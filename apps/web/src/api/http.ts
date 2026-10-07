@@ -179,6 +179,7 @@ export interface HttpClientOptions {
 
 /** The header the API reads the App Check token from (services/api `appcheck.py`). */
 const APP_CHECK_HEADER = "X-Firebase-AppCheck";
+const APP_CHECK_TOKEN = /^[A-Za-z0-9._~+/=-]{1,4096}$/;
 
 export class HttpClient implements TiloClient {
   private readonly base: string;
@@ -209,7 +210,9 @@ export class HttpClient implements TiloClient {
     } catch {
       return init;
     }
-    if (typeof token !== "string" || token === "") return init;
+    // A token is a JWT: base64url characters and dots. Anything else would make `fetch` throw (a bad header
+    // value) and the call would fail as unreachable, so it goes out with no header instead.
+    if (typeof token !== "string" || !APP_CHECK_TOKEN.test(token)) return init;
     const headers = new Headers(init.headers);
     headers.set(APP_CHECK_HEADER, token);
     return { ...init, headers };

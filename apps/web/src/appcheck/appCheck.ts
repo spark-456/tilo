@@ -9,13 +9,18 @@
 // - a deployed host starts `initializeAppCheck` with `ReCaptchaEnterpriseProvider` and token auto-refresh.
 // The Firebase `apiKey` and `projectId` come only from the build (VITE_FIREBASE_API_KEY, VITE_FIREBASE_PROJECT_ID);
 // when either is missing App Check is skipped, one line says so, and the app works as it did before.
-// The getter never rejects, never throws and never hangs: no token (or a start or token request slower than
-// TOKEN_TIMEOUT_MS) is null, and the API only logs a missing token while enforcement is off. The token is never logged.
+// The getter never rejects, never throws and never hangs: one overall deadline (TOKEN_TIMEOUT_MS) covers the start
+// and the token request together, and no token is null (the API only logs a missing token while enforcement is off).
+// After a deadline passes the getter answers null at once for BACKOFF_MS, so a hung SDK does not delay every request
+// and every event poll for the life of the page. A dynamic import that failed is retried after that pause; a
+// start that failed for a reason that cannot change (no config, the SDK refused to start) is not. The token is never logged.
 import type { AppCheck, getToken as GetToken } from "firebase/app-check";
 import { FIREBASE_APP_ID, RECAPTCHA_SITE_KEY } from "./config";
 
-/** The longest the start, or one token request, may take before the call goes out without a header. */
+/** The longest the start plus one token request may take before the call goes out without a header. */
 export const TOKEN_TIMEOUT_MS = 5000;
+/** After a deadline passes (or the SDK could not be loaded) no token is asked for this long. */
+export const BACKOFF_MS = 60_000;
 
 const LOCAL_HOST = /^(localhost|127\.0\.0\.1|\[::1\]|::1|[^/]*\.localhost)$/i;
 
@@ -29,44 +34,73 @@ interface Started {
 
 /** The one start of App Check for the page (a second start throws in the SDK); null when it is not available. */
 let starting: Promise<Started | null> | undefined;
+/** No token is asked for before this time (`Date.now()`). */
+let pausedUntil = 0;
+
+const pause = (): void => {
+  pausedUntil = Date.now() + BACKOFF_MS;
+};
 
 function start(): Promise<Started | null> {
   starting ??= (async (): Promise<Started | null> => {
+    const apiKey: unknown = import.meta.env.VITE_FIREBASE_API_KEY;
+    const projectId: unknown = import.meta.env.VITE_FIREBASE_PROJECT_ID;
+    if (
+      typeof apiKey !== "string" ||
+      apiKey === "" ||
+      typeof projectId !== "string" ||
+      projectId === ""
+    ) {
+      console.info("App Check is off: this build has no Firebase web config.");
+      return null; // cannot change for this page
+    }
+    let app: typeof import("firebase/app");
+    let check: typeof import("firebase/app-check");
     try {
-      const apiKey: unknown = import.meta.env.VITE_FIREBASE_API_KEY;
-      const projectId: unknown = import.meta.env.VITE_FIREBASE_PROJECT_ID;
-      if (
-        typeof apiKey !== "string" ||
-        apiKey === "" ||
-        typeof projectId !== "string" ||
-        projectId === ""
-      ) {
-        console.info("App Check is off: this build has no Firebase web config.");
-        return null;
-      }
-      const { initializeApp } = await import("firebase/app");
-      const sdk = await import("firebase/app-check");
-      const app = initializeApp({ apiKey, projectId, appId: FIREBASE_APP_ID });
-      const appCheck = sdk.initializeAppCheck(app, {
-        provider: new sdk.ReCaptchaEnterpriseProvider(RECAPTCHA_SITE_KEY),
-        isTokenAutoRefreshEnabled: true,
-      });
-      return { appCheck, getToken: sdk.getToken };
+      [app, check] = await Promise.all([import("firebase/app"), import("firebase/app-check")]);
     } catch {
-      return null; // the SDK could not start (blocked script, bad config): no token, the app still works
+      starting = undefined; // a network failure may pass: try again after the pause
+      pause();
+      return null;
+    }
+    try {
+      const appCheck = check.initializeAppCheck(
+        app.initializeApp({ apiKey, projectId, appId: FIREBASE_APP_ID }),
+        {
+          provider: new check.ReCaptchaEnterpriseProvider(RECAPTCHA_SITE_KEY),
+          isTokenAutoRefreshEnabled: true,
+        },
+      );
+      return { appCheck, getToken: check.getToken };
+    } catch {
+      return null; // the SDK refused to start (bad config): no token, the app still works
     }
   })();
   return starting;
 }
 
-/** Resolves `promise`, or null once `ms` has passed or the promise fails. The timer is always cleared. */
-function within<T>(promise: Promise<T>, ms: number): Promise<T | null> {
-  return new Promise<T | null>((resolve) => {
-    const timer = setTimeout(() => resolve(null), ms);
-    promise.then(
-      (value) => {
+async function fetchToken(): Promise<string | null> {
+  const started = await start();
+  if (started === null) return null;
+  try {
+    const result: unknown = await started.getToken(started.appCheck, false);
+    const token = (result as { token?: unknown } | null)?.token;
+    return typeof token === "string" && token !== "" ? token : null;
+  } catch {
+    return null;
+  }
+}
+
+const TIMED_OUT = Symbol("timed out");
+
+/** The token, or null; one deadline for everything, its timer always cleared. */
+function tokenWithin(ms: number): Promise<string | null | typeof TIMED_OUT> {
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => resolve(TIMED_OUT), ms);
+    fetchToken().then(
+      (token) => {
         clearTimeout(timer);
-        resolve(value);
+        resolve(token);
       },
       () => {
         clearTimeout(timer);
@@ -76,21 +110,19 @@ function within<T>(promise: Promise<T>, ms: number): Promise<T | null> {
   });
 }
 
-async function fetchToken(): Promise<string | null> {
-  const started = await within(start(), TOKEN_TIMEOUT_MS);
-  if (started === null) return null;
-  const result: unknown = await within(started.getToken(started.appCheck, false), TOKEN_TIMEOUT_MS);
-  const token = (result as { token?: unknown } | null)?.token;
-  return typeof token === "string" && token !== "" ? token : null;
-}
-
 export function createAppCheckTokenGetter(env: {
   readonly hostname: string;
 }): () => Promise<string | null> {
   if (isLocalHost(env.hostname)) return async () => null;
   return async () => {
     try {
-      return await fetchToken();
+      if (Date.now() < pausedUntil) return null;
+      const token = await tokenWithin(TOKEN_TIMEOUT_MS);
+      if (token === TIMED_OUT) {
+        pause();
+        return null;
+      }
+      return token;
     } catch {
       return null;
     }

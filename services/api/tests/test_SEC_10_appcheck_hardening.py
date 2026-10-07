@@ -173,16 +173,17 @@ def test_SEC_10_keys_past_their_ttl_are_never_served_when_the_refresh_fails(sign
     assert calls["n"] == 3
 
 
-def test_SEC_10_a_three_part_token_over_the_size_cap_is_refused_before_any_key_fetch():
+def test_SEC_10_a_well_formed_signed_token_over_the_size_cap_is_refused_before_any_key_fetch(signer):
     fetches: list[int] = []
-    verifier = _verifier(lambda: fetches.append(1) or {})
-    body = "a" * (appcheck.MAX_TOKEN_CHARS // 2)
-    token = f"{body}.{body}.sig"
+    verifier = _verifier(lambda: fetches.append(1) or {"k1": signer.public_key()})
+    # Every other check passes: header, claims, issuer, audience and a genuine signature. Only the length is wrong.
+    token = _token(signer, padding="x" * appcheck.MAX_TOKEN_CHARS)
     assert len(token) > appcheck.MAX_TOKEN_CHARS and token.count(".") == 2
     with pytest.raises(appcheck.TokenRefused) as refused:
         verifier.verify(token)
     assert refused.value.code == "not_a_jwt"
     assert fetches == []
+    assert _verifier(lambda: {"k1": signer.public_key()}).verify(_token(signer, padding="x" * 100))["sub"]  # control
 
 
 def test_SEC_10_a_genuine_token_at_the_size_cap_boundary_is_judged_on_its_content(signer):

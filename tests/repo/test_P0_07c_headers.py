@@ -47,12 +47,14 @@ def test_P0_07c_headers_apply_to_all_routes(repo_root: pathlib.Path) -> None:
 
 # SEC-10 (documented test change, like P0-07e's base-uri): the web client's App Check loads reCAPTCHA Enterprise and
 # exchanges its challenge at the App Check endpoint, so the policy names exactly these off-origin sources, per
-# directive (Google's documented minimum; the Firebase SDK needs nothing else), and no other directive has any.
+# directive, and no other directive has any. The hosts are the ones the web SDK itself calls: @firebase/app-check
+# 0.13.1 exchanges at https://content-firebaseappcheck.googleapis.com/v1 (not firebaseappcheck.googleapis.com, which
+# is the server-side host the API reads keys from) and loads the reCAPTCHA script from www.google.com/recaptcha/.
 # tests/repo/test_SEC_10_appcheck_client_docs_and_csp.py pins the same set; everything else stays 'self' only.
 OFF_ORIGIN_ALLOWED = {
     "script-src": ["https://www.google.com/recaptcha/", "https://www.gstatic.com/recaptcha/"],
     "frame-src": ["https://www.google.com/recaptcha/"],
-    "connect-src": ["https://firebaseappcheck.googleapis.com"],
+    "connect-src": ["https://content-firebaseappcheck.googleapis.com"],
 }
 
 

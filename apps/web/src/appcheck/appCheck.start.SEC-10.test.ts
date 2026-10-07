@@ -16,11 +16,12 @@ const sdk = vi.hoisted(() => {
 });
 
 vi.mock("firebase/app", () => ({ initializeApp: sdk.initializeApp }));
-vi.mock("firebase/app-check", () => ({
+const workingAppCheck = () => ({
   initializeAppCheck: sdk.initializeAppCheck,
   getToken: sdk.getToken,
   ReCaptchaEnterpriseProvider: sdk.ReCaptchaEnterpriseProvider,
-}));
+});
+vi.mock("firebase/app-check", () => workingAppCheck());
 
 const DEPLOYED = "example-project.web.app";
 
@@ -113,9 +114,9 @@ describe("SEC-10 start-up is lazy and bounded", () => {
       answer = t;
     });
     await vi.waitFor(() => expect(sdk.getToken).toHaveBeenCalled());
-    await vi.advanceTimersByTimeAsync(TOKEN_TIMEOUT_MS - 100);
+    await vi.advanceTimersByTimeAsync(TOKEN_TIMEOUT_MS - 1000);
     expect(answer).toBeUndefined(); // still waiting inside the bound
-    await vi.advanceTimersByTimeAsync(200);
+    await vi.advanceTimersByTimeAsync(1100);
     expect(answer).toBeNull();
   });
 
@@ -126,5 +127,66 @@ describe("SEC-10 start-up is lazy and bounded", () => {
     await vi.waitFor(() => expect(sdk.getToken).toHaveBeenCalled());
     await expect(answer).resolves.toBe("fake-token");
     expect(vi.getTimerCount()).toBe(0);
+  });
+});
+
+describe("SEC-10 a hung or failed SDK does not cost every request", () => {
+  const FAKE: { toFake: ("setTimeout" | "clearTimeout" | "Date")[] } = {
+    toFake: ["setTimeout", "clearTimeout", "Date"],
+  };
+
+  it("SEC-10 after a deadline the getter answers null at once for BACKOFF_MS, then asks again", async () => {
+    vi.useFakeTimers(FAKE);
+    sdk.getToken.mockImplementation(() => new Promise<never>(() => undefined));
+    const { createAppCheckTokenGetter, TOKEN_TIMEOUT_MS, BACKOFF_MS } = await load();
+    const getter = createAppCheckTokenGetter({ hostname: DEPLOYED });
+
+    const first = getter();
+    await vi.waitFor(() => expect(sdk.getToken).toHaveBeenCalledTimes(1));
+    await vi.advanceTimersByTimeAsync(TOKEN_TIMEOUT_MS + 1);
+    await expect(first).resolves.toBeNull();
+
+    await expect(getter()).resolves.toBeNull(); // paused: no wait, no new SDK call
+    await expect(getter()).resolves.toBeNull();
+    expect(sdk.getToken).toHaveBeenCalledTimes(1);
+    expect(vi.getTimerCount()).toBe(0);
+
+    await vi.advanceTimersByTimeAsync(BACKOFF_MS);
+    sdk.getToken.mockImplementation(async () => ({ token: "fake-token" }));
+    await expect(getter()).resolves.toBe("fake-token");
+  });
+
+  it("SEC-10 a dynamic import that failed is retried after the pause, not cached as null for the page's life", async () => {
+    vi.useFakeTimers(FAKE);
+    vi.doMock("firebase/app-check", () => {
+      throw new Error("chunk failed to load");
+    });
+    try {
+      const { createAppCheckTokenGetter, BACKOFF_MS } = await load();
+      const getter = createAppCheckTokenGetter({ hostname: DEPLOYED });
+      await expect(getter()).resolves.toBeNull();
+      expect(sdk.initializeAppCheck).not.toHaveBeenCalled();
+
+      vi.doMock("firebase/app-check", workingAppCheck); // the network is back
+      await expect(getter()).resolves.toBeNull(); // still inside the pause
+      await vi.advanceTimersByTimeAsync(BACKOFF_MS + 1);
+      await expect(getter()).resolves.toBe("fake-token");
+      expect(sdk.initializeAppCheck).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.doMock("firebase/app-check", workingAppCheck);
+    }
+  });
+
+  it("SEC-10 an SDK that refuses to start is not retried", async () => {
+    vi.useFakeTimers(FAKE);
+    sdk.initializeAppCheck.mockImplementationOnce(() => {
+      throw new Error("appCheck/already-initialized");
+    });
+    const { createAppCheckTokenGetter, BACKOFF_MS } = await load();
+    const getter = createAppCheckTokenGetter({ hostname: DEPLOYED });
+    await expect(getter()).resolves.toBeNull();
+    await vi.advanceTimersByTimeAsync(BACKOFF_MS + 1);
+    await expect(getter()).resolves.toBeNull();
+    expect(sdk.initializeAppCheck).toHaveBeenCalledTimes(1);
   });
 });

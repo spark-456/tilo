@@ -10,7 +10,7 @@ import {
   useState,
   useSyncExternalStore,
 } from "react";
-import { API_URL } from "../../api/ClientProvider";
+import { API_URL, appCheckToken } from "../../api/ClientProvider";
 import { API_METHODS, type Api, type ApiMethod } from "../api/index";
 import { parkApi } from "../api/select";
 import type { ApiResult, Source } from "../api/types";
@@ -74,7 +74,8 @@ const windowSize = () => ({ vw: window.innerWidth, vh: window.innerHeight });
 
 export function ParkProvider({ api, navigate, schedule, viewport, children }: ParkProviderProps) {
   const [held] = useState<Held>(() => {
-    const raw = api ?? parkApi({ VITE_TILO_API_URL: API_URL });
+    // SEC-10: the live Api's requests carry the App Check token; none on local hosts or in fixture mode.
+    const raw = api ?? parkApi({ VITE_TILO_API_URL: API_URL }, appCheckToken);
     let store: ParkStore | null = null;
     const wrapped = noting(raw, (source) => store?.noteSource(source));
     const timer = schedule ?? realSchedule;

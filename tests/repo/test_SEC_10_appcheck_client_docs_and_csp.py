@@ -10,8 +10,8 @@
 
 Static only: no network, no cloud credentials.
 
-AMBIGUITY (documented, PRD 6.5 / SEC-02 give no origin list): the CSP additions pinned are Google's own
-documented minimum for reCAPTCHA Enterprise and the App Check REST exchange;
+AMBIGUITY (documented, PRD 6.5 / SEC-02 give no origin list): the CSP additions pinned are the
+origins the SDK itself uses for reCAPTCHA Enterprise and the App Check exchange (content-firebaseappcheck);
 `test_P0_07c_csp_forbids_framing_and_off_origin_loads` asserts "no off-origin source"
 and will need a documented test change in the builder's branch, as P0-07e did for
 `base-uri`, to allow exactly the origins pinned here and no others.
@@ -26,10 +26,13 @@ import re
 FIREBASE_APP_ID = "1:379216745263:web:8cda5846cf882c2cefc7da"
 RECAPTCHA_SITE_KEY = "6LdlsOItAAAAAEhO_aq9zmtbQue6Rni2ZDUDuRTe"
 
-# Origins Google documents for reCAPTCHA Enterprise (script, frame) and the App Check token exchange (connect).
+# Origins the web SDK uses: reCAPTCHA Enterprise (script, frame) and the App Check token exchange (connect). The
+# exchange host is the SDK's BASE_ENDPOINT (@firebase/app-check 0.13.1); the first pin here,
+# firebaseappcheck.googleapis.com, was the server-side host and was wrong for the browser (corrected by the PR-2
+# builder after the security review).
 RECAPTCHA_SCRIPT_ORIGINS = {"https://www.google.com/recaptcha/", "https://www.gstatic.com/recaptcha/"}
 RECAPTCHA_FRAME_ORIGIN = "https://www.google.com/recaptcha/"
-APPCHECK_CONNECT_ORIGIN = "https://firebaseappcheck.googleapis.com"
+APPCHECK_CONNECT_ORIGIN = "https://content-firebaseappcheck.googleapis.com"
 
 
 def _section_7(repo_root: pathlib.Path) -> str:

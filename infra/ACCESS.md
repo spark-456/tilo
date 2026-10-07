@@ -145,10 +145,20 @@ Never requested: `mail.google.com`, `gmail.modify`, full `drive`.
 4. App Check (SEC-10): done in the console, recorded here. The Firebase web app
    `tilo-web` has app id `1:379216745263:web:8cda5846cf882c2cefc7da` and the
    reCAPTCHA Enterprise score-based site key is
-   `6LdlsOItAAAAAEhO_aq9zmtbQue6Rni2ZDUDuRTe`. Both are public values (the web
+   `6LdlsOItAAAAAEhO_aq9zmtbQue6Rni2ZDUDuRTe`. Both ids are public values (the web
    client ships them, `apps/web/src/appcheck/config.ts`), not secrets. The web
    `apiKey` and `projectId` are not in the repo either: the deploy build reads
-   them from `firebase apps:sdkconfig` (docs/deploy-dev.md). Enforcement is OFF
+   them from `firebase apps:sdkconfig` (docs/deploy-dev.md). The browser `apiKey`
+   is "public" only if it is restricted: it is baked into the public bundle, and
+   this project also uses Gemini Developer API keys. OWNER STEP, BEFORE the first
+   `just deploy-web` that bakes the key in: in the Google Cloud console
+   (APIs and Services, Credentials) open the Firebase web key and (a) set an API
+   restriction to the Firebase App Check API only, (b) set website restrictions
+   to the referrers `https://essential-wares-510320-f0.web.app/*` and
+   `https://essential-wares-510320-f0.firebaseapp.com/*`, (c) confirm it cannot
+   call `generativelanguage.googleapis.com` or any other paid API. Only then run
+   `just deploy-web` with `TILO_BAKE_FIREBASE_KEY=1` set; without that variable
+   the recipe builds with no Firebase config and App Check is skipped. Enforcement is OFF
    everywhere and stays off until the owner switches it on: in `tilo-api` by
    `TILO_APPCHECK_ENFORCE=1` on the Cloud Run service, and for Firestore and
    Storage in the Firebase console, only after the deployed client sends tokens
