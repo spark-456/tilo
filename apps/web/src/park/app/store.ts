@@ -5,6 +5,7 @@
 import { TiloApiError } from "../../api/http";
 import { needsLeft as countNeedsLeft, makeWorld, worlds } from "../api/fixtures/worlds";
 import type { Api } from "../api/index";
+import { NotBuilt } from "../api/liveApi";
 import type { Dec, Decision, DecisionKey, Source, TierKey, World } from "../api/types";
 import { TOAST_MS } from "../components/Toast";
 import type { Motion, PageId, Params } from "./AppCtx";
@@ -12,6 +13,9 @@ import { parkPath } from "./router";
 
 /** A live answer that failed in a way the Api did not describe. */
 const NOT_RECORDED = "Tilo could not record that answer. Nothing was sent.";
+/** What a start that failed says when the Api did not describe it, or the API is not connected (FR-UX-13). */
+const NOT_STARTED = "Tilo could not start that task. Try again.";
+const NOT_CONNECTED = "Starting work is not connected yet.";
 
 /** Runs `fn` after `ms` and returns the function that cancels it. */
 export type Schedule = (fn: () => void, ms: number) => () => void;
@@ -52,7 +56,11 @@ export interface ParkStore {
   subscribe(listener: () => void): () => void;
   decide(key: DecisionKey): void;
   undo(key: DecisionKey): void;
+  /** The fixture path: adds the world at once and returns it. */
   addWorld(mode: TierKey, query: string): World;
+  /** The live path (FR-UX-13): the Api is asked first and the promise settles with whether the server accepted
+   * the task; a world is added, and Open offered, only then (HR-1). The shell picks one of the two (`useApp`). */
+  startWorld(mode: TierKey, query: string): Promise<boolean>;
   toast(message: string, actionLabel?: string, action?: () => void): void;
   dismissToast(): void;
   setPref(key: string, value: unknown): void;
@@ -116,6 +124,8 @@ export function createParkStore({ api, navigate, schedule }: ParkStoreDeps): Par
   let decisions: readonly Decision[] = [];
   // Live answers in flight: a second tap sends nothing until the first one is settled.
   const pending = new Set<DecisionKey>();
+  // The live start in flight: a second call gets the same answer and sends nothing.
+  let starting: Promise<boolean> | null = null;
   let cancelToast: (() => void) | null = null;
   let cancelLoader: (() => void) | null = null;
 
@@ -205,6 +215,42 @@ export function createParkStore({ api, navigate, schedule }: ParkStoreDeps): Par
       });
     },
     undo,
+    startWorld(mode, query) {
+      // Live (FR-UX-13): the intake call is made first; the world is added, and Open offered, only after the
+      // server accepted the task. The task is not approved yet, so Open goes to its understanding screen and
+      // nothing says it is running (HR-1). A failure adds nothing and says why.
+      if (starting) return starting;
+      starting = api.startWorld(mode, query).then(
+        ({ data }) => {
+          starting = null;
+          const { world } = data;
+          update({
+            added: [world, ...state.added],
+            toast: arm(
+              `“${world.short}” was sent to Tilo. Open it to review the brief.`,
+              "Open",
+              () => {
+                dismissToast();
+                navigate(`/task/${encodeURIComponent(world.id)}/understanding`);
+              },
+            ),
+          });
+          return true;
+        },
+        (e: unknown) => {
+          starting = null;
+          toast(
+            e instanceof TiloApiError
+              ? e.message
+              : e instanceof NotBuilt
+                ? NOT_CONNECTED
+                : NOT_STARTED,
+          );
+          return false;
+        },
+      );
+      return starting;
+    },
     addWorld(mode, query) {
       const world = makeWorld(mode, query, state.added.length + 1);
       quiet(api.startWorld(mode, query));
