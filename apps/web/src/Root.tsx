@@ -7,14 +7,31 @@ import { Suspense, lazy } from "react";
 import { isKeptPath } from "./keptPaths";
 import { isParkPath } from "./park/app/router";
 import { usePathname } from "./router";
+import "./park/tokens/park.css";
+import "./rootFrame.css";
 
 // Both apps are chunks: the landing (Park Home) never ships the old app's shell, and a kept screen never
 // loads the Park app (NFR-01).
 const App = lazy(() => import("./App").then((m) => ({ default: m.App })));
 const ParkApp = lazy(() => import("./park/app/ParkApp"));
 
+// While a chunk is on its way the page is a plain frame in the colour the real page starts with (the Park boot
+// splash's paper; the old app's surface), not a blank page: no text, no motion, fixed to the viewport, so the page
+// arriving moves nothing (NFR-01, CLS 0). The Park frame carries `data-park` only to read the Park tokens.
+function RootFrame({ park }: { park: boolean }) {
+  return (
+    <div
+      className="root-frame"
+      data-testid="root-frame"
+      data-app={park ? "park" : "kept"}
+      {...(park ? { "data-park": "" } : {})}
+      aria-hidden="true"
+    />
+  );
+}
+
 export function Root() {
   const pathname = usePathname();
   const park = isParkPath(pathname) || !isKeptPath(pathname);
-  return <Suspense fallback={null}>{park ? <ParkApp /> : <App />}</Suspense>;
+  return <Suspense fallback={<RootFrame park={park} />}>{park ? <ParkApp /> : <App />}</Suspense>;
 }

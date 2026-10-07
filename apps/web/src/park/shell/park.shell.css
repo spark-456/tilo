@@ -119,6 +119,13 @@
   pointer-events: none;
   background: var(--ground);
 }
+/* The poster stands in for the city until it is drawn (NFR-01): the same fixed layer, no picture, no motion. */
+[data-park] .park-shell__poster {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: var(--ground);
+}
 [data-park] .park-shell__scene {
   position: absolute;
   left: 50%;

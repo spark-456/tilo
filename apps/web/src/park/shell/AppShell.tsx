@@ -3,7 +3,7 @@
 // It renders no `[data-park]` root (ParkApp owns that one) and reads everything from ParkProvider: the app,
 // the store and the Api. The notifications and the user come through the Api on mount, so a fixture Api
 // raises the "Sample data" chip without any page asking for data. The city's cars and walkers run on Home (cityMotion.ts).
-import { type ReactNode, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { type ReactNode, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import type { Decision, Notification, User } from "../api/types";
 import type { PageId } from "../app/AppCtx";
 import { useApp, useExpectsSample, useParkApi, useParkStore } from "../app/context";
@@ -17,10 +17,10 @@ import { NotificationsPopover } from "./NotificationsPopover";
 import { TopNav } from "./TopNav";
 import { WorldLoader } from "./WorldLoader";
 import { useCityMotion } from "./cityMotion";
+import { useCityScene } from "./cityStart";
 import { loadShellFonts } from "./fonts";
 import { type Bar, useLeavingCard, useMotionOff, usePageSwap } from "./motion";
 import "./park.shell.css";
-import { backdropScene } from "./scene";
 
 const SIGN_OUT = "This is a prototype, so you stay signed in";
 
@@ -75,22 +75,18 @@ export function AppShell({ children }: { children: ReactNode }) {
     };
   }, [api, store]);
 
-  // The first city is drawn after the boot splash has been committed and the design fonts have loaded
-  // (the shell stays hidden under the splash until then, so no text swaps face and moves the nav).
+  // The shell is shown once the design fonts have loaded (it stays hidden under the splash until then, so no text
+  // swaps face and moves the nav). The city is not part of that: it is drawn after the page (cityStart.ts).
   useEffect(() => {
     let live = true;
-    backdropScene(app.time, city.motion);
     loadShellFonts().then(() => {
       if (live) setReady(true);
     });
     return () => {
       live = false;
     };
-  }, [app.time, city.motion]);
-  const scene = useMemo(
-    () => (ready ? backdropScene(app.time, city.motion) : null),
-    [ready, app.time, city.motion],
-  );
+  }, []);
+  const scene = useCityScene(app.time, city.motion, ready);
 
   const page = route?.page ?? null;
   // A tab or menu click fades the old page out and the new one in. Everything else (the browser's back button, a

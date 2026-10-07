@@ -3,6 +3,7 @@
 // `--veil` dims it on every page but Home. It is drawn once per `time|motion` (scene.ts); its cars and walkers
 // run on their own and are paused (`data-paused`) under the veil, while the world loader is open and in a hidden tab, and half are not drawn
 // (`data-lite`) in a narrow window or on a weak device. Its three pin points go to `app.pins` through the provider (useReportPins).
+// The city is drawn after the page (cityStart.ts); until then a poster fills the same fixed layer, so the city arriving moves nothing.
 import { useEffect } from "react";
 import { useReportPins } from "../app/context";
 import { sceneScale } from "../app/pins";
@@ -38,6 +39,7 @@ export function CityBackdrop({
       data-paused={veiled || hidden || loading ? "" : undefined}
       data-lite={lite ? "" : undefined}
     >
+      {scene ? null : <div className="park-shell__poster" data-testid="park-shell-poster" />}
       <div className="park-shell__scene" style={{ transform: `scale(${scale.toFixed(4)})` }}>
         {scene?.el}
       </div>

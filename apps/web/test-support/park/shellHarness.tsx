@@ -9,6 +9,7 @@ import type { AppCtx } from "../../src/park/app/AppCtx";
 import { ParkProvider, useApp, useParkApi, useParkStore } from "../../src/park/app/context";
 import type { ParkStore } from "../../src/park/app/store";
 import { AppShell } from "../../src/park/shell/AppShell";
+import { CITY_DEFER_MS } from "../../src/park/shell/cityStart";
 import { fakeApi, fakeScheduler } from "./appHarness";
 import { mount } from "./componentsHarness";
 
@@ -70,7 +71,8 @@ export function mountShell(ui: ReactNode, o: ShellOpts = {}) {
   return { m, api, navigate, sch, resize };
 }
 
-/** The AppShell around a stand-in page, with the Api reads settled (notifications, user, sample flag). */
+/** The AppShell around a stand-in page, with the Api reads settled (notifications, user, sample flag) and the
+ * city drawn: NFR-01-LANDING draws it after the page, once the scheduler's CITY_DEFER_MS timer fires. */
 export async function mountApp(o: ShellOpts = {}) {
   const r = mountShell(
     <AppShell>
@@ -79,5 +81,9 @@ export async function mountApp(o: ShellOpts = {}) {
     o,
   );
   await settle();
+  const due = r.sch.live().filter((t) => t.ms === CITY_DEFER_MS);
+  act(() => {
+    for (const t of due) r.sch.fire(t);
+  });
   return r;
 }

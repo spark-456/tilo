@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 // NFR-01 (PRD 17.1): landing page to interactive <= 2.0 s desktop, <= 3.5 s on a mid-range phone on 4G. The city
-// backdrop (about nine full-size pictures and 130 cars and walkers, each its own SVG) is what a phone cannot
+// backdrop (about ten full-size SVG pictures and twenty-odd cars and walkers, each its own SVG) is what a phone cannot
 // afford before the first character can be typed, so the shell paints its page first and draws the city
 // afterwards (the supervisor's ruling for ticket NFR-01-LANDING):
 //   - the first commit of the shell does no scene work: scene() is not called and no city is mounted;

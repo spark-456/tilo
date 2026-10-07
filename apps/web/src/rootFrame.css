@@ -1,0 +1,14 @@
+/* The frame Root shows while an app chunk arrives (NFR-01): a plain fixed box in the colour of the page that
+   follows (the Park boot splash's paper, the old app's surface), so a cold chunk is not a blank page and
+   the real page arriving moves nothing. No text, no motion. */
+.root-frame {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+}
+.root-frame[data-app="park"] {
+  background: var(--paper);
+}
+.root-frame[data-app="kept"] {
+  background: var(--color-surface-0);
+}

@@ -20,6 +20,7 @@ import {
 } from "../../../test-support/park/shellHarness";
 import { ParkApp } from "../app/ParkApp";
 import { AppShell } from "./AppShell";
+import { CITY_DEFER_MS } from "./cityStart";
 
 vi.mock("../engines/park", async () =>
   (await import("../../../test-support/park/shellEngine")).parkMock(),
@@ -150,6 +151,12 @@ describe("WEB_3b_parkapp: the real ParkApp wears the shell", () => {
 
   it("WEB_3b_parkapp_one_root_with_the_nav_the_backdrop_and_a_single_main_holding_the_page", async () => {
     const m = await visit("/park/home");
+    // Updated for NFR-01-LANDING: the city is drawn after the page, CITY_DEFER_MS after the shell is ready (the real
+    // scheduler runs here); the nav, the one main and the page are there at once.
+    expect(qa(m.container, '[data-testid="fake-scene"]')).toHaveLength(0);
+    await act(async () => {
+      await new Promise((done) => setTimeout(done, CITY_DEFER_MS + 100));
+    });
     const roots = qa(m.container, "[data-park]");
     expect(roots).toHaveLength(1);
     expect(qa(roots[0] as HTMLElement, "header nav[aria-label]")).toHaveLength(1);
