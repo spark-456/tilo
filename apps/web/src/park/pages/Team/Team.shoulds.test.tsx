@@ -48,6 +48,13 @@ describe("FR-TEAM-01 invites", () => {
     }
   });
 
+  it("FR-TEAM-01 isValidEmail refuses Unicode control and format characters", () => {
+    for (const c of ["", "​", "‮", "⁦", "﻿", "­"]) {
+      expect(isValidEmail(`a${c}b@c.co`), c.charCodeAt(0).toString(16)).toBe(false);
+      expect(isValidEmail(`ab@c${c}.co`), c.charCodeAt(0).toString(16)).toBe(false);
+    }
+  });
+
   it("FR-TEAM-01 the Invite button is disabled until the email is valid", async () => {
     const { root } = await renderTeam(makeApp());
     const btn = buttonNamed(root, "Invite");
