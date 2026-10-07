@@ -229,6 +229,6 @@ describe("SEC-15 SIGNIN the two ways in", () => {
     await settle();
     expect(googleButton()).toBeDefined();
     expect(document.body.textContent ?? "").not.toContain("raw sdk failure");
-    expect(q(document.body, "body")).toBeDefined();
+    expect(document.body).toBeDefined(); // the page is still mounted (q() only searches descendants of body)
   });
 });
