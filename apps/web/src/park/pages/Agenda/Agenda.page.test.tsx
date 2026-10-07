@@ -160,9 +160,9 @@ describe("WEB_9_agenda_boards: pins", () => {
   it("WEB_9_agenda_open_and_review_go_to_the_world", async () => {
     const { container, ...h } = await renderAgenda();
     click(byText(pin(container, "m2"), "button", "Open"));
-    expect(h.navigate).toHaveBeenLastCalledWith("/park/world/invoice");
+    expect(h.navigate).toHaveBeenLastCalledWith("/world/invoice");
     click(byText(pin(container, "t1"), "button", "Review and approve"));
-    expect(h.navigate).toHaveBeenLastCalledWith("/park/world/k1");
+    expect(h.navigate).toHaveBeenLastCalledWith("/world/k1");
     click(q(pin(container, "t1"), 'button[aria-label="Mark as done"]'));
     expect(h.navigate).toHaveBeenCalledTimes(3);
     expect(h.spy.decide).not.toHaveBeenCalled();

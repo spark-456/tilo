@@ -3,14 +3,14 @@ export interface PageSpec {
   name: string;
   /** Hash on `Tilo App.dc.html` (the design's own deep link, README "Routes"). */
   designHash: string;
-  /** Route on our app server. */
+  /** Route on our app server (the root path; /park/<page> is only an alias). */
   path: string;
 }
 
 const page = (name: string, suffix = ""): PageSpec => ({
   name,
   designHash: `${name}${suffix}`,
-  path: `/park/${name}${suffix}`,
+  path: name === "home" ? "/" : `/${name}${suffix}`,
 });
 
 // The World page is only reachable with a world id; k1 is the City in the design's data.

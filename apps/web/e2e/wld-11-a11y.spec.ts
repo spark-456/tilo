@@ -18,7 +18,7 @@ test.describe("FR-WLD-11 accessibility", () => {
   }) => {
     test.setTimeout(90_000); // a cold Vite start plus a dozen key presses, under a loaded machine
     await page.setViewportSize(DESKTOP);
-    await gotoStage(page, "/?fixture=village-basic");
+    await gotoStage(page, `${W}/stage?fixture=village-basic`);
     const outline = page.getByRole("list", { name: "World objects" });
     const items = outline.getByRole("button");
     await expect(outline.getByRole("button", { name: /Gate G1/ })).toBeAttached();
@@ -51,7 +51,7 @@ test.describe("FR-WLD-11 accessibility", () => {
     page,
   }) => {
     await page.setViewportSize(DESKTOP);
-    await gotoStage(page, "/?fixture=village-basic");
+    await gotoStage(page, `${W}/stage?fixture=village-basic`);
     const outline = page.getByRole("list", { name: "World objects" });
     const first = outline.getByRole("button").first();
     await first.focus();
@@ -69,7 +69,7 @@ test.describe("FR-WLD-11 accessibility", () => {
     page,
   }) => {
     await page.setViewportSize(DESKTOP);
-    await gotoStage(page, `${W}?${FAST}`);
+    await gotoStage(page, `${W}/stage?${FAST}`);
     const outline = page.getByRole("list", { name: "World objects" });
     await expect(outline.getByRole("button", { name: /Mail Room/ })).toBeAttached();
     await expect(outline.getByRole("button", { name: /Gate G1/ })).toBeAttached();
@@ -79,7 +79,7 @@ test.describe("FR-WLD-11 accessibility", () => {
     page,
   }) => {
     await page.setViewportSize(DESKTOP);
-    await gotoStage(page, "/?fixture=village-basic");
+    await gotoStage(page, `${W}/stage?fixture=village-basic`);
     const ring = (el: Element) => {
       const s = getComputedStyle(el);
       return { width: s.outlineWidth, style: s.outlineStyle, color: s.outlineColor };
@@ -143,7 +143,7 @@ test.describe("FR-WLD-11 accessibility", () => {
   test("FR_WLD_11 reduced motion: keyboard pan jumps at once", async ({ page }) => {
     await page.setViewportSize(DESKTOP);
     await page.emulateMedia({ reducedMotion: "reduce" });
-    await gotoStage(page, "/?fixture=village-basic");
+    await gotoStage(page, `${W}/stage?fixture=village-basic`);
     const before = await readCamera(page);
     await page.getByTestId("stage-frame").focus();
     await page.keyboard.press("ArrowRight");

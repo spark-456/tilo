@@ -65,7 +65,8 @@ async function stageCenter(page: Page): Promise<{ x: number; y: number }> {
 }
 
 /** A point on the stage that nothing covers. The Start card sits over the middle of the stage on
- * "/" (Bundle D), so a real mouse wheel at the centre would land on the card, not the stage. */
+ * "/" (Bundle D), so a real mouse wheel at the centre would land on the card, not the stage. (WEB-CUTOVER: the
+ * stage is at /world/:id/stage now, nothing covers it, and the scan stays as the guard.) */
 async function openStagePoint(page: Page): Promise<{ x: number; y: number }> {
   const box = await page.getByTestId("stage-frame").boundingBox();
   if (!box) throw new Error("stage-frame has no layout box");
