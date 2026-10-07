@@ -169,6 +169,18 @@ export const GROUPS: [string, (v: PinVm) => boolean][] = [
   ["DONE", (v) => !v.pin.suggested && v.done],
 ];
 
+/** How many pins each board draws while `drawn` pins have been drawn in all (FR-UX-12: the boards are drawn one
+ * after the other, top to bottom, a few pins per task). `null` is a board not started yet: it only holds its cell
+ * in the grid, so nothing already drawn moves. A board starts when the ones before it are complete. */
+export function boardLimits(counts: readonly number[], drawn: number): (number | null)[] {
+  let before = 0;
+  return counts.map((n) => {
+    const left = drawn - before;
+    before += n;
+    return left < 0 ? null : Math.min(n, left);
+  });
+}
+
 /** A new pin lands after the board's suggestions, before everything else. */
 export function addPin(pins: AgendaPin[], board: BoardKey, title: string, id: string): AgendaPin[] {
   const fresh: AgendaPin = {
