@@ -114,6 +114,10 @@ conformance:
 vertex-smoke *args:
     uv run python packages/providers/scripts/live_vertex_smoke.py {{args}}
 
+# PL-02 schema probe: seven tiny Director-profile calls (no schema, json mode, sanitized/raw schema, thinking) to find what Vertex refuses. Refuses unless the user sets the live switch; `just vertex-probe-schema --dry-run` is free.
+vertex-probe-schema *args:
+    uv run python packages/providers/scripts/live_vertex_probe_schema.py {{args}}
+
 # PL-LIVE-E2E (#340): one bank case through the real pipeline. Live only when the user sets LIVE=1; `--dry-run` and `--replay` are free.
 live-e2e *args:
     uv run python evals/scripts/live_e2e.py {{args}}

@@ -30,6 +30,7 @@ from tilo_providers.config import load_providers_config
 from tilo_providers.errors import RequestError
 from tilo_providers.google_adapter import GoogleModelProvider
 from tilo_providers.interfaces import GenerateRequest
+from tilo_providers.schema_subset import to_gemini_schema
 from tilo_providers.vertex_smoke import classify
 
 
@@ -72,7 +73,8 @@ def test_PL_02_the_director_schema_reaches_the_send_through_the_real_sdk(
     assert len(sent) == 1
     generation = sent[0]["generationConfig"]
     assert generation["responseMimeType"] == "application/json"
-    assert generation["responseJsonSchema"] == json.loads(json.dumps(schema)), "the schema goes out unchanged"
+    # the schema goes out as JSON Schema, cut to Gemini's subset (see test_PL_02_schema_subset_real_sdk.py)
+    assert generation["responseJsonSchema"] == json.loads(json.dumps(to_gemini_schema(schema)))
     assert "responseSchema" not in generation
     assert generation["maxOutputTokens"] == 16384
 
