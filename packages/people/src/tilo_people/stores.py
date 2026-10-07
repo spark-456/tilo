@@ -77,7 +77,11 @@ def _at(record: Mapping[str, Any], path: str) -> Any:
 
 
 class MemoryStore:
-    """A `RecordStore` for one kind of `INDEXES`, atomic per call under one lock."""
+    """A `RecordStore` for one kind of `INDEXES`, atomic per call under one lock. `MemoryStore("person")` is the person
+    store, which also holds the address reservations and the founder marker (PPL-11c-FS); no other kind has those."""
+
+    def __new__(cls, kind: str) -> MemoryStore:
+        return super().__new__(_PersonMemoryStore if cls is MemoryStore and kind == "person" else cls)
 
     def __init__(self, kind: str) -> None:
         if not isinstance(kind, str) or kind not in INDEXES:
@@ -86,10 +90,6 @@ class MemoryStore:
         self._schema = f"{kind}.schema.json"
         self._lock = threading.Lock()
         self._rows: dict[tuple[str, str], tuple[int, dict[str, Any]]] = {}
-        # The person store only (PPL-11c-FS): one reservation per person for its lower-cased address, and the org's
-        # founder marker. Both change under `_lock`, in the same step as the record.
-        self._emails: dict[tuple[str, str], str] = {}
-        self._founders: dict[str, str] = {}
 
     def __repr__(self) -> str:
         return f"MemoryStore(kind={self.kind!r})"
@@ -159,42 +159,10 @@ class MemoryStore:
             del self._rows[key]
 
     def _reserve(self, key: tuple[str, str], record: Mapping[str, Any]) -> None:
-        """Holds the record's address for its person (person store only); `EmailTaken` if another person holds it."""
-        if self.kind != "person":
-            return
-        slot = (key[0], str(record["email"]).lower())
-        if self._emails.setdefault(slot, key[1]) != key[1]:
-            raise EmailTaken(f"EmailTaken: person {key[1]}")
+        """Hook of the person store (an address reservation); called under `_lock`."""
 
     def _release(self, key: tuple[str, str], record: Mapping[str, Any]) -> None:
-        if self.kind == "person":
-            self._emails.pop((key[0], str(record["email"]).lower()), None)
-
-    def create_founder(self, record: Mapping[str, Any]) -> Stored:
-        """Person store only: the founder marker, the person and its address, in one step. Refused `OrgAlreadyFounded`
-        when the org has a marker or any person, then `AlreadyExists` (id), then `EmailTaken`; nothing is written."""
-        if self.kind != "person":
-            raise PeopleInputError("only the person store founds an org")
-        key = self._checked(record)
-        if record.get("org_role") != "owner":
-            raise PeopleInputError("a founder is an owner")
-        copied = copy.deepcopy(dict(record))
-        with self._lock:
-            if key[0] in self._founders or any(org == key[0] for org, _ in self._rows):
-                raise OrgAlreadyFounded("OrgAlreadyFounded")
-            if key in self._rows:
-                raise AlreadyExists(f"AlreadyExists: person {key[1]}")
-            self._reserve(key, copied)
-            self._rows[key] = (1, copied)
-            self._founders[key[0]] = key[1]
-        return Stored(self.kind, copy.deepcopy(copied), 1)
-
-    def founded(self, org_id: str) -> bool:
-        """Person store only: is there a founder marker for the org (never removed, even when everyone is erased)."""
-        if self.kind != "person":
-            raise PeopleInputError("only the person store founds an org")
-        with self._lock:
-            return isinstance(org_id, str) and org_id in self._founders
+        """Hook of the person store; called under `_lock`."""
 
     def list(self, org_id: str, field: str | None = None, value: str | None = None) -> tuple[Stored, ...]:
         if field is not None and (not isinstance(field, str) or field not in INDEXES[self.kind]):
@@ -211,6 +179,47 @@ class MemoryStore:
                 for _, (version, rec) in rows
                 if field is None or _at(rec, field) == value
             )
+
+
+class _PersonMemoryStore(MemoryStore):
+    """The person store: one reservation per person for its lower-cased address and the org's founder marker, both
+    changed under `_lock`, in the same step as the record (the Firestore store does the same in a transaction)."""
+
+    def __init__(self, kind: str) -> None:
+        super().__init__(kind)
+        self._emails: dict[tuple[str, str], str] = {}
+        self._founders: dict[str, str] = {}
+
+    def _reserve(self, key: tuple[str, str], record: Mapping[str, Any]) -> None:
+        """Holds the record's address for its person; `EmailTaken` if another person holds it."""
+        slot = (key[0], str(record["email"]).lower())
+        if self._emails.setdefault(slot, key[1]) != key[1]:
+            raise EmailTaken(f"EmailTaken: person {key[1]}")
+
+    def _release(self, key: tuple[str, str], record: Mapping[str, Any]) -> None:
+        self._emails.pop((key[0], str(record["email"]).lower()), None)
+
+    def create_founder(self, record: Mapping[str, Any]) -> Stored:
+        """The founder marker, the person and its address, in one step. Refused `OrgAlreadyFounded` when the org has a
+        marker or any person, then `AlreadyExists` (id), then `EmailTaken`; a refusal writes nothing."""
+        key = self._checked(record)
+        if record.get("org_role") != "owner":
+            raise PeopleInputError("a founder is an owner")
+        copied = copy.deepcopy(dict(record))
+        with self._lock:
+            if key[0] in self._founders or any(org == key[0] for org, _ in self._rows):
+                raise OrgAlreadyFounded("OrgAlreadyFounded")
+            if key in self._rows:
+                raise AlreadyExists(f"AlreadyExists: person {key[1]}")
+            self._reserve(key, copied)
+            self._rows[key] = (1, copied)
+            self._founders[key[0]] = key[1]
+        return Stored(self.kind, copy.deepcopy(copied), 1)
+
+    def founded(self, org_id: str) -> bool:
+        """Is there a founder marker for the org (never removed, even when everyone is erased)."""
+        with self._lock:
+            return isinstance(org_id, str) and org_id in self._founders
 
 
 @dataclass(frozen=True)
