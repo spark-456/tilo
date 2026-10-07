@@ -11,7 +11,8 @@ output "services" {
       min_instance_count    = var.services[k].min_instance_count
       max_instance_count    = var.services[k].max_instance_count
       ingress               = svc.ingress
-      cpu_idle              = true
+      cpu_idle              = var.services[k].cpu_idle
+      env                   = var.services[k].env
       service_account_email = local.service_account_emails[k]
       public                = var.services[k].public
       vpc_egress            = var.services[k].vpc_egress

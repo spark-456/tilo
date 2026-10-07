@@ -81,7 +81,11 @@ locals {
     "api" = {
       image              = local.placeholder_image
       min_instance_count = 0
-      max_instance_count = 3
+      # ADR-0026: one instance is the one writer (a lease, an in-process
+      # cache), and CPU stays allocated between requests for the in-process
+      # kill-switch state and the run threads.
+      max_instance_count = 1
+      cpu_idle           = false
       ingress            = "INGRESS_TRAFFIC_ALL"
       public             = true
       invoked_by         = []

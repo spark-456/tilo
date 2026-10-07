@@ -344,9 +344,17 @@ def budget_cap_ceiling() -> float:
 
 
 def get_access_store() -> AccessStore:
-    """SEC-15: where each person's visitor-or-judge declaration is kept. Production has none wired yet, so a
-    deployed process closes every gated route (503) rather than guess; tests and the Firestore store override it."""
-    raise HTTPException(status_code=503, detail="not_configured")
+    """SEC-15: where each person's visitor-or-judge declaration is kept. Deployed: a `FirestoreAccessStore` on the
+    process's shared client when `TILO_API_STORE=firestore` and the api store door opens (the same rules as
+    `store_door.open_api_store`); otherwise 503 `not_configured`, never cached, so a deployed process closes every
+    gated route rather than guess. A failing client build is 503 `store_unavailable`, never with the error text."""
+    from tilo_api import prod, store_door  # noqa: PLC0415  (they import this module's neighbours)
+
+    try:
+        opened = store_door.open_api_store()
+    except store_door.ApiStoreNotConfigured:
+        raise HTTPException(status_code=503, detail="not_configured") from None
+    return prod.FirestoreAccessStore(opened.client, ORG_ID)
 
 
 def get_app_check_verifier() -> AppCheckVerifier:
