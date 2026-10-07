@@ -16,6 +16,8 @@ from tilo_api import deps, events
 
 _DESK_WORLD = re.compile(r"w_desk_[0-9A-Za-z_]{1,43}")  # a world id (common.schema.json: w_ + 1..48) of the Desk kind
 
+MAX_ATTEMPTS = 3  # `append` calls per write, one part id (BQ-PPL11C-41)
+
 _PHRASE = {  # what the one-line summary says (fixed words only)
     "created": "added",
     "edited": "edited",
@@ -56,7 +58,13 @@ class WorkEvents:
         world = self.desks.desk_world(org, owner)
         if type(world) is not str or _DESK_WORLD.fullmatch(world) is None or self.desks.desk_owner(world) != owner:
             raise ValueError("not the owner's Desk world")  # fail closed: write nothing, never echo the answer
-        self.writer.append(world, part)
+        for attempt in range(MAX_ATTEMPTS):  # the writer is idempotent by part id: a resend of an append that landed
+            try:  # and lost its answer commits nothing twice (FS-2 (b), EV-10)
+                self.writer.append(world, part)
+                return
+            except Exception:
+                if attempt == MAX_ATTEMPTS - 1:
+                    raise
 
 
 def get_work_events(
