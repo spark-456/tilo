@@ -32,7 +32,6 @@ from _fr_agt_14_lib import (
     GOOGLE_ISSUER,
     MON_0330Z,
     SCHEDULE_SA,
-    TASKS_SA,
     TICK,
     WEEK,
     SchedApi,
@@ -113,7 +112,8 @@ def test_FR_AGT_14_the_tick_does_not_need_or_use_a_principal(sched: SchedApi) ->
 
 WRONG_CALLERS = [
     ("gmail scheduler", {"email": GMAIL_SA}),
-    ("tasks invoker", {"email": TASKS_SA}),
+    # the Tasks identity is a second, body-carrying caller of this route since FR-AGT-14e; that it can never fan out
+    # is pinned in test_FR_AGT_14e_task_run.py (test_FR_AGT_14e_the_tasks_identity_can_never_fan_out)
     ("tilo-api itself", {"email": API_SA}),
     ("same account name, another project", {"email": "tilo-schedule-scheduler@other-project.iam.gserviceaccount.com"}),
     ("a person", {"email": "someone@example.com"}),
@@ -276,7 +276,8 @@ def test_FR_AGT_14_a_due_schedule_fires_once_and_a_scheduler_retry_fires_nothing
     run_sched.insert(source, "sched_a")
     run_sched.store.policies["pol_auto_budget"] = l3_budget_policy()
     first = run_sched.tick()
-    assert (first.status_code, first.json()) == (200, {"fired": 1})
+    assert (first.status_code, first.json()) == (200, {"fired": 1})  # FR-AGT-14e: handed to Cloud Tasks, not run here
+    assert run_sched.deliver_new_tasks() == 1  # the task's own delivery runs it
     assert run_sched.tick().json() == {"fired": 0}
     world_id = run_sched.schedules.get("sched_a").last_world_id
     assert world_id and world_id != source.world_id

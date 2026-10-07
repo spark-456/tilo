@@ -13,6 +13,7 @@ dependencies = [
     "google-auth>=2.30",
     "google-cloud-firestore>=2.20.0",
     "requests>=2.31",
+    "cryptography>=42",
     "tilo-planning",
     "tilo-policy",
     "tilo-harness",

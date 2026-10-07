@@ -20,6 +20,7 @@ from tilo_api import skill_proposals as _skill_proposals
 from tilo_api import spend as _spend
 from tilo_api.access import AccessGate as _AccessGate
 from tilo_api.access_routes import router as _access_router
+from tilo_api.appcheck import AppCheckGate as _AppCheckGate
 from tilo_api.assistant.route import router as _assistant_router
 from tilo_api.cards import build_router as _build_cards_router
 from tilo_api.cards_feed import router as _cards_feed_router
@@ -50,6 +51,7 @@ async def _lifespan(_: FastAPI) -> AsyncIterator[None]:
 app = FastAPI(title="tilo-api", lifespan=_lifespan, **_DOCS)
 app.add_middleware(_LogRunId)  # NFR-26: innermost, so the world is looked up only for a request the gate admitted
 app.add_middleware(_AccessGate)  # SEC-15: deployed, every non-public route needs a stored judge declaration
+app.add_middleware(_AppCheckGate)  # SEC-10: App Check token, logged only until the owner sets TILO_APPCHECK_ENFORCE=1
 app.add_middleware(_NoStore)  # added after the gate, so it is outside it: the gate's 403 on `/v1/` is no-store too
 app.add_middleware(_LogContext)  # NFR-26: outermost, no I/O: binds the world id and trace id of the request
 _configure_logging()  # NFR-26: a deployed service logs JSON with no further setup
