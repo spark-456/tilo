@@ -147,7 +147,9 @@ def test_NFR_07_stop_autopilot_is_effective_within_5s_while_the_writer_never_ret
 @given(
     n_policies=st.integers(min_value=0, max_value=40),
     backlog=st.integers(min_value=0, max_value=4),
-    delay_s=st.sampled_from([0.0, 0.01, 0.05]),
+    # Capped so the fake writer's own simulated I/O (at most 44 events x 10 ms) cannot use up the 2 s bound by itself:
+    # the bound measures the code's work, not the fake's delay. The never-returning writer tests cover a stalled writer.
+    delay_s=st.sampled_from([0.0, 0.005, 0.01]),
 )
 def test_NFR_07_pause_all_effective_and_world_paused_first_within_2s_property(
     client, store, n_policies, backlog, delay_s
