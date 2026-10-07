@@ -102,7 +102,7 @@ def _response(
 ) -> FakeGenerateContentResponse:
     return FakeGenerateContentResponse(
         text=text,
-        usage_metadata=usage,
+        usage_metadata=usage,  # type: ignore[arg-type]  # a duck-typed usage (fields left out on purpose)
         candidates=[FakeCandidate(finish_reason=finish)],  # type: ignore[arg-type]
     )
 
