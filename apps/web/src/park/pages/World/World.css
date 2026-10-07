@@ -805,18 +805,24 @@
 
 /* ---- Narrow windows (the design has no rule here; these keep text from overprinting or clipping) ---- */
 @media (max-width: 560px) {
-  /* Districts: the name and note take the top line, the counts and the chip sit under them. */
+  /* Districts: the name and note, then the counts, then the chip, all across the columns right of the tile
+     (the design's column tracks stay; the items span them so nothing runs past the card). */
+  [data-park] .park-world-district {
+    row-gap: 8px;
+  }
   [data-park] .park-world-dinfo--stack {
     grid-column: 2 / -1;
     grid-row: 1;
   }
   [data-park] .park-world-dprog--stack {
-    grid-column: 2 / 4;
+    grid-column: 2 / -1;
     grid-row: 2;
+    min-width: 0;
   }
   [data-park] .park-world-dchip--stack {
-    grid-column: 4;
-    grid-row: 2;
+    grid-column: 2 / -1;
+    grid-row: 3;
+    justify-self: start;
   }
   /* Skills and Tools: the label sits above its chips, so a chip has the card's width. */
   [data-park] .park-world-skillsrow--stack,
