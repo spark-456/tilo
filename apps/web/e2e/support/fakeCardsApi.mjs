@@ -8,7 +8,7 @@
 //        -> held until /__release while hold is on; then by mode: "answer" 200 {"outcome":"answered"} and the card
 //           leaves the feed; "other_world" answers w_here's card as "answer" but refuses any other world's card with
 //           404 {"outcome":"rejected","reason":"card_not_found"} (what tilo-api does today, API-CARDS-XWORLD);
-//           "already" 409 {"outcome":"rejected","reason":"already_resolved"}
+//           "already" 400 (the real route maps already_resolved to 400) {"outcome":"rejected","reason":"already_resolved"}
 //   POST /__control {hold?:boolean, mode?:string, reset?:true} ; POST /__release ; GET /__log -> [{method,path,body}]
 // CORS: any origin may read (it holds nothing private); the page is a different origin from this server.
 import http from "node:http";
@@ -170,7 +170,7 @@ function settleRefused(res) {
 }
 function settleOk(res, world, card) {
   if (mode === "already")
-    return send(res, 409, { outcome: "rejected", reason: "already_resolved" });
+    return send(res, 400, { outcome: "rejected", reason: "already_resolved" });
   cards = cards.filter((c) => !(c.world_id === world && c.card_id === card));
   return send(res, 200, { outcome: "answered" });
 }
