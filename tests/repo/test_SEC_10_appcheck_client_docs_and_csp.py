@@ -33,6 +33,13 @@ RECAPTCHA_SITE_KEY = "6LdlsOItAAAAAEhO_aq9zmtbQue6Rni2ZDUDuRTe"
 RECAPTCHA_SCRIPT_ORIGINS = {"https://www.google.com/recaptcha/", "https://www.gstatic.com/recaptcha/"}
 RECAPTCHA_FRAME_ORIGIN = "https://www.google.com/recaptcha/"
 APPCHECK_CONNECT_ORIGIN = "https://content-firebaseappcheck.googleapis.com"
+# SEC-15 / SIGNIN (documented test change, BQ-SIGNIN-5): Firebase Auth's Google sign-in adds exactly these, read from
+# @firebase/auth 12.19.0: the gapi loader (script-src), the project's own /__/auth/ iframe and handler (frame-src), and
+# the Identity Toolkit and Secure Token REST hosts (connect-src). Nothing else; test_SEC_15_SIGNIN_docs_and_csp.py
+# pins the same four.
+SIGN_IN_SCRIPT_ORIGIN = "https://apis.google.com"
+SIGN_IN_FRAME_ORIGIN = "https://essential-wares-510320-f0.firebaseapp.com/__/auth/"
+SIGN_IN_CONNECT_ORIGINS = {"https://identitytoolkit.googleapis.com", "https://securetoken.googleapis.com"}
 
 
 def _section_7(repo_root: pathlib.Path) -> str:
@@ -101,9 +108,12 @@ def test_SEC_10_hosting_csp_stays_tight(repo_root: pathlib.Path) -> None:
         assert not any(s.startswith("*.") or "://*." in s for s in sources), f"{name}: wildcard host {sources}"
     assert "'unsafe-eval'" not in {s for sources in csp.values() for s in sources}
     assert "'unsafe-inline'" not in csp["script-src"]
-    # Only the three documented origins are added beyond 'self' and the existing data:/blob: sources.
+    # Only the documented origins are added beyond 'self' and the existing data:/blob: sources: App Check's three
+    # (SEC-10) and Google sign-in's four (SEC-15).
     off_origin = {s for name in ("script-src", "connect-src", "frame-src") for s in csp.get(name, []) if "://" in s}
-    assert off_origin <= RECAPTCHA_SCRIPT_ORIGINS | {RECAPTCHA_FRAME_ORIGIN, APPCHECK_CONNECT_ORIGIN}, off_origin
+    allowed = RECAPTCHA_SCRIPT_ORIGINS | {RECAPTCHA_FRAME_ORIGIN, APPCHECK_CONNECT_ORIGIN}
+    allowed |= {SIGN_IN_SCRIPT_ORIGIN, SIGN_IN_FRAME_ORIGIN} | SIGN_IN_CONNECT_ORIGINS
+    assert off_origin <= allowed, off_origin
 
 
 def test_SEC_10_web_depends_on_the_firebase_sdk(repo_root: pathlib.Path) -> None:
