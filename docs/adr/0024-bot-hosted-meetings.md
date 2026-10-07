@@ -1,7 +1,9 @@
 # ADR-0024: Bot-hosted meetings and the meeting host account
 
-- Status: Accepted (2026-10-06) EXCEPT amendment 3 (the persistent browser profile), which is Proposed and
-  pending the user's explicit yes, with MTG09-c gated on it (security review, 7 Oct 2026). The decision that
+- Status: Accepted (2026-10-06). Amendment 3 (the persistent browser profile, and the project-Owner exposure
+  of the bot account) was Proposed and is ACCEPTED by the user on 7 Oct 2026 as a TEMPORARY, time-limited
+  measure, on every hardening precondition below (see "Decision record, 7 Oct 2026"). MTG09-c is unblocked on
+  those preconditions. The decision that
   the bot hosts and invites is the user's ("Have the bot
   start the meeting instead and then send invites to scheduled people", 6 Oct 2026, relayed by the
   supervisor). The open points were decided by the supervisor under the user's direct instruction ("For
@@ -48,36 +50,35 @@ person's connectors as one Google grant (CON-D10).
    meetings: the user's 6 Oct decision replaces the guest-first experiment (D-2), which is no longer required.
    (b) Its decision 2 said Tilo gets no Gmail, Drive or Calendar access to the bot account; Tilo now holds one
    OAuth grant on it with the single scope above, sealed by the token broker like every grant, and nothing
-   else. (c) Proposed to be replaced (amendment 3, pending the user's explicit yes; until then the per-meeting terms
-   of ADR-0017 stand): the bot would keep ONE persistent, dedicated browser
+   else. (c) Replaced by amendment 3 (accepted by the user on 7 Oct 2026, temporary): the bot keeps ONE
+   persistent, dedicated browser
    profile for its own account, signed in once by a human by hand; it is never in the image, the repository,
    a backup, Secret Manager or a Cloud Run service; the deployed services never hold or see that session; the
-   exception ends at the hackathon freeze unless the user renews it. (Only if amendment 3 is accepted does the
-   per-meeting noVNC sign-in on tmpfs of ADR-0017 stop applying; until then it stands, and amendment 3's
-   preconditions (a), (b), (d), (e) and (f) apply to it too.)
+   exception ends at the hackathon freeze unless the user renews it. (The per-meeting noVNC sign-in on tmpfs
+   of ADR-0017 is the fallback if the user withdraws the persistent profile; amendment 3's preconditions (a),
+   (b), (d), (e) and (f) apply to it too.)
 7. **What the bot does at meeting time.** Signed in as the organizer, it opens the link and enters as host
    without admission, posts the versioned disclosure first (FR-MTG-01), leaves on `Tilo leave` (FR-MTG-10) and
    never ends the call for everyone. It never clicks Admit (amendment 3(c)): invited
    attendees join under Meet's own rule for calendar-invited accounts, every knock from another account stays
    out, and a display-name allowlist is never used because it is spoofable; the meet-bot's `AUTO_ADMIT` stays 0
    for hosted meetings. The link is never written to the bot's `out/` files,
-   logs, events or the package it hands to Tilo. If amendment 3 is accepted, its persistent profile stays on its
-   named volume between meetings; otherwise the ADR-0017 per-meeting terms apply and nothing stays after the run.
+   logs, events or the package it hands to Tilo. Its persistent profile stays on its named volume between
+   meetings (amendment 3, accepted 7 Oct 2026); if the user withdraws it, the ADR-0017 per-meeting terms apply
+   and nothing stays after the run.
 
 ## Accepted amendments (supervisor, under the user's instruction of 6 Oct 2026)
-These replace the text above where they differ, except amendment 3, which is Proposed and replaces nothing
-until the user says yes.
+These replace the text above where they differ. Amendment 3 was accepted by the user on 7 Oct 2026 (below).
 1. The organizer is the bot's own dedicated Google account (decision 1 stands). Only the organizer is host.
    A person's grant stays `calendar.readonly`.
 2. One scope, `calendar.events.owned`, on the bot account only; no Meet API scope (decision 2 stands).
-3. **Decision 6(c) is replaced, PROPOSED and PENDING THE USER'S EXPLICIT YES.** The supervisor proposes that
-   the bot keeps ONE persistent, dedicated browser profile for its own account, so it can enter as host at
-   once. An agent cannot widen the PRD 16.1 rule 3 / 3.4 exception (BQ-MTG09-12 required the user's explicit
-   yes for a profile kept between meetings), so until the user says yes in chat (their words and the date are
-   recorded here) the ADR-0017 per-meeting terms stand. **The gate, one wording for ADR, spec and supplement:
-   MTG09-c is not built until the user has decided (a) below; the profile choice (persistent or per-meeting)
-   is then the user's explicit yes.** ADR-0017 decision 2 does not cover tiloagent@gmail.com until (a) is
-   decided. If the user says yes to the persistent profile:
+3. **Decision 6(c) is replaced: ACCEPTED BY THE USER on 7 Oct 2026, as a temporary measure.** The bot keeps
+   ONE persistent, dedicated browser profile for its own account, so it can enter as host at once. An agent
+   cannot widen the PRD 16.1 rule 3 / 3.4 exception (BQ-MTG09-12 required the user's explicit yes for a
+   profile kept between meetings); the user gave it, see the decision record below. **The gate, one wording
+   for ADR, spec and supplement: MTG09-c is built only on the preconditions below; (a) is decided (accepted,
+   time-limited) and the persistent profile is accepted, both by the user on 7 Oct 2026.** ADR-0017 decision 2
+   covers tiloagent@gmail.com only on the terms of this amendment. The terms:
    the user signs the profile in once, by hand; Tilo never sees the password. It lives on the demo machine's
    own disk as a named Docker volume only (never a bind mount under the repository or OneDrive, never in the
    image, a backup, a Docker Desktop volume export or backup extension, Secret Manager or any Cloud Run
@@ -92,12 +93,17 @@ until the user says yes.
    (preferred) the bot uses a NEW Google account with no role in the project or Firebase that receives no
    alerts (re-add it as the consent-screen test user), or the Owner, Firebase and alert roles move off
    tiloagent before the profile is signed in, or the user accepts the project-Owner exposure explicitly (their
-   words and the date recorded here). No session of the bot account, persistent or per-meeting, is signed in before this is decided.
+   words and the date are recorded in the decision record below: the user chose the third option on 7 Oct 2026).
+   It is time-limited: a dedicated no-role account replaces tiloagent before any wider use, and at the latest
+   the exception ends at the freeze (17 Oct 2026) unless the user renews it.
    (b) **noVNC control.** The meet-bot starts `x11vnc -nopw -shared -forever` and websockify on every command,
    published on 127.0.0.1:6080. With a persistent profile that is a live signed-in browser that anything on
    the machine, or a web page opening `ws://127.0.0.1:6080/websockify`, can drive with no password. noVNC is
    therefore started only for the one-time `login` command, and then with a random password per run
-   (`-rfbauth`); `start`, `join` and every hosted-meeting run start no VNC.
+   (`-rfbauth`, made in tmpfs and shown once in the user's terminal, never under /app, `out/` or `debug/`; VNC
+   passwords stop at 8 characters, so VNC also stops once signed in and websockify gets an Origin check);
+   `start`, `join` and every hosted-meeting run start no VNC. For a per-meeting sign-in (the fallback) the same
+   rule applies: a random password per run and VNC stopped once signed in.
    (c) **Admission.** The bot is never given an invited-address list (Tilo hands it only the link, PPL-60c) and
    Meet's knock prompt shows only a display name, so "admit only invited addresses" cannot be enforced. The
    bot never clicks Admit: invited accounts enter by Meet's own rule, every knock stays out. MTG09-c refuses
@@ -114,6 +120,21 @@ until the user says yes.
    protects it; the user confirms device encryption or BitLocker is on before the sign-in.
    (g) **Revocation and end of life:** the runbook below, owned by the user.
    The exception ends at the hackathon freeze (17 Oct 2026) unless the user renews it.
+
+   **Decision record, 7 Oct 2026 (the user's own answers in the Google-lane session chat, given by selecting
+   these options at a prompt; the supervisor had relayed the same words earlier, and that relay was not relied
+   on).**
+   - Question (a): "Do you accept the project-Owner exposure of tiloagent@gmail.com as the meeting bot's account
+     for now, to be replaced by a dedicated no-role account before any wider use?" Answer: **"Yes, accept for
+     now."** Relayed wording, same decision: "I accept the project-Owner exposure of tiloagent@gmail.com as the
+     bot account for now; replace it with a dedicated no-role account before any wider use."
+   - Question (persistent profile): "Do you also say yes to the bot keeping ONE persistent signed-in browser
+     profile (amendment 3), as a temporary measure ending at the 17 Oct freeze unless you renew it?" Answer:
+     **"Yes, temporary profile."** Relayed wording: "yes this is temporary measure, no worries".
+   - Still the user's to do before the sign-in: confirm device encryption or BitLocker is on (f); sign the
+     profile in once by hand (Tilo never sees the password). Still open for later: create the dedicated no-role
+     account and move the bot to it.
+   - Every precondition (a) to (g) and the runbook stand; the decision lifts only the "blocked" status.
 4. Meetings are capped at 60 minutes (`meeting_host.max_duration_min`, free-account group limit). No paid
    Workspace; spending is the user's call.
 5. The invitation is T3 through the outbox and a gate card; the event id derives from the outbox marker;

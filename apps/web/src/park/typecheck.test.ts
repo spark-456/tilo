@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest";
 import { parkTypeErrors } from "../../test-support/park/typecheck";
 
 describe("WEB_1a_typecheck: park files compile with the repo's strict options", () => {
-  it("WEB_1a_typecheck_park_has_no_type_errors", { timeout: 180_000 }, () => {
-    expect(parkTypeErrors()).toEqual([]);
+  it("WEB_1a_typecheck_park_has_no_type_errors", { timeout: 180_000 }, async () => {
+    expect(await parkTypeErrors()).toEqual([]);
   });
 });

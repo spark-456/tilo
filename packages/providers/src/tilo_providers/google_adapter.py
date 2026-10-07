@@ -1,8 +1,10 @@
 """tilo_providers.google_adapter — Google Gen AI SDK adapter (PL-02, PRD 6.4,
 6.5). Wraps `google.genai.Client` against Agent Platform / Vertex, through
 the global endpoint, behind `ModelProvider`. Structured output maps onto
-`GenerateContentConfig(response_mime_type=..., response_schema=...)`;
-SDK/transport errors map onto `tilo_providers.errors`.
+`GenerateContentConfig(response_mime_type=..., response_json_schema=...)`: the JSON Schema field, never
+`response_schema`, which is the SDK's OpenAPI-subset `Schema` type and rejects ordinary JSON Schema (`uniqueItems`,
+a list `type`) while the request body is built, before anything is sent. SDK/transport errors map onto
+`tilo_providers.errors`; a request the SDK refuses to build (pydantic `ValidationError`) is a `RequestError`.
 
 Imports `google.genai`/`.types`/`.errors` via `importlib.import_module`
 rather than `from google import genai`, so the module works whether that
@@ -20,11 +22,13 @@ import re
 from collections.abc import Iterator, Mapping
 from typing import Any
 
+import pydantic
 from tilo_contracts import ProvidersProfile
 
 from tilo_providers.errors import (
     OutputTruncatedError,
     ProviderError,
+    RequestError,
     SafetyError,
     map_http_status,
     map_transport_error,
@@ -117,6 +121,10 @@ class _RedactedAPIError(Exception):
         self.code = code
 
 
+class _ClientSideFailure(Exception):
+    """Stands in for a pydantic error from the SDK as the `__cause__` of a mapped error: its class name, no values."""
+
+
 class GoogleModelProvider(ModelProvider):
     def __init__(
         self,
@@ -156,7 +164,7 @@ class GoogleModelProvider(ModelProvider):
         if request.response_schema is not None:
             # PL-02 structured output: a schema implies JSON output.
             kwargs["response_mime_type"] = "application/json"
-            kwargs["response_schema"] = request.response_schema
+            kwargs["response_json_schema"] = request.response_schema  # not `response_schema`: see the docstring
         elif request.json_mode:
             kwargs["response_mime_type"] = "application/json"
         if not kwargs and request.thinking_level is None:
@@ -172,6 +180,10 @@ class GoogleModelProvider(ModelProvider):
         if isinstance(error, errors_mod.APIError):
             message = self.redact(str(getattr(error, "message", error)))  # a server message can echo a token
             return map_http_status(error.code, message)
+        if isinstance(error, pydantic.ValidationError):
+            # The SDK refused to build the request (nothing was sent): rejected, not unknown. Class name only: the
+            # validation text echoes the schema and prompt values it was given.
+            return RequestError(f"PL-02: the Gen AI SDK refused to build the request ({type(error).__name__})")
         # The SDK's transport is httpx too, so this maps the same as
         # openai_compat_adapter's (mapping must not depend on the adapter).
         return map_transport_error(error) or error
@@ -183,6 +195,8 @@ class GoogleModelProvider(ModelProvider):
             if isinstance(error, _genai_module("google.genai.errors").APIError):
                 # The raw SDK error carries the unredacted server message: keep only its code and redacted text.
                 mapped.__cause__ = _RedactedAPIError(getattr(error, "code", None), str(mapped))
+            elif isinstance(error, pydantic.ValidationError):
+                mapped.__cause__ = _ClientSideFailure(type(error).__name__)  # the raw error carries input values
             else:
                 mapped.__cause__ = error
         return mapped

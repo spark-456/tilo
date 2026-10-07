@@ -178,7 +178,8 @@ describe("WEB_1c_static: no animation in the kit (BQ-WEB-3, ADR-0003a 5; HR-1 to
   });
 
   it("WEB_1c_static_the_honesty_allowlist_is_untouched_by_this_ticket", () => {
-    expect(ALLOWLIST.filter((a) => /park/.test(a.file))).toEqual([]);
+    // WEB-MOTION-1 added entries for engines/park.ts and the shell CSS; none is for kit.ts.
+    expect(ALLOWLIST.filter((a) => /kit\.ts$/.test(a.file))).toEqual([]);
   });
 
   it("WEB_1c_static_the_scan_is_not_vacuous_it_flags_each_form_the_prototype_used", () => {

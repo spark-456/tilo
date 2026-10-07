@@ -2,7 +2,7 @@
 // the account menu, the page outlet (the one <main>), the toast, the world loader and the boot splash.
 // It renders no `[data-park]` root (ParkApp owns that one) and reads everything from ParkProvider: the app,
 // the store and the Api. The notifications and the user come through the Api on mount, so a fixture Api
-// raises the "Sample data" chip without any page asking for data. The city is STATIC (BQ-WEB-3).
+// raises the "Sample data" chip without any page asking for data. The city's cars and walkers run on Home (cityMotion.ts).
 import { type ReactNode, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import type { Decision, Notification, User } from "../api/types";
 import { useApp, useExpectsSample, useParkApi, useParkStore } from "../app/context";
@@ -15,6 +15,7 @@ import { CityBackdrop } from "./CityBackdrop";
 import { NotificationsPopover } from "./NotificationsPopover";
 import { TopNav } from "./TopNav";
 import { WorldLoader } from "./WorldLoader";
+import { useCityMotion } from "./cityMotion";
 import { loadShellFonts } from "./fonts";
 import "./park.shell.css";
 import { backdropScene } from "./scene";
@@ -36,6 +37,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [connectorsOn, setConnectorsOn] = useState<number | null>(null);
   const [ready, setReady] = useState(false);
   const expectsSample = useExpectsSample();
+  const city = useCityMotion(app.motion, app.vw);
 
   useEffect(() => {
     let live = true;
@@ -69,17 +71,17 @@ export function AppShell({ children }: { children: ReactNode }) {
   // (the shell stays hidden under the splash until then, so no text swaps face and moves the nav).
   useEffect(() => {
     let live = true;
-    backdropScene(app.time, app.motion);
+    backdropScene(app.time, city.motion);
     loadShellFonts().then(() => {
       if (live) setReady(true);
     });
     return () => {
       live = false;
     };
-  }, [app.time, app.motion]);
+  }, [app.time, city.motion]);
   const scene = useMemo(
-    () => (ready ? backdropScene(app.time, app.motion) : null),
-    [ready, app.time, app.motion],
+    () => (ready ? backdropScene(app.time, city.motion) : null),
+    [ready, app.time, city.motion],
   );
 
   const page = route?.page ?? null;
@@ -92,7 +94,15 @@ export function AppShell({ children }: { children: ReactNode }) {
   const toast = state.toast;
   return (
     <>
-      <CityBackdrop scene={scene} vw={app.vw} vh={app.vh} veiled={inner} />
+      <CityBackdrop
+        scene={scene}
+        vw={app.vw}
+        vh={app.vh}
+        veiled={inner}
+        lite={city.lite}
+        hidden={city.hidden}
+        loading={state.wl != null}
+      />
       <TopNav
         page={page}
         needsLeft={app.needsLeft}

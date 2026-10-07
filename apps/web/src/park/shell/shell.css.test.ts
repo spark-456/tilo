@@ -1,6 +1,7 @@
 // WEB-3b: the one stylesheet of the shell, apps/web/src/park/shell/park.shell.css (plan section 10: one
-// stylesheet per area, every selector under [data-park]; plan 8d: the shell ships with a STATIC city, so no
-// transition, animation or keyframes; the motion restore is BQ-WEB-3 and brings its own honesty-scan entry).
+// stylesheet per area, every selector under [data-park]; plan 8d: the shell shipped a STATIC city, so no
+// transition, animation or keyframes; WEB-MOTION-1 (BQ-WEB-3) restored the city's cars and walkers with their
+// own honesty-scan entries, so only their keyframes and a pause rule are allowed now).
 // The sizes, radii and colours are not read from the file: they are measured on the running page against the
 // reference in e2e/park-shell-visual.spec.ts.
 import fs from "node:fs";
@@ -18,11 +19,22 @@ describe("WEB_3b_css: park.shell.css", () => {
     expect(rules.map((r) => r.selector).filter((s) => !s.startsWith("[data-park]"))).toEqual([]);
   });
 
-  it("WEB_3b_css_has_no_transition_animation_or_keyframes", () => {
-    expect(stripComments(css())).not.toMatch(
-      /\btransition\b|\banimation\b|@keyframes|animation-play-state/i,
-    );
-    expect(parseRules(css()).others.map((o) => o.head)).toEqual([]);
+  it("WEB_3b_css_has_no_transition_and_motion_only_for_the_city_movers", () => {
+    // WEB-MOTION-1: the city's cars and walkers (the only motion) are keyframes plus one pause rule.
+    const text = stripComments(css());
+    expect(text).not.toMatch(/\btransition\b/i);
+    expect(text.match(/\banimation(?:-[a-z-]+)?\s*:/gi)).toEqual(["animation-play-state:"]);
+    expect(parseRules(css()).others.map((o) => o.head)).toEqual([
+      "@keyframes mvXY",
+      "@keyframes waddle",
+      "@keyframes walkFrame",
+    ]);
+    // Compositor-only: a keyframe changes transform or opacity and nothing else.
+    const props = [...text.matchAll(/@keyframes[^{]+\{([\s\S]*?\n\})/g)]
+      .flatMap((m) => [...(m[1] ?? "").matchAll(/([a-z-]+)\s*:/g)].map((x) => x[1]))
+      .filter((p, i, all) => all.indexOf(p) === i)
+      .sort();
+    expect(props).toEqual(["opacity", "transform"]);
   });
 
   it("WEB_3b_css_glass_blur_is_limited_to_the_nav", () => {

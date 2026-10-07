@@ -198,6 +198,10 @@ class FakeDesks:
             raise RuntimeError("the desk world store is down")
         return "w_desk_" + user_id[2:]
 
+    def desk_owner(self, world_id: str) -> str | None:
+        """Who owns a Desk world this fake made (`w_desk_<suffix>` belongs to `u_<suffix>`); None for any other id."""
+        return "u_" + world_id[len("w_desk_") :] if world_id.startswith("w_desk_") else None
+
 
 class FakeWorldMaker:
     """`deps.get_meeting_worlds()` (PPL-11c, API_PPL_11c.md section 6): creates the Outpost world of a meeting.

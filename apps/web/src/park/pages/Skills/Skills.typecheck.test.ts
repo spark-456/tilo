@@ -18,8 +18,8 @@ describe("WEB_8a_typecheck: Skills compiles with the repo's strict options", () 
     expectTypeOf<Parameters<Api["saveSkill"]>[0]>().toEqualTypeOf<Skill>();
   });
 
-  it("WEB_8a_typecheck_skills_has_no_type_errors", { timeout: 180_000 }, () => {
-    const errors = parkTypeErrors().filter(
+  it("WEB_8a_typecheck_skills_has_no_type_errors", { timeout: 180_000 }, async () => {
+    const errors = (await parkTypeErrors()).filter(
       (e) =>
         e.startsWith("src/park/pages/Skills/") ||
         e.startsWith("test-support/park/skills") ||
