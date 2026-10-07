@@ -25,13 +25,7 @@ from _ppl11c_lib import confirmed_item, transcript_case
 # with its entry still here fails (strict), which is the reminder to delete it. Rows of the `backend` parameter named
 # "memory" already pass at the head of `phase0-stack` (the in-memory limits are the model the durable ones copy) and
 # are never pending; `..._guard_...` tests pass today and must stay green.
-FS2_PENDING: tuple[tuple[str, str], ...] = (
-    ("test_PPL_11c_FS_2_limit_", ""),
-    ("test_PPL_11c_FS_2_key_", ""),
-    ("test_PPL_11c_FS_2_store_", ""),
-    ("test_PPL_11c_FS_2_event_", ""),
-    ("test_PPL_11c_FS_2_emu_", ""),
-)
+FS2_PENDING: tuple[tuple[str, str], ...] = ()
 FS2_EXEMPT: tuple[str, ...] = ("test_PPL_11c_FS_2_guard_",)
 # Rows that pass at the head of `phase0-stack` with the Firestore stores (a single instance behaves like the in-memory
 # model, and today's route already answers a dead event writer with the fixed 503): regression pins, never a strict
