@@ -18,6 +18,7 @@ const proto = loadPrototypeData();
 const ADDITIVE_PATHS: Record<string, readonly string[]> = {
   decisions: ["[].toast", "[].approvedTitle", "[].facts"],
   agenda: ["rules"],
+  worlds: ["[].heroTag"],
 };
 const ADDITIVE_VALUES: readonly (readonly [
   member: string,
@@ -151,7 +152,15 @@ describe("WEB_1a_fixtures_match_prototype: data members", () => {
       expect(reference, `the reference shell has "${want}"`).toContain(want);
     }
     // no extra key outside the listed ones: stripping them leaves exactly the prototype's keys (the test above)
-    expect(Object.keys(ADDITIVE_PATHS)).toEqual(["decisions", "agenda"]);
+    expect(Object.keys(ADDITIVE_PATHS)).toEqual(["decisions", "agenda", "worlds"]);
+    // WEB-6: the K1 hero tag is the World reference page's own line (`heroTag` is the only extra world key, on one world)
+    const world = fs.readFileSync(
+      path.join(HANDOFF_DIR, "design", "Tilo App World.dc.html"),
+      "utf8",
+    );
+    const tagged = fx.worlds({}).filter((w) => w.heroTag !== undefined);
+    expect(tagged).toHaveLength(1);
+    expect(world).toContain(tagged[0]?.heroTag as string);
   });
 
   it("WEB_1a_fixtures_match_prototype the merged final state is what is transcribed (skills, ledger, team)", () => {
@@ -172,7 +181,9 @@ describe("WEB_1a_fixtures_match_prototype: functions", () => {
   });
 
   it.each(DEC_COMBOS)("WEB_1a_fixtures_match_prototype worlds(%o, []) ", (dec) => {
-    expect(norm(fx.worlds(dec, []))).toEqual(norm(proto.worlds(dec, [])));
+    expect(norm(withoutAdditive("worlds", fx.worlds(dec, [])))).toEqual(
+      norm(proto.worlds(dec, [])),
+    );
   });
 
   it("WEB_1a_fixtures_match_prototype makeWorld for every mode and name edge case", () => {
@@ -192,7 +203,7 @@ describe("WEB_1a_fixtures_match_prototype: functions", () => {
     for (const mode of MODES) {
       const mine = fx.worlds(dec, [fx.makeWorld(mode, "Plan the offsite", 1)]);
       const theirs = proto.worlds(dec, [proto.makeWorld(mode, "Plan the offsite", 1)]);
-      expect(norm(mine), `added ${mode} world`).toEqual(norm(theirs));
+      expect(norm(withoutAdditive("worlds", mine)), `added ${mode} world`).toEqual(norm(theirs));
       expect(mine).toHaveLength(12);
       expect(mine[0]?.id).toBe("new1");
     }
