@@ -10,6 +10,10 @@ Production stays fail-closed; the live switch is the user's (ADR-0023, ADR-0003)
 `uv run pytest services/api/tests -k PPL_11c_FS -m emulator`). The `Rig` (`_ppl11a_lib`) now forwards the person store's
 `create_founder`/`founded` and overrides `get_founder_gate` to "yes" (the PPL-11c S3 tests assume any principal may found).
 
+Emulator note: the Firestore emulator's cold start takes about 2.5 min; the first run on a cold cache needs the longer
+timeout. `tilo_harness.emulator.running_emulator()` waits 240 s by default; `TILO_EMULATOR_READY_TIMEOUT_S` overrides it
+(a value that is not a number above zero is ignored). Test: `services/harness/tests/test_PPL_11c_FS_emulator_ready_timeout.py`.
+
 ## 1. Layout (FS-01) and where the code lives
 - The adapter is `tilo_api.people_firestore` (tilo-api): `tilo_people` is pure (its static test forbids `google`, `os`), so
   there is **no `PeopleStores.firestore` classmethod**; the factory is `firestore_people_stores(client) -> PeopleStores`.

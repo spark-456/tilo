@@ -18,7 +18,15 @@ from dataclasses import dataclass, field
 from typing import Any, Protocol
 
 from tilo_people._schema import valid
-from tilo_people.errors import AlreadyExists, NotFound, PeopleInputError, VersionConflict
+from tilo_people.errors import (
+    AlreadyExists,
+    EmailTaken,
+    LastPerson,
+    NotFound,
+    OrgAlreadyFounded,
+    PeopleInputError,
+    VersionConflict,
+)
 
 INDEXES: Mapping[str, tuple[str, ...]] = {
     "person": (),
@@ -78,6 +86,10 @@ class MemoryStore:
         self._schema = f"{kind}.schema.json"
         self._lock = threading.Lock()
         self._rows: dict[tuple[str, str], tuple[int, dict[str, Any]]] = {}
+        # The person store only (PPL-11c-FS): one reservation per person for its lower-cased address, and the org's
+        # founder marker. Both change under `_lock`, in the same step as the record.
+        self._emails: dict[tuple[str, str], str] = {}
+        self._founders: dict[str, str] = {}
 
     def __repr__(self) -> str:
         return f"MemoryStore(kind={self.kind!r})"
@@ -108,6 +120,7 @@ class MemoryStore:
         with self._lock:
             if key in self._rows:
                 raise AlreadyExists(f"AlreadyExists: {self.kind} {key[1]}")
+            self._reserve(key, copied)
             self._rows[key] = (1, copied)
         return Stored(self.kind, copy.deepcopy(copied), 1)
 
@@ -121,6 +134,12 @@ class MemoryStore:
                 raise NotFound(f"NotFound: {self.kind} {key[1]}")
             if row[0] != expected:
                 raise VersionConflict(f"VersionConflict: {self.kind} {key[1]} expected {expected} current {row[0]}")
+            self._release(key, row[1])
+            try:
+                self._reserve(key, copied)
+            except EmailTaken:
+                self._reserve(key, row[1])  # the old address is held again: a refused replace changes nothing
+                raise
             self._rows[key] = (row[0] + 1, copied)
             version = row[0] + 1
         return Stored(self.kind, copy.deepcopy(copied), version)
@@ -136,7 +155,46 @@ class MemoryStore:
                 raise VersionConflict(
                     f"VersionConflict: {self.kind} {_safe(record_id)} expected {expected} current {row[0]}"
                 )
+            self._release(key, row[1])
             del self._rows[key]
+
+    def _reserve(self, key: tuple[str, str], record: Mapping[str, Any]) -> None:
+        """Holds the record's address for its person (person store only); `EmailTaken` if another person holds it."""
+        if self.kind != "person":
+            return
+        slot = (key[0], str(record["email"]).lower())
+        if self._emails.setdefault(slot, key[1]) != key[1]:
+            raise EmailTaken(f"EmailTaken: person {key[1]}")
+
+    def _release(self, key: tuple[str, str], record: Mapping[str, Any]) -> None:
+        if self.kind == "person":
+            self._emails.pop((key[0], str(record["email"]).lower()), None)
+
+    def create_founder(self, record: Mapping[str, Any]) -> Stored:
+        """Person store only: the founder marker, the person and its address, in one step. Refused `OrgAlreadyFounded`
+        when the org has a marker or any person, then `AlreadyExists` (id), then `EmailTaken`; nothing is written."""
+        if self.kind != "person":
+            raise PeopleInputError("only the person store founds an org")
+        key = self._checked(record)
+        if record.get("org_role") != "owner":
+            raise PeopleInputError("a founder is an owner")
+        copied = copy.deepcopy(dict(record))
+        with self._lock:
+            if key[0] in self._founders or any(org == key[0] for org, _ in self._rows):
+                raise OrgAlreadyFounded("OrgAlreadyFounded")
+            if key in self._rows:
+                raise AlreadyExists(f"AlreadyExists: person {key[1]}")
+            self._reserve(key, copied)
+            self._rows[key] = (1, copied)
+            self._founders[key[0]] = key[1]
+        return Stored(self.kind, copy.deepcopy(copied), 1)
+
+    def founded(self, org_id: str) -> bool:
+        """Person store only: is there a founder marker for the org (never removed, even when everyone is erased)."""
+        if self.kind != "person":
+            raise PeopleInputError("only the person store founds an org")
+        with self._lock:
+            return isinstance(org_id, str) and org_id in self._founders
 
     def list(self, org_id: str, field: str | None = None, value: str | None = None) -> tuple[Stored, ...]:
         if field is not None and (not isinstance(field, str) or field not in INDEXES[self.kind]):
@@ -271,10 +329,21 @@ def _always(record: Mapping[str, Any]) -> bool:
     return True
 
 
+def _refuse_last_person(stores: PeopleStores, org_id: str, user: str) -> None:
+    """BQ-PPL11C-16: the sole person of an org that was never founded is not erased (nothing is changed). A store with
+    no `founded` (a bare `RecordStore`) counts as not founded."""
+    everyone = stores.persons.list(org_id)
+    if len(everyone) == 1 and everyone[0].record["id"] == user:
+        founded = getattr(stores.persons, "founded", None)
+        if founded is None or not founded(org_id):
+            raise LastPerson(f"LastPerson: person {_safe(user)}")
+
+
 def erase_person(stores: PeopleStores, org_id: str, user: str) -> dict[str, int]:
     """PE-16 (BQ-PPL10-8): tombstones their meetings, then deletes their work items, personal pins,
     mentions naming them, calendar entries and finally their person record. Idempotent."""
     counts = dict.fromkeys(("meeting", "work_item", "pinboard_item", "mention", "calendar_entry", "person"), 0)
+    _refuse_last_person(stores, org_id, user)
     for stored in stores.meetings.list(org_id, "owner", user):
         counts["meeting"] += _tombstone(stores.meetings, org_id, stored.record["id"])
     plan = (

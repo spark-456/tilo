@@ -43,14 +43,13 @@ FS_PENDING: tuple[tuple[str, str], ...] = (
     ("test_PPL_11c_FS_04_", "firestore"),
     ("test_PPL_11c_FS_05_", "firestore"),
     ("test_PPL_11c_FS_06_", ""),  # the three doors and "no I/O until asked"
-    ("test_PPL_11c_FS_07_", ""),  # the founder: create-if-absent, and the marker (both stores)
-    ("test_PPL_11c_FS_08_", ""),  # founder races (both stores; two adapters: Firestore)
-    ("test_PPL_11c_FS_09_", ""),  # the email reservation
-    ("test_PPL_11c_FS_10_", ""),  # release and swap
-    ("test_PPL_11c_FS_11_", ""),  # last-person erase
-    ("test_PPL_11c_FS_12_", ""),  # bootstrap uid
+    ("test_PPL_11c_FS_07_", "firestore"),  # the founder: create-if-absent, and the marker (both stores)
+    ("test_PPL_11c_FS_08_", "firestore"),  # founder races (both stores; two adapters: Firestore)
+    ("test_PPL_11c_FS_09_", "firestore"),  # the email reservation
+    ("test_PPL_11c_FS_10_", "firestore"),  # release and swap
+    ("test_PPL_11c_FS_11_", "firestore"),  # last-person erase
     ("test_PPL_11c_FS_13_", ""),  # wiring
-    ("test_PPL_11c_FS_14_", ""),  # the API over the stores
+    ("test_PPL_11c_FS_14_", "firestore"),  # the API over the stores (memory rows pass)
 )
 # MemoryStore rows that already pass at the head of `phase0-stack` (a "nothing was left behind" check is true of a store
 # that never reserved anything): pinned, never a strict xfail. Their Firestore rows stay pending like the rest.

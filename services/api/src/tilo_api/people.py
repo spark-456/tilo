@@ -311,10 +311,14 @@ def create_first_person_route(
     body: Annotated[PersonIn, Depends(json_body(PersonIn))],
     principal: Annotated[deps.Principal, Depends(deps.get_current_principal)],
     stores: Annotated[PeopleStores, Depends(deps.get_people_stores)],
+    gate: Annotated[Callable[[str], bool], Depends(deps.get_founder_gate)],
     redact: Annotated[Callable[[str], str], Depends(deps.get_redactor)],
     clock: Annotated[Callable[[], str], Depends(deps.get_clock)],
 ) -> dict[str, Any]:
-    """The signed-in principal founds an empty org as its owner (PE-17); 403 once the org has a person."""
+    """The configured bootstrap uid founds an empty org as its owner (PE-17, BQ-PPL11C-15); every other principal, and
+    any org that has a person or was founded, is the same 403. The uid is checked before any store is read."""
+    if not gate(principal.user_id):
+        raise Refusal(403, "forbidden")
     return _answer(
         lambda: idempotent(
             request,
