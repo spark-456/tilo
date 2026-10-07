@@ -261,7 +261,7 @@ def _unlisted(cleaned: str, names: frozenset[str]) -> bool:
         return True
     if _LINK.search(cleaned.lower()):  # before times are removed: "5pm.me" is a link
         return True
-    cleaned = _TIME.sub(f" {_STOP} ", cleaned).replace("’", "'")
+    cleaned = _TIME.sub(f" {_STOP} ", cleaned).replace("\u2019", "'")
     if any(c.isdigit() for c in cleaned):
         return True
     for line in cleaned.split("\n"):

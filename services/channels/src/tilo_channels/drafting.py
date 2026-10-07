@@ -102,19 +102,15 @@ def _base(address: str) -> str:
     return f"{local.split('+', 1)[0]}@{domain}"
 
 
-def _pairs(value: Any) -> list[tuple[str, str]]:
-    """(display name, raw address) pairs of an untrusted header, bounded as `_addresses` says."""
-    raw = [value] if isinstance(value, str) else value if isinstance(value, list) else []
-    try:
-        return getaddresses([v for v in raw[:MAX_ADDRESSES] if isinstance(v, str) and len(v) <= ADDRESS_CAP])
-    except (RecursionError, ValueError):
-        return []
-
-
 def _addresses(value: Any) -> list[str]:
     """Bare addresses of an untrusted header: at most MAX_ADDRESSES entries, an entry over ADDRESS_CAP is dropped,
     and a header the parser chokes on (nested comments) has none."""
-    return [a for _, addr in _pairs(value) if (a := _address(addr))]
+    raw = [value] if isinstance(value, str) else value if isinstance(value, list) else []
+    try:
+        pairs = getaddresses([v for v in raw[:MAX_ADDRESSES] if isinstance(v, str) and len(v) <= ADDRESS_CAP])
+    except (RecursionError, ValueError):
+        return []
+    return [a for _, addr in pairs if (a := _address(addr))]
 
 
 def _raw(value: Any) -> str:

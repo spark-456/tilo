@@ -18,7 +18,7 @@ import copy
 import hashlib
 import logging
 from collections.abc import Callable, Iterable
-from dataclasses import dataclass, fields, replace
+from dataclasses import dataclass, field, fields, replace
 from typing import Any, Protocol
 
 import tilo_policy
@@ -75,7 +75,7 @@ class DraftContext:
     mailbox: str
     mode: str = "reply"
     # CHN-GATE-E (ADR-0025): filled by `Autopilot._card` from its own reader, never by a caller; never stored or sent
-    participants: tuple[Participant, ...] = ()
+    participants: tuple[Participant, ...] = field(default=(), repr=False)  # names and addresses stay out of any repr
 
 
 class AutonomyPolicy(Protocol):

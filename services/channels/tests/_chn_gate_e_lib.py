@@ -16,11 +16,12 @@ from dataclasses import replace
 from typing import Any
 
 from _chn10_lib import Msg, Thread
-from _chn11_lib import MAILBOX, USER, Bench, Mail, autopilot_module, pair
+from _chn11_lib import USER, Bench, Mail, autopilot_module, pair
 from _chn11_lib import make_bench as _make_bench
 
 __all__ = ["MAILBOX", "USER", "Mail", "autopilot_module", "make_bench", "pair"]
 
+MAILBOX = "ops@harborview.example"  # the plain mailbox: nothing in its local part names the owner
 OWN = f"Sarah Chen <{MAILBOX}>"  # the mailbox owner's From header on mail the user's client wrote
 LOGGER_NAMES = ("", "tilo_channels", "tilo_channels.autopilot", "tilo_channels.participants")
 
@@ -30,6 +31,7 @@ def make_bench(level: str = "L2", contacts: tuple[str, ...] = ()) -> Bench:
     thread holds only what a test puts in it, so nothing vouches for a name by accident."""
     bench = _make_bench(level, contacts)
     bench.rig.own_mail = ()
+    bench.rig.mailbox = MAILBOX  # the plain `ops@` mailbox: no bench help for "Sarah"
     return bench
 
 

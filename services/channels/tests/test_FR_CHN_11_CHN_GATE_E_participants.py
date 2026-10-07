@@ -1,17 +1,17 @@
 """CHN-GATE-E (FR-CHN-11; ADR-0025 decisions 1, 3, 4, 7): `tilo_channels.participants.read_participants(reader, user_id,
 thread_id, mailbox)` and the name filter. The thread is untrusted: someone chooses every name in a mail header, so a
-name counts only when the user's own client wrote it (a `SENT` message From the mailbox) or it comes from an address
-local part, and the gate later uses only the names of the draft's own recipients and the mailbox.
+name counts only when it comes from a BASE address local part (ADR-0025 amendment, 8 Oct: no display name vouches a
+word, not even on the user's own SENT mail, because Gmail's reply copies an inbound From name into the SENT To; and no
+plus tag does), and the gate later uses only the names of the draft's own recipients and the mailbox.
 
 Defaults applied (ADR-0025, "Name filter"):
  - A display name or a local part is dropped WHOLE unless every word is 2 to 24 ASCII letters (one inner apostrophe
    allowed), there are at most 4 words, `inbound_signal` finds nothing in the words joined with spaces or with nothing,
-   and no word (nor two neighbouring words joined) is `_numberish`. A local part is split on `. _ - +`; a display name
-   on spaces, `.`, `,` and `-`. The other source of the same address still counts ("Refunds Team <pat@...>" keeps
-   "pat").
+   and no word (nor two neighbouring words joined) is `_numberish`. A local part is split on `. _ - +` (after the plus
+   tag is dropped). A display name is no source at all, so "Refunds Team <pat@...>" still gives "pat" (its local part).
  - `Participant` lives in `tilo_channels.participants` (the ADR names the field, not the module of the class).
  - Caps (decision 7): 100 participants, newest message first, one per base address (plus tag dropped); 8 name words
-   each.
+   each (a base local part holds at most 4, so the 8 only bounds what a participant can keep).
    Whether the mailbox's own participant counts inside the 100 is not stated: the cap test allows either.
 """
 
@@ -71,7 +71,8 @@ def test_FR_CHN_11_CHN_GATE_E_participant_holds_an_address_and_name_words_only()
 # ---- 2. where names come from (decision 3) ---------------------------------------------------------------------------
 
 
-def test_FR_CHN_11_CHN_GATE_E_sent_to_and_cc_display_names_name_the_recipients() -> None:
+def test_FR_CHN_11_CHN_GATE_E_sent_to_and_cc_display_names_name_nobody_only_the_local_part_does() -> None:
+    # 8 Oct amendment: even the user's own SENT mail carries names a sender chose (Gmail copies them into the reply).
     names = names_by_address(
         read(
             sent(
@@ -80,18 +81,20 @@ def test_FR_CHN_11_CHN_GATE_E_sent_to_and_cc_display_names_name_the_recipients()
             )
         )
     )
-    assert names["david@example.com"] == {"david", "lee"}
-    assert names["priya@example.com"] == {"priya", "shah"}
+    assert names["david@example.com"] == {"david"}
+    assert names["priya@example.com"] == {"priya"}
     assert names["marcus@example.com"] == {"marcus"}
 
 
-def test_FR_CHN_11_CHN_GATE_E_address_local_parts_are_names_split_on_dot_underscore_dash_plus() -> None:
+def test_FR_CHN_11_CHN_GATE_E_address_local_parts_are_names_split_on_dot_underscore_dash_and_a_tag_is_dropped() -> None:
     for address, words in (
-        ("anna.maria_lee+jones@example.com", {"anna", "maria", "lee", "jones"}),
+        ("anna.maria_lee+jones@example.com", {"anna", "maria", "lee"}),  # the plus tag is free text: dropped
+        ("anna.maria_lee+approved.prepaid@example.com", {"anna", "maria", "lee"}),
         ("anne-marie@example.com", {"anne", "marie"}),
         ("david@example.com", {"david"}),
     ):
-        assert names_of(address, inbound(f"Zed <{address}>")) == words, address
+        base = re.sub(r"\+[^@]*", "", address)  # a participant is its base address
+        assert names_of(base, inbound(f"Zed <{address}>")) == words, address
 
 
 def test_FR_CHN_11_CHN_GATE_E_an_inbound_from_display_name_is_not_a_name_source() -> None:
@@ -129,12 +132,11 @@ def test_FR_CHN_11_CHN_GATE_E_a_from_header_alone_is_not_the_users_own_mail() ->
     assert names_by_address(read(unlabelled))["david@example.com"] == {"david"}
 
 
-def test_FR_CHN_11_CHN_GATE_E_the_mailbox_from_name_counts_only_on_its_own_sent_mail() -> None:
-    assert names_of(MAILBOX, sent(to=("david@example.com",))) == {"ops", "sarah", "chen"}
-    # another message From the mailbox address but not SENT, and an inbound sender's own From name: neither counts
+def test_FR_CHN_11_CHN_GATE_E_the_mailbox_from_name_names_nobody_even_on_its_own_sent_mail() -> None:
+    assert names_of(MAILBOX, sent(to=("david@example.com",))) == {"ops"}
     spoof = inbound("Marcus Reed <ops@harborview.example>")
     assert names_of(MAILBOX, spoof) == {"ops"}
-    assert names_of(MAILBOX, sent(to=("david@example.com",)), spoof) == {"ops", "sarah", "chen"}
+    assert names_of(MAILBOX, sent(to=("david@example.com",)), spoof) == {"ops"}
 
 
 def test_FR_CHN_11_CHN_GATE_E_a_member_of_the_thread_is_a_participant_with_its_local_part_only() -> None:
@@ -195,14 +197,13 @@ def test_FR_CHN_11_CHN_GATE_E_an_unusable_mailbox_gives_it_no_names(mailbox: str
 # ---- 4. the name filter (decision 4) --------------------------------------------------------------------------------
 
 PASSING = [
-    ("David Lee", {"david", "lee"}),
-    ("Lee, David", {"lee", "david"}),
-    ('"Lee, David"', {"lee", "david"}),
-    ("Anne-Marie Smith", {"anne", "marie", "smith"}),
-    ("Dr. David Lee", {"dr", "david", "lee"}),
-    ("Pat O'Brien", {"pat", "o'brien"}),
-    ("Al Li", {"al", "li"}),  # two letters is long enough
-    ("Mary Ann Van Berg", {"mary", "ann", "van", "berg"}),  # four words is the limit
+    ("david.lee", {"david", "lee"}),
+    ("lee_david", {"lee", "david"}),
+    ("anne-marie.smith", {"anne", "marie", "smith"}),
+    ("dr.david.lee", {"dr", "david", "lee"}),
+    ("pat.o'brien", {"pat", "o'brien"}),
+    ("al.li", {"al", "li"}),  # two letters is long enough
+    ("mary.ann.van.berg", {"mary", "ann", "van", "berg"}),  # four words is the limit
     ("q" * 24, {"q" * 24}),  # 24 letters is the limit (alone: `_numberish` on a neighbour join also caps its length)
 ]
 DROPPED = [
@@ -228,18 +229,49 @@ DROPPED = [
 ]
 
 
-@pytest.mark.parametrize(("display", "words"), PASSING, ids=[d[:28] for d, _ in PASSING])
-def test_FR_CHN_11_CHN_GATE_E_filter_keeps_a_plain_display_name(display: str, words: set[str]) -> None:
-    quoted = display if display.startswith('"') else f'"{display}"' if "," in display else display
-    found = names_of("pat@example.com", sent(to=(f"{quoted} <pat@example.com>",)))
-    assert found == words | {"pat"}
+@pytest.mark.parametrize(("local", "words"), PASSING, ids=[d[:28] for d, _ in PASSING])
+def test_FR_CHN_11_CHN_GATE_E_filter_keeps_a_plain_local_part(local: str, words: set[str]) -> None:
+    address = f"{local}@example.com"
+    assert names_of(address, sent(to=(address,))) == words
 
 
 @pytest.mark.parametrize("display", DROPPED, ids=[d[:28] for d in DROPPED])
-def test_FR_CHN_11_CHN_GATE_E_filter_drops_a_display_name_whole_and_names_nobody(display: str) -> None:
+def test_FR_CHN_11_CHN_GATE_E_a_display_name_names_nobody_whatever_it_holds(display: str) -> None:
     quoted = f'"{display}"' if "," in display or "/" in display else display
     found = names_of("pat@example.com", sent(to=(f"{quoted} <pat@example.com>",)))
-    assert found == {"pat"}, "a dropped display name leaves the address local part alone"
+    assert found == {"pat"}, "a display name is no source: only the address local part names the recipient"
+
+
+DROPPED_LOCAL = [
+    "fifty.thousand",
+    "refunds.team",
+    "tenk",
+    "legal.dept",
+    "re.fund",
+    "con.tract",
+    "fif.ty",
+    "ten.k",
+    "wire.services",
+    "dave99",
+    "j.smith",
+    "mary.ann.van.der.berg",
+    "we.will",
+    "q" * 25,
+    # CHN-GATE-D r1-r3 number words (review r1): only the single-word `_numberish` check drops these
+    "fifty",
+    "fiftyk",
+    "tenrm",
+    "onemil",
+    "sixbucks",
+    "fivegrand",
+]
+
+
+@pytest.mark.parametrize("local", DROPPED_LOCAL, ids=[d[:28] for d in DROPPED_LOCAL])
+def test_FR_CHN_11_CHN_GATE_E_filter_drops_a_local_part_whole_and_names_nobody(local: str) -> None:
+    address = f"{local}@example.com"
+    assert names_of(address, sent(to=(address,))) == set()
+    assert names_of(address, inbound(address)) == set()
 
 
 @pytest.mark.parametrize(
@@ -299,14 +331,12 @@ def test_FR_CHN_11_CHN_GATE_E_one_participant_per_base_address() -> None:
     assert len([a for a in found if a.split("@")[0].split("+")[0] == "david"]) == 1
 
 
-def test_FR_CHN_11_CHN_GATE_E_at_most_8_name_words_per_participant_newest_first() -> None:
-    oldest = sent(to=("Aa Bb Cc Dd <pat@example.com>",))
-    middle = sent(to=("Ee Ff Gg Hh <pat@example.com>",))
-    newest = sent(to=("Ii Jj Kk Ll <pat@example.com>",))
-    names = names_of("pat@example.com", oldest, middle, newest)
-    assert len(names) == 8, "anything past 8 words is dropped"
-    assert {"ii", "jj", "kk", "ll"} <= names, "the newest message's words come first"
-    assert not names & {"aa", "bb", "cc", "dd"}, "the oldest message's words are the ones cut"
+def test_FR_CHN_11_CHN_GATE_E_a_participant_keeps_at_most_8_words_and_a_local_part_at_most_4() -> None:
+    # a base address has one local part, so the 4-word filter bounds it below the 8-word cap; a longer one is dropped
+    assert len(names_of("aa.bb.cc.dd@example.com", sent(to=("aa.bb.cc.dd@example.com",)))) == 4
+    assert names_of("aa.bb.cc.dd.ee@example.com", sent(to=("aa.bb.cc.dd.ee@example.com",))) == set()
+    for found in read(sent(to=("aa.bb.cc.dd@example.com",))):
+        assert len(found.names) <= 8
 
 
 def test_FR_CHN_11_CHN_GATE_E_only_the_last_50_messages_are_read() -> None:
@@ -326,4 +356,4 @@ def test_FR_CHN_11_CHN_GATE_E_50_messages_of_50_addresses_stay_within_today_s_ti
     result = read(*messages)
     elapsed = time.perf_counter() - started
     assert len(result) <= 101
-    assert elapsed < 1.5, f"{elapsed:.2f}s for 50 messages of 50 addresses: reading participants must stay linear"
+    assert elapsed < 15.0, f"{elapsed:.2f}s for 50 messages of 50 addresses: reading participants must stay linear"

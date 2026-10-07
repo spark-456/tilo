@@ -60,12 +60,23 @@ def held(c) -> None:
 # ---- 1. a name the thread vouches for rides L2 (ADR: "A recipient rides L2") ----
 
 
-def test_FR_CHN_11_CHN_GATE_E_a_recipients_sent_display_name_rides_l2() -> None:
+def test_FR_CHN_11_CHN_GATE_E_a_recipients_address_local_part_words_ride_l2() -> None:
     bench = make_bench("L2")
-    thread = thread_of(bench, sent(to=("David Lee <david@example.com>",)))
-    assert rides_l2(card(bench, thread, "Hi David, works for us.", to=("david@example.com",)))
-    assert rides_l2(card(bench, thread, "Hi David Lee, works for us.", to=("david@example.com",)))
-    assert rides_l2(card(bench, thread, "Hi Lee, works for us.", to=("david@example.com",)))
+    thread = thread_of(bench, sent(to=("David Lee <david.lee@example.com>",)))
+    to = ("david.lee@example.com",)
+    assert rides_l2(card(bench, thread, "Hi David, works for us.", to=to))
+    assert rides_l2(card(bench, thread, "Hi David Lee, works for us.", to=to))
+    assert rides_l2(card(bench, thread, "Hi Lee, works for us.", to=to))
+
+
+def test_FR_CHN_11_CHN_GATE_E_a_recipients_sent_display_name_vouches_nothing() -> None:
+    # 8 Oct amendment: the SENT To name may be a sender's choice that Gmail copied into the user's reply
+    bench = make_bench("L2")
+    thread = thread_of(bench, sent(to=("Prepaid Approved <mallory@example.com>",)))
+    to = ("mallory@example.com",)
+    held(card(bench, thread, "Hi Prepaid Approved, works for us.", to=to))
+    held(card(bench, thread, "Hi Prepaid, works for us.", to=to))
+    assert rides_l2(card(bench, thread, "Hi Mallory, works for us.", to=to)), "its address local part still names it"
 
 
 def test_FR_CHN_11_CHN_GATE_E_a_recipients_address_local_part_rides_l2() -> None:
@@ -82,15 +93,15 @@ def test_FR_CHN_11_CHN_GATE_E_the_replied_to_sender_is_named_by_its_address_loca
     assert rides_l2(card(bench, thread, "Thanks Fox, see you Tuesday.", to=(DANA,)))
 
 
-def test_FR_CHN_11_CHN_GATE_E_the_mailbox_owners_sent_from_name_and_local_part_ride_l2() -> None:
+def test_FR_CHN_11_CHN_GATE_E_only_the_mailbox_local_part_names_the_owner() -> None:
     bench = make_bench("L2")
-    thread = thread_of(bench, sent(to=(DANA,)))
+    thread = thread_of(bench, sent(to=(DANA,)))  # the SENT From name "Sarah Chen" vouches nothing (8 Oct amendment)
+    assert rides_l2(card(bench, thread, "Hi Dana,\n\nFriday 2pm works for us.\n\nBest,\nOps", to=(DANA,)))
     for body in (
         "Hi Dana,\n\nFriday 2pm works for us.\n\nBest,\nSarah",
         "Hi Dana,\n\nFriday 2pm works for us.\n\nBest,\nSarah Chen",
-        "Hi Dana,\n\nFriday 2pm works for us.\n\nBest,\nOps",
     ):
-        assert rides_l2(card(bench, thread, body, to=(DANA,))), body
+        held(card(bench, thread, body, to=(DANA,)))
 
 
 def test_FR_CHN_11_CHN_GATE_E_a_recipient_cc_d_on_the_users_sent_mail_rides_l2() -> None:
@@ -194,24 +205,23 @@ def test_FR_CHN_11_CHN_GATE_E_a_sent_cc_name_belongs_to_that_recipient_only() ->
     assert rides_l2(card(bench, thread, "Hi Priya, works for us.", to=(DANA,), cc=("priya@example.com",)))
 
 
-def test_FR_CHN_11_CHN_GATE_E_the_mailbox_from_name_counts_only_on_its_own_sent_mail() -> None:
+def test_FR_CHN_11_CHN_GATE_E_the_mailbox_from_name_vouches_nothing_on_any_message() -> None:
     bench = make_bench("L2")
     body = "Hi Dana,\n\nFriday 2pm works for us.\n\nBest,\nSarah"
     spoof = Mail("m-spoof", OWN, "Engine tune-up", "x", to=[DANA], labels=["INBOX"])  # From the mailbox, no SENT label
     nolabel = Mail("m-nolabel", OWN, "Engine tune-up", "x", to=[DANA])
     inbound_from_owner = inbound("Sarah Chen <ops@harborview.example>", to=(DANA,))
-    for earlier in (spoof, nolabel, inbound_from_owner):
+    for earlier in (spoof, nolabel, inbound_from_owner, sent(to=(DANA,))):
         held(card(bench, thread_of(bench, earlier), body, to=(DANA,)))
-    assert rides_l2(card(bench, thread_of(bench, sent(to=(DANA,))), body, to=(DANA,)))
 
 
 @pytest.mark.parametrize("display", ["Marcus Reed", "Zebra Pelican"])
-def test_FR_CHN_11_CHN_GATE_E_a_from_header_alone_does_not_make_a_message_the_users_own(display: str) -> None:
+def test_FR_CHN_11_CHN_GATE_E_a_display_name_vouches_nothing_on_a_spoofed_or_a_sent_message(display: str) -> None:
     bench = make_bench("L2")
     spoof = Mail("m-spoof", OWN, "Engine tune-up", "x", to=[f"{display} <{DANA}>"], labels=["INBOX"])
     held(card(bench, thread_of(bench, spoof), f"Hi {display.split()[0]}, works for us.", to=(DANA,)))
-    own = sent(to=(f"{display} <{DANA}>",))
-    assert rides_l2(card(bench, thread_of(bench, own), f"Hi {display.split()[0]}, works for us.", to=(DANA,)))
+    own = sent(to=(f"{display} <{DANA}>",))  # the user's own SENT mail: its display name vouches nothing either
+    held(card(bench, thread_of(bench, own), f"Hi {display.split()[0]}, works for us.", to=(DANA,)))
 
 
 # ---- 4. the name filter reaches the card (ADR: "Filter: ... name nobody") ----
@@ -413,13 +423,14 @@ def test_FR_CHN_11_CHN_GATE_E_a_large_thread_stays_within_today_s_time_per_previ
     )
 )
 def test_FR_CHN_11_CHN_GATE_E_property_a_greeting_rides_l2_only_if_every_name_is_vouched(chosen: list[str]) -> None:
-    # Vouched for this draft (To Dana, mailbox ops with the From name Sarah on SENT mail): dana, fox, ops, sarah.
-    # Not vouched: Marcus (only in the inbound body), Priya (a thread member who is not a recipient), Zoe (nobody).
+    # Vouched for this draft (To dana.fox@, mailbox ops@; display names vouch nothing): dana, fox, ops.
+    # Not vouched: Marcus (only in the inbound body), Priya (a thread member who is not a recipient), Zoe (nobody),
+    # Sarah (only a SENT From display name).
     bench = make_bench("L2")
     thread = thread_of(bench, sent(to=(DANA, "Priya Shah <priya@example.com>")))
     body = f"Hi {' '.join(chosen)}, works for us."
     c = card(bench, thread, body, to=(DANA,))
-    vouched = all(n in {"Dana", "Fox", "Ops", "Sarah"} for n in chosen)
+    vouched = all(n in {"Dana", "Fox", "Ops"} for n in chosen)
     if vouched:
         assert c.tier == "T2" and c.modifiers == (), f"a vouched greeting was held: {body!r}"
     else:
