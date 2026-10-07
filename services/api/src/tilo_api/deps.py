@@ -17,6 +17,7 @@ import functools
 import logging
 import math
 import os
+import re
 import threading
 import time
 from collections.abc import Callable, Iterable, Mapping, Sequence
@@ -45,6 +46,7 @@ from tilo_providers.safety import build_safety_provider
 
 from tilo_api import events, spend
 from tilo_api.access import AccessStore, Mode, enforced, provider_mode
+from tilo_api.appcheck import AppCheckVerifier, default_verifier
 from tilo_api.assistant.config import AssistantConfig, AssistantConfigError, load_assistant_config
 from tilo_api.people_access import NoSourceOwners
 from tilo_api.people_access import SourceOwners as PanelSourceOwners
@@ -222,6 +224,12 @@ def get_access_store() -> AccessStore:
     """SEC-15: where each person's visitor-or-judge declaration is kept. Production has none wired yet, so a
     deployed process closes every gated route (503) rather than guess; tests and the Firestore store override it."""
     raise HTTPException(status_code=503, detail="not_configured")
+
+
+def get_app_check_verifier() -> AppCheckVerifier:
+    """SEC-10: checks a client's App Check token (`tilo_api.appcheck`). Google's keys for the API's own project; dev
+    mode and an unconfigured project refuse without any call. Tests override it; it never decides authorisation."""
+    return default_verifier()
 
 
 def get_spend_caps() -> spend.SpendCaps:
@@ -430,8 +438,66 @@ class SourceOwners(Protocol):
     def owner_of(self, kind: str, ref: str) -> str | None: ...  # kind "mail" or "request"
 
 
+_people_stores_lock = threading.Lock()
+_people_stores: PeopleStores | None = None
+_people_stores_retry_at: float | None = None
+PEOPLE_STORES_BACKOFF_S = 5.0  # after a failed build, no new attempt for this long (FS-18; fixed, 1 to 60 s)
+people_stores_clock: Callable[[], float] = time.monotonic  # read at call time, so a test can replace it
+
+
+def _inside_backoff() -> bool:
+    retry_at = _people_stores_retry_at
+    return retry_at is not None and people_stores_clock() < retry_at
+
+
 def get_people_stores() -> PeopleStores:
-    raise HTTPException(status_code=503, detail="not_configured")  # no Firestore adapter yet (ticket PPL-11c)
+    """The process's one `PeopleStores` (the write limiter and idempotency keys live on it, #549). Built on the first
+    request, single-flight, only for `TILO_PEOPLE_STORE=firestore` plus a valid `TILO_FIRESTORE_PROJECT` (ADR-0023);
+    anything else, or a build that fails, is 503 `not_configured` (the error never echoed). A failed build is
+    remembered for `PEOPLE_STORES_BACKOFF_S`: inside the window a request is refused at once, without the lock and
+    without a client call; after it one request tries again (FS-18)."""
+    global _people_stores, _people_stores_retry_at
+    built = _people_stores
+    if built is not None:
+        return built
+    if _inside_backoff():
+        raise HTTPException(status_code=503, detail="not_configured")
+    with _people_stores_lock:
+        if _people_stores is None:
+            if _inside_backoff():  # the request that held the lock failed while this one waited
+                raise HTTPException(status_code=503, detail="not_configured")
+            from tilo_api.people_firestore import PeopleStoreNotConfigured, open_people_stores  # noqa: PLC0415
+
+            try:
+                _people_stores = open_people_stores()
+                _people_stores_retry_at = None
+            except Exception as exc:
+                logger.warning("people stores not built (%s)", type(exc).__name__)
+                if not isinstance(exc, PeopleStoreNotConfigured):  # no client was tried: nothing to back off from
+                    _people_stores_retry_at = people_stores_clock() + PEOPLE_STORES_BACKOFF_S
+                raise HTTPException(status_code=503, detail="not_configured") from None
+        return _people_stores
+
+
+def _forget_people_stores() -> None:
+    global _people_stores, _people_stores_retry_at
+    with _people_stores_lock:
+        _people_stores, _people_stores_retry_at = None, None
+
+
+get_people_stores.cache_clear = _forget_people_stores  # type: ignore[attr-defined]  # tests start from a cold process
+
+
+_BOOTSTRAP_UID = re.compile(r"u_[0-9A-Za-z_]{1,48}")
+
+
+def get_founder_gate() -> Callable[[str], bool]:
+    """Who may found an empty org (issue #541 item 1, BQ-PPL11C-15): only the uid in `TILO_PEOPLE_BOOTSTRAP_UID`, read
+    on every call and valid only as a `common#user_id` exactly as written. Unset or malformed refuses everyone."""
+    configured = os.environ.get("TILO_PEOPLE_BOOTSTRAP_UID", "")
+    if _BOOTSTRAP_UID.fullmatch(configured) is None:
+        return lambda user_id: False
+    return lambda user_id: user_id == configured
 
 
 def get_clock() -> Callable[[], str]:
@@ -473,6 +539,16 @@ def get_desk_worlds() -> DeskWorlds:
 def get_run_archive() -> Callable[..., RunArchive]:
     """`open_archive(*, org_id, run_id) -> RunArchive`, the run's raw archive. No production store yet: refuses."""
     raise NotImplementedError("no raw-archive store is configured, so no run starts")
+
+
+def get_token_broker() -> Any:
+    """FR-MTG-09: the token broker's adapter-facing half (`access_token_for_adapter`). Unwired: no host run."""
+    raise HTTPException(status_code=503, detail="not_configured")
+
+
+def get_meeting_host_transport() -> Any:
+    """FR-MTG-09: the `Transport` behind `MeetingHostAdapter`. No live transport in dev (EFF-01): refuses."""
+    raise HTTPException(status_code=503, detail="not_configured")
 
 
 REPLAY_ONLY_MESSAGE = "This link is replay-only right now: new work is paused; finished runs can still be replayed."

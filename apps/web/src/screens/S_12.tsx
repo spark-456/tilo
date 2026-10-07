@@ -5,6 +5,7 @@
 // is not finished. Credits come from the same events as the rail. The mark is still, no motion
 // (HR-2); time saved is always marked an estimate and linked beside the figure (PRD 18.4).
 import { useClient } from "../api/ClientProvider";
+import { stagePath } from "../router";
 import { creditsUsed, useRunLog } from "../world/runLog";
 import { worldStatus } from "../world/runSummary";
 import { AppLink } from "./AppLink";
@@ -35,7 +36,7 @@ export function S_12({ params }: ScreenProps) {
             testid="delivery-pending"
             title="Nothing to deliver yet"
             line="This run has not finished yet. The delivery appears here once it completes."
-            action={{ label: "Back to the world", to: `/world/${encodeURIComponent(worldId)}` }}
+            action={{ label: "Back to the world", to: stagePath(worldId) }}
           />
         </div>
       )}

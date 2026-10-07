@@ -1,0 +1,87 @@
+/* WEB-LEGAL: /privacy and /terms. Park tokens only (park/tokens/park.css); no motion, no inline styles (CSP). */
+[data-park].legal-root {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: "Nunito Sans", sans-serif;
+  min-height: 100vh;
+  padding: 0 16px 24px;
+  box-sizing: border-box;
+}
+[data-park] .legal-head,
+[data-park] .legal-main,
+[data-park] .legal-foot {
+  max-width: 720px;
+  margin: 0 auto;
+}
+[data-park] .legal-head {
+  padding: 20px 0 4px;
+}
+[data-park] .legal-logo {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  font-family: "Nunito", sans-serif;
+  font-weight: 900;
+  font-size: 24px;
+  color: var(--logo);
+  text-decoration: none;
+}
+[data-park] .legal-main {
+  font-size: 16px;
+  line-height: 1.6;
+  color: var(--ink2);
+}
+[data-park] .legal-main h1 {
+  font-family: "Nunito", sans-serif;
+  font-weight: 900;
+  font-size: 32px;
+  line-height: 1.2;
+  color: var(--ink);
+  margin: 16px 0 4px;
+}
+[data-park] .legal-main h2 {
+  font-family: "Nunito", sans-serif;
+  font-weight: 800;
+  font-size: 20px;
+  line-height: 1.3;
+  color: var(--ink);
+  margin: 32px 0 8px;
+}
+[data-park] .legal-main p,
+[data-park] .legal-main ul {
+  margin: 0 0 12px;
+}
+[data-park] .legal-main ul {
+  padding-left: 24px;
+}
+[data-park] .legal-main li {
+  margin-bottom: 6px;
+  overflow-wrap: anywhere;
+}
+[data-park] .legal-main p {
+  overflow-wrap: anywhere;
+}
+[data-park] .legal-updated {
+  font-size: 14px;
+  color: var(--ink3);
+}
+[data-park] .legal-root a {
+  color: var(--heroInk);
+  text-underline-offset: 2px;
+}
+[data-park] .legal-root a:focus-visible {
+  outline: 3px solid #5a3fe0;
+  outline-offset: 2px;
+}
+[data-park] .legal-foot {
+  margin-top: 40px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+  font-size: 14px;
+  color: var(--ink3);
+}
+[data-park] .legal-foot a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+}

@@ -1,0 +1,42 @@
+/* NFR-22 replay-only banner. Neutral role tokens only; the label is words, not colour. The box
+   has no size of its own beyond its text, so it fills the flow-slot it replaces (UX-1, CLS). */
+.replay-banner {
+  display: block;
+  box-sizing: border-box;
+  margin: 0 0 var(--space-12);
+  padding: var(--space-12) var(--space-16);
+  border: 2px solid var(--color-ink-2);
+  border-radius: var(--radius-controls);
+  background: var(--color-surface-2);
+  color: var(--color-ink-1);
+  font: 400 var(--text-14) / 1.4 var(--font-ui);
+}
+.replay-banner p {
+  margin: 0 0 var(--space-4);
+}
+.replay-banner .replay-banner-title {
+  font-weight: 700;
+}
+.replay-banner .replay-banner-link {
+  display: inline-block;
+  min-height: 24px;
+  padding: var(--space-4) 0;
+  color: var(--color-ink-1);
+  font-weight: 700;
+  text-decoration: underline;
+}
+.replay-banner .replay-banner-link:focus-visible {
+  outline: 2px solid var(--color-brand-primary);
+  outline-offset: 2px;
+}
+/* Inside a flow screen's action row it spans the row and sits above the button, as a notice does. */
+.flow-actions .replay-banner {
+  flex: 0 0 100%;
+  order: -1;
+}
+@media (max-width: 767px) {
+  .replay-banner .replay-banner-link {
+    min-height: 44px; /* a 44 px target on a phone */
+    padding: var(--space-12) 0;
+  }
+}

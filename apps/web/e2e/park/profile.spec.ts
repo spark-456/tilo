@@ -1,11 +1,11 @@
-// WEB-12 acceptance in a real browser: /park/profile (the route lands with WEB-3a, the page with WEB-12, so
+// WEB-12 acceptance in a real browser: /profile (the route lands with WEB-3a, the page with WEB-12, so
 // this fails until then) at 1440x900 and 390x844, day and night. The h1 (the user's name) is visible, every
 // tab opens with ZERO console errors or warnings, nothing overflows the page sideways (the nav and the
 // notification matrix scroll inside their cards), the key computed values match the design, the matrix
 // switches are 40x24 with a 16px knob travel, and the Appearance cards flip the shell's theme through
 // setPref. The shell's "Sample data" chip arrives in WEB-3b: this spec neither requires nor forbids it.
 // Run on a private port, three workers (a cold Vite start can time out the first test):
-//   TILO_WEB_PORT=5413 pnpm --filter @tilo/web exec playwright test e2e/park/profile.spec.ts --project=chromium --no-deps --workers=3
+//   TILO_WEB_PORT=5413 pnpm --filter @tilo/web exec playwright test e2e/profile.spec.ts --project=chromium --no-deps --workers=3
 //
 // Assumption to settle in WEB-3a (same as team.spec): the day/night toggle in the nav is the button whose
 // accessible name mentions "day" or "night"; the theme is read back from data-time on the [data-park] root.
@@ -20,7 +20,7 @@ const NAME = "Alex Morgan";
 const TABS = ["Profile", "Notifications", "Appearance", "Security", "Plan and billing"] as const;
 
 async function open(page: Page, theme: Theme, tab?: string): Promise<void> {
-  await page.goto(tab ? `/park/profile?tab=${tab}` : "/park/profile");
+  await page.goto(tab ? `/profile?tab=${tab}` : "/profile");
   await expect(page.getByRole("heading", { level: 1, name: NAME, exact: true })).toBeVisible();
   const root = page.locator("[data-park]").first();
   const isNight = async (): Promise<boolean> => (await root.getAttribute("data-time")) === "night";
@@ -38,7 +38,7 @@ const nav = (page: Page) => page.getByRole("navigation", { name: "Settings" });
 const tab = (page: Page, name: string) => nav(page).getByRole("button", { name, exact: true });
 
 for (const [vpName, viewport] of Object.entries(SIZES)) {
-  test.describe(`WEB_12 /park/profile at ${vpName}`, () => {
+  test.describe(`WEB_12 /profile at ${vpName}`, () => {
     test.use({ viewport });
 
     for (const theme of THEMES) {

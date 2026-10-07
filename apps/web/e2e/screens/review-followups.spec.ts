@@ -73,7 +73,7 @@ test("HR_6 an extreme ?speed= shows a clamped, rounded value (#43)", async ({ pa
 
 test("HR_6 the stage fixture player clamps and words its badge too (#43)", async ({ page }) => {
   const problems = watchConsole(page);
-  await page.goto("/?fixture=village-basic&speed=1e308");
+  await page.goto(`${W}/stage?fixture=village-basic&speed=1e308`);
   await expect(page.getByTestId("speed-badge")).toHaveText("Replay at 1000× speed");
   await expect(page.getByTestId("speed-badge")).toHaveAttribute("role", "status");
   expect(problems).toEqual([]);
@@ -82,7 +82,7 @@ test("HR_6 the stage fixture player clamps and words its badge too (#43)", async
 // ---- Not found --------------------------------------------------------------------------------
 
 const UNKNOWN_WORLDS = [
-  "/world/nope",
+  "/world/nope/stage", // WEB-CUTOVER: "/world/nope" is a Park page now; the stage has its own address
   "/world/nope/story",
   "/world/nope/trace",
   "/world/nope/delivery",
@@ -100,8 +100,14 @@ for (const path of [...UNKNOWN_WORLDS, ...EXTRA_SEGMENTS]) {
   test(`HR_1 ${path} says Not found and shows no run`, async ({ page }) => {
     const problems = watchConsole(page);
     await page.goto(`${path}${FAST.replace("?", path.includes("?") ? "&" : "?")}`);
-    await expect(page.getByRole("heading", { level: 1, name: "Not found" })).toBeVisible();
-    await expect(page.getByTestId("not-found")).toBeVisible();
+    if (EXTRA_SEGMENTS.includes(path)) {
+      // WEB-CUTOVER: an address no screen owns is the Park "Page not found" (Root.tsx, isKeptPath), not the old one
+      await expect(page.getByRole("heading", { level: 1, name: "Page not found" })).toBeVisible();
+      await expect(page.getByTestId("park-not-found")).toBeVisible();
+    } else {
+      await expect(page.getByRole("heading", { level: 1, name: "Not found" })).toBeVisible();
+      await expect(page.getByTestId("not-found")).toBeVisible();
+    }
     // Nothing of the village run, and not the Start screen either.
     for (const id of ["story-lens", "trace-lens", "delivery", "inspect-panel", "world-hud"]) {
       await expect(page.getByTestId(id)).toHaveCount(0);
@@ -118,7 +124,9 @@ for (const path of [...UNKNOWN_WORLDS, ...EXTRA_SEGMENTS]) {
 test("HR_1 Not found offers the way back, and the known world still works", async ({ page }) => {
   await page.goto("/world/nope/story");
   await page.getByRole("link", { name: "Back to Start" }).click();
-  await expect(page.getByRole("heading", { level: 1, name: "What should Tilo do?" })).toBeVisible();
+  // WEB-CUTOVER: the way back is "/", the Park Home (S-01 is replaced).
+  await expect(page).toHaveURL(/\/$/);
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText(/^Good \w+, Alex\.$/);
   await page.goto(`${W}/story${FAST}`);
   await expect(page.getByRole("heading", { level: 1, name: "Story" })).toBeVisible();
   await expect(page.getByTestId("story-lens")).toContainText("Done: 1 reply sent", {
@@ -143,7 +151,7 @@ test("PRD-17.5 Escape closes the mobile HUD sheet and focus returns to its summa
   page,
 }) => {
   await page.setViewportSize(MOBILE);
-  await page.goto(`${W}${FAST}`);
+  await page.goto(`${W}/stage${FAST}`);
   const summary = page.getByText("World status");
   await summary.click();
   const inside = page.locator("details.hud-sheet a").first();
@@ -240,11 +248,11 @@ for (const viewport of [MOBILE, NARROW]) {
 
 const RUN_PAGES = [
   "/library",
-  "/worlds",
+  "/worlds/replays",
   "/autonomy",
   "/channels",
   "/mail",
-  "/team",
+  "/team/console",
   "/connections",
   "/library/artifacts",
   "/estimate",
@@ -278,7 +286,8 @@ for (const path of RUN_PAGES) {
 
 test("UX_1 screens that show no run keep the honest empty rail", async ({ page }) => {
   await page.setViewportSize(DESKTOP);
-  for (const path of ["/", "/more", "/needs-you"]) {
+  // WEB-CUTOVER: "/" is the Park Home; S-02 is the old shell's start of the flow, with no run on screen.
+  for (const path of ["/task/task_fixture_1/understanding", "/more", "/needs-you"]) {
     await page.goto(path);
     await expect(page.getByTestId("right-rail")).toContainText("Nothing yet");
   }

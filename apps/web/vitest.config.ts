@@ -16,6 +16,9 @@ export default defineConfig({
   resolve: { alias: [{ find: /%20/g, replacement: " " }] },
   test: {
     environment: "node",
+    // SEC-10: the Firebase web config the build supplies in production (`just deploy-web`). Fake test values, so
+    // the App Check tests reach the SDK (which they replace by a fake); no key literal is committed.
+    env: { VITE_FIREBASE_API_KEY: "test-web-api-key", VITE_FIREBASE_PROJECT_ID: "demo-tilo-web" },
     // A jsdom render is a few hundred ms alone but seconds under load; a timeout only has to catch a hang.
     testTimeout: 30_000,
     maxWorkers: 8,
