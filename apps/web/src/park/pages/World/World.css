@@ -155,6 +155,17 @@
   align-items: flex-end;
   justify-content: center;
   gap: 4px;
+  max-width: 100%;
+}
+/* On a narrow map the buildings shrink together (same ratio) instead of being cropped. */
+[data-park] .park-world-rowitem {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+[data-park] .park-world-bigart img,
+[data-park] .park-world-bigart svg {
+  max-width: 100%;
+  height: auto;
 }
 [data-park] .park-world-tag {
   position: absolute;
@@ -790,4 +801,43 @@
 [data-park] .park-world-toolchip:focus-visible {
   outline: 3px solid #5a3fe0;
   outline-offset: 2px;
+}
+
+/* ---- Narrow windows (the design has no rule here; these keep text from overprinting or clipping) ---- */
+@media (max-width: 560px) {
+  /* Districts: the name and note take the top line, the counts and the chip sit under them. */
+  [data-park] .park-world-dinfo--stack {
+    grid-column: 2 / -1;
+    grid-row: 1;
+  }
+  [data-park] .park-world-dprog--stack {
+    grid-column: 2 / 4;
+    grid-row: 2;
+  }
+  [data-park] .park-world-dchip--stack {
+    grid-column: 4;
+    grid-row: 2;
+  }
+  /* Skills and Tools: the label sits above its chips, so a chip has the card's width. */
+  [data-park] .park-world-skillsrow--stack,
+  [data-park] .park-world-toolsrow--stack {
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: 6px;
+  }
+  [data-park] .park-world-rowlabel--stack {
+    padding-top: 0;
+  }
+  /* A long chip name wraps inside the chip and the chip gets taller (min 28px). */
+  [data-park] .park-world-chipfit {
+    height: auto;
+    min-height: 28px;
+    text-align: left;
+  }
+  [data-park] .park-world-chipfit .park-world-chipname {
+    padding: 4px 0;
+    overflow: visible;
+    overflow-wrap: anywhere;
+    text-overflow: clip;
+    white-space: normal;
+  }
 }

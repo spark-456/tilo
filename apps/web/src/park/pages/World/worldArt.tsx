@@ -28,7 +28,7 @@ export function rowArt(row: NonNullable<World["row"]>, night: boolean): ReactNod
   const name = (b: NonNullable<World["row"]>[number]): string =>
     `${typeof b[0] === "string" ? b[0] : b[0].i}|${b[1]}|${b[2]}`;
   return keyed(row, name).map(([key, b], i) => (
-    <div key={key} style={{ marginLeft: i ? -40 : 0 }}>
+    <div key={key} className="park-world-rowitem" style={{ marginLeft: i ? -40 : 0 }}>
       {kit.building(b[0], b[1], b[2], 200, night) as ReactNode}
     </div>
   ));

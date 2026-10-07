@@ -138,14 +138,14 @@ export function FactsCard({ w, skills, tools, onSkill, onTools }: FactsProps) {
           <span className="park-world-factvalue">{v}</span>
         </div>
       ))}
-      <div className="park-world-skillsrow">
-        <span className="park-world-rowlabel">Skills</span>
+      <div className="park-world-skillsrow park-world-skillsrow--stack">
+        <span className="park-world-rowlabel park-world-rowlabel--stack">Skills</span>
         <div className="park-world-chips">
           {skills.map((s) => (
             <button
               key={s.id}
               type="button"
-              className="park-world-skillchip"
+              className="park-world-skillchip park-world-chipfit"
               onClick={() => onSkill(s.id)}
             >
               {icon("bolt", 12)}
@@ -157,11 +157,16 @@ export function FactsCard({ w, skills, tools, onSkill, onTools }: FactsProps) {
           ) : null}
         </div>
       </div>
-      <div className="park-world-toolsrow">
-        <span className="park-world-rowlabel">Tools</span>
+      <div className="park-world-toolsrow park-world-toolsrow--stack">
+        <span className="park-world-rowlabel park-world-rowlabel--stack">Tools</span>
         <div className="park-world-chips">
           {tools.map((t) => (
-            <button key={t.name} type="button" className="park-world-toolchip" onClick={onTools}>
+            <button
+              key={t.name}
+              type="button"
+              className="park-world-toolchip park-world-chipfit"
+              onClick={onTools}
+            >
               <span className="park-world-mono" style={{ color: t.colour }}>
                 {t.mono}
               </span>

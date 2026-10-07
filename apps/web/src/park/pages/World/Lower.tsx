@@ -21,11 +21,11 @@ function DistrictRow({ d }: { d: WorldDistrict }) {
       <span className="park-world-dtile" style={{ background: look[3], color: look[4] }}>
         {icon(d.icon, 18)}
       </span>
-      <span className="park-world-dinfo">
+      <span className="park-world-dinfo park-world-dinfo--stack">
         <span className="park-world-dname">{d.name}</span>
         <span className="park-world-dnote">{d.note}</span>
       </span>
-      <span className="park-world-dprog">
+      <span className="park-world-dprog park-world-dprog--stack">
         <span className="park-world-dcount">{`${d.done} of ${d.total} buildings · ${d.agents} agents`}</span>
         <span className="park-world-dbar">
           <span
@@ -34,7 +34,10 @@ function DistrictRow({ d }: { d: WorldDistrict }) {
           />
         </span>
       </span>
-      <span className="park-world-dchip" style={{ background: look[1], color: look[2] }}>
+      <span
+        className="park-world-dchip park-world-dchip--stack"
+        style={{ background: look[1], color: look[2] }}
+      >
         {look[0]}
       </span>
     </div>

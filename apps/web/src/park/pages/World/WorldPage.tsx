@@ -52,9 +52,9 @@ function MapArt({
   );
 }
 
-function Frame({ children }: { children?: ReactNode }) {
+function Frame({ children, worldId }: { children?: ReactNode; worldId?: string }) {
   return (
-    <div className="park-world-root" data-testid="park-page-world">
+    <div className="park-world-root" data-testid="park-page-world" data-world-id={worldId}>
       <PageSheet>{children}</PageSheet>
     </div>
   );
@@ -139,7 +139,7 @@ export function WorldPage({ app }: { app: AppCtx }) {
   };
 
   return (
-    <Frame>
+    <Frame worldId={w.id}>
       <nav aria-label="Breadcrumb" className="park-world-crumb">
         <GoLink className="park-world-back" href="#worlds" onGo={() => app.go("worlds")}>
           {icon("arrowL", 15)}Worlds
