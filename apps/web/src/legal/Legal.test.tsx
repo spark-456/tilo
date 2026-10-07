@@ -89,7 +89,10 @@ describe("WEB_LEGAL_privacy_page", () => {
     const { readFileSync } = await import("node:fs");
     const { resolve } = await import("node:path");
     const yaml = readFileSync(resolve(__dirname, "../../../../config/connectors.yaml"), "utf8");
-    const declared = new Set(yaml.match(/https:\/\/www\.googleapis\.com\/auth\/[a-z.]+/g));
+    const declared = new Set(
+      (yaml.match(/https:\/\/www\.googleapis\.com\/auth\/[a-z.]+/g) ?? []).map((u) => u.split("/auth/")[1]),
+    );
+    expect(declared.size).toBe(6);
     expect(new Set(SCOPES.map((s) => s.scope))).toEqual(declared);
   });
 });

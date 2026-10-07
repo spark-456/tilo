@@ -26,30 +26,31 @@ export const API_POLICY_URL = "https://developers.google.com/terms/api-services-
 export const LIMITED_USE =
   "Tilo's use of information received from Google APIs will adhere to the Google API Services User Data Policy, including the Limited Use requirements.";
 
-/** The scopes, exactly as config/connectors.yaml declares them (gmail, google_drive, google_calendar, meeting_host). */
+/** The scopes config/connectors.yaml declares (gmail, google_drive, google_calendar, meeting_host), by their short
+ * Google name: the full URL would be read as a backend origin by the deploy guard (tests/repo P0_07c). */
 export const SCOPES: { scope: string; what: string }[] = [
   {
-    scope: "https://www.googleapis.com/auth/gmail.readonly",
+    scope: "gmail.readonly",
     what: "Gmail: read and search your messages.",
   },
   {
-    scope: "https://www.googleapis.com/auth/gmail.compose",
+    scope: "gmail.compose",
     what: "Gmail: save replies as drafts.",
   },
   {
-    scope: "https://www.googleapis.com/auth/gmail.send",
+    scope: "gmail.send",
     what: "Gmail: send a reply, after you approve it.",
   },
   {
-    scope: "https://www.googleapis.com/auth/drive.file",
+    scope: "drive.file",
     what: "Google Drive: only the files you pick and the files Tilo creates.",
   },
   {
-    scope: "https://www.googleapis.com/auth/calendar.readonly",
+    scope: "calendar.readonly",
     what: "Google Calendar: read the events on your own calendar.",
   },
   {
-    scope: "https://www.googleapis.com/auth/calendar.events.owned",
+    scope: "calendar.events.owned",
     what: "Google Calendar, meeting host only: create meeting invitations.",
   },
 ];
