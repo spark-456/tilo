@@ -1,6 +1,6 @@
 // WEB-MOTION-1 (PRD 9.4 HR-1 to HR-7; docs/open-questions.md BQ-WEB-3, decided by the user 6 Oct 2026;
 // ADR-0003a 5): the Park city's ambient motion (cars and walkers) is allowed, and nothing that depicts Tilo's
-// own agents is. "Ambient non-agent motion built as designed, on by default, one flag PARK_AMBIENT_MOTION;
+// own agents is. "Ambient non-agent motion built as designed, on by default, one off switch (the motion setting "still" or reduced motion; no build variable, see BQ-WEB-MOTION-1 (z));
 // agents animate only from events; narrow reasoned honestyScan.ts allowlist entry".
 // This pins the allowlist's SHAPE: where the exceptions may live and what they must say. It does not name a
 // file the builder must use; any file under park/shell or park/engines will do.
