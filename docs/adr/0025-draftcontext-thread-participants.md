@@ -1,8 +1,9 @@
 # ADR-0025: DraftContext thread participants (the L2 name slot)
 
-- Status: Proposed (architect, 2026-10-07). Needs the user's own yes, and the user has not confirmed
-  in chat (answers relayed by the supervisor are recorded under Decisions below). It changes what
-  may ride the L2 undo window, which is a T3 path, so its build ticket gets a security review and
+- Status: Accepted (user, 2026-10-07). The user's own message: "I accept ADR-0025 (DraftContext
+  thread participants, PR #536) as written: names come only from the draft's recipients and the
+  mailbox, and I accept the residual risk. #525 is already merged". It changes what may ride the L2
+  undo window, which is a T3 path, so its build ticket (CHN-GATE-E) still gets a security review and
   the user's yes before merge (root `CLAUDE.md`). Numbered 0025 because ADR-0024 is taken by PR #501.
 - Deciders: user (approval), architect (proposal)
 - Requirement: FR-CHN-11 and FR-CHN-12 (PRD 10.4: L2 is for T2 only, and "money, contract or legal
@@ -42,13 +43,15 @@
    card, model output or drafter result ever fills it. An Edit reads the thread again. The builder
    may share one fetch with `_known` and `inbound_is_clean`; their trust rules do not change.
 3. **Where names come from.** The last `MAX_MESSAGES` messages, headers parsed with the same bounded
-   parser and caps as `_addresses`:
-   - a participant's own From display name (the name it gave itself);
+   parser and caps as `_addresses`. Names come only from the draft's recipients and the mailbox
+   owner:
    - To and Cc display names on the mailbox's own `SENT` messages (the user's client wrote them);
-   - the words of every participant's local part, split on `. _ - +`;
-   - for the mailbox: its local part, and its From display name on `SENT` messages only.
-   A display name a third party wrote for someone else (an inbound To or Cc) names nobody. No
-   thread, or a failed read: the only names are the mailbox's local part (fail closed).
+   - the words of every participant's address local part, split on `. _ - +`;
+   - for the mailbox: its local part, and its From display name on `SENT` messages only (the user's
+     own SENT mail, not inbound mail).
+   An inbound participant's own From display name is NOT a name source, and neither is a display
+   name a third party wrote for someone else (an inbound To or Cc): both name nobody. No thread, or
+   a failed read: the only names are the mailbox's local part (fail closed).
 4. **Name filter.** A display name or local part is split into words on spaces, `.`, `,` and `-`,
    and dropped whole unless: every word is 2 to 24 ASCII letters (one inner apostrophe allowed);
    there are at most 4 words; `inbound_signal` finds nothing in the words joined with spaces or
@@ -89,15 +92,21 @@
 4. No names at L2 (only "Hi," and "Hi there,"): safest and simplest, but most real drafts greet by
    name, so L2 would rarely apply. It is the fallback if this ADR is rejected.
 5. Names from Google Contacts: needs a new scope and a contacts-port change; later, if wanted.
+6. Names from every thread participant's own From display name: rejected by the user (2026-10-07),
+   because it lets an inbound sender choose a name that then rides L2 back to it (see the residual
+   risk below).
 
 ## Consequences
 - A word the thread does not vouch for never fills a name slot, however it is spelled. The round 4
   forms above go to T3, and the number-word list stops growing.
 - New safe false positives (T3, a person decides): a nickname in no header ("Dave" for David), a
   name of more than 4 words or with non-letters, a recipient the thread never names.
-- Residual risk (the relayed decision below does not accept it): a sender can name itself with an
-  amount-like token the filter misses (a glued form, as in the BQ-274 word-edge gap), and get it
-  back in a reply to a clean inbound message. Fixing the inbound gap fixes this too.
+- Residual risk, accepted by the user (2026-10-07): a sender can still name itself through its own
+  address local part (it chooses it), and an amount-like token the name filter misses (a glued form,
+  as in the BQ-274 word-edge gap) could be sent back in a reply to a clean inbound message. The
+  inbound From display name is no longer a source, which removes the widest channel. The name filter
+  runs `inbound_signal`, and the BQ-274 word-edge fix landed as PR #550 (CHN-GATE-F), so
+  CHN-GATE-E does not depend on it. What is left is the filter's own gaps, which the user accepts.
 - One more thread read per decision, unless the fetch is shared.
 - Migration: `participants` defaults to `()`, so every constructor still works. The channels
   benches (`services/channels/tests/_chn11_lib.py`, the GATE-C and GATE-D files) give their threads
@@ -107,9 +116,12 @@
 ## Tests it enables (build ticket CHN-GATE-E: tests first, names carry FR_CHN_11)
 - Not in the thread is T3: "Hi Fifty Thousand, works for us." with only David in the thread; a
   property test: any word neither in `_WORDS` nor a participant name gives "unlisted".
-- A participant rides L2: "Hi David, works for us." with `From: David Lee`.
+- A recipient rides L2: "Hi David, works for us." with a `SENT` message `To: David Lee
+  <david@example.com>`, and with only the address `david@example.com` (local part).
 - Trust: an inbound `Cc: Fifty Thousand <david@example.com>` does not name David; an inbound
-  `To: Tenk <mailbox>` does not name the user; a thread member who is not a recipient is T3.
+  `From: Fifty Thousand <sender@example.com>` does not name that sender (an inbound From name is
+  not a source); an inbound `To: Tenk <mailbox>` does not name the user; a thread member who is not
+  a recipient is T3. The mailbox's From name counts only on its own `SENT` mail.
 - Filter: display names "Fifty Thousand", "Refunds Team", "Tenk" and "Legal Dept" name nobody.
 - A caller's `participants` is thrown away; a failing reader leaves no names.
 - Privacy: no participant name in the card, events or captured logs.
@@ -117,22 +129,22 @@
   addresses stay within today's time per call.
 - An amount or number word that appears in the thread is still "unlisted" in the draft.
 
-## Decisions (relayed by supervisor, awaiting user confirmation)
-The user has not confirmed these in chat. They are the supervisor's answers to the three questions
-below (2026-10-07). Status stays Proposed and flips to Accepted only on the user's own message.
-1. Question 1: do not accept the residual self-echo risk. The BQ-274 inbound word-edge fix lands
-   before CHN-GATE-E ships.
-2. Question 2: names come from the draft's recipients and the mailbox owner only: the From name only
-   on the user's own SENT mail, To and Cc names there, and address local parts. Not from every
-   thread participant. If confirmed, decision 3 narrows to match (its first bullet, a participant's
-   own From name, goes); the numbered text above stays as proposed until then.
-3. Question 3: PR #525 merges as the interim fix once its local trial passes.
+## Decisions (user, 2026-10-07)
+The user accepted this ADR in their own message (quoted under Status). Their answers to the three
+questions below replace the supervisor's relayed answers.
+1. The user ACCEPTS the residual self-echo risk. This is the ADR's original default and supersedes
+   the supervisor's relayed answer 1 (do not accept it). The BQ-274 inbound word-edge fix landed
+   anyway as PR #550 (CHN-GATE-F), so CHN-GATE-E no longer depends on it.
+2. Names come only from the draft's recipients and the mailbox owner: the From name only on the
+   user's own SENT mail, To and Cc names there, and address local parts. An inbound participant's own
+   From display name is not a name source. Decision 3 above is edited to say exactly this, so the ADR
+   does not contradict itself.
+3. PR #525 merged as the interim fix (already done); CHN-GATE-E builds on it.
 
-## Questions for the user (rows go into `docs/open-questions.md` once accepted)
-All three are answered by relay above and stay open until the user confirms. Relayed answer 1 differs
-from the default below; 2 and 3 match theirs.
-1. Accept the residual risk above, or land the BQ-274 inbound word-edge fix before CHN-GATE-E
-   merges? Default: accept it.
+## Questions for the user (resolved by the user, 2026-10-07)
+No row goes into `docs/open-questions.md`: all three are answered, and this ADR is the record.
+1. Accept the residual risk, or land the BQ-274 inbound word-edge fix before CHN-GATE-E merges?
+   Resolved: accepted; the BQ-274 fix merged anyway as PR #550.
 2. Names only from the draft's recipients and the mailbox (decision 5), or from every thread
-   participant? Default: recipients and mailbox.
-3. Merge PR #525 first as the interim fix (it passed review; CHN-GATE-E builds on it)? Default: yes.
+   participant? Resolved: recipients and mailbox only.
+3. Merge PR #525 first as the interim fix? Resolved: yes, already merged.
