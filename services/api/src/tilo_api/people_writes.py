@@ -11,23 +11,24 @@ from __future__ import annotations
 
 import re
 import secrets
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass
 from typing import Annotated, Any, Literal
 
 from fastapi import HTTPException, Request
 from pydantic import BaseModel, ConfigDict, Field, StrictBool, ValidationError, field_validator, model_validator
-from tilo_people.access import AccessRequest, project
+from tilo_memory.artifacts import ArtifactNotFound, ArtifactStore, Scope
+from tilo_people.access import AccessRequest, decide, project
 from tilo_people.dates import resolve_due
 from tilo_people.directory import Directory
 from tilo_people.errors import NotFound, VersionConflict
-from tilo_people.stores import PeopleStores, RecordStore
+from tilo_people.stores import PeopleStores, RecordStore, meeting_tombstone
 from tilo_people.text import clean_line
 from tilo_people.writes import check_write
 from tilo_policy.schemas import conforms
 
 from tilo_api import deps
-from tilo_api.people_quotes import MAX_HISTORY
+from tilo_api.people_quotes import GONE, MAX_HISTORY
 
 
 class Refusal(HTTPException):
@@ -43,7 +44,36 @@ def _identity(text: str) -> str:
 
 
 _ASCII_CONTROL = re.compile(r"[\x00-\x1f\x7f]")
+_FILLERS = frozenset({0x115F, 0x1160, 0x3164, 0xFFA0})  # default-ignorable letters: invisible, never meaningful
+_UNASSIGNED_IGNORABLE = frozenset({0x2065, 0x2800})  # unassigned default-ignorable, and the blank braille cell
+
+
+def _plane14_hidden(o: int) -> bool:
+    """Plane 14 is variation selectors and unassigned points. Tag characters already go in `clean_line` (Cf), on
+    purpose: they are the ASCII-smuggling channel, so subdivision flags are stored as a bare black flag."""
+    return 0xE0000 <= o <= 0xE0FFF and not 0xE0020 <= o <= 0xE007F
+
+
+def _unhide(text: str) -> str:
+    """Invisible characters `clean_line` leaves (default-ignorable Lo and Mn) out, so none can split a token or a link
+    before the redactor runs. An invisible mark stays only after a non-ASCII character (an emoji keeps its variation
+    selector), and U+FE0E/U+FE0F after a keycap base only when U+20E3 follows (`1` `FE0F` `20E3`)."""
+    out: list[str] = []
+    for i, c in enumerate(text):
+        o = ord(c)
+        if o in _FILLERS or o in _UNASSIGNED_IGNORABLE or 0xFFF0 <= o <= 0xFFF8 or _plane14_hidden(o):
+            continue
+        if o in (0x34F, 0x17B4, 0x17B5) or 0x180B <= o <= 0x180F or 0xFE00 <= o <= 0xFE0F:
+            before = out[-1] if out else ""
+            keycap = before != "" and before in "#*0123456789" and o in (0xFE0E, 0xFE0F) and text[i + 1 : i + 2] == "⃣"
+            if before.isascii() and not keycap:
+                continue
+        out.append(c)
+    return "".join(out)
+
+
 DUE_TEXT_MAX = 60  # work_item.due_text maxLength
+_FROM = ("meeting", "transcript")  # calendar_entry.source.from values that name a meeting
 
 
 # --- closed request bodies: a field the server owns is a 422 ------------------------------------------------------
@@ -165,7 +195,7 @@ class Writer:
         character cannot hide a link from the redactor or the schema), then the secret redactor, then the schema.
         ASCII controls are never stripped or joined: the schema refuses them (a line break is a 422), and the
         redactor's output is checked again, since one that removes a multi-line block could otherwise hide them."""
-        cleaned = "".join(c for c in value if c.isascii() or clean_line(c))
+        cleaned = _unhide("".join(c for c in value if c.isascii() or clean_line(c)))
         redacted = self.redact(cleaned)
         if _ASCII_CONTROL.search(redacted):
             raise Refusal(422, "invalid_record")
@@ -237,6 +267,8 @@ def confirm_item(w: Writer, item_id: str) -> dict[str, Any]:
     item = stored.record
     ref = item["source"]["ref"] or ""
     found = w.stores.meetings.get(w.org, ref.partition("#")[0]) if item["source"]["kind"] == "meeting" else None
+    if found is not None and found.record["status"] in GONE:  # nothing is released from a gone meeting (#464)
+        raise _not_found()
     after = {
         **item,
         "status": "open",
@@ -259,6 +291,71 @@ def confirm_minutes(w: Writer, meeting_id: str) -> dict[str, Any]:
     request = AccessRequest(w.actor, "confirm", "meeting", stored.record, w.now)
     w.commit(request, after, w.stores.meetings, d, _not_found(), version=stored.version)
     return after
+
+
+def _drop_proposed(store: RecordStore, org: str, record_id: str, state: str) -> None:
+    """Deletes the record while it still exists and is proposed (a racing confirm keeps it); a lost race is retried."""
+    for _ in range(3):
+        current = store.get(org, record_id)
+        if current is None or current.record[state] != "proposed":
+            return
+        try:
+            return store.delete(org, record_id, expected_version=current.version)
+        except NotFound:
+            return
+        except VersionConflict:
+            continue
+    raise VersionConflict(f"VersionConflict: {store.kind} {record_id}")
+
+
+def _made_from(meeting_id: str, source: Mapping[str, Any] | None) -> bool:
+    """A source naming the meeting or one of its action items (`mt_x`, `mt_x#ai1`) as Tilo's origin (PE-08)."""
+    if source is None:  # a pin may have no source
+        return False
+    ref = source.get("ref")
+    meeting_made = source.get("kind") == "meeting" or (source.get("kind") == "tilo" and source.get("from") in _FROM)
+    return meeting_made and isinstance(ref, str) and ref.partition("#")[0] == meeting_id
+
+
+def remove_meeting(w: Writer, artifacts: ArtifactStore, meeting_id: str) -> dict[str, Any]:
+    """The owner deletes a meeting and what was made from it (FR-MTG-10, PE-16, PE-19): the transcript and minutes
+    artifacts, then the *proposed* items, pins and calendar entries made from it (what the owner released stays the
+    assignee's), then the tombstone by compare-and-set, last, so a failure leaves the meeting live and a retry
+    finishes. Every step is idempotent; a deleted meeting answers the same again."""
+    stored, me = w.stores.meetings.get(w.org, meeting_id), w.stores.persons.get(w.org, w.actor)
+    if stored is None or me is None:
+        raise _not_found()
+    m = stored.record
+    if not decide(AccessRequest(w.actor, "edit", "meeting", m, w.now), Directory.of([me.record])).allowed:
+        raise _not_found()
+    if m["status"] != "deleted":
+        if m.get("world_id") is not None:  # no world, no artifact: nothing is stored outside a world
+            scope = Scope(m["org_id"], m["world_id"], m["owner"])
+            for ref in (m["transcript"], m["minutes"]):
+                if ref is not None:
+                    _purge(artifacts, scope, ref["artifact_id"])
+        for store, state in ((w.stores.work_items, "status"), (w.stores.pins, "status"), (w.stores.calendar, "state")):
+            for row in store.list(w.org):
+                if row.record[state] == "proposed" and _made_from(meeting_id, row.record["source"]):
+                    _drop_proposed(store, w.org, row.record["id"], state)
+        try:
+            w.stores.meetings.replace(meeting_tombstone(m), expected_version=stored.version)
+        except VersionConflict:
+            raise Refusal(409, "version_conflict", code="version_conflict") from None
+        except NotFound:
+            raise _not_found() from None
+    return {"id": meeting_id, "status": "deleted"}
+
+
+def _purge(artifacts: ArtifactStore, scope: Scope, artifact_id: str) -> None:
+    """Every stored version of one artifact: blob generations and manifests, then the record (the FR-MEM-09 adapter)."""
+    try:
+        versions = artifacts.versions(scope, artifact_id)
+    except ArtifactNotFound:
+        return  # already gone: a retry
+    prefix = f"orgs/{scope.org_id}/worlds/{scope.world_id}/artifacts/{artifact_id}/versions"
+    for version in versions:
+        artifacts.retention().delete(f"{prefix}/{version.version:06d}")
 
 
 def create_meeting(w: Writer, body: MeetingIn) -> dict[str, Any]:

@@ -1,0 +1,524 @@
+/* WEB-10 Team page. Values are read from design "Tilo App Team.dc.html" (user's prototype, ADR-0003a).
+   Every selector sits under [data-park]; classes carry the park-team- prefix; colours are tokens.
+   No transition, animation or keyframes: the details fade, the hover fades and the 1.8 s flash timer
+   arrive with WEB-3b (BQ-WEB-3). */
+
+/* ---- heading and invite ---- */
+[data-park] .park-team-top {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+[data-park] .park-team-titles {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+[data-park] .park-team-titlerow {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+}
+[data-park] .park-team-h1 {
+  margin: 0;
+  font-family: "Nunito", sans-serif;
+  font-weight: 900;
+  font-size: 36px;
+  letter-spacing: -0.8px;
+  line-height: 1.05;
+}
+[data-park] .park-team-h1:focus {
+  outline: none;
+}
+[data-park] .park-team-count {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--ink3);
+}
+[data-park] .park-team-intro {
+  margin: 0;
+  font-size: 15.5px;
+  font-weight: 600;
+  color: var(--ink2);
+}
+[data-park] .park-team-invite {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+[data-park] .park-team-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  box-sizing: border-box;
+  height: 42px;
+  width: 280px;
+  max-width: 100%;
+  padding: 0 12px;
+  border-radius: 12px;
+  background: var(--field);
+  border: 1px solid var(--line);
+  color: var(--ink2);
+}
+[data-park] .park-team-field:focus-within {
+  outline: 3px solid #5a3fe0;
+  outline-offset: 2px;
+}
+[data-park] .park-team-input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  font-family: inherit;
+  font-size: 14.5px;
+  font-weight: 600;
+  color: var(--ink);
+}
+[data-park] .park-team-input::placeholder {
+  color: var(--ink3);
+}
+
+/* ---- cards ---- */
+[data-park] .park-team-card {
+  box-sizing: border-box;
+  min-width: 0;
+  background: var(--card);
+  border: 1px solid var(--line2);
+  border-radius: 22px;
+}
+[data-park] .park-team-members {
+  padding: 14px 18px 6px;
+}
+[data-park] .park-team-cover-card,
+[data-park] .park-team-rules,
+[data-park] .park-team-matrix,
+[data-park] .park-team-empty {
+  display: flex;
+  flex-direction: column;
+}
+[data-park] .park-team-cover-card {
+  padding: 18px 20px 8px;
+  scroll-margin-top: 110px;
+}
+[data-park] .park-team-cover-card[data-flash="true"] {
+  border: 2px solid #f0a500;
+}
+[data-park] .park-team-rules {
+  padding: 18px 20px 8px;
+}
+[data-park] .park-team-matrix {
+  padding: 18px 20px 12px;
+}
+[data-park] .park-team-empty {
+  padding: 18px 20px;
+}
+[data-park] .park-team-two {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr));
+  gap: 18px;
+  align-items: start;
+}
+[data-park] .park-team-cardhead {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-bottom: 10px;
+}
+[data-park] .park-team-cardhead--split {
+  align-items: flex-end;
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+[data-park] .park-team-heading {
+  line-height: 1.35;
+}
+[data-park] .park-team-h2 {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 800;
+}
+[data-park] .park-team-h2--matrix {
+  margin: 0 0 10px;
+}
+[data-park] .park-team-hint {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--ink2);
+}
+[data-park] .park-team-link {
+  font-size: 13.5px;
+  font-weight: 800;
+  color: var(--heroInk);
+  text-decoration: none;
+}
+[data-park] .park-team-link:hover {
+  color: var(--hero);
+}
+
+/* ---- members table (scrolls sideways inside its card) ---- */
+[data-park] .park-team-scroll {
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+[data-park] .park-team-table {
+  min-width: 820px;
+}
+/* Real table elements, laid out as blocks and grids so the design's column templates apply. */
+[data-park] .park-team-blk {
+  display: block;
+  width: 100%;
+  border-collapse: collapse;
+}
+[data-park] :where(.park-team-blk) th,
+[data-park] :where(.park-team-blk) td {
+  padding: 0;
+  font-weight: inherit;
+  text-align: left;
+}
+[data-park] .park-team-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) 150px 110px 110px 100px 44px;
+  column-gap: 16px;
+  align-items: center;
+}
+[data-park] .park-team-head {
+  height: 36px;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.6px;
+  color: var(--ink3);
+}
+[data-park] .park-team-person {
+  border-top: 1px solid var(--line2);
+}
+[data-park] .park-team-row {
+  min-height: 64px;
+}
+[data-park] .park-team-who {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+[data-park] .park-team-avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  box-sizing: border-box;
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
+  border: 1.5px dashed transparent;
+  color: #1f1d2b;
+  font-size: 13.5px;
+  font-weight: 800;
+}
+[data-park] .park-team-avatar--pending {
+  background: transparent;
+  border-color: var(--line);
+  color: var(--ink);
+}
+[data-park] .park-team-id {
+  min-width: 0;
+  line-height: 1.35;
+}
+[data-park] .park-team-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14.5px;
+  font-weight: 800;
+}
+[data-park] .park-team-tag {
+  display: flex;
+  align-items: center;
+  height: 20px;
+  padding: 0 7px;
+  border-radius: 6px;
+  font-size: 11.5px;
+  font-weight: 800;
+}
+[data-park] .park-team-tag--you {
+  background: var(--heroSoft);
+  color: var(--heroInk);
+}
+[data-park] .park-team-tag--ok {
+  background: var(--okSoft);
+  color: var(--okInk);
+}
+[data-park] .park-team-sub {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+[data-park] .park-team-select {
+  width: 100%;
+  height: 36px;
+  padding: 0 10px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--field);
+  color: var(--ink);
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 800;
+  cursor: pointer;
+}
+[data-park] .park-team-select:disabled {
+  opacity: 0.7;
+}
+[data-park] .park-team-select--backup {
+  width: auto;
+  height: 34px;
+  border: 1px solid var(--amberLine);
+  background: var(--amberSoft);
+  color: var(--amberInk);
+  font-size: 13.5px;
+}
+[data-park] .park-team-strong {
+  font-size: 14px;
+  font-weight: 800;
+}
+[data-park] .park-team-helped {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+[data-park] .park-team-track {
+  flex: 1;
+  max-width: 48px;
+  height: 6px;
+  border-radius: 99px;
+  background: var(--track);
+  overflow: hidden;
+}
+[data-park] .park-team-fill {
+  display: block;
+  height: 100%;
+  background: var(--hero);
+  border-radius: 99px;
+}
+[data-park] .park-team-active {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--ink2);
+}
+[data-park] .park-team-active--now {
+  color: var(--okInk);
+}
+[data-park] .park-team-more {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--ink2);
+  cursor: pointer;
+}
+[data-park] .park-team-more:hover,
+[data-park] .park-team-more[aria-expanded="true"] {
+  background: var(--chip);
+}
+[data-park] .park-team-select:focus-visible,
+[data-park] .park-team-more:focus-visible,
+[data-park] .park-team-btn:focus-visible {
+  outline: 3px solid #5a3fe0;
+  outline-offset: 2px;
+}
+
+/* ---- member details ---- */
+[data-park] .park-team-details {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 16px 24px;
+  margin: 0 0 14px 52px;
+  padding: 14px 16px;
+  border-radius: 16px;
+  background: var(--sunk);
+}
+[data-park] .park-team-fact {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+[data-park] .park-team-fact-k {
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  color: var(--ink3);
+}
+[data-park] .park-team-fact-v {
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+[data-park] .park-team-actions {
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+  flex-wrap: wrap;
+}
+[data-park] .park-team-btn {
+  height: 34px;
+  padding: 0 12px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--btn2);
+  color: var(--ink);
+  font-family: inherit;
+  font-size: 13.5px;
+  font-weight: 800;
+  cursor: pointer;
+  white-space: nowrap;
+}
+[data-park] .park-team-btn--red {
+  color: var(--redInk);
+}
+
+/* ---- coverage ---- */
+[data-park] .park-team-cover {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) 110px minmax(150px, auto);
+  gap: 14px;
+  align-items: center;
+  padding: 12px 0;
+  border-top: 1px solid var(--line2);
+}
+[data-park] .park-team-what {
+  min-width: 0;
+  font-size: 14.5px;
+  font-weight: 800;
+}
+[data-park] .park-team-covwho {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+[data-park] .park-team-avs {
+  display: flex;
+}
+[data-park] .park-team-av {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 99px;
+  border: 2px solid var(--pop);
+  margin-right: -6px;
+  font-size: 11px;
+  font-weight: 900;
+  color: #1f1d2b;
+}
+[data-park] .park-team-names {
+  margin-left: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+[data-park] .park-team-wait {
+  font-size: 13.5px;
+  font-weight: 800;
+  color: var(--ink);
+  white-space: nowrap;
+}
+[data-park] .park-team-wait--slow {
+  color: var(--amberInk);
+}
+[data-park] .park-team-act {
+  display: flex;
+  justify-content: flex-end;
+}
+[data-park] .park-team-covered {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--okInk);
+}
+
+/* ---- rules and role matrix ---- */
+[data-park] .park-team-tile {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  flex: none;
+  width: 44px;
+  height: 44px;
+  border-radius: 13px;
+  background: var(--amberTile);
+  overflow: hidden;
+}
+[data-park] .park-team-rule {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 0;
+  border-top: 1px solid var(--line2);
+}
+[data-park] .park-team-ruletext {
+  flex: 1;
+  min-width: 0;
+  line-height: 1.4;
+}
+[data-park] .park-team-ruleby {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink2);
+}
+[data-park] .park-team-mrow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) repeat(4, 72px);
+  align-items: center;
+}
+[data-park] .park-team-mhead {
+  height: 32px;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.4px;
+  color: var(--ink3);
+}
+[data-park] .park-team-mbody {
+  min-height: 40px;
+  border-top: 1px solid var(--line2);
+}
+[data-park] .park-team-mlabel {
+  font-size: 14px;
+  font-weight: 700;
+}
+[data-park] .park-team-mcell {
+  display: flex;
+  justify-content: center;
+}
+[data-park] .park-team-check {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--track);
+}
+[data-park] .park-team-check--on {
+  background: var(--okSoft);
+  color: var(--ok);
+}
