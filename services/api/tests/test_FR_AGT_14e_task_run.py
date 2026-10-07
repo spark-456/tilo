@@ -694,7 +694,7 @@ def test_FR_AGT_14e_a_world_is_never_its_own_prior_world(rig: SchedApi) -> None:
 
 def test_FR_AGT_14e_skipped_and_the_prior_world_are_taken_as_data_within_their_bounds(rig: SchedApi) -> None:
     source = scheduled(rig)
-    response = rig.task_call(task_body("sched_a", MON_0330Z, skipped=100_000, prior_world_id=source.world_id))
+    response = rig.task_call(task_body("sched_a", MON_0330Z, skipped=99_999, prior_world_id=source.world_id))
     assert response.status_code == 200 and response.json() == {"ran": 1, "state": "parked"}, response.text
     world_id = only_world(rig, source)
     assert rig.store.worlds[world_id].prior_world_id == source.world_id  # offered to the new world, never reused

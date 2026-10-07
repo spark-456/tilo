@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import math
 import threading
+import time
 from datetime import UTC, datetime, timedelta
 from typing import Any
 from unittest.mock import MagicMock
@@ -372,8 +373,10 @@ def test_FR_AGT_14_store_only_one_of_many_concurrent_claimers_wins(rig: StoreRig
     threads = [threading.Thread(target=worker, daemon=True) for _ in range(16)]
     for t in threads:
         t.start()
+    deadline = time.monotonic() + 120  # one shared deadline: the emulator's transaction retries are slow under load
     for t in threads:
-        t.join(timeout=30)
+        t.join(timeout=max(0.0, deadline - time.monotonic()))
+    assert not any(t.is_alive() for t in threads), "a claimer was still running after 120 s"
     assert wins.count(True) == 1 and len(wins) == 16
 
 

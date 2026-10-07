@@ -106,7 +106,7 @@ class TaskRunIn(BaseModel):  # extra="forbid"
     schedule_id: str  # ^sched_[0-9A-Za-z_]{1,64}$ fullmatch, else 422
     slot: str  # the slot key
     due: str  # ISO-8601, UTC-aware
-    skipped: int  # 0..100000, default 0 (R1, untrusted, only drives the collapsed-slots alert)
+    skipped: int  # 0..99999, default 0 (R1, untrusted, only drives the collapsed-slots alert)
     prior_world_id: str | None  # null or a world id (R1, untrusted, offered only if it is the owner's world)
 ```
 
