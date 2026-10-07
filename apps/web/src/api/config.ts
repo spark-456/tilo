@@ -7,13 +7,22 @@ import { HttpClient } from "./http";
 export interface ClientConfig {
   readonly apiUrl: string | undefined;
   readonly search: string;
+  /** SEC-10: the App Check token getter, handed to the HTTP client only. The fixture client never asks. */
+  readonly appCheckToken?: (() => Promise<string | null>) | undefined;
+  /** SEC-15: the Firebase ID token getter, handed to the HTTP client only. The fixture client never asks. */
+  readonly authToken?: (() => Promise<string | null>) | undefined;
 }
 
 /** `?client_delay_ms=N` adds a fixed latency to the fixture client so tests can observe loading
  * and busy states deterministically. */
-export function chooseClient({ apiUrl, search }: ClientConfig): TiloClient {
+export function chooseClient({
+  apiUrl,
+  search,
+  appCheckToken,
+  authToken,
+}: ClientConfig): TiloClient {
   const url = apiUrl?.trim();
-  if (url) return new HttpClient({ baseUrl: url });
+  if (url) return new HttpClient({ baseUrl: url, appCheckToken, authToken });
   const delay = Number(new URLSearchParams(search).get("client_delay_ms"));
   return new FixtureClient({
     delayMs: Number.isFinite(delay) && delay > 0 ? delay : 0,

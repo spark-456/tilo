@@ -30,6 +30,11 @@ def test_P0_07a_firebase_hosting_serves_the_vite_build_as_a_spa(repo_root: pathl
     assert "vite build" in pkg["scripts"]["build"], "apps/web build script must run vite build"
     # P0-07e (documented test change): the catch-all `**` became `!/assets/**`; exact source pinned in the 07e tests.
     assert any(r.get("destination") == "/index.html" for r in hosting["rewrites"]), "SPA rewrite to /index.html"
+    # SEC-15 / SIGNIN (documented test change, BQ-SIGNIN-5): the CSP names two public hostnames whose spelling holds a
+    # searched word: the project's own sign-in iframe on its auth domain and the SDK's Secure Token REST host (`token`).
+    # Only those two are removed first (test_P0_07c_deploy_web.py pins that each appears exactly once).
+    for origin in ("https://essential-wares-510320-f0.firebaseapp.com/__/auth/", "https://securetoken.googleapis.com"):
+        text = text.replace(origin, "")
     assert not re.search(r"tilo-demo|apiKey|secret|token|essential-wares", text, re.I), "no project id or secrets here"
 
 

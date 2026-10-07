@@ -1,12 +1,19 @@
 """tilo_providers.schema_probe — which part of a Director request does Vertex AI refuse? (PL-02, EFF-01).
 
 One tiny capped call per request variant on the Director role's primary profile, straight through the Google adapter on
-user ADC: (a) no schema, (b) JSON mode only, (c) the sanitized schema, (d) the raw schema, plus three thinking-config
-variants. One status line per variant (ok / ok_truncated / rejected with the HTTP status / another failure code), then
-the cost. Prints no prompt and no schema; for a 400 it prints the server's scrubbed, capped reason (`vertex_smoke`),
-check it before pasting. Same gate as `vertex_smoke`: refused unless the live switch is exactly "1", checked first;
-`--dry-run` (alias `--replay`) prints the plan and sends nothing. The schema is passed in by the caller, so this
-package does not import the planner. Prices come only from the prices file (PL-06); no model id is named here."""
+user ADC. First, when the caller passes the real Director brief request (`director=`), the `director_*` variants:
+`director_exact` replays it (the adapter's own config: system prompt, JSON mode, sanitized schema, no thinking config;
+short task text, small output cap); if Google rejects it, one variant per suspicious field removed runs, so a single
+run pins the 400 on a field; if Google accepts it, they are skipped and `director_exact_real_cap` tries the role's
+real output cap (quoted first: over the default ceiling it is not sent). Each variant edits a copy of what
+`GoogleModelProvider._config_kwargs` builds, never a hand copy. Then the older variants: (a) no schema, (b) JSON mode
+only, (c) the sanitized schema, (d) the raw schema, plus three thinking-config variants. One status line per variant
+(ok / ok_truncated / rejected with the HTTP status / another failure code / skipped_*), then the cost. Prints no prompt
+and no schema; for a 400 it prints the server's scrubbed, capped reason (`vertex_smoke`), check it before pasting.
+Every call is quoted before it is made and skipped if the quote would take the total over the ceiling. Same gate as
+`vertex_smoke`: refused unless the live switch is exactly "1", checked first; `--dry-run` (alias `--replay`) prints the
+plan and sends nothing. The schema and the Director request are passed in by the caller, so this package does not
+import the planner. Prices come only from the prices file (PL-06); no model id is named here."""
 
 from __future__ import annotations
 
@@ -14,7 +21,7 @@ import argparse
 import copy
 import os
 import sys
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -34,7 +41,11 @@ from tilo_providers.vertex_smoke import (
 
 PROBE_ROLE = "director"
 PROBE_PROMPT = "Reply with a JSON object describing a calm harbour town at sunrise, in plain words."  # fixed, synthetic
-DEFAULT_MAX_CREDITS = 2.0  # ceiling; the seven calls cost about 0.1 credit in all
+DEFAULT_MAX_CREDITS = 2.0  # ceiling: the older seven cost about 0.1 credit, an accepted director call about 0.4
+ROUTER_DEFAULT_OUT = 1024  # the Router's own default when neither the request nor the role names a cap (BQ-63)
+ACCEPTED = frozenset({"ok", "ok_truncated", "blocked"})  # Google took the request; a 400 is "rejected"
+
+Edit = Callable[[dict[str, Any]], dict[str, Any]]
 
 
 @dataclass(frozen=True)
@@ -60,10 +71,115 @@ VARIANTS = (
 VARIANT_NAMES = tuple(v.name for v in VARIANTS)
 
 
+# --- the exact Director request and its one-field-removed variants (PL-02 follow-up 3) ----------------------------
+
+
+def _each_schema(node: Any, change: Callable[[dict[str, Any]], dict[str, Any]]) -> Any:
+    """`change` applied to every sub-schema, innermost first; property names are never read as keywords."""
+    if not isinstance(node, dict):
+        return node
+    out = dict(node)
+    for key in ("properties", "$defs"):
+        if isinstance(out.get(key), dict):
+            out[key] = {name: _each_schema(sub, change) for name, sub in out[key].items()}
+    if isinstance(out.get("anyOf"), list):
+        out["anyOf"] = [_each_schema(branch, change) for branch in out["anyOf"]]
+    if "items" in out:
+        out["items"] = _each_schema(out["items"], change)
+    return change(out)
+
+
+def _drop_empty(node: dict[str, Any]) -> dict[str, Any]:
+    """Properties whose schema is `{}` (untyped: no documented meaning on Vertex) removed, and from `required`."""
+    properties = node.get("properties")
+    if isinstance(properties, dict) and (empty := {n for n, s in properties.items() if s == {}}):
+        node["properties"] = {n: s for n, s in properties.items() if n not in empty}
+        if isinstance(node.get("required"), list):
+            node["required"] = [n for n in node["required"] if n not in empty]
+    return node
+
+
+def _no_null_branch(node: dict[str, Any]) -> dict[str, Any]:
+    """`anyOf: [X, {"type": "null"}]` becomes X (its title and description kept)."""
+    branches = node.get("anyOf")
+    if isinstance(branches, list):
+        kept = [branch for branch in branches if branch != {"type": "null"}]
+        if len(kept) == 1 < len(branches) and isinstance(kept[0], dict):
+            return {**{k: v for k, v in node.items() if k != "anyOf"}, **kept[0]}
+    return node
+
+
+def _without(*keywords: str) -> Callable[[dict[str, Any]], dict[str, Any]]:
+    return lambda node: {k: v for k, v in node.items() if k not in keywords}
+
+
+def _schema_edit(change: Callable[[dict[str, Any]], dict[str, Any]]) -> Edit:
+    def edit(kwargs: dict[str, Any]) -> dict[str, Any]:
+        if isinstance(kwargs.get("response_json_schema"), dict):
+            kwargs["response_json_schema"] = _each_schema(copy.deepcopy(kwargs["response_json_schema"]), change)
+        return kwargs
+
+    return edit
+
+
+def _pop(field: str) -> Edit:
+    return lambda kwargs: {k: v for k, v in kwargs.items() if k != field}
+
+
+def _system_without_role(kwargs: dict[str, Any]) -> dict[str, Any]:
+    """The SDK sends a string system instruction with role "user"; a `Content` without a role goes out without one."""
+    if isinstance(kwargs.get("system_instruction"), str):
+        from tilo_providers.google_adapter import _genai_module  # noqa: PLC0415  # dry runs never load the SDK
+
+        types_mod = _genai_module("google.genai.types")
+        part = types_mod.Part(text=kwargs["system_instruction"])
+        kwargs = {**kwargs, "system_instruction": types_mod.Content(parts=[part])}
+    return kwargs
+
+
+@dataclass(frozen=True)
+class DirectorVariant:
+    name: str
+    change: str  # what differs from `director_exact`, for the plan line (never prompt or schema text)
+    edit: Edit | None = None
+    real_cap: bool = False
+
+
+DIRECTOR_VARIANTS = (
+    DirectorVariant("director_exact", "none (short task text, small output cap)"),
+    DirectorVariant("director_no_system", "system_instruction removed", _pop("system_instruction")),
+    DirectorVariant("director_system_no_role", "system_instruction sent without role", _system_without_role),
+    DirectorVariant("director_no_schema", "response_json_schema removed, JSON mode kept", _pop("response_json_schema")),
+    DirectorVariant("director_schema_no_empty", "untyped {} properties removed", _schema_edit(_drop_empty)),
+    DirectorVariant("director_schema_no_null_anyof", "anyOf [X, null] sent as X", _schema_edit(_no_null_branch)),
+    DirectorVariant(
+        "director_schema_no_titles", "title and description removed", _schema_edit(_without("title", "description"))
+    ),
+    DirectorVariant(
+        "director_schema_no_item_bounds",
+        "minItems and maxItems removed",
+        _schema_edit(_without("minItems", "maxItems")),
+    ),
+    DirectorVariant("director_exact_real_cap", "the role's real output cap", real_cap=True),
+)
+DIRECTOR_VARIANT_NAMES = tuple(v.name for v in DIRECTOR_VARIANTS)
+
+
+def _dependent_status(variant: DirectorVariant, exact: str) -> str | None:
+    """None when `variant` runs, given the exact replay's status; else why it is skipped."""
+    if exact == "skipped_ceiling":
+        return "skipped_ceiling"
+    if exact not in ACCEPTED and exact != "rejected":  # auth, quota, ...: no field can be blamed
+        return "skipped_exact_failed"
+    if variant.real_cap:  # the cap matters only once the small-cap replay is accepted
+        return None if exact in ACCEPTED else "skipped_exact_rejected"
+    return None if exact == "rejected" else "skipped_exact_accepted"
+
+
 @dataclass
 class ProbeRow:
     variant: str
-    status: str  # ok | ok_truncated | blocked | skipped_ceiling | a `vertex_smoke` failure code
+    status: str  # ok | ok_truncated | blocked | skipped_* | a `vertex_smoke` failure code
     http: int | None = None
     error: str | None = None
     reason: str = ""
@@ -79,6 +195,10 @@ def _plan_line(variant: Variant) -> str:
     return f"variant={variant.name} schema={schema} json_mode={variant.json_mode} thinking={thinking}"
 
 
+def _director_plan_line(variant: DirectorVariant, cap: int) -> str:
+    return f'variant={variant.name} base=director_exact change="{variant.change}" max_output_tokens={cap}'
+
+
 def _row_line(row: ProbeRow) -> str:
     parts = [f"variant={row.variant}", f"status={row.status}"]
     if row.http is not None:
@@ -91,22 +211,30 @@ def _row_line(row: ProbeRow) -> str:
     return " ".join(parts)
 
 
-def _provider(raw: bool, profile: Any, profile_id: str, project: str, location: str, client: Any) -> Any:
+def _provider(
+    raw: bool, profile: Any, profile_id: str, project: str, location: str, client: Any, edit: Edit | None = None
+) -> Any:
     from tilo_providers.google_adapter import GoogleModelProvider  # noqa: PLC0415  # dry runs never load the adapter
 
-    class _Raw(GoogleModelProvider):
+    class _Probe(GoogleModelProvider):
         def _schema_for_send(self, schema: dict[str, Any]) -> dict[str, Any]:
-            return copy.deepcopy(schema)  # variant (d): what the adapter sent before the fix
+            # raw: variant (d), what the adapter sent before the fix
+            return copy.deepcopy(schema) if raw else super()._schema_for_send(schema)
 
         def _thinking_for_send(self, level: str) -> str:
-            return level  # minimal stays minimal: tests what Vertex says to it
+            return level if raw else super()._thinking_for_send(level)  # raw: minimal stays minimal
 
-    return (_Raw if raw else GoogleModelProvider)(profile, profile_id, project, location, client=client)
+        def _config_kwargs(self, request: GenerateRequest) -> dict[str, Any]:
+            kwargs = super()._config_kwargs(request)  # the real send's fields; a director variant edits a copy
+            return edit(dict(kwargs)) if edit is not None else kwargs
+
+    return _Probe(profile, profile_id, project, location, client=client)
 
 
 def run_schema_probe(
     schema: dict[str, Any],
     *,
+    director: GenerateRequest | None = None,  # the real Director brief request (`tilo_planning.brief.brief_request`)
     environ: Mapping[str, str] | None = None,
     models_path: Path | str | None = None,
     prices_path: Path | str | None = None,
@@ -128,12 +256,18 @@ def run_schema_probe(
     profile_id = config.roles[PROBE_ROLE].primary
     profile = config.profiles[profile_id]
     _check_prices(config)
+    # The Router's rule (BQ-63): the request's own cap, else the role's, else its default.
+    real_cap = (director.max_output_tokens if director else None) or config.roles[PROBE_ROLE].max_output_tokens
+    real_cap = real_cap or ROUTER_DEFAULT_OUT
+    directors = DIRECTOR_VARIANTS if director is not None else ()
     header = (
         f"probe role={PROBE_ROLE} profile={profile_id} max_output_tokens={max_output_tokens} "
         f"ceiling={max_total_credits:.4f}"
     )
     if dry_run:
         print(header, file=out)
+        for dv in directors:
+            print(f"{_director_plan_line(dv, real_cap if dv.real_cap else max_output_tokens)} (dry-run)", file=out)
         for variant in VARIANTS:
             print(f"{_plan_line(variant)} (dry-run)", file=out)
         print("dry-run: nothing was sent", file=out)
@@ -158,6 +292,37 @@ def run_schema_probe(
     print(header, file=out)
     rows: list[ProbeRow] = []
     total = 0.0
+
+    def attempt(name: str, request: GenerateRequest, est_in: int, raw: bool = False, edit: Edit | None = None) -> None:
+        nonlocal total
+        cap = request.max_output_tokens or 0
+        upper = config.credits((est_in * quote.input + cap * quote.output) / 1e6)  # quoted before the call
+        if total + upper > max_total_credits:
+            row = ProbeRow(name, "skipped_ceiling")
+        else:
+            row = _send(_provider(raw, profile, profile_id, project, location, client, edit), request)
+            row.variant = name
+            if row.status in ACCEPTED and row.tokens_in == 0:
+                row.tokens_in = est_in  # a truncated reply reports no input count: the estimate stands in
+            row.credits = config.credits((row.tokens_in * quote.input + row.tokens_out * quote.output) / 1e6)
+        total += row.credits
+        rows.append(row)
+        print(_row_line(row), file=out)
+
+    if director is not None:
+        from tilo_providers.router import _input_text  # noqa: PLC0415  # what the Router measures for a request
+
+        exact = "skipped_ceiling"
+        for dv in DIRECTOR_VARIANTS:
+            skip = None if dv.name == "director_exact" else _dependent_status(dv, exact)
+            if skip is not None:
+                rows.append(ProbeRow(dv.name, skip))
+                print(_row_line(rows[-1]), file=out)
+                continue
+            request = director.model_copy(update={"max_output_tokens": real_cap if dv.real_cap else max_output_tokens})
+            attempt(dv.name, request, len(_input_text(request, request.prompt)) // 3 + 1, edit=dv.edit)
+            if dv.name == "director_exact":
+                exact = rows[-1].status
     for variant in VARIANTS:
         request = GenerateRequest(
             prompt=PROBE_PROMPT,
@@ -167,18 +332,7 @@ def run_schema_probe(
             thinking_level=variant.thinking,
         )
         est_in = (len(PROBE_PROMPT) + (len(repr(schema)) if variant.schema else 0)) // 3 + 1  # tokens, a guess
-        upper = config.credits((est_in * quote.input + max_output_tokens * quote.output) / 1e6)
-        if total + upper > max_total_credits:
-            row = ProbeRow(variant.name, "skipped_ceiling")
-        else:
-            row = _send(_provider(variant.unmapped, profile, profile_id, project, location, client), request)
-            row.variant = variant.name
-            if row.status in ("ok", "ok_truncated", "blocked") and row.tokens_in == 0:
-                row.tokens_in = est_in  # a truncated reply reports no input count: the estimate stands in
-            row.credits = config.credits((row.tokens_in * quote.input + row.tokens_out * quote.output) / 1e6)
-        total += row.credits
-        rows.append(row)
-        print(_row_line(row), file=out)
+        attempt(variant.name, request, est_in, raw=variant.unmapped)
     print(f"total credits={total:.4f} ceiling={max_total_credits:.4f}", file=out)
     return rows
 
@@ -206,6 +360,7 @@ def main(
     *,
     environ: Mapping[str, str] | None = None,
     schema: dict[str, Any],
+    director: GenerateRequest | None = None,
     client: Any = None,
 ) -> int:
     parser = argparse.ArgumentParser(prog="live_vertex_probe_schema", description=__doc__.split("\n\n")[0])
@@ -220,6 +375,7 @@ def main(
     try:
         run_schema_probe(
             schema,
+            director=director,
             environ=environ,
             models_path=args.models_file,
             prices_path=args.prices_file,
