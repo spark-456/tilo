@@ -20,7 +20,7 @@ import time
 from types import SimpleNamespace
 
 import pytest
-from _api_lib import as_principal, make_principal, make_world
+from _api_lib import as_full_session, as_principal, make_principal, make_world
 from _cards_lib import FakeClock, add_seconds, clone_card, load_valid_card, new_ulid
 from _cards_lib import FakeEventWriter as CardWriter
 from fastapi.testclient import TestClient
@@ -102,7 +102,8 @@ def at(n: int) -> str:
 
 
 def sign_in(user: str, role: str = "owner", world_id: str | None = None, districts: tuple[str, ...] = ()) -> None:
-    as_principal(make_principal(user_id=user, role=role, world_id=world_id, districts=districts))
+    # a full web sign-in session (BQ-XWORLD-10): the feed shows it full cards in every world in scope (BQ-XWORLD-9)
+    as_principal(as_full_session(make_principal(user_id=user, role=role, world_id=world_id, districts=districts)))
 
 
 def feed(client, **params):
@@ -622,6 +623,7 @@ def test_S_06_feed_property_items_equal_the_union_of_the_per_world_routes_for_ev
     snapshot = [(w.world_id, [r.status for r in (w.cards._records.get(w.world_id) or {}).values()]) for w in worlds]
     for user, role, named, districts in _CALLERS:
         me = make_principal(user_id=user, role=role, world_id=named, districts=districts)
+        me = as_full_session(me)  # a full web sign-in session (BQ-XWORLD-10)
         in_scope = (
             [w.world_id for w in worlds if w.owner == user]
             if role == "owner"

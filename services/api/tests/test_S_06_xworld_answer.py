@@ -21,8 +21,8 @@ import secrets
 from types import SimpleNamespace
 
 import pytest
-from _api_lib import as_principal, make_principal, make_store, make_world
-from _cards_lib import FakeClock, clone_card, load_valid_card, new_ulid
+from _api_lib import as_full_session, as_principal, make_principal, make_store, make_world
+from _cards_lib import FakeClock, clone_card, load_valid_card, new_ulid, redacted_card_summary
 from _cards_lib import FakeEventWriter as CardWriter
 from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
@@ -100,10 +100,16 @@ def sign_in(
     channel: str = "web",
     districts: tuple[str, ...] = (),
     from_channels: bool = False,
+    full_session: bool | None = None,
 ) -> None:
     """The verified principal (the only source of who answers and on which channel) and whether the request was
-    authenticated as tilo-channels acting for an email session."""
-    as_principal(make_principal(user_id=user, role=role, world_id=world_id, channel=channel, districts=districts))
+    authenticated as tilo-channels acting for an email session. A user's own web or mobile_web session here is a full
+    web sign-in, so it carries the server-set `full_session` marker (BQ-XWORLD-10); an email session never does.
+    `full_session` overrides that default."""
+    if full_session is None:
+        full_session = channel in ("web", "mobile_web") and not from_channels
+    principal = make_principal(user_id=user, role=role, world_id=world_id, channel=channel, districts=districts)
+    as_principal(as_full_session(principal, full_session))
     app.dependency_overrides[cards.get_channels_caller] = lambda: from_channels
 
 
@@ -508,7 +514,8 @@ def test_S_06_xworld_logs_carry_no_token_cookie_or_card_text(client, store, capl
 @pytest.mark.parametrize("channel", ["web", "mobile_web", "email"])
 def test_S_06_xworld_owner_reads_another_owned_worlds_cards_exactly_as_the_feed_shows_them(client, store, channel):
     """BQ-XWORLD-6: `GET /worlds/{B}/cards` opens for the owner cross-world, matching `GET /cards` (which has no channel
-    rule) and what a session bound to B sees; reading writes nothing."""
+    rule) and what a session bound to B sees; reading writes nothing. A session that is not a full web sign-in (the
+    email one) reads the redacted summary of those cards instead (BQ-XWORLD-9)."""
     World(store, A, ALICE).add("needs_you", seed="a")
     wb = World(store, B, ALICE)
     for n, kind in enumerate(KINDS):
@@ -521,7 +528,10 @@ def test_S_06_xworld_owner_reads_another_owned_worlds_cards_exactly_as_the_feed_
     cross = client.get(f"/worlds/{B}/cards")
 
     assert cross.status_code == 200, cross.text
-    assert cross.json() == reference.json()
+    # changed deliberately: supervisor decision 7 Oct, BQ-XWORLD-9/10. An email session is not a full web sign-in, so
+    # its cross-world read is the redacted summary of the same cards; web and mobile_web here are full sessions.
+    expected = reference.json() if channel != "email" else [redacted_card_summary(c) for c in reference.json()]
+    assert cross.json() == expected
     assert cross.json() == [i["card"] for i in client.get("/cards").json()["cards"] if i["world_id"] == B]
     assert wb.writer.parts == []
 
@@ -582,14 +592,15 @@ _MODES = [  # (principal channel, tilo-channels caller, claimed channel)
     kind=st.sampled_from(list(KINDS)),
     valid_option=st.booleans(),
     mode=st.sampled_from(_MODES),
+    full=st.booleans(),  # changed deliberately: supervisor decision 7 Oct, BQ-XWORLD-9/10 (the full-session marker)
 )
 def test_S_06_xworld_property_only_an_owners_own_web_session_answers_and_only_a_person_authorises(
-    client, user, role, session_world, record_owner, card_store_owner, kind, valid_option, mode
+    client, user, role, session_world, record_owner, card_store_owner, kind, valid_option, mode, full
 ):
-    """For any caller in a world other than B: the answer lands only for role owner, in their own web or mobile_web
-    session, when both the WorldRecord and the run's CardStore name them as B's owner; then every existing check
-    decides as for a bound session, and every authorisation written is that person's. Anything else is the
-    unknown-world 404 and writes nothing (FR-HIL-04: no T3 without a person)."""
+    """For any caller in a world other than B: the answer lands only for role owner, in their own full web or mobile_web
+    sign-in session (the full_session marker, BQ-XWORLD-10), when both the WorldRecord and the run's CardStore name
+    them as B's owner; then every existing check decides as for a bound session, and every authorisation written is
+    that person's. Anything else is the unknown-world 404 and writes nothing (FR-HIL-04: no T3 without a person)."""
     p_channel, from_channels, claimed = mode
     store = make_store()
     use(store)
@@ -597,7 +608,15 @@ def test_S_06_xworld_property_only_an_owners_own_web_session_answers_and_only_a_
     World(store, D, BOB)
     wb = World(store, B, record_owner, card_store_owner=card_store_owner)
     card = wb.add(kind, district="D1", assignee=user if role == "approver" else None)
-    sign_in(user, role=role, world_id=session_world, channel=p_channel, districts=("D1",), from_channels=from_channels)
+    sign_in(
+        user,
+        role=role,
+        world_id=session_world,
+        channel=p_channel,
+        districts=("D1",),
+        from_channels=from_channels,
+        full_session=full,
+    )
     option = KINDS[kind][1] if valid_option else "not_an_option"
 
     response = outcome(post_answer(client, B, card["id"], option, claimed))
@@ -607,6 +626,7 @@ def test_S_06_xworld_property_only_an_owners_own_web_session_answers_and_only_a_
         and user == record_owner == card_store_owner
         and p_channel in ("web", "mobile_web")
         and not from_channels
+        and full  # changed deliberately: supervisor decision 7 Oct, BQ-XWORLD-9/10 (no marker: the unknown-world 404)
     )
     if not eligible:
         assert response == unknown_world(client, card["id"], option, claimed)

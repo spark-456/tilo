@@ -1,6 +1,7 @@
 # API-CARDS-XWORLD: an owner answers cards across the worlds they own (S-06; FR-HIL-01, FR-HIL-04, FR-HIL-11, SEC-06, SEC-07, SEC-11)
 
-Tests: `test_S_06_xworld_answer.py` (every name contains `S_06_xworld`). Issue #539. Open questions: BQ-XWORLD-1..8
+Tests: `test_S_06_xworld_answer.py` and `test_S_06_xworld_session.py` (every name contains `S_06_xworld`). Issue #539.
+Session kind and redacted reads: the last two sections (API-CARDS-XWORLD-2). Open questions: BQ-XWORLD-1..10
 (docs/open-questions.md). No contract change: the events written are byte for byte those of a bound answer, and the audit
 of the session's world is an application log record, not an event (BQ-XWORLD-4, BQ-XWORLD-5).
 
@@ -52,3 +53,28 @@ is the unknown-world 404. Non-owner roles stay bound.
 ## One scope (BQ-XWORLD-7)
 For an owner, the worlds they can answer in = the worlds `GET /worlds` lists = the worlds `GET /cards` covers (BQ-S14-1,
 BQ-S06-1). For anyone else, only the world their principal names. The S-06 feed and S-14 list tests are unchanged.
+
+## Session kind (API-CARDS-XWORLD-2, BQ-XWORLD-10; supervisor decision 7 Oct on PR #561)
+Tests: `test_S_06_xworld_session.py` (every name contains `S_06_xworld`).
+- `deps.Principal` gains `full_session: bool = False`: true only for a full web sign-in session, set only by the server
+  that resolves the session. In dev mode the dev principal (`tilo_api.dev`) is that session (`full_session=True`).
+  Nothing in a request (header, query, cookie or body field) sets it. `deps.Principal` is not a contract (nothing in
+  `contracts/` or `packages/contracts-*` defines it), so this is no contract change.
+- Cross-world answers need the marker in addition to every rule above (role owner, channel `web` or `mobile_web`, not a
+  tilo-channels caller, both owner checks); it replaces none of them. A principal on channel `web` or `mobile_web` without
+  the marker (a signed-link landing session) and every email session stay bound: any other world is the unknown-world
+  404, for every card kind and option, the T3 gate included, before the Pause-all guard (so a paused other world is the
+  404 too, never the 409). Answers in the session's bound world are unchanged.
+- Test fixtures that build a user's full web or mobile_web session set the marker (`_api_lib.as_full_session`).
+
+## Redacted cross-world reads (API-CARDS-XWORLD-2, BQ-XWORLD-9; supervisor decision 7 Oct on PR #561)
+- An owner session without the marker (email, signed link, anything not a full web sign-in) reads the cards of an owned
+  world other than its bound one only as redacted summaries, on `GET /worlds/{world_id}/cards` and in `GET /cards` alike
+  (the feed's item `card` stays equal to what the per-world route shows the same principal, BQ-S06-2). The same cards,
+  in the same order, as the full view; each card is exactly the allowlist (`_cards_lib.redacted_card_summary`):
+  `{"id", "world_id", "kind", "created_at", "timeout", "risk_tier", "redacted": true}`, where `risk_tier` is the gate's
+  tier and null for any other kind. No free text and no risky-action detail: no `gate` (so no `action.exact`, no
+  `action.destination`, no `recipients`), no `consent` (so no `scopes`), no `options`, no `what_happened` or
+  `why_it_matters`. Feed `count`, order and paging are unchanged.
+- Reads in the session's bound world are unchanged (full cards, any channel). A full-session owner gets the full cards
+  across worlds exactly as before. Another person's world is still the unknown-world 404; non-owner roles stay bound.
