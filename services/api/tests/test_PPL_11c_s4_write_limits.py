@@ -558,3 +558,126 @@ def test_PPL_11c_s4_BQ_PPL11C_14_an_idempotency_key_is_scoped_to_the_route_as_we
     assert len(rig.real.meetings.list(rig.org)) == meetings + 1
     assert rig.client.post("/v1/work-items", json=WORK_ITEM_BODY, headers=KEY).content == item.content
     assert rig.client.post("/v1/meetings", json=MEETING_BODY, headers=KEY).content == meeting.content
+
+
+# --- #549 items 2 and 5: key eviction and the 429 pin ---------------------------------------------------------------
+
+
+def _shrink_key_bound(monkeypatch, n: int) -> None:
+    from tilo_api import people_limits
+
+    # both names, so the test means the same against the code before and after the per-principal bound
+    for name in ("_MAX_KEYS_PER_PRINCIPAL", "_MAX_KEYS"):
+        monkeypatch.setattr(people_limits, name, n, raising=False)
+
+
+def _create_person(rig, key: str) -> int:
+    return rig.client.post("/v1/people", json=PERSON_BODY, headers={"Idempotency-Key": key}).status_code
+
+
+def _create_item(rig, key: str) -> int:
+    return rig.client.post("/v1/work-items", json=WORK_ITEM_BODY, headers={"Idempotency-Key": key}).status_code
+
+
+def test_PPL_11c_s4_BQ_PPL11C_14_one_principals_creates_cannot_evict_another_principals_key(people_rig, monkeypatch):
+    """With the bound at 5: Sam's refused and accepted creates (distinct keys) push out none of Priya's keys, and a
+    refused attempt of Priya's own takes no slot either; her retry replays and creates nothing."""
+    _shrink_key_bound(monkeypatch, 5)
+    rig = work_rig(people_rig)
+    first = rig.client.post("/v1/work-items", json=WORK_ITEM_BODY, headers=KEY)
+    assert first.status_code == 201
+    for n in range(5):  # her own refused attempts (a member may not create people)
+        assert _create_person(rig, f"own-{n}") == 403
+    rig.as_user(SAM)
+    for n in range(5):
+        assert _create_person(rig, f"sam-no-{n}") == 403
+        assert _create_item(rig, f"sam-{n}") == 201
+    rig.as_user(PRIYA)
+    snapshot = rig.snapshot()
+    again = rig.client.post("/v1/work-items", json=WORK_ITEM_BODY, headers=KEY)
+    assert again.status_code == 201 and again.content == first.content, "the first answer, not a second record"
+    assert rig.snapshot() == snapshot
+
+
+def test_PPL_11c_s4_BQ_PPL11C_14_a_principal_over_its_bound_forgets_its_own_oldest_key_only(people_rig, monkeypatch):
+    _shrink_key_bound(monkeypatch, 3)
+    rig = work_rig(people_rig)
+    ids = [
+        rig.client.post("/v1/work-items", json=WORK_ITEM_BODY, headers={"Idempotency-Key": f"k-{n}"}).json()["id"]
+        for n in range(4)
+    ]
+    assert len(set(ids)) == 4
+    newest = rig.client.post("/v1/work-items", json=WORK_ITEM_BODY, headers={"Idempotency-Key": "k-3"})
+    assert newest.json()["id"] == ids[3], "the newest key is still remembered"
+
+
+def test_PPL_11c_s4_BQ_PPL11C_14_an_entry_whose_holder_is_inside_make_is_never_evicted(monkeypatch):
+    """A racing retry waits for the first caller even when that caller's key was the oldest of a full principal."""
+    import threading
+    import time
+
+    from pydantic import BaseModel
+    from tilo_api.people_limits import Limits
+
+    class Body(BaseModel):
+        n: int = 1
+
+    _shrink_key_bound(monkeypatch, 2)
+    limits, started, release = Limits(), threading.Event(), threading.Event()
+    calls: list[str] = []
+    results: list[dict] = []
+
+    def slow() -> dict:
+        calls.append("first")
+        started.set()
+        release.wait(5)
+        return {"id": "one"}
+
+    def duplicate() -> dict:
+        calls.append("duplicate")
+        return {"id": "two"}
+
+    first = threading.Thread(target=lambda: results.append(limits.once("u", "/r", "k", Body(), slow)))
+    first.start()
+    assert started.wait(5)
+    for n in range(5):  # the same principal fills its bound while the first create is still running
+        limits.once("u", "/r", f"other-{n}", Body(), lambda: {"id": "x"})
+    retry = threading.Thread(target=lambda: results.append(limits.once("u", "/r", "k", Body(), duplicate)))
+    retry.start()
+    time.sleep(0.2)
+    release.set()
+    first.join(5)
+    retry.join(5)
+    assert calls == ["first"] and results == [{"id": "one"}, {"id": "one"}], (calls, results)
+
+
+def _sixty_writes_then_429s_then_a_late_write(rig) -> int:
+    for _ in range(WRITES_PER_MINUTE):
+        assert rig.post("/v1/work-items", WORK_ITEM_BODY).status_code == 201
+    for second in range(1, 60):  # two refused attempts a second through the minute
+        rig.set_now(at(seconds=second))
+        for _ in range(2):
+            assert rig.post("/v1/work-items", WORK_ITEM_BODY).status_code == 429
+    rig.set_now(at(seconds=61))
+    return rig.post("/v1/work-items", WORK_ITEM_BODY).status_code
+
+
+def test_PPL_11c_s4_SEC_10_a_429_is_not_counted_so_the_write_at_61_seconds_succeeds(people_rig):
+    assert _sixty_writes_then_429s_then_a_late_write(work_rig(people_rig)) == 201
+
+
+def test_PPL_11c_s4_SEC_10_the_429_pin_catches_a_limiter_that_counts_its_refusals(people_rig, monkeypatch):
+    """A mutant that records a hit before refusing keeps the caller limited past the minute; the pin above fails it."""
+    from tilo_api import people_limits
+
+    real = people_limits.Limits.attempt
+
+    def counting_mutant(self, user_id, now):
+        try:
+            real(self, user_id, now)
+        except people_limits.Refusal:
+            self._hits[user_id].append(now)
+            raise
+
+    monkeypatch.setattr(people_limits.Limits, "attempt", counting_mutant)
+    assert _sixty_writes_then_429s_then_a_late_write(work_rig(people_rig)) == 429

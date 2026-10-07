@@ -3,7 +3,8 @@
 * `write_limit`: at most `WRITES_PER_MINUTE` POST attempts a minute per signed-in principal, counted before the body is
   read (a refused attempt, a 413 and a replay count; a read does not). The 61st is a 429 with `Retry-After`.
 * `idempotent`: an optional `Idempotency-Key` on a create; the same principal, route, key and body again is the first
-  answer, with nothing created twice; another body is a 422; a create that failed leaves the key free.
+  answer, with nothing created twice; another body is a 422; a create that failed leaves the key free and takes no
+  slot. Keys are bounded per principal, so no caller can push out another's.
 * `NoStore`: every `/v1/` answer is `Cache-Control: no-store`, the SEC-15 gate's 403 and a validation 422 included.
 
 Counters and keys live in a `Limits` that belongs to one install's `PeopleStores` (never to the module), keyed by the
@@ -34,8 +35,8 @@ from tilo_api.people_writes import Refusal
 
 WRITES_PER_MINUTE = 60  # BQ-PPL11C-2 (SEC-10 gives no number)
 _KEY = re.compile(r"[A-Za-z0-9_-]{1,64}")
-_MAX_KEYS = 10_000  # the oldest key is forgotten first
-_MAX_PRINCIPALS = 1_024
+_MAX_KEYS_PER_PRINCIPAL = 128  # a principal's least recently used key is forgotten first, and only by that principal
+_MAX_PRINCIPALS = 1_024  # also the most principals whose keys are kept (the idle, least recently used go first)
 
 
 class _Entry:
@@ -43,13 +44,14 @@ class _Entry:
         self.lock = threading.Lock()  # racing retries wait here for the first one
         self.fingerprint = ""
         self.answer: dict[str, Any] | None = None
+        self.holders = 0  # callers between lookup and return: an entry with holders is never evicted or dropped
 
 
 class Limits:
     def __init__(self) -> None:
         self._lock = threading.Lock()
         self._hits: dict[str, deque[float]] = {}
-        self._keys: OrderedDict[tuple[str, str, str], _Entry] = OrderedDict()
+        self._keys: OrderedDict[str, OrderedDict[tuple[str, str], _Entry]] = OrderedDict()
 
     def attempt(self, user_id: str, now: float) -> None:
         """Counts one write attempt in the minute ending `now`, or refuses it (the refused one is not counted)."""
@@ -71,17 +73,40 @@ class Limits:
             raise Refusal(422, "invalid_idempotency_key")  # never echoes the key
         fingerprint = hashlib.sha256(body.model_dump_json().encode()).hexdigest()
         with self._lock:
-            entry = self._keys.setdefault((user_id, route, key), _Entry())
-            if len(self._keys) > _MAX_KEYS:
-                self._keys.popitem(last=False)
-        with entry.lock:
-            if entry.answer is not None:
-                if entry.fingerprint != fingerprint:
-                    raise Refusal(422, "idempotency_key_reused", code="idempotency_key_reused")
-                return entry.answer
-            answer = make()  # a refusal raises: the key stays free
-            entry.fingerprint, entry.answer = fingerprint, answer
-            return answer
+            mine = self._keys.setdefault(user_id, OrderedDict())
+            self._keys.move_to_end(user_id)
+            entry = mine.setdefault((route, key), _Entry())
+            mine.move_to_end((route, key))
+            entry.holders += 1
+            self._evict(user_id)
+        try:
+            with entry.lock:
+                if entry.answer is not None:
+                    if entry.fingerprint != fingerprint:
+                        raise Refusal(422, "idempotency_key_reused", code="idempotency_key_reused")
+                    return entry.answer
+                answer = make()  # a refusal raises: the key stays free (see `finally`)
+                entry.fingerprint, entry.answer = fingerprint, answer
+                return answer
+        finally:
+            with self._lock:
+                entry.holders -= 1
+                if entry.answer is None and entry.holders == 0:  # nothing was created: the attempt takes no slot
+                    held = self._keys.get(user_id)
+                    if held is not None and held.get((route, key)) is entry:
+                        del held[(route, key)]
+
+    def _evict(self, user_id: str) -> None:
+        """Bounds the keys; a principal can only push out its own keys, and never an entry someone is inside of."""
+        mine = self._keys[user_id]
+        for k in [k for k, e in mine.items() if e.holders == 0]:
+            if len(mine) <= _MAX_KEYS_PER_PRINCIPAL:
+                break
+            del mine[k]
+        for u in [u for u, m in self._keys.items() if u != user_id and not any(e.holders for e in m.values())]:
+            if len(self._keys) <= _MAX_PRINCIPALS:
+                break
+            del self._keys[u]
 
 
 _LIMITS: dict[int, Limits] = {}
