@@ -62,7 +62,7 @@ def _no_process_lock(monkeypatch):
 
 def _principal_from_header(rig):
     def principal(request: Request):
-        return rig.deps.Principal(user_id=request.headers["x-test-user"], role="owner")
+        return rig.deps.Principal(user_id=request.headers["x-test-user"], role="owner", full_session=True)
 
     rig.app.dependency_overrides[rig.deps.get_current_principal] = principal
 

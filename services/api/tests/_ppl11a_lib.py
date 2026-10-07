@@ -344,6 +344,8 @@ class Rig:
         )
         self.access = access
         self.user, self.role, self.world_id, self.signed_in = OWNER, "owner", None, True
+        # PPL-11c-FS-1c (FS-19): a full web sign-in session by default; a test may set the channel or drop the marker.
+        self.channel, self.full_session = "web", True
         self.resolved: list[str] = []  # the seams a request resolved, in order
         self.router_calls: list[str] = []
         self.flag_calls: list[str] = []
@@ -377,7 +379,8 @@ class Rig:
     def _principal(self) -> Any:
         if not self.signed_in:
             raise HTTPException(status_code=401, detail="not signed in")
-        return self.deps.Principal(user_id=self.user, role=self.role, world_id=self.world_id)  # type: ignore[arg-type]
+        session: dict[str, Any] = {"channel": self.channel, "full_session": self.full_session}
+        return self.deps.Principal(user_id=self.user, role=self.role, world_id=self.world_id, **session)  # type: ignore[arg-type]
 
     def _wire(self) -> None:
         deps, ov = self.deps, self.app.dependency_overrides

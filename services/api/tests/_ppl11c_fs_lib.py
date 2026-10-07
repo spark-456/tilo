@@ -36,7 +36,13 @@ STORE_OF = {
 # (a substring of a pytest node id naming the requirement, a substring that must also be there: "" for every row, or
 # "firestore" for the rows of the `backend` fixture that need the adapter). A requirement that goes green with its
 # entry still here fails (strict), which is the reminder to delete it.
-FS_PENDING: tuple[tuple[str, str], ...] = ()
+FS_PENDING: tuple[tuple[str, str], ...] = (
+    # FS-1c (issue #577 items 2-5, API_PPL_11c_FS1c.md): the builder deletes each entry when its requirement lands.
+    ("test_PPL_11c_FS_16_", ""),  # reservation writes with a create precondition, holder checked before a delete
+    ("test_PPL_11c_FS_17_", ""),  # the last-person erase check is atomic with the delete
+    ("test_PPL_11c_FS_18_", ""),  # negative cache of a failed `get_people_stores` build
+    ("test_PPL_11c_FS_19_", ""),  # `/first` needs a full web or mobile_web session
+)
 # MemoryStore rows that already pass at the head of `phase0-stack` (a "nothing was left behind" check is true of a store
 # that never reserved anything): pinned, never a strict xfail. Their Firestore rows stay pending like the rest.
 FS_MEMORY_GREEN: tuple[str, ...] = (
@@ -56,6 +62,10 @@ FS_EXEMPT: tuple[str, ...] = (
     "test_PPL_11c_FS_13_the_default_is_503_and_builds_no_client",
     "test_PPL_11c_FS_14_an_address_taken_by_a_person_who_is_then_erased",
     "test_PPL_11c_FS_15_",  # regression guard for issue #541 item 4a
+    "test_PPL_11c_FS_16_guard_",  # FS-1c guards: pass today and must stay green
+    "test_PPL_11c_FS_17_guard_",
+    "test_PPL_11c_FS_18_guard_",
+    "test_PPL_11c_FS_19_guard_",
 )
 
 

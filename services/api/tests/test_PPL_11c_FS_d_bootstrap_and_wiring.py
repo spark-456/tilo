@@ -209,7 +209,7 @@ def test_PPL_11c_FS_12_eight_principals_racing_one_bootstrap_uid_leave_its_owner
     rig.require_route(R_PERSON_FIRST)
 
     def principal(request: Request):
-        return rig.deps.Principal(user_id=request.headers["x-test-user"], role="owner")
+        return rig.deps.Principal(user_id=request.headers["x-test-user"], role="owner", full_session=True)
 
     rig.app.dependency_overrides[rig.deps.get_current_principal] = principal
 
@@ -356,12 +356,18 @@ def test_PPL_11c_FS_13_a_failed_build_is_a_503_that_is_not_cached_and_leaks_noth
     monkeypatch.setattr("google.cloud.firestore.Client", build)
     monkeypatch.setenv(ENV_STORE, "firestore")
     monkeypatch.setenv(ENV_PROJECT, "tilo-test-project")
+    # PPL-11c-FS-1c (FS-18, issue #577 item 5): a failed build is negative-cached for a short window, so "the next
+    # request tries again" means the next request after the window. A fake clock (replaced with `raising=False`, so this
+    # test is the same before the seam exists) moves past it without sleeping.
+    now = [1000.0]
+    monkeypatch.setattr(deps, "people_stores_clock", lambda: now[0], raising=False)
     with pytest.raises(HTTPException) as caught:
         deps.get_people_stores()
     assert caught.value.status_code == 503 and caught.value.detail == "not_configured"
     assert SENTINEL not in repr(caught.value) and SENTINEL not in caplog.text
     state["fail"] = False
-    assert isinstance(deps.get_people_stores(), PeopleStores), "the next request tries again"
+    now[0] += float(getattr(deps, "PEOPLE_STORES_BACKOFF_S", 60.0)) + 1
+    assert isinstance(deps.get_people_stores(), PeopleStores), "the next request after the window tries again"
 
 
 def test_PPL_11c_FS_13_the_default_is_503_and_builds_no_client_on_import():
