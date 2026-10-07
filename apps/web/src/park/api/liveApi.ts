@@ -159,6 +159,7 @@ export function createLiveApi(options: LiveApiOptions = {}): Api {
       items.push(...body.cards);
       cursor = body.next_cursor;
     }
+    served.clear(); // a card that left the feed can no longer be answered from a stale key (BQ-WIRE3-1)
     for (const { world_id, card_id, card } of items) {
       const path = `/worlds/${encodeURIComponent(world_id)}/cards/${encodeURIComponent(card_id)}/answer`;
       served.set(decisionKey(world_id, card_id), { path, option: answerOption(card) as string });
