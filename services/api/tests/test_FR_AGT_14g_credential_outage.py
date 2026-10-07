@@ -443,12 +443,16 @@ def test_FR_AGT_14g_quota_and_server_errors_still_count_per_schedule_and_the_tic
     caplog.set_level(logging.DEBUG)
     due_schedules(sched, ids(3))
     session = FakeTasksSession()
-    session.status_for = lambda _name: status
+    # changed deliberately: BQ-AGT14-8: the first two calls answering the same 429/5xx are the service's (FR-AGT-14h),
+    # so the first slot succeeds and the alike answers come after it, where each is still counted per schedule.
+    first = name_of("sched_00")
+    session.status_for = lambda name: None if name == first else status
     use_rest_client(sched, session)
     response = sched.tick()
-    assert (response.status_code, response.json()) == (200, {"fired": 0})
+    assert (response.status_code, response.json()) == (200, {"fired": 1})  # changed deliberately: BQ-AGT14-8
     assert len(session.posts) == 3  # every due slot tried
-    for schedule_id in ids(3):
+    assert_handed_over(sched, "sched_00")  # changed deliberately: BQ-AGT14-8
+    for schedule_id in ids(3)[1:]:  # changed deliberately: BQ-AGT14-8
         record = sched.schedules.get(schedule_id)
         assert (record.failures, record.next_due, record.enabled) == (1, MON_0330Z, True), schedule_id
         assert record.backoff_until is not None and record.last_error is not None, schedule_id

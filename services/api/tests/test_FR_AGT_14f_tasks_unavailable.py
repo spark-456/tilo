@@ -324,6 +324,15 @@ def test_FR_AGT_14f_a_per_schedule_tasks_error_is_counted_and_does_not_stop_the_
     session = RecordingSession(status)
     use_rest_client(sched, session)
     response = sched.tick()
+    if status != 400:  # changed deliberately: BQ-AGT14-8: the first two calls answering the same 429/5xx are the
+        # service's (FR-AGT-14h): two calls, nothing counted, 503. Per-schedule counting of a 429/5xx after a success is
+        # pinned in 14g and 14h.
+        detail = "tasks_quota" if status == 429 else "tasks_server"
+        assert (response.status_code, response.json()) == (503, {"detail": detail})
+        assert len(session.posts) == 2
+        assert [sched.schedules.get(s).failures for s in ids(3)] == [0, 0, 0]
+        assert unavailable_errors(caplog) == []
+        return
     assert (response.status_code, response.json()) == (200, {"fired": 0})
     assert len(session.posts) == 3  # every due slot tried
     for schedule_id in ids(3):

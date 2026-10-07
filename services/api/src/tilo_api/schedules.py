@@ -54,6 +54,7 @@ from tilo_harness.schedule import (
     OidcVerifier,
     RunStart,
     Schedule,
+    StartFailed,
     StartSkipped,
     Ticker,
     next_slot,
@@ -511,18 +512,24 @@ class TasksClient(Protocol):
         ...
 
 
-class TasksError(RuntimeError):
-    """Cloud Tasks refused an enqueue. Carries the status only: never the request, the response or a credential."""
+class TasksError(StartFailed):
+    """Cloud Tasks refused an enqueue. Carries the status only (`status`, an int when Cloud Tasks answered): never the
+    request, the response or a credential. A 429 or a 5xx may be the whole service's: two alike as the first two calls
+    of a tick stop it as `tasks_quota` or `tasks_server` (BQ-AGT14-8)."""
+
+    def __init__(self, message: str, *, status: int | None = None) -> None:
+        super().__init__(message, status=status, pair=_pair(status))
+
+
+def _pair(status: int | None) -> str | None:
+    if type(status) is not int:
+        return None
+    return "tasks_quota" if status == 429 else "tasks_server" if 500 <= status <= 599 else None
 
 
 class TasksUnavailable(TasksError):
     """A refusal that is the service's, not one schedule's (401, 403, 404: wrong caller, missing actAs, no queue): the
-    fan-out records nothing against any schedule for it, and the first one ends the tick with a 503 (BQ-AGT14-6).
-    `status` is the HTTP status when known: an int, never text."""
-
-    def __init__(self, message: str, *, status: int | None = None) -> None:
-        super().__init__(message)
-        self.status = status
+    fan-out records nothing against any schedule for it, and the first one ends the tick with a 503 (BQ-AGT14-6)."""
 
 
 _SERVICE_WIDE = frozenset({401, 403, 404})
@@ -570,7 +577,7 @@ class CloudTasksRestClient:
         if status in _SERVICE_WIDE:
             raise TasksUnavailable(f"cloud tasks answered {status}", status=status)
         if not 200 <= status < 300:
-            raise TasksError(f"cloud tasks answered {status}")
+            raise TasksError(f"cloud tasks answered {status}", status=status)
         return None
 
 
@@ -614,7 +621,7 @@ class TaskEnqueuer:
             raise StartSkipped("tasks_unavailable", count=False, stop=True, status=status) from exc
         except Exception as exc:
             code = next((code for kinds, code in _OUTAGES if isinstance(exc, kinds)), None)
-            if code is None:  # anything else is this schedule's failure (429, 5xx, ...): counted, the tick goes on
+            if code is None:  # this schedule's failure, counted; the Ticker pairs two alike first 429/5xx (BQ-AGT14-8)
                 raise
             raise StartSkipped(code, count=False, stop=True) from exc
         return world_id
@@ -804,12 +811,15 @@ def _fan_out(
         logger.error("schedule tick failed (%s)", type(exc).__name__)
         return _closed(500, "tick failed")
     if result.stopped is not None:  # BQ-AGT14-6: a service-wide refusal is a failed attempt, whatever fired before it
+        extra = {"event": "schedule_tick_stopped", "status": result.status, "code": result.stopped}  # BQ-AGT14-8 (b)
         if result.status is None:
-            logger.error("schedule tick stopped (%s); %d fired, the rest stay due", result.stopped, result.fired)
+            logger.error(
+                "schedule tick stopped (%s); %d fired, the rest stay due", result.stopped, result.fired, extra=extra
+            )
         else:
             logger.error(
                 "schedule tick stopped (%s, status %d); %d fired, the rest stay due",
-                result.stopped, result.status, result.fired,
+                result.stopped, result.status, result.fired, extra=extra,
             )  # fmt: skip
         return _closed(503, result.stopped)
     return {"fired": result.fired}
