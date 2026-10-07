@@ -14,11 +14,14 @@ What goes (each rule is deterministic, and the result is idempotent: `redact(red
   - the userinfo of any `scheme://user:pass@host`;
   - the value of a labelled secret. One key rule (`_secure`) serves trees and text: a key is split into words at any
     non-alphanumeric and at camelCase, and it is secure when its last words spell a `_STRONG` key (`api_key`,
-    `X-Api-Key`, `apikey`, `accessToken`, `payment_authorization`), or when it is exactly `pass` or `pwd`; the cursors
-    `page_token`, `sync_token`, `continuation_token` (`nextPageToken`, ...) are not. In text, the value after a
-    quoted key (JSON, JSON-in-JSON `\\"`, `&quot;`) or after `=` always goes; after an unquoted `key:` it goes when it
-    is quoted, credential-shaped (16 characters, or 8 with a digit or symbol) or a lone word; a word followed by more
-    prose stays ("The secret: ship small"). `pass`/`pwd` need a credential shape or quotes. An `Authorization` or
+    `X-Api-Key`, `apikey`, `accessToken`, `payment_authorization`), when its last word ends in password, passwd, pwd,
+    secret or token (`PGPASSWORD`, `MYSQL_PWD`, `csrftoken`), or when it is exactly `pass`; paging cursors
+    (`page_token`, `nextSyncToken`, `continuation_token`, ...) are not. In text, a quoted value (JSON, JSON-in-JSON
+    `\\"`, `&quot;`, a repr) ends only at a quote of its own JSON-in-JSON level, so a secure field holding JSON loses
+    all of it. The value after a quoted key or after `=` always goes; after an unquoted `key:` it goes when it is
+    quoted, credential-shaped (16 characters, or 8 with a digit or symbol) or a lone word, and a word followed by more
+    prose stays ("The secret: ship small"), except after password, passwd or passphrase, which fail closed (a
+    passphrase to the line end or punctuation). `pass`/`pwd` need a credential shape or quotes. An `Authorization` or
     `Cookie` value goes to the end of its line (in a JSON string, to its closing quote) only when it starts with an
     auth scheme, `name=value` or a credential shape. `code`, `key`, `signature` are only secrets as `?x=` or `&x=`
     parameters, and `code` only in an OAuth URL (one with `state=`, `scope=`, `redirect_uri=`, `grant_type=`,
@@ -57,11 +60,13 @@ _STRONG = (  # keys whose value is a secret wherever they appear, as words
     "password passwd passphrase secret secret_key client_secret token access_token refresh_token id_token auth_token "
     "api_key private_key authorization cookie aws_secret_access_key aws_session_token"
 ).split()
-_EXACT = ("pass", "pwd")  # too common as a word or suffix: only as the whole key
+_EXACT = ("pass", "pwd")  # common words: in text only as a whole key with a credential-shaped or quoted value
 _QUERY = (*_EXACT, "code", "key", "signature", "x_goog_signature", "x_amz_signature", "x_amz_security_token")
 SECURE_KEYS = frozenset((*_STRONG, *_EXACT))  # normalised: lower case, `_` between words
 _FLAT = frozenset(key.replace("_", "") for key in _STRONG)  # `apikey`, `accesstoken`: one word spells the key too
-_CURSORS = (["page", "token"], ["sync", "token"], ["continuation", "token"])  # paging cursors, not credentials
+_GLUED = ("password", "passwd", "pwd", "secret", "token")  # a one-word key may end in one: `PGPASSWORD`, `csrftoken`
+_CURSORS = ("pagetoken", "synctoken", "continuationtoken")  # paging cursors (`next_page_token`), not credentials
+_PASSWORDS = ("password", "passwd", "passphrase")  # labels that fail closed even before prose
 _KEYCHARS = string.ascii_letters + string.digits + "_.%-"
 
 
@@ -70,12 +75,16 @@ def _words(key: str) -> list[str]:
     return [word for word in re.split(r"[^a-z0-9]+", key.lower()) if word]
 
 
+def _cursor(words: list[str]) -> bool:
+    return "".join(words[-2:]).endswith(_CURSORS)
+
+
 def _secure(key: str) -> bool:
     """The one key rule (see the module docstring); text labels follow it too."""
     words = _words(key)
-    if words[-2:] in _CURSORS:
+    if not words or _cursor(words):
         return False
-    if any("".join(words[i:]) in _FLAT for i in range(len(words))):
+    if words[-1].endswith(_GLUED) or any("".join(words[i:]) in _FLAT for i in range(len(words))):
         return True
     chunks = key.split()
     return bool(chunks) and re.fullmatch(r"[^A-Za-z0-9_.%\\\[-]*(?:pass|pwd)[ _.-]*", chunks[-1], re.I) is not None
@@ -133,9 +142,11 @@ _EPOCH_MS = re.compile(r"1[5-9]\d{11}")
 
 _EQ = r"""(?:\\\\)*+\\["']|&(?i:quot|apos);|&#0*+3[49];"""  # a quote as JSON-in-JSON (odd backslashes) or HTML has it
 _START = r"(?:(?<![A-Za-z0-9])|(?<=%[0-9A-Fa-f]{2})|(?<=\\[nrt])|(?-i:(?<=[a-z0-9])(?=[A-Z])))"  # a word starts here
+_WORD_START = r"(?:(?<![A-Za-z0-9])|(?<=%[0-9A-Fa-f]{2})|(?<=\\[nrt]))"  # the same, without camelCase: a whole word
 _LABELLED = re.compile(
     rf"(?<=[?&#;])(?P<query>{_label(_QUERY)})="
-    rf"|(?:{_START}(?P<strong>{_label(_STRONG)})|(?<![A-Za-z0-9_.%\\\[-])(?P<exact>pass|pwd))"
+    rf"|(?:{_START}(?P<strong>{_label(_STRONG)})|(?<![A-Za-z0-9_.%\\\[-])(?P<exact>pass|pwd)"
+    rf"|{_WORD_START}(?P<glued>[A-Za-z0-9]{{0,60}}?(?:{'|'.join(_GLUED)}))(?![A-Za-z0-9]))"
     rf"""[ \t_.-]{{0,8}}+(?:(?P<kq>{_EQ}|["'])|\]|%5[Dd])?[ \t]{{0,8}}+(?P<sep>[:=])[ \t]{{0,8}}+""",
     re.I,
 )
@@ -143,14 +154,8 @@ _OPENER = re.compile(rf"""(?P<eq>{_EQ})|["']""")
 _CLOSER = re.compile(_CL)
 _JSON_SCAN = re.compile(r'(?<!\\)\\*+"|[\[\]{}]')  # a quote (after its backslashes) or a bracket
 _AFTER_NUMBER = re.compile(r"(?:\s|\\[nrt])*+(?:[,}\]]|\Z)")
-# A backslash run is taken whole or not at all, so no layer of JSON-in-JSON loses half an escape: a run before no quote,
-# an escaped quote that does not close a string (odd run), and escaped backslashes before a bare quote (even run).
-_ESC = rf"""\\++(?![\\"'])|(?:\\\\)*+\\["'](?!{_CL})|(?:\\\\)++(?=["'])"""
-_BODY = {  # a quoted value: never past its closing quote, a JSON string's closing quote, or a line end
-    '"': re.compile(rf"""(?:[^"\\\n]|{_ESC})++"""),
-    "'": re.compile(rf"""(?:[^'"\\\n]|{_ESC}|"(?!{_CL}))++"""),
-    "eq": re.compile(r"""(?:[^"\\&\n]|\\++(?![\\"'])|(?:\\\\)++(?=["'])|&(?!(?i:quot|apos);|#0*+3[49];))++"""),
-}
+_ENTITY_BODY = re.compile(r"""(?:[^"\\&\n]|\\++(?![\\"'])|(?:\\\\)++(?=["'])|&(?!(?i:quot|apos);|#0*+3[49];))++""")
+_QUOTE_RUN = re.compile(r"""(?<!\\)\\*+["']|\n""")  # a quote after its whole backslash run, or a line end
 _PLAIN = re.compile(  # an unquoted value: stops at JSON punctuation, a quote, an escaped quote or line end, `&`, space
     r"""(?:[^\s\\&"'<>,}\]]|[,}\]](?![\s,}\]"'\\]|\Z)|\\++(?![\\"'nrt]))++"""
 )
@@ -163,6 +168,7 @@ _HEADER_LINE = {  # a header inside a line: to its end, an escaped line end, or 
 # an Authorization or Cookie value that is a credential: an auth scheme, `name=value` or a credential shape
 _SCHEME = re.compile(r"(?i:basic|bearer|digest|token|negotiate|ntlm|aws4-hmac-sha256|bot|apikey)[ \t]++[^\s,;]")
 _COOKIE = re.compile(r"""[^\s=;,"'<>\\:]{1,256}+=""")
+_PHRASE = re.compile(r"""[^\r\n.,;!?"'<>&\\{}\[\]]*+""")  # a passphrase: to the line end or punctuation
 _WORD = re.compile(r"""[^\s,;"'<>\\]{1,16}""")
 _PROSE = re.compile(r"""[ \t]++[^\s,;"'}\]\\&<>]""")  # the value is followed by more words on its line
 _NUMBER = re.compile(r"-?(?:\d+(?:\.\d+)?(?:[eE][+-]?\d+)?|Infinity)|NaN")
@@ -209,6 +215,29 @@ def _quote(token: str) -> str:
     return "\\" * (2**level - 1) + token[-1]
 
 
+def _ones(run: int) -> int:
+    """The JSON-in-JSON level of a quote after `run` backslashes: the count of its trailing one bits."""
+    return (run ^ (run + 1)).bit_length() - 1
+
+
+def _quoted_end(text: str, start: int, opener: str, strings: int) -> int:
+    """Where a value opened by `opener` (a quote after its backslashes) ends: at a quote of its own JSON-in-JSON level
+    or a shallower one, or a line end. A deeper (escaped) quote is text, so a secure field holding JSON loses all of
+    it. A `"` ends a `'`-quoted value only as the end of a JSON string around it (`strings` deep), so a `"` in a
+    repr's `'`-quoted value is text. Backslash runs are never split."""
+    char, level = opener[-1], _ones(len(opener) - 1)
+    for mark in _QUOTE_RUN.finditer(text, start):
+        found = mark.group()
+        if found == "\n":
+            return mark.start()
+        depth = _ones(len(found) - 1)
+        if found[-1] == char and depth <= level:
+            return mark.start()
+        if found[-1] == '"' and depth < (max(level, strings) if char == "'" else level):
+            return mark.start()
+    return len(text)
+
+
 def _key_start(text: str, pos: int) -> int:
     before = text[max(0, pos - 256) : pos]
     return pos - (len(before) - len(before.rstrip(_KEYCHARS)))
@@ -234,18 +263,27 @@ def _value(text: str, m: re.Match[str], url: _Url, strings: _Strings) -> tuple[i
             return None
         value = _PLAIN.match(text, pos)
         return (pos, value.end(), REDACTED) if value else None
-    label, keyq = m["strong"] or m["exact"], m["kq"] and _quote(m["kq"])
-    if m["strong"] and label.lower().endswith("token"):
-        key = text[_key_start(text, m.start()) : m.start()] + label
-        if _words(key)[-2:] in _CURSORS:
+    strong = m["strong"] or m["glued"]
+    label, keyq = strong or m["exact"], m["kq"] and _quote(m["kq"])
+    if strong and label.lower().endswith("token"):
+        if _cursor(_words(text[_key_start(text, m.start()) : m.start()] + label)):
             return None
     opener = _OPENER.match(text, pos)
     if opener:
-        if keyq != _quote(opener.group()) and _CLOSER.match(text, opener.end()):  # it closes a string: no value
+        quote, depth = _quote(opener.group()), strings.at(m.start())
+        # A quote unlike its key's may close a string, and then there is no value here; but outside a JSON string a
+        # repr mixes quote styles (`{'k': "it's"}`), so a quote of the key's own level opens the value.
+        mixed = keyq and len(keyq) == len(quote) and depth <= _ones(len(quote) - 1)
+        if keyq != quote and not mixed and _CLOSER.match(text, opener.end()):
             return None
-        body = _BODY["eq" if opener["eq"] else opener.group()].match(text, opener.end())
-        return (opener.end(), body.end(), REDACTED) if body else None
-    if m["strong"] and not keyq and re.sub(r"[^a-z]", "", label.lower()).endswith(("authorization", "cookie")):
+        if opener.group().startswith("&"):
+            body = _ENTITY_BODY.match(text, opener.end())
+            end = body.end() if body else opener.end()
+        else:
+            end = _quoted_end(text, opener.end(), opener.group(), depth)
+        return (opener.end(), end, REDACTED) if end > opener.end() else None
+    flat = re.sub(r"[^a-z]", "", label.lower())
+    if strong and not keyq and flat.endswith(("authorization", "cookie")):
         first = _WORD.match(text, pos)
         credential = _SCHEME.match(text, pos) or _COOKIE.match(text, pos) or _cred(first[0] if first else "")
         if m["sep"] == ":" and not credential:
@@ -262,6 +300,10 @@ def _value(text: str, m: re.Match[str], url: _Url, strings: _Strings) -> tuple[i
             return None
         if _NUMBER.fullmatch(word):  # a JSON number becomes a JSON string, as a tree's value does
             return pos, value.end(), f"{keyq}{REDACTED}{keyq}"
+    elif strong and flat.endswith(_PASSWORDS):  # "Password: changeme (temporary)": fails closed, even before prose
+        if flat.endswith("passphrase") and m["sep"] == ":":  # a passphrase runs to the line end or punctuation
+            phrase = _PHRASE.match(text, pos).group().rstrip()  # type: ignore[union-attr]  # `*+` always matches
+            return pos, max(value.end(), pos + len(phrase)), REDACTED
     elif not _cred(word) and (m["exact"] or (m["sep"] == ":" and _PROSE.match(text, value.end()))):
         return None
     return pos, value.end(), REDACTED

@@ -11,6 +11,7 @@ branch | packages/providers/src/tilo_providers/replay.py | _scrub_authorization_
 branch | packages/redact/src/tilo_redact/__init__.py | redact | the shared secret redactor (FR-MEM-05): masks credential shapes, labelled values and Luhn-valid card numbers; never task content
 branch | packages/redact/src/tilo_redact/__init__.py | _labelled | removes the value after a secret key label (password, api_key, ...); matches key shapes, never task content
 branch | packages/redact/src/tilo_redact/__init__.py | _value | decides where a labelled secret's value ends (quotes, JSON escapes, credential shape); matches key and value shapes, never task content
+branch | packages/redact/src/tilo_redact/__init__.py | _quoted_end | finds the quote that ends a quoted secret value at its own JSON-in-JSON level; reads quotes and backslashes only, never task content
 branch | packages/redact/src/tilo_redact/__init__.py | _header_end | finds where an Authorization or Cookie value ends (line start, closing quote); never task content
 branch | packages/redact/src/tilo_redact/__init__.py | _number_quote | picks the quote that keeps JSON valid around a redacted card number; reads punctuation only
 branch | packages/redact/src/tilo_redact/__init__.py | at | the redactor's scanners: whether a URL is an OAuth one (for `code=`) and how deep a position is in JSON strings; never task content

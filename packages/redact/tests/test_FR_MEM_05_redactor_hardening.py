@@ -105,6 +105,15 @@ HOSTILE = {  # one 1 MB input per pattern, built to make a backtracking or resta
     "pem_closing_quotes": BEGIN + _rep('" '),
     "userinfo_quotes": "a://" + _rep('"@'),
     "bearer_letters": _rep("Bearer abcdefghijk "),
+    # third security review: values end at their own level's quote, password labels, one-word keys
+    "quoted_key_deep_quotes": '"password": "' + _rep('\\\\\\"x'),
+    "quoted_key_level_quotes": '{\\"password\\": \\"' + _rep('\\\\\\"x"'),
+    "repr_value_quotes": "{'password': '" + _rep('"x'),
+    "passphrase_repeat": _rep("passphrase: a b "),
+    "password_prose": _rep("Password: a b "),
+    "glued_camel": _rep("aB"),
+    "glued_near_miss": _rep("a" * 59 + "tokenx "),
+    "glued_repeat": _rep("xtoken="),
 }
 
 

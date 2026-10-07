@@ -108,7 +108,7 @@ KEEPS = [
     "Authorization: pending",
     "Cookie: oatmeal raisin, 2 dozen",
     "The secret: ship small, ship often.",
-    "Password: minimum 8 characters",
+    "Secret: minimum 8 characters",
     "Token: of appreciation for the team",
     "Bearer securities are exempt.",
     "Bearer authentication is used by the API, and Bearer instruments too.",
@@ -152,8 +152,10 @@ KEYS_SECURE = [*SECURE, "Password", "PASSWORD", "passwd", "passphrase", "client_
 KEYS_SECURE += ["ACCESS_TOKEN", "refresh_token", "id_token", "apiKey", "apikey", "APIKey", "X-Goog-Api-Key"]
 KEYS_SECURE += ["x-auth-token", "Proxy-Authorization", "payment_authorization", "Set-Cookie", "db_password"]
 KEYS_SECURE += ["dbPassword", "aws_secret_access_key", "private_key", "push_token", "sessionToken", "secret_key"]
+KEYS_SECURE += ["dbpassword", "PGPASSWORD", "MYSQL_PWD", "csrftoken", "clientsecret"]  # one unbroken word, a suffix
 KEYS_PLAIN = [*CURSORS, "max_output_tokens", "input_tokens", "tokens", "token_count", "authz", "bypass", "keyboard"]
-KEYS_PLAIN += ["code", "key", "signature", "session", "user", "passport", "password_hint", "dbpassword", "secretary"]
+KEYS_PLAIN += ["code", "key", "signature", "session", "user", "passport", "password_hint", "secretary", "pagetoken"]
+KEYS_PLAIN += ["nextpagetoken", "synctoken"]
 
 
 @pytest.mark.parametrize("mode", ["tree", "text_eq", "text_colon", "json", "json_compact", "json_in_json"])
