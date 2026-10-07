@@ -71,7 +71,7 @@ describe("FR_SET_04 security sessions", () => {
 });
 
 const BOX = '[aria-label="Confirm sign out of other sessions"]';
-const escape = async (from: Element): Promise<void> => {
+const pressEscape = async (from: Element): Promise<void> => {
   await act(async () => {
     from.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
   });
@@ -86,7 +86,7 @@ describe("FR_SET_04 keyboard focus", () => {
     const box = root.querySelector(BOX) as HTMLElement;
     expect(box.getAttribute("role")).toBe("alertdialog");
     expect(box.contains(document.activeElement)).toBe(true);
-    await escape(document.activeElement as Element);
+    await pressEscape(document.activeElement as Element);
     expect(root.querySelector(BOX)).toBeNull();
     expect(document.activeElement).toBe(trigger);
   });
