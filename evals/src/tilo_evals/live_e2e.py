@@ -54,6 +54,7 @@ HARD_MAX_CREDITS = 200.0
 STAGES = ("intake", "approaches", "plan", "run", "narrate")
 OUTCOME_CLASSES = frozenset(
     {"completed", "held_at_gate", "needs_answers", "refused", "failed", "stopped_at_cap", "replay_miss", "rejected"}
+    | {"declined"}  # `just live-run`: the person said no to the approach
 )
 SAFETY_NOTE = (
     "trusted_bank_input (by design; Model Armor is the safety role's live adapter, FR-INT-02, #450)"  # BQ-LE2E-5
@@ -154,6 +155,8 @@ class LiveE2EReport:
     recordings: str | None = None  # replay only: "synthetic" (a fake provider wrote them) or "unmarked"
     story_note: str | None = None  # why the Narrator left no Story, as a code only
     quoted_calls: int = 0  # calls charged at the pre-call quote because they returned no usage
+    faked: tuple[str, ...] = FAKED
+    work: list[tuple[str, str]] = field(default_factory=list)  # (unit title, text) of every unit that ran
 
     @property
     def event_count(self) -> int:
@@ -167,7 +170,7 @@ class LiveE2EReport:
             "event_count": self.event_count, "rows": [dataclasses.asdict(r) for r in self.rows], "checks": checks,
             "questions": self.questions, "answered": self.answered, "estimate": dataclasses.asdict(self.estimate),
             "story_lines": [dataclasses.asdict(s) for s in self.story_lines], "side_effects": self.side_effects,
-            "faked": list(FAKED), "recordings": self.recordings, "story_note": self.story_note,
+            "faked": list(self.faked), "recordings": self.recordings, "story_note": self.story_note,
         }  # fmt: skip
 
 
@@ -580,6 +583,9 @@ class _UnitRunner:
     def capture(self, brief: dict[str, Any], plan: dict[str, Any]) -> None:
         self._brief, self._units = brief, list(plan.get("units", []))
 
+    def work(self) -> list[tuple[str, str]]:
+        return [(u["title"], self._work[u["id"]]) for u in self._units if u["id"] in self._work]  # in plan order
+
     def _ask(self, role: str, prompt: str) -> tuple[str, float]:
         request = GenerateRequest(prompt=prompt, max_output_tokens=_OUT.get(role), thinking_level="minimal")
         response = self._router.generate(role, request).response
@@ -816,7 +822,7 @@ def _mark_recordings(recordings: Path, *, synthetic: bool) -> None:
 
 def _execute(
     case: BankCase, router: _MeteredRouter, meter: _Meter, screen: SafetyProvider, env: Mapping[str, str],
-    *, live: bool, cap: float, narrate: bool = True,
+    *, live: bool, cap: float, narrate: bool = True, person: Any = None, runner: _UnitRunner | None = None,
 ) -> tuple[Observation, str, str | None, list[StoryLine], str | None]:  # fmt: skip
     """One case through the real pipeline on `router`: (observation, outcome class, reason, Story, why no Story).
     The generator calls it once per brief on its own router, so the whole run shares one meter and one cap."""
@@ -824,10 +830,10 @@ def _execute(
     obs = Observation(case=dataclasses.replace(case, approve=approve))
     story: list[StoryLine] = []
     note: str | None = None
-    app = _app(router, screen, _UnitRunner(router, meter))
+    app = _app(router, screen, runner or _UnitRunner(router, meter))
     with _quiet():
         try:
-            drive(obs.case, obs, _UNIT_TIMEOUT_S["live" if live else "replay"], app)
+            drive(obs.case, obs, _UNIT_TIMEOUT_S["live" if live else "replay"], app, person)
         except Exception as error:  # noqa: BLE001 - a crash is an observation; the error's text is never kept
             obs.crash = type(error).__name__
         if narrate and obs.events and not meter.stop:
@@ -850,13 +856,15 @@ def run_live_e2e(
     safety: SafetyProvider | None = None,
     announce: Callable[[Estimate, float], None] | None = None,
     fake_record: bool = False,  # only `record_with_fake` sets this; the command line has no way to
+    adhoc: BankCase | None = None,  # `just live-run`: an in-memory case for a typed topic, not a bank case
+    person: Any = None,  # `just live-run`: a person answers in place of the case script (`live_topic.TerminalPerson`)
 ) -> LiveE2EReport:
     env: Mapping[str, str] = {} if fake_record else os.environ if environ is None else environ
     if fake_record and (live_provider_factory is None or mode != "live"):
         raise LiveE2ERefused("not_a_fake_provider", "the fake record path takes only an injected fake provider")
     _gate("dry-run" if fake_record else mode, env, max_credits)  # the fake path has no live decision to gate
     config = _load_config(models_path, prices_path, env)
-    case = _load_case(case_id, bank_dir)
+    case = adhoc or _load_case(case_id, bank_dir)
     live = mode == "live"
     factory = (live_provider_factory or _vertex(config)) if live else None
     refused: list[LiveE2ERefused] = []
@@ -876,7 +884,7 @@ def run_live_e2e(
     if announce is not None:
         announce(estimate, max_credits)  # before any model call
     screen = safety or TrustedBankInputScreen(case)
-    report = LiveE2EReport(case_id, mode, max_credits, estimate, expected=case.outcome)
+    report = LiveE2EReport(case.id, mode, max_credits, estimate, expected=case.expect.get("outcome"))
     report.safety = SAFETY_NOTE if isinstance(screen, TrustedBankInputScreen) else f"injected ({type(screen).__name__})"
     if mode == "dry-run":
         return report
@@ -886,9 +894,11 @@ def run_live_e2e(
         _mark_recordings(recordings, synthetic=live_provider_factory is not None)  # only a test injects a provider
     providers = _Providers(config, meter, recordings, factory, fake_record=fake_record)
     router = _MeteredRouter(config, meter, providers)
+    runner = _UnitRunner(router, meter)
     obs, report.outcome_class, report.reason, report.story_lines, report.story_note = _execute(
-        case, router, meter, screen, env, live=live, cap=max_credits
+        case, router, meter, screen, env, live=live, cap=max_credits, person=person, runner=runner
     )
+    report.work = runner.work()
     if report.reason:  # a last line of defence: nothing printed names the project, an ADC path or a token
         report.reason = _scrub_known(" ".join(report.reason.split()), env)
     if refused:
@@ -898,6 +908,8 @@ def run_live_e2e(
     if not live:
         report.recordings = "synthetic" if (recordings / SYNTHETIC_MARKER).is_file() else "unmarked"
     stopped = report.outcome_class in ("stopped_at_cap", "replay_miss")
+    if report.expected is None:  # no expected outcome (a typed topic): check the facts behind the one observed
+        obs.case = dataclasses.replace(obs.case, expect={"outcome": obs.outcome})
     found = check_case(obs)
     report.findings = [f for f in found if not (stopped and f.check == terminal_honest.__name__)]
     report.checks_run = [c.__name__ for c in CHECKS if not (stopped and c is terminal_honest)]
@@ -955,7 +967,7 @@ def _exit_code(report: LiveE2EReport) -> int:
 def _print_report(report: LiveE2EReport) -> None:
     print(f"mode={report.mode} case={report.case_id}")
     print(f"safety: {report.safety}")
-    for item in FAKED:
+    for item in report.faked:
         print(f"faked: {item}")
     if report.recordings == "synthetic":
         print("recordings: SYNTHETIC fixture written by a fake provider; this replay is not a real model run")
@@ -983,6 +995,13 @@ def _print_report(report: LiveE2EReport) -> None:
         print(f"story: {line.text}")
 
 
+def announce(estimate: Estimate, cap: float) -> None:
+    print(
+        f"estimate credits_low={estimate.credits_low:.4f} credits_high={estimate.credits_high:.4f} cap={cap:.4f}",
+        flush=True,
+    )
+
+
 def main(
     argv: list[str] | None = None,
     *,
@@ -992,13 +1011,6 @@ def main(
 ) -> int:
     args = _parser().parse_args(argv)
     mode: Literal["live", "replay", "dry-run"] = "replay" if args.replay else "dry-run" if args.dry_run else "live"
-
-    def announce(estimate: Estimate, cap: float) -> None:
-        print(
-            f"estimate credits_low={estimate.credits_low:.4f} credits_high={estimate.credits_high:.4f} cap={cap:.4f}",
-            flush=True,
-        )
-
     try:
         report = run_live_e2e(
             args.case, mode=mode, max_credits=args.max_credits, environ=environ, bank_dir=args.bank_dir,

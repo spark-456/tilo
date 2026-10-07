@@ -40,7 +40,8 @@ def test_PL_LIVE_04_generate_request_carries_a_thinking_level_the_adapter_sends(
     sdk = FakeVertexSdk()
     with sdk.installed():
         _provider(sdk).generate(GenerateRequest(prompt="hello", thinking_level=level))
-    assert config_thinking_level(sdk.calls[0]["config"]) == level
+    # Vertex 400s on "minimal" (PL-02 fix, 7 Oct 2026): the adapter sends it as "low", the other levels as given
+    assert config_thinking_level(sdk.calls[0]["config"]) == ("low" if level == "minimal" else level)
 
 
 def test_PL_LIVE_04_no_thinking_level_means_no_thinking_config() -> None:

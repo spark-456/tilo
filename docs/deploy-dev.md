@@ -215,6 +215,11 @@ the job finishes as failed. Test the job once with
 `gcloud run jobs execute tilo-eval-nightly --region asia-southeast1 --project essential-wares-510320-f0 --wait`
 and read the job log in Cloud Logging. The job fails until the `nightly` command (EFF-05a) is in the image.
 
+## Scheduled runs (FR-AGT-14, Cloud Scheduler + Cloud Tasks)
+
+Routines need the runs queue, the `tilo-schedule-tick` Scheduler job and six `tilo-api` settings. The steps, the
+checks and what each tick answer means are in [routines-rollout.md](routines-rollout.md).
+
 ## Web app (Firebase Hosting, manual; P0-07c)
 
 ```powershell
