@@ -134,8 +134,9 @@ Never requested: `mail.google.com`, `gmail.modify`, full `drive`.
 
 ## 7. Console steps for the user (Terraform cannot do these)
 
-1. OAuth consent screen: add the scopes above, add test users (up to 100), set
-   the app to Testing. Create the web OAuth client; set its redirect URI to the
+1. OAuth consent screen: add the scopes above and set the app to In production
+   (the user's decision, BQ-SIGNIN-1; Testing with up to 100 test users is the
+   fallback, section 11 step 6). Create the web OAuth client; set its redirect URI to the
    public callback served by `tilo-api` (`GOOGLE_OAUTH_REDIRECT_BASE_URL`), which
    relays the code to connectors through harness. Connectors is internal-only and
    must never be made public to receive the redirect (PRD 6.5 ingress rule).
@@ -321,7 +322,8 @@ Terraform cannot do these. They turn on app sign-in (Google, and anonymous demo 
 3. Authentication, Sign-in method: enable the Anonymous provider (demo sessions). Never enable Email/Password or any other
    provider: Tilo never handles passwords.
 4. Authentication, Settings, Authorized domains: check `essential-wares-510320-f0.web.app` and
-   `essential-wares-510320-f0.firebaseapp.com` are listed (they are by default; add them if not).
+   `essential-wares-510320-f0.firebaseapp.com` are listed (they are by default; add them if not), and remove `localhost`
+   if it is there (Firebase adds it by default; the deployed project must not accept sign-ins started from a local page).
 5. Google Cloud console, APIs and Services, Credentials, the Firebase web key (the one step 4 of section 7 restricted):
    set the API restriction to exactly three APIs: Firebase App Check API, Identity Toolkit API and Token Service API.
    The Auth SDK calls `identitytoolkit.googleapis.com` and `securetoken.googleapis.com`, and Google refuses sign-in
@@ -340,4 +342,13 @@ Terraform cannot do these. They turn on app sign-in (Google, and anonymous demo 
    unverified-app warning and the cap stay.
 8. Redeploy hosting (the Content-Security-Policy and the sign-in code ship together): `just deploy-web` with
    `TILO_BAKE_FIREBASE_KEY=1`, then sign in on `https://essential-wares-510320-f0.web.app` and check the browser
-   console shows no Content-Security-Policy violation, before telling anyone to sign in.
+   console shows no Content-Security-Policy violation, before telling anyone to sign in. Also check that the
+   site-wide `frame-ancestors 'none'` and `X-Frame-Options` (rule source `**` in `firebase.json`) do not break the
+   sign-in iframe Firebase serves at the reserved path `/__/auth/iframe`: if the popup sign-in fails or the console
+   shows a refused frame, exempt `/__/auth/**` from those two headers (a separate headers rule), and re-check.
+
+After the founder has signed in once with Google, `TILO_PEOPLE_BOOTSTRAP_UID` on `tilo-api` must hold the id the API gives
+that person, which is not the Firebase uid: copy the uid (Firebase console, Authentication, Users, "User UID") and run
+`uv run python scripts/signin_user_id.py <uid>`; the printed `u_...` value goes in the variable (BQ-SIGNIN-9). Before
+`TILO_JUDGE_LIVE=1` is ever set, read BQ-SIGNIN-9 and BQ-SIGNIN-10: an anonymous demo session already gets replay models
+only, and App Check enforcement on Firebase Authentication is worth considering, since anonymous uids are free.

@@ -137,6 +137,8 @@ def _decide(scope: Scope) -> JSONResponse | None:
         return _refusal(429, RATE_LIMITED, "rate_limited", {"Retry-After": str(decision.retry_after_s)})
     state = scope.setdefault("state", {})
     state["declaration"], state["uid"] = declaration, principal.user_id
+    state["principal"] = principal  # resolved once per request: the route's own dependency reuses it (BQ-SIGNIN-9)
+    state["demo_session"] = principal.demo_session  # an anonymous demo session: replay models only (BQ-SIGNIN-10)
     return None
 
 

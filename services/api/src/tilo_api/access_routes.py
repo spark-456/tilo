@@ -38,16 +38,18 @@ def _json_only(request: Request) -> None:
         raise HTTPException(status_code=415, detail="Send application/json.")
 
 
-def _view(request: Request, user_id: str, declaration: Declaration | None, flags: FlagStore) -> AccessOut:
+def _view(request: Request, principal: deps.Principal, declaration: Declaration | None, flags: FlagStore) -> AccessOut:
     """`models`: what the person's next request gets (SEC-16); a visitor's view reads no switch and no ledger."""
     allowed = declaration == "judge"
-    models = deps.spend_mode(request, user_id, declaration, flags)[0] if allowed else None
+    # these routes are public, so the gate has not flagged the session: the principal says if it is a demo session
+    demo = principal.demo_session
+    models = deps.spend_mode(request, principal.user_id, declaration, flags, demo=demo)[0] if allowed else None
     return AccessOut(declaration=declaration, allowed=allowed, models=models)
 
 
 @router.get("/access")
 def get_access(request: Request, principal: Principal, store: Store, flags: Flags) -> AccessOut:
-    return _view(request, principal.user_id, store.get(principal.user_id), flags)
+    return _view(request, principal, store.get(principal.user_id), flags)
 
 
 @router.post("/access/declaration", dependencies=[Depends(_json_only)], response_model=None)
@@ -60,4 +62,4 @@ def declare(
             status_code=409,
             content={"detail": "Your answer was already recorded and cannot be changed.", "code": "declaration_locked"},
         )
-    return _view(request, principal.user_id, stored, flags)
+    return _view(request, principal, stored, flags)

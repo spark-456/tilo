@@ -63,7 +63,12 @@ def _fetch_securetoken_keys() -> dict[str, rsa.RSAPublicKey]:
 
 
 def _is_number(value: object) -> TypeGuard[float]:
-    return isinstance(value, int | float) and not isinstance(value, bool) and math.isfinite(value)
+    if not isinstance(value, int | float) or isinstance(value, bool):
+        return False
+    try:
+        return math.isfinite(value)
+    except OverflowError:  # an integer too large for a float (a hand-made token): not a time, so the caller refuses it
+        return False
 
 
 class FirebaseIdTokenVerifier(JwksKeyCache):
@@ -98,9 +103,13 @@ class FirebaseIdTokenVerifier(JwksKeyCache):
             if not _is_number(value) or value > now + _CLOCK_SKEW_S:
                 raise TokenRefused("bad_time" if name != "nbf" else "not_yet_valid")
         firebase = claims.get("firebase")
-        provider = firebase.get("sign_in_provider") if isinstance(firebase, dict) else None
+        if not isinstance(firebase, dict):
+            raise TokenRefused("sign_in_method_not_allowed")
+        provider = firebase.get("sign_in_provider")
         if not isinstance(provider, str) or provider not in PROVIDERS:
             raise TokenRefused("sign_in_method_not_allowed")
+        if "tenant" in firebase:  # a multi-tenant (Identity Platform) token: Tilo has no tenants, so none is accepted
+            raise TokenRefused("tenant_not_allowed")
         if provider == "google.com" and claims.get("email_verified") is not True:
             raise TokenRefused("email_not_verified")
 
@@ -178,9 +187,11 @@ def principal_from_claims(claims: Mapping[str, Any], *, channel: Channel) -> Pri
     sub, firebase = claims.get("sub") if isinstance(claims, Mapping) else None, claims.get("firebase")
     if not isinstance(sub, str) or not 0 < len(sub) <= _MAX_SUB_CHARS or not isinstance(firebase, dict):
         raise TokenRefused("bad_claims")
+    full = firebase.get("sign_in_provider") == "google.com"
     return Principal(
         user_id=user_id_for(sub),
         role="owner",
         channel=channel,
-        full_session=firebase.get("sign_in_provider") == "google.com",
+        full_session=full,
+        demo_session=not full,  # an anonymous demo session gets replay models only (BQ-SIGNIN-10)
     )

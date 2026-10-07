@@ -78,6 +78,7 @@ class Principal:
     channel: Channel = "web"  # the session channel sign-in resolved for this request (FR-HIL-07,
     # world.paused.data.channel is derived from here, never from a request body
     districts: tuple[str, ...] = ()  # visible beyond vis: "all"; ignored for role == "owner"
+    demo_session: bool = False  # an anonymous demo session (SEC-15, BQ-SIGNIN-10): models are replay only, always
     full_session: bool = False  # a full web sign-in session (BQ-XWORLD-10): set only by the server that resolves the
     # session, never from anything in a request; needed to answer, or read in full, another owned world's cards
 
@@ -190,6 +191,12 @@ def get_current_principal(request: HTTPConnection = None) -> Principal:  # type:
     Every other case is a 401 with one fixed body, whatever the cause. Dev mode replaces this whole function
     (`tilo_api.dev.install`), so a token is never looked at there."""
     # FastAPI always injects the request; the default only lets a bare call (no sign-in) refuse with a 401.
+    if request is not None:
+        resolved = getattr(
+            request.state, "principal", None
+        )  # the access gate already verified this request (server-set)
+        if isinstance(resolved, Principal):
+            return resolved
     token = None if request is None else firebase_auth.bearer_token(request.headers.getlist("authorization"))
     if token is None:
         raise HTTPException(status_code=401, detail=SIGN_IN_REQUIRED, headers={"WWW-Authenticate": "Bearer"})
@@ -289,8 +296,18 @@ def get_switches(request: Request, flags: Annotated[FlagStore, Depends(get_flag_
     return spend.Switches(flags, _resolve(request, get_spend_cap_ledger)) if enforced() else flags
 
 
-def spend_mode(request: Request, uid: str | None, declaration: str | None, switches: FlagStore) -> tuple[Mode, bool]:
-    """(mode, capped): SEC-15's decision, then deployed the `SpendGuard`'s; any doubt is replay (fail closed)."""
+def spend_mode(
+    request: Request, uid: str | None, declaration: str | None, switches: FlagStore, *, demo: bool | None = None
+) -> tuple[Mode, bool]:
+    """(mode, capped): SEC-15's decision, then deployed the `SpendGuard`'s; any doubt is replay (fail closed). An
+    anonymous demo session (`Principal.demo_session`, set by the gate from the verified token) is replay whatever
+    `TILO_JUDGE_LIVE` or the guard say (BQ-SIGNIN-10); its cap is still read, so new work is refused the same way."""
+    mode, capped = _spend_mode(request, uid, declaration, switches)
+    demo = getattr(request.state, "demo_session", False) if demo is None else demo  # the gate's flag, or the caller's
+    return ("replay" if demo is True else mode), capped
+
+
+def _spend_mode(request: Request, uid: str | None, declaration: str | None, switches: FlagStore) -> tuple[Mode, bool]:
     mode = provider_mode(declaration, os.environ, replay_only=bool(switches.get("replay_only")))
     if mode != "live" or uid is None or not isinstance(switches, spend.Switches):
         return mode, False

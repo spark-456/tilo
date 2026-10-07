@@ -154,6 +154,17 @@ export function createAuth(env: { readonly hostname: string }): AuthController {
     return typeof value === "string" && value !== "" ? value : null;
   }
 
+  /** An anonymous demo session is kept in session storage, so it ends with the tab (BQ-SIGNIN-4). A Google sign-in
+   * keeps the SDK's default (IndexedDB, falling back to local storage), so it survives a restart; nothing is awaited
+   * before the Google popup opens, so the browser still counts it as the click's. A refusal here keeps the default. */
+  async function keepForTheTabOnly(sdk: Sdk): Promise<void> {
+    try {
+      await sdk.lib.setPersistence(sdk.auth, sdk.lib.browserSessionPersistence);
+    } catch {
+      // the demo session goes ahead with the SDK's default persistence
+    }
+  }
+
   async function popupThenRedirect(sdk: Sdk): Promise<SignInResult> {
     const provider = new sdk.lib.GoogleAuthProvider();
     provider.setCustomParameters({ prompt: "select_account" });
@@ -225,6 +236,7 @@ export function createAuth(env: { readonly hostname: string }): AuthController {
     signInWithGoogle: () => signIn("google", popupThenRedirect),
     signInAnonymously: () =>
       signIn("anonymous", async (sdk) => {
+        await keepForTheTabOnly(sdk);
         try {
           await sdk.lib.signInAnonymously(sdk.auth);
           return { ok: true };
