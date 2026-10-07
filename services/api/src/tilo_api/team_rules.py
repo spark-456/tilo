@@ -78,18 +78,34 @@ class Capability:
     roles: tuple[str, ...]
 
 
+# Pinned in code like MUST_ASK_KEYS: PRD 10.1 / BQ-TEAMACC-2 give no other role these; a config edit can't grant them.
+OWNER_ONLY_CAPABILITIES = frozenset({"change_tool_access", "invite_people"})
+
+
 def load_capabilities(path: str | Path | None = None) -> dict[str, Capability]:
-    """The 8 capabilities of the role matrix (FR-TEAM-05), in the page's row order."""
+    """The 8 capabilities of the role matrix (FR-TEAM-05), in the page's row order. Fails closed: a malformed row,
+    a duplicate, a missing or loosened Owner-only row is a ValueError."""
     doc = yaml.safe_load(Path(path if path is not None else _CONFIG).read_text(encoding="utf-8"))
     rows = doc.get("capabilities") if isinstance(doc, dict) else None
     if not isinstance(rows, list):
         raise ValueError("team_rules.yaml: capabilities must be a list")
     out: dict[str, Capability] = {}
     for r in rows:
-        c = Capability(str(r["key"]), str(r["label"]), tuple(r["roles"]))
-        if c.key in out or not set(c.roles) <= set(ROLES):
+        if not isinstance(r, dict) or not isinstance(r.get("key"), str) or not isinstance(r.get("label"), str):
             raise ValueError("team_rules.yaml: bad capability")
-        out[c.key] = c
+        roles = r.get("roles")
+        if (
+            not isinstance(roles, list)
+            or not all(type(x) is str and x in ROLES for x in roles)
+            or len(set(roles)) != len(roles)
+            or r["key"] in out
+        ):
+            raise ValueError("team_rules.yaml: bad capability")
+        if r["key"] in OWNER_ONLY_CAPABILITIES and any(x != "Owner" for x in roles):
+            raise ValueError("team_rules.yaml: an Owner-only capability can't be granted to another role")
+        out[r["key"]] = Capability(r["key"], r["label"], tuple(roles))
+    if not OWNER_ONLY_CAPABILITIES <= set(out):
+        raise ValueError("team_rules.yaml: a required capability row is missing")
     return out
 
 
@@ -120,8 +136,9 @@ def set_switch(
     """The new switch state and the audit record of this change. A Must-ask switch can't go off; an unknown key is a
     KeyError, a non-bool a TypeError."""
     switch = load_switches()[key]
+    tool_roles = load_capabilities()["change_tool_access"].roles
     if actor_role not in ("Owner", "Approver") or (
-        key in TOOL_SWITCHES and not role_can(actor_role, "change_tool_access")
+        key in TOOL_SWITCHES and (actor_role != "Owner" or actor_role not in tool_roles)
     ):
         raise PermissionError(key)
     if type(value) is not bool:

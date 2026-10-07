@@ -146,8 +146,7 @@ export function memberViews(
   });
 }
 
-const hasControl = (v: string): boolean =>
-  [...v].some((c) => c.charCodeAt(0) < 32 || c.charCodeAt(0) === 127);
+const hasControl = (v: string): boolean => /[\p{Cc}\p{Cf}]/u.test(v);
 const EMAIL = /^[^\s@]+@[^\s@.]+(\.[^\s@.]+)*\.[^\s@.]{2,}$/;
 
 /** FR-TEAM-01: an invite needs a plausible work email. Surrounding spaces are ignored; empty, inner spaces,

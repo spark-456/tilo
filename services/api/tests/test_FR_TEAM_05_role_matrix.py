@@ -92,6 +92,8 @@ def test_FR_TEAM_05_missing_owner_only_row_is_a_load_error(tmp_path):
 
 def test_FR_TEAM_05_set_switch_keeps_the_owner_floor_even_if_config_is_loosened(tmp_path, monkeypatch):
     p = _full(tmp_path, tools="[Owner, Approver]")
+    sw = "switches:\n  - {key: tools, default: true, must_ask: false}\n"
+    p.write_text(sw + p.read_text(encoding="utf-8"), encoding="utf-8")
     monkeypatch.setattr(tr, "_CONFIG", p)
     with pytest.raises(ValueError):
         set_switch({"tools": True}, "tools", False, actor="u", actor_role="Approver", at=AT)
