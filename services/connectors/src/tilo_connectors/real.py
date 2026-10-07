@@ -10,7 +10,6 @@ No logging; what the adapters read is returned to the caller and written nowhere
 
 from __future__ import annotations
 
-import functools
 import time
 from collections.abc import Callable, Mapping
 from datetime import UTC, datetime
@@ -73,8 +72,10 @@ class RealWritesDisabled(SideEffectRefused):
 class _ReadOnly:
     """Common part of every adapter returned: an id, an empty `sent` and the refusing write door."""
 
-    def __init__(self, connector_id: str, inner: Any = None) -> None:
-        self.id, self._inner = connector_id, inner
+    real_read_only = True  # the mark `is_real_read_only` looks for; the run never trusts a factory's say-so
+
+    def __init__(self, connector_id: str) -> None:
+        self.id = connector_id
 
     @property
     def sent(self) -> tuple[()]:
@@ -89,20 +90,28 @@ class _NoArtifacts:  # nothing is saved, so nothing is looked up
         raise SideEffectRefused(_WRITES_OFF)
 
 
-def _delegate(adapter_class: type, name: str) -> Callable[..., Any]:
-    @functools.wraps(getattr(adapter_class, name))
-    def call(self: _ReadOnly, *args: Any, **kwargs: Any) -> Any:
-        return getattr(self._inner, name)(*args, **kwargs)
+def _delegate(inner: Any, name: str) -> Callable[..., Any]:
+    read = getattr(inner, name)  # held only in this closure: no attribute of the wrapper leads to the adapter
 
+    def call(self: _ReadOnly, *args: Any, **kwargs: Any) -> Any:
+        return read(*args, **kwargs)
+
+    call.__name__, call.__doc__ = name, read.__doc__
     return call
 
 
 def _read_only(connector_id: str, inner: Any) -> _ReadOnly:
     """A wrapper with exactly the pinned reads: no watch, no send, nothing reaches the inner write door."""
-    cls = type(
-        f"ReadOnly_{connector_id}", (_ReadOnly,), {n: _delegate(type(inner), n) for n in READ_METHODS[connector_id]}
+    methods = {n: _delegate(inner, n) for n in READ_METHODS[connector_id]}
+    return type(f"ReadOnly_{connector_id}", (_ReadOnly,), methods)(connector_id)  # type: ignore[no-any-return]
+
+
+def is_real_read_only(adapters: object) -> bool:
+    """True only for a dict whose Google ids are read-only wrappers made here (the run checks a factory's result)."""
+    return isinstance(adapters, dict) and all(
+        getattr(adapters.get(c), "real_read_only", False) is True and getattr(adapters.get(c), "id", None) == c
+        for c in REAL_SCOPES
     )
-    return cls(connector_id, inner)  # type: ignore[no-any-return]
 
 
 def real_connector_plan(registry: ConnectorRegistry) -> list[dict[str, Any]]:

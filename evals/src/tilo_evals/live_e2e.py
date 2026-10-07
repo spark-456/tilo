@@ -67,8 +67,10 @@ FAKED = (  # what a run never does for real, printed with every report (HR-1: sa
     "Verifier verdict: recorded in the unit's summary, not acted on",
     "must-ask judgement: a fixed 'nothing to ask' stand-in, no model call; the deterministic rules still ask",
 )
+NO_CONNECTION = "no Google connection is available to this run; nothing was sent"
 REAL_FAKED = (
-    "recipient and destination: the dev stand-in; connectors are real and read-only, nothing is written or sent"
+    "recipient and destination: the dev stand-in; connectors: real, read-only, not read by any unit yet; "
+    "nothing is written or sent"
 )
 PLANNING_NOTE = "planning credits come from this meter: the planning events carry 0 (#327)"
 SCOPE_NOTE = "claim scope: structural pass rate (GEN-11), not output quality"
@@ -204,20 +206,19 @@ def print_real_plan() -> None:
 def _real_adapters(factory: Callable[[], dict[str, Any]] | None) -> dict[str, Any]:
     """The real connectors, built once the gate has passed and before any model call. Fail closed: a refusal or any
     other failure stops the run (its words are never printed) and never falls back to the recording mocks."""
-    from tilo_connectors.real import RealConnectorsRefused  # noqa: PLC0415
+    from tilo_connectors.real import RealConnectorsRefused, is_real_read_only  # noqa: PLC0415
 
     if factory is None:  # the default (live transport and consent flow) is CL-LIVE-3's
-        raise LiveE2ERefused(
-            "real_connectors_no_token", "no Google connection is available to this run; nothing was sent"
-        )
+        raise LiveE2ERefused("real_connectors_no_token", NO_CONNECTION)
     try:
-        return factory()
+        adapters = factory()
+        if is_real_read_only(adapters):
+            return adapters
     except RealConnectorsRefused as refusal:
         raise LiveE2ERefused(f"real_connectors_{refusal.code}", str(refusal)) from None
     except Exception:  # noqa: BLE001 - fixed text only: the error may hold a token
-        raise LiveE2ERefused(
-            "real_connectors_failed", "the real connectors could not be built; nothing was sent"
-        ) from None
+        pass
+    raise LiveE2ERefused("real_connectors_failed", "the real connectors could not be built; nothing was sent")
 
 
 def _gate(mode: str, env: Mapping[str, str], max_credits: float | None) -> None:

@@ -178,6 +178,10 @@ def run_topic(
         if real_connectors:
             e2e.print_real_plan()
         return e2e.LiveE2EReport(case.id, mode, max_credits, estimate, safety=note, faked=TOPIC_FAKED)
+    if (
+        real_connectors and real_connectors_factory is None
+    ):  # no default factory yet (CL-LIVE-3): refuse before the screen call
+        raise _refuse("real_connectors_no_token", e2e.NO_CONNECTION)
     screen = _screen(config, recordings, text, safety)
     report = e2e.run_live_e2e(
         case.id, mode="live", max_credits=max_credits, environ=environ, models_path=models_path,
