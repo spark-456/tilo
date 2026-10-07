@@ -28,15 +28,15 @@ const ROOT_PAGES = new Set<string>([
 const ROOT_WORLD = /^\/world\/[^/]+\/?$/;
 
 /**
- * The ONE predicate for "this address is served by the Park app": the root Park paths and the /park alias.
- * Paths the old app keeps (/world/:id/stage, /team/console, /worlds/replays, ...) are not Park paths.
- */
-/**
  * The live stage (S-04) of a world: an old-app address next to the Park pages (`/world/:id` is the Park overview).
  * The same string as `stagePath` in src/router.ts (router.test.ts pins that); park/ imports nothing from there.
  */
 export const stagePath = (worldId: string): string => `/world/${encodeURIComponent(worldId)}/stage`;
 
+/**
+ * The ONE predicate for "this address is served by the Park app": the root Park paths and the /park alias.
+ * Paths the old app keeps (/world/:id/stage, /team/console, /worlds/replays, ...) are not Park paths.
+ */
 export function isParkPath(pathname: string): boolean {
   if (pathname === "/park" || pathname.startsWith("/park/") || pathname === "/") return true;
   if (ROOT_WORLD.test(pathname)) return true;
