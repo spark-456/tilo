@@ -13,7 +13,7 @@
  * decision.schema.json 1.0.0 sha256:06915b6db08dc4b7
  * envelope.schema.json 1.0.0 sha256:8a5c75c61807baa2
  * evals.schema.json 1.0.0 sha256:ac8bab7830371705
- * event.schema.json 1.1.0 sha256:623dffe796a61450
+ * event.schema.json 1.2.0 sha256:df0b13a4dbc110ce
  * events/data/agent.assigned.schema.json 1.0.0 sha256:f7672c62780b8b4b
  * events/data/agent.blocked.schema.json 1.0.0 sha256:a4b1f97998b1d554
  * events/data/agent.cloned.schema.json 1.0.0 sha256:99567a48c7c65f6f
@@ -513,19 +513,17 @@ export type EventTarget =
 export type EventItemKind =
   "document" | "crate" | "scroll" | "parcel" | "blueprint" | "note" | "decision" | "backpack";
 /**
- * Server-side redaction scope (PRD 10.1): all, or the districts whose viewers may see it; a list includes the event's own district (EV-13).
+ * Server-side redaction scope (PRD 10.1, 15.3): all, or the districts whose viewers may see it; a list includes the event's own district (EV-13). An empty list (1.2.0, ADR-0009) puts the event in no scoped view: only the owner's full stream carries it (owner-only, for example a Desk-world event, PE-12, or a card with no known district, BQ-69). It is allowed only when district is null (EV-13). Never null: a writer must not default a missing vis.
  *
  * This interface was referenced by `TiloContracts`'s JSON-Schema
  * via the `definition` "EventVis".
  */
 export type EventVis = "all" | EventDistrictList;
 /**
- * @minItems 1
- *
  * This interface was referenced by `TiloContracts`'s JSON-Schema
  * via the `definition` "EventDistrictList".
  */
-export type EventDistrictList = [DistrictId, ...DistrictId[]];
+export type EventDistrictList = DistrictId[];
 /**
  * Who answered a question or meeting (BQ-04): a person, a Team Lead, the card's safe default applied at timeout, or an earlier decision (FR-AGT-07). Never a model's own choice.
  *
