@@ -58,17 +58,18 @@ export const agendaRules: AgendaRules = {
           role: "research",
           due: "Tilo booked · just now",
           color: "lilac",
-          noteAfter: "Invites sent to Jin, Priya and Tom.",
+          noteAfter:
+            "Invites to Jin, Priya and Tom go out once Google Calendar is connected and you approve.",
         },
       },
     },
     focus: {
       label: "Block it",
       action: "accept",
-      toast: "Blocked 09:30–11:30 on Monday in Google Calendar",
+      toast: "Blocked 09:30–11:30 on Monday on your Agenda",
       accepted: {
         title: "Focus time · Mon 28 Sep",
-        note: "09:30–11:30, added to your Google Calendar",
+        note: "09:30–11:30, added to your Agenda",
         due: "Blocked by Tilo",
         color: "lilac",
         group: "week",

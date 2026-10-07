@@ -132,10 +132,23 @@ describe("WEB_1a_fixtures_match_prototype: data members", () => {
       focus?.accepted?.due,
       r.briefRewrites[0]?.text,
     ];
+    // BQ-UX15-2: while there is no calendar connector these three strings must not claim Google Calendar did
+    // something, so the honesty rules beat parity for exactly them (the design page's wording is the old claim).
+    const HONEST_COPY = new Set([
+      "Invites to Jin, Priya and Tom go out once Google Calendar is connected and you approve.",
+      "Blocked 09:30–11:30 on Monday on your Agenda",
+      "09:30–11:30, added to your Agenda",
+    ]);
     for (const text of copy) {
       expect(text, "an agenda rule string is missing").toBeTruthy();
+      if (HONEST_COPY.has(text as string)) continue;
       expect(reference, `the Agenda reference page has "${text}"`).toContain(text as string);
     }
+    expect(
+      [find?.pin.noteAfter, focus?.toast, focus?.accepted?.note].every((t) =>
+        HONEST_COPY.has(t as string),
+      ),
+    ).toBe(true);
   });
 
   it("WEB_1a_fixtures_match_prototype decisions: the prototype's own data is identical, only the listed paths are extra", () => {
