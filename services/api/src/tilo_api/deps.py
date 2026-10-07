@@ -545,7 +545,10 @@ ORG_ID = "org_tilo"
 
 _run_stores_lock = threading.Lock()
 _run_stores: dict[tuple[str | None, ...], Any] = {}  # a built store per config; a refusal is never kept
-_RUN_STORE_ENV = ("K_SERVICE", "TILO_FIRESTORE_PROJECT", "FIRESTORE_EMULATOR_HOST", "STORAGE_EMULATOR_HOST")
+_RUN_STORE_ENV = (
+    *("K_SERVICE", "TILO_FIRESTORE_PROJECT", "FIRESTORE_EMULATOR_HOST", "STORAGE_EMULATOR_HOST"),
+    *("GOOGLE_CLOUD_PROJECT", "API_ENDPOINT_OVERRIDE", "TILO_ARTIFACTS_BUCKET", "TILO_ARCHIVE_BUCKET"),
+)  # every variable a door's rules read: a kept store never outlives a config that would now be refused
 
 
 def _run_store(kind: str, switches: tuple[str, str], build: Callable[[], Any]) -> Any:

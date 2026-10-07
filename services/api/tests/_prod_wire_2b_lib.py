@@ -3,9 +3,11 @@
 `FakeBucket` mimics the subset of google-cloud-storage's `Bucket`/`Blob` that the backends may use: `blob(name)`,
 `upload_from_string(data, if_generation_match=)` (412 `PreconditionFailed`), `download_as_bytes()` (`NotFound`),
 `delete()` (a blob listed or built with a generation removes that generation; without one it removes the live object,
-or archives it in a versioned bucket), `list_blobs(prefix=, versions=)` and `delete_blob(name, generation=)`. There is
-no official GCS emulator, so the real-GCS check is the deployed smoke (PR4). Names are unique to this ticket because
-test directories have no `__init__.py` (global module names). No network, no secret.
+or archives it in a versioned bucket), `list_blobs(prefix=, versions=)` and `delete_blob(name, generation=)`.
+`lose_reply` stages the 412 a retried create-only upload meets when its first attempt saved the bytes but the answer
+was lost (google-cloud-storage retries a generation-matched upload by default). There is no official GCS emulator,
+so the real-GCS check is the deployed smoke (PR4). Names are unique to this ticket because test directories have no
+`__init__.py` (global module names). No network, no secret.
 """
 
 from __future__ import annotations
@@ -53,6 +55,7 @@ class FakeBucket:
         self._objects: dict[str, list[dict[str, Any]]] = {}
         self.upload_log: list[tuple[str, Any]] = []  # (name, if_generation_match) of every upload attempt
         self.before_upload = None  # a hook called with the name before each upload
+        self.lose_reply = None  # a hook: True saves the upload, then answers 412 (a retried, lost-reply first attempt)
 
     def blob(self, name: str) -> FakeBlob:
         return FakeBlob(self, name)
@@ -88,6 +91,8 @@ class FakeBucket:
             gens.append({"generation": self._next, "data": data.encode() if isinstance(data, str) else bytes(data),
                          "live": True})  # fmt: skip
             self._next += 1
+        if self.lose_reply is not None and self.lose_reply(name):
+            raise gexc.PreconditionFailed(f"412 {name} (our own first attempt landed; its answer was lost)")
 
     def _delete(self, name: str, generation: int | None) -> None:
         with self._lock:

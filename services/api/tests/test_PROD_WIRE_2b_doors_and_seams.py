@@ -36,6 +36,7 @@ from tilo_api.run_stores import (
     GcsArchiveStore,
     GcsBlobBackend,
     RunStoreNotConfigured,
+    RunStoreUnavailable,
     open_artifact_store,
     open_run_archive,
     redact_leaves,
@@ -48,6 +49,7 @@ LIVE = {"K_SERVICE": "tilo-api", "TILO_FIRESTORE_PROJECT": PROJECT, "TILO_ARTIFA
         "TILO_ARCHIVE_BUCKET": f"{PROJECT}-archive"}  # fmt: skip
 OFF = {k: v for k, v in LIVE.items() if k != "K_SERVICE"}
 EMU = {"FIRESTORE_EMULATOR_HOST": "127.0.0.1:9", "STORAGE_EMULATOR_HOST": "http://127.0.0.1:9"}
+PARITY = ("GOOGLE_CLOUD_PROJECT", "API_ENDPOINT_OVERRIDE")  # the process may hold either: every test starts without
 NO_IO = re.compile(r"(collection|document)(\(\)\.(collection|document))*")
 KINDS = {
     "artifacts": ("TILO_ARTIFACTS_STORE", "TILO_ARTIFACTS_BUCKET"),
@@ -72,7 +74,7 @@ def door(kind: str, env, **kwargs):
 
 @pytest.fixture(autouse=True)
 def _cold_process(monkeypatch):
-    for name in [*LIVE, *EMU, "TILO_SCHEDULES_STORE", "TILO_PEOPLE_STORE", "TILO_API_STORE"]:
+    for name in [*LIVE, *EMU, "TILO_SCHEDULES_STORE", "TILO_PEOPLE_STORE", "TILO_API_STORE", *PARITY]:
         monkeypatch.delenv(name, raising=False)
     monkeypatch.setattr(deps, "get_redactor", lambda: mask)
     for seam in (deps.get_artifact_store, deps.get_run_archive):
@@ -208,17 +210,133 @@ def test_PROD_WIRE_2b_door_outside_cloud_run_never_builds_a_live_client(monkeypa
 
 def test_PROD_WIRE_2b_door_outside_cloud_run_opens_the_emulators_on_a_demo_project(monkeypatch):
     _, _, fs_spy, st_spy, _ = wire(monkeypatch, "default")
+    for host, value in EMU.items():  # the default clients read os.environ: it names the same hosts as env (1a's rule)
+        monkeypatch.setenv(host, value)
     door("artifacts", {**OFF, **DEMO, **EMU})
     assert len(fs_spy.calls) == 1 and "demo-tilo" in repr(fs_spy.calls[0]) and len(st_spy.calls) == 1
+    monkeypatch.delenv("FIRESTORE_EMULATOR_HOST")
     door("archive", {**OFF, **DEMO, "STORAGE_EMULATOR_HOST": EMU["STORAGE_EMULATOR_HOST"]})
     assert len(st_spy.calls) == 2 and len(fs_spy.calls) == 1
 
 
 @pytest.mark.parametrize("kind", KINDS)
-def test_PROD_WIRE_2b_door_outside_cloud_run_opens_over_a_test_injected_client(monkeypatch, kind):
-    _, _, _, st_spy, kwargs = wire(monkeypatch, "injected")
-    door(kind, OFF, **kwargs)  # the caller's own client is not a live one the door built
+def test_PROD_WIRE_2b_door_outside_cloud_run_an_injected_client_still_needs_the_emulators_and_a_demo_project(
+    monkeypatch, kind
+):
+    """Restated (security round 1): an injected factory no longer skips the outside-Cloud-Run rule."""
+    _, _, fs_spy, st_spy, kwargs = wire(monkeypatch, "injected")
+    with pytest.raises(RunStoreNotConfigured):
+        door(kind, OFF, **kwargs)  # a live project outside Cloud Run, injected or not
+    assert fs_spy.calls == [] and st_spy.calls == []
+    door(kind, {**OFF, **DEMO, **EMU}, **kwargs)  # env alone may name the hosts: the injected client is the caller's
     assert len(st_spy.calls) == 1
+
+
+@pytest.mark.parametrize("via", ["default", "injected"])
+@pytest.mark.parametrize("where", ["env", "os.environ"])
+@pytest.mark.parametrize("host", EMU)
+@pytest.mark.parametrize("kind", KINDS)
+def test_PROD_WIRE_2b_door_on_cloud_run_refuses_an_emulator_host_before_any_client(monkeypatch, kind, host, where, via):
+    _, _, fs_spy, st_spy, kwargs = wire(monkeypatch, via)
+    env = {**LIVE, host: EMU[host]} if where == "env" else LIVE
+    if where == "os.environ":
+        monkeypatch.setenv(host, EMU[host])
+    with pytest.raises(RunStoreNotConfigured, match=host):
+        door(kind, env, **kwargs)
+    assert fs_spy.calls == [] and st_spy.calls == []
+
+
+@pytest.mark.parametrize("where", ["env", "os.environ"])
+@pytest.mark.parametrize("kind", KINDS)
+def test_PROD_WIRE_2b_door_refuses_an_api_endpoint_override(monkeypatch, kind, where):
+    _, _, fs_spy, st_spy, kwargs = wire(monkeypatch, "default")
+    override = {"API_ENDPOINT_OVERRIDE": "https://storage.example.test"}
+    if where == "os.environ":
+        monkeypatch.setenv(*next(iter(override.items())))
+    with pytest.raises(RunStoreNotConfigured, match="API_ENDPOINT_OVERRIDE"):
+        door(kind, {**LIVE, **override} if where == "env" else LIVE)
+    assert fs_spy.calls == [] and st_spy.calls == []
+
+
+@pytest.mark.parametrize("kind", KINDS)
+def test_PROD_WIRE_2b_door_refuses_a_google_cloud_project_other_than_the_store_project(monkeypatch, kind):
+    _, _, fs_spy, st_spy, _ = wire(monkeypatch, "default")
+    with pytest.raises(RunStoreNotConfigured, match="GOOGLE_CLOUD_PROJECT"):
+        door(kind, {**LIVE, "GOOGLE_CLOUD_PROJECT": "tilo-other-project"})
+    assert fs_spy.calls == [] and st_spy.calls == []
+    door(kind, {**LIVE, "GOOGLE_CLOUD_PROJECT": PROJECT})
+    assert len(st_spy.calls) == 1
+
+
+PROCESS_HOSTS = {
+    "none": {}, "other storage host": {**EMU, "STORAGE_EMULATOR_HOST": "http://127.0.0.1:10"},
+    "other firestore host": {**EMU, "FIRESTORE_EMULATOR_HOST": "127.0.0.1:10"},
+}  # fmt: skip
+
+
+@pytest.mark.parametrize("process", PROCESS_HOSTS.values(), ids=PROCESS_HOSTS)
+@pytest.mark.parametrize("kind", KINDS)
+def test_PROD_WIRE_2b_door_refuses_when_os_environ_names_another_emulator_host_than_env(monkeypatch, kind, process):
+    """The default clients read os.environ, not `env`: a host only `env` names would open the live service."""
+    _, _, fs_spy, st_spy, _ = wire(monkeypatch, "default")
+    for host, value in process.items():
+        monkeypatch.setenv(host, value)
+    if kind == "archive" and process.get("STORAGE_EMULATOR_HOST") == EMU["STORAGE_EMULATOR_HOST"]:
+        door(kind, {**OFF, **DEMO, **EMU})  # the archive builds no Firestore client: only its storage host matters
+        assert fs_spy.calls == [] and len(st_spy.calls) == 1
+        return
+    with pytest.raises(RunStoreNotConfigured, match="os.environ"):
+        door(kind, {**OFF, **DEMO, **EMU})
+    assert fs_spy.calls == [] and st_spy.calls == []
+
+
+@pytest.mark.parametrize("via", ["default", "injected"])
+@pytest.mark.parametrize("kind", KINDS)
+def test_PROD_WIRE_2b_door_refuses_one_bucket_for_both_the_artifacts_and_the_archive(monkeypatch, kind, via):
+    _, _, fs_spy, st_spy, kwargs = wire(monkeypatch, via)
+    with pytest.raises(RunStoreNotConfigured, match="TILO_ARCHIVE_BUCKET"):
+        door(kind, {**LIVE, "TILO_ARCHIVE_BUCKET": LIVE["TILO_ARTIFACTS_BUCKET"]}, **kwargs)
+    assert fs_spy.calls == [] and st_spy.calls == []
+
+
+@pytest.mark.parametrize("broken", ["firestore", "storage", "bucket"])
+@pytest.mark.parametrize("kind", KINDS)
+def test_PROD_WIRE_2b_door_a_client_that_cannot_be_built_is_store_unavailable_and_logs_only_its_type(
+    monkeypatch, caplog, kind, broken
+):
+    from google.auth.exceptions import DefaultCredentialsError  # noqa: PLC0415
+
+    def boom(*args, **kwargs):
+        raise DefaultCredentialsError(f"no credentials near {SECRET}")
+
+    _, st_client, _, _, kwargs = wire(monkeypatch, "injected")
+    if broken == "bucket":
+        monkeypatch.setattr(st_client, "bucket", boom)
+    else:
+        kwargs[f"{broken}_client_factory"] = boom
+    if kind == "archive" and broken == "firestore":
+        return  # the archive builds no Firestore client
+    with caplog.at_level("DEBUG"), pytest.raises(RunStoreUnavailable) as refused:
+        door(kind, LIVE, **kwargs)
+    assert isinstance(refused.value, RunStoreNotConfigured) and isinstance(refused.value, NotImplementedError)
+    assert SECRET not in str(refused.value) and refused.value.__cause__ is None and refused.value.__suppress_context__
+    assert "DefaultCredentialsError" in caplog.text and SECRET not in caplog.text
+
+
+@pytest.mark.parametrize(
+    "raised,detail", [(RunStoreUnavailable("x"), "store_unavailable"), (RunStoreNotConfigured("x"), "not_configured")]
+)
+def test_PROD_WIRE_2b_the_assistant_answers_503_when_the_archive_door_refuses(raised, detail):
+    from fastapi import HTTPException  # noqa: PLC0415
+    from tilo_api.assistant import route  # noqa: PLC0415
+
+    def seam():
+        raise raised
+
+    request = types.SimpleNamespace(app=types.SimpleNamespace(dependency_overrides={deps.get_run_archive: seam}))
+    with pytest.raises(HTTPException) as answered:
+        route._archive_opener(request)
+    assert (answered.value.status_code, answered.value.detail) == (503, detail)
 
 
 def test_PROD_WIRE_2b_door_has_no_default_redactor(monkeypatch):
@@ -228,6 +346,14 @@ def test_PROD_WIRE_2b_door_has_no_default_redactor(monkeypatch):
     with pytest.raises(TypeError):
         open_run_archive(LIVE, storage_client_factory=kwargs["storage_client_factory"])
     assert kwargs["firestore_client_factory"].calls == [] and kwargs["storage_client_factory"].calls == []
+
+
+def test_PROD_WIRE_2b_redact_leaves_fails_closed_when_two_keys_redact_to_one():
+    redact = redact_leaves(lambda text: text.replace("TOPSECRETWORD", "[R]"))
+    with pytest.raises(ValueError) as refused:
+        redact({"outer": [{"k TOPSECRETWORD": 1, "k [R]": 2}]})  # one value would silently replace the other
+    assert "TOPSECRETWORD" not in str(refused.value)
+    assert redact({"k TOPSECRETWORD": 1, "other": 2}) == {"k [R]": 1, "other": 2}
 
 
 def test_PROD_WIRE_2b_redact_leaves_masks_every_string_and_key_and_fails_closed():
@@ -298,3 +424,28 @@ def test_PROD_WIRE_2b_seams_return_the_durable_store_and_archive_once_configured
     deploy(monkeypatch, {"TILO_ARTIFACTS_BUCKET": f"{PROJECT}-artifacts-two"})
     assert deps.get_artifact_store() is not store  # a changed config is a new store, over the new bucket
     assert f"{PROJECT}-artifacts-two" in st_client.requested
+
+
+def test_PROD_WIRE_2b_seams_never_serve_a_kept_store_past_a_parity_refusal_and_refuse_an_unbuildable_client(
+    monkeypatch,
+):
+    wire(monkeypatch, "default")
+    deploy(monkeypatch, LIVE)
+    deps.get_artifact_store(), deps.get_run_archive()
+    for name, value in [("API_ENDPOINT_OVERRIDE", "https://storage.example.test"), ("GOOGLE_CLOUD_PROJECT", "tilo-x1")]:
+        deploy(monkeypatch, {name: value})
+        for seam in (deps.get_artifact_store, deps.get_run_archive):
+            with pytest.raises(RunStoreNotConfigured):
+                seam()  # the kept store is for another config
+        monkeypatch.delenv(name)
+    from google.auth.exceptions import DefaultCredentialsError  # noqa: PLC0415
+
+    def no_credentials(*args, **kwargs):
+        raise DefaultCredentialsError("no credentials")
+
+    patch_clients(monkeypatch, firestore_client=None, storage_client=None)
+    monkeypatch.setattr(sys.modules["google.cloud.firestore"], "Client", no_credentials)
+    deps.get_artifact_store.cache_clear()
+    with pytest.raises(RunStoreUnavailable):
+        deps.get_artifact_store()
+    assert runs.run_seams(request_with_every_other_seam(), "replay") is None

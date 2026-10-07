@@ -3,7 +3,10 @@ the CMEK `archive` bucket. GCS objects are immutable, so one object holds one li
 
 Pinned: line number `n` (1 first, highest existing + 1, a gap is never filled) goes to the object
 `{org_id}/{run_id}/{n:08d}.jsonl` holding `line + "\\n"` in UTF-8; every upload is create-only
-(`if_generation_match=0`) and an index taken by another writer is retried with the next one; `read_lines` lists
+(`if_generation_match=0`). Security round 1: a record line (a JSON object with `seq` or `prev_hash`) goes to the index
+of its own `seq`, so a second writer of that seq is refused (`FileExistsError`; the caller reopens), never moved to the
+next index with a stale prev_hash; a 412 over identical bytes is our own lost-reply upload (success); only a line with
+neither key is retried at the next index. `read_lines` lists
 `{org_id}/{run_id}/` (the trailing slash: `r_1` must not read `r_10`) and returns the lines in index order. Ids that
 `RunArchive` would refuse are a `ValueError` here too. The real-GCS check is the deployed smoke (PR4).
 `tilo_api.run_stores` does not exist yet: every test here fails at collection with `ModuleNotFoundError`.
@@ -11,6 +14,7 @@ Pinned: line number `n` (1 first, highest existing + 1, a gap is never filled) g
 
 from __future__ import annotations
 
+import json
 import threading
 from datetime import UTC, datetime
 
@@ -18,6 +22,7 @@ import pytest
 from _prod_wire_2b_lib import ORG, RUN, SECRET, FakeBucket, mask
 from tilo_api.run_stores import GcsArchiveStore
 from tilo_archive import RunArchive, verify_chain
+from tilo_archive.record import canonical_json
 
 
 def obj(n: int, org: str = ORG, run: str = RUN) -> str:
@@ -77,33 +82,91 @@ def test_PROD_WIRE_2b_archive_a_run_archive_over_it_verifies_its_chain_across_a_
 
 
 def test_PROD_WIRE_2b_archive_two_appenders_never_lose_or_overwrite_a_line():
-    bucket, errors = FakeBucket(versioned=False), []
+    """Restated (security round 1, BQ-PW-2B (4)): a record line is named by its own `seq`, so the loser of a race is
+    refused (`FileExistsError`) instead of landing at the next index with a stale prev_hash; it reopens and appends
+    again. Nothing is lost or overwritten and the one chain verifies."""
+    bucket, errors, refused = FakeBucket(versioned=False), [], []
     meeting, seen = threading.Barrier(2, timeout=30), set()
 
     def first_upload_meets_the_other(name: str) -> None:
         if threading.get_ident() not in seen:
             seen.add(threading.get_ident())
-            meeting.wait()  # both appenders take index 1 at the same moment
+            meeting.wait()  # both appenders take seq 1 at the same moment
 
     bucket.before_upload = first_upload_meets_the_other
 
     def writer(tag: str) -> None:
         try:
             store = GcsArchiveStore(bucket)  # its own instance: another process in effect
+            run = RunArchive(store, org_id=ORG, run_id=RUN, redactor=lambda p: p)
             for i in range(20):
-                store.append_line(ORG, RUN, f'{{"w":"{tag}","i":{i}}}')
+                while True:
+                    try:
+                        run.append("tool_call", {"w": tag, "i": i})
+                        break
+                    except FileExistsError:
+                        refused.append(tag)
+                        run = RunArchive(store, org_id=ORG, run_id=RUN, redactor=lambda p: p)  # reopen at the head
         except Exception as exc:  # noqa: BLE001
             errors.append(repr(exc))
 
     threads = [threading.Thread(target=writer, args=(tag,)) for tag in "ab"]
     [t.start() for t in threads]
     [t.join(60) for t in threads]
-    lines = GcsArchiveStore(bucket).read_lines(ORG, RUN)
-    assert errors == [] and bucket.live_names() == [obj(i) for i in range(1, 41)]
-    assert sorted(lines) == sorted(f'{{"w":"{t}","i":{i}}}' for t in "ab" for i in range(20))
+    records = archive(bucket).records()
+    payloads = [r["payload"] for r in records]
+    assert errors == [] and refused, "the loser of the race for seq 1 was refused"
+    assert bucket.live_names() == [obj(i) for i in range(1, 41)]
+    assert sorted((p["w"], p["i"]) for p in payloads) == [(t, i) for t in "ab" for i in range(20)]
     for tag in "ab":  # each appender's own lines keep their order
-        assert [ln for ln in lines if f'"w":"{tag}"' in ln] == [f'{{"w":"{tag}","i":{i}}}' for i in range(20)]
-    assert {match for _, match in bucket.upload_log} == {0} and len(bucket.upload_log) > 40, "the lost race was retried"
+        assert [p["i"] for p in payloads if p["w"] == tag] == list(range(20))
+    assert verify_chain(records) == [], "no record landed with a stale prev_hash"
+    assert {match for _, match in bucket.upload_log} == {0} and len(bucket.upload_log) > 40, "the lost race was refused"
+
+
+def test_PROD_WIRE_2b_archive_a_record_is_named_by_its_seq_and_a_second_writer_of_that_seq_is_refused():
+    bucket = FakeBucket(versioned=False)
+    archive(bucket).append("tool_call", {"i": 1})
+    first, second = archive(bucket), archive(bucket)  # two instances at the same head
+    assert first.append("tool_call", {"by": "first"}) == f"{RUN}/2"
+    with pytest.raises(FileExistsError):
+        second.append("tool_call", {"by": "second"})  # its prev_hash is stale: it must never land at index 3
+    assert bucket.live_names() == [obj(1), obj(2)] and verify_chain(archive(bucket).records()) == []
+    assert archive(bucket).append("tool_call", {"by": "second"}) == f"{RUN}/3"  # a reopen continues the one chain
+    assert verify_chain(archive(bucket).records()) == []
+    line = archive(bucket).records()[1]
+    store = GcsArchiveStore(bucket)
+    store.append_line(ORG, RUN, canonical_json(line))  # the same bytes again: our own line, not a second copy
+    assert bucket.live_names() == [obj(1), obj(2), obj(3)]
+    with pytest.raises(FileExistsError):
+        store.append_line(ORG, RUN, canonical_json({**line, "kind": "channel_out"}))
+    assert bucket.live_names() == [obj(1), obj(2), obj(3)]
+
+
+@pytest.mark.parametrize("seq", [0, -1, True, "3", 1.0, 10**8, None])
+def test_PROD_WIRE_2b_archive_a_record_line_without_a_usable_seq_is_refused_and_the_bucket_is_untouched(seq):
+    bucket = FakeBucket(versioned=False)
+    with pytest.raises(ValueError):
+        GcsArchiveStore(bucket).append_line(ORG, RUN, json.dumps({"seq": seq, "prev_hash": "0" * 64}))
+    with pytest.raises(ValueError):
+        GcsArchiveStore(bucket).append_line(ORG, RUN, json.dumps({"prev_hash": "0" * 64}))
+    assert bucket.upload_log == []
+
+
+def test_PROD_WIRE_2b_archive_a_lost_reply_412_is_our_own_line_not_a_duplicate():
+    """google-cloud-storage retries a generation-matched upload: a first attempt that saved the bytes but lost its
+    answer comes back as 412. That is our own line: the chain must not get it twice."""
+    bucket = FakeBucket(versioned=False)
+    bucket.lose_reply = lambda name: True
+    run = archive(bucket)
+    for i in range(1, 6):
+        assert run.append("model_call", {"i": i}) == f"{RUN}/{i}"
+    assert bucket.live_names() == [obj(i) for i in range(1, 6)]
+    assert verify_chain(archive(bucket).records(), expected_head=run.head()) == []
+    store = GcsArchiveStore(bucket)  # a line that carries no seq follows the same rule
+    store.append_line("org_other", RUN, '{"n":1}')
+    store.append_line("org_other", RUN, '{"n":2}')
+    assert store.read_lines("org_other", RUN) == ['{"n":1}', '{"n":2}']
 
 
 def test_PROD_WIRE_2b_archive_tampering_with_an_object_fails_verify_chain():

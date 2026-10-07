@@ -132,3 +132,17 @@ def test_PROD_WIRE_2b_gcs_the_artifact_store_puts_reads_and_erases_through_it():
     store.retention().delete(record.record_id)
     assert bucket.list_blobs(versions=True) == [], "no generation of the blob is left, live or noncurrent"
     assert store.head(scope, done.ref) is None
+
+
+def test_PROD_WIRE_2b_gcs_a_lost_reply_412_on_create_is_success_only_over_the_same_bytes():
+    """google-cloud-storage retries a generation-matched upload: our own first attempt may have saved the bytes."""
+    bucket = FakeBucket()
+    blobs = GcsBlobBackend(bucket)
+    bucket.lose_reply = lambda name: name == KEY
+    blobs.create(KEY, b"ours")  # saved, then the retry met our own object: success
+    assert blobs.read(KEY) == b"ours" and len(bucket.generations(KEY)) == 1
+    bucket.lose_reply = None
+    bucket.plant(OTHER, b"theirs")
+    with pytest.raises(FileExistsError):
+        blobs.create(OTHER, b"ours")  # other bytes at the key: never ours
+    assert blobs.read(OTHER) == b"theirs"

@@ -28,6 +28,7 @@ CLAUDE.md's "record every dependency's licence" rule. Updated whenever a depende
 | google-auth (`tilo_api.schedules`: OIDC verification of the Scheduler tick, FR-AGT-14) | Apache-2.0 | https://pypi.org/project/google-auth/ |
 | requests (the transport google-auth fetches Google's public certs with) | Apache-2.0 | https://pypi.org/project/requests/ |
 | cryptography (`tilo_api.appcheck`: RS256 verification of App Check tokens, SEC-10; already listed under `services/connectors`, now declared by `tilo-api` itself) | Apache-2.0 OR BSD-3-Clause | https://pypi.org/project/cryptography/ |
+| google-cloud-storage (`tilo_api.run_stores`: GCS artifact blobs and the raw archive, PROD-WIRE 2b) | Apache-2.0 | https://pypi.org/project/google-cloud-storage/ |
 
 ## Python (`packages/contracts-py`)
 
@@ -41,7 +42,6 @@ CLAUDE.md's "record every dependency's licence" rule. Updated whenever a depende
 | --- | --- | --- |
 | google-adk | Apache-2.0 | https://pypi.org/project/google-adk/ |
 | google-cloud-firestore | Apache-2.0 | https://pypi.org/project/google-cloud-firestore/ |
-| google-cloud-storage (GCS blobs and the raw archive, PROD-WIRE 2b) | Apache-2.0 | https://pypi.org/project/google-cloud-storage/ |
 | tzdata (the IANA zone database for `zoneinfo`; scheduled runs, FR-AGT-14) | Apache-2.0 | https://pypi.org/project/tzdata/ |
 
 `services/harness` also uses `pyyaml`, `jsonschema` and `referencing` (already listed under the

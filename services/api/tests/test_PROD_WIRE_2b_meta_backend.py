@@ -15,10 +15,13 @@ from __future__ import annotations
 
 import re
 import secrets
+import types
+from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
 from _prod_wire_2b_lib import race
+from google.api_core import exceptions as gexc
 from google.cloud import firestore
 from tilo_api.run_stores import FirestoreMetaBackend
 from tilo_harness.emulator import running_emulator
@@ -131,3 +134,32 @@ def test_PROD_WIRE_2b_meta_a_path_that_escapes_the_root_is_refused_before_the_cl
         with pytest.raises(ValueError):
             FirestoreMetaBackend(client, collection_root=bad_root)
     assert client.mock_calls == before
+
+
+class _LostReplyRef:
+    """A document whose `create` stores the body, then answers AlreadyExists: the Firestore client's own retry met
+    the document its first attempt wrote (the answer was lost), on attempt 0 of the backend's own loop."""
+
+    def __init__(self, stored: Any = None) -> None:
+        self.stored, self.creates = stored, 0
+
+    def create(self, body: Any) -> None:
+        self.creates += 1
+        if self.stored is None:
+            self.stored = body
+        raise gexc.AlreadyExists("409 the document already exists")
+
+    def get(self) -> Any:
+        stored = self.stored
+        return types.SimpleNamespace(exists=stored is not None, to_dict=lambda: dict(stored))
+
+
+def test_PROD_WIRE_2b_meta_a_lost_reply_on_the_first_attempt_is_success_only_over_the_same_body():
+    _, path = where()
+    ours, client = _LostReplyRef(), MagicMock(name="client")
+    client.document.return_value = ours
+    FirestoreMetaBackend(client, collection_root="orgs").create(path, DOC)  # our own body is there: success
+    assert ours.creates == 1
+    client.document.return_value = _LostReplyRef(stored={"v": 1, "doc": "{}"})
+    with pytest.raises(FileExistsError):
+        FirestoreMetaBackend(client, collection_root="orgs").create(path, DOC)
