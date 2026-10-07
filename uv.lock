@@ -13,6 +13,7 @@ members = [
     "tilo-contracts",
     "tilo-evals",
     "tilo-harness",
+    "tilo-logging",
     "tilo-memory",
     "tilo-metering",
     "tilo-people",
@@ -1378,6 +1379,7 @@ dependencies = [
     { name = "tilo-archive" },
     { name = "tilo-connectors" },
     { name = "tilo-harness" },
+    { name = "tilo-logging" },
     { name = "tilo-memory" },
     { name = "tilo-metering" },
     { name = "tilo-people" },
@@ -1399,6 +1401,7 @@ requires-dist = [
     { name = "tilo-archive", editable = "packages/archive" },
     { name = "tilo-connectors", editable = "services/connectors" },
     { name = "tilo-harness", editable = "services/harness" },
+    { name = "tilo-logging", editable = "packages/logging" },
     { name = "tilo-memory", editable = "packages/memory" },
     { name = "tilo-metering", editable = "packages/metering" },
     { name = "tilo-people", editable = "packages/people" },
@@ -1544,6 +1547,7 @@ dependencies = [
     { name = "tilo-archive" },
     { name = "tilo-connectors" },
     { name = "tilo-contracts" },
+    { name = "tilo-logging" },
     { name = "tilo-memory" },
     { name = "tilo-policy" },
     { name = "tilo-providers" },
@@ -1567,6 +1571,7 @@ requires-dist = [
     { name = "tilo-archive", editable = "packages/archive" },
     { name = "tilo-connectors", editable = "services/connectors" },
     { name = "tilo-contracts", editable = "packages/contracts-py" },
+    { name = "tilo-logging", editable = "packages/logging" },
     { name = "tilo-memory", editable = "packages/memory" },
     { name = "tilo-policy", editable = "packages/policy" },
     { name = "tilo-providers", editable = "packages/providers" },
@@ -1576,6 +1581,11 @@ requires-dist = [
 
 [package.metadata.requires-dev]
 dev = [{ name = "tilo-metering", editable = "packages/metering" }]
+
+[[package]]
+name = "tilo-logging"
+version = "0.1.0"
+source = { editable = "packages/logging" }
 
 [[package]]
 name = "tilo-memory"

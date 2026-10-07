@@ -21,10 +21,12 @@ dependencies = [
     "tilo-archive",
     "tilo-memory",
     "tilo-people",
+    "tilo-logging",
 ]
 
 [tool.uv.sources]
 tilo-archive = { workspace = true }
+tilo-logging = { workspace = true }
 tilo-memory = { workspace = true }
 tilo-people = { workspace = true }
 tilo-planning = { workspace = true }

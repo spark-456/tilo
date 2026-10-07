@@ -5,6 +5,7 @@ from typing import Annotated, Any
 
 from fastapi import Depends, FastAPI, Request
 from fastapi.responses import JSONResponse
+from tilo_logging import configure_logging as _configure_logging
 
 from tilo_api import deps as _deps
 from tilo_api import dev as _dev
@@ -22,6 +23,7 @@ from tilo_api.console import build_router as _build_console_router
 from tilo_api.costs import router as _costs_router
 from tilo_api.dispatch import router as _dispatch_router
 from tilo_api.intake import router as intake_router
+from tilo_api.log_context import LogContext as _LogContext
 from tilo_api.people_limits import NoStore as _NoStore
 from tilo_api.redaction import router as _redaction_router
 from tilo_api.sharing import WorldView
@@ -35,6 +37,8 @@ _DOCS: dict[str, Any] = {} if _dev.dev_enabled() else {"docs_url": None, "redoc_
 app = FastAPI(title="tilo-api", **_DOCS)
 app.add_middleware(_AccessGate)  # SEC-15: deployed, every non-public route needs a stored judge declaration
 app.add_middleware(_NoStore)  # added after the gate, so it is outside it: the gate's 403 on `/v1/` is no-store too
+app.add_middleware(_LogContext)  # NFR-26: outermost, so every log line of a request carries its ids
+_configure_logging()  # NFR-26: a deployed service logs JSON with no further setup
 
 
 @app.exception_handler(_deps.ReplayOnly)
