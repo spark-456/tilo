@@ -40,6 +40,36 @@ export interface Decision {
   toast: string;
   /** Additive designed copy (the notification title once this is approved). */
   approvedTitle: string;
+  /** Additive (not in the prototype): what the decision is about. Merged in `fixtures/index.ts`. */
+  facts?: DecisionFacts;
+}
+
+/**
+ * Additive data for one decision (the prototype has none of it): the words and numbers a page shows
+ * while the decision waits and once it is taken. A page reads it as `Decision.facts` from
+ * `api.getDecisions()`, picks the entry by `decision.k`, and opens `decision.world`. No page keeps its own copy.
+ */
+export interface DecisionFacts {
+  /** The project the decision belongs to, e.g. the world's name. */
+  project: string;
+  /** Who or what the decision is about. */
+  subject: string;
+  /** The money involved, in pounds, when there is any. */
+  amount?: number;
+  /** Who decides. */
+  approver: string;
+  /** Short label while the decision waits (when a page shows one). */
+  waiting?: string;
+  /** Short label once it is taken (when a page shows one). */
+  decided?: string;
+  /** The note a pin or row shows once it is taken (when a page shows one). */
+  approvedNote?: string;
+  /** The activity line recorded once it is taken. */
+  activity: string;
+  /** The label of the button that takes it while it waits (a page falls back to "Approve" plus the amount). */
+  approveLabel?: string;
+  /** The label and value rows of the detail panel on the activity line recorded once it is taken. */
+  details?: [label: string, value: string][];
 }
 
 export type TierName = "Village" | "Town" | "City";
@@ -217,6 +247,8 @@ export interface Ledger {
   memory: number[];
   hours: [string, number, string, string][];
   activity: LedgerEntry[];
+  /** The currency the amounts are in, as served; absent means pounds (the fixture). */
+  currency?: "GBP" | "USD";
 }
 
 // Agenda
@@ -255,6 +287,45 @@ export interface AgendaPin {
   done?: boolean;
   go?: string;
 }
+/** What accepting a suggested pin of one `kind` does. */
+export interface SuggestionRule {
+  /** The accept button's label. */
+  label: string;
+  /** "find" opens the time finder; "accept" turns the pin into a normal one. */
+  action: "find" | "accept";
+  /** accept: the toast. */
+  toast?: string;
+  /** accept: the fields the pin takes on (the suggestion flag is dropped). */
+  accepted?: Partial<Pick<AgendaPin, "title" | "note" | "due" | "color" | "group" | "by" | "role">>;
+  /** find: the banner, and what booking a slot creates. */
+  find?: {
+    title: string;
+    sub: string;
+    /** The meeting booked into the chosen slot. */
+    event: { id: string; title: string };
+    /** The pin that confirms it; its note is "<slot>. <noteAfter>". */
+    pin: Pick<AgendaPin, "id" | "title" | "role" | "due" | "color"> & { noteAfter: string };
+  };
+}
+/** Once `dec` is taken, a brief bullet starting with `startsWith` on event `event` reads `text`. */
+export interface BriefRewrite {
+  event: string;
+  dec: DecisionKey;
+  startsWith: string;
+  text: string;
+}
+/** Additive (not in the prototype): the Agenda's behaviour as data. Merged in `fixtures/index.ts`. */
+export interface AgendaRules {
+  /** Month name of the week shown, e.g. for the heading. */
+  month: string;
+  /** The page's date line. */
+  dateLine: string;
+  /** The line under a board's title, by board. A board with no entry gets the page's generic line. */
+  boardSubs?: Partial<Record<AgendaPin["board"], string>>;
+  /** By pin `kind`. A kind with no entry gets the page's generic "Accept". */
+  suggestions: Record<string, SuggestionRule>;
+  briefRewrites: BriefRewrite[];
+}
 export interface Agenda {
   days: string[];
   wkend: string[];
@@ -266,6 +337,7 @@ export interface Agenda {
   slots: { d: number; s: number; e: number; l: string }[];
   details: Record<string, AgendaDetail>;
   pins: AgendaPin[];
+  rules?: AgendaRules;
 }
 export type AgendaSlot = Agenda["slots"][number];
 

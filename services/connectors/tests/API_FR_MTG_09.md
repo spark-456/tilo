@@ -25,7 +25,7 @@ makes a network call, calls a model or reads `LIVE`.
 ## The decision in short
 
 - **Organizer: the meeting bot's own Google account** (the account ADR-0017 already defines: created by the
-  user, used by nothing else), connected to Tilo as the connector `meeting_host`. Only the organizer is the Meet
+  user; today tiloagent@gmail.com, which is also the project Owner login, see ADR-0024 amendment 3(a)), connected to Tilo as the connector `meeting_host`. Only the organizer is the Meet
   host, so this is the one choice where "the bot starts the meeting" holds; on the Owner's calendar the Owner is
   host and the bot is still a guest who must be admitted. It is also least privilege for people: every
   person's own Calendar grant stays `calendar.readonly` (FR-CAL-08 unchanged, no re-consent); the only write
@@ -378,8 +378,10 @@ long zone name; never cut). The limit comes from the loaded config (a test file 
 **FR-MTG-09 (e) the report (the user's live run, `docs/meeting-bot-hosting-report.md`).** Date, accounts by
 role only (host account, two test attendees, never an address), browser; the invitation came from the host
 account and showed a Meet link; the bot entered as host with no admission prompt; the disclosure was the
-first chat line; whether an invited attendee had to knock; `Tilo leave` worked; afterwards the container
-holds no browser profile and no volume of one, and no cookie file is in the image or the repository.
+first chat line; whether an invited attendee had to knock; `Tilo leave` worked; the profile outcome. If the user
+accepted ADR-0024 amendment 3 (BQ-MTG09-15), the bot's one persistent profile sits only on its named volume on
+the demo machine; if not, the run ends with no profile or volume (ADR-0017 per-meeting terms). Either way no
+cookie file or profile is in the image, the repository, a backup, Secret Manager or any Cloud Run service.
 
 ## Hostile cases (reviewers will probe these)
 
@@ -411,8 +413,9 @@ from dev or CI; the Calendar API is free, but the rule is no live call without `
 ## First live step (the user only)
 
 1. Confirm ADR-0024 (or choose the Owner's own calendar instead, BQ-MTG09-2).
-2. Use a bot Google account that nothing else uses (tiloagent@gmail.com; 2-step verification was declined by
-   the user, 7 Oct 2026, BQ-MTG09-19). Tilo and its agents never ask for its password.
+2. Decide the bot account: preferably a new Google account with no project role and no alerts (ADR-0024
+   amendment 3(a)); tiloagent@gmail.com is today the project Owner login. 2-step verification was declined by
+   the user, 7 Oct 2026, BQ-MTG09-19. Tilo and its agents never ask for its password.
 3. Google Cloud console, OAuth consent screen (Testing): on Data Access add
    `https://www.googleapis.com/auth/calendar.events.owned`; on Audience add the bot account as a test user;
    enable the Google Calendar API if it is not enabled yet.
@@ -422,8 +425,10 @@ from dev or CI; the Calendar API is free, but the rule is no live call without `
    the script creates one event and prints the conference status and event id (never the link). Check the
    invitation in the test inbox.
 5. After MTG09-b and -c: host a test meeting from S-26 with two test accounts you own, approve the card, start
-   the bot container by hand at meeting time, sign the bot in through noVNC, join with the link from your own
-   invitation, then remove the container. Notes go into the report (FR-MTG-09 (e)).
+   the bot container by hand at meeting time (signed in by hand: once for the persistent profile if you accepted
+   ADR-0024 amendment 3, otherwise per meeting through a password-protected VNC session), join with the link
+   from your own invitation, then stop the container (the profile volume stays only under amendment 3; otherwise
+   nothing stays). Notes go into the report (FR-MTG-09 (e)).
 
 ## Builder notes and ticket split
 
@@ -437,8 +442,12 @@ from dev or CI; the Calendar API is free, but the rule is no live call without `
   seams (resolver as step 5; `exact` from `draft.exact` for this action instead of `_exact`, whose
   address list would hit the 500 limit), abandon on `meeting_host` disconnect, the `needs_you` card on
   `conference: failure`.
-- MTG09-c (MEET lane, `meet-bot/` on its own branch): ADR-0024 bot rules (host join, admit nobody, tmpfs
-  profile, link never written to `out/`, logs or the package).
+- MTG09-c (MEET lane, `meet-bot/` on its own branch): GATED, not built until the user has decided ADR-0024
+  amendment 3(a) (account separation); the profile choice is then the user's explicit yes. ADR-0024 bot rules
+  (host join, never click Admit (refuse `--auto-admit`), one persistent dedicated profile on a named volume only
+  if the user says yes to amendment 3; its preconditions (a), (b), (d), (e), (f) apply to every signed-in session
+  of the bot account, per-meeting ones too: VNC only for the sign-in with a random password, no `--no-sandbox`,
+  guard deny), link never written to `out/`, logs or the package).
 - PPL-60c (later): `MeetingHostAdapter.join_link(owner: str, receipt: HostReceipt) -> str` (a read with
   `fields: "status,hangoutLink"`; MH-20 a cancelled event, MH-21 a link that does not fullmatch
   `https://meet\.google\.com/[a-z]{3}-[a-z]{4}-[a-z]{3}`); the string lives in memory for the bot's start
