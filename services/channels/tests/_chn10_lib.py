@@ -317,6 +317,7 @@ class Rig:
     drafts: MemoryDraftStore
     events: EventLog
     svc: Any = None
+    own_mail: tuple[Msg, ...] = ()  # CHN-GATE-E: the user's own earlier messages every `thread()` starts with
 
     def new_drafter(self) -> Any:
         return drafting_module().Drafter(
@@ -353,7 +354,7 @@ class Rig:
             cc=list(cc),
             headers={"Authentication-Results": AUTH_PASS, **(headers or {})},
         )
-        thread = Thread(thread_id="t-" + secrets.token_hex(5), messages=[*earlier, last])
+        thread = Thread(thread_id="t-" + secrets.token_hex(5), messages=[*self.own_mail, *earlier, last])
         self.reader.add(user_id, thread)
         if answers:
             self.model.script(key, *answers)
@@ -366,8 +367,9 @@ class Rig:
         return self.svc.draft(user_id, thread_id=thread.thread_id, instruction=instruction, **kwargs)
 
 
-def make_rig() -> Rig:
+def make_rig(own_mail: tuple[Msg, ...] = ()) -> Rig:
     rig = Rig(
+        own_mail=own_mail,
         clock=FakeClock(),
         reader=FakeThreadReader(),
         model=ScriptedModel(),
