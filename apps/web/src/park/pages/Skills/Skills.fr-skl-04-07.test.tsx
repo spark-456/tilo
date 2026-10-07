@@ -217,7 +217,9 @@ describe("FR-SKL-06: Trust and pause", () => {
     // Resume the skill -> can run again
     clickEl(control(lib, "Resume"));
     expect(pageText(lib)).toContain("FINANCE · TRUSTED");
-    expect(toasts(rig.app)).toContainEqual(["“Match invoices to purchase orders” is running again"]);
+    expect(toasts(rig.app)).toContainEqual([
+      "“Match invoices to purchase orders” is running again",
+    ]);
     expect(isDisabled(control(lib, "Test run"))).toBe(false);
     clickEl(control(lib, "Test run"));
     expect(toasts(rig.app)).toContainEqual([
@@ -260,9 +262,7 @@ describe("FR-SKL-07: Who helped this month", () => {
     expect(pageText(whoCard)).toContain("44");
     expect(pageText(whoCard)).toContain("31");
     // Never renders message content or free-text fix body in Who helped this month
-    expect(pageText(whoCard)).not.toContain(
-      "CONFIDENTIAL_MESSAGE_BODY_NEVER_SHOW_IN_HELPER_CARD",
-    );
+    expect(pageText(whoCard)).not.toContain("CONFIDENTIAL_MESSAGE_BODY_NEVER_SHOW_IN_HELPER_CARD");
     expect(pageText(whoCard)).not.toContain("Yes, include shipping");
   });
 });
