@@ -5,6 +5,7 @@
 import type { ReactNode } from "react";
 import type { AppCtx } from "../../app/AppCtx";
 import { useParkApi } from "../../app/context";
+import { useStaged } from "../../app/useStaged";
 import { Button, KpiTile, PageSheet } from "../../components";
 import "../../components/park.components.css";
 import { Activity } from "./Activity";
@@ -34,6 +35,7 @@ function Frame({ source, children }: { source?: string; children?: ReactNode }) 
 
 export function LedgerPage({ app }: LedgerPageProps) {
   const state = useLedger(useParkApi());
+  const part = useStaged(5); // drawn top to bottom, one task each, so the page never holds the thread
 
   if (state.status === "not-built" || state.status === "error") {
     return (
@@ -107,7 +109,7 @@ export function LedgerPage({ app }: LedgerPageProps) {
         ))}
       </div>
 
-      {chart || where ? (
+      {part(2) && (chart || where) ? (
         <div
           className="park-ledger-chartrow"
           data-chart-row=""
@@ -153,15 +155,17 @@ export function LedgerPage({ app }: LedgerPageProps) {
         </div>
       ) : null}
 
-      {L.runs.length > 0 || hasWaits(L) ? (
+      {part(3) && (L.runs.length > 0 || hasWaits(L)) ? (
         <div className="park-ledger-pair">
           {L.runs.length > 0 ? <CostPerRun L={L} go={app.go} /> : null}
           {hasWaits(L) ? <ApprovalWaits L={L} app={app} /> : null}
         </div>
       ) : null}
 
-      {L.memory.length > 0 || L.hours.length > 0 ? <GaveBack L={L} /> : null}
-      {L.activity.length > 0 ? <Activity L={L} decisions={state.decisions} app={app} /> : null}
+      {part(4) && (L.memory.length > 0 || L.hours.length > 0) ? <GaveBack L={L} /> : null}
+      {part(5) && L.activity.length > 0 ? (
+        <Activity L={L} decisions={state.decisions} app={app} />
+      ) : null}
     </Frame>
   );
 }

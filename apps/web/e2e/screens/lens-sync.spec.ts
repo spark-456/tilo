@@ -57,7 +57,7 @@ test("FR_WLD_06 a selection made in the World lens follows to Story and Trace", 
   test.setTimeout(90_000);
   const problems = watchConsole(page);
   await page.setViewportSize(DESKTOP);
-  await page.goto(`${W}${FAST}`);
+  await page.goto(`${W}/stage${FAST}`);
   await finished(page);
   await page.evaluate(() => {
     (window as unknown as { __kept: boolean }).__kept = true;
@@ -132,7 +132,7 @@ test("FR_WLD_06 the stage rings the selection without moving or replaying anythi
   test.setTimeout(90_000);
   const problems = watchConsole(page);
   await page.setViewportSize(DESKTOP);
-  await page.goto(`${W}?fixture=village-basic&seq=44&speed=100`);
+  await page.goto(`${W}/stage?fixture=village-basic&seq=44&speed=100`);
   const frame = page.getByTestId("stage-frame");
   await expect(frame).toHaveAttribute("data-seq", "44");
   await finished(page);
@@ -158,7 +158,7 @@ test("FR_WLD_06 the stage rings the selection without moving or replaying anythi
 test("FR_WLD_06 selection works from the keyboard and Clear undoes it", async ({ page }) => {
   test.setTimeout(90_000);
   await page.setViewportSize(DESKTOP);
-  await page.goto(`${W}${FAST}`);
+  await page.goto(`${W}/stage${FAST}`);
   await finished(page);
   await hudRow(page, /Specialist 2/).focus();
   await page.keyboard.press("Enter");
@@ -215,7 +215,7 @@ test("FR_WLD_06 Inspect opens from the selection for every kind of object", asyn
 test("FR_WLD_06 selecting shifts nothing on the page and passes axe", async ({ page }) => {
   test.setTimeout(90_000);
   await page.setViewportSize(DESKTOP);
-  for (const path of [`${W}/story${FAST}`, `${W}/trace${FAST}`, `${W}${FAST}`]) {
+  for (const path of [`${W}/story${FAST}`, `${W}/trace${FAST}`, `${W}/stage${FAST}`]) {
     await page.goto(path);
     await finished(page);
     const tops = () =>

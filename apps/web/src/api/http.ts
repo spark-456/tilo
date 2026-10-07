@@ -25,6 +25,8 @@ export class TiloApiError extends Error {
     readonly write = false,
     /** The server's stable refusal code (SEC-15: `under_construction`, `declaration_required`), or null. */
     readonly code: string | null = null,
+    /** NFR-22 / NFR-24: a 503 that said `replay_only: true` (live models unavailable); finished runs can still be replayed. */
+    readonly replayOnly = false,
   ) {
     super(message);
     this.name = "TiloApiError";
@@ -33,6 +35,9 @@ export class TiloApiError extends Error {
 
 const UNREACHABLE = "Tilo could not be reached. Check your connection and try again.";
 const SERVER_TROUBLE = "Tilo had a problem on its side.";
+/** NFR-22: the web's own sentence for a replay-only 503; the server's free text is never shown. */
+const REPLAY_ONLY =
+  "Live models are unavailable right now, so nothing new was started. Finished runs can still be replayed.";
 const BAD_REPLY = "Tilo sent a reply this page could not read.";
 const GENERIC_4XX: Readonly<Record<number, string>> = {
   401: "You need to sign in to do this.",
@@ -93,6 +98,16 @@ function codeOf(text: string): string | null {
     return typeof code === "string" && /^[a-z][a-z0-9_]{0,39}$/.test(code) ? code : null;
   } catch {
     return null;
+  }
+}
+
+/** True only for a 503 whose JSON says `replay_only: true` (the string "true" or 1 do not count). */
+function isReplayOnly(status: number, text: string): boolean {
+  if (status !== 503) return false;
+  try {
+    return (JSON.parse(text) as { replay_only?: unknown } | null)?.replay_only === true;
+  } catch {
+    return false;
   }
 }
 
@@ -226,8 +241,15 @@ export class HttpClient implements TiloClient {
       throw new TiloApiError(UNREACHABLE, null, true, write); // the cause (host, port) is not for people
     }
     if (!res.ok) {
-      if (res.status >= 500) throw new TiloApiError(SERVER_TROUBLE, res.status, true, write);
+      // Only a 503 (the replay-only label) or a 4xx has a body worth reading; other 5xx are not awaited.
+      if (res.status >= 500 && res.status !== 503) {
+        throw new TiloApiError(SERVER_TROUBLE, res.status, true, write);
+      }
       const body = await res.text().catch(() => "");
+      if (isReplayOnly(res.status, body)) {
+        throw new TiloApiError(REPLAY_ONLY, 503, false, write, codeOf(body), true);
+      }
+      if (res.status >= 500) throw new TiloApiError(SERVER_TROUBLE, res.status, true, write);
       throw new TiloApiError(reasonOf(res.status, body), res.status, false, write, codeOf(body));
     }
     try {

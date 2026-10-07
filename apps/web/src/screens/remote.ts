@@ -7,11 +7,15 @@ import { useNavigate } from "../router";
 
 export type Remote<T> =
   | { readonly status: "loading" }
-  | { readonly status: "error"; readonly message: string }
+  | { readonly status: "error"; readonly message: string; readonly replayOnly?: boolean }
   | { readonly status: "ready"; readonly value: T };
 
 /** UX-2 / PRD 18.2: the 120 ms press. Busy feedback is held at least this long. */
 export const PRESS_MS = 120;
+
+/** NFR-22: the failure is the replay-only label (live models unavailable), shown as the banner. */
+export const isReplayOnly = (error: unknown): boolean =>
+  error instanceof TiloApiError && error.replayOnly;
 
 export function describeError(doing: string, error: unknown): string {
   // PRD 18.4, say only what is known: a timeout, a dropped connection or a 5xx on a write may have
@@ -46,7 +50,13 @@ export function useRemote<T>(
       .then(() => loadRef.current(stop.signal))
       .then(
         (value) => live && setState({ status: "ready", value }),
-        (e: unknown) => live && setState({ status: "error", message: describeError(doing, e) }),
+        (e: unknown) =>
+          live &&
+          setState({
+            status: "error",
+            message: describeError(doing, e),
+            replayOnly: isReplayOnly(e),
+          }),
       );
     return () => {
       live = false;
@@ -59,6 +69,8 @@ export function useRemote<T>(
 export interface Action {
   readonly busy: boolean;
   readonly error: string | null;
+  /** The failed start was the replay-only label: show the banner, not `error`. */
+  readonly replayOnly?: boolean;
   readonly go: () => void;
 }
 
@@ -68,6 +80,7 @@ export function useAction(doing: string, run: () => Promise<string>): Action {
   const navigate = useNavigate();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [replayOnly, setReplayOnly] = useState(false);
   const busyRef = useRef(false);
   const live = useRef(true);
   useEffect(() => {
@@ -84,6 +97,7 @@ export function useAction(doing: string, run: () => Promise<string>): Action {
     busyRef.current = true;
     setBusy(true);
     setError(null);
+    setReplayOnly(false);
     const hold = new Promise<void>((resolve) => setTimeout(resolve, PRESS_MS));
     // Failure waits out the press too, so the busy feedback is never a flicker.
     const outcome = Promise.resolve()
@@ -101,8 +115,9 @@ export function useAction(doing: string, run: () => Promise<string>): Action {
       if (!live.current) return;
       setBusy(false);
       setError(describeError(doing, result.e));
+      setReplayOnly(isReplayOnly(result.e));
     });
   }, [doing, navigate]);
 
-  return { busy, error, go };
+  return { busy, error, replayOnly, go };
 }

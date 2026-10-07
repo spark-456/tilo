@@ -7,7 +7,7 @@ import { stageFrame } from "./support/world";
 // S-04 (PRD 18.3, artboard "Tilo World Player"): the levels panel left of the stage from 1280 px,
 // and the decision / finish marks on the replay track. Both read the recorded run only (HR-1).
 
-const WORLD = "/world/w_village_basic?fixture=village-basic&seq=44";
+const WORLD = "/world/w_village_basic/stage?fixture=village-basic&seq=44";
 
 test("S-04 the levels panel sits beside the stage, never over it, and shifts nothing", async ({
   page,

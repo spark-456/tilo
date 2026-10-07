@@ -19,15 +19,31 @@ describe("WEB_3b_css: park.shell.css", () => {
     expect(rules.map((r) => r.selector).filter((s) => !s.startsWith("[data-park]"))).toEqual([]);
   });
 
-  it("WEB_3b_css_has_no_transition_and_motion_only_for_the_city_movers", () => {
-    // WEB-MOTION-1: the city's cars and walkers (the only motion) are keyframes plus one pause rule.
+  it("WEB_3b_css_motion_is_the_city_movers_and_the_shell_chrome_keyframes_only", () => {
+    // WEB-MOTION-1: the city's cars and walkers are keyframes plus one pause rule.
+    // Updated for WEB-MOTION-2: the shell's own chrome (splash, page swap, bar, world card) adds transitions on
+    // transform and opacity (pinned in motion.transitions.css.test.ts) and the keyframes tiloSlide, tiloSpin,
+    // tiloFade; every animation declaration is the pause, "none" (reduced motion) or one of those.
     const text = stripComments(css());
-    expect(text).not.toMatch(/\btransition\b/i);
-    expect(text.match(/\banimation(?:-[a-z-]+)?\s*:/gi)).toEqual(["animation-play-state:"]);
+    // (a last declaration may have no semicolon: the match stops at `;` or `}`)
+    for (const d of text.match(/\banimation(?:-[a-z-]+)?\s*:[^;}]*/gi) ?? []) {
+      expect(d).toMatch(/^animation-play-state:|:\s*none\b|\btilo(?:Slide|Spin|Fade)\b/i);
+    }
+    // tiloFade belongs to the two things that fade out and go: the ready splash and the leaving world card.
+    const fades = parseRules(css()).rules.filter((r) =>
+      (r.decls.get("animation") ?? "").includes("tiloFade"),
+    );
+    expect(fades.map((r) => r.selector).sort()).toEqual([
+      "[data-park] .park-scrim:has(> .park-shell__card--leaving)",
+      "[data-park] .park-shell__boot--out",
+    ]);
     expect(parseRules(css()).others.map((o) => o.head)).toEqual([
       "@keyframes mvXY",
       "@keyframes waddle",
       "@keyframes walkFrame",
+      "@keyframes tiloSlide",
+      "@keyframes tiloSpin",
+      "@keyframes tiloFade",
     ]);
     // Compositor-only: a keyframe changes transform or opacity and nothing else.
     const props = [...text.matchAll(/@keyframes[^{]+\{([\s\S]*?\n\})/g)]

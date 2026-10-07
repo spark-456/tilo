@@ -34,6 +34,21 @@ export function spiedApi(): SpiedApi {
   } as SpiedApi;
 }
 
+/**
+ * The spied fixture Api whose world list reports `source: "live"`, as the live Api's does. Only a world whose
+ * data came from the live API has a stage to link to (WEB-CUTOVER).
+ */
+export function liveWorldsApi(): SpiedApi {
+  const base = spiedApi();
+  return {
+    ...base,
+    getWorlds: vi.fn(async (...a: Parameters<typeof base.getWorlds>) => ({
+      ...(await base.getWorlds(...a)),
+      source: "live" as const,
+    })),
+  } as SpiedApi;
+}
+
 /** An Api whose every call is still waiting: the page's loading state. */
 export function pendingApi(): Api {
   const never = () => new Promise(() => undefined);

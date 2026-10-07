@@ -113,7 +113,9 @@ def test_PL_LIVE_E2E_26_model_ids_appear_only_through_config_not_in_the_new_code
     new_code = [
         *sorted((REPO_ROOT / "evals" / "src" / "tilo_evals").glob("*.py")),
         *sorted((REPO_ROOT / "evals" / "scripts").glob("*.py")),
-        *sorted((REPO_ROOT / "evals" / "bank" / "live").rglob("*.json")),
+        *sorted(  # adhoc/: `just live-run` recordings of the user's own topics, git-ignored and never committed
+            p for p in (REPO_ROOT / "evals" / "bank" / "live").rglob("*.json") if "adhoc" not in p.parent.parts
+        ),
     ]
     assert any(path.name == "live_e2e.py" for path in new_code), "tilo_evals/live_e2e.py or the script does not exist"
     for path in new_code:

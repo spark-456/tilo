@@ -135,8 +135,14 @@ class DevDeskWorlds:
             raise ValueError("no Desk world for this user id")
         world_id = f"w_desk_{suffix}"
         with self._lock:
-            self._store.worlds.setdefault(world_id, deps.WorldRecord(owner=user_id, districts={}))
+            held = self._store.worlds.setdefault(world_id, deps.WorldRecord(owner=user_id, districts={}))
+            if getattr(held, "owner", None) != user_id:
+                raise ValueError("that Desk world belongs to someone else")  # never adopted (as `desk.ensure_desk`)
         return world_id
+
+    def desk_owner(self, world_id: str) -> str | None:
+        refuse_if_unsafe()
+        return getattr(self._store.worlds.get(world_id), "owner", None)
 
 
 class _NoSources:

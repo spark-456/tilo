@@ -4,11 +4,14 @@
 // decisions, skills and connectors come through useParkApi(); pausing is page state and writes nothing
 // (docs/park-designed-not-in-prd/World.md). A decision is taken with app.decide (the store toasts it with
 // Undo), navigation inside the Park app is app.go, and the links to the live stage and its lenses are real
-// addresses the browser follows.
+// addresses the browser follows, but only for a world whose data came from the live API: a sample world has no
+// recorded run, so the same elements are disabled with the reason (docs/park-designed-not-in-prd/World.md).
 import { type ReactNode, useEffect, useState } from "react";
 import type { Connector, Decision, Plan, Skill, World } from "../../api/types";
 import type { AppCtx } from "../../app/AppCtx";
 import { useParkApi } from "../../app/context";
+import { stagePath } from "../../app/router";
+import { useStaged } from "../../app/useStaged";
 import { Button, PageSheet } from "../../components";
 import { icon } from "../../shell/kit";
 import { Activity, Districts, Result, RunHistory } from "./Lower";
@@ -26,6 +29,8 @@ import {
 
 interface Loaded {
   worlds: World[];
+  /** True when the world list came from the live API (`source: "live"`): only then does a world have a stage. */
+  live: boolean;
   plans: Record<string, Plan>;
   decisions: Decision[];
   skills: Skill[];
@@ -34,6 +39,41 @@ interface Loaded {
 
 /** S-05's first building (screens/meta.ts): a Park plan's own building ids are not stage ids. */
 const INSPECT_BUILDING = "B1";
+
+const NO_STAGE = "Sample world: there is no recorded run to open";
+const NO_STAGE_ID = "park-world-nostage";
+
+/**
+ * A link to the stage or one of its lenses. With a stage it is a plain link the browser follows. Without one
+ * (a sample world) it is the same element and class, disabled: no href, aria-disabled, and the reason as its
+ * title and, once per page, as visually hidden text it is described by.
+ */
+function StageLink({
+  href,
+  className,
+  children,
+}: { href: string | null; className?: string; children: ReactNode }) {
+  if (href !== null) {
+    return (
+      <a className={className} href={href}>
+        {children}
+      </a>
+    );
+  }
+  return (
+    // biome-ignore lint/a11y/useValidAnchor: a disabled link has no destination, so no href
+    <a
+      className={className}
+      // biome-ignore lint/a11y/useSemanticElements: the disabled-link pattern: role="link" + aria-disabled
+      role="link"
+      aria-disabled="true"
+      aria-describedby={NO_STAGE_ID}
+      title={NO_STAGE}
+    >
+      {children}
+    </a>
+  );
+}
 
 /** The world art in the map: a City's plan, a Town's row, or a Village's single building. */
 function MapArt({
@@ -64,6 +104,8 @@ export function WorldPage({ app }: { app: AppCtx }) {
   const api = useParkApi();
   const [loaded, setLoaded] = useState<Loaded | "failed" | null>(null);
   const [paused, setPaused] = useState<Record<string, boolean>>({});
+  // The map and head first, then the side cards, then the lower part: one task each (WEB-MOTION-2).
+  const part = useStaged(3);
   const { dec, added } = app;
 
   useEffect(() => {
@@ -79,6 +121,7 @@ export function WorldPage({ app }: { app: AppCtx }) {
         if (!live) return;
         setLoaded({
           worlds: worlds.data,
+          live: worlds.source === "live",
           plans: plans.data,
           decisions: decisions.data,
           skills: skills.data,
@@ -123,6 +166,9 @@ export function WorldPage({ app }: { app: AppCtx }) {
   const { skills, tools } = skillsAndTools(w, loaded.skills, loaded.connectors);
   const wide = (app.vw || 1440) >= 1060;
   const id = encodeURIComponent(w.id);
+  // A world has a stage only when its data came from the live API; a world started on this page is local state.
+  const hasStage = loaded.live && !added.some((a) => a.id === w.id);
+  const stage = (to: string): string | null => (hasStage ? to : null);
 
   const togglePause = () => {
     setPaused((p) => ({ ...p, [w.id]: !isPaused }));
@@ -176,9 +222,14 @@ export function WorldPage({ app }: { app: AppCtx }) {
             Share
           </Button>
           {isCity ? (
-            <a className="park-world-live" href={`/world/${id}`}>
+            <StageLink className="park-world-live" href={stage(stagePath(w.id))}>
               {icon("play", 14)}Open live view
-            </a>
+            </StageLink>
+          ) : null}
+          {isCity && !hasStage ? (
+            <span id={NO_STAGE_ID} className="park-world-sr">
+              {NO_STAGE}
+            </span>
           ) : null}
         </div>
       </div>
@@ -202,10 +253,12 @@ export function WorldPage({ app }: { app: AppCtx }) {
             ) : null}
             {isCity ? (
               <nav aria-label="Run views" className="park-world-lenses">
-                <a href={`/world/${id}/story`}>Story</a>
-                <a href={`/world/${id}/trace`}>Trace</a>
-                <a href={`/world/${id}/delivery`}>Delivery</a>
-                <a href={`/world/${id}/inspect/${INSPECT_BUILDING}`}>Inspect</a>
+                <StageLink href={stage(`/world/${id}/story`)}>Story</StageLink>
+                <StageLink href={stage(`/world/${id}/trace`)}>Trace</StageLink>
+                <StageLink href={stage(`/world/${id}/delivery`)}>Delivery</StageLink>
+                <StageLink href={stage(`/world/${id}/inspect/${INSPECT_BUILDING}`)}>
+                  Inspect
+                </StageLink>
               </nav>
             ) : null}
           </div>
@@ -234,58 +287,62 @@ export function WorldPage({ app }: { app: AppCtx }) {
           </div>
         </div>
 
-        <div className="park-world-side">
-          {open > 0 ? (
-            <WaitingCard
-              mine={mine}
-              dec={dec}
-              night={app.night}
-              onDecide={(key) => app.decide(key)}
-              onLater={() => app.toast("Tilo will remind you at 16:00")}
+        {part(2) ? (
+          <div className="park-world-side">
+            {open > 0 ? (
+              <WaitingCard
+                mine={mine}
+                dec={dec}
+                night={app.night}
+                onDecide={(key) => app.decide(key)}
+                onLater={() => app.toast("Tilo will remind you at 16:00")}
+              />
+            ) : null}
+            <SpendCard w={w} mine={mine} dec={dec} onLedger={() => app.go("ledger")} />
+            <FactsCard
+              w={w}
+              skills={skills}
+              tools={tools}
+              onSkill={(skill) => app.go("skills", { id: skill })}
+              onTools={() => app.go("connectors")}
             />
-          ) : null}
-          <SpendCard w={w} mine={mine} dec={dec} onLedger={() => app.go("ledger")} />
-          <FactsCard
-            w={w}
-            skills={skills}
-            tools={tools}
-            onSkill={(skill) => app.go("skills", { id: skill })}
-            onTools={() => app.go("connectors")}
-          />
-        </div>
+          </div>
+        ) : null}
       </div>
 
-      <div className="park-world-lower">
-        {isCity ? <Districts districts={w.districts ?? []} /> : null}
-        {isTown ? (
-          <RunHistory
-            runs={w.runs ?? []}
-            onRunNow={() => app.toast("Run started. You’ll get a notification when it finishes")}
-            onAgenda={() => app.go("agenda")}
+      {part(3) ? (
+        <div className="park-world-lower">
+          {isCity ? <Districts districts={w.districts ?? []} /> : null}
+          {isTown ? (
+            <RunHistory
+              runs={w.runs ?? []}
+              onRunNow={() => app.toast("Run started. You’ll get a notification when it finishes")}
+              onAgenda={() => app.go("agenda")}
+            />
+          ) : null}
+          {!isCity && !isTown ? (
+            <Result
+              w={w}
+              onOpen={() => app.toast("Opening the result in Google Drive")}
+              onSlack={() => app.toast("Shared to #ops in Slack")}
+            />
+          ) : null}
+          <Activity
+            items={
+              w.activity ?? [
+                {
+                  t: w.started,
+                  rank: "director",
+                  who: "Director",
+                  text: `Started ${w.name.toLowerCase()}.`,
+                  kind: "info",
+                },
+              ]
+            }
+            night={app.night}
           />
-        ) : null}
-        {!isCity && !isTown ? (
-          <Result
-            w={w}
-            onOpen={() => app.toast("Opening the result in Google Drive")}
-            onSlack={() => app.toast("Shared to #ops in Slack")}
-          />
-        ) : null}
-        <Activity
-          items={
-            w.activity ?? [
-              {
-                t: w.started,
-                rank: "director",
-                who: "Director",
-                text: `Started ${w.name.toLowerCase()}.`,
-                kind: "info",
-              },
-            ]
-          }
-          night={app.night}
-        />
-      </div>
+        </div>
+      ) : null}
     </Frame>
   );
 }

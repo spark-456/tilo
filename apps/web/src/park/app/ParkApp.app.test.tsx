@@ -109,12 +109,12 @@ describe("WEB_3a_shell: the page gets the app prop", () => {
       vi.advanceTimersByTime(340 * 3);
     });
     await settle();
-    expect(window.location.pathname).toBe("/park/world/k1");
+    expect(window.location.pathname).toBe("/world/k1");
     expect(m.container.querySelector('[data-testid="probe-world"]')).not.toBeNull();
     expect(document.title).toBe("World · Tilo");
     await act(async () => app().go("skills", { id: "sk2" }));
     await settle();
-    expect(window.location.pathname + window.location.search).toBe("/park/skills?id=sk2");
+    expect(window.location.pathname + window.location.search).toBe("/skills?id=sk2");
     expect(app().params).toEqual({ id: "sk2" });
   });
 
@@ -196,7 +196,7 @@ describe("WEB_3a_shell: the toast", () => {
     expect(open.map((b) => b.textContent)).toEqual(["Open"]);
     click(open[0] as HTMLButtonElement);
     await settle();
-    expect(window.location.pathname).toBe("/park/world/new1");
+    expect(window.location.pathname).toBe("/world/new1");
     expect(app().params).toEqual({ id: "new1" });
     expect(toastEl(m.container)).toBeNull();
   });

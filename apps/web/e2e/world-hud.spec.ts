@@ -8,7 +8,7 @@ import { readShifts, watchShifts } from "./support/shifts";
 import { DESKTOP, MOBILE } from "./support/viewports";
 import { stageSeq } from "./support/world";
 
-const W = "/world/w_village_basic";
+const W = "/world/w_village_basic/stage";
 const AT = (seq: number) => `${W}?fixture=village-basic&seq=${seq}`;
 
 test.describe("desktop", () => {

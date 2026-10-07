@@ -133,7 +133,7 @@ describe("WEB_3b_notif: the notifications popover", () => {
     openBell();
     click(rowWith("HubSpot"));
     expect(navigate).toHaveBeenCalledTimes(1);
-    expect(navigate).toHaveBeenCalledWith("/park/connectors");
+    expect(navigate).toHaveBeenCalledWith("/connectors");
     expect(seen.store.getState().wl).toBeNull();
     expect(dialog()).toBeNull();
   });
@@ -142,7 +142,7 @@ describe("WEB_3b_notif: the notifications popover", () => {
     const { navigate } = await mountApp();
     openBell();
     click(settings());
-    expect(navigate).toHaveBeenCalledWith("/park/profile?tab=notifications");
+    expect(navigate).toHaveBeenCalledWith("/profile?tab=notifications");
     expect(dialog()).toBeNull();
   });
 
@@ -222,9 +222,9 @@ describe("WEB_3b_acct: the account menu", () => {
 
   it("WEB_3b_acct_the_three_links_go_to_their_pages_and_close_the_menu", async () => {
     for (const [name, path] of [
-      ["Profile and settings", "/park/profile"],
-      ["Connectors", "/park/connectors"],
-      ["Team and roles", "/park/team"],
+      ["Profile and settings", "/profile"],
+      ["Connectors", "/connectors"],
+      ["Team and roles", "/team"],
     ] as const) {
       const { m, navigate } = await mountApp();
       openMenu();
