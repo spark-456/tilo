@@ -79,7 +79,7 @@ const MOTIONS: readonly Motion[] = ["lively", "calm", "still"];
 
 const derive = (prefs: Record<string, unknown>, dec: Dec) => ({
   time: prefs.time === "night" ? ("night" as const) : ("day" as const),
-  motion: MOTIONS.find((m) => m === prefs.motion) ?? "lively",
+  motion: MOTIONS.find((m) => m === prefs.motion) ?? "calm",
   needsLeft: countNeedsLeft(dec),
 });
 

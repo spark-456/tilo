@@ -101,6 +101,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         veiled={inner}
         lite={city.lite}
         hidden={city.hidden}
+        loading={state.wl != null}
       />
       <TopNav
         page={page}
