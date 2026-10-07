@@ -29,6 +29,16 @@ def checked_id(value: Any) -> str:
     return value
 
 
+def has_token(broker: TokenBroker, user_id: str, connector: str, scope: str) -> bool:
+    """Whether a token for `scope` can be had now (SEC-02: only adapters ask the broker for one). The token is
+    dropped unread and no Google request is made; any failure, its words included, is just False."""
+    try:
+        broker.access_token_for_adapter(user_id, connector, required_scopes=[scope])
+    except Exception:  # noqa: BLE001
+        return False
+    return True
+
+
 def side_effect_marker(entry: Mapping[str, Any]) -> str:
     """A pure function of (world_id, idempotency_key): the same on every retry and every instance."""
     seed = f"{entry['world_id']}\x00{entry['idempotency_key']}".encode()

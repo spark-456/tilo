@@ -4,7 +4,7 @@
 // only through the Api (`useParkApi`); a page whose Api is not built says "Not connected yet", never numbers.
 // The card's 900 ms steps go through the provider's `useSchedule`; a draft skill's save goes through `saveSkill`.
 import { type ReactNode, useEffect, useRef, useState } from "react";
-import type { Learn, Skill, User } from "../../api/types";
+import type { Learn, Skill, Source, User } from "../../api/types";
 import type { AppCtx } from "../../app/AppCtx";
 import { useParkApi } from "../../app/context";
 import { PageSheet } from "../../components";
@@ -18,6 +18,7 @@ interface Data {
   skills: Skill[];
   learn: Learn;
   user: User;
+  source: Source;
 }
 type Loaded = Data | "failed" | null;
 
@@ -55,7 +56,13 @@ export function SkillsPage({ app }: { app: AppCtx }) {
     let live = true;
     together(() => Promise.all([api.getSkills(), api.getLearn(), api.getUser()])).then(
       ([skills, learn, user]) => {
-        if (live) setData({ skills: skills.data, learn: learn.data, user: user.data });
+        if (live)
+          setData({
+            skills: skills.data,
+            learn: learn.data,
+            user: user.data,
+            source: skills.source,
+          });
       },
       () => {
         if (live) setData("failed");
@@ -96,10 +103,10 @@ function withTaught(skills: Skill[], taught: Skill | null): Skill[] {
 
 function Ready({ app, data }: { app: AppCtx; data: Data }) {
   const api = useParkApi();
-  const { user, learn } = data;
+  const { user, learn, source } = data;
   const teachRef = useRef<HTMLElement>(null);
   const draft = data.skills.find((s) => s.st === "draft");
-  const t = useTeach({ app, api, user, draft });
+  const t = useTeach({ app, api, user, draft, source });
   const skills = withTaught(data.skills, t.taught);
 
   const trusted = skills.filter((s) => s.st === "trusted").length;

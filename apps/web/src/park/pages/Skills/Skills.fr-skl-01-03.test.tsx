@@ -1,0 +1,320 @@
+// @vitest-environment happy-dom
+// Acceptance tests for AGY-SKL-1 (FR-SKL-01, FR-SKL-02, FR-SKL-03):
+// - FR-SKL-01: four captured steps enable "Show me Tilo's version"; nothing is sent anywhere while teaching;
+//   screen recording is a concept using fixture steps (never calls getDisplayMedia or fetch).
+// - FR-SKL-02: Tilo restates the skill as steps, each with an "Ask me first" switch, one clarifying question
+//   and estimates (cost per run, time, how often it stops to ask) derived from ledger prices.
+// - FR-SKL-03: a try run sends and saves nothing outside Tilo; the result says how closely it matched you;
+//   try-run progress only advances on fixture events, never on a timer pretending to work.
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { cleanup } from "../../../../test-support/park/componentsHarness";
+import {
+  CAP,
+  EST,
+  METHODS,
+  PLAN,
+  QUESTION,
+  SCREEN,
+  TRY,
+} from "../../../../test-support/park/skillsCopy";
+import {
+  askStates,
+  askSwitches,
+  captureByDescribing,
+  clickEl,
+  control,
+  currentStep,
+  dropzone,
+  estimate,
+  finishRun,
+  hasControl,
+  isDisabled,
+  isOn,
+  methodTile,
+  mountSkills,
+  pageText,
+  pickedCount,
+  planRow,
+  runPill,
+  runStatuses,
+  skillsApi,
+  teachCard,
+  textOf,
+  toTilosVersion,
+  toTryRun,
+} from "../../../../test-support/park/skillsHarness";
+import type { ApiResult } from "../../api/types";
+import * as teachData from "./teachData";
+
+afterEach(() => {
+  cleanup();
+  vi.restoreAllMocks();
+});
+
+const liveResult = <T,>(data: T): Promise<ApiResult<T>> =>
+  Promise.resolve({ data, source: "live" });
+
+describe("FR-SKL-01: Teach by showing", () => {
+  it("test_FR_SKL_01_four_captured_steps_enable_show_me_tilos_version_across_all_methods", async () => {
+    const rig = await mountSkills();
+    const nextBtn = () => control(rig.el, "Show me Tilo’s version");
+
+    // Initially 0 captured steps -> disabled
+    expect(pickedCount(rig.el)).toBe(0);
+    expect(isDisabled(nextBtn())).toBe(true);
+
+    // 1. Record my screen: steps 1..3 keep button disabled; step 4 enables it
+    clickEl(control(rig.el, SCREEN.record.start));
+    for (let step = 1; step <= 3; step++) {
+      rig.clock.advance(900);
+      expect(pickedCount(rig.el)).toBe(step);
+      expect(pageText(teachCard(rig.el))).toContain(CAP.record[step - 1]);
+      expect(isDisabled(nextBtn())).toBe(true);
+    }
+    rig.clock.advance(900);
+    expect(pickedCount(rig.el)).toBe(4);
+    expect(isDisabled(nextBtn())).toBe(false);
+
+    // 2. Guided walkthrough: switching resets to 0 and locks; 4 captured steps enable it
+    clickEl(methodTile(rig.el, "Guided walkthrough"));
+    expect(pickedCount(rig.el)).toBe(0);
+    expect(isDisabled(nextBtn())).toBe(true);
+    clickEl(control(rig.el, SCREEN.guided.start));
+    rig.clock.advance(4 * 900);
+    expect(pickedCount(rig.el)).toBe(4);
+    expect(isDisabled(nextBtn())).toBe(false);
+
+    // 3. Describe it: reading description captures 4 steps and enables button
+    clickEl(methodTile(rig.el, "Describe it"));
+    expect(isDisabled(nextBtn())).toBe(true);
+    clickEl(control(rig.el, "Read my description"));
+    expect(pickedCount(rig.el)).toBe(4);
+    expect(isDisabled(nextBtn())).toBe(false);
+
+    // 4. Upload an example: clicking dropzone captures 4 steps and enables button
+    clickEl(methodTile(rig.el, "Upload an example"));
+    expect(isDisabled(nextBtn())).toBe(true);
+    clickEl(dropzone(rig.el));
+    expect(pickedCount(rig.el)).toBe(4);
+    expect(isDisabled(nextBtn())).toBe(false);
+  });
+
+  it("test_FR_SKL_01_screen_recording_uses_fixture_capture_events_and_never_calls_getDisplayMedia_or_fetch", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(() => {
+      throw new Error("fetch must never be called during teach");
+    });
+    const getDisplayMedia = vi.fn(() => {
+      throw new Error("getDisplayMedia must never be called");
+    });
+    Object.defineProperty(globalThis.navigator, "mediaDevices", {
+      value: { getDisplayMedia },
+      configurable: true,
+    });
+
+    const api = skillsApi();
+    const rig = await mountSkills({ api });
+
+    // Record my screen
+    clickEl(control(rig.el, SCREEN.record.start));
+    rig.clock.advance(4 * 900);
+    expect(pickedCount(rig.el)).toBe(4);
+
+    // Upload an example
+    clickEl(methodTile(rig.el, "Upload an example"));
+    clickEl(dropzone(rig.el));
+    expect(pickedCount(rig.el)).toBe(4);
+
+    expect(getDisplayMedia).not.toHaveBeenCalled();
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(api.saveSkill).not.toHaveBeenCalled();
+
+    // Verify typed fixture capture event stream exists in teachData
+    const captureEvents = (teachData as Record<string, unknown>).CAPTURE_FIXTURE_EVENTS as
+      | Record<string, readonly { seq: number; source: string; text: string }[]>
+      | undefined;
+    expect(captureEvents).toBeDefined();
+    for (const m of METHODS) {
+      expect(captureEvents?.[m.key]).toHaveLength(4);
+      expect(captureEvents?.[m.key]?.every((ev) => ev.source === "fixture")).toBe(true);
+    }
+  });
+
+  it("test_FR_SKL_01_capture_does_not_advance_on_timer_when_source_is_not_fixture", async () => {
+    const base = skillsApi();
+    const api = skillsApi({
+      getSkills: async () => liveResult((await base.getSkills()).data),
+      getLearn: async () => liveResult((await base.getLearn()).data),
+      getUser: async () => liveResult((await base.getUser()).data),
+    });
+    const rig = await mountSkills({ api });
+    clickEl(control(rig.el, SCREEN.record.start));
+    rig.clock.advance(10_000);
+    // Without fixture capture events (live mode has none), timer never pretends to capture steps
+    expect(pickedCount(rig.el)).toBe(0);
+    expect(isDisabled(control(rig.el, "Show me Tilo’s version"))).toBe(true);
+  });
+});
+
+describe("FR-SKL-02: Tilo's version", () => {
+  it("test_FR_SKL_02_tilos_version_restates_skill_as_steps_with_ask_me_first_switches_and_clarifying_question", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(() => {
+      throw new Error("fetch must never be called during Tilo's version");
+    });
+    const rig = await mountSkills();
+    toTilosVersion(rig);
+
+    expect(currentStep(rig.el)).toBe("Tilo’s version");
+    PLAN.forEach((p, i) => {
+      const row = planRow(rig.el, i);
+      expect(textOf(row)).toContain(p.text);
+      expect(textOf(row)).toContain(p.tool);
+    });
+
+    const switches = askSwitches(rig.el);
+    expect(switches).toHaveLength(4);
+    expect(askStates(rig.el)).toEqual([false, false, true, false]);
+
+    // Clarifying question and selectable answers
+    const cardText = pageText(teachCard(rig.el));
+    expect(cardText).toContain(QUESTION.eyebrow);
+    expect(cardText).toContain(QUESTION.text);
+    for (const ans of QUESTION.answers) {
+      expect(hasControl(rig.el, ans)).toBe(true);
+    }
+    clickEl(control(rig.el, QUESTION.answers[0]));
+    expect(isOn(control(rig.el, QUESTION.answers[0]))).toBe(true);
+
+    // Estimates shown
+    expect(estimate(rig.el, EST.runLabel)).toBe("~£0.40");
+    expect(estimate(rig.el, EST.timeLabel)).toBe("~1 min");
+    expect(estimate(rig.el, EST.stopsLabel)).toBe("1 step");
+
+    // Flipping "Ask me first" updates "Stops to ask" estimate immediately
+    clickEl(switches[0] as HTMLElement);
+    expect(estimate(rig.el, EST.stopsLabel)).toBe("2 steps");
+    clickEl(switches[0] as HTMLElement);
+    clickEl(switches[2] as HTMLElement);
+    expect(estimate(rig.el, EST.stopsLabel)).toBe("Never");
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it("test_FR_SKL_02_estimates_compute_cost_per_run_time_and_stops_to_ask_from_ledger_step_prices", () => {
+    const estimateSkillPlan = (teachData as Record<string, unknown>).estimateSkillPlan as
+      | ((
+          steps: readonly { readonly tool: string }[],
+          asks: readonly boolean[],
+          currency?: "GBP" | "USD",
+        ) => { run: string; time: string; stops: string })
+      | undefined;
+    expect(typeof estimateSkillPlan).toBe("function");
+
+    // Default PLAN: 2 Read (£0.05 each) + 2 Act (£0.15 each) = £0.40, 4 steps = ~1 min, 1 ask = "1 step"
+    const def = estimateSkillPlan?.(teachData.PLAN, teachData.DEFAULT_ASK, "GBP");
+    expect(def).toEqual({
+      run: "~£0.40",
+      time: "~1 min",
+      stops: "1 step",
+    });
+
+    // Read-only 2-step plan in USD: 2 * 0.05 = $0.10, 30s = ~1 min, 0 asks = "Never"
+    const custom = estimateSkillPlan?.(
+      [{ tool: "Gmail · Read" }, { tool: "Files · Read" }],
+      [false, false],
+      "USD",
+    );
+    expect(custom).toEqual({
+      run: "~$0.10",
+      time: "~1 min",
+      stops: "Never",
+    });
+  });
+});
+
+describe("FR-SKL-03: Try run", () => {
+  it("test_FR_SKL_03_try_run_sends_and_saves_nothing_outside_tilo_and_never_calls_fetch", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(() => {
+      throw new Error("fetch must never be called during try run");
+    });
+    const api = skillsApi();
+    const rig = await mountSkills({ api });
+
+    captureByDescribing(rig);
+    clickEl(control(rig.el, "Show me Tilo’s version"));
+    clickEl(control(rig.el, "Let Tilo try it"));
+    finishRun(rig);
+
+    expect(pageText(teachCard(rig.el))).toContain(TRY.resultTitle);
+    expect(pageText(teachCard(rig.el))).toContain(TRY.resultSub);
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(api.saveSkill).not.toHaveBeenCalled();
+  });
+
+  it("test_FR_SKL_03_try_run_progress_only_advances_on_fixture_events_never_on_a_timer_pretending_to_work", async () => {
+    // 1. Verify TRY_RUN_FIXTURE_EVENTS and formatTryRunResult exist in teachData
+    const tryEvents = (teachData as Record<string, unknown>).TRY_RUN_FIXTURE_EVENTS as
+      | readonly {
+          seq: number;
+          type: string;
+          stepIndex: number;
+          matched: boolean;
+          durationSec: number;
+          cost: number;
+          source: string;
+        }[]
+      | undefined;
+    expect(tryEvents).toBeDefined();
+    expect(tryEvents).toHaveLength(4);
+    expect(tryEvents?.every((e) => e.source === "fixture" && e.type === "skill.try_run.step")).toBe(
+      true,
+    );
+
+    // 2. When source is not "fixture" (no fixture events), advancing the clock by 60s never advances try-run progress
+    const base = skillsApi();
+    const liveApi = skillsApi({
+      getSkills: async () => liveResult((await base.getSkills()).data),
+      getLearn: async () => liveResult((await base.getLearn()).data),
+      getUser: async () => liveResult((await base.getUser()).data),
+    });
+    const rig = await mountSkills({ api: liveApi });
+    toTryRun(rig);
+
+    expect(runStatuses(rig.el)).toEqual(["Working…", "Waiting", "Waiting", "Waiting"]);
+    expect(rig.clock.live()).toHaveLength(0);
+    rig.clock.advance(60_000);
+    expect(runStatuses(rig.el)).toEqual(["Working…", "Waiting", "Waiting", "Waiting"]);
+    expect(runPill(rig.el)).toBe("Step 1 of 4");
+    expect(pageText(teachCard(rig.el))).not.toContain(TRY.resultTitle);
+  });
+
+  it("test_FR_SKL_03_try_run_result_reports_how_closely_it_matched_you_from_fixture_events", () => {
+    const formatTryRunResult = (teachData as Record<string, unknown>).formatTryRunResult as
+      | ((
+          events: readonly {
+            matched: boolean;
+            durationSec: number;
+            cost: number;
+          }[],
+          totalSteps?: number,
+        ) => { title: string; sub: string })
+      | undefined;
+    expect(typeof formatTryRunResult).toBe("function");
+
+    const tryEvents = (teachData as Record<string, unknown>).TRY_RUN_FIXTURE_EVENTS as readonly {
+      matched: boolean;
+      durationSec: number;
+      cost: number;
+    }[];
+    // Full match on the 4 fixture events
+    expect(formatTryRunResult?.(tryEvents, 4)).toEqual({
+      title: "Matched your way of doing it",
+      sub: "4 of 4 steps · 1 min 08s · £0.38",
+    });
+
+    // Partial match (3 of 4 steps matched)
+    const partial = tryEvents.map((e, i) => (i === 3 ? { ...e, matched: false } : e));
+    expect(formatTryRunResult?.(partial, 4)).toEqual({
+      title: "Matched 3 of 4 steps of your way",
+      sub: "3 of 4 steps · 1 min 08s · £0.38",
+    });
+  });
+});
