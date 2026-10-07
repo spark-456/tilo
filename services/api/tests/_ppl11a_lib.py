@@ -279,6 +279,15 @@ class SpyStore:
         self._note("list", org_id)
         return self._inner.list(org_id, field, value)
 
+    # PPL-11c-FS: the person store's directory calls (API_PPL_11c_FS.md section 2); only a person store has them.
+    def create_founder(self, record: Any) -> Any:
+        self._note("create_founder", record["org_id"])
+        return self._inner.create_founder(record)
+
+    def founded(self, org_id: str) -> Any:
+        self._note("founded", org_id)
+        return self._inner.founded(org_id)
+
 
 # --- the rig --------------------------------------------------------------------------------------------------------
 
@@ -386,6 +395,9 @@ class Rig:
         ov[deps.get_event_writer] = lambda: self.events
         ov[seam(deps, "get_desk_worlds")] = lambda: self.desks
         ov[seam(deps, "get_meeting_worlds")] = lambda: self.world_maker
+        # PPL-11c-FS (FS-12): production founds an org only for the configured bootstrap uid; the rig lets every
+        # principal found an empty org, as the PPL-11c S3 tests assume. The FS-12 tests `unwire("founder_gate")`.
+        ov[seam(deps, "get_founder_gate")] = lambda: lambda user_id: True
         if self.access is not None:
             ov[seam(deps, "get_access_store")] = lambda: self.access
 

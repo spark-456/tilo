@@ -17,6 +17,7 @@ import functools
 import logging
 import math
 import os
+import re
 import threading
 import time
 from collections.abc import Callable, Iterable, Mapping, Sequence
@@ -432,6 +433,18 @@ class SourceOwners(Protocol):
 
 def get_people_stores() -> PeopleStores:
     raise HTTPException(status_code=503, detail="not_configured")  # no Firestore adapter yet (ticket PPL-11c)
+
+
+_BOOTSTRAP_UID = re.compile(r"u_[0-9A-Za-z_]{1,48}")
+
+
+def get_founder_gate() -> Callable[[str], bool]:
+    """Who may found an empty org (issue #541 item 1, BQ-PPL11C-15): only the uid in `TILO_PEOPLE_BOOTSTRAP_UID`, read
+    on every call and valid only as a `common#user_id` exactly as written. Unset or malformed refuses everyone."""
+    configured = os.environ.get("TILO_PEOPLE_BOOTSTRAP_UID", "")
+    if _BOOTSTRAP_UID.fullmatch(configured) is None:
+        return lambda user_id: False
+    return lambda user_id: user_id == configured
 
 
 def get_clock() -> Callable[[], str]:
