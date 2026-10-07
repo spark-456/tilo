@@ -3,7 +3,7 @@ import { fixtureUrl, stageCanvas, stageSeq } from "./support/world";
 
 // P9 / FR-WLD-10 / BQ-08 perf proxy: "a Playwright test at 1440x900 with CDP Emulation
 // .setCPUThrottlingRate {rate: 4}, a deterministic synthetic fixture with 20 agents all moving
-// throughout, rAF intervals over >= 3 s of movement, average fps >= 45 (p95 frame time logged
+// throughout, rAF intervals over three >= 3 s windows of movement, median fps >= 45 (p95 frame time logged
 // for the later 55 fps p95 budget)." BQ-08: CI has no reference laptop, so CPU throttling +
 // software rendering stands in for it; this test only adds the CPU-throttling half (software
 // rendering is a Playwright launch-arg concern, out of this ticket's file scope).
@@ -20,7 +20,7 @@ const WINDOWS = 3;
 
 test.use({ viewport: DESKTOP_1440 });
 
-test("FR-WLD-10 perf: average fps stays >= 45 with 4x CPU throttling and 20 agents moving", async ({
+test("FR-WLD-10 perf: median fps stays >= 45 with 4x CPU throttling and 20 agents moving", async ({
   page,
 }) => {
   await page.goto(fixtureUrl("crowd-20"));
