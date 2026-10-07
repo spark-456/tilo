@@ -14,8 +14,8 @@ import { isHomeAddress, useParkRoute } from "./router";
 
 const NOT_FOUND_TITLE = "Page not found";
 
-// The landing visit (`/`) is the Home page: its chunk starts with the shell's instead of after it (one round
-// trip fewer). `lazy()` in the registry reuses the same module, so nothing loads twice.
+// The landing visit (`/`) is the Home page: its chunk request starts when the shell module is evaluated, not
+// when the page first renders. `lazy()` in the registry reuses the same module, so nothing loads twice.
 if (isHomeAddress()) void import("../pages/Home/HomePage");
 
 function NotFound({ go }: { go: AppCtx["go"] }) {
