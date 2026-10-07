@@ -148,12 +148,16 @@ _ROUTER_SCHEMAS = {
 }
 
 
+# files that only forward a schema listed above (the schema probe replays brief.output_schema())
+_FORWARDERS = {"packages/providers/src/tilo_providers/schema_probe.py"}
+
+
 def test_PL_03_every_unique_array_in_every_router_response_schema_is_linear() -> None:
     found = {
         path.relative_to(REPO).as_posix()
         for top in ("packages", "services")
         for path in (REPO / top).glob("*/src/**/*.py")
         if re.search(r"\bresponse_schema=(?!\.\.\.)", path.read_text("utf-8"))
-    }
+    } - _FORWARDERS
     assert found == set(_ROUTER_SCHEMAS)  # a new response_schema is listed here
     assert sum(_assert_linear(schema_guard.validator(s), s) for s in _ROUTER_SCHEMAS.values()) >= 1
