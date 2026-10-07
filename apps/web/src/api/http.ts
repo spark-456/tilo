@@ -211,6 +211,11 @@ export class HttpClient implements TiloClient {
     }
   }
 
+  /** A plain GET of `path`, decoded as JSON, with the same typed failures as every other call (WIRE-1). */
+  getJson(path: string): Promise<unknown> {
+    return this.request<unknown>(path);
+  }
+
   private post<T>(path: string, body: unknown): Promise<T> {
     const init = {
       method: "POST",

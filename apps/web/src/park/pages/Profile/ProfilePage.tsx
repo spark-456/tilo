@@ -68,6 +68,9 @@ const SESSION_ICONS = { laptop: ICONS.laptop, phone: ICONS.phone, screen: ICONS.
 const sessionSub = (s: ProfileSession): string =>
   [s.place, s.lastActive, s.note].filter(Boolean).join(" · ");
 const money = (n: number): string => `£${n.toLocaleString("en-GB")}`;
+/** The spend bar's fill: 0 when there is no budget to measure against, never past the track. */
+const spendPercent = (spent: number, budget: number): number =>
+  budget > 0 ? Math.min(100, Math.max(0, Math.round((spent / budget) * 100))) : 0;
 
 interface Loaded {
   user: User;
@@ -445,13 +448,15 @@ export function ProfilePage({ app }: { app: AppCtx }) {
                     <span className="park-profile-eyebrow">{`AGENT SPEND · ${loaded.settings.plan.spendMonth.toUpperCase()}`}</span>
                     <span className="park-profile-amount">
                       <span className="park-profile-big">{money(loaded.spend.spent)}</span>
-                      <span className="park-profile-of">{`of ${money(loaded.spend.budget)}`}</span>
+                      {loaded.spend.budget > 0 ? (
+                        <span className="park-profile-of">{`of ${money(loaded.spend.budget)}`}</span>
+                      ) : null}
                     </span>
                     <span className="park-profile-bar">
                       <span
                         className="park-profile-fill"
                         style={{
-                          width: `${Math.round((loaded.spend.spent / loaded.spend.budget) * 100)}%`,
+                          width: `${spendPercent(loaded.spend.spent, loaded.spend.budget)}%`,
                         }}
                       />
                     </span>
