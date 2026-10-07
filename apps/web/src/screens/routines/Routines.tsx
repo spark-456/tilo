@@ -80,10 +80,20 @@ function RoutineList({ api, first }: { api: SchedulesApi; first: readonly Schedu
                 {asking === row.schedule_id && (
                   <div role="alertdialog" aria-label="Delete routine" className="flow-notice">
                     <p>{`Delete "${row.title}"? It will not run again.`}</p>
-                    <button type="button" className="secondary" onClick={() => remove(row)}>
+                    <button
+                      type="button"
+                      className="secondary"
+                      disabled={busy !== null}
+                      onClick={() => remove(row)}
+                    >
                       Delete routine
                     </button>{" "}
-                    <button type="button" className="secondary" onClick={() => setAsking(null)}>
+                    <button
+                      type="button"
+                      className="secondary"
+                      disabled={busy !== null}
+                      onClick={() => setAsking(null)}
+                    >
                       Keep routine
                     </button>
                   </div>

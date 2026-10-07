@@ -24,7 +24,9 @@ export const MAX_BUDGET_CAP_CREDITS = 300;
 
 // The API takes a title without control characters.
 const plain = (text: string): string =>
-  [...text].map((ch) => ((ch.codePointAt(0) ?? 0) < 32 || /^[-]$/.test(ch) ? " " : ch)).join("");
+  [...text]
+    .map((ch) => ((ch.codePointAt(0) ?? 0) < 32 || /^[\u007f-\u009f]$/.test(ch) ? " " : ch))
+    .join("");
 
 export const CAP_RULE = `Enter a whole number from 1 to ${MAX_BUDGET_CAP_CREDITS} credits.`;
 
