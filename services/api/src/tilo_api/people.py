@@ -19,6 +19,7 @@ from tilo_memory.artifacts import ArtifactStore
 from tilo_people.stores import PeopleStores
 
 from tilo_api import deps, people_items
+from tilo_api.people_events import WorkEvents, get_work_events
 from tilo_api.people_limits import idempotent, write_limit
 from tilo_api.people_meetings import MeetingEditIn, edit_meeting, get_meeting, read_minutes, set_world
 from tilo_api.people_plate import build_plate
@@ -166,8 +167,11 @@ def _writer(
     stores: PeopleStores,
     clock: Callable[[], str],
     redact: Callable[[str], str] | None = None,
+    events: WorkEvents | None = None,
 ) -> Writer:
-    return Writer(stores, deps.ORG_ID, principal.user_id, clock(), *(() if redact is None else (redact,)))
+    w = Writer(stores, deps.ORG_ID, principal.user_id, clock(), *(() if redact is None else (redact,)))
+    w.events = events
+    return w
 
 
 @router.post("/v1/meetings/{meeting_id}/confirm")
@@ -264,11 +268,12 @@ def confirm_work_item_route(
     principal: Annotated[deps.Principal, Depends(deps.get_current_principal)],
     stores: Annotated[PeopleStores, Depends(deps.get_people_stores)],
     clock: Annotated[Callable[[], str], Depends(deps.get_clock)],
+    events: Annotated[WorkEvents, Depends(get_work_events)],
 ) -> dict[str, Any]:
     """The assigner confirms a proposed item; nobody else can see it exists (PE-03, PE-07)."""
     if _ITEM_ID.fullmatch(work_item_id) is None:
         raise _not_found()
-    return _answer(lambda: confirm_item(_writer(principal, stores, clock), work_item_id))
+    return _answer(lambda: confirm_item(_writer(principal, stores, clock, events=events), work_item_id))
 
 
 @router.post("/v1/meetings", status_code=201)
@@ -370,6 +375,7 @@ def create_work_item_route(
     stores: Annotated[PeopleStores, Depends(deps.get_people_stores)],
     redact: Annotated[Callable[[str], str], Depends(deps.get_redactor)],
     clock: Annotated[Callable[[], str], Depends(deps.get_clock)],
+    events: Annotated[WorkEvents, Depends(get_work_events)],
 ) -> dict[str, Any]:
     """A person adds their own item; a mail or request source is checked against its owner (PE-08)."""
 
@@ -382,7 +388,7 @@ def create_work_item_route(
             principal,
             stores,
             body,
-            lambda: create_item(_writer(principal, stores, clock, redact), body, owners),
+            lambda: create_item(_writer(principal, stores, clock, redact, events), body, owners),
         )
     )
 
@@ -393,10 +399,11 @@ def _item_writer(
     stores: PeopleStores,
     clock: Callable[[], str],
     redact: Callable[[str], str] | None = None,
+    events: WorkEvents | None = None,
 ) -> Writer:
     if _ITEM_ID.fullmatch(item_id) is None:
         raise _not_found()
-    return _writer(principal, stores, clock, redact)
+    return _writer(principal, stores, clock, redact, events)
 
 
 @router.get("/v1/work-items")
@@ -432,9 +439,10 @@ def edit_work_item_route(
     stores: Annotated[PeopleStores, Depends(deps.get_people_stores)],
     redact: Annotated[Callable[[str], str], Depends(deps.get_redactor)],
     clock: Annotated[Callable[[], str], Depends(deps.get_clock)],
+    events: Annotated[WorkEvents, Depends(get_work_events)],
 ) -> dict[str, Any]:
     """The owner changes the title and the due phrase; `source` and every stamp are immutable (PE-07)."""
-    w = _item_writer(work_item_id, principal, stores, clock, redact)
+    w = _item_writer(work_item_id, principal, stores, clock, redact, events)
     return _answer(lambda: people_items.edit_item(w, work_item_id, body))
 
 
@@ -445,9 +453,10 @@ def snooze_work_item_route(
     principal: Annotated[deps.Principal, Depends(deps.get_current_principal)],
     stores: Annotated[PeopleStores, Depends(deps.get_people_stores)],
     clock: Annotated[Callable[[], str], Depends(deps.get_clock)],
+    events: Annotated[WorkEvents, Depends(get_work_events)],
 ) -> dict[str, Any]:
     """The owner parks an open item until a time within the next 30 days (PE-19)."""
-    w = _item_writer(work_item_id, principal, stores, clock)
+    w = _item_writer(work_item_id, principal, stores, clock, events=events)
     return _answer(lambda: people_items.snooze_item(w, work_item_id, body))
 
 
@@ -460,8 +469,9 @@ def _plain_action(name: str, act: Callable[[Writer, str], dict[str, Any]], summa
         principal: Annotated[deps.Principal, Depends(deps.get_current_principal)],
         stores: Annotated[PeopleStores, Depends(deps.get_people_stores)],
         clock: Annotated[Callable[[], str], Depends(deps.get_clock)],
+        events: Annotated[WorkEvents, Depends(get_work_events)],
     ) -> dict[str, Any]:
-        w = _item_writer(work_item_id, principal, stores, clock)
+        w = _item_writer(work_item_id, principal, stores, clock, events=events)
         return _answer(lambda: act(w, work_item_id))
 
     route.__name__ = f"{name.replace('-', '_')}_work_item_route"

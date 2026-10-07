@@ -35,9 +35,7 @@ from _ppl11a_lib import (
 # Each slice of PPL-11c is a strict xfail until its builder removes its entry (API_PPL_11c.md section 0). An entry is
 # a substring of a pytest node id, so it names a whole file; a slice that goes green with its entry still here
 # fails (strict), which is the reminder to delete it. Guards (`test_PPL_11c_guards.py`) are never pending.
-SLICE_PENDING: tuple[str, ...] = (
-    "test_PPL_11c_s5_",  # PE-12 events (also needs the ADR-0009 contract change for `vis: []`)
-)
+SLICE_PENDING: tuple[str, ...] = ()
 # Tests inside a pending file that pass as soon as an earlier slice lands (a negative test: "a refused work-item write
 # emits nothing" is true of S1's routes, which emit nothing yet). Not xfail: a strict XPASS fails the earlier slice.
 PENDING_EXEMPT: tuple[str, ...] = (
@@ -48,9 +46,6 @@ PENDING_EXEMPT: tuple[str, ...] = (
     "test_PPL_11c_s4_BQ_PPL11C_12_meeting_world_and_delete_read_the_actor_by_id_and_list_no_directory",
     "test_PPL_11c_s4_PE_22_every_people_route_of_this_ticket_answers_no_store_whatever_the_status",
     "test_PPL_11c_s4_PE_22_a_409_and_a_503_are_no_store_too",
-    # true once S3's person and membership routes exist (a meeting create already emits nothing)
-    "test_PPL_11c_s5_PE_12_writes_that_have_no_registry_event_write_none_and_need_no_writer",
-    "test_PPL_11c_s5_HR_1_a_refused_a_lost_or_a_read_only_request_writes_no_event_and_makes_no_world",
 )
 
 # --- routes (API_PPL_11c.md section 1) ------------------------------------------------------------------------------
