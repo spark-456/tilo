@@ -57,9 +57,15 @@ CONFIG_SHAPES = {
     "config/metering.yaml": "metering",
     "config/evals.yaml": "evals",
     "config/scenarios/*.yaml": "scenario",
+    "config/spend_caps.yaml": "spend_caps",
 }
 # Contract roots whose generated name is not the PascalCase file name.
-ROOT_NAMES = {"events/registry": "EventRegistry", "agents": "AgentsConfig", "artifact": "ArtifactVersion"}
+ROOT_NAMES = {
+    "events/registry": "EventRegistry",
+    "agents": "AgentsConfig",
+    "artifact": "ArtifactVersion",
+    "spend_caps": "SpendCapsConfig",  # tilo_api.spend.SpendCaps is the loaded six-field value
+}
 # Fixture folders with their own layout, checked by contracts_events.
 EVENT_FIXTURES = {"events", "streams"}
 SEMVER = re.compile(r"^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$")
