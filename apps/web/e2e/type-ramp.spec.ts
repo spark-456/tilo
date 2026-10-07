@@ -7,7 +7,7 @@ import { SCREENS } from "../src/screens/meta";
 import { DESKTOP, MOBILE } from "./support/viewports";
 
 const SCALE = [12, 14, 16, 20, 24, 32, 40];
-const FIXTURE = "/world/w_village_basic?fixture=village-basic&seq=44";
+const FIXTURE = "/world/w_village_basic/stage?fixture=village-basic&seq=44";
 
 // Every routed screen (S-20 and S-25 are deferred and have no path), the dev indexes, the not-found
 // page and the fixture-mode world, which has the stage labels and the Trace list.

@@ -7,7 +7,7 @@ import { ZOOM_MAX, ZOOM_STEP } from "../src/stage/camera";
 import { gotoStage, readCamera } from "./support/camera";
 import { DESKTOP, MOBILE } from "./support/viewports";
 
-const URL = "/world/w_village_basic?fixture=village-basic&seq=20";
+const URL = "/world/w_village_basic/stage?fixture=village-basic&seq=20";
 
 test.use({ reducedMotion: "reduce" }); // instant moves: no easing to wait out
 
