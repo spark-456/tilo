@@ -119,12 +119,17 @@
   pointer-events: none;
   background: var(--ground);
 }
-/* The poster stands in for the city until it is drawn (NFR-01): the same fixed layer, no picture, no motion. */
+/* The poster stands in for the city until it is drawn (NFR-01): the same fixed layer, no picture to fetch, no
+   motion. The ground colour with a little haze towards the top, where the city is farthest away. */
 [data-park] .park-shell__poster {
   position: absolute;
   inset: 0;
   pointer-events: none;
-  background: var(--ground);
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--ground) 90%, var(--paper)),
+    var(--ground)
+  );
 }
 [data-park] .park-shell__scene {
   position: absolute;
