@@ -112,7 +112,9 @@ export function useAgendaUi(A: Agenda, decisions: Decision[], app: AppCtx, api: 
           setFinding(false);
           setBooked(s);
           setSel(findRuleOf(A)?.find?.event.id ?? defaultEventId(A));
-          app.toast(`Booked ${s.l} on your Agenda. Invites go out from Google Calendar once it's connected and you approve`);
+          app.toast(
+            `Booked ${s.l} on your Agenda. Invites go out from Google Calendar once it's connected and you approve`,
+          );
         },
         () => app.toast("Not connected yet"),
       ),
