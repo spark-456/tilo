@@ -19,9 +19,10 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import fc from "fast-check";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { TiloApiError } from "../../api/http";
 import { callTable, invoke } from "../../../test-support/park/apiCalls";
+import { TiloApiError } from "../../api/http";
 import { API_METHODS } from "./index";
+import type { WorldListItem } from "./live/worldsFromList";
 import { NotBuilt, createLiveApi } from "./liveApi";
 import { parkApi } from "./select";
 import type { World } from "./types";
@@ -98,7 +99,7 @@ describe("WIRE_2_live_getWorlds: GET /worlds as live data", () => {
     expect(new Headers(init?.headers).has("authorization")).toBe(false);
     expect(result.source).toBe("live");
     expect(result.data).toEqual(
-      worldsFromList([entry(1), entry(2, { title: null, status: "completed" })]),
+      worldsFromList([entry(1), entry(2, { title: null, status: "completed" })] as WorldListItem[]),
     );
     expect(result.data.map((w) => w.id)).toEqual(["w-1", "w-2"]);
   });
@@ -159,7 +160,8 @@ describe("WIRE_2_live_getWorlds: GET /worlds as live data", () => {
       fc.asyncProperty(
         fc.integer({ min: 0, max: 40 }),
         fc.integer({ min: 1, max: 9 }),
-        async (total, size) => {
+        async (raw, size) => {
+          const total = Math.min(raw, size * 10); // within the 10-page cap, tested on its own below
           const all = Array.from({ length: total }, (_, i) => entry(i));
           const pages: Record<string, unknown> = {};
           for (let at = 0, n = 0; at === 0 || at < total; at += size, n++) {
