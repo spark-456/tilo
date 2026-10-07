@@ -18,10 +18,18 @@ export function AttentionBanner({
   c,
   waiting,
   onReconnect,
-}: { c: Connector; waiting: boolean; onReconnect: () => void }) {
+}: { c: Merged; waiting: boolean; onReconnect: () => void }) {
   const { title, sub } = bannerText(c);
+  const expired = c.exp === "expired";
   return (
-    <div className="park-connectors-banner">
+    <div
+      className={
+        expired
+          ? "park-connectors-banner park-connectors-banner--expired"
+          : "park-connectors-banner"
+      }
+      role={expired ? "alert" : "status"}
+    >
       <span className="park-connectors-banner-icon">{icon("plug", 18)}</span>
       <div className="park-connectors-banner-text">
         <div className="park-connectors-banner-title">{title}</div>
