@@ -238,10 +238,13 @@ class Outbox:
         if claimed is None:
             return None
         if "authz" not in claimed or not authz_validator().is_valid(claimed["authz"]):  # SEC-11: re-check the store
-            # A stored entry that lost or changed its authz (a store bug, an edited document) is never sent: the side
-            # effect and its data.transfer record (authz included) must stay one thing. Nothing was sent, so no alert.
+            # A stored entry whose authz is missing or malformed (a store bug, an edited document) is not sent now: the
+            # side effect and its data.transfer record (authz included) must stay one thing. This checks the shape only;
+            # binding an entry to its authorisation belongs to the persistent-store ticket. An earlier attempt that may
+            # have acted still alerts a person (FR-AGT-13), as on every other final refusal.
             _log.error("outbox entry %s: the stored entry no longer carries a valid authz; not sent", outbox_id)
-            return self._store._finalize_claim(outbox_id, holder, "failed")
+            alert = _alert_part(claimed) if self._store.retry_state(outbox_id)["ambiguous"] else None
+            return self._store._finalize_claim(outbox_id, holder, "failed", alert=alert)
         name = claimed["connector"]
         adapter = None if name.strip() == RESERVED_CONNECTOR_ID else self._connectors.get(name)
         if adapter is None:  # never a reserved id, even if the map was edited after construction

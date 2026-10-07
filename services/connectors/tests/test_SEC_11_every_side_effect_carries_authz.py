@@ -43,6 +43,7 @@ import tilo_connectors
 import tilo_connectors.adapters as adapters_pkg
 import yaml
 from _connectors_lib import ManualClock, evidence_from_case, fresh_entry
+from conftest import build_registry, gate_case
 from hypothesis import given, settings
 from hypothesis import strategies as st
 from tilo_connectors.errors import MissingGrant, OutboxRefused
@@ -99,8 +100,6 @@ ADAPTERS = _adapter_classes()
 
 
 def _validator(ref: str) -> jsonschema.protocols.Validator:
-    from conftest import build_registry
-
     return jsonschema.Draft202012Validator({"$ref": ref}, registry=build_registry(REPO_ROOT))
 
 
@@ -330,8 +329,6 @@ _AUTHZ = st.one_of(
 @settings(max_examples=150, deadline=None)
 @given(presented=_AUTHZ)
 def test_SEC_11_property_no_side_effect_runs_unless_its_authz_is_the_one_that_opened_it(presented):
-    from conftest import gate_case
-
     case = gate_case(undo_window_s=0)
     genuine = case["entry"]["authz"]
     entry = {**case["entry"], "authz": presented}
@@ -404,9 +401,27 @@ def test_SEC_11_dispatch_refuses_a_stored_entry_that_no_longer_carries_a_valid_a
     outbox.enqueue(case["entry"], evidence_from_case(case))
     damage(store._by_id[case["entry"]["id"]])
 
-    try:
-        outbox.dispatch_due()
-    except Exception:  # noqa: BLE001 - what happens after the send is not the point: the send must not happen
-        pass
+    done = outbox.dispatch_due()  # refused cleanly: no exception, no half-written record
 
     assert gmail.sent == [], "a side effect ran without a valid authz, and its audit record could not be written"
+    assert [e["state"] for e in done] == ["failed"]
+    assert emitted == [], "no data.transfer for a send that did not happen"
+    assert store._pending_alerts == {}, "nothing was ever sent, so no person is alerted"
+    assert outbox.dispatch_due() == [] and gmail.sent == [], "a failed entry is final: never retried"
+
+
+def test_SEC_11_a_refused_entry_that_an_earlier_attempt_may_have_sent_still_alerts_a_person(gate_case_factory):
+    """FR-AGT-13: when an earlier attempt was ambiguous (the provider may have acted), the authz refusal is final
+    but a person is still told, as on every other final refusal of a possibly-sent entry."""
+    case = gate_case_factory(undo_window_s=0)
+    emitted: list[dict] = []
+    outbox, gmail, store = _outbox(emitted)
+    outbox.enqueue(case["entry"], evidence_from_case(case))
+    outbox_id = case["entry"]["id"]
+    store._retries[outbox_id] = {"attempts": 1, "ambiguous": True}  # an earlier try timed out after the provider acted
+    store._by_id[outbox_id].pop("authz")
+
+    done = outbox.dispatch_due()
+
+    assert gmail.sent == [] and [e["state"] for e in done] == ["failed"] and emitted == []
+    assert list(store._pending_alerts) == [outbox_id], "a possibly-sent entry that is refused alerts a person once"
