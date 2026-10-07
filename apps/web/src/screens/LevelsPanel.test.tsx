@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { act } from "react";
 import { createRoot } from "react-dom/client";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { ClientProvider } from "../api/ClientProvider";
 import { FixtureClient } from "../api/fixtureClient";
 import { EVENTS_VILLAGE_BASIC } from "../api/fixtures/events";
@@ -19,16 +19,32 @@ async function mount(node: React.ReactNode): Promise<HTMLElement> {
     createRoot(container).render(<ClientProvider client={silent}>{node}</ClientProvider>);
   });
   await act(async () => {
-    await new Promise((done) => setTimeout(done, 20)); // the layout arrives on a later tick
+    await vi.dynamicImportSettled();
   });
   return container;
 }
 
+async function waitFor<T extends Element = Element>(
+  root: ParentNode,
+  selector: string,
+): Promise<T> {
+  for (let i = 0; i < 200; i++) {
+    const found = root.querySelector<T>(selector);
+    if (found) return found;
+    await act(async () => {
+      await vi.dynamicImportSettled();
+      await new Promise((done) => setTimeout(done, 10));
+    });
+  }
+  throw new Error(`Timed out waiting for ${selector}`);
+}
+
 describe("PRD-18.3 S-04 levels panel (FR-WLD-08 replay point): the layout and the replayed events", () => {
   it("names the size and counts, and one card per level linking to its Inspect page", async () => {
-    const panel = (
-      await mount(<LevelsPanel worldId="w_village_basic" replayed={EVENTS_VILLAGE_BASIC} />)
-    ).querySelector('[data-testid="levels-panel"]');
+    const container = await mount(
+      <LevelsPanel worldId="w_village_basic" replayed={EVENTS_VILLAGE_BASIC} />,
+    );
+    const panel = await waitFor(container, '[data-testid="levels-panel"]');
     expect(panel?.textContent).toContain("Village");
     expect(panel?.textContent).toContain("5 agents · 5 buildings · 1 gate");
     const card = panel?.querySelector("a.level-card");
@@ -41,9 +57,8 @@ describe("PRD-18.3 S-04 levels panel (FR-WLD-08 replay point): the layout and th
 
   it("follows the replay: an early point shows an unfinished level and its latest line", async () => {
     const early = EVENTS_VILLAGE_BASIC.filter((e) => e.seq <= 30);
-    const card = (
-      await mount(<LevelsPanel worldId="w_village_basic" replayed={early} />)
-    ).querySelector("a.level-card");
+    const container = await mount(<LevelsPanel worldId="w_village_basic" replayed={early} />);
+    const card = await waitFor(container, "a.level-card");
     expect(card?.textContent).toContain("0%");
     expect(card?.getAttribute("data-active")).toBe("true");
     expect(card?.textContent).not.toContain("complete");
