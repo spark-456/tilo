@@ -110,7 +110,7 @@ def test_PPL_11a_PE_24_no_text_field_stores_a_hidden_character_behind_a_block_re
     rig.as_user(OWNER)
     for body in (
         {**PERSON, "display_name": f"Ni{junk}"},
-        {**PERSON, "aliases": [f"Ni{junk}"]},
+        {**PERSON, "aliases": [f"Ni{junk}"], "email": "nina.two@example.com"},  # PPL-11c: an address is the org's alone
     ):
         assert rig.post("/v1/people", body).status_code in (201, 422), body
     for name in ("meetings", "work_items", "persons"):
