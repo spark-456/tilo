@@ -17,12 +17,12 @@ import json
 import secrets
 import threading
 from collections.abc import Callable, Iterable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from _channels_lib import FakeClock
-from _chn10_lib import USER, MemoryDraftStore, Rig, Thread, answer, drafting_module, make_rig, message_id_header
+from _chn10_lib import USER, MemoryDraftStore, Msg, Rig, Thread, answer, drafting_module, make_rig, message_id_header
 from _chn_contracts_lib import CONTRACTS, _registry
 from jsonschema import Draft202012Validator
 
@@ -37,6 +37,43 @@ BENIGN = "Hi David,\n\nFriday 2pm works for us. See you then.\n\nBest,\nSarah"
 BENIGN_V2 = "Hi David,\n\nFriday 2pm works for us. Thanks again.\n\nBest,\nSarah"
 
 __all__ = ["USER", "Rig", "Thread", "answer", "make_rig"]
+
+# CHN-GATE-E (ADR-0025, "Migration"): the L2 gate no longer guesses names from their position in the body; a name rides
+# L2 only when the thread vouches for it. The benches' bodies greet "David" (the draft's recipient: the address local
+# part david.miller@ names him) and sign "Sarah" (the mailbox owner's From name on mail the user's own client wrote), so
+# every Autopilot bench thread starts with one such message: SENT, From "Sarah Chen <ops@...>", to the mailbox itself
+# (it adds no recipient a test could trip over).
+OWN_NAME = f"Sarah Chen <{MAILBOX}>"
+# The names a bench thread vouches for: DAVID's address local part and the mailbox owner (From name, local part).
+VOUCHED = frozenset({"david", "miller", "sarah", "chen", "ops"})
+# Further names some positive controls use (`scripted_thread(names=...)`: the user's SENT mail calls DAVID that).
+EXTRA_NAMES = ("Anna Maria", "Jones", "Pat", "Alex")
+EXTRA_WORDS = frozenset({"anna", "maria", "jones", "pat", "alex"})
+
+
+def name_words(*names: str) -> frozenset[str]:
+    """The lower-case words of display names: the `names` a gate call is given for them."""
+    return frozenset(w.lower() for n in names for w in n.split())
+
+
+@dataclass
+class Mail(Msg):
+    """A message with Gmail's `labelIds` (only "SENT" makes it the user's own, BQ-223)."""
+
+    labels: list[str] = field(default_factory=list)
+
+    def as_message(self) -> dict[str, Any]:
+        message = super().as_message()
+        return message | {"labelIds": list(self.labels)} if self.labels else message
+
+
+def own_mail() -> tuple[Msg, ...]:
+    return (Mail("m-own-note", OWN_NAME, "Note", "A note for later.", to=[MAILBOX], labels=["SENT"]),)
+
+
+def named_rig() -> Rig:
+    """`make_rig()` whose threads start with the owner's own SENT message (see above)."""
+    return make_rig(own_mail=own_mail())
 
 
 def autopilot_module() -> Any:
@@ -244,7 +281,7 @@ class Bench:
 
 
 def make_bench(level: str = "L2", contacts: Iterable[str] = ()) -> Bench:
-    rig = make_rig()
+    rig = named_rig()
     bench = Bench(rig, FakeOutbox(rig.clock), FakePolicy(level), FakeContacts(contacts), MemoryDraftStore(), EventLog())
     bench.ap = bench.new_autopilot()
     return bench
@@ -323,6 +360,12 @@ def drafted(bench: Bench, thread: Thread, instruction: str = INSTRUCTION) -> tup
     return ctx, result
 
 
-def scripted_thread(bench: Bench, *bodies: str) -> Thread:
-    thread, _ = bench.rig.thread(answers=tuple(answer(b) for b in bodies))
+def scripted_thread(bench: Bench, *bodies: str, names: Iterable[str] = ()) -> Thread:
+    """A bench thread. `names` are display names the user's own SENT mail gives the draft's recipient (DAVID), so a body
+    may greet or sign them (CHN-GATE-E: only the thread vouches for a name)."""
+    own = tuple(
+        Mail("m-name-" + str(i), OWN_NAME, "Note", "A note.", to=[f"{n} <{DAVID}>"], labels=["SENT"])
+        for i, n in enumerate(names)
+    )
+    thread, _ = bench.rig.thread(earlier=own, answers=tuple(answer(b) for b in bodies))
     return thread

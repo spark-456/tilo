@@ -231,7 +231,7 @@ def test_FR_CHN_11_inbound_aware_l2_an_earlier_risky_message_does_not_matter_onl
 ) -> None:
     h = make_l2(kind)
     thread = h.thread(SCHEDULING_INBOUND, earlier=(earlier_message(earlier_body),))
-    assert len(thread.messages) == 2
+    assert len([m for m in thread.messages if m.message_id != "m-own-note"]) == 2  # the bench adds its own SENT note
     p, _, _ = h.preview(thread, "Yes, confirmed.")
     assert (p.tier, p.modifiers) == ("T2", ())
     _assert_rides_l2(h, p)
