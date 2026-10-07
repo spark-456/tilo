@@ -148,7 +148,7 @@ describe("WEB_3b_loader: the card", () => {
   });
 });
 
-describe("WEB_3b_loader: the steps tick and the bar widens, with no animation", () => {
+describe("WEB_3b_loader: the steps tick and the bar widens by its inline width, with no inline motion style", () => {
   it("WEB_3b_loader_step_0_has_no_check_yet_and_the_bar_is_at_30_percent", async () => {
     await mountApp();
     open("k1");

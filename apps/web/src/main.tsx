@@ -25,7 +25,7 @@ const fonts = [
   "400 1em 'Nunito Sans'",
   "700 1em 'Nunito Sans'",
   "500 1em 'JetBrains Mono'",
-].map((f) => document.fonts.load(f));
+].map((f) => document.fonts.load(f).catch(() => undefined)); // a face that fails to load must not be an uncaught rejection
 if (isParkPath(window.location.pathname)) render();
 else
   Promise.all(fonts)

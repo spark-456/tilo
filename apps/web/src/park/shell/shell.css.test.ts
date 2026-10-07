@@ -19,7 +19,7 @@ describe("WEB_3b_css: park.shell.css", () => {
     expect(rules.map((r) => r.selector).filter((s) => !s.startsWith("[data-park]"))).toEqual([]);
   });
 
-  it("WEB_3b_css_has_no_transition_and_motion_only_for_the_city_movers", () => {
+  it("WEB_3b_css_motion_is_the_city_movers_and_the_shell_chrome_keyframes_only", () => {
     // WEB-MOTION-1: the city's cars and walkers are keyframes plus one pause rule.
     // Updated for WEB-MOTION-2: the shell's own chrome (splash, page swap, bar, world card) adds transitions on
     // transform and opacity (pinned in motion.transitions.css.test.ts) and the keyframes tiloSlide, tiloSpin,

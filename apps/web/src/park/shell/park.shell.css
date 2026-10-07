@@ -77,6 +77,13 @@
   z-index: 1;
   transition: opacity 0.24s ease, transform 0.38s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
+/* Out of sight, so out of reach: no click lands on a page that is fading out, waiting or not yet in. */
+[data-park] .park-shell__main[data-phase="out"],
+[data-park] .park-shell__main[data-phase="pre"],
+[data-park] .park-shell__main[data-phase="wait"],
+[data-park] .park-shell__main[data-phase="hold"] {
+  pointer-events: none;
+}
 [data-park] .park-shell__main[data-phase="out"] {
   opacity: 0;
   transform: translateY(-4px);
@@ -630,6 +637,7 @@
 }
 [data-park] .park-scrim:has(> .park-shell__card--leaving) {
   animation: tiloFade 0.28s ease forwards;
+  pointer-events: none; /* a card on its way out takes no click */
 }
 /* The current step's ring spins (README Async actions: tiloSpin .7s). */
 [data-park] .park-shell__ring {

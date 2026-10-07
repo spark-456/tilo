@@ -163,7 +163,7 @@ export const ALLOWLIST: readonly AllowEntry[] = [
     file: "src/park/shell/park.shell.css",
     rule: "css-animation",
     reason:
-      "Ambient city scenery and non-agent UI chrome. animation-play-state pauses the city's anonymous cars and pedestrians (they stand for no run) under the veil and in a hidden tab. The boot splash's sliding bar and fade and the world loader's spinning ring and card fade run only while a person waits for the app or a world to open, and reduced motion turns them off. None starts from or implies the state of a run; agents animate only from recorded events (HR-1).",
+      "Ambient city scenery and non-agent UI chrome. animation-play-state pauses the city's anonymous cars and pedestrians (they stand for no run) under the veil and in a hidden tab. The boot splash's sliding bar and fade and the world loader's spinning ring and card fade are chrome motion started by a click or by app state (the app booting, a world card opening); the loader's steps are a fixed timer ceremony, so the ring shows no run state, progress or count. Reduced motion turns them off. Agents animate only from recorded events (HR-1).",
   },
   {
     file: "src/park/shell/park.shell.css",

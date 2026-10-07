@@ -5,19 +5,26 @@
 // A splash that was never shown (ready from the first render) is never drawn. Once it has gone, the other pages'
 // bundles are fetched (README Boot: "Prefetch the page bundles afterwards").
 import { useEffect, useRef, useState } from "react";
-import { useMotionOff } from "./motion";
+import { useSchedule } from "../app/context";
+import { FADE_MARGIN_MS, SPLASH_FADE_MS, browserRunsAnimations, useMotionOff } from "./motion";
 import { prefetchPages } from "./prefetch";
 
 type Phase = "up" | "out" | "gone";
 
 export function BootSplash({ ready }: { ready: boolean }) {
   const off = useMotionOff();
+  const schedule = useSchedule();
   const [phase, setPhase] = useState<Phase>(ready ? "gone" : "up");
   const wasShown = useRef(!ready);
   if (ready && phase === "up") setPhase(off ? "gone" : "out");
   useEffect(() => {
     if (phase === "gone" && wasShown.current) prefetchPages();
   }, [phase]);
+  // The browser's animationend ends the fade; if it never runs, the scheduler does, a little later.
+  useEffect(() => {
+    if (phase !== "out" || !browserRunsAnimations()) return undefined;
+    return schedule(() => setPhase("gone"), SPLASH_FADE_MS + FADE_MARGIN_MS);
+  }, [phase, schedule]);
   if (phase === "gone") return null;
   return (
     <div

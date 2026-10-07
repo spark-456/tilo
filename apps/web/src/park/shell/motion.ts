@@ -1,7 +1,7 @@
 // The shell's chrome motion, driven by state (WEB-MOTION-2; README "Interactions and motion": Page change, Open a
 // world, Boot; PRD 9.4: it moves only because a person acted, never because of an agent). Three hooks, no timer of
 // their own: the page swap waits on the provider's injected scheduler, and the two fades (the boot splash, the world
-// card) wait for the browser's own animationend. The CSS that moves things is park.shell.css; this file only decides
+// card) wait for the browser's own animationend, with the scheduler as a fallback. The CSS that moves things is park.shell.css; this file only decides
 // which state the markup is in. Reduced motion and the 'still' preference skip every wait: things change at once.
 import {
   type ReactNode,
@@ -47,6 +47,8 @@ export type SwapMode = "animate" | "wait" | "now";
 /** README: the old page goes out for 200 ms, the new one starts 40 ms after the swap, the bar hides 460 ms and
  * resets 820 ms after the swap. */
 const OUT_MS = 200;
+/** The most the bar reads from timers alone; 100 comes only from the new page's commit. */
+export const CAP_PCT = 78;
 const IN_MS = 40;
 const HIDE_MS = 420;
 const RESET_MS = 360;
@@ -92,19 +94,17 @@ export function usePageSwap(children: ReactNode, key: string, mode: SwapMode): P
     if (phase === "out") {
       // A transition: the new page renders in slices while the old one is still out of sight, so a heavy page
       // never holds the main thread for long.
+      // The bar is held at CAP_PCT until then: the timers never say 100, only the commit below does.
       return schedule(() => {
+        setBar({ on: true, pct: CAP_PCT });
         startTransition(() => {
           setShown(latest.current);
           setPhase("pre");
-          setBar({ on: true, pct: 78 });
         });
       }, OUT_MS);
     }
     if (phase === "pre") {
-      return schedule(() => {
-        setPhase("in");
-        setBar({ on: true, pct: 100 });
-      }, IN_MS);
+      return schedule(() => setPhase("in"), IN_MS);
     }
     if (phase === "wait") {
       return schedule(() => {
@@ -115,9 +115,12 @@ export function usePageSwap(children: ReactNode, key: string, mode: SwapMode): P
     if (phase === "hold") return schedule(() => setPhase("in"), IN_MS);
     return undefined;
   }, [phase, schedule]);
-  // In the commit that puts the new page on screen, so the scroll and the swap are one step.
+  // In the commit that puts the new page on screen, so the scroll and the swap are one step. This commit is the one
+  // real event of the change: the bar reads 100 here and never earlier (it shows no progress it did not measure).
   useLayoutEffect(() => {
-    if (phase === "pre") window.scrollTo(0, 0);
+    if (phase !== "pre") return;
+    window.scrollTo(0, 0);
+    setBar({ on: true, pct: 100 });
   }, [phase]);
   useEffect(() => {
     if (phase !== "in" || bar.pct !== 100) return undefined;
@@ -129,14 +132,24 @@ export function usePageSwap(children: ReactNode, key: string, mode: SwapMode): P
   return { node: key === shown ? children : held.current, key: shown, phase, bar };
 }
 
+/** A fade that the browser never runs (animations off, a hidden tab) must not leave the card or splash up, so the
+ * hooks also remove them on the injected scheduler a little after the fade should have ended. Only where the
+ * browser implements CSS animations at all (the DOM stand-ins used in unit tests do not, and have no fade to wait
+ * for); the browser's own animationend normally comes first and cancels this. */
+export const FADE_MARGIN_MS = 120;
+export const SPLASH_FADE_MS = 450;
+export const CARD_FADE_MS = 280;
+export const browserRunsAnimations = (): boolean => typeof CSSAnimation !== "undefined";
+
 /**
  * The card that is fading out: the loader's last step, kept on screen after the store has dropped it, until the
- * fade is over (`done`, from the browser's animationend). Null when nothing is fading.
+ * fade is over (`done`, from the browser's animationend, or the scheduler's fallback). Null when nothing is fading.
  */
 export function useLeavingCard(
   wl: WorldLaunch | null,
   off: boolean,
 ): { leaving: WorldLaunch | null; done: () => void } {
+  const schedule = useSchedule();
   const [prev, setPrev] = useState(wl);
   const [leaving, setLeaving] = useState<WorldLaunch | null>(null);
   if (wl !== prev) {
@@ -145,5 +158,9 @@ export function useLeavingCard(
       if (leaving !== null) setLeaving(null);
     } else if (prev !== null && prev.step >= 3 && !off) setLeaving(prev);
   }
+  useEffect(() => {
+    if (leaving === null || !browserRunsAnimations()) return undefined;
+    return schedule(() => setLeaving(null), CARD_FADE_MS + FADE_MARGIN_MS);
+  }, [leaving, schedule]);
   return { leaving: wl === null ? leaving : null, done: () => setLeaving(null) };
 }
