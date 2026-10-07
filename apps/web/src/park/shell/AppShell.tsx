@@ -8,14 +8,15 @@ import type { Decision, Notification, User } from "../api/types";
 import type { PageId } from "../app/AppCtx";
 import { endSession, useApp, useExpectsSample, useParkApi, useParkStore } from "../app/context";
 import { useParkRoute } from "../app/router";
-import { Toast } from "../components";
+import { Button, Popover, Toast } from "../components";
 import "../tokens/fonts";
-import { AccountMenu } from "./AccountMenu";
+import { AccountMenu, type AccountPerson } from "./AccountMenu";
 import { BootSplash } from "./BootSplash";
 import { CityBackdrop } from "./CityBackdrop";
 import { NotificationsPopover } from "./NotificationsPopover";
 import { TopNav } from "./TopNav";
 import { WorldLoader } from "./WorldLoader";
+import { authInitials, useParkAuth } from "./auth";
 import { useAppearance } from "./cityMotion";
 import { loadShellFonts } from "./fonts";
 import { type Bar, useLeavingCard, useMotionOff, usePageSwap } from "./motion";
@@ -23,14 +24,9 @@ import "./park.shell.css";
 import { backdropScene } from "./scene";
 
 const SIGN_OUT = "This is a prototype, so you stay signed in";
-
-/** Sign out (FR-UX-10): ends the real session when there is one; with none (a local host, the fixture world, a build
- * with no Firebase config) the menu stays the prototype's toast. `session.signOut` never rejects, and a failed one still
- * closes the menu; the sign-in gate takes the page from there. */
-function signOut(store: { toast: (message: string) => void; closeMenu: () => void }): void {
-  if (endSession()) store.closeMenu();
-  else store.toast(SIGN_OUT);
-}
+const SIGNED_OUT = "You are signed out";
+const SIGN_OUT_FAILED = "Could not sign out. Try again.";
+const MOBILE_NOTE = "The Tilo mobile app is a concept. It is not available yet.";
 
 /** The bar along the nav's bottom edge while a world opens: 18% then 26 more per step, full at step 3. */
 const loaderBar = (step: number): number => (step >= 3 ? 100 : 18 + step * 26);
@@ -48,6 +44,9 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [ready, setReady] = useState(false);
   const expectsSample = useExpectsSample();
   const appearance = useAppearance();
+  const auth = useParkAuth();
+  const [mobileNote, setMobileNote] = useState(false);
+  const signingOut = useRef(false);
   const off = useMotionOff();
   const viaNav = useRef(false);
   const navTo = (to: PageId): void => {
@@ -126,6 +125,43 @@ export function AppShell({ children }: { children: ReactNode }) {
     else store.go("connectors");
   };
   const toast = state.toast;
+  // With a sign-in layer the person is whoever it says (nobody while signed out); without one, the Api's user.
+  const person: AccountPerson | null = auth
+    ? auth.status === "signedIn" && auth.user
+      ? {
+          initials: authInitials(auth.user),
+          name:
+            auth.user.displayName ?? (auth.user.isAnonymous ? "Guest" : (auth.user.email ?? "")),
+          email: auth.user.displayName ? (auth.user.email ?? "") : "",
+        }
+      : null
+    : user
+      ? {
+          initials: user.initials,
+          name: user.name,
+          email: user.email,
+          detail: `${user.org} · ${user.plan} plan`,
+        }
+      : null;
+  // Honest: success is said only after the sign-in layer's promise resolves, a failure says it failed.
+  const signOut = (): void => {
+    if (!auth) {
+      // No ParkAuth seam: the page's own session when there is one (SEC-15), else the prototype's toast. `endSession`
+      // never rejects, and a failed one still closes the menu; the sign-in gate takes the page from there.
+      if (endSession()) store.closeMenu();
+      else store.toast(SIGN_OUT);
+      return;
+    }
+    if (signingOut.current) return;
+    signingOut.current = true;
+    auth
+      .signOut()
+      .then(() => store.toast(SIGNED_OUT))
+      .catch(() => store.toast(SIGN_OUT_FAILED))
+      .finally(() => {
+        signingOut.current = false;
+      });
+  };
   return (
     <>
       <CityBackdrop
@@ -143,7 +179,13 @@ export function AppShell({ children }: { children: ReactNode }) {
         night={appearance.night}
         menu={state.menu}
         unread={!state.read && app.needsLeft > 0}
-        initials={user?.initials ?? ""}
+        initials={
+          auth
+            ? auth.status === "signedIn"
+              ? authInitials(auth.user)
+              : "?"
+            : (user?.initials ?? "")
+        }
         sample={state.sources.fixture}
         org={user?.org ?? null}
         reserveSample={expectsSample}
@@ -167,12 +209,25 @@ export function AppShell({ children }: { children: ReactNode }) {
       ) : null}
       {state.menu === "acct" ? (
         <AccountMenu
-          user={user}
+          user={person}
+          canSignOut={!auth || auth.status === "signedIn"}
+          onMobile={() => setMobileNote(true)}
           connectorsOn={connectorsOn}
           go={navTo}
-          onSignOut={() => signOut(store)}
+          onSignOut={signOut}
           onClose={store.closeMenu}
         />
+      ) : null}
+      {mobileNote ? (
+        <Popover label="Mobile app" width={320} onClose={() => setMobileNote(false)}>
+          <div className="park-shell__concept">
+            <div className="park-shell__whoname">Mobile app</div>
+            <p className="park-shell__whoorg">{MOBILE_NOTE}</p>
+            <Button variant="secondary" size="sm" onClick={() => setMobileNote(false)}>
+              Close
+            </Button>
+          </div>
+        </Popover>
       ) : null}
       {/* The same elements on every page, so a page swap never remounts the outlet (focus stays). */}
       <main
