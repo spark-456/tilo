@@ -303,7 +303,7 @@ describe("WEB_3a_store: addWorld", () => {
     store.addWorld("quick", "Order lunch");
     store.getState().toast?.action?.();
     expect(navigate).toHaveBeenCalledTimes(1);
-    expect(navigate).toHaveBeenCalledWith("/park/world/new1");
+    expect(navigate).toHaveBeenCalledWith("/world/new1");
     expect(store.getState().toast).toBeNull();
   });
 });
@@ -357,13 +357,13 @@ describe("WEB_3a_store: prefs, time and motion", () => {
 describe("WEB_3a_store: navigation, read and sources", () => {
   it("WEB_3a_store_go_navigates_to_the_park_path", () => {
     const table = [
-      ["home", undefined, "/park/home"],
-      ["worlds", undefined, "/park/worlds"],
-      ["world", { id: "k1" }, "/park/world/k1"],
-      ["skills", { id: "sk2" }, "/park/skills?id=sk2"],
-      ["team", { focus: "share" }, "/park/team?focus=share"],
-      ["profile", { tab: "notifications" }, "/park/profile?tab=notifications"],
-      ["ledger", { x: "1" }, "/park/ledger"],
+      ["home", undefined, "/"],
+      ["worlds", undefined, "/worlds"],
+      ["world", { id: "k1" }, "/world/k1"],
+      ["skills", { id: "sk2" }, "/skills?id=sk2"],
+      ["team", { focus: "share" }, "/team?focus=share"],
+      ["profile", { tab: "notifications" }, "/profile?tab=notifications"],
+      ["ledger", { x: "1" }, "/ledger"],
     ] as const;
     for (const [page, params, path] of table) {
       const { store, navigate } = setup();

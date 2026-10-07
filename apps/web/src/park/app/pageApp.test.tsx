@@ -48,7 +48,7 @@ describe("WEB_3b_pageapp: go('world')", () => {
   it("WEB_3b_pageapp_a_world_without_an_id_goes_to_the_worlds_list", () => {
     const navigate = setup();
     act(() => seen.app.go("world"));
-    expect(navigate).toHaveBeenCalledWith("/park/worlds");
+    expect(navigate).toHaveBeenCalledWith("/worlds");
     expect(seen.store.getState().wl).toBeNull();
   });
 });

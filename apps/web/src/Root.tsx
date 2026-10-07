@@ -1,6 +1,7 @@
-// The mount point: the existing app everywhere except under /park, where the Park app takes over. The
-// Park app is a dynamic import, so a landing visit never loads it (NFR-01). The old app is untouched
-// until the cutover PR.
+// The mount point: the Park app serves the root paths (/, /worlds, /world/:id, /team, ...) and the /park
+// alias; the old app serves every other address (the stage at /world/:id/stage and the kept screens). The
+// Park app is a dynamic import, so a visit to a kept screen never loads it (NFR-01). `isParkPath` is the one
+// shared predicate for the split (WEB-CUTOVER).
 import { Suspense, lazy } from "react";
 import { App } from "./App";
 import { isParkPath } from "./park/app/router";

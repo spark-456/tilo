@@ -171,7 +171,7 @@ describe("WEB_3b_loader: the steps tick and the bar widens, with no animation", 
     tick(sch, 2);
     expect(navigate).not.toHaveBeenCalled();
     tick(sch);
-    expect(navigate).toHaveBeenCalledWith("/park/world/comp");
+    expect(navigate).toHaveBeenCalledWith("/world/comp");
     expect(loader()).not.toBeNull();
     tick(sch);
     expect(loader()).toBeNull();

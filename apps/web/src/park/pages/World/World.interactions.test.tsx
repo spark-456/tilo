@@ -357,15 +357,20 @@ describe("WEB_6_world_interactions: the live stage and its lenses (plan question
     const { el } = await mountWorld();
     const live = control(el, "Open live view");
     expect(live.tagName).toBe("A");
-    expect(live.getAttribute("href")).toBe("/world/k1");
+    expect(live.getAttribute("href")).toBe("/world/k1/stage");
     expect(live.querySelector("svg"), "the play icon").not.toBeNull();
   });
 
   it("WEB_6_world_interactions_the_lenses_Story_Trace_Delivery_and_Inspect_are_linked_for_a_City", async () => {
-    // S-10 /world/:id/story, S-11 /trace, S-12 /delivery, S-05 /world/:id/inspect/:building (screens/meta.ts).
+    // S-04 /world/:id/stage (WEB-CUTOVER), S-10 /world/:id/story, S-11 /trace, S-12 /delivery, S-05 /world/:id/inspect/:building (screens/meta.ts).
     const { el } = await mountWorld();
     const hrefs = stageLinks(el).map((a) => a.getAttribute("href"));
-    for (const want of ["/world/k1", "/world/k1/story", "/world/k1/trace", "/world/k1/delivery"]) {
+    for (const want of [
+      "/world/k1/stage",
+      "/world/k1/story",
+      "/world/k1/trace",
+      "/world/k1/delivery",
+    ]) {
       expect(hrefs, want).toContain(want);
     }
     expect(
@@ -379,7 +384,7 @@ describe("WEB_6_world_interactions: the live stage and its lenses (plan question
 
   it("WEB_6_world_interactions_the_links_use_the_second_city_id", async () => {
     const { el } = await mountWorld({ id: "hires" });
-    expect(control(el, "Open live view").getAttribute("href")).toBe("/world/hires");
+    expect(control(el, "Open live view").getAttribute("href")).toBe("/world/hires/stage");
     const hrefs = stageLinks(el).map((a) => a.getAttribute("href"));
     expect(hrefs).toContain("/world/hires/story");
     expect(hrefs.some((h) => h?.startsWith("/world/k1"))).toBe(false);
@@ -392,7 +397,7 @@ describe("WEB_6_world_interactions: the live stage and its lenses (plan question
       expect(
         stageLinks(el).map((a) => a.getAttribute("href")),
         id,
-      ).not.toContain(`/world/${id}`);
+      ).not.toContain(`/world/${id}/stage`);
       cleanup();
     }
   });
@@ -424,7 +429,7 @@ describe("WEB_6_world_interactions: the live stage and its lenses (plan question
       },
     };
     const { el } = await mountWorld({ id: "q 1/2", api: odd });
-    expect(control(el, "Open live view").getAttribute("href")).toBe("/world/q%201%2F2");
+    expect(control(el, "Open live view").getAttribute("href")).toBe("/world/q%201%2F2/stage");
     await settle();
   });
 });

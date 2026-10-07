@@ -9,6 +9,7 @@ import { type ReactNode, useEffect, useState } from "react";
 import type { Connector, Decision, Plan, Skill, World } from "../../api/types";
 import type { AppCtx } from "../../app/AppCtx";
 import { useParkApi } from "../../app/context";
+import { stagePath } from "../../app/router";
 import { Button, PageSheet } from "../../components";
 import { icon } from "../../shell/kit";
 import { Activity, Districts, Result, RunHistory } from "./Lower";
@@ -176,7 +177,7 @@ export function WorldPage({ app }: { app: AppCtx }) {
             Share
           </Button>
           {isCity ? (
-            <a className="park-world-live" href={`/world/${id}`}>
+            <a className="park-world-live" href={stagePath(w.id)}>
               {icon("play", 14)}Open live view
             </a>
           ) : null}

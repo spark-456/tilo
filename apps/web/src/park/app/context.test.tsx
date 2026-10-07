@@ -122,8 +122,8 @@ describe("WEB_3a_context: useApp builds the AppCtx", () => {
     const { navigate } = setup();
     act(() => seen.app.go("ledger"));
     act(() => seen.app.go("world", { id: "k1" }));
-    expect(navigate).toHaveBeenNthCalledWith(1, "/park/ledger");
-    expect(navigate).toHaveBeenNthCalledWith(2, "/park/world/k1");
+    expect(navigate).toHaveBeenNthCalledWith(1, "/ledger");
+    expect(navigate).toHaveBeenNthCalledWith(2, "/world/k1");
   });
 
   it("WEB_3a_context_go_without_an_injected_navigate_pushes_the_path_and_updates_the_page", () => {
@@ -134,7 +134,7 @@ describe("WEB_3a_context: useApp builds the AppCtx", () => {
       </ParkProvider>,
     );
     act(() => seen.app.go("agenda"));
-    expect(window.location.pathname).toBe("/park/agenda");
+    expect(window.location.pathname).toBe("/agenda");
     expect(seen.app.page).toBe("agenda");
   });
 
