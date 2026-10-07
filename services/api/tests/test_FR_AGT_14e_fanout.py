@@ -261,7 +261,8 @@ def test_FR_AGT_14e_a_service_wide_tasks_failure_counts_against_no_schedule(sche
     sched.tasks.error = schedules.TasksUnavailable("cloud tasks answered 403")
     for minute in range(10):
         sched.clock.set(MON_0330Z + timedelta(minutes=minute))
-        assert sched.tick().json() == {"fired": 0}
+        refused = sched.tick()  # changed deliberately: BQ-AGT14-6
+        assert (refused.status_code, refused.json()) == (503, {"detail": "tasks_unavailable"})
     for schedule_id in ("sched_a", "sched_b"):
         record = sched.schedules.get(schedule_id)
         assert (record.enabled, record.failures, record.next_due, record.last_error, record.backoff_until) == (
