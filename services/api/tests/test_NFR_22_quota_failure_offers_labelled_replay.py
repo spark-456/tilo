@@ -6,7 +6,7 @@ Real routes, real `Router`, a provider that raises the provider layer's own `Quo
 router exhausts every candidate (`RouterExhaustedError`, PL-03), the route turns that into an error. NFR-22 says
 the person is then offered a replay and told it is a replay, not shown a bare "problem". PRD 17.2 NFR-24 fixes the
 wire shape of that offer for the replay-only switch (503, `replay_only: true`, a detail that says "replay"); this
-file applies the same shape to a model or quota failure (PRD silent on the code, so 502 and 503 are both allowed).
+file applies the same shape, 503 included, to a model or quota failure (BQ-NFR22-1).
 
 No network, no paid call: the scripted provider is a fake.
 """
@@ -17,7 +17,7 @@ from _clint1_lib import APPROACHES_REPLY, RoleScriptedProvider, brief_reply, bui
 from _sec16_lib import JUDGE_A, JUDGE_B
 from tilo_providers.errors import QuotaError
 
-DEGRADED = (502, 503)  # the PRD fixes no code; "a model failure the person can see", never 2xx and never a crash
+DEGRADED = 503  # the NFR-24 refusal's code, reused for the offer (BQ-NFR22-1)
 
 
 class QuotaProvider(RoleScriptedProvider):
@@ -44,7 +44,7 @@ def test_NFR_22_quota_failure_at_intake_offers_a_labelled_replay(clear_flow, rep
     response = clear_flow.intake()
 
     assert provider.calls, "the failure must come from the real path: the Director's call went to the provider"
-    assert response.status_code in DEGRADED, response.text
+    assert response.status_code == DEGRADED, response.text
     assert _says_replay(response), f"the person is offered a replay, labelled as one (PRD 17.2 NFR-22): {response.text}"
     assert response.json().get("replay_only") is True, "the flag the web reads, as in the NFR-24 refusal"
     assert clear_flow.store.worlds == {}, "a failed intake stores nothing"
@@ -57,9 +57,11 @@ def test_NFR_22_quota_failure_when_proposing_approaches_offers_a_labelled_replay
     response = clear_flow.approaches(task["task_id"])
 
     assert provider.calls
-    assert response.status_code in DEGRADED, response.text
+    assert response.status_code == DEGRADED, response.text
     assert _says_replay(response), f"quota failure while planning must offer a labelled replay: {response.text}"
     assert response.json().get("replay_only") is True
+    stored = clear_flow.store.tasks[task["task_id"]]
+    assert stored.approaches is None, "a failed proposal stores no approaches; the next call asks the Director again"
 
 
 def test_NFR_22_replay_only_degradation_is_visible_as_a_label_and_a_refusal(sec16_factory):
