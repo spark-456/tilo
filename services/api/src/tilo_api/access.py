@@ -44,6 +44,7 @@ PUBLIC_ROUTES: frozenset[tuple[str, str]] = frozenset(
 
 UNDER_CONSTRUCTION = "Tilo is still under construction and not open to the public."
 DECLARATION_REQUIRED = "Tell Tilo whether you are a visitor or a Google AI Builder Cup judge."
+RATE_LIMITED = "Too many requests in a short time. Wait a moment, then try again."
 
 
 class AccessStore(Protocol):
@@ -80,11 +81,14 @@ def enforced(env: Mapping[str, str] | None = None) -> bool:
     return "K_SERVICE" in env or "CLOUD_RUN_JOB" in env
 
 
-def provider_mode(declaration: str | None, env: Mapping[str, str], *, replay_only: bool = False) -> Mode:
-    """ "live" or "replay" for one request. `replay_only` (NFR-24, the cost kill switch) always wins; then the
-    user's own global switch (exactly "1"); then a judge on a deployment whose owner set `TILO_JUDGE_LIVE=1`.
-    Anything else, including every judge in dev or CI, is replay. Reads only `env`, sets nothing."""
-    if replay_only:
+def provider_mode(
+    declaration: str | None, env: Mapping[str, str], *, replay_only: bool = False, capped: bool = False
+) -> Mode:
+    """ "live" or "replay" for one request. `replay_only` (NFR-24, the cost kill switch) and `capped` (SEC-16, the
+    uid's spend cap) always win; then the user's own global switch (exactly "1"); then a judge on a deployment whose
+    owner set `TILO_JUDGE_LIVE=1`. Anything else, including every judge in dev or CI, is replay. Reads only `env`,
+    sets nothing."""
+    if replay_only or capped:
         return "replay"
     if env.get("LIVE") == "1":
         return "live"
@@ -101,8 +105,9 @@ def _refusal(
 
 
 def _decide(scope: Scope) -> JSONResponse | None:
-    """None to let the request through (the declaration is left on `scope["state"]` for `deps.get_mode`), or the
-    refusal. 401 first (the store is not read for nobody), then fail closed on an unwired or failing store."""
+    """None to let the request through (the declaration and uid are left on `scope["state"]` for `deps.get_mode`),
+    or the refusal. 401 first (the store is not read for nobody), then fail closed on an unwired or failing store,
+    then the judge's rate limit (429, SEC-16)."""
     from tilo_api import deps  # noqa: PLC0415  (deps imports this module)
 
     overrides = scope["app"].dependency_overrides
@@ -119,7 +124,15 @@ def _decide(scope: Scope) -> JSONResponse | None:
         return _refusal(403, DECLARATION_REQUIRED, "declaration_required")
     if declaration != "judge":  # a visitor, or anything the store should never hold: no access
         return _refusal(403, UNDER_CONSTRUCTION, "under_construction")
-    scope.setdefault("state", {})["declaration"] = declaration
+    try:  # SEC-16: a judge's every gated request counts, keyed by the verified uid only
+        decision = overrides.get(deps.get_rate_limiter, deps.get_rate_limiter)().check(principal.user_id)
+    except Exception as exc:
+        logger.warning("rate limiter unavailable, so nothing is let through: %s", type(exc).__name__)
+        return _refusal(503, "not_configured")
+    if not decision.allowed:
+        return _refusal(429, RATE_LIMITED, "rate_limited", {"Retry-After": str(decision.retry_after_s)})
+    state = scope.setdefault("state", {})
+    state["declaration"], state["uid"] = declaration, principal.user_id
     return None
 
 

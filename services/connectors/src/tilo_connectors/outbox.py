@@ -256,7 +256,8 @@ class Outbox:
                     grant,
                 )
         except SideEffectRefused as exc:  # final: it can never succeed as written; nothing is emitted
-            alert = _alert_part(claimed) if isinstance(exc, PossiblySent) else None  # it may have acted: tell a person
+            may_have_sent = isinstance(exc, PossiblySent) or self._store.retry_state(outbox_id)["ambiguous"]
+            alert = _alert_part(claimed) if may_have_sent else None  # an earlier try may have acted: tell a person
             return self._store._finalize_claim(outbox_id, holder, "failed", alert=alert)
         except Exception as exc:  # ambiguous or not final: retried later, within the policy's bounds
             try:

@@ -158,6 +158,23 @@ def sec15_factory(monkeypatch: pytest.MonkeyPatch):
     _sec15_lib.close()
 
 
+# --- SEC-16 (per-uid rate limit, spend caps, durable replay-only): see API_SEC_16.md and _sec16_lib.py ---------
+
+
+@pytest.fixture()
+def sec16_factory(monkeypatch: pytest.MonkeyPatch):
+    """`make(declarations=..., deployed=True, judge_live=True, ledger=..., flags=..., **cap_overrides)` -> a `Sec16`:
+    the SEC-15 harness (deployed-style app, fake access store, scripted router behind a spy) plus a spy over the real
+    in-memory ledger, a rate limiter on a fake clock and small test caps. `ledger=None` leaves the seam unwired."""
+    import _sec16_lib
+
+    def make(**kwargs):
+        return _sec16_lib.build(monkeypatch, **kwargs)
+
+    yield make
+    _sec16_lib.close()
+
+
 # --- PPL-11a (people API: quotes, plate, confirm, writes): see API_PPL_11a.md and _ppl11a_lib.py ----------------------
 
 

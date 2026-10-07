@@ -19,6 +19,7 @@ from tilo_memory.artifacts import ArtifactStore
 from tilo_people.stores import PeopleStores
 
 from tilo_api import deps, people_items
+from tilo_api.people_meetings import MeetingEditIn, edit_meeting, get_meeting, read_minutes, set_world
 from tilo_api.people_plate import build_plate
 from tilo_api.people_quotes import Reader, item_quote, meeting_quotes
 from tilo_api.people_writes import (
@@ -174,6 +175,64 @@ def confirm_meeting_route(
     if _MEETING_ID.fullmatch(meeting_id) is None:
         raise _not_found()
     return _answer(lambda: confirm_minutes(_writer(principal, stores, clock), meeting_id))
+
+
+@router.get("/v1/meetings/{meeting_id}")
+def get_meeting_route(
+    meeting_id: str,
+    principal: Annotated[deps.Principal, Depends(deps.get_current_principal)],
+    stores: Annotated[PeopleStores, Depends(deps.get_people_stores)],
+    clock: Annotated[Callable[[], str], Depends(deps.get_clock)],
+) -> dict[str, Any]:
+    """The owner reads their meeting (PE-05); everyone else, and a deleted meeting, is the one 404."""
+    if _MEETING_ID.fullmatch(meeting_id) is None:
+        raise _not_found()
+    return _answer(lambda: get_meeting(_writer(principal, stores, clock), meeting_id))
+
+
+@router.post("/v1/meetings/{meeting_id}/edit")
+def edit_meeting_route(
+    meeting_id: str,
+    body: Annotated[MeetingEditIn, Depends(json_body(MeetingEditIn))],
+    principal: Annotated[deps.Principal, Depends(deps.get_current_principal)],
+    stores: Annotated[PeopleStores, Depends(deps.get_people_stores)],
+    redact: Annotated[Callable[[str], str], Depends(deps.get_redactor)],
+    clock: Annotated[Callable[[], str], Depends(deps.get_clock)],
+) -> dict[str, Any]:
+    """The owner edits title, series, schedule, agenda and attendees, nothing else (PE-07, PE-19)."""
+    if _MEETING_ID.fullmatch(meeting_id) is None:
+        raise _not_found()
+    return _answer(lambda: edit_meeting(_writer(principal, stores, clock, redact), meeting_id, body))
+
+
+@router.get("/v1/meetings/{meeting_id}/minutes")
+def meeting_minutes_route(
+    meeting_id: str,
+    principal: Annotated[deps.Principal, Depends(deps.get_current_principal)],
+    stores: Annotated[PeopleStores, Depends(deps.get_people_stores)],
+    artifacts: Annotated[ArtifactStore, Depends(deps.get_artifact_store)],
+    redact: Annotated[Callable[[str], str], Depends(deps.get_redactor)],
+    clock: Annotated[Callable[[], str], Depends(deps.get_clock)],
+) -> dict[str, Any]:
+    """The owner reads the minutes document, cleaned and redacted (PE-05, PE-24); needs the store and the redactor."""
+    if _MEETING_ID.fullmatch(meeting_id) is None:
+        raise _not_found()
+    return _answer(lambda: read_minutes(_writer(principal, stores, clock), artifacts, redact, meeting_id))
+
+
+@router.post("/v1/meetings/{meeting_id}/world")
+def meeting_world_route(
+    meeting_id: str,
+    _: Annotated[Empty, Depends(json_body(Empty))],
+    principal: Annotated[deps.Principal, Depends(deps.get_current_principal)],
+    stores: Annotated[PeopleStores, Depends(deps.get_people_stores)],
+    worlds: Annotated[deps.MeetingWorlds, Depends(deps.get_meeting_worlds)],
+    clock: Annotated[Callable[[], str], Depends(deps.get_clock)],
+) -> dict[str, Any]:
+    """The owner gets the meeting's world written once; the id is the maker's, never the request's (BQ-273)."""
+    if _MEETING_ID.fullmatch(meeting_id) is None:
+        raise _not_found()
+    return _answer(lambda: set_world(_writer(principal, stores, clock), worlds, meeting_id))
 
 
 @router.post("/v1/meetings/{meeting_id}/delete")
