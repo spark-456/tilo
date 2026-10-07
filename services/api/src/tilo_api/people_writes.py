@@ -35,8 +35,8 @@ from tilo_api.people_quotes import GONE, MAX_HISTORY
 class Refusal(HTTPException):
     """An answer with a body beyond `detail` (409 `code`, `problems`); never record text."""
 
-    def __init__(self, status_code: int, detail: str, **extra: Any) -> None:
-        super().__init__(status_code=status_code, detail=detail)
+    def __init__(self, status_code: int, detail: str, *, headers: dict[str, str] | None = None, **extra: Any) -> None:
+        super().__init__(status_code=status_code, detail=detail, headers=headers)
         self.extra = extra
 
 
@@ -178,6 +178,25 @@ class ItemIn(_Closed):
     source: SourceIn
 
 
+MAX_BODY_BYTES = 32768  # BQ-PPL11C-1: a people POST body over this is a 413, whatever the route
+
+
+async def _capped_body(request: Request) -> bytes:
+    """The body, refused once it passes the cap: by the declared length before any read, else by counting as it
+    streams, so a client that keeps sending is cut after the cap (and one read-ahead chunk)."""
+    declared = request.headers.get("content-length", "")
+    if declared.isdigit() and int(declared) > MAX_BODY_BYTES:
+        raise Refusal(413, "body_too_large")
+    chunks: list[bytes] = []
+    size = 0
+    async for chunk in request.stream():
+        size += len(chunk)
+        if size > MAX_BODY_BYTES:
+            raise Refusal(413, "body_too_large")
+        chunks.append(chunk)
+    return b"".join(chunks)
+
+
 def json_body[Body: BaseModel](model: type[Body]) -> Callable[[Request], Awaitable[Body]]:
     """Strict JSON only (415 otherwise: a cross-site form or `text/plain` POST needs no preflight); a 422 that never
     echoes the input."""
@@ -186,7 +205,7 @@ def json_body[Body: BaseModel](model: type[Body]) -> Callable[[Request], Awaitab
         if request.headers.get("content-type", "").split(";")[0].strip().lower() != "application/json":
             raise Refusal(415, "Send application/json.")
         try:
-            return model.model_validate_json(await request.body())
+            return model.model_validate_json(await _capped_body(request))
         except ValidationError as exc:
             # A key the caller sent that the model does not know is never echoed (it could be a secret): `?`.
             fields = [[*e["loc"][:-1], "?"] if e["type"] == "extra_forbidden" else list(e["loc"]) for e in exc.errors()]
@@ -209,6 +228,11 @@ class Writer:
     redact: Callable[[str], str] = _identity
 
     def directory(self) -> Directory:
+        """The actor's own record, read by id: a write lists no whole-org directory (BQ-PPL11C-12)."""
+        me = self.stores.persons.get(self.org, self.actor)
+        return Directory.of([] if me is None else [me.record])
+
+    def org_directory(self) -> Directory:
         return Directory.of(s.record for s in self.stores.persons.list(self.org))
 
     def text(self, value: str) -> str:
@@ -437,7 +461,7 @@ def create_person(w: Writer, body: PersonIn) -> dict[str, Any]:
             raise Refusal(409, "email_taken", code="email_taken")
 
     with _DIRECTORY_LOCK:
-        made = w.create("person", record, w.stores.persons, w.directory(), address_is_free)
+        made = w.create("person", record, w.stores.persons, w.org_directory(), address_is_free)
     return project("person", "membership", made) or {}
 
 
