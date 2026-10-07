@@ -30,7 +30,15 @@ export async function parkMock() {
     ...actual,
     createPark: (...args: Parameters<typeof actual.createPark>) => ({
       ...actual.createPark(...args),
-      scene: sceneSpy,
+      // NFR-01-LANDING: the shell draws the city in steps (`scene.steps`); the stand-in is one step that calls the
+      // same spy.
+      scene: Object.assign((o?: Parameters<typeof sceneSpy>[0]) => sceneSpy(o), {
+        steps: (o?: Parameters<typeof sceneSpy>[0]) =>
+          (function* () {
+            yield;
+            return sceneSpy(o);
+          })(),
+      }),
     }),
   };
 }

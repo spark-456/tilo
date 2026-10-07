@@ -5,7 +5,7 @@
 // `isKeptPath` are the shared predicates for the split (WEB-CUTOVER).
 import { Suspense, lazy } from "react";
 import { isKeptPath } from "./keptPaths";
-import { isParkPath } from "./park/app/router";
+import { isHomeAddress, isParkPath } from "./park/app/router";
 import { usePathname } from "./router";
 import "./park/tokens/park.css";
 import "./rootFrame.css";
@@ -14,6 +14,11 @@ import "./rootFrame.css";
 // loads the Park app (NFR-01).
 const App = lazy(() => import("./App").then((m) => ({ default: m.App })));
 const ParkApp = lazy(() => import("./park/app/ParkApp"));
+
+// The landing visit is the Home page: its page chunk is requested now, beside the Park app chunk, not after that
+// chunk has arrived and run (a whole round trip later on a phone, NFR-01). `lazy()` in the page registry reuses
+// the same module, so nothing loads twice. Any other address never asks for it.
+if (isHomeAddress()) void import("./park/pages/Home/HomePage");
 
 // While a chunk is on its way the page is a plain frame in the colour the real page starts with (the Park boot
 // splash's paper; the old app's surface), not a blank page: no text, no motion, fixed to the viewport, so the page

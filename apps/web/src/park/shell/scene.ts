@@ -45,20 +45,45 @@ export function pickPins(spots: readonly Spot[]): Pin[] {
 
 const cache = new Map<string, BackdropScene>();
 
+const keyOf = (time: "day" | "night", motion: CityMotion): string => `${time}|${motion}`;
+const sceneOptions = (time: "day" | "night", motion: CityMotion) => ({
+  w: SCENE_W,
+  h: SCENE_H,
+  vw: 1240,
+  night: time === "night",
+  k: motion === "calm" ? 1.9 : 1,
+  still: motion === "still",
+});
+const finish = (drawn: { el: unknown; spots: readonly Spot[] }): BackdropScene => ({
+  el: drawn.el as ReactNode,
+  pins: pickPins(drawn.spots),
+});
+
 export function backdropScene(time: "day" | "night", motion: CityMotion): BackdropScene {
-  const key = `${time}|${motion}`;
+  const key = keyOf(time, motion);
   const hit = cache.get(key);
   if (hit) return hit;
-  const night = time === "night";
-  const drawn = parkKit().TP.scene({
-    w: SCENE_W,
-    h: SCENE_H,
-    vw: 1240,
-    night,
-    k: motion === "calm" ? 1.9 : 1,
-    still: motion === "still",
-  });
-  const scene = { el: drawn.el as ReactNode, pins: pickPins(drawn.spots) };
+  const scene = finish(parkKit().TP.scene(sceneOptions(time, motion)));
   cache.set(key, scene);
   return scene;
+}
+
+/** True when the scene for this key is already drawn and cached (reading it costs nothing). */
+export const isDrawn = (time: "day" | "night", motion: CityMotion): boolean =>
+  cache.has(keyOf(time, motion));
+
+/**
+ * The same scene, drawn in steps so no single task is long (NFR-01): call `next()` until it reports done; the
+ * scene is then in the cache, where `backdropScene` finds it. The scene is identical to the one-go build.
+ */
+export function backdropSceneSteps(
+  time: "day" | "night",
+  motion: CityMotion,
+): Generator<void, void, void> {
+  return (function* () {
+    const key = keyOf(time, motion);
+    if (cache.has(key)) return;
+    const drawn = yield* parkKit().TP.scene.steps(sceneOptions(time, motion));
+    cache.set(key, finish(drawn));
+  })();
 }

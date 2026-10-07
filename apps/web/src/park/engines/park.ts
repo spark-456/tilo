@@ -73,7 +73,10 @@ export function createPark(
   makeWorld: (h: H) => World,
   env: ParkEnv = {},
 ): {
-  scene: (o?: SceneOpts) => { el: El; spots: Spot[] };
+  scene: ((o?: SceneOpts) => { el: El; spots: Spot[] }) & {
+    /** The same scene drawn in steps: each `next()` runs a slice of the work and the last one returns the scene. */
+    steps: (o?: SceneOpts) => Generator<void, { el: El; spots: Spot[] }, void>;
+  };
   world: (plan: Plan, o?: Opt<{ night: boolean; seed: number }>) => El;
   building: (spec: string | Spec, state: string, d?: string, ht?: number, night?: boolean) => El;
   agent: (a: AgentSpec, size?: number, night?: boolean) => El;
@@ -324,7 +327,7 @@ export function createPark(
     return out;
   }
   /* o: {w,h} artboard px, night, k (slow-down), still (frozen movers), mute (0..1 pull towards paper) */
-  function scene(o0?: SceneOpts): { el: El; spots: Spot[] } {
+  function* sceneSteps(o0?: SceneOpts): Generator<void, { el: El; spots: Spot[] }, void> {
     const o = Object.assign(
       { w: 1440, h: 900, vw: 1120, seed: 23, night: false, k: 1, still: false, mute: 0 },
       o0 || ({} as SceneOpts),
@@ -340,6 +343,12 @@ export function createPark(
     const MM = night ? toward(NAVY, 0.3) : o.mute ? toward(PAPER, o.mute * 0.5) : null;
     const prev = cmap;
     cmap = SM;
+    /** A pause point: the colour map is put back for whoever runs in between, and set again on resume. */
+    function* rest(): Generator<void, void, void> {
+      cmap = prev;
+      yield;
+      cmap = SM;
+    }
     try {
       const BW = 4 * T;
       const BD = 3 * T;
@@ -563,6 +572,7 @@ export function createPark(
         const objs: SceneObj[] = [];
         rows[j] = objs;
         for (let i = 0; i < C; i++) {
+          yield* rest();
           const bx = i * PX + RD;
           const by = j * PY + RD;
           if (
@@ -659,6 +669,7 @@ export function createPark(
       const cyc = 0.56 * (k > 1 ? 1.4 : 1);
       const movers: unknown[][] = [];
       for (let j = 0; j <= R; j++) {
+        yield* rest();
         const y = j * PY;
         const yc = y + RD / 2;
         const list: { ly: number; el: El }[] = [];
@@ -739,6 +750,7 @@ export function createPark(
         }
         movers.push(list.sort((p, q) => p.ly - q.ly).map((o) => o.el));
       }
+      yield* rest();
       const vbS = `${vx.toFixed(1)} ${vy.toFixed(1)} ${VW} ${VH.toFixed(1)}`;
       const sv = (els: unknown): El => cover(svgUrl(o.w, o.h, vbS, els));
       const defs = night
@@ -755,6 +767,7 @@ export function createPark(
         : null;
       const kids: unknown[] = [sv([defs, ground, marks, plots, glows])];
       for (let j = 0; j <= R; j++) {
+        yield* rest();
         kids.push(movers[j]);
         const rj = rows[j];
         if (j < R && rj?.length) kids.push(sv(depthSort(rj).map((q) => q.el)));
@@ -774,6 +787,16 @@ export function createPark(
       cmap = prev;
     }
   }
+  const scene = Object.assign(
+    (o0?: SceneOpts): { el: El; spots: Spot[] } => {
+      const steps = sceneSteps(o0);
+      for (;;) {
+        const next = steps.next();
+        if (next.done) return next.value;
+      }
+    },
+    { steps: sceneSteps },
+  );
   const ns = (s: string): string => s.replace("<svg", '<svg xmlns="http://www.w3.org/2000/svg"');
   const dims = (s: string): [number | undefined, number | undefined] => {
     const m = s.match(/^<svg[^>]*?\swidth="([\d.]+)"[^>]*?\sheight="([\d.]+)"/);
