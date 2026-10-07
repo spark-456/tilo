@@ -72,6 +72,39 @@ HOSTILE = {  # one 1 MB input per pattern, built to make a backtracking or resta
     "label_query": _rep("?code="),
     "label_entity": _rep("password=&quot;"),
     "mixed": _rep("eyJ-password='Authorization: bearer 4111 "),
+    # second security review: escaped values, JSON, prose labels, headers, OAuth URLs and JSON-number cards
+    "entity_value_backslashes": "password=&quot;" + "\\" * MB,
+    "escaped_value_backslashes": 'password=\\"' + "\\" * MB,
+    "entity_value_zeros": "password=&quot;&#" + "0" * MB,
+    "entity_value_hashes": "password=&quot;" + _rep("&#0"),
+    "key_backslashes": _rep("password" + "\\" * 50 + " "),
+    "value_quote_spaces": 'password="' + " " * MB,
+    "value_single_quotes": "password='" + _rep('"x'),
+    "value_escaped_quotes": 'password="' + _rep('\\"x'),
+    "value_quote_runs": 'password="' + _rep('\\\\\\"'),
+    "json_keys": _rep('"token":'),
+    "json_numbers": _rep('"token": 5, '),
+    "json_in_json": _rep('{\\"password\\": \\"x\\", '),
+    "prose_labels": _rep("token: ab "),
+    "exact_labels": _rep("pass: ab "),
+    "cursor_labels": _rep("next_page_token: x "),
+    "auth_prose": _rep("authorization: a "),
+    "auth_key_scan": "a-" * (MB // 2) + "authorization: Zq1234567890abcd",
+    "auth_mid_quotes": "x Authorization: Bearer " + _rep('" '),
+    "auth_mid_escaped": "x Authorization: Bearer " + _rep('\\" '),
+    "cookie_long_name": _rep("cookie: " + "a" * 300 + " "),
+    "code_one_url": "https://x.example/p?" + _rep("&code=a"),
+    "code_many_urls": _rep("https://x.example/p?code=a "),
+    "code_scheme_runs": _rep("a://") + "?code=a",
+    "code_letter_run": "x" * MB + "://p?code=a",
+    "code_after_markers": _rep("[REDACTED]&code=a"),
+    "card_json_numbers": "[" + _rep("4111111111111111, "),
+    "card_in_strings": _rep('"4111111111111111", '),
+    "card_after_quotes": _rep('\\"') + "4111111111111111",
+    "pem_quotes": BEGIN + "\n" + _rep('A"\n'),
+    "pem_closing_quotes": BEGIN + _rep('" '),
+    "userinfo_quotes": "a://" + _rep('"@'),
+    "bearer_letters": _rep("Bearer abcdefghijk "),
 }
 
 
@@ -79,7 +112,7 @@ HOSTILE = {  # one 1 MB input per pattern, built to make a backtracking or resta
 def test_FR_MEM_05_hostile_input_of_one_megabyte_is_redacted_in_linear_time(name):
     started = time.perf_counter()
     redact(HOSTILE[name])
-    assert time.perf_counter() - started < 3.0, name  # about 0.5 s measured; a quadratic pattern takes minutes
+    assert time.perf_counter() - started < 3.0, name  # under 1 s measured; a quadratic pattern takes minutes
 
 
 def test_FR_MEM_05_a_service_account_access_token_with_dots_does_not_survive():

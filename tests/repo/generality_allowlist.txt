@@ -10,6 +10,10 @@ branch | packages/providers/src/tilo_providers/prompts.py | neutralise_marker | 
 branch | packages/providers/src/tilo_providers/replay.py | _scrub_authorization_like | redacts credential-shaped strings from recordings (PRD 16.1 rule 4)
 branch | packages/redact/src/tilo_redact/__init__.py | redact | the shared secret redactor (FR-MEM-05): masks credential shapes, labelled values and Luhn-valid card numbers; never task content
 branch | packages/redact/src/tilo_redact/__init__.py | _labelled | removes the value after a secret key label (password, api_key, ...); matches key shapes, never task content
+branch | packages/redact/src/tilo_redact/__init__.py | _value | decides where a labelled secret's value ends (quotes, JSON escapes, credential shape); matches key and value shapes, never task content
+branch | packages/redact/src/tilo_redact/__init__.py | _header_end | finds where an Authorization or Cookie value ends (line start, closing quote); never task content
+branch | packages/redact/src/tilo_redact/__init__.py | _number_quote | picks the quote that keeps JSON valid around a redacted card number; reads punctuation only
+branch | packages/redact/src/tilo_redact/__init__.py | at | the redactor's scanners: whether a URL is an OAuth one (for `code=`) and how deep a position is in JSON strings; never task content
 branch | services/browser/src/tilo_browser/login.py | _asks_in_text | detects a page asking for a password or code, so the worker stops (Tilo never handles passwords)
 branch | services/browser/src/tilo_browser/masking.py | _mask | masks secrets in page text before it is stored or shown
 branch | services/browser/src/tilo_browser/masking.py | _mask_cards | masks Luhn-valid card numbers in page text
