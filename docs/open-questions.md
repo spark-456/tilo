@@ -1,6 +1,6 @@
 # Open questions (build log)
 
-Questions found while building. Each has the default we build on until the user answers. PRD-level open questions (OQ-01 to OQ-15) stay in PRD 22.1; these use `BQ-` ids.
+Questions found while building. Each has the default we build on until the user answers. PRD-level open questions (OQ-01 to OQ-15) stay in PRD 22.1; these use `BQ-` ids. Append new rows at the end of the table, one line per row (the file merges with `merge=union`, see `.gitattributes`).
 
 | ID | Question | Default until answered | Source | Raised |
 | --- | --- | --- | --- | --- |
