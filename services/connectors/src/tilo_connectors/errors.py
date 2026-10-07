@@ -98,3 +98,19 @@ class BriefTooLong(HandoffRefused):
         self.max_url_length = max_url_length
         self.truncated = False
         self.alternatives = (RouteOffer("mcp", False, "unavailable until FR-CON-18"),)
+
+
+class MeetingHostConfigError(ValueError):
+    """The meeting_host config or declaration is refused whole (FR-MTG-09). Names a key, never a value."""
+
+    def __init__(self, message: str) -> None:
+        super().__init__(message[:500])
+
+
+class MeetingHostRefused(ValueError):
+    """A bot-hosted meeting is refused (MH-01..MH-07; MH-20, MH-21 for join_link). Names the rule and ids only:
+    never a title, an address, a time, a URL or a token."""
+
+    def __init__(self, rule: str, detail: str) -> None:
+        super().__init__(f"{rule}: {detail}"[:500])
+        self.rule = rule

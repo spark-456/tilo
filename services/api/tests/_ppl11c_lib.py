@@ -36,14 +36,21 @@ from _ppl11a_lib import (
 # a substring of a pytest node id, so it names a whole file; a slice that goes green with its entry still here
 # fails (strict), which is the reminder to delete it. Guards (`test_PPL_11c_guards.py`) are never pending.
 SLICE_PENDING: tuple[str, ...] = (
-    "test_PPL_11c_s1_",  # work items: list, get, edit, done, snooze, reopen, not-mine
-    "test_PPL_11c_s1b_",  # work items: put back
-    "test_PPL_11c_s2a_",  # meetings: delete drops derived data; confirm refuses a gone source; quote owner match
-    "test_PPL_11c_s2b_",  # meetings: get, edit, the minutes read
-    "test_PPL_11c_s3_",  # directory: first person, email rules, memberships, roles
-    "test_PPL_11c_s4_",  # limits: body cap, idempotency key, rate cap, no whole-org listing, no-store, dev CORS
     "test_PPL_11c_s5_",  # PE-12 events (also needs the ADR-0009 contract change for `vis: []`)
-    "test_PPL_11c_s6_",  # meeting.world_id
+)
+# Tests inside a pending file that pass as soon as an earlier slice lands (a negative test: "a refused work-item write
+# emits nothing" is true of S1's routes, which emit nothing yet). Not xfail: a strict XPASS fails the earlier slice.
+PENDING_EXEMPT: tuple[str, ...] = (
+    # a route-list guard for S4's body-cap test: true as soon as S1 to S3 and S6 have landed, and it must stay true
+    "test_PPL_11c_s4_BQ_PPL11C_1_every_people_post_route_is_in_the_body_cap_list",
+    # regression guards of S4 that already hold at the S1 to S3 and S6 head (those routes are no-store and read the
+    # actor by id); the S4 builder's middleware must keep them true
+    "test_PPL_11c_s4_BQ_PPL11C_12_meeting_world_and_delete_read_the_actor_by_id_and_list_no_directory",
+    "test_PPL_11c_s4_PE_22_every_people_route_of_this_ticket_answers_no_store_whatever_the_status",
+    "test_PPL_11c_s4_PE_22_a_409_and_a_503_are_no_store_too",
+    # true once S3's person and membership routes exist (a meeting create already emits nothing)
+    "test_PPL_11c_s5_PE_12_writes_that_have_no_registry_event_write_none_and_need_no_writer",
+    "test_PPL_11c_s5_HR_1_a_refused_a_lost_or_a_read_only_request_writes_no_event_and_makes_no_world",
 )
 
 # --- routes (API_PPL_11c.md section 1) ------------------------------------------------------------------------------

@@ -16,6 +16,8 @@
 # build_handoff (FR-CON-16, supplement 2026-10-05 s6) hands company data to an outside build partner, so it
 # is T3 and always needs a person. It is listed, not left to the unlisted-is-T3 default, so that removing the
 # line by mistake cannot pass unnoticed: the FR-CON-16 config test pins it at T3.
+# create_meeting_event (meeting_host, FR-MTG-09) invites people from the meeting bot's own Google account, so it is
+# T3 and always needs a person; listed for the same reason as build_handoff (the FR-MTG-09 config test pins it).
 # read_events (google_calendar, FR-CAL-08) reads the person's own calendar: no side effect, never
 # gated, never an outbox entry. Listed so the table and config/connectors.yaml agree on its tier.
 actions:
@@ -29,6 +31,7 @@ actions:
   share_file: T3
   delete_file: T3
   build_handoff: T3
+  create_meeting_event: T3
 modifiers:
   - {condition: new_recipients, raises_to: T3}
   - {condition: attachments, raises_to: T3}

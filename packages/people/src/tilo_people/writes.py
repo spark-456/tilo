@@ -62,6 +62,7 @@ _MAY: dict[tuple[str, str], frozenset[str]] = {
     ("person", "assign_membership"): frozenset({"memberships"}),
     ("person", "set_org_role"): frozenset({"org_role"}),
 }
+_WORLD_ONLY = frozenset({"world_id"})  # absent to a world id (schema pattern), nothing else moves with it
 _GOOGLE_EDIT = frozenset({"share", "updated_at"})  # a Google-synced entry: its times are Google's (FR-CAL-04)
 
 
@@ -160,6 +161,8 @@ def _changed(request: AccessRequest, after: Mapping[str, Any], directory: Direct
     if after["id"] != before["id"] or after["org_id"] != before["org_id"]:
         return {"identity"}
     may = _MAY[(kind, action)]
+    if (kind, action) == ("meeting", "edit") and "world_id" not in before and "world_id" in after:
+        may = _WORLD_ONLY  # the world is written once, alone, by tilo-api (BQ-273)
     if kind == "calendar_entry" and action == "edit" and before["source"]["kind"] == "google":
         may = _GOOGLE_EDIT
     found: set[str] = set()

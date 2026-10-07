@@ -87,7 +87,7 @@ class Seams:
 _MODE_SEAMS = frozenset({"plan_compiler", "unit_runner", "must_ask_providers"})  # the seams that build a Router
 
 
-def run_seams(request: Request, mode: Annotated[Mode, Depends(deps.get_mode)]) -> Seams | None:
+def run_seams(request: Request, mode: Annotated[Mode, Depends(deps.get_work_mode)]) -> Seams | None:
     """The seams as the app wires them, overrides included; if any cannot be built, no run starts. The model
     seams get this request's mode (SEC-15), so a judge's run is live and everyone else's is replay."""
     overrides = request.app.dependency_overrides
