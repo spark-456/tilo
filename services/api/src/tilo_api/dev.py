@@ -121,6 +121,24 @@ class DevEventWriter:
             return stamped
 
 
+class DevDeskWorlds:
+    """One Desk world per person over the in-memory `Store`: `w_desk_<user id without "u_">`, owned by that person with
+    no districts, made on first use (idempotent). A user id that cannot make a valid world id raises."""
+
+    def __init__(self, store: deps.Store) -> None:
+        self._store, self._lock = store, threading.Lock()
+
+    def desk_world(self, org_id: str, user_id: str) -> str:
+        refuse_if_unsafe()
+        suffix = user_id[2:] if user_id.startswith("u_") else ""
+        if re.fullmatch(r"[0-9A-Za-z_]{1,43}", suffix) is None:
+            raise ValueError("no Desk world for this user id")
+        world_id = f"w_desk_{suffix}"
+        with self._lock:
+            self._store.worlds.setdefault(world_id, deps.WorldRecord(owner=user_id, districts={}))
+        return world_id
+
+
 class _NoSources:
     """Dev plate sources and source owners: nothing to join and no owner to name (a stand-in, never a second store)."""
 
@@ -185,6 +203,13 @@ def install(app: FastAPI, env: Mapping[str, str] | None = None) -> None:
         return writer
 
     app.dependency_overrides[deps.get_event_writer] = get_writer
+    desks = DevDeskWorlds(store)
+
+    def get_desks() -> DevDeskWorlds:
+        refuse_if_unsafe()
+        return desks
+
+    app.dependency_overrides[deps.get_desk_worlds] = get_desks  # the Desk worlds of the work-item events (PE-12)
     app.dependency_overrides.update(dev_run.overrides())  # fake unit runner, recipient and send (CL-INT-5c)
     app.dependency_overrides.update(_dev_people())  # in-memory people stores, the dev owner an org owner
     app.add_middleware(
