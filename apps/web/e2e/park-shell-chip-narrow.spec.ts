@@ -18,7 +18,7 @@ for (const width of WIDTHS) {
       page,
     }) => {
       test.setTimeout(150_000);
-      await page.goto("/park", { timeout: 120_000 });
+      await page.goto("/", { timeout: 120_000 });
       const nav = page.locator("header.park-shell__nav");
       const chip = nav.getByRole("button", { name: "Sample data" });
       await expect(chip).toBeVisible({ timeout: 120_000 });
@@ -62,7 +62,7 @@ for (const width of WIDTHS) {
       page,
     }) => {
       test.setTimeout(150_000);
-      await page.goto("/park", { timeout: 120_000 });
+      await page.goto("/", { timeout: 120_000 });
       const chip = page
         .locator("header.park-shell__nav")
         .getByRole("button", { name: "Sample data" });

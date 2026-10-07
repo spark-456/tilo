@@ -6,12 +6,15 @@ No model call, no log, no clock read."""
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from typing import Annotated, Any
 
 from fastapi import Depends
 
 from tilo_api import deps, events
+
+_DESK_WORLD = re.compile(r"w_desk_[0-9A-Za-z_]{1,43}")  # a world id (common.schema.json: w_ + 1..48) of the Desk kind
 
 _PHRASE = {  # what the one-line summary says (fixed words only)
     "created": "added",
@@ -50,7 +53,10 @@ class WorkEvents:
             "authz": None,
             "data": {"work_item_id": after["id"], **data},
         }
-        self.writer.append(self.desks.desk_world(org, owner), part)
+        world = self.desks.desk_world(org, owner)
+        if type(world) is not str or _DESK_WORLD.fullmatch(world) is None or self.desks.desk_owner(world) != owner:
+            raise ValueError("not the owner's Desk world")  # fail closed: write nothing, never echo the answer
+        self.writer.append(world, part)
 
 
 def get_work_events(

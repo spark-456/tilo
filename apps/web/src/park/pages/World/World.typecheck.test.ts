@@ -21,8 +21,8 @@ describe("WEB_6_typecheck: World compiles with the repo's strict options", () =>
     >();
   });
 
-  it("WEB_6_typecheck_world_has_no_type_errors", { timeout: 180_000 }, () => {
-    const errors = parkTypeErrors().filter(
+  it("WEB_6_typecheck_world_has_no_type_errors", { timeout: 180_000 }, async () => {
+    const errors = (await parkTypeErrors()).filter(
       (e) =>
         e.startsWith("src/park/pages/World/") ||
         e.startsWith("test-support/park/world") ||

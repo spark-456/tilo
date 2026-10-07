@@ -301,7 +301,7 @@ def test_PL_LIVE_E2E_32_replay_and_dry_run_still_run_with_the_markers_set(tmp_pa
 def test_PL_LIVE_E2E_33_an_attempt_that_raised_after_it_was_sent_is_still_counted(tmp_path: Path) -> None:
     blocked, _ = run_direct(tmp_path, world=world_for(fail_roles={"writer": SafetyError("blocked by safety filter")}))
     writer = [r for r in blocked.rows if r.role == "writer"]
-    assert writer and all(r.calls >= 1 and r.credits > 0 and r.tokens_out > 0 for r in writer)
+    assert writer and all(r.calls >= 1 and r.credits > 0 and r.tokens_out == 0 for r in writer)
     assert blocked.total_credits == pytest.approx(sum(r.credits for r in blocked.rows))
     folder = tmp_path / "rejected"
     folder.mkdir()

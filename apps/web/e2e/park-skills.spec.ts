@@ -1,4 +1,4 @@
-// WEB-8a acceptance (plan sections 8a and 10; README "Skills" items 1 and 2): /park/skills in a real browser at
+// WEB-8a acceptance (plan sections 8a and 10; README "Skills" items 1 and 2): /skills in a real browser at
 // 1440x900 and 390x844, day and night. The page runs alone inside ParkApp here (the shell, WEB-3b, adds the nav
 // and the city). Every expected value was measured as a computed value on the reference page, served from
 // design_handoff_tilo_web_app/design (`python -m http.server <port>`, open `Tilo App Skills` via
@@ -201,7 +201,7 @@ async function expectEl(
 // ---- driving the page ------------------------------------------------------------------------------------
 async function open(page: Page, theme: Theme): Promise<string[]> {
   const problems = collectConsoleProblems(page);
-  await page.goto("/park/skills");
+  await page.goto("/skills");
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Skills");
   await expect(page.getByRole("button", { name: "Teach a skill", exact: true })).toBeVisible();
   await page.evaluate(() => document.fonts.ready.then(() => undefined));
@@ -233,7 +233,7 @@ async function axe(page: Page) {
 test.beforeAll(async ({ browser, baseURL }) => {
   test.setTimeout(150_000);
   const page = await browser.newPage(baseURL ? { baseURL } : {});
-  await page.goto("/park/skills", { timeout: 120_000 });
+  await page.goto("/skills", { timeout: 120_000 });
   await page
     .getByRole("heading", { level: 1 })
     .waitFor({ timeout: 120_000 })

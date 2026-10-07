@@ -10,9 +10,13 @@ import { type AppCtx, PAGE_LABEL } from "./AppCtx";
 import "./park-app.css";
 import { ParkProvider, usePageApp } from "./context";
 import { PAGES } from "./pages";
-import { useParkRoute } from "./router";
+import { isHomeAddress, useParkRoute } from "./router";
 
 const NOT_FOUND_TITLE = "Page not found";
+
+// The landing visit (`/`) is the Home page: its chunk request starts when the shell module is evaluated, not
+// when the page first renders. `lazy()` in the registry reuses the same module, so nothing loads twice.
+if (isHomeAddress()) void import("../pages/Home/HomePage");
 
 function NotFound({ go }: { go: AppCtx["go"] }) {
   const open = (e: MouseEvent<HTMLAnchorElement>) => {
@@ -27,7 +31,7 @@ function NotFound({ go }: { go: AppCtx["go"] }) {
           {NOT_FOUND_TITLE}
         </h1>
         <p className="park-app__note">There is no page at this address.</p>
-        <a className="park-app__link" href="/park/home" onClick={open}>
+        <a className="park-app__link" href="/" onClick={open}>
           Go to Home
         </a>
       </PageSheet>

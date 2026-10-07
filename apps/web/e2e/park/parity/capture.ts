@@ -1,4 +1,4 @@
-// WEB-PARITY: open the design reference and our /park page, freeze both the same way, set the
+// WEB-PARITY: open the design reference and our root-path page, freeze both the same way, set the
 // theme the same way, and take full-page screenshots. Dev/test tool only.
 import type { Page } from "@playwright/test";
 import type { Rect } from "./diff";

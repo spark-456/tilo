@@ -12,7 +12,7 @@ test("S_14 G1 filter chips carry counts from the one recorded world, Scheduled i
   test.setTimeout(90_000); // the first test after a cold Vite start compiles the app
   const problems = watchConsole(page);
   await page.setViewportSize(DESKTOP);
-  await page.goto("/worlds?speed=100");
+  await page.goto("/worlds/replays?speed=100");
   const card = page.getByTestId("world-card");
   await expect(card).toContainText("Finished", { timeout: 15_000 });
   await expect(page.getByTestId("count-all")).toHaveText("1");
@@ -32,7 +32,7 @@ test("S_14 G1 filter chips carry counts from the one recorded world, Scheduled i
 
 test("S_14 G1 search narrows the list and says so when nothing matches", async ({ page }) => {
   await page.setViewportSize(DESKTOP);
-  await page.goto("/worlds?speed=100");
+  await page.goto("/worlds/replays?speed=100");
   const card = page.getByTestId("world-card");
   await expect(card).toContainText(TITLE, { timeout: 15_000 });
   const search = page.getByRole("searchbox", { name: "Search worlds" });
@@ -51,7 +51,7 @@ test("S_14 G1 the thumbnail is the world's own layout, and the HR-4 banner and r
   page,
 }) => {
   await page.setViewportSize(DESKTOP);
-  await page.goto("/worlds?speed=100");
+  await page.goto("/worlds/replays?speed=100");
   const card = page.getByTestId("world-card");
   await expect(card.locator(".world-thumb svg polygon").first()).toBeAttached();
   await expect(card.locator(".world-thumb svg polygon")).not.toHaveCount(4); // not the old fixed cube
@@ -77,7 +77,7 @@ for (const [name, viewport] of [
         }
       }).observe({ type: "layout-shift", buffered: true });
     });
-    await page.goto("/worlds?speed=100");
+    await page.goto("/worlds/replays?speed=100");
     await expect(page.getByTestId("world-card")).toContainText("Finished", { timeout: 15_000 });
     expect(await page.evaluate(() => (window as unknown as { __cls: number }).__cls)).toBe(0);
     const doc = await page.evaluate(() => document.documentElement.scrollWidth);
@@ -94,7 +94,7 @@ test("S_14 G1 the status chips are 44 px high on a phone and 36 px on a desktop"
     [DESKTOP, 36],
   ] as const) {
     await page.setViewportSize(viewport);
-    await page.goto("/worlds?speed=100");
+    await page.goto("/worlds/replays?speed=100");
     await expect(page.getByTestId("world-card")).toBeVisible({ timeout: 20_000 });
     for (const radio of await page.getByRole("radio").all()) {
       const box = await radio.boundingBox(); // the radio fills its chip: this is the hit area
@@ -107,7 +107,7 @@ test("S_14 artboard size chips filter by the layout's tier, and All sizes lists 
   page,
 }) => {
   await page.setViewportSize(DESKTOP);
-  await page.goto("/worlds?speed=100");
+  await page.goto("/worlds/replays?speed=100");
   const card = page.getByTestId("world-card");
   await expect(card).toContainText("Village · 1 level", { timeout: 15_000 });
   await expect(page.getByRole("radio", { name: "All sizes" })).toBeChecked();
@@ -124,7 +124,7 @@ test("S_14 phone: a short filter bar, the first card's title above the bottom na
 }) => {
   test.setTimeout(90_000);
   await page.setViewportSize(MOBILE);
-  await page.goto("/worlds?speed=100");
+  await page.goto("/worlds/replays?speed=100");
   const card = page.getByTestId("world-card");
   await expect(card).toContainText("Village · 1 level", { timeout: 20_000 });
   const bar = await page.locator(".filter-bar").boundingBox();
@@ -173,7 +173,7 @@ for (const [name, viewport] of [
         }
       }).observe({ type: "layout-shift", buffered: true });
     });
-    await page.goto("/worlds?speed=5", { waitUntil: "commit" }); // replay starts at mount
+    await page.goto("/worlds/replays?speed=5", { waitUntil: "commit" }); // replay starts at mount
     const card = page.getByTestId("world-card");
     const needs = page.getByTestId("world-needs");
     await expect(needs).toHaveAttribute("data-tone", "needs", { timeout: 30_000 });

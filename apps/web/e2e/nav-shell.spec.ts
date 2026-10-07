@@ -8,6 +8,8 @@ import { DESKTOP, MOBILE } from "./support/viewports";
 const SMALL = { width: 320, height: 640 } as const;
 const VIEWPORTS = [DESKTOP, MOBILE, SMALL] as const;
 const W = "/world/w_village_basic";
+// WEB-CUTOVER: "/" is the Park Home (its own shell), so the old flow shell's "start of the flow" is S-02.
+const FLOW = "/task/task_fixture_1/understanding";
 
 type Rect = { x: number; y: number; width: number; height: number };
 const overlaps = (a: Rect, b: Rect) =>
@@ -15,12 +17,12 @@ const overlaps = (a: Rect, b: Rect) =>
 
 // C4: the active item matches the route. "none" is the phone's Home (no tab for it).
 const ACTIVE: ReadonlyArray<readonly [string, string]> = [
-  ["/", "Home"],
-  [`${W}`, "World"],
+  [FLOW, "Home"],
+  [`${W}/stage`, "World"],
   [`${W}/story`, "Story"],
   [`${W}/trace`, "Story"],
   [`${W}/delivery`, "World"],
-  ["/worlds", "World"],
+  ["/worlds/replays", "World"],
   ["/needs-you", "Needs you"],
   ["/library", "Library"],
   ["/settings", "More"],
@@ -86,7 +88,7 @@ for (const viewport of VIEWPORTS) {
       page,
     }) => {
       await page.setViewportSize(viewport);
-      for (const path of ["/", "/worlds", "/needs-you", `${W}/story`]) {
+      for (const path of [FLOW, "/worlds/replays", "/needs-you", `${W}/story`]) {
         await page.goto(`${path}${path.includes("?") ? "&" : "?"}speed=20${display}`);
         const pill = page.getByTestId("fixture-replay-banner");
         const badge = page.getByTestId("speed-badge");
@@ -101,8 +103,8 @@ for (const viewport of VIEWPORTS) {
         expect(p.y + p.height).toBeLessThanOrEqual(strip.y + strip.height);
         expect(p.x + p.width).toBeLessThanOrEqual(viewport.width);
         const boxes = [p];
-        if (path !== "/") {
-          // The start screen shows no replayed run, so it has no speed badge (HR-6).
+        if (path !== FLOW) {
+          // The flow screens show no replayed run, so it has no speed badge (HR-6).
           await expect(badge).toBeVisible();
           const b = (await badge.boundingBox()) as Rect;
           expect(b.y + b.height).toBeLessThanOrEqual(strip.y + strip.height);
@@ -112,9 +114,9 @@ for (const viewport of VIEWPORTS) {
         expect(shell.y, "the shell starts below the strip").toBeGreaterThanOrEqual(
           strip.y + strip.height - 0.5,
         );
-        if (path === "/") {
+        if (path === FLOW) {
           const card = (await page.getByTestId("flow-shell").boundingBox()) as Rect;
-          expect(card.y, "the start card starts below the strip").toBeGreaterThanOrEqual(
+          expect(card.y, "the flow card starts below the strip").toBeGreaterThanOrEqual(
             strip.y + strip.height - 0.5,
           );
         }
@@ -149,7 +151,7 @@ for (const viewport of VIEWPORTS) {
       test.setTimeout(60_000);
       await page.setViewportSize(viewport);
       await watchShifts(page);
-      for (const path of ["/", "/worlds", "/library?speed=50"]) {
+      for (const path of [FLOW, "/worlds/replays", "/library?speed=50"]) {
         await page.goto(`${path}${path.includes("?") ? "&" : "?"}x=1${display}`);
         await expect(page.getByRole("navigation", { name: /primary/i })).toBeVisible();
         expect(await readShifts(page), path).toEqual([]);
@@ -179,7 +181,14 @@ test("UX-227-C3 every route has the same right rail: card, Needs you, Team; link
   page,
 }) => {
   await page.setViewportSize(DESKTOP);
-  for (const path of ["/", "/worlds", "/needs-you", "/settings", `${W}/story`, `${W}/delivery`]) {
+  for (const path of [
+    FLOW,
+    "/worlds/replays",
+    "/needs-you",
+    "/settings",
+    `${W}/story`,
+    `${W}/delivery`,
+  ]) {
     await page.goto(`${path}?speed=1000`);
     const rail = page.getByTestId("right-rail");
     await expect(rail.getByRole("region", { name: "Live meter" }), path).toBeVisible();
@@ -202,7 +211,7 @@ test("UX-227-C5 one filled primary: iris with a lip; the secondary is quiet (1 p
   page,
 }) => {
   await page.setViewportSize(DESKTOP);
-  await page.goto("/");
+  await page.goto(FLOW);
   const primary = page.locator("button.primary");
   await expect(primary).toHaveCount(1);
   const look = await primary.evaluate((el) => {

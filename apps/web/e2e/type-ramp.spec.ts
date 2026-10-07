@@ -7,16 +7,23 @@ import { SCREENS } from "../src/screens/meta";
 import { DESKTOP, MOBILE } from "./support/viewports";
 
 const SCALE = [12, 14, 16, 20, 24, 32, 40];
-const FIXTURE = "/world/w_village_basic?fixture=village-basic&seq=44";
+const FIXTURE = "/world/w_village_basic/stage?fixture=village-basic&seq=44";
 
 // Every routed screen (S-20 and S-25 are deferred and have no path), the dev indexes, the not-found
 // page and the fixture-mode world, which has the stage labels and the Trace list.
 const ROUTES = [
-  ...SCREENS.filter((s) => s.path !== null).map((s) => ({ name: s.id, path: s.path as string })),
+  // WEB-CUTOVER: S-01 at "/" is the Park Home now, which follows its own design's type ramp (the pixel-parity
+  // harness pins it), not PRD 18.2's seven steps; its test is removed with the replaced screen.
+  ...SCREENS.filter((s) => s.path !== null && s.id !== "S-01").map((s) => ({
+    name: s.id,
+    path: s.path as string,
+  })),
   { name: "fixture-world", path: FIXTURE },
   { name: "more", path: "/more" },
   { name: "screens-index", path: "/screens" },
-  { name: "not-found", path: "/world/none/unknown" },
+  // WEB-CUTOVER: "/world/none/unknown" owns no screen, so it is the Park "Page not found" now (the Park shell
+  // follows its own ramp, like the Park Home). An unknown world on a kept address is still the old NotFound.
+  { name: "not-found", path: "/world/none/story" },
 ];
 
 /** Selector and size of every element that draws text (an own text node, an SVG label, or a form

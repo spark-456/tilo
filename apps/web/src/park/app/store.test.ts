@@ -9,7 +9,7 @@
 //   ParkState = { dec, added, prefs, toast: { message, actionLabel?, action? } | null, read, menu, wl,
 //                 time, motion, sources: { fixture, live }, needsLeft }   (needsLeft is derived state)
 // Defaults taken where the spec is silent (listed in the WEB-3a report): `added` is newest first (the
-// prototype prepends); motion defaults to "lively" (the spec; the prototype says "calm"); the store
+// prototype prepends); motion defaults to "calm" (the handoff's Tilo App.dc.html prop default and Profile artboard; changed from "lively" in WEB-MOTION-1); the store
 // forwards setPref to api.setPref; `now` is accepted and unused by these tests.
 import fc from "fast-check";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -45,7 +45,7 @@ describe("WEB_3a_store: initial state and subscription", () => {
       menu: null,
       wl: null,
       time: "day",
-      motion: "lively",
+      motion: "calm",
       needsLeft: 2,
       sources: { fixture: false, live: false },
     });
@@ -303,7 +303,7 @@ describe("WEB_3a_store: addWorld", () => {
     store.addWorld("quick", "Order lunch");
     store.getState().toast?.action?.();
     expect(navigate).toHaveBeenCalledTimes(1);
-    expect(navigate).toHaveBeenCalledWith("/park/world/new1");
+    expect(navigate).toHaveBeenCalledWith("/world/new1");
     expect(store.getState().toast).toBeNull();
   });
 });
@@ -333,11 +333,11 @@ describe("WEB_3a_store: prefs, time and motion", () => {
     }
   });
 
-  it("WEB_3a_store_motion_defaults_to_lively_and_an_unknown_value_falls_back_to_it", () => {
+  it("WEB_3a_store_motion_defaults_to_calm_and_an_unknown_value_falls_back_to_it", () => {
     const { store } = setup();
-    expect(store.getState().motion).toBe("lively");
+    expect(store.getState().motion).toBe("calm");
     store.setPref("motion", "wild");
-    expect(store.getState().motion).toBe("lively");
+    expect(store.getState().motion).toBe("calm");
   });
 
   it("WEB_3a_store_prefs_keep_backup_for_the_ledger_beside_other_keys", () => {
@@ -357,13 +357,13 @@ describe("WEB_3a_store: prefs, time and motion", () => {
 describe("WEB_3a_store: navigation, read and sources", () => {
   it("WEB_3a_store_go_navigates_to_the_park_path", () => {
     const table = [
-      ["home", undefined, "/park/home"],
-      ["worlds", undefined, "/park/worlds"],
-      ["world", { id: "k1" }, "/park/world/k1"],
-      ["skills", { id: "sk2" }, "/park/skills?id=sk2"],
-      ["team", { focus: "share" }, "/park/team?focus=share"],
-      ["profile", { tab: "notifications" }, "/park/profile?tab=notifications"],
-      ["ledger", { x: "1" }, "/park/ledger"],
+      ["home", undefined, "/"],
+      ["worlds", undefined, "/worlds"],
+      ["world", { id: "k1" }, "/world/k1"],
+      ["skills", { id: "sk2" }, "/skills?id=sk2"],
+      ["team", { focus: "share" }, "/team?focus=share"],
+      ["profile", { tab: "notifications" }, "/profile?tab=notifications"],
+      ["ledger", { x: "1" }, "/ledger"],
     ] as const;
     for (const [page, params, path] of table) {
       const { store, navigate } = setup();

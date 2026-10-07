@@ -82,7 +82,7 @@ describe("CP2 #258 a bare address with a live API and no started run says so", (
     "/autonomy",
     "/channels",
     "/mail",
-    "/team",
+    "/team/console",
     "/connections",
     "/estimate",
   ];
@@ -107,9 +107,9 @@ describe("CP2 #258 a bare address with a live API and no started run says so", (
     await page.stop();
   });
 
-  it("/worlds (S-14) is its own empty state with no run, and the API is not asked about any world", async () => {
+  it("/worlds/replays (S-14) is its own empty state with no run, and the API is not asked about any world", async () => {
     const { client, urls } = liveApi(["w_real"]);
-    const page = await visit("/worlds", client);
+    const page = await visit("/worlds/replays", client);
     expect(page.container.querySelector('[data-testid="worlds-empty"]')).not.toBeNull();
     expect(page.container.querySelector('[data-testid="world-card"]')).toBeNull();
     expect(page.container.querySelector('[data-testid="count-all"]')?.textContent).toBe("0");
@@ -117,12 +117,12 @@ describe("CP2 #258 a bare address with a live API and no started run says so", (
     await page.stop();
   });
 
-  it("/worlds?world=bogus is Not found, and /worlds?world=w_real lists that world's card area", async () => {
+  it("/worlds/replays?world=bogus is Not found, and /worlds/replays?world=w_real lists that world's card area", async () => {
     const live = liveApi(["w_real"]);
-    const missing = await visit("/worlds?world=bogus", live.client);
+    const missing = await visit("/worlds/replays?world=bogus", live.client);
     expect(missing.container.querySelector('[data-testid="not-found"]')).not.toBeNull();
     await missing.stop();
-    const known = await visit("/worlds?world=w_real", liveApi(["w_real"]).client);
+    const known = await visit("/worlds/replays?world=w_real", liveApi(["w_real"]).client);
     expect(known.container.querySelector('[data-testid="not-found"]')).toBeNull();
     expect(known.container.querySelector('[data-testid="worlds-empty"]')).toBeNull();
     await known.stop();

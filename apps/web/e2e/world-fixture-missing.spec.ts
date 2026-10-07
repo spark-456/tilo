@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { DESKTOP } from "./support/viewports";
-import { stageCanvas, stageFrame } from "./support/world";
+import { STAGE_PATH, stageCanvas, stageFrame } from "./support/world";
 
 // P0-08b review finding (b): an unknown or empty ?fixture= name must not log to the console
 // (Vite's SPA fallback answers a missing fixture file with index.html and status 200). Instead an
@@ -29,7 +29,7 @@ for (const { label, query, name } of CASES) {
     });
     page.on("pageerror", (err) => messages.push(`[pageerror] ${err.message}`));
 
-    await page.goto(`/${query}`);
+    await page.goto(`${STAGE_PATH}${query}`);
     await expect(stageFrame(page)).toBeVisible();
     await expect(stageCanvas(page)).toBeVisible();
 
@@ -44,7 +44,7 @@ for (const { label, query, name } of CASES) {
 }
 
 test("FR_WLD_04 P0-08b fixture mode: a valid fixture shows no alert", async ({ page }) => {
-  await page.goto("/?fixture=village-basic&seq=20");
+  await page.goto(`${STAGE_PATH}?fixture=village-basic&seq=20`);
   await expect(stageCanvas(page)).toBeVisible();
   await expect.poll(async () => stageFrame(page).getAttribute("data-seq")).toBe("20");
   await expect(page.getByRole("alert")).toHaveCount(0);
@@ -61,7 +61,7 @@ test("FR_WLD_04 P0-08b fixture mode: streaming crowd-20 into the trace list caus
       for (const e of list.getEntries()) w.cls += (e as unknown as { value: number }).value;
     }).observe({ type: "layout-shift", buffered: true });
   });
-  await page.goto("/?fixture=crowd-20");
+  await page.goto(`${STAGE_PATH}?fixture=crowd-20`);
   await expect(stageCanvas(page)).toBeVisible();
   await page.waitForTimeout(4000);
   expect(await page.evaluate(() => (window as unknown as { cls: number }).cls)).toBe(0);
