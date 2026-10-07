@@ -31,7 +31,6 @@ export function WorldsPage({ app }: { app: AppCtx }) {
   const [status, setStatus] = useState<StatusFilter>("all");
   const [tier, setTier] = useState<TierFilter>("all");
   const [query, setQuery] = useState("");
-  // The sections are drawn top to bottom, one task each, so the page never holds the main thread (WEB-MOTION-2).
 
   useEffect(() => {
     let live = true;

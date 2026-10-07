@@ -27,7 +27,4 @@ const fonts = [
   "500 1em 'JetBrains Mono'",
 ].map((f) => document.fonts.load(f).catch(() => undefined)); // a face that fails to load must not be an uncaught rejection
 if (isParkPath(window.location.pathname)) render();
-else
-  Promise.all(fonts)
-    .catch(() => undefined)
-    .then(render);
+else Promise.all(fonts).then(render); // each face has its own catch above

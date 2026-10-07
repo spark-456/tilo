@@ -711,15 +711,17 @@ test("FR_UX_12 WEB-MOTION-2 e2e: with the 'still' motion preference (Profile > A
 // this budget was "no long task over 50 ms" on the dev server. The 50 ms bar was the test-writer's, not a PRD
 // requirement, and on a dev build (unminified React, dev warnings) with browser-extension scripts on the page it
 // could not be met. It now runs against a PRODUCTION build (`vite build` then `vite preview`, see the header) with
-// Long Animation Frame attribution: a task over 150 ms counts unless every script of the frame that holds it comes
+// Long Animation Frame attribution: a task over 200 ms counts unless every script of the frame that holds it comes
 // from a browser extension, named exactly (chrome-extension:// or edge-extension://; page scripts are never
-// ignored). Every page mount and page change is in the tour. To be tightened to 100 ms after the phone pass (f).
+// ignored). Every page mount and page change is in the tour. The budget is 200 ms (it was 150 ms at first, on the
+// supervisor's later ruling) because a city picture (kit.world) is one indivisible draw per city; to be tightened to
+// 100 ms with cached art in the phone pass (f).
 // Run: vite build --outDir <dir> then vite preview --outDir <dir> --port 5393, and
 //   TILO_WEB_PORT=5393 pnpm --filter @tilo/web exec playwright test e2e/park-motion-transitions.spec.ts -g "long task" ...
-const LONG_TASK_BUDGET_MS = 150;
+const LONG_TASK_BUDGET_MS = 200;
 const EXTENSION_SCHEMES = ["chrome-extension://", "edge-extension://"] as const;
 
-test("WEB-MOTION-2 e2e: at 390x844 with the CPU slowed 4x, no task over 150 ms (extension scripts aside) while every page mounts and changes (Home, Ledger, Agenda, Team, Skills, Worlds, Profile, Connectors, a world, Home)", async ({
+test("WEB-MOTION-2 e2e: at 390x844 with the CPU slowed 4x, no task over 200 ms (extension scripts aside) while every page mounts and changes (Home, Ledger, Agenda, Team, Skills, Worlds, Profile, Connectors, a world, Home)", async ({
   browser,
   baseURL,
 }) => {

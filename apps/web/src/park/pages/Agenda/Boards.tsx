@@ -229,12 +229,16 @@ function Board({
           {shown.map((v) => (
             <CorkPin key={v.pin.id} v={v} ui={ui} app={app} />
           ))}
-          <div className="park-agenda-newpin">
-            {input("park-agenda-newinput")}
-            <button type="button" className="park-agenda-pinit" onClick={() => ui.add(k)}>
-              Pin it
-            </button>
-          </div>
+          {shown.length === vms.length ? (
+            // After the last pin: this row sits below the pins, so it appears once they are all drawn instead of
+            // being pushed down by each one (no layout shift while the board stages).
+            <div className="park-agenda-newpin">
+              {input("park-agenda-newinput")}
+              <button type="button" className="park-agenda-pinit" onClick={() => ui.add(k)}>
+                Pin it
+              </button>
+            </div>
+          ) : null}
         </div>
       ) : (
         <div className="park-agenda-grouped">

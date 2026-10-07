@@ -37,6 +37,8 @@ export function useMotionOff(): boolean {
 export interface Bar {
   on: boolean;
   pct: number;
+  /** Jump to `pct` at once, with no slide: a new change starts while the last one's full bar is still held. */
+  snap?: boolean;
 }
 export const NO_BAR: Bar = { on: false, pct: 0 };
 
@@ -90,7 +92,9 @@ export function usePageSwap(children: ReactNode, key: string, mode: SwapMode): P
     setBar(NO_BAR);
   } else {
     setPhase("out");
-    setBar({ on: true, pct: 35 });
+    // The last change's bar may still be held full (hidden, waiting for its fade to end): the new one starts at
+    // 35 by jumping there, never by sliding back from 100.
+    setBar({ on: true, pct: 35, ...(bar.pct > 35 ? { snap: true } : {}) });
   }
   useEffect(() => {
     if (phase === "out") {

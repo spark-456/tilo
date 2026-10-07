@@ -10,6 +10,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, q, qa } from "../../../test-support/park/componentsHarness";
 import { mountApp, mountShell, seen } from "../../../test-support/park/shellHarness";
 import { BootSplash } from "./BootSplash";
+import { TopNav } from "./TopNav";
 import { CAP_PCT, usePageSwap } from "./motion";
 
 vi.mock("../engines/park", async () =>
@@ -120,7 +121,14 @@ describe("WEB-MOTION-2 guards: the page-change bar never claims progress it did 
     return <div data-testid="page">{k}</div>;
   }
   let released = false;
-  const frames: { pct: number; shown: string; want: string; phase: string }[] = [];
+  const frames: {
+    pct: number;
+    shown: string;
+    want: string;
+    phase: string;
+    on: boolean;
+    snap: boolean;
+  }[] = [];
   let setKey: (k: string) => void = () => undefined;
   let barFaded: () => void = () => undefined;
 
@@ -136,7 +144,14 @@ describe("WEB-MOTION-2 guards: the page-change bar never claims progress it did 
     );
     // What was committed (not what a discarded render tried): effects run only for a commit.
     useLayoutEffect(() => {
-      frames.push({ pct: s.bar.pct, shown: s.key, want: k, phase: s.phase });
+      frames.push({
+        pct: s.bar.pct,
+        shown: s.key,
+        want: k,
+        phase: s.phase,
+        on: s.bar.on,
+        snap: s.bar.snap === true,
+      });
       barFaded = s.barFaded;
     });
     return <div data-testid="out">{s.node}</div>;
@@ -184,5 +199,59 @@ describe("WEB-MOTION-2 guards: the page-change bar never claims progress it did 
     expect(frames.at(-1)).toMatchObject({ pct: 100, phase: "in" });
     act(() => barFaded());
     expect(frames.at(-1)?.pct).toBe(0);
+  });
+
+  it("WEB-MOTION-2 guards: a second change that starts while the last bar is still held full jumps to 35 and never slides back from 100", () => {
+    released = true;
+    frames.length = 0;
+    const { sch } = mountShell(<Swap />);
+    act(() => setKey("c"));
+    for (let i = 0; i < 12 && sch.live().length > 0; i++) act(() => sch.fire(sch.live()[0]));
+    // The first change is over; its bar is hidden but still full, waiting for its opacity transition to end.
+    expect(frames.at(-1)).toMatchObject({ pct: 100, on: false, phase: "in" });
+    act(() => setKey("d"));
+    expect(frames.at(-1)).toMatchObject({ pct: 35, on: true, phase: "out", snap: true });
+  });
+
+  it("WEB-MOTION-2 guards: the first change after a quiet page starts at 35 with no snap, so it slides in from empty", () => {
+    released = true;
+    frames.length = 0;
+    mountShell(<Swap />);
+    act(() => setKey("e"));
+    expect(frames.at(-1)).toMatchObject({ pct: 35, on: true, snap: false });
+  });
+});
+
+describe("WEB-MOTION-2 guards: the bar's fill has no transition while it jumps", () => {
+  const nav = (bar: { on: boolean; pct: number; snap?: boolean }) =>
+    mountShell(
+      <TopNav
+        page="home"
+        needsLeft={0}
+        night={false}
+        menu={null}
+        unread={false}
+        initials="AM"
+        sample={false}
+        org={null}
+        reserveSample={false}
+        booting={false}
+        bar={bar}
+        onBarFaded={() => undefined}
+        go={() => undefined}
+        onToggleTime={() => undefined}
+        onBell={() => undefined}
+        onAvatar={() => undefined}
+      />,
+    );
+  const fill = () => q(document.body, ".park-shell__barfill");
+
+  it("WEB-MOTION-2 guards: a snapped bar carries the no-transition class, a sliding one does not", () => {
+    nav({ on: true, pct: 35, snap: true });
+    expect(fill().className).toContain("park-shell__barfill--rest");
+    cleanup();
+    nav({ on: true, pct: 35 });
+    expect(fill().className).not.toContain("park-shell__barfill--rest");
+    expect((fill() as HTMLElement).style.transform).toBe("scaleX(0.35)");
   });
 });

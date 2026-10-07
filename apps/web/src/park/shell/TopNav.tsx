@@ -136,7 +136,7 @@ export function TopNav(p: TopNavProps) {
         }}
       >
         <div
-          className={`park-shell__barfill ${p.bar.pct === 0 ? "park-shell__barfill--rest" : ""}`}
+          className={`park-shell__barfill ${p.bar.pct === 0 || p.bar.snap ? "park-shell__barfill--rest" : ""}`}
           style={{ transform: `scaleX(${p.bar.pct / 100})` }}
         />
       </div>
