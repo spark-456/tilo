@@ -118,6 +118,15 @@ vertex-smoke *args:
 live-e2e *args:
     uv run python evals/scripts/live_e2e.py {{args}}
 
+# PL-LIVE-E2E: one real end-to-end run on a typed topic, screened by the safety role (Model Armor) first. The topic is
+# typed at the prompt (`live-run`) or read from a file (`live-run-file <path>`): it never passes through a shell. Flags
+# only: --dry-run --auto-answer --auto-approve-t1t2 --max-credits N. Live switch as live-e2e. docs/live-e2e.md.
+live-run *flags:
+    uv run python evals/scripts/live_run.py --topic-stdin {{ if flags =~ '^[-a-z0-9.= ]*$' { flags } else { error("live-run takes flags only; type the topic at the prompt or use live-run-file") } }}
+
+live-run-file path *flags:
+    uv run python evals/scripts/live_run.py --topic-file {{ if path =~ "['\u{2018}\u{2019}\u{201A}\u{201B}]" { error("live-run-file: rename a path that holds a single quote") } else { quote(path) } }} {{ if flags =~ '^[-a-z0-9.= ]*$' { flags } else { error("live-run-file takes flags only after the path") } }}
+
 # Run skills/ tests (FR-AGT-04). Actually runs pytest so a real failing skill
 # test fails this gate; pytest's exit code 5 ("no tests collected") is treated
 # as success so the recipe still passes with zero skills present.
