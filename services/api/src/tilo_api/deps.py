@@ -76,6 +76,8 @@ class Principal:
     channel: Channel = "web"  # the session channel sign-in resolved for this request (FR-HIL-07,
     # world.paused.data.channel is derived from here, never from a request body
     districts: tuple[str, ...] = ()  # visible beyond vis: "all"; ignored for role == "owner"
+    full_session: bool = False  # a full web sign-in session (BQ-XWORLD-10): set only by the server that resolves the
+    # session, never from anything in a request; needed to answer, or read in full, another owned world's cards
 
 
 @dataclass

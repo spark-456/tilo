@@ -30,7 +30,7 @@ from tilo_planning.compiler import DELIVER, PlanInputs
 
 from tilo_api import deps, events
 from tilo_api.access import Mode
-from tilo_api.cards import AlreadyCommitted, CardStore, _card_errors
+from tilo_api.cards import AlreadyCommitted, CardStore, _card_errors, answering_principal, get_channels_caller
 
 logger = logging.getLogger("tilo_api.runs")
 router = APIRouter()
@@ -623,14 +623,27 @@ def get_card_store(world_id: str, store: Annotated[deps.Store, Depends(deps.get_
     return CardStore(clock=_CLOCK, writer=_NoCards(), world_owners=owners)
 
 
+def world_owner(world_id: str, store: Annotated[deps.Store, Depends(deps.get_store)]) -> str | None:
+    """The path world's record owner; no record, no owner."""
+    return world.owner if (world := store.worlds.get(world_id)) is not None else None
+
+
 def answer_guard(
     world_id: str,
     principal: Annotated[deps.Principal, Depends(deps.get_current_principal)],
     store: Annotated[deps.Store, Depends(deps.get_store)],
+    from_channels: Annotated[bool, Depends(get_channels_caller)],
+    card_store: Annotated[CardStore, Depends(get_card_store)],
 ) -> None:
-    """Pause all is final for the run (BQ-90): an answer in a paused world changes nothing."""
+    """Pause all is final for the run (BQ-90): an answer in a paused world changes nothing. The card's world's pause
+    decides (BQ-XWORLD-8), checked only for a principal who may answer there, so anyone else gets the route's 404."""
     world = store.worlds.get(world_id)
-    if principal.world_id == world_id and world is not None and world.paused:
+    if world is None or not world.paused:
+        return
+    actor = answering_principal(
+        principal, world_id, record_owner=world.owner, cards=card_store, from_channels=from_channels
+    )
+    if actor is not None:
         raise HTTPException(status_code=409, detail="This world is paused; nothing it holds is sent.")
 
 
