@@ -51,6 +51,7 @@ from tilo_providers.prompts import load_prompt
 
 from tilo_harness.branch import Checkpoint, hit_summary, reusable_units
 from tilo_harness.config import AgentsConfig
+from tilo_harness.context_handoff import context_pct, next_spare, note_is_valid, store_note
 from tilo_harness.must_ask import Ask, MustAsk
 from tilo_harness.outputs import Kept, UnitOutput, existing, keep
 from tilo_harness.question_wait import Answer, QuestionWait
@@ -77,6 +78,8 @@ class UnitOutcome:
     artifact_refs: tuple[dict[str, Any], ...] = ()  # versions that already exist, which the unit selects
     provenance_ids: tuple[str, ...] = ()
     outputs: tuple[UnitOutput, ...] = ()  # what the unit made; the executor stores it (ADR-0018)
+    context_share: float | None = None  # share 0..1 of this agent's context window used when run() returned (FR-AGT-09)
+    handoff_note: dict[str, Any] | None = None  # a draft handoff note when the agent stops unfinished (FR-AGT-09)
 
 
 @dataclass(frozen=True)
@@ -84,6 +87,8 @@ class UnitContext:
     agent_id: str
     skills: tuple[LoadedSkill, ...]
     answer: Answer | None = None  # the answer to the question this unit asked before it started (FR-HIL-10)
+    note: dict[str, Any] | None = None  # the validated note a successor starts from (FR-AGT-09)
+    note_ref: dict[str, Any] | None = None  # that note's artifact_ref
 
 
 class UnitRunner(Protocol):
@@ -140,6 +145,7 @@ class _Roster:
     levels: dict[str, str]  # district -> level
     workers: dict[str, str]  # unit -> worker agent
     sites: dict[str, str]  # unit -> building
+    ranks: dict[str, str] = field(default_factory=dict)  # agent -> rank, in layout order (FR-AGT-09 successors)
 
 
 def _dependency_order(units: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -196,7 +202,7 @@ def _roster(units: list[dict[str, Any]], layout: dict[str, Any], config: AgentsC
         leads[district["id"]] = district["lead"]
         levels[district["id"]] = level_id
         workers[unit["id"]] = pool[unit["role"]].pop(0)
-    return _Roster(directors[0], leads, levels, workers, sites)
+    return _Roster(directors[0], leads, levels, workers, sites, rank)
 
 
 def _envelope(outcome: UnitOutcome, worker: str, lead: str, unit: dict[str, Any]) -> dict[str, Any] | None:
@@ -251,11 +257,14 @@ class _Run:
         question_wait: QuestionWait | None,
         store: dict[str, Any],
         before_handoff: BeforeHandoff | None,
+        handoff_at: float = 1.0,
     ) -> None:
         self.writer, self.roster, self.skills, self.pins, self.runner = writer, roster, skills, pins, runner
         self.must_ask, self.verifier, self.question_wait = must_ask, verifier, question_wait
         self.store = store  # artifacts, scope, archive, redact, max_attempts, recorded (ADR-0018); empty without one
         self.before_handoff = before_handoff
+        self.handoff_at = handoff_at  # config.context.handoff_at: a handoff is valid from this share (FR-AGT-09)
+        self.used = {*roster.workers.values(), *([verifier.agent_id] if verifier is not None else [])}  # not spare
         self.held: set[str] = set()
         self.handoffs: dict[str, str] = {}  # unit -> the agent.handoff event that carried its artifacts
 
@@ -361,19 +370,8 @@ class _Run:
             cause = self.emit(
                 "agent.working", worker, site, "The agent is working.", {"unit": unit_id}, cause=cause, **at
             )
-            ran: object
-            try:
-                # Its own task, so a runner that cancels the current task cancels only its work.
-                ran = await asyncio.ensure_future(self.runner.run(unit, UnitContext(worker, loaded, answer)))
-            except asyncio.CancelledError:
-                task = asyncio.current_task()
-                if task is not None and task.cancelling():  # the run itself was cancelled
-                    raise
-                ran = None  # the runner cancelled its own work: this unit fails, the run goes on
-            except Exception:  # a runner crash fails this unit closed; the run goes on
-                ran = None
-            failed = UnitOutcome(success=False, summary="The unit's work failed.")
-            outcome = ran if isinstance(ran, UnitOutcome) else failed
+            first = UnitContext(worker, loaded, answer)
+            outcome, worker, cause = await self.run_agents(unit, first, site, cause, at)  # a successor may finish it
         made: list[Kept] = []
         if outcome.success is True:
             outcome, made = await self.keep(unit, worker, outcome, trail)
@@ -399,6 +397,62 @@ class _Run:
                 self.handoffs[unit_id] = cause
         self.emit("agent.retired", lead, worker, "The agent finished and left.", {}, cause=cause, **at)
         return outcome
+
+    async def call(self, work: Awaitable[Any]) -> Any:
+        """The runner's result, or None if it crashed or cancelled its own work (a cancel of the run itself goes on)."""
+        try:
+            return await asyncio.ensure_future(work)  # its own task: a runner cancelling "the current task" is itself
+        except asyncio.CancelledError:
+            task = asyncio.current_task()
+            if task is not None and task.cancelling():  # the run itself was cancelled
+                raise
+        except Exception:  # a runner crash fails this unit closed; the run goes on
+            pass
+        return None
+
+    async def run_agents(
+        self, unit: dict[str, Any], context: UnitContext, site: str, cause: str, at: dict[str, Any]
+    ) -> tuple[UnitOutcome, str, str]:
+        """Runs the unit. While the agent stops unfinished, the Lead hands the unit on (FR-AGT-09, PRD 8.5): the note is
+        checked and stored before anything is announced, then the successor verifies it before it continues.
+        Returns the outcome, the agent that ended the unit and the last event."""
+        worker, lead, handoffs = context.agent_id, self.roster.leads[unit["district"]], 0
+        closed = UnitOutcome(success=False, summary="The handoff could not be completed, so the unit stopped.")
+        while True:
+            ran = await self.call(self.runner.run(unit, context))
+            if not isinstance(ran, UnitOutcome):
+                return UnitOutcome(success=False, summary="The unit's work failed."), worker, cause
+            if ran.handoff_note is None or ran.success is not True:
+                return ran, worker, cause
+            note, pct = ran.handoff_note, context_pct(ran.context_share, self.handoff_at)
+            successor = next_spare(self.roster.ranks, unit["role"], self.used)
+            if pct is None or not note_is_valid(note) or not self.store or successor is None:
+                return closed, worker, cause  # nothing handoff-shaped is written
+            try:
+                ref = await asyncio.to_thread(
+                    store_note, self.store, self.writer.run_id, unit["id"], worker, note, handoffs
+                )
+            except Exception:  # a refused or failed put: fail closed
+                return closed, worker, cause
+            self.used.add(successor)
+            handoffs += 1
+
+            def say(type_: str, actor: str, target: str, text: str, data: dict[str, Any]) -> str:
+                return self.emit(type_, actor, target, text, data, cause=cause, **at)
+
+            started = {"note": ref, "context_pct": pct}
+            cause = say("agent.context_handoff_started", worker, worker, "The agent wrote a handoff note.", started)
+            cause = say("agent.spawned", lead, successor, "A successor joined the team.", {"role": unit["role"]})
+            cause = say("agent.assigned", lead, successor, "The Lead gave it the unit.", {"unit": unit["id"]})
+            context = UnitContext(successor, context.skills, None, note, ref)
+            check = getattr(self.runner, "verify", None)
+            verified = check is not None and await self.call(check(unit, context)) is True
+            done = {"predecessor": worker, "note": ref, "verification_passed": verified}
+            cause = say("agent.context_handoff_completed", successor, site, "The successor took over.", done)
+            say("agent.retired", lead, worker, "The agent handed over and left.", {})
+            worker = successor
+            if not verified:
+                return closed, worker, cause
 
     def reuse(self, unit: dict[str, Any], checkpoint: Checkpoint) -> UnitOutcome:
         """A unit taken from the checkpoint: one `memory.hit` and nothing else (HR-1: no event, no animation)."""
@@ -516,6 +570,7 @@ async def run_plan(
         question_wait,
         store if artifacts is not None else {},
         before_handoff,
+        config.context.handoff_at,
     )
     run.spawn_team()
     slots = asyncio.Semaphore(config.limits.max_specialists)
