@@ -11,6 +11,7 @@ import type { Connector, Decision, Plan, Skill, World } from "../../api/types";
 import type { AppCtx } from "../../app/AppCtx";
 import { useParkApi } from "../../app/context";
 import { stagePath } from "../../app/router";
+import { useStaged } from "../../app/useStaged";
 import { Button, PageSheet } from "../../components";
 import { icon } from "../../shell/kit";
 import { Activity, Districts, Result, RunHistory } from "./Lower";
@@ -103,6 +104,8 @@ export function WorldPage({ app }: { app: AppCtx }) {
   const api = useParkApi();
   const [loaded, setLoaded] = useState<Loaded | "failed" | null>(null);
   const [paused, setPaused] = useState<Record<string, boolean>>({});
+  // The map and head first, then the side cards, then the lower part: one task each (WEB-MOTION-2).
+  const part = useStaged(3);
   const { dec, added } = app;
 
   useEffect(() => {
@@ -284,58 +287,62 @@ export function WorldPage({ app }: { app: AppCtx }) {
           </div>
         </div>
 
-        <div className="park-world-side">
-          {open > 0 ? (
-            <WaitingCard
-              mine={mine}
-              dec={dec}
-              night={app.night}
-              onDecide={(key) => app.decide(key)}
-              onLater={() => app.toast("Tilo will remind you at 16:00")}
+        {part(2) ? (
+          <div className="park-world-side">
+            {open > 0 ? (
+              <WaitingCard
+                mine={mine}
+                dec={dec}
+                night={app.night}
+                onDecide={(key) => app.decide(key)}
+                onLater={() => app.toast("Tilo will remind you at 16:00")}
+              />
+            ) : null}
+            <SpendCard w={w} mine={mine} dec={dec} onLedger={() => app.go("ledger")} />
+            <FactsCard
+              w={w}
+              skills={skills}
+              tools={tools}
+              onSkill={(skill) => app.go("skills", { id: skill })}
+              onTools={() => app.go("connectors")}
             />
-          ) : null}
-          <SpendCard w={w} mine={mine} dec={dec} onLedger={() => app.go("ledger")} />
-          <FactsCard
-            w={w}
-            skills={skills}
-            tools={tools}
-            onSkill={(skill) => app.go("skills", { id: skill })}
-            onTools={() => app.go("connectors")}
-          />
-        </div>
+          </div>
+        ) : null}
       </div>
 
-      <div className="park-world-lower">
-        {isCity ? <Districts districts={w.districts ?? []} /> : null}
-        {isTown ? (
-          <RunHistory
-            runs={w.runs ?? []}
-            onRunNow={() => app.toast("Run started. You’ll get a notification when it finishes")}
-            onAgenda={() => app.go("agenda")}
+      {part(3) ? (
+        <div className="park-world-lower">
+          {isCity ? <Districts districts={w.districts ?? []} /> : null}
+          {isTown ? (
+            <RunHistory
+              runs={w.runs ?? []}
+              onRunNow={() => app.toast("Run started. You’ll get a notification when it finishes")}
+              onAgenda={() => app.go("agenda")}
+            />
+          ) : null}
+          {!isCity && !isTown ? (
+            <Result
+              w={w}
+              onOpen={() => app.toast("Opening the result in Google Drive")}
+              onSlack={() => app.toast("Shared to #ops in Slack")}
+            />
+          ) : null}
+          <Activity
+            items={
+              w.activity ?? [
+                {
+                  t: w.started,
+                  rank: "director",
+                  who: "Director",
+                  text: `Started ${w.name.toLowerCase()}.`,
+                  kind: "info",
+                },
+              ]
+            }
+            night={app.night}
           />
-        ) : null}
-        {!isCity && !isTown ? (
-          <Result
-            w={w}
-            onOpen={() => app.toast("Opening the result in Google Drive")}
-            onSlack={() => app.toast("Shared to #ops in Slack")}
-          />
-        ) : null}
-        <Activity
-          items={
-            w.activity ?? [
-              {
-                t: w.started,
-                rank: "director",
-                who: "Director",
-                text: `Started ${w.name.toLowerCase()}.`,
-                kind: "info",
-              },
-            ]
-          }
-          night={app.night}
-        />
-      </div>
+        </div>
+      ) : null}
     </Frame>
   );
 }

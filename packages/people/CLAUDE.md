@@ -3,7 +3,7 @@
 ## Purpose
 People core for meetings, plates, pinboards and calendars (addendum PPL-10): the visibility oracle
 (`decide`, `read`, `project`), write checks (`check_write`), deterministic name matching and due-date
-resolution, and in-memory record stores whose interface `tilo-api` implements on Firestore.
+resolution, and in-memory record stores whose interface `tilo-api` implements on Firestore (the person store also holds the founder marker and one address reservation per person; `erase_person` refuses an unfounded org's last person, PPL-11c-FS).
 
 ## Commands
 - `uv run pytest packages/people/tests -q` (public API pinned in `tests/API.md`); `just check`
