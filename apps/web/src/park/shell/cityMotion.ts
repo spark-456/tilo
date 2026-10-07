@@ -1,10 +1,9 @@
 // How the shell chooses the city's motion (README "Interactions and motion", "City backdrop", "Performance").
-// The person's preference (lively, calm, still) is overridden, never raised: reduced motion or the ambient
-// switch off means a frozen city; a weak device (4 cores or fewer, or 4 GB or less) means calm. The result is
+// The person's preference (lively, calm, still) is overridden, never raised: reduced motion or the person's "still"
+// means a frozen city (there is no build-time switch: the deploy guard reads only VITE_TILO_API_URL); a weak device (4 cores or fewer, or 4 GB or less) means calm. The result is
 // part of the scene's cache key, so each choice is drawn once. `lite` is the sprite cap (a narrow window or a
 // weak device): half the movers are not drawn. `hidden` is a tab nobody is looking at.
 import { useMemo, useSyncExternalStore } from "react";
-import { AMBIENT_ON } from "./ambient";
 
 export type CityMotion = "lively" | "calm" | "still";
 
@@ -46,10 +45,6 @@ export function useCityMotion(
   const hidden = useSyncExternalStore(subscribeVisible, hiddenNow);
   const weak = useMemo(weakDevice, []);
   const motion: CityMotion =
-    !AMBIENT_ON || reduced || pref === "still"
-      ? "still"
-      : weak || pref === "calm"
-        ? "calm"
-        : "lively";
+    reduced || pref === "still" ? "still" : weak || pref === "calm" ? "calm" : "lively";
   return { motion, lite: motion !== "still" && (weak || vw < NARROW_PX), hidden };
 }

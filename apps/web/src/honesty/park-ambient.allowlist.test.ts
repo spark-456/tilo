@@ -92,11 +92,15 @@ describe("WEB-MOTION-1 honesty: ambient city motion is allowed, agent motion is 
     }
   });
 
-  it("WEB-MOTION-1 one flag, PARK_AMBIENT_MOTION, gates the city motion: exactly one source file reads it", () => {
+  it("WEB-MOTION-1 the city's motion has no build-time env switch: still comes only from the person's setting or reduced motion", () => {
+    // BQ-WEB-3 asked for one off switch; the P0-07c deploy guard allows the web source to read only
+    // VITE_TILO_API_URL, so the switch is the app's own motion setting ("still") plus prefers-reduced-motion,
+    // decided in one place (cityMotion.ts).
     const readers = parkFiles.filter((f) =>
-      /PARK_AMBIENT_MOTION/.test(readFileSync(join(SRC, f), "utf8")),
+      /VITE_PARK_AMBIENT_MOTION|PARK_AMBIENT_MOTION/.test(readFileSync(join(SRC, f), "utf8")),
     );
-    expect(readers.length, "BQ-WEB-3: one flag, default on").toBe(1);
-    expect(readers[0]).toMatch(/^park\/(?:shell|app|engines)\//);
+    expect(readers.filter((f) => !/\.test\.tsx?$/.test(f))).toEqual([]);
+    const motion = readFileSync(join(SRC, "park/shell/cityMotion.ts"), "utf8");
+    expect(motion).toMatch(/reduced \|\| pref === "still"/);
   });
 });
