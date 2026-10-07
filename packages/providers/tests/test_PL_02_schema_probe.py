@@ -132,6 +132,28 @@ def test_PL_02_probe_live_run_reports_one_status_line_per_variant_and_the_cost()
     assert SCHEMA_MARKER not in out + err and schema_probe.PROBE_PROMPT not in out + err
 
 
+def test_PL_02_probe_minimal_thinking_is_tested_unmapped_and_mapped() -> None:
+    """The adapter maps minimal to low, so the variant that tests Vertex's reaction to minimal bypasses it."""
+    models = _Models()
+    code, out, _err = _run([], LIVE_ENV, client=SimpleNamespace(models=models))
+    assert code == 0
+    by_name = dict(zip(schema_probe.VARIANT_NAMES, models.configs, strict=True))
+
+    def level(name: str) -> str:
+        return str(by_name[name].thinking_config.thinking_level).upper()
+
+    assert "MINIMAL" in level("json_mode_thinking_minimal_unmapped")
+    assert level("json_mode_thinking_minimal_mapped").endswith("LOW")
+    plan = {line.split()[0]: line for line in schema_probe_plan()}
+    assert "thinking=minimal(sent as minimal)" in plan["variant=json_mode_thinking_minimal_unmapped"]
+    assert "thinking=minimal(adapter sends low)" in plan["variant=json_mode_thinking_minimal_mapped"]
+
+
+def schema_probe_plan() -> list[str]:
+    _code, out, _err = _run(["--dry-run"], {}, client=SimpleNamespace(models=_Models()))
+    return [line for line in out.splitlines() if line.startswith("variant=")]
+
+
 def test_PL_02_probe_variants_cover_no_schema_json_mode_both_schemas_and_thinking() -> None:
     names = set(schema_probe.VARIANT_NAMES)
     assert {"no_schema", "json_mode", "schema_sanitized", "schema_raw"} <= names

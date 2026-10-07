@@ -9,8 +9,11 @@ minItems, nullable, properties, description, propertyOrdering, required; anythin
 can be refused with 400 "InvalidArgument"). The two pages overlap in the keywords kept here; neither lists `default`,
 `pattern`, `minLength`, `maxLength` or `uniqueItems`, which the live Director schemas carried (HTTP 400, 7 Oct 2026).
 
-Decisions where the pages differ or are silent: `$ref`/`$defs` are inlined (Vertex does not list them), except a
-recursive definition, which cannot be inlined and keeps its `$ref` and its own `$defs`; a list `type` becomes `anyOf`
+Decisions where the pages differ or are silent: `additionalProperties` is dropped (the Gemini API page lists it, the
+Vertex page does not, and the Google adapter talks to Vertex only: `vertexai=True`, user ADC, no API-key path, so there
+is no second endpoint to keep it for; the caller's pydantic model forbids extras itself); `$ref`/`$defs` are
+inlined (Vertex does not list them), except a recursive definition, which cannot be inlined and keeps its `$ref`
+and its own `$defs`; a list `type` becomes `anyOf`
 (both pages list `anyOf`, and `{"type": "null"}` is the documented null branch); `const` becomes a one-value `enum`;
 `format` stays only for the documented values. Dropped bounds lose nothing: the caller validates every reply itself.
 Pure functions; the caller's dict is never mutated."""
@@ -28,7 +31,6 @@ ALLOWED_KEYWORDS = frozenset(
         "items",
         "enum",
         "anyOf",
-        "additionalProperties",
         "title",
         "description",
         "minItems",
@@ -105,7 +107,7 @@ class _Cleaner:
                 out[key] = {name: self.clean(sub) for name, sub in value.items()}  # names are not keywords
             elif key == "anyOf" and isinstance(value, list):
                 out[key] = [self.clean(branch) for branch in value]
-            elif key in ("items", "additionalProperties"):
+            elif key == "items":
                 out[key] = self.clean(value)
             elif key == "format":
                 if value in _FORMATS:
@@ -166,6 +168,6 @@ def unsupported_keywords(schema: Any, path: str = "") -> list[str]:
         elif key == "anyOf" and isinstance(value, list):
             for index, sub in enumerate(value):
                 found += unsupported_keywords(sub, f"{here}[{index}]")
-        elif key in ("items", "additionalProperties"):
+        elif key == "items":
             found += unsupported_keywords(value, here)
     return found

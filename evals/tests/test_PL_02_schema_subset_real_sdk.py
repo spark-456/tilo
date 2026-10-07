@@ -34,7 +34,16 @@ def test_PL_02_the_schema_actually_sent_has_no_unsupported_keyword_at_any_depth(
     assert generation["responseMimeType"] == "application/json" and "responseSchema" not in generation
     assert on_the_wire == to_gemini_schema(raw), "the adapter sends exactly the sanitized copy"
     text = json.dumps(on_the_wire)
-    for banned in ('"default"', '"maxLength"', '"minLength"', '"pattern"', '"uniqueItems"', '"$ref"', '"$defs"'):
+    for banned in (
+        '"additionalProperties"',
+        '"default"',
+        '"maxLength"',
+        '"minLength"',
+        '"pattern"',
+        '"uniqueItems"',
+        '"$ref"',
+        '"$defs"',
+    ):
         assert banned not in text, banned
     assert on_the_wire["type"] == "object" and on_the_wire["required"], "the structure survives"
 

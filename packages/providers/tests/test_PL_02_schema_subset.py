@@ -18,7 +18,17 @@ from hypothesis import given, settings
 from hypothesis import strategies as st
 from tilo_providers.schema_subset import ALLOWED_KEYWORDS, to_gemini_schema, unsupported_keywords
 
-DROPPED = ("default", "maxLength", "minLength", "pattern", "uniqueItems", "$schema", "examples", "const_not_a_keyword")
+DROPPED = (
+    "additionalProperties",
+    "default",
+    "maxLength",
+    "minLength",
+    "pattern",
+    "uniqueItems",
+    "$schema",
+    "examples",
+    "const_not_a_keyword",
+)
 
 
 def test_PL_02_unsupported_keywords_are_dropped_and_the_caller_dict_is_not_mutated() -> None:
@@ -39,9 +49,26 @@ def test_PL_02_unsupported_keywords_are_dropped_and_the_caller_dict_is_not_mutat
     assert out["properties"]["name"] == {"type": "string"}
     assert out["properties"]["tags"] == {"type": "array", "items": {"type": "string"}, "maxItems": 3, "minItems": 1}
     assert out["properties"]["n"] == {"type": "integer", "minimum": 0, "maximum": 5}
-    assert out["required"] == ["name"] and out["additionalProperties"] is False and out["title"] == "Brief"
+    assert out["required"] == ["name"] and out["title"] == "Brief"
+    assert "additionalProperties" not in out, "Vertex's supported-fields page does not list it"
     assert out is not schema and out["properties"] is not schema["properties"]
     assert unsupported_keywords(schema) and unsupported_keywords(out) == []
+
+
+def test_PL_02_additional_properties_is_dropped_at_every_depth_including_defs_and_items() -> None:
+    schema = {
+        "$defs": {"D": {"type": "object", "additionalProperties": False, "properties": {"a": {"type": "string"}}}},
+        "type": "object",
+        "additionalProperties": {"type": "string"},
+        "properties": {
+            "d": {"$ref": "#/$defs/D"},
+            "l": {"type": "array", "items": {"type": "object", "additionalProperties": False}},
+        },
+    }
+    out = to_gemini_schema(schema)
+    assert "additionalProperties" not in json.dumps(out)
+    assert out["properties"]["l"]["items"] == {"type": "object"}
+    assert unsupported_keywords({"type": "object", "additionalProperties": False}) == [".additionalProperties"]
 
 
 def test_PL_02_a_property_named_like_a_keyword_is_kept() -> None:
@@ -190,4 +217,4 @@ def test_PL_02_property_type_properties_and_required_are_never_dropped(schema: d
 def test_PL_02_the_allowed_set_is_the_documented_subset() -> None:
     for banned in DROPPED:
         assert banned not in ALLOWED_KEYWORDS
-    assert {"type", "properties", "required", "items", "enum", "anyOf", "additionalProperties"} <= ALLOWED_KEYWORDS
+    assert {"type", "properties", "required", "items", "enum", "anyOf"} <= ALLOWED_KEYWORDS

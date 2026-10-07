@@ -1,7 +1,7 @@
 """tilo_providers.schema_probe — which part of a Director request does Vertex AI refuse? (PL-02, EFF-01).
 
 One tiny capped call per request variant on the Director role's primary profile, straight through the Google adapter on
-user ADC: (a) no schema, (b) JSON mode only, (c) the sanitized schema, (d) the raw schema, plus two thinking-config
+user ADC: (a) no schema, (b) JSON mode only, (c) the sanitized schema, (d) the raw schema, plus three thinking-config
 variants. One status line per variant (ok / ok_truncated / rejected with the HTTP status / another failure code), then
 the cost. Prints no prompt and no schema; for a 400 it prints the server's scrubbed, capped reason (`vertex_smoke`),
 check it before pasting. Same gate as `vertex_smoke`: refused unless the live switch is exactly "1", checked first;
@@ -34,7 +34,7 @@ from tilo_providers.vertex_smoke import (
 
 PROBE_ROLE = "director"
 PROBE_PROMPT = "Reply with a JSON object describing a calm harbour town at sunrise, in plain words."  # fixed, synthetic
-DEFAULT_MAX_CREDITS = 2.0  # ceiling; the six calls cost about 0.1 credit in all
+DEFAULT_MAX_CREDITS = 2.0  # ceiling; the seven calls cost about 0.1 credit in all
 
 
 @dataclass(frozen=True)
@@ -43,15 +43,19 @@ class Variant:
     json_mode: bool = False
     schema: str | None = None  # None, "sanitized" (the adapter's normal send) or "raw" (the caller's dict as it is)
     thinking: str | None = None
+    unmapped: bool = False  # sent exactly as given: the adapter's schema cut and minimal -> low mapping are bypassed
 
 
 VARIANTS = (
     Variant("no_schema"),
     Variant("json_mode", json_mode=True),
     Variant("schema_sanitized", schema="sanitized"),
-    Variant("schema_raw", schema="raw"),
+    Variant("schema_raw", schema="raw", unmapped=True),
     Variant("schema_thinking_low", schema="sanitized", thinking="low"),
-    Variant("json_mode_thinking_minimal", json_mode=True, thinking="minimal"),  # what units, narrator, generator send
+    # What units, narrator and generator ask for. The adapter now sends low for minimal, so the first one bypasses it
+    # (does Vertex still 400 on minimal?) and the second goes through it (does the mapped request work?).
+    Variant("json_mode_thinking_minimal_unmapped", json_mode=True, thinking="minimal", unmapped=True),
+    Variant("json_mode_thinking_minimal_mapped", json_mode=True, thinking="minimal"),
 )
 VARIANT_NAMES = tuple(v.name for v in VARIANTS)
 
@@ -70,6 +74,8 @@ class ProbeRow:
 
 def _plan_line(variant: Variant) -> str:
     schema, thinking = variant.schema or "none", variant.thinking or "off"
+    if variant.thinking == "minimal":
+        thinking += "(sent as minimal)" if variant.unmapped else "(adapter sends low)"
     return f"variant={variant.name} schema={schema} json_mode={variant.json_mode} thinking={thinking}"
 
 
@@ -91,6 +97,9 @@ def _provider(raw: bool, profile: Any, profile_id: str, project: str, location: 
     class _Raw(GoogleModelProvider):
         def _schema_for_send(self, schema: dict[str, Any]) -> dict[str, Any]:
             return copy.deepcopy(schema)  # variant (d): what the adapter sent before the fix
+
+        def _thinking_for_send(self, level: str) -> str:
+            return level  # minimal stays minimal: tests what Vertex says to it
 
     return (_Raw if raw else GoogleModelProvider)(profile, profile_id, project, location, client=client)
 
@@ -162,7 +171,7 @@ def run_schema_probe(
         if total + upper > max_total_credits:
             row = ProbeRow(variant.name, "skipped_ceiling")
         else:
-            row = _send(_provider(variant.schema == "raw", profile, profile_id, project, location, client), request)
+            row = _send(_provider(variant.unmapped, profile, profile_id, project, location, client), request)
             row.variant = variant.name
             if row.status in ("ok", "ok_truncated", "blocked") and row.tokens_in == 0:
                 row.tokens_in = est_in  # a truncated reply reports no input count: the estimate stands in

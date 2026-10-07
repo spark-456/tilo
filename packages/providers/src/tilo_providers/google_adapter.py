@@ -160,6 +160,12 @@ class GoogleModelProvider(ModelProvider):
         """A sanitized copy: Gemini accepts a subset of JSON Schema and answers 400 to the rest (`schema_subset`)."""
         return to_gemini_schema(schema)
 
+    def _thinking_for_send(self, level: str) -> str:
+        """Vertex answers HTTP 400 to thinking level "minimal" (live, 5 Oct 2026; packages/providers/CLAUDE.md, "the
+        smoke sends no `thinking_level`"), so it goes out as "low". This adapter is Vertex-only, so no other
+        endpoint needs "minimal"; the OpenAI-compatible adapter ignores thinking levels and is untouched."""
+        return "low" if level == "minimal" else level
+
     def _config(self, request: GenerateRequest) -> Any | None:
         kwargs: dict[str, Any] = {}
         if request.system is not None:
@@ -179,7 +185,9 @@ class GoogleModelProvider(ModelProvider):
         types_mod = _genai_module("google.genai.types")
         if request.thinking_level is not None and Capability.THINKING.value in self._profile.caps:
             # A profile without the capability (e.g. a fallback) would answer a thinking config with a 400: omit it.
-            kwargs["thinking_config"] = types_mod.ThinkingConfig(thinking_level=request.thinking_level.upper())
+            kwargs["thinking_config"] = types_mod.ThinkingConfig(
+                thinking_level=self._thinking_for_send(request.thinking_level).upper()
+            )
         return types_mod.GenerateContentConfig(**kwargs) if kwargs else None
 
     def _map_error(self, error: Exception) -> Exception:
