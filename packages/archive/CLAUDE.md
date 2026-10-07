@@ -4,7 +4,7 @@
 The raw archive (PRD 13.2, 15.1, 22.2 D-09): every model call, tool call and inbound/outbound
 channel message, with secrets removed, stored as SHA-256-hashed, hash-chained JSONL records per
 run so tampering is detectable. Redaction itself is not here: `RunArchive` takes an injected
-redactor; FR-MEM-05 / SEC-14 supply the real one (shared redaction module, pending).
+redactor; FR-MEM-05 / SEC-14 supply the real one: `tilo_redact.redact_value`.
 
 ## Commands
 - `uv run --package tilo-archive pytest packages/archive/tests` — tests
@@ -34,4 +34,4 @@ redactor; FR-MEM-05 / SEC-14 supply the real one (shared redaction module, pendi
 - Encryption at rest is the bucket's KMS key (infra, P0-07) — nothing here encrypts anything.
 
 ## Requirement IDs
-FR-MEM-04. (FR-MEM-05 / SEC-14 redaction: separate ticket, shared redaction module.)
+FR-MEM-04. (FR-MEM-05 / SEC-14 redaction: `packages/redact`.)

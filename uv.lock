@@ -20,6 +20,7 @@ members = [
     "tilo-planning",
     "tilo-policy",
     "tilo-providers",
+    "tilo-redact",
     "tilo-render",
     "tilo-sandbox-web",
     "tilo-world",
@@ -1387,6 +1388,7 @@ dependencies = [
     { name = "tilo-people" },
     { name = "tilo-planning" },
     { name = "tilo-policy" },
+    { name = "tilo-redact" },
     { name = "tilo-world" },
     { name = "uvicorn", extra = ["standard"] },
 ]
@@ -1411,6 +1413,7 @@ requires-dist = [
     { name = "tilo-people", editable = "packages/people" },
     { name = "tilo-planning", editable = "packages/planning" },
     { name = "tilo-policy", editable = "packages/policy" },
+    { name = "tilo-redact", editable = "packages/redact" },
     { name = "tilo-world", editable = "packages/world" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.32" },
 ]
@@ -1688,6 +1691,7 @@ dependencies = [
     { name = "httpx" },
     { name = "jsonschema" },
     { name = "referencing" },
+    { name = "tilo-redact" },
 ]
 
 [package.metadata]
@@ -1697,7 +1701,13 @@ requires-dist = [
     { name = "httpx", specifier = ">=0.27" },
     { name = "jsonschema", specifier = ">=4.18" },
     { name = "referencing", specifier = ">=0.30" },
+    { name = "tilo-redact", editable = "packages/redact" },
 ]
+
+[[package]]
+name = "tilo-redact"
+version = "0.1.0"
+source = { editable = "packages/redact" }
 
 [[package]]
 name = "tilo-render"

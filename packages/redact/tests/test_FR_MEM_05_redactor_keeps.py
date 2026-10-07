@@ -8,6 +8,8 @@ this" means "refuse", so over-redaction breaks real runs. Decisions where PRD 13
   - A digit run is a card only when it is 13 to 19 digits, passes Luhn and is not touching a letter or digit
     (so sha256 digests, ids and ULIDs are safe); a Luhn-failing 16-digit number (order, tracking, epoch-ms ids)
     is kept. Numbers typed as JSON numbers are kept; only text is scanned.
+  - Added by the builder (BQ-FRMEM05-1): a plain 13-digit number from 1500000000000 to 1999999999999 is an
+    epoch-millisecond timestamp and is kept even when it passes Luhn (about 10% do); a run starting with 0 is no card.
 """
 
 from __future__ import annotations
@@ -15,7 +17,7 @@ from __future__ import annotations
 import copy
 import hashlib
 
-from _redact_samples_lib import FIXED_TAIL, KINDS, TAIL, build, card_number
+from _redact_samples_lib import FIXED_TAIL, KINDS, TAIL, build, card_number, luhn_complete
 from hypothesis import given, settings
 from hypothesis import strategies as st
 from tilo_redact import REDACTED, redact, redact_value
@@ -61,6 +63,18 @@ def test_FR_MEM_05_a_16_digit_number_that_fails_luhn_is_kept():
     _, digits = card_number(FIXED_TAIL)
     bad = digits[:-1] + str((int(digits[-1]) + 1) % 10)
     assert redact(f"order {bad} shipped") == f"order {bad} shipped"
+
+
+def test_FR_MEM_05_a_luhn_valid_epoch_ms_timestamp_is_kept():
+    ms = luhn_complete("178123456789")  # 13 digits from 17...: an epoch-millisecond timestamp that happens to pass Luhn
+    assert len(ms) == 13 and ms.startswith("17")
+    for text in (ms, f"created_at {ms} by u_01HZ", f'{{"ts": {ms}, "note": "ts={ms}"}}'):
+        assert redact(text) == text
+
+
+def test_FR_MEM_05_a_zero_led_luhn_run_and_a_long_decimal_are_kept():
+    zeros, fraction = "0" * 16, luhn_complete("411111111111111")  # Luhn-valid, but after a decimal point
+    assert redact(f"id {zeros} and 0.{fraction} done") == f"id {zeros} and 0.{fraction} done"
 
 
 def test_SEC_14_usage_and_authorisation_records_are_not_secure_fields():
