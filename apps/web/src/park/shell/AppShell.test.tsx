@@ -130,7 +130,7 @@ describe("WEB_3b_shell: the popovers and the loader work together", () => {
     expect(document.querySelector('[role="dialog"]')).toBeNull();
     expect(navigate).not.toHaveBeenCalled();
     for (let i = 0; i < 3; i++) act(() => sch.fire(sch.live()[0]));
-    expect(navigate).toHaveBeenCalledWith("/park/world/comp");
+    expect(navigate).toHaveBeenCalledWith("/world/comp");
     expect(card()).toBeDefined();
     act(() => sch.fire(sch.live()[0]));
     // Updated for WEB-MOTION-2: the card fades out over 280 ms after the last step, and goes at animationend.
@@ -176,7 +176,7 @@ describe("WEB_3b_parkapp: the real ParkApp wears the shell", () => {
     });
     await waitDone();
     expect(ev.defaultPrevented).toBe(true);
-    expect(window.location.pathname).toBe("/park/ledger");
+    expect(window.location.pathname).toBe("/ledger");
     expect(m.container.querySelector('[data-testid="park-page-ledger"]')).not.toBeNull();
     expect(qa(m.container, 'header nav a[aria-current="page"]').map((a) => a.textContent)).toEqual([
       "Ledger",
@@ -229,7 +229,7 @@ describe("WEB_3b_parkapp: the real ParkApp wears the shell", () => {
     await act(async () => {
       await vi.dynamicImportSettled();
     });
-    expect(window.location.pathname).toBe("/park/world/comp");
+    expect(window.location.pathname).toBe("/world/comp");
     expect(card()).toBeDefined();
     await act(async () => {
       vi.advanceTimersByTime(250);

@@ -1,4 +1,5 @@
-// WEB-3a: the pure /park/<page> router (plan section 1; README "Routes"). Pinned surface, in
+// WEB-3a: the pure Park router (plan section 1; README "Routes"); WEB-CUTOVER moved the pages to the root
+// paths (router.cutover.test.ts) and kept /park/<page> as an alias, which this file still pins. Pinned surface, in
 // park/app/router.ts:
 //   parseParkPath(pathname: string, search: string): { page: PageId; params: Params } | null
 //   parkPath(page: PageId, params?: Params): string
@@ -9,8 +10,17 @@
 //   (and a known name on another page) is dropped. The world id is a path segment, not a query.
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
+import { stagePath as appStagePath } from "../../router";
 import { PAGE_IDS, type PageId, type Params } from "./AppCtx";
-import { isParkPath, parkPath, parseParkPath } from "./router";
+import { isParkPath, parkPath, parseParkPath, stagePath } from "./router";
+
+describe("WEB_CUTOVER_router: the Park stagePath is the old app's stagePath", () => {
+  it("WEB_CUTOVER_04_stagePath_matches_src_router", () => {
+    for (const id of ["w", "w_village_basic", "w 1/é", "100%"]) {
+      expect(stagePath(id), id).toBe(appStagePath(id));
+    }
+  });
+});
 
 describe("WEB_3a_router: parseParkPath maps each design route", () => {
   it("WEB_3a_router_every_design_route_maps_to_its_page", () => {
@@ -96,9 +106,8 @@ describe("WEB_3a_router: what is not a Park route", () => {
   it("WEB_3a_router_null_for_anything_that_is_not_a_page", () => {
     const paths = [
       "",
-      "/",
-      "/worlds",
-      "/world/k1",
+      "/world/k1/extra",
+      "/home",
       "/parkour",
       "/parks/home",
       "/park/nope",
@@ -135,34 +144,34 @@ describe("WEB_3a_router: what is not a Park route", () => {
 describe("WEB_3a_router: parkPath writes the path", () => {
   it("WEB_3a_router_parkPath_writes_each_page_path", () => {
     const table = [
-      ["home", "/park/home"],
-      ["worlds", "/park/worlds"],
-      ["skills", "/park/skills"],
-      ["ledger", "/park/ledger"],
-      ["agenda", "/park/agenda"],
-      ["team", "/park/team"],
-      ["profile", "/park/profile"],
-      ["connectors", "/park/connectors"],
+      ["home", "/"],
+      ["worlds", "/worlds"],
+      ["skills", "/skills"],
+      ["ledger", "/ledger"],
+      ["agenda", "/agenda"],
+      ["team", "/team"],
+      ["profile", "/profile"],
+      ["connectors", "/connectors"],
     ] as const;
     for (const [page, path] of table) expect(parkPath(page), page).toBe(path);
   });
 
   it("WEB_3a_router_parkPath_world_puts_the_id_in_the_path", () => {
-    expect(parkPath("world", { id: "k1" })).toBe("/park/world/k1");
-    expect(parkPath("world", { id: "a b" })).toBe("/park/world/a%20b");
-    expect(parkPath("world", { id: "a/b" })).toBe("/park/world/a%2Fb");
+    expect(parkPath("world", { id: "k1" })).toBe("/world/k1");
+    expect(parkPath("world", { id: "a b" })).toBe("/world/a%20b");
+    expect(parkPath("world", { id: "a/b" })).toBe("/world/a%2Fb");
   });
 
   it("WEB_3a_router_parkPath_puts_the_known_params_in_the_query", () => {
-    expect(parkPath("skills", { id: "sk2" })).toBe("/park/skills?id=sk2");
-    expect(parkPath("team", { focus: "share" })).toBe("/park/team?focus=share");
-    expect(parkPath("profile", { tab: "notifications" })).toBe("/park/profile?tab=notifications");
+    expect(parkPath("skills", { id: "sk2" })).toBe("/skills?id=sk2");
+    expect(parkPath("team", { focus: "share" })).toBe("/team?focus=share");
+    expect(parkPath("profile", { tab: "notifications" })).toBe("/profile?tab=notifications");
   });
 
   it("WEB_3a_router_parkPath_drops_params_the_page_does_not_know", () => {
-    expect(parkPath("home", { x: "1", id: "k1" })).toBe("/park/home");
-    expect(parkPath("skills", { id: "sk2", x: "1" })).toBe("/park/skills?id=sk2");
-    expect(parkPath("ledger", { focus: "share" })).toBe("/park/ledger");
+    expect(parkPath("home", { x: "1", id: "k1" })).toBe("/");
+    expect(parkPath("skills", { id: "sk2", x: "1" })).toBe("/skills?id=sk2");
+    expect(parkPath("ledger", { focus: "share" })).toBe("/ledger");
   });
 
   it("WEB_3a_router_parkPath_output_is_always_a_safe_path", () => {
@@ -190,9 +199,10 @@ describe("WEB_3a_router: isParkPath", () => {
   it("WEB_3a_router_isParkPath_false_elsewhere", () => {
     for (const p of [
       "",
-      "/",
-      "/worlds",
-      "/world/park",
+      "/home",
+      "/world",
+      "/world/",
+      "/world/k1/stage",
       "/parkour",
       "/parks",
       "/Park/home",

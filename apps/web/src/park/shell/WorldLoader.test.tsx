@@ -176,7 +176,7 @@ describe("WEB_3b_loader: the steps tick and the bar widens by its inline width, 
     tick(sch, 2);
     expect(navigate).not.toHaveBeenCalled();
     tick(sch);
-    expect(navigate).toHaveBeenCalledWith("/park/world/comp");
+    expect(navigate).toHaveBeenCalledWith("/world/comp");
     expect(loader()).not.toBeNull();
     tick(sch);
     // Updated for WEB-MOTION-2: the card now fades out over 280 ms after the last step, and goes at animationend.

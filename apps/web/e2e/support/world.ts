@@ -6,7 +6,8 @@ import type { Page } from "@playwright/test";
 // ticket's stage-frame seam (data-camera-x/-y/-zoom, a PixiJS world container) and App.tsx's
 // existing `?display=stage` param (see apps/web/src/App.tsx):
 //
-//   URL params (on "/"):
+//   URL params (on the stage address, STAGE_PATH = /world/w_village_basic/stage; WEB-CUTOVER moved the
+//   stage there, "/" is the Park Home now):
 //     ?fixture=<name>   Turns on fixture mode and plays a recorded stream into the world.
 //                        `village-basic` (and `village-basic-unknown`, this ticket's own extra
 //                        HR-5 fixture) are served straight from contracts/ /
@@ -44,10 +45,21 @@ export const FIXTURE_QUERY = {
   crowd20: "crowd-20",
 } as const;
 
-export function fixtureUrl(name: string, extra: Record<string, string | number> = {}): string {
+/** The live stage (S-04) of the fixture world: `/world/:id` is the Park World overview since WEB-CUTOVER. */
+export const STAGE_PATH = "/world/w_village_basic/stage";
+
+/** A page whose stage has no world to draw: the decorative bare iso grid behind the task flow (S-02). The old
+ * S-01 landing at "/" was the other such page; "/" is the Park Home now (WEB-CUTOVER). */
+export const BARE_STAGE_PATH = "/task/task_fixture_1/understanding";
+
+export function fixtureUrl(
+  name: string,
+  extra: Record<string, string | number> = {},
+  base: string = STAGE_PATH,
+): string {
   const params = new URLSearchParams({ fixture: name });
   for (const [k, v] of Object.entries(extra)) params.set(k, String(v));
-  return `/?${params.toString()}`;
+  return `${base}?${params.toString()}`;
 }
 
 /** The stage-frame element, whose `data-seq` attribute tracks the highest applied seq. */
