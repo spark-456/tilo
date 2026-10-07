@@ -252,6 +252,15 @@ live at https://essential-wares-510320-f0.web.app (and the `.firebaseapp.com` al
 - Check before you deploy: `pnpm --filter @tilo/web run build` then `pnpm --filter @tilo/web exec vite preview`
   serves the same bundle locally.
 
+## App Check enforcement (SEC-10)
+
+`tilo-api` checks the web client's `X-Firebase-AppCheck` token (`tilo_api.appcheck`) but enforcement stays off
+until you flip it: with `TILO_APPCHECK_ENFORCE` unset a missing or refused token is only logged as a warning and
+no answer changes. Turn it on only after the web app sends tokens in the deployed build and the log shows none
+refused: set `TILO_APPCHECK_ENFORCE=1` on the Cloud Run service (only exactly `1` counts); unset it to turn it off.
+`/health`, `/healthz` and the scheduler tick are never checked. The API reads the project from
+`TILO_FIRESTORE_PROJECT` (else `GOOGLE_CLOUD_PROJECT`). Decisions: BQ-SEC10-1..3 in `docs/open-questions.md`.
+
 ## Never
 
 - Never put a service-account key file in the repository or in Actions secrets: WIF only.
