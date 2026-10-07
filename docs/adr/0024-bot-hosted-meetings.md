@@ -52,19 +52,21 @@ person's connectors as one Google grant (CON-D10).
    of ADR-0017 stand): the bot would keep ONE persistent, dedicated browser
    profile for its own account, signed in once by a human by hand; it is never in the image, the repository,
    a backup, Secret Manager or a Cloud Run service; the deployed services never hold or see that session; the
-   exception ends at the hackathon freeze unless the user renews it. (The per-meeting noVNC sign-in on tmpfs
-   of ADR-0017 no longer applies.)
+   exception ends at the hackathon freeze unless the user renews it. (Only if amendment 3 is accepted does the
+   per-meeting noVNC sign-in on tmpfs of ADR-0017 stop applying; until then it stands, and amendment 3's
+   preconditions (a), (b), (d), (e) and (f) apply to it too.)
 7. **What the bot does at meeting time.** Signed in as the organizer, it opens the link and enters as host
    without admission, posts the versioned disclosure first (FR-MTG-01), leaves on `Tilo leave` (FR-MTG-10) and
    never ends the call for everyone. It never clicks Admit (amendment 3(c)): invited
    attendees join under Meet's own rule for calendar-invited accounts, every knock from another account stays
    out, and a display-name allowlist is never used because it is spoofable; the meet-bot's `AUTO_ADMIT` stays 0
    for hosted meetings. The link is never written to the bot's `out/` files,
-   logs, events or the package it hands to Tilo. Its persistent profile stays on its named volume between
-   meetings (amendment 3).
+   logs, events or the package it hands to Tilo. If amendment 3 is accepted, its persistent profile stays on its
+   named volume between meetings; otherwise the ADR-0017 per-meeting terms apply and nothing stays after the run.
 
 ## Accepted amendments (supervisor, under the user's instruction of 6 Oct 2026)
-These replace the text above where they differ.
+These replace the text above where they differ, except amendment 3, which is Proposed and replaces nothing
+until the user says yes.
 1. The organizer is the bot's own dedicated Google account (decision 1 stands). Only the organizer is host.
    A person's grant stays `calendar.readonly`.
 2. One scope, `calendar.events.owned`, on the bot account only; no Meet API scope (decision 2 stands).
@@ -72,11 +74,16 @@ These replace the text above where they differ.
    the bot keeps ONE persistent, dedicated browser profile for its own account, so it can enter as host at
    once. An agent cannot widen the PRD 16.1 rule 3 / 3.4 exception (BQ-MTG09-12 required the user's explicit
    yes for a profile kept between meetings), so until the user says yes in chat (their words and the date are
-   recorded here) the ADR-0017 per-meeting terms stand and **MTG09-c is not built**. If the user says yes:
+   recorded here) the ADR-0017 per-meeting terms stand. **The gate, one wording for ADR, spec and supplement:
+   MTG09-c is not built until the user has decided (a) below; the profile choice (persistent or per-meeting)
+   is then the user's explicit yes.** ADR-0017 decision 2 does not cover tiloagent@gmail.com until (a) is
+   decided. If the user says yes to the persistent profile:
    the user signs the profile in once, by hand; Tilo never sees the password. It lives on the demo machine's
    own disk as a named Docker volume only (never a bind mount under the repository or OneDrive, never in the
    image, a backup, a Docker Desktop volume export or backup extension, Secret Manager or any Cloud Run
-   service). Preconditions for MTG09-c, all of them:
+   service). Preconditions for MTG09-c: (a), (b), (d), (e) and (f) apply to EVERY signed-in session of the bot
+   account in the hosting flow, per-meeting ones too (for a per-meeting sign-in, (b) means a random VNC
+   password per run and VNC stopped once signed in); (g) applies to the persistent profile. All of them:
    (a) **Account separation, a user decision.** The documents used to say the bot account "is used by nothing
    else and holds no user data". That is false for tiloagent@gmail.com: it is the gcloud login on the demo
    laptop, the `tilo-dev` project Owner, the Firebase deploy login and the cost-alert inbox. A persistent
@@ -85,7 +92,7 @@ These replace the text above where they differ.
    (preferred) the bot uses a NEW Google account with no role in the project or Firebase that receives no
    alerts (re-add it as the consent-screen test user), or the Owner, Firebase and alert roles move off
    tiloagent before the profile is signed in, or the user accepts the project-Owner exposure explicitly (their
-   words and the date recorded here). No profile is signed in before this is decided.
+   words and the date recorded here). No session of the bot account, persistent or per-meeting, is signed in before this is decided.
    (b) **noVNC control.** The meet-bot starts `x11vnc -nopw -shared -forever` and websockify on every command,
    published on 127.0.0.1:6080. With a persistent profile that is a live signed-in browser that anything on
    the machine, or a web page opening `ws://127.0.0.1:6080/websockify`, can drive with no password. noVNC is
@@ -120,8 +127,12 @@ These replace the text above where they differ.
 2. At Google: Security, Your devices, sign out everywhere; review Third-party access and remove the Tilo
    client. A password change alone does not revoke Calendar-scoped tokens.
 3. Change the account password.
-4. `docker volume rm tilo-meet-bot_tilo_meet_profile` (the profile volume).
-5. If the account holds any project role, check Cloud audit logs, IAM and service-account keys.
+4. `docker volume rm tilo-meet-bot_tilo_meet_profile` (the profile volume). This does not wipe the deleted data
+   inside `docker_data.vhdx`, so the server-side sign-out in step 2 is what actually counts.
+5. If the account holds any project role, check Cloud audit logs, IAM and service-account keys, and every
+   connected app (gcloud SDK or Firebase CLI grants on other devices).
+6. Check the recovery phone and email, and Gmail filters and forwarding (it is the cost-alert inbox, so an
+   attacker could hide alerts).
 User-side compensation for no 2-step verification (BQ-MTG09-19): a long unique password in a password manager,
 the user's own recovery phone and email, Google security alerts on, a separate browser profile for the consent
 sign-in (signed out afterwards), and the account address kept out of anything shown to judges.
