@@ -79,8 +79,9 @@ function varied(patch: Partial<Ledger> = {}): Ledger {
   L.forecast = 7200;
   const waiting = L.tx.find((t) => t.st === "waiting");
   if (waiting) waiting.amt = 910;
-  delete (L as { spike?: unknown }).spike;
-  return { ...L, ...patch };
+  // the designed copy the fixture carries is not part of a ledger that does not hold it
+  const { spike: _spike, memoryWeeks: _weeks, runLabels: _labels, ...held } = L;
+  return { ...held, ...patch };
 }
 
 // ---------------------------------------------------------------------------------------------------------
@@ -358,7 +359,7 @@ describe("FR_SPD_06_ledger_what_tilo_gave_back", () => {
     expect(bars.map((b) => b.style.height)).toEqual(["30px", "60px", "90px", "120px"]);
     expect(text(card)).not.toContain("22–24");
     const widths = qa<HTMLElement>(card, ".park-ledger-stacked span").map((s) =>
-      parseFloat(s.style.width),
+      Number.parseFloat(s.style.width),
     );
     expect(widths[0]).toBeCloseTo((5 / 9) * 100, 1);
     expect(widths[1]).toBeCloseTo((4 / 9) * 100, 1);
