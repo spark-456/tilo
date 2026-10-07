@@ -14,7 +14,7 @@ import { parseRules } from "../../../../test-support/park/componentsCss";
 const DIR = __dirname;
 const CSS = path.join(DIR, "Team.css");
 const PAGE = path.join(DIR, "TeamPage.tsx");
-const HELPERS = new Set(["testApp.ts", "teamExpect.ts"]);
+const HELPERS = new Set(["testApp.ts"]);
 
 const pageFiles = (): string[] => {
   expect(existsSync(PAGE), "TeamPage.tsx exists, so there is code to check").toBe(true);
