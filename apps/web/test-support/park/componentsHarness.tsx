@@ -39,6 +39,12 @@ export function mount(ui: ReactElement): Mounted {
 export function cleanup(): void {
   for (const m of live.splice(0)) m.unmount();
   document.body.innerHTML = "";
+  try {
+    window.localStorage.removeItem("tilo.time");
+    window.localStorage.removeItem("tilo.motion");
+  } catch {
+    // storage absent or blocked
+  }
 }
 
 export function click(el: Element): void {

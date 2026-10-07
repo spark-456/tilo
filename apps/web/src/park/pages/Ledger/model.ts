@@ -6,33 +6,20 @@ import type {
   Ledger,
   LedgerEntry,
 } from "../../api/types";
+import {
+  decisionOf,
+  gbp,
+  money,
+  sum,
+  waitingAmount,
+  waitingKey,
+  waitingTaken,
+} from "../../app/ledgerKpis";
 // The Ledger page's arithmetic: a typed port of the renderVals() of
 // design_handoff_tilo_web_app/design/Tilo App Ledger.dc.html (user's prototype, ADR-0003a). Pure functions
 // of the Ledger fixture and `dec`, so a test can pin every number. No clock, no random, no network.
-import type { KpiTone } from "../../components";
-
-const amount = (v: number): string =>
-  v < 100 && v % 1 ? v.toFixed(2) : Math.round(v).toLocaleString("en-GB");
-export const gbp = (v: number): string => `£${amount(v)}`;
-/** An amount in the Ledger's own currency: a live Ledger served in dollars is never shown as pounds. */
-export const money = (L: Ledger, v: number): string =>
-  L.currency === "USD" ? `$${amount(v)}` : gbp(v);
-
-/** The decision the ledger is waiting on: the one its pending transaction is tied to. */
-const waitingKey = (L: Ledger): DecisionKey | undefined => L.tx.find((t) => t.dec)?.dec;
-
-/** The amount that pending transaction is waiting on. */
-export const waitingAmount = (L: Ledger): number => L.tx.find((t) => t.dec)?.amt ?? 0;
-
-/** Whether the person has taken the decision the ledger was waiting on. */
-const waitingTaken = (L: Ledger, dec: Dec): boolean => {
-  const k = waitingKey(L);
-  return k !== undefined && !!dec[k];
-};
-
-/** The decision for `key` from the Api: its `world` to open and its `facts` (the words) come from there. */
-const decisionOf = (decisions: readonly Decision[], key: DecisionKey | undefined) =>
-  decisions.find((d) => d.k === key);
+export { gbp, kpis, money, waitingAmount } from "../../app/ledgerKpis";
+export type { KpiRow } from "../../app/ledgerKpis";
 
 /** The amount a taken decision's row shows: the money its facts name, or a dash when it names none. */
 const amountOf = (f: DecisionFacts): string => (f.amount === undefined ? "—" : gbp(f.amount));
@@ -50,75 +37,6 @@ const approveLabelOf = (
   const amt = facts?.amount ?? L.tx.find((t) => t.dec === key)?.amt;
   return amt === undefined ? "Approve" : `Approve ${gbp(amt)}`;
 };
-
-// ---- KPI tiles ----
-export interface KpiRow {
-  label: string;
-  value: string;
-  sub: string;
-  tone?: KpiTone;
-  /** The amber tile opens the world that is waiting. */
-  opensWorld?: string;
-}
-
-const sum = (xs: readonly number[]): number => xs.reduce((a, v) => a + v, 0);
-
-export function kpis(L: Ledger, dec: Dec, decisions: readonly Decision[] = []): KpiRow[] {
-  const waiting = waitingAmount(L);
-  const taken = waitingTaken(L, dec);
-  const pending = decisionOf(decisions, waitingKey(L));
-  const spent = taken ? L.spent + waiting : L.spent;
-  const hours = sum(L.hours.map((h) => h[1]));
-  // A tile the Ledger holds no data for is left out, not shown as zero (HR-1..HR-7): no budget gives no
-  // share of it, no forecast no month-end tile, no waiting transaction no "Waiting on you", and so on.
-  const rows: (KpiRow | null)[] = [
-    {
-      label: "Spent so far",
-      value: money(L, spent),
-      sub: L.budget > 0 ? `${Math.round((spent / L.budget) * 100)}% of ${gbp(L.budget)}` : "",
-    },
-    L.forecast > 0 && L.budget > 0
-      ? {
-          label: "Month-end forecast",
-          value: gbp(L.forecast),
-          sub: `${gbp(L.budget - L.forecast)} under budget`,
-        }
-      : null,
-    waitingKey(L) === undefined
-      ? null
-      : taken
-        ? {
-            label: "Waiting on you",
-            value: "£0",
-            sub: pending?.facts?.decided ?? "Approved today",
-            tone: "ok",
-          }
-        : {
-            label: "Waiting on you",
-            value: gbp(waiting),
-            sub: pending?.facts?.waiting ?? "Needs your sign-off",
-            tone: "amber",
-            ...(pending ? { opensWorld: pending.world } : {}),
-          },
-    L.memory.length
-      ? {
-          label: "Saved by memory",
-          value: gbp(sum(L.memory)),
-          sub: "Up £120 on August",
-          tone: "sch",
-        }
-      : null,
-    L.hours.length
-      ? {
-          label: "Hours handed back",
-          value: `${hours} h`,
-          sub: `About ${Math.round(hours / 8)} working days`,
-          tone: "hero",
-        }
-      : null,
-  ];
-  return rows.filter((r): r is KpiRow => r !== null);
-}
 
 /** The lede's "<month> · <n> days left": only when the Ledger holds daily spend for the month so far. */
 export const monthLeft = (L: Ledger): string | null =>

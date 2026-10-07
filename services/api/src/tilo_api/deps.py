@@ -26,6 +26,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Annotated, Any, Literal, Protocol, cast
 
 from fastapi import Depends, HTTPException, Request
+from starlette.requests import HTTPConnection
 from tilo_archive import RunArchive
 from tilo_connectors import InMemoryOutboxStore
 from tilo_connectors.registry import ConnectorRegistry, load_registry
@@ -44,8 +45,9 @@ from tilo_providers.interfaces import SafetyProvider
 from tilo_providers.router import Router, RouterExhaustedError
 from tilo_providers.safety import build_safety_provider
 
-from tilo_api import events, spend
+from tilo_api import events, firebase_auth, spend
 from tilo_api.access import AccessStore, Mode, enforced, provider_mode
+from tilo_api.appcheck import AppCheckVerifier, default_verifier
 from tilo_api.assistant.config import AssistantConfig, AssistantConfigError, load_assistant_config
 from tilo_api.people_access import NoSourceOwners
 from tilo_api.people_access import SourceOwners as PanelSourceOwners
@@ -76,6 +78,7 @@ class Principal:
     channel: Channel = "web"  # the session channel sign-in resolved for this request (FR-HIL-07,
     # world.paused.data.channel is derived from here, never from a request body
     districts: tuple[str, ...] = ()  # visible beyond vis: "all"; ignored for role == "owner"
+    demo_session: bool = False  # an anonymous demo session (SEC-15, BQ-SIGNIN-10): models are replay only, always
     full_session: bool = False  # a full web sign-in session (BQ-XWORLD-10): set only by the server that resolves the
     # session, never from anything in a request; needed to answer, or read in full, another owned world's cards
 
@@ -172,8 +175,40 @@ class EventWriter(Protocol):
         ...
 
 
-def get_current_principal() -> Principal:
-    raise HTTPException(status_code=401, detail="Sign in to use this.")  # no sign-in is wired: fail closed, cleanly
+SIGN_IN_REQUIRED = "Sign in to use this."
+
+
+def get_firebase_verifier() -> firebase_auth.FirebaseVerifier:
+    """SEC-15: checks a person's Firebase ID token (`tilo_api.firebase_auth`). Google's keys for the API's own
+    project; dev mode and an unconfigured project refuse without any call. Tests override it; it never decides
+    authorisation beyond who the person is."""
+    return firebase_auth.default_verifier()
+
+
+def get_current_principal(request: HTTPConnection = None) -> Principal:  # type: ignore[assignment]
+    """The signed-in person (SEC-15, BQ-SIGNIN-6): `Authorization: Bearer <Firebase ID token>`, verified through
+    `get_firebase_verifier`; `X-Tilo-Channel: mobile_web` picks the channel, nothing else in a request sets anything.
+    Every other case is a 401 with one fixed body, whatever the cause. Dev mode replaces this whole function
+    (`tilo_api.dev.install`), so a token is never looked at there."""
+    # FastAPI always injects the request; the default only lets a bare call (no sign-in) refuse with a 401.
+    if request is not None:
+        resolved = getattr(
+            request.state, "principal", None
+        )  # the access gate already verified this request (server-set)
+        if isinstance(resolved, Principal):
+            return resolved
+    token = None if request is None else firebase_auth.bearer_token(request.headers.getlist("authorization"))
+    if token is None:
+        raise HTTPException(status_code=401, detail=SIGN_IN_REQUIRED, headers={"WWW-Authenticate": "Bearer"})
+    try:
+        factory = request.app.dependency_overrides.get(get_firebase_verifier, get_firebase_verifier)
+        claims = factory().verify(token)
+        channel = firebase_auth.channel_of(request.headers.get("x-tilo-channel"))
+        return firebase_auth.principal_from_claims(claims, channel=channel)
+    except Exception as exc:  # any failure at all is "not signed in": nothing here ever fails open
+        reason = exc.code if isinstance(exc, firebase_auth.TokenRefused) else f"verifier_failed:{type(exc).__name__}"
+        logger.warning("sign-in token not accepted (reason=%s)", reason)  # a fixed code, never the token
+        raise HTTPException(status_code=401, detail=SIGN_IN_REQUIRED, headers={"WWW-Authenticate": "Bearer"}) from None
 
 
 def get_store() -> Store:
@@ -225,6 +260,12 @@ def get_access_store() -> AccessStore:
     raise HTTPException(status_code=503, detail="not_configured")
 
 
+def get_app_check_verifier() -> AppCheckVerifier:
+    """SEC-10: checks a client's App Check token (`tilo_api.appcheck`). Google's keys for the API's own project; dev
+    mode and an unconfigured project refuse without any call. Tests override it; it never decides authorisation."""
+    return default_verifier()
+
+
 def get_spend_caps() -> spend.SpendCaps:
     """SEC-16: `config/spend_caps.yaml`, read on every call (a cap is a config edit, never code)."""
     return spend.load_spend_caps(None)
@@ -255,8 +296,18 @@ def get_switches(request: Request, flags: Annotated[FlagStore, Depends(get_flag_
     return spend.Switches(flags, _resolve(request, get_spend_cap_ledger)) if enforced() else flags
 
 
-def spend_mode(request: Request, uid: str | None, declaration: str | None, switches: FlagStore) -> tuple[Mode, bool]:
-    """(mode, capped): SEC-15's decision, then deployed the `SpendGuard`'s; any doubt is replay (fail closed)."""
+def spend_mode(
+    request: Request, uid: str | None, declaration: str | None, switches: FlagStore, *, demo: bool | None = None
+) -> tuple[Mode, bool]:
+    """(mode, capped): SEC-15's decision, then deployed the `SpendGuard`'s; any doubt is replay (fail closed). An
+    anonymous demo session (`Principal.demo_session`, set by the gate from the verified token) is replay whatever
+    `TILO_JUDGE_LIVE` or the guard say (BQ-SIGNIN-10); its cap is still read, so new work is refused the same way."""
+    mode, capped = _spend_mode(request, uid, declaration, switches)
+    demo = getattr(request.state, "demo_session", False) if demo is None else demo  # the gate's flag, or the caller's
+    return ("replay" if demo is True else mode), capped
+
+
+def _spend_mode(request: Request, uid: str | None, declaration: str | None, switches: FlagStore) -> tuple[Mode, bool]:
     mode = provider_mode(declaration, os.environ, replay_only=bool(switches.get("replay_only")))
     if mode != "live" or uid is None or not isinstance(switches, spend.Switches):
         return mode, False
