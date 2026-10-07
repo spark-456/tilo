@@ -27,7 +27,6 @@ import re
 import sys
 import threading
 import time
-import uuid
 from collections.abc import Callable, Iterator, Mapping
 from contextvars import ContextVar
 from dataclasses import dataclass, field
@@ -35,6 +34,7 @@ from pathlib import Path
 from typing import Any, Literal
 
 from fastapi import FastAPI, Request
+from tilo_harness.outputs import UnitOutput
 from tilo_providers.config import ProviderConfigError, ProvidersConfig, load_providers_config, resolve_models_path
 from tilo_providers.errors import ProviderError, QuotaError, RequestError
 from tilo_providers.interfaces import Capability, GenerateRequest, GenerateResponse, ModelProvider, SafetyProvider
@@ -44,6 +44,7 @@ from tilo_providers.router import BudgetExceededError, Router
 from tilo_providers.safety import FakeSafetyProvider
 from tilo_providers.vertex_smoke import MAX_REASON_CHARS, classify, scrubbed_server_text
 
+from . import e2e_stand_ins
 from .bank import BankCase, BankError, load_bank
 from .bank_checks import CHECKS, Finding, check_case, terminal_honest
 from .bank_run import Observation, drive
@@ -54,10 +55,13 @@ STAGES = ("intake", "approaches", "plan", "run", "narrate")
 OUTCOME_CLASSES = frozenset(
     {"completed", "held_at_gate", "needs_answers", "refused", "failed", "stopped_at_cap", "replay_miss", "rejected"}
 )
-SAFETY_NOTE = "trusted_bank_input (Model Armor not wired)"  # BQ-LE2E-5
+SAFETY_NOTE = (
+    "trusted_bank_input (by design; Model Armor is the safety role's live adapter, FR-INT-02, #450)"  # BQ-LE2E-5
+)
 SYNTHETIC_MARKER = "SYNTHETIC"  # a file beside `model-recordings/`: a fake provider wrote them (BQ-LE2E-9)
 FAKED = (  # what a run never does for real, printed with every report (HR-1: say what is not real)
-    "safety screen: trusted bank input only (Model Armor not wired)",
+    "safety screen: trusted bank input only, by design (Model Armor is the safety role's live adapter, "
+    "FR-INT-02, #450)",
     "connectors and recipient: recording mocks; no real mailbox, chat or Drive write",
     "Verifier verdict: recorded in the unit's summary, not acted on",
     "must-ask judgement: a fixed 'nothing to ask' stand-in, no model call; the deterministic rules still ask",
@@ -489,8 +493,9 @@ class TrustedBankInputScreen(SafetyProvider):
     """TRUSTED-BANK-INPUT: allows a text only if it is byte-identical (after CRLF to LF, as the bank digest does) to the
     brief, an attached file, the file names or the scripted answers of the committed bank case being run, whose own file
     hash it re-checks on every call; refuses everything else with a clear error. Nothing untrusted can reach a live
-    model through it. It is NOT a general safety provider (Model Armor is not wired), is never registered in the
-    factory and is used only by `just live-e2e`. A trusted text still gets the fake screen's injection-marker scan."""
+    model through it. It is NOT a general safety provider (Model Armor is the safety role's live adapter, FR-INT-02,
+    #450), is never registered in the factory and is used only by `just live-e2e`. A trusted text still gets the fake
+    screen's injection-marker scan."""
 
     def __init__(self, case: BankCase) -> None:
         self._path, self._file = case.path, _sha(case.path.read_text(encoding="utf-8"))
@@ -613,11 +618,8 @@ class _UnitRunner:
             prompt = load_prompt("lead", "review.md", {"district": district, "work": _safe(work), **self._request()})
             review, spent = await asyncio.to_thread(self._ask, "lead", prompt)
             summary, credits = f"{summary} Lead review: {review[:200]}", credits + spent
-        ref = {
-            "artifact_id": f"art_live_{uuid.uuid4().hex[:20]}",
-            "version": 1,
-        }  # no artifact store yet: the item is a stand-in
-        return MeteredOutcome(success=True, summary=summary, artifact_refs=(ref,), credits=credits)
+        item = UnitOutput(media_type="text/markdown", content=text.encode("utf-8"))  # the executor stores it (ADR-0018)
+        return MeteredOutcome(success=True, summary=summary, outputs=(item,), credits=credits)
 
 
 def _safe(text: str) -> str:
@@ -676,6 +678,7 @@ def _app(router: _MeteredRouter, safety: SafetyProvider, runner: _UnitRunner) ->
             deps.get_router: lambda: router, deps.get_safety: lambda: safety, deps.get_plan_compiler: compiler,
             deps.get_unit_runner: lambda: runner, deps.get_action_resolver: lambda: resolve,
             deps.get_connector_adapters: lambda: adapters, deps.get_must_ask_providers: must_ask_providers,
+            **e2e_stand_ins.overrides(),  # the artifact store, redactor and raw archive the run needs (ADR-0018 T4)
         }
     )  # fmt: skip
     return app

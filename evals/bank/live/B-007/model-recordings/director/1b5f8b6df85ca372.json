@@ -1,0 +1,14 @@
+{
+  "key": "1b5f8b6df85ca372",
+  "profile": "flash-38",
+  "response": {
+    "profile_id": "flash-38",
+    "text": "{\"units\": [{\"actions\": [], \"connectors\": [], \"depends_on\": [], \"district\": \"D1\", \"id\": \"U1\", \"role\": \"writer\", \"skills\": [], \"title\": \"Write three subject-line variants\", \"unit_type\": \"draft\"}, {\"actions\": [], \"connectors\": [], \"depends_on\": [\"U1\"], \"district\": \"D1\", \"id\": \"U2\", \"role\": \"writer\", \"skills\": [], \"title\": \"Write the launch note\", \"unit_type\": \"draft\"}, {\"actions\": [], \"connectors\": [], \"depends_on\": [\"U2\"], \"district\": \"D1\", \"id\": \"U3\", \"role\": \"verifier\", \"skills\": [], \"title\": \"Check the length and tone\", \"unit_type\": \"verify\"}, {\"actions\": [\"save_file\"], \"connectors\": [\"google_drive\"], \"depends_on\": [\"U3\"], \"district\": \"D1\", \"id\": \"U4\", \"role\": \"writer\", \"skills\": [], \"title\": \"Save the result to Drive\", \"unit_type\": \"deliver\"}]}",
+    "usage": {
+      "input_tokens": 1000,
+      "output_tokens": 500,
+      "total_tokens": 1500
+    }
+  },
+  "role": "director"
+}

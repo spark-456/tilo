@@ -1,0 +1,8 @@
+# Which server's Authentication-Results header Tilo believes (FR-CHN-11, BQ-278 n, BQ-274 f).
+# A sender can write any header, including "Authentication-Results: attacker.example; dmarc=pass". Gmail writes its
+# own header above the sender's, and the text before its first ";" (the authserv-id) names the server that wrote it.
+# The Email Autopilot lets a reply ride the L2 undo window only when the replied-to message's header carries this
+# id (compared case-insensitively, whole value) and every DMARC verdict is "pass". A missing, blank or unreadable
+# value here fails closed: every such reply waits for a person (L1).
+# Shape: gmail_authserv_id: one DNS-style name, letters, digits, dots and hyphens, no spaces, no other keys.
+gmail_authserv_id: mx.google.com

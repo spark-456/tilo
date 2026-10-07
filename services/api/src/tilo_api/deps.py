@@ -16,25 +16,42 @@ from __future__ import annotations
 import functools
 import logging
 import math
+import os
 import threading
-from collections.abc import Callable, Mapping
+import time
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Literal, Protocol, cast
+from typing import TYPE_CHECKING, Annotated, Any, Literal, Protocol, cast
 
-from fastapi import HTTPException
+from fastapi import Depends, HTTPException, Request
+from tilo_archive import RunArchive
 from tilo_connectors import InMemoryOutboxStore
 from tilo_connectors.registry import ConnectorRegistry, load_registry
 from tilo_harness.executor import DefaultUnitRunner
 from tilo_harness.skills import SkillRegistry
+from tilo_memory.artifacts import ArtifactStore
+from tilo_metering import LedgerEntry
 from tilo_metering.flags import FlagStore, process_flags
+from tilo_people.stores import PeopleStores
 from tilo_planning.compiler import PlanInputs, compile_plan
+from tilo_planning.gaps import Gap
 from tilo_planning.memory import InMemoryPreferenceStore, MemoryLookup
 from tilo_planning.questions import Question
 from tilo_providers.config import ProviderConfigError, ProvidersConfig, load_providers_config, resolve_models_path
 from tilo_providers.interfaces import SafetyProvider
 from tilo_providers.router import Router
 from tilo_providers.safety import build_safety_provider
+
+from tilo_api import events, spend
+from tilo_api.access import AccessStore, Mode, enforced, provider_mode
+from tilo_api.assistant.config import AssistantConfig, AssistantConfigError, load_assistant_config
+from tilo_api.people_access import NoSourceOwners
+from tilo_api.people_access import SourceOwners as PanelSourceOwners
+
+if TYPE_CHECKING:
+    from tilo_api.assistant.core import Decider
+    from tilo_api.assistant.metering import DecisionCache, SpendLedger
 
 Role = Literal["owner", "team_lead", "approver", "viewer"]
 Channel = Literal["web", "mobile_web", "email"]  # WhatsApp removed: SD-01, ADR-0019
@@ -75,6 +92,7 @@ class WorldRecord:
     run_id: str = "r_village_basic_1"  # the world's current run; tilo-api reads this, never invents it
     paused: bool = False  # true once Pause all has actually paused this world (PRD 9.4 honesty:
     # only ever true together with a world.paused event queued or committed somewhere)
+    prior_world_id: str | None = None  # a scheduled run's previous world (FR-AGT-14b): offered, never silently reused
 
 
 @dataclass
@@ -94,6 +112,7 @@ class TaskRecord:
     approaches: list[dict] | None = None  # proposed for the current brief
     granted: bool = False
     scenario: str | None = None  # FR-INT-11: the scenario id named at intake; its policies are created at approve
+    gaps: tuple[Gap, ...] = ()  # FR-INT-15: the parts Tilo cannot do, set once at intake; answers and edits keep them
     lock: threading.Lock = field(default_factory=threading.Lock, repr=False, compare=False)
 
 
@@ -162,6 +181,16 @@ def get_event_writer() -> EventWriter:
     raise HTTPException(status_code=503, detail="not_configured")
 
 
+def get_ledger() -> Sequence[LedgerEntry]:
+    """The Treasury's ledger (FR-MTR-10). No ledger store is wired in yet (BQ-MTR10-4): fail closed."""
+    raise HTTPException(status_code=503, detail="not_configured")
+
+
+def prices_path() -> Path:
+    """config/prices.yaml, the price sheet (FR-MTR-01): the one public way for a route to find it."""
+    return _REPO_ROOT / "config" / "prices.yaml"
+
+
 def providers_config() -> ProvidersConfig:
     """Read on every call, not at import: `TILO_MODELS_FILE` picks the models file (PL-02)."""
     return load_providers_config(resolve_models_path(_REPO_ROOT), _REPO_ROOT / "config" / "prices.yaml")
@@ -187,14 +216,87 @@ def budget_cap_ceiling() -> float:
     return float(value)
 
 
-def get_router() -> Router:
-    """Every model call goes through the provider layer's Router (PL-01); it replays recordings unless the
-    user turned live mode on (EFF-01)."""
+def get_access_store() -> AccessStore:
+    """SEC-15: where each person's visitor-or-judge declaration is kept. Production has none wired yet, so a
+    deployed process closes every gated route (503) rather than guess; tests and the Firestore store override it."""
+    raise HTTPException(status_code=503, detail="not_configured")
+
+
+def get_spend_caps() -> spend.SpendCaps:
+    """SEC-16: `config/spend_caps.yaml`, read on every call (a cap is a config edit, never code)."""
+    return spend.load_spend_caps(None)
+
+
+@functools.cache
+def get_rate_limiter() -> spend.RateLimiter:
+    """SEC-16: one process-wide limiter from config (per instance on Cloud Run; a shared one is a later decision)."""
+    caps = get_spend_caps()
+    return spend.RateLimiter(limit=caps.rate_limit_requests, window_s=caps.rate_limit_window_s, clock=time.monotonic)
+
+
+def get_spend_cap_ledger() -> spend.SpendLedger:
+    """SEC-16's ledger (not FR-PA-19's `get_spend_ledger`). Unwired, a deployed judge is replay, never uncapped; wire
+    it only with the per-unit `SpendGuard.begin_unit`/`settle_unit` wiring (BQ-SEC16-1), or live spend is unmetered."""
+    raise HTTPException(status_code=503, detail="not_configured")
+
+
+def _resolve(request: Request, seam: Callable[[], Any]) -> Any:
+    try:  # the seam as the app is wired (overrides included), or None when it refuses or fails
+        return request.app.dependency_overrides.get(seam, seam)()
+    except Exception:
+        return None
+
+
+def get_switches(request: Request, flags: Annotated[FlagStore, Depends(get_flag_store)]) -> FlagStore:
+    """Deployed, NFR-24's flags plus the ledger's durable `replay_only` (FR-MTR-04); not deployed, the flags alone."""
+    return spend.Switches(flags, _resolve(request, get_spend_cap_ledger)) if enforced() else flags
+
+
+def spend_mode(request: Request, uid: str | None, declaration: str | None, switches: FlagStore) -> tuple[Mode, bool]:
+    """(mode, capped): SEC-15's decision, then deployed the `SpendGuard`'s; any doubt is replay (fail closed)."""
+    mode = provider_mode(declaration, os.environ, replay_only=bool(switches.get("replay_only")))
+    if mode != "live" or uid is None or not isinstance(switches, spend.Switches):
+        return mode, False
+    caps = _resolve(request, get_spend_caps)
+    if switches.ledger is None or caps is None:
+        return "replay", False
+    guard = spend.SpendGuard(switches.ledger, switches.flags, caps)
+    capped = guard.uid_capped(uid)
+    return provider_mode(declaration, os.environ, replay_only=not guard.live_allowed(uid), capped=capped), capped
+
+
+def get_mode(request: Request, switches: Annotated[FlagStore, Depends(get_switches)]) -> Mode:
+    """This request's model mode from what the access gate verified (never what a client sent): SEC-15, SEC-16."""
+    state = request.state
+    return spend_mode(request, getattr(state, "uid", None), getattr(state, "declaration", None), switches)[0]
+
+
+def get_work_mode(request: Request, switches: Annotated[FlagStore, Depends(get_switches)]) -> Mode:
+    """`get_mode` for new work, refused before any router is built: a switch set (503) or the uid capped (403)."""
+    if isinstance(switches, spend.Switches) and switches.get("replay_only"):
+        raise ReplayOnly
+    state = request.state
+    mode, capped = spend_mode(request, getattr(state, "uid", None), getattr(state, "declaration", None), switches)
+    if capped:
+        raise spend.SpendCapReached
+    return mode
+
+
+def router_for_mode(mode: Mode) -> Router:
+    """The one place a request's Router is built (PL-01). It replays recordings unless `mode` is "live", which only
+    `access.provider_mode` returns: the user's own global switch, or a deployed judge where the user set
+    `TILO_JUDGE_LIVE=1` (SEC-15). The permission is injected into the Router, never read-and-written from the
+    environment, so no request can turn live mode on for the process (EFF-01)."""
     try:
-        return Router(providers_config(), fixtures_dir=FIXTURES_DIR)
+        return Router(providers_config(), fixtures_dir=FIXTURES_DIR, live_permitted=(mode == "live"))
     except ProviderConfigError as exc:
         logger.warning("model router unavailable: %s", exc)
         raise HTTPException(status_code=503, detail="The model router is not configured.") from exc
+
+
+def get_router(mode: Annotated[Mode, Depends(get_work_mode)] = "replay") -> Router:
+    """Every model call goes through the provider layer's Router (PL-01), built for this request's mode."""
+    return router_for_mode(mode)
 
 
 def get_safety() -> SafetyProvider:
@@ -216,12 +318,18 @@ def _no_plan_compiler(*, brief: dict, approach: dict, budget_cap: float, context
     raise NotImplementedError("no `director` role is configured, so no plan can be compiled and no run starts")
 
 
-def get_plan_compiler() -> Callable[..., dict]:
+def _seam_router(mode: Mode) -> Router:
+    """The run seams build their Router through `get_router`, the request's mode threaded in by `runs.run_seams`.
+    The replay default stays a zero-argument call, so a zero-argument override of `get_router` keeps working."""
+    return get_router() if mode == "replay" else get_router(mode)
+
+
+def get_plan_compiler(mode: Mode = "replay") -> Callable[..., dict]:
     """`compile(*, brief, approach, budget_cap, context) -> PlanGraph` (FR-INT-09). The Director drafts it through
     the Router and `validate_plan` decides (BQ-90); with no `director` role in the provider config it refuses."""
     if "director" not in providers_config().roles:
         return _no_plan_compiler
-    router = get_router()
+    router = _seam_router(mode)
 
     def compile_with_director(*, brief: dict, approach: dict, budget_cap: float, context: PlanInputs) -> dict:
         return compile_plan(brief, approach, budget_cap, context, router=router).plan
@@ -246,18 +354,18 @@ class _RoleModel:
         return self._router.generate(self._role, request).response
 
 
-def _worker_models() -> Mapping[str, Any]:
-    router = get_router()
+def _worker_models(mode: Mode = "replay") -> Mapping[str, Any]:
+    router = _seam_router(mode)
     return {role: _RoleModel(router, role) for role in ("specialist", "writer", "verifier")}
 
 
-def get_unit_runner() -> Any:
-    return DefaultUnitRunner(cast(Any, _worker_models()))
+def get_unit_runner(mode: Mode = "replay") -> Any:
+    return DefaultUnitRunner(cast(Any, _worker_models(mode)))
 
 
-def get_must_ask_providers() -> Mapping[str, Any]:
+def get_must_ask_providers(mode: Mode = "replay") -> Mapping[str, Any]:
     """The models `MustAsk` judges a unit with (FR-AGT-05), keyed by the unit's role; always the Router's roles."""
-    return _worker_models()
+    return _worker_models(mode)
 
 
 def _no_recipients(*, unit: dict, action_type: str, item: dict, brief: dict) -> dict:
@@ -285,6 +393,70 @@ def get_connector_adapters() -> dict[str, Any]:
 @functools.cache
 def get_outbox_store() -> InMemoryOutboxStore:
     return InMemoryOutboxStore()  # the process's own until the Firestore store lands
+
+
+# ADR-0018 T4: tilo-api has no org until sign-in, so every run's artifact Scope is in this org (PRD 15.1), never a
+# request's.
+ORG_ID = "org_tilo"
+
+
+def get_artifact_store() -> ArtifactStore:
+    """Where a run's outputs go. No production backend exists until ADR-0018 T8 (Firestore, GCS), so this refuses and
+    no run starts (fail closed, BQ-AGT02-T4-1); dev mode wires one in-memory store."""
+    raise NotImplementedError("no artifact store is configured, so no run starts")
+
+
+def get_redactor() -> Callable[[str], str]:
+    """The shared secret redactor the store was given (MF-06). Not built until FR-MEM-05 (BQ-109): refuses."""
+    raise NotImplementedError("the shared secret redactor is not built, so no run starts")
+
+
+# --- the people API seams (PPL-11a, services/api/tests/API_PPL_11a.md section 4); production fails closed ---
+
+NOTICE_VERSION = "1.0.0"  # stamped as `attestation.notice_version` on a meeting a person adds; read at call time
+
+
+class PlateSources(Protocol):
+    """The cards, runs and mail a plate may draw on; each returns facts, possibly more than the person's own."""
+
+    def cards(self, user_id: str) -> Iterable[dict[str, Any]]: ...
+    def runs(self, user_id: str) -> Iterable[dict[str, Any]]: ...
+    def mail(self, user_id: str) -> Iterable[dict[str, Any]]: ...
+
+
+class SourceOwners(Protocol):
+    def owner_of(self, kind: str, ref: str) -> str | None: ...  # kind "mail" or "request"
+
+
+def get_people_stores() -> PeopleStores:
+    raise HTTPException(status_code=503, detail="not_configured")  # no Firestore adapter yet (ticket PPL-11c)
+
+
+def get_clock() -> Callable[[], str]:
+    return events.now  # a `common#timestamp`; a route reads it once per request
+
+
+def get_plate_sources() -> PlateSources:
+    raise HTTPException(status_code=503, detail="not_configured")
+
+
+def get_source_owners() -> SourceOwners:
+    raise HTTPException(status_code=503, detail="not_configured")
+
+
+class MeetingWorlds(Protocol):
+    """Creates the Outpost world that holds a meeting's transcript and minutes (FR-MTG-07, BQ-273)."""
+
+    def make_meeting_world(self, *, org_id: str, owner: str, meeting_id: str) -> str: ...
+
+
+def get_meeting_worlds() -> MeetingWorlds:
+    raise HTTPException(status_code=503, detail="not_configured")  # production wiring lands with the Outpost world
+
+
+def get_run_archive() -> Callable[..., RunArchive]:
+    """`open_archive(*, org_id, run_id) -> RunArchive`, the run's raw archive. No production store yet: refuses."""
+    raise NotImplementedError("no raw-archive store is configured, so no run starts")
 
 
 REPLAY_ONLY_MESSAGE = "This link is replay-only right now: new work is paused; finished runs can still be replayed."
@@ -337,3 +509,84 @@ def get_attempt_abandon_after_s() -> float:
     """How long an append may stay in flight before dispatch presumes it lost and resends the same
     event id (idempotent, EV-10)."""
     return _dispatch_config("attempt_abandon_after_s", _DEFAULT_ABANDON_AFTER_S)
+
+
+# --- the assistant panel seams (PPL-11b, services/api/tests/API_PPL_11b.md): each default refuses until wired ---
+
+
+class PlateSource(Protocol):
+    """ADR-0021: the one plate builder, for the signed-in person only (PE-26). PPL-11a supplies it (BQ-PPL11B-15)."""
+
+    def build(self, user: str, now: str) -> dict: ...
+
+
+class _PlateBuilder:
+    """The panel's `PlateSource` over PPL-11a's one plate builder (ADR-0021, BQ-PPL11B-15)."""
+
+    def __init__(self, stores: PeopleStores, sources: PlateSources, owners: SourceOwners) -> None:
+        self._stores, self._sources, self._owners = stores, sources, owners
+
+    def build(self, user: str, now: str) -> dict:
+        from tilo_api.people_plate import build_plate  # noqa: PLC0415  (people_plate imports this module)
+
+        plate = build_plate(self._stores, self._sources, self._owners, ORG_ID, user, now)
+        if plate is None:
+            raise LookupError("no such person")
+        return plate
+
+
+def get_plate_source(
+    stores: Annotated[PeopleStores, Depends(get_people_stores)],
+    sources: Annotated[PlateSources, Depends(get_plate_sources)],
+    owners: Annotated[SourceOwners, Depends(get_source_owners)],
+) -> PlateSource:
+    return _PlateBuilder(stores, sources, owners)  # each seam is 503 `not_configured` until wired
+
+
+def get_panel_source_owners() -> PanelSourceOwners:
+    return NoSourceOwners()  # fail closed until PPL-31 and PPL-11a read the owner from the source store (BQ-PPL11B-13)
+
+
+def get_assistant_config() -> AssistantConfig:
+    """Read on every call; an unusable file closes the panel (503) and the log names the key path only."""
+    try:
+        return load_assistant_config()
+    except AssistantConfigError as exc:
+        logger.warning("assistant config unusable: %s", exc)
+        raise HTTPException(status_code=503, detail="not_configured") from exc
+
+
+@functools.cache
+def get_spend_ledger() -> SpendLedger:
+    """The panel's daily allowance per person (FR-PA-19): in memory and process-wide until a shared store exists
+    (BQ-PPL11B-6), like `get_outbox_store`."""
+    from tilo_api.assistant.metering import InMemorySpendLedger  # noqa: PLC0415  (metering imports the model modules)
+
+    return InMemorySpendLedger()
+
+
+@functools.cache
+def get_decision_cache() -> DecisionCache:
+    from tilo_api.assistant.metering import InMemoryDecisionCache  # noqa: PLC0415
+
+    config = get_assistant_config()
+    return InMemoryDecisionCache(per_user_entries=config.cache_per_user_entries, ttl_hours=config.cache_ttl_hours)
+
+
+def get_assistant_decider(mode: Annotated[Mode, Depends(get_mode)] = "replay") -> Decider | None:
+    """The model fallback (FR-PA-14, FR-PA-19): the metered decider over the Router, or None, and the panel answers
+    by rules only. None when the `assistant` role is not configured (dev mode), has no caps or no price, or the
+    router or the safety provider is unavailable."""
+    from tilo_api.assistant.metering import MeteredDecider  # noqa: PLC0415
+    from tilo_api.assistant.model import AssistantModelUnavailable, ModelDecider  # noqa: PLC0415
+
+    try:
+        config = get_assistant_config()
+        providers = providers_config()
+        if config.model["role"] not in providers.roles:
+            return None
+        router = _seam_router(mode)
+        inner = ModelDecider(router=router, providers=providers, safety=get_safety(), config=config)
+        return MeteredDecider(inner, ledger=get_spend_ledger(), cache=get_decision_cache(), config=config)
+    except (HTTPException, ProviderConfigError, AssistantModelUnavailable):
+        return None

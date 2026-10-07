@@ -36,3 +36,54 @@
     - {id: save_as_google_file, capability: write, description: "Save a deck, doc or sheet as a Slides, Docs or Sheets file in a Tilo folder in your Drive.", risk_tier: T1, gate_type: approval, irreversible: false}
   limits: {per_minute: 60, batch_size: 50}
   data_class: {returns: [personal, business], redact: []}
+
+# Build partner (PRD supplement 2026-10-05 s6, SD-03; FR-CON-16, FR-CON-17). Link route only: Tilo makes a
+# Lovable "Build with URL" link from the person-accepted requirements and the person presses send in Lovable,
+# so there is no key, no token and no scope (auth none), and Tilo makes no call to Lovable. build_handoff is
+# `send`: it delivers a composed prompt to an outside party (`share` grants access to a stored file). It is T3
+# (also listed in config/autonomy.yaml) and irreversible: once the person opens the link the prompt and the
+# granted data it carries are with Lovable. Route limits are in config/build_partners.yaml. Listed after gmail
+# and google_drive: the dev Director takes the first gated action in catalogue order.
+- id: lovable
+  name: Lovable
+  icon: build
+  auth: none
+  scopes: {}
+  capabilities: [send]
+  actions:
+    - {id: build_handoff, capability: send, description: "Hand the accepted requirements to Lovable as a build prompt you send yourself.", risk_tier: T3, gate_type: approval, irreversible: true}
+  limits: {per_minute: null, batch_size: null}
+  data_class: {returns: [business], redact: []}
+# Google Calendar (FR-CAL-02, FR-CAL-08, FR-CON-14; services/connectors/tests/API_FR_CAL_08.md): read only in
+# this release. Events of the person's own primary calendar, synced with a sync token inside their working
+# window (config/personal.yaml). The request's field mask asks Google for no description, attendee address,
+# conference link or location, so there is nothing to redact (PE-13). Writing (FR-CAL-04, calendar.events)
+# is not declared until it is built. per_minute is per connected person; batch_size is the page size
+# (Google's maximum for events.list).
+- id: google_calendar
+  name: Google Calendar
+  icon: calendar
+  auth: oauth2
+  scopes:
+    read: ["https://www.googleapis.com/auth/calendar.readonly"]
+  capabilities: [read]
+  actions:
+    - {id: read_events, capability: read, description: "Read the events on your own calendar to show them in Tilo.", risk_tier: T1, gate_type: none, irreversible: false}
+  limits: {per_minute: 60, batch_size: 2500}
+  data_class: {returns: [personal, business], redact: []}
+
+# meeting_host (FR-MTG-09, ADR-0024): the meeting bot's OWN Google account creates a Calendar event with a Meet link
+# and Google invites the attendees the Owner approved. The one write scope sits on that account, which holds no
+# personal data; every person's own google_calendar grant stays read-only. Always T3 (the Owner is invited, so
+# new_recipients applies). The Meet link is never stored; the request asks Google for none.
+- id: meeting_host
+  name: Tilo meeting host
+  icon: calendar
+  auth: oauth2
+  scopes:
+    send: ["https://www.googleapis.com/auth/calendar.events.owned"]
+  capabilities: [send]
+  actions:
+    - {id: create_meeting_event, capability: send, description: "On the meeting bot's own Google account (sign in as the bot, not as yourself): create a meeting with a Meet link and invite the people you approve.", risk_tier: T3, gate_type: approval, irreversible: true}
+  limits: {per_minute: 30, batch_size: 50}
+  data_class: {returns: [business], redact: []}

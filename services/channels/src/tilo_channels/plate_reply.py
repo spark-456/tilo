@@ -18,7 +18,7 @@ from collections.abc import Callable
 from hashlib import sha256
 
 from .autopilot import Autopilot, DraftContext, Preview
-from .drafting import Drafter, message_id_of
+from .drafting import Drafter, ReplyTargetMoved, message_id_of
 from .triage import MailReader, TriageStore
 from .triage import _result as triage_result  # the one place the "flag beats label beats model" rule lives
 
@@ -66,13 +66,24 @@ class PlateReply:
         own_id = message_id_of(mail) if mail else ""
         if not isinstance(thread_id, str) or not thread_id or not own_id:  # nothing proves the draft answers this mail
             return None
-        if self._read(self._drafter.reply_target, user_id, thread_id, mailbox) != own_id:
+        # The message answered is named by its Gmail id (no sender writes it), never by the Message-ID header text,
+        # which a later message can copy or write with look-alike characters.
+        if self._read(self._drafter.reply_target, user_id, thread_id, mailbox) != mail_id:
             return None  # a later message in the thread would be the one answered
         instruction_id = _instruction_id(request_id, mail_id)
-        result = self._drafter.draft(
-            user_id, instruction_id=instruction_id, thread_id=thread_id, instruction="", mailbox=mailbox, mode=MODE
-        )
-        if result.draft is not None and result.draft.in_reply_to != own_id:  # the thread moved between the two reads
+        try:  # the drafter reads the thread again; if it changed, it raises before storing or emitting anything
+            result = self._drafter.draft(
+                user_id,
+                instruction_id=instruction_id,
+                thread_id=thread_id,
+                instruction="",
+                mailbox=mailbox,
+                mode=MODE,
+                answers=mail_id,
+            )
+        except ReplyTargetMoved:
+            return None
+        if result.draft is not None and result.draft.in_reply_to != own_id:  # a draft stored for the same tap earlier
             return None
         context = DraftContext(instruction_id, thread_id, "", mailbox, MODE)
         return self._autopilot.preview(user_id, context, result)

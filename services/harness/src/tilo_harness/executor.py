@@ -22,9 +22,11 @@ itself. Once a successful unit has handed over, each artifact it handed over get
 With `artifacts` and `scope` (FR-AGT-02, FR-MEM-06; ADR-0018 s5) a successful unit's `outputs` are stored with their
 `created` manifests (`outputs.keep`) after the runner returns and before `agent.handoff`, then announced: one
 `artifact.created` (or `artifact.versioned` for an output with a `parent`) per version, its data from the store's
-record, the unit's credits on the first. Its `artifact_refs` must be versions the store holds in `scope`. The envelope
-names the stored refs, then those. Any refusal fails the unit with no artifact event. Without a store, a unit that
-returns outputs fails (nowhere to put them) and its refs pass unchecked as before (tilo-api until ADR-0018 T4).
+record, the unit's credits on the first. Its `artifact_refs` must be versions the store holds in `scope` and the world
+recorded (`writer.recorded_version`). The envelope names the stored refs, then those. Any refusal fails the unit with no
+artifact event. `scope` must be the writer's org and world, or the plan is refused. Without a store, a unit that returns
+outputs fails (nowhere to put them) and its refs pass unchecked. With `before_handoff` (tilo-api's gate), a unit whose
+items are announced hands off only if it returns True; False fails the unit.
 
 Per unit: agent.spawned (Lead spawns the worker), agent.assigned, skill.loaded per pinned skill,
 agent.working, the `UnitRunner`'s work, agent.handoff (typed envelope, worker to Lead) when it
@@ -40,14 +42,16 @@ from __future__ import annotations
 import asyncio
 import dataclasses
 import math
-from collections.abc import Callable, Mapping
+from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass, field
 from typing import Any, Protocol
 
 from tilo_providers.interfaces import GenerateRequest, ModelProvider
 from tilo_providers.prompts import load_prompt
 
+from tilo_harness.branch import Checkpoint, hit_summary, reusable_units
 from tilo_harness.config import AgentsConfig
+from tilo_harness.context_handoff import context_pct, next_spare, note_is_valid, store_note
 from tilo_harness.must_ask import Ask, MustAsk
 from tilo_harness.outputs import Kept, UnitOutput, existing, keep
 from tilo_harness.question_wait import Answer, QuestionWait
@@ -74,6 +78,8 @@ class UnitOutcome:
     artifact_refs: tuple[dict[str, Any], ...] = ()  # versions that already exist, which the unit selects
     provenance_ids: tuple[str, ...] = ()
     outputs: tuple[UnitOutput, ...] = ()  # what the unit made; the executor stores it (ADR-0018)
+    context_share: float | None = None  # share 0..1 of this agent's context window used when run() returned (FR-AGT-09)
+    handoff_note: dict[str, Any] | None = None  # a draft handoff note when the agent stops unfinished (FR-AGT-09)
 
 
 @dataclass(frozen=True)
@@ -81,10 +87,16 @@ class UnitContext:
     agent_id: str
     skills: tuple[LoadedSkill, ...]
     answer: Answer | None = None  # the answer to the question this unit asked before it started (FR-HIL-10)
+    note: dict[str, Any] | None = None  # the validated note a successor starts from (FR-AGT-09)
+    note_ref: dict[str, Any] | None = None  # that note's artifact_ref
 
 
 class UnitRunner(Protocol):
     async def run(self, unit: Mapping[str, Any], context: UnitContext) -> UnitOutcome: ...
+
+
+# (unit, worker, [(announced ref, its artifact event id)]) -> whether the unit may hand off (e.g. tilo-api's gate)
+BeforeHandoff = Callable[[dict[str, Any], str, list[tuple[dict[str, Any], str]]], Awaitable[bool]]
 
 
 @dataclass
@@ -94,6 +106,7 @@ class RunResult:
     skipped: list[str] = field(default_factory=list)
     parked: list[str] = field(default_factory=list)  # waiting for a person's answer (FR-AGT-05)
     held: list[str] = field(default_factory=list)  # answered, and the answer leaves the unit unrun (FR-HIL-10)
+    reused: list[str] = field(default_factory=list)  # taken from the parent run's checkpoint, not run (FR-MEM-11)
 
     @property
     def failed(self) -> list[str]:
@@ -132,6 +145,7 @@ class _Roster:
     levels: dict[str, str]  # district -> level
     workers: dict[str, str]  # unit -> worker agent
     sites: dict[str, str]  # unit -> building
+    ranks: dict[str, str] = field(default_factory=dict)  # agent -> rank, in layout order (FR-AGT-09 successors)
 
 
 def _dependency_order(units: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -188,7 +202,7 @@ def _roster(units: list[dict[str, Any]], layout: dict[str, Any], config: AgentsC
         leads[district["id"]] = district["lead"]
         levels[district["id"]] = level_id
         workers[unit["id"]] = pool[unit["role"]].pop(0)
-    return _Roster(directors[0], leads, levels, workers, sites)
+    return _Roster(directors[0], leads, levels, workers, sites, rank)
 
 
 def _envelope(outcome: UnitOutcome, worker: str, lead: str, unit: dict[str, Any]) -> dict[str, Any] | None:
@@ -242,10 +256,15 @@ class _Run:
         verifier: Verifier | None,
         question_wait: QuestionWait | None,
         store: dict[str, Any],
+        before_handoff: BeforeHandoff | None,
+        handoff_at: float = 1.0,
     ) -> None:
         self.writer, self.roster, self.skills, self.pins, self.runner = writer, roster, skills, pins, runner
         self.must_ask, self.verifier, self.question_wait = must_ask, verifier, question_wait
-        self.store = store  # artifacts, scope, archive, redact, max_attempts (ADR-0018); empty without a store
+        self.store = store  # artifacts, scope, archive, redact, max_attempts, recorded (ADR-0018); empty without one
+        self.before_handoff = before_handoff
+        self.handoff_at = handoff_at  # config.context.handoff_at: a handoff is valid from this share (FR-AGT-09)
+        self.used = {*roster.workers.values(), *([verifier.agent_id] if verifier is not None else [])}  # not spare
         self.held: set[str] = set()
         self.handoffs: dict[str, str] = {}  # unit -> the agent.handoff event that carried its artifacts
 
@@ -351,19 +370,8 @@ class _Run:
             cause = self.emit(
                 "agent.working", worker, site, "The agent is working.", {"unit": unit_id}, cause=cause, **at
             )
-            ran: object
-            try:
-                # Its own task, so a runner that cancels the current task cancels only its work.
-                ran = await asyncio.ensure_future(self.runner.run(unit, UnitContext(worker, loaded, answer)))
-            except asyncio.CancelledError:
-                task = asyncio.current_task()
-                if task is not None and task.cancelling():  # the run itself was cancelled
-                    raise
-                ran = None  # the runner cancelled its own work: this unit fails, the run goes on
-            except Exception:  # a runner crash fails this unit closed; the run goes on
-                ran = None
-            failed = UnitOutcome(success=False, summary="The unit's work failed.")
-            outcome = ran if isinstance(ran, UnitOutcome) else failed
+            first = UnitContext(worker, loaded, answer)
+            outcome, worker, cause = await self.run_agents(unit, first, site, cause, at)  # a successor may finish it
         made: list[Kept] = []
         if outcome.success is True:
             outcome, made = await self.keep(unit, worker, outcome, trail)
@@ -372,8 +380,14 @@ class _Run:
             outcome = UnitOutcome(success=False, summary="The unit's result was not a valid handoff.")
         if envelope is not None:
             credits = getattr(outcome, "credits", 0)  # the unit's credits ride on its first item (HR-1: the meter)
-            for index, item in enumerate(made):
-                self.announce(item, worker, cause, district, credits if index == 0 else 0)
+            announced = [
+                (item.version.ref, self.announce(item, worker, cause, district, credits if index == 0 else 0))
+                for index, item in enumerate(made)
+            ]
+            if self.before_handoff is not None and not await self.before_handoff(unit, worker, announced):
+                outcome = UnitOutcome(success=False, summary="The unit's step before its handoff did not finish.")
+                envelope = None
+        if envelope is not None:
             summary = "The agent handed its result to the Lead."
             try:
                 cause = self.emit("agent.handoff", worker, lead, summary, {"envelope": envelope}, cause=cause, **at)
@@ -383,6 +397,71 @@ class _Run:
                 self.handoffs[unit_id] = cause
         self.emit("agent.retired", lead, worker, "The agent finished and left.", {}, cause=cause, **at)
         return outcome
+
+    async def call(self, work: Awaitable[Any]) -> Any:
+        """The runner's result, or None if it crashed or cancelled its own work (a cancel of the run itself goes on)."""
+        try:
+            return await asyncio.ensure_future(work)  # its own task: a runner cancelling "the current task" is itself
+        except asyncio.CancelledError:
+            task = asyncio.current_task()
+            if task is not None and task.cancelling():  # the run itself was cancelled
+                raise
+        except Exception:  # a runner crash fails this unit closed; the run goes on
+            pass
+        return None
+
+    async def run_agents(
+        self, unit: dict[str, Any], context: UnitContext, site: str, cause: str, at: dict[str, Any]
+    ) -> tuple[UnitOutcome, str, str]:
+        """Runs the unit. While the agent stops unfinished, the Lead hands the unit on (FR-AGT-09, PRD 8.5): the note is
+        checked and stored before anything is announced, then the successor verifies it before it continues.
+        Returns the outcome, the agent that ended the unit and the last event."""
+        worker, lead, handoffs = context.agent_id, self.roster.leads[unit["district"]], 0
+        closed = UnitOutcome(success=False, summary="The handoff could not be completed, so the unit stopped.")
+        while True:
+            ran = await self.call(self.runner.run(unit, context))
+            if not isinstance(ran, UnitOutcome):
+                return UnitOutcome(success=False, summary="The unit's work failed."), worker, cause
+            if ran.handoff_note is None or ran.success is not True:
+                return ran, worker, cause
+            note, pct = ran.handoff_note, context_pct(ran.context_share, self.handoff_at)
+            successor = next_spare(self.roster.ranks, unit["role"], self.used)
+            if pct is None or not note_is_valid(note) or not self.store or successor is None:
+                return closed, worker, cause  # nothing handoff-shaped is written
+            self.used.add(successor)  # reserved before any await, so a concurrent handoff cannot pick the same spare
+            try:
+                ref = await asyncio.to_thread(
+                    store_note, self.store, self.writer.run_id, unit["id"], worker, note, handoffs
+                )
+            except Exception:  # a refused or failed put: fail closed, and the unused spare goes back
+                self.used.discard(successor)
+                return closed, worker, cause
+            handoffs += 1
+
+            def say(type_: str, actor: str, target: str, text: str, data: dict[str, Any]) -> str:
+                return self.emit(type_, actor, target, text, data, cause=cause, **at)
+
+            started = {"note": ref, "context_pct": pct}
+            cause = say("agent.context_handoff_started", worker, worker, "The agent wrote a handoff note.", started)
+            cause = say("agent.spawned", lead, successor, "A successor joined the team.", {"role": unit["role"]})
+            cause = say("agent.assigned", lead, successor, "The Lead gave it the unit.", {"unit": unit["id"]})
+            context = UnitContext(successor, context.skills, None, note, ref)
+            check = getattr(self.runner, "verify", None)
+            verified = check is not None and await self.call(check(unit, context)) is True
+            done = {"predecessor": worker, "note": ref, "verification_passed": verified}
+            cause = say("agent.context_handoff_completed", successor, site, "The successor took over.", done)
+            say("agent.retired", lead, worker, "The agent handed over and left.", {})
+            worker = successor
+            if not verified:
+                return closed, worker, cause
+
+    def reuse(self, unit: dict[str, Any], checkpoint: Checkpoint) -> UnitOutcome:
+        """A unit taken from the checkpoint: one `memory.hit` and nothing else (HR-1: no event, no animation)."""
+        finished, worker = checkpoint.units[unit["id"]], self.roster.workers[unit["id"]]
+        data = {"origin_cost": finished.origin_cost, "lookup_cost": 0, "saved": finished.origin_cost}
+        summary, district = hit_summary(finished.origin_cost), unit["district"]
+        self.emit("memory.hit", worker, worker, summary, data, district=district, cause=finished.handoff_event_id)
+        return UnitOutcome(success=True, artifact_refs=finished.artifact_refs)
 
     async def keep(
         self, unit: dict[str, Any], worker: str, outcome: UnitOutcome, trail: list[dict[str, Any]]
@@ -396,7 +475,7 @@ class _Run:
             credits = getattr(outcome, "credits", 0)
             if isinstance(credits, bool) or not isinstance(credits, int | float) or not 0 <= credits < math.inf:
                 raise ValueError("the unit's credits are not a finite number of at least 0")
-            selected = existing(store["artifacts"], store["scope"], outcome.artifact_refs)
+            selected = existing(store["artifacts"], store["scope"], outcome.artifact_refs, store["recorded"])
             made = await asyncio.to_thread(
                 keep, outcome.outputs, run_id=self.writer.run_id, unit=unit, worker=worker, events=list(trail), **store
             )
@@ -405,7 +484,7 @@ class _Run:
         except Exception:  # a refused put, manifest or ref, or a backend error: no artifact event for this unit
             return UnitOutcome(success=False, summary="The unit's result could not be stored."), []
 
-    def announce(self, item: Kept, worker: str, cause: str, district: str, credits: float) -> None:
+    def announce(self, item: Kept, worker: str, cause: str, district: str, credits: float) -> str:
         """One event per stored version, its data from the store's record (ADR-0018 s6): no runner-named id or hash."""
         record, ref = item.version.record, item.version.ref
         if record["parents"]:  # EV-15: created names version 1 only; a later version is recorded as versioned
@@ -416,7 +495,7 @@ class _Run:
             data = {"artifact": ref} | {k: record[k] for k in ("content_sha256", "media_type", "size_bytes")}
         labelled = {"item": {"kind": "document", "artifact_id": ref["artifact_id"], "label": item.label}}
         extra = labelled if item.label is not None else {}
-        self.emit(
+        return self.emit(
             type_, worker, ref["artifact_id"], summary, data, cause=cause, district=district, credits=credits, **extra
         )
 
@@ -444,11 +523,24 @@ async def run_plan(
     scope: Any = None,
     archive: Any = None,
     redact: Callable[[str], str] | None = None,
+    before_handoff: BeforeHandoff | None = None,
+    reuse: Checkpoint | None = None,
 ) -> RunResult:
-    """`artifacts` (a `tilo_memory.artifacts.ArtifactStore`) comes with the run's `scope` and the shared secret
-    `redact`or the store also got; `archive` (`tilo_archive.RunArchive`) is the run's raw archive, for manifests."""
-    if artifacts is not None and (scope is None or redact is None):
-        raise PlanRefused(["run_plan: an artifact store needs the run's scope and the secret redactor"])
+    """`artifacts` (a `tilo_memory.artifacts.ArtifactStore`) comes with the run's `scope`, which must be the writer's
+    org and world, and the shared secret `redact`or the store also got; `archive` (`tilo_archive.RunArchive`) is the
+    run's raw archive, for manifests. The writer then also says what its world recorded (`recorded_version`).
+
+    With `reuse` (FR-MEM-11) this run is a branch of the checkpoint's parent run (its run id must differ, else
+    `ValueError` before any write): a finished, unchanged unit whose dependencies are all reused is not run but
+    recorded as one `memory.hit`, a success with the parent's refs, before its dependents start (see `branch`)."""
+    if reuse is not None and getattr(writer, "run_id", None) == reuse.parent_run_id:
+        raise ValueError("run_plan: a branch needs its own run id, not the parent run's")
+    if artifacts is not None:
+        if scope is None or redact is None or not callable(getattr(writer, "recorded_version", None)):
+            raise PlanRefused(["run_plan: an artifact store needs the scope, the redactor and the world's record"])
+        writer_at = (getattr(writer, "org_id", None), getattr(writer, "world_id", None))
+        if (getattr(scope, "org_id", None), getattr(scope, "world_id", None)) != writer_at:
+            raise PlanRefused(["run_plan: the artifact scope is not the writer's org and world"])
     validator = repo_validator()
     problems = validator.contract_problems("plan", plan) + validator.contract_problems("layout", layout)
     if problems:
@@ -466,16 +558,35 @@ async def run_plan(
 
     result = RunResult(pins=pins)
     store = {"artifacts": artifacts, "scope": scope, "archive": archive, "redact": redact}
-    store |= {"max_attempts": config.retries.max_attempts}
+    if artifacts is not None:
+        store |= {"max_attempts": config.retries.max_attempts, "recorded": writer.recorded_version}
     run = _Run(
-        writer, roster, skills, pins, runner, must_ask, verifier, question_wait, store if artifacts is not None else {}
+        writer,
+        roster,
+        skills,
+        pins,
+        runner,
+        must_ask,
+        verifier,
+        question_wait,
+        store if artifacts is not None else {},
+        before_handoff,
+        config.context.handoff_at,
     )
     run.spawn_team()
     slots = asyncio.Semaphore(config.limits.max_specialists)
     loop = asyncio.get_running_loop()
     finished: dict[str, asyncio.Future[bool]] = {unit["id"]: loop.create_future() for unit in order}
+    if reuse is not None:
+        reused = set(reusable_units(reuse, order, getattr(writer, "recorded_version", None)))
+        for unit in (u for u in order if u["id"] in reused):
+            result.outcomes[unit["id"]] = run.reuse(unit, reuse)
+            result.reused.append(unit["id"])
+            finished[unit["id"]].set_result(True)
 
     async def unit_task(unit: dict[str, Any]) -> None:
+        if unit["id"] in result.reused:
+            return
         dependencies_ok = [await finished[dep] for dep in unit["depends_on"]]
         if not all(dependencies_ok):
             result.skipped.append(unit["id"])

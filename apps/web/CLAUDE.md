@@ -6,10 +6,10 @@ Trace lenses, cards and settings.
 
 ## Commands
 - `pnpm --filter @tilo/web run dev` / `build` / `test` / `test:e2e` — dev server / build / Vitest / Playwright (always `TILO_WEB_PORT=<own port>`; a filtered run also runs the whole `timing` project unless `--no-deps`)
-- `just tokens` — regenerate token files from `design/tokens.json`; `just check` — full gate; `just e2e-cp2` — `@cp2` Playwright walk on the real dev API (starts `tilo-api` + its own Vite; local only, never CI)
+- `just tokens` — regenerate token files from `design/tokens.json`; `just check` — full gate; `just e2e-cp2` — `@cp2` Playwright walk on the real dev API (starts `tilo-api` + its own Vite; local only, never CI); `just parity [page]` — Park pixel-parity report vs the design (`parity-report/`, local only)
 
 ## Contracts
-- Reads `packages/contracts-ts` types and Firestore docs under security rules; writes only through `tilo-api` (`src/api/http.ts`, chosen by `VITE_TILO_API_URL`, else the fixture client; polls events by seq).
+- Reads `packages/contracts-ts` types and Firestore docs under security rules; writes only through `tilo-api` (`src/api/http.ts`, chosen by `VITE_TILO_API_URL`, else the fixture client; polls events by seq). `TiloApiError.code` carries an access refusal (SEC-15: `src/access/` sign-up question, under-construction page, `AccessGate`; not mounted until real sign-in).
 
 ## Config and requirement IDs
 `config/themes/` (world themes), feature flags. UX-1–UX-9 (18.1); FR-WLD-*; owned from P0-08.

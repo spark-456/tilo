@@ -198,6 +198,23 @@ these).
   allowlist and Cloud Audit Logs are the controls. Closing it fully needs a deploy path that fixes each service's
   runtime account, which is a later decision.
 
+## Nightly eval smoke (EFF-05b, Cloud Scheduler)
+
+Cloud Scheduler `tilo-eval-nightly` (daily 19:00 UTC) starts the Cloud Run job `tilo-eval-nightly`, which runs
+`python -m tilo_evals nightly` (replay; no secret, no live switch). `infra/envs/dev/eval_nightly.tf` creates it with two
+new service accounts (`tilo-eval-scheduler`: `roles/run.invoker` on that one job; `tilo-eval-runner`: no role).
+Order: build the image first (`just build-evals-image`, Cloud Build as `tilo-cloudbuild`, pushes `tilo/evals:latest`);
+then check the Terraform offline with `just tf-validate` (`terraform init -backend=false` and `terraform validate`
+in `infra/envs/dev`; it downloads providers but needs no credentials and changes nothing); then plan and apply as in
+`infra/README.md`. Expect exactly 6 to add (google_service_account.eval_scheduler, google_service_account.eval_runner,
+google_cloud_run_v2_job.eval_nightly, its google_cloud_run_v2_job_iam_member, google_cloud_scheduler_job.eval_nightly, and
+module.monitoring.google_monitoring_alert_policy.eval_nightly_failed, EFF-05c), 1 to change (the Artifact Registry
+repository `tilo` gains two cleanup policies, in place, for the `evals` package only: keep the newest 5 versions, delete
+older ones after 7 days), 0 to destroy; any destroy means stop and ask. The alert emails `alert_email` when an execution of
+the job finishes as failed. Test the job once with
+`gcloud run jobs execute tilo-eval-nightly --region asia-southeast1 --project essential-wares-510320-f0 --wait`
+and read the job log in Cloud Logging. The job fails until the `nightly` command (EFF-05a) is in the image.
+
 ## Web app (Firebase Hosting, manual; P0-07c)
 
 ```powershell

@@ -1,0 +1,23 @@
+# Personal settings of the people features (PRD addendum 2026-10-05, docs/prd-addendum-people-agents.md).
+# Started by FR-CAL-08 with the two keys it needs; CC-PEOPLE-2 adds the rest of this file (reminder caps,
+# retention, disclosure, wake aliases, attention window, voice caps) and its contract schema, and keeps
+# these two keys as they are (BQ-CAL8-1). Each loader checks only its own keys and ignores the others.
+#
+# working_window: local wall-clock time in each person's `time_zone` (person.schema.json), start inclusive,
+# end exclusive, start before end (no overnight window). One window for everyone in this release: the
+# FR-PA-05 reminder window (09:00 to 18:00) and the FR-CAL-08 sync window are this key.
+working_window: {start: "09:00", end: "18:00"}
+
+# calendar_sync (FR-CAL-08; loader and rules in services/connectors/tests/API_FR_CAL_08.md). The page size
+# and the per-minute request limit come from config/connectors.yaml `google_calendar.limits`.
+calendar_sync:
+  poll_interval_s: 900 # one incremental sync per person every 15 minutes, inside the working window only
+  past_days: 7 # a full sync lists from now - 7 days; older cached entries are evicted
+  future_days: 366 # ... to now + 366 days; instances further out are not cached (BQ-CAL8-4)
+  max_pages: 25 # pages in one sync run; 2 x max_pages stays below the per-minute limit
+  backoff_base_s: 60 # after the n-th failure in a row: min(base x 2^(n-1), max), or Google's Retry-After
+  backoff_max_s: 3600
+
+# FR-MTG-09 (bot-hosted meeting): the longest meeting the bot will host, 1..1440 minutes. Google ends a free
+# account's group call at 60 minutes and the bot counts as a participant (BQ-MTG09-9).
+meeting_host: {max_duration_min: 60}

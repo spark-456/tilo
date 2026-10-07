@@ -140,3 +140,76 @@ def crashing_run_flow(repo_root: pathlib.Path):
     yield rf
     rf.close()
     app.dependency_overrides.clear()
+
+
+# --- SEC-15 (deployed access: visitor or judge): see API_SEC_15.md and _sec15_lib.py ---------------
+
+
+@pytest.fixture()
+def sec15_factory(monkeypatch: pytest.MonkeyPatch):
+    """`make(declarations=..., deployed=True)` -> a `Sec15` over the real app, deployed-style (K_SERVICE set, the
+    live switches cleared), with a fake access store and a scripted router behind a spy on `deps.router_for_mode`."""
+    import _sec15_lib
+
+    def make(**kwargs):
+        return _sec15_lib.build(monkeypatch, **kwargs)
+
+    yield make
+    _sec15_lib.close()
+
+
+# --- SEC-16 (per-uid rate limit, spend caps, durable replay-only): see API_SEC_16.md and _sec16_lib.py ---------
+
+
+@pytest.fixture()
+def sec16_factory(monkeypatch: pytest.MonkeyPatch):
+    """`make(declarations=..., deployed=True, judge_live=True, ledger=..., flags=..., **cap_overrides)` -> a `Sec16`:
+    the SEC-15 harness (deployed-style app, fake access store, scripted router behind a spy) plus a spy over the real
+    in-memory ledger, a rate limiter on a fake clock and small test caps. `ledger=None` leaves the seam unwired."""
+    import _sec16_lib
+
+    def make(**kwargs):
+        return _sec16_lib.build(monkeypatch, **kwargs)
+
+    yield make
+    _sec16_lib.close()
+
+
+# --- PPL-11a (people API: quotes, plate, confirm, writes): see API_PPL_11a.md and _ppl11a_lib.py ----------------------
+
+
+@pytest.fixture()
+def people_rig(monkeypatch: pytest.MonkeyPatch):
+    """`make(org=..., now=..., deployed=False, access=None)` -> a `Rig` over the real app with every people seam
+    faked (stores, artifact store, redactor, clock, plate sources, source owners)."""
+    import _ppl11a_lib
+
+    made: list[_ppl11a_lib.Rig] = []
+
+    def make(**kwargs):
+        rig = _ppl11a_lib.Rig(monkeypatch, **kwargs)
+        made.append(rig)
+        return rig
+
+    yield make
+    for rig in made:
+        rig.close()
+
+
+def pytest_collection_modifyitems(items):
+    """PPL-11a: tests that need a slice B or C route are strict xfails until that slice lands (`SLICE_BC_PENDING`).
+    PPL-11c: the same for each slice of the rest of the people API (`SLICE_PENDING`, API_PPL_11c.md section 0)."""
+    if any("test_PPL_11a_" in item.nodeid for item in items):
+        from _ppl11a_lib import SLICE_BC_PENDING
+
+        for item in items:
+            if "test_PPL_11a_" in item.nodeid and any(entry in item.nodeid for entry in SLICE_BC_PENDING):
+                item.add_marker(pytest.mark.xfail(strict=True, reason="PPL-11a slice B/C"))
+    if any("test_PPL_11c_" in item.nodeid for item in items):
+        from _ppl11c_lib import PENDING_EXEMPT, SLICE_PENDING
+
+        for item in items:
+            if any(entry in item.nodeid for entry in PENDING_EXEMPT):
+                continue  # passes once an earlier slice lands: pinned, never a strict xfail
+            if "test_PPL_11c_" in item.nodeid and any(entry in item.nodeid for entry in SLICE_PENDING):
+                item.add_marker(pytest.mark.xfail(strict=True, reason="PPL-11c slice pending"))
