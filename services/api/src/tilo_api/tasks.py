@@ -171,7 +171,7 @@ def _foreign_sources(task: deps.TaskRecord, edits: dict[str, Any]) -> bool:
 
 Principal = Annotated[deps.Principal, Depends(deps.get_current_principal)]
 StoreDep = Annotated[deps.Store, Depends(deps.get_store)]
-FlagsDep = Annotated[FlagStore, Depends(deps.get_flag_store)]
+FlagsDep = Annotated[FlagStore, Depends(deps.get_switches)]  # deployed: NFR-24's flag or the spend ledger's switch
 
 
 @router.post("/tasks/{task_id}/answers")

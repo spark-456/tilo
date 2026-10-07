@@ -19,7 +19,7 @@ from tilo_people.stores import PeopleStores
 from tilo_people.text import clean_line
 
 MAX_HISTORY = 200  # `work_item.history` has no maxItems: a longer record is unreadable, never run through `decide`
-_GONE = ("discarded", "deleted")
+GONE = ("discarded", "deleted")
 _MASK = re.compile(r"[^\s@]+@[^\s@]+|\S+://\S+|www\.\S+|\+?\d[\d ().-]{6,}\d")  # addresses, phone numbers, links
 
 
@@ -47,7 +47,7 @@ def meeting_quotes(r: Reader, meeting_id: str, ids: list[str]) -> dict[str, Any]
     if directory.record(r.actor) is None or stored is None or stored.record["owner"] != r.actor:
         return None
     m = stored.record
-    return _expired(m["id"], ids) if m["status"] in _GONE else _answer(r, directory, m, ids, None)
+    return _expired(m["id"], ids) if m["status"] in GONE else _answer(r, directory, m, ids, None)
 
 
 def item_quote(r: Reader, item_id: str) -> dict[str, Any] | None:
@@ -62,8 +62,10 @@ def item_quote(r: Reader, item_id: str) -> dict[str, Any] | None:
         return None
     meeting_id = ref.partition("#")[0]
     found = r.stores.meetings.get(r.org, meeting_id)
-    if found is None or found.record["status"] in _GONE:
+    if found is None:
         return _expired(meeting_id, _lowest_cited(wi))
+    if found.record["status"] in GONE:  # the assigner must be the owner on the record or tombstone (#456)
+        return _expired(meeting_id, _lowest_cited(wi)) if wi["assigned_by"]["by"] == found.record["owner"] else None
     return _answer(r, directory, found.record, [], wi)
 
 
@@ -101,7 +103,7 @@ def _quote(meeting_id: str, ref: Mapping[str, Any] | None, uid: str, state: str)
     }
 
 
-def _read(artifacts: ArtifactStore, scope: Scope, ref: Mapping[str, Any]) -> dict[str, Any] | None:
+def read_doc(artifacts: ArtifactStore, scope: Scope, ref: Mapping[str, Any]) -> dict[str, Any] | None:
     """A stored JSON document, or None when the scope holds no such version. A corrupt one raises (the route's 503)."""
     try:
         doc = json.loads(artifacts.read(scope, ref))
@@ -136,7 +138,7 @@ def _answer(
     if world is None or m["status"] != "minuted" or minutes_ref is None:
         return None  # a meeting with no world yields no quote (BQ-273)
     scope = Scope(m["org_id"], world, m["owner"])
-    mins = _read(r.artifacts, scope, minutes_ref)
+    mins = read_doc(r.artifacts, scope, minutes_ref)
     if mins is None or mins["meeting_id"] != m["id"]:
         return None
     ref = {k: mins["transcript"][k] for k in ("artifact_id", "version")}
@@ -157,7 +159,7 @@ def _answer(
     held = wi is not None and (head.doc["screening"] != "clean" or bool(mins["flagged"]))
     utterances: dict[str, Any] = {}
     if not held:
-        tr = _read(r.artifacts, scope, ref)
+        tr = read_doc(r.artifacts, scope, ref)
         if tr is None:
             return gone
         if tr["meeting_id"] != m["id"]:

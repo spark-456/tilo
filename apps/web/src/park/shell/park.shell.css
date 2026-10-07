@@ -288,6 +288,34 @@
     white-space: nowrap;
   }
 }
+/* Narrow phones: in the reference nav (wordmark + three buttons) the Home tab gets ~78px at 390 and needs 68. Here the
+   chip is only its dot and gives back the pill chrome and the tools gap, so it takes ~4px of the strip (dot 8px, tools gap -4px) and Home stays whole at 390
+   (the reference itself scrolls the strip below ~380). The button's own box is 24x24 (WCAG 2.5.8; axe measures the
+   element box, not a pseudo-element): the box fills the 16px tab-strip gap to its left (padding-left 16) plus 8px above and
+   below the dot, all cancelled by negative margins so the strip is unchanged; it touches, never covers, its neighbours. */
+@media (max-width: 430px) {
+  [data-park] .park-shell__sample {
+    padding: 8px 0 8px 16px;
+    margin: -8px -4px -8px -16px;
+  }
+  /* The focus ring hugs the dot (as before the 24px box), not the padded box. */
+  [data-park] .park-shell__nav .park-shell__sample:focus-visible {
+    outline: none;
+  }
+  [data-park] .park-shell__sample:focus-visible .park-shell__sampledot {
+    outline: 3px solid #5a3fe0;
+    outline-offset: 2px;
+  }
+  /* The invisible boot ghost must never take a tap meant for the next button. */
+  [data-park] .park-shell__sample.park-shell__booting {
+    pointer-events: none;
+  }
+  [data-park] .park-shell__sample .park-chip {
+    height: auto;
+    padding: 0;
+    background: transparent;
+  }
+}
 
 /* ---- Notifications popover (392 wide, right 60 as measured) ---- */
 [data-park] .park-popover.park-shell__notif {
