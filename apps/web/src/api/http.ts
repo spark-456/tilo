@@ -172,12 +172,19 @@ export interface HttpClientOptions {
   readonly fetch?: typeof fetch;
   /** Gap between event polls (default 1000 ms). */
   readonly pollMs?: number;
+  /** SEC-10: the App Check token for the next request, or null. Asked before every request (the SDK
+   * caches and refreshes it); a getter that fails or answers null sends the request with no header. */
+  readonly appCheckToken?: (() => Promise<string | null>) | undefined;
 }
+
+/** The header the API reads the App Check token from (services/api `appcheck.py`). */
+const APP_CHECK_HEADER = "X-Firebase-AppCheck";
 
 export class HttpClient implements TiloClient {
   private readonly base: string;
   private readonly fetchFn: typeof fetch;
   private readonly pollMs: number;
+  private readonly appCheckToken: (() => Promise<string | null>) | undefined;
   private readonly cardWorlds = new Map<string, string>(); // card -> world, from listCards
   private readonly cardChannels = new Map<string, Card["answer_channels"]>(); // card -> channels it lists
   private readonly layouts = new Map<string, LayoutCall>(); // a run's layout never changes
@@ -190,12 +197,28 @@ export class HttpClient implements TiloClient {
     this.base = options.baseUrl.trim().replace(/\/+$/, "");
     this.fetchFn = options.fetch ?? ((url, init) => fetch(url, init));
     this.pollMs = options.pollMs ?? 1000;
+    this.appCheckToken = options.appCheckToken;
+  }
+
+  /** `init` with the App Check header when there is a token (SEC-10). Never throws: no token is no header. */
+  private async withAppCheck(init: RequestInit): Promise<RequestInit> {
+    if (!this.appCheckToken) return init;
+    let token: string | null = null;
+    try {
+      token = await this.appCheckToken();
+    } catch {
+      return init;
+    }
+    if (typeof token !== "string" || token === "") return init;
+    const headers = new Headers(init.headers);
+    headers.set(APP_CHECK_HEADER, token);
+    return { ...init, headers };
   }
 
   private async request<T>(path: string, init: RequestInit = {}, write = false): Promise<T> {
     let res: Response;
     try {
-      res = await this.fetchFn(`${this.base}${path}`, init);
+      res = await this.fetchFn(`${this.base}${path}`, await this.withAppCheck(init));
     } catch {
       throw new TiloApiError(UNREACHABLE, null, true, write); // the cause (host, port) is not for people
     }

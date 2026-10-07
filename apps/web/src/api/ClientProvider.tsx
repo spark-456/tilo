@@ -1,4 +1,5 @@
 import { type ReactNode, createContext, useContext, useSyncExternalStore } from "react";
+import { createAppCheckTokenGetter } from "../appcheck/appCheck";
 import type { TiloClient } from "./client";
 import { chooseClient } from "./config";
 import { FixtureClient } from "./fixtureClient";
@@ -10,7 +11,12 @@ export const API_URL: string | undefined = import.meta.env.VITE_TILO_API_URL;
 // `VITE_TILO_API_URL` selects the HTTP client (config.ts); the fixture client is the default.
 function createDefaultClient(): TiloClient {
   const search = typeof window === "undefined" ? "" : window.location.search;
-  return chooseClient({ apiUrl: API_URL, search });
+  // SEC-10: App Check starts on the first API call, so the fixture world never loads reCAPTCHA.
+  const appCheckToken =
+    typeof window === "undefined"
+      ? undefined
+      : createAppCheckTokenGetter({ hostname: window.location.hostname });
+  return chooseClient({ apiUrl: API_URL, search, appCheckToken });
 }
 
 const ClientContext = createContext<TiloClient>(createDefaultClient());

@@ -248,7 +248,7 @@ describe("SEC-10 properties", () => {
           if (behaviour === "empty") return { token: "" };
           if (behaviour === "garbage") return 42;
           return { token: "fake-app-check-token" };
-        }) as typeof sdk.getToken);
+        }) as unknown as typeof sdk.getToken);
         const { createAppCheckTokenGetter } = await load();
         const token = await createAppCheckTokenGetter({ hostname })();
         expect(token === null || (typeof token === "string" && token.length > 0)).toBe(true);

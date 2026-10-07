@@ -55,6 +55,15 @@ _MAX_JWKS_BYTES = 65536
 _CLOCK_SKEW_S = 10.0
 
 
+class TokenRefused(ValueError):
+    """A token the verifier refuses. `code` is one of a fixed set of words written in this module, never taken from
+    the token or from a library's text, so the gate can log WHY without ever logging the token."""
+
+    def __init__(self, code: str) -> None:
+        super().__init__(code)
+        self.code = code
+
+
 class AppCheckVerifier(Protocol):
     def verify(self, token: str) -> Mapping[str, Any]:
         """The token's claims; raises for any token it refuses or cannot check."""
@@ -112,7 +121,7 @@ class GoogleAppCheckVerifier:
             if kid in keys or now - max(fetched, tried) < _REFETCH_MIN_S:
                 return keys
         if 0 <= now - tried < JWKS_RETRY_COOLDOWN_S:
-            raise ValueError("keys unavailable")
+            raise TokenRefused("keys_unavailable")
         return None
 
     def _keys(self, kid: str) -> dict[str, rsa.RSAPublicKey]:
@@ -121,7 +130,7 @@ class GoogleAppCheckVerifier:
         if keys is not None:
             return keys
         if not self._lock.acquire(blocking=False):
-            raise ValueError("key refresh in flight")
+            raise TokenRefused("key_refresh_in_flight")
         try:
             now = self._clock()
             keys = self._usable(kid, now)
@@ -143,37 +152,37 @@ class GoogleAppCheckVerifier:
     def verify(self, token: str) -> Mapping[str, Any]:
         parts = token.split(".")
         if len(parts) != 3 or len(token) > MAX_TOKEN_CHARS:
-            raise ValueError("not a JWT")
+            raise TokenRefused("not_a_jwt")
         try:
             header, claims, signature = json.loads(_b64(parts[0])), json.loads(_b64(parts[1])), _b64(parts[2])
         except (binascii.Error, ValueError) as exc:
-            raise ValueError("not a JWT") from exc
+            raise TokenRefused("not_a_jwt") from exc
         if not isinstance(header, dict) or not isinstance(claims, dict) or header.get("alg") != "RS256":
-            raise ValueError("not an App Check token")
+            raise TokenRefused("not_an_app_check_token")
         kid = header.get("kid")
         if not isinstance(kid, str) or not kid:
-            raise ValueError("not an App Check token")
+            raise TokenRefused("not_an_app_check_token")
         audience, issuer = claims.get("aud"), claims.get("iss")
         if self._audience not in (audience if isinstance(audience, list) else [audience]):
-            raise ValueError("not a token for this project")
+            raise TokenRefused("wrong_project")
         if not isinstance(issuer, str) or not issuer.startswith(ISSUER_PREFIX) or issuer == ISSUER_PREFIX:
-            raise ValueError("not issued by App Check")
+            raise TokenRefused("wrong_issuer")
         if not isinstance(claims.get("sub"), str) or not claims["sub"]:
-            raise ValueError("no app")
+            raise TokenRefused("no_app")
         key = self._keys(kid).get(kid)
         if key is None:
-            raise ValueError("unknown key")
+            raise TokenRefused("unknown_key")
         try:
             key.verify(signature, f"{parts[0]}.{parts[1]}".encode("ascii"), padding.PKCS1v15(), hashes.SHA256())
         except (InvalidSignature, UnicodeEncodeError) as exc:
-            raise ValueError("bad signature") from exc
+            raise TokenRefused("bad_signature") from exc
         now = self._wall()
         exp, nbf = claims.get("exp"), claims.get("nbf", 0)
         numbers = (int, float)
         if not isinstance(exp, numbers) or isinstance(exp, bool) or exp < now - _CLOCK_SKEW_S:
-            raise ValueError("expired")
+            raise TokenRefused("expired")
         if not isinstance(nbf, numbers) or isinstance(nbf, bool) or nbf > now + _CLOCK_SKEW_S:
-            raise ValueError("not yet valid")
+            raise TokenRefused("not_yet_valid")
         return claims
 
 
@@ -184,7 +193,7 @@ class _RefuseAll:
         self._why = why
 
     def verify(self, token: str) -> Mapping[str, Any]:
-        raise ValueError(self._why)
+        raise TokenRefused(self._why)
 
 
 @functools.cache
@@ -198,10 +207,10 @@ def default_verifier() -> AppCheckVerifier:
     from tilo_api import dev  # noqa: PLC0415  (dev imports deps, which imports this module)
 
     if dev.dev_enabled():
-        return _RefuseAll("dev mode makes no external call")
+        return _RefuseAll("dev_mode")
     project = (os.environ.get("TILO_FIRESTORE_PROJECT") or os.environ.get("GOOGLE_CLOUD_PROJECT") or "").strip()
     if not project:
-        return _RefuseAll("no project configured")
+        return _RefuseAll("no_project")
     return _google_verifier(project)
 
 
@@ -218,9 +227,10 @@ def _token_of(scope: Scope) -> str:
 
 def _is_verified(scope: Scope, token: str) -> bool:
     """True for a genuine token. Anything else (no token, a refused one, a verifier that fails) is False and logged
-    once as a warning: the error TYPE only, never the token or the error text."""
+    once as a warning with a fixed reason code (`TokenRefused.code`, or `verifier_failed:<error type>` for any other
+    failure of the verifier), never the token or an error text."""
     if not token:
-        logger.warning("App Check token missing from the request")
+        logger.warning("App Check token missing from the request (reason=missing)")
         return False
     from tilo_api import deps  # noqa: PLC0415  (deps imports this module)
 
@@ -228,7 +238,8 @@ def _is_verified(scope: Scope, token: str) -> bool:
         factory = scope["app"].dependency_overrides.get(deps.get_app_check_verifier, deps.get_app_check_verifier)
         factory().verify(token)
     except Exception as exc:
-        logger.warning("App Check token not verified (%s)", type(exc).__name__)
+        reason = exc.code if isinstance(exc, TokenRefused) else f"verifier_failed:{type(exc).__name__}"
+        logger.warning("App Check token not verified (reason=%s)", reason)
         return False
     return True
 

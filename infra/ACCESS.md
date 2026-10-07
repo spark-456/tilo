@@ -142,8 +142,17 @@ Never requested: `mail.google.com`, `gmail.modify`, full `drive`.
 2. Put values in the eight secrets (`gcloud secrets versions add`).
 3. Identity Platform: enable Google sign-in and anonymous sign-in; add the
    hosting domain to authorised domains.
-4. App Check: register the web app with a reCAPTCHA Enterprise key, then switch
-   enforcement on for Firestore and Storage after the client sends tokens.
+4. App Check (SEC-10): done in the console, recorded here. The Firebase web app
+   `tilo-web` has app id `1:379216745263:web:8cda5846cf882c2cefc7da` and the
+   reCAPTCHA Enterprise score-based site key is
+   `6LdlsOItAAAAAEhO_aq9zmtbQue6Rni2ZDUDuRTe`. Both are public values (the web
+   client ships them, `apps/web/src/appcheck/config.ts`), not secrets. The web
+   `apiKey` and `projectId` are not in the repo either: the deploy build reads
+   them from `firebase apps:sdkconfig` (docs/deploy-dev.md). Enforcement is OFF
+   everywhere and stays off until the owner switches it on: in `tilo-api` by
+   `TILO_APPCHECK_ENFORCE=1` on the Cloud Run service, and for Firestore and
+   Storage in the Firebase console, only after the deployed client sends tokens
+   and the API log shows none refused.
 5. Firebase deploys stay manual (the CI deployer holds no project role). From
    the repo root, signed in as yourself (`firebase login`), with `<project>`
    the real project id:

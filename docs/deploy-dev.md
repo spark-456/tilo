@@ -241,8 +241,10 @@ live at https://essential-wares-510320-f0.web.app (and the `.firebaseapp.com` al
   without security headers), hashed files under `/assets/**` as `public, max-age=31536000, immutable`, and
   every other path as `no-cache` (the `**` default) so a new deploy is picked up on the next load. Every
   route also gets `Content-Security-Policy` (self only, no inline styles, `base-uri 'none'`,
-  `connect-src 'self'`, `frame-ancestors 'none'`, no `unsafe-eval`: the web app loads
-  `pixi.js/unsafe-eval`), `X-Content-Type-Options: nosniff` and
+  `frame-ancestors 'none'`, no `unsafe-eval`: the web app loads `pixi.js/unsafe-eval`; SEC-10 adds exactly
+  `https://www.google.com/recaptcha/` and `https://www.gstatic.com/recaptcha/` to `script-src`,
+  `https://www.google.com/recaptcha/` to `frame-src` and `https://firebaseappcheck.googleapis.com` to
+  `connect-src`, for App Check with reCAPTCHA Enterprise), `X-Content-Type-Options: nosniff` and
   `Referrer-Policy: strict-origin-when-cross-origin`. A new backend origin for the web app must be
   added to `connect-src` when the app is pointed at a deployed `tilo-api`.
 - Two Hosting sites exist in the project: the default site `essential-wares-510320-f0`
@@ -258,8 +260,26 @@ live at https://essential-wares-510320-f0.web.app (and the `.firebaseapp.com` al
 until you flip it: with `TILO_APPCHECK_ENFORCE` unset a missing or refused token is only logged as a warning and
 no answer changes. Turn it on only after the web app sends tokens in the deployed build and the log shows none
 refused: set `TILO_APPCHECK_ENFORCE=1` on the Cloud Run service (only exactly `1` counts); unset it to turn it off.
-`/health`, `/healthz` and the scheduler tick are never checked. The API reads the project from
-`TILO_FIRESTORE_PROJECT` (else `GOOGLE_CLOUD_PROJECT`). Decisions: BQ-SEC10-1..3 in `docs/open-questions.md`.
+`/health`, `/healthz` (probes carry no token) and the scheduler tick are never checked. The API reads the project from
+`TILO_FIRESTORE_PROJECT` (else `GOOGLE_CLOUD_PROJECT`). Decisions: BQ-SEC10-1..5 in `docs/open-questions.md`.
+
+### App Check in the web build (SEC-10)
+
+The web client sends `X-Firebase-AppCheck` on every API call (`apps/web/src/appcheck/`), but only once the build
+has the Firebase web config: `VITE_FIREBASE_API_KEY` and `VITE_FIREBASE_PROJECT_ID`. No key literal is in the
+repo. `just deploy-web` fills both at build time from the output of
+`firebase apps:sdkconfig WEB 1:379216745263:web:8cda5846cf882c2cefc7da --project essential-wares-510320-f0`
+(`scripts/web_build_env.py`): it reads the output into the build's environment and writes nothing to disk. If that
+command fails (you are not signed in) the build goes ahead without them, App Check is skipped and the browser
+console says so once. The two public ids (`FIREBASE_APP_ID`, the reCAPTCHA Enterprise site key) are recorded in
+`infra/ACCESS.md` section 7, where enforcement is also recorded as OFF.
+
+The deployed fixture world calls no API, so it never loads reCAPTCHA: App Check starts on the first API request.
+Local hosts (localhost, 127.0.0.1) never start it.
+
+Before you read the `tilo-api` log for refused or missing tokens, set `TILO_FIRESTORE_PROJECT` (or
+`GOOGLE_CLOUD_PROJECT`) on the `tilo-api` Cloud Run service: with neither set the verifier has no project and
+refuses every token, so the log would show every request as unverified.
 
 ## Never
 
