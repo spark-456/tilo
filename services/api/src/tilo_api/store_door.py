@@ -9,8 +9,7 @@ answer 503 `not_configured`, never cache the refusal and never fall back to memo
 its own guard are untouched.
 
 The handle holds the client and two backends over it (slice 1b): `records` (`durable_store.FirestoreBackend`) and
-`events` (the harness store protocol, the documents `WorldWriter` writes). A `demo-` project may keep an emulator host
-on Cloud Run (it can only be the emulator); any other project may not.
+`events` (the harness store protocol, the documents `WorldWriter` writes).
 """
 
 from __future__ import annotations
@@ -83,8 +82,7 @@ def open_api_store(
         raise ApiStoreNotConfigured(f"set {ENV_STORE}=firestore and {ENV_PROJECT} to a project id")
     emulator = values.get("FIRESTORE_EMULATOR_HOST", "")
     if values.get("K_SERVICE"):
-        if (emulator or os.environ.get("FIRESTORE_EMULATOR_HOST")) and not project.startswith("demo-"):
-            # a deployed process never talks to an emulator host
+        if emulator or os.environ.get("FIRESTORE_EMULATOR_HOST"):  # a deployed process never talks to an emulator host
             raise ApiStoreNotConfigured("FIRESTORE_EMULATOR_HOST is set on Cloud Run")
     elif not (emulator and project.startswith("demo-")):
         raise ApiStoreNotConfigured("outside Cloud Run only the emulator and a demo- project open")

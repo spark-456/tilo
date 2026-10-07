@@ -21,6 +21,7 @@ import re
 import threading
 import time
 from collections.abc import Callable, Iterable, Mapping, Sequence
+from contextlib import AbstractContextManager, nullcontext
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Annotated, Any, Literal, Protocol, cast
@@ -153,17 +154,25 @@ class Store:
 
     # The seams a route uses to read and write records and events. Here (dev mode, tests) the dicts are the store:
     # loads read the cache, and `save` sends events through the writer first. `DurableStore` overrides all of them.
-    def load_world(self, world_id: str) -> WorldRecord | None:
+    # `settle=False` is for a caller that has not yet checked who is asking: a load that settles also writes.
+    def load_world(self, world_id: str, settle: bool = True) -> WorldRecord | None:
         return self.worlds.get(world_id)
 
-    def load_task(self, task_id: str) -> TaskRecord | None:
+    def load_task(self, task_id: str, settle: bool = True) -> TaskRecord | None:
         return self.tasks.get(task_id)
 
-    def load_owner(self, owner: str) -> None:
+    def load_owner(self, owner: str, settle: bool = True) -> None:
         """Called before a route iterates an owner's worlds or policies; the cache already holds them."""
 
     def load_path(self, params: Mapping[str, Any]) -> Store:
         return self
+
+    def settle(self, world_id: str, writer: EventWriter | None = None) -> None:
+        """What a previous process left in the world (its queue, a run that died): nothing to do on a plain store."""
+
+    def deadline(self, seconds: float) -> AbstractContextManager[None]:
+        """Bounds the calling thread's wait for the store's lock; a plain store has no lock to wait for."""
+        return nullcontext()
 
     def commit(
         self,

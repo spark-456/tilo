@@ -32,7 +32,9 @@ def test_PROD_WIRE_1b_a_shutdown_closes_every_deployed_writer_and_is_harmless_wi
     monkeypatch.setattr(durable_store, "_opened", {})
     with TestClient(app):  # nothing deployed: the shutdown hook finds no writer
         pass
-    monkeypatch.setattr(durable_store, "_opened", {("a",): (None, SimpleNamespace(reopen=lambda: closed.append("a")))})
+    monkeypatch.setattr(
+        durable_store, "_opened", {("a",): (None, SimpleNamespace(reopen=lambda budget_s=None: closed.append("a")))}
+    )
     with TestClient(app):
         assert closed == []
     assert closed == ["a"], "the lifespan's shutdown released the writer's leases"

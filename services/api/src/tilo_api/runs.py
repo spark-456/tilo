@@ -108,6 +108,7 @@ def run_seams(request: Request, mode: Annotated[Mode, Depends(deps.get_work_mode
 
 
 def start_run(store: deps.Store, task: deps.TaskRecord, *, approach: dict, budget_cap: float, seams: Seams) -> None:
+    store.settle(task.world_id)  # the queued events go out first, so `world.started` follows them
     with store.runs_guard:  # one run per world, in any process: a started world's stream says so (ADR-0026 decision 5)
         started = any(e["type"] == "world.started" for e in store.events.get(task.world_id, []))
         if task.world_id in store.runs or started:
@@ -325,6 +326,12 @@ class Run:
     def _prepare(self) -> Any:
         """Compile, validate, lay out. Returns the agents config, or None when no run may start."""
         registry = self.seams.connectors
+        try:  # the policy context and the PI-11 history are read across all of the owner's worlds
+            self.store.load_owner(self.owner)
+        except Exception as exc:
+            logger.warning("run %s: the owner's records could not be read (%s)", self.run_id, type(exc).__name__)
+            self._fail("the owner's records could not be read", None)
+            return None
         try:
             context = PlanInputs(
                 approaches=copy.deepcopy(self.approaches), owner=self.owner, skills=dict(self.seams.skills.catalog()),

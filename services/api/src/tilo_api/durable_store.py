@@ -1,15 +1,23 @@
 """tilo-api's durable store: a write-through cache over Firestore (PROD-WIRE, ADR-0026 decisions 2, 3 and 5).
 
 `DurableStore` is a `deps.Store` whose plain dicts routes read as ever. Loads are lazy: by the ids of a request's path
-(`load_path`) and by owner (`load_owner`, before any route iterates an owner's worlds or policies). A write is one
-rev-checked backend transaction that holds the new records and the event parts (the world's durable queue); only then
-does the cache change, and the queue drains through the single `EventWriter`, oldest first, resending by id: no record
-without its events, no event twice. A failed or ambiguous commit evicts what it touched (503 `store_unavailable`; a
-`rev` mismatch is 409 `stale`). `MemoryBackend` serves tests; `FirestoreBackend` is the same layout in Firestore, with
-the parts as JSON strings and the layout as one, because Firestore refuses arrays of arrays.
+(`load_path`, read-only: it runs before the route's own checks) and by owner (`load_owner`, before any route iterates
+an owner's worlds or policies). A write is one rev-checked backend transaction that holds the new records and the event
+parts (the world's durable queue); only then does the cache change, and the queue drains through the single
+`EventWriter`, oldest first, resending by id: no record without its events, no event twice. A failed or ambiguous
+commit evicts what it touched (503 `store_unavailable`; a `rev` mismatch is 409 `stale`). `MemoryBackend` serves
+tests; `FirestoreBackend` is the same layout in Firestore, with the parts, the layout and the brief's free-form fields
+as JSON strings, because Firestore refuses arrays of arrays.
 
-A world whose stream has `world.started`, no terminal event, no run of this process and a free lease gets one
-`world.failed` when this process loads it (decision 5), so it does not look busy forever.
+`settle(world_id)` sends what a previous process left queued, and a world whose stream has `world.started`, no
+terminal event, no run of this process and a free lease gets one `world.failed` (decision 5), so it does not look busy
+forever. It writes, so a route calls it only after its own ownership check; `load_world`, `load_task` and
+`load_owner` settle by default for callers that have checked, and `settle=False` is for those that have not.
+
+Kill switches (FR-HIL-07) change the cache in place first. `unsaved` keeps every such policy and world until a commit
+lands, and `commit_unsaved` writes them all, so a retry that finds nothing new to lower still saves what is pending.
+`deadline(s)` bounds the process-wide lock wait of the calling thread: a kill switch never waits behind another
+commit's Firestore I/O (which holds the lock so `rev`s stay in order) for more than its budget.
 """
 
 from __future__ import annotations
@@ -21,6 +29,7 @@ import logging
 import os
 import re
 import threading
+import time
 from collections.abc import Iterable, Iterator, Mapping
 from contextlib import contextmanager
 from typing import Any
@@ -34,20 +43,32 @@ from tilo_api import deps, events, store_door
 logger = logging.getLogger("tilo_api.durable_store")
 
 _ID = {
-    "worlds": re.compile(r"^w_[0-9A-Za-z_]{1,48}$"),
-    "tasks": re.compile(r"^t_[0-7][0-9A-HJKMNP-TV-Z]{25}$"),
-    "policies": re.compile(r"^pol_[0-9a-z_]{1,48}$"),
+    "worlds": re.compile(r"w_[0-9A-Za-z_]{1,48}"),
+    "tasks": re.compile(r"t_[0-7][0-9A-HJKMNP-TV-Z]{25}"),
+    "policies": re.compile(r"pol_[0-9a-z_]{1,48}"),
 }
+_JSON_FIELDS = {"worlds": ("layout",), "tasks": ("draft", "brief", "edits", "approaches")}  # free-form: may nest arrays
 RESTARTED = "the service restarted, so the work stopped"
+_CLOSE_BUDGET_S = 5.0  # shutdown, well under Cloud Run's 10 s SIGTERM grace
 
 
 class StaleRev(Exception):
     """A record's `rev` is not the one the writer read, or a create found the record there."""
 
 
+def _valid(coll: str, doc_id: Any) -> bool:
+    return isinstance(doc_id, str) and _ID[coll].fullmatch(doc_id) is not None
+
+
+def _check(coll: str, doc_id: str) -> None:
+    """Every id that becomes a path or a key is its schema's first (no `/`, no trailing newline)."""
+    if not _valid(coll, doc_id):
+        raise ValueError(f"{coll} id {doc_id!r} does not match its schema")
+
+
 @contextmanager
 def _io() -> Iterator[None]:
-    """Any backend failure is 503 `store_unavailable`, never its text."""
+    """Any backend or decoding failure is 503 `store_unavailable`, never its text."""
     try:
         yield
     except HTTPException:
@@ -105,9 +126,11 @@ class MemoryBackend:
         self.lock = threading.RLock()
 
     def read(self, collection: str, doc_id: str) -> dict[str, Any] | None:
+        _check(collection, doc_id)
         return copy.deepcopy(self.docs.get((collection, doc_id)))
 
     def queue(self, world_id: str) -> list[dict[str, Any]]:
+        _check("worlds", world_id)
         return copy.deepcopy(self.queues.get(world_id, []))
 
     def find(self, collection: str, field: str, value: Any) -> list[tuple[str, dict[str, Any]]]:
@@ -119,10 +142,13 @@ class MemoryBackend:
         return [(i, self.read(c, i)) for (c, i), d in list(self.docs.items()) if c == collection and get(d) == value]  # type: ignore[misc]
 
     def commit(self, writes: list[tuple[str, str, dict[str, Any], int | None]], appends: dict[str, list[dict]]) -> None:
+        for coll, i, *_ in writes:
+            _check(coll, i)
+        for w in appends:
+            _check("worlds", w)
         with self.lock:
             for coll, i, _, expect in writes:
-                cur = self.docs.get((coll, i))
-                if not _fresh(cur, expect):
+                if not _fresh(self.docs.get((coll, i)), expect):
                     raise StaleRev
             for coll, i, data, expect in writes:
                 self.docs[(coll, i)] = _plain(_stored(coll, data, expect, self.docs.get((coll, i))))
@@ -131,6 +157,7 @@ class MemoryBackend:
                 queued += [_plain(p) for p in parts if p["id"] not in {q["id"] for q in queued}]
 
     def ack(self, world_id: str, part_id: str) -> None:
+        _check("worlds", world_id)
         with self.lock:
             self.queues[world_id] = [p for p in self.queues.get(world_id, []) if p["id"] != part_id]
 
@@ -141,47 +168,48 @@ class FirestoreBackend:
     def __init__(self, client: Any, *, org_id: str = deps.ORG_ID) -> None:
         self.client, self.org_id = client, org_id
 
-    def _ref(self, path: str) -> Any:
-        return self.client.document(f"orgs/{self.org_id}/{path}")
+    def _ref(self, collection: str, doc_id: str, *tail: str) -> Any:
+        _check(collection, doc_id)
+        return self.client.document("/".join(("orgs", self.org_id, collection, doc_id, *tail)))
+
+    def _queue(self, world_id: str) -> Any:
+        return self._ref("worlds", world_id, "_pending", "queue")
 
     @staticmethod
-    def _dec(doc: dict[str, Any]) -> dict[str, Any]:
-        layout = doc.get("layout")
-        return {**doc, "layout": json.loads(layout)} if isinstance(layout, str) else doc
+    def _enc(coll: str, doc: dict[str, Any]) -> dict[str, Any]:
+        return {**doc, **{f: json.dumps(doc[f]) for f in _JSON_FIELDS.get(coll, ()) if f in doc}}
+
+    @staticmethod
+    def _dec(coll: str, doc: dict[str, Any]) -> dict[str, Any]:
+        return {**doc, **{f: json.loads(doc[f]) for f in _JSON_FIELDS.get(coll, ()) if isinstance(doc.get(f), str)}}
 
     def read(self, collection: str, doc_id: str) -> dict[str, Any] | None:
-        doc = self._ref(f"{collection}/{doc_id}").get().to_dict()
-        return None if doc is None else self._dec(doc)
+        doc = self._ref(collection, doc_id).get().to_dict()
+        return None if doc is None else self._dec(collection, doc)
 
     def queue(self, world_id: str) -> list[dict[str, Any]]:
-        doc = self._ref(f"worlds/{world_id}/_pending/queue").get().to_dict() or {}
+        doc = self._queue(world_id).get().to_dict() or {}
         return [json.loads(p) for p in doc.get("parts", [])]
 
     def find(self, collection: str, field: str, value: Any) -> list[tuple[str, dict[str, Any]]]:
         from google.cloud.firestore_v1.base_query import FieldFilter
 
         query = self.client.collection(f"orgs/{self.org_id}/{collection}").where(filter=FieldFilter(field, "==", value))
-        return [(d.id, self._dec(d.to_dict())) for d in query.stream()]
+        return [(d.id, self._dec(collection, d.to_dict())) for d in query.stream()]
 
     def commit(self, writes: list[tuple[str, str, dict[str, Any], int | None]], appends: dict[str, list[dict]]) -> None:
         from google.cloud import firestore
 
         @firestore.transactional  # type: ignore[misc]
         def run(tx: Any) -> None:
-            held = [(self._ref(f"{c}/{i}"), c, d, e) for c, i, d, e in writes]
+            held = [(self._ref(c, i), c, d, e) for c, i, d, e in writes]
             current = [ref.get(transaction=tx).to_dict() for ref, *_ in held]
-            queues = {w: self._ref(f"worlds/{w}/_pending/queue") for w in appends}
+            queues = {w: self._queue(w) for w in appends}
             queued = {w: (ref.get(transaction=tx).to_dict() or {}).get("parts", []) for w, ref in queues.items()}
             if not all(_fresh(cur, e) for (_, _, _, e), cur in zip(held, current, strict=True)):
                 raise StaleRev
             for (ref, coll, data, expect), cur in zip(held, current, strict=True):
-                doc = _stored(coll, data, expect, cur)
-                tx.set(
-                    ref,
-                    {**doc, "layout": json.dumps(doc["layout"]) if doc.get("layout") is not None else None}
-                    if coll == "worlds"
-                    else doc,
-                )
+                tx.set(ref, self._enc(coll, _stored(coll, data, expect, cur)))
             for w, parts in appends.items():
                 seen = {json.loads(p)["id"] for p in queued[w]}
                 new = [json.dumps(p, sort_keys=True) for p in parts if p["id"] not in seen]
@@ -192,7 +220,7 @@ class FirestoreBackend:
     def ack(self, world_id: str, part_id: str) -> None:
         from google.cloud import firestore
 
-        ref = self._ref(f"worlds/{world_id}/_pending/queue")
+        ref = self._queue(world_id)
 
         @firestore.transactional  # type: ignore[misc]
         def run(tx: Any) -> None:
@@ -206,96 +234,136 @@ class DurableStore(deps.Store):
     def __init__(self, backend: Any, events_backend: Any, *, org_id: str = deps.ORG_ID) -> None:
         super().__init__()
         self.backend, self.events_backend, self.org_id = backend, events_backend, org_id
-        self.writer: deps.EventWriter | None = (
-            None  # the loads drain, and write the restart's `world.failed`, through it
-        )
+        self.writer: deps.EventWriter | None = None  # `settle` and the loads' drain go through it
         self.revs: dict[tuple[str, str], int] = {}
+        self.unsaved: dict[str, set[str]] = {"policies": set(), "worlds": set()}  # kill-switch changes not yet stored
         self._owners: set[str] = set()
+        self._settled: set[str] = set()
         self._lock = threading.RLock()
+        self._marks = threading.Lock()  # for `unsaved` alone, so marking a change never waits behind a commit
+        self._wait = threading.local()
+
+    # -- the process-wide lock: held for dict changes and across a commit (so `rev`s stay in order), never for a load
+    @contextmanager
+    def _held(self) -> Iterator[None]:
+        at = getattr(self._wait, "at", None)
+        if not self._lock.acquire(timeout=-1 if at is None else max(0.0, at - time.monotonic())):
+            raise HTTPException(status_code=503, detail="store_unavailable")
+        try:
+            yield
+        finally:
+            self._lock.release()
+
+    @contextmanager
+    def deadline(self, seconds: float) -> Iterator[None]:
+        """Within this block the calling thread waits at most `seconds` in all for the lock (else 503)."""
+        before = getattr(self._wait, "at", None)
+        self._wait.at = time.monotonic() + seconds
+        try:
+            yield
+        finally:
+            self._wait.at = before
 
     # -- loads: a miss is never cached, and an id that is not its schema's never reaches the backend
     def _doc(self, coll: str, doc_id: Any) -> dict[str, Any] | None:
-        if not isinstance(doc_id, str) or not _ID[coll].match(doc_id):
+        if not _valid(coll, doc_id):
             return None
         with _io():
             return self.backend.read(coll, doc_id)
 
     def _adopt_world(self, w: str, d: Mapping[str, Any]) -> bool:
-        with self._lock, _io():
+        with _io():  # all the I/O and decoding first: the lock is only for the dicts
+            record, rev = _world_from(d), d["rev"]
+            stream, queued = self.events_backend.read_events(self.org_id, w), self.backend.queue(w)
+        with self._held():
             if w in self.worlds:
                 return False
-            self.events[w] = self.events_backend.read_events(self.org_id, w)
-            self.pending_events[w] = self.backend.queue(w)
-            self.revs[("worlds", w)], self.worlds[w] = d["rev"], _world_from(d)
+            self.events[w], self.pending_events[w], self.revs[("worlds", w)], self.worlds[w] = (
+                stream,
+                queued,
+                rev,
+                record,
+            )
             return True
 
-    def _adopt_policy(self, p: str, d: Mapping[str, Any]) -> None:
-        with self._lock:
+    def _adopt_policy(self, p: str, d: Mapping[str, Any], settle: bool) -> None:
+        with _io():
+            rev, record, world_id = d["rev"], d["record"], d["world_id"]
+        with self._held():
             if p not in self.policies:
-                self.revs[("policies", p)], self.policies[p], self.policy_worlds[p] = (
-                    d["rev"],
-                    d["record"],
-                    d["world_id"],
-                )
-        if d["world_id"]:
-            self.load_world(d["world_id"])
+                self.revs[("policies", p)], self.policies[p], self.policy_worlds[p] = rev, record, world_id
+        if world_id:
+            self.load_world(world_id, settle=settle)
 
-    def _settle(self, w: str) -> None:
-        """What the previous process left: its queue is sent, and a started world with no end and no run is closed."""
-        if self.writer is None:
+    def settle(self, world_id: str, writer: deps.EventWriter | None = None) -> None:
+        """What a previous process left, once per world: its queue is sent, and a started world with no end, no run
+        and no pause is closed with one `world.failed` (a stable id, so two loaders never write two). Writes: call it
+        only after the route's own ownership or membership check."""
+        writer = writer or self.writer
+        if writer is None or world_id in self._settled or world_id not in self.worlds:
             return
         try:
-            self.drain(w)
-            stream, record = self.events.get(w, []), self.worlds[w]
-            types = {e["type"] for e in stream}
+            self.drain(world_id, writer)
+            types = {e["type"] for e in self.events.get(world_id, [])}
+            record = self.worlds[world_id]
             if (
                 "world.started" in types
                 and not types & {"world.completed", "world.failed"}
-                and not (record.paused or w in self.runs)
+                and not (record.paused or world_id in self.runs)
             ):
-                self.writer.append(w, events.world_failed_part(w, RESTARTED))
-        except Exception as exc:  # a busy lease belongs to whoever holds it; the next process looks again
-            logger.warning("settling world %s failed (%s)", w, type(exc).__name__)
+                writer.append(world_id, events.world_failed_part(world_id, RESTARTED, record.run_id))
+            self._settled.add(world_id)
+        except Exception as exc:  # a busy lease belongs to whoever holds it; the next look tries again
+            logger.warning("settling world %s failed (%s)", world_id, type(exc).__name__)
 
-    def load_world(self, world_id: str) -> deps.WorldRecord | None:
-        if (
-            world_id not in self.worlds
-            and (d := self._doc("worlds", world_id)) is not None
-            and self._adopt_world(world_id, d)
-        ):
-            self._settle(world_id)
+    def load_world(self, world_id: str, settle: bool = True) -> deps.WorldRecord | None:
+        if world_id not in self.worlds and (d := self._doc("worlds", world_id)) is not None:
+            self._adopt_world(world_id, d)
+        if settle:
+            self.settle(world_id)
         return self.worlds.get(world_id)
 
-    def load_task(self, task_id: str) -> deps.TaskRecord | None:
+    def load_task(self, task_id: str, settle: bool = True) -> deps.TaskRecord | None:
         if task_id not in self.tasks and (d := self._doc("tasks", task_id)) is not None:
-            with self._lock:
-                self.revs[("tasks", task_id)], self.tasks[task_id] = d["rev"], _task_from(d)
-        task = self.tasks.get(task_id)
-        if task is not None:
-            self.load_world(task.world_id)
-        return task
+            with _io():
+                task, rev = _task_from(d), d["rev"]
+            with self._held():
+                self.revs[("tasks", task_id)], self.tasks[task_id] = rev, task
+        found = self.tasks.get(task_id)
+        if found is not None:
+            self.load_world(found.world_id, settle=settle)
+        return found
 
-    def load_owner(self, owner: str) -> None:
-        if owner in self._owners:
-            return
-        with _io():
-            worlds, policies = (
-                self.backend.find("worlds", "owner", owner),
-                self.backend.find("policies", "record.owner", owner),
-            )
-        fresh = [w for w, d in worlds if self._adopt_world(w, d)]
-        for p, d in policies:
-            self._adopt_policy(p, d)
-        for w in fresh:
-            self._settle(w)
-        self._owners.add(owner)
+    def load_owner(self, owner: str, settle: bool = True) -> None:
+        if owner not in self._owners:
+            with _io():
+                worlds, policies = (
+                    self.backend.find("worlds", "owner", owner),
+                    self.backend.find("policies", "record.owner", owner),
+                )
+            for w, d in worlds:
+                if _valid("worlds", w):
+                    self._adopt_world(w, d)
+            for p, d in policies:
+                if _valid("policies", p):
+                    self._adopt_policy(p, d, settle=False)
+            self._owners.add(owner)
+        if settle:
+            for w in [w for w, r in list(self.worlds.items()) if r.owner == owner]:
+                self.settle(w)
 
     def load_path(self, params: Mapping[str, Any]) -> DurableStore:
-        self.load_world(params.get("world_id"))  # type: ignore[arg-type]
-        self.load_task(params.get("task_id"))  # type: ignore[arg-type]
+        """The ids of a request's path, read-only: this runs before the route has checked who is asking."""
+        self.load_world(params.get("world_id"), settle=False)  # type: ignore[arg-type]
+        self.load_task(params.get("task_id"), settle=False)  # type: ignore[arg-type]
         p = params.get("policy_id")
-        if isinstance(p, str) and p not in self.policies and (d := self._doc("policies", p)) is not None:
-            self._adopt_policy(p, d)
+        if (
+            isinstance(p, str)
+            and _valid("policies", p)
+            and p not in self.policies
+            and (d := self._doc("policies", p)) is not None
+        ):
+            self._adopt_policy(p, d, settle=False)
         return self
 
     # -- writes
@@ -311,7 +379,7 @@ class DurableStore(deps.Store):
         evict: bool = True,
     ) -> None:
         made, parts = set(create), {w: list(p) for w, p in (parts or {}).items() if p}
-        with self._lock:
+        with self._held():
             mapped = {p: (policy_worlds or {}).get(p, self.policy_worlds.get(p)) for p in policies or {}}
             records = [("worlds", i, _plain(r)) for i, r in (worlds or {}).items()]
             records += [("tasks", i, _task_doc(r)) for i, r in (tasks or {}).items()]
@@ -334,9 +402,30 @@ class DurableStore(deps.Store):
             self.tasks.update(tasks or {})
             self.policies.update(policies or {})
             self.policy_worlds.update({p: w for p, w in mapped.items() if w})
+            with self._marks:
+                self.unsaved["worlds"] -= set(worlds or {})
+                self.unsaved["policies"] -= set(policies or {})
             for w, new in parts.items():
                 queued = self.pending_events.get(w, [])
                 self.pending_events[w] = [*queued, *(p for p in new if p["id"] not in {q["id"] for q in queued})]
+
+    def commit_unsaved(
+        self, touched: Iterable[str] = (), *, policies: Iterable[str] = (), worlds: Iterable[str] = ()
+    ) -> None:
+        """A kill switch's commit (FR-HIL-07): marks what it changed in place, then writes every change still unsaved
+        (this call's and any earlier failed one's) with the queued parts of every world they belong to. Raises 503 or
+        409 if that does not land; the changes stay applied here and marked."""
+        with self._marks:  # marked first, outside the big lock: a commit that cannot start still leaves them marked
+            self.unsaved["policies"] |= set(policies)
+            self.unsaved["worlds"] |= set(worlds)
+            marked_policies, marked_worlds = set(self.unsaved["policies"]), set(self.unsaved["worlds"])
+        with self._held():
+            ps = {p: self.policies[p] for p in marked_policies if p in self.policies}
+            ws = {w: self.worlds[w] for w in marked_worlds if w in self.worlds}
+            wanted = {*touched, *ws, *(self.policy_worlds[p] for p in ps if p in self.policy_worlds)}
+            parts = {w: list(q) for w in wanted if isinstance(q := self.pending_events.get(w), list) and q}
+            if ps or ws or parts:
+                self.commit(policies=ps, worlds=ws, parts=parts, evict=False)
 
     def _expect(self, coll: str, doc_id: str, creating: bool, authoritative: bool) -> int | None:
         """The `rev` a write must find: none for a create. An in-place change (a kill switch, the layout) is
@@ -349,20 +438,31 @@ class DurableStore(deps.Store):
         return None if doc is None else doc["rev"]
 
     def _evict(self, touched: list[tuple[str, str]], parts: Mapping[str, Any], *, forget: bool) -> None:
-        """After a failed commit the `rev` of what it touched is unknown. `forget` also drops the cached entries, so the
-        next access reloads what is really stored; a kill switch's in-place change stays."""
+        """After a failed commit the `rev` of what it touched is unknown. `forget` also drops the cached entries (but
+        never a kill switch's unsaved change), so the next access reloads what is really stored; a world that stays
+        cached gets its durable queue read again, never dropped."""
         cached: dict[str, dict[str, Any]] = {"worlds": self.worlds, "tasks": self.tasks, "policies": self.policies}
         for coll, i in touched:
             self.revs.pop((coll, i), None)
-            if forget:
+            if forget and i not in self.unsaved.get(coll, ()):
                 cached[coll].pop(i, None)
                 if coll == "worlds":
                     self.events.pop(i, None)
                     self.pending_events.pop(i, None)
-        if forget:
-            self._owners.clear()  # an evicted world is found again by the next `load_owner`
-            for w in parts:
+                    self._settled.discard(i)
+        if not forget:
+            return
+        self._owners.clear()  # an evicted world is found again by the next `load_owner`
+        for w in parts:
+            if w not in self.worlds:
+                continue
+            try:
+                self.pending_events[w] = self.backend.queue(w)
+            except Exception:  # unreadable: forget the whole world, so its next access reads everything again
+                self.worlds.pop(w, None)
+                self.events.pop(w, None)
                 self.pending_events.pop(w, None)
+                self.revs.pop(("worlds", w), None)
 
     def ack(self, world_id: str, part_id: str) -> None:
         """The part is committed: out of the durable queue and the cache. A failed ack only means a resend by id."""
@@ -416,6 +516,16 @@ def deployed() -> tuple[DurableStore, deps.EventWriter]:
 
 
 def close_deployed() -> None:
-    """On shutdown (SIGTERM): every writer closes and releases its lease, so a new revision does not wait it out."""
-    for _, writer in list(_opened.values()):
-        getattr(writer, "reopen", lambda: None)()
+    """On shutdown (SIGTERM): every writer closes and releases its lease, so a new revision does not wait it out. The
+    whole call is bounded (`_CLOSE_BUDGET_S`): a busy world is skipped, and its lease lapses by itself."""
+    end = time.monotonic() + _CLOSE_BUDGET_S
+    got = _opening.acquire(timeout=1.0)  # a client being built does not hold the shutdown up
+    try:
+        writers = [writer for _, writer in _opened.values()]
+    finally:
+        if got:
+            _opening.release()
+    for writer in writers:
+        reopen = getattr(writer, "reopen", None)
+        if callable(reopen) and (left := end - time.monotonic()) > 0:
+            reopen(left)

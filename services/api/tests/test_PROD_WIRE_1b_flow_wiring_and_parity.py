@@ -136,6 +136,8 @@ def test_PROD_WIRE_1b_a_deployed_route_serves_a_world_an_earlier_process_wrote(
     )
     earlier.drain(world_id)
     earlier.writer.reopen()
+    # The clients above were built with the emulator's env set; a deployed process has none (the door refuses it).
+    monkeypatch.delenv("FIRESTORE_EMULATOR_HOST")
     saved = dict(app.dependency_overrides)
     app.dependency_overrides.clear()
     app.dependency_overrides[deps.get_current_principal] = lambda: deps.Principal("u_pw1b_owner", "owner", world_id)

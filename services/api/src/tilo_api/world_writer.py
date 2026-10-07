@@ -17,6 +17,7 @@ from __future__ import annotations
 import copy
 import logging
 import threading
+import time
 import zlib
 from collections.abc import Callable
 from datetime import datetime
@@ -128,15 +129,21 @@ class WorldWriterAdapter:
                 events.append(committed)
             return copy.deepcopy(committed)
 
-    def reopen(self) -> None:
+    def reopen(self, budget_s: float | None = None) -> None:
         """Closes every open writer, releasing its lease; each reopens on its next append. A world whose lock another
-        thread holds for more than `_REOPEN_LOCK_WAIT_S` is skipped, never waited for: its append is in flight."""
+        thread holds for more than `_REOPEN_LOCK_WAIT_S` is skipped, never waited for: its append is in flight. With
+        `budget_s` the whole call (shutdown) stops waiting when it is spent; the leases left lapse by themselves."""
         with self._guard:
             worlds = list(self._open)
+        end = None if budget_s is None else time.monotonic() + budget_s
         skipped = 0
         for world_id in worlds:
+            if end is not None and time.monotonic() >= end:
+                skipped += 1
+                continue
+            wait = _REOPEN_LOCK_WAIT_S if end is None else min(_REOPEN_LOCK_WAIT_S, max(0.0, end - time.monotonic()))
             lock = self._lock(world_id)
-            if not lock.acquire(timeout=_REOPEN_LOCK_WAIT_S):
+            if not lock.acquire(timeout=wait):
                 skipped += 1
                 continue
             try:

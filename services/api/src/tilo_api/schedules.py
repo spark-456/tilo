@@ -23,6 +23,7 @@ import copy
 import dataclasses
 import functools
 import hashlib
+import inspect
 import json
 import logging
 import os
@@ -250,6 +251,17 @@ Flags = Annotated[FlagStore, Depends(deps.get_flag_store)]
 StoreDep = Annotated[deps.Store, Depends(deps.get_store)]
 
 
+def get_store_factory(request: Request) -> Callable[[], deps.Store]:
+    """The request's store as the app is wired (overrides included), built only when called: the tick calls it after
+    its token check, so an anonymous call opens no Firestore client and reads nothing."""
+
+    def build() -> deps.Store:
+        seam = request.app.dependency_overrides.get(deps.get_store, deps.get_store)
+        return seam(request) if inspect.signature(seam).parameters else seam()
+
+    return build
+
+
 # --- the routes -----------------------------------------------------------------------------------------------------
 
 
@@ -323,7 +335,7 @@ def create_schedule(
     clock: Clock,
     flags: Flags,
 ) -> dict[str, Any]:
-    task = store.load_task(body.task_id)
+    task = store.load_task(body.task_id, settle=False)  # not yet known to be this owner's
     if task is None or task.owner != principal.user_id:  # unknown and another user's task answer alike
         raise HTTPException(status_code=404, detail="No such task.")
     deps.refuse_if_replay_only(flags)  # NFR-24: after sign-in and the owner check
@@ -427,6 +439,7 @@ class ScheduleStarter:
         digest = _digest(run.idempotency_key)
         world_id, run_id, owner, store = f"w_s{digest}", f"r_s{digest}", record.owner_user_id, self._store
         with store.grant_lock(owner):  # one owner's grants at a time: daily limits count every earlier grant
+            store.load_owner(owner)  # the earlier grants, the policies and the history a run reads: all of the owner's
             existing = store.load_world(world_id)
             if existing is None:
                 self._create_world(run, record, world_id, run_id)
@@ -504,7 +517,7 @@ def tick(
     verifier: Annotated[OidcVerifier, Depends(get_oidc_verifier)],
     clock: Clock,
     flags: Flags,
-    store: StoreDep,
+    store_factory: Annotated[Callable[[], deps.Store], Depends(get_store_factory)],
 ) -> Any:
     """No body and no query are read: nothing a caller sends selects a schedule or sets the time. The schedule store and
     the run seams are built only after the token passed (an anonymous call costs neither), once per request."""
@@ -523,6 +536,7 @@ def tick(
     try:
         schedules = schedule_store()
         seams = seams_factory()
+        store = store_factory()  # the durable store opens here, after the token: an anonymous call costs no client
     except HTTPException as exc:  # no store configured: closed, with the fixed code the routes use
         return JSONResponse({"detail": exc.detail}, status_code=exc.status_code)
     except Exception as exc:

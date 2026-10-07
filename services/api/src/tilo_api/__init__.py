@@ -111,7 +111,7 @@ app.include_router(_schedules.router)
 
 def _world_owner(world_id: str) -> str | None:
     """The world's owner from the store the app is wired with (503 `not_configured` when none is)."""
-    world = app.dependency_overrides.get(_deps.get_store, _deps.get_store)().load_world(world_id)
+    world = app.dependency_overrides.get(_deps.get_store, _deps.get_store)().load_world(world_id, settle=False)
     return world.owner if world else None
 
 

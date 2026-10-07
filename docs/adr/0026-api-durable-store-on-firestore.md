@@ -33,11 +33,16 @@
 
    | Path | Holds |
    | --- | --- |
-   | `worlds/{world}` | owner, districts, owner_channels, run_id, paused, prior_world_id, `layout` (null until the run builds it; PRD 15.1 World), `created_at`, `rev` |
-   | `tasks/{task}` | owner, world_id, run_id, draft, brief, questions, answers, edits, approaches, granted, scenario, gaps, next_seq (`Question`, `Gap` as fields), `created_at`, `rev`; never `lock` |
+   | `worlds/{world}` | owner, districts, owner_channels, run_id, paused, prior_world_id, `layout` (null until the run builds it; PRD 15.1 World; a JSON string, see below), `created_at`, `rev` |
+   | `tasks/{task}` | owner, world_id, run_id, draft, brief, questions, answers, edits, approaches, granted, scenario, gaps, next_seq (`Question`, `Gap` as fields; `draft`, `brief`, `edits` and `approaches` are JSON strings, see below), `created_at`, `rev`; never `lock` |
    | `policies/{policy}` | `{record, world_id, rev}`: the `policy.schema.json` record unchanged, and its `policy_worlds` world |
    | `worlds/{world}/events/{seq:08d}`, `.../views/{scope}/events/{seq:08d}`, `.../_head/state` | exactly the harness layout, written only by `WorldWriter` |
-   | `worlds/{world}/_pending/queue` | `pending_events[world]`: the parts as built, in order |
+   | `worlds/{world}/_pending/queue` | `pending_events[world]`: the parts as built, in order, each a JSON string |
+
+   *JSON strings.* Firestore refuses an array inside an array. The queued parts, the world's `layout` and the task's
+   free-form `draft`, `brief`, `edits` and `approaches` can hold one (a brief edit is any JSON the brief schema
+   accepts), so those are stored as JSON strings and decoded on read; every other field is a plain Firestore value
+   (checked on the emulator, scenario policy records included).
 
    `pending_events` is durable because Pause all, Stop all and revoke apply their change before its event
    commits (FR-HIL-07): a queue lost at a restart would leave a paused world or lowered policy with no
