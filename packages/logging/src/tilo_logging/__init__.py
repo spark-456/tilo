@@ -49,3 +49,5 @@ def configure_logging(stream: IO[str] | None = None, level: int = logging.INFO) 
         root.removeHandler(handler)
     root.addHandler(_JsonHandler(stream))
     root.setLevel(level)
+    for chatty in ("httpx", "httpcore"):  # at INFO they log every outbound URL, query strings included
+        logging.getLogger(chatty).setLevel(max(level, logging.WARNING))

@@ -512,7 +512,8 @@ class _Run:
 
 def _logged_with_run_ids[**P, R](work: Callable[P, Awaitable[R]]) -> Callable[P, Awaitable[R]]:
     """NFR-26: every log line made while the run works carries the run and world ids its writer was opened with
-    (a contextvar, so two runs in one process never share them); outside the run there are none."""
+    (a contextvar, so two runs in one process never share them); outside the run there are none.
+    `writer` is keyword-only in `run_plan` (a test pins it), so `kwargs` cannot miss a positional one."""
 
     @functools.wraps(work)
     async def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
