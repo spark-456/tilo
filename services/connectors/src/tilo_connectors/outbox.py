@@ -13,7 +13,7 @@ from typing import Any
 
 import tilo_policy
 
-from ._schema import outbox_validator
+from ._schema import authz_validator, outbox_validator
 from ._time import add_seconds, parse_ts
 from .errors import (
     AdapterError,
@@ -237,6 +237,11 @@ class Outbox:
             return None
         if claimed is None:
             return None
+        if "authz" not in claimed or not authz_validator().is_valid(claimed["authz"]):  # SEC-11: re-check the store
+            # A stored entry that lost or changed its authz (a store bug, an edited document) is never sent: the side
+            # effect and its data.transfer record (authz included) must stay one thing. Nothing was sent, so no alert.
+            _log.error("outbox entry %s: the stored entry no longer carries a valid authz; not sent", outbox_id)
+            return self._store._finalize_claim(outbox_id, holder, "failed")
         name = claimed["connector"]
         adapter = None if name.strip() == RESERVED_CONNECTOR_ID else self._connectors.get(name)
         if adapter is None:  # never a reserved id, even if the map was edited after construction

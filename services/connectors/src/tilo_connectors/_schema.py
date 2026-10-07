@@ -58,6 +58,12 @@ def approach_validator() -> jsonschema.protocols.Validator:  # plan.schema.json#
 
 
 @functools.lru_cache(maxsize=1)
+def authz_validator() -> jsonschema.protocols.Validator:  # common.schema.json#/$defs/authz (SEC-11)
+    ref = {"$ref": "https://contracts.tilo.example/common.schema.json#/$defs/authz"}
+    return jsonschema.Draft202012Validator(ref, registry=_registry())
+
+
+@functools.lru_cache(maxsize=1)
 def manifest_validator() -> jsonschema.protocols.Validator:
     """Without uniqueItems on parents and inputs: jsonschema compares those pairwise (O(n^2)), so
     provenance.build_manifest refuses a repeated (artifact_id, version) first, in O(n) (#187)."""
