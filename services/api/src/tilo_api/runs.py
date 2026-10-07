@@ -135,6 +135,8 @@ class Run:
     """Also the executor's writer (`emit`, `org_id`, `world_id`, `recorded_version`) and its CardStore's (`write`):
     both end at the single writer."""
 
+    owner_started: frozenset[str] = frozenset({"create_meeting_event"})  # FR-MTG-09: no plan names it, only the owner
+
     def __init__(self, store: deps.Store, task: deps.TaskRecord, approach: dict, cap: float, seams: Seams) -> None:
         self.store, self.seams, self.cap, self.approach = store, seams, cap, copy.deepcopy(approach)
         self.org_id = deps.ORG_ID  # the run's artifact Scope is (org_id, world_id, owner); never a request's
@@ -321,6 +323,17 @@ class Run:
                 except Exception:
                     logger.warning("run %s left entry %s to its sender", self.run_id, outbox_id)
 
+    def _compile(self, context: PlanInputs) -> dict:
+        return self.seams.compiler(
+            brief=copy.deepcopy(self.brief), approach=self.approach, budget_cap=self.cap, context=context
+        )
+
+    def _must_ask(self, config: Any) -> MustAsk | None:
+        return MustAsk(
+            self.seams.must_ask_providers, config=config, card_sink=self._store_card, owner=self.owner,
+            covered_actions={p["action_type"] for p in self.store.policies.values() if p.get("owner") == self.owner},
+        )  # fmt: skip
+
     def _prepare(self) -> Any:
         """Compile, validate, lay out. Returns the agents config, or None when no run may start."""
         registry = self.seams.connectors
@@ -330,9 +343,7 @@ class Run:
                 connectors={c: registry.get(c) for c in registry.ids()}, risk_table=tilo_policy.load_risk_table(),
                 policies=dict(self.store.policies),
             )  # fmt: skip
-            plan = self.seams.compiler(
-                brief=copy.deepcopy(self.brief), approach=self.approach, budget_cap=self.cap, context=context
-            )
+            plan = self._compile(context)
         except Exception as exc:
             logger.warning("run %s: no plan (%s)", self.run_id, type(exc).__name__)
             self._fail("the Director could not plan this task", None)
@@ -343,6 +354,9 @@ class Run:
         )  # fmt: skip
         if violations:
             self._fail("the plan broke " + ", ".join(sorted({v.rule_id for v in violations})), None)
+            return None
+        if self.owner_started & {action for unit in plan["units"] for action in unit["actions"]}:
+            self._fail("the plan names an action only its owner can start", None)  # FR-MTG-09: never a planned unit
             return None
         try:
             self.layout, config = self.seams.layout_builder(plan, world_id=self.world_id), load_agents_config()
@@ -369,10 +383,7 @@ class Run:
         granted = next((e["id"] for e in reversed(stream) if e["type"] == "budget.granted"), None)
         summary = f"Work started with a budget of {self.cap:g} credits."
         self.put("world.started", self.director, self.world_id, summary, {"budget_cap": self.cap}, cause=granted)
-        must_ask = MustAsk(
-            self.seams.must_ask_providers, config=config, card_sink=self._store_card, owner=self.owner,
-            covered_actions={p["action_type"] for p in self.store.policies.values() if p.get("owner") == self.owner},
-        )  # fmt: skip
+        must_ask = self._must_ask(config)
         planned = asyncio.ensure_future(
             run_plan(
                 self.plan,
