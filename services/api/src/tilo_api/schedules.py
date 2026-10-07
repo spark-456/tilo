@@ -454,10 +454,16 @@ class ScheduleStarter:
             raise StartSkipped("budget_not_granted", advance=True)
         fields = world_requested_kwargs(dataclasses.replace(run, title=record.title), world_id)
         requested = build_event(base, seq=1, item=None, severity="info", tool=None, cause=None, **fields)
-        store.events.setdefault(world_id, []).extend([requested, outcome.granted_event])
-        store.worlds[world_id] = deps.WorldRecord(
+        assert self._seams is not None  # `start` returned before this without the run seams
+        store.worlds[world_id] = deps.WorldRecord(  # the writer needs the record; removed again if the events fail
             owner=owner, districts={}, run_id=run_id, prior_world_id=run.prior_world_id
         )
+        try:
+            for part in (requested, outcome.granted_event):  # through the single writer (ADR-0026 decision 4)
+                self._seams.writer.append(world_id, part)
+        except BaseException:
+            store.worlds.pop(world_id, None)
+            raise
 
 
 def _digest(key: str) -> str:

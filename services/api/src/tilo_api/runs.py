@@ -346,6 +346,8 @@ class Run:
             return None
         try:
             self.layout, config = self.seams.layout_builder(plan, world_id=self.world_id), load_agents_config()
+            if (record := self.store.worlds.get(self.world_id)) is not None:
+                record.layout = self.layout  # before `world.started`: the event writer validates against it (ADR-0026)
         except Exception:
             self._fail("the world could not be laid out", None)
             return None

@@ -4,8 +4,8 @@ answer the questions, get the approaches, approve one with a budget cap.
 Every route needs the signed-in principal, and only the task's creator may use it: anyone else gets the same
 404 as an unknown task, before any model call. Model calls go through the provider layer's Router; the grant
 is `tilo_planning.budget` run through the deterministic policy engine, never a model. Events are built and
-validated by `tilo_planning`; `Store.events` stands in for the world's stream until the harness writer is
-wired, and each task appends to it in strictly increasing `seq`.
+validated by `tilo_planning`, and every one of them is committed through `EventWriter.append` (ADR-0026 decision 4):
+the writer assigns `seq`, and `TaskRecord.next_seq` is only the helpers' `seq=` hint, derived from what was committed.
 """
 
 from __future__ import annotations
@@ -86,13 +86,28 @@ def _base(task: deps.TaskRecord, actor: str) -> dict[str, Any]:
     return {"v": "1.0", "ts": now_ts(), "world_id": task.world_id, "run_id": task.run_id, "actor": actor}
 
 
-def _append(store: deps.Store, task: deps.TaskRecord, events: list[dict[str, Any]]) -> None:
-    store.events.setdefault(task.world_id, []).extend(events)
-    task.next_seq = max([task.next_seq - 1, *(e["seq"] for e in events)]) + 1
+def _append(writer: deps.EventWriter, task: deps.TaskRecord, events: list[dict[str, Any]]) -> None:
+    """Commits each event through the single writer, oldest first, and moves the helpers' `seq` hint past what the
+    writer committed. A writer that cannot answer is 503 `store_unavailable`; a conflict is the writer's, not ours."""
+    last = task.next_seq - 1
+    try:
+        for event in events:
+            last = max(last, writer.append(task.world_id, event)["seq"])
+    except (deps.EventRejected, HTTPException):
+        raise
+    except Exception as exc:
+        logger.warning("event writer failed for world %s (%s)", task.world_id, type(exc).__name__)
+        raise HTTPException(status_code=503, detail="store_unavailable") from exc
+    finally:
+        task.next_seq = last + 1
 
 
 def create_task(
-    store: deps.Store, intake: IntakeResult, extraction: ExtractionResult, scenario: str | None = None
+    store: deps.Store,
+    writer: deps.EventWriter,
+    intake: IntakeResult,
+    extraction: ExtractionResult,
+    scenario: str | None = None,
 ) -> tuple[str, deps.TaskRecord]:
     """FR-INT-03/04: the task from its intake and the Director's brief (extracted first, so a failed extraction
     stores nothing), then the questions, decided in code."""
@@ -112,7 +127,11 @@ def create_task(
     task.draft = task.brief = asked.brief
     task.questions = asked.questions
     store.worlds[task.world_id] = deps.WorldRecord(owner=owner, districts={}, run_id=task.run_id)
-    _append(store, task, [*intake_events, *asked.memory_hit_events, *([asked.event] if asked.event else [])])
+    try:  # the writer needs the world's record, so it is stored first and removed again if the events fail
+        _append(writer, task, [*intake_events, *asked.memory_hit_events, *([asked.event] if asked.event else [])])
+    except BaseException:
+        store.worlds.pop(task.world_id, None)
+        raise
     store.tasks[intake.task_id] = task
     return intake.task_id, task
 
@@ -171,6 +190,7 @@ def _foreign_sources(task: deps.TaskRecord, edits: dict[str, Any]) -> bool:
 
 Principal = Annotated[deps.Principal, Depends(deps.get_current_principal)]
 StoreDep = Annotated[deps.Store, Depends(deps.get_store)]
+WriterDep = Annotated[deps.EventWriter, Depends(deps.get_event_writer)]
 FlagsDep = Annotated[FlagStore, Depends(deps.get_switches)]  # deployed: NFR-24's flag or the spend ledger's switch
 
 
@@ -216,6 +236,7 @@ def get_approaches(
     task_id: str,
     principal: Principal,
     store: StoreDep,
+    writer: WriterDep,
     model_router: Annotated[Router, Depends(deps.get_router)],
     flags: FlagsDep,
 ) -> dict[str, Any]:
@@ -239,7 +260,7 @@ def get_approaches(
             except ApproachProposalError as exc:
                 deps.raise_if_model_unavailable(exc)
                 raise HTTPException(status_code=502, detail="The Director could not propose approaches.") from exc
-            _append(store, task, [result.event])
+            _append(writer, task, [result.event])
             task.approaches = result.approaches
         approaches = task.approaches
     # Default (PRD silent, BQ-83): the cheapest approach is recommended; ties keep the Director's order.
@@ -285,6 +306,7 @@ def approve(
     principal: Principal,
     body: Annotated[ApproveIn, Depends(_json_body(ApproveIn))],
     store: StoreDep,
+    writer: WriterDep,
     seams: Annotated[runs.Seams | None, Depends(runs.run_seams)],
     flags: FlagsDep,
 ) -> dict[str, Any]:
@@ -318,7 +340,7 @@ def approve(
         except PermissionError as exc:
             raise HTTPException(status_code=403, detail="Only the world's owner sets budgets.") from exc
         policies, policy_events = _scenario_policies(task, preload, event["seq"] + 1)  # built before anything is stored
-        _append(store, task, [event, *policy_events])
+        _append(writer, task, [event, *policy_events])
         for policy in policies:
             store.policies[policy["id"]] = policy
             store.policy_worlds[policy["id"]] = task.world_id

@@ -96,6 +96,8 @@ class WorldRecord:
     paused: bool = False  # true once Pause all has actually paused this world (PRD 9.4 honesty:
     # only ever true together with a world.paused event queued or committed somewhere)
     prior_world_id: str | None = None  # a scheduled run's previous world (FR-AGT-14b): offered, never silently reused
+    layout: dict | None = None  # the run's built layout (PRD 15.1 World), None until the run commits it (ADR-0026);
+    # the event writer reads it, with `run_id`, from here, never from a part
 
 
 @dataclass
