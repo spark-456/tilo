@@ -83,6 +83,55 @@ export const CAP: Record<MethodKey, readonly string[]> = {
   ],
 };
 
+export interface CaptureFixtureEvent {
+  readonly seq: number;
+  readonly type: "skill.capture.step";
+  readonly method: MethodKey;
+  readonly stepIndex: number;
+  readonly text: string;
+  readonly delayMs: number;
+  readonly source: "fixture";
+}
+
+export const CAPTURE_FIXTURE_EVENTS: Record<MethodKey, readonly CaptureFixtureEvent[]> = {
+  record: CAP.record.map((text, stepIndex) => ({
+    seq: stepIndex + 1,
+    type: "skill.capture.step",
+    method: "record",
+    stepIndex,
+    text,
+    delayMs: STEP_MS,
+    source: "fixture",
+  })),
+  guided: CAP.guided.map((text, stepIndex) => ({
+    seq: stepIndex + 1,
+    type: "skill.capture.step",
+    method: "guided",
+    stepIndex,
+    text,
+    delayMs: STEP_MS,
+    source: "fixture",
+  })),
+  describe: CAP.describe.map((text, stepIndex) => ({
+    seq: stepIndex + 1,
+    type: "skill.capture.step",
+    method: "describe",
+    stepIndex,
+    text,
+    delayMs: STEP_MS,
+    source: "fixture",
+  })),
+  upload: CAP.upload.map((text, stepIndex) => ({
+    seq: stepIndex + 1,
+    type: "skill.capture.step",
+    method: "upload",
+    stepIndex,
+    text,
+    delayMs: STEP_MS,
+    source: "fixture",
+  })),
+};
+
 export const DEFAULT_DESC =
   "When an invoice email arrives in the Accounts inbox, open the PDF, copy the supplier, amount and due date into the “Invoices 2026” sheet, then label the email “Logged”.";
 export const DESCRIBE_HELP =
@@ -131,6 +180,86 @@ export const TRY = {
   resultSub: "4 of 4 steps · 1 min 08s · £0.38",
 } as const;
 
+export interface TryRunFixtureEvent {
+  readonly seq: number;
+  readonly type: "skill.try_run.step";
+  readonly stepIndex: number;
+  readonly text: string;
+  readonly matched: boolean;
+  readonly durationSec: number;
+  readonly cost: number;
+  readonly delayMs: number;
+  readonly source: "fixture";
+}
+
+/** Fixture events driving the practice try-run (sum: 4 matched steps, 68s = 1 min 08s, £0.38). */
+export const TRY_RUN_FIXTURE_EVENTS: readonly TryRunFixtureEvent[] = [
+  {
+    seq: 1,
+    type: "skill.try_run.step",
+    stepIndex: 0,
+    text: PLAN[0].text,
+    matched: true,
+    durationSec: 14,
+    cost: 0.05,
+    delayMs: STEP_MS,
+    source: "fixture",
+  },
+  {
+    seq: 2,
+    type: "skill.try_run.step",
+    stepIndex: 1,
+    text: PLAN[1].text,
+    matched: true,
+    durationSec: 18,
+    cost: 0.09,
+    delayMs: STEP_MS,
+    source: "fixture",
+  },
+  {
+    seq: 3,
+    type: "skill.try_run.step",
+    stepIndex: 2,
+    text: PLAN[2].text,
+    matched: true,
+    durationSec: 21,
+    cost: 0.14,
+    delayMs: STEP_MS,
+    source: "fixture",
+  },
+  {
+    seq: 4,
+    type: "skill.try_run.step",
+    stepIndex: 3,
+    text: PLAN[3].text,
+    matched: true,
+    durationSec: 15,
+    cost: 0.1,
+    delayMs: STEP_MS,
+    source: "fixture",
+  },
+];
+
+export function formatTryRunResult(
+  events: readonly Pick<TryRunFixtureEvent, "matched" | "durationSec" | "cost">[],
+  totalSteps: number = PLAN.length,
+): { title: string; sub: string } {
+  const matched = events.filter((e) => e.matched).length;
+  const totalSec = events.reduce((sum, e) => sum + e.durationSec, 0);
+  const totalCost = events.reduce((sum, e) => sum + e.cost, 0);
+  const mins = Math.floor(totalSec / 60);
+  const secs = String(totalSec % 60).padStart(2, "0");
+  const dur = mins > 0 ? `${mins} min ${secs}s` : `${totalSec}s`;
+  const title =
+    matched === totalSteps
+      ? TRY.resultTitle
+      : `Matched ${matched} of ${totalSteps} steps of your way`;
+  return {
+    title,
+    sub: `${matched} of ${totalSteps} steps · ${dur} · £${totalCost.toFixed(2)}`,
+  };
+}
+
 export const SAVE = {
   nameLabel: "Skill name",
   who: "Who can use it",
@@ -152,12 +281,40 @@ export const savedLine = (who: string, t: Trigger): string =>
 export const sharedWith = (scope: Scope, org: string): string =>
   scope === "team" ? `Shared with ${org}` : "Just for you";
 
-/** The estimates of Tilo's version; the third is counted from the switches. */
-export const EST = { run: "~£0.40", time: "~1 min" } as const;
+/** Ledger step-cost table by tool access level (Read = 0.05, Draft = 0.10, Act = 0.15) and ~15s per step. */
+export const STEP_LEDGER_PRICES = {
+  Read: 0.05,
+  Draft: 0.1,
+  Act: 0.15,
+} as const;
+export const STEP_SECONDS = 15;
+
 export const stopsToAsk = (asks: readonly boolean[]): string => {
   const n = asks.filter(Boolean).length;
   return n === 0 ? "Never" : `${n} ${n === 1 ? "step" : "steps"}`;
 };
+
+export function estimateSkillPlan(
+  steps: readonly { readonly tool: string }[],
+  asks: readonly boolean[],
+  currency: "GBP" | "USD" = "GBP",
+): { run: string; time: string; stops: string } {
+  const sym = currency === "USD" ? "$" : "£";
+  const cost = steps.reduce((sum, s) => {
+    if (s.tool.endsWith("Act")) return sum + STEP_LEDGER_PRICES.Act;
+    if (s.tool.endsWith("Draft")) return sum + STEP_LEDGER_PRICES.Draft;
+    return sum + STEP_LEDGER_PRICES.Read;
+  }, 0);
+  const mins = Math.max(1, Math.round((steps.length * STEP_SECONDS) / 60));
+  return {
+    run: `~${sym}${cost.toFixed(2)}`,
+    time: `~${mins} min`,
+    stops: stopsToAsk(asks),
+  };
+}
+
+/** The estimates of Tilo's version; computed from the default plan and ledger prices. */
+export const EST = estimateSkillPlan(PLAN, DEFAULT_ASK, "GBP");
 
 /** What "Save skill" sets on the draft skill (the design's `S.live` override). */
 export const savedOverride = (owner: string): Partial<Skill> => ({
