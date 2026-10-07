@@ -25,6 +25,7 @@ import time
 from typing import Any
 
 from google.api_core import exceptions as gexc
+from google.auth import exceptions as gauth_exc
 
 from tilo_api.people_firestore import PeopleStoreNotConfigured
 from tilo_api.store_door import GCP_PROJECT, ApiStoreNotConfigured, ApiStoreUnavailable
@@ -92,7 +93,7 @@ def reset() -> None:
 
 _DECLARATIONS = ("visitor", "judge")
 _ATTEMPTS = 8
-_LIBRARY_ERRORS = (gexc.GoogleAPICallError, gexc.RetryError)
+_LIBRARY_ERRORS = (gexc.GoogleAPICallError, gexc.RetryError, gauth_exc.GoogleAuthError)
 _RESERVED_ID = re.compile(r"__.*__", re.DOTALL)
 
 

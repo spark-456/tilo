@@ -22,6 +22,7 @@ from _pw3_lib import DEMO, EMULATOR, PROJECT, SENTINEL, Builder, FakeClient
 from fastapi import HTTPException
 from fastapi.testclient import TestClient
 from google.api_core import exceptions as gexc
+from google.auth import exceptions as gauth_exc
 from tilo_api import app, deps
 
 
@@ -158,8 +159,10 @@ LIBRARY_ERRORS = [
     lambda: gexc.PermissionDenied(f"denied ({SENTINEL})"),
     lambda: gexc.DeadlineExceeded(f"slow ({SENTINEL})"),
     lambda: gexc.RetryError(f"retries ({SENTINEL})", cause=None),
+    lambda: gauth_exc.RefreshError(f"refresh ({SENTINEL})"),
+    lambda: gauth_exc.TransportError(f"transport ({SENTINEL})"),
 ]
-LIBRARY_IDS = ["unavailable", "permission-denied", "deadline", "retry-error"]
+LIBRARY_IDS = ["unavailable", "permission-denied", "deadline", "retry-error", "auth-refresh", "auth-transport"]
 
 
 @pytest.fixture
