@@ -785,8 +785,10 @@ def test_PPL_11c_s4_BQ_PPL11C_14_a_principal_with_a_create_in_flight_survives_pr
 
 def test_PPL_11c_s4_BQ_PPL11C_14_a_members_store_after_strangers_refusals_evicts_nobody(people_rig, monkeypatch):
     """With room for 3 principals' keys: six strangers' keyed creates are refused (403), then Sam (a member) stores one,
-    then Priya retries. A limiter that keeps the empty principal map of a refused create is over the bound at Sam's
-    store and pushes Priya out; with the fix her retry is the first answer."""
+    then Priya retries and gets the first answer. This pins the combination of the unanswered-entry cleanup and the
+    stored-only counting; neither mutant alone is guaranteed to fail it. The cleanup mutant is caught by
+    `a_refused_create_leaves_no_principal_map_behind`, the old counting (pending work takes a slot) by
+    `an_in_flight_create_by_a_stranger_takes_no_principal_slot`."""
     _shrink_principal_bound(monkeypatch, 3)
     rig = work_rig(people_rig)
     first = rig.client.post("/v1/work-items", json=WORK_ITEM_BODY, headers=KEY)
@@ -914,3 +916,43 @@ def test_PPL_11c_s4_BQ_PPL11C_14_an_in_flight_create_by_a_stranger_takes_no_prin
         release.set()
         thread.join(5)
     assert outcome == ["refused"] and set(limits._keys) == {"a", "b"}
+
+
+def test_PPL_11c_s4_BQ_PPL11C_14_a_stored_principal_with_a_create_in_flight_is_skipped_by_the_principal_pass(
+    monkeypatch,
+):
+    """Bound 2: `a` has a stored answer and a second create in flight, and is the least recently used principal when
+    `b` and `c` store. The principal pass skips it (it has a holder) and forgets `b` instead; a racing retry of the
+    in-flight key waits for the first caller and makes nothing."""
+    import threading
+    import time
+
+    limits, body = _limits_with_bound(monkeypatch, 2)
+    _store(limits, body, "a", "stored")
+    started, release = threading.Event(), threading.Event()
+    calls: list[str] = []
+    results: list[dict] = []
+
+    def slow() -> dict:
+        calls.append("first")
+        started.set()
+        release.wait(5)
+        return {"id": "one"}
+
+    def duplicate() -> dict:
+        calls.append("duplicate")
+        return {"id": "two"}
+
+    first = threading.Thread(target=lambda: results.append(limits.once("a", "/r", "k", body(), slow)))
+    first.start()
+    assert started.wait(5)
+    _store(limits, body, "b")
+    _store(limits, body, "c")
+    retry = threading.Thread(target=lambda: results.append(limits.once("a", "/r", "k", body(), duplicate)))
+    retry.start()
+    time.sleep(0.2)
+    release.set()
+    first.join(5)
+    retry.join(5)
+    assert calls == ["first"] and results == [{"id": "one"}, {"id": "one"}], (calls, results)
+    assert set(limits._keys) == {"a", "c"}

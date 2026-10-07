@@ -5,9 +5,11 @@
 * `idempotent`: an optional `Idempotency-Key` on a create; the same principal, route, key and body again is the first
   answer, with nothing created twice; another body is a 422; a create that failed leaves the key free and takes no
   slot. Keys are bounded: 16 per principal (its own least recently used goes first, so one caller cannot push out
-  another's) and 512 principals, 8,192 stored answers in all. Only a principal with a stored answer takes a slot (a
-  refused or in-flight create never does, and never pushes anyone out); past 512 such principals, the least recently
-  used idle one's keys are forgotten, never the one that is storing.
+  another's) and 512 principals, 8,192 stored answers in all. Only a principal with a stored answer takes a slot: a
+  refused or in-flight create holds no stored answer, takes no principal slot and evicts nobody; past 512 such
+  principals, the least recently used idle one's keys are forgotten, never the one that is storing. The 512 and 8,192
+  are approximate: requests in flight can exceed them briefly, by at most the number in flight. The per-principal pass
+  still counts a principal's own in-flight entries toward its 16 (its own traffic only).
 * `NoStore`: every `/v1/` answer is `Cache-Control: no-store`, the SEC-15 gate's 403 and a validation 422 included.
 
 Counters and keys live in a `Limits` that belongs to one install's `PeopleStores` (never to the module), keyed by the
@@ -92,6 +94,8 @@ class Limits:
                 entry.fingerprint, entry.answer = fingerprint, answer
                 return answer
         finally:
+            # this cleanup of an unanswered entry and its empty map is the only thing that frees the map of a principal
+            # with no stored answer: `_evict` never looks at those
             with self._lock:
                 entry.holders -= 1
                 held = self._keys.get(user_id)
