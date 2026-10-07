@@ -493,7 +493,7 @@ def slot_ids(key: str) -> tuple[str, str]:
 TASKS_API = "https://cloudtasks.googleapis.com/v2"
 TASKS_TIMEOUT_S = 10.0  # one enqueue call; google-auth's own default is 120 s, which would hold a tick that long
 TICK_PATH = "/internal/schedules/tick"
-MAX_SKIPPED = 100_000  # a task's `skipped`: bounds-checked, it is only ever a count in an info alert
+MAX_SKIPPED = 99_999  # a task's `skipped`: bounds-checked, only a count in an info alert (not the SEC-16 cap literal)
 _MAX_BODY = 4096  # bytes of request body read (a task's body is about 300)
 _QUEUE = re.compile(r"^projects/[^/\s]+/locations/[^/\s]+/queues/[^/\s]+$")
 _WORLD_ID = re.compile(r"^w_[0-9A-Za-z_]{1,48}$")  # contracts/common.schema.json world_id; use with fullmatch
