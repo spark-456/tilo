@@ -43,6 +43,8 @@ evals/nightly.local.md
 evals/metrics.local.md
 # Live generator output (issue #272 b): one folder per run; the user promotes a case into evals/bank/ by PR
 evals/generated/
+# just live-run (PL-LIVE-E2E): recordings of runs on a typed topic are the user's own text, never committed
+evals/bank/live/adhoc/
 
 # Terraform state and plans (state lives in a GCS backend)
 .terraform/

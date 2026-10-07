@@ -55,7 +55,7 @@ describe("PRD-18.3 AGW-08 route table: every Must screen has a route", () => {
     // Real addresses are untouched: the flow shell and every screen keep theirs.
     expect(matchScreen("/world/w/inspect/B1")?.id).toBe("S-05");
     expect(matchScreen("/world/w/delivery")?.id).toBe("S-12");
-    expect(matchScreen("/world/w")).toBeNull();
+    expect(matchScreen("/world/w/stage")).toBeNull(); // the stage is a flow route (S-04)
     expect(matchScreen("/task/t/approaches")).toBeNull();
     expect(matchScreen("/nowhere")).toBeNull();
   });
@@ -73,6 +73,7 @@ describe("PRD-18.3 AGW-08 route table: every Must screen has a route", () => {
     expect(sectionOf("/needs-you/gate")).toBe("needs");
     expect(sectionOf("/library/artifacts")).toBe("library");
     expect(sectionOf("/autonomy")).toBe("more");
-    expect(sectionOf("/worlds")).toBe("world"); // S-14 lists worlds (#227 C4)
+    expect(sectionOf("/world/w1/stage")).toBe("world"); // S-04 (WEB-CUTOVER: /world/:id is the Park overview)
+    expect(sectionOf("/worlds/replays")).toBe("world"); // S-14 lists worlds (#227 C4), at /worlds/replays since WEB-CUTOVER
   });
 });

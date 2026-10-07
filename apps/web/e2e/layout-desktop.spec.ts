@@ -1,13 +1,16 @@
 import { expect, test } from "@playwright/test";
 import { expectWithinPx, requireBox } from "./support/assertions";
 import { DESKTOP } from "./support/viewports";
+import { BARE_STAGE_PATH } from "./support/world";
 
 test.use({ viewport: DESKTOP });
 
 test("PRD-18.3 layout: desktop 1440x900 renders a 72px left rail, centre stage and 360px right rail", async ({
   page,
 }) => {
-  await page.goto("/");
+  // WEB-CUTOVER: "/" is the Park Home (its own shell); the old app's three-column frame (no levels panel, which only a
+  // world address adds) is the task flow's page.
+  await page.goto(BARE_STAGE_PATH);
 
   const leftRail = page.getByTestId("left-rail");
   const stage = page.getByTestId("stage-frame");
