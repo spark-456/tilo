@@ -74,6 +74,7 @@ BODY_ROUTES = {
     "edit meeting": "/v1/meetings/mt_q4_plan/edit",
     "delete meeting": "/v1/meetings/mt_q4_plan/delete",
     "meeting world": "/v1/meetings/mt_q4_plan/world",
+    "host meeting": "/v1/meetings/mt_q4_plan/host",
     "add membership": "/v1/people/u_priya/memberships",
     "remove membership": "/v1/people/u_priya/memberships/remove",
     "role": "/v1/people/u_priya/role",

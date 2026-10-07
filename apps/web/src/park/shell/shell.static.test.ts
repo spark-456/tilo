@@ -67,6 +67,7 @@ describe("WEB_3b_static: the shell exists and is wired", () => {
 describe("WEB_3b_static: honesty (HR-1..HR-7; the scan and its allowlist, WEB-MOTION-1 edit)", () => {
   it("WEB_3b_static_ALLOWLIST_has_only_the_two_choreographer_clocks_and_the_city_layer_entries", () => {
     // WEB-MOTION-1 added the city's ambient entries (engines/park.ts and shell/park.shell.css only).
+    // Updated for WEB-MOTION-2: exactly one more, the shell stylesheet's css-transition (splash, page swap, bar).
     expect(ALLOWLIST.map((e) => `${e.file}:${e.rule}`)).toEqual([
       "src/world/runWorld.ts:raf",
       "src/stage/Stage.tsx:raf",
@@ -74,6 +75,7 @@ describe("WEB_3b_static: honesty (HR-1..HR-7; the scan and its allowlist, WEB-MO
       "src/park/engines/park.ts:css-animation",
       "src/park/shell/park.shell.css:css-keyframes",
       "src/park/shell/park.shell.css:css-animation",
+      "src/park/shell/park.shell.css:css-transition",
     ]);
   });
 
@@ -90,7 +92,9 @@ describe("WEB_3b_static: honesty (HR-1..HR-7; the scan and its allowlist, WEB-MO
     const banned =
       /\btransition\b|\banimation\b|@keyframes|requestAnimationFrame|cancelAnimationFrame|\.animate\s*\(/;
     expect(ts.filter((p) => banned.test(code(p))).map(shellRel)).toEqual([]);
-    const cssBanned = /\btransition\b|requestAnimationFrame|\.animate\s*\(/;
+    // Updated for WEB-MOTION-2: the stylesheet may now hold transitions (transform and opacity only, pinned in
+    // motion.transitions.css.test.ts); it still holds no frame loop or script animation.
+    const cssBanned = /requestAnimationFrame|\.animate\s*\(/;
     expect(
       sources.filter((p) => p.endsWith(".css") && cssBanned.test(code(p))).map(shellRel),
     ).toEqual([]);

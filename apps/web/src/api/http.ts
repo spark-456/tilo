@@ -25,6 +25,8 @@ export class TiloApiError extends Error {
     readonly write = false,
     /** The server's stable refusal code (SEC-15: `under_construction`, `declaration_required`), or null. */
     readonly code: string | null = null,
+    /** NFR-22 / NFR-24: a 503 that said `replay_only: true` (live models unavailable); finished runs can still be replayed. */
+    readonly replayOnly = false,
   ) {
     super(message);
     this.name = "TiloApiError";
@@ -33,6 +35,9 @@ export class TiloApiError extends Error {
 
 const UNREACHABLE = "Tilo could not be reached. Check your connection and try again.";
 const SERVER_TROUBLE = "Tilo had a problem on its side.";
+/** NFR-22: the web's own sentence for a replay-only 503; the server's free text is never shown. */
+const REPLAY_ONLY =
+  "Live models are unavailable right now, so nothing new was started. Finished runs can still be replayed.";
 const BAD_REPLY = "Tilo sent a reply this page could not read.";
 const GENERIC_4XX: Readonly<Record<number, string>> = {
   401: "You need to sign in to do this.",
@@ -93,6 +98,16 @@ function codeOf(text: string): string | null {
     return typeof code === "string" && /^[a-z][a-z0-9_]{0,39}$/.test(code) ? code : null;
   } catch {
     return null;
+  }
+}
+
+/** True only for a 503 whose JSON says `replay_only: true` (the string "true" or 1 do not count). */
+function isReplayOnly(status: number, text: string): boolean {
+  if (status !== 503) return false;
+  try {
+    return (JSON.parse(text) as { replay_only?: unknown } | null)?.replay_only === true;
+  } catch {
+    return false;
   }
 }
 
@@ -172,12 +187,20 @@ export interface HttpClientOptions {
   readonly fetch?: typeof fetch;
   /** Gap between event polls (default 1000 ms). */
   readonly pollMs?: number;
+  /** SEC-10: the App Check token for the next request, or null. Asked before every request (the SDK
+   * caches and refreshes it); a getter that fails or answers null sends the request with no header. */
+  readonly appCheckToken?: (() => Promise<string | null>) | undefined;
 }
+
+/** The header the API reads the App Check token from (services/api `appcheck.py`). */
+const APP_CHECK_HEADER = "X-Firebase-AppCheck";
+const APP_CHECK_TOKEN = /^[A-Za-z0-9._~+/=-]{1,4096}$/;
 
 export class HttpClient implements TiloClient {
   private readonly base: string;
   private readonly fetchFn: typeof fetch;
   private readonly pollMs: number;
+  private readonly appCheckToken: (() => Promise<string | null>) | undefined;
   private readonly cardWorlds = new Map<string, string>(); // card -> world, from listCards
   private readonly cardChannels = new Map<string, Card["answer_channels"]>(); // card -> channels it lists
   private readonly layouts = new Map<string, LayoutCall>(); // a run's layout never changes
@@ -190,18 +213,43 @@ export class HttpClient implements TiloClient {
     this.base = options.baseUrl.trim().replace(/\/+$/, "");
     this.fetchFn = options.fetch ?? ((url, init) => fetch(url, init));
     this.pollMs = options.pollMs ?? 1000;
+    this.appCheckToken = options.appCheckToken;
+  }
+
+  /** `init` with the App Check header when there is a token (SEC-10). Never throws: no token is no header. */
+  private async withAppCheck(init: RequestInit): Promise<RequestInit> {
+    if (!this.appCheckToken) return init;
+    let token: string | null = null;
+    try {
+      token = await this.appCheckToken();
+    } catch {
+      return init;
+    }
+    // A token is a JWT: base64url characters and dots. Anything else would make `fetch` throw (a bad header
+    // value) and the call would fail as unreachable, so it goes out with no header instead.
+    if (typeof token !== "string" || !APP_CHECK_TOKEN.test(token)) return init;
+    const headers = new Headers(init.headers);
+    headers.set(APP_CHECK_HEADER, token);
+    return { ...init, headers };
   }
 
   private async request<T>(path: string, init: RequestInit = {}, write = false): Promise<T> {
     let res: Response;
     try {
-      res = await this.fetchFn(`${this.base}${path}`, init);
+      res = await this.fetchFn(`${this.base}${path}`, await this.withAppCheck(init));
     } catch {
       throw new TiloApiError(UNREACHABLE, null, true, write); // the cause (host, port) is not for people
     }
     if (!res.ok) {
-      if (res.status >= 500) throw new TiloApiError(SERVER_TROUBLE, res.status, true, write);
+      // Only a 503 (the replay-only label) or a 4xx has a body worth reading; other 5xx are not awaited.
+      if (res.status >= 500 && res.status !== 503) {
+        throw new TiloApiError(SERVER_TROUBLE, res.status, true, write);
+      }
       const body = await res.text().catch(() => "");
+      if (isReplayOnly(res.status, body)) {
+        throw new TiloApiError(REPLAY_ONLY, 503, false, write, codeOf(body), true);
+      }
+      if (res.status >= 500) throw new TiloApiError(SERVER_TROUBLE, res.status, true, write);
       throw new TiloApiError(reasonOf(res.status, body), res.status, false, write, codeOf(body));
     }
     try {

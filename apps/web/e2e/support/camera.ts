@@ -1,4 +1,5 @@
 import { type Page, expect } from "@playwright/test";
+import { STAGE_PATH } from "./world";
 
 /**
  * P0-08b stage readiness: `[data-testid="stage-frame"]` gains `data-stage-ready="true"` (and the
@@ -10,7 +11,7 @@ export async function waitForStage(page: Page): Promise<void> {
 }
 
 /** page.goto, then wait until the stage has drawn its first frame. */
-export async function gotoStage(page: Page, url = "/"): Promise<void> {
+export async function gotoStage(page: Page, url = STAGE_PATH): Promise<void> {
   await page.goto(url);
   await waitForStage(page);
 }

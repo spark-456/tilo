@@ -19,6 +19,7 @@ from tilo_memory.artifacts import ArtifactStore
 from tilo_people.stores import PeopleStores
 
 from tilo_api import deps, people_items
+from tilo_api.meeting_host import HostSeams, get_host_seams, host_meeting
 from tilo_api.people_events import WorkEvents, get_work_events
 from tilo_api.people_limits import idempotent, write_limit
 from tilo_api.people_meetings import MeetingEditIn, edit_meeting, get_meeting, read_minutes, set_world
@@ -49,6 +50,7 @@ from tilo_api.people_writes import (
 _MEETING_ID = re.compile(r"mt_[0-9A-Za-z_]{1,48}")
 _ITEM_ID = re.compile(r"wi_[0-9A-Za-z_]{1,48}")
 _PERSON_ID = re.compile(r"u_[0-9A-Za-z_]{1,48}")
+_FOUNDING_CHANNELS = frozenset({"web", "mobile_web"})  # an allow-list: `/first` needs a full web sign-in (FS-19)
 _IDS = r"^u[0-9]{4,6}(,u[0-9]{4,6}){0,19}$"  # 1 to 20 utterance ids, comma separated
 
 
@@ -246,6 +248,21 @@ def meeting_world_route(
     return _answer(lambda: set_world(_writer(principal, stores, clock), worlds, meeting_id))
 
 
+@router.post("/v1/meetings/{meeting_id}/host")
+def host_meeting_route(
+    meeting_id: str,
+    _: Annotated[Empty, Depends(json_body(Empty))],
+    principal: Annotated[deps.Principal, Depends(deps.get_current_principal)],
+    stores: Annotated[PeopleStores, Depends(deps.get_people_stores)],
+    clock: Annotated[Callable[[], str], Depends(deps.get_clock)],
+    seams: Annotated[HostSeams, Depends(get_host_seams)],
+) -> dict[str, Any]:
+    """The owner hosts a scheduled bot meeting (FR-MTG-09): one gate card, then one invitation (BQ-MTG09-20)."""
+    if _MEETING_ID.fullmatch(meeting_id) is None:
+        raise _not_found()
+    return _answer(lambda: host_meeting(_writer(principal, stores, clock), meeting_id, seams))
+
+
 @router.post("/v1/meetings/{meeting_id}/delete")
 def delete_meeting_route(
     meeting_id: str,
@@ -316,10 +333,15 @@ def create_first_person_route(
     body: Annotated[PersonIn, Depends(json_body(PersonIn))],
     principal: Annotated[deps.Principal, Depends(deps.get_current_principal)],
     stores: Annotated[PeopleStores, Depends(deps.get_people_stores)],
+    gate: Annotated[Callable[[str], bool], Depends(deps.get_founder_gate)],
     redact: Annotated[Callable[[str], str], Depends(deps.get_redactor)],
     clock: Annotated[Callable[[], str], Depends(deps.get_clock)],
 ) -> dict[str, Any]:
-    """The signed-in principal founds an empty org as its owner (PE-17); 403 once the org has a person."""
+    """The configured bootstrap uid founds an empty org as its owner (PE-17, BQ-PPL11C-15); every other principal, and
+    any org that has a person or was founded, is the same 403. The uid and the session (a full web or mobile_web
+    sign-in, FS-19, an allow-list) are checked before any store is read; the marker is never the request's."""
+    if not (principal.full_session and principal.channel in _FOUNDING_CHANNELS and gate(principal.user_id)):
+        raise Refusal(403, "forbidden")
     return _answer(
         lambda: idempotent(
             request,

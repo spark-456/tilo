@@ -129,7 +129,7 @@ describe("WEB_6_shell: /park/world/<id> inside the shell", () => {
     const m = await visit("/park/world/k1");
     click(control(breadcrumb(m.container), "Worlds"));
     await settle();
-    expect(window.location.pathname).toBe("/park/worlds");
+    expect(window.location.pathname).toBe("/worlds");
     expect(m.container.querySelector('[data-testid="park-page-worlds"]')).not.toBeNull();
     await goTo("/park/world/k1");
     const spend = elWithText(m.container, "Spend") as HTMLElement;
@@ -137,7 +137,7 @@ describe("WEB_6_shell: /park/world/<id> inside the shell", () => {
     while (card && !hasControl(card, "Ledger")) card = card.parentElement;
     click(control(card as HTMLElement, "Ledger"));
     await settle();
-    expect(window.location.pathname).toBe("/park/ledger");
+    expect(window.location.pathname).toBe("/ledger");
   });
 
   it("WEB_6_shell_Approve_goes_through_the_store_toast_with_Undo_and_the_card_updates", async () => {

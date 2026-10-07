@@ -85,7 +85,7 @@ lint:
 
 # Type-check everything.
 typecheck:
-    uv run mypy services/api/src services/harness/src services/sandbox-web/src packages/providers packages/contracts-py packages/policy/src packages/metering packages/planning/src evals/src services/connectors/src packages/archive/src packages/memory/src services/render/src services/channels/src services/browser/src packages/people/src
+    uv run mypy services/api/src services/harness/src services/sandbox-web/src packages/providers packages/contracts-py packages/policy/src packages/metering packages/planning/src evals/src services/connectors/src packages/archive/src packages/memory/src services/render/src services/channels/src services/browser/src packages/people/src packages/logging/src
     pnpm -r exec tsc --noEmit
 
 # Validate the dev Terraform without a backend or credentials (EFF-05c). Downloads providers, changes nothing in the cloud.
@@ -114,9 +114,22 @@ conformance:
 vertex-smoke *args:
     uv run python packages/providers/scripts/live_vertex_smoke.py {{args}}
 
+# PL-02 schema probe: seven tiny Director-profile calls (no schema, json mode, sanitized/raw schema, thinking) to find what Vertex refuses. Refuses unless the user sets the live switch; `just vertex-probe-schema --dry-run` is free.
+vertex-probe-schema *args:
+    uv run python packages/providers/scripts/live_vertex_probe_schema.py {{args}}
+
 # PL-LIVE-E2E (#340): one bank case through the real pipeline. Live only when the user sets LIVE=1; `--dry-run` and `--replay` are free.
 live-e2e *args:
     uv run python evals/scripts/live_e2e.py {{args}}
+
+# PL-LIVE-E2E: one real end-to-end run on a typed topic, screened by the safety role (Model Armor) first. The topic is
+# typed at the prompt (`live-run`) or read from a file (`live-run-file <path>`): it never passes through a shell. Flags
+# only: --dry-run --auto-answer --auto-approve-t1t2 --max-credits N. Live switch as live-e2e. docs/live-e2e.md.
+live-run *flags:
+    uv run python evals/scripts/live_run.py --topic-stdin {{ if flags =~ '^[-a-z0-9.= ]*$' { flags } else { error("live-run takes flags only; type the topic at the prompt or use live-run-file") } }}
+
+live-run-file path *flags:
+    uv run python evals/scripts/live_run.py --topic-file {{ if path =~ "['\u{2018}\u{2019}\u{201A}\u{201B}]" { error("live-run-file: rename a path that holds a single quote") } else { quote(path) } }} {{ if flags =~ '^[-a-z0-9.= ]*$' { flags } else { error("live-run-file takes flags only after the path") } }}
 
 # Run skills/ tests (FR-AGT-04). Actually runs pytest so a real failing skill
 # test fails this gate; pytest's exit code 5 ("no tests collected") is treated
@@ -155,7 +168,8 @@ build-evals-image:
 # Build the web app and deploy it to Firebase Hosting on the tilo-dev project (P0-07c). The build is given an empty
 # VITE_TILO_API_URL, so the deployed app runs the fixture / replay world with no backend. Pinned to the dev project:
 # no parameter, no other project, never tilo-demo. Needs your own `firebase login` first (the CI deployer has no
-# Firebase role). Steps and the resulting URL: docs/deploy-dev.md.
+# Firebase role). Steps and the resulting URL: docs/deploy-dev.md. scripts/web_build_env.py also reads the web app's
+# VITE_FIREBASE_* config (SEC-10 App Check) into the build environment; it writes nothing to disk.
 deploy-web:
-    python -c "import os,subprocess,sys; sys.exit(subprocess.call('pnpm --filter @tilo/web run build', shell=True, env=dict(os.environ, VITE_TILO_API_URL='' )))"
+    python scripts/web_build_env.py pnpm --filter @tilo/web run build
     pnpm exec firebase deploy --only hosting --project essential-wares-510320-f0
