@@ -1,9 +1,9 @@
-// WEB-11 acceptance in a real browser (plan section 10): /park/connectors at 1440x900 and 390x844, day and
+// WEB-11 acceptance in a real browser (plan section 10): /connectors at 1440x900 and 390x844, day and
 // night. The heading is visible, the six fixture tiles are listed under Connected, and the console shows
 // ZERO errors or warnings. The route lands with WEB-3a, so this fails until then (404 or the old app).
 // Night is the shell's own `data-time="night"` on the `data-park` root, set after load.
 // Run on a private port with three workers (a cold Vite start can time out the first test):
-//   TILO_WEB_PORT=5412 pnpm --filter @tilo/web exec playwright test e2e/park/connectors.spec.ts --project=chromium --no-deps --workers=3
+//   TILO_WEB_PORT=5412 pnpm --filter @tilo/web exec playwright test e2e/connectors.spec.ts --project=chromium --no-deps --workers=3
 import { type Page, expect, test } from "@playwright/test";
 import { collectConsoleProblems } from "../support/console";
 import { DESKTOP, MOBILE } from "../support/viewports";
@@ -12,7 +12,7 @@ const SIZES = { desktop: DESKTOP, mobile: MOBILE } as const;
 const THEMES = ["day", "night"] as const;
 
 async function openConnectors(page: Page, theme: (typeof THEMES)[number]): Promise<void> {
-  await page.goto("/park/connectors");
+  await page.goto("/connectors");
   if (theme === "night") {
     await page.evaluate(() =>
       document.querySelector("[data-park]")?.setAttribute("data-time", "night"),

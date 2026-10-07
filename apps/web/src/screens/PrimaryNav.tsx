@@ -6,7 +6,7 @@ import { FIXTURE_WORLD_ID } from "../api/fixtures/derived";
 // Ask Tilo button, which opens the assistant panel.
 import { AssistantLauncher } from "../assistant/AssistantLauncher";
 import { deriveQueue } from "../needs-you/queue";
-import { usePathname } from "../router";
+import { stagePath, usePathname } from "../router";
 import { useRunLog } from "../world/runLog";
 import { useAddressedWorld, withWorld } from "../world/worldContext";
 import { AppLink } from "./AppLink";
@@ -20,7 +20,8 @@ const WORLD_ID = /^\/world\/([^/]+)/;
 export function sectionOf(path: string): Section {
   if (path === "/" || path.startsWith("/task/")) return "home";
   if (/^\/world\/[^/]+\/(story|trace)\/?$/.test(path)) return "story";
-  if (WORLD_ID.test(path) || path === "/worlds") return "world"; // S-14 lists worlds
+  // /world/:id/stage (S-04), and S-14's replays list at /worlds/replays
+  if (WORLD_ID.test(path) || path === "/worlds" || path.startsWith("/worlds/")) return "world";
   if (path.startsWith("/needs-you")) return "needs";
   if (path.startsWith("/library")) return "library";
   return "more";
@@ -75,7 +76,9 @@ export function PrimaryNav({ id, mobile }: { id: string; mobile: boolean }) {
           ? base
           : i.section === "needs"
             ? withWorld(base, inWorld)
-            : base.replace(WORLD_ID, `/world/${encodeURIComponent(inWorld)}`);
+            : i.section === "world"
+              ? stagePath(inWorld)
+              : base.replace(WORLD_ID, stagePath(inWorld).replace(/\/stage$/, ""));
         return (
           <AppLink
             key={i.section}

@@ -75,7 +75,7 @@ test("AGW-08 More reaches every screen the tabs do not, and nav links navigate",
 }) => {
   const problems = watchConsole(page);
   await page.setViewportSize(MOBILE);
-  await page.goto("/");
+  await page.goto("/needs-you"); // WEB-CUTOVER: "/" is the Park Home, which has its own nav
   const nav = page.getByRole("navigation", { name: /primary/i });
   await nav.getByRole("link", { name: "More" }).click();
   await expect(page.getByRole("heading", { level: 1, name: "More" })).toBeVisible();

@@ -8,6 +8,7 @@
 import { useId, useRef, useState } from "react";
 import { useClient, useWorldKnown } from "../api/ClientProvider";
 import { deriveQueue } from "../needs-you/queue";
+import { stagePath } from "../router";
 import { reduce } from "../world/reducer";
 import { creditsUsed, useRunLog } from "../world/runLog";
 import { budgetCap, worldStatus } from "../world/runSummary";
@@ -85,7 +86,7 @@ export function S_14() {
   const shown = visible(worlds, filter, query, sizeFilter);
   const cap = budgetCap(events);
   const used = creditsUsed(events);
-  const w = `/world/${encodeURIComponent(worldId ?? "")}`;
+  const w = stagePath(worldId ?? "");
   return (
     <Page
       testid="worlds"
@@ -260,7 +261,10 @@ export function S_14() {
                       <AppLink to={w} className="pill">
                         Open world
                       </AppLink>
-                      <AppLink to={`${w}/story`} className="pill">
+                      <AppLink
+                        to={`/world/${encodeURIComponent(worldId ?? "")}/story`}
+                        className="pill"
+                      >
                         Replay in Story
                       </AppLink>
                     </div>

@@ -32,6 +32,11 @@ afterEach(() => {
 });
 
 const status = () => qa(document.body, '[role="status"]');
+/** The browser's own "the fade has finished" (WEB-MOTION-2: the card and the splash fade out, then go). */
+const animationEnd = (el: Element | null | undefined) =>
+  act(() => {
+    el?.dispatchEvent(new Event("animationend", { bubbles: true }));
+  });
 const waitDone = async () => {
   await act(async () => {
     await vi.dynamicImportSettled();
@@ -62,6 +67,9 @@ describe("WEB_3b_shell: the pieces and where they sit", () => {
 
   it("WEB_3b_shell_the_boot_splash_is_gone_once_the_shell_has_mounted", async () => {
     await mountApp();
+    // Updated for WEB-MOTION-2: the splash fades over .45 s once ready (no longer a loading status), then goes.
+    expect(document.querySelector('[role="status"][aria-label="Loading Tilo"]')).toBeNull();
+    animationEnd(document.querySelector('[aria-label="Loading Tilo"]'));
     expect(document.querySelector('[aria-label="Loading Tilo"]')).toBeNull();
   });
 
@@ -122,9 +130,12 @@ describe("WEB_3b_shell: the popovers and the loader work together", () => {
     expect(document.querySelector('[role="dialog"]')).toBeNull();
     expect(navigate).not.toHaveBeenCalled();
     for (let i = 0; i < 3; i++) act(() => sch.fire(sch.live()[0]));
-    expect(navigate).toHaveBeenCalledWith("/park/world/comp");
+    expect(navigate).toHaveBeenCalledWith("/world/comp");
     expect(card()).toBeDefined();
     act(() => sch.fire(sch.live()[0]));
+    // Updated for WEB-MOTION-2: the card fades out over 280 ms after the last step, and goes at animationend.
+    expect(card()).toBeDefined();
+    animationEnd(card());
     expect(card()).toBeUndefined();
   });
 });
@@ -159,9 +170,13 @@ describe("WEB_3b_parkapp: the real ParkApp wears the shell", () => {
     await act(async () => {
       ledger.dispatchEvent(ev);
     });
+    // Updated for WEB-MOTION-2: a tab click fades the old page out (200 ms) and swaps after it.
+    await act(async () => {
+      await new Promise((done) => setTimeout(done, 400));
+    });
     await waitDone();
     expect(ev.defaultPrevented).toBe(true);
-    expect(window.location.pathname).toBe("/park/ledger");
+    expect(window.location.pathname).toBe("/ledger");
     expect(m.container.querySelector('[data-testid="park-page-ledger"]')).not.toBeNull();
     expect(qa(m.container, 'header nav a[aria-current="page"]').map((a) => a.textContent)).toEqual([
       "Ledger",
@@ -214,11 +229,14 @@ describe("WEB_3b_parkapp: the real ParkApp wears the shell", () => {
     await act(async () => {
       await vi.dynamicImportSettled();
     });
-    expect(window.location.pathname).toBe("/park/world/comp");
+    expect(window.location.pathname).toBe("/world/comp");
     expect(card()).toBeDefined();
     await act(async () => {
       vi.advanceTimersByTime(250);
     });
+    // Updated for WEB-MOTION-2: the card fades out over 280 ms after the last step, and goes at animationend.
+    expect(card()).toBeDefined();
+    animationEnd(card());
     expect(card()).toBeUndefined();
     await act(async () => {
       await vi.dynamicImportSettled();

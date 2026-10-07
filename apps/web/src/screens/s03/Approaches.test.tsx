@@ -94,7 +94,7 @@ describe("AGW-04 S-03 Approaches and budget", () => {
     await act(async () => primary?.click());
     await settle();
     expect(approve).toHaveBeenCalledWith("t1", { approach_id: "thorough", budget_cap: 150 });
-    expect(window.location.pathname).toBe("/world/w_approved");
+    expect(window.location.pathname).toBe("/world/w_approved/stage");
   });
 
   it("FR-INT-08 S-03: disables Start and marks input invalid on empty, 0, 1.5 or above-ceiling cap", async () => {

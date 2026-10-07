@@ -1,5 +1,5 @@
 // WEB-3b: the shell does not move once it is on screen (Core Web Vitals CLS; README "Performance"). A cold
-// load of /park/worlds and /park/home at 1440 and 390 is measured with a layout-shift PerformanceObserver
+// load of /worlds and / (home) at 1440 and 390 is measured with a layout-shift PerformanceObserver
 // (entries without recent input) after the page has settled: the main landmark and the Sample data chip are
 // there, the fonts have loaded and two frames have passed (promises only, no fixed sleep). The cumulative
 // shift must be 0. Each test is its own browser context, so every load is cold.
@@ -9,14 +9,14 @@ import { type Page, expect, test } from "@playwright/test";
 import { DESKTOP, MOBILE } from "./support/viewports";
 
 const SIZES = { desktop: DESKTOP, mobile: MOBILE } as const;
-const PATHS = ["/park/worlds", "/park/home"] as const;
+const PATHS = ["/worlds", "/"] as const;
 
 // A cold Vite dev server optimises its dependencies on the first request and reloads the page; warm it
 // once per worker so no test pays for it.
 test.beforeAll(async ({ browser, baseURL }) => {
   test.setTimeout(240_000);
   const page = await browser.newPage(baseURL ? { baseURL } : {});
-  await page.goto("/park/home", { timeout: 200_000 });
+  await page.goto("/", { timeout: 200_000 });
   await page
     .locator("header")
     .waitFor({ timeout: 200_000 })
@@ -60,7 +60,7 @@ for (const [name, viewport] of Object.entries(SIZES)) {
     test.use({ viewport });
 
     for (const path of PATHS) {
-      test(`WEB_3b_e2e_${name}_cold_load_of_${path.replace("/park/", "")}_shifts_nothing`, async ({
+      test(`WEB_3b_e2e_${name}_cold_load_of_${path === "/" ? "home" : path.slice(1)}_shifts_nothing`, async ({
         page,
       }) => {
         await observe(page);

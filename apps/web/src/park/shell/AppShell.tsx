@@ -2,9 +2,10 @@
 // the account menu, the page outlet (the one <main>), the toast, the world loader and the boot splash.
 // It renders no `[data-park]` root (ParkApp owns that one) and reads everything from ParkProvider: the app,
 // the store and the Api. The notifications and the user come through the Api on mount, so a fixture Api
-// raises the "Sample data" chip without any page asking for data. The city is STATIC (BQ-WEB-3).
-import { type ReactNode, useEffect, useMemo, useState, useSyncExternalStore } from "react";
+// raises the "Sample data" chip without any page asking for data. The city's cars and walkers run on Home (cityMotion.ts).
+import { type ReactNode, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import type { Decision, Notification, User } from "../api/types";
+import type { PageId } from "../app/AppCtx";
 import { useApp, useExpectsSample, useParkApi, useParkStore } from "../app/context";
 import { useParkRoute } from "../app/router";
 import { Toast } from "../components";
@@ -15,7 +16,9 @@ import { CityBackdrop } from "./CityBackdrop";
 import { NotificationsPopover } from "./NotificationsPopover";
 import { TopNav } from "./TopNav";
 import { WorldLoader } from "./WorldLoader";
+import { useCityMotion } from "./cityMotion";
 import { loadShellFonts } from "./fonts";
+import { type Bar, useLeavingCard, useMotionOff, usePageSwap } from "./motion";
 import "./park.shell.css";
 import { backdropScene } from "./scene";
 
@@ -36,6 +39,13 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [connectorsOn, setConnectorsOn] = useState<number | null>(null);
   const [ready, setReady] = useState(false);
   const expectsSample = useExpectsSample();
+  const city = useCityMotion(app.motion, app.vw);
+  const off = useMotionOff();
+  const viaNav = useRef(false);
+  const navTo = (to: PageId): void => {
+    viaNav.current = true;
+    store.go(to);
+  };
 
   useEffect(() => {
     let live = true;
@@ -69,21 +79,39 @@ export function AppShell({ children }: { children: ReactNode }) {
   // (the shell stays hidden under the splash until then, so no text swaps face and moves the nav).
   useEffect(() => {
     let live = true;
-    backdropScene(app.time, app.motion);
+    backdropScene(app.time, city.motion);
     loadShellFonts().then(() => {
       if (live) setReady(true);
     });
     return () => {
       live = false;
     };
-  }, [app.time, app.motion]);
+  }, [app.time, city.motion]);
   const scene = useMemo(
-    () => (ready ? backdropScene(app.time, app.motion) : null),
-    [ready, app.time, app.motion],
+    () => (ready ? backdropScene(app.time, city.motion) : null),
+    [ready, app.time, city.motion],
   );
 
   const page = route?.page ?? null;
-  const inner = page !== "home";
+  // A tab or menu click fades the old page out and the new one in. Everything else (the browser's back button, a
+  // link inside a page, a world loader's card that covers the swap, reduced motion) swaps at once.
+  const key = route ? (route.page === "world" ? `world/${route.params.id}` : route.page) : "none";
+  const swap = usePageSwap(
+    children,
+    key,
+    state.wl !== null || !viaNav.current ? "now" : off ? "wait" : "animate",
+  );
+  useEffect(() => {
+    viaNav.current = false; // every commit uses up the click
+  });
+  const { leaving, done } = useLeavingCard(state.wl, off);
+  const card = state.wl ?? leaving;
+  const inner = swap.key !== "home";
+  const bar: Bar = state.wl
+    ? { on: true, pct: loaderBar(state.wl.step) }
+    : leaving
+      ? { on: false, pct: 100 }
+      : swap.bar;
   // Pages go to a world through the loader (README: always), everything else straight there.
   const open = (n: Notification): void => {
     if (n.go[0] === "world") store.openWorld(n.go[1]);
@@ -92,7 +120,15 @@ export function AppShell({ children }: { children: ReactNode }) {
   const toast = state.toast;
   return (
     <>
-      <CityBackdrop scene={scene} vw={app.vw} vh={app.vh} veiled={inner} />
+      <CityBackdrop
+        scene={scene}
+        vw={app.vw}
+        vh={app.vh}
+        veiled={inner}
+        lite={city.lite}
+        hidden={city.hidden}
+        loading={state.wl != null}
+      />
       <TopNav
         page={page}
         needsLeft={app.needsLeft}
@@ -104,8 +140,9 @@ export function AppShell({ children }: { children: ReactNode }) {
         org={user?.org ?? null}
         reserveSample={expectsSample}
         booting={!ready}
-        progress={state.wl ? loaderBar(state.wl.step) : null}
-        go={(to) => store.go(to)}
+        bar={bar}
+        onBarFaded={swap.barFaded}
+        go={navTo}
         onToggleTime={() => store.setPref("time", app.night ? "day" : "night")}
         onBell={() => store.toggleMenu("notif")}
         onAvatar={() => store.toggleMenu("acct")}
@@ -124,15 +161,18 @@ export function AppShell({ children }: { children: ReactNode }) {
         <AccountMenu
           user={user}
           connectorsOn={connectorsOn}
-          go={(to) => store.go(to)}
+          go={navTo}
           onSignOut={() => store.toast(SIGN_OUT)}
           onClose={store.closeMenu}
         />
       ) : null}
       {/* The same elements on every page, so a page swap never remounts the outlet (focus stays). */}
-      <main className={`park-shell__main ${ready ? "" : "park-shell__booting"}`}>
+      <main
+        className={`park-shell__main ${ready ? "" : "park-shell__booting"}`}
+        data-phase={swap.phase === "in" ? undefined : swap.phase}
+      >
         <div className={inner ? "park-shell__page" : undefined}>
-          <div className={inner ? "park-shell__column" : undefined}>{children}</div>
+          <div className={inner ? "park-shell__column" : undefined}>{swap.node}</div>
         </div>
       </main>
       {toast ? (
@@ -143,8 +183,15 @@ export function AppShell({ children }: { children: ReactNode }) {
           onDismiss={store.dismissToast}
         />
       ) : null}
-      {state.wl ? (
-        <WorldLoader launch={state.wl} dec={state.dec} added={state.added} night={app.night} />
+      {card ? (
+        <WorldLoader
+          launch={card}
+          dec={state.dec}
+          added={state.added}
+          night={app.night}
+          leaving={state.wl === null}
+          onGone={done}
+        />
       ) : null}
       <BootSplash ready={ready} />
     </>

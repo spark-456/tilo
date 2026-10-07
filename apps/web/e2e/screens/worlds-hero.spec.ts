@@ -8,7 +8,7 @@ test("UX-227-G1 desktop: a single world is the hero card across the page, thumbn
   page,
 }) => {
   await page.setViewportSize(DESKTOP);
-  await page.goto("/worlds?speed=1000");
+  await page.goto("/worlds/replays?speed=1000");
   const card = page.getByTestId("world-card");
   await expect(card.getByText("Finished", { exact: true })).toBeVisible({ timeout: 30_000 });
   const [cardBox, gridBox, thumbBox] = await Promise.all([
@@ -27,7 +27,7 @@ test("UX-227-G1 phone: the world card stays one column with its thumbnail on top
   page,
 }) => {
   await page.setViewportSize(MOBILE);
-  await page.goto("/worlds?speed=1000");
+  await page.goto("/worlds/replays?speed=1000");
   const card = page.getByTestId("world-card");
   await expect(card.getByText("Finished", { exact: true })).toBeVisible({ timeout: 30_000 });
   const [thumb, body] = await Promise.all([
@@ -48,7 +48,7 @@ for (const width of [1280]) {
   }) => {
     await page.setViewportSize({ width, height: 800 });
     await watchShifts(page);
-    await page.goto("/worlds?speed=1000");
+    await page.goto("/worlds/replays?speed=1000");
     await expect(page.getByTestId("world-card").getByText("Finished", { exact: true })).toBeVisible(
       {
         timeout: 30_000,
