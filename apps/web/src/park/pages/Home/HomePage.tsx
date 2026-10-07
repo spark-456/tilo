@@ -187,6 +187,9 @@ export function HomePage({ app }: { app: AppCtx }) {
           onChange={toIdle}
         />
       )}
+      <nav className="park-home-legal" aria-label="Legal">
+        <a href="/privacy">Privacy</a> · <a href="/terms">Terms</a>
+      </nav>
     </div>
   );
 }

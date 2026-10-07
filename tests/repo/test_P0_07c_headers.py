@@ -45,18 +45,33 @@ def test_P0_07c_headers_apply_to_all_routes(repo_root: pathlib.Path) -> None:
     assert headers["referrer-policy"].lower() == "strict-origin-when-cross-origin"
 
 
+# SEC-10 (documented test change, like P0-07e's base-uri): the web client's App Check loads reCAPTCHA Enterprise and
+# exchanges its challenge at the App Check endpoint, so the policy names exactly these off-origin sources, per
+# directive, and no other directive has any. The hosts are the ones the web SDK itself calls: @firebase/app-check
+# 0.13.1 exchanges at https://content-firebaseappcheck.googleapis.com/v1 (not firebaseappcheck.googleapis.com, which
+# is the server-side host the API reads keys from) and loads the reCAPTCHA script from www.google.com/recaptcha/.
+# tests/repo/test_SEC_10_appcheck_client_docs_and_csp.py pins the same set; everything else stays 'self' only.
+OFF_ORIGIN_ALLOWED = {
+    "script-src": ["https://www.google.com/recaptcha/", "https://www.gstatic.com/recaptcha/"],
+    "frame-src": ["https://www.google.com/recaptcha/"],
+    "connect-src": ["https://content-firebaseappcheck.googleapis.com"],
+}
+
+
 def test_P0_07c_csp_forbids_framing_and_off_origin_loads(repo_root: pathlib.Path) -> None:
     csp = _directives(_site_wide(repo_root)["content-security-policy"])
     assert csp["frame-ancestors"] == ["'none'"]
     assert csp["default-src"] == ["'self'"]
-    assert csp["script-src"] == ["'self'"]
-    assert csp["connect-src"] == ["'self'"]
+    assert csp["script-src"] == ["'self'", *OFF_ORIGIN_ALLOWED["script-src"]]  # SEC-10: was exactly 'self'
+    assert csp["connect-src"] == ["'self'", *OFF_ORIGIN_ALLOWED["connect-src"]]  # SEC-10: was exactly 'self'
+    assert csp["frame-src"] == OFF_ORIGIN_ALLOWED["frame-src"]  # SEC-10: new, the reCAPTCHA challenge frame only
     assert csp["object-src"] == ["'none'"]
     # P0-07e (documented test change): base-uri tightened from 'self' to 'none'; the app has no <base> tag.
     assert csp["base-uri"] == ["'none'"]
     for name, sources in csp.items():
         assert "*" not in sources, f"{name}: wildcard source"
-        assert not any(re.match(r"https?:", s) for s in sources), f"{name}: off-origin source {sources}"
+        off_origin = [s for s in sources if re.match(r"https?:", s)]
+        assert off_origin == OFF_ORIGIN_ALLOWED.get(name, []), f"{name}: off-origin source {sources}"
 
 
 def test_P0_07c_csp_script_src_allows_neither_eval_nor_inline_scripts(repo_root: pathlib.Path) -> None:

@@ -85,7 +85,9 @@ def test_PL_02_google_adapter_conforms_to_model_provider(fake_genai_sdk):
 def test_PL_02_google_adapter_generate_returns_structured_json_output(fake_genai_sdk):
     """PL-02 "structured output": `GenerateRequest.response_schema` must
     reach the SDK as `GenerateContentConfig(response_mime_type=
-    "application/json", response_schema=...)` -- not merely pass unmodified
+    "application/json", response_json_schema=...)` (the JSON Schema field, not the
+    OpenAPI-subset `response_schema`, which rejects ordinary JSON Schema such as
+    `uniqueItems`) -- not merely pass unmodified
     JSON text through, which a caller with no way to ask for JSON at all
     would also satisfy."""
     schema = {
@@ -106,7 +108,8 @@ def test_PL_02_google_adapter_generate_returns_structured_json_output(fake_genai
     config = call["config"]
     assert config is not None, "PL-02: structured output must reach the SDK's GenerateContentConfig"
     assert config.response_mime_type == "application/json"
-    assert config.response_schema == schema
+    assert config.response_json_schema == schema
+    assert not hasattr(config, "response_schema"), "PL-02: the OpenAPI-subset field is never used"
 
 
 def test_PL_02_google_adapter_generate_json_mode_without_a_schema(fake_genai_sdk):
@@ -120,7 +123,7 @@ def test_PL_02_google_adapter_generate_json_mode_without_a_schema(fake_genai_sdk
     config = models_api.calls[0]["config"]
     assert config is not None
     assert config.response_mime_type == "application/json"
-    assert not hasattr(config, "response_schema")
+    assert not hasattr(config, "response_schema") and not hasattr(config, "response_json_schema")
 
 
 def test_PL_02_google_adapter_generate_maps_a_tool_call(fake_genai_sdk):

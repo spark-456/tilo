@@ -139,7 +139,7 @@ describe("WEB_9c_agenda_generic: behaviour follows the data", () => {
     );
     const { container, navigate, decideFromOutside } = await renderAgenda({ api });
     click(byText(pin(container, "t1"), "button", "Review and approve"));
-    expect(navigate).toHaveBeenLastCalledWith("/park/world/w9");
+    expect(navigate).toHaveBeenLastCalledWith("/world/w9");
     decideFromOutside("depot");
     expect(text(pin(container, "t1"))).toContain("Signed off");
   });

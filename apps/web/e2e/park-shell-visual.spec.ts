@@ -83,7 +83,7 @@ async function pixelAt(page: Page, x: number, y: number): Promise<number[]> {
 test.beforeAll(async ({ browser, baseURL }) => {
   test.setTimeout(240_000);
   const page = await browser.newPage(baseURL ? { baseURL } : {});
-  await page.goto("/park/home", { timeout: 200_000 });
+  await page.goto("/", { timeout: 200_000 });
   await page
     .locator("header")
     .waitFor({ timeout: 200_000 })
@@ -100,7 +100,7 @@ for (const [name, viewport] of Object.entries(SIZES)) {
       test(`WEB_3b_e2e_${name}_${theme}_nav_is_a_fixed_glass_bar_left_16_top_14_height_62_radius_22`, async ({
         page,
       }) => {
-        await open(page, "/park/home", theme);
+        await open(page, "/", theme);
         const b = await box(nav(page));
         expect([b.x, b.y, b.height, b.width]).toEqual([16, 14, 62, viewport.width - 32]);
         const s = await style(
@@ -124,7 +124,7 @@ for (const [name, viewport] of Object.entries(SIZES)) {
       test(`WEB_3b_e2e_${name}_${theme}_six_tabs_home_current_h40_r14_15px_800_and_the_Worlds_badge_2`, async ({
         page,
       }) => {
-        await open(page, "/park/home", theme);
+        await open(page, "/", theme);
         const tabs = nav(page).locator("nav a");
         const labels = (await tabs.allTextContents()).map((t) => t.replace(/\d+$/, ""));
         expect(labels).toEqual(["Home", "Worlds", "Skills", "Ledger", "Agenda", "Team"]);
@@ -166,7 +166,7 @@ for (const [name, viewport] of Object.entries(SIZES)) {
       test(`WEB_3b_e2e_${name}_${theme}_logo_tile_34_visor_22x12_two_3px_dots_and_the_Nunito_900_wordmark`, async ({
         page,
       }) => {
-        await open(page, "/park/home", theme);
+        await open(page, "/", theme);
         const logo = nav(page).getByRole("link", { name: "Tilo home" });
         const parts = await logo.evaluate((a) =>
           [...a.querySelectorAll("*")].map((e) => {
@@ -193,7 +193,7 @@ for (const [name, viewport] of Object.entries(SIZES)) {
       test(`WEB_3b_e2e_${name}_${theme}_icon_buttons_40_r13_avatar_38_with_the_line_ring_and_the_3px_bar`, async ({
         page,
       }) => {
-        await open(page, "/park/home", theme);
+        await open(page, "/", theme);
         for (const n of [/Switch to/, "Notifications"]) {
           const b = nav(page).getByRole("button", { name: n });
           const r = await box(b);
@@ -228,7 +228,7 @@ for (const [name, viewport] of Object.entries(SIZES)) {
     test(`WEB_3b_e2e_${name}_the_amber_unread_dot_is_9px_at_top_8_right_9_of_the_bell_until_it_is_opened`, async ({
       page,
     }) => {
-      await open(page, "/park/home");
+      await open(page, "/");
       const dot = bell(page).locator(":scope > :not(svg)");
       await expect(dot).toHaveCount(1);
       const d = await box(dot);
@@ -243,7 +243,7 @@ for (const [name, viewport] of Object.entries(SIZES)) {
     test(`WEB_3b_e2e_${name}_the_bell_opens_the_notifications_popover_at_top_86_and_Escape_closes_it`, async ({
       page,
     }) => {
-      await open(page, "/park/home");
+      await open(page, "/");
       await bell(page).focus();
       await bell(page).click();
       const pop = page.getByRole("dialog", { name: "Notifications" });
@@ -283,7 +283,7 @@ for (const [name, viewport] of Object.entries(SIZES)) {
     test(`WEB_3b_e2e_${name}_notification_tiles_are_36_r11_amber_for_needs_green_for_done_red_for_warn`, async ({
       page,
     }) => {
-      await open(page, "/park/home");
+      await open(page, "/");
       await bell(page).click();
       const pop = page.getByRole("dialog", { name: "Notifications" });
       const want = [
@@ -313,7 +313,7 @@ for (const [name, viewport] of Object.entries(SIZES)) {
     test(`WEB_3b_e2e_${name}_the_avatar_opens_the_300_menu_with_header_separator_and_42px_rows`, async ({
       page,
     }) => {
-      await open(page, "/park/home");
+      await open(page, "/");
       await avatar(page).click();
       const menu = page.getByRole("menu", { name: "Account" });
       await expect(menu).toBeVisible();
@@ -354,7 +354,7 @@ for (const [name, viewport] of Object.entries(SIZES)) {
     });
 
     test(`WEB_3b_e2e_${name}_Sign_out_shows_the_prototype_toast_at_top_92`, async ({ page }) => {
-      await open(page, "/park/home");
+      await open(page, "/");
       await avatar(page).click();
       await page.getByRole("menuitem", { name: "Sign out" }).click();
       const toast = page.getByRole("status").filter({ hasText: "This is a prototype" });
@@ -377,17 +377,17 @@ for (const [name, viewport] of Object.entries(SIZES)) {
         "font-weight": "700",
       });
       await expect(page.getByRole("menu", { name: "Account" })).toHaveCount(0);
-      expect(page.url()).toMatch(/\/park\/home$/);
+      expect(new URL(page.url()).pathname).toBe("/");
     });
 
     test(`WEB_3b_e2e_${name}_account_links_navigate_and_the_hero_ring_shows_on_connectors`, async ({
       page,
     }) => {
-      await open(page, "/park/home");
+      await open(page, "/");
       await avatar(page).click();
       await page.getByRole("menuitem", { name: /^Connectors/ }).click();
       await expect(page.getByTestId("park-page-connectors")).toBeVisible();
-      expect(page.url()).toMatch(/\/park\/connectors$/);
+      expect(page.url()).toMatch(/\/connectors$/);
       expect((await style(avatar(page), "box-shadow"))["box-shadow"]).toContain("rgb(90, 63, 224)");
       await expect(nav(page).locator('nav a[aria-current="page"]')).toHaveCount(0);
     });
@@ -395,7 +395,7 @@ for (const [name, viewport] of Object.entries(SIZES)) {
     test(`WEB_3b_e2e_${name}_tabs_navigate_without_a_reload_and_the_keyboard_works`, async ({
       page,
     }) => {
-      await open(page, "/park/home");
+      await open(page, "/");
       await page.evaluate(() => {
         Reflect.set(window, "__marker", "same document");
       });
@@ -414,7 +414,7 @@ for (const [name, viewport] of Object.entries(SIZES)) {
     test(`WEB_3b_e2e_${name}_the_toggle_flips_data_time_draws_another_city_and_day_comes_back_the_same`, async ({
       page,
     }) => {
-      await open(page, "/park/home");
+      await open(page, "/");
       const html = () => backdrop(page).evaluate((el) => el.innerHTML);
       const day = await html();
       await page.getByRole("button", { name: "Switch to night" }).click();
@@ -429,7 +429,7 @@ for (const [name, viewport] of Object.entries(SIZES)) {
     test(`WEB_3b_e2e_${name}_the_backdrop_is_full_bleed_behind_everything_hidden_and_never_clickable`, async ({
       page,
     }) => {
-      await open(page, "/park/home");
+      await open(page, "/");
       await expect(backdrop(page)).toHaveAttribute("aria-hidden", "true");
       const b = await box(backdrop(page));
       expect([b.x, b.y, b.width, b.height]).toEqual([0, 0, viewport.width, viewport.height]);
@@ -451,7 +451,7 @@ for (const [name, viewport] of Object.entries(SIZES)) {
     test(`WEB_3b_e2e_${name}_the_scene_is_scaled_by_the_larger_ratio_and_centred`, async ({
       page,
     }) => {
-      await open(page, "/park/home");
+      await open(page, "/");
       const boxes = await backdrop(page).evaluate((el) =>
         [...el.querySelectorAll("*")]
           .map((e) => e.getBoundingClientRect())
@@ -478,8 +478,8 @@ for (const [name, viewport] of Object.entries(SIZES)) {
         await page.addStyleTag({ content: "main, header{display:none!important}" });
         return pixelAt(page, 10, 300);
       };
-      const home = await read("/park/home");
-      const inner = await read("/park/ledger");
+      const home = await read("/");
+      const inner = await read("/ledger");
       // --veil is rgba(241,239,233,.42) over the city: each channel is the city's own, pulled 42% to the paper
       for (let c = 0; c < 3; c++) {
         const want = (home[c] ?? 0) * 0.58 + (PAPER[c] ?? 0) * 0.42;
@@ -493,7 +493,7 @@ for (const [name, viewport] of Object.entries(SIZES)) {
     test(`WEB_3b_e2e_${name}_inner_pages_sit_in_the_1320_column_with_100_24_56_padding`, async ({
       page,
     }) => {
-      await open(page, "/park/ledger");
+      await open(page, "/ledger");
       const col = await page.getByRole("heading", { level: 1 }).evaluate((h) => {
         const out: { max: string; x: number; w: number; pad: string[] }[] = [];
         for (let e = h.parentElement; e && e.tagName !== "BODY"; e = e.parentElement) {
@@ -521,7 +521,7 @@ for (const [name, viewport] of Object.entries(SIZES)) {
     test(`WEB_3b_e2e_${name}_a_village_opens_through_the_loader_then_the_page`, async ({
       page,
     }) => {
-      await open(page, "/park/home");
+      await open(page, "/");
       await bell(page).click();
       await page.getByRole("button", { name: /Competitor pricing is ready/ }).click();
       await expect(loader(page)).toBeVisible();
@@ -542,8 +542,8 @@ for (const [name, viewport] of Object.entries(SIZES)) {
         "row-gap": "18px",
       });
       await expect(page.getByRole("dialog", { name: "Notifications" })).toHaveCount(0);
-      expect(page.url()).toMatch(/\/park\/home$/); // the old page stays until step 3
-      await expect(page).toHaveURL(/\/park\/world\/comp$/, { timeout: 3000 });
+      expect(new URL(page.url()).pathname).toBe("/"); // the old page stays until step 3
+      await expect(page).toHaveURL(/\/world\/comp$/, { timeout: 3000 });
       await expect(page.getByTestId("park-page-world")).toBeVisible({ timeout: 3000 });
       await expect(loader(page)).toHaveCount(0, { timeout: 3000 });
     });
@@ -551,7 +551,7 @@ for (const [name, viewport] of Object.entries(SIZES)) {
     test(`WEB_3b_e2e_${name}_a_city_loader_says_OPENING_CITY_shows_a_16px_ring_and_waits_for_step_3`, async ({
       page,
     }) => {
-      await open(page, "/park/home");
+      await open(page, "/");
       await bell(page).click();
       await page.getByRole("button", { name: /Laptop Depot needs budget sign-off/ }).click();
       await expect(loader(page)).toContainText("OPENING CITY");
@@ -571,15 +571,15 @@ for (const [name, viewport] of Object.entries(SIZES)) {
           }).length,
       );
       expect(rings, "the active step shows a 16px ring").toBe(1);
-      expect(page.url()).toMatch(/\/park\/home$/); // the swap is at the third 340 ms tick, about 1 s
-      await expect(page).toHaveURL(/\/park\/world\/k1$/, { timeout: 3000 });
+      expect(new URL(page.url()).pathname).toBe("/"); // the swap is at the third 340 ms tick, about 1 s
+      await expect(page).toHaveURL(/\/world\/k1$/, { timeout: 3000 });
       await expect(loader(page)).toHaveCount(0, { timeout: 3000 });
     });
 
     test(`WEB_3b_e2e_${name}_the_sample_data_chip_is_visible_and_explains_itself`, async ({
       page,
     }) => {
-      await open(page, "/park/home");
+      await open(page, "/");
       const chip = nav(page).getByRole("button", { name: "Sample data" });
       await expect(chip).toBeVisible();
       const b = await box(chip);
@@ -597,7 +597,7 @@ for (const [name, viewport] of Object.entries(SIZES)) {
 
     test(`WEB_3b_e2e_${name}_the_shell_logs_no_console_error_through_a_tour`, async ({ page }) => {
       const problems = collectConsoleProblems(page);
-      await open(page, "/park/home");
+      await open(page, "/");
       await bell(page).click();
       await page.keyboard.press("Escape");
       await avatar(page).click();
@@ -612,7 +612,7 @@ for (const [name, viewport] of Object.entries(SIZES)) {
 
     test(`WEB_3b_e2e_${name}_day_axe_finds_nothing_serious_or_critical`, async ({ page }) => {
       test.setTimeout(90_000);
-      for (const path of ["/park/home", "/park/ledger"]) {
+      for (const path of ["/", "/ledger"]) {
         await open(page, path);
         let axe = new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"]);
         for (const [selector] of AXE_EXCLUDE) axe = axe.exclude(selector);
@@ -627,7 +627,7 @@ for (const [name, viewport] of Object.entries(SIZES)) {
     test(`WEB_3b_e2e_${name}_the_page_does_not_scroll_sideways_with_a_popover_open`, async ({
       page,
     }) => {
-      for (const path of ["/park/home", "/park/ledger"]) {
+      for (const path of ["/", "/ledger"]) {
         await open(page, path);
         await bell(page).click();
         const over = await page.evaluate(
@@ -644,7 +644,7 @@ test.describe("park shell at 390 wide", () => {
   test.use({ viewport: MOBILE });
 
   test("WEB_3b_e2e_mobile_the_tab_strip_scrolls_sideways_inside_the_nav", async ({ page }) => {
-    await open(page, "/park/home");
+    await open(page, "/");
     const css = await nav(page)
       .locator("nav")
       .evaluate((el) => ({

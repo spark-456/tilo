@@ -271,7 +271,7 @@ export function size(v: unknown): number {
 
 /** The motion words the port must not carry in any output (WEB-1b adds no keyframes, ADR-0003a 5). */
 const MOTION_WORDS =
-  /animation|keyframes|--dx|--dy|tiloDash|tiloBob|tiloGhost|tiloPulse|mvXY|waddle|sprite2/;
+  /animation|transition|keyframes|--dx|--dy|tiloDash|tiloBob|tiloGhost|tiloPulse|mvXY|waddle|walkFrame|sprite2/;
 /** Which motion words appear in a port output tree (strings, keys and values alike). */
 export function motionLeaks(port: unknown): string[] {
   const text = JSON.stringify(canon(port));

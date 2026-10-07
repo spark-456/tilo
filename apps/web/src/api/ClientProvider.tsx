@@ -1,4 +1,5 @@
 import { type ReactNode, createContext, useContext, useSyncExternalStore } from "react";
+import { createAppCheckTokenGetter } from "../appcheck/appCheck";
 import type { TiloClient } from "./client";
 import { chooseClient } from "./config";
 import { FixtureClient } from "./fixtureClient";
@@ -7,10 +8,18 @@ import { HttpClient } from "./http";
 /** The one reader of `VITE_TILO_API_URL` (repo test P0-07c); the Park app takes it from here. */
 export const API_URL: string | undefined = import.meta.env.VITE_TILO_API_URL;
 
+/** SEC-10: the App Check token getter for this page's host, shared by the app's client and the Park app's own
+ * (`park/app/context.tsx` takes it from here). Nothing starts until a request asks for a token, so the fixture
+ * world never loads reCAPTCHA, and a local host answers null with no call. */
+export const appCheckToken: (() => Promise<string | null>) | undefined =
+  typeof window === "undefined"
+    ? undefined
+    : createAppCheckTokenGetter({ hostname: window.location.hostname });
+
 // `VITE_TILO_API_URL` selects the HTTP client (config.ts); the fixture client is the default.
 function createDefaultClient(): TiloClient {
   const search = typeof window === "undefined" ? "" : window.location.search;
-  return chooseClient({ apiUrl: API_URL, search });
+  return chooseClient({ apiUrl: API_URL, search, appCheckToken });
 }
 
 const ClientContext = createContext<TiloClient>(createDefaultClient());
