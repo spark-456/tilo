@@ -183,13 +183,18 @@ _MAGNITUDE_INSIDE = re.compile(_alternation("hundred thousand million billion tr
 # CHN-GATE-F (BQ-274, inbound only): the same word edges for a number word glued to a unit in free text ("Tenrm",
 # "Fiftydollars", "Onemil", "Tenkk"). Base: the counting words that `_NUMBER_WORD` does not match whole (so "Milan",
 # "Craig", "Miles", "milk" stay words); tail: a magnitude suffix (k, m, b, l, repeated, or ks), an abbreviation or
-# magnitude `_NUMBER_WORD` knows, or any word `_MONEY` matches, both taken from those patterns. A bare number word
-# ("Fifty-fifty", "ones", "Tenant") is no amount. A magnitude inside any word counts ("Halfmillion"). Linear: one
-# `\b` start per word, and a backtrack step costs a constant.
+# magnitude `_NUMBER_WORD` knows, or any word `_MONEY` matches, both taken from those patterns. Between the counting
+# words and the unit come zero or more of those abbreviations ("Fivelacrupees", "Tenmildollars"). The middle group is
+# disjoint from the counting group (a group of all `_NUMBER_WORDS` is quadratic). A bare number word ("Fifty-fifty",
+# "ones", "Tenant") is no amount. A magnitude inside any word counts ("Halfmillion"). Linear: one `\b` start per word,
+# and a backtrack step costs a constant.
+_ABBREVIATIONS = [w for w in _NUMBER_WORDS if _NUMBER_WORD.fullmatch(w)]
 _GLUED = re.compile(
     r"\b"
-    + _alternation(w for w in _NUMBER_WORDS if not _NUMBER_WORD.fullmatch(w))
-    + "+(?:ks|[kmbl]+|"
+    + _alternation(w for w in _NUMBER_WORDS if w not in _ABBREVIATIONS)
+    + "+"
+    + _alternation(_ABBREVIATIONS)
+    + "*(?:ks|[kmbl]+|"
     + _NUMBER_WORD.pattern.replace(r"\b", "")
     + "|"
     + _MONEY.pattern.replace(r"\b", "")
