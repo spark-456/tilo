@@ -195,7 +195,18 @@ def test_P0_07c_web_source_never_reads_a_backend_origin_when_api_url_is_unset(re
             assert not re.search(r"run\.app|cloudfunctions|appspot|googleapis", host), (
                 f"{p.name}: hard-coded backend origin {url}; the origin comes only from VITE_TILO_API_URL"
             )
-    assert set(env_readers) <= {"VITE_TILO_API_URL"}, f"only VITE_TILO_API_URL may be read: {env_readers}"
+    # SEC-10 (documented test change): App Check needs the Firebase web `apiKey` and `projectId`, which the build
+    # supplies (`just deploy-web` reads them from `firebase apps:sdkconfig`; no key literal is committed). They are
+    # public client values, not backend origins, and only the App Check starter may read them. The API origin rule
+    # is unchanged.
+    app_check_vars = {"VITE_FIREBASE_API_KEY", "VITE_FIREBASE_PROJECT_ID"}
+    assert set(env_readers) <= {"VITE_TILO_API_URL"} | app_check_vars, (
+        f"only VITE_TILO_API_URL and the two App Check config variables may be read: {env_readers}"
+    )
+    for var in app_check_vars & set(env_readers):
+        assert env_readers[var] == ["appcheck/appCheck.ts"], (
+            f"{var} is read only by appcheck/appCheck.ts: {env_readers}"
+        )
     assert env_readers.get("VITE_TILO_API_URL") == ["api/ClientProvider.tsx"], (
         f"the single reader of VITE_TILO_API_URL is api/ClientProvider.tsx (feeding chooseClient): {env_readers}"
     )

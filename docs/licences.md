@@ -27,6 +27,7 @@ CLAUDE.md's "record every dependency's licence" rule. Updated whenever a depende
 | uvicorn | BSD-3-Clause | https://pypi.org/project/uvicorn/ |
 | google-auth (`tilo_api.schedules`: OIDC verification of the Scheduler tick, FR-AGT-14) | Apache-2.0 | https://pypi.org/project/google-auth/ |
 | requests (the transport google-auth fetches Google's public certs with) | Apache-2.0 | https://pypi.org/project/requests/ |
+| cryptography (`tilo_api.appcheck`: RS256 verification of App Check tokens, SEC-10; already listed under `services/connectors`, now declared by `tilo-api` itself) | Apache-2.0 OR BSD-3-Clause | https://pypi.org/project/cryptography/ |
 
 ## Python (`packages/contracts-py`)
 
@@ -140,6 +141,7 @@ Its tests use `jsonschema` and `referencing` from the root dev group (above).
 | Dependency | Licence | Source |
 | --- | --- | --- |
 | @biomejs/biome | MIT | https://www.npmjs.com/package/@biomejs/biome |
+| firebase (Firebase JS SDK, `apps/web` runtime dependency: `firebase/app` and `firebase/app-check` for App Check with reCAPTCHA Enterprise, SEC-10; loaded on the first API call only) | Apache-2.0 | https://www.npmjs.com/package/firebase |
 | firebase-tools (runs the Firestore emulator for `services/harness`, P0-09; also an `apps/web` devDependency at the same pinned 15.31.0 for `just deploy-web`, P0-07c) | MIT | https://www.npmjs.com/package/firebase-tools |
 | typescript | Apache-2.0 | https://www.npmjs.com/package/typescript |
 | react, react-dom, pixi.js, vite, @vitejs/plugin-react, vitest, @types/node, @types/react, @types/react-dom | MIT | https://www.npmjs.com/ |

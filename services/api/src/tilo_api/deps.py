@@ -46,6 +46,7 @@ from tilo_providers.safety import build_safety_provider
 
 from tilo_api import events, spend
 from tilo_api.access import AccessStore, Mode, enforced, provider_mode
+from tilo_api.appcheck import AppCheckVerifier, default_verifier
 from tilo_api.assistant.config import AssistantConfig, AssistantConfigError, load_assistant_config
 from tilo_api.people_access import NoSourceOwners
 from tilo_api.people_access import SourceOwners as PanelSourceOwners
@@ -223,6 +224,12 @@ def get_access_store() -> AccessStore:
     """SEC-15: where each person's visitor-or-judge declaration is kept. Production has none wired yet, so a
     deployed process closes every gated route (503) rather than guess; tests and the Firestore store override it."""
     raise HTTPException(status_code=503, detail="not_configured")
+
+
+def get_app_check_verifier() -> AppCheckVerifier:
+    """SEC-10: checks a client's App Check token (`tilo_api.appcheck`). Google's keys for the API's own project; dev
+    mode and an unconfigured project refuse without any call. Tests override it; it never decides authorisation."""
+    return default_verifier()
 
 
 def get_spend_caps() -> spend.SpendCaps:

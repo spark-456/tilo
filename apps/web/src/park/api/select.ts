@@ -5,7 +5,11 @@ import { createFixtureApi } from "./fixtureApi";
 import type { Api } from "./index";
 import { createLiveApi } from "./liveApi";
 
-export function parkApi(env: { VITE_TILO_API_URL?: string | undefined }): Api {
+export function parkApi(
+  env: { VITE_TILO_API_URL?: string | undefined },
+  appCheckToken?: () => Promise<string | null>,
+): Api {
   const baseUrl = env.VITE_TILO_API_URL?.trim();
-  return baseUrl ? createLiveApi({ baseUrl }) : createFixtureApi();
+  // SEC-10: the live Api gets the App Check getter (never asked in fixture mode).
+  return baseUrl ? createLiveApi({ baseUrl, appCheckToken }) : createFixtureApi();
 }
