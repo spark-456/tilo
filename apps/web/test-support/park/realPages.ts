@@ -4,7 +4,15 @@
 // covering every page.
 import { PAGE_IDS, type PageId } from "../../src/park/app/AppCtx";
 
-export const REAL_PAGES: readonly PageId[] = ["home"];
+export const REAL_PAGES: readonly PageId[] = [
+  "home",
+  "skills",
+  "ledger",
+  "agenda",
+  "connectors",
+  "team",
+  "profile",
+];
 
 export const PLACEHOLDER_PAGES: readonly PageId[] = PAGE_IDS.filter(
   (id) => !REAL_PAGES.includes(id),

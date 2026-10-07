@@ -36,11 +36,14 @@ from _ppl11a_lib import (
 # a substring of a pytest node id, so it names a whole file; a slice that goes green with its entry still here
 # fails (strict), which is the reminder to delete it. Guards (`test_PPL_11c_guards.py`) are never pending.
 SLICE_PENDING: tuple[str, ...] = (
-    "test_PPL_11c_s1_",  # work items: list, get, edit, done, snooze, reopen, not-mine
-    "test_PPL_11c_s1b_",  # work items: put back
     "test_PPL_11c_s3_",  # directory: first person, email rules, memberships, roles
     "test_PPL_11c_s4_",  # limits: body cap, idempotency key, rate cap, no whole-org listing, no-store, dev CORS
     "test_PPL_11c_s5_",  # PE-12 events (also needs the ADR-0009 contract change for `vis: []`)
+)
+# Tests inside a pending file that pass as soon as an earlier slice lands (a negative test: "a refused work-item write
+# emits nothing" is true of S1's routes, which emit nothing yet). Not xfail: a strict XPASS fails the earlier slice.
+PENDING_EXEMPT: tuple[str, ...] = (
+    "test_PPL_11c_s5_HR_1_a_refused_a_lost_or_a_read_only_request_writes_no_event_and_makes_no_world",
 )
 
 # --- routes (API_PPL_11c.md section 1) ------------------------------------------------------------------------------
