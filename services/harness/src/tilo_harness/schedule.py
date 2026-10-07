@@ -189,15 +189,31 @@ class StartSkipped(Exception):
     """A start that deliberately did nothing. `advance`: next_due moves to the first slot after the one skipped (retry
     next week); otherwise the slot stays and is retried after the backoff. `code` is a short fixed code, never text.
     `count=False` is for a condition of the whole service, not of one schedule: the claim is released and NOTHING is
-    recorded (no failure, no backoff, no move), whatever `advance` says."""
+    recorded (no failure, no backoff, no move), whatever `advance` says. `stop` (with `count=False`) also ends the tick:
+    no later slot is tried and every one stays due; the tick result names `code` and `status` (HTTP status or None)."""
 
-    def __init__(self, code: str, *, advance: bool = False, count: bool = True) -> None:
+    def __init__(
+        self, code: str, *, advance: bool = False, count: bool = True, stop: bool = False, status: int | None = None
+    ) -> None:
         super().__init__(code)
-        self.code, self.advance, self.count = code, advance, count
+        self.code, self.advance, self.count, self.stop, self.status = code, advance, count, stop, status
+
+
+class StartFailed(RuntimeError):
+    """A start that failed with an HTTP status (an int, never text): counted against its schedule as START_FAILED,
+    and logged once at WARNING with `status` and `code` as structured fields (NFR-23, NFR-26). `pair` names a status
+    that may be the whole service's: when the FIRST TWO starts of a tick both raise one with the same `pair` and the
+    same `status`, neither is counted, both and every later slot stay due, and the tick stops with `pair` as its code
+    (BQ-AGT14-8)."""
+
+    def __init__(self, message: str, *, status: int | None = None, pair: str | None = None) -> None:
+        super().__init__(message)
+        self.status, self.pair = status, pair
 
 
 GOOGLE_ISSUERS = frozenset({"https://accounts.google.com", "accounts.google.com"})  # exact, case-sensitive
 START_FAILED = "start_failed"  # the fixed code a raising start is recorded under
+ENQUEUE_FAILED = "schedule_enqueue_failed"  # the `event` field of a counted start failure with a status (BQ-AGT14-8 a)
 
 
 def tick_caller_ok(claims: Mapping[str, Any], *, audience: str, caller: str) -> bool:
@@ -246,9 +262,15 @@ class OidcVerifier(Protocol):  # google-auth id_token verification in production
     def verify(self, token: str, audience: str) -> Mapping[str, Any]: ...
 
 
+def _alike(first: StartFailed, second: StartFailed) -> bool:
+    return (first.pair, first.status) == (second.pair, second.status)
+
+
 @dataclass(frozen=True)
 class TickResult:
     fired: int
+    stopped: str | None = None  # the code of a `StartSkipped(stop=True)` that ended the tick early
+    status: int | None = None  # its HTTP status, when the starter knew one
 
 
 def world_requested_kwargs(run: RunStart, world_id: str) -> dict[str, Any]:
@@ -291,14 +313,16 @@ class Ticker:
 
     def tick(self) -> TickResult:
         """Starts every schedule due now (at most MAX_FIRES_PER_TICK). A store or flag read that raises propagates:
-        nothing is started that was not proven safe. One schedule's failing start never stops the others."""
+        nothing is started that was not proven safe. One schedule's failing start never stops the others; only a
+        service-wide `StartSkipped(stop=True)` or two alike `StartFailed` first starts (BQ-AGT14-8) end the tick."""
         now = self._clock()
         if self._flags.get(
             "replay_only"
         ):  # NFR-24: a replay-only link starts nothing; the slot fires once when cleared
             return TickResult(0)
-        fired = 0
+        fired = starts = 0
         uncounted: set[str] = set()  # fixed codes of uncounted skips, each logged once per tick
+        pending: tuple[str, datetime, StartFailed] | None = None  # the first start's pairable failure, not yet counted
         for schedule in self._store.due(now, MAX_FIRES_PER_TICK)[:MAX_FIRES_PER_TICK]:
             if not schedule.enabled or schedule.next_due > now:  # never trust the store with either rule
                 continue
@@ -321,25 +345,41 @@ class Ticker:
                     skipped=skipped,
                     cache_namespace=schedule.schedule_id,
                 )
+                starts += 1
                 world_id = self._starter.start(run)
             except StartSkipped as skip:  # a deliberate no-op: recorded, and may give the slot up until next week
+                self._settle(pending)
+                pending = None
                 if not skip.count:  # a global condition: nothing is recorded, the slot is claimable on the next tick
                     if skip.code not in uncounted:
                         uncounted.add(skip.code)
                         log.warning("schedule starts skipped, not counted (%s)", skip.code)
                     self._release(schedule.schedule_id, due)
+                    if skip.stop:  # no later start can succeed this tick: they all stay due
+                        return TickResult(fired, stopped=skip.code, status=skip.status)
                     continue
                 log.info("schedule start skipped (%s)", skip.code)
                 after = next_slot(schedule.cadence, slot) if skip.advance and slot is not None else None
                 self._fail(schedule.schedule_id, due, skip.code, after)
                 continue
             except Exception as exc:  # any failure: slot claimable again, next_due unmoved, retried after the backoff
-                log.warning("schedule start failed (%s); retrying after the backoff", type(exc).__name__)
-                self._fail(schedule.schedule_id, due, START_FAILED, None)
+                failed = exc if isinstance(exc, StartFailed) and exc.pair and type(exc.status) is int else None
+                if failed is not None and starts == 1:  # BQ-AGT14-8: the second start decides whether it is counted
+                    pending = (schedule.schedule_id, due, failed)
+                    continue
+                if failed is not None and pending is not None and _alike(pending[2], failed):  # the service's
+                    self._release(pending[0], pending[1])  # neither slot is counted; every later one stays due
+                    self._release(schedule.schedule_id, due)
+                    return TickResult(fired, stopped=failed.pair, status=failed.status)
+                self._settle(pending)
+                pending = None
+                self._count(schedule.schedule_id, due, exc)
                 continue
             # The run started. `complete` failing leaves the claim held (it expires; the same key dedupes a restart);
             # it never aborts the tick for the other schedules.
             assert slot is not None  # the try only reaches here after the slot arithmetic
+            self._settle(pending)
+            pending = None
             fired += 1
             try:
                 self._store.complete(
@@ -349,7 +389,19 @@ class Ticker:
                 log.error("schedule complete failed (%s); the claim will lapse", type(exc).__name__)
             if skipped:
                 self._alert(world_id, skipped, now)
+        self._settle(pending)  # a lone failing start: one call cannot tell the service's answer from its schedule's
         return TickResult(fired)
+
+    def _settle(self, pending: tuple[str, datetime, StartFailed] | None) -> None:
+        """Counts the first start's held failure: what followed it did not pair with it."""
+        if pending is not None:
+            self._count(*pending)
+
+    def _count(self, schedule_id: str, due: datetime, exc: Exception) -> None:
+        status = exc.status if isinstance(exc, StartFailed) and type(exc.status) is int else None
+        extra = None if status is None else {"event": ENQUEUE_FAILED, "status": status, "code": START_FAILED}
+        log.warning("schedule start failed (%s); retrying after the backoff", type(exc).__name__, extra=extra)
+        self._fail(schedule_id, due, START_FAILED, None)
 
     def _fail(self, schedule_id: str, due: datetime, error: str, next_due: datetime | None) -> None:
         """Records the failure (a store without `record_failure` retries every tick) and frees the claim."""

@@ -15,6 +15,7 @@ dependencies = [
     "tilo-archive",
     "tilo-connectors",
     "tilo-contracts",
+    "tilo-logging",
     "tilo-memory",
     "tilo-policy",
     "tilo-providers",
@@ -30,6 +31,7 @@ tilo-metering = { workspace = true }
 tilo-archive = { workspace = true }
 tilo-connectors = { workspace = true }
 tilo-contracts = { workspace = true }
+tilo-logging = { workspace = true }
 tilo-memory = { workspace = true }
 tilo-policy = { workspace = true }
 tilo-providers = { workspace = true }
