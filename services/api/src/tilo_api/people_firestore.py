@@ -28,6 +28,7 @@ from tilo_people._schema import valid
 from tilo_people.errors import (
     AlreadyExists,
     EmailTaken,
+    LastPerson,
     NotFound,
     OrgAlreadyFounded,
     PeopleError,
@@ -219,23 +220,41 @@ class FirestorePersonStore(FirestoreRecordStore):
     def _reservation(self, org_id: str, email: str) -> Any:
         return self._directory(org_id, f"email_{_digest(email)}")
 
-    def _transact(self, work: Callable[[Any], Any]) -> Any:
-        """Runs `work(transaction)` and retries contention (a lost commit, or a lock that was not granted)."""
+    def _transact(self, work: Callable[[Any], Any], pid: str) -> Any:
+        """Runs `work(transaction)` and retries contention (a lost commit, or a lock that was not granted). A document
+        a rival created between our read and our commit is reported by the path in the error (FS-16)."""
         for attempt in range(_ATTEMPTS):
             try:
                 return firestore.transactional(work)(self._client.transaction())
             except gexc.Aborted:
                 pass
+            except gexc.AlreadyExists as exc:
+                raise _collided(str(exc), pid) from None
             except ValueError as exc:  # the library's "failed in N attempts" wraps the Aborted it gave up on
                 if not isinstance(exc.__cause__, gexc.Aborted):
                     raise
             _pause(attempt)
         raise PeopleError("the people store is busy")
 
-    def _taken(self, txn: Any, org: str, email: str, pid: str) -> None:
-        held = self._reservation(org, email).get(transaction=txn)
-        if held.exists and held.get("person_id") != pid:
+    def _claim(self, txn: Any, org: str, email: str, pid: str) -> None:
+        """Reserves an address for the person: created (never set) when the read found none, `EmailTaken` when another
+        person holds it; one the person already holds is left as it is."""
+        ref = self._reservation(org, email)
+        held = ref.get(transaction=txn)
+        if not held.exists:
+            txn.create(ref, {"person_id": pid})
+        elif held.get("person_id") != pid:
             raise EmailTaken(f"EmailTaken: person {pid}")
+
+    def _release(self, txn: Any, org: str, email: str, pid: str) -> None:
+        """Deletes the person's reservation; one held by someone else fails the whole transaction (nothing is written,
+        no address or text in the error), an absent one is no error."""
+        ref = self._reservation(org, email)
+        held = ref.get(transaction=txn)
+        if held.exists:
+            if held.get("person_id") != pid:
+                raise PeopleError("the people store is inconsistent")
+            txn.delete(ref)
 
     def create(self, record: Mapping[str, Any]) -> Stored:
         org, pid = self._checked(record)
@@ -244,12 +263,11 @@ class FirestorePersonStore(FirestoreRecordStore):
         def work(txn: Any) -> None:
             if ref.get(transaction=txn).exists:
                 raise AlreadyExists(f"AlreadyExists: person {pid}")
-            self._taken(txn, org, record["email"], pid)
+            self._claim(txn, org, record["email"], pid)
             txn.create(ref, data)
-            txn.set(self._reservation(org, record["email"]), {"person_id": pid})
 
         with _guarded():
-            self._transact(work)
+            self._transact(work, pid)
         return Stored(self.kind, copy.deepcopy(data["record"]), 1)
 
     def create_founder(self, record: Mapping[str, Any]) -> Stored:
@@ -264,16 +282,12 @@ class FirestorePersonStore(FirestoreRecordStore):
                 raise OrgAlreadyFounded("OrgAlreadyFounded")
             if ref.get(transaction=txn).exists:
                 raise AlreadyExists(f"AlreadyExists: person {pid}")
-            self._taken(txn, org, record["email"], pid)
+            self._claim(txn, org, record["email"], pid)
             txn.create(founder, {"uid": pid})
             txn.create(ref, data)
-            txn.set(self._reservation(org, record["email"]), {"person_id": pid})
 
         with _guarded():
-            try:
-                self._transact(work)
-            except gexc.AlreadyExists:  # a rival's marker landed between our read and our commit
-                raise OrgAlreadyFounded("OrgAlreadyFounded") from None
+            self._transact(work, pid)
         return Stored(self.kind, copy.deepcopy(data["record"]), 1)
 
     def founded(self, org_id: str) -> bool:
@@ -295,16 +309,23 @@ class FirestorePersonStore(FirestoreRecordStore):
                 raise self._conflict(pid, expected, snap.get("version"))
             old, new = str(snap.get("record")["email"]).lower(), record["email"].lower()
             if old != new:
-                self._taken(txn, org, new, pid)
-                txn.delete(self._reservation(org, old))
-                txn.set(self._reservation(org, new), {"person_id": pid})
+                self._release(txn, org, old, pid)
+                self._claim(txn, org, new, pid)
             txn.update(ref, data)
 
         with _guarded():
-            self._transact(work)
+            self._transact(work, pid)
         return Stored(self.kind, copy.deepcopy(data["record"]), expected + 1)
 
     def delete(self, org_id: str, record_id: str, *, expected_version: int) -> None:
+        self._delete(org_id, record_id, expected_version, keep_one=False)
+
+    def delete_not_last(self, org_id: str, record_id: str, *, expected_version: int) -> None:
+        """`delete`, but `LastPerson` (nothing changed) for the sole person of an org nobody founded; the check reads
+        the people collection inside the delete transaction, so a stale `list` cannot beat it (FS-17)."""
+        self._delete(org_id, record_id, expected_version, keep_one=True)
+
+    def _delete(self, org_id: str, record_id: str, expected_version: int, *, keep_one: bool) -> None:
         expected = self._version(expected_version)
         if not self._addressable(org_id, record_id):
             raise NotFound(f"NotFound: person {_safe(record_id)}")
@@ -316,11 +337,24 @@ class FirestorePersonStore(FirestoreRecordStore):
                 raise NotFound(f"NotFound: person {record_id}")
             if snap.get("version") != expected:
                 raise self._conflict(record_id, expected, snap.get("version"))
-            txn.delete(self._reservation(org_id, snap.get("record")["email"]))
+            if keep_one:
+                people = [s.id for s in self._collection(org_id).limit(2).stream(transaction=txn)]
+                if people == [record_id] and not self._directory(org_id, "founder").get(transaction=txn).exists:
+                    raise LastPerson(f"LastPerson: person {record_id}")
+            self._release(txn, org_id, snap.get("record")["email"], record_id)
             txn.delete(ref)
 
         with _guarded():
-            self._transact(work)
+            self._transact(work, record_id)
+
+
+def _collided(where: str, pid: str) -> PeopleError:
+    """What a document a rival created first means, from its path in the library's error."""
+    if "/people_directory/founder" in where:
+        return OrgAlreadyFounded("OrgAlreadyFounded")
+    if "/people_directory/email_" in where:
+        return EmailTaken(f"EmailTaken: person {pid}")
+    return AlreadyExists(f"AlreadyExists: person {pid}")
 
 
 def firestore_people_stores(client: Any) -> PeopleStores:

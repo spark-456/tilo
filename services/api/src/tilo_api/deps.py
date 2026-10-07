@@ -433,32 +433,49 @@ class SourceOwners(Protocol):
 
 _people_stores_lock = threading.Lock()
 _people_stores: PeopleStores | None = None
+_people_stores_retry_at: float | None = None
+PEOPLE_STORES_BACKOFF_S = 5.0  # after a failed build, no new attempt for this long (FS-18; fixed, 1 to 60 s)
+people_stores_clock: Callable[[], float] = time.monotonic  # read at call time, so a test can replace it
+
+
+def _inside_backoff() -> bool:
+    retry_at = _people_stores_retry_at
+    return retry_at is not None and people_stores_clock() < retry_at
 
 
 def get_people_stores() -> PeopleStores:
     """The process's one `PeopleStores` (the write limiter and idempotency keys live on it, #549). Built on the first
     request, single-flight, only for `TILO_PEOPLE_STORE=firestore` plus a valid `TILO_FIRESTORE_PROJECT` (ADR-0023);
-    anything else, or a build that fails, is 503 `not_configured` (never cached, the error never echoed)."""
-    global _people_stores
+    anything else, or a build that fails, is 503 `not_configured` (the error never echoed). A failed build is
+    remembered for `PEOPLE_STORES_BACKOFF_S`: inside the window a request is refused at once, without the lock and
+    without a client call; after it one request tries again (FS-18)."""
+    global _people_stores, _people_stores_retry_at
     built = _people_stores
     if built is not None:
         return built
+    if _inside_backoff():
+        raise HTTPException(status_code=503, detail="not_configured")
     with _people_stores_lock:
         if _people_stores is None:
-            from tilo_api.people_firestore import open_people_stores  # noqa: PLC0415
+            if _inside_backoff():  # the request that held the lock failed while this one waited
+                raise HTTPException(status_code=503, detail="not_configured")
+            from tilo_api.people_firestore import PeopleStoreNotConfigured, open_people_stores  # noqa: PLC0415
 
             try:
                 _people_stores = open_people_stores()
+                _people_stores_retry_at = None
             except Exception as exc:
                 logger.warning("people stores not built (%s)", type(exc).__name__)
+                if not isinstance(exc, PeopleStoreNotConfigured):  # no client was tried: nothing to back off from
+                    _people_stores_retry_at = people_stores_clock() + PEOPLE_STORES_BACKOFF_S
                 raise HTTPException(status_code=503, detail="not_configured") from None
         return _people_stores
 
 
 def _forget_people_stores() -> None:
-    global _people_stores
+    global _people_stores, _people_stores_retry_at
     with _people_stores_lock:
-        _people_stores = None
+        _people_stores, _people_stores_retry_at = None, None
 
 
 get_people_stores.cache_clear = _forget_people_stores  # type: ignore[attr-defined]  # tests start from a cold process

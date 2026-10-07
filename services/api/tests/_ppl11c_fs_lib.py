@@ -36,13 +36,7 @@ STORE_OF = {
 # (a substring of a pytest node id naming the requirement, a substring that must also be there: "" for every row, or
 # "firestore" for the rows of the `backend` fixture that need the adapter). A requirement that goes green with its
 # entry still here fails (strict), which is the reminder to delete it.
-FS_PENDING: tuple[tuple[str, str], ...] = (
-    # FS-1c (issue #577 items 2-5, API_PPL_11c_FS1c.md): the builder deletes each entry when its requirement lands.
-    ("test_PPL_11c_FS_16_", ""),  # reservation writes with a create precondition, holder checked before a delete
-    ("test_PPL_11c_FS_17_", ""),  # the last-person erase check is atomic with the delete
-    ("test_PPL_11c_FS_18_", ""),  # negative cache of a failed `get_people_stores` build
-    ("test_PPL_11c_FS_19_", ""),  # `/first` needs a full web or mobile_web session
-)
+FS_PENDING: tuple[tuple[str, str], ...] = ()
 # MemoryStore rows that already pass at the head of `phase0-stack` (a "nothing was left behind" check is true of a store
 # that never reserved anything): pinned, never a strict xfail. Their Firestore rows stay pending like the rest.
 FS_MEMORY_GREEN: tuple[str, ...] = (
