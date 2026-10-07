@@ -7,12 +7,14 @@ import type { ReactNode } from "react";
 import type { Api } from "../../api/index";
 import type { Agenda, Decision } from "../../api/types";
 import { useParkApi } from "../../app/context";
+import { useStagedCount } from "../../app/useStaged";
 import { Button, PageSheet } from "../../components";
 import "../../components/park.components.css";
 import type { AppCtx } from "../../app/AppCtx";
 import { Boards } from "./Boards";
 import { Week } from "./Week";
 import { icon } from "./icons";
+import { BOARDS } from "./model";
 import { useAgenda, useAgendaUi } from "./useAgenda";
 import "./Agenda.css";
 
@@ -40,6 +42,15 @@ function Ready({
   api,
 }: { A: Agenda; decisions: Decision[]; app: AppCtx; api: Api }) {
   const ui = useAgendaUi(A, decisions, app, api);
+  // The boards draw their pins a row at a time (the same row in each board), then the week: one task each, top to
+  // bottom, nothing already drawn moves (WEB-MOTION-2: no long task while pages change).
+  const perBoard = Math.max(
+    0,
+    ...BOARDS.map((b) => ui.pins.filter((p) => p.board === b.key).length),
+  );
+  const steps = perBoard + 2;
+  const count = useStagedCount(steps);
+  const done = count >= steps;
   return (
     <>
       <div className="park-agenda-head">
@@ -59,8 +70,8 @@ function Ready({
           </Button>
         </div>
       </div>
-      <Boards A={A} ui={ui} app={app} />
-      <Week A={A} ui={ui} app={app} />
+      <Boards A={A} ui={ui} app={app} limit={done ? Number.POSITIVE_INFINITY : count - 1} />
+      {done ? <Week A={A} ui={ui} app={app} /> : null}
     </>
   );
 }

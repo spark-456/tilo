@@ -148,7 +148,7 @@ def test_PPL_11c_s3_PE_17_two_principals_racing_for_an_empty_org_leave_exactly_o
     rig.require_route(R_PERSON_FIRST)
 
     def principal(request: Request):
-        return rig.deps.Principal(user_id=request.headers["x-test-user"], role="owner")
+        return rig.deps.Principal(user_id=request.headers["x-test-user"], role="owner", full_session=True)
 
     rig.app.dependency_overrides[rig.deps.get_current_principal] = principal
 

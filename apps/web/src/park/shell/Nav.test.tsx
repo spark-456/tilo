@@ -27,12 +27,12 @@ afterEach(() => {
 });
 
 const TABS = [
-  ["Home", "/park/home"],
-  ["Worlds", "/park/worlds"],
-  ["Skills", "/park/skills"],
-  ["Ledger", "/park/ledger"],
-  ["Agenda", "/park/agenda"],
-  ["Team", "/park/team"],
+  ["Home", "/"],
+  ["Worlds", "/worlds"],
+  ["Skills", "/skills"],
+  ["Ledger", "/ledger"],
+  ["Agenda", "/agenda"],
+  ["Team", "/team"],
 ] as const;
 
 const header = (root: ParentNode) => q(root, "header");
@@ -64,14 +64,14 @@ describe("WEB_3b_nav: structure", () => {
   it("WEB_3b_nav_the_logo_is_a_home_link_that_reads_tilo_and_does_not_reload", async () => {
     const { m, navigate } = await mountApp({ path: "/park/ledger" });
     const logo = q<HTMLAnchorElement>(m.container, 'a[aria-label="Tilo home"]');
-    expect(logo.getAttribute("href")).toBe("/park/home");
+    expect(logo.getAttribute("href")).toBe("/");
     expect(logo.textContent).toBe("tilo");
     const ev = new MouseEvent("click", { bubbles: true, cancelable: true, button: 0 });
     act(() => {
       logo.dispatchEvent(ev);
     });
     expect(ev.defaultPrevented).toBe(true);
-    expect(navigate).toHaveBeenCalledWith("/park/home");
+    expect(navigate).toHaveBeenCalledWith("/");
   });
 
   it("WEB_3b_nav_the_six_tabs_in_the_reference_order_link_to_their_park_paths", async () => {
@@ -99,7 +99,7 @@ describe("WEB_3b_nav: structure", () => {
       expect(b.getAttribute("tabindex")).not.toBe("-1");
     }
     for (const a of qa(header(m.container), "a")) {
-      expect(a.getAttribute("href")).toMatch(/^\/park\//);
+      expect(a.getAttribute("href")).toMatch(/^\/(?!park(\/|$))/); // a root path, never the /park alias
       expect(a.getAttribute("tabindex")).not.toBe("-1");
     }
   });

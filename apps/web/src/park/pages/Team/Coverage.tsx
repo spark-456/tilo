@@ -33,7 +33,7 @@ export function Coverage({ rows, owner, flash, onBackup, onLedger }: CoveragePro
           </div>
         </div>
         <a
-          href="/park/ledger"
+          href="/ledger"
           className="park-team-link"
           onClick={(e) => {
             e.preventDefault();

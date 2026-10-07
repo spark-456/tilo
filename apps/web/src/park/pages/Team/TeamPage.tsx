@@ -13,6 +13,7 @@ import {
 } from "react";
 import type { AppCtx } from "../../app/AppCtx";
 import { useParkApi } from "../../app/context";
+import { useStaged } from "../../app/useStaged";
 import { Button, PageSheet } from "../../components";
 import { Coverage } from "./Coverage";
 import { Members } from "./Members";
@@ -161,6 +162,7 @@ interface BodyProps {
 function TeamBody({ app, data, people, setPeople }: BodyProps) {
   const { team } = data;
   const { toast } = app;
+  const part = useStaged(4); // drawn top to bottom, one task each (no long task while pages change)
   const [open, setOpen] = useState<string | null>(null);
   const [backups, setBackups] = useState<Backups>({});
   const [flags, setFlags] = useState<Record<string, boolean>>({});
@@ -209,22 +211,26 @@ function TeamBody({ app, data, people, setPeople }: BodyProps) {
         onRemove={remove}
         onResend={(p) => toast(`Invite sent again to ${p.email}`)}
       />
-      <Coverage
-        rows={rows}
-        owner={team.people.find((p) => p.role === "Owner")?.name.split(" ")[0]}
-        flash={Boolean(app.params.focus)}
-        onBackup={addBackup}
-        onLedger={() => app.go("ledger")}
-      />
-      <div className="park-team-two">
-        <RulesCard
-          rules={team.rules}
-          on={flags}
-          art={agentArt(app.night)}
-          onToggle={(key, next) => setFlags((f) => ({ ...f, [key]: next }))}
+      {part(2) ? (
+        <Coverage
+          rows={rows}
+          owner={team.people.find((p) => p.role === "Owner")?.name.split(" ")[0]}
+          flash={Boolean(app.params.focus)}
+          onBackup={addBackup}
+          onLedger={() => app.go("ledger")}
         />
-        <MatrixCard team={team} />
-      </div>
+      ) : null}
+      {part(3) ? (
+        <div className="park-team-two">
+          <RulesCard
+            rules={team.rules}
+            on={flags}
+            art={agentArt(app.night)}
+            onToggle={(key, next) => setFlags((f) => ({ ...f, [key]: next }))}
+          />
+          {part(4) ? <MatrixCard team={team} /> : null}
+        </div>
+      ) : null}
     </>
   );
 }

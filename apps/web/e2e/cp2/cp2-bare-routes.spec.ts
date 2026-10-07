@@ -12,11 +12,11 @@ const BARE = [
   "/meeting",
   "/library",
   "/library/artifacts",
-  "/worlds",
+  "/worlds/replays",
   "/autonomy",
   "/channels",
   "/mail",
-  "/team",
+  "/team/console",
   "/connections",
   "/estimate",
 ];
@@ -40,6 +40,8 @@ test.describe("@cp2 bare routes with a live API and no run", () => {
     const problems = watchConsole(page);
     const worldRequests: string[] = [];
     page.on("request", (req) => {
+      // WEB-CUTOVER: S-14's own address, /worlds/replays, is a page navigation, not a request about a world.
+      if (req.resourceType() === "document") return;
       if (/\/worlds\//.test(new URL(req.url()).pathname)) worldRequests.push(req.url());
     });
 
@@ -47,7 +49,8 @@ test.describe("@cp2 bare routes with a live API and no run", () => {
       await page.goto(path);
       await expect(page.getByTestId("fixture-replay-banner")).toHaveCount(0); // a real client
       // S-14 lists worlds: with none it is its own empty state, the other screens say "No run yet"
-      if (path === "/worlds") await expect(page.getByTestId("worlds-empty"), path).toBeVisible();
+      if (path === "/worlds/replays")
+        await expect(page.getByTestId("worlds-empty"), path).toBeVisible();
       else await expect(page.getByTestId("no-run"), path).toContainText("No run yet");
       await expect(page.getByTestId("not-found"), path).toHaveCount(0);
     }

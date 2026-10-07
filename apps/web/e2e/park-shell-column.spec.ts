@@ -15,8 +15,8 @@ for (const [name, viewport, want] of CASES) {
   test.describe(`park page column at ${name}`, () => {
     test.use({ viewport });
 
-    for (const path of ["/park/ledger", "/park/worlds"]) {
-      test(`WEB_3b_e2e_${name}_the_page_column_of_${path.replace("/park/", "")}_is_at_x_${want.x}_width_${want.width}`, async ({
+    for (const path of ["/ledger", "/worlds"]) {
+      test(`WEB_3b_e2e_${name}_the_page_column_of_${path.slice(1)}_is_at_x_${want.x}_width_${want.width}`, async ({
         page,
       }) => {
         test.setTimeout(150_000);
