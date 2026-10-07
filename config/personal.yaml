@@ -17,3 +17,7 @@ calendar_sync:
   max_pages: 25 # pages in one sync run; 2 x max_pages stays below the per-minute limit
   backoff_base_s: 60 # after the n-th failure in a row: min(base x 2^(n-1), max), or Google's Retry-After
   backoff_max_s: 3600
+
+# FR-MTG-09 (bot-hosted meeting): the longest meeting the bot will host, 1..1440 minutes. Google ends a free
+# account's group call at 60 minutes and the bot counts as a participant (BQ-MTG09-9).
+meeting_host: {max_duration_min: 60}

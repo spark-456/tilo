@@ -46,6 +46,15 @@ _CROCKFORD = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
 _SETTLE_WAIT_S = 10.0  # the longest a call waits for another thread's store_tokens events to land
 
 
+# The meeting_host connector signs in as the meeting bot's own Google account (FR-MTG-09): another Google grant.
+# Every other connector shares one person grant (CON-D10); this one stands alone.
+GRANT_GROUPS: Mapping[str, str] = {"meeting_host": "meeting_host"}
+
+
+def grant_group(connector: str) -> str:
+    return GRANT_GROUPS.get(connector, "person")
+
+
 class TokenError(Exception):
     """Base of every broker error. Messages are fixed text: never a token, a body or a secret."""
 
@@ -363,7 +372,7 @@ class TokenBroker:
         if not isinstance(token, str):
             return
         with self._user_lock(user_id):
-            error = None if self.has_live_grant(user_id) else self._revoke(token)
+            error = None if self._live_in_group(user_id, grant_group(connector)) else self._revoke(token)
         if error is not None:
             _log.warning("discarded tokens for connector %r could not be revoked", connector)
 
@@ -376,10 +385,17 @@ class TokenBroker:
     def has_live_grant(self, user_id: str, *, excluding: str | None = None) -> bool:
         """True when the user has a record in state "connected" for any connector (but `excluding`),
         whether or not the KMS can read it now: an outage must never make a connected connector look
-        absent. Every Google connector shares one OAuth client and one grant per account, so revoking a
-        token there ends all of them (CON-D10)."""
+        absent. Every Google connector of one account shares one OAuth client and one grant, so revoking a
+        token there ends all of them (CON-D10). Only connectors of the same grant group count: the group of
+        `excluding`, else the person group."""
+        group = grant_group(excluding) if excluding is not None else "person"
+        return self._live_in_group(user_id, group, excluding)
+
+    def _live_in_group(self, user_id: str, group: str, excluding: str | None = None) -> bool:
         for other in self._store.connectors_of(user_id):
-            if other != excluding and (self._store.get(user_id, other) or {}).get("state") == "connected":
+            if other == excluding or grant_group(other) != group:
+                continue
+            if (self._store.get(user_id, other) or {}).get("state") == "connected":
                 return True
         return False
 
@@ -412,7 +428,6 @@ class TokenBroker:
 
     def _retry_pending(self, user_id: str, skip: Collection[str] = ()) -> int:
         done, now = 0, parse_ts(self._clock())
-        live = self.has_live_grant(user_id)  # CON-D10: another connected connector shares the grant
         for key in self._retry.connectors_of(user_id):
             if key in skip:
                 continue
@@ -432,8 +447,8 @@ class TokenBroker:
             if not token or age is None or age > self._retention:
                 self._retry.delete(user_id, key)
                 _log.warning("a pending revoke for connector %r was dropped unrevoked", record.get("connector"))
-            elif live:
-                continue  # never while the user is connected elsewhere; kept until the retention ends
+            elif self._live_in_group(user_id, grant_group(str(record.get("connector")))):
+                continue  # never while a connector of the same grant is connected (CON-D10); kept until retention
             elif self._revoke(str(token)) is None:
                 self._retry.delete(user_id, key)
                 done += 1
@@ -616,8 +631,8 @@ class TokenBroker:
                 unread = record if keep_retry and not token and "ciphertext" in record else None
                 alerts.append(self._keep_revoke_for_retry(user_id, connector, token if keep_retry else None, unread))
             self._store.delete(user_id, connector)
-            if keep_retry and not self.has_live_grant(user_id):
-                self._retry_pending(user_id, skip=alerts)  # the last connector: earlier pending revokes go now
+            if keep_retry:  # a pending revoke goes now unless a connector of its own grant is still connected
+                self._retry_pending(user_id, skip=alerts)
         for alert_id in alerts:
             self._raise_alert(user_id, alert_id)
         self._emit_part("connection.revoked", user_id, connector)
@@ -626,7 +641,8 @@ class TokenBroker:
     def _readable_sibling(self, user_id: str, connector: str) -> bool:
         """True when another connector's record is connected and the KMS can read it now."""
         for other in self._store.connectors_of(user_id):
-            record = self._store.get(user_id, other) if other != connector else None
+            same = other != connector and grant_group(other) == grant_group(connector)
+            record = self._store.get(user_id, other) if same else None
             if (record or {}).get("state") == "connected" and self._readable(user_id, other, record):
                 return True
         return False
