@@ -515,7 +515,12 @@ class TasksError(RuntimeError):
 
 class TasksUnavailable(TasksError):
     """A refusal that is the service's, not one schedule's (401, 403, 404: wrong caller, missing actAs, no queue): the
-    fan-out records nothing against any schedule for it."""
+    fan-out records nothing against any schedule for it, and the first one ends the tick with a 503 (BQ-AGT14-6).
+    `status` is the HTTP status when known: an int, never text."""
+
+    def __init__(self, message: str, *, status: int | None = None) -> None:
+        super().__init__(message)
+        self.status = status
 
 
 _SERVICE_WIDE = frozenset({401, 403, 404})
@@ -553,8 +558,10 @@ class CloudTasksRestClient:
         status = response.status_code
         if status == 409 and _error_status(response) == "ALREADY_EXISTS":  # ABORTED is a 409 too: that one is a failure
             return AlreadyExists()
+        if status in _SERVICE_WIDE:
+            raise TasksUnavailable(f"cloud tasks answered {status}", status=status)
         if not 200 <= status < 300:
-            raise (TasksUnavailable if status in _SERVICE_WIDE else TasksError)(f"cloud tasks answered {status}")
+            raise TasksError(f"cloud tasks answered {status}")
         return None
 
 
@@ -592,8 +599,9 @@ class TaskEnqueuer:
         }  # no retry config (the queue owns it) and no Authorization header (the OIDC token is Cloud Tasks' own)
         try:
             self._client.enqueue(task)  # None or AlreadyExists: handed over either way
-        except TasksUnavailable as exc:  # the whole service's setting: no schedule is to blame, nothing is recorded
-            raise StartSkipped("tasks_unavailable", count=False) from exc
+        except TasksUnavailable as exc:  # the whole service's setting: nothing is recorded, and the tick stops here
+            status = exc.status if type(exc.status) is int else None
+            raise StartSkipped("tasks_unavailable", count=False, stop=True, status=status) from exc
         return world_id
 
 
@@ -776,11 +784,20 @@ def _fan_out(
         ticker = Ticker(
             store=schedules, starter=enqueuer, flags=flags, clock=clock, alerts=lambda _world, _fields: None
         )
-        fired = ticker.tick().fired
+        result = ticker.tick()
     except Exception as exc:  # fail closed with a fixed body; Scheduler retries and the next tick re-reads the store
         logger.error("schedule tick failed (%s)", type(exc).__name__)
         return _closed(500, "tick failed")
-    return {"fired": fired}
+    if result.stopped is not None:  # BQ-AGT14-6: a service-wide refusal is a failed attempt, whatever fired before it
+        if result.status is None:
+            logger.error("schedule tick stopped (%s); %d fired, the rest stay due", result.stopped, result.fired)
+        else:
+            logger.error(
+                "schedule tick stopped (%s, status %d); %d fired, the rest stay due",
+                result.stopped, result.status, result.fired,
+            )  # fmt: skip
+        return _closed(503, result.stopped)
+    return {"fired": result.fired}
 
 
 def _run_task(

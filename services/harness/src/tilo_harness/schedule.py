@@ -189,11 +189,14 @@ class StartSkipped(Exception):
     """A start that deliberately did nothing. `advance`: next_due moves to the first slot after the one skipped (retry
     next week); otherwise the slot stays and is retried after the backoff. `code` is a short fixed code, never text.
     `count=False` is for a condition of the whole service, not of one schedule: the claim is released and NOTHING is
-    recorded (no failure, no backoff, no move), whatever `advance` says."""
+    recorded (no failure, no backoff, no move), whatever `advance` says. `stop` (with `count=False`) also ends the tick:
+    no later slot is tried and every one stays due; the tick result names `code` and `status` (HTTP status or None)."""
 
-    def __init__(self, code: str, *, advance: bool = False, count: bool = True) -> None:
+    def __init__(
+        self, code: str, *, advance: bool = False, count: bool = True, stop: bool = False, status: int | None = None
+    ) -> None:
         super().__init__(code)
-        self.code, self.advance, self.count = code, advance, count
+        self.code, self.advance, self.count, self.stop, self.status = code, advance, count, stop, status
 
 
 GOOGLE_ISSUERS = frozenset({"https://accounts.google.com", "accounts.google.com"})  # exact, case-sensitive
@@ -249,6 +252,8 @@ class OidcVerifier(Protocol):  # google-auth id_token verification in production
 @dataclass(frozen=True)
 class TickResult:
     fired: int
+    stopped: str | None = None  # the code of a `StartSkipped(stop=True)` that ended the tick early
+    status: int | None = None  # its HTTP status, when the starter knew one
 
 
 def world_requested_kwargs(run: RunStart, world_id: str) -> dict[str, Any]:
@@ -291,7 +296,8 @@ class Ticker:
 
     def tick(self) -> TickResult:
         """Starts every schedule due now (at most MAX_FIRES_PER_TICK). A store or flag read that raises propagates:
-        nothing is started that was not proven safe. One schedule's failing start never stops the others."""
+        nothing is started that was not proven safe. One schedule's failing start never stops the others; only a
+        service-wide `StartSkipped(stop=True)` ends the tick."""
         now = self._clock()
         if self._flags.get(
             "replay_only"
@@ -328,6 +334,8 @@ class Ticker:
                         uncounted.add(skip.code)
                         log.warning("schedule starts skipped, not counted (%s)", skip.code)
                     self._release(schedule.schedule_id, due)
+                    if skip.stop:  # no later start can succeed this tick: they all stay due
+                        return TickResult(fired, stopped=skip.code, status=skip.status)
                     continue
                 log.info("schedule start skipped (%s)", skip.code)
                 after = next_slot(schedule.cadence, slot) if skip.advance and slot is not None else None
