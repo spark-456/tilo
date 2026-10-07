@@ -55,7 +55,8 @@ describe(
     });
 
     it("FR_WLD_09 the allowlist is small, every entry has a reason, and none is stale", () => {
-      expect(ALLOWLIST.length).toBeLessThanOrEqual(3);
+      // The two choreographer-era clocks plus the Park city's ambient entries (WEB-MOTION-1: four, city layer only).
+      expect(ALLOWLIST.length).toBeLessThanOrEqual(6);
       const hits = found();
       for (const a of ALLOWLIST) {
         expect(a.reason.length, `${a.file} needs a reason`).toBeGreaterThanOrEqual(30);
@@ -70,8 +71,9 @@ describe(
       expect(ALLOWLIST.some((a) => a.file === "src/world/choreographer.ts")).toBe(false);
     });
 
-    it("FR_WLD_09 app CSS has no keyframes, animation, transition or smooth scrolling at all", () => {
-      const css = found().filter((v) => v.file.endsWith(".css"));
+    it("FR_WLD_09 app CSS has no keyframes, animation, transition or smooth scrolling outside the allowlist", () => {
+      // Only the Park city's ambient keyframes and pause rule (park.shell.css) are on the allowlist.
+      const css = found().filter((v) => v.file.endsWith(".css") && !allowed(v));
       expect(css).toEqual([]);
     });
 

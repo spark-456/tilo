@@ -134,6 +134,34 @@ export const ALLOWLIST: readonly AllowEntry[] = [
     reason:
       "Camera glide: the person's own pan or zoom key, never an event. One frame per eased step, ends on the target, and is instant under reduced motion (HR-2; PRD 9.7).",
   },
+  // The Park city backdrop (WEB-MOTION-1, BQ-WEB-3 decided by the user 6 Oct 2026, ADR-0003a 5): its cars and
+  // walkers are ambient scenery: anonymous pedestrians drawn with agent-style art, with no run state, label or
+  // link to any run. Nothing that shows Tilo's own agents, worlds or data animates here
+  // (src/honesty/park-ambient.allowlist.test.ts pins that); agents animate only from recorded events.
+  {
+    file: "src/park/engines/park.ts",
+    rule: "inline-motion-style",
+    reason:
+      "Ambient scenery only: the Park city's cars and anonymous pedestrians (drawn with agent-style art) carry looping keyframes (transform and opacity), with no run state, label or link to any run. Agents animate only from recorded events (HR-1).",
+  },
+  {
+    file: "src/park/engines/park.ts",
+    rule: "css-animation",
+    reason:
+      "Same ambient scenery as above, written as the animation shorthand: cars and anonymous agent-styled pedestrians that stand for no run, drawn frozen when still. Agent motion comes only from recorded events (HR-1).",
+  },
+  {
+    file: "src/park/shell/park.shell.css",
+    rule: "css-keyframes",
+    reason:
+      "Keyframes for the Park city's ambient scenery, cars and anonymous pedestrians drawn with agent-style art that stand for no run (mvXY, waddle, walkFrame): transform and opacity only. Agents animate only from recorded events (HR-1).",
+  },
+  {
+    file: "src/park/shell/park.shell.css",
+    rule: "css-animation",
+    reason:
+      "animation-play-state pauses the ambient city scenery (anonymous cars and pedestrians that stand for no run) under the veil and in a hidden tab. It starts nothing; agents animate only from recorded events (HR-1).",
+  },
 ];
 
 export interface Violation {

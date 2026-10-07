@@ -1,9 +1,44 @@
 /* Park City shell (WEB-3b): the city backdrop, the top nav, the notifications popover, the account menu,
    the sample-data chip, the world loader, the boot splash and the page column. Every number is measured on
    the reference (design_handoff_tilo_web_app/design/Tilo App.dc.html inline styles); colours come from the
-   tokens. Every selector sits under [data-park]. STATIC: no motion of any kind here; it returns with the
-   motion restore (BQ-WEB-3), which brings its own honesty-scan entry. Glass blur is on the nav only
-   (README "Performance"). */
+   tokens. Every selector sits under [data-park]. The only motion is the city's ambient cars and walkers
+   (WEB-MOTION-1, BQ-WEB-3; honesty-scan entry in test-support/honestyScan.ts): keyframes below, transform
+   and opacity only, never a transition. Glass blur is on the nav only (README "Performance"). */
+
+/* The city's movers (the engine puts the animation on each layer; reference Tilo App.dc.html keyframes).
+   The walker's two frames flip by opacity instead of the reference's background-position (walkFrame). */
+@keyframes mvXY {
+  from {
+    transform: translate(0, 0);
+  }
+  to {
+    transform: translate(var(--dx), var(--dy));
+  }
+}
+@keyframes waddle {
+  0%,
+  100% {
+    transform: rotate(-6deg) translateY(0);
+  }
+  25% {
+    transform: rotate(0deg) translateY(-2.5px);
+  }
+  50% {
+    transform: rotate(6deg) translateY(0);
+  }
+  75% {
+    transform: rotate(0deg) translateY(-2.5px);
+  }
+}
+@keyframes walkFrame {
+  0% {
+    opacity: 1;
+  }
+  50%,
+  100% {
+    opacity: 0;
+  }
+}
 
 /* Laid out but not shown: the shell under the boot splash, and the ghost that holds the chip's place.
    Hidden elements are not painted, so nothing here can count as a layout shift when it appears. */
@@ -44,6 +79,17 @@
   height: 1000px;
   margin: -500px 0 0 -800px;
   transform-origin: 50% 50%;
+}
+/* Paused (under the veil, in a hidden tab): every mover holds its place. !important beats the shorthand
+   the engine writes inline. */
+[data-park] .park-shell__backdrop[data-paused] .park-shell__scene * {
+  animation-play-state: paused !important;
+}
+/* Sprite cap (narrow window or weak device): every second mover layer is not drawn. This relies on the
+   scene's root div holding the static pictures as <img> and ONLY movers as div children, one per car or
+   walker (nth-of-type counts divs only); engines/park.sprite-cap.test.ts pins that structure. */
+[data-park] .park-shell__backdrop[data-lite] .park-shell__scene > div > div:nth-of-type(even) {
+  display: none;
 }
 /* --veil dims the city on every page but Home (the opacity is set inline). */
 [data-park] .park-shell__veil {
