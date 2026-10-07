@@ -144,7 +144,7 @@ describe("WEB_9_agenda_boards: pins", () => {
     expect(text(p())).toContain("Priya · Thu 1 Oct");
   });
 
-  it("WEB_9_agenda_tilo_suggestions_block_it_dismiss_and_find", async () => {
+  it("FR_UX_14 WEB_9_agenda_tilo_suggestions_block_it_dismiss_and_find", async () => {
     const { container, ...h } = await renderAgenda();
     const m0 = pin(container, "m0");
     expect(text(m0)).toContain("Block it");
@@ -216,7 +216,7 @@ describe("WEB_9_agenda_week: the calendar", () => {
     toasted(h, "Tilo will join Supplier sync · Northline");
   });
 
-  it("WEB_9_agenda_find_a_time_books_a_slot_and_pins_it", async () => {
+  it("FR_UX_15 WEB_9_agenda_find_a_time_books_a_slot_and_pins_it", async () => {
     const { container, ...h } = await renderAgenda();
     const week = region(container, "This week");
     click(byText(container, "button", "Find a time"));
