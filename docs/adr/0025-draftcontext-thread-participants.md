@@ -1,8 +1,9 @@
 # ADR-0025: DraftContext thread participants (the L2 name slot)
 
-- Status: Proposed (architect, 2026-10-07). Needs the user's own yes. It changes what may ride the
-  L2 undo window, which is a T3 path, so its build ticket gets a security review and the user's yes
-  before merge (root `CLAUDE.md`). Numbered 0025 because ADR-0024 is taken by PR #501.
+- Status: Proposed (architect, 2026-10-07). Needs the user's own yes, and the user has not confirmed
+  in chat (answers relayed by the supervisor are recorded under Decisions below). It changes what
+  may ride the L2 undo window, which is a T3 path, so its build ticket gets a security review and
+  the user's yes before merge (root `CLAUDE.md`). Numbered 0025 because ADR-0024 is taken by PR #501.
 - Deciders: user (approval), architect (proposal)
 - Requirement: FR-CHN-11 and FR-CHN-12 (PRD 10.4: L2 is for T2 only, and "money, contract or legal
   terms" is T3). Related: issue #298 (the name slot), PR #525 (CHN-GATE-D), BQ-224,
@@ -94,9 +95,9 @@
   forms above go to T3, and the number-word list stops growing.
 - New safe false positives (T3, a person decides): a nickname in no header ("Dave" for David), a
   name of more than 4 words or with non-letters, a recipient the thread never names.
-- Residual risk, accepted here: a sender can name itself with an amount-like token the filter
-  misses (a glued form, as in the BQ-274 word-edge gap), and get it back in a reply to a clean
-  inbound message. Fixing the inbound gap fixes this too.
+- Residual risk (the relayed decision below does not accept it): a sender can name itself with an
+  amount-like token the filter misses (a glued form, as in the BQ-274 word-edge gap), and get it
+  back in a reply to a clean inbound message. Fixing the inbound gap fixes this too.
 - One more thread read per decision, unless the fetch is shared.
 - Migration: `participants` defaults to `()`, so every constructor still works. The channels
   benches (`services/channels/tests/_chn11_lib.py`, the GATE-C and GATE-D files) give their threads
@@ -116,7 +117,20 @@
   addresses stay within today's time per call.
 - An amount or number word that appears in the thread is still "unlisted" in the draft.
 
+## Decisions (relayed by supervisor, awaiting user confirmation)
+The user has not confirmed these in chat. They are the supervisor's answers to the three questions
+below (2026-10-07). Status stays Proposed and flips to Accepted only on the user's own message.
+1. Question 1: do not accept the residual self-echo risk. The BQ-274 inbound word-edge fix lands
+   before CHN-GATE-E ships.
+2. Question 2: names come from the draft's recipients and the mailbox owner only: the From name only
+   on the user's own SENT mail, To and Cc names there, and address local parts. Not from every
+   thread participant. If confirmed, decision 3 narrows to match (its first bullet, a participant's
+   own From name, goes); the numbered text above stays as proposed until then.
+3. Question 3: PR #525 merges as the interim fix once its local trial passes.
+
 ## Questions for the user (rows go into `docs/open-questions.md` once accepted)
+All three are answered by relay above and stay open until the user confirms. Relayed answer 1 differs
+from the default below; 2 and 3 match theirs.
 1. Accept the residual risk above, or land the BQ-274 inbound word-edge fix before CHN-GATE-E
    merges? Default: accept it.
 2. Names only from the draft's recipients and the mailbox (decision 5), or from every thread
