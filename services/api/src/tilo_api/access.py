@@ -3,8 +3,9 @@ services/api/tests/API_SEC_15.md).
 
 Everything here is deterministic code; a model never decides who gets in. The declaration is a record behind a
 store seam (`deps.get_access_store`), set once, and read only for the verified `Principal`, never from a header,
-query, cookie or body field. `AccessGate` is the first thing a deployed request meets: it refuses every route that
-is not in `PUBLIC_ROUTES` before any body is read or any world looked up. Not deployed (no `K_SERVICE` or
+query, cookie or body field. `AccessGate` runs before any store or world work (only middleware with no I/O, such as the
+log context and no-store headers, wraps it): it refuses every route that is not in `PUBLIC_ROUTES` before any body
+is read or any world looked up. Not deployed (no `K_SERVICE` or
 `CLOUD_RUN_JOB`) nothing is enforced, so CI and `just dev-api` behave as before.
 
 `provider_mode` is the one decision about live models for a request: pure, no I/O, never sets `LIVE`.
@@ -12,6 +13,7 @@ is not in `PUBLIC_ROUTES` before any body is read or any world looked up. Not de
 
 from __future__ import annotations
 
+import inspect
 import logging
 import os
 import threading
@@ -20,6 +22,7 @@ from typing import Literal, Protocol
 
 from fastapi import HTTPException
 from fastapi.concurrency import run_in_threadpool
+from starlette.requests import HTTPConnection
 from starlette.responses import JSONResponse
 from starlette.types import ASGIApp, Receive, Scope, Send
 
@@ -112,7 +115,9 @@ def _decide(scope: Scope) -> JSONResponse | None:
 
     overrides = scope["app"].dependency_overrides
     try:
-        principal = overrides.get(deps.get_current_principal, deps.get_current_principal)()
+        resolver = overrides.get(deps.get_current_principal, deps.get_current_principal)
+        # SEC-15 sign-in reads the request's Authorization header; a test double that takes no argument still works
+        principal = resolver(HTTPConnection(scope)) if inspect.signature(resolver).parameters else resolver()
         store = overrides.get(deps.get_access_store, deps.get_access_store)()
         declaration = store.get(principal.user_id)
     except HTTPException as exc:
@@ -133,6 +138,8 @@ def _decide(scope: Scope) -> JSONResponse | None:
         return _refusal(429, RATE_LIMITED, "rate_limited", {"Retry-After": str(decision.retry_after_s)})
     state = scope.setdefault("state", {})
     state["declaration"], state["uid"] = declaration, principal.user_id
+    state["principal"] = principal  # resolved once per request: the route's own dependency reuses it (BQ-SIGNIN-9)
+    state["demo_session"] = principal.demo_session  # an anonymous demo session: replay models only (BQ-SIGNIN-10)
     return None
 
 
