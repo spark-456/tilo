@@ -51,6 +51,7 @@ _PROJECT = re.compile(r"[a-z][a-z0-9-]{4,28}[a-z0-9]")
 _SAFE_ID = re.compile(r"[A-Za-z0-9_.-]{1,128}")
 _ATTEMPTS = 8
 _CONTENDED = (gexc.FailedPrecondition, gexc.Aborted, gexc.NotFound)
+_LOCK_WAIT = (gexc.Aborted, gexc.Conflict)  # `AlreadyExists` is a Conflict too: caught first, never retried
 
 
 class PeopleStoreNotConfigured(RuntimeError):
@@ -143,12 +144,28 @@ class FirestoreRecordStore:
     def create(self, record: Mapping[str, Any]) -> Stored:
         org, rid = self._checked(record)
         data = _doc(1, record)
+        ref = self._ref(org, rid)
         with _guarded():
-            try:
-                self._ref(org, rid).create(data)
-            except gexc.AlreadyExists:
-                raise AlreadyExists(f"AlreadyExists: {self.kind} {rid}") from None
+            for attempt in range(_ATTEMPTS):
+                try:
+                    ref.create(data)
+                except gexc.AlreadyExists:
+                    # after a contention retry our own create may have landed (a lost answer): the same document is ours
+                    if attempt and self._is(ref, data):
+                        break
+                    raise AlreadyExists(f"AlreadyExists: {self.kind} {rid}") from None
+                except _LOCK_WAIT:  # the emulator's "409 Transaction lock timeout" (Aborted): try again, bounded
+                    _pause(attempt)
+                    continue
+                break
+            else:
+                raise PeopleError("the people store is busy")
         return Stored(self.kind, copy.deepcopy(data["record"]), 1)
+
+    @staticmethod
+    def _is(ref: Any, data: Mapping[str, Any]) -> bool:
+        snap = ref.get()
+        return bool(snap.exists and snap.to_dict() == data)
 
     def replace(self, record: Mapping[str, Any], *, expected_version: int) -> Stored:
         org, rid = self._checked(record)
