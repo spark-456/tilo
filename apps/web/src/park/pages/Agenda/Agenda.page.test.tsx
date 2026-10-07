@@ -170,7 +170,7 @@ describe("WEB_9_agenda_boards: pins", () => {
 });
 
 describe("WEB_9_agenda_week: the calendar", () => {
-  it("WEB_9_agenda_calendar_filters_and_weekend", async () => {
+  it("FR_UX_16 WEB_9_agenda_calendar_filters_and_weekend", async () => {
     const { container } = await renderAgenda();
     const week = region(container, "This week");
     event(container, "read");
@@ -202,7 +202,7 @@ describe("WEB_9_agenda_week: the calendar", () => {
     expect(text(detail(container))).toContain("No notes for this one.");
   });
 
-  it("WEB_9_agenda_ask_tilo_for_a_brief_and_the_switches", async () => {
+  it("FR_UX_16 WEB_9_agenda_ask_tilo_for_a_brief_and_the_switches", async () => {
     const { container, ...h } = await renderAgenda();
     click(event(container, "read"));
     click(byText(detail(container), "button", "Ask Tilo for a brief"));
