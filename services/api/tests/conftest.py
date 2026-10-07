@@ -262,3 +262,14 @@ def pytest_collection_modifyitems(items):
         for item in items:
             if "test_PPL_11c_FS_" in item.nodeid and is_pending(item.nodeid):
                 item.add_marker(pytest.mark.xfail(strict=True, reason="PPL-11c-FS-1 pending (API_PPL_11c_FS.md)"))
+    if any("test_FR_PA_08_" in item.nodeid for item in items):
+        # FR-PA-08 (people assistant STATUS and weekly summary, API_FR_PA_08.md section 0): a slice is a strict xfail
+        # until its builder deletes its entry from `SLICE_PENDING`; the guards file is never pending.
+        from _fr_pa_08_lib import PENDING_EXEMPT as FR_PA_08_EXEMPT
+        from _fr_pa_08_lib import SLICE_PENDING as FR_PA_08_PENDING
+
+        for item in items:
+            if any(entry in item.nodeid for entry in FR_PA_08_EXEMPT):
+                continue
+            if any(entry in item.nodeid for entry in FR_PA_08_PENDING):
+                item.add_marker(pytest.mark.xfail(strict=True, reason="FR-PA-08 slice pending"))

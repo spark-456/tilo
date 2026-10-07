@@ -81,6 +81,16 @@ describe("WEB_5_worlds: header, search and New world", () => {
     expect(text(q(c, "h1"))).toBe("Worlds");
   });
 
+  it("WEB_5_worlds_live_worlds_and_decisions_show_even_when_the_city_plans_are_not_built", async () => {
+    // The live Api serves worlds (all Villages) and decisions but not plans yet: plans only draw City art.
+    const api = worldsApi();
+    api.getPlans = vi.fn(() => Promise.reject(new NotBuilt("getPlans")));
+    const { c } = await renderWorlds({ api });
+    expect(text(c)).not.toContain("Not connected yet");
+    expect(cardIds(c, "Villages").length).toBeGreaterThan(0);
+    expect(spotlight(c)).not.toBeNull();
+  });
+
   it("WEB_5_worlds_search_is_named_and_filters_by_name_ignoring_case", async () => {
     const { c } = await renderWorlds();
     expect(search(c).placeholder).toBe("Search worlds");

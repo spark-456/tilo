@@ -88,7 +88,7 @@ describe("WEB_3a_context: useApp builds the AppCtx", () => {
       prefs: {},
       time: "day",
       night: false,
-      motion: "lively",
+      motion: "calm",
       vw: 1280,
       vh: 720,
       pins: [],

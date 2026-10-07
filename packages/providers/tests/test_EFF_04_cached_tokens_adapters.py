@@ -347,8 +347,8 @@ def test_EFF_04_google_sends_system_tools_and_schema_in_that_order_ahead_of_the_
 
     first, second = api.calls
     order = list(vars(first["config"]))
-    assert order.index("system_instruction") < order.index("tools") < order.index("response_schema")
-    for key in ("system_instruction", "tools", "response_schema"):
+    assert order.index("system_instruction") < order.index("tools") < order.index("response_json_schema")
+    for key in ("system_instruction", "tools", "response_json_schema"):
         assert json.dumps(getattr(first["config"], key)) == json.dumps(getattr(second["config"], key))
     assert first["contents"] != second["contents"], "only the per-call text differs"
 

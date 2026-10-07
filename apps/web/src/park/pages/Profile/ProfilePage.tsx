@@ -169,7 +169,8 @@ export function ProfilePage({ app }: { app: AppCtx }) {
         : problem === "failed"
           ? "Your profile could not be loaded"
           : "";
-  const motion = MOTIONS.find((m) => m[0] === app.motion) ?? MOTIONS[0];
+  // An unknown value reads as the default, calm (the store and the handoff default), not as the first option.
+  const motion = MOTIONS.find((m) => m[0] === app.motion) ?? MOTIONS[1];
 
   return (
     <div data-testid="park-page-profile">
@@ -350,10 +351,10 @@ export function ProfilePage({ app }: { app: AppCtx }) {
                     <button
                       key={id}
                       type="button"
-                      aria-pressed={app.motion === id}
+                      aria-pressed={motion[0] === id}
                       className={cls(
                         "park-profile-mopt",
-                        app.motion === id && "park-profile-mopt--on",
+                        motion[0] === id && "park-profile-mopt--on",
                       )}
                       onClick={() => app.setPref("motion", id)}
                     >
