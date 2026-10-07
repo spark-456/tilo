@@ -94,6 +94,11 @@ function decidedText(decision: Decision | undefined): string {
   return decision.toast || (decision.done ? `${decision.title}: ${decision.done}` : decision.title);
 }
 
+/** A live answer says what was recorded, never that the work is done: the outbox still has to act (HR-1). */
+function answeredText(decision: Decision | undefined): string {
+  return decision ? `${decision.yes} recorded: ${decision.title}` : "Answer recorded";
+}
+
 export function createParkStore({ api, navigate, schedule }: ParkStoreDeps): ParkStore {
   let state: ParkState = {
     dec: {},
@@ -176,7 +181,7 @@ export function createParkStore({ api, navigate, schedule }: ParkStoreDeps): Par
             pending.delete(key);
             update({
               dec: { ...state.dec, [key]: true },
-              toast: arm(decidedText(decisions.find((d) => d.k === key))),
+              toast: arm(answeredText(decisions.find((d) => d.k === key))),
             });
           },
           (e: unknown) => {
