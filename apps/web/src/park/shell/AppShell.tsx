@@ -16,7 +16,7 @@ import { CityBackdrop } from "./CityBackdrop";
 import { NotificationsPopover } from "./NotificationsPopover";
 import { TopNav } from "./TopNav";
 import { WorldLoader } from "./WorldLoader";
-import { useCityMotion } from "./cityMotion";
+import { useAppearance } from "./cityMotion";
 import { loadShellFonts } from "./fonts";
 import { type Bar, useLeavingCard, useMotionOff, usePageSwap } from "./motion";
 import "./park.shell.css";
@@ -47,7 +47,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [connectorsOn, setConnectorsOn] = useState<number | null>(null);
   const [ready, setReady] = useState(false);
   const expectsSample = useExpectsSample();
-  const city = useCityMotion(app.motion, app.vw);
+  const appearance = useAppearance();
   const off = useMotionOff();
   const viaNav = useRef(false);
   const navTo = (to: PageId): void => {
@@ -87,17 +87,17 @@ export function AppShell({ children }: { children: ReactNode }) {
   // (the shell stays hidden under the splash until then, so no text swaps face and moves the nav).
   useEffect(() => {
     let live = true;
-    backdropScene(app.time, city.motion);
+    backdropScene(appearance.time, appearance.motion);
     loadShellFonts().then(() => {
       if (live) setReady(true);
     });
     return () => {
       live = false;
     };
-  }, [app.time, city.motion]);
+  }, [appearance.time, appearance.motion]);
   const scene = useMemo(
-    () => (ready ? backdropScene(app.time, city.motion) : null),
-    [ready, app.time, city.motion],
+    () => (ready ? backdropScene(appearance.time, appearance.motion) : null),
+    [ready, appearance.time, appearance.motion],
   );
 
   const page = route?.page ?? null;
@@ -133,14 +133,14 @@ export function AppShell({ children }: { children: ReactNode }) {
         vw={app.vw}
         vh={app.vh}
         veiled={inner}
-        lite={city.lite}
-        hidden={city.hidden}
+        lite={appearance.lite}
+        hidden={appearance.hidden}
         loading={state.wl != null}
       />
       <TopNav
         page={page}
         needsLeft={app.needsLeft}
-        night={app.night}
+        night={appearance.night}
         menu={state.menu}
         unread={!state.read && app.needsLeft > 0}
         initials={user?.initials ?? ""}
@@ -151,7 +151,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         bar={bar}
         onBarFaded={swap.barFaded}
         go={navTo}
-        onToggleTime={() => store.setPref("time", app.night ? "day" : "night")}
+        onToggleTime={appearance.toggleTime}
         onBell={() => store.toggleMenu("notif")}
         onAvatar={() => store.toggleMenu("acct")}
       />
@@ -196,7 +196,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           launch={card}
           dec={state.dec}
           added={state.added}
-          night={app.night}
+          night={appearance.night}
           leaving={state.wl === null}
           onGone={done}
         />
