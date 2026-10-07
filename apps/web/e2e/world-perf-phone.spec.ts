@@ -1,3 +1,4 @@
+import { readFile } from "node:fs/promises";
 import { expect, test } from "@playwright/test";
 import { fixtureUrl, stageCanvas, stageSeq } from "./support/world";
 
@@ -8,7 +9,8 @@ import { fixtureUrl, stageCanvas, stageSeq } from "./support/world";
 // (19 agents emit agent.moved throughout, as in FR-WLD-10).
 //
 // Asserted: over a 5 s window of requestAnimationFrame deltas, taken once the replay is past its setup
-// events and moving, the median fps is >= 30. The p5 fps (the slow tail) is logged, not asserted.
+// events and moving, the mean fps (frames / elapsed) is >= 30. The median of the rAF deltas and the p5 fps (slow tail) are logged only: the stage
+// draws on demand, so quiet frames make the median of deltas flatter the true rate.
 const WINDOW_MS = 5_000;
 const FLOOR_FPS = 30;
 
@@ -22,6 +24,11 @@ test.use({
 test("FR-WLD-13 perf: median fps >= 30 on a 390x844 phone, 4x CPU throttle, 20 agents moving", async ({
   page,
 }) => {
+  // `vite preview` serves only dist/, which has no fixtures (the dev server serves apps/web/fixtures/).
+  await page.route("**/fixtures/crowd-20.*", async (route) => {
+    const name = new URL(route.request().url()).pathname.split("/").pop() ?? "";
+    await route.fulfill({ body: await readFile(`fixtures/${name}`), contentType: "text/plain" });
+  });
   await page.goto(fixtureUrl("crowd-20"));
   await expect(stageCanvas(page)).toBeVisible();
 
@@ -29,29 +36,37 @@ test("FR-WLD-13 perf: median fps >= 30 on a 390x844 phone, 4x CPU throttle, 20 a
   await client.send("Emulation.setCPUThrottlingRate", { rate: 4 });
   await expect.poll(() => stageSeq(page), { timeout: 20_000 }).toBeGreaterThan(25);
 
-  const { medianFps, p5Fps, frames } = await page.evaluate((windowMs) => {
-    return new Promise<{ medianFps: number; p5Fps: number; frames: number }>((resolve) => {
-      const deltas: number[] = [];
-      const start = performance.now();
-      let last = start;
-      function tick(now: number) {
-        deltas.push(now - last);
-        last = now;
-        if (now - start < windowMs) return void requestAnimationFrame(tick);
-        const sorted = [...deltas].sort((a, b) => a - b);
-        const at = (q: number) => sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * q))] ?? 1;
-        // median frame time -> median fps; p5 fps comes from the p95 frame time
-        resolve({ medianFps: 1000 / at(0.5), p5Fps: 1000 / at(0.95), frames: deltas.length });
-      }
-      requestAnimationFrame(tick);
-    });
+  const { meanFps, medianFps, p5Fps, frames } = await page.evaluate((windowMs) => {
+    return new Promise<{ meanFps: number; medianFps: number; p5Fps: number; frames: number }>(
+      (resolve) => {
+        const deltas: number[] = [];
+        const start = performance.now();
+        let last = start;
+        function tick(now: number) {
+          deltas.push(now - last);
+          last = now;
+          if (now - start < windowMs) return void requestAnimationFrame(tick);
+          const sorted = [...deltas].sort((a, b) => a - b);
+          const at = (q: number) =>
+            sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * q))] ?? 1;
+          // median frame time -> median fps; p5 fps comes from the p95 frame time
+          resolve({
+            meanFps: (deltas.length / (now - start)) * 1000,
+            medianFps: 1000 / at(0.5),
+            p5Fps: 1000 / at(0.95),
+            frames: deltas.length,
+          });
+        }
+        requestAnimationFrame(tick);
+      },
+    );
   }, WINDOW_MS);
   await client.detach();
 
   console.log(
-    `FR-WLD-13 perf: median fps=${medianFps.toFixed(1)}, p5 fps=${p5Fps.toFixed(1)}, frames=${frames}`,
+    `FR-WLD-13 perf: mean fps=${meanFps.toFixed(1)}, median fps=${medianFps.toFixed(1)}, p5 fps=${p5Fps.toFixed(1)}, frames=${frames}`,
   );
-  expect(medianFps, `median fps ${medianFps.toFixed(1)} below ${FLOOR_FPS}`).toBeGreaterThanOrEqual(
+  expect(meanFps, `mean fps ${meanFps.toFixed(1)} below ${FLOOR_FPS}`).toBeGreaterThanOrEqual(
     FLOOR_FPS,
   );
 });
