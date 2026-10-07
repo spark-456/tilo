@@ -81,6 +81,21 @@ def _card(tail: str, spaced: str) -> Sample:
     return Sample(f"paid with {shown} today", (shown, digits), digits)
 
 
+def _prefixed(prefix: str, sample: Sample) -> Sample:
+    return Sample(prefix + sample.text, sample.vanish)
+
+
+def _userinfo(scheme: str, tail: str) -> Sample:
+    password = "Zq" + tail[:14]
+    return Sample(f"{scheme}://ann:{password}@db.example.com:5432/app", (password,))
+
+
+def _two_part(template: str, tail: str) -> Sample:
+    """A value in two chunks (`{a}` and `{b}`), no known shape: both must go."""
+    a, b = "Zq" + tail[:14], "Zq" + tail[14:28]
+    return Sample(template.format(a=a, b=b), (a, b))
+
+
 def build(kind: str, tail: str) -> Sample:
     return KINDS[kind](tail)
 
@@ -110,6 +125,35 @@ KINDS = {  # the first ten are one each for scripts/secret_scan.py's ten pattern
     "client_secret_json": lambda t: _labelled('"client_secret": "{v}"', t),
     "refresh_token_colon": lambda t: _labelled("refresh_token: {v}", t),
     "access_token_in_query": lambda t: _labelled("https://example.com/cb?access_token={v}&x=1", t),
+    # added for the security review (BQ-FRMEM05-1): more shapes, keys, headers, escapes and URLs
+    "google_oauth_access_c": lambda t: _token("ya" + "29.c.c0ASRK0Ga", 60, t),
+    "google_auth_code": lambda t: _token("4/" + "0A", 40, t),
+    "firebase_refresh": lambda t: _token("AM" + "f-vB", 60, t),
+    "github_fine_grained": lambda t: _token("github" + "_pat_", 70, t),
+    "slack_bot_token": lambda t: _token("xo" + "xb-", 24, t),
+    "slack_webhook": lambda t: Sample("https://hooks.slack" + ".com/services/T0/B0/" + t[:24], (t[:24],)),
+    "aws_session_key": lambda t: _token("AS" + "IA", 16, t, upper=True),
+    "aws_secret_labelled": lambda t: _labelled("AWS_SECRET_ACCESS_KEY={v}", t),
+    "sk_after_underscore": lambda t: _prefixed("OPENAI_KEY_", _token("s" + "k-", 30, t)),
+    "pgp_private_key": lambda t: _pem(t, "PGP PRIVATE KEY BLOCK", True),
+    "url_userinfo": lambda t: _userinfo("https", t),
+    "url_userinfo_postgres": lambda t: _userinfo("postgres", t),
+    "password_escaped_json": lambda t: _labelled('{{\\"password\\": \\"{v}\\"}}', t),
+    "password_entity_json": lambda t: _labelled("{{&quot;password&quot;: &quot;{v}&quot;}}", t),
+    "password_with_escaped_quote": lambda t: _two_part('{{"password": "{a}\\"{b}"}}', t),
+    "camel_case_key": lambda t: _labelled('{{"accessToken": "{v}"}}', t),
+    "x_api_key_header": lambda t: _labelled("X-Api-Key: {v}", t),
+    "proxy_authorization": lambda t: _two_part("Proxy-Authorization: Basic {a} {b}", t),
+    "authorization_any_scheme": lambda t: _two_part("authorization: Digest {a} {b}", t),
+    "cookie_header": lambda t: _labelled("Cookie: sid={v}; theme=dark", t),
+    "set_cookie_header": lambda t: _labelled("Set-Cookie: sid={v}; Path=/; HttpOnly", t),
+    "form_pass": lambda t: _labelled("user=ann&pass={v}", t),
+    "form_pwd": lambda t: _labelled("user=ann&pwd={v}", t),
+    "rails_form_password": lambda t: _labelled("user%5Bpassword%5D={v}", t),
+    "query_token": lambda t: _labelled("https://example.com/dl?token={v}&x=1", t),
+    "query_secret": lambda t: _labelled("https://example.com/dl?a=1&secret={v}", t),
+    "oauth_callback_code": lambda t: _labelled("https://example.com/cb?code={v}&state=1", t),
+    "signed_url_signature": lambda t: _labelled("https://example.com/o?X-Goog-Algorithm=A&X-Goog-Signature={v}", t),
     "card_plain": lambda t: _card(t, ""),
     "card_spaced": lambda t: _card(t, " "),
     "card_dashed": lambda t: _card(t, "-"),
