@@ -233,3 +233,8 @@ class Ledger:
                 return stored  # the key is taken: that entry stands at any age, no fresh decision is needed (#343)
         entry = entry or self.entry_for(doc)
         return self._outbox.enqueue(entry, evidence or {"instruction_id": doc["instruction_id"], "level": doc["level"]})
+
+
+def enqueue_digest(outbox: Outbox, entry: dict[str, Any], evidence: dict[str, Any]) -> dict[str, Any]:
+    """Enqueues a policy-authorised L3 daily digest entry once its daily key is checked (FR-CHN-18, SEC-03)."""
+    return outbox.enqueue(entry, evidence)
