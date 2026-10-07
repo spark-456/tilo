@@ -190,7 +190,7 @@ export function WorldPage({ app }: { app: AppCtx }) {
         }}
       >
         <div className="park-world-mapcard">
-          <div className="park-world-map">
+          <div className={isCity ? "park-world-map" : "park-world-map park-world-map--art"}>
             <MapArt w={w} plans={loaded.plans} app={app} />
             <div className="park-world-tag">{heroTagOf(w)}</div>
             {isPaused ? (

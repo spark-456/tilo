@@ -211,11 +211,10 @@ for (const [sizeName, viewport] of Object.entries(SIZES)) {
           gap: "6px",
         });
         // the name at the end is --ink, the slash --ink3
-        await expect(crumb(page))
-          .toContainText("Worlds/K1 electric scooter".replace("/", " / "), {
-            ignoreCase: false,
-          })
-          .catch(() => undefined);
+        await expect(crumb(page).locator("span").first()).toHaveText("/");
+        const crumbName = crumb(page).locator(".park-world-crumbname");
+        await expect(crumbName).toHaveText("K1 electric scooter");
+        await expect(crumbName).toHaveCSS("color", await token(page, "--ink"));
 
         // h1: Nunito 900 36px, tracking -0.8, line 37.8
         const t = await facts(h1(page), [
