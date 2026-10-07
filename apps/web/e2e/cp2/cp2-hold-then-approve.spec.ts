@@ -25,7 +25,7 @@ test.describe("@cp2 hold then approve on the real dev API", () => {
     await page.waitForTimeout(2000); // nothing to wait for: the point is that nothing happens
     await expect(sheet).toHaveAttribute("data-gate-state", "waiting");
     await page.getByRole("link", { name: "World", exact: true }).first().click();
-    await expect(page).toHaveURL(new RegExp(`/world/${world}$`));
+    await expect(page).toHaveURL(new RegExp(`/world/${world}/stage$`));
     await expect(page.getByTestId("hud-meter")).toContainText("Working");
     await expect(page.getByTestId("needs-count")).toHaveText("1");
 
