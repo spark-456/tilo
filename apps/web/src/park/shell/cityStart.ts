@@ -7,17 +7,20 @@
 // when it is whole. Every wait goes through the provider's injected scheduler, the shell's only timer (a test
 // fires it by hand). Once the first city is up, a change of theme or motion draws the new scene at once: that is
 // the person's own click, and the cache makes the way back free.
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useSchedule } from "../app/context";
 import type { CityMotion } from "./cityMotion";
 import { type BackdropScene, backdropScene, backdropSceneSteps, isDrawn } from "./scene";
 
 /** How long after the shell is ready the city is requested. */
-export const CITY_DEFER_MS = 1200;
+export const CITY_DEFER_MS = 1500;
 /** The pause between two slices of the build, so input and paint get their turn. */
 export const CITY_SLICE_MS = 8;
 /** How long one slice may run before it pauses. */
 const SLICE_BUDGET_MS = 16;
+/** The person is typing or tapping: the build waits this long after their last key, tap or input. */
+export const CITY_HOLD_MS = 900;
+const PERSON_EVENTS = ["keydown", "pointerdown", "input"] as const;
 
 /** The city for `time|motion`, or null until it is drawn (the poster stands in). */
 export function useCityScene(
@@ -28,6 +31,18 @@ export function useCityScene(
   const schedule = useSchedule();
   const [started, setStarted] = useState(false);
   const [live, setLive] = useState(false);
+  // The person comes first: while they type or tap, the build holds still (decoration waits for them).
+  const holdUntil = useRef(0);
+  useEffect(() => {
+    if (live) return undefined;
+    const hold = (): void => {
+      holdUntil.current = performance.now() + CITY_HOLD_MS;
+    };
+    for (const type of PERSON_EVENTS) document.addEventListener(type, hold, true);
+    return () => {
+      for (const type of PERSON_EVENTS) document.removeEventListener(type, hold, true);
+    };
+  }, [live]);
   useEffect(() => {
     if (!ready || started) return undefined;
     return schedule(() => setStarted(true), CITY_DEFER_MS);
@@ -42,6 +57,10 @@ export function useCityScene(
     let cancel: (() => void) | undefined;
     const slice = (): void => {
       const from = performance.now();
+      if (from < holdUntil.current) {
+        cancel = schedule(slice, holdUntil.current - from);
+        return;
+      }
       for (;;) {
         if (steps.next().done) {
           setLive(true);

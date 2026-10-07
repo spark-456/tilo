@@ -9,7 +9,7 @@ import { cleanup } from "../../../test-support/park/componentsHarness";
 import { sceneSpy } from "../../../test-support/park/shellEngine";
 import { mountShell, seen, settle } from "../../../test-support/park/shellHarness";
 import { AppShell } from "./AppShell";
-import { CITY_DEFER_MS, CITY_SLICE_MS } from "./cityStart";
+import { CITY_DEFER_MS, CITY_HOLD_MS, CITY_SLICE_MS } from "./cityStart";
 
 const STEPS = 30;
 
@@ -87,5 +87,27 @@ describe("NFR_01_LANDING_slices: the city is built a slice at a time", () => {
     expect(pending).toBeDefined();
     m.unmount();
     expect(pending?.cancelled).toBe(true);
+  });
+});
+
+describe("NFR_01_LANDING_slices: the person comes first", () => {
+  it("NFR_01_LANDING_slices_a_key_or_a_tap_holds_the_build_for_CITY_HOLD_MS", async () => {
+    const { m, sch } = mountShell(
+      <AppShell>
+        <input aria-label="x" />
+      </AppShell>,
+    );
+    await settle();
+    act(() => seen.app.setPref("motion", "lively")); // a city nobody has drawn
+    // the person types before the city is due: the first slice is held back, not run
+    act(() => {
+      m.container.querySelector("input")?.dispatchEvent(new Event("keydown", { bubbles: true }));
+    });
+    act(() => sch.fire(sch.live().find((t) => t.ms === CITY_DEFER_MS)));
+    expect(document.querySelector('[data-testid="fake-scene"]')).toBeNull();
+    const held = sch.live().filter((t) => t.ms !== CITY_SLICE_MS && t.ms > CITY_SLICE_MS);
+    expect(held.some((t) => t.ms <= CITY_HOLD_MS)).toBe(true);
+    // nothing but a wait is pending: the build has not advanced
+    expect(sceneSpy.mock.calls.length).toBe(0);
   });
 });
