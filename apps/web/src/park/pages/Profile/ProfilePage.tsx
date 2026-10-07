@@ -11,6 +11,7 @@ import { useParkApi } from "../../app/context";
 import { PageSheet, StatusChip, Switch } from "../../components";
 import "./Profile.css";
 import { ICONS } from "./icons";
+import { signOutOne, signOutOthers } from "./profileSessions";
 
 const TABS = [
   { id: "profile", label: "Profile", icon: ICONS.profile },
@@ -120,6 +121,7 @@ export function ProfilePage({ app }: { app: AppCtx }) {
   const [notif, setNotif] = useState<boolean[][]>([]);
   const [quiet, setQuiet] = useState(false);
   const [sessions, setSessions] = useState<ProfileSession[]>([]);
+  const [confirmOthers, setConfirmOthers] = useState(false);
 
   useEffect(() => {
     let live = true;
@@ -145,6 +147,8 @@ export function ProfilePage({ app }: { app: AppCtx }) {
     };
   }, [api]);
 
+  const currentId = sessions.find((s) => s.current)?.id ?? "";
+  const others = sessions.some((s) => s.id === currentId) ? sessions.length - 1 : 0;
   const wide = app.vw >= 980;
   const user = loaded?.user;
   const flip = (r: number, c: number) => {
@@ -160,7 +164,7 @@ export function ProfilePage({ app }: { app: AppCtx }) {
     setNotif(notif.map((cells, i) => (i === r ? cells.map((v, j) => (j === c ? !v : v)) : cells)));
   };
   const signOut = (s: ProfileSession) => {
-    setSessions(sessions.filter((o) => o !== s));
+    setSessions(signOutOne(sessions, s.id));
     app.toast(`Signed out of ${s.device}`);
   };
   // One head for every state, so the h1 is the same node while the data loads (focus stays on it).
@@ -393,14 +397,45 @@ export function ProfilePage({ app }: { app: AppCtx }) {
                   <button
                     type="button"
                     className="park-profile-link"
-                    onClick={() => {
-                      setSessions(sessions.filter((s) => s.current));
-                      app.toast("Signed out everywhere except this device");
-                    }}
+                    onClick={() => setConfirmOthers(true)}
                   >
                     Sign out everywhere else
                   </button>
                 </div>
+                {confirmOthers && others > 0 ? (
+                  <section
+                    aria-label="Confirm sign out of other sessions"
+                    className="park-profile-session"
+                    onKeyDown={(e) => {
+                      if (e.key === "Escape") setConfirmOthers(false);
+                    }}
+                  >
+                    <div className="park-profile-grow">
+                      <div className="park-profile-stitle">
+                        Sign out {others} other {others === 1 ? "session" : "sessions"}?
+                      </div>
+                      <div className="park-profile-ssub">This device stays signed in.</div>
+                    </div>
+                    <button
+                      type="button"
+                      className="park-profile-signout"
+                      onClick={() => setConfirmOthers(false)}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      className="park-profile-signout"
+                      onClick={() => {
+                        setSessions(signOutOthers(sessions, currentId));
+                        setConfirmOthers(false);
+                        app.toast("Signed out everywhere except this device");
+                      }}
+                    >
+                      Sign out the other sessions
+                    </button>
+                  </section>
+                ) : null}
                 {sessions.map((s) => (
                   <div key={s.id} className="park-profile-session">
                     <Tile tone="sunk">{SESSION_ICONS[s.icon]}</Tile>
@@ -414,6 +449,7 @@ export function ProfilePage({ app }: { app: AppCtx }) {
                       <button
                         type="button"
                         className="park-profile-signout"
+                        aria-label={`Sign out ${s.device}`}
                         onClick={() => signOut(s)}
                       >
                         Sign out

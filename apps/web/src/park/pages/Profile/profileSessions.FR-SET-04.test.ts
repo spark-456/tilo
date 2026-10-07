@@ -51,17 +51,22 @@ describe("FR_SET_04 properties", () => {
   const ids = fc.uniqueArray(fc.string({ minLength: 1, maxLength: 6 }), { maxLength: 8 });
   it("FR_SET_04_property_lists_never_gain_entries_and_current_survives", () => {
     fc.assert(
-      fc.property(ids, fc.string({ maxLength: 6 }), fc.string({ maxLength: 6 }), (list, cur, pick) => {
-        const sessions = list.map((id) => mk(id, id === cur));
-        const one = signOutOne(sessions, pick);
-        const others = signOutOthers(sessions, cur);
-        const all = new Set(list);
-        expect(one.length).toBeLessThanOrEqual(sessions.length);
-        expect(others.length).toBeLessThanOrEqual(sessions.length);
-        for (const s of [...one, ...others]) expect(all.has(s.id)).toBe(true);
-        if (all.has(cur)) expect(others.map((s) => s.id)).toContain(cur);
-        else expect(others).toEqual(sessions);
-      }),
+      fc.property(
+        ids,
+        fc.string({ maxLength: 6 }),
+        fc.string({ maxLength: 6 }),
+        (list, cur, pick) => {
+          const sessions = list.map((id) => mk(id, id === cur));
+          const one = signOutOne(sessions, pick);
+          const others = signOutOthers(sessions, cur);
+          const all = new Set(list);
+          expect(one.length).toBeLessThanOrEqual(sessions.length);
+          expect(others.length).toBeLessThanOrEqual(sessions.length);
+          for (const s of [...one, ...others]) expect(all.has(s.id)).toBe(true);
+          if (all.has(cur)) expect(others.map((s) => s.id)).toContain(cur);
+          else expect(others).toEqual(sessions);
+        },
+      ),
     );
   });
 });

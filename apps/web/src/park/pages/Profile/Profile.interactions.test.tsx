@@ -345,6 +345,8 @@ describe("WEB_12_profile_security: actions and sessions", () => {
     const { root } = await renderProfile(app);
     await openTab(root, "Security");
     await clickAndSettle(buttonNamed(root, SECURITY_COPY.everywhere));
+    // FR-SET-04: the bulk action now asks for an in-page confirmation first.
+    await clickAndSettle(buttonNamed(root, "Sign out the other sessions"));
     expect(app.toast).toHaveBeenCalledTimes(1);
     expect(app.toast).toHaveBeenCalledWith(SECURITY_COPY.everywhereToast);
     expect(strings(root).has(SESSIONS[1][0]) || strings(root).has(SESSIONS[2][0])).toBe(false);

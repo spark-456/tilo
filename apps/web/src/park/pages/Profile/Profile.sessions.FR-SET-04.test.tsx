@@ -59,7 +59,10 @@ describe("FR_SET_04 security sessions", () => {
     await openTab(root, "Security");
     await clickAndSettle(buttonNamed(root, EVERYWHERE));
     await clickAndSettle(
-      buttonNamed(region(root, "Confirm sign out of other sessions"), "Sign out the other sessions"),
+      buttonNamed(
+        region(root, "Confirm sign out of other sessions"),
+        "Sign out the other sessions",
+      ),
     );
     await clickAndSettle(buttonNamed(root, EVERYWHERE));
     expect(root.querySelector('[aria-label="Confirm sign out of other sessions"]')).toBeNull();
