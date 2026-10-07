@@ -15,8 +15,8 @@
 #
 #   infra/envs/dev/main.tf, the api entry:
 #     max_instance_count = 1   # ADR-0026: one instance is the one writer (a lease, an in-process cache)
-#     cpu_idle           = false   # background work (a run's thread, the lease heartbeat) needs CPU between requests
-#     env = { TILO_API_STORE = "firestore", TILO_PEOPLE_STORE = "firestore", TILO_FIRESTORE_PROJECT = var.project_id }
+#     cpu_idle           = !var.api_durable_stores   # background work (a run's thread, the lease heartbeat) needs CPU between requests
+#     env = var.api_durable_stores ? { TILO_API_STORE = "firestore", TILO_PEOPLE_STORE = "firestore", TILO_FIRESTORE_PROJECT = var.project_id } : {}
 #
 # Every other service keeps cpu_idle = true, no env, and its own max_instance_count (harness and channels 3, the rest 2). min_instance_count stays 0 for all
 # (PRD 6.5; cloud_run.tftest.hcl). No secret, no LIVE and no TILO_JUDGE_LIVE: those are the user's, never Terraform's
@@ -50,17 +50,53 @@ run "PROD_WIRE_3_api_is_one_writer_instance" {
   }
 }
 
-run "PROD_WIRE_3_api_has_cpu_between_requests" {
+# Security round 1 (ADR-0023, ADR-0026 Proposed): the durable stores are the user's opt-in. The variable
+# `api_durable_stores` (bool, default false, infra/envs/dev/variables.tf) switches the api's three Firestore variables
+# and its always-on CPU together; max_instance_count = 1 is unconditional.
+
+run "PROD_WIRE_3_default_api_has_no_durable_store_env_and_request_based_cpu" {
   command = plan
 
   assert {
-    condition     = output.cloud_run_services["api"].cpu_idle == false
-    error_message = "tilo-api needs CPU allocated outside requests (cpu_idle = false): a run's thread and the writer lease heartbeat."
+    condition     = length(output.cloud_run_services["api"].env) == 0
+    error_message = "By default (api_durable_stores = false) tilo-api gets no environment variable: the next apply must not switch the Firestore stores on."
+  }
+
+  assert {
+    condition     = output.cloud_run_services["api"].cpu_idle == true
+    error_message = "By default tilo-api keeps request-based CPU billing (PRD 6.6)."
+  }
+
+  assert {
+    condition     = output.cloud_run_services["api"].max_instance_count == 1
+    error_message = "tilo-api runs at most one instance whatever the switch says (ADR-0026)."
   }
 }
 
-run "PROD_WIRE_3_api_opens_the_firestore_doors_and_nothing_else" {
+run "PROD_WIRE_3_opt_in_api_has_cpu_between_requests" {
   command = plan
+
+  variables {
+    api_durable_stores = true
+  }
+
+  assert {
+    condition     = output.cloud_run_services["api"].cpu_idle == false
+    error_message = "With api_durable_stores = true tilo-api needs CPU allocated outside requests (cpu_idle = false): a run's thread and the writer lease heartbeat."
+  }
+
+  assert {
+    condition     = output.cloud_run_services["api"].max_instance_count == 1 && output.cloud_run_services["api"].min_instance_count == 0
+    error_message = "One instance at most (ADR-0026), still scaling to zero (PRD 6.5)."
+  }
+}
+
+run "PROD_WIRE_3_opt_in_api_opens_the_firestore_doors_and_nothing_else" {
+  command = plan
+
+  variables {
+    api_durable_stores = true
+  }
 
   assert {
     condition = output.cloud_run_services["api"].env == tomap({

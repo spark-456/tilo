@@ -94,9 +94,16 @@ def test_PROD_WIRE_3_on_cloud_run_an_emulator_host_is_refused(pw3, k_service):
 
 @pytest.mark.parametrize("k_service", ["tilo-api", ""], ids=["named", "empty-string"])
 def test_PROD_WIRE_3_on_cloud_run_a_live_project_opens_without_an_emulator(pw3, k_service):
+    """Security round 1 (restated): deployed means `K_SERVICE` is non-empty. `K_SERVICE=` on a laptop that holds
+    application default credentials is not Cloud Run, so a live project is refused there."""
     builder = Builder()
     prod = pw3.use(builder)
-    pw3.env(K_SERVICE=k_service)  # presence, not truthiness: an empty value is still Cloud Run
+    pw3.env(K_SERVICE=k_service)
+    if k_service == "":
+        with pytest.raises(prod.FirestoreNotConfigured):
+            prod.firestore_client(PROJECT)
+        assert builder.calls == []
+        return
     client = prod.firestore_client(PROJECT)
     assert client is builder.returned[0] and builder.calls == [PROJECT]
 

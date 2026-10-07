@@ -6,8 +6,10 @@ must never be there):
 
   * `infra/modules/service` takes optional `cpu_idle` (bool, default true) and `env` (map(string), default {}) per
     service and renders them on the container: no literal `cpu_idle = true` any more, an `env` block per entry;
-  * the api entry of `infra/envs/dev/main.tf`: `max_instance_count = 1`, `cpu_idle = false`, and env exactly
-    TILO_API_STORE and TILO_PEOPLE_STORE `"firestore"` plus TILO_FIRESTORE_PROJECT `var.project_id`;
+  * the api entry of `infra/envs/dev/main.tf`: `max_instance_count = 1` always; `cpu_idle = !var.api_durable_stores`
+    and env `var.api_durable_stores ? local.api_durable_stores_env : {}` (security round 1: the durable stores are the
+    user's opt-in, default false), the local being exactly TILO_API_STORE and TILO_PEOPLE_STORE `"firestore"` plus
+    TILO_FIRESTORE_PROJECT `var.project_id`;
   * every other service entry: no `env`, no `cpu_idle = false`;
   * no secret-looking env name or value anywhere in `infra/`, and neither `LIVE` nor `TILO_JUDGE_LIVE` is set on any
     service (live model calls are the user's switch, EFF-01).
@@ -83,20 +85,45 @@ def test_PROD_WIRE_3_the_service_module_renders_them_on_the_container_and_report
     assert re.search(r"\benv\s*=\s*var\.services\[k\]\.env\b", outputs), "and the env (the tftest reads both)"
 
 
-def test_PROD_WIRE_3_the_api_entry_is_one_writer_instance_without_idle_cpu(repo_root: pathlib.Path) -> None:
+def _durable_env(repo_root: pathlib.Path) -> dict[str, str]:
+    """The api's opt-in environment: the local `api_durable_stores_env` map of `infra/envs/dev/main.tf`."""
+    text = (repo_root / "infra/envs/dev/main.tf").read_text(encoding="utf-8")
+    inner = _body(text, re.compile(r"^\s*api_durable_stores_env\s*=\s*\{", re.M))
+    pairs = re.findall(r'^\s*"?([A-Za-z_][A-Za-z0-9_]*)"?\s*=\s*(.+?)\s*(?:#.*)?$', inner, re.M)
+    return {name: value.strip() for name, value in pairs}
+
+
+def test_PROD_WIRE_3_the_api_entry_is_one_writer_instance_with_idle_cpu_off_only_on_opt_in(
+    repo_root: pathlib.Path,
+) -> None:
     api = _services(repo_root)["api"]
-    assert re.search(r"^\s*max_instance_count\s*=\s*1\s*(#.*)?$", api, re.M), "max_instance_count = 1 (ADR-0026)"
-    assert re.search(r"^\s*cpu_idle\s*=\s*false\s*(#.*)?$", api, re.M), "cpu_idle = false"
+    assert re.search(r"^\s*max_instance_count\s*=\s*1\s*(#.*)?$", api, re.M), "max_instance_count = 1, unconditional"
+    assert re.search(r"^\s*cpu_idle\s*=\s*!var\.api_durable_stores\s*(#.*)?$", api, re.M), (
+        "cpu_idle = !var.api_durable_stores (false only when the user opts in)"
+    )
     assert re.search(r"^\s*min_instance_count\s*=\s*0\s*(#.*)?$", api, re.M), "min_instance_count stays 0 (PRD 6.5)"
 
 
-def test_PROD_WIRE_3_the_api_env_is_exactly_the_three_firestore_switches(repo_root: pathlib.Path) -> None:
-    env = _env(_services(repo_root)["api"])
-    assert env == {
+def test_PROD_WIRE_3_the_api_env_is_the_three_firestore_switches_only_on_opt_in(repo_root: pathlib.Path) -> None:
+    api = _services(repo_root)["api"]
+    assert re.search(
+        r"^\s*env\s*=\s*var\.api_durable_stores\s*\?\s*local\.api_durable_stores_env\s*:\s*\{\s*\}\s*(#.*)?$",
+        api,
+        re.M,
+    ), "env is the switches when api_durable_stores is true, else {}"
+    assert _durable_env(repo_root) == {
         "TILO_API_STORE": '"firestore"',
         "TILO_PEOPLE_STORE": '"firestore"',
         "TILO_FIRESTORE_PROJECT": "var.project_id",
-    }, env
+    }
+
+
+def test_PROD_WIRE_3_api_durable_stores_is_a_bool_off_by_default_naming_both_adrs(repo_root: pathlib.Path) -> None:
+    variables = (repo_root / "infra/envs/dev/variables.tf").read_text(encoding="utf-8")
+    body = _body(variables, r'variable\s+"api_durable_stores"\s*\{')
+    assert re.search(r"^\s*type\s*=\s*bool\s*$", body, re.M), "type = bool"
+    assert re.search(r"^\s*default\s*=\s*false\s*$", body, re.M), "default = false: the next apply switches nothing on"
+    assert "ADR-0026" in body and "ADR-0023" in body, "the description points at both ADRs"
 
 
 def test_PROD_WIRE_3_no_other_service_gets_an_env_or_idle_cpu_off(repo_root: pathlib.Path) -> None:
@@ -108,8 +135,9 @@ def test_PROD_WIRE_3_no_other_service_gets_an_env_or_idle_cpu_off(repo_root: pat
 
 
 def test_PROD_WIRE_3_no_secret_looking_environment_variable_in_the_service_entries(repo_root: pathlib.Path) -> None:
-    for name, entry in _services(repo_root).items():
-        for key, value in (_env(entry) or {}).items():
+    for name, entry in [*_services(repo_root).items(), ("api (opt-in)", "")]:
+        env = _durable_env(repo_root) if name == "api (opt-in)" else _env(entry)
+        for key, value in (env or {}).items():
             assert not SECRET_NAME.search(key), f"{name}: {key} looks like a secret name; secrets are not Terraform env"
             assert not SECRET_VALUE.search(value), f"{name}: {key} holds a secret-looking value"
             assert value.startswith(('"', "var.", "local.")), (

@@ -161,10 +161,15 @@ def test_PROD_WIRE_3_SEC_15_a_failing_client_build_is_a_503_that_never_echoes_th
     builder.fail = True
     pw3.use(builder)
     pw3.deployed(PROJECT, api=True)
+    # Security round 1 (restated): a failed build is remembered for the FS-18 window (test_PROD_WIRE_3_security_round1
+    # pins the window itself); the next request after it tries again.
+    now = [1000.0]
+    pw3.monkeypatch.setattr(deps, "people_stores_clock", lambda: now[0], raising=False)
     with pytest.raises(HTTPException) as refused:
         deps.get_access_store()
     assert refused.value.status_code == 503 and "cannot reach" not in str(refused.value.detail)
     builder.fail = False
+    now[0] += deps.PEOPLE_STORES_BACKOFF_S + 1
     assert deps.get_access_store().get(UID) is None  # the next request tries again
 
 

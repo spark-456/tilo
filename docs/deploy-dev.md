@@ -68,7 +68,7 @@ user-approved step, never from this workflow or recipe).
 | Infrastructure (services, IAM, ingress, env, secrets) | Terraform, applied by you (`infra/README.md`) | `infra/` |
 
 Cloud Build and the workflow only swap the image (pinned by digest) and passes `--min-instances 0` and
-`--max-instances 2..3` on an existing service. It never sets ingress, IAM, env vars or secrets;
+`--max-instances` (3 for harness and channels, 2 for the rest, and 1 for `tilo-api`: one instance is the one writer, ADR-0026) on an existing service. It never sets ingress, IAM, env vars or secrets;
 Terraform owns those and ignores image changes (`infra/modules/service`). Env vars are Terraform's for every service
 except `tilo-api`: that one has `ignore_env = true`, so its `TILO_*` runtime settings are set by hand with
 `gcloud run services update` (`docs/routines-rollout.md`) and a Terraform run leaves them alone.
@@ -143,7 +143,7 @@ a flag or a shell command cannot be smuggled in through them.
 `cloudbuild.yaml` (repo root) has three steps: check `_SERVICE` (`all` or one of the seven short names, anything
 else fails with `unknown service`), build each image from `services/<svc>/Dockerfile` with the repo root as
 context and push it to `asia-southeast1-docker.pkg.dev/<project>/tilo/<svc>:<build id>`, then
-`gcloud run services update tilo-<svc> --image <repo>@sha256:<digest> --min-instances 0 --max-instances 2..3`,
+`gcloud run services update tilo-<svc> --image <repo>@sha256:<digest> --min-instances 0 --max-instances <n>` (`tilo-api` is always `--max-instances 1`, ADR-0026; the others 2 or 3),
 after refusing any image reference that is not `asia-southeast1-docker.pkg.dev/<project>/tilo/<svc>@sha256:...`.
 The upload is an allowlist (`.gcloudignore`): only `pyproject.toml`, `uv.lock`, `.dockerignore`, `evals/pyproject.toml`
 and the `packages`, `services`, `config`, `contracts`, `prompts` and `templates` trees leave your machine, and secret
