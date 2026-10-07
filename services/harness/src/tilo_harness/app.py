@@ -15,10 +15,12 @@ import logging
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
+from tilo_logging import configure_logging
 
 from tilo_harness.schedule import TickWiring, tick_caller_ok
 
 log = logging.getLogger(__name__)
+configure_logging()  # NFR-26: a deployed harness logs JSON with no further setup
 
 
 def _refuse(status: int, message: str) -> JSONResponse:

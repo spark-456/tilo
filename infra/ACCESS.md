@@ -44,7 +44,7 @@ Other identities:
 
 | Identity | Grants | Status |
 | --- | --- | --- |
-| `tilo-tasks-invoker` (Cloud Tasks OIDC) | `run.invoker` on harness | present |
+| `tilo-tasks-invoker` (Cloud Tasks OIDC) | `run.invoker` on harness. Also the identity of the scheduled-run hand-off (FR-AGT-14e): the tasks `tilo-api` enqueues for its own tick route carry its token, and that route checks it itself (api is public), so no further IAM | present |
 | `tilo-gmail-push` (Pub/Sub push OIDC) | `run.invoker` on channels; Pub/Sub service agent holds `serviceAccountTokenCreator` on it | added |
 | `tilo-gmail-scheduler` (Scheduler OIDC) | `run.invoker` on harness only | added |
 | `tilo-schedule-scheduler` (Scheduler OIDC, FR-AGT-14) | none: no `run.invoker` and no project role. It calls public `tilo-api`, whose tick route verifies the token itself (the first design held `run.invoker` on harness; the tick moved to api with the run, ADR-0023) | added |
@@ -74,8 +74,8 @@ output; the grants by `cloudbuild_grants`.
 | Subscription `tilo-gmail-push` | Push to `tilo-channels` `POST /internal/gmail/push`, OIDC as `tilo-gmail-push`, audience = channels URL, no inactivity expiry | added |
 | Scheduler `tilo-gmail-renew` (daily 03:00 UTC) | `POST /internal/gmail/renew` on **harness** (re-watch through connectors) | added |
 | Scheduler `tilo-gmail-poll` (every 5 min) | `POST /internal/gmail/poll` on **harness** (polling fallback) | added |
-| Cloud Tasks queue `runs` | api to harness | present |
-| Scheduler `tilo-schedule-tick` (every minute, `* * * * *` UTC, `retry_count` 1) | `POST /internal/schedules/tick` on **api**, OIDC as `tilo-schedule-scheduler`, audience = api URL, no body, no query. ONE job for every user schedule (not one per user): the tick reads the due schedules from the store and fires each exactly once per slot (FR-AGT-14) | added |
+| Cloud Tasks queue `runs` | api to harness; api to api for scheduled runs (FR-AGT-14e: one task per due slot, delivered to the tick route as `tilo-tasks-invoker`) | present |
+| Scheduler `tilo-schedule-tick` (every minute, `* * * * *` UTC, `retry_count` 1) | `POST /internal/schedules/tick` on **api**, OIDC as `tilo-schedule-scheduler`, audience = api URL, no body, no query. ONE job for every user schedule (not one per user): the tick reads the due schedules from the store and hands each to Cloud Tasks exactly once per slot; the run itself executes in the task's own request (FR-AGT-14, FR-AGT-14e) | added |
 | Scheduler `tilo-eval-nightly` (daily 19:00 UTC) | OAuth `POST` to the Cloud Run Admin API `.../jobs/tilo-eval-nightly:run`: the replay smoke `python -m tilo_evals nightly` (parallelism 1, one task, 1 retry, 3600 s). Image from `evals/cloudbuild.yaml` (`just build-evals-image`) | added (EFF-05b) |
 | Scheduler job for the sweeper | PRD 6.3 | deferred: no sweeper endpoint exists; add with that ticket |
 
@@ -94,13 +94,16 @@ Dependencies (none of these routes exist yet):
   internal-only service. Channels never reaches connectors.
 
 - `tilo-api`: `POST /internal/schedules/tick` (FR-AGT-14b, `tilo_api.schedules`; the
-  run lives in tilo-api). It accepts `tilo-schedule-scheduler` only; see the route
-  requirements below. It answers 503 until the user sets
-  `TILO_SCHEDULE_TICK_AUDIENCE` (copy the `audience` field of `terraform output
-  schedule_tick`), `TILO_SCHEDULE_TICK_CALLER`, `TILO_SCHEDULES_STORE=firestore` and
-  `TILO_FIRESTORE_PROJECT` on tilo-api AND production wires the api store and run
-  seams (they answer 503 when deployed today); the job fires into that 503 until
-  then. The earlier harness route stays unused (to be removed in a later ticket).
+  run lives in tilo-api). It accepts two callers, `tilo-schedule-scheduler` (FR-AGT-14b)
+  and `tilo-tasks-invoker` (FR-AGT-14e); see the route requirements below. It answers
+  503 until the user sets `TILO_SCHEDULE_TICK_AUDIENCE` (copy the `audience` field of
+  `terraform output schedule_tick`), `TILO_SCHEDULE_TICK_CALLER`, `TILO_TASKS_CALLER`
+  (`tilo-tasks-invoker@<project>.iam.gserviceaccount.com`), `TILO_RUNS_QUEUE`
+  (`projects/<project>/locations/asia-southeast1/queues/runs`),
+  `TILO_SCHEDULES_STORE=firestore` and `TILO_FIRESTORE_PROJECT` on tilo-api AND
+  production wires the api store and run seams (they answer 503 when deployed today);
+  the job fires into that 503 until then. The earlier harness route stays unused (to
+  be removed in a later ticket).
 
 ## 4. Storage ownership (PRD 13.2, FR-INT-02)
 
@@ -256,17 +259,27 @@ Hard requirements from the security review for the routes the infra points at:
   stored watches only (`MailWatcher.renew_due` / `poll_due`).
 - Schedule tick (`POST /internal/schedules/tick` on **tilo-api**, built): api is public (`allUsers`), so
   neither ingress nor IAM protects the route and it checks its caller itself; it verifies the
-  token (`aud` = its own URL, `email` = `tilo-schedule-scheduler@<project>`
-  exactly, `email_verified` true) and answers 401 with no token, 403 for any
-  other caller (`tilo-gmail-scheduler`, `tilo-tasks-invoker`, `tilo-api` and the
-  same name in another project included), 503 when nothing is wired, 200
-  `{"fired": n}` otherwise. It reads no body and no query: nothing a caller
-  sends selects a schedule or sets the time. Why the gmail and tasks identities
-  must be refused: any Google service account can mint a token with the api
-  audience, so only the one named account passes (the issuer, audience, exact
-  email and `email_verified` are all checked; a malformed token is refused before
-  any call to Google's cert endpoint). A run it starts still goes through the
-  outbox and the policy engine; every T3 step waits for a person.
+  token (`aud` = its own URL, `email` exactly, `email_verified` true; a malformed token is
+  refused before any call to Google's cert endpoint) and answers 401 with no token, 403 for
+  any other caller (`tilo-gmail-scheduler`, `tilo-api` and the same names in another
+  project included), 503 when nothing is wired. It has TWO callers and the identity picks
+  the mode (FR-AGT-14e, BQ-AGT14-5): (1) `tilo-schedule-scheduler@<project>` (the exact
+  `TILO_SCHEDULE_TICK_CALLER`) with NO body fans out: it claims each due slot and hands it
+  to Cloud Tasks (`TILO_RUNS_QUEUE`), starts nothing, and answers 200 `{"fired": n}`;
+  (2) `tilo-tasks-invoker@<project>` (the exact `TILO_TASKS_CALLER`) with the task's JSON
+  body runs ONE run inside that request, so CPU is allocated while it works, and answers
+  200 `{"ran": 1, "state": "done" | "parked" | "timeout"}` or a 2xx `{"ran": 0, "skipped": code}`
+  for a refusal. The Scheduler never gets the Tasks mode and Cloud Tasks never gets the
+  Scheduler's: the Scheduler with a body, the Tasks identity without one, and one account
+  configured for both are refused with no side effect. The task body is untrusted (closed,
+  strict; the owner, brief and cap come from the stored schedule only). Why only these two:
+  any Google service account can mint a token with the api audience, so only the two named
+  accounts pass. A run it starts still goes through the outbox and the policy engine; every
+  T3 step waits for a person. No Terraform change: `tilo-api` (like `tilo-harness`) already holds
+  `cloudtasks.enqueuer` and `serviceAccountUser` on `tilo-tasks-invoker`, so either can mint a
+  task token for this route (an accepted trust set, BQ-AGT14-5 h), and api needs no
+  `run.invoker` for a task to reach it. The api service's request timeout must cover the
+  in-request wait (1500 s): see `infra/README.md`.
 - `tilo-channels` is `allUsers`, so the `tilo-gmail-push` `run.invoker` binding
   gives no protection: `/internal/gmail/push` is reachable from the internet and
   no channels route under `/internal/` may rely on ingress or IAM.
