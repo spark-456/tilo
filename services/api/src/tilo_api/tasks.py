@@ -88,13 +88,17 @@ def _base(task: deps.TaskRecord, actor: str) -> dict[str, Any]:
 
 def _append(writer: deps.EventWriter, task: deps.TaskRecord, events: list[dict[str, Any]]) -> None:
     """Commits each event through the single writer, oldest first, and moves the helpers' `seq` hint past what the
-    writer committed. A writer that cannot answer is 503 `store_unavailable`; a conflict is the writer's, not ours."""
+    writer committed. A writer that cannot answer is 503 `store_unavailable`; a refusal is 409 with a fixed detail,
+    never the validator's text (it names world, run and event ids)."""
     last = task.next_seq - 1
     try:
         for event in events:
             last = max(last, writer.append(task.world_id, event)["seq"])
-    except (deps.EventRejected, HTTPException):
+    except HTTPException:
         raise
+    except deps.EventRejected as exc:
+        logger.warning("event refused for world %s (%s)", task.world_id, type(exc).__name__)
+        raise HTTPException(status_code=409, detail="the event was refused") from None
     except Exception as exc:
         logger.warning("event writer failed for world %s (%s)", task.world_id, type(exc).__name__)
         raise HTTPException(status_code=503, detail="store_unavailable") from exc

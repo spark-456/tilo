@@ -33,6 +33,7 @@ PREPLAN_LAYOUT: dict[str, Any] = {
     "semantic": {"levels": [], "islands": [], "gates": [], "agents": [{"id": "A_director", "rank": "director"}]}
 }
 _WRITER_ID = "tilo-api"
+_REOPEN_LOCK_WAIT_S = 1.0
 
 
 class WorldWriterAdapter:
@@ -48,7 +49,7 @@ class WorldWriterAdapter:
         self._store, self._backend, self._org_id, self._clock, self._lease_s = store, backend, org_id, clock, lease_s
         # world -> ((run_id, layout) it was opened for, its writer)
         self._open: dict[str, tuple[tuple[str, dict[str, Any] | None], WorldWriter]] = {}
-        self._locks: dict[str, threading.RLock] = {}
+        self._locks: dict[str, threading.RLock] = {}  # one per world ever seen; pruned with the cache in slice 1b
         self._guard = threading.Lock()
 
     def _lock(self, world_id: str) -> threading.RLock:
@@ -108,15 +109,15 @@ class WorldWriterAdapter:
             raise deps.EventRejected(str(exc)) from exc
 
     def append(self, world_id: str, part: dict[str, Any]) -> dict[str, Any]:
-        record = self._store.worlds.get(world_id)
-        if record is None:
-            raise deps.EventRejected(f"unknown world {world_id!r}")
         if not isinstance(part.get("id"), str) or part.get("vis") is None:
             raise deps.EventRejected("an event needs its own `id` and says who may see it (`vis`)")
         with self._lock(world_id):
+            record = self._store.worlds.get(world_id)  # read under the world's lock
+            if record is None:
+                raise deps.EventRejected(f"unknown world {world_id!r}")
             try:
                 committed = self._emit(world_id, record, part)
-            except WriterBusy:  # an own lease lapsed while idle, or the head moved: reopen once, resend
+            except WriterBusy:  # an own lease lapsed while idle, or the head moved: reopen this world once, resend
                 self._close(world_id)
                 committed = self._emit(world_id, record, part)
             events = self._store.events.setdefault(world_id, [])
@@ -125,9 +126,19 @@ class WorldWriterAdapter:
             return copy.deepcopy(committed)
 
     def reopen(self) -> None:
-        """Closes every open writer, releasing its lease; each reopens on its next append."""
+        """Closes every open writer, releasing its lease; each reopens on its next append. A world whose lock another
+        thread holds for more than `_REOPEN_LOCK_WAIT_S` is skipped, never waited for: its append is in flight."""
         with self._guard:
             worlds = list(self._open)
+        skipped = 0
         for world_id in worlds:
-            with self._lock(world_id):
+            lock = self._lock(world_id)
+            if not lock.acquire(timeout=_REOPEN_LOCK_WAIT_S):
+                skipped += 1
+                continue
+            try:
                 self._close(world_id)
+            finally:
+                lock.release()
+        if skipped:
+            logger.warning("reopen skipped %d world(s) whose writer was busy", skipped)

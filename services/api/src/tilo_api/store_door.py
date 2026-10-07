@@ -53,8 +53,20 @@ def open_api_store(
     project = values.get(ENV_PROJECT, "")
     if values.get(ENV_STORE) != "firestore" or not GCP_PROJECT.fullmatch(project):
         raise ApiStoreNotConfigured(f"set {ENV_STORE}=firestore and {ENV_PROJECT} to a project id")
-    if not values.get("K_SERVICE") and not (values.get("FIRESTORE_EMULATOR_HOST") and project.startswith("demo-")):
+    emulator = values.get("FIRESTORE_EMULATOR_HOST", "")
+    if values.get("K_SERVICE"):
+        if emulator or os.environ.get("FIRESTORE_EMULATOR_HOST"):  # a deployed process never talks to an emulator host
+            raise ApiStoreNotConfigured("FIRESTORE_EMULATOR_HOST is set on Cloud Run")
+    elif not (emulator and project.startswith("demo-")):
         raise ApiStoreNotConfigured("outside Cloud Run only the emulator and a demo- project open")
+    if "GOOGLE_CLOUD_PROJECT" in values and values["GOOGLE_CLOUD_PROJECT"] != project:
+        raise ApiStoreNotConfigured(f"{ENV_PROJECT} must equal GOOGLE_CLOUD_PROJECT")  # the project is pinned
+    if (
+        env is not None
+        and firestore_client_factory is None
+        and os.environ.get("FIRESTORE_EMULATOR_HOST", "") != emulator
+    ):
+        raise ApiStoreNotConfigured("the client reads os.environ, which names another emulator host than env")
     try:
         if firestore_client_factory is not None:
             client = firestore_client_factory(project)

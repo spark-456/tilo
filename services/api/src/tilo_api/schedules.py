@@ -461,6 +461,10 @@ class ScheduleStarter:
         try:
             for part in (requested, outcome.granted_event):  # through the single writer (ADR-0026 decision 4)
                 self._seams.writer.append(world_id, part)
+        except deps.EventRejected as exc:  # a fixed code, never the validator's text
+            store.worlds.pop(world_id, None)
+            logger.warning("scheduled start refused by the event writer (%s)", type(exc).__name__)
+            raise StartSkipped("event_refused") from None
         except BaseException:
             store.worlds.pop(world_id, None)
             raise

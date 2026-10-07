@@ -161,8 +161,9 @@ class EventWriter(Protocol):
     """The single writer of events (PRD 15.3). Every event tilo-api hands here carries its own
     stable `id` (a ULID), built once when the part is enqueued and resent unchanged on every
     retry -- the sole idempotency key `append` dedupes on (issue #46 / EV-10), never raw content
-    and never which writer object happens to receive the call. `seq`, `ts`, `run_id` and `trace`
-    remain writer-only.
+    and never which writer object happens to receive the call. The writer stamps `seq`, `ts`, `world_id`,
+    `run_id` and `v`; a part's `trace` is kept only after the event validator accepts it, and a part without
+    one gets a null trace.
 
     A writer that wraps the harness `WorldWriter` should also expose an optional `reopen()`: the
     dispatcher calls it after a failed append, before the same event is resent, so a stale lease
