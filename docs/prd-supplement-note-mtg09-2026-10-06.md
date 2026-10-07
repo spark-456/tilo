@@ -27,8 +27,8 @@ ADR-0024 (Accepted, 6 Oct 2026), `services/connectors/tests/API_FR_MTG_09.md`,
 - **Plan rows (addendum 8):** PPL-60b (guest-join experiment) is replaced by MTG09-a (CL-REACH: connector,
   adapter, token grant groups, config, fake, live smoke script; security review), MTG09-b (CL-PEOPLE, CL-INT:
   `POST /v1/meetings/{id}/host`, fixed one-gate plan, S-26 button), MTG09-c (MEET: host join, never click
-  Admit; gated: not built until the user has decided the bot account separation, ADR-0024 amendment 3(a), and the
-  persistent profile only on the user's explicit yes) and the user's live run with the report. PPL-60c (later) hands the link to the bot in memory.
+  Admit; unblocked on the ADR-0024 amendment 3 preconditions: on 7 Oct 2026 the user accepted the bot account's
+  project-Owner exposure as time-limited and the persistent profile as temporary) and the user's live run with the report. PPL-60c (later) hands the link to the bot in memory.
 - **CC-PEOPLE-2** config list: `meeting_host` in `config/connectors.yaml`, `create_meeting_event: T3` in
   `config/autonomy.yaml`, `meeting_host.max_duration_min: 60` in `config/personal.yaml` (MTG09-a adds them;
   B-007 regen by the orchestrator or the user).
@@ -36,6 +36,6 @@ ADR-0024 (Accepted, 6 Oct 2026), `services/connectors/tests/API_FR_MTG_09.md`,
 ## Still needs the user
 
 1. Confirm ADR-0024 (it widens ADR-0017), or choose the Owner's own calendar as organizer (BQ-MTG09-2).
-2. The bot Google account: preferably a new one with no project role (tiloagent@gmail.com is today the project Owner login, ADR-0024 amendment 3(a)); 2-step verification was declined by the user; never a password to Tilo or an agent. The persistent browser profile (amendment 3) needs the user's explicit yes.
+2. The bot Google account: decided on 7 Oct 2026, the user accepts tiloagent@gmail.com (today the project Owner login, ADR-0024 amendment 3(a)) for now and the persistent browser profile as a temporary measure; later a new account with no project role replaces it before any wider use. 2-step verification was declined by the user; never a password to Tilo or an agent. Still the user's: confirm device encryption or BitLocker is on, and sign the profile in once by hand.
 3. Consent screen: the scope above and the bot account as a test user.
 4. The first live run (`LIVE=1` is the user's): the smoke script, then a test meeting with test accounts only.
