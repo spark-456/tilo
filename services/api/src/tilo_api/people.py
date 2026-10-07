@@ -27,18 +27,25 @@ from tilo_api.people_writes import (
     MeetingIn,
     PersonIn,
     Refusal,
+    RoleIn,
+    TeamIn,
     Writer,
+    add_team,
     confirm_item,
     confirm_minutes,
+    create_first_person,
     create_item,
     create_meeting,
     create_person,
     json_body,
     remove_meeting,
+    remove_team,
+    set_role,
 )
 
 _MEETING_ID = re.compile(r"mt_[0-9A-Za-z_]{1,48}")
 _ITEM_ID = re.compile(r"wi_[0-9A-Za-z_]{1,48}")
+_PERSON_ID = re.compile(r"u_[0-9A-Za-z_]{1,48}")
 _IDS = r"^u[0-9]{4,6}(,u[0-9]{4,6}){0,19}$"  # 1 to 20 utterance ids, comma separated
 
 
@@ -73,6 +80,12 @@ router = APIRouter(route_class=_PeopleRoute)
 
 def _not_found() -> HTTPException:
     return HTTPException(status_code=404, detail="not_found")  # one body whatever the cause: no oracle
+
+
+def _person_id(person_id: str) -> str:
+    if _PERSON_ID.fullmatch(person_id) is None:
+        raise _not_found()
+    return person_id
 
 
 def _unreadable() -> HTTPException:
@@ -214,6 +227,54 @@ def create_person_route(
 ) -> dict[str, Any]:
     """An org owner adds a person; the server mints the id and the org is `deps.ORG_ID` (PE-17)."""
     return _answer(lambda: create_person(_writer(principal, stores, clock, redact), body))
+
+
+@router.post("/v1/people/first", status_code=201)
+def create_first_person_route(
+    body: Annotated[PersonIn, Depends(json_body(PersonIn))],
+    principal: Annotated[deps.Principal, Depends(deps.get_current_principal)],
+    stores: Annotated[PeopleStores, Depends(deps.get_people_stores)],
+    redact: Annotated[Callable[[str], str], Depends(deps.get_redactor)],
+    clock: Annotated[Callable[[], str], Depends(deps.get_clock)],
+) -> dict[str, Any]:
+    """The signed-in principal founds an empty org as its owner (PE-17); 403 once the org has a person."""
+    return _answer(lambda: create_first_person(_writer(principal, stores, clock, redact), body))
+
+
+@router.post("/v1/people/{person_id}/memberships")
+def add_team_route(
+    person_id: str,
+    body: Annotated[TeamIn, Depends(json_body(TeamIn))],
+    principal: Annotated[deps.Principal, Depends(deps.get_current_principal)],
+    stores: Annotated[PeopleStores, Depends(deps.get_people_stores)],
+    clock: Annotated[Callable[[], str], Depends(deps.get_clock)],
+) -> dict[str, Any]:
+    """An org owner puts a person in a team; the stamp is the owner and the clock (PE-17)."""
+    return _answer(lambda: add_team(_writer(principal, stores, clock), _person_id(person_id), body.team))
+
+
+@router.post("/v1/people/{person_id}/memberships/remove")
+def remove_team_route(
+    person_id: str,
+    body: Annotated[TeamIn, Depends(json_body(TeamIn))],
+    principal: Annotated[deps.Principal, Depends(deps.get_current_principal)],
+    stores: Annotated[PeopleStores, Depends(deps.get_people_stores)],
+    clock: Annotated[Callable[[], str], Depends(deps.get_clock)],
+) -> dict[str, Any]:
+    """An org owner takes a person out of a team; an absent team is a 200 with nothing changed."""
+    return _answer(lambda: remove_team(_writer(principal, stores, clock), _person_id(person_id), body.team))
+
+
+@router.post("/v1/people/{person_id}/role")
+def set_role_route(
+    person_id: str,
+    body: Annotated[RoleIn, Depends(json_body(RoleIn))],
+    principal: Annotated[deps.Principal, Depends(deps.get_current_principal)],
+    stores: Annotated[PeopleStores, Depends(deps.get_people_stores)],
+    clock: Annotated[Callable[[], str], Depends(deps.get_clock)],
+) -> dict[str, Any]:
+    """An org owner promotes a member; roles are only ever promoted (409 `transition` otherwise)."""
+    return _answer(lambda: set_role(_writer(principal, stores, clock), _person_id(person_id), body.org_role))
 
 
 @router.post("/v1/work-items", status_code=201)
