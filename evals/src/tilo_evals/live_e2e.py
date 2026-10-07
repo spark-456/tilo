@@ -67,11 +67,15 @@ FAKED = (  # what a run never does for real, printed with every report (HR-1: sa
     "Verifier verdict: recorded in the unit's summary, not acted on",
     "must-ask judgement: a fixed 'nothing to ask' stand-in, no model call; the deterministic rules still ask",
 )
+REAL_FAKED = (
+    "recipient and destination: the dev stand-in; connectors are real and read-only, nothing is written or sent"
+)
 PLANNING_NOTE = "planning credits come from this meter: the planning events carry 0 (#327)"
 SCOPE_NOTE = "claim scope: structural pass rate (GEN-11), not output quality"
 
 _REPO = Path(__file__).resolve().parents[3]
 _OWNER = "u_live_e2e"
+_GOOGLE_IDS = ("gmail", "google_drive", "google_calendar")
 _UNIT_TIMEOUT_S = {"live": 600.0, "replay": 120.0}
 _OUT = {
     "writer": 1024,
@@ -156,6 +160,7 @@ class LiveE2EReport:
     story_note: str | None = None  # why the Narrator left no Story, as a code only
     quoted_calls: int = 0  # calls charged at the pre-call quote because they returned no usage
     faked: tuple[str, ...] = FAKED
+    real_connectors: tuple[str, ...] = ()  # ids of the real read-only connectors the run used (CL-LIVE-1)
     work: list[tuple[str, str]] = field(default_factory=list)  # (unit title, text) of every unit that ran
 
     @property
@@ -179,6 +184,40 @@ def default_recordings_dir(case_id: str) -> Path:
 
 
 # --- the gate (EFF-01) ---------------------------------------------------------------------------------------------
+
+
+def real_faked(faked: tuple[str, ...]) -> tuple[str, ...]:
+    """`faked` for a run on real read-only connectors: the connectors are no longer recording mocks."""
+    return tuple(REAL_FAKED if item.startswith("connectors and recipient") else item for item in faked)
+
+
+def print_real_plan() -> None:
+    """`--dry-run --real-connectors`: what a live run would ask Google for. Builds no client, broker or listener."""
+    from tilo_connectors.real import real_connector_plan  # noqa: PLC0415
+    from tilo_connectors.registry import load_registry  # noqa: PLC0415
+
+    print("real-connectors: read_only (dry run: nothing built, nothing sent)")
+    for row in real_connector_plan(load_registry(_REPO / "config" / "connectors.yaml")):
+        print(f"real-connector {row['connector']}: scopes={','.join(row['scopes'])} mode=read_only")
+
+
+def _real_adapters(factory: Callable[[], dict[str, Any]] | None) -> dict[str, Any]:
+    """The real connectors, built once the gate has passed and before any model call. Fail closed: a refusal or any
+    other failure stops the run (its words are never printed) and never falls back to the recording mocks."""
+    from tilo_connectors.real import RealConnectorsRefused  # noqa: PLC0415
+
+    if factory is None:  # the default (live transport and consent flow) is CL-LIVE-3's
+        raise LiveE2ERefused(
+            "real_connectors_no_token", "no Google connection is available to this run; nothing was sent"
+        )
+    try:
+        return factory()
+    except RealConnectorsRefused as refusal:
+        raise LiveE2ERefused(f"real_connectors_{refusal.code}", str(refusal)) from None
+    except Exception:  # noqa: BLE001 - fixed text only: the error may hold a token
+        raise LiveE2ERefused(
+            "real_connectors_failed", "the real connectors could not be built; nothing was sent"
+        ) from None
 
 
 def _gate(mode: str, env: Mapping[str, str], max_credits: float | None) -> None:
@@ -647,7 +686,9 @@ class _ClearModel:
         return GenerateResponse(text='{"ask": false}', profile_id="live-e2e-clear")
 
 
-def _app(router: _MeteredRouter, safety: SafetyProvider, runner: _UnitRunner) -> FastAPI:
+def _app(
+    router: _MeteredRouter, safety: SafetyProvider, runner: _UnitRunner, connectors: dict[str, Any] | None = None
+) -> FastAPI:
     from tilo_api import deps, dev_run, runs  # noqa: PLC0415
     from tilo_api.cards import build_router  # noqa: PLC0415
     from tilo_api.dispatch import router as dispatch_router  # noqa: PLC0415
@@ -663,7 +704,8 @@ def _app(router: _MeteredRouter, safety: SafetyProvider, runner: _UnitRunner) ->
     for api_router in (intake_router, dispatch_router, redaction_router, tasks_router, runs.router):
         app.include_router(api_router)
     app.include_router(build_router(runs.get_card_store, answer_guard=runs.answer_guard))
-    adapters, writer = dev_run.mock_adapters(), _Writer(store)  # recording mocks: no real mailbox, chat or Drive
+    adapters = dev_run.mock_adapters() if connectors is None else connectors  # mocks: no real mailbox, chat or Drive
+    writer = _Writer(store)
 
     def compiler() -> Any:
         def compile_and_capture(*, brief: dict, approach: dict, budget_cap: float, context: Any) -> dict:
@@ -823,6 +865,7 @@ def _mark_recordings(recordings: Path, *, synthetic: bool) -> None:
 def _execute(
     case: BankCase, router: _MeteredRouter, meter: _Meter, screen: SafetyProvider, env: Mapping[str, str],
     *, live: bool, cap: float, narrate: bool = True, person: Any = None, runner: _UnitRunner | None = None,
+    connectors: dict[str, Any] | None = None,
 ) -> tuple[Observation, str, str | None, list[StoryLine], str | None]:  # fmt: skip
     """One case through the real pipeline on `router`: (observation, outcome class, reason, Story, why no Story).
     The generator calls it once per brief on its own router, so the whole run shares one meter and one cap."""
@@ -830,7 +873,7 @@ def _execute(
     obs = Observation(case=dataclasses.replace(case, approve=approve))
     story: list[StoryLine] = []
     note: str | None = None
-    app = _app(router, screen, runner or _UnitRunner(router, meter))
+    app = _app(router, screen, runner or _UnitRunner(router, meter), connectors)
     with _quiet():
         try:
             drive(obs.case, obs, _UNIT_TIMEOUT_S["live" if live else "replay"], app, person)
@@ -858,14 +901,21 @@ def run_live_e2e(
     fake_record: bool = False,  # only `record_with_fake` sets this; the command line has no way to
     adhoc: BankCase | None = None,  # `just live-run`: an in-memory case for a typed topic, not a bank case
     person: Any = None,  # `just live-run`: a person answers in place of the case script (`live_topic.TerminalPerson`)
+    real_connectors: bool = False,  # CL-LIVE-1: real read-only Google connectors in place of the recording mocks
+    real_connectors_factory: Callable[[], dict[str, Any]] | None = None,  # the only way the run gets them
 ) -> LiveE2EReport:
     env: Mapping[str, str] = {} if fake_record else os.environ if environ is None else environ
     if fake_record and (live_provider_factory is None or mode != "live"):
         raise LiveE2ERefused("not_a_fake_provider", "the fake record path takes only an injected fake provider")
     _gate("dry-run" if fake_record else mode, env, max_credits)  # the fake path has no live decision to gate
+    if real_connectors and mode == "replay":
+        raise LiveE2ERefused("real_connectors_not_live", "--real-connectors needs a live run, not a replay")
+    if real_connectors and fake_record:
+        raise LiveE2ERefused("real_connectors_fake_providers", "--real-connectors never goes with a fake provider")
     config = _load_config(models_path, prices_path, env)
     case = adhoc or _load_case(case_id, bank_dir)
     live = mode == "live"
+    connectors = _real_adapters(real_connectors_factory) if real_connectors and live else None
     factory = (live_provider_factory or _vertex(config)) if live else None
     refused: list[LiveE2ERefused] = []
     if fake_record and factory is not None:
@@ -886,6 +936,9 @@ def run_live_e2e(
     screen = safety or TrustedBankInputScreen(case)
     report = LiveE2EReport(case.id, mode, max_credits, estimate, expected=case.expect.get("outcome"))
     report.safety = SAFETY_NOTE if isinstance(screen, TrustedBankInputScreen) else f"injected ({type(screen).__name__})"
+    if connectors is not None:
+        ids = tuple(i for i in connectors if i in _GOOGLE_IDS)
+        report.side_effects, report.real_connectors, report.faked = "real_read_only", ids, real_faked(FAKED)
     if mode == "dry-run":
         return report
     meter = _Meter(config, max_credits)
@@ -896,7 +949,16 @@ def run_live_e2e(
     router = _MeteredRouter(config, meter, providers)
     runner = _UnitRunner(router, meter)
     obs, report.outcome_class, report.reason, report.story_lines, report.story_note = _execute(
-        case, router, meter, screen, env, live=live, cap=max_credits, person=person, runner=runner
+        case,
+        router,
+        meter,
+        screen,
+        env,
+        live=live,
+        cap=max_credits,
+        person=person,
+        runner=runner,
+        connectors=connectors,
     )
     report.work = runner.work()
     if report.reason:  # a last line of defence: nothing printed names the project, an ADC path or a token
@@ -949,6 +1011,7 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--max-credits", type=float, default=DEFAULT_MAX_CREDITS, help=f"cap, at most {HARD_MAX_CREDITS:g}"
     )
+    parser.add_argument("--real-connectors", action="store_true", help="real read-only Gmail, Drive and Calendar")
     kind = parser.add_mutually_exclusive_group()
     kind.add_argument("--replay", action="store_true", help="serve the recordings; never goes live, free")
     kind.add_argument("--dry-run", action="store_true", help="print the estimate and stop; no call")
@@ -969,6 +1032,8 @@ def _print_report(report: LiveE2EReport) -> None:
     print(f"safety: {report.safety}")
     for item in report.faked:
         print(f"faked: {item}")
+    if report.real_connectors:
+        print(f"connectors: real_read_only ({', '.join(report.real_connectors)})")
     if report.recordings == "synthetic":
         print("recordings: SYNTHETIC fixture written by a fake provider; this replay is not a real model run")
     elif report.recordings:
@@ -1008,6 +1073,7 @@ def main(
     environ: Mapping[str, str] | None = None,
     live_provider_factory: Callable[[str, str], ModelProvider] | None = None,
     safety: SafetyProvider | None = None,
+    real_connectors_factory: Callable[[], dict[str, Any]] | None = None,
 ) -> int:
     args = _parser().parse_args(argv)
     mode: Literal["live", "replay", "dry-run"] = "replay" if args.replay else "dry-run" if args.dry_run else "live"
@@ -1016,11 +1082,14 @@ def main(
             args.case, mode=mode, max_credits=args.max_credits, environ=environ, bank_dir=args.bank_dir,
             models_path=args.models_file, prices_path=args.prices_file, recordings_dir=args.recordings_dir,
             live_provider_factory=live_provider_factory, safety=safety, announce=announce,
+            real_connectors=args.real_connectors, real_connectors_factory=real_connectors_factory,
         )  # fmt: skip
     except LiveE2ERefused as refusal:
         print(f"REFUSED {refusal.code}: {refusal}", file=sys.stderr)
         return 2
     if mode == "dry-run":
+        if args.real_connectors:
+            print_real_plan()
         return 0
     _print_report(report)
     if args.report_json:
