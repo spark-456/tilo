@@ -180,6 +180,26 @@ _NUMBER_ONLY = re.compile(
 )
 _NUMBER_START = re.compile(_alternation(w for w in _NUMBER_WORDS if len(w) >= 4))
 _MAGNITUDE_INSIDE = re.compile(_alternation("hundred thousand million billion trillion lakh crore".split()))
+# CHN-GATE-F (BQ-274, inbound only): the same word edges for a number word glued to a unit in free text ("Tenrm",
+# "Fiftydollars", "Onemil", "Tenkk"). Base: the counting words that `_NUMBER_WORD` does not match whole (so "Milan",
+# "Craig", "Miles", "milk" stay words); tail: a magnitude suffix (k, m, b, l, repeated, or ks), an abbreviation or
+# magnitude `_NUMBER_WORD` knows, or any word `_MONEY` matches, both taken from those patterns. Between the counting
+# words and the unit come zero or more of those abbreviations ("Fivelacrupees", "Tenmildollars"). The middle group is
+# disjoint from the counting group (a group of all `_NUMBER_WORDS` is quadratic). A bare number word ("Fifty-fifty",
+# "ones", "Tenant") is no amount. A magnitude inside any word counts ("Halfmillion"). Linear: one `\b` start per word,
+# and a backtrack step costs a constant.
+_ABBREVIATIONS = [w for w in _NUMBER_WORDS if _NUMBER_WORD.fullmatch(w)]
+_GLUED = re.compile(
+    r"\b"
+    + _alternation(w for w in _NUMBER_WORDS if w not in _ABBREVIATIONS)
+    + "+"
+    + _alternation(_ABBREVIATIONS)
+    + "*(?:ks|[kmbl]+|"
+    + _NUMBER_WORD.pattern.replace(r"\b", "")
+    + "|"
+    + _MONEY.pattern.replace(r"\b", "")
+    + r")\b"
+)
 _NAME_WORD_MAX = 24  # a longer word is no name: the check stays bounded (a 20k-character word is read no further)
 _WORDS = frozenset(
     (
@@ -370,10 +390,15 @@ def _match_phrase(
     return False
 
 
+def _number_word(folded: str) -> bool:
+    """BQ-274, CHN-GATE-F: a number word as a whole word, glued to a unit (`_GLUED`), or a magnitude inside any word."""
+    return bool(_NUMBER_WORD.search(folded) or _GLUED.search(folded) or _MAGNITUDE_INSIDE.search(folded))
+
+
 def _word_hits(words: list[str]) -> frozenset[str]:
     text = "\x01".join(words)  # not whitespace: a family phrase ("we will") cannot match across two joins
     hits = {name for name, pattern in _FAMILIES if pattern.search(text)}
-    return frozenset(hits | {"money"} if _NUMBER_WORD.search(text) else hits)
+    return frozenset(hits | {"money"} if _number_word(text) else hits)
 
 
 def _join_hits(prepared: str) -> frozenset[str]:
@@ -431,8 +456,8 @@ def _amount(folded: str) -> bool:
     """BQ-274: a decimal part or thousands separator, 3+ digits in a row (a recent 4-digit year aside), "%" or a number
     word."""
     if not _DIGIT_OR_PERCENT.search(folded):  # every other shape needs a digit or "%"
-        return bool(_NUMBER_WORD.search(folded))
-    return bool(_AMOUNT.search(folded) or _NUMBER_WORD.search(folded) or _DIGITS.search(_YEAR.sub(" ", folded)))
+        return _number_word(folded)
+    return bool(_AMOUNT.search(folded) or _number_word(folded) or _DIGITS.search(_YEAR.sub(" ", folded)))
 
 
 def _signal(text: str, *, inbound: bool) -> frozenset[str]:
@@ -470,11 +495,7 @@ def _signal(text: str, *, inbound: bool) -> frozenset[str]:
         spread = _SPREAD.sub(_join, folded)
         leet = folded.translate(_LEET)  # translated: "@" is an "a" before it can be dropped
         forms = _forms(folded) + (_forms(leet) if leet != folded else [])
-        if (
-            _amount(folded)
-            or (spread != folded and _amount(spread))
-            or any(_NUMBER_WORD.search(f) for f in {*forms[1:3]})
-        ):
+        if _amount(folded) or (spread != folded and _amount(spread)) or any(_number_word(f) for f in {*forms[1:3]}):
             signal.add("money")
         runs = " ".join(_join(m) for t in forms[::3] for m in _SPREAD.finditer(t))
         texts = list(dict.fromkeys([*forms, *(f.translate(_LEET) for f in forms[:3])]))
