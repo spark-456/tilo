@@ -612,7 +612,7 @@ test("WEB-MOTION-2 e2e: two tab clicks in a row end on the second page, with the
   await page.waitForTimeout(80);
   await clickTab(page, "Agenda", false);
   await page.waitForTimeout(2_600);
-  await expect(page).toHaveURL(/\/park\/agenda$/);
+  await expect(page).toHaveURL(/\/agenda$/);
   await expect(page.getByRole("heading", { level: 1, name: "Agenda" })).toBeVisible();
   await expect(page.getByRole("heading", { level: 1, name: "Ledger" })).toHaveCount(0);
   const { samples } = await readProbe(page);
@@ -920,7 +920,7 @@ for (const [size, viewport] of SIZES) {
       const shiftBefore = await cls(page);
       await startProbe(page);
       await openFromBell(page, /Laptop Depot needs budget sign-off/);
-      await expect(page).toHaveURL(/\/park\/world\/k1$/, { timeout: 6_000 });
+      await expect(page).toHaveURL(/\/world\/k1$/, { timeout: 6_000 });
       await page.waitForTimeout(1_800);
       const data = await readProbe(page);
       expectLoader(data, { stepMs: 340, reduced: false, size });
@@ -941,7 +941,7 @@ for (const [size, viewport] of SIZES) {
       const page = await settled(browser, baseURL, "home", { viewport });
       await startProbe(page);
       await openFromBell(page, /Competitor pricing is ready/);
-      await expect(page).toHaveURL(/\/park\/world\/comp$/, { timeout: 6_000 });
+      await expect(page).toHaveURL(/\/world\/comp$/, { timeout: 6_000 });
       await page.waitForTimeout(1_800);
       expectLoader(await readProbe(page), { stepMs: 250, reduced: false, size });
       await page.context().close();
@@ -958,7 +958,7 @@ test("FR_UX_12 WEB-MOTION-2 e2e: with prefers-reduced-motion opening a world sti
   const problems = collectConsoleProblems(page);
   await startProbe(page);
   await openFromBell(page, /Competitor pricing is ready/);
-  await expect(page).toHaveURL(/\/park\/world\/comp$/, { timeout: 6_000 });
+  await expect(page).toHaveURL(/\/world\/comp$/, { timeout: 6_000 });
   await page.waitForTimeout(1_500);
   expectLoader(await readProbe(page), { stepMs: 250, reduced: true, size: "reduced" });
   expect(problems).toEqual([]);
