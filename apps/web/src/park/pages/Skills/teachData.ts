@@ -260,11 +260,13 @@ export function formatTryRunResult(
   };
 }
 
+import { SKILL_TRUST_CONFIG } from "./skillConfig";
+
 export const SAVE = {
   nameLabel: "Skill name",
   who: "Who can use it",
   when: "When it runs",
-  note: "I’ll ask before adding rows until we’ve had 5 good runs together, then you can mark it trusted.",
+  note: `I’ll ask before adding rows until we’ve had ${SKILL_TRUST_CONFIG.minGoodRunsForTrust} good runs together, then you can mark it trusted.`,
 } as const;
 
 export type Scope = "me" | "team";
