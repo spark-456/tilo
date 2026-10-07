@@ -114,7 +114,7 @@ for (const [name, viewport] of Object.entries(SIZES)) {
 
     test(`WEB_3a_e2e_${name}_a_world_route_shows_its_id`, async ({ page }) => {
       await page.goto("/park/world/k1");
-      await expect(page.getByTestId("park-page-world")).toContainText("k1");
+      await expect(page.getByTestId("park-page-world")).toHaveAttribute("data-world-id", "k1");
     });
 
     test(`WEB_3a_e2e_${name}_/park_is_home_and_unknown_params_are_ignored`, async ({ page }) => {

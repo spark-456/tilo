@@ -69,13 +69,14 @@ def _rows(repo_root: pathlib.Path) -> list[str]:
     return [line for line in text.splitlines() if line.startswith("|")]
 
 
-def test_FR_AGT_14e_one_bq_row_logs_the_decisions_and_it_is_the_last_row(repo_root: pathlib.Path) -> None:
+def test_FR_AGT_14e_one_bq_row_logs_the_decisions_exactly_once(repo_root: pathlib.Path) -> None:
+    """Where the row sits is not pinned (changed deliberately after #554: open-questions.md merges with
+    `merge=union` and later tickets append their own rows, so a last-row pin made every PR conflict)."""
     rows = _rows(repo_root)
     fourth = [line for line in rows if line.startswith("| BQ-AGT14-4 |")]
     fifth = [line for line in rows if line.startswith("| BQ-AGT14-5 |")]
     assert len(fifth) == 1, "log the 14e decisions as ONE row, BQ-AGT14-5"
     assert len(fourth) == 1, "BQ-AGT14-4 (14d) stays ONE row"
-    assert rows[-1] == fifth[0], "append it at the end of docs/open-questions.md"
     assert rows.index(fourth[0]) < rows.index(fifth[0])
 
 

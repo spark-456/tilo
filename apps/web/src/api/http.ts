@@ -61,7 +61,7 @@ const ANSWER_REASONS = new Map([
 
 /** The server's sentence only when it is a short plain string (`detail`, or the intake limits'
  * `error`); lists, codes, markup and anything long fall back to a sentence of ours. */
-function reasonOf(status: number, text: string): string {
+export function reasonOf(status: number, text: string): string {
   let said: unknown;
   try {
     const body: unknown = JSON.parse(text);
@@ -209,6 +209,16 @@ export class HttpClient implements TiloClient {
     } catch {
       throw new TiloApiError(BAD_REPLY, res.status, true, write);
     }
+  }
+
+  /** A plain GET of `path`, decoded as JSON, with the same typed failures as every other call (WIRE-1). */
+  getJson(path: string): Promise<unknown> {
+    return this.request<unknown>(path);
+  }
+
+  /** A plain POST of `body` as JSON, decoded as JSON, with the same typed failures and `write` true (WIRE-3). No credentials. */
+  postJson(path: string, body: unknown): Promise<unknown> {
+    return this.post<unknown>(path, body);
   }
 
   private post<T>(path: string, body: unknown): Promise<T> {

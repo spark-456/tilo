@@ -22,7 +22,14 @@ from typing import Any
 
 from tilo_contracts import ProvidersProfile
 
-from tilo_providers.errors import ProviderError, SafetyError, map_http_status, map_transport_error
+from tilo_providers.errors import (
+    OutputTruncatedError,
+    ProviderError,
+    SafetyError,
+    map_http_status,
+    map_transport_error,
+    truncated_message,
+)
 from tilo_providers.interfaces import (
     Capability,
     GenerateRequest,
@@ -196,13 +203,25 @@ class GoogleModelProvider(ModelProvider):
             # success instead of a safety block.
             raise SafetyError(f"blocked by safety filter: finish_reason={finish_reason!r}")
 
+        usage_metadata = getattr(response, "usage_metadata", None)
+        if str(getattr(finish_reason, "value", finish_reason)) == "MAX_TOKENS":
+            # The reply hit its output cap (thinking tokens count against it): empty or cut off, never a reply.
+            # Vertex leaves a visible-output count out when it is 0 (so 0 with usage present, None with no usage); a
+            # missing thinking count stays None: the model did not report one.
+            output = thoughts = None
+            if usage_metadata is not None:
+                output = getattr(usage_metadata, "candidates_token_count", None) or 0
+                thoughts = getattr(usage_metadata, "thoughts_token_count", None)
+            raise OutputTruncatedError(
+                truncated_message(output, thoughts), output_tokens=output, thinking_tokens=thoughts
+            )
+
         tool_calls: list[dict[str, Any]] | None = None
         function_calls = getattr(response, "function_calls", None)
         if function_calls:
             tool_calls = [{"name": call.name, "args": call.args} for call in function_calls]
 
         usage: dict[str, int] | None = None
-        usage_metadata = getattr(response, "usage_metadata", None)
         if usage_metadata is not None:
             # Thinking tokens are billed as output, so metering counts them there (FR-MTR-01).
             # Vertex leaves a count None when thinking used the whole output cap: that is zero, never a crash.

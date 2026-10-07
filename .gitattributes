@@ -26,6 +26,10 @@
 *.mp4 binary
 *.webm binary
 
+# Every ticket appends rows to the same table: a local merge keeps both sides' new rows instead of conflicting.
+# (GitHub's merge button ignores merge drivers; merge the base in locally when a PR shows a conflict here.)
+docs/open-questions.md merge=union
+
 # Generated contract types: collapse in diffs, still tracked (CI fails on drift).
 packages/contracts-py/src/** linguist-generated=true
 packages/contracts-ts/src/** linguist-generated=true

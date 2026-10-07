@@ -3,8 +3,10 @@
 `LiveHttpClient` and `LiveTransport` are the only code that reaches Google: refused unless LIVE is exactly "1", https
 to a fixed list of Google hosts, no redirects, always a timeout, no retries (the adapters retry). `CallbackServer`
 is the one-shot loopback listener; `run_smoke` is the flow: consent URL, callback, code exchange, up to 5 messages,
-and with an address one draft through the outbox. Tokens stay in memory under a FakeKms; nothing sends mail or
-lets a token, code, header or secret reach an exception, a repr or the output. API: tests/API_FR_CON_04_live_smoke.md.
+and with an address one draft through the outbox. `run_host_smoke` (FR-MTG-09) signs in as the meeting bot and
+creates one Meet event with one invitation through the outbox. Tokens stay in memory under a FakeKms; nothing sends
+mail (the host check sends the one invitation) or lets a token, code, header or secret reach an exception, a repr or
+the output. API: tests/API_FR_CON_04_live_smoke.md.
 """
 
 from __future__ import annotations
@@ -33,9 +35,19 @@ from pathlib import Path
 from typing import Any, TextIO
 from urllib.parse import parse_qs, urlencode, urlsplit
 
-from ._time import format_ts
+from ._time import add_seconds, format_ts
 from .adapters import GmailAdapter, TransportError
+from .adapters.meeting_host import MeetingHostAdapter
 from .consent import ConsentRefused, ConsentService
+from .errors import MeetingHostRefused
+from .meeting_host import CONNECTOR_ID as MEETING_HOST
+from .meeting_host import (
+    InMemoryReceiptStore,
+    MeetingEventDraft,
+    draft_meeting_event,
+    host_gate,
+    load_meeting_host_config,
+)
 from .outbox import Outbox
 from .registry import load_registry
 from .store import InMemoryOutboxStore
@@ -526,3 +538,151 @@ def _draft(
         raise SmokeError("the draft was not created: Google did not accept it")
     _say(out, f"One draft was saved in Gmail Drafts for {address}. Nothing was sent.")
     return {"outbox_id": entry["id"], "state": "sent"}
+
+
+class _HostDraft:
+    """The one draft artifact of the host smoke run, as the adapter's ArtifactSource."""
+
+    def __init__(self, content: bytes) -> None:
+        self._content = content
+
+    def get(self, artifact_id: str, version: int) -> Mapping[str, Any]:
+        return dict(jsonlib.loads(self._content))
+
+
+def _host_case(invite: str, start_in_min: int, now: str) -> tuple[MeetingEventDraft, dict, dict]:
+    """The draft, outbox entry and evidence of one smoke meeting: the person who ran the command is the owner, the
+    only attendee and the authority (as `_draft_case`); the invitation goes to `invite` alone."""
+    owner, org = "u_live_smoke", "org_live_smoke"
+    start = add_seconds(now, start_in_min * 60)
+    meeting = {
+        "id": "mt_live_smoke", "org_id": org, "owner": owner, "title": "Tilo meeting host smoke check",
+        "series": None, "scheduled": {"start": start, "end": add_seconds(start, 30 * 60)},
+        "agenda": [{"title": "Smoke check", "minutes": 15}], "attendees": [{"name": "Smoke check", "user": owner}],
+        "attestation": {"by": owner, "at": now, "notice_version": "1.0.0"}, "source": "bot", "status": "scheduled",
+        "ended_reason": None, "minutes_confirmed_by": None, "transcript": None, "minutes": None,
+        "delete_transcript_after": None, "delete_minutes_after": None, "created_at": now,
+    }  # fmt: skip
+    person = {
+        "id": owner, "org_id": org, "display_name": "Smoke check", "aliases": [], "email": invite,
+        "time_zone": "UTC", "preferred_channel": "email", "org_role": "owner", "memberships": [],
+        "created_by": {"by": owner, "at": now},
+    }  # fmt: skip
+    registry = load_registry(_CONFIG)
+    draft = draft_meeting_event(
+        meeting=meeting, persons={owner: person}, actor=owner, now=now,
+        config=load_meeting_host_config(registry=registry),
+    )  # fmt: skip
+    stored = {
+        "artifact": {"artifact_id": "art_live_smoke_host", "version": 1}, "media_type": "application/json",
+        "content_sha256": draft.content_sha256, "origin": {"kind": "unit"}, "screening": "clean",
+    }  # fmt: skip
+    gate = host_gate(draft, stored, registry.get(MEETING_HOST))
+    outbox_id, card_id = _ulid(time.time()), _ulid(time.time())
+    authz = {"by": "person", "ref": owner, "at": now}
+    entry = {
+        "id": outbox_id, "idempotency_key": f"{_RUN}:host:{outbox_id}", "world_id": _WORLD, "run_id": _RUN,
+        "action_type": gate["action_type"], "connector": gate["connector"], "recipients": gate["recipients"],
+        "attachments": gate["attachments"], "item": gate["item"], "destination": gate["destination"],
+        "modifiers": gate["modifiers"], "risk_tier": gate["risk_tier"], "authz": authz,
+        "undo_window_s": gate["undo_window_s"], "scheduled_at": now, "state": "queued", "created_at": now,
+    }  # fmt: skip
+    ids = {"gate_id": "G1", "card_id": card_id, "outbox_id": outbox_id}
+    requested = {"type": "approval.requested", "authz": None, "data": {
+        **ids, "action_type": gate["action_type"], "risk_tier": gate["risk_tier"], "irreversible": True,
+        "item": gate["item"], "approver": None, "team_lead": None}}  # fmt: skip
+    resolved = {"type": "approval.resolved", "authz": authz, "data": {
+        **ids, "option": "approve", "channel": "web", "pin_verified": False}}  # fmt: skip
+    evidence = {"reserved_by": requested, "authorised_by": resolved, "policy": None, "team_lead": None,
+                "world_owner": owner, "instruction": None, "earlier_applied": None}  # fmt: skip
+    return draft, entry, evidence
+
+
+def run_host_smoke(
+    *,
+    invite: str,
+    start_in_min: int = 30,
+    environ: Mapping[str, str] | None = None,
+    out: TextIO | None = None,
+    on_consent_url: Callable[[str], None] | None = None,
+    callback_timeout_s: float = 300.0,
+    allowed_hosts: Collection[str] = ALLOWED_HOSTS,
+    timeout_s: float = DEFAULT_TIMEOUT_S,
+    endpoint_overrides: Mapping[str, str] | None = None,
+    allow_loopback_http: bool = False,
+    sleep: Callable[[float], None] = time.sleep,
+) -> dict[str, str]:
+    """FR-MTG-09 first live step (the user only): sign in as the meeting bot, create one event with a Meet link on
+    its calendar through the outbox, invite `invite` and print the conference status and the event id. The link is
+    never requested, stored or printed. The command line is the approval: the person running it is the authority."""
+    env = os.environ if environ is None else environ
+    _require_live(env)  # first: before anything is validated, printed, bound or sent
+    out = sys.stdout if out is None else out
+    settings, port = _check_options(env, None, callback_timeout_s)
+    if not (isinstance(invite, str) and _ADDRESS.fullmatch(invite)):
+        raise SmokeError("--invite needs exactly one plain e-mail address")
+    if isinstance(start_in_min, bool) or not isinstance(start_in_min, int) or not 1 <= start_in_min <= 1440:
+        raise SmokeError("--start-in-min must be a whole number of minutes from 1 to 1440")
+    net: dict[str, Any] = {"allowed_hosts": allowed_hosts, "timeout_s": timeout_s}
+    net |= {"endpoint_overrides": endpoint_overrides, "allow_loopback_http": allow_loopback_http}
+    clock = lambda: format_ts(datetime.now(UTC))  # noqa: E731
+    try:
+        http_client, transport = LiveHttpClient(env, **net), LiveTransport(env, **net)
+        decl = load_registry(_CONFIG).get(MEETING_HOST)
+        draft, entry, evidence = _host_case(invite, start_in_min, clock())
+    except (ValueError, MeetingHostRefused) as error:
+        raise SmokeError(f"the options cannot be used: {error}") from None
+    owner = draft.owner
+    events: list[dict] = []
+    broker = TokenBroker(
+        store=InMemoryTokenStore(), kms=FakeKms(), http=http_client, settings=settings, clock=clock, emit=events.append
+    )
+    consent = ConsentService(
+        connectors={MEETING_HOST: decl}, broker=broker, http=http_client, settings=settings, clock=clock,
+        emit=events.append,
+    )  # fmt: skip
+    card_id = _ulid(time.time())
+    url = consent.authorization_url(user_id=owner, connector=MEETING_HOST, capabilities=["send"], card_id=card_id)
+    state = parse_qs(urlsplit(str(url)).query)["state"][0]
+    try:
+        server = CallbackServer(expected_state=state, port=port, timeout_s=callback_timeout_s)
+    except OSError:
+        raise SmokeError(f"cannot listen on 127.0.0.1:{port} (is another program using it?)") from None
+    try:  # the listener exists before the URL is shown, so a fast redirect cannot be missed
+        if _ipv6_taken(server.port):
+            raise SmokeError(f"another program listens on [::1]:{server.port}; stop it or pick another port")
+        _say(out, f"Open this address in your browser and sign in to Google AS THE MEETING BOT:\n{url}")
+        _say(out, f"Waiting up to {callback_timeout_s:g} s for the redirect on 127.0.0.1:{server.port} ...")
+        if on_consent_url is not None:
+            on_consent_url(str(url))
+        reply = server.wait()
+    finally:
+        server.close()
+    if reply.code is None:
+        raise SmokeError(f"the sign-in was not completed ({reply.error})")
+    try:
+        consent.handle_callback(user_id=owner, state=state, code=reply.code)
+    except Exception as error:  # noqa: BLE001 - ConsentRefused texts are fixed; anything else is not echoed
+        raise SmokeError(str(error) if isinstance(error, ConsentRefused) else "the sign-in failed") from None
+
+    receipts = InMemoryReceiptStore()
+    adapter = MeetingHostAdapter(
+        declaration=decl, broker=broker, transport=transport, artifacts=_HostDraft(draft.content),
+        owner_of=lambda world: owner, receipts=receipts, clock=clock, emit=events.append, sleep=sleep,
+    )  # fmt: skip
+    outbox = Outbox(InMemoryOutboxStore(), {MEETING_HOST: adapter}, emit=events.append, clock=clock, world_id=_WORLD)
+    _say(out, f"Creating one meeting in {start_in_min} min with a Meet link, and one invitation to your address.")
+    try:
+        outbox.enqueue(entry, evidence)
+        settled = outbox.dispatch_due()  # once: a 400 is final, a retryable failure is not retried here
+    except Exception as error:  # noqa: BLE001
+        raise SmokeError(f"the meeting was not created ({type(error).__name__})") from None
+    if not any(e["id"] == entry["id"] and e["state"] == "sent" for e in settled) or not receipts.receipts:
+        with contextlib.suppress(Exception):
+            outbox.abandon(entry["id"])
+        raise SmokeError("the meeting was not created: Google did not accept it")
+    receipt = receipts.receipts[0]
+    _say(out, f"Created. Conference status: {receipt.conference}. Event id: {receipt.event_ref}.")
+    _say(out, "Check the invitation in the test inbox. The Meet link is in it; this check never reads or shows it.")
+    _say(out, "Delete the event on the bot's calendar and remove the grant at myaccount.google.com/permissions.")
+    return {"event_id": receipt.event_ref, "conference": receipt.conference}
