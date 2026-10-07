@@ -124,10 +124,10 @@ def test_FR_AGT_14_an_adr_names_the_explicit_switch_that_opens_the_live_store(re
     assert "TILO_FIRESTORE_PROJECT" in text and "emulator" in text.lower() and "demo-" in text
 
 
-def test_FR_AGT_14_one_bq_row_logs_the_decisions_and_it_is_the_last_row(repo_root: pathlib.Path) -> None:
-    """14b logged ONE row, BQ-AGT14-3; 14d appended ONE more, BQ-AGT14-4; 14e appends ONE more, BQ-AGT14-5, which is now
-    the last row (deliberately changed from "BQ-AGT14-4 is last"): each is present exactly once, in this order, and the
-    newest ends the file."""
+def test_FR_AGT_14_one_bq_row_logs_the_decisions_exactly_once(repo_root: pathlib.Path) -> None:
+    """14b logged ONE row, BQ-AGT14-3, and 14d ONE more, BQ-AGT14-4: each is present exactly once and says which
+    ticket's decisions it holds. Where they sit is not pinned: later tickets append their own rows at the end (the
+    file merges with `merge=union`, see .gitattributes); pinning BQ-AGT14-4 as the last row made every PR conflict."""
     rows = [
         line
         for line in (repo_root / "docs" / "open-questions.md").read_text(encoding="utf-8").splitlines()
@@ -135,9 +135,10 @@ def test_FR_AGT_14_one_bq_row_logs_the_decisions_and_it_is_the_last_row(repo_roo
     ]
     third = [line for line in rows if line.startswith("| BQ-AGT14-3 |")]
     assert len(third) == 1, "the 14b decisions stay ONE row, BQ-AGT14-3"
+    assert "FR-AGT-14b" in third[0], "BQ-AGT14-3 holds the FR-AGT-14b decisions"
     fourth = [line for line in rows if line.startswith("| BQ-AGT14-4 |")]
-    assert len(fourth) == 1, "the 14d decisions stay ONE row, BQ-AGT14-4"
+    assert len(fourth) == 1, "log the 14d decisions as ONE row, BQ-AGT14-4"
+    assert "FR-AGT-14d" in fourth[0], "BQ-AGT14-4 holds the FR-AGT-14d decisions"
     fifth = [line for line in rows if line.startswith("| BQ-AGT14-5 |")]
-    assert len(fifth) == 1, "log the 14e decisions as ONE row, BQ-AGT14-5"
-    assert rows[-1] == fifth[0], "append it at the end of docs/open-questions.md"
-    assert rows.index(third[0]) < rows.index(fourth[0]) < rows.index(fifth[0])
+    assert len(fifth) == 1, "the 14e decisions are ONE row, BQ-AGT14-5"
+    assert "FR-AGT-14e" in fifth[0], "BQ-AGT14-5 holds the FR-AGT-14e decisions"

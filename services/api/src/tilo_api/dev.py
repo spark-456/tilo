@@ -168,8 +168,10 @@ def install(app: FastAPI, env: Mapping[str, str] | None = None) -> None:
     def principal(request: Request) -> deps.Principal:
         refuse_if_unsafe()
         # The one owner is a member of whichever of its own worlds the path names; an unknown world is
-        # the same 404 as ever, because the route looks the world up in the store.
-        return deps.Principal(user_id=DEV_OWNER, role="owner", world_id=request.path_params.get("world_id"))
+        # the same 404 as ever, because the route looks the world up in the store. The dev owner is the person at the
+        # keyboard: a full web sign-in session (BQ-XWORLD-10).
+        world_id = request.path_params.get("world_id")
+        return deps.Principal(user_id=DEV_OWNER, role="owner", world_id=world_id, full_session=True)
 
     def get_store() -> deps.Store:
         refuse_if_unsafe()
@@ -189,7 +191,8 @@ def install(app: FastAPI, env: Mapping[str, str] | None = None) -> None:
         CORSMiddleware,
         allow_origins=origins,
         allow_methods=["GET", "POST", "OPTIONS"],
-        allow_headers=["Content-Type"],
+        allow_headers=["Content-Type", "Idempotency-Key"],
+        expose_headers=["Retry-After"],
     )  # no credentials: the dev principal reads no cookie or header
     app.add_middleware(_LocalHostOnly)  # added last, so it runs first
 

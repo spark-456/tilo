@@ -71,3 +71,19 @@
     - {id: read_events, capability: read, description: "Read the events on your own calendar to show them in Tilo.", risk_tier: T1, gate_type: none, irreversible: false}
   limits: {per_minute: 60, batch_size: 2500}
   data_class: {returns: [personal, business], redact: []}
+
+# meeting_host (FR-MTG-09, ADR-0024): the meeting bot's OWN Google account creates a Calendar event with a Meet link
+# and Google invites the attendees the Owner approved. The one write scope sits on that account, which holds no
+# personal data; every person's own google_calendar grant stays read-only. Always T3 (the Owner is invited, so
+# new_recipients applies). The Meet link is never stored; the request asks Google for none.
+- id: meeting_host
+  name: Tilo meeting host
+  icon: calendar
+  auth: oauth2
+  scopes:
+    send: ["https://www.googleapis.com/auth/calendar.events.owned"]
+  capabilities: [send]
+  actions:
+    - {id: create_meeting_event, capability: send, description: "On the meeting bot's own Google account (sign in as the bot, not as yourself): create a meeting with a Meet link and invite the people you approve.", risk_tier: T3, gate_type: approval, irreversible: true}
+  limits: {per_minute: 30, batch_size: 50}
+  data_class: {returns: [business], redact: []}

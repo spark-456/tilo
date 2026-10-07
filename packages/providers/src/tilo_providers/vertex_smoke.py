@@ -106,6 +106,8 @@ def classify(error: BaseException) -> str:
     text = " ".join(str(link) for link in _chain(error)).lower()
     if "ReplayMissError" in names:
         return "replay_miss"
+    if "OutputTruncatedError" in names:  # by class, before any text check: the reply is never read
+        return "truncated"
     if 400 in statuses:  # before the text checks: a 400's own words ("is disabled", "not_found") never decide its code
         return "rejected"
     if "DefaultCredentialsError" in names or "default credentials" in text or 401 in statuses:

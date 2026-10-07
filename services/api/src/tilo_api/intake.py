@@ -59,7 +59,7 @@ async def intake(
     store: Annotated[InMemoryArtifactStore, Depends(get_store)],
     tasks: Annotated[deps.Store, Depends(deps.get_store)],
     model_router: Annotated[Router, Depends(deps.get_router)],
-    flags: Annotated[FlagStore, Depends(deps.get_flag_store)],
+    flags: Annotated[FlagStore, Depends(deps.get_switches)],
     text: Annotated[str, Form()] = "",
     scenario: Annotated[str | None, Form()] = None,
     files: Annotated[list[UploadFile], File()] = [],  # noqa: B006 (FastAPI copies defaults)
