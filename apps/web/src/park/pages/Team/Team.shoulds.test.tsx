@@ -5,8 +5,17 @@ import { resolve } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { cleanup, makeApp, renderTeam } from "../../../../test-support/park/teamHarness";
 import { team } from "../../api/fixtures";
+import type { World } from "../../api/types";
 import { isValidEmail, reassignWorlds } from "./teamModel";
-import { buttonNamed, clickAndSettle, inputNamed, ownText, region, strings, typeInto } from "./testApp";
+import {
+  buttonNamed,
+  clickAndSettle,
+  inputNamed,
+  ownText,
+  region,
+  strings,
+  typeInto,
+} from "./testApp";
 
 afterEach(cleanup);
 const text = (el: Element | null | undefined): string => (el?.textContent ?? "").trim();
@@ -54,10 +63,10 @@ describe("FR-TEAM-01 invites", () => {
       { id: "1", owner: "Priya Shah" },
       { id: "2", owner: "Jin Park" },
       { id: "3", owner: "Priya Shah" },
-    ] as never[];
-    const out = reassignWorlds(ws, "Priya Shah", "Alex Morgan") as { id: string; owner: string }[];
+    ] as unknown as World[];
+    const out = reassignWorlds(ws, "Priya Shah", "Alex Morgan");
     expect(out.map((w) => w.owner)).toEqual(["Alex Morgan", "Jin Park", "Alex Morgan"]);
-    expect((ws[0] as { owner: string }).owner).toBe("Priya Shah");
+    expect(ws[0]?.owner).toBe("Priya Shah");
   });
 
   it("FR-TEAM-01 removing a person on the page gives their worlds to the Owner", async () => {
@@ -81,7 +90,9 @@ describe("FR-TEAM-03 who signs off", () => {
       expect(s.has(c.what), c.what).toBe(true);
       expect(s.has(c.wait), c.wait).toBe(true);
     }
-    expect(card.querySelectorAll('select[aria-label^="Add a backup for"]').length).toBeGreaterThan(0);
+    expect(card.querySelectorAll('select[aria-label^="Add a backup for"]').length).toBeGreaterThan(
+      0,
+    );
   });
 
   it("FR-TEAM-03 arriving from the Ledger highlights the card and scrolls to it", async () => {
@@ -96,7 +107,8 @@ describe("FR-TEAM-03 who signs off", () => {
       expect(region(root, "Approval coverage").getAttribute("data-flash")).toBe("true");
       expect(calls).toContain("Approval coverage");
     } finally {
-      proto.scrollIntoView = prev;
+      if (prev) proto.scrollIntoView = prev;
+      else Reflect.deleteProperty(proto, "scrollIntoView");
     }
   });
 });
@@ -104,10 +116,15 @@ describe("FR-TEAM-03 who signs off", () => {
 describe("FR-TEAM-05 what each role can do", () => {
   const yaml = readFileSync(resolve(__dirname, "../../../../../../config/team_rules.yaml"), "utf8");
   const ROLES = ["Owner", "Approver", "Member", "Viewer"];
-  const engine = [...yaml.matchAll(/\{key: \w+, label: "([^"]+)", roles: \[([^\]]*)\]\}/g)].map((m) => {
-    const roles = (m[2] ?? "").split(",").map((r) => r.trim());
-    return [m[1] ?? "", ROLES.reduce((n, r, i) => n + (roles.includes(r) ? 1 << i : 0), 0)] as const;
-  });
+  const engine = [...yaml.matchAll(/\{key: \w+, label: "([^"]+)", roles: \[([^\]]*)\]\}/g)].map(
+    (m) => {
+      const roles = (m[2] ?? "").split(",").map((r) => r.trim());
+      return [
+        m[1] ?? "",
+        ROLES.reduce((n, r, i) => n + (roles.includes(r) ? 1 << i : 0), 0),
+      ] as const;
+    },
+  );
 
   it("FR-TEAM-05 the fixture matrix equals the engine's role rules in config/team_rules.yaml", () => {
     expect(team.roles).toEqual(ROLES);

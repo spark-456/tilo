@@ -68,7 +68,34 @@ class Switch:
 
 
 MUST_ASK_KEYS = frozenset({"spend", "share", "undo"})  # pinned in code: a config edit can't unlock one (PRD 8.3)
-OWNER_ONLY_SWITCHES = frozenset({"tools"})  # the design: only the owner changes tool access
+TOOL_SWITCHES = frozenset({"tools"})  # changing one needs the `change_tool_access` capability (config capabilities)
+
+
+@dataclass(frozen=True)
+class Capability:
+    key: str
+    label: str
+    roles: tuple[str, ...]
+
+
+def load_capabilities(path: str | Path | None = None) -> dict[str, Capability]:
+    """The 8 capabilities of the role matrix (FR-TEAM-05), in the page's row order."""
+    doc = yaml.safe_load(Path(path if path is not None else _CONFIG).read_text(encoding="utf-8"))
+    rows = doc.get("capabilities") if isinstance(doc, dict) else None
+    if not isinstance(rows, list):
+        raise ValueError("team_rules.yaml: capabilities must be a list")
+    out: dict[str, Capability] = {}
+    for r in rows:
+        c = Capability(str(r["key"]), str(r["label"]), tuple(r["roles"]))
+        if c.key in out or not set(c.roles) <= set(ROLES):
+            raise ValueError("team_rules.yaml: bad capability")
+        out[c.key] = c
+    return out
+
+
+def role_can(role: str, capability: str) -> bool:
+    """Whether `role` holds `capability`; an unknown capability is a KeyError, an unknown role holds nothing."""
+    return role in load_capabilities()[capability].roles
 
 
 def load_switches(path: str | Path | None = None) -> dict[str, Switch]:
@@ -93,7 +120,9 @@ def set_switch(
     """The new switch state and the audit record of this change. A Must-ask switch can't go off; an unknown key is a
     KeyError, a non-bool a TypeError."""
     switch = load_switches()[key]
-    if actor_role not in ("Owner", "Approver") or (key in OWNER_ONLY_SWITCHES and actor_role != "Owner"):
+    if actor_role not in ("Owner", "Approver") or (
+        key in TOOL_SWITCHES and not role_can(actor_role, "change_tool_access")
+    ):
         raise PermissionError(key)
     if type(value) is not bool:
         raise TypeError("a switch is on or off")
