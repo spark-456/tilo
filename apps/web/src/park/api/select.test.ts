@@ -38,10 +38,10 @@ describe("WEB_1a_select: no API url means fixtures, labelled as such", () => {
 
 describe("WEB_1a_select: an API url means the live Api and no sample values", () => {
   it("WEB_1a_select_with_url_every_method_rejects_NotBuilt", async () => {
-    // WIRE-1: getLedger is the one built endpoint (GET /costs; liveApi.wire1.test.ts), so it is excluded here.
+    // WIRE-1/WIRE-2: getLedger (GET /costs) and getWorlds (GET /worlds) are built (liveApi.wire1/wire2 tests).
     const api = parkApi(LIVE_ENV);
     const args = callTable();
-    for (const m of API_METHODS.filter((x) => x !== "getLedger")) {
+    for (const m of API_METHODS.filter((x) => x !== "getLedger" && x !== "getWorlds")) {
       const p = invoke(api, m, args);
       expect(p, `${m} returns a Promise`).toBeInstanceOf(Promise);
       const outcome = await (p as Promise<unknown>).then(
