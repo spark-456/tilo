@@ -382,10 +382,17 @@ class DurableStore(deps.Store):
     ) -> None:
         made, parts = set(create), {w: list(p) for w, p in (parts or {}).items() if p}
         with self._held():
-            mapped = {p: (policy_worlds or {}).get(p, self.policy_worlds.get(p)) for p in policies or {}}
             with self._marks:  # the marks before these records are read: a later mark is a change they may not hold
-                seen = {("worlds", i): self._mark_gen.get(("worlds", i)) for i in worlds or {}}
-                seen |= {("policies", i): self._mark_gen.get(("policies", i)) for i in policies or {}}
+                marked = {c: set(ids) for c, ids in self.unsaved.items()}
+            # Every commit also writes the kill switches' unsaved changes, always from the cached record (never a
+            # caller's copy), so a pause is stored by the next commit that lands, whichever request it is.
+            worlds = {**(worlds or {}), **{i: self.worlds[i] for i in marked["worlds"] if i in self.worlds}}
+            policies = {**(policies or {}), **{i: self.policies[i] for i in marked["policies"] if i in self.policies}}
+            carried = {("worlds", i) for i in marked["worlds"]} | {("policies", i) for i in marked["policies"]}
+            mapped = {p: (policy_worlds or {}).get(p, self.policy_worlds.get(p)) for p in policies}
+            with self._marks:
+                seen = {("worlds", i): self._mark_gen.get(("worlds", i)) for i in worlds}
+                seen |= {("policies", i): self._mark_gen.get(("policies", i)) for i in policies}
             records = [("worlds", i, _plain(r)) for i, r in (worlds or {}).items()]
             records += [("tasks", i, _task_doc(r)) for i, r in (tasks or {}).items()]
             records += [
@@ -393,7 +400,10 @@ class DurableStore(deps.Store):
             ]
             touched = [(c, i) for c, i, _ in records]
             try:
-                writes = [(c, i, d, self._expect(c, i, (c, i) in made, not evict)) for c, i, d in records]
+                # a carried change is authoritative here: its `rev`, unknown after its own failed commit, is re-read
+                writes = [
+                    (c, i, d, self._expect(c, i, (c, i) in made, not evict or (c, i) in carried)) for c, i, d in records
+                ]
                 self.backend.commit(writes, parts)
             except Exception as exc:
                 self._evict(touched, parts, forget=evict)

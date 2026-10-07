@@ -480,3 +480,28 @@ def test_PROD_WIRE_1b_loads_are_read_only_unless_asked_to_settle(pw1b_rig) -> No
     assert pw1b_rig.stream(W1) == [] and len(pw1b_rig.backend.queue(W1)) == 2, "a default load writes nothing"
     cold.load_world(W1, settle=True)
     assert [e["type"] for e in pw1b_rig.stream(W1)][-1] == "world.failed"
+
+
+def test_PROD_WIRE_1b_the_next_commit_that_lands_stores_an_unsaved_pause(pw1b_rig) -> None:
+    """A Pause all that was not saved is stored by the next commit that lands, whatever request it is, so a restart
+    before the next kill switch keeps it."""
+    store, _ = _rig(pw1b_rig)
+    store.worlds[W1].paused = True
+    with commits_fail(pw1b_rig.backend), pytest.raises(HTTPException):
+        store.commit_unsaved(worlds=[W1])
+    store.commit(tasks={T1: task(world_id=W2)}, create=[("tasks", T1)])  # an unrelated request's commit
+    assert pw1b_rig.backend.read("worlds", W1)["paused"] is True and not store.unsaved["worlds"]
+    cold, _ = pw1b_rig.process()
+    assert cold.load_world(W1).paused is True
+
+
+def test_PROD_WIRE_1b_a_stale_copy_of_a_marked_world_is_never_written(pw1b_rig) -> None:
+    """A caller that passes an old copy of a world a kill switch changed and has not saved: the cached record is what
+    is stored, so the pause cannot be lost by a stale write."""
+    store, _ = _rig(pw1b_rig)
+    stale = copy.deepcopy(store.worlds[W1])
+    store.worlds[W1].paused = True
+    with commits_fail(pw1b_rig.backend), pytest.raises(HTTPException):
+        store.commit_unsaved(worlds=[W1])
+    store.commit(worlds={W1: stale})
+    assert pw1b_rig.backend.read("worlds", W1)["paused"] is True and store.worlds[W1].paused is True
