@@ -30,7 +30,14 @@ from tilo_planning.compiler import DELIVER, PlanInputs
 
 from tilo_api import deps, events
 from tilo_api.access import Mode
-from tilo_api.cards import AlreadyCommitted, CardStore, _card_errors, answering_principal, get_channels_caller
+from tilo_api.cards import (
+    OWNER_ONLY_ACTIONS,
+    AlreadyCommitted,
+    CardStore,
+    _card_errors,
+    answering_principal,
+    get_channels_caller,
+)
 
 logger = logging.getLogger("tilo_api.runs")
 router = APIRouter()
@@ -135,7 +142,7 @@ class Run:
     """Also the executor's writer (`emit`, `org_id`, `world_id`, `recorded_version`) and its CardStore's (`write`):
     both end at the single writer."""
 
-    owner_started: frozenset[str] = frozenset({"create_meeting_event"})  # FR-MTG-09: no plan names it, only the owner
+    owner_started: frozenset[str] = OWNER_ONLY_ACTIONS  # FR-MTG-09: no plan names it, only the owner starts it
 
     def __init__(self, store: deps.Store, task: deps.TaskRecord, approach: dict, cap: float, seams: Seams) -> None:
         self.store, self.seams, self.cap, self.approach = store, seams, cap, copy.deepcopy(approach)

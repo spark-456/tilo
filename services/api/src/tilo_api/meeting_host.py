@@ -20,7 +20,7 @@ from typing import Annotated, Any
 
 from fastapi import Depends, HTTPException
 from tilo_archive import RunArchive
-from tilo_connectors import Outbox, OutboxRefused
+from tilo_connectors import Outbox
 from tilo_connectors.adapters.meeting_host import MeetingHostAdapter
 from tilo_connectors.errors import MeetingHostConfigError, MeetingHostRefused, SideEffectRefused
 from tilo_connectors.meeting_host import (
@@ -181,8 +181,11 @@ def _plan() -> dict[str, Any]:
 class HostRun(Run):
     owner_started: frozenset[str] = frozenset()  # this is the owner's own request
 
-    def __init__(self, seams: HostSeams, task: deps.TaskRecord, draft: MeetingEventDraft) -> None:
-        self.draft, scope = draft, Scope(deps.ORG_ID, task.world_id, task.owner)
+    def __init__(
+        self, seams: HostSeams, task: deps.TaskRecord, draft: MeetingEventDraft, still_hosted: Callable[[], bool]
+    ) -> None:
+        self.draft, self.still_hosted = draft, still_hosted
+        scope = Scope(deps.ORG_ID, task.world_id, task.owner)
         self.receipts = _Receipts(seams.artifacts, scope, task.run_id)
         adapter = MeetingHostAdapter(  # built per run from the two Google seams and this run's own store
             declaration=seams.registry.get(CONNECTOR_ID), broker=seams.broker, transport=seams.transport,
@@ -227,6 +230,13 @@ class HostRun(Run):
         return dict(found.record)
 
     async def _send(self, entry: dict, evidence: dict[str, Any]) -> dict:
+        authz = entry["authz"]  # only the owner's own approval sends, and only for a meeting that still stands
+        try:
+            ok = authz.get("by") == "person" and authz.get("ref") == self.owner and self.still_hosted()
+        except Exception:
+            ok = False  # fail closed
+        if not ok:
+            raise _GateFailed("the meeting changed or was deleted, so nothing was sent")
         transfer = await super()._send(entry, evidence)
         try:
             self._after_send(entry, transfer)
@@ -313,12 +323,28 @@ def host_meeting(w: Writer, meeting_id: str, seams: HostSeams) -> dict[str, Any]
     task = deps.TaskRecord(
         owner=w.actor, world_id=world_id, run_id=world.run_id, draft={}, brief={}, questions=[], next_seq=1
     )
-    run = HostRun(seams, task, draft)
+
+    def still_hosted() -> (
+        bool
+    ):  # at approval: the meeting is still the owner's, scheduled, and every invitee is a person
+        now = w.stores.meetings.get(w.org, meeting_id)
+        return (
+            now is not None
+            and (now.record.get("owner"), now.record.get("status")) == (w.actor, "scheduled")
+            and all(w.stores.persons.get(w.org, u) is not None for u in draft.invited)
+        )
+
+    run = HostRun(seams, task, draft, still_hosted)
     with seams.store.runs_guard:  # two requests at once make one run
         if world_id in seams.store.runs:
             raise Refusal(409, "already_hosted")
         seams.store.runs[world_id] = run
-    threading.Thread(target=run.main, name=f"host-{world_id}", daemon=True).start()
+    try:
+        threading.Thread(target=run.main, name=f"host-{world_id}", daemon=True).start()
+    except BaseException:
+        with seams.store.runs_guard:  # a run that never started must not leave a permanent 409
+            seams.store.runs.pop(world_id, None)
+        raise
     return {"world_id": world_id}
 
 
@@ -334,15 +360,17 @@ def on_connection_event(part: Mapping[str, Any], *, outbox_store: Any) -> int:
             e for e in outbox_store.all_entries()
             if e["connector"] == CONNECTOR_ID and e["state"] in _UNSENT and (e.get("authz") or {}).get("ref") == user
         ]  # fmt: skip
-    except (KeyError, TypeError, AttributeError):
+    except Exception:  # a malformed part or a store that cannot be read: nothing is abandoned, nothing is raised
         return 0
     abandoned = 0
     for entry in unsent:
         try:
+            if outbox_store.retry_state(entry["id"]).get("ambiguous"):
+                continue  # it may have gone out: it stays for the alert path, never marked failed
             Outbox(outbox_store, {}, emit=lambda part: None, clock=events.now, world_id=entry["world_id"]).abandon(
                 entry["id"]
             )
             abandoned += 1
-        except OutboxRefused:
+        except Exception:  # a live lease (OutboxRefused) or a store error: the next event asks again
             continue
     return abandoned

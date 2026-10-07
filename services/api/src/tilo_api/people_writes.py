@@ -9,6 +9,7 @@ no clock read (`now` is handed in).
 
 from __future__ import annotations
 
+import json
 import re
 import secrets
 import threading
@@ -399,6 +400,7 @@ def remove_meeting(w: Writer, artifacts: ArtifactStore, meeting_id: str) -> dict
             for ref in (m["transcript"], m["minutes"]):
                 if ref is not None:
                     _purge(artifacts, scope, ref["artifact_id"])
+            _purge_hosted(artifacts, scope, meeting_id)
         for store, state in ((w.stores.work_items, "status"), (w.stores.pins, "status"), (w.stores.calendar, "state")):
             for row in store.list(w.org):
                 if row.record[state] == "proposed" and _made_from(meeting_id, row.record["source"]):
@@ -410,6 +412,23 @@ def remove_meeting(w: Writer, artifacts: ArtifactStore, meeting_id: str) -> dict
         except NotFound:
             raise _not_found() from None
     return {"id": meeting_id, "status": "deleted"}
+
+
+def _purge_hosted(artifacts: ArtifactStore, scope: Scope, meeting_id: str) -> None:
+    """FR-MTG-09: the host draft (title, time, invitee addresses) and the receipt of this meeting, found in its world by
+    their own `kind` and `meeting_id`; nothing else in the world is touched."""
+    prefix = f"orgs/{scope.org_id}/worlds/{scope.world_id}/artifacts/"
+    for record in artifacts.retention().records():
+        if not record.record_id.startswith(prefix) or record.user_id != scope.owner:
+            continue
+        art, _, version = record.record_id[len(prefix) :].partition("/versions/")
+        try:
+            doc = json.loads(artifacts.read(scope, {"artifact_id": art, "version": int(version)}))
+            hosted = doc["kind"] in ("meeting_event", "meeting_event_receipt") and doc["meeting_id"] == meeting_id
+        except Exception:  # not JSON, not a host document, or unreadable: not ours to purge
+            continue
+        if hosted:
+            artifacts.retention().delete(record.record_id)
 
 
 def _purge(artifacts: ArtifactStore, scope: Scope, artifact_id: str) -> None:
