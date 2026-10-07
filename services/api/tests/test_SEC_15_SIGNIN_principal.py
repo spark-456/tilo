@@ -61,10 +61,15 @@ def _clean_env_and_no_network(monkeypatch):
     for name in ENV_CLEAR:
         monkeypatch.delenv(name, raising=False)
 
-    def refuse(*_a, **_k):
-        raise AssertionError("SIGNIN: nothing may open a network connection")
+    real_connect = socket.socket.connect
 
-    monkeypatch.setattr(socket.socket, "connect", refuse)
+    def guarded(self, address, *args, **kwargs):
+        host = address[0] if isinstance(address, tuple) else ""
+        if host not in ("127.0.0.1", "::1", "localhost", "0.0.0.0"):  # noqa: S104  (the event loop's own socketpair)
+            raise AssertionError(f"SIGNIN: nothing may open a network connection (to {host!r})")
+        return real_connect(self, address, *args, **kwargs)
+
+    monkeypatch.setattr(socket.socket, "connect", guarded)
     yield
     tilo_app.dependency_overrides.clear()
 

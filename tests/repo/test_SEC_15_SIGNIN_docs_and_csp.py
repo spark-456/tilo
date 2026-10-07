@@ -3,9 +3,12 @@ the user setup sheet, the Hosting CSP for Google sign-in, and the static rules o
 
 - infra/ACCESS.md has a sign-in section (a numbered setup sheet, in order): enable the Google provider in Firebase
   Authentication, enable the Anonymous provider, check the authorized domains (the project's web.app and firebaseapp.com
-  hosts), widen the web API key's API restriction to what the Auth SDK calls, and the OAuth consent screen with BOTH
-  publishing-status options and their consequences (R-06), the default being Testing until the user answers
-  (BQ-SIGNIN-1). docs/deploy-dev.md must not keep telling the user the key is "App Check API only", or sign-in breaks.
+  hosts), widen the web API key's API restriction to what the Auth SDK calls, and the OAuth consent screen with
+  publishing status: the user chose In production (BQ-SIGNIN-1), with its consequences (the unverified-app warning and
+  the 100-new-user cap on Gmail consent, until Google verifies the restricted scopes: a later owner step) and Testing as
+  the fallback. docs/deploy-dev.md must not keep telling the user the key is "App Check API only", or sign-in breaks.
+- The Gmail consent sheet (S-08) tells the person about Google's unverified-app warning before the redirect; the exact
+  sentence is in services/api/tests/API_SIGNIN.md and in apps/web/src/screens/S_08.unverified.SIGNIN.test.tsx.
 - The Hosting CSP (firebase.json) gets exactly what the Firebase Auth SDK needs for a popup / redirect Google sign-in,
   nothing wider. Found by reading @firebase/auth 12.x `dist/esm/index-*.js` (version in pnpm-lock): the gapi loader is
   `https://apis.google.com/js/api.js` (script-src), the sign-in iframe and handler live on the project's auth domain at
@@ -142,29 +145,71 @@ def test_SEC_15_SIGNIN_access_md_widens_the_web_key_to_the_apis_the_auth_sdk_cal
     assert re.search(r"generativelanguage", section), "and the key still must not reach the Gemini API"
 
 
-def test_SEC_15_SIGNIN_access_md_documents_both_consent_screen_options_and_the_default(repo_root: pathlib.Path) -> None:
+def test_SEC_15_SIGNIN_access_md_says_the_consent_screen_goes_in_production_and_what_that_means(
+    repo_root: pathlib.Path,
+) -> None:
     section = _sign_in_section(repo_root)
-    assert re.search(r"\bTesting\b", section), "option 1: the consent screen stays in Testing"
-    assert re.search(r"In production", section), "option 2: publish it (In production)"
-    assert re.search(r"test users?", section, flags=re.I), "Testing: only listed test users can sign in"
-    assert re.search(r"\b7[ -]days?\b|seven days", section, flags=re.I), (
-        "Testing: sign-ins expire after about 7 days (R-06)"
+    assert re.search(r"In production", section), "the consent screen publishing status is In production"
+    assert re.search(
+        r"(chosen|decided|decision|selected)[^.\n]{0,120}In production"
+        r"|In production[^.\n]{0,120}(chosen|decided|decision|selected)",
+        section,
+        flags=re.I,
+    ), "production is stated as the user's chosen status, not as one option among two"
+    assert re.search(r"`?openid`?[^\n]*`?email`?[^\n]*`?profile`?", section), "the sign-in scopes are named"
+    assert re.search(r"non-sensitive|basic", section, flags=re.I), (
+        "the sign-in scopes are non-sensitive: anyone can sign in"
     )
-    assert re.search(r"\b100\b", section), "the 100 test-user / new-user cap (R-06)"
-    assert re.search(r"unverified", section, flags=re.I), (
-        "In production without Google verification: the unverified-app warning"
-    )
-    assert re.search(r"restricted", section, flags=re.I) and re.search(r"gmail", section, flags=re.I), (
-        "the same consent screen carries the restricted Gmail scopes: that is why publishing is not free"
-    )
-    assert re.search(r"judges?", section, flags=re.I), "judges who are not listed test users are locked out in Testing"
-    assert re.search(r"default[^.\n]{0,80}\bTesting\b|\bTesting\b[^.\n]{0,80}default", section, flags=re.I), (
-        "until the user answers, the default is Testing (they add the judge and demo accounts as test users)"
-    )
-    assert "BQ-SIGNIN-1" in section, "points at the open question the user decides"
+    assert re.search(r"anyone|any Google account|every Google account", section, flags=re.I)
+    assert re.search(r"restricted", section, flags=re.I) and re.search(r"gmail", section, flags=re.I)
+    assert re.search(r"unverified", section, flags=re.I), "Gmail consent shows Google's unverified-app warning"
+    assert re.search(r"\b100\b", section), "and is capped at 100 new users until Google verifies the scopes"
+    assert re.search(r"100[^.\n]{0,60}(new )?users|users[^.\n]{0,60}\b100\b", section, flags=re.I)
+    assert "BQ-SIGNIN-1" in section
     assert re.search(r"no code path|either (works|way)|does not depend", section, flags=re.I), (
         "says the build works with either status (nothing in the code depends on it)"
     )
+
+
+def test_SEC_15_SIGNIN_access_md_keeps_testing_as_a_one_line_fallback(repo_root: pathlib.Path) -> None:
+    section = _sign_in_section(repo_root)
+    line = next((ln for ln in section.splitlines() if re.search(r"\bTesting\b", ln)), None)
+    assert line is not None, "Testing is mentioned as the fallback"
+    assert re.search(r"\b7[ -]days?\b|seven days", section, flags=re.I), (
+        "Testing: sign-ins expire after about 7 days (R-06)"
+    )
+    assert re.search(r"test users?", section, flags=re.I), "Testing: only listed test users can sign in"
+    assert re.search(r"fall ?back", section, flags=re.I)
+
+
+def test_SEC_15_SIGNIN_access_md_lists_google_verification_of_the_restricted_scopes_as_a_later_owner_step(
+    repo_root: pathlib.Path,
+) -> None:
+    steps = _steps(_sign_in_section(repo_root))
+    consent = _first_step(steps, r"consent screen")
+    later = _first_step(
+        steps, r"(start|begin|submit|request)[^.\n]{0,60}(Google )?verification|verification[^.\n]{0,80}restricted"
+    )
+    assert later >= 0, "a step says to start Google verification for the restricted Gmail scopes"
+    assert later >= consent, "it comes at or after the consent screen step"
+    step = steps[later]
+    assert re.search(r"later|after|once|when", step, flags=re.I), "it is marked as a later step, not needed to sign in"
+    assert re.search(r"restricted", step, flags=re.I) and re.search(r"gmail", step, flags=re.I)
+    assert re.search(r"owner", step, flags=re.I), "it is an owner step"
+
+
+def test_SEC_15_SIGNIN_the_gmail_consent_sentence_in_the_spec_doc_is_the_one_the_web_test_pins(
+    repo_root: pathlib.Path,
+) -> None:
+    spec = (repo_root / "services" / "api" / "tests" / "API_SIGNIN.md").read_text(encoding="utf-8")
+    web = (repo_root / "apps" / "web" / "src" / "screens" / "S_08.unverified.SIGNIN.test.tsx").read_text(
+        encoding="utf-8"
+    )
+    match = re.search(r'const UNVERIFIED_NOTE =\s*"([^"]+)"', web)
+    assert match, "the web test pins the sentence in UNVERIFIED_NOTE"
+    sentence = match.group(1)
+    assert sentence in spec, "services/api/tests/API_SIGNIN.md must hold the exact sentence the web test pins"
+    assert "not verified" in sentence and "Gmail" in sentence
 
 
 def test_SEC_15_SIGNIN_access_md_keeps_the_app_check_key_instructions_consistent(repo_root: pathlib.Path) -> None:
@@ -299,9 +344,9 @@ def test_SEC_15_SIGNIN_the_web_auth_code_loads_the_firebase_sdk_only_dynamically
 
 def test_SEC_15_SIGNIN_the_web_auth_code_never_logs_tokens_or_touches_storage_itself(repo_root: pathlib.Path) -> None:
     folder = repo_root / "apps" / "web" / "src" / "auth"
-    for path in folder.glob("*.ts*"):
-        if ".test." in path.name or ".SIGNIN." in path.name:
-            continue
+    sources = [p for p in folder.glob("*.ts*") if ".test." not in p.name and ".SIGNIN." not in p.name]
+    assert sources, "apps/web/src/auth/ has no sign-in sources yet"
+    for path in sources:
         text = path.read_text(encoding="utf-8")
         for line in text.splitlines():
             if re.search(r"console\.(log|info|warn|error|debug)\(", line):
