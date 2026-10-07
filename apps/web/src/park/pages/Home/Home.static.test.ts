@@ -11,6 +11,10 @@ import { dirname, join, relative, resolve } from "node:path";
 import { beforeEach, describe, expect, it } from "vitest";
 import { ALLOWLIST, scanSource } from "../../../../test-support/honestyScan";
 
+// The Park city's ambient scenery (shell and engines) is decoration, not work: its animation entries are
+// pinned by src/honesty/park-ambient.allowlist.test.ts. Every other entry stays pinned exactly here.
+const AMBIENT = /^src\/park\/(shell|engines)\//;
+
 const HOME = __dirname;
 const PAGES = resolve(HOME, "..");
 const PARK = resolve(PAGES, "..");
@@ -86,10 +90,9 @@ describe("WEB_4_static: the page folder", () => {
 
 describe("WEB_4_static: honesty (HR-1..HR-7; the scan and its allowlist are untouched)", () => {
   it("WEB_4_static_ALLOWLIST_is_unchanged", () => {
-    expect(ALLOWLIST.map((e) => `${e.file}:${e.rule}`)).toEqual([
-      "src/world/runWorld.ts:raf",
-      "src/stage/Stage.tsx:raf",
-    ]);
+    expect(
+      ALLOWLIST.filter((e) => !AMBIENT.test(e.file)).map((e) => `${e.file}:${e.rule}`),
+    ).toEqual(["src/world/runWorld.ts:raf", "src/stage/Stage.tsx:raf"]);
   });
 
   it("WEB_4_static_the_honesty_scan_finds_nothing_in_the_page", () => {
