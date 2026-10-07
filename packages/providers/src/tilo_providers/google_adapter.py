@@ -3,8 +3,10 @@
 the global endpoint, behind `ModelProvider`. Structured output maps onto
 `GenerateContentConfig(response_mime_type=..., response_json_schema=...)`: the JSON Schema field, never
 `response_schema`, which is the SDK's OpenAPI-subset `Schema` type and rejects ordinary JSON Schema (`uniqueItems`,
-a list `type`) while the request body is built, before anything is sent. SDK/transport errors map onto
-`tilo_providers.errors`; a request the SDK refuses to build (pydantic `ValidationError`) is a `RequestError`.
+a list `type`) while the request body is built, before anything is sent. The schema goes out as a sanitized copy
+(`schema_subset.to_gemini_schema`: Gemini answers 400 to `default`, `pattern`, `maxLength`...).
+SDK/transport errors map onto `tilo_providers.errors`; a request the SDK refuses to build (pydantic
+`ValidationError`) is a `RequestError`.
 
 Imports `google.genai`/`.types`/`.errors` via `importlib.import_module`
 rather than `from google import genai`, so the module works whether that
@@ -42,6 +44,7 @@ from tilo_providers.interfaces import (
     PriceQuote,
     cached_tokens_or_none,
 )
+from tilo_providers.schema_subset import to_gemini_schema
 
 _NO_FIELD = object()
 
@@ -153,6 +156,10 @@ class GoogleModelProvider(ModelProvider):
             client = genai.Client(vertexai=True, project=project, location=location)
         self._client = client
 
+    def _schema_for_send(self, schema: dict[str, Any]) -> dict[str, Any]:
+        """A sanitized copy: Gemini accepts a subset of JSON Schema and answers 400 to the rest (`schema_subset`)."""
+        return to_gemini_schema(schema)
+
     def _config(self, request: GenerateRequest) -> Any | None:
         kwargs: dict[str, Any] = {}
         if request.system is not None:
@@ -164,7 +171,7 @@ class GoogleModelProvider(ModelProvider):
         if request.response_schema is not None:
             # PL-02 structured output: a schema implies JSON output.
             kwargs["response_mime_type"] = "application/json"
-            kwargs["response_json_schema"] = request.response_schema  # not `response_schema`: see the docstring
+            kwargs["response_json_schema"] = self._schema_for_send(request.response_schema)  # not `response_schema`
         elif request.json_mode:
             kwargs["response_mime_type"] = "application/json"
         if not kwargs and request.thinking_level is None:
