@@ -35,6 +35,15 @@ const PARITY = process.env.TILO_PARITY === "1";
 const PARITY_PORT = Number(process.env.TILO_PARITY_PORT ?? 5395);
 const PARITY_ORIGIN = `http://127.0.0.1:${PARITY_PORT}`;
 const PARITY_SPECS = "**/park/parity/**";
+// LIVE (`TILO_LIVE=1`, local only): the Park decisions flow against the live Api (WIRE-3). A tiny fake tilo-api
+// (e2e/support/fakeCardsApi.mjs: GET /worlds, GET /cards, the answer route, a control surface) and its own Vite server
+// with VITE_TILO_API_URL set, both on private ports. No credentials, no real backend. CI never sets TILO_LIVE.
+const LIVE = process.env.TILO_LIVE === "1";
+const LIVE_PORT = Number(process.env.TILO_LIVE_PORT ?? 5397);
+const LIVE_API_PORT = Number(process.env.TILO_LIVE_API_PORT ?? 5398);
+const LIVE_ORIGIN = `http://127.0.0.1:${LIVE_PORT}`;
+const LIVE_API = `http://127.0.0.1:${LIVE_API_PORT}`;
+const LIVE_SPECS = "**/live/**";
 const TIMING_SPECS = [
   "**/world-perf.spec.ts",
   "**/world-reduced-motion-toggle.spec.ts",
@@ -57,7 +66,7 @@ export default defineConfig({
   projects: [
     {
       name: "chromium",
-      testIgnore: [...TIMING_SPECS, CP2_SPECS, NFR01_SPECS, PARITY_SPECS],
+      testIgnore: [...TIMING_SPECS, CP2_SPECS, NFR01_SPECS, PARITY_SPECS, LIVE_SPECS],
       // Runs the timing project after this one finishes, pass or fail. A `dependencies` link would
       // skip the C8 freeze and perf specs whenever any chromium test failed.
       teardown: "timing",
@@ -75,6 +84,16 @@ export default defineConfig({
     },
     ...(CP2
       ? [{ name: "cp2", testMatch: CP2_SPECS, use: { ...BROWSER, baseURL: CP2_ORIGIN } }]
+      : []),
+    ...(LIVE
+      ? [
+          {
+            name: "live",
+            testMatch: LIVE_SPECS,
+            workers: 1,
+            use: { ...BROWSER, baseURL: LIVE_ORIGIN },
+          },
+        ]
       : []),
     ...(NFR01
       ? [{ name: "nfr01", testMatch: NFR01_SPECS, use: { ...BROWSER, baseURL: NFR01_ORIGIN } }]
@@ -123,6 +142,23 @@ export default defineConfig({
           {
             command: `pnpm exec vite --host 127.0.0.1 --port ${PARITY_PORT} --strictPort`,
             url: `${PARITY_ORIGIN}/@vite/client`,
+            reuseExistingServer: false,
+            timeout: 30_000,
+          },
+        ]
+      : []),
+    ...(LIVE
+      ? [
+          {
+            command: `node e2e/support/fakeCardsApi.mjs ${LIVE_API_PORT}`,
+            url: `${LIVE_API}/healthz`,
+            reuseExistingServer: false,
+            timeout: 30_000,
+          },
+          {
+            command: `pnpm exec vite --host 127.0.0.1 --port ${LIVE_PORT} --strictPort`,
+            env: { VITE_TILO_API_URL: LIVE_API },
+            url: `${LIVE_ORIGIN}/@vite/client`,
             reuseExistingServer: false,
             timeout: 30_000,
           },

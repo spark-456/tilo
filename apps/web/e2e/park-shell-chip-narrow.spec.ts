@@ -57,5 +57,36 @@ for (const width of WIDTHS) {
       expect(m.allTabs).toHaveLength(6);
       await expect(chip).toHaveAccessibleName("Sample data");
     });
+
+    test(`UI_10_WEB_3b_e2e_${width}_the_sample_chip_is_a_24px_target_and_its_focus_ring_hugs_the_dot`, async ({
+      page,
+    }) => {
+      test.setTimeout(150_000);
+      await page.goto("/park", { timeout: 120_000 });
+      const chip = page
+        .locator("header.park-shell__nav")
+        .getByRole("button", { name: "Sample data" });
+      await expect(chip).toBeVisible({ timeout: 120_000 });
+      const box = await chip.boundingBox();
+      expect(box?.width, "WCAG 2.5.8 target width").toBeGreaterThanOrEqual(24);
+      expect(box?.height, "WCAG 2.5.8 target height").toBeGreaterThanOrEqual(24);
+      await chip.focus();
+      await page.keyboard.press("Shift+Tab");
+      await page.keyboard.press("Tab");
+      await expect(chip).toBeFocused();
+      const ring = await chip.evaluate((el) => {
+        const outline = (e: Element) => {
+          const c = getComputedStyle(e);
+          return `${c.outlineStyle} ${c.outlineWidth}`;
+        };
+        return {
+          button: outline(el),
+          dot: outline(el.querySelector(".park-shell__sampledot") as Element),
+        };
+      });
+      // <=430px the dot carries the ring; wider, the chip pill does
+      if (width <= 430) expect(ring).toEqual({ button: "none 3px", dot: "solid 3px" });
+      else expect(ring.button).toBe("solid 3px");
+    });
   });
 }

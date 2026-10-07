@@ -99,7 +99,10 @@ describe("WIRE_1_live_api: every other method is still NotBuilt", () => {
     const fetchSpy = okFetch();
     const api = createLiveApi({ baseUrl: BASE, fetch: asFetch(fetchSpy) });
     const args = callTable();
-    for (const m of API_METHODS.filter((x) => x !== "getLedger")) {
+    // WIRE-2 connects getWorlds, WIRE-3 getDecisions and decide (liveApi.wire2/wire3.test.ts): they leave this list.
+    for (const m of API_METHODS.filter(
+      (x) => !["getLedger", "getWorlds", "getDecisions", "decide"].includes(x),
+    )) {
       const err = await Promise.resolve(invoke(api, m, args)).then(
         (value) => ({ resolved: value }),
         (e: unknown) => e,

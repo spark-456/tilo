@@ -442,10 +442,11 @@ from dev or CI; the Calendar API is free, but the rule is no live call without `
   seams (resolver as step 5; `exact` from `draft.exact` for this action instead of `_exact`, whose
   address list would hit the 500 limit), abandon on `meeting_host` disconnect, the `needs_you` card on
   `conference: failure`.
-- MTG09-c (MEET lane, `meet-bot/` on its own branch): GATED, not built until the user has decided ADR-0024
-  amendment 3(a) (account separation); the profile choice is then the user's explicit yes. ADR-0024 bot rules
-  (host join, never click Admit (refuse `--auto-admit`), one persistent dedicated profile on a named volume only
-  if the user says yes to amendment 3; its preconditions (a), (b), (d), (e), (f) apply to every signed-in session
+- MTG09-c (MEET lane, `meet-bot/` on its own branch): UNBLOCKED on the preconditions: the user accepted ADR-0024
+  amendment 3(a) (project-Owner exposure of the bot account, time-limited) and the persistent profile (temporary)
+  on 7 Oct 2026, decision record in the ADR. ADR-0024 bot rules
+  (host join, never click Admit (refuse `--auto-admit`), one persistent dedicated profile on a named volume only;
+  its preconditions (a), (b), (d), (e), (f) apply to every signed-in session
   of the bot account, per-meeting ones too: VNC only for the sign-in with a random password, no `--no-sandbox`,
   guard deny), link never written to `out/`, logs or the package).
 - PPL-60c (later): `MeetingHostAdapter.join_link(owner: str, receipt: HostReceipt) -> str` (a read with

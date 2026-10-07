@@ -256,6 +256,27 @@ places (BQ-01, BQ-02 and the gaps listed under decision 9).
     file: nothing is removed or changed, so it is additive. Two tests that pinned `== "1.1.0"` now
     check "1.2.0 or later". **Rule for parallel contract branches:** before merging a branch that
     bumps a schema, compare its `x-version` with the base's and take the next free minor.
+16. **`spend_caps.schema.json` 1.1.0 (additive, 2026-10-06, ticket SEC-16, FR-MTR-04).** A new
+    contract, named `SpendCapsConfig` through `ROOT_NAMES` (tilo-api's loaded value is its own
+    six-field `SpendCaps`), shapes `config/spend_caps.yaml`, which `CONFIG_SHAPES` adds to
+    `just contracts-check`. It is a new file because `metering.schema.json` is closed and counts
+    credits and US dollars, while SEC-16's cap is 1,000 INR per uid. Money is an integer in INR
+    minor units (paise) and `currency` is `const` INR. As in decision 13, every key is required, no
+    other key is allowed, and every cap is above zero and never null except the per-org daily cap
+    (`org_day_minor`, null for no separate cap). JSON Schema reads 1000.0 as the integer 1000, so
+    refusing a whole float is the loader's job, and so is the shipped file's `unit_reserve_minor <=
+    run_minor <= uid_lifetime_minor <= global_day_hard_minor` (checked by the SEC-16 config test). The shipped
+    values convert PRD 17.3's US dollar figures at 80 INR per US$, below the market rate, so no INR
+    cap exceeds its US$ counterpart: `run_minor` 12000 for 300 credits (US$1.50) and
+    `global_day_hard_minor` 200000 for US$25 a day. The rate limit is 240 requests per uid per 60 s,
+    because the web polls a run's events every second. This INR daily cap and `metering.yaml`'s
+    `spend.daily_usd_hard` both trip NFR-24; the first one reached wins and neither replaces the
+    other. 1.1.0 adds the required `unit_reserve_minor` (shipped 1000, 10 INR): until PL-06 prices
+    and a US$ to INR rate exist, each live unit and each Director call (intake, approaches, MustAsk)
+    reserves this flat amount and settles at it (BQ-SEC16-1). A new required key counts as minor
+    because nothing reads the file yet, as for `budget.requested` in decision 13. The SEC-16 config
+    test's key set and invalid cases were extended to match, as a one-off exception agreed with the
+    test-writer.
 
 ## Consequences
 - Builders import `tilo_contracts` or `@tilo/contracts` and never hand-write these shapes.

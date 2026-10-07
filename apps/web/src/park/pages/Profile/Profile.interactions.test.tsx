@@ -299,6 +299,14 @@ describe("WEB_12_profile_appearance: time and motion go through setPref", () => 
     expect(pressedOf(buttonWith(root, "Lamps and glow"))).toBe("true");
     expect(strings(root).has(APPEARANCE_COPY.help.still)).toBe(true);
   });
+
+  it("WEB_12_profile_an_unknown_motion_value_reads_as_calm_the_default_not_lively", async () => {
+    const { root } = await renderProfile(makeApp({ motion: "wild" as never }));
+    await openTab(root, "Appearance");
+    expect(pressedOf(buttonNamed(root, "Calm"))).toBe("true");
+    expect(pressedOf(buttonNamed(root, "Lively"))).toBe("false");
+    expect(strings(root).has(APPEARANCE_COPY.help.calm)).toBe(true);
+  });
 });
 
 describe("WEB_12_profile_security: actions and sessions", () => {

@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import re
 import secrets
+import threading
 from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass
 from typing import Annotated, Any, Literal
@@ -28,14 +29,15 @@ from tilo_people.writes import check_write
 from tilo_policy.schemas import conforms
 
 from tilo_api import deps
+from tilo_api.people_events import WorkEvents
 from tilo_api.people_quotes import GONE, MAX_HISTORY
 
 
 class Refusal(HTTPException):
     """An answer with a body beyond `detail` (409 `code`, `problems`); never record text."""
 
-    def __init__(self, status_code: int, detail: str, **extra: Any) -> None:
-        super().__init__(status_code=status_code, detail=detail)
+    def __init__(self, status_code: int, detail: str, *, headers: dict[str, str] | None = None, **extra: Any) -> None:
+        super().__init__(status_code=status_code, detail=detail, headers=headers)
         self.extra = extra
 
 
@@ -132,12 +134,32 @@ class MeetingIn(_Closed):
         return value
 
 
+_LABEL = r"[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?"
+_EMAIL = re.compile(rf"[A-Za-z0-9%+_'-]+(?:\.[A-Za-z0-9%+_'-]+)*@(?:{_LABEL}\.)+[A-Za-z]{{2,63}}")
+
+
 class PersonIn(_Closed):
     display_name: Text
     aliases: Annotated[list[Text], Field(max_length=8)]
     email: Text
     time_zone: Text
     preferred_channel: Text
+
+    @field_validator("email")
+    @classmethod
+    def _address(cls, value: str) -> str:
+        """An ASCII dot-atom address only (PE-09: a recipient is resolved from it); a 422 never names the value."""
+        if len(value) > 254 or _EMAIL.fullmatch(value) is None:
+            raise ValueError("email")
+        return value
+
+
+class TeamIn(_Closed):
+    team: Annotated[str, Field(pattern=r"^tm_[0-9a-z_]{1,48}$")]
+
+
+class RoleIn(_Closed):
+    org_role: Literal["owner", "member"]
 
 
 class SourceIn(_Closed):
@@ -157,6 +179,25 @@ class ItemIn(_Closed):
     source: SourceIn
 
 
+MAX_BODY_BYTES = 32768  # BQ-PPL11C-1: a people POST body over this is a 413, whatever the route
+
+
+async def _capped_body(request: Request) -> bytes:
+    """The body, refused once it passes the cap: by the declared length before any read, else by counting as it
+    streams, so a client that keeps sending is cut after the cap (and one read-ahead chunk)."""
+    declared = request.headers.get("content-length", "")
+    if declared.isdigit() and int(declared) > MAX_BODY_BYTES:
+        raise Refusal(413, "body_too_large")
+    chunks: list[bytes] = []
+    size = 0
+    async for chunk in request.stream():
+        size += len(chunk)
+        if size > MAX_BODY_BYTES:
+            raise Refusal(413, "body_too_large")
+        chunks.append(chunk)
+    return b"".join(chunks)
+
+
 def json_body[Body: BaseModel](model: type[Body]) -> Callable[[Request], Awaitable[Body]]:
     """Strict JSON only (415 otherwise: a cross-site form or `text/plain` POST needs no preflight); a 422 that never
     echoes the input."""
@@ -165,7 +206,7 @@ def json_body[Body: BaseModel](model: type[Body]) -> Callable[[Request], Awaitab
         if request.headers.get("content-type", "").split(";")[0].strip().lower() != "application/json":
             raise Refusal(415, "Send application/json.")
         try:
-            return model.model_validate_json(await request.body())
+            return model.model_validate_json(await _capped_body(request))
         except ValidationError as exc:
             # A key the caller sent that the model does not know is never echoed (it could be a secret): `?`.
             fields = [[*e["loc"][:-1], "?"] if e["type"] == "extra_forbidden" else list(e["loc"]) for e in exc.errors()]
@@ -186,8 +227,14 @@ class Writer:
     actor: str
     now: str
     redact: Callable[[str], str] = _identity
+    events: WorkEvents | None = None  # a work-item write needs it (PE-12); the other writes emit nothing
 
     def directory(self) -> Directory:
+        """The actor's own record, read by id: a write lists no whole-org directory (BQ-PPL11C-12)."""
+        me = self.stores.persons.get(self.org, self.actor)
+        return Directory.of([] if me is None else [me.record])
+
+    def org_directory(self) -> Directory:
         return Directory.of(s.record for s in self.stores.persons.list(self.org))
 
     def text(self, value: str) -> str:
@@ -224,15 +271,33 @@ class Writer:
             also()
         if problems:
             raise Refusal(409, "write_refused", code="write_refused", problems=list(problems))
+        work_events = self.events if request.record_kind == "work_item" else None
+        if request.record_kind == "work_item" and work_events is None:
+            raise Refusal(503, "not_configured")  # a write whose event could never be recorded does not happen
         try:
-            if version is None:
-                store.create(after)
-            else:
-                store.replace(after, expected_version=version)
+            stored = store.create(after) if version is None else store.replace(after, expected_version=version)
         except VersionConflict:
             raise Refusal(409, "version_conflict", code="version_conflict") from None
         except NotFound:
             raise denied from None
+        if work_events is not None:
+            try:
+                work_events.record(self.org, self.actor, after)
+            except Exception:
+                self._undo(store, request, stored.version, created=version is None)
+                raise Refusal(503, "unavailable") from None  # never the record's text or the cause
+
+    def _undo(self, store: RecordStore, request: AccessRequest, version: int, *, created: bool) -> None:
+        """The event could not be written: no row may look changed without it (HR-1, PE-30). A created record is
+        deleted, a changed one restored by compare-and-set (content back; the version has moved twice). A record
+        another write has since changed is left alone."""
+        try:
+            if created:
+                store.delete(self.org, request.record["id"], expected_version=version)
+            else:
+                store.replace(request.record, expected_version=version)
+        except (VersionConflict, NotFound):
+            pass
 
     def create(
         self,
@@ -384,22 +449,96 @@ def create_meeting(w: Writer, body: MeetingIn) -> dict[str, Any]:
     return w.create("meeting", record, w.stores.meetings, w.directory())
 
 
-def create_person(w: Writer, body: PersonIn) -> dict[str, Any]:
-    """An org owner adds a member; the id and the org are the server's (PE-17, G1). Answers the membership view."""
+_DIRECTORY_LOCK = (
+    threading.Lock()
+)  # makes "address free, then create" and "org empty, then create" one step per process
+
+
+def _person_record(w: Writer, body: PersonIn, record_id: str, role: str) -> dict[str, Any]:
     r = w.text
-    record: dict[str, Any] = {
-        "id": _mint("u"),
+    return {
+        "id": record_id,
         "org_id": w.org,
         "display_name": r(body.display_name),
         "aliases": [r(a) for a in body.aliases],
         "email": body.email,
         "time_zone": body.time_zone,
         "preferred_channel": body.preferred_channel,
-        "org_role": "member",
+        "org_role": role,
         "memberships": [],
         "created_by": w.stamp(),
     }
-    return project("person", "membership", w.create("person", record, w.stores.persons, w.directory())) or {}
+
+
+def create_person(w: Writer, body: PersonIn) -> dict[str, Any]:
+    """An org owner adds a member; the id and the org are the server's (PE-17, G1). The address is the org's alone
+    (409 `email_taken`, case-insensitive, checked once the actor is allowed). Answers the membership view."""
+    record = _person_record(w, body, _mint("u"), "member")
+
+    def address_is_free() -> None:
+        wanted = body.email.lower()
+        if any(str(s.record.get("email", "")).lower() == wanted for s in w.stores.persons.list(w.org)):
+            raise Refusal(409, "email_taken", code="email_taken")
+
+    with _DIRECTORY_LOCK:
+        made = w.create("person", record, w.stores.persons, w.org_directory(), address_is_free)
+    return project("person", "membership", made) or {}
+
+
+def create_first_person(w: Writer, body: PersonIn) -> dict[str, Any]:
+    """The first person of an empty org is the signed-in principal, as its owner (PE-17, BQ-PPL10-3: minted by
+    tilo-api, outside `decide`). Anyone else, or anyone once the org has a person, is a 403 with no reason."""
+    record = _person_record(w, body, w.actor, "owner")
+    if not conforms("person.schema.json", record):
+        raise Refusal(422, "invalid_record")
+    with _DIRECTORY_LOCK:
+        if w.stores.persons.list(w.org):
+            raise Refusal(403, "forbidden")
+        w.create("person", record, w.stores.persons, Directory.of([record]))  # the founder is its own org owner
+    return project("person", "membership", record) or {}
+
+
+def _view(person: Mapping[str, Any]) -> dict[str, Any]:
+    return project("person", "membership", person) or {}
+
+
+def change_person(
+    w: Writer, person_id: str, action: str, change: Callable[[dict[str, Any]], dict[str, Any]], *, same_ok: bool
+) -> dict[str, Any]:
+    """An org owner changes one person (PE-17): memberships or the role. Two reads (the actor and the target), the
+    stamp is the actor and the clock, everyone else gets the one 404. `same_ok`: a change already made is a 200
+    with no new version (a membership); a role never is (`check_write` refuses owner to owner)."""
+    me, stored = w.stores.persons.get(w.org, w.actor), w.stores.persons.get(w.org, person_id)
+    if me is None or stored is None:
+        raise _not_found()
+    d = Directory.of({r["id"]: r for r in (me.record, stored.record)}.values())
+    before = dict(stored.record)
+    request = AccessRequest(w.actor, action, "person", before, w.now)
+    after = change(before)
+    if same_ok and after == before and decide(request, d).allowed:
+        return _view(before)
+    w.commit(request, after, w.stores.persons, d, _not_found(), version=stored.version)
+    return _view(after)
+
+
+def add_team(w: Writer, person_id: str, team: str) -> dict[str, Any]:
+    def add(person: dict[str, Any]) -> dict[str, Any]:
+        if any(m["team"] == team for m in person["memberships"]):
+            return person
+        return {**person, "memberships": [*person["memberships"], {"team": team, "assigned_by": w.stamp()}]}
+
+    return change_person(w, person_id, "assign_membership", add, same_ok=True)
+
+
+def remove_team(w: Writer, person_id: str, team: str) -> dict[str, Any]:
+    def remove(person: dict[str, Any]) -> dict[str, Any]:
+        return {**person, "memberships": [m for m in person["memberships"] if m["team"] != team]}
+
+    return change_person(w, person_id, "assign_membership", remove, same_ok=True)
+
+
+def set_role(w: Writer, person_id: str, org_role: str) -> dict[str, Any]:
+    return change_person(w, person_id, "set_org_role", lambda p: {**p, "org_role": org_role}, same_ok=False)
 
 
 def create_item(w: Writer, body: ItemIn, owners: Callable[[], deps.SourceOwners]) -> dict[str, Any]:
