@@ -17,7 +17,14 @@ from typing import Any
 import httpx
 from tilo_contracts import ProvidersProfile
 
-from tilo_providers.errors import ProviderError, SafetyError, map_http_status, map_transport_error
+from tilo_providers.errors import (
+    OutputTruncatedError,
+    ProviderError,
+    SafetyError,
+    map_http_status,
+    map_transport_error,
+    truncated_message,
+)
 from tilo_providers.interfaces import (
     Capability,
     GenerateRequest,
@@ -154,6 +161,10 @@ class OpenAICompatModelProvider(ModelProvider):
             # Honesty rule: a blocked completion surfaces as SafetyError,
             # not as ordinary (possibly empty) text.
             raise SafetyError(f"PL-02: blocked by content filter (finish_reason={finish_reason!r})")
+        if finish_reason == "length":
+            # The reply hit its max_tokens cap: cut off or empty, never a reply. No thinking count on this wire.
+            output = None if usage_raw is None else (usage_raw.get("completion_tokens") or 0)
+            raise OutputTruncatedError(truncated_message(output, None), output_tokens=output, thinking_tokens=None)
         tool_calls: list[dict[str, Any]] | None = None
         raw_tool_calls = message.get("tool_calls")
         if raw_tool_calls:
@@ -258,6 +269,12 @@ class OpenAICompatModelProvider(ModelProvider):
                     finish_reason = choice.get("finish_reason")
                     if finish_reason == "content_filter":
                         raise SafetyError(f"PL-02: blocked by content filter (finish_reason={finish_reason!r})")
+                    if finish_reason == "length":
+                        usage_raw = chunk.get("usage")
+                        output = None if not isinstance(usage_raw, dict) else (usage_raw.get("completion_tokens") or 0)
+                        raise OutputTruncatedError(
+                            truncated_message(output, None), output_tokens=output, thinking_tokens=None
+                        )
                     delta = choice.get("delta", {})
                     content = delta.get("content")
                     if content:
