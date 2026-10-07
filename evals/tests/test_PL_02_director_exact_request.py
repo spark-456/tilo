@@ -23,11 +23,11 @@ Sources (read 2026-10-07):
 - Vertex structured output (https://docs.cloud.google.com/vertex-ai/generative-ai/docs/multimodal/control-generated-output):
   a complex schema "can result in an InvalidArgument: 400 error": long property names, long array length limits, enums
   with many values, many optional properties. No numeric limit is published.
-- Gemini API structured output (https://ai.google.dev/gemini-api/docs/structured-output): "null" is a supported type
+- Gemini API structured output (ai.google.dev, structured-output page): "null" is a supported type
   ("include "null" in the type array"); "Very large or deeply nested schemas may be rejected."
-- Model (https://ai.google.dev/gemini-api/docs/models/gemini-3.8-flash): output limit 65,536 tokens; structured
+- Model (ai.google.dev, the Director model page): output limit 65,536 tokens; structured
   outputs and thinking supported; thinking level "minimal is not supported and returns an error".
-- Thinking (https://ai.google.dev/gemini-api/docs/thinking): `max_output_tokens` includes thought tokens (a cap hit is
+- Thinking (ai.google.dev, thinking page): `max_output_tokens` includes thought tokens (a cap hit is
   MAX_TOKENS, not a 400); thinking is dynamic by default when no thinking config is sent.
 """
 
@@ -58,7 +58,7 @@ from tilo_providers.schema_subset import to_gemini_schema
 
 TOPIC = "Plan a two-day offsite for a team of twelve, with an agenda and a budget sheet."  # synthetic
 DUMP = live_topic.ADHOC / "pl02-director-request.redacted.json"  # git-ignored (.gitignore: evals/bank/live/adhoc/)
-MODEL_MAX_OUTPUT = 65_536  # gemini-3.8-flash output limit, ai.google.dev model page (read 2026-10-07)
+MODEL_MAX_OUTPUT = 65_536  # the Director model output limit, ai.google.dev model page (read 2026-10-07)
 ROLE_CAP = 16_384  # config/models.yaml director max_output_tokens
 
 
