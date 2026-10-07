@@ -41,6 +41,7 @@ from _ppl11b_lib import (
     SAM,
     UNMATCHED,
     W_LAUNCH,
+    W_PRIYA,
     AccessSpy,
     DirectorySpy,
     ScriptedDecider,
@@ -50,10 +51,14 @@ from _ppl11b_lib import (
     body_lines,
     hist,
     make_plate,
+    maker,
     model_decision,
+    plate_buggy,
     plate_row,
     plate_s0,
     plate_s1,
+    stamp,
+    strip_volatile,
     work_item,
 )
 from _ppl11b_lib import rig_factory as rig_factory  # noqa: PLC0414  (the fixture)
@@ -361,3 +366,55 @@ def test_FR_PA_08_a_failing_item_store_is_a_failed_answer_never_a_partial_summar
     replied = rig.events()[-1]
     assert replied["type"] == "assistant.replied" and replied["data"]["outcome"] == "failed"
     assert "RuntimeError" in rig.logs() and "item store unavailable" not in rig.logs(), "the log names the type only"
+
+
+# --------------------------------------------------------------------------------------------- review follow-ups
+def _refused_done_item() -> dict:
+    """Sam's own record in the owner index that the oracle refuses him (PE-08: a Tilo-made item whose source and
+    assignment do not hold), done inside the window with the latest done stamp of all."""
+    rec = done_item("wi_wk_refused", SAM, "REFUSED-ITEM-TITLE secret plan", "2026-10-06T09:30:00.000Z")
+    rec["created_by"] = maker("A_notes", "tilo")
+    rec["assigned_by"] = stamp(PRIYA)
+    rec["confirmed_by"] = stamp(SAM)  # not by the assigner: the item was never confirmed by the right person
+    rec["source"] = {"kind": "meeting", "ref": "mt_priya1", "evidence": ["u0004"]}
+    return rec
+
+
+def test_FR_PA_08_weekly_an_owned_item_the_oracle_refuses_is_not_counted_cited_or_leaked(rig_factory, monkeypatch):
+    spy = AccessSpy(monkeypatch)
+    plain = _rig(rig_factory)
+    plain_response = plain.ask("Weekly summary")
+    with_refused = _rig(rig_factory, records=[*week_records(), _refused_done_item()])
+    response = with_refused.ask("Weekly summary")
+    assert strip_volatile(response.json()) == strip_volatile(plain_response.json())
+    assert body_lines(response.json()) == S1_WEEK_LITERAL, "same Done count and citation as without the item"
+    assert with_refused.events()[-1]["data"]["sources"] == plain.events()[-1]["data"]["sources"]
+    assert with_refused.events()[-1]["summary"] == plain.events()[-1]["summary"]
+    surfaces = with_refused.surfaces(response)
+    assert_no_leak(surfaces, ["wi_wk_refused", "REFUSED-ITEM-TITLE"], where="weekly refused item")
+    assert "wi_wk_refused" in spy.record_ids(), "the oracle was asked about it (it is in Sam's owner index)"
+
+
+def test_FR_PA_08_weekly_counts_only_gated_plate_rows_not_a_buggy_builders_rows(rig_factory):
+    buggy = plate_buggy(SAM)
+    buggy["rows"].append(plate_row("world", W_PRIYA, "run", "rest", PRIYA_TITLES["wi_priya_2"], at=NOW))
+    buggy["rows"].append(
+        plate_row(
+            "work_item", "wi_priya_2", "work_item", "overdue", PRIYA_TITLES["wi_priya_2"], due="2026-10-01", at=NOW
+        )
+    )
+    rig = _rig(rig_factory, plate=buggy)
+    response = rig.ask("Weekly summary")
+    body = response.json()
+    assert body_lines(body) == S1_WEEK_LITERAL, "the counts and sources of the clean plate"
+    sentinels = [*rig.world.sentinels, W_PRIYA, "wi_priya_2", "wi_priya_1", "wi_sam_proposed"]
+    assert_no_leak(rig.surfaces(response), sentinels, where="weekly buggy plate")
+
+
+def test_FR_PA_08_weekly_asks_the_oracle_nothing_about_items_that_are_not_done(rig_factory, monkeypatch):
+    spy = AccessSpy(monkeypatch)
+    rig = _rig(rig_factory)
+    assert body_lines(rig.ask("Weekly summary").json()) == S1_WEEK_LITERAL
+    asked = spy.record_ids()
+    assert {"wi_wk_h", "wi_wk_i"}.isdisjoint(asked), "a reopened and a dropped item are never read through the oracle"
+    assert {"wi_wk_a", "wi_wk_b"} <= asked, "the finished items are"

@@ -165,7 +165,8 @@ def _finished(people: PeopleStores, gate: RefGate, org: str, user: str) -> Calla
     """FR-PA-08: the person's own work items as the oracle shows them to them (one owner-index read per request)."""
 
     def read() -> list[Mapping[str, Any]]:
-        views = (gate.record(Ref("work_item", s.record["id"])) for s in people.work_items.list(org, "owner", user))
+        done = (s.record["id"] for s in people.work_items.list(org, "owner", user) if s.record.get("status") == "done")
+        views = (gate.record(Ref("work_item", wid)) for wid in done)  # a not-done item is never read, nor counted
         return [v for v in views if v is not None]
 
     return read
