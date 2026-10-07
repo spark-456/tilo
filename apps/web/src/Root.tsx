@@ -3,18 +3,15 @@
 // Park app is a dynamic import, so a visit to a kept screen never loads it (NFR-01). `isParkPath` is the one
 // shared predicate for the split (WEB-CUTOVER).
 import { Suspense, lazy } from "react";
-import { App } from "./App";
 import { isParkPath } from "./park/app/router";
 import { usePathname } from "./router";
 
+// Both apps are chunks: the landing (Park Home) never ships the old app's shell, and a kept screen never
+// loads the Park app (NFR-01).
+const App = lazy(() => import("./App").then((m) => ({ default: m.App })));
 const ParkApp = lazy(() => import("./park/app/ParkApp"));
 
 export function Root() {
   const pathname = usePathname();
-  if (!isParkPath(pathname)) return <App />;
-  return (
-    <Suspense fallback={null}>
-      <ParkApp />
-    </Suspense>
-  );
+  return <Suspense fallback={null}>{isParkPath(pathname) ? <ParkApp /> : <App />}</Suspense>;
 }
