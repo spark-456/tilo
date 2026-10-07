@@ -157,8 +157,10 @@ def test_PPL_11c_FS_16_replace_that_moves_an_address_it_does_not_hold_fails_loud
     org, db, persons = _org_stores()
     _seed_person(db, org, email="old@example.com")
     db.put(email_path(org, "old@example.com"), OTHER)
+    # built outside the `with`: the traceback shows the call line
+    moved = person("u_nina", org, email="new@example.com")
     with pytest.raises(errors.PeopleError) as caught:
-        persons.replace(person("u_nina", org, email="new@example.com"), expected_version=1)
+        persons.replace(moved, expected_version=1)
     _loud(caught)
     assert db.raw(email_path(org, "old@example.com")) == OTHER, "another person's reservation was deleted"
     assert db.raw(email_path(org, "new@example.com")) is None, "the new address was reserved on an inconsistent store"
@@ -207,8 +209,10 @@ def test_PPL_11c_FS_16_on_the_emulator_replace_that_moves_an_address_it_does_not
     stores = fs_backend.stores()
     stores.persons.create(person("u_nina", org, email="old@example.com"))
     client.document(email_path(org, "old@example.com")).set(OTHER)
+    # built outside the `with`: the traceback shows the call line
+    moved = person("u_nina", org, email="new@example.com")
     with pytest.raises(errors.PeopleError) as caught:
-        stores.persons.replace(person("u_nina", org, email="new@example.com"), expected_version=1)
+        stores.persons.replace(moved, expected_version=1)
     _loud(caught)
     assert raw(client, email_path(org, "old@example.com")) == OTHER
     assert raw(client, email_path(org, "new@example.com")) is None
