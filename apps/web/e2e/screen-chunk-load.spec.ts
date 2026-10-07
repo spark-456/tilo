@@ -20,7 +20,7 @@ for (const viewport of [DESKTOP, MOBILE]) {
       await new Promise((r) => setTimeout(r, 1200));
       await route.continue();
     });
-    await page.goto("/worlds", { waitUntil: "commit" });
+    await page.goto("/worlds/replays", { waitUntil: "commit" });
     const frame = page.getByTestId("screen-page");
     await expect(page.getByTestId("screen-loading")).toBeVisible({ timeout: 20_000 }); // a cold dev server
     const before = await frame.boundingBox();
@@ -38,7 +38,7 @@ for (const viewport of [DESKTOP, MOBILE]) {
     await page.setViewportSize(viewport);
     const problems = collect(page);
     await page.route(S14_MODULE, (route) => route.abort());
-    await page.goto("/worlds");
+    await page.goto("/worlds/replays");
     const failed = page.getByTestId("screen-chunk-failed");
     await expect(failed).toBeVisible({ timeout: 20_000 });
     await expect(failed).toContainText("This page did not load.");
@@ -57,7 +57,7 @@ test("NFR-01 a nav click to a code-split screen still moves focus to the new hea
   page,
 }) => {
   await page.setViewportSize(DESKTOP);
-  await page.goto("/worlds");
+  await page.goto("/worlds/replays");
   await expect(page.getByRole("heading", { level: 1, name: "Worlds" })).toBeVisible({
     timeout: 20_000,
   });

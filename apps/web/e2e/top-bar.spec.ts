@@ -10,9 +10,9 @@ const W = "/world/w_village_basic";
 // [path, the place's name, the lens or step after it ("" for none)]. A world route's name is the
 // run's recorded title once its first event is in.
 const PLACES: ReadonlyArray<readonly [string, RegExp, string]> = [
-  ["/", /^Home$/, ""],
-  ["/worlds", /^Worlds$/, ""],
-  [`${W}`, /Triage my inbox/, ""],
+  ["/connections", /^Connections$/, ""],
+  ["/worlds/replays", /^Worlds$/, ""],
+  [`${W}/stage`, /Triage my inbox/, ""],
   [`${W}/story`, /Triage my inbox/, "Story"],
   [`${W}/trace`, /Triage my inbox/, "Trace"],
   ["/needs-you", /^Needs you$/, ""],
@@ -53,7 +53,7 @@ for (const viewport of [DESKTOP, MOBILE, SMALL]) {
     page,
   }) => {
     await page.setViewportSize(viewport);
-    for (const path of ["/", "/worlds", `${W}`, `${W}/story`]) {
+    for (const path of ["/needs-you", "/worlds/replays", `${W}/stage`, `${W}/story`]) {
       await page.goto(`${path}?speed=1000`);
       const bar = await page.getByTestId("top-bar").boundingBox();
       const barBottom = (bar?.y ?? 0) + (bar?.height ?? 0);
@@ -112,7 +112,7 @@ test("UX-227-C1 the bar draws no user, plan or avatar: the client has none (HR-1
   page,
 }) => {
   await page.setViewportSize(DESKTOP);
-  await page.goto("/worlds");
+  await page.goto("/worlds/replays");
   const text = await page.getByTestId("top-bar").innerText();
   expect(text).not.toMatch(/plan|team plan|free|pro\b|enterprise|alex|\bAM\b/i);
   await expect(page.getByTestId("top-bar").locator("img")).toHaveCount(0);
@@ -133,8 +133,10 @@ test("UX-227-C1 the bar names a ?fixture= replay's world and keeps the HR-4 bann
   page,
 }) => {
   await page.setViewportSize(DESKTOP);
-  await page.goto("/?fixture=village-basic&seq=44");
-  await expect(page.getByTestId("top-bar-place")).toHaveText(/^World$/);
+  await page.goto(`${W}/stage?fixture=village-basic&seq=44`);
+  // WEB-CUTOVER: the replay is drawn at a world address now, so the bar names it by its recorded title
+  // (it said "World" at "/", where no world was addressed).
+  await expect(page.getByTestId("top-bar-place")).toHaveText(/Triage my inbox/);
   await expect(page.getByTestId("fixture-replay-banner")).toBeVisible();
   const banner = await page.getByTestId("fixture-replay-banner").boundingBox();
   const bar = await page.getByTestId("top-bar").boundingBox();
@@ -145,7 +147,7 @@ test("UX-227-C1 at 1920 the bar's row is capped at 1440 px and centred, the bar 
   page,
 }) => {
   await page.setViewportSize({ width: 1920, height: 1080 });
-  await page.goto("/worlds?speed=1000");
+  await page.goto("/worlds/replays?speed=1000");
   const bar = await page.getByTestId("top-bar").boundingBox();
   expect(bar?.width).toBe(1920);
   const logo = await page.getByRole("link", { name: "Tilo home" }).boundingBox();
