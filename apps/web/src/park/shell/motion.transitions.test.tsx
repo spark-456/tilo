@@ -146,7 +146,7 @@ describe("WEB-MOTION-2 unit: the world loader's card fades after the last step (
     tick(sch, 2);
     expect(navigate).not.toHaveBeenCalled();
     tick(sch);
-    expect(navigate).toHaveBeenCalledWith("/park/world/comp");
+    expect(navigate).toHaveBeenCalledWith("/world/comp");
     expect(loader()).not.toBeNull();
     tick(sch); // step 4: the card starts to fade
     expect(loader(), "the card is cut instead of fading").not.toBeNull();
@@ -165,7 +165,7 @@ describe("WEB-MOTION-2 unit: the world loader's card fades after the last step (
     expect((loader() as Element).textContent).toContain("Competitor pricing");
     expect((loader() as Element).textContent).toContain("OPENING VILLAGE");
     tick(sch, 3);
-    expect(navigate).toHaveBeenLastCalledWith("/park/world/comp");
+    expect(navigate).toHaveBeenLastCalledWith("/world/comp");
     drain(sch);
     expect(loader()).toBeNull();
   });
