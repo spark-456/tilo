@@ -31,6 +31,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import JSONResponse
 
 from tilo_api import runs
+from tilo_api.cards import as_read_by
 from tilo_api.deps import Principal, Store, get_current_principal, get_store
 from tilo_api.worlds_list import _MAX_CURSOR_CHARS, _b64, _unb64
 
@@ -95,8 +96,9 @@ def _world_cards(principal: Principal, store: Store, world_id: str) -> list[tupl
     found = []
     for card in cards:
         if isinstance(card, dict) and all(isinstance(card.get(k), str) for k in ("created_at", "id", "world_id")):
-            found.append(((card["created_at"], card["world_id"], card["id"]), card))
-    return found
+            found.append(card)
+    shown = as_read_by(principal, world_id, found)  # what the per-world route shows this session (BQ-XWORLD-9)
+    return [((card["created_at"], card["world_id"], card["id"]), card) for card in shown]
 
 
 @router.get("/cards")
