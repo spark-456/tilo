@@ -80,22 +80,24 @@ function RoutineList({ api, first }: { api: SchedulesApi; first: readonly Schedu
                 {asking === row.schedule_id && (
                   <div role="alertdialog" aria-label="Delete routine" className="flow-notice">
                     <p>{`Delete "${row.title}"? It will not run again.`}</p>
-                    <button
-                      type="button"
-                      className="secondary"
-                      disabled={busy !== null}
-                      onClick={() => remove(row)}
-                    >
-                      Delete routine
-                    </button>{" "}
-                    <button
-                      type="button"
-                      className="secondary"
-                      disabled={busy !== null}
-                      onClick={() => setAsking(null)}
-                    >
-                      Keep routine
-                    </button>
+                    <div style={{ display: "flex", gap: "var(--space-12)", flexWrap: "wrap" }}>
+                      <button
+                        type="button"
+                        className="secondary"
+                        disabled={busy !== null}
+                        onClick={() => remove(row)}
+                      >
+                        Delete routine
+                      </button>
+                      <button
+                        type="button"
+                        className="secondary"
+                        disabled={busy !== null}
+                        onClick={() => setAsking(null)}
+                      >
+                        Keep routine
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>
@@ -104,6 +106,7 @@ function RoutineList({ api, first }: { api: SchedulesApi; first: readonly Schedu
                 type="button"
                 className="secondary"
                 disabled={busy !== null}
+                aria-label={`${row.enabled ? "Pause" : "Resume"} ${row.title}`}
                 onClick={() => setEnabled(row, !row.enabled)}
               >
                 {row.enabled ? "Pause" : "Resume"}
@@ -112,6 +115,7 @@ function RoutineList({ api, first }: { api: SchedulesApi; first: readonly Schedu
                 type="button"
                 className="secondary"
                 disabled={busy !== null}
+                aria-label={`Delete ${row.title}`}
                 onClick={() => setAsking(row.schedule_id)}
               >
                 Delete

@@ -65,7 +65,7 @@ export function S_22() {
       <Section
         title="Routines"
         note="Runs that repeat every week. Set one with Repeat weekly when you start a run."
-        reserve={6}
+        reserve={[6, 10]}
       >
         <Routines />
       </Section>
