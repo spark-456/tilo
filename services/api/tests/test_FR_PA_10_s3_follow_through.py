@@ -37,8 +37,16 @@ pytestmark = pending("s3")
 class _Desks:
     """`deps.get_desk_worlds()`: the person's one Desk world, the same id the assistant route uses."""
 
+    def __init__(self) -> None:
+        self.owners: dict[str, str] = {}
+
     def desk_world(self, org_id: str, user_id: str) -> str:
-        return desk_ids(user_id, org_id)[0]
+        world = desk_ids(user_id, org_id)[0]
+        self.owners[world] = user_id
+        return world
+
+    def desk_owner(self, world_id: str) -> str | None:  # added by #576 (world ownership) to the protocol
+        return self.owners.get(world_id)
 
 
 def wire_writes(rig: Rig) -> None:
