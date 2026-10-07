@@ -36,7 +36,6 @@ from _ppl11a_lib import (
 # a substring of a pytest node id, so it names a whole file; a slice that goes green with its entry still here
 # fails (strict), which is the reminder to delete it. Guards (`test_PPL_11c_guards.py`) are never pending.
 SLICE_PENDING: tuple[str, ...] = (
-    "test_PPL_11c_s4_",  # limits: body cap, idempotency key, rate cap, no whole-org listing, no-store, dev CORS
     "test_PPL_11c_s5_",  # PE-12 events (also needs the ADR-0009 contract change for `vis: []`)
 )
 # Tests inside a pending file that pass as soon as an earlier slice lands (a negative test: "a refused work-item write

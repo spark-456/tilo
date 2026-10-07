@@ -530,3 +530,31 @@ def test_PPL_11c_s4_BQ_PPL11C_4_the_dev_browser_may_send_an_idempotency_key_and_
     real = client.get("/v1/plate", headers={"Origin": dev.DEFAULT_ORIGIN})
     assert real.status_code == 200
     assert "retry-after" in real.headers.get("access-control-expose-headers", "").lower()
+
+
+# --- supervisor decisions of 7 Oct (BQ-PPL11C-13, BQ-PPL11C-14) -------------------------------------------------------
+
+
+def test_PPL_11c_s4_BQ_PPL11C_13_an_oversize_body_counts_against_the_rate_cap(people_rig):
+    """Every authenticated write attempt counts, a 413 included: oversized-payload spam cannot bypass the limiter."""
+    rig = work_rig(people_rig)
+    for n in range(WRITES_PER_MINUTE):
+        oversize = rig.client.post(
+            "/v1/work-items", content=b" " * (MAX_BODY_BYTES + 1), headers={"content-type": "application/json"}
+        )
+        assert oversize.status_code == 413, n
+    over = rig.post("/v1/work-items", WORK_ITEM_BODY)
+    assert over.status_code == 429 and over.json()["code"] == "rate_limited", over.text[:200]
+
+
+def test_PPL_11c_s4_BQ_PPL11C_14_an_idempotency_key_is_scoped_to_the_route_as_well_as_the_principal(people_rig):
+    """The same key on another create route is another request, never a replay (or a reuse) of the first route's."""
+    rig = work_rig(people_rig)
+    item = rig.client.post("/v1/work-items", json=WORK_ITEM_BODY, headers=KEY)
+    assert item.status_code == 201
+    meetings = len(rig.real.meetings.list(rig.org))
+    meeting = rig.client.post("/v1/meetings", json=MEETING_BODY, headers=KEY)
+    assert meeting.status_code == 201 and meeting.json()["id"].startswith("mt_"), meeting.text[:200]
+    assert len(rig.real.meetings.list(rig.org)) == meetings + 1
+    assert rig.client.post("/v1/work-items", json=WORK_ITEM_BODY, headers=KEY).content == item.content
+    assert rig.client.post("/v1/meetings", json=MEETING_BODY, headers=KEY).content == meeting.content
