@@ -58,7 +58,7 @@ from tilo_policy.schemas import conforms
 # FR-PA-10 slices are strict xfails until the builder removes the entry (API_FR_PA_10.md section 0). A test module
 # names its slice with `pending("s1")`; a slice that goes green with its entry still here fails (strict), which is the
 # reminder to delete it. The guards file is never pending. See the real failures with `--runxfail`.
-SLICE_PENDING: tuple[str, ...] = ("s1", "s2", "s3")
+SLICE_PENDING: tuple[str, ...] = ()
 
 
 def pending(slice_name: str) -> list[Any]:
