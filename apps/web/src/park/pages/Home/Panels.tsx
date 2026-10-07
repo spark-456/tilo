@@ -2,6 +2,9 @@
 // Tilo App Home.dc.html): map pins, the greeting panel, the Today panel and the composer's panels.
 // Presentation only: HomePage.tsx owns the data, the composer state and every navigation call.
 import type { MouseEvent, ReactNode } from "react";
+import type { Dec, Decision, Ledger } from "../../api/types";
+import { kpis } from "../../app/ledgerKpis";
+import { KpiTile } from "../../components";
 import {
   type LiveRow,
   type NextEvent,
@@ -185,5 +188,42 @@ export function TodayPanel({
         <span className="park-home-spend__note">{spend.forecast}</span>
       </button>
     </aside>
+  );
+}
+
+/**
+ * The five spend tiles of the Ledger (FR-SPD-01), the same `kpis()` and `KpiTile`, read from the ledger this
+ * page loaded. "Waiting on you" is the one control: it opens the world its decision is in, or else the world
+ * that needs you.
+ */
+export function KpiStrip({
+  ledger,
+  dec,
+  decisions,
+  fallbackWorld,
+  onWorld,
+}: {
+  ledger: Ledger;
+  dec: Dec;
+  decisions: readonly Decision[];
+  fallbackWorld: string | undefined;
+  onWorld: (id: string) => void;
+}) {
+  return (
+    <section aria-label="Spend at a glance" className="park-home-kpis park-home-glass">
+      {kpis(ledger, dec, decisions).map((k) => {
+        const world = k.tone === "amber" ? (k.opensWorld ?? fallbackWorld) : undefined;
+        return (
+          <KpiTile
+            key={k.label}
+            label={k.label}
+            value={k.value}
+            {...(k.sub ? { sub: k.sub } : {})}
+            {...(k.tone ? { tone: k.tone } : {})}
+            {...(world ? { onClick: () => onWorld(world) } : {})}
+          />
+        );
+      })}
+    </section>
   );
 }
