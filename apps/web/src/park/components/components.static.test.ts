@@ -8,6 +8,10 @@ import { readFileSync, readdirSync, statSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { ALLOWLIST, RULES, scanSource } from "../../../test-support/honestyScan";
+
+// The Park city's ambient scenery (shell and engines) is decoration, not work: its animation entries are
+// pinned by src/honesty/park-ambient.allowlist.test.ts. Every other entry stays pinned exactly here.
+const AMBIENT = /^src\/park\/(shell|engines)\//;
 import { COMPONENTS_DIR } from "../../../test-support/park/componentsCss";
 import { PARK_DIR } from "../../../test-support/park/prototype";
 import { parkTypeErrors } from "../../../test-support/park/typecheck";
@@ -174,10 +178,9 @@ describe("WEB_2_static: honesty (FR-WLD-09) and motion (BQ-WEB-3)", () => {
   });
 
   it("WEB_2_static_the_honesty_allowlist_and_rules_are_unchanged", () => {
-    expect(ALLOWLIST.map((e) => `${e.file}|${e.rule}`)).toEqual([
-      "src/world/runWorld.ts|raf",
-      "src/stage/Stage.tsx|raf",
-    ]);
+    expect(
+      ALLOWLIST.filter((e) => !AMBIENT.test(e.file)).map((e) => `${e.file}|${e.rule}`),
+    ).toEqual(["src/world/runWorld.ts|raf", "src/stage/Stage.tsx|raf"]);
     expect(RULES.map((r) => r.id)).toEqual([
       "raf",
       "interval",
