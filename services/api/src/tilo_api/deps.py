@@ -76,6 +76,8 @@ class Principal:
     channel: Channel = "web"  # the session channel sign-in resolved for this request (FR-HIL-07,
     # world.paused.data.channel is derived from here, never from a request body
     districts: tuple[str, ...] = ()  # visible beyond vis: "all"; ignored for role == "owner"
+    full_session: bool = False  # a full web sign-in session (BQ-XWORLD-10): set only by the server that resolves the
+    # session, never from anything in a request; needed to answer, or read in full, another owned world's cards
 
 
 @dataclass
@@ -465,6 +467,16 @@ class MeetingWorlds(Protocol):
 
 def get_meeting_worlds() -> MeetingWorlds:
     raise HTTPException(status_code=503, detail="not_configured")  # production wiring lands with the Outpost world
+
+
+class DeskWorlds(Protocol):
+    """The one Desk world of a person, made lazily and idempotently: where their work-item events go (PE-12)."""
+
+    def desk_world(self, org_id: str, user_id: str) -> str: ...
+
+
+def get_desk_worlds() -> DeskWorlds:
+    raise HTTPException(status_code=503, detail="not_configured")  # production wiring lands with the Desk
 
 
 def get_run_archive() -> Callable[..., RunArchive]:

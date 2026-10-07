@@ -24,7 +24,7 @@ import re
 import secrets
 import threading
 from collections.abc import Callable, Mapping
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any, Protocol
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
@@ -717,6 +717,55 @@ def session_allows(principal: Principal, claimed: str, from_channels: bool) -> b
     return principal.channel in _WEB_CHANNELS and claimed in _WEB_CHANNELS
 
 
+def answering_principal(
+    principal: Principal, world_id: str, *, record_owner: str | None, cards: CardStore, from_channels: bool
+) -> Principal | None:
+    """Who answers a card in `world_id` (BQ-XWORLD-1, BQ-XWORLD-2). A session bound to that world, unchanged. Otherwise
+    only role owner, on the user's own web or mobile_web session (never a tilo-channels caller, so never an email link),
+    when both the world's record owner and its run's CardStore owner are the caller: the principal narrowed to that
+    world, role and user unchanged, and only on a full web sign-in session (`full_session`, BQ-XWORLD-10), so a
+    signed-link landing session stays bound. Anything else is None, the unknown-world 404. Checked on every request."""
+    if principal.world_id == world_id:
+        return principal
+    me = principal.user_id
+    if principal.role != "owner" or principal.channel not in _WEB_CHANNELS or from_channels:
+        return None
+    if not principal.full_session:
+        return None
+    if record_owner != me or cards.owner_of(world_id) != me:
+        return None
+    return replace(principal, world_id=world_id)
+
+
+def reading_principal(principal: Principal, world_id: str, *, record_owner: str | None) -> Principal | None:
+    """Who reads `world_id`'s cards (BQ-XWORLD-6): a session bound to it, or its record owner with role owner on any
+    channel, as `GET /cards` shows them (narrowed to that world); anyone else is None, the unknown-world 404. What the
+    owner sees there, full or redacted, is `as_read_by`'s (BQ-XWORLD-9)."""
+    if principal.world_id == world_id:
+        return principal
+    if principal.role == "owner" and record_owner == principal.user_id:
+        return replace(principal, world_id=world_id)
+    return None
+
+
+_SUMMARY_KEYS = ("id", "world_id", "kind", "created_at", "timeout")
+
+
+def as_read_by(session: Principal, world_id: str, cards: list[dict]) -> list[dict]:
+    """What `session` reads of `world_id`'s cards (BQ-XWORLD-9): in full in its bound world or on a full web sign-in;
+    otherwise each card as a summary built from an allowlist (ids, kind, timing, the gate's tier), never free text."""
+    if session.world_id == world_id or session.full_session:
+        return cards
+    summaries = []
+    for card in cards:
+        gate = card.get("gate")
+        summary = {key: card.get(key) for key in _SUMMARY_KEYS}
+        summary["risk_tier"] = gate.get("risk_tier") if isinstance(gate, dict) else None
+        summary["redacted"] = True
+        summaries.append(summary)
+    return summaries
+
+
 def get_channels_caller() -> bool:
     """True only when the request was authenticated as tilo-channels, acting for the principal
     (service-to-service auth lands with sign-in, PRD 15.3). Until then no caller is, so every
@@ -725,24 +774,31 @@ def get_channels_caller() -> bool:
 
 
 def build_router(
-    cards: CardStore | Callable[..., CardStore], *, answer_guard: Callable[..., None] | None = None
+    cards: CardStore | Callable[..., CardStore],
+    *,
+    answer_guard: Callable[..., None] | None = None,
+    world_owner: Callable[..., str | None] | None = None,
 ) -> APIRouter:
     """`cards` is one CardStore, or a dependency that finds the world's own; `answer_guard` (a dependency) may
-    refuse an answer before the store sees it."""
+    refuse an answer before the store sees it; `world_owner` (a dependency) names the path world's record owner, so
+    an owner reads and answers across the worlds they own (S-06); without it every route stays bound to one world."""
     router = APIRouter()
     get_cards = cards if not isinstance(cards, CardStore) else (lambda: cards)
     guards = [Depends(answer_guard)] if answer_guard is not None else []
+    get_owner = world_owner or (lambda: None)
 
     @router.get("/worlds/{world_id}/cards")
     def list_cards(
         world_id: str,
         principal: Principal = Depends(get_current_principal),
         store: CardStore = Depends(get_cards),
+        record_owner: str | None = Depends(get_owner),
     ) -> list[dict]:
-        if principal.world_id != world_id:
+        reader = reading_principal(principal, world_id, record_owner=record_owner)
+        if reader is None:
             raise HTTPException(status_code=404)  # same as an unknown world
         try:
-            return store.list_for_world(world_id, principal=principal)
+            return as_read_by(principal, world_id, store.list_for_world(world_id, principal=reader))
         except PermissionError as exc:
             raise HTTPException(status_code=403) from exc
 
@@ -754,12 +810,16 @@ def build_router(
         principal: Principal = Depends(get_current_principal),
         from_channels: bool = Depends(get_channels_caller),
         store: CardStore = Depends(get_cards),
+        record_owner: str | None = Depends(get_owner),
     ) -> JSONResponse:
-        if principal.world_id != world_id:
-            raise HTTPException(status_code=404)
+        actor = answering_principal(
+            principal, world_id, record_owner=record_owner, cards=store, from_channels=from_channels
+        )
+        if actor is None:
+            raise HTTPException(status_code=404)  # same as an unknown world, before any other check
         if body.pin_verified or (not from_channels and body.channel not in _WEB_CHANNELS):
             return JSONResponse(status_code=403, content={"outcome": "rejected", "reason": "channel_not_permitted"})
-        if not session_allows(principal, body.channel, from_channels):
+        if not session_allows(actor, body.channel, from_channels):
             return JSONResponse(status_code=400, content={"outcome": "rejected", "reason": "invalid_channel"})
         try:
             result = store.answer(
@@ -767,12 +827,17 @@ def build_router(
                 card_id,
                 option=body.option,
                 channel=body.channel,
-                principal=principal,
+                principal=actor,
             )
         except Exception as exc:  # the event write failed; the card stays open and the answer can be sent again
             logger.warning("a card answer could not be written: %s", type(exc).__name__)
             return JSONResponse(status_code=503, content={"outcome": "error", "reason": "event_write_failed"})
         if result.outcome == "answered":
+            if actor is not principal:  # BQ-XWORLD-5: an operations record of a cross-world answer, ids only
+                logger.info(
+                    "cross-world answer: user %s, session world %s, target world %s, card %s, option %s",
+                    actor.user_id, principal.world_id, world_id, card_id, body.option,
+                )  # fmt: skip
             return JSONResponse(status_code=200, content={"outcome": "answered"})
         return JSONResponse(
             status_code=_STATUS.get(result.reason or "", 400), content={"outcome": "rejected", "reason": result.reason}
