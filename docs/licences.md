@@ -89,6 +89,11 @@ one runtime dependency, the IANA zone database for `zoneinfo` (Windows and slim 
 | --- | --- | --- |
 | tzdata | Apache-2.0 | https://pypi.org/project/tzdata/ |
 
+## Python (`packages/logging`)
+
+`tilo-logging` (NFR-26) uses the standard library only (no external dependency). `tilo-api` and `tilo-harness`
+now depend on the in-workspace `tilo-logging` (not external). No new licence.
+
 ## Python (`services/connectors`)
 
 `tilo-connectors` declares `jsonschema` and `referencing` as runtime dependencies (ticket ST-2 /

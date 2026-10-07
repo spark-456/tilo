@@ -33,6 +33,7 @@ from _fr_agt_14_lib import (
     WEEK,
     SchedApi,
     bearer,
+    task_body,
 )
 from tilo_harness.schedule import StartSkipped, next_slot
 from tilo_harness.schedule_store import MAX_FAILURES
@@ -114,12 +115,31 @@ def test_FR_AGT_14_a_verified_token_of_the_wrong_caller_builds_neither_the_seams
     assert counters.both() == (0, 0)
 
 
-def test_FR_AGT_14_a_good_token_resolves_the_seams_and_the_store_once_each(sched: SchedApi, counters: Counters) -> None:
+def test_FR_AGT_14_a_good_token_resolves_the_store_once_and_the_fan_out_builds_no_seams(
+    sched: SchedApi, counters: Counters
+) -> None:
+    """Changed deliberately by FR-AGT-14e (BQ-AGT14-5 R7): the Scheduler's call only hands slots to Cloud Tasks and runs
+    nothing, so it needs the schedule store (once per request, never cached) but NOT the run seams (was `(1, 1)`)."""
     response = sched.tick()
     assert (response.status_code, response.json()) == (200, {"fired": 0})
-    assert counters.both() == (1, 1)
+    assert counters.both() == (0, 1)
     assert sched.tick().status_code == 200
-    assert counters.both() == (2, 2)  # once per request: never cached across requests
+    assert counters.both() == (0, 2)  # once per request: never cached across requests
+
+
+def test_FR_AGT_14_a_tasks_delivery_resolves_the_store_and_the_seams_once_each_after_its_token_and_body(
+    sched: SchedApi, counters: Counters
+) -> None:
+    """The Tasks mode (the same route, FR-AGT-14e) is the one that runs work, so it does build the seams: once, and
+    only for a well-formed body from the Tasks identity."""
+    assert sched.task_call({"schedule_id": "nope"}).status_code == 422  # a bad body costs neither
+    assert sched.tick(sched.good_token, json=task_body("sched_a", MON_0330Z)).status_code in (403, 422)  # nor does a
+    assert counters.both() == (0, 0)  # task body from the Scheduler's identity
+    response = sched.task_call(task_body("sched_gone", MON_0330Z))
+    assert response.status_code < 600
+    assert counters.both() == (1, 1)
+    sched.task_call(task_body("sched_gone", MON_0330Z))
+    assert counters.both() == (2, 2)
 
 
 @pytest.mark.parametrize("unset", [(ENV_AUDIENCE,), (ENV_CALLER,), (ENV_AUDIENCE, ENV_CALLER)])
@@ -201,32 +221,8 @@ def test_FR_AGT_14_the_starter_with_no_seams_raises_the_uncounted_skip_and_creat
     assert set(sched.store.worlds) == worlds
 
 
-def test_FR_AGT_14_through_the_tick_unwired_seams_never_count_against_a_schedule(sched: SchedApi) -> None:
-    """The seams factory answers None (unwired). 25 schedules, 20 ticks a minute apart: none is disabled, backed off or
-    given a failure, and the slot stays the same."""
-    from tilo_api import schedules
-
-    sched.app.dependency_overrides[schedules.get_seams_factory] = lambda: lambda: None
-    task = sched.approved_task()
-    ids = [f"sched_u{n:02d}" for n in range(25)]
-    for schedule_id in ids:
-        sched.insert(task, schedule_id)
-    worlds = set(sched.store.worlds)
-    assert 20 > MAX_FAILURES
-    for minute in range(20):
-        sched.clock.set(MON_0330Z + timedelta(minutes=minute))
-        response = sched.tick()
-        assert (response.status_code, response.json()) == (200, {"fired": 0})
-    for schedule_id in ids:
-        got = sched.schedules.get(schedule_id)
-        assert (got.enabled, got.failures, got.last_error, got.backoff_until, got.next_due) == (
-            True,
-            0,
-            None,
-            None,
-            MON_0330Z,
-        ), schedule_id
-    assert set(sched.store.worlds) == worlds
+# (FR-AGT-14e retired `..._through_the_tick_unwired_seams_never_count_against_a_schedule`: the tick no longer runs
+# anything, so unwired seams are met by the task's delivery; `test_FR_AGT_14e_unwired_run_seams_are_retryable_...`.)
 
 
 # --- 4. PATCH enabled:true moves a stale next_due -------------------------------------------------------------------

@@ -41,11 +41,13 @@ from __future__ import annotations
 
 import asyncio
 import dataclasses
+import functools
 import math
 from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass, field
 from typing import Any, Protocol
 
+from tilo_logging.context import bound
 from tilo_providers.interfaces import GenerateRequest, ModelProvider
 from tilo_providers.prompts import load_prompt
 
@@ -508,6 +510,21 @@ class _Run:
             )
 
 
+def _logged_with_run_ids[**P, R](work: Callable[P, Awaitable[R]]) -> Callable[P, Awaitable[R]]:
+    """NFR-26: every log line made while the run works carries the run and world ids its writer was opened with
+    (a contextvar, so two runs in one process never share them); outside the run there are none.
+    `writer` is keyword-only in `run_plan` (a test pins it), so `kwargs` cannot miss a positional one."""
+
+    @functools.wraps(work)
+    async def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
+        writer = kwargs.get("writer")
+        with bound(run_id=getattr(writer, "run_id", None), world_id=getattr(writer, "world_id", None)):
+            return await work(*args, **kwargs)
+
+    return wrapper
+
+
+@_logged_with_run_ids
 async def run_plan(
     plan: dict[str, Any],
     layout: dict[str, Any],

@@ -3,8 +3,9 @@ services/api/tests/API_SEC_15.md).
 
 Everything here is deterministic code; a model never decides who gets in. The declaration is a record behind a
 store seam (`deps.get_access_store`), set once, and read only for the verified `Principal`, never from a header,
-query, cookie or body field. `AccessGate` is the first thing a deployed request meets: it refuses every route that
-is not in `PUBLIC_ROUTES` before any body is read or any world looked up. Not deployed (no `K_SERVICE` or
+query, cookie or body field. `AccessGate` runs before any store or world work (only middleware with no I/O, such as the
+log context and no-store headers, wraps it): it refuses every route that is not in `PUBLIC_ROUTES` before any body
+is read or any world looked up. Not deployed (no `K_SERVICE` or
 `CLOUD_RUN_JOB`) nothing is enforced, so CI and `just dev-api` behave as before.
 
 `provider_mode` is the one decision about live models for a request: pure, no I/O, never sets `LIVE`.
