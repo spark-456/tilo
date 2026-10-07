@@ -35,7 +35,7 @@ def remainder_of(key: str, intent: FactIntent, config: AssistantConfig) -> froze
     return frozenset(words(key, config)) - config.words["question_stop"] - named
 
 
-def _moment(stamp: Any) -> datetime | None:
+def moment_of(stamp: Any) -> datetime | None:
     try:
         return datetime.strptime(stamp, _STAMP).replace(tzinfo=UTC)
     except (TypeError, ValueError):
@@ -53,7 +53,7 @@ def _passes(intent: FactIntent, row: Mapping[str, Any], as_of: datetime | None) 
     if f.has_due and row["due"] is None:
         return False
     if f.within_hours is not None:
-        at = _moment(row["at"])
+        at = moment_of(row["at"])
         if at is None or as_of is None or not as_of - timedelta(hours=f.within_hours) <= at <= as_of:
             return False
     return True
@@ -79,20 +79,30 @@ def _narrow(
     return selected
 
 
-def _fill(template: str, **values: str) -> str:
+def fill(template: str, **values: str) -> str:
     """A config template filled with plain values; a value is data and is never read as a template."""
     filler = Template(template)
     return filler.substitute(**values)
 
 
+def claim(row: Mapping[str, Any], template: str, config: AssistantConfig, *, time: str = "", due: bool = True) -> str:
+    """One claim line: the row's title (or its kind's label) in `template`, plus the due and flagged suffixes."""
+    a = config.answer
+    label = row["title"] or a["kind_labels"].get(row["ref"]["kind"]) or a["untitled"]
+    text = fill(template, label=label, time=time)
+    if due and row["due"] is not None and row["reason"] != "calendar":
+        text += fill(a["due_suffix"], due=row["due"])
+    return text + a["flagged_suffix"] if row["flagged"] else text
+
+
 def _clock(at: Any, zone: ZoneInfo | None) -> str:
-    moment = _moment(at)
+    moment = moment_of(at)
     if moment is None:
         return ""
     return moment.strftime("%H:%M") + " UTC" if zone is None else moment.astimezone(zone).strftime("%H:%M")
 
 
-def _zone(name: str | None) -> ZoneInfo | None:
+def zone_of(name: str | None) -> ZoneInfo | None:
     try:
         return ZoneInfo(name) if isinstance(name, str) else None
     except Exception:
@@ -110,13 +120,13 @@ def fact_lines(
     config: AssistantConfig,
 ) -> tuple[tuple[Line, ...], Mapping[str, Any] | None]:
     """(lines, offered ui_action). Nothing selected: one `intent.empty` line that claims nothing."""
-    moment = _moment(as_of)
+    moment = moment_of(as_of)
     selected = [r for r in rows if _passes(intent, r, moment)]
     if intent.narrow:
         selected = _narrow(selected, context, remainder, config)
     if not selected:
         return (Line(intent.empty, None),), None
-    a, zone = config.answer, _zone(time_zone)
+    a, zone = config.answer, zone_of(time_zone)
     lines = [] if intent.header is None else [Line(intent.header, None)]
     shown, last = 0, None
     for row in selected:
@@ -125,12 +135,7 @@ def fact_lines(
         if intent.header is None and row["group"] != last and row["group"] in a["group_headers"]:
             lines.append(Line(a["group_headers"][row["group"]], None))
         last = row["group"]
-        label = row["title"] or a["kind_labels"].get(row["ref"]["kind"]) or a["untitled"]
-        text = _fill(a["lines"][row["reason"]], label=label, time=_clock(row["at"], zone))
-        if row["due"] is not None and row["reason"] != "calendar":
-            text += _fill(a["due_suffix"], due=row["due"])
-        if row["flagged"]:
-            text += a["flagged_suffix"]
+        text = claim(row, a["lines"][row["reason"]], config, time=_clock(row["at"], zone))
         lines.append(Line(text, Ref(row["ref"]["kind"], row["ref"]["id"])))
         shown += 1
     if len(selected) > a["max_lines"]:

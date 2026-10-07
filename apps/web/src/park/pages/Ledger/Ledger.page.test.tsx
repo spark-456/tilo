@@ -179,7 +179,7 @@ describe("WEB_7_ledger_interactions", () => {
   it("WEB_7_ledger_waiting_kpi_opens_k1_and_header_buttons_toast", async () => {
     const { container, navigate, store } = await renderLedger();
     click(byText(container, "button", "Waiting on you£3,420Laptop Depot sign-off"));
-    expect(navigate).toHaveBeenCalledWith("/park/world/k1");
+    expect(navigate).toHaveBeenCalledWith("/world/k1");
     click(byText(container, "button", "September 2026"));
     expect(store.getState().toast).toMatchObject({
       message: "August and earlier months live here",
@@ -243,13 +243,13 @@ describe("WEB_7_ledger_interactions", () => {
     expect(cards).toHaveLength(4);
     expect(text(cards[0] as HTMLElement)).toBe("Match invoices to POs−79%£2.80 run 1£0.60 run 142");
     click(cards[0] as HTMLElement);
-    expect(navigate).toHaveBeenCalledWith("/park/skills?id=invoice");
+    expect(navigate).toHaveBeenCalledWith("/skills?id=invoice");
   });
 
   it("WEB_7_ledger_add_a_backup_goes_to_team_and_prefs_backup_changes_the_wait", async () => {
     const first = await renderLedger();
     click(byText(first.container, "button", "Add a backup"));
-    expect(first.navigate).toHaveBeenCalledWith("/park/team?focus=share");
+    expect(first.navigate).toHaveBeenCalledWith("/team?focus=share");
     expect(text(first.container)).toContain("2 h 10 min");
     cleanup();
     const { container } = await renderLedger({ prefs: { backup: "priya" } });
@@ -347,7 +347,7 @@ describe("WEB_7_ledger_decide: every approval goes through app.decide(key)", () 
   it("WEB_7_ledger_open_in_world_goes_to_the_row_world", async () => {
     const { container, navigate } = await renderLedger();
     click(byText(region(container, "Activity"), "button", "Open in world"));
-    expect(navigate).toHaveBeenCalledWith("/park/world/k1");
+    expect(navigate).toHaveBeenCalledWith("/world/k1");
   });
 });
 

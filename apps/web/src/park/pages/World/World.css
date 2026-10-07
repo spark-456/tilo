@@ -124,6 +124,30 @@
   filter: brightness(1.08);
 }
 
+/* a sample world's disabled stage links keep their look; they only stop looking pressable */
+[data-park] .park-world-live[aria-disabled="true"],
+[data-park] .park-world-lenses a[aria-disabled="true"] {
+  cursor: not-allowed;
+}
+[data-park] .park-world-live[aria-disabled="true"]:hover {
+  filter: none;
+}
+[data-park] .park-world-lenses a[aria-disabled="true"]:hover {
+  background: transparent;
+}
+/* the reason a stage link is disabled, for assistive technology; out of the flow, so nothing moves */
+[data-park] .park-world-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 /* ---- Top grid: the map card ---- */
 [data-park] .park-world-top {
   display: grid;

@@ -62,7 +62,7 @@ test("UX-1 E2 Trace rows are 14 px and Open record is 28 px high, disabled until
 test("UX-1 phone targets: lens tabs and the level link are 44 px high at 390", async ({ page }) => {
   test.setTimeout(90_000);
   await page.setViewportSize(MOBILE);
-  await page.goto(`${W}?speed=100`);
+  await page.goto(`${W}/stage?speed=100`);
   await page.getByText("World status").click(); // the panels sit in this sheet on a phone
   const tabs = page.locator(".world-panels .lens-tab");
   await expect(tabs.first()).toBeVisible({ timeout: 20_000 });
@@ -75,7 +75,7 @@ test("UX-1 phone targets: lens tabs and the level link are 44 px high at 390", a
     expect((await link.boundingBox())?.height).toBeGreaterThanOrEqual(44);
   }
   await page.setViewportSize(DESKTOP);
-  await page.goto(`${W}?speed=100`);
+  await page.goto(`${W}/stage?speed=100`);
   await expect(tabs.first()).toBeVisible({ timeout: 20_000 });
   expect((await tabs.first().boundingBox())?.height).toBe(44);
 });

@@ -1,6 +1,7 @@
 // The composer column of Home (reference "Tilo App Home.dc.html"): the example chips while idle, the
 // "drafting" line, the plan card, and the glass panel with the task input and the size of job.
-// Presentation only: the phase, the query and the 900 ms draft are HomePage's.
+// Presentation only: the phase, the query and the 900 ms draft are HomePage's. The "Start a real task" link
+// under the panel is the one element the design does not have.
 import { type SegmentOption, SegmentedControl } from "../../components";
 import type { Mode } from "./homeData";
 
@@ -128,6 +129,11 @@ export function ComposerPanel(p: ComposerProps) {
           <div className="park-home-hint">{mode.hint}</div>
         </div>
       </div>
+      {/* Not in the design (docs/park-designed-not-in-prd/Home.md): the composer above is fixture-only until
+          FR-UX-13, so this plain link opens the old app's real intake form (a full navigation, not app.go). */}
+      <a className="park-home-real" href="/start">
+        Start a real task
+      </a>
     </div>
   );
 }

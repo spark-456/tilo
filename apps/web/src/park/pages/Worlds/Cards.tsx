@@ -1,8 +1,9 @@
 // The three world cards of the Worlds page: a city (404 high), a town (196) and a village (150). Each is a
 // real link to the world; a plain click goes through the shell (`onOpen`), a modified click keeps the browser's.
-import type { MouseEvent, ReactNode } from "react";
+import { type MouseEvent, type ReactNode, memo } from "react";
 import type { World } from "../../api/types";
 import { parkPath } from "../../app/router";
+import { useAfterTask } from "../../app/useStaged";
 import { cx } from "../../components/cx";
 import type { Art } from "./art";
 import type { Status } from "./model";
@@ -65,7 +66,8 @@ function Stat({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
-export function CityCard({ w, art, status, onOpen }: CardProps) {
+function CityCardView({ w, art, status, onOpen }: CardProps) {
+  const artOn = useAfterTask(); // the city art is the heavy part: drawn a task after the card (WEB-MOTION-2)
   return (
     <a className={cx("park-worlds-card park-worlds-card--city", edge(w))} {...linkProps(w, onOpen)}>
       <div className="park-worlds-city__head">
@@ -76,7 +78,7 @@ export function CityCard({ w, art, status, onOpen }: CardProps) {
         </div>
         <Chip status={status} />
       </div>
-      <div className="park-worlds-city__art">{art.city(w)}</div>
+      <div className="park-worlds-city__art">{artOn ? art.city(w) : null}</div>
       <div className="park-worlds-city__progress">
         <div className="park-worlds-track">
           <Fill w={w} status={status} round />
@@ -94,7 +96,7 @@ export function CityCard({ w, art, status, onOpen }: CardProps) {
   );
 }
 
-export function TownCard({ w, art, status, onOpen }: CardProps) {
+function TownCardView({ w, art, status, onOpen }: CardProps) {
   return (
     <a className={cx("park-worlds-card park-worlds-card--town", edge(w))} {...linkProps(w, onOpen)}>
       <div className="park-worlds-town__strip">{art.strip(w)}</div>
@@ -122,7 +124,7 @@ export function TownCard({ w, art, status, onOpen }: CardProps) {
   );
 }
 
-export function VillageCard({ w, art, status, onOpen }: CardProps) {
+function VillageCardView({ w, art, status, onOpen }: CardProps) {
   return (
     <a
       className={cx("park-worlds-card park-worlds-card--village", edge(w))}
@@ -137,3 +139,9 @@ export function VillageCard({ w, art, status, onOpen }: CardProps) {
     </a>
   );
 }
+
+// Memoised: the page draws its cards one task at a time (WEB-MOTION-2), and a card already drawn must not be
+// rendered again, art and all, each time the next one is added.
+export const CityCard = memo(CityCardView);
+export const TownCard = memo(TownCardView);
+export const VillageCard = memo(VillageCardView);

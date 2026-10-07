@@ -1,9 +1,9 @@
-// WEB-5 acceptance (plan sections 8a and 10; README "Worlds"; design "Tilo App Worlds.dc.html"): /park/worlds in
+// WEB-5 acceptance (plan sections 8a and 10; README "Worlds"; design "Tilo App Worlds.dc.html"): /worlds in
 // a real browser at 1440x900 and 390x844. The three sections draw with the design's card heights (404, 196,
 // 150), the status tabs, scale legend and search narrow the list, a decision is approved through the shell,
-// and opening a world goes to /park/world/<id> without a page load. Any console error fails.
+// and opening a world goes to /world/<id> without a page load. Any console error fails.
 // Run on a private port: TILO_WEB_PORT=<own port> pnpm --filter @tilo/web exec playwright test
-// e2e/park/worlds.spec.ts --project=chromium --no-deps --workers=3
+// e2e/worlds.spec.ts --project=chromium --no-deps --workers=3
 import { type Page, expect, test } from "@playwright/test";
 import { collectConsoleProblems } from "../support/console";
 import { DESKTOP, MOBILE } from "../support/viewports";
@@ -15,7 +15,7 @@ const HEIGHTS = { Cities: 404, Towns: 196, Villages: 150 } as const;
 test.beforeAll(async ({ browser, baseURL }) => {
   test.setTimeout(150_000);
   const page = await browser.newPage(baseURL ? { baseURL } : {});
-  await page.goto("/park/worlds", { timeout: 120_000 });
+  await page.goto("/worlds", { timeout: 120_000 });
   await page
     .getByTestId("park-page-worlds")
     .waitFor({ timeout: 120_000 })
@@ -34,7 +34,7 @@ for (const [name, viewport] of Object.entries(SIZES)) {
       page,
     }) => {
       const problems = collectConsoleProblems(page);
-      await page.goto("/park/worlds");
+      await page.goto("/worlds");
       await expect(page.getByTestId("park-page-worlds")).toBeVisible();
       await expect(page.getByRole("heading", { level: 1 })).toHaveText("Worlds");
       await expect(page).toHaveTitle("Worlds · Tilo");
@@ -59,7 +59,7 @@ for (const [name, viewport] of Object.entries(SIZES)) {
 
     test(`WEB_5_e2e_${name}_status_scale_and_search_narrow_the_list`, async ({ page }) => {
       const problems = collectConsoleProblems(page);
-      await page.goto("/park/worlds");
+      await page.goto("/worlds");
       await expect(links(page, "Cities")).toHaveCount(3);
       await page.getByRole("tab", { name: /^Running/ }).click();
       await expect(page.getByRole("tab", { name: /^Running/ })).toHaveAttribute(
@@ -88,7 +88,7 @@ for (const [name, viewport] of Object.entries(SIZES)) {
       page,
     }) => {
       const problems = collectConsoleProblems(page);
-      await page.goto("/park/worlds");
+      await page.goto("/worlds");
       await expect(page.getByText("WAITING FOR YOU")).toBeVisible();
       await expect(page.getByText("2 buildings paused")).toBeVisible();
       await page.getByRole("button", { name: "Approve £3,420" }).click();
@@ -105,11 +105,11 @@ for (const [name, viewport] of Object.entries(SIZES)) {
     test(`WEB_5_e2e_${name}_opening_a_world_goes_to_its_route_without_a_page_load`, async ({
       page,
     }) => {
-      await page.goto("/park/worlds");
+      await page.goto("/worlds");
       await expect(links(page, "Towns")).toHaveCount(4);
       await page.evaluate(() => Reflect.set(window, "__worldsMarker", "same document"));
-      await page.locator('a[href="/park/world/northline"]').click();
-      await expect(page).toHaveURL(/\/park\/world\/northline$/);
+      await page.locator('a[href="/world/northline"]').click();
+      await expect(page).toHaveURL(/\/world\/northline$/);
       await expect(page.getByTestId("park-page-world")).toBeVisible();
       expect(await page.evaluate(() => Reflect.get(window, "__worldsMarker"))).toBe(
         "same document",

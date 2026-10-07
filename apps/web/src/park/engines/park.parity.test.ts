@@ -8,9 +8,9 @@
 //  - createPark's second argument is the createWorld FACTORY, not an instance. The prototype builds its own
 //    world engine on a private string-building, colour-mapping `h` (night and mute remap colours as the
 //    SVG text is written), so an already-built world engine cannot be reused.
-//  - WEB-1b adds no animation (BQ-WEB-3, ADR-0003a 5). scene() accepts `still` and `k` and ignores them:
-//    the cars and walkers are always drawn frozen at their seeded phase, exactly as the prototype draws
-//    them with still: true. The port equals the prototype with still: true for every input.
+//  - WEB-1b added no animation (BQ-WEB-3, ADR-0003a 5): the port equalled the prototype with still: true for
+//    every input. WEB-MOTION-1 makes `still` and `k` real (the live movers are pinned in park.motion.test.ts);
+//    this file compares the frozen drawing (`still: true` on both sides).
 import * as fc from "fast-check";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
@@ -58,7 +58,9 @@ function both(p: Pair, name: string, ...args: unknown[]): string | null {
   });
 }
 function bothScene(p: Pair, opts: Record<string, unknown> | undefined): string | null {
-  const port = opts === undefined ? call(p.port, "scene") : call(p.port, "scene", opts);
+  // WEB-MOTION-1: the port now animates by default, as the prototype does, so the frozen drawings are compared:
+  // both engines are asked for the same options with `still: true` (live motion: park.motion.test.ts).
+  const port = call(p.port, "scene", { ...(opts ?? {}), still: true });
   const proto = call(p.proto, "scene", { ...(opts ?? {}), still: true });
   return sameAsPrototype(port, proto, { frozenWalkers: true });
 }
@@ -157,9 +159,9 @@ describe("WEB_1b_park_scene: scene(o) for the design's sizes, day and night, and
   });
 });
 
-describe("WEB_1b_park_motion: movers are drawn, frozen, and carry no animation (BQ-WEB-3, ADR-0003a 5)", () => {
+describe("WEB_1b_park_motion: movers are drawn frozen when still and run otherwise (BQ-WEB-3, WEB-MOTION-1)", () => {
   it(
-    "WEB_1b_park_motion_cars_and_walkers_layers_exist_in_both_modes_frozen_at_their_phase",
+    "WEB_1b_park_motion_cars_and_walkers_layers_exist_in_both_modes_frozen_only_when_still",
     SLOW,
     () => {
       for (const still of [false, true, undefined]) {
@@ -177,7 +179,11 @@ describe("WEB_1b_park_motion: movers are drawn, frozen, and carry no animation (
             styleOf(n).willChange === "transform" &&
             String(styleOf(n).transform ?? "").startsWith("translate("),
         );
-        expect(frozen, "every mover sits at a fixed translate()").toBe(movers);
+        // Still: every mover sits at a fixed translate(). Live (the prototype's default): none does, each
+        // runs mvXY (park.motion.test.ts pins the durations, phases and travel).
+        expect(frozen, `movers at a fixed translate() with still=${still}`).toBe(
+          still === true ? movers : 0,
+        );
         const walkers = findAll(tree, (n) =>
           String(styleOf(n).backgroundImage ?? "").startsWith('url("blob:'),
         );
@@ -186,17 +192,27 @@ describe("WEB_1b_park_motion: movers are drawn, frozen, and carry no animation (
     },
   );
 
-  it("WEB_1b_park_motion_still_false_k_and_still_are_accepted_and_ignored", SLOW, () => {
-    const p = pair();
-    const base = { w: 800, h: 560, seed: 4 };
-    const ref = call(p.port, "scene", base);
-    for (const extra of [{ still: false }, { still: true }, { k: 2 }, { k: 2, still: false }]) {
-      expect(
-        sameAsPrototype(call(portPark(), "scene", { ...base, ...extra }), ref),
-        JSON.stringify(extra),
-      ).toBeNull();
-    }
-  });
+  it(
+    "WEB_1b_park_motion_k_changes_nothing_when_still_and_still_false_is_not_the_frozen_drawing",
+    SLOW,
+    () => {
+      const p = pair();
+      const base = { w: 800, h: 560, seed: 4 };
+      const ref = call(p.port, "scene", { ...base, still: true });
+      for (const extra of [{ still: true }, { k: 2, still: true }]) {
+        expect(
+          sameAsPrototype(call(portPark(), "scene", { ...base, ...extra }), ref),
+          JSON.stringify(extra),
+        ).toBeNull();
+      }
+      for (const extra of [{}, { still: false }, { k: 2, still: false }]) {
+        expect(
+          sameAsPrototype(call(portPark(), "scene", { ...base, ...extra }), ref),
+          JSON.stringify(extra),
+        ).not.toBeNull();
+      }
+    },
+  );
 
   it("WEB_1b_park_motion_the_reference_really_animates_when_still_is_off", () => {
     // Guards the equality above: the prototype with still: false carries mvXY, waddle and sprite2.
@@ -209,13 +225,13 @@ describe("WEB_1b_park_motion: movers are drawn, frozen, and carry no animation (
   });
 
   it(
-    "WEB_1b_park_motion_no_output_carries_an_animation_name_a_keyframe_or_a_css_variable_for_it",
+    "WEB_1b_park_motion_only_a_live_scene_carries_an_animation_name_a_keyframe_or_a_css_variable_for_it",
     SLOW,
     () => {
       const p = portPark();
       const outs = [
-        call(p, "scene", { w: 1000, h: 700, still: false }),
-        call(p, "scene", { w: 390, h: 844, night: true, k: 2 }),
+        call(p, "scene", { w: 1000, h: 700, still: true }),
+        call(p, "scene", { w: 390, h: 844, night: true, k: 2, still: true }),
         call(p, "world", plan("k1"), {}),
         call(p, "building", "library", "active", "research", 150, true),
         call(p, "agent", { role: "builder", expr: "walking" }, 90, false),

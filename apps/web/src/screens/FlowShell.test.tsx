@@ -179,7 +179,7 @@ describe("PRD-18.3 flow: loading and empty states", () => {
     await act(async () => button("primary")?.click());
     await settle();
     expect(approve).toHaveBeenCalledWith("t1", { approach_id: "quick", budget_cap: 45 });
-    expect(window.location.pathname).toBe("/world/w9");
+    expect(window.location.pathname).toBe("/world/w9/stage");
   });
 
   it("an empty approaches list is an empty state with a retry, and nothing to approve", async () => {
@@ -214,7 +214,7 @@ describe("PRD-18.3 flow: loading and empty states", () => {
 
   it("every screen has exactly one primary button", async () => {
     const client = new FixtureClient();
-    for (const path of ["/", "/task/t/understanding", "/task/t/approaches", "/world/w"]) {
+    for (const path of ["/", "/task/t/understanding", "/task/t/approaches", "/world/w/stage"]) {
       await show(path, client);
       await settle(0);
       expect(container.querySelectorAll("button.primary")).toHaveLength(1);

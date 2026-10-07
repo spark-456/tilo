@@ -42,6 +42,7 @@ WORD_LISTS = (
     "third_person",
 )
 DECLINE_KEYS = ("unknown", "other_person", "no_selection", "dropped", "rules_only", "budget", "flagged", "failed")
+REPORTS = ("status", "weekly")
 ROW_KEYS = ("reasons", "groups", "kinds", "has_due", "within_hours")
 
 
@@ -67,6 +68,7 @@ class FactIntent:
     header: str | None
     empty: str
     narrow: bool
+    report: str | None = None  # "status" or "weekly" (FR-PA-08): a template over more than the filtered rows
 
 
 @dataclass(frozen=True)
@@ -188,7 +190,7 @@ def _facts(node: Any) -> tuple[FactIntent, ...]:
     out: list[FactIntent] = []
     for i, raw in enumerate(_list("facts", node, least=1, most=60)):
         path = f"facts.{i}"
-        item = _mapping(path, raw, ("id", "describe", "when", "rows", "header", "empty"), ("narrow",))
+        item = _mapping(path, raw, ("id", "describe", "when", "rows", "header", "empty"), ("narrow", "report"))
         iid = item["id"]
         if type(iid) is not str or not _INTENT_ID.fullmatch(iid) or any(f.id == iid for f in out):
             raise _fail(f"{path}.id", "must be a unique lower-case id of at most 32 letters")
@@ -205,6 +207,9 @@ def _facts(node: Any) -> tuple[FactIntent, ...]:
         narrow = item.get("narrow", False)
         if type(narrow) is not bool:
             raise _fail(f"{path}.narrow", "must be true or false")
+        report = item.get("report")
+        if report is not None:
+            _choice(f"{path}.report", report, REPORTS)
         out.append(
             FactIntent(
                 iid,
@@ -214,6 +219,7 @@ def _facts(node: Any) -> tuple[FactIntent, ...]:
                 header,
                 _text(f"{path}.empty", item["empty"]),
                 narrow,
+                report,
             )
         )
     return tuple(out)
@@ -267,6 +273,8 @@ def _answer(node: Any) -> Mapping[str, Any]:
         "opening",
         "target_screens",
         "group_headers",
+        "status",
+        "weekly",
         "lines",
     )
     a = _mapping("answer", node, keys)
@@ -275,6 +283,8 @@ def _answer(node: Any) -> Mapping[str, Any]:
     lines = _mapping("answer.lines", a["lines"], reasons)
     shown = _mapping("answer.target_screens", a["target_screens"], ("world", "meeting"))
     headers = _mapping("answer.group_headers", a["group_headers"], GROUPS)
+    status = _mapping("answer.status", a["status"], ("tasks_empty", "changed_header", "changed_empty", "done"))
+    weekly = _mapping("answer.weekly", a["weekly"], ("done", "open", "overdue", "tasks", "waiting", "truncated"))
     return MappingProxyType(
         {
             "max_lines": _int("answer.max_lines", a["max_lines"], 1, 20),
@@ -286,6 +296,18 @@ def _answer(node: Any) -> Mapping[str, Any]:
             "opening": _text("answer.opening", a["opening"], frozenset({"screen"})),
             "target_screens": MappingProxyType({k: _text(f"answer.target_screens.{k}", v) for k, v in shown.items()}),
             "group_headers": MappingProxyType({k: _text(f"answer.group_headers.{k}", v) for k, v in headers.items()}),
+            "status": MappingProxyType(
+                {
+                    k: _text(f"answer.status.{k}", v, frozenset({"label"}) if k == "done" else frozenset())
+                    for k, v in status.items()
+                }
+            ),
+            "weekly": MappingProxyType(
+                {
+                    k: _text(f"answer.weekly.{k}", v, frozenset() if k == "truncated" else frozenset({"n"}))
+                    for k, v in weekly.items()
+                }
+            ),
             "lines": MappingProxyType(
                 {k: _text(f"answer.lines.{k}", v, frozenset({"label", "time"})) for k, v in lines.items()}
             ),
