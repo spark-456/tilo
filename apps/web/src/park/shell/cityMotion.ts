@@ -5,8 +5,18 @@
 // so each choice is drawn once. `lite` is the sprite cap (a narrow window or a weak device): half the movers
 // are not drawn. `hidden` is a tab nobody is looking at.
 import { useMemo, useSyncExternalStore } from "react";
+import { useApp } from "../app/context";
 
 export type CityMotion = "lively" | "calm" | "still";
+
+export interface AppearanceSettings {
+  time: "day" | "night";
+  night: boolean;
+  motion: CityMotion;
+  lite: boolean;
+  hidden: boolean;
+  toggleTime: () => void;
+}
 
 const REDUCE = "(prefers-reduced-motion: reduce)";
 /** The window width under which the sprite cap applies (README breakpoint). */
@@ -48,4 +58,18 @@ export function useCityMotion(
   const motion: CityMotion =
     reduced || pref === "still" ? "still" : weak || pref === "calm" ? "calm" : "lively";
   return { motion, lite: motion !== "still" && (weak || vw < NARROW_PX), hidden };
+}
+
+/** Appearance settings hook shared by the shell and city backdrop (FR-SET-03). */
+export function useAppearance(): AppearanceSettings {
+  const app = useApp();
+  const city = useCityMotion(app.motion, app.vw);
+  return {
+    time: app.time,
+    night: app.night,
+    motion: city.motion,
+    lite: city.lite,
+    hidden: city.hidden,
+    toggleTime: () => app.setPref("time", app.night ? "day" : "night"),
+  };
 }

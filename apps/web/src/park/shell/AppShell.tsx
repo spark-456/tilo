@@ -6,7 +6,7 @@
 import { type ReactNode, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import type { Decision, Notification, User } from "../api/types";
 import type { PageId } from "../app/AppCtx";
-import { useApp, useExpectsSample, useParkApi, useParkStore } from "../app/context";
+import { endSession, useApp, useExpectsSample, useParkApi, useParkStore } from "../app/context";
 import { useParkRoute } from "../app/router";
 import { Button, Popover, Toast } from "../components";
 import "../tokens/fonts";
@@ -17,7 +17,7 @@ import { NotificationsPopover } from "./NotificationsPopover";
 import { TopNav } from "./TopNav";
 import { WorldLoader } from "./WorldLoader";
 import { authInitials, useParkAuth } from "./auth";
-import { useCityMotion } from "./cityMotion";
+import { useAppearance } from "./cityMotion";
 import { loadShellFonts } from "./fonts";
 import { type Bar, useLeavingCard, useMotionOff, usePageSwap } from "./motion";
 import "./park.shell.css";
@@ -27,6 +27,14 @@ const SIGN_OUT = "This is a prototype, so you stay signed in";
 const SIGNED_OUT = "You are signed out";
 const SIGN_OUT_FAILED = "Could not sign out. Try again.";
 const MOBILE_NOTE = "The Tilo mobile app is a concept. It is not available yet.";
+
+/** Sign out (FR-UX-10): ends the real session when there is one; with none (a local host, the fixture world, a build
+ * with no Firebase config) the menu stays the prototype's toast. `session.signOut` never rejects, and a failed one still
+ * closes the menu; the sign-in gate takes the page from there. */
+function signOut(store: { toast: (message: string) => void; closeMenu: () => void }): void {
+  if (endSession()) store.closeMenu();
+  else store.toast(SIGN_OUT);
+}
 
 /** The bar along the nav's bottom edge while a world opens: 18% then 26 more per step, full at step 3. */
 const loaderBar = (step: number): number => (step >= 3 ? 100 : 18 + step * 26);
@@ -46,7 +54,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const auth = useParkAuth();
   const [mobileNote, setMobileNote] = useState(false);
   const signingOut = useRef(false);
-  const city = useCityMotion(app.motion, app.vw);
+  const appearance = useAppearance();
   const off = useMotionOff();
   const viaNav = useRef(false);
   const navTo = (to: PageId): void => {
@@ -86,17 +94,17 @@ export function AppShell({ children }: { children: ReactNode }) {
   // (the shell stays hidden under the splash until then, so no text swaps face and moves the nav).
   useEffect(() => {
     let live = true;
-    backdropScene(app.time, city.motion);
+    backdropScene(appearance.time, appearance.motion);
     loadShellFonts().then(() => {
       if (live) setReady(true);
     });
     return () => {
       live = false;
     };
-  }, [app.time, city.motion]);
+  }, [appearance.time, appearance.motion]);
   const scene = useMemo(
-    () => (ready ? backdropScene(app.time, city.motion) : null),
-    [ready, app.time, city.motion],
+    () => (ready ? backdropScene(appearance.time, appearance.motion) : null),
+    [ready, appearance.time, appearance.motion],
   );
 
   const page = route?.page ?? null;
@@ -144,9 +152,9 @@ export function AppShell({ children }: { children: ReactNode }) {
         }
       : null;
   // Honest: success is said only after the sign-in layer's promise resolves, a failure says it failed.
-  const signOut = (): void => {
+  const signOutViaSeam = (): void => {
     if (!auth) {
-      store.toast(SIGN_OUT);
+      signOut(store);
       return;
     }
     if (signingOut.current) return;
@@ -166,14 +174,14 @@ export function AppShell({ children }: { children: ReactNode }) {
         vw={app.vw}
         vh={app.vh}
         veiled={inner}
-        lite={city.lite}
-        hidden={city.hidden}
+        lite={appearance.lite}
+        hidden={appearance.hidden}
         loading={state.wl != null}
       />
       <TopNav
         page={page}
         needsLeft={app.needsLeft}
-        night={app.night}
+        night={appearance.night}
         menu={state.menu}
         unread={!state.read && app.needsLeft > 0}
         initials={
@@ -190,7 +198,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         bar={bar}
         onBarFaded={swap.barFaded}
         go={navTo}
-        onToggleTime={() => store.setPref("time", app.night ? "day" : "night")}
+        onToggleTime={appearance.toggleTime}
         onBell={() => store.toggleMenu("notif")}
         onAvatar={() => store.toggleMenu("acct")}
       />
@@ -211,7 +219,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           onMobile={() => setMobileNote(true)}
           connectorsOn={connectorsOn}
           go={navTo}
-          onSignOut={signOut}
+          onSignOut={signOutViaSeam}
           onClose={store.closeMenu}
         />
       ) : null}
@@ -248,7 +256,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           launch={card}
           dec={state.dec}
           added={state.added}
-          night={app.night}
+          night={appearance.night}
           leaving={state.wl === null}
           onGone={done}
         />

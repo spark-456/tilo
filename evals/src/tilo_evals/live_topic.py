@@ -152,6 +152,7 @@ def run_topic(
     recordings_dir: Path | None = None, live_provider_factory: Callable[[str, str], ModelProvider] | None = None,
     safety: SafetyProvider | None = None,  # the test seam, only beside an injected (fake) provider
     person: TerminalPerson | None = None, announce: Callable[[e2e.Estimate, float], None] | None = None,
+    real_connectors: bool = False, real_connectors_factory: Callable[[], dict[str, Any]] | None = None,
 ) -> e2e.LiveE2EReport:  # fmt: skip
     env = os.environ if environ is None else environ
     e2e._gate(mode, env, max_credits)  # the live switch, CI, Cloud Run and the cap: first of all
@@ -174,14 +175,22 @@ def run_topic(
         if announce is not None:
             announce(estimate, max_credits)
         print(f"safety screen named (not called in a dry run): {note}")
+        if real_connectors:
+            e2e.print_real_plan()
         return e2e.LiveE2EReport(case.id, mode, max_credits, estimate, safety=note, faked=TOPIC_FAKED)
+    if (
+        real_connectors and real_connectors_factory is None
+    ):  # no default factory yet (CL-LIVE-3): refuse before the screen call
+        raise _refuse("real_connectors_no_token", e2e.NO_CONNECTION)
     screen = _screen(config, recordings, text, safety)
     report = e2e.run_live_e2e(
         case.id, mode="live", max_credits=max_credits, environ=environ, models_path=models_path,
         prices_path=prices_path, recordings_dir=recordings, live_provider_factory=live_provider_factory, safety=screen,
-        announce=announce, adhoc=case, person=person,
+        announce=announce, adhoc=case, person=person, real_connectors=real_connectors,
+        real_connectors_factory=real_connectors_factory,
     )  # fmt: skip
-    report.safety, report.faked = note, TOPIC_FAKED
+    report.safety = note
+    report.faked = e2e.real_faked(TOPIC_FAKED) if report.real_connectors else TOPIC_FAKED
     report.story_lines = [e2e.StoryLine(clean(s.text), s.event_ids) for s in report.story_lines]
     return report
 
@@ -204,6 +213,7 @@ def main(
     argv: list[str] | None = None, *, environ: Mapping[str, str] | None = None,
     live_provider_factory: Callable[[str, str], ModelProvider] | None = None, safety: SafetyProvider | None = None,
     read: Callable[[str], str] | None = None, tty: Callable[[], bool] | None = None,
+    real_connectors_factory: Callable[[], dict[str, Any]] | None = None,
 ) -> int:  # fmt: skip
     parser = argparse.ArgumentParser(prog="live_run", description=(__doc__ or "").split("\n")[0])
     source = parser.add_mutually_exclusive_group(required=True)
@@ -214,6 +224,7 @@ def main(
     parser.add_argument("--dry-run", action="store_true", help="print the estimate and name the safety screen; no call")
     parser.add_argument("--auto-answer", action="store_true", help="take each question's default; labelled as such")
     parser.add_argument("--auto-approve-t1t2", action="store_true", help="approve T1/T2 gates; a T3 gate always asks")
+    parser.add_argument("--real-connectors", action="store_true", help="real read-only Gmail, Drive and Calendar")
     for name in ("models-file", "prices-file", "recordings-dir"):
         parser.add_argument(f"--{name}", type=Path)
     args = parser.parse_args(argv)
@@ -235,6 +246,7 @@ def main(
             topic, mode="dry-run" if args.dry_run else "live", max_credits=args.max_credits, environ=environ,
             models_path=args.models_file, prices_path=args.prices_file, recordings_dir=args.recordings_dir,
             live_provider_factory=live_provider_factory, safety=safety, person=person, announce=e2e.announce,
+            real_connectors=args.real_connectors, real_connectors_factory=real_connectors_factory,
         )  # fmt: skip
     except e2e.LiveE2ERefused as refusal:
         print(f"REFUSED {refusal.code}: {refusal}", file=sys.stderr)

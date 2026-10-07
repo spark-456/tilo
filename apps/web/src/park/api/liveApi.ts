@@ -27,6 +27,10 @@ export interface LiveApiOptions {
   /** The API origin; trailing slashes are trimmed. Without it, every method is NotBuilt. */
   baseUrl?: string;
   fetch?: typeof fetch;
+  /** SEC-10: the App Check token getter; the Park pages' requests carry `X-Firebase-AppCheck` like the rest of the app. */
+  appCheckToken?: (() => Promise<string | null>) | undefined;
+  /** SEC-15: the Firebase ID token getter; every Park request carries `Authorization: Bearer` like the rest of the app. */
+  authToken?: (() => Promise<string | null>) | undefined;
 }
 
 const BAD_REPLY = "Tilo sent a reply this page could not read.";
@@ -127,6 +131,8 @@ export function createLiveApi(options: LiveApiOptions = {}): Api {
   const http = new HttpClient({
     baseUrl,
     ...(options.fetch ? { fetch: options.fetch } : {}),
+    ...(options.appCheckToken ? { appCheckToken: options.appCheckToken } : {}),
+    ...(options.authToken ? { authToken: options.authToken } : {}),
   });
   api.getLedger = async () => {
     const report = await http.getJson("/costs");

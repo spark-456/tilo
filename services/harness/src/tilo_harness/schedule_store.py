@@ -68,6 +68,7 @@ class ScheduleRepository(ScheduleStore, Protocol):
     def record_failure(
         self, schedule_id: str, due: datetime, *, error: str, next_due: datetime | None = None
     ) -> None: ...
+    def record_refusal(self, schedule_id: str, code: str) -> None: ...
     def disable_for_owner(self, owner_user_id: str) -> int: ...
     def documents(self) -> list[tuple[str, dict[str, Any]]]: ...
     def now(self) -> datetime: ...
@@ -215,6 +216,17 @@ def _complete(doc: Mapping[str, Any], due: datetime, next_due: datetime, last_wo
     }
 
 
+def _fixed_code(error: Any) -> str:
+    """A code, never free text: anything that is not `^[a-z][a-z0-9_]{0,63}$` is recorded as `start_failed`."""
+    return error if isinstance(error, str) and _ERROR_CODE.fullmatch(error) else "start_failed"
+
+
+def _refusal(doc: Mapping[str, Any], code: str) -> dict[str, Any]:
+    """FR-AGT-14e: a delivered task was refused for good. Only `last_error` is set: not a failure (no count, no backoff,
+    no disabling), and neither the slot nor a held claim is touched. The next `complete` clears it."""
+    return {"last_error": _fixed_code(code)}
+
+
 def _failure(
     doc: Mapping[str, Any], due: datetime, error: str, next_due: datetime | None, now: datetime
 ) -> dict[str, Any] | None:
@@ -226,7 +238,7 @@ def _failure(
     failures = (prior if isinstance(prior, int) and not isinstance(prior, bool) else 0) + 1
     changes: dict[str, Any] = {
         "failures": failures,
-        "last_error": error if _ERROR_CODE.fullmatch(error) else "start_failed",  # a code, never free text
+        "last_error": _fixed_code(error),
         "backoff_until": now + backoff_for(failures),
         **_NO_CLAIM,
     }
@@ -349,6 +361,10 @@ class _Store:
 
     def record_failure(self, schedule_id: str, due: datetime, *, error: str, next_due: datetime | None = None) -> None:
         self._apply(schedule_id, lambda doc, now: _failure(doc, due, error, next_due, now))
+
+    def record_refusal(self, schedule_id: str, code: str) -> None:
+        """Sets only `last_error` to the fixed `code`. An unknown or malformed id is a no-op."""
+        self._apply(schedule_id, lambda doc, now: _refusal(doc, code))
 
 
 class InMemoryScheduleStore(_Store):

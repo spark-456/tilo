@@ -144,14 +144,14 @@ describe("WEB_9_agenda_boards: pins", () => {
     expect(text(p())).toContain("Priya · Thu 1 Oct");
   });
 
-  it("WEB_9_agenda_tilo_suggestions_block_it_dismiss_and_find", async () => {
+  it("FR_UX_14 WEB_9_agenda_tilo_suggestions_block_it_dismiss_and_find", async () => {
     const { container, ...h } = await renderAgenda();
     const m0 = pin(container, "m0");
     expect(text(m0)).toContain("Block it");
     click(byText(m0, "button", "Block it"));
-    toasted(h, "Blocked 09:30–11:30 on Monday in Google Calendar");
+    toasted(h, "Blocked 09:30–11:30 on Monday on your Agenda");
     expect(text(pin(container, "m0"))).toContain("Focus time · Mon 28 Sep");
-    expect(text(pin(container, "m0"))).toContain("09:30–11:30, added to your Google Calendar");
+    expect(text(pin(container, "m0"))).toContain("09:30–11:30, added to your Agenda");
     expect(text(pin(container, "m0"))).toContain("Blocked by Tilo");
     click(byText(pin(container, "t0"), "button", "Not now"));
     expect(container.querySelector('[data-pin="t0"]')).toBeNull();
@@ -216,7 +216,7 @@ describe("WEB_9_agenda_week: the calendar", () => {
     toasted(h, "Tilo will join Supplier sync · Northline");
   });
 
-  it("WEB_9_agenda_find_a_time_books_a_slot_and_pins_it", async () => {
+  it("FR_UX_15 WEB_9_agenda_find_a_time_books_a_slot_and_pins_it", async () => {
     const { container, ...h } = await renderAgenda();
     const week = region(container, "This week");
     click(byText(container, "button", "Find a time"));
@@ -232,11 +232,11 @@ describe("WEB_9_agenda_week: the calendar", () => {
     click(byText(container, "button", "Find a time"));
     click(qa(week, "[data-slot]")[0] as HTMLElement);
     await settle();
-    toasted(h, "Booked Thu 16:00. Invites sent from Google Calendar");
+    toasted(h, "Booked Thu 16:00 on your Agenda. Invites go out from Google Calendar once it's connected and you approve");
     expect(qa(week, "[data-slot]")).toHaveLength(0);
     expect(container.querySelector('[data-pin="t0"]')).toBeNull();
     expect(text(pin(container, "tg"))).toContain("K1 gate review booked");
-    expect(text(pin(container, "tg"))).toContain("Thu 16:00. Invites sent to Jin, Priya and Tom.");
+    expect(text(pin(container, "tg"))).toContain("Thu 16:00. Invites to Jin, Priya and Tom go out once Google Calendar is connected and you approve.");
     expect(text(detail(container))).toContain("K1 gate review");
     expect(text(detail(container))).toContain("Thu 24 Sep · 16:00–16:30 · booked by Tilo");
     expect(text(detail(container))).toContain("Booked by Tilo");
