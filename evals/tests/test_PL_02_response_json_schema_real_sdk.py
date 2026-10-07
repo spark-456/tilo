@@ -54,7 +54,7 @@ def _provider(sent: list[dict[str, Any]], monkeypatch: pytest.MonkeyPatch) -> Go
         vertexai=True, project="tilo-test-project", location="global", credentials=AnonymousCredentials()
     )
     profile = ProvidersProfile.model_validate(
-        {"provider": "google", "model": "gemini-3.8-flash", "context": 1_000_000, "caps": ["json", "thinking"]}
+        {"provider": "google", "model": "placeholder-model", "context": 1_000_000, "caps": ["json", "thinking"]}
     )
     return GoogleModelProvider(
         profile=profile, profile_id="flash-38", project="tilo-test-project", location="global", client=client
