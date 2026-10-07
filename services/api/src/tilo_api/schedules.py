@@ -41,10 +41,12 @@ from datetime import UTC, datetime, timedelta
 from typing import Annotated, Any, Protocol
 
 import anyio.from_thread
+import requests.exceptions as requests_errors
 import tilo_planning.budget as budget
 import tilo_policy
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import JSONResponse, Response
+from google.auth import exceptions as google_auth_errors
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator, model_validator
 from tilo_harness.schedule import (
     GOOGLE_ISSUERS,
@@ -524,6 +526,13 @@ class TasksUnavailable(TasksError):
 
 
 _SERVICE_WIDE = frozenset({401, 403, 404})
+# FR-AGT-14g (BQ-AGT14-7): raised by any TasksClient's enqueue, these are outages of the whole service, stopped like
+# `tasks_unavailable`. The raised type decides, in this order: a RefreshError wrapping a transport error is credential.
+_TRANSPORT_ERRORS = (google_auth_errors.TransportError, requests_errors.Timeout, requests_errors.ConnectionError)
+_OUTAGES: tuple[tuple[tuple[type[Exception], ...], str], ...] = (
+    ((google_auth_errors.RefreshError,), "tasks_credential"),
+    (_TRANSPORT_ERRORS, "tasks_transport"),
+)
 
 
 def _error_status(response: Any) -> str | None:
@@ -574,7 +583,8 @@ class TaskEnqueuer:
     """The tick's `RunStarter` in fan-out: hands ONE slot to Cloud Tasks and returns the slot's world id (the same
     derivation `ScheduleStarter` uses, so the schedule records the world the delivery will make). It makes no world and
     no event. The task carries the slot and two facts of this firing, never a brief, owner, cap or secret: the delivery
-    reads those from the schedule's own record. ALREADY_EXISTS is a success; any other failure raises."""
+    reads those from the schedule's own record. ALREADY_EXISTS is a success; any other failure raises, as a
+    stopping `StartSkipped` when the whole service's (`tasks_unavailable`, `tasks_credential`, `tasks_transport`)."""
 
     def __init__(self, *, client: TasksClient, queue: str, audience: str, caller: str) -> None:
         self._client, self._queue, self._audience, self._caller = client, queue, audience, caller
@@ -602,6 +612,11 @@ class TaskEnqueuer:
         except TasksUnavailable as exc:  # the whole service's setting: nothing is recorded, and the tick stops here
             status = exc.status if type(exc.status) is int else None
             raise StartSkipped("tasks_unavailable", count=False, stop=True, status=status) from exc
+        except Exception as exc:
+            code = next((code for kinds, code in _OUTAGES if isinstance(exc, kinds)), None)
+            if code is None:  # anything else is this schedule's failure (429, 5xx, ...): counted, the tick goes on
+                raise
+            raise StartSkipped(code, count=False, stop=True) from exc
         return world_id
 
 
