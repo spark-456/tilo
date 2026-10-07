@@ -140,6 +140,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         reserveSample={expectsSample}
         booting={!ready}
         bar={bar}
+        onBarFaded={swap.barFaded}
         go={navTo}
         onToggleTime={() => store.setPref("time", app.night ? "day" : "night")}
         onBell={() => store.toggleMenu("notif")}

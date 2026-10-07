@@ -51,7 +51,7 @@ const OUT_MS = 200;
 export const CAP_PCT = 78;
 const IN_MS = 40;
 const HIDE_MS = 420;
-const RESET_MS = 360;
+const RESET_MS = 1000;
 
 export interface PageSwap {
   /** What the page outlet draws: the page the person left while it fades out, else the live page. */
@@ -61,6 +61,8 @@ export interface PageSwap {
   /** "in" is the settled state; "out", "pre" and "hold" are the stages of a swap (a data attribute on <main>). */
   phase: Phase;
   bar: Bar;
+  /** The bar's opacity transition has ended: if it was fading out, it is emptied now. */
+  barFaded: () => void;
 }
 
 /**
@@ -123,13 +125,20 @@ export function usePageSwap(children: ReactNode, key: string, mode: SwapMode): P
     setBar({ on: true, pct: 100 });
   }, [phase]);
   useEffect(() => {
-    if (phase !== "in" || bar.pct !== 100) return undefined;
-    return schedule(
-      () => setBar(bar.on ? { on: false, pct: 100 } : NO_BAR),
-      bar.on ? HIDE_MS : RESET_MS,
-    );
+    if (phase !== "in" || bar.pct !== 100 || !bar.on) return undefined;
+    return schedule(() => setBar({ on: false, pct: 100 }), HIDE_MS);
   }, [phase, bar, schedule]);
-  return { node: key === shown ? children : held.current, key: shown, phase, bar };
+  // Back to empty only once the bar has faded out (the browser's transitionend, `barFaded`), never on a clock
+  // alone: a busy main thread must not empty a bar that is still in view. The scheduler is the fallback.
+  const faded = !bar.on && bar.pct === 100 && phase === "in";
+  useEffect(() => {
+    if (!faded || !browserRunsAnimations()) return undefined;
+    return schedule(() => setBar(NO_BAR), RESET_MS);
+  }, [faded, schedule]);
+  const barFaded = () => {
+    if (faded) setBar(NO_BAR);
+  };
+  return { node: key === shown ? children : held.current, key: shown, phase, bar, barFaded };
 }
 
 /** A fade that the browser never runs (animations off, a hidden tab) must not leave the card or splash up, so the

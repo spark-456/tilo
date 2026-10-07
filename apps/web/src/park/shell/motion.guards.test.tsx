@@ -122,6 +122,7 @@ describe("WEB-MOTION-2 guards: the page-change bar never claims progress it did 
   let released = false;
   const frames: { pct: number; shown: string; want: string; phase: string }[] = [];
   let setKey: (k: string) => void = () => undefined;
+  let barFaded: () => void = () => undefined;
 
   function Swap() {
     const [k, set] = useState("a");
@@ -136,6 +137,7 @@ describe("WEB-MOTION-2 guards: the page-change bar never claims progress it did 
     // What was committed (not what a discarded render tried): effects run only for a commit.
     useLayoutEffect(() => {
       frames.push({ pct: s.bar.pct, shown: s.key, want: k, phase: s.phase });
+      barFaded = s.barFaded;
     });
     return <div data-testid="out">{s.node}</div>;
   }
@@ -170,5 +172,17 @@ describe("WEB-MOTION-2 guards: the page-change bar never claims progress it did 
     for (const f of frames) {
       if (f.pct === 100) expect(f.shown, "100 with the old page still on screen").toBe(f.want);
     }
+  });
+
+  it("WEB-MOTION-2 guards: after it hides, the bar is emptied by the browser's transitionend, not by a clock", async () => {
+    released = true; // the new page is ready at once
+    frames.length = 0;
+    const { sch } = mountShell(<Swap />);
+    act(() => setKey("c"));
+    for (let i = 0; i < 12 && sch.live().length > 0; i++) act(() => sch.fire(sch.live()[0]));
+    // Every timer has run: the bar has hidden (opacity 0) but still holds its fill until the fade has ended.
+    expect(frames.at(-1)).toMatchObject({ pct: 100, phase: "in" });
+    act(() => barFaded());
+    expect(frames.at(-1)?.pct).toBe(0);
   });
 });

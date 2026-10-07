@@ -40,6 +40,8 @@ export interface TopNavProps {
   booting: boolean;
   /** The progress bar: shown or not, and how full (a world opening, or a page change). */
   bar: Bar;
+  /** The bar's opacity transition has ended. */
+  onBarFaded: () => void;
   go: (page: PageId) => void;
   onToggleTime: () => void;
   onBell: () => void;
@@ -125,7 +127,14 @@ export function TopNav(p: TopNavProps) {
         </div>
       </header>
       {/* Over the nav's bottom edge but not inside it: the nav's glass blur must not sit under a moving layer. */}
-      <div aria-hidden="true" className="park-shell__bar" style={{ opacity: p.bar.on ? 1 : 0 }}>
+      <div
+        aria-hidden="true"
+        className="park-shell__bar"
+        style={{ opacity: p.bar.on ? 1 : 0 }}
+        onTransitionEnd={(e) => {
+          if (e.target === e.currentTarget && e.propertyName === "opacity") p.onBarFaded();
+        }}
+      >
         <div
           className={`park-shell__barfill ${p.bar.pct === 0 ? "park-shell__barfill--rest" : ""}`}
           style={{ transform: `scaleX(${p.bar.pct / 100})` }}

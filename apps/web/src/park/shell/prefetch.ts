@@ -1,7 +1,9 @@
 // README "Boot": the page bundles are fetched after the splash has gone, so the first tab click finds its page
 // already loaded. Importing a module here and in app/pages.ts is the same module (one chunk, fetched once);
-// a failed fetch is left for the page's own import to report. The placeholders (worlds, world) have no bundle.
+// a failed fetch is left for the page's own import to report.
 const LOADERS: readonly (() => Promise<unknown>)[] = [
+  () => import("../pages/Worlds/WorldsPage"),
+  () => import("../pages/World/WorldPage"),
   () => import("../pages/Skills/SkillsPage"),
   () => import("../pages/Ledger/LedgerPage"),
   () => import("../pages/Agenda/AgendaPage"),

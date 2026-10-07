@@ -7,6 +7,7 @@ import type { ReactNode } from "react";
 import type { Api } from "../../api/index";
 import type { Agenda, Decision } from "../../api/types";
 import { useParkApi } from "../../app/context";
+import { useStaged } from "../../app/useStaged";
 import { Button, PageSheet } from "../../components";
 import "../../components/park.components.css";
 import type { AppCtx } from "../../app/AppCtx";
@@ -40,6 +41,7 @@ function Ready({
   api,
 }: { A: Agenda; decisions: Decision[]; app: AppCtx; api: Api }) {
   const ui = useAgendaUi(A, decisions, app, api);
+  const part = useStaged(2); // the boards first, the week one task later (no long task while pages change)
   return (
     <>
       <div className="park-agenda-head">
@@ -60,7 +62,7 @@ function Ready({
         </div>
       </div>
       <Boards A={A} ui={ui} app={app} />
-      <Week A={A} ui={ui} app={app} />
+      {part(2) ? <Week A={A} ui={ui} app={app} /> : null}
     </>
   );
 }
