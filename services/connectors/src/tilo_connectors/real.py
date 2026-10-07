@@ -19,6 +19,7 @@ from typing import Any
 
 from ._time import format_ts
 from .adapters import CalendarAdapter, DriveAdapter, GmailAdapter, InMemoryPicks, SideEffectRefused, Transport
+from .adapters._google import has_token
 from .recording import RecordingTransport, ReplayTransport
 from .registry import ConnectorRegistry
 from .tokens import TokenBroker
@@ -147,10 +148,8 @@ def real_adapters(  # noqa: PLR0913
     _refuse_unless_allowed(registry, transport, process_environ if environ is None else environ, mode, providers_fake)
     plan = real_connector_plan(registry)
     for row in plan:  # fail closed: a token for the first pinned scope of each, no Google request
-        try:
-            broker.access_token_for_adapter(user_id, row["connector"], required_scopes=[row["scopes"][0]])
-        except Exception:
-            raise RealConnectorsRefused("no_token") from None
+        if not has_token(broker, user_id, row["connector"], row["scopes"][0]):
+            raise RealConnectorsRefused("no_token")
     common: dict[str, Any] = {
         "broker": broker,
         "transport": transport,
