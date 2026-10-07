@@ -468,6 +468,10 @@ class DeskWorlds(Protocol):
 
     def desk_world(self, org_id: str, user_id: str) -> str: ...
 
+    def desk_owner(self, world_id: str) -> str | None:
+        """Who owns that Desk world now (None: unknown), so a caller can check an answer before it writes there."""
+        ...
+
 
 def get_desk_worlds() -> DeskWorlds:
     raise HTTPException(status_code=503, detail="not_configured")  # production wiring lands with the Desk
