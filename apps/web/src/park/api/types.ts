@@ -251,6 +251,11 @@ export interface Ledger {
   activity: LedgerEntry[];
   /** The currency the amounts are in, as served; absent means pounds (the fixture). */
   currency?: "GBP" | "USD";
+  /**
+   * How much more memory saved than in an earlier period (`since`, e.g. "August"). `total` is the sum of
+   * `memory` it was worked out for; a ledger whose `memory` has changed since no longer states it.
+   */
+  memoryUp?: { amount: number; since: string; total: number };
 }
 
 // Agenda

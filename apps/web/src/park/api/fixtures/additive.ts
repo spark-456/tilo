@@ -2,7 +2,7 @@
 // data but which its pages hard-coded as copy. They live here so a page's logic stays generic ("No
 // scenario-specific code"). Not generated; `index.ts` merges them onto the generated fixtures, and the
 // parity test compares only the prototype's own fields. Strings are the designed copy, verbatim.
-import type { AgendaRules, DecisionFacts, DecisionKey } from "../types";
+import type { AgendaRules, DecisionFacts, DecisionKey, Ledger } from "../types";
 
 /** What each decision is about, by key; read as `Decision.facts`. */
 export const decisionFacts: Record<DecisionKey, DecisionFacts> = {
@@ -84,4 +84,14 @@ export const agendaRules: AgendaRules = {
       text: "Laptop Depot budget was approved today.",
     },
   ],
+};
+
+/**
+ * The Ledger's "Saved by memory" comparison (the prototype typed "Up £120 on August" as copy). `total` is the sum
+ * of the fixture's `memory`; a ledger whose memory differs does not state it.
+ */
+export const ledgerMemoryUp: NonNullable<Ledger["memoryUp"]> = {
+  amount: 120,
+  since: "August",
+  total: 640,
 };
