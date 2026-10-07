@@ -232,7 +232,7 @@ describe("WEB_9_agenda_week: the calendar", () => {
     click(byText(container, "button", "Find a time"));
     click(qa(week, "[data-slot]")[0] as HTMLElement);
     await settle();
-    toasted(h, "Booked Thu 16:00. Invites sent from Google Calendar");
+    toasted(h, "Booked Thu 16:00 on your Agenda. Invites go out from Google Calendar once it's connected and you approve");
     expect(qa(week, "[data-slot]")).toHaveLength(0);
     expect(container.querySelector('[data-pin="t0"]')).toBeNull();
     expect(text(pin(container, "tg"))).toContain("K1 gate review booked");
