@@ -14,6 +14,7 @@ from typing import Any
 import pytest
 from conftest import build_providers_config, models_config, prices_config
 from tilo_providers.config import ProviderConfigError
+from tilo_providers.errors import ProviderError
 from tilo_providers.factory import build_provider
 from tilo_providers.interfaces import Capability, GenerateRequest, GenerateResponse, ModelProvider
 from tilo_providers.replay import RecordReplayProvider, ReplayMissError, embed_recording_key, recording_key
@@ -113,7 +114,7 @@ def test_EFF_01_openai_compat_adapter_receives_the_injected_live_permission(tmp_
     assert isinstance(permitted._live(), OpenAICompatModelProvider)
 
     refused = build_provider("director", _compat_config(), fixtures_dir=tmp_path)
-    with pytest.raises(Exception, match="LIVE"):
+    with pytest.raises(ProviderError, match="refusing to build a real network client"):
         refused._live()
 
 
