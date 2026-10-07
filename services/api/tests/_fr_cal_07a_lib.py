@@ -46,11 +46,7 @@ from _ppl11b_lib import (
 # Each slice is a strict xfail until its builder deletes its entry (API_FR_CAL_07a.md section 0). An entry is a
 # substring of a pytest node id, so it names a whole file. `test_FR_CAL_07a_guards.py` is never pending: it passes
 # today and must keep passing.
-SLICE_PENDING: tuple[str, ...] = (
-    "test_FR_CAL_07a_today",
-    "test_FR_CAL_07a_prepare",
-    "test_FR_CAL_07a_privacy",
-)
+SLICE_PENDING: tuple[str, ...] = ()
 PENDING_EXEMPT: tuple[str, ...] = ("test_FR_CAL_07a_guards",)
 
 IST = "Asia/Kolkata"

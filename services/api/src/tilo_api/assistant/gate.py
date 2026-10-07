@@ -14,7 +14,7 @@ from tilo_policy.schemas import conforms
 
 from tilo_api import deps
 from tilo_api.assistant.config import AssistantConfig
-from tilo_api.people_access import SourceOwners, read_as
+from tilo_api.people_access import SourceOwners, read_as, released_item
 from tilo_api.people_vet import decide_as
 
 _PEOPLE_KINDS = ("work_item", "pinboard_item", "calendar_entry", "meeting", "person")
@@ -78,6 +78,15 @@ class RefGate:
                 source_owners=self._owners,
             )
         return self._seen[key]
+
+    def released(self, entry: Mapping[str, Any]) -> Ref | None:
+        """FR-CAL-07: the one work item of the entry's owner that the entry cites (the link `read_as` loads)."""
+        try:
+            found = released_item(self._people, self._org, entry)
+        except Exception:
+            return None
+        found_id = found.get("id") if isinstance(found, Mapping) else None
+        return Ref("work_item", found_id) if isinstance(found_id, str) else None
 
     def stored(self, ref: Ref, action: str) -> Mapping[str, Any] | None:
         """FR-PA-10: the work item as stored now, only when `decide` lets the signed-in person do `action` to it."""
