@@ -723,11 +723,14 @@ def answering_principal(
     """Who answers a card in `world_id` (BQ-XWORLD-1, BQ-XWORLD-2). A session bound to that world, unchanged. Otherwise
     only role owner, on the user's own web or mobile_web session (never a tilo-channels caller, so never an email link),
     when both the world's record owner and its run's CardStore owner are the caller: the principal narrowed to that
-    world, role and user unchanged. Anything else is None, the unknown-world 404. Checked on every request."""
+    world, role and user unchanged, and only on a full web sign-in session (`full_session`, BQ-XWORLD-10), so a
+    signed-link landing session stays bound. Anything else is None, the unknown-world 404. Checked on every request."""
     if principal.world_id == world_id:
         return principal
     me = principal.user_id
     if principal.role != "owner" or principal.channel not in _WEB_CHANNELS or from_channels:
+        return None
+    if not principal.full_session:
         return None
     if record_owner != me or cards.owner_of(world_id) != me:
         return None
@@ -736,12 +739,31 @@ def answering_principal(
 
 def reading_principal(principal: Principal, world_id: str, *, record_owner: str | None) -> Principal | None:
     """Who reads `world_id`'s cards (BQ-XWORLD-6): a session bound to it, or its record owner with role owner on any
-    channel, as `GET /cards` shows them (narrowed to that world); anyone else is None, the unknown-world 404."""
+    channel, as `GET /cards` shows them (narrowed to that world); anyone else is None, the unknown-world 404. What the
+    owner sees there, full or redacted, is `as_read_by`'s (BQ-XWORLD-9)."""
     if principal.world_id == world_id:
         return principal
     if principal.role == "owner" and record_owner == principal.user_id:
         return replace(principal, world_id=world_id)
     return None
+
+
+_SUMMARY_KEYS = ("id", "world_id", "kind", "created_at", "timeout")
+
+
+def as_read_by(session: Principal, world_id: str, cards: list[dict]) -> list[dict]:
+    """What `session` reads of `world_id`'s cards (BQ-XWORLD-9): in full in its bound world or on a full web sign-in;
+    otherwise each card as a summary built from an allowlist (ids, kind, timing, the gate's tier), never free text."""
+    if session.world_id == world_id or session.full_session:
+        return cards
+    summaries = []
+    for card in cards:
+        gate = card.get("gate")
+        summary = {key: card.get(key) for key in _SUMMARY_KEYS}
+        summary["risk_tier"] = gate.get("risk_tier") if isinstance(gate, dict) else None
+        summary["redacted"] = True
+        summaries.append(summary)
+    return summaries
 
 
 def get_channels_caller() -> bool:
@@ -776,7 +798,7 @@ def build_router(
         if reader is None:
             raise HTTPException(status_code=404)  # same as an unknown world
         try:
-            return store.list_for_world(world_id, principal=reader)
+            return as_read_by(principal, world_id, store.list_for_world(world_id, principal=reader))
         except PermissionError as exc:
             raise HTTPException(status_code=403) from exc
 
