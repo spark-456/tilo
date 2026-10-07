@@ -302,7 +302,7 @@ def test_FR_PA_08_weekly_counts_only_the_signed_in_persons_items_through_the_ora
     assert body_lines(body)[1][0] == "Done in the last 7 days: 4", "not Priya's, not another org's"
     assert {r.actor for r in spy.all_requests()} == {SAM} and {r.action for r in spy.all_requests()} == {"read_full"}
     assert not {"wi_wk_j", "wi_wk_k"} & spy.record_ids(), "another person's or org's item never reaches the oracle"
-    lists = [e for e in rig.world.log if e[:2] == ("work_items", "list")]
+    lists = [e for e in rig.world.log if e[:2] == ("work_item", "list")]
     assert len(lists) == 1, "the owner index is read once per request"
     assert dirs.calls == 1, "one directory per request, never per item"
     assert rig.plate_source.calls == [(SAM, NOW)]
