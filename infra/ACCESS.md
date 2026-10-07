@@ -153,7 +153,9 @@ Never requested: `mail.google.com`, `gmail.modify`, full `drive`.
    this project also uses Gemini Developer API keys. OWNER STEP, BEFORE the first
    `just deploy-web` that bakes the key in: in the Google Cloud console
    (APIs and Services, Credentials) open the Firebase web key and (a) set an API
-   restriction to the Firebase App Check API only, (b) set website restrictions
+   restriction to exactly three APIs: Firebase App Check API, Identity Toolkit API
+   and Token Service API (the last two are what Google sign-in calls, section 11),
+   (b) set website restrictions
    to the referrers `https://essential-wares-510320-f0.web.app/*` and
    `https://essential-wares-510320-f0.firebaseapp.com/*`, (c) confirm it cannot
    call `generativelanguage.googleapis.com` or any other paid API. Only then run
@@ -306,3 +308,36 @@ Hard requirements from the security review for the routes the infra points at:
 7. The push route lives on `tilo-channels` (`/internal/gmail/push`, where `GmailPushEndpoint` is); renew and poll live on `tilo-harness` (`/internal/gmail/{renew,poll}`).
 8. Vertex publisher models and Model Armor have no resource-level IAM, so their grants are project-level. The internet-facing services (api, channels) get only the custom `tiloVertexGenerate` role (`aiplatform.endpoints.predict`); harness alone keeps `roles/aiplatform.user`. `roles/modelarmor.user` is project-level for api, harness and channels.
 9. The WhatsApp `channels-webhook-signing-key` slot holds the Meta app secret used by `verify_signature`.
+
+## 11. Sign-in with Google (Firebase Authentication): the console checklist (SEC-15)
+
+Terraform cannot do these. They turn on app sign-in (Google, and anonymous demo sessions for visitors and judges), which
+`tilo-api` checks on every request and the web app asks for before it shows anything (BQ-SIGNIN-1..7 in
+`docs/open-questions.md`). Tilo never handles passwords (PRD 16.1). Do them in this order, for project
+`essential-wares-510320-f0`:
+
+1. Firebase console, Authentication, Get started.
+2. Authentication, Sign-in method: enable the Google provider (public-facing name `Tilo`, your support email) and save.
+3. Authentication, Sign-in method: enable the Anonymous provider (demo sessions). Never enable Email/Password or any other
+   provider: Tilo never handles passwords.
+4. Authentication, Settings, Authorized domains: check `essential-wares-510320-f0.web.app` and
+   `essential-wares-510320-f0.firebaseapp.com` are listed (they are by default; add them if not).
+5. Google Cloud console, APIs and Services, Credentials, the Firebase web key (the one step 4 of section 7 restricted):
+   set the API restriction to exactly three APIs: Firebase App Check API, Identity Toolkit API and Token Service API.
+   The Auth SDK calls `identitytoolkit.googleapis.com` and `securetoken.googleapis.com`, and Google refuses sign-in
+   with the key restricted to App Check alone. Keep the website restrictions (the two referrers); the key must still not
+   reach `generativelanguage.googleapis.com` or any other paid API.
+6. Google Cloud console, Google Auth Platform (OAuth consent screen), Audience: publishing status In production.
+   The user's decision (7 Oct 2026, BQ-SIGNIN-1) is In production, so the status is not a choice you make here.
+   The sign-in scopes `openid`, `email` and `profile` are non-sensitive (basic), so anyone with a Google account can
+   sign in: no test-user list, no expiry. The Gmail scopes (`gmail.readonly`, `gmail.compose`, `gmail.send`) are
+   restricted, so Google shows its unverified-app warning on every Gmail consent and caps an unverified app at
+   100 new users until Google verifies those scopes; the Gmail consent sheet (S-08) says so before the redirect. No code
+   path depends on the status, so either works. Fallback in one line: set it back to Testing and list test users; sign-ins and grants then expire after
+   about 7 days (PRD R-06).
+7. Later, an owner step, not needed to sign in: start Google verification for the restricted Gmail scopes
+   (Google Auth Platform, Verification Center), once the app is ready to be reviewed. Until it is approved the
+   unverified-app warning and the cap stay.
+8. Redeploy hosting (the Content-Security-Policy and the sign-in code ship together): `just deploy-web` with
+   `TILO_BAKE_FIREBASE_KEY=1`, then sign in on `https://essential-wares-510320-f0.web.app` and check the browser
+   console shows no Content-Security-Policy violation, before telling anyone to sign in.

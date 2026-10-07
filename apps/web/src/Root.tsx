@@ -3,6 +3,8 @@
 // until the cutover PR.
 import { Suspense, lazy } from "react";
 import { App } from "./App";
+import { SignInGate } from "./auth/SignInGate";
+import { session } from "./auth/session";
 import { isParkPath } from "./park/app/router";
 import { usePathname } from "./router";
 
@@ -10,10 +12,16 @@ const ParkApp = lazy(() => import("./park/app/ParkApp"));
 
 export function Root() {
   const pathname = usePathname();
-  if (!isParkPath(pathname)) return <App />;
+  // SEC-15: the whole app sits behind sign-in; no Firebase here (a local host, no config) means no gate at all.
   return (
-    <Suspense fallback={null}>
-      <ParkApp />
-    </Suspense>
+    <SignInGate auth={session}>
+      {!isParkPath(pathname) ? (
+        <App />
+      ) : (
+        <Suspense fallback={null}>
+          <ParkApp />
+        </Suspense>
+      )}
+    </SignInGate>
   );
 }

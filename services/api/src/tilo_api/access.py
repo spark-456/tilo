@@ -12,6 +12,7 @@ is not in `PUBLIC_ROUTES` before any body is read or any world looked up. Not de
 
 from __future__ import annotations
 
+import inspect
 import logging
 import os
 import threading
@@ -20,6 +21,7 @@ from typing import Literal, Protocol
 
 from fastapi import HTTPException
 from fastapi.concurrency import run_in_threadpool
+from starlette.requests import HTTPConnection
 from starlette.responses import JSONResponse
 from starlette.types import ASGIApp, Receive, Scope, Send
 
@@ -112,7 +114,9 @@ def _decide(scope: Scope) -> JSONResponse | None:
 
     overrides = scope["app"].dependency_overrides
     try:
-        principal = overrides.get(deps.get_current_principal, deps.get_current_principal)()
+        resolver = overrides.get(deps.get_current_principal, deps.get_current_principal)
+        # SEC-15 sign-in reads the request's Authorization header; a test double that takes no argument still works
+        principal = resolver(HTTPConnection(scope)) if inspect.signature(resolver).parameters else resolver()
         store = overrides.get(deps.get_access_store, deps.get_access_store)()
         declaration = store.get(principal.user_id)
     except HTTPException as exc:

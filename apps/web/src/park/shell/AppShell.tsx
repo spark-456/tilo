@@ -5,7 +5,7 @@
 // raises the "Sample data" chip without any page asking for data. The city's cars and walkers run on Home (cityMotion.ts).
 import { type ReactNode, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import type { Decision, Notification, User } from "../api/types";
-import { useApp, useExpectsSample, useParkApi, useParkStore } from "../app/context";
+import { endSession, useApp, useExpectsSample, useParkApi, useParkStore } from "../app/context";
 import { useParkRoute } from "../app/router";
 import { Toast } from "../components";
 import "../tokens/fonts";
@@ -21,6 +21,14 @@ import "./park.shell.css";
 import { backdropScene } from "./scene";
 
 const SIGN_OUT = "This is a prototype, so you stay signed in";
+
+/** Sign out (FR-UX-10): ends the real session when there is one; with none (a local host, the fixture world, a build
+ * with no Firebase config) the menu stays the prototype's toast. `session.signOut` never rejects, and a failed one still
+ * closes the menu; the sign-in gate takes the page from there. */
+function signOut(store: { toast: (message: string) => void; closeMenu: () => void }): void {
+  if (endSession()) store.closeMenu();
+  else store.toast(SIGN_OUT);
+}
 
 /** The bar along the nav's bottom edge while a world opens: 18% then 26 more per step, full at step 3. */
 const loaderBar = (step: number): number => (step >= 3 ? 100 : 18 + step * 26);
@@ -135,7 +143,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           user={user}
           connectorsOn={connectorsOn}
           go={(to) => store.go(to)}
-          onSignOut={() => store.toast(SIGN_OUT)}
+          onSignOut={() => signOut(store)}
           onClose={store.closeMenu}
         />
       ) : null}
