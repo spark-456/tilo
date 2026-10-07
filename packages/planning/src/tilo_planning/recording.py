@@ -24,7 +24,9 @@ SCREEN_CHUNK_CHARS = 20_000  # well under the safety role's own input cap: a lon
 _VIDEO_TYPES = frozenset({"video/mp4", "video/webm"})
 _AUDIO_TYPE = re.compile(r"audio/[a-z0-9][a-z0-9.+-]*")
 _MEETING_ID = re.compile(r"mt_[0-9A-Za-z_]{1,48}")
-_STRIPPED = frozenset({"Cc", "Cf", "Zl", "Zp"})  # controls, format characters (bidi, zero-width), separators
+_STRIPPED = frozenset(
+    {"Cc", "Cf", "Cs", "Co", "Zl", "Zp"}
+)  # controls, format (bidi, zero-width), surrogates, private use, separators
 
 
 class RecordingRejected(ValueError):
@@ -106,7 +108,10 @@ def transcribe_recording(
     for segment in sorted(segments, key=lambda s: s["start_ms"]):  # stable: provider order breaks ties
         text = _line(segment["text"], MAX_TEXT_CHARS)
         if text:
-            speaker = _line(segment["speaker"].replace("://", " "), MAX_SPEAKER_CHARS) or "Speaker 1"
+            speaker = _line(segment["speaker"], MAX_SPEAKER_CHARS)
+            while "://" in speaker:  # stripping can join a separator back together ("a:<zero-width>//x")
+                speaker = _line(speaker.replace("://", " "), MAX_SPEAKER_CHARS)
+            speaker = speaker or "Speaker 1"
             utterances.append({"id": "", "speaker": speaker, "t_ms": segment["start_ms"], "text": text})
     if not utterances:
         raise RecordingRejected("No speech was found in the recording.")

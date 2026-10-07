@@ -199,6 +199,21 @@ def test_FR_MTG_17_untrusted_text_is_sanitised_to_the_schema_shape():
     assert "://" not in utterance["speaker"] and "\n" not in utterance["speaker"]
 
 
+@pytest.mark.parametrize(
+    "speaker", ["a:\u200b//evil", "a:\u2028//x", "a:/\u202e/y", "a:\x00//z", "a:::\u200b//\u200b//q"]
+)
+def test_FR_MTG_17_a_url_separator_rebuilt_by_stripping_never_reaches_the_speaker(speaker):
+    result = run([seg("Hi.", speaker=speaker)])
+    assert "://" not in result.content["utterances"][0]["speaker"]
+    assert_valid_transcript(result.content)  # the JSON Schema itself, not only the pydantic model
+
+
+def test_FR_MTG_17_lone_surrogates_in_text_are_stripped_not_a_raw_validation_error():
+    result = run([seg("a\ud800b", speaker="S\udc00")])
+    assert result.content["utterances"][0]["text"] == "ab"
+    assert_valid_transcript(result.content)
+
+
 def test_FR_MTG_17_blank_segments_are_dropped_and_a_blank_speaker_gets_a_label():
     result = run([seg("   \n "), seg("Kept.", speaker=" \x00 "), seg("​​")])
     assert [(u["id"], u["speaker"], u["text"]) for u in result.content["utterances"]] == [
