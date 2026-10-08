@@ -4,8 +4,8 @@
 // and not the app (the Park sign-in screen, SignInScreen); "google" or "anonymous" shows the app. Tilo never handles passwords: Google signs the person
 // in, in its own window, and the panel has no field and no form (PRD 16.1). Neutral role tokens only.
 import { type ReactNode, useState, useSyncExternalStore } from "react";
-import type { AuthController, SignInResult } from "./auth";
 import { SignInScreen } from "./SignInScreen";
+import type { AuthController, SignInResult } from "./auth";
 
 const FAILED = "Signing in did not work. Please try again.";
 

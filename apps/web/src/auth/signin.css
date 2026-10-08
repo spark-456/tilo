@@ -8,6 +8,7 @@
   --si-line: rgba(31, 29, 43, 0.12);
   --si-btn: #ffffff;
   --si-hero: #5a3fe0;
+  --si-link: #5a3fe0;
   --si-soft: rgba(90, 63, 224, 0.12);
   --si-ground: #eceaf5;
   position: fixed;
@@ -30,6 +31,7 @@
   --si-line: rgba(255, 255, 255, 0.14);
   --si-btn: rgba(255, 255, 255, 0.07);
   --si-hero: #7a62f5;
+  --si-link: #b4a7ff;
   --si-soft: rgba(122, 98, 245, 0.22);
   --si-ground: #14121f;
 }
@@ -135,7 +137,7 @@
 .signin__btn--demo {
   border-color: transparent;
   background: var(--si-soft);
-  color: var(--si-hero);
+  color: var(--si-link);
 }
 .signin__btn:disabled {
   cursor: default;
@@ -144,7 +146,7 @@
 .signin__btn:focus-visible,
 .signin__toggle:focus-visible,
 .signin__legal a:focus-visible {
-  outline: 3px solid var(--si-hero);
+  outline: 3px solid var(--si-link);
   outline-offset: 2px;
 }
 .signin__or {
@@ -189,7 +191,7 @@
   text-align: center;
 }
 .signin__legal a {
-  color: var(--si-hero);
+  color: var(--si-link);
   font-weight: 700;
   text-decoration: none;
 }
