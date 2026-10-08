@@ -12,7 +12,7 @@ import { Activity } from "./Activity";
 import { ApprovalWaits, CostPerRun, GaveBack, WhereItGoes } from "./Sections";
 import { SpendChart } from "./SpendChart";
 import { icon } from "./icons";
-import { gbp, groupsWithRows, hasChart, hasWaits, kpis, monthLeft } from "./model";
+import { chartHeadline, groupsWithRows, hasChart, hasWaits, kpis, money, monthLeft } from "./model";
 import { useLedger } from "./useLedger";
 import "./Ledger.css";
 
@@ -61,7 +61,7 @@ export function LedgerPage({ app }: LedgerPageProps) {
   // What the Ledger holds no data for is left out, not shown as a sample or a zero (HR-1..HR-7).
   const chart = hasChart(L);
   const where = groupsWithRows(L).length > 0;
-  const lede = [monthLeft(L), L.budget > 0 ? `budget ${gbp(L.budget)}` : null].filter(Boolean);
+  const lede = [monthLeft(L), L.budget > 0 ? `budget ${money(L, L.budget)}` : null].filter(Boolean);
   const month = monthLeft(L) !== null;
   return (
     <Frame source={state.source}>
@@ -126,9 +126,7 @@ export function LedgerPage({ app }: LedgerPageProps) {
               <div className="park-ledger-charthead">
                 <div>
                   <div className="park-ledger-eyebrow">SPEND OVER TIME</div>
-                  <h2 className="park-ledger-h2">
-                    {`On track to finish ${gbp(L.budget - L.forecast)} under budget`}
-                  </h2>
+                  <h2 className="park-ledger-h2">{chartHeadline(L)}</h2>
                   <div className="park-ledger-sub">
                     Running total for September. Hover for daily spend.
                   </div>

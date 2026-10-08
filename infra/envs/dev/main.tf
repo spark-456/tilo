@@ -86,6 +86,7 @@ locals {
       public             = true
       invoked_by         = []
       vpc_egress         = local.caller_vpc_egress # calls harness directly
+      ignore_env         = true                    # TILO_* runtime settings via gcloud (docs/routines-rollout.md)
     }
     "harness" = {
       image              = local.placeholder_image

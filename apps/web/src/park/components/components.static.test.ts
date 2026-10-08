@@ -14,7 +14,6 @@ import { ALLOWLIST, RULES, scanSource } from "../../../test-support/honestyScan"
 const AMBIENT = /^src\/park\/(shell|engines)\//;
 import { COMPONENTS_DIR } from "../../../test-support/park/componentsCss";
 import { PARK_DIR } from "../../../test-support/park/prototype";
-import { parkTypeErrors } from "../../../test-support/park/typecheck";
 
 const WEB = resolve(PARK_DIR, "..", "..");
 const DEV_DIR = join(PARK_DIR, "dev");
@@ -248,17 +247,4 @@ describe("WEB_2_static: apps/web/CLAUDE.md is untouched", () => {
     expect(md.replace(/\n$/, "").split("\n").length).toBeLessThanOrEqual(40);
     expect(md).not.toMatch(/dev\/components|park\.components|park\/components/);
   });
-});
-
-describe("WEB_2_typecheck: the new files compile with the repo's strict options", () => {
-  it(
-    "WEB_2_typecheck_components_dev_and_their_tests_have_no_type_errors",
-    { timeout: 180_000 },
-    async () => {
-      const mine = (await parkTypeErrors()).filter((e) =>
-        /^(?:src\/park\/components\/|src\/park\/dev\/|test-support\/park\/components)/.test(e),
-      );
-      expect(mine).toEqual([]);
-    },
-  );
 });

@@ -12,6 +12,12 @@ import type {
   QuestionAnswer,
   TiloClient,
 } from "./client";
+import {
+  type ScheduleRequest,
+  type ScheduleView,
+  type SchedulesApi,
+  isScheduleView,
+} from "./schedules";
 import { type StopResult, isStopResult } from "./stop";
 
 /** What a person reads when a call fails (PRD 18.4). `retryable` is true for 5xx and for network
@@ -204,7 +210,7 @@ const AUTH_TOKEN = /^[A-Za-z0-9._~+/=-]{1,4096}$/;
 /** SEC-15 (BQ-SIGNIN-3): sent on a phone-width window, with a token, so the API records `mobile_web`. */
 const CHANNEL_HEADER = "X-Tilo-Channel";
 
-export class HttpClient implements TiloClient {
+export class HttpClient implements TiloClient, SchedulesApi {
   private readonly base: string;
   private readonly fetchFn: typeof fetch;
   private readonly pollMs: number;
@@ -283,6 +289,7 @@ export class HttpClient implements TiloClient {
       if (res.status >= 500) throw new TiloApiError(SERVER_TROUBLE, res.status, true, write);
       throw new TiloApiError(reasonOf(res.status, body), res.status, false, write, codeOf(body));
     }
+    if (res.status === 204) return undefined as T; // no content: nothing to read
     try {
       return (await res.json()) as T;
     } catch {
@@ -616,5 +623,40 @@ export class HttpClient implements TiloClient {
   /** `POST /worlds/{id}/pause` (FR-WLD-07). Not on the TiloClient interface yet. */
   async pauseWorld(worldId: string): Promise<void> {
     await this.post(`/worlds/${encodeURIComponent(worldId)}/pause`, {});
+  }
+
+  /** `GET /schedules` (FR-AGT-14): the owner's routines. A body that is not `{schedules: [...]}` of
+   * readable rows is an unreadable reply, never an empty list. */
+  async listSchedules(): Promise<ScheduleView[]> {
+    const body = await this.request<{ schedules?: unknown } | null>("/schedules");
+    const rows = body?.schedules;
+    if (!Array.isArray(rows) || !rows.every(isScheduleView)) {
+      throw new TiloApiError(BAD_REPLY, 200, true);
+    }
+    return rows;
+  }
+
+  /** `POST /schedules`: repeat a run the person already approved. */
+  createSchedule(req: ScheduleRequest): Promise<ScheduleView> {
+    return this.post("/schedules", req);
+  }
+
+  /** `PATCH /schedules/{id}`: pause, resume or rename. */
+  updateSchedule(id: string, patch: { enabled?: boolean; title?: string }): Promise<ScheduleView> {
+    const init = {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(patch),
+    };
+    return this.request(`/schedules/${encodeURIComponent(id)}`, init, true);
+  }
+
+  /** `DELETE /schedules/{id}`: 204 with no body. */
+  async deleteSchedule(id: string): Promise<void> {
+    await this.request<undefined>(
+      `/schedules/${encodeURIComponent(id)}`,
+      { method: "DELETE" },
+      true,
+    );
   }
 }

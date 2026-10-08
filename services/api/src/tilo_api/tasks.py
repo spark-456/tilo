@@ -4,13 +4,14 @@ answer the questions, get the approaches, approve one with a budget cap.
 Every route needs the signed-in principal, and only the task's creator may use it: anyone else gets the same
 404 as an unknown task, before any model call. Model calls go through the provider layer's Router; the grant
 is `tilo_planning.budget` run through the deterministic policy engine, never a model. Events are built and
-validated by `tilo_planning`; `Store.events` stands in for the world's stream until the harness writer is
-wired, and each task appends to it in strictly increasing `seq`.
+validated by `tilo_planning`, and every one of them is committed through `EventWriter.append` (ADR-0026 decision 4):
+the writer assigns `seq`, and `TaskRecord.next_seq` is only the helpers' `seq=` hint, derived from what was committed.
 """
 
 from __future__ import annotations
 
 import copy
+import dataclasses
 import logging
 from collections.abc import Awaitable, Callable, Iterator
 from datetime import UTC, date, datetime
@@ -86,13 +87,29 @@ def _base(task: deps.TaskRecord, actor: str) -> dict[str, Any]:
     return {"v": "1.0", "ts": now_ts(), "world_id": task.world_id, "run_id": task.run_id, "actor": actor}
 
 
-def _append(store: deps.Store, task: deps.TaskRecord, events: list[dict[str, Any]]) -> None:
-    store.events.setdefault(task.world_id, []).extend(events)
-    task.next_seq = max([task.next_seq - 1, *(e["seq"] for e in events)]) + 1
+def _saved(
+    store: deps.Store,
+    writer: deps.EventWriter | None,
+    task_id: str,
+    task: deps.TaskRecord,
+    parts: list[dict[str, Any]],
+    changes: dict[str, Any],
+    **records: Any,
+) -> deps.TaskRecord:
+    """The task with `changes` applied, saved with its event parts through `Store.save` (ADR-0026 decisions 3, 4): the
+    store's records change only when that returns, so a refused request changes nothing. `next_seq` is only the helpers'
+    `seq=` hint, moved past the parts; the writer assigns the real `seq`."""
+    new = dataclasses.replace(task, next_seq=task.next_seq + len(parts), **changes)  # shares the task's lock
+    store.save(writer, tasks={task_id: new}, parts={task.world_id: parts} if parts else None, **records)
+    return new
 
 
 def create_task(
-    store: deps.Store, intake: IntakeResult, extraction: ExtractionResult, scenario: str | None = None
+    store: deps.Store,
+    writer: deps.EventWriter,
+    intake: IntakeResult,
+    extraction: ExtractionResult,
+    scenario: str | None = None,
 ) -> tuple[str, deps.TaskRecord]:
     """FR-INT-03/04: the task from its intake and the Director's brief (extracted first, so a failed extraction
     stores nothing), then the questions, decided in code."""
@@ -111,9 +128,17 @@ def create_task(
     )
     task.draft = task.brief = asked.brief
     task.questions = asked.questions
-    store.worlds[task.world_id] = deps.WorldRecord(owner=owner, districts={}, run_id=task.run_id)
-    _append(store, task, [*intake_events, *asked.memory_hit_events, *([asked.event] if asked.event else [])])
-    store.tasks[intake.task_id] = task
+    parts = [*intake_events, *asked.memory_hit_events, *([asked.event] if asked.event else [])]
+    task.next_seq = len(parts) + 1
+    world = deps.WorldRecord(owner=owner, districts={}, run_id=task.run_id)
+    created = [("worlds", task.world_id), ("tasks", intake.task_id)]
+    store.save(
+        writer,
+        worlds={task.world_id: world},
+        tasks={intake.task_id: task},
+        parts={task.world_id: parts},
+        create=created,
+    )
     return intake.task_id, task
 
 
@@ -171,6 +196,7 @@ def _foreign_sources(task: deps.TaskRecord, edits: dict[str, Any]) -> bool:
 
 Principal = Annotated[deps.Principal, Depends(deps.get_current_principal)]
 StoreDep = Annotated[deps.Store, Depends(deps.get_store)]
+WriterDep = Annotated[deps.EventWriter, Depends(deps.get_event_writer)]
 FlagsDep = Annotated[FlagStore, Depends(deps.get_switches)]  # deployed: NFR-24's flag or the spend ledger's switch
 
 
@@ -205,9 +231,10 @@ def answer_questions(
             brief = _brief(task, answers, edits)
         except BriefValidationError as exc:
             raise HTTPException(status_code=422, detail=f"That change does not fit the brief: {exc}") from exc
+        changes: dict[str, Any] = {"answers": answers, "edits": edits, "brief": brief}
         if brief != task.brief:
-            task.approaches = None  # proposed for the old brief
-        task.answers, task.edits, task.brief = answers, edits, brief
+            changes["approaches"] = None  # proposed for the old brief
+        _saved(store, None, task_id, task, [], changes)
     return {"brief": brief}
 
 
@@ -216,6 +243,7 @@ def get_approaches(
     task_id: str,
     principal: Principal,
     store: StoreDep,
+    writer: WriterDep,
     model_router: Annotated[Router, Depends(deps.get_router)],
     flags: FlagsDep,
 ) -> dict[str, Any]:
@@ -239,8 +267,8 @@ def get_approaches(
             except ApproachProposalError as exc:
                 deps.raise_if_model_unavailable(exc)
                 raise HTTPException(status_code=502, detail="The Director could not propose approaches.") from exc
-            _append(store, task, [result.event])
-            task.approaches = result.approaches
+            task = _saved(store, writer, task_id, task, [result.event], {"approaches": result.approaches})
+        assert task.approaches is not None
         approaches = task.approaches
     # Default (PRD silent, BQ-83): the cheapest approach is recommended; ties keep the Director's order.
     recommended = min(approaches, key=lambda a: a["credits"]["max"])["id"]
@@ -285,6 +313,7 @@ def approve(
     principal: Principal,
     body: Annotated[ApproveIn, Depends(_json_body(ApproveIn))],
     store: StoreDep,
+    writer: WriterDep,
     seams: Annotated[runs.Seams | None, Depends(runs.run_seams)],
     flags: FlagsDep,
 ) -> dict[str, Any]:
@@ -304,6 +333,8 @@ def approve(
             raise HTTPException(status_code=422, detail="Pick one of the proposed approaches.")
         preload = _load_scenario(task)  # before anything changes: a scenario that no longer loads stops the approval
         now, base, cap = now_ts(), _base(task, task.owner), body.budget_cap
+        # the earlier grants and the policies are read across all of the owner's worlds
+        store.load_owner(task.owner, settle=True)
         owned = {w for w, record in store.worlds.items() if record.owner == task.owner}
         earlier = [e for w in owned for e in store.events.get(w, []) if e.get("type") == "budget.granted"]
         outcome = budget.request_budget_grant(
@@ -318,12 +349,12 @@ def approve(
         except PermissionError as exc:
             raise HTTPException(status_code=403, detail="Only the world's owner sets budgets.") from exc
         policies, policy_events = _scenario_policies(task, preload, event["seq"] + 1)  # built before anything is stored
-        _append(store, task, [event, *policy_events])
-        for policy in policies:
-            store.policies[policy["id"]] = policy
-            store.policy_worlds[policy["id"]] = task.world_id
-        task.granted = True
         approach = next(a for a in task.approaches if a["id"] == body.approach_id)
+        # One save: the grant, its policy events, the policies and the task, or none of them (ADR-0026 decision 3).
+        task = _saved(
+            store, writer, task_id, task, [event, *policy_events], {"granted": True},
+            policies={p["id"]: p for p in policies}, policy_worlds={p["id"]: task.world_id for p in policies},
+        )  # fmt: skip
     if seams is not None:
         try:
             runs.start_run(store, task, approach=approach, budget_cap=cap, seams=seams)
