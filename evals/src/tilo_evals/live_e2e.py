@@ -70,6 +70,8 @@ FAKED = (  # what a run never does for real, printed with every report (HR-1: sa
     "connectors and recipient: recording mocks; no real mailbox, chat or Drive write",
     "Verifier verdict: recorded in the unit's summary, not acted on",
     "must-ask judgement: a fixed 'nothing to ask' stand-in, no model call; the deterministic rules still ask",
+    "web fetch: the fetch tool reads the in-process sandbox-web fixtures only, never the internet; tool results are "
+    "screened by the marker-list fake, not Model Armor; no skill grants it to a unit yet (LW-17)",
 )
 NO_CONNECTION = "no Google connection is available to this run; nothing was sent"
 REAL_FAKED = (
@@ -764,9 +766,15 @@ class _UnitRunner:
     verdict is recorded, not acted on."""
 
     def __init__(self, router: Router, meter: _Meter) -> None:
+        from .web_replay import FixtureWeb  # noqa: PLC0415 (lazy: the 160-case replay never loads the fetch service)
+
         self._router, self._meter = router, meter
+        self._web = FixtureWeb()  # LW-16: the fetch tool over the sandbox-web fixtures, in process, in every mode
         self._shared = ToolUnitRunner(
             _RoleModels(router),
+            tools=self._web.registry(),
+            safety=FakeSafetyProvider(),  # every tool result is screened; the marker-list fake, named in `FAKED`
+            role_tools={"specialist": ("fetch_url",)},
             meter=lambda role, request, response: meter.cost(response.profile_id, *meter.tokens(response, request)),
             request_options={
                 role: {"max_output_tokens": cap, "thinking_level": "minimal"} for role, cap in _OUT.items()
@@ -776,6 +784,9 @@ class _UnitRunner:
         self._units: list[dict[str, Any]] = []
         self._milestones: frozenset[str] = frozenset()
         self._work: dict[str, str] = {}
+
+    def close(self) -> None:
+        self._web.close()
 
     def capture(self, brief: dict[str, Any], plan: dict[str, Any]) -> None:
         self._brief, self._units = brief, list(plan.get("units", []))
@@ -1036,7 +1047,8 @@ def _execute(
     obs = Observation(case=dataclasses.replace(case, approve=approve))
     story: list[StoryLine] = []
     note: str | None = None
-    app = _app(router, screen, runner or _UnitRunner(router, meter), connectors)
+    own = runner or _UnitRunner(router, meter)  # the caller closes a runner it passed in
+    app = _app(router, screen, own, connectors)
     if connectors is not None:  # CL-LIVE-2: write-gated connectors get this run's store, redactor and person
         from .live_writes import bind_writes  # noqa: PLC0415
 
@@ -1047,6 +1059,8 @@ def _execute(
         except Exception as error:  # noqa: BLE001 - a crash is an observation; the error's text is never kept
             obs.crash = type(error).__name__
         finally:
+            if runner is None:
+                own.close()
             if connectors is not None:  # an approval nobody used does not outlive the run
                 from .live_writes import release_writes  # noqa: PLC0415
 
@@ -1128,18 +1142,21 @@ def run_live_e2e(
     providers = _Providers(config, meter, recordings, factory, fake_record=fake_record)
     router = _MeteredRouter(config, meter, providers)
     runner = _UnitRunner(router, meter)
-    obs, report.outcome_class, report.reason, report.story_lines, report.story_note = _execute(
-        case,
-        router,
-        meter,
-        screen,
-        env,
-        live=live,
-        cap=max_credits,
-        person=person,
-        runner=runner,
-        connectors=connectors,
-    )
+    try:
+        obs, report.outcome_class, report.reason, report.story_lines, report.story_note = _execute(
+            case,
+            router,
+            meter,
+            screen,
+            env,
+            live=live,
+            cap=max_credits,
+            person=person,
+            runner=runner,
+            connectors=connectors,
+        )
+    finally:
+        runner.close()
     report.work = runner.work()
     if report.reason:  # a last line of defence: nothing printed names the project, an ADC path or a token
         report.reason = _scrub_known(" ".join(report.reason.split()), env)
