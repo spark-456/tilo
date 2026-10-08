@@ -106,6 +106,8 @@ loader. No new licence. FR-CON-02 adds `cryptography` for AES-GCM envelope encry
 | --- | --- | --- |
 | cryptography (`tilo_connectors.tokens`, FR-CON-02) | Apache-2.0 OR BSD-3-Clause | https://pypi.org/project/cryptography/ |
 | tzdata (`tilo_connectors.calendar_sync`, FR-CAL-08: the IANA zone database `zoneinfo` needs on Windows) | Apache-2.0 | https://pypi.org/project/tzdata/ |
+| google-cloud-firestore (`tilo_connectors.host_broker`: the token and revoke-retry stores, ADR-0032 T2) | Apache-2.0 | https://pypi.org/project/google-cloud-firestore/ |
+| google-cloud-kms (`tilo_connectors.host_broker`: `CloudKms` client, ADR-0032 T2; pulls `grpc-google-iam-v1`, Apache-2.0) | Apache-2.0 | https://pypi.org/project/google-cloud-kms/ |
 
 FR-CON-10 (`tilo_connectors.provenance`) adds the in-workspace `tilo-archive` and `tilo-contracts`
 (not external). No new licence.
