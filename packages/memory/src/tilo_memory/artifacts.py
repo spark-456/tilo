@@ -124,6 +124,9 @@ class NewVersion:
     idempotency_key: str | None = None
     parent: Mapping[str, Any] | None = None
     label: str | None = None
+    # A producer that screened its own input in pieces may say "flagged". It can only raise the stored verdict (the
+    # store takes flagged if its own screen or the hint says so) and is never stored or applied to a replay.
+    screening_hint: str | None = None
 
 
 @dataclass(frozen=True)
@@ -679,6 +682,8 @@ class ArtifactStore:
         data, redacted = self._prepare(new)
         digest = self._hash(data)
         screening, screened_at = self._screen(data, new.media_type)
+        if new.screening_hint == "flagged" and screening != "flagged":  # the hint only ever raises (AR-07)
+            screening, screened_at = "flagged", screened_at or _iso(self._clock())
         fields = {
             "run_id": new.run_id,
             "media_type": new.media_type,
@@ -697,6 +702,8 @@ class ArtifactStore:
     def _check_new(new: NewVersion) -> dict[str, Any] | None:
         """Shape, kinds and caps: everything that can be refused without hashing. Returns the normalised parent."""
         origin, media = new.origin, new.media_type
+        if new.screening_hint is not None and (type(new.screening_hint) is not str or new.screening_hint != "flagged"):
+            raise _refuse("AR-07", "a screening hint can only be 'flagged'; the store alone says clean")
         if not isinstance(origin, Origin) or origin.kind not in ("unit", "render", "upload"):
             raise _refuse("AR-02", "origin must be unit, render or upload (restore has its own call)")
         if type(media) is not str or media not in TEXT_TYPES | FILE_TYPES:

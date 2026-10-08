@@ -24,6 +24,7 @@ SCREEN_CHUNK_CHARS = 20_000  # well under the safety role's own input cap: a lon
 _VIDEO_TYPES = frozenset({"video/mp4", "video/webm"})
 _AUDIO_TYPE = re.compile(r"audio/[a-z0-9][a-z0-9.+-]*")
 _MEETING_ID = re.compile(r"mt_[0-9A-Za-z_]{1,48}")
+_WHITESPACE = re.compile(r"\s+")
 _STRIPPED = frozenset(
     {"Cc", "Cf", "Cs", "Co", "Zl", "Zp"}
 )  # controls, format (bidi, zero-width), surrogates, private use, separators
@@ -61,8 +62,10 @@ def media_type_allowed(media_type: object) -> str:
 def _line(text: str, limit: int) -> str:
     """One line: whitespace runs (newlines included) become one space, controls, format characters and line or
     paragraph separators are removed, the result is trimmed and cut to `limit`."""
-    collapsed = re.sub(r"\s+", " ", text)
-    return "".join(c for c in collapsed if unicodedata.category(c) not in _STRIPPED).strip()[:limit].strip()
+    collapsed = _WHITESPACE.sub(" ", text)
+    # one lookup per distinct character, then a C-speed translate: linear in the input, not a Python loop per character
+    table = dict.fromkeys(ord(c) for c in set(collapsed) if unicodedata.category(c) in _STRIPPED)
+    return collapsed.translate(table).strip()[:limit].strip()
 
 
 def _screen(lines: list[str], safety: SafetyProvider) -> tuple[bool, str | None]:

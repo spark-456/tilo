@@ -47,7 +47,7 @@ def state_bytes() -> bytes:
 class Rig:
     """The real `ArtifactStore` over memory backends, with the recording safety fake that ingest screens through."""
 
-    def __init__(self) -> None:
+    def __init__(self, *, store_screener: Any = "default") -> None:
         self.safety = make_safety_provider()
         self.alerts: list[dict[str, Any]] = []
         self.meta, self.blobs = MemoryMetaBackend(), MemoryBlobBackend()
@@ -58,7 +58,8 @@ class Rig:
             redactor=lambda text: text,
             archive_lookup=lambda scope, ref: None,
             alert_sink=self.alerts.append,
-            screener=make_safety_provider(),  # the store's own verdict on the stored bytes (AR-07), apart from ingest's
+            # the store's own verdict on the stored bytes (AR-07), apart from ingest's; a test may swap it
+            screener=make_safety_provider() if store_screener == "default" else store_screener,
         )
 
     def ingest(self, kind: str, data: bytes, **kwargs: Any) -> TranscriptIngest:
