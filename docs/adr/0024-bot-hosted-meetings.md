@@ -12,9 +12,12 @@
   account tiloagent@gmail.com without 2-step verification). The rest is the architect's default,
   BQ-MTG09-2 to BQ-MTG09-11 (BQ-MTG09-1 and -12 are superseded). Amends ADR-0017.
   (Next free number on every remote branch at 2026-10-06; the merger may renumber.)
-- Deciders: user (the scope change; approval of the ADR-0017 change), architect (design)
-- Requirement: FR-MTG-09 (amended), FR-MTG-01, FR-MTG-10, FR-CAL-02, FR-CAL-04; PE-13, PE-14, PE-18, PE-20;
-  PRD 3.4, 10.4, 16.1, 16.2; ADR-0016 decision 7, ADR-0017
+  **Amendment 4 (a transient Meet join link for the meeting's owner, read on click and stored nowhere) is
+  ACCEPTED: the user approved it on 8 Oct 2026, about 12:00 IST** (relayed by the supervisor as user-approved;
+  the user's own words are not quoted here). See "Amendment 4" below; it narrows decision 4, nothing else.
+- Deciders: user (the scope change; approval of the ADR-0017 change; amendment 4), architect (design)
+- Requirement: FR-MTG-09 (amended), FR-MTG-01, FR-MTG-10, FR-CAL-01, FR-CAL-02, FR-CAL-04; PE-13, PE-14, PE-18,
+  PE-20; PRD 3.4, 10.4, 16.1, 16.2; ADR-0016 decision 7, ADR-0017; amendment 4: PPL-60c, MJ-01 to MJ-10
 
 ## Context
 FR-MTG-09 was a guest-join experiment: the bot joins an ordinary Meet with no account and the host admits it;
@@ -42,7 +45,8 @@ person's connectors as one Google grant (CON-D10).
    Guests cannot invite others, edit the event or see each other's addresses.
 4. **The Meet link is never stored** (FR-MTG-01, `meeting.schema.json`). The insert asks Google for no link;
    Tilo keeps only Google's event id, in a receipt artifact. The bot gets the link in its start request: from
-   the Owner's own invitation now, from an in-memory hand-over later (PPL-60c).
+   the Owner's own invitation now, from an in-memory hand-over later (PPL-60c). Amendment 4 (8 Oct 2026): the
+   owner's Join click reads it from Google for that one answer and still stores it nowhere.
 5. **Grant groups.** The token broker keeps the bot account's grant in its own group, so revoking it never
    touches a person's Google grant and the reverse. A consent answer for `meeting_host` that carries any other
    scope is refused as "not the bot account".
@@ -143,6 +147,71 @@ These replace the text above where they differ. Amendment 3 was accepted by the 
 6. Conversation quality: the cascade voice architecture already planned (`docs/VOICE_ARCHITECTURE.md`), not
    Gemini Live.
 
+## Amendment 4 (8 Oct 2026, ACCEPTED by the user): a transient Meet join link for the owner
+Numbered after amendment 3 as the fourth change to this ADR; it is not item 4 of the list above (the 60-minute cap).
+
+**Context.** The user wants a click on a meeting Tilo hosts, in Tilo's calendar, to open the Meet call at once.
+Decision 4 keeps the link out of every store and asks Google for none at insert time, so today the owner looks
+for the invitation in their own mail or Google Calendar. PPL-60c already planned one narrow read for the bot's
+start request (`MeetingHostAdapter.join_link`, `fields: status,hangoutLink`, refusals MH-20 and MH-21), held in
+memory only. Rules: `contracts/meeting_join.rules.md` MJ-01 to MJ-10. Notes for the tickets:
+`services/api/tests/API_MTG09_d_join.md`.
+
+**Decision.**
+1. **One route, keyed by the meeting:** `GET /v1/meetings/{meeting_id}/join` answers 200 with
+   `meeting_join.schema.json` `{join_url, expires_at}`. A Tilo meeting is never a `calendar_entry` (the agenda
+   cites it as `{kind: "meeting", id}`), and the receipt, the owner and the world all hang off the meeting, so
+   the sketched `GET /v1/calendar/{entry}/join` would need a calendar-entry-to-meeting map that exists nowhere
+   (BQ-JOIN-1).
+2. **The owner only (MJ-01).** The principal is the meeting's owner, its world's owner and the receipt's owner;
+   anyone else gets the missing-meeting 404 (PE-05). Invitees use Google's own invitation (BQ-JOIN-2).
+3. **Read when clicked, never before (MJ-02, MJ-03).** The route runs only on the owner's click: never on agenda
+   load, hover or prefetch. PPL-60c's `join_link` is pulled forward and gains this second caller: one
+   `events.get` of the receipt's `event_ref` on the host account, the `(owner, "meeting_host")` grant and its
+   one scope `calendar.events.owned` (no new scope, no person's grant), `fields=status,hangoutLink`, not
+   patient. A cancelled or missing event is MH-20.
+4. **Only a Meet link passes, three times (MJ-04, MJ-07).** The connector fullmatches
+   `https://meet\.google\.com/[a-z]{3}-[a-z]{4}-[a-z]{3}` (MH-21); tilo-api validates the body against the
+   contract before answering; the web checks the same shape and the origin before opening.
+5. **Stored nowhere, short-lived (MJ-05, MJ-06).** The link is in the request's variables and the response body
+   only: no store, cache, event, card, notification, archive record, artifact, log line, trace or error report.
+   `expires_at` is the server clock plus 60 seconds; the web drops the link then or when the view closes.
+6. **The browser (MJ-07).** A new tab, `rel="noopener noreferrer"` (or `window.open` with
+   `"noopener,noreferrer"`), opened inside the click's user activation. When the browser blocks the tab or the
+   answer is slow, the event's detail shows a "Join the call" link that holds the URL only in component state
+   until `expires_at`, so a second click opens it. Never in the address bar, history, web storage, a
+   service-worker cache, the console, analytics or an error report.
+7. **The calendar offers Join only where it works (MJ-10).** `calendar_entry` 1.1.0 adds the optional
+   `agenda_item.joinable` (additive): true only on a `meeting` row the reader owns and Tilo hosts, computed at read
+   time. The row never carries the link; a synced Google copy of the same event is never joinable.
+8. **Not a side effect (MJ-08, MJ-09).** A read of Tilo's own event: no outbox entry, gate, policy, event, run or
+   model call; nothing animates (HR-1); metered at zero. At most 10 joins a minute per principal.
+9. **Unchanged.** The insert still asks Google for no link; `meeting` and `calendar_entry` keep no field for one
+   (`fixtures/calendar_entry/invalid/conference_link_field.json` and the meeting link checks stay); synced Google
+   copies keep no link (PE-13 gains one sentence naming this exception; the FR-CAL-08 adapter still never asks
+   for `hangoutLink`); the bot's start request (PPL-60c) and amendment 3(c) (the bot never admits) stand.
+
+**Security.** A Meet link is a capability to knock, not to enter: invited accounts join by Meet's own rule and the
+bot never clicks Admit (amendment 3(c)), so a leaked link lets a stranger knock and a human participant could
+still admit them. That is why the link stays out of logs and stores even though the owner already has it in
+their invitation. Lookalike hosts, `javascript:` and other schemes, user info, ports, paths, queries and fragments
+are refused by the exact shape (contract fixtures); `noopener` stops reverse tab-nabbing and `noreferrer` keeps
+the Tilo URL (which names the meeting id) from Google. Cross-user reads get the same bytes as a missing meeting.
+JOIN-a and JOIN-b take a security review (token broker grant use, link handling).
+
+**Alternatives.** *Store the link, encrypted, on the meeting or receipt:* contradicts FR-MTG-01 and
+`meeting.schema.json`, and a stored bearer link outlives its use. *Read it through the owner's own
+`google_calendar` grant* (their copy has the same event id): the FR-CAL-08 adapter's privacy tests forbid asking
+for `hangoutLink`, and it fails when the owner has not connected Calendar. *Fetch on agenda load or hover:* more
+reads and the link sits in memory far longer. *A 302 from tilo-api to Meet:* tilo-api authenticates with a bearer
+header, which a plain top-level navigation cannot carry, and the link would sit in `Location` headers and proxy
+logs.
+
+**Consequences.** Tickets JOIN-a (connectors: `join_link`), JOIN-b (tilo-api route), JOIN-c (web: Agenda and S-26
+Join), JOIN-d (`joinable` on agenda rows, with the FR-CAL-01 agenda route); acceptance tests first. Contract
+changes: `meeting_join.schema.json` 1.0.0 (new), `calendar_entry.schema.json` 1.1.0 (additive), the PE-13
+sentence, regenerated types. Open points: BQ-JOIN-1 to BQ-JOIN-6.
+
 ## Revocation and end of life (runbook; owner: the user; date: the hackathon freeze, 17 Oct 2026, or at once on any doubt)
 1. In Tilo, disconnect `meeting_host` (the token broker revokes the grant).
 2. At Google: Security, Your devices, sign out everywhere; review Third-party access and remove the Tilo
@@ -180,3 +249,5 @@ sign-in (signed out afterwards), and the account address kept out of anything sh
 - Only the person who connected the host account hosts with it, for their own meetings; sharing it across a
   team is a later decision.
 - Cancelling or moving a hosted meeting (delete or patch with invitations) is a later T3 ticket.
+- Amendment 4: the owner joins a hosted meeting from Tilo's calendar with one click; the link is read from Google
+  per click and stored nowhere (tickets JOIN-a to JOIN-d).

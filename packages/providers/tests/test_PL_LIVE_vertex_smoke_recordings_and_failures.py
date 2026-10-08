@@ -256,16 +256,17 @@ def test_PL_LIVE_07_a_429_on_the_primary_uses_the_fallback_profile_and_shows_it(
 
 def test_PL_LIVE_07_a_failure_after_some_successes_keeps_the_rows_already_printed(tmp_path: Path) -> None:
     cfg = real_config()
-    # the narrator profile fails with a request error; the five roles before it succeeded and were printed
-    broken = cfg.profiles[cfg.roles["narrator"].primary].model
-    others = {cfg.profiles[cfg.roles[r].primary].model for r in ROLES if r != "narrator"}
-    assert broken not in others, "fixture assumption: the narrator profile is not shared with another role"
+    # the specialist's profile (EFF-02: the cheapest, shared with the narrator) fails with a request error; the two
+    # roles before it succeeded and were printed
+    broken = cfg.profiles[cfg.roles["specialist"].primary].model
+    before = {cfg.profiles[cfg.roles[r].primary].model for r in ("director", "lead")}
+    assert broken not in before, "fixture assumption: the specialist profile is not used by an earlier role"
     sdk = FakeVertexSdk(errors_by_model={broken: FakeAPIError(*PERMISSION)})
     result, _, _ = live_run(tmp_path, sdk=sdk)
     assert result.code == 1
-    assert [m["role"] for m in result.rows()] == ["director", "lead", "specialist", "verifier", "writer"]
+    assert [m["role"] for m in result.rows()] == ["director", "lead"]
     lines = result.err_lines()
-    assert len(lines) == 1 and lines[0].startswith("FAIL role=narrator reason=permission:")
+    assert len(lines) == 1 and lines[0].startswith("FAIL role=specialist reason=permission:")
     assert "autopilot" not in result.everything  # the run stopped; the last role never ran
     total = result.total()
     assert total is not None  # what was spent so far is still reported

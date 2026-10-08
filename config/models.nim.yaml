@@ -38,16 +38,23 @@ profiles:
     caps: [json, tools]
 
 roles:
+  # The Director's `thinking: high` is only the default for a caller that sets no level (BQ-LE2E-10): planning calls
+  # set low (brief) or medium (approaches, plan) themselves. Specialist is already cheapest first (EFF-02).
   director: { primary: nim-gemma-4-31b, fallback: nim-gemma-3-27b, thinking: high, max_input_tokens: 100000, max_output_tokens: 16384 }
   lead: { primary: nim-gemma-4-31b, fallback: nim-gemma-3-27b, thinking: medium, max_output_tokens: 16384 }
-  specialist: { primary: nim-gemma-3-27b, fallback: nim-gemma-4-31b }
+  specialist: { primary: nim-gemma-3-27b, fallback: nim-gemma-4-31b, thinking: low, max_output_tokens: 8192 }
   verifier: { primary: nim-gemma-4-31b, fallback: nim-gemma-3-27b, thinking: high, max_output_tokens: 16384 }
-  writer: { primary: nim-gemma-4-31b, fallback: nim-gemma-3-27b }
-  narrator: { primary: nim-gemma-3-27b, fallback: nim-gemma-4-31b }
+  writer: { primary: nim-gemma-4-31b, fallback: nim-gemma-3-27b, thinking: low, max_output_tokens: 16384 }
+  narrator: { primary: nim-gemma-3-27b, fallback: nim-gemma-4-31b, max_output_tokens: 4096 }
   autopilot: { primary: nim-gemma-3-27b, fallback: nim-gemma-4-31b, max_input_tokens: 16000 }
   generator: { primary: nim-gemma-4-31b, fallback: nim-gemma-3-27b, thinking: low }
   autorater: { primary: nim-gemma-3-27b, fallback: nim-gemma-4-31b }
   assistant: { primary: nim-gemma-3-27b, fallback: nim-gemma-4-31b, max_input_tokens: 8000, max_output_tokens: 1000 } # FR-PA-19
+  # FR-MTG-11: the meeting bot's two roles (meet-bot/bot/providers.py asks for these, never a model). `meeting` is the
+  # agenda analysis (JSON in, JSON out, about 12000 characters of transcript); `meeting_fast` answers one question in a
+  # sentence on the cheapest profile. Caps per EFF-03; the fallback (NFR-25) serves a quota or provider error only.
+  meeting: { primary: nim-gemma-3-27b, fallback: nim-gemma-4-31b, max_input_tokens: 16000, max_output_tokens: 2048 }
+  meeting_fast: { primary: nim-gemma-3-27b, fallback: nim-gemma-4-31b, max_input_tokens: 8000, max_output_tokens: 256 }
 
 rules:
   deny: ["gemini-2.5-*", "*-preview*"]
