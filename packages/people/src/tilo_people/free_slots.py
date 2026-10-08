@@ -70,15 +70,20 @@ def _instant(value: Any, reason: str) -> datetime:
     return moment.astimezone(UTC)
 
 
-def _span(item: Any, owner: str, zone: ZoneInfo, default: timedelta) -> list[tuple[datetime, datetime]]:
+def _span(
+    item: Any, owner: str, zone: ZoneInfo, default: timedelta, room: int, skip: frozenset[str]
+) -> list[tuple[datetime, datetime]]:
+    """The busy spans of one record; `room` is what is left of MAX_ENTRIES, checked before any expansion."""
     if not isinstance(item, Mapping):
         raise FreeSlotError("bad_entry")
     if "busy" in item:  # a free_busy record (PE-04): every interval is busy
         if item.get("user") != owner:
             return []
         rows = item["busy"]
-        if not isinstance(rows, list) or len(rows) > MAX_ENTRIES:
+        if not isinstance(rows, list):
             raise FreeSlotError("bad_entry")
+        if len(rows) > room:
+            raise FreeSlotError("too_many_entries")
         spans = [
             (_instant(r.get("start"), "bad_entry"), _instant(r.get("end"), "bad_entry"))
             for r in rows
@@ -89,7 +94,7 @@ def _span(item: Any, owner: str, zone: ZoneInfo, default: timedelta) -> list[tup
         return [s for s in spans if s[0] < s[1]]
     if type(item.get("owner")) is not str or type(item.get("state")) is not str:
         raise FreeSlotError("bad_entry")
-    if item["owner"] != owner or item["state"] != "accepted":
+    if item["owner"] != owner or item["state"] != "accepted" or item.get("id") in skip:
         return []
     start = _instant(item.get("start"), "bad_entry")
     end = None if item.get("end") is None else _instant(item["end"], "bad_entry")
@@ -134,6 +139,7 @@ def find_free_slots(
     buffer_min: int = 0,
     default_entry_min: int = 60,
     horizon_days: int = MAX_HORIZON_DAYS,
+    exclude: Iterable[str] = (),
 ) -> tuple[str, ...]:
     """Up to `count` start times (UTC timestamps) where `duration_min` fits free, earliest first."""
     if type(owner) is not str or not is_user_id(owner):
@@ -161,6 +167,11 @@ def find_free_slots(
     buffer = timedelta(minutes=_int(buffer_min, 0, 240, "bad_buffer"))
     default = timedelta(minutes=_int(default_entry_min, 1, 1440, "bad_default"))
     horizon = _int(horizon_days, 1, 3650, "bad_horizon")
+    if isinstance(exclude, (str, bytes)) or not isinstance(exclude, Iterable):
+        raise FreeSlotError("bad_exclude")
+    skip = frozenset(islice(exclude, MAX_ENTRIES + 1))
+    if len(skip) > MAX_ENTRIES or any(type(i) is not str for i in skip):
+        raise FreeSlotError("bad_exclude")
     low = _instant(now, "bad_time")
     start_at = max(low, _instant(not_before, "bad_time")) if not_before is not None else low
     stop_at = low + timedelta(days=min(horizon, MAX_HORIZON_DAYS))
@@ -171,9 +182,11 @@ def find_free_slots(
         raise FreeSlotError("bad_entry")
     if len(rows) > MAX_ENTRIES:
         raise FreeSlotError("too_many_entries")
-    spans = [s for item in rows for s in _span(item, owner, zone, default)]
-    if len(spans) > MAX_ENTRIES:
-        raise FreeSlotError("too_many_entries")
+    spans: list[tuple[datetime, datetime]] = []
+    for item in rows:
+        spans += _span(item, owner, zone, default, MAX_ENTRIES - len(spans), skip)
+        if len(spans) > MAX_ENTRIES:
+            raise FreeSlotError("too_many_entries")
     starts, ends = _merge(spans, buffer)
     length = timedelta(minutes=duration_min)
     advance = -(-length // step) * step  # the next proposal starts after this one, on the grid

@@ -387,7 +387,7 @@ def resolve_due(due_text: object, *, meeting_at: str, time_zone: str) -> DueReso
 ```python
 def find_free_slots(entries, *, owner, now, tz, duration_min, working_window=("09:00", "18:00"),
                     working_days=(0, 1, 2, 3, 4), not_before=None, not_after=None, count=3, step_min=15,
-                    buffer_min=0, default_entry_min=60, horizon_days=14) -> tuple[str, ...]
+                    buffer_min=0, default_entry_min=60, horizon_days=14, exclude=()) -> tuple[str, ...]
 def parse_working_window(raw) -> tuple[str, str]   # {start, end} of config/personal.yaml; raises FreeSlotError
 class FreeSlotError(PeopleInputError): reason: str  # a code, never record text
 ```
@@ -398,7 +398,13 @@ local `step_min` grid, no later than `now` + 14 days and ending by `not_after`. 
 entries and the owner's `free_busy` intervals; all-day blocks its local day; no end blocks `default_entry_min`.
 Refused with a reason: `bad_owner`, `bad_time_zone`, `bad_window`, `bad_duration` (not an int >= 1),
 `duration_too_long` (longer than the window), `bad_working_days`, `bad_count`, `bad_step`, `bad_buffer`,
-`bad_default`, `bad_horizon`, `bad_time`, `bad_entry`, `too_many_entries` (over 2000).
+`bad_default`, `bad_horizon`, `bad_exclude`, `bad_time`, `bad_entry`, `too_many_entries` (over 2000).
+
+`exclude`: calendar entry ids that do not block (the meeting being moved); it never drops free_busy intervals.
+The caps (2000 spans over all records) are checked before a record is expanded. Timestamps must be the contract's
+`Z` form: an offset such as `+05:00` is `bad_entry`. A window edge inside a spring-forward gap resolves with
+`fold=0` (the pre-transition offset). Importable from `services/channels` as a workspace package like
+`tilo-policy` (no rule in CLAUDE.md forbids it); the service's pyproject must first add `tilo-people`.
 
 ## 4. Write checks (PPL-10c) — PE-02, PE-04, PE-07, PE-17, PE-19
 

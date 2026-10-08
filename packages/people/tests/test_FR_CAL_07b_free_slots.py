@@ -272,3 +272,51 @@ def test_FR_CAL_07b_property_every_slot_is_free_inside_the_window_and_increasing
         assert ls.date() == le.date() and ls.weekday() < 5
         assert (9, 0) <= (ls.hour, ls.minute) and (le.hour, le.minute) <= (18, 0)
         assert (ls.hour * 60 + ls.minute) % step == 0
+
+
+def test_FR_CAL_07b_many_free_busy_intervals_are_refused_before_they_are_expanded():
+    import time
+
+    class Counting(list):  # a busy list that must never be walked
+        def __iter__(self):
+            raise AssertionError("intervals were expanded")
+
+    row = {"start": local("2026-10-07", "09:00"), "end": local("2026-10-07", "09:30")}
+    rows = [row] * 2000
+    records = [{"user": U, "from": NOW, "to": NOW, "busy": rows} for _ in range(2000)]
+    began = time.perf_counter()
+    with pytest.raises(FreeSlotError) as exc:
+        slots(records)
+    assert exc.value.reason == "too_many_entries"
+    assert time.perf_counter() - began < 1.0
+    walked = Counting([row] * 2001)
+    with pytest.raises(FreeSlotError) as exc:
+        slots([{"user": U, "from": NOW, "to": NOW, "busy": walked}])
+    assert exc.value.reason == "too_many_entries"
+
+
+def test_FR_CAL_07b_exclude_ignores_only_the_named_entries():
+    moved = entry(local("2026-10-07", "10:00"), local("2026-10-07", "11:00"), i=1)
+    other = entry(local("2026-10-07", "09:00"), local("2026-10-07", "10:00"), i=2)
+    fb = {
+        "user": U,
+        "from": NOW,
+        "to": NOW,
+        "busy": [{"start": local("2026-10-07", "10:00"), "end": local("2026-10-07", "10:30")}],
+    }
+    # without the exclusion the moved meeting blocks its own hour; with it the hour is free
+    assert slots([moved, other], count=1) == (local("2026-10-07", "11:00"),)
+    assert slots([moved, other], count=1, exclude=["ce_1"]) == (local("2026-10-07", "10:00"),)
+    assert slots([moved, other], count=1, exclude={"ce_2"}) == (local("2026-10-07", "09:00"),)
+    assert slots([moved, other], count=1, exclude=["ce_9"]) == slots([moved, other], count=1)
+    # a free_busy interval is never dropped by exclude, even when its text names an id
+    assert slots([moved, other, fb], count=1, exclude=["ce_1"]) == (local("2026-10-07", "10:30"),)
+    for bad in ("ce_1", [1], 5):
+        with pytest.raises(FreeSlotError):
+            slots([], exclude=bad)
+
+
+def test_FR_CAL_07b_offset_timestamps_are_refused_as_bad_entry():
+    with pytest.raises(FreeSlotError) as exc:
+        slots([entry("2026-10-07T09:00:00.000+05:00", "2026-10-07T10:00:00.000+05:00")])
+    assert exc.value.reason == "bad_entry"
