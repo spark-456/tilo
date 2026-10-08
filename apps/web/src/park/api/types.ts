@@ -245,12 +245,30 @@ export interface Ledger {
   by: Record<"world" | "tool" | "role", { head: string; rows: [string, number][] }>;
   tx: LedgerTx[];
   runs: [string, number[], number, string][];
-  waits: { buckets: [string, number][]; types: [string, string, string][] };
+  waits: {
+    buckets: [string, number][];
+    types: [string, string, string][];
+    /** The headline over the histogram (a typical wait the ledger itself states); absent means none is shown. */
+    summary?: string;
+    /** The wait a type shows once a backup approver exists, by type name; absent means the wait is unchanged. */
+    withBackup?: Record<string, string>;
+  };
   memory: number[];
   hours: [string, number, string, string][];
   activity: LedgerEntry[];
   /** The currency the amounts are in, as served; absent means pounds (the fixture). */
   currency?: "GBP" | "USD";
+  /**
+   * How much more memory saved than in an earlier period (`since`, e.g. "August"). `total` is the sum of
+   * `memory` it was worked out for; a ledger whose `memory` has changed since no longer states it.
+   */
+  memoryUp?: { amount: number; since: string; total: number };
+  /** The day of the month that spiked and what bought it; drawn only while that day's spend covers `amount`. */
+  spike?: { day: number; label: string; amount: number };
+  /** Skill id -> the name the cost-per-run headline uses (else the run's own name). */
+  runLabels?: Record<string, string>;
+  /** One name per entry of `memory` (e.g. "1–7 Sep"); absent, or of another length, means no week names. */
+  memoryWeeks?: string[];
 }
 
 // Agenda

@@ -3,8 +3,11 @@
 // keeps (`isKeptPath`: /start, the stage at /world/:id/stage and the other kept screens). Both apps are
 // dynamic imports, so a visit to a kept screen never loads the Park app (NFR-01). `isParkPath` and
 // `isKeptPath` are the shared predicates for the split (WEB-CUTOVER). /privacy and /terms (WEB-LEGAL) are
-// static public pages: their own chunk, loading neither app (no sign-in, no API).
+// static public pages: their own chunk, loading neither app (no sign-in, no API). SEC-15: both apps sit behind the
+// sign-in gate; with no Firebase here (a local host, a build with no config) the gate shows the app at once.
 import { Suspense, lazy } from "react";
+import { SignInGate } from "./auth/SignInGate";
+import { session } from "./auth/session";
 import { isKeptPath } from "./keptPaths";
 import { legalKind } from "./legal/legalPaths";
 import { isParkPath } from "./park/app/router";
@@ -27,5 +30,9 @@ export function Root() {
     );
   }
   const park = isParkPath(pathname) || !isKeptPath(pathname);
-  return <Suspense fallback={null}>{park ? <ParkApp /> : <App />}</Suspense>;
+  return (
+    <SignInGate auth={session}>
+      <Suspense fallback={null}>{park ? <ParkApp /> : <App />}</Suspense>
+    </SignInGate>
+  );
 }

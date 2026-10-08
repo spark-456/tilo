@@ -5,6 +5,7 @@
 import { TiloApiError } from "../../api/http";
 import { needsLeft as countNeedsLeft, makeWorld, worlds } from "../api/fixtures/worlds";
 import type { Api } from "../api/index";
+import { NotBuilt } from "../api/liveApi";
 import type { Dec, Decision, DecisionKey, Source, TierKey, World } from "../api/types";
 import { TOAST_MS } from "../components/Toast";
 import type { Motion, PageId, Params } from "./AppCtx";
@@ -12,6 +13,9 @@ import { parkPath } from "./router";
 
 /** A live answer that failed in a way the Api did not describe. */
 const NOT_RECORDED = "Tilo could not record that answer. Nothing was sent.";
+/** What a start that failed says when the Api did not describe it, or the API is not connected (FR-UX-13). */
+const NOT_STARTED = "Tilo could not start that task. Try again.";
+const NOT_CONNECTED = "Starting work is not connected yet.";
 
 /** Runs `fn` after `ms` and returns the function that cancels it. */
 export type Schedule = (fn: () => void, ms: number) => () => void;
@@ -52,7 +56,11 @@ export interface ParkStore {
   subscribe(listener: () => void): () => void;
   decide(key: DecisionKey): void;
   undo(key: DecisionKey): void;
+  /** The fixture path: adds the world at once and returns it. */
   addWorld(mode: TierKey, query: string): World;
+  /** The live path (FR-UX-13): the Api is asked first and the promise settles with whether the server accepted
+   * the task; a world is added, and Open offered, only then (HR-1). The shell picks one of the two (`useApp`). */
+  startWorld(mode: TierKey, query: string): Promise<boolean>;
   toast(message: string, actionLabel?: string, action?: () => void): void;
   dismissToast(): void;
   setPref(key: string, value: unknown): void;
@@ -80,6 +88,33 @@ export interface ParkStoreDeps {
 /** Milliseconds per loader step: cities take longer to wake (README "Open a world"). */
 const STEP_MS = { City: 340, other: 250 } as const;
 const MOTIONS: readonly Motion[] = ["lively", "calm", "still"];
+const TIME_STORAGE_KEY = "tilo.time";
+const MOTION_STORAGE_KEY = "tilo.motion";
+
+function readStoredPrefs(): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  try {
+    const t = window.localStorage.getItem(TIME_STORAGE_KEY);
+    if (t === "day" || t === "night") out.time = t;
+    const m = window.localStorage.getItem(MOTION_STORAGE_KEY);
+    if (m === "lively" || m === "calm" || m === "still") out.motion = m;
+  } catch {
+    // storage absent (Node tests) or blocked (private mode)
+  }
+  return out;
+}
+
+function writeStoredPref(key: string, value: unknown): void {
+  if (key !== "time" && key !== "motion") return;
+  try {
+    window.localStorage.setItem(
+      key === "time" ? TIME_STORAGE_KEY : MOTION_STORAGE_KEY,
+      String(value),
+    );
+  } catch {
+    // storage absent or blocked: preference still applies for this session
+  }
+}
 
 const derive = (prefs: Record<string, unknown>, dec: Dec) => ({
   time: prefs.time === "night" ? ("night" as const) : ("day" as const),
@@ -100,22 +135,25 @@ function answeredText(decision: Decision | undefined): string {
 }
 
 export function createParkStore({ api, navigate, schedule }: ParkStoreDeps): ParkStore {
+  const initialPrefs = readStoredPrefs();
   let state: ParkState = {
     dec: {},
     added: [],
-    prefs: {},
+    prefs: initialPrefs,
     toast: null,
     read: false,
     menu: null,
     wl: null,
     sources: { fixture: false, live: false },
-    ...derive({}, {}),
+    ...derive(initialPrefs, {}),
   };
   const listeners = new Set<() => void>();
   // The decisions with their designed copy, handed over by the shell once the Api has returned them.
   let decisions: readonly Decision[] = [];
   // Live answers in flight: a second tap sends nothing until the first one is settled.
   const pending = new Set<DecisionKey>();
+  // The live start in flight: a second call gets the same answer and sends nothing.
+  let starting: Promise<boolean> | null = null;
   let cancelToast: (() => void) | null = null;
   let cancelLoader: (() => void) | null = null;
 
@@ -205,6 +243,42 @@ export function createParkStore({ api, navigate, schedule }: ParkStoreDeps): Par
       });
     },
     undo,
+    startWorld(mode, query) {
+      // Live (FR-UX-13): the intake call is made first; the world is added, and Open offered, only after the
+      // server accepted the task. The task is not approved yet, so Open goes to its understanding screen and
+      // nothing says it is running (HR-1). A failure adds nothing and says why.
+      if (starting) return starting;
+      starting = api.startWorld(mode, query).then(
+        ({ data }) => {
+          starting = null;
+          const { world } = data;
+          update({
+            added: [world, ...state.added],
+            toast: arm(
+              `“${world.short}” was sent to Tilo. Open it to review the brief.`,
+              "Open",
+              () => {
+                dismissToast();
+                navigate(`/task/${encodeURIComponent(world.id)}/understanding`);
+              },
+            ),
+          });
+          return true;
+        },
+        (e: unknown) => {
+          starting = null;
+          toast(
+            e instanceof TiloApiError
+              ? e.message
+              : e instanceof NotBuilt
+                ? NOT_CONNECTED
+                : NOT_STARTED,
+          );
+          return false;
+        },
+      );
+      return starting;
+    },
     addWorld(mode, query) {
       const world = makeWorld(mode, query, state.added.length + 1);
       quiet(api.startWorld(mode, query));
@@ -221,6 +295,7 @@ export function createParkStore({ api, navigate, schedule }: ParkStoreDeps): Par
     toast,
     dismissToast,
     setPref(key, value) {
+      writeStoredPref(key, value);
       quiet(api.setPref(key, value));
       update({ prefs: { ...state.prefs, [key]: value } });
     },

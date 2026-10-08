@@ -762,6 +762,24 @@
   box-shadow: 0 0 0 5px var(--halo);
 }
 
+/* ---- the five spend tiles (FR-SPD-01), under the greeting panel ---- */
+[data-park] .park-home-kpis {
+  position: absolute;
+  left: 24px;
+  top: 360px;
+  width: 500px;
+  max-width: calc(100% - 48px);
+  max-height: calc(100% - 560px);
+  overflow-y: auto;
+  box-sizing: border-box;
+  padding: 8px;
+  border-radius: 26px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  z-index: 3;
+}
+
 /* ---- focus: the README ring on every control of the page ---- */
 [data-park] .park-home-needs:focus-visible,
 [data-park] .park-home-link:focus-visible,

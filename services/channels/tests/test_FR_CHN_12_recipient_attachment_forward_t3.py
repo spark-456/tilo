@@ -186,7 +186,7 @@ class LabelledMsg(Msg):
 def test_FR_CHN_12_own_message_vouches_for_its_recipients_only_with_the_sent_label(labels, tier) -> None:
     # BQ-154: a From header naming the mailbox is set by the sender; only Gmail's SENT label makes it the user's own.
     bench = make_bench("L2")
-    sender = "Sarah Chen <ops@harborview.example>"
+    sender = f"Sarah Chen <{bench.rig.mailbox}>"  # CHN-GATE-E: the bench mailbox is `sarah.ops@...`, not a literal
     own = LabelledMsg("m-own", sender, "Engine tune-up", "Adding events.", to=[PARTNER], labels=labels)
     thread, _ = bench.rig.thread(earlier=(own,), cc=())
     card = card_for(bench, thread=thread, mode="reply_all", ctx_mode="reply_all", to=(DAVID,), cc=(PARTNER,))

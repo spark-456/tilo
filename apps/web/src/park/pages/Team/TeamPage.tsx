@@ -11,6 +11,7 @@ import {
   useRef,
   useState,
 } from "react";
+import type { World } from "../../api/types";
 import type { AppCtx } from "../../app/AppCtx";
 import { useParkApi } from "../../app/context";
 import { useStaged } from "../../app/useStaged";
@@ -28,10 +29,10 @@ import {
   type Member,
   canChangeRole,
   coverRows,
+  isValidEmail,
   memberViews,
+  reassignWorlds,
 } from "./teamModel";
-
-const EMAIL = /.+@.+\..+/;
 
 function Top({ count, children }: { count?: string | undefined; children?: ReactNode }) {
   return (
@@ -94,7 +95,7 @@ export function TeamPage({ app }: { app: AppCtx }) {
     };
   }, [api, dec, added]);
 
-  const valid = EMAIL.test(email.trim());
+  const valid = isValidEmail(email);
   const invite = () => {
     const to = email.trim();
     if (!valid) return toast("Enter a work email to invite");
@@ -137,7 +138,12 @@ export function TeamPage({ app }: { app: AppCtx }) {
                 onKeyDown={(e) => e.key === "Enter" && invite()}
               />
             </div>
-            <Button variant="primary" style={{ opacity: valid ? 1 : 0.6 }} onClick={invite}>
+            <Button
+              variant="primary"
+              disabled={!valid}
+              style={{ opacity: valid ? 1 : 0.6 }}
+              onClick={invite}
+            >
               Invite
             </Button>
           </div>
@@ -166,6 +172,8 @@ function TeamBody({ app, data, people, setPeople }: BodyProps) {
   const { toast } = app;
   const part = useStaged(4); // drawn top to bottom, one task each (no long task while pages change)
   const [open, setOpen] = useState<string | null>(null);
+  // FR-TEAM-01: worlds handed to the Owner by a removal (page state; the Api has no write yet).
+  const [handed, setHanded] = useState<World[] | null>(null);
   const [backups, setBackups] = useState<Backups>({});
   const [flags, setFlags] = useState<Record<string, boolean>>({});
   const [ruleLog, setRuleLog] = useState<{ key: string; when: string; to: boolean }[]>([]);
@@ -179,7 +187,7 @@ function TeamBody({ app, data, people, setPeople }: BodyProps) {
       ? { ...backups, [slowId]: pref }
       : backups;
   const rows = coverRows(team, data.policy, people, lent);
-  const views = memberViews(people, rows, lent, data);
+  const views = memberViews(people, rows, lent, handed ? { ...data, worlds: handed } : data);
 
   const setRole = (p: Member, role: string) => {
     setPeople((ps) =>
@@ -189,6 +197,8 @@ function TeamBody({ app, data, people, setPeople }: BodyProps) {
   };
   const remove = (p: Member) => {
     setPeople((ps) => (ps ?? []).filter((q) => q.id !== p.id));
+    const owner = people.find((q) => q.role === "Owner");
+    if (owner && !p.pending) setHanded((w) => reassignWorlds(w ?? data.worlds, p.name, owner.name));
     setOpen(null);
     toast(
       p.pending

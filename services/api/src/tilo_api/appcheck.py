@@ -74,10 +74,11 @@ def _b64(part: str) -> bytes:
     return base64.urlsafe_b64decode(part + "=" * (-len(part) % 4))
 
 
-def _fetch_jwks() -> dict[str, rsa.RSAPublicKey]:
+def fetch_jwks(url: str) -> dict[str, rsa.RSAPublicKey]:
+    """The RSA keys of one JWKS endpoint, by key id (shared with `tilo_api.firebase_auth`)."""
     import requests  # noqa: PLC0415  (kept out of import time: nothing here opens a socket until a token needs a key)
 
-    response = requests.get(JWKS_URL, timeout=JWKS_FETCH_TIMEOUT_S)
+    response = requests.get(url, timeout=JWKS_FETCH_TIMEOUT_S)
     if response.status_code != 200 or len(response.content) > _MAX_JWKS_BYTES:
         raise ValueError("key fetch failed")
     keys: dict[str, rsa.RSAPublicKey] = {}
@@ -90,26 +91,18 @@ def _fetch_jwks() -> dict[str, rsa.RSAPublicKey]:
     return keys
 
 
-class GoogleAppCheckVerifier:
-    """Verifies an App Check JWT (RS256) against Google's JWKS for one Firebase project.
+def _fetch_jwks() -> dict[str, rsa.RSAPublicKey]:
+    return fetch_jwks(JWKS_URL)
 
-    The signature, `exp`, `nbf`, `iss` (Firebase App Check) and `aud` (`projects/<project>`) are all checked. The
-    header and claims are read first, from public values only, and a token that cannot pass them is refused before
-    any key is fetched. Keys live in one immutable snapshot (read without a lock); a refresh takes the lock with a
-    non-blocking acquire, so at most one thread is inside a fetch and a caller that finds one running is refused at
-    once. A failed fetch stores nothing and a snapshot past `JWKS_TTL_S` is never served. `fetch` and the clocks
-    are injectable; tests and dev never reach the default fetch."""
 
-    def __init__(
-        self,
-        project: str,
-        *,
-        fetch: Callable[[], dict[str, rsa.RSAPublicKey]] = _fetch_jwks,
-        clock: Callable[[], float] = time.monotonic,
-        wall: Callable[[], float] = time.time,
-    ) -> None:
-        self._audience = f"projects/{project}"
-        self._fetch, self._clock, self._wall = fetch, clock, wall
+class JwksKeyCache:
+    """One immutable snapshot of a JWKS, refreshed single-flight: the snapshot is read without a lock; a refresh takes
+    the lock with a non-blocking acquire, so at most one thread is inside a fetch and a caller that finds one running
+    is refused at once. A failed fetch stores nothing, a snapshot past `JWKS_TTL_S` is never served, and no fetch
+    starts within `JWKS_RETRY_COOLDOWN_S` of another. Shared by the App Check and Firebase ID-token verifiers."""
+
+    def __init__(self, fetch: Callable[[], dict[str, rsa.RSAPublicKey]], clock: Callable[[], float]) -> None:
+        self._fetch, self._clock = fetch, clock
         self._lock = threading.Lock()
         self._snapshot: tuple[dict[str, rsa.RSAPublicKey], float] | None = None
         self._tried_at = float("-inf")
@@ -148,6 +141,29 @@ class GoogleAppCheckVerifier:
             return fetched
         finally:
             self._lock.release()
+
+
+class GoogleAppCheckVerifier(JwksKeyCache):
+    """Verifies an App Check JWT (RS256) against Google's JWKS for one Firebase project.
+
+    The signature, `exp`, `nbf`, `iss` (Firebase App Check) and `aud` (`projects/<project>`) are all checked. The
+    header and claims are read first, from public values only, and a token that cannot pass them is refused before
+    any key is fetched. Keys live in one immutable snapshot (read without a lock); a refresh takes the lock with a
+    non-blocking acquire, so at most one thread is inside a fetch and a caller that finds one running is refused at
+    once. A failed fetch stores nothing and a snapshot past `JWKS_TTL_S` is never served. `fetch` and the clocks
+    are injectable; tests and dev never reach the default fetch."""
+
+    def __init__(
+        self,
+        project: str,
+        *,
+        fetch: Callable[[], dict[str, rsa.RSAPublicKey]] = _fetch_jwks,
+        clock: Callable[[], float] = time.monotonic,
+        wall: Callable[[], float] = time.time,
+    ) -> None:
+        super().__init__(fetch, clock)
+        self._audience = f"projects/{project}"
+        self._wall = wall
 
     def verify(self, token: str) -> Mapping[str, Any]:
         parts = token.split(".")

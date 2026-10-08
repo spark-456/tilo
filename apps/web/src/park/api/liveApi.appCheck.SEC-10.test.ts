@@ -106,7 +106,8 @@ describe("SEC-10 the Park live Api carries the App Check token", () => {
   it("SEC-10 the Park provider takes the page's getter from ClientProvider and gives it to parkApi", () => {
     const text = readFileSync(join(__dirname, "..", "app", "context.tsx"), "utf8");
     expect(text).toMatch(/\{[^}]*\bappCheckToken\b[^}]*\} from "..\/..\/api\/ClientProvider"/);
-    expect(text).toMatch(/parkApi\([^)]*appCheckToken\)/);
+    // SEC-15 / SIGNIN (documented test change): parkApi gained a third argument, the sign-in getter, after this one.
+    expect(text).toMatch(/parkApi\([^)]*appCheckToken(,\s*authToken)?\)/);
     const provider = readFileSync(join(__dirname, "..", "..", "api", "ClientProvider.tsx"), "utf8");
     expect(provider).toMatch(
       /createAppCheckTokenGetter\(\{ hostname: window\.location\.hostname \}\)/,
