@@ -25,7 +25,7 @@ from __future__ import annotations
 import json
 import traceback
 from collections.abc import Callable
-from typing import Any
+from typing import Any, cast
 
 import httpx
 import pytest
@@ -114,7 +114,7 @@ def _request(kind: str = "pairwise", *, template: str = TEMPLATE, **item_overrid
         item_overrides["baseline_response"] = "baseline plan"
     return EvalRequest(
         metric="plan_pairwise" if kind == "pairwise" else "plan_groundedness",
-        kind=kind,
+        kind=cast("Any", kind),  # the tests also pass invalid kinds
         template=template,
         item=_item(**item_overrides),
     )
