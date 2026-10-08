@@ -1,0 +1,200 @@
+/* The sign-in screen (SEC-15 / SIGNIN): a glass card over the Park city. Own role tokens, day and night, so the card
+   draws before the city's chunk arrives. Neutral role tokens only; the logo colours are the Park design's. */
+.signin {
+  --si-ink: #1f1d2b;
+  --si-ink2: #4a4655;
+  --si-card: rgba(255, 255, 255, 0.72);
+  --si-edge: rgba(255, 255, 255, 0.85);
+  --si-line: rgba(31, 29, 43, 0.12);
+  --si-btn: #ffffff;
+  --si-hero: #5a3fe0;
+  --si-soft: rgba(90, 63, 224, 0.12);
+  --si-ground: #eceaf5;
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  box-sizing: border-box;
+  overflow: auto;
+  background: var(--si-ground);
+  color: var(--si-ink);
+  font-family: "Nunito Sans", system-ui, sans-serif;
+}
+.signin[data-time="night"] {
+  --si-ink: #f4f2fa;
+  --si-ink2: #d2cee3;
+  --si-card: rgba(28, 26, 42, 0.74);
+  --si-edge: rgba(255, 255, 255, 0.14);
+  --si-line: rgba(255, 255, 255, 0.14);
+  --si-btn: rgba(255, 255, 255, 0.07);
+  --si-hero: #7a62f5;
+  --si-soft: rgba(122, 98, 245, 0.22);
+  --si-ground: #14121f;
+}
+.signin__city {
+  position: absolute;
+  inset: 0;
+}
+.signin__toggle {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border: 1px solid var(--si-edge);
+  border-radius: 14px;
+  background: var(--si-card);
+  color: var(--si-ink);
+  cursor: pointer;
+  backdrop-filter: blur(14px);
+}
+.signin__card {
+  position: relative;
+  z-index: 1;
+  box-sizing: border-box;
+  width: min(100%, 440px);
+  padding: 32px 32px 24px;
+  border: 1px solid var(--si-edge);
+  border-radius: 28px;
+  background: var(--si-card);
+  backdrop-filter: blur(22px) saturate(1.2);
+  box-shadow: 0 24px 60px rgba(31, 29, 43, 0.18);
+}
+.signin__logo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  line-height: 1;
+}
+.signin__mark {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 15px;
+  background: var(--si-hero);
+}
+.signin__visor {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  width: 30px;
+  height: 17px;
+  border-radius: 7px;
+  background: #ffffff;
+}
+.signin__dot {
+  width: 4px;
+  height: 4px;
+  border-radius: 9px;
+  background: #1f1d2b;
+}
+.signin__word {
+  color: var(--si-hero);
+  font-family: "Nunito", sans-serif;
+  font-size: 40px;
+  font-weight: 900;
+  letter-spacing: -1px;
+}
+.signin__title {
+  margin: 28px 0 8px;
+  font-family: "Nunito", sans-serif;
+  font-size: 28px;
+  font-weight: 900;
+  letter-spacing: -0.5px;
+}
+.signin__lead {
+  margin: 0 0 22px;
+  color: var(--si-ink2);
+  font-size: 16px;
+  line-height: 1.5;
+}
+.signin__btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 48px;
+  box-sizing: border-box;
+  border: 1px solid var(--si-line);
+  border-radius: 14px;
+  background: var(--si-btn);
+  color: var(--si-ink);
+  font: 700 16px "Nunito Sans", system-ui, sans-serif;
+  cursor: pointer;
+}
+.signin__btn--demo {
+  border-color: transparent;
+  background: var(--si-soft);
+  color: var(--si-hero);
+}
+.signin__btn:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+.signin__btn:focus-visible,
+.signin__toggle:focus-visible,
+.signin__legal a:focus-visible {
+  outline: 3px solid var(--si-hero);
+  outline-offset: 2px;
+}
+.signin__or {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 16px 0;
+  color: var(--si-ink2);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 1px;
+}
+.signin__or::before,
+.signin__or::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--si-line);
+}
+.signin__note {
+  margin: 14px 8px 0;
+  color: var(--si-ink2);
+  font-size: 14px;
+  line-height: 1.45;
+  text-align: center;
+}
+.signin__error {
+  margin: 12px 0 0;
+  color: #b3261e;
+  font-size: 14px;
+  text-align: center;
+}
+.signin[data-time="night"] .signin__error {
+  color: #ffb4ab;
+}
+.signin__legal {
+  margin: 20px 0 0;
+  padding-top: 16px;
+  border-top: 1px solid var(--si-line);
+  color: var(--si-ink2);
+  font-size: 13px;
+  text-align: center;
+}
+.signin__legal a {
+  color: var(--si-hero);
+  font-weight: 700;
+  text-decoration: none;
+}
+@media (max-width: 480px) {
+  .signin__card {
+    padding: 24px 20px 20px;
+  }
+}

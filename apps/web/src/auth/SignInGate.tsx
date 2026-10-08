@@ -1,10 +1,11 @@
 // SEC-15 / SIGNIN: the app sits behind this gate. "unavailable" (a local host, the fixture world, a build with no
 // Firebase config) shows the app and no sign-in UI at all, so dev, tests and the fixture deploy work as before
 // (EFF-01); "unknown" (the SDK has not answered) shows nothing, so nothing flashes; "signed_out" shows the panel
-// and not the app; "google" or "anonymous" shows the app. Tilo never handles passwords: Google signs the person
+// and not the app (the Park sign-in screen, SignInScreen); "google" or "anonymous" shows the app. Tilo never handles passwords: Google signs the person
 // in, in its own window, and the panel has no field and no form (PRD 16.1). Neutral role tokens only.
 import { type ReactNode, useState, useSyncExternalStore } from "react";
 import type { AuthController, SignInResult } from "./auth";
+import { SignInScreen } from "./SignInScreen";
 
 const FAILED = "Signing in did not work. Please try again.";
 
@@ -44,36 +45,12 @@ function SignInPanel({ auth }: { readonly auth: AuthController }) {
   };
 
   return (
-    <main className="screen-body" data-testid="sign-in">
-      <h1>Sign in to Tilo</h1>
-      <p>
-        Sign in with your Google account, or look around in a demo session. Google handles the
-        sign-in in its own window.
-      </p>
-      <div className="need-actions">
-        <button
-          type="button"
-          className="primary"
-          disabled={busy}
-          aria-busy={busy ? "true" : undefined}
-          onClick={() => run(() => auth.signInWithGoogle())}
-        >
-          Sign in with Google
-        </button>
-        <button
-          type="button"
-          className="secondary"
-          disabled={busy}
-          onClick={() => run(() => auth.signInAnonymously())}
-        >
-          Try a demo session
-        </button>
-      </div>
-      {failed && (
-        <p className="need-error" role="alert">
-          {FAILED}
-        </p>
-      )}
-    </main>
+    <SignInScreen
+      busy={busy}
+      failed={failed}
+      failedText={FAILED}
+      onGoogle={() => run(() => auth.signInWithGoogle())}
+      onDemo={() => run(() => auth.signInAnonymously())}
+    />
   );
 }
