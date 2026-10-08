@@ -531,6 +531,6 @@ def test_FR_MTG_11_the_requirement_scan_would_catch_a_vendor_package():
 def test_FR_MTG_11_speech_and_voice_vendors_are_config_and_google_or_fake_only():
     for name in ("speech.yaml", "speech.dev.yaml", "voice.yaml", "voice.dev.yaml"):
         section = yaml.safe_load(read(f"config/{name}"))[name.split(".")[0]]
-        assert section["vendor"] in {"google", "fake"}, name
-    assert yaml.safe_load(read("config/voice.yaml"))["voice"]["vendor"] == "google"
+        assert section["vendor"] in {"google", "google-cloud-tts", "fake"}, name  # Google only (D-1)
+    assert yaml.safe_load(read("config/voice.yaml"))["voice"]["vendor"] == "google-cloud-tts"  # BQ-MTG11-13
     assert yaml.safe_load(read("config/voice.yaml"))["voice"]["voice"]  # the voice name is config, not code
