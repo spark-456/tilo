@@ -1,9 +1,10 @@
-// The side column of the World page: the Waiting for you card, Spend, and the facts with skills and tools.
+// The side column of the World page: the Waiting for you card, Spend, the Lovable handoff card, and the facts with skills and tools.
 import type { MouseEvent, ReactNode } from "react";
-import type { Dec, Decision, DecisionKey, Skill, World } from "../../api/types";
+import type { BuildHandoff, Dec, Decision, DecisionKey, Skill, World } from "../../api/types";
 import { DecisionFields } from "../../app/DecisionFields";
 import { Button } from "../../components";
 import { icon } from "../../shell/kit";
+import { buildLovableUrl } from "./lovableHandoff";
 import { agentArt } from "./worldArt";
 import { type ToolChip, decisionsWord, spendNoteOf, spendShare } from "./worldModel";
 
@@ -178,6 +179,76 @@ export function FactsCard({ w, skills, tools, onSkill, onTools }: FactsProps) {
             </button>
           ))}
         </div>
+      </div>
+    </div>
+  );
+}
+
+export interface LovableCardProps {
+  handoff: BuildHandoff;
+  dec: Dec;
+  onDecide: (key: DecisionKey) => void;
+}
+
+/** FR-CON-16: "Build this in Lovable" card showing exact prompt, files leaving Tilo, and approval-gated link. */
+export function LovableCard({ handoff, dec, onDecide }: LovableCardProps) {
+  const approved = Boolean(dec[handoff.decisionKey]);
+  const url = buildLovableUrl(handoff.prompt, {
+    maxPromptChars: handoff.maxPromptChars,
+    maxUrlLength: handoff.maxUrlLength,
+  });
+  const canOpen = approved && url !== null;
+
+  return (
+    <div className="park-world-lovable">
+      <div className="park-world-lovablehead">
+        <span className="park-world-lovabletitle">Build this in Lovable</span>
+        <span className="park-world-lovablesub">Nothing is sent by Tilo itself</span>
+      </div>
+      <pre className="park-world-lovableprompt">{handoff.prompt}</pre>
+      <div className="park-world-lovablefiles">
+        <span className="park-world-rowlabel">Files leaving Tilo</span>
+        {handoff.files.map((f) => (
+          <div key={f.path} className="park-world-lovablefile">
+            <span className="park-world-lovablepath">{f.path}</span>
+            <span className="park-world-lovablesummary">{f.summary}</span>
+          </div>
+        ))}
+      </div>
+      <div className="park-world-dactions">
+        {approved ? (
+          <div className="park-world-ddone">
+            {icon("check", 14)}
+            {handoff.doneLabel}
+          </div>
+        ) : (
+          <Button variant="needs" size="sm" onClick={() => onDecide(handoff.decisionKey)}>
+            {handoff.approveLabel}
+          </Button>
+        )}
+        {canOpen ? (
+          <a
+            className="park-world-lovablelink"
+            href={url}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            {icon("arrowR", 14)}Open in Lovable
+          </a>
+        ) : (
+          <Button
+            variant="secondary"
+            size="sm"
+            disabled
+            title={
+              url === null
+                ? "Prompt exceeds Lovable URL size limit"
+                : "Approve the handoff card first to open in Lovable"
+            }
+          >
+            Open in Lovable
+          </Button>
+        )}
       </div>
     </div>
   );

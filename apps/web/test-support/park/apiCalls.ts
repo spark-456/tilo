@@ -34,6 +34,7 @@ export function callTable(): CallTable {
     getTeamPolicy: [],
     getConnectorTerms: [],
     getProfileSettings: [],
+    getBuildHandoff: [],
     decide: ["depot"],
     undo: ["depot"],
     startWorld: ["workspace", "Plan the offsite"],
