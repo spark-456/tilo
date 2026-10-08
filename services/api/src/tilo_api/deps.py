@@ -306,6 +306,17 @@ def get_ledger() -> Sequence[LedgerEntry]:
     raise HTTPException(status_code=503, detail="not_configured")
 
 
+def get_ledger_writer() -> Any:
+    """The Treasury's write seam (COST-FAST-1b, BQ-COSTFAST-7): an object with `append(LedgerEntry)`. Not wired
+    yet, like `get_ledger`: fail closed. Quick treats that as best effort (`ledger_writer_for`)."""
+    raise HTTPException(status_code=503, detail="not_configured")
+
+
+def ledger_writer_for(request: Request) -> Any:
+    """The writer as the app is wired (overrides included), or None when it is unwired or fails."""
+    return _resolve(request, get_ledger_writer)
+
+
 def get_time_baselines() -> Any:
     """The EV-G2 time-saved baselines (FR-PA-20, PRD 14.2):
     `{method_url, units: {unit_type: {p25, median, p75}}}`, minutes
