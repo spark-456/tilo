@@ -12,11 +12,21 @@ interface MembersProps {
   open: string | null;
   onOpen: (id: string) => void;
   onRole: (p: Member, role: string) => void;
+  canChange: (p: Member) => boolean;
   onRemove: (p: Member) => void;
   onResend: (p: Member) => void;
 }
 
-export function Members({ views, roles, open, onOpen, onRole, onRemove, onResend }: MembersProps) {
+export function Members({
+  views,
+  roles,
+  open,
+  onOpen,
+  onRole,
+  canChange,
+  onRemove,
+  onResend,
+}: MembersProps) {
   return (
     <section className="park-team-card park-team-members" aria-label="Members">
       <div className="park-team-scroll">
@@ -37,7 +47,7 @@ export function Members({ views, roles, open, onOpen, onRole, onRemove, onResend
               v={v}
               roles={roles}
               isOpen={open === v.p.id}
-              {...{ onOpen, onRole, onRemove, onResend }}
+              {...{ onOpen, onRole, canChange, onRemove, onResend }}
             />
           ))}
         </table>
@@ -46,12 +56,15 @@ export function Members({ views, roles, open, onOpen, onRole, onRemove, onResend
   );
 }
 
-type PersonProps = Pick<MembersProps, "roles" | "onOpen" | "onRole" | "onRemove" | "onResend"> & {
+type PersonProps = Pick<
+  MembersProps,
+  "roles" | "onOpen" | "onRole" | "canChange" | "onRemove" | "onResend"
+> & {
   v: MemberView;
   isOpen: boolean;
 };
 
-function Person({ v, roles, isOpen, onOpen, onRole, onRemove, onResend }: PersonProps) {
+function Person({ v, roles, isOpen, onOpen, onRole, canChange, onRemove, onResend }: PersonProps) {
   const { p } = v;
   return (
     <tbody className="park-team-blk park-team-person">
@@ -81,7 +94,7 @@ function Person({ v, roles, isOpen, onOpen, onRole, onRemove, onResend }: Person
             className="park-team-select"
             aria-label={`Role for ${p.name}`}
             value={p.role}
-            disabled={!!p.you}
+            disabled={!canChange(p)}
             onChange={(e) => onRole(p, e.target.value)}
           >
             {roles.map((r) => (

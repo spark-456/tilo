@@ -47,9 +47,9 @@ def test_PL_02_unsupported_keywords_are_dropped_and_the_caller_dict_is_not_mutat
     out = to_gemini_schema(schema)
     assert schema == before, "the caller's dict is never mutated"
     assert out["properties"]["name"] == {"type": "string"}
-    assert out["properties"]["tags"] == {"type": "array", "items": {"type": "string"}, "maxItems": 3, "minItems": 1}
-    assert out["properties"]["n"] == {"type": "integer", "minimum": 0, "maximum": 5}
-    assert out["required"] == ["name"] and out["title"] == "Brief"
+    assert out["properties"]["tags"] == {"type": "array", "items": {"type": "string"}}  # bounds stay with the caller
+    assert out["properties"]["n"] == {"type": "integer"}
+    assert out["required"] == ["name"] and "title" not in out
     assert "additionalProperties" not in out, "Vertex's supported-fields page does not list it"
     assert out is not schema and out["properties"] is not schema["properties"]
     assert unsupported_keywords(schema) and unsupported_keywords(out) == []
@@ -117,9 +117,10 @@ def test_PL_02_a_recursive_ref_stays_a_ref_with_only_its_own_defs() -> None:
     assert to_gemini_schema(out) == out
 
 
-def test_PL_02_a_list_type_becomes_any_of_with_a_null_branch() -> None:
+def test_PL_02_a_nullable_list_type_is_sent_as_one_type_with_nullable() -> None:
     out = to_gemini_schema({"type": ["string", "null"], "description": "maybe", "maxLength": 4})
-    assert out == {"description": "maybe", "anyOf": [{"type": "string"}, {"type": "null"}]}
+    assert out == {"description": "maybe", "type": "string", "nullable": True}
+    assert to_gemini_schema({"type": ["string", "integer"]}) == {"anyOf": [{"type": "string"}, {"type": "integer"}]}
     assert unsupported_keywords(out) == []
 
 
@@ -205,6 +206,11 @@ def test_PL_02_property_type_properties_and_required_are_never_dropped(schema: d
             if key in src:
                 assert key in got, f"{key} was dropped"
         for name, sub in src.get("properties", {}).items():
+            if name not in got["properties"]:
+                assert not (set(sub) & {"type", "anyOf", "enum", "$ref", "properties", "items"}), (
+                    name
+                )  # untyped: dropped
+                continue
             walk(sub, got["properties"][name])
         if "items" in src:
             walk(src["items"], got["items"])

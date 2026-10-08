@@ -41,7 +41,7 @@ from typing import Any
 
 import tilo_policy
 import yaml
-from _chn10_lib import USER, Msg, Thread, answer, make_rig, message_id_header
+from _chn10_lib import USER, Msg, Thread, answer, message_id_header
 from _chn11_lib import (
     BENIGN,
     DAVID,
@@ -53,6 +53,7 @@ from _chn11_lib import (
     MemoryDraftStore,
     autopilot_module,
     context,
+    named_rig,
 )
 from _chn_contracts_lib import REPO_ROOT
 from tilo_connectors import InMemoryOutboxStore, Outbox
@@ -371,7 +372,7 @@ class Line:
 
 
 def make_line(level: str = "L2", contacts: Sequence[str] = ()) -> Line:
-    rig = make_rig()
+    rig = named_rig()  # CHN-GATE-E: the owner's own SENT message names "Sarah"
     broker = FakeBroker()
     line = Line(bench=None, store=InMemoryOutboxStore(), api=FakeGmailApi(rig.clock, broker), broker=broker)  # type: ignore[arg-type]
     cards = MemoryDraftStore()

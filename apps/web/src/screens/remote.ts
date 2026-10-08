@@ -76,7 +76,7 @@ export interface Action {
 
 /** The primary button's action: busy at once (synchronously, UX-2), then navigates to the path
  * `run` resolves with. A rejection becomes `error` and the button is usable again. */
-export function useAction(doing: string, run: () => Promise<string>): Action {
+export function useAction(doing: string, run: () => Promise<string | null>): Action {
   const navigate = useNavigate();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -108,7 +108,11 @@ export function useAction(doing: string, run: () => Promise<string>): Action {
       );
     void Promise.all([outcome, hold]).then(([result]) => {
       if ("to" in result) {
-        if (live.current) navigate(result.to); // the next screen mounts fresh, so busy resets
+        if (result.to === null) {
+          // The call did what it was asked and the screen stays to say more (S-03's weekly repeat).
+          busyRef.current = false;
+          if (live.current) setBusy(false);
+        } else if (live.current) navigate(result.to); // the next screen mounts fresh, so busy resets
         return;
       }
       busyRef.current = false;
