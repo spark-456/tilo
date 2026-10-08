@@ -274,6 +274,8 @@ class DurableStore(deps.Store):
             return self.backend.read(coll, doc_id)
 
     def _adopt_world(self, w: str, d: Mapping[str, Any]) -> bool:
+        if w == deps.SAMPLE_WORLD_ID:  # STARTER-1: a stored doc under the reserved id is never a world
+            return False
         with _io():  # all the I/O and decoding first: the lock is only for the dicts
             record, rev = _world_from(d), d["rev"]
             stream, queued = self.events_backend.read_events(self.org_id, w), self.backend.queue(w)
@@ -380,7 +382,9 @@ class DurableStore(deps.Store):
         create: Iterable[tuple[str, str]] = (),
         evict: bool = True,
     ) -> None:
-        deps.refuse_reserved(worlds)  # STARTER-1: no real world takes the sample project's id
+        deps.refuse_reserved(
+            worlds, parts=parts, policy_worlds=policy_worlds, tasks=tasks
+        )  # STARTER-1: no real world takes the sample project's id
         made, parts = set(create), {w: list(p) for w, p in (parts or {}).items() if p}
         with self._held():
             with self._marks:  # the marks before these records are read: a later mark is a change they may not hold

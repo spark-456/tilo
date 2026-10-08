@@ -51,7 +51,7 @@ const BAD_REPLY = "Tilo sent a reply this page could not read.";
 /** STARTER-1: the recorded sample project (`tilo_api.sample_world`); its path is read-only. */
 const SAMPLE_PATH = "/worlds/w_sample_village_basic";
 const SAMPLE_SIMULATED =
-  "This is a recorded sample replay, so nothing was sent. Approvals here are simulated.";
+  "This is a recorded sample replay, so your answer was not sent. Nothing here can be approved.";
 const GENERIC_4XX: Readonly<Record<number, string>> = {
   401: "You need to sign in to do this.",
   403: "You do not have access to this.",
@@ -373,8 +373,8 @@ export class HttpClient implements TiloClient, SchedulesApi {
   }
 
   private post<T>(path: string, body: unknown): Promise<T> {
-    // STARTER-1: the sample project is a recorded replay. An answer or a pause on it is simulated by the page and
-    // never sent: no request leaves for it, whoever asks.
+    // STARTER-1: the sample project is a recorded replay. A write for it is refused here and never sent: no
+    // request leaves for it, whoever asks. Nothing is simulated.
     if (path === SAMPLE_PATH || path.startsWith(`${SAMPLE_PATH}/`)) {
       return Promise.reject(
         new TiloApiError(SAMPLE_SIMULATED, null, false, false, "sample_is_a_replay"),

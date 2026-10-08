@@ -154,10 +154,16 @@ def list_worlds(
     after = _decode_cursor(principal.user_id, cursor) if cursor is not None else None
     if principal.role == "owner":
         store.load_owner(principal.user_id, settle=True)
-        scope = {w: rec for w, rec in store.worlds.items() if rec.owner == principal.user_id}
+        scope = {
+            w: rec for w, rec in store.worlds.items() if rec.owner == principal.user_id and w != SAMPLE_WORLD_ID
+        }  # STARTER-1: the sample is never a stored world, whatever a store holds under its id
     else:
         named = store.load_world(principal.world_id, settle=True) if principal.world_id is not None else None
-        scope = {principal.world_id: named} if principal.world_id is not None and named is not None else {}
+        scope = (
+            {principal.world_id: named}
+            if principal.world_id is not None and named is not None and principal.world_id != SAMPLE_WORLD_ID
+            else {}
+        )
     positions = [_position(principal, store, w, rec) for w, rec in scope.items()]
     sample = _sample_item() if principal.role == "owner" and (not scope or include_sample == "1") else None
     if sample is not None:  # STARTER-1: ordered among the caller's worlds like any other, so pages walk it once

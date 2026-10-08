@@ -124,7 +124,7 @@ describe("STARTER_1 the live Api", () => {
 });
 
 describe("STARTER_1 nothing is written for the sample", () => {
-  it("STARTER_1_an_answer_or_pause_on_the_sample_is_simulated_and_sends_no_request", async () => {
+  it("STARTER_1_an_answer_or_pause_on_the_sample_is_refused_and_sends_no_request", async () => {
     const fetchSpy = vi.fn(async () => json({ outcome: "answered" }));
     const http = new HttpClient({ baseUrl: BASE, fetch: fetchSpy as unknown as typeof fetch });
     for (const path of [
@@ -134,7 +134,7 @@ describe("STARTER_1 nothing is written for the sample", () => {
     ]) {
       await expect(http.postJson(path, { option: "approve" })).rejects.toMatchObject({
         code: "sample_is_a_replay",
-        message: expect.stringContaining("simulated"),
+        message: expect.stringContaining("not sent"),
       });
     }
     expect(fetchSpy).not.toHaveBeenCalled();

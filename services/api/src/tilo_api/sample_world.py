@@ -102,6 +102,22 @@ def sample_cards(sample: Sample = Depends(_read)) -> JSONResponse:
     return JSONResponse(content=[])  # the recorded stream's one approval is already resolved in it
 
 
+@router.get(f"/worlds/{SAMPLE_WORLD_ID}/delivery")
+def sample_delivery(sample: Sample = Depends(_read)) -> JSONResponse:
+    """The recorded run delivered nothing a person can open (no artifact exists behind it): no artifacts, the
+    credits its `world.completed` recorded, no time saved claimed."""
+    done: Any = next((e["data"] for e in sample.events if e["type"] == "world.completed"), {})
+    credits = done.get("credits_used") if isinstance(done, dict) else None
+    return JSONResponse(
+        content={
+            "world_id": SAMPLE_WORLD_ID,
+            "artifacts": [],
+            "credits_used": credits if isinstance(credits, (int, float)) else 0,
+            "time_saved": None,
+        }
+    )
+
+
 @router.api_route(
     f"/worlds/{SAMPLE_WORLD_ID}/{{rest:path}}", methods=["POST", "PUT", "PATCH", "DELETE"], include_in_schema=False
 )

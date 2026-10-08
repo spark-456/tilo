@@ -9,15 +9,17 @@ Through the public interface only (`client`, `store`, `writer` from conftest.py)
 
 from __future__ import annotations
 
-import inspect
+import copy
 import json
 import logging
 import pathlib
+import re
 
 import pytest
 from _api_lib import as_principal, make_principal
+from _pw1b_lib import OWNER, W1, make_rig
+from _pw1b_lib import world as pw_world
 from tilo_api import app, deps, sample_world
-from tilo_api.durable_store import DurableStore
 
 SAMPLE = "w_sample_village_basic"
 STREAM = pathlib.Path(__file__).resolve().parents[3] / "contracts" / "fixtures" / "streams" / "village-basic.jsonl"
@@ -163,16 +165,37 @@ def test_STARTER_1_other_worlds_are_untouched_by_the_sample_routes(client):
     assert client.get("/worlds/w_sample_village_basic_2/events").status_code == 404
 
 
-def test_STARTER_1_a_real_world_can_never_take_the_sample_id():
+def _sample_task() -> deps.TaskRecord:
+    brief = {"title": "t", "sources": [], "audience": None}
+    return deps.TaskRecord("u_new", SAMPLE, "r_1", brief, brief, [], 1)
+
+
+_ALL_FOUR = {
+    "worlds": lambda record: {"worlds": {SAMPLE: record}},
+    "parts": lambda record: {"parts": {SAMPLE: [{"id": "p1"}]}},
+    "policy_worlds": lambda record: {"policy_worlds": {"pol_1": SAMPLE}},
+    "tasks": lambda record: {"tasks": {"t_1": _sample_task()}},
+}
+
+
+@pytest.mark.parametrize("field", list(_ALL_FOUR))
+def test_STARTER_1_a_real_world_can_never_take_the_sample_id(field, writer):
+    """Refused as a world key, a parts key, a policy_worlds value and a task's world_id, in both stores."""
     record = deps.WorldRecord(owner="u_new", districts={}, run_id="r_1")
+    given = _ALL_FOUR[field](record)
     plain = deps.Store()
     with pytest.raises(ValueError, match="sample"):
-        plain.commit(worlds={SAMPLE: record})
+        plain.commit(**given)
     with pytest.raises(ValueError, match="sample"):
-        sample_world.refuse_reserved({SAMPLE: record})
-    assert SAMPLE not in plain.worlds
-    # the deployed store's commit needs Firestore; here only that it calls the same guard first
-    assert "refuse_reserved(worlds)" in inspect.getsource(DurableStore.commit)
+        plain.save(writer, **given)
+    assert SAMPLE not in plain.worlds and not plain.tasks and not plain.policy_worlds and writer.calls == []
+    rig = make_rig("memory")  # the deployed store over its in-memory backend
+    durable, durable_writer = rig.process()
+    with pytest.raises(ValueError, match="sample"):
+        durable.commit(**given)
+    with pytest.raises(ValueError, match="sample"):
+        durable.save(durable_writer, **given)
+    assert rig.backend.docs == {} and rig.backend.queues == {}
 
 
 def test_STARTER_1_save_refuses_the_sample_id_and_stores_nothing(store, writer):
@@ -180,6 +203,89 @@ def test_STARTER_1_save_refuses_the_sample_id_and_stores_nothing(store, writer):
     with pytest.raises(ValueError, match="sample"):
         store.save(writer, worlds={SAMPLE: record})
     assert SAMPLE not in store.worlds and writer.calls == []
+
+
+def test_STARTER_1_a_stored_doc_with_the_sample_id_is_never_adopted(client):
+    """A doc that got into the backend under the reserved id is skipped by every load, and the list shows the
+    sample once (not twice, not as null)."""
+    rig = make_rig("memory")
+    seeding, _ = rig.process()
+    seeding.commit(worlds={W1: pw_world()})
+    rig.backend.docs[("worlds", SAMPLE)] = copy.deepcopy(rig.backend.docs[("worlds", W1)])
+    store, _ = rig.process()
+    assert store.load_world(SAMPLE) is None
+    store.load_owner(OWNER)
+    assert SAMPLE not in store.worlds and W1 in store.worlds
+    app.dependency_overrides[deps.get_store] = lambda: store
+    as_principal(make_principal(user_id=OWNER, role="owner", world_id=None))
+    listed = client.get("/worlds", params={"include_sample": "1"}).json()["worlds"]
+    assert [w["world_id"] for w in listed].count(SAMPLE) == 1 and None not in listed
+    assert [w["world_id"] for w in listed] == [W1, SAMPLE] or [w["world_id"] for w in listed] == [SAMPLE, W1]
+
+
+def test_STARTER_1_a_plain_store_world_with_the_sample_id_is_dropped_from_the_list(client, store):
+    from test_S_14_worlds_list import seed_world
+
+    seed_world(store, SAMPLE, "u_new")  # seeded behind the guard, as a probe would
+    _sign_in()
+    listed = client.get("/worlds").json()["worlds"]
+    assert [(w["world_id"], w.get("sample")) for w in listed] == [(SAMPLE, True)]
+    assert listed[0]["title"].startswith("Sample: ")
+    _sign_in("u_view", role="viewer", world_id=SAMPLE)
+    assert client.get("/worlds").json()["worlds"] == []
+
+
+def _leaf_routes(routes, prefix=""):
+    """The app's routes with every included router opened up (this FastAPI keeps them as lazy wrappers)."""
+    for route in routes:
+        if hasattr(route, "original_router"):
+            yield from _leaf_routes(route.original_router.routes, prefix + route.include_context.prefix)
+        elif getattr(route, "path", None) is not None:
+            yield prefix + route.path, route
+
+
+def test_STARTER_1_every_non_get_worlds_route_answers_409_for_the_sample_id(client, store, writer):
+    """Walks the app's own routes, so a write route added later is covered without anyone remembering this file."""
+    _sign_in()
+    seen = 0
+    for path, route in _leaf_routes(app.routes):
+        methods = set(getattr(route, "methods", None) or ()) - {"GET", "HEAD", "OPTIONS"}
+        if not path.startswith("/worlds/{") or not methods or SAMPLE in path:
+            continue
+        url = re.sub(r"\{world_id(:[^}]*)?\}", SAMPLE, path)
+        url = re.sub(r"\{[^}]+\}", "x", url)
+        assert url.startswith(f"/worlds/{SAMPLE}"), path
+        for method in sorted(methods):
+            response = client.request(method, url, json={"option": "approve"})
+            assert response.status_code == 409, (method, path)
+            assert response.json() == {"detail": "sample_is_a_replay"}, (method, path)
+            seen += 1
+    assert seen >= 5 and writer.calls == [] and SAMPLE not in store.worlds
+
+
+def test_STARTER_1_served_events_are_the_recorded_ones_with_only_the_world_id_replaced(client):
+    _sign_in()
+    served = client.get(f"/worlds/{SAMPLE}/events").json()["events"]
+    expected = [
+        {**e, "world_id": SAMPLE, "target": SAMPLE if e["target"] == "w_village_basic" else e["target"]}
+        for e in _recorded()
+    ]
+    assert served == expected
+    assert "w_village_basic" not in json.dumps(served)
+
+
+def test_STARTER_1_sample_delivery_is_empty_read_only_and_needs_sign_in(client):
+    _sign_in()
+    response = client.get(f"/worlds/{SAMPLE}/delivery")
+    assert response.status_code == 200
+    assert response.json() == {
+        "world_id": SAMPLE,
+        "artifacts": [],
+        "credits_used": _recorded()[-1]["data"]["credits_used"],
+        "time_saved": None,
+    }
+    app.dependency_overrides.pop(deps.get_current_principal, None)
+    assert client.get(f"/worlds/{SAMPLE}/delivery").status_code == 401
 
 
 def test_STARTER_1_fails_closed_when_the_files_are_missing(client, monkeypatch, tmp_path, caplog):
@@ -192,6 +298,7 @@ def test_STARTER_1_fails_closed_when_the_files_are_missing(client, monkeypatch, 
         assert client.get(f"/worlds/{SAMPLE}/events").status_code == 404
         assert client.get(f"/worlds/{SAMPLE}/layout").status_code == 404
         assert client.get(f"/worlds/{SAMPLE}/cards").status_code == 404
+        assert client.get(f"/worlds/{SAMPLE}/delivery").status_code == 404
     lines = [r for r in caplog.records if r.name == "tilo_api.sample_world"]
     assert len(lines) == 1 and "sample project" in lines[0].getMessage()  # one line, however many requests
     assert client.post(f"/worlds/{SAMPLE}/approve").status_code == 409  # the id stays reserved

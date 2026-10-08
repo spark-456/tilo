@@ -38,7 +38,7 @@ old screens until the cutover PR. WEB-1a holds the tokens, fonts, typed fixtures
 - The city is STATIC (motion and its honesty-scan entry: BQ-WEB-3): `scene.ts` caches a scene per `time|motion` at module level, with the 3 pin points for `app.pins`.
 - `usePageApp()` is what pages get: `go('world')` runs the loader first (`store.openWorld`); `useApp().go` stays immediate.
 
-- `sample/` (STARTER-1, BQ-STARTER-1): the API's recorded sample project `w_sample_village_basic` (`World.sample`, `sample: true` on the list item): `SampleBadge`/`SampleNote` on the Home card, Worlds row and world page; Hide is `localStorage` (`sampleChoice.ts`, try/catch), "Show sample project" makes `getWorlds` ask `?include_sample=1`; `HttpClient.post` never sends a write for its path ("simulated").
+- `sample/` (STARTER-1, BQ-STARTER-1): the API's recorded sample project `w_sample_village_basic` (`World.sample`, `sample: true` on the list item): `SampleBadge`/`SampleNote` on the Home card, Worlds row and world page; Hide is `localStorage` (`sampleChoice.ts`, try/catch), "Show sample project" makes `getWorlds` ask `?include_sample=1`; `HttpClient.post` never sends a write for its path (the message says the answer was not sent; nothing is simulated).
 
 ## Local rules
 - Import nothing from `screens/`, `world/`, `stage/` (only the shared `src/api`, `src/router` seams). No `window` globals, no model ids, no design runtime port.
