@@ -9,10 +9,10 @@ import jsonschema
 import yaml
 from tilo_harness.skill_proposals import SkillProposals
 from tilo_harness.skills import SkillRegistry
+from tilo_harness.validator import repo_validator
 
 REPO_ROOT = Path(__file__).resolve().parents[4]
 SKILLS_ROOT = REPO_ROOT / "skills"
-SKILL_SCHEMA = json.loads((REPO_ROOT / "contracts" / "skill.schema.json").read_text(encoding="utf-8"))
 SKILL_DIR = SKILLS_ROOT / "automation" / "skill-from-description"
 
 RISKY_VERBS = {"send", "pay", "delete", "share", "book"}
@@ -110,7 +110,7 @@ def test_FR_SKL_01_FR_SKL_02_skill_from_description_loads_and_conforms_to_contra
     raw = yaml.safe_load((SKILL_DIR / "skill.yaml").read_text(encoding="utf-8"))
     assert raw["domain"] == "automation"
     assert raw["tools_allowed"] == []
-    jsonschema.validate(raw, SKILL_SCHEMA)
+    assert repo_validator().contract_problems("skill", raw) == []
     jsonschema.Draft202012Validator.check_schema(raw["inputs"])
     jsonschema.Draft202012Validator.check_schema(raw["outputs"])
 
