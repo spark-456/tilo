@@ -31,7 +31,7 @@ from urllib.parse import urlsplit
 from cryptography.exceptions import InvalidTag
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
-from ._time import add_seconds, parse_ts
+from ._time import add_seconds, format_ts, parse_ts
 
 _log = logging.getLogger(__name__)
 
@@ -409,13 +409,19 @@ class TokenBroker:
         record = self._store.get(user_id, connector)
         if record is None:
             return None, [], None
+        raw = record.get("scopes")
         scopes = (
-            sorted({s for s in record.get("scopes", []) if isinstance(s, str)})
-            if record.get("state") == "connected"
+            sorted({s for s in raw if isinstance(s, str) and len(s) <= 200})[:50]
+            if record.get("state") == "connected" and isinstance(raw, list)
             else []
         )
-        expires_at = record.get("expires_at")
-        return str(record.get("state")), scopes, expires_at if isinstance(expires_at, str) else None
+        try:
+            expires_at = format_ts(parse_ts(record.get("expires_at")))  # type: ignore[arg-type]
+        except (ValueError, TypeError, OverflowError):
+            expires_at = None
+        if record.get("state") not in ("connected", "expiring", "expired", "revoked", "needs_reconnect"):
+            expires_at = None
+        return str(record.get("state")), scopes, expires_at
 
     def disconnect(self, user_id: str, connector: str) -> DisconnectResult:
         """Revoke at the provider, then delete whatever it answered (fail toward deletion). A failed

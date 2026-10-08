@@ -41,3 +41,20 @@ def test_FR_CON_02_connection_view_returns_only_state_scopes_expiry() -> None:
     store.put("u_a", "gmail", {"v": 1, "state": "expired", "scopes": ["s1"], "expires_at": None})
     assert broker.connection_view("u_a", "gmail") == ("expired", [], None)
     assert http.calls == 0
+
+
+def test_FR_CON_02_connection_view_sanitises_expiry_scopes_and_non_live_rows() -> None:
+    store, http = InMemoryTokenStore(), _Http()
+    broker = _broker(store, http)
+    base = {"v": 1, "state": "connected", "scopes": ["s1"], "expires_at": "2026-10-08T01:02:03.000Z"}
+    store.put("u", "a", base)
+    assert broker.connection_view("u", "a") == ("connected", ["s1"], "2026-10-08T01:02:03.000Z")
+    store.put("u", "b", {**base, "expires_at": "tomorrow"})
+    assert broker.connection_view("u", "b")[2] is None
+    store.put("u", "c", {**base, "scopes": "abc"})
+    assert broker.connection_view("u", "c")[1] == []
+    store.put("u", "d", {**base, "scopes": [f"s{i}" for i in range(80)] + ["x" * 201, 5]})
+    assert len(broker.connection_view("u", "d")[1]) == 50
+    store.put("u", "e", {**base, "state": "weird"})
+    assert broker.connection_view("u", "e") == ("weird", [], None)
+    assert http.calls == 0

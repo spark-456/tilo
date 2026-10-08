@@ -8,7 +8,7 @@ and FR-ACC-04 ("A warning ... shows 3 days ahead"); SEC-02 (no token leaves the 
 Pinned interface (the ticket's decided spec):
 
     GET /v1/connectors               auth: `deps.get_current_principal`; owner is `Principal.user_id` and nothing else
-    200 {"connectors": [{"id", "name", "auth", "state", "scopes", "expires_at"}], "state_known": bool}
+    200 {"connectors": [{"id", "name", "auth", "state", "scopes", "expires_at", "state_known"}]}  (per row)
         connectors   one per entry of `deps.get_connector_registry()`, in registry order; id/name/auth: the registry's
         state        "connected" (broker state `connected` and expires_at more than 3 days away); "attention" (a stored
                      state other than `connected`: expiring, expired, revoked, needs_reconnect; or expires_at within 3
@@ -16,7 +16,7 @@ Pinned interface (the ticket's decided spec):
         scopes       the scopes granted to THIS person (list of strings), [] when none
         expires_at   RFC 3339 string of the stored record, null when there is none
         state_known  true when every connector's state was read; false when the broker is unwired
-                     (`deps.get_token_broker` raises HTTP 503 today) or a read failed
+                     (`deps.get_connection_views` raises HTTP 503 today) or a read failed
     Unwired broker: 200, every connector "available", scopes [], expires_at null, state_known false (never 500/503).
     A broker/store error for one connector: that connector "available", the rest as usual, 200, state_known false, and
     no error text in the body, the headers or the logs.
@@ -26,7 +26,8 @@ Pinned interface (the ticket's decided spec):
 How the tests install a broker (the seam the builder must resolve the broker through): a REAL
 `tilo_connectors.tokens.TokenBroker` over a spy `TokenStore` wrapping `InMemoryTokenStore` (a `FakeKms`, a fake HTTP
 client that records any call, a real-time clock), installed with
-`app.dependency_overrides[deps.get_token_broker] = lambda: broker`. Records are written the way production writes them
+`app.dependency_overrides[deps.get_connection_views] = lambda: <adapter over a real broker>`. Records are written
+the way production writes them
 (`broker.store_tokens(...)`), or planted straight into the store (`store.put`) for the states the broker only writes in
 production on a refresh failure. Failures are injected in the STORE, so they reach the route whichever public broker
 method it uses. The route is a pure read: no HTTP call, no store write, no event.
@@ -66,8 +67,8 @@ from tilo_connectors.tokens import (
 )
 
 PATH = "/v1/connectors"
-ROW_KEYS = {"id", "name", "auth", "state", "scopes", "expires_at"}
-TOP_KEYS = {"connectors", "state_known"}
+ROW_KEYS = {"id", "name", "auth", "state", "scopes", "expires_at", "state_known"}
+TOP_KEYS = {"connectors"}
 STATES = {"connected", "attention", "available"}
 DAY = 86400
 REGISTRY = load_registry(REPO_ROOT / "config" / "connectors.yaml")
@@ -138,6 +139,13 @@ class _SpyStore:
         return self.inner.connectors_of(user_id)
 
 
+class _Views:
+    """Test-side adapter: the read-only `deps.get_connection_views` seam over a real TokenBroker."""
+
+    def __init__(self, broker: TokenBroker) -> None:
+        self.view = broker.connection_view
+
+
 class Rig:
     """The real `tilo_api.app` with a real token broker over a spy store, the signed-in person set by `user`."""
 
@@ -156,7 +164,7 @@ class Rig:
         self.secrets: list[str] = [self.client_secret]
         ov = app.dependency_overrides
         ov[deps.get_current_principal] = lambda: deps.Principal(user_id=self.user, role="owner", full_session=True)
-        ov[deps.get_token_broker] = lambda: self.broker
+        ov[deps.get_connection_views] = lambda: _Views(self.broker)
         self.client = TestClient(app, raise_server_exceptions=False)
 
     def close(self) -> None:
@@ -254,7 +262,7 @@ def test_FR_CON_02_LIVE_GAPS_1b_shape_and_registry_order(rig: Rig) -> None:
     registry's own."""
     body = rig.ask()
     assert set(body) == TOP_KEYS
-    assert isinstance(body["state_known"], bool)
+    assert all(isinstance(r["state_known"], bool) for r in body["connectors"])
     assert [r["id"] for r in body["connectors"]] == ALL_IDS
     assert len(ALL_IDS) >= 4  # gmail, google_drive, google_calendar, ... the shipped catalogue
     for row in body["connectors"]:
@@ -285,7 +293,7 @@ def test_FR_CON_02_LIVE_GAPS_1b_person_with_no_grant_sees_every_connector_availa
     rig.user = CAROL
     body = rig.ask()
     assert_all_available(body)
-    assert body["state_known"] is True
+    assert all(r["state_known"] is True for r in body["connectors"])
     rig.assert_read_only()
 
 
@@ -310,7 +318,7 @@ def test_FR_CON_02_LIVE_GAPS_1b_connected_row_has_granted_scopes_and_expiry(rig:
         stored_expiry.replace("Z", "+00:00")
     )
     assert all(r["state"] == "available" for cid, r in rows(body).items() if cid != "gmail")
-    assert body["state_known"] is True
+    assert all(r["state_known"] is True for r in body["connectors"])
     rig.assert_read_only()
 
 
@@ -319,14 +327,16 @@ def test_FR_CON_02_LIVE_GAPS_1b_connected_row_has_granted_scopes_and_expiry(rig:
     [
         (30 * DAY, "connected"),
         (3 * DAY + 3600, "connected"),
-        (3 * DAY - 3600, "attention"),
-        (2 * DAY, "attention"),
-        (3600, "attention"),
+        (3 * DAY - 3600, "connected"),
+        (2 * DAY, "connected"),
+        (3600, "connected"),
     ],
 )
-def test_FR_ACC_04_LIVE_GAPS_1b_expiry_within_3_days_is_attention(rig: Rig, lifetime_s: int, state: str) -> None:
-    """FR-ACC-04: 'The warning shows 3 days ahead.' A connected record whose expires_at is within 3 days is
-    `attention`; further out it is `connected`. The granted scopes and the expiry are still shown."""
+def test_FR_ACC_04_LIVE_GAPS_1b_attention_keys_on_the_grant_not_the_access_token_expiry(
+    rig: Rig, lifetime_s: int, state: str
+) -> None:
+    """FR-ACC-04 (ruling): `attention` keys on the grant, not the access token's ~1 h expiry. A connected record is
+    `connected` however near its expires_at is. The granted scopes and the expiry are still shown."""
     rig.connect(ALICE, "gmail", lifetime_s=lifetime_s)
     expected_scopes = [_scope(ALICE, "gmail")]
     rig.settle()
@@ -337,15 +347,15 @@ def test_FR_ACC_04_LIVE_GAPS_1b_expiry_within_3_days_is_attention(rig: Rig, life
     rig.assert_read_only()
 
 
-def test_FR_ACC_04_LIVE_GAPS_1b_a_past_expiry_is_attention_and_is_never_refreshed(rig: Rig) -> None:
-    """A connected record whose expires_at has passed is `attention`; reading the list never refreshes it at the
-    provider (a list is not an adapter call)."""
+def test_FR_ACC_04_LIVE_GAPS_1b_a_past_access_expiry_is_connected_and_is_never_refreshed(rig: Rig) -> None:
+    """A connected record whose access-token expires_at has passed is still `connected` (refreshed on use);
+    reading the list never refreshes it at the provider (a list is not an adapter call)."""
     rig.connect(ALICE, "gmail")
     record = rig.sealed(ALICE, "gmail")
     rig.plant(ALICE, "gmail", {**record, "expires_at": _ts(-DAY)})
     rig.settle()
     gmail = rows(rig.ask())["gmail"]
-    assert gmail["state"] == "attention"
+    assert gmail["state"] == "connected"
     rig.assert_read_only()
 
 
@@ -529,20 +539,20 @@ def test_FR_CON_02_LIVE_GAPS_1b_response_is_not_cacheable(rig: Rig) -> None:
 
 
 def test_FR_CON_02_LIVE_GAPS_1b_unwired_broker_answers_200_all_available_and_not_known(rig: Rig) -> None:
-    """Given `deps.get_token_broker` unwired (HTTP 503 today), Then the route still answers 200: every connector
+    """Given `deps.get_connection_views` unwired (HTTP 503 today), Then the route still answers 200: every connector
     available, scopes [], expires_at null, state_known false. Never a 500, never a 503."""
-    del app.dependency_overrides[deps.get_token_broker]
+    del app.dependency_overrides[deps.get_connection_views]
     with pytest.raises(HTTPException) as unwired:  # the premise: the production default refuses with 503
-        deps.get_token_broker()
+        deps.get_connection_views()
     assert unwired.value.status_code == 503
     response = rig.get()
     assert response.status_code == 200, response.text
     body = response.json()
     assert set(body) == TOP_KEYS
-    assert body["state_known"] is False
     assert_all_available(body)
     for row in body["connectors"]:
         assert set(row) == ROW_KEYS
+        assert row["state_known"] is False
     assert "no-store" in response.headers.get("cache-control", "").lower()
     assert "not_configured" not in response.text
 
@@ -566,7 +576,8 @@ def test_FR_CON_02_LIVE_GAPS_1b_one_failing_connector_is_available_and_state_unk
     assert response.status_code == 200, response.text
     body = response.json()
     now = rows(body)
-    assert body["state_known"] is False
+    assert now["google_drive"]["state_known"] is False
+    assert all(now[cid]["state_known"] is True for cid in ALL_IDS if cid != "google_drive")
     assert (now["google_drive"]["state"], now["google_drive"]["scopes"], now["google_drive"]["expires_at"]) == (
         "available",
         [],
@@ -575,7 +586,7 @@ def test_FR_CON_02_LIVE_GAPS_1b_one_failing_connector_is_available_and_state_unk
     assert healthy["google_drive"]["state"] == "connected"
     for cid in ALL_IDS:
         if cid != "google_drive":
-            assert now[cid] == healthy[cid], cid
+            assert now[cid] == healthy[cid], cid  # incl. its own state_known
     assert [r["id"] for r in body["connectors"]] == ALL_IDS
     assert_clean(response, [boom, *rig.secrets])
     assert boom not in caplog.text
@@ -590,7 +601,7 @@ def test_FR_CON_02_LIVE_GAPS_1b_every_connector_failing_is_still_200_all_availab
     response = rig.get()
     assert response.status_code == 200, response.text
     body = response.json()
-    assert body["state_known"] is False
+    assert all(r["state_known"] is False for r in body["connectors"])
     assert_all_available(body)
     assert_clean(response, [boom, *rig.secrets])
 
@@ -607,7 +618,7 @@ _GRANTS = st.fixed_dictionaries(
 @given(grants=_GRANTS)
 def test_FR_CON_02_LIVE_GAPS_1b_property_state_scopes_and_isolation(grants: dict[str, dict[str, int | None]]) -> None:
     """For any grants of two people over the OAuth connectors: ids are always the registry's in order; a person's row is
-    `available` iff they have no record, `connected` iff the record expires more than 3 days out, else `attention`;
+    `available` iff they have no record, `connected` for any connected record (the access-token expiry never matters);
     scopes are exactly the person's own granted ones (empty when available); nobody ever sees the other's scopes; the
     same request twice gives the same answer; and the route stays read-only."""
     rig = Rig()
@@ -623,14 +634,14 @@ def test_FR_CON_02_LIVE_GAPS_1b_property_state_scopes_and_isolation(grants: dict
             assert response.status_code == 200
             body = response.json()
             assert [r["id"] for r in body["connectors"]] == ALL_IDS
-            assert body["state_known"] is True
             for row in body["connectors"]:
                 assert set(row) == ROW_KEYS
+                assert row["state_known"] is True
                 lifetime = grants[user].get(row["id"])
                 if lifetime is None:
                     assert (row["state"], row["scopes"], row["expires_at"]) == ("available", [], None)
                 else:
-                    assert row["state"] == ("connected" if lifetime > 3 * DAY else "attention")
+                    assert row["state"] == "connected"
                     assert row["scopes"] == [_scope(user, row["id"])]
                     assert row["expires_at"] is not None
             assert f"/{other}/" not in response.text
@@ -639,3 +650,91 @@ def test_FR_CON_02_LIVE_GAPS_1b_property_state_scopes_and_isolation(grants: dict
         rig.assert_read_only()
     finally:
         rig.close()
+
+
+# --- hardening (cross-review fixes) --------------------------------------------------------------------------------
+
+
+class _Fixed:
+    def __init__(self, answer: Any) -> None:
+        self.answer = answer
+
+    def view(self, user_id: str, connector: str) -> Any:
+        return self.answer
+
+
+def _serve(rig: Rig, answer: Any) -> dict[str, Any]:
+    app.dependency_overrides[deps.get_connection_views] = lambda: _Fixed(answer)
+    return rows(rig.ask())["gmail"]
+
+
+def test_FR_CON_02_LIVE_GAPS_1b_the_route_never_asks_the_token_broker_seam(rig: Rig) -> None:
+    """SEC-02 / ADR-0032: tilo-api never holds a broker; the route must not resolve `deps.get_token_broker`."""
+
+    def boom() -> Any:
+        raise AssertionError("the list route resolved the token broker")
+
+    app.dependency_overrides[deps.get_token_broker] = boom
+    rig.connect(ALICE, "gmail")
+    assert rows(rig.ask())["gmail"]["state"] == "connected"
+
+
+def test_FR_ACC_04_LIVE_GAPS_1b_grant_expired_marker_is_attention_even_with_a_far_expiry(rig: Rig) -> None:
+    rig.plant(ALICE, "gmail", {"v": 1, "state": "expired", "scopes": ["s"], "expires_at": _ts(30 * DAY)})
+    gmail = rows(rig.ask())["gmail"]
+    assert gmail["state"] == "attention"
+    assert gmail["state_known"] is True
+
+
+@pytest.mark.parametrize("bad", ["tomorrow", "2026-10-08", 12345, {"a": 1}, ["x"], "2026-10-08T00:00:00+05:30"])
+def test_FR_CON_02_LIVE_GAPS_1b_expires_at_is_a_normalised_utc_string_or_null(rig: Rig, bad: Any) -> None:
+    assert _serve(rig, ("connected", ["s"], bad))["expires_at"] is None
+
+
+def test_FR_CON_02_LIVE_GAPS_1b_expires_at_is_normalised(rig: Rig) -> None:
+    assert _serve(rig, ("connected", ["s"], "2026-10-08T01:02:03.5Z"))["expires_at"] == "2026-10-08T01:02:03.500Z"
+
+
+@pytest.mark.parametrize("bad", ["abc", {"a": 1}, ("a", "b"), {"a"}, 7, None])
+def test_FR_CON_02_LIVE_GAPS_1b_scopes_that_are_not_a_list_become_empty(rig: Rig, bad: Any) -> None:
+    assert _serve(rig, ("connected", bad, None))["scopes"] == []
+
+
+def test_FR_CON_02_LIVE_GAPS_1b_scopes_are_capped_and_non_strings_dropped(rig: Rig) -> None:
+    many = [f"s{i}" for i in range(80)]
+    assert _serve(rig, ("connected", many, None))["scopes"] == many[:50]
+    assert _serve(rig, ("connected", ["ok", "x" * 201, 5, None, "x" * 200], None))["scopes"] == ["ok", "x" * 200]
+
+
+@pytest.mark.parametrize("stored", ["weird", "available"])
+def test_FR_CON_02_LIVE_GAPS_1b_rows_that_are_not_connected_or_attention_carry_no_expiry(rig: Rig, stored: str) -> None:
+    gmail = _serve(rig, (stored, ["s"], "2026-10-08T01:02:03Z"))
+    assert gmail["state"] == "available"
+    assert gmail["expires_at"] is None
+
+
+def test_FR_CON_02_LIVE_GAPS_1b_a_failing_seam_never_chains_its_text(
+    rig: Rig, caplog: pytest.LogCaptureFixture
+) -> None:
+    boom = _sentinel("chain")
+
+    class _Failing:
+        def view(self, user_id: str, connector: str) -> Any:
+            raise RuntimeError(boom)
+
+    app.dependency_overrides[deps.get_connection_views] = lambda: _Failing()
+    response = rig.get()
+    assert response.status_code == 200
+    assert all(r["state_known"] is False for r in response.json()["connectors"])
+    assert_clean(response, [boom])
+    assert boom not in caplog.text
+
+
+def test_FR_CON_02_LIVE_GAPS_1b_a_seam_override_that_needs_a_parameter_is_treated_as_unwired(rig: Rig) -> None:
+    def parameterised(needed: str) -> Any:
+        return _Fixed(("connected", ["s"], None))
+
+    app.dependency_overrides[deps.get_connection_views] = parameterised
+    body = rig.ask()
+    assert_all_available(body)
+    assert all(r["state_known"] is False for r in body["connectors"])
