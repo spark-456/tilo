@@ -762,6 +762,24 @@
   box-shadow: 0 0 0 5px var(--halo);
 }
 
+/* ---- the five spend tiles (FR-SPD-01), under the greeting panel ---- */
+[data-park] .park-home-kpis {
+  position: absolute;
+  left: 24px;
+  top: 360px;
+  width: 500px;
+  max-width: calc(100% - 48px);
+  max-height: calc(100% - 560px);
+  overflow-y: auto;
+  box-sizing: border-box;
+  padding: 8px;
+  border-radius: 26px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  z-index: 3;
+}
+
 /* ---- focus: the README ring on every control of the page ---- */
 [data-park] .park-home-needs:focus-visible,
 [data-park] .park-home-link:focus-visible,
@@ -776,4 +794,27 @@
 [data-park] .park-home-pin__card:focus-visible {
   outline: 3px solid #5a3fe0;
   outline-offset: 2px;
+}
+
+/* ---- legal links (WEB-LEGAL): a quiet strip under the composer, on the page's bottom edge ---- */
+[data-park] .park-home-legal {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  transform: translateX(-50%);
+  z-index: 4;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ink3);
+  white-space: nowrap;
+}
+[data-park] .park-home-legal a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  color: var(--ink2);
 }

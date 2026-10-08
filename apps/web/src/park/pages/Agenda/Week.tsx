@@ -121,7 +121,12 @@ function Calendar({ A, EV, ui, app }: { A: Agenda; EV: Ev[]; ui: AgendaUi; app: 
                 type="button"
                 className="park-agenda-slot"
                 data-slot={s.l}
-                style={{ top: (s.s - A.start) * PX + 1, height: (s.e - s.s) * PX - 3 }}
+                aria-label={`Book ${s.l}, everyone is free`}
+                // At least 24 px tall: a 30 minute slot is 23 px at PX 52 (WCAG 2.5.8).
+                style={{
+                  top: (s.s - A.start) * PX + 1,
+                  height: Math.max(24, (s.e - s.s) * PX - 3),
+                }}
                 onClick={() => void ui.book(s)}
               >
                 {icon("plus", 13)}

@@ -4,12 +4,21 @@
 // is not built shows "Not connected yet", never sample values. The composer's 900 ms goes through the
 // provider's `useSchedule`, so a test never waits and a pending draft is cancelled when the page goes.
 import { useEffect, useRef, useState } from "react";
-import type { Agenda, ApiResult, Ledger, TierKey, Today, User, World } from "../../api/types";
+import type {
+  Agenda,
+  ApiResult,
+  Decision,
+  Ledger,
+  TierKey,
+  Today,
+  User,
+  World,
+} from "../../api/types";
 import type { AppCtx } from "../../app/AppCtx";
 import { useParkApi, useSchedule } from "../../app/context";
 import { ComposerPanel, type Phase } from "./ComposerPanel";
 import "./Home.css";
-import { Hero, Pins, TodayPanel } from "./Panels";
+import { Hero, KpiStrip, Pins, TodayPanel } from "./Panels";
 import {
   DRAFT_MS,
   MODES,
@@ -26,6 +35,8 @@ interface Base {
   today: Today;
   agenda: Agenda;
   ledger: Ledger;
+  /** What the "Waiting on you" tile says and opens; none when the Api serves no decisions. */
+  decisions: Decision[];
 }
 
 type Loaded<T> = T | "failed" | null;
@@ -45,16 +56,19 @@ export function HomePage({ app }: { app: AppCtx }) {
 
   useEffect(() => {
     let live = true;
+    const decisions = (): Promise<Decision[]> =>
+      together(() => api.getDecisions()).then(data, () => []);
     together(() =>
-      Promise.all([api.getUser(), api.getToday(), api.getAgenda(), api.getLedger()]),
+      Promise.all([api.getUser(), api.getToday(), api.getAgenda(), api.getLedger(), decisions()]),
     ).then(
-      ([user, today, agenda, ledger]) => {
+      ([user, today, agenda, ledger, decided]) => {
         if (live)
           setBase({
             user: data(user),
             today: data(today),
             agenda: data(agenda),
             ledger: data(ledger),
+            decisions: decided,
           });
       },
       () => {
@@ -141,6 +155,15 @@ export function HomePage({ app }: { app: AppCtx }) {
             onReview={() => (waitingIn ? open(waitingIn.id) : go("worlds"))}
           />
           {(vw || 1440) >= 1180 ? (
+            <KpiStrip
+              ledger={base.ledger}
+              dec={dec}
+              decisions={base.decisions}
+              fallbackWorld={waitingIn?.id}
+              onWorld={open}
+            />
+          ) : null}
+          {(vw || 1440) >= 1180 ? (
             <TodayPanel
               rows={liveRows(worlds, needs)}
               events={nextEvents(base.agenda)}
@@ -187,6 +210,9 @@ export function HomePage({ app }: { app: AppCtx }) {
           onChange={toIdle}
         />
       )}
+      <nav className="park-home-legal" aria-label="Legal">
+        <a href="/privacy">Privacy</a> · <a href="/terms">Terms</a>
+      </nav>
     </div>
   );
 }

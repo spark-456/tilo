@@ -2,7 +2,7 @@
 // data but which its pages hard-coded as copy. They live here so a page's logic stays generic ("No
 // scenario-specific code"). Not generated; `index.ts` merges them onto the generated fixtures, and the
 // parity test compares only the prototype's own fields. Strings are the designed copy, verbatim.
-import type { AgendaRules, DecisionFacts, DecisionKey } from "../types";
+import type { AgendaRules, DecisionFacts, DecisionKey, Ledger } from "../types";
 
 /** What each decision is about, by key; read as `Decision.facts`. */
 export const decisionFacts: Record<DecisionKey, DecisionFacts> = {
@@ -58,17 +58,18 @@ export const agendaRules: AgendaRules = {
           role: "research",
           due: "Tilo booked · just now",
           color: "lilac",
-          noteAfter: "Invites sent to Jin, Priya and Tom.",
+          noteAfter:
+            "Invites to Jin, Priya and Tom go out once Google Calendar is connected and you approve.",
         },
       },
     },
     focus: {
       label: "Block it",
       action: "accept",
-      toast: "Blocked 09:30–11:30 on Monday in Google Calendar",
+      toast: "Blocked 09:30–11:30 on Monday on your Agenda",
       accepted: {
         title: "Focus time · Mon 28 Sep",
-        note: "09:30–11:30, added to your Google Calendar",
+        note: "09:30–11:30, added to your Agenda",
         due: "Blocked by Tilo",
         color: "lilac",
         group: "week",
@@ -84,4 +85,14 @@ export const agendaRules: AgendaRules = {
       text: "Laptop Depot budget was approved today.",
     },
   ],
+};
+
+/**
+ * The Ledger's "Saved by memory" comparison (the prototype typed "Up £120 on August" as copy). `total` is the sum
+ * of the fixture's `memory`; a ledger whose memory differs does not state it.
+ */
+export const ledgerMemoryUp: NonNullable<Ledger["memoryUp"]> = {
+  amount: 120,
+  since: "August",
+  total: 640,
 };

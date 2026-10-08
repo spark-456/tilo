@@ -52,6 +52,7 @@ _MERGEABLE = ("needs_you", "meeting")
 _ROLES = ("owner", "team_lead", "approver")  # any other role (a Viewer included) answers and lists nothing
 _CROCKFORD = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
 _WEB_CHANNELS = ("web", "mobile_web")
+OWNER_ONLY_ACTIONS = frozenset({"create_meeting_event"})  # FR-MTG-09, ADR-0024: no plan names it, no Approver opens it
 _ANSWER_CHANNELS = (*_WEB_CHANNELS, "email")  # the only channels that answer, whatever a card lists (CH-RM)
 _STATUS = {"card_not_found": 404, "forbidden": 403, "busy": 409}  # AnswerResult.reason -> HTTP; others are 400
 _ALWAYS_NOTIFY = frozenset({"gate", "blocked"})
@@ -504,6 +505,8 @@ class CardStore:
                 raise ShareRefused("not_an_open_gate")
             if record.reraised_from is not None:
                 raise ShareRefused("not_an_original_gate")  # a shared card is never shared again
+            if record.card["gate"]["action"]["type"] in OWNER_ONLY_ACTIONS:
+                raise ShareRefused("owner_only_gate")
             now = self._clock.now()
             new_id, outbox_id = _derived_id(secrets.token_hex(16)), _derived_id(secrets.token_hex(16))
             card = copy.deepcopy(record.card) | {"id": new_id, "created_at": now}
