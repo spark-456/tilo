@@ -36,6 +36,7 @@ class LoadedSkill:
     version: str
     body: str
     sha256: str
+    tools_allowed: tuple[str, ...] = ()  # the tools the skill may use (LW-07); a unit gets these intersect its role's
 
 
 def _read_capped(path: Path) -> bytes:
@@ -70,7 +71,9 @@ def _parse_skill(folder: Path) -> tuple[dict[str, Any], LoadedSkill]:
         except jsonschema.SchemaError as error:
             raise SkillError(f"{folder.name}: {field} is not a valid JSON Schema") from error
     sha256 = hashlib.sha256(raw_yaml + raw_md).hexdigest()
-    return data, LoadedSkill(id=data["id"], version=data["version"], body=body, sha256=sha256)
+    return data, LoadedSkill(
+        id=data["id"], version=data["version"], body=body, sha256=sha256, tools_allowed=tuple(data["tools_allowed"])
+    )
 
 
 class SkillRegistry:

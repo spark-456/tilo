@@ -51,8 +51,6 @@ from dataclasses import dataclass, field
 from typing import Any, Protocol
 
 from tilo_logging.context import bound
-from tilo_providers.interfaces import GenerateRequest, ModelProvider
-from tilo_providers.prompts import load_prompt
 
 from tilo_harness.branch import Checkpoint, hit_summary, reusable_units
 from tilo_harness.config import AgentsConfig
@@ -61,7 +59,8 @@ from tilo_harness.must_ask import Ask, MustAsk
 from tilo_harness.outputs import Kept, UnitOutput, existing, keep
 from tilo_harness.question_wait import Answer, QuestionWait
 from tilo_harness.skills import LoadedSkill, Pins, SkillError, SkillRegistry
-from tilo_harness.unit_prompt import UPSTREAM_ITEM_CAP, UpstreamItem, data_line, inputs_text, request_variables
+from tilo_harness.tool_runner import ToolUnitRunner
+from tilo_harness.unit_prompt import UPSTREAM_ITEM_CAP, UpstreamItem
 from tilo_harness.validator import EventRejected, repo_validator
 from tilo_harness.verifier import Verifier
 
@@ -124,31 +123,9 @@ class RunResult:
         return [unit_id for unit_id, outcome in self.outcomes.items() if not outcome.success]
 
 
-class DefaultUnitRunner:
-    """Does a unit's work with the model for the unit's role, through the provider layer."""
-
-    def __init__(self, providers: Mapping[str, ModelProvider]) -> None:
-        self._providers = providers
-
-    async def run(self, unit: Mapping[str, Any], context: UnitContext) -> UnitOutcome:
-        provider = self._providers[unit["role"]]
-        prompt = load_prompt(
-            unit["role"],
-            "unit.md",
-            {
-                "title": data_line(unit["title"], 120),
-                "unit_type": data_line(unit["unit_type"], 80),
-                "skills": "\n\n".join(skill.body for skill in context.skills),
-                "inputs": inputs_text(context.upstream),
-                **request_variables(context.brief, context.intake_answers),
-            },
-        )
-        response = await asyncio.to_thread(provider.generate, GenerateRequest(prompt=prompt))
-        if not response.text:
-            return UnitOutcome(success=False, summary=f"No result for {unit['title']}.")
-        # Code picks the media type; a model never names one (ADR-0018 s1).
-        output = UnitOutput(media_type="text/markdown", content=response.text.encode("utf-8"))
-        return UnitOutcome(success=True, summary=f"Finished {unit['title']}.", outputs=(output,))
+class DefaultUnitRunner(ToolUnitRunner):
+    """Does a unit's work with the model for the unit's role, through the provider layer. It is the shared
+    `ToolUnitRunner` (LW-07): with no `tools=` it is one `generate` per unit, as it always was."""
 
 
 @dataclass(frozen=True)
@@ -227,23 +204,27 @@ def _upstream_item(
     """What a finished unit hands to the units that depend on it: the text of what it STORED (so the redacted version,
     never the runner's raw bytes), cut to the cap now; a flagged or unreadable item is left out with a note."""
     texts: list[str] = []
+    verdict = "clean"  # LW-07: clean only if every text item was screened clean; the first other verdict stands
     for item in made:
         record = item.version.record
         if not str(record.get("media_type", "")).startswith("text/"):
             continue
+        if record.get("screening") != "clean" and verdict == "clean":
+            verdict = str(record.get("screening") or "unscreened")
         if record.get("screening") == "flagged":
             texts.append("(an item was left out: the safety screen flagged it)")
             continue
         try:
             raw = store["artifacts"].read(store["scope"], item.version.ref) if store else b""
         except Exception:  # an unreadable version is left out, never guessed at
+            verdict = verdict if verdict != "clean" else "unscreened"
             texts.append("(an item was left out: it could not be read)")
             continue
         texts.append(raw[: UPSTREAM_ITEM_CAP * 4].decode("utf-8", errors="replace")[:UPSTREAM_ITEM_CAP])
     refs = tuple(
         str(ref["artifact_id"]) for ref in outcome.artifact_refs if isinstance(ref, Mapping) and "artifact_id" in ref
     )
-    return UpstreamItem(unit["id"], unit["title"], NL2.join(texts)[:UPSTREAM_ITEM_CAP] or None, refs)
+    return UpstreamItem(unit["id"], unit["title"], NL2.join(texts)[:UPSTREAM_ITEM_CAP] or None, refs, verdict)
 
 
 def _envelope(outcome: UnitOutcome, worker: str, lead: str, unit: dict[str, Any]) -> dict[str, Any] | None:

@@ -36,7 +36,8 @@ from typing import Any, Literal
 from fastapi import FastAPI, Request
 from tilo_harness.lead_review import REVIEW_ROLE, review_milestones
 from tilo_harness.outputs import UnitOutput
-from tilo_harness.unit_prompt import data_line, request_variables
+from tilo_harness.tool_runner import ToolUnitRunner
+from tilo_harness.unit_prompt import UpstreamItem, request_variables
 from tilo_harness.untrusted import neutralise as neutralise_text
 from tilo_providers.config import ProviderConfigError, ProvidersConfig, load_providers_config, resolve_models_path
 from tilo_providers.errors import ProviderError, QuotaError, RequestError
@@ -627,6 +628,43 @@ class _Writer:
             return stamped
 
 
+class _RoleModel(ModelProvider):
+    """One role seen as a provider, for the shared runner: every call goes through the metered Router."""
+
+    def __init__(self, router: Router, role: str) -> None:
+        self._router, self._role = router, role
+
+    def generate(self, request: GenerateRequest) -> GenerateResponse:
+        response = self._router.generate(self._role, request).response
+        if not response or not (response.text or "").strip():
+            raise ProviderError("the model returned no text")
+        return response
+
+    def stream(self, request: GenerateRequest) -> Iterator[GenerateResponse]:
+        raise NotImplementedError
+
+    def embed(self, request: Any) -> Any:
+        raise NotImplementedError
+
+    def count_tokens(self, text: str) -> int:
+        raise NotImplementedError
+
+    def capabilities(self) -> set[Capability]:
+        return set()
+
+    def price(self) -> Any:
+        raise NotImplementedError
+
+
+class _RoleModels(dict[str, ModelProvider]):
+    def __init__(self, router: Router) -> None:
+        super().__init__()
+        self._router = router
+
+    def __missing__(self, role: str) -> ModelProvider:
+        return _RoleModel(self._router, role)
+
+
 class _UnitRunner:
     """One model call per unit by the unit's role (prompts/<role>/unit.md), fed the work of the units it waits for; one
     Lead review per district of two or more units (at its last unit, on the cheap `lead_review` role). A Verifier's
@@ -634,6 +672,13 @@ class _UnitRunner:
 
     def __init__(self, router: Router, meter: _Meter) -> None:
         self._router, self._meter = router, meter
+        self._shared = ToolUnitRunner(
+            _RoleModels(router),
+            meter=lambda role, request, response: meter.cost(response.profile_id, *meter.tokens(response, request)),
+            request_options={
+                role: {"max_output_tokens": cap, "thinking_level": "minimal"} for role, cap in _OUT.items()
+            },
+        )
         self._brief: dict[str, Any] = {}
         self._units: list[dict[str, Any]] = []
         self._milestones: frozenset[str] = frozenset()
@@ -661,15 +706,16 @@ class _UnitRunner:
     async def run(self, unit: Any, context: Any) -> Any:
         from tilo_api.runs import MeteredOutcome  # noqa: PLC0415
 
-        earlier = [f"[{d}] {self._work[d]}" for d in unit["depends_on"] if d in self._work]
-        variables = {
-            "title": data_line(unit["title"], 120), "unit_type": unit["unit_type"],
-            "inputs": _safe("\n\n".join(earlier) or "(none)"),
-            "skills": "\n\n".join(skill.body for skill in context.skills), **self._request(),
-        }  # fmt: skip
-        text, credits = await asyncio.to_thread(
-            self._ask, unit["role"], load_prompt(unit["role"], "unit.md", variables)
+        titles = {u["id"]: u["title"] for u in self._units}
+        upstream = tuple(  # the work of the units this one waits for, as the default runner shows it (unit_prompt)
+            UpstreamItem(d, titles.get(d, d), self._work[d], (), "clean") for d in unit["depends_on"] if d in self._work
         )
+        shown = dataclasses.replace(context, brief=self._brief, intake_answers=(), upstream=upstream)
+        done = await self._shared.run_unit(unit, shown)  # the shared ToolUnitRunner (LW-07); no tools offered here
+        if not done.outcome.success:
+            raise ProviderError("the model returned no text")
+        text = done.outcome.outputs[0].content.decode("utf-8").strip()
+        credits = done.credits
         self._work[unit["id"]] = text
         summary = f"Finished {unit['title']}."
         if unit["role"] == "verifier":

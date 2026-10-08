@@ -39,6 +39,7 @@ class UpstreamItem:
     title: str
     text: str | None  # the unit's stored (redacted, screened) text; None when it made none
     refs: tuple[str, ...] = ()  # artifact ids of what it stored or selected
+    screening: str = "unscreened"  # the stored item's verdict; only "clean" may reach a unit that can act (LW-07)
 
 
 def data_line(value: Any, cap: int) -> str:

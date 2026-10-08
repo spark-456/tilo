@@ -26,3 +26,5 @@ untrusted claim and source text).
 `tilo_connectors.handoff.writer_brief(...)` run through `neutralise_marker(..., "REQUIREMENTS")`, the only data the writer
 sees, and `$max_framing_chars` comes from `config/build_partners.yaml`. Code checks the reply before it is used (BH-03).
 `assistant/` is the panel's model fallback (FR-PA-14, FR-PA-17): `route_system.md` instructions with the fact intents and routes of `config/assistant.yaml` as `$intents` and `$routes`, `route_task.md` the delimited, untrusted question (`$question`, run through `neutralise_marker(..., "QUESTION")`) with `$screen` and `$context`. The person's plate rows are not in the template: `tilo_api.assistant.model` hands them to the Router as one tool output (`<<<ROWS ... ROWS>>>`, titles through `neutralise_marker`) so the Router compacts the rows, never the question. The reply is one JSON object that code parses and the core vets.
+
+`specialist/tools.md` and `tools_read_only.md` frame the tool loop of `ToolUnitRunner` (LW-07) for every worker role: `$base` is the unit prompt, `$tools` the tools now allowed, `$results` the fenced tool results (data, not instructions).
