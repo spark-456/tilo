@@ -1,0 +1,208 @@
+{
+  "skill_id": "agent-self-report",
+  "requirements": ["ADR-0028", "MR-06", "MEETROOM_SELF_REPORT"],
+  "cases": [
+    {
+      "id": "village_s1_what_did_you_do_and_what_is_left",
+      "stream_file": "village-basic.jsonl",
+      "input": {
+        "agent_id": "A_s1",
+        "unit_id": "U1",
+        "up_to_seq": null,
+        "question": "What did you do in the Mail Room and what is left for your unit?",
+        "question_kind": "what_did_you_do"
+      },
+      "output": {
+        "answer": "I joined the Mail district to triage the inbox and received unit U1 with the triage brief from our Lead [seq: 14, 18, 19]. I loaded the email-triage skill v1.0.0, read 12 new emails from Gmail into art_inbox_batch, and sorted them into art_triage_list showing 1 needing a reply and 11 FYI or newsletters [seq: 20, 22, 24, 25]. I handed art_triage_list to Specialist A_s2 and completed triaging all 12 emails at the Mail Room, so nothing is left for my unit [seq: 27, 40].",
+        "has_record": true,
+        "cited_seqs": [14, 18, 19, 20, 22, 24, 25, 27, 40],
+        "what_i_did": [
+          {
+            "claim": "I loaded email-triage v1.0.0 and pulled 12 new emails from Gmail into art_inbox_batch [seq: 20, 22].",
+            "seqs": [20, 22]
+          },
+          {
+            "claim": "I sorted the 12 emails and created art_triage_list with 1 needing a reply and 11 FYI or newsletters, then handed it to A_s2 [seq: 24, 25, 27].",
+            "seqs": [24, 25, 27]
+          }
+        ],
+        "why": [
+          {
+            "claim": "I followed the triage brief from A_l1 requiring every email since yesterday to have one category and suspicious emails to be flagged [seq: 19].",
+            "seqs": [19]
+          }
+        ],
+        "what_is_left": [
+          {
+            "claim": "Nothing is left for my unit U1 after completing the 12 triaged emails at the Mail Room [seq: 40].",
+            "seqs": [40]
+          }
+        ]
+      }
+    },
+    {
+      "id": "village_s2_why_thursday_3pm_in_same_thread",
+      "stream_file": "village-basic.jsonl",
+      "input": {
+        "agent_id": "A_s2",
+        "unit_id": "U2",
+        "up_to_seq": null,
+        "question": "Why did you draft the supplier reply for Thursday 3pm in the same thread and request approval before sending?",
+        "question_kind": "why"
+      },
+      "output": {
+        "answer": "I drafted the reply for Thursday 3pm in the same thread because the handoff brief from A_s1 stated the supplier asked whether Thursday 3pm works and set acceptance criteria that the reply stay in the thread using only facts from the instruction and thread [seq: 26, 27]. I loaded email-reply-drafting v1.0.0 and created art_reply_draft at the Reply Desk [seq: 28, 31, 32]. I requested gate G1 approval before sending because send_email is an irreversible T2 action, and I sent the reply only after the owner approved it and completed unit U2 [seq: 34, 38, 39].",
+        "has_record": true,
+        "cited_seqs": [26, 27, 28, 31, 32, 34, 38, 39],
+        "what_i_did": [
+          {
+            "claim": "I loaded email-reply-drafting v1.0.0, drafted art_reply_draft confirming Thursday 3pm works, and sent it via Gmail after gate G1 approval [seq: 28, 31, 32, 34, 38].",
+            "seqs": [28, 31, 32, 34, 38]
+          }
+        ],
+        "why": [
+          {
+            "claim": "I kept the reply in the thread and answered about Thursday 3pm because the handoff envelope from A_s1 specified those acceptance criteria [seq: 27].",
+            "seqs": [27]
+          },
+          {
+            "claim": "I opened approval gate G1 because send_email is a T2 irreversible side effect [seq: 34].",
+            "seqs": [34]
+          }
+        ],
+        "what_is_left": [
+          {
+            "claim": "Nothing is left for my unit at the Reply Desk after finishing 1 reply [seq: 39].",
+            "seqs": [39]
+          }
+        ]
+      }
+    },
+    {
+      "id": "village_s2_mid_run_what_is_left_at_gate",
+      "stream_file": "village-basic.jsonl",
+      "input": {
+        "agent_id": "A_s2",
+        "unit_id": "U2",
+        "up_to_seq": 34,
+        "question": "What have you done so far on the supplier reply and what is left?",
+        "question_kind": "what_is_left"
+      },
+      "output": {
+        "answer": "I received unit U2 and the triage list handoff, loaded email-reply-drafting v1.0.0, and drafted art_reply_draft stating Thursday 3pm works [seq: 26, 27, 28, 31, 32]. What is left is waiting on your approval at gate G1 for the irreversible T2 send_email action before I can send the reply and finish the Reply Desk work [seq: 34].",
+        "has_record": true,
+        "cited_seqs": [26, 27, 28, 31, 32, 34],
+        "what_i_did": [
+          {
+            "claim": "I started work at the Reply Desk and created art_reply_draft for the supplier [seq: 29, 30, 31, 32].",
+            "seqs": [29, 30, 31, 32]
+          }
+        ],
+        "why": [
+          {
+            "claim": "I paused at gate G1 because sending the email requires owner approval [seq: 34].",
+            "seqs": [34]
+          }
+        ],
+        "what_is_left": [
+          {
+            "claim": "I am waiting for approval on gate G1 before sending art_reply_draft [seq: 34].",
+            "seqs": [34]
+          }
+        ]
+      }
+    },
+    {
+      "id": "village_s1_absent_fact_deleted_spam_or_slack",
+      "stream_file": "village-basic.jsonl",
+      "input": {
+        "agent_id": "A_s1",
+        "unit_id": "U1",
+        "up_to_seq": null,
+        "question": "Why did you delete three spam emails and post a summary in Slack?",
+        "question_kind": "absent_fact"
+      },
+      "output": {
+        "answer": "I have no record of that in my unit events, as I neither deleted any emails nor posted to Slack [seq: 22, 24, 25]. My recorded work only read 12 new emails from Gmail, sorted them into art_triage_list, handed the list to A_s2, and completed triaging at the Mail Room [seq: 22, 24, 25, 27, 40].",
+        "has_record": false,
+        "cited_seqs": [22, 24, 25, 27, 40],
+        "what_i_did": [
+          {
+            "claim": "I read 12 emails from Gmail and created art_triage_list without deleting emails or calling Slack [seq: 22, 24, 25].",
+            "seqs": [22, 24, 25]
+          }
+        ],
+        "why": [],
+        "what_is_left": [
+          {
+            "claim": "My unit completed triaging 12 emails at the Mail Room [seq: 40].",
+            "seqs": [40]
+          }
+        ]
+      }
+    },
+    {
+      "id": "artifact_versions_s1_what_did_you_do",
+      "stream_file": "artifact-versions.jsonl",
+      "input": {
+        "agent_id": "A_s1",
+        "unit_id": null,
+        "up_to_seq": null,
+        "question": "What did you do on the market brief?",
+        "question_kind": "what_did_you_do"
+      },
+      "output": {
+        "answer": "I wrote the initial market brief artifact art_market_brief as version 1 (1,840 bytes of text/markdown) [seq: 1]. I then produced version 2 of art_market_brief superseding version 1, and no further actions by me are recorded [seq: 2].",
+        "has_record": true,
+        "cited_seqs": [1, 2],
+        "what_i_did": [
+          {
+            "claim": "I created art_market_brief version 1 and updated it to version 2 [seq: 1, 2].",
+            "seqs": [1, 2]
+          }
+        ],
+        "why": [
+          {
+            "claim": "I updated art_market_brief from previous_version 1 to version 2 [seq: 1, 2].",
+            "seqs": [1, 2]
+          }
+        ],
+        "what_is_left": [
+          {
+            "claim": "Nothing is left in my recorded events after creating version 2 of art_market_brief [seq: 2].",
+            "seqs": [2]
+          }
+        ]
+      }
+    },
+    {
+      "id": "artifact_versions_v1_why_reviewed_v3_and_absent_competitor_table",
+      "stream_file": "artifact-versions.jsonl",
+      "input": {
+        "agent_id": "A_v1",
+        "unit_id": null,
+        "up_to_seq": null,
+        "question": "Did you reject version 2 because of the competitor pricing table?",
+        "question_kind": "absent_fact"
+      },
+      "output": {
+        "answer": "I have no record of that in my events, as I never reviewed version 2 or recorded anything about a competitor pricing table [seq: 4]. My only recorded event is checking art_market_brief version 3 and marking it passed [seq: 4].",
+        "has_record": false,
+        "cited_seqs": [4],
+        "what_i_did": [
+          {
+            "claim": "I checked art_market_brief version 3 and recorded result passed [seq: 4].",
+            "seqs": [4]
+          }
+        ],
+        "why": [],
+        "what_is_left": [
+          {
+            "claim": "Nothing is left for me after passing art_market_brief version 3 [seq: 4].",
+            "seqs": [4]
+          }
+        ]
+      }
+    }
+  ]
+}
