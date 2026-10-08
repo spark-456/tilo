@@ -309,6 +309,33 @@ it("FR_AGT_14 failed rename retains the recorded title and returns focus", async
   expect(document.activeElement).toBe(buttonIn(row("sched_a1") ?? null, "Rename"));
 });
 
+it.each([null, {}, { title: "New title" }])(
+  "FR_AGT_14 unreadable rename reply %j keeps the recorded title and reports uncertainty",
+  async (reply) => {
+    await open({
+      "GET /schedules": json({ schedules: [A] }),
+      "PATCH /schedules/sched_a1": json(reply),
+    });
+    await click(buttonIn(row("sched_a1") ?? null, "Rename"));
+    await editName("New title");
+    await click(buttonIn(container, "Save name"));
+    expect(row("sched_a1")?.querySelector("b")?.textContent).toBe(A.title);
+    expect(q('[role="alert"]')?.textContent).toContain("We could not confirm it.");
+    expect(q('[role="alert"]')?.textContent).not.toContain("Nothing was changed");
+    expect(document.activeElement).toBe(buttonIn(row("sched_a1") ?? null, "Rename"));
+  },
+);
+
+it("FR_AGT_14 rename blur keeps the draft without saving or cancelling", async () => {
+  const { calls } = await open({ "GET /schedules": json({ schedules: [A] }) });
+  await click(buttonIn(row("sched_a1") ?? null, "Rename"));
+  await editName("Draft name");
+  await act(async () => buttonIn(container, "Save name")?.focus());
+  expect(q<HTMLInputElement>('input[aria-label="Routine name"]')?.value).toBe("Draft name");
+  expect(row("sched_a1")?.querySelector("b")?.textContent).toBe(A.title);
+  expect(calls.filter((call) => call.method !== "GET")).toEqual([]);
+});
+
 it("FR_AGT_14 delete confirmation focuses Keep, contains Tab and closes with Escape", async () => {
   const { calls } = await open({ "GET /schedules": json({ schedules: [A] }) });
   const trigger = buttonIn(row("sched_a1") ?? null, "Delete");

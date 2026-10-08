@@ -4,6 +4,7 @@
 // schedule routes (the fixture client) says so in words.
 import { useLayoutEffect, useRef, useState } from "react";
 import { useClient } from "../../api/ClientProvider";
+import { TiloApiError } from "../../api/http";
 import {
   type ScheduleView,
   type SchedulesApi,
@@ -122,15 +123,18 @@ function RoutineList({ api, first }: { api: SchedulesApi; first: readonly Schedu
                 {editing?.id === row.schedule_id && (
                   <form
                     className="routine-name"
+                    // Blur neither saves nor cancels: the draft stays until an explicit action.
                     onSubmit={(e) => {
                       e.preventDefault();
                       const title = editing.title.trim();
                       if (!title || busy !== null) return;
                       void run(row.schedule_id, "rename the routine", async () => {
                         const updated = await api.updateSchedule(row.schedule_id, { title });
-                        const next = isScheduleView(updated) ? updated : { ...row, title };
+                        if (!isScheduleView(updated)) {
+                          throw new TiloApiError("Unreadable routine reply", 200, true, true);
+                        }
                         setRows((all) =>
-                          all.map((r) => (r.schedule_id === row.schedule_id ? next : r)),
+                          all.map((r) => (r.schedule_id === row.schedule_id ? updated : r)),
                         );
                       });
                     }}
