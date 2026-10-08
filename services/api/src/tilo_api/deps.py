@@ -674,14 +674,58 @@ def get_run_archive() -> Callable[..., RunArchive]:
     raise NotImplementedError("no raw-archive store is configured, so no run starts")
 
 
+_host_lock = threading.Lock()
+_host_seams: dict[str, Any] = {}
+
+
+def _host_seam(name: str, build: Callable[[], Any]) -> Any:
+    """One process-wide instance per seam, built on the first request. An unconfigured or failed build is 503
+    `not_configured` (the error never echoed or logged) and is not remembered, so the next request tries again."""
+    built = _host_seams.get(name)
+    if built is not None:
+        return built
+    with _host_lock:
+        if name not in _host_seams:
+            try:
+                _host_seams[name] = build()
+            except Exception:
+                raise HTTPException(status_code=503, detail="not_configured") from None
+        return _host_seams[name]
+
+
 def get_token_broker() -> Any:
-    """FR-MTG-09: the token broker's adapter-facing half (`access_token_for_adapter`). Unwired: no host run."""
-    raise HTTPException(status_code=503, detail="not_configured")
+    """FR-MTG-09: the token broker's adapter-facing half (`access_token_for_adapter`), over Firestore and Cloud KMS,
+    only for a full environment (`tilo_api.host_wiring`, MTG-WIRE-1); otherwise 503 `not_configured`."""
+
+    def build() -> Any:
+        from tilo_api import host_wiring, meeting_host  # noqa: PLC0415 - meeting_host imports this module
+
+        sink = host_wiring.connection_sink(
+            lambda part: meeting_host.on_connection_event(part, outbox_store=get_outbox_store())
+        )
+        return host_wiring.open_host_broker(emit=sink)
+
+    return _host_seam("broker", build)
 
 
 def get_meeting_host_transport() -> Any:
-    """FR-MTG-09: the `Transport` behind `MeetingHostAdapter`. No live transport in dev (EFF-01): refuses."""
-    raise HTTPException(status_code=503, detail="not_configured")
+    """FR-MTG-09: the `Transport` behind `MeetingHostAdapter`. Live only (EFF-01): without the user's switch, 503."""
+
+    def build() -> Any:
+        from tilo_api import host_wiring  # noqa: PLC0415
+
+        return host_wiring.open_host_transport()
+
+    return _host_seam("transport", build)
+
+
+def _forget_host_seams() -> None:
+    with _host_lock:
+        _host_seams.clear()
+
+
+get_token_broker.cache_clear = _forget_host_seams  # type: ignore[attr-defined]  # tests start from a cold process
+get_meeting_host_transport.cache_clear = _forget_host_seams  # type: ignore[attr-defined]
 
 
 REPLAY_ONLY_MESSAGE = "This link is replay-only right now: new work is paused; finished runs can still be replayed."
