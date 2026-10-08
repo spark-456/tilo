@@ -35,15 +35,15 @@ variable "github_repository" {
 }
 
 variable "budget_amount_usd" {
-  description = "Monthly billing budget ceiling in USD for tilo-dev (PRD 17.3)."
+  description = "Monthly billing budget ceiling for tilo-dev (PRD 17.3), in var.budget_currency_code units despite the name (user decision 8 Oct 2026: INR 15,000)."
   type        = number
-  default     = 150
+  default     = 15000
 }
 
 variable "budget_currency_code" {
   description = "Currency of the billing account (gcloud billing accounts describe ID --format='value(currencyCode)'), e.g. \"INR\". Then budget_amount_usd is in that currency."
   type        = string
-  default     = "USD"
+  default     = "INR"
 }
 
 variable "github_repository_id" {
