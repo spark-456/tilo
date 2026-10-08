@@ -37,7 +37,8 @@ import {
 interface Base {
   user: User;
   today: Today;
-  agenda: Agenda;
+  /** Null when the Api serves no calendar (live today): the Today panel then lists no events. */
+  agenda: Agenda | null;
   ledger: Ledger;
   /** What the "Waiting on you" tile says and opens; none when the Api serves no decisions. */
   decisions: Decision[];
@@ -71,14 +72,20 @@ export function HomePage({ app }: { app: AppCtx }) {
         () => ({ list: [], served: false }),
       );
     together(() =>
-      Promise.all([api.getUser(), api.getToday(), api.getAgenda(), api.getLedger(), decisions()]),
+      Promise.all([
+        api.getUser(),
+        api.getToday(),
+        api.getAgenda().catch(() => null),
+        api.getLedger(),
+        decisions(),
+      ]),
     ).then(
       ([user, today, agenda, ledger, decided]) => {
         if (live)
           setBase({
             user: data(user),
             today: data(today),
-            agenda: data(agenda),
+            agenda: agenda && data(agenda),
             ledger: data(ledger),
             decisions: decided.list,
             decisionsServed: decided.served,
@@ -286,7 +293,7 @@ export function HomePage({ app }: { app: AppCtx }) {
           {(vw || 1440) >= 1180 ? (
             <TodayPanel
               rows={liveRows(worlds, needs, served)}
-              events={nextEvents(base.agenda)}
+              events={base.agenda ? nextEvents(base.agenda) : []}
               spend={spendOf(base.ledger)}
               night={night}
               onWorld={open}
