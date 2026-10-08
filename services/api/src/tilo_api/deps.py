@@ -14,6 +14,7 @@ world_id string never share lock state.
 from __future__ import annotations
 
 import functools
+import inspect
 import logging
 import math
 import os
@@ -185,19 +186,15 @@ def get_firebase_verifier() -> firebase_auth.FirebaseVerifier:
     return firebase_auth.default_verifier()
 
 
-def get_current_principal(request: HTTPConnection = None) -> Principal:  # type: ignore[assignment]
+def get_current_principal(request: HTTPConnection) -> Principal:
     """The signed-in person (SEC-15, BQ-SIGNIN-6): `Authorization: Bearer <Firebase ID token>`, verified through
     `get_firebase_verifier`; `X-Tilo-Channel: mobile_web` picks the channel, nothing else in a request sets anything.
     Every other case is a 401 with one fixed body, whatever the cause. Dev mode replaces this whole function
     (`tilo_api.dev.install`), so a token is never looked at there."""
-    # FastAPI always injects the request; the default only lets a bare call (no sign-in) refuse with a 401.
-    if request is not None:
-        resolved = getattr(
-            request.state, "principal", None
-        )  # the access gate already verified this request (server-set)
-        if isinstance(resolved, Principal):
-            return resolved
-    token = None if request is None else firebase_auth.bearer_token(request.headers.getlist("authorization"))
+    resolved = getattr(request.state, "principal", None)  # the access gate already verified this request (server-set)
+    if isinstance(resolved, Principal):
+        return resolved
+    token = firebase_auth.bearer_token(request.headers.getlist("authorization"))
     if token is None:
         raise HTTPException(status_code=401, detail=SIGN_IN_REQUIRED, headers={"WWW-Authenticate": "Bearer"})
     try:
@@ -209,6 +206,13 @@ def get_current_principal(request: HTTPConnection = None) -> Principal:  # type:
         reason = exc.code if isinstance(exc, firebase_auth.TokenRefused) else f"verifier_failed:{type(exc).__name__}"
         logger.warning("sign-in token not accepted (reason=%s)", reason)  # a fixed code, never the token
         raise HTTPException(status_code=401, detail=SIGN_IN_REQUIRED, headers={"WWW-Authenticate": "Bearer"}) from None
+
+
+def resolve_principal(app: Any, connection: HTTPConnection) -> Principal:
+    """The principal for `connection` through the seam as the app is wired (overrides included), the way FastAPI would
+    resolve it. A test double that takes no argument still works. Raises what the seam raises (a 401, usually)."""
+    resolver = app.dependency_overrides.get(get_current_principal, get_current_principal)
+    return resolver(connection) if inspect.signature(resolver).parameters else resolver()
 
 
 def get_store() -> Store:
@@ -303,8 +307,22 @@ def spend_mode(
     anonymous demo session (`Principal.demo_session`, set by the gate from the verified token) is replay whatever
     `TILO_JUDGE_LIVE` or the guard say (BQ-SIGNIN-10); its cap is still read, so new work is refused the same way."""
     mode, capped = _spend_mode(request, uid, declaration, switches)
-    demo = getattr(request.state, "demo_session", False) if demo is None else demo  # the gate's flag, or the caller's
+    if demo is None:  # the gate's flag, or what the request's own sign-in says where there is no gate
+        demo = getattr(request.state, "demo_session", False) is True or _signed_in_as_demo(request)
     return ("replay" if demo is True else mode), capped
+
+
+def _signed_in_as_demo(request: Request) -> bool:
+    """True when this request's own sign-in is an anonymous demo session. Only a process the access gate does not
+    guard (not deployed) looks: deployed, the gate has already set the flag, and a public route has no person to
+    resolve. Any failure, or nobody signed in, is False: the answer is then the user's own switch, as it always was
+    (BQ-SIGNIN-10)."""
+    if enforced():
+        return False
+    try:
+        return resolve_principal(request.app, request).demo_session is True
+    except Exception:
+        return False
 
 
 def _spend_mode(request: Request, uid: str | None, declaration: str | None, switches: FlagStore) -> tuple[Mode, bool]:

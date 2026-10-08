@@ -7,6 +7,8 @@ import { type ReactNode, useState, useSyncExternalStore } from "react";
 import type { AuthController, SignInResult } from "./auth";
 
 const FAILED = "Signing in did not work. Please try again.";
+const SIGN_OUT_FAILED =
+  "Signing out did not finish, so your session may still be open on this device. Close this browser window to be sure.";
 
 export function SignInGate({
   auth,
@@ -20,10 +22,13 @@ export function SignInGate({
     return <>{children}</>;
   }
   if (state.status === "unknown") return null;
-  return <SignInPanel auth={auth} />;
+  return <SignInPanel auth={auth} signOutFailed={state.signOutFailed === true} />;
 }
 
-function SignInPanel({ auth }: { readonly auth: AuthController }) {
+function SignInPanel({
+  auth,
+  signOutFailed,
+}: { readonly auth: AuthController; readonly signOutFailed: boolean }) {
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(false);
 
@@ -69,6 +74,11 @@ function SignInPanel({ auth }: { readonly auth: AuthController }) {
           Try a demo session
         </button>
       </div>
+      {signOutFailed && (
+        <p className="need-error" role="alert" data-testid="sign-out-failed">
+          {SIGN_OUT_FAILED}
+        </p>
+      )}
       {failed && (
         <p className="need-error" role="alert">
           {FAILED}

@@ -132,9 +132,10 @@ def get_schedule_store_factory(request: Request) -> Callable[[], ScheduleReposit
 
 def get_seams_factory(
     request: Request, mode: Annotated[Mode, Depends(deps.get_mode)]
-) -> Callable[[], runs.Seams | None]:
-    """Builds nothing (about 80 ms when called): `runs.run_seams`, overrides included, for the tick to call after it."""
-    return lambda: runs.run_seams(request, mode)
+) -> Callable[..., runs.Seams | None]:
+    """Builds nothing (about 80 ms when called): `runs.run_seams`, overrides included, for the tick to call after it.
+    `demo=True` builds them for a demo session's schedule: replay, whatever the request's own mode is (BQ-SIGNIN-10)."""
+    return lambda demo=False: runs.run_seams(request, "replay" if demo else mode)
 
 
 def _unverified(token: str) -> tuple[dict[str, Any], dict[str, Any]]:
@@ -361,7 +362,7 @@ def create_schedule(
         record = Schedule(
             schedule_id="sched_" + secrets.token_hex(12), owner_user_id=principal.user_id, title=body.title,
             cadence=cadence, approved_brief_ref=task.world_id, budget_cap=float(cap), next_due=next_slot(cadence, now),
-            brief=brief, approach=approach, created_at=now,
+            brief=brief, approach=approach, created_at=now, demo=principal.demo_session,
         )  # fmt: skip
     except ValueError as exc:
         raise HTTPException(status_code=409, detail="This task's budget cannot be scheduled.") from exc
@@ -743,7 +744,7 @@ def tick(
     config: Annotated[tuple[str, str], Depends(_tick_config)],
     tasks_config: Annotated[tuple[str, str], Depends(_tasks_config)],
     schedule_store: Annotated[Callable[[], ScheduleRepository], Depends(get_schedule_store_factory)],
-    seams_factory: Annotated[Callable[[], runs.Seams | None], Depends(get_seams_factory)],
+    seams_factory: Annotated[Callable[..., runs.Seams | None], Depends(get_seams_factory)],
     tasks_client: Annotated[Callable[[], TasksClient], Depends(get_tasks_client_factory)],
     verifier: Annotated[OidcVerifier, Depends(get_oidc_verifier)],
     clock: Clock,
@@ -829,7 +830,7 @@ def _run_task(
     request: Request,
     raw: bytes,
     schedule_store: Callable[[], ScheduleRepository],
-    seams_factory: Callable[[], runs.Seams | None],
+    seams_factory: Callable[..., runs.Seams | None],
     clock: Callable[[], datetime],
     flags: FlagStore,
     store: deps.Store,
@@ -859,6 +860,12 @@ def _run_task(
     due, record = body.due_at(), schedules.get(body.schedule_id)
     if record is None:
         return refused("schedule_missing")
+    if record.demo:  # BQ-SIGNIN-10: the tick has no signed-in person; the record says the owner was a demo session
+        try:
+            seams = seams_factory(demo=True)
+        except Exception as exc:
+            logger.error("schedule task could not be set up (%s)", type(exc).__name__)
+            return _closed(500, "tick failed")
     if due > clock() + _CLOCK_SLACK:
         return refused("slot_not_due")
     try:

@@ -15,7 +15,9 @@ import { FIREBASE_APP_ID } from "../appcheck/config";
 
 export type AuthState =
   | { status: "unknown" }
-  | { status: "signed_out" }
+  /** `signOutFailed`: the SDK refused to sign the person out. No token is used for them, but the SDK still holds them,
+   * so the page is not loaded afresh (a full load would let the SDK restore them) and the sign-in panel says so. */
+  | { status: "signed_out"; signOutFailed?: true }
   | { status: "google"; displayName: string | null; email: string | null }
   | { status: "anonymous" }
   | { status: "unavailable" };
@@ -78,7 +80,9 @@ function codeOf(error: unknown): string {
 const sameState = (a: AuthState, b: AuthState): boolean =>
   a.status === b.status &&
   (a.status !== "google" ||
-    (b.status === "google" && a.displayName === b.displayName && a.email === b.email));
+    (b.status === "google" && a.displayName === b.displayName && a.email === b.email)) &&
+  (a.status !== "signed_out" ||
+    (b.status === "signed_out" && (a.signOutFailed ?? false) === (b.signOutFailed ?? false)));
 
 export function createAuth(env: { readonly hostname: string }): AuthController {
   const config = firebaseWebConfig();
@@ -102,7 +106,7 @@ export function createAuth(env: { readonly hostname: string }): AuthController {
   const apply = (user: User | null): void => {
     if (user === null || user === refused) {
       if (user === null) refused = null;
-      set({ status: "signed_out" });
+      set(user === null ? { status: "signed_out" } : { status: "signed_out", signOutFailed: true });
     } else if (user.isAnonymous) {
       set({ status: "anonymous" });
     } else {
@@ -254,8 +258,10 @@ export function createAuth(env: { readonly hostname: string }): AuthController {
           // fall through: whoever is still the SDK's current user is not used
         }
         const left = sdk.auth.currentUser;
-        if (left !== null) refused = left;
-        set({ status: "signed_out" });
+        if (left !== null) refused = left; // the SDK still holds them: no token is used, and the page says so
+        set(
+          left === null ? { status: "signed_out" } : { status: "signed_out", signOutFailed: true },
+        );
       } catch {
         // never rejects
       }
