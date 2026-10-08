@@ -131,3 +131,33 @@ def test_FR_INT_04_a_huge_answer_is_cut_to_the_routes_limit_and_never_scanned_wh
     except BriefValidationError:
         pass
     assert time.perf_counter() - started < 1.0
+
+
+FREE_TEXT = "A detailed end to end curriculum, plan, topics, old papers, questions, mcqs, etc."
+
+
+def test_FR_INT_04_free_text_with_no_format_is_kept_as_content_in_the_default_format():
+    brief = _brief(("pdf", "docx"))
+
+    result = apply_answer(brief, _question(brief), FREE_TEXT, today=TODAY)
+
+    assert _formats(result) == ["markdown"]
+    assert len(result["deliverables"]) == 1
+    assert result["deliverables"][0]["title"].startswith("A detailed end to end curriculum")
+    assert any("old papers" in c and "mcqs" in c for c in result["constraints"])
+
+
+def test_FR_INT_04_free_text_mixed_with_a_format_word_is_asked_again_for_the_format_only():
+    brief = _brief(("pdf",))
+
+    with pytest.raises(BriefValidationError, match="Name the format"):
+        apply_answer(brief, _question(brief), "A detailed plan as a slide deck", today=TODAY)
+
+
+def test_FR_INT_04_kept_free_text_has_no_control_characters():
+    brief = _brief(("pdf",))
+
+    result = apply_answer(brief, _question(brief), "A detailed\x00 plan\x1b with old\npapers", today=TODAY)
+
+    assert result["deliverables"][0]["title"] == "A detailed plan with old papers"
+    assert all("\x00" not in c and "\x1b" not in c for c in result["constraints"])

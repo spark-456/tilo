@@ -158,7 +158,7 @@ async def _quick(
         body = await run_in_threadpool(
             quick.respond, text=request.text, uid=uid, has_files=bool(request.files), scenario=scenario,
             safety=safety, router=model_router, allowance=allowance, switches=flags, mode=work_mode,
-            caps=deps.caps_for(http), key=http.headers.get("idempotency-key"),
+            caps=deps.caps_for(http), key=http.headers.get("idempotency-key"), ledger=deps.ledger_writer_for(http),
         )  # fmt: skip
     except quick.QuickRefusal as refusal:
         return JSONResponse(status_code=refusal.status, content={"error": refusal.message})

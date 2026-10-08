@@ -63,7 +63,10 @@ def test_FR_TEAM_04_tools_switch_is_owner_only():
     with pytest.raises(PermissionError):
         set_switch(state, "tools", False, actor="u", actor_role="Approver", at=AT)
     assert set_switch(state, "tools", False, actor="u", actor_role="Owner", at=AT)[0]["tools"] is False
-    assert set_switch(state, "weekend", True, actor="u", actor_role="Approver", at=AT)[0]["weekend"] is True
+    # TEAM-ROUTES (#621): PRD 10.1 gives the Approver no policy rights, so every switch is Owner-only now (stricter)
+    with pytest.raises(PermissionError):
+        set_switch(state, "weekend", True, actor="u", actor_role="Approver", at=AT)
+    assert set_switch(state, "weekend", True, actor="u", actor_role="Owner", at=AT)[0]["weekend"] is True
 
 
 def test_FR_TEAM_04_a_config_edit_cannot_unlock_a_must_ask_rule(tmp_path):

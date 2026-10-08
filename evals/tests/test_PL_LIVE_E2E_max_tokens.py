@@ -26,6 +26,7 @@ test: `OutputTruncatedError(message, *, output_tokens=None, thinking_tokens=None
 
 from __future__ import annotations
 
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
@@ -174,6 +175,18 @@ def test_PL_LIVE_E2E_35_the_shipped_config_gives_the_director_a_cap_and_the_esti
     ) / DIRECTOR_FLOOR
     assert shipped - at_floor == pytest.approx(per_token * (cap - DIRECTOR_FLOOR), rel=1e-6)
     assert shipped > at_floor, "the estimate before a live run must show what the new cap can cost"
+
+
+def test_PL_LIVE_E2E_35_the_estimate_is_the_worst_case_ceiling_not_the_routers_expected_output_reserve() -> None:
+    # PL-03 reserves a call at input + the role's expected output; `credits_high` stays every call at its whole cap
+    config = load_providers_config(REAL_MODELS, REAL_PRICES)
+    assert config.expected_output, "the shipped config states expected sizes"
+    shipped = live_e2e()._estimate_chars(config, 300)
+    without = live_e2e()._estimate_chars(replace(config, expected_output={}), 300)
+    assert (shipped.credits_low, shipped.credits_high) == (without.credits_low, without.credits_high)
+    assert shipped.credits_low == pytest.approx(3.36, abs=0.005), (
+        "docs/live-e2e.md: credits_low for a 300-character brief"
+    )
 
 
 class _RecordingModel(CaseFakeModel):

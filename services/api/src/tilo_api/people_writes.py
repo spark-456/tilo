@@ -138,6 +138,11 @@ _LABEL = r"[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?"
 _EMAIL = re.compile(rf"[A-Za-z0-9%+_'-]+(?:\.[A-Za-z0-9%+_'-]+)*@(?:{_LABEL}\.)+[A-Za-z]{{2,63}}")
 
 
+def valid_email(value: str) -> bool:
+    """The directory's address rule (an ASCII dot-atom, at most 254 characters), shared with team invites."""
+    return len(value) <= 254 and _EMAIL.fullmatch(value) is not None
+
+
 class PersonIn(_Closed):
     display_name: Text
     aliases: Annotated[list[Text], Field(max_length=8)]
@@ -149,7 +154,7 @@ class PersonIn(_Closed):
     @classmethod
     def _address(cls, value: str) -> str:
         """An ASCII dot-atom address only (PE-09: a recipient is resolved from it); a 422 never names the value."""
-        if len(value) > 254 or _EMAIL.fullmatch(value) is None:
+        if not valid_email(value):
             raise ValueError("email")
         return value
 

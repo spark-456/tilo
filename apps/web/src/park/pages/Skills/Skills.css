@@ -2034,3 +2034,53 @@
   font-weight: 600;
   color: var(--ink3);
 }
+
+/* ---- tool access per skill (FR-ACC-02) ---- */
+[data-park] .park-skills-access {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+[data-park] .park-skills-access-h {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--ink);
+}
+[data-park] .park-skills-access-sub {
+  margin: 0;
+  font-size: 14px;
+  color: var(--ink2);
+}
+[data-park] .park-skills-access-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+[data-park] .park-skills-access-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 12px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+[data-park] .park-skills-access-name {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--ink);
+}
+[data-park] .park-skills-access-select {
+  min-height: 36px;
+  padding: 0 10px;
+  font-size: 14px;
+  color: var(--ink);
+  background: var(--sunk);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
