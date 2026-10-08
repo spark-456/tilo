@@ -5,7 +5,7 @@
 # artifact.schema.json 1.0.0 sha256:358508330e9ee2f2
 # attention.schema.json 1.0.0 sha256:f35cff84728304af
 # brief.schema.json 1.0.0 sha256:be4e747f37e399b2
-# calendar_entry.schema.json 1.0.0 sha256:4a8550295789f3af
+# calendar_entry.schema.json 1.1.0 sha256:291531543be88320
 # card.schema.json 1.0.0 sha256:2666292eb19087d0
 # common.schema.json 1.4.0 sha256:09b36846ed11add2
 # connector.schema.json 1.0.0 sha256:cc3a7d9b3820e12c
@@ -100,6 +100,7 @@
 # layout.schema.json 1.0.0 sha256:1db88b1e3b744add
 # manifest.schema.json 1.0.0 sha256:9b885d1826522bb7
 # meeting.schema.json 1.2.0 sha256:034e93898bb28957
+# meeting_join.schema.json 1.0.0 sha256:ea1e8f0945773573
 # mention.schema.json 1.0.0 sha256:ca9c1acbf81616f2
 # meter.schema.json 1.0.0 sha256:ad596dcc70e45e09
 # metering.schema.json 1.0.0 sha256:91358a776e6c033a
@@ -1796,6 +1797,25 @@ class MeetingAttestation(BaseModel):
     notice_version: Semver
 
 
+class MeetingJoin(BaseModel):
+    """
+    The answer of `GET /v1/meetings/{meeting_id}/join` (ADR-0024 amendment 4): the Google Meet link of a meeting Tilo hosts, for that meeting's owner only, read from the host account's event when the owner clicks and stored nowhere (rules MJ-01 to MJ-10 in `meeting_join.rules.md`). It is a response body, never a record: no store, cache, event, card, notification, archive record or log line holds it, and `meeting.schema.json` and `calendar_entry.schema.json` still have no field that can. `join_url` is exactly `https://meet.google.com/` and a three-four-three lower-case meeting code: no other scheme, host, user info, port, path, query or fragment (36 characters, so a trailing newline is refused in every engine). `expires_at` is the server's clock plus 60 seconds: the client drops the link then, or when the view closes, and asks again on the next click.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    join_url: Annotated[
+        str,
+        Field(
+            max_length=36,
+            min_length=36,
+            pattern="^https://meet\\.google\\.com/[a-z]{3}-[a-z]{4}-[a-z]{3}$",
+        ),
+    ]
+    expires_at: Timestamp
+
+
 class MentionRemoval(BaseModel):
     """
     Who removed the tag and when: the tagged person or the entry's setter (PE-06).
@@ -2724,12 +2744,13 @@ class CalendarEntrySourceTilo(BaseModel):
 
 class CalendarEntryAgendaItem(BaseModel):
     """
-    One row of the merged agenda read model (FR-CAL-01): never stored.
+    One row of the merged agenda read model (FR-CAL-01): never stored. `joinable` (1.1.0, optional: absent means false, never null) is true only on a meeting row whose meeting the reader owns and Tilo hosts, so the calendar offers Join; the link itself is fetched on click from `GET /v1/meetings/{id}/join` (`meeting_join.schema.json`, MJ-10) and never sits on the row.
     """
 
     model_config = ConfigDict(
         extra="forbid",
     )
+    joinable: bool | None = None
     start: Timestamp
     end: Timestamp | None
     all_day: bool
