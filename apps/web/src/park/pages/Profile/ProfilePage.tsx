@@ -8,6 +8,7 @@ import { type ReactNode, useEffect, useRef, useState } from "react";
 import type { ProfileSession, ProfileSettings, User } from "../../api/types";
 import type { AppCtx } from "../../app/AppCtx";
 import { useParkApi } from "../../app/context";
+import { useFollowed } from "../../app/followed";
 import { PageSheet, StatusChip, Switch } from "../../components";
 import "./Profile.css";
 import { ICONS } from "./icons";
@@ -134,8 +135,12 @@ export function ProfilePage({ app }: { app: AppCtx }) {
   const [base, setBase] = useState<Form | null>(null);
   const routeTab = tabFrom(app.params.tab);
   const [tab, setTab] = useState<TabId>(routeTab);
-  // The address names a tab ("?tab=appearance", the notification menu's settings link): follow it when it changes.
-  useEffect(() => setTab(routeTab), [routeTab]);
+  // The address names a tab ("?tab=appearance", the notification menu's settings link): follow it whenever a link
+  // is followed, also a link to the tab the address already names after another tab was opened by hand
+  // (useFollowed counts the links followed; the address itself does not change for such a link, FR-UX-12).
+  const followed = useFollowed();
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `followed` is the signal, routeTab the value
+  useEffect(() => setTab(routeTab), [followed, routeTab]);
   const [notif, setNotif] = useState<boolean[][]>([]);
   const [quiet, setQuiet] = useState(false);
   const [sessions, setSessions] = useState<ProfileSession[]>([]);

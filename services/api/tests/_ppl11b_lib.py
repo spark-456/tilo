@@ -1205,6 +1205,9 @@ def expected_facts(
         lines.append((text, (row["ref"]["kind"], row["ref"]["id"])))
         shown += 1
     ui_action = None
+    if intent_id == "calendar_today" and len(selected) == 1:  # FR-CAL-07 (BQ-CAL07-1): exactly one entry is opened
+        only = selected[0]["ref"]
+        ui_action = {"kind": "navigate", "route": "calendar", "target": {"kind": only["kind"], "id": only["id"]}}
     if len(selected) > ANSWER["max_lines"]:
         lines.append((ANSWER["more"], None))
         ui_action = {"kind": "navigate", "route": "plate", "target": None}
