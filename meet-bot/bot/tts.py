@@ -5,7 +5,8 @@
 
 Providers:
 - LocalTTS: espeak-ng in the container. Robotic, but free, offline and instant; the fallback and the test voice.
-A cloud voice (FR-MTG-11, through the speech provider layer) only needs to implement the same two members.
+The cloud voice (FR-MTG-11) is `providers.ProviderTTS`, which implements the same two members; `providers.make_tts`
+builds it with the local voice as backup.
 """
 
 from __future__ import annotations
@@ -144,12 +145,3 @@ class FallbackTTS:
         yield first
         async for chunk in gen:
             yield chunk
-
-
-def make_tts() -> TTSProvider | None:
-    """The local voice if espeak-ng is installed, else None (the bot then stays chat-only)."""
-    try:
-        return LocalTTS()
-    except TTSError as e:
-        log.info("local voice unavailable: %s", e)
-        return None

@@ -5,6 +5,7 @@ Everything the bot needs from a model or a speech service goes through here and 
 - `ProviderLLM`: the `LLM` protocol of `brain.py` on the `meeting` role (agenda analysis, JSON in and out).
 - `ProviderFastClient`: the client behind `FastLLM` (`llm_fast.py`) on the `meeting_fast` role (direct answers).
 - `ProviderSpeech`: audio to text through `SpeechProvider` (the hybrid transcript and `retranscribe`).
+- `ProviderTTS` and `make_tts`: the bot's voice through `SpeechProvider.synthesize` (`config/voice.yaml`).
 
 The bot never names a model, a vendor or a key. Roles, profiles, the speech vendor and the caps are Tilo config
 (`config/models*.yaml`, `config/speech*.yaml`); credentials are Google's application default credentials, read by the
@@ -16,6 +17,7 @@ library and the bot's own modules; a test (`test_FR_MTG_11_*`) enforces it.
 from __future__ import annotations
 
 import asyncio
+import logging
 import os
 import time
 from collections.abc import AsyncIterator, Callable
@@ -23,14 +25,18 @@ from pathlib import Path
 from typing import Any
 
 from tilo_providers.config import ProvidersConfig, load_providers_config
-from tilo_providers.errors import QuotaError, RequestError, RetryableError
+from tilo_providers.errors import NotConfigured, QuotaError, RequestError, RetryableError
 from tilo_providers.interfaces import GenerateRequest, SpeechProvider
 from tilo_providers.router import Router, RouterError, TokenCapExceededError
 from tilo_providers.speech import build_speech_provider, load_speech_config
+from tilo_providers.voice import VoiceConfig, build_voice_provider, load_voice_config
 
 from .brain import Busy, LLMUnavailable
+from .config import ROOT
 from .llm_fast import ModelCallError
+from .tts import FallbackTTS, LocalTTS, TTSError, TTSProvider
 
+log = logging.getLogger("bot.providers")
 BRAIN_ROLE = "meeting"
 FAST_ROLE = "meeting_fast"
 WAV_TYPE = "audio/wav"
@@ -62,6 +68,10 @@ def models_file() -> Path:
 
 def speech_file() -> Path:
     return _config_file("TILO_SPEECH_FILE", "speech.yaml", "speech.dev.yaml")
+
+
+def voice_file() -> Path:
+    return _config_file("TILO_VOICE_FILE", "voice.yaml", "voice.dev.yaml")
 
 
 def fixtures_dir() -> Path:
@@ -215,3 +225,46 @@ class ProviderSpeech:
 
     def text(self, wav: bytes, language: str | None = "en") -> str:
         return " ".join(s["text"].strip() for s in self.segments(wav, language) if s["text"].strip())
+
+
+# -- the voice (text to speech) -------------------------------------------------------------------------------------
+class ProviderTTS:
+    """`tts.TTSProvider` on `SpeechProvider.synthesize`. The vendor, voice and sample rate are `config/voice.yaml`.
+    The provider returns the whole reply as PCM, so the first chunk arrives when synthesis ends (streamed voice is
+    FR-MTG-16); the chunks are then handed on at the player's pace. Refusals that cannot clear within the meeting
+    (no live switch, a refused request) are `permanent`, so the fallback voice takes over for the rest of it."""
+
+    name = "provider-voice"
+
+    def __init__(self, provider: SpeechProvider | None = None, config: VoiceConfig | None = None) -> None:
+        self.config = config or load_voice_config(voice_file(), models_path=repo_root() / "config" / "models.yaml")
+        self.provider = provider or build_voice_provider(self.config, fixtures_dir=fixtures_dir())
+        self.sample_rate = self.config.sample_rate
+
+    async def stream(self, text: str) -> AsyncIterator[bytes]:
+        spoken = " ".join(text.split())[: self.config.max_chars]
+        try:
+            pcm = await asyncio.to_thread(self.provider.synthesize, spoken)
+        except Exception as error:
+            cause = _cause(error)
+            raise TTSError(
+                f"the voice could not speak ({type(cause).__name__})",
+                permanent=isinstance(cause, NotConfigured | RequestError),
+            ) from None
+        for start in range(0, len(pcm), 4800):
+            yield pcm[start : start + 4800]
+
+
+def make_tts() -> TTSProvider | None:
+    """The configured voice with the local espeak voice as backup, the local voice alone if the configured one cannot be
+    built, else None (the bot then stays chat-only). A bad voice config (an unknown vendor, a denied model) is not
+    swallowed: it fails start-up."""
+    local: LocalTTS | None = None
+    try:
+        local = LocalTTS()
+    except TTSError as e:
+        log.info("local voice unavailable: %s", e)
+    cloud = ProviderTTS()
+    if local is None:
+        return cloud
+    return FallbackTTS(cloud, local, ROOT / "out" / ".tts_state.json", f"{cloud.config.vendor}/{cloud.config.voice}")

@@ -39,11 +39,10 @@ from .knowledge import KnowledgeBase
 from .llm_fast import FastLLM
 from .people import gate_open, missing_required
 from .playback import write_playback
-from .providers import ProviderFastClient, ProviderLLM, ProviderSpeech, make_router
+from .providers import ProviderFastClient, ProviderLLM, ProviderSpeech, make_router, make_tts
 from .speaker import NullSpeaker, VoiceSpeaker
 from .timing import Timeline
 from .trace import Turn, TurnTrace
-from .tts import make_tts
 
 log = logging.getLogger("bot.session")
 STATUS_EVERY_S = 3.0  # how often to check who is here before the meeting has started for the bot
