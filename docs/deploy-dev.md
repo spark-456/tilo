@@ -315,8 +315,10 @@ gcloud run services update tilo-api --project essential-wares-510320-f0 --region
   --update-env-vars "TILO_API_STORE=firestore,TILO_PEOPLE_STORE=firestore"
 ```
 
-3. Check `/health`, then that the instance count stays at 1. To switch back, `--remove-env-vars
-   TILO_API_STORE,TILO_PEOPLE_STORE`: the doors answer 503 `not_configured` again.
+3. Check `/health`, that the instance count stays at 1, and run the tilo-api env audit in
+   `docs/routines-rollout.md` ("Env drift check"). To switch back, `--remove-env-vars
+   TILO_API_STORE,TILO_PEOPLE_STORE` (the doors answer 503 `not_configured` again), then set
+   `api_durable_stores = false` and apply, so CPU is billed per request again.
 
 ## Never
 

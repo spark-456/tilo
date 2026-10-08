@@ -145,3 +145,14 @@ def test_PROD_WIRE_3_live_and_judge_live_are_never_set_by_terraform(repo_root: p
         )
     for name, entry in _services(repo_root).items():
         assert "LIVE" not in (_env(entry) or {}) and "TILO_JUDGE_LIVE" not in (_env(entry) or {}), name
+
+
+def test_PROD_WIRE_3_terraform_stays_in_charge_of_cpu_idle_on_the_ignore_env_resource(repo_root: pathlib.Path) -> None:
+    main = (repo_root / "infra/modules/service/main.tf").read_text(encoding="utf-8")
+    blocks = re.findall(r"ignore_changes\s*=\s*\[(.*?)\n\s*\]", main, re.S)
+    assert len(blocks) == 2 and all("containers[0].image" in b for b in blocks), "both resources' lists are read"
+    for block in blocks:
+        code = re.sub(r"(?m)#.*$", "", block)
+        assert "resources" not in code and "cpu_idle" not in code, (
+            "no ignore_changes may cover the container resources: api_durable_stores must reach cpu_idle"
+        )
