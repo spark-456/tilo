@@ -1,3 +1,4 @@
+import { type Body, type Route, compileTraffic } from "../shell/cityTraffic";
 // ported from design_handoff_tilo_web_app/design/tilo-park.js (user's prototype, ADR-0003a)
 // The Park City backdrop and glass-friendly world thumbnails. Static art is built as SVG strings and
 // shown as images; only the movers are separate layers. Faithful port: same names, numbers, rounding,
@@ -179,6 +180,7 @@ export function createPark(
     vb: Walk5,
     child: unknown,
     still: boolean,
+    schedule?: Props,
   ): El {
     const sc = vb[4];
     const src = svgUrl(vb[2] * sc, vb[3] * sc, vb.slice(0, 4).join(" "), child, "xMidYMid meet");
@@ -193,7 +195,7 @@ export function createPark(
           height: 0,
           willChange: "transform",
           pointerEvents: "none",
-          ...motion(dx, dy, dur, f, still),
+          ...(schedule ?? motion(dx, dy, dur, f, still)),
         },
       },
       h("img", {
@@ -222,6 +224,7 @@ export function createPark(
     frames: [unknown, unknown],
     still: boolean,
     cyc: number,
+    schedule?: Props,
   ): El {
     const sc = vb[4];
     const w = vb[2] * sc;
@@ -265,7 +268,7 @@ export function createPark(
           height: 0,
           willChange: "transform",
           pointerEvents: "none",
-          ...motion(dx, dy, dur, f, still),
+          ...(schedule ?? motion(dx, dy, dur, f, still)),
         },
       },
       h(
@@ -580,6 +583,7 @@ export function createPark(
       const spots: { top: Pt; area: number; st: string }[] = [];
       /** Agents standing at a building's kerb: each stands in the road row below its building. */
       const kerb: LaneRow[] = [];
+      const standing: Body[] = [];
       for (let j = 0; j < R; j++) {
         const objs: SceneObj[] = [];
         rows[j] = objs;
@@ -654,6 +658,7 @@ export function createPark(
               const ex = pick(["focused", "neutral", "talking", "delighted"]);
               const fa = r() < 0.5 ? "L" : "R";
               const role = pick(ROLES);
+              standing.push({ x: ax, y: ay, halfX: STANDING_HALF, halfY: STANDING_HALF });
               kerb.push({
                 row: j + 1,
                 kind: "standing",
@@ -690,7 +695,9 @@ export function createPark(
       for (let j = 0; j <= R; j++) {
         const y = j * PY;
         const yc = y + RD / 2;
-        const list: { ly: number; el: El }[] = [];
+        const list: { ly: number; el: () => El }[] = [];
+        const routes: Route[] = [];
+        const schedules: Props[] = [];
         const x0 = Math.max(yc + (vx - 140) / 0.866, 2 * (vy - 100) - yc, -RD);
         const x1 = Math.min(yc + (vx + VW + 140) / 0.866, 2 * (vy + VH + 140) - yc, X + RD);
         if (x1 - x0 > 80) {
@@ -738,22 +745,35 @@ export function createPark(
             const wrap = (el: unknown): El =>
               E("g", { transform: `translate(${(-p0[0]).toFixed(1)} ${(-p0[1]).toFixed(1)})` }, el);
             const made = using(MM, () => make(a));
+            const id = routes.length;
+            routes.push({
+              kind: walk ? "walker" : "car",
+              x: a + (b - a) * f,
+              y: ly,
+              start: a,
+              end: b,
+              speed: speed / k,
+              halfX: walk ? WALKER_HALF : 12,
+              halfY: walk ? WALKER_HALF : CAR_HALF,
+            });
             list.push({
               ly,
-              el: walk
-                ? walker(
-                    q[0],
-                    q[1],
-                    dx,
-                    dy,
-                    dur,
-                    f,
-                    vb,
-                    (made as unknown[]).map(wrap) as [unknown, unknown],
-                    still,
-                    cyc,
-                  )
-                : mover(q[0], q[1], dx, dy, dur, f, vb, wrap(made), still),
+              el: () =>
+                walk
+                  ? walker(
+                      q[0],
+                      q[1],
+                      dx,
+                      dy,
+                      dur,
+                      f,
+                      vb,
+                      (made as unknown[]).map(wrap) as [unknown, unknown],
+                      still,
+                      cyc,
+                      schedules[id],
+                    )
+                  : mover(q[0], q[1], dx, dy, dur, f, vb, wrap(made), still, schedules[id]),
             });
           };
           for (let n = 0; n < nc; n++) {
@@ -796,7 +816,32 @@ export function createPark(
             );
           }
         }
-        movers.push(list.sort((p, q) => p.ly - q.ly).map((o) => o.el));
+        if (o.traffic && o.avoid && !still && routes.length) {
+          // Existing free lanes route around standing tiles; walkers wait rather than cross lanes.
+          const frames = compileTraffic(routes, standing, true);
+          routes.forEach((route, id) => {
+            const span = route.end - route.start;
+            const progress = (frame: Body[]): string => {
+              const pos = frame[id];
+              if (!pos) throw new Error("Missing scheduled city mover");
+              return ((pos.x - route.start) / span).toFixed(8);
+            };
+            const stops = frames
+              .slice(0, 60)
+              .map((frame, i) => `${progress(frame)} ${((i * 100) / 60).toFixed(6)}%`);
+            // Duplicate 100% stops make the shared reset discrete (no sweep through the city).
+            stops.push(
+              `${progress(frames[59] as Body[])} 100%`,
+              `${progress(frames[0] as Body[])} 100%`,
+            );
+            schedules.push({
+              animation: `mvXY 15s linear(${stops.join(",")}) 0s infinite`,
+              "--dx": `${span * 0.866 * s2}px`,
+              "--dy": `${span * 0.5 * s2}px`,
+            });
+          });
+        }
+        movers.push(list.sort((p, q) => p.ly - q.ly).map((o) => o.el()));
       }
       const vbS = `${vx.toFixed(1)} ${vy.toFixed(1)} ${VW} ${VH.toFixed(1)}`;
       const sv = (els: unknown): El => cover(svgUrl(o.w, o.h, vbS, els));

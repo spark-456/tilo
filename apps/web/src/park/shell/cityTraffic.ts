@@ -77,7 +77,7 @@ export class CityTraffic {
     const dir = Math.sign(r.end - r.start);
     return dir * (x - r.end) > 0 ? r.start : x;
   }
-  step(): void {
+  step(dt = TRAFFIC_TICK, loop = true, detour = true): void {
     const grid = this.grid();
     const people = this.grid();
     this.positions.forEach((p, id) => {
@@ -96,8 +96,9 @@ export class CityTraffic {
           if (!people.free(ahead, id)) speed = r.speed * 0.5;
           if (!people.free({ ...p, x: p.x + dir * 12, halfX: p.halfX + 12 }, id)) speed = 0;
         }
-        const x = this.wrap(p.x + dir * speed * TRAFFIC_TICK, r);
-        const ys = kind === "walker" ? [r.y, p.y, r.y - 20, r.y + 20] : [r.y];
+        const target = p.x + dir * speed * dt;
+        const x = loop ? this.wrap(target, r) : dir * (target - r.end) > 0 ? r.end : target;
+        const ys = kind === "walker" && detour ? [r.y, p.y, r.y - 20, r.y + 20] : [r.y];
         let moved = false;
         for (const y of ys) {
           const next = { ...p, x: y === p.y ? x : p.x, y };
@@ -115,4 +116,20 @@ export class CityTraffic {
         p.speed = moved ? speed : 0;
       });
   }
+}
+
+// Sixty shared quarter-second segments. Reset together in a discrete final segment;
+// independently looping each mover would invalidate the grid reservations.
+export function compileTraffic(
+  routes: readonly Route[],
+  standing: readonly Body[],
+  lanesOnly = false,
+): Body[][] {
+  const traffic = new CityTraffic(routes, standing);
+  const frames = [traffic.positions.map((p) => ({ ...p }))];
+  for (let i = 1; i < 60; i++) {
+    traffic.step(0.25, false, !lanesOnly);
+    frames.push(traffic.positions.map((p) => ({ ...p })));
+  }
+  return [...frames, frames[0] as Body[]];
 }
