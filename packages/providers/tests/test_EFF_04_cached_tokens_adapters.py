@@ -376,7 +376,8 @@ def test_EFF_04_the_router_passes_each_roles_static_parts_through_byte_for_byte(
 # the same on every call of a process, so the prefix stays byte-stable and cacheable.
 # `gaps` and `services` (director/brief_system.md, FR-INT-15) are read once from config/capability_gaps.yaml in the
 # same way.
-_STATIC_PLACEHOLDERS = {"categories", "gaps", "intents", "routes", "services"}
+# `reasons` (assistant/quick_classify_system.md, COST-FAST-1) is the closed list of work reasons, fixed in code.
+_STATIC_PLACEHOLDERS = {"categories", "gaps", "intents", "reasons", "routes", "services"}
 
 
 def _system_templates() -> list[Path]:

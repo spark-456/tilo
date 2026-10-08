@@ -19,7 +19,7 @@ The model provider layer (PRD 6.4): one interface (`ModelProvider`, plus `Search
   fallback/cascade profile fails; a missing result warns unless `TILO_REQUIRE_CONFORMANCE=1`.
 
 ## Requirement IDs
-- PL-01–PL-07 (6.4), NFR-25 (17.2), EFF-01–05 (6.6), FR-CON-13 (12.5): P0-04 config, P0-05 adapters, P0-06 router; FR-INT-02: CC-SP-47 safety; FR-MTG-17/-11: `speech.py`, `google_speech_adapter.py`, `config/speech.yaml` (docs/speech-recording-upload.md).
+- PL-01–PL-07 (6.4), NFR-25 (17.2), EFF-01–05 (6.6), FR-CON-13 (12.5): P0-04 config, P0-05 adapters, P0-06 router; FR-INT-02: CC-SP-47 safety; FR-MTG-17/-11: `speech.py`, `google_speech_adapter.py`, `voice.py` (`synthesize`, PCM), `config/speech.yaml`, `config/voice.yaml` (docs/speech-recording-upload.md).
 
 ## Local rules
 - Denylisted ids fail start-up loudly (PL-07); every role needs a fallback (NFR-25); `price()` never invents one (PL-06).
@@ -37,4 +37,4 @@ The model provider layer (PRD 6.4): one interface (`ModelProvider`, plus `Search
   `model_armor` -> `SafetyRecordReplayProvider`, live `model_armor_adapter` (REST `:sanitizeUserPrompt`, ADC bearer, `model`=template id, env `GOOGLE_CLOUD_PROJECT`/`TILO_MODEL_ARMOR_LOCATION`; clean only on NO_MATCH+SUCCESS+every filter ran, else raises; `max_input_tokens` cap -> `RequestError`); reasons are fixed categories, writes atomic, corrupt -> `ProviderError`.
 - `Router._candidate` is the one choke point for every candidate touch (build, count_tokens, calls, first chunk): `RequestError`/
   stream-embed `SafetyError` raise (generate: `safety_blocked`), mid-stream -> `StreamInterruptedError`, anything else falls back
-  (over budget: never sent). Only `RouterError`s leave, with `.attempts` and `__cause__`. `OutputTruncatedError` (MAX_TOKENS/`length`): no repair and no fallback (same cap, same burn: `RouterExhaustedError`, error as `__cause__`), charged from its usage (`input_tokens`), `classify` -> `truncated`; thinking roles carry a `max_output_tokens` (BQ-PL02-1). The role's `thinking` fills an unset `thinking_level` for a profile that declares the capability (BQ-LE2E-10).
+  (over budget: never sent; a call is reserved at input + the role's expected output, `config/expected_output.yaml`, refused only if that does not fit or its full cap exceeds 2x the budget left, BQ-EXPECTED-OUT-1). Only `RouterError`s leave, with `.attempts` and `__cause__`. `OutputTruncatedError` (MAX_TOKENS/`length`): no repair and no fallback, the one exception to EFF-02 fallback on provider failure (same cap, same burn: `RouterExhaustedError`, error as `__cause__`), charged from its usage (`input_tokens`), `classify` -> `truncated`; thinking roles carry a `max_output_tokens` (BQ-PL02-1). The role's `thinking` fills an unset `thinking_level` for a profile that declares the capability (BQ-LE2E-10).

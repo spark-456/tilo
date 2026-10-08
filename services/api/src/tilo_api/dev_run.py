@@ -34,7 +34,7 @@ DEV_DESTINATION = "thread-dev-1"  # destination.schema: letters, digits, undersc
 DEV_RECIPIENT = "dev.recipient@example.com"  # never a known recipient, so the policy engine sees a new one (T3)
 DELAY_ENV = "TILO_DEV_UNIT_DELAY_S"  # seconds each unit takes, so "watch the world" is paced, not a burst
 DEFAULT_DELAY_S, MAX_DELAY_S = 1.5, 10.0
-_UNIT_USAGE = Usage("dev-unit", tokens_in=2000, tokens_out=600)  # fixed fake tokens, priced by config/prices.dev.yaml
+UNIT_USAGE = Usage("dev-unit", tokens_in=2000, tokens_out=600)  # fixed fake tokens, priced by config/prices.dev.yaml
 
 
 def _refuse() -> None:
@@ -60,7 +60,7 @@ def _prices() -> PriceBook:
 
 def unit_credits() -> float:
     """What one dev unit costs: fixed fake token counts priced by the real PriceBook (HR-1: the meter sums events)."""
-    return round(_prices().credits(_UNIT_USAGE, datetime.now(UTC)), 6)
+    return round(_prices().credits(UNIT_USAGE, datetime.now(UTC)), 6)
 
 
 class DevUnitRunner:

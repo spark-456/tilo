@@ -8,6 +8,7 @@ import type {
   Agenda,
   ApiResult,
   Decision,
+  Effort,
   Ledger,
   TierKey,
   Today,
@@ -16,13 +17,16 @@ import type {
 } from "../../api/types";
 import type { AppCtx } from "../../app/AppCtx";
 import { useParkApi, useParkStore, useSchedule } from "../../app/context";
-import { ComposerPanel, type Phase } from "./ComposerPanel";
+import { ComposerPanel, type Phase, QUICK_IDLE, type QuickView } from "./ComposerPanel";
 import "./Home.css";
 import { Hero, KpiStrip, Pins, TodayPanel } from "./Panels";
+import { readEffort, writeEffort } from "./effortStore";
 import {
   DRAFT_MS,
   MODES,
+  QUICK_MAX_CHARS,
   liveRows,
+  liveSummaryLine,
   needsWorld,
   nextEvents,
   placedPins,
@@ -37,6 +41,8 @@ interface Base {
   ledger: Ledger;
   /** What the "Waiting on you" tile says and opens; none when the Api serves no decisions. */
   decisions: Decision[];
+  /** True when the decisions came from the live Api (an empty list is then "none open", not "unknown"). */
+  decisionsServed: boolean;
 }
 
 type Loaded<T> = T | "failed" | null;
@@ -50,7 +56,7 @@ export function HomePage({ app }: { app: AppCtx }) {
   const api = useParkApi();
   const schedule = useSchedule();
   const store = useParkStore();
-  const { go, dec, added, night, vw, vh, pins, needsLeft: needs } = app;
+  const { go, dec, added, night, vw, vh, pins, needsLeft } = app;
 
   const [base, setBase] = useState<Loaded<Base>>(null);
   const [worlds, setWorlds] = useState<Loaded<World[]>>(null);
@@ -59,8 +65,11 @@ export function HomePage({ app }: { app: AppCtx }) {
 
   useEffect(() => {
     let live = true;
-    const decisions = (): Promise<Decision[]> =>
-      together(() => api.getDecisions()).then(data, () => []);
+    const decisions = (): Promise<{ list: Decision[]; served: boolean }> =>
+      together(() => api.getDecisions()).then(
+        (r) => ({ list: r.data, served: r.source === "live" }),
+        () => ({ list: [], served: false }),
+      );
     together(() =>
       Promise.all([api.getUser(), api.getToday(), api.getAgenda(), api.getLedger(), decisions()]),
     ).then(
@@ -71,7 +80,8 @@ export function HomePage({ app }: { app: AppCtx }) {
             today: data(today),
             agenda: data(agenda),
             ledger: data(ledger),
-            decisions: decided,
+            decisions: decided.list,
+            decisionsServed: decided.served,
           });
       },
       () => {
@@ -164,24 +174,102 @@ export function HomePage({ app }: { app: AppCtx }) {
     if (!sendingNow.current) toIdle();
   };
 
+  // Quick / Thinking (COST-FAST-1). The choice is remembered per signed-in email (effortStore), Thinking by
+  // default. A Quick ask makes no world and no plan: the answer, or the offer to switch, shows in the composer.
+  const [effort, setEffort] = useState<Effort>(() => readEffort());
+  const email = base !== null && base !== "failed" ? base.user.email : null;
+  // Once the signed-in email is known, that person's remembered choice applies, unless they have chosen since.
+  const chosenNow = useRef(false);
+  useEffect(() => {
+    if (email && !chosenNow.current) setEffort(readEffort(email));
+  }, [email]);
+  const [quick, setQuick] = useState<QuickView>(QUICK_IDLE);
+  const asking = useRef(false);
+  const alive = useRef(true);
+  useEffect(() => {
+    alive.current = true;
+    return () => {
+      alive.current = false;
+    };
+  }, []);
+  const busy = () => sendingNow.current || asking.current;
+  const chooseEffort = (next: Effort) => {
+    if (busy()) return;
+    chosenNow.current = true;
+    setEffort(next);
+    writeEffort(email, next);
+    setQuick(QUICK_IDLE);
+    toIdle();
+  };
+  const ask = () => {
+    if (busy()) return;
+    const text = query.trim();
+    if (text === "") {
+      setQuick({ state: "error", message: "Type your question first." });
+      return;
+    }
+    const length = Array.from(text).length;
+    if (length > QUICK_MAX_CHARS) {
+      setQuick({
+        state: "error",
+        message: `A Quick question can be up to ${QUICK_MAX_CHARS} characters; this one is ${length}. Shorten it, or switch to Thinking.`,
+      });
+      return;
+    }
+    asking.current = true;
+    setQuick({ state: "asking" });
+    store.askQuick(modeKey, text).then((out) => {
+      asking.current = false;
+      if (!alive.current) return;
+      setQuick(
+        out.kind === "answered"
+          ? { state: "answered", text: out.text, cost: out.cost, sample: out.sample }
+          : out.kind === "switch"
+            ? { state: "switch", reason: out.reason }
+            : { state: "error", message: out.message },
+      );
+    });
+  };
+  // "Switch to Thinking" on an offer: the same text goes as Thinking, through the usual start.
+  const switchToThinking = () => {
+    if (busy()) return;
+    chosenNow.current = true;
+    setEffort("thinking");
+    writeEffort(email, "thinking");
+    setQuick(QUICK_IDLE);
+    confirmStart();
+  };
+
   const open = (id: string) => go("world", { id });
   const failed = base === "failed" || worlds === "failed";
   const ready = base !== null && base !== "failed" && worlds !== null && worlds !== "failed";
   const waitingIn = ready ? needsWorld(worlds) : undefined;
+  // Live (PRD 9.4): numbers come only from the served worlds and served decisions, never the sample count.
+  const served = ready && worldsLive;
+  const openServed =
+    ready && base.decisionsServed ? base.decisions.filter((d) => !dec[d.k]).length : null;
+  const needs = served ? (openServed ?? 0) : needsLeft;
+  const summary = served
+    ? liveSummaryLine(
+        worlds.filter((w) => !w.isNew && (w.st === "running" || w.st === "needs")).length,
+        openServed,
+      )
+    : summaryLine(needs, night);
 
   return (
     <div className="park-home-root" data-testid="park-page-home">
       {ready ? (
         <>
           <Pins
-            pins={placedPins(pins, worlds, needs, night, vw || 1440, vh || 900)}
+            pins={placedPins(pins, worlds, needs, night, vw || 1440, vh || 900, served)}
             onOpen={open}
           />
           <Hero
             dateLine={`${base.today.long}${night ? " · 21:10" : ""}`.toUpperCase()}
             greeting={`${night ? "Good evening" : "Good morning"}, ${base.user.first}.`}
-            summary={summaryLine(needs, night)}
+            summary={summary}
             needs={needs}
+            needsKnown={!served || openServed !== null}
             night={night}
             worldName={waitingIn?.name ?? null}
             onReview={() => (waitingIn ? open(waitingIn.id) : go("worlds"))}
@@ -197,7 +285,7 @@ export function HomePage({ app }: { app: AppCtx }) {
           ) : null}
           {(vw || 1440) >= 1180 ? (
             <TodayPanel
-              rows={liveRows(worlds, needs)}
+              rows={liveRows(worlds, needs, served)}
               events={nextEvents(base.agenda)}
               spend={spendOf(base.ledger)}
               night={night}
@@ -223,22 +311,29 @@ export function HomePage({ app }: { app: AppCtx }) {
           query={query}
           shown={query.trim() || mode.example}
           phase={phase}
+          effort={effort}
+          onEffort={chooseEffort}
+          quick={quick}
+          onSwitch={switchToThinking}
           onQuery={(value) => {
-            if (sendingNow.current) return;
+            if (busy()) return;
             setQuery(value);
+            setQuick(QUICK_IDLE);
             toIdle();
           }}
           onMode={(key) => {
-            if (sendingNow.current) return;
+            if (busy()) return;
             setModeKey(key as TierKey);
+            setQuick(QUICK_IDLE);
             toIdle();
           }}
           onChip={(label) => {
-            if (sendingNow.current) return;
+            if (busy()) return;
             setQuery(label);
+            setQuick(QUICK_IDLE);
             toIdle();
           }}
-          onDraft={draft}
+          onDraft={effort === "quick" ? ask : draft}
           onConfirm={confirmStart}
           onChange={idleUnlessSending}
         />

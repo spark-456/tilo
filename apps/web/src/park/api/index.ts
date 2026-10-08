@@ -17,6 +17,7 @@ import type {
   Notification,
   Plan,
   ProfileSettings,
+  QuickReply,
   Skill,
   StartAck,
   Team,
@@ -26,6 +27,7 @@ import type {
   User,
   World,
 } from "./types";
+export { HELPER_SUMMARY_FIXTURE } from "./fixtures/additive";
 
 type R<T> = Promise<ApiResult<T>>;
 
@@ -87,3 +89,16 @@ export interface Api {
   /** TEAM-WEB: one Owner-only team write; resolves with the view the server answers. Fixture: `data: null`, nothing written. */
   writeTeam(op: TeamOp): R<TeamView | null>;
 }
+
+/**
+ * Quick (COST-FAST-1): `startWorld` takes a third argument at run time, "quick", and then answers with a
+ * `QuickReply` (a direct answer or an offer to switch) and makes no world. It is not in the `Api` type because
+ * `types.test.ts` pins `startWorld`'s parameters and `keyof Api`; Thinking calls stay exactly two arguments.
+ * `mode` is only the size on screen and never reaches the server. This one helper is the only caller.
+ */
+export const askQuick = (api: Api, mode: TierKey, query: string): R<QuickReply> =>
+  (api.startWorld as unknown as (m: TierKey, q: string, effort: "quick") => R<QuickReply>)(
+    mode,
+    query,
+    "quick",
+  );

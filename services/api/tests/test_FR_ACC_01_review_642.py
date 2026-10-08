@@ -106,8 +106,15 @@ def test_FR_ACC_01_no_team_store_configured_reads_as_no_team(env) -> None:  # ty
                           ("firestore", "Not A Project"), ("memry", "")],
 )  # fmt: skip
 def test_FR_ACC_01_a_configured_team_store_that_cannot_open_fails_closed(env, kind: str, project: str) -> None:  # type: ignore[no-untyped-def]
+    from google.cloud import firestore
     from tilo_api.team_store import team_reader
 
+    def refuse(*_a: object, **_k: object) -> object:  # "Firestore" and "firestore " are valid since the setting is
+        raise RuntimeError(
+            "no credentials"
+        )  # trimmed and case-folded: never reach the network (it blocked for minutes)
+
+    env.setattr(firestore, "Client", refuse)
     env.setenv("TILO_TEAM_STORE", kind)
     env.setenv("TILO_FIRESTORE_PROJECT", project)
     with pytest.raises(Exception):  # noqa: B017
