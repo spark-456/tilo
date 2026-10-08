@@ -96,3 +96,10 @@ export const ledgerMemoryUp: NonNullable<Ledger["memoryUp"]> = {
   since: "August",
   total: 640,
 };
+
+/** Monthly helper summary display fixtures for the Skills "Who helped this month" card. */
+export const HELPER_SUMMARY_FIXTURE = {
+  baseMonthlyAnswersAndFixes: 41,
+  mistakesDeltaSinceJuly: "−38%",
+  helperMonthLabel: "September",
+} as const;

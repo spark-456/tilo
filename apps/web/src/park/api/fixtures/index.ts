@@ -4,10 +4,12 @@ export const gbp = (v: number): string =>
   `£${v < 100 && v % 1 ? v.toFixed(2) : Math.round(v).toLocaleString("en-GB")}`;
 
 import type { Agenda, Decision, Ledger } from "../types";
-import { agendaRules, decisionFacts, ledgerMemoryUp } from "./additive";
+import { HELPER_SUMMARY_FIXTURE, agendaRules, decisionFacts, ledgerMemoryUp } from "./additive";
 import { agenda as generatedAgenda } from "./agenda";
 import { decisions as generatedDecisions } from "./decisions";
 import { ledger as generatedLedger } from "./ledger";
+
+export { HELPER_SUMMARY_FIXTURE };
 
 /** The prototype's Agenda plus the additive `rules` (additive.ts). */
 export const agenda: Agenda = { ...generatedAgenda, rules: agendaRules };

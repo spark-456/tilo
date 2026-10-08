@@ -41,6 +41,7 @@ export interface PaneProps {
 }
 
 export interface Teach {
+  source: Source;
   stage: Stage;
   method: MethodKey;
   cap: number;
@@ -146,6 +147,7 @@ export function useTeach({ app, api, user, draft, source = "fixture" }: TeachInp
   }, []);
 
   const capture = () => {
+    if (source !== "fixture") return;
     if (method === "describe" || method === "upload") {
       setCap(CAPTURE_STEPS);
       return;
@@ -154,10 +156,14 @@ export function useTeach({ app, api, user, draft, source = "fixture" }: TeachInp
     setRec(true);
   };
   const goTo = (i: Stage) => {
+    if (source !== "fixture" && i > 0) return;
     if (i === 2 && stage !== 2) startRun();
     setStage(i);
   };
-  const reach = [true, cap >= CAPTURE_STEPS, cap >= CAPTURE_STEPS, runDone];
+  const reach =
+    source === "fixture"
+      ? [true, cap >= CAPTURE_STEPS, cap >= CAPTURE_STEPS, runDone]
+      : [true, false, false, false];
   const reset = () => {
     setStage(0);
     setCap(0);
@@ -191,6 +197,7 @@ export function useTeach({ app, api, user, draft, source = "fixture" }: TeachInp
   };
 
   return {
+    source,
     stage,
     method,
     cap,

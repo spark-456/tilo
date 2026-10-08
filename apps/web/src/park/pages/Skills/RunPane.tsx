@@ -8,6 +8,20 @@ import type { PaneProps } from "./useTeach";
 type Tone = "done" | "asking" | "working" | "waiting";
 
 export function RunPane({ t, night }: PaneProps) {
+  if (t.source !== "fixture") {
+    return (
+      <div
+        className="park-skills-pane park-skills-pane--show"
+        data-testid="skills-connect-to-teach"
+      >
+        <div className="park-skills-none">
+          <div>{agent({ role: "builder", rank: "lead", expr: "neutral" }, 58, night)}</div>
+          <div className="park-skills-picked-title">Connect to start teaching</div>
+          <div>Connect your workspace tools to capture steps and run a practice session.</div>
+        </div>
+      </div>
+    );
+  }
   const { run, waiting, runDone } = t;
   const result = formatTryRunResult(TRY_RUN_FIXTURE_EVENTS, PLAN.length);
   const pill = runDone
@@ -23,6 +37,9 @@ export function RunPane({ t, night }: PaneProps) {
       <div className="park-skills-art">
         <div className="park-skills-art-top">
           <span className="park-skills-art-pill">{TRY.practice}</span>
+          <span className="park-skills-art-pill" data-testid="skills-sample-run">
+            Sample run
+          </span>
           <span className={`park-skills-art-pill park-skills-art-pill--${pillTone}`}>{pill}</span>
         </div>
         <div>{desk(deskState, night)}</div>

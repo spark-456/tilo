@@ -5,12 +5,37 @@
 import type { Dec, Decision, DecisionKey, Ledger } from "../api/types";
 import type { KpiTone } from "../components";
 
+export type CurrencyCode = NonNullable<Ledger["currency"]>;
+
+export const CURRENCY_SYMBOL: Readonly<Record<CurrencyCode, string>> = {
+  GBP: "£",
+  USD: "$",
+};
+
+/** Step-cost table by tool access level used across Ledger and Skills estimates. */
+export const STEP_LEDGER_PRICES = {
+  Read: 0.05,
+  Draft: 0.1,
+  Act: 0.15,
+} as const;
+
+export const currencySymbol = (currency: CurrencyCode = "GBP"): string => CURRENCY_SYMBOL[currency];
+
+/** Formats a per-run / per-step cost in the given currency (or Ledger's currency) to 2 decimal places. */
+export const runMoney = (
+  v: number,
+  currency: CurrencyCode | Pick<Ledger, "currency"> = "GBP",
+): string => {
+  const code = typeof currency === "string" ? currency : (currency.currency ?? "GBP");
+  return `${currencySymbol(code)}${v.toFixed(2)}`;
+};
+
 const amount = (v: number): string =>
   v < 100 && v % 1 ? v.toFixed(2) : Math.round(v).toLocaleString("en-GB");
-export const gbp = (v: number): string => `£${amount(v)}`;
+export const gbp = (v: number): string => `${CURRENCY_SYMBOL.GBP}${amount(v)}`;
 /** An amount in the Ledger's own currency: a live Ledger served in dollars is never shown as pounds. */
 export const money = (L: Ledger, v: number): string =>
-  L.currency === "USD" ? `$${amount(v)}` : gbp(v);
+  `${currencySymbol(L.currency ?? "GBP")}${amount(v)}`;
 
 /** The decision the ledger is waiting on: the one its pending transaction is tied to. */
 export const waitingKey = (L: Ledger): DecisionKey | undefined => L.tx.find((t) => t.dec)?.dec;

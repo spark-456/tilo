@@ -18,8 +18,17 @@ import {
 // The Ledger page's arithmetic: a typed port of the renderVals() of
 // design_handoff_tilo_web_app/design/Tilo App Ledger.dc.html (user's prototype, ADR-0003a). Pure functions
 // of the Ledger fixture and `dec`, so a test can pin every number. No clock, no random, no network.
-export { gbp, kpis, money, waitingAmount } from "../../app/ledgerKpis";
-export type { KpiRow } from "../../app/ledgerKpis";
+export {
+  CURRENCY_SYMBOL,
+  STEP_LEDGER_PRICES,
+  currencySymbol,
+  gbp,
+  kpis,
+  money,
+  runMoney,
+  waitingAmount,
+} from "../../app/ledgerKpis";
+export type { CurrencyCode, KpiRow } from "../../app/ledgerKpis";
 
 /** The amount a taken decision's row shows: the money its facts name, or a dash when it names none. */
 const amountOf = (f: DecisionFacts): string => (f.amount === undefined ? "—" : gbp(f.amount));
