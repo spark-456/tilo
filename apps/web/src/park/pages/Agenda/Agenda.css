@@ -419,7 +419,7 @@
   flex: none;
   height: 30px;
   padding: 0 12px;
-  background: var(--hero);
+  background: var(--heroFill);
   font-size: 12.5px;
 }
 [data-park] .park-agenda-notnow--soft {
