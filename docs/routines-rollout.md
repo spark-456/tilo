@@ -37,7 +37,8 @@ $Env = @(
   "TILO_SCHEDULES_STORE=firestore",
   "TILO_FIRESTORE_PROJECT=$Project",
   "TILO_RUNS_QUEUE=projects/$Project/locations/$Region/queues/runs",
-  "TILO_TASKS_CALLER=tilo-tasks-invoker@$Project.iam.gserviceaccount.com"
+  "TILO_TASKS_CALLER=tilo-tasks-invoker@$Project.iam.gserviceaccount.com",
+  "TILO_TEAM_STORE=firestore"                                                        # team roles, limits and switches (#642)
 ) -join ","
 gcloud run services update tilo-api --project $Project --region $Region --update-env-vars $Env
 
@@ -69,8 +70,9 @@ gcloud logging read `
 Routines that were due during any 503 stay due, and fire once the cause is fixed. None is disabled by an outage.
 
 ## Known caveats
-- The six tilo-api settings in step 2 are set with gcloud, but Terraform owns this service's other settings. A later
-  `terraform apply` may remove them; a follow-up moves them into Terraform. Until it lands, check every plan for
-  removed env vars on `tilo-api` and re-run step 2 if needed.
+- The tilo-api settings in step 2 are set with gcloud. The service module ignores `env` drift (`ignore_changes` on
+  `template[0].containers[0].env`), so a later Terraform run leaves them alone; Terraform does not manage them.
+  Without that, a later run would have stripped them. Until `TILO_TEAM_STORE=firestore` is set, the team controls
+  (roles, limits, switches, tool levels) are inert and `/v1/team` answers 503.
 - The structured log fields (`event`, `status`, `code`) reach Cloud Logging only once the NFR-26 JSON handler lands.
   Until then, search the log text as step 3 does.

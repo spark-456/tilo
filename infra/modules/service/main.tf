@@ -78,6 +78,10 @@ resource "google_cloud_run_v2_service" "this" {
   lifecycle {
     ignore_changes = [
       template[0].containers[0].image,
+      # Runtime settings (TILO_* env vars) are set with `gcloud run services update` (docs/routines-rollout.md, FR-AGT-14
+      # and the team store), not by Terraform. Without this, a later apply would strip them: the plan would show them
+      # as removed. Terraform stays authoritative for everything else on the service.
+      template[0].containers[0].env,
       client,
       client_version,
       # The API defaults this service-level block (min/manual instance count
