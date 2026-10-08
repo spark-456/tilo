@@ -62,6 +62,7 @@ SAFETY_NOTE = (
     "trusted_bank_input (by design; Model Armor is the safety role's live adapter, FR-INT-02, #450)"  # BQ-LE2E-5
 )
 SYNTHETIC_MARKER = "SYNTHETIC"  # a file beside `model-recordings/`: a fake provider wrote them (BQ-LE2E-9)
+_ATTEMPTS_PER_CALL = 3  # attempts one Router call may make (first, repair, fallback) inside its reserved share
 FAKED = (  # what a run never does for real, printed with every report (HR-1: say what is not real)
     "safety screen: trusted bank input only, by design (Model Armor is the safety role's live adapter, "
     "FR-INT-02, #450)",
@@ -373,7 +374,11 @@ class _Meter:
         self.failure: tuple[str, BaseException] | None = None  # (role, error): the first call the Router gave up on
         self.quoted_calls = 0  # calls that returned no usage: charged at the pre-call quote, not at what was used
         self.counters: dict[str, Callable[[str], int]] = {}  # profile -> the provider's own token count (FR-MTR-01)
-        self.lock = threading.RLock()  # one model call at a time, so the cap is checked against what was really spent
+        self.lock = threading.RLock()  # guards the rows and the reservations; never held across a model call
+        self.cond = threading.Condition(self.lock)  # a call that cannot be reserved waits here for the others to settle
+        self.reserved = 0.0  # credits held for calls in flight: the cap is checked against spent plus reserved
+        self.progress: Callable[[str], None] | None = None  # a numbers-only line per finished call (LIVE-RUN)
+        self.started = time.perf_counter()
 
     def cost(self, profile: str, tokens_in: int, tokens_out: int) -> float:
         quote = self.config.price(profile)
@@ -454,6 +459,18 @@ class _Meter:
             row.credits += self.cost(profile, tokens_in, tokens_out)
             row.latency_ms += latency_ms
 
+    def report_call(self, stage: str, role: str, profile: str) -> None:
+        """One numbers-only line per finished call (never a prompt, reply or error): a long live run is not silent."""
+        if self.progress is None:
+            return
+        with self.lock:
+            row = self.rows[(stage, role, profile)]
+            line = (
+                f"progress stage={stage} role={role} profile={profile} calls={row.calls} "
+                f"total_credits={self.total:.4f} cap={self.cap:.4f} elapsed_s={time.perf_counter() - self.started:.1f}"
+            )
+        self.progress(line)
+
     def stopped(self, kind: str, role: str, detail: str = "", stage: str = "") -> None:
         with self.lock:
             self.stop = self.stop or (kind, role, detail, stage)
@@ -533,6 +550,7 @@ class _Metered(_Redacting):
             self._meter.add_unreturned(self._role, self._profile, request, tokens_in, elapsed)
             raise
         self._meter.add(self._role, request, response, (time.perf_counter() - started) * 1000)
+        self._meter.report_call(_stage(self._role, request), self._role, response.profile_id)
         return response
 
 
@@ -598,25 +616,43 @@ class _MeteredRouter(Router):
         super().__init__(config, provider_for_profile=lambda profile: providers(_ROLE.get(), profile))
         self.meter, self._cfg = meter, config
 
+    def _worst_quote(self, role_id: str, request: GenerateRequest) -> float:
+        """The dearest single attempt this call could make: the priciest candidate, the input and the full output cap,
+        plus a tenth for the difference between our token count and the Router's own."""
+        return 1.1 * max(
+            self.meter.cost(profile, self.meter.count(profile, _sent_text(request)), request.max_output_tokens or 0)
+            for profile in self._candidates(role_id, None)
+        )
+
     def generate(self, role_id: str, request: GenerateRequest, *, budget: float | None = None, **kwargs: Any) -> Any:
         if request.max_output_tokens is None:  # the Router's own default of 1024 would cut a Director plan short
             request = request.model_copy(update={"max_output_tokens": _output_cap(self._cfg, role_id)})
-        with self.meter.lock:
-            left = self.meter.left()
-            token = _ROLE.set(role_id)
-            try:
-                return super().generate(
-                    role_id, request, budget=left if budget is None else min(budget, left), **kwargs
-                )
-            except BudgetExceededError:
-                self.meter.stopped("stopped_at_cap", role_id)
-                raise
-            except Exception as error:
-                if role_id != "narrator":  # a Narrator that fails leaves no Story; it never ends the run (see `_story`)
-                    self.meter.failed(role_id, error)
-                raise
-            finally:
-                _ROLE.reset(token)
+        # Calls of independent units run side by side. The cap is kept by reservation: a call is sent with a budget
+        # of its own, taken out of what is left beside the calls in flight, and the Router never spends past it.
+        # When the rest cannot cover even one more attempt while others are in flight, it waits for them to settle.
+        worst = self._worst_quote(role_id, request)
+        meter = self.meter
+        with meter.cond:
+            while (available := meter.left() - meter.reserved) < worst and meter.reserved > 0:
+                meter.cond.wait()
+            share = max(available, 0.0) if budget is None else min(budget, max(available, 0.0))
+            share = min(share, _ATTEMPTS_PER_CALL * worst)
+            meter.reserved += share
+        token = _ROLE.set(role_id)
+        try:
+            return super().generate(role_id, request, budget=share, **kwargs)
+        except BudgetExceededError:
+            meter.stopped("stopped_at_cap", role_id)
+            raise
+        except Exception as error:
+            if role_id != "narrator":  # a Narrator that fails leaves no Story; it never ends the run (see `_story`)
+                meter.failed(role_id, error)
+            raise
+        finally:
+            _ROLE.reset(token)
+            with meter.cond:  # the call is in the rows by now (`_Metered`), so releasing never lets spend slip past
+                meter.reserved = max(meter.reserved - share, 0.0)
+                meter.cond.notify_all()
 
 
 # --- the screen a live run uses (BQ-LE2E-5) -----------------------------------------------------------------------
@@ -1019,6 +1055,7 @@ def run_live_e2e(
     real_connectors_factory: Callable[[], dict[str, Any]] | None = None,  # the only way the run gets them
     allow_writes: bool = False,  # CL-LIVE-2: Gmail drafts and Drive saves, each after a typed terminal approval
     allow_send: bool = False,  # CL-LIVE-2: also Gmail send, the same gate
+    progress: Callable[[str], None] | None = None,  # a numbers-only line per finished model call (LIVE-RUN)
 ) -> LiveE2EReport:
     env: Mapping[str, str] = {} if fake_record else os.environ if environ is None else environ
     if fake_record and (live_provider_factory is None or mode != "live"):
@@ -1064,6 +1101,7 @@ def run_live_e2e(
     if mode == "dry-run":
         return report
     meter = _Meter(config, max_credits)
+    meter.progress = progress
     recordings = Path(recordings_dir) if recordings_dir else default_recordings_dir(case_id)
     if live and not fake_record and os.environ.get("TILO_RECORD") == "1":
         _mark_recordings(recordings, synthetic=live_provider_factory is not None)  # only a test injects a provider
@@ -1189,6 +1227,10 @@ def _print_report(report: LiveE2EReport) -> None:
         print(f"story: {line.text}")
 
 
+def print_progress(line: str) -> None:
+    print(line, flush=True)
+
+
 def announce(estimate: Estimate, cap: float) -> None:
     print(
         f"estimate credits_low={estimate.credits_low:.4f} credits_high={estimate.credits_high:.4f} cap={cap:.4f}",
@@ -1212,7 +1254,7 @@ def main(
             models_path=args.models_file, prices_path=args.prices_file, recordings_dir=args.recordings_dir,
             live_provider_factory=live_provider_factory, safety=safety, announce=announce,
             real_connectors=args.real_connectors, real_connectors_factory=real_connectors_factory,
-            allow_writes=args.allow_writes, allow_send=args.allow_send,
+            allow_writes=args.allow_writes, allow_send=args.allow_send, progress=print_progress,
         )  # fmt: skip
     except LiveE2ERefused as refusal:
         print(f"REFUSED {refusal.code}: {refusal}", file=sys.stderr)
