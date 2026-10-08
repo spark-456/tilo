@@ -3,7 +3,7 @@
 // Data comes only from the Park Api (fixture or live, with its `source`); the page reads approvals from
 // `app.dec` (the shell's `decide(key)` is the only way one changes); navigation only through `app.go`.
 // No motion until WEB-3 (BQ-WEB-3).
-import type { ReactNode } from "react";
+import { type ReactNode, useRef } from "react";
 import type { Api } from "../../api/index";
 import type { Agenda, Decision } from "../../api/types";
 import { useParkApi } from "../../app/context";
@@ -14,7 +14,7 @@ import type { AppCtx } from "../../app/AppCtx";
 import { Boards } from "./Boards";
 import { Week } from "./Week";
 import { icon } from "./icons";
-import { BOARDS } from "./model";
+import { BOARDS, boardLimits } from "./model";
 import { useAgenda, useAgendaUi } from "./useAgenda";
 import "./Agenda.css";
 
@@ -42,13 +42,13 @@ function Ready({
   api,
 }: { A: Agenda; decisions: Decision[]; app: AppCtx; api: Api }) {
   const ui = useAgendaUi(A, decisions, app, api);
-  // The boards draw their pins a row at a time (the same row in each board), then the week: one task each, top to
-  // bottom, nothing already drawn moves (WEB-MOTION-2: no long task while pages change).
-  const perBoard = Math.max(
-    0,
-    ...BOARDS.map((b) => ui.pins.filter((p) => p.board === b.key).length),
-  );
-  const steps = perBoard + 2;
+  // The boards draw one after the other, a pin per task, then the week: top to bottom, and a board that has not
+  // started holds its cell in the grid, so nothing already drawn moves (WEB-MOTION-2, FR-UX-12: no long task while
+  // pages change).
+  const counts = BOARDS.map((b) => ui.pins.filter((p) => p.board === b.key).length);
+  // The steps are those of the pins that came with the page: a pin the person adds later shows at once and does not
+  // take the week away for a task.
+  const steps = useRef(counts.reduce((a, n) => a + n, 0) + 2).current;
   const count = useStagedCount(steps);
   const done = count >= steps;
   return (
@@ -70,7 +70,12 @@ function Ready({
           </Button>
         </div>
       </div>
-      <Boards A={A} ui={ui} app={app} limit={done ? Number.POSITIVE_INFINITY : count - 1} />
+      <Boards
+        A={A}
+        ui={ui}
+        app={app}
+        limits={boardLimits(counts, done ? Number.POSITIVE_INFINITY : count - 1)}
+      />
       {done ? <Week A={A} ui={ui} app={app} /> : null}
     </>
   );
