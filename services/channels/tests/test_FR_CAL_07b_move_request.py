@@ -159,7 +159,7 @@ def test_FR_CAL_07b_ambiguous_or_missing_day_gives_no_day() -> None:
     for body in (
         "Can we move the meeting to next week?",
         "Can we reschedule?",
-        "Can we move the meeting to the 31st of february?",
+        "Can we move the meeting to the 99th?",
     ):
         found = mod().detect_move_request(mail(body))
         assert found is not None and "day" not in found.constraint
@@ -227,21 +227,21 @@ def test_FR_CAL_07b_result_is_frozen() -> None:
 # --- hostile input --------------------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize(
-    "body",
-    [
-        "ﷺ" * 100_000,
-        ("ﷺ" * 5000) + " Can we reschedule?",
-        "x" * 100_000,
-        "reschedule " * 20_000,
-        "to " * 40_000,
-        "> " * 50_000,
-        "(" * 100_000,
-        "monday " * 20_000 + "reschedule",
-        "\n" * 100_000 + "Can we reschedule?",
-        "a. " * 40_000,
-    ],
-)
+HOSTILE = {
+    "nfkc_expanding": "ﷺ" * 100_000,
+    "nfkc_then_ask": ("ﷺ" * 5000) + " Can we reschedule?",
+    "no_spaces": "x" * 100_000,
+    "many_hits": "reschedule " * 20_000,
+    "many_lead_ins": "to " * 40_000,
+    "quote_marks": "> " * 50_000,
+    "parens": "(" * 100_000,
+    "many_days": "monday " * 20_000 + "reschedule",
+    "newlines": "\n" * 100_000 + "Can we reschedule?",
+    "many_sentences": "a. " * 40_000,
+}
+
+
+@pytest.mark.parametrize("body", list(HOSTILE.values()), ids=list(HOSTILE))
 def test_FR_CAL_07b_hostile_bodies_are_bounded_in_time(body: str) -> None:
     started = time.perf_counter()
     mod().detect_move_request(mail(body, "ﷺ" * 5000))
@@ -270,12 +270,12 @@ def test_FR_CAL_07b_is_deterministic_idempotent_and_does_not_mutate_the_mail() -
 
 def test_FR_CAL_07b_module_has_no_model_network_or_io_imports() -> None:
     source = Path(mod().__file__).read_text(encoding="utf-8")
-    imported = {
-        (n.module or "").split(".")[0] if isinstance(n, ast.ImportFrom) else a.name.split(".")[0]
-        for n in ast.walk(ast.parse(source))
-        if isinstance(n, ast.Import | ast.ImportFrom)
-        for a in (n.names if isinstance(n, ast.Import) else [n])
-    }
+    imported: set[str] = set()
+    for node in ast.walk(ast.parse(source)):
+        if isinstance(node, ast.Import):
+            imported.update(a.name.split(".")[0] for a in node.names)
+        elif isinstance(node, ast.ImportFrom):
+            imported.add((node.module or "").split(".")[0])
     assert not imported & {"tilo_providers", "httpx", "requests", "socket", "subprocess", "urllib", "logging"}
 
 

@@ -15,12 +15,14 @@ import logging
 import string
 import unicodedata
 from collections.abc import Callable, Iterable, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from email.utils import parseaddr
 from typing import Any, Protocol
 
 from tilo_providers.interfaces import GenerateRequest, GenerateResponse, ModelProvider, SafetyProvider
 from tilo_providers.prompts import load_prompt
+
+from tilo_channels.reschedule_intent import detect_move_request
 
 CATEGORIES = ("needs_reply", "needs_action", "fyi", "newsletter_promo", "suspicious")
 PRIORITIES = ("high", "normal", "low")
@@ -62,6 +64,8 @@ class TriageResult:
     priority: str
     source: str  # "model" | "rule" | "user" | "safety" | "fallback": where the category came from
     flagged: bool
+    # FR-CAL-07 b: {"kind", "constraint"} when a needs_reply mail asks to move a meeting (rules only, no mail text)
+    move_request: Mapping[str, Any] | None = field(default=None, hash=False)
 
 
 @dataclass(frozen=True)
@@ -124,12 +128,14 @@ def _pick(value: Any, allowed: tuple[str, ...]) -> str | None:
 
 def _result(message_id: str, doc: Mapping[str, Any]) -> TriageResult:
     label = None if doc["flagged"] else doc.get("label")  # a flag beats every label (PRD 16.2)
+    category = label or doc["category"]
     return TriageResult(
         message_id=message_id,
-        category=label or doc["category"],
+        category=category,
         priority=(None if doc["flagged"] else doc.get("label_priority")) or doc["priority"],  # flagged stays high
         source="user" if label else doc["source"],
         flagged=doc["flagged"],
+        move_request=doc.get("move_request") if category == "needs_reply" and not doc["flagged"] else None,
     )
 
 
@@ -189,7 +195,9 @@ class Triage:
                 category, source = "fyi", "rule"
         if sender is not None and sender in (prefs.get("vips") or ()):  # BQ-134: a VIP only raises priority
             priority = "high"
-        return {**doc, "category": category, "priority": priority, "source": source}
+        move = detect_move_request(mail)  # FR-CAL-07 b: rules only; the stored marker holds no subject or body
+        marker = {"move_request": {"kind": move.kind, "constraint": move.constraint}} if move else {}
+        return {**doc, "category": category, "priority": priority, "source": source, **marker}
 
     def _ask(self, fields: Mapping[str, str]) -> tuple[str, str, str]:
         capped = {name: text[: FIELD_CAPS[name]] for name, text in fields.items()}
