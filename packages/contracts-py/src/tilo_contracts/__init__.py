@@ -101,6 +101,7 @@
 # layout.schema.json 1.0.0 sha256:1db88b1e3b744add
 # manifest.schema.json 1.0.0 sha256:9b885d1826522bb7
 # meeting.schema.json 1.2.0 sha256:034e93898bb28957
+# meeting_host_rpc.schema.json 1.0.0 sha256:4bb81673d4ef363b
 # mention.schema.json 1.0.0 sha256:ca9c1acbf81616f2
 # meter.schema.json 1.0.0 sha256:ad596dcc70e45e09
 # metering.schema.json 1.0.0 sha256:91358a776e6c033a
@@ -1827,6 +1828,98 @@ class MeetingAttestation(BaseModel):
     notice_version: Semver
 
 
+class MeetingHostRpcDraft(BaseModel):
+    """
+    The pinned draft the owner approved (kind meeting_event): the bytes tilo-api read from the run's artifact store, hash-checked there (AR-01), because tilo-connectors cannot read that store. HB-03: the SHA-256 of the decoded bytes equals content_sha256, artifact_id and version equal entry.item, and the document parses as kind meeting_event. content_b64 is padded base64 (RFC 4648 section 4) of at most 43692 characters, the base64 of 32 KiB, so a request with 50 recipients stays under the 64 KiB body cap.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    artifact_id: ArtifactId
+    version: Annotated[int, Field(ge=1)]
+    content_sha256: Annotated[str, Field(pattern="^[0-9a-f]{64}$")]
+    content_b64: Annotated[
+        str,
+        Field(
+            max_length=43692,
+            min_length=4,
+            pattern="^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$",
+        ),
+    ]
+
+
+class MeetingHostRpcDraftRef(BaseModel):
+    """
+    The draft the receipt was made from, by id and version only (no label).
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    artifact_id: ArtifactId
+    version: Annotated[int, Field(ge=1)]
+
+
+class MeetingHostRpcUserRequest(BaseModel):
+    """
+    POST /internal/meeting-host/status and POST /internal/meeting-host/disconnect. user_id is the signed-in principal's own id in tilo-api, never one taken from a body, path or query there (HB-02); the bot account's meeting_host grant is (user_id, meeting_host).
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    user_id: UserId
+
+
+class MeetingHostRpcStatusAnswer(BaseModel):
+    """
+    The 200 answer to status: a store read only, with no token use and no Google call, so it emits nothing and has no parts. state is connected, expired (Google refused the grant; connect again) or none (no grant stored); scope_ok is true when the stored grant holds the calendar.events.owned scope, and false when there is none.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    state: Literal["connected", "expired", "none"]
+    scope_ok: bool
+
+
+class MeetingHostRpcConnectionPart(BaseModel):
+    """
+    A connection event of the meeting_host grant: expired (Google refused the grant at refresh), rate_limited, or revoked (a disconnect). Type, connector and user only.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    type: Literal["connection.expired", "connection.rate_limited", "connection.revoked"]
+    connector: Literal["meeting_host"]
+    user_id: UserId
+
+
+class MeetingHostRpcAlertPart(BaseModel):
+    """
+    An alert.raised the broker emitted (a revoke kept for a retry): its alert id only.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    type: Literal["alert.raised"]
+    alert_id: Ulid
+
+
+class MeetingHostRpcError(BaseModel):
+    """
+    The body of every refusal on this surface, a fixed code and nothing else: unauthenticated (401, no valid ID token, HB-01), forbidden (403, any account but tilo-api's, HB-01), invalid_request (422, a body over 64 KiB, not JSON or not this contract's request; refused before anything acted) and not_configured (503, a setting is missing or a seam failed to build). Never a value, a setting's value or an exception's text.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    error: Literal["unauthenticated", "forbidden", "invalid_request", "not_configured"]
+
+
 class MentionRemoval(BaseModel):
     """
     Who removed the tag and when: the tagged person or the entry's setter (PE-06).
@@ -3372,6 +3465,31 @@ class MeetingAgendaItem(BaseModel):
     minutes: MeetingAgendaMinutes | None
 
 
+class MeetingHostRpcReceipt(BaseModel):
+    """
+    What the adapter made (HostReceipt): Google's event id, never a link. HB-07: event_ref equals side_effect_marker(entry); world_id, outbox_id and draft equal the entry's; meeting_id and owner equal the draft's. tilo-api stores it through the run's receipt store only when all hold.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    world_id: WorldId
+    outbox_id: Ulid
+    meeting_id: MeetingId
+    owner: UserId
+    draft: MeetingHostRpcDraftRef
+    event_ref: Annotated[str, Field(pattern="^[0-9a-f]{32}$")]
+    conference: Literal["pending", "success", "failure"]
+
+
+type MeetingHostRpcParts = Annotated[
+    list[MeetingHostRpcConnectionPart | MeetingHostRpcAlertPart], Field(max_length=16)
+]
+"""
+What the broker emitted during one call, in order, nothing more (ADR-0032 decision 7): tilo-api hands each connection part to meeting_host.on_connection_event. Every connection part names the call's own user (entry.authz.ref for a send, the request's user_id otherwise); a part naming anyone else is not that call's, and tilo-api's client drops it. At most 16.
+"""
+
+
 class Mention(BaseModel):
     """
     An @mention of a team member on a team pinboard entry (FR-PB-04). It names a team because a personal entry cannot be tagged (PE-01, PE-06). The tagged person is a member of the team when tagged; they can always remove themselves, and the entry's `set_up_by` person can remove anyone (PE-06). A removed mention stays as a record; a new tag is a new mention.
@@ -4236,6 +4354,49 @@ class Meeting(BaseModel):
     created_at: Timestamp
 
 
+class MeetingHostRpcEvidence(BaseModel):
+    """
+    The OB-01/OB-05 case tilo-api's own enqueue checked (outbox.rules.md), without the entry: reserved_by is the gate's approval.requested event and authorised_by the approval.resolved event that answered it (event.schema.json, each with its data schema applied in the then branch, so the generated type stays Event), world_owner is the world's owner. A meeting invitation is T3, so no policy, Team Lead, instruction or earlier policy.applied takes part: those are null or empty. tilo-connectors runs the same check on its own outbox (HB-04) and trusts these copies (ADR-0032, residual trust).
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    reserved_by: Event
+    authorised_by: Event
+    world_owner: UserId
+    policy: None
+    team_lead: None
+    instruction: None
+    earlier_applied: Annotated[list[Any], Field(max_length=0)]
+
+
+class MeetingHostRpcSendAnswer(BaseModel):
+    """
+    The 200 answer to send. sent: the invitation exists at Google and receipt says what was made; tilo-api checks it (HB-07) before storing it. refused: nothing was sent and nothing will be (SideEffectRefused, HB-03 to HB-06). possibly_sent: Google may hold the invitation and a retry would not help (PossiblySent). retry: try again later; may_have_sent is false when nothing reached Google (not connected, expired, a missing scope, a KMS outage) and true after a Google 5xx or a lost answer. receipt is set only with sent and may_have_sent only with retry; otherwise each is null. parts lists what the broker emitted during the call; tilo-connectors writes no data.transfer and raises no alert of its own outbox here, because tilo-api's outbox does (one writer per world).
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    outcome: Literal["sent", "refused", "possibly_sent", "retry"]
+    receipt: MeetingHostRpcReceipt | None
+    may_have_sent: bool | None
+    parts: MeetingHostRpcParts
+
+
+class MeetingHostRpcDisconnectAnswer(BaseModel):
+    """
+    The 200 answer to disconnect. revoked_at_provider is true only when Google confirmed the revoke. The call is idempotent: with nothing stored it answers false with no parts. parts carries connection.revoked, and an alert.raised for each revoke kept for a retry.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    revoked_at_provider: bool
+    parts: MeetingHostRpcParts
+
+
 class Meter(BaseModel):
     """
     The HUD meter's state for one run (PRD 14.4, FR-MTR-07): credits used (the sum of the run's event credits), credits saved (origin cost minus lookup cost over accepted reuses, PRD 14.3), time saved (estimate) and the run's budget. packages/metering computes it from the run's events up to last_seq, and apps/web renders it. Rules MT-05 and MT-06 in contracts/metering.rules.md.
@@ -4468,6 +4629,19 @@ class LayoutLevel(BaseModel):
     districts: Annotated[list[LayoutDistrict], Field(max_length=6, min_length=1)]
 
 
+class MeetingHostRpcSendRequest(BaseModel):
+    """
+    POST /internal/meeting-host/send, called only by the host run's outbox stub in tilo-api (HB-02). entry is the outbox entry (outbox.schema.json) tilo-api's outbox enqueued, evidence the case its enqueue checked, and draft the pinned item the owner approved. It names no user: the grant used is (entry.authz.ref, meeting_host). The then branch narrows entry to the one action this surface runs (MH-10), a meeting invitation the owner approved: state queued, create_meeting_event on meeting_host, T3 with the new_recipients modifier, 1 to 50 recipients (MAX_RECIPIENTS), no attachments, the draft pinned as item, the host account's primary calendar as destination, no undo window, authorised by a person. (The narrowing sits in if/then so the generated type stays Outbox.)
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    entry: Outbox
+    evidence: MeetingHostRpcEvidence
+    draft: MeetingHostRpcDraft
+
+
 class Card(BaseModel):
     """
     One card, every channel (PRD 10.2, 10.3): needs-you, gate, consent and meeting cards. Channel rules are data: answer_channels is limited per kind (email answers questions only; gates need sign-in on the web or a verified WhatsApp number; consent needs the web). safe_default is the option id applied at timeout; it names one of the options and that option is reversible (contracts/card.rules.md CR-01 to CR-03). A gate's or consent card's is always hold, so a gate never times out to go and a consent card never times out to a grant; every hold option is reversible, only a gate may offer an irreversible option, and neither a gate nor a consent card is delegated to the Director. A gate's option ids are the closed set approve, edit, hold, each with a fixed label (Approve, Edit first, Hold); only approve opens the gate, and its irreversible flag equals the gate's (CR-07, CR-08). A consent card's option ids are the closed set connect, hold with fixed labels Connect, Hold; only connect grants (CR-13). The deterministic card builder writes a gate card's gate details and options, never a model, and the card validator checks them against the plan gate, the connector action and the outbox entry the gate releases (CR-09 to CR-12).
@@ -4518,6 +4692,15 @@ class LayoutSemantic(BaseModel):
     islands: list[LayoutIsland]
     gates: list[LayoutGate]
     agents: Annotated[list[LayoutAgent], Field(min_length=1)]
+
+
+type MeetingHostRpc = Annotated[
+    MeetingHostRpcSendRequest | MeetingHostRpcSendAnswer | MeetingHostRpcUserRequest | MeetingHostRpcStatusAnswer | MeetingHostRpcDisconnectAnswer | MeetingHostRpcError,
+    Field(title="MeetingHostRpc"),
+]
+"""
+The internal meeting-host surface of tilo-connectors (FR-MTG-09, ADR-0032 decision 2): what tilo-api posts to /internal/meeting-host/send, /internal/meeting-host/status and /internal/meeting-host/disconnect, and what each answers. Each route validates its own request and answer ($defs send_request and send_answer; user_request and status_answer; user_request and disconnect_answer; error for any refusal) in both services; this root is any one of them. Every object is closed, and no field holds an access or refresh token, an OAuth code, the client secret, key material or a Meet link (ADR-0024 decision 4, ADR-0032 decision 3). Ids travel in the body, never in a path or query. A route refuses a body over 65536 bytes (64 KiB) before it parses it. Rules that compare values (HB-03 the draft against its hash and the entry, HB-05 the owner, HB-07 the receipt against the entry) are checked by the routes and by tilo-api's client, not by this schema.
+"""
 
 
 class Layout(BaseModel):
