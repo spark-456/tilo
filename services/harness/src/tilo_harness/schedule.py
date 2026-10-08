@@ -142,6 +142,9 @@ class Schedule:
     # FR-AGT-14b: the owner's approved brief and approach are SNAPSHOTTED here (a task may not survive a redeploy)
     brief: dict[str, Any] | None = None
     approach: dict[str, Any] | None = None
+    # SCHED_PLAN (#656): the FULL offered list (2 to 3, the chosen one among them) the Director's plan names; None on a
+    # record made before the field existed, which the starter skips cleanly rather than plan from a list of one
+    approaches: list[dict[str, Any]] | None = None
     failures: int = 0
     backoff_until: datetime | None = None
     last_error: str | None = None  # a short fixed code (^[a-z][a-z0-9_]{0,63}$), never exception text

@@ -96,6 +96,7 @@ def schedule_to_doc(s: Schedule) -> dict[str, Any]:
         "last_world_id": s.last_world_id,
         "brief": copy.deepcopy(s.brief),
         "approach": copy.deepcopy(s.approach),
+        "approaches": copy.deepcopy(s.approaches),
         "failures": s.failures,
         "backoff_until": s.backoff_until,
         "last_error": s.last_error,
@@ -120,6 +121,13 @@ def _typed(doc: Mapping[str, Any], name: str, kind: type | tuple[type, ...], *, 
     if not isinstance(value, kind):
         raise ValueError(f"{name} has the wrong type")
     return value
+
+
+def _approaches(doc: Mapping[str, Any]) -> list[dict[str, Any]] | None:
+    value = _typed(doc, "approaches", list, optional=True)  # absent in a document written before SCHED_PLAN
+    if value is not None and not all(isinstance(a, dict) for a in value):
+        raise ValueError("approaches has the wrong type")
+    return copy.deepcopy(value)
 
 
 def schedule_from_doc(doc: Mapping[str, Any]) -> Schedule:
@@ -152,6 +160,7 @@ def schedule_from_doc(doc: Mapping[str, Any]) -> Schedule:
             last_world_id=_typed(doc, "last_world_id", str, optional=True),
             brief=copy.deepcopy(_typed(doc, "brief", dict, optional=True)),
             approach=copy.deepcopy(_typed(doc, "approach", dict, optional=True)),
+            approaches=_approaches(doc),
             failures=failures,
             backoff_until=doc.get("backoff_until"),
             last_error=_typed(doc, "last_error", str, optional=True),
