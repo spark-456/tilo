@@ -1,7 +1,15 @@
 // Home page data rules, written out from the reference (design_handoff_tilo_web_app/design/
 // Tilo App Home.dc.html, its renderVals, and tilo-app.js). Pure functions over what the Api returned:
 // nothing here reads a fixture, the clock or the address bar.
-import type { Agenda, AgendaEvent, Ledger, TierKey, World } from "../../api/types";
+import type {
+  Agenda,
+  AgendaEvent,
+  Ledger,
+  QuickCost,
+  SwitchReason,
+  TierKey,
+  World,
+} from "../../api/types";
 
 /** The composer's copy per size of job (the reference reads it from `D.TIERS`; the Api has no tier call). */
 export interface Mode {
@@ -82,6 +90,52 @@ export const MODES: readonly [Mode, Mode, Mode] = [
 
 export const DRAFT_MS = 900;
 
+// Quick / Thinking (COST-FAST-1). Words only: no number here is an estimate, a price or a time. The one number is
+// the server's own input cap for a Quick question (config/assistant.yaml question.max_chars).
+export const QUICK_MAX_CHARS = 500;
+
+export const EFFORTS = [
+  {
+    key: "quick",
+    label: "Quick",
+    note: "A direct answer. No plan is made and no agents start.",
+    start: "Ask",
+  },
+  {
+    key: "thinking",
+    label: "Thinking",
+    note: "The Director plans the work first, and nothing starts until you approve it.",
+    start: null,
+  },
+] as const;
+
+/** Why a Quick ask was sent back to Thinking, in plain words (the server's closed set of reasons). */
+export const SWITCH_WORDS: Readonly<Record<SwitchReason, string>> = {
+  attachments: "It has files, which a Quick answer cannot read.",
+  side_effect: "It would send, post, delete or book something, which needs a plan you approve.",
+  deliverable: "It asks for a document, deck or sheet to be made.",
+  needs_tools: "It needs tools, like searching the web or reading your inbox or calendar.",
+  multi_step: "It has several steps, one after another.",
+  too_long: "It is longer than a Quick answer can take.",
+  scenario: "It is a ready-made scenario, which runs as a full plan.",
+  unclear: "Tilo could not tell whether a quick answer would be enough.",
+};
+
+const figure = (n: number): string =>
+  n === 0 ? "0" : n < 0.01 ? "under 0.01" : String(Number(n.toFixed(2)));
+const credits = (n: number): string => `${figure(n)} ${n === 1 ? "credit" : "credits"}`;
+
+/** The cost line of a Quick answer, only from what the server served; null when it served nothing. */
+export function quickCostLine(cost: QuickCost | null): string | null {
+  if (!cost) return null;
+  const parts: string[] = [];
+  if (cost.credits !== undefined) parts.push(`Cost ${credits(cost.credits)}`);
+  if (cost.savedCredits !== undefined && cost.savedCredits > 0) {
+    parts.push(`Saved ${credits(cost.savedCredits)}`);
+  }
+  return parts.length > 0 ? parts.join(" · ") : null;
+}
+
 const plural = (n: number, one: string, many: string): string => (n === 1 ? one : many);
 
 /** The greeting panel's summary line (the "38 agents" count is the reference's own text). */
@@ -98,6 +152,23 @@ export function summaryLine(needs: number, night: boolean): string {
   return `38 agents are at work across 4 worlds. ${tail}`;
 }
 
+/**
+ * The summary on the live path (PRD 9.4): only what the served worlds and decisions say. `running` counts the
+ * served worlds that run or need a person; `needs` is the served open-decision count, or null when none were
+ * served (then nothing is claimed about it). No agent count: the worlds list does not serve one.
+ */
+export function liveSummaryLine(running: number, needs: number | null): string {
+  const parts: string[] = [];
+  if (running > 0)
+    parts.push(`${running} ${plural(running, "world is", "worlds are")} in progress.`);
+  if (needs !== null) {
+    if (needs === 0) parts.push("Nothing needs you right now.");
+    else if (needs === 1) parts.push("One thing needs you.");
+    else parts.push(needs === 2 ? "Two things need you." : `${needs} things need you.`);
+  }
+  return parts.join(" ");
+}
+
 export const decisionsWaiting = (needs: number): string =>
   `${needs} ${plural(needs, "decision waiting", "decisions waiting")}`;
 
@@ -109,7 +180,7 @@ export interface LiveRow {
 }
 
 /** "Live now": the worlds that need you or run, five at most, in the Api's order. */
-export function liveRows(worlds: readonly World[], needs: number): LiveRow[] {
+export function liveRows(worlds: readonly World[], needs: number, served = false): LiveRow[] {
   return worlds
     .filter((w) => w.st === "needs" || w.st === "running")
     .slice(0, 5)
@@ -121,7 +192,9 @@ export function liveRows(worlds: readonly World[], needs: number): LiveRow[] {
           ? "Starting now"
           : w.tier === "Village"
             ? (w.when ?? "")
-            : `Running · ${w.prog ?? 0}%`;
+            : served && w.prog === undefined
+              ? "Running"
+              : `Running · ${w.prog ?? 0}%`;
       return { world: w, needs: nd, sub, prog: w.prog ?? 0 };
     });
 }
@@ -210,6 +283,7 @@ export function pinDefs(
   worlds: readonly World[],
   needs: number,
   night: boolean,
+  served = false,
 ): readonly (PinDef | undefined)[] {
   const old = worlds.filter((w) => !w.isNew);
   const [first, second] = old.filter((w) => w.st === "needs" || w.st === "running");
@@ -222,13 +296,17 @@ export function pinDefs(
       tone: nd ? "needs" : "run",
       sub: nd
         ? `${needs} ${plural(needs, "decision needs you", "decisions need you")}`
-        : `Running · ${first.prog ?? 0}%`,
+        : served && first.prog === undefined
+          ? "Running"
+          : `Running · ${first.prog ?? 0}%`,
     },
     second && {
       worldId: second.id,
       icon: "people",
       tone: "run",
-      sub: `${night ? "Running overnight" : "Running"} · ${second.prog ?? 0}%`,
+      sub: `${night ? "Running overnight" : "Running"}${
+        served && second.prog === undefined ? "" : ` · ${second.prog ?? 0}%`
+      }`,
     },
     sched && {
       worldId: sched.id,
@@ -253,6 +331,7 @@ export function placedPins(
   night: boolean,
   vw: number,
   vh: number,
+  served = false,
 ): PlacedPin[] {
   const side = vw >= 1180;
   const blocks: readonly [number, number, number, number][] = [
@@ -263,7 +342,7 @@ export function placedPins(
   ];
   const clear = (p: { x: number; y: number }): boolean =>
     !blocks.some((b) => p.x + 140 > b[0] && p.x - 140 < b[2] && p.y > b[1] && p.y - 84 < b[3]);
-  const defs = pinDefs(worlds, needs, night);
+  const defs = pinDefs(worlds, needs, night, served);
   const out: PlacedPin[] = [];
   pins.forEach((p, i) => {
     const def = defs[i];

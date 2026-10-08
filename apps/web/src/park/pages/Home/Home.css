@@ -818,3 +818,79 @@
   min-height: 24px;
   color: var(--ink2);
 }
+
+/* ---- Quick / Thinking (COST-FAST-1): the depth control beside the size of job, and the Quick answer card.
+   Nothing here animates. ---- */
+[data-park] .park-home-effort {
+  position: relative;
+  width: 210px;
+  max-width: 100%;
+  flex: none;
+}
+[data-park] .park-home-effort .park-seg {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 4px;
+  border-radius: 16px;
+}
+[data-park] .park-home-effort .park-seg__item {
+  height: 36px;
+  font-size: 14px;
+}
+[data-park] .park-home-effort .park-seg__thumb {
+  top: 4px;
+  bottom: 4px;
+  left: 4px;
+  border-radius: 12px;
+  /* !important: SegmentedControl sets its own width inline; this track has 4px padding and two items */
+  width: calc((100% - 8px) / 2) !important;
+}
+[data-park] .park-home-quick {
+  width: 100%;
+  box-sizing: border-box;
+  background: var(--pop);
+  border: 1px solid var(--line2);
+  border-radius: 24px;
+  box-shadow: var(--sh);
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+[data-park] .park-home-quick__head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+[data-park] .park-home-quick__sample {
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--ink2);
+}
+[data-park] .park-home-quick__text {
+  margin: 0;
+  font-size: 15.5px;
+  font-weight: 700;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 220px;
+  overflow-y: auto;
+}
+[data-park] .park-home-quick__cost {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--ink2);
+}
+[data-park] .park-home-quick--note {
+  flex-direction: row;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 20px;
+  font-size: 14.5px;
+  font-weight: 700;
+}
+[data-park] .park-home-quick--note > span {
+  flex: 1;
+  min-width: 0;
+}
