@@ -7,6 +7,7 @@ import { type ReactNode, useEffect, useRef, useState } from "react";
 import type { Learn, Skill, Source, User } from "../../api/types";
 import type { AppCtx } from "../../app/AppCtx";
 import { useParkApi } from "../../app/context";
+import { useStaged } from "../../app/useStaged";
 import { PageSheet } from "../../components";
 import { HelpSection } from "./HelpSection";
 import { LibrarySection } from "./LibrarySection";
@@ -110,6 +111,7 @@ function Ready({ app, data }: { app: AppCtx; data: Data }) {
   const teachRef = useRef<HTMLElement>(null);
   const draft = data.skills.find((s) => s.st === "draft");
   const t = useTeach({ app, api, user, draft, source });
+  const part = useStaged(3); // header and card, then the help section, then the library: one task each (no long task)
 
   const [sel, setSel] = useState<string | null>(null);
   const [ans, setAns] = useState<Record<string, string>>({});
@@ -177,51 +179,55 @@ function Ready({ app, data }: { app: AppCtx; data: Data }) {
         </div>
       </Header>
       <TeachCard t={t} night={app.night} user={user} cardRef={teachRef} />
-      <HelpSection
-        app={app}
-        skills={skills}
-        learn={learn}
-        ans={ans}
-        rate={rate}
-        fixed={fixed}
-        rev={rev}
-        onAnswer={(skillId, skillName, label) => {
-          setAns((prev) => ({ ...prev, [skillId]: label }));
-          app.toast(`Thanks. Every agent using “${skillName}” now knows`);
-        }}
-        onRateUp={(rateId) => setRate((prev) => ({ ...prev, [rateId]: "up" }))}
-        onRateDown={(rateId) => setRate((prev) => ({ ...prev, [rateId]: "down" }))}
-        onSaveFix={(entry) => {
-          setFixed((prev) => ({ ...prev, [entry.rateId]: entry }));
-          app.toast("Fix saved. The next run uses it");
-        }}
-        onReview={(skillId, skillName, decision) => {
-          setRev((prev) => ({ ...prev, [skillId]: decision }));
-          if (decision === "trusted") app.toast(`“${skillName}” is trusted`);
-        }}
-      />
-      <LibrarySection
-        app={app}
-        skills={skills}
-        selectedId={selectedId}
-        paused={paused}
-        onSelect={(id) => setSel(id)}
-        onTogglePause={(skill) => {
-          const nextPaused = !paused[skill.id];
-          setPaused((prev) => ({ ...prev, [skill.id]: nextPaused }));
-          app.toast(
-            nextPaused
-              ? `“${skill.name}” is paused. Worlds using it will ask you instead`
-              : `“${skill.name}” is running again`,
-          );
-        }}
-        onTryDraft={() => {
-          t.setMethod("describe");
-          t.capture();
-          t.goStep(2);
-          scrollTeach();
-        }}
-      />
+      {part(2) ? (
+        <HelpSection
+          app={app}
+          skills={skills}
+          learn={learn}
+          ans={ans}
+          rate={rate}
+          fixed={fixed}
+          rev={rev}
+          onAnswer={(skillId, skillName, label) => {
+            setAns((prev) => ({ ...prev, [skillId]: label }));
+            app.toast(`Thanks. Every agent using “${skillName}” now knows`);
+          }}
+          onRateUp={(rateId) => setRate((prev) => ({ ...prev, [rateId]: "up" }))}
+          onRateDown={(rateId) => setRate((prev) => ({ ...prev, [rateId]: "down" }))}
+          onSaveFix={(entry) => {
+            setFixed((prev) => ({ ...prev, [entry.rateId]: entry }));
+            app.toast("Fix saved. The next run uses it");
+          }}
+          onReview={(skillId, skillName, decision) => {
+            setRev((prev) => ({ ...prev, [skillId]: decision }));
+            if (decision === "trusted") app.toast(`“${skillName}” is trusted`);
+          }}
+        />
+      ) : null}
+      {part(3) ? (
+        <LibrarySection
+          app={app}
+          skills={skills}
+          selectedId={selectedId}
+          paused={paused}
+          onSelect={(id) => setSel(id)}
+          onTogglePause={(skill) => {
+            const nextPaused = !paused[skill.id];
+            setPaused((prev) => ({ ...prev, [skill.id]: nextPaused }));
+            app.toast(
+              nextPaused
+                ? `“${skill.name}” is paused. Worlds using it will ask you instead`
+                : `“${skill.name}” is running again`,
+            );
+          }}
+          onTryDraft={() => {
+            t.setMethod("describe");
+            t.capture();
+            t.goStep(2);
+            scrollTeach();
+          }}
+        />
+      ) : null}
     </>
   );
 }
