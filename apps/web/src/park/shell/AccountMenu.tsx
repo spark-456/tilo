@@ -1,13 +1,25 @@
 // The account menu (README "Shell > Account menu"; reference `Tilo App.dc.html` acctItems): 300 wide, the
 // person (initials, name, email, org and plan) and a rule above five rows. Mobile app is a placeholder
-// ("Concept"; the mobile app is not part of this design). Sign out only says this is a prototype.
-import type { User } from "../api/types";
+// ("Concept"; the mobile app is not part of this design). Sign out is wired by AppShell through the ParkAuth
+// seam (FR-UX-10): with no seam it only says this is a prototype; with one that is not signed in it is left out.
 import type { PageId } from "../app/AppCtx";
 import { Menu, type MenuItem } from "../components";
 import { icon } from "./kit";
 
+/** Who the header shows: from the Api's user (fixture or live), or from the sign-in layer (no org or plan). */
+export interface AccountPerson {
+  initials: string;
+  name: string;
+  email: string;
+  /** The line under the email (the org name and plan), when there is one. */
+  detail?: string;
+}
+
 export interface AccountMenuProps {
-  user: User | null;
+  user: AccountPerson | null;
+  /** False when a sign-in layer exists and nobody is signed in: there is nothing to sign out of. */
+  canSignOut: boolean;
+  onMobile: () => void;
   /** Connectors that are on (connected or needing attention), or null until they have been read. */
   connectorsOn: number | null;
   go: (page: PageId) => void;
@@ -15,7 +27,15 @@ export interface AccountMenuProps {
   onClose: () => void;
 }
 
-export function AccountMenu({ user, connectorsOn, go, onSignOut, onClose }: AccountMenuProps) {
+export function AccountMenu({
+  user,
+  canSignOut,
+  onMobile,
+  connectorsOn,
+  go,
+  onSignOut,
+  onClose,
+}: AccountMenuProps) {
   const items: MenuItem[] = [
     {
       id: "profile",
@@ -36,9 +56,11 @@ export function AccountMenu({ user, connectorsOn, go, onSignOut, onClose }: Acco
       label: "Mobile app",
       icon: icon("phone", 17),
       hint: "Concept",
-      onSelect: () => undefined,
+      onSelect: onMobile,
     },
-    { id: "signout", label: "Sign out", icon: icon("logout", 17), onSelect: onSignOut },
+    ...(canSignOut
+      ? [{ id: "signout", label: "Sign out", icon: icon("logout", 17), onSelect: onSignOut }]
+      : []),
   ];
   const header = user ? (
     <>
@@ -47,7 +69,7 @@ export function AccountMenu({ user, connectorsOn, go, onSignOut, onClose }: Acco
         <div className="park-shell__whotext">
           <div className="park-shell__whoname">{user.name}</div>
           <div className="park-shell__whomail">{user.email}</div>
-          <div className="park-shell__whoorg">{`${user.org} · ${user.plan} plan`}</div>
+          {user.detail ? <div className="park-shell__whoorg">{user.detail}</div> : null}
         </div>
       </div>
       <div className="park-shell__rule" />

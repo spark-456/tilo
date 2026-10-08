@@ -17,6 +17,19 @@ export interface Loaded {
   worlds: World[];
 }
 
+/** FR-TEAM-04: the switches that are PRD Must-ask rules, locked on. Mirrors `must_ask: true` in
+ * config/team_rules.yaml (a test compares them); a live Api would send them. */
+export const MUST_ASK_RULES: readonly string[] = ["spend", "share", "undo"];
+
+/** FR-TEAM-02: nobody changes their own role, and only an Owner changes roles (BQ-TEAMACC-2). The same rule as
+ * tilo_api.team_rules.change_role, for the page's controls. */
+export function canChangeRole(
+  actor: { id: string; role: string },
+  target: { id: string; role: string },
+): boolean {
+  return actor.id !== target.id && actor.role === "Owner";
+}
+
 export const initialsOf = (name: string): string =>
   name
     .split(" ")
@@ -131,4 +144,20 @@ export function memberViews(
       ],
     };
   });
+}
+
+const hasControl = (v: string): boolean => /[\p{Cc}\p{Cf}]/u.test(v);
+const EMAIL = /^[^\s@]+@[^\s@.]+(\.[^\s@.]+)*\.[^\s@.]{2,}$/;
+
+/** FR-TEAM-01: an invite needs a plausible work email. Surrounding spaces are ignored; empty, inner spaces,
+ * control characters, no @ or no dotted domain, and anything over 254 characters are not valid. No network. */
+export function isValidEmail(value: string): boolean {
+  if (hasControl(value)) return false;
+  const v = value.trim();
+  return v.length > 0 && v.length <= 254 && EMAIL.test(v);
+}
+
+/** FR-TEAM-01: removing a person hands each of their worlds to the Owner (a new list; the input is not changed). */
+export function reassignWorlds(worlds: readonly World[], from: string, toOwner: string): World[] {
+  return worlds.map((w) => (w.owner === from ? { ...w, owner: toOwner } : w));
 }

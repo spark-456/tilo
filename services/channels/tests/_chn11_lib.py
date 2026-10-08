@@ -17,16 +17,16 @@ import json
 import secrets
 import threading
 from collections.abc import Callable, Iterable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from _channels_lib import FakeClock
-from _chn10_lib import USER, MemoryDraftStore, Rig, Thread, answer, drafting_module, make_rig, message_id_header
+from _chn10_lib import USER, MemoryDraftStore, Msg, Rig, Thread, answer, drafting_module, make_rig, message_id_header
 from _chn_contracts_lib import CONTRACTS, _registry
 from jsonschema import Draft202012Validator
 
-MAILBOX = "ops@harborview.example"
+MAILBOX = "sarah.ops@harborview.example"  # CHN-GATE-E: the bench mailbox names its owner (see the note below)
 DAVID = "david.miller@harriercharters.example"
 SARAH = "sarah.chen@harborview.example"
 WORLD = "w_autopilot"
@@ -37,6 +37,44 @@ BENIGN = "Hi David,\n\nFriday 2pm works for us. See you then.\n\nBest,\nSarah"
 BENIGN_V2 = "Hi David,\n\nFriday 2pm works for us. Thanks again.\n\nBest,\nSarah"
 
 __all__ = ["USER", "Rig", "Thread", "answer", "make_rig"]
+
+# CHN-GATE-E (ADR-0025, "Migration" and the 8 Oct amendment): the L2 gate no longer guesses names from their position in
+# the body; a name rides L2 only when a BASE address local part of the draft's own To / Cc or of the mailbox vouches for
+# it (no display name does, no plus tag). The benches' bodies greet "David" (the draft's recipient: david.miller@) and
+# sign "Sarah", so the bench mailbox is `sarah.ops@...` (`named_rig`); `scripted_thread(names=...)` adds recipients
+# whose local parts are the names a test needs (`Thread.vouch`, the extra To of `ready()`), known from the user's SENT
+# mail. `_chn_gate_e_lib.make_bench` goes back to the plain `ops@` mailbox with no such help.
+OWN_NAME = f"Sarah Chen <{MAILBOX}>"
+# The names a bench thread vouches for: DAVID's address local part and the bench mailbox's.
+VOUCHED = frozenset({"david", "miller", "sarah", "chen", "ops"})
+# Further names some positive controls use (`scripted_thread(names=...)`).
+EXTRA_NAMES = ("Anna Maria", "Jones", "Pat", "Alex")
+EXTRA_WORDS = frozenset({"anna", "maria", "jones", "pat", "alex"})
+
+
+def name_words(*names: str) -> frozenset[str]:
+    """The lower-case words of display names: the `names` a gate call is given for them."""
+    return frozenset(w.lower() for n in names for w in n.split())
+
+
+@dataclass
+class Mail(Msg):
+    """A message with Gmail's `labelIds` (only "SENT" makes it the user's own, BQ-223)."""
+
+    labels: list[str] = field(default_factory=list)
+
+    def as_message(self) -> dict[str, Any]:
+        message = super().as_message()
+        return message | {"labelIds": list(self.labels)} if self.labels else message
+
+
+def named_rig() -> Rig:
+    """`make_rig()` in the bench mailbox `sarah.ops@...` (see above); every thread still starts with the owner's own
+    SENT note to the mailbox itself (it adds no recipient a test could trip over)."""
+    note = Mail("m-own-note", OWN_NAME, "Note", "A note for later.", to=[MAILBOX], labels=["SENT"])
+    rig = make_rig(own_mail=(note,))
+    rig.mailbox = MAILBOX
+    return rig
 
 
 def autopilot_module() -> Any:
@@ -244,7 +282,7 @@ class Bench:
 
 
 def make_bench(level: str = "L2", contacts: Iterable[str] = ()) -> Bench:
-    rig = make_rig()
+    rig = named_rig()
     bench = Bench(rig, FakeOutbox(rig.clock), FakePolicy(level), FakeContacts(contacts), MemoryDraftStore(), EventLog())
     bench.ap = bench.new_autopilot()
     return bench
@@ -257,7 +295,7 @@ def context(
         instruction_id=instruction_id or "ins-" + secrets.token_hex(6),
         thread_id=thread.thread_id,
         instruction=instruction,
-        mailbox=MAILBOX,
+        mailbox=thread.mailbox,
         mode=mode,
     )
 
@@ -267,7 +305,7 @@ def reply_target(thread: Thread) -> str:
     message (the inbound-aware L2 check, FR-CHN-11, looks that message up). A thread with no inbound message keeps a
     placeholder."""
     try:
-        return message_id_header(thread.last_inbound(MAILBOX).message_id)
+        return message_id_header(thread.last_inbound(thread.mailbox).message_id)
     except IndexError:
         return "<m@mail.example>"
 
@@ -276,7 +314,7 @@ def ready(
     thread: Thread,
     body: str,
     *,
-    to: tuple[str, ...] = (DAVID,),
+    to: tuple[str, ...] | None = None,
     cc: tuple[str, ...] = (),
     safety_flag: bool = False,
     flagged: bool = False,
@@ -285,6 +323,7 @@ def ready(
 ) -> Any:
     """A FR-CHN-10 `ready` DraftResult built directly: what the checker passed, with no findings."""
     mod = drafting_module()
+    to = (DAVID, *thread.vouch) if to is None else to
     iid = instruction_id or "ins-" + secrets.token_hex(6)
     target = reply_target(thread)
     draft = mod.Draft(
@@ -317,12 +356,24 @@ def drafted(bench: Bench, thread: Thread, instruction: str = INSTRUCTION) -> tup
     """Drafts through the real FR-CHN-10 Drafter; returns (DraftContext, DraftResult)."""
     ctx = context(thread, instruction=instruction)
     result = bench.rig.svc.draft(
-        USER, instruction_id=ctx.instruction_id, thread_id=thread.thread_id, instruction=instruction, mailbox=MAILBOX
+        USER,
+        instruction_id=ctx.instruction_id,
+        thread_id=thread.thread_id,
+        instruction=instruction,
+        mailbox=thread.mailbox,
     )
     assert result.status == "ready", "FR-CHN-11 test setup: the benign draft must pass the FR-CHN-10 checker"
     return ctx, result
 
 
-def scripted_thread(bench: Bench, *bodies: str) -> Thread:
-    thread, _ = bench.rig.thread(answers=tuple(answer(b) for b in bodies))
+def scripted_thread(bench: Bench, *bodies: str, names: Iterable[str] = ()) -> Thread:
+    """A bench thread. `names` become extra recipients of a `ready()` draft whose address local parts are those names
+    (`anna.maria@...`), known from the user's own SENT mail, so a body may greet or sign them (CHN-GATE-E: only an
+    address local part of the draft's own recipients or the mailbox vouches for a name)."""
+    addresses = tuple(f"{'.'.join(n.lower().split())}@harriercharters.example" for n in names)
+    note = Mail(
+        "m-names", f"Sarah Chen <{bench.rig.mailbox}>", "Note", "A note.", to=[DAVID, *addresses], labels=["SENT"]
+    )
+    thread, _ = bench.rig.thread(earlier=(note,) if addresses else (), answers=tuple(answer(b) for b in bodies))
+    thread.vouch = addresses
     return thread

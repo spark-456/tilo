@@ -200,6 +200,16 @@ class RecordReplayProvider(ModelProvider):
     def count_tokens(self, text: str) -> int:
         return len(text.split())
 
+    def provider_count_tokens(self, text: str) -> int:
+        """FR-MTR-01: the live provider's own count of `text` (a count call, never a generation: no billed tokens) for a
+        meter that has to count a call whose response reported no usage; words in replay, and when that count fails."""
+        if self._is_live():
+            try:
+                return int(self._live().count_tokens(text))
+            except Exception:  # noqa: BLE001 - metering must never fail a run: the word count is the floor
+                pass
+        return len(text.split())
+
     def capabilities(self) -> set[Capability]:
         # Live: ask the real provider. Replay: the profile's declared caps,
         # so no network client is built just to answer this.

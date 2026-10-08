@@ -10,6 +10,7 @@ import {
   decisionOf,
   gbp,
   money,
+  sign,
   sum,
   waitingAmount,
   waitingKey,
@@ -26,6 +27,7 @@ export {
   kpis,
   money,
   runMoney,
+  sign,
   waitingAmount,
 } from "../../app/ledgerKpis";
 export type { CurrencyCode, KpiRow } from "../../app/ledgerKpis";
@@ -80,7 +82,16 @@ export function chartGeometry(L: Ledger, dec: Dec, hover: number | null) {
   const fcPts: [number, number][] = taken
     ? [now, [X(30), Y(L.forecast)]]
     : [now, [X(25), Y(L.spent + waiting + 70)], [X(30), Y(L.forecast)]];
-  const hd = hover != null ? Math.min(24, Math.max(1, hover)) : null;
+  // "Today" is the last day the ledger holds spend for; the pointer is clamped to the days it holds.
+  const today = Math.max(1, daily.length);
+  const hd = hover != null ? Math.min(today, Math.max(1, hover)) : null;
+  const spike = L.spike;
+  const spikeShown =
+    spike !== undefined &&
+    spike.day >= 1 &&
+    spike.day <= daily.length &&
+    spike.amount <= (L.daily[spike.day - 1] ?? 0);
+  const s = sign(L);
   const hx = hd != null ? X(hd) : 0;
   const hv = hd != null ? (cum[hd - 1] ?? 0) : 0;
   return {
@@ -97,36 +108,50 @@ export function chartGeometry(L: Ledger, dec: Dec, hover: number | null) {
     endY: Y(L.forecast).toFixed(1),
     yLabels: (
       [
-        [0, "£0"],
-        [2000, "£2k"],
-        [4000, "£4k"],
-        [6000, "£6k"],
+        [0, "0"],
+        [2000, "2k"],
+        [4000, "4k"],
+        [6000, "6k"],
       ] as const
-    ).map(([v, t]) => ({ t, top: pct(Y(v), 270) })),
+    ).map(([v, t]) => ({ t: `${s}${t}`, top: pct(Y(v), 270) })),
     xLabels: (
       [
         [1, "1 Sep"],
         [8, "8"],
         [15, "15"],
-        [24, "Today"],
+        [today, "Today"],
         [30, "30 Sep"],
       ] as const
     ).map(([d, t]) => ({ t, left: pct(X(d), 720) })),
     capTop: pct(Y(L.budget), 270),
-    spikeLeft: pct(X(21) - 4, 720),
-    spikeTop: pct(Y(cum[20] ?? 0), 270),
+    spike:
+      spike && spikeShown
+        ? {
+            left: pct(X(spike.day) - 4, 720),
+            top: pct(Y(cum[spike.day - 1] ?? 0), 270),
+            text: `${spike.label} ${money(L, spike.amount)}`,
+          }
+        : null,
     fcLeft: pct(X(27.4), 720),
-    fcTop: pct(Y(5950), 270),
-    fcLabel: taken ? `Forecast ${gbp(L.forecast)}` : `If you approve ${gbp(waiting)}`,
+    // The note sits a fixed distance (350 on the budget scale) below the end of the forecast.
+    fcTop: pct(Y(L.forecast) + (350 / L.budget) * 206, 270),
+    fcLabel: taken ? `Forecast ${money(L, L.forecast)}` : `If you approve ${money(L, waiting)}`,
     hOp: hd != null ? "1" : "0",
     hx: hd != null ? hx.toFixed(1) : "0",
     hy: hd != null ? Y(hv).toFixed(1) : "0",
     hLine: hd != null ? `M${hx.toFixed(1)} 24 V236` : "M0 0",
     tipLeft: hd != null ? pct(hx, 720) : "0%",
-    tipA: hd != null ? `${DAY_NAMES[(hd + 1) % 7]} ${hd} Sep · ${gbp(daily[hd - 1] ?? 0)}` : "",
-    tipB: hd != null ? `Running total ${gbp(hv)}` : "",
+    tipA:
+      hd != null ? `${DAY_NAMES[(hd + 1) % 7]} ${hd} Sep · ${money(L, daily[hd - 1] ?? 0)}` : "",
+    tipB: hd != null ? `Running total ${money(L, hv)}` : "",
   };
 }
+
+/** The chart's headline: the forecast against the budget, as the ledger holds them. */
+export const chartHeadline = (L: Ledger): string =>
+  L.forecast > L.budget
+    ? `Forecast to finish ${money(L, L.forecast - L.budget)} over budget`
+    : `On track to finish ${money(L, L.budget - L.forecast)} under budget`;
 
 // ---- Where it goes ----
 const PALETTE = ["#5A3FE0", "#0E7C79", "#F0A500", "#D9588C", "#3F7FE0", "#8C8899"] as const;
@@ -145,6 +170,8 @@ export function donut(L: Ledger, by: By) {
   });
   return {
     head: B.head,
+    // The ring's total is what its own legend adds up to: one figure for every view of a consistent ledger.
+    total: money(L, tot),
     // No spend to divide is an empty ring, not a gradient with NaN stops.
     conic:
       tot > 0 ? `conic-gradient(${stops.join(", ")})` : "conic-gradient(transparent, transparent)",
@@ -173,18 +200,33 @@ export function runCards(L: Ledger) {
       .join(" ");
     const first = v[0] ?? 0;
     const last = v[v.length - 1] ?? 0;
+    // Percent cheaper than the first run; negative when the cost rose.
+    const dropPct = first > 0 ? Math.round((1 - last / first) * 100) : 0;
     return {
       name,
       n: String(n),
       skill,
       line,
       area: `${line} L200 60 L0 60 Z`,
-      first: `£${first.toFixed(2)}`,
-      now: `£${last.toFixed(2)}`,
-      drop: `−${first > 0 ? Math.round((1 - last / first) * 100) : 0}%`,
+      first: `${sign(L)}${first.toFixed(2)}`,
+      now: `${sign(L)}${last.toFixed(2)}`,
+      dropPct,
+      drop: dropPct >= 0 ? `−${dropPct}%` : `+${-dropPct}%`,
     };
   });
 }
+
+/** The cost-per-run headline: the biggest drop since the first run the ledger holds, or a plain title when none fell. */
+export function runsHeadline(L: Ledger): string {
+  let best: ReturnType<typeof runCards>[number] | undefined;
+  for (const c of runCards(L)) if (!best || c.dropPct > best.dropPct) best = c;
+  return best && best.dropPct > 0
+    ? `Repeat work gets cheaper. ${L.runLabels?.[best.skill] ?? best.name} now costs ${best.dropPct}% less.`
+    : "Cost per run, by skill.";
+}
+
+/** The approval-waits headline: the one the ledger states; otherwise a plain title. */
+export const waitsHeadline = (L: Ledger): string => L.waits.summary ?? "How long approvals wait";
 
 /** The approval-waits card is shown only when the Ledger holds waits to show. */
 export const hasWaits = (L: Ledger): boolean =>
@@ -200,28 +242,58 @@ export function waitBuckets(L: Ledger) {
   }));
 }
 
+/** A type's wait: the ledger's own; with a backup approver, the wait the ledger holds for that case (else unchanged). */
 export function waitTypes(L: Ledger, backup: unknown) {
-  return L.waits.types.map(([name, v, tone]) => ({
-    name,
-    v: name.startsWith("Sharing") && backup ? "About 20 min with a backup" : v,
-    c:
-      tone === "ok"
-        ? "var(--okInk)"
-        : tone === "amber" && !backup
-          ? "var(--amberInk)"
-          : "var(--ink)",
-  }));
+  return L.waits.types.map(([name, v, tone]) => {
+    const withBackup = backup ? L.waits.withBackup?.[name] : undefined;
+    return {
+      name,
+      v: withBackup ?? v,
+      c:
+        tone === "ok"
+          ? "var(--okInk)"
+          : tone === "amber" && withBackup === undefined
+            ? "var(--amberInk)"
+            : "var(--ink)",
+    };
+  });
 }
 
-export const memoryBars = (L: Ledger) =>
-  L.memory.map((v, i) => ({
-    v: `£${v}`,
-    h: `${(v / 200) * 120}px`,
-    c: i === 3 ? "var(--sch)" : "var(--schSoft)",
+/** The weekly bars scale to the largest week the ledger holds; the latest week is highlighted. */
+export const memoryBars = (L: Ledger) => {
+  const top = Math.max(1, ...L.memory);
+  return L.memory.map((v, i) => ({
+    v: money(L, v),
+    h: `${(v / top) * 120}px`,
+    c: i === L.memory.length - 1 ? "var(--sch)" : "var(--schSoft)",
   }));
+};
 
-export const hourBars = (L: Ledger) =>
-  L.hours.map(([name, h, c, what]) => ({ name, h: `${h} h`, w: `${(h / 46) * 100}%`, c, what }));
+/** Week names, only when the ledger names exactly one per bar. */
+export const memoryWeeks = (L: Ledger): string[] =>
+  L.memoryWeeks?.length === L.memory.length ? L.memoryWeeks : [];
+
+export const hourBars = (L: Ledger) => {
+  const total = Math.max(1, sum(L.hours.map((h) => h[1])));
+  return L.hours.map(([name, h, c, what]) => ({
+    name,
+    h: `${h} h`,
+    w: `${(h / total) * 100}%`,
+    c,
+    what,
+  }));
+};
+
+/**
+ * How the two "gave back" figures are counted: the one-sentence methods of PRD 14.3 (credits saved) and 14.2
+ * (time saved). Both are shown as estimates and link to their method (FR-SPD-06).
+ */
+export const METHODS = {
+  memory:
+    "When Tilo reuses a result, we credit what that result actually cost the first time, minus the cost of the lookup.",
+  hours:
+    "We count the units of work the agents finished, multiply by the minutes a person took for the same unit in our timing study, and subtract the minutes you spent steering and reviewing.",
+} as const;
 
 // ---- Activity ----
 /** Kind -> [icon, tile, ink, tag, filter group]. */

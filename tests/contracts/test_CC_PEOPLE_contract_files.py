@@ -89,14 +89,15 @@ def test_CC_PEOPLE_FR_WLD_02_common_schema_is_1_3_0_and_keeps_its_old_defs(repo_
 
 def test_CC_PEOPLE_FR_WLD_03_registry_files_are_1_1_0_with_the_new_families(repo_root, registry):
     reg_schema = load_json(registry_schema_path(repo_root))
-    assert reg_schema["x-version"] == "1.1.0"
+    # 1.1.0 added the people families; later minors are additive (1.2.0: team_rule, ADR-0027).
+    assert tuple(int(p) for p in reg_schema["x-version"].split(".")) >= (1, 1, 0)
     families = set(reg_schema["$defs"]["family"]["enum"])
     assert set(pl.NEW_FAMILIES) <= families, f"registry family enum lacks {sorted(set(pl.NEW_FAMILIES) - families)}"
     assert {"meeting", "world", "app"} <= families, "existing families stay"
     raw = load_registry_raw(repo_root)
-    assert raw is not None and raw["version"] == "1.1.0"
+    assert raw is not None and tuple(int(p) for p in raw["version"].split(".")) >= (1, 1, 0)
     found = [e.message for e in errors_for(reg_schema, raw, registry)]
-    assert not found, f"registry.yaml must validate against registry.schema.json 1.1.0: {found[:3]}"
+    assert not found, f"registry.yaml must validate against registry.schema.json: {found[:3]}"
 
 
 # ---- common $defs: ids ---------------------------------------------------------------------------

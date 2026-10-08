@@ -103,3 +103,23 @@ export const HELPER_SUMMARY_FIXTURE = {
   mistakesDeltaSinceJuly: "−38%",
   helperMonthLabel: "September",
 } as const;
+
+/**
+ * The designed copy of the Ledger that the prototype typed into its page (WEB-9c pattern): the spike note, the
+ * name in the cost-per-run headline, the week names, the wait headline and the wait with a backup. Each is a
+ * value the ledger holds, so the page shows none of them for a ledger that does not (HR-1).
+ */
+export const ledgerCopy: {
+  spike: NonNullable<Ledger["spike"]>;
+  runLabels: NonNullable<Ledger["runLabels"]>;
+  memoryWeeks: NonNullable<Ledger["memoryWeeks"]>;
+  waits: { summary: string; withBackup: Record<string, string> };
+} = {
+  spike: { day: 21, label: "Motor dev kit", amount: 1140 },
+  runLabels: { invoice: "Invoice matching" },
+  memoryWeeks: ["1–7 Sep", "8–14", "15–21", "22–24"],
+  waits: {
+    summary: "Most asks get a yes in 9 minutes. Sharing outside waits longest.",
+    withBackup: { "Sharing outside the company": "About 20 min with a backup" },
+  },
+};

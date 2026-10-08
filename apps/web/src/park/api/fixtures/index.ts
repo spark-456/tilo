@@ -4,7 +4,13 @@ export const gbp = (v: number): string =>
   `£${v < 100 && v % 1 ? v.toFixed(2) : Math.round(v).toLocaleString("en-GB")}`;
 
 import type { Agenda, Decision, Ledger } from "../types";
-import { HELPER_SUMMARY_FIXTURE, agendaRules, decisionFacts, ledgerMemoryUp } from "./additive";
+import {
+  HELPER_SUMMARY_FIXTURE,
+  agendaRules,
+  decisionFacts,
+  ledgerCopy,
+  ledgerMemoryUp,
+} from "./additive";
 import { agenda as generatedAgenda } from "./agenda";
 import { decisions as generatedDecisions } from "./decisions";
 import { ledger as generatedLedger } from "./ledger";
@@ -18,8 +24,15 @@ export const decisions: Decision[] = generatedDecisions.map((d) => ({
   ...d,
   facts: decisionFacts[d.k],
 }));
-/** The prototype's Ledger plus the additive `memoryUp` (additive.ts). */
-export const ledger: Ledger = { ...generatedLedger, memoryUp: ledgerMemoryUp };
+/** The prototype's Ledger plus the additive `memoryUp` and designed copy (additive.ts). */
+export const ledger: Ledger = {
+  ...generatedLedger,
+  memoryUp: ledgerMemoryUp,
+  spike: ledgerCopy.spike,
+  runLabels: ledgerCopy.runLabels,
+  memoryWeeks: ledgerCopy.memoryWeeks,
+  waits: { ...generatedLedger.waits, ...ledgerCopy.waits },
+};
 
 export { connectors } from "./connectors";
 export { connectorTerms } from "./connectorTerms";

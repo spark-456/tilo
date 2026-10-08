@@ -78,7 +78,7 @@ def _meeting_id(kind: str, record: Mapping[str, Any]) -> str | None:
     return found if conforms("common.schema.json#/$defs/meeting_id", found) else None
 
 
-def _released_item(people: PeopleStores, org_id: str, entry: Mapping[str, Any]) -> Any:
+def released_item(people: PeopleStores, org_id: str, entry: Mapping[str, Any]) -> Any:
     source = _source(entry)
     ref = source.get("ref")
     if not (_tilo_made(entry) and source.get("kind") == "tilo" and isinstance(ref, str) and "#" in ref):
@@ -123,7 +123,7 @@ def request_parts(
     if meeting_id is not None:
         found = people.meetings.get(org_id, meeting_id)
         meeting = None if found is None else plain(found.record)
-    work_item = _released_item(people, org_id, record) if record_kind == "calendar_entry" else None
+    work_item = released_item(people, org_id, record) if record_kind == "calendar_entry" else None
     owner = source_owners.owner_of(org_id, record_kind, record) if _needs_source_owner(record) else None
     return {
         "actor": actor,
