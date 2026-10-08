@@ -269,7 +269,7 @@ def run_topic(
     safety: SafetyProvider | None = None,  # the test seam, only beside an injected (fake) provider
     person: TerminalPerson | None = None, announce: Callable[[e2e.Estimate, float], None] | None = None,
     real_connectors: bool = False, real_connectors_factory: Callable[[], dict[str, Any]] | None = None,
-    allow_writes: bool = False, allow_send: bool = False,
+    allow_writes: bool = False, allow_send: bool = False, progress: Callable[[str], None] | None = None,
 ) -> e2e.LiveE2EReport:  # fmt: skip
     env = os.environ if environ is None else environ
     e2e._gate(mode, env, max_credits)  # the live switch, CI, Cloud Run and the cap: first of all
@@ -306,6 +306,7 @@ def run_topic(
         prices_path=prices_path, recordings_dir=recordings, live_provider_factory=live_provider_factory, safety=screen,
         announce=announce, adhoc=case, person=person, real_connectors=real_connectors,
         real_connectors_factory=real_connectors_factory, allow_writes=allow_writes, allow_send=allow_send,
+        progress=progress,
     )  # fmt: skip
     report.safety = note
     report.faked = e2e.real_faked(TOPIC_FAKED, allow_writes) if report.real_connectors else TOPIC_FAKED
@@ -367,7 +368,7 @@ def main(
             models_path=args.models_file, prices_path=args.prices_file, recordings_dir=args.recordings_dir,
             live_provider_factory=live_provider_factory, safety=safety, person=person, announce=e2e.announce,
             real_connectors=args.real_connectors, real_connectors_factory=real_connectors_factory,
-            allow_writes=args.allow_writes, allow_send=args.allow_send,
+            allow_writes=args.allow_writes, allow_send=args.allow_send, progress=e2e.print_progress,
         )  # fmt: skip
     except e2e.LiveE2ERefused as refusal:
         print(f"REFUSED {refusal.code}: {refusal}", file=sys.stderr)
