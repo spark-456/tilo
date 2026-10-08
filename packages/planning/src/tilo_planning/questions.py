@@ -173,7 +173,8 @@ _FORMAT_WORDS = {  # what a person types for a format
     "powerpoint": "pptx", "ppt": "pptx", "slides": "pptx", "slide deck": "pptx", "deck": "pptx", "word": "docx",
     "doc": "docx", "document": "docx", "excel": "xlsx", "spreadsheet": "xlsx", "md": "markdown", "report": "pdf",
 }  # fmt: skip
-_ANSWER_SPLIT = re.compile(r"\s*(?:[;,+&/]|\band\b)\s*", re.IGNORECASE)
+_ANSWER_SPLIT = re.compile(r"[;,+&/]|\band\b", re.IGNORECASE)  # no \s* around it: linear on a long run of spaces
+_ANSWER_LIMIT = 300  # the answers route's own limit
 _CHIP_FORMAT = re.compile(r".*\((" + "|".join(_FORMATS) + r")\)")
 
 
@@ -191,8 +192,9 @@ def _answer_formats(answer: str, current: str, brief: dict[str, Any]) -> list[st
     """The formats a deliverables answer names, in order, once each: one answer or several joined by "and", a
     comma, a semicolon, "+" or "&". The chip's own text (`current`, whose titles may hold any of those) stands for the
     formats the brief has now. A part that names no format refuses the answer, the person says it again."""
+    answer = answer[:_ANSWER_LIMIT]
     have = [d["format"] for d in brief["deliverables"]] if current in answer else []
-    parts = [p for p in _ANSWER_SPLIT.split(answer.replace(current, ";")) if p.strip()]
+    parts = [p.strip() for p in _ANSWER_SPLIT.split(answer.replace(current, ";")) if p.strip()]
     formats = [*have, *(_part_format(p) for p in parts)]
     if not formats or None in formats:
         raise BriefValidationError(

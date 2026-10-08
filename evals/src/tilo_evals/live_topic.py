@@ -41,7 +41,9 @@ def clean(text: Any, *, lines: bool = False) -> str:
     return kept if lines else " ".join(kept.split())
 
 
-_NUMBER_LIST = re.compile(r"\d{1,2}(?:\s*(?:,|;|&|\+|\band\b|\s)\s*\d{1,2})+", re.IGNORECASE)
+# "1 2", "1, 2", "1 and 2": the separator is optional (the \s* around it covers a space) and a number is never
+# followed by a digit, so "123" is not "12" and "3"; one \s* per gap keeps a long run of spaces linear.
+_NUMBER_LIST = re.compile(r"\d{1,2}(?!\d)(?:\s*(?:(?:,|;|&|\+|\band\b)\s*)?\d{1,2}(?!\d))+", re.IGNORECASE)
 
 
 def _numbers(said: str) -> list[int] | None:
