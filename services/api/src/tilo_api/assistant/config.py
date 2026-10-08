@@ -54,8 +54,18 @@ DECLINE_KEYS = (
     "which_day",
     "update_refused",
     "snooze_range",
+    "which_entry",
 )
-REPORTS = ("status", "weekly")
+REPORTS = ("status", "weekly", "calendar", "prepare")
+PREPARE_HOLES = {  # FR-CAL-07: the placeholders each `answer.prepare` text may use
+    "header": frozenset(),
+    "entry": frozenset({"label", "start", "end"}),
+    "entry_open": frozenset({"label", "start"}),
+    "attendees": frozenset({"n"}),
+    "meeting": frozenset({"label"}),
+    "item": frozenset({"label"}),
+    "nothing": frozenset(),
+}
 ROW_KEYS = ("reasons", "groups", "kinds", "has_due", "within_hours")
 
 
@@ -289,6 +299,7 @@ def _answer(node: Any) -> Mapping[str, Any]:
         "status",
         "weekly",
         "update",
+        "prepare",
         "lines",
     )
     a = _mapping("answer", node, keys)
@@ -300,6 +311,7 @@ def _answer(node: Any) -> Mapping[str, Any]:
     status = _mapping("answer.status", a["status"], ("tasks_empty", "changed_header", "changed_empty", "done"))
     weekly = _mapping("answer.weekly", a["weekly"], ("done", "open", "overdue", "tasks", "waiting", "truncated"))
     update = _mapping("answer.update", a["update"], ("done", "snooze"))
+    prepare = _mapping("answer.prepare", a["prepare"], tuple(PREPARE_HOLES))
     return MappingProxyType(
         {
             "max_lines": _int("answer.max_lines", a["max_lines"], 1, 20),
@@ -328,6 +340,9 @@ def _answer(node: Any) -> Mapping[str, Any]:
                     k: _text(f"answer.update.{k}", v, frozenset({"label"}) | ({"day"} if k == "snooze" else set()))
                     for k, v in update.items()
                 }
+            ),
+            "prepare": MappingProxyType(
+                {k: _text(f"answer.prepare.{k}", v, PREPARE_HOLES[k]) for k, v in prepare.items()}
             ),
             "lines": MappingProxyType(
                 {k: _text(f"answer.lines.{k}", v, frozenset({"label", "time"})) for k, v in lines.items()}

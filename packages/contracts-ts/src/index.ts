@@ -8,7 +8,7 @@
  * brief.schema.json 1.0.0 sha256:be4e747f37e399b2
  * calendar_entry.schema.json 1.0.0 sha256:4a8550295789f3af
  * card.schema.json 1.0.0 sha256:2666292eb19087d0
- * common.schema.json 1.4.0 sha256:09b36846ed11add2
+ * common.schema.json 1.5.0 sha256:b1bd17a36819c785
  * connector.schema.json 1.0.0 sha256:cc3a7d9b3820e12c
  * decision.schema.json 1.0.0 sha256:06915b6db08dc4b7
  * envelope.schema.json 1.0.0 sha256:8a5c75c61807baa2
@@ -87,6 +87,7 @@
  * events/data/question.answered.schema.json 1.1.0 sha256:27aa69077ee8f813
  * events/data/question.routed.schema.json 1.0.0 sha256:af061a697d8396b2
  * events/data/skill.loaded.schema.json 1.0.0 sha256:acddc05d7bde55d2
+ * events/data/team_rule.changed.schema.json 1.0.0 sha256:c095fa9eb4a68023
  * events/data/work_item.changed.schema.json 1.0.0 sha256:8740c0c65f424dc5
  * events/data/work_item.created.schema.json 1.0.0 sha256:a9fbffc5d3854c81
  * events/data/world.completed.schema.json 1.0.0 sha256:0370652b0ac84eea
@@ -96,7 +97,7 @@
  * events/data/world.requested.schema.json 1.1.0 sha256:7f1370b796c05ea1
  * events/data/world.resumed.schema.json 1.0.0 sha256:a3fd175fc848bf87
  * events/data/world.started.schema.json 1.0.0 sha256:e0daa70c85838c8f
- * events/registry.schema.json 1.1.0 sha256:22ae30d4e99499c8
+ * events/registry.schema.json 1.2.0 sha256:5a2b8514c1e7e2b1
  * handoff.schema.json 1.0.0 sha256:7ed882f92b634672
  * layout.schema.json 1.0.0 sha256:1db88b1e3b744add
  * manifest.schema.json 1.0.0 sha256:9b885d1826522bb7
@@ -112,15 +113,15 @@
  * plan.schema.json 1.0.0 sha256:35991402fa6e958d
  * plate.schema.json 1.0.0 sha256:d2a4e4361a714c8f
  * policy.schema.json 1.0.0 sha256:307bca25f6efc07e
- * providers.schema.json 1.1.0 sha256:ece7537b584e69f8
+ * providers.schema.json 1.2.0 sha256:4514148b0b6b2f7e
  * scenario.schema.json 1.0.0 sha256:b8e044d7e37b92a3
- * skill.schema.json 1.0.0 sha256:94e0d6872579d3c5
+ * skill.schema.json 1.1.0 sha256:9eeee7768b667afa
  * spend_caps.schema.json 1.1.0 sha256:d337adf13a5337f9
  * team_lead.schema.json 1.0.0 sha256:19413726e364ffdd
  * transcript.schema.json 1.0.0 sha256:08f934b8f0c9a40e
  * ui_action.schema.json 1.0.0 sha256:2ceb1e0b46368734
  * work_item.schema.json 1.0.0 sha256:7add9f68c1f996fb
- * events/registry.yaml 1.1.0 sha256:2db78f63298c923a
+ * events/registry.yaml 1.2.0 sha256:8be0da29431a82c4
  */
 
 /**
@@ -369,6 +370,13 @@ export type Severity = "info" | "fyi" | "nudge" | "needs_you" | "blocked" | "gat
  */
 export type AutonomyLevel = "L0" | "L1" | "L2" | "L3";
 /**
+ * Plain-language access level for one connector (FR-ACC-01, BQ-DSN-04, 1.5.0, ADR-0027): a ceiling on the risk tier an action of that connector may reach before the policy engine. off blocks every action, read allows reads only, draft allows reads and T1, act allows up to the policy engine's own ceiling (a T3 action still needs a person). It never authorises anything; a skill's level only lowers the team's (FR-ACC-02).
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "ToolAccessLevel".
+ */
+export type ToolAccessLevel = "off" | "read" | "draft" | "act";
+/**
  * World size by agent count (PRD 9.1): outpost 1-2, village 3-6, town 7-15, city 16+.
  *
  * This interface was referenced by `TiloContracts`'s JSON-Schema
@@ -578,7 +586,35 @@ export type UiActionTarget =
   | UiActionTargetWorkItem
   | UiActionTargetCalendarEntry;
 /**
- * Event families of PRD 9.5, plus work_item, pinboard, mention, calendar and assistant (CC-PEOPLE, registry 1.1.0).
+ * switch: one of the five 'When agents stop and ask' switches (FR-TEAM-04). tool_access: the team's level for one connector (FR-ACC-01). Roles, spend limits, invites and removals are not team rules (BQ-ADR27-3).
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "TeamRuleChangedDataRule".
+ */
+export type TeamRuleChangedDataRule = "switch" | "tool_access";
+/**
+ * The switch (rule switch) or the connector id (rule tool_access) that changed.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "TeamRuleChangedDataKey".
+ */
+export type TeamRuleChangedDataKey = string;
+/**
+ * on or off for a switch; off, read, draft or act for a tool level (common tool_access_level).
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "TeamRuleChangedDataValue".
+ */
+export type TeamRuleChangedDataValue = "on" | "off" | "read" | "draft" | "act";
+/**
+ * The five switches of the Team page (FR-TEAM-04, config/team_rules.yaml). spend, share and undo are PRD 8.3 Must-ask rules and always on.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "TeamRuleChangedDataSwitchKey".
+ */
+export type TeamRuleChangedDataSwitchKey = "spend" | "share" | "undo" | "tools" | "weekend";
+/**
+ * Event families of PRD 9.5, plus work_item, pinboard, mention, calendar and assistant (CC-PEOPLE, registry 1.1.0) and team_rule (registry 1.2.0, ADR-0027).
  *
  * This interface was referenced by `TiloContracts`'s JSON-Schema
  * via the `definition` "EventRegistryFamily".
@@ -607,7 +643,8 @@ export type EventRegistryFamily =
   | "pinboard"
   | "mention"
   | "calendar"
-  | "assistant";
+  | "assistant"
+  | "team_rule";
 /**
  * One plain-language effect.
  *
@@ -1430,6 +1467,7 @@ export interface Common {
   severity?: Severity;
   risk_tier?: RiskTier;
   autonomy_level?: AutonomyLevel;
+  tool_access_level?: ToolAccessLevel;
   authz?: Authz;
   artifact_ref?: ArtifactRef;
   destination?: Destination;
@@ -2722,6 +2760,18 @@ export interface SkillLoadedData {
   version: Semver;
 }
 /**
+ * data of team_rule.changed (registry 1.2.0, ADR-0027; FR-TEAM-04 'every change is logged', FR-ACC-01). A person changed one team rule: a stop-and-ask switch (rule switch, key the switch, values on or off) or the team's access level for one connector (rule tool_access, key the connector id, values off, read, draft or act). from is the value in force before the change (an unset tool is act, an unset switch its configured default), to the value after it. A Must-ask switch (spend, share, undo; PRD 8.3) can't be switched off, so its to is always on. tilo-api's team routes write it after the team store's compare-and-set succeeded, never an agent or a model: actor and target are the signed-in person who made the change (only the team's Owner may, BQ-TEAMACC-2), the world is that person's Desk world, district is null and vis is [] (owner-only, ADR-0009). It authorises nothing (a level or switch only narrows what reaches the policy engine), so it is not a side effect and authz is null.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "TeamRuleChangedData".
+ */
+export interface TeamRuleChangedData {
+  rule: TeamRuleChangedDataRule;
+  key: TeamRuleChangedDataKey;
+  from: TeamRuleChangedDataValue;
+  to: TeamRuleChangedDataValue;
+}
+/**
  * data of work_item.changed (CC-PEOPLE, FR-PA-01, FR-PA-05). A work item moved: confirmed (proposed to open), edited, snoozed, done, dropped, reopened, reassign_requested, or reminded (the sweeper nudged the owner).
  *
  * This interface was referenced by `TiloContracts`'s JSON-Schema
@@ -4007,7 +4057,7 @@ export interface PolicyMaxLevel {
   T3: "L1";
 }
 /**
- * Provider-layer configuration as the provider layer loads it (PRD 6.4, 6.6, 14.1): models is config/models.yaml ($defs.models) and prices is config/prices.yaml ($defs.prices). The loader also checks that every role names existing profiles and every profile has a price entry. Model ids appear only in config/ and packages/providers.
+ * Provider-layer configuration as the provider layer loads it (PRD 6.4, 6.6, 14.1): models is config/models.yaml ($defs.models) and prices is config/prices.yaml ($defs.prices). The loader also checks that every role names existing profiles and every profile has a price entry, and the speech role's rules below (1.2.0, ADR-0027). Model ids appear only in config/ and packages/providers.
  *
  * This interface was referenced by `TiloContracts`'s JSON-Schema
  * via the `definition` "Providers".
@@ -4029,7 +4079,7 @@ export interface ProvidersModels {
     [k: string]: ProvidersProfile;
   };
   /**
-   * Business code asks for a role, never a model (PL-01).
+   * Business code asks for a role, never a model (PL-01). speech (1.2.0, ADR-0027) is the role every SpeechProvider call asks for (FR-MTG-17, FR-MTG-11, FR-INT-14, FR-CHN-16): the loader refuses it unless it states max_output_tokens and its primary, fallback and cascade profiles declare the audio capability and, while prices are set, carry an audio_input price.
    */
   roles: {
     [k: string]: ProvidersRole;
@@ -4107,7 +4157,7 @@ export interface ProvidersPrices {
   };
 }
 /**
- * Standard list price in US dollars per million tokens.
+ * Standard list price in US dollars per million tokens. audio_input (1.2.0, ADR-0027) is the price per million audio input tokens where the provider bills audio input at its own rate (Gemini); left out, the profile has no audio price and cannot serve the speech role. The other input tokens of the same call are priced at input.
  *
  * This interface was referenced by `TiloContracts`'s JSON-Schema
  * via the `definition` "ProvidersPrice".
@@ -4115,6 +4165,7 @@ export interface ProvidersPrices {
 export interface ProvidersPrice {
   input: number | null;
   output: number | null;
+  audio_input?: number | null;
 }
 /**
  * A scenario config, config/scenarios/<id>.yaml (PRD 4.3, 7.1 FR-INT-11, ADR-0014): the skill set, connectors, seed data, autonomy policy and world theme a scenario preloads, and nothing else. Data only: no code, prompt, model id, brief text or plan, so a scenario that needs any of those becomes a pillar requirement first, and no platform source names a scenario id. The same shape serves any scenario, a demo, a held-out bank case or a generated brief. theme is the world theme, the same slug as layout.schema.json theme (config/themes/, FR-WLD-15; only its shape is checked until that folder exists, BQ-202). Rules that need other files (the id equals the file name, connectors in config/connectors.yaml, seed files exist inside the repo, each autonomy level within its risk tier's max_level, T3 at L1 only) are SN-01 to SN-09 in contracts/scenario.rules.md, checked by the loader.
@@ -4188,12 +4239,22 @@ export interface Skill {
    */
   reviewer: string;
   tools_allowed: ActionType[];
+  tool_access?: SkillToolAccess;
   inputs: SkillEmbeddedSchema;
   outputs: SkillEmbeddedSchema;
   /**
    * One line, shown to the planner.
    */
   description: string;
+}
+/**
+ * FR-ACC-02 (1.1.0, ADR-0027): the level this skill may use each listed connector at, keyed by connector id (config/connectors.yaml or config/mcp.yaml). It can only lower the team's level for that connector: the level in force is the lower of the two (tilo_policy.access_levels.effective_level), so act here sets no further limit and no value can raise the team's. A connector left out uses the team's level. Optional: a skill without it changes nothing. It is part of the signed-off, version-pinned skill (PRD 8.2), so changing it is a new skill version.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "SkillToolAccess".
+ */
+export interface SkillToolAccess {
+  [k: string]: ToolAccessLevel;
 }
 /**
  * A JSON Schema (2020-12) for the skill's inputs or outputs. Deliberately open: the skill loader checks it against the 2020-12 meta-schema.
@@ -4466,6 +4527,7 @@ export const EVENT_TYPES = [
   "calendar.entry_changed",
   "assistant.asked",
   "assistant.replied",
+  "team_rule.changed",
 ] as const;
 export type RegisteredEventType = (typeof EVENT_TYPES)[number];
 
@@ -4562,6 +4624,7 @@ export interface EventDataByType {
   "calendar.entry_changed": CalendarEntryChangedData;
   "assistant.asked": AssistantAskedData;
   "assistant.replied": AssistantRepliedData;
+  "team_rule.changed": TeamRuleChangedData;
 }
 
 /** A registered TiloEvent, discriminated on `type`. */
@@ -4572,7 +4635,7 @@ export type RegisteredEvent = {
 export const EVENT_REGISTRY: EventRegistry & {
   types: { readonly [T in RegisteredEventType]: EventRegistryEntry };
 } = {
-  "version": "1.1.0",
+  "version": "1.2.0",
   "unknown_types": "trace_only",
   "types": {
     "world.requested": {
@@ -5744,6 +5807,20 @@ export const EVENT_REGISTRY: EventRegistry & {
       "trace_row": "conversation={data.conversation_id} outcome={data.outcome} decided_by={data.decided_by}",
       "data_schema": "events/data/assistant.replied.schema.json",
       "fixture": "fixtures/events/valid/assistant.replied.json"
+    },
+    "team_rule.changed": {
+      "family": "team_rule",
+      "verb": "changed",
+      "priority": "must",
+      "pillar": "P4",
+      "default_severity": "info",
+      "side_effect": false,
+      "world_effect": "The rules board beside Your Desk flips the changed rule.",
+      "hud_effect": "The Team page shows the new setting and logs the change.",
+      "story_template": "{actor} changed a team rule: {data.key} is now {data.to}.",
+      "trace_row": "rule={data.rule} key={data.key} from={data.from} to={data.to}",
+      "data_schema": "events/data/team_rule.changed.schema.json",
+      "fixture": "fixtures/events/valid/team_rule.changed.json"
     }
   }
 };

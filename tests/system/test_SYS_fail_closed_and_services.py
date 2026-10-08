@@ -28,6 +28,15 @@ SERVICES = {
 }
 # sandbox-web is the public practice site the browser worker drives (PRD 6.5): its pages are open on purpose.
 PUBLIC_BY_DESIGN = {"sandbox-web": {"/manifest.json"}}
+# Cloud Scheduler / Cloud Tasks call this one with a Google OIDC token, never a person's sign-in. It checks its
+# config first and answers 503 (tilo-api: `not_configured`; harness: `unavailable`) while no audience/caller is set
+# (the production default, fail closed). The 401/403 for a missing, bad or wrong-caller token needs a wired verifier and
+# store, which no real process has here: the services' own tests drive it (test_FR_AGT_14_schedule_routes.py).
+TICK = "/internal/schedules/tick"
+
+
+def _refuses_anonymous(method: str, path: str, status: int) -> bool:
+    return status in ({401, 403, 503} if path == TICK else {401, 403})
 
 
 def _operations(app: str) -> list[tuple[str, str]]:
@@ -67,7 +76,11 @@ def test_SYS_SEC_05_a_service_route_that_is_not_public_by_design_refuses_an_anon
             if path in OPEN or path in PUBLIC_BY_DESIGN.get(name, set()) or path.startswith("/s/"):
                 continue
             response = httpx.request(method, server.url + _fill(path), json={} if method == "POST" else None)
-            assert response.status_code in {401, 403}, f"{name} {method} {path} answered {response.status_code}"
+            assert _refuses_anonymous(method, path, response.status_code), (
+                f"{name} {method} {path} answered {response.status_code}"
+            )
+            if path == TICK:  # unconfigured means closed, not open: it never reaches the token or any side effect
+                assert response.status_code == 503, f"{name} {path} answered {response.status_code}"
     finally:
         server.stop()
 
@@ -77,7 +90,8 @@ def test_SYS_SEC_05_tilo_api_without_dev_mode_serves_nothing_that_needs_a_person
     assert ("POST", "/intake") in ops and ("GET", "/worlds/{world_id}/events") in ops, "the route list was read"
     for method, path in ops:
         response = httpx.request(method, prod_api.url + _fill(path), json={} if method == "POST" else None, timeout=15)
-        assert response.status_code == 401, f"{method} {path} answered {response.status_code} with no sign-in"
+        expected = 503 if path == TICK else 401  # the tick has no sign-in to ask for: it fails closed, unconfigured
+        assert response.status_code == expected, f"{method} {path} answered {response.status_code} with no sign-in"
         assert "Traceback" not in response.text and "NotImplementedError" not in response.text, (
             f"{method} {path} leaks a server error body"
         )

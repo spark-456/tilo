@@ -25,8 +25,11 @@ locals {
   }
 }
 
+# Services with ignore_env = false are managed in full. Services with ignore_env = true live in a second,
+# otherwise identical resource because `ignore_changes` cannot be conditional. `moved` keeps the existing tilo-api
+# instance in state, so a plan shows no destroy and no replace.
 resource "google_cloud_run_v2_service" "this" {
-  for_each = var.services
+  for_each = { for k, v in var.services : k => v if !v.ignore_env }
 
   project             = var.project_id
   name                = "tilo-${each.key}"
@@ -88,6 +91,85 @@ resource "google_cloud_run_v2_service" "this" {
   }
 }
 
+
+resource "google_cloud_run_v2_service" "env_ignored" {
+  for_each = { for k, v in var.services : k => v if v.ignore_env }
+
+  project             = var.project_id
+  name                = "tilo-${each.key}"
+  location            = var.region
+  deletion_protection = false
+  ingress             = each.value.ingress
+
+  template {
+    service_account = local.service_account_emails[each.key]
+
+    # Direct VPC egress for callers of internal-only services (PRD 6.1):
+    # a Cloud Run service that calls another over the public internet is
+    # rejected by INGRESS_TRAFFIC_INTERNAL_ONLY; traffic leaving through the
+    # VPC subnet (Private Google Access on) counts as internal.
+    dynamic "vpc_access" {
+      for_each = each.value.vpc_egress == null ? [] : [each.value.vpc_egress]
+      content {
+        egress = vpc_access.value
+        network_interfaces {
+          network    = var.vpc_network
+          subnetwork = var.vpc_subnetwork
+        }
+      }
+    }
+
+    scaling {
+      min_instance_count = each.value.min_instance_count
+      max_instance_count = each.value.max_instance_count
+    }
+
+    containers {
+      image = each.value.image
+
+      resources {
+        # Request-based CPU billing: CPU is only allocated while a request
+        # is being processed (PRD 6.6 lean infrastructure).
+        cpu_idle = true
+
+        limits = {
+          cpu    = "1"
+          memory = "512Mi"
+        }
+      }
+    }
+  }
+
+  # CI deploys real images (PRD 6.5); a later plan must not roll services
+  # back to the placeholder image.
+  lifecycle {
+    ignore_changes = [
+      template[0].containers[0].image,
+      # Runtime settings (TILO_* env vars) of services with ignore_env = true (only tilo-api) are set with
+      # `gcloud run services update` (docs/routines-rollout.md, FR-AGT-14 and the team store), not by Terraform.
+      # Without this, a later run would strip them. Terraform stays authoritative for everything else. This block
+      # must therefore declare NO `env` block (tests/repo guard): declared env would be silently never applied.
+      template[0].containers[0].env,
+      client,
+      client_version,
+      # The API defaults this service-level block (min/manual instance count
+      # 0), which showed as a perpetual diff. template[0].scaling above is
+      # the real min/max and stays managed.
+      scaling,
+    ]
+  }
+}
+
+moved {
+  from = google_cloud_run_v2_service.this["api"]
+  to   = google_cloud_run_v2_service.env_ignored["api"]
+}
+
+locals {
+  # Both resource sets as one map, for the invoker bindings and the outputs.
+  run_services = merge(google_cloud_run_v2_service.this, google_cloud_run_v2_service.env_ignored)
+}
+
 locals {
   # Static keys "<service>::<invoker>" so for_each is known at plan time.
   invoker_bindings = merge(
@@ -115,7 +197,7 @@ resource "google_cloud_run_v2_service_iam_member" "invoker" {
 
   project  = var.project_id
   location = var.region
-  name     = google_cloud_run_v2_service.this[each.value.service].name
+  name     = local.run_services[each.value.service].name
   role     = "roles/run.invoker"
   member   = each.value.member
 
@@ -138,7 +220,7 @@ resource "google_cloud_run_v2_service_iam_member" "developer" {
 
   project  = var.project_id
   location = var.region
-  name     = google_cloud_run_v2_service.this[each.value.service].name
+  name     = local.run_services[each.value.service].name
   role     = "roles/run.developer"
   member   = each.value.member
 }
