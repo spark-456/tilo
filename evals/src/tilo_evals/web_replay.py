@@ -47,6 +47,7 @@ from . import e2e_stand_ins
 CASE_ID = "E-RES-11"
 REPO = Path(__file__).resolve().parents[3]
 RECORDING = "evals/fixtures/res/E-RES-11.jsonl"
+CASES_ROOT = "evals/web-cases"  # its own folder, apart from the 160 of PRD 19.2 in evals/cases (BQ-LW16-1)
 SANDBOX_HOST = "sandbox-web.example"
 BASE = f"http://{SANDBOX_HOST}"
 _SANDBOX_IP = "93.184.216.34"
@@ -326,10 +327,25 @@ def recording_text(run: WebRun) -> str:
     return json.dumps({"outputs": run.outputs, "credits": 0}, sort_keys=True, ensure_ascii=True) + "\n"
 
 
+def replay() -> int:
+    """Replays the case from its recording through the normal runner; 0 if it passes, 1 if not."""
+    from .config import EvalsConfig  # noqa: PLC0415
+    from .runner import run_pass  # noqa: PLC0415
+
+    config = EvalsConfig.load(str(REPO / "config" / "evals.yaml"))
+    done = run_pass(pass_kind="full", config=config, cases_root=str(REPO / CASES_ROOT), base=REPO, case_ids=[CASE_ID])
+    ok = len(done.ran) == 1 and done.ran[0].passed is True
+    sys.stdout.write(f"{CASE_ID}: {'passed' if ok else 'FAILED'} ({len(done.ran)} of 1 ran, 0 credits)\n")
+    return 0 if ok else 1
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="python -m tilo_evals.web_replay", description=__doc__.splitlines()[0])
     parser.add_argument("--write", action="store_true", help=f"rewrite {RECORDING} (no network, no paid call)")
+    parser.add_argument("--replay", action="store_true", help="replay the committed recording and grade it (free)")
     args = parser.parse_args(argv)
+    if args.replay:
+        return replay()
     text = recording_text(run_web_case())
     if args.write:
         target = REPO / RECORDING

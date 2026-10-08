@@ -48,8 +48,7 @@ def _all_cases() -> tuple[Case, ...]:
 
 
 def _cases_by_group(group: str) -> list[Case]:
-    """The PRD 19.2 cases of a group: E-RES-11 is the ADR-0029 extra (LW-16, BQ-LW16-1) and has its own tests."""
-    return [c for c in _all_cases() if c.group == group and c.id != "E-RES-11"]
+    return [c for c in _all_cases() if c.group == group]
 
 
 def test_PRD_19_2_EV_01_task_success_e_res_coverage_and_gate_1_replay(fake_repo) -> None:

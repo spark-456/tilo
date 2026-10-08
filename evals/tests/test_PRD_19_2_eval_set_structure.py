@@ -35,15 +35,9 @@ def _iter_eval_files() -> list[Path]:
     return sorted(files)
 
 
-# Cases ADR-0029 adds on top of the PRD 19.2 rows (BQ-LW16-1); the rows and `config/evals.yaml` (EFF-07) stay at 160.
-_ADR_EXTRAS = {"E-RES-11"}
-
-
 def test_PRD_19_2_eval_set_structure_cases_load_and_respect_group_caps_and_contiguous_ids() -> None:
     cfg = EvalsConfig.load(str(_CONFIG_PATH))
-    every = load_cases(str(_CASES_DIR))
-    assert {c.id for c in every} >= _ADR_EXTRAS, "an ADR-0029 extra case is missing"
-    cases = [c for c in every if c.id not in _ADR_EXTRAS]
+    cases = load_cases(str(_CASES_DIR))
     assert len(cases) == sum(cfg.groups.values()) == 160, f"expected all 160 eval cases, got {len(cases)}"
     ids = [c.id for c in cases]
     assert len(ids) == len(set(ids)), "duplicate case ids found"
@@ -107,7 +101,7 @@ _DEDICATED_CHECK_FIELDS: dict[str, set[str]] = {
 
 def test_PRD_19_2_eval_set_structure_every_ground_truth_key_is_graded_or_marked_descriptive() -> None:
     cases = load_cases(str(_CASES_DIR))
-    assert len(cases) == 160 + len(_ADR_EXTRAS)
+    assert len(cases) == 160
     for case in cases:
         gt = case.ground_truth or {}
         graded: set[str] = set()

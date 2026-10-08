@@ -25,7 +25,7 @@ def run() -> web.WebRun:
     return web.run_web_case()
 
 
-def _pass(cases_root: Path = REPO_ROOT / "evals" / "cases", base: Path = REPO_ROOT) -> Any:
+def _pass(cases_root: Path = REPO_ROOT / web.CASES_ROOT, base: Path = REPO_ROOT) -> Any:
     config = EvalsConfig.load(str(REPO_ROOT / "config" / "evals.yaml"))
     return run_pass(pass_kind="full", config=config, cases_root=str(cases_root), base=base, case_ids=[CASE])
 
@@ -65,13 +65,13 @@ MUTATIONS = [
 def test_LW_16_the_case_has_teeth_a_recording_that_breaks_a_property_fails(
     tmp_path: Path, field: str, value: Any
 ) -> None:
-    (tmp_path / "evals" / "cases" / "E-RES").mkdir(parents=True)
-    shutil.copy(REPO_ROOT / "evals" / "cases" / "E-RES" / f"{CASE}.yaml", tmp_path / "evals" / "cases" / "E-RES")
+    (tmp_path / "web-cases" / "E-RES").mkdir(parents=True)
+    shutil.copy(REPO_ROOT / web.CASES_ROOT / "E-RES" / f"{CASE}.yaml", tmp_path / "web-cases" / "E-RES")
     (tmp_path / RECORDING.relative_to(REPO_ROOT)).parent.mkdir(parents=True)
     broken = json.loads(RECORDING.read_text(encoding="utf-8"))
     broken["outputs"][field] = copy.deepcopy(value)
     (tmp_path / RECORDING.relative_to(REPO_ROOT)).write_text(json.dumps(broken), encoding="utf-8")
-    result = _pass(tmp_path / "evals" / "cases", tmp_path).ran[0]
+    result = _pass(tmp_path / "web-cases", tmp_path).ran[0]
     assert result.passed is False, f"{field} changed and the case still passed"
 
 
@@ -133,3 +133,12 @@ def test_LW_16_the_report_is_a_pdf_stored_with_origin_render(run: web.WebRun) ->
 
 def test_LW_16_a_second_run_gives_the_same_facts(run: web.WebRun) -> None:
     assert web.run_web_case().outputs == run.outputs
+
+
+def test_LW_16_the_case_lives_apart_from_the_160_and_has_a_documented_free_replay_command(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    assert not (REPO_ROOT / "evals" / "cases" / "E-RES" / f"{CASE}.yaml").exists(), "PRD 19.2 stays at 160 cases"
+    assert (REPO_ROOT / web.CASES_ROOT / "E-RES" / f"{CASE}.yaml").is_file()
+    assert web.main(["--replay"]) == 0 and "E-RES-11: passed" in capsys.readouterr().out
+    assert "python -m tilo_evals.web_replay --replay" in (REPO_ROOT / "evals" / "CLAUDE.md").read_text("utf-8")
