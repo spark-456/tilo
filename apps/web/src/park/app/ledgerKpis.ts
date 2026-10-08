@@ -8,6 +8,8 @@ import type { KpiTone } from "../components";
 const amount = (v: number): string =>
   v < 100 && v % 1 ? v.toFixed(2) : Math.round(v).toLocaleString("en-GB");
 export const gbp = (v: number): string => `£${amount(v)}`;
+/** The currency sign of the Ledger's own unit (pounds unless the ledger is served in dollars). */
+export const sign = (L: Ledger): string => (L.currency === "USD" ? "$" : "£");
 /** An amount in the Ledger's own currency: a live Ledger served in dollars is never shown as pounds. */
 export const money = (L: Ledger, v: number): string =>
   L.currency === "USD" ? `$${amount(v)}` : gbp(v);
