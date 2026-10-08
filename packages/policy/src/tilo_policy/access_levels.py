@@ -32,8 +32,6 @@ def effective_level(team: Level, skill: Level | None = None) -> Level:
     """min(team_level, skill_level): a skill can restrict a tool, never elevate it. No skill level means the team's."""
     if type(team) is not Level or (skill is not None and type(skill) is not Level):
         raise TypeError("a level is a Level")
-    if type(team) is not Level or (skill is not None and type(skill) is not Level):
-        raise TypeError("a level is a Level")
     return team if skill is None else Level(min(team, skill))
 
 

@@ -38,6 +38,7 @@ from tilo_api.redaction import router as _redaction_router
 from tilo_api.sharing import WorldView
 from tilo_api.sharing import build_router as _build_sharing_router
 from tilo_api.tasks import router as _tasks_router
+from tilo_api.team_routes import router as _team_router
 from tilo_api.worlds_list import router as _worlds_list_router
 
 # Generated docs only in local dev mode: deployed, the service is public and the route list is not for
@@ -115,6 +116,7 @@ app.include_router(_assistant_router)
 app.include_router(_people.router)
 app.include_router(_effort_router)
 app.include_router(_schedules.router)
+app.include_router(_team_router)
 
 
 def _world_owner(world_id: str) -> str | None:
