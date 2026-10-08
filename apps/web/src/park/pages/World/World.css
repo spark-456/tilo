@@ -816,13 +816,95 @@
   white-space: nowrap;
 }
 
+/* ---- Build this in Lovable card (FR-CON-16) ---- */
+[data-park] .park-world-lovable {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 18px 18px 16px;
+  border: 1px solid var(--line2);
+  border-radius: 22px;
+  background: var(--card);
+}
+[data-park] .park-world-lovablehead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+[data-park] .park-world-lovabletitle {
+  font-size: 15px;
+  font-weight: 800;
+}
+[data-park] .park-world-lovablesub {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--ink3);
+}
+[data-park] .park-world-lovableprompt {
+  margin: 0;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: var(--sunk);
+  color: var(--ink);
+  font-family: "Nunito Sans", sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+[data-park] .park-world-lovablefiles {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+[data-park] .park-world-lovablefile {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: var(--sunk);
+}
+[data-park] .park-world-lovablepath {
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--ink);
+}
+[data-park] .park-world-lovablesummary {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ink2);
+}
+[data-park] .park-world-lovablelink {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 14px;
+  border-radius: 10px;
+  background: var(--hero);
+  color: #ffffff;
+  font-size: 13.5px;
+  font-weight: 800;
+  text-decoration: none;
+  white-space: nowrap;
+}
+[data-park] .park-world-lovablelink:hover {
+  color: #ffffff;
+  filter: brightness(1.08);
+}
+
 /* ---- Focus ring (README "Interactions and motion"): 3px #5A3FE0, offset 2px ---- */
 [data-park] .park-world-back:focus-visible,
 [data-park] .park-world-live:focus-visible,
 [data-park] .park-world-lenses a:focus-visible,
 [data-park] .park-world-spendlink:focus-visible,
 [data-park] .park-world-skillchip:focus-visible,
-[data-park] .park-world-toolchip:focus-visible {
+[data-park] .park-world-toolchip:focus-visible,
+[data-park] .park-world-lovablelink:focus-visible {
   outline: 3px solid #5a3fe0;
   outline-offset: 2px;
 }
