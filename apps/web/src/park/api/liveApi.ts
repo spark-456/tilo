@@ -13,6 +13,7 @@ import {
   decisionsFromCards,
 } from "./live/decisionsFromCards";
 import { type CostReport, ledgerFromCosts } from "./live/ledgerFromCosts";
+import { isNotificationPage, notificationsFromApi } from "./live/notificationsFromApi";
 import { worldFromIntake } from "./live/worldFromIntake";
 import { STATE_OF, type WorldListItem, worldsFromList } from "./live/worldsFromList";
 import type { Dec, DecisionKey, TierKey } from "./types";
@@ -154,6 +155,11 @@ export function createLiveApi(options: LiveApiOptions = {}): Api {
     const live = worldsFromList(items);
     const liveIds = new Set(live.map((w) => w.id));
     return { data: [...added.filter((w) => !liveIds.has(w.id)), ...live], source: "live" };
+  };
+  api.getNotifications = async () => {
+    const body = await http.getJson("/notifications?limit=100");
+    if (!isNotificationPage(body)) throw new TiloApiError(BAD_REPLY, 200, true);
+    return { data: notificationsFromApi(body.notifications), source: "live" };
   };
   const served = new Map<string, Answerable>();
   const answered: Dec = {};
