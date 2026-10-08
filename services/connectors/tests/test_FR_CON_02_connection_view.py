@@ -22,7 +22,7 @@ def _broker(store: InMemoryTokenStore, http: _Http) -> TokenBroker:
         kms=FakeKms(),
         http=http,
         settings=OAuthSettings(client_id="client-example", client_secret="-".join(["fake", "secret"])),
-        clock=lambda: "2026-10-08T00:00:00Z",
+        clock=lambda: "2026-10-08T00:00:00.000Z",
         emit=lambda _part: None,
     )
 
