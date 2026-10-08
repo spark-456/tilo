@@ -777,7 +777,10 @@
 }
 [data-park] .park-shell__tab:hover::before,
 [data-park] .park-shell__iconbtn:hover::before,
-[data-park] .park-shell__nrow:hover::before {
+[data-park] .park-shell__nrow:hover::before,
+[data-park] .park-shell__tab:focus-visible::before,
+[data-park] .park-shell__iconbtn:focus-visible::before,
+[data-park] .park-shell__nrow:focus-visible::before {
   opacity: 1;
 }
 /* The tab you are on keeps its own fill. */
@@ -823,12 +826,6 @@
 [data-park] .park-shell__main .park-skills-ask-knob,
 [data-park] .park-shell__main .park-agenda-knob {
   transition: transform 0.25s cubic-bezier(0.3, 1.3, 0.5, 1);
-}
-
-/* A ring on a page turns only while it is drawn, and it is drawn only while its action is in flight
-   (README Async actions: tiloSpin .7s). */
-[data-park] .park-shell__main .park-shell__ring--page {
-  animation: tiloSpin 0.7s linear infinite;
 }
 
 /* A toast, a popover or a menu comes in: from a few px up and transparent, over .25s (the shell's Enter component

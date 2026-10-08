@@ -85,9 +85,14 @@ describe("WEB-MOTION-3 css: hover, press and slide feedback is a transform trans
     }
   });
 
-  it("FR_UX_12 WEB-MOTION-3 css: the page spinner turns with the loader's tiloSpin .7s linear, forever, and only on the page ring class", () => {
-    const hit = rule(parseRules(shell()).rules, `${MAIN} .park-shell__ring--page`);
-    expect(hit?.decls.get("animation")).toMatch(/^tiloSpin \.?0?\.7s linear infinite$/);
+  it("FR_UX_12 WEB-MOTION-3 css: no page ring turns (the Home draft and the Connectors connect are stand-ins with no call behind them, HR-1)", () => {
+    const rules = parseRules(shell()).rules;
+    expect(rule(rules, `${MAIN} .park-shell__ring--page`)).toBeUndefined();
+    expect(
+      rules.filter(
+        (r) => r.selector.includes(MAIN) && !/^none/.test(r.decls.get("animation") ?? "none"),
+      ),
+    ).toEqual([]);
   });
 
   it("FR_UX_12 WEB-MOTION-3 css: toast, popover and menu come in with an opacity and transform transition from a pre state", () => {

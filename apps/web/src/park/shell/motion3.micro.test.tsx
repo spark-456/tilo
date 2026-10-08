@@ -4,7 +4,7 @@
 //  - A toast, the notifications popover and the account menu mount inside `.park-shell__enter`, which holds
 //    data-enter="pre" for the style flush and "in" once it has happened (no timer, no frame loop).
 //  - The root carries data-motion (the person's preference) so the stylesheet can turn motion off for 'still'.
-//  - The Home composer's ring and the Connectors spinner carry `park-shell__ring--page` ONLY while an action is in flight.
+//  - The Home composer's ring and the Connectors spinner do not turn: they stand in for no real call (HR-1).
 import { act } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, click, mount, q } from "../../../test-support/park/componentsHarness";
@@ -81,17 +81,13 @@ describe("WEB-MOTION-3 root: data-motion carries the person's motion preference"
   });
 });
 
-describe("WEB-MOTION-3 spinner: the ring turns only while a Home draft is in flight", () => {
-  it("FR_UX_12 WEB-MOTION-3 spinner: the drafting ring has the page ring class, and it is gone once the plan shows", async () => {
+describe("WEB-MOTION-3 spinner: a draft with no call behind it does not turn a ring", () => {
+  it("FR_UX_12 WEB-MOTION-3 spinner: the drafting ring is drawn while the draft shows but carries no page-ring class (HR-1)", async () => {
     const rig = await mountHome();
-    expect(rig.el.querySelector(".park-shell__ring--page")).toBeNull();
     typeInto(taskInput(rig.el), "Order laptops");
     clickEl(control(rig.el, "Start task"));
     await settleHome();
-    expect(rig.el.querySelector(".park-home-drafting .park-shell__ring--page")).not.toBeNull();
-    const draft = rig.sch.live().find((t) => t.ms === 900);
-    rig.sch.fire(draft);
-    await settleHome();
+    expect(rig.el.querySelector(".park-home-drafting .park-home-spin")).not.toBeNull();
     expect(rig.el.querySelector(".park-shell__ring--page")).toBeNull();
   });
 });
