@@ -141,7 +141,9 @@ def test_FR_ACC_01_an_unopenable_team_store_caps_spend_at_zero(env) -> None:  # 
     env.setenv("TILO_TEAM_STORE", "Firestore")
     env.setenv("K_SERVICE", "tilo-api")
     env.setenv("TILO_JUDGE_" + "LIVE", "1")  # spelled apart: the repo's guard hook looks for the literal
-    request = SimpleNamespace(app=SimpleNamespace(dependency_overrides={deps.get_spend_caps: lambda: caps}))
+    request = SimpleNamespace(
+        app=SimpleNamespace(dependency_overrides={deps.get_spend_caps: lambda: caps}), state=SimpleNamespace()
+    )  # state: spend_mode reads the gate's demo_session flag (BQ-SIGNIN-10)
     switches = spend.Switches(process_flags(), spend.InMemorySpendLedger(caps))
     assert deps.spend_mode(request, OWNER, "judge", switches) == ("replay", True)  # type: ignore[arg-type]
 
