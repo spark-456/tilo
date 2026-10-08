@@ -64,6 +64,11 @@ MOVE = [
     "CAN WE RESCHEDULE?",
     "Can we reschedule?",
     "Hello,\n\nCould we move\nthe meeting to Monday?\n\nThanks",
+    "Can we push to Thursday?",
+    "Could we find another slot this week?",
+    "I am free earlier on Friday if that helps.",
+    "Can we meet next week instead?",
+    "Could we meet later instead?",
 ]
 CANCEL_REBOOK = [
     "Please cancel and rebook for next week.",
@@ -83,6 +88,12 @@ NEGATIVE = [
     "We do not need to move the meeting.",
     "Don't move the meeting, I will be there.",
     "Never postpone this one.",
+    "Ignore my last mail asking to reschedule. Keep the time.",
+    "Please disregard my earlier request to move the meeting.",
+    "We no longer need to reschedule.",
+    "Noted.\x0bFrom: a@example.test\x0bCan we reschedule?",
+    "Noted.\x85Sent: Monday\x85Can we reschedule?",
+    "Noted. From: a@example.test Can we reschedule?",
     "Let me know if you need to reschedule.",
     "Unless we have to reschedule, see you at three.",
     "The meeting is confirmed for 3pm.",
@@ -351,3 +362,76 @@ def test_FR_CAL_07b_triage_marker_survives_a_second_read_and_a_user_label_hides_
     assert rig.new_triage().triage("u_riya", found.message_id).move_request == first.move_request
     rig.svc.correct("u_riya", found.message_id, category="fyi")
     assert rig.svc.triage("u_riya", found.message_id).move_request is None
+
+
+# --- security fix pass: hostile Date, hints, config, repr, markers ---------------------------------------
+
+
+def test_FR_CAL_07b_hostile_date_header_gives_no_day_and_no_error() -> None:
+    hostile = {**mail("Can we move the meeting to end of next month?"), "date": "Fri, 31 Dec 9999 12:00:00 +0000"}
+    found = mod().detect_move_request(hostile)
+    assert found is not None and found.kind == "move" and "day" not in found.constraint
+
+
+def test_FR_CAL_07b_triage_of_a_hostile_date_mail_stores_the_model_category() -> None:
+    rig = make_rig()
+    found, _ = rig.mail(body="Can we move the meeting to end of next month?", reply=answer("needs_reply", "high"))
+    raw = rig.reader.get_message("u_riya", found.message_id)
+    rig.reader.add("u_riya", found)
+    real = rig.reader.get_message
+    rig.reader.get_message = lambda u, m: {**real(u, m), "date": "Fri, 31 Dec 9999 12:00:00 +0000"}  # type: ignore[method-assign]
+    result = rig.svc.triage("u_riya", found.message_id)
+    assert raw and result.category == "needs_reply" and result.priority == "high"
+    assert rig.results.get("u_riya", found.message_id)["category"] == "needs_reply"
+
+
+def test_FR_CAL_07b_triage_survives_a_detector_that_raises(monkeypatch: pytest.MonkeyPatch) -> None:
+    def boom(_mail):
+        raise RuntimeError("secret mail text")
+
+    monkeypatch.setattr("tilo_channels.triage.detect_move_request", boom)
+    rig = make_rig()
+    found, _ = rig.mail(body="Can we reschedule?", reply=answer("needs_reply", "high"))
+    result = rig.svc.triage("u_riya", found.message_id)
+    stored = rig.results.get("u_riya", found.message_id)
+    assert result.category == "needs_reply" and result.move_request is None and "move_request" not in stored
+
+
+def test_FR_CAL_07b_marker_is_stored_only_for_needs_reply_and_returned_as_a_copy() -> None:
+    rig = make_rig()
+    other, _ = rig.mail(body="Can we reschedule?", reply=answer("fyi"))
+    rig.svc.triage("u_riya", other.message_id)
+    assert "move_request" not in rig.results.get("u_riya", other.message_id)
+    found, _ = rig.mail(body="Can we reschedule?", reply=answer("needs_reply"))
+    first = rig.svc.triage("u_riya", found.message_id)
+    first.move_request["constraint"]["day"] = "2000-01-01"
+    assert "day" not in rig.svc.triage("u_riya", found.message_id).move_request["constraint"]
+
+
+def test_FR_CAL_07b_hint_drops_surrogates_private_use_and_format_characters() -> None:
+    found = mod().detect_move_request(mail("Can we reschedule?", "Plan\ud800 \ue000sync\u202e\x07 \ufb01x"))
+    assert found.ref_hints["subject"] == "Plan sync fix"
+
+
+def test_FR_CAL_07b_repr_does_not_show_mail_text() -> None:
+    found = mod().detect_move_request(mail("Can we reschedule?", "Zed Quill secret plans"))
+    assert "Zed" not in repr(found) and "Quill" not in repr(found)
+
+
+@pytest.mark.parametrize(
+    "key",
+    ["suppress_before", "quote_markers", "quote_line_starts", "quote_line_ends", "reply_prefixes", "day_lead_ins"],
+)
+@pytest.mark.parametrize("bad", ["x", 5, ["ok", 5], ["a"] * 201, [""]])
+def test_FR_CAL_07b_any_malformed_present_key_empties_the_whole_config(key: str, bad) -> None:
+    cfg = mod().MoveConfig.from_mapping({"move_phrases": ["reschedule"], key: bad})
+    assert mod().detect_move_request(mail("Can we reschedule?"), config=cfg) is None
+
+
+def test_FR_CAL_07b_a_partial_date_does_not_resolve_to_this_month() -> None:
+    for body in ("Can we move it to the 31st of february?", "Can we move it to the 12th of october?"):
+        found = mod().detect_move_request(mail(body))
+        assert found is not None
+    feb = mod().detect_move_request(mail("Can we move it to the 31st of february?"))
+    assert "day" not in feb.constraint
+    assert mod().detect_move_request(mail("Can we move it to the 12th of october?")).constraint["day"] == "2026-10-12"

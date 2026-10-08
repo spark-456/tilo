@@ -25,12 +25,15 @@ from typing import Any
 import yaml
 from tilo_people.dates import resolve_due
 from tilo_people.errors import PeopleInputError
-from tilo_people.text import clean_line
 
 CONFIG_PATH = Path(__file__).resolve().parents[4] / "config" / "move_request.yaml"
 KINDS = ("move", "cancel_and_rebook", "ask_availability")
 RAW_HEADING, RAW_MESSAGE, SCAN_CHARS, HINT_HEADING = 500, 8_000, 4_096, 120
-MAX_PHRASES, MAX_PHRASE_CHARS, SUPPRESS_WINDOW, DAY_TRIES, SENTENCES_AHEAD = 200, 60, 4, 40, 4
+MAX_PHRASES, MAX_PHRASE_CHARS, SUPPRESS_WINDOW, DAY_TRIES, SENTENCES_AHEAD = 200, 60, 6, 40, 4
+_MONTH_WORDS = frozenset(
+    "january february march april may june july august september october november december "
+    "jan feb mar apr jun jul aug sep sept oct nov dec of".split()
+)  # a day token followed by one of these is part of a longer date that did not resolve
 
 _TOKEN = re.compile(r"[0-9]+(?:-[0-9]+)+|[a-z0-9']+(?:[.:][0-9]+)*")
 _SPLIT = re.compile(r"(?<=[.!?;:,])\s+|\n\s*\n")
@@ -63,10 +66,13 @@ def _words(value: str) -> str:
     return " ".join(_TOKEN.findall(value))
 
 
-def _strings(raw: Any, key: str) -> list[str]:
-    found = raw.get(key) if isinstance(raw, Mapping) else None
-    ok = isinstance(found, list) and len(found) <= MAX_PHRASES
-    return [s for s in found if isinstance(s, str) and 0 < len(s) <= MAX_PHRASE_CHARS] if ok and found else []
+def _strings(raw: Mapping[str, Any], key: str) -> list[str] | None:
+    """The list under `key` (absent: empty), or None when it is present but malformed."""
+    found = raw.get(key, [])
+    if isinstance(found, list) and len(found) <= MAX_PHRASES:
+        if all(isinstance(s, str) and 0 < len(s) <= MAX_PHRASE_CHARS for s in found):
+            return found
+    return None
 
 
 def _marker_re(markers: tuple[str, ...]) -> re.Pattern[str] | None:
@@ -94,8 +100,11 @@ class MoveConfig:
 
     @classmethod
     def from_mapping(cls, raw: Any) -> MoveConfig:
-        lists = {k: tuple(w for s in _strings(raw, k) if (w := _words(_fold(s, MAX_PHRASE_CHARS)))) for k in _LISTS}
-        lists.update({k: tuple(_fold(s, MAX_PHRASE_CHARS) for s in _strings(raw, k)) for k in _RAW_LISTS})
+        found = {k: _strings(raw, k) for k in (*_LISTS, *_RAW_LISTS)} if isinstance(raw, Mapping) else None
+        if found is None or any(v is None for v in found.values()):
+            return cls()  # any malformed list: nothing is ever a request (fail closed)
+        lists = {k: tuple(w for s in found[k] or () if (w := _words(_fold(s, MAX_PHRASE_CHARS)))) for k in _LISTS}
+        lists.update({k: tuple(_fold(s, MAX_PHRASE_CHARS) for s in found[k] or ()) for k in _RAW_LISTS})
         padded = {k: tuple(f" {w} " for w in lists[k]) for k in _LISTS[:4]}
         both = {**lists, **padded}
         return cls(
@@ -120,7 +129,9 @@ def _default() -> MoveConfig:
 class MoveRequest:
     kind: str  # one of KINDS
     constraint: dict[str, Any]  # day (YYYY-MM-DD), earliest_time / latest_time (HH:MM), duration_min: all from code
-    ref_hints: dict[str, str | None]  # subject (cleaned, bounded), ics_uid, thread_id (strict alphabet)
+    ref_hints: dict[str, str | None] = field(
+        repr=False
+    )  # mail text: never in a repr; subject (cleaned, bounded), ics_uid, thread_id (strict alphabet)
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -188,8 +199,10 @@ def _mail_time(value: Any) -> str | None:
 
 def _day(window: list[list[str]], cfg: MoveConfig, sent_at: str | None, zone: str) -> str | None:
     """The first phrase after a lead-in word (or opening a sentence) that `resolve_due` resolves; at most DAY_TRIES."""
+    if sent_at is None:
+        return None
     tries = 0
-    for sentence in window if sent_at else ():
+    for sentence in window:
         for i in range(len(sentence)):
             if i and sentence[i - 1] not in cfg.day_lead_ins:
                 continue
@@ -199,9 +212,11 @@ def _day(window: list[list[str]], cfg: MoveConfig, sent_at: str | None, zone: st
                     return None
                 try:
                     found = resolve_due(" ".join(sentence[i : i + n]), meeting_at=sent_at, time_zone=zone)
-                except PeopleInputError:
-                    return None
+                except (PeopleInputError, ValueError, OverflowError):
+                    return None  # a hostile Date header gets no day, never an error
                 if found.reason == "resolved":
+                    if sentence[i + n : i + n + 1] and sentence[i + n] in _MONTH_WORDS:
+                        break  # "the 31st of february": not the 31st of this month
                     return found.due
     return None
 
@@ -256,7 +271,8 @@ def _ref_hints(mail: Mapping[str, Any], heading: str) -> dict[str, str | None]:
     def ident(value: Any) -> str | None:
         return value if isinstance(value, str) and _ID.fullmatch(value) else None
 
-    cleaned = " ".join(clean_line(heading).split())[:HINT_HEADING]
+    squeezed = " ".join(unicodedata.normalize("NFKC", heading[:RAW_HEADING]).split())
+    cleaned = "".join(c for c in squeezed if unicodedata.category(c)[0] != "C")[:HINT_HEADING]
     return {
         "subject": cleaned or None,
         "ics_uid": ident(mail.get("ics_uid")),

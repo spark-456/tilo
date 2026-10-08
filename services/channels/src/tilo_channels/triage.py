@@ -135,8 +135,15 @@ def _result(message_id: str, doc: Mapping[str, Any]) -> TriageResult:
         priority=(None if doc["flagged"] else doc.get("label_priority")) or doc["priority"],  # flagged stays high
         source="user" if label else doc["source"],
         flagged=doc["flagged"],
-        move_request=doc.get("move_request") if category == "needs_reply" and not doc["flagged"] else None,
+        move_request=_marker_copy(doc.get("move_request"))
+        if category == "needs_reply" and not doc["flagged"]
+        else None,
     )
+
+
+def _marker_copy(stored: Any) -> dict[str, Any] | None:
+    """A copy of the stored marker, so a caller cannot change the stored document."""
+    return {"kind": stored["kind"], "constraint": dict(stored["constraint"])} if isinstance(stored, dict) else None
 
 
 class Triage:
@@ -195,9 +202,20 @@ class Triage:
                 category, source = "fyi", "rule"
         if sender is not None and sender in (prefs.get("vips") or ()):  # BQ-134: a VIP only raises priority
             priority = "high"
-        move = detect_move_request(mail)  # FR-CAL-07 b: rules only; the stored marker holds no subject or body
-        marker = {"move_request": {"kind": move.kind, "constraint": move.constraint}} if move else {}
-        return {**doc, "category": category, "priority": priority, "source": source, **marker}
+        return {**doc, "category": category, "priority": priority, "source": source, **self._marker(category, mail)}
+
+    @staticmethod
+    def _marker(category: str, mail: Mapping[str, Any]) -> dict[str, Any]:
+        """FR-CAL-07 b: rules only; the marker holds no subject or body. It can never fail the triage: any error
+        from the detector (the mail's Date is the sender's) means no marker, and only the exception type is logged."""
+        if category != "needs_reply":
+            return {}
+        try:
+            move = detect_move_request(mail)
+        except Exception as exc:
+            _LOG.info("move detector failed: %s", type(exc).__name__)
+            return {}
+        return {"move_request": {"kind": move.kind, "constraint": dict(move.constraint)}} if move else {}
 
     def _ask(self, fields: Mapping[str, str]) -> tuple[str, str, str]:
         capped = {name: text[: FIELD_CAPS[name]] for name, text in fields.items()}

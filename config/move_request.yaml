@@ -39,6 +39,14 @@ move_phrases:
   - alternative time
   - later time
   - earlier time
+  - push to
+  - find another slot
+  - another slot
+  - free earlier
+  - free later
+  - meet next week instead
+  - meet later instead
+  - meet earlier instead
 
 # A phrase that asks to cancel this meeting and book a new one (kind "cancel_and_rebook").
 cancel_and_rebook_phrases:
@@ -64,7 +72,7 @@ availability_phrases:
   - what is your availability
   - which times suit
 
-# A word or phrase in the four words before a hit that makes the hit not a request (negation, condition).
+# A word or phrase in the six words before a hit that makes the hit not a request (negation, condition).
 suppress_before:
   - not
   - dont
@@ -78,6 +86,9 @@ suppress_before:
   - if
   - in case
   - whether
+  - ignore
+  - disregard
+  - no longer
   - cannot
   - can't
   - wont
