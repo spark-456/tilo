@@ -17,6 +17,8 @@ import hashlib
 import json
 import logging
 import re
+import threading
+import time
 from collections.abc import Callable, Mapping
 from typing import Any, NamedTuple, Protocol
 
@@ -24,16 +26,18 @@ from pydantic import ValidationError
 from tilo_connectors.errors import AdapterError, PossiblySent, ProviderUnavailable, SideEffectRefused
 from tilo_connectors.meeting_host import CONNECTOR_ID, HostReceipt
 from tilo_contracts import (
+    MeetingHostRpcAlertPart,
     MeetingHostRpcConnectionPart,
     MeetingHostRpcError,
     MeetingHostRpcReceipt,
     MeetingHostRpcSendAnswer,
     MeetingHostRpcStatusAnswer,
 )
+from tilo_memory.artifacts import ArtifactCorrupt  # noqa: E402
 
 logger = logging.getLogger("tilo_api.meeting_host_rpc")
 URL_VAR = "TILO_CONNECTORS_URL"
-TIMEOUT_S = 20.0  # under the outbox's 30 s lease (HB-07)
+TIMEOUT_S = 20.0  # one deadline for the token fetch and the request together, under the outbox's 30 s lease (HB-07)
 MAX_REPLY_BYTES = 65_536
 _LABEL = r"[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?"
 _URL = re.compile(rf"https://(?:{_LABEL}\.)+run\.app")  # https only, a Cloud Run host, no user, port, path or query
@@ -115,6 +119,30 @@ class MeetingHostRpc:
         return "MeetingHostRpc()"
 
     def _post(self, route: str, payload: Mapping[str, Any]) -> bytes:
+        """The whole call (token fetch and request) under one deadline. Past it, the call is `not_sent` if the request
+        had not been handed to the transport yet, else `unknown`; the worker thread is left to finish on its own."""
+        stage = {"posted": False}
+        box: dict[str, Any] = {}
+        done = threading.Event()
+        deadline = time.monotonic() + self._timeout
+
+        def work() -> None:
+            try:
+                box["value"] = self._call(route, payload, stage, deadline)
+            except BaseException as exc:  # noqa: BLE001 - handed to the caller below
+                box["error"] = exc
+            finally:
+                done.set()
+
+        threading.Thread(target=work, name="meeting-host-rpc", daemon=True).start()
+        if not done.wait(self._timeout):
+            logger.warning("meeting-host %s: the deadline passed", route)
+            raise HostRpcError("unknown" if stage["posted"] else "not_sent")
+        if "error" in box:
+            raise box["error"]
+        return bytes(box["value"])
+
+    def _call(self, route: str, payload: Mapping[str, Any], stage: dict[str, bool], deadline: float) -> bytes:
         try:  # HB-01: minted per call for the connectors audience; failing here means nothing was sent
             token = self._token_for(self._base)
         except Exception:  # noqa: BLE001 - the metadata server's text is not ours to echo
@@ -122,8 +150,11 @@ class MeetingHostRpc:
             raise HostRpcError("not_sent") from None
         headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json", "Accept": "application/json"}
         data = json.dumps(payload, separators=(",", ":")).encode()
+        stage["posted"] = True
         try:
-            reply = self._transport.post(f"{self._base}/internal/meeting-host/{route}", data, headers, self._timeout)
+            reply = self._transport.post(
+                f"{self._base}/internal/meeting-host/{route}", data, headers, max(0.1, deadline - time.monotonic())
+            )
         except Exception:  # noqa: BLE001 - a timeout, a cut connection: it may have arrived
             logger.warning("meeting-host %s: the call failed in transit", route)
             raise HostRpcError("unknown") from None
@@ -143,7 +174,8 @@ class MeetingHostRpc:
             raise HostRpcError("unknown")
         return got
 
-    def send(self, entry: Mapping[str, Any], evidence: Mapping[str, Any], draft: Mapping[str, Any]) -> Any:
+    def send_invitation(self, entry: Mapping[str, Any], evidence: Mapping[str, Any], draft: Mapping[str, Any]) -> Any:
+        """A registered side-effect name (SEC-03): only `MeetingHostStub.execute_side_effect` calls it."""
         raw = self._post("send", {"entry": entry, "evidence": evidence, "draft": draft})
         try:
             answer = MeetingHostRpcSendAnswer.model_validate_json(raw)
@@ -200,20 +232,26 @@ class MeetingHostStub:
         self._evidence[outbox_id] = json.loads(json.dumps(evidence))
 
     def execute_side_effect(self, entry: Mapping[str, Any], grant: Any) -> None:
+        grant.verify(entry["idempotency_key"])  # SEC-03: only the outbox's own dispatch, before anything is read
         evidence, item = self._evidence.get(entry["id"]), entry["item"]
         if evidence is None:
             raise SideEffectRefused("no evidence was handed for this entry")
         try:
             raw = self._read_draft({"artifact_id": item["artifact_id"], "version": item["version"]})
+        except ArtifactCorrupt:  # AR-01: the bytes are not the pinned ones, and will not become so
+            raise SideEffectRefused("the pinned draft does not match its hash") from None
+        except Exception:  # noqa: BLE001 - any other read error may pass: nothing was sent, try again
+            raise NotSent("the pinned draft cannot be read now") from None
+        try:
             document = json.loads(raw)
-        except Exception:  # noqa: BLE001 - missing, tampered (AR-01) or not JSON: nothing was sent
-            raise SideEffectRefused("the pinned draft cannot be read") from None
+        except ValueError:
+            raise SideEffectRefused("the pinned draft is not a document") from None
         draft = {
             "artifact_id": item["artifact_id"], "version": item["version"],
             "content_sha256": hashlib.sha256(raw).hexdigest(), "content_b64": base64.b64encode(raw).decode("ascii"),
         }  # fmt: skip
         try:  # the outbox hands over the claimed ("sending") entry; the contract takes it as enqueued
-            answer = self._rpc.send({**entry, "state": "queued"}, evidence, draft)
+            answer = self._rpc.send_invitation({**entry, "state": "queued"}, evidence, draft)
         except HostRpcError as exc:
             if exc.kind == "refused":
                 raise SideEffectRefused("connectors refused the send") from None
@@ -242,9 +280,15 @@ class MeetingHostStub:
     def _deliver(self, parts: list[Any], user_id: str) -> None:
         """Only this call's own user's connection parts reach the sink (ADR-0032 decision 7)."""
         for part in parts:
-            if not (isinstance(part, MeetingHostRpcConnectionPart) and part.user_id == user_id):
+            if isinstance(part, MeetingHostRpcAlertPart):  # ids only; the run records it once
+                handed: dict[str, Any] = {
+                    "type": part.type, "authz": None, "data": {"alert_id": part.alert_id, "card_id": None},
+                }  # fmt: skip
+            elif isinstance(part, MeetingHostRpcConnectionPart) and part.user_id == user_id:
+                handed = {"type": part.type, "authz": None, "data": {"connector": CONNECTOR_ID}, "user_id": user_id}
+            else:
                 continue
             try:
-                self._sink({"type": part.type, "authz": None, "data": {"connector": CONNECTOR_ID}, "user_id": user_id})
+                self._sink(handed)
             except Exception as exc:  # noqa: BLE001 - a sink error never fails the call
                 logger.warning("a connection part was not handled (%s)", type(exc).__name__)

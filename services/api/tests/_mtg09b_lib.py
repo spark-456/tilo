@@ -312,6 +312,8 @@ class InProcessConnectors:
         from tilo_connectors.host_routes import AUDIENCE_VAR, CALLER_VAR, HostRuntime  # noqa: PLC0415
 
         self.audience = "https://tilo-connectors-" + secrets.token_hex(3) + ".a.run.app"
+        self.script: list[Any] = []  # callables(body) -> Reply, used instead of the real routes, one per call
+        self.lose_answers = 0  # this many calls reach connectors for real, then their answer is lost in transit
         caller, self.id_token, self.down = (
             "api-" + secrets.token_hex(3) + "@demo-tilo.example.test",
             secrets.token_hex(12),
@@ -339,11 +341,20 @@ class InProcessConnectors:
         self.rpc = MeetingHostRpc(self.audience, transport=self, token_for=lambda audience: self.id_token)
 
     def post(self, url: str, body: bytes, headers: Any, timeout_s: float) -> Any:
-        from tilo_api.meeting_host_rpc import Reply  # noqa: PLC0415
+        from tilo_api.meeting_host_rpc import (
+            Reply,  # noqa: PLC0415
+            TransportError,  # noqa: PLC0415
+        )
 
         if self.down:
             return Reply(503, b'{"error":"not_configured"}')
+        sending = url.endswith("/send")  # the scripted and lost answers are the send's; a status call is real
+        if self.script and sending:
+            return self.script.pop(0)(body)
         response = self.client.post(url.removeprefix(self.audience), content=body, headers=dict(headers))
+        if self.lose_answers and sending:
+            self.lose_answers -= 1
+            raise TransportError
         return Reply(response.status_code, response.content)
 
 

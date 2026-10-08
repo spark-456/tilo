@@ -167,11 +167,13 @@ class HostRun(Run):
         self, seams: HostSeams, task: deps.TaskRecord, draft: MeetingEventDraft, still_hosted: Callable[[], bool]
     ) -> None:
         self.draft, self.still_hosted = draft, still_hosted
+        self._alerted: set[str] = set()
+        self._alert_lock = threading.Lock()
         scope = Scope(deps.ORG_ID, task.world_id, task.owner)
         self.receipts = _Receipts(seams.artifacts, scope, task.run_id)
         self.stub = MeetingHostStub(  # the Google call is connectors' (ADR-0032); this run keeps the draft and receipts
             seams.host_client, lambda ref: seams.artifacts.read(scope, ref),
-            lambda part: on_connection_event(part, outbox_store=seams.outbox_store), self.receipts.put,
+            self._part_sink, self.receipts.put,
         )  # fmt: skip
 
         def resolver(**_: Any) -> dict:  # step 5 of the gate: the draft's own list, never the address book
@@ -188,6 +190,51 @@ class HostRun(Run):
 
     def _compile(self, context: Any) -> dict:
         return _plan()
+
+    def _outbox(self) -> Outbox:
+        """The generic run's outbox plus an alert sink: a possibly-sent invitation is never only a parked alert."""
+        return Outbox(
+            self.seams.outbox_store, self.seams.adapters, emit=self._record_transfer, clock=events.now,
+            world_id=self.world_id, halted=self.paused, alert=lambda part: self._record_alert(part["data"]["alert_id"]),
+        )  # fmt: skip
+
+    def _part_sink(self, part: Mapping[str, Any]) -> None:
+        """What connectors' answer carried (ADR-0032 decision 7): an alert is recorded, a connection part abandons."""
+        if part["type"] == "alert.raised":
+            self._record_alert(part["data"]["alert_id"])
+        else:
+            on_connection_event(part, outbox_store=self.seams.outbox_store)
+
+    def _record_alert(self, alert_id: str) -> None:
+        """One `alert.raised` per alert id, ids only (FR-AGT-13): a person must check the host calendar."""
+        with self._alert_lock:
+            send = self.sends.get(alert_id) or next(iter(self.sends.values()), None)
+            if alert_id in self._alerted or send is None:
+                return
+            self.put(
+                "alert.raised", send["worker"], send["island"], "A person must check whether the invitation went out.",
+                {"alert_id": alert_id, "card_id": None}, district=send["district"], cause=send["cause"],
+                severity="needs_you", check_pause=False,
+            )  # fmt: skip
+            self._alerted.add(alert_id)
+
+    def _may_have_sent(self, outbox_id: str) -> bool:
+        return outbox_id in self._alerted or bool(self.seams.outbox_store.retry_state(outbox_id).get("ambiguous"))
+
+    def _abandon_unsent(self) -> None:
+        """As the generic run, except an entry that may have gone out is never failed: it stays, with one alert."""
+        store = self.seams.outbox_store
+        for outbox_id, send in list(self.sends.items()):
+            entry = store.get(outbox_id)
+            if "committed" in send or entry is None or entry["state"] not in _UNSENT:
+                continue
+            try:
+                if self._may_have_sent(outbox_id):
+                    self._record_alert(outbox_id)
+                else:
+                    self._outbox().abandon(outbox_id)
+            except Exception:
+                logger.warning("run %s left entry %s to its sender", self.run_id, outbox_id)
 
     def _must_ask(self, config: Any) -> None:
         return None  # the owner's own request replaces the "go ahead?" question; the gate card is the one authorisation
@@ -219,7 +266,12 @@ class HostRun(Run):
         if not ok:
             raise _GateFailed("the meeting changed or was deleted, so nothing was sent")
         self.stub.hand_evidence(entry["id"], evidence)  # connectors checks the same case again (HB-04)
-        transfer = await super()._send(entry, evidence)
+        try:
+            transfer = await super()._send(entry, evidence)
+        except _GateFailed:
+            if self._may_have_sent(entry["id"]):  # the world says what it knows, not that nothing was sent
+                raise _GateFailed("the invitation may have gone out; check the host calendar") from None
+            raise
         try:
             self._after_send(entry, transfer)
         except Exception as exc:  # the invitation went out; the run says so plainly

@@ -32,6 +32,7 @@ from tilo_connectors._schema import host_rpc_validator
 from tilo_connectors.adapters import side_effect_marker
 from tilo_connectors.meeting_host import HostReceipt
 from tilo_connectors.outbox import RetryPolicy
+from tilo_memory.artifacts import ArtifactCorrupt, ArtifactNotFound
 
 CONTRACTS = pathlib.Path(__file__).resolve().parents[3] / "contracts"
 BASE = json.loads((CONTRACTS / "fixtures/meeting_host_rpc.send_request/valid/owner_and_one_invitee.json").read_text())
@@ -203,7 +204,7 @@ def test_ADR32_T4_FR_MTG_09_a_token_that_cannot_be_minted_sends_nothing_and_is_a
 
 
 def test_ADR32_T4_FR_MTG_09_a_missing_evidence_or_unreadable_draft_is_refused_before_anything_is_posted():
-    rig = Rig(answer("sent"), read_draft=lambda ref: (_ for _ in ()).throw(LookupError("gone")))
+    rig = Rig(answer("sent"), read_draft=lambda ref: (_ for _ in ()).throw(ArtifactCorrupt("AR-01")))
     assert rig.run()["state"] == "failed" and rig.transport.calls == [] and rig.alerts() == []
     rig = Rig(answer("sent"))
     rig.stub._evidence.clear()
@@ -229,16 +230,17 @@ def test_ADR32_T4_FR_MTG_09_own_connection_parts_reach_the_sink_even_when_the_se
     assert rig.sunk == [{"type": kind, "authz": None, "data": {"connector": CONNECTOR}, "user_id": OWNER}]
 
 
-def test_ADR32_T4_FR_MTG_09_a_part_for_another_user_is_dropped_in_code():
+def test_ADR32_T4_FR_MTG_09_a_part_for_another_user_is_dropped_in_code_and_an_alert_part_is_handed_on():
+    alert = {"type": "alert.raised", "alert_id": "01JB5VQ0000000000000009311"}
     parts = [
         part("connection.revoked", STRANGER),
         part("connection.expired", OWNER),
         part("connection.expired", STRANGER),
     ]
-    parts.append({"type": "alert.raised", "alert_id": "01JB5VQ0000000000000009311"})
-    rig = Rig(answer("sent", parts=parts))
+    rig = Rig(answer("sent", parts=[*parts, alert]))
     rig.run()
-    assert [(p["type"], p["user_id"]) for p in rig.sunk] == [("connection.expired", OWNER)]
+    assert [(p["type"], p.get("user_id")) for p in rig.sunk] == [("connection.expired", OWNER), ("alert.raised", None)]
+    assert rig.sunk[1]["data"] == {"alert_id": alert["alert_id"], "card_id": None}
 
 
 def test_ADR32_T4_FR_MTG_09_a_sink_that_raises_never_fails_the_call():
@@ -371,3 +373,70 @@ def test_ADR32_T4_FR_MTG_09_the_client_seam_builds_once_and_a_failed_build_waits
     now[0] += 31
     first = deps.get_meeting_host_client()
     assert deps.get_meeting_host_client() is first and len(opened) == 2, "fixed setting: no restart, then cached"
+
+
+# --- security round 1 follow-ups ---
+
+
+def test_ADR32_T4_FR_MTG_09_the_stub_demands_the_outbox_grant_before_anything_is_read_or_posted():
+    from tilo_connectors.errors import MissingGrant
+    from tilo_connectors.outbox import Grant
+
+    read: list[Any] = []
+    rig = Rig(answer("sent"), read_draft=lambda ref: read.append(ref) or RAW)
+    with pytest.raises(MissingGrant):
+        rig.stub.execute_side_effect(copy.deepcopy(ENTRY), Grant(ENTRY["world_id"], ENTRY["idempotency_key"]))
+    assert read == [] and rig.transport.calls == []
+
+
+def test_ADR32_T4_FR_MTG_09_the_client_send_is_a_registered_side_effect_name_only_the_stub_may_call():
+    import ast
+
+    from tilo_connectors.side_effects import SIDE_EFFECT_METHOD_NAMES, scan_for_side_effect_calls
+
+    assert "send_invitation" in SIDE_EFFECT_METHOD_NAMES and not hasattr(MeetingHostRpc, "send")
+    src = pathlib.Path(meeting_host.__file__).parent
+    files = [p for p in src.rglob("*.py") if p.name != "meeting_host_rpc.py"]
+    assert scan_for_side_effect_calls(files, allowed_path=src / "meeting_host_rpc.py") == []
+    assert {n for n in dir(MeetingHostRpc) if not n.startswith("_")} == {"status", "send_invitation"}
+    tree = ast.parse((src / "meeting_host_rpc.py").read_text(encoding="utf-8"))
+    callers = [
+        c.name
+        for c in ast.walk(tree)
+        if isinstance(c, ast.FunctionDef)
+        and any(isinstance(n, ast.Attribute) and n.attr == "send_invitation" for n in ast.walk(c))
+    ]
+    assert callers == ["execute_side_effect"]
+
+
+def test_ADR32_T4_FR_MTG_09_one_deadline_covers_the_token_fetch_and_the_request():
+    import threading
+
+    stuck = threading.Event()
+
+    def hang(*_a: Any) -> Any:
+        stuck.wait(5)
+        raise RuntimeError
+
+    slow_token = MeetingHostRpc(URL, transport=Scripted(), token_for=hang, timeout_s=0.2)
+    with pytest.raises(HostRpcError) as no_token:
+        slow_token.status(OWNER)
+    assert no_token.value.kind == "not_sent"
+    slow_post = MeetingHostRpc(URL, transport=type("T", (), {"post": hang})(), token_for=lambda a: "t", timeout_s=0.2)
+    with pytest.raises(HostRpcError) as lost:
+        slow_post.status(OWNER)
+    assert lost.value.kind == "unknown"
+    stuck.set()
+
+
+@pytest.mark.parametrize(
+    ("raises", "final"),
+    [(ArtifactCorrupt("AR-01"), True), (ArtifactNotFound("gone"), False), (OSError("blob store down"), False)],
+)
+def test_ADR32_T4_FR_MTG_09_only_a_hash_mismatch_of_the_draft_is_final(raises, final):
+    def read(ref: Any) -> bytes:
+        raise raises
+
+    rig = Rig(answer("sent"), read_draft=read)
+    settled = rig.run()
+    assert (settled["state"] == "failed") is final and rig.transport.calls == [] and not rig.ambiguous()
