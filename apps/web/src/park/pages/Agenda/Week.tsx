@@ -104,7 +104,7 @@ function Calendar({ A, EV, ui, app }: { A: Agenda; EV: Ev[]; ui: AgendaUi; app: 
                   <span className="park-agenda-eventline">
                     <span className="park-agenda-eventtitle">{e.t}</span>
                     {joinsOf(e, ui.flags) ? (
-                      <span className="park-agenda-badge">
+                      <span role="img" aria-label="Tilo joins" className="park-agenda-badge">
                         {face({ rank: "director", expr: "neutral" }, 15, app.night)}
                       </span>
                     ) : null}
