@@ -382,6 +382,24 @@ def resolve_due(due_text: object, *, meeting_at: str, time_zone: str) -> DueReso
   before the request day but on or after D0 stays (the plate shows it overdue, PE-28); there is no
   `now` argument. Dates are computed on `date` values, so DST never shifts a day once D0 is known.
 
+## 3b. Free slots (FR-CAL-07b-1) — `tilo_people.free_slots`
+
+```python
+def find_free_slots(entries, *, owner, now, tz, duration_min, working_window=("09:00", "18:00"),
+                    working_days=(0, 1, 2, 3, 4), not_before=None, not_after=None, count=3, step_min=15,
+                    buffer_min=0, default_entry_min=60, horizon_days=14) -> tuple[str, ...]
+def parse_working_window(raw) -> tuple[str, str]   # {start, end} of config/personal.yaml; raises FreeSlotError
+class FreeSlotError(PeopleInputError): reason: str  # a code, never record text
+```
+
+Returns up to `count` UTC start timestamps, earliest first, strictly increasing, each fitting `duration_min`
+plus `buffer_min` either side free inside `working_window` (local to `tz`) on `working_days` (Monday 0), on the
+local `step_min` grid, no later than `now` + 14 days and ending by `not_after`. Busy: the owner's `accepted`
+entries and the owner's `free_busy` intervals; all-day blocks its local day; no end blocks `default_entry_min`.
+Refused with a reason: `bad_owner`, `bad_time_zone`, `bad_window`, `bad_duration` (not an int >= 1),
+`duration_too_long` (longer than the window), `bad_working_days`, `bad_count`, `bad_step`, `bad_buffer`,
+`bad_default`, `bad_horizon`, `bad_time`, `bad_entry`, `too_many_entries` (over 2000).
+
 ## 4. Write checks (PPL-10c) — PE-02, PE-04, PE-07, PE-17, PE-19
 
 ```python

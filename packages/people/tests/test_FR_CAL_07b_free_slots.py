@@ -66,7 +66,8 @@ def test_FR_CAL_07b_overlapping_and_gap_too_small():
         entry(local("2026-10-07", "09:30"), local("2026-10-07", "10:30"), i=2),
         entry(local("2026-10-07", "10:45"), local("2026-10-07", "12:00"), i=3),
     ]
-    assert slots(es, count=1) == (local("2026-10-07", "10:30"),)
+    assert slots(es, count=1, duration_min=15) == (local("2026-10-07", "10:30"),)
+    assert slots(es, count=1) == (local("2026-10-07", "12:00"),)
     assert slots(es, count=1, duration_min=45) == (local("2026-10-07", "12:00"),)
 
 
@@ -97,7 +98,7 @@ def test_FR_CAL_07b_free_busy_intervals_block():
 def test_FR_CAL_07b_working_days_and_window_and_range_limits():
     fri = "2026-10-09T10:00:00.000Z"  # 15:30 IST Friday
     got = slots([], now=fri, count=2, duration_min=60)
-    assert got == (local("2026-10-09", "16:00"), local("2026-10-09", "17:00"))
+    assert got == (local("2026-10-09", "15:30"), local("2026-10-09", "16:30"))
     got = slots([], now=fri, count=3, duration_min=60)
     assert got[2] == local("2026-10-12", "09:00")  # weekend skipped
     assert slots([], now=fri, working_days=(5, 6), count=1) == (local("2026-10-10", "09:00"),)
