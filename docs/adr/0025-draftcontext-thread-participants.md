@@ -141,6 +141,19 @@ questions below replace the supervisor's relayed answers.
    does not contradict itself.
 3. PR #525 merged as the interim fix (already done); CHN-GATE-E builds on it.
 
+### Amendment 8 Oct (supervisor, fail closed, user may widen)
+Display names vouch nothing. Decisions 3 and 4 above are tightened: the only name source is the BASE address local part
+(a plus tag dropped, split on `. _ - +`, then the filter of decision 4) of an address in the thread, and the gate still
+takes only those of the draft's own To and Cc and of the mailbox. The To / Cc display names on the user's own SENT
+mail and the mailbox's From name on SENT mail are no longer sources. Reason: Gmail's reply copies the inbound From
+display name into the SENT To, so a name a sender chose reaches the user's own mail once the user replies by hand
+(bench: `Prepaid Approved <mallory@...>`, a manual reply, then "Hi Prepaid Approved, works for us." rode L2). A plus tag
+is free text too (a header-only message From the mailbox could write `david.miller+approved.prepaid@...` into a Cc and
+name David). Effect: more safe false positives (T3, a person decides), e.g. "Hi Sarah" when the mailbox is `ops@` and no
+`sarah*` address is a recipient. It is a tightening within the risk the user accepted, not a widening; the user may
+widen it later (for example display names on SENT mail again, once the production reader carries `label_ids`). The
+parser also reads at most 60,000 header characters per call (fewer names past it).
+
 ## Questions for the user (resolved by the user, 2026-10-07)
 No row goes into `docs/open-questions.md`: all three are answered, and this ADR is the record.
 1. Accept the residual risk, or land the BQ-274 inbound word-edge fix before CHN-GATE-E merges?

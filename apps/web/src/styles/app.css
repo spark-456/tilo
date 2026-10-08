@@ -2906,3 +2906,50 @@ html[data-density="professional"] .app-shell {
     border-radius: var(--radius-cards) var(--radius-cards) 0 0;
   }
 }
+/* FR-AGT-14 S-03 "Repeat weekly": a checkbox row, and its day, time and zone when switched on. */
+.repeat-weekly {
+  margin: 0 0 var(--space-8);
+  font: 700 var(--text-14) var(--font-ui);
+}
+.repeat-weekly-toggle,
+.repeat-weekly-fields {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-8);
+  min-height: 24px;
+}
+.repeat-weekly-toggle input {
+  width: 24px;
+  height: 24px;
+}
+.repeat-weekly-fields {
+  margin-top: var(--space-8);
+  font-weight: 600;
+}
+.repeat-weekly-fields select,
+.repeat-weekly-fields input {
+  min-height: 24px;
+  padding: var(--space-4) var(--space-8);
+  border: 1px solid var(--color-ink-2);
+  border-radius: var(--radius-controls);
+  background: var(--color-surface-1);
+  color: var(--color-ink-1);
+  font: 700 var(--text-14) var(--font-ui);
+}
+.repeat-weekly-tz,
+.repeat-weekly-hint {
+  flex: 1 0 100%;
+  color: var(--color-ink-2);
+  font-weight: 400;
+}
+@media (max-width: 767px) {
+  .repeat-weekly-toggle input,
+  .repeat-weekly-fields select,
+  .repeat-weekly-fields input {
+    min-height: 44px; /* the phone touch target */
+  }
+  .repeat-weekly-toggle input {
+    min-width: 44px;
+  }
+}
