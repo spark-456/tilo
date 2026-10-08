@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://contracts.tilo.example/common.schema.json",
-  "x-version": "1.4.0",
+  "x-version": "1.5.0",
   "title": "Common",
   "description": "Definitions shared by every Tilo contract. The root is a sampler with one optional property per definition so that fixtures and generated types cover each one; no service sends a Common document.",
   "type": "object",
@@ -14,6 +14,7 @@
     "severity": { "$ref": "#/$defs/severity" },
     "risk_tier": { "$ref": "#/$defs/risk_tier" },
     "autonomy_level": { "$ref": "#/$defs/autonomy_level" },
+    "tool_access_level": { "$ref": "#/$defs/tool_access_level" },
     "authz": { "$ref": "#/$defs/authz" },
     "artifact_ref": { "$ref": "#/$defs/artifact_ref" },
     "destination": { "$ref": "#/$defs/destination" },
@@ -93,6 +94,11 @@
       "description": "Autonomy level (PRD 10.4): L0 observe, L1 ask each time (default), L2 instruction is approval, L3 standing rules.",
       "type": "string",
       "enum": ["L0", "L1", "L2", "L3"]
+    },
+    "tool_access_level": {
+      "description": "Plain-language access level for one connector (FR-ACC-01, BQ-DSN-04, 1.5.0, ADR-0027): a ceiling on the risk tier an action of that connector may reach before the policy engine. off blocks every action, read allows reads only, draft allows reads and T1, act allows up to the policy engine's own ceiling (a T3 action still needs a person). It never authorises anything; a skill's level only lowers the team's (FR-ACC-02).",
+      "type": "string",
+      "enum": ["off", "read", "draft", "act"]
     },
     "authz": {
       "description": "Who authorised a side effect (BQ-01, ADR-0002): a person, a policy or a Team Lead, with the id of that authority and when. A model is never an authority. ref must match by: a user id for a person, a policy id for a policy, a Team Lead id for a Team Lead.",
