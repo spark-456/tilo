@@ -74,6 +74,9 @@ def test_FR_AGT_14_reenable_still_clears_failures_backoff_and_error(rig: StoreRi
         assert rig.store.claim("sched_a", due) is True
         rig.store.record_failure("sched_a", due, error="start_failed")
         assert rig.store.get("sched_a").failures == 1
+        rig.store.update(
+            "sched_a", enabled=False
+        )  # only an OFF schedule is moved on re-enable (schedule_store._update)
     rig.store.update("sched_a", enabled=True)
     got = rig.store.get("sched_a")
     assert (got.enabled, got.failures, got.backoff_until, got.last_error) == (True, 0, None, None)

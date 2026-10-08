@@ -85,9 +85,10 @@ def _rows(out: str) -> dict[str, str]:
     return {line.split()[0].removeprefix("variant="): line for line in out.splitlines() if line.startswith("variant=")}
 
 
-def _empty_property(config: Any) -> bool:  # Google stand-in: refuses an untyped (empty) property schema
-    schema = getattr(config, "response_json_schema", None) or {}
-    return any(sub == {} for sub in (schema.get("properties") or {}).values())
+def _empty_property(config: Any) -> bool:  # Google stand-in: refuses any structured-output schema at all. (The real
+    # causes, an untyped property, null branches and array bounds, never reach the wire any more: the sanitizer drops
+    # or collapses them, see test_PL_02_untyped_schema.py; so this stands in for "the schema is the problem".)
+    return getattr(config, "response_json_schema", None) is not None
 
 
 def test_PL_02_director_variants_are_listed_first_and_in_order() -> None:
@@ -124,7 +125,7 @@ def test_PL_02_director_exact_is_the_adapters_own_config_with_a_small_cap() -> N
     exact = models.configs[0]
     assert exact.system_instruction == DIRECTOR.system
     assert exact.response_mime_type == "application/json"
-    assert exact.response_json_schema["properties"]["loose"] == {}  # what the real send carries
+    assert "loose" not in exact.response_json_schema["properties"]  # the sanitizer drops the untyped property
     assert exact.max_output_tokens == 128  # the probe's cap, not the role's 16384
     assert exact.thinking_config is None  # the real brief request sends none
 
@@ -135,7 +136,7 @@ def test_PL_02_director_removal_variants_pin_the_cause_when_exact_is_rejected() 
     assert code == 0, err
     rows = _rows(out)
     assert " status=rejected " in rows["director_exact"] + " " and "http=400" in rows["director_exact"]
-    assert " status=ok " in rows["director_schema_no_empty"] + " "
+    assert " status=rejected " in rows["director_schema_no_item_bounds"] + " "  # the sanitizer already dropped bounds
     assert " status=ok " in rows["director_no_schema"] + " "
     for name in ("director_no_system", "director_system_no_role", "director_schema_no_titles"):
         assert " status=rejected " in rows[name] + " ", rows[name]
@@ -158,7 +159,7 @@ def test_PL_02_director_each_variant_changes_exactly_its_field() -> None:
     assert by_name["director_no_schema"].response_mime_type == "application/json"
     assert "loose" not in by_name["director_schema_no_empty"].response_json_schema["properties"]
     deadline = by_name["director_schema_no_null_anyof"].response_json_schema["properties"]["deadline"]
-    assert deadline == {"type": "string"}
+    assert deadline == {"type": "string"}  # nullable removed (the sanitizer sends it as nullable: true)
     assert "title" not in str(by_name["director_schema_no_titles"].response_json_schema)
     assert "maxItems" not in str(by_name["director_schema_no_item_bounds"].response_json_schema)
     for name, config in by_name.items():
