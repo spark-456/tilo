@@ -1,11 +1,8 @@
 # ADR-0029: Live web search, fetch, media input and prices
 
-- Status: Proposed. Written by the architect on 2026-10-08 for the user's approval. Every change is
-  additive, but `providers`, `artifact` and `common` are frozen contracts (CP0, 29 Sep), so nothing
-  that depends on them merges until the user says yes. **The user should check decisions 1 to 9
-  and the price table.** One price question is already answered: on 2026-10-08 the supervisor
-  relayed the user's answer to BQ-LW-7, "meter flash at the full 0.825/4.125 (cached 0.0825)
-  while Google's 50% net-spend credit runs, and reconcile against the bill net of credits".
+- Status: Accepted (user approved 8 Oct 2026). BQ-LW-7 was answered earlier on 2026-10-08 by the
+  supervisor relaying the user: "meter flash at the full 0.825/4.125 (cached 0.0825) while Google's
+  50% net-spend credit runs, and reconcile against the bill net of credits".
 - Deciders: user (approval), architect
 - Requirements: PL-03, PL-06, FR-MTR-01, EFF-03, EFF-04 (prices and router); PRD 12.2 web search
   (Must), 12.3, FR-CON-10, SEC-05, SEC-09 (search and fetch); FR-INT-01, FR-INT-02 (media);
