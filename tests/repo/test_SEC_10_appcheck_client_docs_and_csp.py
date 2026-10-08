@@ -113,6 +113,7 @@ def test_SEC_10_hosting_csp_stays_tight(repo_root: pathlib.Path) -> None:
     off_origin = {s for name in ("script-src", "connect-src", "frame-src") for s in csp.get(name, []) if "://" in s}
     allowed = RECAPTCHA_SCRIPT_ORIGINS | {RECAPTCHA_FRAME_ORIGIN, APPCHECK_CONNECT_ORIGIN}
     allowed |= {SIGN_IN_SCRIPT_ORIGIN, SIGN_IN_FRAME_ORIGIN} | SIGN_IN_CONNECT_ORIGINS
+    allowed |= {"https://tilo-api-4qhkpsn5ga-as.a.run.app"}  # WEB-TO-API: the one tilo-dev API origin
     assert off_origin <= allowed, off_origin
 
 

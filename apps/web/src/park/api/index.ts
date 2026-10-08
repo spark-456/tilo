@@ -16,6 +16,7 @@ import type {
   Notification,
   Plan,
   ProfileSettings,
+  QuickReply,
   Skill,
   StartAck,
   Team,
@@ -80,3 +81,16 @@ export interface Api {
   addBackup(personId: string): R<Ack>;
   setPref(key: string, value: unknown): R<Ack>;
 }
+
+/**
+ * Quick (COST-FAST-1): `startWorld` takes a third argument at run time, "quick", and then answers with a
+ * `QuickReply` (a direct answer or an offer to switch) and makes no world. It is not in the `Api` type because
+ * `types.test.ts` pins `startWorld`'s parameters and `keyof Api`; Thinking calls stay exactly two arguments.
+ * `mode` is only the size on screen and never reaches the server. This one helper is the only caller.
+ */
+export const askQuick = (api: Api, mode: TierKey, query: string): R<QuickReply> =>
+  (api.startWorld as unknown as (m: TierKey, q: string, effort: "quick") => R<QuickReply>)(
+    mode,
+    query,
+    "quick",
+  );

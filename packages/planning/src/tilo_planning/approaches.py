@@ -2,7 +2,8 @@
 provider layer's router (PL-01), which checks the reply's shape against `plan.schema.json#/$defs/approach`.
 Whether the set is usable is deterministic code: every pair differs on at least 2 of the 5 dimensions (PG-08),
 ranges are ordered (PG-09) and ids are unique (PG-07). A set that breaks a rule is sent back once through the
-router with the problems named; if it still breaks one it is rejected, never returned."""
+router with the problems named; if it still breaks one it is rejected, never returned. Too many skips for the room
+that gap lines leave is not a model matter (COST-FAST-2, PRD 6.6): `trim_skips` cuts them in code, no second call."""
 
 from __future__ import annotations
 
@@ -27,6 +28,7 @@ from tilo_planning.gaps import Gap
 DIMENSIONS = ("depth", "sources", "parallelism", "verification", "output_format")
 MIN_DIFFERING = 2
 MAX_SKIPS = 5  # plan.schema.json approach.skips maxItems
+APPROACHES_THINKING = "medium"  # weighing 2-3 approaches needs some thought; the default (high) is billed as output
 
 
 class ApproachProposalError(Exception):
@@ -90,6 +92,13 @@ def problems(approaches: list[dict[str, Any]], *, skip_room: int = MAX_SKIPS) ->
     return found
 
 
+def trim_skips(approaches: list[dict[str, Any]], room: int) -> list[dict[str, Any]]:
+    """COST-FAST-2: keep each approach's first `room` skips in the model's order and drop the tail. Pure (a new list;
+    the input is untouched), stable and idempotent; nothing else about an approach changes, so distinctness (PG-08),
+    ranges (PG-09) and ids (PG-07) are unaffected and a schema-valid approach stays schema-valid."""
+    return [{**a, "skips": list(a.get("skips", []))[: max(room, 0)]} for a in approaches]
+
+
 def _data(text: str, marker: str) -> str:
     """Delimited data never closes its own block (PRD 16.3 item 1)."""
     return neutralise_marker(text, marker)
@@ -101,6 +110,7 @@ def _ask(router: Router, prompt: str, budget: float | None) -> tuple[RouterResul
         prompt=prompt,
         json_mode=True,
         response_schema=_Reply.model_json_schema(),
+        thinking_level=APPROACHES_THINKING,
     )
     try:
         run = router.generate(DIRECTOR_ROLE, request, budget=budget, required_capability=Capability.JSON)
@@ -131,14 +141,16 @@ def propose_approaches(
     brief_text = _data(json.dumps(brief, ensure_ascii=False, indent=2), "BRIEF")
     prompt = load_prompt(DIRECTOR_ROLE, "approaches_task.md", {"brief": brief_text, "skip_room": room})
     run, approaches = _ask(router, prompt, budget)
+    approaches = trim_skips(approaches, room)  # over the room: cut in code, never a repair call (COST-FAST-2)
     runs = [run]
-    if found := problems(approaches, skip_room=room):  # one repair through the router, then reject
+    if found := problems(approaches, skip_room=room):  # PG-07/08/09 only: one repair, then reject
         previous = _data(json.dumps({"approaches": approaches}, ensure_ascii=False, indent=2), "PREVIOUS")
         listed = _data("\n".join(f"- {p}" for p in found), "PROBLEMS")
         variables = {"problems": listed, "brief": brief_text, "previous": previous}
         remaining = None if budget is None else run.budget
         run, approaches = _ask(router, load_prompt(DIRECTOR_ROLE, "approaches_repair.md", variables), remaining)
         runs.append(run)
+        approaches = trim_skips(approaches, room)
         if found := problems(approaches, skip_room=room):
             raise ApproachProposalError(f"FR-INT-06: approaches still break the rules after one repair: {found}")
     if gaps:
