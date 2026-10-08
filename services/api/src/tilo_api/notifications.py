@@ -9,6 +9,7 @@ no address, link, card text or event summary can reach the bell. Newest first; `
 
 from __future__ import annotations
 
+import re
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, Query
@@ -21,6 +22,7 @@ from tilo_api.redaction import _is_malformed_event
 router = APIRouter()
 
 DEFAULT_LIMIT, MAX_LIMIT = 20, 100
+_ARTIFACT_ID = re.compile(r"art_[0-9A-Za-z_]{1,48}")  # common.schema.json#/$defs/artifact_id
 _NEEDS_TITLES = {
     "gate": "A send is waiting for your approval",
     "consent": "A connection is waiting for your answer",
@@ -50,11 +52,17 @@ def list_notifications(
                 title = _NEEDS_TITLES.get(str(card.get("kind")), _NEEDS_DEFAULT)
                 items.append(_item("needs", f"c:{card['id']}", card["created_at"], world_id, title, card_id=card["id"]))
             for event in store.events.get(world_id, []):
-                if _is_malformed_event(event) or event["type"] not in _DONE_TITLES:
+                if (
+                    _is_malformed_event(event)
+                    or not isinstance(event["type"], str)
+                    or event["type"] not in _DONE_TITLES
+                ):
                     continue
                 data = event["data"] if isinstance(event["data"], dict) else {}
                 artifact = data.get("artifact_id")
-                ref = {"artifact_id": artifact} if isinstance(artifact, str) else {}
+                ref = (
+                    {"artifact_id": artifact} if isinstance(artifact, str) and _ARTIFACT_ID.fullmatch(artifact) else {}
+                )
                 title = _DONE_TITLES[event["type"]]
                 items.append(_item("done", f"e:{event['id']}", str(event["ts"]), world_id, title, **ref))
     items.sort(key=lambda n: (n["created_at"], n["id"]), reverse=True)
