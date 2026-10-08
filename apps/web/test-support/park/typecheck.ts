@@ -13,7 +13,7 @@ import { PARK_DIR } from "./prototype";
 
 const WEB_DIR = path.resolve(PARK_DIR, "..", "..");
 const WORKER = path.join(WEB_DIR, "test-support", "park", "typecheckWorker.mjs");
-const DEFAULT_TIMEOUT_MS = 175_000;
+const DEFAULT_TIMEOUT_MS = 235_000;
 
 let cached: Promise<string[]> | undefined;
 

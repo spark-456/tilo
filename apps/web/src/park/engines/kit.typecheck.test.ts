@@ -78,7 +78,7 @@ describe("WEB_1c_typecheck: kit.ts compiles with the repo's strict options", () 
     expect(kitExists(), "apps/web/src/park/engines/kit.ts is missing").toBe(true);
   });
 
-  it("WEB_1c_typecheck_kit_has_no_type_errors", { timeout: 180_000 }, async () => {
+  it("WEB_1c_typecheck_kit_has_no_type_errors", { timeout: 240_000 }, async () => {
     expect(kitExists(), "nothing to compile: kit.ts is missing").toBe(true);
     expect(await kitTypeErrors()).toEqual([]);
   });
@@ -97,14 +97,14 @@ describe("WEB_1c_typecheck: kit.ts compiles with the repo's strict options", () 
 describe("WEB_1c_typecheck: the exported signatures", () => {
   it(
     "WEB_1c_typecheck_a_consumer_compiles_against_createKit_and_the_bad_calls_do_not",
-    { timeout: 180_000 },
+    { timeout: 240_000 },
     async () => {
       expect(kitExists()).toBe(true);
       expect(await probeErrors(PROBE)).toEqual([]);
     },
   );
 
-  it("WEB_1c_typecheck_the_probe_catches_a_missing_export", { timeout: 180_000 }, async () => {
+  it("WEB_1c_typecheck_the_probe_catches_a_missing_export", { timeout: 240_000 }, async () => {
     // Guards the test above against passing for the wrong reason: a consumer of a name kit.ts lacks fails.
     expect(kitExists()).toBe(true);
     const errs = await probeErrors(

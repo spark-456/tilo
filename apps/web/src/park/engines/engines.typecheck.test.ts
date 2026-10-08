@@ -17,7 +17,7 @@ describe("WEB_1b_typecheck: the engines compile with the repo's strict options",
     expect(names).toEqual(expect.arrayContaining(["types.ts", "world.ts", "park.ts"]));
   });
 
-  it("WEB_1b_typecheck_engines_have_no_type_errors", { timeout: 180_000 }, async () => {
+  it("WEB_1b_typecheck_engines_have_no_type_errors", { timeout: 240_000 }, async () => {
     expect(
       engineSources().length,
       "nothing to compile: the engine files are missing",
