@@ -210,6 +210,57 @@ const AUTH_TOKEN = /^[A-Za-z0-9._~+/=-]{1,4096}$/;
 /** SEC-15 (BQ-SIGNIN-3): sent on a phone-width window, with a token, so the API records `mobile_web`. */
 const CHANNEL_HEADER = "X-Tilo-Channel";
 
+/** A Quick ask's two answers (services/api COST-FAST-1): the model's text with its cost, or an offer to switch. */
+export type QuickIntakeResult =
+  | {
+      outcome: "answered";
+      text: string;
+      cost: { credits?: number; saved_credits?: number } | null;
+    }
+  | { outcome: "switch_to_thinking"; reason: string };
+
+const QUICK_REASONS = new Set([
+  "attachments",
+  "side_effect",
+  "deliverable",
+  "needs_tools",
+  "multi_step",
+  "too_long",
+  "scenario",
+  "unclear",
+]);
+
+const figure = (v: unknown): number | undefined =>
+  typeof v === "number" && Number.isFinite(v) && v >= 0 ? v : undefined;
+
+/** The strict reading of a Quick reply: anything else is null (a reply this page cannot read), never a guess. */
+function quickOf(body: unknown): QuickIntakeResult | null {
+  if (typeof body !== "object" || body === null) return null;
+  const b = body as Record<string, unknown>;
+  if (b.mode !== "quick") return null;
+  if (b.outcome === "switch_to_thinking") {
+    return typeof b.reason === "string" && QUICK_REASONS.has(b.reason)
+      ? { outcome: "switch_to_thinking", reason: b.reason }
+      : null;
+  }
+  if (b.outcome !== "answered" || typeof b.text !== "string" || b.text === "") return null;
+  const c =
+    typeof b.cost === "object" && b.cost !== null ? (b.cost as Record<string, unknown>) : {};
+  const credits = figure(c.credits);
+  const saved = figure(c.saved_credits);
+  return {
+    outcome: "answered",
+    text: b.text,
+    cost:
+      credits === undefined && saved === undefined
+        ? null
+        : {
+            ...(credits === undefined ? {} : { credits }),
+            ...(saved === undefined ? {} : { saved_credits: saved }),
+          },
+  };
+}
+
 export class HttpClient implements TiloClient, SchedulesApi {
   private readonly base: string;
   private readonly fetchFn: typeof fetch;
@@ -316,10 +367,28 @@ export class HttpClient implements TiloClient, SchedulesApi {
     return this.request<T>(path, init, true);
   }
 
-  async submitIntake(text: string, files: File[]): Promise<IntakeResult> {
+  /**
+   * `POST /intake`. With no `mode` it is exactly the legacy call (the server reads an absent mode as Thinking);
+   * "thinking" says so; "quick" (COST-FAST-1) returns a direct answer or an offer to switch, and makes no task.
+   */
+  submitIntake(text: string, files: File[]): Promise<IntakeResult>;
+  submitIntake(text: string, files: File[], mode: "thinking"): Promise<IntakeResult>;
+  submitIntake(text: string, files: File[], mode: "quick"): Promise<QuickIntakeResult>;
+  async submitIntake(
+    text: string,
+    files: File[],
+    mode?: "quick" | "thinking",
+  ): Promise<IntakeResult | QuickIntakeResult> {
     const form = new FormData();
     form.append("text", text);
     for (const file of files) form.append("files", file);
+    if (mode !== undefined) form.append("mode", mode);
+    if (mode === "quick") {
+      const body = await this.request<unknown>("/intake", { method: "POST", body: form }, true);
+      const quick = quickOf(body);
+      if (!quick) throw new TiloApiError(BAD_REPLY, 200, true, true);
+      return quick;
+    }
     const r = await this.request<
       Omit<IntakeResult, "files"> & {
         files: Array<{ filename: string; status: "ok" | "failed"; safety_flagged: boolean }>;
