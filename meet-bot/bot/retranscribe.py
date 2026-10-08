@@ -1,27 +1,22 @@
-"""Second opinion on a meeting: transcribe the recorded audio with Gemini and compare with Meet's live captions.
+"""Second opinion on a meeting: transcribe the recorded audio with the speech provider and compare with Meet's live captions.
 
-Runs after the meeting (inside the container, needs GEMINI_API_KEY). Silent stretches are skipped. The result is
+Runs after the meeting (inside the container, through `bot/providers.py`). Silent stretches are skipped. The result is
 out/<run>/transcript_audio.md, which you can read next to transcript.jsonl and listen to in playback.html.
-The audio goes to Gemini only (see README data note).
+The audio goes to the speech provider only (see README data note).
 """
 
 from __future__ import annotations
 
 import io
 import logging
-import re
 import struct
 import time
 import wave
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
 log = logging.getLogger("bot.retranscribe")
-
-PROMPT = """Transcribe this meeting audio verbatim, in English. Label distinct speakers Speaker 1, Speaker 2, ... consistently. \
-Start every utterance on its own line as: [mm:ss] Speaker N: text  (exactly the [mm:ss] format; mm:ss counts from the start of THIS clip). \
-When people talk over each other, transcribe both and add (overlap). Use [unclear] for words you cannot make out. \
-Do not summarise, correct, or add anything. If there is no speech, reply exactly: (no speech)."""
 
 
 def speech_segments(
@@ -72,20 +67,13 @@ def speech_segments(
         return out
 
 
-def shift_timestamps(text: str, offset_s: int) -> str:
-    def fix(m: re.Match) -> str:
-        total = int(m.group(1)) * 60 + int(m.group(2)) + offset_s
-        return f"[{total // 60:02d}:{total % 60:02d}]"
-
-    text = re.sub(
-        r"\[\s*(\d+)m(\d+)s\d*ms\s*\]", lambda m: f"[{m.group(1)}:{int(m.group(2)):02d}]", text
-    )  # "[ 0m6s444ms ]"
-    return re.sub(r"\[(\d{1,2}):(\d{2})\]", fix, text)
+def _stamp(seconds: float) -> str:
+    total = int(seconds)
+    return f"{total // 60:02d}:{total % 60:02d}"
 
 
-def retranscribe(run_dir: Path, client: Any, model: str) -> Path:
-    from google.genai import types
-
+def retranscribe(run_dir: Path, transcribe: Callable[[bytes], list[dict[str, Any]]]) -> Path:
+    """`transcribe(wav_bytes)` is `ProviderSpeech.segments`: [{speaker, start_ms, text}] for one clip."""
     wav = run_dir / "audio.wav"
     if not wav.is_file():
         raise FileNotFoundError(f"{wav} not found: run the meeting with --record-audio")
@@ -93,25 +81,21 @@ def retranscribe(run_dir: Path, client: Any, model: str) -> Path:
     segments = speech_segments(wav)
     log.info("%d speech segment(s) found", len(segments))
     for offset, data in segments:
-        label = f"{int(offset) // 60:02d}:{int(offset) % 60:02d}"
+        label = _stamp(offset)
         log.info("transcribing segment at %s (%.1f MB)...", label, len(data) / 1e6)
         started = time.monotonic()
-        resp = client.models.generate_content(
-            model=model,
-            contents=[types.Part.from_bytes(data=data, mime_type="audio/wav"), PROMPT],
-            config={
-                "temperature": 0.0,
-                "max_output_tokens": 8192,
-                **({"thinking_config": {"thinking_budget": 0}} if "2.5" in model and "pro" not in model else {}),
-            },
-        )
+        lines = [
+            f"[{_stamp(offset + seg['start_ms'] / 1000)}] {seg['speaker']}: {seg['text'].strip()}"
+            for seg in transcribe(data)
+            if seg["text"].strip()
+        ]
         log.info("  done in %.1fs", time.monotonic() - started)
-        parts.append(f"## From {label}\n\n{shift_timestamps((resp.text or '').strip(), int(offset))}\n")
+        parts.append(f"## From {label}\n\n" + ("\n".join(lines) if lines else "(no speech)") + "\n")
     if not parts:
         parts.append("(no sound found in the recording)\n")
     out = run_dir / "transcript_audio.md"
     out.write_text(
-        "# Transcript from the recorded audio (Gemini)\n\nTimestamps are from the start of audio.wav, "
+        "# Transcript from the recorded audio (speech provider)\n\nTimestamps are from the start of audio.wav, "
         "the same clock as playback.html.\n\n" + "\n".join(parts),
         encoding="utf-8",
     )

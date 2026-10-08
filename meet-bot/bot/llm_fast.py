@@ -1,66 +1,69 @@
 """The fast-path model client: streaming, a hard first-token deadline, and no sleeping.
 
-Direct answers must not wait on the model, so this client is built differently from the analysis loop's `GeminiLLM`:
-- one long-lived async client per purpose (never a client per worker thread);
+Direct answers must not wait on the model, so this client is built differently from the analysis loop's `ProviderLLM`:
+- one long-lived client per purpose (never a client per worker thread);
 - the first token has a deadline; on a miss or a dropped connection it retries once on a fresh client, at once;
-- a 429 raises `Busy` straight away: the caller falls back, it never sleeps and retries;
-- `prewarm()` opens the connection early (when a question is likely), at most once every 10 s;
+- a quota error raises `Busy` straight away: the caller falls back, it never sleeps and retries;
+- `prewarm()` opens the connection early (when a question is likely), at most once every 10 s, and only reports a
+  prewarm when the client really had something to warm;
 - every attempt is reported (outcome, code, first-token time), so a slow reply can be explained from the logs.
 
-Model id and thinking level come from config (`FAST_MODEL`, `FAST_THINKING`), never from the model's name.
+The client behind it is a `FastClient` (the provider layer, `bot/providers.py`); this module names no model, vendor or
+SDK. Which model answers is the role's profile in Tilo's `config/`; the thinking level comes from `FAST_THINKING`.
 """
 
 from __future__ import annotations
 
 import asyncio
 import logging
-import os
 import re
 import time
 from collections.abc import AsyncIterator, Callable
-from typing import Any
+from typing import Any, Protocol
 
 from .brain import Busy, LLMUnavailable
 
 log = logging.getLogger("bot.llm_fast")
 
 
-def thinking_config(level: str) -> dict[str, Any]:
-    """`off` switches thinking off; anything else sets that thinking level."""
-    return {"thinking_budget": 0} if level == "off" else {"thinking_level": level.upper()}
+class ModelCallError(Exception):
+    """A failed model call as `FastLLM` reads it: an HTTP-like code (429 quota, 4xx refused, None transport) and a
+    status word. The message is a fixed word, never provider text."""
+
+    def __init__(self, code: int | None, status: str = "", message: str = "model call failed") -> None:
+        super().__init__(message)
+        self.code, self.status = code, status
 
 
-def make_client(timeout_s: float = 10.0) -> Any:
-    key = os.environ.get("GEMINI_API_KEY", "")
-    if not key:
-        raise LLMUnavailable("GEMINI_API_KEY is not set. Add it to .env to enable direct answers.")
-    from google import genai
-    from google.genai import types
+class FastClient(Protocol):
+    async def open(
+        self, system: str, prompt: str, *, json_mode: bool, max_tokens: int, thinking: str
+    ) -> AsyncIterator[str]:
+        """The reply's text deltas, in order."""
+        ...
 
-    return genai.Client(vertexai=True, api_key=key, http_options=types.HttpOptions(timeout=int(timeout_s * 1000)))
+    async def warm(self) -> bool:
+        """Open whatever can be opened ahead of a call; True if something was."""
+        ...
 
 
 class FastLLM:
     def __init__(
         self,
-        model: str,
+        client_factory: Callable[[], FastClient],
         thinking: str = "off",
         purpose: str = "fast",
-        client_factory: Callable[[], Any] = make_client,
         first_token_s: float = 2.5,
         on_attempt: Callable[[dict[str, Any]], None] | None = None,
         clock: Callable[[], float] = time.monotonic,
         prewarm_every_s: float = 10.0,
-        api_key: str | None = None,
-        fallback_model: str | None = None,
     ) -> None:
-        self.model, self.thinking, self.purpose = model, thinking, purpose
-        self.fallback_model = fallback_model  # used for good if `model` is not available to this key
+        self.thinking, self.purpose = thinking, purpose
         self._prewarm_off = False
         self.first_token_s, self.on_attempt, self.clock = first_token_s, on_attempt, clock
-        self.prewarm_every_s, self._api_key = prewarm_every_s, api_key
+        self.prewarm_every_s = prewarm_every_s
         self._factory = client_factory
-        self._client: Any = None
+        self._client: FastClient | None = None
         self._last_prewarm: float | None = None
         self.last_call: dict[str, float] = {}  # clock time of the last request and of its first token
 
@@ -68,16 +71,7 @@ class FastLLM:
     async def stream(
         self, system: str, prompt: str, *, json_mode: bool = False, max_tokens: int = 256
     ) -> AsyncIterator[str]:
-        """Text deltas in order. Raises `Busy` on a 429 and `LLMUnavailable` when both attempts fail."""
-        config: dict[str, Any] = {
-            "system_instruction": system,
-            "temperature": 0.2,
-            "max_output_tokens": max_tokens,
-            "automatic_function_calling": {"disable": True},
-            "thinking_config": thinking_config(self.thinking),
-        }
-        if json_mode:
-            config["response_mime_type"] = "application/json"
+        """Text deltas in order. Raises `Busy` on a quota error and `LLMUnavailable` when both attempts fail."""
         last: Exception | None = None
         for attempt in (1, 2):
             if attempt == 2 or self._client is None:
@@ -86,8 +80,8 @@ class FastLLM:
             chunks = None
             try:
                 async with asyncio.timeout(self.first_token_s):
-                    chunks = await self._client.aio.models.generate_content_stream(
-                        model=self.model, contents=prompt, config=config
+                    chunks = await self._client.open(
+                        system, prompt, json_mode=json_mode, max_tokens=max_tokens, thinking=self.thinking
                     )
                     iterator = chunks.__aiter__()
                     first = await self._first_text(iterator)
@@ -104,10 +98,6 @@ class FastLLM:
                     raise Busy("the model is rate limited") from None
                 if code in (400, 401, 403, 404):
                     self._report(attempt, "error", code, None, started, self._redact(e))
-                    if code == 404 and self.fallback_model and self.fallback_model != self.model and attempt == 1:
-                        log.warning("model %s is not available to this key; using %s", self.model, self.fallback_model)
-                        self.model = self.fallback_model
-                        continue
                     raise LLMUnavailable(self._explain(code, e)) from None
                 self._report(attempt, "error", code, None, started, self._redact(e))
                 last = e
@@ -144,11 +134,12 @@ class FastLLM:
         try:
             if self._client is None:
                 self._client = self._factory()
-            await asyncio.wait_for(self._client.aio.models.get(model=self.model), timeout=self.first_token_s * 2)
-            self._report(1, "prewarm", None, None, now)
+            warmed = await asyncio.wait_for(self._client.warm(), timeout=self.first_token_s * 2)
+            if warmed:
+                self._report(1, "prewarm", None, None, now)
         except Exception as e:  # warming is best effort
             self._report(1, "error", _code(e), None, now, self._redact(e))
-            if _code(e) in (401, 403, 404):  # this key cannot call models.get: it would only fail again
+            if _code(e) in (401, 403, 404):  # this client cannot warm: it would only fail again
                 self._prewarm_off = True
         return True
 
@@ -156,8 +147,7 @@ class FastLLM:
     @staticmethod
     async def _first_text(iterator: Any) -> str:
         """The first non-empty delta; an empty stream gives ''."""
-        async for chunk in iterator:
-            text = getattr(chunk, "text", None)
+        async for text in iterator:
             if text:
                 return text
         return ""
@@ -173,7 +163,6 @@ class FastLLM:
     ) -> None:
         row = {
             "purpose": self.purpose,
-            "model": self.model,
             "attempt": attempt,
             "outcome": outcome,
             "code": code,
@@ -186,24 +175,21 @@ class FastLLM:
         if self.on_attempt:
             self.on_attempt(row)
 
-    def _redact(self, e: Exception | None) -> str:
-        text = re.sub(r"\s+", " ", f"{type(e).__name__}: {e}")
-        for secret in (self._api_key, os.environ.get("GEMINI_API_KEY")):
-            if secret:
-                text = text.replace(secret, "[redacted]")
-        return text[:200]
+    @staticmethod
+    def _redact(e: Exception | None) -> str:
+        return re.sub(r"\s+", " ", f"{type(e).__name__}: {e}")[:200]
 
-    def _explain(self, code: int | None, e: Exception) -> str:
+    @staticmethod
+    def _explain(code: int | None, e: Exception) -> str:
         if code in (401, 403):
-            return f"Gemini rejected the API key or permissions ({code}). Check GEMINI_API_KEY."
+            return f"the model service refused the credentials or permissions ({code})"
         if code == 404:
-            return f"Model '{self.model}' was not found. Set FAST_MODEL to a model your key can use."
-        return f"Gemini request failed ({code}): {self._redact(e)}"
+            return "the model for this role was not found (check the role's profile in config/)"
+        return f"the model request was refused ({code})"
 
 
 async def _texts(iterator: Any) -> AsyncIterator[str]:
-    async for chunk in iterator:
-        text = getattr(chunk, "text", None)
+    async for text in iterator:
         if text:
             yield text
 

@@ -339,7 +339,6 @@ class FakeBrowser:
 @pytest.fixture
 def session(tmp_path, monkeypatch):
     monkeypatch.setattr("bot.config.load_dotenv", lambda path=None: None)
-    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
     monkeypatch.setenv("OUT_DIR", str(tmp_path / "out"))
     monkeypatch.setenv("CONTEXT_DIR", str(tmp_path / "ctx"))
     agenda = tmp_path / "agenda.md"

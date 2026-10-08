@@ -200,20 +200,20 @@ def test_VA_04_the_bot_tap_writes_a_valid_wav(tmp_path):
 
 # -- the model client and the session write the marks ------------------------------------------------------------------
 class OkClient:
-    def __init__(self):
-        self.aio = SimpleNamespace(models=self)
-
-    async def generate_content_stream(self, *, model, contents, config):
+    async def open(self, system, prompt, *, json_mode, max_tokens, thinking):
         async def chunks():
             await asyncio.sleep(0.05)
-            yield SimpleNamespace(text="Hi.")
+            yield "Hi."
 
         return chunks()
+
+    async def warm(self):
+        return False
 
 
 def test_VA_04_the_fast_client_keeps_the_request_and_first_token_times():
     clock = FakeClock(10.0)
-    llm = FastLLM("m", client_factory=OkClient, clock=clock.now)
+    llm = FastLLM(OkClient, clock=clock.now)
 
     async def go():
         await llm.generate("s", "p")
@@ -222,8 +222,7 @@ def test_VA_04_the_fast_client_keeps_the_request_and_first_token_times():
     assert llm.last_call["request_at"] == 10.0 and llm.last_call["first_token_at"] == 10.0  # the fake clock never moved
 
 
-def test_VA_04_connection_events_go_to_connections_jsonl(session, monkeypatch):  # noqa: F811
-    monkeypatch.setenv("GEMINI_API_KEY", FAKE_KEY)
+def test_VA_04_connection_events_go_to_connections_jsonl(session):  # noqa: F811
     fast = session._build_fast()
     fast.on_attempt({"purpose": "fast", "attempt": 1, "outcome": "timeout", "code": None})
     rows = [json.loads(x) for x in (session.out_dir / "connections.jsonl").read_text(encoding="utf-8").splitlines()]

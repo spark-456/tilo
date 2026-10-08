@@ -84,11 +84,12 @@ def cmd_doctor(args: argparse.Namespace) -> int:
         True if os.environ.get("BOT_GOOGLE_EMAIL") else None,
         f"BOT_GOOGLE_EMAIL = {os.environ.get('BOT_GOOGLE_EMAIL') or '(unset)'}",
     )
+    live = os.environ.get("LIVE") == "1"
     line(
-        True if os.environ.get("GEMINI_API_KEY") else None,
-        "GEMINI_API_KEY is set"
-        if os.environ.get("GEMINI_API_KEY")
-        else "GEMINI_API_KEY not set (fine until you want the brain; transcript still works)",
+        True,
+        "models and speech: live providers (the user set the live switch)"
+        if live
+        else "models and speech: fake providers (offline; the live switch is not set)",
     )
     agenda = ROOT / os.environ.get("AGENDA_PATH", "agenda.md")
     line(
@@ -325,7 +326,7 @@ def _live(mode: str, args: argparse.Namespace) -> int:
 
 
 def cmd_run_mock(args: argparse.Namespace) -> int:
-    from .brain import Agenda, GeminiLLM, LLMUnavailable
+    from .brain import Agenda
     from .mock import load_transcript, run_mock
     from .mock_llm import KeywordStubLLM
 
@@ -334,10 +335,9 @@ def cmd_run_mock(args: argparse.Namespace) -> int:
     duration = agenda.resolve_duration(args.duration)
     llm = KeywordStubLLM()
     if args.live_llm:
-        try:
-            llm = GeminiLLM(model=cfg.gemini_model or None)
-        except LLMUnavailable as e:
-            print(f"{e} Using the offline stub instead.")
+        from .providers import ProviderLLM
+
+        llm = ProviderLLM()
     out = cfg.out_dir / ("mock-" + time.strftime("%Y%m%d-%H%M%S"))
     res = run_mock(
         agenda, load_transcript(Path(args.transcript)), llm, duration, cfg.brain_interval_s, cfg.window_minutes, out
@@ -347,23 +347,11 @@ def cmd_run_mock(args: argparse.Namespace) -> int:
     return 0
 
 
-def cmd_list_models(_: argparse.Namespace) -> int:
-    from .brain import GeminiLLM, LLMUnavailable, list_models
-
-    try:
-        llm = GeminiLLM(model="placeholder")
-        for name in list_models(llm.client):
-            print(name)
-        return 0
-    except LLMUnavailable as e:
-        print(e)
-        return 1
-
-
 def cmd_retranscribe(args: argparse.Namespace) -> int:
     if not IN_CONTAINER:
         return _compose_run(["retranscribe"] + ([args.run] if args.run else []))
-    from .brain import GeminiLLM, LLMUnavailable
+    from .brain import LLMUnavailable
+    from .providers import ProviderSpeech
     from .retranscribe import retranscribe
 
     cfg = Config.from_env()
@@ -373,52 +361,11 @@ def cmd_retranscribe(args: argparse.Namespace) -> int:
         print("no run folder under out/")
         return 1
     try:
-        llm = GeminiLLM(model=cfg.gemini_model or None)
-        print(f"wrote {retranscribe(run, llm.client, llm.model)}")
+        print(f"wrote {retranscribe(run, ProviderSpeech().segments)}")
         return 0
     except (LLMUnavailable, FileNotFoundError) as e:
         print(e)
         return 1
-
-
-def cmd_live_probe(args: argparse.Namespace) -> int:
-    if not IN_CONTAINER:
-        forward = ["live-probe"] + ([args.run] if args.run else [])
-        forward += (["--burst"] if args.burst else []) + (["--espeak"] if args.espeak else [])
-        return _compose_run(forward + (["--models", args.models] if args.models else []))
-    from . import live_probe as lp
-
-    cfg = Config.from_env()
-    try:
-        key = lp.live_key()
-        runs = sorted(p for p in cfg.out_dir.glob("2*") if (p / "audio.wav").is_file())
-        run = Path(args.run) if args.run else (runs[-1] if runs else None)
-        questions = [] if args.espeak or run is None else lp.run_questions(run)
-        source = f"recorded questions from {run.name}" if questions and run else "questions voiced by espeak-ng"
-        questions = questions or lp.espeak_questions()
-    except lp.LiveProbeError as e:
-        print(e)
-        return 1
-    models = [m.strip() for m in args.models.split(",")] if args.models else cfg.live_models
-    out = cfg.out_dir / ("live-probe-" + time.strftime("%Y%m%d-%H%M%S"))
-    print(
-        f"{len(questions)} {source}; models: {', '.join(models)}; sending {'in a burst' if args.burst else 'in real time'}"
-    )
-    results = asyncio.run(
-        lp.probe(
-            models,
-            questions,
-            out,
-            key,
-            lp.meeting_card(cfg.agenda_path, cfg.context_dir),
-            voice=cfg.live_voice,
-            burst=args.burst,
-            url=lp.BASE_URL.format(version=cfg.live_api_version),
-        )
-    )
-    print(lp.summarize(results))
-    print(f"\nAnswers (WAV) and results.jsonl in {out}")
-    return 0 if any(r.first_audio_s is not None for r in results) else 1
 
 
 def cmd_playback(args: argparse.Namespace) -> int:
@@ -490,7 +437,7 @@ def build_parser() -> argparse.ArgumentParser:
         s.add_argument(
             "--hybrid",
             action="store_true",
-            help="accurate transcript: Gemini transcribes the audio, captions supply speaker names",
+            help="accurate transcript: the speech provider transcribes the audio, captions supply speaker names",
         )
         s.add_argument(
             "--context",
@@ -512,18 +459,15 @@ def build_parser() -> argparse.ArgumentParser:
     m.add_argument("--agenda", default=str(ROOT / "agenda.example.md"))
     m.add_argument("--transcript", default=str(ROOT / "tests/fixtures/mock_meeting.jsonl"))
     m.add_argument("--duration", type=float)
-    m.add_argument("--live-llm", action="store_true", help="use real Gemini if GEMINI_API_KEY is set")
-    sub.add_parser("list-models", help="list models your Gemini key can use")
-    rt = sub.add_parser("retranscribe", help="transcribe a run's recorded audio with Gemini (needs --record-audio run)")
-    rt.add_argument("run", nargs="?")
-    lv = sub.add_parser(
-        "live-probe",
-        help="time Gemini Live native-audio answers to spoken questions (needs GEMINI_LIVE_API_KEY, an AI Studio key)",
+    m.add_argument(
+        "--live-llm",
+        action="store_true",
+        help="use the provider layer's model (real only if the user set the live switch)",
     )
-    lv.add_argument("run", nargs="?", help="run folder with audio.wav to take questions from (default: the latest)")
-    lv.add_argument("--burst", action="store_true", help="send each question's audio at once instead of in real time")
-    lv.add_argument("--espeak", action="store_true", help="use questions voiced by espeak-ng, not recorded ones")
-    lv.add_argument("--models", help="comma-separated Live model ids (default: LIVE_MODELS from .env or config)")
+    rt = sub.add_parser(
+        "retranscribe", help="transcribe a run's recorded audio with the speech provider (needs --record-audio run)"
+    )
+    rt.add_argument("run", nargs="?")
     pb = sub.add_parser("playback", help="rebuild playback.html for a run (default: the latest)")
     pb.add_argument("run", nargs="?")
     rp = sub.add_parser("report", help="per-turn latency waterfall and p50/p90 for a run (default: the latest)")
@@ -541,13 +485,11 @@ def main(argv: list[str] | None = None) -> int:
         "doctor": cmd_doctor,
         "login": cmd_login,
         "run-mock": cmd_run_mock,
-        "list-models": cmd_list_models,
         "_check-login": cmd_check_login,
         "playback": cmd_playback,
         "report": cmd_report,
         "audit": cmd_audit,
         "retranscribe": cmd_retranscribe,
-        "live-probe": cmd_live_probe,
         "start": lambda a: _live("start", a),
         "join": lambda a: _live("join", a),
     }

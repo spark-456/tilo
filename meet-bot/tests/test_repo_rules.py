@@ -35,7 +35,7 @@ def test_no_password_anywhere():
         assert "PASSWORD" not in text.upper().replace("NOT AUTHENTICATION", "") or path.name == "main.py"
     env = parse_dotenv((ROOT / ".env.example").read_text(encoding="utf-8"))
     assert not any("PASS" in k.upper() for k in env)
-    assert env["BOT_GOOGLE_EMAIL"] == "tiloagent@gmail.com" and env["GEMINI_API_KEY"] == ""
+    assert env["BOT_GOOGLE_EMAIL"] == "tiloagent@gmail.com"
 
 
 def test_dotenv_parsing():

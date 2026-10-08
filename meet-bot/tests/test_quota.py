@@ -1,4 +1,4 @@
-"""The free Gemini key is throttled (first live meeting: calls took 0.7 s to 15 s and some failed with 429), so the
+"""A throttled project is slow (first live meeting: calls took 0.7 s to 15 s and some failed with 429), so the
 answers to people come first and the notes loop stays out of their way."""
 
 import pytest
@@ -25,8 +25,7 @@ def test_QUOTA_the_first_token_deadline_is_configurable_and_defaults_to_6_second
     assert Config.from_env().fast_first_token_s == 3.5
 
 
-def test_QUOTA_the_session_builds_the_fast_client_with_that_deadline(session, monkeypatch):  # noqa: F811
-    monkeypatch.setenv("GEMINI_API_KEY", "k-" + "z9" * 8)
+def test_QUOTA_the_session_builds_the_fast_client_with_that_deadline(session):  # noqa: F811
     assert session._build_fast().first_token_s == pytest.approx(session.cfg.fast_first_token_s)
 
 

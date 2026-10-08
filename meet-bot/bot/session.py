@@ -11,7 +11,6 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-import os
 import time
 from collections import Counter
 from collections.abc import Callable
@@ -20,15 +19,14 @@ from pathlib import Path
 from typing import Any
 
 from .audio_out import Player, WavTap, setup_virtual_mic
-from .brain import CHAT_SUFFIX, Agenda, Brain, GeminiLLM, LLMUnavailable, _norm, chat_utterance
+from .brain import CHAT_SUFFIX, Agenda, Brain, _norm, chat_utterance
 from .browser import MeetBrowser
 from .captions import CaptionMerger, CaptionReader, TranscriptStore, Utterance
 from .chat import ChatPoster, intro_text
 from .clock import SystemClock
-from .config import DEFAULT_MODEL, ROOT, Config
+from .config import ROOT, Config
 from .events import EventSink
 from .hybrid import (
-    STT_PROMPT,
     AudioBuffer,
     CaptionSpans,
     LiveRecorder,
@@ -41,6 +39,7 @@ from .knowledge import KnowledgeBase
 from .llm_fast import FastLLM
 from .people import gate_open, missing_required
 from .playback import write_playback
+from .providers import ProviderFastClient, ProviderLLM, ProviderSpeech, make_router
 from .speaker import NullSpeaker, VoiceSpeaker
 from .timing import Timeline
 from .trace import Turn, TurnTrace
@@ -61,20 +60,15 @@ def build_knowledge(cfg: Config, routes: list[str]) -> KnowledgeBase:
 
 
 def build_brain(cfg: Config, agenda_path: Path | None, duration: float | None, kb: KnowledgeBase) -> Brain | None:
-    """None (transcript only) when there is no agenda or no API key. The bot still joins and transcribes."""
+    """None (transcript only) when there is no agenda. The bot still joins and transcribes."""
     path = agenda_path or cfg.agenda_path
     if not path.is_file():
         log.warning("no agenda at %s: transcript only, no brain (copy agenda.example.md to agenda.md)", path)
         return None
     agenda = Agenda.load(path)
-    try:
-        llm = GeminiLLM(model=cfg.gemini_model or None)
-    except LLMUnavailable as e:
-        log.warning("%s Transcript only, no brain.", e)
-        return None
     return Brain(
         agenda,
-        llm,
+        ProviderLLM(),
         agenda.resolve_duration(duration or cfg.meeting_minutes),
         bot_name=cfg.bot_display_name or "tilo",
         answer_mode=cfg.answer_mode,
@@ -149,7 +143,7 @@ class LiveSession:
         self.record_audio = record_audio or cfg.record_audio
         self.stt_mode = stt or ("gemini" if (hybrid or cfg.hybrid) else cfg.stt)
         if self.stt_mode == "gemini" and self.brain is None:
-            log.warning("--stt gemini needs the Gemini key and an agenda: falling back to captions")
+            log.warning("--stt gemini needs an agenda: falling back to captions")
             self.stt_mode = "captions"
         self.hybrid = self.stt_mode != "captions"  # audio is the transcript source; captions give names and timing
         self.merger = CaptionMerger(ignore_speakers=("you", cfg.bot_display_name))
@@ -182,15 +176,13 @@ class LiveSession:
         self.others_seen, self.alone_since = False, None
         self.last_wait_msg, self.intro_sent = None, False
 
-    def _build_fast(self) -> FastLLM | None:
+    def _build_fast(self) -> FastLLM:
         """One long-lived async client for direct answers; every attempt lands in latency.jsonl."""
-        if not os.environ.get("GEMINI_API_KEY"):
-            return None
+        router = make_router()
         return FastLLM(
-            self.cfg.fast_model,
+            lambda: ProviderFastClient(router),
             self.cfg.fast_thinking,
             first_token_s=self.cfg.fast_first_token_s,
-            fallback_model=self.cfg.gemini_model or DEFAULT_MODEL,
             on_attempt=lambda row: self.conns.record("prewarm" if row["outcome"] == "prewarm" else "attempt", **row),
         )
 
@@ -337,13 +329,13 @@ class LiveSession:
 
     # -- hybrid speech-to-text (Gemini, batch) -----------------------------------------------------------------------
     async def _stt_worker(self) -> None:
-        llm = self.brain.llm
+        speech = ProviderSpeech()
         while True:
             a, b = await self.seg_q.get()
             try:
                 pcm = self.buffer.slice(a, b)
                 t0 = time.monotonic()
-                text = (await asyncio.to_thread(llm.transcribe_audio, to_wav(pcm), STT_PROMPT)).strip()
+                text = (await asyncio.to_thread(speech.text, to_wav(pcm))).strip()
                 stt_s = time.monotonic() - t0
                 if not text:
                     self.timeline.record("segment_empty", start_s=a, end_s=b, stt_s=round(stt_s, 2))

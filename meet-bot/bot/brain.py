@@ -1,6 +1,6 @@
 """The brain: agenda tracking with an LLM, plus a chat policy that is enforced in code.
 
-All model access goes through the `LLM` protocol, so the provider is swappable. Nothing here touches the browser.
+All model access goes through the `LLM` protocol (the provider layer implements it in `providers.py`). Nothing here touches the browser.
 """
 
 from __future__ import annotations
@@ -8,17 +8,13 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-import os
 import re
-import time
-from collections.abc import Callable
 from dataclasses import dataclass, field
 from difflib import SequenceMatcher
 from pathlib import Path
 from typing import Any, NamedTuple, Protocol
 
 from .captions import Utterance
-from .config import DEFAULT_MODEL
 from .instant import instant_answer
 from .people import addressed_sentence, looks_like_followup, question_of
 
@@ -809,134 +805,3 @@ class Brain:
 def _mmss(seconds: float) -> str:
     s = int(seconds)
     return f"{s // 60:02d}:{s % 60:02d}"
-
-
-# ---------------------------------------------------------------------------------------------------------------
-# Gemini (Vertex AI Express Mode)
-# ---------------------------------------------------------------------------------------------------------------
-_FLASH_RE = re.compile(r"^gemini-(\d+(?:\.\d+)?)-flash$")
-
-
-def pick_flash_model(names: list[str]) -> str | None:
-    """Highest-version plain '-flash' model from a model list (skips lite, preview, image, tts variants)."""
-    best: tuple[float, str] | None = None
-    for n in names:
-        short = n.rsplit("/", 1)[-1]
-        if m := _FLASH_RE.match(short):
-            v = float(m.group(1))
-            if best is None or v > best[0]:
-                best = (v, short)
-    return best[1] if best else None
-
-
-class GeminiLLM:
-    """google-genai against a Vertex AI Express Mode key. Retries quota and transient errors with backoff."""
-
-    def __init__(
-        self,
-        api_key: str | None = None,
-        model: str | None = None,
-        client: Any = None,
-        sleep: Callable[[float], None] = time.sleep,
-        max_attempts: int = 5,
-        timeout_s: int = 60,
-    ) -> None:
-        if client is None:
-            key = api_key or os.environ.get("GEMINI_API_KEY", "")
-            if not key:
-                raise LLMUnavailable("GEMINI_API_KEY is not set. Add it to .env to enable the brain.")
-            from google import genai
-            from google.genai import types
-
-            client = genai.Client(vertexai=True, api_key=key, http_options=types.HttpOptions(timeout=timeout_s * 1000))
-        self.client = client
-        self.sleep, self.max_attempts = sleep, max_attempts
-        self.model = model or os.environ.get("GEMINI_MODEL", "").strip() or self.resolve_model(client)
-
-    @staticmethod
-    def resolve_model(client: Any) -> str:
-        try:
-            names = [getattr(m, "name", "") or "" for m in client.models.list()]
-            picked = pick_flash_model(names)
-            if picked:
-                log.info("using model %s (newest Flash from the model list)", picked)
-                return picked
-        except Exception as e:  # listing is best effort on Express Mode
-            log.warning("could not list models (%s); falling back to %s", _err_summary(e), DEFAULT_MODEL)
-        return DEFAULT_MODEL
-
-    def generate(self, system: str, prompt: str) -> str:
-        config: dict[str, Any] = {
-            "system_instruction": system,
-            "response_mime_type": "application/json",
-            "temperature": 0.2,
-            "max_output_tokens": 2048,
-            "automatic_function_calling": {"disable": True},
-        }
-        if "2.5" in self.model and "pro" not in self.model:
-            config["thinking_config"] = {"thinking_budget": 0}  # no hidden reasoning: several seconds faster
-        return self._invoke(prompt, config)
-
-    def transcribe_audio(self, wav: bytes, prompt: str) -> str:
-        """Speech to text with the same model and the same retry/backoff as text calls."""
-        from google.genai import types
-
-        config: dict[str, Any] = {
-            "temperature": 0.0,
-            "max_output_tokens": 1024,
-            "automatic_function_calling": {"disable": True},
-        }
-        if "2.5" in self.model and "pro" not in self.model:
-            config["thinking_config"] = {"thinking_budget": 0}
-        return self._invoke([types.Part.from_bytes(data=wav, mime_type="audio/wav"), prompt], config)
-
-    def _invoke(self, contents: Any, config: dict[str, Any]) -> str:
-        for attempt in range(1, self.max_attempts + 1):
-            try:
-                resp = self.client.models.generate_content(model=self.model, contents=contents, config=config)
-                return resp.text or ""
-            except Exception as e:
-                code = getattr(e, "code", None) or getattr(e, "status_code", None)
-                status = str(getattr(e, "status", "") or "")
-                if code in (401, 403) or status in ("UNAUTHENTICATED", "PERMISSION_DENIED"):
-                    raise LLMUnavailable(
-                        f"Gemini rejected the API key or permissions ({code}). "
-                        "Check GEMINI_API_KEY is a Vertex AI Express Mode key."
-                    ) from None
-                if code == 404:
-                    raise LLMUnavailable(
-                        f"Model '{self.model}' was not found. Set GEMINI_MODEL, "
-                        "or run `list-models` to see what your key can use."
-                    ) from None
-                retryable = code in (429, 500, 502, 503, 504) or status == "RESOURCE_EXHAUSTED" or code is None
-                if not retryable:
-                    raise LLMUnavailable(f"Gemini request failed ({code}): {_err_summary(e)}") from None
-                if attempt == self.max_attempts:
-                    if code == 429 or status == "RESOURCE_EXHAUSTED":
-                        raise LLMUnavailable(
-                            "Gemini quota or rate limit reached (429). Express Mode is free but tightly limited: "
-                            "raise BRAIN_INTERVAL_SECONDS in .env or wait and retry."
-                        ) from None
-                    raise LLMUnavailable(f"Gemini unavailable after {attempt} tries: {_err_summary(e)}") from None
-                delay = min(60.0, 2.0**attempt)
-                log.warning(
-                    "Gemini %s; retrying in %.0fs (attempt %d/%d)",
-                    code or "network error",
-                    delay,
-                    attempt,
-                    self.max_attempts,
-                )
-                self.sleep(delay)
-        raise LLMUnavailable("Gemini call failed")  # unreachable
-
-
-def _err_summary(e: Exception) -> str:
-    text = f"{type(e).__name__}: {e}"
-    secret = os.environ.get("GEMINI_API_KEY")
-    if secret:
-        text = text.replace(secret, "[redacted]")
-    return re.sub(r"\s+", " ", text)[:200]
-
-
-def list_models(client: Any) -> list[str]:
-    return sorted(getattr(m, "name", "") for m in client.models.list())

@@ -7,13 +7,11 @@ from bot.brain import (
     Agenda,
     Brain,
     ChatPolicy,
-    GeminiLLM,
     ItemState,
     LLMUnavailable,
     MeetingState,
     SchemaError,
     fair_windows,
-    pick_flash_model,
     validate_output,
 )
 from bot.captions import Utterance
@@ -248,68 +246,3 @@ def test_model_outage_still_allows_time_warning():
     b = Brain(AGENDA, Down(), 30)
     r = b.step([], 1300)
     assert not r.ok and r.chat and r.chat.kind == "time_warning"
-
-
-# --- Gemini wrapper (fake client, no network) -------------------------------------------------------------------
-class _Err(Exception):
-    def __init__(self, code, status=""):
-        super().__init__(f"{code} {status}")
-        self.code, self.status = code, status
-
-
-class _Client:
-    def __init__(self, outcomes):
-        self.outcomes, self.n = outcomes, 0
-        self.models = self
-
-    def generate_content(self, **kw):
-        o = self.outcomes[min(self.n, len(self.outcomes) - 1)]
-        self.n += 1
-        if isinstance(o, Exception):
-            raise o
-        return type("R", (), {"text": o})()
-
-
-def test_gemini_backs_off_on_429_then_succeeds():
-    sleeps = []
-    g = GeminiLLM(model="m", client=_Client([_Err(429, "RESOURCE_EXHAUSTED"), _Err(503), "{}"]), sleep=sleeps.append)
-    assert g.generate("s", "p") == "{}"
-    assert sleeps == [2.0, 4.0]
-
-
-def test_gemini_quota_exhaustion_gives_clear_message():
-    g = GeminiLLM(model="m", client=_Client([_Err(429, "RESOURCE_EXHAUSTED")]), sleep=lambda s: None, max_attempts=3)
-    with pytest.raises(LLMUnavailable, match="quota or rate limit"):
-        g.generate("s", "p")
-
-
-def test_gemini_bad_key_fails_fast():
-    c = _Client([_Err(403, "PERMISSION_DENIED")])
-    g = GeminiLLM(model="m", client=c, sleep=lambda s: None)
-    with pytest.raises(LLMUnavailable, match="API key"):
-        g.generate("s", "p")
-    assert c.n == 1
-
-
-def test_pick_flash_model_prefers_newest_plain_flash():
-    names = [
-        "publishers/google/models/gemini-2.5-flash",
-        "models/gemini-2.5-flash-lite",
-        "models/gemini-3-flash",
-        "models/gemini-3-flash-preview",
-        "models/gemini-2.0-flash",
-        "models/gemini-2.5-pro",
-    ]
-    assert pick_flash_model(names) == "gemini-3-flash"
-    assert pick_flash_model(["models/gemini-2.5-pro"]) is None
-
-
-def test_missing_key_message_and_no_key_leak(monkeypatch):
-    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
-    with pytest.raises(LLMUnavailable, match="GEMINI_API_KEY is not set"):
-        GeminiLLM()
-    fake = "AI" + "za" + "FakeKeyForTest123"
-    monkeypatch.setenv("GEMINI_API_KEY", fake)
-    from bot.brain import _err_summary
-
-    assert fake not in _err_summary(RuntimeError(f"boom {fake}"))

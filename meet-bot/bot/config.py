@@ -9,13 +9,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 IN_CONTAINER = os.environ.get("TILO_IN_CONTAINER") == "1"
-SECRET_ENV_NAMES = ("GEMINI_API_KEY", "GEMINI_LIVE_API_KEY")
-# Gemini Live models tried by `live-probe`, fastest-first by third-party measurements (Sep 2026). Override with LIVE_MODELS.
-# Every model id lives here (or in .env), behind the provider interfaces.
-DEFAULT_MODEL = "gemini-2.5-flash"  # the analysis loop, when the model list cannot be read; override with GEMINI_MODEL
-DEFAULT_FAST_MODEL = DEFAULT_MODEL  # direct answers; flash-lite gave 404 for the Express key, X1 picks a faster one. Override with FAST_MODEL
+# No model id, vendor or key lives in meet-bot (FR-MTG-11): roles and profiles are Tilo's config/, see bot/providers.py.
 THINKING_LEVELS = ("off", "minimal", "low", "medium", "high")
-DEFAULT_LIVE_MODELS = "gemini-3.1-flash-live-preview,gemini-3.8-live,gemini-2.5-flash-native-audio-preview-12-2025"
 
 
 def parse_dotenv(text: str) -> dict[str, str]:
@@ -63,8 +58,6 @@ def _names(raw: str) -> list[str]:
 class Config:
     bot_email: str
     bot_display_name: str
-    gemini_model: str
-    fast_model: str
     fast_thinking: str
     fast_first_token_s: float
     brain_interval_s: float
@@ -94,9 +87,6 @@ class Config:
     reply_mode: str
     voice_nudges: bool
     mic_policy: str
-    live_models: list[str]
-    live_voice: str
-    live_api_version: str
 
     @classmethod
     def from_env(cls) -> Config:
@@ -106,8 +96,6 @@ class Config:
         return cls(
             bot_email=e("BOT_GOOGLE_EMAIL", "").strip(),
             bot_display_name=e("BOT_DISPLAY_NAME", "").strip(),
-            gemini_model=e("GEMINI_MODEL", "").strip(),
-            fast_model=e("FAST_MODEL", "").strip() or DEFAULT_FAST_MODEL,
             fast_thinking=_choice("FAST_THINKING", "off", THINKING_LEVELS),
             fast_first_token_s=_num("FAST_FIRST_TOKEN_SECONDS", 6),
             brain_interval_s=max(10.0, _num("BRAIN_INTERVAL_SECONDS", 20)),
@@ -139,32 +127,15 @@ class Config:
             ),
             voice_nudges=e("VOICE_NUDGES", "0") == "1",
             mic_policy=_choice("MIC_POLICY", "open", ("open", "conversation")),
-            live_models=_names(e("LIVE_MODELS", "") or DEFAULT_LIVE_MODELS),
-            live_voice=e("LIVE_VOICE", "").strip(),
-            live_api_version=e("LIVE_API_VERSION", "v1beta").strip() or "v1beta",
             stt=e("STT_PROVIDER", "").strip().lower()
             or ("gemini" if e("HYBRID_TRANSCRIPT", "0") == "1" else "captions"),
             answer_mode="addressed" if e("ANSWER_MODE", "questions") == "addressed" else "questions",
         )
 
 
-class _Redactor(logging.Filter):
-    """Belt and braces: never let a configured secret reach a log line."""
-
-    def filter(self, record: logging.LogRecord) -> bool:
-        msg = record.getMessage()
-        for name in SECRET_ENV_NAMES:
-            secret = os.environ.get(name)
-            if secret and secret in msg:
-                record.msg = msg.replace(secret, "[redacted]")
-                record.args = ()
-        return True
-
-
 def setup_logging(level: int = logging.INFO) -> None:
     handler = logging.StreamHandler()
     handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s", "%H:%M:%S"))
-    handler.addFilter(_Redactor())
     root = logging.getLogger()
     root.handlers[:] = [handler]
     root.setLevel(level)
