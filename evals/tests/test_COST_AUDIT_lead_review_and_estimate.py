@@ -13,6 +13,7 @@
 from __future__ import annotations
 
 import asyncio
+import dataclasses
 import json
 from pathlib import Path
 from types import SimpleNamespace
@@ -67,6 +68,14 @@ def test_COST_AUDIT_the_driver_uses_the_shared_helper_and_the_lite_lead_review_r
     assert live_e2e.REVIEW_ROLE == lead_review.REVIEW_ROLE == "lead_review"
 
 
+@dataclasses.dataclass
+class _Context:
+    skills: list[Any] = dataclasses.field(default_factory=list)
+    brief: Any = None
+    intake_answers: Any = ()
+    upstream: Any = ()
+
+
 def test_COST_AUDIT_the_driver_makes_one_lead_review_per_multi_unit_district() -> None:
     asked: list[str] = []
 
@@ -76,9 +85,17 @@ def test_COST_AUDIT_the_driver_makes_one_lead_review_per_multi_unit_district() -
             return f"{role} text", 0.1
 
     runner = Runner(router=None, meter=None)  # type: ignore[arg-type]
+
+    class _Shared:  # the unit's own call goes through the shared ToolUnitRunner (LW-07): count it as a role call
+        async def run_unit(self, unit: Any, context: Any) -> Any:
+            asked.append(unit["role"])
+            item = SimpleNamespace(content=b"text")
+            return SimpleNamespace(outcome=SimpleNamespace(success=True, outputs=(item,)), credits=0.1)
+
+    runner._shared = _Shared()  # type: ignore[assignment]
     units = _plan()
     runner.capture({"goal": "g"}, {"units": units})
-    context = SimpleNamespace(skills=[])
+    context = _Context()
     for unit in units:
         asyncio.run(runner.run(unit, context))
     assert asked.count("lead_review") == 2 and "lead" not in asked
