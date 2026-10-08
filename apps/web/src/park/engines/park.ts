@@ -7,6 +7,15 @@
 // frames flip by opacity (two stacked frames), not by the prototype's background-position, so every moving
 // layer animates transform and opacity only (WEB-MOTION-1, README "Performance"). The keyframes live in
 // shell/park.shell.css. `still` draws every mover frozen at its seeded phase; `k` slows the cars.
+import {
+  type Band,
+  CAR_HALF,
+  type LaneRow,
+  STANDING_AT,
+  STANDING_HALF,
+  WALKER_HALF,
+  assignLane,
+} from "./lanes";
 import type {
   AgentSpec,
   El,
@@ -73,7 +82,7 @@ export function createPark(
   makeWorld: (h: H) => World,
   env: ParkEnv = {},
 ): {
-  scene: (o?: SceneOpts) => { el: El; spots: Spot[] };
+  scene: (o?: SceneOpts) => { el: El; spots: Spot[]; lanes?: LaneRow[] };
   world: (plan: Plan, o?: Opt<{ night: boolean; seed: number }>) => El;
   building: (spec: string | Spec, state: string, d?: string, ht?: number, night?: boolean) => El;
   agent: (a: AgentSpec, size?: number, night?: boolean) => El;
@@ -324,9 +333,19 @@ export function createPark(
     return out;
   }
   /* o: {w,h} artboard px, night, k (slow-down), still (frozen movers), mute (0..1 pull towards paper) */
-  function scene(o0?: SceneOpts): { el: El; spots: Spot[] } {
+  function scene(o0?: SceneOpts): { el: El; spots: Spot[]; lanes?: LaneRow[] } {
     const o = Object.assign(
-      { w: 1440, h: 900, vw: 1120, seed: 23, night: false, k: 1, still: false, mute: 0 },
+      {
+        w: 1440,
+        h: 900,
+        vw: 1120,
+        seed: 23,
+        night: false,
+        k: 1,
+        still: false,
+        mute: 0,
+        avoid: false,
+      },
       o0 || ({} as SceneOpts),
     );
     const { P, box, poly, shade, lt, building, agent } = W;
@@ -559,6 +578,8 @@ export function createPark(
       };
       const rows: SceneObj[][] = [];
       const spots: { top: Pt; area: number; st: string }[] = [];
+      /** Agents standing at a building's kerb: each stands in the road row below its building. */
+      const kerb: LaneRow[] = [];
       for (let j = 0; j < R; j++) {
         const objs: SceneObj[] = [];
         rows[j] = objs;
@@ -633,6 +654,13 @@ export function createPark(
               const ex = pick(["focused", "neutral", "talking", "delighted"]);
               const fa = r() < 0.5 ? "L" : "R";
               const role = pick(ROLES);
+              kerb.push({
+                row: j + 1,
+                kind: "standing",
+                lane: STANDING_AT,
+                pref: STANDING_AT,
+                half: STANDING_HALF,
+              });
               objs.push({
                 k: ax + ay,
                 b: [ax - 1, ax + 1, ay - 1, ay + 1],
@@ -658,6 +686,7 @@ export function createPark(
       }
       const cyc = 0.56 * (k > 1 ? 1.4 : 1);
       const movers: unknown[][] = [];
+      const reported: LaneRow[] = [];
       for (let j = 0; j <= R; j++) {
         const y = j * PY;
         const yc = y + RD / 2;
@@ -668,9 +697,30 @@ export function createPark(
           const nc = r() < 0.75 ? 1 : 0;
           const nw = r() < 0.7 ? (r() < 0.35 ? 2 : 1) : 0;
           const span = x1 - x0;
+          // avoid (FR-UX-12): each mover takes its own lane across the road, clear of the others and of the
+          // agents standing at the kerb. The rng draws are the same, so only a lane moves, or a mover with no
+          // free lane is left out. Without avoid every lane is the prototype's own.
+          const taken: Band[] = o.avoid
+            ? kerb
+                .filter((c) => c.row === j)
+                .map((c) => ({ lo: (c.lane as number) - c.half, hi: (c.lane as number) + c.half }))
+            : [];
+          const lane = (
+            kind: "car" | "walker",
+            pref: number,
+            half: number,
+            range: readonly [number, number],
+          ): number | null => {
+            if (!o.avoid) return y + pref;
+            const c = assignLane(pref, half, range, taken);
+            reported.push({ row: j, kind, lane: c, pref, half });
+            if (c === null) return null;
+            taken.push({ lo: c - half, hi: c + half });
+            return y + c;
+          };
           const place = (
             dir: number,
-            ly: number,
+            ly: number | null,
             speed: number,
             vb: Walk5,
             make: (a: number) => unknown,
@@ -680,6 +730,7 @@ export function createPark(
             const b = dir > 0 ? x1 : x0;
             const dur = (span / speed) * k;
             const f = r();
+            if (ly === null) return;
             const p0 = P(a, ly, 0);
             const q = toPx(p0);
             const dx = (b - a) * 0.866 * s2;
@@ -707,20 +758,23 @@ export function createPark(
           };
           for (let n = 0; n < nc; n++) {
             const dir = r() < 0.5 ? 1 : -1;
-            const ly = y + (dir > 0 ? RD * 0.72 : RD * 0.28);
+            const ly = lane("car", dir > 0 ? RD * 0.72 : RD * 0.28, CAR_HALF, [
+              CAR_HALF + 0.5,
+              RD - CAR_HALF - 0.5,
+            ]);
             const col = pick(CARS);
             place(
               dir,
               ly,
               50 + r() * 20,
               [-30, -30, 60, 45, s2],
-              (a) => car(a, ly, col, dir),
+              (a) => car(a, ly as number, col, dir),
               false,
             );
           }
           for (let n = 0; n < nw; n++) {
             const dir = r() < 0.5 ? 1 : -1;
-            const ly = y + (dir > 0 ? RD * 0.9 : RD * 0.1);
+            const ly = lane("walker", dir > 0 ? RD * 0.9 : RD * 0.1, WALKER_HALF, [2.5, RD - 2.5]);
             const role = pick(ROLES);
             place(
               dir,
@@ -729,9 +783,14 @@ export function createPark(
               [-22, -60, 44, 70, s2],
               (a) =>
                 [false, true].map((step) =>
-                  agent({ role, expr: "walking", facing: "R", back: dir < 0, step }, a, ly, {
-                    scale: 1.1,
-                  }),
+                  agent(
+                    { role, expr: "walking", facing: "R", back: dir < 0, step },
+                    a,
+                    ly as number,
+                    {
+                      scale: 1.1,
+                    },
+                  ),
                 ),
               true,
             );
@@ -769,6 +828,7 @@ export function createPark(
           const q = toPx(c.top);
           return { x: q[0], y: q[1], area: c.area, st: c.st };
         }),
+        ...(o.avoid ? { lanes: [...kerb, ...reported] } : {}),
       };
     } finally {
       cmap = prev;
