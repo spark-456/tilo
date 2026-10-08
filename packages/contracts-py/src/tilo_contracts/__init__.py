@@ -68,10 +68,15 @@
 # events/data/district.created.schema.json 1.0.0 sha256:1b25e3de1fa3e1fb
 # events/data/level.completed.schema.json 1.0.0 sha256:b99d3220a8e24536
 # events/data/level.created.schema.json 1.0.0 sha256:f404c2d35df9da17
+# events/data/meeting.adjourned.schema.json 1.0.0 sha256:0c3fb38b0ad2732a
+# events/data/meeting.asked.schema.json 1.0.0 sha256:7d58ef4c8d45d1b0
 # events/data/meeting.called.schema.json 1.0.0 sha256:af1b23d42d145e42
+# events/data/meeting.change_requested.schema.json 1.0.0 sha256:3df34dc137ada7dd
+# events/data/meeting.convened.schema.json 1.0.0 sha256:2c0f55f0f651b348
 # events/data/meeting.decision.schema.json 1.0.0 sha256:359fc3bc20f11676
 # events/data/meeting.ended.schema.json 1.1.0 sha256:9219b0e4934a318e
 # events/data/meeting.minuted.schema.json 1.0.0 sha256:f2a9c646721e5b64
+# events/data/meeting.replied.schema.json 1.0.0 sha256:1591c9f4ab421e93
 # events/data/meeting.started.schema.json 1.1.0 sha256:3ee754f6effc0b32
 # events/data/memory.hit.schema.json 1.0.0 sha256:ae1d0919f97240c5
 # events/data/memory.saved.schema.json 1.0.0 sha256:e8764ecbbdc670a9
@@ -81,6 +86,7 @@
 # events/data/pinboard.item_changed.schema.json 1.0.0 sha256:2db181d1a51c6c84
 # events/data/plan.approaches_proposed.schema.json 1.0.0 sha256:4e67dfd9f1e856b4
 # events/data/plan.questions_asked.schema.json 1.0.0 sha256:5fe5359427d0e04b
+# events/data/plan.revised.schema.json 1.0.0 sha256:55005a10fa84656a
 # events/data/policy.applied.schema.json 1.0.0 sha256:3ca104f308b12dce
 # events/data/policy.changed.schema.json 1.0.0 sha256:e480c2319e07c2a6
 # events/data/question.answered.schema.json 1.1.0 sha256:27aa69077ee8f813
@@ -100,6 +106,7 @@
 # layout.schema.json 1.0.0 sha256:1db88b1e3b744add
 # manifest.schema.json 1.0.0 sha256:9b885d1826522bb7
 # meeting.schema.json 1.2.0 sha256:034e93898bb28957
+# meeting_room.schema.json 1.0.0 sha256:13c682235d58ce69
 # mention.schema.json 1.0.0 sha256:ca9c1acbf81616f2
 # meter.schema.json 1.0.0 sha256:ad596dcc70e45e09
 # metering.schema.json 1.0.0 sha256:91358a776e6c033a
@@ -108,7 +115,7 @@
 # person.schema.json 1.0.0 sha256:2c928319dd7ab9d1
 # pilot.schema.json 1.0.0 sha256:5d091f814844b3b1
 # pinboard_item.schema.json 1.0.0 sha256:fe6df109871cea93
-# plan.schema.json 1.0.0 sha256:35991402fa6e958d
+# plan.schema.json 1.1.0 sha256:f0722cc94a84e2d1
 # plate.schema.json 1.0.0 sha256:d2a4e4361a714c8f
 # policy.schema.json 1.0.0 sha256:307bca25f6efc07e
 # providers.schema.json 1.1.0 sha256:ece7537b584e69f8
@@ -119,7 +126,7 @@
 # transcript.schema.json 1.0.0 sha256:08f934b8f0c9a40e
 # ui_action.schema.json 1.0.0 sha256:2ceb1e0b46368734
 # work_item.schema.json 1.0.0 sha256:7add9f68c1f996fb
-# events/registry.yaml 1.1.0 sha256:2db78f63298c923a
+# events/registry.yaml 1.3.0 sha256:725d1606408157d0
 
 from __future__ import annotations
 
@@ -1360,6 +1367,18 @@ class PlanQuestionsAskedData(BaseModel):
     question_count: Annotated[int, Field(ge=1, le=3)]
 
 
+class PlanRevisedDataRevisionUnit(BaseModel):
+    """
+    A new plan unit and the unit whose work it changes (plan.schema.json unit revises).
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    id: UnitId
+    revises: UnitId
+
+
 class PolicyChangedData(BaseModel):
     """
     data of policy.changed (PRD 9.5). The owner created, edited or revoked a policy, or used Stop all autopilot, which sets every policy to L1 (one event per policy). Revoking also sets the policy to L1, as if it did not exist: it authorises nothing and its next send waits at a gate (FR-HIL-03). level is the level after the change and is appended to the policy's history, so a send after a revocation or Stop all is never covered, even if the owner raises the level again later (outbox OB-01, BQ-31). Only the policy's owner creates and changes it (PRD 10.1; a Team Lead only proposes), so authz is by person and authz.ref is the owner of the policy policy_id names (event rule EV-04, validator); the history entry the change appends has that owner as by (outbox OB-01).
@@ -1796,6 +1815,99 @@ class MeetingAttestation(BaseModel):
     notice_version: Semver
 
 
+type MeetingRoomMode = Literal["quick", "thinking"]
+"""
+The person's Quick or Thinking choice for a turn: quick uses the meeting role, thinking the meeting_thinking role (config/models.yaml).
+"""
+
+
+type MeetingRoomAsRole = Literal["owner", "approver", "member"]
+"""
+Why the convener may hold this room, from the team store and the world record at the time (MR-03): the world's owner, or an Approver or Member of the world's team whose scope covers every attendee's district. A Viewer never convenes.
+"""
+
+
+type MeetingRoomAdjournReason = Literal["person", "idle", "capped", "paused", "access_lost", "failed"]
+"""
+person: the convener closed it; idle: no turn for the configured time; capped: the next turn would pass the room's credit or turn cap; paused: Pause all or Stop all; access_lost: the convener's role or scope no longer covers the room; failed: the room could not go on (writer or archive error).
+"""
+
+
+type MeetingRoomOutcome = Literal["answered", "proposed_change", "declined", "failed"]
+"""
+answered: a reply grounded in the agent's own units; proposed_change: a reply that also proposes a change for the person to confirm; declined: the agent has no record for it, or the safety screen flagged the message; failed: no reply was produced (no text exists).
+"""
+
+
+type MeetingRoomTurnNumber = Annotated[int, Field(ge=1, le=50)]
+
+
+type MeetingRoomAttendees = Annotated[list[AgentId], Field(max_length=7)]
+"""
+The agents in the room besides the lead, in seating order.
+"""
+
+
+type MeetingRoomCitedUnits = Annotated[list[UnitId], Field(max_length=20)]
+"""
+Plan units the reply rests on: the replying agent's own units (a lead's: its district's), checked by code against the grounding set (MR-06).
+"""
+
+
+type MeetingRoomPersonText = Annotated[str, Field(max_length=2000, min_length=1)]
+
+
+type MeetingRoomReplyText = Annotated[str, Field(max_length=4000, min_length=1)]
+"""
+A reply's text after the secret redactor; a reply's text is null exactly when its outcome is failed.
+"""
+
+
+class MeetingRoomConfirmedChange(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    proposal_id: Ulid
+    text: MeetingRoomPersonText
+
+
+class MeetingRoomConveneRequest(BaseModel):
+    """
+    POST /v1/worlds/{world_id}/rooms. The server picks the run, the role, the caps and the room id.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    lead: AgentId
+    agents: MeetingRoomAttendees
+
+
+class MeetingRoomAskRequest(BaseModel):
+    """
+    POST /v1/worlds/{world_id}/rooms/{room_id}/turns. One turn in flight at a time.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    to: AgentId
+    text: MeetingRoomPersonText
+    mode: MeetingRoomMode
+
+
+class MeetingRoomChangeRequest(BaseModel):
+    """
+    POST /v1/worlds/{world_id}/rooms/{room_id}/changes: the person confirms a proposal, in the proposal's words or their own. Units and artifacts come from the proposal, never from this body (MR-07).
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    proposal_id: Ulid
+    text: MeetingRoomPersonText
+
+
 class MentionRemoval(BaseModel):
     """
     Who removed the tag and when: the tagged person or the entry's setter (PE-06).
@@ -2100,6 +2212,10 @@ class PlanDimensions(BaseModel):
 
 
 class PlanUnit(BaseModel):
+    """
+    One plan unit. 1.1.0 (ADR-0028): a revision unit, planned from a change a person confirmed in a meeting room, also carries revises (the unit whose work it changes) and change (the proposal_id of that meeting.change_requested), both or neither (PG-13).
+    """
+
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -2118,6 +2234,8 @@ class PlanUnit(BaseModel):
     Side-effect action types this unit performs; each must be guarded by a gate (PG-04).
     """
     depends_on: Annotated[list[UnitId], Field(max_length=50)]
+    revises: UnitId | None = None
+    change: Ulid | None = None
 
 
 class PlanGate(BaseModel):
@@ -3155,6 +3273,52 @@ class DataTransferData(BaseModel):
     risk_tier: RiskTier
 
 
+class MeetingAdjournedData(BaseModel):
+    """
+    data of meeting.adjourned (ADR-0028). The room closed, once (MR-05). actor is the convener when reason is person, otherwise system (the idle sweeper, the cap check, Pause all or Stop all, the access check); target is the lead. turns is the number of meeting.asked in the room and credits_spent the sum of its meeting.replied credits (MR-08). A room open at Pause all or Stop all is adjourned (paused) before world.paused is written.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    room_id: Ulid
+    reason: MeetingRoomAdjournReason
+    turns: Annotated[int, Field(ge=0, le=50)]
+    credits_spent: Credits
+
+
+class MeetingAskedData(BaseModel):
+    """
+    data of meeting.asked (ADR-0028). The convener said something in the room to one attendee (to; the web sends the lead when nobody is selected). actor is the convener, target the addressed agent. The words are in the redacted raw archive (message_ref), never here (MR-12). Turns count 1, 2, ... per room with one turn in flight (MR-04); mode is the person's Quick or Thinking choice for this turn.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    room_id: Ulid
+    turn: MeetingRoomTurnNumber
+    to: AgentId
+    mode: MeetingRoomMode
+    message_ref: EventArchiveRef
+
+
+class MeetingConvenedData(BaseModel):
+    """
+    data of meeting.convened (ADR-0028, a user-requested addition). A person called a lead agent and the agents it supervises into the Meeting Hall of this world, to talk about the run run_id names. actor is that person (a user id), target the lead; district is the lead's district (null for the Director, whom only the owner calls); vis lists every attendee's district. Written by tilo-api through the world's writer after the access checks (MR-01, MR-03); never by a model, never a side effect (authz null). run_state says whether that run was live or had finished; a paused world opens no room. credit_cap and max_turns are this room's caps, from config/meeting_room.yaml and the convener's remaining spend cap at the time.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    room_id: Ulid
+    lead: AgentId
+    agents: MeetingRoomAttendees
+    as_role: MeetingRoomAsRole
+    run_state: Literal["live", "finished"]
+    credit_cap: Credits
+    max_turns: MeetingRoomTurnNumber
+
+
 class MeetingMinutedData(BaseModel):
     """
     data of meeting.minuted (CC-PEOPLE, FR-MTG-03). The minutes artifact is ready for the Owner to review; the counts let the HUD say what is waiting without carrying any text. unverified counts items whose evidence check failed (FR-MTG-04). flagged is the safety provider's verdict on the transcript.
@@ -3169,6 +3333,22 @@ class MeetingMinutedData(BaseModel):
     action_items: Annotated[int, Field(ge=0)]
     unverified: Annotated[int, Field(ge=0)]
     flagged: bool
+
+
+class PlanRevisedData(BaseModel):
+    """
+    data of plan.revised (ADR-0028). The planner compiled a confirmed change (the meeting.change_requested with this proposal_id, which is this event's cause) into revision units, and the plan validator accepted the revised plan (PG-13). actor is the world's Director, target the world. run is same_run when the discussed run was still live (the units join it) and revision_run when it had finished: then this event is the first of a new run of the same world (new run_id), and budget.requested, budget.granted and world.started follow (MR-09, MR-10). credits is the revision's estimate. Not a side effect: the units' own side effects wait at gates or policies like any unit's.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    proposal_id: Ulid
+    run: Literal["same_run", "revision_run"]
+    units: Annotated[
+        list[PlanRevisedDataRevisionUnit], Field(max_length=10, min_length=1)
+    ]
+    credits: CreditRange
 
 
 class PolicyAppliedData(BaseModel):
@@ -3318,6 +3498,37 @@ class MeetingAgendaItem(BaseModel):
         ),
     ]
     minutes: MeetingAgendaMinutes | None
+
+
+type MeetingRoomCitedArtifacts = Annotated[list[ArtifactRef], Field(max_length=10)]
+"""
+Pinned artifact versions the reply rests on, made by those units.
+"""
+
+
+class MeetingRoomProposal(BaseModel):
+    """
+    A change an agent proposes. It names only WHAT changes (units and artifact versions); its wording is in the reply's archive record. It has no field for an action, a recipient, a connector, a risk tier or a policy: the planner and the policy engine derive those (MR-11).
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    proposal_id: Ulid
+    units: Annotated[list[UnitId], Field(max_length=10, min_length=1)]
+    artifacts: Annotated[list[ArtifactRef], Field(max_length=10)]
+
+
+class MeetingRoomReply(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    from_: Annotated[AgentId, Field(alias="from")]
+    outcome: MeetingRoomOutcome
+    text: MeetingRoomReplyText | None
+    units: MeetingRoomCitedUnits
+    artifacts: MeetingRoomCitedArtifacts
+    proposal: MeetingRoomProposal | None
 
 
 class Mention(BaseModel):
@@ -4056,6 +4267,41 @@ class ApprovalRequestedData(BaseModel):
     team_lead: ApprovalRequestedDataTeamLeadAllowance | None
 
 
+class MeetingChangeRequestedData(BaseModel):
+    """
+    data of meeting.change_requested (ADR-0028). The convener confirmed a change an agent proposed in this room. actor is the convener, target the proposing agent (to). units and artifacts equal the proposal's, so the person confirms exactly what was shown (MR-07); message_ref is the confirmed wording in the redacted raw archive (the proposal's words or the person's own). It is not a side effect and authorises nothing: nothing leaves Tilo and nothing is spent until plan.revised and the budget events (MR-09, MR-10); it is never an L2 instruction (OB-01 counts only world.requested) and sets no gate, tier or policy (MR-11).
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    room_id: Ulid
+    proposal_id: Ulid
+    to: AgentId
+    units: Annotated[list[UnitId], Field(max_length=10, min_length=1)]
+    artifacts: MeetingRoomCitedArtifacts
+    as_role: MeetingRoomAsRole
+    message_ref: EventArchiveRef
+
+
+class MeetingRepliedData(BaseModel):
+    """
+    data of meeting.replied (ADR-0028). The addressed agent answered one turn. actor is that agent (the turn's to), target the convener. The reply is one model call over that agent's own records only (MR-06): the event's trace names the meeting or meeting_thinking role and profile, and credits what the call cost. The text is in the redacted raw archive (message_ref); a failed reply has none. units and artifacts are what the reply rests on, checked by code against the agent's own grounding set before the event is written; a proposal names what would change and nothing about how (MR-11). The web shows the speaker's cue only while this event's reply is on screen.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    room_id: Ulid
+    turn: MeetingRoomTurnNumber
+    mode: MeetingRoomMode
+    outcome: MeetingRoomOutcome
+    message_ref: EventArchiveRef | None
+    units: MeetingRoomCitedUnits
+    artifacts: MeetingRoomCitedArtifacts
+    proposal: MeetingRoomProposal | None
+
+
 class EventRegistry(BaseModel):
     """
     Shape of contracts/events/registry.yaml (PRD 9.5): every registered event type with exactly one world effect, one HUD effect, one Story line template and one Trace row, its data schema, its fixture and the pillar that emits it. unknown_types is fixed to trace_only (HR-5). contracts-check also checks the paths, the placeholders and the side-effect list (contracts/event.rules.md).
@@ -4180,6 +4426,22 @@ class Meeting(BaseModel):
     delete_transcript_after: Timestamp | None
     delete_minutes_after: Timestamp | None
     created_at: Timestamp
+
+
+class MeetingRoomTurn(BaseModel):
+    """
+    One turn: what the person asked, the reply (null while it is pending) and the change the person confirmed from it (null if none).
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    turn: MeetingRoomTurnNumber
+    to: AgentId
+    mode: MeetingRoomMode
+    text: MeetingRoomPersonText
+    reply: MeetingRoomReply | None
+    change: MeetingRoomConfirmedChange | None
 
 
 class Meter(BaseModel):
@@ -4414,6 +4676,31 @@ class LayoutLevel(BaseModel):
     districts: Annotated[list[LayoutDistrict], Field(max_length=6, min_length=1)]
 
 
+class MeetingRoom(BaseModel):
+    """
+    A meeting room (ADR-0028, user-requested 2026-10-08, Proposed): a person calls a lead agent and the agents it supervises into the Meeting Hall of a live or finished world, asks them what they did and why, and confirms changes they proposed. The root is the room as tilo-api serves it (GET /v1/worlds/{world_id}/rooms/{room_id}); it is rebuilt from the room's meeting.* events plus the redacted archive records they point at, and holds nothing the events do not. $defs hold the three request bodies and the shapes the meeting.* event data share. Text is plain text: the web shows it as text, never as markup or links. Rules MR-01 to MR-12 are in meeting_room.rules.md.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    room_id: Ulid
+    world_id: WorldId
+    run_id: RunId
+    state: Literal["open", "adjourned"]
+    reason: MeetingRoomAdjournReason | None
+    """
+    Why the room closed; null exactly while it is open.
+    """
+    lead: AgentId
+    agents: MeetingRoomAttendees
+    as_role: MeetingRoomAsRole
+    credit_cap: Credits
+    credits_spent: Credits
+    max_turns: MeetingRoomTurnNumber
+    turns: Annotated[list[MeetingRoomTurn], Field(max_length=50)]
+
+
 class Card(BaseModel):
     """
     One card, every channel (PRD 10.2, 10.3): needs-you, gate, consent and meeting cards. Channel rules are data: answer_channels is limited per kind (email answers questions only; gates need sign-in on the web or a verified WhatsApp number; consent needs the web). safe_default is the option id applied at timeout; it names one of the options and that option is reversible (contracts/card.rules.md CR-01 to CR-03). A gate's or consent card's is always hold, so a gate never times out to go and a consent card never times out to a grant; every hold option is reversible, only a gate may offer an irreversible option, and neither a gate nor a consent card is delegated to the Director. A gate's option ids are the closed set approve, edit, hold, each with a fixed label (Approve, Edit first, Hold); only approve opens the gate, and its irreversible flag equals the gate's (CR-07, CR-08). A consent card's option ids are the closed set connect, hold with fixed labels Connect, Hold; only connect grants (CR-13). The deterministic card builder writes a gate card's gate details and options, never a model, and the card validator checks them against the plan gate, the connector action and the outbox entry the gate releases (CR-09 to CR-12).
@@ -4498,6 +4785,7 @@ type RegisteredEventType = Literal[
     "world.failed",
     "plan.questions_asked",
     "plan.approaches_proposed",
+    "plan.revised",
     "budget.requested",
     "budget.granted",
     "level.created",
@@ -4531,6 +4819,11 @@ type RegisteredEventType = Literal[
     "meeting.started",
     "meeting.decision",
     "meeting.ended",
+    "meeting.convened",
+    "meeting.asked",
+    "meeting.replied",
+    "meeting.change_requested",
+    "meeting.adjourned",
     "connection.requested",
     "connection.consented",
     "connection.established",
@@ -4583,6 +4876,7 @@ EVENT_TYPES: Final[tuple[RegisteredEventType, ...]] = (
     "world.failed",
     "plan.questions_asked",
     "plan.approaches_proposed",
+    "plan.revised",
     "budget.requested",
     "budget.granted",
     "level.created",
@@ -4616,6 +4910,11 @@ EVENT_TYPES: Final[tuple[RegisteredEventType, ...]] = (
     "meeting.started",
     "meeting.decision",
     "meeting.ended",
+    "meeting.convened",
+    "meeting.asked",
+    "meeting.replied",
+    "meeting.change_requested",
+    "meeting.adjourned",
     "connection.requested",
     "connection.consented",
     "connection.established",
@@ -4679,6 +4978,7 @@ EVENT_DATA_MODELS: Final[dict[RegisteredEventType, type[BaseModel]]] = {
     "world.failed": WorldFailedData,
     "plan.questions_asked": PlanQuestionsAskedData,
     "plan.approaches_proposed": PlanApproachesProposedData,
+    "plan.revised": PlanRevisedData,
     "budget.requested": BudgetRequestedData,
     "budget.granted": BudgetGrantedData,
     "level.created": LevelCreatedData,
@@ -4712,6 +5012,11 @@ EVENT_DATA_MODELS: Final[dict[RegisteredEventType, type[BaseModel]]] = {
     "meeting.started": MeetingStartedData,
     "meeting.decision": MeetingDecisionData,
     "meeting.ended": MeetingEndedData,
+    "meeting.convened": MeetingConvenedData,
+    "meeting.asked": MeetingAskedData,
+    "meeting.replied": MeetingRepliedData,
+    "meeting.change_requested": MeetingChangeRequestedData,
+    "meeting.adjourned": MeetingAdjournedData,
     "connection.requested": ConnectionRequestedData,
     "connection.consented": ConnectionConsentedData,
     "connection.established": ConnectionEstablishedData,
@@ -4755,7 +5060,7 @@ EVENT_DATA_MODELS: Final[dict[RegisteredEventType, type[BaseModel]]] = {
 }
 
 EVENT_REGISTRY: Final[EventRegistry] = EventRegistry.model_validate(
-    {'version': '1.1.0',
+    {'version': '1.3.0',
      'unknown_types': 'trace_only',
      'types': {'world.requested': {'family': 'world',
                                    'verb': 'requested',
@@ -4877,6 +5182,21 @@ EVENT_REGISTRY: Final[EventRegistry] = EventRegistry.model_validate(
                                             'trace_row': 'approaches={data.approach_count}',
                                             'data_schema': 'events/data/plan.approaches_proposed.schema.json',
                                             'fixture': 'fixtures/events/valid/plan.approaches_proposed.json'},
+               'plan.revised': {'family': 'plan',
+                                'verb': 'revised',
+                                'priority': 'should',
+                                'pillar': 'P1',
+                                'default_severity': 'info',
+                                'side_effect': False,
+                                'world_effect': 'Revision blueprints appear on the buildings whose '
+                                                'work changes.',
+                                'hud_effect': 'The plan gains the revision units and the credit '
+                                              'estimate updates.',
+                                'story_template': '{actor} planned revision work for a change asked '
+                                                  'for in the Meeting Hall ({data.run}).',
+                                'trace_row': 'proposal={data.proposal_id} run={data.run}',
+                                'data_schema': 'events/data/plan.revised.schema.json',
+                                'fixture': 'fixtures/events/valid/plan.revised.json'},
                'budget.requested': {'family': 'budget',
                                     'verb': 'requested',
                                     'priority': 'must',
@@ -5291,6 +5611,84 @@ EVENT_REGISTRY: Final[EventRegistry] = EventRegistry.model_validate(
                                  'trace_row': 'ended',
                                  'data_schema': 'events/data/meeting.ended.schema.json',
                                  'fixture': 'fixtures/events/valid/meeting.ended.json'},
+               'meeting.convened': {'family': 'meeting',
+                                    'verb': 'convened',
+                                    'priority': 'should',
+                                    'pillar': 'P4',
+                                    'default_severity': 'info',
+                                    'side_effect': False,
+                                    'world_effect': 'The lead and its agents gather in the Meeting '
+                                                    'Hall.',
+                                    'hud_effect': 'The meeting room opens with the agents seated round '
+                                                  'the table.',
+                                    'story_template': '{actor} called {target} and its team into the '
+                                                      'Meeting Hall.',
+                                    'trace_row': 'room={data.room_id} lead={data.lead} '
+                                                 'as={data.as_role} run={data.run_state} '
+                                                 'cap={data.credit_cap} turns={data.max_turns}',
+                                    'data_schema': 'events/data/meeting.convened.schema.json',
+                                    'fixture': 'fixtures/events/valid/meeting.convened.json'},
+               'meeting.asked': {'family': 'meeting',
+                                 'verb': 'asked',
+                                 'priority': 'should',
+                                 'pillar': 'P4',
+                                 'default_severity': 'info',
+                                 'side_effect': False,
+                                 'world_effect': 'A speech bubble shows over the Meeting Hall.',
+                                 'hud_effect': "The chat panel shows the person's message.",
+                                 'story_template': '{actor} asked {target} something in the Meeting '
+                                                   'Hall.',
+                                 'trace_row': 'room={data.room_id} turn={data.turn} to={data.to} '
+                                              'mode={data.mode}',
+                                 'data_schema': 'events/data/meeting.asked.schema.json',
+                                 'fixture': 'fixtures/events/valid/meeting.asked.json'},
+               'meeting.replied': {'family': 'meeting',
+                                   'verb': 'replied',
+                                   'priority': 'should',
+                                   'pillar': 'P2',
+                                   'default_severity': 'info',
+                                   'side_effect': False,
+                                   'world_effect': 'A reply bubble shows over the Meeting Hall.',
+                                   'hud_effect': 'The chat panel shows the reply and its sources; the '
+                                                 "speaker's cue shows while the reply is on screen.",
+                                   'story_template': '{actor} replied in the Meeting Hall '
+                                                     '({data.outcome}).',
+                                   'trace_row': 'room={data.room_id} turn={data.turn} '
+                                                'outcome={data.outcome} mode={data.mode}',
+                                   'data_schema': 'events/data/meeting.replied.schema.json',
+                                   'fixture': 'fixtures/events/valid/meeting.replied.json'},
+               'meeting.change_requested': {'family': 'meeting',
+                                            'verb': 'change_requested',
+                                            'priority': 'should',
+                                            'pillar': 'P4',
+                                            'default_severity': 'info',
+                                            'side_effect': False,
+                                            'world_effect': 'A change slip goes from the Meeting Hall '
+                                                            'to the Town Hall.',
+                                            'hud_effect': 'The chat panel marks the change as sent to '
+                                                          'planning.',
+                                            'story_template': '{actor} asked {target} for a change; it '
+                                                              'goes to planning.',
+                                            'trace_row': 'room={data.room_id} '
+                                                         'proposal={data.proposal_id} '
+                                                         'as={data.as_role}',
+                                            'data_schema': 'events/data/meeting.change_requested.schema.json',
+                                            'fixture': 'fixtures/events/valid/meeting.change_requested.json'},
+               'meeting.adjourned': {'family': 'meeting',
+                                     'verb': 'adjourned',
+                                     'priority': 'should',
+                                     'pillar': 'P4',
+                                     'default_severity': 'info',
+                                     'side_effect': False,
+                                     'world_effect': 'The agents leave the Meeting Hall.',
+                                     'hud_effect': 'The meeting room closes and the chat panel says '
+                                                   'why.',
+                                     'story_template': 'The Meeting Hall meeting with {target} ended '
+                                                       '({data.reason}).',
+                                     'trace_row': 'room={data.room_id} reason={data.reason} '
+                                                  'turns={data.turns} credits={data.credits_spent}',
+                                     'data_schema': 'events/data/meeting.adjourned.schema.json',
+                                     'fixture': 'fixtures/events/valid/meeting.adjourned.json'},
                'connection.requested': {'family': 'connection',
                                         'verb': 'requested',
                                         'priority': 'must',
