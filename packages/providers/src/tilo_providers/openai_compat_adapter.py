@@ -180,7 +180,10 @@ class OpenAICompatModelProvider(ModelProvider):
         if finish_reason == "length":
             # The reply hit its max_tokens cap: cut off or empty, never a reply. No thinking count on this wire.
             output = None if usage_raw is None else (usage_raw.get("completion_tokens") or 0)
-            raise OutputTruncatedError(truncated_message(output, None), output_tokens=output, thinking_tokens=None)
+            prompt = None if usage_raw is None else usage_raw.get("prompt_tokens")
+            raise OutputTruncatedError(
+                truncated_message(output, None), output_tokens=output, thinking_tokens=None, input_tokens=prompt
+            )
         tool_calls: list[dict[str, Any]] | None = None
         raw_tool_calls = message.get("tool_calls")
         if raw_tool_calls:
@@ -288,8 +291,12 @@ class OpenAICompatModelProvider(ModelProvider):
                     if finish_reason == "length":
                         usage_raw = chunk.get("usage")
                         output = None if not isinstance(usage_raw, dict) else (usage_raw.get("completion_tokens") or 0)
+                        prompt = None if not isinstance(usage_raw, dict) else usage_raw.get("prompt_tokens")
                         raise OutputTruncatedError(
-                            truncated_message(output, None), output_tokens=output, thinking_tokens=None
+                            truncated_message(output, None),
+                            output_tokens=output,
+                            thinking_tokens=None,
+                            input_tokens=prompt,
                         )
                     delta = choice.get("delta", {})
                     content = delta.get("content")

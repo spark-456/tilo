@@ -131,6 +131,11 @@
   margin: 0;
   font-size: var(--text-14);
 }
+/* FR-MTG-09: the status line of "Host this meeting" is a live region, reserved even when empty. */
+.host-status {
+  display: block;
+  min-height: 1.5em;
+}
 .mrow,
 .prow {
   padding: var(--space-12) 0;

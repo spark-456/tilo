@@ -18,7 +18,7 @@ has safe, deterministic targets instead of the live internet.
 - None yet; scenario config lives in `config/scenarios/` once scenarios are built.
 
 ## Requirement IDs
-- Section 6.2 `tilo-sandbox-web` row; supports EV-* eval acceptance tests.
+- Section 6.2 `tilo-sandbox-web` row; supports EV-* eval acceptance tests and LW-09 live-fetch fixtures (`fetch_fixtures.py`).
 
 ## Local rules
 - Public ingress allowed (needed for browser-worker eval runs), but serves only fictional,

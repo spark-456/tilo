@@ -43,6 +43,22 @@ def clean(text: Any, *, lines: bool = False) -> str:
     return kept if lines else " ".join(kept.split())
 
 
+_NUMBER_LIST = re.compile(r"\d{1,2}(?:\s*(?:,|;|&|\+|\band\b)\s*\d{1,2}|\s+\d{1,2})+", re.IGNORECASE)
+
+
+def _numbers(said: str) -> list[int] | None:
+    """The numbers of "1 and 2", "1, 2" or "1 2" (two or more), else None (one number or words are not a list)."""
+    return [int(n) for n in re.findall(r"\d+", said)] if said.isascii() and _NUMBER_LIST.fullmatch(said) else None
+
+
+def _clip_at_part(answer: str, limit: int = 300) -> str:
+    """Cut at the answers route's limit, on a part boundary when the answer joins several."""
+    if len(answer) <= limit:
+        return answer
+    cut = answer[:limit]
+    return cut[: cut.rfind("; ")] if "; " in cut else cut
+
+
 def _flush_input() -> None:
     """Discard what is waiting in the console's input buffer. Raises if this is not a real console."""
     if os.name == "nt":
@@ -143,9 +159,16 @@ class TerminalPerson:
             self._write("answer y or n")
         return False, "no answer (input closed)"
 
-    def _pick(self, prompt: str, options: list[Any]) -> Any:
-        """An option by its number, the person's own words, or "" (the default); a bad number asks again."""
+    def _pick(self, prompt: str, options: list[Any], *, many: bool = False) -> Any:
+        """An option by its number, the person's own words, or "" (the default); a bad number asks again. With
+        `many` (a question that can name several: deliverables) "1 and 2" or "1,2" picks both options, joined."""
         while (said := self._read(prompt)) is not None:
+            numbers = _numbers(said) if many and options and all(isinstance(o, str) for o in options) else None
+            if numbers is not None:
+                if all(1 <= n <= len(options) for n in numbers):
+                    return "; ".join(dict.fromkeys(options[n - 1] for n in numbers))
+                self._write(f"pick numbers from 1 to {len(options)}, or type words")
+                continue
             if not said.isdigit() or not options:  # words, or "" for the default
                 return said
             if said.isascii() and 1 <= int(said) <= len(options):
@@ -161,9 +184,19 @@ class TerminalPerson:
             return default
         self._write(f"Director asks ({field}): {clean(question['text'])}")
         self._write("\n".join(f"  {n}. {option}" for n, option in enumerate(suggested, 1)))
-        pick = self._pick("answer (a number, your own words, or empty for the default): ", suggested) or default
+        pick = (
+            self._pick(
+                "answer (a number, your own words, or empty for the default): ", suggested, many=field == "deliverables"
+            )
+            or default
+        )
         self.log.append(f"question {field}: {pick!r} (answered by the person)")
-        return pick[:300] if pick else None  # the answers route's own limit
+        return _clip_at_part(pick) if pick else None  # the answers route's own limit
+
+    def explain(self, detail: str) -> None:
+        """The answers were refused as a brief: say why in the person's terms; the run asks again, it does not end."""
+        self._write(f"That did not fit the brief ({clean(detail)}). Please answer again.")
+        self.log.append("answers refused as a brief change: asked again")
 
     def approach(self, offered: dict[str, Any]) -> str | None:
         options, recommended = offered["approaches"], offered["recommended"]

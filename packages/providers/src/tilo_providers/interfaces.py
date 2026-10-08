@@ -12,7 +12,7 @@ from typing import Any, TypedDict
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from tilo_providers.errors import RequestError
+from tilo_providers.errors import NotConfigured, RequestError
 from tilo_providers.media import MAX_PARTS, MediaPart
 
 
@@ -143,9 +143,15 @@ class SafetyProvider(ABC):  # PRD 10.4, 16.3 item 2: screens intake, tool output
         return text
 
 
-class SpeechProvider(ABC):  # FR-INT-14, FR-CHN-16: voice intake transcription
+class SpeechProvider(ABC):  # FR-INT-14, FR-CHN-16: voice intake transcription; FR-MTG-11: and the bot's voice
     @abstractmethod
     def transcribe(self, audio: bytes, **kwargs: Any) -> Any: ...
+
+    def synthesize(self, text: str, *, voice: str | None = None, **kwargs: Any) -> bytes:
+        """FR-MTG-11: text to speech, returned as raw 16-bit mono little-endian PCM. The sample rate is not in the
+        result: it is `config/voice.yaml`'s `sample_rate` (tilo_providers.voice). Additive and not abstract, so every
+        transcribe-only provider still conforms; it says so instead of guessing."""
+        raise NotConfigured("FR-MTG-11: this speech provider cannot synthesize speech")
 
 
 class RenderProvider(ABC):  # PRD 12.4: PDF/PPTX deliverables rendered from templates
