@@ -175,7 +175,8 @@ class MeetingHostRpc:
         return got
 
     def send_invitation(self, entry: Mapping[str, Any], evidence: Mapping[str, Any], draft: Mapping[str, Any]) -> Any:
-        """A registered side-effect name (SEC-03): only `MeetingHostStub.execute_side_effect` calls it."""
+        """Not a registered SEC-03 name (that list is the connector adapters' methods); a local AST test pins that only
+        `MeetingHostStub.execute_side_effect` calls it, and the stub verifies the outbox Grant first."""
         raw = self._post("send", {"entry": entry, "evidence": evidence, "draft": draft})
         try:
             answer = MeetingHostRpcSendAnswer.model_validate_json(raw)
