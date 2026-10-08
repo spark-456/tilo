@@ -8,6 +8,7 @@ import type {
   Agenda,
   ApiResult,
   Decision,
+  Effort,
   Ledger,
   TierKey,
   Today,
@@ -16,12 +17,14 @@ import type {
 } from "../../api/types";
 import type { AppCtx } from "../../app/AppCtx";
 import { useParkApi, useParkStore, useSchedule } from "../../app/context";
-import { ComposerPanel, type Phase } from "./ComposerPanel";
+import { ComposerPanel, type Phase, QUICK_IDLE, type QuickView } from "./ComposerPanel";
 import "./Home.css";
 import { Hero, KpiStrip, Pins, TodayPanel } from "./Panels";
+import { readEffort, writeEffort } from "./effortStore";
 import {
   DRAFT_MS,
   MODES,
+  QUICK_MAX_CHARS,
   liveRows,
   liveSummaryLine,
   needsWorld,
@@ -171,6 +174,72 @@ export function HomePage({ app }: { app: AppCtx }) {
     if (!sendingNow.current) toIdle();
   };
 
+  // Quick / Thinking (COST-FAST-1). The choice is remembered per signed-in email (effortStore), Thinking by
+  // default. A Quick ask makes no world and no plan: the answer, or the offer to switch, shows in the composer.
+  const [effort, setEffort] = useState<Effort>(() => readEffort());
+  const email = base !== null && base !== "failed" ? base.user.email : null;
+  // Once the signed-in email is known, that person's remembered choice applies, unless they have chosen since.
+  const chosenNow = useRef(false);
+  useEffect(() => {
+    if (email && !chosenNow.current) setEffort(readEffort(email));
+  }, [email]);
+  const [quick, setQuick] = useState<QuickView>(QUICK_IDLE);
+  const asking = useRef(false);
+  const alive = useRef(true);
+  useEffect(() => {
+    alive.current = true;
+    return () => {
+      alive.current = false;
+    };
+  }, []);
+  const busy = () => sendingNow.current || asking.current;
+  const chooseEffort = (next: Effort) => {
+    if (busy()) return;
+    chosenNow.current = true;
+    setEffort(next);
+    writeEffort(email, next);
+    setQuick(QUICK_IDLE);
+    toIdle();
+  };
+  const ask = () => {
+    if (busy()) return;
+    const text = query.trim();
+    if (text === "") {
+      setQuick({ state: "error", message: "Type your question first." });
+      return;
+    }
+    const length = Array.from(text).length;
+    if (length > QUICK_MAX_CHARS) {
+      setQuick({
+        state: "error",
+        message: `A Quick question can be up to ${QUICK_MAX_CHARS} characters; this one is ${length}. Shorten it, or switch to Thinking.`,
+      });
+      return;
+    }
+    asking.current = true;
+    setQuick({ state: "asking" });
+    store.askQuick(modeKey, text).then((out) => {
+      asking.current = false;
+      if (!alive.current) return;
+      setQuick(
+        out.kind === "answered"
+          ? { state: "answered", text: out.text, cost: out.cost, sample: out.sample }
+          : out.kind === "switch"
+            ? { state: "switch", reason: out.reason }
+            : { state: "error", message: out.message },
+      );
+    });
+  };
+  // "Switch to Thinking" on an offer: the same text goes as Thinking, through the usual start.
+  const switchToThinking = () => {
+    if (busy()) return;
+    chosenNow.current = true;
+    setEffort("thinking");
+    writeEffort(email, "thinking");
+    setQuick(QUICK_IDLE);
+    confirmStart();
+  };
+
   const open = (id: string) => go("world", { id });
   const failed = base === "failed" || worlds === "failed";
   const ready = base !== null && base !== "failed" && worlds !== null && worlds !== "failed";
@@ -242,22 +311,29 @@ export function HomePage({ app }: { app: AppCtx }) {
           query={query}
           shown={query.trim() || mode.example}
           phase={phase}
+          effort={effort}
+          onEffort={chooseEffort}
+          quick={quick}
+          onSwitch={switchToThinking}
           onQuery={(value) => {
-            if (sendingNow.current) return;
+            if (busy()) return;
             setQuery(value);
+            setQuick(QUICK_IDLE);
             toIdle();
           }}
           onMode={(key) => {
-            if (sendingNow.current) return;
+            if (busy()) return;
             setModeKey(key as TierKey);
+            setQuick(QUICK_IDLE);
             toIdle();
           }}
           onChip={(label) => {
-            if (sendingNow.current) return;
+            if (busy()) return;
             setQuery(label);
+            setQuick(QUICK_IDLE);
             toIdle();
           }}
-          onDraft={draft}
+          onDraft={effort === "quick" ? ask : draft}
           onConfirm={confirmStart}
           onChange={idleUnlessSending}
         />

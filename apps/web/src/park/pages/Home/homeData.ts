@@ -1,7 +1,15 @@
 // Home page data rules, written out from the reference (design_handoff_tilo_web_app/design/
 // Tilo App Home.dc.html, its renderVals, and tilo-app.js). Pure functions over what the Api returned:
 // nothing here reads a fixture, the clock or the address bar.
-import type { Agenda, AgendaEvent, Ledger, TierKey, World } from "../../api/types";
+import type {
+  Agenda,
+  AgendaEvent,
+  Ledger,
+  QuickCost,
+  SwitchReason,
+  TierKey,
+  World,
+} from "../../api/types";
 
 /** The composer's copy per size of job (the reference reads it from `D.TIERS`; the Api has no tier call). */
 export interface Mode {
@@ -81,6 +89,52 @@ export const MODES: readonly [Mode, Mode, Mode] = [
 ];
 
 export const DRAFT_MS = 900;
+
+// Quick / Thinking (COST-FAST-1). Words only: no number here is an estimate, a price or a time. The one number is
+// the server's own input cap for a Quick question (config/assistant.yaml question.max_chars).
+export const QUICK_MAX_CHARS = 500;
+
+export const EFFORTS = [
+  {
+    key: "quick",
+    label: "Quick",
+    note: "A direct answer. No plan is made and no agents start.",
+    start: "Ask",
+  },
+  {
+    key: "thinking",
+    label: "Thinking",
+    note: "The Director plans the work first, and nothing starts until you approve it.",
+    start: null,
+  },
+] as const;
+
+/** Why a Quick ask was sent back to Thinking, in plain words (the server's closed set of reasons). */
+export const SWITCH_WORDS: Readonly<Record<SwitchReason, string>> = {
+  attachments: "It has files, which a Quick answer cannot read.",
+  side_effect: "It would send, post, delete or book something, which needs a plan you approve.",
+  deliverable: "It asks for a document, deck or sheet to be made.",
+  needs_tools: "It needs tools, like searching the web or reading your inbox or calendar.",
+  multi_step: "It has several steps, one after another.",
+  too_long: "It is longer than a Quick answer can take.",
+  scenario: "It is a ready-made scenario, which runs as a full plan.",
+  unclear: "Tilo could not tell whether a quick answer would be enough.",
+};
+
+const figure = (n: number): string =>
+  n === 0 ? "0" : n < 0.01 ? "under 0.01" : String(Number(n.toFixed(2)));
+const credits = (n: number): string => `${figure(n)} ${n === 1 ? "credit" : "credits"}`;
+
+/** The cost line of a Quick answer, only from what the server served; null when it served nothing. */
+export function quickCostLine(cost: QuickCost | null): string | null {
+  if (!cost) return null;
+  const parts: string[] = [];
+  if (cost.credits !== undefined) parts.push(`Cost ${credits(cost.credits)}`);
+  if (cost.savedCredits !== undefined && cost.savedCredits > 0) {
+    parts.push(`Saved ${credits(cost.savedCredits)}`);
+  }
+  return parts.length > 0 ? parts.join(" · ") : null;
+}
 
 const plural = (n: number, one: string, many: string): string => (n === 1 ? one : many);
 
