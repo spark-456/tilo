@@ -15,17 +15,16 @@ from __future__ import annotations
 import logging
 import secrets
 import unicodedata
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from dataclasses import replace
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from fastapi import APIRouter, Depends, HTTPException, Request
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 from tilo_metering.flags import FlagStore
 
 from tilo_api import deps
-from tilo_api.people_writes import valid_email
-from tilo_api.tasks import _json_body
+from tilo_api.people_writes import _capped_body, valid_email
 from tilo_api.team_events import TeamEvents, get_team_events
 from tilo_api.team_rules import ROLES, MustAskLocked, RoleChangeRefused, load_capabilities, load_switches, set_switch
 from tilo_api.team_store import (
@@ -219,6 +218,23 @@ def _read(store: TeamRepository) -> TeamState:
     except Exception as exc:
         logger.warning("team read refused (%s)", type(exc).__name__)
         raise HTTPException(status_code=503, detail="not_configured") from exc
+
+
+def _json_body[Body: BaseModel](model: type[Body]) -> Callable[[Request], Awaitable[Body]]:
+    """Strict JSON from `application/json` only (415 otherwise), refused at 413 once it passes the people-write cap
+    (BQ-PPL11C-1: a client that keeps sending is cut after the cap), and a 422 that never echoes the input back."""
+
+    async def parse(request: Request) -> Body:
+        if request.headers.get("content-type", "").split(";")[0].strip().lower() != "application/json":
+            raise HTTPException(status_code=415, detail="Send application/json.")
+        raw = await _capped_body(request)
+        try:
+            return model.model_validate_json(raw)
+        except ValidationError as exc:
+            detail = [{"loc": list(e["loc"]), "msg": e["msg"]} for e in exc.errors()]
+            raise HTTPException(status_code=422, detail=detail) from exc
+
+    return parse
 
 
 @router.get("/v1/team")
