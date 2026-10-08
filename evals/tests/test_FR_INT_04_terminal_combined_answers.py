@@ -142,3 +142,23 @@ def test_FR_INT_04_a_scripted_run_without_a_person_is_refused_once_as_before():
     bank_run.drive(case, obs, 10.0, _app([422], seen))
 
     assert seen == ["banana"] and obs.outcome == "refused"
+
+
+@pytest.mark.parametrize(
+    "typed",
+    [" " * 3_000, "1" + " " * 3_000 + "x", "1 " * 1_500],
+    ids=["spaces", "digit-then-spaces", "digit-space-pairs"],
+)
+def test_FR_INT_04_a_long_run_of_spaces_at_the_terminal_is_read_quickly(typed):
+    import time
+
+    started = time.perf_counter()
+    person, _ = _person([typed, ""])
+    person.answer(QUESTION)
+    assert time.perf_counter() - started < 1.0
+
+
+def test_FR_INT_04_digits_separated_by_more_than_one_space_are_still_a_list():
+    person, _ = _person(["1   2"])
+
+    assert person.answer(QUESTION) == "Report (pdf); A PDF report"

@@ -2,12 +2,14 @@ import type { PlanApproach } from "@tilo/contracts";
 import { useState } from "react";
 import { useClient } from "../../api/ClientProvider";
 import type { ApproachesResult } from "../../api/client";
+import { canSchedule } from "../../api/schedules";
 import { stagePath } from "../../router";
 import { rememberWorld } from "../../world/lastWorld";
 import { AppLink } from "../AppLink";
 import { Loaded, Primary } from "../FlowShell";
 import { useAction, useRemote } from "../remote";
 import { BudgetMeter } from "./BudgetMeter";
+import { useRepeatWeekly } from "./RepeatWeekly";
 
 // biome-ignore format: compact dimension tuple table
 const DIMS = [
@@ -19,6 +21,12 @@ const DIMS = [
 // 17.3); services/api answers 422 above it. The web has no config read, so this mirrors it; change
 // both together.
 export const MAX_BUDGET_CAP_CREDITS = 300;
+
+// The API takes a title without control characters.
+const plain = (text: string): string =>
+  [...text]
+    .map((ch) => ((ch.codePointAt(0) ?? 0) < 32 || /^[\u007f-\u009f]$/.test(ch) ? " " : ch))
+    .join("");
 
 export const CAP_RULE = `Enter a whole number from 1 to ${MAX_BUDGET_CAP_CREDITS} credits.`;
 
@@ -42,6 +50,9 @@ export function Approaches({ taskId }: { taskId: string }) {
   );
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [capDraft, setCapDraft] = useState<string | null>(null);
+  const repeat = useRepeatWeekly();
+  // Set when the run started but its weekly repeat was refused: the run stays, and so does this page.
+  const [started, setStarted] = useState<{ worldId: string; said: string } | null>(null);
 
   const ready = remote.status === "ready" ? remote.value : null;
   const selected = ready?.result.approaches.find((a) => a.id === selectedId);
@@ -63,8 +74,25 @@ export function Approaches({ taskId }: { taskId: string }) {
       budget_cap: validCap,
     });
     rememberWorld(world_id); // a bare /needs-you or /library shows this run next
+    if (repeat.cadence && canSchedule(client)) {
+      // FR-AGT-14: the schedule copies what was just approved, so it is created only after the grant.
+      const title = plain(`Weekly run: ${selected.label}`).slice(0, 140);
+      try {
+        await client.createSchedule({
+          task_id: taskId,
+          approach_id: selected.id,
+          title,
+          cadence: repeat.cadence,
+        });
+      } catch (e) {
+        const said = e instanceof Error && e.message ? e.message : "Tilo could not set it up.";
+        setStarted({ worldId: world_id, said });
+        return null; // the run has started; it is not undone and not announced as failed
+      }
+    }
     return stagePath(world_id);
   });
+  const repeating = canSchedule(client);
 
   // biome-ignore format: compact JSX
   return (
@@ -102,7 +130,14 @@ export function Approaches({ taskId }: { taskId: string }) {
           );
         }}
       </Loaded>
-      <Primary label="Start this approach" action={action} disabled={!selected || validCap === null} />
+      {repeating && repeat.control}
+      {started && (
+        <div className="flow-notice" role="alert" data-testid="repeat-refused">
+          <p>{`The run has started, but it was not set to repeat weekly. ${started.said}`}</p>
+          <AppLink to={stagePath(started.worldId)} className="secondary">Open the run</AppLink>
+        </div>
+      )}
+      <Primary label="Start this approach" action={action} disabled={!selected || validCap === null || (repeating && repeat.on && repeat.cadence === null) || started !== null} />
     </>
   );
 }
