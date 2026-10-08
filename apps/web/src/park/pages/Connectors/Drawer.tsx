@@ -1,26 +1,49 @@
 // The connector detail panel (design: a right-hand drawer, role="dialog" named by the tool). The scrim and
 // Escape close it; focus goes to Close on open and back to the opener on close.
 import { useEffect, useRef } from "react";
+import { Spin } from "./ConnectorParts";
 import { icon } from "./icons";
-import { DEFAULT_SCOPES, LEVEL_LABEL, type Merged, drawerSync } from "./view";
+import {
+  DEFAULT_SCOPES,
+  LEVEL_LABEL,
+  type Merged,
+  type UsedRow,
+  ceilingOf,
+  drawerSync,
+} from "./view";
 
 export interface DrawerProps {
   c: Merged;
-  /** Skill name to skill id, for the "Used by" rows. */
-  skillIds: ReadonlyMap<string, string>;
+  /** The skills and worlds that touch the tool (FR-ACC-03), from `usedBy`. */
+  used: readonly UsedRow[];
+  /** A sync of this tool is in flight: the only time the spinner shows. */
+  syncing: boolean;
+  /** A reconnect of this tool is in flight. */
+  reconnecting: boolean;
   onClose: () => void;
   onLevel: (level: number, sub: string) => void;
-  onUsed: (name: string) => void;
+  onUsed: (row: UsedRow) => void;
+  onReconnect: () => void;
   onDisconnect: () => void;
   onSync: () => void;
 }
 
+const USED_ICON = { skill: "bolt", world: "globe", other: "calendar" } as const;
+const USED_TITLE = {
+  skill: "Opens the skill",
+  world: "Opens the world",
+  other: "Opens the agenda",
+} as const;
+
 export function Drawer({
   c,
-  skillIds,
+  used,
+  syncing,
+  reconnecting,
   onClose,
   onLevel,
   onUsed,
+  onReconnect,
   onDisconnect,
   onSync,
 }: DrawerProps) {
@@ -81,7 +104,19 @@ export function Drawer({
                   : "park-connectors-band-dot"
               }
             />
-            {drawerSync(c)}
+            {syncing ? <Spin /> : null}
+            <span>{syncing ? "Syncing now…" : drawerSync(c)}</span>
+            {attn ? (
+              <button
+                type="button"
+                className="park-connectors-band-action"
+                disabled={reconnecting}
+                onClick={onReconnect}
+              >
+                {reconnecting ? <Spin /> : null}
+                {reconnecting ? `Waiting for ${c.name}` : "Reconnect"}
+              </button>
+            ) : null}
           </div>
           <div
             className="park-connectors-group"
@@ -123,20 +158,20 @@ export function Drawer({
                 </button>
               );
             })}
+            <div className="park-connectors-ceiling">{ceilingOf(c.level)}</div>
           </div>
           <div className="park-connectors-group">
             <h3 className="park-connectors-h3">Used by</h3>
-            {(c.used ?? []).map((name) => (
+            {used.map((row) => (
               <button
                 type="button"
-                key={name}
+                key={`${row.kind}:${row.name}`}
                 className="park-connectors-usedrow"
-                onClick={() => onUsed(name)}
+                title={USED_TITLE[row.kind]}
+                onClick={() => onUsed(row)}
               >
-                <span className="park-connectors-usedicon">
-                  {icon(skillIds.has(name) ? "bolt" : "calendar", 14)}
-                </span>
-                <span className="park-connectors-usedname">{name}</span>
+                <span className="park-connectors-usedicon">{icon(USED_ICON[row.kind], 14)}</span>
+                <span className="park-connectors-usedname">{row.name}</span>
                 {icon("chevR", 12)}
               </button>
             ))}
@@ -145,12 +180,23 @@ export function Drawer({
             Access uses the tool’s own sign-in. You can revoke it here or from {c.name} at any time.
             Team rules for spend and sharing still apply on top.
           </div>
+          {attn ? (
+            <div className="park-connectors-note">
+              You sign in on {c.name}’s own page. Tilo never sees your password.
+            </div>
+          ) : null}
         </div>
         <div className="park-connectors-drawer-foot">
           <button type="button" className="park-connectors-disconnect" onClick={onDisconnect}>
             Disconnect
           </button>
-          <button type="button" className="park-connectors-sync-now" onClick={onSync}>
+          <button
+            type="button"
+            className="park-connectors-sync-now"
+            disabled={syncing || attn}
+            title={attn ? "Reconnect first" : undefined}
+            onClick={onSync}
+          >
             {icon("refresh", 15)}Sync now
           </button>
         </div>

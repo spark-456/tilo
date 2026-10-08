@@ -9,6 +9,7 @@ branch | packages/providers/src/tilo_providers/dev_director.py | _brief_reply | 
 branch | packages/providers/src/tilo_providers/prompts.py | neutralise_marker | neutralises prompt block delimiters in untrusted text
 branch | packages/providers/src/tilo_providers/replay.py | _scrub_authorization_like | redacts credential-shaped strings from recordings (PRD 16.1 rule 4)
 branch | services/api/src/tilo_api/dev_run.py | dev_redact | dev-only stand-in for the shared secret redactor (FR-MEM-05, BQ-109); masks fixed secret shapes in synthetic text; no branch on task content
+branch | services/api/src/tilo_api/quick_rules.py | _stems | COST-FAST-1 Quick classifier (also `classify`, which re.splits the question key into clauses): splits the question into words for the config/quick.yaml word lists; a hit only suggests switching to Thinking (a person who chose Thinking always gets it), it never chooses what a run does and names no scenario
 branch | services/browser/src/tilo_browser/login.py | _asks_in_text | detects a page asking for a password or code, so the worker stops (Tilo never handles passwords)
 branch | services/browser/src/tilo_browser/masking.py | _mask | masks secrets in page text before it is stored or shown
 branch | services/browser/src/tilo_browser/masking.py | _mask_cards | masks Luhn-valid card numbers in page text
@@ -34,4 +35,6 @@ branch | services/harness/src/tilo_harness/run_bundle.py | _stamp | validates th
 branch | services/harness/src/tilo_harness/run_bundle.py | export_run | compares recorded artifact fields and the run's archive records with the event stream (FR-MEM-10); a task's words are never read
 branch | services/connectors/src/tilo_connectors/calendar_sync.py | _diff | PE-13/PE-21: compares a synced title with the stored copy of the same event so an unchanged title keeps its verdict and is not screened again; no word of the title is read
 branch | packages/providers/src/tilo_providers/model_armor_adapter.py | redact | scrubs the bearer token and credentials (ya29./AIza) from provider and error text; never task text
+branch | packages/providers/src/tilo_providers/google_speech_adapter.py | redact | scrubs credentials (ya29./AIza) from provider and error text; never task text
+branch | packages/planning/src/tilo_planning/recording.py | _line | FR-MTG-17: cleans one line of untrusted transcript text (whitespace, control and format characters); every text gets the same treatment, no word is read
 branch | services/channels/src/tilo_channels/meeting_followup.py | _title_is_clear | FR-MTG-08c: runs the FR-CHN-10 checker on a meeting title (links, addresses, numbers, commitment words, obfuscation) before it reaches a subject; a safety screen of untrusted text, no choice of what a run does from the subject of a task

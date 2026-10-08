@@ -1,0 +1,69 @@
+{
+  "key": "6e38da13f91151be",
+  "profile": "google-audio",
+  "result": {
+    "segments": [
+      {
+        "speaker": "Speaker 1",
+        "start_ms": 0,
+        "text": "Good morning everyone, thanks for joining the planning call."
+      },
+      {
+        "speaker": "Speaker 2",
+        "start_ms": 7500,
+        "text": "Morning. I have the supplier quotes ready, there are three of them."
+      },
+      {
+        "speaker": "Speaker 1",
+        "start_ms": 14200,
+        "text": "Great. Which one is the cheaper for the first batch of two hundred units?"
+      },
+      {
+        "speaker": "Speaker 2",
+        "start_ms": 21000,
+        "text": "The second supplier, at four dollars twenty a unit, with delivery in ten days."
+      },
+      {
+        "speaker": "Speaker 3",
+        "start_ms": 31800,
+        "text": "The first supplier is lower but their quality record is much better than the others."
+      },
+      {
+        "speaker": "Speaker 1",
+        "start_ms": 42600,
+        "text": "Let us not decide on price alone. Priya, can you check the quality reports before Friday?"
+      },
+      {
+        "speaker": "Speaker 3",
+        "start_ms": 55300,
+        "text": "Yes, I will review the reports and send a short summary to the team by Thursday evening."
+      },
+      {
+        "speaker": "Speaker 2",
+        "start_ms": 68000,
+        "text": "I will also ask the second supplier whether they can improve the delivery time."
+      },
+      {
+        "speaker": "Speaker 1",
+        "start_ms": 79400,
+        "text": "Good. We still need an owner for the budget approval, that should be Marcus."
+      },
+      {
+        "speaker": "Speaker 3",
+        "start_ms": 91200,
+        "text": "Marcus is on live until Monday, so the approval will wait until next week."
+      },
+      {
+        "speaker": "Speaker 1",
+        "start_ms": 103500,
+        "text": "That is fine. We will decide on the supplier at the Tuesday meeting."
+      },
+      {
+        "speaker": "Speaker 2",
+        "start_ms": 114800,
+        "text": "Sounds good. Thanks everyone, talk to you on Tuesday."
+      }
+    ]
+  },
+  "role": "speech"
+}

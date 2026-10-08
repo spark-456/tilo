@@ -62,7 +62,7 @@ const toastCopy = (app: TestApp, msg: string) => {
 };
 
 describe("WEB_11_connectors_drawer: a tile opens the detail panel", () => {
-  it("WEB_11_connectors_drawer_gmail_header_status_levels_and_footer_copy", async () => {
+  it("FR_ACC_03_WEB_11_connectors_drawer_gmail_header_status_levels_and_footer_copy", async () => {
     const { root } = await open();
     const d = openTile(root, "Gmail");
     expect(d.getAttribute("aria-label")).toBe("Gmail");
@@ -91,7 +91,7 @@ describe("WEB_11_connectors_drawer: a tile opens the detail panel", () => {
     });
   });
 
-  it("WEB_11_connectors_drawer_live_and_attention_status_lines", async () => {
+  it("FR_ACC_03_WEB_11_connectors_drawer_live_and_attention_status_lines", async () => {
     const { root } = await open();
     expect(hasExactText(openTile(root, "Google Calendar"), "Healthy · synced live")).toBe(true);
     click(labelled(root, "Close") as HTMLElement);
@@ -158,7 +158,7 @@ describe("WEB_11_connectors_drawer: a tile opens the detail panel", () => {
 describe("WEB_11_connectors_go: Used by sends people to skills or the Agenda", () => {
   const goArgs = (app: TestApp) => app.go.mock.calls.at(-1);
 
-  it("WEB_11_connectors_go_a_skill_name_opens_skills_with_its_id_and_closes_the_drawer", async () => {
+  it("FR_ACC_03_WEB_11_connectors_go_a_skill_name_opens_skills_with_its_id_and_closes_the_drawer", async () => {
     const { app, root } = await open();
     for (const name of ["Triage the Accounts inbox", "Draft a supplier brief"]) {
       const d = openTile(root, "Gmail");
@@ -181,7 +181,7 @@ describe("WEB_11_connectors_go: Used by sends people to skills or the Agenda", (
     expect(dialogOf(root)).toBeNull();
   });
 
-  it("WEB_11_connectors_go_hubspot_used_by_scan_competitor_prices_opens_that_skill", async () => {
+  it("FR_ACC_03_WEB_11_connectors_go_hubspot_used_by_scan_competitor_prices_opens_that_skill", async () => {
     const { app, root } = await open();
     const d = openTile(root, "HubSpot");
     click(buttonText(d, "Scan competitor prices") as HTMLElement);
@@ -244,7 +244,7 @@ describe("WEB_11_connectors_reconnect: the HubSpot banner", () => {
       /^(Reconnect|Waiting for HubSpot)$/.test(textOf(b)),
     ) as HTMLButtonElement | undefined;
 
-  it("WEB_11_connectors_reconnect_waits_ignores_a_second_click_then_clears_the_attention", async () => {
+  it("FR_ACC_04_WEB_11_connectors_reconnect_waits_ignores_a_second_click_then_clears_the_attention", async () => {
     const { app, root } = await open();
     click(reconnect(root) as HTMLElement);
     expect(textOf(reconnect(root) as HTMLElement)).toBe("Waiting for HubSpot");
@@ -262,7 +262,7 @@ describe("WEB_11_connectors_reconnect: the HubSpot banner", () => {
     expect(app.go, "S-08 hand-off is not in the design").not.toHaveBeenCalled();
   });
 
-  it("WEB_11_connectors_reconnect_completes_without_any_timer", async () => {
+  it("FR_ACC_04_WEB_11_connectors_reconnect_completes_without_any_timer", async () => {
     const { app, root } = await open();
     vi.useFakeTimers({ toFake: ["setTimeout", "setInterval", "requestAnimationFrame"] });
     click(reconnect(root) as HTMLElement);

@@ -102,7 +102,7 @@ function Shell() {
   }, [title]);
   const Page = route ? PAGES[route.page] : null;
   return (
-    <div data-park data-time={app.time}>
+    <div data-park data-time={app.time} data-motion={app.motion}>
       <AppShell>
         <Suspense fallback={null}>
           {Page ? <Page app={app} /> : <NotFound go={app.go} />}

@@ -1,5 +1,6 @@
 // Typed shapes of the Park City fixtures (WEB-1a; README "State and data"; plan section 5).
 // Each shape follows design_handoff_tilo_web_app/design/tilo-app.js, the user's own prototype data.
+import type { QuickCost, QuickIntakeResult, QuickReason } from "../../api/http";
 
 export type Source = "fixture" | "live";
 export type ApiResult<T> = { data: T; source: Source };
@@ -245,7 +246,14 @@ export interface Ledger {
   by: Record<"world" | "tool" | "role", { head: string; rows: [string, number][] }>;
   tx: LedgerTx[];
   runs: [string, number[], number, string][];
-  waits: { buckets: [string, number][]; types: [string, string, string][] };
+  waits: {
+    buckets: [string, number][];
+    types: [string, string, string][];
+    /** The headline over the histogram (a typical wait the ledger itself states); absent means none is shown. */
+    summary?: string;
+    /** The wait a type shows once a backup approver exists, by type name; absent means the wait is unchanged. */
+    withBackup?: Record<string, string>;
+  };
   memory: number[];
   hours: [string, number, string, string][];
   activity: LedgerEntry[];
@@ -256,6 +264,12 @@ export interface Ledger {
    * `memory` it was worked out for; a ledger whose `memory` has changed since no longer states it.
    */
   memoryUp?: { amount: number; since: string; total: number };
+  /** The day of the month that spiked and what bought it; drawn only while that day's spend covers `amount`. */
+  spike?: { day: number; label: string; amount: number };
+  /** Skill id -> the name the cost-per-run headline uses (else the run's own name). */
+  runLabels?: Record<string, string>;
+  /** One name per entry of `memory` (e.g. "1–7 Sep"); absent, or of another length, means no week names. */
+  memoryWeeks?: string[];
 }
 
 // Agenda
@@ -379,6 +393,8 @@ export interface Connector {
   level?: number;
   used?: string[];
   blurb?: string;
+  /** When the sign-in lapses (ISO 8601). The Connectors page warns 3 days ahead; absent means no expiry is known. */
+  expires?: string;
 }
 export interface Notification {
   id: string;
@@ -400,6 +416,14 @@ export interface DecideAck extends Ack {
 export interface StartAck extends Ack {
   world: World;
 }
+
+/** How deep a start goes (COST-FAST-1): Quick is a direct answer, Thinking the full Director plan. Not a world size. */
+export type Effort = "quick" | "thinking";
+
+/** Why a Quick ask is offered as Thinking, what it cost, and the reply: the one definition is in src/api/http.ts. */
+export type SwitchReason = QuickReason;
+export type { QuickCost };
+export type QuickReply = QuickIntakeResult;
 
 // Page fixtures (WEB-1d): designed content the Team, Connectors and Profile pages must not hard-code.
 // Not in tilo-app.js; hand-written from the reference pages (fixtures/teamPolicy.ts and the others).

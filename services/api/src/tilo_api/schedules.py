@@ -27,6 +27,7 @@ import copy
 import dataclasses
 import functools
 import hashlib
+import inspect
 import json
 import logging
 import os
@@ -75,6 +76,7 @@ from tilo_planning.events import build_event
 
 from tilo_api import deps, dev, events, runs
 from tilo_api.access import Mode
+from tilo_api.durable_store import DurableStore
 from tilo_api.tasks import _json_body
 
 logger = logging.getLogger("tilo_api.schedules")
@@ -272,6 +274,17 @@ Flags = Annotated[FlagStore, Depends(deps.get_flag_store)]
 StoreDep = Annotated[deps.Store, Depends(deps.get_store)]
 
 
+def get_store_factory(request: Request) -> Callable[[], deps.Store]:
+    """The request's store as the app is wired (overrides included), built only when called: the tick calls it after
+    its token check, so an anonymous call opens no Firestore client and reads nothing."""
+
+    def build() -> deps.Store:
+        seam = request.app.dependency_overrides.get(deps.get_store, deps.get_store)
+        return seam(request) if inspect.signature(seam).parameters else seam()
+
+    return build
+
+
 # --- the routes -----------------------------------------------------------------------------------------------------
 
 
@@ -345,7 +358,7 @@ def create_schedule(
     clock: Clock,
     flags: Flags,
 ) -> dict[str, Any]:
-    task = store.tasks.get(body.task_id)
+    task = store.load_task(body.task_id, settle=False)  # not yet known to be this owner's
     if task is None or task.owner != principal.user_id:  # unknown and another user's task answer alike
         raise HTTPException(status_code=404, detail="No such task.")
     deps.refuse_if_replay_only(flags)  # NFR-24: after sign-in and the owner check
@@ -449,11 +462,15 @@ class ScheduleStarter:
         world_id, run_id = slot_ids(run.idempotency_key)
         owner, store = record.owner_user_id, self._store
         with store.grant_lock(owner):  # one owner's grants at a time: daily limits count every earlier grant
-            existing = store.worlds.get(world_id)
+            # the earlier grants, the policies and the history a run reads: all of the owner's
+            store.load_owner(owner, settle=True)
+            existing = store.load_world(world_id, settle=False)  # its owner is checked below; :442 settled theirs
             if existing is None:
                 self._create_world(run, record, world_id, run_id)
             elif existing.owner != owner:
                 raise StartSkipped("owner_mismatch")
+            elif isinstance(store, DurableStore):  # a retry: the events an earlier attempt queued go first, by id
+                store.drain(world_id, self._seams.writer)
         task = deps.TaskRecord(
             owner, world_id, run_id, copy.deepcopy(record.brief), copy.deepcopy(record.brief), [], 3,
             approaches=[copy.deepcopy(record.approach)], granted=True,
@@ -466,6 +483,8 @@ class ScheduleStarter:
         """world.requested, then the budget grant by the owner's own policy; stored only if the grant ran."""
         store, owner, stamp = self._store, record.owner_user_id, _stamp(self._clock())
         base = {"v": "1.0", "ts": stamp, "world_id": world_id, "run_id": run_id, "actor": owner}
+        # the earlier grants and the policies are read across all of the owner's worlds
+        store.load_owner(owner, settle=True)
         owned = {w for w, r in store.worlds.items() if r.owner == owner}
         earlier = [e for w in owned for e in store.events.get(w, []) if e.get("type") == "budget.granted"]
         outcome = budget.request_budget_grant(
@@ -477,10 +496,19 @@ class ScheduleStarter:
             raise StartSkipped("budget_not_granted", advance=True)
         fields = world_requested_kwargs(dataclasses.replace(run, title=record.title), world_id)
         requested = build_event(base, seq=1, item=None, severity="info", tool=None, cause=None, **fields)
-        store.events.setdefault(world_id, []).extend([requested, outcome.granted_event])
-        store.worlds[world_id] = deps.WorldRecord(
-            owner=owner, districts={}, run_id=run_id, prior_world_id=run.prior_world_id
-        )
+        assert self._seams is not None  # `start` returned before this without the run seams
+        world = deps.WorldRecord(owner=owner, districts={}, run_id=run_id, prior_world_id=run.prior_world_id)
+        try:  # the world and its two events in one save, through the single writer (ADR-0026 decisions 3, 4)
+            store.save(
+                self._seams.writer, worlds={world_id: world}, parts={world_id: [requested, outcome.granted_event]},
+                create=[("worlds", world_id)],
+            )  # fmt: skip
+        except HTTPException as exc:
+            if (
+                exc.status_code == 409 and exc.detail == "the event was refused"
+            ):  # a fixed code, never the validator's text
+                raise StartSkipped("event_refused") from None
+            raise
 
 
 def slot_ids(key: str) -> tuple[str, str]:
@@ -749,7 +777,7 @@ def tick(
     verifier: Annotated[OidcVerifier, Depends(get_oidc_verifier)],
     clock: Clock,
     flags: Flags,
-    store: StoreDep,
+    store_factory: Annotated[Callable[[], deps.Store], Depends(get_store_factory)],
 ) -> Any:
     """ONE route for two callers (BQ-AGT14-5): the verified identity picks the mode, and an identity never gets the
     other's. The schedule store, the Tasks client and the run seams are built only after the token passed (an anonymous
@@ -780,7 +808,7 @@ def tick(
         if raw:  # the Scheduler sends no body: a task's body from it is the other mode's, refused with no side effect
             return _closed(422, "This caller sends no body.")
         return _fan_out(schedule_store, tasks_client, clock, flags, audience=audience, caller=tasks_caller, queue=queue)
-    return _run_task(request, raw, schedule_store, seams_factory, clock, flags, store)
+    return _run_task(request, raw, schedule_store, seams_factory, clock, flags, store_factory)
 
 
 def _fan_out(
@@ -833,7 +861,7 @@ def _run_task(
     seams_factory: Callable[..., runs.Seams | None],
     clock: Callable[[], datetime],
     flags: FlagStore,
-    store: deps.Store,
+    store_factory: Callable[[], deps.Store],
 ) -> Any:
     """Cloud Tasks' call: execute ONE run for the slot the body names, inside this request, then answer once the run is
     done or parked at a person (or at the deadline). The record, never the body, says whose run it is."""
@@ -848,6 +876,7 @@ def _run_task(
     deps.refuse_if_replay_only(flags)  # NFR-24: 503, so Cloud Tasks retries once the flag is clear
     try:
         schedules = schedule_store()
+        store = store_factory()  # the durable store opens here, after the token: an anonymous call costs no client
     except HTTPException as exc:
         return _closed(exc.status_code, str(exc.detail))
     except Exception as exc:
