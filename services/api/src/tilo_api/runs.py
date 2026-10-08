@@ -123,10 +123,14 @@ def run_seams(request: Request, mode: Annotated[Mode, Depends(deps.get_work_mode
         return None
 
 
-def _tool_access(seams: Any, connector: str, action: str, tier: str) -> None:
-    """FR-ACC-01: the team's level for this tool; a refusal or a store that cannot be read fails the step."""
+def _tool_access(seams: Any, connector: str, action: str, tier: str, skill_ids: Any = ()) -> None:
+    """FR-ACC-01/02: the team's level for this tool, lowered by the unit's skills' `tool_access` (never raised); a
+    refusal or a store that cannot be read fails the step."""
     try:
-        access = team_access.tool_check(seams.team(), connector, action, tier, registry=seams.connectors)
+        lowest = team_access.skill_level(seams.skills, skill_ids, connector) if skill_ids else None
+        access = team_access.tool_check(
+            seams.team(), connector, action, tier, registry=seams.connectors, skill_level=lowest
+        )
     except Exception as exc:
         raise _GateFailed("tool access could not be checked") from exc
     if access == "block":
@@ -586,7 +590,8 @@ class Run:
         proposal = tilo_policy.Proposal(self.world_id, action, connector, district, destination, facts, item, 0, None)
         table = tilo_policy.load_risk_table()
         assessed = max(table.assess(action, facts).tier, gate["risk_tier"], key=_TIERS.index)
-        _tool_access(self.seams, connector, action, assessed)  # FR-ACC-01: before the engine; it only refuses
+        skills = unit.get("skills") or ()
+        _tool_access(self.seams, connector, action, assessed, skills)  # FR-ACC-01/02: before the engine; only refuses
         decision = tilo_policy.decide(
             proposal, table=table, policies=list(self.store.policies.values()),
             world_owner=self.owner, applied=self._applied(), now=events.now(),
@@ -625,7 +630,7 @@ class Run:
             raise RunStopped
         if tilo_policy.open_gate(requested, resolved, world_owner=self.owner).outcome != "run":
             raise _GateFailed("the gate did not open")
-        _tool_access(self.seams, connector, action, assessed)  # again at dispatch: a tool turned Off while it waited
+        _tool_access(self.seams, connector, action, assessed, skills)  # again at dispatch: a tool turned Off meanwhile
         created = events.now()
         entry = {
             "id": outbox_id, "idempotency_key": f"{self.run_id}:{unit['id']}:{action}:1", "world_id": self.world_id,

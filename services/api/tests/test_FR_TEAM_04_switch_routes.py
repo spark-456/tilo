@@ -2,13 +2,12 @@
 
 Done-when: "Must-ask rules from the PRD can't be switched off; every change is logged." Every switch is Owner-only
 (PRD 10.1 gives an Approver no policy rights, so not even `weekend`); a stored state whose Must-ask key is False is
-read as on; a change is logged as one ids-only line (no registered event fits yet: BQ-TEAMACC-1). The `weekend`
+read as on; a change is logged as one `team_rule.changed` event (ADR-0027). The `weekend`
 switch is read on the scheduled-run path: on, a weekend slot is held (not skipped, not counted) until Monday.
 """
 
 from __future__ import annotations
 
-import logging
 from datetime import UTC, datetime
 from types import SimpleNamespace
 
@@ -41,16 +40,14 @@ def test_FR_TEAM_04_a_stored_must_ask_switch_that_is_off_is_read_as_on() -> None
         assert api.store.read().switches["spend"] is True  # a write never carries the stale False forward
 
 
-def test_FR_TEAM_04_the_owner_turns_an_optional_switch_and_the_change_is_logged(
-    caplog: pytest.LogCaptureFixture,
-) -> None:
-    with team_api() as api, caplog.at_level(logging.INFO):
+def test_FR_TEAM_04_the_owner_turns_an_optional_switch_and_the_change_is_logged() -> None:
+    with team_api() as api:
         response = api.put("/v1/team/switches/weekend", {"on": True})
         assert response.status_code == 200, response.text
         assert _switches(response.json())["weekend"] is True
         assert api.store.read().switches["weekend"] is True
-    lines = [r.getMessage() for r in caplog.records if "team_rule_changed" in r.getMessage()]
-    assert len(lines) == 1 and "weekend" in lines[0] and OWNER in lines[0]
+        [(_world, part)] = api.writer.parts  # logged as a registered `team_rule.changed` (ADR-0027), not a log line
+    assert part["type"] == "team_rule.changed" and part["actor"] == OWNER and part["data"]["key"] == "weekend"
 
 
 def test_FR_TEAM_04_a_must_ask_switch_cannot_go_off_through_the_route() -> None:
