@@ -142,3 +142,64 @@ def test_FR_TEAM_04_the_event_carries_only_enums_and_the_connector_id() -> None:
             assert set(part["data"]) == {"rule", "key", "from", "to"}
             blob = repr(part)
             assert "@" not in blob and "example.com" not in blob
+
+
+def _level(api) -> str:  # type: ignore[no-untyped-def]
+    return api.store.read().tools.get("gmail", "act")
+
+
+def test_FR_TEAM_04_an_undo_never_overwrites_a_same_value_write_made_meanwhile(caplog) -> None:  # type: ignore[no-untyped-def]
+    """A sets gmail=read, the append fails, another write of `read` lands first: A must not put it back to act."""
+    with team_api() as api:
+        other = []
+
+        def append(world_id, part):  # type: ignore[no-untyped-def]
+            other.append(api.store.compare_and_set(api.store.read().version, api.store.read()))  # a no-op write
+            raise RuntimeError("down")
+
+        api.writer.append = append  # type: ignore[method-assign]
+        assert api.put("/v1/team/tools/gmail", {"level": "read"}).status_code == 503
+        assert _level(api) == "read" and other == [True]  # left as it is: nothing widened
+    assert any(r.levelno >= 40 and "gmail" in r.getMessage() and OWNER in r.getMessage() for r in caplog.records)
+
+
+def test_FR_TEAM_04_an_undo_after_two_later_logged_writes_leaves_the_last_logged_level() -> None:
+    """A: read (append fails) while B writes draft and C writes read, both logged: the final level is read."""
+    from dataclasses import replace
+
+    with team_api() as api:
+
+        def append(world_id, part):  # type: ignore[no-untyped-def]
+            api.writer.append = lambda w, p: api.writer.parts.append((w, p))  # type: ignore[method-assign]
+            for level in ("draft", "read"):
+                s = api.store.read()
+                assert api.store.compare_and_set(s.version, replace(s, tools={**s.tools, "gmail": level}))
+                api.writer.append("w_desk_owner", {"data": {"to": level}})
+            raise RuntimeError("down")
+
+        api.writer.append = append  # type: ignore[method-assign]
+        assert api.put("/v1/team/tools/gmail", {"level": "read"}).status_code == 503
+        assert _level(api) == "read"  # not act
+        assert api.writer.parts[-1][1]["data"]["to"] == "read"
+
+
+def test_FR_TEAM_04_a_switch_undo_after_a_later_write_leaves_the_state_alone() -> None:
+    from dataclasses import replace
+
+    with team_api() as api:
+
+        def append(world_id, part):  # type: ignore[no-untyped-def]
+            s = api.store.read()
+            api.store.compare_and_set(s.version, replace(s, switches={**s.switches, "weekend": True}))
+            raise RuntimeError("down")
+
+        api.writer.append = append  # type: ignore[method-assign]
+        assert api.put("/v1/team/switches/weekend", {"on": True}).status_code == 503
+        assert api.store.read().switches["weekend"] is True
+
+
+def test_FR_TEAM_04_an_undo_with_nothing_written_since_restores_the_old_level() -> None:
+    with team_api() as api:
+        api.writer.fail = True
+        assert api.put("/v1/team/tools/gmail", {"level": "read"}).status_code == 503
+        assert "gmail" not in api.store.read().tools

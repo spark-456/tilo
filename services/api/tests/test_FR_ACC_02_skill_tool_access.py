@@ -26,6 +26,9 @@ class Skills:
     def __init__(self, **by_id: object) -> None:
         self.by_id = by_id
 
+    def folder(self, skill_id: str) -> object | None:
+        return "skills/x" if skill_id in self.by_id else None  # None: not in the registry
+
     def load(self, skill_id: str) -> SimpleNamespace:
         if skill_id not in self.by_id:
             raise KeyError(skill_id)
@@ -114,12 +117,16 @@ def test_FR_ACC_02_an_unknown_skill_does_not_weaken_and_logs_ids_only(  # type: 
     assert not any("ann@example.com" in r.getMessage() for r in caplog.records)
 
 
-def test_FR_ACC_02_a_skill_registry_that_cannot_be_read_does_not_weaken(registry) -> None:  # type: ignore[no-untyped-def]
+def test_FR_ACC_02_a_registered_skill_that_cannot_be_read_counts_as_off(registry) -> None:  # type: ignore[no-untyped-def]
     class Broken:
+        def folder(self, _id: str) -> object:
+            return "skills/x"  # in the registry
+
         def load(self, _id: str) -> object:
             raise RuntimeError("disk")
 
-    assert _blocked(registry, "read", Broken()) is True
+    assert _blocked(registry, "act", Broken()) is True  # unreadable at gate time: off, not skipped
+    assert _blocked(registry, "act", Skills(), ("ghost",)) is False  # an id the registry never had stays skipped
 
 
 def test_FR_ACC_02_the_skill_loader_reads_tool_access_from_the_manifest(tmp_path) -> None:  # type: ignore[no-untyped-def]
