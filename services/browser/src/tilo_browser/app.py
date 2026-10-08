@@ -74,7 +74,7 @@ def create_app(
 
     @fastapi_app.get("/health")  # Cloud Run reserves /healthz on run.app; the smoke check uses /health (#397)
     @fastapi_app.get("/healthz")
-    def healthz() -> dict[str, str]:
+    async def healthz() -> dict[str, str]:  # async: runs on the loop, not in the thread pool fetches use
         return {"status": "ok"}
 
     @fastapi_app.post("/fetch")

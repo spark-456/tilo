@@ -158,6 +158,13 @@ class DripServer:
             if self.mode == "body":
                 conn.sendall(b"HTTP/1.1 200 OK\r\nContent-Length: 10000000\r\nConnection: close\r\n\r\n%PDF-1.4\n")
                 chunk = b"A"
+            elif self.mode == "nolen":
+                conn.sendall(b"HTTP/1.1 200 OK\r\nConnection: close\r\n\r\n%PDF-1.4\n")
+                chunk = b"A"
+            elif self.mode == "chunked":
+                conn.sendall(b"HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\nConnection: close\r\n\r\n")
+                conn.sendall(b"9\r\n%PDF-1.4\n\r\n")
+                chunk = b"1\r\nA\r\n"
             else:
                 conn.sendall(b"HTTP/1.1 200 OK\r\nX-Pad: ")
                 chunk = b"p"
@@ -508,3 +515,199 @@ def test_LW_08_explicit_443_is_allowed_and_sandbox_hosts_may_use_the_configured_
         "/fetch", json={"url": f"http://{SANDBOX_HOST}/a.pdf", "allow_hosts": [SANDBOX_HOST]}, headers=AUTH
     )
     assert default_port.status_code == 403  # port 80 is not the configured sandbox port here
+
+
+# ---------------------------------------------------------------------------------------------------------------
+# Round 2: no deadlock at the unit cap, no truncated 200 at the deadline, /health independent of the fetch pool
+# ---------------------------------------------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("mode", ["body", "nolen", "chunked"])
+def test_LW_08_deadline_never_returns_a_truncated_200_and_always_logs_timeout(
+    tmp_path: Path, drip: Callable[[str], DripServer], mode: str
+) -> None:
+    from tilo_browser.fetch import FetchBlocked, PinnedHttpTransport
+
+    drip(mode)
+    for attempt in range(15):
+        service = make_service(tmp_path, PinnedHttpTransport(), total_timeout=0.35, read_timeout=15.0)
+        with pytest.raises(FetchBlocked) as err:
+            service.fetch(f"http://{SANDBOX_HOST}/papers/slow{attempt}.pdf", allow_hosts=[SANDBOX_HOST])
+        assert err.value.block.reason == "timeout", (mode, attempt, err.value.block.reason)
+    assert not list((tmp_path / "archive").glob("**/*.blobs/*"))  # nothing truncated was archived or hashed
+
+
+class _EofOnShutdownSocket:
+    """Socket double whose blocked read returns a clean EOF once `shutdown` is called (as Linux does)."""
+
+    def __init__(self, head: bytes) -> None:
+        self.head = head
+        self.shut = threading.Event()
+
+    def settimeout(self, value: float | None) -> None:
+        pass
+
+    def sendall(self, data: bytes) -> None:
+        pass
+
+    def shutdown(self, how: int) -> None:
+        self.shut.set()
+
+    def close(self) -> None:
+        pass
+
+    def makefile(self, mode: str, *args: Any, **kwargs: Any) -> io.BytesIO:
+        shut = self.shut
+
+        class Stream(io.BytesIO):
+            def read1(self, size: int = -1) -> bytes:
+                data = super().read1(size)
+                if data:
+                    return data
+                shut.wait(5)
+                return b""
+
+        return Stream(self.head)
+
+
+@pytest.mark.parametrize("length_header", ["", "Content-Length: 100\r\n"])
+def test_LW_08_eof_caused_by_the_watchdog_shutdown_is_a_timeout_not_a_truncated_body(
+    monkeypatch: pytest.MonkeyPatch, length_header: str
+) -> None:
+    from tilo_browser.fetch import FetchBlocked, PinnedHttpTransport
+
+    head = f"HTTP/1.1 200 OK\r\n{length_header}Connection: close\r\n\r\n%PDF-1.4\n".encode("ascii")
+    sock = _EofOnShutdownSocket(head)
+    monkeypatch.setattr(socket, "create_connection", lambda *_a, **_kw: sock)
+    started = time.monotonic()
+    with pytest.raises(FetchBlocked) as err:
+        PinnedHttpTransport().send_get(
+            scheme="http",
+            host=SANDBOX_HOST,
+            port=80,
+            pinned_ip=PUBLIC_IP,
+            path_and_query="/slow.pdf",
+            headers={},
+            connect_timeout=1.0,
+            read_timeout=15.0,
+            max_bytes=1024 * 1024,
+            time_budget=0.3,
+        )
+    assert err.value.block.reason == "timeout"
+    assert time.monotonic() - started < 2.0
+
+
+def test_LW_08_unit_file_cap_under_concurrent_fetches_does_not_deadlock_the_service_lock(tmp_path: Path) -> None:
+    from concurrent.futures import ThreadPoolExecutor
+
+    from tilo_browser.fetch import FetchBlocked
+
+    callers = 12
+    gate = threading.Barrier(callers, timeout=10)
+
+    def after_everyone_downloaded(path: str):
+        gate.wait()  # all callers pass the early cap check before any reaches the post-download one
+        return pdf_ok(path)
+
+    service = make_service(tmp_path, ScriptTransport(after_everyone_downloaded))
+
+    def one(i: int) -> str:
+        try:
+            service.fetch(
+                f"http://{SANDBOX_HOST}/papers/p{i}.pdf", allow_hosts=[SANDBOX_HOST], run_id="r_cap", unit_id="U1"
+            )
+            return "ok"
+        except FetchBlocked as exc:
+            return exc.block.reason
+
+    pool = ThreadPoolExecutor(max_workers=callers)
+    futures = [pool.submit(one, i) for i in range(callers)]
+    results = sorted(f.result(timeout=15) for f in futures)
+    pool.shutdown(wait=True)
+    assert results == ["ok"] * 10 + ["unit_file_limit"] * 2
+    assert service._lock.acquire(timeout=1), "service lock was left held"
+    service._lock.release()
+
+
+def test_LW_08_unit_file_cap_through_the_app_leaves_later_fetches_working(tmp_path: Path) -> None:
+    from concurrent.futures import ThreadPoolExecutor
+
+    callers = 12
+    gate = threading.Barrier(callers, timeout=10)
+
+    def after_everyone_downloaded(path: str):
+        try:
+            gate.wait()
+        except threading.BrokenBarrierError:
+            pass  # aborted below so the later fetch does not wait for a crowd
+        return pdf_ok(path)
+
+    service = make_service(tmp_path, ScriptTransport(after_everyone_downloaded))
+    client = make_client(service)
+
+    def one(i: int) -> tuple[int, str | None]:
+        resp = client.post(
+            "/fetch",
+            json={
+                "url": f"http://{SANDBOX_HOST}/papers/p{i}.pdf",
+                "allow_hosts": [SANDBOX_HOST],
+                "run_id": "r_cap",
+                "unit_id": "U1",
+            },
+            headers=AUTH,
+        )
+        return resp.status_code, resp.json().get("reason")
+
+    pool = ThreadPoolExecutor(max_workers=callers)
+    try:
+        results = sorted(f.result(timeout=20) for f in [pool.submit(one, i) for i in range(callers)])
+    finally:
+        pool.shutdown(wait=False)  # a deadlocked worker must fail the test, not hang it
+    assert [r for r in results if r[0] == 200] == [(200, None)] * 10
+    assert [r for r in results if r[0] != 200] == [(413, "unit_file_limit")] * 2
+
+    gate.abort()  # later fetches must not wait for a crowd
+    later = client.post(
+        "/fetch",
+        json={"url": f"http://{SANDBOX_HOST}/papers/later.pdf", "allow_hosts": [SANDBOX_HOST], "run_id": "r_other"},
+        headers=AUTH,
+    )
+    assert later.status_code == 200, later.text
+    assert service._lock.acquire(timeout=1)
+    service._lock.release()
+
+
+def test_LW_08_health_stays_fast_with_more_slow_fetches_than_pool_threads(tmp_path: Path) -> None:
+    def slow(path: str):
+        time.sleep(1.0)
+        return pdf_ok(path)
+
+    app = make_app(make_service(tmp_path, ScriptTransport(slow)))
+
+    async def scenario() -> tuple[float, list[int]]:
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://browser.test") as client:
+
+            async def health_after_delay() -> float:
+                await asyncio.sleep(0.4)
+                began = time.perf_counter()
+                assert (await client.get("/health")).status_code == 200
+                return time.perf_counter() - began
+
+            fetches = [
+                client.post(
+                    "/fetch",
+                    json={
+                        "url": f"http://{SANDBOX_HOST}/papers/p.pdf",
+                        "allow_hosts": [SANDBOX_HOST],
+                        "run_id": f"r_load{i}",
+                    },
+                    headers=AUTH,
+                )
+                for i in range(50)
+            ]
+            health_seconds, *replies = await asyncio.gather(health_after_delay(), *fetches)
+            return health_seconds, [r.status_code for r in replies]
+
+    health_seconds, statuses = asyncio.run(scenario())
+    assert statuses == [200] * 50
+    assert health_seconds < 0.2

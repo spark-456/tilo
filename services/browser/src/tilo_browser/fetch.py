@@ -478,6 +478,9 @@ class PinnedHttpTransport:
                     is_html = _looks_like_html(bytes(buf[:1024]))
                 if is_html and len(buf) > MAX_HTML_BYTES:
                     raise FetchBlocked("html_too_large", url_for_err, host=host)
+            if timed_out.is_set() or time_left() <= 0:
+                # The watchdog's shutdown (or a stalled upstream) can look like a clean EOF: never accept that body.
+                raise FetchBlocked("timeout", url_for_err, host=host)
             body_expected = http_resp.status >= 200 and http_resp.status not in (204, 304) and not http_resp.chunked
             if expected is not None and body_expected and len(buf) < expected:
                 raise FetchBlocked("upstream_error", url_for_err, host=host)
@@ -491,6 +494,7 @@ class PinnedHttpTransport:
         finally:
             if watchdog is not None:
                 watchdog.cancel()
+                watchdog.join()  # an abort in progress finishes before the socket is closed
             if sock is not None:
                 try:
                     sock.close()
@@ -900,13 +904,18 @@ class FetchService:
             except FetchBlocked as exc:
                 raise self._record_block(exc.block.reason, current_url, host=host, allowlist=allowlist) from None
 
+            # Decide under the lock, record the refusal after releasing it (`_record_block` takes the same lock).
+            refusal: str | None = None
             with self._lock:
                 cur_files, cur_bytes = self._unit_usage.get(unit_key, (0, 0))
                 if cur_files >= MAX_UNIT_FILES:
-                    raise self._record_block("unit_file_limit", current_url, host=host, allowlist=allowlist)
-                if cur_bytes + len(stored_bytes) > MAX_UNIT_BYTES:
-                    raise self._record_block("unit_byte_limit", current_url, host=host, allowlist=allowlist)
-                self._unit_usage[unit_key] = (cur_files + 1, cur_bytes + len(stored_bytes))
+                    refusal = "unit_file_limit"
+                elif cur_bytes + len(stored_bytes) > MAX_UNIT_BYTES:
+                    refusal = "unit_byte_limit"
+                else:
+                    self._unit_usage[unit_key] = (cur_files + 1, cur_bytes + len(stored_bytes))
+            if refusal is not None:
+                raise self._record_block(refusal, current_url, host=host, allowlist=allowlist)
 
             sha256_hex = hashlib.sha256(stored_bytes).hexdigest()
             fetched_at = format_ts(self._clock())
