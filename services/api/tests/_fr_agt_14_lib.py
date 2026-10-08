@@ -315,10 +315,7 @@ class SchedApi:
             "next_due": MON_0330Z, "brief": copy.deepcopy(record.brief), "approach": copy.deepcopy(approach),
             "created_at": SUNDAY,
         }  # fmt: skip
-        if (
-            "approaches" in Schedule.__dataclass_fields__
-        ):  # SCHED_PLAN: the full offered list, as the create route snapshots
-            fields["approaches"] = copy.deepcopy(record.approaches)
+        fields["approaches"] = copy.deepcopy(record.approaches)  # SCHED_PLAN: the full offered list, as create does
         fields.update(over)
         return Schedule(**fields)
 
