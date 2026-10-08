@@ -128,7 +128,7 @@ def test_PPL_11c_FS_2_key_05b_after_the_ttl_the_same_key_and_body_is_a_new_reque
     rig.set_now(at(days=1, seconds=1))
     second = _keyed(rig, "/v1/work-items", WORK_ITEM_BODY, key)
     assert second.status_code == 201 and second.json()["id"] != first.json()["id"]
-    assert len(work_items_titled(rig, WORK_ITEM_BODY["title"])) == 2
+    assert len(work_items_titled(rig, WORK_ITEM_BODY["title"])) == 3  # the seeded wi_own1 has this title too
     assert _keyed(rig, "/v1/work-items", WORK_ITEM_BODY, key).content == second.content, "and now it is that one's"
 
 
