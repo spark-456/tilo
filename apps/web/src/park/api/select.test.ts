@@ -44,9 +44,15 @@ describe("WEB_1a_select: an API url means the live Api and no sample values", ()
     const args = callTable();
     for (const m of API_METHODS.filter(
       (x) =>
-        !["getLedger", "getWorlds", "getDecisions", "decide", "getTeamLive", "writeTeam"].includes(
-          x,
-        ),
+        ![
+          "getLedger",
+          "getWorlds",
+          "getDecisions",
+          "decide",
+          "getTeamLive",
+          "writeTeam",
+          "startWorld",
+        ].includes(x),
     )) {
       const p = invoke(api, m, args);
       expect(p, `${m} returns a Promise`).toBeInstanceOf(Promise);

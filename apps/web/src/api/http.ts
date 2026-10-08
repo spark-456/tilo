@@ -1,7 +1,7 @@
 // CL-INT-3: the HTTP TiloClient over the services/api routes (API_CL_INT_1.md, API_CL_INT_2.md).
 // Request and response shapes are the contract types re-exported by ./client; nothing here
-// restates a contract. No sign-in: the API's own principal dependency decides (no credentials are
-// held or sent from here).
+// restates a contract. Sign-in (SEC-15): the app's own getter supplies the Firebase ID token, sent as a Bearer
+// header only (never a cookie, URL or body); the API's own principal dependency decides.
 import type { Brief, Card, Event, Layout } from "@tilo/contracts";
 import type {
   ApproachesResult,
@@ -12,6 +12,12 @@ import type {
   QuestionAnswer,
   TiloClient,
 } from "./client";
+import {
+  type ScheduleRequest,
+  type ScheduleView,
+  type SchedulesApi,
+  isScheduleView,
+} from "./schedules";
 import { type StopResult, isStopResult } from "./stop";
 
 /** What a person reads when a call fails (PRD 18.4). `retryable` is true for 5xx and for network
@@ -190,17 +196,26 @@ export interface HttpClientOptions {
   /** SEC-10: the App Check token for the next request, or null. Asked before every request (the SDK
    * caches and refreshes it); a getter that fails or answers null sends the request with no header. */
   readonly appCheckToken?: (() => Promise<string | null>) | undefined;
+  /** SEC-15: the Firebase ID token for the next request, or null. Asked before every request (the SDK caches and
+   * refreshes it); a getter that fails or answers null, or a token that cannot be a header value, sends the request
+   * with no `Authorization` header and the API answers 401. */
+  readonly authToken?: (() => Promise<string | null>) | undefined;
 }
 
 /** The header the API reads the App Check token from (services/api `appcheck.py`). */
 const APP_CHECK_HEADER = "X-Firebase-AppCheck";
 const APP_CHECK_TOKEN = /^[A-Za-z0-9._~+/=-]{1,4096}$/;
+/** SEC-15: the sign-in token goes in `Authorization: Bearer`; a Firebase ID token is a JWT of a few KB at most. */
+const AUTH_TOKEN = /^[A-Za-z0-9._~+/=-]{1,4096}$/;
+/** SEC-15 (BQ-SIGNIN-3): sent on a phone-width window, with a token, so the API records `mobile_web`. */
+const CHANNEL_HEADER = "X-Tilo-Channel";
 
-export class HttpClient implements TiloClient {
+export class HttpClient implements TiloClient, SchedulesApi {
   private readonly base: string;
   private readonly fetchFn: typeof fetch;
   private readonly pollMs: number;
   private readonly appCheckToken: (() => Promise<string | null>) | undefined;
+  private readonly authToken: (() => Promise<string | null>) | undefined;
   private readonly cardWorlds = new Map<string, string>(); // card -> world, from listCards
   private readonly cardChannels = new Map<string, Card["answer_channels"]>(); // card -> channels it lists
   private readonly layouts = new Map<string, LayoutCall>(); // a run's layout never changes
@@ -214,6 +229,25 @@ export class HttpClient implements TiloClient {
     this.fetchFn = options.fetch ?? ((url, init) => fetch(url, init));
     this.pollMs = options.pollMs ?? 1000;
     this.appCheckToken = options.appCheckToken;
+    this.authToken = options.authToken;
+  }
+
+  /** `init` with `Authorization: Bearer <ID token>` when there is a token (SEC-15). Never throws: no token is no header. */
+  private async withAuth(init: RequestInit): Promise<RequestInit> {
+    if (!this.authToken) return init;
+    let token: string | null = null;
+    try {
+      token = await this.authToken();
+    } catch {
+      return init;
+    }
+    // Anything that is not base64url characters and dots would make `fetch` throw (a bad header value), and the call
+    // would fail as unreachable; it goes out with no header instead.
+    if (typeof token !== "string" || !AUTH_TOKEN.test(token)) return init;
+    const headers = new Headers(init.headers);
+    headers.set("Authorization", `Bearer ${token}`);
+    if (onPhone()) headers.set(CHANNEL_HEADER, "mobile_web");
+    return { ...init, headers };
   }
 
   /** `init` with the App Check header when there is a token (SEC-10). Never throws: no token is no header. */
@@ -236,7 +270,10 @@ export class HttpClient implements TiloClient {
   private async request<T>(path: string, init: RequestInit = {}, write = false): Promise<T> {
     let res: Response;
     try {
-      res = await this.fetchFn(`${this.base}${path}`, await this.withAppCheck(init));
+      res = await this.fetchFn(
+        `${this.base}${path}`,
+        await this.withAuth(await this.withAppCheck(init)),
+      );
     } catch {
       throw new TiloApiError(UNREACHABLE, null, true, write); // the cause (host, port) is not for people
     }
@@ -252,6 +289,7 @@ export class HttpClient implements TiloClient {
       if (res.status >= 500) throw new TiloApiError(SERVER_TROUBLE, res.status, true, write);
       throw new TiloApiError(reasonOf(res.status, body), res.status, false, write, codeOf(body));
     }
+    if (res.status === 204) return undefined as T; // no content: nothing to read
     try {
       return (await res.json()) as T;
     } catch {
@@ -595,5 +633,40 @@ export class HttpClient implements TiloClient {
   /** `POST /worlds/{id}/pause` (FR-WLD-07). Not on the TiloClient interface yet. */
   async pauseWorld(worldId: string): Promise<void> {
     await this.post(`/worlds/${encodeURIComponent(worldId)}/pause`, {});
+  }
+
+  /** `GET /schedules` (FR-AGT-14): the owner's routines. A body that is not `{schedules: [...]}` of
+   * readable rows is an unreadable reply, never an empty list. */
+  async listSchedules(): Promise<ScheduleView[]> {
+    const body = await this.request<{ schedules?: unknown } | null>("/schedules");
+    const rows = body?.schedules;
+    if (!Array.isArray(rows) || !rows.every(isScheduleView)) {
+      throw new TiloApiError(BAD_REPLY, 200, true);
+    }
+    return rows;
+  }
+
+  /** `POST /schedules`: repeat a run the person already approved. */
+  createSchedule(req: ScheduleRequest): Promise<ScheduleView> {
+    return this.post("/schedules", req);
+  }
+
+  /** `PATCH /schedules/{id}`: pause, resume or rename. */
+  updateSchedule(id: string, patch: { enabled?: boolean; title?: string }): Promise<ScheduleView> {
+    const init = {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(patch),
+    };
+    return this.request(`/schedules/${encodeURIComponent(id)}`, init, true);
+  }
+
+  /** `DELETE /schedules/{id}`: 204 with no body. */
+  async deleteSchedule(id: string): Promise<void> {
+    await this.request<undefined>(
+      `/schedules/${encodeURIComponent(id)}`,
+      { method: "DELETE" },
+      true,
+    );
   }
 }

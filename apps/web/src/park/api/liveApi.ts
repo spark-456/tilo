@@ -1,9 +1,10 @@
-// The live Api (WEB-1a, WIRE-1..3): `getLedger` reads `GET {base}/costs`, `getWorlds` walks `GET {base}/worlds`
+// The live Api (WEB-1a, WIRE-1..3, FR-UX-13): `startWorld` makes the real intake call; `getLedger` reads `GET {base}/costs`, `getWorlds` walks `GET {base}/worlds`
 // pages, `getDecisions` walks `GET {base}/cards` pages and `decide` answers one card with one POST (the
 // person's tap, never a retry); every other method is NotBuilt and
 // fetches nothing. With no base url nothing is fetched at all. It never imports the fixtures, so sample
 // numbers cannot pass as live (HR-1..HR-7). Failures are the shared `TiloApiError` (src/api/http.ts).
 import { HttpClient, TiloApiError, reasonOf } from "../../api/http";
+import { rememberIntake } from "../../api/intakes";
 import { API_METHODS, type Api, type ApiMethod } from "./index";
 import {
   type CardFeedItem,
@@ -13,8 +14,9 @@ import {
 } from "./live/decisionsFromCards";
 import { type CostReport, ledgerFromCosts } from "./live/ledgerFromCosts";
 import { type TeamView, isTeamView, requestOf } from "./live/teamLive";
+import { worldFromIntake } from "./live/worldFromIntake";
 import { STATE_OF, type WorldListItem, worldsFromList } from "./live/worldsFromList";
-import type { Dec, DecisionKey } from "./types";
+import type { Dec, DecisionKey, TierKey } from "./types";
 
 export class NotBuilt extends Error {
   readonly code = "not_built";
@@ -30,6 +32,8 @@ export interface LiveApiOptions {
   fetch?: typeof fetch;
   /** SEC-10: the App Check token getter; the Park pages' requests carry `X-Firebase-AppCheck` like the rest of the app. */
   appCheckToken?: (() => Promise<string | null>) | undefined;
+  /** SEC-15: the Firebase ID token getter; every Park request carries `Authorization: Bearer` like the rest of the app. */
+  authToken?: (() => Promise<string | null>) | undefined;
 }
 
 const BAD_REPLY = "Tilo sent a reply this page could not read.";
@@ -131,6 +135,7 @@ export function createLiveApi(options: LiveApiOptions = {}): Api {
     baseUrl,
     ...(options.fetch ? { fetch: options.fetch } : {}),
     ...(options.appCheckToken ? { appCheckToken: options.appCheckToken } : {}),
+    ...(options.authToken ? { authToken: options.authToken } : {}),
   });
   api.getLedger = async () => {
     const report = await http.getJson("/costs");
@@ -207,6 +212,24 @@ export function createLiveApi(options: LiveApiOptions = {}): Api {
     if (op.kind === "invite") return { data: await readTeam().catch(() => null), source: "live" };
     if (!isTeamView(reply)) throw new TiloApiError(BAD_REPLY, 200, true, true);
     return { data: reply, source: "live" };
+  };
+
+  // The real intake call, the legacy S-01's (FR-UX-13): one POST of the text alone (the intake has no size, routine
+  // or workspace field; the size only picks the tier shown, BQ-UX13-2). A reply the page cannot read, including
+  // one without its `files`, is a TiloApiError, never a TypeError or a world. The brief goes to S-02.
+  api.startWorld = async (mode: TierKey, query: string) => {
+    let intake: Awaited<ReturnType<HttpClient["submitIntake"]>>;
+    try {
+      intake = await http.submitIntake(query, []);
+    } catch (e) {
+      if (e instanceof TiloApiError) throw e;
+      throw new TiloApiError(BAD_REPLY, 200, true, true);
+    }
+    if (!isText(intake?.task_id) || intake.task_id === "" || !isObject(intake.brief)) {
+      throw new TiloApiError(BAD_REPLY, 200, true, true);
+    }
+    rememberIntake(intake);
+    return { data: { ok: true, world: worldFromIntake(mode, intake, query) }, source: "live" };
   };
   return api;
 }

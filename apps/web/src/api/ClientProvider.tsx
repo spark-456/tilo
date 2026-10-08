@@ -1,5 +1,6 @@
 import { type ReactNode, createContext, useContext, useSyncExternalStore } from "react";
 import { createAppCheckTokenGetter } from "../appcheck/appCheck";
+import { session } from "../auth/session";
 import type { TiloClient } from "./client";
 import { chooseClient } from "./config";
 import { FixtureClient } from "./fixtureClient";
@@ -16,10 +17,15 @@ export const appCheckToken: (() => Promise<string | null>) | undefined =
     ? undefined
     : createAppCheckTokenGetter({ hostname: window.location.hostname });
 
+/** SEC-15: the Firebase ID token getter for this page's one sign-in session, shared like `appCheckToken`. Null when
+ * nobody is signed in, on a local host and in a build with no Firebase config (no SDK is loaded then). */
+export const authToken: (() => Promise<string | null>) | undefined =
+  typeof window === "undefined" ? undefined : () => session.idToken();
+
 // `VITE_TILO_API_URL` selects the HTTP client (config.ts); the fixture client is the default.
 function createDefaultClient(): TiloClient {
   const search = typeof window === "undefined" ? "" : window.location.search;
-  return chooseClient({ apiUrl: API_URL, search, appCheckToken });
+  return chooseClient({ apiUrl: API_URL, search, appCheckToken, authToken });
 }
 
 const ClientContext = createContext<TiloClient>(createDefaultClient());

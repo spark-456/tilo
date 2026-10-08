@@ -23,7 +23,7 @@ from tilo_api.assistant.model import ModelDecider
 
 _STAMP = "%Y-%m-%dT%H:%M:%S.%fZ"
 _EPSILON = 1e-9  # float sums of credits: 46.0 + 4.0 must fit a cap of 50
-_CACHED = ("intent", "navigate", "decline", "dropped")
+_CACHED = ("intent", "navigate", "update", "decline", "dropped")
 
 
 class SpendLedger(Protocol):
@@ -69,7 +69,7 @@ class InMemorySpendLedger:
 
 @dataclass(frozen=True)
 class CachedDecision:
-    choice: Literal["intent", "navigate", "decline", "dropped"]
+    choice: Literal["intent", "navigate", "update", "decline", "dropped"]
     intent: str | None
     action: Mapping[str, Any] | None
     origin_cost: float

@@ -3,10 +3,11 @@
 export const gbp = (v: number): string =>
   `£${v < 100 && v % 1 ? v.toFixed(2) : Math.round(v).toLocaleString("en-GB")}`;
 
-import type { Agenda, Decision } from "../types";
-import { agendaRules, decisionFacts } from "./additive";
+import type { Agenda, Decision, Ledger } from "../types";
+import { agendaRules, decisionFacts, ledgerCopy, ledgerMemoryUp } from "./additive";
 import { agenda as generatedAgenda } from "./agenda";
 import { decisions as generatedDecisions } from "./decisions";
+import { ledger as generatedLedger } from "./ledger";
 
 /** The prototype's Agenda plus the additive `rules` (additive.ts). */
 export const agenda: Agenda = { ...generatedAgenda, rules: agendaRules };
@@ -15,11 +16,19 @@ export const decisions: Decision[] = generatedDecisions.map((d) => ({
   ...d,
   facts: decisionFacts[d.k],
 }));
+/** The prototype's Ledger plus the additive `memoryUp` and designed copy (additive.ts). */
+export const ledger: Ledger = {
+  ...generatedLedger,
+  memoryUp: ledgerMemoryUp,
+  spike: ledgerCopy.spike,
+  runLabels: ledgerCopy.runLabels,
+  memoryWeeks: ledgerCopy.memoryWeeks,
+  waits: { ...generatedLedger.waits, ...ledgerCopy.waits },
+};
 
 export { connectors } from "./connectors";
 export { connectorTerms } from "./connectorTerms";
 export { learn } from "./learn";
-export { ledger } from "./ledger";
 export { notifications } from "./notifications";
 export { profileSettings } from "./profileSettings";
 export { skills } from "./skills";

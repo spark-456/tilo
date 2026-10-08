@@ -10,8 +10,8 @@ import { icon } from "./kit";
 type Kind = Notification["kind"];
 
 const TILE_ICON: Record<Kind, string> = { needs: "flag", done: "check", warn: "plug" };
-/** The title once its decision is approved: the decision's designed copy, else its own "done" line. */
-const approvedTitle = (d: Decision | undefined): string => d?.approvedTitle || d?.done || "Done";
+/** The title once its decision is approved: the decision's designed copy, else "You approved" (FR-UX-11). */
+const approvedTitle = (d: Decision | undefined): string => d?.approvedTitle || "You approved";
 
 export interface NotificationsPopoverProps {
   notifications: readonly Notification[];
