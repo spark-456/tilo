@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
-// FR-SET-01 / FR-SET-02 on the Profile page (AGY-WEB-4). The visible copy of the Profile and Notifications
-// tabs is pinned exactly by Profile.render.test.tsx, so the honest lines ("kept on this device only", "never
-// hidden by quiet hours") are carried as accessible descriptions (aria-description / title), not new strings.
+// FR-SET-01 / FR-SET-02 on the Profile page (AGY-WEB-4). The honest lines ("kept on this device only", "never
+// hidden by quiet hours") are accessible descriptions (aria-description / title) here and, since BQ-SET-2 (user
+// approved 8 Oct), visible helper text too (pinned in Profile.BQ_SET_2.test.tsx).
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { makeApp } from "../../../../test-support/park/profileApp";
 import type { ApiResult, User } from "../../api/types";
