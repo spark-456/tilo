@@ -86,7 +86,8 @@ class RefGate:
         except Exception:
             return None
         found_id = found.get("id") if isinstance(found, Mapping) else None
-        return Ref("work_item", found_id) if isinstance(found_id, str) else None
+        ref = Ref("work_item", found_id) if isinstance(found_id, str) else None
+        return ref if ref is not None and self.record(ref) is not None else None
 
     def stored(self, ref: Ref, action: str) -> Mapping[str, Any] | None:
         """FR-PA-10: the work item as stored now, only when `decide` lets the signed-in person do `action` to it."""

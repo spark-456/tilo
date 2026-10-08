@@ -10,6 +10,8 @@ from collections.abc import Mapping, Sequence
 from datetime import UTC
 from typing import Any
 
+from tilo_people.text import clean_line
+
 from tilo_api.assistant.config import AssistantConfig
 from tilo_api.assistant.facts import Line, clock_of, fill, moment_of, zone_of
 from tilo_api.assistant.gate import Ref, RefGate
@@ -18,7 +20,8 @@ from tilo_api.assistant.words import words
 
 Row = Mapping[str, Any]
 # H, H:MM, with am/pm attached or as the next word; a colon without am/pm is a 24-hour time. A bare number is no time.
-_TIME = re.compile(r"(?<![\w:.])(\d{1,2})(?::(\d{2}))?(?:\s?(am|pm))?(?![\w:])")
+_TIME = re.compile(r"(?<![\w:.])([0-9]{1,2})(?::([0-9]{2}))?(?:\s?(am|pm))?(?![\w:])")
+_TITLE_MAX = 140
 _OTHER_DAYS = frozenset({"tomorrow", "yesterday"})
 
 
@@ -57,27 +60,30 @@ def time_asked(key: str, config: AssistantConfig) -> tuple[int, int] | None:
 
 def _title(record: Mapping[str, Any], config: AssistantConfig) -> str:
     title = record.get("title")
-    return title if isinstance(title, str) and title else config.answer["untitled"]
+    return (clean_line(title)[:_TITLE_MAX] if isinstance(title, str) else "") or config.answer["untitled"]
 
 
 def _linked(entry: Mapping[str, Any], gate: RefGate, config: AssistantConfig) -> list[Line]:
     """The meeting the person may read and the released action item, cited by title and record only."""
-    a, lines = config.answer, []
+    a, lines = config.answer, list[Line]()
     source, made = entry.get("source"), entry.get("created_by")
-    ref = source.get("ref") if isinstance(source, Mapping) else None
-    if isinstance(made, Mapping) and made.get("by") == "tilo" and isinstance(ref, str):
-        if source.get("kind") == "tilo" and source.get("from") == "meeting":
-            meeting = Ref("meeting", ref.split("#")[0])
-            record = gate.record(meeting)
-            if record is not None:
-                lines.append(Line(fill(a["prepare"]["meeting"], label=_title(record, config)), meeting))
-        item = gate.released(entry) if "#" in ref else None
-        record = None if item is None else gate.record(item)
-        if item is not None and record is not None:
-            text = fill(a["prepare"]["item"], label=_title(record, config))
-            if record.get("due") is not None:
-                text += fill(a["due_suffix"], due=record["due"])
-            lines.append(Line(text + (a["flagged_suffix"] if record.get("flagged") else ""), item))
+    if not (isinstance(source, Mapping) and isinstance(made, Mapping) and made.get("by") == "tilo"):
+        return lines
+    ref = source.get("ref")
+    if not isinstance(ref, str):
+        return lines
+    if source.get("kind") == "tilo" and source.get("from") == "meeting":
+        meeting = Ref("meeting", ref.split("#")[0])
+        record = gate.record(meeting)
+        if record is not None:
+            lines.append(Line(fill(a["prepare"]["meeting"], label=_title(record, config)), meeting))
+    item = gate.released(entry) if "#" in ref else None
+    record = None if item is None else gate.record(item)
+    if item is not None and record is not None:
+        text = fill(a["prepare"]["item"], label=_title(record, config))
+        if record.get("due") is not None:
+            text += fill(a["due_suffix"], due=record["due"])
+        lines.append(Line(text + (a["flagged_suffix"] if record.get("flagged") else ""), item))
     return lines
 
 
