@@ -8,11 +8,11 @@ from __future__ import annotations
 import enum
 from abc import ABC, abstractmethod
 from collections.abc import Iterator
-from typing import Any, TypedDict
+from typing import Any, Literal, TypedDict
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from tilo_providers.errors import NotConfigured, RequestError
+from tilo_providers.errors import NotConfigured, ProviderError, RequestError
 
 
 class Capability(enum.StrEnum):
@@ -130,6 +130,64 @@ class SafetyProvider(ABC):  # PRD 10.4, 16.3 item 2: screens intake, tool output
 
     @abstractmethod
     def _check(self, text: str, *, content: bytes | None, mime_type: str | None) -> SafetyResult: ...
+
+    def redact(self, text: str) -> str:  # same role as ModelProvider.redact (PRD 16.1 rule 4)
+        return text
+
+
+class EvalItem(BaseModel):
+    """One instance to judge. `baseline_response` is for pairwise requests only."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    id: str = Field(pattern=r"^[A-Za-z0-9_-]{1,64}$")
+    prompt: str
+    context: str = ""
+    response: str
+    baseline_response: str | None = None
+
+
+class EvalRequest(BaseModel):
+    """One instance against one metric (ADR-0033): a call is one quote and one charge."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    metric: str = Field(pattern=r"^[a-z][a-z0-9_]{0,40}$")
+    kind: Literal["pairwise", "pointwise"]
+    template: str  # rubric text from prompts/eval_judge/ (PL-04), sent as is
+    item: EvalItem
+
+
+class EvalScore(BaseModel):
+    """`choice` is set for pairwise, `score` (finite) for pointwise; `explanation` is already redacted and capped."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    choice: Literal["candidate", "baseline", "tie"] | None = None
+    score: float | None = Field(default=None, allow_inf_nan=False)
+    explanation: str = Field(default="", max_length=500)
+
+
+class EvalProvider(ABC):  # ADR-0033: the Gen AI evaluation service, a sibling of ModelProvider (no usage, no cascade)
+    def evaluate(self, request: EvalRequest) -> EvalScore:
+        """Template method: kind and fields must agree (`RequestError`, nothing sent), and the result must match the
+        kind (`ProviderError`); an unusable judgement fails closed and is never replaced by a default."""
+        has_baseline = request.item.baseline_response is not None
+        if (request.kind == "pairwise") != has_baseline:
+            raise RequestError(
+                "VERTEX-EVAL-1: a pairwise request needs a baseline response and a pointwise one has none"
+            )
+        result = self._evaluate(request)
+        if request.kind == "pairwise":
+            usable = result.choice is not None and result.score is None
+        else:
+            usable = result.score is not None and result.choice is None
+        if not usable:
+            raise ProviderError("VERTEX-EVAL-1: the judgement does not match the request kind; failing closed")
+        return result
+
+    @abstractmethod
+    def _evaluate(self, request: EvalRequest) -> EvalScore: ...
 
     def redact(self, text: str) -> str:  # same role as ModelProvider.redact (PRD 16.1 rule 4)
         return text

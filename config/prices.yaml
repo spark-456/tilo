@@ -33,6 +33,7 @@ profiles:
   # https://cloud.google.com/security-command-center/pricing, read 2026-10-06.
   armor-default: { input: 0.10, output: 0 }
   safety-fake: { input: 0, output: 0 } # the dev fake safety screen; makes no paid call
+  eval-fake: { input: 0, output: 0 } # config/models.dev.yaml's fake eval judge (VERTEX-EVAL-1); makes no paid call
   director-dev: { input: 0, output: 0 } # config/models.dev.yaml's fake Director; makes no paid call
   meeting-fake: { input: 0, output: 0 } # config/models.dev.yaml's fake meeting-bot model (FR-MTG-11); makes no paid call
   # PL-02/ADR-0003: config/models.nim.yaml's profiles need a price entry too --
