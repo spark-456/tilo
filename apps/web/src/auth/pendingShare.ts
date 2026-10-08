@@ -38,11 +38,11 @@ export function stashShareToken(now: number = Date.now()): void {
   window.history.replaceState(window.history.state, "", "/share");
 }
 
-/** After sign-in: on `/share` with a fresh kept token, put it back in the address and drop it from storage. */
+/** After sign-in: the stash is always dropped; on `/share` with a fresh kept token, put it back in the address and drop it from storage. */
 export function restoreShareToken(now: number = Date.now()): void {
-  if (!BARE.test(window.location.pathname)) return;
   const kept = read();
-  clear();
+  clear(); // signed in: a stash is never kept, on any path
+  if (!BARE.test(window.location.pathname)) return;
   if (!kept || now - kept.at > KEEP_MS || !/^[A-Za-z0-9_-]{16,128}$/.test(kept.t)) return;
   window.history.replaceState(window.history.state, "", `/share/${kept.t}`);
   window.dispatchEvent(new PopStateEvent("popstate"));

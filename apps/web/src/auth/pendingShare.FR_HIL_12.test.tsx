@@ -69,6 +69,7 @@ describe("FR_HIL_12 the token stays out of the address during sign-in", () => {
     window.sessionStorage.setItem(KEY, JSON.stringify({ t: TOKEN, at: Date.now() }));
     restoreShareToken();
     expect(window.location.pathname).toBe("/worlds"); // only /share is rewritten
+    expect(window.sessionStorage.getItem(KEY)).toBeNull(); // and a signed-in tab keeps no stash on any path
   });
 });
 
