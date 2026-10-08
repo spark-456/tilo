@@ -27,7 +27,7 @@ from __future__ import annotations
 
 import copy
 import secrets
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from datetime import UTC, datetime
 from typing import Any, Protocol
 
@@ -233,3 +233,27 @@ class Ledger:
                 return stored  # the key is taken: that entry stands at any age, no fresh decision is needed (#343)
         entry = entry or self.entry_for(doc)
         return self._outbox.enqueue(entry, evidence or {"instruction_id": doc["instruction_id"], "level": doc["level"]})
+
+
+def enqueue_digest(
+    outbox: Outbox,
+    entry: dict[str, Any],
+    *,
+    policy_applied: dict[str, Any],
+    policy: Mapping[str, Any] | None,
+    world_owner: str,
+    emit: Callable[[dict[str, Any]], None] | None = None,
+) -> dict[str, Any] | None:
+    """Enqueues a policy-authorised L3 daily digest entry once its full OB-01 evidence opens the gate (FR-CHN-18)."""
+    from tilo_channels import autopilot_gate
+
+    if not isinstance(policy, Mapping):
+        return None
+    evidence: dict[str, Any] = {"reserved_by": None, "authorised_by": copy.deepcopy(policy_applied)}
+    evidence |= {"policy": copy.deepcopy(dict(policy)), "team_lead": None, "world_owner": world_owner}
+    evidence |= {"instruction": None, "earlier_applied": []}
+    if not autopilot_gate.opens(entry, evidence):
+        return None
+    if emit is not None:
+        emit(copy.deepcopy(policy_applied))
+    return outbox.enqueue(entry, evidence)
