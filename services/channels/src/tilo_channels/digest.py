@@ -2,19 +2,34 @@
 
 from __future__ import annotations
 
+import copy
 import datetime as dt
 import re
 from collections.abc import Callable, Collection, Iterable, Mapping
 from dataclasses import dataclass, field
-from typing import Any, Literal, TypeGuard
+from typing import Any, Literal, Protocol, TypeGuard
 
-from tilo_policy.schemas import conforms
+import tilo_policy
+from tilo_policy.schemas import conforms, event_ok
 
-from tilo_channels.autopilot_state import timestamp
+from tilo_channels.autopilot_gate import gate_id_for
+from tilo_channels.autopilot_state import ACTION_TYPE, Outbox, enqueue_digest, fresh, parse_ms, timestamp, ulid
 from tilo_channels.links import CardState, KeyRing, LinkService, NonceStore, Redemption
+from tilo_channels.quiet_hours import PreferenceReader, QuietHours, should_notify
 from tilo_channels.triage import PRIORITIES
 
-__all__ = ["AUTOMATED_LEVELS", "DailyDigest", "DailyDigestBuilder", "DigestAction", "DigestFyiItem", "WINDOW_S"]
+__all__ = [
+    "AUTOMATED_LEVELS",
+    "DailyDigest",
+    "DailyDigestBuilder",
+    "DigestAction",
+    "DigestArtifactPort",
+    "DigestArtifacts",
+    "DigestFyiItem",
+    "DigestPolicyPort",
+    "DigestService",
+    "WINDOW_S",
+]
 
 WINDOW_S = 86_400
 AUTOMATED_LEVELS: frozenset[str] = frozenset({"L2", "L3"})
@@ -250,3 +265,174 @@ class DailyDigestBuilder:
             tuple(skipped_ids),
             tuple(skipped_fyi),
         )
+
+
+class DigestArtifactPort(Protocol):
+    def store(self, artifact_id: str, subject: str, body_text: str, version: int = 1) -> dict[str, Any]: ...
+    def get(self, artifact_id: str, version: int) -> Mapping[str, Any]: ...
+
+
+class DigestArtifacts:
+    def __init__(self) -> None:
+        self._by_ref: dict[tuple[str, int], dict[str, Any]] = {}
+
+    def store(self, artifact_id: str, subject: str, body_text: str, version: int = 1) -> dict[str, Any]:
+        doc = {"kind": "email", "subject": subject, "body_text": body_text, "in_reply_to": "", "references": ""}
+        if self._by_ref.setdefault((artifact_id, version), doc) != doc:
+            raise ValueError("digest artifact version is immutable")
+        return {"artifact_id": artifact_id, "version": version}
+
+    def get(self, artifact_id: str, version: int) -> Mapping[str, Any]:
+        return copy.deepcopy(self._by_ref[(artifact_id, version)])
+
+
+class DigestPolicyPort(Protocol):
+    def decide(self, user_id: str, proposal: tilo_policy.Proposal) -> tilo_policy.Decision: ...
+    def policy_for(self, user_id: str, policy_id: str) -> Mapping[str, Any] | None: ...
+
+
+def _user_prefs(
+    source: PreferenceReader | Mapping[str, Any] | QuietHours | None, user_id: str
+) -> Mapping[str, Any] | QuietHours | None:
+    if source is None or isinstance(source, QuietHours):
+        return source
+    if isinstance(source, Mapping) and ("quiet_hours" in source or "start" in source):
+        return source
+    res = source.get(user_id)
+    return res if isinstance(res, Mapping | QuietHours) else None
+
+
+def _allowed_l3_decision(d: Any, now_ms: int, default_undo_s: int) -> tuple[dict[str, str], int, int] | None:
+    if type(d) is not tilo_policy.Decision or d.outcome != "run" or d.level != "L3" or d.tier not in ("T1", "T2"):
+        return None
+    authz = d.authz
+    if type(d.modifiers) is not tuple or d.modifiers or type(authz) is not dict or len(authz) != 3:
+        return None
+    by, ref, stamp = authz.get("by"), authz.get("ref"), authz.get("at")
+    if (
+        by != "policy"
+        or not isinstance(ref, str)
+        or not _valid_str("common.schema.json#/$defs/policy_id", ref)
+        or ref != d.policy_id
+        or (at_ms := parse_ms(stamp)) is None
+        or not fresh(stamp, now_ms)
+    ):
+        return None
+    undo = d.undo_window_s if type(d.undo_window_s) is int else default_undo_s
+    return ({"by": "policy", "ref": ref, "at": str(stamp)}, at_ms, undo) if 0 <= undo <= 3600 else None
+
+
+class DigestService:
+    def __init__(
+        self,
+        *,
+        builder: DailyDigestBuilder,
+        outbox: Outbox,
+        policy: DigestPolicyPort | None = None,
+        artifacts: DigestArtifactPort,
+        emit: Callable[[dict[str, Any]], None],
+        mailbox: Callable[[str], str | None],
+        world_id: str,
+        world_owner: str,
+        run_id: str,
+        preferences: PreferenceReader | Mapping[str, Any] | QuietHours | None = None,
+        connector: str = "gmail",
+        district: str = "D1",
+    ) -> None:
+        self._builder, self._outbox, self._policy, self._artifacts = builder, outbox, policy, artifacts
+        self._emit, self._mailbox, self._preferences = emit, mailbox, preferences
+        self._world_id, self._world_owner, self._run_id = world_id, world_owner, run_id
+        self._connector, self._district = connector, district
+
+    def deliver_if_non_empty(
+        self,
+        *,
+        user_id: str,
+        events: Iterable[Mapping[str, Any]],
+        outbox_entries: Iterable[Mapping[str, Any]] = (),
+        fyi_mail: Iterable[Mapping[str, Any]] = (),
+        world_ids: Collection[str] | None = None,
+        recipient: str | None = None,
+        now: float | int | str | dt.datetime | None = None,
+    ) -> dict[str, Any] | None:
+        if (
+            self._policy is None
+            or user_id != self._world_owner
+            or not _valid_str("common.schema.json#/$defs/user_id", user_id)
+        ):
+            return None
+        owner_addr = self._mailbox(user_id)
+        if not isinstance(owner_addr, str) or not _valid_str("common.schema.json#/$defs/email_address", owner_addr):
+            return None
+        if recipient is not None and recipient != owner_addr:
+            return None
+        check_now = self._builder.now() if now is None else now
+        try:
+            if not should_notify("digest", prefs=_user_prefs(self._preferences, user_id), now=check_now):
+                return None
+        except Exception:
+            return None
+        scoped_worlds = {self._world_id} if world_ids is None else (set(world_ids) & {self._world_id})
+        digest = self._builder.build(
+            user_id=user_id,
+            world_ids=scoped_worlds,
+            events=events,
+            outbox_entries=outbox_entries,
+            fyi_mail=fyi_mail,
+            now=check_now,
+        )
+        if digest is None:
+            return None
+        utc_day, idem_key = digest.window_end[:10], f"digest:{user_id}:{digest.window_end[:10]}"
+        if self._outbox.get_by_idempotency_key(self._world_id, idem_key) is not None:
+            return None
+        if (now_ms := parse_ms(digest.window_end)) is None:
+            return None
+        outbox_id = ulid(now_ms)
+        item = self._artifacts.store(
+            f"art_digest_{outbox_id[:16].lower()}", f"Daily Digest ({utc_day})", digest.rendered_text
+        )
+        if not conforms("common.schema.json#/$defs/artifact_ref", item):
+            return None
+        facts = tilo_policy.SideEffectFacts(recipients=(owner_addr,), known_recipients=(owner_addr,))
+        proposal = tilo_policy.Proposal(
+            self._world_id, ACTION_TYPE, self._connector, self._district, None, facts, copy.deepcopy(item), 0, None
+        )
+        try:
+            decision = self._policy.decide(user_id, proposal)
+            pol_doc = self._policy.policy_for(user_id, decision.policy_id) if type(decision.policy_id) is str else None
+        except Exception:
+            return None
+        if not isinstance(pol_doc, Mapping):
+            return None
+        pol_undo = pol_doc.get("undo_window_s")
+        if (checked := _allowed_l3_decision(decision, now_ms, pol_undo if type(pol_undo) is int else 60)) is None:
+            return None
+        authz, at_ms, undo = checked
+        pdata: dict[str, Any] = {"policy_id": decision.policy_id, "gate_id": gate_id_for(f"digest_{outbox_id}")}
+        pdata |= {"outbox_id": outbox_id, "action_type": ACTION_TYPE, "connector": self._connector, "destination": None}
+        pdata |= {"district": self._district, "risk_tier": decision.tier, "level": "L3", "instruction_id": None}
+        pdata |= {"undo_window_s": undo, "item": copy.deepcopy(item), "credits": 0}
+        policy_applied = {"type": "policy.applied", "authz": copy.deepcopy(authz), "data": pdata}
+        entry: dict[str, Any] = {"id": outbox_id, "idempotency_key": idem_key, "world_id": self._world_id}
+        entry |= {"run_id": self._run_id, "action_type": ACTION_TYPE, "connector": self._connector}
+        entry |= {"recipients": [owner_addr], "attachments": [], "item": copy.deepcopy(item), "destination": None}
+        entry |= {"modifiers": [], "risk_tier": decision.tier, "authz": authz, "undo_window_s": undo}
+        entry |= {
+            "scheduled_at": timestamp(at_ms + undo * 1000),
+            "state": "scheduled" if undo > 0 else "queued",
+            "created_at": authz["at"],
+        }
+        if not event_ok(policy_applied, ("policy.applied",)) or not conforms("outbox.schema.json", entry):
+            return None
+        try:
+            return enqueue_digest(
+                self._outbox,
+                entry,
+                policy_applied=policy_applied,
+                policy=pol_doc,
+                world_owner=self._world_owner,
+                emit=self._emit,
+            )
+        except Exception:
+            return None
