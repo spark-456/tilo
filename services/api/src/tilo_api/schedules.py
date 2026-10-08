@@ -75,7 +75,7 @@ from tilo_metering.flags import FlagStore
 from tilo_planning.events import build_event
 
 from tilo_api import deps, dev, ephemeral, events, runs, team_access, team_store
-from tilo_api.access import Mode
+from tilo_api.access import Mode, enforced
 from tilo_api.durable_store import DurableStore
 from tilo_api.tasks import _json_body
 
@@ -110,6 +110,8 @@ def get_schedule_store() -> ScheduleRepository:
             kind = "memory"
         except dev.DevModeRefused:
             pass
+    if kind == "memory" and enforced():  # deployed: a restart would lose every routine, so never in memory
+        raise HTTPException(status_code=503, detail="not_configured")
     try:
         return _open(kind, os.environ.get("TILO_FIRESTORE_PROJECT") or "")
     except ScheduleStoreNotConfigured as exc:
