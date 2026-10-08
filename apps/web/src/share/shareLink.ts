@@ -146,7 +146,7 @@ export function tokenOf(pathname: string): string | null {
 export const REFUSAL_TEXT: Readonly<Record<ShareRefusal, string>> = {
   sign_in: "Sign in with the account this link was shared with, then open it again.",
   unavailable: "This link is not available.",
-  busy: "This cannot be answered right now. Nothing was sent. Try again later.",
+  busy: "Your answer was not taken. Another answer is being written. Check before trying again.",
   try_again: "Tilo could not be reached. Nothing was changed. Try again.",
   unreadable: "Tilo sent a reply this page could not read. Nothing was changed.",
   unconfirmed:

@@ -192,6 +192,7 @@ describe("FR_HIL_12 the page", () => {
       "This link is not available.",
     );
     expect(m.container.querySelector("section")).toBeNull();
+    expect(m.container.innerHTML).not.toContain(TOKEN);
   });
 
   it("FR_HIL_12 a failure the person can try again keeps the card and sends nothing by itself", async () => {
@@ -278,6 +279,7 @@ describe("FR_HIL_12 review fixes (security round 1)", () => {
       const line = q(m.container, '[data-testid="share-refused"]').textContent ?? "";
       expect(line, String(failure.status)).toContain("Check before trying again");
       expect(line).not.toContain("Nothing was changed");
+      expect(m.container.innerHTML).not.toContain(TOKEN);
       cleanup();
     }
     const odd = http({ post: async () => ({ outcome: "rejected" }) });
