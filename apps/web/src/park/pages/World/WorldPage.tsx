@@ -162,7 +162,8 @@ export function WorldPage({ app }: { app: AppCtx }) {
   const mine = loaded.decisions.filter((d) => d.world === w.id);
   const open = mine.filter((d) => !dec[d.k]).length;
   const look = stateLook(w, isPaused);
-  const chip = w.st === "needs" && !isPaused ? decisionsWord(app.needsLeft) : look[0];
+  const chip =
+    w.st === "needs" && !isPaused && app.needsLeft > 0 ? decisionsWord(app.needsLeft) : look[0];
   const { skills, tools } = skillsAndTools(w, loaded.skills, loaded.connectors);
   const wide = (app.vw || 1440) >= 1060;
   const id = encodeURIComponent(w.id);

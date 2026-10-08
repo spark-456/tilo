@@ -9,6 +9,7 @@ import type { Decision, Notification, User } from "../api/types";
 import type { PageId } from "../app/AppCtx";
 import { endSession, useApp, useExpectsSample, useParkApi, useParkStore } from "../app/context";
 import { useParkRoute } from "../app/router";
+import { openServedCount } from "../app/servedDecisions";
 import { Toast } from "../components";
 import "../tokens/fonts";
 import { AccountMenu } from "./AccountMenu";
@@ -130,7 +131,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   };
   const toast = state.toast;
   // The dot counts the decisions the Api served that are still open, never the sample count (HR-1..HR-7).
-  const waiting = decisions.some((d) => !state.dec[d.k]);
+  const waiting = openServedCount(decisions, state.dec) > 0;
   return (
     <>
       <CityBackdrop
