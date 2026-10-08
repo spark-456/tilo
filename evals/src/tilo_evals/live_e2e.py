@@ -72,6 +72,10 @@ REAL_FAKED = (
     "recipient and destination: the dev stand-in; connectors: real, read-only, not read by any unit yet; "
     "nothing is written or sent"
 )
+REAL_WRITE_FAKED = (
+    "recipient and destination: the dev stand-in; connectors: real; a Gmail draft or Drive save (and a send only with "
+    "--allow-send) goes out only after you type yes at the terminal for that exact payload"
+)
 PLANNING_NOTE = "planning credits come from this meter: the planning events carry 0 (#327)"
 SCOPE_NOTE = "claim scope: structural pass rate (GEN-11), not output quality"
 
@@ -188,31 +192,67 @@ def default_recordings_dir(case_id: str) -> Path:
 # --- the gate (EFF-01) ---------------------------------------------------------------------------------------------
 
 
-def real_faked(faked: tuple[str, ...]) -> tuple[str, ...]:
-    """`faked` for a run on real read-only connectors: the connectors are no longer recording mocks."""
-    return tuple(REAL_FAKED if item.startswith("connectors and recipient") else item for item in faked)
+def real_faked(faked: tuple[str, ...], writes: bool = False) -> tuple[str, ...]:
+    """`faked` for a run on real connectors: the connectors are no longer recording mocks."""
+    note = REAL_WRITE_FAKED if writes else REAL_FAKED
+    return tuple(note if item.startswith("connectors and recipient") else item for item in faked)
 
 
-def print_real_plan() -> None:
+def write_mode(allow_writes: bool, allow_send: bool) -> str:
+    """The report word for what the real connectors may do (the flag combination is checked first)."""
+    return "real_write_gated_send" if allow_send else "real_write_gated" if allow_writes else "real_read_only"
+
+
+def check_write_flags(real_connectors: bool, allow_writes: bool, allow_send: bool) -> None:
+    if (allow_writes or allow_send) and not real_connectors:
+        raise LiveE2ERefused(
+            "allow_writes_needs_real_connectors", "--allow-writes and --allow-send need --real-connectors"
+        )
+    if allow_send and not allow_writes:
+        raise LiveE2ERefused("allow_send_needs_allow_writes", "--allow-send needs --allow-writes")
+
+
+def print_real_plan(allow_writes: bool = False, allow_send: bool = False) -> None:
     """`--dry-run --real-connectors`: what a live run would ask Google for. Builds no client, broker or listener."""
-    from tilo_connectors.real import real_connector_plan  # noqa: PLC0415
+    from tilo_connectors.real import real_connector_plan, real_write_plan  # noqa: PLC0415
+    from tilo_connectors.real_writes import WriteFlags  # noqa: PLC0415
     from tilo_connectors.registry import load_registry  # noqa: PLC0415
 
-    print("real-connectors: read_only (dry run: nothing built, nothing sent)")
-    for row in real_connector_plan(load_registry(_REPO / "config" / "connectors.yaml")):
-        print(f"real-connector {row['connector']}: scopes={','.join(row['scopes'])} mode=read_only")
+    registry = load_registry(_REPO / "config" / "connectors.yaml")
+    if not allow_writes:
+        print("real-connectors: read_only (dry run: nothing built, nothing sent)")
+        for row in real_connector_plan(registry):
+            print(f"real-connector {row['connector']}: scopes={','.join(row['scopes'])} mode=read_only")
+        return
+    rows, writes = real_write_plan(registry, WriteFlags(allow_writes, allow_send))
+    print(f"real-writes: {write_mode(allow_writes, allow_send)[5:]} (dry run: nothing built, nothing sent)")
+    for row in rows:
+        print(f"real-connector {row['connector']}: scopes={','.join(row['scopes'])} mode={row['mode']}")
+    for connector, action in writes:
+        print(f"real-write {connector} {action}: typed terminal approval")
 
 
-def _real_adapters(factory: Callable[[], dict[str, Any]] | None) -> dict[str, Any]:
+def _real_adapters(
+    factory: Callable[[], dict[str, Any]] | None, allow_writes: bool = False, allow_send: bool = False
+) -> dict[str, Any]:
     """The real connectors, built once the gate has passed and before any model call. Fail closed: a refusal or any
-    other failure stops the run (its words are never printed) and never falls back to the recording mocks."""
-    from tilo_connectors.real import RealConnectorsRefused, is_real_read_only  # noqa: PLC0415
+    other failure stops the run (its words are never printed) and never falls back to the recording mocks. A write gate
+    must carry exactly this run's flags: a factory built with send is refused in a run without `--allow-send`."""
+    from tilo_connectors.real import (  # noqa: PLC0415
+        RealConnectorsRefused,
+        is_real_read_only,
+        is_real_write_gated,
+        write_gate_of,
+    )
+    from tilo_connectors.real_writes import WriteFlags  # noqa: PLC0415
 
     if factory is None:  # the default (live transport and consent flow) is CL-LIVE-3's
         raise LiveE2ERefused("real_connectors_no_token", NO_CONNECTION)
     try:
         adapters = factory()
-        if is_real_read_only(adapters):
+        if (is_real_write_gated if allow_writes else is_real_read_only)(adapters) and (
+            not allow_writes or getattr(write_gate_of(adapters), "flags", None) == WriteFlags(allow_writes, allow_send)
+        ):
             return adapters
     except RealConnectorsRefused as refusal:
         raise LiveE2ERefused(f"real_connectors_{refusal.code}", str(refusal)) from None
@@ -874,11 +914,20 @@ def _execute(
     story: list[StoryLine] = []
     note: str | None = None
     app = _app(router, screen, runner or _UnitRunner(router, meter), connectors)
+    if connectors is not None:  # CL-LIVE-2: write-gated connectors get this run's store, redactor and person
+        from .live_writes import bind_writes  # noqa: PLC0415
+
+        bind_writes(connectors, app, person, owner=_OWNER)
     with _quiet():
         try:
             drive(obs.case, obs, _UNIT_TIMEOUT_S["live" if live else "replay"], app, person)
         except Exception as error:  # noqa: BLE001 - a crash is an observation; the error's text is never kept
             obs.crash = type(error).__name__
+        finally:
+            if connectors is not None:  # an approval nobody used does not outlive the run
+                from .live_writes import release_writes  # noqa: PLC0415
+
+                release_writes(connectors)
         if narrate and obs.events and not meter.stop:
             story, note = _story(router, obs.events, env)
     outcome, reason = _classify(obs, meter, screen, env)
@@ -903,11 +952,18 @@ def run_live_e2e(
     person: Any = None,  # `just live-run`: a person answers in place of the case script (`live_topic.TerminalPerson`)
     real_connectors: bool = False,  # CL-LIVE-1: real read-only Google connectors in place of the recording mocks
     real_connectors_factory: Callable[[], dict[str, Any]] | None = None,  # the only way the run gets them
+    allow_writes: bool = False,  # CL-LIVE-2: Gmail drafts and Drive saves, each after a typed terminal approval
+    allow_send: bool = False,  # CL-LIVE-2: also Gmail send, the same gate
 ) -> LiveE2EReport:
     env: Mapping[str, str] = {} if fake_record else os.environ if environ is None else environ
     if fake_record and (live_provider_factory is None or mode != "live"):
         raise LiveE2ERefused("not_a_fake_provider", "the fake record path takes only an injected fake provider")
     _gate("dry-run" if fake_record else mode, env, max_credits)  # the fake path has no live decision to gate
+    check_write_flags(real_connectors, allow_writes, allow_send)
+    if allow_writes and mode == "live" and person is None:
+        raise LiveE2ERefused(
+            "allow_writes_needs_a_person", "real writes need a person at a terminal; this run has none"
+        )
     if real_connectors and mode == "replay":
         raise LiveE2ERefused("real_connectors_not_live", "--real-connectors needs a live run, not a replay")
     if real_connectors and fake_record:
@@ -915,7 +971,7 @@ def run_live_e2e(
     config = _load_config(models_path, prices_path, env)
     case = adhoc or _load_case(case_id, bank_dir)
     live = mode == "live"
-    connectors = _real_adapters(real_connectors_factory) if real_connectors and live else None
+    connectors = _real_adapters(real_connectors_factory, allow_writes, allow_send) if real_connectors and live else None
     factory = (live_provider_factory or _vertex(config)) if live else None
     refused: list[LiveE2ERefused] = []
     if fake_record and factory is not None:
@@ -938,7 +994,8 @@ def run_live_e2e(
     report.safety = SAFETY_NOTE if isinstance(screen, TrustedBankInputScreen) else f"injected ({type(screen).__name__})"
     if connectors is not None:
         ids = tuple(i for i in connectors if i in _GOOGLE_IDS)
-        report.side_effects, report.real_connectors, report.faked = "real_read_only", ids, real_faked(FAKED)
+        report.side_effects, report.real_connectors = write_mode(allow_writes, allow_send), ids
+        report.faked = real_faked(FAKED, allow_writes)
     if mode == "dry-run":
         return report
     meter = _Meter(config, max_credits)
@@ -1005,6 +1062,12 @@ def record_with_fake(
 # --- the command ---------------------------------------------------------------------------------------------------
 
 
+def add_write_flags(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("--allow-writes", action="store_true", help="with --real-connectors: Gmail drafts and Drive "
+                        "saves, each only after you type yes for that exact payload")  # fmt: skip
+    parser.add_argument("--allow-send", action="store_true", help="with --allow-writes: also Gmail send, same gate")
+
+
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="live_e2e", description=(__doc__ or "").split("\n\n")[0])
     parser.add_argument("--case", default="B-007", help="the bank case to run (default B-007)")
@@ -1012,6 +1075,7 @@ def _parser() -> argparse.ArgumentParser:
         "--max-credits", type=float, default=DEFAULT_MAX_CREDITS, help=f"cap, at most {HARD_MAX_CREDITS:g}"
     )
     parser.add_argument("--real-connectors", action="store_true", help="real read-only Gmail, Drive and Calendar")
+    add_write_flags(parser)
     kind = parser.add_mutually_exclusive_group()
     kind.add_argument("--replay", action="store_true", help="serve the recordings; never goes live, free")
     kind.add_argument("--dry-run", action="store_true", help="print the estimate and stop; no call")
@@ -1033,7 +1097,7 @@ def _print_report(report: LiveE2EReport) -> None:
     for item in report.faked:
         print(f"faked: {item}")
     if report.real_connectors:
-        print(f"connectors: real_read_only ({', '.join(report.real_connectors)})")
+        print(f"connectors: {report.side_effects} ({', '.join(report.real_connectors)})")
     if report.recordings == "synthetic":
         print("recordings: SYNTHETIC fixture written by a fake provider; this replay is not a real model run")
     elif report.recordings:
@@ -1083,13 +1147,14 @@ def main(
             models_path=args.models_file, prices_path=args.prices_file, recordings_dir=args.recordings_dir,
             live_provider_factory=live_provider_factory, safety=safety, announce=announce,
             real_connectors=args.real_connectors, real_connectors_factory=real_connectors_factory,
+            allow_writes=args.allow_writes, allow_send=args.allow_send,
         )  # fmt: skip
     except LiveE2ERefused as refusal:
         print(f"REFUSED {refusal.code}: {refusal}", file=sys.stderr)
         return 2
     if mode == "dry-run":
         if args.real_connectors:
-            print_real_plan()
+            print_real_plan(args.allow_writes, args.allow_send)
         return 0
     _print_report(report)
     if args.report_json:

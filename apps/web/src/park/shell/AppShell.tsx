@@ -13,6 +13,7 @@ import "../tokens/fonts";
 import { AccountMenu, type AccountPerson } from "./AccountMenu";
 import { BootSplash } from "./BootSplash";
 import { CityBackdrop } from "./CityBackdrop";
+import { Enter } from "./Enter";
 import { NotificationsPopover } from "./NotificationsPopover";
 import { TopNav } from "./TopNav";
 import { WorldLoader } from "./WorldLoader";
@@ -203,25 +204,29 @@ export function AppShell({ children }: { children: ReactNode }) {
         onAvatar={() => store.toggleMenu("acct")}
       />
       {state.menu === "notif" ? (
-        <NotificationsPopover
-          notifications={notifications}
-          decisions={decisions}
-          dec={state.dec}
-          onOpen={open}
-          onSettings={() => store.go("profile", { tab: "notifications" })}
-          onClose={store.closeMenu}
-        />
+        <Enter>
+          <NotificationsPopover
+            notifications={notifications}
+            decisions={decisions}
+            dec={state.dec}
+            onOpen={open}
+            onSettings={() => store.go("profile", { tab: "notifications" })}
+            onClose={store.closeMenu}
+          />
+        </Enter>
       ) : null}
       {state.menu === "acct" ? (
-        <AccountMenu
-          user={person}
-          canSignOut={!auth || auth.status === "signedIn"}
-          onMobile={() => setMobileNote(true)}
-          connectorsOn={connectorsOn}
-          go={navTo}
-          onSignOut={signOutViaSeam}
-          onClose={store.closeMenu}
-        />
+        <Enter>
+          <AccountMenu
+            user={person}
+            canSignOut={!auth || auth.status === "signedIn"}
+            onMobile={() => setMobileNote(true)}
+            connectorsOn={connectorsOn}
+            go={navTo}
+            onSignOut={signOutViaSeam}
+            onClose={store.closeMenu}
+          />
+        </Enter>
       ) : null}
       {mobileNote ? (
         <Popover label="Mobile app" width={320} onClose={() => setMobileNote(false)}>
@@ -244,12 +249,14 @@ export function AppShell({ children }: { children: ReactNode }) {
         </div>
       </main>
       {toast ? (
-        <Toast
-          message={toast.message}
-          {...(toast.actionLabel !== undefined ? { actionLabel: toast.actionLabel } : {})}
-          {...(toast.action !== undefined ? { onAction: toast.action } : {})}
-          onDismiss={store.dismissToast}
-        />
+        <Enter>
+          <Toast
+            message={toast.message}
+            {...(toast.actionLabel !== undefined ? { actionLabel: toast.actionLabel } : {})}
+            {...(toast.action !== undefined ? { onAction: toast.action } : {})}
+            onDismiss={store.dismissToast}
+          />
+        </Enter>
       ) : null}
       {card ? (
         <WorldLoader

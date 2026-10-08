@@ -1,6 +1,6 @@
 // Connectors page-local parts (plan section 4 "ConnectorTile"): the attention banner, a Connected tile and an
-// Add-a-tool row. Built from the design's markup (Tilo App Connectors.dc.html). The design's spinner turns;
-// here it is a still ring (motion arrives with WEB-3b, BQ-WEB-3) and the label says the state.
+// Add-a-tool row. Built from the design's markup (Tilo App Connectors.dc.html). The design's spinner turns
+// and it is a still ring: connect and reconnect are page-local stand-ins with no call behind them, so it does not turn (HR-1).
 import type { Connector } from "../../api/types";
 import { icon } from "./icons";
 import { LEVEL_LABEL, type Merged, bannerText, syncLine, usedLine } from "./view";
