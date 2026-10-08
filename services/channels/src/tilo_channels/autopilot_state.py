@@ -26,6 +26,7 @@ caller saw an error and retries) or a queued one that a retry, E2, E4 or the swe
 from __future__ import annotations
 
 import copy
+import logging
 import secrets
 from collections.abc import Callable, Mapping
 from datetime import UTC, datetime
@@ -47,9 +48,17 @@ class StaleDecision(RuntimeError):
     """The L2 entry would be created outside its decision's freshness bound: nothing is enqueued, decide again."""
 
 
+_LOG = logging.getLogger("tilo_channels.autopilot_state")
+
+
+class DigestSettleFailed(Exception):  # not a RuntimeError: never an "expected" failure
+    """The digest's policy.applied failed to emit AND its entry could not be settled: it may still be sent."""
+
+
 class Outbox(Protocol):  # the names of tilo_connectors.outbox.Outbox, which tilo-channels never imports (BQ-158)
     def enqueue(self, entry: dict, evidence: dict) -> dict: ...
     def cancel(self, outbox_id: str) -> dict: ...
+    def abandon(self, outbox_id: str) -> dict: ...
     def get(self, outbox_id: str) -> dict | None: ...  # read port: a copy or None; never writes
     def get_by_idempotency_key(self, world_id: str, idempotency_key: str) -> dict | None: ...
     def revoke(self, world_id: str, idempotency_key: str) -> dict | None: ...  # never creates an entry (BQ-186)
@@ -255,13 +264,20 @@ def enqueue_digest(
     if not autopilot_gate.opens(entry, evidence):
         return None
     stored = outbox.enqueue(entry, evidence)
-    if emit is not None:
-        try:
-            emit(copy.deepcopy(policy_applied))
-        except Exception:
-            try:
-                outbox.cancel(entry["id"])
-            except Exception:
-                pass
-            raise
+    if emit is None or stored.get("id") != entry["id"]:  # a replay under the same key is another call's entry
+        return stored
+    try:
+        emit(copy.deepcopy(policy_applied))
+    except Exception as exc:
+        try:  # abandon settles queued and scheduled entries alike (cancel refuses a queued one, undo window 0)
+            outbox.abandon(entry["id"])
+        except Exception as err:
+            _LOG.error(
+                "digest %s: emit failed (%s) and abandon failed (%s); the entry may still be sent",
+                entry["id"],
+                type(exc).__name__,
+                type(err).__name__,
+            )
+            raise DigestSettleFailed(entry["id"]) from exc
+        raise
     return stored

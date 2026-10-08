@@ -303,6 +303,17 @@ def _rate_limit_response(limit_scope: LimitScope, retry_after_s: int) -> JSONRes
     )
 
 
+_CAPABILITY_MISSING = (NotImplementedError, AttributeError, TypeError)  # a store without peek/consume_all: fail closed
+
+
+def _store_unusable(limiter: object) -> JSONResponse:
+    logger.error("rate limiter store lacks peek/consume_all, failing closed: %s", type(limiter).__name__)
+    return JSONResponse(
+        status_code=503,
+        content={"detail": "Rate limiter store is unusable.", "code": "rate_limiter_unavailable"},
+    )
+
+
 async def _decide(scope: dict[str, Any], fastapi_app: FastAPI) -> JSONResponse | None:
     try:
         limiter: RateLimiter = fastapi_app.dependency_overrides.get(get_rate_limiter, get_rate_limiter)()
@@ -311,22 +322,17 @@ async def _decide(scope: dict[str, Any], fastapi_app: FastAPI) -> JSONResponse |
         logger.warning("rate limit configuration unavailable, failing open: %s", type(exc).__name__)
         return None
 
-    peek_fn = getattr(limiter, "peek", None)
-    if not callable(peek_fn):
-        logger.error("rate limiter store missing peek capability, failing closed: %s", type(limiter).__name__)
-        return JSONResponse(
-            status_code=503,
-            content={
-                "detail": "Rate limiter store missing peek capability.",
-                "code": "rate_limiter_unavailable",
-            },
-        )
+    peek_fn, consume_fn = getattr(limiter, "peek", None), getattr(limiter, "consume_all", None)
+    if not callable(peek_fn) or not callable(consume_fn):
+        return _store_unusable(limiter)
 
     ip_key = f"ip:{_client_ip(scope, cfg.trusted_hops)}"
     try:
         ip_ok, ip_retry_s = peek_fn(ip_key, capacity=cfg.ip_capacity, refill_per_s=cfg.ip_refill_per_s)
         if not ip_ok:
             return _rate_limit_response("ip", ip_retry_s)
+    except _CAPABILITY_MISSING:
+        return _store_unusable(limiter)
     except Exception as exc:
         logger.warning("rate limiter store failed, failing open: %s", type(exc).__name__)
         return None
@@ -339,9 +345,11 @@ async def _decide(scope: dict[str, Any], fastapi_app: FastAPI) -> JSONResponse |
         checks.append(("user", f"user:{principal.user_id}", cfg.user_capacity, cfg.user_refill_per_s))
 
     try:
-        limited_scope, retry_after_s = limiter.consume_all(checks)
+        limited_scope, retry_after_s = consume_fn(checks)
         if limited_scope is not None:
             return _rate_limit_response(limited_scope, retry_after_s)
+    except _CAPABILITY_MISSING:
+        return _store_unusable(limiter)
     except Exception as exc:
         logger.warning("rate limiter store failed, failing open: %s", type(exc).__name__)
         return None

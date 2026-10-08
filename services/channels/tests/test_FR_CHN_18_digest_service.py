@@ -115,7 +115,7 @@ def test_FR_CHN_18_refuses_no_policy_raising_policy_raising_emit_and_respects_qu
     emit_fail_store = InMemoryOutboxStore()
     emit_fail_outbox = Outbox(emit_fail_store, connectors={}, emit=lambda _: None, clock=lambda: NOW_TS, world_id=WORLD)
     assert _deliver(_svc(emit_fail_outbox, _RealEnginePort([l3_pol], emitted), artifacts, _raise_emit)) is None
-    assert emitted == [] and [e["state"] for e in emit_fail_store.all_entries()] == ["cancelled"]
+    assert emitted == [] and [e["state"] for e in emit_fail_store.all_entries()] == ["failed"]
 
     for blocked in ([_digest_policy(level="L2")], [_digest_policy(level="L1")]):
         assert _deliver(_svc(outbox, _RealEnginePort(blocked, emitted), artifacts, emitted.append)) is None
@@ -241,3 +241,60 @@ def test_FR_CHN_18_662_digest_service_emits_policy_applied_only_after_enqueue_an
     bug_logs = "\n".join(r.getMessage() for r in caplog.records)
     assert "_UnexpectedBugError" in bug_logs
     assert "private body text" not in bug_logs and "Daily Digest" not in bug_logs
+
+
+class _RecordingGmail:
+    def __init__(self) -> None:
+        self.sent: list[Any] = []
+
+    def send_reply(self, *args: Any) -> None:
+        self.sent.append(args)
+
+
+def _raise_emit(_part: dict[str, Any]) -> None:
+    raise RuntimeError("event log down")
+
+
+def test_FR_CHN_18_704_failed_emit_with_no_undo_window_never_lets_the_queued_digest_send() -> None:
+    store, emitted, gmail = InMemoryOutboxStore(), list[dict[str, Any]](), _RecordingGmail()
+    outbox = Outbox(store, connectors={"gmail": gmail}, emit=lambda _: None, clock=lambda: NOW_TS, world_id=WORLD)
+    pol = _digest_policy(level="L3", undo_window_s=0)
+    svc = _svc(outbox, _RealEnginePort([pol], emitted), DigestArtifacts(), _raise_emit)
+
+    assert _deliver(svc) is None
+    assert [e["state"] for e in store.all_entries()] not in (["queued"], ["sent"])
+    outbox.dispatch_due()
+    assert gmail.sent == [] and emitted == []
+    assert [e["state"] for e in store.all_entries()] == ["failed"]
+
+
+def test_FR_CHN_18_704_failed_emit_and_failed_abandon_logs_the_outbox_id_and_raises(caplog: Any) -> None:
+    import logging
+
+    import pytest
+    from tilo_channels.autopilot_state import DigestSettleFailed
+
+    store, emitted = InMemoryOutboxStore(), list[dict[str, Any]]()
+    real = Outbox(store, connectors={}, emit=lambda _: None, clock=lambda: NOW_TS, world_id=WORLD)
+
+    class _StuckOutbox:
+        def __getattr__(self, name: str) -> Any:
+            return getattr(real, name)
+
+        def enqueue(self, entry: dict[str, Any], evidence: dict[str, Any]) -> dict[str, Any]:
+            return real.enqueue(entry, evidence)
+
+        def cancel(self, outbox_id: str) -> dict[str, Any]:
+            raise OSError("store down secret digest body leak")
+
+        def abandon(self, outbox_id: str) -> dict[str, Any]:
+            raise OSError("store down secret digest body leak")
+
+    pol = _digest_policy(level="L3", undo_window_s=60)
+    svc = _svc(_StuckOutbox(), _RealEnginePort([pol], emitted), DigestArtifacts(), _raise_emit)  # type: ignore[arg-type]
+    with caplog.at_level(logging.ERROR), pytest.raises(DigestSettleFailed):
+        _deliver(svc)
+    (entry,) = store.all_entries()
+    errors = [r.getMessage() for r in caplog.records if r.levelno >= logging.ERROR]
+    assert any(entry["id"] in m and "RuntimeError" in m and "OSError" in m for m in errors), errors
+    assert not any("secret digest body leak" in m or "Daily Digest" in m for m in errors)

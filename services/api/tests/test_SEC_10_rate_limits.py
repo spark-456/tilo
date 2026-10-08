@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from typing import Any
 
 import pytest
 from fastapi import Request
@@ -325,6 +326,46 @@ def test_SEC_10_515_rate_limiter_protocol_requires_peek_before_auth_and_fails_cl
         assert refused.status_code == 503
         assert refused.json()["code"] == "rate_limiter_unavailable"
         assert auth_calls["count"] == 0
+    finally:
+        app.dependency_overrides.clear()
+
+
+@pytest.mark.parametrize(
+    ("missing", "raises", "status"),
+    [
+        ("consume_all", None, 503),
+        ("peek", NotImplementedError, 503),
+        ("consume_all", TypeError, 503),
+        ("peek", ConnectionError, 200),
+    ],
+    ids=["no consume_all", "peek not implemented", "consume_all type error", "other store error fails open"],
+)
+def test_SEC_10_704_store_capability_missing_fails_closed_other_errors_fail_open(
+    missing: str, raises: type[Exception] | None, status: int
+) -> None:
+    class Store:
+        def peek(self, key: str, *, capacity: int, refill_per_s: float) -> tuple[bool, int]:
+            if missing == "peek" and raises:
+                raise raises("x")
+            return True, 0
+
+        def consume_all(self, checks: Any) -> tuple[str | None, int]:
+            if missing == "consume_all" and raises:
+                raise raises("x")
+            return None, 0
+
+    store = Store()
+    if raises is None:
+        del Store.consume_all
+    app.dependency_overrides[get_rate_limiter] = lambda: store  # type: ignore[return-value]
+    alice = Principal(user_id="u_alice", role="owner", world_id="w_sec10")
+    app.dependency_overrides[get_current_principal] = lambda: alice
+    try:
+        res = TestClient(app).get("/health")
+        assert res.status_code == 200  # exempt path is never limited
+        res = TestClient(app).get("/worlds/w_sec10/cards")
+        closed = res.status_code == 503 and res.json().get("code") == "rate_limiter_unavailable"
+        assert closed == (status == 503), res.text[:120]
     finally:
         app.dependency_overrides.clear()
 
