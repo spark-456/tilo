@@ -36,7 +36,7 @@ old screens until the cutover PR. WEB-1a holds the tokens, fonts, typed fixtures
 ## Shell (WEB-3b, `shell/`)
 - `AppShell` (named export, `children` only) holds the nav, popovers, one `<main>`, toast, loader, boot (`park.shell.css`: no motion, blur on the nav only); ParkApp owns `[data-park]`.
 - The city is STATIC (motion and its honesty-scan entry: BQ-WEB-3): `scene.ts` caches a scene per `time|motion` at module level, with the 3 pin points for `app.pins`.
-- `RunBar` (RUN-INDICATOR, BQ-RUNBAR-1..5): an `<output>` pill at the bottom, only while `getWorlds` serves a `running` world (ring, `runStatus.ts` words) or a `needs` one (static); fixture path counts only `store.added`; no `prog`, no %.
+- `RunBar` (RUN-INDICATOR, BQ-RUNBAR-1..5): an `<output>` pill at the bottom, only while `getWorlds` serves a `running` world (ring, `runStatus.ts` words) or a `needs` one (static); live counts only server-listed worlds, fixture only `store.added` ("Working"); no `prog`, no %.
 - `usePageApp()` is what pages get: `go('world')` runs the loader first (`store.openWorld`); `useApp().go` stays immediate.
 
 ## Local rules

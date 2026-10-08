@@ -5,8 +5,10 @@
 //   - anything else, a failed read, or no worlds: nothing is drawn.
 // The state is read on mount, when the page changes, when a decision or a started world changes, and, while a live
 // run is showing, again every POLL_MS through the injected scheduler (so the end of a run takes the bar away; no
-// clock here moves anything). On the fixture path only worlds the person started in this session count: the canned
-// sample worlds are not runs that are happening (HR-2). Reduced motion and the 'still' preference draw a still dot.
+// clock here moves anything). A failed read hides the bar and stops the polling; the next page or decision change
+// reads again. Live, only worlds the server listed count (a world the person started here that the list lacks is a
+// canned stand-in, not a recorded run). On the fixture path only worlds the person started in this session count: the
+// canned sample worlds are not runs that are happening (HR-2). Reduced motion and 'still' draw a still dot.
 import { useEffect, useState, useSyncExternalStore } from "react";
 import type { World } from "../api/types";
 import { useParkApi, useParkStore, useSchedule } from "../app/context";
@@ -36,13 +38,23 @@ export function RunBar() {
   // biome-ignore lint/correctness/useExhaustiveDependencies: `page` (a page change) and `round` (the poll) only re-run the read
   useEffect(() => {
     let current = true;
-    const mine = new Set(state.added.map((w) => w.id));
+    const ids = new Set(state.added.map((w) => w.id));
+    const sessionWorlds = new Set<World>(state.added);
     api
       .getWorlds(state.dec, state.added)
       .then((r) => {
         if (!current) return;
         const live = r.source === "live";
-        setRead({ worlds: live ? r.data : r.data.filter((w) => mine.has(w.id)), live });
+        // Live: only worlds the server's list served. The Api prepends the session's own started worlds (canned
+        // sample objects: `running`, a template agent count) when the list lacks them; those are not recorded runs.
+        // Fixture: only the worlds the person started here, minus the sample's agent count and activity line (the
+        // fixture does not serve them as data), so the label is the plain "Working" and the world's name.
+        const worlds = live
+          ? r.data.filter((w) => !sessionWorlds.has(w))
+          : r.data
+              .filter((w) => ids.has(w.id))
+              .map(({ activity: _activity, ...w }) => ({ ...w, agents: 0 }));
+        setRead({ worlds, live });
       })
       .catch(() => current && setRead(null)); // an unreadable state is never shown as running
     return () => {

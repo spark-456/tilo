@@ -106,6 +106,57 @@ describe("RUN_INDICATOR bar: shown only while a recorded run is in progress", ()
     expect(seen.store.getState().sources.fixture).toBe(true); // the nav's Sample data chip logic still applies
   });
 
+  it("RUN_INDICATOR_on_the_fixture_path_a_started_world_reads_Working_with_its_name_and_no_sample_agent_count", async () => {
+    await mountApp({ api: fakeApi() });
+    act(() => {
+      seen.app.addWorld("quick", "Find three venues");
+    });
+    await settle();
+    const text = bar()?.textContent ?? "";
+    expect(text).toContain("Working");
+    expect(text).not.toMatch(/agents? working/); // the template's count is not served data
+    expect(text).not.toContain("started planning"); // nor is its canned activity line
+  });
+
+  it("RUN_INDICATOR_live_a_session_started_world_the_server_list_lacks_is_not_a_recorded_run_and_shows_no_bar", async () => {
+    const served = { worlds: [w("srv1", "finished")] as World[] | "fail" };
+    const base = servedApi(served);
+    // What the live Api does: the session's own started worlds ride in front of the served list.
+    base.getWorlds = (_dec, added) =>
+      Promise.resolve({
+        data: [...added, ...(served.worlds as World[])],
+        source: "live" as const,
+      });
+    const { sch } = await mountApp({ api: base });
+    act(() => {
+      seen.app.addWorld("quick", "Find three venues");
+    });
+    await settle();
+    expect(seen.store.getState().added.some((a) => a.st === "running")).toBe(true); // the stand-in is there...
+    expect(bar(), "...but it is no recorded run").toBeNull();
+    expect(sch.live().filter((t) => t.ms >= 5000)).toEqual([]); // and nothing polls for it
+  });
+
+  it("RUN_INDICATOR_live_a_world_the_server_lists_as_started_shows_Working_with_its_title", async () => {
+    const served = {
+      worlds: [w("srv1", "running", { name: "Offsite", short: "Offsite" })] as World[] | "fail",
+    };
+    const base = servedApi(served);
+    base.getWorlds = (_dec, added) =>
+      Promise.resolve({
+        data: [...added, ...(served.worlds as World[])],
+        source: "live" as const,
+      });
+    await mountApp({ api: base });
+    act(() => {
+      seen.app.addWorld("quick", "Find three venues"); // a stand-in rides along; only the served one counts
+    });
+    await settle();
+    expect(bar()?.textContent).toContain("Working");
+    expect(bar()?.textContent).toContain("Offsite");
+    expect(bar()?.textContent).not.toContain("Find three venues");
+  });
+
   it("RUN_INDICATOR_a_running_world_shows_the_bar_with_the_label_from_the_served_state", async () => {
     await mountApp({ api: servedApi({ worlds: [w("a", "running", { agents: 3 })] }) });
     const el = bar() as HTMLElement;
@@ -141,6 +192,19 @@ describe("RUN_INDICATOR bar: shown only while a recorded run is in progress", ()
     served.worlds = "fail";
     await poll(sch);
     expect(bar(), "an unreadable state is not shown as running").toBeNull();
+  });
+
+  it("RUN_INDICATOR_a_failed_re_read_stops_the_polling_and_the_next_decision_change_reads_again", async () => {
+    const served = { worlds: [w("a", "running")] as World[] | "fail" };
+    const { sch } = await mountApp({ api: servedApi(served) });
+    served.worlds = "fail";
+    await poll(sch);
+    expect(bar()).toBeNull();
+    expect(sch.live().filter((t) => t.ms >= 5000)).toEqual([]);
+    served.worlds = [w("a", "running")];
+    act(() => seen.app.decide("depot"));
+    await settle();
+    expect(bar()).not.toBeNull();
   });
 
   it("RUN_INDICATOR_after_the_terminal_event_nothing_is_re_read_on_a_timer", async () => {
