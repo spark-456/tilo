@@ -228,6 +228,24 @@ describe("MTG09_HOST_UI the request", () => {
     expect(say(box)).toMatch(/approval card has not appeared/i);
   });
 
+  it("MTG09_HOST_UI of two host gates in the world (an earlier held run) the newest is shown", async () => {
+    const stale: Card = {
+      ...GATE,
+      id: "01J8Z3K4M5N6P7Q8R9S0T1V2OLD",
+      created_at: "2026-10-07T04:00:00.000Z",
+    };
+    const client = fake({ listCards: vi.fn(async () => [GATE, stale]) });
+    const box = await host(client);
+    await click(button(box));
+    await settle();
+    const send = [...box.querySelectorAll('input[type="radio"]')].find((i) =>
+      i.closest("label")?.textContent?.startsWith("Approve"),
+    ) as HTMLInputElement;
+    await click(send);
+    await click([...box.querySelectorAll("button")].find((b) => b.textContent === "Approve"));
+    expect(client.answerCard).toHaveBeenCalledWith(GATE.id, { option_id: "approve" });
+  });
+
   it("MTG09_HOST_UI when no card appears the page says so and points to Needs you; nothing is claimed as done", async () => {
     const client = fake({ listCards: vi.fn(async () => []) });
     const box = await host(client);
@@ -294,7 +312,13 @@ describe("MTG09_HOST_UI every refusal has its own sentence and no card", () => {
     expect(say(box)).not.toContain("MH-0");
     expect(box.querySelector('[data-testid="need-card"]')).toBeNull();
     expect(client.listCards).not.toHaveBeenCalled();
-    expect(button(box)?.disabled).toBe(false); // it can be tried again once the cause is gone
+    if (_name === "409 already_hosted") {
+      // Asking again is only refused: no button, and a way to the approval that already exists.
+      expect(button(box)).toBeUndefined();
+      expect(box.querySelector('a[href="/needs-you"]')).not.toBeNull();
+    } else {
+      expect(button(box)?.disabled).toBe(false); // it can be tried again once the cause is gone
+    }
   });
 
   it("MTG09_HOST_UI the sentences are all different", async () => {

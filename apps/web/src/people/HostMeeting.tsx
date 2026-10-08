@@ -7,6 +7,7 @@ import type { Card, Meeting } from "@tilo/contracts";
 import { useEffect, useRef, useState } from "react";
 import { useClient } from "../api/ClientProvider";
 import type { TiloClient } from "../api/client";
+import { TiloApiError } from "../api/http";
 import { CardHead, CardOptions, useAnswer } from "../needs-you/CardView";
 import { AppLink } from "../screens/AppLink";
 import { NOT_CONNECTED, canAskToHost, canHostMeeting, hostFailureText } from "./host";
@@ -18,6 +19,7 @@ type View =
   | { readonly kind: "card"; readonly card: Card }
   | { readonly kind: "no_card" }
   | { readonly kind: "unreadable" }
+  | { readonly kind: "hosted"; readonly message: string }
   | { readonly kind: "error"; readonly message: string };
 
 const SAYS: Readonly<Record<string, string>> = {
@@ -33,6 +35,10 @@ const SAYS: Readonly<Record<string, string>> = {
 /** The gate this feature opens: the one T3 card for creating the event (FR-MTG-09). */
 const isHostGate = (c: Card): boolean =>
   c.kind === "gate" && c.gate?.action.type === "create_meeting_event" && c.gate.risk_tier === "T3";
+
+/** The card carries no meeting id to bind on, so of the world's host gates the newest is the one just asked for. */
+const newest = (cards: readonly Card[]): Card | undefined =>
+  [...cards].sort((a, b) => b.created_at.localeCompare(a.created_at))[0];
 
 const wait = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
@@ -104,14 +110,23 @@ export function HostMeeting({
     try {
       worldId = (await client.hostMeeting(meeting.id)).world_id;
     } catch (error) {
+      const message = hostFailureText(error);
+      // Already hosted: asking again is only refused, so the button goes; the approval is in Needs you.
+      if (
+        error instanceof TiloApiError &&
+        error.status === 409 &&
+        error.refusal === "already_hosted"
+      ) {
+        return show({ kind: "hosted", message });
+      }
       busy.current = false;
-      return show({ kind: "error", message: hostFailureText(error) });
+      return show({ kind: "error", message });
     }
     // The run has started: asking again would only be refused, so the button stays gone from here on.
     show({ kind: "waiting" });
     try {
       for (let i = 0; i < tries && live.current; i++) {
-        const card = (await client.listCards(worldId)).find(isHostGate);
+        const card = newest((await client.listCards(worldId)).filter(isHostGate));
         if (card) return show({ kind: "card", card });
         await wait(pollMs);
       }
@@ -142,9 +157,9 @@ export function HostMeeting({
         </p>
       </div>
       <output className="section-note host-status" data-testid="host-status">
-        {view.kind === "error" ? view.message : (SAYS[view.kind] ?? "")}
+        {view.kind === "error" || view.kind === "hosted" ? view.message : (SAYS[view.kind] ?? "")}
       </output>
-      {(view.kind === "no_card" || view.kind === "unreadable") && (
+      {(view.kind === "no_card" || view.kind === "unreadable" || view.kind === "hosted") && (
         <AppLink to="/needs-you" className="pill">
           Open Needs you
         </AppLink>
