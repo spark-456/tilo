@@ -262,6 +262,34 @@ live at https://essential-wares-510320-f0.web.app (and the `.firebaseapp.com` al
 - Check before you deploy: `pnpm --filter @tilo/web run build` then `pnpm --filter @tilo/web exec vite preview`
   serves the same bundle locally.
 
+## Test the live world on tilo-dev
+
+The deployed web app (Hosting) can talk to the deployed `tilo-api` (https://tilo-api-4qhkpsn5ga-as.a.run.app) with
+`just deploy-web-live` (WEB-TO-API). `just deploy-web` stays the fixture build. Your own steps, in order; Tilo never
+runs them for you and never handles your password:
+
+1. In the Cloud console (APIs & Services, Credentials), restrict the Firebase browser API key BEFORE it is baked in:
+   API restrictions to Firebase App Check and Identity Toolkit only, website restrictions to
+   `https://essential-wares-510320-f0.web.app/*` and `https://essential-wares-510320-f0.firebaseapp.com/*`
+   (infra/ACCESS.md section 7). The key ends up in the public JavaScript bundle.
+2. `pnpm exec firebase login` (once, your own Google account).
+3. Set the tilo-api settings with `gcloud run services update`. The 7 `TILO_*` settings are step 2 of
+   `docs/routines-rollout.md`. `LIVE`, `TILO_API_DEV` and `TILO_JUDGE_LIVE` stay unset. The CORS origins contain a
+   comma, so use gcloud's custom delimiter for that one setting:
+
+   ```powershell
+   gcloud run services update tilo-api --project essential-wares-510320-f0 --region asia-southeast1 `
+     --update-env-vars "^@^TILO_API_CORS_ORIGINS=https://essential-wares-510320-f0.web.app,https://essential-wares-510320-f0.firebaseapp.com"
+   ```
+
+   Exact https origins only; one invalid entry and the API adds no CORS at all (no wildcard, no credentials).
+4. `just deploy-dev-cloudbuild api` (the CORS code is in the image).
+5. `$env:TILO_BAKE_FIREBASE_KEY="1"; just deploy-web-live`. It refuses to build without the Firebase config,
+   bakes the fixed API origin (not a parameter) and deploys Hosting to the dev project only.
+6. Open https://essential-wares-510320-f0.web.app and sign in with Google. This needs the Google provider enabled in
+   Firebase Authentication and both Hosting domains in Auth, Settings, Authorized domains. Unverified: not checked
+   by Tilo; if sign-in fails, look there first.
+
 ## App Check enforcement (SEC-10)
 
 `tilo-api` checks the web client's `X-Firebase-AppCheck` token (`tilo_api.appcheck`) but enforcement stays off

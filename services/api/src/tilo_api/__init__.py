@@ -10,6 +10,7 @@ from starlette.concurrency import run_in_threadpool
 from tilo_harness.writer import WriterBusy as _WriterBusy
 from tilo_logging import configure_logging as _configure_logging
 
+from tilo_api import cors as _cors
 from tilo_api import deps as _deps
 from tilo_api import dev as _dev
 from tilo_api import durable_store as _durable_store
@@ -55,6 +56,7 @@ app.add_middleware(_AccessGate)  # SEC-15: deployed, every non-public route need
 app.add_middleware(_AppCheckGate)  # SEC-10: App Check token, logged only until the owner sets TILO_APPCHECK_ENFORCE=1
 app.add_middleware(_NoStore)  # added after the gate, so it is outside it: the gate's 403 on `/v1/` is no-store too
 app.add_middleware(_LogContext)  # NFR-26: outermost, no I/O: binds the world id and trace id of the request
+_cors.install_cors(app)  # WEB-TO-API: only with TILO_API_CORS_ORIGINS; outermost, so a preflight needs no token
 _configure_logging()  # NFR-26: a deployed service logs JSON with no further setup
 
 

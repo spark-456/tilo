@@ -174,3 +174,11 @@ build-evals-image:
 deploy-web:
     python scripts/web_build_env.py pnpm --filter @tilo/web run build
     pnpm exec firebase deploy --only hosting --project essential-wares-510320-f0
+
+# Like `deploy-web`, but the build talks to the deployed tilo-dev tilo-api (WEB-TO-API, BQ-WEBAPI-1): the API origin
+# is the constant LIVE_API_ORIGIN in scripts/web_build_env.py (no parameter), the Firebase web config is required
+# (TILO_BAKE_FIREBASE_KEY=1 after you restricted the key, docs/deploy-dev.md "Test the live world on tilo-dev").
+# Pinned to the dev project; `deploy-web` stays the fixture build.
+deploy-web-live:
+    python scripts/web_build_env.py --tilo-dev-api pnpm --filter @tilo/web run build
+    pnpm exec firebase deploy --only hosting --project essential-wares-510320-f0
