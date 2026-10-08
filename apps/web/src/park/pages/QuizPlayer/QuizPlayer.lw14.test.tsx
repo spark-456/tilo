@@ -65,12 +65,11 @@ describe("LW_14 Quiz player for AppSpec", () => {
   it("test_LW_14_score_is_computed_correctly_and_attempt_saved_to_localStorage", async () => {
     expect(QUIZ_FIXTURE_SPEC.questions).toHaveLength(10);
 
-    // Pure scoring check over the 10-question fixture
     const firstThreeCorrect = {
-      q1: QUIZ_FIXTURE_SPEC.questions[0].answer,
-      q2: QUIZ_FIXTURE_SPEC.questions[1].answer,
-      q3: QUIZ_FIXTURE_SPEC.questions[2].answer,
-      q4: (QUIZ_FIXTURE_SPEC.questions[3]?.answer === "a" ? "b" : "a") as const,
+      q1: QUIZ_FIXTURE_SPEC.questions[0]?.answer ?? "a",
+      q2: QUIZ_FIXTURE_SPEC.questions[1]?.answer ?? "a",
+      q3: QUIZ_FIXTURE_SPEC.questions[2]?.answer ?? "a",
+      q4: QUIZ_FIXTURE_SPEC.questions[3]?.answer === "a" ? ("b" as const) : ("a" as const),
     };
     const score = scoreQuizAttempt(QUIZ_FIXTURE_SPEC.questions, firstThreeCorrect);
     expect(score.total).toBe(10);
@@ -195,11 +194,11 @@ describe("LW_14 Quiz player for AppSpec", () => {
     const optA = q<HTMLButtonElement>(root, '[data-option-id="a"]');
     optA.focus();
     click(optA);
-    expect(optA.getAttribute("aria-checked")).toBe("true");
+    expect(optA.getAttribute("aria-pressed")).toBe("true");
 
     pressKey(optA, "ArrowDown");
     const optB = q<HTMLButtonElement>(root, '[data-option-id="b"]');
-    expect(optB.getAttribute("aria-checked")).toBe("true");
+    expect(optB.getAttribute("aria-pressed")).toBe("true");
     expect(document.activeElement).toBe(optB);
 
     pressKey(optB, "Enter");

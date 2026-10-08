@@ -1,7 +1,7 @@
 // The Park app (README "Routes", "The `app` prop", "Focus"): the data-park root around the shell (shell/AppShell:
 // nav, backdrop, the one <main>, toast, world loader), the page for the route, the document title and the
 // focus move after a route change. Lazy-imported by src/Root.tsx, so a landing visit never loads it (NFR-01).
-import { type MouseEvent, Suspense, useEffect, useRef } from "react";
+import { type MouseEvent, Suspense, lazy, useEffect, useRef } from "react";
 import { PageSheet } from "../components";
 import { AppShell } from "../shell/AppShell";
 import "../tokens/fonts";
@@ -10,9 +10,12 @@ import { type AppCtx, PAGE_LABEL } from "./AppCtx";
 import "./park-app.css";
 import { ParkProvider, usePageApp } from "./context";
 import { PAGES } from "./pages";
-import { isHomeAddress, useParkRoute } from "./router";
+import { isHomeAddress, useParkRoute, useQuizAppRoute } from "./router";
 
 const NOT_FOUND_TITLE = "Page not found";
+const QuizPlayerPage = lazy(() =>
+  import("../pages/QuizPlayer/QuizPlayerPage").then((m) => ({ default: m.QuizPlayerPage })),
+);
 
 // The landing visit (`/`) is the Home page: its chunk request starts when the shell module is evaluated, not
 // when the page first renders. `lazy()` in the registry reuses the same module, so nothing loads twice.
@@ -85,13 +88,16 @@ function FocusHeading({ routeKey }: { routeKey: string }) {
 function Shell() {
   const app = usePageApp();
   const route = useParkRoute();
-  const title = route ? PAGE_LABEL[route.page] : NOT_FOUND_TITLE;
+  const quizRoute = useQuizAppRoute();
+  const title = route ? PAGE_LABEL[route.page] : quizRoute ? "Quiz" : NOT_FOUND_TITLE;
   // A world is a different page per id; the other pages keep focus where it is when only a query changes.
   const routeKey = route
     ? route.page === "world"
       ? `world/${route.params.id}`
       : route.page
-    : "none";
+    : quizRoute
+      ? `world/${quizRoute.worldId}/app/${quizRoute.artifactId}`
+      : "none";
   useEffect(() => {
     const before = document.title;
     document.title = `${title} · Tilo`;
@@ -104,7 +110,17 @@ function Shell() {
     <div data-park data-time={app.time} data-motion={app.motion}>
       <AppShell>
         <Suspense fallback={null}>
-          {Page ? <Page app={app} /> : <NotFound go={app.go} />}
+          {Page ? (
+            <Page app={app} />
+          ) : quizRoute ? (
+            <QuizPlayerPage
+              app={app}
+              worldId={quizRoute.worldId}
+              artifactId={quizRoute.artifactId}
+            />
+          ) : (
+            <NotFound go={app.go} />
+          )}
           <FocusHeading routeKey={routeKey} />
         </Suspense>
       </AppShell>
