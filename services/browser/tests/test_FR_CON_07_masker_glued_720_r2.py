@@ -105,3 +105,27 @@ def test_FR_CON_07_720_r2_the_look_aheads_reach_as_far_as_documented():
     assert "7" not in mask_text("key" + "sk-" + body).replace("[masked:secret]", "")
     aws = "A" * 15 + "7"  # the digit is the last of the 16 characters
     assert aws not in mask_text("x" + "AK" + "IA" + aws)
+
+
+def test_FR_CON_07_720_r2_a_glued_id_leaves_a_bearer_right_after_it_masked_in_one_call():
+    """The second left-anchored pass: the glued pass turns the id into a placeholder, and the `Bearer` after it then
+    has a word boundary."""
+    out = mask_text("AKIA" + "7MA0DY5IBP1HAHMM" + "Bearer tokenabcdefghijklmnopq")
+    assert "tokenabc" not in out
+    assert mask_text(out) == out
+
+
+def test_FR_CON_07_720_r2_the_glued_bearer_look_ahead_reaches_past_the_eighth_character():
+    token = "abcdefghijklmnopqrstuv" + "7" + "wxyz"  # the first digit is the 23rd character
+    out = mask_text("is" + "bearer " + token)
+    assert "wxyz" not in out
+    assert "klmnop" not in out
+
+
+def test_FR_CON_07_720_r2_no_secret_pattern_matches_the_empty_string():
+    """A stray `|` in an alternation would match everywhere and mask the whole text."""
+    from tilo_browser import masking
+
+    for pattern in (masking._FREE_SECRETS, masking._GLUED_SECRETS, masking._KEY_VALUE, masking._AUTH_HEADER):
+        assert pattern.match("") is None
+        assert mask_text("plain words with nothing secret") == "plain words with nothing secret"

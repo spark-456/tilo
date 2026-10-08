@@ -43,8 +43,7 @@ _FREE_SECRETS = re.compile(
 # narrower than its left-anchored sibling, because it can also stand inside ordinary words: a digit in the first
 # characters (bounded look-aheads, so every form stays linear), or segment lengths no real value is shorter than.
 _GLUED_SECRETS = re.compile(
-    r"(?<=\w)Bearer\s+(?=[A-Za-z0-9._~+/=-]{0,64}\d)[A-Za-z0-9._~+/=-]{8,}"
-    r"|(?<=\w)(?i:bearer)\s+(?=[A-Za-z0-9._~+/=-]{0,64}\d)[A-Za-z0-9._~+/=-]{8,}"
+    r"(?<=\w)(?i:bearer)\s+(?=[A-Za-z0-9._~+/=-]{0,64}\d)[A-Za-z0-9._~+/=-]{8,}"
     r"|(?<=\w)(?i:sk)-(?=[A-Za-z0-9_-]{0,63}\d)[A-Za-z0-9_-]{20,}"
     r"|(?:AKIA|ASIA)(?=[A-Z0-9]{0,15}\d)[A-Z0-9]{16}"
     # the header part is bounded (a run of `eyJeyJ...` stays linear) and at least 16 characters (`eyJ` + 16 is the
