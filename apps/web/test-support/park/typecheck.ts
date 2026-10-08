@@ -90,3 +90,10 @@ export function parkTypeErrors(): Promise<string[]> {
   cached ??= runTypecheckWorker().promise;
   return cached;
 }
+
+/** Compile an in-memory kit consumer in its own bounded child, leaving Vitest responsive. */
+export function kitProbeErrors(source: string): Promise<string[]> {
+  return runTypecheckWorker({
+    args: [WORKER, WEB_DIR, "kit-probe", Buffer.from(source).toString("base64")],
+  }).promise;
+}
