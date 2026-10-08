@@ -33,7 +33,7 @@ Run from the `meet-bot/` folder. On Windows use `python`, on Mac/Linux `python3`
 |---|---|
 | `python -m bot.main doctor [--watch]` | Checks Docker, `.env`, login state; prints container CPU/RAM while a meeting runs |
 | `python -m bot.main login` | Starts the container with a plain browser for the one-time manual sign-in |
-| `python -m bot.main start [--agenda FILE] [--duration MIN]` | Opens `meet.google.com/new`, prints `MEETING_URL ...`, joins as host (prototype only: ADR-0024 disables it for the persistent profile) |
+| `python -m bot.main start [--agenda FILE] [--duration MIN]` | Not used with the bot account until MTG09-c (ADR-0024 decision 7 and amendment 3(c)/(d): the bot never hosts or admits, and `start` is disabled for the persistent profile) |
 | `python -m bot.main join URL` | Joins an existing meeting |
 | `python -m bot.main run-mock` | Replays a recorded 30-minute transcript through the brain, offline, no key needed |
 
@@ -41,7 +41,7 @@ Outputs per meeting, in `out/<timestamp>/`: `transcript.jsonl`, `events.jsonl`, 
 
 `start` and `join` need `LIVE=1` (set by you only): without it the providers are dev fakes, and a fake transcript never
 reaches a real meeting, so both commands refuse and tell you so. `run-mock` works offline without it. The bot never
-clicks Admit for a meeting Tilo hosts (ADR-0024); `--auto-admit` is for prototype test meetings only.
+clicks Admit (ADR-0024 decision 7): `--auto-admit` and `start` are not used with the bot account until MTG09-c's preconditions are met, with no prototype exception.
 
 Press Ctrl+C in the terminal to make the bot leave cleanly and write the summary.
 
@@ -91,8 +91,10 @@ The bot names no model, vendor or key. `bot/providers.py` is the one module that
   the prototype's model key (Gemini or AI Studio) and its third-party voice key. Nothing reads them now, but
   `env_file: .env` in `docker-compose.yml` loads the whole file into the container. Remove every `*_API_KEY` line from
   `.env`, then revoke each key in the console of the service that issued it.
-- **Credentials for a live meeting (BQ-MTG11-4).** Run the bot on the host, or in the container with a dedicated identity
-  that has no project role (ADR-0024 amendment 3(a)). Never put your own gcloud credentials in the container: they are
+- **Credentials for a live meeting (BQ-MTG11-4).** The only default is a dedicated identity that has no project role
+  (ADR-0024 amendment 3(a)); until you create one, make no live run. Running on the host is not an alternative: the bot starts
+  Chromium with `--no-sandbox` everywhere (`bot/browser.py`), so a host run would put an unsandboxed browser on pages other
+  people control next to your own gcloud credentials, until MTG09-c drops that flag outside the container. Never put your own gcloud credentials in the container: they are
   the project Owner's, and the container runs Chromium with `--no-sandbox` behind a VNC session with no password.
 - **A cap per meeting.** `config/meeting.yaml` bounds the provider calls of one meeting (200 model calls, 400 speech
   calls). At the cap the bot logs one warning and carries on without them: no more answers, the local voice, the
