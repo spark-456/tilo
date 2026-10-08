@@ -66,6 +66,7 @@ profiles:
   safety-fake: { input: 0, output: 0 } # the dev fake safety screen; makes no paid call
   # LW-05: config/models.dev.yaml's fake search; makes no paid call (the search role wants a query unit_price).
   search-fake: { input: 0, output: 0, unit_price: { unit: query, per_1k: 0 } }
+  eval-fake: { input: 0, output: 0 } # config/models.dev.yaml's fake eval judge (VERTEX-EVAL-1); makes no paid call
   director-dev: { input: 0, output: 0 } # config/models.dev.yaml's fake Director; makes no paid call
   specialist-fake: { input: 0, output: 0 } # config/models.dev.yaml's fake skill-capture model (SKILLS-4); makes no paid call
   meeting-fake: { input: 0, output: 0 } # config/models.dev.yaml's fake meeting-bot model (FR-MTG-11); makes no paid call

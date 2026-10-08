@@ -25,6 +25,12 @@ profiles:
     model: fake-search
     context: 1000000
     caps: [grounding]
+  # VERTEX-EVAL-1 (ADR-0033): the dev stand-in judge for the Gen AI evaluation service; deterministic, no paid call.
+  eval-fake:
+    provider: fake
+    model: fake-eval-judge
+    context: 1000000
+    caps: []
   # FR-MTG-11: the meeting bot's dev profile. A deterministic FakeModelProvider (canned text from the prompt), so every
   # meet-bot test and `python -m bot.main` without LIVE=1 is offline. Not refused when live (it is not a dev-only
   # model like fake-director), but the bot only reads this file when LIVE is not 1 and TILO_MODELS_FILE is unset.
@@ -48,6 +54,7 @@ roles:
   specialist: { primary: specialist-fake, fallback: specialist-fake, max_input_tokens: 16000, max_output_tokens: 2048 }
   safety: { primary: safety-fake, fallback: safety-fake } # screens use the primary only
   search: { primary: search-fake, fallback: search-fake, max_input_tokens: 8000, max_output_tokens: 4096, reserve_units: 5 }
+  eval_judge: { primary: eval-fake, fallback: eval-fake } # judged with the primary only: one judge per run
   meeting: { primary: meeting-fake, fallback: meeting-fake, max_input_tokens: 16000, max_output_tokens: 2048 }
   meeting_fast: { primary: meeting-fake, fallback: meeting-fake, max_input_tokens: 8000, max_output_tokens: 256 }
   # ADR-0028 (MROOM-A1): the meeting room's replies (`meeting` is the meet-bot's role, so these are `meeting_room*`).
