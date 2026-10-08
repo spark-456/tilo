@@ -23,6 +23,9 @@ export interface GateView {
   readonly action: string;
   readonly recipients: readonly string[];
   readonly irreversible: boolean;
+  /** "label (version 2)" of the stored file the action holds, or null. */
+  readonly item: string | null;
+  readonly tier: string | null;
   readonly options: readonly GateOption[];
 }
 
@@ -53,27 +56,45 @@ export function gateViewOf(body: unknown): GateView | null {
     if (!rec(o) || !text(o.id) || !text(o.label)) return null;
     shown.push({ id: o.id, label: o.label, suggested: o.suggested === true });
   }
+  const ref = (gate.action as Record<string, unknown>).item;
+  const item =
+    rec(ref) && typeof ref.version === "number"
+      ? `${text(ref.label) ? ref.label : "A stored file"} (version ${ref.version})`
+      : null;
   return {
     what: card.what_happened,
     why: card.why_it_matters,
     action,
     recipients,
     irreversible: gate.irreversible === true,
+    item,
+    tier: text(gate.risk_tier) ? gate.risk_tier : null,
     options: shown,
   };
 }
 
 /** Why a share call did not work, in the few ways the page tells apart. Anything about the token (unknown,
  * another person's, expired, revoked, answered elsewhere) is one line, so the page never says which. */
-export type ShareRefusal = "sign_in" | "unavailable" | "paused" | "try_again" | "unreadable";
+export type ShareRefusal =
+  | "sign_in"
+  | "unavailable"
+  | "busy"
+  | "try_again"
+  | "unreadable"
+  | "unconfirmed";
 
 export function refusalOf(error: unknown): ShareRefusal {
   if (!(error instanceof TiloApiError)) return "try_again";
   if (error.status === 401) return "sign_in";
-  if (error.status === 409) return "paused";
+  if (error.status === 409) return "busy";
   if (error.status === null || error.status >= 500 || error.retryable) return "try_again";
   return "unavailable"; // 400, 403, 404, 410: this link cannot be used by this person now
 }
+
+/** The shape of a link token (the API makes them with `secrets.token_urlsafe`): anything else is never sent, so
+ * "." or ".." can not become a request path. */
+const TOKEN = /^[A-Za-z0-9_-]{16,128}$/;
+export const isToken = (v: string): boolean => TOKEN.test(v);
 
 const path = (token: string, tail = ""): string => `/share/${encodeURIComponent(token)}${tail}`;
 
@@ -82,6 +103,7 @@ export async function openShare(
   http: ShareHttp,
   token: string,
 ): Promise<{ view: GateView } | { refusal: ShareRefusal }> {
+  if (!isToken(token)) return { refusal: "unavailable" };
   try {
     const view = gateViewOf(await http.getJson(path(token)));
     return view ? { view } : { refusal: "unreadable" };
@@ -96,11 +118,15 @@ export async function answerShare(
   token: string,
   option: string,
 ): Promise<"answered" | ShareRefusal> {
+  if (!isToken(token)) return "unavailable";
   try {
     const body = await http.postJson(path(token, "/answer"), { option });
-    return rec(body) && body.outcome === "answered" ? "answered" : "unreadable";
+    // The API sends 200 only for an answer; any other body may still have been written (PRD 18.4).
+    return rec(body) && body.outcome === "answered" ? "answered" : "unconfirmed";
   } catch (e) {
-    return refusalOf(e);
+    // After the send, only a definite refusal (a 4xx) is known not to have been written; the rest may have been.
+    const why = refusalOf(e);
+    return why === "try_again" || why === "unreadable" ? "unconfirmed" : why;
   }
 }
 
@@ -109,7 +135,8 @@ export function tokenOf(pathname: string): string | null {
   const m = /^\/share\/([^/]+)\/?$/.exec(pathname);
   if (!m?.[1]) return null;
   try {
-    return decodeURIComponent(m[1]);
+    const token = decodeURIComponent(m[1]);
+    return isToken(token) ? token : null;
   } catch {
     return null;
   }
@@ -119,7 +146,9 @@ export function tokenOf(pathname: string): string | null {
 export const REFUSAL_TEXT: Readonly<Record<ShareRefusal, string>> = {
   sign_in: "Sign in with the account this link was shared with, then open it again.",
   unavailable: "This link is not available.",
-  paused: "This is paused right now, so it cannot be answered. Try again later.",
+  busy: "This cannot be answered right now. Nothing was sent. Try again later.",
   try_again: "Tilo could not be reached. Nothing was changed. Try again.",
   unreadable: "Tilo sent a reply this page could not read. Nothing was changed.",
+  unconfirmed:
+    "We could not confirm your answer. It may have been recorded. Check before trying again.",
 };

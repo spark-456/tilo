@@ -11,7 +11,8 @@ import { answerShare, gateViewOf, openShare, refusalOf, tokenOf } from "./shareL
 
 afterEach(cleanup);
 
-const TOKEN = ["tok", "en", "/with space"].join("-"); // assembled at runtime: not a real secret
+const TOKEN = "Ab_1-".repeat(9); // 45 characters of the right shape; made here, not a real secret
+const OTHER = "Zy_9-".repeat(9);
 const gateCard = (over: Record<string, unknown> = {}) => ({
   card: {
     kind: "gate",
@@ -52,10 +53,21 @@ const byText = (root: ParentNode, sel: string, t: string) =>
   must(qa<HTMLElement>(root, sel).find((e) => (e.textContent ?? "").trim() === t));
 
 describe("FR_HIL_12 the share address and the gate view", () => {
-  it("FR_HIL_12 tokenOf reads /share/<token> only, decoded, and nothing else", () => {
-    expect(tokenOf(`/share/${encodeURIComponent(TOKEN)}`)).toBe(TOKEN);
-    expect(tokenOf("/share/abc/")).toBe("abc");
-    for (const p of ["/share", "/share/", "/share/a/b", "/shared/abc", "/", "/share/%E0%A4%A"])
+  it("FR_HIL_12 tokenOf reads /share/<token> only, and only a token-shaped one; '.' and '..' never become a path", () => {
+    expect(tokenOf(`/share/${TOKEN}`)).toBe(TOKEN);
+    expect(tokenOf(`/share/${TOKEN}/`)).toBe(TOKEN);
+    for (const p of [
+      "/share",
+      "/share/",
+      `/share/${TOKEN}/b`,
+      `/shared/${TOKEN}`,
+      "/",
+      "/share/.",
+      "/share/..",
+      "/share/abc",
+      "/share/%E0%A4%A",
+      `/share/${encodeURIComponent("a b".repeat(10))}`,
+    ])
       expect(tokenOf(p), p).toBeNull();
   });
 
@@ -76,11 +88,11 @@ describe("FR_HIL_12 the share address and the gate view", () => {
       expect(gateViewOf(bad), JSON.stringify(bad)).toBeNull();
   });
 
-  it("FR_HIL_12 refusals: 401 sign in; 404/410/403/400 one unavailable line; 409 paused; 5xx or network try again", () => {
+  it("FR_HIL_12 refusals: 401 sign in; 404/410/403/400 one unavailable line; 409 busy; 5xx or network try again", () => {
     expect(refusalOf(apiError(401))).toBe("sign_in");
     for (const s of [400, 403, 404, 410])
       expect(refusalOf(apiError(s)), String(s)).toBe("unavailable");
-    expect(refusalOf(apiError(409))).toBe("paused");
+    expect(refusalOf(apiError(409))).toBe("busy");
     expect(refusalOf(apiError(503, true))).toBe("try_again");
     expect(refusalOf(apiError(null, true))).toBe("try_again");
     expect(refusalOf(new Error("boom"))).toBe("try_again");
@@ -102,10 +114,10 @@ describe("FR_HIL_12 the calls", () => {
 
   it("FR_HIL_12 a failed answer is not retried, and an unexpected 200 body is not shown as answered", async () => {
     const failing = http({ post: async () => Promise.reject(apiError(503, true)) });
-    expect(await answerShare(failing, TOKEN, "approve")).toBe("try_again");
+    expect(await answerShare(failing, TOKEN, "approve")).toBe("unconfirmed");
     expect(failing.postJson).toHaveBeenCalledTimes(1);
     const odd = http({ post: async () => ({ outcome: "rejected" }) });
-    expect(await answerShare(odd, TOKEN, "approve")).toBe("unreadable");
+    expect(await answerShare(odd, TOKEN, "approve")).toBe("unconfirmed");
   });
 });
 
@@ -117,7 +129,7 @@ describe("FR_HIL_12 the page", () => {
     const root = m.container;
     expect(q(root, '[data-testid="share-action"]').textContent).toBe("Email 3 purchase orders");
     expect(root.textContent).toContain("a@example.com, b@example.com");
-    expect(root.textContent).toContain("This cannot be undone.");
+    expect(root.textContent).toContain("Once done, it can't be undone.");
     const radios = qa<HTMLInputElement>(root, 'input[type="radio"]');
     expect(radios).toHaveLength(2);
     expect(radios.some((r) => r.checked)).toBe(false); // not even the suggested option
@@ -130,7 +142,9 @@ describe("FR_HIL_12 the page", () => {
     click(go); // a second tap while sending sends nothing more
     await settle();
     expect(h.postJson).toHaveBeenCalledTimes(1);
-    expect(q(root, '[data-testid="share-answered"]').textContent).toContain("recorded");
+    expect(q(root, '[data-testid="share-answered"]').textContent).toContain(
+      "approval was recorded",
+    );
     expect(root.querySelector('input[type="radio"]')).toBeNull();
   });
 
@@ -152,7 +166,10 @@ describe("FR_HIL_12 the page", () => {
       [403, "This link is not available."],
     ] as const) {
       const m = mount(
-        <SharePage http={http({ get: async () => Promise.reject(apiError(status)) })} token="t" />,
+        <SharePage
+          http={http({ get: async () => Promise.reject(apiError(status)) })}
+          token={TOKEN}
+        />,
       );
       await settle();
       expect(q(m.container, '[data-testid="share-refused"]').textContent, String(status)).toContain(
@@ -165,7 +182,7 @@ describe("FR_HIL_12 the page", () => {
 
   it("FR_HIL_12 a link answered elsewhere between open and send ends in the unavailable line with no card", async () => {
     const h = http({ post: async () => Promise.reject(apiError(410)) });
-    const m = mount(<SharePage http={h} token="t" />);
+    const m = mount(<SharePage http={h} token={TOKEN} />);
     await settle();
     click(must(m.container.querySelector<HTMLInputElement>('input[type="radio"]')));
     await settle();
@@ -179,14 +196,14 @@ describe("FR_HIL_12 the page", () => {
 
   it("FR_HIL_12 a failure the person can try again keeps the card and sends nothing by itself", async () => {
     const h = http({ post: async () => Promise.reject(apiError(503, true)) });
-    const m = mount(<SharePage http={h} token="t" />);
+    const m = mount(<SharePage http={h} token={TOKEN} />);
     await settle();
     click(must(m.container.querySelector<HTMLInputElement>('input[type="radio"]')));
     await settle();
     click(byText(m.container, "button", "Approve"));
     await settle();
     expect(q(m.container, '[data-testid="share-refused"]').textContent).toContain(
-      "Nothing was changed",
+      "Check before trying again",
     );
     expect(m.container.querySelector("section")).not.toBeNull();
     await settle();
@@ -196,12 +213,124 @@ describe("FR_HIL_12 the page", () => {
   it("FR_HIL_12 with no API behind the client (the fixture client) the page says the link is not available and fetches nothing", async () => {
     const spy = vi.fn();
     vi.stubGlobal("fetch", spy);
-    const m = mount(<SharePage token="t" />);
+    const m = mount(<SharePage token={TOKEN} />);
     await settle();
     expect(q(m.container, '[data-testid="share-refused"]').textContent).toBe(
       "This link is not available.",
     );
     expect(spy).not.toHaveBeenCalled();
     vi.unstubAllGlobals();
+  });
+});
+
+describe("FR_HIL_12 review fixes (security round 1)", () => {
+  it("FR_HIL_12 a new token is a new page: the old card and choice go, nothing is checked, nothing is posted to the new token", async () => {
+    const h = http({
+      get: async () => gateCard(),
+    });
+    const m = mount(<SharePage http={h} token={TOKEN} />);
+    await settle();
+    click(must(m.container.querySelector<HTMLInputElement>('input[type="radio"]')));
+    await settle();
+    expect(qa<HTMLInputElement>(m.container, 'input[type="radio"]').some((r) => r.checked)).toBe(
+      true,
+    );
+    m.render(<SharePage http={h} token={OTHER} />);
+    await settle();
+    expect(h.getJson).toHaveBeenLastCalledWith(`/share/${OTHER}`);
+    expect(qa<HTMLInputElement>(m.container, 'input[type="radio"]').some((r) => r.checked)).toBe(
+      false,
+    );
+    expect((byText(m.container, "button", "Choose an option") as HTMLButtonElement).disabled).toBe(
+      true,
+    );
+    expect(h.postJson).not.toHaveBeenCalled();
+  });
+
+  it("FR_HIL_12 while the new token's card is loading the old card is not on screen", async () => {
+    let release: (v: unknown) => void = () => undefined;
+    const h = http();
+    const m = mount(<SharePage http={h} token={TOKEN} />);
+    await settle();
+    h.getJson.mockImplementationOnce(
+      () =>
+        new Promise((r) => {
+          release = r;
+        }),
+    );
+    m.render(<SharePage http={h} token={OTHER} />);
+    await settle();
+    expect(m.container.querySelector("section")).toBeNull();
+    release(gateCard());
+    await settle();
+    expect(m.container.querySelector("section")).not.toBeNull();
+  });
+
+  it("FR_HIL_12 an answer that may have been written is never reported as unchanged (null status, 500, 503, odd 200)", async () => {
+    for (const failure of [apiError(null, true), apiError(500, true), apiError(503, true)]) {
+      const h = http({ post: async () => Promise.reject(failure) });
+      const m = mount(<SharePage http={h} token={TOKEN} />);
+      await settle();
+      click(must(m.container.querySelector<HTMLInputElement>('input[type="radio"]')));
+      await settle();
+      click(byText(m.container, "button", "Approve"));
+      await settle();
+      const line = q(m.container, '[data-testid="share-refused"]').textContent ?? "";
+      expect(line, String(failure.status)).toContain("Check before trying again");
+      expect(line).not.toContain("Nothing was changed");
+      cleanup();
+    }
+    const odd = http({ post: async () => ({ outcome: "rejected" }) });
+    const m = mount(<SharePage http={odd} token={TOKEN} />);
+    await settle();
+    click(must(m.container.querySelector<HTMLInputElement>('input[type="radio"]')));
+    await settle();
+    click(byText(m.container, "button", "Approve"));
+    await settle();
+    const line = q(m.container, '[data-testid="share-refused"]').textContent ?? "";
+    expect(line).toContain("Check before trying again");
+    expect(line).not.toContain("Nothing was changed");
+  });
+
+  it("FR_HIL_12 Hold says what happened (nothing was sent) and is not shown as a recorded approval", async () => {
+    const h = http();
+    const m = mount(<SharePage http={h} token={TOKEN} />);
+    await settle();
+    click(must(qa<HTMLInputElement>(m.container, 'input[type="radio"]')[1]));
+    await settle();
+    click(byText(m.container, "button", "Hold"));
+    await settle();
+    const said = q(m.container, '[data-testid="share-answered"]').textContent ?? "";
+    expect(said).toContain("Nothing was sent");
+    expect(said).not.toContain("recorded");
+  });
+
+  it("FR_HIL_12 the facts match the gate sheet: tier, what it holds, and 'No one' with no recipients", async () => {
+    const card = gateCard();
+    (card.card.gate as Record<string, unknown>).recipients = [];
+    ((card.card.gate as Record<string, unknown>).action as Record<string, unknown>).item = {
+      artifact_id: "art_x",
+      version: 2,
+      label: "Order sheet",
+    };
+    const m = mount(<SharePage http={http({ get: async () => card })} token={TOKEN} />);
+    await settle();
+    const facts = q(m.container, '[data-testid="share-facts"]').textContent ?? "";
+    expect(facts).toContain("No one: nothing leaves your own Drive.");
+    expect(facts).toContain("Order sheet (version 2)");
+    expect(facts).toContain("T3: a person always decides this.");
+  });
+
+  it("FR_HIL_12 a token that is not token-shaped (the prop too) makes no request at all", async () => {
+    for (const bad of [".", "..", "a/b", "short", "x".repeat(200)]) {
+      const h = http();
+      const m = mount(<SharePage http={h} token={bad} />);
+      await settle();
+      expect(h.getJson, bad).not.toHaveBeenCalled();
+      expect(q(m.container, '[data-testid="share-refused"]').textContent).toBe(
+        "This link is not available.",
+      );
+      cleanup();
+    }
   });
 });
