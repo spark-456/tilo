@@ -95,11 +95,11 @@ def test_WEB_TO_API_runbook_lists_the_users_steps_in_order(repo_root: pathlib.Pa
     needles = [
         "restrict",
         "firebase login",
-        "TILO_API_CORS_ORIGINS",
         "gcloud run services update",
+        "TILO_API_CORS_ORIGINS",
         "just deploy-dev-cloudbuild api",
         "just deploy-web-live",
-        "Google",
+        "sign in with Google",
     ]
     at = [section.find(n) for n in needles]
     assert all(i >= 0 for i in at), dict(zip(needles, at, strict=True))
