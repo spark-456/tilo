@@ -31,9 +31,40 @@ def state(**overrides: Any) -> Any:
     return TeamState(**{**base, **overrides})
 
 
+class Writer:
+    """Records the parts handed to the single event writer (ADR-0027: `team_rule.changed`); `fail` makes it raise."""
+
+    def __init__(self) -> None:
+        self.parts: list[tuple[str, dict[str, Any]]] = []
+        self.fail = False
+
+    def append(self, world_id: str, event: dict[str, Any]) -> dict[str, Any]:
+        if self.fail:
+            raise RuntimeError("the event writer is down")
+        self.parts.append((world_id, event))
+        return event
+
+
+class Desks:
+    """`deps.get_desk_worlds()`: `w_desk_<suffix>` belongs to `u_<suffix>`; `answer` overrides the Desk id."""
+
+    def __init__(self) -> None:
+        self.answer: Any = None
+        self.fail = False
+
+    def desk_world(self, org_id: str, user_id: str) -> Any:
+        if self.fail:
+            raise RuntimeError("the desk world store is down")
+        return self.answer if self.answer is not None else "w_desk_" + user_id[2:]
+
+    def desk_owner(self, world_id: str) -> str | None:
+        return "u_" + world_id[len("w_desk_") :] if world_id.startswith("w_desk_") else None
+
+
 class TeamApi:
     def __init__(self, client: Any, store: Any, flags: Flags) -> None:
         self.client, self.store, self.flags = client, store, flags
+        self.writer, self.desks = Writer(), Desks()
         self.user = OWNER
         self.full_session, self.channel = True, "web"  # a full web sign-in (BQ-XWORLD-10); tests narrow it
 
@@ -72,6 +103,8 @@ def team_api(snapshot: Any = None, *, store: Any = None) -> Iterator[TeamApi]:
     )
     app.dependency_overrides[get_team_store] = lambda: team
     app.dependency_overrides[deps.get_flag_store] = lambda: flags
+    app.dependency_overrides[deps.get_event_writer] = lambda: api.writer
+    app.dependency_overrides[deps.get_desk_worlds] = lambda: api.desks
     app.dependency_overrides[deps.get_clock] = lambda: lambda: "2026-10-08T10:00:00.000Z"
     try:
         api.client = TestClient(app)

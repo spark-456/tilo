@@ -5,8 +5,9 @@ STORED roles map's, never the session's or the body's; time is the server clock.
 404 body on every route. Only the Owner writes (BQ-TEAMACC-2; PRD 10.1 gives the Approver no policy rights). Writes
 read only `application/json` (415), take closed bodies (422), are refused while replay-only (503), and are applied with
 the store's compare-and-set, re-checked on the fresh state after a lost race. Every refusal from `team_rules` maps to
-a 4xx; a broken store or config is a 503 that never echoes the cause. A change is logged as one ids-only line
-(`team_rule_changed`): no registered event fits yet (BQ-TEAMACC-1).
+a 4xx; a broken store or config is a 503 that never echoes the cause. A changed switch or tool level appends one
+`team_rule.changed` event (ADR-0027, `team_events`) after the compare-and-set; if that fails the change is undone and
+the answer is 503. Role, limit, invite and removal changes are no team rules: they keep an ids-only log line.
 """
 
 from __future__ import annotations
@@ -25,6 +26,7 @@ from tilo_metering.flags import FlagStore
 from tilo_api import deps
 from tilo_api.people_writes import valid_email
 from tilo_api.tasks import _json_body
+from tilo_api.team_events import TeamEvents, get_team_events
 from tilo_api.team_rules import ROLES, MustAskLocked, RoleChangeRefused, load_capabilities, load_switches, set_switch
 from tilo_api.team_store import (
     LEVELS,
@@ -42,6 +44,7 @@ Principal = Annotated[deps.Principal, Depends(deps.get_current_principal)]
 Store = Annotated[TeamRepository, Depends(get_team_store)]
 Flags = Annotated[FlagStore, Depends(deps.get_flag_store)]
 Clock = Annotated[Callable[[], str], Depends(deps.get_clock)]
+Events = Annotated[TeamEvents, Depends(get_team_events)]
 _NOT_FOUND = "No such team."
 _ATTEMPTS = 5
 MAX_LIMIT_MINOR = 10**12  # 10 billion INR: anything above is a typo, never a limit
@@ -175,8 +178,39 @@ def _stored[T](call: Callable[[], T]) -> T:
 
 
 def _audit(principal: deps.Principal, what: str, key: str, at: str) -> None:
-    """BQ-TEAMACC-1: no registered event fits, so a plain ids-only line until `team_rule.changed` exists."""
+    """Roles, limits, invites and removals are no team rules (BQ-ADR27-3): a plain ids-only line."""
     logger.info("team_rule_changed what=%s key=%s by=%s at=%s", what, key, principal.user_id, at)
+
+
+def _undo(store: TeamRepository, written: int, restore: Callable[[TeamState], TeamState], key: str, actor: str) -> None:
+    """Put one rule back after its event could not be written, ONLY if the store is still at the version this
+    request wrote. Anything written since (even a no-op) is left alone: a value check could widen a tool or switch
+    past the last logged change. Then one ids-only ERROR line; the caller still answers 503."""
+    try:
+        state = store.read()
+        if state.version == written and store.compare_and_set(written, restore(state)):
+            return
+    except Exception as exc:
+        logger.error("team rule undo failed (%s) key=%s by=%s", type(exc).__name__, key, actor)
+        return
+    logger.error("team rule not undone, the team changed since key=%s by=%s", key, actor)
+
+
+def _log_change(
+    store: TeamRepository, principal: deps.Principal, events_: TeamEvents, change: tuple[str, str, str, str],
+    written: int, restore: Callable[[TeamState], TeamState],
+) -> None:  # fmt: skip
+    """The one `team_rule.changed` event of a change that committed; none for a no-op. A failed append undoes the
+    change (only if nothing was written since) and answers 503: never a change left unlogged (FR-TEAM-04)."""
+    rule, key, before, after = change
+    if before == after:
+        return
+    try:
+        events_.record(principal.user_id, rule, key, before, after)
+    except Exception as exc:
+        logger.warning("team rule event not written (%s) key=%s by=%s", type(exc).__name__, key, principal.user_id)
+        _undo(store, written, restore, key, principal.user_id)
+        raise HTTPException(status_code=503, detail="not_configured") from exc
 
 
 def _read(store: TeamRepository) -> TeamState:
@@ -277,27 +311,36 @@ def invite(
 @router.put("/v1/team/switches/{key}")
 def put_switch(
     key: str, principal: Principal, body: Annotated[SwitchIn, Depends(_json_body(SwitchIn))],
-    store: Store, flags: Flags, clock: Clock,
+    store: Store, flags: Flags, clock: Clock, events_: Events,
 ) -> dict[str, Any]:  # fmt: skip
     at = clock()
+    seen: dict[str, bool] = {}
 
     def change(state: TeamState) -> TeamState:
         switches, _record = set_switch(
             effective_switches(state), key, body.on, actor=principal.user_id, actor_role=state.roles[principal.user_id],
             at=at,
         )  # fmt: skip
+        seen["before"], seen["after"] = effective_switches(state)[key], switches[key]
         return replace(state, switches=switches)
 
+    def undo(state: TeamState) -> TeamState:
+        return replace(state, switches={**effective_switches(state), key: seen["before"]})
+
     state = _write(store, principal, flags, change)
-    _audit(principal, "switch", key, at)
+    on_off = {True: "on", False: "off"}
+    change_ = ("switch", key, on_off[seen["before"]], on_off[seen["after"]])
+    _log_change(store, principal, events_, change_, state.version, undo)
     return _view(state, principal)
 
 
 @router.put("/v1/team/tools/{connector}")
 def put_tool(
     connector: str, principal: Principal, body: Annotated[ToolIn, Depends(_json_body(ToolIn))],
-    store: Store, flags: Flags, clock: Clock,
+    store: Store, flags: Flags, events_: Events,
 ) -> dict[str, Any]:  # fmt: skip
+    seen: dict[str, str | None] = {}
+
     def change(state: TeamState) -> TeamState:
         if state.roles[principal.user_id] != "Owner" or "Owner" not in load_capabilities()["change_tool_access"].roles:
             raise PermissionError(connector)
@@ -305,8 +348,14 @@ def put_tool(
             raise KeyError(connector)
         if body.level not in LEVELS:
             raise HTTPException(status_code=422, detail="Pick off, read, draft or act.")
+        seen["before"] = state.tools.get(connector)  # None: unset, which reads as act
         return replace(state, tools={**state.tools, connector: body.level})
 
+    def undo(state: TeamState) -> TeamState:
+        tools = {c: v for c, v in state.tools.items() if c != connector}
+        return replace(state, tools=tools if seen["before"] is None else {**tools, connector: seen["before"]})
+
     state = _write(store, principal, flags, change)
-    _audit(principal, "tool", connector, clock())
+    change_ = ("tool_access", connector, seen["before"] or "act", body.level)
+    _log_change(store, principal, events_, change_, state.version, undo)
     return _view(state, principal)

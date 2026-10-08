@@ -11,6 +11,8 @@ No team store wired (`state is None`) changes nothing. Deterministic; no model, 
 
 from __future__ import annotations
 
+import logging
+from collections.abc import Iterable
 from datetime import datetime
 from typing import Any
 from zoneinfo import ZoneInfo
@@ -21,6 +23,7 @@ from tilo_policy.access_levels import Outcome, parse_level
 from tilo_api.team_rules import effective_user_cap, load_role_limits
 from tilo_api.team_store import TeamState, effective_switches
 
+logger = logging.getLogger("tilo_api.team_access")
 _READ_CAPABILITIES = frozenset({"read", "search", "list"})
 
 
@@ -39,6 +42,40 @@ def read_only(connector: str, action: str, *, registry: Any, mcp: Any = None) ->
         tool = next((t for t in mcp.tools(connector) if t.name == action), None)
         return tool is not None and tool.side_effect is False and tool.risk_tier == "T1"
     return False
+
+
+def _in_registry(skills: Any, skill_id: str) -> bool:
+    """False only when the registry says it has no such skill (`folder` is None); one that cannot say counts as in."""
+    try:
+        return bool(skills.folder(skill_id) is not None)
+    except Exception:
+        return True
+
+
+def skill_level(skills: Any, skill_ids: Iterable[str], connector: str) -> Level | None:
+    """FR-ACC-02: the lowest `tool_access[connector]` the unit's skills declare, or None (the team's level applies).
+    It can only lower. A value that is not one of the four levels (or a map that is not a map) counts as off, never
+    act. A skill the registry lists but cannot read now counts as off; an unknown id is skipped (ids-only log line)."""
+    found: list[Level] = []
+    for skill_id in skill_ids:
+        try:
+            declared = skills.load(skill_id).tool_access
+        except Exception as exc:
+            logger.warning("skill %s tool_access not read (%s)", skill_id, type(exc).__name__)
+            if _in_registry(skills, skill_id):
+                found.append(Level.OFF)  # registered but unreadable now: fail closed
+            continue  # an id the registry never had (PG-11 refuses it in the plan): skipped
+        if declared is None or declared == {}:  # a skill without tool_access changes nothing
+            continue
+        if not isinstance(declared, dict):
+            found.append(Level.OFF)
+            continue
+        if connector in declared:
+            try:
+                found.append(parse_level(declared[connector]))
+            except ValueError:
+                found.append(Level.OFF)
+    return min(found) if found else None
 
 
 def tool_check(

@@ -178,9 +178,15 @@ def test_FR_TEAM_02_spend_mode_caps_a_person_at_their_team_limit(monkeypatch: py
         held = ledger.reserve(uid=uid, run_id=f"r_{uid}", org_id="org_tilo", amount_minor=600, at=_now())
         ledger.settle(held, 600)  # type: ignore[arg-type]
     team = InMemoryTeamStore(state(limits={MEMBER: 500}))
-    request = SimpleNamespace(app=SimpleNamespace(dependency_overrides={
-        deps.get_spend_caps: lambda: caps, get_team_store: lambda: team,
-    }))  # fmt: skip
+    request = SimpleNamespace(
+        app=SimpleNamespace(
+            dependency_overrides={
+                deps.get_spend_caps: lambda: caps,
+                get_team_store: lambda: team,
+            }
+        ),
+        state=SimpleNamespace(),
+    )  # fmt: skip  (state: spend_mode reads the gate's demo_session flag, BQ-SIGNIN-10)
     monkeypatch.setenv("K_SERVICE", "tilo-api")
     monkeypatch.setenv("TILO_JUDGE_" + "LIVE", "1")  # spelled apart: the repo's guard hook looks for the literal
     switches = spend.Switches(process_flags(), ledger)
