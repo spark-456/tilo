@@ -102,6 +102,7 @@
  * layout.schema.json 1.0.0 sha256:1db88b1e3b744add
  * manifest.schema.json 1.0.0 sha256:9b885d1826522bb7
  * meeting.schema.json 1.2.0 sha256:034e93898bb28957
+ * meeting_host_rpc.schema.json 1.0.0 sha256:4bb81673d4ef363b
  * meeting_join.schema.json 1.0.0 sha256:ea1e8f0945773573
  * mention.schema.json 1.0.0 sha256:ca9c1acbf81616f2
  * meter.schema.json 1.0.0 sha256:ad596dcc70e45e09
@@ -690,6 +691,41 @@ export type LayoutCommonType =
  */
 export type MeetingAgendaMinutes = number;
 /**
+ * The internal meeting-host surface of tilo-connectors (FR-MTG-09, ADR-0032 decision 2): what tilo-api posts to /internal/meeting-host/send, /internal/meeting-host/status and /internal/meeting-host/disconnect, and what each answers. Each route validates its own request and answer ($defs send_request and send_answer; user_request and status_answer; user_request and disconnect_answer; error for any refusal) in both services; this root is any one of them. Every object is closed, and no field holds an access or refresh token, an OAuth code, the client secret, key material or a Meet link (ADR-0024 decision 4, ADR-0032 decision 3). Ids travel in the body, never in a path or query. A route refuses a body over 65536 bytes (64 KiB) before it parses it. Rules that compare values (HB-03 the draft against its hash and the entry, HB-05 the owner, HB-07 the receipt against the entry) are checked by the routes and by tilo-api's client, not by this schema.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MeetingHostRpc".
+ */
+export type MeetingHostRpc =
+  | MeetingHostRpcSendRequest
+  | MeetingHostRpcSendAnswer
+  | MeetingHostRpcUserRequest
+  | MeetingHostRpcStatusAnswer
+  | MeetingHostRpcDisconnectAnswer
+  | MeetingHostRpcError;
+/**
+ * A PRD 10.4 context condition that raises any action to T3; also listed on the outbox entry it applies to (outbox.schema.json modifiers).
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "PolicyTierCondition".
+ */
+export type PolicyTierCondition =
+  | "new_recipients"
+  | "attachments"
+  | "external_sharing"
+  | "deletion"
+  | "money_or_legal"
+  | "safety_flag";
+/**
+ * What the broker emitted during one call, in order, nothing more (ADR-0032 decision 7): tilo-api hands each connection part to meeting_host.on_connection_event. Every connection part names the call's own user (entry.authz.ref for a send, the request's user_id otherwise); a part naming anyone else is not that call's, and tilo-api's client drops it. At most 16.
+ *
+ * @maxItems 16
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MeetingHostRpcParts".
+ */
+export type MeetingHostRpcParts = (MeetingHostRpcConnectionPart | MeetingHostRpcAlertPart)[];
+/**
  * An https URL of host, optional port and path, with no user info, query or fragment. The not-pattern rejects a final line break, which a Python validator's $ lets through.
  *
  * This interface was referenced by `TiloContracts`'s JSON-Schema
@@ -726,19 +762,6 @@ export type MeteringBillingService = string;
  * via the `definition` "MinutesEvidence".
  */
 export type MinutesEvidence = UtteranceId[];
-/**
- * A PRD 10.4 context condition that raises any action to T3; also listed on the outbox entry it applies to (outbox.schema.json modifiers).
- *
- * This interface was referenced by `TiloContracts`'s JSON-Schema
- * via the `definition` "PolicyTierCondition".
- */
-export type PolicyTierCondition =
-  | "new_recipients"
-  | "attachments"
-  | "external_sharing"
-  | "deletion"
-  | "money_or_legal"
-  | "safety_flag";
 /**
  * Pseudonymous tester id: t_ and 6 to 32 lower-case letters or digits, assigned by Tilo. Never an email address, a name or a Tilo user id (PRD 16.5). The not-pattern rejects a final line break, which a Python validator's $ lets through.
  *
@@ -3315,6 +3338,194 @@ export interface ArtifactRef3 {
   label?: string;
 }
 /**
+ * POST /internal/meeting-host/send, called only by the host run's outbox stub in tilo-api (HB-02). entry is the outbox entry (outbox.schema.json) tilo-api's outbox enqueued, evidence the case its enqueue checked, and draft the pinned item the owner approved. It names no user: the grant used is (entry.authz.ref, meeting_host). The then branch narrows entry to the one action this surface runs (MH-10), a meeting invitation the owner approved: state queued, create_meeting_event on meeting_host, T3 with the new_recipients modifier, 1 to 50 recipients (MAX_RECIPIENTS), no attachments, the draft pinned as item, the host account's primary calendar as destination, no undo window, authorised by a person. (The narrowing sits in if/then so the generated type stays Outbox.)
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MeetingHostRpcSendRequest".
+ */
+export interface MeetingHostRpcSendRequest {
+  entry: Outbox;
+  evidence: MeetingHostRpcEvidence;
+  draft: MeetingHostRpcDraft;
+}
+/**
+ * One outbox entry: an authorised side effect waiting to run exactly once (PRD 8.5, FR-AGT-11, FR-CHN-13, SEC-03). The harness writes it and tilo-connectors runs it; connector side-effect methods are callable only from the outbox. An entry exists only once the policy engine has authorised it (a person at a gate, or a policy below T3), so authz is always set, equal to the authz of the approval.resolved that answered approve on its gate or of the policy.applied that opened it, never of approval.requested, and the data.transfer it emits carries the same authz (OB-01, HR-7); a proposed side effect waiting at a gate is not in the outbox yet (approval.requested reserves its id). The entry names everything the connector needs: recipients, attachments, the pinned item and the destination. Rules OB-01 to OB-05 are in contracts/outbox.rules.md.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "Outbox".
+ */
+export interface Outbox {
+  id: Ulid;
+  /**
+   * Stable per step: a retry reuses it, and the connector runs a key at most once (OB-03).
+   */
+  idempotency_key: string;
+  world_id: WorldId;
+  run_id: RunId;
+  action_type: ActionType;
+  connector: ConnectorId;
+  /**
+   * Everyone the side effect reaches; equals the recipients the gate card showed (card rule CR-12).
+   *
+   * @maxItems 50
+   */
+  recipients: EmailAddress[];
+  attachments: ArtifactRef[];
+  /**
+   * The draft or file this entry sends, saves or shares, pinned to the version the policy engine assessed and the gate card showed; the connector sends exactly this version (OB-05). null only when the action moves no content, such as a delete.
+   */
+  item: ArtifactRef | null;
+  /**
+   * The thread a reply goes into or the folder a file is saved in, as the gate card showed it (OB-05); null when there is none, such as a new email.
+   */
+  destination: Destination | null;
+  /**
+   * The PRD 10.4 conditions that apply to this side effect; any one makes it T3.
+   */
+  modifiers: PolicyTierCondition[];
+  risk_tier: RiskTier;
+  authz: Authz;
+  /**
+   * Seconds the person can still cancel (PRD 10.4: L2 default 60); 0 when none.
+   */
+  undo_window_s: number;
+  /**
+   * RFC 3339 timestamp in UTC with exactly three fractional digits, e.g. 2026-09-29T09:30:00.000Z.
+   */
+  scheduled_at: string;
+  /**
+   * queued (ready, no undo window), scheduled (waiting out its undo window), sending, sent, cancelled (undone before sending) or failed.
+   */
+  state: "queued" | "scheduled" | "sending" | "sent" | "cancelled" | "failed";
+  created_at: Timestamp;
+}
+/**
+ * The OB-01/OB-05 case tilo-api's own enqueue checked (outbox.rules.md), without the entry: reserved_by is the gate's approval.requested event and authorised_by the approval.resolved event that answered it (event.schema.json, each with its data schema applied in the then branch, so the generated type stays Event), world_owner is the world's owner. A meeting invitation is T3, so no policy, Team Lead, instruction or earlier policy.applied takes part: those are null or empty. tilo-connectors runs the same check on its own outbox (HB-04) and trusts these copies (ADR-0032, residual trust).
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MeetingHostRpcEvidence".
+ */
+export interface MeetingHostRpcEvidence {
+  reserved_by: Event;
+  authorised_by: Event;
+  world_owner: UserId;
+  policy: null;
+  team_lead: null;
+  instruction: null;
+  /**
+   * @maxItems 0
+   */
+  earlier_applied: unknown[];
+}
+/**
+ * The pinned draft the owner approved (kind meeting_event): the bytes tilo-api read from the run's artifact store, hash-checked there (AR-01), because tilo-connectors cannot read that store. HB-03: the SHA-256 of the decoded bytes equals content_sha256, artifact_id and version equal entry.item, and the document parses as kind meeting_event. content_b64 is padded base64 (RFC 4648 section 4) of at most 43692 characters, the base64 of 32 KiB, so a request with 50 recipients stays under the 64 KiB body cap.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MeetingHostRpcDraft".
+ */
+export interface MeetingHostRpcDraft {
+  artifact_id: ArtifactId;
+  version: number;
+  content_sha256: string;
+  content_b64: string;
+}
+/**
+ * The 200 answer to send. sent: the invitation exists at Google and receipt says what was made; tilo-api checks it (HB-07) before storing it. refused: nothing was sent and nothing will be (SideEffectRefused, HB-03 to HB-06). possibly_sent: Google may hold the invitation and a retry would not help (PossiblySent). retry: try again later; may_have_sent is false when nothing reached Google (not connected, expired, a missing scope, a KMS outage) and true after a Google 5xx or a lost answer. receipt is set only with sent and may_have_sent only with retry; otherwise each is null. parts lists what the broker emitted during the call; tilo-connectors writes no data.transfer and raises no alert of its own outbox here, because tilo-api's outbox does (one writer per world).
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MeetingHostRpcSendAnswer".
+ */
+export interface MeetingHostRpcSendAnswer {
+  outcome: "sent" | "refused" | "possibly_sent" | "retry";
+  receipt: MeetingHostRpcReceipt | null;
+  may_have_sent: boolean | null;
+  parts: MeetingHostRpcParts;
+}
+/**
+ * What the adapter made (HostReceipt): Google's event id, never a link. HB-07: event_ref equals side_effect_marker(entry); world_id, outbox_id and draft equal the entry's; meeting_id and owner equal the draft's. tilo-api stores it through the run's receipt store only when all hold.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MeetingHostRpcReceipt".
+ */
+export interface MeetingHostRpcReceipt {
+  world_id: WorldId;
+  outbox_id: Ulid;
+  meeting_id: MeetingId;
+  owner: UserId;
+  draft: MeetingHostRpcDraftRef;
+  event_ref: string;
+  conference: "pending" | "success" | "failure";
+}
+/**
+ * The draft the receipt was made from, by id and version only (no label).
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MeetingHostRpcDraftRef".
+ */
+export interface MeetingHostRpcDraftRef {
+  artifact_id: ArtifactId;
+  version: number;
+}
+/**
+ * A connection event of the meeting_host grant: expired (Google refused the grant at refresh), rate_limited, or revoked (a disconnect). Type, connector and user only.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MeetingHostRpcConnectionPart".
+ */
+export interface MeetingHostRpcConnectionPart {
+  type: "connection.expired" | "connection.rate_limited" | "connection.revoked";
+  connector: "meeting_host";
+  user_id: UserId;
+}
+/**
+ * An alert.raised the broker emitted (a revoke kept for a retry): its alert id only.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MeetingHostRpcAlertPart".
+ */
+export interface MeetingHostRpcAlertPart {
+  type: "alert.raised";
+  alert_id: Ulid;
+}
+/**
+ * POST /internal/meeting-host/status and POST /internal/meeting-host/disconnect. user_id is the signed-in principal's own id in tilo-api, never one taken from a body, path or query there (HB-02); the bot account's meeting_host grant is (user_id, meeting_host).
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MeetingHostRpcUserRequest".
+ */
+export interface MeetingHostRpcUserRequest {
+  user_id: UserId;
+}
+/**
+ * The 200 answer to status: a store read only, with no token use and no Google call, so it emits nothing and has no parts. state is connected, expired (Google refused the grant; connect again) or none (no grant stored); scope_ok is true when the stored grant holds the calendar.events.owned scope, and false when there is none.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MeetingHostRpcStatusAnswer".
+ */
+export interface MeetingHostRpcStatusAnswer {
+  state: "connected" | "expired" | "none";
+  scope_ok: boolean;
+}
+/**
+ * The 200 answer to disconnect. revoked_at_provider is true only when Google confirmed the revoke. The call is idempotent: with nothing stored it answers false with no parts. parts carries connection.revoked, and an alert.raised for each revoke kept for a retry.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MeetingHostRpcDisconnectAnswer".
+ */
+export interface MeetingHostRpcDisconnectAnswer {
+  revoked_at_provider: boolean;
+  parts: MeetingHostRpcParts;
+}
+/**
+ * The body of every refusal on this surface, a fixed code and nothing else: unauthenticated (401, no valid ID token, HB-01), forbidden (403, any account but tilo-api's, HB-01), invalid_request (422, a body over 64 KiB, not JSON or not this contract's request; refused before anything acted) and not_configured (503, a setting is missing or a seam failed to build). Never a value, a setting's value or an exception's text.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MeetingHostRpcError".
+ */
+export interface MeetingHostRpcError {
+  error: "unauthenticated" | "forbidden" | "invalid_request" | "not_configured";
+}
+/**
  * The answer of `GET /v1/meetings/{meeting_id}/join` (ADR-0024 amendment 4): the Google Meet link of a meeting Tilo hosts, for that meeting's owner only, read from the host account's event when the owner clicks and stored nowhere (rules MJ-01 to MJ-10 in `meeting_join.rules.md`). It is a response body, never a record: no store, cache, event, card, notification, archive record or log line holds it, and `meeting.schema.json` and `calendar_entry.schema.json` still have no field that can. `join_url` is exactly `https://meet.google.com/` and a three-four-three lower-case meeting code: no other scheme, host, user info, port, path, query or fragment (36 characters, so a trailing newline is refused in every engine). `expires_at` is the server's clock plus 60 seconds: the client drops the link then, or when the view closes, and asks again on the next click.
  *
  * This interface was referenced by `TiloContracts`'s JSON-Schema
@@ -3517,57 +3728,6 @@ export interface MinutesAgendaPoint {
   title: string;
   coverage: "covered" | "partial" | "not_discussed";
   evidence: MinutesEvidence;
-}
-/**
- * One outbox entry: an authorised side effect waiting to run exactly once (PRD 8.5, FR-AGT-11, FR-CHN-13, SEC-03). The harness writes it and tilo-connectors runs it; connector side-effect methods are callable only from the outbox. An entry exists only once the policy engine has authorised it (a person at a gate, or a policy below T3), so authz is always set, equal to the authz of the approval.resolved that answered approve on its gate or of the policy.applied that opened it, never of approval.requested, and the data.transfer it emits carries the same authz (OB-01, HR-7); a proposed side effect waiting at a gate is not in the outbox yet (approval.requested reserves its id). The entry names everything the connector needs: recipients, attachments, the pinned item and the destination. Rules OB-01 to OB-05 are in contracts/outbox.rules.md.
- *
- * This interface was referenced by `TiloContracts`'s JSON-Schema
- * via the `definition` "Outbox".
- */
-export interface Outbox {
-  id: Ulid;
-  /**
-   * Stable per step: a retry reuses it, and the connector runs a key at most once (OB-03).
-   */
-  idempotency_key: string;
-  world_id: WorldId;
-  run_id: RunId;
-  action_type: ActionType;
-  connector: ConnectorId;
-  /**
-   * Everyone the side effect reaches; equals the recipients the gate card showed (card rule CR-12).
-   *
-   * @maxItems 50
-   */
-  recipients: EmailAddress[];
-  attachments: ArtifactRef[];
-  /**
-   * The draft or file this entry sends, saves or shares, pinned to the version the policy engine assessed and the gate card showed; the connector sends exactly this version (OB-05). null only when the action moves no content, such as a delete.
-   */
-  item: ArtifactRef | null;
-  /**
-   * The thread a reply goes into or the folder a file is saved in, as the gate card showed it (OB-05); null when there is none, such as a new email.
-   */
-  destination: Destination | null;
-  /**
-   * The PRD 10.4 conditions that apply to this side effect; any one makes it T3.
-   */
-  modifiers: PolicyTierCondition[];
-  risk_tier: RiskTier;
-  authz: Authz;
-  /**
-   * Seconds the person can still cancel (PRD 10.4: L2 default 60); 0 when none.
-   */
-  undo_window_s: number;
-  /**
-   * RFC 3339 timestamp in UTC with exactly three fractional digits, e.g. 2026-09-29T09:30:00.000Z.
-   */
-  scheduled_at: string;
-  /**
-   * queued (ready, no undo window), scheduled (waiting out its undo window), sending, sent, cancelled (undone before sending) or failed.
-   */
-  state: "queued" | "scheduled" | "sending" | "sent" | "cancelled" | "failed";
-  created_at: Timestamp;
 }
 /**
  * A person of an org (PRD 15.1 User entity, ADR-0015): who they are, how they are called in a meeting, how Tilo reaches them, and which teams an org owner put them in. `aliases` are names others use for them; a spoken name that matches more than one person is never assigned (PE-15). A membership counts only as people.rules.md defines it (PE-02). Contact details are never shown to teammates; `tilo-api` resolves a recipient from this record (PE-09).

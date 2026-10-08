@@ -1,0 +1,242 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.tilo.example/meeting_host_rpc.schema.json",
+  "x-version": "1.0.0",
+  "title": "MeetingHostRpc",
+  "description": "The internal meeting-host surface of tilo-connectors (FR-MTG-09, ADR-0032 decision 2): what tilo-api posts to /internal/meeting-host/send, /internal/meeting-host/status and /internal/meeting-host/disconnect, and what each answers. Each route validates its own request and answer ($defs send_request and send_answer; user_request and status_answer; user_request and disconnect_answer; error for any refusal) in both services; this root is any one of them. Every object is closed, and no field holds an access or refresh token, an OAuth code, the client secret, key material or a Meet link (ADR-0024 decision 4, ADR-0032 decision 3). Ids travel in the body, never in a path or query. A route refuses a body over 65536 bytes (64 KiB) before it parses it. Rules that compare values (HB-03 the draft against its hash and the entry, HB-05 the owner, HB-07 the receipt against the entry) are checked by the routes and by tilo-api's client, not by this schema.",
+  "anyOf": [
+    { "$ref": "#/$defs/send_request" },
+    { "$ref": "#/$defs/send_answer" },
+    { "$ref": "#/$defs/user_request" },
+    { "$ref": "#/$defs/status_answer" },
+    { "$ref": "#/$defs/disconnect_answer" },
+    { "$ref": "#/$defs/error" }
+  ],
+  "$defs": {
+    "send_request": {
+      "description": "POST /internal/meeting-host/send, called only by the host run's outbox stub in tilo-api (HB-02). entry is the outbox entry (outbox.schema.json) tilo-api's outbox enqueued, evidence the case its enqueue checked, and draft the pinned item the owner approved. It names no user: the grant used is (entry.authz.ref, meeting_host). The then branch narrows entry to the one action this surface runs (MH-10), a meeting invitation the owner approved: state queued, create_meeting_event on meeting_host, T3 with the new_recipients modifier, 1 to 50 recipients (MAX_RECIPIENTS), no attachments, the draft pinned as item, the host account's primary calendar as destination, no undo window, authorised by a person. (The narrowing sits in if/then so the generated type stays Outbox.)",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["entry", "evidence", "draft"],
+      "properties": {
+        "entry": { "$ref": "outbox.schema.json" },
+        "evidence": { "$ref": "#/$defs/evidence" },
+        "draft": { "$ref": "#/$defs/draft" }
+      },
+      "if": { "required": ["entry"] },
+      "then": {
+        "properties": {
+          "entry": {
+            "properties": {
+              "state": { "const": "queued" },
+              "action_type": { "const": "create_meeting_event" },
+              "connector": { "const": "meeting_host" },
+              "recipients": { "minItems": 1, "maxItems": 50 },
+              "attachments": { "maxItems": 0 },
+              "item": { "type": "object" },
+              "destination": { "const": "primary" },
+              "modifiers": { "contains": { "const": "new_recipients" } },
+              "risk_tier": { "const": "T3" },
+              "authz": { "properties": { "by": { "const": "person" } } },
+              "undo_window_s": { "const": 0 }
+            }
+          }
+        }
+      }
+    },
+    "evidence": {
+      "description": "The OB-01/OB-05 case tilo-api's own enqueue checked (outbox.rules.md), without the entry: reserved_by is the gate's approval.requested event and authorised_by the approval.resolved event that answered it (event.schema.json, each with its data schema applied in the then branch, so the generated type stays Event), world_owner is the world's owner. A meeting invitation is T3, so no policy, Team Lead, instruction or earlier policy.applied takes part: those are null or empty. tilo-connectors runs the same check on its own outbox (HB-04) and trusts these copies (ADR-0032, residual trust).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "reserved_by",
+        "authorised_by",
+        "world_owner",
+        "policy",
+        "team_lead",
+        "instruction",
+        "earlier_applied"
+      ],
+      "properties": {
+        "reserved_by": { "$ref": "event.schema.json" },
+        "authorised_by": { "$ref": "event.schema.json" },
+        "world_owner": { "$ref": "common.schema.json#/$defs/user_id" },
+        "policy": { "type": "null" },
+        "team_lead": { "type": "null" },
+        "instruction": { "type": "null" },
+        "earlier_applied": { "type": "array", "maxItems": 0 }
+      },
+      "if": { "required": ["reserved_by", "authorised_by"] },
+      "then": {
+        "properties": {
+          "reserved_by": {
+            "properties": {
+              "type": { "const": "approval.requested" },
+              "data": { "$ref": "events/data/approval.requested.schema.json" }
+            }
+          },
+          "authorised_by": {
+            "properties": {
+              "type": { "const": "approval.resolved" },
+              "data": { "$ref": "events/data/approval.resolved.schema.json" }
+            }
+          }
+        }
+      }
+    },
+    "draft": {
+      "description": "The pinned draft the owner approved (kind meeting_event): the bytes tilo-api read from the run's artifact store, hash-checked there (AR-01), because tilo-connectors cannot read that store. HB-03: the SHA-256 of the decoded bytes equals content_sha256, artifact_id and version equal entry.item, and the document parses as kind meeting_event. content_b64 is padded base64 (RFC 4648 section 4) of at most 43692 characters, the base64 of 32 KiB, so a request with 50 recipients stays under the 64 KiB body cap.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["artifact_id", "version", "content_sha256", "content_b64"],
+      "properties": {
+        "artifact_id": { "$ref": "common.schema.json#/$defs/artifact_id" },
+        "version": { "type": "integer", "minimum": 1 },
+        "content_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "not": { "pattern": "\n" }
+        },
+        "content_b64": {
+          "type": "string",
+          "minLength": 4,
+          "maxLength": 43692,
+          "pattern": "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$",
+          "not": { "pattern": "\n" }
+        }
+      }
+    },
+    "send_answer": {
+      "description": "The 200 answer to send. sent: the invitation exists at Google and receipt says what was made; tilo-api checks it (HB-07) before storing it. refused: nothing was sent and nothing will be (SideEffectRefused, HB-03 to HB-06). possibly_sent: Google may hold the invitation and a retry would not help (PossiblySent). retry: try again later; may_have_sent is false when nothing reached Google (not connected, expired, a missing scope, a KMS outage) and true after a Google 5xx or a lost answer. receipt is set only with sent and may_have_sent only with retry; otherwise each is null. parts lists what the broker emitted during the call; tilo-connectors writes no data.transfer and raises no alert of its own outbox here, because tilo-api's outbox does (one writer per world).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["outcome", "receipt", "may_have_sent", "parts"],
+      "properties": {
+        "outcome": { "type": "string", "enum": ["sent", "refused", "possibly_sent", "retry"] },
+        "receipt": { "anyOf": [{ "$ref": "#/$defs/receipt" }, { "type": "null" }] },
+        "may_have_sent": { "anyOf": [{ "type": "boolean" }, { "type": "null" }] },
+        "parts": { "$ref": "#/$defs/parts" }
+      },
+      "if": { "properties": { "outcome": { "const": "sent" } }, "required": ["outcome"] },
+      "then": {
+        "properties": { "receipt": { "type": "object" }, "may_have_sent": { "type": "null" } }
+      },
+      "else": {
+        "properties": { "receipt": { "type": "null" } },
+        "if": { "properties": { "outcome": { "const": "retry" } }, "required": ["outcome"] },
+        "then": { "properties": { "may_have_sent": { "type": "boolean" } } },
+        "else": { "properties": { "may_have_sent": { "type": "null" } } }
+      }
+    },
+    "receipt": {
+      "description": "What the adapter made (HostReceipt): Google's event id, never a link. HB-07: event_ref equals side_effect_marker(entry); world_id, outbox_id and draft equal the entry's; meeting_id and owner equal the draft's. tilo-api stores it through the run's receipt store only when all hold.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "world_id",
+        "outbox_id",
+        "meeting_id",
+        "owner",
+        "draft",
+        "event_ref",
+        "conference"
+      ],
+      "properties": {
+        "world_id": { "$ref": "common.schema.json#/$defs/world_id" },
+        "outbox_id": { "$ref": "common.schema.json#/$defs/ulid" },
+        "meeting_id": { "$ref": "common.schema.json#/$defs/meeting_id" },
+        "owner": { "$ref": "common.schema.json#/$defs/user_id" },
+        "draft": { "$ref": "#/$defs/draft_ref" },
+        "event_ref": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{32}$",
+          "not": { "pattern": "\n" }
+        },
+        "conference": { "type": "string", "enum": ["pending", "success", "failure"] }
+      }
+    },
+    "draft_ref": {
+      "description": "The draft the receipt was made from, by id and version only (no label).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["artifact_id", "version"],
+      "properties": {
+        "artifact_id": { "$ref": "common.schema.json#/$defs/artifact_id" },
+        "version": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "user_request": {
+      "description": "POST /internal/meeting-host/status and POST /internal/meeting-host/disconnect. user_id is the signed-in principal's own id in tilo-api, never one taken from a body, path or query there (HB-02); the bot account's meeting_host grant is (user_id, meeting_host).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["user_id"],
+      "properties": { "user_id": { "$ref": "common.schema.json#/$defs/user_id" } }
+    },
+    "status_answer": {
+      "description": "The 200 answer to status: a store read only, with no token use and no Google call, so it emits nothing and has no parts. state is connected, expired (Google refused the grant; connect again) or none (no grant stored); scope_ok is true when the stored grant holds the calendar.events.owned scope, and false when there is none.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["state", "scope_ok"],
+      "properties": {
+        "state": { "type": "string", "enum": ["connected", "expired", "none"] },
+        "scope_ok": { "type": "boolean" }
+      },
+      "if": { "properties": { "state": { "const": "none" } }, "required": ["state"] },
+      "then": { "properties": { "scope_ok": { "const": false } } }
+    },
+    "disconnect_answer": {
+      "description": "The 200 answer to disconnect. revoked_at_provider is true only when Google confirmed the revoke. The call is idempotent: with nothing stored it answers false with no parts. parts carries connection.revoked, and an alert.raised for each revoke kept for a retry.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["revoked_at_provider", "parts"],
+      "properties": {
+        "revoked_at_provider": { "type": "boolean" },
+        "parts": { "$ref": "#/$defs/parts" }
+      }
+    },
+    "parts": {
+      "description": "What the broker emitted during one call, in order, nothing more (ADR-0032 decision 7): tilo-api hands each connection part to meeting_host.on_connection_event. Every connection part names the call's own user (entry.authz.ref for a send, the request's user_id otherwise); a part naming anyone else is not that call's, and tilo-api's client drops it. At most 16.",
+      "type": "array",
+      "maxItems": 16,
+      "items": {
+        "anyOf": [{ "$ref": "#/$defs/connection_part" }, { "$ref": "#/$defs/alert_part" }]
+      }
+    },
+    "connection_part": {
+      "description": "A connection event of the meeting_host grant: expired (Google refused the grant at refresh), rate_limited, or revoked (a disconnect). Type, connector and user only.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "connector", "user_id"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["connection.expired", "connection.rate_limited", "connection.revoked"]
+        },
+        "connector": { "const": "meeting_host" },
+        "user_id": { "$ref": "common.schema.json#/$defs/user_id" }
+      }
+    },
+    "alert_part": {
+      "description": "An alert.raised the broker emitted (a revoke kept for a retry): its alert id only.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "alert_id"],
+      "properties": {
+        "type": { "const": "alert.raised" },
+        "alert_id": { "$ref": "common.schema.json#/$defs/ulid" }
+      }
+    },
+    "error": {
+      "description": "The body of every refusal on this surface, a fixed code and nothing else: unauthenticated (401, no valid ID token, HB-01), forbidden (403, any account but tilo-api's, HB-01), invalid_request (422, a body over 64 KiB, not JSON or not this contract's request; refused before anything acted) and not_configured (503, a setting is missing or a seam failed to build). Never a value, a setting's value or an exception's text.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["error"],
+      "properties": {
+        "error": {
+          "type": "string",
+          "enum": ["unauthenticated", "forbidden", "invalid_request", "not_configured"]
+        }
+      }
+    }
+  }
+}
