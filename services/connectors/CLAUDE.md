@@ -36,4 +36,4 @@ Cloud Run service (PRD 6.2): OAuth token broker, Gmail, Drive and Calendar adapt
 - Tokens: AES-GCM under a per-record data key wrapped by a `Kms` (`FakeKms` in dev; `CloudKms` is
   unexercised until billing). Only `tokens.py` and `adapters/` call `access_token_for_adapter`; no
   other service imports `tilo_connectors.tokens` (SEC-02). `delete_user` leaves no token in any store
-  (CON-D4). Google keeps one grant per client: never revoke while another connector is connected (CON-D10). Consent state and the revoke-retry store are in memory.
+  (CON-D4). Google keeps one grant per client: never revoke while another connector is connected (CON-D10). Consent state is in memory. `host_broker.py` (ADR-0032 T2, FR-MTG-09): Firestore token and retry stores at nested paths, `connected_at` sealed in the record, `open_broker(env)` and the 30 s `BrokerSeam`; no CAS until T7.
