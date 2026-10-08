@@ -85,7 +85,7 @@ def create_app(
         if oidc_verifier is None or not audience or not callers:
             return _refuse(403, "forbidden")
         try:
-            claims = oidc_verifier(token, audience)
+            claims = await run_in_threadpool(oidc_verifier, token, audience)
         except Exception:
             return _refuse(401, "unauthorized")
         if not service_caller_ok(claims, audience=audience, allowed_callers=callers):

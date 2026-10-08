@@ -320,7 +320,7 @@ def test_LW_08_slow_fetch_does_not_block_health_on_the_event_loop(tmp_path: Path
 def test_LW_08_huge_html_with_parser_bomb_is_refused_html_too_large_in_under_a_second(tmp_path: Path) -> None:
     from tilo_browser.fetch import MAX_HTML_BYTES, UpstreamResponse
 
-    assert MAX_HTML_BYTES == 2 * 1024 * 1024
+    assert MAX_HTML_BYTES == 512 * 1024
     bomb = b"<html>" + b"</" * ((25 * 1024 * 1024 - 6) // 2)
     transport = ScriptTransport(lambda _p: UpstreamResponse(200, {"content-type": "text/html"}, bomb))
     service = make_service(tmp_path, transport)
@@ -339,7 +339,7 @@ def test_LW_08_html_under_the_cap_is_still_converted_to_text(tmp_path: Path) -> 
     from tilo_browser.fetch import UpstreamResponse
 
     page = b"<html><body><p>" + b"word " * 100_000 + b"</p><script>evil()</script></body></html>"
-    assert len(page) < 2 * 1024 * 1024
+    assert len(page) < 512 * 1024
     service = make_service(tmp_path, ScriptTransport(lambda _p: UpstreamResponse(200, {}, page)))
     resp = make_client(service).post(
         "/fetch", json={"url": f"http://{SANDBOX_HOST}/papers/long.html", "allow_hosts": [SANDBOX_HOST]}, headers=AUTH
@@ -711,3 +711,170 @@ def test_LW_08_health_stays_fast_with_more_slow_fetches_than_pool_threads(tmp_pa
     health_seconds, statuses = asyncio.run(scenario())
     assert statuses == [200] * 50
     assert health_seconds < 0.2
+
+
+def test_LW_08_broken_endtag_html_under_cap_parses_quickly_and_honors_deadline(tmp_path: Path) -> None:
+    from tilo_browser.fetch import MAX_HTML_BYTES, FetchBlocked, UpstreamResponse, detect_media_type
+
+    bomb_under_cap = b"<html><body>ok " + b"</" * ((MAX_HTML_BYTES - 64) // 2) + b"</body></html>"
+    assert len(bomb_under_cap) <= MAX_HTML_BYTES
+    started = time.monotonic()
+    media_type, plain = detect_media_type(bomb_under_cap, url="https://a.test/x", host="a.test")
+    assert time.monotonic() - started < 0.5
+    assert media_type == "text/plain" and b"ok" in plain
+
+    with pytest.raises(FetchBlocked) as err:
+        detect_media_type(
+            b"<html><body><p>a</p></body></html>",
+            url="https://a.test/x",
+            host="a.test",
+            deadline=0.0,
+            monotonic=lambda: 1.0,
+        )
+    assert err.value.block.reason == "timeout"
+    _ = UpstreamResponse
+
+
+@pytest.mark.parametrize("exc", [UnicodeError("idna"), ValueError("bad"), RuntimeError("resolver boom")])
+def test_LW_08_non_oserror_resolver_exceptions_map_to_logged_502_upstream_error(tmp_path: Path, exc: Exception) -> None:
+    def broken_resolver(_host: str, _port: int) -> list[str]:
+        raise exc
+
+    service = make_service(tmp_path, ScriptTransport(pdf_ok), dns_resolver=broken_resolver)
+    resp = make_client(service).post(
+        "/fetch", json={"url": f"http://{SANDBOX_HOST}/papers/p.pdf", "allow_hosts": [SANDBOX_HOST]}, headers=AUTH
+    )
+    assert resp.status_code == 502
+    assert resp.json()["reason"] == "upstream_error"
+    assert service.blocked[-1].reason == "upstream_error"
+
+
+def test_LW_08_multi_ip_fallback_tries_next_validated_ip_while_blocking_any_private_ip(tmp_path: Path) -> None:
+    from tilo_browser.fetch import UpstreamResponse
+
+    seen_ips: list[str] = []
+
+    class FallbackTransport:
+        def send_get(self, *, pinned_ip: str, path_and_query: str, **_kw: Any) -> UpstreamResponse:
+            seen_ips.append(pinned_ip)
+            if pinned_ip == "2606:4700:4700::1111":
+                raise OSError("IPv6 unreachable")
+            return pdf_ok(path_and_query)
+
+    service = make_service(
+        tmp_path, FallbackTransport(), dns_resolver=lambda _h, _p: ["2606:4700:4700::1111", PUBLIC_IP]
+    )
+    resp = make_client(service).post(
+        "/fetch", json={"url": f"http://{SANDBOX_HOST}/papers/p.pdf", "allow_hosts": [SANDBOX_HOST]}, headers=AUTH
+    )
+    assert resp.status_code == 200, resp.text
+    assert seen_ips[:2] == ["2606:4700:4700::1111", PUBLIC_IP]
+    assert service.blocked == []
+
+    mixed_service = make_service(tmp_path, FallbackTransport(), dns_resolver=lambda _h, _p: [PUBLIC_IP, "10.0.0.1"])
+    mixed_resp = make_client(mixed_service).post(
+        "/fetch", json={"url": f"http://{SANDBOX_HOST}/papers/p.pdf", "allow_hosts": [SANDBOX_HOST]}, headers=AUTH
+    )
+    assert mixed_resp.status_code == 403
+    assert mixed_resp.json()["reason"] == "ssrf_blocked"
+
+
+def test_LW_08_robots_error_cache_expires_and_blocked_history_is_bounded(tmp_path: Path) -> None:
+    from tilo_browser.fetch import MAX_BLOCKED_HISTORY, UpstreamResponse
+
+    now = [100.0]
+    robots_status = [503]
+
+    class RobotsTransport:
+        def send_get(self, *, path_and_query: str, **_kw: Any) -> UpstreamResponse:
+            if path_and_query == "/robots.txt":
+                return UpstreamResponse(robots_status[0], {}, b"User-agent: *\nAllow: /\n")
+            return pdf_ok(path_and_query)
+
+    service = make_service(
+        tmp_path, RobotsTransport(), monotonic=lambda: now[0], robots_error_ttl=10.0, robots_ttl=60.0
+    )
+    client = make_client(service)
+    r1 = client.post(
+        "/fetch", json={"url": f"http://{SANDBOX_HOST}/papers/p.pdf", "allow_hosts": [SANDBOX_HOST]}, headers=AUTH
+    )
+    assert r1.status_code == 403 and r1.json()["reason"] == "robots_disallowed"
+
+    robots_status[0] = 200
+    now[0] += 11.0  # past robots_error_ttl
+    r2 = client.post(
+        "/fetch", json={"url": f"http://{SANDBOX_HOST}/papers/p.pdf", "allow_hosts": [SANDBOX_HOST]}, headers=AUTH
+    )
+    assert r2.status_code == 200
+
+    for i in range(MAX_BLOCKED_HISTORY + 25):
+        service._record_block(
+            "host_not_allowed", f"https://untrusted.example/{i}", host="untrusted.example", allowlist=()
+        )
+    assert len(service.blocked) == MAX_BLOCKED_HISTORY
+
+
+def test_LW_08_ooxml_with_vba_or_ole_is_refused_and_html_strips_void_embed_and_hidden(tmp_path: Path) -> None:
+    import zipfile
+
+    from tilo_browser.fetch import FetchBlocked, detect_media_type
+
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as zf:
+        zf.writestr("[Content_Types].xml", "<Types/>")
+        zf.writestr("word/document.xml", "<w:document/>")
+        zf.writestr("word/vbaProject.bin", b"macro")
+    with pytest.raises(FetchBlocked) as err:
+        detect_media_type(buf.getvalue(), url="https://a.test/doc.docx", host="a.test")
+    assert err.value.block.reason == "archive_refused"
+
+    html = (
+        b"<!doctype html><html><body>"
+        b"<embed src='x.swf'>Visible text"
+        b"<div hidden>secret1</div>"
+        b"<span aria-hidden='true'>secret2</span>"
+        b"<p style='display: none'>secret3</p>"
+        b"&lt;script&gt;evil()&lt;/script&gt;"
+        b"</body></html>"
+    )
+    media_type, plain = detect_media_type(html, url="https://a.test/page.html", host="a.test")
+    text = plain.decode("utf-8")
+    assert media_type == "text/plain"
+    assert "Visible text" in text
+    assert "secret1" not in text and "secret2" not in text and "secret3" not in text
+    assert "<script>" not in text
+
+
+def test_LW_08_slow_oidc_verifier_runs_in_threadpool_without_blocking_health(tmp_path: Path) -> None:
+    from tilo_browser.app import create_app
+
+    def slow_verifier(_token: str, audience: str) -> dict[str, Any]:
+        time.sleep(0.3)
+        return {"email": SERVICE_CALLER, "email_verified": True, "aud": audience, "iss": "https://accounts.google.com"}
+
+    app = create_app(
+        fetch_service=make_service(tmp_path, ScriptTransport(pdf_ok)),
+        oidc_verifier=slow_verifier,
+        audience=AUDIENCE,
+        allowed_callers=[SERVICE_CALLER],
+    )
+
+    async def scenario() -> tuple[float, int]:
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://browser.test") as client:
+            fetch_task = asyncio.create_task(
+                client.post(
+                    "/fetch",
+                    json={"url": f"http://{SANDBOX_HOST}/papers/p.pdf", "allow_hosts": [SANDBOX_HOST]},
+                    headers=AUTH,
+                )
+            )
+            await asyncio.sleep(0.05)
+            t0 = time.perf_counter()
+            assert (await client.get("/health")).status_code == 200
+            elapsed = time.perf_counter() - t0
+            resp = await fetch_task
+            return elapsed, resp.status_code
+
+    elapsed, status = asyncio.run(scenario())
+    assert status == 200
+    assert elapsed < 0.15
