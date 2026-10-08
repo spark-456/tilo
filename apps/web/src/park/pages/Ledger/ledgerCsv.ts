@@ -21,7 +21,7 @@ export const CSV_COLUMNS = [
 ] as const;
 
 const NEEDS_QUOTES = /[",\r\n]/;
-const FORMULA_LEAD = /^[=+\-@\t\r]/;
+const FORMULA_LEAD = /^(?:\s*[=+\-@]|[\t\r])/;
 
 /** One cell: guarded against spreadsheet formulas, then quoted when RFC 4180 requires it. */
 export function csvCell(value: string): string {

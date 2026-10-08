@@ -260,3 +260,11 @@ describe("FR_SPD_08_download_is_a_real_blob_through_an_anchor", () => {
     expect(document.querySelector("a[download]")).toBeNull(); // the anchor does not stay on the page
   });
 });
+
+describe("FR_SPD_08 formula guard after leading spaces", () => {
+  it("FR_SPD_08 csvCell prefixes a quote when spaces come before = + - @", () => {
+    for (const v of [" =1+1", "  +cmd", "\u00a0-2", " @SUM(A1)"]) {
+      expect(csvCell(v).startsWith("'")).toBe(true);
+    }
+  });
+});
