@@ -4,13 +4,17 @@
 // the matrix, quiet hours, sessions and the form are page state and call nothing
 // (docs/park-designed-not-in-prd/Profile.md). Time and motion are the shell's prefs, written with
 // app.setPref and read back from the AppCtx. Navigation is app.go only.
-import { type ReactNode, useEffect, useState } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import type { ProfileSession, ProfileSettings, User } from "../../api/types";
 import type { AppCtx } from "../../app/AppCtx";
 import { useParkApi } from "../../app/context";
+import { useFollowed } from "../../app/followed";
 import { PageSheet, StatusChip, Switch } from "../../components";
 import "./Profile.css";
 import { ICONS } from "./icons";
+import { canSwitchOff } from "./notifyRules";
+import { signOutOne, signOutOthers } from "./profileSessions";
+import { loadProfile, saveProfile } from "./profileStore";
 
 const TABS = [
   { id: "profile", label: "Profile", icon: ICONS.profile },
@@ -93,13 +97,27 @@ function Tile({ tone, children }: { tone: "ok" | "sunk" | "hero"; children: Reac
   return <div className={`park-profile-tile park-profile-tile--${tone}`}>{children}</div>;
 }
 
-function Toggle({ label, on, onChange }: { label: string; on: boolean; onChange: () => void }) {
+// FR-SET-01: a save is kept on this device only (no profile endpoint yet); FR-SET-02: quiet hours never hide
+// a gate. Both lines are visible helper text (BQ-SET-2, user approved 8 Oct) and stay accessible descriptions too.
+const SAVE_HINT = "Kept on this device only. Tilo has no profile service to send it to yet.";
+const QUIET_HINT =
+  "Quiet hours silence the phone only. A decision that needs you is never hidden by quiet hours: it waits in Needs you.";
+const NEED_ONE = "Decisions need at least one channel";
+
+function Toggle({
+  label,
+  on,
+  onChange,
+  locked,
+}: { label: string; on: boolean; onChange: () => void; locked?: boolean }) {
   return (
     <button
       type="button"
       role="switch"
       aria-checked={on}
       aria-label={label}
+      aria-disabled={locked ? true : undefined}
+      title={locked ? NEED_ONE : undefined}
       className={cls("park-profile-switch", on && "park-profile-switch--on")}
       onClick={onChange}
     >
@@ -113,13 +131,31 @@ export function ProfilePage({ app }: { app: AppCtx }) {
   const [loaded, setLoaded] = useState<Loaded | null>(null);
   const [problem, setProblem] = useState<"missing" | "failed" | null>(null);
   const [form, setForm] = useState<Form | null>(null);
+  // The last saved (or loaded) form: Cancel returns to it. The user key is the signed-in email.
+  const [base, setBase] = useState<Form | null>(null);
   const routeTab = tabFrom(app.params.tab);
   const [tab, setTab] = useState<TabId>(routeTab);
-  // The address names a tab ("?tab=appearance", the notification menu's settings link): follow it when it changes.
-  useEffect(() => setTab(routeTab), [routeTab]);
+  // The address names a tab ("?tab=appearance", the notification menu's settings link): follow it whenever a link
+  // is followed, also a link to the tab the address already names after another tab was opened by hand
+  // (useFollowed counts the links followed; the address itself does not change for such a link, FR-UX-12).
+  const followed = useFollowed();
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `followed` is the signal, routeTab the value
+  useEffect(() => setTab(routeTab), [followed, routeTab]);
   const [notif, setNotif] = useState<boolean[][]>([]);
   const [quiet, setQuiet] = useState(false);
   const [sessions, setSessions] = useState<ProfileSession[]>([]);
+  const [confirmOthers, setConfirmOthers] = useState(false);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const cancelRef = useRef<HTMLButtonElement>(null);
+  const listHeadRef = useRef<HTMLHeadingElement>(null);
+  // Focus moves into the confirmation when it opens (Cancel, the safe choice).
+  useEffect(() => {
+    if (confirmOthers) cancelRef.current?.focus();
+  }, [confirmOthers]);
+  const closeConfirm = () => {
+    triggerRef.current?.focus();
+    setConfirmOthers(false);
+  };
 
   useEffect(() => {
     let live = true;
@@ -131,7 +167,9 @@ export function ProfilePage({ app }: { app: AppCtx }) {
           settings: st.data,
           spend: { spent: led.data.spent, budget: led.data.budget },
         });
-        setForm(formOf(u.data));
+        const start = { ...formOf(u.data), ...loadProfile(u.data.email) };
+        setForm(start);
+        setBase(start);
         setNotif(st.data.notifications.map((n) => [n.phone, n.email, n.slack]));
         setQuiet(st.data.quiet.on);
         setSessions(st.data.sessions);
@@ -145,22 +183,22 @@ export function ProfilePage({ app }: { app: AppCtx }) {
     };
   }, [api]);
 
+  const currentId = sessions.find((s) => s.current)?.id ?? "";
+  const others = sessions.some((s) => s.id === currentId) ? sessions.length - 1 : 0;
   const wide = app.vw >= 980;
   const user = loaded?.user;
   const flip = (r: number, c: number) => {
     const row = notif[r] ?? [];
-    if (
-      loaded?.settings.notifications[r]?.id === "decisions" &&
-      row[c] &&
-      row.filter(Boolean).length === 1
-    ) {
-      app.toast("Decisions need at least one channel");
+    const id = loaded?.settings.notifications[r]?.id;
+    if (id && !canSwitchOff(id, row, c)) {
+      app.toast(NEED_ONE);
       return;
     }
     setNotif(notif.map((cells, i) => (i === r ? cells.map((v, j) => (j === c ? !v : v)) : cells)));
   };
   const signOut = (s: ProfileSession) => {
-    setSessions(sessions.filter((o) => o !== s));
+    listHeadRef.current?.focus(); // the pressed button is about to unmount: keep focus on a stable node
+    setSessions(signOutOne(sessions, s.id));
     app.toast(`Signed out of ${s.device}`);
   };
   // One head for every state, so the h1 is the same node while the data loads (focus stays on it).
@@ -235,18 +273,26 @@ export function ProfilePage({ app }: { app: AppCtx }) {
                     </label>
                   ))}
                 </div>
+                <p className="park-profile-note">{SAVE_HINT}</p>
                 <div className="park-profile-foot">
                   <button
                     type="button"
                     className="park-profile-btn park-profile-btn--quiet"
-                    onClick={() => setForm(formOf(user))}
+                    onClick={() => setForm(base ?? formOf(user))}
                   >
                     Cancel
                   </button>
+                  {/* biome-ignore lint/a11y/useValidAriaProps: aria-description is ARIA 1.3; biome's list predates it */}
                   <button
                     type="button"
                     className="park-profile-btn park-btn--primary"
-                    onClick={() => app.toast("Profile saved")}
+                    aria-description={SAVE_HINT}
+                    title={SAVE_HINT}
+                    onClick={() => {
+                      saveProfile(user.email, form);
+                      setBase(form);
+                      app.toast("Profile saved");
+                    }}
                   >
                     Save changes
                   </button>
@@ -284,6 +330,7 @@ export function ProfilePage({ app }: { app: AppCtx }) {
                             <Toggle
                               label={`${label} by ${c}`}
                               on={notif[r]?.[i] ?? false}
+                              locked={!canSwitchOff(id, notif[r] ?? [], i)}
                               onChange={() => flip(r, i)}
                             />
                           </div>
@@ -300,8 +347,14 @@ export function ProfilePage({ app }: { app: AppCtx }) {
                       {`Phone stays silent, except decisions over ${loaded.settings.quiet.threshold}.`}
                     </div>
                   </div>
-                  <Switch label="Quiet hours" checked={quiet} onChange={setQuiet} />
+                  <Switch
+                    label="Quiet hours"
+                    description={QUIET_HINT}
+                    checked={quiet}
+                    onChange={setQuiet}
+                  />
                 </div>
+                <p className="park-profile-note">{QUIET_HINT}</p>
               </section>
             ) : null}
 
@@ -389,18 +442,54 @@ export function ProfilePage({ app }: { app: AppCtx }) {
                   </div>
                 ))}
                 <div className="park-profile-signed">
-                  <h3 className="park-profile-group">Signed in on</h3>
+                  <h3 ref={listHeadRef} tabIndex={-1} className="park-profile-group">
+                    Signed in on
+                  </h3>
                   <button
+                    ref={triggerRef}
                     type="button"
                     className="park-profile-link"
-                    onClick={() => {
-                      setSessions(sessions.filter((s) => s.current));
-                      app.toast("Signed out everywhere except this device");
-                    }}
+                    onClick={() => setConfirmOthers(true)}
                   >
                     Sign out everywhere else
                   </button>
                 </div>
+                {confirmOthers && others > 0 ? (
+                  <section
+                    role="alertdialog"
+                    aria-label="Confirm sign out of other sessions"
+                    className="park-profile-session"
+                    onKeyDown={(e) => {
+                      if (e.key === "Escape") closeConfirm();
+                    }}
+                  >
+                    <div className="park-profile-grow">
+                      <div className="park-profile-stitle">
+                        Sign out {others} other {others === 1 ? "session" : "sessions"}?
+                      </div>
+                      <div className="park-profile-ssub">This device stays signed in.</div>
+                    </div>
+                    <button
+                      ref={cancelRef}
+                      type="button"
+                      className="park-profile-signout"
+                      onClick={closeConfirm}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      className="park-profile-signout"
+                      onClick={() => {
+                        setSessions(signOutOthers(sessions, currentId));
+                        closeConfirm();
+                        app.toast("Signed out everywhere except this device");
+                      }}
+                    >
+                      Sign out the other sessions
+                    </button>
+                  </section>
+                ) : null}
                 {sessions.map((s) => (
                   <div key={s.id} className="park-profile-session">
                     <Tile tone="sunk">{SESSION_ICONS[s.icon]}</Tile>
@@ -414,6 +503,7 @@ export function ProfilePage({ app }: { app: AppCtx }) {
                       <button
                         type="button"
                         className="park-profile-signout"
+                        aria-label={`Sign out ${s.device}`}
                         onClick={() => signOut(s)}
                       >
                         Sign out

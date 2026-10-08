@@ -205,6 +205,8 @@ export type SceneOpts = Opt<{
   /** True draws cars and walkers frozen at their seeded phase; false (the default) runs them. */
   still: boolean;
   mute: number;
+  /** True gives each car, walker and kerb agent its own lane (FR-UX-12); false is the prototype's drawing. */
+  avoid: boolean;
 }>;
 /** A spot on the backdrop where the app may place a pin (scene()'s second result). */
 export interface Spot {

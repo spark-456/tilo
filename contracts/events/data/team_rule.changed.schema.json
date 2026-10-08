@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.tilo.example/events/data/team_rule.changed.schema.json",
+  "x-version": "1.0.0",
+  "title": "TeamRuleChangedData",
+  "description": "data of team_rule.changed (registry 1.2.0, ADR-0027; FR-TEAM-04 'every change is logged', FR-ACC-01). A person changed one team rule: a stop-and-ask switch (rule switch, key the switch, values on or off) or the team's access level for one connector (rule tool_access, key the connector id, values off, read, draft or act). from is the value in force before the change (an unset tool is act, an unset switch its configured default), to the value after it. A Must-ask switch (spend, share, undo; PRD 8.3) can't be switched off, so its to is always on. tilo-api's team routes write it after the team store's compare-and-set succeeded, never an agent or a model: actor and target are the signed-in person who made the change (only the team's Owner may, BQ-TEAMACC-2), the world is that person's Desk world, district is null and vis is [] (owner-only, ADR-0009). It authorises nothing (a level or switch only narrows what reaches the policy engine), so it is not a side effect and authz is null.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["rule", "key", "from", "to"],
+  "properties": {
+    "rule": { "$ref": "#/$defs/rule" },
+    "key": { "$ref": "#/$defs/key" },
+    "from": { "$ref": "#/$defs/value" },
+    "to": { "$ref": "#/$defs/value" }
+  },
+  "if": { "properties": { "rule": { "const": "switch" } }, "required": ["rule"] },
+  "then": {
+    "properties": {
+      "key": { "$ref": "#/$defs/switch_key" },
+      "from": { "enum": ["on", "off"] },
+      "to": { "enum": ["on", "off"] }
+    },
+    "if": {
+      "properties": { "key": { "enum": ["spend", "share", "undo"] } },
+      "required": ["key"]
+    },
+    "then": { "properties": { "to": { "const": "on" } } }
+  },
+  "else": {
+    "properties": {
+      "key": { "$ref": "../../common.schema.json#/$defs/connector_id" },
+      "from": { "$ref": "../../common.schema.json#/$defs/tool_access_level" },
+      "to": { "$ref": "../../common.schema.json#/$defs/tool_access_level" }
+    }
+  },
+  "$defs": {
+    "rule": {
+      "description": "switch: one of the five 'When agents stop and ask' switches (FR-TEAM-04). tool_access: the team's level for one connector (FR-ACC-01). Roles, spend limits, invites and removals are not team rules (BQ-ADR27-3).",
+      "type": "string",
+      "enum": ["switch", "tool_access"]
+    },
+    "key": {
+      "description": "The switch (rule switch) or the connector id (rule tool_access) that changed.",
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]{1,31}$"
+    },
+    "switch_key": {
+      "description": "The five switches of the Team page (FR-TEAM-04, config/team_rules.yaml). spend, share and undo are PRD 8.3 Must-ask rules and always on.",
+      "type": "string",
+      "enum": ["spend", "share", "undo", "tools", "weekend"]
+    },
+    "value": {
+      "description": "on or off for a switch; off, read, draft or act for a tool level (common tool_access_level).",
+      "type": "string",
+      "enum": ["on", "off", "read", "draft", "act"]
+    }
+  }
+}

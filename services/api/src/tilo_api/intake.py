@@ -14,7 +14,7 @@ import logging
 from dataclasses import asdict
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import JSONResponse
 from starlette.concurrency import run_in_threadpool
 from tilo_metering.flags import FlagStore
@@ -38,7 +38,8 @@ from tilo_providers.interfaces import SafetyProvider
 from tilo_providers.replay import ReplayMissError
 from tilo_providers.router import Router
 
-from tilo_api import deps
+from tilo_api import deps, quick
+from tilo_api.assistant.metering import SpendLedger
 from tilo_api.deps import get_safety  # the dependency key tests and callers override
 from tilo_api.tasks import create_task
 
@@ -54,17 +55,25 @@ def get_store() -> InMemoryArtifactStore:
 
 @router.post("/intake", status_code=201)
 async def intake(
+    http: Request,
     principal: Annotated[deps.Principal, Depends(deps.get_current_principal)],
     safety: Annotated[SafetyProvider, Depends(get_safety)],  # before any store: fail closed first
     store: Annotated[InMemoryArtifactStore, Depends(get_store)],
     tasks: Annotated[deps.Store, Depends(deps.get_store)],
+    writer: Annotated[deps.EventWriter, Depends(deps.get_event_writer)],
     model_router: Annotated[Router, Depends(deps.get_router)],
     flags: Annotated[FlagStore, Depends(deps.get_switches)],
+    work_mode: Annotated[deps.Mode, Depends(deps.get_work_mode)],
+    allowance: Annotated[SpendLedger, Depends(deps.get_spend_ledger)],
     text: Annotated[str, Form()] = "",
     scenario: Annotated[str | None, Form()] = None,
+    mode: Annotated[str | None, Form()] = None,  # COST-FAST-1: "quick" or "thinking" (read from the form below)
     files: Annotated[list[UploadFile], File()] = [],  # noqa: B006 (FastAPI copies defaults)
 ) -> Any:
     deps.refuse_if_replay_only(flags)  # NFR-24: after sign-in, before any work
+    chosen = (await http.form()).getlist("mode")  # exactly one of quick or thinking; two fields are never resolved
+    if len(chosen) > 1 or (chosen and chosen[0] not in ("quick", "thinking")):
+        return _rejected("The mode must be quick or thinking.")  # the value is never echoed
     if scenario is not None:  # FR-INT-11: an unknown or hostile id stores nothing; nothing is created at intake
         try:
             await run_in_threadpool(load_scenario, scenario)
@@ -83,6 +92,10 @@ async def intake(
     try:
         # CPU-bound extraction and blocking screen and model calls stay off the event loop.
         await run_in_threadpool(screen_task_text, request, safety=safety)
+        if chosen and chosen[0] == "quick":  # COST-FAST-1: the rules answer, offer Thinking, or call the cheap role
+            return await _quick(
+                http, request, principal.user_id, safety, model_router, allowance, flags, work_mode, scenario
+            )
         # The Director reads only the screened text, and runs before anything is stored: a failure leaves no
         # artifacts without a task (BQ-99).
         try:
@@ -112,7 +125,7 @@ async def intake(
     except (ProviderError, ProviderConfigError, ReplayMissError) as exc:
         logger.warning("safety screen failed: %s", type(exc).__name__)
         raise HTTPException(status_code=503, detail="The safety screen is unavailable; nothing was stored.") from exc
-    task_id, task = create_task(tasks, result, extraction, scenario=scenario)
+    task_id, task = await run_in_threadpool(create_task, tasks, writer, result, extraction, scenario=scenario)
     body = asdict(result)  # per-file text and events stay server-side
     body["files"] = [{k: v for k, v in f.items() if k not in ("text", "events")} for f in body["files"]]
     questions = [
@@ -120,12 +133,36 @@ async def intake(
     ]
     return {
         **body,
+        "mode": "thinking",
         "task_id": task_id,
         "brief": task.brief,
         "questions": questions,
         "scenario": scenario,
         "gaps": [g.as_dict() for g in task.gaps],
     }
+
+
+async def _quick(
+    http: Request,
+    request: IntakeRequest,
+    uid: str,
+    safety: SafetyProvider,
+    model_router: Router,
+    allowance: SpendLedger,
+    flags: FlagStore,
+    work_mode: deps.Mode,
+    scenario: str | None,
+) -> JSONResponse:
+    """COST-FAST-1: nothing is created or stored; the body is the answer or the offer to switch to Thinking."""
+    try:
+        body = await run_in_threadpool(
+            quick.respond, text=request.text, uid=uid, has_files=bool(request.files), scenario=scenario,
+            safety=safety, router=model_router, allowance=allowance, switches=flags, mode=work_mode,
+            caps=deps.caps_for(http), key=http.headers.get("idempotency-key"),
+        )  # fmt: skip
+    except quick.QuickRefusal as refusal:
+        return JSONResponse(status_code=refusal.status, content={"error": refusal.message})
+    return JSONResponse(body)
 
 
 def _rejected(reason: str) -> JSONResponse:

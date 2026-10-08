@@ -255,7 +255,7 @@ def run_topic(tmp_path: Path, extra: Iterable[str], *, values: dict[str, str] | 
 
     argv = ["--topic", TOPIC, "--auto-answer", "--prices-file", str(lib.write_prices(tmp_path)), *extra]
     kwargs: dict[str, Any] = {"live_provider_factory": world.factory, "safety": FakeSafetyProvider(), "read": read,
-                              "tty": lambda: True}  # fmt: skip
+                              "tty": lambda: True, "drain": lambda: True}  # fmt: skip
     if factory is not None:
         kwargs["real_connectors_factory"] = factory
     return _invoke(module.main, argv, values, world, kwargs)

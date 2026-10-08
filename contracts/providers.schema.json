@@ -1,9 +1,9 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://contracts.tilo.example/providers.schema.json",
-  "x-version": "1.1.0",
+  "x-version": "1.2.0",
   "title": "Providers",
-  "description": "Provider-layer configuration as the provider layer loads it (PRD 6.4, 6.6, 14.1): models is config/models.yaml ($defs.models) and prices is config/prices.yaml ($defs.prices). The loader also checks that every role names existing profiles and every profile has a price entry. Model ids appear only in config/ and packages/providers.",
+  "description": "Provider-layer configuration as the provider layer loads it (PRD 6.4, 6.6, 14.1): models is config/models.yaml ($defs.models) and prices is config/prices.yaml ($defs.prices). The loader also checks that every role names existing profiles and every profile has a price entry, and the speech role's rules below (1.2.0, ADR-0027). Model ids appear only in config/ and packages/providers.",
   "type": "object",
   "additionalProperties": false,
   "required": ["models", "prices"],
@@ -43,7 +43,7 @@
           "additionalProperties": { "$ref": "#/$defs/profile" }
         },
         "roles": {
-          "description": "Business code asks for a role, never a model (PL-01).",
+          "description": "Business code asks for a role, never a model (PL-01). speech (1.2.0, ADR-0027) is the role every SpeechProvider call asks for (FR-MTG-17, FR-MTG-11, FR-INT-14, FR-CHN-16): the loader refuses it unless it states max_output_tokens and its primary, fallback and cascade profiles declare the audio capability and, while prices are set, carry an audio_input price.",
           "type": "object",
           "minProperties": 1,
           "propertyNames": { "$ref": "common.schema.json#/$defs/slug" },
@@ -147,20 +147,25 @@
           "source": { "type": "string" },
           "profiles": {
             "additionalProperties": {
-              "properties": { "input": { "type": "number" }, "output": { "type": "number" } }
+              "properties": {
+                "input": { "type": "number" },
+                "output": { "type": "number" },
+                "audio_input": { "type": "number" }
+              }
             }
           }
         }
       }
     },
     "price": {
-      "description": "Standard list price in US dollars per million tokens.",
+      "description": "Standard list price in US dollars per million tokens. audio_input (1.2.0, ADR-0027) is the price per million audio input tokens where the provider bills audio input at its own rate (Gemini); left out, the profile has no audio price and cannot serve the speech role. The other input tokens of the same call are priced at input.",
       "type": "object",
       "additionalProperties": false,
       "required": ["input", "output"],
       "properties": {
         "input": { "type": ["number", "null"], "minimum": 0 },
-        "output": { "type": ["number", "null"], "minimum": 0 }
+        "output": { "type": ["number", "null"], "minimum": 0 },
+        "audio_input": { "type": ["number", "null"], "minimum": 0 }
       }
     }
   }

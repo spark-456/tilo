@@ -8,14 +8,16 @@ import type { Decision, Notification, User } from "../api/types";
 import type { PageId } from "../app/AppCtx";
 import { endSession, useApp, useExpectsSample, useParkApi, useParkStore } from "../app/context";
 import { useParkRoute } from "../app/router";
-import { Toast } from "../components";
+import { Button, Popover, Toast } from "../components";
 import "../tokens/fonts";
-import { AccountMenu } from "./AccountMenu";
+import { AccountMenu, type AccountPerson } from "./AccountMenu";
 import { BootSplash } from "./BootSplash";
 import { CityBackdrop } from "./CityBackdrop";
+import { Enter } from "./Enter";
 import { NotificationsPopover } from "./NotificationsPopover";
 import { TopNav } from "./TopNav";
 import { WorldLoader } from "./WorldLoader";
+import { authInitials, useParkAuth } from "./auth";
 import { useAppearance } from "./cityMotion";
 import { loadShellFonts } from "./fonts";
 import { type Bar, useLeavingCard, useMotionOff, usePageSwap } from "./motion";
@@ -23,6 +25,9 @@ import "./park.shell.css";
 import { backdropScene } from "./scene";
 
 const SIGN_OUT = "This is a prototype, so you stay signed in";
+const SIGNED_OUT = "You are signed out";
+const SIGN_OUT_FAILED = "Could not sign out. Try again.";
+const MOBILE_NOTE = "The Tilo mobile app is a concept. It is not available yet.";
 
 /** Sign out (FR-UX-10): ends the real session when there is one; with none (a local host, the fixture world, a build
  * with no Firebase config) the menu stays the prototype's toast. `session.signOut` never rejects, and a failed one still
@@ -47,6 +52,9 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [connectorsOn, setConnectorsOn] = useState<number | null>(null);
   const [ready, setReady] = useState(false);
   const expectsSample = useExpectsSample();
+  const auth = useParkAuth();
+  const [mobileNote, setMobileNote] = useState(false);
+  const signingOut = useRef(false);
   const appearance = useAppearance();
   const off = useMotionOff();
   const viaNav = useRef(false);
@@ -126,6 +134,40 @@ export function AppShell({ children }: { children: ReactNode }) {
     else store.go("connectors");
   };
   const toast = state.toast;
+  // With a sign-in layer the person is whoever it says (nobody while signed out); without one, the Api's user.
+  const person: AccountPerson | null = auth
+    ? auth.status === "signedIn" && auth.user
+      ? {
+          initials: authInitials(auth.user),
+          name:
+            auth.user.displayName ?? (auth.user.isAnonymous ? "Guest" : (auth.user.email ?? "")),
+          email: auth.user.displayName ? (auth.user.email ?? "") : "",
+        }
+      : null
+    : user
+      ? {
+          initials: user.initials,
+          name: user.name,
+          email: user.email,
+          detail: `${user.org} · ${user.plan} plan`,
+        }
+      : null;
+  // Honest: success is said only after the sign-in layer's promise resolves, a failure says it failed.
+  const signOutViaSeam = (): void => {
+    if (!auth) {
+      signOut(store);
+      return;
+    }
+    if (signingOut.current) return;
+    signingOut.current = true;
+    auth
+      .signOut()
+      .then(() => store.toast(SIGNED_OUT))
+      .catch(() => store.toast(SIGN_OUT_FAILED))
+      .finally(() => {
+        signingOut.current = false;
+      });
+  };
   return (
     <>
       <CityBackdrop
@@ -143,7 +185,13 @@ export function AppShell({ children }: { children: ReactNode }) {
         night={appearance.night}
         menu={state.menu}
         unread={!state.read && app.needsLeft > 0}
-        initials={user?.initials ?? ""}
+        initials={
+          auth
+            ? auth.status === "signedIn"
+              ? authInitials(auth.user)
+              : "?"
+            : (user?.initials ?? "")
+        }
         sample={state.sources.fixture}
         org={user?.org ?? null}
         reserveSample={expectsSample}
@@ -156,23 +204,40 @@ export function AppShell({ children }: { children: ReactNode }) {
         onAvatar={() => store.toggleMenu("acct")}
       />
       {state.menu === "notif" ? (
-        <NotificationsPopover
-          notifications={notifications}
-          decisions={decisions}
-          dec={state.dec}
-          onOpen={open}
-          onSettings={() => store.go("profile", { tab: "notifications" })}
-          onClose={store.closeMenu}
-        />
+        <Enter>
+          <NotificationsPopover
+            notifications={notifications}
+            decisions={decisions}
+            dec={state.dec}
+            onOpen={open}
+            onSettings={() => store.go("profile", { tab: "notifications" })}
+            onClose={store.closeMenu}
+          />
+        </Enter>
       ) : null}
       {state.menu === "acct" ? (
-        <AccountMenu
-          user={user}
-          connectorsOn={connectorsOn}
-          go={navTo}
-          onSignOut={() => signOut(store)}
-          onClose={store.closeMenu}
-        />
+        <Enter>
+          <AccountMenu
+            user={person}
+            canSignOut={!auth || auth.status === "signedIn"}
+            onMobile={() => setMobileNote(true)}
+            connectorsOn={connectorsOn}
+            go={navTo}
+            onSignOut={signOutViaSeam}
+            onClose={store.closeMenu}
+          />
+        </Enter>
+      ) : null}
+      {mobileNote ? (
+        <Popover label="Mobile app" width={320} onClose={() => setMobileNote(false)}>
+          <div className="park-shell__concept">
+            <div className="park-shell__whoname">Mobile app</div>
+            <p className="park-shell__whoorg">{MOBILE_NOTE}</p>
+            <Button variant="secondary" size="sm" onClick={() => setMobileNote(false)}>
+              Close
+            </Button>
+          </div>
+        </Popover>
       ) : null}
       {/* The same elements on every page, so a page swap never remounts the outlet (focus stays). */}
       <main
@@ -184,12 +249,14 @@ export function AppShell({ children }: { children: ReactNode }) {
         </div>
       </main>
       {toast ? (
-        <Toast
-          message={toast.message}
-          {...(toast.actionLabel !== undefined ? { actionLabel: toast.actionLabel } : {})}
-          {...(toast.action !== undefined ? { onAction: toast.action } : {})}
-          onDismiss={store.dismissToast}
-        />
+        <Enter>
+          <Toast
+            message={toast.message}
+            {...(toast.actionLabel !== undefined ? { actionLabel: toast.actionLabel } : {})}
+            {...(toast.action !== undefined ? { onAction: toast.action } : {})}
+            onDismiss={store.dismissToast}
+          />
+        </Enter>
       ) : null}
       {card ? (
         <WorldLoader

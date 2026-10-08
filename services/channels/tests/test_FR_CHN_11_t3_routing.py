@@ -16,6 +16,7 @@ from _chn11_lib import (
     DAVID,
     SARAH,
     USER,
+    VOUCHED,
     autopilot_module,
     context,
     make_bench,
@@ -82,7 +83,8 @@ def test_FR_CHN_11_obfuscated_terms_still_give_the_t3_signal(text: str) -> None:
 
 @pytest.mark.parametrize("text", BENIGN_LINES + [BENIGN])
 def test_FR_CHN_11_benign_text_gives_no_t3_signal(text: str) -> None:
-    assert autopilot_module().t3_content_signal(text) == frozenset()
+    # CHN-GATE-E: "David" and "Sarah" are names the bench thread vouches for (a recipient and the mailbox owner)
+    assert autopilot_module().t3_content_signal(text, names=VOUCHED) == frozenset()
 
 
 @pytest.mark.parametrize("text", [MONEY[1], LEGAL[0], COMMITMENT[0], OBFUSCATED[0]])
