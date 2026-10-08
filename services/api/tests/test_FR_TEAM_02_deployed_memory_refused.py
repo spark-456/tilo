@@ -20,9 +20,9 @@ VARIANTS = ["memory", "Memory", "MEMORY", "memory ", " memory", "\tMemory\n"]
 def _clean(monkeypatch: pytest.MonkeyPatch):  # type: ignore[no-untyped-def]
     for name in ("K_SERVICE", "CLOUD_RUN_JOB", "LIVE", "TILO_API_DEV", "TILO_TEAM_STORE", "TILO_FIRESTORE_PROJECT"):
         monkeypatch.delenv(name, raising=False)
-    team_store.get_team_store.cache_clear()
+    team_store.get_team_store.cache_clear()  # type: ignore[attr-defined]
     yield
-    team_store.get_team_store.cache_clear()
+    team_store.get_team_store.cache_clear()  # type: ignore[attr-defined]
 
 
 @pytest.mark.parametrize(("var", "value"), DEPLOYED)

@@ -140,8 +140,18 @@ def _dev_seed() -> TeamState | None:
     return TeamState(roles={dev.DEV_OWNER: "Owner"}) if dev.dev_enabled() else None
 
 
+def _setting() -> str:
+    """`TILO_TEAM_STORE`, trimmed and lower-cased: "Memory " is "memory", blank is unset."""
+    return (os.environ.get("TILO_TEAM_STORE") or "").strip().lower()
+
+
+def _deployed() -> bool:
+    """Presence, not truthiness (as `dev.refuse_if_unsafe`): Cloud Run can set a variable to an empty string."""
+    return "K_SERVICE" in os.environ or "CLOUD_RUN_JOB" in os.environ
+
+
 @functools.cache
-def _open(kind: str, project: str) -> TeamRepository:
+def _build(kind: str, project: str) -> TeamRepository:
     if kind == "memory":
         return InMemoryTeamStore(_dev_seed())
     if kind == "firestore" and _PROJECT.fullmatch(project):
@@ -151,12 +161,21 @@ def _open(kind: str, project: str) -> TeamRepository:
     raise LookupError("team store not configured")
 
 
+def _open(kind: str, project: str) -> TeamRepository:
+    """A deployed service (K_SERVICE or CLOUD_RUN_JOB) never runs on the in-memory store: refused before the cache, so
+    a store opened earlier by a dev process is never handed to a deployed one."""
+    kind = kind.strip().lower()
+    if kind == "memory" and _deployed():
+        raise LookupError("team store not configured")
+    return _build(kind, project)
+
+
 def get_team_store() -> TeamRepository:
     """Memory by name, or in dev mode by default (never deployed or live); Firestore only by explicit config; else
     503 `not_configured`. A success is cached per config, a refusal never is."""
     from tilo_api import dev
 
-    kind = os.environ.get("TILO_TEAM_STORE") or ""
+    kind = _setting()
     if not kind and dev.dev_enabled():
         try:
             dev.refuse_if_unsafe()
@@ -172,14 +191,15 @@ def get_team_store() -> TeamRepository:
         raise HTTPException(status_code=503, detail="not_configured") from exc
 
 
-get_team_store.cache_clear = _open.cache_clear  # type: ignore[attr-defined]
+get_team_store.cache_clear = _build.cache_clear  # type: ignore[attr-defined]
 
 
 def team_configured() -> bool:
-    """Whether a team store is asked for: a non-empty `TILO_TEAM_STORE` (even one that cannot open), or dev mode."""
+    """Whether a team store is asked for: a non-blank `TILO_TEAM_STORE` (even one that cannot open, such as memory when
+    deployed), or dev mode."""
     from tilo_api import dev
 
-    return bool(os.environ.get("TILO_TEAM_STORE")) or dev.dev_enabled()
+    return bool(_setting()) or dev.dev_enabled()
 
 
 def team_reader(overrides: Mapping[Callable[..., Any], Callable[..., Any]]) -> Callable[[], TeamState | None]:
