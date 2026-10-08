@@ -11,6 +11,8 @@ import { useParkApi } from "../../app/context";
 import { PageSheet, StatusChip, Switch } from "../../components";
 import "./Profile.css";
 import { ICONS } from "./icons";
+import { canSwitchOff } from "./notifyRules";
+import { loadProfile, saveProfile } from "./profileStore";
 
 const TABS = [
   { id: "profile", label: "Profile", icon: ICONS.profile },
@@ -93,13 +95,27 @@ function Tile({ tone, children }: { tone: "ok" | "sunk" | "hero"; children: Reac
   return <div className={`park-profile-tile park-profile-tile--${tone}`}>{children}</div>;
 }
 
-function Toggle({ label, on, onChange }: { label: string; on: boolean; onChange: () => void }) {
+// FR-SET-01: a save is kept on this device only (no profile endpoint yet); FR-SET-02: quiet hours never hide
+// a gate. Both lines are accessible descriptions, because the tabs' visible copy is pinned by the design.
+const SAVE_HINT = "Kept on this device only. Tilo has no profile service to send it to yet.";
+const QUIET_HINT =
+  "Quiet hours silence the phone only. A decision that needs you is never hidden by quiet hours: it waits in Needs you.";
+const NEED_ONE = "Decisions need at least one channel";
+
+function Toggle({
+  label,
+  on,
+  onChange,
+  locked,
+}: { label: string; on: boolean; onChange: () => void; locked?: boolean }) {
   return (
     <button
       type="button"
       role="switch"
       aria-checked={on}
       aria-label={label}
+      aria-disabled={locked ? true : undefined}
+      title={locked ? NEED_ONE : undefined}
       className={cls("park-profile-switch", on && "park-profile-switch--on")}
       onClick={onChange}
     >
@@ -113,6 +129,8 @@ export function ProfilePage({ app }: { app: AppCtx }) {
   const [loaded, setLoaded] = useState<Loaded | null>(null);
   const [problem, setProblem] = useState<"missing" | "failed" | null>(null);
   const [form, setForm] = useState<Form | null>(null);
+  // The last saved (or loaded) form: Cancel returns to it. The user key is the signed-in email.
+  const [base, setBase] = useState<Form | null>(null);
   const routeTab = tabFrom(app.params.tab);
   const [tab, setTab] = useState<TabId>(routeTab);
   // The address names a tab ("?tab=appearance", the notification menu's settings link): follow it when it changes.
@@ -131,7 +149,9 @@ export function ProfilePage({ app }: { app: AppCtx }) {
           settings: st.data,
           spend: { spent: led.data.spent, budget: led.data.budget },
         });
-        setForm(formOf(u.data));
+        const start = { ...formOf(u.data), ...loadProfile(u.data.email) };
+        setForm(start);
+        setBase(start);
         setNotif(st.data.notifications.map((n) => [n.phone, n.email, n.slack]));
         setQuiet(st.data.quiet.on);
         setSessions(st.data.sessions);
@@ -149,12 +169,9 @@ export function ProfilePage({ app }: { app: AppCtx }) {
   const user = loaded?.user;
   const flip = (r: number, c: number) => {
     const row = notif[r] ?? [];
-    if (
-      loaded?.settings.notifications[r]?.id === "decisions" &&
-      row[c] &&
-      row.filter(Boolean).length === 1
-    ) {
-      app.toast("Decisions need at least one channel");
+    const id = loaded?.settings.notifications[r]?.id;
+    if (id && !canSwitchOff(id, row, c)) {
+      app.toast(NEED_ONE);
       return;
     }
     setNotif(notif.map((cells, i) => (i === r ? cells.map((v, j) => (j === c ? !v : v)) : cells)));
@@ -239,14 +256,21 @@ export function ProfilePage({ app }: { app: AppCtx }) {
                   <button
                     type="button"
                     className="park-profile-btn park-profile-btn--quiet"
-                    onClick={() => setForm(formOf(user))}
+                    onClick={() => setForm(base ?? formOf(user))}
                   >
                     Cancel
                   </button>
+                  {/* biome-ignore lint/a11y/useValidAriaProps: aria-description is ARIA 1.3; biome's list predates it */}
                   <button
                     type="button"
                     className="park-profile-btn park-btn--primary"
-                    onClick={() => app.toast("Profile saved")}
+                    aria-description={SAVE_HINT}
+                    title={SAVE_HINT}
+                    onClick={() => {
+                      saveProfile(user.email, form);
+                      setBase(form);
+                      app.toast("Profile saved");
+                    }}
                   >
                     Save changes
                   </button>
@@ -284,6 +308,7 @@ export function ProfilePage({ app }: { app: AppCtx }) {
                             <Toggle
                               label={`${label} by ${c}`}
                               on={notif[r]?.[i] ?? false}
+                              locked={!canSwitchOff(id, notif[r] ?? [], i)}
                               onChange={() => flip(r, i)}
                             />
                           </div>
@@ -300,7 +325,12 @@ export function ProfilePage({ app }: { app: AppCtx }) {
                       {`Phone stays silent, except decisions over ${loaded.settings.quiet.threshold}.`}
                     </div>
                   </div>
-                  <Switch label="Quiet hours" checked={quiet} onChange={setQuiet} />
+                  <Switch
+                    label="Quiet hours"
+                    description={QUIET_HINT}
+                    checked={quiet}
+                    onChange={setQuiet}
+                  />
                 </div>
               </section>
             ) : null}

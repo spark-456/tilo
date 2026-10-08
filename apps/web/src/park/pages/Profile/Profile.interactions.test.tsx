@@ -176,7 +176,7 @@ describe("WEB_12_profile_notifications: channel matrix and quiet hours", () => {
     expect(app.setPref, "channels are page state in the design").not.toHaveBeenCalled();
   });
 
-  it("WEB_12_profile_decisions_keep_at_least_one_channel_with_the_design_toast", async () => {
+  it("FR_SET_02_WEB_12_profile_decisions_keep_at_least_one_channel_with_the_design_toast", async () => {
     const app = makeApp();
     const { root } = await renderProfile(app);
     await openTab(root, "Notifications");
@@ -207,7 +207,7 @@ describe("WEB_12_profile_notifications: channel matrix and quiet hours", () => {
     expect(app.toast).not.toHaveBeenCalled();
   });
 
-  it("WEB_12_profile_property_any_toggle_sequence_matches_the_model_and_decisions_never_empty", async () => {
+  it("FR_SET_02_WEB_12_profile_property_any_toggle_sequence_matches_the_model_and_decisions_never_empty", async () => {
     // Invariant (README: "Decisions must keep at least one channel"): after any sequence of toggles the
     // decisions row has an "on" switch, every other switch is exactly the model's, and the toast fires
     // once per refused toggle and never otherwise.
