@@ -84,16 +84,34 @@ const sameState = (a: AuthState, b: AuthState): boolean =>
   (a.status !== "signed_out" ||
     (b.status === "signed_out" && (a.signOutFailed ?? false) === (b.signOutFailed ?? false)));
 
-export function createAuth(env: { readonly hostname: string }): AuthController {
+/** Loads the page afresh where it is: the module-level API clients and their caches belong to one person. */
+const reloadPage = (): void => {
+  try {
+    window.location.reload();
+  } catch {
+    // no window (tests, server): nothing to drop
+  }
+};
+
+export function createAuth(env: {
+  readonly hostname: string;
+  /** Called when a different person (by uid) takes over this page, or after a sign-in that follows a refused
+   * sign-out: the page's caches are not theirs (BQ-SIGNIN-4). Defaults to a full reload. */
+  readonly reload?: () => void;
+}): AuthController {
   const config = firebaseWebConfig();
   const hostname = env.hostname.trim();
   const local = hostname === "" || LOCAL_HOST.test(hostname);
+  const reload = env.reload ?? reloadPage;
 
   let state: AuthState = local || !config ? { status: "unavailable" } : { status: "unknown" };
   const listeners = new Set<() => void>();
   let starting: Promise<Sdk | null> | undefined;
-  /** A user whose sign-out failed: no token is used for them and the state says signed out. */
-  let refused: User | null = null;
+  /** The uid of a user whose sign-out failed: no token is used for them and the state says signed out. By uid, since
+   * the SDK may hand over a fresh User object for the same person. */
+  let refusedUid: string | null = null;
+  /** The person this page's caches belong to: the first uid it saw. */
+  let pageUid: string | null = null;
   let said = false;
 
   const set = (next: AuthState): void => {
@@ -102,16 +120,27 @@ export function createAuth(env: { readonly hostname: string }): AuthController {
     for (const listener of [...listeners]) listener();
   };
   const unavailable = (): boolean => state.status === "unavailable";
+  let reloading = false;
+  const dropCaches = (): void => {
+    if (reloading) return; // one load afresh is enough
+    reloading = true;
+    reload();
+  };
 
   const apply = (user: User | null): void => {
-    if (user === null || user === refused) {
-      if (user === null) refused = null;
+    if (user === null || user.uid === refusedUid) {
+      if (user === null) refusedUid = null;
       set(user === null ? { status: "signed_out" } : { status: "signed_out", signOutFailed: true });
-    } else if (user.isAnonymous) {
+      return;
+    }
+    if (user.isAnonymous) {
       set({ status: "anonymous" });
     } else {
       set({ status: "google", displayName: user.displayName ?? null, email: user.email ?? null });
     }
+    const changed = pageUid !== null && pageUid !== user.uid;
+    pageUid = user.uid;
+    if (changed) dropCaches(); // another person: nothing cached for the last one may serve them
   };
 
   function start(): Promise<Sdk | null> {
@@ -153,7 +182,7 @@ export function createAuth(env: { readonly hostname: string }): AuthController {
   async function token(): Promise<string | null> {
     const sdk = await start();
     const user = sdk?.auth.currentUser ?? null;
-    if (user === null || user === refused) return null;
+    if (user === null || user.uid === refusedUid) return null;
     const value: unknown = await user.getIdToken();
     return typeof value === "string" && value !== "" ? value : null;
   }
@@ -200,8 +229,10 @@ export function createAuth(env: { readonly hostname: string }): AuthController {
         if (sdk === null) return { ok: false, reason: "unavailable" };
         const result = await run(sdk);
         if (result.ok) {
-          refused = null;
+          const afterRefusal = refusedUid !== null;
+          refusedUid = null;
           apply(sdk.auth.currentUser);
+          if (afterRefusal) dropCaches(); // the caches may hold the refused person's data
         }
         return result;
       } catch {
@@ -258,7 +289,7 @@ export function createAuth(env: { readonly hostname: string }): AuthController {
           // fall through: whoever is still the SDK's current user is not used
         }
         const left = sdk.auth.currentUser;
-        if (left !== null) refused = left; // the SDK still holds them: no token is used, and the page says so
+        if (left !== null) refusedUid = left.uid; // the SDK still holds them: no token is used, the page says so
         set(
           left === null ? { status: "signed_out" } : { status: "signed_out", signOutFailed: true },
         );

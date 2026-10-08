@@ -18,7 +18,6 @@ from __future__ import annotations
 import dataclasses
 import inspect
 import pathlib
-import socket
 from typing import Annotated, Any
 
 import pytest
@@ -30,6 +29,9 @@ from fastapi.testclient import TestClient
 from tilo_api import access, appcheck, deps, firebase_auth, runs
 from tilo_harness.schedule_store import schedule_from_doc, schedule_to_doc
 from tilo_metering.flags import InMemoryFlagStore
+from tilo_providers import factory as tilo_factory
+from tilo_providers import safety as tilo_safety
+from tilo_providers.replay import RecordReplayProvider, ReplayMissError
 
 ENV_CLEAR = (
     "K_SERVICE", "CLOUD_RUN_JOB", "LIVE", "TILO_API_DEV", "TILO_JUDGE_LIVE", "TILO_APPCHECK_ENFORCE",
@@ -68,10 +70,115 @@ def _principal(**flags: bool):
     return lambda: deps.Principal(user_id=FLOW_USER, role="owner", **flags)
 
 
-@pytest.mark.parametrize("path", ["/mode", "/work"])
-def test_SEC_15_SIGNIN_fix_a_demo_principal_is_replay_under_the_global_live_switch_when_not_deployed(monkeypatch, path):
+def _live_builds(monkeypatch: pytest.MonkeyPatch) -> list[str]:
+    """Stubs the provider layer's live builders: a call that goes live builds a stub (never a network client) and
+    is recorded here. The switch itself is set only through monkeypatch."""
+    built: list[str] = []
+
+    class _Stub:
+        def generate(self, request: Any) -> Any:
+            raise AssertionError("a live model call")
+
+        def capabilities(self) -> set[Any]:
+            return set()
+
+        def check(self, *args: Any, **kwargs: Any) -> Any:
+            raise AssertionError("a live safety call")
+
+    def model(*args: Any, **kwargs: Any) -> Any:
+        built.append("model")
+        return _Stub()
+
+    def screen(*args: Any, **kwargs: Any) -> Any:
+        built.append("safety")
+        return _Stub()
+
+    monkeypatch.setattr(tilo_factory, "_build_live_provider", model)
+    monkeypatch.setattr(tilo_safety, "_build_live_safety_provider", screen)
+    return built
+
+
+def _touch_every_provider(router: Any) -> int:
+    """Asks every replay-backed provider the router can build for its capabilities: a live one builds its client."""
+    touched = 0
+    for role_id, role in router._config.roles.items():
+        for profile_id in role.cascade or [p for p in (role.primary, role.fallback) if p]:
+            if router._config.profiles[profile_id].provider == "model_armor":
+                continue  # the safety profile is no Router candidate (build_safety_provider)
+            provider = router._provider(role_id, profile_id)
+            if isinstance(provider, RecordReplayProvider):
+                provider.capabilities()
+                touched += 1
+    return touched
+
+
+def _screen(safety: Any) -> None:
+    with pytest.raises(ReplayMissError):  # replay: no recording for this text, and no live client
+        safety.check("SIGNIN-FIX provider probe")
+
+
+def _router_app(principal: Any = None) -> tuple[TestClient, list[Any]]:
+    client = _mini(principal)
+    seen: list[Any] = []
+
+    @client.app.get("/router")  # type: ignore[attr-defined]
+    def router(
+        r: Annotated[Any, Depends(deps.get_router)], s: Annotated[Any, Depends(deps.get_safety)]
+    ) -> dict[str, bool]:
+        seen.extend([r, s])
+        return {"ok": True}
+
+    @client.app.get("/decider")  # type: ignore[attr-defined]
+    def decider(d: Annotated[Any, Depends(deps.get_assistant_decider)]) -> dict[str, bool]:
+        seen.append(d)
+        return {"ok": d is not None}
+
+    return client, seen
+
+
+def test_SEC_15_SIGNIN_fix_a_demo_principal_gets_no_live_provider_under_the_global_live_switch(monkeypatch):
+    built = _live_builds(monkeypatch)
     monkeypatch.setenv("LIVE", "1")
-    assert _mini(_principal(demo_session=True)).get(path).json() == {"mode": "replay"}
+    client, seen = _router_app(_principal(demo_session=True))
+    assert client.get("/router").json() == {"ok": True}
+    router, safety = seen
+    assert _touch_every_provider(router) > 0
+    _screen(safety)
+    assert built == [], "a demo session's router and safety screen built a live client"
+
+
+def test_SEC_15_SIGNIN_fix_a_google_principal_still_gets_live_providers_under_the_global_live_switch(monkeypatch):
+    built = _live_builds(monkeypatch)
+    monkeypatch.setenv("LIVE", "1")
+    client, seen = _router_app(_principal(full_session=True))
+    assert client.get("/router").json() == {"ok": True}
+    assert _touch_every_provider(seen[0]) > 0
+    assert "model" in built, "the probe must be able to see a live provider (control)"
+
+
+def test_SEC_15_SIGNIN_fix_the_assistant_decider_of_a_demo_session_is_never_live(monkeypatch):
+    built = _live_builds(monkeypatch)
+    monkeypatch.setenv("LIVE", "1")
+    client, seen = _router_app(_principal(demo_session=True))
+    assert client.get("/decider").json() == {"ok": True}
+    inner = seen[0]._inner
+    assert _touch_every_provider(inner._router) > 0
+    _screen(inner._safety)
+    assert built == [], "the demo session's assistant decider built a live client"
+
+
+def test_SEC_15_SIGNIN_fix_replay_only_reaches_the_assistant_decider_under_the_global_live_switch(monkeypatch):
+    """Same root cause (NFR-24): the switch turns the mode to replay, and the decider's providers follow it."""
+    built = _live_builds(monkeypatch)
+    monkeypatch.setenv("LIVE", "1")
+    client, seen = _router_app(_principal(full_session=True))
+    flags = InMemoryFlagStore()
+    flags.set("replay_only", True, reason="test")
+    client.app.dependency_overrides[deps.get_flag_store] = lambda: flags  # type: ignore[attr-defined]
+    assert client.get("/decider").json() == {"ok": True}
+    assert _touch_every_provider(seen[0]._inner._router) > 0
+    _screen(seen[0]._inner._safety)
+    assert built == []
 
 
 @pytest.mark.parametrize("path", ["/mode", "/work"])
@@ -95,19 +202,48 @@ def test_SEC_15_SIGNIN_fix_a_principal_double_that_takes_no_request_still_works(
     }
 
 
-def test_SEC_15_SIGNIN_fix_a_real_anonymous_token_is_replay_and_a_google_token_live_when_not_deployed(monkeypatch):
+class _Counting:
+    def __init__(self, inner: Any) -> None:
+        self.inner, self.calls = inner, 0
+
+    def verify(self, token: str) -> Any:
+        self.calls += 1
+        return self.inner.verify(token)
+
+
+def test_SEC_15_SIGNIN_fix_a_real_anonymous_token_gets_no_live_provider_and_is_verified_once(monkeypatch):
+    built = _live_builds(monkeypatch)
     monkeypatch.setenv("LIVE", "1")
     signer = _key()
-    verifier = firebase_auth.FirebaseIdTokenVerifier(
-        PROJECT, fetch=Fetch({"k1": signer.public_key()}), clock=lambda: 0.0, wall=lambda: NOW
+    verifier = _Counting(
+        firebase_auth.FirebaseIdTokenVerifier(
+            PROJECT, fetch=Fetch({"k1": signer.public_key()}), clock=lambda: 0.0, wall=lambda: NOW
+        )
     )
-    client = _mini()
+    client, seen = _router_app()
     client.app.dependency_overrides[deps.get_firebase_verifier] = lambda: verifier  # type: ignore[attr-defined]
-    anonymous = _token(signer, provider="anonymous", sub="anon" + "Q7" * 12)
-    google = _token(signer, provider="google.com", sub="uid" + "A1" * 10)
-    assert client.get("/mode", headers={"Authorization": f"Bearer {anonymous}"}).json() == {"mode": "replay"}
-    assert client.get("/mode", headers={"Authorization": f"Bearer {google}"}).json() == {"mode": "live"}
-    assert client.get("/mode", headers={"Authorization": "Bearer not-a-token"}).json() == {"mode": "live"}
+
+    @client.app.get("/me")  # type: ignore[attr-defined]
+    def me(
+        p: Annotated[deps.Principal, Depends(deps.get_current_principal)],
+        r: Annotated[Any, Depends(deps.get_router)],
+    ) -> dict[str, bool]:
+        seen.append(r)
+        return {"demo": p.demo_session}
+
+    anonymous = {"Authorization": f"Bearer {_token(signer, provider='anonymous', sub='anon' + 'Q7' * 12)}"}
+    google = {"Authorization": f"Bearer {_token(signer, provider='google.com', sub='uid' + 'A1' * 10)}"}
+
+    assert client.get("/me", headers=anonymous).json() == {"demo": True}
+    assert verifier.calls == 1, "the route and the mode share one verification per request (BQ-SIGNIN-9(e))"
+    assert client.get("/router", headers={"Authorization": "Bearer not-a-token"}).json() == {"ok": True}
+    for router in (seen[0], seen[1]):  # the anonymous token's, then the unverifiable one's: both fail closed
+        assert _touch_every_provider(router) > 0
+    _screen(seen[2])
+    assert built == []
+
+    assert client.get("/me", headers=google).json() == {"demo": False}
+    assert _touch_every_provider(seen[-1]) > 0 and "model" in built, "a Google token keeps the user's switch"
 
 
 def test_SEC_15_SIGNIN_fix_a_principal_seam_that_fails_does_not_break_the_mode(monkeypatch):
@@ -143,7 +279,7 @@ def test_SEC_15_SIGNIN_fix_a_schedule_record_has_a_demo_flag_that_defaults_to_fa
     assert schedule_from_doc(schedule_to_doc(plain)).demo is False
     old = schedule_to_doc(plain)
     old.pop("demo", None)
-    assert schedule_from_doc(old).demo is False, "a record written before the field existed is a plain one"
+    assert schedule_from_doc(old).demo is True, "a record written before the field existed only replays (safe)"
     for bad in ("yes", 1, None):
         with pytest.raises(ValueError):
             schedule_from_doc({**schedule_to_doc(plain), "demo": bad})
@@ -182,16 +318,53 @@ def _execute(rig: SchedApi):
     return rig.task_call(task_body("sched_a", MON_0330Z))
 
 
-def test_SEC_15_SIGNIN_fix_the_tick_builds_a_demo_schedules_run_in_replay_under_the_global_live_switch(
+def _real_model_seams(monkeypatch: pytest.MonkeyPatch) -> list[Any]:
+    """While the tick runs, also builds the production model seams (`plan_compiler`, `unit_runner`,
+    `must_ask_providers`) in the mode the tick asked for, and keeps every Router they build. The run itself still
+    uses the rig's doubles."""
+    routers: list[Any] = []
+    original_seams, original_router = runs.run_seams, deps.router_for_mode
+
+    def keep(mode: Any) -> Any:
+        routers.append(original_router(mode))
+        return routers[-1]
+
+    def spy(request: Any, mode: Any) -> Any:
+        deps.get_plan_compiler(mode), deps.get_unit_runner(mode), deps.get_must_ask_providers(mode)
+        return original_seams(request, mode)
+
+    monkeypatch.setattr(deps, "router_for_mode", keep)
+    monkeypatch.setattr(runs, "run_seams", spy)
+    return routers
+
+
+def test_SEC_15_SIGNIN_fix_the_tick_gives_a_demo_schedules_seams_no_live_provider_under_the_global_live_switch(
     rig: SchedApi, monkeypatch
 ):
+    built = _live_builds(monkeypatch)
     source = armed(rig)
     rig.insert(source, "sched_a", demo=True)
     monkeypatch.setenv("LIVE", "1")
-    modes = _record_modes(monkeypatch)
+    routers = _real_model_seams(monkeypatch)
     response = _execute(rig)
     assert response.status_code == 200 and response.json()["ran"] == 1, response.text
-    assert modes and modes[-1] == "replay", modes
+    assert len(routers) == 3, "plan_compiler, unit_runner and must_ask_providers, built once"
+    assert all(_touch_every_provider(router) > 0 for router in routers)
+    assert built == [], "a demo schedule's run seams built a live client"
+
+
+def test_SEC_15_SIGNIN_fix_the_tick_gives_a_google_owners_schedule_live_providers_under_the_switch(
+    rig: SchedApi, monkeypatch
+):
+    built = _live_builds(monkeypatch)
+    source = armed(rig)
+    rig.insert(source, "sched_a")
+    monkeypatch.setenv("LIVE", "1")
+    routers = _real_model_seams(monkeypatch)
+    response = _execute(rig)
+    assert response.status_code == 200 and response.json()["ran"] == 1, response.text
+    assert len(routers) == 3 and _touch_every_provider(routers[0]) > 0
+    assert "model" in built, "control: the probe sees a live provider"
 
 
 def test_SEC_15_SIGNIN_fix_the_tick_leaves_a_google_owners_schedule_on_the_users_own_switch(rig: SchedApi, monkeypatch):
@@ -237,7 +410,3 @@ def test_SEC_15_SIGNIN_fix_a_request_with_no_authorization_is_the_fixed_401():
     with pytest.raises(HTTPException) as refused:
         deps.get_current_principal(HTTPConnection({"type": "http", "headers": [], "app": FastAPI()}))
     assert refused.value.status_code == 401
-
-
-def test_SEC_15_SIGNIN_fix_nothing_in_these_tests_opens_a_connection():
-    assert socket.socket.connect is not None

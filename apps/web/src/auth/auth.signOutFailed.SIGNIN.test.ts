@@ -77,12 +77,12 @@ const userOf = (isAnonymous: boolean): FakeUser => ({
   getIdToken: async () => fakeToken(),
 });
 
-async function started() {
+async function started(reload?: () => void) {
   vi.resetModules();
   sdk.state.currentUser = null;
   sdk.state.listeners = [];
   const { createAuth } = await import("./auth");
-  const auth = createAuth({ hostname: "example-project.web.app" });
+  const auth = createAuth({ hostname: "example-project.web.app", ...(reload ? { reload } : {}) });
   auth.subscribe(() => undefined);
   await vi.waitFor(() => expect(auth.getState().status).toBe("signed_out"));
   return auth;
@@ -169,5 +169,44 @@ describe("SEC-15 SIGNIN-FIX the controller says when the SDK's sign-out did not 
     heard.mockClear();
     await auth.signOut();
     expect(heard).toHaveBeenCalled();
+  });
+});
+
+describe("SEC-15 SIGNIN-FIX r2: the refused person is matched by uid, and a new person reloads the page", () => {
+  const refuseSignOut = () =>
+    sdk.signOut.mockImplementation(async () => {
+      throw new Error("auth/network-request-failed");
+    });
+
+  it("SEC-15 SIGNIN-FIX a fresh User object for the refused uid still gets no token and keeps the flag", async () => {
+    const auth = await started(vi.fn());
+    await auth.signInAnonymously();
+    refuseSignOut();
+    await auth.signOut();
+    sdk.emit(userOf(true)); // the SDK swaps the object, same uid
+    expect(auth.getState()).toEqual({ status: "signed_out", signOutFailed: true });
+    await expect(auth.idToken()).resolves.toBeNull();
+  });
+
+  it("SEC-15 SIGNIN-FIX a sign-in after a refused sign-out loads the page afresh, once", async () => {
+    const reload = vi.fn();
+    const auth = await started(reload);
+    await auth.signInAnonymously();
+    refuseSignOut();
+    await auth.signOut();
+    expect(reload).not.toHaveBeenCalled();
+    await auth.signInAnonymously(); // the same person again: the caches still go
+    expect(reload).toHaveBeenCalledTimes(1);
+    await auth.signInWithGoogle(); // another person too, but one reload is already on its way
+    expect(reload).toHaveBeenCalledTimes(1);
+  });
+
+  it("SEC-15 SIGNIN-FIX another uid taking over the page reloads it; the first sign-in does not", async () => {
+    const reload = vi.fn();
+    const auth = await started(reload);
+    await auth.signInAnonymously();
+    expect(reload).not.toHaveBeenCalled();
+    sdk.emit(userOf(false)); // e.g. another tab signed a Google person in
+    expect(reload).toHaveBeenCalledTimes(1);
   });
 });

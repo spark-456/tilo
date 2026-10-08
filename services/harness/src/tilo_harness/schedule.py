@@ -148,7 +148,8 @@ class Schedule:
     created_at: datetime | None = None
     # SEC-15 / BQ-SIGNIN-10: the owner was an anonymous demo session when this was created (set by the server from the
     # verified principal, never by a request body). The tick has no signed-in person, so it reads the flag from here and
-    # runs the schedule in replay whatever `LIVE` says. A record written before the field existed is a plain one.
+    # builds the run's model seams in replay mode, which tilo-api injects into the providers as `force_replay`: replay
+    # whatever `LIVE` says. A stored record written before the field existed reads as demo (it only replays, safe).
     demo: bool = False
 
     def __post_init__(self) -> None:

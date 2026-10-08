@@ -194,6 +194,22 @@ def get_current_principal(request: HTTPConnection) -> Principal:
     resolved = getattr(request.state, "principal", None)  # the access gate already verified this request (server-set)
     if isinstance(resolved, Principal):
         return resolved
+    # With no gate, the token is verified once per request (BQ-SIGNIN-9(e)): `spend_mode` and the route share it.
+    earlier = getattr(request.state, "signin_attempt", None)
+    if isinstance(earlier, Principal):
+        return earlier
+    if earlier is not None:
+        raise HTTPException(status_code=401, detail=SIGN_IN_REQUIRED, headers={"WWW-Authenticate": "Bearer"})
+    try:
+        principal = _verified_principal(request)
+    except HTTPException:
+        request.state.signin_attempt = "refused"
+        raise
+    request.state.signin_attempt = principal
+    return principal
+
+
+def _verified_principal(request: HTTPConnection) -> Principal:
     token = firebase_auth.bearer_token(request.headers.getlist("authorization"))
     if token is None:
         raise HTTPException(status_code=401, detail=SIGN_IN_REQUIRED, headers={"WWW-Authenticate": "Bearer"})
@@ -304,8 +320,10 @@ def spend_mode(
     request: Request, uid: str | None, declaration: str | None, switches: FlagStore, *, demo: bool | None = None
 ) -> tuple[Mode, bool]:
     """(mode, capped): SEC-15's decision, then deployed the `SpendGuard`'s; any doubt is replay (fail closed). An
-    anonymous demo session (`Principal.demo_session`, set by the gate from the verified token) is replay whatever
-    `TILO_JUDGE_LIVE` or the guard say (BQ-SIGNIN-10); its cap is still read, so new work is refused the same way."""
+    anonymous demo session (`Principal.demo_session`, set by the gate from the verified token, or with no gate the
+    request's own sign-in) is replay whatever `LIVE`, `TILO_JUDGE_LIVE` or the guard say (BQ-SIGNIN-10): a "replay"
+    mode reaches the providers as `force_replay` (`router_for_mode`, `get_safety`), so `LIVE=1` cannot override it.
+    Its cap is still read, so new work is refused the same way."""
     mode, capped = _spend_mode(request, uid, declaration, switches)
     if demo is None:  # the gate's flag, or what the request's own sign-in says where there is no gate
         demo = getattr(request.state, "demo_session", False) is True or _signed_in_as_demo(request)
@@ -315,14 +333,15 @@ def spend_mode(
 def _signed_in_as_demo(request: Request) -> bool:
     """True when this request's own sign-in is an anonymous demo session. Only a process the access gate does not
     guard (not deployed) looks: deployed, the gate has already set the flag, and a public route has no person to
-    resolve. Any failure, or nobody signed in, is False: the answer is then the user's own switch, as it always was
-    (BQ-SIGNIN-10)."""
+    resolve. Nobody signed in (no `Authorization` header) is False: the answer is then the user's own switch. A token
+    that is present but cannot be verified fails closed: replay (BQ-SIGNIN-10). The verification is the route's own,
+    done once per request (`get_current_principal`), so this adds no second check and no second log line."""
     if enforced():
         return False
     try:
         return resolve_principal(request.app, request).demo_session is True
     except Exception:
-        return False
+        return bool(request.headers.getlist("authorization"))
 
 
 def _spend_mode(request: Request, uid: str | None, declaration: str | None, switches: FlagStore) -> tuple[Mode, bool]:
@@ -358,9 +377,12 @@ def router_for_mode(mode: Mode) -> Router:
     """The one place a request's Router is built (PL-01). It replays recordings unless `mode` is "live", which only
     `access.provider_mode` returns: the user's own global switch, or a deployed judge where the user set
     `TILO_JUDGE_LIVE=1` (SEC-15). The permission is injected into the Router, never read-and-written from the
-    environment, so no request can turn live mode on for the process (EFF-01)."""
+    environment, so no request can turn live mode on for the process (EFF-01). Any other mode is a replay decision
+    (a demo session, NFR-24's switch, SEC-16's cap, no live declaration), injected as `force_replay`: it holds at the
+    provider layer even where `LIVE=1` is set, and never records (BQ-SIGNIN-10)."""
     try:
-        return Router(providers_config(), fixtures_dir=FIXTURES_DIR, live_permitted=(mode == "live"))
+        live = mode == "live"
+        return Router(providers_config(), fixtures_dir=FIXTURES_DIR, live_permitted=live, force_replay=not live)
     except ProviderConfigError as exc:
         logger.warning("model router unavailable: %s", exc)
         raise HTTPException(status_code=503, detail="The model router is not configured.") from exc
@@ -371,11 +393,12 @@ def get_router(mode: Annotated[Mode, Depends(get_work_mode)] = "replay") -> Rout
     return router_for_mode(mode)
 
 
-def get_safety() -> SafetyProvider:
+def get_safety(mode: Annotated[Mode | None, Depends(get_mode)] = None) -> SafetyProvider:
     """PRD 16.3 item 2: built from the `safety` role on every call; no role, or a provider the factory refuses
-    (the fake when live or deployed), closes the screened routes with 503."""
+    (the fake when live or deployed), closes the screened routes with 503. A request in replay mode screens from
+    recordings only, `LIVE=1` or not (BQ-SIGNIN-10); `None` (a direct call with no request) follows the live switch."""
     try:
-        return build_safety_provider(providers_config(), fixtures_dir=FIXTURES_DIR)
+        return build_safety_provider(providers_config(), fixtures_dir=FIXTURES_DIR, force_replay=mode == "replay")
     except ProviderConfigError as exc:
         logger.warning("safety provider unavailable: %s", exc)
         raise HTTPException(
@@ -764,7 +787,9 @@ def get_assistant_decider(mode: Annotated[Mode, Depends(get_mode)] = "replay") -
         if config.model["role"] not in providers.roles:
             return None
         router = _seam_router(mode)
-        inner = ModelDecider(router=router, providers=providers, safety=get_safety(), config=config)
+        # this request's mode reaches the screen too (BQ-SIGNIN-10); a stand-in that takes no argument still works
+        safety = get_safety(mode) if inspect.signature(get_safety).parameters else get_safety()
+        inner = ModelDecider(router=router, providers=providers, safety=safety, config=config)
         return MeteredDecider(inner, ledger=get_spend_ledger(), cache=get_decision_cache(), config=config)
     except (HTTPException, ProviderConfigError, AssistantModelUnavailable):
         return None

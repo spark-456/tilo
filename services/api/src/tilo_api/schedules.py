@@ -847,7 +847,7 @@ def _run_task(
         return _closed(422, "Invalid task.")
     deps.refuse_if_replay_only(flags)  # NFR-24: 503, so Cloud Tasks retries once the flag is clear
     try:
-        schedules, seams = schedule_store(), seams_factory()
+        schedules = schedule_store()
     except HTTPException as exc:
         return _closed(exc.status_code, str(exc.detail))
     except Exception as exc:
@@ -858,14 +858,16 @@ def _run_task(
         return {"ran": 0, "skipped": code}
 
     due, record = body.due_at(), schedules.get(body.schedule_id)
+    demo = record is not None and record.demo  # the tick has no signed-in person: the record says if it was a demo's
+    try:  # built once, after the record (BQ-SIGNIN-10: a demo's replays)
+        seams = seams_factory(demo=True) if demo else seams_factory()
+    except HTTPException as exc:
+        return _closed(exc.status_code, str(exc.detail))
+    except Exception as exc:
+        logger.error("schedule task could not be set up (%s)", type(exc).__name__)
+        return _closed(500, "tick failed")
     if record is None:
         return refused("schedule_missing")
-    if record.demo:  # BQ-SIGNIN-10: the tick has no signed-in person; the record says the owner was a demo session
-        try:
-            seams = seams_factory(demo=True)
-        except Exception as exc:
-            logger.error("schedule task could not be set up (%s)", type(exc).__name__)
-            return _closed(500, "tick failed")
     if due > clock() + _CLOCK_SLACK:
         return refused("slot_not_due")
     try:
