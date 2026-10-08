@@ -101,7 +101,7 @@ The bot names no model, vendor or key. `bot/providers.py` is the one module that
   cap the bot logs one warning and carries on without them: no more answers, the local voice (for the rest of that
   meeting only, nothing is remembered for the next), the transcript still written. Captions stay the transcript only
   outside hybrid mode: in hybrid mode (`--stt gemini`) the audio transcript is the transcript, so once the speech cap is
-  reached no further speech is transcribed (the captions still go to `captions.jsonl`, with names and timing only). The
+  reached no further speech is transcribed (`captions.jsonl` keeps the caption text, but the audio transcript no longer uses it for words). The
   config is checked when the session starts, before the bot joins: a bad `config/meeting.yaml`, or a role, speech or voice
   config that resolves to the dev fake provider, stops the start with a clear error. SEC-16 spend caps are not wired for
   the bot (BQ-MTG11-9).

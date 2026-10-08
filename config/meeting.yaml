@@ -4,7 +4,7 @@
 # BQ-MTG11-9), so one meeting is bounded by count. When a cap is reached the bot logs it once and degrades: no more model
 # answers or analysis (the transcript keeps being written), no more cloud speech (the local voice speaks, the captions
 # stay the transcript). The counts are per bot process, which is one meeting. Defaults are conservative: a 60 minute
-# meeting at the bot's own pacing makes well under these. A non-positive or non-integer value fails start-up.
+# meeting at the bot's own pacing makes well under these outside hybrid mode; in hybrid mode STT segments (up to 12 s each) and voice replies share max_speech_calls, so a talkative hour can reach it and transcription then stops with one warning. A non-positive or non-integer value fails start-up.
 meeting:
   max_model_calls: 200 # analysis steps plus direct answers, one per router call (a call that tries the primary and then the fallback counts once)
   max_speech_calls: 400 # speech-to-text segments plus voice replies
