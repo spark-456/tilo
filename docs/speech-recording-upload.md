@@ -35,5 +35,6 @@ caps and safety screen (FR-INT-02) that this path shares.
 
 ## Not built here
 
-The FR-MTG-02 ingest (VTT, SRT, text, the meet-bot package, the stored artifact, the Trace event) and the upload
-route. See BQ-MTG17-1 and BQ-MTG17-2 in `docs/open-questions.md`.
+The upload route and the storing of a recording's transcript. The FR-MTG-02 ingest (VTT, SRT, text, the meet-bot
+package, the stored artifact, the Trace event) is in `docs/transcript-ingest.md` and shares `normalise_segments` with
+this path. See BQ-MTG17-1 and BQ-MTG17-2 in `docs/open-questions.md`.
