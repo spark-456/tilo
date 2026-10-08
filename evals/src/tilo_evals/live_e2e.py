@@ -36,11 +36,11 @@ from typing import Any, Literal
 from fastapi import FastAPI, Request
 from tilo_harness.outputs import UnitOutput
 from tilo_providers.config import ProviderConfigError, ProvidersConfig, load_providers_config, resolve_models_path
-from tilo_providers.errors import ProviderError, QuotaError, RequestError
+from tilo_providers.errors import OutputTruncatedError, ProviderError, QuotaError, RequestError
 from tilo_providers.interfaces import Capability, GenerateRequest, GenerateResponse, ModelProvider, SafetyProvider
 from tilo_providers.prompts import load_prompt, neutralise_marker
 from tilo_providers.replay import RecordReplayProvider, ReplayMissError, recording_key, redact_strings
-from tilo_providers.router import BudgetExceededError, Router
+from tilo_providers.router import BudgetExceededError, Router, RouterError
 from tilo_providers.safety import FakeSafetyProvider
 from tilo_providers.vertex_smoke import MAX_REASON_CHARS, classify, scrubbed_server_text
 
@@ -80,12 +80,13 @@ _OWNER = "u_live_e2e"
 _GOOGLE_IDS = ("gmail", "google_drive", "google_calendar")
 _UNIT_TIMEOUT_S = {"live": 600.0, "replay": 120.0}
 _OUT = {
-    "writer": 1024,
-    "specialist": 1024,
-    "verifier": 300,
-    "lead": 400,
-    "narrator": 600,
-}  # output caps of our own calls
+    "writer": 16384,
+    "specialist": 8192,
+    "verifier": 1024,
+    "lead": 2048,
+    "narrator": 2048,
+}  # output caps of our own calls; thinking tokens count against them, so a call that writes text states room for both
+_RETRY_OUT_MAX = 32768  # a reply cut at its cap is asked once more with twice the room, up to this
 _DEFAULT_OUT = 1024  # the Router's default when neither the request nor the role gives one (BQ-63)
 _DIRECTOR_OUT = 4096  # the Director's floor when its role sets no cap: thinking tokens count against it (BQ-LE2E-9)
 _PROMPT_TOKENS, _UNITS, _DIRECTOR_RETRIES, _MAX_BEATS = 1500, (3, 8), 3, 8  # estimate assumptions; Narrator beats
@@ -628,7 +629,15 @@ class _UnitRunner:
 
     def _ask(self, role: str, prompt: str) -> tuple[str, float]:
         request = GenerateRequest(prompt=prompt, max_output_tokens=_OUT.get(role), thinking_level="minimal")
-        response = self._router.generate(role, request).response
+        try:
+            response = self._router.generate(role, request).response
+        except RouterError as exc:
+            if not isinstance(exc.__cause__, OutputTruncatedError) or not request.max_output_tokens:
+                raise
+            request = request.model_copy(
+                update={"max_output_tokens": min(request.max_output_tokens * 2, _RETRY_OUT_MAX)}
+            )
+            response = self._router.generate(role, request).response  # a second cut is the failure: no third try
         text = ((response.text if response else None) or "").strip()
         if not response or not text:
             raise ProviderError("the model returned no text")
