@@ -137,9 +137,10 @@ def list_worlds(
 ) -> JSONResponse:
     after = _decode_cursor(principal.user_id, cursor) if cursor is not None else None
     if principal.role == "owner":
+        store.load_owner(principal.user_id, settle=True)
         scope = {w: rec for w, rec in store.worlds.items() if rec.owner == principal.user_id}
     else:
-        named = store.worlds.get(principal.world_id) if principal.world_id is not None else None
+        named = store.load_world(principal.world_id, settle=True) if principal.world_id is not None else None
         scope = {principal.world_id: named} if principal.world_id is not None and named is not None else {}
     ordered = sorted((_position(principal, store, w, rec) for w, rec in scope.items()), reverse=True)
     rest = [p for p in ordered if after is None or p < after]

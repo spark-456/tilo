@@ -13,8 +13,12 @@ import type { Page } from "@playwright/test";
 export type Zone = "main" | "bar" | "splash" | "loader" | "city" | "other";
 
 export interface AnimRec {
-  /** ms since `start()` (or since the page began, before the first start()). */
+  /** ms since `start()` (or since the page began, before the first start()) when the probe NOTICED it: a busy main
+   * thread notices late, so this is no measure of when the animation ran. */
   t: number;
+  /** ms on the same clock when the animation itself began (its own startTime), which a busy main thread cannot
+   * delay; falls back to `t` for an animation that was cancelled before it ever got a start time. */
+  start: number;
   kind: "transition" | "animation" | "script";
   /** transitionProperty, animationName, or "" for script animations. */
   name: string;
@@ -67,6 +71,8 @@ export function installProbe(): void {
   const META = new Set(["offset", "easing", "composite", "computedOffset"]);
   const seen = new WeakSet<Animation>();
   const recs: AnimRec[] = [];
+  /** Animations noticed before the browser gave them a startTime: read again until they have one. */
+  const waiting: { rec: AnimRec; anim: Animation }[] = [];
   const samples: Sample[] = [];
   let t0 = 0;
   let baseline = -1;
@@ -127,8 +133,9 @@ export function installProbe(): void {
     };
     const isTransition = typeof CSSTransition !== "undefined" && a instanceof CSSTransition;
     const isAnimation = typeof CSSAnimation !== "undefined" && a instanceof CSSAnimation;
-    recs.push({
+    const rec: AnimRec = {
       t: now(),
+      start: now(),
       kind: isTransition ? "transition" : isAnimation ? "animation" : "script",
       name: isTransition
         ? (a as CSSTransition).transitionProperty
@@ -146,10 +153,20 @@ export function installProbe(): void {
       zone: zoneOf(target),
       tag: target ? `${target.tagName.toLowerCase()}.${String(target.className).slice(0, 60)}` : "",
       blurred: blurredUp(target),
-    });
+    };
+    recs.push(rec);
+    if (a.startTime !== null) rec.start = Number(a.startTime) - t0;
+    else waiting.push({ rec, anim: a });
   };
 
   const tick = (): void => {
+    for (let i = waiting.length - 1; i >= 0; i--) {
+      const w1 = waiting[i] as { rec: AnimRec; anim: Animation };
+      if (w1.anim.startTime !== null) {
+        w1.rec.start = Number(w1.anim.startTime) - t0;
+        waiting.splice(i, 1);
+      } else if (w1.anim.playState === "idle") waiting.splice(i, 1);
+    }
     for (const a of document.getAnimations()) {
       if (seen.has(a)) continue;
       seen.add(a);
@@ -207,6 +224,7 @@ export function installProbe(): void {
     start(): void {
       recs.length = 0;
       samples.length = 0;
+      waiting.length = 0;
       t0 = performance.now();
     },
     data(): ProbeData {

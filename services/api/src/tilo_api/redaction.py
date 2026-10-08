@@ -192,6 +192,8 @@ def get_world_events(
 ) -> JSONResponse:
     world = _require_member_world(principal, store, world_id)
     is_owner = _is_owner(principal, world.owner)
+    if is_owner:
+        store.settle(world_id)  # only after the checks: a restart's queued events and its `world.failed` (ADR-0026 5)
     safe_districts = _safe_districts(principal.districts)
 
     well_formed = [e for e in store.events.get(world_id, []) if not _is_malformed_event(e)]

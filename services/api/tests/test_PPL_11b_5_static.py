@@ -25,7 +25,7 @@ import yaml
 REPO_ROOT = pathlib.Path(__file__).resolve().parents[3]
 SRC = REPO_ROOT / "services" / "api" / "src" / "tilo_api"
 PKG = SRC / "assistant"
-MODULES = ["__init__", "config", "words", "facts", "gate", "core", "navigation", "route", "model", "metering"]
+MODULES = sorted(p.stem for p in PKG.glob("*.py"))  # every module of the package, so a new one is scanned too
 PROVIDER_OK = {"model", "metering"}  # the only modules that may import tilo_providers (metering: types only)
 NETWORK = ("anthropic", "openai", "google", "vertexai", "httpx", "requests", "urllib", "socket", "aiohttp", "grpc")
 LOG_BANNED = {

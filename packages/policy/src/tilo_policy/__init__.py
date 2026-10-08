@@ -1,6 +1,9 @@
 """tilo_policy — the deterministic policy engine (PRD 10.4). A model never decides authorisation;
 T3 always needs a person. Public API: packages/policy/tests/API.md."""
 
+from .access_levels import Level as Level
+from .access_levels import effective_level as effective_level
+from .access_levels import permits as permits
 from .crossref import check_entry as check_entry
 from .decide import Decision as Decision
 from .decide import Proposal as Proposal
