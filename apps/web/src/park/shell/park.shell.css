@@ -764,3 +764,9 @@
     transition: none !important;
   }
 }
+/* The person's 'still' (Profile > Appearance, on the Park root as data-motion) stops what loops: the loader's
+   ring and the boot splash's bar. The one-shot fades are already skipped by the shell (motion.ts). */
+[data-park][data-motion="still"] .park-shell__ring,
+[data-park][data-motion="still"] .park-shell__bootfill {
+  animation: none !important;
+}
