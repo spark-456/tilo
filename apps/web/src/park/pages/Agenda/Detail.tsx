@@ -91,6 +91,15 @@ export function Detail({ vm, ui, app }: { vm: DetailVm; ui: AgendaUi; app: AppCt
           ))}
         </div>
       ) : null}
+      {vm.upcoming && joins ? (
+        <button
+          type="button"
+          className="park-agenda-askbrief"
+          onClick={() => ui.openMeeting(e.t)}
+        >
+          Open meeting page
+        </button>
+      ) : null}
       {vm.empty ? <div className="park-agenda-empty">No notes for this one.</div> : null}
       {vm.upcoming ? (
         <div className="park-agenda-toggles">
