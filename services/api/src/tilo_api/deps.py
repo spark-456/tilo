@@ -392,6 +392,11 @@ def _resolve(request: Request, seam: Callable[[], Any]) -> Any:
         return None
 
 
+def caps_for(request: Request) -> spend.SpendCaps | None:
+    """SEC-16 caps as the app is wired (overrides included), or None when unreadable (COST-FAST-1 reserves a unit)."""
+    return _resolve(request, get_spend_caps)
+
+
 def get_switches(request: Request, flags: Annotated[FlagStore, Depends(get_flag_store)]) -> FlagStore:
     """Deployed, NFR-24's flags plus the ledger's durable `replay_only` (FR-MTR-04); not deployed, the flags alone."""
     return spend.Switches(flags, _resolve(request, get_spend_cap_ledger)) if enforced() else flags

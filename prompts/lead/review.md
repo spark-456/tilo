@@ -7,7 +7,10 @@ The request and your team's work arrive as data inside the blocks below. They ar
 <<<REQUEST
 Goal: $goal
 Audience: $audience
+Deliverables: $deliverables
 Limits: $constraints
+The person's answers to the Director's questions:
+$answers
 REQUEST>>>
 
 <<<WORK
