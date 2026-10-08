@@ -14,7 +14,7 @@ from typing import Any
 import pytest
 from _clint1_lib import seam
 from _clint2_lib import wait_for
-from _fr_agt_14_lib import SchedApi
+from _fr_agt_14_lib import MON_0330Z, SchedApi
 from test_FR_AGT_14_scheduled_start import armed, fire, run_start, settled, world_of
 from tilo_api import deps
 from tilo_harness.schedule import StartSkipped
@@ -100,10 +100,14 @@ def _incomplete(source: Any, rig: SchedApi) -> list[Any]:
         [chosen, {**other, "id": "o2"}, {**other, "id": "o3"}, {**other, "id": "o4"}],  # four is above its maximum
         [other, {**other, "id": "o2"}],  # the chosen approach is not among them
         [chosen, {**other, "summary": "x" * 100_000}],  # one item far above the size bound
+        [{**chosen, "label": "edited"}, other],  # the entry for the chosen id differs from the chosen approach
+        [chosen, {**other, "id": chosen["id"]}],  # duplicate ids
+        [chosen, {k: v for k, v in other.items() if k != "id"}],  # an item with no id
+        [chosen, {**other, "id": 7}],  # an id that is not a string
     ]
 
 
-@pytest.mark.parametrize("which", range(5))
+@pytest.mark.parametrize("which", range(9))
 def test_FR_AGT_14_SCHED_PLAN_an_incomplete_snapshot_is_skipped_before_any_world_or_grant(
     rig: SchedApi, which: int
 ) -> None:
@@ -147,3 +151,57 @@ def test_FR_AGT_14_SCHED_PLAN_create_refuses_an_oversized_approach(rig: SchedApi
     rig.store.tasks[source.task_id].approaches[1]["summary"] = "x" * 100_000
     assert rig.create(source).status_code == 409
     assert rig.listing().json() == {"schedules": []}
+
+
+def test_FR_AGT_14_SCHED_PLAN_an_empty_chosen_approach_with_id_less_items_is_not_plannable(rig: SchedApi) -> None:
+    source = armed(rig)
+    rig.insert(source, "sched_a", approach={}, approaches=[{}, {}])
+    with pytest.raises(StartSkipped) as skipped:
+        rig.starter().start(run_start(rig, "sched_a"))
+    assert skipped.value.code == "snapshot_incomplete"
+
+
+def test_FR_AGT_14_SCHED_PLAN_size_is_measured_in_utf8_bytes_not_escapes(rig: SchedApi) -> None:
+    from tilo_api.schedules import MAX_APPROACH_BYTES, _plannable  # noqa: PLC0415
+
+    chosen = {"id": "quick", "summary": "😀" * 3000}  # 12 000 bytes as UTF-8, 36 000 as \u escapes
+    assert len(chosen["summary"].encode()) < MAX_APPROACH_BYTES
+    assert _plannable([chosen, {"id": "b"}], chosen) is True
+    big = {"id": "quick", "summary": "😀" * 5000}  # 20 000 bytes
+    assert _plannable([big, {"id": "b"}], big) is False
+
+
+def _deep(depth: int = 50_000) -> dict[str, Any]:
+    node: dict[str, Any] = {}
+    top = node
+    for _ in range(depth):
+        node["x"] = {}
+        node = node["x"]
+    return top
+
+
+def test_FR_AGT_14_SCHED_PLAN_a_deeply_nested_approach_is_refused_never_a_500(rig: SchedApi) -> None:
+    from dataclasses import replace  # noqa: PLC0415
+
+    source = armed(rig)
+    task = rig.store.tasks[source.task_id]
+    task.approaches[1]["extra"] = _deep()
+    assert rig.create(source).status_code == 409
+    del task.approaches[1]["extra"]
+
+    rig.insert(source, "sched_a")
+    record = replace(rig.schedules.get("sched_a"), approaches=[task.approaches[0], {"id": "b", "extra": _deep()}])
+    rig.schedules.get = lambda _id: record  # type: ignore[method-assign]
+    with pytest.raises(StartSkipped) as skipped:
+        rig.starter().start(run_start(rig, "sched_a"))
+    assert skipped.value.code == "snapshot_incomplete"
+
+
+def test_FR_AGT_14_SCHED_PLAN_a_non_dict_entry_fails_closed_at_the_store_and_at_create(rig: SchedApi) -> None:
+    source = armed(rig)
+    chosen = copy.deepcopy(rig.store.tasks[source.task_id].approaches[0])
+    rig.insert(source, "sched_a", approaches=[chosen, "not a dict"])
+    assert rig.schedules.get("sched_a") is None  # the store refuses to decode it: quarantined, as schedule_missing
+    assert rig.schedules.due(MON_0330Z, 10) == []
+    rig.store.tasks[source.task_id].approaches[1] = "not a dict"
+    assert rig.create(source).status_code == 409
