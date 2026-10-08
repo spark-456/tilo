@@ -817,6 +817,15 @@
   color: var(--ink2);
   white-space: nowrap;
 }
+/* a phone: the composer's "Start a real task" is centred, so the strip hugs the right edge and shrinks to leave a gap */
+@media (max-width: 480px) {
+  [data-park] .park-home-legal {
+    right: 12px;
+    gap: 4px;
+    padding: 0 8px;
+    font-size: 11px;
+  }
+}
 [data-park] .park-home-legal a {
   display: inline-flex;
   align-items: center;
