@@ -130,6 +130,8 @@ class Msg:
 class Thread:
     thread_id: str
     messages: list[Msg]
+    mailbox: str = "ops@harborview.example"  # CHN-GATE-E: the mailbox this thread belongs to (the DraftContext's)
+    vouch: tuple[str, ...] = ()  # CHN-GATE-E: extra recipients a bench draft goes to, so their local parts name them
 
     def as_thread(self) -> dict[str, Any]:
         return {"thread_id": self.thread_id, "messages": [m.as_message() for m in self.messages]}
@@ -317,6 +319,8 @@ class Rig:
     drafts: MemoryDraftStore
     events: EventLog
     svc: Any = None
+    own_mail: tuple[Msg, ...] = ()  # CHN-GATE-E: the user's own earlier messages every `thread()` starts with
+    mailbox: str = "ops@harborview.example"  # CHN-GATE-E: the mailbox every `thread()` is in (see `Thread.mailbox`)
 
     def new_drafter(self) -> Any:
         return drafting_module().Drafter(
@@ -332,7 +336,7 @@ class Rig:
         self,
         *,
         sender: str = "David Miller <david.miller@harriercharters.example>",
-        to: Sequence[str] = ("ops@harborview.example",),
+        to: Sequence[str] | None = None,
         cc: Sequence[str] = ("sarah.chen@harborview.example",),
         subject: str = CLEAN_SUBJECT,
         body: str = "Can Marcus come by this Friday afternoon to look at the engine?",
@@ -344,6 +348,7 @@ class Rig:
         """Adds a thread for `user_id` whose last message carries a fresh key; `answers` are scripted for it.
         Returns the thread and its key."""
         key = fresh_key()
+        to = (self.mailbox,) if to is None else to
         last = Msg(
             message_id="m-" + secrets.token_hex(5),
             sender=sender,
@@ -353,7 +358,9 @@ class Rig:
             cc=list(cc),
             headers={"Authentication-Results": AUTH_PASS, **(headers or {})},
         )
-        thread = Thread(thread_id="t-" + secrets.token_hex(5), messages=[*earlier, last])
+        thread = Thread(
+            thread_id="t-" + secrets.token_hex(5), messages=[*self.own_mail, *earlier, last], mailbox=self.mailbox
+        )
         self.reader.add(user_id, thread)
         if answers:
             self.model.script(key, *answers)
@@ -361,13 +368,14 @@ class Rig:
 
     def draft(self, thread: Thread, instruction: str = "Tell David Friday 2pm works.", **kwargs: Any) -> Any:
         kwargs.setdefault("instruction_id", "ins-" + secrets.token_hex(6))
-        kwargs.setdefault("mailbox", "ops@harborview.example")
+        kwargs.setdefault("mailbox", thread.mailbox)
         user_id = kwargs.pop("user_id", USER)
         return self.svc.draft(user_id, thread_id=thread.thread_id, instruction=instruction, **kwargs)
 
 
-def make_rig() -> Rig:
+def make_rig(own_mail: tuple[Msg, ...] = ()) -> Rig:
     rig = Rig(
+        own_mail=own_mail,
         clock=FakeClock(),
         reader=FakeThreadReader(),
         model=ScriptedModel(),

@@ -29,7 +29,11 @@ export function Detail({ vm, ui, app }: { vm: DetailVm; ui: AgendaUi; app: AppCt
           </span>
         ))}
         {joins ? (
-          <span className="park-agenda-person park-agenda-person--tilo">
+          <span
+            role="img"
+            aria-label="Tilo joins"
+            className="park-agenda-person park-agenda-person--tilo"
+          >
             {face({ rank: "director", expr: "talking" }, 28, app.night)}
           </span>
         ) : null}
@@ -114,6 +118,10 @@ export function Detail({ vm, ui, app }: { vm: DetailVm; ui: AgendaUi; app: AppCt
               </span>
             </button>
           ))}
+          <div className="park-agenda-togglenote">
+            Not connected yet. These switches are kept on this page only, so Tilo does not act on
+            them yet.
+          </div>
         </div>
       ) : null}
     </aside>

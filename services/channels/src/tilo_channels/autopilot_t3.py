@@ -10,12 +10,13 @@ draft T3: a safe false positive. Callers pass the raw body, so a hidden characte
 
 BQ-224 (issue #256): the families also run on a squeezed copy (separators `- . _ *` and line breaks between letters or
 digits dropped, 0 o, 1 i, 3 e, 4 a, 5 s, 7 t, @ a), and L2 is an allowlist: a body over SHORT_BODY_MAX, a link, a digit
-that is not a time of day, or a word off the scheduling list gives "unlisted". Names are allowed only as the greeting's
-and the signature's run (two words each) and as repeats of those words. Every step is linear, no model.
+that is not a time of day, or a word off the scheduling list gives "unlisted". Every step is linear, no model.
 
-CHN-GATE-D (issue #298): a name run counts only when it ends properly (`_name_run`: "," "!" or a blank line for the
-greeting, its line for the signature), a number word is never a name, and a repeat of a name starts only after greeting
-words that open a line or clause (`_opens_clause`). Body only: no participants, no contract change.
+CHN-GATE-E (FR-CHN-11, ADR-0025): a name is a word in `names`, the names of the draft's own To and Cc and of the mailbox
+that `participants.read_participants` vouches for from the thread (no names, the default, fails closed). It may stand
+anywhere; a row of name words is at most two long and every join of the row runs through the families. The position
+rules of PR #525 (greeting and signature runs, clause openers, Title case) and the number-word checks on the body are
+retired: an amount or number word is never in `names` (the name filter keeps them out) so it stays "unlisted".
 
 BQ-274 (issue #298): `inbound_signal` is the same check for the message a draft answers, minus the allowlist, plus
 what an inbound message may hide: an amount, a magnitude suffix ("5m", "50 K") or a number word is "money" with no
@@ -150,8 +151,7 @@ _TOKEN = re.compile(r"[A-Za-z]+(?:'[A-Za-z]+)*|\0")
 # sign-off line ("Best,", "Kind regards,", "Many thanks!") may hold.
 _GREETING = frozenset("hi hello hey dear good morning afternoon evening thanks thank you".split())
 _SIGN_OFF = frozenset("best regards kind warm wishes cheers thanks thank you many sincerely all the".split())
-_CLAUSE_MARKS = frozenset(".,!?;:")
-# CHN-GATE-D: a number word is never a name ("Hi Fifty Thousand, works for us."); `_NUMBER_WORD` covers the magnitudes.
+# CHN-GATE-D: number words, used by `_numberish` (the participants' name filter, ADR-0025).
 _NUMBER_WORDS = frozenset(
     "zero one two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen sixteen seventeen "
     "eighteen nineteen twenty thirty forty fifty sixty seventy eighty ninety dozen hundred hundreds thousand thousands "
@@ -216,6 +216,7 @@ _WORDS = frozenset(
         "same sorry i'm it's that's don't doesn't can't let's you're we're we've i've you've isn't"
     ).split()
 )
+_WORDS |= _GREETING | _SIGN_OFF  # ADR-0025: the greeting and sign-off words are listed words
 _BREAKS = re.compile("\r\n|[\r\x0b\x0c\x1c\x1d\x1e\x85\u2028\u2029]")
 
 
@@ -243,11 +244,6 @@ def _suspicious(c: str) -> bool:
     return not c.isascii() and kind[0] not in "PZ" and kind != "Sc"
 
 
-def _sign_off(items: list[str]) -> bool:
-    words = [i.lower() for i in items if i[0].isalpha()]
-    return bool(words) and all(w in _SIGN_OFF for w in words) and all(i[0].isalpha() or i in ",.!" for i in items)
-
-
 def _numberish(word: str) -> bool:
     """CHN-GATE-D: `word` (lower case) is no name: too long, or a number by the rules above."""
     word = word.replace("'", "")
@@ -256,66 +252,11 @@ def _numberish(word: str) -> bool:
     )
 
 
-def _name_run(lines: list[list[str]], index: int, start: int, greeting: bool) -> list[str]:
-    """CHN-GATE-D: the name run of `lines[index]` from item `start`: at most two Title-case words of two letters or more
-    that are neither listed words nor number words (the join of the two too: "Fif Ty"). It counts only when it ends
-    properly: a greeting run with "," or "!", or with its line when a blank line (or the end) follows; a signature run
-    with its line. "-" and "_" are items of their own, so "Fifty Thousand-ok" ends in "-", not in a name. Anything else
-    gives no name at all."""
-    items = lines[index]
-    run: list[str] = []
-    for item in items[start : start + 2]:
-        word = item.lower()
-        if not (len(item) > 1 and item.istitle() and word not in _WORDS and not _numberish(word)):
-            break
-        if run and _numberish(run[-1] + word):
-            break
-        run.append(word)
-    after = items[start + len(run)] if start + len(run) < len(items) else None
-    if greeting:
-        blank_after = index + 1 == len(lines) or not lines[index + 1]
-        ended = after in (",", "!") or (after is None and blank_after)
-    else:
-        ended = after is None
-    return run if ended else []
-
-
-def _opens_clause(items: list[str], i: int) -> bool:
-    """CHN-GATE-D: `items[i]` follows greeting words only, and the first of them opens the line or a clause (after
-    "," "." "!" "?" ";" or ":"): "Thanks David" and "Sounds good, thanks David" yes, "Sounds good David" and "See you
-    David" no."""
-    k = i
-    while k > 0 and items[k - 1].lower() in _GREETING:
-        k -= 1
-    return k < i and (k == 0 or items[k - 1] in _CLAUSE_MARKS)
-
-
-def _names(lines: list[list[str]]) -> set[str]:
-    """The words of the body's two name runs: the greeting's, right after the greeting words that open the first line
-    ("Hi David,"), and the signature's, opening the last line when the non-empty line before it is the last sign-off
-    line ("Best," then "Sarah"). A run is at most two Title-case words of two letters or more and must end as
-    `_name_run` says; anything else ends it, a time of day included."""
-    filled = [i for i, items in enumerate(lines) if items]
-    starts: dict[int, int] = {}
-    if filled:
-        first = lines[filled[0]]
-        lead = next((n for n in range(2) if n >= len(first) or first[n].lower() not in _GREETING), 2)
-        if lead:
-            starts[filled[0]] = lead
-        signs = [i for i in filled if _sign_off(lines[i])]
-        if signs and filled[-2:-1] == signs[-1:]:  # one line follows the last sign-off line, and it ends the body
-            starts[filled[-1]] = 0
-    names: set[str] = set()
-    for index, start in starts.items():
-        names.update(_name_run(lines, index, start, greeting=start > 0))
-    return names
-
-
-def _unlisted(cleaned: str) -> bool:
+def _unlisted(cleaned: str, names: frozenset[str]) -> bool:
     """True when the body is not plain scheduling talk: too long, a link, a digit that is not a time of day, or a word
-    that is neither on the list nor a word of the greeting's or the signature's name run (`_names`). A name elsewhere
-    ("Thanks David") must repeat one of those words. Name words in a row that join into a family word ("Re Fund") are
-    flagged. Linear, no backtracking."""
+    that is neither listed nor in `names` (ADR-0025: the vouched names of the draft's recipients and the mailbox, in any
+    position). A row of name words is at most two long, and every join of it ("Re Fund") is checked against the
+    families. Linear, no backtracking."""
     if len(cleaned) > SHORT_BODY_MAX:
         return True
     if _LINK.search(cleaned.lower()):  # before times are removed: "5pm.me" is a link
@@ -323,37 +264,26 @@ def _unlisted(cleaned: str) -> bool:
     cleaned = _TIME.sub(f" {_STOP} ", cleaned).replace("\u2019", "'")
     if any(c.isdigit() for c in cleaned):
         return True
-    lines = [_ITEM.findall(line) for line in cleaned.split("\n")]
-    names = _names(lines)
-    filled = [i for i, items in enumerate(lines) if items]
-    signs = [i for i in filled if _sign_off(lines[i])]
-    sig = filled[-1] if signs and filled[-2:-1] == signs[-1:] else None  # the signature line
-    for li, items in enumerate(lines):
-        run: list[str] = []  # a name run: at most two words, every join of them is checked
-        for idx, item in enumerate(items):
+    for line in cleaned.split("\n"):
+        run: list[str] = []
+        for item in _ITEM.findall(line):
             word = item.lower()
             if word in names:
-                # a run starts right after greeting words that open a line or clause, or opens the signature line
-                if not run and not (_opens_clause(items, idx) or (idx == 0 and li == sig)):
-                    return True
                 run = [*run, word]
-                if len(run) > 2:
-                    return True
                 joins = ("".join(run[-n:]) for n in range(2, len(run) + 1))
-                if any(_numberish(j) or any(p.search(j) for _, p in _FAMILIES) for j in joins):
+                if len(run) > 2 or any(p.search(j) for j in joins for _, p in _FAMILIES):
                     return True
             else:
-                if run and item[0].isalpha():
-                    return True  # a word right after a name: the name is a subject, not a vocative or a signature
                 if item[0].isalpha() and word not in _WORDS:
                     return True
                 run = []
     return False
 
 
-def t3_content_signal(text: str) -> frozenset[str]:
-    """Subset of {"money", "legal", "commitment", "obfuscated", "unlisted"}; empty means no signal."""
-    return _signal(text, inbound=False)
+def t3_content_signal(text: str, names: frozenset[str] = frozenset()) -> frozenset[str]:
+    """Subset of {"money", "legal", "commitment", "obfuscated", "unlisted"}; empty means no signal. `names`: lower-case
+    name words the thread vouches for (ADR-0025); with none, a name in the text is "unlisted" (fail closed)."""
+    return _signal(text, inbound=False, names=names)
 
 
 def _join(match: re.Match[str]) -> str:
@@ -460,7 +390,7 @@ def _amount(folded: str) -> bool:
     return bool(_AMOUNT.search(folded) or _number_word(folded) or _DIGITS.search(_YEAR.sub(" ", folded)))
 
 
-def _signal(text: str, *, inbound: bool) -> frozenset[str]:
+def _signal(text: str, *, inbound: bool, names: frozenset[str] = frozenset()) -> frozenset[str]:
     if len(text) > SIGNAL_CAP:
         return frozenset({"obfuscated"})
     ascii_only = text.isascii()  # BQ-278: no per-character Unicode checks on plain ASCII
@@ -503,7 +433,7 @@ def _signal(text: str, *, inbound: bool) -> frozenset[str]:
     else:
         texts = [folded, _SPLIT.sub("", folded).translate(_LEET)]
     signal |= {name for name, pattern in _FAMILIES if any(pattern.search(t) for t in texts)}
-    if not inbound and _unlisted(cleaned):
+    if not inbound and _unlisted(cleaned, names):
         signal.add("unlisted")
     return frozenset(signal)
 
