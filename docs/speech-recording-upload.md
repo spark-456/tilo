@@ -16,6 +16,21 @@ An uploaded audio or video recording is transcribed through `SpeechProvider`, th
   `+TILO_RECORD=1` writes a redacted recording. Tests use a fake client and the committed recording only.
 - `FakeSpeechProvider` is deterministic and refused when `LIVE=1` or deployed (`K_SERVICE`, `CLOUD_RUN_JOB`).
 
+## The bot's voice (FR-MTG-11, `tilo_providers.voice`)
+
+- `SpeechProvider.synthesize(text, *, voice=None)` returns raw 16-bit mono little-endian PCM. It is additive and not
+  abstract: a provider that only transcribes raises `errors.NotConfigured`. The sample rate is not in the result, it is
+  `config/voice.yaml` `sample_rate`.
+- `config/voice.yaml` sets the vendor (`google`, or the dev vendor `fake`; anything else fails start-up), the profile id,
+  the model id (checked against `rules.deny`, PL-07), the voice name, the sample rate and the caps (`max_chars` before the
+  request, `max_audio_bytes` after it). `config/voice.dev.yaml` is the offline default the meet-bot reads without the live
+  switch. `voice.build_voice_provider(load_voice_config(...))` builds it.
+- `google` is Gemini speech output through the same client as `transcribe` (`GoogleSpeechProvider.synthesize`,
+  `response_modalities: [AUDIO]`, a prebuilt voice name). It is built only with `LIVE=1`; without it the call raises
+  `NotConfigured` (audio is not recorded for replay). `fake` is `FakeSpeechProvider.synthesize`: a deterministic
+  sawtooth, 0.1 s per word, pitch from a digest of voice and text.
+- Not metered: `config/prices.yaml` has no audio-output price (BQ-MTG11-3). Streaming the voice is FR-MTG-16.
+
 ## Ingest (`tilo_planning.recording.transcribe_recording`, pure)
 
 Why `tilo_planning`: it already depends on `tilo-providers` and `tilo-contracts`, and owns the upload allowlists, size

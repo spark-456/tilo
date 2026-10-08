@@ -2,6 +2,8 @@
 // design_handoff_tilo_web_app/design/Tilo App Profile.dc.html, inventory.md "Tilo App Profile.dc.html" and
 // the user fixture (api/fixtures/user.ts). Literals on purpose: a fixture that drifts from the design fails
 // here. "Sample data" is shell-only (WEB-3b): nothing on this page says it.
+// BQ-SET-2 (DECIDED 8 Oct, user approved): the two honest lines of FR-SET-01 and FR-SET-02 are visible text now,
+// pinned below as PROFILE_COPY.saveNote and NOTIF_COPY.quietNote. They are the only strings added to the design's.
 
 export const USER = {
   name: "Alex Morgan",
@@ -41,6 +43,8 @@ export const PROFILE_COPY = {
   sub: "How you appear to your team and how Tilo addresses you.",
   cancel: "Cancel",
   save: "Save changes",
+  /** BQ-SET-2: FR-SET-01, shown above the footer (also the Save button's aria-description and title). */
+  saveNote: "Kept on this device only. Tilo has no profile service to send it to yet.",
 } as const;
 
 export const CHANNELS = ["Phone", "Email", "Slack"] as const;
@@ -76,6 +80,9 @@ export const NOTIF_COPY = {
   quietSub: "Phone stays silent, except decisions over £1,000.",
   quietLabel: "Quiet hours",
   needOne: "Decisions need at least one channel",
+  /** BQ-SET-2: FR-SET-02, shown under the Quiet hours row (also that switch's aria-description). */
+  quietNote:
+    "Quiet hours silence the phone only. A decision that needs you is never hidden by quiet hours: it waits in Needs you.",
 } as const;
 
 export const APPEARANCE_COPY = {
@@ -168,6 +175,7 @@ export const STRINGS: Record<TabId, readonly string[]> = {
     ...FIELDS.flatMap((f) => [f[0], f[1]]),
     PROFILE_COPY.cancel,
     PROFILE_COPY.save,
+    PROFILE_COPY.saveNote,
   ],
   notifications: [
     ...header,
@@ -176,6 +184,7 @@ export const STRINGS: Record<TabId, readonly string[]> = {
     ...NOTIF.flatMap((n) => [n[1], n[2]]),
     NOTIF_COPY.quiet,
     NOTIF_COPY.quietSub,
+    NOTIF_COPY.quietNote,
   ],
   appearance: [
     ...header,
