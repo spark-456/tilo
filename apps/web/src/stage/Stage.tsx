@@ -7,7 +7,6 @@ import { AppLink } from "../screens/AppLink";
 import { agentNames, rankName } from "../world/runSummary";
 import { useSelection } from "../world/selection";
 import * as cam from "./camera";
-import { stageResolution } from "./resolution";
 
 const { tileWidth: TW, tileHeight: TH } = tokens.stage;
 const BARE_GRID_DELAY_MS = 1500;
@@ -290,12 +289,7 @@ export function Stage({
 
     // The device-pixel box also reports devicePixelRatio changes, keeping the canvas sharp.
     const fit = () => {
-      const width = target.clientWidth || 1;
-      app.renderer.resize(
-        width,
-        target.clientHeight || 1,
-        stageResolution(devicePixelRatio, width),
-      );
+      app.renderer.resize(target.clientWidth || 1, target.clientHeight || 1, devicePixelRatio);
       draw();
     };
     const observer = new ResizeObserver(fit);

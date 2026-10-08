@@ -72,7 +72,14 @@ export default defineConfig({
   projects: [
     {
       name: "chromium",
-      testIgnore: [...TIMING_SPECS, PERF_PHONE_SPECS, CP2_SPECS, NFR01_SPECS, PARITY_SPECS, LIVE_SPECS],
+      testIgnore: [
+        ...TIMING_SPECS,
+        PERF_PHONE_SPECS,
+        CP2_SPECS,
+        NFR01_SPECS,
+        PARITY_SPECS,
+        LIVE_SPECS,
+      ],
       // Runs the timing project after this one finishes, pass or fail. A `dependencies` link would
       // skip the C8 freeze and perf specs whenever any chromium test failed.
       teardown: "timing",
