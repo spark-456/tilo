@@ -210,16 +210,8 @@ const AUTH_TOKEN = /^[A-Za-z0-9._~+/=-]{1,4096}$/;
 /** SEC-15 (BQ-SIGNIN-3): sent on a phone-width window, with a token, so the API records `mobile_web`. */
 const CHANNEL_HEADER = "X-Tilo-Channel";
 
-/** A Quick ask's two answers (services/api COST-FAST-1): the model's text with its cost, or an offer to switch. */
-export type QuickIntakeResult =
-  | {
-      outcome: "answered";
-      text: string;
-      cost: { credits?: number; saved_credits?: number } | null;
-    }
-  | { outcome: "switch_to_thinking"; reason: string };
-
-const QUICK_REASONS = new Set([
+/** Why a Quick ask is offered as Thinking instead: the server's closed set (COST-FAST-1), written once, here. */
+export const QUICK_REASONS = [
   "attachments",
   "side_effect",
   "deliverable",
@@ -228,7 +220,19 @@ const QUICK_REASONS = new Set([
   "too_long",
   "scenario",
   "unclear",
-]);
+] as const;
+export type QuickReason = (typeof QUICK_REASONS)[number];
+
+/** What the server charged for a Quick answer; each figure only when it was served (no estimate is made here). */
+export interface QuickCost {
+  credits?: number;
+  savedCredits?: number;
+}
+
+/** A Quick ask's two answers (services/api COST-FAST-1): the model's text with its cost, or an offer to switch. */
+export type QuickIntakeResult =
+  | { kind: "answered"; text: string; cost: QuickCost | null }
+  | { kind: "switch"; reason: QuickReason };
 
 const figure = (v: unknown): number | undefined =>
   typeof v === "number" && Number.isFinite(v) && v >= 0 ? v : undefined;
@@ -239,26 +243,18 @@ function quickOf(body: unknown): QuickIntakeResult | null {
   const b = body as Record<string, unknown>;
   if (b.mode !== "quick") return null;
   if (b.outcome === "switch_to_thinking") {
-    return typeof b.reason === "string" && QUICK_REASONS.has(b.reason)
-      ? { outcome: "switch_to_thinking", reason: b.reason }
-      : null;
+    const reason = QUICK_REASONS.find((r) => r === b.reason);
+    return reason ? { kind: "switch", reason } : null;
   }
   if (b.outcome !== "answered" || typeof b.text !== "string" || b.text === "") return null;
   const c =
     typeof b.cost === "object" && b.cost !== null ? (b.cost as Record<string, unknown>) : {};
+  const cost: QuickCost = {};
   const credits = figure(c.credits);
   const saved = figure(c.saved_credits);
-  return {
-    outcome: "answered",
-    text: b.text,
-    cost:
-      credits === undefined && saved === undefined
-        ? null
-        : {
-            ...(credits === undefined ? {} : { credits }),
-            ...(saved === undefined ? {} : { saved_credits: saved }),
-          },
-  };
+  if (credits !== undefined) cost.credits = credits;
+  if (saved !== undefined) cost.savedCredits = saved;
+  return { kind: "answered", text: b.text, cost: Object.keys(cost).length > 0 ? cost : null };
 }
 
 export class HttpClient implements TiloClient, SchedulesApi {
@@ -369,21 +365,20 @@ export class HttpClient implements TiloClient, SchedulesApi {
 
   /**
    * `POST /intake`. With no `mode` it is exactly the legacy call (the server reads an absent mode as Thinking);
-   * "thinking" says so; "quick" (COST-FAST-1) returns a direct answer or an offer to switch, and makes no task.
+   * "quick" (COST-FAST-1) returns a direct answer or an offer to switch, and makes no task.
    */
   submitIntake(text: string, files: File[]): Promise<IntakeResult>;
-  submitIntake(text: string, files: File[], mode: "thinking"): Promise<IntakeResult>;
   submitIntake(text: string, files: File[], mode: "quick"): Promise<QuickIntakeResult>;
   async submitIntake(
     text: string,
     files: File[],
-    mode?: "quick" | "thinking",
+    mode?: "quick",
   ): Promise<IntakeResult | QuickIntakeResult> {
     const form = new FormData();
     form.append("text", text);
     for (const file of files) form.append("files", file);
-    if (mode !== undefined) form.append("mode", mode);
     if (mode === "quick") {
+      form.append("mode", mode);
       const body = await this.request<unknown>("/intake", { method: "POST", body: form }, true);
       const quick = quickOf(body);
       if (!quick) throw new TiloApiError(BAD_REPLY, 200, true, true);

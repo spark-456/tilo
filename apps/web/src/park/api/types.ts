@@ -1,5 +1,6 @@
 // Typed shapes of the Park City fixtures (WEB-1a; README "State and data"; plan section 5).
 // Each shape follows design_handoff_tilo_web_app/design/tilo-app.js, the user's own prototype data.
+import type { QuickCost, QuickIntakeResult, QuickReason } from "../../api/http";
 
 export type Source = "fixture" | "live";
 export type ApiResult<T> = { data: T; source: Source };
@@ -417,29 +418,10 @@ export interface StartAck extends Ack {
 /** How deep a start goes (COST-FAST-1): Quick is a direct answer, Thinking the full Director plan. Not a world size. */
 export type Effort = "quick" | "thinking";
 
-/** Why a Quick ask is offered as Thinking instead (the server's closed set). */
-export const SWITCH_REASONS = [
-  "attachments",
-  "side_effect",
-  "deliverable",
-  "needs_tools",
-  "multi_step",
-  "too_long",
-  "scenario",
-  "unclear",
-] as const;
-export type SwitchReason = (typeof SWITCH_REASONS)[number];
-
-/** What the server charged for a Quick answer; each figure only when it was served (no estimate is made here). */
-export interface QuickCost {
-  credits?: number;
-  savedCredits?: number;
-}
-
-/** The result of a Quick ask: an answer (no world, no event is made) or an offer to switch to Thinking. */
-export type QuickReply =
-  | { kind: "answered"; text: string; cost: QuickCost | null }
-  | { kind: "switch"; reason: SwitchReason };
+/** Why a Quick ask is offered as Thinking, what it cost, and the reply: the one definition is in src/api/http.ts. */
+export type SwitchReason = QuickReason;
+export type { QuickCost };
+export type QuickReply = QuickIntakeResult;
 
 // Page fixtures (WEB-1d): designed content the Team, Connectors and Profile pages must not hard-code.
 // Not in tilo-app.js; hand-written from the reference pages (fixtures/teamPolicy.ts and the others).

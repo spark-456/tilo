@@ -1,8 +1,8 @@
-import type { Effort, QuickCost, SwitchReason } from "../../api/types";
 // The composer column of Home (reference "Tilo App Home.dc.html"): the example chips while idle, the
 // "drafting" line, the plan card, and the glass panel with the task input and the size of job.
 // Presentation only: the phase, the query and the 900 ms draft are HomePage's. The "Start a real task" link
 // under the panel is the one element the design does not have.
+import type { Effort, QuickCost, SwitchReason } from "../../api/types";
 import { type SegmentOption, SegmentedControl } from "../../components";
 import { EFFORTS, type Mode, SWITCH_WORDS, quickCostLine } from "./homeData";
 

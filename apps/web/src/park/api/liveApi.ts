@@ -16,15 +16,7 @@ import {
 import { type CostReport, ledgerFromCosts } from "./live/ledgerFromCosts";
 import { worldFromIntake } from "./live/worldFromIntake";
 import { STATE_OF, type WorldListItem, worldsFromList } from "./live/worldsFromList";
-import {
-  type Dec,
-  type DecisionKey,
-  type Effort,
-  type QuickReply,
-  SWITCH_REASONS,
-  type SwitchReason,
-  type TierKey,
-} from "./types";
+import type { Dec, DecisionKey, Effort, QuickReply, TierKey } from "./types";
 
 export class NotBuilt extends Error {
   readonly code = "not_built";
@@ -58,21 +50,7 @@ async function quickAsk(
     if (e instanceof TiloApiError) throw e;
     throw new TiloApiError(BAD_REPLY, 200, true, true);
   }
-  if (r.outcome === "answered") {
-    const credits = r.cost?.credits;
-    const saved = r.cost?.saved_credits;
-    const cost = {
-      ...(credits === undefined ? {} : { credits }),
-      ...(saved === undefined ? {} : { savedCredits: saved }),
-    };
-    return {
-      data: { kind: "answered", text: r.text, cost: Object.keys(cost).length > 0 ? cost : null },
-      source: "live",
-    };
-  }
-  const reason = SWITCH_REASONS.find((x) => x === r.reason) as SwitchReason | undefined;
-  if (!reason) throw new TiloApiError(BAD_REPLY, 200, true, true);
-  return { data: { kind: "switch", reason }, source: "live" };
+  return { data: r, source: "live" };
 }
 
 const isRows = (v: unknown): boolean =>
