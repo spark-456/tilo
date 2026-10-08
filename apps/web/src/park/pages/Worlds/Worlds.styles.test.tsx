@@ -307,7 +307,7 @@ describe("WEB_5_worlds_styles: sections and cards", () => {
       check(`${name} count`, sec && leaf(sec, blurb), T("13.5px", "700", { color: "var(--ink3)" }));
       check(`${name} grid`, card(c, id).parentElement, {
         display: "grid",
-        "grid-template-columns": `repeat(auto-fill,minmax(${min},1fr))`,
+        "grid-template-columns": `repeat(auto-fill,minmax(min(${min},100%),1fr))`,
         gap,
       });
     }
