@@ -403,6 +403,20 @@ class TokenBroker:
         record = self._store.get(user_id, connector)
         return None if record is None else str(record.get("state"))
 
+    def connection_view(self, user_id: str, connector: str) -> tuple[str | None, list[str], str | None]:
+        """LIVE-GAPS-1b: a pure read for the connector list: (state, granted scopes, expires_at), nothing of the
+        record (never a token, ciphertext, key or nonce). No refresh, write or event. No record: (None, [], None)."""
+        record = self._store.get(user_id, connector)
+        if record is None:
+            return None, [], None
+        scopes = (
+            sorted({s for s in record.get("scopes", []) if isinstance(s, str)})
+            if record.get("state") == "connected"
+            else []
+        )
+        expires_at = record.get("expires_at")
+        return str(record.get("state")), scopes, expires_at if isinstance(expires_at, str) else None
+
     def disconnect(self, user_id: str, connector: str) -> DisconnectResult:
         """Revoke at the provider, then delete whatever it answered (fail toward deletion). A failed
         revoke keeps the token sealed in the retry store and raises alert.raised."""
