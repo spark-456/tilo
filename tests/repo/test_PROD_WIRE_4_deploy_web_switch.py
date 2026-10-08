@@ -162,7 +162,9 @@ def test_PROD_WIRE_4_deploy_web_passes_api_to_the_build_only_and_keeps_the_dev_p
 
     # The base's SEC-10 build wrapper (scripts/web_build_env.py) sets VITE_TILO_API_URL, and only from its checked
     # `--api` argument; a shell value never reaches the bundle (test_SEC_10_web_build_env.py).
-    assert "web_build_env.py --api" in code, "the value reaches the build through web_build_env.py --api"
+    assert re.search(r"web_build_env\.py \{\{[^\n]*--api[^\n]*\}\}", code), (
+        "the value reaches the build through web_build_env.py --api, passed only when a url is given"
+    )
     build_line = next(ln for ln in code.splitlines() if "run build" in ln)
     assert re.search(r"\{\{[^\n]*\bapi\b[^\n]*\}\}", build_line), "the parameter is interpolated into the build"
     deploy_line = next(ln for ln in code.splitlines() if "firebase deploy" in ln)
@@ -181,7 +183,9 @@ def test_PROD_WIRE_4_dry_run_with_no_value_keeps_the_empty_fixture_build(repo_ro
 
     out = proc.stdout + proc.stderr
     assert proc.returncode == 0, out
-    assert re.search(r"--api\s+(''|\"\")\s", out), "the default build is given an empty API url"
+    build_line = next(ln for ln in out.splitlines() if "run build" in ln)
+    assert "--api" not in build_line, "the default build passes no --api (an empty '' is lost on older PowerShell)"
+    assert re.search(r"web_build_env\.py\s+pnpm", build_line), "and the wrapper still sets VITE_TILO_API_URL empty"
     assert f"--project {DEV_PROJECT}" in out and "firebase deploy --only hosting" in out
 
 
@@ -317,4 +321,7 @@ def test_PROD_WIRE_4_web_build_env_refuses_a_bad_api_url_before_any_build(repo_r
     for bad in [b for b in BAD if b] + ["https://tilo-api-abc-as.a.run.app\n"]:
         assert script.main(["--api", bad, "pnpm", "run", "build"]) == 2, repr(bad)
     assert script.main(["--api"]) == 2
+    assert script.main(["--api", GOOD[0], "--api", GOOD[1], "pnpm"]) == 2, "a second --api is refused"
+    assert script.main([f"--api={GOOD[0]}", "pnpm"]) == 2, "the --api=<x> form is refused"
+    assert script.main(["--bake", "pnpm"]) == 2, "any other leading flag is refused"
     assert ran == [], "no build and no sdkconfig call for a refused url"

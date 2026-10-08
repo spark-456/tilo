@@ -344,3 +344,35 @@ print("DEV-OK")
         [sys.executable, "-c", code], capture_output=True, text=True, timeout=120, cwd=REPO_ROOT, env=env
     )
     assert proc.returncode == 0 and "DEV-OK" in proc.stdout, proc.stdout + proc.stderr
+
+
+# --- SEC-10 App Check enforced: still outside it --------------------------------------------------------------
+
+
+class _RefusingVerifier:
+    def verify(self, token: str) -> dict[str, str]:
+        from tilo_api.appcheck import TokenRefused
+
+        raise TokenRefused("invalid")
+
+
+def test_PROD_WIRE_4_with_app_check_enforced_a_preflight_is_granted_and_its_401_carries_cors_for_our_origins(
+    deployed, monkeypatch
+):
+    monkeypatch.setenv("TILO_APPCHECK_ENFORCE", "1")
+    app.dependency_overrides[deps.get_app_check_verifier] = lambda: _RefusingVerifier()
+    try:
+        granted = preflight(deployed.client, "/worlds", WEB_APP)
+        assert granted.status_code in (200, 204) and granted.headers.get("access-control-allow-origin") == WEB_APP
+
+        for origin in (WEB_APP, FIREBASE_APP):
+            refused = deployed.client.get("/worlds", headers={"Origin": origin, "X-Firebase-AppCheck": "bad"})
+            assert refused.status_code == 401, refused.text
+            assert refused.headers.get("access-control-allow-origin") == origin
+            assert "access-control-allow-credentials" not in refused.headers
+        stranger = deployed.client.get(
+            "/worlds", headers={"Origin": "https://evil.example", "X-Firebase-AppCheck": "bad"}
+        )
+        assert stranger.status_code == 401 and "access-control-allow-origin" not in stranger.headers
+    finally:
+        app.dependency_overrides.pop(deps.get_app_check_verifier, None)

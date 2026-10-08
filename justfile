@@ -176,11 +176,11 @@ build-evals-image:
 # takes no parameter, so nothing can name another project. Needs your own `firebase login` first (the CI deployer has
 # no Firebase role). Steps and the resulting URL: docs/deploy-dev.md. scripts/web_build_env.py also reads the web app's
 # VITE_FIREBASE_* config (SEC-10 App Check) into the build environment, writes nothing to disk, and sets
-# VITE_TILO_API_URL only from its --api argument (re-checked there; a shell value is ignored). The first command line
-# IS the url check: keep it first.
+# VITE_TILO_API_URL only from its --api argument (re-checked there; a shell value is ignored), passed only when a url is
+# given (Windows PowerShell before 7.3 drops an empty '' argument). The first command line IS the url check: keep it first.
 deploy-web api="":
     python -c "print('deploy-web: api accepted')" {{ if api == '' { '' } else if api =~ '^https://tilo-api-[a-z0-9]+-as\.a\.run\.app$|^https://tilo-api-[0-9]+\.asia-southeast1\.run\.app$' { '' } else { error('deploy-web: api must be empty or the tilo-api Cloud Run url (https://tilo-api-<hash>-as.a.run.app or https://tilo-api-<project-number>.asia-southeast1.run.app, lower case, no path, port or query), got ' + api) } }}
-    python scripts/web_build_env.py --api '{{api}}' pnpm --filter @tilo/web run build
+    python scripts/web_build_env.py {{ if api == '' { '' } else { "--api '" + api + "'" } }} pnpm --filter @tilo/web run build
     pnpm exec firebase deploy --only hosting --project essential-wares-510320-f0
 
 # Deployed smoke of tilo-dev (PROD-WIRE-4, scripts/smoke_dev.py): `just smoke-dev <api-url>` (positional, tilo-api's own

@@ -133,7 +133,7 @@ def main(argv: list[str]) -> int:
             print("web_build_env.py: --api must be empty or tilo-api's own Cloud Run url", file=sys.stderr)
             return 2
         api, argv = argv[1], argv[2:]
-    if not argv:
+    if not argv or argv[0].startswith("-"):  # a second --api, `--api=<x>` or any other flag: never a build command
         print("usage: web_build_env.py [--api <url>] <build command...>", file=sys.stderr)
         return 2
     return _run(argv, env=build_env(os.environ, sdk_env(os.environ), api)).returncode
