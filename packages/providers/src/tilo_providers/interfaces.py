@@ -91,9 +91,12 @@ class ModelProvider(ABC):  # PRD 6.4: generate, stream, embed, count_tokens, cap
         return text
 
 
-class SearchProvider(ABC):  # PRD 6.1: grounded search
+class SearchProvider(ABC):  # PRD 6.1: grounded search; the typed result is `tilo_providers.search.SearchResult` (LW-05)
     @abstractmethod
     def search(self, query: str, **kwargs: Any) -> Any: ...
+
+    def redact(self, text: str) -> str:  # same role as ModelProvider.redact (PRD 16.1 rule 4)
+        return text
 
 
 class SafetyResult(TypedDict):  # CC-SP-47: the one fixed SafetyProvider.check() result
