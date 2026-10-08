@@ -153,7 +153,10 @@ describe("TEAM_WEB_team_page_live: Owner writes", () => {
     let n = 0;
     const { api, read } = liveApi(
       async () => (n++ === 0 ? view() : fresh),
-      async () => Promise.reject(err(409)),
+      async () =>
+        Promise.reject(
+          new TiloApiError("Someone else changed the team. Try again.", 409, false, true),
+        ),
     );
     const { root } = await renderTeam(makeApp(), api);
     await choose(selectNamed(root, "Role for u2"), "Approver");
@@ -232,7 +235,8 @@ describe("TEAM_WEB_team_page_live: honest copy", () => {
     await typeInto(inputNamed(root, "Invite by email"), "x@acme.co");
     await clickAndSettle(buttonNamed(root, "Invite"));
     expect(root.textContent).toContain("Saved; could not refresh");
-    expect(strings(root).has("x@acme.co")).toBe(true);
+    expect(strings(root).has("Saved; could not refresh")).toBe(true); // a success, not a rollback message
+    expect(root.textContent).not.toMatch(/could not do that/i);
   });
 });
 

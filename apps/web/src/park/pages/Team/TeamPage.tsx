@@ -14,10 +14,11 @@ import {
 import type { World } from "../../api/types";
 import type { AppCtx } from "../../app/AppCtx";
 import { useParkApi } from "../../app/context";
+import { useLiveTeam } from "../../app/useLiveTeam";
 import { useStaged } from "../../app/useStaged";
 import { Button, PageSheet } from "../../components";
 import { Coverage } from "./Coverage";
-import { LiveBody, LiveInvite, StatusLine, useLiveTeam } from "./LiveTeam";
+import { LiveBody, LiveInvite, StatusLine } from "./LiveTeam";
 import { Members } from "./Members";
 import { MatrixCard, RulesCard } from "./Rules";
 import "./Team.css";

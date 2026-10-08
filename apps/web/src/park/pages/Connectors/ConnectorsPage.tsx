@@ -12,7 +12,7 @@ import type { AppCtx } from "../../app/AppCtx";
 import { useParkApi } from "../../app/context";
 import { PageSheet } from "../../components";
 import "./Connectors.css";
-import { useLiveTeam } from "../Team/LiveTeam";
+import { useLiveTeam } from "../../app/useLiveTeam";
 import { AttentionBanner, AvailableRow, ConnectedTile } from "./ConnectorParts";
 import { Drawer } from "./Drawer";
 import { ToolAccess } from "./ToolAccess";

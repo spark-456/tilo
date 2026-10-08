@@ -184,7 +184,11 @@ describe("TEAM_WEB_errors: every outcome has a plain sentence", () => {
     expect(await say("That address is already invited.")).toMatch(/already invited/);
     expect(await say("Too many pending invites.")).toMatch(/too many/i);
     expect(await say("A Must-ask rule can't be switched off.")).toMatch(/always asks/i);
-    for (const d of ["refused: own_role", "refused: last_owner", "That address is already invited."])
+    for (const d of [
+      "refused: own_role",
+      "refused: last_owner",
+      "That address is already invited.",
+    ])
       expect(await say(d)).not.toMatch(/Someone else changed/);
     expect(await say("refused: own_role")).not.toContain("refused:");
   });

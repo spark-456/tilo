@@ -112,6 +112,21 @@ export function requestOf(op: TeamOp): { method: string; path: string; body?: un
 
 export const NOT_SET_UP = "Team controls are not set up on this install yet.";
 
+/** The server uses 409 for several refusals; its detail says which (team_routes.py). Unknown wording gets the
+ * generic sentence, never the raw code. */
+function conflictText(detail: string): string {
+  if (/Someone else changed/i.test(detail))
+    return "Someone else changed the team. Showing the latest.";
+  if (/own_role/.test(detail)) return "You can’t change your own role.";
+  if (/last_owner/.test(detail))
+    return "The team needs at least one Owner. That would remove the last Owner.";
+  if (/already invited/i.test(detail)) return "That address is already invited.";
+  if (/too many/i.test(detail))
+    return "Too many invites are waiting. Wait for some to be accepted first.";
+  if (/Must-ask/i.test(detail)) return "That rule always asks. It can’t be switched off.";
+  return "That cannot be done right now.";
+}
+
 /** What a person reads for a failed team call. 422 keeps the server's own plain sentence (it says what to pick);
  * every other outcome gets ours, so a code like `not_configured` never shows. */
 export function teamErrorText(e: unknown): string {
@@ -125,7 +140,7 @@ export function teamErrorText(e: unknown): string {
     case 404:
       return "That person or setting is no longer on the team.";
     case 409:
-      return "Someone else changed the team. Showing the latest.";
+      return conflictText(e.message);
     case 422:
       return e.message;
     case 503:

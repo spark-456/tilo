@@ -202,7 +202,9 @@ export function createLiveApi(options: LiveApiOptions = {}): Api {
   api.writeTeam = async (op) => {
     const { method, path, body } = requestOf(op);
     const reply = await http.sendJson(method, path, body);
-    if (op.kind === "invite") return { data: await readTeam(), source: "live" };
+    // The invite is saved once the POST answers; if the read after it fails, say "no view" (the page keeps its
+    // optimistic copy and says so) rather than fail a write that happened, which a retry would refuse (409).
+    if (op.kind === "invite") return { data: await readTeam().catch(() => null), source: "live" };
     if (!isTeamView(reply)) throw new TiloApiError(BAD_REPLY, 200, true, true);
     return { data: reply, source: "live" };
   };

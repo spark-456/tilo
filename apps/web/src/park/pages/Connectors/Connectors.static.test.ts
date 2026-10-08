@@ -17,7 +17,8 @@ describe("TEAM_WEB_static: pages do not import pages", () => {
           if (!spec.startsWith(".")) continue;
           const target = path.resolve(dir, spec);
           const rel = path.relative(PAGES, target).replaceAll("\\", "/");
-          if (!rel.startsWith("..") && rel.split("/")[0] !== page) bad.push(`${page}/${f} imports ${spec}`);
+          if (!rel.startsWith("..") && rel.split("/")[0] !== page)
+            bad.push(`${page}/${f} imports ${spec}`);
         }
       }
     }

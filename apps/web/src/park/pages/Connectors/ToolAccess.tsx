@@ -3,11 +3,11 @@
 // with PUT /v1/team/tools/{connector} by the Owner only. Optimistic, rolled back on failure (useLiveTeam).
 // A saved level for each skill (FR-ACC-02) needs a contract change and stays not built.
 import { TOOL_LEVELS, type TeamView } from "../../api/live/teamLive";
-import { type LiveTeam, READ_ONLY } from "../Team/LiveTeam";
+import { type LiveTeam, READ_ONLY } from "../../app/useLiveTeam";
 
 const LABEL: Record<string, string> = { off: "Off", read: "Read", draft: "Draft", act: "Act" };
 const WORDS: Record<string, string> = {
-  off: "Agents cannot use this tool.",
+  off: "Agent runs cannot use this tool. Email Autopilot and calendar sync do not check this yet.",
   read: "Agents can read from this tool.",
   draft: "Agents can prepare drafts, never send.",
   act: "Agents can act, within policy.",

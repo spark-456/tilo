@@ -1,100 +1,15 @@
-// TEAM-WEB (FR-TEAM-02/04, FR-ACC-01): the Team page on a live Api. The state machine (`useLiveTeam`) reads
-// GET /v1/team through api.getTeamLive and sends each Owner-only write through api.writeTeam: optimistic, rolled
-// back on failure, refetched on a stale write (409), one write at a time. The body shows only what the server
+// TEAM-WEB (FR-TEAM-02/04, FR-ACC-01): the Team page on a live Api (state machine: app/useLiveTeam). The body shows only what the server
 // sends: members by id (no names exist yet), their limits, the five switches, the capability matrix and pending
 // invites. Not built, so not offered: cancel or resend an invite, changing an invite's role, the coverage
 // card, helped-Tilo and activity numbers, the per-skill saved level (FR-ACC-02). Fixture mode never gets here.
-import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
-import { TiloApiError } from "../../../api/http";
-import type { Api } from "../../api";
-import {
-  TEAM_ROLES,
-  type TeamOp,
-  type TeamView,
-  applyOp,
-  isStale,
-  readErrorText,
-  teamErrorText,
-} from "../../api/live/teamLive";
+import { type ReactNode, useState } from "react";
+import { TEAM_ROLES, type TeamView } from "../../api/live/teamLive";
+import type { LiveTeam } from "../../app/useLiveTeam";
 import { Button } from "../../components";
 import { Members } from "./Members";
 import { MatrixCard, RulesCard } from "./Rules";
 import { agentArt } from "./teamKit";
 import { type Member, type MemberView, isValidEmail } from "./teamModel";
-
-export type LiveState =
-  | { phase: "probing" }
-  | { phase: "fixture" }
-  | { phase: "error"; text: string }
-  | { phase: "ready"; view: TeamView };
-
-export interface LiveTeam {
-  state: LiveState;
-  /** The line under the heading: the last failure, else why the controls are off. Always present, so nothing shifts. */
-  note: string;
-  busy: boolean;
-  isOwner: boolean;
-  send: (op: TeamOp) => Promise<boolean>;
-}
-
-export const READ_ONLY = "Only an Owner can change the team. You can look at it.";
-
-export function useLiveTeam(api: Api): LiveTeam {
-  const [state, setState] = useState<LiveState>({ phase: "probing" });
-  const [failure, setFailure] = useState("");
-  const [busy, setBusy] = useState(false);
-  const locked = useRef(false);
-  const alive = useRef(true);
-  useEffect(() => {
-    alive.current = true;
-    api.getTeamLive().then(
-      (r) =>
-        alive.current && setState(r.data ? { phase: "ready", view: r.data } : { phase: "fixture" }),
-      // A TiloApiError means a live server answered; anything else (NotBuilt) is the sample path's to handle.
-      (e: unknown) =>
-        alive.current &&
-        setState(
-          e instanceof TiloApiError
-            ? { phase: "error", text: readErrorText(e) }
-            : { phase: "fixture" },
-        ),
-    );
-    return () => {
-      alive.current = false;
-    };
-  }, [api]);
-
-  const view = state.phase === "ready" ? state.view : null;
-  const send = useCallback(
-    async (op: TeamOp): Promise<boolean> => {
-      if (!view || locked.current) return false;
-      locked.current = true;
-      setBusy(true);
-      setFailure("");
-      const show = (v: TeamView) => alive.current && setState({ phase: "ready", view: v });
-      show(applyOp(view, op));
-      try {
-        const r = await api.writeTeam(op);
-        if (r.data) show(r.data);
-        return true;
-      } catch (e) {
-        show(view); // roll back
-        if (alive.current) setFailure(teamErrorText(e));
-        if (isStale(e)) {
-          const fresh = await api.getTeamLive().catch(() => null);
-          if (fresh?.data) show(fresh.data);
-        }
-        return false;
-      } finally {
-        locked.current = false;
-        if (alive.current) setBusy(false);
-      }
-    },
-    [api, view],
-  );
-  const isOwner = view?.me.role === "Owner";
-  return { state, note: failure || (view && !isOwner ? READ_ONLY : ""), busy, isOwner, send };
-}
 
 /** The always-present status line (a reserved height, so a message never moves the page). */
 export function StatusLine({ text }: { text: string }) {
@@ -111,7 +26,10 @@ const SWITCH_COPY: Record<string, [string, string]> = {
   undo: ["Actions that can’t be undone", "Always asks. This can’t be switched off."],
   // BQ-TEAMRT-3: the engine does not read this switch yet; the page says so instead of implying it does.
   tools: ["Giving a skill more access to a tool", "Saved; not enforced yet"],
-  weekend: ["Routines that fall on a weekend", "Hold until Monday morning"],
+  weekend: [
+    "Routines that fall on a weekend",
+    "Hold until Monday morning. A hold that runs long can lose the slot",
+  ],
 };
 
 /** INR minor units (paise) in words; null is a limit nobody set, or one this person may not see. */
@@ -231,10 +149,7 @@ export function LiveBody({
         canRemove={(p) => isOwner && !p.pending}
         onRemove={(p) => {
           setOpen(null);
-          done(
-            send({ kind: "remove", id: p.id }),
-            `${p.name} was removed. Their worlds move to you`,
-          );
+          done(send({ kind: "remove", id: p.id }), `${p.name} was removed from the team`);
         }}
         extra={(p): ReactNode =>
           p.pending || !isOwner ? null : (
