@@ -750,6 +750,66 @@
   font-weight: 700;
 }
 
+/* ---- Run bar (RUN-INDICATOR): a pill at the bottom while a recorded run is in progress or held ----
+   Fixed and only as wide as its text, so nothing around it is covered or blocked; above the page (z 1), below the
+   nav (30). It has no motion rule of its own: the moving ring is the loader's .park-shell__ring (tiloSpin), and
+   the still look (reduced motion, 'still', or a held run) is a dot. */
+[data-park] .park-shell__runbar {
+  position: fixed;
+  left: 50%;
+  bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  transform: translateX(-50%);
+  z-index: 25;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 40px;
+  max-width: calc(100vw - 32px);
+  padding: 0 16px;
+  border: 1px solid var(--line);
+  border-radius: 99px;
+  background: var(--paper);
+  color: var(--ink);
+  box-shadow: var(--shPop);
+  font-family: "Nunito Sans", sans-serif;
+  font-size: 14px;
+  font-weight: 700;
+}
+[data-park] .park-shell__runbar-label {
+  flex: none;
+}
+[data-park] .park-shell__runbar-sep {
+  flex: none;
+  color: var(--ink3);
+}
+[data-park] .park-shell__runbar-detail {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ink2);
+  font-weight: 600;
+}
+[data-park] .park-shell__runbar-dot {
+  display: block;
+  flex: none;
+  box-sizing: border-box;
+  width: 16px;
+  height: 16px;
+  border-radius: 99px;
+  background: var(--hero);
+}
+/* Held: a pause mark (two bars), so the state is not told by colour alone. */
+[data-park] .park-shell__runbar-dot--held {
+  width: 16px;
+  height: 16px;
+  border-radius: 0;
+  background: transparent;
+  border-left: 5px solid var(--ink2);
+  border-right: 5px solid var(--ink2);
+}
+
 /* Reduced motion (README): no animation and no transition at all in the shell's chrome. The shell also skips
    its own waits (motion.ts), so a page swaps at once and a splash or card goes the moment it is done. */
 @media (prefers-reduced-motion: reduce) {

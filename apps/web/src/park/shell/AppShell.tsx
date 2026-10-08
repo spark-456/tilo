@@ -14,6 +14,7 @@ import { AccountMenu } from "./AccountMenu";
 import { BootSplash } from "./BootSplash";
 import { CityBackdrop } from "./CityBackdrop";
 import { NotificationsPopover } from "./NotificationsPopover";
+import { RunBar } from "./RunBar";
 import { TopNav } from "./TopNav";
 import { WorldLoader } from "./WorldLoader";
 import { useAppearance } from "./cityMotion";
@@ -191,6 +192,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           onDismiss={store.dismissToast}
         />
       ) : null}
+      <RunBar />
       {card ? (
         <WorldLoader
           launch={card}
