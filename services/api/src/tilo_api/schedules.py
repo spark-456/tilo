@@ -74,7 +74,7 @@ from tilo_harness.writer import new_ulid
 from tilo_metering.flags import FlagStore
 from tilo_planning.events import build_event
 
-from tilo_api import deps, dev, events, runs
+from tilo_api import deps, dev, events, runs, team_access, team_store
 from tilo_api.access import Mode, enforced
 from tilo_api.durable_store import DurableStore
 from tilo_api.tasks import _json_body
@@ -435,6 +435,11 @@ def _stamp(at: datetime) -> str:
     return at.strftime("%Y-%m-%dT%H:%M:%S.") + f"{at.microsecond // 1000:03d}Z"
 
 
+@dataclass(frozen=True)
+class _Reader:
+    read: Callable[[], Any]
+
+
 class ScheduleStarter:
     """The tick's `RunStarter`: reads the stored snapshot, never what it is handed over it (design decisions 3, 4)."""
 
@@ -445,8 +450,10 @@ class ScheduleStarter:
         schedules: ScheduleRepository,
         seams: runs.Seams | None,
         clock: Callable[[], datetime],
+        team: Any = None,  # anything with `read() -> TeamState | None`
     ) -> None:
         self._store, self._schedules, self._seams, self._clock = store, schedules, seams, clock
+        self._team = team  # FR-TEAM-04's weekend switch; None: no team store wired, as before
 
     def start(self, run: RunStart) -> str:
         record = self._schedules.get(run.schedule_id)
@@ -458,6 +465,9 @@ class ScheduleStarter:
             raise StartSkipped("snapshot_missing")
         if not record.enabled:  # claimed just before `disable_for_owner` or a pause: read again here, after the claim
             raise StartSkipped("schedule_disabled", count=False)
+        team = self._team.read() if self._team is not None else None  # unreadable raises: no start (fail closed)
+        if team_access.weekend_hold(team, self._clock(), record.cadence.tz):
+            raise StartSkipped("weekend_hold", count=False)  # held, never counted against the schedule (BQ-TEAMRT-3)
         if self._seams is None:
             raise StartSkipped("run_seams_unwired", count=False)  # the whole service, not this schedule: not counted
         world_id, run_id = slot_ids(run.idempotency_key)
@@ -907,7 +917,8 @@ def _run_task(
         prior_world_id=offered if offered != world_id else None, budget_cap=record.budget_cap, slot=due,
         skipped=body.skipped, cache_namespace=record.schedule_id,
     )  # fmt: skip
-    starter = ScheduleStarter(store=store, schedules=schedules, seams=seams, clock=clock)
+    team = team_store.team_reader(request.app.dependency_overrides)
+    starter = ScheduleStarter(store=store, schedules=schedules, seams=seams, clock=clock, team=_Reader(team))
     try:
         started = starter.start(run)
     except StartSkipped as skip:

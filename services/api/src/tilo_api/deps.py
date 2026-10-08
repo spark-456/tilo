@@ -13,6 +13,7 @@ world_id string never share lock state.
 
 from __future__ import annotations
 
+import dataclasses
 import functools
 import logging
 import math
@@ -306,6 +307,17 @@ def get_ledger() -> Sequence[LedgerEntry]:
     raise HTTPException(status_code=503, detail="not_configured")
 
 
+def get_ledger_writer() -> Any:
+    """The Treasury's write seam (COST-FAST-1b, BQ-COSTFAST-7): an object with `append(LedgerEntry)`. Not wired
+    yet, like `get_ledger`: fail closed. Quick treats that as best effort (`ledger_writer_for`)."""
+    raise HTTPException(status_code=503, detail="not_configured")
+
+
+def ledger_writer_for(request: Request) -> Any:
+    """The writer as the app is wired (overrides included), or None when it is unwired or fails."""
+    return _resolve(request, get_ledger_writer)
+
+
 def get_time_baselines() -> Any:
     """The EV-G2 time-saved baselines (FR-PA-20, PRD 14.2):
     `{method_url, units: {unit_type: {p25, median, p75}}}`, minutes
@@ -408,6 +420,18 @@ def _spend_mode(request: Request, uid: str | None, declaration: str | None, swit
     caps = _resolve(request, get_spend_caps)
     if switches.ledger is None or caps is None:
         return "replay", False
+    from tilo_api import team_access, team_store  # late: team_store's dev seam imports this module
+
+    try:  # FR-TEAM-02: the team's role and personal limits, a MIN on the lifetime cap; unreadable is capped
+        cap = team_access.user_cap_minor(
+            team_store.team_reader(request.app.dependency_overrides)(), uid, caps.uid_lifetime_minor
+        )
+    except Exception as exc:
+        logger.warning("team limits unreadable, so live is denied: %s", type(exc).__name__)
+        cap = 0
+    if cap <= 0:
+        return "replay", True
+    caps = dataclasses.replace(caps, uid_lifetime_minor=min(cap, caps.uid_lifetime_minor))
     guard = spend.SpendGuard(switches.ledger, switches.flags, caps)
     capped = guard.uid_capped(uid)
     return provider_mode(declaration, os.environ, replay_only=not guard.live_allowed(uid), capped=capped), capped

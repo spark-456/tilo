@@ -97,6 +97,13 @@ export const ledgerMemoryUp: NonNullable<Ledger["memoryUp"]> = {
   total: 640,
 };
 
+/** Monthly helper summary display fixtures for the Skills "Who helped this month" card. */
+export const HELPER_SUMMARY_FIXTURE = {
+  baseMonthlyAnswersAndFixes: 41,
+  mistakesDeltaSinceJuly: "−38%",
+  helperMonthLabel: "September",
+} as const;
+
 /**
  * The designed copy of the Ledger that the prototype typed into its page (WEB-9c pattern): the spike note, the
  * name in the cost-per-run headline, the week names, the wait headline and the wait with a backup. Each is a

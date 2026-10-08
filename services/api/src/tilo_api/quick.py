@@ -32,6 +32,7 @@ from tilo_api import deps, spend
 from tilo_api.assistant.metering import SpendLedger
 from tilo_api.people_limits import Limits
 from tilo_api.people_writes import Refusal
+from tilo_api.quick_ledger import LedgerWriter, quick_entry
 from tilo_api.quick_rules import REASONS, QuickConfigError, QuickRules, classify, clean, load_quick_rules, parse_verdict
 
 logger = logging.getLogger("tilo_api.quick")
@@ -75,6 +76,8 @@ class _Tally:
 
     budget: float
     left: float = -1.0
+    profile: str | None = None  # the last profile that answered, for the cost report's rows
+    tokens: tuple[int, int] = (0, 0)
 
     def __post_init__(self) -> None:
         self.left = self.budget
@@ -150,6 +153,13 @@ def _call(
     reply = "" if reply is None and empty_ok and result.outcome == "ok" else reply
     if result.budget is not None:
         tally.left = result.budget
+    if result.response is not None:
+        used = result.response.usage or {}
+        tally.profile = result.response.profile_id
+        tally.tokens = (
+            tally.tokens[0] + int(used.get("input_tokens") or 0),
+            tally.tokens[1] + int(used.get("output_tokens") or 0),
+        )
     sent = sum(1 for a in result.attempts if a.error_type not in _NOT_SENT)
     if result.outcome != "ok" or type(reply) is not str or not (reply.strip() or empty_ok):
         raise QuickRefusal(502, "The model gave no usable reply.")
@@ -205,6 +215,7 @@ def respond(
     mode: str,
     caps: Any,
     key: str | None,
+    ledger: LedgerWriter | None = None,
 ) -> dict[str, Any]:
     """The 200 body (answer or offer) of a Quick ask whose text, limits and file names intake has already screened;
     raises QuickRefusal (a fixed sentence), ReplayOnly, ModelUnavailable, SpendCapReached or HTTPException."""
@@ -233,6 +244,17 @@ def respond(
     if rules.role not in deps.providers_config().roles:
         raise QuickRefusal(503, "not_configured")  # never a fallback to the Director
 
+    def record(tally: _Tally) -> None:
+        """COST-FAST-1b: the same credits on the person's Quick pseudo run, so GET /costs shows them. Best effort: the
+        allowance commit above is authoritative, so a failed write is logged by type and never changes the answer."""
+        if ledger is None or tally.spent <= 0:
+            return
+        try:
+            now = datetime.now(UTC)
+            ledger.append(quick_entry(uid, deps.ORG_ID, now, float(tally.spent), tally.profile, tally.tokens))
+        except Exception as exc:
+            logger.warning("quick ledger write failed: %s", type(exc).__name__)
+
     def make() -> dict[str, Any]:
         held = _hold(rules, uid, datetime.now(UTC), allowance, switches, mode, caps)
         tally = _Tally(rules.budget)
@@ -240,8 +262,10 @@ def respond(
             done = _ask(rules, router, question, tally, vet=verdict.kind == "model")
         except BaseException:
             held.commit(tally.spent) if tally.spent > 0 else held.release()  # billed stays charged
+            record(tally)
             raise
         held.commit(tally.spent)
+        record(tally)
         if "offer" in done:
             return _offer(done["offer"])
         cost = {"model_calls": done["calls"], "credits": float(tally.spent), "saved_credits": 0.0}
