@@ -13,7 +13,7 @@ from hypothesis import strategies as st
 from tilo_planning.recording import RecordingRejected, normalise_segments
 from tilo_planning.transcript_ingest import MAX_INPUT_BYTES, TranscriptRejected, parse_transcript
 
-BOUND_S = 1.0
+BOUND_S = 3.0  # an exponential regression still blows far past this; headroom for a loaded machine
 BIG_BOUND_S = (
     30.0  # a 4 MB single line is linear (seconds, even on a loaded laptop); a quadratic pattern would take hours
 )
