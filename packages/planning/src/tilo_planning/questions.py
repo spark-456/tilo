@@ -137,7 +137,7 @@ def apply_answer(brief: dict[str, Any], question: Question, answer: str, *, toda
     if field == "deliverables":
         formats = _answer_formats(answer, question.suggested_answers[0], brief)
         if not formats:  # free text with no format: it stays as the content, in the default format (BQ-FREETEXT-1)
-            wish = clip(" ".join(answer[:ANSWER_MAX_CHARS].split()), 300)  # no control characters or line breaks
+            wish = clip(" ".join(_C0.sub(" ", answer[:ANSWER_MAX_CHARS]).split()), 300)  # no control chars or breaks
             first = {**brief["deliverables"][0], "title": clip(wish, 120), "format": DEFAULT_FORMAT}
             brief = {
                 **copy.deepcopy(brief),
@@ -184,6 +184,7 @@ _FORMAT_WORDS = {  # what a person types for a format
 }  # fmt: skip
 DEFAULT_FORMAT = "markdown"  # PRD default for a deliverable whose format the person did not name
 MIN_FREE_TEXT_WORDS = 3  # a deliverables answer of this many words and no format is content, not a typo
+_C0 = re.compile(r"[\x00-\x1f\x7f]")
 _WORD = re.compile(r"[A-Za-z]{2,}")
 _ANSWER_SPLIT = re.compile(r"[;,+&/]|\band\b", re.IGNORECASE)
 _CHIP_FORMAT = re.compile(r".*\((" + "|".join(_FORMATS) + r")\)")
