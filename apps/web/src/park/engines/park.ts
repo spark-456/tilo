@@ -1,4 +1,4 @@
-import { type Body, type Route, compileTraffic } from "../shell/cityTraffic";
+import { type Body, type Route, compileTraffic } from "./cityTraffic";
 // ported from design_handoff_tilo_web_app/design/tilo-park.js (user's prototype, ADR-0003a)
 // The Park City backdrop and glass-friendly world thumbnails. Static art is built as SVG strings and
 // shown as images; only the movers are separate layers. Faithful port: same names, numbers, rounding,
