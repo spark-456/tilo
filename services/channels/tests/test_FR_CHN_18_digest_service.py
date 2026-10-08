@@ -298,3 +298,76 @@ def test_FR_CHN_18_704_failed_emit_and_failed_abandon_logs_the_outbox_id_and_rai
     errors = [r.getMessage() for r in caplog.records if r.levelno >= logging.ERROR]
     assert any(entry["id"] in m and "RuntimeError" in m and "OSError" in m for m in errors), errors
     assert not any("secret digest body leak" in m or "Daily Digest" in m for m in errors)
+
+
+def test_FR_CHN_18_713_atomic_enqueue_emit_base_exception_replay_id_and_retry_key() -> None:
+    import copy
+
+    import pytest
+    from tilo_channels.autopilot_state import enqueue_digest
+
+    # 1. With undo_window_s=0, dispatch_due inside emit cannot claim or send before emit fails; retry on same day works
+    store, emitted, gmail = InMemoryOutboxStore(), list[dict[str, Any]](), _RecordingGmail()
+    outbox = Outbox(store, connectors={"gmail": gmail}, emit=lambda _: None, clock=lambda: NOW_TS, world_id=WORLD)
+    pol0 = _digest_policy(level="L3", undo_window_s=0)
+    port0 = _RealEnginePort([pol0], emitted, now_ts=NOW_TS)
+    artifacts = DigestArtifacts()
+
+    def _dispatch_then_fail(_part: dict[str, Any]) -> None:
+        outbox.dispatch_due()
+        raise RuntimeError("emit failed after concurrent dispatch_due")
+
+    assert _deliver(_svc(outbox, port0, artifacts, _dispatch_then_fail)) is None
+    assert gmail.sent == [] and emitted == [] and [e["state"] for e in store.all_entries()] == ["failed"]
+
+    svc_retry = _svc(outbox, port0, artifacts, emitted.append)
+    retried = _deliver(svc_retry)
+    assert retried is not None and retried["idempotency_key"] == f"digest:{USER}:2026-10-06:retry:1"
+    assert len(emitted) == 1 and _deliver(svc_retry) is None
+
+    # 2. BaseException (KeyboardInterrupt) from emit still compensates and never leaves a queued digest to send
+    store_be, emitted_be, gmail_be = InMemoryOutboxStore(), list[dict[str, Any]](), _RecordingGmail()
+    outbox_be = Outbox(
+        store_be, connectors={"gmail": gmail_be}, emit=lambda _: None, clock=lambda: NOW_TS, world_id=WORLD
+    )
+
+    def _interrupt_emit(_part: dict[str, Any]) -> None:
+        raise KeyboardInterrupt("simulated interrupt")
+
+    with pytest.raises(KeyboardInterrupt):
+        _deliver(_svc(outbox_be, _RealEnginePort([pol0], emitted_be), DigestArtifacts(), _interrupt_emit))
+    outbox_be.dispatch_due()
+    assert gmail_be.sent == [] and emitted_be == [] and [e["state"] for e in store_be.all_entries()] == ["failed"]
+
+    # 3. Replay check: different-id replay emits nothing and leaves winner untouched; same-id replay emits once
+    store_rp, emitted_rp = InMemoryOutboxStore(), list[dict[str, Any]]()
+    outbox_rp = Outbox(store_rp, connectors={}, emit=lambda _: None, clock=lambda: NOW_TS, world_id=WORLD)
+    pol60 = _digest_policy(level="L3", undo_window_s=60)
+    winner = _deliver(_svc(outbox_rp, _RealEnginePort([pol60], emitted_rp), DigestArtifacts(), emitted_rp.append))
+    assert winner is not None and len(emitted_rp) == 1
+    part1 = copy.deepcopy(emitted_rp[0])
+
+    same_res = enqueue_digest(
+        outbox_rp, winner, policy_applied=part1, policy=pol60, world_owner=USER, emit=emitted_rp.append
+    )
+    assert same_res is not None and same_res["id"] == winner["id"] and len(emitted_rp) == 1
+
+    loser_id = "01J8Z3K4M5N6P7Q8R9S0T1V9ZZ"
+    loser_entry = copy.deepcopy(winner) | {"id": loser_id}
+    loser_part = copy.deepcopy(part1) | {"data": copy.deepcopy(part1["data"]) | {"outbox_id": loser_id}}
+    diff_res = enqueue_digest(
+        outbox_rp, loser_entry, policy_applied=loser_part, policy=pol60, world_owner=USER, emit=emitted_rp.append
+    )
+    assert diff_res is not None and diff_res["id"] == winner["id"] and len(emitted_rp) == 1
+    assert store_rp.get(winner["id"])["state"] == "scheduled" and store_rp.get(loser_id) is None
+
+    # 4. LookupError (KeyError) in policy port is not treated as an expected port error
+    class _KeyErrorPolicy:
+        def decide(self, user_id: str, proposal: tilo_policy.Proposal) -> tilo_policy.Decision:
+            raise KeyError("missing_key_bug")
+
+        def policy_for(self, user_id: str, policy_id: str) -> dict[str, Any] | None:
+            return None
+
+    with pytest.raises(KeyError):
+        _deliver(_svc(outbox_be, _KeyErrorPolicy(), DigestArtifacts(), emitted_be.append))

@@ -244,6 +244,21 @@ class Ledger:
         return self._outbox.enqueue(entry, evidence or {"instruction_id": doc["instruction_id"], "level": doc["level"]})
 
 
+def _acquire_hold(store: Any, outbox_id: str, holder: str) -> None:
+    lock, leases = getattr(store, "_lock", None), getattr(store, "_send_leases", None)
+    if lock is not None and isinstance(leases, dict):
+        with lock:
+            leases.setdefault(outbox_id, (holder, "9999-12-31T23:59:59.999Z"))
+
+
+def _release_hold(store: Any, outbox_id: str, holder: str) -> None:
+    lock, leases = getattr(store, "_lock", None), getattr(store, "_send_leases", None)
+    if lock is not None and isinstance(leases, dict):
+        with lock:
+            if leases.get(outbox_id, (None,))[0] == holder:
+                leases.pop(outbox_id, None)
+
+
 def enqueue_digest(
     outbox: Outbox,
     entry: dict[str, Any],
@@ -253,7 +268,10 @@ def enqueue_digest(
     world_owner: str,
     emit: Callable[[dict[str, Any]], None] | None = None,
 ) -> dict[str, Any] | None:
-    """Enqueues a policy-authorised L3 daily digest entry once its full OB-01 evidence opens the gate (FR-CHN-18)."""
+    """Enqueues a policy-authorised L3 daily digest entry once its full OB-01 evidence opens the gate (FR-CHN-18).
+    Holds a send lease on the entry id across insert + emit so `dispatch_due` cannot claim a queued (undo_window_s=0)
+    entry before `policy.applied` settles; both different-id and same-id replays return the stored entry without
+    emitting a duplicate `policy.applied`."""
     from tilo_channels import autopilot_gate
 
     if not isinstance(policy, Mapping):
@@ -263,12 +281,23 @@ def enqueue_digest(
     evidence |= {"instruction": None, "earlier_applied": []}
     if not autopilot_gate.opens(entry, evidence):
         return None
-    stored = outbox.enqueue(entry, evidence)
-    if emit is None or stored.get("id") != entry["id"]:  # a replay under the same key is another call's entry
+    get_fn = getattr(outbox, "get", None)
+    already_stored = callable(get_fn) and get_fn(entry["id"]) is not None
+    store, holder = getattr(outbox, "_store", None), f"digest_emit:{ulid(0)}"
+    if not already_stored:
+        _acquire_hold(store, entry["id"], holder)
+    try:
+        stored = outbox.enqueue(entry, evidence)
+    except BaseException:
+        _release_hold(store, entry["id"], holder)
+        raise
+    if already_stored or emit is None or stored.get("id") != entry["id"]:  # a replay under the same key or id
+        _release_hold(store, entry["id"], holder)
         return stored
     try:
         emit(copy.deepcopy(policy_applied))
-    except Exception as exc:
+    except BaseException as exc:
+        _release_hold(store, entry["id"], holder)
         try:  # abandon settles queued and scheduled entries alike (cancel refuses a queued one, undo window 0)
             outbox.abandon(entry["id"])
         except Exception as err:
@@ -280,4 +309,5 @@ def enqueue_digest(
             )
             raise DigestSettleFailed(entry["id"]) from exc
         raise
+    _release_hold(store, entry["id"], holder)
     return stored

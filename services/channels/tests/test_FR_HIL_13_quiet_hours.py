@@ -128,3 +128,52 @@ def test_FR_HIL_13_FR_CHN_18_quiet_hours_fails_closed_on_zoneinfo_not_found_and_
     pyproject = Path(__file__).resolve().parents[1] / "pyproject.toml"
     deps = tomllib.loads(pyproject.read_text(encoding="utf-8"))["project"]["dependencies"]
     assert any(d == "tzdata" or d.startswith("tzdata>") or d.startswith("tzdata=") for d in deps)
+
+
+def test_FR_HIL_13_713_oserror_zones_malformed_blocks_and_gate_short_circuit(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    daytime = "2026-10-06T12:00:00.000Z"
+
+    # 1. Directory-like or over-long zones raising PermissionError/OSError fail closed for needs_you and pass gate
+    def _oserror_zone(key: str) -> object:
+        raise PermissionError(f"Is a directory: {key}")
+
+    monkeypatch.setattr("tilo_channels.quiet_hours.ZoneInfo", _oserror_zone)
+    for z in ("America", "Etc", "A" * 300):
+        p = {"quiet_hours": {"start": "22:00", "end": "07:00", "timezone": z}}
+        assert is_quiet_hours(p, now=daytime) is True
+        assert should_notify("needs_you", prefs=p, now=daytime) is False
+        assert should_notify("gate", prefs=p, now=daytime) is True
+        assert should_notify("blocked", prefs=p, now=daytime) is True
+    monkeypatch.undo()
+
+    # 2. Malformed quiet_hours blocks (non-mapping, empty mapping, missing start/end, bad HH:MM) all fail closed
+    for malformed in (
+        {"quiet_hours": "22:00-07:00"},
+        {"quiet_hours": ["22:00", "07:00"]},
+        {"quiet_hours": {}},
+        {"quiet_hours": {"enabled": True}},
+        {"quiet_hours": {"start": "22:00"}},
+        {"quiet_hours": {"start": "99:00", "end": "07:00"}},
+    ):
+        assert is_quiet_hours(malformed, now=daytime) is True
+        assert should_notify("needs_you", prefs=malformed, now=daytime) is False
+        assert should_notify("gate", prefs=malformed, now=daytime) is True
+
+    # 3. NotificationGate short-circuits gate/blocked before prefs read & stores in-app before deciding
+    class _CustomStoreError(Exception):
+        pass
+
+    class _ExplodingPrefs:
+        def get(self, user_id: str) -> dict | None:
+            raise _CustomStoreError("firestore down")
+
+    sent: list[dict] = []
+    gate = NotificationGate(preferences=_ExplodingPrefs(), clock=lambda: daytime, sender=sent.append)
+    dg = gate.deliver(USER, {"id": "c_gate", "kind": "gate", "rung": "gate"})
+    dn = gate.deliver(USER, {"id": "c_needs", "kind": "needs_you", "rung": "needs_you"})
+    assert (dg.notified, dg.in_app) == (True, True)
+    assert (dn.notified, dn.in_app) == (False, True)
+    assert [c["id"] for c in sent] == ["c_gate"]
+    assert [c["id"] for c in gate.in_app_items(USER)] == ["c_gate", "c_needs"]

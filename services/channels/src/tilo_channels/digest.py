@@ -6,6 +6,7 @@ import copy
 import datetime as dt
 import logging
 import re
+import sys
 from collections.abc import Callable, Collection, Iterable, Mapping
 from dataclasses import dataclass, field
 from typing import Any, Literal, Protocol, TypeGuard
@@ -15,7 +16,16 @@ import tilo_policy
 from tilo_policy.schemas import conforms, event_ok
 
 from tilo_channels.autopilot_gate import gate_id_for
-from tilo_channels.autopilot_state import ACTION_TYPE, Outbox, enqueue_digest, fresh, parse_ms, timestamp, ulid
+from tilo_channels.autopilot_state import (
+    ACTION_TYPE,
+    DigestSettleFailed,
+    Outbox,
+    enqueue_digest,
+    fresh,
+    parse_ms,
+    timestamp,
+    ulid,
+)
 from tilo_channels.links import CardState, KeyRing, LinkService, NonceStore, Redemption
 from tilo_channels.quiet_hours import PreferenceReader, QuietHours, should_notify
 from tilo_channels.triage import PRIORITIES
@@ -37,16 +47,30 @@ WINDOW_S = 86_400
 AUTOMATED_LEVELS: frozenset[str] = frozenset({"L2", "L3"})
 _MSG_ID_RE = re.compile(r"^[A-Za-z0-9_-]{1,64}\Z")
 _LOG = logging.getLogger("tilo_channels.digest")
-_EXPECTED_ERROR_NAMES: frozenset[str] = frozenset(
-    {"OutboxRefused", "AdapterError", "ProviderUnavailable", "RateLimited", "SideEffectRefused"}
-)
+_MAX_DIGEST_RETRIES = 16
 
 
 def _is_expected_port_error(exc: Exception) -> bool:
-    return (
-        isinstance(exc, (ZoneInfoNotFoundError, ValueError, LookupError, PermissionError, RuntimeError, OSError))
-        or type(exc).__name__ in _EXPECTED_ERROR_NAMES
+    if isinstance(exc, DigestSettleFailed):
+        return False
+    mod = sys.modules.get("tilo_connectors.errors")
+    conn_errs = tuple(
+        cls for name in ("OutboxRefused", "AdapterError") if isinstance(cls := getattr(mod, name, None), type)
     )
+    return isinstance(exc, (ZoneInfoNotFoundError, ValueError, PermissionError, RuntimeError, OSError, *conn_errs))
+
+
+def _resolve_digest_key(outbox: Outbox, world_id: str, base_key: str) -> str | None:
+    for attempt in range(_MAX_DIGEST_RETRIES):
+        key = base_key if attempt == 0 else f"{base_key}:retry:{attempt}"
+        existing = outbox.get_by_idempotency_key(world_id, key)
+        if existing is None:
+            return key
+        if existing.get("state") != "failed":
+            return None
+        next_key = f"{base_key}:retry:{attempt + 1}"
+        _LOG.warning("digest key %s held failed entry %s; retrying as %s", key, existing.get("id"), next_key)
+    return None
 
 
 def _to_epoch_s(value: float | int | str | dt.datetime | None) -> float | None:
@@ -400,8 +424,8 @@ class DigestService:
         )
         if digest is None:
             return None
-        utc_day, idem_key = digest.window_end[:10], f"digest:{user_id}:{digest.window_end[:10]}"
-        if self._outbox.get_by_idempotency_key(self._world_id, idem_key) is not None:
+        utc_day, base_key = digest.window_end[:10], f"digest:{user_id}:{digest.window_end[:10]}"
+        if (idem_key := _resolve_digest_key(self._outbox, self._world_id, base_key)) is None:
             return None
         if (now_ms := parse_ms(digest.window_end)) is None:
             return None

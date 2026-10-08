@@ -331,41 +331,70 @@ def test_SEC_10_515_rate_limiter_protocol_requires_peek_before_auth_and_fails_cl
 
 
 @pytest.mark.parametrize(
-    ("missing", "raises", "status"),
+    ("missing", "raises", "ret", "status"),
     [
-        ("consume_all", None, 503),
-        ("peek", NotImplementedError, 503),
-        ("consume_all", TypeError, 503),
-        ("peek", ConnectionError, 200),
+        ("consume_all", None, None, 503),
+        ("peek", NotImplementedError, None, 503),
+        ("peek", AttributeError, None, 503),
+        ("consume_all", AttributeError, None, 503),
+        ("consume_all", TypeError, None, 503),
+        ("peek", None, (True,), 503),
+        ("consume_all", None, (None, 0, "extra"), 503),
+        ("peek", None, "bad_none", 503),
+        ("peek", ConnectionError, None, 200),
     ],
-    ids=["no consume_all", "peek not implemented", "consume_all type error", "other store error fails open"],
+    ids=[
+        "no consume_all",
+        "peek not implemented",
+        "peek attribute error",
+        "consume_all attribute error",
+        "consume_all type error",
+        "peek wrong-length tuple",
+        "consume_all wrong-length tuple",
+        "peek returns None",
+        "other store error fails open",
+    ],
 )
 def test_SEC_10_704_store_capability_missing_fails_closed_other_errors_fail_open(
-    missing: str, raises: type[Exception] | None, status: int
+    missing: str, raises: type[Exception] | None, ret: Any, status: int
 ) -> None:
+    peeks = {"count": 0}
+    auth_calls = {"count": 0}
+
     class Store:
-        def peek(self, key: str, *, capacity: int, refill_per_s: float) -> tuple[bool, int]:
+        def peek(self, key: str, *, capacity: int, refill_per_s: float) -> Any:
+            peeks["count"] += 1
             if missing == "peek" and raises:
                 raise raises("x")
+            if missing == "peek" and ret is not None:
+                return None if ret == "bad_none" else ret
             return True, 0
 
-        def consume_all(self, checks: Any) -> tuple[str | None, int]:
+        def consume_all(self, checks: Any) -> Any:
             if missing == "consume_all" and raises:
                 raise raises("x")
+            if missing == "consume_all" and ret is not None:
+                return ret
             return None, 0
 
     store = Store()
-    if raises is None:
+    if raises is None and ret is None:
         del Store.consume_all
     app.dependency_overrides[get_rate_limiter] = lambda: store  # type: ignore[return-value]
-    alice = Principal(user_id="u_alice", role="owner", world_id="w_sec10")
-    app.dependency_overrides[get_current_principal] = lambda: alice
+
+    def counting_alice() -> Principal:
+        auth_calls["count"] += 1
+        return Principal(user_id="u_alice", role="owner", world_id="w_sec10")
+
+    app.dependency_overrides[get_current_principal] = counting_alice
     try:
         res = TestClient(app).get("/health")
         assert res.status_code == 200  # exempt path is never limited
         res = TestClient(app).get("/worlds/w_sec10/cards")
         closed = res.status_code == 503 and res.json().get("code") == "rate_limiter_unavailable"
         assert closed == (status == 503), res.text[:120]
+        if raises is None and ret is None:
+            assert peeks["count"] == 0 and auth_calls["count"] == 0
     finally:
         app.dependency_overrides.clear()
 
@@ -470,3 +499,42 @@ def test_SEC_10_local_load_test_trips_cleanly_and_recovers() -> None:
         assert recovered.status_code == 200
     finally:
         app.dependency_overrides.clear()
+
+
+def test_FR_HIL_13_713_api_cards_quiet_hours_fails_closed_and_short_circuits_gate(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import datetime as dt
+
+    from tilo_api.cards import CardStore, _quiet_hours_active
+
+    daytime = dt.datetime(2026, 10, 6, 12, 0, 0, tzinfo=dt.UTC)
+    assert not _quiet_hours_active(None, daytime) and not _quiet_hours_active({}, daytime)
+    for bad in (
+        {"quiet_hours": "22:00-07:00"},
+        {"quiet_hours": {}},
+        {"quiet_hours": {"start": "22:00", "end": "07:00", "timezone": "NoSuch/Zone"}},
+    ):
+        assert _quiet_hours_active(bad, daytime) is True
+
+    def _oserror_zone(key: str) -> object:
+        raise PermissionError(key)
+
+    monkeypatch.setattr("tilo_api.cards.ZoneInfo", _oserror_zone)
+    assert _quiet_hours_active({"quiet_hours": {"start": "22:00", "end": "07:00", "timezone": "America"}}, daytime)
+    monkeypatch.undo()
+
+    class _Stub:
+        def now(self) -> str:
+            return "2026-10-06T12:00:00.000Z"
+
+        def write(self, part: dict[str, Any]) -> None:
+            pass
+
+        def get(self, user_id: str) -> dict[str, Any]:
+            raise RuntimeError("prefs broken")
+
+    stub = _Stub()
+    cs = CardStore(clock=stub, writer=stub, world_owners={"w_1": "u_alice"}, preferences=stub)
+    assert cs.should_notify({"world_id": "w_1", "kind": "gate", "rung": "gate"}) is True
+    assert cs.should_notify({"world_id": "w_1", "kind": "needs_you", "rung": "needs_you"}) is False
