@@ -1,6 +1,7 @@
 /* Agenda page (WEB-9). Values are the inline styles of design_handoff_tilo_web_app/design/Tilo App
    Agenda.dc.html, colours through the park tokens. Every selector sits under [data-park]. No transition,
-   animation or keyframes: the design's motion (tiloFade entrances, tiloGhost on the dashed slots, pin hover
+   animation or keyframes: the design's motion (tiloFade entrances, tiloGhost on the dashed slots (kept static,
+   BQ-UX15-1), pin hover
    spring .45s, event hover .2s, check pop .25s, switch knob .25s, filter fades .2s) is restored in WEB-3
    (BQ-WEB-3). Static :hover states are kept. */
 
@@ -918,6 +919,12 @@
   font-size: 12.5px;
   font-weight: 600;
   color: var(--ink2);
+}
+[data-park] .park-agenda-togglenote {
+  padding-top: 6px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ink3);
 }
 [data-park] .park-agenda-track {
   box-sizing: border-box;

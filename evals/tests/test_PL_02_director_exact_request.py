@@ -54,7 +54,7 @@ from tilo_providers import schema_probe
 from tilo_providers.config import load_providers_config
 from tilo_providers.google_adapter import GoogleModelProvider
 from tilo_providers.safety import FakeSafetyProvider
-from tilo_providers.schema_subset import to_gemini_schema
+from tilo_providers.schema_subset import complexity, to_gemini_schema
 
 TOPIC = "Plan a two-day offsite for a team of twelve, with an agenda and a budget sheet."  # synthetic
 DUMP = live_topic.ADHOC / "pl02-director-request.redacted.json"  # git-ignored (.gitignore: evals/bank/live/adhoc/)
@@ -165,7 +165,9 @@ def _null_anyof(node: dict[str, Any]) -> bool:
     return {"type": "null"} in (node.get("anyOf") or [])
 
 
-PROPERTY_SCHEMA_KEYS = frozenset({"type", "properties", "required", "items", "enum", "anyOf", "title", "description"})
+PROPERTY_SCHEMA_KEYS = frozenset(
+    {"type", "properties", "required", "items", "enum", "anyOf", "description", "nullable"}
+)
 
 
 # (id, fact that must hold on the captured request, evidence, outcome: "ok" | "fixed" | "probe:<variant>")
@@ -178,26 +180,30 @@ SUSPECTS: list[tuple[str, Callable[[dict[str, Any]], bool], str, str]] = [
     ),
     (
         "an_untyped_empty_property_schema_out_of_scope",
-        lambda b: _where(b, lambda n: n == {}) == ["$.out_of_scope"],
-        "content.proto response_json_schema: keyword list silent on an untyped {} schema",
+        lambda b: not _where(b, lambda n: n == {}) and _schema(b)["properties"]["out_of_scope"]["type"] == "array",
+        "FIXED (probe 8 Oct 2026: schema_no_empty passed): out_of_scope is sent as a typed list of {category, part}",
         "probe:director_schema_no_empty",
     ),
     (
         "type_null_branches_in_anyof",
-        lambda b: sorted(_where(b, _null_anyof)) == ["$.deadline", "$.out_of_policy", "$.sources[].label"],
-        "Gemini API page lists type null; the Vertex keyword list names `type` but no type values",
+        lambda b: (
+            not _where(b, _null_anyof)
+            and sorted(_where(b, lambda n: n.get("nullable") is True))
+            == ["$.deadline", "$.out_of_policy", "$.sources[].label"]
+        ),
+        "FIXED (probe 8 Oct 2026: schema_no_null_anyof passed): anyOf [X, null] is sent as X with nullable",
         "probe:director_schema_no_null_anyof",
     ),
     (
         "titles_and_descriptions_present",
-        lambda b: bool(_where(b, lambda n: "title" in n)) and len(_schema(b).get("description", "")) < 300,
-        "content.proto: `title` and `description` are supported keywords (kept as a cheap check)",
+        lambda b: not _where(b, lambda n: "title" in n) and len(_schema(b).get("description", "")) < 300,
+        "titles are not sent (probe: schema_no_titles alone still failed); descriptions stay",
         "probe:director_schema_no_titles",
     ),
     (
         "array_bounds_maxitems_10_20_50",
-        lambda b: sorted(n["maxItems"] for _p, n, _d in _nodes(_schema(b)) if "maxItems" in n) == [10, 20, 50],
-        "structured output page: 'long array length limits' can cause InvalidArgument 400",
+        lambda b: not any({"minItems", "maxItems", "minimum", "maximum"} & set(n) for _p, n, _d in _nodes(_schema(b))),
+        "FIXED (probe 8 Oct 2026: schema_no_item_bounds passed): no bounds are sent; the caller validates them",
         "probe:director_schema_no_item_bounds",
     ),
     (
@@ -235,14 +241,17 @@ SUSPECTS: list[tuple[str, Callable[[dict[str, Any]], bool], str, str]] = [
     ),
     (
         "only_documented_keywords",
-        lambda b: all(set(n) <= PROPERTY_SCHEMA_KEYS | {"minItems", "maxItems"} for _p, n, _d in _nodes(_schema(b))),
+        lambda b: all(set(n) <= PROPERTY_SCHEMA_KEYS for _p, n, _d in _nodes(_schema(b))),
         "content.proto response_json_schema keyword list",
         "ok",
     ),
     (
-        "no_nullable_no_format_no_ref_no_property_ordering",
-        lambda b: not _where(b, lambda n: bool({"nullable", "format", "$ref", "$defs", "propertyOrdering"} & set(n))),
-        "content.proto: nullable is not a response_json_schema keyword; none of these are sent",
+        "nullable_is_a_true_flag_and_no_format_ref_or_property_ordering",
+        lambda b: (
+            not _where(b, lambda n: bool({"format", "$ref", "$defs", "propertyOrdering"} & set(n)))
+            and all(n["nullable"] is True for _p, n, _d in _nodes(_schema(b)) if "nullable" in n)
+        ),
+        "Vertex lists nullable; tracked in the follow-up issue (not a response_json_schema keyword in the proto)",
         "ok",
     ),
     (
@@ -273,8 +282,8 @@ SUSPECTS: list[tuple[str, Callable[[dict[str, Any]], bool], str, str]] = [
     (
         "schema_is_small_and_shallow",
         lambda b: (
-            max(d for _p, _n, d in _nodes(_schema(b))) == 5
-            and sum(len(n.get("properties", {})) for _p, n, _d in _nodes(_schema(b))) == 15
+            max(d for _p, _n, d in _nodes(_schema(b))) <= 5
+            and complexity(_schema(b)) <= 80  # the refused Director schema scored 117
             and len(json.dumps(_schema(b))) < 2048
         ),
         "Gemini API page: 'Very large or deeply nested schemas may be rejected' (15 properties, depth 5, under 2 KB)",

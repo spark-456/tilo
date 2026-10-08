@@ -51,10 +51,26 @@ def test_P0_07c_headers_apply_to_all_routes(repo_root: pathlib.Path) -> None:
 # 0.13.1 exchanges at https://content-firebaseappcheck.googleapis.com/v1 (not firebaseappcheck.googleapis.com, which
 # is the server-side host the API reads keys from) and loads the reCAPTCHA script from www.google.com/recaptcha/.
 # tests/repo/test_SEC_10_appcheck_client_docs_and_csp.py pins the same set; everything else stays 'self' only.
+# SEC-15 / SIGNIN (documented test change, BQ-SIGNIN-5): Firebase Auth's Google sign-in adds exactly three more, read
+# from @firebase/auth 12.19.0: the gapi loader https://apis.google.com (script-src), the project's own sign-in iframe
+# and handler https://essential-wares-510320-f0.firebaseapp.com/__/auth/ (frame-src), and the two REST hosts
+# identitytoolkit.googleapis.com and securetoken.googleapis.com (connect-src).
+# tests/repo/test_SEC_15_SIGNIN_docs_and_csp.py pins the same set.
 OFF_ORIGIN_ALLOWED = {
-    "script-src": ["https://www.google.com/recaptcha/", "https://www.gstatic.com/recaptcha/"],
-    "frame-src": ["https://www.google.com/recaptcha/"],
-    "connect-src": ["https://content-firebaseappcheck.googleapis.com"],
+    "script-src": [
+        "https://www.google.com/recaptcha/",
+        "https://www.gstatic.com/recaptcha/",
+        "https://apis.google.com",
+    ],
+    "frame-src": [
+        "https://www.google.com/recaptcha/",
+        "https://essential-wares-510320-f0.firebaseapp.com/__/auth/",
+    ],
+    "connect-src": [
+        "https://content-firebaseappcheck.googleapis.com",
+        "https://identitytoolkit.googleapis.com",
+        "https://securetoken.googleapis.com",
+    ],
 }
 
 
@@ -64,7 +80,7 @@ def test_P0_07c_csp_forbids_framing_and_off_origin_loads(repo_root: pathlib.Path
     assert csp["default-src"] == ["'self'"]
     assert csp["script-src"] == ["'self'", *OFF_ORIGIN_ALLOWED["script-src"]]  # SEC-10: was exactly 'self'
     assert csp["connect-src"] == ["'self'", *OFF_ORIGIN_ALLOWED["connect-src"]]  # SEC-10: was exactly 'self'
-    assert csp["frame-src"] == OFF_ORIGIN_ALLOWED["frame-src"]  # SEC-10: new, the reCAPTCHA challenge frame only
+    assert csp["frame-src"] == OFF_ORIGIN_ALLOWED["frame-src"]  # SEC-10 reCAPTCHA challenge frame, SEC-15 sign-in frame
     assert csp["object-src"] == ["'none'"]
     # P0-07e (documented test change): base-uri tightened from 'self' to 'none'; the app has no <base> tag.
     assert csp["base-uri"] == ["'none'"]

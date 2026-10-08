@@ -2,13 +2,14 @@
 // doing. A step set to ask first stops on amber "Asking you" until the person says yes (design: `t.isTry`).
 import { cx } from "../../components/cx";
 import { agent, desk, icon } from "./skillsKit";
-import { PLAN, TRY } from "./teachData";
+import { PLAN, TRY, TRY_RUN_FIXTURE_EVENTS, formatTryRunResult } from "./teachData";
 import type { PaneProps } from "./useTeach";
 
 type Tone = "done" | "asking" | "working" | "waiting";
 
 export function RunPane({ t, night }: PaneProps) {
   const { run, waiting, runDone } = t;
+  const result = formatTryRunResult(TRY_RUN_FIXTURE_EVENTS, PLAN.length);
   const pill = runDone
     ? "Finished"
     : waiting
@@ -67,8 +68,8 @@ export function RunPane({ t, night }: PaneProps) {
         {runDone ? (
           <div className="park-skills-result">
             <div className="park-skills-result-text">
-              <div className="park-skills-result-title">{TRY.resultTitle}</div>
-              <div className="park-skills-result-line">{TRY.resultSub}</div>
+              <div className="park-skills-result-title">{result.title}</div>
+              <div className="park-skills-result-line">{result.sub}</div>
             </div>
             <button type="button" className="park-skills-fix" onClick={t.back}>
               Fix a step

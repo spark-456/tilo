@@ -4,12 +4,21 @@
 // is not built shows "Not connected yet", never sample values. The composer's 900 ms goes through the
 // provider's `useSchedule`, so a test never waits and a pending draft is cancelled when the page goes.
 import { useEffect, useRef, useState } from "react";
-import type { Agenda, ApiResult, Ledger, TierKey, Today, User, World } from "../../api/types";
+import type {
+  Agenda,
+  ApiResult,
+  Decision,
+  Ledger,
+  TierKey,
+  Today,
+  User,
+  World,
+} from "../../api/types";
 import type { AppCtx } from "../../app/AppCtx";
-import { useParkApi, useSchedule } from "../../app/context";
+import { useParkApi, useParkStore, useSchedule } from "../../app/context";
 import { ComposerPanel, type Phase } from "./ComposerPanel";
 import "./Home.css";
-import { Hero, Pins, TodayPanel } from "./Panels";
+import { Hero, KpiStrip, Pins, TodayPanel } from "./Panels";
 import {
   DRAFT_MS,
   MODES,
@@ -26,6 +35,8 @@ interface Base {
   today: Today;
   agenda: Agenda;
   ledger: Ledger;
+  /** What the "Waiting on you" tile says and opens; none when the Api serves no decisions. */
+  decisions: Decision[];
 }
 
 type Loaded<T> = T | "failed" | null;
@@ -38,23 +49,29 @@ const data = <T,>(r: ApiResult<T>): T => r.data;
 export function HomePage({ app }: { app: AppCtx }) {
   const api = useParkApi();
   const schedule = useSchedule();
+  const store = useParkStore();
   const { go, dec, added, night, vw, vh, pins, needsLeft: needs } = app;
 
   const [base, setBase] = useState<Loaded<Base>>(null);
   const [worlds, setWorlds] = useState<Loaded<World[]>>(null);
+  // True once the worlds read came from the live Api: the composer works then, whatever the greeting reads did.
+  const [worldsLive, setWorldsLive] = useState(false);
 
   useEffect(() => {
     let live = true;
+    const decisions = (): Promise<Decision[]> =>
+      together(() => api.getDecisions()).then(data, () => []);
     together(() =>
-      Promise.all([api.getUser(), api.getToday(), api.getAgenda(), api.getLedger()]),
+      Promise.all([api.getUser(), api.getToday(), api.getAgenda(), api.getLedger(), decisions()]),
     ).then(
-      ([user, today, agenda, ledger]) => {
+      ([user, today, agenda, ledger, decided]) => {
         if (live)
           setBase({
             user: data(user),
             today: data(today),
             agenda: data(agenda),
             ledger: data(ledger),
+            decisions: decided,
           });
       },
       () => {
@@ -71,7 +88,10 @@ export function HomePage({ app }: { app: AppCtx }) {
     let live = true;
     together(() => api.getWorlds(dec, added)).then(
       (r) => {
-        if (live) setWorlds(data(r));
+        if (live) {
+          setWorlds(data(r));
+          setWorldsLive(r.source === "live");
+        }
       },
       () => {
         if (live) setWorlds("failed");
@@ -118,6 +138,32 @@ export function HomePage({ app }: { app: AppCtx }) {
   };
   const mode = MODES.find((m) => m.key === modeKey) ?? MODES[0];
 
+  // A start in flight (live only): the confirm control waits, nothing is cleared and nothing else is edited.
+  const [sending, setSending] = useState(false);
+  const sendingNow = useRef(false);
+  const confirmStart = () => {
+    if (sendingNow.current) return;
+    const text = query.trim();
+    if (!store.getState().sources.live) {
+      app.addWorld(modeKey, text);
+      setQuery("");
+      toIdle();
+      return;
+    }
+    sendingNow.current = true;
+    setSending(true);
+    store.startWorld(modeKey, text).then((ok) => {
+      sendingNow.current = false;
+      setSending(false);
+      if (!ok) return; // the card stays open and the text stays, so the person can try again
+      setQuery("");
+      toIdle();
+    });
+  };
+  const idleUnlessSending = () => {
+    if (!sendingNow.current) toIdle();
+  };
+
   const open = (id: string) => go("world", { id });
   const failed = base === "failed" || worlds === "failed";
   const ready = base !== null && base !== "failed" && worlds !== null && worlds !== "failed";
@@ -141,6 +187,15 @@ export function HomePage({ app }: { app: AppCtx }) {
             onReview={() => (waitingIn ? open(waitingIn.id) : go("worlds"))}
           />
           {(vw || 1440) >= 1180 ? (
+            <KpiStrip
+              ledger={base.ledger}
+              dec={dec}
+              decisions={base.decisions}
+              fallbackWorld={waitingIn?.id}
+              onWorld={open}
+            />
+          ) : null}
+          {(vw || 1440) >= 1180 ? (
             <TodayPanel
               rows={liveRows(worlds, needs)}
               events={nextEvents(base.agenda)}
@@ -159,34 +214,35 @@ export function HomePage({ app }: { app: AppCtx }) {
           <h1 className="park-home-h1">Home</h1>
           <p className="park-home-summary">Not connected yet</p>
         </div>
-      ) : (
+      ) : null}
+      {!failed || (worldsLive && worlds !== "failed") ? (
         <ComposerPanel
+          sending={sending}
           mode={mode}
           modes={MODES}
           query={query}
           shown={query.trim() || mode.example}
           phase={phase}
           onQuery={(value) => {
+            if (sendingNow.current) return;
             setQuery(value);
             toIdle();
           }}
           onMode={(key) => {
+            if (sendingNow.current) return;
             setModeKey(key as TierKey);
             toIdle();
           }}
           onChip={(label) => {
+            if (sendingNow.current) return;
             setQuery(label);
             toIdle();
           }}
           onDraft={draft}
-          onConfirm={() => {
-            app.addWorld(modeKey, query.trim());
-            setQuery("");
-            toIdle();
-          }}
-          onChange={toIdle}
+          onConfirm={confirmStart}
+          onChange={idleUnlessSending}
         />
-      )}
+      ) : null}
       <nav className="park-home-legal" aria-label="Legal">
         <a href="/privacy">Privacy</a> · <a href="/terms">Terms</a>
       </nav>

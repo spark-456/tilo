@@ -134,8 +134,10 @@ def _tool_access(seams: Any, connector: str, action: str, tier: str) -> None:
 
 
 def start_run(store: deps.Store, task: deps.TaskRecord, *, approach: dict, budget_cap: float, seams: Seams) -> None:
-    with store.runs_guard:  # one run per world
-        if task.world_id in store.runs:
+    store.settle(task.world_id)  # the queued events go out first, so `world.started` follows them
+    with store.runs_guard:  # one run per world, in any process: a started world's stream says so (ADR-0026 decision 5)
+        started = any(e["type"] == "world.started" for e in store.events.get(task.world_id, []))
+        if task.world_id in store.runs or started:
             return
         run = store.runs[task.world_id] = Run(store, task, approach, budget_cap, seams)
     threading.Thread(target=run.main, name=f"run-{task.world_id}", daemon=True).start()
@@ -437,6 +439,12 @@ class Run:
     def _prepare(self) -> Any:
         """Compile, validate, lay out. Returns the agents config, or None when no run may start."""
         registry = self.seams.connectors
+        try:  # the policy context and the PI-11 history are read across all of the owner's worlds
+            self.store.load_owner(self.owner, settle=True)
+        except Exception as exc:
+            logger.warning("run %s: the owner's records could not be read (%s)", self.run_id, type(exc).__name__)
+            self._fail("the owner's records could not be read", None)
+            return None
         try:
             context = PlanInputs(
                 approaches=copy.deepcopy(self.approaches), owner=self.owner, skills=dict(self.seams.skills.catalog()),
@@ -460,6 +468,13 @@ class Run:
             return None
         try:
             self.layout, config = self.seams.layout_builder(plan, world_id=self.world_id), load_agents_config()
+            if (record := self.store.worlds.get(self.world_id)) is not None:
+                record.layout = self.layout  # before `world.started`: the event writer validates against it (ADR-0026)
+                try:
+                    self.store.commit(worlds={self.world_id: record}, evict=False)  # durable: the layout is stored too
+                except Exception:
+                    record.layout = None  # the record stays cached, as it was, for the run's `world.failed`
+                    raise
         except Exception:
             self._fail("the world could not be laid out", None)
             return None

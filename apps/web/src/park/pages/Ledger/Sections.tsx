@@ -1,19 +1,22 @@
 // The Ledger's middle sections: where it goes, cost per run, approval wait times, what Tilo gave back.
-import { type ReactNode, useState } from "react";
+import { type ReactNode, useId, useState } from "react";
 import type { Ledger } from "../../api/types";
 import type { AppCtx } from "../../app/AppCtx";
 import { Button, SegmentedControl } from "../../components";
 import {
   type By,
+  METHODS,
   donut,
-  gbp,
   groupsWithRows,
   hourBars,
   memoryBars,
+  memoryWeeks,
   money,
   runCards,
+  runsHeadline,
   waitBuckets,
   waitTypes,
+  waitsHeadline,
 } from "./model";
 
 export function Head({
@@ -64,7 +67,7 @@ export function WhereItGoes({ L }: { L: Ledger }) {
           <div className="park-ledger-ring" data-donut="" style={{ background: d.conic }} />
           <div className="park-ledger-hole">
             <span className="park-ledger-hole-label">Total</span>
-            <span className="park-ledger-hole-value">{money(L, L.spent)}</span>
+            <span className="park-ledger-hole-value">{d.total}</span>
           </div>
         </div>
         <div className="park-ledger-legendlist">
@@ -86,11 +89,7 @@ export function WhereItGoes({ L }: { L: Ledger }) {
 export function CostPerRun({ L, go }: { L: Ledger; go: AppCtx["go"] }) {
   return (
     <section aria-label="Cost per run" className="park-ledger-card park-ledger-card--tight">
-      <Head
-        eyebrow="COST PER RUN"
-        title="Repeat work gets cheaper. Invoice matching now costs 79% less."
-        balance
-      />
+      <Head eyebrow="COST PER RUN" title={runsHeadline(L)} balance />
       <div className="park-ledger-runs">
         {runCards(L).map((s) => (
           <button
@@ -133,11 +132,7 @@ export function ApprovalWaits({ L, app }: { L: Ledger; app: AppCtx }) {
   const backup = app.prefs.backup;
   return (
     <section aria-label="Approval wait times" className="park-ledger-card park-ledger-card--tight">
-      <Head
-        eyebrow="APPROVAL WAIT TIMES"
-        title="Most asks get a yes in 9 minutes. Sharing outside waits longest."
-        balance
-      />
+      <Head eyebrow="APPROVAL WAIT TIMES" title={waitsHeadline(L)} balance />
       <div className="park-ledger-stack8">
         {waitBuckets(L).map((b) => (
           <div key={b.label} className="park-ledger-bucket">
@@ -171,10 +166,41 @@ export function ApprovalWaits({ L, app }: { L: Ledger; app: AppCtx }) {
   );
 }
 
+/** A figure that is an estimate says so, and its method opens in place (FR-SPD-06; PRD 14.2, 14.3). */
+function Estimate({ method }: { method: string }) {
+  const [open, setOpen] = useState(false);
+  const id = useId();
+  return (
+    <div className="park-ledger-estimate">
+      <span className="park-ledger-estimate-row">
+        <span className="park-ledger-estimate-tag" data-estimate="">
+          Estimate
+        </span>
+        <button
+          type="button"
+          className="park-ledger-method"
+          aria-expanded={open}
+          aria-controls={id}
+          onClick={() => setOpen(!open)}
+        >
+          How this is counted
+        </button>
+      </span>
+      <p id={id} className="park-ledger-method-text" hidden={!open}>
+        {method}
+      </p>
+    </div>
+  );
+}
+
 export function GaveBack({ L }: { L: Ledger }): ReactNode {
   const memory = memoryBars(L);
+  const weeks = memoryWeeks(L);
   const hours = hourBars(L);
-  const saved = gbp(L.memory.reduce((a, v) => a + v, 0));
+  const saved = money(
+    L,
+    L.memory.reduce((a, v) => a + v, 0),
+  );
   const total = L.hours.reduce((a, h) => a + h[1], 0);
   return (
     <section aria-label="What Tilo gave back" className="park-ledger-card">
@@ -194,6 +220,7 @@ export function GaveBack({ L }: { L: Ledger }): ReactNode {
               <span>Saved by memory, per week</span>
               <span style={{ color: "var(--sch)" }}>{saved}</span>
             </div>
+            <Estimate method={METHODS.memory} />
             <div className="park-ledger-bars">
               {memory.map((b, i) => (
                 <div key={`${b.v}-${i}`} className="park-ledger-bar">
@@ -202,12 +229,13 @@ export function GaveBack({ L }: { L: Ledger }): ReactNode {
                 </div>
               ))}
             </div>
-            <div className="park-ledger-weeks">
-              <span>1–7 Sep</span>
-              <span>8–14</span>
-              <span>15–21</span>
-              <span>22–24</span>
-            </div>
+            {weeks.length > 0 ? (
+              <div className="park-ledger-weeks">
+                {weeks.map((w) => (
+                  <span key={w}>{w}</span>
+                ))}
+              </div>
+            ) : null}
           </div>
         ) : null}
         {L.hours.length > 0 ? (
@@ -216,6 +244,7 @@ export function GaveBack({ L }: { L: Ledger }): ReactNode {
               <span>Hours handed back, by team</span>
               <span style={{ color: "var(--heroInk)" }}>{total} h</span>
             </div>
+            <Estimate method={METHODS.hours} />
             <div className="park-ledger-stacked">
               {hours.map((t) => (
                 <span key={t.name} style={{ width: t.w, background: t.c }} />

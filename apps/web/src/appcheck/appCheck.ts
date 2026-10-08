@@ -41,19 +41,30 @@ const pause = (): void => {
   pausedUntil = Date.now() + BACKOFF_MS;
 };
 
+/** The Firebase web config the build supplies, or null when it has none. The one reader of the two variables: sign-in
+ * (`auth/auth.ts`, SEC-15) takes the config from here too, so the two never disagree about what the build holds. */
+export function firebaseWebConfig(): { apiKey: string; projectId: string } | null {
+  const apiKey: unknown = import.meta.env.VITE_FIREBASE_API_KEY;
+  const projectId: unknown = import.meta.env.VITE_FIREBASE_PROJECT_ID;
+  if (
+    typeof apiKey !== "string" ||
+    apiKey === "" ||
+    typeof projectId !== "string" ||
+    projectId === ""
+  ) {
+    return null;
+  }
+  return { apiKey, projectId };
+}
+
 function start(): Promise<Started | null> {
   starting ??= (async (): Promise<Started | null> => {
-    const apiKey: unknown = import.meta.env.VITE_FIREBASE_API_KEY;
-    const projectId: unknown = import.meta.env.VITE_FIREBASE_PROJECT_ID;
-    if (
-      typeof apiKey !== "string" ||
-      apiKey === "" ||
-      typeof projectId !== "string" ||
-      projectId === ""
-    ) {
+    const config = firebaseWebConfig();
+    if (config === null) {
       console.info("App Check is off: this build has no Firebase web config.");
       return null; // cannot change for this page
     }
+    const { apiKey, projectId } = config;
     let app: typeof import("firebase/app");
     let check: typeof import("firebase/app-check");
     try {
