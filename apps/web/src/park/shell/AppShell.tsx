@@ -13,6 +13,7 @@ import "../tokens/fonts";
 import { AccountMenu } from "./AccountMenu";
 import { BootSplash } from "./BootSplash";
 import { CityBackdrop } from "./CityBackdrop";
+import { Enter } from "./Enter";
 import { NotificationsPopover } from "./NotificationsPopover";
 import { TopNav } from "./TopNav";
 import { WorldLoader } from "./WorldLoader";
@@ -156,23 +157,27 @@ export function AppShell({ children }: { children: ReactNode }) {
         onAvatar={() => store.toggleMenu("acct")}
       />
       {state.menu === "notif" ? (
-        <NotificationsPopover
-          notifications={notifications}
-          decisions={decisions}
-          dec={state.dec}
-          onOpen={open}
-          onSettings={() => store.go("profile", { tab: "notifications" })}
-          onClose={store.closeMenu}
-        />
+        <Enter>
+          <NotificationsPopover
+            notifications={notifications}
+            decisions={decisions}
+            dec={state.dec}
+            onOpen={open}
+            onSettings={() => store.go("profile", { tab: "notifications" })}
+            onClose={store.closeMenu}
+          />
+        </Enter>
       ) : null}
       {state.menu === "acct" ? (
-        <AccountMenu
-          user={user}
-          connectorsOn={connectorsOn}
-          go={navTo}
-          onSignOut={() => signOut(store)}
-          onClose={store.closeMenu}
-        />
+        <Enter>
+          <AccountMenu
+            user={user}
+            connectorsOn={connectorsOn}
+            go={navTo}
+            onSignOut={() => signOut(store)}
+            onClose={store.closeMenu}
+          />
+        </Enter>
       ) : null}
       {/* The same elements on every page, so a page swap never remounts the outlet (focus stays). */}
       <main
@@ -184,12 +189,14 @@ export function AppShell({ children }: { children: ReactNode }) {
         </div>
       </main>
       {toast ? (
-        <Toast
-          message={toast.message}
-          {...(toast.actionLabel !== undefined ? { actionLabel: toast.actionLabel } : {})}
-          {...(toast.action !== undefined ? { onAction: toast.action } : {})}
-          onDismiss={store.dismissToast}
-        />
+        <Enter>
+          <Toast
+            message={toast.message}
+            {...(toast.actionLabel !== undefined ? { actionLabel: toast.actionLabel } : {})}
+            {...(toast.action !== undefined ? { onAction: toast.action } : {})}
+            onDismiss={store.dismissToast}
+          />
+        </Enter>
       ) : null}
       {card ? (
         <WorldLoader

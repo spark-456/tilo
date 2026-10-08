@@ -169,7 +169,7 @@ export const ALLOWLIST: readonly AllowEntry[] = [
     file: "src/park/shell/park.shell.css",
     rule: "css-transition",
     reason:
-      "UI chrome only, non-agent: the page change fade and slide, the top progress bar and its fill. Each runs after a person's click and animates transform and opacity only, never a layout property; reduced motion turns them off. Nothing here shows or implies an agent, a run or a decision; agents animate only from recorded events (HR-1).",
+      "UI chrome only, non-agent: the page change fade and slide, the top progress bar and its fill, the enter fade of a toast, popover or menu, and pointer-only hover and press feedback on controls and on page cards, tiles, pins and events under the page outlet (a lift or a press; it carries no run or decision state), plus the slide of a control's thumb or knob. Each starts from a person's pointer or click or from the UI state that click set (menu open, toast shown, switch on), and animates transform and opacity only, never a layout property; reduced motion and the still preference turn them off. Nothing here shows or implies an agent, a run or a decision; agents animate only from recorded events (HR-1).",
   },
 ];
 

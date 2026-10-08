@@ -48,7 +48,7 @@ export function ComposerPanel(p: ComposerProps) {
       {phase === "drafting" ? (
         // biome-ignore lint/a11y/useSemanticElements: the design's status line is a div with role="status"
         <div role="status" className="park-home-drafting">
-          {/* motion: restored in WEB-3 (BQ-WEB-3): the ring turns */}
+          {/* a still ring: the draft is a fixed-timer stand-in with no call behind it, so it does not turn (HR-1) */}
           <span className="park-home-spin" aria-hidden="true" />
           {`Tilo is drafting a ${mode.word} for “${p.shown}”`}
         </div>
