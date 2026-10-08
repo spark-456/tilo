@@ -85,6 +85,8 @@ class UnitOutcome:
     outputs: tuple[UnitOutput, ...] = ()  # what the unit made; the executor stores it (ADR-0018)
     context_share: float | None = None  # share 0..1 of this agent's context window used when run() returned (FR-AGT-09)
     handoff_note: dict[str, Any] | None = None  # a draft handoff note when the agent stops unfinished (FR-AGT-09)
+    credits: float = 0.0  # what the unit's work cost (model calls through the runner's meter, tool results)
+    read_external: bool = True  # the unit read outside content, or text resting on it (SEC-05); unknown = True
 
 
 @dataclass(frozen=True)
@@ -224,7 +226,9 @@ def _upstream_item(
     refs = tuple(
         str(ref["artifact_id"]) for ref in outcome.artifact_refs if isinstance(ref, Mapping) and "artifact_id" in ref
     )
-    return UpstreamItem(unit["id"], unit["title"], NL2.join(texts)[:UPSTREAM_ITEM_CAP] or None, refs, verdict)
+    return UpstreamItem(
+        unit["id"], unit["title"], NL2.join(texts)[:UPSTREAM_ITEM_CAP] or None, refs, verdict, outcome.read_external
+    )
 
 
 def _envelope(outcome: UnitOutcome, worker: str, lead: str, unit: dict[str, Any]) -> dict[str, Any] | None:

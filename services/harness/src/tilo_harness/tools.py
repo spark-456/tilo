@@ -20,7 +20,7 @@ from typing import Any, Literal, Protocol, runtime_checkable
 
 _CROCKFORD = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
 
-Outcome = Literal["ok", "cached", "dropped", "refused", "error"]
+Outcome = Literal["ok", "cached", "dropped", "refused", "error", "queued"]
 
 
 @dataclass(frozen=True)
@@ -60,16 +60,27 @@ class ToolRegistry:
     def __bool__(self) -> bool:
         return bool(self._tools)
 
+    @staticmethod
+    def is_side_effect(tool: Tool) -> bool:
+        """The one place that decides it: a tool that declares a side effect, or any tool above T1 (a read)."""
+        return bool(tool.side_effect) or tool.tier != "T1"
+
+    @classmethod
+    def is_external(cls, tool: Tool) -> bool:
+        """Does reading its result make the unit an outside-content reader (SEC-05)? Every read tool does, whatever
+        it declares (files, mail and pages are all untrusted); a side-effect tool says for itself."""
+        return bool(tool.external_content) or not cls.is_side_effect(tool)
+
 
 def args_hash(tool: str, args: Mapping[str, Any]) -> str:
     """The cache key and the trace id of a call: sha256 of the tool name and its canonical JSON arguments."""
-    canonical = json.dumps({"tool": tool, "args": args}, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+    canonical = json.dumps({"tool": tool, "args": args}, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
 def archive_id(payload: Mapping[str, Any]) -> str:
     """A deterministic ULID-shaped id for an archived record (`provenance_ids` are ULIDs, PRD 13.3)."""
-    raw = json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False, default=str)
+    raw = json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=True, default=str)
     number = int.from_bytes(hashlib.sha256(raw.encode("utf-8")).digest()[:16], "big")
     chars = [_CROCKFORD[(number >> (5 * i)) & 31] for i in range(25, -1, -1)]
     chars[0] = _CROCKFORD[(number >> 125) & 7]  # a ULID's first character is 0-7
@@ -196,3 +207,17 @@ class FakeFetchUrl:
 def fake_tool_registry(*, credits: float = 0.0) -> ToolRegistry:
     """The registry dev and CI use until the real search and fetch land."""
     return ToolRegistry([FakeWebSearch(credits), FakeFetchUrl(credits)])
+
+
+def trace_fields(record: ToolCallRecord) -> dict[str, Any]:
+    """The one mapping from a call record to the envelope `trace` columns (PRD 9.3). The `tool.called` event that
+    carries it comes with the contract change (ADR-0029 amendment); nothing else may build these fields."""
+    return {
+        "model_role": None,
+        "profile": None,
+        "tokens_in": None,
+        "tokens_out": None,
+        "tool": record.tool,
+        "latency_ms": record.latency_ms,
+        "archive_ref": record.archive_ref,
+    }

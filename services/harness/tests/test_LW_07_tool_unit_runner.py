@@ -241,7 +241,7 @@ def test_LW_07_without_a_gate_a_side_effect_call_is_refused() -> None:
 
 def test_LW_07_an_unscreened_upstream_item_is_withheld_from_a_unit_that_holds_side_effect_tools() -> None:
     upstream = (
-        UpstreamItem("U0", "Earlier", "SECRET-UNSCREENED-TEXT", (), "unscreened"),
+        UpstreamItem("U0", "Earlier", "SECRET-UNSCREENED-TEXT", (), "unscreened", False),
         UpstreamItem("U00", "Clean one", "CLEAN-TEXT", (), "clean", False),
     )
     provider = Script("done")

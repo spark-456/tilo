@@ -708,7 +708,9 @@ class _UnitRunner:
 
         titles = {u["id"]: u["title"] for u in self._units}
         upstream = tuple(  # the work of the units this one waits for, as the default runner shows it (unit_prompt)
-            UpstreamItem(d, titles.get(d, d), self._work[d], (), "clean") for d in unit["depends_on"] if d in self._work
+            UpstreamItem(d, titles.get(d, d), self._work[d], (), "unscreened")
+            for d in unit["depends_on"]
+            if d in self._work
         )
         shown = dataclasses.replace(context, brief=self._brief, intake_answers=(), upstream=upstream)
         done = await self._shared.run_unit(unit, shown)  # the shared ToolUnitRunner (LW-07); no tools offered here
