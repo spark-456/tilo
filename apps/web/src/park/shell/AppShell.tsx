@@ -28,6 +28,14 @@ const SIGNED_OUT = "You are signed out";
 const SIGN_OUT_FAILED = "Could not sign out. Try again.";
 const MOBILE_NOTE = "The Tilo mobile app is a concept. It is not available yet.";
 
+/** Sign out (FR-UX-10): ends the real session when there is one; with none (a local host, the fixture world, a build
+ * with no Firebase config) the menu stays the prototype's toast. `session.signOut` never rejects, and a failed one still
+ * closes the menu; the sign-in gate takes the page from there. */
+function signOut(store: { toast: (message: string) => void; closeMenu: () => void }): void {
+  if (endSession()) store.closeMenu();
+  else store.toast(SIGN_OUT);
+}
+
 /** The bar along the nav's bottom edge while a world opens: 18% then 26 more per step, full at step 3. */
 const loaderBar = (step: number): number => (step >= 3 ? 100 : 18 + step * 26);
 
@@ -43,10 +51,10 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [connectorsOn, setConnectorsOn] = useState<number | null>(null);
   const [ready, setReady] = useState(false);
   const expectsSample = useExpectsSample();
-  const appearance = useAppearance();
   const auth = useParkAuth();
   const [mobileNote, setMobileNote] = useState(false);
   const signingOut = useRef(false);
+  const appearance = useAppearance();
   const off = useMotionOff();
   const viaNav = useRef(false);
   const navTo = (to: PageId): void => {
@@ -144,12 +152,9 @@ export function AppShell({ children }: { children: ReactNode }) {
         }
       : null;
   // Honest: success is said only after the sign-in layer's promise resolves, a failure says it failed.
-  const signOut = (): void => {
+  const signOutViaSeam = (): void => {
     if (!auth) {
-      // No ParkAuth seam: the page's own session when there is one (SEC-15), else the prototype's toast. `endSession`
-      // never rejects, and a failed one still closes the menu; the sign-in gate takes the page from there.
-      if (endSession()) store.closeMenu();
-      else store.toast(SIGN_OUT);
+      signOut(store);
       return;
     }
     if (signingOut.current) return;
@@ -214,7 +219,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           onMobile={() => setMobileNote(true)}
           connectorsOn={connectorsOn}
           go={navTo}
-          onSignOut={signOut}
+          onSignOut={signOutViaSeam}
           onClose={store.closeMenu}
         />
       ) : null}
