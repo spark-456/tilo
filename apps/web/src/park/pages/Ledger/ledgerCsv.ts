@@ -29,7 +29,7 @@ export function csvCell(value: string): string {
   return NEEDS_QUOTES.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
 }
 
-/** The money a row shows as a plain decimal ("£3,420" -> "3420", "+£2.20" -> "2.20", "—" -> ""). */
+/** The money a row shows as a plain decimal: the digits and the point, no symbol, comma or sign ("—" gives nothing). */
 const amountOf = (shown: string): string =>
   /\d[\d,]*(?:\.\d+)?/.exec(shown)?.[0].replaceAll(",", "") ?? "";
 
