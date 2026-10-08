@@ -35,6 +35,7 @@ class TeamApi:
     def __init__(self, client: Any, store: Any, flags: Flags) -> None:
         self.client, self.store, self.flags = client, store, flags
         self.user = OWNER
+        self.full_session, self.channel = True, "web"  # a full web sign-in (BQ-XWORLD-10); tests narrow it
 
     def as_(self, user: str) -> TeamApi:
         self.user = user
@@ -63,7 +64,12 @@ def team_api(snapshot: Any = None, *, store: Any = None) -> Iterator[TeamApi]:
     flags = Flags()
     saved = dict(app.dependency_overrides)
     api = TeamApi(None, team, flags)
-    app.dependency_overrides[deps.get_current_principal] = lambda: deps.Principal(user_id=api.user, role="owner")
+    app.dependency_overrides[deps.get_current_principal] = lambda: deps.Principal(
+        user_id=api.user,
+        role="owner",
+        channel=api.channel,
+        full_session=api.full_session,  # type: ignore[arg-type]
+    )
     app.dependency_overrides[get_team_store] = lambda: team
     app.dependency_overrides[deps.get_flag_store] = lambda: flags
     app.dependency_overrides[deps.get_clock] = lambda: lambda: "2026-10-08T10:00:00.000Z"
