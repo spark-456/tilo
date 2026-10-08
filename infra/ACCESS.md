@@ -322,6 +322,7 @@ Hard requirements from the security review for the routes the infra points at:
 7. The push route lives on `tilo-channels` (`/internal/gmail/push`, where `GmailPushEndpoint` is); renew and poll live on `tilo-harness` (`/internal/gmail/{renew,poll}`).
 8. Vertex publisher models and Model Armor have no resource-level IAM, so their grants are project-level. The internet-facing services (api, channels) get only the custom `tiloVertexGenerate` role (`aiplatform.endpoints.predict`); harness alone keeps `roles/aiplatform.user`. `roles/modelarmor.user` is project-level for api, harness and channels.
 9. The WhatsApp `channels-webhook-signing-key` slot holds the Meta app secret used by `verify_signature`.
+10. `tilo-api` rate limiting (`config/rate_limits.yaml`, `trusted_hops: 1`, SEC-10) assumes the browser calls Cloud Run (`*.run.app`) directly, so Cloud Run's front end appends one trusted hop to `X-Forwarded-For` (`browser -> run.app`). Routing API traffic through a Firebase Hosting rewrite or a Google Cloud Load Balancer adds proxy hops on the right of `X-Forwarded-For`; raise `trusted_hops` in `config/rate_limits.yaml` to match before enabling such a proxy.
 
 ## 11. Sign-in with Google (Firebase Authentication): the console checklist (SEC-15)
 

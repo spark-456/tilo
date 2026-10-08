@@ -45,6 +45,14 @@ def _no_dev_unit_delay(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("TILO_DEV_UNIT_DELAY_S", "0")
 
 
+@pytest.fixture(autouse=True)
+def _reset_rate_limiter() -> None:
+    """SEC-10: each test starts with empty in-process rate-limit buckets."""
+    from tilo_api.rate_limit import reset_default_rate_limiter
+
+    reset_default_rate_limiter()
+
+
 @pytest.fixture(scope="session")
 def repo_root() -> pathlib.Path:
     return REPO_ROOT
