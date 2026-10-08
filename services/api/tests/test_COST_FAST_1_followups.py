@@ -70,6 +70,12 @@ def test_COST_FAST_1_text_the_rules_cannot_read_goes_to_the_model_not_simple(qui
     assert_offer_shape(response.json(), "needs_tools")
 
 
+def test_COST_FAST_1_accented_latin_is_not_foreign_so_a_cheap_question_stays_one_call(quick_rig):
+    body = quick_rig.ask("What is the plural of café?").json()
+    assert body["outcome"] == "answered" and body["cost"]["model_calls"] == 1, body
+    assert not quick_rig.classifier_calls, "accented Latin has stems: the rules decide, no classifier call"
+
+
 def test_COST_FAST_1_a_phrase_split_by_zero_width_characters_is_flagged_after_cleaning(quick_rig):
     split = "\u200b".join(INJECTION_PHRASE)
     response = quick_rig.ask(f"{SIMPLE_TEXT} {split}")

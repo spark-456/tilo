@@ -112,7 +112,9 @@ def classify(rules: QuickRules, text: str, *, max_chars: int, has_files: bool, s
     cleaned = clean(text)
     key = _RUN.sub(lambda m: m.group()[0], question_key(cleaned))  # a run of marks is one: linear splitting below
     cut = len(unicodedata.normalize("NFKC", cleaned)) > MAX_KEY  # the key lost its tail: later words were never read
-    foreign = any(c.isalpha() and not c.isascii() for c in key)  # no stems for these letters: the rules are blind
+    foreign = any(
+        c.isalpha() and not c.isascii() and not unicodedata.name(c, "").startswith("LATIN") for c in key
+    )  # no stems: blind
     breaks = "|".join(sorted(rules.sets["clause_breaks"]))
     clauses = [_stems(c) for c in re.split(rf"[,;:.!?]+|\s(?:{breaks})\s", key) if c.strip()]
     stems = [s for c in clauses for s in c]
