@@ -22,6 +22,15 @@ const car = (x: number, y: number): Route => ({
 const cells = (x: number, y: number) => `${Math.floor(x / 4)},${Math.floor(y / 4)}`;
 
 describe("WEB_MOTION_1 city occupancy", () => {
+  it("WEB_MOTION_1 lane schedules wait at occupied tiles without crossing into another lane", () => {
+    const frames = compileTraffic([walker(0, 20)], [{ x: 80, y: 20, halfX: 8, halfY: 8 }], true);
+    for (const frame of frames) {
+      const p = frame[0];
+      if (!p) throw new Error("missing walker");
+      expect(p.y).toBe(20);
+      expect(p.x).toBeLessThan(65);
+    }
+  });
   it("WEB_MOTION_1 compiled CSS segments and repeated schedules remain collision free", () => {
     for (const seed of [1, 7, 23]) {
       const routes = [car(seed, 20), walker(55 + seed, 20)];
