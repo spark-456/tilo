@@ -191,6 +191,19 @@ def test_DEV_HARNESS_d_an_emulator_demo_project_is_not_refused(dev_client, monke
     assert dev_client.post(PATH, json={}).status_code == 200
 
 
+def test_DEV_HARNESS_d_BQ_DEVH_2_a_non_memory_store_is_refused_before_it_is_read(dev_client):
+    class NonMemoryStore:
+        def due(self, *_args):
+            pytest.fail("the dev tick must refuse the store before reading due schedules")
+
+    dev_client.app.dependency_overrides[schedules.get_schedule_store] = NonMemoryStore
+
+    response = dev_client.post(PATH, json={})
+
+    assert response.status_code == 503
+    assert response.json() == {"detail": "dev_tick_needs_memory_store"}
+
+
 def test_DEV_HARNESS_d_only_json_is_accepted_so_a_cross_site_page_needs_a_preflight(dev_client):
     repo, record = _foreign_schedule(dev_client)
     for headers in (
