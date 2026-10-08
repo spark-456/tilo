@@ -6,43 +6,45 @@ than coerces, and nothing here ever puts the bytes anywhere but the request itse
   match it (magic numbers, and for mp4, webm and ogg the brand, DocType or codec);
 - bytes are capped per part, per request and in parts per request;
 - `sha256` is computed here from the bytes; a caller's value is only checked against it, never trusted;
-- the pages of a PDF are measured here by walking its page tree with a real parser (`pypdf`) under a node budget, never
-  read from a caller's number or a text scan; an unreadable PDF, or one over MAX_PDF_PAGES, is refused;
+- the pages of a PDF are measured here by walking its page tree with pypdf in a child process under a wall-clock limit
+  and a decoded-size limit (`_pdf_pages_child`), never from a caller's number or a text scan; an unreadable, slow or
+  oversize PDF, or one over MAX_PDF_PAGES, is refused;
+- the duration of audio and video is never taken from a caller or a header: a plain PCM WAV is measured exactly from its
+  length once its header agrees with the file, and everything else (no decoder is a dependency yet) is assumed to last
+  UNMEASURED_SECONDS, so a capped role refuses it (BQ-LW6-2);
 - `repr`, `model_dump` and validation errors leave the bytes out (`data` is excluded from the dump, which is what
   recordings are keyed on: the sha256, never the bytes), and no message below ever quotes content;
 - a GCS URI part is typed but refused until ADR-0018 T8 gives it a reader.
 
 Billing never uses the estimates here: they are bounds for the pre-flight EFF-03 cap check and the PL-03 budget check
-(`estimate_tokens`); the reported usage is what is billed. Audio and video duration is not measured (no decoder is a
-dependency yet): it is bounded from the size at a bitrate below any practical codec, which is a bound for real
-recordings and not for digital silence (BQ-LW6-2)."""
+(`estimate_tokens`); the reported usage is what is billed."""
 
 from __future__ import annotations
 
-import functools
 import hashlib
-import io
 import math
+import os
 import re
+import struct
+import subprocess
+import sys
+import threading
+from collections import OrderedDict
 from collections.abc import Callable, Sequence
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
-from pypdf import PdfReader
-from pypdf.generic import DictionaryObject
 
+from tilo_providers._pdf_pages_child import MAX_PDF_PAGES
 from tilo_providers.errors import RequestError
 
 MAX_PARTS = 10  # FR-INT-01: at most 10 files a unit
 MAX_PART_BYTES = 10 * 1024 * 1024
 MAX_TOTAL_BYTES = 14 * 1024 * 1024  # inline data rides base64 (x4/3) under Gemini's 20 MB request limit
-MAX_PDF_PAGES = 100
-MAX_PDF_NODES = 4 * MAX_PDF_PAGES  # page-tree nodes visited, a shared or cyclic tree counts each visit
-MAX_SECONDS = 3600.0  # the most a caller may declare
-# Bytes a second of audio/video takes at the very least: below Opus at its lowest rate (about 750 B/s with its Ogg
-# framing) and a 16 kbit/s video, so a file of N bytes lasts at most N / this seconds. Silence compressed to nothing is
-# the one thing that beats it. The estimate uses the larger of this bound and any declared duration (BQ-LW6-2).
-_MIN_BYTES_PER_SECOND = {"audio": 500, "video": 1_000}
+PDF_TIMEOUT_SECONDS = 3.0  # wall clock for counting one PDF's pages, child start-up included; then it is killed
+_PDF_CACHE_ENTRIES = 32  # keyed on the sha256, never the bytes; at least MAX_PARTS
+UNMEASURED_SECONDS = 3600  # what audio or video of unknown duration is assumed to last (config-free, BQ-LW6-2)
+_WAV_RATES = range(8_000, 192_001)
 _SHA256_RE = re.compile(r"[0-9a-f]{64}")
 _GCS_URI_RE = re.compile(r"gs://[a-z0-9][a-z0-9._-]{1,220}/[^\s\x00-\x1f\x7f]{1,1000}")
 _SHOWABLE_RE = re.compile(r"[a-z0-9/.+-]{1,60}")
@@ -111,51 +113,92 @@ def _inspect(mime_type: str, data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
-@functools.lru_cache(maxsize=4)
-def pdf_pages(data: bytes) -> int:
-    """The number of pages of a PDF, counted by walking its page tree (not its /Count, not a text scan): every node
-    without /Kids is a page, whatever its /Type, so object streams and escaped names change nothing. Shared and
-    cyclic trees are cut off by the node budget. Refuses an unreadable or encrypted PDF, no pages, or more than
-    MAX_PDF_PAGES. Nothing of the file (pypdf's own messages can quote it) reaches an error."""
-    pages = nodes = 0
-    unreadable = too_many = False
+def _child_command() -> list[str]:
+    return [sys.executable, "-I", "-m", "tilo_providers._pdf_pages_child"]
+
+
+def _measure(data: bytes) -> tuple[str, int]:
+    """Runs the page counter in a child process: ("ok", pages), ("many", 0), ("bad", 0) or ("slow", 0) when it was
+    still running at PDF_TIMEOUT_SECONDS and was killed. The child gets the file on stdin and almost no environment."""
     try:
-        reader = PdfReader(io.BytesIO(data), strict=False)
-        if reader.is_encrypted:
-            raise ValueError
-        root: Any = reader.trailer["/Root"]
-        stack: list[Any] = [root["/Pages"]]
-        while stack and not too_many:
-            nodes += 1
-            node = stack.pop().get_object()
-            if not isinstance(node, DictionaryObject):
-                raise ValueError
-            kids = node.get("/Kids")
-            if kids is None:
-                pages += 1
-            else:
-                kids = kids.get_object()
-                if not isinstance(kids, list):
-                    raise ValueError
-                too_many = len(stack) + len(kids) > MAX_PDF_NODES  # before the extend: a huge Kids array costs nothing
-                stack.extend([] if too_many else kids)
-            too_many = too_many or pages > MAX_PDF_PAGES or nodes > MAX_PDF_NODES
-    except Exception:  # noqa: BLE001 -- pypdf raises many types; none of them may carry the file's content out
-        unreadable = True
-    if unreadable:
-        raise RequestError("LW-06: a PDF part cannot be read as a PDF (malformed, encrypted or no pages tree)")
-    if too_many:
+        done = subprocess.run(  # noqa: S603 -- our own module, a fixed command; the file never reaches argv
+            _child_command(),
+            input=data,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            timeout=PDF_TIMEOUT_SECONDS,
+            check=False,
+            env={"SYSTEMROOT": os.environ.get("SYSTEMROOT", "")} if sys.platform == "win32" else {},
+        )
+    except subprocess.TimeoutExpired:
+        return "slow", 0
+    except Exception:  # noqa: BLE001 -- no child could be run: refuse, never guess
+        return "bad", 0
+    fields = done.stdout.split()
+    if done.returncode == 0 and len(fields) == 2 and fields[0] in (b"ok", b"many") and fields[1].isdigit():
+        return fields[0].decode(), int(fields[1])
+    return "bad", 0
+
+
+_pdf_cache: OrderedDict[str, tuple[str, int]] = OrderedDict()
+_pdf_lock = threading.Lock()
+
+
+def pdf_pages(data: bytes) -> int:
+    """The number of pages of a PDF, counted by walking its page tree (not its /Count, not a text scan) in a child
+    process with a wall-clock limit and decoded-size limits, so a hostile file cannot burn the service's CPU or memory
+    (`_pdf_pages_child`). Refuses an unreadable, encrypted, slow or oversize PDF, no pages, or more than MAX_PDF_PAGES.
+    Results (refusals too) are cached by the file's sha256, so a repeat costs nothing."""
+    key = hashlib.sha256(data).hexdigest()
+    with _pdf_lock:
+        result = _pdf_cache.get(key)
+    if result is None:
+        result = _measure(data)
+        with _pdf_lock:
+            _pdf_cache[key] = result
+            while len(_pdf_cache) > _PDF_CACHE_ENTRIES:
+                _pdf_cache.popitem(last=False)
+    status, pages = result
+    if status == "ok":
+        return pages
+    if status == "many":
         raise RequestError(f"LW-06: a PDF part has more than {MAX_PDF_PAGES} pages (or a page tree too large to count)")
-    if pages < 1:
-        raise RequestError("LW-06: a PDF part has no pages")
-    return pages
+    if status == "slow":
+        raise RequestError(f"LW-06: a PDF part took over {PDF_TIMEOUT_SECONDS:g} seconds to read and was refused")
+    raise RequestError("LW-06: a PDF part cannot be read as a PDF (malformed, encrypted, oversize or no pages)")
+
+
+def wav_seconds(data: bytes) -> float | None:
+    """The exact duration of a plain PCM WAV, or None (not measured). The header must agree with the file: PCM format,
+    1 to 8 channels, 8 to 192 kHz, 8 to 32 bits, block align and byte rate consistent with them, and a data chunk that
+    does not claim more bytes than the file holds. The seconds are every byte after the data header over the byte rate
+    (the safe side if the file has trailing bytes)."""
+    if len(data) < 12 or data[:4] != b"RIFF" or data[8:12] != b"WAVE":
+        return None
+    pos, byte_rate = 12, 0
+    while pos + 8 <= len(data):
+        chunk, size = data[pos : pos + 4], int.from_bytes(data[pos + 4 : pos + 8], "little")
+        body = pos + 8
+        if chunk == b"fmt ":
+            if size < 16 or body + 16 > len(data):
+                return None
+            tag, channels, rate, byte_rate, align, bits = struct.unpack("<HHIIHH", data[body : body + 16])
+            if tag != 1 or not 1 <= channels <= 8 or rate not in _WAV_RATES or bits not in (8, 16, 24, 32):
+                return None
+            if align != channels * bits // 8 or byte_rate != rate * align:
+                return None
+        elif chunk == b"data":
+            if byte_rate == 0 or size > len(data) - body:
+                return None
+            return (len(data) - body) / byte_rate
+        pos = body + size + (size & 1)
+    return None
 
 
 class MediaPart(BaseModel):
     """One media file on a request: `data` (bytes) or `uri` (gs://, refused for now), its MIME type and a sha256.
-    `seconds` (audio, video) is a declared duration that can only raise the estimate; `pages` (PDF) is optional and,
-    if stated, must equal the measured count. Build one with `MediaPart(mime_type=..., data=...)`: `sha256`, `size`
-    and a PDF's `pages` are set from the bytes."""
+    `pages` (PDF) is optional and, if stated, must equal the measured count. Build one with
+    `MediaPart(mime_type=..., data=...)`: `sha256`, `size` and a PDF's `pages` are set from the bytes."""
 
     model_config = ConfigDict(extra="forbid", frozen=True, hide_input_in_errors=True)
     mime_type: str = Field(strict=True, max_length=100)
@@ -163,7 +206,6 @@ class MediaPart(BaseModel):
     uri: str | None = Field(default=None, strict=True, max_length=1300)
     sha256: str | None = Field(default=None, strict=True, max_length=64)
     size: int | None = None
-    seconds: float | None = Field(default=None, gt=0, le=MAX_SECONDS)
     pages: int | None = Field(default=None, ge=1, le=MAX_PDF_PAGES)
 
     @model_validator(mode="after")
@@ -173,8 +215,6 @@ class MediaPart(BaseModel):
             raise RequestError("LW-06: a media part carries its bytes or a URI, exactly one")
         if self.size is not None and self.data is None:
             raise RequestError("LW-06: a URI media part cannot state a size")
-        if self.seconds is not None and kind not in ("audio", "video"):
-            raise RequestError("LW-06: seconds is allowed only for audio and video parts")
         if self.pages is not None and self.mime_type != "application/pdf":
             raise RequestError("LW-06: pages is allowed only for PDF parts")
         if self.data is not None:
@@ -199,8 +239,8 @@ class MediaPart(BaseModel):
 
 def check_parts(parts: Sequence[MediaPart] | None) -> Sequence[MediaPart] | None:
     """The request-level gate the router and every adapter run: part count, total bytes, URI parts refused, and each
-    part's fields checked again from its bytes -- type, sha256, size, declared seconds, measured PDF pages -- because
-    a `model_copy(update=...)` or `model_construct` skips model validation."""
+    part's fields checked again from its bytes -- type, sha256, size, measured PDF pages -- because a
+    `model_copy(update=...)` or `model_construct` skips model validation."""
     if not parts:
         return parts
     if len(parts) > MAX_PARTS:
@@ -211,8 +251,6 @@ def check_parts(parts: Sequence[MediaPart] | None) -> Sequence[MediaPart] | None
             raise RequestError("LW-06: GCS URI media parts are not supported yet (they need ADR-0018 T8); send bytes")
         if _inspect(part.mime_type, part.data) != part.sha256 or part.size != len(part.data):
             raise RequestError("LW-06: a media part's sha256 or size does not match its bytes")
-        if part.seconds is not None and not (0 < part.seconds <= MAX_SECONDS and part.kind in ("audio", "video")):
-            raise RequestError("LW-06: a media part's declared seconds are out of range")
         if part.kind == "document" and part.pages != pdf_pages(part.data):
             raise RequestError("LW-06: a PDF part's pages do not match the PDF")
         total += len(part.data)
@@ -231,8 +269,8 @@ def provider_takes(provider: str, part: MediaPart) -> bool:
 
 def estimate_tokens(parts: Sequence[MediaPart] | None, media_tokens: Any) -> tuple[int, int]:
     """(tokens of every part, of which audio tokens): a bound from a profile's `media_tokens`, for EFF-03 and PL-03
-    before sending (call `check_parts` first). Images cost `image`; a PDF `pdf_page` times its measured pages; audio
-    and video `*_per_second` times the larger of the declared seconds and the size over the minimum bytes a second.
+    before sending (call `check_parts` first). Images cost `image`; a PDF `pdf_page` times its measured pages; a WAV
+    `audio_per_second` times its exact seconds; any other audio or video `*_per_second` times UNMEASURED_SECONDS.
     Billing uses the reported usage, never this."""
     total = audio = 0
     for part in parts or ():
@@ -242,7 +280,8 @@ def estimate_tokens(parts: Sequence[MediaPart] | None, media_tokens: Any) -> tup
         elif part.kind == "document":
             tokens = pdf_pages(data) * media_tokens.pdf_page
         else:
-            seconds = math.ceil(max(part.seconds or 0, len(data) / _MIN_BYTES_PER_SECOND[part.kind]))
+            measured = wav_seconds(data) if part.mime_type == "audio/wav" else None
+            seconds = math.ceil(UNMEASURED_SECONDS if measured is None else measured)
             tokens = seconds * (
                 media_tokens.audio_per_second if part.kind == "audio" else media_tokens.video_per_second
             )

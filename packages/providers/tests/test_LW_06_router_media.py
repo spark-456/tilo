@@ -12,7 +12,7 @@ from typing import Any
 
 import pytest
 import yaml
-from _lw06_media import classic_pdf, objstm_pdf, ogg, pdf
+from _lw06_media import WEBM, classic_pdf, objstm_pdf, ogg, pdf, wav
 from tilo_providers.config import ProviderConfigError, ProvidersConfig, load_providers_config
 from tilo_providers.errors import MissingCapabilityError, RequestError
 from tilo_providers.interfaces import Capability, GenerateRequest, GenerateResponse, ModelProvider, PriceQuote
@@ -28,7 +28,7 @@ from tilo_providers.router import (
 
 PNG = b"\x89PNG\r\n\x1a\n" + b"image-bytes"
 PDF = pdf(2)
-WAV = b"RIFF\x00\x00\x00\x00WAVE" + b"audio-bytes"
+WAV = wav(10.0)  # exactly ten seconds
 MEDIA_TOKENS = {"image": 1000, "pdf_page": 100, "audio_per_second": 10, "video_per_second": 50}
 CREDIT = 0.005
 
@@ -60,7 +60,7 @@ def make_config(tmp_path: pathlib.Path, role: dict[str, Any]) -> ProvidersConfig
             "hearing": {
                 **google,
                 "model": "example-hearing",
-                "caps": ["json", "vision", "documents", "audio"],
+                "caps": ["json", "vision", "documents", "audio", "video"],
                 "media_tokens": MEDIA_TOKENS,
             },
             "compat": {
@@ -132,8 +132,6 @@ class Fleet:
 
 def part(mime: str = "image/png", data: bytes | None = None, **extra: Any) -> MediaPart:
     data = data or {"image/png": PNG, "application/pdf": PDF, "audio/wav": WAV}[mime]
-    if mime.startswith("audio/"):
-        extra.setdefault("seconds", 10.0)
     return MediaPart(mime_type=mime, data=data, **extra)
 
 
@@ -329,13 +327,29 @@ def test_LW_06_a_thousand_page_pdf_is_refused_before_any_candidate_whatever_its_
     assert fleet.built == {}
 
 
-def test_LW_06_a_low_bitrate_clip_with_a_short_declared_duration_is_refused_under_a_tight_cap(tmp_path):
-    router, fleet = reader(tmp_path, cascade=["hearing"], max_input_tokens=150)
-    clip = part("audio/ogg", ogg(40_000), seconds=1.0)  # 40 kB at the lowest practical bitrate: 80 s, 800 tokens
-    with pytest.raises(TokenCapExceededError):
-        router.generate("reader", ask(clip))
+def test_LW_06_audio_that_is_not_a_measured_wav_is_assumed_to_last_an_hour_so_a_capped_role_refuses_it(tmp_path):
+    router, fleet = reader(tmp_path, cascade=["hearing"], max_input_tokens=20_000)  # an hour of audio is 36,000
+    for silent in (ogg(40_000), ogg(600), b"fLaC" + b"\0" * 14_000):  # DTX Opus, a tiny clip, 8 kHz FLAC silence
+        mime = "audio/flac" if silent.startswith(b"fLaC") else "audio/ogg"
+        with pytest.raises(TokenCapExceededError):
+            router.generate("reader", ask(part(mime, silent)))
     assert fleet.built["hearing"].requests == [], "nothing was sent"
-    router.generate("reader", ask(part("audio/ogg", ogg(1_000), seconds=1.0)))  # 2 s: 20 tokens, fits
+
+
+def test_LW_06_a_one_frame_a_second_static_video_is_assumed_to_last_an_hour_and_refused(tmp_path):
+    router, fleet = reader(tmp_path, cascade=["hearing"], max_input_tokens=100_000)  # an hour of video is 180,000
+    with pytest.raises(TokenCapExceededError):
+        router.generate("reader", ask(part("video/webm", WEBM + bytes(88_000))))
+    assert fleet.built["hearing"].requests == []
+
+
+def test_LW_06_a_wav_measured_exactly_is_accepted_under_a_fitting_cap_and_refused_over_it(tmp_path):
+    router, fleet = reader(tmp_path, cascade=["hearing"], max_input_tokens=1500)
+    router.generate("reader", ask(part("audio/wav", wav(10.0))))  # 100 audio tokens
+    router.generate("reader", ask(part("audio/wav", wav(100.0))))  # 1,000
+    assert len(fleet.built["hearing"].requests) == 2
+    with pytest.raises(TokenCapExceededError):
+        router.generate("reader", ask(part("audio/wav", wav(200.0))))  # 2,000
 
 
 def test_LW_06_parts_are_snapshotted_so_a_list_changed_after_the_call_starts_changes_nothing(tmp_path):

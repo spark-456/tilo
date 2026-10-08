@@ -9,10 +9,29 @@ from __future__ import annotations
 import base64
 import hashlib
 import json
+import re
+import subprocess
+import sys
+import time
 
 import pytest
-from _lw06_media import MARK, MP4, OGG_HEAD, PNG, WAV, WEBM, classic_pdf, objstm_pdf, ogg, pdf
+from _lw06_media import (
+    MARK,
+    MP4,
+    OGG_HEAD,
+    PNG,
+    WAV,
+    WEBM,
+    classic_pdf,
+    huge_xref_pdf,
+    objstm_pdf,
+    ogg,
+    pdf,
+    wav,
+    whitespace_run_pdf,
+)
 from pydantic import ValidationError
+from tilo_providers import media
 from tilo_providers.batch import BatchRequest, FakeBatchProvider
 from tilo_providers.errors import RequestError
 from tilo_providers.fake import FakeModelProvider
@@ -22,10 +41,13 @@ from tilo_providers.media import (
     MAX_PARTS,
     MAX_PDF_PAGES,
     MAX_TOTAL_BYTES,
+    PDF_TIMEOUT_SECONDS,
+    UNMEASURED_SECONDS,
     MediaPart,
     check_parts,
     estimate_tokens,
     pdf_pages,
+    wav_seconds,
 )
 from tilo_providers.replay import recording_key
 
@@ -141,10 +163,7 @@ def test_LW_06_a_uri_part_is_typed_but_refused_until_adr_0018_t8():
         )
 
 
-def test_LW_06_seconds_and_pages_are_allowed_only_where_they_mean_something():
-    assert part("audio/wav", seconds=5.0).seconds == 5.0 and part("audio/wav").seconds is None
-    with pytest.raises(RequestError, match="seconds"):
-        MediaPart(mime_type="image/png", data=PNG, seconds=3.0)
+def test_LW_06_pages_are_allowed_only_for_pdfs_and_must_equal_the_measured_count():
     with pytest.raises(RequestError, match="pages"):
         MediaPart(mime_type="image/png", data=PNG, pages=2)
     assert part("application/pdf", pdf(3), pages=3).pages == 3
@@ -178,21 +197,10 @@ def test_LW_06_a_part_swapped_after_validation_is_caught_by_the_request_gate():
         check_parts([retyped])
 
 
-@pytest.mark.parametrize(
-    "forged",
-    [
-        {"seconds": -5.0},
-        {"seconds": float("nan")},
-        {"seconds": 1e9},
-        {"size": -10_000_000},
-        {"size": 3},
-        {"pages": 1},
-    ],
-)
-def test_LW_06_forged_sizes_seconds_and_pages_are_refused_by_the_request_gate(forged):
-    base = part("audio/wav") if "seconds" in forged else part("application/pdf", pdf(3))
+@pytest.mark.parametrize("forged", [{"size": -10_000_000}, {"size": 3}, {"pages": 1}])
+def test_LW_06_forged_sizes_and_pages_are_refused_by_the_request_gate(forged):
     with pytest.raises(RequestError):
-        check_parts([base.model_copy(update=forged)])
+        check_parts([part("application/pdf", pdf(3)).model_copy(update=forged)])
 
 
 def test_LW_06_the_pages_of_a_pdf_are_counted_from_its_page_tree_not_from_text_or_a_claimed_count():
@@ -279,16 +287,111 @@ def test_LW_06_token_estimates_come_from_the_profile_media_tokens_and_the_measur
     assert estimate_tokens([part("application/pdf", objstm_pdf(5))], Tokens) == (5000, 0)
     assert estimate_tokens([part("application/pdf", classic_pdf(5, page_type=b"/Type /#50age"))], Tokens) == (5000, 0)
     assert estimate_tokens(None, Tokens) == (0, 0)
-    # audio and video: the larger of the declared seconds and size / minimum bytes a second (500 audio, 1,000 video)
-    assert estimate_tokens([part("audio/wav", seconds=10.0)], Tokens) == (250, 250)
-    assert estimate_tokens([part("video/mp4", seconds=2.0)], Tokens) == (516, 0)
-    assert estimate_tokens([part("audio/wav")], Tokens) == (25, 25), "no declared seconds: one second at least"
 
 
-def test_LW_06_a_short_declared_duration_cannot_lower_what_the_size_implies():
-    clip = part("audio/ogg", ogg(10_000_000), seconds=1.0)  # a 10 MB ogg that claims one second
-    assert estimate_tokens([clip], Tokens) == (20_000 * 25, 20_000 * 25)
-    low_bitrate = part("audio/ogg", ogg(40_000), seconds=1.0)
-    assert estimate_tokens([low_bitrate], Tokens)[0] == 80 * 25
-    still = part("video/mp4", MP4 + bytes(500_000), seconds=1.0)
-    assert estimate_tokens([still], Tokens)[0] == 501 * 258
+def test_LW_06_a_pcm_wav_is_measured_exactly_from_its_length_once_the_header_agrees_with_the_file():
+    assert wav_seconds(wav(10.0)) == 10.0
+    assert wav_seconds(wav(2.5, rate=16000)) == 2.5
+    assert estimate_tokens([part("audio/wav", wav(10.0))], Tokens) == (250, 250)
+    assert estimate_tokens([part("audio/wav", wav(0.5, rate=48000))], Tokens) == (25, 25), (
+        "half a second is charged as a whole one"
+    )
+    assert estimate_tokens([part("audio/wav", wav(1.0) + b"x" * 8000)], Tokens) == (50, 50), "trailing bytes count"
+
+
+@pytest.mark.parametrize(
+    "lying",
+    [
+        wav(10.0, declared=10**9),  # a data chunk that claims more than the file holds
+        wav(10.0, fmt_tag=3),  # float, not PCM
+        wav(10.0, byte_rate=1),  # byte rate disagrees with rate x block align
+        wav(10.0, rate=1),  # an 1 Hz rate
+        wav(0.001, rate=500_000),
+        b"RIFF\x00\x00\x00\x00WAVE" + MARK,  # no chunks
+        wav(10.0)[:40],  # cut inside the header
+    ],
+    ids=["data-too-big", "not-pcm", "byte-rate", "low-rate", "high-rate", "no-chunks", "truncated"],
+)
+def test_LW_06_a_wav_whose_header_disagrees_with_the_file_is_not_measured_and_gets_the_worst_case(lying):
+    assert wav_seconds(lying) is None
+    assert estimate_tokens([part("audio/wav", lying)], Tokens) == (UNMEASURED_SECONDS * 25, UNMEASURED_SECONDS * 25)
+
+
+@pytest.mark.parametrize(
+    ("mime", "build", "per_second"),
+    [
+        ("audio/ogg", lambda: ogg(40_000), 25),  # Opus with DTX can be this small for an hour
+        ("audio/ogg", lambda: ogg(10_000_000), 25),
+        ("audio/mpeg", lambda: b"ID3\x04" + MARK, 25),
+        ("audio/flac", lambda: b"fLaC" + MARK, 25),  # 8 kHz FLAC silence is a few kilobytes
+        ("video/webm", lambda: WEBM, 258),  # a static frame at 1 fps for an hour is under 100 kB
+        ("video/mp4", lambda: MP4 + bytes(500_000), 258),
+    ],
+    ids=["opus-dtx", "big-ogg", "mp3", "flac-silence", "webm-1fps", "mp4"],
+)
+def test_LW_06_audio_and_video_that_is_not_a_measured_wav_is_assumed_to_last_the_worst_case(mime, build, per_second):
+    tokens, audio = estimate_tokens([part(mime, build())], Tokens)
+    assert tokens == UNMEASURED_SECONDS * per_second, "whatever its size, a header or a caller says"
+    assert audio == (tokens if mime.startswith("audio/") else 0)
+
+
+def test_LW_06_seconds_is_no_longer_a_field_a_caller_can_set():
+    with pytest.raises(ValidationError):
+        MediaPart(mime_type="audio/wav", data=WAV, seconds=1.0)  # type: ignore[call-arg]
+
+
+# --- hostile PDFs: a parser has no CPU or memory bound of its own, so the count runs in a limited child process ---
+
+
+@pytest.mark.parametrize(
+    "build",
+    [
+        lambda: objstm_pdf(5, pad=5_000_000),  # a ~5 kB file whose object stream decodes to 5 MB
+        lambda: whitespace_run_pdf(entries=10, run=2_000_000),  # ten entries into one 2 MB whitespace run
+        lambda: huge_xref_pdf(2_000_000),  # an xref stream declaring two million bogus entries
+    ],
+    ids=["padded-object-stream", "whitespace-run", "huge-xref-stream"],
+)
+def test_LW_06_a_hostile_pdf_is_refused_within_the_limit_not_after_burning_the_cpu(build):
+    hostile = build()
+    started = time.monotonic()
+    with pytest.raises(RequestError) as caught:
+        MediaPart(mime_type="application/pdf", data=hostile)
+    assert time.monotonic() - started < PDF_TIMEOUT_SECONDS + 2, "refused inside the wall-clock limit"
+    assert "LW-06" in str(caught.value)
+    no_leak(str(caught.value))
+
+
+def test_LW_06_a_page_counter_still_running_at_the_wall_clock_limit_is_killed_and_the_part_refused(monkeypatch):
+    monkeypatch.setattr(media, "PDF_TIMEOUT_SECONDS", 1.0)
+    monkeypatch.setattr(media, "_child_command", lambda: [sys.executable, "-I", "-c", "import time; time.sleep(60)"])
+    started = time.monotonic()
+    with pytest.raises(RequestError, match="took over 1 seconds"):
+        pdf_pages(b"%PDF-1.4 a file nobody has counted before " + MARK)
+    assert time.monotonic() - started < 10, "the sleeping child was killed, not waited for"
+    monkeypatch.setattr(media, "_child_command", lambda: pytest.fail("a refusal is cached by the file's sha256"))
+    with pytest.raises(RequestError, match="took over"):
+        pdf_pages(b"%PDF-1.4 a file nobody has counted before " + MARK)
+
+
+def test_LW_06_a_child_that_prints_nonsense_or_fails_is_a_refusal(monkeypatch):
+    for code in ("print('ok 7 7')", "import sys; sys.exit(3)", "print('ok -1')", "print('ok 99999999999999999999x')"):
+        monkeypatch.setattr(media, "_child_command", lambda code=code: [sys.executable, "-I", "-c", code])
+        with pytest.raises(RequestError, match="cannot be read"):
+            pdf_pages(b"%PDF-1.4 " + code.encode())
+
+
+def test_LW_06_the_page_cache_is_keyed_on_the_sha256_and_holds_at_least_a_requests_worth(monkeypatch):
+    calls: list[int] = []
+    monkeypatch.setattr(media, "_measure", lambda data: (calls.append(1), ("ok", 1))[1])
+    files = [f"%PDF-1.4 distinct file {n}".encode() for n in range(MAX_PARTS)]
+    for data in files * 2:
+        assert pdf_pages(data) == 1
+    assert len(calls) == MAX_PARTS, "ten distinct files in one request are each counted once"
+    assert all(re.fullmatch(r"[0-9a-f]{64}", key) for key in media._pdf_cache), "no file bytes held as a key"
+
+
+def test_LW_06_importing_the_provider_layer_loads_no_pdf_parser():
+    code = "import sys, tilo_providers.interfaces, tilo_providers.media as m; print('pypdf' in sys.modules)"
+    done = subprocess.run([sys.executable, "-I", "-c", code], capture_output=True, text=True, timeout=60, check=False)
+    assert done.stdout.strip() == "False", done.stderr[-300:]

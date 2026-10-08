@@ -146,8 +146,8 @@ def test_LW_06_openai_compat_sends_an_image_as_an_image_url_data_part():
     "part",
     [
         MediaPart(mime_type="application/pdf", data=PDF),
-        MediaPart(mime_type="audio/wav", data=WAV, seconds=2.0),
-        MediaPart(mime_type="video/mp4", data=b"\x00\x00\x00\x18ftypmp42" + MARK, seconds=2.0),
+        MediaPart(mime_type="audio/wav", data=WAV),
+        MediaPart(mime_type="video/mp4", data=b"\x00\x00\x00\x18ftypmp42" + MARK),
     ],
 )
 def test_LW_06_openai_compat_takes_images_only_anything_else_is_a_missing_capability(monkeypatch, part):
