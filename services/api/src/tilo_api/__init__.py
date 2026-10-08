@@ -1,14 +1,18 @@
 """tilo-api: sessions, tasks, cards, approvals, policies, downloads, sharing, RBAC (PRD 6.2)."""
 
-from collections.abc import Callable
+from collections.abc import AsyncIterator, Callable
+from contextlib import asynccontextmanager
 from typing import Annotated, Any
 
 from fastapi import Depends, FastAPI, Request
 from fastapi.responses import JSONResponse
+from starlette.concurrency import run_in_threadpool
+from tilo_harness.writer import WriterBusy as _WriterBusy
 from tilo_logging import configure_logging as _configure_logging
 
 from tilo_api import deps as _deps
 from tilo_api import dev as _dev
+from tilo_api import durable_store as _durable_store
 from tilo_api import people as _people
 from tilo_api import runs as _runs
 from tilo_api import schedules as _schedules
@@ -23,6 +27,7 @@ from tilo_api.cards_feed import router as _cards_feed_router
 from tilo_api.console import build_router as _build_console_router
 from tilo_api.costs import router as _costs_router
 from tilo_api.dispatch import router as _dispatch_router
+from tilo_api.effort import router as _effort_router
 from tilo_api.intake import router as intake_router
 from tilo_api.log_context import LogContext as _LogContext
 from tilo_api.log_context import LogRunId as _LogRunId
@@ -36,13 +41,26 @@ from tilo_api.worlds_list import router as _worlds_list_router
 # Generated docs only in local dev mode: deployed, the service is public and the route list is not for
 # strangers (issue #411). `app.openapi()` still works in-process for tests.
 _DOCS: dict[str, Any] = {} if _dev.dev_enabled() else {"docs_url": None, "redoc_url": None, "openapi_url": None}
-app = FastAPI(title="tilo-api", **_DOCS)
+
+
+@asynccontextmanager
+async def _lifespan(_: FastAPI) -> AsyncIterator[None]:
+    yield
+    await run_in_threadpool(_durable_store.close_deployed)  # SIGTERM: the writers release their leases (ADR-0026 4)
+
+
+app = FastAPI(title="tilo-api", lifespan=_lifespan, **_DOCS)
 app.add_middleware(_LogRunId)  # NFR-26: innermost, so the world is looked up only for a request the gate admitted
 app.add_middleware(_AccessGate)  # SEC-15: deployed, every non-public route needs a stored judge declaration
 app.add_middleware(_AppCheckGate)  # SEC-10: App Check token, logged only until the owner sets TILO_APPCHECK_ENFORCE=1
 app.add_middleware(_NoStore)  # added after the gate, so it is outside it: the gate's 403 on `/v1/` is no-store too
 app.add_middleware(_LogContext)  # NFR-26: outermost, no I/O: binds the world id and trace id of the request
 _configure_logging()  # NFR-26: a deployed service logs JSON with no further setup
+
+
+@app.exception_handler(_WriterBusy)
+def _writer_busy(_: Request, __: Exception) -> JSONResponse:  # the one retry is spent: another holds the world
+    return JSONResponse(status_code=503, content={"detail": "store_unavailable"})
 
 
 @app.exception_handler(_deps.ReplayOnly)
@@ -91,12 +109,13 @@ app.include_router(_build_sharing_router(_world_views))
 app.include_router(_runs.router)
 app.include_router(_assistant_router)
 app.include_router(_people.router)
+app.include_router(_effort_router)
 app.include_router(_schedules.router)
 
 
 def _world_owner(world_id: str) -> str | None:
     """The world's owner from the store the app is wired with (503 `not_configured` when none is)."""
-    world = app.dependency_overrides.get(_deps.get_store, _deps.get_store)().worlds.get(world_id)
+    world = app.dependency_overrides.get(_deps.get_store, _deps.get_store)().load_world(world_id, settle=False)
     return world.owner if world else None
 
 

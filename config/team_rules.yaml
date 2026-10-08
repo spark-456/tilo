@@ -1,0 +1,23 @@
+# The five "When agents stop and ask" switches (FR-TEAM-04, supplement design 2026-10-06, Team page).
+# `must_ask: true` marks a rule that is one of PRD 8.3's Must-ask rules (money, personal data, legal terms or
+# outside communication not covered by an autonomy policy; a choice outside policy): it can't be switched off, and
+# it must default on. Loader: tilo_api.team_rules.load_switches. Order is the order the Team page shows.
+switches:
+  - {key: spend, default: true, must_ask: true} # PRD 8.3: the step touches money
+  - {key: share, default: true, must_ask: true} # PRD 8.3: outside communication
+  - {key: undo, default: true, must_ask: true} # PRD 8.3: money, personal data, legal terms; T3 actions
+  - {key: tools, default: true, must_ask: false}
+  - {key: weekend, default: false, must_ask: false}
+
+# FR-TEAM-05: "What each role can do", the 8 x 4 matrix on the Team page. The roles listed hold the capability.
+# Read by tilo_api.team_rules.role_can (set_switch checks `change_tool_access` here) and compared with the page's
+# matrix by a test, so a rule and its display can't drift. Order and labels are the page's rows.
+capabilities:
+  - {key: start_quick_tasks, label: "Start quick tasks", roles: [Owner, Approver, Member]}
+  - {key: build_routines, label: "Build routines", roles: [Owner, Approver, Member]}
+  - {key: open_workspaces, label: "Open workspaces", roles: [Owner, Approver]}
+  - {key: approve_spend, label: "Approve spend up to their limit", roles: [Owner, Approver]}
+  - {key: approve_sharing, label: "Approve sharing outside", roles: [Owner, Approver]}
+  - {key: change_tool_access, label: "Change tool access", roles: [Owner]}
+  - {key: invite_people, label: "Invite people", roles: [Owner]}
+  - {key: see_the_ledger, label: "See the ledger", roles: [Owner, Approver, Member, Viewer]}

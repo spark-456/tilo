@@ -192,13 +192,18 @@ function Board({
   ui,
   app,
   limit,
-}: { A: Agenda; k: BoardKey; ui: AgendaUi; app: AppCtx; limit: number }) {
+}: { A: Agenda; k: BoardKey; ui: AgendaUi; app: AppCtx; limit: number | null }) {
   const b = BOARDS.find((x) => x.key === k) ?? BOARDS[0];
   if (!b) return null;
+  // A board that is not started holds its cell in the grid (FR-UX-12), so the columns never shift when it comes.
+  if (limit === null) return <div data-board-reserved="" aria-hidden="true" />;
   const ps: AgendaPin[] = ui.pins.filter((p) => p.board === k);
   const vms = ps.map((p, i) => pinVm(p, i, app.dec, ui.done, ui.decisions));
   const open = vms.filter((v) => !v.done && !v.pin.suggested).length;
-  const shown = vms.slice(0, limit); // the pins are drawn a few tasks at a time (WEB-MOTION-2), top to bottom
+  // The pins are drawn a task at a time (WEB-MOTION-2), in the order they appear: the grouped style lists them by
+  // group, so a pin drawn later never opens a group above the ones already there.
+  const ordered = ui.style === "soft" ? GROUPS.flatMap(([, f]) => vms.filter(f)) : vms;
+  const shown = ordered.slice(0, limit);
   const label = `Pin to ${b.title}`;
   const input = (cls: string) => (
     <input
@@ -270,8 +275,8 @@ export function Boards({
   A,
   ui,
   app,
-  limit,
-}: { A: Agenda; ui: AgendaUi; app: AppCtx; limit: number }) {
+  limits,
+}: { A: Agenda; ui: AgendaUi; app: AppCtx; limits: (number | null)[] }) {
   return (
     <section aria-label="Boards" className="park-agenda-section">
       <div className="park-agenda-sechead">
@@ -297,8 +302,8 @@ export function Boards({
         </div>
       </div>
       <div className="park-agenda-boards">
-        {BOARDS.map((b) => (
-          <Board key={b.key} A={A} k={b.key} ui={ui} app={app} limit={limit} />
+        {BOARDS.map((b, i) => (
+          <Board key={b.key} A={A} k={b.key} ui={ui} app={app} limit={limits[i] ?? null} />
         ))}
       </div>
     </section>

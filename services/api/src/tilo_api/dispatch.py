@@ -19,6 +19,7 @@ from __future__ import annotations
 import logging
 import threading
 import time
+from collections.abc import Iterable
 from concurrent.futures import Future
 from concurrent.futures import TimeoutError as FutureTimeoutError
 from contextlib import contextmanager
@@ -40,6 +41,7 @@ from tilo_api.deps import (
     get_part_write_deadline_s,
     get_store,
 )
+from tilo_api.durable_store import DurableStore
 
 router = APIRouter()
 logger = logging.getLogger("tilo_api.dispatch")
@@ -47,6 +49,7 @@ logger = logging.getLogger("tilo_api.dispatch")
 _CALL_BUDGET_S = 4.5  # a whole request's own write-attempt budget, under FR-HIL-07's 5s
 _SOLE_RETRY_LIMIT = 2  # total attempts for a fast-failing part with nothing else left to try
 _CONFIRM_CHANNELS = ("web", "email")  # FR-HIL-07 as amended (SD-01): confirm on the web and by email only
+_LOCK_WAIT_S = 1.0  # a kill switch waits this long for the store's lock, once to read and once to save
 _MAX_ABANDONED = 2  # presumed-lost threads tolerated per world before no new thread starts
 
 
@@ -130,6 +133,7 @@ def _run_attempt(store: Store, world_id: str, part: dict, writer: EventWriter, a
     try:
         writer.append(world_id, part)
         _remove_pending(store, world_id, part["id"])
+        store.ack(world_id, part["id"])  # a durable store forgets it in its queue too
     except Exception as exc:
         error = exc
         with locks["queue"]:
@@ -287,7 +291,7 @@ def _revoke_fallback_world(store: Store, principal: Principal) -> str | None:
     """The principal's own world, only when it exists and this principal owns it: a policy with no
     mapping must never write an event into someone else's (or a nonexistent) stream."""
     world_id = principal.world_id
-    world = store.worlds.get(world_id) if isinstance(world_id, str) else None
+    world = store.load_world(world_id, settle=False) if isinstance(world_id, str) else None
     if isinstance(world, WorldRecord) and principal.role == "owner" and world.owner == principal.user_id:
         return world_id
     return None
@@ -324,6 +328,58 @@ def _apply_plan(store: Store, plan, owner: str, change: str, at: str) -> None:
         _enqueue(store, target, part)
 
 
+def _persist(
+    store: Store, touched, *, policies: Iterable[str] = (), worlds: Iterable[str] = (), loaded: bool = True
+) -> None:
+    """A durable store commits what a kill switch applied here, with every earlier change that is still unsaved and
+    the parts queued (FR-HIL-07's order: applied first, committed after, never under a mutate lock, and never waiting
+    on the store's lock past `_LOCK_WAIT_S`). If that fails, or the owner's other policies could not be read, the
+    change stays applied in this process and marked unsaved, so a run still stops (FR-WLD-07) and the next switch
+    saves it; the answer is 503 "not saved", never 200 or 202."""
+    if isinstance(store, DurableStore):
+        try:
+            with store.deadline(_LOCK_WAIT_S):
+                store.commit_unsaved(touched, policies=policies, worlds=worlds)
+        except HTTPException as exc:
+            logger.warning("kill switch applied but not saved (%s)", exc.detail)
+            raise HTTPException(status_code=503, detail="not saved") from None
+    if not loaded:
+        raise HTTPException(status_code=503, detail="not saved")
+
+
+def _policy_ids(plan) -> list[str]:
+    return [part["data"]["policy_id"] for _, _, part in plan]
+
+
+def _switch(store: Store, world: WorldRecord, world_id: str, at: str, pause_part: dict | None = None):
+    """Stop all's change (and Pause all's), cached first: every cached policy of the owner is lowered and the world
+    paused with no backend read and no wait on the store's lock; then the rest of the owner's are loaded, within
+    `_LOCK_WAIT_S`, and whatever is new is lowered. Returns (plan, already_l1, touched worlds, loaded)."""
+    owner = world.owner
+
+    def apply():
+        touched = _touched_worlds(store, world_id, owner)
+        with _locked(store, touched):
+            plan, already = _plan_stop_all(store, owner, world_id, "stop_all", at)
+            _apply_plan(store, plan, owner, "stop_all", at)  # levels first, never waiting on I/O
+            if pause_part is not None and not world.paused:
+                world.paused = True
+                _enqueue(store, world_id, pause_part, front=True)  # then world.paused at the head of its queue
+        return plan, already, touched
+
+    plan, already_l1, touched = apply()
+    if not isinstance(store, DurableStore):
+        return plan, already_l1, touched, True
+    try:
+        with store.deadline(_LOCK_WAIT_S):
+            store.load_owner(owner, settle=False)
+    except HTTPException as exc:
+        logger.warning("kill switch could not read the owner's other records (%s)", exc.detail)
+        return plan, already_l1, touched, False
+    more, already_all, touched = apply()  # the policies and worlds the load added
+    return plan + more, already_all - len(plan), touched, True
+
+
 def _drain_touched(
     store: Store, touched, writer: EventWriter, deadline_at: float, part_deadline_s: float, abandon_after_s: float
 ) -> int:
@@ -344,14 +400,12 @@ def stop_autopilot(
     world = _require_member_world(principal, store, world_id)
     _require_owner(principal, world)
 
-    at = events.now()
-    touched = _touched_worlds(store, world_id, world.owner)
-    with _locked(store, touched):
-        plan, already_l1 = _plan_stop_all(store, world.owner, world_id, "stop_all", at)
-        _apply_plan(store, plan, world.owner, "stop_all", at)
+    plan, already_l1, touched, loaded = _switch(store, world, world_id, events.now())
+    _persist(store, touched, policies=_policy_ids(plan), loaded=loaded)
 
     deadline_at = time.monotonic() + _CALL_BUDGET_S
     pending = _drain_touched(store, touched, writer, deadline_at, part_deadline_s, abandon_after_s)
+    store.settle(world_id, writer)
     body = {
         "stopped": len(plan),
         "already_l1": already_l1,
@@ -379,22 +433,16 @@ def pause_world(
     _require_owner(principal, world)
     del body  # validated against the schema enum (422 outside it); principal.channel is authoritative
 
-    at = events.now()
-    touched = _touched_worlds(store, world_id, world.owner)
-    with _locked(store, touched):
-        # Levels first (never waits on I/O), then world.paused at the head of its world's queue.
-        plan, already_l1 = _plan_stop_all(store, world.owner, world_id, "stop_all", at)
-        _apply_plan(store, plan, world.owner, "stop_all", at)
-        if not world.paused:
-            world.paused = True
-            part = events.world_paused_part(
-                part_id=events.new_part_id(), world_id=world_id, actor=principal.user_id, channel=principal.channel
-            )
-            _enqueue(store, world_id, part, front=True)
+    pause = events.world_paused_part(
+        part_id=events.new_part_id(), world_id=world_id, actor=principal.user_id, channel=principal.channel
+    )
+    plan, already_l1, touched, loaded = _switch(store, world, world_id, events.now(), pause)
+    _persist(store, touched, policies=_policy_ids(plan), worlds=[world_id], loaded=loaded)
 
     deadline_at = time.monotonic() + _CALL_BUDGET_S
     drain(store, world_id, writer, deadline_at, part_deadline_s, abandon_after_s, only_type="world.paused")
     pending = _drain_touched(store, touched, writer, deadline_at, part_deadline_s, abandon_after_s)
+    store.settle(world_id, writer)
     body_out = {"stopped": len(plan), "already_l1": already_l1, "paused": True, "pending": pending}
     return JSONResponse(content=body_out, status_code=202 if pending else 200)
 
@@ -421,6 +469,7 @@ def revoke_policy(
         # Nowhere to send an event; the level change alone still needs a per-policy lock.
         with _policy_lock(store, policy_id):
             events.apply_level_change(policy, owner=owner, change="revoked", at=at)
+        _persist(store, [], policies=[policy_id])
         return {"policy_id": policy_id, "level": "L1"}
 
     deadline_at = time.monotonic() + _CALL_BUDGET_S
@@ -435,5 +484,7 @@ def revoke_policy(
         )
         events.apply_level_change(policy, owner=owner, change="revoked", at=at)
         _enqueue(store, target, part)
+    _persist(store, [target], policies=[policy_id])
     drain(store, target, writer, deadline_at, part_deadline_s, abandon_after_s)
+    store.settle(target, writer)
     return {"policy_id": policy_id, "level": "L1"}
