@@ -249,6 +249,34 @@ describe("FR-SKL-02: Tilo's version", () => {
       stops: "Never",
     });
   });
+
+  it("test_FR_SKL_02_skills_reads_ledger_currency_and_shows_dollars_when_ledger_is_usd", async () => {
+    const base = skillsApi();
+    const usdLedger = { ...(await base.getLedger()).data, currency: "USD" as const };
+    const api = skillsApi({
+      getLedger: () => Promise.resolve({ data: usdLedger, source: "fixture" }),
+    });
+    const rig = await mountSkills({ api });
+
+    // Library cost shows "$", not "£"
+    const lib = rig.el.querySelector('section[aria-label="Learned skills"]') as HTMLElement;
+    expect(pageText(lib)).toContain("$0.60 a run");
+    expect(pageText(lib)).toContain("First run $2.80");
+    expect(pageText(lib)).toContain("Now $0.60");
+    expect(pageText(lib)).not.toContain("£0.60");
+    expect(pageText(lib)).not.toContain("£2.80");
+
+    // Skills estimate on Tilo's version shows "$", not "£"
+    toTilosVersion(rig);
+    expect(estimate(rig.el, EST.runLabel)).toBe("~$0.40");
+    expect(pageText(teachCard(rig.el))).not.toContain("~£0.40");
+
+    // Try-run result shows "$", not "£"
+    clickEl(control(rig.el, "Let Tilo try it"));
+    finishRun(rig);
+    expect(pageText(teachCard(rig.el))).toContain("4 of 4 steps · 1 min 08s · $0.38");
+    expect(pageText(teachCard(rig.el))).not.toContain("£0.38");
+  });
 });
 
 describe("FR-SKL-03: Try run", () => {

@@ -4,12 +4,12 @@
 // - Ready for your review (FR-SKL-06: run-history bars, Mark as trusted / Keep learning gated by SKILL_TRUST_CONFIG)
 // - Who helped this month (FR-SKL-07: Mistakes since July, Answers and fixes, per-person counts only, never message content)
 import { useState } from "react";
+import { HELPER_SUMMARY_FIXTURE } from "../../api/index";
 import type { Learn, Skill } from "../../api/types";
 import type { AppCtx } from "../../app/AppCtx";
 import { cx } from "../../components/cx";
 import { SKILL_TRUST_CONFIG, type SkillFixEntry, canTrustSkill } from "./skillConfig";
 import { agent, icon } from "./skillsKit";
-import { HELPER_SUMMARY_FIXTURE } from "./teachData";
 
 export interface HelpProps {
   app: AppCtx;

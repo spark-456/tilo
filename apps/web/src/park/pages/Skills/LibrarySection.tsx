@@ -29,6 +29,7 @@ export interface LibraryProps {
   skills: readonly Skill[];
   selectedId: string;
   paused: Readonly<Record<string, boolean>>;
+  currency?: CurrencyCode;
   onSelect: (id: string) => void;
   onTogglePause: (skill: Skill) => void;
   onTryDraft: () => void;
@@ -39,6 +40,7 @@ export function LibrarySection({
   skills,
   selectedId,
   paused,
+  currency = "GBP",
   onSelect,
   onTogglePause,
   onTryDraft,
@@ -140,7 +142,7 @@ export function LibrarySection({
                     {meta.label}
                   </span>
                   <span className="park-skills-lib-row-cost">
-                    {s.now != null ? `${money(s.now)} a run` : "Not run yet"}
+                    {s.now != null ? `${money(s.now, currency)} a run` : "Not run yet"}
                   </span>
                 </span>
               </button>
@@ -212,8 +214,8 @@ export function LibrarySection({
                 <div className="park-skills-lib-cost-fill" style={{ width: barWidth }} />
               </div>
               <div className="park-skills-lib-cost-sub">
-                <span>{`First run ${money(cur.first)}`}</span>
-                <span>{`Now ${money(cur.now)}`}</span>
+                <span>{`First run ${money(cur.first, currency)}`}</span>
+                <span>{`Now ${money(cur.now, currency)}`}</span>
               </div>
             </div>
           ) : null}

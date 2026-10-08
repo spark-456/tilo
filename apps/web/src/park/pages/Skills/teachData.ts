@@ -2,7 +2,7 @@
 // design_handoff_tilo_web_app/design/Tilo App Skills.dc.html (the markup and `renderVals`). The Api serves none
 // of it (a teaching session has no endpoint yet), so it is page-local, as the Home composer's copy is. Nothing
 // here names the person, the company or a skill of the sample data: those come from the Api.
-import type { Skill } from "../../api/types";
+import type { Ledger, Skill } from "../../api/types";
 import { type CurrencyCode, STEP_LEDGER_PRICES, runMoney } from "../../app/ledgerKpis";
 import { SKILL_TRUST_CONFIG } from "./skillConfig";
 
@@ -85,18 +85,6 @@ export const CAP: Record<MethodKey, readonly string[]> = {
     "Each row matches one email in the Accounts inbox",
     "Emails with a row are labelled “Logged”",
   ],
-};
-
-export interface HelperSummaryFixture {
-  readonly baseMonthlyAnswersAndFixes: number;
-  readonly mistakesDeltaSinceJuly: string;
-  readonly helperMonthLabel: string;
-}
-
-export const HELPER_SUMMARY_FIXTURE: HelperSummaryFixture = {
-  baseMonthlyAnswersAndFixes: 41,
-  mistakesDeltaSinceJuly: "−38%",
-  helperMonthLabel: "September",
 };
 
 export interface CaptureFixtureEvent {
@@ -237,7 +225,7 @@ export const TRY_RUN_FIXTURE_EVENTS: readonly TryRunFixtureEvent[] = [
 export function formatTryRunResult(
   events: readonly Pick<TryRunFixtureEvent, "matched" | "durationSec" | "cost">[],
   totalSteps: number = PLAN.length,
-  currency: CurrencyCode = "GBP",
+  currency: CurrencyCode | Pick<Ledger, "currency"> = "GBP",
 ): { title: string; sub: string } {
   const matched = events.filter((e) => e.matched).length;
   const totalSec = events.reduce((sum, e) => sum + e.durationSec, 0);
@@ -286,7 +274,7 @@ export const stopsToAsk = (asks: readonly boolean[]): string => {
 export function estimateSkillPlan(
   steps: readonly { readonly tool: string }[],
   asks: readonly boolean[],
-  currency: CurrencyCode = "GBP",
+  currency: CurrencyCode | Pick<Ledger, "currency"> = "GBP",
 ): { run: string; time: string; stops: string } {
   const cost = steps.reduce((sum, s) => {
     if (s.tool.endsWith("Act")) return sum + STEP_LEDGER_PRICES.Act;
@@ -300,9 +288,6 @@ export function estimateSkillPlan(
     stops: stopsToAsk(asks),
   };
 }
-
-/** The estimates of Tilo's version; computed from the default plan and ledger prices. */
-export const EST = estimateSkillPlan(PLAN, DEFAULT_ASK, "GBP");
 
 /** What "Save skill" sets on the draft skill (the design's `S.live` override). */
 export const savedOverride = (owner: string): Partial<Skill> => ({

@@ -23,7 +23,7 @@ export function RunPane({ t, night }: PaneProps) {
     );
   }
   const { run, waiting, runDone } = t;
-  const result = formatTryRunResult(TRY_RUN_FIXTURE_EVENTS, PLAN.length);
+  const result = formatTryRunResult(TRY_RUN_FIXTURE_EVENTS, PLAN.length, t.currency);
   const pill = runDone
     ? "Finished"
     : waiting

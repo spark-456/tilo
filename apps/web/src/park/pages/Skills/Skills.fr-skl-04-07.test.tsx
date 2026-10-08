@@ -231,12 +231,14 @@ describe("FR-SKL-06: Trust and pause", () => {
 
 describe("FR-SKL-07: Who helped this month", () => {
   it("test_FR_SKL_07_who_helped_this_month_shows_counts_and_mistake_change_only_never_message_content", async () => {
+    const fixtures = (await import("../../api/fixtures")) as Record<string, unknown>;
     const teachData = (await import("./teachData")) as Record<string, unknown>;
-    expect(teachData.HELPER_SUMMARY_FIXTURE).toEqual({
+    expect(fixtures.HELPER_SUMMARY_FIXTURE).toEqual({
       baseMonthlyAnswersAndFixes: 41,
       mistakesDeltaSinceJuly: "−38%",
       helperMonthLabel: "September",
     });
+    expect(teachData.HELPER_SUMMARY_FIXTURE).toBeUndefined();
 
     const rig = await mountSkills();
     const help = helpSection(rig.el);
