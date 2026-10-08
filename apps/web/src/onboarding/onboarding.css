@@ -1,6 +1,7 @@
 /* ONBOARD-1: the welcome and the coach marks. Park tokens only (var(--name), scoped under [data-park] so night comes
    from the tokens) and the README type ramp and spacing numbers used by the Park components. Nothing here moves,
-   so reduced motion has nothing to turn off (HR-1). */
+   so reduced motion has nothing to turn off (HR-1). Sizes: 12/14/20/24 are the ramp; 14.5 and 13 are the Park README
+   numbers the Park components use for body and row text (tokens/ramp.ts: body 14.5, meta 12.5-13). */
 
 [data-park] .onb-scrim {
   position: fixed;
@@ -72,7 +73,7 @@
 }
 [data-park] .onb-coach-title {
   margin: 0;
-  font-size: 18px;
+  font-size: 20px;
   font-weight: 800;
   letter-spacing: -0.3px;
 }
@@ -156,6 +157,13 @@
   clip: rect(0 0 0 0);
   white-space: nowrap;
   border: 0;
+}
+
+/* Night: the shared primary fill (white on #7A62F5) is 4.29:1, under AA. The welcome's one primary uses the existing
+   light iris with the existing dark ink instead (about 9:1); the shared token is AG-WEB's (PR follow-up). */
+[data-park][data-time="night"] .onb-card .park-btn--primary.park-btn--md {
+  background: var(--heroInk);
+  color: var(--inv);
 }
 
 @media (max-width: 480px) {

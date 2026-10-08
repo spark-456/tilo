@@ -264,14 +264,19 @@ describe("ONBOARD_1 tour", () => {
     expect(active()).toBe(avatar);
   });
 
-  it("ONBOARD_1_tour_tab_wraps_inside_the_coach_mark", async () => {
+  it("ONBOARD_1_tour_tab_is_not_trapped_in_the_non_modal_coach_mark", async () => {
     await startTour();
     const d = dialog() as HTMLElement;
+    expect(d.getAttribute("aria-modal")).toBe("false");
     const items = qa<HTMLElement>(d, "button");
     const last = items[items.length - 1] as HTMLElement;
     act(() => last.focus());
-    key("Tab", last);
-    expect(active()).toBe(items[0]);
+    const e = new KeyboardEvent("keydown", { key: "Tab", bubbles: true, cancelable: true });
+    act(() => {
+      last.dispatchEvent(e);
+    });
+    expect(e.defaultPrevented, "Tab is left to the browser").toBe(false);
+    expect(active()).toBe(last);
   });
 });
 

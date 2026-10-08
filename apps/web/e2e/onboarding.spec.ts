@@ -65,7 +65,10 @@ for (const [name, viewport] of Object.entries({ desktop: DESKTOP, mobile: MOBILE
         if (i === 1) {
           const target = page.locator('nav[aria-label="Main"] a[href="/worlds"]');
           await expect(target).toHaveAttribute("aria-describedby", /onb-body/);
-          const [r, t] = [await page.locator(".onb-ring").boundingBox(), await target.boundingBox()];
+          const [r, t] = [
+            await page.locator(".onb-ring").boundingBox(),
+            await target.boundingBox(),
+          ];
           expect(Math.abs((r?.x ?? 0) - ((t?.x ?? 0) - 4))).toBeLessThan(2);
           const axeStep = await new AxeBuilder({ page }).include('[role="dialog"]').analyze();
           expect(axeStep.violations.map((v) => v.id)).toEqual([]);
@@ -98,6 +101,34 @@ for (const [name, viewport] of Object.entries({ desktop: DESKTOP, mobile: MOBILE
       await expect(page.getByRole("button", { name: "Account menu" })).toBeFocused();
       expect(problems).toEqual([]);
     });
+  });
+}
+
+// WCAG 2.2 AA in night: the welcome's primary and the coach marks keep 4.5:1 text (axe inside the dialog).
+for (const [name, viewport] of Object.entries({ desktop: DESKTOP, mobile: MOBILE })) {
+  test(`ONBOARD_1_e2e_night_contrast_${name}`, async ({ page }) => {
+    await page.setViewportSize(viewport);
+    await page.addInitScript(() => window.localStorage.setItem("tilo.time", "night"));
+    await page.goto("/?onboarding=1");
+    await expect(page.locator('[data-park][data-time="night"]')).toHaveCount(1);
+    await expect(dialog(page)).toHaveAccessibleName("Welcome to Tilo");
+    await shot(page, `${name}-night-1-welcome`);
+    const welcome = await new AxeBuilder({ page }).include('[role="dialog"]').analyze();
+    expect(
+      welcome.violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.html).join(" ")}`),
+    ).toEqual([]);
+    await dialog(page).getByRole("button", { name: "Take the tour" }).click();
+    for (const title of ["Describe the work", "Account menu"]) {
+      while (
+        (await dialog(page).getAttribute("aria-labelledby")) &&
+        !(await dialog(page).getByRole("heading", { name: title }).count())
+      ) {
+        await dialog(page).getByRole("button", { name: "Next" }).click();
+      }
+      const coach = await new AxeBuilder({ page }).include('[role="dialog"]').analyze();
+      expect(coach.violations.map((v) => v.id)).toEqual([]);
+    }
+    await shot(page, `${name}-night-2-last`);
   });
 }
 

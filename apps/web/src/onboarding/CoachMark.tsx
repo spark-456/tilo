@@ -1,11 +1,10 @@
 // ONBOARD-1: one tour step as a coach mark over the real element it is about. A non-modal dialog (the page stays
 // usable): named by its title, described by its text, and tied to the target by adding its text to the target's
 // aria-describedby while the step shows. It is placed and outlined from the target's box and re-placed on resize and
-// scroll; it never animates (nothing moves without a recorded event, HR-1) and has no filled primary button (UX-1).
+// scroll; Tab is not trapped (the page stays usable); it never animates (nothing moves without a recorded event, HR-1) and has no filled primary button (UX-1).
 import { type KeyboardEvent, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { Button } from "../park/components";
 import "./onboarding.css";
-import { trapTab } from "./focus";
 import { COPY, type TourStep } from "./steps";
 
 interface Box {
@@ -112,7 +111,6 @@ export function CoachMark({
   useEffect(() => ref.current?.focus(), []);
 
   const onKeyDown = (e: KeyboardEvent<HTMLDivElement>): void => {
-    trapTab(e);
     if (e.key === "ArrowRight" && !last) {
       e.preventDefault();
       onNext();
