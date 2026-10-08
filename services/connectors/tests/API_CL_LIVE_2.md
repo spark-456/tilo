@@ -31,7 +31,11 @@ No contract change: Python in `services/connectors`, `evals/`, docs. Tests: `ser
    person typed exactly `yes` at an interactive terminal for the payload (the digest of connector, action, recipients,
    destination, item and content as read from the send itself), `entry.authz.by == "person"`, the broker holds the
    write-scope token, and the outbox called the door with its own grant. Hold, `no`, anything but `yes`, piped input and
-   `--auto-approve-t1t2` never approve a real write. No approval, or an approval of another payload: the entry ends
+   `--auto-approve-t1t2` never approve a real write. The word is exactly `yes` (`YES`, `Yes`: no). Right before the prompt the
+   terminal's input buffer is discarded (`live_topic.drain_stdin`: Windows `FlushConsoleInputBuffer`, POSIX
+   `termios.tcflush`), so paste or early typing cannot answer it; if it cannot be discarded the write is held. A control,
+   zero-width or bidi character in the subject, body, file name, recipients or destination holds the write
+   (`hidden_characters`). `WriteGate.clear()` drops unused approvals (on a hold and at the run's end). No approval, or an approval of another payload: the entry ends
    `failed`, no request of any kind goes out, nothing is retried.
 2. Exactly once: an approval is spent by the first entry that uses it; a retry of that entry (an ambiguous failure,
    a second dispatch) goes through the adapter's own earlier-attempt lookup and never makes a second draft or send.

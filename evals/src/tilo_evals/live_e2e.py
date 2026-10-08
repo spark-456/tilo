@@ -232,16 +232,27 @@ def print_real_plan(allow_writes: bool = False, allow_send: bool = False) -> Non
         print(f"real-write {connector} {action}: typed terminal approval")
 
 
-def _real_adapters(factory: Callable[[], dict[str, Any]] | None, allow_writes: bool = False) -> dict[str, Any]:
+def _real_adapters(
+    factory: Callable[[], dict[str, Any]] | None, allow_writes: bool = False, allow_send: bool = False
+) -> dict[str, Any]:
     """The real connectors, built once the gate has passed and before any model call. Fail closed: a refusal or any
-    other failure stops the run (its words are never printed) and never falls back to the recording mocks."""
-    from tilo_connectors.real import RealConnectorsRefused, is_real_read_only, is_real_write_gated  # noqa: PLC0415
+    other failure stops the run (its words are never printed) and never falls back to the recording mocks. A write gate
+    must carry exactly this run's flags: a factory built with send is refused in a run without `--allow-send`."""
+    from tilo_connectors.real import (  # noqa: PLC0415
+        RealConnectorsRefused,
+        is_real_read_only,
+        is_real_write_gated,
+        write_gate_of,
+    )
+    from tilo_connectors.real_writes import WriteFlags  # noqa: PLC0415
 
     if factory is None:  # the default (live transport and consent flow) is CL-LIVE-3's
         raise LiveE2ERefused("real_connectors_no_token", NO_CONNECTION)
     try:
         adapters = factory()
-        if (is_real_write_gated if allow_writes else is_real_read_only)(adapters):
+        if (is_real_write_gated if allow_writes else is_real_read_only)(adapters) and (
+            not allow_writes or getattr(write_gate_of(adapters), "flags", None) == WriteFlags(allow_writes, allow_send)
+        ):
             return adapters
     except RealConnectorsRefused as refusal:
         raise LiveE2ERefused(f"real_connectors_{refusal.code}", str(refusal)) from None
@@ -913,6 +924,11 @@ def _execute(
             drive(obs.case, obs, _UNIT_TIMEOUT_S["live" if live else "replay"], app, person)
         except Exception as error:  # noqa: BLE001 - a crash is an observation; the error's text is never kept
             obs.crash = type(error).__name__
+        finally:
+            if connectors is not None:  # an approval nobody used does not outlive the run
+                from .live_writes import release_writes  # noqa: PLC0415
+
+                release_writes(connectors)
         if narrate and obs.events and not meter.stop:
             story, note = _story(router, obs.events, env)
     outcome, reason = _classify(obs, meter, screen, env)
@@ -956,7 +972,7 @@ def run_live_e2e(
     config = _load_config(models_path, prices_path, env)
     case = adhoc or _load_case(case_id, bank_dir)
     live = mode == "live"
-    connectors = _real_adapters(real_connectors_factory, allow_writes) if real_connectors and live else None
+    connectors = _real_adapters(real_connectors_factory, allow_writes, allow_send) if real_connectors and live else None
     factory = (live_provider_factory or _vertex(config)) if live else None
     refused: list[LiveE2ERefused] = []
     if fake_record and factory is not None:

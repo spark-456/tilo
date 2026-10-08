@@ -14,6 +14,7 @@ import dataclasses
 import hashlib
 import json
 import threading
+import unicodedata
 from collections.abc import Callable, Mapping
 from copy import deepcopy
 from dataclasses import dataclass
@@ -30,6 +31,7 @@ WRITE_ACTIONS: Mapping[str, tuple[str, ...]] = {
 SEND_ACTIONS: Mapping[str, tuple[str, ...]] = {"gmail": ("send_email",)}
 KINDS: Mapping[str, str] = {"gmail": "email", "google_drive": "file"}  # the artifact kind each adapter reads
 SUBJECT_CHARS, PREVIEW_CHARS = 120, 300
+_LAYOUT = "\n\r\t"  # the only control characters a card can show
 _REFUSALS = {
     "not_bound": "real writes are not bound to this run's content",
     "action_off": "this write is not enabled for this run",
@@ -38,6 +40,7 @@ _REFUSALS = {
     "no_approval": "no typed terminal approval for exactly this payload",
     "approval_spent": "the typed approval was already used for another entry",
     "attachments_off": "attachments are not enabled for real writes",
+    "hidden_characters": "the content has hidden, control or bidi characters the card cannot show",
 }
 
 
@@ -144,8 +147,9 @@ class WriteGate:
         if kind not in (*WRITE_ACTIONS.get(connector, ()), *SEND_ACTIONS.get(connector, ())):
             return None
         recipients = tuple(str(r) for r in gate.get("recipients") or ())
-        destination = str(action.get("destination"))
-        blank = Review(False, "", connector, kind, recipients, destination, "", "", 0, "")
+        destination = action.get("destination")  # None stays None: it is the "no thread / the Tilo folder" case
+        blank = Review(False, "", connector, kind, recipients, "" if destination is None else str(destination),
+                       "", "", 0, "")  # fmt: skip
         if kind not in self.flags.actions(connector):
             return _held(blank, "action_off")
         try:
@@ -159,6 +163,8 @@ class WriteGate:
         except Exception:  # noqa: BLE001 - fixed text only
             return _held(blank, "content_unavailable")
         title, text = _shown(content)
+        if any(_hidden(s) for s in (title, text, destination or "", *recipients)):
+            return _held(blank, "hidden_characters")  # the card strips them, the adapter would write them
         redact = self._redact
         where = effective_destination(destination) or (
             "no thread: a new message" if connector == "gmail" else "the Tilo folder"
@@ -168,12 +174,25 @@ class WriteGate:
 
     def approve(self, review: Review, *, said: str, interactive: bool) -> bool:
         """Records a typed `yes` from an interactive terminal against the payload's digest; anything else is a no."""
-        if not (review.allowed and interactive and said.strip().lower() == "yes"):
+        if not (review.allowed and interactive and said.strip() == "yes"):
             return False
         with self._lock:
             if (current := self._approved.get(review.digest)) is None or current.result is not None:
                 self._approved[review.digest] = _Approval()  # a spent approval never covers a second send
         return True
+
+    def clear(self) -> int:
+        """Drops every approval no entry has used yet (a hold, the end of the run); a spent one stays spent."""
+        with self._lock:
+            unused = [d for d, a in self._approved.items() if a.key is None]
+            for digest in unused:
+                del self._approved[digest]
+            return len(unused)
+
+    @property
+    def open_approvals(self) -> int:
+        with self._lock:
+            return sum(a.key is None for a in self._approved.values())
 
     def authorise(self, entry: Mapping[str, Any], connector: str) -> Authorised:
         """Called by a write door the outbox reached: re-reads the content, checks it is exactly what was approved."""
@@ -217,6 +236,11 @@ class WriteGate:
     @property
     def lock(self) -> threading.RLock:
         return self._lock
+
+
+def _hidden(text: Any) -> bool:
+    """A control, format (zero width, bidi) or unassigned character, newlines and tabs apart."""
+    return any(unicodedata.category(c)[0] == "C" and c not in _LAYOUT for c in str(text))
 
 
 def _held(blank: Review, code: str) -> Review:

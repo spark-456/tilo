@@ -22,7 +22,7 @@ from typing import Any
 
 from ._time import format_ts
 from .adapters import CalendarAdapter, DriveAdapter, GmailAdapter, InMemoryPicks, SideEffectRefused, Transport
-from .adapters._google import has_token
+from .adapters._google import GoogleAdapter, has_token
 from .real_writes import SEND_SCOPE, WriteFlags, WriteGate, write_plan
 from .recording import RecordingTransport, ReplayTransport
 from .registry import ConnectorRegistry
@@ -150,6 +150,7 @@ def _gated(connector_id: str, inner: Any, source: _Served, gate: WriteGate) -> _
             return tuple(a for a in gate.executed if a.startswith(connector_id + "."))
 
         def execute_side_effect(self, entry: Any, grant: Any) -> dict[str, Any]:
+            GoogleAdapter._check_grant(entry, grant)  # first: a call with no real grant must not spend an approval
             with gate.lock:  # one write at a time: an approved entry makes at most one request
                 auth = gate.authorise(entry, connector_id)
                 if auth.done is not None:

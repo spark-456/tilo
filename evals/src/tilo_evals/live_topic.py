@@ -11,6 +11,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import os
+import re
 import sys
 import unicodedata
 from collections.abc import Callable, Mapping
@@ -30,6 +31,8 @@ MODEL_ARMOR_NEEDS = (
     "TILO_MODEL_ARMOR_LOCATION (default asia-southeast1), user ADC and the Model Armor API enabled"
 )
 TOPIC_FAKED = tuple(item for item in e2e.FAKED if not item.startswith("safety screen"))  # the screen here is real
+NL = chr(10)
+_BLANKS = re.compile(r"\n\s*\n\s*")  # a run of blank lines is one: a preview cannot push the card off screen
 ADHOC = e2e.default_recordings_dir("adhoc")  # git-ignored: a typed topic is the person's own text
 
 
@@ -40,14 +43,44 @@ def clean(text: Any, *, lines: bool = False) -> str:
     return kept if lines else " ".join(kept.split())
 
 
+def _flush_input() -> None:
+    """Discard what is waiting in the console's input buffer. Raises if this is not a real console."""
+    if os.name == "nt":
+        import ctypes  # noqa: PLC0415
+
+        kernel = ctypes.windll.kernel32  # type: ignore[attr-defined,unused-ignore]
+        kernel.GetStdHandle.restype = ctypes.c_void_p
+        if not kernel.FlushConsoleInputBuffer(kernel.GetStdHandle(-10)):  # STD_INPUT_HANDLE
+            raise OSError("stdin is not a console")
+    else:
+        import termios  # noqa: PLC0415
+
+        termios.tcflush(sys.stdin.fileno(), termios.TCIFLUSH)  # type: ignore[attr-defined,unused-ignore]
+
+
+def drain_stdin() -> bool:
+    """True only if the terminal's pending input was discarded. Anything else (stdin not a tty, no API) is False, so the
+    caller holds: text pasted or typed before a write card must never be able to answer it."""
+    try:
+        if not sys.stdin.isatty():
+            return False
+        _flush_input()
+    except Exception:  # noqa: BLE001 - fail closed
+        return False
+    return True
+
+
 class TerminalPerson:
     """The person at the terminal (`bank_run.drive`'s `person`); `log` says who decided each thing, for the report."""
 
     def __init__(self, *, auto_answer: bool = False, auto_approve_t1t2: bool = False,
                  read: Callable[[str], str] = input, write: Callable[[str], None] = print,
-                 tty: Callable[[], bool] = sys.stdin.isatty) -> None:  # fmt: skip
+                 tty: Callable[[], bool] = sys.stdin.isatty,
+                 drain: Callable[[], bool] | None = None) -> None:  # fmt: skip
         self.auto_answer, self.auto_approve_t1t2, self._input, self._write = auto_answer, auto_approve_t1t2, read, write
-        self._tty, self.log, self._wgate = tty, list[str](), None  # _wgate: CL-LIVE-2 write gate, bound by the run
+        self._tty, self.log = tty, list[str]()
+        self._wgate: Any = None  # CL-LIVE-2 write gate, bound by the run
+        self._drain = drain  # discards the input buffer before a write prompt; None or False: the write is held
 
     def bind_write_gate(self, gate: Any) -> None:
         self._wgate = gate
@@ -67,17 +100,35 @@ class TerminalPerson:
         if not review.allowed:
             self._write(f"  held: {clean(review.why)}")
             self.log.append(f"gate {kind}: held ({clean(review.why)})")
-            return False
+            return self._hold()
         self._write(f"  title: {clean(review.title)}; {review.size} characters; payload {review.digest[:12]}")
-        self._write(f"  preview: {clean(review.preview, lines=True)}")
+        self._write(f"  preview: {_BLANKS.sub(NL * 2, clean(review.preview, lines=True))}")
         if not self._tty():
             self._write("a real write needs a person at an interactive terminal; piped input cannot approve it: held")
             self.log.append(f"gate {kind}: held (no interactive terminal)")
-            return False
+            return self._hold()
+        self._write(
+            f"  writing to: {to}; destination: {clean(review.destination)}"
+        )  # above the prompt, whatever the preview did
+        if not self._flushed():  # last thing before the prompt: nothing queued earlier may answer it
+            self._write("could not discard input queued before this card (not a real terminal?): held")
+            self.log.append(f"gate {kind}: held (queued input could not be discarded)")
+            return self._hold()
         said = self._read("type yes to write exactly this (anything else holds it): ")
         ok = self._wgate.approve(review, said=said or "", interactive=True)
         self.log.append(f"gate {kind}: {'approved by a typed yes' if ok else 'held'} (the person, at the terminal)")
-        return bool(ok)
+        return True if ok else self._hold()
+
+    def _flushed(self) -> bool:
+        try:
+            return bool(self._drain is not None and self._drain())
+        except Exception:  # noqa: BLE001 - fail closed
+            return False
+
+    def _hold(self) -> bool:
+        """A held card ends the run: no approval may stay behind for it."""
+        self._wgate.clear()
+        return False
 
     def _read(self, prompt: str) -> str | None:
         try:
@@ -247,6 +298,7 @@ def main(
     argv: list[str] | None = None, *, environ: Mapping[str, str] | None = None,
     live_provider_factory: Callable[[str, str], ModelProvider] | None = None, safety: SafetyProvider | None = None,
     read: Callable[[str], str] | None = None, tty: Callable[[], bool] | None = None,
+    drain: Callable[[], bool] | None = None,
     real_connectors_factory: Callable[[], dict[str, Any]] | None = None,
 ) -> int:  # fmt: skip
     parser = argparse.ArgumentParser(prog="live_run", description=(__doc__ or "").split("\n")[0])
@@ -275,7 +327,7 @@ def main(
     text = topic.replace("\r\n", "\n").strip()
     print(f"topic: {len(text)} characters, sha256 {hashlib.sha256(text.encode('utf-8')).hexdigest()}", flush=True)
     person = TerminalPerson(auto_answer=args.auto_answer, auto_approve_t1t2=args.auto_approve_t1t2, read=read,
-                            tty=tty or sys.stdin.isatty)  # fmt: skip
+                            tty=tty or sys.stdin.isatty, drain=drain or drain_stdin)  # fmt: skip
     try:
         report = run_topic(
             topic, mode="dry-run" if args.dry_run else "live", max_credits=args.max_credits, environ=environ,

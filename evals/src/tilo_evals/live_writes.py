@@ -49,6 +49,12 @@ def store_resolver(
     return resolve
 
 
+def release_writes(connectors: dict[str, Any]) -> None:
+    """The run is over: drop every approval no write used (a spent one stays spent)."""
+    if (gate := write_gate_of(connectors)) is not None:
+        gate.clear()
+
+
 def bind_writes(connectors: dict[str, Any], app: Any, person: Any, *, owner: str) -> None:
     """If `connectors` are write-gated: bind their gate to this run's store and redactor and give it to the person."""
     from tilo_api import deps  # noqa: PLC0415
