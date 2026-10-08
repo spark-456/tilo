@@ -37,13 +37,11 @@ from .hybrid import (
     assign_speaker,
     to_wav,
 )
-from .keyterms import build_keyterms
 from .knowledge import KnowledgeBase
 from .llm_fast import FastLLM
 from .people import gate_open, missing_required
 from .playback import write_playback
 from .speaker import NullSpeaker, VoiceSpeaker
-from .stt_stream import AudioGate, ScribeStream, SpeakerNames, STTUnavailable
 from .timing import Timeline
 from .trace import Turn, TurnTrace
 from .tts import make_tts
@@ -154,8 +152,6 @@ class LiveSession:
             log.warning("--stt gemini needs the Gemini key and an agenda: falling back to captions")
             self.stt_mode = "captions"
         self.hybrid = self.stt_mode != "captions"  # audio is the transcript source; captions give names and timing
-        self.partial: tuple[str, float, float] | None = None  # (text, last_change_clock, first_seen_clock)
-        self.names = SpeakerNames()
         self.merger = CaptionMerger(ignore_speakers=("you", cfg.bot_display_name))
         self.queue: asyncio.Queue = asyncio.Queue()
         self.start = self.clock.now()
@@ -170,12 +166,7 @@ class LiveSession:
         self.chat_seen: Counter = Counter()
         self.reply_mode = reply or cfg.reply_mode  # chat | voice | both
         self.voice = False
-        self.partial_idle_s = (
-            0.5 if self.stt_mode == "elevenlabs" else 1.0
-        )  # how long a finished question must sit still
-        self.stream_enabled = (
-            False  # streaming audio out costs credits: only while the meeting is on and people are in it
-        )
+        self.partial_idle_s = 1.0  # how long a finished question must sit still
         self.tts = None
         self.speaker: Any = NullSpeaker()
         self.activity: VoiceActivity | None = None
@@ -185,7 +176,7 @@ class LiveSession:
         self.next_brain_at = 0.0
         self.last_question_at = -1e9  # when a question was last put to the assistant
         self.delivering = False  # a reply is being spoken or typed right now
-        self.conns = Timeline(self.out_dir / "connections.jsonl")  # model attempts, prewarms, Scribe connections
+        self.conns = Timeline(self.out_dir / "connections.jsonl")  # model attempts and prewarms
         self.trace = TurnTrace(self.out_dir / "turns.jsonl", self.clock, self.start)
         self.bot_tap: WavTap | None = None
         self.others_seen, self.alone_since = False, None
@@ -314,27 +305,11 @@ class LiveSession:
             finally:
                 await self._shutdown()
 
-    def _frame_hook(self, loop: asyncio.AbstractEventLoop):
-        """Runs in the recorder thread for every 100 ms of meeting audio. Nothing leaves this machine unless the
-        meeting has started, someone else is in it, and there is actual speech (AudioGate)."""
-        gate = AudioGate()
-
-        def hook(chunk: bytes) -> None:
-            if not self.stream_enabled:
-                gate.reset()
-                return
-            t = self.buffer.seconds - len(chunk) / 32000.0
-            for frame, ft in gate.feed(chunk, t):
-                loop.call_soon_threadsafe(self.audio_q.put_nowait, (frame, ft))
-
-        return hook
-
     async def _start_audio(self) -> None:
         if not (self.hybrid or self.record_audio or self.voice):
             return
         loop = asyncio.get_running_loop()
         wav = self.out_dir / "audio.wav" if self.record_audio else None
-        self.audio_q: asyncio.Queue = asyncio.Queue()
         self.recorder = LiveRecorder(
             wav,
             self.buffer,
@@ -342,7 +317,6 @@ class LiveSession:
             (lambda a, b: loop.call_soon_threadsafe(self.seg_q.put_nowait, (a, b)))
             if self.stt_mode == "gemini"
             else (lambda a, b: None),
-            on_frame=self._frame_hook(loop) if self.stt_mode == "elevenlabs" else None,
             activity=self.activity,
         )
         if not self.recorder.start():
@@ -360,59 +334,6 @@ class LiveSession:
             self.events.emit("audio.recording", path=str(wav), starts_at_s=0)
         if self.stt_mode == "gemini":
             self.stt_task = asyncio.create_task(self._stt_worker())
-        elif self.stt_mode == "elevenlabs":
-            try:
-                self.scribe = ScribeStream(
-                    self._on_partial,
-                    self._on_final,
-                    keyterms=self._keyterms(),
-                    on_event=lambda kind, **d: self.conns.record(kind, source="scribe", **d),
-                )
-            except STTUnavailable as e:
-                log.warning("%s Falling back to captions.", e)
-                self.recorder.stop()
-                self.recorder, self.stt_mode, self.hybrid = None, "captions", False
-                return
-            self.stt_task = asyncio.create_task(self._run_scribe())
-
-    def _keyterms(self, present: list[str] | None = None) -> list[str]:
-        b = self.brain
-        names = list(dict.fromkeys(self.required + (present or [])))
-        return build_keyterms(
-            b.bot_name if b else "Tilo", names, [i.title for i in b.agenda.items] if b else [], self.kb
-        )
-
-    # -- streaming speech-to-text (ElevenLabs Scribe) ---------------------------------------------------------------
-    async def _run_scribe(self) -> None:
-        try:
-            await self.scribe.run(self.audio_q)
-        except STTUnavailable as e:
-            log.error("streaming transcription stopped (%s): transcript will now come from captions", e)
-            self.stt_mode, self.hybrid = "captions", False
-
-    def _on_partial(self, text: str) -> None:
-        now = self.clock.now()
-        if not text:
-            self.partial = None
-        elif self.partial is None or self.partial[0] != text:
-            self.partial = (text, now, self.partial[2] if self.partial else now)
-
-    def _on_final(self, fin) -> None:
-        self.partial = None
-        cap, _ = assign_speaker((fin.start_s, fin.end_s), self.spans.as_tuples())
-        name = self.names.resolve(fin.speaker_id, cap) or (
-            f"Speaker {fin.speaker_id[-1]}" if fin.speaker_id else "Speaker"
-        )
-        self.timeline.record(
-            "segment",
-            start_s=fin.start_s,
-            end_s=fin.end_s,
-            speaker=name,
-            scribe_speaker=fin.speaker_id,
-            text=fin.text[:160],
-            end_to_text_s=round(self.elapsed() - fin.end_s, 2),
-        )
-        self.record(Utterance(name, fin.text, fin.start_s), heard_at=self.start + fin.end_s)
 
     # -- hybrid speech-to-text (Gemini, batch) -----------------------------------------------------------------------
     async def _stt_worker(self) -> None:
@@ -715,19 +636,7 @@ class LiveSession:
                     quick_task = None
                 if brain and self.gate_at is not None:
                     gate = self.gate_at
-                    if self.stt_mode == "elevenlabs":  # live partial words, before the server commits a pause
-                        opens = (
-                            [
-                                (
-                                    Utterance("Speaker", self.partial[0], max(0.0, self.partial[2] - self.start)),
-                                    now - self.partial[1],
-                                )
-                            ]
-                            if self.partial
-                            else []
-                        )
-                    else:
-                        opens = [] if self.hybrid else self.merger.open_utterances(now)
+                    opens = [] if self.hybrid else self.merger.open_utterances(now)
                     base = [self._shift(u) for u in self.store.window(self.elapsed(), 3)]
                     q_any = brain.pending_question(base + [self._shift(u) for u, _ in opens])
                     if q_any:
@@ -855,8 +764,6 @@ class LiveSession:
                 return True
         if brain:
             brain.present = present
-        if scribe := getattr(self, "scribe", None):
-            scribe.set_keyterms(self._keyterms(present))
 
         if self.gate_at is None:
             if gate_open(self.required, present):
@@ -876,7 +783,6 @@ class LiveSession:
                     self.last_wait_msg = wait_msg
         else:
             await self._keep_mic_open()  # re-check every status cycle: someone may have muted the bot
-        self.stream_enabled = self.gate_at is not None and (others_count is None or others_count > 0)
         if self.gate_at is None and self.elapsed() > cfg.empty_timeout_s:
             log.info("required people did not arrive within %.0fs; leaving", cfg.empty_timeout_s)
             return True
@@ -901,30 +807,6 @@ class LiveSession:
                         await asyncio.sleep(0.5)
                     await asyncio.sleep(2.5)
                     self.stt_task.cancel()
-                elif self.stt_mode == "elevenlabs":
-                    self.stream_enabled = False
-                    self.audio_q.put_nowait(None)  # commits what is pending
-                    try:
-                        await asyncio.wait_for(self.stt_task, timeout=8)
-                    except Exception:
-                        self.stt_task.cancel()
-                    scribe = getattr(self, "scribe", None)
-                    if scribe:
-                        heard = self.buffer.seconds
-                        log.info(
-                            "streaming transcription used %.0f s of audio out of %.0f s in the meeting (%.0f%%), "
-                            "%d connection(s)",
-                            scribe.total_sent_s,
-                            heard,
-                            100 * scribe.total_sent_s / heard if heard else 0,
-                            scribe.connections,
-                        )
-                        self.timeline.record(
-                            "stt_usage",
-                            audio_sent_s=round(scribe.total_sent_s, 1),
-                            meeting_audio_s=round(heard, 1),
-                            connections=scribe.connections,
-                        )
             for u in self.merger.flush(self.clock.now()):
                 self.record_caption(u)
             if self.brain and self.gate_at is not None:

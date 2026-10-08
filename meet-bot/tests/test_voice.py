@@ -1,12 +1,7 @@
 import asyncio
 
-import httpx
-import pytest
-
 from bot.speaker import NullSpeaker, VoiceSpeaker
-from bot.tts import ElevenLabsTTS, TTSError
-
-FAKE_KEY = "fake" + "-" + "key" + "-for-tests"
+from bot.tts import TTSError
 
 
 class FakeTTS:
@@ -88,7 +83,10 @@ def test_barge_in_stops_speech_and_remutes():
 
 
 def test_voice_failure_never_raises_so_chat_can_be_the_backup():
-    for tts in (FakeTTS(error=TTSError("ElevenLabs rejected the API key")), FakeTTS(chunks=())):
+    for tts in (
+        FakeTTS(error=TTSError("the voice service rejected the credentials", permanent=True)),
+        FakeTTS(chunks=()),
+    ):
         log = []
         res = asyncio.run(speaker(log, tts=tts).say("Hi."))
         assert not res.spoken and res.error
@@ -104,52 +102,6 @@ def test_unmute_failure_is_reported_not_spoken():
 
 def test_null_speaker_is_chat_only():
     assert not asyncio.run(NullSpeaker().say("x")).spoken
-
-
-# --- ElevenLabs client (mock HTTP transport, no network) -----------------------------------------------------------
-def make_tts(handler):
-    client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
-    return ElevenLabsTTS(api_key=FAKE_KEY, voice_id="voice123", model="eleven_flash_v2_5", client=client)
-
-
-async def collect(tts, text="Hello"):
-    return [c async for c in tts.stream(text)]
-
-
-def test_elevenlabs_streams_pcm_and_sends_the_right_request():
-    seen = {}
-
-    def handler(request):
-        seen["url"], seen["key"], seen["body"] = str(request.url), request.headers["xi-api-key"], request.read()
-        return httpx.Response(200, content=b"\x01\x02" * 5000)
-
-    chunks = asyncio.run(collect(make_tts(handler)))
-    assert b"".join(chunks) == b"\x01\x02" * 5000
-    assert "/v1/text-to-speech/voice123/stream" in seen["url"] and "output_format=pcm_24000" in seen["url"]
-    assert seen["key"] == FAKE_KEY and b"eleven_flash_v2_5" in seen["body"] and FAKE_KEY.encode() not in seen["body"]
-
-
-@pytest.mark.parametrize(
-    "status,needle",
-    [
-        (401, "rejected the API key"),
-        (403, "Text to Speech"),
-        (402, "Text to Speech"),
-        (429, "limit"),
-        (422, "voice or model"),
-    ],
-)
-def test_elevenlabs_errors_are_explained_and_never_leak_the_key(status, needle):
-    tts = make_tts(lambda r: httpx.Response(status, json={"detail": "nope " + FAKE_KEY}))
-    with pytest.raises(TTSError) as e:
-        asyncio.run(collect(tts))
-    assert needle in str(e.value) and FAKE_KEY not in str(e.value)
-
-
-def test_missing_key_raises_a_clear_error(monkeypatch):
-    monkeypatch.delenv("ELEVENLABS_API_KEY", raising=False)
-    with pytest.raises(TTSError, match="ELEVENLABS_API_KEY"):
-        ElevenLabsTTS()
 
 
 def test_intro_line_discloses_voice_and_audio_handling():
@@ -169,9 +121,7 @@ def test_fallback_voice_takes_over_on_plan_errors_and_remembers_it():
 
         async def stream(self, text):
             Broken.calls += 1
-            raise TTSError(
-                "ElevenLabs refused text-to-speech: give the key 'Text to Speech: Access' or check your plan"
-            )
+            raise TTSError("the voice service refused text-to-speech for this plan", permanent=True)
             yield b""
 
     class Backup:
@@ -192,6 +142,10 @@ def test_fallback_voice_takes_over_on_plan_errors_and_remembers_it():
     assert (
         a == [b"xx", b"yy"] == b and rate == 22050 and name == "backup" and Broken.calls == 1
     )  # not retried every reply
+
+
+async def collect(tts, text="Hello"):
+    return [c async for c in tts.stream(text)]
 
 
 def test_fallback_uses_primary_when_it_works():

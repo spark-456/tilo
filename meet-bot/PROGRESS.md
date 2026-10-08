@@ -6,12 +6,12 @@
 |---|---|
 | M1 Join and stay (Dockerfile, compose, noVNC, CLI: doctor/login/start/join/run-mock, waiting-room timeout, clean leave) | Code written. Image built and container stack smoke-tested. Not run against real Meet. |
 | M2 Live transcript (captions on, MutationObserver, parser, merger, transcript.jsonl, rolling window) | Parser and merger unit-tested on synthetic fixtures. Live path written, not run. |
-| M3 Brain and chat (agenda, JSON schema + retry, chat policy in code, summary.md/state.json) | Done and tested with fake clock and stub model. Real Gemini smoke test skipped (no key). |
+| M3 Brain and chat (agenda, JSON schema + retry, chat policy in code, summary.md/state.json) | Done and tested with fake clock and stub model. No live model smoke test: live calls need the user's `LIVE=1`. |
 | Stretch `--api-create` | Not implemented, on purpose (needs Google Cloud OAuth). Flag exists and says so. |
 
 ## Verified
 
-- `python -m pytest`: 43 passed, 1 skipped (Gemini smoke test, no key).
+- `just meet-bot-test`: the offline suite (no network, fakes only).
 - `python -m bot.main run-mock`: 30-minute replay gives 3 chat messages (missing owner, 10-minute warning, untouched "Hiring plan"), all at least 5 minutes apart.
 - `python -m bot.main doctor` runs on the host without dependencies.
 - Docker image builds. In the container: Xvfb, openbox, PulseAudio (null sink `tilo_out`), x11vnc and noVNC (HTTP 200 on 127.0.0.1:6080) all start; Playwright launches headed Chromium and reaches Google's sign-in page; `start` without a login stops cleanly with "profile is not signed in".
@@ -25,9 +25,8 @@ See Handoff item 4 in the final message. Short version: every Meet selector, the
 
 State: 121 tests pass. Live pieces working: auto-admit, "start only when required people are in", hybrid/streaming transcript,
 knowledge base, chat reading, voice replies (local espeak fallback), audio recording, latency log.
-ElevenLabs: key set in `.env`; Scribe STT works (gated, ~5-15% of audio sent, ~1.7 s lag). TTS blocked on the free plan for
-library voices: needs `ELEVENLABS_VOICE_ID` of a voice the user owns, or key permission Voices: Read.
-Gemini Live is NOT available on the Express key (every model name -> "1007 Invalid resource"); needs a GCP project with billing.
+The third-party streaming speech and voice clients were removed by FR-MTG-11 (Google only). Google streaming ears and the
+native-audio voice are FR-MTG-16.
 
 Open problems seen in the last live run (fix first next time):
 1. **Model calls still 12 s in the meeting despite the keep-warm task** (in isolation, pings every 5 s gave 0.4-0.8 s). Log ping
@@ -35,12 +34,12 @@ Open problems seen in the last live run (fix first next time):
    client/thread for replies, or streaming responses.
 2. **Typed chat questions without a "?" are ignored** ("When does the beta ship"). Treat every typed chat message as addressed to
    the assistant.
-3. **"Can't take more than one question"**: later questions returned "no reply" (model said not answerable, 12 s) and Scribe misheard
+3. **"Can't take more than one question"**: later questions returned "no reply" (model said not answerable, 12 s) and the recogniser misheard
    ("beta ship" -> "leadership meet"). Check `direct_reply` gap/attempt bookkeeping and add a short "I didn't catch that" spoken reply
    instead of silence for unanswerable-but-addressed questions.
 4. Instant local answers work (source: local, model 0.0 s) but first sound was still ~3.9 s after speech end: ~1.6 s detection,
    ~1.8 s to first sound (mic unmute + espeak). Measure unmute time; consider keeping the mic unmuted while speaking soon.
-5. Speaker names: Scribe returned no speaker ids for a single speaker; multi-speaker not yet tested.
+5. Speaker names come from caption-name voting; multi-speaker is not yet tested.
 6. `account_button` selector still misses (harmless).
 
 ## Voice plan v2 tickets (docs/VOICE_ARCHITECTURE.md section 5)
@@ -59,14 +58,14 @@ Branches `feat/VA-<nn>-<slug>` are cut from `chore/meet-bot-baseline` and merged
 All four Phase 1 tickets are merged (PRs 75 to 78) and green offline (192 pass, 1 skipped). **None of it has been run in a live meeting yet**, so the 12 s cold-call fix, the unmute wait and the first-sound numbers are unproven until the live test below.
 
 ### Next (in order)
-1. **Live test with the user (blocks everything else).** Needs Docker running, `.env` with `GEMINI_API_KEY` and `ELEVENLABS_API_KEY`, and the user in the meeting. Suggested command (prints `MEETING_URL ...`; join it from the user's own browser):
-   `python -m bot.main start --agenda agenda.md --stt elevenlabs --auto-admit --record-audio --reply both`
+1. **Live test with the user (blocks everything else).** Needs Docker running, the user's `LIVE=1` and Google project settings (README, Providers), and the user in the meeting. Suggested command (prints `MEETING_URL ...`; join it from the user's own browser):
+   `python -m bot.main start --agenda agenda.md --stt gemini --auto-admit --record-audio --reply both`
    Ask 5 spoken questions (2 with the name, 1 repeated twice), type 3 chat questions (one without "?", one gibberish), then end the meeting. Then run `python -m bot.main report` and `python -m bot.main audit` and compare with the budget in VOICE_ARCHITECTURE section 4 (model path p50 1.3 s / p90 2.0 s, instant p50 0.8 s). Look in `connections.jsonl` for `timeout` or `busy` attempts and in `latency.jsonl` for `model_s`.
-   Voice: ElevenLabs TTS needs `ELEVENLABS_VOICE_ID` of a voice the user owns on the free plan, otherwise the local espeak voice speaks.
-2. **Choose the voice order** from that run: if `GEMINI_LIVE_API_KEY` (a free AI Studio key) is in `.env`, run `python -m bot.main live-probe` and pick the Live or cascade order from VOICE_ARCHITECTURE section 5. Without that key the cascade order applies (VA-05 to VA-13, Opus tickets VA-09, VA-11, VA-13: tell the user before starting them).
+   Voice: the cloud voice is `config/voice.yaml`; if it cannot speak, the local espeak voice does.
+2. **Choose the voice order** (FR-MTG-16, a later ticket): the Live probe was removed with FR-MTG-11 (it spoke a vendor protocol directly); a probe through the provider layer replaces it. Until then the cascade order applies (VA-05 to VA-13).
 3. **Meeting features**: the four draft specs are in `docs/specs/` (MF-01 team pinboard, MF-02 personal pinboards, MF-03 responsibilities, MF-04 effort tracker). Nothing is built; each lists open questions. MF-04 needs the user to say which "effort tracker" they mean. Agenda tracking needs no spec (built and tested).
 4. **Experiment probes** (X1 net-probe, X2, X3, X5) are not built yet; build them when their decision is due (X1 explains any slow model calls the live test still shows).
-5. **VA-INT** last: move the model ids from `bot/config.py` to the repo's `config/` and the calls into `packages/providers`.
+5. **VA-INT**: done as FR-MTG-11 (model ids in `config/`, every call through `packages/providers` via `bot/providers.py`).
 
 ### Things to know
 - Per ticket: branch `feat/VA-<nn>-<slug>` from `chore/meet-bot-baseline`, commit through `uv run --no-project --with pre-commit git commit` (delete the empty `<worktree>/.venv` first, or the ruff hook fails), push, PR, merge with `gh pr merge --merge`.
@@ -77,4 +76,4 @@ All four Phase 1 tickets are merged (PRs 75 to 78) and green offline (192 pass, 
 ### CV-01 conversation mode (2026-10-02, user request)
 Tilo answers ordinary questions and small talk when spoken to (by name, in typed chat, or as a follow-up within 15 s), with no keywords or question mark needed. 209 tests pass. The live quality of the answers, and the 0.8 s extra wait for statements, are unmeasured: check in the next live meeting.
 
-- Handoff for the next agent: `docs/HANDOFF-2026-10-02.md` (what is done, open bugs, next tickets in order).
+- The 2026-10-02 handoff and the architect brief named removed third-party providers; they are replaced by short notes (`docs/HANDOFF-2026-10-02.md`, `docs/ARCHITECT_BRIEF.md`). The originals are on `chore/meet-bot-baseline` (c2991182).

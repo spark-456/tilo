@@ -1,8 +1,8 @@
 # Tilo Meet bot (prototype)
 
-A bot that joins a Google Meet like a person, reads the live captions, tracks your agenda with Gemini, and occasionally asks a short question in the Meet chat.
+A bot that joins a Google Meet like a person, reads the live captions, tracks your agenda with a model (through Tilo's provider layer), and occasionally asks a short question in the Meet chat.
 
-> **Test meetings only.** Meeting content goes nowhere except local files (`out/`) and Gemini. Until Google's data terms for that use have been reviewed, do not use real or sensitive meetings.
+> **Test meetings only.** Meeting content goes nowhere except local files (`out/`) and the Google models the provider layer calls. Until Google's data terms for that use have been reviewed, do not use real or sensitive meetings.
 >
 > **Terms note.** Automated browser clients for Google Meet may have terms-of-service implications. Review them before any commercial use.
 
@@ -12,7 +12,7 @@ Think of a spare laptop in a cupboard that only this bot uses:
 
 - **Docker container = the laptop.** Inside it: a virtual screen (Xvfb), virtual sound (PulseAudio) and a real, visible Chromium browser driven by Playwright.
 - **The bot's Google account** (`tiloagent@gmail.com`) is signed in once, by you, by hand. The browser remembers it in a Docker volume. The code never sees or stores a password.
-- **The script does what a person would**: opens Meet, joins with camera and mic off, turns on captions, reads them, and every 45 seconds sends the last few minutes to Gemini. Gemini fills in a small JSON form (agenda status, decisions, action items, open questions). The code, not Gemini, decides whether the bot may speak.
+- **The script does what a person would**: opens Meet, joins with camera and mic off, turns on captions, reads them, and every 45 seconds sends the last few minutes to the model. The model fills in a small JSON form (agenda status, decisions, action items, open questions). The code, not the model, decides whether the bot may speak.
 - **noVNC** lets you watch and click inside that browser from a normal tab at http://localhost:6080. Used for the one-time login and for debugging.
 
 The bot speaks in chat only: at most 4 messages per meeting, at least 5 minutes apart, and only when (a) an agenda item is untouched after its fair share of time, (b) an action item lacks an owner or due date, or (c) once, with about 10 minutes left. Default is silence. Right after joining it posts one intro line ("Hi, I'm an AI assistant taking notes for this meeting.").
@@ -23,7 +23,7 @@ The bot speaks in chat only: at most 4 messages per meeting, at least 5 minutes 
 2. Copy `.env.example` to `.env`. Copy `agenda.example.md` to `agenda.md` and edit it.
 3. Cap WSL2 memory (Windows, recommended, see below).
 4. `python -m bot.main login`, then open http://localhost:6080 and sign in as the bot account.
-5. Later, put `GEMINI_API_KEY` in `.env` (a Vertex AI Express Mode key). Without it the bot still joins and transcribes; only the brain is off.
+5. Models and speech: see Providers below. Without them the bot still joins and transcribes with fake providers (`bot/providers.py`); only the answers are canned.
 
 ## Commands
 
@@ -36,7 +36,6 @@ Run from the `meet-bot/` folder. On Windows use `python`, on Mac/Linux `python3`
 | `python -m bot.main start [--agenda FILE] [--duration MIN]` | Opens `meet.google.com/new`, prints `MEETING_URL ...`, joins as host |
 | `python -m bot.main join URL` | Joins an existing meeting |
 | `python -m bot.main run-mock` | Replays a recorded 30-minute transcript through the brain, offline, no key needed |
-| `python -m bot.main list-models` | Lists models your Gemini key can use |
 
 Outputs per meeting, in `out/<timestamp>/`: `transcript.jsonl`, `events.jsonl`, `state.json`, `summary.md`. Screenshots go to `debug/`.
 
@@ -48,21 +47,21 @@ Start with `--record-audio` (or `RECORD_AUDIO=1`). The bot then says in chat tha
 
 - `audio.wav`: exactly what the bot receives from Meet. Play it in any media player.
 - `playback.html`: open in a browser; click a transcript line to hear that moment. Rebuild with `python -m bot.main playback`.
-- `transcript_audio.md`: a second transcript made by Gemini from the audio (`python -m bot.main retranscribe`), to compare with Meet's captions in `transcript.jsonl`.
+- `transcript_audio.md`: a second transcript made by the speech provider from the audio (`python -m bot.main retranscribe`), to compare with Meet's captions in `transcript.jsonl`.
 - `latency.jsonl`: per question, time from caption visible to detected, model call, chat typing, total.
 - `turns.jsonl`: one row per question with every stage (heard, model first token, first sound, chat posted) timed from the end of the human turn. Read it with `python -m bot.main report [out/<time>]`: a per-turn waterfall and p50/p90 per stage.
-- `connections.jsonl`: model attempts (outcome, code, first-token time), prewarms and Scribe connections, so a slow answer can be explained.
+- `connections.jsonl`: model attempts (outcome, code, first-token time), and prewarms, so a slow answer can be explained.
 - `bot.wav` (voice replies on): what the bot actually sent into the meeting, recorded next to `audio.wav` (`audio_clock.json` holds both start times). `python -m bot.main audit [out/<time>]` measures end of question to first bot sound from the recordings, to about 10 ms, and compares it with the log.
 
 Talking to Tilo: say its name at the start or end of what you say ("Tilo, tell me a joke", "what do you think, Tilo"), or type in the chat; no question mark and no special words are needed, and it answers any topic in a sentence or two. For about 15 s after it answers you can follow up without the name. People talking among themselves are never answered, except a question the meeting notes or project files can answer.
 
-Tuning: `DIRECT_REPLY_GAP_SECONDS` (default 6), `MAX_DIRECT_REPLIES` (40), `BRAIN_INTERVAL_SECONDS` (20), `ANSWER_MODE` (`questions` or `addressed`). Free-tier Gemini keys hit 429 limits if these are pushed too hard.
+Tuning: `DIRECT_REPLY_GAP_SECONDS` (default 6), `MAX_DIRECT_REPLIES` (40), `BRAIN_INTERVAL_SECONDS` (20), `ANSWER_MODE` (`questions` or `addressed`). A throttled project hits quota errors if these are pushed too hard.
 
 ## Transcript sources and project knowledge
 
-`--stt captions` (default) uses Meet's captions. `--stt gemini` (or `--hybrid`) sends each detected speech segment to Gemini; captions only supply speaker names. `--stt elevenlabs` streams audio to ElevenLabs Scribe v2 Realtime (partial text while people speak, speaker ids, `ELEVENLABS_API_KEY` in `.env`); run `python -m bot.main stt-probe` on a recorded run first to measure it on your plan. Audio modes are announced in the intro chat line.
+`--stt captions` (default) uses Meet's captions. `--stt gemini` (or `--hybrid`) sends each detected speech segment to the speech provider as batch audio; captions only supply speaker names. Streaming speech-to-text is a later ticket (FR-MTG-16). Audio modes are announced in the intro chat line.
 
-Gemini Live (native voice) is not wired into meetings yet; see `docs/VOICE_ARCHITECTURE.md`. `python -m bot.main live-probe` measures it first. It needs `GEMINI_LIVE_API_KEY`, a Google AI Studio key. For each model in `LIVE_MODELS`, it asks the questions from your latest recorded run (or espeak-voiced ones with `--espeak`) and times our end-of-turn signal to the first audio. It prints PASS/FAIL against the "instant" target and saves every answer as a WAV in `out/live-probe-*/`.
+Google's native-audio voice (Gemini Live) is not wired into meetings yet: it is FR-MTG-16, see `docs/VOICE_ARCHITECTURE.md`.
 
 The bot answers project questions from `context/` (.md/.txt/.csv/.json), any `--context FILE|FOLDER|https://URL` (repeatable, or `CONTEXT_URLS`), and text people paste into the Meet chat. Typed chat questions work without any speech recognition.
 
@@ -102,7 +101,7 @@ pip install pytest
 python -m pytest
 ```
 
-No live meeting, browser or API key is needed. `tests/test_gemini_smoke.py` runs only when `GEMINI_API_KEY` is set. Caption fixtures in `tests/fixtures/` are synthetic (see the README there).
+No live meeting, browser, network or key is needed. Caption fixtures in `tests/fixtures/` are synthetic (see the README there).
 
 ## Least certain parts
 

@@ -381,25 +381,6 @@ def cmd_retranscribe(args: argparse.Namespace) -> int:
         return 1
 
 
-def cmd_stt_probe(args: argparse.Namespace) -> int:
-    if not IN_CONTAINER:
-        return _compose_run(["stt-probe"] + ([args.run] if args.run else []))
-    from .probe import probe
-    from .stt_stream import STTUnavailable
-
-    cfg = Config.from_env()
-    runs = sorted(p for p in cfg.out_dir.glob("2*") if (p / "audio.wav").is_file())
-    run = Path(args.run) if args.run else (runs[-1] if runs else None)
-    if run is None:
-        print("no run with audio.wav under out/ (record one with --record-audio)")
-        return 1
-    try:
-        return asyncio.run(probe(run / "audio.wav"))
-    except STTUnavailable as e:
-        print(e)
-        return 1
-
-
 def cmd_live_probe(args: argparse.Namespace) -> int:
     if not IN_CONTAINER:
         forward = ["live-probe"] + ([args.run] if args.run else [])
@@ -503,8 +484,8 @@ def build_parser() -> argparse.ArgumentParser:
         )
         s.add_argument(
             "--stt",
-            choices=["captions", "gemini", "elevenlabs"],
-            help="transcript source: captions (default), gemini (audio, batch), elevenlabs (audio, streaming)",
+            choices=["captions", "gemini"],
+            help="transcript source: captions (default) or gemini (audio, batch, through the speech provider)",
         )
         s.add_argument(
             "--hybrid",
@@ -535,11 +516,6 @@ def build_parser() -> argparse.ArgumentParser:
     sub.add_parser("list-models", help="list models your Gemini key can use")
     rt = sub.add_parser("retranscribe", help="transcribe a run's recorded audio with Gemini (needs --record-audio run)")
     rt.add_argument("run", nargs="?")
-    sp = sub.add_parser(
-        "stt-probe",
-        help="stream a recorded run to ElevenLabs Scribe and report latency/speakers (needs ELEVENLABS_API_KEY)",
-    )
-    sp.add_argument("run", nargs="?")
     lv = sub.add_parser(
         "live-probe",
         help="time Gemini Live native-audio answers to spoken questions (needs GEMINI_LIVE_API_KEY, an AI Studio key)",
@@ -571,7 +547,6 @@ def main(argv: list[str] | None = None) -> int:
         "report": cmd_report,
         "audit": cmd_audit,
         "retranscribe": cmd_retranscribe,
-        "stt-probe": cmd_stt_probe,
         "live-probe": cmd_live_probe,
         "start": lambda a: _live("start", a),
         "join": lambda a: _live("join", a),

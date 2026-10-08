@@ -24,7 +24,7 @@ ticket, until it is ready for release.
   - Redact keys from every error you log.
 - **Tests cost nothing and make no network calls.** Use fakes, fake WebSocket servers and synthetic audio (tones,
   noise, espeak). Never copy recordings from `out/` (real people's voices) into `tests/fixtures`.
-- **Live runs happen only when I say so.** That means joining a real Meet, `live-probe`, `stt-probe`, or any real
+- **Live runs happen only when I say so.** That means joining a real Meet, a live model or speech call (`LIVE=1`), or any real
   model or speech call. A live meeting test needs me in the meeting: start the bot only when I say I'm ready, and give
   me the meeting URL it prints.
 - **Never spend money.** No plan upgrades and no billing changes. Tell me when something would cost money and what it

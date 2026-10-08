@@ -18,10 +18,9 @@ from bot.hybrid import RATE, LiveRecorder, parec_command
 from bot.llm_fast import FastLLM
 from bot.main import main
 from bot.report import audit, render_report
-from bot.stt_stream import ScribeStream
 from bot.trace import MARKS, TurnTrace, load_turns, percentile
 
-FAKE_KEY = "el-" + "t4ce" * 6
+FAKE_KEY = "k-" + "t4ce" * 6
 
 
 def run(coro):
@@ -230,26 +229,6 @@ def test_VA_04_connection_events_go_to_connections_jsonl(session, monkeypatch): 
     rows = [json.loads(x) for x in (session.out_dir / "connections.jsonl").read_text(encoding="utf-8").splitlines()]
     assert rows[0]["kind"] == "attempt" and rows[0]["outcome"] == "timeout"
     assert FAKE_KEY not in json.dumps(rows)
-
-
-def test_VA_04_scribe_reports_connect_errors_as_events():
-    events = []
-
-    def failing(*a, **k):
-        raise OSError("no route")
-
-    async def go():
-        s = ScribeStream(
-            lambda t: None, lambda f: None, api_key=FAKE_KEY, connect=failing, on_event=lambda k, **d: events.append(k)
-        )
-        q = asyncio.Queue()
-        task = asyncio.create_task(s.run(q))
-        q.put_nowait((b"\x00\x01" * 1600, 1.0))
-        await asyncio.sleep(0.3)
-        task.cancel()
-
-    run(go())
-    assert events and set(events) == {"error"}  # no connection was ever made
 
 
 def test_VA_04_a_spoken_reply_becomes_a_turn_with_marks(session):  # noqa: F811

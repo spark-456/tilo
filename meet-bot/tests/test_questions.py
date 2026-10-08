@@ -1,4 +1,4 @@
-"""VA-02: question bookkeeping, typed chat, fallback lines and Scribe keyterms. Fakes only."""
+"""VA-02: question bookkeeping, typed chat and fallback lines. Fakes only."""
 
 import asyncio
 
@@ -15,13 +15,9 @@ from bot.brain import (
     chat_utterance,
 )
 from bot.captions import Utterance
-from bot.keyterms import build_keyterms
-from bot.knowledge import KnowledgeBase
 from bot.mock_llm import ScriptedLLM
-from bot.stt_stream import ScribeStream
 
 AGENDA = Agenda.parse("# Sync\nRequired: John Regi, Priya\n1. Roadmap (10 min)\n2. Hiring plan (5 min)\n")
-FAKE_KEY = "el-" + "k3y9" * 6
 
 
 def brain(*replies, **kw):
@@ -131,33 +127,6 @@ def test_VA_02_fallback_lines_count_against_the_reply_budget():
     b.commit_chat(first, 11)
     second = b.quick_reply([chat_utterance("Sam", "and the headcount", 12)], 13)
     assert second is None  # inside the 6 s gap between direct replies
-
-
-def test_VA_02_keyterms_hold_names_titles_and_frequent_project_terms():
-    kb = KnowledgeBase()
-    kb.add_text("plan.md", "Kestrel ships in October. The Kestrel beta needs Kestrel docs. Lumen is the cache.", "file")
-    terms = build_keyterms("Tilo", ["John Regi", "Priya"], ["Roadmap", "Hiring plan"], kb)
-    assert terms[0] == "Tilo"
-    assert {"John Regi", "Priya", "Roadmap", "Hiring plan", "Kestrel"} <= set(terms)
-    assert terms.index("Kestrel") > terms.index("Hiring plan")  # names and titles come before document terms
-    lowered = [t.lower() for t in terms]
-    assert "the" not in lowered and "that" not in lowered  # common words are not keyterms
-    assert "Lumen" not in terms  # mentioned once: not a frequent term
-
-
-def test_VA_02_keyterms_are_unique_and_capped_at_50():
-    kb = KnowledgeBase()
-    kb.add_text("big.md", " ".join(f"Word{i} Word{i} Word{i}" for i in range(200)), "file")
-    terms = build_keyterms("Tilo", ["Tilo", "tilo", "Priya"], [], kb)
-    assert len(terms) == 50 and len({t.lower() for t in terms}) == 50
-
-
-def test_VA_02_scribe_accepts_50_keyterms_and_new_ones_for_the_next_connection():
-    s = ScribeStream(lambda t: None, lambda f: None, api_key=FAKE_KEY, keyterms=[f"term{i}" for i in range(80)])
-    assert len(s.keyterms) == 50
-    s.set_keyterms(["Tilo", "Priya"])
-    assert s.keyterms == ["Tilo", "Priya"] and "keyterms=Priya" in s._full_url(True)
-    assert FAKE_KEY not in s._full_url(True)
 
 
 @pytest.mark.parametrize("text", ["Hi", "  spaced out  "])

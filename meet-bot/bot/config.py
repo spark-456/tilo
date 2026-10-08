@@ -9,13 +9,11 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 IN_CONTAINER = os.environ.get("TILO_IN_CONTAINER") == "1"
-SECRET_ENV_NAMES = ("GEMINI_API_KEY", "GEMINI_LIVE_API_KEY", "ELEVENLABS_API_KEY")
+SECRET_ENV_NAMES = ("GEMINI_API_KEY", "GEMINI_LIVE_API_KEY")
 # Gemini Live models tried by `live-probe`, fastest-first by third-party measurements (Sep 2026). Override with LIVE_MODELS.
 # Every model id lives here (or in .env), behind the provider interfaces.
 DEFAULT_MODEL = "gemini-2.5-flash"  # the analysis loop, when the model list cannot be read; override with GEMINI_MODEL
 DEFAULT_FAST_MODEL = DEFAULT_MODEL  # direct answers; flash-lite gave 404 for the Express key, X1 picks a faster one. Override with FAST_MODEL
-DEFAULT_TTS_MODEL = "eleven_flash_v2_5"  # ElevenLabs' low-latency model; override with ELEVENLABS_TTS_MODEL
-STT_MODEL = "scribe_v2_realtime"  # ElevenLabs realtime speech to text
 THINKING_LEVELS = ("off", "minimal", "low", "medium", "high")
 DEFAULT_LIVE_MODELS = "gemini-3.1-flash-live-preview,gemini-3.8-live,gemini-2.5-flash-native-audio-preview-12-2025"
 

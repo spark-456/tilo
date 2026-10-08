@@ -161,11 +161,11 @@ def test_CV_02_a_voice_the_plan_refuses_is_remembered_between_meetings(tmp_path)
     from bot.tts import FallbackTTS, TTSError
 
     class Refused:
-        name, sample_rate, calls = "eleven", 24000, 0
+        name, sample_rate, calls = "cloud", 24000, 0
 
         async def stream(self, text):
             Refused.calls += 1
-            raise TTSError("ElevenLabs refused text-to-speech: check your plan/credits (paid_plan_required)")
+            raise TTSError("the voice service refused text-to-speech: check the plan or credits", permanent=True)
             yield b""
 
     class Backup:
