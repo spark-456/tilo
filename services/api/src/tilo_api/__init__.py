@@ -7,6 +7,8 @@ from typing import Annotated, Any
 from fastapi import Depends, FastAPI, Request
 from fastapi.responses import JSONResponse
 from starlette.concurrency import run_in_threadpool
+from starlette.middleware.cors import CORSMiddleware
+from starlette.types import ASGIApp, Receive, Scope, Send
 from tilo_harness.writer import WriterBusy as _WriterBusy
 from tilo_logging import configure_logging as _configure_logging
 
@@ -19,6 +21,7 @@ from tilo_api import schedules as _schedules
 from tilo_api import skill_proposals as _skill_proposals
 from tilo_api import spend as _spend
 from tilo_api.access import AccessGate as _AccessGate
+from tilo_api.access import enforced as _enforced
 from tilo_api.access_routes import router as _access_router
 from tilo_api.appcheck import AppCheckGate as _AppCheckGate
 from tilo_api.assistant.route import router as _assistant_router
@@ -49,12 +52,41 @@ async def _lifespan(_: FastAPI) -> AsyncIterator[None]:
     await run_in_threadpool(_durable_store.close_deployed)  # SIGTERM: the writers release their leases (ADR-0026 4)
 
 
+# The two Firebase Hosting origins of the tilo-dev web app (BQ-SIGNIN-7, CL-REACH): exact strings, never a wildcard,
+# a suffix match or `allow_origin_regex`. Not credentialed: the API reads a bearer token, no cookie.
+PRODUCTION_ORIGINS = (
+    "https://essential-wares-510320-f0.web.app",
+    "https://essential-wares-510320-f0.firebaseapp.com",
+)
+
+
+class _ProductionCors:
+    """PROD-WIRE-4: Starlette's CORS layer, on only while deployed (`enforced()`, read on every request). Dev mode
+    installs its own CORS in `tilo_api.dev`; not deployed, this layer adds nothing. Only the headers the web client
+    may send are allowed, and no response header is exposed (the web reads none)."""
+
+    def __init__(self, app: ASGIApp) -> None:
+        self.app = app
+        self._cors = CORSMiddleware(
+            app,
+            allow_origins=list(PRODUCTION_ORIGINS),
+            allow_credentials=False,
+            allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+            allow_headers=["Authorization", "X-Tilo-Channel", "X-Firebase-AppCheck", "Content-Type"],
+        )
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        await (self._cors if _enforced() else self.app)(scope, receive, send)
+
+
 app = FastAPI(title="tilo-api", lifespan=_lifespan, **_DOCS)
 app.add_middleware(_LogRunId)  # NFR-26: innermost, so the world is looked up only for a request the gate admitted
 app.add_middleware(_AccessGate)  # SEC-15: deployed, every non-public route needs a stored judge declaration
 app.add_middleware(_AppCheckGate)  # SEC-10: App Check token, logged only until the owner sets TILO_APPCHECK_ENFORCE=1
 app.add_middleware(_NoStore)  # added after the gate, so it is outside it: the gate's 403 on `/v1/` is no-store too
-app.add_middleware(_LogContext)  # NFR-26: outermost, no I/O: binds the world id and trace id of the request
+app.add_middleware(_LogContext)  # NFR-26: outside all but CORS, no I/O: binds the world id and trace id of the request
+# PROD-WIRE-4: outermost, so a preflight is answered before the gate and the gate's own refusals carry the CORS headers.
+app.add_middleware(_ProductionCors)
 _configure_logging()  # NFR-26: a deployed service logs JSON with no further setup
 
 

@@ -62,7 +62,13 @@ def test_P0_07c_deploy_web_recipe_builds_without_api_url_then_deploys_hosting_to
     assert build.start() < cmd.start(), "the build comes before the deploy"
     # Fixture / replay world: the build must not get an API origin. Neither set nor passed through from the shell.
     code = re.sub(r"(?m)^\s*#.*$", "", body)
-    for m in re.finditer(r"VITE_TILO_API_URL(\s*=\s*(\S*))?", code):
+    # PROD-WIRE-4 (documented test change): the recipe gained `api=""`, a just-validated Cloud Run URL for a build
+    # against a deployed tilo-api (test_PROD_WIRE_4_deploy_web_switch.py). The build's value is a `{{ ... }}`
+    # interpolation of that parameter, whose default stays empty; with it removed, the fixture build is still empty.
+    header = RECIPE_HEADER.search(body).group(0)
+    assert header.split(":")[0].split()[1:] in ([], ['api=""'], ["api=''"]), "the only parameter is `api`, empty"
+    code = re.sub(r"\{\{.*\}\}", "", code)
+    for m in re.finditer(r"VITE_TILO_API_URL(\s*=\s*('[^']*'|\"[^\"]*\"|[^\s)]*))?", code):
         value = (m.group(2) or "").strip("\"'")
         assert m.group(1) is not None and value == "", "the web build must not be given a VITE_TILO_API_URL value"
 
@@ -77,7 +83,8 @@ def test_P0_07c_deploy_web_recipe_refuses_other_projects_and_never_mentions_demo
     params = header.split(":")[0].split()[1:]
     deploy_at = body.index("firebase deploy")
     if params:
-        refusal = re.search(r"!=|exit\(1\)|sys\.exit", body)
+        # PROD-WIRE-4 (documented test change): `just`'s own `error()` refuses a bad `api` before any line runs.
+        refusal = re.search(r"!=|exit\(1\)|sys\.exit|error\(", body)
         assert refusal and refusal.start() < deploy_at, "a parameterised recipe must refuse a non-dev project first"
         assert "essential-wares-510320-f0" in body[: deploy_at + 200]
     # Whatever project ids are mentioned, the only one is the dev project.

@@ -166,11 +166,29 @@ deploy-dev-cloudbuild service="all" env="dev":
 build-evals-image:
     gcloud builds submit --config evals/cloudbuild.yaml --ignore-file evals/cloudbuild.gcloudignore --project essential-wares-510320-f0 --region asia-southeast1 --gcs-source-staging-dir gs://essential-wares-510320-f0-cloudbuild-staging/source .
 
-# Build the web app and deploy it to Firebase Hosting on the tilo-dev project (P0-07c). The build is given an empty
-# VITE_TILO_API_URL, so the deployed app runs the fixture / replay world with no backend. Pinned to the dev project:
-# no parameter, no other project, never tilo-demo. Needs your own `firebase login` first (the CI deployer has no
-# Firebase role). Steps and the resulting URL: docs/deploy-dev.md. scripts/web_build_env.py also reads the web app's
-# VITE_FIREBASE_* config (SEC-10 App Check) into the build environment; it writes nothing to disk.
-deploy-web:
-    python scripts/web_build_env.py pnpm --filter @tilo/web run build
+# Build the web app and deploy it to Firebase Hosting on the tilo-dev project (P0-07c, PROD-WIRE-4). With no argument the
+# build is given an empty VITE_TILO_API_URL (whatever your shell holds), so the deployed app runs the fixture / replay
+# world with no backend. `just deploy-web <api-url>` (positional) builds against a deployed tilo-api instead: the url
+# must be tilo-api's own Cloud Run url, lower case, no path, port or query (https://tilo-api-<hash>-as.a.run.app or the
+# deterministic https://tilo-api-<project-number>.asia-southeast1.run.app; another service name is refused, so a typo
+# or a pasted link never builds the app against a stranger's service). just checks it with error() on the first command
+# line, before any shell, python or pnpm runs, and it reaches the build only. Pinned to the dev project: the deploy line
+# takes no parameter, so nothing can name another project. Needs your own `firebase login` first (the CI deployer has
+# no Firebase role). Steps and the resulting URL: docs/deploy-dev.md. scripts/web_build_env.py also reads the web app's
+# VITE_FIREBASE_* config (SEC-10 App Check) into the build environment, writes nothing to disk, and sets
+# VITE_TILO_API_URL only from its --api argument (re-checked there; a shell value is ignored). The first command line
+# IS the url check: keep it first.
+deploy-web api="":
+    python -c "print('deploy-web: api accepted')" {{ if api == '' { '' } else if api =~ '^https://tilo-api-[a-z0-9]+-as\.a\.run\.app$|^https://tilo-api-[0-9]+\.asia-southeast1\.run\.app$' { '' } else { error('deploy-web: api must be empty or the tilo-api Cloud Run url (https://tilo-api-<hash>-as.a.run.app or https://tilo-api-<project-number>.asia-southeast1.run.app, lower case, no path, port or query), got ' + api) } }}
+    python scripts/web_build_env.py --api '{{api}}' pnpm --filter @tilo/web run build
     pnpm exec firebase deploy --only hosting --project essential-wares-510320-f0
+
+# Deployed smoke of tilo-dev (PROD-WIRE-4, scripts/smoke_dev.py): `just smoke-dev <api-url>` (positional, tilo-api's own
+# Cloud Run url, checked by just on the first command line like `deploy-web`, so a person's token only ever goes to
+# tilo-api). The token must be a JWT, and the smoke answers no card that could send anything out. Health, the CORS preflight from the hosting
+# origin and from a stranger, and the closed gate need no token. Set TILO_SMOKE_ID_TOKEN in your own shell (a Firebase
+# ID token you paste; it is never printed, logged or written) to also run the signed-in flow in replay mode. It needs a
+# real deployment and a person: CI never runs it and it is no part of `check` or `test`. Docs: docs/deploy-dev.md.
+# The url check is in the command line itself: error() fires before the script runs.
+smoke-dev url="":
+    uv run python scripts/smoke_dev.py {{ if url =~ '^https://tilo-api-[a-z0-9]+-as\.a\.run\.app$|^https://tilo-api-[0-9]+\.asia-southeast1\.run\.app$' { url } else { error('smoke-dev: url must be the tilo-api Cloud Run url (https://tilo-api-<hash>-as.a.run.app or https://tilo-api-<project-number>.asia-southeast1.run.app, lower case, no path, port or query), got ' + url) } }}

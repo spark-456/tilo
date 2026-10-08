@@ -9,10 +9,11 @@ no Firebase config and App Check is skipped in the browser (by design, nothing b
 
 With the flag set, the config is read from `firebase apps:sdkconfig WEB <app id>` (the owner's own `firebase login`
 is needed), checked for shape, and handed to the build as VITE_FIREBASE_API_KEY and VITE_FIREBASE_PROJECT_ID.
-Nothing is written to disk and nothing is printed. VITE_TILO_API_URL is always set empty, so the deployed web app
-stays the fixture / replay world (P0-07c).
+Nothing is written to disk and nothing is printed. VITE_TILO_API_URL comes only from `--api <url>` (PROD-WIRE-4):
+empty, or tilo-api's own Cloud Run url, checked here as well as by `just`. Without it the deployed web app stays the
+fixture / replay world (P0-07c); a VITE_TILO_API_URL already in the shell is always ignored.
 
-Usage: python scripts/web_build_env.py <build command...>   (stdlib only; runs on Windows and Linux)
+Usage: python scripts/web_build_env.py [--api <url>] <build command...>   (stdlib only; runs on Windows and Linux)
 """
 
 from __future__ import annotations
@@ -31,6 +32,8 @@ PROJECT = "essential-wares-510320-f0"  # the tilo-dev project, pinned like `just
 BAKE_FLAG = "TILO_BAKE_FIREBASE_KEY"  # "1" (exactly) once the owner has restricted the browser key
 
 _API_KEY_SHAPE = re.compile(r"^AIza[0-9A-Za-z_-]{35}$")
+# tilo-api's own Cloud Run urls (the `just deploy-web` check, kept in step by tests/repo/test_PROD_WIRE_4_*).
+API_URL = re.compile(r"https://tilo-api-[a-z0-9]+-as\.a\.run\.app|https://tilo-api-[0-9]+\.asia-southeast1\.run\.app")
 _FIELDS = (("apiKey", "VITE_FIREBASE_API_KEY"), ("projectId", "VITE_FIREBASE_PROJECT_ID"))
 
 
@@ -117,17 +120,23 @@ def sdk_env(base: Mapping[str, str]) -> dict[str, str]:
     return found
 
 
-def build_env(base: Mapping[str, str], firebase: Mapping[str, str]) -> dict[str, str]:
+def build_env(base: Mapping[str, str], firebase: Mapping[str, str], api: str = "") -> dict[str, str]:
     # A VITE_FIREBASE_* value already in the shell is dropped: only the checked config above may reach the bundle.
     kept = {k: v for k, v in base.items() if not k.startswith("VITE_FIREBASE_")}
-    return {**kept, **firebase, "VITE_TILO_API_URL": ""}
+    return {**kept, **firebase, "VITE_TILO_API_URL": api}
 
 
 def main(argv: list[str]) -> int:
+    api = ""
+    if argv[:1] == ["--api"]:
+        if len(argv) < 2 or not (argv[1] == "" or API_URL.fullmatch(argv[1])):
+            print("web_build_env.py: --api must be empty or tilo-api's own Cloud Run url", file=sys.stderr)
+            return 2
+        api, argv = argv[1], argv[2:]
     if not argv:
-        print("usage: web_build_env.py <build command...>", file=sys.stderr)
+        print("usage: web_build_env.py [--api <url>] <build command...>", file=sys.stderr)
         return 2
-    return _run(argv, env=build_env(os.environ, sdk_env(os.environ))).returncode
+    return _run(argv, env=build_env(os.environ, sdk_env(os.environ), api)).returncode
 
 
 if __name__ == "__main__":
