@@ -1,6 +1,6 @@
 // Connectors page-local parts (plan section 4 "ConnectorTile"): the attention banner, a Connected tile and an
-// Add-a-tool row. Built from the design's markup (Tilo App Connectors.dc.html). The design's spinner turns;
-// here it is a still ring (motion arrives with WEB-3b, BQ-WEB-3) and the label says the state.
+// Add-a-tool row. Built from the design's markup (Tilo App Connectors.dc.html). The design's spinner turns
+// (the shell stylesheet's tiloSpin, WEB-MOTION-3), and it is drawn only while the action is in flight.
 import type { Connector } from "../../api/types";
 import { icon } from "./icons";
 import { LEVEL_LABEL, type Merged, bannerText, syncLine, usedLine } from "./view";
@@ -8,7 +8,11 @@ import { LEVEL_LABEL, type Merged, bannerText, syncLine, usedLine } from "./view
 export function Spin({ onRed }: { onRed?: boolean }) {
   return (
     <span
-      className={onRed ? "park-connectors-spin park-connectors-spin--red" : "park-connectors-spin"}
+      className={
+        onRed
+          ? "park-connectors-spin park-connectors-spin--red park-shell__ring--page"
+          : "park-connectors-spin park-shell__ring--page"
+      }
       aria-hidden="true"
     />
   );
