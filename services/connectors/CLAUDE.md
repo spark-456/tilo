@@ -11,7 +11,7 @@ Cloud Run service (PRD 6.2): OAuth token broker, Gmail, Drive and Calendar adapt
 - Reads `contracts/outbox.schema.json` (+ cross-refs), `data.transfer.schema.json`, `contracts/fixtures/outbox/`;
   calls `tilo_policy.check_entry` (OB-01/OB-05). Emits `data.transfer` via the `emit` callback `Outbox` gets.
 - `tokens.py`, `consent.py` and `adapters/` emit `connection.*` parts `{type, authz, data, user_id}` (`user_id` is the
-  seam: the caller picks the world and actor); a failed revoke raises `alert.raised` via the optional `alert` callback.
+  seam: the caller picks the world and actor); a failed revoke raises `alert.raised` via the `alert` callback (required in `open_broker` and `BrokerSeam`).
   The broker holds no lock while a hook, `emit` or `alert` runs: collect under the lock, call out after (#149).
 ## Config
 - Env only, never logged: `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET`, `GOOGLE_OAUTH_REDIRECT_BASE_URL`.
@@ -36,4 +36,4 @@ Cloud Run service (PRD 6.2): OAuth token broker, Gmail, Drive and Calendar adapt
 - Tokens: AES-GCM under a per-record data key wrapped by a `Kms` (`FakeKms` in dev; `CloudKms` is
   unexercised until billing). Only `tokens.py` and `adapters/` call `access_token_for_adapter`; no
   other service imports `tilo_connectors.tokens` (SEC-02). `delete_user` leaves no token in any store
-  (CON-D4). Google keeps one grant per client: never revoke while another connector is connected (CON-D10). Consent state is in memory. `host_broker.py` (ADR-0032 T2, FR-MTG-09): Firestore token and retry stores at nested paths, `connected_at` sealed in the record, `open_broker(env)` and the 30 s `BrokerSeam`; no CAS until T7.
+  (CON-D4). Google keeps one grant per client: never revoke while another connector is connected (CON-D10). Consent state is in memory. `host_broker.py` (ADR-0032 T2, FR-MTG-09): Firestore token and retry stores at nested paths, `connected_at` sealed in the record, `open_broker(env)` and the 30 s `BrokerSeam`; no CAS until T7. `host_routes.py`/`host_auth.py` (T3): POST `/internal/meeting-host/{send,status,disconnect}` per `contracts/meeting_host_rpc.schema.json`; caller = the one OIDC account `TILO_MEETING_HOST_CALLER`, audience `TILO_CONNECTORS_AUDIENCE` (503 `not_configured` when unset), body cap 64 KiB, a fresh `Outbox` per send, `connection.*` parts returned in the answer that caused them (context sink), HB-06 `not_before` checked inside the broker's locked token step (`ApprovalBoundBroker`). `HostRuntime.retry_pending_revokes(user_id)` is the scheduler hook for kept revokes (no route yet). Run only after ADR-0032 T5 sets one instance.

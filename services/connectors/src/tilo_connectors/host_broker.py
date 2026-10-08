@@ -23,7 +23,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from ._time import format_ts
-from .live import LiveHttpClient, LiveNotEnabled, _require_live
+from .live import LiveHttpClient, LiveNotEnabled, LiveTransport, _require_live
 from .tokens import CloudKms, Kms, OAuthSettings, TokenBroker
 
 TOKEN_COLLECTION = "token_grants"
@@ -36,7 +36,8 @@ _CONNECTOR = re.compile(r"[a-z][a-z0-9_]{1,31}")
 _RETRY_KEY = re.compile(r"[0-9A-HJKMNP-TV-Z]{26}")
 _PROJECT = re.compile(r"[a-z][a-z0-9-]{4,28}[a-z0-9]")
 _KMS_KEY = re.compile(
-    r"projects/[a-z][a-z0-9-]{4,28}[a-z0-9]/locations/[a-z0-9-]{1,40}/keyRings/[\w-]{1,63}/cryptoKeys/[\w-]{1,63}"
+    r"projects/[a-z][a-z0-9-]{4,28}[a-z0-9]/locations/[a-z0-9-]{1,40}/keyRings/[\w-]{1,63}/cryptoKeys/[\w-]{1,63}",
+    re.ASCII,
 )
 
 
@@ -72,7 +73,14 @@ class _NestedStore:
     def get(self, user_id: str, connector: str) -> dict[str, Any] | None:
         snap = self._doc(user_id, connector).get()
         data = snap.to_dict() if snap.exists else None
-        return None if data is None else dict(data["record"])
+        if data is None:
+            return None
+        record = data.get("record") if isinstance(data, dict) else None
+        # A document that is not a record is present but unreadable: the same marker an expiry leaves, so it can be
+        # disconnected or overwritten by a new consent and is never used.
+        return (
+            dict(record) if isinstance(record, dict) else {"v": 1, "state": "expired", "scopes": [], "expires_at": None}
+        )
 
     def delete(self, user_id: str, connector: str) -> None:
         self._doc(user_id, connector).delete()
@@ -112,21 +120,18 @@ def _now() -> str:
     return format_ts(datetime.now(UTC))
 
 
-def _drop(part: dict[str, Any]) -> None:
-    return None
-
-
 def open_broker(
     env: Mapping[str, str] | None = None,
     *,
-    emit: Callable[[dict[str, Any]], None] = _drop,
-    alert: Callable[[dict[str, Any]], None] | None = None,
+    emit: Callable[[dict[str, Any]], None],
+    alert: Callable[[dict[str, Any]], None],
     clock: Callable[[], str] = _now,
     client_factory: Callable[[str], Any] | None = None,
     kms_factory: Callable[[str], Kms] | None = None,
     http_factory: Callable[[Mapping[str, str]], Any] | None = None,
 ) -> TokenBroker:
-    """The broker over Firestore and Cloud KMS, or `BrokerNotConfigured`. Live use stays the user's switch (EFF-01)."""
+    """The broker over Firestore and Cloud KMS, or `BrokerNotConfigured`. Live use stays the user's switch (EFF-01).
+    `emit` and `alert` have no default: a connection part or a failed bot revoke must reach someone (ADR-0032 T3)."""
     source = os.environ if env is None else env
     project = source.get("TILO_FIRESTORE_PROJECT", "")
     if source.get("TILO_TOKEN_STORE") != "firestore" or _PROJECT.fullmatch(project) is None:
@@ -158,21 +163,35 @@ def open_broker(
     )
 
 
+def open_transport(env: Mapping[str, str] | None = None) -> LiveTransport:
+    """The one transport that reaches Google with a token (tilo-connectors only), or `BrokerNotConfigured`."""
+    try:
+        return LiveTransport(os.environ if env is None else env)
+    except LiveNotEnabled:
+        raise BrokerNotConfigured("live access is off") from None
+
+
 class BrokerSeam:
     """Builds the broker once. A failed build is remembered for `NEGATIVE_CACHE_S`, so a misconfigured service does not
-    rebuild clients on every request, and then the next call tries again: a fixed setting needs no restart."""
+    rebuild clients on every request, and then the next call tries again: a fixed setting needs no restart.
+
+    The build runs outside the lock (a slow client must not stall every request); two callers may build at once and the
+    first to finish wins, the other's is dropped unused. The environment is read when it is needed (`env=None` reads the
+    process environment each time) and a given mapping is let go once a build succeeded, so the OAuth client secret is
+    not kept as an attribute for the life of the process."""
 
     def __init__(
         self,
         env: Mapping[str, str] | None = None,
         *,
-        emit: Callable[[dict[str, Any]], None] = _drop,
-        alert: Callable[[dict[str, Any]], None] | None = None,
+        emit: Callable[[dict[str, Any]], None],
+        alert: Callable[[dict[str, Any]], None],
         opener: Callable[..., Any] = open_broker,
         clock: Callable[[], float] = time.monotonic,
         ttl_s: float = NEGATIVE_CACHE_S,
     ) -> None:
-        self._env, self._emit, self._alert, self._opener = env, emit, alert, opener
+        self._env: Mapping[str, str] | None = env
+        self._emit, self._alert, self._opener = emit, alert, opener
         self._clock, self._ttl = clock, ttl_s
         self._lock = threading.Lock()
         self._built: Any = None
@@ -184,21 +203,24 @@ class BrokerSeam:
             if self._built is not None:
                 return self._built
             now = self._clock()
-            if self._failed_at is None or now - self._failed_at >= self._ttl:
-                self._attempt(now)
-            if self._built is not None:
-                return self._built
-            reason = self._reason
-        raise BrokerNotConfigured(reason)
-
-    def _attempt(self, now: float) -> None:
-        reason = "not_configured"
+            if self._failed_at is not None and now - self._failed_at < self._ttl:
+                raise BrokerNotConfigured(self._reason)
+            env, opener = self._env, self._opener
+        reason, built = "not_configured", None
         try:
-            self._built = self._opener(self._env, emit=self._emit, alert=self._alert)
-            self._failed_at = None
-            return
+            built = opener(env, emit=self._emit, alert=self._alert)
         except BrokerNotConfigured as error:
             reason = str(error)  # ours: it names a setting, never a value
         except Exception:  # noqa: BLE001 - any other error text may echo a secret
             pass
-        self._failed_at, self._reason = now, reason
+        with self._lock:
+            if self._built is None and built is not None:
+                self._built, self._failed_at, self._env, self._opener = built, None, None, _spent
+            if self._built is not None:
+                return self._built
+            self._failed_at, self._reason = now, reason
+        raise BrokerNotConfigured(reason)
+
+
+def _spent(*_: Any, **__: Any) -> Any:
+    raise BrokerNotConfigured("the broker is built already")

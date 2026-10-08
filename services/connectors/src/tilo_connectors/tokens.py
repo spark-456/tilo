@@ -79,6 +79,10 @@ class _Expired(ConnectionExpired):
     """Raised under the connector lock; connection.expired is emitted once the lock is released."""
 
 
+class GrantPredatesApproval(TokenError):
+    """ADR-0032 HB-06: the grant was made after the approval being sent, so that approval must not use it."""
+
+
 class InsufficientScope(TokenError):
     def __init__(self, missing: list[str]) -> None:
         super().__init__("scopes not granted: " + ", ".join(missing))
@@ -343,11 +347,19 @@ class TokenBroker:
                 self._settled.notify_all()
 
     def access_token_for_adapter(
-        self, user_id: str, connector: str, *, required_scopes: Iterable[str], force_refresh: bool = False
+        self,
+        user_id: str,
+        connector: str,
+        *,
+        required_scopes: Iterable[str],
+        force_refresh: bool = False,
+        not_before: str | None = None,
     ) -> str:
         """The one call that returns a plaintext token; refreshes first when it is about to expire.
         `force_refresh` is the adapters' 401 path (Google dropped the token before its expiry): it refreshes
-        this same user and connector's record now, after the same connected and scope checks."""
+        this same user and connector's record now, after the same connected and scope checks. `not_before` (HB-06) is
+        an approval time: a grant whose sealed `connected_at` is later raises `GrantPredatesApproval`, checked in this
+        same locked step as the token fetch, so no reconnect can slip in between."""
         try:
             with self._held(user_id, connector, user=False):
                 record = self._store.get(user_id, connector)
@@ -361,6 +373,8 @@ class TokenBroker:
                 payload = self._payload(user_id, connector, record)
                 if payload is None:
                     raise TokenError("the stored record could not be read")
+                if not_before is not None and not self._connected_by(record, not_before):
+                    raise GrantPredatesApproval("the grant was made after the approval")
                 now = parse_ts(add_seconds(self._clock(), self._skew))
                 if not force_refresh and now < parse_ts(record["expires_at"]):
                     return str(payload["access_token"])
@@ -389,6 +403,16 @@ class TokenBroker:
             return None
         since = record.get("connected_at")
         return since if isinstance(since, str) else None
+
+    @staticmethod
+    def _connected_by(record: Mapping[str, Any], moment: str) -> bool:
+        """True when the (already authenticated) record's connected_at is not later than `moment`; a record
+        without a readable connected_at is never old enough."""
+        since = record.get("connected_at")
+        try:
+            return isinstance(since, str) and parse_ts(since) <= parse_ts(moment)
+        except (ValueError, TypeError, OverflowError):
+            return False
 
     def granted_scopes(self, user_id: str, connector: str) -> frozenset[str]:
         record = self._store.get(user_id, connector)

@@ -1503,6 +1503,7 @@ source = { editable = "services/connectors" }
 dependencies = [
     { name = "cryptography" },
     { name = "fastapi" },
+    { name = "google-auth" },
     { name = "google-cloud-firestore" },
     { name = "google-cloud-kms" },
     { name = "jsonschema" },
@@ -1519,6 +1520,7 @@ dependencies = [
 requires-dist = [
     { name = "cryptography", specifier = ">=42" },
     { name = "fastapi", specifier = ">=0.115" },
+    { name = "google-auth", specifier = ">=2.30" },
     { name = "google-cloud-firestore", specifier = ">=2.20.0" },
     { name = "google-cloud-kms", specifier = ">=3.0" },
     { name = "jsonschema", specifier = ">=4.18" },

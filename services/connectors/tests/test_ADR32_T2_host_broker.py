@@ -128,7 +128,7 @@ def _build(
     return open_broker(
         _env() if env is None else env,
         emit=lambda part: None,
-        alert=alert,
+        alert=alert or (lambda part: None),
         clock=clock or ManualClock(START),
         client_factory=lambda project: client,
         kms_factory=lambda name: kms,
@@ -392,7 +392,7 @@ def _seam(builds: list[int], clock: Any, fail: list[bool]) -> BrokerSeam:
             raise RuntimeError("sk-" + "z" * 12)
         return object()
 
-    return BrokerSeam(_env(), opener=factory, clock=clock)
+    return BrokerSeam(_env(), emit=lambda p: None, alert=lambda p: None, opener=factory, clock=clock)
 
 
 def test_ADR32_T2_FR_MTG_09_a_failed_build_is_remembered_for_30_seconds() -> None:

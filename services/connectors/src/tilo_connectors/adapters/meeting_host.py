@@ -24,6 +24,7 @@ from ..meeting_host import (
     ReceiptStore,
 )
 from ..outbox import Grant
+from ..tokens import GrantPredatesApproval
 from ._google import GoogleAdapter, side_effect_marker
 from ._transport import ArtifactSource
 
@@ -31,6 +32,34 @@ EVENTS_URL = "https://www.googleapis.com/calendar/v3/calendars/primary/events"
 EVENT_FIELDS = "id,status,conferenceData(createRequest(status(statusCode)))"  # never hangoutLink
 _CONFERENCE_STATUSES = ("pending", "success", "failure")
 _DRAFT_TEXT_KEYS = ("meeting_id", "owner", "title", "start", "end", "time_zone")
+
+
+class ApprovalBoundBroker:
+    """What the adapter sees of the broker when tilo-api sends (ADR-0032 HB-06): every token fetch carries the
+    approval's own time as `not_before`, so a grant made after the approval is refused in the broker's own locked
+    step (`GrantPredatesApproval` becomes a final `SideEffectRefused`), and a user whose disconnect has begun gets
+    no token at all. Refusing is final: the entry fails, and nothing was sent."""
+
+    def __init__(self, broker: Any, *, approved_at: str, stopped: Callable[[str], bool]) -> None:
+        self._broker, self._approved_at, self._stopped = broker, approved_at, stopped
+
+    def access_token_for_adapter(
+        self, user_id: str, connector: str, *, required_scopes: Any, force_refresh: bool = False
+    ) -> str:
+        if self._stopped(user_id):
+            raise SideEffectRefused("HB-06: the grant is being disconnected")
+        try:
+            return str(
+                self._broker.access_token_for_adapter(
+                    user_id,
+                    connector,
+                    required_scopes=required_scopes,
+                    force_refresh=force_refresh,
+                    not_before=self._approved_at,
+                )
+            )
+        except GrantPredatesApproval:
+            raise SideEffectRefused("HB-06: the grant is newer than the approval") from None
 
 
 class MeetingHostAdapter(GoogleAdapter):

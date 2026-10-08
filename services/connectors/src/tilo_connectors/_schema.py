@@ -86,3 +86,10 @@ def calendar_entry_validator() -> (
 def agenda_item_validator() -> jsonschema.protocols.Validator:  # calendar_entry.schema.json#/$defs/agenda_item
     ref = {"$ref": "https://contracts.tilo.example/calendar_entry.schema.json#/$defs/agenda_item"}
     return jsonschema.Draft202012Validator(ref, registry=_registry())
+
+
+@functools.lru_cache(maxsize=8)
+def host_rpc_validator(name: str) -> jsonschema.protocols.Validator:
+    """One `$defs` entry of meeting_host_rpc.schema.json (ADR-0032): send_request, user_request, send_answer, ..."""
+    ref = {"$ref": f"https://contracts.tilo.example/meeting_host_rpc.schema.json#/$defs/{name}"}
+    return jsonschema.Draft202012Validator(ref, registry=_registry())
