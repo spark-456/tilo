@@ -48,6 +48,10 @@ const SERVER_TROUBLE = "Tilo had a problem on its side.";
 const REPLAY_ONLY =
   "Live models are unavailable right now, so nothing new was started. Finished runs can still be replayed.";
 const BAD_REPLY = "Tilo sent a reply this page could not read.";
+/** STARTER-1: the recorded sample project (`tilo_api.sample_world`); its path is read-only. */
+const SAMPLE_PATH = "/worlds/w_sample_village_basic";
+const SAMPLE_SIMULATED =
+  "This is a recorded sample replay, so nothing was sent. Approvals here are simulated.";
 const GENERIC_4XX: Readonly<Record<number, string>> = {
   401: "You need to sign in to do this.",
   403: "You do not have access to this.",
@@ -369,6 +373,13 @@ export class HttpClient implements TiloClient, SchedulesApi {
   }
 
   private post<T>(path: string, body: unknown): Promise<T> {
+    // STARTER-1: the sample project is a recorded replay. An answer or a pause on it is simulated by the page and
+    // never sent: no request leaves for it, whoever asks.
+    if (path === SAMPLE_PATH || path.startsWith(`${SAMPLE_PATH}/`)) {
+      return Promise.reject(
+        new TiloApiError(SAMPLE_SIMULATED, null, false, false, "sample_is_a_replay"),
+      );
+    }
     const init = {
       method: "POST",
       headers: { "content-type": "application/json" },

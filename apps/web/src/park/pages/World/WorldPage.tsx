@@ -13,6 +13,7 @@ import { useParkApi } from "../../app/context";
 import { stagePath } from "../../app/router";
 import { useStaged } from "../../app/useStaged";
 import { Button, PageSheet } from "../../components";
+import { SampleBadge, SampleNote } from "../../sample/SampleBadge";
 import { icon } from "../../shell/kit";
 import { Activity, Districts, Result, RunHistory } from "./Lower";
 import { FactsCard, GoLink, SpendCard, WaitingCard } from "./Side";
@@ -205,16 +206,21 @@ export function WorldPage({ app }: { app: AppCtx }) {
           </div>
           <h1 className="park-world-h1" tabIndex={-1}>
             {w.name}
+            {w.sample ? <SampleBadge /> : null}
           </h1>
           <p className="park-world-meta">
-            {`Owned by ${w.owner} · started ${w.started} · ${agentsWord(w.agents)}`}
+            {w.sample
+              ? `Recorded ${w.started}`
+              : `Owned by ${w.owner} · started ${w.started} · ${agentsWord(w.agents)}`}
           </p>
+          {w.sample ? <SampleNote /> : null}
         </div>
         <div className="park-world-actions">
           <Button
             variant="secondary"
             icon={icon(isPaused ? "play" : "pause", 14)}
             onClick={togglePause}
+            {...(w.sample ? { disabled: true, title: "A recorded replay cannot be paused" } : {})}
           >
             {isPaused ? "Resume" : "Pause"}
           </Button>
@@ -225,6 +231,11 @@ export function WorldPage({ app }: { app: AppCtx }) {
             <StageLink className="park-world-live" href={stage(stagePath(w.id))}>
               {icon("play", 14)}Open live view
             </StageLink>
+          ) : null}
+          {w.sample ? (
+            <a className="park-world-live" href={stagePath(w.id)}>
+              {icon("play", 14)}Watch the replay
+            </a>
           ) : null}
           {isCity && !hasStage ? (
             <span id={NO_STAGE_ID} className="park-world-sr">

@@ -286,6 +286,7 @@ export function HomePage({ app }: { app: AppCtx }) {
           {(vw || 1440) >= 1180 ? (
             <TodayPanel
               rows={liveRows(worlds, needs, served)}
+              sample={served ? worlds.find((w) => w.sample) : undefined}
               events={nextEvents(base.agenda)}
               spend={spendOf(base.ledger)}
               night={night}
