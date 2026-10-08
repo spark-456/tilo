@@ -62,3 +62,48 @@ def test_FR_MTG_11_the_text_to_first_audio_latency_is_logged_without_the_text(ca
         asyncio.run(go())
     line = next(r.getMessage() for r in caplog.records if "first_audio_ms" in r.getMessage())
     assert "characters=23" in line and "Private" not in line and "budget" not in line
+
+
+def test_FR_MTG_11_stt_end_to_first_audio_is_logged_from_the_turns_stt_final_time_with_no_text(caplog):
+    ticks = iter([100.0, 100.8])  # the request starts, the first audio piece arrives 0.8 s later
+    tts = P.ProviderTTS(Streaming([b"\x00\x01" * 50]), clock=lambda: next(ticks))
+    from bot.tts import STT_END_AT
+
+    async def go():
+        STT_END_AT.set(98.5)  # the STT final result was 1.5 s before the request
+        return [c async for c in tts.stream("Private budget figures.")]
+
+    with caplog.at_level(logging.INFO, logger="bot.providers"):
+        asyncio.run(go())
+    line = next(r.getMessage() for r in caplog.records if "first_audio_ms" in r.getMessage())
+    assert "first_audio_ms=800" in line and "stt_end_to_first_audio_ms=2300" in line
+    assert "Private" not in line and "budget" not in line
+
+
+def test_FR_MTG_11_without_an_stt_final_time_only_the_text_in_latency_is_logged(caplog):
+    ticks = iter([5.0, 5.4])
+    tts = P.ProviderTTS(Streaming([b"\x00\x01" * 50]), clock=lambda: next(ticks))
+
+    async def go():
+        return [c async for c in tts.stream("Hello")]
+
+    with caplog.at_level(logging.INFO, logger="bot.providers"):
+        asyncio.run(go())
+    line = next(r.getMessage() for r in caplog.records if "first_audio_ms" in r.getMessage())
+    assert "first_audio_ms=400" in line and "stt_end" not in line
+
+
+def test_FR_MTG_11_a_live_voice_that_cannot_be_built_is_a_permanent_refusal_so_the_backup_voice_takes_over(monkeypatch):
+    import sys
+
+    monkeypatch.setenv("LIVE", "1")
+    monkeypatch.setenv("GOOGLE_CLOUD_PROJECT", "demo-project")
+    monkeypatch.setitem(sys.modules, "google.cloud.texttospeech", None)  # the SDK is absent
+    monkeypatch.setattr("tilo_providers.voice.character_metering_ready", lambda: True)  # only the SDK refuses here
+
+    async def go():
+        return [c async for c in P.ProviderTTS().stream("Hello there")]
+
+    with pytest.raises(TTSError) as excinfo:
+        asyncio.run(go())
+    assert excinfo.value.permanent  # retried every reply otherwise
