@@ -114,3 +114,20 @@ def test_FR_INT_04_titles_with_and_or_commas_in_the_current_chip_do_not_break_th
     assert validate_brief(result) == result
     assert _formats(result) == ["pdf", "pptx", "docx"]
     assert result["deliverables"][0]["title"] == "Pricing, risks and plan"
+
+
+@pytest.mark.parametrize(
+    "answer",
+    [" " * 100_000, "and,;" * 20_000, "pdf" + " " * 100_000 + "and pptx", "(" * 100_000],
+    ids=["spaces", "and-commas", "spaced-and", "parens"],
+)
+def test_FR_INT_04_a_huge_answer_is_cut_to_the_routes_limit_and_never_scanned_whole(answer):
+    import time
+
+    brief = _brief(("pdf",))
+    started = time.perf_counter()
+    try:
+        apply_answer(brief, _question(brief), answer, today=TODAY)
+    except BriefValidationError:
+        pass
+    assert time.perf_counter() - started < 1.0

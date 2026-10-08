@@ -31,6 +31,8 @@ MODEL_ARMOR_NEEDS = (
     "TILO_MODEL_ARMOR_LOCATION (default asia-southeast1), user ADC and the Model Armor API enabled"
 )
 TOPIC_FAKED = tuple(item for item in e2e.FAKED if not item.startswith("safety screen"))  # the screen here is real
+NL = chr(10)
+_BLANKS = re.compile(r"\n\s*\n\s*")  # a run of blank lines is one: a preview cannot push the card off screen
 ADHOC = e2e.default_recordings_dir("adhoc")  # git-ignored: a typed topic is the person's own text
 
 
@@ -41,7 +43,7 @@ def clean(text: Any, *, lines: bool = False) -> str:
     return kept if lines else " ".join(kept.split())
 
 
-_NUMBER_LIST = re.compile(r"\d{1,2}(?:\s*(?:,|;|&|\+|\band\b|\s)\s*\d{1,2})+", re.IGNORECASE)
+_NUMBER_LIST = re.compile(r"\d{1,2}(?:\s*(?:,|;|&|\+|\band\b)\s*\d{1,2}|\s+\d{1,2})+", re.IGNORECASE)
 
 
 def _numbers(said: str) -> list[int] | None:
@@ -57,14 +59,92 @@ def _clip_at_part(answer: str, limit: int = 300) -> str:
     return cut[: cut.rfind("; ")] if "; " in cut else cut
 
 
+def _flush_input() -> None:
+    """Discard what is waiting in the console's input buffer. Raises if this is not a real console."""
+    if os.name == "nt":
+        import ctypes  # noqa: PLC0415
+
+        kernel = ctypes.windll.kernel32  # type: ignore[attr-defined,unused-ignore]
+        kernel.GetStdHandle.restype = ctypes.c_void_p
+        if not kernel.FlushConsoleInputBuffer(kernel.GetStdHandle(-10)):  # STD_INPUT_HANDLE
+            raise OSError("stdin is not a console")
+    else:
+        import termios  # noqa: PLC0415
+
+        termios.tcflush(sys.stdin.fileno(), termios.TCIFLUSH)  # type: ignore[attr-defined,unused-ignore]
+
+
+def drain_stdin() -> bool:
+    """True only if the terminal's pending input was discarded. Anything else (stdin not a tty, no API) is False, so the
+    caller holds: text pasted or typed before a write card must never be able to answer it."""
+    try:
+        if not sys.stdin.isatty():
+            return False
+        _flush_input()
+    except Exception:  # noqa: BLE001 - fail closed
+        return False
+    return True
+
+
 class TerminalPerson:
     """The person at the terminal (`bank_run.drive`'s `person`); `log` says who decided each thing, for the report."""
 
     def __init__(self, *, auto_answer: bool = False, auto_approve_t1t2: bool = False,
                  read: Callable[[str], str] = input, write: Callable[[str], None] = print,
-                 tty: Callable[[], bool] = sys.stdin.isatty) -> None:  # fmt: skip
+                 tty: Callable[[], bool] = sys.stdin.isatty,
+                 drain: Callable[[], bool] | None = None) -> None:  # fmt: skip
         self.auto_answer, self.auto_approve_t1t2, self._input, self._write = auto_answer, auto_approve_t1t2, read, write
         self._tty, self.log = tty, list[str]()
+        self._wgate: Any = None  # CL-LIVE-2 write gate, bound by the run
+        self._drain = drain  # discards the input buffer before a write prompt; None or False: the write is held
+
+    def bind_write_gate(self, gate: Any) -> None:
+        self._wgate = gate
+
+    def _write_gate(self, card: dict[str, Any]) -> bool | None:
+        """A real connector write: only a typed `yes` at an interactive terminal approves it, for exactly the payload
+        shown. No flag (`--auto-approve-t1t2`), no piped input, no tier decides. None: not a real write."""
+        review = self._wgate.review(card) if self._wgate is not None else None
+        if review is None:
+            return None
+        kind = f"{clean(review.connector)} {clean(review.action)}"
+        self._write(
+            f"REAL WRITE ({kind}): {'this SENDS mail' if review.action == 'send_email' else 'a real draft or file'}"
+        )
+        to = clean(", ".join(review.recipients)) or "(none)"
+        self._write(f"  to: {to}; destination: {clean(review.destination)}")
+        if not review.allowed:
+            self._write(f"  held: {clean(review.why)}")
+            self.log.append(f"gate {kind}: held ({clean(review.why)})")
+            return self._hold()
+        self._write(f"  title: {clean(review.title)}; {review.size} characters; payload {review.digest[:12]}")
+        self._write(f"  preview: {_BLANKS.sub(NL * 2, clean(review.preview, lines=True))}")
+        if not self._tty():
+            self._write("a real write needs a person at an interactive terminal; piped input cannot approve it: held")
+            self.log.append(f"gate {kind}: held (no interactive terminal)")
+            return self._hold()
+        self._write(
+            f"  writing to: {to}; destination: {clean(review.destination)}"
+        )  # above the prompt, whatever the preview did
+        if not self._flushed():  # last thing before the prompt: nothing queued earlier may answer it
+            self._write("could not discard input queued before this card (not a real terminal?): held")
+            self.log.append(f"gate {kind}: held (queued input could not be discarded)")
+            return self._hold()
+        said = self._read("type yes to write exactly this (anything else holds it): ")
+        ok = self._wgate.approve(review, said=said or "", interactive=True)
+        self.log.append(f"gate {kind}: {'approved by a typed yes' if ok else 'held'} (the person, at the terminal)")
+        return True if ok else self._hold()
+
+    def _flushed(self) -> bool:
+        try:
+            return bool(self._drain is not None and self._drain())
+        except Exception:  # noqa: BLE001 - fail closed
+            return False
+
+    def _hold(self) -> bool:
+        """A held card ends the run: no approval may stay behind for it."""
+        self._wgate.clear()
+        return False
 
     def _read(self, prompt: str) -> str | None:
         try:
@@ -133,6 +213,8 @@ class TerminalPerson:
         return chosen["id"] if ok else None
 
     def gate(self, card: dict[str, Any]) -> bool:
+        if (real_write := self._write_gate(card)) is not None:
+            return real_write
         gate = card.get("gate") or {}
         action = gate.get("action") or {}
         tier, kind = gate.get("risk_tier"), clean(action.get("type", "?"))
@@ -187,9 +269,11 @@ def run_topic(
     safety: SafetyProvider | None = None,  # the test seam, only beside an injected (fake) provider
     person: TerminalPerson | None = None, announce: Callable[[e2e.Estimate, float], None] | None = None,
     real_connectors: bool = False, real_connectors_factory: Callable[[], dict[str, Any]] | None = None,
+    allow_writes: bool = False, allow_send: bool = False,
 ) -> e2e.LiveE2EReport:  # fmt: skip
     env = os.environ if environ is None else environ
     e2e._gate(mode, env, max_credits)  # the live switch, CI, Cloud Run and the cap: first of all
+    e2e.check_write_flags(real_connectors, allow_writes, allow_send)
     if not (text := topic.replace("\r\n", "\n").strip()):
         raise _refuse("empty_topic", "the topic is empty; nothing was sent")
     digest = hashlib.sha256(text.encode("utf-8")).hexdigest()[:12]
@@ -210,7 +294,7 @@ def run_topic(
             announce(estimate, max_credits)
         print(f"safety screen named (not called in a dry run): {note}")
         if real_connectors:
-            e2e.print_real_plan()
+            e2e.print_real_plan(allow_writes, allow_send)
         return e2e.LiveE2EReport(case.id, mode, max_credits, estimate, safety=note, faked=TOPIC_FAKED)
     if (
         real_connectors and real_connectors_factory is None
@@ -221,10 +305,10 @@ def run_topic(
         case.id, mode="live", max_credits=max_credits, environ=environ, models_path=models_path,
         prices_path=prices_path, recordings_dir=recordings, live_provider_factory=live_provider_factory, safety=screen,
         announce=announce, adhoc=case, person=person, real_connectors=real_connectors,
-        real_connectors_factory=real_connectors_factory,
+        real_connectors_factory=real_connectors_factory, allow_writes=allow_writes, allow_send=allow_send,
     )  # fmt: skip
     report.safety = note
-    report.faked = e2e.real_faked(TOPIC_FAKED) if report.real_connectors else TOPIC_FAKED
+    report.faked = e2e.real_faked(TOPIC_FAKED, allow_writes) if report.real_connectors else TOPIC_FAKED
     report.story_lines = [e2e.StoryLine(clean(s.text), s.event_ids) for s in report.story_lines]
     return report
 
@@ -247,6 +331,7 @@ def main(
     argv: list[str] | None = None, *, environ: Mapping[str, str] | None = None,
     live_provider_factory: Callable[[str, str], ModelProvider] | None = None, safety: SafetyProvider | None = None,
     read: Callable[[str], str] | None = None, tty: Callable[[], bool] | None = None,
+    drain: Callable[[], bool] | None = None,
     real_connectors_factory: Callable[[], dict[str, Any]] | None = None,
 ) -> int:  # fmt: skip
     parser = argparse.ArgumentParser(prog="live_run", description=(__doc__ or "").split("\n")[0])
@@ -259,6 +344,7 @@ def main(
     parser.add_argument("--auto-answer", action="store_true", help="take each question's default; labelled as such")
     parser.add_argument("--auto-approve-t1t2", action="store_true", help="approve T1/T2 gates; a T3 gate always asks")
     parser.add_argument("--real-connectors", action="store_true", help="real read-only Gmail, Drive and Calendar")
+    e2e.add_write_flags(parser)
     for name in ("models-file", "prices-file", "recordings-dir"):
         parser.add_argument(f"--{name}", type=Path)
     args = parser.parse_args(argv)
@@ -274,13 +360,14 @@ def main(
     text = topic.replace("\r\n", "\n").strip()
     print(f"topic: {len(text)} characters, sha256 {hashlib.sha256(text.encode('utf-8')).hexdigest()}", flush=True)
     person = TerminalPerson(auto_answer=args.auto_answer, auto_approve_t1t2=args.auto_approve_t1t2, read=read,
-                            tty=tty or sys.stdin.isatty)  # fmt: skip
+                            tty=tty or sys.stdin.isatty, drain=drain or drain_stdin)  # fmt: skip
     try:
         report = run_topic(
             topic, mode="dry-run" if args.dry_run else "live", max_credits=args.max_credits, environ=environ,
             models_path=args.models_file, prices_path=args.prices_file, recordings_dir=args.recordings_dir,
             live_provider_factory=live_provider_factory, safety=safety, person=person, announce=e2e.announce,
             real_connectors=args.real_connectors, real_connectors_factory=real_connectors_factory,
+            allow_writes=args.allow_writes, allow_send=args.allow_send,
         )  # fmt: skip
     except e2e.LiveE2ERefused as refusal:
         print(f"REFUSED {refusal.code}: {refusal}", file=sys.stderr)
