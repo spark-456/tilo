@@ -445,7 +445,8 @@ class _Run:
                 self.handoffs[unit_id] = cause
         self.emit("agent.retired", lead, worker, "The agent finished and left.", {}, cause=cause, **at)
         if outcome.success is True:
-            self.results[unit_id] = _upstream_item(unit, outcome, made, self.store)
+            # the store read is synchronous: keep it off the event loop
+            self.results[unit_id] = await asyncio.to_thread(_upstream_item, unit, outcome, made, self.store)
         return outcome
 
     async def call(self, work: Awaitable[Any]) -> Any:

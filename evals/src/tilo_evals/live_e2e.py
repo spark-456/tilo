@@ -34,8 +34,9 @@ from pathlib import Path
 from typing import Any, Literal
 
 from fastapi import FastAPI, Request
+from tilo_harness.lead_review import REVIEW_ROLE, review_milestones
 from tilo_harness.outputs import UnitOutput
-from tilo_harness.unit_prompt import request_variables
+from tilo_harness.unit_prompt import data_line, request_variables
 from tilo_harness.untrusted import neutralise as neutralise_text
 from tilo_providers.config import ProviderConfigError, ProvidersConfig, load_providers_config, resolve_models_path
 from tilo_providers.errors import ProviderError, QuotaError, RequestError
@@ -85,12 +86,13 @@ _OUT = {
     "writer": 1024,
     "specialist": 1024,
     "verifier": 300,
-    "lead": 400,
+    REVIEW_ROLE: 400,
     "narrator": 600,
 }  # output caps of our own calls
 _DEFAULT_OUT = 1024  # the Router's default when neither the request nor the role gives one (BQ-63)
 _DIRECTOR_OUT = 4096  # the Director's floor when its role sets no cap: thinking tokens count against it (BQ-LE2E-9)
 _PROMPT_TOKENS, _UNITS, _DIRECTOR_RETRIES, _MAX_BEATS = 1500, (3, 8), 3, 8  # estimate assumptions; Narrator beats
+_REVIEWS_HIGH = 3  # Lead reviews in the worst case (districts of 2+ units in a plan of up to 8 units)
 _ROLE: ContextVar[str] = ContextVar("live_e2e_role")
 _PERSONAL = re.compile(
     "|".join(
@@ -261,7 +263,7 @@ def _load_config(
         raise LiveE2ERefused("config_invalid", f"the models or prices file did not load: {error}") from None
     if config.prices.status != "set":
         raise LiveE2ERefused("prices_unset", "config/prices.yaml is unset: confirm the prices, then set status to set")
-    needed = ("director", "lead", "specialist", "verifier", "writer", "narrator", *extra_roles)
+    needed = ("director", REVIEW_ROLE, "specialist", "verifier", "writer", "narrator", *extra_roles)
     absent = [r for r in needed if r not in config.roles]
     if absent:
         raise LiveE2ERefused("config_invalid", f"the models file has no role {absent[0]!r}")
@@ -296,21 +298,34 @@ def _estimate(config: ProvidersConfig, case: BankCase) -> Estimate:
     return _estimate_chars(config, len(case.brief) + sum(len(f["text"]) for f in case.files))
 
 
-def _estimate_chars(config: ProvidersConfig, chars: int) -> Estimate:
-    """One run of a brief with `chars` characters of input (the generator reuses it for each brief it will run)."""
+def _p90_out() -> dict[str, int]:
+    """Output tokens at the 90th percentile per role (`evals/live_usage_p90.json`, with its provenance)."""
+    return json.loads((_REPO / "evals" / "live_usage_p90.json").read_text(encoding="utf-8"))["output_tokens_p90"]
+
+
+def _estimate_chars(config: ProvidersConfig, chars: int, *, at_cap: bool = False, repairs: int = 1) -> Estimate:
+    """One run of a brief with `chars` characters of input (the generator reuses it for each brief it will run).
+
+    COST-AUDIT: the high figure counts each call at the role's p90 output (never above its output cap) plus `repairs`
+    repair attempts per Director call, not every call at its whole cap. `at_cap=True` is the old worst case, the hard
+    upper bound the high figure never exceeds; the meter still bounds a live run."""
     base = _PROMPT_TOKENS + chars // 3
+    p90 = _p90_out()
 
     def credits(role: str, calls: int, tokens_in: int, tokens_out: int) -> float:
         quote = config.price(config.roles[role].primary)
         return calls * config.credits((tokens_in * quote.input + tokens_out * quote.output) / 1e6)
 
     def out(role: str) -> int:
-        return _output_cap(config, role)
+        cap = _output_cap(config, role)
+        return cap if at_cap else min(cap, p90.get(role, cap))
 
+    director_calls = 3 + _DIRECTOR_RETRIES if at_cap else 3 * (1 + repairs)
     low = credits("director", 3, base, 400) + credits("writer", _UNITS[0], base, 250)
-    low += credits("lead", 1, base, 100) + credits("narrator", 1, base, 200)
-    high = credits("director", 3 + _DIRECTOR_RETRIES, base + 1000, out("director"))
-    high += credits("writer", _UNITS[1], base + 1500, out("writer")) + credits("lead", 3, base + 1500, out("lead"))
+    low += credits(REVIEW_ROLE, 1, base, 100) + credits("narrator", 1, base, 200)
+    high = credits("director", director_calls, base + 1000, out("director"))
+    high += credits("writer", _UNITS[1], base + 1500, out("writer"))
+    high += credits(REVIEW_ROLE, _REVIEWS_HIGH, base + 1500, out(REVIEW_ROLE))
     high += credits("narrator", 1, base + 1500, out("narrator"))
     return Estimate(low, high)
 
@@ -614,16 +629,19 @@ class _Writer:
 
 class _UnitRunner:
     """One model call per unit by the unit's role (prompts/<role>/unit.md), fed the work of the units it waits for; one
-    Lead review per district milestone (the district's last unit). A Verifier's verdict is recorded, not acted on."""
+    Lead review per district of two or more units (at its last unit, on the cheap `lead_review` role). A Verifier's
+    verdict is recorded, not acted on."""
 
     def __init__(self, router: Router, meter: _Meter) -> None:
         self._router, self._meter = router, meter
         self._brief: dict[str, Any] = {}
         self._units: list[dict[str, Any]] = []
+        self._milestones: frozenset[str] = frozenset()
         self._work: dict[str, str] = {}
 
     def capture(self, brief: dict[str, Any], plan: dict[str, Any]) -> None:
         self._brief, self._units = brief, list(plan.get("units", []))
+        self._milestones = review_milestones(self._units)
 
     def work(self) -> list[tuple[str, str]]:
         return [(u["title"], self._work[u["id"]]) for u in self._units if u["id"] in self._work]  # in plan order
@@ -645,7 +663,7 @@ class _UnitRunner:
 
         earlier = [f"[{d}] {self._work[d]}" for d in unit["depends_on"] if d in self._work]
         variables = {
-            "title": _safe(unit["title"]), "unit_type": unit["unit_type"],
+            "title": data_line(unit["title"], 120), "unit_type": unit["unit_type"],
             "inputs": _safe("\n\n".join(earlier) or "(none)"),
             "skills": "\n\n".join(skill.body for skill in context.skills), **self._request(),
         }  # fmt: skip
@@ -657,14 +675,14 @@ class _UnitRunner:
         if unit["role"] == "verifier":
             summary += f" Verdict: {text.splitlines()[0][:80]}"
         district = unit["district"]
-        if not any(unit["id"] in u["depends_on"] and u["district"] == district for u in self._units):  # the milestone
+        if unit["id"] in self._milestones:  # COST-AUDIT: one review per district of 2+ units (tilo_harness.lead_review)
             work = "\n\n".join(
                 f"[{u['id']}] {u['title']}: {self._work[u['id']]}"
                 for u in self._units
                 if u["id"] in self._work and u["district"] == district
             )
             prompt = load_prompt("lead", "review.md", {"district": district, "work": _safe(work), **self._request()})
-            review, spent = await asyncio.to_thread(self._ask, "lead", prompt)
+            review, spent = await asyncio.to_thread(self._ask, REVIEW_ROLE, prompt)
             summary, credits = f"{summary} Lead review: {review[:200]}", credits + spent
         item = UnitOutput(media_type="text/markdown", content=text.encode("utf-8"))  # the executor stores it (ADR-0018)
         return MeteredOutcome(success=True, summary=summary, outputs=(item,), credits=credits)
