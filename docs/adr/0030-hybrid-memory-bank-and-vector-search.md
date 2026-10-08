@@ -1,8 +1,7 @@
 # ADR-0030: Hybrid memory: Memory Bank preferences and Firestore vector search
 
-- Status: **Proposed** (8 Oct 2026). Needs the user's approval before any ticket below starts. The supervisor
-  asked for this design on the user's behalf (8 Oct 2026, about 12:00 IST); the decision itself is the user's.
-  It changes no contract, no `config/` and no code: tickets MEM30-a to MEM30-e do that after approval.
+- Status: Accepted (user approved 8 Oct 2026). The supervisor asked for this design on the user's behalf;
+  the user approved it in the supervisor chat. Open questions keep their stated defaults.
 - Deciders: user (approval, embedding price, the region question), architect (design)
 - Requirement: PRD 13.1 (memory layers), FR-MEM-01, FR-MEM-02, FR-MEM-05, FR-MEM-09, FR-INT-05, FR-AGT-07;
   PRD 6.4 (`ModelProvider.embed`), 6.6 (efficiency), 14.3 (credits saved), 16.5 (deletion); PL-01, PL-06,
