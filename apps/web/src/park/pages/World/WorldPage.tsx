@@ -213,7 +213,7 @@ export function WorldPage({ app }: { app: AppCtx }) {
     if (!slackState.connected) return;
     triggerRef.current = trigger;
     setSlackChannel((cur) =>
-      cur && slackState.channels.includes(cur) ? cur : (slackState.channels[0] ?? "#ops"),
+      cur && slackState.channels.includes(cur) ? cur : (slackState.channels[0] ?? ""),
     );
     setSlackNote("");
     setSlackOpen(true);
@@ -225,7 +225,8 @@ export function WorldPage({ app }: { app: AppCtx }) {
   };
 
   const submitSlackApproval = () => {
-    const channel = slackChannel || slackState.channels[0] || "#ops";
+    const channel = slackChannel || slackState.channels[0];
+    if (!channel) return;
     const req: SlackShareRequest = {
       worldId: w.id,
       worldName: w.name,

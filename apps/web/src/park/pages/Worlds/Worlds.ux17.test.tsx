@@ -69,10 +69,9 @@ describe("FR_UX_17 Worlds page: Share to Slack through the approval card", () =>
     const selects = qa<HTMLSelectElement>(dialog, "select");
     const channelSelect = must(selects[selects.length - 1], "channel select");
     const options = qa<HTMLOptionElement>(channelSelect, "option").map((o) => o.value);
-    expect(options.length).toBeGreaterThanOrEqual(2);
-    expect(options[0]).toMatch(/^#/);
+    expect(options).toEqual(["#ops", "#k1-firmware"]);
 
-    setFieldValue(channelSelect, options[1] ?? options[0] ?? "#ops");
+    setFieldValue(channelSelect, options[1] ?? options[0] ?? "");
     const noteInput = must(
       dialog.querySelector<HTMLInputElement | HTMLTextAreaElement>("textarea, input"),
       "note input",
@@ -122,6 +121,27 @@ describe("FR_UX_17 Worlds page: Share to Slack through the approval card", () =>
 
     click(trigger);
     expect(r.c.querySelector('[role="dialog"]')).toBeNull();
+
+    // Also when Slack is connected but has no channels configured, the action is disabled with a reason.
+    cleanup();
+    const noChApi = worldsApi();
+    const baseNoCh = noChApi.getConnectors.bind(noChApi);
+    noChApi.getConnectors = vi.fn(async () => {
+      const res = await baseNoCh();
+      return {
+        ...res,
+        data: res.data.map((c) => (c.id === "slack" ? { ...c, channels: [] } : c)),
+      };
+    });
+    const noChR = await renderWorlds({ api: noChApi });
+    const noChTrigger = must(buttons(noChR.c, "Share to Slack")[0], "Share to Slack button");
+    expect(noChTrigger.disabled || noChTrigger.getAttribute("aria-disabled") === "true").toBe(true);
+    const noChDescId = noChTrigger.getAttribute("aria-describedby");
+    const noChDesc = noChDescId ? (noChR.c.querySelector(`#${noChDescId}`)?.textContent ?? "") : "";
+    const noChReason = `${noChTrigger.getAttribute("title") ?? ""} ${noChDesc}`;
+    expect(noChReason).toMatch(/channel/i);
+    click(noChTrigger);
+    expect(noChR.c.querySelector('[role="dialog"]')).toBeNull();
   });
 
   it("test_FR_UX_17_worlds_note_is_length_capped_and_rendered_as_text_never_html", async () => {

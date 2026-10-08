@@ -115,7 +115,7 @@ export function WorldsPage({ app }: { app: AppCtx }) {
     const defaultWorld = all[0]?.id ?? "";
     setSlackWorldId((cur) => (cur && all.some((w) => w.id === cur) ? cur : defaultWorld));
     setSlackChannel((cur) =>
-      cur && slackState.channels.includes(cur) ? cur : (slackState.channels[0] ?? "#ops"),
+      cur && slackState.channels.includes(cur) ? cur : (slackState.channels[0] ?? ""),
     );
     setSlackNote("");
     setSlackOpen(true);
@@ -130,7 +130,8 @@ export function WorldsPage({ app }: { app: AppCtx }) {
     if (!data || !slackState) return;
     const targetWorld = all.find((w) => w.id === slackWorldId) ?? all[0];
     if (!targetWorld) return;
-    const channel = slackChannel || slackState.channels[0] || "#ops";
+    const channel = slackChannel || slackState.channels[0];
+    if (!channel) return;
     setSlackPending({
       worldId: targetWorld.id,
       worldName: targetWorld.name,

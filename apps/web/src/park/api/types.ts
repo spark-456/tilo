@@ -392,6 +392,7 @@ export interface Connector {
   level?: number;
   used?: string[];
   blurb?: string;
+  channels?: string[];
 }
 export interface Notification {
   id: string;

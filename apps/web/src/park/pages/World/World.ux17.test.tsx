@@ -71,10 +71,9 @@ describe("FR_UX_17 World page: Share to Slack through the approval card", () => 
     expect(textOf(dialog)).toContain("northwind.slack.com");
     const select = q<HTMLSelectElement>(dialog, "select");
     const options = qa<HTMLOptionElement>(select, "option").map((o) => o.value);
-    expect(options.length).toBeGreaterThanOrEqual(2);
-    expect(options[0]).toMatch(/^#/);
+    expect(options).toEqual(["#ops", "#k1-firmware"]);
 
-    setFieldValue(select, options[1] ?? options[0] ?? "#ops");
+    setFieldValue(select, options[1] ?? options[0] ?? "");
     const noteInput = must(
       dialog.querySelector<HTMLInputElement | HTMLTextAreaElement>("textarea, input"),
       "note input",
@@ -134,6 +133,29 @@ describe("FR_UX_17 World page: Share to Slack through the approval card", () => 
 
     click(trigger);
     expect(rig.el.querySelector('[role="dialog"]')).toBeNull();
+
+    // Also when Slack is connected but has no channels configured, the action is disabled with a reason.
+    cleanup();
+    const noChannelsApi = spiedApi();
+    const baseNoChannels = noChannelsApi.getConnectors;
+    noChannelsApi.getConnectors = vi.fn(async () => {
+      const res = await baseNoChannels();
+      return {
+        ...res,
+        data: res.data.map((c) => (c.id === "slack" ? { ...c, channels: [] } : c)),
+      };
+    });
+    const noChRig = await mountWorld({ id: "k1", api: noChannelsApi });
+    const noChTrigger = control(noChRig.el, "Share to Slack") as HTMLButtonElement;
+    expect(noChTrigger.disabled || noChTrigger.getAttribute("aria-disabled") === "true").toBe(true);
+    const noChDescId = noChTrigger.getAttribute("aria-describedby");
+    const noChDesc = noChDescId
+      ? (noChRig.el.querySelector(`#${noChDescId}`)?.textContent ?? "")
+      : "";
+    const noChReason = `${noChTrigger.getAttribute("title") ?? ""} ${noChDesc}`;
+    expect(noChReason).toMatch(/channel/i);
+    click(noChTrigger);
+    expect(noChRig.el.querySelector('[role="dialog"]')).toBeNull();
   });
 
   it("test_FR_UX_17_note_is_length_capped_and_rendered_as_text_never_html", async () => {

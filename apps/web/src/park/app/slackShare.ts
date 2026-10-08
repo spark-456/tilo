@@ -21,20 +21,6 @@ export interface SlackConnectorState {
   readonly disabledReason: string;
 }
 
-const DEFAULT_CHANNELS: readonly string[] = ["#ops", "#general", "#launches"];
-
-function channelSlugFromUsed(entry: string): string | null {
-  const words = entry
-    .toLowerCase()
-    .replace(/[^a-z0-9\s]+/g, " ")
-    .trim()
-    .split(/\s+/)
-    .filter((w) => w.length > 2 && w !== "the" && w !== "set" && w !== "for" && w !== "and");
-  if (words.length === 0) return null;
-  const tail = words.slice(-2).join("-");
-  return tail ? `#${tail}` : null;
-}
-
 export function capSlackNote(raw: string): string {
   return raw.slice(0, SLACK_NOTE_MAX);
 }
@@ -53,16 +39,22 @@ export function slackConnectorState(connectors: readonly Connector[]): SlackConn
       disabledReason: reason,
     };
   }
-  const derived = (slack.used ?? [])
-    .map(channelSlugFromUsed)
-    .filter((ch): ch is string => ch !== null);
   const seen = new Set<string>();
   const channels: string[] = [];
-  for (const ch of [...DEFAULT_CHANNELS, ...derived]) {
-    if (!seen.has(ch)) {
+  for (const raw of slack.channels ?? []) {
+    const ch = raw.trim();
+    if (ch && !seen.has(ch)) {
       seen.add(ch);
       channels.push(ch);
     }
+  }
+  if (channels.length === 0) {
+    return {
+      connected: false,
+      account: slack.acct ?? "Slack",
+      channels: [],
+      disabledReason: "Slack has no channels available to share into.",
+    };
   }
   return {
     connected: true,
