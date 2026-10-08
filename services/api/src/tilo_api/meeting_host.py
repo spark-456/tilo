@@ -5,8 +5,9 @@ stores the draft, a single T3 gate card, then the outbox sends exactly the appro
 `HostRun` is the generic `Run` with four differences: its plan is fixed, no question comes before the gate, the gate
 card says the draft's own sentence to the draft's own recipients, and after the send it records the receipt, the draft's
 `sent` revision and, when Google added no Meet link, a needs-you card. The Meet link, the title and the addresses are
-in no event, log, receipt or card but where the pins allow. `on_connection_event` abandons what a revoked grant leaves
-unsent. Deterministic code only.
+in no event, log, receipt or card but where the pins allow. `on_connection_event` abandons what a revoked or expired
+grant leaves unsent. The Google call is tilo-connectors' (ADR-0032): the run's connector is `MeetingHostStub`.
+Deterministic code only.
 """
 
 from __future__ import annotations
@@ -21,7 +22,6 @@ from typing import Annotated, Any
 from fastapi import Depends, HTTPException
 from tilo_archive import RunArchive
 from tilo_connectors import Outbox
-from tilo_connectors.adapters.meeting_host import MeetingHostAdapter
 from tilo_connectors.errors import MeetingHostConfigError, MeetingHostRefused, SideEffectRefused
 from tilo_connectors.meeting_host import (
     ACTION_TYPE,
@@ -41,6 +41,7 @@ from tilo_harness.skills import SkillRegistry
 from tilo_memory.artifacts import ArtifactStore, NewVersion, Origin, Scope
 
 from tilo_api import deps, events
+from tilo_api.meeting_host_rpc import HostRpcError, MeetingHostRpc, MeetingHostStub
 from tilo_api.people_writes import Refusal, Writer
 from tilo_api.runs import Run, Seams, _GateFailed
 
@@ -63,8 +64,7 @@ class HostSeams:
     open_archive: Callable[..., RunArchive]
     layout_builder: Callable[..., dict]
     skills: SkillRegistry
-    broker: Any
-    transport: Any
+    host_client: MeetingHostRpc
 
 
 def get_host_seams(
@@ -77,8 +77,7 @@ def get_host_seams(
     open_archive: Annotated[Callable[..., RunArchive], Depends(deps.get_run_archive)],
     layout_builder: Annotated[Callable[..., dict], Depends(deps.get_layout_builder)],
     skills: Annotated[SkillRegistry, Depends(deps.get_skill_registry)],
-    broker: Annotated[Any, Depends(deps.get_token_broker)],
-    transport: Annotated[Any, Depends(deps.get_meeting_host_transport)],
+    host_client: Annotated[MeetingHostRpc, Depends(deps.get_meeting_host_client)],
 ) -> HostSeams:
     return HostSeams(
         store,
@@ -90,24 +89,12 @@ def get_host_seams(
         open_archive,
         layout_builder,
         skills,
-        broker,
-        transport,
+        host_client,
     )
 
 
 def _canonical(doc: Mapping[str, Any]) -> bytes:
     return json.dumps(doc, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode("ascii")
-
-
-class _Drafts:
-    """The adapter's `ArtifactSource`: the hash-checked read of the run's own store, parsed."""
-
-    def __init__(self, artifacts: ArtifactStore, scope: Scope) -> None:
-        self._artifacts, self._scope = artifacts, scope
-
-    def get(self, artifact_id: str, version: int) -> Mapping[str, Any]:
-        doc = json.loads(self._artifacts.read(self._scope, {"artifact_id": artifact_id, "version": version}))
-        return doc if isinstance(doc, dict) else {}
 
 
 class _Receipts:
@@ -135,11 +122,6 @@ class _Receipts:
             raise SideEffectRefused("a different receipt is already stored for this send")
         self.made[(receipt.world_id, receipt.outbox_id)] = (receipt, stored.ref)
         return stored.ref
-
-    def get(self, world_id: str, meeting_id: str) -> HostReceipt | None:
-        return next(
-            (r for (w, _), (r, _ref) in self.made.items() if w == world_id and r.meeting_id == meeting_id), None
-        )
 
 
 class _DraftRunner:
@@ -187,10 +169,9 @@ class HostRun(Run):
         self.draft, self.still_hosted = draft, still_hosted
         scope = Scope(deps.ORG_ID, task.world_id, task.owner)
         self.receipts = _Receipts(seams.artifacts, scope, task.run_id)
-        adapter = MeetingHostAdapter(  # built per run from the two Google seams and this run's own store
-            declaration=seams.registry.get(CONNECTOR_ID), broker=seams.broker, transport=seams.transport,
-            artifacts=_Drafts(seams.artifacts, scope), owner_of=lambda world_id: seams.store.worlds[world_id].owner,
-            receipts=self.receipts, clock=events.now, emit=lambda part: None, sleep=lambda seconds: None,
+        self.stub = MeetingHostStub(  # the Google call is connectors' (ADR-0032); this run keeps the draft and receipts
+            seams.host_client, lambda ref: seams.artifacts.read(scope, ref),
+            lambda part: on_connection_event(part, outbox_store=seams.outbox_store), self.receipts.put,
         )  # fmt: skip
 
         def resolver(**_: Any) -> dict:  # step 5 of the gate: the draft's own list, never the address book
@@ -198,7 +179,7 @@ class HostRun(Run):
 
         run_seams = Seams(
             _no_director, seams.layout_builder, _DraftRunner(draft), resolver, seams.skills, seams.registry,
-            {CONNECTOR_ID: adapter}, seams.outbox_store, seams.writer, {}, seams.artifacts, seams.redactor,
+            {CONNECTOR_ID: self.stub}, seams.outbox_store, seams.writer, {}, seams.artifacts, seams.redactor,
             seams.open_archive,
         )  # fmt: skip
         super().__init__(seams.store, task, {}, _CAP, run_seams)
@@ -237,6 +218,7 @@ class HostRun(Run):
             ok = False  # fail closed
         if not ok:
             raise _GateFailed("the meeting changed or was deleted, so nothing was sent")
+        self.stub.hand_evidence(entry["id"], evidence)  # connectors checks the same case again (HB-04)
         transfer = await super()._send(entry, evidence)
         try:
             self._after_send(entry, transfer)
@@ -320,6 +302,10 @@ def host_meeting(w: Writer, meeting_id: str, seams: HostSeams) -> dict[str, Any]
         draft = draft_meeting_event(meeting=meeting, persons=persons, actor=w.actor, now=w.now, config=config)
     except MeetingHostRefused as exc:
         raise Refusal(422, str(exc), rule=exc.rule) from None
+    try:  # ADR-0032 decision 8: no gate card is raised that could never send
+        seams.host_client.status(w.actor)
+    except HostRpcError:
+        raise HTTPException(status_code=503, detail="not_configured") from None
     task = deps.TaskRecord(
         owner=w.actor, world_id=world_id, run_id=world.run_id, draft={}, brief={}, questions=[], next_seq=1
     )
@@ -349,11 +335,14 @@ def host_meeting(w: Writer, meeting_id: str, seams: HostSeams) -> dict[str, Any]
 
 
 def on_connection_event(part: Mapping[str, Any], *, outbox_store: Any) -> int:
-    """The token broker's `emit` sink. A revoked `meeting_host` grant abandons every unsent entry of that person's
+    """The connection sink. A revoked or expired `meeting_host` grant abandons every unsent entry of that person's
     (`authz.ref`), so a reconnect later sends nothing for it. Returns how many it abandoned; an entry a live lease holds
     stays for the next event; any other or malformed part does nothing."""
     try:
-        if part["type"] != "connection.revoked" or part["data"]["connector"] != CONNECTOR_ID:
+        if (
+            part["type"] not in ("connection.revoked", "connection.expired")
+            or part["data"]["connector"] != CONNECTOR_ID
+        ):
             return 0
         user = part["user_id"]
         unsent = [

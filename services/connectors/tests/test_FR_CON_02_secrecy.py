@@ -213,25 +213,38 @@ def test_FR_CON_02_the_access_token_is_reachable_only_from_the_adapter_path():
     assert violations == []
 
 
+# ADR-0032 decision 1: the broker, the live Google transport and every adapter (each takes a token) stay in connectors.
+# tilo-api may keep the pure modules (meeting_host, outbox, provenance, registry, errors).
+TOKEN_MODULES = ("tilo_connectors.tokens", "tilo_connectors.live", "tilo_connectors.adapters")
+TOKEN_NAMES = ("tokens", "TokenBroker", "FakeKms", "live", "adapters")
+
+
+def _is_token_module(name: str) -> bool:
+    return any(name == m or name.startswith(m + ".") for m in TOKEN_MODULES)
+
+
 def test_FR_CON_02_no_service_outside_tilo_connectors_imports_the_broker():
-    """SEC-02 / PRD 6.5: only tilo-connectors can decrypt OAuth tokens, so no other service or
-    package imports tilo_connectors.tokens."""
+    """SEC-02 / PRD 6.5 / ADR-0032: only tilo-connectors can decrypt OAuth tokens or use them, so no other service or
+    package imports tilo_connectors.tokens, .live or .adapters (import, from-import or importlib)."""
     own = (REPO_ROOT / "services" / "connectors").resolve()
     violations = []
     for path in production_files():
         if own in path.resolve().parents:
             continue
         tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        where = f"{path.relative_to(REPO_ROOT)}"
         for node in ast.walk(tree):
-            if isinstance(node, ast.ImportFrom) and (node.module or "").startswith("tilo_connectors.tokens"):
-                violations.append(f"{path.relative_to(REPO_ROOT)}:{node.lineno}")
+            if isinstance(node, ast.ImportFrom) and _is_token_module(node.module or ""):
+                violations.append(f"{where}:{node.lineno}")
             elif isinstance(node, ast.ImportFrom) and node.module == "tilo_connectors":
-                if any(a.name in ("tokens", "TokenBroker", "FakeKms") for a in node.names):
-                    violations.append(f"{path.relative_to(REPO_ROOT)}:{node.lineno}")
+                if any(a.name in TOKEN_NAMES for a in node.names):
+                    violations.append(f"{where}:{node.lineno}")
             elif isinstance(node, ast.Import):
-                violations += [
-                    f"{path.relative_to(REPO_ROOT)}:{node.lineno}"
-                    for a in node.names
-                    if a.name.startswith("tilo_connectors.tokens")
-                ]
+                violations += [f"{where}:{node.lineno}" for a in node.names if _is_token_module(a.name)]
+            elif (
+                isinstance(node, ast.Constant)
+                and isinstance(node.value, str)
+                and _is_token_module(node.value)  # importlib.import_module("tilo_connectors.live")
+            ):
+                violations.append(f"{where}:{node.lineno}")
     assert violations == []

@@ -50,6 +50,7 @@ from tilo_api import events, firebase_auth, spend
 from tilo_api.access import AccessStore, Mode, enforced, provider_mode
 from tilo_api.appcheck import AppCheckVerifier, default_verifier
 from tilo_api.assistant.config import AssistantConfig, AssistantConfigError, load_assistant_config
+from tilo_api.meeting_host_rpc import MeetingHostRpc, open_meeting_host_rpc
 from tilo_api.people_access import NoSourceOwners
 from tilo_api.people_access import SourceOwners as PanelSourceOwners
 
@@ -679,14 +680,42 @@ def get_run_archive() -> Callable[..., RunArchive]:
     raise NotImplementedError("no raw-archive store is configured, so no run starts")
 
 
-def get_token_broker() -> Any:
-    """FR-MTG-09: the token broker's adapter-facing half (`access_token_for_adapter`). Unwired: no host run."""
-    raise HTTPException(status_code=503, detail="not_configured")
+_host_client_lock = threading.Lock()
+_host_client: MeetingHostRpc | None = None
+_host_client_retry_at: float | None = None
+MEETING_HOST_BACKOFF_S = 30.0  # after a failed build, no new attempt for this long (ADR-0032 decision 8)
+meeting_host_clock: Callable[[], float] = time.monotonic  # read at call time, so a test can replace it
 
 
-def get_meeting_host_transport() -> Any:
-    """FR-MTG-09: the `Transport` behind `MeetingHostAdapter`. No live transport in dev (EFF-01): refuses."""
-    raise HTTPException(status_code=503, detail="not_configured")
+def get_meeting_host_client() -> MeetingHostRpc:
+    """FR-MTG-09, ADR-0032: the one client to tilo-connectors' meeting-host routes, built from `TILO_CONNECTORS_URL` on
+    first use. Unset or malformed is 503 `not_configured` (the value never echoed); a failed build is remembered for
+    `MEETING_HOST_BACKOFF_S`, then the next request tries again, so a fixed setting needs no restart."""
+    global _host_client, _host_client_retry_at
+    built = _host_client
+    if built is not None:
+        return built
+    with _host_client_lock:
+        if _host_client is None:
+            retry_at = _host_client_retry_at
+            if retry_at is not None and meeting_host_clock() < retry_at:
+                raise HTTPException(status_code=503, detail="not_configured")
+            try:
+                _host_client, _host_client_retry_at = open_meeting_host_rpc(os.environ), None
+            except Exception as exc:  # noqa: BLE001 - the type only
+                logger.warning("meeting-host client not built (%s)", type(exc).__name__)
+                _host_client_retry_at = meeting_host_clock() + MEETING_HOST_BACKOFF_S
+                raise HTTPException(status_code=503, detail="not_configured") from None
+        return _host_client
+
+
+def _forget_host_client() -> None:
+    global _host_client, _host_client_retry_at
+    with _host_client_lock:
+        _host_client, _host_client_retry_at = None, None
+
+
+get_meeting_host_client.cache_clear = _forget_host_client  # type: ignore[attr-defined]  # tests start from a cold process
 
 
 REPLAY_ONLY_MESSAGE = "This link is replay-only right now: new work is paused; finished runs can still be replayed."
