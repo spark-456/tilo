@@ -68,9 +68,10 @@ def test_DEMO_EPHEMERAL_1_the_global_cap_refuses_without_evicting_a_live_session
 def test_DEMO_EPHEMERAL_1_no_new_session_past_the_session_cap_and_a_live_one_still_works():
     reg = fresh_registry(max_sessions=2)
     live = reg.session("u_a")
-    reg.session("u_b")
+    live.charge(1)
+    reg.session("u_b").charge(1)
     with pytest.raises(HTTPException) as refused:
-        reg.session("u_c")
+        reg.session("u_c").charge(1)
     assert _full(refused.value) == (503, "demo_capacity")
     assert reg.session("u_a") is live and set(reg.sessions) == {"u_a", "u_b"}
 
@@ -97,8 +98,8 @@ def test_DEMO_EPHEMERAL_1_every_access_sweeps_without_a_background_thread():
     reg = fresh_registry(clock=clock, ttl_s=10.0)
     reg.session("u_a").charge(2)
     clock.t += 11
-    reg.session("u_b")
-    assert set(reg.sessions) == {"u_b"} and reg.total_items == 0
+    reg.session("u_b").charge(1)
+    assert set(reg.sessions) == {"u_b"} and reg.total_items == 1
 
 
 def _mini(monkeypatch):
@@ -111,6 +112,8 @@ def _mini(monkeypatch):
 
     @app.post("/probe")
     def probe(store: Any = Depends(deps.get_store), writer: Any = Depends(deps.get_event_writer)) -> dict[str, bool]:
+        if hasattr(store, "session"):
+            store.session.charge(1)  # a first write takes the session's slot
         return {"ephemeral": store is not durable.store and writer is not durable.store.writer}
 
     app.dependency_overrides[deps.get_firebase_verifier] = lambda: verifier

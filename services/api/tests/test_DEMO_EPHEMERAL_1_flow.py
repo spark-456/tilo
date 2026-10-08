@@ -43,9 +43,9 @@ def outbox():
     return SpyOutbox()
 
 
-def _rig(repo_root, monkeypatch, outbox, **flags):
+def _rig(repo_root, monkeypatch, outbox, google=False):
     rf = build_run_flow(repo_root, covered=False)
-    install_run_seams(rf, monkeypatch, outbox)
+    install_run_seams(rf, monkeypatch, outbox, google=google)
     return rf
 
 
@@ -62,7 +62,7 @@ def demo_rig(repo_root, monkeypatch, registry, durable, outbox):
 
 @pytest.fixture()
 def google_rig(repo_root, monkeypatch, registry, durable, outbox):
-    rf = _rig(repo_root, monkeypatch, outbox)
+    rf = _rig(repo_root, monkeypatch, outbox, google=True)
     durable.store.commit(policies={"pol_send_ask": covering_policy()}, create=[("policies", "pol_send_ask")])
     as_session(rf, durable.store, full_session=True)
     durable.records.calls.clear()
@@ -84,6 +84,7 @@ def test_DEMO_EPHEMERAL_1_a_demo_intake_approve_and_run_writes_nothing_durable(d
     assert rf.adapter.sent == [], "a demo run sent something through a connector"
     assert rf.rig.meta._docs == {} and rf.rig.opened == [], "a demo reached the shared artifact store or raw archive"
     session = registry.sessions[FLOW_USER]
+    assert "artifacts" in session._made and "archive" in session._made, "the demo's own seams ran"
     assert rf.world_id in session.store.worlds and session.store.events[rf.world_id], "the demo's data is its own"
     assert session.items > 0
 
@@ -115,7 +116,7 @@ def test_DEMO_EPHEMERAL_1_a_demos_data_is_gone_after_the_idle_ttl(repo_root, mon
     assert registry.total_items > 0
     clock.t += 61  # idle past the TTL
     assert rf.flow.client.get(f"/tasks/{task}/approaches").status_code == 404
-    assert registry.sessions[FLOW_USER].store.tasks == {}, "the session came back empty"
+    assert FLOW_USER not in registry.sessions, "a read after expiry creates nothing"
     assert durable.writes() == []
     rf.close()
     rf.app.dependency_overrides.clear()
@@ -152,7 +153,7 @@ def test_DEMO_EPHEMERAL_1_one_demo_cannot_read_another_demos_data_nor_a_google_u
     assert [w["id"] for w in client.get("/worlds").json().get("worlds", [])] == []
     assert client.get("/cards").json().get("items", []) == []
     assert client.get(f"/worlds/{W2}/cards").status_code in (403, 404)  # nor the Google user's world
-    assert registry.sessions[OTHER_USER].store.worlds == {}
+    assert OTHER_USER not in registry.sessions, "reads on a session that does not exist create no slot"
 
     rf.as_member(user_id=FLOW_USER)  # the owner again still sees its own
     assert client.get(f"/tasks/{mine[0]}/approaches").status_code == 200
@@ -192,3 +193,38 @@ def test_DEMO_EPHEMERAL_1_a_full_demo_session_answers_demo_capacity_and_spills_n
     assert durable.writes() == [] and registry.sessions[FLOW_USER].store.tasks == {}
     rf.close()
     rf.app.dependency_overrides.clear()
+
+
+def test_DEMO_EPHEMERAL_1_a_demos_upload_lands_in_its_own_store_not_the_shared_one(demo_rig, registry):
+    from tilo_api import intake
+
+    before = dict(intake._store._versions)
+    response = demo_rig.flow.intake(files=[("notes.csv", b"a,b" + bytes([10]) + b"1,2" + bytes([10]))])
+    assert response.status_code == 201, response.text
+    assert intake._store._versions == before, "a demo's upload reached the process-wide store"
+    assert registry.sessions[FLOW_USER].uploads._versions, "the upload is in the demo's own store"
+
+
+def test_DEMO_EPHEMERAL_1_the_byte_cap_fires_through_the_upload_route(repo_root, monkeypatch, durable, outbox):
+    registry = fresh_registry(max_bytes=100)
+    rf = _rig(repo_root, monkeypatch, outbox)
+    as_session(rf, registry.session(FLOW_USER).store, demo_session=True)
+    refused = rf.flow.intake(files=[("big.csv", b"a,b" + bytes([10]) + b"1,2" + bytes([10]) * 1 + b"x" * 500)])
+    assert refused.status_code == 429 and refused.json()["detail"] == "demo_capacity"
+    assert durable.writes() == []
+    rf.close()
+    rf.app.dependency_overrides.clear()
+
+
+def test_DEMO_EPHEMERAL_1_approve_is_refused_while_a_demo_has_its_runs_going(demo_rig, registry):
+    import threading
+    from types import SimpleNamespace
+
+    rf = demo_rig
+    rf.start()
+    store = registry.sessions[FLOW_USER].store
+    for n in range(ephemeral.MAX_RUNS):
+        store.runs[f"w_busy{n}"] = SimpleNamespace(_ended=threading.Event())
+    refused = rf.approve()
+    assert refused.status_code == 429 and refused.json()["detail"] == "demo_runs_busy"
+    assert not any(t.granted for t in store.tasks.values()), "nothing was granted"

@@ -105,12 +105,7 @@ def run_seams(request: Request, mode: Annotated[Mode, Depends(deps.get_work_mode
 
     from tilo_api import ephemeral  # noqa: PLC0415
 
-    try:  # a demo's run stores nothing durable (DEMO-EPHEMERAL-1); the tick has no person, so none applies
-        demo = ephemeral.for_request(request)
-    except HTTPException as refused:
-        if refused.status_code != 401:  # capacity: never fall back to the durable seams
-            raise
-        demo = None
+    demo = None if ephemeral.has_no_person(request) else ephemeral.for_request(request)  # the tick has no person
     mine = (  # the storage seams a demo run takes from its own bundle; connector adapters stay empty: it sends nothing
         {}
         if demo is None

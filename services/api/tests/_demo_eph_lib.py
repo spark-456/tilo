@@ -65,7 +65,7 @@ class Durable:
         return self.records.writes() + self.events.writes()
 
 
-def install_run_seams(rf: Any, monkeypatch: Any, outbox: SpyOutbox) -> None:
+def install_run_seams(rf: Any, monkeypatch: Any, outbox: SpyOutbox, *, google: bool = False) -> None:
     """Moves the run flow's storage seams from dependency overrides to the module defaults, as production has them:
     the app picks what a demo gets; a Google session gets these recording fakes."""
     ov = rf.app.dependency_overrides
@@ -75,9 +75,10 @@ def install_run_seams(rf: Any, monkeypatch: Any, outbox: SpyOutbox) -> None:
     ):  # fmt: skip
         ov.pop(seam, None)
     monkeypatch.setattr(deps, "get_outbox_store", lambda: outbox)
-    monkeypatch.setattr(deps, "get_artifact_store", lambda request=None: rf.rig.store)
-    monkeypatch.setattr(deps, "get_redactor", lambda request=None: rf.rig.redactor)
-    monkeypatch.setattr(deps, "get_run_archive", lambda request=None: rf.rig.open_archive)
+    if google:  # a Google session's artifact seams are recording fakes; a demo's are the app's own (ephemeral)
+        monkeypatch.setattr(deps, "get_artifact_store", lambda request=None: rf.rig.store)
+        monkeypatch.setattr(deps, "get_redactor", lambda request=None: rf.rig.redactor)
+        monkeypatch.setattr(deps, "get_run_archive", lambda request=None: rf.rig.open_archive)
     monkeypatch.setattr(deps, "get_connector_adapters", lambda: {MOCK_ID: rf.adapter})
 
 

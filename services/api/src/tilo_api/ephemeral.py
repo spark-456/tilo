@@ -20,6 +20,7 @@ import logging
 import re
 import threading
 import time
+import weakref
 from collections.abc import Callable
 from datetime import UTC, datetime
 from typing import Any
@@ -29,7 +30,7 @@ from starlette.requests import HTTPConnection
 from tilo_archive import RunArchive
 from tilo_connectors import InMemoryOutboxStore
 from tilo_memory.artifacts import ArtifactStore, MemoryBlobBackend, MemoryMetaBackend
-from tilo_people.stores import MemoryStore, PeopleStores
+from tilo_people.stores import PeopleStores
 from tilo_planning.artifacts import InMemoryArtifactStore
 
 from tilo_api import deps
@@ -42,6 +43,8 @@ MAX_ITEMS = 1000  # per session: records, events, artifact documents and blobs, 
 MAX_BYTES = 8_000_000  # per session: artifact blobs, archive lines, uploads
 MAX_TOTAL_ITEMS = 20_000
 MAX_TOTAL_BYTES = 100_000_000
+MAX_RUNS = 2  # a demo's runs at once
+IDLE_EMPTY_S = 60.0  # an empty session older than this may be evicted for a new one
 CAPACITY = "demo_capacity"
 _SECRET = re.compile(r"(?:sk-|AIza|ghp_|xox[abp]-)[0-9A-Za-z_-]{16,}")  # the stand-in redactor (FR-MEM-05 is not built)
 
@@ -66,6 +69,15 @@ class _Counted:
     def charge(self, items: int = 1, nbytes: int = 0) -> None:
         self.session.charge(items, nbytes)
 
+    def charged(self, call: Callable[[], Any], items: int = 1, nbytes: int = 0) -> Any:
+        """`call` after charging; a refused or failed write gives the charge back."""
+        self.charge(items, nbytes)
+        try:
+            return call()
+        except BaseException:
+            self.session.refund(items, nbytes)
+            raise
+
 
 class _Meta(_Counted, MemoryMetaBackend):
     def __init__(self, session: DemoSession) -> None:
@@ -73,8 +85,7 @@ class _Meta(_Counted, MemoryMetaBackend):
         self.session = session
 
     def create(self, path: str, doc: dict[str, Any]) -> None:
-        self.charge()
-        super().create(path, doc)
+        self.charged(lambda: super(_Meta, self).create(path, doc))
 
 
 class _Blobs(_Counted, MemoryBlobBackend):
@@ -83,8 +94,7 @@ class _Blobs(_Counted, MemoryBlobBackend):
         self.session = session
 
     def create(self, key: str, data: bytes) -> None:
-        self.charge(1, len(data))
-        super().create(key, data)
+        self.charged(lambda: super(_Blobs, self).create(key, data), 1, len(data))
 
 
 class _Uploads(_Counted, InMemoryArtifactStore):
@@ -93,8 +103,7 @@ class _Uploads(_Counted, InMemoryArtifactStore):
         self.session = session
 
     def put(self, **kwargs: Any) -> Any:
-        self.charge(1, len(kwargs.get("content", b"")))
-        return super().put(**kwargs)
+        return self.charged(lambda: super(_Uploads, self).put(**kwargs), 1, len(kwargs.get("content", b"")))
 
 
 class _Outbox(_Counted, InMemoryOutboxStore):
@@ -104,21 +113,13 @@ class _Outbox(_Counted, InMemoryOutboxStore):
 
     def _insert_if_absent(self, entry: dict) -> bool:
         self.charge()
-        return super()._insert_if_absent(entry)
-
-
-class _Records(_Counted, MemoryStore):
-    def __init__(self, session: DemoSession, kind: str) -> None:
-        super().__init__(kind)
-        self.session = session
-
-    def create(self, record: Any) -> Any:
-        self.charge()
-        return super().create(record)
-
-    def create_founder(self, record: Any) -> Any:
-        self.charge()
-        return super().create_founder(record)
+        added = False
+        try:
+            added = super()._insert_if_absent(entry)
+            return added
+        finally:
+            if not added:
+                self.session.refund(1, 0)
 
 
 class _ArchiveLines:
@@ -128,7 +129,7 @@ class _ArchiveLines:
         self._session, self._lines, self._lock = session, {}, threading.Lock()
 
     def append_line(self, org_id: str, run_id: str, line: str) -> None:
-        self._session.charge(1, len(line))
+        self._session.charge(1, len(line.encode()))
         with self._lock:
             self._lines.setdefault((org_id, run_id), []).append(line)
 
@@ -142,6 +143,11 @@ class EphemeralStore(deps.Store):
 
     session: DemoSession
     _busy = threading.local()
+
+    def admit_run(self) -> None:
+        """At most `MAX_RUNS` runs at once: each parked run keeps a polling thread (429 `demo_runs_busy`)."""
+        if sum(not r._ended.is_set() for r in list(self.runs.values())) >= MAX_RUNS:
+            raise HTTPException(status_code=429, detail="demo_runs_busy")
 
     def _new(self, worlds: Any, tasks: Any, policies: Any) -> int:
         return sum(
@@ -193,6 +199,7 @@ class DemoSession:
     def __init__(self, registry: Registry, uid: str) -> None:
         self.registry, self.uid, self.items, self.nbytes, self.dead = registry, uid, 0, 0, False
         self.last_seen = registry.clock()
+        self.registered = False  # a session holds a registry slot only once it has stored something
         self._lock = threading.Lock()
         self._made: dict[str, Any] = {}
         self.store = EphemeralStore()
@@ -239,8 +246,18 @@ class DemoSession:
     @property
     def people(self) -> PeopleStores:
         def make() -> PeopleStores:
-            kinds = ("person", "meeting", "work_item", "pinboard_item", "mention", "calendar_entry")
-            stores = PeopleStores(*(_Records(self, kind) for kind in kinds))
+            stores = PeopleStores.in_memory()  # the real person store: address reservation, founder marker, last person
+            for store in (
+                stores.persons,
+                stores.meetings,
+                stores.work_items,
+                stores.pins,
+                stores.mentions,
+                stores.calendar,
+            ):
+                for name in ("create", "create_founder"):
+                    if hasattr(store, name):
+                        setattr(store, name, self._charging(getattr(store, name)))
             stamp = {"by": self.uid, "at": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%S.000Z")}
             stores.persons.create(
                 {"id": self.uid, "org_id": deps.ORG_ID, "display_name": "Demo", "aliases": [],
@@ -251,11 +268,29 @@ class DemoSession:
 
         return self._once("people", make)
 
+    def _charging(self, create: Callable[[Any], Any]) -> Callable[[Any], Any]:
+        def charged(record: Any) -> Any:
+            self.charge()
+            try:
+                return create(record)
+            except BaseException:
+                self.refund(1, 0)
+                raise
+
+        return charged
+
+    def refund(self, items: int, nbytes: int) -> None:
+        self.registry.refund(self, items, nbytes)
+
     def clear(self) -> None:
         self.dead = True
         for held in (self.store.worlds, self.store.tasks, self.store.policies, self.store.events, self.store.runs):
             held.clear()
-        self._made.clear()
+        if self._lock.acquire(timeout=1.0):  # never wait on a builder that holds it while it charges (lock order)
+            try:
+                self._made.clear()
+            finally:
+                self._lock.release()
 
 
 class Registry:
@@ -274,20 +309,31 @@ class Registry:
         self.max_items, self.max_bytes = max_items, max_bytes
         self.max_total_items, self.max_total_bytes = max_total_items, max_total_bytes
         self.sessions: dict[str, DemoSession] = {}
+        self._pending: weakref.WeakValueDictionary[str, DemoSession] = weakref.WeakValueDictionary()
         self.total_items = self.total_bytes = 0
         self._lock = threading.RLock()
 
     def session(self, uid: str) -> DemoSession:
-        """The uid's live session (its idle clock restarts), or a new one; 503 `demo_capacity` when full."""
+        """The uid's live session (its idle clock restarts), or an empty one that holds no slot until it first stores
+        something: a read creates nothing here."""
         with self._lock:
             self.sweep()
-            held = self.sessions.get(uid)
+            held = self.sessions.get(uid) or self._pending.get(uid)
             if held is None:
-                if len(self.sessions) >= self.max_sessions:
-                    raise _capacity(503)
-                held = self.sessions[uid] = DemoSession(self, uid)
+                held = self._pending[uid] = DemoSession(self, uid)
             held.last_seen = self.clock()
             return held
+
+    def _register(self, session: DemoSession) -> None:
+        if len(self.sessions) >= self.max_sessions:
+            now = self.clock()
+            idle = [s for s in self.sessions.values() if s.items == 0 and now - s.last_seen > IDLE_EMPTY_S]
+            if not idle:
+                raise _capacity(503)  # never one that holds data
+            self.drop(min(idle, key=lambda s: s.last_seen).uid)
+        self.sessions[session.uid] = session
+        self._pending.pop(session.uid, None)
+        session.registered = True
 
     def sweep(self) -> None:
         with self._lock:
@@ -297,16 +343,26 @@ class Registry:
 
     def drop(self, uid: str) -> None:
         with self._lock:
-            gone = self.sessions.pop(uid, None)
+            gone = self.sessions.pop(uid, None) or self._pending.pop(uid, None)
             if gone is not None:
                 self.total_items -= gone.items
                 self.total_bytes -= gone.nbytes
                 gone.clear()
 
+    def refund(self, session: DemoSession, items: int, nbytes: int) -> None:
+        with self._lock:
+            if not session.dead:
+                session.items -= items
+                session.nbytes -= nbytes
+                self.total_items -= items
+                self.total_bytes -= nbytes
+
     def charge(self, session: DemoSession, items: int, nbytes: int) -> None:
         with self._lock:
             if session.dead:
                 raise _capacity(503)  # the session ended while its run was still writing
+            if (items > 0 or nbytes > 0) and not session.registered:
+                self._register(session)
             if items > 0 or nbytes > 0:
                 if session.items + items > self.max_items or session.nbytes + nbytes > self.max_bytes:
                     raise _capacity(429)
@@ -332,11 +388,25 @@ def configure(**limits: Any) -> Registry:
     return _registry
 
 
+def mark_no_person(request: Any) -> None:
+    """Said by the scheduler routes alone, after their OIDC check: this request has no person (no Firebase token to
+    verify), so it gets the durable store and the durable run seams. Nothing a client sends sets it."""
+    if (state := getattr(request, "state", None)) is not None:
+        state.no_person = True
+
+
+def has_no_person(request: Any) -> bool:
+    state = getattr(request, "state", None)
+    return state is None or getattr(state, "no_person", False) is True  # not a real request: nobody to resolve
+
+
 def for_request(request: HTTPConnection) -> DemoSession | None:
     """This request's ephemeral session when it is an anonymous demo session; None for a full session. The demo flag is
     the access gate's or the verified principal's, the bucket the principal's uid: nothing a client sends picks either.
     A request whose principal cannot be resolved is refused with the sign-in 401, never given a durable store."""
     state = getattr(request, "state", None)
+    if state is not None and getattr(state, "no_person", False) is True:
+        return None  # the scheduler's own request (see `mark_no_person`): the durable store, as before
     if state is None:  # not a real request (no person to resolve): refused like any unresolvable principal
         raise HTTPException(status_code=401, detail=deps.SIGN_IN_REQUIRED, headers={"WWW-Authenticate": "Bearer"})
     if (held := getattr(state, "ephemeral_session", None)) is not None:
