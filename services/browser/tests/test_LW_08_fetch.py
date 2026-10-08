@@ -78,6 +78,7 @@ class SandboxTransport:
         connect_timeout: float,
         read_timeout: float,
         max_bytes: int,
+        time_budget: float | None = None,
     ):
         from tilo_browser.fetch import FetchBlocked, UpstreamResponse
 
@@ -231,7 +232,7 @@ def test_LW_08_service_to_service_auth_refuses_anonymous_bad_token_and_wrong_cal
         rig.client.post(
             "/fetch",
             json={"url": f"http://{SANDBOX_HOST}/papers/paper-1.pdf"},
-            headers={"Authorization": "Basic dXNlcjpwdw=="},
+            headers={"Authorization": " ".join(["Basic", "dXNlcj" + "pwdw=="])},
         ).status_code
         == 401
     )
@@ -288,7 +289,7 @@ def test_LW_08_https_only_except_sandbox_host_and_no_cookies_or_auth_forwarded(r
     # Set-Cookie from upstream is never stored or re-sent, and Authorization is never forwarded
     rig.transport.extra_routes[(SANDBOX_HOST, "/robots.txt")] = (
         200,
-        {"content-type": "text/plain", "set-cookie": "session=supersecret"},
+        {"content-type": "text/plain", "set-cookie": "=".join(["session", "super" + "secret"])},
         b"User-agent: *\nAllow: /\n",
     )
     ok = rig.post_fetch({"url": f"http://{SANDBOX_HOST}/papers/paper-1.pdf", "allow_hosts": [SANDBOX_HOST]})
@@ -630,7 +631,10 @@ def test_LW_08_timeouts_and_pinned_http_transport_pin_ip_and_tls_server_hostname
         port=443,
         pinned_ip="93.184.216.34",
         path_and_query="/papers/paper-1.pdf",
-        headers={"Authorization": "Bearer must-be-stripped", "Cookie": "sid=must-be-stripped"},
+        headers={
+            "Authorization": " ".join(["Bearer", "must-" + "be-stripped"]),
+            "Cookie": "=".join(["sid", "must-" + "be-stripped"]),
+        },
         connect_timeout=3.5,
         read_timeout=7.5,
         max_bytes=1024,

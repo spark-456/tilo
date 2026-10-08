@@ -10,7 +10,14 @@ Security invariants enforced on every call:
 - Resolved IP is pinned for the TCP connection while keeping the original host for `Host` and TLS SNI.
 - Every redirect hop (at most 5) re-runs egress policy, DNS resolution, IP pinning, and `robots.txt`.
 - `robots.txt` is honoured and cached per `(scheme, host, port)`.
-- Streaming enforces 25 MiB per file and 10 files / 50 MB per unit (FR-INT-01).
+- One wall-clock deadline per `FetchService.fetch()` (default 60 s) covers DNS, `robots.txt`, every redirect hop,
+  the header read and the body; the remaining time is passed to the transport, which checks it inside its read
+  loop and aborts a stalled socket. Expiry is refused and logged as `timeout` (HTTP 504).
+- Only port 443 is fetched (plus the configured sandbox port for sandbox hosts).
+- Streaming enforces 25 MiB per file and 10 files / 50 MB per unit (FR-INT-01). HTML is capped at
+  `MAX_HTML_BYTES` (2 MiB) before it is decoded or parsed; larger pages are refused as `html_too_large` (HTTP 413),
+  and the transport stops reading an HTML body at the cap. A body shorter than its `Content-Length`, a malformed
+  header or any other transport error is refused as `upstream_error` (HTTP 502).
 - Media type is determined strictly from magic bytes (`tilo_planning.extraction.FILE_TYPES`), never from
   URL extension or `Content-Type`; bare archives and executables are refused; HTML is converted to plain
   text with `<script>`/`<style>` removed.
@@ -29,6 +36,7 @@ import re
 import socket
 import ssl
 import threading
+import time
 import urllib.robotparser
 import zipfile
 from collections.abc import Callable, Mapping, Sequence
@@ -50,14 +58,18 @@ log = logging.getLogger("tilo_browser.fetch")
 
 MAX_FILE_BYTES = 25 * 1024 * 1024  # 25 MiB per file
 MAX_ROBOTS_BYTES = 512 * 1024
+MAX_HTML_BYTES = 2 * 1024 * 1024  # HTML is parsed in memory: refuse larger pages before decoding
 MAX_UNIT_FILES = 10  # FR-INT-01: max 10 files per unit
 MAX_UNIT_BYTES = 50_000_000  # FR-INT-01 / BQ-98: 50 MB per unit
 MAX_REDIRECTS = 5
 DEFAULT_CONNECT_TIMEOUT = 5.0
 DEFAULT_READ_TIMEOUT = 15.0
+DEFAULT_TOTAL_TIMEOUT = 60.0  # wall clock for one fetch(): DNS, robots, every hop, headers and body
+DEFAULT_SANDBOX_PORT = 80
 USER_AGENT = "TiloBot/1.0"
 UNIT_ID_RE = re.compile(r"^U[0-9]{1,4}$")
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
+_CONTENT_LENGTH_RE = re.compile(r"[0-9]{1,18}")
 
 _CGNAT_NET = ipaddress.IPv4Network("100.64.0.0/10")
 _BENCHMARK_NET = ipaddress.IPv4Network("198.18.0.0/15")
@@ -128,6 +140,10 @@ class FetchBlock:
     redirect_from: str | None = None
 
 
+class _DnsDeadline(Exception):
+    """The resolver was still running when the fetch deadline expired."""
+
+
 class FetchBlocked(Exception):
     def __init__(
         self,
@@ -192,6 +208,7 @@ class FetchTransport(Protocol):
         connect_timeout: float,
         read_timeout: float,
         max_bytes: int,
+        time_budget: float | None = None,
     ) -> UpstreamResponse: ...
 
 
@@ -340,6 +357,8 @@ def detect_media_type(raw_bytes: bytes, *, url: str, host: str) -> tuple[str, by
         return _detect_ooxml(raw_bytes, url, host), raw_bytes
 
     if _looks_like_html(raw_bytes):
+        if len(raw_bytes) > MAX_HTML_BYTES:
+            raise FetchBlocked("html_too_large", url, host=host)
         try:
             decoded_html = raw_bytes.decode("utf-8")
         except UnicodeDecodeError as exc:
@@ -357,7 +376,11 @@ def detect_media_type(raw_bytes: bytes, *, url: str, host: str) -> tuple[str, by
 
 
 class PinnedHttpTransport:
-    """Stdlib HTTP/HTTPS GET transport that connects directly to `pinned_ip` and verifies TLS against `host`."""
+    """Stdlib HTTP/HTTPS GET transport that connects directly to `pinned_ip` and verifies TLS against `host`.
+
+    `time_budget` is the wall-clock time left for the whole call (connect, TLS, headers, body). It is checked
+    before every read and enforced on a stalled socket by a watchdog that shuts the socket down at expiry.
+    """
 
     def send_get(
         self,
@@ -371,16 +394,46 @@ class PinnedHttpTransport:
         connect_timeout: float,
         read_timeout: float,
         max_bytes: int,
+        time_budget: float | None = None,
     ) -> UpstreamResponse:
         url_for_err = f"{scheme}://{host}:{port}{path_and_query}"
+        started = time.monotonic()
+        timed_out = threading.Event()
         sock: Any = None
+        watchdog: threading.Timer | None = None
+
+        def time_left() -> float:
+            return math.inf if time_budget is None else time_budget - (time.monotonic() - started)
+
+        def io_timeout() -> float:
+            return max(min(read_timeout, time_left()), 0.001)
+
+        def abort() -> None:
+            timed_out.set()
+            target = sock
+            if target is None:
+                return
+            try:
+                if isinstance(target, socket.socket):
+                    socket.socket.shutdown(target, socket.SHUT_RDWR)  # skips SSLSocket's override
+                else:
+                    target.shutdown(socket.SHUT_RDWR)
+            except Exception:
+                pass
+
         try:
-            sock = socket.create_connection((pinned_ip, port), timeout=connect_timeout)
-            sock.settimeout(read_timeout)
+            if time_left() <= 0:
+                raise FetchBlocked("timeout", url_for_err, host=host)
+            sock = socket.create_connection((pinned_ip, port), timeout=max(min(connect_timeout, time_left()), 0.001))
+            if time_budget is not None:
+                watchdog = threading.Timer(max(time_left(), 0.001), abort)
+                watchdog.daemon = True
+                watchdog.start()
+            sock.settimeout(io_timeout())
             if scheme == "https":
                 ctx = ssl.create_default_context()
                 sock = ctx.wrap_socket(sock, server_hostname=host)
-                sock.settimeout(read_timeout)
+                sock.settimeout(io_timeout())
 
             default_port = (scheme == "https" and port == 443) or (scheme == "http" and port == 80)
             host_header = host if default_port else f"{host}:{port}"
@@ -398,26 +451,46 @@ class PinnedHttpTransport:
             http_resp = http.client.HTTPResponse(sock)
             http_resp.begin()
             resp_headers = {k.lower(): v for k, v in http_resp.getheaders()}
+            expected: int | None = None
             cl = resp_headers.get("content-length")
-            if cl and cl.isdigit() and int(cl) > max_bytes:
-                raise FetchBlocked("file_too_large", url_for_err, host=host)
+            if cl is not None:
+                if not _CONTENT_LENGTH_RE.fullmatch(cl.strip()):
+                    raise FetchBlocked("upstream_error", url_for_err, host=host)
+                expected = int(cl)
+                if expected > max_bytes:
+                    raise FetchBlocked("file_too_large", url_for_err, host=host)
 
             buf = bytearray()
+            html_checked = False
+            is_html = False
             while True:
-                chunk = http_resp.read(65536)
+                if time_left() <= 0:
+                    raise FetchBlocked("timeout", url_for_err, host=host)
+                sock.settimeout(io_timeout())
+                chunk = http_resp.read1(65536)  # one underlying read at a time, so the deadline is re-checked
                 if not chunk:
                     break
                 buf.extend(chunk)
                 if len(buf) > max_bytes:
                     raise FetchBlocked("file_too_large", url_for_err, host=host)
+                if not html_checked and len(buf) >= 1024:
+                    html_checked = True
+                    is_html = _looks_like_html(bytes(buf[:1024]))
+                if is_html and len(buf) > MAX_HTML_BYTES:
+                    raise FetchBlocked("html_too_large", url_for_err, host=host)
+            body_expected = http_resp.status >= 200 and http_resp.status not in (204, 304) and not http_resp.chunked
+            if expected is not None and body_expected and len(buf) < expected:
+                raise FetchBlocked("upstream_error", url_for_err, host=host)
             return UpstreamResponse(status_code=http_resp.status, headers=resp_headers, body=bytes(buf))
         except FetchBlocked:
             raise
-        except TimeoutError as exc:
-            raise FetchBlocked("timeout", url_for_err, host=host) from exc
-        except OSError as exc:
+        except (OSError, http.client.HTTPException, ValueError) as exc:
+            if timed_out.is_set() or isinstance(exc, TimeoutError):
+                raise FetchBlocked("timeout", url_for_err, host=host) from exc
             raise FetchBlocked("upstream_error", url_for_err, host=host) from exc
         finally:
+            if watchdog is not None:
+                watchdog.cancel()
             if sock is not None:
                 try:
                     sock.close()
@@ -499,11 +572,21 @@ class FetchService:
         clock: Callable[[], datetime] | None = None,
         connect_timeout: float = DEFAULT_CONNECT_TIMEOUT,
         read_timeout: float = DEFAULT_READ_TIMEOUT,
+        total_timeout: float = DEFAULT_TOTAL_TIMEOUT,
+        sandbox_port: int = DEFAULT_SANDBOX_PORT,
+        monotonic: Callable[[], float] = time.monotonic,
     ) -> None:
         if not (math.isfinite(connect_timeout) and connect_timeout > 0):
             raise ValueError("connect_timeout must be a positive finite number")
         if not (math.isfinite(read_timeout) and read_timeout > 0):
             raise ValueError("read_timeout must be a positive finite number")
+        if not (math.isfinite(total_timeout) and total_timeout > 0):
+            raise ValueError("total_timeout must be a positive finite number")
+        if not 0 < sandbox_port < 65536:
+            raise ValueError("sandbox_port must be a valid TCP port")
+        self._total_timeout = total_timeout
+        self._sandbox_port = sandbox_port
+        self._monotonic = monotonic
         self._base_allow = tuple(base_allow)
         self._sandbox_hosts = frozenset(norm for h in sandbox_hosts if (norm := _normalise_host(h)) is not None)
         self._dns_resolver = dns_resolver
@@ -550,11 +633,53 @@ class FetchService:
                 combined.append(entry)
         return EgressPolicy(allow=combined, allow_schemes=("https", "http")), tuple(combined)
 
-    def _resolve_and_pin(self, host: str, port: int, *, url: str, allowlist: Sequence[str]) -> str:
+    def _time_left(
+        self,
+        deadline: float,
+        *,
+        url: str,
+        host: str | None,
+        allowlist: Sequence[str],
+        redirect_from: str | None = None,
+    ) -> float:
+        """Seconds left on this fetch's wall-clock deadline; expiry is a logged `timeout` refusal."""
+        left = deadline - self._monotonic()
+        if left <= 0:
+            raise self._record_block("timeout", url, host=host, allowlist=allowlist, redirect_from=redirect_from)
+        return left
+
+    def _resolve_within(self, host: str, port: int, seconds: float) -> list[str]:
+        """Run the (blocking) resolver on a helper thread so a stalled lookup cannot outlive the deadline."""
+        outcome: list[tuple[list[str] | None, BaseException | None]] = []
+
+        def run() -> None:
+            try:
+                outcome.append((list(self._dns_resolver(host, port)), None))
+            except BaseException as exc:
+                outcome.append((None, exc))
+
+        worker = threading.Thread(target=run, daemon=True)
+        worker.start()
+        worker.join(seconds)
+        if not outcome:
+            raise _DnsDeadline
+        addresses, error = outcome[0]
+        if error is not None:
+            raise error
+        return addresses or []
+
+    def _resolve_and_pin(
+        self, host: str, port: int, *, url: str, allowlist: Sequence[str], deadline: float, redirect_from: str | None
+    ) -> str:
         if is_forbidden_hostname(host):
             raise self._record_block("ssrf_blocked", url, host=host, allowlist=allowlist)
+        left = self._time_left(deadline, url=url, host=host, allowlist=allowlist, redirect_from=redirect_from)
         try:
-            resolved = list(self._dns_resolver(host, port))
+            resolved = self._resolve_within(host, port, left)
+        except _DnsDeadline:
+            raise self._record_block(
+                "timeout", url, host=host, allowlist=allowlist, redirect_from=redirect_from
+            ) from None
         except OSError:
             raise self._record_block("dns_failed", url, host=host, allowlist=allowlist) from None
         if not resolved or not all(is_public_ip(ip) for ip in resolved):
@@ -567,6 +692,7 @@ class FetchService:
         *,
         policy: EgressPolicy,
         allowlist: tuple[str, ...],
+        deadline: float,
         redirect_from: str | None = None,
     ) -> tuple[str, str, int, str, str, str]:
         decision = policy.check(url, redirect_from=redirect_from)
@@ -591,13 +717,61 @@ class FetchService:
                 allowlist=allowlist,
                 redirect_from=redirect_from,
             )
-        port = parts.port or (443 if scheme == "https" else 80)
-        pinned_ip = self._resolve_and_pin(ascii_host, port, url=url, allowlist=allowlist)
+        port = parts.port if parts.port is not None else (443 if scheme == "https" else 80)
+        allowed_ports = {443, self._sandbox_port} if ascii_host in self._sandbox_hosts else {443}
+        if port not in allowed_ports:
+            raise self._record_block(
+                "port_not_allowed", url, host=ascii_host, allowlist=allowlist, redirect_from=redirect_from
+            )
+        pinned_ip = self._resolve_and_pin(
+            ascii_host, port, url=url, allowlist=allowlist, deadline=deadline, redirect_from=redirect_from
+        )
         raw_path = parts.path or "/"
         clean_path = "/".join(seg.split(";", 1)[0] for seg in raw_path.split("/")) or "/"
         path_and_query = f"{clean_path}?{parts.query}" if parts.query else clean_path
         cleaned = clean_source_url(scheme, ascii_host, parts.port, clean_path)
         return scheme, ascii_host, port, pinned_ip, path_and_query, cleaned
+
+    def _upstream_get(
+        self,
+        *,
+        scheme: str,
+        host: str,
+        port: int,
+        pinned_ip: str,
+        path_and_query: str,
+        max_bytes: int,
+        url: str,
+        allowlist: tuple[str, ...],
+        deadline: float,
+        redirect_from: str | None = None,
+        unit_capped: bool = False,
+    ) -> UpstreamResponse:
+        """One upstream GET inside the fetch deadline; every failure becomes a logged refusal, never a 500."""
+        left = self._time_left(deadline, url=url, host=host, allowlist=allowlist, redirect_from=redirect_from)
+        try:
+            return self._transport.send_get(
+                scheme=scheme,
+                host=host,
+                port=port,
+                pinned_ip=pinned_ip,
+                path_and_query=path_and_query,
+                headers={},
+                connect_timeout=self._connect_timeout,
+                read_timeout=self._read_timeout,
+                max_bytes=max_bytes,
+                time_budget=left,
+            )
+        except FetchBlocked as exc:
+            reason = exc.block.reason
+            if reason == "file_too_large" and unit_capped:
+                reason = "unit_byte_limit"
+            raise self._record_block(reason, url, host=host, allowlist=allowlist, redirect_from=redirect_from) from None
+        except TimeoutError:
+            reason = "timeout"
+        except (OSError, http.client.HTTPException, ValueError):
+            reason = "upstream_error"
+        raise self._record_block(reason, url, host=host, allowlist=allowlist, redirect_from=redirect_from)
 
     def _check_robots(
         self,
@@ -609,29 +783,23 @@ class FetchService:
         path_and_query: str,
         url: str,
         allowlist: tuple[str, ...],
+        deadline: float,
     ) -> None:
         cache_key = (scheme, host, port)
         with self._lock:
             cached = self._robots_cache.get(cache_key)
         if cached is None:
-            try:
-                resp = self._transport.send_get(
-                    scheme=scheme,
-                    host=host,
-                    port=port,
-                    pinned_ip=pinned_ip,
-                    path_and_query="/robots.txt",
-                    headers={},
-                    connect_timeout=self._connect_timeout,
-                    read_timeout=self._read_timeout,
-                    max_bytes=MAX_ROBOTS_BYTES,
-                )
-            except FetchBlocked as exc:
-                raise self._record_block(exc.block.reason, url, host=host, allowlist=allowlist) from None
-            except TimeoutError:
-                raise self._record_block("timeout", url, host=host, allowlist=allowlist) from None
-            except OSError:
-                raise self._record_block("upstream_error", url, host=host, allowlist=allowlist) from None
+            resp = self._upstream_get(
+                scheme=scheme,
+                host=host,
+                port=port,
+                pinned_ip=pinned_ip,
+                path_and_query="/robots.txt",
+                max_bytes=MAX_ROBOTS_BYTES,
+                url=url,
+                allowlist=allowlist,
+                deadline=deadline,
+            )
             rp = urllib.robotparser.RobotFileParser()
             if resp.status_code == 200:
                 robots_lines = resp.body.decode("utf-8", errors="replace").splitlines()
@@ -673,6 +841,7 @@ class FetchService:
         if remaining_unit_bytes <= 0:
             raise self._record_block("unit_byte_limit", url, host=None, allowlist=allowlist)
 
+        deadline = self._monotonic() + self._total_timeout
         current_url = url
         previous_url: str | None = None
         for hop in range(MAX_REDIRECTS + 1):
@@ -680,6 +849,7 @@ class FetchService:
                 current_url,
                 policy=policy,
                 allowlist=allowlist,
+                deadline=deadline,
                 redirect_from=previous_url,
             )
             self._check_robots(
@@ -690,31 +860,21 @@ class FetchService:
                 path_and_query=path_and_query,
                 url=current_url,
                 allowlist=allowlist,
+                deadline=deadline,
             )
-            stream_cap = min(MAX_FILE_BYTES, remaining_unit_bytes)
-            try:
-                resp = self._transport.send_get(
-                    scheme=scheme,
-                    host=host,
-                    port=port,
-                    pinned_ip=pinned_ip,
-                    path_and_query=path_and_query,
-                    headers={},
-                    connect_timeout=self._connect_timeout,
-                    read_timeout=self._read_timeout,
-                    max_bytes=stream_cap,
-                )
-            except FetchBlocked as exc:
-                reason = exc.block.reason
-                if reason == "file_too_large" and remaining_unit_bytes < MAX_FILE_BYTES:
-                    reason = "unit_byte_limit"
-                raise self._record_block(
-                    reason,
-                    current_url,
-                    host=host,
-                    allowlist=allowlist,
-                    redirect_from=previous_url,
-                ) from None
+            resp = self._upstream_get(
+                scheme=scheme,
+                host=host,
+                port=port,
+                pinned_ip=pinned_ip,
+                path_and_query=path_and_query,
+                max_bytes=min(MAX_FILE_BYTES, remaining_unit_bytes),
+                url=current_url,
+                allowlist=allowlist,
+                deadline=deadline,
+                redirect_from=previous_url,
+                unit_capped=remaining_unit_bytes < MAX_FILE_BYTES,
+            )
 
             if resp.status_code in _REDIRECT_STATUSES:
                 if hop >= MAX_REDIRECTS:

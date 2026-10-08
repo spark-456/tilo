@@ -11,6 +11,7 @@ from collections.abc import Callable, Mapping, Sequence
 from typing import Any
 
 from fastapi import FastAPI, Request
+from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from tilo_logging import configure_logging
@@ -21,6 +22,7 @@ configure_logging()
 
 _STATUS_BY_REASON: dict[str, int] = {
     "file_too_large": 413,
+    "html_too_large": 413,
     "unit_file_limit": 413,
     "unit_byte_limit": 413,
     "archive_refused": 415,
@@ -97,7 +99,10 @@ def create_app(
 
         combined_allow = [*req_data.allow_hosts, *req_data.task_allowlist]
         try:
-            result = service.fetch(
+            # Blocking work (DNS, sockets, HTML parsing) runs on a worker thread so /health and other
+            # requests keep answering while a fetch is in flight.
+            result = await run_in_threadpool(
+                service.fetch,
                 req_data.url,
                 allow_hosts=combined_allow,
                 org_id=req_data.org_id,
