@@ -16,6 +16,8 @@ Defaults chosen where the PRD names no pattern list (listed in the ticket report
 
 from __future__ import annotations
 
+import re
+
 import pytest
 from _browser_lib import EMAIL, PHONE, PNG, FakeWeb, doc, fake_card_numbers, fake_secrets, node, password_box, textbox
 from hypothesis import example, given, settings
@@ -241,7 +243,7 @@ def test_FR_CON_07_a_secret_embedded_in_any_text_never_survives_masking(before, 
     assert sensitive not in flat
     assert mask(out) == out
     # `bearer <token>` is one credential: a trailing scheme word of `before` may be masked with the token.
-    kept = before[: -len("bearer")] if before.casefold().endswith("bearer") else before
+    kept = re.sub(r"(?i)(?:^|(?<=\s))bearer\s*$", "", before)
     assert out.startswith(kept) and out.endswith(after), "text around the secret must be untouched"
 
 
