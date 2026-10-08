@@ -1,4 +1,4 @@
-// LW-14 AppSpec Quiz Player at owner-only route /world/:id/app/:artifactId (ADR-0029 decision 9, AS-01..AS-04).
+// LW-14 AppSpec Quiz Player at route /world/:id/app/:artifactId (ADR-0029 decision 9, AS-01..AS-04).
 // Renders a declarative quiz AppSpec using fixed web code only: every spec string is shown as plain text, never
 // HTML or Markdown. Countdown timer uses the Park provider's useSchedule() and auto-submits at 0. Attempts are
 // saved in localStorage (try/catch) in phase 1.
@@ -26,7 +26,7 @@ import {
   scoreQuizAttempt,
   validateAppSpec,
 } from "../../app/appspec.draft";
-import { useApp, useSchedule } from "../../app/context";
+import { useApp, useExpectsSample, useSchedule } from "../../app/context";
 import { Button, PageSheet } from "../../components";
 import "./QuizPlayer.css";
 
@@ -51,15 +51,16 @@ export function QuizPlayerPage({
   const worldId = worldIdProp ?? app.params.id ?? "world";
   const artifactId = artifactIdProp ?? app.params.artifactId ?? "quiz";
 
-  const validation = useMemo(() => {
-    const raw =
-      rawSpecProp !== undefined
-        ? rawSpecProp
-        : artifactId === "malformed"
-          ? { invalid: true }
-          : QUIZ_FIXTURE_SPEC;
-    return validateAppSpec(raw);
-  }, [rawSpecProp, artifactId]);
+  // The fictional sample quiz is shown only where the shell shows its Sample chip (the fixture Api). Under a live
+  // Api the page has no spec to read yet, so it says so instead of inventing questions (HR-1..HR-7).
+  const sample = useExpectsSample();
+  const raw = rawSpecProp !== undefined ? rawSpecProp : sample ? QUIZ_FIXTURE_SPEC : undefined;
+  const validation = useMemo(
+    () => (raw === undefined ? { ok: false as const, reason: "" } : validateAppSpec(raw)),
+    [raw],
+  );
+  const unavailable = raw === undefined;
+  const showSample = rawSpecProp === undefined && sample;
 
   const initialSeconds = validation.ok ? validation.spec.timer.seconds : 60;
   const [topic, setTopic] = useState<string>("all");
@@ -144,6 +145,36 @@ export function QuizPlayerPage({
       cancelCurrent?.();
     };
   }, [validation, submitted, paused, schedule, finalizeSubmit]);
+
+  if (unavailable) {
+    return (
+      <div
+        className="park-quiz-root"
+        data-testid="park-page-quiz"
+        data-world-id={worldId}
+        data-artifact-id={artifactId}
+        data-motion={app.motion}
+      >
+        <PageSheet>
+          <div className="park-quiz-crumb">
+            <button
+              type="button"
+              className="park-quiz-back"
+              onClick={() => app.go("world", { id: worldId })}
+            >
+              Back to world
+            </button>
+          </div>
+          <div data-testid="quiz-unavailable" className="park-quiz-error">
+            <h1 className="park-quiz-h1" tabIndex={-1}>
+              This quiz is not available yet
+            </h1>
+            <p className="park-quiz-scoresub">Quizzes are not connected to your workspace yet.</p>
+          </div>
+        </PageSheet>
+      </div>
+    );
+  }
 
   if (!validation.ok) {
     return (
@@ -265,7 +296,9 @@ export function QuizPlayerPage({
           <div className="park-quiz-titles">
             <div className="park-quiz-eyebrowrow">
               <span className="park-quiz-eyebrow">{`APPSPEC · ${spec.theme.toUpperCase()}`}</span>
-              <span className="park-quiz-badge">Owner only · Practice quiz</span>
+              <span className="park-quiz-badge">
+                {showSample ? "Sample · Practice quiz" : "Practice quiz"}
+              </span>
             </div>
             <h1 className="park-quiz-h1" tabIndex={-1}>
               {spec.title}

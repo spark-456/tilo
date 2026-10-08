@@ -10,7 +10,7 @@ import type {
   AppSpecSource,
   AppSpecTimer,
   AppSpecTitle,
-} from "@tilo/contracts";
+} from "../api/appSpecTypes";
 
 export type {
   AppSpec,
@@ -26,7 +26,10 @@ export { QUIZ_FIXTURE_PUBLISHERS, QUIZ_FIXTURE_SPEC } from "../api/fixtures/quiz
 
 export const OPTION_IDS: readonly AppSpecOptionId[] = ["a", "b", "c", "d", "e", "f"];
 const QUESTION_ID_RE = /^q[1-9][0-9]{0,2}$/;
-const SLUG_RE = /^[a-z0-9][a-z0-9_-]{0,63}$/;
+// The contract's patterns, copied: common.schema.json slug and artifact_id. The production bundle does not carry a
+// JSON Schema validator (the page CSP forbids eval); appspec.draft.parity.test.ts checks this module against the schema.
+const SLUG_RE = /^[a-z][a-z0-9_]{0,63}$/;
+const ARTIFACT_ID_RE = /^art_[0-9A-Za-z_]{1,48}$/;
 const TOP_KEYS = new Set(["v", "kind", "title", "theme", "timer", "questions"]);
 const QUESTION_KEYS = new Set(["id", "stem", "options", "answer", "topic", "source"]);
 const SOURCE_KEYS = new Set(["artifact", "page"]);
@@ -169,10 +172,12 @@ export function validateAppSpec(raw: unknown): AppSpecValidation {
       !isPlainRecord(art) ||
       !hasOnlyKeys(art, ARTIFACT_KEYS) ||
       typeof art.artifact_id !== "string" ||
-      art.artifact_id.length < 1 ||
+      !ARTIFACT_ID_RE.test(art.artifact_id) ||
       typeof art.version !== "number" ||
       !Number.isInteger(art.version) ||
-      art.version < 1
+      art.version < 1 ||
+      (art.label !== undefined &&
+        (typeof art.label !== "string" || art.label.length < 1 || art.label.length > 80))
     ) {
       return { ok: false, reason: `Question ${item.id} source artifact reference is invalid.` };
     }
