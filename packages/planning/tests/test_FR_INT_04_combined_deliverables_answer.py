@@ -152,3 +152,12 @@ def test_FR_INT_04_free_text_mixed_with_a_format_word_is_asked_again_for_the_for
 
     with pytest.raises(BriefValidationError, match="Name the format"):
         apply_answer(brief, _question(brief), "A detailed plan as a slide deck", today=TODAY)
+
+
+def test_FR_INT_04_kept_free_text_has_no_control_characters():
+    brief = _brief(("pdf",))
+
+    result = apply_answer(brief, _question(brief), "A detailed\x00 plan\x1b with old\npapers", today=TODAY)
+
+    assert result["deliverables"][0]["title"] == "A detailed plan with old papers"
+    assert all("\x00" not in c and "\x1b" not in c for c in result["constraints"])

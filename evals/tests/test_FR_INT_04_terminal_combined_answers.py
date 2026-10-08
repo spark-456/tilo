@@ -187,3 +187,13 @@ def test_FR_INT_04_a_declined_approach_without_a_reason_is_not_revised():
     person = SimpleNamespace(decline_reason="")
 
     assert bank_run._revise(lambda *a, **k: 1 / 0, {"task_id": "t"}, person) is False
+
+
+def test_FR_INT_04_an_unknown_provider_failure_names_its_error_classes_only():
+    from tilo_evals import live_e2e
+
+    inner = TimeoutError("secret text that must not be shown")
+    outer = RuntimeError("wrapper")
+    outer.__cause__ = inner
+
+    assert live_e2e._error_classes(outer) == "RuntimeError <- TimeoutError"
