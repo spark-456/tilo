@@ -5,8 +5,9 @@
 //
 // What the running page does with these rules (durations, easings, the bar's 35/78/100 steps, reduced motion)
 // is measured in a real browser in e2e/park-motion-transitions.spec.ts; this file pins what a stylesheet can
-// be held to without a browser: the keyframes, the compositor-only budget (transform and opacity, nothing that
-// lays out or repaints), and that no glass blur sits on anything that moves.
+// be held to without a browser: the keyframes, the motion budget (transform, opacity and, since the user approved
+// it on 8 Oct, the paint-only background-color and color; nothing that lays out), and that no glass blur sits on
+// anything that moves.
 import fs from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
@@ -111,7 +112,7 @@ describe("WEB-MOTION-2 css: compositor only (transform and opacity), no glass bl
     }
   });
 
-  it("WEB-MOTION-2 css: every transition in the shell names transform and/or opacity only (a progress bar may scaleX; it never animates width)", () => {
+  it("WEB-MOTION-2 css MOTION3_PINS: every transition in the shell names transform, opacity, background-color and/or color only (a progress bar may scaleX; it never animates width)", () => {
     const names: string[] = [];
     for (const r of parseRules(css()).rules) {
       const shorthand = r.decls.get("transition");
@@ -149,7 +150,7 @@ describe("WEB-MOTION-2 css: compositor only (transform and opacity), no glass bl
         for (const p of longhand.split(",")) names.push(`${r.selector}: ${p.trim()}`);
       }
     }
-    const bad = names.filter((n) => !/: (transform|opacity)$/.test(n));
+    const bad = names.filter((n) => !/: (transform|opacity|background-color|color)$/.test(n));
     expect(bad, "a transition on anything else lays out or repaints on every frame").toEqual([]);
   });
 

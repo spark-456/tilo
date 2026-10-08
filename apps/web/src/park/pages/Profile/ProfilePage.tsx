@@ -98,7 +98,7 @@ function Tile({ tone, children }: { tone: "ok" | "sunk" | "hero"; children: Reac
 }
 
 // FR-SET-01: a save is kept on this device only (no profile endpoint yet); FR-SET-02: quiet hours never hide
-// a gate. Both lines are accessible descriptions, because the tabs' visible copy is pinned by the design.
+// a gate. Both lines are visible helper text (BQ-SET-2, user approved 8 Oct) and stay accessible descriptions too.
 const SAVE_HINT = "Kept on this device only. Tilo has no profile service to send it to yet.";
 const QUIET_HINT =
   "Quiet hours silence the phone only. A decision that needs you is never hidden by quiet hours: it waits in Needs you.";
@@ -273,6 +273,7 @@ export function ProfilePage({ app }: { app: AppCtx }) {
                     </label>
                   ))}
                 </div>
+                <p className="park-profile-note">{SAVE_HINT}</p>
                 <div className="park-profile-foot">
                   <button
                     type="button"
@@ -353,6 +354,7 @@ export function ProfilePage({ app }: { app: AppCtx }) {
                     onChange={setQuiet}
                   />
                 </div>
+                <p className="park-profile-note">{QUIET_HINT}</p>
               </section>
             ) : null}
 
