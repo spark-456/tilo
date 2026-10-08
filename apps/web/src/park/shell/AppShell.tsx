@@ -4,6 +4,7 @@
 // the store and the Api. The notifications and the user come through the Api on mount, so a fixture Api
 // raises the "Sample data" chip without any page asking for data. The city's cars and walkers run on Home (cityMotion.ts).
 import { type ReactNode, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { nameInitials } from "../api/nameInitials";
 import type { Decision, Notification, User } from "../api/types";
 import type { PageId } from "../app/AppCtx";
 import { endSession, useApp, useExpectsSample, useParkApi, useParkStore } from "../app/context";
@@ -138,7 +139,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const person: AccountPerson | null = auth
     ? auth.status === "signedIn" && auth.user
       ? {
-          initials: authInitials(auth.user),
+          initials: nameInitials(auth.user.displayName?.trim() || authInitials(auth.user)),
           name:
             auth.user.displayName ?? (auth.user.isAnonymous ? "Guest" : (auth.user.email ?? "")),
           email: auth.user.displayName ? (auth.user.email ?? "") : "",
@@ -149,7 +150,9 @@ export function AppShell({ children }: { children: ReactNode }) {
           initials: user.initials,
           name: user.name,
           email: user.email,
-          detail: `${user.org} · ${user.plan} plan`,
+          detail: [user.org.trim(), user.plan.trim() ? `${user.plan.trim()} plan` : ""]
+            .filter(Boolean)
+            .join(" · "),
         }
       : null;
   // Honest: success is said only after the sign-in layer's promise resolves, a failure says it failed.
@@ -188,7 +191,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         initials={
           auth
             ? auth.status === "signedIn"
-              ? authInitials(auth.user)
+              ? nameInitials(auth.user?.displayName?.trim() || authInitials(auth.user))
               : "?"
             : (user?.initials ?? "")
         }
