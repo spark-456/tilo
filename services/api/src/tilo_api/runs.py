@@ -165,7 +165,9 @@ class Run:
         self.world_id, self.run_id, self.owner, self.brief = task.world_id, task.run_id, task.owner, task.brief
         self.intake_answers = (
             tuple(  # (the Director's question, the person's answer) for the units' prompts (UNIT-PROMPT)
-                (q.text, str(task.answers[q.field])) for q in task.questions if task.answers.get(q.field)
+                (q.text, str(task.answers[q.field]))
+                for q in task.questions
+                if task.answers.get(q.field) and q.field not in task.edits
             )
         )
         self.approaches = copy.deepcopy(task.approaches or [])

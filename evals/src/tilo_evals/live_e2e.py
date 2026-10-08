@@ -36,10 +36,11 @@ from typing import Any, Literal
 from fastapi import FastAPI, Request
 from tilo_harness.outputs import UnitOutput
 from tilo_harness.unit_prompt import request_variables
+from tilo_harness.untrusted import neutralise as neutralise_text
 from tilo_providers.config import ProviderConfigError, ProvidersConfig, load_providers_config, resolve_models_path
 from tilo_providers.errors import ProviderError, QuotaError, RequestError
 from tilo_providers.interfaces import Capability, GenerateRequest, GenerateResponse, ModelProvider, SafetyProvider
-from tilo_providers.prompts import load_prompt, neutralise_marker
+from tilo_providers.prompts import load_prompt
 from tilo_providers.replay import RecordReplayProvider, ReplayMissError, recording_key, redact_strings
 from tilo_providers.router import BudgetExceededError, Router
 from tilo_providers.safety import FakeSafetyProvider
@@ -669,11 +670,9 @@ class _UnitRunner:
         return MeteredOutcome(success=True, summary=summary, outputs=(item,), credits=credits)
 
 
-def _safe(text: str) -> str:
-    """Model-written or user text goes into a prompt as data: none of our block markers can be closed from inside."""
-    for marker in ("REQUEST", "EARLIER", "WORK", "BEATS"):
-        text = neutralise_marker(text, marker)
-    return text
+def _safe(text: str, limit: int = 20_000) -> str:
+    """Model-written or user text goes into a prompt as data: the harness rule (BQ-232) leaves no marker to close."""
+    return neutralise_text(text, limit=limit)
 
 
 class _ClearModel:

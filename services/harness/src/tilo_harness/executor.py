@@ -61,7 +61,7 @@ from tilo_harness.must_ask import Ask, MustAsk
 from tilo_harness.outputs import Kept, UnitOutput, existing, keep
 from tilo_harness.question_wait import Answer, QuestionWait
 from tilo_harness.skills import LoadedSkill, Pins, SkillError, SkillRegistry
-from tilo_harness.unit_prompt import UpstreamItem, inputs_text, request_variables
+from tilo_harness.unit_prompt import UPSTREAM_ITEM_CAP, UpstreamItem, data_line, inputs_text, request_variables
 from tilo_harness.validator import EventRejected, repo_validator
 from tilo_harness.verifier import Verifier
 
@@ -136,8 +136,8 @@ class DefaultUnitRunner:
             unit["role"],
             "unit.md",
             {
-                "title": unit["title"],
-                "unit_type": unit["unit_type"],
+                "title": data_line(unit["title"], 120),
+                "unit_type": data_line(unit["unit_type"], 80),
                 "skills": "\n\n".join(skill.body for skill in context.skills),
                 "inputs": inputs_text(context.upstream),
                 **request_variables(context.brief, context.intake_answers),
@@ -218,16 +218,32 @@ def _roster(units: list[dict[str, Any]], layout: dict[str, Any], config: AgentsC
     return _Roster(directors[0], leads, levels, workers, sites, rank)
 
 
-def _upstream_item(unit: Mapping[str, Any], outcome: UnitOutcome) -> UpstreamItem:
-    """What a finished unit hands to the units that depend on it: its text outputs, and the ids of what it stored."""
+NL2 = chr(10) * 2
+
+
+def _upstream_item(
+    unit: Mapping[str, Any], outcome: UnitOutcome, made: Sequence[Kept], store: Mapping[str, Any] | None
+) -> UpstreamItem:
+    """What a finished unit hands to the units that depend on it: the text of what it STORED (so the redacted version,
+    never the runner's raw bytes), cut to the cap now; a flagged or unreadable item is left out with a note."""
     texts: list[str] = []
-    for out in outcome.outputs if isinstance(outcome.outputs, tuple | list) else ():
-        if str(getattr(out, "media_type", "")).startswith("text/") and isinstance(getattr(out, "content", None), bytes):
-            texts.append(out.content.decode("utf-8", errors="replace"))
+    for item in made:
+        record = item.version.record
+        if not str(record.get("media_type", "")).startswith("text/"):
+            continue
+        if record.get("screening") == "flagged":
+            texts.append("(an item was left out: the safety screen flagged it)")
+            continue
+        try:
+            raw = store["artifacts"].read(store["scope"], item.version.ref) if store else b""
+        except Exception:  # an unreadable version is left out, never guessed at
+            texts.append("(an item was left out: it could not be read)")
+            continue
+        texts.append(raw[: UPSTREAM_ITEM_CAP * 4].decode("utf-8", errors="replace")[:UPSTREAM_ITEM_CAP])
     refs = tuple(
         str(ref["artifact_id"]) for ref in outcome.artifact_refs if isinstance(ref, Mapping) and "artifact_id" in ref
     )
-    return UpstreamItem(unit["id"], unit["title"], "\n\n".join(texts) or None, refs)
+    return UpstreamItem(unit["id"], unit["title"], NL2.join(texts)[:UPSTREAM_ITEM_CAP] or None, refs)
 
 
 def _envelope(outcome: UnitOutcome, worker: str, lead: str, unit: dict[str, Any]) -> dict[str, Any] | None:
@@ -429,7 +445,7 @@ class _Run:
                 self.handoffs[unit_id] = cause
         self.emit("agent.retired", lead, worker, "The agent finished and left.", {}, cause=cause, **at)
         if outcome.success is True:
-            self.results[unit_id] = _upstream_item(unit, outcome)
+            self.results[unit_id] = _upstream_item(unit, outcome, made, self.store)
         return outcome
 
     async def call(self, work: Awaitable[Any]) -> Any:
@@ -496,7 +512,7 @@ class _Run:
         summary, district = hit_summary(finished.origin_cost), unit["district"]
         self.emit("memory.hit", worker, worker, summary, data, district=district, cause=finished.handoff_event_id)
         outcome = UnitOutcome(success=True, artifact_refs=finished.artifact_refs)
-        self.results[unit["id"]] = _upstream_item(unit, outcome)
+        self.results[unit["id"]] = _upstream_item(unit, outcome, (), None)
         return outcome
 
     async def keep(
