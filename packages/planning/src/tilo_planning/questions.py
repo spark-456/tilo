@@ -12,6 +12,7 @@ Events are built here and returned, never written (the harness is the single wri
 from __future__ import annotations
 
 import copy
+import re
 from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import date, timedelta
@@ -134,7 +135,17 @@ def apply_answer(brief: dict[str, Any], question: Question, answer: str, *, toda
         raise BriefValidationError("Describe the goal in the goal chip; that answer is not a goal.")
     value: Any = _ANSWER_VALUES.get(field, {}).get(answer, answer)
     if field == "deliverables":
-        value = [{**d, "format": value} for d in brief["deliverables"]]
+        formats = _answer_formats(answer, question.suggested_answers[0], brief)
+        if len(formats) == 1:
+            value = [{**d, "format": formats[0]} for d in brief["deliverables"]]
+        else:  # "A PDF report and a slide deck": the deliverables already in a named format stay, the rest are added
+            kept = [d for d in brief["deliverables"] if d["format"] in formats]
+            title = brief["deliverables"][0]["title"]
+            value = kept + [
+                {"title": clip(f"{title} ({f})", 120), "format": f}
+                for f in formats
+                if f not in {d["format"] for d in kept}
+            ]
     elif field == "constraints":
         value = [] if value is None else list(dict.fromkeys([*brief["constraints"], value]))
     elif field == "sources" and value in (None, "web"):
@@ -143,6 +154,51 @@ def apply_answer(brief: dict[str, Any], question: Question, answer: str, *, toda
     elif field == "deadline" and value == "end_of_week":
         value = (today + timedelta(days=(4 - today.weekday()) % 7)).isoformat()  # the coming Friday
     return validate_brief({**copy.deepcopy(brief), field: value})
+
+
+_FORMATS = (
+    "pdf",
+    "pptx",
+    "docx",
+    "xlsx",
+    "csv",
+    "markdown",
+    "google_slides",
+    "google_docs",
+    "google_sheets",
+    "email",
+    "in_app",
+)
+_FORMAT_WORDS = {  # what a person types for a format
+    "powerpoint": "pptx", "ppt": "pptx", "slides": "pptx", "slide deck": "pptx", "deck": "pptx", "word": "docx",
+    "doc": "docx", "document": "docx", "excel": "xlsx", "spreadsheet": "xlsx", "md": "markdown", "report": "pdf",
+}  # fmt: skip
+_ANSWER_SPLIT = re.compile(r"\s*(?:[;,+&/]|\band\b)\s*", re.IGNORECASE)
+_CHIP_FORMAT = re.compile(r".*\((" + "|".join(_FORMATS) + r")\)")
+
+
+def _part_format(part: str) -> str | None:
+    key = part.strip().rstrip(".").lower()
+    labels = {label.lower(): fmt for label, fmt in _ANSWER_VALUES["deliverables"].items()}
+    if key in labels:
+        return labels[key]
+    if (chip := _CHIP_FORMAT.fullmatch(key)) is not None:  # the current chip: "Price report (pdf)"
+        return chip.group(1)
+    return key if key in _FORMATS else _FORMAT_WORDS.get(key)
+
+
+def _answer_formats(answer: str, current: str, brief: dict[str, Any]) -> list[str]:
+    """The formats a deliverables answer names, in order, once each: one answer or several joined by "and", a
+    comma, a semicolon, "+" or "&". The chip's own text (`current`, whose titles may hold any of those) stands for the
+    formats the brief has now. A part that names no format refuses the answer, the person says it again."""
+    have = [d["format"] for d in brief["deliverables"]] if current in answer else []
+    parts = [p for p in _ANSWER_SPLIT.split(answer.replace(current, ";")) if p.strip()]
+    formats = [*have, *(_part_format(p) for p in parts)]
+    if not formats or None in formats:
+        raise BriefValidationError(
+            "Name the format as pdf, pptx, docx, xlsx, csv, markdown, email and so on, or pick a number from the list."
+        )
+    return list(dict.fromkeys(f for f in formats if f is not None))
 
 
 # Suggested answers (from _WORDING) that stand for a chip value; any other answer is set as typed.
