@@ -7,7 +7,7 @@
 // calls nothing; Profile has no approve control, so app.decide and app.addWorld are never called.
 // Local state lives at page level, as in the design, so it survives a tab switch.
 import fc from "fast-check";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { makeApp } from "../../../../test-support/park/profileApp";
 import {
   APPEARANCE_COPY,
@@ -24,6 +24,7 @@ import {
   USER,
   switchLabel,
 } from "../../../../test-support/park/profileExpect";
+import { clearProfileStore } from "./profileStore";
 import {
   buttonNamed,
   buttonWith,
@@ -58,6 +59,12 @@ const signOutButtons = (root: ParentNode): HTMLButtonElement[] =>
   [...root.querySelectorAll<HTMLButtonElement>("button")].filter(
     (b) => text(b) === SECURITY_COPY.signOut,
   );
+
+// FR-SET-01: Save now persists to localStorage and the store's memory; every test starts from an empty store.
+beforeEach(() => {
+  localStorage.clear();
+  clearProfileStore();
+});
 
 describe("WEB_12_profile_tabs: local state, no navigation", () => {
   it("WEB_12_profile_clicking_each_tab_opens_its_section_and_moves_the_current_marker", async () => {
@@ -154,7 +161,10 @@ describe("WEB_12_profile_form: edit, cancel, save", () => {
     expect(app.toast).toHaveBeenCalledTimes(1);
     expect(app.toast).toHaveBeenCalledWith("Profile saved");
     expect(heading(root)).toBe("Alexandra Morgan");
-    expect(api.setPref, "the design persists nothing on Save").not.toHaveBeenCalled();
+    expect(
+      api.setPref,
+      "Save makes no server call (it is kept on this device)",
+    ).not.toHaveBeenCalled();
   });
 });
 
@@ -176,7 +186,7 @@ describe("WEB_12_profile_notifications: channel matrix and quiet hours", () => {
     expect(app.setPref, "channels are page state in the design").not.toHaveBeenCalled();
   });
 
-  it("WEB_12_profile_decisions_keep_at_least_one_channel_with_the_design_toast", async () => {
+  it("FR_SET_02_WEB_12_profile_decisions_keep_at_least_one_channel_with_the_design_toast", async () => {
     const app = makeApp();
     const { root } = await renderProfile(app);
     await openTab(root, "Notifications");
@@ -207,7 +217,7 @@ describe("WEB_12_profile_notifications: channel matrix and quiet hours", () => {
     expect(app.toast).not.toHaveBeenCalled();
   });
 
-  it("WEB_12_profile_property_any_toggle_sequence_matches_the_model_and_decisions_never_empty", async () => {
+  it("FR_SET_02_WEB_12_profile_property_any_toggle_sequence_matches_the_model_and_decisions_never_empty", async () => {
     // Invariant (README: "Decisions must keep at least one channel"): after any sequence of toggles the
     // decisions row has an "on" switch, every other switch is exactly the model's, and the toast fires
     // once per refused toggle and never otherwise.

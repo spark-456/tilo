@@ -1,0 +1,14 @@
+{
+  "key": "68ff2db1d5366b32",
+  "profile": "flash-38",
+  "response": {
+    "profile_id": "flash-38",
+    "text": "{\"approaches\": [{\"credits\": {\"max\": 8, \"min\": 3}, \"dimensions\": {\"depth\": \"overview\", \"output_format\": \"google_docs\", \"parallelism\": 1, \"sources\": 3, \"verification\": \"basic\"}, \"id\": \"quick\", \"label\": \"Quick pass\", \"risks\": [\"A scripted estimate, not a model's judgement.\"], \"skips\": [\"Nothing was analysed: the bank scripts the Director.\"], \"summary\": \"A overview pass: up to 3 sources, basic checking.\", \"time\": {\"max_s\": 30, \"min_s\": 8}}, {\"credits\": {\"max\": 30, \"min\": 10}, \"dimensions\": {\"depth\": \"standard\", \"output_format\": \"google_docs\", \"parallelism\": 3, \"sources\": 12, \"verification\": \"standard\"}, \"id\": \"balanced\", \"label\": \"Balanced pass\", \"risks\": [\"A scripted estimate, not a model's judgement.\"], \"skips\": [\"Nothing was analysed: the bank scripts the Director.\"], \"summary\": \"A standard pass: up to 12 sources, standard checking.\", \"time\": {\"max_s\": 120, \"min_s\": 30}}, {\"credits\": {\"max\": 110, \"min\": 40}, \"dimensions\": {\"depth\": \"deep\", \"output_format\": \"google_docs\", \"parallelism\": 5, \"sources\": 40, \"verification\": \"thorough\"}, \"id\": \"thorough\", \"label\": \"Thorough pass\", \"risks\": [\"A scripted estimate, not a model's judgement.\"], \"skips\": [\"Nothing was analysed: the bank scripts the Director.\"], \"summary\": \"A deep pass: up to 40 sources, thorough checking.\", \"time\": {\"max_s\": 480, \"min_s\": 120}}]}",
+    "usage": {
+      "input_tokens": 1000,
+      "output_tokens": 500,
+      "total_tokens": 1500
+    }
+  },
+  "role": "director"
+}

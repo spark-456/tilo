@@ -3,7 +3,8 @@ language=None)` returns exactly `{"segments": [{"speaker", "start_ms", "text"}]}
 (`config/speech.yaml`), Google only (D-1: Gemini audio, `google_speech_adapter`); `FakeSpeechProvider` is the dev
 vendor and `SpeechRecordReplayProvider` mirrors `safety.SafetyRecordReplayProvider` (EFF-01: replay by default,
 `LIVE=1` live, `+TILO_RECORD=1` writes a redacted recording; raw audio never reaches a key or a file).
-`build_speech_provider` resolves a `SpeechConfig`; any other vendor fails loudly."""
+`build_speech_provider` resolves a `SpeechConfig`; any other vendor fails loudly. FR-MTG-11 adds `synthesize` (the
+voice, `tilo_providers.voice`): the fake's lives here, the Google one in `google_speech_adapter`."""
 
 from __future__ import annotations
 
@@ -12,6 +13,7 @@ import hashlib
 import json
 import os
 import re
+import struct
 import tempfile
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -28,6 +30,7 @@ from tilo_providers.replay import Redactor, ReplayMissError, is_live_mode, redac
 SPEECH_VENDORS = frozenset({"google", "fake"})  # D-1 (FR-MTG-11): Google only; `fake` is the dev vendor
 _LANGUAGE_RE = re.compile(r"[A-Za-z]{2,3}(-[A-Za-z0-9]{2,8})?")  # a BCP-47 hint; it reaches a prompt, so a strict shape
 _SEGMENT_KEYS = frozenset({"speaker", "start_ms", "text"})
+_VOICE_RE = re.compile(r"[A-Za-z][A-Za-z0-9_-]{0,39}")  # a voice name reaches a request, so a strict shape
 
 
 @dataclass(frozen=True)
@@ -111,12 +114,26 @@ def check_request(audio: Any, kwargs: dict[str, Any], max_bytes: int | None) -> 
     return media_type.strip().lower(), language
 
 
+def check_synth_request(text: Any, voice: Any, kwargs: dict[str, Any], max_chars: int | None) -> tuple[str, str | None]:
+    """Validates one `synthesize` call before anything is sent (FR-MTG-11); returns (text, voice)."""
+    if kwargs:
+        raise RequestError("FR-MTG-11: synthesize takes only text and voice=")
+    if not isinstance(text, str) or not text.strip():
+        raise RequestError("FR-MTG-11: synthesize needs non-empty text")
+    if voice is not None and not (isinstance(voice, str) and _VOICE_RE.fullmatch(voice)):
+        raise RequestError("FR-MTG-11: voice= must be a plain voice name")
+    if max_chars is not None and len(text) > max_chars:
+        raise RequestError(f"EFF-03: the text is over the voice cap of {max_chars} characters")
+    return text, voice
+
+
 class FakeSpeechProvider(SpeechProvider):
     """Deterministic, no network: the given segments, or one segment derived from the audio's digest. Refused when
     `LIVE=1` or deployed (a fake transcript must never reach a real meeting)."""
 
-    def __init__(self, segments: list[dict[str, Any]] | None = None) -> None:
+    def __init__(self, segments: list[dict[str, Any]] | None = None, *, max_chars: int | None = None) -> None:
         refuse_dev_only("fake-speech")
+        self._max_chars = max_chars
         self._segments = as_speech_result({"segments": segments})["segments"] if segments is not None else None
 
     def transcribe(self, audio: bytes, **kwargs: Any) -> Any:
@@ -125,6 +142,23 @@ class FakeSpeechProvider(SpeechProvider):
             return {"segments": [dict(s) for s in self._segments]}
         digest = hashlib.sha256(audio).hexdigest()[:8]
         return {"segments": [{"speaker": "Speaker 1", "start_ms": 0, "text": f"[fake:{digest}] {media_type}"}]}
+
+    def synthesize(self, text: str, *, voice: str | None = None, **kwargs: Any) -> bytes:
+        text, voice = check_synth_request(text, voice, kwargs, self._max_chars)
+        return _fake_pcm(text, voice)
+
+
+def _fake_pcm(text: str, voice: str | None) -> bytes:
+    """A deterministic sawtooth, integers only (no platform float noise): 0.1 s per word at a nominal 24 kHz, its pitch
+    and phase taken from a digest of the voice and the text, so a different text or voice sounds different."""
+    digest = hashlib.sha256(f"{voice or ''}\0{text}".encode()).digest()
+    period = 40 + int.from_bytes(digest[:4], "big") % 200
+    phase0 = int.from_bytes(digest[4:6], "big") % period
+    amplitude = 3000
+    samples = 2400 * max(1, len(text.split()))
+    return b"".join(
+        struct.pack("<h", ((phase0 + i) % period) * 2 * amplitude // period - amplitude) for i in range(samples)
+    )
 
 
 def speech_recording_key(profile_id: str, audio: bytes, media_type: str, language: str | None) -> str:

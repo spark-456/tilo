@@ -20,7 +20,7 @@ resolution, and in-memory record stores whose interface `tilo-api` implements on
 
 ## Requirement IDs
 FR-MTG-05, FR-PA-01, FR-PA-11, FR-PA-17, FR-PB-01, FR-PB-02, FR-PB-04 to FR-PB-07,
-FR-CAL-03, FR-CAL-06 (oracle half); PPL-10a to PPL-10d.
+FR-CAL-03, FR-CAL-06 (oracle half), FR-CAL-07b-1 (`free_slots`); PPL-10a to PPL-10d.
 
 ## Local rules
 - Pure: no model, provider, network, randomness, logging, print or clock read under `src/`.
