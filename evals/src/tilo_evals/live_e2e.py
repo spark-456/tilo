@@ -366,6 +366,7 @@ class _Meter:
         )
         self.failure: tuple[str, BaseException] | None = None  # (role, error): the first call the Router gave up on
         self.quoted_calls = 0  # calls that returned no usage: charged at the pre-call quote, not at what was used
+        self.counters: dict[str, Callable[[str], int]] = {}  # profile -> the provider's own token count (FR-MTR-01)
         self.lock = threading.RLock()  # one model call at a time, so the cap is checked against what was really spent
 
     def cost(self, profile: str, tokens_in: int, tokens_out: int) -> float:
@@ -383,7 +384,18 @@ class _Meter:
         usage = response.usage or {}
         if isinstance(usage.get("input_tokens"), int) and isinstance(usage.get("output_tokens"), int):
             return usage["input_tokens"], usage["output_tokens"]
-        return len(f"{request.system or ''} {request.prompt}".split()), len((response.text or "").split())  # no usage
+        # no usage: the provider's own count of what was sent and what came back (never words where it can count)
+        return self.count(response.profile_id, _sent_text(request)), self.count(
+            response.profile_id, response.text or ""
+        )
+
+    def count(self, profile: str, text: str) -> int:
+        """FR-MTR-01: the provider's own token count of `text` (a count call, no generation), words if it has none."""
+        counter = self.counters.get(profile)
+        try:
+            return int(counter(text)) if counter is not None else len(text.split())
+        except Exception:  # noqa: BLE001 - metering never fails a run: the word count is the floor
+            return len(text.split())
 
     def add(self, role: str, request: GenerateRequest, response: GenerateResponse, latency_ms: float) -> None:
         tokens_in, tokens_out = self.tokens(response, request)
@@ -414,6 +426,28 @@ class _Meter:
             row.credits += self.cost(profile, tokens_in, quote_out)
             row.latency_ms += latency_ms
 
+    def add_truncated(
+        self, role: str, profile: str, request: GenerateRequest, error: OutputTruncatedError, latency_ms: float
+    ) -> None:
+        """FR-MTR-01: a reply cut at its cap was billed. Metered from the usage the error reports: input tokens from
+        it, output plus thinking tokens; a side it does not report is the provider's own count of the input, and for
+        the output the cap the call burned (a cut reply used all of it). Not a quote, so not in `quoted_calls`."""
+        reported = error.output_tokens is not None or error.thinking_tokens is not None
+        tokens_out = (
+            (error.output_tokens or 0) + (error.thinking_tokens or 0) if reported else request.max_output_tokens or 0
+        )
+        with self.lock:
+            tokens_in = (
+                error.input_tokens if isinstance(error.input_tokens, int) else self.count(profile, _sent_text(request))
+            )
+            key = (_stage(role, request), role, profile)
+            row = self.rows.setdefault(key, Row(*key))
+            row.calls += 1
+            row.tokens_in += tokens_in
+            row.tokens_out += tokens_out
+            row.credits += self.cost(profile, tokens_in, tokens_out)
+            row.latency_ms += latency_ms
+
     def stopped(self, kind: str, role: str, detail: str = "", stage: str = "") -> None:
         with self.lock:
             self.stop = self.stop or (kind, role, detail, stage)
@@ -421,6 +455,10 @@ class _Meter:
     def failed(self, role: str, error: BaseException) -> None:
         with self.lock:
             self.failure = self.failure or (role, error)
+
+
+def _sent_text(request: GenerateRequest) -> str:
+    return f"{request.system or ''} {request.prompt}"
 
 
 def _stage(role: str, request: GenerateRequest) -> str:
@@ -466,6 +504,8 @@ class _Metered(_Redacting):
     def __init__(self, inner: ModelProvider, role: str, profile: str, meter: _Meter) -> None:
         super().__init__(inner)
         self._role, self._profile, self._meter = role, profile, meter
+        own = getattr(inner, "provider_count_tokens", None)  # a replay or live wrapper offers the provider's own count
+        meter.counters[profile] = own if callable(own) else inner.count_tokens
 
     def generate(self, request: GenerateRequest) -> GenerateResponse:
         started = time.perf_counter()
@@ -477,9 +517,12 @@ class _Metered(_Redacting):
             raise
         except (RequestError, QuotaError):  # refused before any generation: never billed
             raise
+        except OutputTruncatedError as error:  # billed, and it reported its usage (FR-MTR-01)
+            self._meter.add_truncated(self._role, self._profile, request, error, (time.perf_counter() - started) * 1000)
+            raise
         except Exception:
             # Anything else may have been billed after it was sent (a blocked candidate, a timeout): count it.
-            tokens_in = len(f"{request.system or ''} {request.prompt}".split())
+            tokens_in = self._meter.count(self._profile, _sent_text(request))
             elapsed = (time.perf_counter() - started) * 1000
             self._meter.add_unreturned(self._role, self._profile, request, tokens_in, elapsed)
             raise

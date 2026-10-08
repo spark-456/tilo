@@ -25,6 +25,7 @@ from tilo_providers.router import Router, RouterError, RouterResult
 from tilo_planning.brief import DIRECTOR_ROLE
 from tilo_planning.plangraph import SCHEMA_RULE, Violation, _floor_tier, validate_plan
 
+PLAN_THINKING = "medium"  # drafting units needs some thought; the model's default (dynamic, high) is billed as output
 MAX_ATTEMPTS = 2  # the first draft and one repair, as for approaches (PL-03, PRD 6.6)
 MAX_UNITS = 30  # BQ-115: the schema allows 200; the Director drafts a plan a person reads
 DELIVER = "deliver"  # BQ-218: the unit type code appends so every run delivers in Tilo (FR-CON-10)
@@ -156,6 +157,7 @@ def _ask(router: Router, prompt: str) -> RouterResult:
         prompt=prompt,
         json_mode=True,
         response_schema=_Reply.model_json_schema(),
+        thinking_level=PLAN_THINKING,
     )
     try:
         run = router.generate(DIRECTOR_ROLE, request, required_capability=Capability.JSON)
