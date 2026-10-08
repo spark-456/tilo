@@ -25,6 +25,11 @@ class RequestError(ProviderError):
     """The request itself was rejected (other 4xx). Retrying unchanged will not help."""
 
 
+class MissingCapabilityError(ProviderError):
+    """The provider cannot take this input, for example a media type (LW-06). Not a bad request: the router falls
+    back to the next candidate. The message names the type, never the content."""
+
+
 class SafetyError(ProviderError):
     """The model or platform blocked the response on safety grounds (PRD 10.4)."""
 

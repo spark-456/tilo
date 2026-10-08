@@ -16,10 +16,11 @@ _DEFAULT_CAPS = frozenset({Capability.JSON, Capability.TOOLS})
 _DEFAULT_PRICE = PriceQuote(input=0.0, output=0.0)  # UI/fixture work never meters real spend
 
 
-def _canned_text(prompt: str) -> str:
+def _canned_text(prompt: str, media: list[str] | None = None) -> str:
     # A short stable digest keeps two different prompts from ever colliding,
     # while the same prompt always reproduces byte-for-byte the same text.
-    digest = hashlib.sha256(prompt.encode("utf-8")).hexdigest()[:8]
+    # LW-06: a media part's sha256 (never its bytes) is part of the digest, so two files give two replies
+    digest = hashlib.sha256("\n".join([prompt, *(media or [])]).encode("utf-8")).hexdigest()[:8]
     return f"[fake:{digest}] {prompt}"
 
 
@@ -38,7 +39,11 @@ class FakeModelProvider(ModelProvider):
 
     def generate(self, request: GenerateRequest) -> GenerateResponse:
         usage = dict(self._usage) if self._usage is not None else None
-        return GenerateResponse(text=_canned_text(request.prompt), profile_id=self._profile_id, usage=usage)
+        return GenerateResponse(
+            text=_canned_text(request.prompt, [p.sha256 or "" for p in request.parts or ()]),
+            profile_id=self._profile_id,
+            usage=usage,
+        )
 
     def stream(self, request: GenerateRequest) -> Iterator[GenerateResponse]:
         yield self.generate(request)

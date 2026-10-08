@@ -17,7 +17,7 @@ from collections.abc import Callable, Sequence
 from pathlib import Path
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from tilo_providers.config import ProviderConfigError, ProvidersConfig
 from tilo_providers.errors import ProviderError, RequestError
@@ -45,6 +45,13 @@ class BatchRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     custom_id: str = Field(min_length=1)
     request: GenerateRequest
+
+    @field_validator("request")
+    @classmethod
+    def _no_media(cls, request: GenerateRequest) -> GenerateRequest:
+        if request.parts:  # the batch wire carries the prompt only: refuse rather than drop a file silently
+            raise RequestError("LW-06: a batch request carries no media parts")
+        return request
 
 
 class BatchJob(BaseModel):
