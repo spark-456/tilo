@@ -71,7 +71,8 @@ def _resolve_seed_path(seeds: dict[str, Any], path: tuple[Any, ...]) -> Any:
 
 
 def _group_cases(group: str) -> list[Case]:
-    return [c for c in load_cases(str(_CASES_DIR)) if c.group == group]
+    """The PRD 19.2 cases of a group: E-RES-11 is the ADR-0029 extra (LW-16, BQ-LW16-1) and has its own tests."""
+    return [c for c in load_cases(str(_CASES_DIR)) if c.group == group and c.id != "E-RES-11"]
 
 
 def test_PRD_19_2_e_res_doc_hand_ten_e_res_cases_match_sandbox_web_seeds() -> None:
