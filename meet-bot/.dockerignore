@@ -1,0 +1,8 @@
+.env
+.git
+.venv
+debug
+out
+profile
+tests
+__pycache__

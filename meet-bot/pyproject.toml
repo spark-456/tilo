@@ -1,0 +1,23 @@
+[project]
+name = "tilo-meet-bot"
+version = "0.1.0"
+description = "Google Meet note-taking bot prototype"
+requires-python = ">=3.12"
+dependencies = []  # host CLI is stdlib only; container installs docker/requirements.txt
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "playwright==1.52.0", "google-genai>=1.0"]
+
+[tool.uv.workspace]
+members = []  # standalone: not part of the Tilo monorepo workspace
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+
+[tool.ruff]
+extend = "../pyproject.toml"  # same rules as the rest of the repo
+
+[tool.ruff.lint]
+# Prototype: long lines are prompts and explanatory comments that read better unbroken.
+extend-ignore = ["E501"]
