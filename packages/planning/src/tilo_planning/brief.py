@@ -91,7 +91,19 @@ def output_schema() -> dict[str, Any]:
     # length, count and duplicate check is code (`_gaps`, `clean_part`), on the one call. The empty-deliverables
     # minimum is relaxed here only (brief.schema.json is unchanged): code turns "no deliverable" into NothingPossible
     # or an error.
-    schema["properties"]["out_of_scope"] = {}
+    # The wire shape (`x-wire-schema`, read only by the provider's sanitizer; Vertex refuses an untyped property with
+    # 400, PL-02 probe 8 Oct 2026) is what `_gaps` accepts: a list of {category, part}. The router's validator ignores
+    # the keyword, so the schema it checks stays unconstrained.
+    schema["properties"]["out_of_scope"] = {
+        "x-wire-schema": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {"category": {"type": "string"}, "part": {"type": "string"}},
+                "required": ["category", "part"],
+            },
+        }
+    }
     del schema["properties"]["deliverables"]["minItems"]
     return schema
 
