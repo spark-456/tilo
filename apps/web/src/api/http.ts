@@ -12,6 +12,7 @@ import type {
   QuestionAnswer,
   TiloClient,
 } from "./client";
+import { type HostStarted, isHostStarted, refusalOf } from "./meetingHost";
 import {
   type ScheduleRequest,
   type ScheduleView,
@@ -33,6 +34,8 @@ export class TiloApiError extends Error {
     readonly code: string | null = null,
     /** NFR-22 / NFR-24: a 503 that said `replay_only: true` (live models unavailable); finished runs can still be replayed. */
     readonly replayOnly = false,
+    /** The refusal's short word (a connector rule such as `MH-02`, or a reason such as `already_hosted`), or null. */
+    readonly refusal: string | null = null,
   ) {
     super(message);
     this.name = "TiloApiError";
@@ -286,8 +289,19 @@ export class HttpClient implements TiloClient, SchedulesApi {
       if (isReplayOnly(res.status, body)) {
         throw new TiloApiError(REPLAY_ONLY, 503, false, write, codeOf(body), true);
       }
-      if (res.status >= 500) throw new TiloApiError(SERVER_TROUBLE, res.status, true, write);
-      throw new TiloApiError(reasonOf(res.status, body), res.status, false, write, codeOf(body));
+      const refusal = refusalOf(body);
+      if (res.status >= 500) {
+        throw new TiloApiError(SERVER_TROUBLE, res.status, true, write, null, false, refusal);
+      }
+      throw new TiloApiError(
+        reasonOf(res.status, body),
+        res.status,
+        false,
+        write,
+        codeOf(body),
+        false,
+        refusal,
+      );
     }
     if (res.status === 204) return undefined as T; // no content: nothing to read
     try {
@@ -623,6 +637,16 @@ export class HttpClient implements TiloClient, SchedulesApi {
   /** `POST /worlds/{id}/pause` (FR-WLD-07). Not on the TiloClient interface yet. */
   async pauseWorld(worldId: string): Promise<void> {
     await this.post(`/worlds/${encodeURIComponent(worldId)}/pause`, {});
+  }
+
+  /** `POST /v1/meetings/{id}/host` (FR-MTG-09): the owner asks Tilo to host a scheduled bot meeting. The body is
+   * always `{}`. The reply is only the meeting's world id; the T3 gate card is then in that world's cards
+   * (`listCards`). Nothing is created until the person answers it. Not on the TiloClient interface. */
+  async hostMeeting(meetingId: string): Promise<HostStarted> {
+    const path = `/v1/meetings/${encodeURIComponent(meetingId)}/host`;
+    const result = await this.post<unknown>(path, {});
+    if (!isHostStarted(result)) throw new TiloApiError(BAD_REPLY, 200, true, true);
+    return { world_id: result.world_id };
   }
 
   /** `GET /schedules` (FR-AGT-14): the owner's routines. A body that is not `{schedules: [...]}` of
