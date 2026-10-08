@@ -7,12 +7,28 @@
 import { hasSession } from "../auth/auth";
 import { session } from "../auth/session";
 
+/** The Home composer's remembered Quick / Thinking choice (park/pages/Home/effortStore.ts): the person's, not the next one's. */
+const EFFORT_KEYS = "tilo.park.effort.";
+
+function forgetPerson(): void {
+  try {
+    for (const key of Object.keys(window.localStorage)) {
+      if (key.startsWith(EFFORT_KEYS)) window.localStorage.removeItem(key);
+    }
+  } catch {
+    // storage absent or blocked: nothing was kept there
+  }
+}
+
 export function endSession(): boolean {
   if (!hasSession(session.getState())) return false;
   session
     .signOut()
     .then(() => {
-      if (session.getState().status === "signed_out") window.location.assign("/");
+      if (session.getState().status === "signed_out") {
+        forgetPerson();
+        window.location.assign("/");
+      }
     })
     .catch(() => undefined);
   return true;
