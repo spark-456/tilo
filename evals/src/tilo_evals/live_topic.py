@@ -317,17 +317,24 @@ def run_topic(
 
 
 def _typed(read: Callable[[str], str]) -> str:
-    print("Type your request; finish with an empty line (or end of input):", flush=True)
+    print("Type your request; finish with /end on its own line (or end of input):", flush=True)
     lines: list[str] = []
     while True:
         try:
             line = read("")
         except EOFError:
             break
-        if not line.strip():
+        if line == "/end":
             break
         lines.append(line)
     return "\n".join(lines)
+
+
+def _exit_code(report: e2e.LiveE2EReport) -> int:
+    if report.outcome_class == "stopped_at_cap":
+        return 3
+    bad = report.outcome_class not in ("completed", "held_at_gate", "declined") or any(f.hard for f in report.findings)
+    return int(bad)
 
 
 def main(
@@ -383,9 +390,8 @@ def main(
     label = "deliverable" if report.outcome_class == "completed" else "draft (not delivered)"
     for title, work in report.work:
         print(f"{label}: {clean(title)}\n{clean(work, lines=True)}\n")
-    bad = report.outcome_class not in ("completed", "held_at_gate", "declined") or any(f.hard for f in report.findings)
-    code = 3 if report.outcome_class == "stopped_at_cap" else int(bad)
+    code = _exit_code(report)
     if code:
-        why = " ".join((report.reason or "the run did not finish, or a hard check failed").split())
+        why = clean(report.reason or "the run did not finish, or a hard check failed")
         print(f"STOP {report.outcome_class}: {why}", file=sys.stderr)
     return code
