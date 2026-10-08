@@ -134,6 +134,16 @@ def clear_flow(flow_factory):
     return flow_factory([])
 
 
+@pytest.fixture()
+def quick_rig(flow_factory, repo_root: pathlib.Path):
+    """COST-FAST-1 (Quick / Thinking): a clear-task `Flow` whose router is a recording wrapper over a real Router with
+    one scripted provider, plus a fresh artifact store, flag store and FR-PA-19 allowance ledger. See API_COST_FAST_1.md
+    and _costfast1_lib.py."""
+    import _costfast1_lib
+
+    return _costfast1_lib.QuickRig(flow_factory([]), repo_root)
+
+
 # --- CL-INT-2 (CP2 thin slice, the run after approve): see API_CL_INT_2.md and _clint2_lib.py ----
 
 

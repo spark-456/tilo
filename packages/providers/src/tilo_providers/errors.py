@@ -13,6 +13,11 @@ class ProviderError(Exception):
     """Base for every error a ModelProvider adapter raises."""
 
 
+class NotConfigured(ProviderError):
+    """The provider has no such capability configured (FR-MTG-11): a `SpeechProvider` without a voice, a voice vendor
+    without the live switch. Not retried and not a fallback trigger: the caller (or the config) has to change."""
+
+
 class QuotaError(ProviderError):
     """Rate limit or quota exceeded (HTTP 429). The router may fall back."""
 

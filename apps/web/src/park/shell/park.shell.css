@@ -4,8 +4,8 @@
    tokens. Every selector sits under [data-park]. Motion is of two kinds, both with honesty-scan entries in
    test-support/honestyScan.ts: the city's ambient cars and walkers (WEB-MOTION-1, BQ-WEB-3), and the shell's own
    chrome (WEB-MOTION-2: the boot splash, the page swap, the progress bar, the world card), which moves only
-   because a person acted. Transform and opacity only, never a layout property; reduced motion switches all of
-   it off at the end of the file. Glass blur is on the nav only (README "Performance"). */
+   because a person acted. Transform, opacity, background-color and color only (the last two were approved on 8 Oct,
+   BQ-WEB-MOTION-3a), never a layout property; reduced motion switches all of it off at the end of the file. Glass blur is on the nav only (README "Performance"). */
 
 /* The city's movers (the engine puts the animation on each layer; reference Tilo App.dc.html keyframes).
    The walker's two frames flip by opacity instead of the reference's background-position (walkFrame). */
@@ -765,37 +765,29 @@
    or tiloSpin on a ring, and starts from something a person did (a pointer over a control, a press, a click that
    opens a menu, an action in flight). Nothing shows or implies an agent, a run or a decision. Page and component
    stylesheets may not hold motion, so the page's controls are reached from the page outlet (.park-shell__main).
-   The reference's colour, box-shadow, filter and width fades are not built: they would animate paint or layout.
-   The Home glass chip does not lift for the same reason (it carries a backdrop-filter). */
+   Colour fades (user approved 8 Oct, BQ-WEB-MOTION-3a) are background-color and color only, on the exact list pinned
+   in motion3.micro.css.test.ts. The reference's box-shadow, filter (the primary button's brightness) and width fades
+   are not built: they would animate paint or layout. The Home glass chip does not lift for the same reason (it
+   carries a backdrop-filter). */
 
-/* The nav's hover wash is an overlay that fades by opacity (the reference fades background-color .2s). */
-[data-park] .park-shell__tab::before,
-[data-park] .park-shell__iconbtn::before,
-[data-park] .park-shell__nrow::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  border-radius: inherit;
+/* The nav's hover wash fades the element's own background-color over .2s, as in the reference. The tab you are on
+   keeps its fill (heroSoft); a focused control gets the same wash as a hovered one. */
+[data-park] .park-shell__tab {
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+[data-park] .park-shell__iconbtn,
+[data-park] .park-shell__nrow {
+  transition: background-color 0.2s ease;
+}
+[data-park] .park-shell__tab:not(.park-shell__tab--on):hover,
+[data-park] .park-shell__tab:not(.park-shell__tab--on):focus-visible,
+[data-park] .park-shell__iconbtn:hover,
+[data-park] .park-shell__iconbtn:focus-visible {
   background: var(--chip);
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.2s ease;
 }
-[data-park] .park-shell__nrow::before {
+[data-park] .park-shell__nrow:hover,
+[data-park] .park-shell__nrow:focus-visible {
   background: var(--rowHover);
-}
-[data-park] .park-shell__tab:hover::before,
-[data-park] .park-shell__iconbtn:hover::before,
-[data-park] .park-shell__nrow:hover::before,
-[data-park] .park-shell__tab:focus-visible::before,
-[data-park] .park-shell__iconbtn:focus-visible::before,
-[data-park] .park-shell__nrow:focus-visible::before {
-  opacity: 1;
-}
-/* The tab you are on keeps its own fill. */
-[data-park] .park-shell__tab--on:hover::before {
-  opacity: 0;
 }
 
 /* Lifts on hover: cards, tiles and pins rise on transform .3s cubic-bezier(.2,.8,.2,1). */
@@ -838,6 +830,28 @@
   transition: transform 0.25s cubic-bezier(0.3, 1.3, 0.5, 1);
 }
 
+/* Colour fades of the handoff (user approved 8 Oct): the switch tracks recolour as the knob travels, list rows wash
+   on hover, the Worlds and Agenda chips fill when chosen, the sliding segmented text recolours. Paint only. */
+[data-park] .park-shell__main .park-switch,
+[data-park] .park-shell__main .park-profile-switch,
+[data-park] .park-shell__main .park-agenda-track,
+[data-park] .park-shell__main .park-skills-ask-track,
+[data-park] .park-shell__main .park-home-live,
+[data-park] .park-shell__main .park-home-event,
+[data-park] .park-shell__main .park-home-spend,
+[data-park] .park-shell__main .park-ledger-run,
+[data-park] .park-shell__main .park-ledger-arow-btn,
+[data-park] .park-shell__main .park-row--action {
+  transition: background-color 0.2s ease;
+}
+[data-park] .park-shell__main .park-agenda-filter,
+[data-park] .park-shell__main .park-worlds-tab {
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+[data-park] .park-shell__main .park-seg--sliding .park-seg__item {
+  transition: color 0.25s ease;
+}
+
 /* A toast, a popover or a menu comes in: from a few px up and transparent, over .25s (the shell's Enter component
    holds data-enter="pre" for one style flush, then "in"). The wrapper has no box. */
 [data-park] .park-shell__enter {
@@ -869,9 +883,9 @@
   [data-park] .park-shell__bootfill,
   [data-park] .park-shell__boot--out,
   [data-park] .park-shell__ring,
-  [data-park] .park-shell__tab::before,
-  [data-park] .park-shell__iconbtn::before,
-  [data-park] .park-shell__nrow::before,
+  [data-park] .park-shell__tab,
+  [data-park] .park-shell__iconbtn,
+  [data-park] .park-shell__nrow,
   [data-park] .park-shell__enter > .park-toast,
   [data-park] .park-shell__enter > .park-popover,
   [data-park] .park-scrim:has(> .park-shell__card--leaving) {
@@ -886,9 +900,9 @@
 [data-park][data-motion="still"] .park-shell__bootfill,
 [data-park][data-motion="still"] .park-shell__boot--out,
 [data-park][data-motion="still"] .park-shell__ring,
-[data-park][data-motion="still"] .park-shell__tab::before,
-[data-park][data-motion="still"] .park-shell__iconbtn::before,
-[data-park][data-motion="still"] .park-shell__nrow::before,
+[data-park][data-motion="still"] .park-shell__tab,
+[data-park][data-motion="still"] .park-shell__iconbtn,
+[data-park][data-motion="still"] .park-shell__nrow,
 [data-park][data-motion="still"] .park-shell__enter > .park-toast,
 [data-park][data-motion="still"] .park-shell__enter > .park-popover,
 [data-park][data-motion="still"] .park-scrim:has(> .park-shell__card--leaving) {

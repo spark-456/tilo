@@ -25,7 +25,7 @@ from _planning_contracts_lib import (
     load_brief_fixture,
     sample_event_base,
 )
-from tilo_planning.approaches import ApproachProposalError, problems, propose_approaches
+from tilo_planning.approaches import problems, propose_approaches
 from tilo_planning.brief import complete_brief
 from tilo_planning.compiler import PlanInputs, compile_plan
 
@@ -183,26 +183,16 @@ def test_FR_INT_15_problems_default_room_is_the_schemas_five_so_existing_callers
     assert not [p for p in problems(approaches) if "list at most" in p]
 
 
-# --- H12: over the room: one repair, then failure ---
+# --- H12: over the room: trimmed in code (COST-FAST-2: no repair call) ---
 
 
-def test_FR_INT_15_H12_a_reply_over_the_room_is_repaired_once_then_refused(tmp_path):
+def test_FR_INT_15_H12_a_reply_over_the_room_is_trimmed_in_code_with_one_call(tmp_path):
     gaps = make_gaps(*THREE)  # room: 2
     over = _payload([["a", "b", "c"], [], []])
 
-    with pytest.raises(ApproachProposalError):
-        _propose(tmp_path, [over, over], gaps)
+    result, provider = _propose(tmp_path, [over], gaps)
 
-
-def test_FR_INT_15_H12_the_repair_call_names_the_room_problem_and_the_second_reply_is_used(tmp_path):
-    gaps = make_gaps(*THREE)
-    over = _payload([["a", "b", "c"], [], []])
-    within = _payload([["a", "b"], [], ["c"]])
-
-    result, provider = _propose(tmp_path, [over, within], gaps)
-
-    assert len(provider.calls) == 2 and len(result.runs) == 2, "exactly one repair, recorded as a second run"
-    assert "lists 3 skips; list at most 2" in provider.calls[1].prompt
+    assert len(provider.calls) == 1 and len(result.runs) == 1, "COST-FAST-2: no repair call for skips"
     lines = [g.skip_line() for g in gaps]
     assert result.approaches[0]["skips"] == [*lines, "a", "b"] and len(result.approaches[0]["skips"]) == 5
 
@@ -215,19 +205,6 @@ def test_FR_INT_15_H12_a_reply_exactly_within_the_room_is_used_without_a_repair(
 
     assert len(provider.calls) == 1
     assert all(len(a["skips"]) <= 5 for a in result.approaches)
-
-
-def test_FR_INT_15_H12_over_the_room_twice_makes_exactly_two_calls(tmp_path):
-    gaps = make_gaps(*THREE[:1])  # room 4
-    over = _payload([["a", "b", "c", "d", "e"], [], []])
-    provider = ScriptedModelProvider("large", [ScriptedCall(text=json.dumps(over))] * 2)
-
-    with pytest.raises(ApproachProposalError):
-        propose_approaches(
-            _brief(), router=build_test_router(tmp_path, provider), base=sample_event_base(), seq=2, gaps=gaps
-        )
-
-    assert len(provider.calls) == 2, "one proposal, one repair, no third call"
 
 
 # --- compile_plan carries the merged approaches into the plan ---

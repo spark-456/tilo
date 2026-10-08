@@ -293,4 +293,10 @@ def test_FR_MTG_17_only_google_fake_and_replay_speech_providers_exist():
         return {cls}.union(*(walk(sub) for sub in cls.__subclasses__()))
 
     ours = {c.__name__ for c in walk(SpeechProvider) if c.__module__.startswith("tilo_providers")}
-    assert ours == {"SpeechProvider", "FakeSpeechProvider", "SpeechRecordReplayProvider", "GoogleSpeechProvider"}
+    assert ours == {
+        "SpeechProvider",
+        "FakeSpeechProvider",
+        "SpeechRecordReplayProvider",
+        "GoogleSpeechProvider",
+        "GoogleVoiceProvider",  # FR-MTG-11: Gemini speech output behind the live switch (tilo_providers.voice)
+    }
