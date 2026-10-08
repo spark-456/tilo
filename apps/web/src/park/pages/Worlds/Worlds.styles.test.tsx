@@ -137,7 +137,7 @@ describe("WEB_5_worlds_styles: header, tabs, scale", () => {
       height: "42px",
       padding: "0 18px 0 14px",
       "border-radius": "12px",
-      background: "var(--hero)",
+      background: "var(--heroFill)",
       color: "#FFFFFF",
       gap: "8px",
       ...T("15px", "800"),

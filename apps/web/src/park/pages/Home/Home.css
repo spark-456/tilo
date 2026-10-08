@@ -806,9 +806,15 @@
   display: flex;
   align-items: center;
   gap: 6px;
+  padding: 0 12px; /* a backing like "Start a real task": the text sits on the map, so it needs a fill to be readable */
+  border-radius: 999px;
+  background: var(--pop);
+  border: 1px solid var(--line2);
+  box-shadow: var(--sh);
+  box-sizing: border-box;
   font-size: 12px;
   font-weight: 700;
-  color: var(--ink3);
+  color: var(--ink2);
   white-space: nowrap;
 }
 [data-park] .park-home-legal a {
