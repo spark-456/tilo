@@ -36,6 +36,15 @@ export function SharePage({
   const path = usePathname();
   const http = given ?? (hasHttp(client) ? client : null);
   const token = givenToken ?? tokenOf(path);
+  // The address holds the token: nothing this page requests may carry it as a Referer. (Hosting sends the
+  // site-wide policy for the first load; a header for /share/** is a follow-up, see PR notes.)
+  useEffect(() => {
+    const meta = document.createElement("meta");
+    meta.name = "referrer";
+    meta.content = "no-referrer";
+    document.head.append(meta);
+    return () => meta.remove();
+  }, []);
   return <ShareGate key={token ?? ""} http={http} token={token} />;
 }
 
