@@ -1,6 +1,6 @@
 // The live Api (WEB-1a, WIRE-1..3, FR-UX-13): `startWorld` makes the real intake call; `getLedger` reads `GET {base}/costs`, `getWorlds` walks `GET {base}/worlds`
 // pages, `getDecisions` walks `GET {base}/cards` pages and `decide` answers one card with one POST (the
-// person's tap, never a retry); every other method is NotBuilt and
+// person's tap, never a retry). Profile defaults and preferences are in-memory page choices; other methods are NotBuilt and
 // fetches nothing. With no base url nothing is fetched at all. It never imports the fixtures, so sample
 // numbers cannot pass as live (HR-1..HR-7). Failures are the shared `TiloApiError` (src/api/http.ts).
 import type { IntakeResult } from "../../api/client";
@@ -14,6 +14,7 @@ import {
   decisionsFromCards,
 } from "./live/decisionsFromCards";
 import { type CostReport, ledgerFromCosts } from "./live/ledgerFromCosts";
+import { profileDefaults } from "./live/profileDefaults";
 import { worldFromIntake } from "./live/worldFromIntake";
 import { STATE_OF, type WorldListItem, worldsFromList } from "./live/worldsFromList";
 import type { Dec, DecisionKey, Effort, QuickReply, TierKey, Today, User } from "./types";
@@ -196,6 +197,17 @@ export function createLiveApi(options: LiveApiOptions = {}): Api {
   const api = Object.fromEntries(stubs) as unknown as Api;
   const baseUrl = options.baseUrl?.trim();
   if (!baseUrl) return api;
+  const prefs = new Map<string, unknown>();
+  api.setPref = async (key, value) => {
+    prefs.set(key, structuredClone(value));
+    return { data: { ok: true }, source: "live" };
+  };
+  api.getProfileSettings = async () => {
+    const data = profileDefaults();
+    const quiet = prefs.get("quiet");
+    if (typeof quiet === "boolean") data.quiet.on = quiet;
+    return { data, source: "live" };
+  };
   const http = new HttpClient({
     baseUrl,
     ...(options.fetch ? { fetch: options.fetch } : {}),
