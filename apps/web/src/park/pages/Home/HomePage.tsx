@@ -23,6 +23,7 @@ import {
   DRAFT_MS,
   MODES,
   liveRows,
+  liveSummaryLine,
   needsWorld,
   nextEvents,
   placedPins,
@@ -37,6 +38,8 @@ interface Base {
   ledger: Ledger;
   /** What the "Waiting on you" tile says and opens; none when the Api serves no decisions. */
   decisions: Decision[];
+  /** True when the decisions came from the live Api (an empty list is then "none open", not "unknown"). */
+  decisionsServed: boolean;
 }
 
 type Loaded<T> = T | "failed" | null;
@@ -50,7 +53,7 @@ export function HomePage({ app }: { app: AppCtx }) {
   const api = useParkApi();
   const schedule = useSchedule();
   const store = useParkStore();
-  const { go, dec, added, night, vw, vh, pins, needsLeft: needs } = app;
+  const { go, dec, added, night, vw, vh, pins, needsLeft } = app;
 
   const [base, setBase] = useState<Loaded<Base>>(null);
   const [worlds, setWorlds] = useState<Loaded<World[]>>(null);
@@ -59,8 +62,11 @@ export function HomePage({ app }: { app: AppCtx }) {
 
   useEffect(() => {
     let live = true;
-    const decisions = (): Promise<Decision[]> =>
-      together(() => api.getDecisions()).then(data, () => []);
+    const decisions = (): Promise<{ list: Decision[]; served: boolean }> =>
+      together(() => api.getDecisions()).then(
+        (r) => ({ list: r.data, served: r.source === "live" }),
+        () => ({ list: [], served: false }),
+      );
     together(() =>
       Promise.all([api.getUser(), api.getToday(), api.getAgenda(), api.getLedger(), decisions()]),
     ).then(
@@ -71,7 +77,8 @@ export function HomePage({ app }: { app: AppCtx }) {
             today: data(today),
             agenda: data(agenda),
             ledger: data(ledger),
-            decisions: decided,
+            decisions: decided.list,
+            decisionsServed: decided.served,
           });
       },
       () => {
@@ -168,20 +175,32 @@ export function HomePage({ app }: { app: AppCtx }) {
   const failed = base === "failed" || worlds === "failed";
   const ready = base !== null && base !== "failed" && worlds !== null && worlds !== "failed";
   const waitingIn = ready ? needsWorld(worlds) : undefined;
+  // Live (PRD 9.4): numbers come only from the served worlds and served decisions, never the sample count.
+  const served = ready && worldsLive;
+  const openServed =
+    ready && base.decisionsServed ? base.decisions.filter((d) => !dec[d.k]).length : null;
+  const needs = served ? (openServed ?? 0) : needsLeft;
+  const summary = served
+    ? liveSummaryLine(
+        worlds.filter((w) => !w.isNew && (w.st === "running" || w.st === "needs")).length,
+        openServed,
+      )
+    : summaryLine(needs, night);
 
   return (
     <div className="park-home-root" data-testid="park-page-home">
       {ready ? (
         <>
           <Pins
-            pins={placedPins(pins, worlds, needs, night, vw || 1440, vh || 900)}
+            pins={placedPins(pins, worlds, needs, night, vw || 1440, vh || 900, served)}
             onOpen={open}
           />
           <Hero
             dateLine={`${base.today.long}${night ? " · 21:10" : ""}`.toUpperCase()}
             greeting={`${night ? "Good evening" : "Good morning"}, ${base.user.first}.`}
-            summary={summaryLine(needs, night)}
+            summary={summary}
             needs={needs}
+            needsKnown={!served || openServed !== null}
             night={night}
             worldName={waitingIn?.name ?? null}
             onReview={() => (waitingIn ? open(waitingIn.id) : go("worlds"))}
@@ -197,7 +216,7 @@ export function HomePage({ app }: { app: AppCtx }) {
           ) : null}
           {(vw || 1440) >= 1180 ? (
             <TodayPanel
-              rows={liveRows(worlds, needs)}
+              rows={liveRows(worlds, needs, served)}
               events={nextEvents(base.agenda)}
               spend={spendOf(base.ledger)}
               night={night}
