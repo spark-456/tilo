@@ -270,7 +270,7 @@ def resolve_due(due_text: object, *, meeting_at: str, time_zone: str) -> DueReso
             return DueResolution(None, text, "out_of_range")
     except _Verdict as verdict:
         return DueResolution(None, text, verdict.reason)
-    except OverflowError:
+    except (OverflowError, ValueError):  # a meeting near the year 9999 has no "next month"
         return DueResolution(None, text, "out_of_range")
     if due < d0:
         return DueResolution(None, text, "before_meeting")

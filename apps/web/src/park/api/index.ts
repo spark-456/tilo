@@ -27,6 +27,7 @@ import type {
   User,
   World,
 } from "./types";
+export { HELPER_SUMMARY_FIXTURE } from "./fixtures/additive";
 
 type R<T> = Promise<ApiResult<T>>;
 
