@@ -217,3 +217,11 @@ def test_CL_LIVE_2_the_docs_state_the_buffer_rule_and_the_no_default_factory_fac
     if doc == "docs/live-e2e.md":
         assert "real_connectors_no_token" in text and "until CL-LIVE-3" in text
         assert "never in a recording or report" not in text and "TILO_RECORD" in text.split("typed approval")[-1]
+
+
+def test_CL_LIVE_2_a_person_without_a_drain_seam_never_counts_the_buffer_as_discarded():
+    from tilo_evals.live_topic import TerminalPerson
+
+    assert TerminalPerson(drain=None)._flushed() is False
+    assert TerminalPerson(drain=lambda: False)._flushed() is False
+    assert TerminalPerson(drain=lambda: True)._flushed() is True
