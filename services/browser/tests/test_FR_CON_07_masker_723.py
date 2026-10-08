@@ -82,3 +82,18 @@ def test_FR_CON_07_723_hostile_placeholder_runs_stay_linear():
     start = time.perf_counter()
     mask(text)
     assert time.perf_counter() - start < 0.6
+
+
+def test_FR_CON_07_723_an_email_with_a_card_like_local_part_is_still_one_email():
+    card = CARDS["plain"]
+    assert mask(f"riya{card}@example.org") == "[masked:email]"
+    assert mask(f"ops_team{card}@mail.example.com") == "[masked:email]"
+
+
+def test_FR_CON_07_723_an_authorization_value_keeps_nothing_glued_after_its_token():
+    app = SECRETS["bearer"]
+    for text in (
+        f"Authorization: Bearer {SECRETS['github_token']}|{app}",
+        f"Authorization: AKIA{app[:16].upper()}:{app}",
+    ):
+        assert app[:12] not in mask(text)

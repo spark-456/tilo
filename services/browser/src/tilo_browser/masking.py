@@ -65,7 +65,7 @@ _KEY_VALUE = re.compile(
 _SCHEMES = "basic|bearer|digest|token|negotiate|ntlm|hoba|mutual|vapid|dpop|aws4-hmac-sha256"
 # A `Cookie:` line can hold several pairs, so it is left alone only when every value on it is already a placeholder
 # (`Cookie: <JWT>; refresh=<v>` masks the JWT first and must still lose the refresh value). An `Authorization:` value
-# is one credential, so a leading placeholder is enough.
+# is left alone when its leading placeholder ends at whitespace or the end, so prose after a token stays.
 _ALL_MASKED = r"(?!\[masked:\w+\](?:[ \t;,]*\[masked:\w+\])*[ \t;,]*(?=[\r\n]|\Z))"
 
 
@@ -76,14 +76,16 @@ def _header(names: str, guard: str) -> re.Pattern[str]:
     )
 
 
-_AUTH_HEADER = _header("authorization", r"(?!\[masked:)")
+_AUTH_HEADER = _header("authorization", r"(?!\[masked:\w+\](?=\s|\Z))")
 _COOKIE_HEADER = _header("(?:set-)?cookie", _ALL_MASKED)
 # `scheme://userinfo@` anywhere in text (a path, a query, page copy): the userinfo, of any length and
 # with at most one space, is dropped.
 _URL_USERINFO = re.compile(
     r"(?<![A-Za-z0-9+.-])([A-Za-z][A-Za-z0-9+.-]{0,63}://)(?!\[masked:secret\]@)[^\s/?#]+(?: [^\s/?#]+)?@"
 )
+# the card pass runs first, so a card-like run in a local part is a placeholder by now: a slower form, used only then
 _EMAIL = re.compile(r"[A-Za-z0-9._%+-]{1,64}@[A-Za-z0-9-]{1,63}(?:\.[A-Za-z0-9-]{1,63}){1,8}")
+_EMAIL_CARD = re.compile(r"(?:[A-Za-z0-9._%+-]|\[masked:card\]){1,64}@[A-Za-z0-9-]{1,63}(?:\.[A-Za-z0-9-]{1,63}){1,8}")
 _PHONE = re.compile(r"(?<![\d+])\+\d[\d ()-]{6,24}\d")
 # Digit groups of 2+ digits joined by one space or dash; a lone digit is never part of a card layout.
 _DIGIT_RUN = re.compile(r"(?<!\d)\d{2,}(?:[ -]\d{2,})*")
@@ -178,7 +180,7 @@ def _mask(text: str) -> str:
     if card:
         text = _mask_cards(text)
     if "@" in text:
-        text = _EMAIL.sub("[masked:email]", text)
+        text = (_EMAIL_CARD if "[masked:card]" in text else _EMAIL).sub("[masked:email]", text)
     return _PHONE.sub("[masked:phone]", text) if "+" in text else text
 
 
