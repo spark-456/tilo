@@ -37,7 +37,8 @@ the contract wins. Conventions are in [ADR-0002](../docs/adr/0002-contract-conve
 | `work_item.schema.json` | One thing a person has to do; proposed until the meeting Owner confirms an item Tilo made | 1.0.0 |
 | `pinboard_item.schema.json` | An entry on a personal or team pinboard; Tilo's entries carry a source and, on the team board, a confirmation | 1.0.0 |
 | `mention.schema.json` | An @mention of a team member on a team entry | 1.0.0 |
-| `calendar_entry.schema.json` | A stored calendar entry (cached Google event, own or proposed), plus the `agenda_item` read-model row and `free_busy` | 1.0.0 |
+| `calendar_entry.schema.json` | A stored calendar entry (cached Google event, own or proposed), plus the `agenda_item` read-model row and `free_busy`; 1.1.0 adds the row's optional `joinable` (ADR-0024 amendment 4, MJ-10); no field holds a link | 1.1.0 |
+| `meeting_join.schema.json` | The answer of `GET /v1/meetings/{id}/join`: a hosted meeting's Meet link for its owner, read on click and stored nowhere, with `expires_at` (ADR-0024 amendment 4); rules MJ-01 to MJ-10 in `meeting_join.rules.md` | 1.0.0 |
 | `ui_action.schema.json` | The assistant panel's closed allow-list of UI actions (FR-PA-14) | 1.0.0 |
 | `transcript.schema.json` | The content of a transcript artifact version (utterances), plus the `evidence_quote` read-model row tilo-api cuts per request (ADR-0020, PE-22 to PE-25) | 1.0.0 |
 | `plate.schema.json` | A person's plate (FR-PA-02): the read model S-27, the digest and the panel share; rows and parked lanes, groups and order by code (ADR-0021, PE-26 to PE-30) | 1.0.0 |
