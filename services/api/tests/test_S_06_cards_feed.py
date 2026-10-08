@@ -580,6 +580,9 @@ def test_S_06_feed_errors_never_leak_exception_text_and_a_broken_world_is_not_hi
 
 def _build_example(store: deps.Store, spec: list[list[tuple[str, int, str | None, str | None, bool]]]):
     """worlds: w_a1, w_a2 (Alice), w_b1 (Bob); each card (kind, stamp, district, assignee, answered)."""
+    from tilo_api.rate_limit import reset_default_rate_limiter
+
+    reset_default_rate_limiter()  # SEC-10: each example is a fresh install (one shared test IP bucket)
     store.worlds.clear()
     store.runs.clear()
     store.events.clear()
