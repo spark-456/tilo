@@ -1,0 +1,17 @@
+# The meeting bot's voice (FR-MTG-11): text to speech through SpeechProvider.synthesize. Read by
+# tilo_providers.voice.load_voice_config; a vendor other than google or fake, a denylisted model id (the rules.deny list in
+# config/models.yaml, PL-07), a bad voice name, an unknown sample rate or a non-positive cap fails start-up loudly. The
+# model id appears only here and in packages/providers (PL-01). The Google voice speaks only with the live switch, which
+# only the user sets (EFF-01); dev and CI read config/voice.dev.yaml (the deterministic fake).
+#
+# BQ-MTG11-2: whether this model id serves speech OUTPUT is NOT verified (no network in the build). It is the id the repo
+# already uses for audio input (config/speech.yaml); the user confirms or replaces it here before the first live meeting.
+# Cost: config/prices.yaml has no audio-output price (BQ-MTG11-3), so a live voice call is not metered yet.
+voice:
+  vendor: google
+  profile: google-voice
+  model: gemini-3.7-flash
+  voice: Kore # a prebuilt Gemini voice name; any plain name is accepted, the service rejects an unknown one
+  sample_rate: 24000 # Hz of the raw 16-bit mono PCM the model returns
+  max_chars: 400 # one reply's text (the bot already trims to this)
+  max_audio_bytes: 2400000 # about 50 s at 24 kHz: a reply is a sentence or two

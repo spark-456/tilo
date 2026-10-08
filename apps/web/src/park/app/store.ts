@@ -4,9 +4,18 @@
 // is injected as `schedule` so a test never waits.
 import { TiloApiError } from "../../api/http";
 import { needsLeft as countNeedsLeft, makeWorld, worlds } from "../api/fixtures/worlds";
-import type { Api } from "../api/index";
+import { type Api, askQuick } from "../api/index";
 import { NotBuilt } from "../api/liveApi";
-import type { Dec, Decision, DecisionKey, Source, TierKey, World } from "../api/types";
+import type {
+  Dec,
+  Decision,
+  DecisionKey,
+  QuickCost,
+  Source,
+  SwitchReason,
+  TierKey,
+  World,
+} from "../api/types";
 import { TOAST_MS } from "../components/Toast";
 import type { Motion, PageId, Params } from "./AppCtx";
 import { parkPath } from "./router";
@@ -16,6 +25,30 @@ const NOT_RECORDED = "Tilo could not record that answer. Nothing was sent.";
 /** What a start that failed says when the Api did not describe it, or the API is not connected (FR-UX-13). */
 const NOT_STARTED = "Tilo could not start that task. Try again.";
 const NOT_CONNECTED = "Starting work is not connected yet.";
+
+/** What a Quick ask came to: an answer (`sample` when the Api is the fixture), an offer to switch, or a plain failure. */
+export type QuickOutcome =
+  | { kind: "answered"; text: string; cost: QuickCost | null; sample: boolean }
+  | { kind: "switch"; reason: SwitchReason }
+  | { kind: "error"; message: string };
+
+/** One honest sentence per refusal of a Quick ask (the typed text stays on the page). */
+export function quickErrorMessage(e: unknown): string {
+  if (e instanceof NotBuilt) return "Quick answers are not connected yet.";
+  if (!(e instanceof TiloApiError)) return "Tilo could not answer that. Try again.";
+  if (e.status === 429) {
+    return "Quick answers are limited right now (today’s allowance or too many asks). Try again later.";
+  }
+  if (e.status === 403 && (e.code === "spend_cap_reached" || e.message === "spend_cap_reached")) {
+    // SEAM (CL-REACH lifetime-cap pop-up): the pop-up replaces this sentence when it lands.
+    return "The spending limit for this account has been reached, so nothing new can run.";
+  }
+  if (e.status === 503) {
+    return "Live models are unavailable right now, so Tilo could not answer. Try again later.";
+  }
+  if (e.status !== null && e.status >= 500) return "Tilo had a problem on its side. Try again.";
+  return e.message;
+}
 
 /** Runs `fn` after `ms` and returns the function that cancels it. */
 export type Schedule = (fn: () => void, ms: number) => () => void;
@@ -61,6 +94,11 @@ export interface ParkStore {
   /** The live path (FR-UX-13): the Api is asked first and the promise settles with whether the server accepted
    * the task; a world is added, and Open offered, only then (HR-1). The shell picks one of the two (`useApp`). */
   startWorld(mode: TierKey, query: string): Promise<boolean>;
+  /**
+   * Quick (COST-FAST-1): one direct question. It makes no world, adds nothing, toasts nothing and never animates;
+   * the page shows the outcome. `mode` is only the size on screen. A second call while one is in flight shares it.
+   */
+  askQuick(mode: TierKey, query: string): Promise<QuickOutcome>;
   toast(message: string, actionLabel?: string, action?: () => void): void;
   dismissToast(): void;
   setPref(key: string, value: unknown): void;
@@ -154,6 +192,7 @@ export function createParkStore({ api, navigate, schedule }: ParkStoreDeps): Par
   const pending = new Set<DecisionKey>();
   // The live start in flight: a second call gets the same answer and sends nothing.
   let starting: Promise<boolean> | null = null;
+  let asking: Promise<QuickOutcome> | null = null;
   let cancelToast: (() => void) | null = null;
   let cancelLoader: (() => void) | null = null;
 
@@ -278,6 +317,22 @@ export function createParkStore({ api, navigate, schedule }: ParkStoreDeps): Par
         },
       );
       return starting;
+    },
+    askQuick(mode, query) {
+      if (asking) return asking;
+      asking = askQuick(api, mode, query).then(
+        ({ data, source }): QuickOutcome => {
+          asking = null;
+          return data.kind === "answered"
+            ? { kind: "answered", text: data.text, cost: data.cost, sample: source !== "live" }
+            : { kind: "switch", reason: data.reason };
+        },
+        (e: unknown): QuickOutcome => {
+          asking = null;
+          return { kind: "error", message: quickErrorMessage(e) };
+        },
+      );
+      return asking;
     },
     addWorld(mode, query) {
       const world = makeWorld(mode, query, state.added.length + 1);

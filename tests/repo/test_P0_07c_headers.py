@@ -70,6 +70,7 @@ OFF_ORIGIN_ALLOWED = {
         "https://content-firebaseappcheck.googleapis.com",
         "https://identitytoolkit.googleapis.com",
         "https://securetoken.googleapis.com",
+        "https://tilo-api-4qhkpsn5ga-as.a.run.app",  # WEB-TO-API: the deployed tilo-dev tilo-api, the one API origin
     ],
 }
 

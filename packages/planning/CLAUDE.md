@@ -8,7 +8,7 @@ ambiguous fields; `questions.generate_questions` checks `memory` first, then ran
 FR-INT-09: `plangraph.validate_plan` (plan schema, PG-01..PG-11, no model); `compiler.compile_plan`: the `director`
 drafts units, code adds gates, cap and a final `deliver` unit (BQ-218), one repair sends rule ids and pointers in data blocks (BQ-115).
 FR-INT-06/07/08: `approaches.propose_approaches` asks the `director` role for 2-3 approaches and checks
-PG-07/08/09 in code (one repair through the router, then reject); `estimate.estimate_units` sums
+PG-07/08/09 in code (one repair through the router, then reject; skips over the gap room are trimmed in code, COST-FAST-2); `estimate.estimate_units` sums
 historical unit costs (seed table `unit_cost_seed.json`, empty at launch, PRD 7.3); `budget` grants a
 budget by the person or, via `tilo_policy.decide`, by an L3 policy on the `grant_budget` action type.
 FR-INT-11/12/15: `scenarios` (`config/scenarios/`), `refusal` (`config/out_of_policy.yaml`), `gaps` (`config/capability_gaps.yaml`). Tests: `uv run pytest packages/planning`.

@@ -1,0 +1,38 @@
+{
+  "id": "web-research-citations",
+  "version": "0.1.0",
+  "domain": "research",
+  "author": "Example Research Author",
+  "reviewer": "Example Domain Expert",
+  "tools_allowed": ["web_search", "read_file"],
+  "inputs": {
+    "type": "object",
+    "required": ["question"],
+    "properties": {
+      "question": {
+        "type": "string"
+      },
+      "max_sources": {
+        "type": "integer",
+        "minimum": 1
+      }
+    }
+  },
+  "outputs": {
+    "type": "object",
+    "required": ["findings"],
+    "properties": {
+      "findings": {
+        "type": "array",
+        "items": {
+          "type": "object"
+        }
+      }
+    }
+  },
+  "description": "Answer a research question from the web with a citation for every claim.",
+  "tool_access": {
+    "google_drive": "read",
+    "gmail": "off"
+  }
+}

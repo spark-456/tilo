@@ -12,6 +12,7 @@ import type {
   QuestionAnswer,
   TiloClient,
 } from "./client";
+import { type HostStarted, isHostStarted, refusalOf } from "./meetingHost";
 import {
   type ScheduleRequest,
   type ScheduleView,
@@ -33,6 +34,8 @@ export class TiloApiError extends Error {
     readonly code: string | null = null,
     /** NFR-22 / NFR-24: a 503 that said `replay_only: true` (live models unavailable); finished runs can still be replayed. */
     readonly replayOnly = false,
+    /** The refusal's short word (a connector rule such as `MH-02`, or a reason such as `already_hosted`), or null. */
+    readonly refusal: string | null = null,
   ) {
     super(message);
     this.name = "TiloApiError";
@@ -210,6 +213,53 @@ const AUTH_TOKEN = /^[A-Za-z0-9._~+/=-]{1,4096}$/;
 /** SEC-15 (BQ-SIGNIN-3): sent on a phone-width window, with a token, so the API records `mobile_web`. */
 const CHANNEL_HEADER = "X-Tilo-Channel";
 
+/** Why a Quick ask is offered as Thinking instead: the server's closed set (COST-FAST-1), written once, here. */
+export const QUICK_REASONS = [
+  "attachments",
+  "side_effect",
+  "deliverable",
+  "needs_tools",
+  "multi_step",
+  "too_long",
+  "scenario",
+  "unclear",
+] as const;
+export type QuickReason = (typeof QUICK_REASONS)[number];
+
+/** What the server charged for a Quick answer; each figure only when it was served (no estimate is made here). */
+export interface QuickCost {
+  credits?: number;
+  savedCredits?: number;
+}
+
+/** A Quick ask's two answers (services/api COST-FAST-1): the model's text with its cost, or an offer to switch. */
+export type QuickIntakeResult =
+  | { kind: "answered"; text: string; cost: QuickCost | null }
+  | { kind: "switch"; reason: QuickReason };
+
+const figure = (v: unknown): number | undefined =>
+  typeof v === "number" && Number.isFinite(v) && v >= 0 ? v : undefined;
+
+/** The strict reading of a Quick reply: anything else is null (a reply this page cannot read), never a guess. */
+function quickOf(body: unknown): QuickIntakeResult | null {
+  if (typeof body !== "object" || body === null) return null;
+  const b = body as Record<string, unknown>;
+  if (b.mode !== "quick") return null;
+  if (b.outcome === "switch_to_thinking") {
+    const reason = QUICK_REASONS.find((r) => r === b.reason);
+    return reason ? { kind: "switch", reason } : null;
+  }
+  if (b.outcome !== "answered" || typeof b.text !== "string" || b.text === "") return null;
+  const c =
+    typeof b.cost === "object" && b.cost !== null ? (b.cost as Record<string, unknown>) : {};
+  const cost: QuickCost = {};
+  const credits = figure(c.credits);
+  const saved = figure(c.saved_credits);
+  if (credits !== undefined) cost.credits = credits;
+  if (saved !== undefined) cost.savedCredits = saved;
+  return { kind: "answered", text: b.text, cost: Object.keys(cost).length > 0 ? cost : null };
+}
+
 export class HttpClient implements TiloClient, SchedulesApi {
   private readonly base: string;
   private readonly fetchFn: typeof fetch;
@@ -286,8 +336,19 @@ export class HttpClient implements TiloClient, SchedulesApi {
       if (isReplayOnly(res.status, body)) {
         throw new TiloApiError(REPLAY_ONLY, 503, false, write, codeOf(body), true);
       }
-      if (res.status >= 500) throw new TiloApiError(SERVER_TROUBLE, res.status, true, write);
-      throw new TiloApiError(reasonOf(res.status, body), res.status, false, write, codeOf(body));
+      const refusal = refusalOf(body);
+      if (res.status >= 500) {
+        throw new TiloApiError(SERVER_TROUBLE, res.status, true, write, null, false, refusal);
+      }
+      throw new TiloApiError(
+        reasonOf(res.status, body),
+        res.status,
+        false,
+        write,
+        codeOf(body),
+        false,
+        refusal,
+      );
     }
     if (res.status === 204) return undefined as T; // no content: nothing to read
     try {
@@ -316,10 +377,27 @@ export class HttpClient implements TiloClient, SchedulesApi {
     return this.request<T>(path, init, true);
   }
 
-  async submitIntake(text: string, files: File[]): Promise<IntakeResult> {
+  /**
+   * `POST /intake`. With no `mode` it is exactly the legacy call (the server reads an absent mode as Thinking);
+   * "quick" (COST-FAST-1) returns a direct answer or an offer to switch, and makes no task.
+   */
+  submitIntake(text: string, files: File[]): Promise<IntakeResult>;
+  submitIntake(text: string, files: File[], mode: "quick"): Promise<QuickIntakeResult>;
+  async submitIntake(
+    text: string,
+    files: File[],
+    mode?: "quick",
+  ): Promise<IntakeResult | QuickIntakeResult> {
     const form = new FormData();
     form.append("text", text);
     for (const file of files) form.append("files", file);
+    if (mode === "quick") {
+      form.append("mode", mode);
+      const body = await this.request<unknown>("/intake", { method: "POST", body: form }, true);
+      const quick = quickOf(body);
+      if (!quick) throw new TiloApiError(BAD_REPLY, 200, true, true);
+      return quick;
+    }
     const r = await this.request<
       Omit<IntakeResult, "files"> & {
         files: Array<{ filename: string; status: "ok" | "failed"; safety_flagged: boolean }>;
@@ -623,6 +701,16 @@ export class HttpClient implements TiloClient, SchedulesApi {
   /** `POST /worlds/{id}/pause` (FR-WLD-07). Not on the TiloClient interface yet. */
   async pauseWorld(worldId: string): Promise<void> {
     await this.post(`/worlds/${encodeURIComponent(worldId)}/pause`, {});
+  }
+
+  /** `POST /v1/meetings/{id}/host` (FR-MTG-09): the owner asks Tilo to host a scheduled bot meeting. The body is
+   * always `{}`. The reply is only the meeting's world id; the T3 gate card is then in that world's cards
+   * (`listCards`). Nothing is created until the person answers it. Not on the TiloClient interface. */
+  async hostMeeting(meetingId: string): Promise<HostStarted> {
+    const path = `/v1/meetings/${encodeURIComponent(meetingId)}/host`;
+    const result = await this.post<unknown>(path, {});
+    if (!isHostStarted(result)) throw new TiloApiError(BAD_REPLY, 200, true, true);
+    return { world_id: result.world_id };
   }
 
   /** `GET /schedules` (FR-AGT-14): the owner's routines. A body that is not `{schedules: [...]}` of
