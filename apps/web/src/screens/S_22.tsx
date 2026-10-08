@@ -6,6 +6,7 @@ import { type Density, useDensity } from "../display/density";
 import { AppLink } from "./AppLink";
 import { Placeholder } from "./Placeholder";
 import { Page, Row, Section } from "./kit";
+import { Routines } from "./routines/Routines";
 
 // PRD 16.5 consent: each opt-in is explicit and revocable.
 // `to` is where the access is shown and managed today; an opt-in with no screen of its own yet has
@@ -60,6 +61,13 @@ export function S_22() {
             </label>
           ))}
         </fieldset>
+      </Section>
+      <Section
+        title="Routines"
+        note="Runs that repeat every week. Set one with Repeat weekly when you start a run."
+        reserve={[6, 10]}
+      >
+        <Routines />
       </Section>
       <Section title="Consent" note="Every one is explicit and can be taken back at any time.">
         <ul className="blist">

@@ -53,7 +53,7 @@ describe("WEB_10_team_render: heading, intro and invite field", () => {
     expect(email.closest("div")?.querySelector("svg"), "mail icon inside the field").not.toBeNull();
     const invite = [...root.querySelectorAll("button")].find((b) => text(b) === COPY.invite);
     expect(invite, "Invite button").toBeDefined();
-    expect(invite?.disabled, "never disabled: it explains itself with a toast instead").toBe(false);
+    expect(invite?.disabled, "FR-TEAM-01: disabled until the email is valid").toBe(true);
   });
 
   it("WEB_10_team_has_one_filled_primary_button_UX_1", async () => {

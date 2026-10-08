@@ -14,6 +14,8 @@ export interface ComposerProps {
   /** What the person typed, or the size's example task when the box is empty. */
   readonly shown: string;
   readonly phase: Phase;
+  /** A start is on its way to the server: the confirm control waits (live only). */
+  readonly sending?: boolean;
   readonly onQuery: (value: string) => void;
   readonly onMode: (key: string) => void;
   readonly onChip: (label: string) => void;
@@ -84,10 +86,21 @@ export function ComposerPanel(p: ComposerProps) {
             </ol>
           </div>
           <div className="park-home-plan__actions">
-            <button type="button" className="park-home-confirm" onClick={p.onConfirm}>
+            <button
+              type="button"
+              className="park-home-confirm"
+              disabled={p.sending}
+              aria-busy={p.sending ? true : undefined}
+              onClick={p.onConfirm}
+            >
               {mode.confirm}
             </button>
-            <button type="button" className="park-home-change" onClick={p.onChange}>
+            <button
+              type="button"
+              className="park-home-change"
+              disabled={p.sending}
+              onClick={p.onChange}
+            >
               Change brief
             </button>
           </div>
