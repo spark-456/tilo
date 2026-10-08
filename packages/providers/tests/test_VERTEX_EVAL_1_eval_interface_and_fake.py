@@ -62,7 +62,7 @@ def _request(kind: str = "pointwise", *, metric: str | None = None, item: Any = 
             item_overrides["baseline_response"] = "plan B"
         item = _item(**item_overrides)
     return EvalRequest(
-        metric=metric or ("plan_pairwise" if kind == "pairwise" else "plan_groundedness"),
+        metric=metric if metric is not None else ("plan_pairwise" if kind == "pairwise" else "plan_groundedness"),
         kind=kind,
         template="Judge the response. Rubric text, sent as is.",
         item=item,
