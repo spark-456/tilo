@@ -21,14 +21,17 @@ node_modules
 *.pem
 *.key
 *.p12
-# Credential files at any depth (OAuth client secrets, saved tokens); a bare pattern only matches the context root.
+# Credential files at any depth (OAuth client secrets, saved tokens, key files): a bare pattern only matches the
+# context root, so every one of these is a `**/` pattern.
 **/*.pem
+**/*.key
+**/*.p12
 **/client_secret*.json
 **/token*.json
 **/credentials.json
-service-account*.json
-*-credentials.json
-application_default_credentials.json
+**/service-account*.json
+**/*-credentials.json
+**/application_default_credentials.json
 design
 docs
 infra

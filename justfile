@@ -68,6 +68,10 @@ test:
     uv run pytest -q -m "not emulator and not system"
     pnpm -r run test
 
+# The meeting bot's offline tests (FR-MTG-11): fakes only, no browser, network or key. Also part of `just test` (root pytest).
+meet-bot-test:
+    uv run pytest meet-bot/tests -q -p no:cacheprovider
+
 # Format everything in place.
 fmt:
     uv run ruff format .
@@ -125,7 +129,7 @@ live-e2e *args:
 # PL-LIVE-E2E: one real end-to-end run on a typed topic, screened by the safety role (Model Armor) first. The topic is
 # typed at the prompt (`live-run`) or read from a file (`live-run-file <path>`): it never passes through a shell. Flags
 # only: --dry-run --auto-answer --auto-approve-t1t2 --max-credits N --real-connectors (real read-only Gmail, Drive,
-# Calendar). Live switch as live-e2e. docs/live-e2e.md.
+# Calendar) --allow-writes (draft/save after a typed yes) --allow-send. Live switch as live-e2e. docs/live-e2e.md.
 live-run *flags:
     uv run python evals/scripts/live_run.py --topic-stdin {{ if flags =~ '^[-a-z0-9.= ]*$' { flags } else { error("live-run takes flags only; type the topic at the prompt or use live-run-file") } }}
 
@@ -173,4 +177,12 @@ build-evals-image:
 # VITE_FIREBASE_* config (SEC-10 App Check) into the build environment; it writes nothing to disk.
 deploy-web:
     python scripts/web_build_env.py pnpm --filter @tilo/web run build
+    pnpm exec firebase deploy --only hosting --project essential-wares-510320-f0
+
+# Like `deploy-web`, but the build talks to the deployed tilo-dev tilo-api (WEB-TO-API, BQ-WEBAPI-1): the API origin
+# is the constant LIVE_API_ORIGIN in scripts/web_build_env.py (no parameter), the Firebase web config is required
+# (TILO_BAKE_FIREBASE_KEY=1 after you restricted the key, docs/deploy-dev.md "Test the live world on tilo-dev").
+# Pinned to the dev project; `deploy-web` stays the fixture build.
+deploy-web-live:
+    python scripts/web_build_env.py --tilo-dev-api pnpm --filter @tilo/web run build
     pnpm exec firebase deploy --only hosting --project essential-wares-510320-f0

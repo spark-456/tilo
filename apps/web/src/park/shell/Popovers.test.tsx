@@ -220,7 +220,7 @@ describe("WEB_3b_acct: the account menu", () => {
     for (const b of items()) expect(b.querySelector("svg")).not.toBeNull();
   });
 
-  it("WEB_3b_acct_the_three_links_go_to_their_pages_and_close_the_menu", async () => {
+  it("FR_UX_10 WEB_3b_acct_the_three_links_go_to_their_pages_and_close_the_menu", async () => {
     for (const [name, path] of [
       ["Profile and settings", "/profile"],
       ["Connectors", "/connectors"],

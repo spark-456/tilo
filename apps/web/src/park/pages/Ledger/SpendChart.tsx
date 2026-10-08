@@ -1,6 +1,6 @@
 import { type MouseEvent, useState } from "react";
 import type { Dec, Ledger } from "../../api/types";
-import { chartGeometry, dayFromX, gbp } from "./model";
+import { chartGeometry, dayFromX, money } from "./model";
 
 /** Spend over the month: the SVG 720x270 chart, its labels and the hover tooltip. */
 export function SpendChart({ L, dec }: { L: Ledger; dec: Dec }) {
@@ -50,14 +50,16 @@ export function SpendChart({ L, dec }: { L: Ledger; dec: Dec }) {
         </span>
       ))}
       <span className="park-ledger-note park-ledger-note--cap" style={{ top: c.capTop }}>
-        Budget {gbp(L.budget)}
+        Budget {money(L, L.budget)}
       </span>
-      <span
-        className="park-ledger-note park-ledger-note--spike"
-        style={{ left: c.spikeLeft, top: c.spikeTop }}
-      >
-        Motor dev kit £1,140
-      </span>
+      {c.spike ? (
+        <span
+          className="park-ledger-note park-ledger-note--spike"
+          style={{ left: c.spike.left, top: c.spike.top }}
+        >
+          {c.spike.text}
+        </span>
+      ) : null}
       <span
         className="park-ledger-note park-ledger-note--fc"
         style={{ left: c.fcLeft, top: c.fcTop }}

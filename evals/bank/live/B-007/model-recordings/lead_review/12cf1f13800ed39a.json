@@ -1,0 +1,14 @@
+{
+  "key": "12cf1f13800ed39a",
+  "profile": "lite-31",
+  "response": {
+    "profile_id": "lite-31",
+    "text": "Synthetic lead_review reply for the test.",
+    "usage": {
+      "input_tokens": 1000,
+      "output_tokens": 500,
+      "total_tokens": 1500
+    }
+  },
+  "role": "lead_review"
+}

@@ -30,6 +30,7 @@ from tilo_planning.gaps import (
 from tilo_planning.refusal import RefusalCategory, RefusalPolicy, TaskRefused, load_refusal_policy
 
 DIRECTOR_ROLE = "director"
+BRIEF_THINKING = "low"  # extraction is reading, not planning: the model's default (dynamic, high) is billed as output
 CHIP_FIELDS = ("goal", "deliverables", "audience", "deadline", "constraints", "sources", "sensitivity")
 
 
@@ -167,6 +168,7 @@ def brief_request(
         prompt=load_prompt(DIRECTOR_ROLE, "brief_task.md", {"task": neutralise_marker(task_text, "TASK")}),
         json_mode=True,
         response_schema=output_schema(),
+        thinking_level=BRIEF_THINKING,
     )
 
 
