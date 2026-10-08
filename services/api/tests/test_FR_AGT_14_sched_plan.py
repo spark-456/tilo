@@ -85,6 +85,7 @@ def test_FR_AGT_14_SCHED_PLAN_the_compiler_gets_two_to_three_approaches_with_the
     spy = PlanSpy(rig)
     rig.insert(source, "sched_a")
     rig.starter().start(run_start(rig, "sched_a"))
+    wait_for(lambda: spy.seen, what="the plan to be compiled")
     (seen,) = spy.seen
     assert 2 <= len(seen) <= 3 and "quick" in {a["id"] for a in seen}
     assert rig.rf.compile_calls[-1]["approach"]["id"] == "quick"  # the chosen one is still record.approach
@@ -98,7 +99,7 @@ def _incomplete(source: Any, rig: SchedApi) -> list[Any]:
         [chosen],  # one is below the schema's minimum
         [chosen, {**other, "id": "o2"}, {**other, "id": "o3"}, {**other, "id": "o4"}],  # four is above its maximum
         [other, {**other, "id": "o2"}],  # the chosen approach is not among them
-        [chosen, "not a dict"],
+        [chosen, {**other, "summary": "x" * 100_000}],  # one item far above the size bound
     ]
 
 
