@@ -2,7 +2,7 @@
 // Lists GET /schedules, pauses and resumes (PATCH enabled) and deletes after an in-page
 // confirmation. Each change is shown only after the API answered (HR-1). A client without the
 // schedule routes (the fixture client) says so in words.
-import { useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import { useClient } from "../../api/ClientProvider";
 import {
   type ScheduleView,
@@ -25,6 +25,28 @@ function RoutineList({ api, first }: { api: SchedulesApi; first: readonly Schedu
   const [busy, setBusy] = useState<string | null>(null);
   const [asking, setAsking] = useState<string | null>(null);
   const [problem, setProblem] = useState<Problem | null>(null);
+  const [editing, setEditing] = useState<{ id: string; title: string } | null>(null);
+  const scope = useRef<HTMLElement>(null);
+  const returnFocus = useRef<HTMLButtonElement | null>(null);
+  const editingId = editing?.id;
+  useLayoutEffect(() => {
+    if (busy !== null) return;
+    if (asking || editingId) {
+      scope.current
+        ?.querySelector<HTMLElement>(
+          asking ? '[role="alertdialog"] button:last-child' : 'input[aria-label="Routine name"]',
+        )
+        ?.focus();
+    } else if (returnFocus.current) {
+      const target = returnFocus.current;
+      returnFocus.current = null;
+      (target.isConnected
+        ? target
+        : (scope.current?.querySelector<HTMLElement>(".bitem button:not(:disabled)") ??
+          scope.current)
+      )?.focus();
+    }
+  }, [asking, busy, editingId]);
 
   const run = async (id: string, doing: string, change: () => Promise<void>) => {
     setBusy(id);
@@ -38,6 +60,7 @@ function RoutineList({ api, first }: { api: SchedulesApi; first: readonly Schedu
     } finally {
       setBusy(null);
       setAsking(null);
+      setEditing(null);
     }
   };
   const setEnabled = (row: ScheduleView, enabled: boolean) =>
@@ -53,7 +76,30 @@ function RoutineList({ api, first }: { api: SchedulesApi; first: readonly Schedu
     });
 
   return (
-    <>
+    <section
+      className="routines-scope"
+      aria-label="Routines"
+      tabIndex={-1}
+      ref={scope}
+      onKeyDown={(e) => {
+        if (busy !== null) return;
+        if (e.key === "Escape" && (asking || editing)) {
+          e.preventDefault();
+          setAsking(null);
+          setEditing(null);
+        } else if (e.key === "Tab" && asking) {
+          const buttons = scope.current?.querySelectorAll<HTMLButtonElement>(
+            '[role="alertdialog"] button',
+          );
+          const target = e.shiftKey ? buttons?.[1] : buttons?.[0];
+          const edge = e.shiftKey ? buttons?.[0] : buttons?.[1];
+          if (document.activeElement === edge) {
+            e.preventDefault();
+            target?.focus();
+          }
+        }
+      }}
+    >
       {problem && (
         <div className="flow-notice" role="alert" data-testid="routines-problem">
           <p>{problem.message}</p>
@@ -73,6 +119,47 @@ function RoutineList({ api, first }: { api: SchedulesApi; first: readonly Schedu
             >
               <div className="bitem-main">
                 <b>{row.title}</b>
+                {editing?.id === row.schedule_id && (
+                  <form
+                    className="routine-name"
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      const title = editing.title.trim();
+                      if (!title || busy !== null) return;
+                      void run(row.schedule_id, "rename the routine", async () => {
+                        const updated = await api.updateSchedule(row.schedule_id, { title });
+                        const next = isScheduleView(updated) ? updated : { ...row, title };
+                        setRows((all) =>
+                          all.map((r) => (r.schedule_id === row.schedule_id ? next : r)),
+                        );
+                      });
+                    }}
+                  >
+                    <input
+                      aria-label="Routine name"
+                      value={editing.title}
+                      maxLength={140}
+                      required
+                      disabled={busy !== null}
+                      onChange={(e) => setEditing({ id: row.schedule_id, title: e.target.value })}
+                    />
+                    <button
+                      type="submit"
+                      className="secondary"
+                      disabled={busy !== null || !editing.title.trim()}
+                    >
+                      Save name
+                    </button>
+                    <button
+                      type="button"
+                      className="secondary"
+                      disabled={busy !== null}
+                      onClick={() => setEditing(null)}
+                    >
+                      Cancel
+                    </button>
+                  </form>
+                )}
                 <span className="bitem-sub">{cadenceWords(row.cadence)}</span>
                 <span className="bitem-sub">
                   {`Next run: ${nextRunWords(row.next_due, row.cadence.tz)}`}
@@ -106,8 +193,24 @@ function RoutineList({ api, first }: { api: SchedulesApi; first: readonly Schedu
                 type="button"
                 className="secondary"
                 disabled={busy !== null}
+                aria-label={`Rename ${row.title}`}
+                onClick={(e) => {
+                  returnFocus.current = e.currentTarget;
+                  setAsking(null);
+                  setEditing({ id: row.schedule_id, title: row.title });
+                }}
+              >
+                Rename
+              </button>
+              <button
+                type="button"
+                className="secondary"
+                disabled={busy !== null}
                 aria-label={`${row.enabled ? "Pause" : "Resume"} ${row.title}`}
-                onClick={() => setEnabled(row, !row.enabled)}
+                onClick={(e) => {
+                  returnFocus.current = e.currentTarget;
+                  void setEnabled(row, !row.enabled);
+                }}
               >
                 {row.enabled ? "Pause" : "Resume"}
               </button>
@@ -116,7 +219,11 @@ function RoutineList({ api, first }: { api: SchedulesApi; first: readonly Schedu
                 className="secondary"
                 disabled={busy !== null}
                 aria-label={`Delete ${row.title}`}
-                onClick={() => setAsking(row.schedule_id)}
+                onClick={(e) => {
+                  returnFocus.current = e.currentTarget;
+                  setEditing(null);
+                  setAsking(row.schedule_id);
+                }}
               >
                 Delete
               </button>
@@ -124,7 +231,7 @@ function RoutineList({ api, first }: { api: SchedulesApi; first: readonly Schedu
           ))}
         </ul>
       )}
-    </>
+    </section>
   );
 }
 
