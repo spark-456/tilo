@@ -114,6 +114,65 @@ afterEach(async () => {
 });
 
 describe("FR-AGT-14 Routines list", () => {
+  it("FR-AGT-14 delete confirmation focuses Keep, traps Tab and restores focus on Escape", async () => {
+    const { calls } = await open({ "GET /schedules": json({ schedules: [A, B] }) });
+    const trigger = buttonIn(row("sched_a1"), "Delete");
+    trigger?.focus();
+    await click(trigger);
+    const keep = buttonIn(container, "Keep routine");
+    expect(document.activeElement).toBe(keep);
+    await act(async () => {
+      keep?.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "Tab", bubbles: true, cancelable: true }),
+      );
+    });
+    expect(document.activeElement).toBe(buttonIn(container, "Delete routine"));
+    await act(async () => {
+      document.activeElement?.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
+      );
+    });
+    expect(q('[role="alertdialog"]')).toBeNull();
+    expect(document.activeElement).toBe(trigger);
+    expect(calls.filter((c) => c.method === "DELETE")).toHaveLength(0);
+  });
+
+  it("FR-AGT-14 deleting a routine focuses the next row and pausing restores its action", async () => {
+    await open({
+      "GET /schedules": json({ schedules: [A, B] }),
+      "DELETE /schedules/sched_a1": new Response(null, { status: 204 }),
+      "PATCH /schedules/sched_b2": json({ ...B, enabled: true }),
+    });
+    await click(buttonIn(row("sched_a1"), "Delete"));
+    await click(buttonIn(container, "Delete routine"));
+    expect(document.activeElement).toBe(buttonIn(row("sched_b2"), "Resume"));
+    await click(buttonIn(row("sched_b2"), "Resume"));
+    expect(document.activeElement).toBe(buttonIn(row("sched_b2"), "Pause"));
+  });
+
+  it("FR-AGT-14 renames a routine only after the server accepts the title", async () => {
+    const { calls } = await open({
+      "GET /schedules": json({ schedules: [A] }),
+      "PATCH /schedules/sched_a1": json(view({ title: "New weekly summary" })),
+    });
+    await click(buttonIn(row("sched_a1"), "Rename"));
+    const input = q<HTMLInputElement>('input[aria-label="Routine name"]');
+    expect(input).not.toBeNull();
+    expect(document.activeElement).toBe(input);
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set?.call(
+        input,
+        "New weekly summary",
+      );
+      input?.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    expect(row("sched_a1")?.querySelector("b")?.textContent).toBe(A.title);
+    await click(buttonIn(container, "Save name"));
+    expect(calls.find((c) => c.method === "PATCH")?.body).toEqual({ title: "New weekly summary" });
+    expect(row("sched_a1")?.querySelector("b")?.textContent).toBe("New weekly summary");
+    expect(document.activeElement).toBe(buttonIn(row("sched_a1"), "Rename"));
+  });
+
   it("FR-AGT-14 Routines: GETs /schedules once on mount and shows title, cadence in words and next run", async () => {
     const { calls } = await open({ "GET /schedules": json({ schedules: [A, B] }) });
     expect(calls.filter((c) => c.method === "GET" && c.path === "/schedules")).toHaveLength(1);
