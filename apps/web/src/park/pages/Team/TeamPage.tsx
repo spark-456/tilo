@@ -24,7 +24,9 @@ import {
   type Backups,
   type CoverRow,
   type Loaded,
+  MUST_ASK_RULES,
   type Member,
+  canChangeRole,
   coverRows,
   memberViews,
 } from "./teamModel";
@@ -166,6 +168,8 @@ function TeamBody({ app, data, people, setPeople }: BodyProps) {
   const [open, setOpen] = useState<string | null>(null);
   const [backups, setBackups] = useState<Backups>({});
   const [flags, setFlags] = useState<Record<string, boolean>>({});
+  const [ruleLog, setRuleLog] = useState<{ key: string; when: string; to: boolean }[]>([]);
+  const you = people.find((p) => p.you);
 
   const pref = app.prefs.backup;
   // prefs.backup is the Ledger's backup for the row the fixture flags as slow.
@@ -208,6 +212,7 @@ function TeamBody({ app, data, people, setPeople }: BodyProps) {
         open={open}
         onOpen={(id) => setOpen((o) => (o === id ? null : id))}
         onRole={setRole}
+        canChange={(p) => !!you && canChangeRole(you, p)}
         onRemove={remove}
         onResend={(p) => toast(`Invite sent again to ${p.email}`)}
       />
@@ -226,7 +231,14 @@ function TeamBody({ app, data, people, setPeople }: BodyProps) {
             rules={team.rules}
             on={flags}
             art={agentArt(app.night)}
-            onToggle={(key, next) => setFlags((f) => ({ ...f, [key]: next }))}
+            locked={MUST_ASK_RULES}
+            log={ruleLog}
+            onToggle={(key, next) => {
+              if (MUST_ASK_RULES.includes(key) && !next) return;
+              setFlags((f) => ({ ...f, [key]: next }));
+              const when = team.rules.find((r) => r[0] === key)?.[1] ?? key;
+              setRuleLog((l) => [...l, { key, when, to: next }]);
+            }}
           />
           {part(4) ? <MatrixCard team={team} /> : null}
         </div>

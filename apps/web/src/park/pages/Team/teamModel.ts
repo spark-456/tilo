@@ -17,6 +17,19 @@ export interface Loaded {
   worlds: World[];
 }
 
+/** FR-TEAM-04: the switches that are PRD Must-ask rules, locked on. Mirrors `must_ask: true` in
+ * config/team_rules.yaml (a test compares them); a live Api would send them. */
+export const MUST_ASK_RULES: readonly string[] = ["spend", "share", "undo"];
+
+/** FR-TEAM-02: nobody changes their own role, and only an Owner changes roles (BQ-TEAMACC-2). The same rule as
+ * tilo_api.team_rules.change_role, for the page's controls. */
+export function canChangeRole(
+  actor: { id: string; role: string },
+  target: { id: string; role: string },
+): boolean {
+  return actor.id !== target.id && actor.role === "Owner";
+}
+
 export const initialsOf = (name: string): string =>
   name
     .split(" ")

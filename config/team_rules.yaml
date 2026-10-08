@@ -1,0 +1,10 @@
+# The five "When agents stop and ask" switches (FR-TEAM-04, supplement design 2026-10-06, Team page).
+# `must_ask: true` marks a rule that is one of PRD 8.3's Must-ask rules (money, personal data, legal terms or
+# outside communication not covered by an autonomy policy; a choice outside policy): it can't be switched off, and
+# it must default on. Loader: tilo_api.team_rules.load_switches. Order is the order the Team page shows.
+switches:
+  - {key: spend, default: true, must_ask: true} # PRD 8.3: the step touches money
+  - {key: share, default: true, must_ask: true} # PRD 8.3: outside communication
+  - {key: undo, default: true, must_ask: true} # PRD 8.3: money, personal data, legal terms; T3 actions
+  - {key: tools, default: true, must_ask: false}
+  - {key: weekend, default: false, must_ask: false}

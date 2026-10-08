@@ -328,9 +328,10 @@ describe("WEB_10_team_rules: switches", () => {
     expect(state()).toEqual(["true", "true", "true", "true", "false"]);
     await clickAndSettle(switchNamed(root, "Routines that fall on a weekend"));
     expect(state()).toEqual(["true", "true", "true", "true", "true"]);
-    await clickAndSettle(switchNamed(root, "Spending over £250"));
-    expect(state()).toEqual(["false", "true", "true", "true", "true"]);
-    await clickAndSettle(switchNamed(root, "Spending over £250"));
+    // FR-TEAM-04: the three Must-ask switches are locked on, so the independent one is "tools".
+    await clickAndSettle(switchNamed(root, "Giving a skill more access to a tool"));
+    expect(state()).toEqual(["true", "true", "true", "false", "true"]);
+    await clickAndSettle(switchNamed(root, "Giving a skill more access to a tool"));
     expect(state()).toEqual(["true", "true", "true", "true", "true"]);
     expect(app.toast).not.toHaveBeenCalled();
   });
@@ -359,7 +360,7 @@ describe("WEB_10_team_nav: go() only, never decide()", () => {
     await invite(root, NEW);
     await choose(selectNamed(root, "Role for Tom Reyes"), "Approver");
     await openMore(root, "Jin Park");
-    await clickAndSettle(switchNamed(root, "Spending over £250"));
+    await clickAndSettle(switchNamed(root, "Routines that fall on a weekend"));
     await choose(selectNamed(root, "Add a backup for Gate sign-offs"), "ps");
     await clickAndSettle(buttonNamed(root, "Remove from team"));
     expect(app.decide).not.toHaveBeenCalled();
