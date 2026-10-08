@@ -160,3 +160,13 @@ def test_UNIT_PROMPT_a_context_handoff_successor_keeps_the_brief() -> None:
     successor = dataclasses.replace(context, agent_id="A_s1")
     assert successor.brief == BRIEF and successor.intake_answers == tuple(ANSWERS)
     assert make_rig is not None
+
+
+def test_UNIT_PROMPT_units_of_one_run_share_a_stable_prefix_up_to_the_per_unit_part(tmp_path) -> None:
+    import os
+
+    specialist, _ = _run(tmp_path, depends={})
+    first, second = _prompt_for(specialist, "Unit U1"), _prompt_for(specialist, "Unit U2")
+    shared = os.path.commonprefix([first, second])
+    assert "REQUEST>>>" in shared, "role rules, skills, brief and answers come first, identical"
+    assert "Unit U1" not in shared and "Unit U2" not in shared

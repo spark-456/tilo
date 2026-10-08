@@ -35,6 +35,7 @@ from typing import Any, Literal
 
 from fastapi import FastAPI, Request
 from tilo_harness.outputs import UnitOutput
+from tilo_harness.unit_prompt import request_variables
 from tilo_providers.config import ProviderConfigError, ProvidersConfig, load_providers_config, resolve_models_path
 from tilo_providers.errors import ProviderError, QuotaError, RequestError
 from tilo_providers.interfaces import Capability, GenerateRequest, GenerateResponse, ModelProvider, SafetyProvider
@@ -636,11 +637,7 @@ class _UnitRunner:
         return text, self._meter.cost(response.profile_id, tokens_in, tokens_out)
 
     def _request(self) -> dict[str, str]:
-        brief = self._brief
-        return {
-            "goal": _safe(str(brief.get("goal") or "")), "audience": _safe(str(brief.get("audience") or "not stated")),
-            "constraints": _safe("; ".join(map(str, brief.get("constraints") or [])) or "none"),
-        }  # fmt: skip
+        return request_variables(self._brief)  # capped, one-line, marker-safe (UNIT-PROMPT); no intake answers here
 
     async def run(self, unit: Any, context: Any) -> Any:
         from tilo_api.runs import MeteredOutcome  # noqa: PLC0415
