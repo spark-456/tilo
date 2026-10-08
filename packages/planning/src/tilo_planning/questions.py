@@ -137,7 +137,7 @@ def apply_answer(brief: dict[str, Any], question: Question, answer: str, *, toda
     if field == "deliverables":
         formats = _answer_formats(answer, question.suggested_answers[0], brief)
         if not formats:  # free text with no format: it stays as the content, in the default format (BQ-FREETEXT-1)
-            wish = clip(answer[:ANSWER_MAX_CHARS].strip(), 300)
+            wish = clip(" ".join(answer[:ANSWER_MAX_CHARS].split()), 300)  # no control characters or line breaks
             first = {**brief["deliverables"][0], "title": clip(wish, 120), "format": DEFAULT_FORMAT}
             brief = {
                 **copy.deepcopy(brief),
