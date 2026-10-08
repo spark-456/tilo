@@ -6,7 +6,7 @@ import { BUBBLE_TAIL, LEARN_NOTE, PLAN, QUESTION, estimateSkillPlan } from "./te
 import type { PaneProps } from "./useTeach";
 
 export function LearnPane({ t, night }: PaneProps) {
-  const est = estimateSkillPlan(PLAN, t.ask);
+  const est = estimateSkillPlan(PLAN, t.ask, t.currency);
   const estimates = [
     { k: "Each run", v: est.run },
     { k: "Time", v: est.time },
