@@ -44,17 +44,27 @@ def read_only(connector: str, action: str, *, registry: Any, mcp: Any = None) ->
     return False
 
 
+def _in_registry(skills: Any, skill_id: str) -> bool:
+    """False only when the registry says it has no such skill (`folder` is None); one that cannot say counts as in."""
+    try:
+        return bool(skills.folder(skill_id) is not None)
+    except Exception:
+        return True
+
+
 def skill_level(skills: Any, skill_ids: Iterable[str], connector: str) -> Level | None:
     """FR-ACC-02: the lowest `tool_access[connector]` the unit's skills declare, or None (the team's level applies).
     It can only lower. A value that is not one of the four levels (or a map that is not a map) counts as off, never
-    act. An unknown or unreadable skill is skipped, never trusted to lower or raise, with an ids-only log line."""
+    act. A skill the registry lists but cannot read now counts as off; an unknown id is skipped (ids-only log line)."""
     found: list[Level] = []
     for skill_id in skill_ids:
         try:
             declared = skills.load(skill_id).tool_access
         except Exception as exc:
             logger.warning("skill %s tool_access not read (%s)", skill_id, type(exc).__name__)
-            continue
+            if _in_registry(skills, skill_id):
+                found.append(Level.OFF)  # registered but unreadable now: fail closed
+            continue  # an id the registry never had (PG-11 refuses it in the plan): skipped
         if declared is None or declared == {}:  # a skill without tool_access changes nothing
             continue
         if not isinstance(declared, dict):

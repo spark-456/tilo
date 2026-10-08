@@ -182,28 +182,26 @@ def _audit(principal: deps.Principal, what: str, key: str, at: str) -> None:
     logger.info("team_rule_changed what=%s key=%s by=%s at=%s", what, key, principal.user_id, at)
 
 
-def _undo(store: TeamRepository, apply: Callable[[TeamState], TeamState | None]) -> None:
-    """Put one rule back after its event could not be written. `apply` answers the state with that rule restored, or
-    None if it no longer holds the value this request set (someone else changed it since: leave theirs). A lost race
-    reads again; a store that fails here is logged and cannot be helped."""
+def _undo(store: TeamRepository, written: int, restore: Callable[[TeamState], TeamState], key: str, actor: str) -> None:
+    """Put one rule back after its event could not be written, ONLY if the store is still at the version this
+    request wrote. Anything written since (even a no-op) is left alone: a value check could widen a tool or switch
+    past the last logged change. Then one ids-only ERROR line; the caller still answers 503."""
     try:
-        for _ in range(_ATTEMPTS):
-            state = store.read()
-            restored = apply(state)
-            if restored is None or store.compare_and_set(state.version, restored):
-                return
+        state = store.read()
+        if state.version == written and store.compare_and_set(written, restore(state)):
+            return
     except Exception as exc:
-        logger.error("team rule undo failed (%s)", type(exc).__name__)
+        logger.error("team rule undo failed (%s) key=%s by=%s", type(exc).__name__, key, actor)
         return
-    logger.error("team rule undo failed (lost race)")
+    logger.error("team rule not undone, the team changed since key=%s by=%s", key, actor)
 
 
 def _log_change(
     store: TeamRepository, principal: deps.Principal, events_: TeamEvents, change: tuple[str, str, str, str],
-    undo: Callable[[TeamState], TeamState | None],
+    written: int, restore: Callable[[TeamState], TeamState],
 ) -> None:  # fmt: skip
     """The one `team_rule.changed` event of a change that committed; none for a no-op. A failed append undoes the
-    change and answers 503: never a change left unlogged (FR-TEAM-04)."""
+    change (only if nothing was written since) and answers 503: never a change left unlogged (FR-TEAM-04)."""
     rule, key, before, after = change
     if before == after:
         return
@@ -211,7 +209,7 @@ def _log_change(
         events_.record(principal.user_id, rule, key, before, after)
     except Exception as exc:
         logger.warning("team rule event not written (%s) key=%s by=%s", type(exc).__name__, key, principal.user_id)
-        _undo(store, undo)
+        _undo(store, written, restore, key, principal.user_id)
         raise HTTPException(status_code=503, detail="not_configured") from exc
 
 
@@ -326,13 +324,13 @@ def put_switch(
         seen["before"], seen["after"] = effective_switches(state)[key], switches[key]
         return replace(state, switches=switches)
 
-    def undo(state: TeamState) -> TeamState | None:
-        now = effective_switches(state)
-        return replace(state, switches={**now, key: seen["before"]}) if now[key] == seen["after"] else None
+    def undo(state: TeamState) -> TeamState:
+        return replace(state, switches={**effective_switches(state), key: seen["before"]})
 
     state = _write(store, principal, flags, change)
     on_off = {True: "on", False: "off"}
-    _log_change(store, principal, events_, ("switch", key, on_off[seen["before"]], on_off[seen["after"]]), undo)
+    change_ = ("switch", key, on_off[seen["before"]], on_off[seen["after"]])
+    _log_change(store, principal, events_, change_, state.version, undo)
     return _view(state, principal)
 
 
@@ -353,12 +351,11 @@ def put_tool(
         seen["before"] = state.tools.get(connector)  # None: unset, which reads as act
         return replace(state, tools={**state.tools, connector: body.level})
 
-    def undo(state: TeamState) -> TeamState | None:
-        if state.tools.get(connector) != body.level:
-            return None
+    def undo(state: TeamState) -> TeamState:
         tools = {c: v for c, v in state.tools.items() if c != connector}
         return replace(state, tools=tools if seen["before"] is None else {**tools, connector: seen["before"]})
 
     state = _write(store, principal, flags, change)
-    _log_change(store, principal, events_, ("tool_access", connector, seen["before"] or "act", body.level), undo)
+    change_ = ("tool_access", connector, seen["before"] or "act", body.level)
+    _log_change(store, principal, events_, change_, state.version, undo)
     return _view(state, principal)
