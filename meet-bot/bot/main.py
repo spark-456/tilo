@@ -326,14 +326,14 @@ def _live(mode: str, args: argparse.Namespace) -> int:
 
 
 def cmd_run_mock(args: argparse.Namespace) -> int:
-    from .brain import Agenda
+    from .brain import LLM, Agenda
     from .mock import load_transcript, run_mock
     from .mock_llm import KeywordStubLLM
 
     cfg = Config.from_env()
     agenda = Agenda.load(Path(args.agenda))
     duration = agenda.resolve_duration(args.duration)
-    llm = KeywordStubLLM()
+    llm: LLM = KeywordStubLLM()
     if args.live_llm:
         from .providers import ProviderLLM
 

@@ -67,8 +67,8 @@ model (VA-10, VA-16), and on auto-admit.
 ## Start here
 0. **Baseline commit.** `meet-bot/` is not in git yet. Show me its `git status`, check that `.env`, `out/`, `debug/`
    and `profile/` are gitignored, and propose a baseline commit on a new branch. Wait for my yes.
-1. **Experiment X4 decides the voice.** Tell me the steps to run `python -m bot.main live-probe`; it needs
-   `GEMINI_LIVE_API_KEY` (a free AI Studio key) and Docker running.
+1. **Experiment X4 decides the voice.** The Live probe was removed by FR-MTG-11 (it spoke a vendor protocol from `meet-bot`);
+   FR-MTG-16 rebuilds it on the provider layer. It needs the user's live switch, the Google project and Docker running.
    - When I say the key is in, run it and paste its summary into `PROGRESS.md`.
    - Then choose the ticket order from section 5: the Live order if it passes, the cascade order if it fails.
 2. **Phase 1 (VA-01 to VA-04).** These fix today's worst bugs (12 s model calls, unmute stuck behind chat typing,

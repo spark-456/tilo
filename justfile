@@ -68,6 +68,10 @@ test:
     uv run pytest -q -m "not emulator and not system"
     pnpm -r run test
 
+# The meeting bot's offline tests (FR-MTG-11): fakes only, no browser, network or key. Also part of `just test` (root pytest).
+meet-bot-test:
+    uv run pytest meet-bot/tests -q -p no:cacheprovider
+
 # Format everything in place.
 fmt:
     uv run ruff format .

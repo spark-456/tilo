@@ -186,7 +186,7 @@ class ProviderFastClient:
         return self._deltas(iter(run))
 
     async def _deltas(self, chunks: Any) -> AsyncIterator[str]:
-        end = object()
+        end: Any = object()
         try:
             while True:
                 try:

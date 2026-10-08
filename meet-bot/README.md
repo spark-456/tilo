@@ -65,6 +65,30 @@ Google's native-audio voice (Gemini Live) is not wired into meetings yet: it is 
 
 The bot answers project questions from `context/` (.md/.txt/.csv/.json), any `--context FILE|FOLDER|https://URL` (repeatable, or `CONTEXT_URLS`), and text people paste into the Meet chat. Typed chat questions work without any speech recognition.
 
+## Providers (FR-MTG-11): models, speech and voice are Tilo's config
+
+The bot names no model, vendor or key. `bot/providers.py` is the one module that talks to Tilo's provider layer
+(`packages/providers`); everything else asks it for a role:
+
+| What | Role or config | Used by |
+|---|---|---|
+| Agenda analysis (JSON in, JSON out) | role `meeting` in `config/models.yaml` | `Brain` through `ProviderLLM` |
+| Direct answers, streamed with a first-token deadline | role `meeting_fast` | `FastLLM` through `ProviderFastClient` |
+| Audio to text (`--stt gemini`, `retranscribe`) | `config/speech.yaml` (`SpeechProvider.transcribe`) | `ProviderSpeech` |
+| The bot's voice | `config/voice.yaml` (`SpeechProvider.synthesize`, PCM) with the local espeak voice as backup | `ProviderTTS` / `make_tts` |
+
+- **Vendor, model, voice and caps are config.** Speech and voice accept the vendor `google` (or the dev vendor `fake`);
+  anything else, or a denylisted model id, fails start-up. The voice name and sample rate are in `config/voice.yaml`.
+- **Offline by default.** Without the live switch the bot reads `config/models.dev.yaml`, `config/speech.dev.yaml` and
+  `config/voice.dev.yaml`, whose providers are deterministic fakes: canned answers, a tone for a voice, no network, no paid
+  call. Only the user sets `LIVE` to `1` (then the real files are read and the Google adapters are built; they need
+  `GOOGLE_CLOUD_PROJECT` and the user's Google application default credentials). There is no API key in `.env`.
+- **Tests** run offline with the repo's venv: `just meet-bot-test` (also part of `just test`).
+- **Docker.** The image carries the provider layer, so the build context is the repository root: `docker compose build`
+  from `meet-bot/` uses `context: ..` and `docker/Dockerfile`; `docker/Dockerfile.dockerignore` whitelists what is copied
+  (`meet-bot/bot`, `packages/providers/src`, `packages/contracts-py/src`, `config/`, `prompts/`). The layout is kept under
+  `/opt/tilo` (`TILO_REPO_ROOT`). How the user's credentials reach the container is not wired (open question BQ-MTG11-4).
+
 ## Meeting events (for later use inside a bigger system)
 
 `events.jsonl` holds one JSON object per line: `{"v":1,"type":...,"ts":...,"meeting_id":...}` with types `meeting.joined`, `transcript.utterance`, `agenda.update`, `chat.posted`, `summary.ready`, `meeting.ended`. Input is a meeting URL plus an agenda file. Voice (`speaker.py`) and co-host control (`cohost.py`) are interfaces only.
@@ -97,8 +121,8 @@ Then run `wsl --shutdown` and restart Docker Desktop.
 ## Tests
 
 ```
-pip install pytest
-python -m pytest
+just meet-bot-test            # from the repository root
+uv run pytest meet-bot/tests   # the same
 ```
 
 No live meeting, browser, network or key is needed. Caption fixtures in `tests/fixtures/` are synthetic (see the README there).
