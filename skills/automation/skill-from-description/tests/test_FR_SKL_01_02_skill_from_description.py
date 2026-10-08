@@ -119,19 +119,31 @@ def test_FR_SKL_01_FR_SKL_02_skill_from_description_loads_and_conforms_to_contra
 
     proposals = SkillProposals(registry)
     decision = {
-        "id": "dec_fr_skl_01_02",
-        "tenant_id": "t_test",
+        "id": "01J9RP8V7X2K4M6N8P0Q2R4S6T",
+        "org_id": "org_acme",
         "domain": "automation",
         "question": "Should booking steps always set ask_me_first to True?",
         "answer": "Always require ask_me_first=True on any step that books a meeting or resource.",
-        "answered_by": {"by": "team_lead", "user": "lead_auto"},
-        "answered_at": "2026-10-08T12:00:00Z",
-        "source": {"run_id": "run_001", "card_id": "card_001"},
+        "option_id": None,
+        "answered_by": {
+            "by": "team_lead",
+            "ref": "tl_automation",
+            "user": "u_lead_auto",
+            "at": "2026-10-08T12:00:00.000Z",
+        },
+        "source": {
+            "world_id": "w_main",
+            "run_id": "r_001",
+            "card_id": "01J9RP8V7X2K4M6N8P0Q2R4S6V",
+        },
+        "scope": {"worlds": "all", "districts": "all"},
+        "created_at": "2026-10-08T12:00:00.000Z",
+        "expires_at": None,
     }
     proposal = proposals.propose(
         decision=decision,
         skill_id="skill-from-description",
-        proposer="lead_auto",
+        proposer="u_lead_auto",
     )
     assert proposal["to_version"] == "1.0.1"
 
