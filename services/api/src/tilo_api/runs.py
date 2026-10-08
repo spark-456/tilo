@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import asyncio
 import copy
+import dataclasses
 import logging
 import math
 import threading
@@ -30,7 +31,7 @@ from tilo_harness.validator import repo_validator
 from tilo_memory.artifacts import Scope
 from tilo_planning.compiler import DELIVER, PlanInputs
 
-from tilo_api import deps, events
+from tilo_api import deps, events, team_access, team_store
 from tilo_api.access import Mode
 from tilo_api.cards import (
     OWNER_ONLY_ACTIONS,
@@ -91,6 +92,7 @@ class Seams:
     artifacts: Any  # tilo_memory.artifacts.ArtifactStore (ADR-0018 T4)
     redactor: Callable[[str], str]  # the shared secret redactor the store was given
     open_archive: Callable[..., Any]  # (*, org_id, run_id) -> the run's tilo_archive.RunArchive
+    team: Callable[[], Any] = lambda: None  # the team's settings (FR-ACC-01); None: no team store wired, as before
 
 
 _MODE_SEAMS = frozenset({"plan_compiler", "unit_runner", "must_ask_providers"})  # the seams that build a Router
@@ -110,7 +112,8 @@ def run_seams(request: Request, mode: Annotated[Mode, Depends(deps.get_work_mode
         return seam(mode) if name in _MODE_SEAMS else seam()
 
     try:
-        return Seams(*(build(n) for n in names.split()))
+        seams = Seams(*(build(n) for n in names.split()))
+        return dataclasses.replace(seams, team=team_store.team_reader(overrides))
     except Exception as exc:
         logger.warning("the run seams are not wired, so no run starts: %s", type(exc).__name__)
         return None
@@ -552,8 +555,18 @@ class Run:
             recipients=tuple(recipients), known_recipients=tuple(known or ()), safety_flags=flagged
         )
         proposal = tilo_policy.Proposal(self.world_id, action, connector, district, destination, facts, item, 0, None)
+        table = tilo_policy.load_risk_table()
+        assessed = max(table.assess(action, facts).tier, gate["risk_tier"], key=_TIERS.index)
+        try:  # FR-ACC-01: the team's level for this tool, before the engine; it only refuses (an unreadable store too)
+            access = team_access.tool_check(
+                self.seams.team(), connector, action, assessed, registry=self.seams.connectors
+            )
+        except Exception as exc:
+            raise _GateFailed("tool access could not be checked") from exc
+        if access == "block":
+            raise _GateFailed("tool access does not allow this step")
         decision = tilo_policy.decide(
-            proposal, table=tilo_policy.load_risk_table(), policies=list(self.store.policies.values()),
+            proposal, table=table, policies=list(self.store.policies.values()),
             world_owner=self.owner, applied=self._applied(), now=events.now(),
         )  # fmt: skip
         if decision.outcome == "draft_only":  # an owner's L0 policy: nothing leaves Tilo (PRD 10.4, BQ-90)
