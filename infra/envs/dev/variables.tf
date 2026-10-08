@@ -97,12 +97,12 @@ variable "deployer_project_roles" {
 
 variable "api_durable_stores" {
   description = <<-EOT
-    Opt-in to tilo-api's durable stores (PROD-WIRE 3). false (default): tilo-api keeps no Firestore switches, so it
-    stays on its 503 `not_configured` doors, and bills CPU only during requests. true: it gets TILO_API_STORE and
-    TILO_PEOPLE_STORE = "firestore" plus TILO_FIRESTORE_PROJECT, and CPU stays allocated between requests (the
-    in-process kill-switch state, run threads and the writer lease). Set it only when you accept ADR-0026 (the api
-    store, still Proposed) and ADR-0023 (the people store, security-flagged): the next apply must not switch them on
-    silently. One instance (max_instance_count = 1) holds either way.
+    Opt-in to tilo-api's durable stores (PROD-WIRE 3). false (default): tilo-api bills CPU only during requests.
+    true: CPU stays allocated between requests (the in-process kill-switch state, run threads and the writer lease).
+    The store switches themselves (TILO_API_STORE, TILO_PEOPLE_STORE) are tilo-api runtime env,
+    set with gcloud (ignore_env, docs/deploy-dev.md "Durable stores"), never by Terraform. Set this, and those, only
+    when you accept ADR-0026 (the api store, still Proposed) and ADR-0023 (the people store, security-flagged). One
+    instance (max_instance_count = 1) holds either way.
   EOT
   type        = bool
   default     = false

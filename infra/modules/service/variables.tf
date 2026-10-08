@@ -34,9 +34,6 @@ variable "services" {
     # false keeps CPU allocated between requests (background work); the
     # default is request-based billing (PRD 6.6).
     cpu_idle = optional(bool, true)
-    # Plain container environment variables. No secrets: those never go
-    # through Terraform values.
-    env = optional(map(string), {})
   }))
 }
 

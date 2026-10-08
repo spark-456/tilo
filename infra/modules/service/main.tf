@@ -63,15 +63,6 @@ resource "google_cloud_run_v2_service" "this" {
     containers {
       image = each.value.image
 
-      # Plain environment variables only: no secrets, and never LIVE (the user's).
-      dynamic "env" {
-        for_each = each.value.env
-        content {
-          name  = env.key
-          value = env.value
-        }
-      }
-
       resources {
         # Request-based CPU billing by default: CPU is only allocated while a
         # request is being processed (PRD 6.6 lean infrastructure). An entry
@@ -139,9 +130,9 @@ resource "google_cloud_run_v2_service" "env_ignored" {
       image = each.value.image
 
       resources {
-        # Request-based CPU billing: CPU is only allocated while a request
-        # is being processed (PRD 6.6 lean infrastructure).
-        cpu_idle = true
+        # Request-based CPU billing unless the entry says otherwise (tilo-api
+        # with var.api_durable_stores, ADR-0026); PRD 6.6 lean infrastructure.
+        cpu_idle = each.value.cpu_idle
 
         limits = {
           cpu    = "1"

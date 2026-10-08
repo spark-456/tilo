@@ -75,14 +75,6 @@ locals {
   # Public placeholder image until CI deploys real images per service.
   placeholder_image = "us-docker.pkg.dev/cloudrun/container/hello"
 
-  # What tilo-api gets when var.api_durable_stores is true: plain switches, no
-  # secret, never LIVE or TILO_JUDGE_LIVE (the user's, EFF-01).
-  api_durable_stores_env = {
-    TILO_API_STORE         = "firestore"
-    TILO_PEOPLE_STORE      = "firestore"
-    TILO_FIRESTORE_PROJECT = var.project_id
-  }
-
   # PRD 6.2 services, 6.5 ingress rule: public only for api, channels
   # (webhooks) and sandbox-web; everything else internal only.
   cloud_run_services = {
@@ -96,12 +88,12 @@ locals {
       # Opt-in (var.api_durable_stores, ADR-0023 and ADR-0026): CPU stays
       # allocated between requests (the in-process kill-switch state, the run
       # threads) only when the user turns the durable stores on.
-      cpu_idle           = !var.api_durable_stores
-      ingress            = "INGRESS_TRAFFIC_ALL"
-      public             = true
-      invoked_by         = []
-      vpc_egress         = local.caller_vpc_egress # calls harness directly
-      ignore_env         = true                    # TILO_* runtime settings via gcloud (docs/routines-rollout.md)
+      cpu_idle   = !var.api_durable_stores
+      ingress    = "INGRESS_TRAFFIC_ALL"
+      public     = true
+      invoked_by = []
+      vpc_egress = local.caller_vpc_egress # calls harness directly
+      ignore_env = true                    # TILO_* runtime settings via gcloud (docs/routines-rollout.md)
     }
     "harness" = {
       image              = local.placeholder_image

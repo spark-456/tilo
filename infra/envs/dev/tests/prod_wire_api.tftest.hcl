@@ -4,23 +4,20 @@
 #   terraform -chdir=infra/envs/dev init -backend=false
 #   terraform -chdir=infra/envs/dev test
 #
-# Contract the builder must add (names and shapes pinned here, mirroring cloud_run.tftest.hcl):
+# Contract (names and shapes pinned here, mirroring cloud_run.tftest.hcl):
 #
-#   infra/modules/service  var.services entries gain two optional attributes
-#     cpu_idle = optional(bool, true)             # request-based CPU billing unless an entry says false
-#     env      = optional(map(string), {})        # plain container environment variables, no secrets
-#   and the module output `services` (so root output.cloud_run_services) reports, per service,
-#     cpu_idle : bool          # what the entry asked for, no longer a literal true
-#     env      : map(string)   # exactly the entry's env ({} when it has none)
+#   infra/modules/service  var.services entries take `cpu_idle = optional(bool, true)`, rendered on both Cloud Run
+#   resources (the managed one and the ignore_env one tilo-api lives in), and the module output `services` reports
+#   the real cpu_idle per service.
 #
 #   infra/envs/dev/main.tf, the api entry:
-#     max_instance_count = 1   # ADR-0026: one instance is the one writer (a lease, an in-process cache)
-#     cpu_idle           = !var.api_durable_stores   # background work (a run's thread, the lease heartbeat) needs CPU between requests
-#     env = var.api_durable_stores ? { TILO_API_STORE = "firestore", TILO_PEOPLE_STORE = "firestore", TILO_FIRESTORE_PROJECT = var.project_id } : {}
+#     max_instance_count = 1                     # ADR-0026: one instance is the one writer
+#     cpu_idle           = !var.api_durable_stores
+#     ignore_env         = true                  # the store switches are gcloud runtime env (docs/deploy-dev.md)
 #
-# Every other service keeps cpu_idle = true, no env, and its own max_instance_count (harness and channels 3, the rest 2). min_instance_count stays 0 for all
-# (PRD 6.5; cloud_run.tftest.hcl). No secret, no LIVE and no TILO_JUDGE_LIVE: those are the user's, never Terraform's
-# (the exact env map below leaves no room for them).
+# Every other service keeps cpu_idle = true and its own max_instance_count (harness and channels 3, the rest 2).
+# min_instance_count stays 0 for all (PRD 6.5). Terraform sets no env on tilo-api at all, so it can never set the
+# store switches, a secret, LIVE or TILO_JUDGE_LIVE (tests/repo/test_PROD_WIRE_3_api_service_terraform.py).
 
 variables {
   project_id                 = "tilo-dev-test"
@@ -51,16 +48,11 @@ run "PROD_WIRE_3_api_is_one_writer_instance" {
 }
 
 # Security round 1 (ADR-0023, ADR-0026 Proposed): the durable stores are the user's opt-in. The variable
-# `api_durable_stores` (bool, default false, infra/envs/dev/variables.tf) switches the api's three Firestore variables
-# and its always-on CPU together; max_instance_count = 1 is unconditional.
+# `api_durable_stores` (bool, default false, infra/envs/dev/variables.tf) switches the api's always-on CPU; the store
+# switches are the user's gcloud step. max_instance_count = 1 is unconditional.
 
-run "PROD_WIRE_3_default_api_has_no_durable_store_env_and_request_based_cpu" {
+run "PROD_WIRE_3_default_api_has_request_based_cpu" {
   command = plan
-
-  assert {
-    condition     = length(output.cloud_run_services["api"].env) == 0
-    error_message = "By default (api_durable_stores = false) tilo-api gets no environment variable: the next apply must not switch the Firestore stores on."
-  }
 
   assert {
     condition     = output.cloud_run_services["api"].cpu_idle == true
@@ -91,28 +83,6 @@ run "PROD_WIRE_3_opt_in_api_has_cpu_between_requests" {
   }
 }
 
-run "PROD_WIRE_3_opt_in_api_opens_the_firestore_doors_and_nothing_else" {
-  command = plan
-
-  variables {
-    api_durable_stores = true
-  }
-
-  assert {
-    condition = output.cloud_run_services["api"].env == tomap({
-      TILO_API_STORE         = "firestore"
-      TILO_PEOPLE_STORE      = "firestore"
-      TILO_FIRESTORE_PROJECT = var.project_id
-    })
-    error_message = "tilo-api's environment is exactly TILO_API_STORE, TILO_PEOPLE_STORE (both firestore) and TILO_FIRESTORE_PROJECT = the project; no secret, no LIVE, no TILO_JUDGE_LIVE."
-  }
-
-  assert {
-    condition     = !contains(keys(output.cloud_run_services["api"].env), "LIVE") && !contains(keys(output.cloud_run_services["api"].env), "TILO_JUDGE_LIVE")
-    error_message = "Live model calls are the user's switch, never Terraform's (EFF-01)."
-  }
-}
-
 run "PROD_WIRE_3_every_other_service_is_unchanged" {
   command = plan
 
@@ -122,14 +92,6 @@ run "PROD_WIRE_3_every_other_service_is_unchanged" {
       output.cloud_run_services[name].cpu_idle == true
     ])
     error_message = "Only tilo-api leaves request-based CPU billing; harness and every other service keep cpu_idle = true (PRD 6.6)."
-  }
-
-  assert {
-    condition = alltrue([
-      for name in ["harness", "channels", "connectors", "browser", "render", "sandbox-web"] :
-      length(output.cloud_run_services[name].env) == 0
-    ])
-    error_message = "No other service gets an environment variable in this slice."
   }
 
   assert {

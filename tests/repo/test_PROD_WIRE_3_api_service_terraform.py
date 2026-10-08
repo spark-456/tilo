@@ -4,12 +4,12 @@ Static checks, no terraform binary, no network (the planned values are pinned by
 `infra/envs/dev/tests/prod_wire_api.tftest.hcl`; this file pins the text those values come from, and the things that
 must never be there):
 
-  * `infra/modules/service` takes optional `cpu_idle` (bool, default true) and `env` (map(string), default {}) per
-    service and renders them on the container: no literal `cpu_idle = true` any more, an `env` block per entry;
+  * `infra/modules/service` takes optional `cpu_idle` (bool, default true) per service and renders it on both Cloud
+    Run resources (the managed one and the `ignore_env` one tilo-api lives in): no literal `cpu_idle = true` any more;
   * the api entry of `infra/envs/dev/main.tf`: `max_instance_count = 1` always; `cpu_idle = !var.api_durable_stores`
-    and env `var.api_durable_stores ? local.api_durable_stores_env : {}` (security round 1: the durable stores are the
-    user's opt-in, default false), the local being exactly TILO_API_STORE and TILO_PEOPLE_STORE `"firestore"` plus
-    TILO_FIRESTORE_PROJECT `var.project_id`;
+    (security round 1: the durable stores are the user's opt-in, default false); `ignore_env = true` and no `env`:
+    the store switches TILO_API_STORE and TILO_PEOPLE_STORE are runtime env the user sets with gcloud
+    (docs/deploy-dev.md "Durable stores"), never Terraform's;
   * every other service entry: no `env`, no `cpu_idle = false`;
   * no secret-looking env name or value anywhere in `infra/`, and neither `LIVE` nor `TILO_JUDGE_LIVE` is set on any
     service (live model calls are the user's switch, EFF-01).
@@ -64,33 +64,22 @@ def _env(entry: str) -> dict[str, str] | None:
     return {name: value.strip() for name, value in pairs}
 
 
-def test_PROD_WIRE_3_the_service_module_takes_cpu_idle_and_env_per_service(repo_root: pathlib.Path) -> None:
+def test_PROD_WIRE_3_the_service_module_takes_cpu_idle_per_service(repo_root: pathlib.Path) -> None:
     variables = (repo_root / "infra/modules/service/variables.tf").read_text(encoding="utf-8")
     services = _body(variables, r'variable\s+"services"\s*\{')
     assert re.search(r"\bcpu_idle\s*=\s*optional\(\s*bool\s*,\s*true\s*\)", services), "cpu_idle: optional(bool, true)"
-    assert re.search(r"\benv\s*=\s*optional\(\s*map\(\s*string\s*\)\s*,\s*\{\s*\}\s*\)", services), (
-        "env: optional(map(string), {})"
-    )
+    assert not re.search(r"^\s*env\s*=", services, re.M), "no env attribute: tilo-api's env is gcloud's (ignore_env)"
 
 
-def test_PROD_WIRE_3_the_service_module_renders_them_on_the_container_and_reports_them(repo_root: pathlib.Path) -> None:
+def test_PROD_WIRE_3_both_cloud_run_resources_render_cpu_idle_and_report_it(repo_root: pathlib.Path) -> None:
     main = (repo_root / "infra/modules/service/main.tf").read_text(encoding="utf-8")
     assert not re.search(r"\bcpu_idle\s*=\s*true\b", main), "cpu_idle is no longer a literal true"
-    assert re.search(r"\bcpu_idle\s*=\s*each\.value\.cpu_idle\b", main), "the container takes the entry's cpu_idle"
-    assert re.search(r"each\.value\.env\b", main), "the container renders the entry's env"
-    assert re.search(r'dynamic\s+"env"|\benv\s*\{', main), "one env block per variable on the container"
+    assert len(re.findall(r"\bcpu_idle\s*=\s*each\.value\.cpu_idle\b", main)) == 2, (
+        "both resources (managed and ignore_env) take the entry's cpu_idle"
+    )
+    assert "each.value.env" not in main, "no env is rendered from Terraform values"
     outputs = (repo_root / "infra/modules/service/outputs.tf").read_text(encoding="utf-8")
-    assert not re.search(r"\bcpu_idle\s*=\s*true\b", outputs), "the services output reports the real cpu_idle"
-    assert re.search(r"\bcpu_idle\s*=\s*var\.services\[k\]\.cpu_idle\b", outputs)
-    assert re.search(r"\benv\s*=\s*var\.services\[k\]\.env\b", outputs), "and the env (the tftest reads both)"
-
-
-def _durable_env(repo_root: pathlib.Path) -> dict[str, str]:
-    """The api's opt-in environment: the local `api_durable_stores_env` map of `infra/envs/dev/main.tf`."""
-    text = (repo_root / "infra/envs/dev/main.tf").read_text(encoding="utf-8")
-    inner = _body(text, re.compile(r"^\s*api_durable_stores_env\s*=\s*\{", re.M))
-    pairs = re.findall(r'^\s*"?([A-Za-z_][A-Za-z0-9_]*)"?\s*=\s*(.+?)\s*(?:#.*)?$', inner, re.M)
-    return {name: value.strip() for name, value in pairs}
+    assert re.search(r"\bcpu_idle\s*=\s*var\.services\[k\]\.cpu_idle\b", outputs), "the output reports it"
 
 
 def test_PROD_WIRE_3_the_api_entry_is_one_writer_instance_with_idle_cpu_off_only_on_opt_in(
@@ -104,18 +93,22 @@ def test_PROD_WIRE_3_the_api_entry_is_one_writer_instance_with_idle_cpu_off_only
     assert re.search(r"^\s*min_instance_count\s*=\s*0\s*(#.*)?$", api, re.M), "min_instance_count stays 0 (PRD 6.5)"
 
 
-def test_PROD_WIRE_3_the_api_env_is_the_three_firestore_switches_only_on_opt_in(repo_root: pathlib.Path) -> None:
+def test_PROD_WIRE_3_the_api_store_switches_are_gcloud_env_never_terraform(repo_root: pathlib.Path) -> None:
     api = _services(repo_root)["api"]
-    assert re.search(
-        r"^\s*env\s*=\s*var\.api_durable_stores\s*\?\s*local\.api_durable_stores_env\s*:\s*\{\s*\}\s*(#.*)?$",
-        api,
-        re.M,
-    ), "env is the switches when api_durable_stores is true, else {}"
-    assert _durable_env(repo_root) == {
-        "TILO_API_STORE": '"firestore"',
-        "TILO_PEOPLE_STORE": '"firestore"',
-        "TILO_FIRESTORE_PROJECT": "var.project_id",
-    }
+    assert re.search(r"^\s*ignore_env\s*=\s*true\b", api, re.M), "tilo-api's env is runtime (gcloud), not Terraform"
+    assert _env(api) is None, "no env map on the api entry"
+    for path in _tf_files(repo_root):
+        text = path.read_text(encoding="utf-8")
+        assert not re.search(r'^\s*"?TILO_(API|PEOPLE)_STORE"?\s*[=:]', text, re.M), (
+            f"{path.relative_to(repo_root)}: the store switches are the user's gcloud step, not Terraform"
+        )
+    doc = (repo_root / "docs/deploy-dev.md").read_text(encoding="utf-8")
+    section = doc[doc.index("## Durable stores") :]
+    section = section[: section.index("\n## ", 1)]
+    step = re.search(r'--update-env-vars\s+"([^"]+)"', section)
+    assert step is not None, "the doc gives the one gcloud step"
+    assert sorted(step.group(1).split(",")) == ["TILO_API_STORE=firestore", "TILO_PEOPLE_STORE=firestore"]
+    assert "ADR-0026" in section and "api_durable_stores" in section
 
 
 def test_PROD_WIRE_3_api_durable_stores_is_a_bool_off_by_default_naming_both_adrs(repo_root: pathlib.Path) -> None:
@@ -135,9 +128,8 @@ def test_PROD_WIRE_3_no_other_service_gets_an_env_or_idle_cpu_off(repo_root: pat
 
 
 def test_PROD_WIRE_3_no_secret_looking_environment_variable_in_the_service_entries(repo_root: pathlib.Path) -> None:
-    for name, entry in [*_services(repo_root).items(), ("api (opt-in)", "")]:
-        env = _durable_env(repo_root) if name == "api (opt-in)" else _env(entry)
-        for key, value in (env or {}).items():
+    for name, entry in _services(repo_root).items():
+        for key, value in (_env(entry) or {}).items():
             assert not SECRET_NAME.search(key), f"{name}: {key} looks like a secret name; secrets are not Terraform env"
             assert not SECRET_VALUE.search(value), f"{name}: {key} holds a secret-looking value"
             assert value.startswith(('"', "var.", "local.")), (

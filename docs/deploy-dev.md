@@ -301,6 +301,23 @@ Before you read the `tilo-api` log for refused or missing tokens, set `TILO_FIRE
 `GOOGLE_CLOUD_PROJECT`) on the `tilo-api` Cloud Run service: with neither set the verifier has no project and
 refuses every token, so the log would show every request as unverified.
 
+## Durable stores (PROD-WIRE, ADR-0026; run this yourself, only after you accept ADR-0026)
+
+tilo-api keeps its worlds, people and SEC-15 declarations in Firestore only when two runtime switches are set. They
+are `gcloud` env, not Terraform (tilo-api has `ignore_env = true`), so no apply turns them on by itself:
+
+1. Set `api_durable_stores = true` for the dev env and apply the Terraform plan: CPU stays allocated between
+   requests on the one tilo-api instance (`max_instance_count = 1` holds either way; this raises idle cost).
+2. Turn the stores on (`TILO_FIRESTORE_PROJECT` is already set by the routines rollout):
+
+```powershell
+gcloud run services update tilo-api --project essential-wares-510320-f0 --region asia-southeast1 `
+  --update-env-vars "TILO_API_STORE=firestore,TILO_PEOPLE_STORE=firestore"
+```
+
+3. Check `/health`, then that the instance count stays at 1. To switch back, `--remove-env-vars
+   TILO_API_STORE,TILO_PEOPLE_STORE`: the doors answer 503 `not_configured` again.
+
 ## Never
 
 - Never put a service-account key file in the repository or in Actions secrets: WIF only.
