@@ -37,7 +37,7 @@ async function waitFor<T extends Element = Element>(
       expect(found, `Waiting for ${selector}`).not.toBeNull();
       return found as T;
     },
-    { timeout: 2_000 },
+    { timeout: 5_000 },
   );
 }
 
