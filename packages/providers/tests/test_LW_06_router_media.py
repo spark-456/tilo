@@ -12,8 +12,9 @@ from typing import Any
 
 import pytest
 import yaml
+from _lw06_media import classic_pdf, objstm_pdf, ogg, pdf
 from tilo_providers.config import ProviderConfigError, ProvidersConfig, load_providers_config
-from tilo_providers.errors import MissingCapabilityError
+from tilo_providers.errors import MissingCapabilityError, RequestError
 from tilo_providers.interfaces import Capability, GenerateRequest, GenerateResponse, ModelProvider, PriceQuote
 from tilo_providers.media import MediaPart
 from tilo_providers.replay import recording_key
@@ -26,7 +27,7 @@ from tilo_providers.router import (
 )
 
 PNG = b"\x89PNG\r\n\x1a\n" + b"image-bytes"
-PDF = b"%PDF-1.7\n/Type /Page\n/Type /Page\n"  # two pages
+PDF = pdf(2)
 WAV = b"RIFF\x00\x00\x00\x00WAVE" + b"audio-bytes"
 MEDIA_TOKENS = {"image": 1000, "pdf_page": 100, "audio_per_second": 10, "video_per_second": 50}
 CREDIT = 0.005
@@ -302,3 +303,45 @@ def test_LW_06_a_recorded_call_replays_by_the_files_sha256_and_a_changed_file_mi
     assert router.generate("reader", request).response.text == "from the recording"
     with pytest.raises(RouterExhaustedError):  # other bytes: another key, no recording
         router.generate("reader", ask(part("image/png", PNG + b"x")))
+
+
+@pytest.mark.parametrize(
+    "five_pages",
+    [objstm_pdf(5), classic_pdf(5, page_type=b"/Type /#50age"), classic_pdf(5, count=1)],
+    ids=["object-stream", "escaped-name", "lying-count"],
+)
+def test_LW_06_a_pdf_a_text_scan_would_miss_is_priced_by_its_real_pages_under_a_tight_cap(tmp_path, five_pages):
+    router, fleet = reader(tmp_path, cascade=["plain"], max_input_tokens=450)  # one page (103) fits, five (503) do not
+    router.generate("reader", ask(part("application/pdf", pdf(1))))
+    sent = len(fleet.built["plain"].requests)
+    with pytest.raises(TokenCapExceededError):
+        router.generate("reader", ask(part("application/pdf", five_pages)))
+    assert len(fleet.built["plain"].requests) == sent, "the over-cap PDF was never sent"
+
+
+def test_LW_06_a_thousand_page_pdf_is_refused_before_any_candidate_whatever_its_size(tmp_path):
+    with pytest.raises(RequestError, match="more than 100 pages"):
+        part("application/pdf", classic_pdf(1000, count=1))
+    router, fleet = reader(tmp_path, cascade=["plain"])
+    forged = part("application/pdf", pdf(1)).model_copy(update={"data": classic_pdf(1000, count=1)})
+    with pytest.raises(RouterRequestError):
+        router.generate("reader", GenerateRequest.model_construct(prompt="p", parts=[forged]))
+    assert fleet.built == {}
+
+
+def test_LW_06_a_low_bitrate_clip_with_a_short_declared_duration_is_refused_under_a_tight_cap(tmp_path):
+    router, fleet = reader(tmp_path, cascade=["hearing"], max_input_tokens=150)
+    clip = part("audio/ogg", ogg(40_000), seconds=1.0)  # 40 kB at the lowest practical bitrate: 80 s, 800 tokens
+    with pytest.raises(TokenCapExceededError):
+        router.generate("reader", ask(clip))
+    assert fleet.built["hearing"].requests == [], "nothing was sent"
+    router.generate("reader", ask(part("audio/ogg", ogg(1_000), seconds=1.0)))  # 2 s: 20 tokens, fits
+
+
+def test_LW_06_parts_are_snapshotted_so_a_list_changed_after_the_call_starts_changes_nothing(tmp_path):
+    router, fleet = reader(tmp_path, cascade=["plain"])
+    request = ask(part("image/png"))
+    result = router.generate("reader", request)
+    assert request.parts is not None and result.request.parts is not request.parts
+    request.parts.append(part("image/png"))
+    assert len(fleet.built["plain"].requests[0].parts or []) == 1

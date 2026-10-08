@@ -15,6 +15,7 @@ from _fake_genai_sdk import (
     FakeModelsAPI,
     FakeUsageMetadata,
 )
+from _lw06_media import pdf
 from google.genai import types as real_genai_types  # the real SDK, imported before the fake replaces it
 from tilo_contracts import ProvidersProfile
 from tilo_providers.errors import MissingCapabilityError, ProviderError, RequestError
@@ -23,7 +24,7 @@ from tilo_providers.media import MediaPart
 
 MARK = b"SECRETMARK-do-not-leak"
 PNG = b"\x89PNG\r\n\x1a\n" + MARK
-PDF = b"%PDF-1.7\n" + MARK
+PDF = pdf()
 WAV = b"RIFF\x00\x00\x00\x00WAVE" + MARK
 KEY_ENV, KEY = "FAKE_OPENAI_COMPAT_API_KEY", "fake-test-key-do-not-use-1234567890"
 

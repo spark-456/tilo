@@ -241,13 +241,14 @@ class Router:
             attempt.latency_ms = (time.perf_counter() - start) * 1000
 
     def _start(self, role_id: str, req: GenerateRequest, outs: list[str] | None, cap: Any, budget: Any) -> RouterResult:
+        parts = list(req.parts) if req.parts else req.parts  # a snapshot: the caller's list cannot change under the run
         try:
-            check_parts(req.parts)  # LW-06: count, bytes, types, sha256; a URI part is refused (ADR-0018 T8)
+            check_parts(parts)  # LW-06: count, bytes, types, sha256, pages; a URI part is refused (ADR-0018 T8)
         except RequestError as error:
             raise RouterRequestError(f"LW-06: role {role_id!r} rejected the request: {error}") from error
-        role, candidates = self._config.roles[role_id], self._candidates(role_id, cap, capabilities_needed(req.parts))
+        role, candidates = self._config.roles[role_id], self._candidates(role_id, cap, capabilities_needed(parts))
         max_output = next(n for n in (req.max_output_tokens, role.max_output_tokens, 1024) if n is not None)  # BQ-63
-        request = req.model_copy(update={"max_output_tokens": max_output})
+        request = req.model_copy(update={"max_output_tokens": max_output, "parts": parts})
         return RouterResult(role_id, request, candidates, budget, raw_prompt=req.prompt, tool_outputs=list(outs or []))
 
     def _prepare(
