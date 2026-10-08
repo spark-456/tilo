@@ -353,8 +353,13 @@ for (const [size, viewport] of SIZES) {
       const lastUp = samples.map((s) => s.splash !== null).lastIndexOf(true);
       const goneAt = samples[lastUp + 1]?.t ?? Number.NaN;
       const fadeAt = fade?.t ?? Number.NaN;
-      expect(goneAt - fadeAt, "the splash was cut before its fade ran").toBeGreaterThanOrEqual(430);
-      expect(goneAt - fadeAt, "the splash lingers after its fade").toBeLessThanOrEqual(1_000);
+      // The fade's own startTime, not when the probe noticed it: a busy main thread (the first city draw)
+      // notices late, which made a full .45 s fade look cut short.
+      const fadeBegan = fade?.start ?? Number.NaN;
+      expect(goneAt - fadeBegan, "the splash was cut before its fade ran").toBeGreaterThanOrEqual(
+        430,
+      );
+      expect(goneAt - fadeBegan, "the splash lingers after its fade").toBeLessThanOrEqual(1_000);
       const revealedAt = when(samples, (s) => s.navVisible) ?? Number.NaN;
       expect(revealedAt, "the shell shows no later than the fade begins").toBeLessThanOrEqual(
         fadeAt + 30,
