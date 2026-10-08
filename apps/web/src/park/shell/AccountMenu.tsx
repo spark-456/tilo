@@ -11,7 +11,7 @@ export interface AccountPerson {
   initials: string;
   name: string;
   email: string;
-  /** The line under the email ("Northwind Ops · Team plan"), when there is one. */
+  /** The line under the email (the org name and plan), when there is one. */
   detail?: string;
 }
 
