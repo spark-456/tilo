@@ -34,6 +34,7 @@ from tilo_api.log_context import LogContext as _LogContext
 from tilo_api.log_context import LogRunId as _LogRunId
 from tilo_api.people_limits import NoStore as _NoStore
 from tilo_api.redaction import router as _redaction_router
+from tilo_api.sample_world import router as _sample_router
 from tilo_api.sharing import WorldView
 from tilo_api.sharing import build_router as _build_sharing_router
 from tilo_api.tasks import router as _tasks_router
@@ -96,6 +97,7 @@ def _world_views(store: Annotated[_deps.Store, Depends(_deps.get_store)]) -> Cal
 
 
 app.include_router(_access_router)
+app.include_router(_sample_router)  # STARTER-1: ahead of the owner-scoped /worlds/{id} routes
 app.include_router(intake_router)
 app.include_router(_dispatch_router)
 app.include_router(_redaction_router)

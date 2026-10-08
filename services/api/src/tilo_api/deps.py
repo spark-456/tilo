@@ -90,6 +90,15 @@ class DistrictRecord:
     summary: str
 
 
+SAMPLE_WORLD_ID = "w_sample_village_basic"  # STARTER-1: the read-only sample project (`tilo_api.sample_world`)
+
+
+def refuse_reserved(worlds: Mapping[str, Any] | None) -> None:
+    """A real world can never take the sample project's id (create or import)."""
+    if worlds and SAMPLE_WORLD_ID in worlds:
+        raise ValueError("world id is reserved for the sample project")
+
+
 @dataclass
 class WorldRecord:
     owner: str  # common.schema.json#/$defs/user_id
@@ -188,6 +197,7 @@ class Store:
         create: Iterable[tuple[str, str]] = (),
         evict: bool = True,
     ) -> None:
+        refuse_reserved(worlds)
         self.worlds.update(worlds or {})
         self.tasks.update(tasks or {})
         self.policies.update(policies or {})
@@ -198,6 +208,7 @@ class Store:
     ) -> None:
         """A route's new records and events. The events go through `writer` first (it reads the world's record, so a
         new one is stored before them); a failure removes the worlds this call created and changes nothing else."""
+        refuse_reserved(records.get("worlds"))
         self.worlds.update(records.get("worlds") or {})
         sending = ""
         try:

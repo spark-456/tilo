@@ -32,6 +32,8 @@ from fastapi.responses import JSONResponse
 
 from tilo_api.deps import Principal, Store, WorldRecord, get_current_principal, get_store
 from tilo_api.redaction import _event_hides_district, _is_malformed_event, _is_owner, _safe_districts, _visible
+from tilo_api.sample_world import SAMPLE_TITLE_PREFIX, SAMPLE_WORLD_ID
+from tilo_api.sample_world import load as _load_sample
 
 router = APIRouter()
 
@@ -112,13 +114,17 @@ def _position(principal: Principal, store: Store, world_id: str, world: WorldRec
 
 def _item(principal: Principal, store: Store, world_id: str, world: WorldRecord) -> dict[str, Any]:
     seen = list(_view(principal, world, store.events.get(world_id, [])))
+    # The owner's last stored seq; anyone else the last seq of their own renumbered view (BQ-S14-4, SEC-07).
+    last_seq = (seen[-1]["seq"] if seen else 0) if _is_owner(principal, world.owner) else len(seen)
+    return _summary(world_id, seen, last_seq)
+
+
+def _summary(world_id: str, seen: list[dict], last_seq: int) -> dict[str, Any]:
     first = _requested(iter(seen))
     title = first["data"].get("title") if first is not None and isinstance(first["data"], dict) else None
     status = "idle"
     for event in seen:
         status = _STATUS.get(event["type"], status)
-    # The owner's last stored seq; anyone else the last seq of their own renumbered view (BQ-S14-4, SEC-07).
-    last_seq = (seen[-1]["seq"] if seen else 0) if _is_owner(principal, world.owner) else len(seen)
     return {
         "world_id": world_id,
         "title": title if isinstance(title, str) else None,
@@ -128,10 +134,20 @@ def _item(principal: Principal, store: Store, world_id: str, world: WorldRecord)
     }
 
 
+def _sample_item() -> dict[str, Any] | None:
+    """STARTER-1: the recorded sample as a list item, from its events like any world; None when it is absent."""
+    sample = _load_sample()
+    if sample is None:
+        return None
+    item = _summary(SAMPLE_WORLD_ID, list(sample.events), sample.events[-1]["seq"])
+    return {**item, "title": SAMPLE_TITLE_PREFIX + (item["title"] or ""), "sample": True}
+
+
 @router.get("/worlds")
 def list_worlds(
     limit: int = Query(DEFAULT_LIMIT, ge=1, le=MAX_LIMIT),
     cursor: str | None = Query(None),
+    include_sample: str | None = Query(None),
     principal: Principal = Depends(get_current_principal),
     store: Store = Depends(get_store),
 ) -> JSONResponse:
@@ -142,10 +158,14 @@ def list_worlds(
     else:
         named = store.load_world(principal.world_id, settle=True) if principal.world_id is not None else None
         scope = {principal.world_id: named} if principal.world_id is not None and named is not None else {}
-    ordered = sorted((_position(principal, store, w, rec) for w, rec in scope.items()), reverse=True)
+    positions = [_position(principal, store, w, rec) for w, rec in scope.items()]
+    sample = _sample_item() if principal.role == "owner" and (not scope or include_sample == "1") else None
+    if sample is not None:  # STARTER-1: ordered among the caller's worlds like any other, so pages walk it once
+        positions.append((True, sample["created_at"], SAMPLE_WORLD_ID))
+    ordered = sorted(positions, reverse=True)
     rest = [p for p in ordered if after is None or p < after]
     page = rest[:limit]
-    worlds = [_item(principal, store, p[2], scope[p[2]]) for p in page]
+    worlds = [sample if p[2] == SAMPLE_WORLD_ID else _item(principal, store, p[2], scope[p[2]]) for p in page]
     more = len(rest) > limit
     return JSONResponse(
         content={"worlds": worlds, "next_cursor": _encode_cursor(principal.user_id, page[-1]) if more else None}

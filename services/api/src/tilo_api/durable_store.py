@@ -380,6 +380,7 @@ class DurableStore(deps.Store):
         create: Iterable[tuple[str, str]] = (),
         evict: bool = True,
     ) -> None:
+        deps.refuse_reserved(worlds)  # STARTER-1: no real world takes the sample project's id
         made, parts = set(create), {w: list(p) for w, p in (parts or {}).items() if p}
         with self._held():
             with self._marks:  # the marks before these records are read: a later mark is a change they may not hold
