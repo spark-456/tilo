@@ -117,3 +117,24 @@ def test_DEV_HARNESS_c_the_dev_ledger_refuses_when_deployed(dev_client, monkeypa
     monkeypatch.setenv("K_SERVICE", "tilo-api")
     with pytest.raises(dev.DevModeRefused):
         dev_client.app.dependency_overrides[deps.get_ledger]()
+
+
+def test_DEV_HARNESS_c_one_desks_credits_never_count_for_another_owner(dev_client):
+    import copy  # noqa: PLC0415
+    import json  # noqa: PLC0415
+
+    from _api_lib import REPO_ROOT  # noqa: PLC0415
+
+    fixture = json.loads((REPO_ROOT / "contracts/fixtures/events/valid/assistant.replied.json").read_text("utf-8"))
+    desks = dev_client.app.dependency_overrides[deps.get_desk_worlds]()
+    writer = dev_client.app.dependency_overrides[deps.get_event_writer]()
+    store = dev_client.app.dependency_overrides[deps.get_store]()
+    mine, theirs = desks.desk_world(deps.ORG_ID, dev.DEV_OWNER), desks.desk_world(deps.ORG_ID, "u_priya")
+    assert store.worlds[mine].run_id != store.worlds[theirs].run_id  # each Desk has its own run, as desk.ensure_desk
+    for number, (world, credits) in enumerate(((mine, 2.0), (theirs, 3.0)), start=1):
+        event = copy.deepcopy(fixture)
+        event.update(id=f"01JB5VQ{number:019d}", world_id=world, credits=credits, target=store.worlds[world].owner)
+        event.pop("seq"), event.pop("run_id")
+        writer.append(world, event)
+
+    assert dev_client.get("/costs").json()["totals"]["credits"] == pytest.approx(2.0)  # not 5.0

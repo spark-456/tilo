@@ -144,3 +144,88 @@ def test_DEV_HARNESS_d_the_real_tick_still_needs_its_google_token(dev_client, mo
     monkeypatch.setenv(schedules.ENV_QUEUE, "projects/p/locations/l/queues/q")
     assert dev_client.post(schedules.TICK_PATH).status_code == 401  # no bearer
     assert dev_client.post(schedules.TICK_PATH, headers={"Authorization": "Bearer not-a-token"}).status_code == 401
+
+
+def _foreign_schedule(client: TestClient):
+    from tilo_harness.schedule import Cadence, Schedule, next_slot  # noqa: PLC0415
+
+    repo = client.app.dependency_overrides[schedules.get_schedule_store]()
+    now = datetime.now(UTC)
+    cadence = Cadence(weekday=0, hour=9, minute=0, tz="Asia/Kolkata")
+    record = Schedule(
+        schedule_id="sched_" + "ab" * 12, owner_user_id="u_someone_else", title="Not yours", cadence=cadence,
+        approved_brief_ref="w_other", budget_cap=8.0, next_due=next_slot(cadence, now), brief={}, approach={},
+        created_at=now,
+    )  # fmt: skip
+    assert repo.create(record, max_per_owner=10)
+    return repo, record
+
+
+def test_DEV_HARNESS_d_a_real_firestore_project_in_the_environment_is_refused_and_claims_nothing(
+    dev_client, monkeypatch
+):
+    repo, record = _foreign_schedule(dev_client)
+    monkeypatch.setenv("TILO_SCHEDULES_STORE", "firestore")
+    monkeypatch.setenv("TILO_FIRESTORE_PROJECT", "essential-wares-510320-f0")
+    year_on = (record.next_due + timedelta(days=365)).astimezone(UTC).isoformat()
+
+    response = dev_client.post(PATH, json={"as_of": year_on})
+
+    assert response.status_code == 503 and response.json() == {"detail": "dev_tick_needs_memory_store"}
+    assert repo.get(record.schedule_id).next_due == record.next_due  # nothing claimed, nothing moved
+
+
+def test_DEV_HARNESS_d_dev_mode_never_opens_the_store_the_environment_names(dev_client, monkeypatch):
+    from tilo_harness.schedule_store import InMemoryScheduleStore  # noqa: PLC0415
+
+    monkeypatch.setenv("TILO_SCHEDULES_STORE", "firestore")
+    monkeypatch.setenv("TILO_FIRESTORE_PROJECT", "essential-wares-510320-f0")
+    repo = dev_client.app.dependency_overrides[schedules.get_schedule_store]()
+    assert isinstance(repo, InMemoryScheduleStore)
+    assert dev_client.get("/schedules").json() == {"schedules": []}  # the routes use it too, no cloud client built
+
+
+def test_DEV_HARNESS_d_an_emulator_demo_project_is_not_refused(dev_client, monkeypatch):
+    monkeypatch.setenv("TILO_SCHEDULES_STORE", "firestore")
+    monkeypatch.setenv("TILO_FIRESTORE_PROJECT", "demo-tilo")
+    assert dev_client.post(PATH, json={}).status_code == 200
+
+
+def test_DEV_HARNESS_d_only_json_is_accepted_so_a_cross_site_page_needs_a_preflight(dev_client):
+    repo, record = _foreign_schedule(dev_client)
+    for headers in (
+        {"Origin": "https://evil.example", "Content-Type": "text/plain"},
+        {"Origin": "https://evil.example"},
+        {"Origin": "https://evil.example", "Content-Type": "application/x-www-form-urlencoded"},
+    ):
+        response = dev_client.post(PATH, headers=headers)  # no body, as a blind cross-site POST sends
+        assert response.status_code == 415, headers
+    preflight = dev_client.options(
+        PATH, headers={"Origin": "https://evil.example", "Access-Control-Request-Method": "POST"}
+    )
+    assert "access-control-allow-origin" not in preflight.headers
+    assert repo.get(record.schedule_id).next_due == record.next_due
+
+
+def test_DEV_HARNESS_d_one_failing_task_does_not_lose_the_slots_after_it(dev_client, monkeypatch):
+    first, second = _schedule(dev_client), _schedule(dev_client)
+    _grant_policy(dev_client)
+    real, calls = schedules._run_task, []
+
+    def flaky(*args, **kwargs):
+        calls.append(1)
+        if len(calls) == 1:
+            raise RuntimeError("boom with a secret-looking detail")
+        return real(*args, **kwargs)
+
+    monkeypatch.setattr(schedules, "_run_task", flaky)
+    body = dev_client.post(PATH, json={"as_of": _as_of(max((first, second), key=lambda s: s["next_due"]))}).json()
+
+    assert body["fired"] == 2 and len(calls) == 2
+    assert body["tasks"][0] == {"ran": 0, "error": "task_failed"} and body["tasks"][1]["ran"] == 1
+    assert "secret" not in str(body)
+
+
+def test_DEV_HARNESS_f_a_host_with_a_trailing_newline_is_refused():
+    assert dev._HOST_RE.fullmatch("localhost:8080")
+    assert dev._HOST_RE.fullmatch("localhost:8080\n") is None

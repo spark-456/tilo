@@ -6,6 +6,8 @@ unchanged. Nothing we ship sets it."""
 from __future__ import annotations
 
 import pathlib
+import re
+import subprocess
 
 import pytest
 import tilo_api
@@ -69,8 +71,54 @@ def test_DEV_HARNESS_e_without_dev_mode_the_env_is_ignored_even_when_set_in_clou
     assert flag_module.process_flags().get("replay_only") is False
 
 
+ALLOWED = (
+    "services/api/tests/",
+    "services/api/src/tilo_api/dev.py",
+    "services/api/CLAUDE.md",
+    "docs/open-questions.md",
+)
+ASSIGNMENT = re.compile(rf"{ENV}[\"']?\s*[:=]\s*[\"']?1\b")
+
+
+def _tracked() -> list[str]:
+    out = subprocess.run(["git", "ls-files"], cwd=REPO, capture_output=True, text=True, check=True).stdout
+    return [line for line in out.splitlines() if line]
+
+
 def test_DEV_HARNESS_e_nothing_we_ship_sets_it():
-    shipped = [REPO / "justfile", *(REPO / "infra").rglob("*"), *(REPO / ".github").rglob("*")]
-    shipped += [p for p in (REPO / "services").glob("*/Dockerfile")] + list((REPO / "config").rglob("*"))
-    hits = [p for p in shipped if p.is_file() and ENV in p.read_text(encoding="utf-8", errors="ignore")]
-    assert hits == [], f"{ENV} must never be set by a shipped config, script or workflow: {hits}"
+    """Every tracked file (not a filesystem walk): cloudbuild, Dockerfiles, scripts, .env.example, firebase.json,
+    workflows, infra, config and the runbooks. Outside the allow list the name must not appear in code or config at all,
+    and in a document it must not appear as an assignment."""
+    files = _tracked()
+    assert "justfile" in files and any(f.endswith("cloudbuild.yaml") for f in files)  # the scan sees what ships
+    hits = []
+    for name in files:
+        if name.startswith(ALLOWED) or name == ALLOWED[1]:
+            continue
+        text = (REPO / name).read_text(encoding="utf-8", errors="ignore") if (REPO / name).is_file() else ""
+        if ENV not in text:
+            continue
+        if not name.endswith((".md", ".txt")) or ASSIGNMENT.search(text):
+            hits.append(name)
+    assert hits == [], f"{ENV} must never be set by a shipped config, script, workflow or runbook: {hits}"
+
+
+def test_DEV_HARNESS_e_it_never_flips_a_shared_flag_store(monkeypatch):
+    class SharedFlags:  # stands in for a Firestore-backed store installed with use_process_flags
+        def __init__(self) -> None:
+            self.sets: list = []
+
+        def get(self, name: str) -> bool:
+            return False
+
+        def set(self, name: str, value: bool, *, reason: str) -> None:
+            self.sets.append((name, value))
+
+        def history(self, name: str) -> tuple:
+            return ()
+
+    shared = SharedFlags()
+    monkeypatch.setattr(flag_module, "_process_flags", shared)
+    with pytest.raises(dev.DevModeRefused):
+        dev.install(_app(), {ENV: "1"})
+    assert shared.sets == []

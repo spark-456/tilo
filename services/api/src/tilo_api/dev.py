@@ -8,6 +8,7 @@ no network or paid call, and it is a stand-in for sign-in and Firestore, never a
 
 from __future__ import annotations
 
+import hashlib
 import os
 import re
 import threading
@@ -20,8 +21,9 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.responses import PlainTextResponse
 from starlette.types import ASGIApp, Receive, Scope, Send
+from tilo_harness.schedule_store import InMemoryScheduleStore
 from tilo_harness.validator import repo_validator
-from tilo_metering import LedgerEntry
+from tilo_metering import InMemoryFlagStore, LedgerEntry
 from tilo_metering.flags import process_flags
 from tilo_people.stores import PeopleStores
 
@@ -69,7 +71,7 @@ class _LocalHostOnly:
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         if scope["type"] in ("http", "websocket"):
             host = next((v.decode("latin-1") for k, v in scope["headers"] if k == b"host"), "")
-            if not _HOST_RE.match(host):
+            if not _HOST_RE.fullmatch(host):
                 if scope["type"] == "http":
                     await PlainTextResponse("Invalid host header", status_code=400)(scope, receive, send)
                 else:
@@ -168,8 +170,9 @@ class DevDeskWorlds:
         if re.fullmatch(r"[0-9A-Za-z_]{1,43}", suffix) is None:
             raise ValueError("no Desk world for this user id")
         world_id = f"w_desk_{suffix}"
+        run_id = "r_desk_" + hashlib.sha256(f"{org_id}:{user_id}".encode()).hexdigest()[:24]  # one run per Desk
         with self._lock:
-            held = self._store.worlds.setdefault(world_id, deps.WorldRecord(owner=user_id, districts={}))
+            held = self._store.worlds.setdefault(world_id, deps.WorldRecord(owner=user_id, districts={}, run_id=run_id))
             if getattr(held, "owner", None) != user_id:
                 raise ValueError("that Desk world belongs to someone else")  # never adopted (as `desk.ensure_desk`)
         return world_id
@@ -224,7 +227,10 @@ def install(app: FastAPI, env: Mapping[str, str] | None = None) -> None:
     ledger = DevLedger()
     writer = DevEventWriter(store, ledger)
     if (os.environ if env is None else env).get(ENV_FORCE_REPLAY) == "1":
-        process_flags().set("replay_only", True, reason=f"{ENV_FORCE_REPLAY} (dev mode)")  # the real switch's flag
+        flags = process_flags()
+        if not isinstance(flags, InMemoryFlagStore):  # never flip a shared (Firestore-backed) switch from a dev box
+            raise DevModeRefused(f"{ENV_FORCE_REPLAY}=1 needs the in-process flag store")
+        flags.set("replay_only", True, reason=f"{ENV_FORCE_REPLAY} (dev mode)")  # the real switch's flag
 
     def principal(request: Request) -> deps.Principal:
         refuse_if_unsafe()
@@ -247,8 +253,15 @@ def install(app: FastAPI, env: Mapping[str, str] | None = None) -> None:
 
     app.dependency_overrides[deps.get_event_writer] = get_writer
     app.dependency_overrides[deps.get_ledger] = ledger.entries  # the cost routes' seam (FR-MTR-10, BQ-MTR10-4)
-    from tilo_api import dev_tick  # noqa: PLC0415 (it imports schedules, which imports this module)
+    from tilo_api import dev_tick, schedules  # noqa: PLC0415 (they import this module)
 
+    schedule_store = InMemoryScheduleStore()  # per install: dev never reads TILO_SCHEDULES_STORE or a real project
+
+    def get_schedule_store() -> InMemoryScheduleStore:
+        refuse_if_unsafe()
+        return schedule_store
+
+    app.dependency_overrides[schedules.get_schedule_store] = get_schedule_store
     app.include_router(dev_tick.router)  # POST /dev/schedules/tick: registered here and nowhere else
     desks = DevDeskWorlds(store)
 
