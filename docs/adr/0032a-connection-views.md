@@ -1,6 +1,7 @@
 # ADR-0032 addendum 1: a read-only connection views route on tilo-connectors
 
-- Status: **Proposed**, awaiting the user's approval, like ADR-0032 itself. It adds one route to ADR-0032 decision 2,
+- Status: **Accepted** (the user approved it with the stated defaults on 9 Oct 2026 ~00:30 in the supervisor chat; the
+  supervisor relayed this to the architect lane, whose session did not see the user's own words). It adds one route to ADR-0032 decision 2,
   extends HB-02 to it, and adds tickets T1b and T4b. It supersedes BQ-LIVEGAPS-1's default ("wire the broker").
 - Deciders: user (approval), supervisor (request, 9 Oct 2026), architect
 - Requirement: FR-CON-02, FR-ACC-03, FR-ACC-04, FR-MTG-09; SEC-02; PRD 6.5 (Identity), 11.5, 12.1 (Token broker),
