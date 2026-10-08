@@ -319,3 +319,24 @@ def test_PL_02_google_adapter_stream_yields_chunks_that_concatenate_to_the_full_
 
     assert "".join(chunk.text for chunk in received) == "Once upon a time."
     assert all(chunk.profile_id == "flash-38" for chunk in received)
+
+
+def test_PL_02_google_adapter_real_client_has_a_request_timeout(fake_genai_sdk, monkeypatch):
+    """Live run 8 Oct 2026: verifier and narrator calls hung 300-425 s with no answer. The client the adapter builds
+    carries an HTTP timeout, so a stalled request ends (as a retryable 504) instead of hanging the run."""
+    import sys
+
+    from tilo_providers import google_adapter
+
+    seen: dict[str, object] = {}
+    genai_pkg = sys.modules["google.genai"]
+    types_mod = sys.modules["google.genai.types"]
+    monkeypatch.setattr(types_mod, "HttpOptions", lambda **kw: ("http_options", kw), raising=False)
+    monkeypatch.setattr(genai_pkg, "Client", lambda **kw: seen.update(kw) or FakeModelsAPI(), raising=False)
+
+    google_adapter.GoogleModelProvider(
+        profile=_profile(), profile_id="flash-38", project=PROJECT, location=LOCATION, live_permitted=True
+    )
+
+    assert seen["http_options"] == ("http_options", {"timeout": google_adapter.REQUEST_TIMEOUT_MS})
+    assert 0 < google_adapter.REQUEST_TIMEOUT_MS <= 180_000

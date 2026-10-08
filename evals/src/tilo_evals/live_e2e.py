@@ -894,7 +894,18 @@ def _provider_failure(error: BaseException, env: Mapping[str, str]) -> tuple[str
     """(code, reason) of a call the Router gave up on. Only a rejected request (HTTP 400) gives a reason: the adapter's
     redacted server text, scrubbed again here, one line, scrubbed before it is capped. Any other status: code only."""
     code = classify(error)
+    if code == "unknown":  # class names only (no text, no values): the next run says what kind of failure it was
+        return code, _error_classes(error)
     return code, (_scrub_known(scrubbed_server_text(error), env)[:MAX_REASON_CHARS] if code == "rejected" else "")
+
+
+def _error_classes(error: BaseException) -> str:
+    names: list[str] = []
+    link: BaseException | None = error
+    while link is not None and len(names) < 6:
+        names.append(type(link).__name__)
+        link = link.__cause__ or link.__context__
+    return " <- ".join(dict.fromkeys(names))
 
 
 def _classify(
@@ -923,7 +934,9 @@ def _classify(
         else ((obs.outcome or "failed"), obs.reason)
     )
     if code and meter.failure and outcome not in ("completed", "held_at_gate", "needs_answers"):
-        reason = f"{reason or 'the run did not finish'}; provider call failed ({meter.failure[0]} role): {code}"
+        reason = f"{reason or 'the run did not finish'}; provider call failed ({meter.failure[0]} role): {code}" + (
+            f" ({said})" if said else ""
+        )
     return outcome, reason
 
 
