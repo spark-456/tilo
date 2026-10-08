@@ -139,7 +139,17 @@ describe("FR-SKL-01: Teach by showing", () => {
     }
   });
 
-  it("test_FR_SKL_01_capture_does_not_advance_on_timer_when_source_is_not_fixture", async () => {
+  it("test_FR_SKL_01_labels_teach_and_try_run_visibly_as_sample_run_whenever_source_is_fixture", async () => {
+    const rig = await mountSkills();
+    // Step 1 (Show it) visibly labels the capture flow as a sample run when source === "fixture"
+    expect(pageText(teachCard(rig.el))).toContain("Sample run");
+
+    // Step 3 (Try run) also visibly labels the practice run as a sample run when source === "fixture"
+    toTryRun(rig);
+    expect(pageText(teachCard(rig.el))).toContain("Sample run");
+  });
+
+  it("test_FR_SKL_01_non_fixture_data_shows_honest_connect_to_start_teaching_state_instead_of_dead_end", async () => {
     const base = skillsApi();
     const api = skillsApi({
       getSkills: async () => liveResult((await base.getSkills()).data),
@@ -147,11 +157,13 @@ describe("FR-SKL-01: Teach by showing", () => {
       getUser: async () => liveResult((await base.getUser()).data),
     });
     const rig = await mountSkills({ api });
-    clickEl(control(rig.el, SCREEN.record.start));
+    const text = pageText(teachCard(rig.el));
+    expect(text).toMatch(/connect to start teaching/i);
+    expect(text).not.toContain("Sample run");
+    expect(hasControl(rig.el, "Show me Tilo’s version")).toBe(false);
+    expect(rig.clock.live()).toHaveLength(0);
     rig.clock.advance(10_000);
-    // Without fixture capture events (live mode has none), timer never pretends to capture steps
-    expect(pickedCount(rig.el)).toBe(0);
-    expect(isDisabled(control(rig.el, "Show me Tilo’s version"))).toBe(true);
+    expect(rig.clock.live()).toHaveLength(0);
   });
 });
 
@@ -198,7 +210,16 @@ describe("FR-SKL-02: Tilo's version", () => {
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
-  it("test_FR_SKL_02_estimates_compute_cost_per_run_time_and_stops_to_ask_from_ledger_step_prices", () => {
+  it("test_FR_SKL_02_estimates_compute_cost_per_run_time_and_stops_to_ask_from_shared_ledger_step_prices_and_currency", async () => {
+    const ledgerKpis = (await import("../../app/ledgerKpis")) as Record<string, unknown>;
+    expect(ledgerKpis.STEP_LEDGER_PRICES).toEqual({
+      Read: 0.05,
+      Draft: 0.1,
+      Act: 0.15,
+    });
+    expect(teachData.STEP_LEDGER_PRICES).toBe(ledgerKpis.STEP_LEDGER_PRICES);
+    expect(typeof ledgerKpis.runMoney).toBe("function");
+
     const estimateSkillPlan = (teachData as Record<string, unknown>).estimateSkillPlan as
       | ((
           steps: readonly { readonly tool: string }[],
@@ -268,7 +289,7 @@ describe("FR-SKL-03: Try run", () => {
       true,
     );
 
-    // 2. When source is not "fixture" (no fixture events), advancing the clock by 60s never advances try-run progress
+    // 2. When source is not "fixture", Teach card shows honest "Connect to start teaching" state and schedules no timers
     const base = skillsApi();
     const liveApi = skillsApi({
       getSkills: async () => liveResult((await base.getSkills()).data),
@@ -276,13 +297,11 @@ describe("FR-SKL-03: Try run", () => {
       getUser: async () => liveResult((await base.getUser()).data),
     });
     const rig = await mountSkills({ api: liveApi });
-    toTryRun(rig);
 
-    expect(runStatuses(rig.el)).toEqual(["Working…", "Waiting", "Waiting", "Waiting"]);
+    expect(pageText(teachCard(rig.el))).toMatch(/connect to start teaching/i);
     expect(rig.clock.live()).toHaveLength(0);
     rig.clock.advance(60_000);
-    expect(runStatuses(rig.el)).toEqual(["Working…", "Waiting", "Waiting", "Waiting"]);
-    expect(runPill(rig.el)).toBe("Step 1 of 4");
+    expect(rig.clock.live()).toHaveLength(0);
     expect(pageText(teachCard(rig.el))).not.toContain(TRY.resultTitle);
   });
 
@@ -295,6 +314,7 @@ describe("FR-SKL-03: Try run", () => {
             cost: number;
           }[],
           totalSteps?: number,
+          currency?: "GBP" | "USD",
         ) => { title: string; sub: string })
       | undefined;
     expect(typeof formatTryRunResult).toBe("function");
@@ -310,11 +330,11 @@ describe("FR-SKL-03: Try run", () => {
       sub: "4 of 4 steps · 1 min 08s · £0.38",
     });
 
-    // Partial match (3 of 4 steps matched)
+    // Partial match (3 of 4 steps matched) and USD currency support via shared ledger formatter
     const partial = tryEvents.map((e, i) => (i === 3 ? { ...e, matched: false } : e));
-    expect(formatTryRunResult?.(partial, 4)).toEqual({
+    expect(formatTryRunResult?.(partial, 4, "USD")).toEqual({
       title: "Matched 3 of 4 steps of your way",
-      sub: "3 of 4 steps · 1 min 08s · £0.38",
+      sub: "3 of 4 steps · 1 min 08s · $0.38",
     });
   });
 });
