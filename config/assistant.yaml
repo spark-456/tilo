@@ -35,6 +35,13 @@ facts:
     rows: { reasons: [mail_reply] }
     header: "Mail that needs your reply:"
     empty: "No mail needs your reply."
+  - id: calendar_prepare
+    describe: "what to prepare for one of your calendar entries today, named by its start time like the 3pm"
+    when: [[prepare, prep, preparation]]
+    rows: { reasons: [calendar] }
+    header: "To prepare:"
+    empty: "Nothing to prepare."
+    report: prepare # FR-CAL-07: one own accepted entry at that minute today, its fields and linked records
   - id: waiting
     describe: "cards and blocked work waiting for your answer or approval"
     when: [[waiting, wait, waits, needs, need, approve, approval, approvals, pending, answer, decide]]
@@ -59,6 +66,7 @@ facts:
     rows: { reasons: [calendar] }
     header: "On your calendar today:"
     empty: "Nothing is on your calendar today."
+    report: calendar # FR-CAL-07: only your own accepted entries; opens the entry when exactly one is listed
   - id: tasks
     describe: "how your running and blocked tasks are going"
     when: [[task, tasks, run, runs, going, progress, world, worlds]]
@@ -184,6 +192,17 @@ answer:
     tasks: "Tasks in progress: $n"
     waiting: "Waiting for you: $n"
     truncated: "+"
+  update: # FR-PA-10 (the confirm line of a proposed update); $label: the item's title; $day: its local date, YYYY-MM-DD
+    done: "Mark \"$label\" as done."
+    snooze: "Snooze \"$label\" until $day."
+  prepare: # FR-CAL-07 (intent `calendar_prepare`); $label: the entry, meeting or item title; $start, $end: HH:MM; $n: a count
+    header: "To prepare:"
+    entry: "$label at $start to $end"
+    entry_open: "$label at $start"
+    attendees: "Other attendees: $n"
+    meeting: "Meeting: $label"
+    item: "Action item: $label"
+    nothing: "Nothing else is linked to it."
   lines: # one claim per row, by plate reason. $label: the row title; $time: HH:MM in your time zone
     gate: "$label: waiting for your approval"
     consent: "$label: waiting for your consent"
@@ -208,6 +227,11 @@ declines:
   budget: "Today's assistant allowance is used up, so I can only answer common questions until tomorrow (UTC)."
   flagged: "I can't help with that question."
   failed: "I can't read your plate right now. Please try again in a moment."
+  which_item: "Which work item do you mean? Select it, or say its title."
+  which_day: "Which day do you mean? Say a day like tomorrow, monday, oct 12 or in 3 days."
+  update_refused: "I can't change that item. It may be done already, or not yours to change."
+  which_entry: "Which calendar entry do you mean? Say its start time, like the 3pm."
+  snooze_range: "I can only snooze until a day that is later than now and within the next 30 days."
 
 model: # the fallback (FR-PA-14, FR-PA-19); never asked when a rule matched
   role: assistant

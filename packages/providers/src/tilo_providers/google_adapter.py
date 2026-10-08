@@ -167,6 +167,11 @@ class GoogleModelProvider(ModelProvider):
         return "low" if level == "minimal" else level
 
     def _config(self, request: GenerateRequest) -> Any | None:
+        kwargs = self._config_kwargs(request)
+        return _genai_module("google.genai.types").GenerateContentConfig(**kwargs) if kwargs else None
+
+    def _config_kwargs(self, request: GenerateRequest) -> dict[str, Any]:
+        """The `GenerateContentConfig` fields for `request` ({} = no config); `schema_probe` edits a copy of these."""
         kwargs: dict[str, Any] = {}
         if request.system is not None:
             kwargs["system_instruction"] = request.system
@@ -180,15 +185,12 @@ class GoogleModelProvider(ModelProvider):
             kwargs["response_json_schema"] = self._schema_for_send(request.response_schema)  # not `response_schema`
         elif request.json_mode:
             kwargs["response_mime_type"] = "application/json"
-        if not kwargs and request.thinking_level is None:
-            return None
-        types_mod = _genai_module("google.genai.types")
         if request.thinking_level is not None and Capability.THINKING.value in self._profile.caps:
             # A profile without the capability (e.g. a fallback) would answer a thinking config with a 400: omit it.
-            kwargs["thinking_config"] = types_mod.ThinkingConfig(
+            kwargs["thinking_config"] = _genai_module("google.genai.types").ThinkingConfig(
                 thinking_level=self._thinking_for_send(request.thinking_level).upper()
             )
-        return types_mod.GenerateContentConfig(**kwargs) if kwargs else None
+        return kwargs
 
     def _map_error(self, error: Exception) -> Exception:
         errors_mod = _genai_module("google.genai.errors")
@@ -237,12 +239,13 @@ class GoogleModelProvider(ModelProvider):
             # The reply hit its output cap (thinking tokens count against it): empty or cut off, never a reply.
             # Vertex leaves a visible-output count out when it is 0 (so 0 with usage present, None with no usage); a
             # missing thinking count stays None: the model did not report one.
-            output = thoughts = None
+            output = thoughts = prompt = None
             if usage_metadata is not None:
                 output = getattr(usage_metadata, "candidates_token_count", None) or 0
                 thoughts = getattr(usage_metadata, "thoughts_token_count", None)
+                prompt = getattr(usage_metadata, "prompt_token_count", None)  # billed too (FR-MTR-01)
             raise OutputTruncatedError(
-                truncated_message(output, thoughts), output_tokens=output, thinking_tokens=thoughts
+                truncated_message(output, thoughts), output_tokens=output, thinking_tokens=thoughts, input_tokens=prompt
             )
 
         tool_calls: list[dict[str, Any]] | None = None

@@ -83,7 +83,7 @@ for (const [name, viewport] of Object.entries(SIZES)) {
       ).toBeVisible();
       await page.locator("[data-slot]").first().click();
       await expect(page.getByRole("status")).toContainText(
-        "Booked Thu 16:00. Invites sent from Google Calendar",
+        "Booked Thu 16:00 on your Agenda. Invites go out from Google Calendar once it's connected and you approve",
       );
       await expect(page.locator('[data-pin="tg"]')).toContainText("K1 gate review booked");
       await expect(page.locator("[data-slot]")).toHaveCount(0);

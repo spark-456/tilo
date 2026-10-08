@@ -30,6 +30,7 @@ from tilo_planning.gaps import (
 from tilo_planning.refusal import RefusalCategory, RefusalPolicy, TaskRefused, load_refusal_policy
 
 DIRECTOR_ROLE = "director"
+BRIEF_THINKING = "low"  # extraction is reading, not planning: the model's default (dynamic, high) is billed as output
 CHIP_FIELDS = ("goal", "deliverables", "audience", "deadline", "constraints", "sources", "sensitivity")
 
 
@@ -91,7 +92,19 @@ def output_schema() -> dict[str, Any]:
     # length, count and duplicate check is code (`_gaps`, `clean_part`), on the one call. The empty-deliverables
     # minimum is relaxed here only (brief.schema.json is unchanged): code turns "no deliverable" into NothingPossible
     # or an error.
-    schema["properties"]["out_of_scope"] = {}
+    # The wire shape (`x-wire-schema`, read only by the provider's sanitizer; Vertex refuses an untyped property with
+    # 400, PL-02 probe 8 Oct 2026) is what `_gaps` accepts: a list of {category, part}. The router's validator ignores
+    # the keyword, so the schema it checks stays unconstrained.
+    schema["properties"]["out_of_scope"] = {
+        "x-wire-schema": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {"category": {"type": "string"}, "part": {"type": "string"}},
+                "required": ["category", "part"],
+            },
+        }
+    }
     del schema["properties"]["deliverables"]["minItems"]
     return schema
 
@@ -136,6 +149,29 @@ def _gaps(value: Any, refusal: RefusalPolicy, policy: GapPolicy) -> tuple[Gap, .
     return tuple(found.values())
 
 
+def brief_request(
+    task_text: str, *, refusal_policy: RefusalPolicy | None = None, gap_policy: GapPolicy | None = None
+) -> GenerateRequest:
+    """The Director's brief request as `extract_brief` sends it to the router; `just vertex-probe-schema` replays it
+    (PL-02), so the probe cannot drift from the real request."""
+    policy = load_refusal_policy() if refusal_policy is None else refusal_policy
+    gap_config = load_gap_policy() if gap_policy is None else gap_policy
+    if any(policy.get(c.id) for c in gap_config.categories):
+        raise GapConfigError("a gap category id is also a refusal id")
+    variables = {
+        "categories": _refusal_menu(policy),
+        "gaps": "\n".join(f"- {c.id}: {c.reason}" for c in gap_config.categories),
+        "services": ", ".join(gap_config.services) or "no other service",
+    }
+    return GenerateRequest(
+        system=load_prompt(DIRECTOR_ROLE, "brief_system.md", variables),
+        prompt=load_prompt(DIRECTOR_ROLE, "brief_task.md", {"task": neutralise_marker(task_text, "TASK")}),
+        json_mode=True,
+        response_schema=output_schema(),
+        thinking_level=BRIEF_THINKING,
+    )
+
+
 def extract_brief(
     task_text: str,
     *,
@@ -149,19 +185,7 @@ def extract_brief(
     Tilo cannot do come back as `gaps` (FR-INT-15); a task with no possible part raises `NothingPossible`."""
     policy = load_refusal_policy() if refusal_policy is None else refusal_policy
     gap_config = load_gap_policy() if gap_policy is None else gap_policy
-    if any(policy.get(c.id) for c in gap_config.categories):
-        raise GapConfigError("a gap category id is also a refusal id")
-    variables = {
-        "categories": _refusal_menu(policy),
-        "gaps": "\n".join(f"- {c.id}: {c.reason}" for c in gap_config.categories),
-        "services": ", ".join(gap_config.services) or "no other service",
-    }
-    request = GenerateRequest(
-        system=load_prompt(DIRECTOR_ROLE, "brief_system.md", variables),
-        prompt=load_prompt(DIRECTOR_ROLE, "brief_task.md", {"task": neutralise_marker(task_text, "TASK")}),
-        json_mode=True,
-        response_schema=output_schema(),
-    )
+    request = brief_request(task_text, refusal_policy=policy, gap_policy=gap_config)
     try:
         run = router.generate(DIRECTOR_ROLE, request, budget=budget, required_capability=Capability.JSON)
     except RouterError as error:

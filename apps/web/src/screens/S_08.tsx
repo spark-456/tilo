@@ -10,6 +10,13 @@ import { Loaded } from "./FlowShell";
 import { Page, Section, nameOf, useFixtureRun } from "./kit";
 import { useRemote } from "./remote";
 
+/** SEC-15 / SIGNIN (BQ-SIGNIN-1): the consent screen is In production without Google's review of the restricted Gmail
+ * scopes, so Google shows an unverified-app warning before the Gmail grant. Said here first, in these words (also in
+ * services/api/tests/API_SIGNIN.md). Not shown for a connector Google does not flag. */
+const UNVERIFIED_NOTE =
+  "Google will show a warning that this app is not verified, because Google has not finished reviewing Tilo's access to Gmail. Tilo asks only for the access listed above. To continue, choose Advanced on Google's page, then continue to Tilo.";
+const GOOGLE_FLAGS = new Set(["gmail"]);
+
 const cardIdOf = (e: Event): string => (e.data as ConnectionRequestedData).card_id;
 const connectorOf = (e: Event): string => (e.data as ConnectionRequestedData).connector;
 
@@ -95,6 +102,11 @@ function Sheet({ request, card }: { request: Event; card: Card | null }) {
           </dd>
         </div>
       </dl>
+      {GOOGLE_FLAGS.has(connectorOf(request)) && (
+        <p className="empty-note" data-testid="consent-unverified-note">
+          {UNVERIFIED_NOTE}
+        </p>
+      )}
       {card ? (
         <div className="need-bar">
           <div className="need-actions">

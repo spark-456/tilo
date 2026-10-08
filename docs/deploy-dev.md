@@ -69,7 +69,9 @@ user-approved step, never from this workflow or recipe).
 
 Cloud Build and the workflow only swap the image (pinned by digest) and passes `--min-instances 0` and
 `--max-instances 2..3` on an existing service. It never sets ingress, IAM, env vars or secrets;
-Terraform owns those and ignores image changes (`infra/modules/service`).
+Terraform owns those and ignores image changes (`infra/modules/service`). Env vars are Terraform's for every service
+except `tilo-api`: that one has `ignore_env = true`, so its `TILO_*` runtime settings are set by hand with
+`gcloud run services update` (`docs/routines-rollout.md`) and a Terraform run leaves them alone.
 
 ## Alternative: GitHub Actions workflow (one-time setup)
 
@@ -278,7 +280,8 @@ The web client (the main app and the Park pages) sends `X-Firebase-AppCheck` on 
 **Owner step, before the first `just deploy-web` that bakes the key in.** The browser `apiKey` is written into the
 public JavaScript bundle, and this project also uses Gemini Developer API keys, so the key is only harmless if it
 is restricted. In the Google Cloud console (APIs and Services, Credentials) open the Firebase web key and
-(a) set the API restriction to the Firebase App Check API only; (b) set website restrictions to the referrers
+(a) set the API restriction to exactly three APIs: Firebase App Check API, Identity Toolkit API and Token Service API
+(the last two are what Google sign-in calls; `infra/ACCESS.md` section 11); (b) set website restrictions to the referrers
 `https://essential-wares-510320-f0.web.app/*` and `https://essential-wares-510320-f0.firebaseapp.com/*`;
 (c) confirm it cannot call `generativelanguage.googleapis.com` or any other paid API. Then run
 `TILO_BAKE_FIREBASE_KEY=1 just deploy-web` (in PowerShell: `$env:TILO_BAKE_FIREBASE_KEY = "1"` first).

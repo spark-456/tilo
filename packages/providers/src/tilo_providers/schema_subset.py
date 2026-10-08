@@ -31,18 +31,65 @@ ALLOWED_KEYWORDS = frozenset(
         "items",
         "enum",
         "anyOf",
-        "title",
         "description",
-        "minItems",
-        "maxItems",
-        "minimum",
-        "maximum",
         "format",
         "propertyOrdering",
         "nullable",
     }
 )
+WIRE_SCHEMA_KEY = "x-wire-schema"  # a node's typed shape for the wire only; the caller's validator ignores the keyword
+_TYPING_KEYWORDS = frozenset({"type", "anyOf", "enum", "$ref", "properties", "items"})
 _REF_KEYWORDS = frozenset({"$ref", "$defs"})  # only a recursive definition keeps them
+
+
+def _untyped(node: Any) -> bool:
+    """A schema that says nothing about its type (`{}`, or only a title or description). Vertex answers an untyped
+    property with 400 "Request contains an invalid argument" (the live probe, 8 Oct 2026: director_schema_no_empty was
+    accepted, director_exact rejected). The sanitizer never sends one: an optional property that is untyped is dropped
+    (the caller validates the reply against its own full schema), an array item or anyOf branch becomes a string."""
+    return isinstance(node, dict) and not (_TYPING_KEYWORDS & node.keys())
+
+
+def _typed(node: Any) -> Any:
+    return {**node, "type": "string"} if _untyped(node) else node
+
+
+def complexity(schema: Any) -> int:
+    """A proxy for Vertex's structured-output budget (the live probe, 8 Oct 2026: the Director schema was refused with
+    400 "invalid argument" and any ONE of three unrelated reductions made it pass, so the cause is a complexity limit,
+    not a keyword; Google publishes no number): one point per node, per property, per enum value, per anyOf branch and
+    per bound. Every real schema should sit well under what the Director sends today, so that margin is tested."""
+    if isinstance(schema, list):
+        return sum(complexity(item) for item in schema)
+    if not isinstance(schema, dict):
+        return 0
+    points = 1 + sum(1 for key in ("minItems", "maxItems", "minimum", "maximum", "pattern") if key in schema)
+    points += len(schema["enum"]) if isinstance(schema.get("enum"), list) else 0
+    for key, value in schema.items():
+        if key in ("properties", "$defs") and isinstance(value, dict):
+            points += len(value) + sum(complexity(sub) for sub in value.values())
+        elif key in ("items", "anyOf"):
+            points += complexity(value)
+    return points
+
+
+def untyped_schemas(schema: Any, path: str = "") -> list[str]:
+    """Every untyped node (as `path`) at any depth; [] means `schema` is safe to send."""
+    found: list[str] = [path or "."] if _untyped(schema) else []
+    if not isinstance(schema, dict):
+        return found
+    for key in ("properties", "$defs"):
+        if isinstance(schema.get(key), dict):
+            for name, sub in schema[key].items():
+                found += untyped_schemas(sub, f"{path}.{key}.{name}")
+    if isinstance(schema.get("anyOf"), list):
+        for index, sub in enumerate(schema["anyOf"]):
+            found += untyped_schemas(sub, f"{path}.anyOf[{index}]")
+    if "items" in schema:
+        found += untyped_schemas(schema["items"], f"{path}.items")
+    return found
+
+
 _FORMATS = frozenset({"date", "date-time", "time", "duration", "int32", "int64", "float", "double"})
 _DEFS_PREFIX = "#/$defs/"
 
@@ -98,22 +145,34 @@ class _Cleaner:
             if name in self.defs:
                 self.kept.add(name)
             return {"$ref": ref, **{k: v for k, v in node.items() if k in ("title", "description")}}
+        hint = node.get(WIRE_SCHEMA_KEY)
+        if isinstance(hint, dict):  # the caller's own typed shape for the wire; its validator keeps the loose schema
+            return self.clean(hint)
         node = self._normalise(node)
         out: dict[str, Any] = {}
         for key, value in node.items():
             if key not in ALLOWED_KEYWORDS:
                 continue
             if key == "properties" and isinstance(value, dict):
-                out[key] = {name: self.clean(sub) for name, sub in value.items()}  # names are not keywords
+                cleaned = {name: self.clean(sub) for name, sub in value.items()}  # names are not keywords
+                out[key] = {name: sub for name, sub in cleaned.items() if not _untyped(sub)}  # see _untyped
             elif key == "anyOf" and isinstance(value, list):
-                out[key] = [self.clean(branch) for branch in value]
+                out[key] = [_typed(self.clean(branch)) for branch in value]
             elif key == "items":
-                out[key] = self.clean(value)
+                out[key] = _typed(self.clean(value))
             elif key == "format":
                 if value in _FORMATS:
                     out[key] = value
             else:
                 out[key] = value
+        if isinstance(out.get("required"), list) and isinstance(out.get("properties"), dict):
+            out["required"] = [name for name in out["required"] if name in out["properties"]]
+        branches = out.get("anyOf")
+        if isinstance(branches, list) and len(branches) == 2:
+            others = [b for b in branches if b != {"type": "null"}]
+            if len(others) == 1 and isinstance(others[0], dict) and others[0]:  # anyOf [X, null] -> X, nullable
+                del out["anyOf"]
+                out = {**others[0], "nullable": True, **out}
         return out
 
     @staticmethod

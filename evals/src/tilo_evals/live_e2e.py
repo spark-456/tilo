@@ -35,12 +35,14 @@ from typing import Any, Literal
 
 from fastapi import FastAPI, Request
 from tilo_harness.outputs import UnitOutput
+from tilo_harness.unit_prompt import request_variables
+from tilo_harness.untrusted import neutralise as neutralise_text
 from tilo_providers.config import ProviderConfigError, ProvidersConfig, load_providers_config, resolve_models_path
-from tilo_providers.errors import ProviderError, QuotaError, RequestError
+from tilo_providers.errors import OutputTruncatedError, ProviderError, QuotaError, RequestError
 from tilo_providers.interfaces import Capability, GenerateRequest, GenerateResponse, ModelProvider, SafetyProvider
-from tilo_providers.prompts import load_prompt, neutralise_marker
+from tilo_providers.prompts import load_prompt
 from tilo_providers.replay import RecordReplayProvider, ReplayMissError, recording_key, redact_strings
-from tilo_providers.router import BudgetExceededError, Router
+from tilo_providers.router import BudgetExceededError, Router, RouterError
 from tilo_providers.safety import FakeSafetyProvider
 from tilo_providers.vertex_smoke import MAX_REASON_CHARS, classify, scrubbed_server_text
 
@@ -67,19 +69,30 @@ FAKED = (  # what a run never does for real, printed with every report (HR-1: sa
     "Verifier verdict: recorded in the unit's summary, not acted on",
     "must-ask judgement: a fixed 'nothing to ask' stand-in, no model call; the deterministic rules still ask",
 )
+NO_CONNECTION = "no Google connection is available to this run; nothing was sent"
+REAL_FAKED = (
+    "recipient and destination: the dev stand-in; connectors: real, read-only, not read by any unit yet; "
+    "nothing is written or sent"
+)
+REAL_WRITE_FAKED = (
+    "recipient and destination: the dev stand-in; connectors: real; a Gmail draft or Drive save (and a send only with "
+    "--allow-send) goes out only after you type yes at the terminal for that exact payload"
+)
 PLANNING_NOTE = "planning credits come from this meter: the planning events carry 0 (#327)"
 SCOPE_NOTE = "claim scope: structural pass rate (GEN-11), not output quality"
 
 _REPO = Path(__file__).resolve().parents[3]
 _OWNER = "u_live_e2e"
+_GOOGLE_IDS = ("gmail", "google_drive", "google_calendar")
 _UNIT_TIMEOUT_S = {"live": 600.0, "replay": 120.0}
 _OUT = {
-    "writer": 1024,
-    "specialist": 1024,
-    "verifier": 300,
-    "lead": 400,
-    "narrator": 600,
-}  # output caps of our own calls
+    "writer": 16384,
+    "specialist": 8192,
+    "verifier": 1024,
+    "lead": 2048,
+    "narrator": 2048,
+}  # output caps of our own calls; thinking tokens count against them, so a call that writes text states room for both
+_RETRY_OUT_MAX = 32768  # a reply cut at its cap is asked once more with twice the room, up to this
 _DEFAULT_OUT = 1024  # the Router's default when neither the request nor the role gives one (BQ-63)
 _DIRECTOR_OUT = 4096  # the Director's floor when its role sets no cap: thinking tokens count against it (BQ-LE2E-9)
 _PROMPT_TOKENS, _UNITS, _DIRECTOR_RETRIES, _MAX_BEATS = 1500, (3, 8), 3, 8  # estimate assumptions; Narrator beats
@@ -156,6 +169,7 @@ class LiveE2EReport:
     story_note: str | None = None  # why the Narrator left no Story, as a code only
     quoted_calls: int = 0  # calls charged at the pre-call quote because they returned no usage
     faked: tuple[str, ...] = FAKED
+    real_connectors: tuple[str, ...] = ()  # ids of the real read-only connectors the run used (CL-LIVE-1)
     work: list[tuple[str, str]] = field(default_factory=list)  # (unit title, text) of every unit that ran
 
     @property
@@ -179,6 +193,75 @@ def default_recordings_dir(case_id: str) -> Path:
 
 
 # --- the gate (EFF-01) ---------------------------------------------------------------------------------------------
+
+
+def real_faked(faked: tuple[str, ...], writes: bool = False) -> tuple[str, ...]:
+    """`faked` for a run on real connectors: the connectors are no longer recording mocks."""
+    note = REAL_WRITE_FAKED if writes else REAL_FAKED
+    return tuple(note if item.startswith("connectors and recipient") else item for item in faked)
+
+
+def write_mode(allow_writes: bool, allow_send: bool) -> str:
+    """The report word for what the real connectors may do (the flag combination is checked first)."""
+    return "real_write_gated_send" if allow_send else "real_write_gated" if allow_writes else "real_read_only"
+
+
+def check_write_flags(real_connectors: bool, allow_writes: bool, allow_send: bool) -> None:
+    if (allow_writes or allow_send) and not real_connectors:
+        raise LiveE2ERefused(
+            "allow_writes_needs_real_connectors", "--allow-writes and --allow-send need --real-connectors"
+        )
+    if allow_send and not allow_writes:
+        raise LiveE2ERefused("allow_send_needs_allow_writes", "--allow-send needs --allow-writes")
+
+
+def print_real_plan(allow_writes: bool = False, allow_send: bool = False) -> None:
+    """`--dry-run --real-connectors`: what a live run would ask Google for. Builds no client, broker or listener."""
+    from tilo_connectors.real import real_connector_plan, real_write_plan  # noqa: PLC0415
+    from tilo_connectors.real_writes import WriteFlags  # noqa: PLC0415
+    from tilo_connectors.registry import load_registry  # noqa: PLC0415
+
+    registry = load_registry(_REPO / "config" / "connectors.yaml")
+    if not allow_writes:
+        print("real-connectors: read_only (dry run: nothing built, nothing sent)")
+        for row in real_connector_plan(registry):
+            print(f"real-connector {row['connector']}: scopes={','.join(row['scopes'])} mode=read_only")
+        return
+    rows, writes = real_write_plan(registry, WriteFlags(allow_writes, allow_send))
+    print(f"real-writes: {write_mode(allow_writes, allow_send)[5:]} (dry run: nothing built, nothing sent)")
+    for row in rows:
+        print(f"real-connector {row['connector']}: scopes={','.join(row['scopes'])} mode={row['mode']}")
+    for connector, action in writes:
+        print(f"real-write {connector} {action}: typed terminal approval")
+
+
+def _real_adapters(
+    factory: Callable[[], dict[str, Any]] | None, allow_writes: bool = False, allow_send: bool = False
+) -> dict[str, Any]:
+    """The real connectors, built once the gate has passed and before any model call. Fail closed: a refusal or any
+    other failure stops the run (its words are never printed) and never falls back to the recording mocks. A write gate
+    must carry exactly this run's flags: a factory built with send is refused in a run without `--allow-send`."""
+    from tilo_connectors.real import (  # noqa: PLC0415
+        RealConnectorsRefused,
+        is_real_read_only,
+        is_real_write_gated,
+        write_gate_of,
+    )
+    from tilo_connectors.real_writes import WriteFlags  # noqa: PLC0415
+
+    if factory is None:  # the default (live transport and consent flow) is CL-LIVE-3's
+        raise LiveE2ERefused("real_connectors_no_token", NO_CONNECTION)
+    try:
+        adapters = factory()
+        if (is_real_write_gated if allow_writes else is_real_read_only)(adapters) and (
+            not allow_writes or getattr(write_gate_of(adapters), "flags", None) == WriteFlags(allow_writes, allow_send)
+        ):
+            return adapters
+    except RealConnectorsRefused as refusal:
+        raise LiveE2ERefused(f"real_connectors_{refusal.code}", str(refusal)) from None
+    except Exception:  # noqa: BLE001 - fixed text only: the error may hold a token
+        pass
+    raise LiveE2ERefused("real_connectors_failed", "the real connectors could not be built; nothing was sent")
 
 
 def _gate(mode: str, env: Mapping[str, str], max_credits: float | None) -> None:
@@ -285,6 +368,7 @@ class _Meter:
         )
         self.failure: tuple[str, BaseException] | None = None  # (role, error): the first call the Router gave up on
         self.quoted_calls = 0  # calls that returned no usage: charged at the pre-call quote, not at what was used
+        self.counters: dict[str, Callable[[str], int]] = {}  # profile -> the provider's own token count (FR-MTR-01)
         self.lock = threading.RLock()  # one model call at a time, so the cap is checked against what was really spent
 
     def cost(self, profile: str, tokens_in: int, tokens_out: int) -> float:
@@ -302,7 +386,18 @@ class _Meter:
         usage = response.usage or {}
         if isinstance(usage.get("input_tokens"), int) and isinstance(usage.get("output_tokens"), int):
             return usage["input_tokens"], usage["output_tokens"]
-        return len(f"{request.system or ''} {request.prompt}".split()), len((response.text or "").split())  # no usage
+        # no usage: the provider's own count of what was sent and what came back (never words where it can count)
+        return self.count(response.profile_id, _sent_text(request)), self.count(
+            response.profile_id, response.text or ""
+        )
+
+    def count(self, profile: str, text: str) -> int:
+        """FR-MTR-01: the provider's own token count of `text` (a count call, no generation), words if it has none."""
+        counter = self.counters.get(profile)
+        try:
+            return int(counter(text)) if counter is not None else len(text.split())
+        except Exception:  # noqa: BLE001 - metering never fails a run: the word count is the floor
+            return len(text.split())
 
     def add(self, role: str, request: GenerateRequest, response: GenerateResponse, latency_ms: float) -> None:
         tokens_in, tokens_out = self.tokens(response, request)
@@ -333,6 +428,28 @@ class _Meter:
             row.credits += self.cost(profile, tokens_in, quote_out)
             row.latency_ms += latency_ms
 
+    def add_truncated(
+        self, role: str, profile: str, request: GenerateRequest, error: OutputTruncatedError, latency_ms: float
+    ) -> None:
+        """FR-MTR-01: a reply cut at its cap was billed. Metered from the usage the error reports: input tokens from
+        it, output plus thinking tokens; a side it does not report is the provider's own count of the input, and for
+        the output the cap the call burned (a cut reply used all of it). Not a quote, so not in `quoted_calls`."""
+        reported = error.output_tokens is not None or error.thinking_tokens is not None
+        tokens_out = (
+            (error.output_tokens or 0) + (error.thinking_tokens or 0) if reported else request.max_output_tokens or 0
+        )
+        with self.lock:
+            tokens_in = (
+                error.input_tokens if isinstance(error.input_tokens, int) else self.count(profile, _sent_text(request))
+            )
+            key = (_stage(role, request), role, profile)
+            row = self.rows.setdefault(key, Row(*key))
+            row.calls += 1
+            row.tokens_in += tokens_in
+            row.tokens_out += tokens_out
+            row.credits += self.cost(profile, tokens_in, tokens_out)
+            row.latency_ms += latency_ms
+
     def stopped(self, kind: str, role: str, detail: str = "", stage: str = "") -> None:
         with self.lock:
             self.stop = self.stop or (kind, role, detail, stage)
@@ -340,6 +457,10 @@ class _Meter:
     def failed(self, role: str, error: BaseException) -> None:
         with self.lock:
             self.failure = self.failure or (role, error)
+
+
+def _sent_text(request: GenerateRequest) -> str:
+    return f"{request.system or ''} {request.prompt}"
 
 
 def _stage(role: str, request: GenerateRequest) -> str:
@@ -385,6 +506,8 @@ class _Metered(_Redacting):
     def __init__(self, inner: ModelProvider, role: str, profile: str, meter: _Meter) -> None:
         super().__init__(inner)
         self._role, self._profile, self._meter = role, profile, meter
+        own = getattr(inner, "provider_count_tokens", None)  # a replay or live wrapper offers the provider's own count
+        meter.counters[profile] = own if callable(own) else inner.count_tokens
 
     def generate(self, request: GenerateRequest) -> GenerateResponse:
         started = time.perf_counter()
@@ -396,9 +519,12 @@ class _Metered(_Redacting):
             raise
         except (RequestError, QuotaError):  # refused before any generation: never billed
             raise
+        except OutputTruncatedError as error:  # billed, and it reported its usage (FR-MTR-01)
+            self._meter.add_truncated(self._role, self._profile, request, error, (time.perf_counter() - started) * 1000)
+            raise
         except Exception:
             # Anything else may have been billed after it was sent (a blocked candidate, a timeout): count it.
-            tokens_in = len(f"{request.system or ''} {request.prompt}".split())
+            tokens_in = self._meter.count(self._profile, _sent_text(request))
             elapsed = (time.perf_counter() - started) * 1000
             self._meter.add_unreturned(self._role, self._profile, request, tokens_in, elapsed)
             raise
@@ -588,7 +714,15 @@ class _UnitRunner:
 
     def _ask(self, role: str, prompt: str) -> tuple[str, float]:
         request = GenerateRequest(prompt=prompt, max_output_tokens=_OUT.get(role), thinking_level="minimal")
-        response = self._router.generate(role, request).response
+        try:
+            response = self._router.generate(role, request).response
+        except RouterError as exc:
+            if not isinstance(exc.__cause__, OutputTruncatedError) or not request.max_output_tokens:
+                raise
+            request = request.model_copy(
+                update={"max_output_tokens": min(request.max_output_tokens * 2, _RETRY_OUT_MAX)}
+            )
+            response = self._router.generate(role, request).response  # a second cut is the failure: no third try
         text = ((response.text if response else None) or "").strip()
         if not response or not text:
             raise ProviderError("the model returned no text")
@@ -596,11 +730,7 @@ class _UnitRunner:
         return text, self._meter.cost(response.profile_id, tokens_in, tokens_out)
 
     def _request(self) -> dict[str, str]:
-        brief = self._brief
-        return {
-            "goal": _safe(str(brief.get("goal") or "")), "audience": _safe(str(brief.get("audience") or "not stated")),
-            "constraints": _safe("; ".join(map(str, brief.get("constraints") or [])) or "none"),
-        }  # fmt: skip
+        return request_variables(self._brief)  # capped, one-line, marker-safe (UNIT-PROMPT); no intake answers here
 
     async def run(self, unit: Any, context: Any) -> Any:
         from tilo_api.runs import MeteredOutcome  # noqa: PLC0415
@@ -632,11 +762,9 @@ class _UnitRunner:
         return MeteredOutcome(success=True, summary=summary, outputs=(item,), credits=credits)
 
 
-def _safe(text: str) -> str:
-    """Model-written or user text goes into a prompt as data: none of our block markers can be closed from inside."""
-    for marker in ("REQUEST", "EARLIER", "WORK", "BEATS"):
-        text = neutralise_marker(text, marker)
-    return text
+def _safe(text: str, limit: int = 20_000) -> str:
+    """Model-written or user text goes into a prompt as data: the harness rule (BQ-232) leaves no marker to close."""
+    return neutralise_text(text, limit=limit)
 
 
 class _ClearModel:
@@ -647,7 +775,9 @@ class _ClearModel:
         return GenerateResponse(text='{"ask": false}', profile_id="live-e2e-clear")
 
 
-def _app(router: _MeteredRouter, safety: SafetyProvider, runner: _UnitRunner) -> FastAPI:
+def _app(
+    router: _MeteredRouter, safety: SafetyProvider, runner: _UnitRunner, connectors: dict[str, Any] | None = None
+) -> FastAPI:
     from tilo_api import deps, dev_run, runs  # noqa: PLC0415
     from tilo_api.cards import build_router  # noqa: PLC0415
     from tilo_api.dispatch import router as dispatch_router  # noqa: PLC0415
@@ -663,7 +793,8 @@ def _app(router: _MeteredRouter, safety: SafetyProvider, runner: _UnitRunner) ->
     for api_router in (intake_router, dispatch_router, redaction_router, tasks_router, runs.router):
         app.include_router(api_router)
     app.include_router(build_router(runs.get_card_store, answer_guard=runs.answer_guard))
-    adapters, writer = dev_run.mock_adapters(), _Writer(store)  # recording mocks: no real mailbox, chat or Drive
+    adapters = dev_run.mock_adapters() if connectors is None else connectors  # mocks: no real mailbox, chat or Drive
+    writer = _Writer(store)
 
     def compiler() -> Any:
         def compile_and_capture(*, brief: dict, approach: dict, budget_cap: float, context: Any) -> dict:
@@ -682,15 +813,14 @@ def _app(router: _MeteredRouter, safety: SafetyProvider, runner: _UnitRunner) ->
     def principal(request: Request) -> Any:
         return deps.Principal(user_id=_OWNER, role="owner", world_id=request.path_params.get("world_id"))
 
-    app.dependency_overrides.update(
-        {
-            deps.get_current_principal: principal, deps.get_store: lambda: store, deps.get_event_writer: lambda: writer,
-            deps.get_router: lambda: router, deps.get_safety: lambda: safety, deps.get_plan_compiler: compiler,
-            deps.get_unit_runner: lambda: runner, deps.get_action_resolver: lambda: resolve,
-            deps.get_connector_adapters: lambda: adapters, deps.get_must_ask_providers: must_ask_providers,
-            **e2e_stand_ins.overrides(),  # the artifact store, redactor and raw archive the run needs (ADR-0018 T4)
-        }
-    )  # fmt: skip
+    overrides: dict[Callable[..., Any], Callable[..., Any]] = {
+        deps.get_current_principal: principal, deps.get_store: lambda: store, deps.get_event_writer: lambda: writer,
+        deps.get_router: lambda: router, deps.get_safety: lambda: safety, deps.get_plan_compiler: compiler,
+        deps.get_unit_runner: lambda: runner, deps.get_action_resolver: lambda: resolve,
+        deps.get_connector_adapters: lambda: adapters, deps.get_must_ask_providers: must_ask_providers,
+        **e2e_stand_ins.overrides(),  # the artifact store, redactor and raw archive the run needs (ADR-0018 T4)
+    }  # fmt: skip
+    app.dependency_overrides.update(overrides)
     return app
 
 
@@ -823,6 +953,7 @@ def _mark_recordings(recordings: Path, *, synthetic: bool) -> None:
 def _execute(
     case: BankCase, router: _MeteredRouter, meter: _Meter, screen: SafetyProvider, env: Mapping[str, str],
     *, live: bool, cap: float, narrate: bool = True, person: Any = None, runner: _UnitRunner | None = None,
+    connectors: dict[str, Any] | None = None,
 ) -> tuple[Observation, str, str | None, list[StoryLine], str | None]:  # fmt: skip
     """One case through the real pipeline on `router`: (observation, outcome class, reason, Story, why no Story).
     The generator calls it once per brief on its own router, so the whole run shares one meter and one cap."""
@@ -830,12 +961,21 @@ def _execute(
     obs = Observation(case=dataclasses.replace(case, approve=approve))
     story: list[StoryLine] = []
     note: str | None = None
-    app = _app(router, screen, runner or _UnitRunner(router, meter))
+    app = _app(router, screen, runner or _UnitRunner(router, meter), connectors)
+    if connectors is not None:  # CL-LIVE-2: write-gated connectors get this run's store, redactor and person
+        from .live_writes import bind_writes  # noqa: PLC0415
+
+        bind_writes(connectors, app, person, owner=_OWNER)
     with _quiet():
         try:
             drive(obs.case, obs, _UNIT_TIMEOUT_S["live" if live else "replay"], app, person)
         except Exception as error:  # noqa: BLE001 - a crash is an observation; the error's text is never kept
             obs.crash = type(error).__name__
+        finally:
+            if connectors is not None:  # an approval nobody used does not outlive the run
+                from .live_writes import release_writes  # noqa: PLC0415
+
+                release_writes(connectors)
         if narrate and obs.events and not meter.stop:
             story, note = _story(router, obs.events, env)
     outcome, reason = _classify(obs, meter, screen, env)
@@ -858,14 +998,28 @@ def run_live_e2e(
     fake_record: bool = False,  # only `record_with_fake` sets this; the command line has no way to
     adhoc: BankCase | None = None,  # `just live-run`: an in-memory case for a typed topic, not a bank case
     person: Any = None,  # `just live-run`: a person answers in place of the case script (`live_topic.TerminalPerson`)
+    real_connectors: bool = False,  # CL-LIVE-1: real read-only Google connectors in place of the recording mocks
+    real_connectors_factory: Callable[[], dict[str, Any]] | None = None,  # the only way the run gets them
+    allow_writes: bool = False,  # CL-LIVE-2: Gmail drafts and Drive saves, each after a typed terminal approval
+    allow_send: bool = False,  # CL-LIVE-2: also Gmail send, the same gate
 ) -> LiveE2EReport:
     env: Mapping[str, str] = {} if fake_record else os.environ if environ is None else environ
     if fake_record and (live_provider_factory is None or mode != "live"):
         raise LiveE2ERefused("not_a_fake_provider", "the fake record path takes only an injected fake provider")
     _gate("dry-run" if fake_record else mode, env, max_credits)  # the fake path has no live decision to gate
+    check_write_flags(real_connectors, allow_writes, allow_send)
+    if allow_writes and mode == "live" and person is None:
+        raise LiveE2ERefused(
+            "allow_writes_needs_a_person", "real writes need a person at a terminal; this run has none"
+        )
+    if real_connectors and mode == "replay":
+        raise LiveE2ERefused("real_connectors_not_live", "--real-connectors needs a live run, not a replay")
+    if real_connectors and fake_record:
+        raise LiveE2ERefused("real_connectors_fake_providers", "--real-connectors never goes with a fake provider")
     config = _load_config(models_path, prices_path, env)
     case = adhoc or _load_case(case_id, bank_dir)
     live = mode == "live"
+    connectors = _real_adapters(real_connectors_factory, allow_writes, allow_send) if real_connectors and live else None
     factory = (live_provider_factory or _vertex(config)) if live else None
     refused: list[LiveE2ERefused] = []
     if fake_record and factory is not None:
@@ -886,6 +1040,10 @@ def run_live_e2e(
     screen = safety or TrustedBankInputScreen(case)
     report = LiveE2EReport(case.id, mode, max_credits, estimate, expected=case.expect.get("outcome"))
     report.safety = SAFETY_NOTE if isinstance(screen, TrustedBankInputScreen) else f"injected ({type(screen).__name__})"
+    if connectors is not None:
+        ids = tuple(i for i in connectors if i in _GOOGLE_IDS)
+        report.side_effects, report.real_connectors = write_mode(allow_writes, allow_send), ids
+        report.faked = real_faked(FAKED, allow_writes)
     if mode == "dry-run":
         return report
     meter = _Meter(config, max_credits)
@@ -896,7 +1054,16 @@ def run_live_e2e(
     router = _MeteredRouter(config, meter, providers)
     runner = _UnitRunner(router, meter)
     obs, report.outcome_class, report.reason, report.story_lines, report.story_note = _execute(
-        case, router, meter, screen, env, live=live, cap=max_credits, person=person, runner=runner
+        case,
+        router,
+        meter,
+        screen,
+        env,
+        live=live,
+        cap=max_credits,
+        person=person,
+        runner=runner,
+        connectors=connectors,
     )
     report.work = runner.work()
     if report.reason:  # a last line of defence: nothing printed names the project, an ADC path or a token
@@ -943,12 +1110,20 @@ def record_with_fake(
 # --- the command ---------------------------------------------------------------------------------------------------
 
 
+def add_write_flags(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("--allow-writes", action="store_true", help="with --real-connectors: Gmail drafts and Drive "
+                        "saves, each only after you type yes for that exact payload")  # fmt: skip
+    parser.add_argument("--allow-send", action="store_true", help="with --allow-writes: also Gmail send, same gate")
+
+
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="live_e2e", description=(__doc__ or "").split("\n\n")[0])
     parser.add_argument("--case", default="B-007", help="the bank case to run (default B-007)")
     parser.add_argument(
         "--max-credits", type=float, default=DEFAULT_MAX_CREDITS, help=f"cap, at most {HARD_MAX_CREDITS:g}"
     )
+    parser.add_argument("--real-connectors", action="store_true", help="real read-only Gmail, Drive and Calendar")
+    add_write_flags(parser)
     kind = parser.add_mutually_exclusive_group()
     kind.add_argument("--replay", action="store_true", help="serve the recordings; never goes live, free")
     kind.add_argument("--dry-run", action="store_true", help="print the estimate and stop; no call")
@@ -969,6 +1144,8 @@ def _print_report(report: LiveE2EReport) -> None:
     print(f"safety: {report.safety}")
     for item in report.faked:
         print(f"faked: {item}")
+    if report.real_connectors:
+        print(f"connectors: {report.side_effects} ({', '.join(report.real_connectors)})")
     if report.recordings == "synthetic":
         print("recordings: SYNTHETIC fixture written by a fake provider; this replay is not a real model run")
     elif report.recordings:
@@ -1008,6 +1185,7 @@ def main(
     environ: Mapping[str, str] | None = None,
     live_provider_factory: Callable[[str, str], ModelProvider] | None = None,
     safety: SafetyProvider | None = None,
+    real_connectors_factory: Callable[[], dict[str, Any]] | None = None,
 ) -> int:
     args = _parser().parse_args(argv)
     mode: Literal["live", "replay", "dry-run"] = "replay" if args.replay else "dry-run" if args.dry_run else "live"
@@ -1016,11 +1194,15 @@ def main(
             args.case, mode=mode, max_credits=args.max_credits, environ=environ, bank_dir=args.bank_dir,
             models_path=args.models_file, prices_path=args.prices_file, recordings_dir=args.recordings_dir,
             live_provider_factory=live_provider_factory, safety=safety, announce=announce,
+            real_connectors=args.real_connectors, real_connectors_factory=real_connectors_factory,
+            allow_writes=args.allow_writes, allow_send=args.allow_send,
         )  # fmt: skip
     except LiveE2ERefused as refusal:
         print(f"REFUSED {refusal.code}: {refusal}", file=sys.stderr)
         return 2
     if mode == "dry-run":
+        if args.real_connectors:
+            print_real_plan(args.allow_writes, args.allow_send)
         return 0
     _print_report(report)
     if args.report_json:

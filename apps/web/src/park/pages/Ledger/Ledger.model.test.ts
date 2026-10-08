@@ -1,7 +1,6 @@
 // WEB-7 Ledger model: the reference's arithmetic (Tilo App Ledger.dc.html renderVals) as pure functions.
 import { describe, expect, it } from "vitest";
-import { decisions } from "../../api/fixtures";
-import { ledger } from "../../api/fixtures/ledger";
+import { decisions, ledger } from "../../api/fixtures";
 import type { DecisionFacts } from "../../api/types";
 import { activityGroups, chartGeometry, dayFromX, donut, gbp, kpis, waitingAmount } from "./model";
 

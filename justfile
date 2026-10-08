@@ -114,7 +114,7 @@ conformance:
 vertex-smoke *args:
     uv run python packages/providers/scripts/live_vertex_smoke.py {{args}}
 
-# PL-02 schema probe: seven tiny Director-profile calls (no schema, json mode, sanitized/raw schema, thinking) to find what Vertex refuses. Refuses unless the user sets the live switch; `just vertex-probe-schema --dry-run` is free.
+# PL-02 schema probe: the exact Director brief request (small cap) and one variant per suspect field removed, then seven tiny Director-profile calls (no schema, json mode, sanitized/raw schema, thinking) to find what Vertex refuses. Refuses unless the user sets the live switch; `just vertex-probe-schema --dry-run` is free.
 vertex-probe-schema *args:
     uv run python packages/providers/scripts/live_vertex_probe_schema.py {{args}}
 
@@ -124,7 +124,8 @@ live-e2e *args:
 
 # PL-LIVE-E2E: one real end-to-end run on a typed topic, screened by the safety role (Model Armor) first. The topic is
 # typed at the prompt (`live-run`) or read from a file (`live-run-file <path>`): it never passes through a shell. Flags
-# only: --dry-run --auto-answer --auto-approve-t1t2 --max-credits N. Live switch as live-e2e. docs/live-e2e.md.
+# only: --dry-run --auto-answer --auto-approve-t1t2 --max-credits N --real-connectors (real read-only Gmail, Drive,
+# Calendar) --allow-writes (draft/save after a typed yes) --allow-send. Live switch as live-e2e. docs/live-e2e.md.
 live-run *flags:
     uv run python evals/scripts/live_run.py --topic-stdin {{ if flags =~ '^[-a-z0-9.= ]*$' { flags } else { error("live-run takes flags only; type the topic at the prompt or use live-run-file") } }}
 

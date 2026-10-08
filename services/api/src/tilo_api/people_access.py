@@ -78,7 +78,7 @@ def _meeting_id(kind: str, record: Mapping[str, Any]) -> str | None:
     return found if conforms("common.schema.json#/$defs/meeting_id", found) else None
 
 
-def _released_item(people: PeopleStores, org_id: str, entry: Mapping[str, Any]) -> Any:
+def released_item(people: PeopleStores, org_id: str, entry: Mapping[str, Any]) -> Any:
     source = _source(entry)
     ref = source.get("ref")
     if not (_tilo_made(entry) and source.get("kind") == "tilo" and isinstance(ref, str) and "#" in ref):
@@ -95,6 +95,47 @@ def _needs_source_owner(record: Mapping[str, Any]) -> bool:
     )
 
 
+def request_parts(
+    people: PeopleStores,
+    *,
+    actor: str,
+    org_id: str,
+    record_kind: str,
+    record_id: str,
+    now: str,
+    source_owners: SourceOwners,
+) -> dict[str, Any] | None:
+    """What an `AccessRequest` needs besides its action, loaded from the stores (the source meeting, the released
+    item, the outside owner); None for a missing or malformed record. May raise: callers turn that into a refusal."""
+    if not all(isinstance(v, str) for v in (actor, org_id, record_kind, record_id, now)):
+        return None
+    if record_kind not in _STORES or not conforms(f"common.schema.json#/$defs/{_ID_SCHEMAS[record_kind]}", record_id):
+        return None
+    actor, org_id, record_kind, record_id, now = (plain(v) for v in (actor, org_id, record_kind, record_id, now))
+    stored = getattr(people, _STORES[record_kind]).get(org_id, record_id)
+    if stored is None:
+        return None
+    record = plain(stored.record)
+    if record.get("id") != record_id:  # the oracle itself refuses a record of another org than the actor's
+        return None
+    meeting = None
+    meeting_id = _meeting_id(record_kind, record)
+    if meeting_id is not None:
+        found = people.meetings.get(org_id, meeting_id)
+        meeting = None if found is None else plain(found.record)
+    work_item = released_item(people, org_id, record) if record_kind == "calendar_entry" else None
+    owner = source_owners.owner_of(org_id, record_kind, record) if _needs_source_owner(record) else None
+    return {
+        "actor": actor,
+        "record_kind": record_kind,
+        "record": record,
+        "now": now,
+        "meeting": meeting,
+        "work_item": work_item,
+        "source_owner": plain(owner) if isinstance(owner, str) else None,
+    }
+
+
 def read_as(
     people: PeopleStores,
     directory: Any,
@@ -108,36 +149,15 @@ def read_as(
 ) -> dict[str, Any] | None:
     """The full view of one record of `org_id` for `actor`, or None (refused, missing, malformed or unreadable)."""
     try:
-        if not all(isinstance(v, str) for v in (actor, org_id, record_kind, record_id, now)):
-            return None
-        if record_kind not in _STORES or not conforms(
-            f"common.schema.json#/$defs/{_ID_SCHEMAS[record_kind]}", record_id
-        ):
-            return None
-        actor, org_id, record_kind, record_id, now = (plain(v) for v in (actor, org_id, record_kind, record_id, now))
-        stored = getattr(people, _STORES[record_kind]).get(org_id, record_id)
-        if stored is None:
-            return None
-        record = plain(stored.record)
-        if record.get("id") != record_id:  # the oracle itself refuses a record of another org than the actor's
-            return None
-        meeting = None
-        meeting_id = _meeting_id(record_kind, record)
-        if meeting_id is not None:
-            found = people.meetings.get(org_id, meeting_id)
-            meeting = None if found is None else plain(found.record)
-        work_item = _released_item(people, org_id, record) if record_kind == "calendar_entry" else None
-        owner = source_owners.owner_of(org_id, record_kind, record) if _needs_source_owner(record) else None
-        request = access.AccessRequest(
+        parts = request_parts(
+            people,
             actor=actor,
-            action="read_full",
+            org_id=org_id,
             record_kind=record_kind,
-            record=record,
+            record_id=record_id,
             now=now,
-            meeting=meeting,
-            work_item=work_item,
-            source_owner=plain(owner) if isinstance(owner, str) else None,
+            source_owners=source_owners,
         )
-        return access.read(request, directory)
+        return None if parts is None else access.read(access.AccessRequest(action="read_full", **parts), directory)
     except Exception:
         return None

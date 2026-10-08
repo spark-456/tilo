@@ -7,11 +7,12 @@ from __future__ import annotations
 import time
 
 import pytest
-from _chn11_lib import USER, autopilot_module, make_bench, pair, scripted_thread
+from _chn11_lib import EXTRA_NAMES, EXTRA_WORDS, USER, VOUCHED, autopilot_module, make_bench, pair, scripted_thread
 
 
-def signal(body: str) -> frozenset[str]:
-    return autopilot_module().t3_content_signal(body)
+def signal(body: str, names: frozenset[str] = VOUCHED) -> frozenset[str]:
+    # CHN-GATE-E: a name rides L2 only when the thread vouches for it; the bench thread vouches for VOUCHED.
+    return autopilot_module().t3_content_signal(body, names=names)
 
 
 def never_auto_sent(body: str) -> None:
@@ -25,9 +26,9 @@ def never_auto_sent(body: str) -> None:
     assert bench.outbox.entries == {}, "T3 is never scheduled without a person"
 
 
-def auto_sent(body: str) -> None:
+def auto_sent(body: str, names: tuple[str, ...] = EXTRA_NAMES) -> None:
     bench = make_bench("L2")
-    thread = scripted_thread(bench)
+    thread = scripted_thread(bench, names=names)
     card = bench.ap.preview(USER, *pair(thread, body))
     assert card.tier == "T2" and (card.level, card.undo_window_s) == ("L2", 60) and card.outbox_id is not None
 
@@ -90,7 +91,7 @@ def test_CHN_GATE_C_R1_FR_CHN_11_a_link_next_to_a_time_of_day_is_still_a_link(te
     ],
 )
 def test_CHN_GATE_C_R1_FR_CHN_11_names_after_greetings_and_sign_offs_still_ride_l2(body: str) -> None:
-    assert signal(body) == frozenset()
+    assert signal(body, VOUCHED | EXTRA_WORDS) == frozenset()
     auto_sent(body)
 
 

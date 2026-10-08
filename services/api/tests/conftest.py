@@ -239,6 +239,25 @@ def fs_backend(people_fs_client):
     return _ppl11c_fs_lib.Backend("firestore", people_fs_client)
 
 
+@pytest.fixture(scope="session")
+def pw1b_emulator_host():
+    """PROD-WIRE 1b: the Firestore emulator for the session (a `demo-` project only), as the harness tests do."""
+    from tilo_harness.emulator import running_emulator
+
+    with running_emulator() as host:
+        yield host
+
+
+@pytest.fixture(params=["memory", pytest.param("firestore", marks=pytest.mark.emulator)])
+def pw1b_rig(request):
+    """PROD-WIRE 1b: a `PwRig` (records backend, events store) in memory, and again on the emulator (`-m emulator`)."""
+    import _pw1b_lib
+
+    if request.param == "firestore":
+        request.getfixturevalue("pw1b_emulator_host")
+    return _pw1b_lib.make_rig(request.param)
+
+
 def pytest_collection_modifyitems(items):
     """PPL-11a: tests that need a slice B or C route are strict xfails until that slice lands (`SLICE_BC_PENDING`).
     PPL-11c: the same for each slice of the rest of the people API (`SLICE_PENDING`, API_PPL_11c.md section 0)."""
@@ -273,3 +292,14 @@ def pytest_collection_modifyitems(items):
                 continue
             if any(entry in item.nodeid for entry in FR_PA_08_PENDING):
                 item.add_marker(pytest.mark.xfail(strict=True, reason="FR-PA-08 slice pending"))
+    if any("test_FR_CAL_07a_" in item.nodeid for item in items):
+        # FR-CAL-07 part (a) (assistant panel: calendar today and prepare, API_FR_CAL_07a.md section 0): a file is a
+        # strict xfail until its builder deletes its entry from `SLICE_PENDING`; the guards file is never pending.
+        from _fr_cal_07a_lib import PENDING_EXEMPT as FR_CAL_07A_EXEMPT
+        from _fr_cal_07a_lib import SLICE_PENDING as FR_CAL_07A_PENDING
+
+        for item in items:
+            if any(entry in item.nodeid for entry in FR_CAL_07A_EXEMPT):
+                continue
+            if any(entry in item.nodeid for entry in FR_CAL_07A_PENDING):
+                item.add_marker(pytest.mark.xfail(strict=True, reason="FR-CAL-07a slice pending"))

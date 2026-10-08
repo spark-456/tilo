@@ -1,6 +1,6 @@
 # services/connectors — `tilo-connectors`
 ## Purpose
-Cloud Run service (PRD 6.2): OAuth token broker, Gmail, Drive and Calendar adapters (calendar read and sync: `calendar_sync.py`, `calendar_cache.py`), bot-hosted meeting (`meeting_host.py`, `adapters/meeting_host.py`), MCP client, outbox. Only it decrypts tokens.
+Cloud Run service (PRD 6.2): OAuth token broker, Gmail, Drive and Calendar adapters (calendar read and sync: `calendar_sync.py`, `calendar_cache.py`), bot-hosted meeting (`meeting_host.py`, `adapters/meeting_host.py`), MCP client, outbox, `real.py` (CL-LIVE-1: real read-only Gmail/Drive/Calendar for a local live run, guarded; API `tests/API_CL_LIVE_1.md`; CL-LIVE-2 `real_writes.py`: with `allow_writes` a draft/save/send executes only after a typed terminal `yes` for that exact payload, API `tests/API_CL_LIVE_2.md`). Only it decrypts tokens.
 
 ## Commands
 - `uv run pytest services/connectors/tests -q` — API pinned in `tests/API*.md`; `just check` is the full gate. Image: `Dockerfile` runs `tilo_connectors.app:app` (`/health` for Cloud Run smoke checks, `/healthz` for in-container probes; P0-07a, P0-07h).
