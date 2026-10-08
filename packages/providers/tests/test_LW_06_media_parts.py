@@ -12,6 +12,7 @@ import json
 import re
 import subprocess
 import sys
+import threading
 import time
 
 import pytest
@@ -22,11 +23,14 @@ from _lw06_media import (
     PNG,
     WAV,
     WEBM,
+    chunk,
     classic_pdf,
+    fmt_chunk,
     huge_xref_pdf,
     objstm_pdf,
     ogg,
     pdf,
+    riff,
     wav,
     whitespace_run_pdf,
 )
@@ -41,8 +45,8 @@ from tilo_providers.media import (
     MAX_PARTS,
     MAX_PDF_PAGES,
     MAX_TOTAL_BYTES,
-    PDF_TIMEOUT_SECONDS,
-    UNMEASURED_SECONDS,
+    UNMEASURED_AUDIO_SECONDS,
+    UNMEASURED_VIDEO_SECONDS,
     MediaPart,
     check_parts,
     estimate_tokens,
@@ -296,7 +300,8 @@ def test_LW_06_a_pcm_wav_is_measured_exactly_from_its_length_once_the_header_agr
     assert estimate_tokens([part("audio/wav", wav(0.5, rate=48000))], Tokens) == (25, 25), (
         "half a second is charged as a whole one"
     )
-    assert estimate_tokens([part("audio/wav", wav(1.0) + b"x" * 8000)], Tokens) == (50, 50), "trailing bytes count"
+    with_list = wav(1.0) + chunk(b"LIST", b"x" * 7000)
+    assert estimate_tokens([part("audio/wav", with_list)], Tokens) == (50, 50), "bytes of a trailing chunk count"
 
 
 @pytest.mark.parametrize(
@@ -314,7 +319,10 @@ def test_LW_06_a_pcm_wav_is_measured_exactly_from_its_length_once_the_header_agr
 )
 def test_LW_06_a_wav_whose_header_disagrees_with_the_file_is_not_measured_and_gets_the_worst_case(lying):
     assert wav_seconds(lying) is None
-    assert estimate_tokens([part("audio/wav", lying)], Tokens) == (UNMEASURED_SECONDS * 25, UNMEASURED_SECONDS * 25)
+    assert estimate_tokens([part("audio/wav", lying)], Tokens) == (
+        UNMEASURED_AUDIO_SECONDS * 25,
+        UNMEASURED_AUDIO_SECONDS * 25,
+    )
 
 
 @pytest.mark.parametrize(
@@ -331,7 +339,8 @@ def test_LW_06_a_wav_whose_header_disagrees_with_the_file_is_not_measured_and_ge
 )
 def test_LW_06_audio_and_video_that_is_not_a_measured_wav_is_assumed_to_last_the_worst_case(mime, build, per_second):
     tokens, audio = estimate_tokens([part(mime, build())], Tokens)
-    assert tokens == UNMEASURED_SECONDS * per_second, "whatever its size, a header or a caller says"
+    seconds = UNMEASURED_AUDIO_SECONDS if mime.startswith("audio/") else UNMEASURED_VIDEO_SECONDS
+    assert tokens == seconds * per_second, "whatever its size, a header or a caller says"
     assert audio == (tokens if mime.startswith("audio/") else 0)
 
 
@@ -357,7 +366,7 @@ def test_LW_06_a_hostile_pdf_is_refused_within_the_limit_not_after_burning_the_c
     started = time.monotonic()
     with pytest.raises(RequestError) as caught:
         MediaPart(mime_type="application/pdf", data=hostile)
-    assert time.monotonic() - started < PDF_TIMEOUT_SECONDS + 2, "refused inside the wall-clock limit"
+    assert time.monotonic() - started < 10, "refused inside the wall-clock limit, not after the CPU burn"
     assert "LW-06" in str(caught.value)
     no_leak(str(caught.value))
 
@@ -369,9 +378,11 @@ def test_LW_06_a_page_counter_still_running_at_the_wall_clock_limit_is_killed_an
     with pytest.raises(RequestError, match="took over 1 seconds"):
         pdf_pages(b"%PDF-1.4 a file nobody has counted before " + MARK)
     assert time.monotonic() - started < 10, "the sleeping child was killed, not waited for"
-    monkeypatch.setattr(media, "_child_command", lambda: pytest.fail("a refusal is cached by the file's sha256"))
-    with pytest.raises(RequestError, match="took over"):
+    calls: list[int] = []
+    monkeypatch.setattr(media, "_child_command", lambda: (calls.append(1), [sys.executable, "-I", "-c", "pass"])[1])
+    with pytest.raises(RequestError, match="cannot be read"):
         pdf_pages(b"%PDF-1.4 a file nobody has counted before " + MARK)
+    assert calls, "a timeout is not a verdict on the file: it is not cached, the next call tries again"
 
 
 def test_LW_06_a_child_that_prints_nonsense_or_fails_is_a_refusal(monkeypatch):
@@ -395,3 +406,69 @@ def test_LW_06_importing_the_provider_layer_loads_no_pdf_parser():
     code = "import sys, tilo_providers.interfaces, tilo_providers.media as m; print('pypdf' in sys.modules)"
     done = subprocess.run([sys.executable, "-I", "-c", code], capture_output=True, text=True, timeout=60, check=False)
     assert done.stdout.strip() == "False", done.stderr[-300:]
+
+
+# --- WAV ambiguity: a decoder and this code must not be able to read different durations from one file ---
+
+
+def _ten_seconds_of_8k() -> bytes:
+    return chunk(b"data", b"\x80" * 80_000)
+
+
+@pytest.mark.parametrize(
+    "ambiguous",
+    [
+        # ffmpeg reads the FIRST fmt chunk: 100 s at 8 kHz, but a last-one-wins reader would measure 0.13 s
+        lambda: riff(fmt_chunk(8000), fmt_chunk(192000, bits=16, channels=2), chunk(b"data", b"\x80" * 800_000)),
+        lambda: riff(fmt_chunk(), _ten_seconds_of_8k(), _ten_seconds_of_8k()),  # two data chunks
+        lambda: riff(_ten_seconds_of_8k(), fmt_chunk()),  # fmt after data
+        lambda: riff(fmt_chunk(), _ten_seconds_of_8k(), fmt_chunk(192000, bits=16, channels=2)),  # fmt after data
+        lambda: riff(fmt_chunk(), chunk(b"odd ", b"abc"), _ten_seconds_of_8k()),  # an odd-sized chunk before the data
+        lambda: riff(fmt_chunk(), _ten_seconds_of_8k()) + b"trailing junk!!",  # bytes that are no chunk
+    ],
+    ids=["two-fmt", "two-data", "fmt-after-data", "second-fmt-after-data", "odd-chunk", "junk-tail"],
+)
+def test_LW_06_a_wav_with_any_chunk_ambiguity_is_not_measured(ambiguous):
+    data = ambiguous()
+    assert wav_seconds(data) is None
+    assert estimate_tokens([part("audio/wav", data)], Tokens)[0] == UNMEASURED_AUDIO_SECONDS * 25
+
+
+def test_LW_06_an_unambiguous_wav_with_extra_chunks_is_still_measured():
+    data = riff(chunk(b"LIST", b"abcd"), fmt_chunk(), _ten_seconds_of_8k(), chunk(b"id3 ", b"tag!"))
+    assert wav_seconds(data) is not None and 10 <= wav_seconds(data) < 10.01
+
+
+# --- the page-counting child: concurrency limit and a watchdog that ends an orphan ---
+
+
+def test_LW_06_at_most_two_page_counting_children_run_at_once(monkeypatch):
+    monkeypatch.setattr(media, "_child_command", lambda: [sys.executable, "-I", "-c", "import time; time.sleep(1)"])
+    errors: list[Exception] = []
+
+    def count(n: int) -> None:
+        try:
+            pdf_pages(f"%PDF-1.4 concurrent {n}".encode())
+        except RequestError as error:
+            errors.append(error)
+
+    threads = [threading.Thread(target=count, args=(n,)) for n in range(4)]
+    started = time.monotonic()
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join(timeout=60)
+    assert len(errors) == 4, "the sleeping stand-in prints nothing, so every file is refused"
+    assert time.monotonic() - started >= 1.9, "four one-second children, two at a time, take at least two seconds"
+
+
+def test_LW_06_a_page_counting_child_ends_itself_if_nobody_waits_for_it():
+    code = (
+        "import time, tilo_providers._pdf_pages_child as c\n"
+        "c.WATCHDOG_SECONDS = 1.0\n"
+        "c.arm_watchdog()\n"
+        "time.sleep(60)\n"
+    )
+    started = time.monotonic()
+    done = subprocess.run([sys.executable, "-I", "-c", code], capture_output=True, timeout=45, check=False)
+    assert done.returncode == 1 and time.monotonic() - started < 30, "the watchdog exited the process, not the sleep"

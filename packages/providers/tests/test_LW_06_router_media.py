@@ -12,11 +12,11 @@ from typing import Any
 
 import pytest
 import yaml
-from _lw06_media import WEBM, classic_pdf, objstm_pdf, ogg, pdf, wav
+from _lw06_media import WEBM, chunk, classic_pdf, fmt_chunk, objstm_pdf, ogg, pdf, riff, wav
 from tilo_providers.config import ProviderConfigError, ProvidersConfig, load_providers_config
 from tilo_providers.errors import MissingCapabilityError, RequestError
 from tilo_providers.interfaces import Capability, GenerateRequest, GenerateResponse, ModelProvider, PriceQuote
-from tilo_providers.media import MediaPart
+from tilo_providers.media import UNMEASURED_AUDIO_SECONDS, MediaPart
 from tilo_providers.replay import recording_key
 from tilo_providers.router import (
     BudgetExceededError,
@@ -336,6 +336,27 @@ def test_LW_06_audio_that_is_not_a_measured_wav_is_assumed_to_last_an_hour_so_a_
     assert fleet.built["hearing"].requests == [], "nothing was sent"
 
 
+def test_LW_06_a_nine_and_a_half_hour_silent_flac_is_refused_under_the_directors_real_cap(tmp_path):
+    cap = 100_000  # config/models.yaml: the director role's max_input_tokens
+    config = make_config(tmp_path, {"cascade": ["hearing"], "max_input_tokens": cap})
+    object.__setattr__(config.profiles["hearing"].media_tokens, "audio_per_second", 25)  # the real figure
+    fleet = Fleet()
+    flac = b"fLaC" + bytes(68_000)  # about 68 kB for 9.5 hours of silence at 8 kHz
+    with pytest.raises(TokenCapExceededError):
+        Router(config, provider_for_profile=fleet).generate("reader", ask(part("audio/flac", flac)))
+    assert fleet.built["hearing"].requests == [], "nothing was sent"
+    assert UNMEASURED_AUDIO_SECONDS * 25 == 855_000, "the documented 9.5 hours, not 3,600 s"
+
+
+def test_LW_06_an_uncapped_role_is_priced_at_the_same_worst_case_before_the_call(tmp_path):
+    router, fleet = reader(tmp_path, cascade=["hearing"])
+    estimate = credits(3 + UNMEASURED_AUDIO_SECONDS * 10 + 3, 100, audio=UNMEASURED_AUDIO_SECONDS * 10)
+    flac = part("audio/flac", b"fLaC" + bytes(2000))
+    with pytest.raises(BudgetExceededError):
+        router.generate("reader", ask(flac), budget=estimate * 0.99)
+    router.generate("reader", ask(flac), budget=estimate * 1.01)
+
+
 def test_LW_06_a_one_frame_a_second_static_video_is_assumed_to_last_an_hour_and_refused(tmp_path):
     router, fleet = reader(tmp_path, cascade=["hearing"], max_input_tokens=100_000)  # an hour of video is 180,000
     with pytest.raises(TokenCapExceededError):
@@ -359,3 +380,11 @@ def test_LW_06_parts_are_snapshotted_so_a_list_changed_after_the_call_starts_cha
     assert request.parts is not None and result.request.parts is not request.parts
     request.parts.append(part("image/png"))
     assert len(fleet.built["plain"].requests[0].parts or []) == 1
+
+
+def test_LW_06_a_wav_with_two_fmt_chunks_is_not_measured_and_is_refused_under_a_small_cap(tmp_path):
+    router, fleet = reader(tmp_path, cascade=["hearing"], max_input_tokens=1500)
+    lying = riff(fmt_chunk(8000), fmt_chunk(192000, bits=16, channels=2), chunk(b"data", b"\x80" * 800_000))
+    with pytest.raises(TokenCapExceededError):  # 100 s at 8 kHz in the first fmt: a last-one-wins reader saw 0.13 s
+        router.generate("reader", ask(part("audio/wav", lying)))
+    assert fleet.built["hearing"].requests == []

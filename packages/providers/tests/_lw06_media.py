@@ -31,6 +31,21 @@ def wav(
 WAV = wav(1.0)
 
 
+def chunk(chunk_id: bytes, body: bytes) -> bytes:
+    """A RIFF chunk, padded to an even length."""
+    return chunk_id + struct.pack("<I", len(body)) + body + (b"\0" if len(body) & 1 else b"")
+
+
+def fmt_chunk(rate: int = 8000, bits: int = 8, channels: int = 1) -> bytes:
+    align = channels * bits // 8
+    return chunk(b"fmt ", struct.pack("<HHIIHH", 1, channels, rate, rate * align, align, bits))
+
+
+def riff(*chunks: bytes) -> bytes:
+    body = b"WAVE" + b"".join(chunks)
+    return b"RIFF" + struct.pack("<I", len(body)) + body
+
+
 def ogg(size: int = 0) -> bytes:
     return OGG_HEAD + b"OpusHead" + MARK + bytes(max(0, size - len(OGG_HEAD) - 8 - len(MARK)))
 

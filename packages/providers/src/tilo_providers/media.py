@@ -10,8 +10,9 @@ than coerces, and nothing here ever puts the bytes anywhere but the request itse
   and a decoded-size limit (`_pdf_pages_child`), never from a caller's number or a text scan; an unreadable, slow or
   oversize PDF, or one over MAX_PDF_PAGES, is refused;
 - the duration of audio and video is never taken from a caller or a header: a plain PCM WAV is measured exactly from its
-  length once its header agrees with the file, and everything else (no decoder is a dependency yet) is assumed to last
-  UNMEASURED_SECONDS, so a capped role refuses it (BQ-LW6-2);
+  length once its header agrees with the file and has no chunk ambiguity, and everything else (no decoder is a
+  dependency yet) is assumed to last the provider's documented maximum (UNMEASURED_AUDIO_SECONDS,
+  UNMEASURED_VIDEO_SECONDS), so a capped role refuses it (BQ-LW6-2);
 - `repr`, `model_dump` and validation errors leave the bytes out (`data` is excluded from the dump, which is what
   recordings are keyed on: the sha256, never the bytes), and no message below ever quotes content;
 - a GCS URI part is typed but refused until ADR-0018 T8 gives it a reader.
@@ -41,9 +42,14 @@ from tilo_providers.errors import RequestError
 MAX_PARTS = 10  # FR-INT-01: at most 10 files a unit
 MAX_PART_BYTES = 10 * 1024 * 1024
 MAX_TOTAL_BYTES = 14 * 1024 * 1024  # inline data rides base64 (x4/3) under Gemini's 20 MB request limit
-PDF_TIMEOUT_SECONDS = 3.0  # wall clock for counting one PDF's pages, child start-up included; then it is killed
+PDF_TIMEOUT_SECONDS = 5.0  # wall clock for counting one PDF's pages, child start-up included; then it is killed
+_PDF_CHILDREN = 2  # page-counting children running at once; the others wait their turn
 _PDF_CACHE_ENTRIES = 32  # keyed on the sha256, never the bytes; at least MAX_PARTS
-UNMEASURED_SECONDS = 3600  # what audio or video of unknown duration is assumed to last (config-free, BQ-LW6-2)
+# What audio or video of unknown duration is assumed to last (config-free, BQ-LW6-2). Audio: the longest the
+# provider documents for one file (Gemini audio understanding, 9.5 hours). Video: one hour, the length Gemini
+# documents for video with audio; the provider's tokens-per-second figures come from `media_tokens`.
+UNMEASURED_AUDIO_SECONDS = 34_200
+UNMEASURED_VIDEO_SECONDS = 3_600
 _WAV_RATES = range(8_000, 192_001)
 _SHA256_RE = re.compile(r"[0-9a-f]{64}")
 _GCS_URI_RE = re.compile(r"gs://[a-z0-9][a-z0-9._-]{1,220}/[^\s\x00-\x1f\x7f]{1,1000}")
@@ -118,46 +124,53 @@ def _child_command() -> list[str]:
 
 
 def _measure(data: bytes) -> tuple[str, int]:
-    """Runs the page counter in a child process: ("ok", pages), ("many", 0), ("bad", 0) or ("slow", 0) when it was
-    still running at PDF_TIMEOUT_SECONDS and was killed. The child gets the file on stdin and almost no environment."""
-    try:
-        done = subprocess.run(  # noqa: S603 -- our own module, a fixed command; the file never reaches argv
-            _child_command(),
-            input=data,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.DEVNULL,
-            timeout=PDF_TIMEOUT_SECONDS,
-            check=False,
-            env={"SYSTEMROOT": os.environ.get("SYSTEMROOT", "")} if sys.platform == "win32" else {},
-        )
-    except subprocess.TimeoutExpired:
-        return "slow", 0
-    except Exception:  # noqa: BLE001 -- no child could be run: refuse, never guess
-        return "bad", 0
+    """Runs the page counter in a child process: ("ok", pages), ("many", 0), ("bad", 0) for a file the child judged
+    unreadable, or ("slow", 0) / ("error", 0) when no verdict was reached (still running at PDF_TIMEOUT_SECONDS and
+    killed; could not start; died; printed nonsense). At most _PDF_CHILDREN run at once. The child gets the file on
+    stdin and almost no environment."""
+    with _pdf_children:
+        try:
+            done = subprocess.run(  # noqa: S603 -- our own module, a fixed command; the file never reaches argv
+                _child_command(),
+                input=data,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.DEVNULL,
+                timeout=PDF_TIMEOUT_SECONDS,
+                check=False,
+                env={"SYSTEMROOT": os.environ.get("SYSTEMROOT", "")} if sys.platform == "win32" else {},
+            )
+        except subprocess.TimeoutExpired:
+            return "slow", 0
+        except Exception:  # noqa: BLE001 -- no child could be run: refuse, never guess
+            return "error", 0
     fields = done.stdout.split()
-    if done.returncode == 0 and len(fields) == 2 and fields[0] in (b"ok", b"many") and fields[1].isdigit():
+    if done.returncode == 0 and len(fields) == 2 and fields[0] in (b"ok", b"many", b"bad") and fields[1].isdigit():
         return fields[0].decode(), int(fields[1])
-    return "bad", 0
+    return "error", 0
 
 
 _pdf_cache: OrderedDict[str, tuple[str, int]] = OrderedDict()
 _pdf_lock = threading.Lock()
+_pdf_children = threading.BoundedSemaphore(_PDF_CHILDREN)
+_CACHED_VERDICTS = frozenset({"ok", "many", "bad"})
 
 
 def pdf_pages(data: bytes) -> int:
     """The number of pages of a PDF, counted by walking its page tree (not its /Count, not a text scan) in a child
     process with a wall-clock limit and decoded-size limits, so a hostile file cannot burn the service's CPU or memory
     (`_pdf_pages_child`). Refuses an unreadable, encrypted, slow or oversize PDF, no pages, or more than MAX_PDF_PAGES.
-    Results (refusals too) are cached by the file's sha256, so a repeat costs nothing."""
+    A verdict on the file (ok, too many, unreadable) is cached by its sha256, so a repeat costs nothing; a timeout
+    or a failure to run is not a verdict on the file and is tried again next time."""
     key = hashlib.sha256(data).hexdigest()
     with _pdf_lock:
         result = _pdf_cache.get(key)
     if result is None:
         result = _measure(data)
-        with _pdf_lock:
-            _pdf_cache[key] = result
-            while len(_pdf_cache) > _PDF_CACHE_ENTRIES:
-                _pdf_cache.popitem(last=False)
+        if result[0] in _CACHED_VERDICTS:
+            with _pdf_lock:
+                _pdf_cache[key] = result
+                while len(_pdf_cache) > _PDF_CACHE_ENTRIES:
+                    _pdf_cache.popitem(last=False)
     status, pages = result
     if status == "ok":
         return pages
@@ -171,16 +184,20 @@ def pdf_pages(data: bytes) -> int:
 def wav_seconds(data: bytes) -> float | None:
     """The exact duration of a plain PCM WAV, or None (not measured). The header must agree with the file: PCM format,
     1 to 8 channels, 8 to 192 kHz, 8 to 32 bits, block align and byte rate consistent with them, and a data chunk that
-    does not claim more bytes than the file holds. The seconds are every byte after the data header over the byte rate
-    (the safe side if the file has trailing bytes)."""
+    does not claim more bytes than the file holds. Any ambiguity a decoder could resolve differently makes it None:
+    more than one fmt or data chunk, a fmt after the data, an odd-sized chunk before the data, a chunk running past
+    the end of the file, or trailing bytes that are no chunk. The seconds are every byte after the data header over
+    the byte rate (the safe side if chunks follow the data)."""
     if len(data) < 12 or data[:4] != b"RIFF" or data[8:12] != b"WAVE":
         return None
-    pos, byte_rate = 12, 0
+    pos, byte_rate, data_start = 12, 0, None
     while pos + 8 <= len(data):
         chunk, size = data[pos : pos + 4], int.from_bytes(data[pos + 4 : pos + 8], "little")
         body = pos + 8
+        if body + size > len(data):
+            return None
         if chunk == b"fmt ":
-            if size < 16 or body + 16 > len(data):
+            if byte_rate or data_start is not None or size < 16:
                 return None
             tag, channels, rate, byte_rate, align, bits = struct.unpack("<HHIIHH", data[body : body + 16])
             if tag != 1 or not 1 <= channels <= 8 or rate not in _WAV_RATES or bits not in (8, 16, 24, 32):
@@ -188,11 +205,15 @@ def wav_seconds(data: bytes) -> float | None:
             if align != channels * bits // 8 or byte_rate != rate * align:
                 return None
         elif chunk == b"data":
-            if byte_rate == 0 or size > len(data) - body:
+            if byte_rate == 0 or data_start is not None:
                 return None
-            return (len(data) - body) / byte_rate
+            data_start = body
+        elif size & 1 and data_start is None:
+            return None
         pos = body + size + (size & 1)
-    return None
+    if data_start is None or pos < len(data) - 1:
+        return None
+    return (len(data) - data_start) / byte_rate
 
 
 class MediaPart(BaseModel):
@@ -270,7 +291,8 @@ def provider_takes(provider: str, part: MediaPart) -> bool:
 def estimate_tokens(parts: Sequence[MediaPart] | None, media_tokens: Any) -> tuple[int, int]:
     """(tokens of every part, of which audio tokens): a bound from a profile's `media_tokens`, for EFF-03 and PL-03
     before sending (call `check_parts` first). Images cost `image`; a PDF `pdf_page` times its measured pages; a WAV
-    `audio_per_second` times its exact seconds; any other audio or video `*_per_second` times UNMEASURED_SECONDS.
+    `audio_per_second` times its exact seconds; any other audio (video) `*_per_second` times
+    UNMEASURED_AUDIO_SECONDS (UNMEASURED_VIDEO_SECONDS).
     Billing uses the reported usage, never this."""
     total = audio = 0
     for part in parts or ():
@@ -281,7 +303,8 @@ def estimate_tokens(parts: Sequence[MediaPart] | None, media_tokens: Any) -> tup
             tokens = pdf_pages(data) * media_tokens.pdf_page
         else:
             measured = wav_seconds(data) if part.mime_type == "audio/wav" else None
-            seconds = math.ceil(UNMEASURED_SECONDS if measured is None else measured)
+            worst = UNMEASURED_AUDIO_SECONDS if part.kind == "audio" else UNMEASURED_VIDEO_SECONDS
+            seconds = math.ceil(worst if measured is None else measured)
             tokens = seconds * (
                 media_tokens.audio_per_second if part.kind == "audio" else media_tokens.video_per_second
             )

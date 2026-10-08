@@ -10,11 +10,16 @@ from __future__ import annotations
 
 import io
 import logging
+import os
 import sys
+import threading
+from typing import Any
 
 MAX_PDF_PAGES = 100
 MAX_PDF_NODES = 4 * MAX_PDF_PAGES  # page-tree nodes visited, a shared or cyclic tree counts each visit
 DECODED_LIMIT = 1_000_000  # bytes any one stream may decode to; real object streams are far smaller
+WATCHDOG_SECONDS = 10.0  # the child ends itself after this, so an orphan (its parent died) cannot run for hours
+MEMORY_LIMIT_BYTES = 1 << 30  # address space of the child on POSIX; Windows has no setrlimit
 
 
 def count(data: bytes) -> tuple[str, int]:
@@ -63,7 +68,26 @@ def count(data: bytes) -> tuple[str, int]:
     return ("ok", pages) if pages >= 1 else ("bad", 0)
 
 
+def arm_watchdog() -> None:
+    """Ends this process hard (exit status 1) WATCHDOG_SECONDS from now, whatever the parser is doing."""
+    timer = threading.Timer(WATCHDOG_SECONDS, lambda: os._exit(1))
+    timer.daemon = True
+    timer.start()
+
+
+def limit_memory() -> None:
+    """RLIMIT_AS where the platform has it (POSIX); a failure to set it is not a reason to refuse every PDF."""
+    try:
+        resource: Any = __import__("resource")  # not available on Windows
+
+        resource.setrlimit(resource.RLIMIT_AS, (MEMORY_LIMIT_BYTES, MEMORY_LIMIT_BYTES))
+    except (ImportError, ValueError, OSError):
+        pass
+
+
 def main() -> None:
+    arm_watchdog()
+    limit_memory()
     status, pages = count(sys.stdin.buffer.read())
     sys.stdout.write(f"{status} {pages}\n")
 
