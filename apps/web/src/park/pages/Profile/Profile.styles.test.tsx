@@ -223,7 +223,7 @@ describe("WEB_12_profile_styles: profile form", () => {
     expect(d(cancel, "padding")).toBe("0 16px");
     expect(d(save, "padding")).toBe("0 18px");
     expect([bg(cancel), d(cancel, "border")]).toEqual(["var(--btn2)", "1px solid var(--line)"]);
-    expect(bg(save)).toBe("var(--hero)");
+    expect(bg(save)).toBe("var(--herofill)"); // BQ-DS-A11Y-1: the computed value is lower-cased
     const footer = save.parentElement as Element;
     expect([d(footer, "justify-content"), gaps(footer, rules())[1]]).toEqual(["flex-end", 8]);
     expect(d(footer, "border-top")).toBe("1px solid var(--line2)");
