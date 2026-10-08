@@ -27,14 +27,21 @@ _CUT_PARTIAL = 4200  # a window that ends mid-secret: drop this much of the mask
 # Every shape here needs a word in _HINT_WORDS (its lower-case marker), or the gate skips it on
 # text that holds nothing else; test_FR_CON_07_more_secret_shapes_are_masked is the canary.
 _FREE_SECRETS = re.compile(
-    r"\bBearer\s+[A-Za-z0-9._~+/=-]{8,}"
+    # No left word boundary on any shape: page text glues a label to the secret that follows (innerText joins
+    # neighbouring inline elements with no space), and `\b` then misses it (issue #720). A shape that could be
+    # prose when glued to a word needs a digit in its first characters (a bounded look-ahead, so it stays linear).
+    r"Bearer\s+[A-Za-z0-9._~+/=-]{8,}"
     # any case, but then the token must hold a digit or punctuation, so prose ("bearer instruments") stays
-    r"|\b(?i:bearer)\s+(?=[A-Za-z0-9._~+/=-]*[\d._~+/=-])[A-Za-z0-9._~+/=-]{8,}"
+    r"|(?i:bearer)\s+(?=[A-Za-z0-9._~+/=-]*[\d._~+/=-])[A-Za-z0-9._~+/=-]{8,}"
     r"|\b(?i:sk)-[A-Za-z0-9_-]{20,}"
-    r"|\bgh[pousr]_[A-Za-z0-9]{30,}"
+    r"|(?<=\w)(?i:sk)-(?=[A-Za-z0-9_-]{0,63}\d)[A-Za-z0-9_-]{20,}"
+    r"|gh[pousr]_[A-Za-z0-9]{30,}"
     r"|\b(?:AKIA|ASIA)[A-Z0-9]{16}\b"
+    r"|(?:AKIA|ASIA)(?=[A-Z0-9]{0,15}\d)[A-Z0-9]{16}"
     r"|(?<![A-Za-z0-9_-])eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+"
-    r"|\bya29\.[A-Za-z0-9_-]{20,}"
+    # glued after a word character: the header part is bounded, so a run of `eyJeyJ...` stays linear
+    r"|(?<=[A-Za-z0-9_-])eyJ[A-Za-z0-9_-]{1,256}\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+"
+    r"|ya29\.[A-Za-z0-9_-]{20,}"
 )
 # A quoted value runs to its closing quote, an escaped quote does not close it, and with no
 # closing quote it runs to the end of the line; any length is masked whole. Linear: each
@@ -42,7 +49,7 @@ _FREE_SECRETS = re.compile(
 _QUOTED = r"([\"'])((?:(?!\2)[^\\\n]|\\.)+)(\2?)"
 # The keyword is matched directly (no prefix scan), so a long word cannot make this quadratic.
 _KEY_VALUE = re.compile(
-    r"(?i)((?:password|passwd|pwd|secret|token|api[_-]?key|otp)[\"']?\s{0,8}[=:]\s{0,8})"
+    r"(?i)((?:password|passwd|pwd|secret|token|api[_-]?key|otp)[\"']?\s{0,8}[=:]\s*+)"
     rf"(?:{_QUOTED}|([^\s&\"']+))"
 )
 # `Authorization:` and `Cookie:` values run to the end of the line. Only a known scheme word, with a
@@ -50,7 +57,7 @@ _KEY_VALUE = re.compile(
 # The scheme is possessive, so an already masked value is left alone (idempotent).
 _SCHEMES = "basic|bearer|digest|token|negotiate|ntlm|hoba|mutual|vapid|dpop|aws4-hmac-sha256"
 _AUTH_HEADER = re.compile(
-    r"(?i)(\b(?:authorization|(?:set-)?cookie)[\"']?\s{0,8}[=:]\s{0,8}+)"
+    r"(?i)(\b(?:authorization|(?:set-)?cookie)[\"']?\s{0,8}[=:]\s*+)"
     rf"(?:{_QUOTED}|((?:(?:{_SCHEMES})[ \t]+(?=[A-Za-z0-9._~+/=\"'\[]))?+)(?!\[masked:)[^\r\n]+)"
 )
 # `scheme://userinfo@` anywhere in text (a path, a query, page copy): the userinfo, of any length and
@@ -144,6 +151,9 @@ def _mask(text: str) -> str:
         text = _AUTH_HEADER.sub(_auth, text)
     if words:
         text = _KEY_VALUE.sub(_kv, text)
+    if "://" in text:
+        # again: a userinfo that holds a secret (more than one space, say) is shorter once the passes above have run
+        text = _URL_USERINFO.sub(r"\1[masked:secret]@", text)
     if card:
         text = _mask_cards(text)
     if "@" in text:
