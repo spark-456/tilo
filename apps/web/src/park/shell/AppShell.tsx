@@ -4,6 +4,7 @@
 // the store and the Api. The notifications and the user come through the Api on mount, so a fixture Api
 // raises the "Sample data" chip without any page asking for data. The city's cars and walkers run on Home (cityMotion.ts).
 import { type ReactNode, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { NotBuilt } from "../api/liveApi";
 import type { Decision, Notification, User } from "../api/types";
 import type { PageId } from "../app/AppCtx";
 import { endSession, useApp, useExpectsSample, useParkApi, useParkStore } from "../app/context";
@@ -13,7 +14,7 @@ import "../tokens/fonts";
 import { AccountMenu } from "./AccountMenu";
 import { BootSplash } from "./BootSplash";
 import { CityBackdrop } from "./CityBackdrop";
-import { NotificationsPopover } from "./NotificationsPopover";
+import { type FeedStatus, NotificationsPopover } from "./NotificationsPopover";
 import { TopNav } from "./TopNav";
 import { WorldLoader } from "./WorldLoader";
 import { useAppearance } from "./cityMotion";
@@ -42,6 +43,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const route = useParkRoute();
   const state = useSyncExternalStore(store.subscribe, store.getState);
   const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [feed, setFeed] = useState<FeedStatus>("ready");
   const [decisions, setDecisions] = useState<Decision[]>([]);
   const [user, setUser] = useState<User | null>(null);
   const [connectorsOn, setConnectorsOn] = useState<number | null>(null);
@@ -61,7 +63,8 @@ export function AppShell({ children }: { children: ReactNode }) {
     api
       .getNotifications()
       .then((r) => live && setNotifications(r.data))
-      .catch(quiet);
+      // No notifications route yet (the live Api) or a failed read: the popover says so, never sample items (FR-UX-11)
+      .catch((e: unknown) => live && setFeed(e instanceof NotBuilt ? "not-built" : "error"));
     api
       .getDecisions()
       .then((r) => {
@@ -126,6 +129,8 @@ export function AppShell({ children }: { children: ReactNode }) {
     else store.go("connectors");
   };
   const toast = state.toast;
+  // The dot counts the decisions the Api served that are still open, never the sample count (HR-1..HR-7).
+  const waiting = decisions.some((d) => !state.dec[d.k]);
   return (
     <>
       <CityBackdrop
@@ -142,7 +147,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         needsLeft={app.needsLeft}
         night={appearance.night}
         menu={state.menu}
-        unread={!state.read && app.needsLeft > 0}
+        unread={!state.read && waiting}
         initials={user?.initials ?? ""}
         sample={state.sources.fixture}
         org={user?.org ?? null}
@@ -158,6 +163,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       {state.menu === "notif" ? (
         <NotificationsPopover
           notifications={notifications}
+          status={feed}
           decisions={decisions}
           dec={state.dec}
           onOpen={open}

@@ -508,6 +508,15 @@
   font-size: 13px;
   font-weight: 600;
 }
+[data-park] .park-shell__nempty {
+  display: block;
+  margin: 0;
+  padding: 18px 10px 22px;
+  color: var(--ink2);
+  font-size: 13.5px;
+  font-weight: 600;
+  text-align: center;
+}
 [data-park] .park-shell__ntime {
   align-self: flex-start;
   padding-top: 2px;

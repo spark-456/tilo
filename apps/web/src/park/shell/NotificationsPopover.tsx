@@ -13,8 +13,16 @@ const TILE_ICON: Record<Kind, string> = { needs: "flag", done: "check", warn: "p
 /** The title once its decision is approved: the decision's designed copy, else "You approved" (FR-UX-11). */
 const approvedTitle = (d: Decision | undefined): string => d?.approvedTitle || "You approved";
 
+/** Where the list came from: read, a service with no notifications route yet, or a read that failed. */
+export type FeedStatus = "ready" | "not-built" | "error";
+const EMPTY_LINE: Record<Exclude<FeedStatus, "ready">, string> = {
+  "not-built": "Not connected yet",
+  error: "Notifications could not load",
+};
+
 export interface NotificationsPopoverProps {
   notifications: readonly Notification[];
+  status?: FeedStatus;
   decisions: readonly Decision[];
   dec: Dec;
   onOpen: (n: Notification) => void;
@@ -24,6 +32,7 @@ export interface NotificationsPopoverProps {
 
 export function NotificationsPopover({
   notifications,
+  status = "ready",
   decisions,
   dec,
   onOpen,
@@ -38,6 +47,9 @@ export function NotificationsPopover({
           Settings
         </button>
       </div>
+      {status !== "ready" ? (
+        <output className="park-shell__nempty">{EMPTY_LINE[status]}</output>
+      ) : null}
       {notifications.map((n) => {
         const approved = n.dec !== undefined && dec[n.dec] === true;
         const kind: Kind = approved ? "done" : n.kind;
