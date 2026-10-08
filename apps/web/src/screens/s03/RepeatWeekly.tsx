@@ -44,7 +44,8 @@ export function useRepeatWeekly(): Repeat {
         <span>Repeat weekly</span>
       </label>
       {on && (
-        <div className="repeat-weekly-fields">
+        // biome-ignore lint/a11y/useSemanticElements: the named group preserves the existing flex row, without a fieldset border or legend (as SelectionBar).
+        <div className="repeat-weekly-fields" role="group" aria-label="Weekly cadence">
           <label htmlFor={`${id}-day`}>Day</label>
           <select
             id={`${id}-day`}
@@ -65,13 +66,16 @@ export function useRepeatWeekly(): Repeat {
             type="time"
             value={time}
             aria-invalid={parts === null}
+            aria-describedby={parts === null ? `${id}-time-hint` : undefined}
             onChange={(e) => setTime(e.target.value)}
           />
           <span className="repeat-weekly-tz">
             Time zone: <output data-testid="repeat-tz">{tz}</output>
           </span>
           {parts === null && (
-            <span className="repeat-weekly-hint">Enter a time such as 09:00.</span>
+            <span className="repeat-weekly-hint" id={`${id}-time-hint`}>
+              Enter a time such as 09:00.
+            </span>
           )}
         </div>
       )}

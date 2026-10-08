@@ -2,7 +2,7 @@
 // Lists GET /schedules, pauses and resumes (PATCH enabled) and deletes after an in-page
 // confirmation. Each change is shown only after the API answered (HR-1). A client without the
 // schedule routes (the fixture client) says so in words.
-import { useState } from "react";
+import { type KeyboardEvent, useLayoutEffect, useRef, useState } from "react";
 import { useClient } from "../../api/ClientProvider";
 import {
   type ScheduleView,
@@ -24,7 +24,48 @@ function RoutineList({ api, first }: { api: SchedulesApi; first: readonly Schedu
   const [rows, setRows] = useState<readonly ScheduleView[]>(first);
   const [busy, setBusy] = useState<string | null>(null);
   const [asking, setAsking] = useState<string | null>(null);
+  const [renaming, setRenaming] = useState<string | null>(null);
+  const [title, setTitle] = useState("");
   const [problem, setProblem] = useState<Problem | null>(null);
+  const list = useRef<HTMLElement>(null);
+  const trigger = useRef<HTMLButtonElement | null>(null);
+  const restore = useRef(false);
+
+  useLayoutEffect(() => {
+    if (busy !== null) return;
+    if (asking !== null) {
+      list.current?.querySelector<HTMLButtonElement>("[data-keep-routine]")?.focus();
+    } else if (renaming !== null) {
+      list.current?.querySelector<HTMLInputElement>('input[aria-label="Routine title"]')?.focus();
+    } else if (restore.current) {
+      restore.current = false;
+      const target = trigger.current;
+      if (target?.isConnected && !target.disabled) target.focus();
+      else
+        (
+          list.current?.querySelector<HTMLButtonElement>("button:not(:disabled)") ?? list.current
+        )?.focus();
+    }
+  });
+
+  const cancel = () => {
+    restore.current = true;
+    setAsking(null);
+    setRenaming(null);
+  };
+  const dialogKeys = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (event.key === "Escape" && busy === null) {
+      event.preventDefault();
+      cancel();
+    } else if (event.key === "Tab") {
+      const controls = [
+        ...event.currentTarget.querySelectorAll<HTMLElement>("button:not(:disabled), input"),
+      ];
+      const index = controls.indexOf(document.activeElement as HTMLElement);
+      event.preventDefault();
+      controls[(index + (event.shiftKey ? -1 : 1) + controls.length) % controls.length]?.focus();
+    }
+  };
 
   const run = async (id: string, doing: string, change: () => Promise<void>) => {
     setBusy(id);
@@ -36,8 +77,10 @@ function RoutineList({ api, first }: { api: SchedulesApi; first: readonly Schedu
       const said = e instanceof Error ? e.message : "";
       setProblem({ message: replayOnly ? said : describeError(doing, e), replayOnly });
     } finally {
+      restore.current = true;
       setBusy(null);
       setAsking(null);
+      setRenaming(null);
     }
   };
   const setEnabled = (row: ScheduleView, enabled: boolean) =>
@@ -51,9 +94,15 @@ function RoutineList({ api, first }: { api: SchedulesApi; first: readonly Schedu
       await api.deleteSchedule(row.schedule_id);
       setRows((all) => all.filter((r) => r.schedule_id !== row.schedule_id));
     });
+  const rename = (row: ScheduleView) =>
+    run(row.schedule_id, "rename the routine", async () => {
+      const updated = await api.updateSchedule(row.schedule_id, { title: title.trim() });
+      const next = isScheduleView(updated) ? updated : { ...row, title: title.trim() };
+      setRows((all) => all.map((r) => (r.schedule_id === row.schedule_id ? next : r)));
+    });
 
   return (
-    <>
+    <section ref={list} aria-label="Routines" tabIndex={-1}>
       {problem && (
         <div className="flow-notice" role="alert" data-testid="routines-problem">
           <p>{problem.message}</p>
@@ -78,7 +127,13 @@ function RoutineList({ api, first }: { api: SchedulesApi; first: readonly Schedu
                   {`Next run: ${nextRunWords(row.next_due, row.cadence.tz)}`}
                 </span>
                 {asking === row.schedule_id && (
-                  <div role="alertdialog" aria-label="Delete routine" className="flow-notice">
+                  <div
+                    role="alertdialog"
+                    aria-modal="true"
+                    aria-label="Delete routine"
+                    className="flow-notice"
+                    onKeyDown={dialogKeys}
+                  >
                     <p>{`Delete "${row.title}"? It will not run again.`}</p>
                     <div style={{ display: "flex", gap: "var(--space-12)", flexWrap: "wrap" }}>
                       <button
@@ -93,11 +148,45 @@ function RoutineList({ api, first }: { api: SchedulesApi; first: readonly Schedu
                         type="button"
                         className="secondary"
                         disabled={busy !== null}
-                        onClick={() => setAsking(null)}
+                        data-keep-routine
+                        onClick={cancel}
                       >
                         Keep routine
                       </button>
                     </div>
+                  </div>
+                )}
+                {renaming === row.schedule_id && (
+                  <div
+                    role="alertdialog"
+                    aria-modal="true"
+                    aria-label="Rename routine"
+                    className="flow-notice"
+                    onKeyDown={dialogKeys}
+                  >
+                    <input
+                      aria-label="Routine title"
+                      value={title}
+                      maxLength={140}
+                      disabled={busy !== null}
+                      onChange={(event) => setTitle(event.target.value)}
+                    />
+                    <button
+                      type="button"
+                      className="secondary"
+                      disabled={busy !== null || !title.trim()}
+                      onClick={() => rename(row)}
+                    >
+                      Save title
+                    </button>
+                    <button
+                      type="button"
+                      className="secondary"
+                      disabled={busy !== null}
+                      onClick={cancel}
+                    >
+                      Cancel
+                    </button>
                   </div>
                 )}
               </div>
@@ -107,7 +196,10 @@ function RoutineList({ api, first }: { api: SchedulesApi; first: readonly Schedu
                 className="secondary"
                 disabled={busy !== null}
                 aria-label={`${row.enabled ? "Pause" : "Resume"} ${row.title}`}
-                onClick={() => setEnabled(row, !row.enabled)}
+                onClick={(event) => {
+                  trigger.current = event.currentTarget;
+                  setEnabled(row, !row.enabled);
+                }}
               >
                 {row.enabled ? "Pause" : "Resume"}
               </button>
@@ -116,15 +208,33 @@ function RoutineList({ api, first }: { api: SchedulesApi; first: readonly Schedu
                 className="secondary"
                 disabled={busy !== null}
                 aria-label={`Delete ${row.title}`}
-                onClick={() => setAsking(row.schedule_id)}
+                onClick={(event) => {
+                  trigger.current = event.currentTarget;
+                  setRenaming(null);
+                  setAsking(row.schedule_id);
+                }}
               >
                 Delete
+              </button>
+              <button
+                type="button"
+                className="secondary"
+                disabled={busy !== null}
+                aria-label={`Rename ${row.title}`}
+                onClick={(event) => {
+                  trigger.current = event.currentTarget;
+                  setAsking(null);
+                  setTitle(row.title);
+                  setRenaming(row.schedule_id);
+                }}
+              >
+                Rename
               </button>
             </li>
           ))}
         </ul>
       )}
-    </>
+    </section>
   );
 }
 

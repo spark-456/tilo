@@ -488,6 +488,12 @@ textarea {
   outline: 2px solid var(--color-brand-primary);
   outline-offset: 2px;
 }
+.repeat-weekly input:focus-visible,
+.repeat-weekly select:focus-visible,
+.flow-notice input:focus-visible {
+  outline: 2px solid var(--color-brand-primary);
+  outline-offset: 2px;
+}
 .flow-shell {
   position: fixed;
   top: calc(var(--chrome-h) + var(--space-16));
