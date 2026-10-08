@@ -56,9 +56,13 @@ declared none of its own): `tilo_providers.config` uses `pydantic` (already list
 (already listed under the root dev dependency group); both are already installed into the
 shared `uv` workspace venv by `uv sync --all-packages`.
 
-`google-cloud-texttospeech` (Apache-2.0, https://pypi.org/project/google-cloud-texttospeech/) is imported lazily by
-`tilo_providers.cloud_tts_adapter` (FR-MTG-11) only for a real client, and is not yet in `pyproject.toml` or `uv.lock`
-(BQ-MTG11-15); the licence is recorded here ahead of the `uv add`.
+FR-MTG-11 adds one direct runtime dependency to `packages/providers/pyproject.toml`:
+
+| Dependency | Licence | Source |
+| --- | --- | --- |
+| google-cloud-texttospeech (`tilo_providers.cloud_tts_adapter`, imported lazily and only for a real client; licence read from the installed 2.38.0 metadata) | Apache-2.0 | https://pypi.org/project/google-cloud-texttospeech/ |
+
+Its other dependencies (`google-api-core`, `google-auth`, `grpcio`, `proto-plus`, `protobuf`) were already in `uv.lock`.
 
 ## Python (`packages/policy`)
 
