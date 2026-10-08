@@ -40,12 +40,15 @@ roles:
   # PL-02 / BQ-PL02-1: thinking tokens count against max_output_tokens, so a role that thinks states a cap that fits
   # thinking plus the JSON reply (16384 for high and medium). Not a model limit: the repo states none.
   # max_input_tokens (EFF-03): 100000, under the smallest context of any example profile (NIM: 128000)
+  # `thinking` is only the DEFAULT for a caller that sets no level: the Router fills it in per profile that declares the
+  # thinking capability (BQ-LE2E-10). The Director's planning calls set their own: brief extraction low, approaches and
+  # plan compile medium (thinking tokens are billed as output), so `high` is not what a plain planning call pays for.
   director: { primary: flash-38, fallback: flash-37, thinking: high, max_input_tokens: 100000, max_output_tokens: 16384 }
   lead: { primary: flash-38, fallback: flash-37, thinking: medium, max_output_tokens: 16384 }
   # Long-text roles (8 Oct 2026, live run 2: both writer calls stopped `truncated` with 0 visible tokens): without a cap the
   # Router sends 1024 (BQ-63) and the model's own thinking uses all of it, so a role that writes a document or a research
   # note states a cap that fits thinking plus the text, and thinks little.
-  specialist: { primary: flash-37, fallback: lite-31, thinking: low, max_output_tokens: 8192 }
+  specialist: { primary: lite-31, fallback: flash-37, thinking: low, max_output_tokens: 8192 } # EFF-02: cheapest first
   verifier: { primary: flash-38, fallback: flash-37, thinking: high, max_output_tokens: 16384 }
   writer: { primary: flash-38, fallback: flash-37, thinking: low, max_output_tokens: 16384 }
   narrator: { primary: lite-31, fallback: flash-37, max_output_tokens: 4096 } # fallback added for NFR-25 (BQ-18)
