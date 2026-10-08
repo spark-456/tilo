@@ -31,6 +31,10 @@
       {
         "source": "/",
         "headers": [{ "key": "Cache-Control", "value": "no-cache" }]
+      },
+      {
+        "source": "/share/**",
+        "headers": [{ "key": "Referrer-Policy", "value": "no-referrer" }]
       }
     ]
   }

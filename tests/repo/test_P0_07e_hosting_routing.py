@@ -46,6 +46,15 @@ IMMUTABLE = "public, max-age=31536000, immutable"
 # Paths a deployed SPA really sees. `ROUTES` have no static file behind them (client-side routes) and must fall
 # back to the SPA shell; `ASSETS` are Vite's hashed output, which exists on disk or is a 404, never the SPA shell.
 ROUTES = ["/", "/index.html", "/s/foo", "/foo", "/s/foo/bar", "/settings/profile", "/s/assets-overview"]
+# FR-HIL-12 (user approved 8 Oct): a shared link's token is in its path, so /share/** sends no Referer at all.
+# Every other path keeps strict-origin-when-cross-origin.
+SHARE_ROUTES = ["/share/abc", "/share/Ab_1-Ab_1-Ab_1-Ab_1-Ab_1-"]
+
+
+def _expected_referrer(path: str) -> str:
+    return "no-referrer" if path.startswith("/share/") else "strict-origin-when-cross-origin"
+
+
 # Dot paths: minimatch's `dot: false` makes `**` skip them, so a glob rewrite and a glob header rule can disagree on
 # them. Whether they get the SPA shell or a 404 is the builder's choice; whatever gets the shell must get every header.
 # (`**/.*` in `ignore` keeps dot files out of the upload, so no static file ever answers these.)
@@ -217,11 +226,11 @@ def test_P0_07e_hashed_assets_keep_the_immutable_cache_policy(repo_root: pathlib
 
 
 def test_P0_07e_security_headers_still_cover_assets_and_routes(repo_root: pathlib.Path) -> None:
-    for path in ROUTES + ASSETS:
+    for path in ROUTES + SHARE_ROUTES + ASSETS:
         headers = effective_headers(repo_root, path)
         assert "content-security-policy" in headers, path
         assert headers["x-content-type-options"].lower() == "nosniff", path
-        assert headers["referrer-policy"].lower() == "strict-origin-when-cross-origin", path
+        assert headers["referrer-policy"].lower() == _expected_referrer(path), path
 
 
 def test_P0_07e_every_path_that_gets_the_spa_shell_gets_every_security_header_and_no_cache(
@@ -233,17 +242,26 @@ def test_P0_07e_every_path_that_gets_the_spa_shell_gets_every_security_header_an
     headers rule does not match them; that gap must not exist (fix it with a `regex` header rule, or keep dot paths
     out of the rewrite; either satisfies this test).
     """
-    for path in ROUTES + DOT_PATHS + ASSETS:
+    for path in ROUTES + SHARE_ROUTES + DOT_PATHS + ASSETS:
         if rewrite_for(repo_root, path) != SPA_DESTINATION:
             continue
         headers = effective_headers(repo_root, path)
         csp = _directives(headers.get("content-security-policy", ""))
         assert csp.get("frame-ancestors") == ["'none'"], f"{path} is served index.html without a framing-safe CSP"
         assert headers.get("x-content-type-options", "").lower() == "nosniff", f"{path}: missing nosniff"
-        assert headers.get("referrer-policy", "").lower() == "strict-origin-when-cross-origin", (
+        assert headers.get("referrer-policy", "").lower() == _expected_referrer(path), (
             f"{path}: missing Referrer-Policy"
         )
         assert headers.get("cache-control") == "no-cache", f"{path}: index.html must not be cached"
+
+
+def test_P0_07e_FR_HIL_12_only_share_paths_send_no_referrer(repo_root: pathlib.Path) -> None:
+    for path in SHARE_ROUTES:
+        assert effective_headers(repo_root, path)["referrer-policy"].lower() == "no-referrer", path
+    for path in ROUTES + DOT_PATHS + ASSETS + ["/share", "/shared/x", "/s/share/x"]:
+        headers = effective_headers(repo_root, path)
+        if "referrer-policy" in headers:
+            assert headers["referrer-policy"].lower() == "strict-origin-when-cross-origin", path
 
 
 def test_P0_07e_dot_paths_never_get_the_immutable_cache_policy(repo_root: pathlib.Path) -> None:
