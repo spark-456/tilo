@@ -44,11 +44,9 @@ export function isNotificationPage(v: unknown): v is { notifications: Notificati
   );
 }
 
-/** "HH:MM" of the stamp in the viewer's zone; the raw stamp when it is not a date. */
+/** "HH:MM" (UTC) of an ISO stamp, read from its text: the api layer has no clock. The raw stamp when it is not ISO. */
 function clock(stamp: string): string {
-  const d = new Date(stamp);
-  if (Number.isNaN(d.getTime())) return stamp;
-  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+  return /^\d{4}-\d\d-\d\dT(\d\d:\d\d)/.exec(stamp)?.[1] ?? stamp;
 }
 
 function notificationOf(row: NotificationRow): Notification {

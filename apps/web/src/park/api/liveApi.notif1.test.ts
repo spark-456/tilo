@@ -2,8 +2,8 @@
 // the owner's bell. Served fields only: the API's fixed title, no subtitle, no warn kind, no sample.
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { TiloApiError } from "../../api/http";
-import { NotBuilt, createLiveApi } from "./liveApi";
 import { decisionKey } from "./live/decisionsFromCards";
+import { NotBuilt, createLiveApi } from "./liveApi";
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -53,6 +53,7 @@ describe("NOTIF_1 live getNotifications", () => {
       ["e:7", "done", "A file is ready", "", ["world", "w1"]],
     ]);
     expect(r.data[0]?.dec).toBe(decisionKey("w1", "card1"));
+    expect(r.data.map((n) => n.t)).toEqual(["09:30", "09:30"]); // UTC clock read from the stamp text
     expect(r.data[1]?.dec).toBeUndefined();
   });
 
