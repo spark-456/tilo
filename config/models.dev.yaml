@@ -19,10 +19,17 @@ profiles:
     model: fake-safety
     context: 1000000
     caps: []
+  # LW-05: the dev search; `FakeSearchProvider` answers from the query alone and is refused live or deployed.
+  search-fake:
+    provider: fake
+    model: fake-search
+    context: 1000000
+    caps: [grounding]
 
 roles:
   director: { primary: director-dev, fallback: director-dev }
   safety: { primary: safety-fake, fallback: safety-fake } # screens use the primary only
+  search: { primary: search-fake, fallback: search-fake, max_input_tokens: 8000, max_output_tokens: 4096, reserve_units: 5 }
 
 rules:
   deny: ["gemini-2.5-*", "*-preview*"]

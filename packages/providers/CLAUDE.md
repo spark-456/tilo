@@ -19,7 +19,7 @@ The model provider layer (PRD 6.4): one interface (`ModelProvider`, plus `Search
   fallback/cascade profile fails; a missing result warns unless `TILO_REQUIRE_CONFORMANCE=1`.
 
 ## Requirement IDs
-- PL-01–PL-07 (6.4), NFR-25 (17.2), EFF-01–05 (6.6), FR-CON-13 (12.5): P0-04 config, P0-05 adapters, P0-06 router; FR-INT-02: CC-SP-47 safety; FR-MTG-17/-11: `speech.py`, `google_speech_adapter.py`, `config/speech.yaml` (docs/speech-recording-upload.md).
+- PL-01–PL-07 (6.4), NFR-25 (17.2), EFF-01–05 (6.6), FR-CON-13 (12.5): P0-04 config, P0-05 adapters, P0-06 router; FR-INT-02: CC-SP-47 safety; FR-MTG-17/-11: `speech.py`, `google_speech_adapter.py`, `config/speech.yaml` (docs/speech-recording-upload.md). LW-05 (ADR-0029): `search.py` (SearchProvider: typed result, fake, replay, query redactor), `google_search_adapter.py` (only `google_search`, never URL context; redirect URLs stay unresolved), `Router.search` (reserve_units, overrun on the attempt), `ProvidersConfig.cost_usd`/`check_live` (cached_input, unit_price, valid_until, region).
 
 ## Local rules
 - Denylisted ids fail start-up loudly (PL-07); every role needs a fallback (NFR-25); `price()` never invents one (PL-06).

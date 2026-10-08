@@ -136,8 +136,10 @@ def test_PL_06_confirmed_prices_and_credit_rate(repo_root, prices_yaml):
     for name in ("models.dev.yaml", "models.nim.yaml"):
         free_profiles |= set(yaml.safe_load((repo_root / "config" / name).read_text(encoding="utf-8"))["profiles"])
     assert len(free_profiles) >= 4
+    zero_fee = {"unit_price": {"unit": "query", "per_1k": 0}}  # LW-05: the dev search profile's 0 fee per query
     for free in free_profiles:
-        assert profiles[free] == {"input": 0, "output": 0}, f"PL-06: {free} makes no paid call, price 0"
+        zero = {"input": 0, "output": 0, **(zero_fee if "unit_price" in profiles[free] else {})}
+        assert profiles[free] == zero, f"PL-06: {free} makes no paid call, price 0"
 
 
 def test_PL_06_every_profile_in_every_models_file_has_a_price(repo_root, prices_yaml):
