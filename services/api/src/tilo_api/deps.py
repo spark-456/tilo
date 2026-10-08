@@ -309,15 +309,21 @@ def resolve_principal(app: Any, connection: HTTPConnection) -> Principal:
 def get_store(request: Request = None) -> Store:  # type: ignore[assignment]  # FastAPI injects it; None elsewhere
     """Deployed: the durable store for `TILO_API_STORE`, with the request's path ids loaded (ADR-0026 decisions 1, 3);
     without a valid config 503 `not_configured`, never cached. Dev mode and the tests override this seam."""
+    from tilo_api import ephemeral
     from tilo_api.durable_store import deployed
 
+    if request is not None and (demo := ephemeral.for_request(request)) is not None:
+        return demo.store  # an anonymous demo session stores nothing durable (DEMO-EPHEMERAL-1)
     store = deployed()[0]
     return store.load_path(request.path_params) if request is not None else store
 
 
-def get_event_writer() -> EventWriter:
+def get_event_writer(request: Request = None) -> EventWriter:  # type: ignore[assignment]
+    from tilo_api import ephemeral
     from tilo_api.durable_store import deployed
 
+    if request is not None and (demo := ephemeral.for_request(request)) is not None:
+        return demo.writer
     return deployed()[1]
 
 
@@ -580,7 +586,7 @@ def get_connector_adapters() -> dict[str, Any]:
 
 
 @functools.cache
-def get_outbox_store() -> InMemoryOutboxStore:
+def get_outbox_store() -> InMemoryOutboxStore:  # a demo's own: `ephemeral.DemoSession.outbox`, built by `run_seams`
     return InMemoryOutboxStore()  # the process's own until the Firestore store lands
 
 
@@ -589,14 +595,24 @@ def get_outbox_store() -> InMemoryOutboxStore:
 ORG_ID = "org_tilo"
 
 
-def get_artifact_store() -> ArtifactStore:
+def _demo(request: Request | None) -> Any:
+    from tilo_api import ephemeral
+
+    return ephemeral.for_request(request) if request is not None else None
+
+
+def get_artifact_store(request: Request = None) -> ArtifactStore:  # type: ignore[assignment]
     """Where a run's outputs go. No production backend exists until ADR-0018 T8 (Firestore, GCS), so this refuses and
-    no run starts (fail closed, BQ-AGT02-T4-1); dev mode wires one in-memory store."""
+    no run starts (fail closed, BQ-AGT02-T4-1); dev mode wires one in-memory store, and a demo session its own."""
+    if (demo := _demo(request)) is not None:
+        return demo.artifacts
     raise NotImplementedError("no artifact store is configured, so no run starts")
 
 
-def get_redactor() -> Callable[[str], str]:
+def get_redactor(request: Request = None) -> Callable[[str], str]:  # type: ignore[assignment]
     """The shared secret redactor the store was given (MF-06). Not built until FR-MEM-05 (BQ-109): refuses."""
+    if (demo := _demo(request)) is not None:
+        return demo.redactor
     raise NotImplementedError("the shared secret redactor is not built, so no run starts")
 
 
@@ -629,13 +645,15 @@ def _inside_backoff() -> bool:
     return retry_at is not None and people_stores_clock() < retry_at
 
 
-def get_people_stores() -> PeopleStores:
+def get_people_stores(request: Request = None) -> PeopleStores:  # type: ignore[assignment]
     """The process's one `PeopleStores` (the write limiter and idempotency keys live on it, #549). Built on the first
     request, single-flight, only for `TILO_PEOPLE_STORE=firestore` plus a valid `TILO_FIRESTORE_PROJECT` (ADR-0023);
     anything else, or a build that fails, is 503 `not_configured` (the error never echoed). A failed build is
     remembered for `PEOPLE_STORES_BACKOFF_S`: inside the window a request is refused at once, without the lock and
     without a client call; after it one request tries again (FS-18)."""
     global _people_stores, _people_stores_retry_at
+    if (demo := _demo(request)) is not None:
+        return demo.people  # in memory, per demo session, gone with it
     built = _people_stores
     if built is not None:
         return built
@@ -715,8 +733,11 @@ def get_desk_worlds() -> DeskWorlds:
     raise HTTPException(status_code=503, detail="not_configured")  # production wiring lands with the Desk
 
 
-def get_run_archive() -> Callable[..., RunArchive]:
-    """`open_archive(*, org_id, run_id) -> RunArchive`, the run's raw archive. No production store yet: refuses."""
+def get_run_archive(request: Request = None) -> Callable[..., RunArchive]:  # type: ignore[assignment]
+    """`open_archive(*, org_id, run_id) -> RunArchive`, the run's raw archive. No production store yet: refuses
+    (a demo session's is in memory and dies with it)."""
+    if (demo := _demo(request)) is not None:
+        return demo.open_archive
     raise NotImplementedError("no raw-archive store is configured, so no run starts")
 
 

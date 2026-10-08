@@ -358,6 +358,8 @@ def create_schedule(
     clock: Clock,
     flags: Flags,
 ) -> dict[str, Any]:
+    if principal.demo_session:  # DEMO-EPHEMERAL-1: a demo stores nothing durable, and a schedule outlives the session
+        raise HTTPException(status_code=403, detail="demo_schedules_unavailable")
     task = store.load_task(body.task_id, settle=False)  # not yet known to be this owner's
     if task is None or task.owner != principal.user_id:  # unknown and another user's task answer alike
         raise HTTPException(status_code=404, detail="No such task.")
