@@ -126,6 +126,10 @@ vertex-smoke *args:
 vertex-probe-schema *args:
     uv run python packages/providers/scripts/live_vertex_probe_schema.py {{args}}
 
+# VERTEX-EVAL-1 (ADR-0033): `just vertex-eval export --candidate DIR [--baseline DIR]` pairs recorded Director output (free); `run --pairs P --fake|--dry-run` is free; a live run needs the user's own live switch and stays under 20 credits.
+vertex-eval *args:
+    uv run python -m tilo_evals vertex-eval {{args}}
+
 # PL-LIVE-E2E (#340): one bank case through the real pipeline. Live only when the user sets LIVE=1; `--dry-run` and `--replay` are free.
 live-e2e *args:
     uv run python evals/scripts/live_e2e.py {{args}}
