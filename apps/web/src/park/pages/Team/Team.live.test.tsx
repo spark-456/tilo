@@ -39,7 +39,11 @@ const view = (over: Partial<TeamView> = {}): TeamView => ({
   ],
   tools: [{ connector: "gmail", level: "act" }],
   capabilities: [
-    { key: "start_quick_tasks", label: "Start quick tasks", roles: ["Owner", "Approver", "Member"] },
+    {
+      key: "start_quick_tasks",
+      label: "Start quick tasks",
+      roles: ["Owner", "Approver", "Member"],
+    },
     { key: "invite_people", label: "Invite people", roles: ["Owner"] },
   ],
   invites: [{ id: "inv_1", email: "new@acme.co", role: "Viewer" }],
@@ -63,7 +67,7 @@ function liveApi(read: () => Promise<TeamView>, write?: (op: TeamOp) => Promise<
 const err = (status: number, replay = false) =>
   new TiloApiError("server words", status, status >= 500, true, null, replay);
 const statusLine = (root: ParentNode): string =>
-  root.querySelector('[role="status"]')?.textContent?.trim() ?? "";
+  root.querySelector("output")?.textContent?.trim() ?? "";
 
 describe("TEAM_WEB_team_page_live: reads the server's team", () => {
   it("TEAM_WEB_live_page_shows_the_servers_members_invites_and_matrix_not_the_sample_team", async () => {
@@ -83,7 +87,9 @@ describe("TEAM_WEB_team_page_live: reads the server's team", () => {
     const { root } = await renderTeam(makeApp(), api);
     const rows = [...region(root, "What each role can do").querySelectorAll("tbody tr")];
     const granted = (i: number) =>
-      [...(rows[i]?.querySelectorAll("[data-granted]") ?? [])].map((c) => c.getAttribute("data-granted"));
+      [...(rows[i]?.querySelectorAll("[data-granted]") ?? [])].map((c) =>
+        c.getAttribute("data-granted"),
+      );
     expect(granted(0)).toEqual(["true", "true", "true", "false"]);
     expect(granted(1)).toEqual(["true", "false", "false", "false"]);
   });
@@ -91,7 +97,11 @@ describe("TEAM_WEB_team_page_live: reads the server's team", () => {
   it("TEAM_WEB_live_must_ask_switches_are_on_and_locked_and_tools_says_not_enforced_yet", async () => {
     const { api } = liveApi(async () => view());
     const { root } = await renderTeam(makeApp(), api);
-    for (const name of ["Spending money", "Sharing anything outside the company", "Actions that can’t be undone"]) {
+    for (const name of [
+      "Spending money",
+      "Sharing anything outside the company",
+      "Actions that can’t be undone",
+    ]) {
       const sw = switchNamed(root, name);
       expect(sw.getAttribute("aria-checked")).toBe("true");
       expect((sw as HTMLButtonElement).disabled).toBe(true);
@@ -104,8 +114,16 @@ describe("TEAM_WEB_team_page_live: reads the server's team", () => {
 describe("TEAM_WEB_team_page_live: Owner writes", () => {
   it("TEAM_WEB_live_role_change_is_optimistic_then_takes_the_servers_view", async () => {
     let release: (v: TeamView) => void = () => undefined;
-    const next = view({ members: [view().members[0] as never, { id: "u2", role: "Approver", limit_minor: 5000 }] });
-    const { api, write } = liveApi(async () => view(), () => new Promise<TeamView>((r) => (release = r)));
+    const next = view({
+      members: [view().members[0] as never, { id: "u2", role: "Approver", limit_minor: 5000 }],
+    });
+    const { api, write } = liveApi(
+      async () => view(),
+      () =>
+        new Promise<TeamView>((r) => {
+          release = r;
+        }),
+    );
     const { root } = await renderTeam(makeApp(), api);
     await choose(selectNamed(root, "Role for u2"), "Approver");
     expect(write).toHaveBeenCalledWith({ kind: "role", id: "u2", role: "Approver" });
@@ -116,7 +134,10 @@ describe("TEAM_WEB_team_page_live: Owner writes", () => {
   });
 
   it("TEAM_WEB_live_failed_write_rolls_back_and_says_why", async () => {
-    const { api } = liveApi(async () => view(), async () => Promise.reject(err(422)));
+    const { api } = liveApi(
+      async () => view(),
+      async () => Promise.reject(err(422)),
+    );
     const { root } = await renderTeam(makeApp(), api);
     await choose(selectNamed(root, "Role for u2"), "Viewer");
     expect(selectNamed(root, "Role for u2").value).toBe("Member");
@@ -124,9 +145,14 @@ describe("TEAM_WEB_team_page_live: Owner writes", () => {
   });
 
   it("TEAM_WEB_live_409_refetches_and_shows_the_current_state", async () => {
-    const fresh = view({ members: [view().members[0] as never, { id: "u2", role: "Viewer", limit_minor: null }] });
+    const fresh = view({
+      members: [view().members[0] as never, { id: "u2", role: "Viewer", limit_minor: null }],
+    });
     let n = 0;
-    const { api, read } = liveApi(async () => (n++ === 0 ? view() : fresh), async () => Promise.reject(err(409)));
+    const { api, read } = liveApi(
+      async () => (n++ === 0 ? view() : fresh),
+      async () => Promise.reject(err(409)),
+    );
     const { root } = await renderTeam(makeApp(), api);
     await choose(selectNamed(root, "Role for u2"), "Approver");
     expect(read).toHaveBeenCalledTimes(2);
@@ -135,17 +161,27 @@ describe("TEAM_WEB_team_page_live: Owner writes", () => {
   });
 
   it("TEAM_WEB_live_switch_weekend_sends_one_write_and_rolls_back_on_503", async () => {
-    const { api, write } = liveApi(async () => view(), async () => Promise.reject(err(503)));
+    const { api, write } = liveApi(
+      async () => view(),
+      async () => Promise.reject(err(503)),
+    );
     const { root } = await renderTeam(makeApp(), api);
     await clickAndSettle(switchNamed(root, "Routines that fall on a weekend"));
     expect(write).toHaveBeenCalledWith({ kind: "switch", key: "weekend", on: true });
-    expect(switchNamed(root, "Routines that fall on a weekend").getAttribute("aria-checked")).toBe("false");
+    expect(switchNamed(root, "Routines that fall on a weekend").getAttribute("aria-checked")).toBe(
+      "false",
+    );
     expect(statusLine(root)).toBe("Team controls are not set up on this install yet.");
   });
 
   it("TEAM_WEB_live_invite_sends_email_and_role_member_and_shows_the_servers_invite", async () => {
-    const after = view({ invites: [...view().invites, { id: "inv_2", email: "x@acme.co", role: "Member" }] });
-    const { api, write } = liveApi(async () => view(), async () => after);
+    const after = view({
+      invites: [...view().invites, { id: "inv_2", email: "x@acme.co", role: "Member" }],
+    });
+    const { api, write } = liveApi(
+      async () => view(),
+      async () => after,
+    );
     const { root } = await renderTeam(makeApp(), api);
     await typeInto(inputNamed(root, "Invite by email"), "x@acme.co");
     await clickAndSettle(buttonNamed(root, "Invite"));
@@ -155,7 +191,10 @@ describe("TEAM_WEB_team_page_live: Owner writes", () => {
 
   it("TEAM_WEB_live_remove_member_sends_delete_and_cancel_invite_is_not_offered_without_a_route", async () => {
     const after = view({ members: [view().members[0] as never] });
-    const { api, write } = liveApi(async () => view(), async () => after);
+    const { api, write } = liveApi(
+      async () => view(),
+      async () => after,
+    );
     const { root } = await renderTeam(makeApp(), api);
     await clickAndSettle(buttonNamed(root, "Show details for u2"));
     await clickAndSettle(buttonNamed(root, "Remove from team"));
@@ -166,6 +205,24 @@ describe("TEAM_WEB_team_page_live: Owner writes", () => {
   });
 });
 
+describe("TEAM_WEB_team_page_live: spend limits", () => {
+  it("TEAM_WEB_live_owner_sets_a_members_spend_limit_in_rupees_sent_as_minor_units", async () => {
+    const after = view({
+      members: [view().members[0] as never, { id: "u2", role: "Member", limit_minor: 120000 }],
+    });
+    const { api, write } = liveApi(
+      async () => view(),
+      async () => after,
+    );
+    const { root } = await renderTeam(makeApp(), api);
+    await clickAndSettle(buttonNamed(root, "Show details for u2"));
+    await typeInto(inputNamed(root, "Spend limit for u2 in rupees"), "1200");
+    await clickAndSettle(buttonNamed(root, "Save limit"));
+    expect(write).toHaveBeenCalledWith({ kind: "limit", id: "u2", limitMinor: 120000 });
+    expect(strings(root).has("₹1,200")).toBe(true);
+  });
+});
+
 describe("TEAM_WEB_team_page_live: who may change what", () => {
   it("TEAM_WEB_live_non_owner_sees_a_read_only_page_with_disabled_controls", async () => {
     const v = view({ me: { id: "u2", role: "Member" }, invites: [] });
@@ -173,7 +230,9 @@ describe("TEAM_WEB_team_page_live: who may change what", () => {
     const { root } = await renderTeam(makeApp(), api);
     expect(selectNamed(root, "Role for u1").disabled).toBe(true);
     expect(selectNamed(root, "Role for u2").disabled).toBe(true);
-    expect(switchNamed(root, "Routines that fall on a weekend").hasAttribute("disabled")).toBe(true);
+    expect(switchNamed(root, "Routines that fall on a weekend").hasAttribute("disabled")).toBe(
+      true,
+    );
     expect(inputNamed(root, "Invite by email").disabled).toBe(true);
     expect(statusLine(root)).toBe("Only an Owner can change the team. You can look at it.");
   });
@@ -189,14 +248,24 @@ describe("TEAM_WEB_team_page_live: who may change what", () => {
 describe("TEAM_WEB_team_page_live: read failures are messages, not crashes", () => {
   const cases: [number, boolean, RegExp][] = [
     [503, false, /Team controls are not set up on this install yet/],
-    [403, false, /signed in on the web/],
+    [403, false, /sign-in on the web/],
     [401, false, /Sign in again/],
     [404, false, /not on this team/i],
     [503, true, /Live models are unavailable/],
   ];
   for (const [status, replay, re] of cases) {
     it(`TEAM_WEB_live_read_${status}${replay ? "_replay_only" : ""}_shows_a_plain_message_and_keeps_the_heading`, async () => {
-      const e = status === 503 && replay ? new TiloApiError("Live models are unavailable right now.", 503, false, false, null, true) : err(status);
+      const e =
+        status === 503 && replay
+          ? new TiloApiError(
+              "Live models are unavailable right now.",
+              503,
+              false,
+              false,
+              null,
+              true,
+            )
+          : err(status);
       const { api } = liveApi(async () => Promise.reject(e));
       const errors = vi.spyOn(console, "error").mockImplementation(() => undefined);
       const { root } = await renderTeam(makeApp(), api);

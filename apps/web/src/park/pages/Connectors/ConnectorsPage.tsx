@@ -12,8 +12,10 @@ import type { AppCtx } from "../../app/AppCtx";
 import { useParkApi } from "../../app/context";
 import { PageSheet } from "../../components";
 import "./Connectors.css";
+import { useLiveTeam } from "../Team/LiveTeam";
 import { AttentionBanner, AvailableRow, ConnectedTile } from "./ConnectorParts";
 import { Drawer } from "./Drawer";
+import { ToolAccess } from "./ToolAccess";
 import { icon } from "./icons";
 import { type Overrides, isOn, matches, merge } from "./view";
 
@@ -57,7 +59,12 @@ export function ConnectorsPage({ app }: { app: AppCtx }) {
   const [busy, setBusy] = useState<Record<string, boolean>>({});
   const [reconnecting, setReconnecting] = useState(false);
 
+  // TEAM-WEB: a live server answers with the team's tool levels; the sample Api (null) and an unbuilt one (a
+  // rejection that is not a server answer) leave the page below as it was.
+  const lt = useLiveTeam(api);
+  const sample = lt.state.phase === "fixture";
   useEffect(() => {
+    if (!sample) return;
     let live = true;
     Promise.all([api.getConnectors(), api.getSkills(), api.getConnectorTerms()]).then(
       ([c, s, t]) =>
@@ -67,10 +74,26 @@ export function ConnectorsPage({ app }: { app: AppCtx }) {
     return () => {
       live = false;
     };
-  }, [api]);
+  }, [api, sample]);
 
   const close = useCallback(() => setOpen(null), []);
 
+  if (lt.state.phase === "ready" || lt.state.phase === "error") {
+    return (
+      <Frame>
+        <Heading />
+        {lt.state.phase === "ready" ? (
+          <ToolAccess live={lt} view={lt.state.view} toast={app.toast} />
+        ) : (
+          <div className="park-connectors-empty">
+            <span className="park-connectors-empty-glyph">{icon("plug", 22)}</span>
+            <div className="park-connectors-empty-title">Not connected yet</div>
+            <div className="park-connectors-empty-line">{lt.state.text}</div>
+          </div>
+        )}
+      </Frame>
+    );
+  }
   if (load.kind === "unavailable") {
     return (
       <Frame>

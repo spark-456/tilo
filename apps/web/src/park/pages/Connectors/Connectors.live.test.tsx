@@ -4,7 +4,13 @@
 // connector appears; the per-skill saved level (FR-ACC-02) and Disconnect/Connect stay not built.
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup } from "../../../../test-support/park/componentsHarness";
-import { flush, labelled, makeApp, renderPage, textOf } from "../../../../test-support/park/connectorsDom";
+import {
+  flush,
+  labelled,
+  makeApp,
+  renderPage,
+  textOf,
+} from "../../../../test-support/park/connectorsDom";
 import { TiloApiError } from "../../../api/http";
 import type { Api } from "../../api";
 import type { TeamOp, TeamView } from "../../api/live/teamLive";
@@ -30,7 +36,11 @@ const apiOf = (read: () => Promise<TeamView>, write?: (op: TeamOp) => Promise<Te
     data: await (write ?? (() => Promise.reject(new Error("no write"))))(op),
     source: "live" as const,
   }));
-  return { api: { ...createLiveApi(), getTeamLive, writeTeam } as unknown as Api, writeTeam, getTeamLive };
+  return {
+    api: { ...createLiveApi(), getTeamLive, writeTeam } as unknown as Api,
+    writeTeam,
+    getTeamLive,
+  };
 };
 const level = (root: ParentNode, id: string) =>
   root.querySelector<HTMLSelectElement>(`select[aria-label="Access level for ${id}"]`);
@@ -43,7 +53,7 @@ const pick = async (sel: HTMLSelectElement | null, value: string) => {
   });
   await flush();
 };
-const status = (root: ParentNode) => root.querySelector('[role="status"]')?.textContent?.trim() ?? "";
+const status = (root: ParentNode) => root.querySelector("output")?.textContent?.trim() ?? "";
 
 describe("TEAM_WEB_connectors_live: tool levels from the server", () => {
   it("TEAM_WEB_connectors_live_lists_the_servers_tools_with_their_levels_and_no_sample_connector", async () => {
@@ -57,8 +67,17 @@ describe("TEAM_WEB_connectors_live: tool levels from the server", () => {
   });
 
   it("TEAM_WEB_connectors_live_owner_changes_a_level_with_one_write_and_it_sticks", async () => {
-    const after: TeamView = { ...view(), tools: [{ connector: "gmail", level: "draft" }, { connector: "calendar", level: "read" }] };
-    const { api, writeTeam } = apiOf(async () => view(), async () => after);
+    const after: TeamView = {
+      ...view(),
+      tools: [
+        { connector: "gmail", level: "draft" },
+        { connector: "calendar", level: "read" },
+      ],
+    };
+    const { api, writeTeam } = apiOf(
+      async () => view(),
+      async () => after,
+    );
     const m = await renderPage(makeApp(), api);
     await pick(level(m.container, "gmail"), "draft");
     expect(writeTeam).toHaveBeenCalledTimes(1);
@@ -67,7 +86,10 @@ describe("TEAM_WEB_connectors_live: tool levels from the server", () => {
   });
 
   it("TEAM_WEB_connectors_live_failed_write_rolls_back_with_a_plain_message", async () => {
-    const { api } = apiOf(async () => view(), async () => Promise.reject(new TiloApiError("x", 403, false, true)));
+    const { api } = apiOf(
+      async () => view(),
+      async () => Promise.reject(new TiloApiError("x", 403, false, true)),
+    );
     const m = await renderPage(makeApp(), api);
     await pick(level(m.container, "gmail"), "off");
     expect(level(m.container, "gmail")?.value).toBe("act");

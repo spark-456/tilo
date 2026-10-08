@@ -14,9 +14,11 @@ interface RulesProps {
   /** Every switch change this session, newest last (sample: nothing is stored). */
   log: readonly { key: string; when: string; to: boolean }[];
   onToggle: (key: string, next: boolean) => void;
+  /** Live mode, not the Owner (or a write is in flight): every switch is off-limits. */
+  readOnly?: boolean;
 }
 
-export function RulesCard({ rules, on, art, locked, log, onToggle }: RulesProps) {
+export function RulesCard({ rules, on, art, locked, log, onToggle, readOnly }: RulesProps) {
   return (
     <section className="park-team-card park-team-rules" aria-label="Approval rules">
       <div className="park-team-cardhead">
@@ -35,7 +37,7 @@ export function RulesCard({ rules, on, art, locked, log, onToggle }: RulesProps)
           <Switch
             label={when}
             checked={locked.includes(key) || (on[key] ?? dflt)}
-            disabled={locked.includes(key)}
+            disabled={readOnly || locked.includes(key)}
             onChange={(next) => onToggle(key, next)}
           />
         </div>
@@ -54,7 +56,7 @@ export function RulesCard({ rules, on, art, locked, log, onToggle }: RulesProps)
   );
 }
 
-export function MatrixCard({ team }: { team: Team }) {
+export function MatrixCard({ team }: { team: Pick<Team, "roles" | "matrix"> }) {
   return (
     <section className="park-team-card park-team-matrix" aria-label="What each role can do">
       <h2 className="park-team-h2 park-team-h2--matrix">What each role can do</h2>

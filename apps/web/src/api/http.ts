@@ -269,6 +269,16 @@ export class HttpClient implements TiloClient {
     return this.post<unknown>(path, body);
   }
 
+  /** A JSON write with any method (PUT, DELETE, POST), decoded as JSON, `write` true (TEAM-WEB). No credentials. */
+  sendJson(method: string, path: string, body?: unknown): Promise<unknown> {
+    const init: RequestInit = { method };
+    if (body !== undefined) {
+      init.headers = { "content-type": "application/json" };
+      init.body = JSON.stringify(body);
+    }
+    return this.request<unknown>(path, init, true);
+  }
+
   private post<T>(path: string, body: unknown): Promise<T> {
     const init = {
       method: "POST",

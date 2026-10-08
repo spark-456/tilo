@@ -12,6 +12,7 @@ import {
   decisionsFromCards,
 } from "./live/decisionsFromCards";
 import { type CostReport, ledgerFromCosts } from "./live/ledgerFromCosts";
+import { type TeamView, isTeamView, requestOf } from "./live/teamLive";
 import { STATE_OF, type WorldListItem, worldsFromList } from "./live/worldsFromList";
 import type { Dec, DecisionKey } from "./types";
 
@@ -189,6 +190,21 @@ export function createLiveApi(options: LiveApiOptions = {}): Api {
     if (outcome !== "answered") throw new TiloApiError(BAD_REPLY, 200, true, true);
     answered[key] = true;
     return { data: { ok: true, dec: { ...answered } }, source: "live" };
+  };
+  // TEAM-WEB: the team view and its Owner-only writes (services/api team_routes.py). A write answers the new view;
+  // an invite answers its id only, so it is followed by a read. No retry: the server already retries a lost race.
+  const readTeam = async (): Promise<TeamView> => {
+    const body = await http.getJson("/v1/team");
+    if (!isTeamView(body)) throw new TiloApiError(BAD_REPLY, 200, true);
+    return body;
+  };
+  api.getTeamLive = async () => ({ data: await readTeam(), source: "live" });
+  api.writeTeam = async (op) => {
+    const { method, path, body } = requestOf(op);
+    const reply = await http.sendJson(method, path, body);
+    if (op.kind === "invite") return { data: await readTeam(), source: "live" };
+    if (!isTeamView(reply)) throw new TiloApiError(BAD_REPLY, 200, true, true);
+    return { data: reply, source: "live" };
   };
   return api;
 }

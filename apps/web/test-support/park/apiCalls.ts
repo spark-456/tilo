@@ -29,6 +29,7 @@ export function callTable(): CallTable {
     getLedger: [],
     getAgenda: [],
     getTeam: [],
+    getTeamLive: [],
     getConnectors: [],
     getNotifications: [],
     getTeamPolicy: [],
@@ -42,6 +43,7 @@ export function callTable(): CallTable {
     bookSlot: [slot],
     addBackup: ["ps"],
     setPref: ["backup", "ps"],
+    writeTeam: [{ kind: "remove", id: "ps" }],
   };
 }
 

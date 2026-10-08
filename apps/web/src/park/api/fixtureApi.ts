@@ -27,6 +27,7 @@ export function createFixtureApi(): Api {
     getLedger: () => ok(fx.ledger),
     getAgenda: () => ok(fx.agenda),
     getTeam: () => ok(fx.team),
+    getTeamLive: () => ok(null),
     getConnectors: () => ok(fx.connectors),
     getNotifications: () => ok(fx.notifications),
     getTeamPolicy: () => ok(fx.teamPolicy),
@@ -43,5 +44,6 @@ export function createFixtureApi(): Api {
     bookSlot: ack,
     addBackup: ack,
     setPref: ack,
+    writeTeam: () => ok(null),
   };
 }

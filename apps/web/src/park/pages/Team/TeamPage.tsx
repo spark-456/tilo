@@ -17,6 +17,7 @@ import { useParkApi } from "../../app/context";
 import { useStaged } from "../../app/useStaged";
 import { Button, PageSheet } from "../../components";
 import { Coverage } from "./Coverage";
+import { LiveBody, LiveInvite, StatusLine, useLiveTeam } from "./LiveTeam";
 import { Members } from "./Members";
 import { MatrixCard, RulesCard } from "./Rules";
 import "./Team.css";
@@ -69,7 +70,12 @@ export function TeamPage({ app }: { app: AppCtx }) {
   const [people, setPeople] = useState<Member[] | null>(null);
   const [email, setEmail] = useState("");
   const sent = useRef(0);
+  // TEAM-WEB: ask the live Api first. A live server answers with its team (or a refusal we say in words); the
+  // fixture Api answers `null` and an unbuilt one rejects, and both leave the sample page below as it was.
+  const lt = useLiveTeam(api);
+  const sample = lt.state.phase === "fixture";
   useEffect(() => {
+    if (!sample) return;
     let live = true;
     Promise.all([
       api.getTeam(),
@@ -93,7 +99,7 @@ export function TeamPage({ app }: { app: AppCtx }) {
     return () => {
       live = false;
     };
-  }, [api, dec, added]);
+  }, [api, dec, added, sample]);
 
   const valid = isValidEmail(email);
   const invite = () => {
@@ -111,6 +117,26 @@ export function TeamPage({ app }: { app: AppCtx }) {
 
   // One stable root: the frame and the heading are the same elements while loading, loaded or failed, so
   // the h1 the shell focuses on arrival is not remounted when the data lands.
+  const liveView = lt.state.phase === "ready" ? lt.state.view : null;
+  if (!sample) {
+    const count = liveView
+      ? `${liveView.members.length + liveView.invites.length} people`
+      : undefined;
+    return (
+      <Frame>
+        <Top count={count}>{liveView ? <LiveInvite live={lt} toast={toast} /> : null}</Top>
+        {liveView ? <StatusLine text={lt.note} /> : null}
+        {liveView ? (
+          <LiveBody live={lt} view={liveView} toast={toast} />
+        ) : lt.state.phase === "error" ? (
+          <section className="park-team-card park-team-empty">
+            <h2 className="park-team-h2">Team</h2>
+            <p className="park-team-intro">{lt.state.text}</p>
+          </section>
+        ) : null}
+      </Frame>
+    );
+  }
   const ready =
     loaded && loaded !== "failed" && people
       ? {
