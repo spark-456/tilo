@@ -18,7 +18,7 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from typing import Annotated, Any
 
-from fastapi import Depends, HTTPException
+from fastapi import Depends, HTTPException, Request
 from tilo_archive import RunArchive
 from tilo_connectors import Outbox
 from tilo_connectors.adapters.meeting_host import MeetingHostAdapter
@@ -40,7 +40,7 @@ from tilo_harness.outputs import UnitOutput
 from tilo_harness.skills import SkillRegistry
 from tilo_memory.artifacts import ArtifactStore, NewVersion, Origin, Scope
 
-from tilo_api import deps, events
+from tilo_api import deps, events, team_store
 from tilo_api.people_writes import Refusal, Writer
 from tilo_api.runs import Run, Seams, _GateFailed
 
@@ -65,9 +65,11 @@ class HostSeams:
     skills: SkillRegistry
     broker: Any
     transport: Any
+    team: Callable[[], Any]  # the team's settings (FR-ACC-01): the host gate checks the tool level like any run
 
 
 def get_host_seams(
+    request: Request,
     store: Annotated[deps.Store, Depends(deps.get_store)],
     writer: Annotated[deps.EventWriter, Depends(deps.get_event_writer)],
     outbox_store: Annotated[Any, Depends(deps.get_outbox_store)],
@@ -92,6 +94,7 @@ def get_host_seams(
         skills,
         broker,
         transport,
+        team_store.team_reader(request.app.dependency_overrides),
     )
 
 
@@ -199,7 +202,7 @@ class HostRun(Run):
         run_seams = Seams(
             _no_director, seams.layout_builder, _DraftRunner(draft), resolver, seams.skills, seams.registry,
             {CONNECTOR_ID: adapter}, seams.outbox_store, seams.writer, {}, seams.artifacts, seams.redactor,
-            seams.open_archive,
+            seams.open_archive, seams.team,
         )  # fmt: skip
         super().__init__(seams.store, task, {}, _CAP, run_seams)
         self.unit: dict[str, Any] = {}

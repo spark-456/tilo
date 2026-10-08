@@ -52,9 +52,12 @@ def tool_check(
     skill_level: Level | None = None,
 ) -> Outcome:
     """Whether the team's level for `connector` (lowered by a skill's) lets an action of `tier` through to the
-    engine. An unset tool is Act (as before); a stored level that is not one of the four blocks."""
+    engine. An unset declared tool is Act (as before); an undeclared tool or a stored level that is not one of the
+    four blocks."""
     if state is None:
         return "allow"
+    if connector not in registry and (mcp is None or connector not in mcp):
+        return "block"  # a tool the tables do not declare has no level, so it is never Act
     try:
         level = effective_level(parse_level(state.tools.get(connector, "act")), skill_level)
     except (TypeError, ValueError):

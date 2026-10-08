@@ -175,12 +175,24 @@ def get_team_store() -> TeamRepository:
 get_team_store.cache_clear = _open.cache_clear  # type: ignore[attr-defined]
 
 
+def team_configured() -> bool:
+    """Whether a team store is asked for: a non-empty `TILO_TEAM_STORE` (even one that cannot open), or dev mode."""
+    from tilo_api import dev
+
+    return bool(os.environ.get("TILO_TEAM_STORE")) or dev.dev_enabled()
+
+
 def team_reader(overrides: Mapping[Callable[..., Any], Callable[..., Any]]) -> Callable[[], TeamState | None]:
-    """For the engine: the team's state as the app is wired (overrides included). No team store configured means no
-    team settings, so nothing changes from before; a configured store that fails to READ raises (callers fail
-    closed)."""
-    try:
-        store = overrides.get(get_team_store, get_team_store)()
-    except HTTPException:
-        return lambda: None
-    return store.read
+    """For the engine: the team's state as the app is wired (overrides included), read on each call. None ONLY when
+    no team store is configured at all (nothing changes from before); a configured store that cannot be opened or
+    read raises, so every caller fails closed (B2, PR #642)."""
+
+    def read() -> TeamState | None:
+        seam = overrides.get(get_team_store)
+        if seam is None:
+            if not team_configured():
+                return None
+            seam = get_team_store
+        return seam().read()
+
+    return read

@@ -44,6 +44,9 @@ Flags = Annotated[FlagStore, Depends(deps.get_flag_store)]
 Clock = Annotated[Callable[[], str], Depends(deps.get_clock)]
 _NOT_FOUND = "No such team."
 _ATTEMPTS = 5
+MAX_LIMIT_MINOR = 10**12  # 10 billion INR: anything above is a typo, never a limit
+MAX_INVITES = 100  # pending invites at once
+_SESSIONS = frozenset({"web", "mobile_web"})
 _REFUSED = {"not_allowed": 403, "own_role": 409, "last_owner": 409, "unknown": 404}
 
 
@@ -56,7 +59,7 @@ class RoleIn(_Closed):
 
 
 class LimitIn(_Closed):
-    limit_minor: Annotated[int, Field(ge=0)] | None
+    limit_minor: Annotated[int, Field(ge=0, le=MAX_LIMIT_MINOR)] | None
 
 
 class SwitchIn(_Closed):
@@ -78,6 +81,16 @@ class InviteIn(_Closed):
         if any(unicodedata.category(c) in ("Cc", "Cf") for c in value) or not valid_email(value):
             raise ValueError("email")
         return value
+
+
+class _StoreFailed(Exception):
+    """The store could not be read or written: a 503, never a member 404."""
+
+
+def _session(principal: deps.Principal) -> None:
+    """Team settings are admin settings: only a full web or mobile_web sign-in session (server-set, BQ-XWORLD-10)."""
+    if not (principal.full_session is True and principal.channel in _SESSIONS):
+        raise HTTPException(status_code=403, detail="Sign in on the web to manage the team.")
 
 
 def _member(state: TeamState, principal: deps.Principal) -> str:
@@ -125,18 +138,22 @@ def _write(
 ) -> TeamState:
     """Read, check membership, refuse while replay-only, apply `change` (which checks the actor) and compare-and-set;
     a lost race reads again and re-checks everything on the fresh state."""
+    _session(principal)
     try:
         for attempt in range(_ATTEMPTS):
-            state = store.read()
+            state = _stored(store.read)
             _member(state, principal)
             if attempt == 0:
                 deps.refuse_if_replay_only(flags)
             new = change(state)
-            if store.compare_and_set(state.version, new):
+            if _stored(lambda: store.compare_and_set(state.version, new)):
                 return replace(new, version=state.version + 1)
         raise HTTPException(status_code=409, detail="Someone else changed the team. Try again.")
     except (HTTPException, deps.ReplayOnly):
         raise
+    except _StoreFailed as exc:
+        logger.warning("team store refused (%s)", type(exc.__cause__).__name__)
+        raise HTTPException(status_code=503, detail="not_configured") from exc
     except RoleChangeRefused as exc:
         raise HTTPException(status_code=_REFUSED.get(exc.reason, 409), detail=f"refused: {exc.reason}") from exc
     except MustAskLocked as exc:
@@ -148,6 +165,13 @@ def _write(
     except Exception as exc:  # a broken store or config: closed, never the cause
         logger.warning("team write refused (%s)", type(exc).__name__)
         raise HTTPException(status_code=503, detail="not_configured") from exc
+
+
+def _stored[T](call: Callable[[], T]) -> T:
+    try:
+        return call()
+    except Exception as exc:
+        raise _StoreFailed from exc
 
 
 def _audit(principal: deps.Principal, what: str, key: str, at: str) -> None:
@@ -165,6 +189,7 @@ def _read(store: TeamRepository) -> TeamState:
 
 @router.get("/v1/team")
 def get_team(principal: Principal, store: Store) -> dict[str, Any]:
+    _session(principal)  # it carries invite emails
     state = _read(store)
     _member(state, principal)
     return _view(state, principal)
@@ -175,6 +200,7 @@ def put_role(
     person_id: str, principal: Principal, body: Annotated[RoleIn, Depends(_json_body(RoleIn))],
     store: Store, flags: Flags, clock: Clock,
 ) -> dict[str, Any]:  # fmt: skip
+    _session(principal)
     if body.role not in ROLES:  # a legacy contract role ("Team Lead") too, until BQ-DSN-01 maps it
         _member(_read(store), principal)
         raise HTTPException(status_code=422, detail="Pick Owner, Approver, Member or Viewer.")
@@ -236,6 +262,10 @@ def invite(
         _owner(state, principal)
         if body.role not in ROLES or body.role == "Owner":
             raise HTTPException(status_code=422, detail="Invite as Approver, Member or Viewer.")
+        if any(i["email"].lower() == body.email.lower() for i in state.invites.values()):
+            raise HTTPException(status_code=409, detail="That address is already invited.")
+        if len(state.invites) >= MAX_INVITES:
+            raise HTTPException(status_code=409, detail="Too many pending invites.")
         invites = {**state.invites, invite_id: {"email": body.email, "role": body.role}}
         return replace(state, invites=invites)
 
