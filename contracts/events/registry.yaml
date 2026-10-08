@@ -19,7 +19,7 @@
 # (PRD 10.4 Audit, HR-7). Such an event carries authz (EV-03) from one of authz_by (EV-04), and
 # event.schema.json lists the same types (contracts-check fails if the lists drift).
 
-version: 1.1.0
+version: 1.2.0
 unknown_types: trace_only
 types:
   world.requested:
@@ -1094,3 +1094,16 @@ types:
     trace_row: "conversation={data.conversation_id} outcome={data.outcome} decided_by={data.decided_by}"
     data_schema: events/data/assistant.replied.schema.json
     fixture: fixtures/events/valid/assistant.replied.json
+  team_rule.changed:
+    family: team_rule
+    verb: changed
+    priority: must
+    pillar: P4
+    default_severity: info
+    side_effect: false
+    world_effect: "The rules board beside Your Desk flips the changed rule."
+    hud_effect: "The Team page shows the new setting and logs the change."
+    story_template: "{actor} changed a team rule: {data.key} is now {data.to}."
+    trace_row: "rule={data.rule} key={data.key} from={data.from} to={data.to}"
+    data_schema: events/data/team_rule.changed.schema.json
+    fixture: fixtures/events/valid/team_rule.changed.json

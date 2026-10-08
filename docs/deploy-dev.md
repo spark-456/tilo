@@ -69,7 +69,9 @@ user-approved step, never from this workflow or recipe).
 
 Cloud Build and the workflow only swap the image (pinned by digest) and passes `--min-instances 0` and
 `--max-instances 2..3` on an existing service. It never sets ingress, IAM, env vars or secrets;
-Terraform owns those and ignores image changes (`infra/modules/service`).
+Terraform owns those and ignores image changes (`infra/modules/service`). Env vars are Terraform's for every service
+except `tilo-api`: that one has `ignore_env = true`, so its `TILO_*` runtime settings are set by hand with
+`gcloud run services update` (`docs/routines-rollout.md`) and a Terraform run leaves them alone.
 
 ## Alternative: GitHub Actions workflow (one-time setup)
 

@@ -6,7 +6,7 @@ output "service_accounts" {
 output "services" {
   description = "Map of service key => the fields the P0-07 acceptance tests read."
   value = {
-    for k, svc in google_cloud_run_v2_service.this : k => {
+    for k, svc in local.run_services : k => {
       region                = svc.location
       min_instance_count    = var.services[k].min_instance_count
       max_instance_count    = var.services[k].max_instance_count
@@ -42,5 +42,5 @@ output "developer_grants" {
 
 output "uris" {
   description = "Map of service key => its run.app URL (known after apply)."
-  value       = { for k, svc in google_cloud_run_v2_service.this : k => svc.uri }
+  value       = { for k, svc in local.run_services : k => svc.uri }
 }
