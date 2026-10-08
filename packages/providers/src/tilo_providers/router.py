@@ -189,10 +189,12 @@ class Router:
         provider_for_profile: ProviderFor | None = None,
         fixtures_dir: Any = None,
         live_permitted: bool = False,
+        role_thinking: bool = True,
     ) -> None:
         if provider_for_profile is None and fixtures_dir is None:
             raise RouterError("Router needs either provider_for_profile or fixtures_dir")
         self._config, self._provider_for_profile, self._fixtures_dir = config, provider_for_profile, fixtures_dir
+        self._role_thinking = role_thinking  # False: never fill a role's `thinking` (the live smoke sends none)
         self._live_permitted = live_permitted  # SEC-15: set by the caller that decided this router may go live
 
     def _provider(self, role_id: str, profile_id: str) -> ModelProvider:
@@ -256,7 +258,8 @@ class Router:
         sent = run.request.model_copy(update={"prompt": prompt})
         role = self._config.roles[run.role_id]
         if (
-            sent.thinking_level is None
+            self._role_thinking
+            and sent.thinking_level is None
             and role.thinking
             and Capability.THINKING.value in self._config.profiles[profile_id].caps
         ):

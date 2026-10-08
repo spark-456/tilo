@@ -118,6 +118,17 @@ def test_PL_03_only_a_profile_with_the_thinking_capability_is_sent_the_roles_lev
     assert primary.calls[0].thinking_level == "high" and fallback.calls[0].thinking_level is None
 
 
+def test_PL_03_a_router_built_with_role_thinking_off_never_fills_it(providers_config):
+    from tilo_providers.router import Router  # noqa: PLC0415
+
+    primary = ScriptedModelProvider("large", [ScriptedCall(text="ok")])
+    router = Router(providers_config, provider_for_profile={"large": primary}.__getitem__, role_thinking=False)
+
+    router.generate("director", GenerateRequest(prompt="hello"))
+
+    assert primary.calls[0].thinking_level is None, "the live smoke sends no thinking level at all"
+
+
 # --- billing a truncated call (FR-MTR-01) ----------------------------------------------------------------------------
 
 
