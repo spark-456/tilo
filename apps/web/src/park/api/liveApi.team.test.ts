@@ -135,6 +135,16 @@ describe("TEAM_WEB_live_api: the six Owner-only writes", () => {
     expect(r.data).toEqual(VIEW);
   });
 
+  it("TEAM_WEB_writeTeam_invite_saved_but_refresh_failed_is_not_an_error", async () => {
+    const fetchSpy = vi.fn(async (_u: string | URL | Request, i?: RequestInit) =>
+      i?.method === "POST" ? json({ invite_id: "inv_9" }, 201) : json({ detail: "x" }, 500),
+    );
+    const api = createLiveApi({ baseUrl: BASE, fetch: fetchSpy as unknown as typeof fetch });
+    const r = await api.writeTeam({ kind: "invite", email: "a@b.co", role: "Member" });
+    expect(r.data).toBeNull();
+    expect(r.source).toBe("live");
+  });
+
   it("TEAM_WEB_writeTeam_ids_are_path_encoded", async () => {
     const { fetchSpy, api } = apiWith(() => json(VIEW));
     await api.writeTeam({ kind: "remove", id: "a/b c" });
@@ -157,13 +167,26 @@ describe("TEAM_WEB_errors: every outcome has a plain sentence", () => {
     expect(teamErrorText(await statusOf(401))).toMatch(/sign in/i);
     expect(teamErrorText(await statusOf(403))).toMatch(/Owner/);
     expect(teamErrorText(await statusOf(404))).toMatch(/no longer/);
-    expect(teamErrorText(await statusOf(409))).toMatch(/Someone else changed the team/);
+    expect(teamErrorText(await statusOf(409))).toBe("That cannot be done right now.");
     expect(
       teamErrorText(await statusOf(422, { detail: "Pick Owner, Approver, Member or Viewer." })),
     ).toBe("Pick Owner, Approver, Member or Viewer.");
     const none = teamErrorText(await statusOf(503, { detail: "not_configured" }));
     expect(none).toBe("Team controls are not set up on this install yet.");
     expect(none).not.toContain("not_configured");
+  });
+
+  it("TEAM_WEB_409_says_the_true_cause_in_a_plain_sentence", async () => {
+    const say = async (detail: string) => teamErrorText(await statusOf(409, { detail }));
+    expect(await say("Someone else changed the team. Try again.")).toMatch(/Someone else changed/);
+    expect(await say("refused: own_role")).toMatch(/your own role/i);
+    expect(await say("refused: last_owner")).toMatch(/last Owner/);
+    expect(await say("That address is already invited.")).toMatch(/already invited/);
+    expect(await say("Too many pending invites.")).toMatch(/too many/i);
+    expect(await say("A Must-ask rule can't be switched off.")).toMatch(/always asks/i);
+    for (const d of ["refused: own_role", "refused: last_owner", "That address is already invited."])
+      expect(await say(d)).not.toMatch(/Someone else changed/);
+    expect(await say("refused: own_role")).not.toContain("refused:");
   });
 
   it("TEAM_WEB_replay_only_keeps_the_replay_only_sentence", async () => {

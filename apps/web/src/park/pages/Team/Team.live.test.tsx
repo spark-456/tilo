@@ -107,7 +107,9 @@ describe("TEAM_WEB_team_page_live: reads the server's team", () => {
       expect((sw as HTMLButtonElement).disabled).toBe(true);
     }
     expect(strings(root).has("Saved; not enforced yet")).toBe(true);
-    expect(strings(root).has("Hold until Monday morning")).toBe(true); // weekend is wired into the engine
+    // weekend is wired into the engine, but a hold longer than the retry window can lose the slot (BQ-TEAMRT-3)
+    expect([...strings(root)].some((t) => /^Hold until Monday morning\./.test(t))).toBe(true);
+    expect(root.textContent).toMatch(/lose the slot|can be missed/i);
   });
 });
 
@@ -202,6 +204,35 @@ describe("TEAM_WEB_team_page_live: Owner writes", () => {
     expect(root.querySelector('select[aria-label="Role for u2"]')).toBeNull();
     expect(root.textContent).not.toContain("Cancel invite"); // no route cancels an invite (NotBuilt)
     expect(root.textContent).not.toContain("Resend invite");
+  });
+});
+
+describe("TEAM_WEB_team_page_live: honest copy", () => {
+  it("TEAM_WEB_live_remove_toast_does_not_claim_worlds_moved", async () => {
+    const after = view({ members: [view().members[0] as never] });
+    const { api } = liveApi(
+      async () => view(),
+      async () => after,
+    );
+    const app = makeApp();
+    const { root } = await renderTeam(app, api);
+    await clickAndSettle(buttonNamed(root, "Show details for u2"));
+    await clickAndSettle(buttonNamed(root, "Remove from team"));
+    expect(app.toast).toHaveBeenCalledWith("u2 was removed from the team");
+    for (const [m] of (app.toast as ReturnType<typeof vi.fn>).mock.calls)
+      expect(String(m)).not.toMatch(/worlds?/i);
+  });
+
+  it("TEAM_WEB_live_invite_saved_but_refresh_failed_keeps_the_invite_and_says_so", async () => {
+    const { api } = liveApi(
+      async () => view(),
+      async () => null as never,
+    );
+    const { root } = await renderTeam(makeApp(), api);
+    await typeInto(inputNamed(root, "Invite by email"), "x@acme.co");
+    await clickAndSettle(buttonNamed(root, "Invite"));
+    expect(root.textContent).toContain("Saved; could not refresh");
+    expect(strings(root).has("x@acme.co")).toBe(true);
   });
 });
 

@@ -114,6 +114,15 @@ describe("TEAM_WEB_connectors_live: tool levels from the server", () => {
     errors.mockRestore();
   });
 
+  it("TEAM_WEB_connectors_live_off_copy_does_not_overpromise_beyond_the_run_path", async () => {
+    const off: TeamView = { ...view(), tools: [{ connector: "gmail", level: "off" }] };
+    const { api } = apiOf(async () => off);
+    const m = await renderPage(makeApp(), api);
+    expect(textOf(m.container)).not.toContain("Agents cannot use this tool.");
+    expect(textOf(m.container)).toMatch(/runs/i);
+    expect(textOf(m.container)).toMatch(/Email Autopilot|calendar sync/i);
+  });
+
   it("TEAM_WEB_connectors_live_names_the_per_skill_level_as_not_built", async () => {
     const { api } = apiOf(async () => view());
     const m = await renderPage(makeApp(), api);
