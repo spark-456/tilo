@@ -1,0 +1,254 @@
+{
+  "skill_id": "skill-from-description",
+  "requirements": ["FR-SKL-01", "FR-SKL-02"],
+  "cases": [
+    {
+      "id": "clear_inbox_digest",
+      "category": "clear",
+      "input": {
+        "description": "Read starred customer emails in Gmail and summarise the open support questions into a Google Drive notes document.",
+        "connected_tools": ["gmail", "google_drive"],
+        "is_ambiguous": false,
+        "expected_action_clauses": [
+          "Read starred customer emails in Gmail",
+          "summarise the open support questions into a Google Drive notes document"
+        ]
+      },
+      "output": {
+        "title": "Summarise starred customer emails",
+        "steps": [
+          {
+            "verb": "read",
+            "object": "starred customer emails in Gmail",
+            "tool": "gmail",
+            "ask_me_first": false
+          },
+          {
+            "verb": "summarise",
+            "object": "open support questions into a Google Drive notes document",
+            "tool": "google_drive",
+            "ask_me_first": false
+          }
+        ],
+        "clarifying_question": null,
+        "trigger": {
+          "kind": "on_request"
+        },
+        "scope": "just_me"
+      }
+    },
+    {
+      "id": "ambiguous_cleanup_and_forward",
+      "category": "ambiguous",
+      "input": {
+        "description": "Find old draft proposals in Google Drive, delete the outdated draft proposals, and share the final proposal with the client.",
+        "connected_tools": ["google_drive", "gmail"],
+        "is_ambiguous": true,
+        "expected_action_clauses": [
+          "Find old draft proposals in Google Drive",
+          "delete the outdated draft proposals",
+          "share the final proposal with the client"
+        ]
+      },
+      "output": {
+        "title": "Clean up draft proposals and share final proposal",
+        "steps": [
+          {
+            "verb": "find",
+            "object": "old draft proposals in Google Drive",
+            "tool": "google_drive",
+            "ask_me_first": false
+          },
+          {
+            "verb": "delete",
+            "object": "outdated draft proposals in Google Drive",
+            "tool": "google_drive",
+            "ask_me_first": true
+          },
+          {
+            "verb": "share",
+            "object": "final proposal with the client",
+            "tool": "google_drive",
+            "ask_me_first": true
+          }
+        ],
+        "clarifying_question": "How old should a draft proposal be before it counts as outdated and who is the client recipient?",
+        "trigger": {
+          "kind": "on_request"
+        },
+        "scope": "just_me"
+      }
+    },
+    {
+      "id": "weekly_team_pipeline_routine",
+      "category": "weekly_routine",
+      "input": {
+        "description": "Every Monday for our team, read the weekly sales pipeline spreadsheet in Google Drive and summarise stalled deals for the team.",
+        "connected_tools": ["google_drive", "slack"],
+        "is_ambiguous": false,
+        "expected_action_clauses": [
+          "read the weekly sales pipeline spreadsheet in Google Drive",
+          "summarise stalled deals for the team"
+        ]
+      },
+      "output": {
+        "title": "Weekly team sales pipeline summary",
+        "steps": [
+          {
+            "verb": "read",
+            "object": "weekly sales pipeline spreadsheet in Google Drive",
+            "tool": "google_drive",
+            "ask_me_first": false
+          },
+          {
+            "verb": "summarise",
+            "object": "stalled deals for the team",
+            "tool": "slack",
+            "ask_me_first": false
+          }
+        ],
+        "clarifying_question": null,
+        "trigger": {
+          "kind": "schedule",
+          "cadence": "weekly"
+        },
+        "scope": "team"
+      }
+    },
+    {
+      "id": "email_sending_vendor_followup",
+      "category": "email_sending",
+      "input": {
+        "description": "Check overdue vendor deliverables in Google Drive, draft a polite status follow-up in Gmail, and send the follow-up email to the vendor contact.",
+        "connected_tools": ["google_drive", "gmail"],
+        "is_ambiguous": false,
+        "expected_action_clauses": [
+          "Check overdue vendor deliverables in Google Drive",
+          "draft a polite status follow-up in Gmail",
+          "send the follow-up email to the vendor contact"
+        ]
+      },
+      "output": {
+        "title": "Follow up on overdue vendor deliverables",
+        "steps": [
+          {
+            "verb": "check",
+            "object": "overdue vendor deliverables in Google Drive",
+            "tool": "google_drive",
+            "ask_me_first": false
+          },
+          {
+            "verb": "draft",
+            "object": "polite status follow-up in Gmail",
+            "tool": "gmail",
+            "ask_me_first": false
+          },
+          {
+            "verb": "send",
+            "object": "follow-up email to the vendor contact",
+            "tool": "gmail",
+            "ask_me_first": true
+          }
+        ],
+        "clarifying_question": null,
+        "trigger": {
+          "kind": "on_request"
+        },
+        "scope": "just_me"
+      }
+    },
+    {
+      "id": "payment_monthly_contractor_invoice",
+      "category": "payment",
+      "input": {
+        "description": "Every month, read approved contractor invoices in Gmail, verify the invoice totals against the budget sheet in Google Drive, and pay the approved contractor invoice in Stripe.",
+        "connected_tools": ["gmail", "google_drive", "stripe"],
+        "is_ambiguous": false,
+        "expected_action_clauses": [
+          "read approved contractor invoices in Gmail",
+          "verify the invoice totals against the budget sheet in Google Drive",
+          "pay the approved contractor invoice in Stripe"
+        ]
+      },
+      "output": {
+        "title": "Verify and pay monthly contractor invoice",
+        "steps": [
+          {
+            "verb": "read",
+            "object": "approved contractor invoices in Gmail",
+            "tool": "gmail",
+            "ask_me_first": false
+          },
+          {
+            "verb": "verify",
+            "object": "invoice totals against the budget sheet in Google Drive",
+            "tool": "google_drive",
+            "ask_me_first": false
+          },
+          {
+            "verb": "pay",
+            "object": "approved contractor invoice in Stripe",
+            "tool": "stripe",
+            "ask_me_first": true
+          }
+        ],
+        "clarifying_question": null,
+        "trigger": {
+          "kind": "schedule",
+          "cadence": "monthly"
+        },
+        "scope": "just_me"
+      }
+    },
+    {
+      "id": "multi_tool_onboarding_coordination",
+      "category": "multi_tool",
+      "input": {
+        "description": "When a new hire welcome email arrives in Gmail, copy the onboarding checklist in Google Drive, share the onboarding checklist with the new hire, book the 30-minute orientation meeting on Google Calendar, and send the orientation welcome message in Slack.",
+        "connected_tools": ["gmail", "google_drive", "google_calendar", "slack"],
+        "is_ambiguous": false,
+        "expected_action_clauses": [
+          "copy the onboarding checklist in Google Drive",
+          "share the onboarding checklist with the new hire",
+          "book the 30-minute orientation meeting on Google Calendar",
+          "send the orientation welcome message in Slack"
+        ]
+      },
+      "output": {
+        "title": "Coordinate new hire onboarding across Drive, Calendar, and Slack",
+        "steps": [
+          {
+            "verb": "copy",
+            "object": "onboarding checklist in Google Drive",
+            "tool": "google_drive",
+            "ask_me_first": false
+          },
+          {
+            "verb": "share",
+            "object": "onboarding checklist with the new hire",
+            "tool": "google_drive",
+            "ask_me_first": true
+          },
+          {
+            "verb": "book",
+            "object": "30-minute orientation meeting on Google Calendar",
+            "tool": "google_calendar",
+            "ask_me_first": true
+          },
+          {
+            "verb": "send",
+            "object": "orientation welcome message in Slack",
+            "tool": "slack",
+            "ask_me_first": true
+          }
+        ],
+        "clarifying_question": null,
+        "trigger": {
+          "kind": "event",
+          "event": "new hire welcome email arrives in Gmail"
+        },
+        "scope": "just_me"
+      }
+    }
+  ]
+}
