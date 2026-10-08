@@ -21,6 +21,7 @@ import re
 import threading
 import time
 from collections.abc import Callable, Iterable, Mapping, Sequence
+from contextlib import AbstractContextManager, nullcontext
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Annotated, Any, Literal, Protocol, cast
@@ -99,6 +100,8 @@ class WorldRecord:
     paused: bool = False  # true once Pause all has actually paused this world (PRD 9.4 honesty:
     # only ever true together with a world.paused event queued or committed somewhere)
     prior_world_id: str | None = None  # a scheduled run's previous world (FR-AGT-14b): offered, never silently reused
+    layout: dict | None = None  # the run's built layout (PRD 15.1 World), None until the run commits it (ADR-0026);
+    # the event writer reads it, with `run_id`, from here, never from a part
 
 
 @dataclass
@@ -152,18 +155,90 @@ class Store:
         with self._grant_locks_guard:
             return self.grant_locks.setdefault(owner, threading.Lock())
 
+    # The seams a route uses to read and write records and events. Here (dev mode, tests) the dicts are the store:
+    # loads read the cache, and `save` sends events through the writer first. `DurableStore` overrides all of them.
+    # `settle=False` is for a caller that has not yet checked who is asking: a load that settles also writes.
+    def load_world(self, world_id: str, settle: bool = False) -> WorldRecord | None:
+        return self.worlds.get(world_id)
+
+    def load_task(self, task_id: str, settle: bool = False) -> TaskRecord | None:
+        return self.tasks.get(task_id)
+
+    def load_owner(self, owner: str, settle: bool = False) -> None:
+        """Called before a route iterates an owner's worlds or policies; the cache already holds them."""
+
+    def load_path(self, params: Mapping[str, Any]) -> Store:
+        return self
+
+    def settle(self, world_id: str, writer: EventWriter | None = None) -> None:
+        """What a previous process left in the world (its queue, a run that died): nothing to do on a plain store."""
+
+    def deadline(self, seconds: float) -> AbstractContextManager[None]:
+        """Bounds the calling thread's wait for the store's lock; a plain store has no lock to wait for."""
+        return nullcontext()
+
+    def commit(
+        self,
+        *,
+        worlds: Mapping[str, WorldRecord] | None = None,
+        tasks: Mapping[str, TaskRecord] | None = None,
+        policies: Mapping[str, dict] | None = None,
+        policy_worlds: Mapping[str, str] | None = None,
+        parts: Mapping[str, list[dict]] | None = None,  # a plain store has no queue: the caller sends its parts
+        create: Iterable[tuple[str, str]] = (),
+        evict: bool = True,
+    ) -> None:
+        self.worlds.update(worlds or {})
+        self.tasks.update(tasks or {})
+        self.policies.update(policies or {})
+        self.policy_worlds.update(policy_worlds or {})
+
+    def save(
+        self, writer: EventWriter | None, *, parts: Mapping[str, list[dict]] | None = None, **records: Any
+    ) -> None:
+        """A route's new records and events. The events go through `writer` first (it reads the world's record, so a
+        new one is stored before them); a failure removes the worlds this call created and changes nothing else."""
+        self.worlds.update(records.get("worlds") or {})
+        sending = ""
+        try:
+            for sending, world_parts in (parts or {}).items():
+                for part in world_parts:
+                    assert writer is not None
+                    writer.append(sending, part)
+        except Exception as exc:
+            for kind, world_id in records.get("create", ()):
+                if kind == "worlds":
+                    self.worlds.pop(world_id, None)
+            raise event_failure(sending, exc) from None
+        self.commit(parts=parts, **records)
+
+    def ack(self, world_id: str, part_id: str) -> None:
+        """A queued part is committed: a durable store forgets it in its queue too."""
+
 
 class EventRejected(Exception):
     """Raised by EventWriter.append when a caller resends an `id` already committed for that
     world with genuinely different content (EV-10 conflict, never a silent overwrite)."""
 
 
+def event_failure(world_id: str, exc: Exception) -> HTTPException:
+    """A writer's failure as the route's answer: a refused event is a fixed 409, anything else 503 `store_unavailable`;
+    never the validator's text (it names world, run and event ids)."""
+    if isinstance(exc, HTTPException):
+        return exc
+    logger.warning("event writer failed for world %s (%s)", world_id, type(exc).__name__)
+    if isinstance(exc, EventRejected):
+        return HTTPException(status_code=409, detail="the event was refused")
+    return HTTPException(status_code=503, detail="store_unavailable")
+
+
 class EventWriter(Protocol):
     """The single writer of events (PRD 15.3). Every event tilo-api hands here carries its own
     stable `id` (a ULID), built once when the part is enqueued and resent unchanged on every
     retry -- the sole idempotency key `append` dedupes on (issue #46 / EV-10), never raw content
-    and never which writer object happens to receive the call. `seq`, `ts`, `run_id` and `trace`
-    remain writer-only.
+    and never which writer object happens to receive the call. The writer stamps `seq`, `ts`, `world_id`,
+    `run_id` and `v`; a part's `trace` is kept only after the event validator accepts it, and a part without
+    one gets a null trace.
 
     A writer that wraps the harness `WorldWriter` should also expose an optional `reopen()`: the
     dispatcher calls it after a failed append, before the same event is resent, so a stale lease
@@ -211,12 +286,19 @@ def get_current_principal(request: HTTPConnection = None) -> Principal:  # type:
         raise HTTPException(status_code=401, detail=SIGN_IN_REQUIRED, headers={"WWW-Authenticate": "Bearer"}) from None
 
 
-def get_store() -> Store:
-    raise HTTPException(status_code=503, detail="not_configured")
+def get_store(request: Request = None) -> Store:  # type: ignore[assignment]  # FastAPI injects it; None elsewhere
+    """Deployed: the durable store for `TILO_API_STORE`, with the request's path ids loaded (ADR-0026 decisions 1, 3);
+    without a valid config 503 `not_configured`, never cached. Dev mode and the tests override this seam."""
+    from tilo_api.durable_store import deployed
+
+    store = deployed()[0]
+    return store.load_path(request.path_params) if request is not None else store
 
 
 def get_event_writer() -> EventWriter:
-    raise HTTPException(status_code=503, detail="not_configured")
+    from tilo_api.durable_store import deployed
+
+    return deployed()[1]
 
 
 def get_ledger() -> Sequence[LedgerEntry]:
