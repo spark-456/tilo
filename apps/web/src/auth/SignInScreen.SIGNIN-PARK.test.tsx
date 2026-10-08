@@ -35,7 +35,7 @@ describe("SIGNIN-PARK the sign-in screen", () => {
     expect(text()).toContain(
       "Your agents keep working while you’re away. Sign in to see what needs you.",
     );
-    expect(text()).toContain("A sample company with live agents. Nothing you do is saved.");
+    expect(text()).toContain("A sample company to explore. Demo sessions replay recorded runs.");
     expect(text()).toContain("OR");
   });
 

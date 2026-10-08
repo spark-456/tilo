@@ -1,12 +1,24 @@
 // The sign-in screen (SEC-15 / SIGNIN): the Park city behind a glass card with Google and a demo session. The card is
 // drawn at once; the city is its own chunk and arrives behind it. Tilo never handles passwords: no field, no form
 // (PRD 16.1). The two choices are real buttons; what they do is the gate's (`SignInGate`).
-import { Suspense, lazy, useState } from "react";
+import { Component, type ReactNode, Suspense, lazy, useState } from "react";
 import "./signin.css";
 
 const SignInBackdrop = lazy(() => import("./SignInBackdrop"));
 
 type Time = "day" | "night";
+
+/** The city is decoration: if its chunk does not arrive (a deploy while the page is open, a dropped network) the
+ * card stays and the page does not go blank. */
+class QuietBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
+  state = { failed: false };
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+  render() {
+    return this.state.failed ? null : this.props.children;
+  }
+}
 
 function GoogleMark() {
   return (
@@ -48,9 +60,11 @@ export function SignInScreen({
   return (
     <main className="signin" data-testid="sign-in" data-time={time}>
       <div className="signin__city">
-        <Suspense fallback={null}>
-          <SignInBackdrop time={time} />
-        </Suspense>
+        <QuietBoundary>
+          <Suspense fallback={null}>
+            <SignInBackdrop time={time} />
+          </Suspense>
+        </QuietBoundary>
       </div>
       <button
         type="button"
@@ -106,7 +120,9 @@ export function SignInScreen({
         >
           <span aria-hidden="true">✦</span> Explore a demo session
         </button>
-        <p className="signin__note">A sample company with live agents. Nothing you do is saved.</p>
+        <p className="signin__note">
+          A sample company to explore. Demo sessions replay recorded runs.
+        </p>
         {failed && (
           <p className="signin__error" role="alert">
             {failedText}

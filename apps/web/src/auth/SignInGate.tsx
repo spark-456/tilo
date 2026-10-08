@@ -3,7 +3,7 @@
 // (EFF-01); "unknown" (the SDK has not answered) shows nothing, so nothing flashes; "signed_out" shows the panel
 // and not the app (the Park sign-in screen, SignInScreen); "google" or "anonymous" shows the app. Tilo never handles passwords: Google signs the person
 // in, in its own window, and the panel has no field and no form (PRD 16.1). Neutral role tokens only.
-import { type ReactNode, useState, useSyncExternalStore } from "react";
+import { type ReactNode, useRef, useState, useSyncExternalStore } from "react";
 import { SignInScreen } from "./SignInScreen";
 import type { AuthController, SignInResult } from "./auth";
 
@@ -27,17 +27,22 @@ export function SignInGate({
 function SignInPanel({ auth }: { readonly auth: AuthController }) {
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(false);
+  // A ref, not the state: two clicks in one batch both see the same render, and only one sign-in may start.
+  const running = useRef(false);
 
   const run = (start: () => Promise<SignInResult>): void => {
-    if (busy) return;
+    if (running.current) return;
+    running.current = true;
     setBusy(true);
     setFailed(false);
     start().then(
       (result) => {
+        running.current = false;
         setBusy(false);
         setFailed(!result.ok && result.reason !== "cancelled");
       },
       () => {
+        running.current = false;
         setBusy(false);
         setFailed(true);
       },
