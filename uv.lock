@@ -1427,6 +1427,9 @@ source = { editable = "services/browser" }
 dependencies = [
     { name = "fastapi" },
     { name = "idna" },
+    { name = "tilo-archive" },
+    { name = "tilo-logging" },
+    { name = "tilo-planning" },
     { name = "tilo-providers" },
     { name = "uvicorn" },
 ]
@@ -1435,6 +1438,9 @@ dependencies = [
 requires-dist = [
     { name = "fastapi", specifier = ">=0.115" },
     { name = "idna", specifier = ">=3.7" },
+    { name = "tilo-archive", editable = "packages/archive" },
+    { name = "tilo-logging", editable = "packages/logging" },
+    { name = "tilo-planning", editable = "packages/planning" },
     { name = "tilo-providers", editable = "packages/providers" },
     { name = "uvicorn", specifier = ">=0.32" },
 ]

@@ -14,6 +14,7 @@ allowlisted egress, masked secure fields, nothing persisted between runs.
 - `masking.py` — `mask_text` / `mask_data`: the one masker for anything that leaves a worker.
 - `login.py` — `detect_login`, `secure_field_refs`, `build_login_card` (needs-you card; FR-CON-08).
 - `worker.py` — `BrowserWorker`, a `HandsProvider` over `engine.new_context(gate)`; one worker = one run.
+- `fetch.py` — `FetchService` and `POST /fetch` (LW-08): service-to-service HTTPS GET fetcher with SSRF IP pinning, `robots.txt` check, size/unit caps, magic-byte sniffing, HTML text extraction, and `RunArchive` writing.
 
 ## Contracts
 - Reads/writes: `contracts/card.schema.json` needs-you cards via a `card_sink`; masked
@@ -24,7 +25,7 @@ allowlisted egress, masked secure fields, nothing persisted between runs.
 - `config/connectors.yaml` (egress allowlist per adapter; not created yet, tests use literals).
 
 ## Requirement IDs
-- Section 6.2 `tilo-browser` row; FR-CON-07, FR-CON-08, FR-CON-13; SEC-09 (egress allowlist).
+- Section 6.2 `tilo-browser` row; FR-CON-07, FR-CON-08, FR-CON-13; LW-08; SEC-09 (egress allowlist).
 
 ## Local rules
 - One isolated browser per session; egress only through the allowlist proxy.
