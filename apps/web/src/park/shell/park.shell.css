@@ -226,6 +226,8 @@
   flex: none;
   align-items: center;
   gap: 7px;
+  position: relative;
+  isolation: isolate;
   height: 40px;
   padding: 0 14px;
   border-radius: 14px;
@@ -234,9 +236,6 @@
   font-size: 15px;
   font-weight: 800;
   text-decoration: none;
-}
-[data-park] .park-shell__tab:hover {
-  background: var(--chip);
 }
 [data-park] .park-shell__tab--on,
 [data-park] .park-shell__tab--on:hover {
@@ -268,6 +267,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  position: relative;
+  isolation: isolate;
   width: 40px;
   height: 40px;
   border: 0;
@@ -276,7 +277,6 @@
   color: var(--ink);
   cursor: pointer;
 }
-[data-park] .park-shell__iconbtn:hover,
 [data-park] .park-shell__iconbtn--on {
   background: var(--chip);
 }
@@ -460,6 +460,8 @@
   grid-template-columns: 36px minmax(0, 1fr) auto;
   align-items: center;
   gap: 12px;
+  position: relative;
+  isolation: isolate;
   padding: 10px;
   border: 0;
   border-radius: 14px;
@@ -468,9 +470,6 @@
   cursor: pointer;
   font-family: inherit;
   text-align: left;
-}
-[data-park] .park-shell__nrow:hover {
-  background: var(--rowHover);
 }
 [data-park] .park-shell__ntile {
   display: flex;
@@ -760,17 +759,139 @@
   font-weight: 700;
 }
 
-/* Reduced motion (README): no animation and no transition at all in the shell's chrome. The shell also skips
-   its own waits (motion.ts), so a page swaps at once and a splash or card goes the moment it is done. */
+/* ---- Micro-interactions (WEB-MOTION-3, FR-UX-12) ----
+   Hover, press, slide and enter feedback from the handoff (README "Interactions and motion"; the inline styles of
+   design_handoff_tilo_web_app/design/Tilo App *.dc.html). Every rule here is a transition on transform or opacity,
+   or tiloSpin on a ring, and starts from something a person did (a pointer over a control, a press, a click that
+   opens a menu, an action in flight). Nothing shows or implies an agent, a run or a decision. Page and component
+   stylesheets may not hold motion, so the page's controls are reached from the page outlet (.park-shell__main).
+   The reference's colour, box-shadow, filter and width fades are not built: they would animate paint or layout.
+   The Home glass chip does not lift for the same reason (it carries a backdrop-filter). */
+
+/* The nav's hover wash is an overlay that fades by opacity (the reference fades background-color .2s). */
+[data-park] .park-shell__tab::before,
+[data-park] .park-shell__iconbtn::before,
+[data-park] .park-shell__nrow::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  background: var(--chip);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+}
+[data-park] .park-shell__nrow::before {
+  background: var(--rowHover);
+}
+[data-park] .park-shell__tab:hover::before,
+[data-park] .park-shell__iconbtn:hover::before,
+[data-park] .park-shell__nrow:hover::before,
+[data-park] .park-shell__tab:focus-visible::before,
+[data-park] .park-shell__iconbtn:focus-visible::before,
+[data-park] .park-shell__nrow:focus-visible::before {
+  opacity: 1;
+}
+/* The tab you are on keeps its own fill. */
+[data-park] .park-shell__tab--on:hover::before {
+  opacity: 0;
+}
+
+/* Lifts on hover: cards, tiles and pins rise on transform .3s cubic-bezier(.2,.8,.2,1). */
+[data-park] .park-shell__main .park-worlds-card,
+[data-park] .park-shell__main .park-home-pin__card,
+[data-park] .park-shell__main .park-connectors-tile {
+  transition: transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+[data-park] .park-shell__main .park-worlds-card:hover {
+  transform: translateY(-3px);
+}
+[data-park] .park-shell__main .park-connectors-tile:hover {
+  transform: translateY(-2px);
+}
+/* The pinboard note straightens and lifts with a spring; the agenda event lifts 1px. */
+[data-park] .park-shell__main .park-agenda-pin {
+  transition: transform 0.45s cubic-bezier(0.34, 1.4, 0.5, 1);
+}
+[data-park] .park-shell__main .park-agenda-event {
+  transition: transform 0.2s ease;
+}
+
+/* Press: the Home start button sinks 2px (its own :active), a shared button 1px, over .15s. */
+[data-park] .park-shell__main .park-home-start,
+[data-park] .park-shell__main .park-btn {
+  transition: transform 0.15s ease;
+}
+[data-park] .park-shell__main .park-btn:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+/* The sliding thumb of a segmented control and the knobs of the switches (the component sets the end state). */
+[data-park] .park-shell__main .park-seg--sliding .park-seg__thumb {
+  transition: transform 0.4s cubic-bezier(0.34, 1.3, 0.5, 1);
+}
+[data-park] .park-shell__main .park-switch__knob,
+[data-park] .park-shell__main .park-profile-knob,
+[data-park] .park-shell__main .park-skills-ask-knob,
+[data-park] .park-shell__main .park-agenda-knob {
+  transition: transform 0.25s cubic-bezier(0.3, 1.3, 0.5, 1);
+}
+
+/* A toast, a popover or a menu comes in: from a few px up and transparent, over .25s (the shell's Enter component
+   holds data-enter="pre" for one style flush, then "in"). The wrapper has no box. */
+[data-park] .park-shell__enter {
+  display: contents;
+}
+[data-park] .park-shell__enter > .park-toast {
+  transition: opacity 0.25s ease, transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+[data-park] .park-shell__enter > .park-popover {
+  transition: opacity 0.2s ease, transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+[data-park] .park-shell__enter[data-enter="pre"] > .park-toast {
+  opacity: 0;
+  transform: translateX(-50%) translateY(-8px);
+}
+[data-park] .park-shell__enter[data-enter="pre"] > .park-popover {
+  opacity: 0;
+  transform: translateY(-6px);
+}
+
+/* Reduced motion (README): no animation and no transition at all in the shell's chrome or the page's controls.
+   The shell also skips its own waits (motion.ts), so a page swaps at once and a splash or card goes the moment it
+   is done. The person's 'still' (Profile > Appearance, data-motion on the root) is the same list. */
 @media (prefers-reduced-motion: reduce) {
   [data-park] .park-shell__main,
+  [data-park] .park-shell__main *,
   [data-park] .park-shell__bar,
   [data-park] .park-shell__barfill,
   [data-park] .park-shell__bootfill,
   [data-park] .park-shell__boot--out,
   [data-park] .park-shell__ring,
+  [data-park] .park-shell__tab::before,
+  [data-park] .park-shell__iconbtn::before,
+  [data-park] .park-shell__nrow::before,
+  [data-park] .park-shell__enter > .park-toast,
+  [data-park] .park-shell__enter > .park-popover,
   [data-park] .park-scrim:has(> .park-shell__card--leaving) {
     animation: none !important;
     transition: none !important;
   }
+}
+[data-park][data-motion="still"] .park-shell__main,
+[data-park][data-motion="still"] .park-shell__main *,
+[data-park][data-motion="still"] .park-shell__bar,
+[data-park][data-motion="still"] .park-shell__barfill,
+[data-park][data-motion="still"] .park-shell__bootfill,
+[data-park][data-motion="still"] .park-shell__boot--out,
+[data-park][data-motion="still"] .park-shell__ring,
+[data-park][data-motion="still"] .park-shell__tab::before,
+[data-park][data-motion="still"] .park-shell__iconbtn::before,
+[data-park][data-motion="still"] .park-shell__nrow::before,
+[data-park][data-motion="still"] .park-shell__enter > .park-toast,
+[data-park][data-motion="still"] .park-shell__enter > .park-popover,
+[data-park][data-motion="still"] .park-scrim:has(> .park-shell__card--leaving) {
+  animation: none !important;
+  transition: none !important;
 }
