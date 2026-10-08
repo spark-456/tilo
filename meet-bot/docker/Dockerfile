@@ -1,3 +1,5 @@
+# Build context is the REPOSITORY ROOT (see docker-compose.yml and meet-bot/docker/Dockerfile.dockerignore): the bot calls
+# Tilo's provider layer (FR-MTG-11), so the image carries packages/providers, packages/contracts-py, config/ and prompts/.
 FROM mcr.microsoft.com/playwright/python:v1.52.0-noble
 
 ENV DEBIAN_FRONTEND=noninteractive \
@@ -14,15 +16,24 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && mkdir -p /tmp/.X11-unix && chmod 1777 /tmp/.X11-unix \
     && rm -rf /var/lib/apt/lists/*
 
-COPY docker/requirements.txt /tmp/requirements.txt
+COPY meet-bot/docker/requirements.txt /tmp/requirements.txt
 RUN pip install --break-system-packages --ignore-installed typing_extensions -r /tmp/requirements.txt
+
+# Tilo's provider layer, in the repository's own layout under /opt/tilo so config/ and prompts/ resolve next to the
+# packages exactly as in the repo (tilo_providers finds both four directories above its own files).
+COPY packages/contracts-py/src /opt/tilo/packages/contracts-py/src
+COPY packages/providers/src /opt/tilo/packages/providers/src
+COPY config /opt/tilo/config
+COPY prompts /opt/tilo/prompts
+ENV TILO_REPO_ROOT=/opt/tilo \
+    PYTHONPATH=/opt/tilo/packages/contracts-py/src:/opt/tilo/packages/providers/src
 
 # Profile volume mount point, owned by the non-root user so the named volume inherits it.
 RUN mkdir -p /profile /app && chown pwuser:pwuser /profile /app
 
 WORKDIR /app
-COPY --chown=pwuser:pwuser bot /app/bot
-COPY --chown=pwuser:pwuser docker/entrypoint.py /entrypoint.py
+COPY --chown=pwuser:pwuser meet-bot/bot /app/bot
+COPY --chown=pwuser:pwuser meet-bot/docker/entrypoint.py /entrypoint.py
 
 USER pwuser
 EXPOSE 6080

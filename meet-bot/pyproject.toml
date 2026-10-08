@@ -3,10 +3,10 @@ name = "tilo-meet-bot"
 version = "0.1.0"
 description = "Google Meet note-taking bot prototype"
 requires-python = ">=3.12"
-dependencies = []  # host CLI is stdlib only; container installs docker/requirements.txt
+dependencies = []  # host CLI is stdlib only; container installs docker/requirements.txt (the provider layer is copied in)
 
 [project.optional-dependencies]
-dev = ["pytest>=8", "playwright==1.52.0", "google-genai>=1.0"]
+dev = ["pytest>=8", "playwright==1.52.0"]  # model and speech SDKs come with packages/providers (the repo venv), never from here
 
 [tool.uv.workspace]
 members = []  # standalone: not part of the Tilo monorepo workspace

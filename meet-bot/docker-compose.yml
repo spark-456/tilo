@@ -4,8 +4,10 @@ services:
   bot:
     image: tilo-meet-bot:latest
     build:
-      context: .
-      dockerfile: docker/Dockerfile
+      # The repository root (FR-MTG-11): the image carries Tilo's provider layer, config/ and prompts/. What goes into the
+      # context is whitelisted in docker/Dockerfile.dockerignore.
+      context: ..
+      dockerfile: meet-bot/docker/Dockerfile
     init: true
     cpus: ${BOT_CPUS:-2}
     mem_limit: ${BOT_MEM_LIMIT:-3g}
@@ -20,6 +22,10 @@ services:
       SAVE_CAPTION_SNAPSHOTS:
       ADMIT_ALLOWED_NAMES:
       REQUIRED_PARTICIPANTS:
+      # The user's own live switch and Google project (README, Providers). Unset = the offline fake providers.
+      LIVE:
+      GOOGLE_CLOUD_PROJECT:
+      GOOGLE_LOCATION:
     ports:
       # noVNC, reachable only from this computer. The VNC session has no password, so never widen this.
       - "127.0.0.1:6080:6080"
