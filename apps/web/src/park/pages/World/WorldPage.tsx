@@ -6,11 +6,19 @@
 // Undo), navigation inside the Park app is app.go, and the links to the live stage and its lenses are real
 // addresses the browser follows, but only for a world whose data came from the live API: a sample world has no
 // recorded run, so the same elements are disabled with the reason (docs/park-designed-not-in-prd/World.md).
-import { type ReactNode, useEffect, useState } from "react";
+import { type ChangeEvent, type ReactNode, useEffect, useRef, useState } from "react";
 import type { Connector, Decision, Plan, Skill, World } from "../../api/types";
 import type { AppCtx } from "../../app/AppCtx";
 import { useParkApi } from "../../app/context";
 import { stagePath } from "../../app/router";
+import {
+  SLACK_NOTE_MAX,
+  type SlackShareRequest,
+  capSlackNote,
+  focusablesIn,
+  handleSlackDialogKeyDown,
+  slackConnectorState,
+} from "../../app/slackShare";
 import { useStaged } from "../../app/useStaged";
 import { Button, PageSheet } from "../../components";
 import { icon } from "../../shell/kit";
@@ -42,6 +50,7 @@ const INSPECT_BUILDING = "B1";
 
 const NO_STAGE = "Sample world: there is no recorded run to open";
 const NO_STAGE_ID = "park-world-nostage";
+const NO_SLACK_ID = "park-world-noslack";
 
 /**
  * A link to the stage or one of its lenses. With a stage it is a plain link the browser follows. Without one
@@ -104,6 +113,14 @@ export function WorldPage({ app }: { app: AppCtx }) {
   const api = useParkApi();
   const [loaded, setLoaded] = useState<Loaded | "failed" | null>(null);
   const [paused, setPaused] = useState<Record<string, boolean>>({});
+  const [slackOpen, setSlackOpen] = useState(false);
+  const [slackChannel, setSlackChannel] = useState("");
+  const [slackNote, setSlackNote] = useState("");
+  const [slackPendingByWorld, setSlackPendingByWorld] = useState<Record<string, SlackShareRequest>>(
+    {},
+  );
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
+  const dialogRef = useRef<HTMLDivElement | null>(null);
   // The map and head first, then the side cards, then the lower part: one task each (WEB-MOTION-2).
   const part = useStaged(3);
   const { dec, added } = app;
@@ -137,6 +154,12 @@ export function WorldPage({ app }: { app: AppCtx }) {
     };
   }, [api, dec, added]);
 
+  useEffect(() => {
+    if (!slackOpen) return;
+    const first = focusablesIn(dialogRef.current)[0];
+    first?.focus();
+  }, [slackOpen]);
+
   if (loaded === null) return <Frame />;
   const world =
     loaded === "failed"
@@ -160,10 +183,12 @@ export function WorldPage({ app }: { app: AppCtx }) {
   const isTown = w.tier === "Town";
   const isPaused = Boolean(paused[w.id]);
   const mine = loaded.decisions.filter((d) => d.world === w.id);
-  const open = mine.filter((d) => !dec[d.k]).length;
+  const slackPending = slackPendingByWorld[w.id] ?? null;
+  const open = mine.filter((d) => !dec[d.k]).length + (slackPending ? 1 : 0);
   const look = stateLook(w, isPaused);
   const chip = w.st === "needs" && !isPaused ? decisionsWord(app.needsLeft) : look[0];
   const { skills, tools } = skillsAndTools(w, loaded.skills, loaded.connectors);
+  const slackState = slackConnectorState(loaded.connectors);
   const wide = (app.vw || 1440) >= 1060;
   const id = encodeURIComponent(w.id);
   // A world has a stage only when its data came from the live API; a world started on this page is local state.
@@ -182,6 +207,35 @@ export function WorldPage({ app }: { app: AppCtx }) {
       // no clipboard here: the toast still says what the button is for
     }
     app.toast("Link copied. Only your team can open it");
+  };
+
+  const openSlackDialog = (trigger: HTMLButtonElement) => {
+    if (!slackState.connected) return;
+    triggerRef.current = trigger;
+    setSlackChannel((cur) =>
+      cur && slackState.channels.includes(cur) ? cur : (slackState.channels[0] ?? "#ops"),
+    );
+    setSlackNote("");
+    setSlackOpen(true);
+  };
+
+  const closeSlackDialog = () => {
+    setSlackOpen(false);
+    triggerRef.current?.focus();
+  };
+
+  const submitSlackApproval = () => {
+    const channel = slackChannel || slackState.channels[0] || "#ops";
+    const req: SlackShareRequest = {
+      worldId: w.id,
+      worldName: w.name,
+      channel,
+      note: capSlackNote(slackNote),
+      sample: !loaded.live,
+    };
+    setSlackPendingByWorld((prev) => ({ ...prev, [w.id]: req }));
+    setSlackOpen(false);
+    triggerRef.current?.focus();
   };
 
   return (
@@ -221,6 +275,24 @@ export function WorldPage({ app }: { app: AppCtx }) {
           <Button variant="secondary" icon={icon("share", 16)} onClick={share}>
             Share
           </Button>
+          <Button
+            variant="secondary"
+            size="sm"
+            disabled={!slackState.connected}
+            aria-disabled={!slackState.connected ? "true" : undefined}
+            aria-describedby={!slackState.connected ? NO_SLACK_ID : undefined}
+            title={
+              !slackState.connected ? slackState.disabledReason : "Share this world link to Slack"
+            }
+            onClick={(e) => openSlackDialog(e.currentTarget)}
+          >
+            Share to Slack
+          </Button>
+          {!slackState.connected ? (
+            <span id={NO_SLACK_ID} className="park-world-sr">
+              {slackState.disabledReason}
+            </span>
+          ) : null}
           {isCity ? (
             <StageLink className="park-world-live" href={stage(stagePath(w.id))}>
               {icon("play", 14)}Open live view
@@ -233,6 +305,63 @@ export function WorldPage({ app }: { app: AppCtx }) {
           ) : null}
         </div>
       </div>
+
+      {slackOpen ? (
+        <div className="park-world-slackbackdrop">
+          <div
+            ref={dialogRef}
+            // biome-ignore lint/a11y/useSemanticElements: custom modal dialog with focus trap and role="dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Share to Slack"
+            className="park-world-slackdialog"
+            onKeyDown={(e) => handleSlackDialogKeyDown(e, dialogRef.current, closeSlackDialog)}
+          >
+            <div className="park-world-slackhead">
+              <div className="park-world-slacktitle">Share to Slack</div>
+              <div className="park-world-slacksub">{`${w.name} · ${slackState.account}`}</div>
+            </div>
+            <label className="park-world-slackfield">
+              <span className="park-world-slacklabel">Channel</span>
+              <select
+                aria-label="Slack channel"
+                className="park-world-slackselect"
+                value={slackChannel}
+                onChange={(e: ChangeEvent<HTMLSelectElement>) => setSlackChannel(e.target.value)}
+              >
+                {slackState.channels.map((ch) => (
+                  <option key={ch} value={ch}>
+                    {ch}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="park-world-slackfield">
+              <span className="park-world-slacklabel">
+                {`Note (optional, up to ${SLACK_NOTE_MAX} characters)`}
+              </span>
+              <textarea
+                aria-label="Optional note"
+                className="park-world-slacknote"
+                rows={3}
+                maxLength={SLACK_NOTE_MAX}
+                value={slackNote}
+                onChange={(e: ChangeEvent<HTMLTextAreaElement>) =>
+                  setSlackNote(capSlackNote(e.target.value))
+                }
+              />
+            </label>
+            <div className="park-world-slackactions">
+              <Button variant="needs" size="sm" onClick={submitSlackApproval}>
+                Ask for approval
+              </Button>
+              <Button variant="secondary" size="sm" onClick={closeSlackDialog}>
+                Cancel
+              </Button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       <div
         className="park-world-top"
@@ -296,6 +425,7 @@ export function WorldPage({ app }: { app: AppCtx }) {
                 night={app.night}
                 onDecide={(key) => app.decide(key)}
                 onLater={() => app.toast("Tilo will remind you at 16:00")}
+                slackPending={slackPending}
               />
             ) : null}
             <SpendCard w={w} mine={mine} dec={dec} onLedger={() => app.go("ledger")} />
@@ -324,7 +454,10 @@ export function WorldPage({ app }: { app: AppCtx }) {
             <Result
               w={w}
               onOpen={() => app.toast("Opening the result in Google Drive")}
-              onSlack={() => app.toast("Shared to #ops in Slack")}
+              onSlack={openSlackDialog}
+              slackConnected={slackState.connected}
+              slackReason={slackState.disabledReason}
+              noSlackId={NO_SLACK_ID}
             />
           ) : null}
           <Activity
