@@ -239,12 +239,13 @@ class GoogleModelProvider(ModelProvider):
             # The reply hit its output cap (thinking tokens count against it): empty or cut off, never a reply.
             # Vertex leaves a visible-output count out when it is 0 (so 0 with usage present, None with no usage); a
             # missing thinking count stays None: the model did not report one.
-            output = thoughts = None
+            output = thoughts = prompt = None
             if usage_metadata is not None:
                 output = getattr(usage_metadata, "candidates_token_count", None) or 0
                 thoughts = getattr(usage_metadata, "thoughts_token_count", None)
+                prompt = getattr(usage_metadata, "prompt_token_count", None)  # billed too (FR-MTR-01)
             raise OutputTruncatedError(
-                truncated_message(output, thoughts), output_tokens=output, thinking_tokens=thoughts
+                truncated_message(output, thoughts), output_tokens=output, thinking_tokens=thoughts, input_tokens=prompt
             )
 
         tool_calls: list[dict[str, Any]] | None = None
