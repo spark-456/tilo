@@ -20,8 +20,12 @@
 # T3 and always needs a person; listed for the same reason as build_handoff (the FR-MTG-09 config test pins it).
 # read_events (google_calendar, FR-CAL-08) reads the person's own calendar: no side effect, never
 # gated, never an outbox entry. Listed so the table and config/connectors.yaml agree on its tier.
+# web_search and fetch_url (web, ADR-0029 decision 7, PRD 12.2) read the public web: no side effect, never gated,
+# never an outbox entry. Listed because an unlisted action is T3, which would put a person in front of every search.
 actions:
   read_events: T1
+  web_search: T1
+  fetch_url: T1
   create_draft: T1
   save_file: T1
   save_as_google_file: T1

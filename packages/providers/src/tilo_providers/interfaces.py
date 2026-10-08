@@ -26,6 +26,8 @@ class Capability(enum.StrEnum):
     COMPUTER_USE = "computer_use"
     GROUNDING = "grounding"
     CODE_EXECUTION = "code_execution"
+    VIDEO = "video"  # providers 1.3.0, ADR-0029 decision 6
+    DOCUMENTS = "documents"  # a PDF read natively (FR-INT-02); providers 1.3.0, ADR-0029 decision 6
 
 
 class GenerateRequest(BaseModel):  # one ModelProvider.generate() / .stream() call

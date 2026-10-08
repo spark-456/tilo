@@ -6,7 +6,7 @@ the contract wins. Conventions are in [ADR-0002](../docs/adr/0002-contract-conve
 
 | File | Describes | Version |
 | --- | --- | --- |
-| `common.schema.json` | Shared definitions: ids, ULID, timestamps, credits, severity, risk tier, autonomy level, `authz`, artifact refs, tier, artifact media types, the people ids (`wi_`, `mt_`, `pb_`, `mn_`, `ce_`, `tm_`, utterance), `opaque_ref`, `maker`, `record_ref`; 1.2.0 merges the artifact media types (1.1.0, ADR-0018) and the people ids (1.1.0, ADR-0016); both 1.1.0 releases carried different content, so 1.2.0 is the first version that has both (additive, no breaking change); 1.3.0 adds `mail` to `record_ref.kind` (ADR-0021); 1.4.0 adds `schedule` to `channel` (FR-AGT-14) | 1.4.0 |
+| `common.schema.json` | Shared definitions: ids, ULID, timestamps, credits, severity, risk tier, autonomy level, `authz`, artifact refs, tier, artifact media types, the people ids (`wi_`, `mt_`, `pb_`, `mn_`, `ce_`, `tm_`, utterance), `opaque_ref`, `maker`, `record_ref`; 1.2.0 merges the artifact media types (1.1.0, ADR-0018) and the people ids (1.1.0, ADR-0016); both 1.1.0 releases carried different content, so 1.2.0 is the first version that has both (additive, no breaking change); 1.3.0 adds `mail` to `record_ref.kind` (ADR-0021); 1.4.0 adds `schedule` to `channel` (FR-AGT-14); 1.5.0 adds `tool_access_level` (ADR-0027); 1.6.0 adds the `app` deliverable format (ADR-0029) | 1.6.0 |
 | `brief.schema.json` | Structured brief from intake (FR-INT-03 to 05) | 1.0.0 |
 | `plan.schema.json` | `PlanGraph`: approaches, units, dependencies, gates, budget cap; rules in `plan.rules.md` | 1.0.0 |
 | `layout.schema.json` | `WorldLayout` v1: semantic part and solver geometry; rules in `layout.rules.md` | 1.0.0 |
@@ -21,11 +21,11 @@ the contract wins. Conventions are in [ADR-0002](../docs/adr/0002-contract-conve
 | `envelope.schema.json` | Agent-to-agent handoff envelope | 1.0.0 |
 | `skill.schema.json` | `skill.yaml` | 1.0.0 |
 | `connector.schema.json` | Connector declarations | 1.0.0 |
-| `providers.schema.json` | `config/models.yaml` and `config/prices.yaml` | 1.0.0 |
+| `providers.schema.json` | `config/models.yaml` and `config/prices.yaml`; 1.1.0 openai_compat endpoints, 1.2.0 the speech role and `audio_input` (ADR-0027), 1.3.0 the search role, `reserve_units`, `unit_price`, `cached_input`, `valid_until`, `region`, `media_tokens` and the `video`/`documents` capabilities (ADR-0029) | 1.3.0 |
 | `agents.schema.json` | `AgentsConfig`: `config/agents.yaml`, the harness's role limits, context thresholds, liveness, retries and question cap | 1.0.0 |
 | `decision.schema.json` | An answer kept to answer repeat questions (`orgs/{org}/decisions`); rules in `decision.rules.md` | 1.0.0 |
 | `manifest.schema.json` | Provenance manifest of an artifact version (frozen 1 Oct); rules in `manifest.rules.md` | 1.0.0 |
-| `artifact.schema.json` | `ArtifactVersion`: one stored artifact version and its manifest revisions (ADR-0018, FR-MEM-12); rules AR-01 to AR-08 in `artifact.rules.md` | 1.0.0 |
+| `artifact.schema.json` | `ArtifactVersion`: one stored artifact version and its manifest revisions (ADR-0018, FR-MEM-12); rules AR-01 to AR-09 in `artifact.rules.md`; 1.1.0 adds the `fetch` origin (ADR-0029) | 1.1.0 |
 | `metering.schema.json` | `config/metering.yaml`: reserve margin, budget-request threshold, credit caps, daily spend caps, reconciliation; rules for this and the next four in `metering.rules.md` | 1.0.0 |
 | `meter.schema.json` | The HUD meter's state for one run: credits used and saved, time saved with range and method link, budget | 1.0.0 |
 | `attention.schema.json` | One measured span of a person's steering or review time, subtracted from time saved | 1.0.0 |
@@ -43,8 +43,7 @@ the contract wins. Conventions are in [ADR-0002](../docs/adr/0002-contract-conve
 | `plate.schema.json` | A person's plate (FR-PA-02): the read model S-27, the digest and the panel share; rows and parked lanes, groups and order by code (ADR-0021, PE-26 to PE-30) | 1.0.0 |
 | `scenario.schema.json` | `config/scenarios/<id>.yaml` (FR-INT-11, ADR-0014): skills, connectors, seed data, theme and autonomy policy seeds, and nothing else; rules SN-01 to SN-09 in `scenario.rules.md` | 1.0.0 |
 | `spend_caps.schema.json` | `SpendCapsConfig`: `config/spend_caps.yaml`, live-model spend caps in INR minor units (per uid lifetime, per run, per org day, deployment day hard cap), the flat reservation per live unit (1.1.0) and the per-uid rate limit (SEC-16, FR-MTR-04; ADR-0002 decision 16) | 1.1.0 |
-
-Still to come: `appspec` (Could).
+| `appspec.schema.json` | `AppSpec`: a declarative app that fixed web code renders; 1.0.0 has the quiz kind only (FR-AGT-16, ADR-0029); rules AS-01 to AS-04 in `appspec.rules.md` | 1.0.0 |
 
 - `fixtures/<name>/valid|invalid/*.json` exercise each schema root; `fixtures/<name>.<def>/`
   exercise one `$defs` entry. Invalid file names say which rule they break.

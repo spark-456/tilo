@@ -1,9 +1,9 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://contracts.tilo.example/providers.schema.json",
-  "x-version": "1.2.0",
+  "x-version": "1.3.0",
   "title": "Providers",
-  "description": "Provider-layer configuration as the provider layer loads it (PRD 6.4, 6.6, 14.1): models is config/models.yaml ($defs.models) and prices is config/prices.yaml ($defs.prices). The loader also checks that every role names existing profiles and every profile has a price entry, and the speech role's rules below (1.2.0, ADR-0027). Model ids appear only in config/ and packages/providers.",
+  "description": "Provider-layer configuration as the provider layer loads it (PRD 6.4, 6.6, 14.1): models is config/models.yaml ($defs.models) and prices is config/prices.yaml ($defs.prices). The loader also checks that every role names existing profiles and every profile has a price entry, the speech role's rules below (1.2.0, ADR-0027), and the search role, unit price, region and valid_until rules below (1.3.0, ADR-0029). Model ids appear only in config/ and packages/providers.",
   "type": "object",
   "additionalProperties": false,
   "required": ["models", "prices"],
@@ -14,7 +14,7 @@
   "$defs": {
     "profile_id": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,31}$" },
     "capability": {
-      "description": "structured output (json), tool calling, vision, audio input, thinking levels, computer use, search grounding, code execution.",
+      "description": "structured output (json), tool calling, vision, audio input, thinking levels, computer use, search grounding, code execution; 1.3.0 (ADR-0029): video input and documents (a PDF read natively, FR-INT-02).",
       "type": "string",
       "enum": [
         "json",
@@ -24,7 +24,9 @@
         "thinking",
         "computer_use",
         "grounding",
-        "code_execution"
+        "code_execution",
+        "video",
+        "documents"
       ]
     },
     "models": {
@@ -43,7 +45,7 @@
           "additionalProperties": { "$ref": "#/$defs/profile" }
         },
         "roles": {
-          "description": "Business code asks for a role, never a model (PL-01). speech (1.2.0, ADR-0027) is the role every SpeechProvider call asks for (FR-MTG-17, FR-MTG-11, FR-INT-14, FR-CHN-16): the loader refuses it unless it states max_output_tokens and its primary, fallback and cascade profiles declare the audio capability and, while prices are set, carry an audio_input price.",
+          "description": "Business code asks for a role, never a model (PL-01). speech (1.2.0, ADR-0027) is the role every SpeechProvider call asks for (FR-MTG-17, FR-MTG-11, FR-INT-14, FR-CHN-16): the loader refuses it unless it states max_output_tokens and its primary, fallback and cascade profiles declare the audio capability and, while prices are set, carry an audio_input price. search (1.3.0, ADR-0029) is the role every SearchProvider call asks for (PRD 12.2): the loader refuses it unless it states reserve_units and its primary, fallback and cascade profiles declare the grounding capability and, while prices are set, carry a unit_price with unit query. Any role whose profiles carry a unit_price must state reserve_units.",
           "type": "object",
           "minProperties": 1,
           "propertyNames": { "$ref": "common.schema.json#/$defs/slug" },
@@ -53,7 +55,7 @@
       }
     },
     "profile": {
-      "description": "One model profile. Its cost rank (PRD 6.6) is derived from prices, never declared here. base_url and api_key_env are allowed only when provider is openai_compat (ADR-0002, ADR-0003).",
+      "description": "One model profile. Its cost rank (PRD 6.6) is derived from prices, never declared here. base_url and api_key_env are allowed only when provider is openai_compat (ADR-0002, ADR-0003). media_tokens (1.3.0, ADR-0029) holds the tokens the provider counts for one image, one PDF page and one second of audio or video, as upper bounds; the router uses them only for the pre-flight estimate and the EFF-03 cap check before it sends a media part, never for billing (the reported usage is billed). A profile without media_tokens gets no media part: the router refuses it before sending.",
       "type": "object",
       "additionalProperties": false,
       "required": ["provider", "model", "context", "caps"],
@@ -69,6 +71,7 @@
           "uniqueItems": true,
           "items": { "$ref": "#/$defs/capability" }
         },
+        "media_tokens": { "$ref": "#/$defs/media_tokens" },
         "base_url": {
           "description": "openai_compat endpoint. https only, with no user info, query or fragment, so no credential can sit in the URL (PRD 16.1 rule 4). The not-pattern rejects a final line break, which a Python validator's $ lets through.",
           "type": "string",
@@ -89,7 +92,20 @@
         "not": { "anyOf": [{ "required": ["base_url"] }, { "required": ["api_key_env"] }] }
       }
     },
+    "media_tokens": {
+      "description": "Tokens per unit of media input (ADR-0029 decision 6): image is one image, pdf_page one PDF page, audio_per_second and video_per_second one second. Upper bounds, so an estimate never understates.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["image", "pdf_page", "audio_per_second", "video_per_second"],
+      "properties": {
+        "image": { "type": "integer", "minimum": 1 },
+        "pdf_page": { "type": "integer", "minimum": 1 },
+        "audio_per_second": { "type": "integer", "minimum": 1 },
+        "video_per_second": { "type": "integer", "minimum": 1 }
+      }
+    },
     "role": {
+      "description": "reserve_units (1.3.0, ADR-0029) is how many units of the profile's unit_price the router reserves under the PL-03 budget check before it sends, because the provider cannot cap them (a grounded call runs as many searches as the model decides). A reply that reports no unit count is charged the reserved amount.",
       "type": "object",
       "additionalProperties": false,
       "required": ["primary"],
@@ -104,7 +120,8 @@
         },
         "thinking": { "type": "string", "enum": ["low", "medium", "high"] },
         "max_input_tokens": { "type": "integer", "minimum": 1 },
-        "max_output_tokens": { "type": "integer", "minimum": 1 }
+        "max_output_tokens": { "type": "integer", "minimum": 1 },
+        "reserve_units": { "type": "integer", "minimum": 1 }
       }
     },
     "rules": {
@@ -121,7 +138,7 @@
       }
     },
     "prices": {
-      "description": "Prices per profile (PL-06, FR-MTR-01). Prices, the date and the source may be null only while status is unset, and the loader refuses live metering until status is set.",
+      "description": "Prices per profile (PL-06, FR-MTR-01). Prices, the date and the source may be null only while status is unset, and the loader refuses live metering until status is set. region (1.3.0, ADR-0029), optional, is the provider location the rates were quoted for (for example a regional endpoint's rates): the loader refuses live metering of a profile whose adapter sends to another location; an adapter with no location setting (fake, openai_compat) is not checked.",
       "type": "object",
       "additionalProperties": false,
       "required": ["status", "effective_date", "source", "currency", "credit_usd", "profiles"],
@@ -131,6 +148,12 @@
           "anyOf": [{ "$ref": "common.schema.json#/$defs/calendar_date" }, { "type": "null" }]
         },
         "source": { "type": ["string", "null"], "minLength": 1, "maxLength": 500 },
+        "region": {
+          "type": "string",
+          "maxLength": 32,
+          "pattern": "^(global|us|eu|[a-z]+-[a-z]+[0-9]+)$",
+          "not": { "pattern": "\n" }
+        },
         "currency": { "const": "USD" },
         "credit_usd": { "description": "PRD 14.1: 1 credit = US$0.005.", "const": 0.005 },
         "profiles": {
@@ -150,7 +173,9 @@
               "properties": {
                 "input": { "type": "number" },
                 "output": { "type": "number" },
-                "audio_input": { "type": "number" }
+                "audio_input": { "type": "number" },
+                "cached_input": { "type": "number" },
+                "unit_price": { "properties": { "per_1k": { "type": "number" } } }
               }
             }
           }
@@ -158,14 +183,27 @@
       }
     },
     "price": {
-      "description": "Standard list price in US dollars per million tokens. audio_input (1.2.0, ADR-0027) is the price per million audio input tokens where the provider bills audio input at its own rate (Gemini); left out, the profile has no audio price and cannot serve the speech role. The other input tokens of the same call are priced at input.",
+      "description": "The rate charged, in US dollars per million tokens. audio_input (1.2.0, ADR-0027) is the price per million audio input tokens where the provider bills audio input at its own rate (Gemini); left out, the profile has no audio price and cannot serve the speech role. The other input tokens of the same call are priced at input. 1.3.0 (ADR-0029): cached_input is the price per million input tokens served from the provider's prompt cache (the Trace's tokens_cached, ADR-0022); left out, cached tokens are priced at input. unit_price is a fee per 1,000 units charged on top of the token rates (a call costs tokens times their rates plus units times per_1k / 1000). valid_until is the last calendar day (UTC) the price holds, for a promotional rate: after it the loader refuses live metering of the profile until the file is updated. Promotions, credits and free allowances are never subtracted here (the meter overstates, never understates).",
       "type": "object",
       "additionalProperties": false,
       "required": ["input", "output"],
       "properties": {
         "input": { "type": ["number", "null"], "minimum": 0 },
         "output": { "type": ["number", "null"], "minimum": 0 },
-        "audio_input": { "type": ["number", "null"], "minimum": 0 }
+        "audio_input": { "type": ["number", "null"], "minimum": 0 },
+        "cached_input": { "type": ["number", "null"], "minimum": 0 },
+        "unit_price": { "$ref": "#/$defs/unit_price" },
+        "valid_until": { "$ref": "common.schema.json#/$defs/calendar_date" }
+      }
+    },
+    "unit_price": {
+      "description": "A fee per 1,000 units (ADR-0029 decision 1): query is one search the provider ran (Gemini grounding reports them in grounding_metadata.web_search_queries), minute one minute of audio, character one input character, image one generated image. per_1k is US dollars per 1,000 units, null only while prices are unset.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["unit", "per_1k"],
+      "properties": {
+        "unit": { "type": "string", "enum": ["query", "minute", "character", "image"] },
+        "per_1k": { "type": ["number", "null"], "minimum": 0 }
       }
     }
   }

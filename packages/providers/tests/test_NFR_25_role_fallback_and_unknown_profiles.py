@@ -90,6 +90,7 @@ def test_PRD_6_4_shipped_config_loads(repo_root):
         "generator",  # issue #272 (b), GEN-07: the live scenario generator
         "autorater",  # issue #272 (b), GEN-10: scores the generator's plans
         "assistant",  # PPL-11b, FR-PA-19: the assistant panel's fallback (services/api/tests/API_PPL_11b.md)
+        "search",  # ADR-0029, PRD 12.2: every SearchProvider call (falls back to the same grounded profile)
     }
     assert config.roles["director"].primary == "flash-38"
     assert config.roles["director"].fallback == "flash-37"
