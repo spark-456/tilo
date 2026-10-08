@@ -83,7 +83,11 @@ def add_arguments(parser: argparse.ArgumentParser) -> None:
     exp.add_argument("--baseline-label", default="baseline")
     exp.add_argument("--max-cases", type=_positive, default=None)
     exp.add_argument("--out", type=Path, default=Path(_PAIRS_DEFAULT))
-    run = sub.add_parser("run", formatter_class=raw, help="judge a pairs file (fake by default in dev; live is gated)")
+    run = sub.add_parser(
+        "run",
+        formatter_class=raw,
+        help="judge a pairs file (--fake or --dry-run need no network; a run without them is live and gated)",
+    )
     run.epilog = f"default --report-md:\n  {_REPORT_DEFAULT}\ndefault --pairs:\n  {_PAIRS_DEFAULT}"
     run.add_argument("--pairs", type=Path, default=Path(_PAIRS_DEFAULT))
     mode = run.add_mutually_exclusive_group()
@@ -462,6 +466,12 @@ def _run(args: argparse.Namespace, env: Mapping[str, str], injected: EvalProvide
         else:
             done.append(record)
             continue
+        if record.said:  # a provider failure cut this case short: its charged calls are reported, as an error row
+            record.choice = record.choice or "error"
+            for call in plan:
+                if call.kind != "pairwise":
+                    record.grounded.setdefault(call.kind, "error")
+            done.append(record)
         break
     errors = sum(d.choice == "error" or "error" in d.grounded.values() for d in done)
     return _finish(
