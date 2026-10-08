@@ -45,6 +45,7 @@ def _starter(store: DurableStore, writer: object) -> schedules.ScheduleStarter:
     record = Schedule(
         schedule_id="sched_a", owner_user_id=OWNER, title=TITLE, cadence=Cadence(**CADENCE), approved_brief_ref=W1,
         budget_cap=60.0, enabled=True, next_due=MON_0330Z, brief=copy.deepcopy(BRIEF), approach=copy.deepcopy(APPROACH),
+        approaches=[copy.deepcopy(APPROACH), {"id": "thorough", "credits": {"min": 2, "max": 4}}],
         created_at=SUNDAY,
     )  # fmt: skip
     return schedules.ScheduleStarter(
