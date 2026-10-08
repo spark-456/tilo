@@ -269,7 +269,7 @@ The deployed web app (Hosting) can talk to the deployed `tilo-api` (https://tilo
 runs them for you and never handles your password:
 
 1. In the Cloud console (APIs & Services, Credentials), restrict the Firebase browser API key BEFORE it is baked in:
-   API restrictions to Firebase App Check and Identity Toolkit only, website restrictions to
+   API restrictions to exactly three APIs (Firebase App Check, Identity Toolkit and Token Service), website restrictions to
    `https://essential-wares-510320-f0.web.app/*` and `https://essential-wares-510320-f0.firebaseapp.com/*`
    (infra/ACCESS.md section 7). The key ends up in the public JavaScript bundle.
 2. `pnpm exec firebase login` (once, your own Google account).

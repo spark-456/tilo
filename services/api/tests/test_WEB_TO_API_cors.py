@@ -78,6 +78,7 @@ def test_WEB_TO_API_cors_is_the_outermost_middleware_and_never_wildcard_or_crede
         "Idempotency-Key",
         "X-Firebase-AppCheck",
         "Authorization",
+        "X-Tilo-Channel",
     }
     assert first.kwargs["expose_headers"] == ["Retry-After"]
     assert not first.kwargs.get("allow_credentials")
@@ -125,3 +126,21 @@ def test_WEB_TO_API_the_real_app_adds_cors_only_when_configured() -> None:
 
     source = inspect.getsource(tilo_api)
     assert source.index("_cors.install_cors(app)") > source.index("app.add_middleware(_LogContext)")
+
+
+def test_WEB_TO_API_a_phone_preflight_with_the_channel_header_is_allowed() -> None:
+    client = TestClient(_gated_app({cors.ENV: WEB}))
+    response = client.options(
+        "/health",
+        headers={
+            "Origin": WEB,
+            "Access-Control-Request-Method": "GET",
+            "Access-Control-Request-Headers": "authorization,x-tilo-channel",
+        },
+    )
+    assert response.status_code == 200 and response.headers["access-control-allow-origin"] == WEB
+
+
+def test_WEB_TO_API_dev_mode_never_gets_the_second_cors_layer() -> None:
+    app = FastAPI()
+    assert cors.install_cors(app, {cors.ENV: WEB, "TILO_API_DEV": "1"}) is False

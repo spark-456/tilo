@@ -34,6 +34,9 @@ def cors_origins(env: Mapping[str, str] | None = None) -> list[str]:
 
 def install_cors(app: FastAPI, env: Mapping[str, str] | None = None) -> bool:
     """Adds the middleware when there are valid origins; returns whether it did."""
+    source = os.environ if env is None else env
+    if source.get("TILO_API_DEV") == "1":  # dev mode has its own CORS (tilo_api.dev): never both
+        return False
     origins = cors_origins(env)
     if not origins:
         return False
@@ -41,7 +44,7 @@ def install_cors(app: FastAPI, env: Mapping[str, str] | None = None) -> bool:
         CORSMiddleware,
         allow_origins=origins,
         allow_methods=["GET", "POST", "OPTIONS"],
-        allow_headers=["Content-Type", "Idempotency-Key", "X-Firebase-AppCheck", "Authorization"],
+        allow_headers=["Content-Type", "Idempotency-Key", "X-Firebase-AppCheck", "Authorization", "X-Tilo-Channel"],
         expose_headers=["Retry-After"],
         allow_credentials=False,
     )
