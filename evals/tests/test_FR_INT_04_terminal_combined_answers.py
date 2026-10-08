@@ -162,3 +162,28 @@ def test_FR_INT_04_digits_separated_by_more_than_one_space_are_still_a_list():
     person, _ = _person(["1   2"])
 
     assert person.answer(QUESTION) == "Report (pdf); A PDF report"
+
+
+def test_FR_INT_04_a_declined_approach_with_a_reason_asks_for_one_revised_set():
+    calls: list[tuple[str, dict[str, Any]]] = []
+    person, _ = _person(["", "n", "It does not cover old papers"])
+    offered = {
+        "approaches": [{"id": "a1", "label": "A", "summary": "s", "credits": {"min": 1, "max": 2}}],
+        "recommended": "a1",
+    }
+    assert person.approach(offered) is None
+    assert person.decline_reason == "It does not cover old papers"
+
+    def call(method: str, path: str, **kw: Any) -> Any:
+        calls.append((path, kw.get("json", {})))
+        return SimpleNamespace(status_code=200, json=lambda: {"brief": {"constraints": ["x"]}})
+
+    assert bank_run._revise(call, {"task_id": "t"}, person) is True
+    edits = calls[-1][1]["brief_edits"]["constraints"]
+    assert edits == ["x", "Must address: It does not cover old papers"]
+
+
+def test_FR_INT_04_a_declined_approach_without_a_reason_is_not_revised():
+    person = SimpleNamespace(decline_reason="")
+
+    assert bank_run._revise(lambda *a, **k: 1 / 0, {"task_id": "t"}, person) is False

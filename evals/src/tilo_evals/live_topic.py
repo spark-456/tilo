@@ -95,6 +95,7 @@ class TerminalPerson:
                  drain: Callable[[], bool] | None = None) -> None:  # fmt: skip
         self.auto_answer, self.auto_approve_t1t2, self._input, self._write = auto_answer, auto_approve_t1t2, read, write
         self._tty, self.log = tty, list[str]()
+        self.decline_reason = ""  # why the person declined the last approach set, said in their words
         self._wgate: Any = None  # CL-LIVE-2 write gate, bound by the run
         self._drain = drain  # discards the input buffer before a write prompt; None or False: the write is held
 
@@ -210,6 +211,7 @@ class TerminalPerson:
         ok, why = self._yes(f"approve the approach {clean(chosen['label'])!r}?")
         said = "approved" if ok else "declined"
         self.log.append(f"approach {clean(chosen['id'])}: {said} by the person ({clean(why) or '-'})")
+        self.decline_reason = "" if ok else clean(why)[:200]
         return chosen["id"] if ok else None
 
     def gate(self, card: dict[str, Any]) -> bool:

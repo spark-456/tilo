@@ -136,7 +136,15 @@ def apply_answer(brief: dict[str, Any], question: Question, answer: str, *, toda
     value: Any = _ANSWER_VALUES.get(field, {}).get(answer, answer)
     if field == "deliverables":
         formats = _answer_formats(answer, question.suggested_answers[0], brief)
-        if len(formats) == 1:
+        if not formats:  # free text with no format: it stays as the content, in the default format (BQ-FREETEXT-1)
+            wish = clip(answer[:ANSWER_MAX_CHARS].strip(), 300)
+            first = {**brief["deliverables"][0], "title": clip(wish, 120), "format": DEFAULT_FORMAT}
+            brief = {
+                **copy.deepcopy(brief),
+                "constraints": list(dict.fromkeys([*brief["constraints"], f"Deliverable wishes: {wish}"])),
+            }
+            value = [first]
+        elif len(formats) == 1:
             value = [{**d, "format": formats[0]} for d in brief["deliverables"]]
         else:  # "A PDF report and a slide deck": the deliverables already in a named format stay, the rest are added
             kept = [d for d in brief["deliverables"] if d["format"] in formats]
@@ -174,6 +182,9 @@ _FORMAT_WORDS = {  # what a person types for a format
     "powerpoint": "pptx", "ppt": "pptx", "slides": "pptx", "slide deck": "pptx", "deck": "pptx", "word": "docx",
     "doc": "docx", "document": "docx", "excel": "xlsx", "spreadsheet": "xlsx", "md": "markdown", "report": "pdf",
 }  # fmt: skip
+DEFAULT_FORMAT = "markdown"  # PRD default for a deliverable whose format the person did not name
+MIN_FREE_TEXT_WORDS = 3  # a deliverables answer of this many words and no format is content, not a typo
+_WORD = re.compile(r"[A-Za-z]{2,}")
 _ANSWER_SPLIT = re.compile(r"[;,+&/]|\band\b", re.IGNORECASE)
 _CHIP_FORMAT = re.compile(r".*\((" + "|".join(_FORMATS) + r")\)")
 
@@ -188,11 +199,20 @@ def _part_format(part: str) -> str | None:
     return key if key in _FORMATS else _FORMAT_WORDS.get(key)
 
 
+def _names_a_format(answer: str) -> bool:
+    """Any format, format word or suggested label anywhere in `answer`: such an answer is a format answer."""
+    text = " " + " ".join(_WORD.findall(answer.lower())) + " "
+    names = {*_FORMATS, *_FORMAT_WORDS, *(label.lower() for label in _ANSWER_VALUES["deliverables"])}
+    return any(f" {name} " in text for name in names) or any(_part_format(p) for p in _ANSWER_SPLIT.split(answer))
+
+
 def _answer_formats(answer: str, current: str, brief: dict[str, Any]) -> list[str]:
     """The formats a deliverables answer names, in order, once each: one answer or several joined by "and", a
     comma, a semicolon, "+" or "&". The chip's own text (`current`, whose titles may hold any of those) stands for the
     formats the brief has now. A part that names no format refuses the answer, the person says it again."""
     answer = answer[:ANSWER_MAX_CHARS]
+    if len(_WORD.findall(answer)) >= MIN_FREE_TEXT_WORDS and not _names_a_format(answer):
+        return []  # what the person wants in it, in their words: not a format, not refused
     have = [d["format"] for d in brief["deliverables"]] if current in answer else []
     parts = [p for p in _ANSWER_SPLIT.split(answer.replace(current, ";")) if p.strip()]
     formats = [*have, *(_part_format(p) for p in parts)]
