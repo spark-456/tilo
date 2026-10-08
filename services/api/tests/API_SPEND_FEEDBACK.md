@@ -161,3 +161,10 @@ exists the owner reads the collection in the Firebase console. `BQ-FEEDBACK-1` s
 5. Capped plus replay-only both set: the existing order stands (the switch is checked first: 503 replay-only); this
    ticket does not pin which of the two a person in both states sees.
 6. Fixture mode never shows the pop-up (only a server 403 does) and never says Thanks.
+
+## Hardening (security review r1; tests `test_SEC_16_FEEDBACK_hardening.py`)
+
+- Body: 415 unless JSON; 413 over 65536 bytes before it is read; parsed from bytes; a 422 answers `{"detail": [{"loc": ...}]}` only.
+- Invisible-only text (marks, separators, U+2800, fillers) is 422. Only a full (Google) sign-in may post: an anonymous demo session
+  (`Principal.demo_session`) gets 403 `full_session_required`. A busy store is 503 `busy`.
+- Firestore: slots `items/00..19` written with `create`; the read is bounded to `lifetime_limit + 1`.

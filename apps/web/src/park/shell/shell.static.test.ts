@@ -163,9 +163,10 @@ describe("WEB_3b_static: imports", () => {
           continue;
         }
         // SEC-16: the one shared lifetime-cap dialog (src/components/LifetimeCapDialog) is the only import from outside park.
+        const target = resolve(dirname(p), spec);
         if (
-          !resolve(dirname(p), spec).startsWith(PARK) &&
-          !spec.endsWith("/components/LifetimeCapDialog")
+          !target.startsWith(PARK) &&
+          target !== resolve(PARK, "..", "components", "LifetimeCapDialog")
         )
           bad.push(`${shellRel(p)} imports ${spec}`);
       }
