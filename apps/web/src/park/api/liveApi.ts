@@ -76,8 +76,7 @@ export function userOf(who: Identity): User | null {
 }
 
 /** Today from the clock: a date is true wherever it comes from. */
-export function todayNow(): Today {
-  const d = new Date();
+export function todayOf(d: Date): Today {
   const part = (o: Intl.DateTimeFormatOptions): string =>
     new Intl.DateTimeFormat("en-GB", o).format(d);
   return {

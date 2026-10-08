@@ -75,7 +75,10 @@ export function HomePage({ app }: { app: AppCtx }) {
       Promise.all([
         api.getUser(),
         api.getToday(),
-        api.getAgenda().catch(() => null),
+        api.getAgenda().catch((e: unknown) => {
+          if (e instanceof Error && e.name === "NotBuilt") return null;
+          throw e;
+        }),
         api.getLedger(),
         decisions(),
       ]),

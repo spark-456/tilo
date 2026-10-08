@@ -25,6 +25,7 @@ export const authToken: (() => Promise<string | null>) | undefined =
 
 /** Who is signed in, read at call time from the one sign-in session (LIVE-HOME). */
 export const sessionView: SessionView = {
+  now: () => new Date(),
   demo: () => session.getState().status === "anonymous",
   identity: () => {
     const state = session.getState();

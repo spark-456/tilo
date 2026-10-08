@@ -7,13 +7,15 @@
 import { createFixtureApi } from "./fixtureApi";
 import type { Api } from "./index";
 import { API_METHODS } from "./index";
-import { type Identity, NotBuilt, createLiveApi, todayNow, userOf } from "./liveApi";
+import { type Identity, NotBuilt, createLiveApi, todayOf, userOf } from "./liveApi";
 import type { ApiResult } from "./types";
 
 export interface SessionView {
   /** True for a demo (anonymous) session. */
   demo: () => boolean;
   identity: () => Identity | null;
+  /** The clock (park/api reads none itself). */
+  now: () => Date;
 }
 
 export function parkApi(
@@ -52,7 +54,7 @@ export function withSession(live: Api, who: SessionView): Api {
     );
   api.getToday = () =>
     demoOr(
-      async () => ({ data: todayNow(), source: "live" as const }),
+      async () => ({ data: todayOf(who.now()), source: "live" as const }),
       () => fixture.getToday(),
     );
   return api;

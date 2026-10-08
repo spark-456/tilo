@@ -16,7 +16,11 @@ describe("LIVE-HOME demo session", () => {
   it("LIVE-HOME a demo session reads the fixture Api and makes no network request", async () => {
     const fetchSpy = vi.fn();
     vi.stubGlobal("fetch", fetchSpy);
-    const api = withSession(parkApi(LIVE_ENV), { demo: () => true, identity: () => null });
+    const api = withSession(parkApi(LIVE_ENV), {
+      now: () => new Date(),
+      demo: () => true,
+      identity: () => null,
+    });
     const user = await api.getUser();
     expect(user.source).toBe("fixture");
     expect(user.data).toEqual(fx.user);
@@ -31,6 +35,7 @@ describe("LIVE-HOME demo session", () => {
       vi.fn(async () => new Response("{}", { status: 401 })),
     );
     const api = withSession(parkApi(LIVE_ENV), {
+      now: () => new Date(),
       demo: () => false,
       identity: () => ({ name: "Riya Sharma", email: "riya@example.org" }),
     });
@@ -41,6 +46,7 @@ describe("LIVE-HOME demo session", () => {
 describe("LIVE-HOME signed-in reads that need no endpoint", () => {
   const live = () =>
     withSession(parkApi(LIVE_ENV), {
+      now: () => new Date(),
       demo: () => false,
       identity: () => ({ name: "Riya Sharma", email: "riya@example.org" }),
     });
@@ -58,6 +64,7 @@ describe("LIVE-HOME signed-in reads that need no endpoint", () => {
 
   it("LIVE-HOME a person with no display name is greeted by the start of the email", async () => {
     const api = withSession(parkApi(LIVE_ENV), {
+      now: () => new Date(),
       demo: () => false,
       identity: () => ({ name: null, email: "riya.sharma@example.org" }),
     });
@@ -82,6 +89,7 @@ describe("LIVE-HOME signed-in reads that need no endpoint", () => {
 
   it("LIVE-HOME nobody signed in means getUser is not built, not a made-up person", async () => {
     const api = withSession(parkApi(LIVE_ENV), {
+      now: () => new Date(),
       demo: () => false,
       identity: () => null,
     });
