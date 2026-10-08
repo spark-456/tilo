@@ -23,8 +23,8 @@
 # or 4M (Neural2, WaveNet, Standard) characters a month.
 #
 # Not priced until a profile uses them (decision 5; no role names them on this base):
-#   Cloud TTS, unit character, input 0 / output 0: Chirp 3 HD per_1k 0.03, Neural2 0.016, WaveNet and Standard
-#   0.004. Gemini 3.8 Flash-Lite TTS: audio output 6.00 per 1M audio tokens (12.00 from 2027-01-01); its text
+#   Cloud TTS, unit character, input 0 / output 0: Neural2 per_1k 0.016, WaveNet and Standard 0.004 (Chirp 3 HD is
+#   priced below, FR-MTG-11). Gemini 3.8 Flash-Lite TTS: audio output 6.00 per 1M audio tokens (12.00 from 2027-01-01); its text
 #   input rate was not supplied, and a set file holds no null, so it has no row yet (BQ-LW-9).
 #   Speech-to-Text V2 Chirp, unit minute, per_1k 16 (dynamic batch 3). Imagen 4, unit image, per_1k 40 / 60 / 20
 #   (PRD 12.4 draws charts by code, so there is no image role).
@@ -54,6 +54,10 @@ profiles:
   # Gemini 3.8 Flash TTS (FR-MTG-16; no profile names it yet, so the row is inert until one does): text input 0.50
   # per 1M tokens, output 9.00 per 1M audio output tokens (about 25 a second). From 2027-01-01: 1.00 / 18.00.
   tts-flash: { input: 0.50, output: 9.00, valid_until: "2026-12-31" }
+  # The meeting bot's voice (FR-MTG-11, config/voice.yaml): Cloud Text-to-Speech, Chirp 3 HD, streamed. Metered by
+  # input characters only (no tokens): US$0.03 per 1,000 = US$30 per 1M. No promotion, so no valid_until. The 1M free
+  # characters a month are not subtracted (decision 5): the meter charges from the first character.
+  chirp3-hd: { input: 0, output: 0, unit_price: { unit: character, per_1k: 0.03 } }
   # The profiles below make no paid call, so their price is 0 by decision (PL-06, 2026-10-04):
   # Model Armor bills per token screened, so it is an input price and output is 0. US$0.10 per 1M tokens
   # (standalone), from https://cloud.google.com/security/products/model-armor and
