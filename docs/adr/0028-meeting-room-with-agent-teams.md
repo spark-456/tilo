@@ -1,9 +1,6 @@
 # ADR-0028: Meeting room with agent teams (user-requested addition)
 
-- Status: **Proposed.** Written by the architect on 2026-10-08 from the user's request of 8 Oct, relayed
-  by the supervisor. It is not in the PRD, so it is logged as a user-requested addition (BQ-MROOM-1),
-  and it changes two frozen contracts (the event registry and `plan`), so nothing built on it merges
-  until the user says yes. **The user should check decisions 3, 6, 7 and 9 and the questions at the end.**
+- Status: Accepted (user approved 8 Oct 2026)
 - Deciders: user (approval), architect (proposal), supervisor (relay)
 - Requirement: USER-MEETING-ROOM (user, 2026-10-08). Touches PRD 8.1, 9.1 (Meeting Hall), 9.4 (HR-1 to
   HR-7), 9.5, 10.1, 10.4, 14.1, 16.3, 18.3 (S-09 Meeting); FR-MTR-02 to 04, SEC-16, FR-TEAM-02,
