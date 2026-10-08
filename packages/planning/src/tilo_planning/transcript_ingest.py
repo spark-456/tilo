@@ -38,7 +38,10 @@ _EXTENSIONS = {".vtt": "vtt", ".srt": "srt", ".txt": "text", ".text": "text", ".
 _TIME = r"(?:(\d{1,3}):)?(\d{1,2}):(\d{2})[.,](\d{3})"
 _CUE = re.compile(rf"\s*{_TIME}\s*-->\s*{_TIME}(?:\s.*)?")  # anything after the end time is cue settings: ignored
 _NEWLINE = re.compile(r"\r\n|\r|\n")
-_VOICE = re.compile(r"<v(?:\.[^\s<>]*)*[ \t]+([^<>]*)>")
+# Linear on any input (no nested quantifier, no overlapping classes): the dot is excluded from a class and one
+# separator is taken, so neither `<v....` nor `<v` plus spaces can backtrack; `_line` trims the speaker's own spaces.
+_VOICE = re.compile(r"<v(?:\.[^\s.<>]+)*[ \t]([^<>]*)>")
+_BIG_DECIMAL_ENTITY = re.compile(r"&#[0-9]{30,};?")  # html.unescape raises ValueError past 4,300 digits
 _TAG = re.compile(r"<(?:/?[A-Za-z][^<>]*|\d[^<>]*)>")  # <c.x>, </v>, <i>, <font ...>, <00:00:01.000>; "a < b" stays
 _ASS = re.compile(r"\{\\[^{}]*\}")
 _BLOCK_NOT_A_CUE = re.compile(r"(NOTE|STYLE|REGION)(\s|$)")
@@ -97,6 +100,10 @@ def _offset_ms(value: Any) -> int | None:
     return round(max(0, min(value, MAX_OFFSET_MS / 1000)) * 1000)
 
 
+def _unescape(raw: str) -> str:
+    return html.unescape(_BIG_DECIMAL_ENTITY.sub("\N{REPLACEMENT CHARACTER}", raw))
+
+
 def _prefixed(text: str) -> tuple[str, str]:
     match = _SPEAKER_PREFIX.fullmatch(text)
     return (match[1], match[2]) if match else ("", text)
@@ -112,8 +119,8 @@ def _cue(block: list[str], kind: str) -> dict[str, Any] | None:
     h, m, s, ms = (int(g or 0) for g in match.groups()[:4])
     raw = " ".join(block[at + 1 :])
     voice = _VOICE.search(raw)
-    text = html.unescape(_TAG.sub("", _ASS.sub("", raw)))
-    speaker, text = (html.unescape(voice[1]), text) if voice else _prefixed(text.strip())
+    text = _unescape(_TAG.sub("", _ASS.sub("", raw)))
+    speaker, text = (_unescape(voice[1]), text) if voice else _prefixed(text.strip())
     return {"speaker": speaker, "start_ms": min(((h * 60 + m) * 60 + s) * 1000 + ms, MAX_OFFSET_MS), "text": text}
 
 
@@ -209,7 +216,9 @@ def ingest_transcript(
     lines = [f"{u['speaker']}: {u['text']}" for u in content["utterances"]]
     flagged, reason = _screen([*lines, *([parsed.title] if parsed.title else [])], safety)
 
-    stored = store.put(scope, NewVersion("application/json", payload, run_id, Origin(kind="upload"), parent=parent))
+    hint = "flagged" if flagged else None  # the store can only raise to flagged: its whole-payload screen may miss it
+    new = NewVersion("application/json", payload, run_id, Origin(kind="upload"), parent=parent, screening_hint=hint)
+    stored = store.put(scope, new)
     record = stored.record
     if record["screening"] == "flagged" and not flagged:  # the store's own verdict on the stored bytes counts too
         flagged, reason = True, "flagged by the safety provider"

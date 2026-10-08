@@ -19,6 +19,9 @@ FR-MTG-17 recording path) and the upload limits and safety screen (FR-INT-02). `
    - VTT: header required; `NOTE`, `STYLE`, `REGION` blocks and cue ids skipped; cue settings ignored; `<v Name>`
      gives the speaker; other tags (`<c>`, `<i>`, timestamps, `<font>`), SRT/ASS `{\an8}` and entities are removed or
      decoded. SRT: same cue parser. Text: one utterance per non-empty line, optional `Name: text`.
+   Every pattern is linear on hostile input (no nested quantifiers: the `<v.class Name>` tag takes dots one
+   segment at a time and one separator space); a numeric entity of 30 or more digits becomes U+FFFD, since
+   `html.unescape` would raise past 4,300 digits. Tests bound each hostile line (a 4 MB single line included).
    - meet-bot: one JSON row per line `{speaker, text, t}` with `t` in seconds; a bad line is skipped and counted
      (`origin.skipped_lines`). `state.json` only gives the cleaned `agenda_title`; every other field is ignored.
 3. `recording.normalise_segments` cleans and orders (stable time sort, control, format and bidi characters removed,
@@ -27,7 +30,11 @@ FR-MTG-17 recording path) and the upload limits and safety screen (FR-INT-02). `
 4. The speaker and text lines (and the title) are screened with the injected `SafetyProvider` in chunks of at most
    20,000 characters. A flag is kept and marked, never dropped; a provider error propagates before anything is stored.
 5. One `NewVersion` (`application/json`, origin kind `upload`) goes into the `ArtifactStore`; the store redacts secrets
-   and sets `screening` from its own verdict on the stored bytes (AR-07).
+   and sets `screening` from its own verdict on the stored bytes (AR-07). When step 4 flagged, ingest passes
+   `screening_hint="flagged"`: the store takes `flagged` if its own screen or the hint says so, so a transcript whose
+   chunk screen flagged is never stored as `clean` or `unscreened`. The hint only raises a verdict, any other value
+   is refused, and a replay of the same idempotency key returns the stored version unchanged (an upload has no key,
+   so ingest never replays). ADR-0020 decision 4 therefore reads the version's `screening` alone (BQ-MTG02-3).
 6. One registered event is returned, unwritten (the harness is the single writer): `artifact.created`
    (`artifact.versioned` when `parent` is given), severity `fyi` and `trace.tool` `safety_provider` when flagged,
    `info` otherwise. That is "flagged in the Trace". No transcript text is in the event.
