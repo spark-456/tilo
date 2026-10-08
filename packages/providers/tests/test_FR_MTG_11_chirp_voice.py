@@ -297,3 +297,51 @@ def test_FR_MTG_11_the_global_region_uses_the_default_endpoint(monkeypatch):
 
     GoogleCloudTTSProvider(voice=VOICE, sample_rate=24000, project="demo-project", region="global")
     assert "api_endpoint" not in options
+
+
+# --- follow-ups of review #719: no live voice the meter cannot charge; a missing SDK is a permanent refusal ----------
+
+
+def _live_env(monkeypatch):
+    monkeypatch.setenv("LIVE", "1")
+    monkeypatch.setenv("GOOGLE_CLOUD_PROJECT", "demo-project")
+
+
+def test_FR_MTG_11_the_live_cloud_voice_is_refused_while_the_price_book_cannot_charge_characters(tmp_path, monkeypatch):
+    import dataclasses
+
+    from tilo_providers import config as providers_config
+
+    _live_env(monkeypatch)
+    if "unit" in {f.name for f in dataclasses.fields(providers_config.ProfilePriceQuote)}:
+        return  # LW-05 has landed: the probe passes and there is nothing to refuse
+    voice = build_voice_provider(CHIRP, fixtures_dir=tmp_path)
+    with pytest.raises(NotConfigured, match=r"LW-05.*BQ-MTG11-15"):
+        voice.synthesize_stream("Hello")
+
+
+def test_FR_MTG_11_the_live_cloud_voice_builds_once_the_price_book_can_charge_characters(tmp_path, monkeypatch):
+    import dataclasses
+
+    from tilo_providers import config as providers_config
+
+    _live_env(monkeypatch)
+    charging = dataclasses.make_dataclass("ProfilePriceQuote", [("input", float), ("unit", str | None)])
+    monkeypatch.setattr(providers_config, "ProfilePriceQuote", charging)  # what LW-05 adds: a unit fee on the quote
+    module = types.ModuleType("google.cloud.texttospeech")
+    module.TextToSpeechClient = lambda client_options: SimpleNamespace(  # type: ignore[attr-defined]
+        streaming_synthesize=lambda requests, timeout=None: iter([SimpleNamespace(audio_content=A)])
+    )
+    module.StreamingSynthesizeRequest = dict  # type: ignore[attr-defined]
+    monkeypatch.setitem(sys.modules, "google.cloud.texttospeech", module)
+    assert b"".join(build_voice_provider(CHIRP, fixtures_dir=tmp_path).synthesize_stream("Hello")) == A
+
+
+def test_FR_MTG_11_a_missing_cloud_tts_sdk_is_not_configured_never_a_retryable_failure(monkeypatch):
+    _live_env(monkeypatch)
+    monkeypatch.setitem(sys.modules, "google.cloud.texttospeech", None)  # an import of it raises ImportError
+    from tilo_providers.cloud_tts_adapter import GoogleCloudTTSProvider
+
+    with pytest.raises(NotConfigured, match="google-cloud-texttospeech") as excinfo:
+        GoogleCloudTTSProvider(voice=VOICE, sample_rate=24000, project="demo-project", region="global")
+    assert excinfo.value.__cause__ is None

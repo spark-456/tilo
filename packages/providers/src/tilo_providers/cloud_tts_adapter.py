@@ -23,7 +23,7 @@ import time
 from collections.abc import Callable, Iterator
 from typing import Any
 
-from tilo_providers.errors import ProviderError, RequestError, map_http_status, map_transport_error
+from tilo_providers.errors import NotConfigured, ProviderError, RequestError, map_http_status, map_transport_error
 from tilo_providers.google_adapter import _GOOGLE_SECRET_RE, validate_google_settings
 from tilo_providers.interfaces import SpeechProvider
 from tilo_providers.speech import VoiceTiming, check_synth_request
@@ -86,7 +86,12 @@ class GoogleCloudTTSProvider(SpeechProvider):
 
     @staticmethod
     def _build_client(project: str, region: str) -> Any:
-        sdk = importlib.import_module("google.cloud.texttospeech")
+        try:
+            sdk = importlib.import_module("google.cloud.texttospeech")
+        except ImportError:  # permanent for the bot (it falls back instead of retrying every reply), no raw cause
+            sdk = None
+        if sdk is None:
+            raise NotConfigured("FR-MTG-11: google-cloud-texttospeech is not installed (BQ-MTG11-15)")
         options: dict[str, Any] = {"quota_project_id": project}
         endpoint = endpoint_for(region)
         if endpoint:

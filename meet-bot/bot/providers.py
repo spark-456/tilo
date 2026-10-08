@@ -41,7 +41,7 @@ from .brain import Busy, LLMUnavailable
 from .config import ROOT
 from .guards import BotRefused, recording_refusal
 from .llm_fast import CallCapReached, ModelCallError
-from .tts import FallbackTTS, LocalTTS, TTSError, TTSProvider
+from .tts import STT_END_AT, FallbackTTS, LocalTTS, TTSError, TTSProvider
 
 log = logging.getLogger("bot.providers")
 BRAIN_ROLE = "meeting"
@@ -335,7 +335,13 @@ class ProviderTTS:
 
     name = "provider-voice"
 
-    def __init__(self, provider: SpeechProvider | None = None, config: VoiceConfig | None = None) -> None:
+    def __init__(
+        self,
+        provider: SpeechProvider | None = None,
+        config: VoiceConfig | None = None,
+        clock: Callable[[], float] = time.monotonic,
+    ) -> None:
+        self._clock = clock
         self.config = config or load_voice_config(voice_file(), models_path=repo_root() / "config" / "models.yaml")
         self.provider = provider or build_voice_provider(self.config, fixtures_dir=fixtures_dir())
         self.sample_rate = self.config.sample_rate
@@ -346,7 +352,7 @@ class ProviderTTS:
             raise TTSError(
                 "the meeting's speech call cap is reached (config/meeting.yaml)", permanent=True, remember=False
             )
-        started, first_ms, end = time.monotonic(), None, object()
+        started, first_ms, end = self._clock(), None, object()
         pieces: Any = None
         try:
             while True:
@@ -363,8 +369,11 @@ class ProviderTTS:
                 if pcm is end:
                     return
                 if first_ms is None:  # FR-MTG-11: text in to first audio out, counts only (never the text)
-                    first_ms = (time.monotonic() - started) * 1000
-                    log.info("voice latency: characters=%d first_audio_ms=%.0f", len(spoken), first_ms)
+                    now = self._clock()
+                    first_ms = (now - started) * 1000
+                    stt_end = STT_END_AT.get()  # when the turn's speech-to-text result came back (bot clock), if known
+                    since_stt = "" if stt_end is None else f" stt_end_to_first_audio_ms={(now - stt_end) * 1000:.0f}"
+                    log.info("voice latency: characters=%d first_audio_ms=%.0f%s", len(spoken), first_ms, since_stt)
                 for start in range(0, len(pcm), 4800):
                     yield pcm[start : start + 4800]
         finally:

@@ -444,3 +444,37 @@ def test_VA_03_the_mic_is_opened_when_the_meeting_starts_and_rechecked(session):
     s.cfg = SimpleNamespace(**{**s.cfg.__dict__, "mic_policy": "open"})
     run(s._keep_mic_open())
     assert s.br.mic_calls == [True]  # no voice, no mic
+
+
+def test_FR_MTG_11_the_stt_final_time_of_a_question_is_kept_and_marked_on_its_turn(session):
+    from bot.brain import _norm
+    from bot.captions import Utterance
+
+    s = session
+    u = Utterance("Ana", "Tilo, what is the plan for Hiring?", 5.0)
+    s.record(u, heard_at=40.0, stt_final_at=41.2)
+    (q,) = [s.brain.question_in(u)]
+    assert s.stt_final[_norm(q.text)] == 41.2  # the moment the transcript came back, on the bot clock
+    turn = s._new_turn(q, {"first_seen": 40.0, "detected": 42.0, "stt_final": s.stt_final[_norm(q.text)]})
+    assert turn.marks["stt_final"] == 41.2
+
+
+def test_FR_MTG_11_the_speak_call_sees_the_turns_stt_final_time_and_a_chat_reply_sees_none(session):
+    from bot.tts import STT_END_AT
+
+    s = session
+    s.br = FakeBrowser([[]])
+    seen: list = []
+
+    class Spy(FakeSpeaker):
+        async def say(self, text, on_first_sound=None):
+            seen.append(STT_END_AT.get())
+            return await super().say(text, on_first_sound)
+
+    s.speaker = Spy(speak_s=0.05, first_s=0.01)
+    msg = SimpleNamespace(kind="direct_reply", text="Hiring is next.")
+    turn = s.trace.new_turn("Ana", "Tilo, what is next?", 1.0)
+    turn.mark("stt_final", 12.5)
+    run(s._deliver(msg, turn))
+    run(s._deliver(msg))
+    assert seen == [12.5, None]

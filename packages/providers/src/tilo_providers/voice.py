@@ -12,6 +12,7 @@ the dev config names the deterministic fake. The model id appears only in the co
 
 from __future__ import annotations
 
+import dataclasses
 import fnmatch
 import os
 from collections.abc import Iterator
@@ -105,6 +106,14 @@ def load_voice_config(path: Path | str, *, models_path: Path | str | None = None
     )
 
 
+def character_metering_ready() -> bool:
+    """True once the price loader can charge a `unit_price` (LW-05 gives `ProfilePriceQuote` a `unit`). Until then the
+    `character` fee of the Chirp profile would be ignored, so the live voice refuses to build (BQ-MTG11-15)."""
+    from tilo_providers import config  # noqa: PLC0415  (read at call time, so a later loader is seen)
+
+    return "unit" in {f.name for f in dataclasses.fields(config.ProfilePriceQuote)}
+
+
 def check_voice_name(voice: str) -> bool:
     try:
         check_synth_request("x", voice, {}, None)
@@ -157,6 +166,10 @@ class GoogleVoiceProvider(SpeechProvider):
         if not project:
             raise ProviderConfigError("FR-MTG-11: GOOGLE_CLOUD_PROJECT is not set; cannot speak live")
         if self._config.vendor == "google-cloud-tts":
+            if not character_metering_ready():  # a live call the meter cannot charge is a silent overspend
+                raise NotConfigured(
+                    "FR-MTG-11: character metering needs LW-05 (BQ-MTG11-15); the Chirp voice stays off"
+                )
             from tilo_providers.cloud_tts_adapter import GoogleCloudTTSProvider  # noqa: PLC0415  (dev never loads it)
 
             return GoogleCloudTTSProvider(
