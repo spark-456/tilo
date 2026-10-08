@@ -112,16 +112,23 @@ export function useAgendaUi(A: Agenda, decisions: Decision[], app: AppCtx, api: 
           setFinding(false);
           setBooked(s);
           setSel(findRuleOf(A)?.find?.event.id ?? defaultEventId(A));
-          app.toast(`Booked ${s.l}. Invites sent from Google Calendar`);
+          app.toast(
+            `Booked ${s.l} on your Agenda. Invites go out from Google Calendar once it's connected and you approve`,
+          );
         },
         () => app.toast("Not connected yet"),
       ),
     flip: (id: string, k: "join" | "pins" | "brief", cur: boolean, title: string) => {
       setFlags((f) => ({ ...f, [`${id}:${k}`]: !cur }));
       if (k === "join") app.toast(cur ? "Tilo won’t join this one" : `Tilo will join ${title}`);
+      if (k === "brief")
+        app.toast(
+          cur ? `No brief before ${title}` : `Tilo will brief you 15 minutes before ${title}`,
+        );
     },
     askBrief: (id: string, title: string) => {
       setBriefed((b) => ({ ...b, [id]: true }));
+      setFlags((f) => ({ ...f, [`${id}:brief`]: true }));
       app.toast(`Tilo will brief you 15 minutes before ${title}`);
     },
   };

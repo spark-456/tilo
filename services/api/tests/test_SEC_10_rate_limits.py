@@ -266,22 +266,91 @@ def test_SEC_10_default_limits_sustain_web_client_polling_cadence_for_several_mi
 
 
 def test_SEC_10_replaceable_shared_store_interface() -> None:
-    calls: list[str] = []
+    calls: list[list[tuple[str, str]]] = []
 
     class CustomSharedLimiter:
         def consume(self, key: str, *, capacity: int, refill_per_s: float) -> tuple[bool, int]:
-            calls.append(key)
             return False, 7
 
-    custom: RateLimiter = CustomSharedLimiter()
+        def consume_all(
+            self, checks: list[tuple[str, str, int, float]] | tuple[tuple[str, str, int, float], ...]
+        ) -> tuple[str | None, int]:
+            calls.append([(scope, key) for scope, key, _, _ in checks])
+            return "ip", 7
+
+    custom: RateLimiter = CustomSharedLimiter()  # type: ignore[assignment]
     app.dependency_overrides[get_rate_limiter] = lambda: custom
+    app.dependency_overrides[get_current_principal] = lambda: Principal(
+        user_id="u_alice", role="owner", world_id="w_sec10"
+    )
     try:
         client = TestClient(app)
         res = client.get("/worlds/w_sec10/cards")
         assert res.status_code == 429
         assert res.headers["Retry-After"] == "7"
         assert res.json()["retry_after_s"] == 7
-        assert calls == ["ip:testclient"]
+        assert calls == [[("ip", "ip:testclient"), ("user", "user:u_alice")]]
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_SEC_10_ip_checked_before_principal_verify_once_and_async_provider() -> None:
+    import warnings
+
+    from fastapi import HTTPException
+
+    clock = FakeClock()
+    limiter = InMemoryRateLimiter(clock=clock)
+    cfg = RateLimitConfig(ip_capacity=2, ip_refill_per_s=0.5, user_capacity=2, user_refill_per_s=0.5)
+    store = _seed_store()
+    verify_calls = {"count": 0}
+
+    def bad_token_provider(_request: Request) -> Principal:
+        verify_calls["count"] += 1
+        raise HTTPException(status_code=401, detail="bad token")
+
+    app.dependency_overrides[get_store] = lambda: store
+    app.dependency_overrides[get_rate_limiter] = lambda: limiter
+    app.dependency_overrides[get_rate_limit_config] = lambda: cfg
+    app.dependency_overrides[get_current_principal] = bad_token_provider
+
+    try:
+        client = TestClient(app)
+        xff = {"X-Forwarded-For": "198.51.100.77", "Authorization": "Bearer bad.token"}
+        # First 2 bad-token requests exhaust the IP bucket for 198.51.100.77
+        assert client.get("/access", headers=xff).status_code == 401
+        assert client.get("/access", headers=xff).status_code == 401
+        calls_at_exhaustion = verify_calls["count"]
+
+        # Subsequent flood of bad tokens from the exhausted IP is refused BEFORE resolving the principal
+        for _ in range(5):
+            flood = client.get("/access", headers=xff)
+            assert flood.status_code == 429
+            assert flood.json()["scope"] == "ip"
+        assert verify_calls["count"] == calls_at_exhaustion
+
+        # Async principal providers are awaited cleanly without 'coroutine was never awaited' warnings
+        async def async_ok_principal(request: Request) -> Principal:
+            return Principal(user_id="u_alice", role="owner", world_id=request.path_params.get("world_id") or "w_sec10")
+
+        async def async_bad_principal(_request: Request) -> Principal:
+            raise HTTPException(status_code=401, detail="async unauthorized")
+
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            app.dependency_overrides[get_current_principal] = async_ok_principal
+            xff_async = {"X-Forwarded-For": "198.51.100.88"}
+            assert client.get("/worlds/w_sec10/cards", headers=xff_async).status_code == 200
+            assert client.get("/worlds/w_sec10/cards", headers=xff_async).status_code == 200
+            limited = client.get("/worlds/w_sec10/cards", headers={"X-Forwarded-For": "198.51.100.89"})
+            assert limited.status_code == 429
+            assert limited.json()["scope"] == "user"
+
+            app.dependency_overrides[get_current_principal] = async_bad_principal
+            assert client.get("/worlds/w_sec10/cards", headers={"X-Forwarded-For": "198.51.100.90"}).status_code == 401
+
+        unawaited = [w for w in caught if "was never awaited" in str(w.message)]
+        assert unawaited == []
     finally:
         app.dependency_overrides.clear()
 

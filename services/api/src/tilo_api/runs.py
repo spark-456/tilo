@@ -10,11 +10,13 @@ import copy
 import logging
 import math
 import threading
+import time
 import unicodedata
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Iterator, Mapping
+from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 
 import tilo_planning.plangraph as plangraph
 import tilo_policy
@@ -30,7 +32,14 @@ from tilo_planning.compiler import DELIVER, PlanInputs
 
 from tilo_api import deps, events
 from tilo_api.access import Mode
-from tilo_api.cards import AlreadyCommitted, CardStore, _card_errors, answering_principal, get_channels_caller
+from tilo_api.cards import (
+    OWNER_ONLY_ACTIONS,
+    AlreadyCommitted,
+    CardStore,
+    _card_errors,
+    answering_principal,
+    get_channels_caller,
+)
 
 logger = logging.getLogger("tilo_api.runs")
 router = APIRouter()
@@ -108,8 +117,10 @@ def run_seams(request: Request, mode: Annotated[Mode, Depends(deps.get_work_mode
 
 
 def start_run(store: deps.Store, task: deps.TaskRecord, *, approach: dict, budget_cap: float, seams: Seams) -> None:
-    with store.runs_guard:  # one run per world
-        if task.world_id in store.runs:
+    store.settle(task.world_id)  # the queued events go out first, so `world.started` follows them
+    with store.runs_guard:  # one run per world, in any process: a started world's stream says so (ADR-0026 decision 5)
+        started = any(e["type"] == "world.started" for e in store.events.get(task.world_id, []))
+        if task.world_id in store.runs or started:
             return
         run = store.runs[task.world_id] = Run(store, task, approach, budget_cap, seams)
     threading.Thread(target=run.main, name=f"run-{task.world_id}", daemon=True).start()
@@ -131,9 +142,23 @@ class _NoCards:
         raise RuntimeError("a world with no run holds no cards")
 
 
+class _ObservedWait(QuestionWait):
+    """The run's `QuestionWait`, which also says when a unit is asleep waiting for a person's answer (FR-AGT-14e)."""
+
+    def __init__(self, run: Run) -> None:
+        super().__init__(run)
+        self._run = run
+
+    async def wait_for(self, card: dict[str, Any], *, lead: str, director: str, district: str | None) -> Any:
+        with self._run.asleep():
+            return await super().wait_for(card, lead=lead, director=director, district=district)
+
+
 class Run:
     """Also the executor's writer (`emit`, `org_id`, `world_id`, `recorded_version`) and its CardStore's (`write`):
     both end at the single writer."""
+
+    owner_started: frozenset[str] = OWNER_ONLY_ACTIONS  # FR-MTG-09: no plan names it, only the owner starts it
 
     def __init__(self, store: deps.Store, task: deps.TaskRecord, approach: dict, cap: float, seams: Seams) -> None:
         self.store, self.seams, self.cap, self.approach = store, seams, cap, copy.deepcopy(approach)
@@ -142,7 +167,7 @@ class Run:
         self.world_id, self.run_id, self.owner, self.brief = task.world_id, task.run_id, task.owner, task.brief
         self.approaches = copy.deepcopy(task.approaches or [])
         self.cards = CardStore(clock=_CLOCK, writer=self, world_owners={self.world_id: self.owner})
-        self.question_wait = QuestionWait(self)  # a unit that asked a person waits here for the answer (FR-HIL-10)
+        self.question_wait = _ObservedWait(self)  # a unit that asked a person waits here for the answer (FR-HIL-10)
         self.plan: dict[str, Any] = {}
         self.layout: dict[str, Any] = {}
         self.levels: dict[str, str] = {}
@@ -157,6 +182,14 @@ class Run:
         self._built: dict[str, dict] = {}  # event id -> the event as first built, resent as is on an exact retry
         self.failure: str | None = None
         self._failed = False
+        # What `wait_until_parked_or_done` looks at (FR-AGT-14e). Written from the run's thread, read from any thread.
+        self._ended = threading.Event()  # the run's thread has finished, whichever way out
+        self._seen = threading.Lock()
+        self._unit_of: dict[str, str] = {}  # worker -> the unit it was assigned
+        self._started: set[str] = set()  # units that were assigned
+        self._live: set[str] = set()  # assigned and not yet retired
+        self._handed: set[str] = set()  # units that handed their result over (their dependents may start)
+        self._asleep = 0  # live units waiting for a person: a gate card or a question
 
     def now(self) -> datetime:
         return datetime.now(UTC)
@@ -227,9 +260,62 @@ class Run:
             if defaulted:  # an answer already committed this card's question: the deadline closes the card as well
                 self._close_defaulted()
             raise
+        self._observe(type, actor, target, data)
         if defaulted:
             self._close_defaulted()  # the harness applied a deadline default: close that card here too (BQ-208)
         return event
+
+    def _observe(self, type_: str, actor: str, target: str, data: dict) -> None:
+        """Which units are at work: assigned, handed over and retired are the executor's own events."""
+        with self._seen:
+            if type_ == "agent.assigned":
+                self._unit_of[target] = data["unit"]
+                self._started.add(data["unit"])
+                self._live.add(data["unit"])
+            elif type_ == "agent.handoff" and actor in self._unit_of:
+                self._handed.add(self._unit_of[actor])
+            elif type_ == "agent.retired":
+                self._live.discard(self._unit_of.get(target, ""))
+
+    @contextmanager
+    def asleep(self) -> Iterator[None]:
+        """A live unit is waiting for a person (a gate card or a question) from here until the block ends."""
+        with self._seen:
+            self._asleep += 1
+        try:
+            yield
+        finally:
+            with self._seen:
+                self._asleep -= 1
+
+    def _quiet(self) -> bool:
+        """Nothing goes on until a person answers: someone waits for one, every live unit is that waiting, and no unit
+        is about to start (not started, every dependency handed over). A paused world is winding down, not waiting."""
+        if self.paused():
+            return False
+        with self._seen:
+            if self._asleep == 0 or len(self._live) != self._asleep:
+                return False
+            units = self.plan.get("units", [])
+            return not any(
+                u["id"] not in self._started and all(d in self._handed for d in u["depends_on"]) for u in units
+            )
+
+    def wait_until_parked_or_done(
+        self, timeout_s: float, *, clock: Callable[[], float] = time.monotonic, poll_s: float = 0.25
+    ) -> Literal["done", "parked", "timeout"]:
+        """FR-AGT-14e: for a Cloud Tasks delivery, which holds a request only while the run works. "done": the run's
+        thread has ended. "parked": the run is quiet at a person (see `_quiet`), never while a unit computes.
+        "timeout": `timeout_s` of `clock()` passed. The run itself is untouched either way."""
+        deadline = clock() + timeout_s
+        while True:
+            if self._ended.is_set():
+                return "done"
+            if self._quiet():
+                return "parked"
+            if clock() >= deadline:
+                return "timeout"
+            self._ended.wait(poll_s)
 
     def _close_defaulted(self) -> None:
         try:
@@ -303,6 +389,7 @@ class Run:
                 raise
         finally:
             self._abandon_unsent()
+            self._ended.set()
 
     def _outbox(self) -> Outbox:
         """The run dispatches and records only its own world's entries, and claims none once the world is paused
@@ -321,18 +408,33 @@ class Run:
                 except Exception:
                     logger.warning("run %s left entry %s to its sender", self.run_id, outbox_id)
 
+    def _compile(self, context: PlanInputs) -> dict:
+        return self.seams.compiler(
+            brief=copy.deepcopy(self.brief), approach=self.approach, budget_cap=self.cap, context=context
+        )
+
+    def _must_ask(self, config: Any) -> MustAsk | None:
+        return MustAsk(
+            self.seams.must_ask_providers, config=config, card_sink=self._store_card, owner=self.owner,
+            covered_actions={p["action_type"] for p in self.store.policies.values() if p.get("owner") == self.owner},
+        )  # fmt: skip
+
     def _prepare(self) -> Any:
         """Compile, validate, lay out. Returns the agents config, or None when no run may start."""
         registry = self.seams.connectors
+        try:  # the policy context and the PI-11 history are read across all of the owner's worlds
+            self.store.load_owner(self.owner, settle=True)
+        except Exception as exc:
+            logger.warning("run %s: the owner's records could not be read (%s)", self.run_id, type(exc).__name__)
+            self._fail("the owner's records could not be read", None)
+            return None
         try:
             context = PlanInputs(
                 approaches=copy.deepcopy(self.approaches), owner=self.owner, skills=dict(self.seams.skills.catalog()),
                 connectors={c: registry.get(c) for c in registry.ids()}, risk_table=tilo_policy.load_risk_table(),
                 policies=dict(self.store.policies),
             )  # fmt: skip
-            plan = self.seams.compiler(
-                brief=copy.deepcopy(self.brief), approach=self.approach, budget_cap=self.cap, context=context
-            )
+            plan = self._compile(context)
         except Exception as exc:
             logger.warning("run %s: no plan (%s)", self.run_id, type(exc).__name__)
             self._fail("the Director could not plan this task", None)
@@ -344,8 +446,18 @@ class Run:
         if violations:
             self._fail("the plan broke " + ", ".join(sorted({v.rule_id for v in violations})), None)
             return None
+        if self.owner_started & {action for unit in plan["units"] for action in unit["actions"]}:
+            self._fail("the plan names an action only its owner can start", None)  # FR-MTG-09: never a planned unit
+            return None
         try:
             self.layout, config = self.seams.layout_builder(plan, world_id=self.world_id), load_agents_config()
+            if (record := self.store.worlds.get(self.world_id)) is not None:
+                record.layout = self.layout  # before `world.started`: the event writer validates against it (ADR-0026)
+                try:
+                    self.store.commit(worlds={self.world_id: record}, evict=False)  # durable: the layout is stored too
+                except Exception:
+                    record.layout = None  # the record stays cached, as it was, for the run's `world.failed`
+                    raise
         except Exception:
             self._fail("the world could not be laid out", None)
             return None
@@ -369,10 +481,7 @@ class Run:
         granted = next((e["id"] for e in reversed(stream) if e["type"] == "budget.granted"), None)
         summary = f"Work started with a budget of {self.cap:g} credits."
         self.put("world.started", self.director, self.world_id, summary, {"budget_cap": self.cap}, cause=granted)
-        must_ask = MustAsk(
-            self.seams.must_ask_providers, config=config, card_sink=self._store_card, owner=self.owner,
-            covered_actions={p["action_type"] for p in self.store.policies.values() if p.get("owner") == self.owner},
-        )  # fmt: skip
+        must_ask = self._must_ask(config)
         planned = asyncio.ensure_future(
             run_plan(
                 self.plan,
@@ -485,10 +594,11 @@ class Run:
         self.requested[card_id] = requested
         if self.cards.submit(card, outbox_id=outbox_id, district=district).outcome != "accepted":
             raise _GateFailed("the gate card was refused")
-        while (answered := self._answered_card(card_id)) is None:  # a person's approve on any card of this gate
-            if self.paused():
-                raise RunStopped
-            await asyncio.sleep(_POLL_S)
+        with self.asleep():  # FR-AGT-14e: a person's approve on any card of this gate
+            while (answered := self._answered_card(card_id)) is None:
+                if self.paused():
+                    raise RunStopped
+                await asyncio.sleep(_POLL_S)
         resolved, requested = self.resolved[answered], self.requested[answered]  # the answered card's own proposal
         outbox_id = requested["data"]["outbox_id"]  # a share re-raised the gate under a fresh reservation (FR-HIL-12)
         if self.paused():

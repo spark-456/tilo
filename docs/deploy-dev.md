@@ -246,8 +246,11 @@ live at https://essential-wares-510320-f0.web.app (and the `.firebaseapp.com` al
   without security headers), hashed files under `/assets/**` as `public, max-age=31536000, immutable`, and
   every other path as `no-cache` (the `**` default) so a new deploy is picked up on the next load. Every
   route also gets `Content-Security-Policy` (self only, no inline styles, `base-uri 'none'`,
-  `connect-src 'self'`, `frame-ancestors 'none'`, no `unsafe-eval`: the web app loads
-  `pixi.js/unsafe-eval`), `X-Content-Type-Options: nosniff` and
+  `frame-ancestors 'none'`, no `unsafe-eval`: the web app loads `pixi.js/unsafe-eval`; SEC-10 adds exactly
+  `https://www.google.com/recaptcha/` and `https://www.gstatic.com/recaptcha/` to `script-src`,
+  `https://www.google.com/recaptcha/` to `frame-src` and `https://content-firebaseappcheck.googleapis.com`
+  (the host the web SDK, `@firebase/app-check` 0.13.1, exchanges tokens at) to `connect-src`, for App Check with
+  reCAPTCHA Enterprise), `X-Content-Type-Options: nosniff` and
   `Referrer-Policy: strict-origin-when-cross-origin`. A new backend origin for the web app must be
   added to `connect-src` when the app is pointed at a deployed `tilo-api`.
 - Two Hosting sites exist in the project: the default site `essential-wares-510320-f0`
@@ -256,6 +259,45 @@ live at https://essential-wares-510320-f0.web.app (and the `.firebaseapp.com` al
   (https://essential-wares-510320-f0-web.web.app). The `-web` site is optional and unused.
 - Check before you deploy: `pnpm --filter @tilo/web run build` then `pnpm --filter @tilo/web exec vite preview`
   serves the same bundle locally.
+
+## App Check enforcement (SEC-10)
+
+`tilo-api` checks the web client's `X-Firebase-AppCheck` token (`tilo_api.appcheck`) but enforcement stays off
+until you flip it: with `TILO_APPCHECK_ENFORCE` unset a missing or refused token is only logged as a warning and
+no answer changes. Turn it on only after the web app sends tokens in the deployed build and the log shows none
+refused: set `TILO_APPCHECK_ENFORCE=1` on the Cloud Run service (only exactly `1` counts); unset it to turn it off.
+`/health`, `/healthz` (probes carry no token) and the scheduler tick are never checked. The API reads the project from
+`TILO_FIRESTORE_PROJECT` (else `GOOGLE_CLOUD_PROJECT`). Decisions: BQ-SEC10-1..5 in `docs/open-questions.md`.
+
+### App Check in the web build (SEC-10)
+
+The web client (the main app and the Park pages) sends `X-Firebase-AppCheck` on every API call
+(`apps/web/src/appcheck/`), but only once the build has the Firebase web config: `VITE_FIREBASE_API_KEY` and
+`VITE_FIREBASE_PROJECT_ID`. No key literal is in the repo.
+
+**Owner step, before the first `just deploy-web` that bakes the key in.** The browser `apiKey` is written into the
+public JavaScript bundle, and this project also uses Gemini Developer API keys, so the key is only harmless if it
+is restricted. In the Google Cloud console (APIs and Services, Credentials) open the Firebase web key and
+(a) set the API restriction to exactly three APIs: Firebase App Check API, Identity Toolkit API and Token Service API
+(the last two are what Google sign-in calls; `infra/ACCESS.md` section 11); (b) set website restrictions to the referrers
+`https://essential-wares-510320-f0.web.app/*` and `https://essential-wares-510320-f0.firebaseapp.com/*`;
+(c) confirm it cannot call `generativelanguage.googleapis.com` or any other paid API. Then run
+`TILO_BAKE_FIREBASE_KEY=1 just deploy-web` (in PowerShell: `$env:TILO_BAKE_FIREBASE_KEY = "1"` first).
+
+`just deploy-web` without `TILO_BAKE_FIREBASE_KEY=1` builds with no Firebase config: App Check is skipped, the
+browser console says so once, and nothing else changes. With it, `scripts/web_build_env.py` reads the output of
+`firebase apps:sdkconfig WEB 1:379216745263:web:8cda5846cf882c2cefc7da --project essential-wares-510320-f0 --non-interactive --json`
+into the build's environment (writes nothing to disk), and uses it only if the key has the Google key shape and the
+project id is the dev project's; any `VITE_FIREBASE_*` already in your shell is dropped. If the command fails (you
+are not signed in) the build goes ahead without the config. The two public ids (`FIREBASE_APP_ID`, the reCAPTCHA Enterprise site key) are recorded in
+`infra/ACCESS.md` section 7, where enforcement is also recorded as OFF.
+
+The deployed fixture world calls no API, so it never loads reCAPTCHA: App Check starts on the first API request.
+Local hosts (localhost, 127.0.0.1) never start it.
+
+Before you read the `tilo-api` log for refused or missing tokens, set `TILO_FIRESTORE_PROJECT` (or
+`GOOGLE_CLOUD_PROJECT`) on the `tilo-api` Cloud Run service: with neither set the verifier has no project and
+refuses every token, so the log would show every request as unverified.
 
 ## Never
 

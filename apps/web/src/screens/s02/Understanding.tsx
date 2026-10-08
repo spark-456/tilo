@@ -2,6 +2,7 @@ import type { Brief, DeliverableFormat } from "@tilo/contracts";
 import { useState } from "react";
 import { useClient } from "../../api/ClientProvider";
 import type { IntakeFileStatus, IntakeResult } from "../../api/client";
+import { intakes, rememberIntake } from "../../api/intakes";
 import { AppLink } from "../AppLink";
 import { Loaded, Primary } from "../FlowShell";
 import { type Remote, useAction } from "../remote";
@@ -17,8 +18,8 @@ const FORMATS = new Set<string>(["pdf", "pptx", "docx", "xlsx", "csv", "markdown
 
 // S-01 hands its result over here: the client seam has no "get intake" call, so a brief exists only
 // for a task submitted in this session (a direct link to any other task gets the empty notice).
-const intakes = new Map<string, IntakeResult>();
-export const rememberIntake = (i: IntakeResult): void => void intakes.set(i.task_id, i);
+// The map itself lives in src/api/intakes.ts, so the Park Api (FR-UX-13) can fill it without importing a screen.
+export { rememberIntake };
 
 // biome-ignore format: compact helpers
 const toDraft = (b: Brief): Record<BriefField, string> => ({

@@ -19,13 +19,14 @@ fails. Invisible characters would be written as \\u escapes (none are needed her
 from __future__ import annotations
 
 import pytest
-from _chn11_lib import USER, autopilot_module, make_bench, pair, scripted_thread
+from _chn11_lib import EXTRA_NAMES, EXTRA_WORDS, USER, VOUCHED, autopilot_module, make_bench, pair, scripted_thread
 from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 
 
-def signal(body: str) -> frozenset[str]:
-    return autopilot_module().t3_content_signal(body)
+def signal(body: str, names: frozenset[str] = VOUCHED) -> frozenset[str]:
+    # CHN-GATE-E: a name rides L2 only when the thread vouches for it; the bench thread vouches for VOUCHED.
+    return autopilot_module().t3_content_signal(body, names=names)
 
 
 def never_auto_sent(body: str) -> None:
@@ -40,9 +41,9 @@ def never_auto_sent(body: str) -> None:
     assert bench.outbox.entries == {}, "T3 is never scheduled without a person"
 
 
-def auto_sent(body: str) -> None:
+def auto_sent(body: str, names: tuple[str, ...] = EXTRA_NAMES) -> None:
     bench = make_bench("L2")
-    thread = scripted_thread(bench)
+    thread = scripted_thread(bench, names=names)
     card = bench.ap.preview(USER, *pair(thread, body))
     assert card.tier == "T2" and card.modifiers == (), f"harmless reply made T3: {body!r}"
     assert (card.level, card.undo_window_s) == ("L2", 60) and card.outbox_id is not None
@@ -88,7 +89,7 @@ def test_FR_CHN_11_CHN_GATE_D_name_slot_rejects_number_word_run_before_comma() -
     ],
 )
 def test_FR_CHN_11_CHN_GATE_D_name_slot_comma_bang_and_blank_line_still_end_a_run(body: str) -> None:
-    assert signal(body) == frozenset()
+    assert signal(body, VOUCHED | EXTRA_WORDS) == frozenset()
     auto_sent(body)
 
 
@@ -119,19 +120,30 @@ def test_FR_CHN_11_CHN_GATE_D_property_signature_run_must_end_its_line(run: str,
 
 # ---- 2. repeats only after a greeting word that opens a line or clause -----------------------------------------------
 
+# CHN-GATE-E (ADR-0025, "Heuristics this retires"): the clause-opener rule is gone. A repeat of a VOUCHED name ("Sounds
+# good David.") no longer needs to follow a greeting word that opens a clause: those four bodies moved to the second
+# list and ride L2. What stays pinned as T3 is a repeat of a name nobody vouched for.
 MID_SENTENCE_REPEATS = [
+    "Hi Fifty Thousand,\n\nSounds good Fifty Thousand.\n\nBest,\nSarah",
+    "Hi Fifty Thousand,\n\nSee you fifty thousand.\n\nBest,\nSarah",
+]
+VOUCHED_MID_SENTENCE_REPEATS = [
     "Hi David,\n\nSounds good David.\n\nBest,\nSarah",
     "Hi David,\n\nSee you David.\n\nBest,\nSarah",
     "Hi David,\n\nSee you Friday morning David.\n\nBest,\nSarah",
     "Hi David,\n\nSounds good Sarah.\n\nBest,\nSarah",
-    "Hi Fifty Thousand,\n\nSounds good Fifty Thousand.\n\nBest,\nSarah",
-    "Hi Fifty Thousand,\n\nSee you fifty thousand.\n\nBest,\nSarah",
 ]
 
 
 @pytest.mark.parametrize("body", MID_SENTENCE_REPEATS)
 def test_FR_CHN_11_CHN_GATE_D_repeat_after_mid_sentence_greeting_word_rejected(body: str) -> None:
     assert_unlisted_and_t3(body)
+
+
+@pytest.mark.parametrize("body", VOUCHED_MID_SENTENCE_REPEATS)
+def test_FR_CHN_11_CHN_GATE_D_repeat_of_a_vouched_name_mid_sentence_rides_l2_after_adr_0025(body: str) -> None:
+    assert signal(body) == frozenset()
+    auto_sent(body)
 
 
 @pytest.mark.parametrize(
@@ -143,7 +155,7 @@ def test_FR_CHN_11_CHN_GATE_D_repeat_after_mid_sentence_greeting_word_rejected(b
     ],
 )
 def test_FR_CHN_11_CHN_GATE_D_repeat_after_line_or_clause_opening_greeting_word_still_rides_l2(body: str) -> None:
-    assert signal(body) == frozenset()
+    assert signal(body, VOUCHED | EXTRA_WORDS) == frozenset()
     auto_sent(body)
 
 
@@ -162,5 +174,5 @@ LEGIT = [
 
 @pytest.mark.parametrize("body", LEGIT)
 def test_FR_CHN_11_CHN_GATE_D_legit_scheduling_bodies_still_ride_l2(body: str) -> None:
-    assert signal(body) == frozenset()
+    assert signal(body, VOUCHED | EXTRA_WORDS) == frozenset()
     auto_sent(body)

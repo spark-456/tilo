@@ -106,6 +106,10 @@ class RateLimiter(Protocol):
         """Attempt to consume 1 token from `key`. Returns `(allowed, retry_after_s)`."""
         ...
 
+    def consume_all(self, checks: Sequence[tuple[LimitScope, str, int, float]]) -> tuple[LimitScope | None, int]:
+        """Check all buckets before consuming any token. Returns `(None, 0)` or `(limited_scope, retry_after_s)`."""
+        ...
+
 
 @dataclass
 class _Bucket:
@@ -138,6 +142,23 @@ class InMemoryRateLimiter:
         with self._lock:
             self._buckets.clear()
 
+    def _available(self, key: str, now: float, capacity: int, refill_per_s: float) -> tuple[float, int]:
+        cap = float(capacity)
+        bucket = self._buckets.get(key)
+        tokens = cap if bucket is None else min(cap, bucket.tokens + max(0.0, now - bucket.updated_at) * refill_per_s)
+        if tokens < 1.0:
+            retry_after_s = max(1, int(math.ceil(max(0.0, 1.0 - tokens) / refill_per_s - 1e-12)))
+            return tokens, retry_after_s
+        return tokens, 0
+
+    def peek(self, key: str, *, capacity: int, refill_per_s: float) -> tuple[bool, int]:
+        """Check whether `key` currently has at least 1 token without consuming it."""
+        if type(capacity) is not int or capacity < 1 or not (math.isfinite(refill_per_s) and refill_per_s > 0):
+            raise ValueError("capacity must be >= 1 and refill_per_s must be finite > 0")
+        with self._lock:
+            tokens, retry_after_s = self._available(key, float(self._clock()), capacity, refill_per_s)
+            return tokens >= 1.0, retry_after_s
+
     def consume(self, key: str, *, capacity: int, refill_per_s: float) -> tuple[bool, int]:
         limited_scope, retry_after_s = self.consume_all((("ip", key, capacity, refill_per_s),))
         return limited_scope is None, retry_after_s
@@ -151,16 +172,8 @@ class InMemoryRateLimiter:
         with self._lock:
             refilled: list[tuple[str, float]] = []
             for limit_scope, key, capacity, refill_per_s in checks:
-                cap = float(capacity)
-                bucket = self._buckets.get(key)
-                if bucket is None:
-                    tokens = cap
-                else:
-                    elapsed = max(0.0, now - bucket.updated_at)
-                    tokens = min(cap, bucket.tokens + elapsed * refill_per_s)
+                tokens, retry_after_s = self._available(key, now, capacity, refill_per_s)
                 if tokens < 1.0:
-                    deficit = max(0.0, 1.0 - tokens)
-                    retry_after_s = max(1, int(math.ceil(deficit / refill_per_s - 1e-12)))
                     return limit_scope, retry_after_s
                 refilled.append((key, tokens))
 
@@ -232,8 +245,17 @@ def _client_ip(scope: Mapping[str, Any], trusted_hops: int = 1) -> str:
     return "unknown"
 
 
-def _resolve_principal(scope: dict[str, Any], fastapi_app: FastAPI) -> Principal | None:
+async def _resolve_principal(scope: dict[str, Any], fastapi_app: FastAPI) -> Principal | None:
+    if scope.get("path") == "/internal/schedules/tick":
+        return None
+    state = scope.setdefault("state", {})
+    if isinstance(state, dict) and isinstance(state.get("principal"), Principal):
+        return state["principal"]
     provider = fastapi_app.dependency_overrides.get(get_current_principal, get_current_principal)
+    if provider is get_current_principal and not any(
+        k.lower() == b"authorization" for k, _ in scope.get("headers", ())
+    ):
+        return None
     try:
         sig = inspect.signature(provider)
         takes_request = any(
@@ -245,10 +267,20 @@ def _resolve_principal(scope: dict[str, Any], fastapi_app: FastAPI) -> Principal
             )
             for p in sig.parameters.values()
         )
-        candidate = provider(Request(scope)) if takes_request else provider()
+        args = (Request(scope),) if takes_request else ()
+        if inspect.iscoroutinefunction(provider):
+            candidate = await provider(*args)
+        else:
+            candidate = await run_in_threadpool(provider, *args)
+            if inspect.isawaitable(candidate):
+                candidate = await candidate
     except Exception:
         return None
-    return candidate if isinstance(candidate, Principal) else None
+    if isinstance(candidate, Principal):
+        if isinstance(state, dict):
+            state["principal"] = candidate
+        return candidate
+    return None
 
 
 def _rate_limit_response(limit_scope: LimitScope, retry_after_s: int) -> JSONResponse:
@@ -267,7 +299,7 @@ def _rate_limit_response(limit_scope: LimitScope, retry_after_s: int) -> JSONRes
     )
 
 
-def _decide(scope: dict[str, Any], fastapi_app: FastAPI) -> JSONResponse | None:
+async def _decide(scope: dict[str, Any], fastapi_app: FastAPI) -> JSONResponse | None:
     try:
         limiter: RateLimiter = fastapi_app.dependency_overrides.get(get_rate_limiter, get_rate_limiter)()
         cfg: RateLimitConfig = fastapi_app.dependency_overrides.get(get_rate_limit_config, get_rate_limit_config)()
@@ -275,24 +307,27 @@ def _decide(scope: dict[str, Any], fastapi_app: FastAPI) -> JSONResponse | None:
         logger.warning("rate limit configuration unavailable, failing open: %s", type(exc).__name__)
         return None
 
-    principal = _resolve_principal(scope, fastapi_app)
     ip_key = f"ip:{_client_ip(scope, cfg.trusted_hops)}"
-    checks: list[tuple[LimitScope, str, int, float]] = []
+    try:
+        if hasattr(limiter, "peek"):
+            ip_ok, ip_retry_s = limiter.peek(ip_key, capacity=cfg.ip_capacity, refill_per_s=cfg.ip_refill_per_s)
+            if not ip_ok:
+                return _rate_limit_response("ip", ip_retry_s)
+    except Exception as exc:
+        logger.warning("rate limiter store failed, failing open: %s", type(exc).__name__)
+        return None
+
+    principal = await _resolve_principal(scope, fastapi_app)
+    checks: list[tuple[LimitScope, str, int, float]] = [
+        ("ip", ip_key, cfg.ip_capacity, cfg.ip_refill_per_s),
+    ]
     if principal is not None:
         checks.append(("user", f"user:{principal.user_id}", cfg.user_capacity, cfg.user_refill_per_s))
-    checks.append(("ip", ip_key, cfg.ip_capacity, cfg.ip_refill_per_s))
 
     try:
-        if isinstance(limiter, InMemoryRateLimiter):
-            limited_scope, retry_after_s = limiter.consume_all(checks)
-            if limited_scope is not None:
-                return _rate_limit_response(limited_scope, retry_after_s)
-            return None
-
-        for limit_scope, key, capacity, refill_per_s in checks:
-            ok, retry_after_s = limiter.consume(key, capacity=capacity, refill_per_s=refill_per_s)
-            if not ok:
-                return _rate_limit_response(limit_scope, retry_after_s)
+        limited_scope, retry_after_s = limiter.consume_all(checks)
+        if limited_scope is not None:
+            return _rate_limit_response(limited_scope, retry_after_s)
     except Exception as exc:
         logger.warning("rate limiter store failed, failing open: %s", type(exc).__name__)
         return None
@@ -314,7 +349,7 @@ class RateLimitGate:
         if kind not in {"http", "websocket"}:
             return
 
-        refusal = await run_in_threadpool(_decide, scope, self._app)
+        refusal = await _decide(scope, self._app)
         if refusal is None:
             await self._inner(scope, receive, send)
         elif kind == "http":

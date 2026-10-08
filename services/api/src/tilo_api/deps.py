@@ -21,11 +21,13 @@ import re
 import threading
 import time
 from collections.abc import Callable, Iterable, Mapping, Sequence
+from contextlib import AbstractContextManager, nullcontext
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Annotated, Any, Literal, Protocol, cast
 
 from fastapi import Depends, HTTPException, Request
+from starlette.requests import HTTPConnection
 from tilo_archive import RunArchive
 from tilo_connectors import InMemoryOutboxStore
 from tilo_connectors.registry import ConnectorRegistry, load_registry
@@ -44,8 +46,9 @@ from tilo_providers.interfaces import SafetyProvider
 from tilo_providers.router import Router, RouterExhaustedError
 from tilo_providers.safety import build_safety_provider
 
-from tilo_api import events, spend
+from tilo_api import events, firebase_auth, spend
 from tilo_api.access import AccessStore, Mode, enforced, provider_mode
+from tilo_api.appcheck import AppCheckVerifier, default_verifier
 from tilo_api.assistant.config import AssistantConfig, AssistantConfigError, load_assistant_config
 from tilo_api.people_access import NoSourceOwners
 from tilo_api.people_access import SourceOwners as PanelSourceOwners
@@ -76,6 +79,7 @@ class Principal:
     channel: Channel = "web"  # the session channel sign-in resolved for this request (FR-HIL-07,
     # world.paused.data.channel is derived from here, never from a request body
     districts: tuple[str, ...] = ()  # visible beyond vis: "all"; ignored for role == "owner"
+    demo_session: bool = False  # an anonymous demo session (SEC-15, BQ-SIGNIN-10): models are replay only, always
     full_session: bool = False  # a full web sign-in session (BQ-XWORLD-10): set only by the server that resolves the
     # session, never from anything in a request; needed to answer, or read in full, another owned world's cards
 
@@ -96,6 +100,8 @@ class WorldRecord:
     paused: bool = False  # true once Pause all has actually paused this world (PRD 9.4 honesty:
     # only ever true together with a world.paused event queued or committed somewhere)
     prior_world_id: str | None = None  # a scheduled run's previous world (FR-AGT-14b): offered, never silently reused
+    layout: dict | None = None  # the run's built layout (PRD 15.1 World), None until the run commits it (ADR-0026);
+    # the event writer reads it, with `run_id`, from here, never from a part
 
 
 @dataclass
@@ -149,18 +155,90 @@ class Store:
         with self._grant_locks_guard:
             return self.grant_locks.setdefault(owner, threading.Lock())
 
+    # The seams a route uses to read and write records and events. Here (dev mode, tests) the dicts are the store:
+    # loads read the cache, and `save` sends events through the writer first. `DurableStore` overrides all of them.
+    # `settle=False` is for a caller that has not yet checked who is asking: a load that settles also writes.
+    def load_world(self, world_id: str, settle: bool = False) -> WorldRecord | None:
+        return self.worlds.get(world_id)
+
+    def load_task(self, task_id: str, settle: bool = False) -> TaskRecord | None:
+        return self.tasks.get(task_id)
+
+    def load_owner(self, owner: str, settle: bool = False) -> None:
+        """Called before a route iterates an owner's worlds or policies; the cache already holds them."""
+
+    def load_path(self, params: Mapping[str, Any]) -> Store:
+        return self
+
+    def settle(self, world_id: str, writer: EventWriter | None = None) -> None:
+        """What a previous process left in the world (its queue, a run that died): nothing to do on a plain store."""
+
+    def deadline(self, seconds: float) -> AbstractContextManager[None]:
+        """Bounds the calling thread's wait for the store's lock; a plain store has no lock to wait for."""
+        return nullcontext()
+
+    def commit(
+        self,
+        *,
+        worlds: Mapping[str, WorldRecord] | None = None,
+        tasks: Mapping[str, TaskRecord] | None = None,
+        policies: Mapping[str, dict] | None = None,
+        policy_worlds: Mapping[str, str] | None = None,
+        parts: Mapping[str, list[dict]] | None = None,  # a plain store has no queue: the caller sends its parts
+        create: Iterable[tuple[str, str]] = (),
+        evict: bool = True,
+    ) -> None:
+        self.worlds.update(worlds or {})
+        self.tasks.update(tasks or {})
+        self.policies.update(policies or {})
+        self.policy_worlds.update(policy_worlds or {})
+
+    def save(
+        self, writer: EventWriter | None, *, parts: Mapping[str, list[dict]] | None = None, **records: Any
+    ) -> None:
+        """A route's new records and events. The events go through `writer` first (it reads the world's record, so a
+        new one is stored before them); a failure removes the worlds this call created and changes nothing else."""
+        self.worlds.update(records.get("worlds") or {})
+        sending = ""
+        try:
+            for sending, world_parts in (parts or {}).items():
+                for part in world_parts:
+                    assert writer is not None
+                    writer.append(sending, part)
+        except Exception as exc:
+            for kind, world_id in records.get("create", ()):
+                if kind == "worlds":
+                    self.worlds.pop(world_id, None)
+            raise event_failure(sending, exc) from None
+        self.commit(parts=parts, **records)
+
+    def ack(self, world_id: str, part_id: str) -> None:
+        """A queued part is committed: a durable store forgets it in its queue too."""
+
 
 class EventRejected(Exception):
     """Raised by EventWriter.append when a caller resends an `id` already committed for that
     world with genuinely different content (EV-10 conflict, never a silent overwrite)."""
 
 
+def event_failure(world_id: str, exc: Exception) -> HTTPException:
+    """A writer's failure as the route's answer: a refused event is a fixed 409, anything else 503 `store_unavailable`;
+    never the validator's text (it names world, run and event ids)."""
+    if isinstance(exc, HTTPException):
+        return exc
+    logger.warning("event writer failed for world %s (%s)", world_id, type(exc).__name__)
+    if isinstance(exc, EventRejected):
+        return HTTPException(status_code=409, detail="the event was refused")
+    return HTTPException(status_code=503, detail="store_unavailable")
+
+
 class EventWriter(Protocol):
     """The single writer of events (PRD 15.3). Every event tilo-api hands here carries its own
     stable `id` (a ULID), built once when the part is enqueued and resent unchanged on every
     retry -- the sole idempotency key `append` dedupes on (issue #46 / EV-10), never raw content
-    and never which writer object happens to receive the call. `seq`, `ts`, `run_id` and `trace`
-    remain writer-only.
+    and never which writer object happens to receive the call. The writer stamps `seq`, `ts`, `world_id`,
+    `run_id` and `v`; a part's `trace` is kept only after the event validator accepts it, and a part without
+    one gets a null trace.
 
     A writer that wraps the harness `WorldWriter` should also expose an optional `reopen()`: the
     dispatcher calls it after a failed append, before the same event is resent, so a stale lease
@@ -172,20 +250,66 @@ class EventWriter(Protocol):
         ...
 
 
-def get_current_principal() -> Principal:
-    raise HTTPException(status_code=401, detail="Sign in to use this.")  # no sign-in is wired: fail closed, cleanly
+SIGN_IN_REQUIRED = "Sign in to use this."
 
 
-def get_store() -> Store:
-    raise HTTPException(status_code=503, detail="not_configured")
+def get_firebase_verifier() -> firebase_auth.FirebaseVerifier:
+    """SEC-15: checks a person's Firebase ID token (`tilo_api.firebase_auth`). Google's keys for the API's own
+    project; dev mode and an unconfigured project refuse without any call. Tests override it; it never decides
+    authorisation beyond who the person is."""
+    return firebase_auth.default_verifier()
+
+
+def get_current_principal(request: HTTPConnection = None) -> Principal:  # type: ignore[assignment]
+    """The signed-in person (SEC-15, BQ-SIGNIN-6): `Authorization: Bearer <Firebase ID token>`, verified through
+    `get_firebase_verifier`; `X-Tilo-Channel: mobile_web` picks the channel, nothing else in a request sets anything.
+    Every other case is a 401 with one fixed body, whatever the cause. Dev mode replaces this whole function
+    (`tilo_api.dev.install`), so a token is never looked at there."""
+    # FastAPI always injects the request; the default only lets a bare call (no sign-in) refuse with a 401.
+    if request is not None:
+        resolved = getattr(
+            request.state, "principal", None
+        )  # the access gate already verified this request (server-set)
+        if isinstance(resolved, Principal):
+            return resolved
+    token = None if request is None else firebase_auth.bearer_token(request.headers.getlist("authorization"))
+    if token is None:
+        raise HTTPException(status_code=401, detail=SIGN_IN_REQUIRED, headers={"WWW-Authenticate": "Bearer"})
+    try:
+        factory = request.app.dependency_overrides.get(get_firebase_verifier, get_firebase_verifier)
+        claims = factory().verify(token)
+        channel = firebase_auth.channel_of(request.headers.get("x-tilo-channel"))
+        return firebase_auth.principal_from_claims(claims, channel=channel)
+    except Exception as exc:  # any failure at all is "not signed in": nothing here ever fails open
+        reason = exc.code if isinstance(exc, firebase_auth.TokenRefused) else f"verifier_failed:{type(exc).__name__}"
+        logger.warning("sign-in token not accepted (reason=%s)", reason)  # a fixed code, never the token
+        raise HTTPException(status_code=401, detail=SIGN_IN_REQUIRED, headers={"WWW-Authenticate": "Bearer"}) from None
+
+
+def get_store(request: Request = None) -> Store:  # type: ignore[assignment]  # FastAPI injects it; None elsewhere
+    """Deployed: the durable store for `TILO_API_STORE`, with the request's path ids loaded (ADR-0026 decisions 1, 3);
+    without a valid config 503 `not_configured`, never cached. Dev mode and the tests override this seam."""
+    from tilo_api.durable_store import deployed
+
+    store = deployed()[0]
+    return store.load_path(request.path_params) if request is not None else store
 
 
 def get_event_writer() -> EventWriter:
-    raise HTTPException(status_code=503, detail="not_configured")
+    from tilo_api.durable_store import deployed
+
+    return deployed()[1]
 
 
 def get_ledger() -> Sequence[LedgerEntry]:
     """The Treasury's ledger (FR-MTR-10). No ledger store is wired in yet (BQ-MTR10-4): fail closed."""
+    raise HTTPException(status_code=503, detail="not_configured")
+
+
+def get_time_baselines() -> Any:
+    """The EV-G2 time-saved baselines (FR-PA-20, PRD 14.2):
+    `{method_url, units: {unit_type: {p25, median, p75}}}`, minutes
+    per unit. Not measured and no config shape yet (BQ-PA20-2), so no production wiring: fail closed."""
     raise HTTPException(status_code=503, detail="not_configured")
 
 
@@ -225,6 +349,12 @@ def get_access_store() -> AccessStore:
     raise HTTPException(status_code=503, detail="not_configured")
 
 
+def get_app_check_verifier() -> AppCheckVerifier:
+    """SEC-10: checks a client's App Check token (`tilo_api.appcheck`). Google's keys for the API's own project; dev
+    mode and an unconfigured project refuse without any call. Tests override it; it never decides authorisation."""
+    return default_verifier()
+
+
 def get_spend_caps() -> spend.SpendCaps:
     """SEC-16: `config/spend_caps.yaml`, read on every call (a cap is a config edit, never code)."""
     return spend.load_spend_caps(None)
@@ -255,8 +385,18 @@ def get_switches(request: Request, flags: Annotated[FlagStore, Depends(get_flag_
     return spend.Switches(flags, _resolve(request, get_spend_cap_ledger)) if enforced() else flags
 
 
-def spend_mode(request: Request, uid: str | None, declaration: str | None, switches: FlagStore) -> tuple[Mode, bool]:
-    """(mode, capped): SEC-15's decision, then deployed the `SpendGuard`'s; any doubt is replay (fail closed)."""
+def spend_mode(
+    request: Request, uid: str | None, declaration: str | None, switches: FlagStore, *, demo: bool | None = None
+) -> tuple[Mode, bool]:
+    """(mode, capped): SEC-15's decision, then deployed the `SpendGuard`'s; any doubt is replay (fail closed). An
+    anonymous demo session (`Principal.demo_session`, set by the gate from the verified token) is replay whatever
+    `TILO_JUDGE_LIVE` or the guard say (BQ-SIGNIN-10); its cap is still read, so new work is refused the same way."""
+    mode, capped = _spend_mode(request, uid, declaration, switches)
+    demo = getattr(request.state, "demo_session", False) if demo is None else demo  # the gate's flag, or the caller's
+    return ("replay" if demo is True else mode), capped
+
+
+def _spend_mode(request: Request, uid: str | None, declaration: str | None, switches: FlagStore) -> tuple[Mode, bool]:
     mode = provider_mode(declaration, os.environ, replay_only=bool(switches.get("replay_only")))
     if mode != "live" or uid is None or not isinstance(switches, spend.Switches):
         return mode, False
@@ -532,6 +672,16 @@ def get_desk_worlds() -> DeskWorlds:
 def get_run_archive() -> Callable[..., RunArchive]:
     """`open_archive(*, org_id, run_id) -> RunArchive`, the run's raw archive. No production store yet: refuses."""
     raise NotImplementedError("no raw-archive store is configured, so no run starts")
+
+
+def get_token_broker() -> Any:
+    """FR-MTG-09: the token broker's adapter-facing half (`access_token_for_adapter`). Unwired: no host run."""
+    raise HTTPException(status_code=503, detail="not_configured")
+
+
+def get_meeting_host_transport() -> Any:
+    """FR-MTG-09: the `Transport` behind `MeetingHostAdapter`. No live transport in dev (EFF-01): refuses."""
+    raise HTTPException(status_code=503, detail="not_configured")
 
 
 REPLAY_ONLY_MESSAGE = "This link is replay-only right now: new work is paused; finished runs can still be replayed."

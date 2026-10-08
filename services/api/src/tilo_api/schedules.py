@@ -11,8 +11,12 @@ Owner-scoped schedule routes, the scheduled-run start and the tick Cloud Schedul
   skipped, recorded under a fixed code, and retried next week). A person's earlier approval is never reused, so every
   T3 step of a fired run still waits for a person.
 - `POST /internal/schedules/tick` is a public route of the access gate and checks its caller itself: a Google-signed
-  ID token for `TILO_SCHEDULE_TICK_AUDIENCE` from the one service account in `TILO_SCHEDULE_TICK_CALLER`.
-  Unconfigured: 503.
+  ID token for `TILO_SCHEDULE_TICK_AUDIENCE`. Unconfigured: 503. FR-AGT-14e (BQ-AGT14-5): the caller's identity picks
+  one of two modes and neither identity ever gets the other's. The Scheduler (`TILO_SCHEDULE_TICK_CALLER`, no body)
+  FANS OUT: it claims each due slot and hands it to Cloud Tasks (`TILO_RUNS_QUEUE`), starting nothing, so no run
+  thread lives on a request that has already returned. Cloud Tasks (`TILO_TASKS_CALLER`, the task's JSON body)
+  EXECUTES ONE RUN inside its own request, where CPU is allocated, and answers once the run is done or parked at a
+  person (or after `IN_REQUEST_DEADLINE_S`).
 """
 
 from __future__ import annotations
@@ -23,40 +27,56 @@ import copy
 import dataclasses
 import functools
 import hashlib
+import inspect
 import json
 import logging
 import os
+import re
 import secrets
 import threading
 import time
 import unicodedata
 from collections.abc import Callable, Mapping
-from datetime import UTC, datetime
-from typing import Annotated, Any
+from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta
+from typing import Annotated, Any, Protocol
 
+import anyio.from_thread
+import requests.exceptions as requests_errors
 import tilo_planning.budget as budget
 import tilo_policy
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import JSONResponse, Response
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from google.auth import exceptions as google_auth_errors
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator, model_validator
 from tilo_harness.schedule import (
     GOOGLE_ISSUERS,
     Cadence,
     OidcVerifier,
     RunStart,
     Schedule,
+    StartFailed,
     StartSkipped,
     Ticker,
     next_slot,
+    skipped_alert_kwargs,
+    task_name,
     tick_caller_ok,
     world_requested_kwargs,
 )
-from tilo_harness.schedule_store import ScheduleRepository, ScheduleStoreNotConfigured, open_schedule_store
+from tilo_harness.schedule_store import (
+    SCHEDULE_ID,
+    ScheduleRepository,
+    ScheduleStoreNotConfigured,
+    open_schedule_store,
+)
+from tilo_harness.writer import new_ulid
 from tilo_metering.flags import FlagStore
 from tilo_planning.events import build_event
 
 from tilo_api import deps, dev, events, runs
 from tilo_api.access import Mode
+from tilo_api.durable_store import DurableStore
 from tilo_api.tasks import _json_body
 
 logger = logging.getLogger("tilo_api.schedules")
@@ -64,6 +84,10 @@ router = APIRouter()
 
 MAX_SCHEDULES_PER_OWNER = 10
 ENV_AUDIENCE, ENV_CALLER = "TILO_SCHEDULE_TICK_AUDIENCE", "TILO_SCHEDULE_TICK_CALLER"
+ENV_QUEUE = "TILO_RUNS_QUEUE"  # projects/<p>/locations/<region>/queues/runs
+ENV_TASKS_CALLER = "TILO_TASKS_CALLER"  # the Cloud Tasks OIDC identity (tilo-tasks-invoker@...), an exact email
+DISPATCH_DEADLINE_S = 1800  # a task's dispatchDeadline: Cloud Tasks gives up on a delivery after this
+IN_REQUEST_DEADLINE_S = 25 * 60  # a delivery answers by now at the latest, with room under the dispatch deadline
 _GRANT_CONNECTOR, _GRANT_DISTRICT = "internal", "world"  # a grant uses no connector and sits in no district
 _MAX_TOKEN = 8192
 
@@ -249,6 +273,17 @@ Flags = Annotated[FlagStore, Depends(deps.get_flag_store)]
 StoreDep = Annotated[deps.Store, Depends(deps.get_store)]
 
 
+def get_store_factory(request: Request) -> Callable[[], deps.Store]:
+    """The request's store as the app is wired (overrides included), built only when called: the tick calls it after
+    its token check, so an anonymous call opens no Firestore client and reads nothing."""
+
+    def build() -> deps.Store:
+        seam = request.app.dependency_overrides.get(deps.get_store, deps.get_store)
+        return seam(request) if inspect.signature(seam).parameters else seam()
+
+    return build
+
+
 # --- the routes -----------------------------------------------------------------------------------------------------
 
 
@@ -322,7 +357,7 @@ def create_schedule(
     clock: Clock,
     flags: Flags,
 ) -> dict[str, Any]:
-    task = store.tasks.get(body.task_id)
+    task = store.load_task(body.task_id, settle=False)  # not yet known to be this owner's
     if task is None or task.owner != principal.user_id:  # unknown and another user's task answer alike
         raise HTTPException(status_code=404, detail="No such task.")
     deps.refuse_if_replay_only(flags)  # NFR-24: after sign-in and the owner check
@@ -423,14 +458,18 @@ class ScheduleStarter:
             raise StartSkipped("schedule_disabled", count=False)
         if self._seams is None:
             raise StartSkipped("run_seams_unwired", count=False)  # the whole service, not this schedule: not counted
-        digest = _digest(run.idempotency_key)
-        world_id, run_id, owner, store = f"w_s{digest}", f"r_s{digest}", record.owner_user_id, self._store
+        world_id, run_id = slot_ids(run.idempotency_key)
+        owner, store = record.owner_user_id, self._store
         with store.grant_lock(owner):  # one owner's grants at a time: daily limits count every earlier grant
-            existing = store.worlds.get(world_id)
+            # the earlier grants, the policies and the history a run reads: all of the owner's
+            store.load_owner(owner, settle=True)
+            existing = store.load_world(world_id, settle=False)  # its owner is checked below; :442 settled theirs
             if existing is None:
                 self._create_world(run, record, world_id, run_id)
             elif existing.owner != owner:
                 raise StartSkipped("owner_mismatch")
+            elif isinstance(store, DurableStore):  # a retry: the events an earlier attempt queued go first, by id
+                store.drain(world_id, self._seams.writer)
         task = deps.TaskRecord(
             owner, world_id, run_id, copy.deepcopy(record.brief), copy.deepcopy(record.brief), [], 3,
             approaches=[copy.deepcopy(record.approach)], granted=True,
@@ -443,6 +482,8 @@ class ScheduleStarter:
         """world.requested, then the budget grant by the owner's own policy; stored only if the grant ran."""
         store, owner, stamp = self._store, record.owner_user_id, _stamp(self._clock())
         base = {"v": "1.0", "ts": stamp, "world_id": world_id, "run_id": run_id, "actor": owner}
+        # the earlier grants and the policies are read across all of the owner's worlds
+        store.load_owner(owner, settle=True)
         owned = {w for w, r in store.worlds.items() if r.owner == owner}
         earlier = [e for w in owned for e in store.events.get(w, []) if e.get("type") == "budget.granted"]
         outcome = budget.request_budget_grant(
@@ -454,14 +495,240 @@ class ScheduleStarter:
             raise StartSkipped("budget_not_granted", advance=True)
         fields = world_requested_kwargs(dataclasses.replace(run, title=record.title), world_id)
         requested = build_event(base, seq=1, item=None, severity="info", tool=None, cause=None, **fields)
-        store.events.setdefault(world_id, []).extend([requested, outcome.granted_event])
-        store.worlds[world_id] = deps.WorldRecord(
-            owner=owner, districts={}, run_id=run_id, prior_world_id=run.prior_world_id
-        )
+        assert self._seams is not None  # `start` returned before this without the run seams
+        world = deps.WorldRecord(owner=owner, districts={}, run_id=run_id, prior_world_id=run.prior_world_id)
+        try:  # the world and its two events in one save, through the single writer (ADR-0026 decisions 3, 4)
+            store.save(
+                self._seams.writer, worlds={world_id: world}, parts={world_id: [requested, outcome.granted_event]},
+                create=[("worlds", world_id)],
+            )  # fmt: skip
+        except HTTPException as exc:
+            if (
+                exc.status_code == 409 and exc.detail == "the event was refused"
+            ):  # a fixed code, never the validator's text
+                raise StartSkipped("event_refused") from None
+            raise
 
 
-def _digest(key: str) -> str:
-    return hashlib.sha256(key.encode("utf-8")).hexdigest()[:40]
+def slot_ids(key: str) -> tuple[str, str]:
+    """The world id and run id of a slot: a function of its key alone, so the tick's hand-over (`TaskEnqueuer`) and the
+    start (`ScheduleStarter`) name the same world, and a repeated start meets it."""
+    digest = hashlib.sha256(key.encode("utf-8")).hexdigest()[:40]
+    return f"w_s{digest}", f"r_s{digest}"
+
+
+# --- Cloud Tasks: the fan-out's side ----------------------------------------------------------------------------------
+
+TASKS_API = "https://cloudtasks.googleapis.com/v2"
+TASKS_TIMEOUT_S = 10.0  # one enqueue call; google-auth's own default is 120 s, which would hold a tick that long
+TICK_PATH = "/internal/schedules/tick"
+MAX_SKIPPED = 99_999  # a task's `skipped`: bounds-checked, only a count in an info alert (not the SEC-16 cap literal)
+_MAX_BODY = 4096  # bytes of request body read (a task's body is about 300)
+_QUEUE = re.compile(r"^projects/[^/\s]+/locations/[^/\s]+/queues/[^/\s]+$")
+_WORLD_ID = re.compile(r"^w_[0-9A-Za-z_]{1,48}$")  # contracts/common.schema.json world_id; use with fullmatch
+_TASKS_SCOPE = "https://www.googleapis.com/auth/cloud-platform"
+
+
+@dataclass(frozen=True)
+class AlreadyExists:
+    """What a `TasksClient` returns for Cloud Tasks' ALREADY_EXISTS (a task name used within its reuse window)."""
+
+
+class TasksClient(Protocol):
+    def enqueue(self, task: Mapping[str, Any]) -> None | AlreadyExists:
+        """Creates the task in the queue its name carries. Raises on any failure other than ALREADY_EXISTS."""
+        ...
+
+
+class TasksError(StartFailed):
+    """Cloud Tasks refused an enqueue. Carries the status only (`status`, an int when Cloud Tasks answered): never the
+    request, the response or a credential. A 429 or a 5xx may be the whole service's: two alike as the first two calls
+    of a tick stop it as `tasks_quota` or `tasks_server` (BQ-AGT14-8)."""
+
+    def __init__(self, message: str, *, status: int | None = None) -> None:
+        super().__init__(message, status=status, pair=_pair(status))
+
+
+def _pair(status: int | None) -> str | None:
+    if type(status) is not int:
+        return None
+    return "tasks_quota" if status == 429 else "tasks_server" if 500 <= status <= 599 else None
+
+
+class TasksUnavailable(TasksError):
+    """A refusal that is the service's, not one schedule's (401, 403, 404: wrong caller, missing actAs, no queue): the
+    fan-out records nothing against any schedule for it, and the first one ends the tick with a 503 (BQ-AGT14-6)."""
+
+
+_SERVICE_WIDE = frozenset({401, 403, 404})
+# FR-AGT-14g (BQ-AGT14-7): raised by any TasksClient's enqueue, these are outages of the whole service, stopped like
+# `tasks_unavailable`. The raised type decides, in this order: a RefreshError wrapping a transport error is credential.
+_TRANSPORT_ERRORS = (google_auth_errors.TransportError, requests_errors.Timeout, requests_errors.ConnectionError)
+_OUTAGES: tuple[tuple[tuple[type[Exception], ...], str], ...] = (
+    ((google_auth_errors.RefreshError,), "tasks_credential"),
+    (_TRANSPORT_ERRORS, "tasks_transport"),
+)
+
+
+def _error_status(response: Any) -> str | None:
+    """The google.rpc status name of an error answer ("ALREADY_EXISTS"), or None; never raises, never the text."""
+    try:
+        status = response.json()["error"]["status"]
+    except (ValueError, KeyError, TypeError, AttributeError):
+        return None
+    return status if isinstance(status, str) else None
+
+
+class CloudTasksRestClient:
+    """The Cloud Tasks REST API (`POST /v2/{queue}/tasks`) through google-auth's `AuthorizedSession`: no extra client
+    library. Built only after a caller's token passed (credentials are looked up here, once per request). The body of
+    the task and the token are never logged. `session` has the `requests.Session` shape (tests inject one)."""
+
+    def __init__(self, *, session: Any = None, timeout_s: float = TASKS_TIMEOUT_S) -> None:
+        if session is None:
+            import google.auth
+            from google.auth.transport.requests import AuthorizedSession
+
+            credentials, _project = google.auth.default(scopes=[_TASKS_SCOPE])
+            session = AuthorizedSession(credentials)
+        self._session, self._timeout_s = session, timeout_s
+
+    def enqueue(self, task: Mapping[str, Any]) -> None | AlreadyExists:
+        queue = str(task["name"]).rpartition("/tasks/")[0]
+        response = self._session.post(
+            f"{TASKS_API}/{queue}/tasks", json={"task": dict(task)}, timeout=self._timeout_s,
+            max_allowed_time=self._timeout_s,
+        )  # fmt: skip
+        status = response.status_code
+        if status == 409 and _error_status(response) == "ALREADY_EXISTS":  # ABORTED is a 409 too: that one is a failure
+            return AlreadyExists()
+        if status in _SERVICE_WIDE:
+            raise TasksUnavailable(f"cloud tasks answered {status}", status=status)
+        if not 200 <= status < 300:
+            raise TasksError(f"cloud tasks answered {status}", status=status)
+        return None
+
+
+def get_tasks_client_factory() -> Callable[[], TasksClient]:
+    """Builds nothing: the fan-out calls the factory only after its token passed, once per request."""
+    return CloudTasksRestClient
+
+
+class TaskEnqueuer:
+    """The tick's `RunStarter` in fan-out: hands ONE slot to Cloud Tasks and returns the slot's world id (the same
+    derivation `ScheduleStarter` uses, so the schedule records the world the delivery will make). It makes no world and
+    no event. The task carries the slot and two facts of this firing, never a brief, owner, cap or secret: the delivery
+    reads those from the schedule's own record. ALREADY_EXISTS is a success; any other failure raises, as a
+    stopping `StartSkipped` when the whole service's (`tasks_unavailable`, `tasks_credential`, `tasks_transport`)."""
+
+    def __init__(self, *, client: TasksClient, queue: str, audience: str, caller: str) -> None:
+        self._client, self._queue, self._audience, self._caller = client, queue, audience, caller
+
+    def start(self, run: RunStart) -> str:
+        world_id, _run_id = slot_ids(run.idempotency_key)
+        prior = run.prior_world_id if run.prior_world_id and _WORLD_ID.fullmatch(run.prior_world_id) else None
+        body = {
+            "schedule_id": run.schedule_id, "slot": run.idempotency_key, "due": run.slot.astimezone(UTC).isoformat(),
+            "skipped": max(0, min(run.skipped, MAX_SKIPPED)), "prior_world_id": prior,
+        }  # fmt: skip
+        task = {
+            "name": f"{self._queue}/tasks/{task_name(run.idempotency_key)}",
+            "dispatchDeadline": f"{DISPATCH_DEADLINE_S}s",
+            "httpRequest": {
+                "httpMethod": "POST",
+                "url": self._audience.rstrip("/") + TICK_PATH,
+                "headers": {"Content-Type": "application/json"},
+                "body": base64.b64encode(json.dumps(body, separators=(",", ":")).encode("utf-8")).decode("ascii"),
+                "oidcToken": {"serviceAccountEmail": self._caller, "audience": self._audience},
+            },
+        }  # no retry config (the queue owns it) and no Authorization header (the OIDC token is Cloud Tasks' own)
+        try:
+            self._client.enqueue(task)  # None or AlreadyExists: handed over either way
+        except TasksUnavailable as exc:  # the whole service's setting: nothing is recorded, and the tick stops here
+            status = exc.status if type(exc.status) is int else None
+            raise StartSkipped("tasks_unavailable", count=False, stop=True, status=status) from exc
+        except Exception as exc:
+            code = next((code for kinds, code in _OUTAGES if isinstance(exc, kinds)), None)
+            if code is None:  # this schedule's failure, counted; the Ticker pairs two alike first 429/5xx (BQ-AGT14-8)
+                raise
+            raise StartSkipped(code, count=False, stop=True) from exc
+        return world_id
+
+
+# --- Cloud Tasks: a delivery's side -----------------------------------------------------------------------------------
+
+
+class TaskRunIn(BaseModel):
+    """What the fan-out wrote into a task. Closed and strict, and untrusted: the owner, brief, approach, cap and world
+    always come from the schedule's own record. `skipped` and `prior_world_id` are server-written facts of the firing,
+    taken as data within their bounds: a count for an info alert, and a world offered only if the owner has it."""
+
+    model_config = ConfigDict(extra="forbid", strict=True)
+    schedule_id: str
+    slot: str
+    due: str
+    skipped: Annotated[int, Field(strict=True, ge=0, le=MAX_SKIPPED)] = 0
+    prior_world_id: str | None = None
+
+    @field_validator("schedule_id")
+    @classmethod
+    def _schedule_id(cls, value: str) -> str:
+        if not SCHEDULE_ID.fullmatch(value):
+            raise ValueError("not a schedule id")
+        return value
+
+    @field_validator("prior_world_id")
+    @classmethod
+    def _prior(cls, value: str | None) -> str | None:
+        if value is not None and not _WORLD_ID.fullmatch(value):
+            raise ValueError("not a world id")
+        return value
+
+    @model_validator(mode="after")
+    def _the_slot_is_this_schedules_own(self) -> TaskRunIn:
+        """`due` is one UTC-aware instant spelled as `slot_key` spells it, and `slot` is exactly that schedule's key."""
+        try:
+            due = datetime.fromisoformat(self.due)
+            if due.tzinfo is None or due.utcoffset() is None:
+                raise ValueError("due is not timezone-aware")
+            spelled = due.astimezone(UTC).isoformat()
+        except (ValueError, OverflowError) as exc:  # OverflowError: an offset pushes the instant out of range
+            raise ValueError("due is not an instant") from exc
+        if self.due != spelled or self.slot != f"{self.schedule_id}:{spelled}":
+            raise ValueError("the slot is not this schedule's slot key")
+        return self
+
+    def due_at(self) -> datetime:
+        return datetime.fromisoformat(self.due)
+
+
+# the starter's own codes that no retry can change: a 2xx, so Cloud Tasks does not retry (run_seams_unwired is a 5xx)
+_REFUSALS = frozenset(
+    {"schedule_missing", "schedule_disabled", "owner_mismatch", "budget_not_granted", "snapshot_missing"}
+)
+_RECORDED = frozenset({"owner_mismatch", "budget_not_granted", "snapshot_missing"})  # not a missing or disabled one
+_CLOCK_SLACK = timedelta(seconds=60)  # a slot this far ahead is the clocks of two instances, not a forged future
+_ALERTS = threading.Lock()  # one instance's duplicate deliveries raise the missed-slots alert once
+
+
+def _tasks_config() -> tuple[str, str]:
+    """(`TILO_TASKS_CALLER`, `TILO_RUNS_QUEUE`), read per request; an empty string is unset."""
+    return os.environ.get(ENV_TASKS_CALLER) or "", os.environ.get(ENV_QUEUE) or ""
+
+
+def _raise_skipped_alert(seams: runs.Seams, store: deps.Store, world_id: str, skipped: int, now: datetime) -> None:
+    """BQ-AGT14-5 R2: the info `alert.raised` that tells the owner how many missed runs were collapsed, after
+    `world.requested`, once per world (a duplicate delivery finds it). Its failure never undoes the run."""
+    fields = skipped_alert_kwargs(world_id, skipped, new_ulid(now))
+    try:
+        with _ALERTS:
+            stream = store.events.get(world_id, [])
+            if any(e.get("type") == "alert.raised" and e.get("summary") == fields["summary"] for e in stream):
+                return
+            part = {"id": events.new_part_id(), "level": None, "district": None, "item": None, "credits": 0}
+            seams.writer.append(world_id, {**part, "cause": None, "vis": "all", "authz": None, **fields})
+    except Exception as exc:
+        logger.warning("skipped-run alert failed (%s)", type(exc).__name__)
 
 
 # --- the tick -------------------------------------------------------------------------------------------------------
@@ -482,49 +749,182 @@ def _bearer(request: Request) -> str | None:
     return token if scheme.lower() == "bearer" and token and not any(c.isspace() for c in token) else None
 
 
+async def _read_body(request: Request) -> bytes | None:
+    """The request body, or None when it is longer than `_MAX_BODY` (never read past that)."""
+    chunks: list[bytes] = []
+    size = 0
+    async for chunk in request.stream():
+        size += len(chunk)
+        if size > _MAX_BODY:
+            return None
+        chunks.append(chunk)
+    return b"".join(chunks)
+
+
+def _closed(status: int, detail: str) -> JSONResponse:
+    return JSONResponse({"detail": detail}, status_code=status)
+
+
 @router.post("/internal/schedules/tick")
 def tick(
     request: Request,
     config: Annotated[tuple[str, str], Depends(_tick_config)],
+    tasks_config: Annotated[tuple[str, str], Depends(_tasks_config)],
     schedule_store: Annotated[Callable[[], ScheduleRepository], Depends(get_schedule_store_factory)],
     seams_factory: Annotated[Callable[[], runs.Seams | None], Depends(get_seams_factory)],
+    tasks_client: Annotated[Callable[[], TasksClient], Depends(get_tasks_client_factory)],
     verifier: Annotated[OidcVerifier, Depends(get_oidc_verifier)],
     clock: Clock,
     flags: Flags,
-    store: StoreDep,
+    store_factory: Annotated[Callable[[], deps.Store], Depends(get_store_factory)],
 ) -> Any:
-    """No body and no query are read: nothing a caller sends selects a schedule or sets the time. The schedule store and
-    the run seams are built only after the token passed (an anonymous call costs neither), once per request."""
-    audience, caller = config
+    """ONE route for two callers (BQ-AGT14-5): the verified identity picks the mode, and an identity never gets the
+    other's. The schedule store, the Tasks client and the run seams are built only after the token passed (an anonymous
+    call costs none), once per request, and only by the mode that needs them."""
+    audience, scheduler = config
+    tasks_caller, queue = tasks_config
     token = _bearer(request)
     if token is None:
         return JSONResponse({"detail": "Unauthorized"}, status_code=401, headers={"WWW-Authenticate": "Bearer"})
     try:
         claims = verifier.verify(token, audience)
-        allowed = isinstance(claims, Mapping) and tick_caller_ok(claims, audience=audience, caller=caller)
+        valid = isinstance(claims, Mapping)
+        as_scheduler = valid and tick_caller_ok(claims, audience=audience, caller=scheduler)
+        as_tasks = valid and bool(tasks_caller) and tick_caller_ok(claims, audience=audience, caller=tasks_caller)
     except Exception as exc:  # bad signature, expiry, audience or a verifier outage: not an accepted caller
         logger.warning("schedule tick token refused (%s)", type(exc).__name__)  # the type only: no text, no traceback
         return JSONResponse({"detail": "Unauthorized"}, status_code=401, headers={"WWW-Authenticate": "Bearer"})
-    if not allowed:
+    if not (as_scheduler or as_tasks):
         return JSONResponse({"detail": "Forbidden"}, status_code=403)
+    if as_scheduler and as_tasks:  # one account for both modes: the identity cannot pick one, so it gets neither
+        return _closed(503, "not_configured")
+    if not tasks_caller or not _QUEUE.fullmatch(queue):  # nothing runs inline any more: fail closed, nothing claimed
+        return _closed(503, "not_configured")
+    raw = anyio.from_thread.run(_read_body, request)
+    if raw is None:
+        return _closed(413, "Too large.")
+    if as_scheduler:
+        if raw:  # the Scheduler sends no body: a task's body from it is the other mode's, refused with no side effect
+            return _closed(422, "This caller sends no body.")
+        return _fan_out(schedule_store, tasks_client, clock, flags, audience=audience, caller=tasks_caller, queue=queue)
+    return _run_task(request, raw, schedule_store, seams_factory, clock, flags, store_factory)
+
+
+def _fan_out(
+    schedule_store: Callable[[], ScheduleRepository],
+    tasks_client: Callable[[], TasksClient],
+    clock: Callable[[], datetime],
+    flags: FlagStore,
+    *,
+    audience: str,
+    caller: str,
+    queue: str,
+) -> Any:
+    """The Scheduler's call: claim each due slot and hand it to Cloud Tasks. Starts nothing and writes to no world."""
     try:
         schedules = schedule_store()
-        seams = seams_factory()
+        client = tasks_client()
     except HTTPException as exc:  # no store configured: closed, with the fixed code the routes use
-        return JSONResponse({"detail": exc.detail}, status_code=exc.status_code)
+        return _closed(exc.status_code, str(exc.detail))
     except Exception as exc:
         logger.error("schedule tick could not be set up (%s)", type(exc).__name__)
-        return JSONResponse({"detail": "tick failed"}, status_code=500)
-
-    def alert(world_id: str, fields: dict[str, Any]) -> None:
-        assert seams is not None  # an alert follows a fired run, which needs the seams
-        part = {"id": events.new_part_id(), "level": None, "district": None, "item": None, "credits": 0}
-        seams.writer.append(world_id, {**part, "cause": None, "vis": "all", "authz": None, **fields})
-
-    starter = ScheduleStarter(store=store, schedules=schedules, seams=seams, clock=clock)
+        return _closed(500, "tick failed")
+    enqueuer = TaskEnqueuer(client=client, queue=queue, audience=audience, caller=caller)
     try:
-        fired = Ticker(store=schedules, starter=starter, flags=flags, clock=clock, alerts=alert).tick().fired
+        ticker = Ticker(
+            store=schedules, starter=enqueuer, flags=flags, clock=clock, alerts=lambda _world, _fields: None
+        )
+        result = ticker.tick()
     except Exception as exc:  # fail closed with a fixed body; Scheduler retries and the next tick re-reads the store
         logger.error("schedule tick failed (%s)", type(exc).__name__)
-        return JSONResponse({"detail": "tick failed"}, status_code=500)
-    return {"fired": fired}
+        return _closed(500, "tick failed")
+    if result.stopped is not None:  # BQ-AGT14-6: a service-wide refusal is a failed attempt, whatever fired before it
+        extra = {"event": "schedule_tick_stopped", "status": result.status, "code": result.stopped}  # BQ-AGT14-8 (b)
+        if result.status is None:
+            logger.error(
+                "schedule tick stopped (%s); %d fired, the rest stay due", result.stopped, result.fired, extra=extra
+            )
+        else:
+            logger.error(
+                "schedule tick stopped (%s, status %d); %d fired, the rest stay due",
+                result.stopped, result.status, result.fired, extra=extra,
+            )  # fmt: skip
+        return _closed(503, result.stopped)
+    return {"fired": result.fired}
+
+
+def _run_task(
+    request: Request,
+    raw: bytes,
+    schedule_store: Callable[[], ScheduleRepository],
+    seams_factory: Callable[[], runs.Seams | None],
+    clock: Callable[[], datetime],
+    flags: FlagStore,
+    store_factory: Callable[[], deps.Store],
+) -> Any:
+    """Cloud Tasks' call: execute ONE run for the slot the body names, inside this request, then answer once the run is
+    done or parked at a person (or at the deadline). The record, never the body, says whose run it is."""
+    if not raw:
+        return _closed(422, "A task body is required.")
+    if request.headers.get("content-type", "").split(";")[0].strip().lower() != "application/json":
+        return _closed(415, "Send application/json.")
+    try:
+        body = TaskRunIn.model_validate_json(raw)
+    except ValidationError:  # never the input, never its errors: the body is untrusted
+        return _closed(422, "Invalid task.")
+    deps.refuse_if_replay_only(flags)  # NFR-24: 503, so Cloud Tasks retries once the flag is clear
+    try:
+        schedules, seams = schedule_store(), seams_factory()
+        store = store_factory()  # the durable store opens here, after the token: an anonymous call costs no client
+    except HTTPException as exc:
+        return _closed(exc.status_code, str(exc.detail))
+    except Exception as exc:
+        logger.error("schedule task could not be set up (%s)", type(exc).__name__)
+        return _closed(500, "tick failed")
+
+    def refused(code: str) -> dict[str, Any]:  # a 2xx, so Cloud Tasks does not retry it
+        return {"ran": 0, "skipped": code}
+
+    due, record = body.due_at(), schedules.get(body.schedule_id)
+    if record is None:
+        return refused("schedule_missing")
+    if due > clock() + _CLOCK_SLACK:
+        return refused("slot_not_due")
+    try:
+        on_cadence = next_slot(record.cadence, due - timedelta(microseconds=1)) == due
+    except OverflowError:  # an instant at the edge of the calendar is no slot of any cadence
+        on_cadence = False
+    if not on_cadence:
+        return refused("slot_off_cadence")
+    world_id, _run_id = slot_ids(body.slot)
+    prior = store.worlds.get(body.prior_world_id) if body.prior_world_id else None
+    offered = body.prior_world_id if prior is not None and prior.owner == record.owner_user_id else None
+    run = RunStart(
+        idempotency_key=body.slot, schedule_id=record.schedule_id, owner_user_id=record.owner_user_id,
+        title=record.title, approved_brief_ref=record.approved_brief_ref,
+        prior_world_id=offered if offered != world_id else None, budget_cap=record.budget_cap, slot=due,
+        skipped=body.skipped, cache_namespace=record.schedule_id,
+    )  # fmt: skip
+    starter = ScheduleStarter(store=store, schedules=schedules, seams=seams, clock=clock)
+    try:
+        started = starter.start(run)
+    except StartSkipped as skip:
+        if skip.code not in _REFUSALS:  # e.g. the run seams are unwired: the whole service, so Cloud Tasks retries
+            logger.warning("schedule task not started (%s)", skip.code)
+            return _closed(503, "run could not start")
+        if skip.code in _RECORDED:
+            try:
+                schedules.record_refusal(record.schedule_id, skip.code)
+            except Exception as exc:  # the answer stands; the code is only the owner's hint
+                logger.warning("schedule refusal not recorded (%s)", type(exc).__name__)
+        return refused(skip.code)
+    except (
+        Exception
+    ) as exc:  # anything from the start: a fixed 5xx; the ids are deterministic, so a retry meets this world
+        logger.warning("schedule task failed to start (%s)", type(exc).__name__)
+        return _closed(500, "run could not start")
+    if body.skipped > 0 and seams is not None:
+        _raise_skipped_alert(seams, store, started, body.skipped, clock())
+    run_of = store.runs.get(started)
+    state = run_of.wait_until_parked_or_done(IN_REQUEST_DEADLINE_S) if run_of is not None else "done"
+    return {"ran": 1, "state": state}
