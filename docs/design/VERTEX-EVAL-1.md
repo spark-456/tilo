@@ -79,23 +79,27 @@ class EvalItem(BaseModel):
     prompt: str
     context: str = ""
     response: str
-    baseline_response: str | None = None        # pairwise only; required there
+    baseline_response: str | None = None  # pairwise only; required there
+
 
 class EvalRequest(BaseModel):
     metric: str = Field(pattern=r"^[a-z][a-z0-9_]{0,40}$")
     kind: Literal["pairwise", "pointwise"]
-    template: str                                # rubric text from prompts/eval_judge/ (PL-04), sent as is
-    item: EvalItem                               # one instance a call: one quote, one charge
+    template: str  # rubric text from prompts/eval_judge/ (PL-04), sent as is
+    item: EvalItem  # one instance a call: one quote, one charge
+
 
 class EvalScore(BaseModel):
-    choice: Literal["candidate", "baseline", "tie"] | None = None   # set iff pairwise
-    score: float | None = None                                       # set iff pointwise, finite
-    explanation: str = ""                        # already redacted by the provider, at most 500 chars
+    choice: Literal["candidate", "baseline", "tie"] | None = None  # set iff pairwise
+    score: float | None = None  # set iff pointwise, finite
+    explanation: str = ""  # already redacted by the provider, at most 500 chars
+
 
 class EvalProvider(ABC):
     @abstractmethod
     def evaluate(self, request: EvalRequest) -> EvalScore: ...
-    def redact(self, text: str) -> str: return text
+    def redact(self, text: str) -> str:
+        return text
 ```
 A request whose kind and fields disagree is a `RequestError`. A result whose shape does not match its
 kind is a `ProviderError`. Each fails closed: an unusable judgement becomes an error row and is never
