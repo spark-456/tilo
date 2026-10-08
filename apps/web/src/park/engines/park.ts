@@ -179,14 +179,12 @@ export function createPark(
     vb: Walk5,
     child: unknown,
     still: boolean,
-    route?: string,
   ): El {
     const sc = vb[4];
     const src = svgUrl(vb[2] * sc, vb[3] * sc, vb.slice(0, 4).join(" "), child, "xMidYMid meet");
     return h(
       "div",
       {
-        "data-city-route": route,
         style: {
           position: "absolute",
           left: `${x.toFixed(1)}px`,
@@ -224,7 +222,6 @@ export function createPark(
     frames: [unknown, unknown],
     still: boolean,
     cyc: number,
-    route?: string,
   ): El {
     const sc = vb[4];
     const w = vb[2] * sc;
@@ -260,7 +257,6 @@ export function createPark(
     return h(
       "div",
       {
-        "data-city-route": route,
         style: {
           position: "absolute",
           left: `${x.toFixed(1)}px`,
@@ -584,7 +580,6 @@ export function createPark(
       const spots: { top: Pt; area: number; st: string }[] = [];
       /** Agents standing at a building's kerb: each stands in the road row below its building. */
       const kerb: LaneRow[] = [];
-      const standing: { x: number; y: number; halfX: number; halfY: number }[] = [];
       for (let j = 0; j < R; j++) {
         const objs: SceneObj[] = [];
         rows[j] = objs;
@@ -659,7 +654,6 @@ export function createPark(
               const ex = pick(["focused", "neutral", "talking", "delighted"]);
               const fa = r() < 0.5 ? "L" : "R";
               const role = pick(ROLES);
-              standing.push({ x: ax, y: ay, halfX: STANDING_HALF, halfY: STANDING_HALF });
               kerb.push({
                 row: j + 1,
                 kind: "standing",
@@ -737,22 +731,6 @@ export function createPark(
             const dur = (span / speed) * k;
             const f = r();
             if (ly === null) return;
-            const route =
-              o.avoid && !still
-                ? JSON.stringify({
-                    kind: walk ? "walker" : "car",
-                    x: a + (b - a) * f,
-                    y: ly,
-                    start: a,
-                    end: b,
-                    speed: speed / k,
-                    halfX: walk ? WALKER_HALF : 12,
-                    halfY: walk ? WALKER_HALF : CAR_HALF,
-                    originX: a,
-                    originY: ly,
-                    scale: s2,
-                  })
-                : undefined;
             const p0 = P(a, ly, 0);
             const q = toPx(p0);
             const dx = (b - a) * 0.866 * s2;
@@ -774,9 +752,8 @@ export function createPark(
                     (made as unknown[]).map(wrap) as [unknown, unknown],
                     still,
                     cyc,
-                    route,
                   )
-                : mover(q[0], q[1], dx, dy, dur, f, vb, wrap(made), still, route),
+                : mover(q[0], q[1], dx, dy, dur, f, vb, wrap(made), still),
             });
           };
           for (let n = 0; n < nc; n++) {
@@ -844,10 +821,7 @@ export function createPark(
       return {
         el: h(
           "div",
-          {
-            style: { position: "absolute", inset: 0 },
-            "data-city-standing": o.avoid && !still ? JSON.stringify(standing) : undefined,
-          },
+          { style: { position: "absolute", inset: 0 } },
           ...kids.flat(9).filter((x) => x != null && x !== false),
         ),
         spots: spots.map((c) => {

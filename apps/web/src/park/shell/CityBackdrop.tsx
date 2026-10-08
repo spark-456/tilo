@@ -3,11 +3,10 @@
 // `--veil` dims it on every page but Home. It is drawn once per `time|motion` (scene.ts); its cars and walkers
 // run on their own and are paused (`data-paused`) under the veil, while the world loader is open and in a hidden tab, and half are not drawn
 // (`data-lite`) in a narrow window or on a weak device. Its three pin points go to `app.pins` through the provider (useReportPins).
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 import { useReportPins } from "../app/context";
 import { sceneScale } from "../app/pins";
 import type { BackdropScene } from "./scene";
-import { useCityTraffic } from "./useCityTraffic";
 
 export function CityBackdrop({
   scene,
@@ -28,8 +27,6 @@ export function CityBackdrop({
   loading?: boolean;
 }) {
   const report = useReportPins();
-  const sceneRef = useRef<HTMLDivElement>(null);
-  useCityTraffic(sceneRef, scene, veiled || hidden || loading);
   useEffect(() => {
     if (scene) report(scene.pins);
   }, [scene, report]);
@@ -41,11 +38,7 @@ export function CityBackdrop({
       data-paused={veiled || hidden || loading ? "" : undefined}
       data-lite={lite ? "" : undefined}
     >
-      <div
-        ref={sceneRef}
-        className="park-shell__scene"
-        style={{ transform: `scale(${scale.toFixed(4)})` }}
-      >
+      <div className="park-shell__scene" style={{ transform: `scale(${scale.toFixed(4)})` }}>
         {scene?.el}
       </div>
       <div className="park-shell__veil" style={{ opacity: veiled ? 1 : 0 }} />
