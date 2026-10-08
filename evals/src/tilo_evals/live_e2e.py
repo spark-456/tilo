@@ -38,11 +38,11 @@ from tilo_harness.outputs import UnitOutput
 from tilo_harness.unit_prompt import request_variables
 from tilo_harness.untrusted import neutralise as neutralise_text
 from tilo_providers.config import ProviderConfigError, ProvidersConfig, load_providers_config, resolve_models_path
-from tilo_providers.errors import ProviderError, QuotaError, RequestError
+from tilo_providers.errors import OutputTruncatedError, ProviderError, QuotaError, RequestError
 from tilo_providers.interfaces import Capability, GenerateRequest, GenerateResponse, ModelProvider, SafetyProvider
 from tilo_providers.prompts import load_prompt
 from tilo_providers.replay import RecordReplayProvider, ReplayMissError, recording_key, redact_strings
-from tilo_providers.router import BudgetExceededError, Router
+from tilo_providers.router import BudgetExceededError, Router, RouterError
 from tilo_providers.safety import FakeSafetyProvider
 from tilo_providers.vertex_smoke import MAX_REASON_CHARS, classify, scrubbed_server_text
 
@@ -86,12 +86,13 @@ _OWNER = "u_live_e2e"
 _GOOGLE_IDS = ("gmail", "google_drive", "google_calendar")
 _UNIT_TIMEOUT_S = {"live": 600.0, "replay": 120.0}
 _OUT = {
-    "writer": 1024,
-    "specialist": 1024,
-    "verifier": 300,
-    "lead": 400,
-    "narrator": 600,
-}  # output caps of our own calls
+    "writer": 16384,
+    "specialist": 8192,
+    "verifier": 1024,
+    "lead": 2048,
+    "narrator": 2048,
+}  # output caps of our own calls; thinking tokens count against them, so a call that writes text states room for both
+_RETRY_OUT_MAX = 32768  # a reply cut at its cap is asked once more with twice the room, up to this
 _DEFAULT_OUT = 1024  # the Router's default when neither the request nor the role gives one (BQ-63)
 _DIRECTOR_OUT = 4096  # the Director's floor when its role sets no cap: thinking tokens count against it (BQ-LE2E-9)
 _PROMPT_TOKENS, _UNITS, _DIRECTOR_RETRIES, _MAX_BEATS = 1500, (3, 8), 3, 8  # estimate assumptions; Narrator beats
@@ -367,6 +368,7 @@ class _Meter:
         )
         self.failure: tuple[str, BaseException] | None = None  # (role, error): the first call the Router gave up on
         self.quoted_calls = 0  # calls that returned no usage: charged at the pre-call quote, not at what was used
+        self.counters: dict[str, Callable[[str], int]] = {}  # profile -> the provider's own token count (FR-MTR-01)
         self.lock = threading.RLock()  # one model call at a time, so the cap is checked against what was really spent
 
     def cost(self, profile: str, tokens_in: int, tokens_out: int) -> float:
@@ -384,7 +386,18 @@ class _Meter:
         usage = response.usage or {}
         if isinstance(usage.get("input_tokens"), int) and isinstance(usage.get("output_tokens"), int):
             return usage["input_tokens"], usage["output_tokens"]
-        return len(f"{request.system or ''} {request.prompt}".split()), len((response.text or "").split())  # no usage
+        # no usage: the provider's own count of what was sent and what came back (never words where it can count)
+        return self.count(response.profile_id, _sent_text(request)), self.count(
+            response.profile_id, response.text or ""
+        )
+
+    def count(self, profile: str, text: str) -> int:
+        """FR-MTR-01: the provider's own token count of `text` (a count call, no generation), words if it has none."""
+        counter = self.counters.get(profile)
+        try:
+            return int(counter(text)) if counter is not None else len(text.split())
+        except Exception:  # noqa: BLE001 - metering never fails a run: the word count is the floor
+            return len(text.split())
 
     def add(self, role: str, request: GenerateRequest, response: GenerateResponse, latency_ms: float) -> None:
         tokens_in, tokens_out = self.tokens(response, request)
@@ -415,6 +428,28 @@ class _Meter:
             row.credits += self.cost(profile, tokens_in, quote_out)
             row.latency_ms += latency_ms
 
+    def add_truncated(
+        self, role: str, profile: str, request: GenerateRequest, error: OutputTruncatedError, latency_ms: float
+    ) -> None:
+        """FR-MTR-01: a reply cut at its cap was billed. Metered from the usage the error reports: input tokens from
+        it, output plus thinking tokens; a side it does not report is the provider's own count of the input, and for
+        the output the cap the call burned (a cut reply used all of it). Not a quote, so not in `quoted_calls`."""
+        reported = error.output_tokens is not None or error.thinking_tokens is not None
+        tokens_out = (
+            (error.output_tokens or 0) + (error.thinking_tokens or 0) if reported else request.max_output_tokens or 0
+        )
+        with self.lock:
+            tokens_in = (
+                error.input_tokens if isinstance(error.input_tokens, int) else self.count(profile, _sent_text(request))
+            )
+            key = (_stage(role, request), role, profile)
+            row = self.rows.setdefault(key, Row(*key))
+            row.calls += 1
+            row.tokens_in += tokens_in
+            row.tokens_out += tokens_out
+            row.credits += self.cost(profile, tokens_in, tokens_out)
+            row.latency_ms += latency_ms
+
     def stopped(self, kind: str, role: str, detail: str = "", stage: str = "") -> None:
         with self.lock:
             self.stop = self.stop or (kind, role, detail, stage)
@@ -422,6 +457,10 @@ class _Meter:
     def failed(self, role: str, error: BaseException) -> None:
         with self.lock:
             self.failure = self.failure or (role, error)
+
+
+def _sent_text(request: GenerateRequest) -> str:
+    return f"{request.system or ''} {request.prompt}"
 
 
 def _stage(role: str, request: GenerateRequest) -> str:
@@ -467,6 +506,8 @@ class _Metered(_Redacting):
     def __init__(self, inner: ModelProvider, role: str, profile: str, meter: _Meter) -> None:
         super().__init__(inner)
         self._role, self._profile, self._meter = role, profile, meter
+        own = getattr(inner, "provider_count_tokens", None)  # a replay or live wrapper offers the provider's own count
+        meter.counters[profile] = own if callable(own) else inner.count_tokens
 
     def generate(self, request: GenerateRequest) -> GenerateResponse:
         started = time.perf_counter()
@@ -478,9 +519,12 @@ class _Metered(_Redacting):
             raise
         except (RequestError, QuotaError):  # refused before any generation: never billed
             raise
+        except OutputTruncatedError as error:  # billed, and it reported its usage (FR-MTR-01)
+            self._meter.add_truncated(self._role, self._profile, request, error, (time.perf_counter() - started) * 1000)
+            raise
         except Exception:
             # Anything else may have been billed after it was sent (a blocked candidate, a timeout): count it.
-            tokens_in = len(f"{request.system or ''} {request.prompt}".split())
+            tokens_in = self._meter.count(self._profile, _sent_text(request))
             elapsed = (time.perf_counter() - started) * 1000
             self._meter.add_unreturned(self._role, self._profile, request, tokens_in, elapsed)
             raise
@@ -670,7 +714,15 @@ class _UnitRunner:
 
     def _ask(self, role: str, prompt: str) -> tuple[str, float]:
         request = GenerateRequest(prompt=prompt, max_output_tokens=_OUT.get(role), thinking_level="minimal")
-        response = self._router.generate(role, request).response
+        try:
+            response = self._router.generate(role, request).response
+        except RouterError as exc:
+            if not isinstance(exc.__cause__, OutputTruncatedError) or not request.max_output_tokens:
+                raise
+            request = request.model_copy(
+                update={"max_output_tokens": min(request.max_output_tokens * 2, _RETRY_OUT_MAX)}
+            )
+            response = self._router.generate(role, request).response  # a second cut is the failure: no third try
         text = ((response.text if response else None) or "").strip()
         if not response or not text:
             raise ProviderError("the model returned no text")
