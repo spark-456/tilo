@@ -58,6 +58,7 @@ async def intake(
     safety: Annotated[SafetyProvider, Depends(get_safety)],  # before any store: fail closed first
     store: Annotated[InMemoryArtifactStore, Depends(get_store)],
     tasks: Annotated[deps.Store, Depends(deps.get_store)],
+    writer: Annotated[deps.EventWriter, Depends(deps.get_event_writer)],
     model_router: Annotated[Router, Depends(deps.get_router)],
     flags: Annotated[FlagStore, Depends(deps.get_switches)],
     text: Annotated[str, Form()] = "",
@@ -112,7 +113,7 @@ async def intake(
     except (ProviderError, ProviderConfigError, ReplayMissError) as exc:
         logger.warning("safety screen failed: %s", type(exc).__name__)
         raise HTTPException(status_code=503, detail="The safety screen is unavailable; nothing was stored.") from exc
-    task_id, task = create_task(tasks, result, extraction, scenario=scenario)
+    task_id, task = await run_in_threadpool(create_task, tasks, writer, result, extraction, scenario=scenario)
     body = asdict(result)  # per-file text and events stay server-side
     body["files"] = [{k: v for k, v in f.items() if k not in ("text", "events")} for f in body["files"]]
     questions = [

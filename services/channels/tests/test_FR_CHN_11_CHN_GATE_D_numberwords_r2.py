@@ -16,11 +16,12 @@ Existing GATE_D tests are not edited."""
 from __future__ import annotations
 
 import pytest
-from _chn11_lib import USER, autopilot_module, make_bench, pair, scripted_thread
+from _chn11_lib import EXTRA_NAMES, USER, VOUCHED, autopilot_module, make_bench, name_words, pair, scripted_thread
 
 
-def signal(body: str) -> frozenset[str]:
-    return autopilot_module().t3_content_signal(body)
+def signal(body: str, names: frozenset[str] = VOUCHED) -> frozenset[str]:
+    # CHN-GATE-E: a name rides L2 only when the thread vouches for it; the bench thread vouches for VOUCHED.
+    return autopilot_module().t3_content_signal(body, names=names)
 
 
 def never_auto_sent(body: str) -> None:
@@ -35,9 +36,9 @@ def never_auto_sent(body: str) -> None:
     assert bench.outbox.entries == {}, "T3 is never scheduled without a person"
 
 
-def auto_sent(body: str) -> None:
+def auto_sent(body: str, names: tuple[str, ...] = EXTRA_NAMES) -> None:
     bench = make_bench("L2")
-    thread = scripted_thread(bench)
+    thread = scripted_thread(bench, names=names)
     card = bench.ap.preview(USER, *pair(thread, body))
     assert card.tier == "T2" and card.modifiers == (), f"harmless reply made T3: {body!r}"
     assert (card.level, card.undo_window_s) == ("L2", 60) and card.outbox_id is not None
@@ -117,9 +118,9 @@ def named(name: str) -> str:
 
 @pytest.mark.parametrize("name", REAL_NAMES)
 def test_FR_CHN_11_CHN_GATE_D_numberword_r2_real_name_is_listed(name: str) -> None:
-    assert signal(named(name)) == frozenset(), f"real name {name!r} rejected"
+    assert signal(named(name), VOUCHED | name_words(name)) == frozenset(), f"real name {name!r} rejected"
 
 
 @pytest.mark.parametrize("name", REAL_NAMES)
 def test_FR_CHN_11_CHN_GATE_D_numberword_r2_real_name_still_l2(name: str) -> None:
-    auto_sent(named(name))
+    auto_sent(named(name), names=(name,))

@@ -4,22 +4,17 @@
 import type { ReactNode } from "react";
 import type { Dec, Plan, World } from "../../api/types";
 import type { AgentSpec } from "../../engines/types";
+import { cachedCity } from "../../shell/cityCache";
 import { parkKit } from "../../shell/kit";
 import { keyed } from "./worldModel";
 
 export const agentArt = (spec: AgentSpec, size: number, night: boolean): ReactNode =>
   parkKit().agent(spec, size, night) as ReactNode;
 
-/** The city map for a plan and the decisions that are on: each state is its own memoised picture. */
-export function cityArt(plan: Plan, planId: string, dec: Dec, night: boolean): ReactNode {
-  const kit = parkKit();
-  const on = Object.keys(dec)
-    .filter((k) => dec[k as keyof Dec])
-    .sort()
-    .join("+");
-  return kit.ck(`worldpage|${planId}|${on}|${night}`, () =>
-    kit.TP.world(plan, { night }),
-  ) as ReactNode;
+/** The city map for a plan. The plan already holds the decisions that are on, so the picture is kept by the plan's
+ * content and the time of day (FR-UX-12); the Worlds card of the same city shares it. */
+export function cityArt(plan: Plan, _planId: string, _dec: Dec, night: boolean): ReactNode {
+  return cachedCity(plan, night, (p, n) => parkKit().TP.world(p, { night: n }) as ReactNode);
 }
 
 /** A Town's row of buildings, drawn side by side, each tucked 40px under the one before. */

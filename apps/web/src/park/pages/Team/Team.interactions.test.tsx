@@ -70,7 +70,12 @@ describe("WEB_10_team_invite: email, validation, pending row", () => {
     async (value) => {
       const app = makeApp();
       const { root } = await renderTeam(app);
-      await invite(root, value);
+      // FR-TEAM-01: the button is disabled while invalid, so the prompt comes from the Enter key.
+      const field = inputNamed(root, "Invite by email");
+      await typeInto(field, value);
+      expect(buttonNamed(root, COPY.invite).disabled).toBe(true);
+      await act(async () => press(field, "Enter"));
+      await settle();
       expect(app.toast).toHaveBeenCalledTimes(1);
       expect(app.toast).toHaveBeenCalledWith("Enter a work email to invite");
       expect(memberRows(root)).toHaveLength(PEOPLE.length);
@@ -328,9 +333,10 @@ describe("WEB_10_team_rules: switches", () => {
     expect(state()).toEqual(["true", "true", "true", "true", "false"]);
     await clickAndSettle(switchNamed(root, "Routines that fall on a weekend"));
     expect(state()).toEqual(["true", "true", "true", "true", "true"]);
-    await clickAndSettle(switchNamed(root, "Spending over £250"));
-    expect(state()).toEqual(["false", "true", "true", "true", "true"]);
-    await clickAndSettle(switchNamed(root, "Spending over £250"));
+    // FR-TEAM-04: the three Must-ask switches are locked on, so the independent one is "tools".
+    await clickAndSettle(switchNamed(root, "Giving a skill more access to a tool"));
+    expect(state()).toEqual(["true", "true", "true", "false", "true"]);
+    await clickAndSettle(switchNamed(root, "Giving a skill more access to a tool"));
     expect(state()).toEqual(["true", "true", "true", "true", "true"]);
     expect(app.toast).not.toHaveBeenCalled();
   });
@@ -359,7 +365,7 @@ describe("WEB_10_team_nav: go() only, never decide()", () => {
     await invite(root, NEW);
     await choose(selectNamed(root, "Role for Tom Reyes"), "Approver");
     await openMore(root, "Jin Park");
-    await clickAndSettle(switchNamed(root, "Spending over £250"));
+    await clickAndSettle(switchNamed(root, "Routines that fall on a weekend"));
     await choose(selectNamed(root, "Add a backup for Gate sign-offs"), "ps");
     await clickAndSettle(buttonNamed(root, "Remove from team"));
     expect(app.decide).not.toHaveBeenCalled();

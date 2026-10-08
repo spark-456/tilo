@@ -4,13 +4,14 @@
 // the matrix, quiet hours, sessions and the form are page state and call nothing
 // (docs/park-designed-not-in-prd/Profile.md). Time and motion are the shell's prefs, written with
 // app.setPref and read back from the AppCtx. Navigation is app.go only.
-import { type ReactNode, useEffect, useState } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import type { ProfileSession, ProfileSettings, User } from "../../api/types";
 import type { AppCtx } from "../../app/AppCtx";
 import { useParkApi } from "../../app/context";
 import { PageSheet, StatusChip, Switch } from "../../components";
 import "./Profile.css";
 import { ICONS } from "./icons";
+import { signOutOne, signOutOthers } from "./profileSessions";
 
 const TABS = [
   { id: "profile", label: "Profile", icon: ICONS.profile },
@@ -120,6 +121,18 @@ export function ProfilePage({ app }: { app: AppCtx }) {
   const [notif, setNotif] = useState<boolean[][]>([]);
   const [quiet, setQuiet] = useState(false);
   const [sessions, setSessions] = useState<ProfileSession[]>([]);
+  const [confirmOthers, setConfirmOthers] = useState(false);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const cancelRef = useRef<HTMLButtonElement>(null);
+  const listHeadRef = useRef<HTMLHeadingElement>(null);
+  // Focus moves into the confirmation when it opens (Cancel, the safe choice).
+  useEffect(() => {
+    if (confirmOthers) cancelRef.current?.focus();
+  }, [confirmOthers]);
+  const closeConfirm = () => {
+    triggerRef.current?.focus();
+    setConfirmOthers(false);
+  };
 
   useEffect(() => {
     let live = true;
@@ -145,6 +158,8 @@ export function ProfilePage({ app }: { app: AppCtx }) {
     };
   }, [api]);
 
+  const currentId = sessions.find((s) => s.current)?.id ?? "";
+  const others = sessions.some((s) => s.id === currentId) ? sessions.length - 1 : 0;
   const wide = app.vw >= 980;
   const user = loaded?.user;
   const flip = (r: number, c: number) => {
@@ -160,7 +175,8 @@ export function ProfilePage({ app }: { app: AppCtx }) {
     setNotif(notif.map((cells, i) => (i === r ? cells.map((v, j) => (j === c ? !v : v)) : cells)));
   };
   const signOut = (s: ProfileSession) => {
-    setSessions(sessions.filter((o) => o !== s));
+    listHeadRef.current?.focus(); // the pressed button is about to unmount: keep focus on a stable node
+    setSessions(signOutOne(sessions, s.id));
     app.toast(`Signed out of ${s.device}`);
   };
   // One head for every state, so the h1 is the same node while the data loads (focus stays on it).
@@ -389,18 +405,54 @@ export function ProfilePage({ app }: { app: AppCtx }) {
                   </div>
                 ))}
                 <div className="park-profile-signed">
-                  <h3 className="park-profile-group">Signed in on</h3>
+                  <h3 ref={listHeadRef} tabIndex={-1} className="park-profile-group">
+                    Signed in on
+                  </h3>
                   <button
+                    ref={triggerRef}
                     type="button"
                     className="park-profile-link"
-                    onClick={() => {
-                      setSessions(sessions.filter((s) => s.current));
-                      app.toast("Signed out everywhere except this device");
-                    }}
+                    onClick={() => setConfirmOthers(true)}
                   >
                     Sign out everywhere else
                   </button>
                 </div>
+                {confirmOthers && others > 0 ? (
+                  <section
+                    role="alertdialog"
+                    aria-label="Confirm sign out of other sessions"
+                    className="park-profile-session"
+                    onKeyDown={(e) => {
+                      if (e.key === "Escape") closeConfirm();
+                    }}
+                  >
+                    <div className="park-profile-grow">
+                      <div className="park-profile-stitle">
+                        Sign out {others} other {others === 1 ? "session" : "sessions"}?
+                      </div>
+                      <div className="park-profile-ssub">This device stays signed in.</div>
+                    </div>
+                    <button
+                      ref={cancelRef}
+                      type="button"
+                      className="park-profile-signout"
+                      onClick={closeConfirm}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      className="park-profile-signout"
+                      onClick={() => {
+                        setSessions(signOutOthers(sessions, currentId));
+                        closeConfirm();
+                        app.toast("Signed out everywhere except this device");
+                      }}
+                    >
+                      Sign out the other sessions
+                    </button>
+                  </section>
+                ) : null}
                 {sessions.map((s) => (
                   <div key={s.id} className="park-profile-session">
                     <Tile tone="sunk">{SESSION_ICONS[s.icon]}</Tile>
@@ -414,6 +466,7 @@ export function ProfilePage({ app }: { app: AppCtx }) {
                       <button
                         type="button"
                         className="park-profile-signout"
+                        aria-label={`Sign out ${s.device}`}
                         onClick={() => signOut(s)}
                       >
                         Sign out

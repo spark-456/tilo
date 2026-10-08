@@ -563,6 +563,12 @@
   font-weight: 600;
   color: var(--ink2);
 }
+[data-park] .park-connectors-ceiling {
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--ink2);
+}
 [data-park] .park-connectors-usedrow {
   display: flex;
   align-items: center;

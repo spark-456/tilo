@@ -484,6 +484,10 @@
   font-weight: 600;
   color: var(--ink2);
 }
+[data-park] .park-team-rulelog {
+  margin: 0;
+  padding: 0 0 0 18px;
+}
 [data-park] .park-team-mrow {
   display: grid;
   grid-template-columns: minmax(0, 1fr) repeat(4, 72px);

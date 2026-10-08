@@ -3,7 +3,14 @@
 import { useEffect, useRef } from "react";
 import { Spin } from "./ConnectorParts";
 import { icon } from "./icons";
-import { DEFAULT_SCOPES, LEVEL_LABEL, type Merged, type UsedRow, drawerSync } from "./view";
+import {
+  DEFAULT_SCOPES,
+  LEVEL_LABEL,
+  type Merged,
+  type UsedRow,
+  ceilingOf,
+  drawerSync,
+} from "./view";
 
 export interface DrawerProps {
   c: Merged;
@@ -151,6 +158,7 @@ export function Drawer({
                 </button>
               );
             })}
+            <div className="park-connectors-ceiling">{ceilingOf(c.level)}</div>
           </div>
           <div className="park-connectors-group">
             <h3 className="park-connectors-h3">Used by</h3>
