@@ -389,15 +389,20 @@ def test_ADR32_T4_FR_MTG_09_the_stub_demands_the_outbox_grant_before_anything_is
     assert read == [] and rig.transport.calls == []
 
 
-def test_ADR32_T4_FR_MTG_09_the_client_send_is_a_registered_side_effect_name_only_the_stub_may_call():
+def test_ADR32_T4_FR_MTG_09_only_the_stub_may_reach_the_client_send():
+    """Not a registered SEC-03 name (that scan allows only outbox.py): this scan pins tilo-api's own rule instead."""
     import ast
 
-    from tilo_connectors.side_effects import SIDE_EFFECT_METHOD_NAMES, scan_for_side_effect_calls
-
-    assert "send_invitation" in SIDE_EFFECT_METHOD_NAMES and not hasattr(MeetingHostRpc, "send")
     src = pathlib.Path(meeting_host.__file__).parent
-    files = [p for p in src.rglob("*.py") if p.name != "meeting_host_rpc.py"]
-    assert scan_for_side_effect_calls(files, allowed_path=src / "meeting_host_rpc.py") == []
+    assert not hasattr(MeetingHostRpc, "send")
+    for path in src.rglob("*.py"):
+        if path.name == "meeting_host_rpc.py":
+            continue
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        assert not any(
+            getattr(n, "attr", None) == "send_invitation" or getattr(n, "id", None) == "send_invitation"
+            for n in ast.walk(tree)
+        ), f"{path.name} reaches the RPC client's send_invitation"
     assert {n for n in dir(MeetingHostRpc) if not n.startswith("_")} == {"status", "send_invitation"}
     tree = ast.parse((src / "meeting_host_rpc.py").read_text(encoding="utf-8"))
     callers = [
