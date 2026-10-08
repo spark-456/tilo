@@ -73,9 +73,7 @@ def test_DEV_HARNESS_c_a_replayed_event_is_not_counted_twice(dev_client):
     writer = dev_client.app.dependency_overrides[deps.get_event_writer]()
     charged = next(e for e in stream if e["credits"])
     before = len(_ledger(dev_client))
-    writer.append(
-        world_id, {k: charged[k] for k in ("id", "type", "actor", "target", "summary", "data", "vis", "credits", "ts")}
-    )
+    assert writer.append(world_id, dict(charged)) == charged  # idempotent by id: nothing new committed
     assert len(_ledger(dev_client)) == before
 
 

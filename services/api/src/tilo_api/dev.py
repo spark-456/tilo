@@ -12,6 +12,7 @@ import os
 import re
 import threading
 from collections.abc import Callable, Mapping
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -20,12 +21,15 @@ from fastapi.middleware.cors import CORSMiddleware
 from starlette.responses import PlainTextResponse
 from starlette.types import ASGIApp, Receive, Scope, Send
 from tilo_harness.validator import repo_validator
+from tilo_metering import LedgerEntry
+from tilo_metering.flags import process_flags
 from tilo_people.stores import PeopleStores
 
 from tilo_api import deps, dev_run, events
 
 ENV_FLAG = "TILO_API_DEV"  # "1" turns dev mode on; nothing else does
 ENV_ORIGINS = "TILO_API_DEV_ORIGINS"  # comma-separated allowed browser origins
+ENV_FORCE_REPLAY = "TILO_DEV_FORCE_REPLAY"  # "1" (dev mode only, tests only): start with `replay_only` set (NFR-22/24)
 DEFAULT_ORIGIN = "http://localhost:5173"  # the Vite dev server
 DEV_OWNER = "u_dev_owner"  # the one dev principal (common.schema.json user_id)
 PORT = 8080
@@ -84,14 +88,42 @@ def cors_origins(env: Mapping[str, str] | None = None) -> list[str]:
     return origins
 
 
+class DevLedger:
+    """The dev stand-in for the Treasury's ledger (DEV-HARNESS-1c), behind the one seam production will use
+    (`deps.get_ledger`). It is fed only by cost events the dev writer has newly committed: one `commit` entry per event
+    that carries credits, in the credits the event recorded (priced from config/prices.dev.yaml by the dev unit
+    runner), so the cost routes and the credits the UI reads off the events can be compared. It prices nothing."""
+
+    def __init__(self) -> None:
+        self._entries: list[LedgerEntry] = []
+        self._lock = threading.Lock()
+
+    def record(self, event: Mapping[str, Any], owner: str) -> None:
+        credits = event.get("credits")
+        if isinstance(credits, bool) or not isinstance(credits, int | float) or credits <= 0:
+            return
+        item = event.get("item")
+        entry = LedgerEntry(
+            kind="commit", run=event["run_id"], user=owner, org=deps.ORG_ID, at=datetime.fromisoformat(event["ts"]),
+            step=item if isinstance(item, str) else None, credits=float(credits), usage=dev_run.UNIT_USAGE,
+        )  # fmt: skip
+        with self._lock:
+            self._entries.append(entry)
+
+    def entries(self) -> tuple[LedgerEntry, ...]:
+        refuse_if_unsafe()
+        with self._lock:
+            return tuple(self._entries)
+
+
 class DevEventWriter:
     """Stands in for the harness's single writer (PRD 15.3) over the in-memory store: stamps `v`, `seq` (strictly
     increasing after whatever the API itself wrote), `ts`, `world_id`, `run_id` and the null trace; validates the
     result against the contract before it is stored; idempotent by event `id`. It never defaults `vis`: an event
     without one is refused, so nothing built against dev mode can widen who sees it."""
 
-    def __init__(self, store: deps.Store) -> None:
-        self._store, self._lock = store, threading.Lock()
+    def __init__(self, store: deps.Store, ledger: DevLedger | None = None) -> None:
+        self._store, self._ledger, self._lock = store, ledger, threading.Lock()
 
     def append(self, world_id: str, event: dict) -> dict:
         refuse_if_unsafe()
@@ -118,6 +150,8 @@ class DevEventWriter:
             if problems := repo_validator().problems(stamped):
                 raise deps.EventRejected("; ".join(problems[:3]))
             committed.append(stamped)
+            if self._ledger is not None:
+                self._ledger.record(stamped, world.owner)  # newly committed only: a repeat returned above
             return stamped
 
 
@@ -187,7 +221,10 @@ def install(app: FastAPI, env: Mapping[str, str] | None = None) -> None:
     origins = cors_origins(env)
     store = deps.Store()
     store.policies["pol_dev_send"] = dev_run.dev_send_policy(DEV_OWNER)  # the dev run goes straight to its gate card
-    writer = DevEventWriter(store)
+    ledger = DevLedger()
+    writer = DevEventWriter(store, ledger)
+    if (os.environ if env is None else env).get(ENV_FORCE_REPLAY) == "1":
+        process_flags().set("replay_only", True, reason=f"{ENV_FORCE_REPLAY} (dev mode)")  # the real switch's flag
 
     def principal(request: Request) -> deps.Principal:
         refuse_if_unsafe()
@@ -209,6 +246,10 @@ def install(app: FastAPI, env: Mapping[str, str] | None = None) -> None:
         return writer
 
     app.dependency_overrides[deps.get_event_writer] = get_writer
+    app.dependency_overrides[deps.get_ledger] = ledger.entries  # the cost routes' seam (FR-MTR-10, BQ-MTR10-4)
+    from tilo_api import dev_tick  # noqa: PLC0415 (it imports schedules, which imports this module)
+
+    app.include_router(dev_tick.router)  # POST /dev/schedules/tick: registered here and nowhere else
     desks = DevDeskWorlds(store)
 
     def get_desks() -> DevDeskWorlds:

@@ -8,10 +8,11 @@ from __future__ import annotations
 import pathlib
 
 import pytest
+import tilo_api
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from test_CL_INT_5d_dev_run_pacing import _app
-from tilo_api import dev
+from tilo_api import deps, dev
 from tilo_metering import InMemoryFlagStore
 from tilo_metering import flags as flag_module
 
@@ -29,6 +30,7 @@ def _own_flags(monkeypatch):
 
 def _dev_client(env: dict[str, str]) -> TestClient:
     app: FastAPI = _app()
+    app.add_exception_handler(deps.ReplayOnly, tilo_api._replay_only)  # as the production app registers it
     dev.install(app, env)
     return TestClient(app, base_url=f"http://localhost:{dev.PORT}")
 
@@ -36,7 +38,7 @@ def _dev_client(env: dict[str, str]) -> TestClient:
 def test_DEV_HARNESS_e_without_the_env_nothing_changes():
     client = _dev_client({})
     assert flag_module.process_flags().get("replay_only") is False
-    assert client.post("/intake", data={"text": "Prepare the weekly supplier summary."}).status_code == 200
+    assert client.post("/intake", data={"text": "Prepare the weekly supplier summary."}).status_code == 201
 
 
 def test_DEV_HARNESS_e_with_the_env_the_replay_offer_is_the_unchanged_503():

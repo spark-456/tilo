@@ -10,8 +10,9 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 from _fr_agt_14_lib import l3_budget_policy
+from _sec15_lib import route_table
 from fastapi.testclient import TestClient
-from test_CL_INT_5d_dev_run_pacing import _app, _events, _wait
+from test_CL_INT_5d_dev_run_pacing import _app, _events
 from tilo_api import app as production_app
 from tilo_api import deps, dev, schedules
 
@@ -57,9 +58,14 @@ def _grant_policy(client: TestClient) -> None:
     client.app.dependency_overrides[deps.get_store]().policies["pol_auto_budget"] = l3_budget_policy(dev.DEV_OWNER)
 
 
-def test_DEV_HARNESS_d_a_due_routine_runs_end_to_end_to_its_gate_card(dev_client):
+def _worlds(client: TestClient) -> dict:
+    return client.app.dependency_overrides[deps.get_store]().worlds
+
+
+def test_DEV_HARNESS_d_a_due_routine_is_delivered_and_its_world_granted_by_the_l3_policy(dev_client):
     schedule = _schedule(dev_client)
     _grant_policy(dev_client)
+    before = set(_worlds(dev_client))
 
     response = dev_client.post(PATH, json={"as_of": _as_of(schedule)})
 
@@ -67,9 +73,11 @@ def test_DEV_HARNESS_d_a_due_routine_runs_end_to_end_to_its_gate_card(dev_client
     body = response.json()
     assert body["fired"] == 1 and [t["ran"] for t in body["tasks"]] == [1]
     world_id = dev_client.get(f"/schedules/{schedule['schedule_id']}").json()["last_world_id"]
-    assert world_id and world_id.startswith("w_")
-    _wait(lambda: [c for c in dev_client.get(f"/worlds/{world_id}/cards").json() if c["kind"] == "gate"], "gate")
-    assert any(e["type"] == "budget.granted" for e in _events(dev_client, world_id))
+    assert world_id.startswith("w_") and set(_worlds(dev_client)) - before == {world_id}
+    granted = [e for e in _events(dev_client, world_id) if e["type"] == "budget.granted"]
+    assert len(granted) == 1 and granted[0]["authz"] is not None  # by the owner's policy, never a model
+    again = dev_client.post(PATH, json={"as_of": _as_of(schedule)}).json()
+    assert again["fired"] == 0 and set(_worlds(dev_client)) - before == {world_id}  # the slot fires once
 
 
 def test_DEV_HARNESS_d_not_due_fires_nothing(dev_client):
@@ -81,9 +89,10 @@ def test_DEV_HARNESS_d_not_due_fires_nothing(dev_client):
 
 def test_DEV_HARNESS_d_without_the_l3_grant_budget_policy_the_run_is_not_started(dev_client):
     schedule = _schedule(dev_client)  # no policy: the dev owner has only the L1 send policy
+    before = set(_worlds(dev_client))
     body = dev_client.post(PATH, json={"as_of": _as_of(schedule)}).json()
     assert [t.get("skipped") for t in body["tasks"]] == ["budget_not_granted"]
-    assert dev_client.get(f"/schedules/{schedule['schedule_id']}").json()["last_world_id"] is None
+    assert set(_worlds(dev_client)) == before  # no world, no run
 
 
 def test_DEV_HARNESS_d_the_body_is_strict(dev_client):
@@ -101,29 +110,31 @@ def test_DEV_HARNESS_d_replay_only_starts_nothing(dev_client):
 
     schedule = _schedule(dev_client)
     _grant_policy(dev_client)
+    before = set(_worlds(dev_client))
     flags.process_flags().set("replay_only", True, reason="DEV_HARNESS test")
     try:
         response = dev_client.post(PATH, json={"as_of": _as_of(schedule)})
         assert response.status_code != 200 or response.json()["fired"] == 0
+        assert set(_worlds(dev_client)) == before
     finally:
         flags.process_flags().set("replay_only", False, reason="DEV_HARNESS test done")
 
 
 def test_DEV_HARNESS_d_production_has_no_such_route():
-    paths = {getattr(r, "path", "") for r in production_app.routes}
-    assert PATH not in paths and not any(p.startswith("/dev/") for p in paths)
-    assert ("POST", "/internal/schedules/tick") in {
-        (m, getattr(r, "path", "")) for r in production_app.routes for m in getattr(r, "methods", ())
-    }
+    routes = route_table(production_app)
+    assert not any(path.startswith("/dev/") for _, path in routes)
+    assert ("POST", schedules.TICK_PATH) in routes  # the real tick, with its own OIDC check, is still there
 
 
-def test_DEV_HARNESS_d_a_deployed_process_never_registers_it(monkeypatch):
+def test_DEV_HARNESS_d_a_deployed_process_never_registers_it():
     app = _app()
     with pytest.raises(dev.DevModeRefused):
         dev.install(app, {"K_SERVICE": "tilo-api"})
-    assert not any(getattr(r, "path", "") == PATH for r in app.routes)
     assert dev.install_if_enabled(app, {"K_SERVICE": "tilo-api"}) is False
-    assert not any(getattr(r, "path", "") == PATH for r in app.routes)
+    assert ("POST", PATH) not in route_table(app)
+    probe = _app()
+    dev.install(probe, {})
+    assert ("POST", PATH) in route_table(probe)
 
 
 def test_DEV_HARNESS_d_the_real_tick_still_needs_its_google_token(dev_client, monkeypatch):
