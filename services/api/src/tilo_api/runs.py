@@ -165,6 +165,13 @@ class Run:
         self.org_id = deps.ORG_ID  # the run's artifact Scope is (org_id, world_id, owner); never a request's
         self.scope: Scope | None = None  # set when the run starts
         self.world_id, self.run_id, self.owner, self.brief = task.world_id, task.run_id, task.owner, task.brief
+        self.intake_answers = (
+            tuple(  # (the Director's question, the person's answer) for the units' prompts (UNIT-PROMPT)
+                (q.text, str(task.answers[q.field]))
+                for q in task.questions
+                if task.answers.get(q.field) and q.field not in task.edits
+            )
+        )
         self.approaches = copy.deepcopy(task.approaches or [])
         self.cards = CardStore(clock=_CLOCK, writer=self, world_owners={self.world_id: self.owner})
         self.question_wait = _ObservedWait(self)  # a unit that asked a person waits here for the answer (FR-HIL-10)
@@ -497,6 +504,8 @@ class Run:
                 archive=archive,
                 redact=self.seams.redactor,
                 before_handoff=self.before_handoff,
+                brief=copy.deepcopy(self.brief),
+                intake_answers=self.intake_answers,
             )  # fmt: skip
         )
         while not planned.done():  # a unit waiting for a person must not outlive a pause

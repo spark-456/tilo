@@ -1,14 +1,14 @@
 {
-  "key": "de9d179a0ecd04ba",
+  "key": "29555d709b3820ff",
   "profile": "flash-38",
   "response": {
     "profile_id": "flash-38",
-    "text": "Synthetic lead reply for the test.",
+    "text": "Synthetic writer reply for the test.",
     "usage": {
       "input_tokens": 1000,
       "output_tokens": 500,
       "total_tokens": 1500
     }
   },
-  "role": "lead"
+  "role": "writer"
 }
