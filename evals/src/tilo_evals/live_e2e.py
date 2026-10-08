@@ -338,7 +338,11 @@ def _estimate(config: ProvidersConfig, case: BankCase) -> Estimate:
 
 
 def _estimate_chars(config: ProvidersConfig, chars: int) -> Estimate:
-    """One run of a brief with `chars` characters of input (the generator reuses it for each brief it will run)."""
+    """One run of a brief with `chars` characters of input (the generator reuses it for each brief it will run).
+    `credits_low` is the floor (a 300-character brief: 3.36 credits at the shipped prices). `credits_high` is the
+    explicit WORST-CASE CEILING, every call burning its whole output cap; it is not the Router's reserve (PL-03
+    reserves a call at its input plus the role's expected output, `config/expected_output.yaml`), so it does not
+    follow that rule."""
     base = _PROMPT_TOKENS + chars // 3
 
     def credits(role: str, calls: int, tokens_in: int, tokens_out: int) -> float:
@@ -415,9 +419,9 @@ class _Meter:
     def add_unreturned(
         self, role: str, profile: str, request: GenerateRequest, tokens_in: int, latency_ms: float
     ) -> None:
-        """A call that raised after it may have been billed (a blocked reply, a timeout): charged at the Router's own
-        pre-call quote, the input and the full output cap, because the provider reported no usage for it. The cap is a
-        quote, not usage, so it is left out of `tokens_out` (`quoted_calls` counts them for the printed note)."""
+        """A call that raised after it may have been billed (a blocked reply, a timeout): charged at the input and the
+        full output cap (the Router's ceiling, not its smaller reserve), because the provider reported no usage for it.
+        The cap is a quote, not usage, so it is left out of `tokens_out` (`quoted_calls` counts them for the note)."""
         with self.lock:
             key = (_stage(role, request), role, profile)
             row = self.rows.setdefault(key, Row(*key))
