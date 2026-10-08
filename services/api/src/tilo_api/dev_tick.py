@@ -81,7 +81,7 @@ def dev_tick(
     schedule_store: Annotated[Any, Depends(schedules.get_schedule_store_factory)],
     seams_factory: Annotated[Any, Depends(schedules.get_seams_factory)],
     flags: schedules.Flags,
-    store: schedules.StoreDep,
+    store_factory: Annotated[Callable[[], Any], Depends(schedules.get_store_factory)],
     clock: schedules.Clock,
     body: TickIn = TickIn(),
 ) -> Any:
@@ -103,7 +103,9 @@ def dev_tick(
     for task in tasks.tasks:  # one task failing never loses the slots after it
         try:
             raw = base64.b64decode(task["httpRequest"]["body"])
-            ran.append(_plain(schedules._run_task(delivery, raw, lambda: repo, seams_factory, now, flags, store)))
+            ran.append(
+                _plain(schedules._run_task(delivery, raw, lambda: repo, seams_factory, now, flags, store_factory))
+            )
         except Exception as exc:
             logger.warning("dev tick task failed (%s)", type(exc).__name__)
             ran.append({"ran": 0, "error": "task_failed"})
