@@ -1,9 +1,7 @@
 # ADR-0031: Tilo as an MCP server on Cloud Run
 
-- Status: **Proposed** (8 Oct 2026). Needs the user's approval before any ticket below starts. The supervisor
-  asked for this design on the user's behalf (8 Oct 2026); the decision is the user's. It adds a contract
-  (`mcp_tools.schema.json` 1.0.0, its fixtures and rules MC-01 to MC-12). It changes no service, `config/` or
-  `infra/`.
+- Status: Accepted (user approved 8 Oct 2026). The supervisor asked for this design on the user's behalf;
+  the user approved it in the supervisor chat. Open questions keep their stated defaults.
 - Deciders: user (approval; turning the server on; which clients; the new public routes), architect (design)
 - Requirement: none in the PRD (an MCP *client* is FR-CON-12; a server is new, at the user's request of 8 Oct
   2026). It touches SEC-03, SEC-07, SEC-10, SEC-11, SEC-12, SEC-15, SEC-16; PRD 10.4 (tiers), 16.3; OB-01;
