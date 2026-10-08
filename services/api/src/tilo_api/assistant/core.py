@@ -15,6 +15,7 @@ from typing import Any, Literal, Protocol
 from tilo_people.text import clean_line
 from tilo_policy.schemas import conforms
 
+from tilo_api.assistant.calendar import listed, prepare_lines
 from tilo_api.assistant.config import AssistantConfig, FactIntent
 from tilo_api.assistant.facts import Line, fact_lines, match_fact, moment_of, remainder_of, zone_of
 from tilo_api.assistant.gate import Ref, RefGate
@@ -220,8 +221,20 @@ def _report(
     finished: Callable[[], Sequence[Mapping[str, Any]]] | None,
     tz: str | None,
     config: AssistantConfig,
+    key: str,
 ) -> tuple[tuple[Line, ...], Mapping[str, Any] | None]:
-    """FR-PA-08: `status` also reads the gated `done` lane, `weekly` the person's finished items (route-supplied)."""
+    """FR-PA-08: `status` also reads the gated `done` lane, `weekly` the person's finished items (route-supplied).
+    FR-CAL-07: `calendar` lists the person's own accepted entries; `prepare` is ((), None) unless one entry is named."""
+    if intent.report == "calendar":
+        mine = [row for row, _ in listed(rows, gate, ask.user)]
+        lines, offer = fact_lines(
+            intent, mine, as_of=ask.now, context=ask.context, remainder=frozenset(), time_zone=tz, config=config
+        )
+        if len(mine) == 1:
+            offer = route_for(Ref("calendar_entry", mine[0]["ref"]["id"]), gate)
+        return lines, offer
+    if intent.report == "prepare":
+        return prepare_lines(key, rows, user=ask.user, now=ask.now, tz=tz, gate=gate, config=config)
     now, zone = moment_of(ask.now), zone_of(tz)
     if now is None:
         raise ValueError("now")
@@ -250,6 +263,8 @@ def _facts(
         )
     else:
         lines, offer = report(intent)
+        if intent.report == "prepare" and offer is None:  # no entry, or more than one, at the time asked
+            return _decline(config, "which_entry", by, model)
     if not any(line.source is not None for line in lines):  # nothing to cite is never `answered` (HR-1)
         return Answer("declined", by, lines, None, "empty", intent.id, model)
     return Answer("answered", by, lines, offer, None, intent.id, model)
@@ -271,7 +286,7 @@ def answer(
     rows = _gated_rows(plate["rows"], gate)
 
     def report(intent: FactIntent) -> tuple[tuple[Line, ...], Mapping[str, Any] | None]:
-        return _report(intent, rows, ask, plate, gate, finished, time_zone, config)
+        return _report(intent, rows, ask, plate, gate, finished, time_zone, config, key)
 
     upd = match_update(key, rows, ask, gate, config, time_zone)  # before navigation and facts: "wait" is no fact here
     if upd is not None:

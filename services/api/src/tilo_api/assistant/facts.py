@@ -95,7 +95,7 @@ def claim(row: Mapping[str, Any], template: str, config: AssistantConfig, *, tim
     return text + a["flagged_suffix"] if row["flagged"] else text
 
 
-def _clock(at: Any, zone: ZoneInfo | None) -> str:
+def clock_of(at: Any, zone: ZoneInfo | None) -> str:
     moment = moment_of(at)
     if moment is None:
         return ""
@@ -135,7 +135,7 @@ def fact_lines(
         if intent.header is None and row["group"] != last and row["group"] in a["group_headers"]:
             lines.append(Line(a["group_headers"][row["group"]], None))
         last = row["group"]
-        text = claim(row, a["lines"][row["reason"]], config, time=_clock(row["at"], zone))
+        text = claim(row, a["lines"][row["reason"]], config, time=clock_of(row["at"], zone))
         lines.append(Line(text, Ref(row["ref"]["kind"], row["ref"]["id"])))
         shown += 1
     if len(selected) > a["max_lines"]:

@@ -5,9 +5,9 @@
 # artifact.schema.json 1.0.0 sha256:358508330e9ee2f2
 # attention.schema.json 1.0.0 sha256:f35cff84728304af
 # brief.schema.json 1.0.0 sha256:be4e747f37e399b2
-# calendar_entry.schema.json 1.0.0 sha256:4a8550295789f3af
+# calendar_entry.schema.json 1.1.0 sha256:291531543be88320
 # card.schema.json 1.0.0 sha256:2666292eb19087d0
-# common.schema.json 1.4.0 sha256:09b36846ed11add2
+# common.schema.json 1.5.0 sha256:b1bd17a36819c785
 # connector.schema.json 1.0.0 sha256:cc3a7d9b3820e12c
 # decision.schema.json 1.0.0 sha256:06915b6db08dc4b7
 # envelope.schema.json 1.0.0 sha256:8a5c75c61807baa2
@@ -86,6 +86,7 @@
 # events/data/question.answered.schema.json 1.1.0 sha256:27aa69077ee8f813
 # events/data/question.routed.schema.json 1.0.0 sha256:af061a697d8396b2
 # events/data/skill.loaded.schema.json 1.0.0 sha256:acddc05d7bde55d2
+# events/data/team_rule.changed.schema.json 1.0.0 sha256:c095fa9eb4a68023
 # events/data/work_item.changed.schema.json 1.0.0 sha256:8740c0c65f424dc5
 # events/data/work_item.created.schema.json 1.0.0 sha256:a9fbffc5d3854c81
 # events/data/world.completed.schema.json 1.0.0 sha256:0370652b0ac84eea
@@ -95,11 +96,12 @@
 # events/data/world.requested.schema.json 1.1.0 sha256:7f1370b796c05ea1
 # events/data/world.resumed.schema.json 1.0.0 sha256:a3fd175fc848bf87
 # events/data/world.started.schema.json 1.0.0 sha256:e0daa70c85838c8f
-# events/registry.schema.json 1.1.0 sha256:22ae30d4e99499c8
+# events/registry.schema.json 1.2.0 sha256:5a2b8514c1e7e2b1
 # handoff.schema.json 1.0.0 sha256:7ed882f92b634672
 # layout.schema.json 1.0.0 sha256:1db88b1e3b744add
 # manifest.schema.json 1.0.0 sha256:9b885d1826522bb7
 # meeting.schema.json 1.2.0 sha256:034e93898bb28957
+# meeting_join.schema.json 1.0.0 sha256:ea1e8f0945773573
 # mention.schema.json 1.0.0 sha256:ca9c1acbf81616f2
 # meter.schema.json 1.0.0 sha256:ad596dcc70e45e09
 # metering.schema.json 1.0.0 sha256:91358a776e6c033a
@@ -111,15 +113,15 @@
 # plan.schema.json 1.0.0 sha256:35991402fa6e958d
 # plate.schema.json 1.0.0 sha256:d2a4e4361a714c8f
 # policy.schema.json 1.0.0 sha256:307bca25f6efc07e
-# providers.schema.json 1.1.0 sha256:ece7537b584e69f8
+# providers.schema.json 1.2.0 sha256:4514148b0b6b2f7e
 # scenario.schema.json 1.0.0 sha256:b8e044d7e37b92a3
-# skill.schema.json 1.0.0 sha256:94e0d6872579d3c5
+# skill.schema.json 1.1.0 sha256:9eeee7768b667afa
 # spend_caps.schema.json 1.1.0 sha256:d337adf13a5337f9
 # team_lead.schema.json 1.0.0 sha256:19413726e364ffdd
 # transcript.schema.json 1.0.0 sha256:08f934b8f0c9a40e
 # ui_action.schema.json 1.0.0 sha256:2ceb1e0b46368734
 # work_item.schema.json 1.0.0 sha256:7add9f68c1f996fb
-# events/registry.yaml 1.1.0 sha256:2db78f63298c923a
+# events/registry.yaml 1.2.0 sha256:8be0da29431a82c4
 
 from __future__ import annotations
 
@@ -324,6 +326,12 @@ Deterministic risk tier (PRD 10.4). T3 always needs a person.
 type AutonomyLevel = Literal["L0", "L1", "L2", "L3"]
 """
 Autonomy level (PRD 10.4): L0 observe, L1 ask each time (default), L2 instruction is approval, L3 standing rules.
+"""
+
+
+type ToolAccessLevel = Literal["off", "read", "draft", "act"]
+"""
+Plain-language access level for one connector (FR-ACC-01, BQ-DSN-04, 1.5.0, ADR-0027): a ceiling on the risk tier an action of that connector may reach before the policy engine. off blocks every action, read allows reads only, draft allows reads and T1, act allows up to the policy engine's own ceiling (a T3 action still needs a person). It never authorises anything; a skill's level only lowers the team's (FR-ACC-02).
 """
 
 
@@ -1409,6 +1417,30 @@ class SkillLoadedData(BaseModel):
     version: Semver
 
 
+type TeamRuleChangedDataRule = Literal["switch", "tool_access"]
+"""
+switch: one of the five 'When agents stop and ask' switches (FR-TEAM-04). tool_access: the team's level for one connector (FR-ACC-01). Roles, spend limits, invites and removals are not team rules (BQ-ADR27-3).
+"""
+
+
+type TeamRuleChangedDataKey = Annotated[str, Field(pattern="^[a-z][a-z0-9_]{1,31}$")]
+"""
+The switch (rule switch) or the connector id (rule tool_access) that changed.
+"""
+
+
+type TeamRuleChangedDataSwitchKey = Literal["spend", "share", "undo", "tools", "weekend"]
+"""
+The five switches of the Team page (FR-TEAM-04, config/team_rules.yaml). spend, share and undo are PRD 8.3 Must-ask rules and always on.
+"""
+
+
+type TeamRuleChangedDataValue = Literal["on", "off", "read", "draft", "act"]
+"""
+on or off for a switch; off, read, draft or act for a tool level (common tool_access_level).
+"""
+
+
 class WorkItemChangedData(BaseModel):
     """
     data of work_item.changed (CC-PEOPLE, FR-PA-01, FR-PA-05). A work item moved: confirmed (proposed to open), edited, snoozed, done, dropped, reopened, reassign_requested, or reminded (the sweeper nudged the owner).
@@ -1521,9 +1553,9 @@ class WorldStartedData(BaseModel):
     budget_cap: Credits
 
 
-type EventRegistryFamily = Literal["world", "plan", "budget", "level", "district", "building", "agent", "skill", "question", "meeting", "connection", "data", "channel", "artifact", "approval", "policy", "alert", "memory", "app", "work_item", "pinboard", "mention", "calendar", "assistant"]
+type EventRegistryFamily = Literal["world", "plan", "budget", "level", "district", "building", "agent", "skill", "question", "meeting", "connection", "data", "channel", "artifact", "approval", "policy", "alert", "memory", "app", "work_item", "pinboard", "mention", "calendar", "assistant", "team_rule"]
 """
-Event families of PRD 9.5, plus work_item, pinboard, mention, calendar and assistant (CC-PEOPLE, registry 1.1.0).
+Event families of PRD 9.5, plus work_item, pinboard, mention, calendar and assistant (CC-PEOPLE, registry 1.1.0) and team_rule (registry 1.2.0, ADR-0027).
 """
 
 
@@ -1794,6 +1826,25 @@ class MeetingAttestation(BaseModel):
     by: UserId
     at: Timestamp
     notice_version: Semver
+
+
+class MeetingJoin(BaseModel):
+    """
+    The answer of `GET /v1/meetings/{meeting_id}/join` (ADR-0024 amendment 4): the Google Meet link of a meeting Tilo hosts, for that meeting's owner only, read from the host account's event when the owner clicks and stored nowhere (rules MJ-01 to MJ-10 in `meeting_join.rules.md`). It is a response body, never a record: no store, cache, event, card, notification, archive record or log line holds it, and `meeting.schema.json` and `calendar_entry.schema.json` still have no field that can. `join_url` is exactly `https://meet.google.com/` and a three-four-three lower-case meeting code: no other scheme, host, user info, port, path, query or fragment (36 characters, so a trailing newline is refused in every engine). `expires_at` is the server's clock plus 60 seconds: the client drops the link then, or when the view closes, and asks again on the next click.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    join_url: Annotated[
+        str,
+        Field(
+            max_length=36,
+            min_length=36,
+            pattern="^https://meet\\.google\\.com/[a-z]{3}-[a-z]{4}-[a-z]{3}$",
+        ),
+    ]
+    expires_at: Timestamp
 
 
 class MentionRemoval(BaseModel):
@@ -2340,7 +2391,7 @@ class ProvidersRules(BaseModel):
 
 class ProvidersPrice(BaseModel):
     """
-    Standard list price in US dollars per million tokens.
+    Standard list price in US dollars per million tokens. audio_input (1.2.0, ADR-0027) is the price per million audio input tokens where the provider bills audio input at its own rate (Gemini); left out, the profile has no audio price and cannot serve the speech role. The other input tokens of the same call are priced at input.
     """
 
     model_config = ConfigDict(
@@ -2348,6 +2399,7 @@ class ProvidersPrice(BaseModel):
     )
     input: Annotated[float | None, Field(ge=0.0)]
     output: Annotated[float | None, Field(ge=0.0)]
+    audio_input: Annotated[float | None, Field(ge=0.0)] = None
 
 
 type ScenarioId = Annotated[str, Field(pattern="^[A-Za-z][A-Za-z0-9_-]{0,31}$")]
@@ -2390,6 +2442,12 @@ class ScenarioAutonomyEntry(BaseModel):
     """
     The policy's undo_window_s: seconds an L2 action can still be undone; left out means the policy default, 60.
     """
+
+
+type SkillToolAccess = dict[ConnectorId, ToolAccessLevel]
+"""
+FR-ACC-02 (1.1.0, ADR-0027): the level this skill may use each listed connector at, keyed by connector id (config/connectors.yaml or config/mcp.yaml). It can only lower the team's level for that connector: the level in force is the lower of the two (tilo_policy.access_levels.effective_level), so act here sets no further limit and no value can raise the team's. A connector left out uses the team's level. Optional: a skill without it changes nothing. It is part of the signed-off, version-pinned skill (PRD 8.2), so changing it is a new skill version.
+"""
 
 
 class SkillEmbeddedSchema(BaseModel):
@@ -2724,12 +2782,13 @@ class CalendarEntrySourceTilo(BaseModel):
 
 class CalendarEntryAgendaItem(BaseModel):
     """
-    One row of the merged agenda read model (FR-CAL-01): never stored.
+    One row of the merged agenda read model (FR-CAL-01): never stored. `joinable` (1.1.0, optional: absent means false, never null) is true only on a meeting row whose meeting the reader owns and Tilo hosts, so the calendar offers Join; the link itself is fetched on click from `GET /v1/meetings/{id}/join` (`meeting_join.schema.json`, MJ-10) and never sits on the row.
     """
 
     model_config = ConfigDict(
         extra="forbid",
     )
+    joinable: bool | None = None
     start: Timestamp
     end: Timestamp | None
     all_day: bool
@@ -3194,6 +3253,20 @@ class PolicyAppliedData(BaseModel):
     credits: Credits
 
 
+class TeamRuleChangedData(BaseModel):
+    """
+    data of team_rule.changed (registry 1.2.0, ADR-0027; FR-TEAM-04 'every change is logged', FR-ACC-01). A person changed one team rule: a stop-and-ask switch (rule switch, key the switch, values on or off) or the team's access level for one connector (rule tool_access, key the connector id, values off, read, draft or act). from is the value in force before the change (an unset tool is act, an unset switch its configured default), to the value after it. A Must-ask switch (spend, share, undo; PRD 8.3) can't be switched off, so its to is always on. tilo-api's team routes write it after the team store's compare-and-set succeeded, never an agent or a model: actor and target are the signed-in person who made the change (only the team's Owner may, BQ-TEAMACC-2), the world is that person's Desk world, district is null and vis is [] (owner-only, ADR-0009). It authorises nothing (a level or switch only narrows what reaches the policy engine), so it is not a side effect and authz is null.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    rule: TeamRuleChangedDataRule
+    key: TeamRuleChangedDataKey
+    from_: Annotated[TeamRuleChangedDataValue, Field(alias="from")]
+    to: TeamRuleChangedDataValue
+
+
 class EventRegistryEntry(BaseModel):
     """
     One registered type. Templates fill {actor} and {target} with display names from the layout (the id when there is none) and {data.<field>} from a required field of the type's data schema.
@@ -3603,7 +3676,7 @@ class ProvidersModels(BaseModel):
     profiles: Annotated[dict[ProvidersProfileId, ProvidersProfile], Field(min_length=1)]
     roles: Annotated[dict[Slug, ProvidersRole], Field(min_length=1)]
     """
-    Business code asks for a role, never a model (PL-01).
+    Business code asks for a role, never a model (PL-01). speech (1.2.0, ADR-0027) is the role every SpeechProvider call asks for (FR-MTG-17, FR-MTG-11, FR-INT-14, FR-CHN-16): the loader refuses it unless it states max_output_tokens and its primary, fallback and cascade profiles declare the audio capability and, while prices are set, carry an audio_input price.
     """
     rules: ProvidersRules
 
@@ -3676,6 +3749,7 @@ class Skill(BaseModel):
     The domain expert who signed the skill off.
     """
     tools_allowed: list[ActionType]
+    tool_access: SkillToolAccess | None = None
     inputs: SkillEmbeddedSchema
     outputs: SkillEmbeddedSchema
     description: Annotated[
@@ -3917,6 +3991,7 @@ class Common(BaseModel):
     severity: Severity | None = None
     risk_tier: RiskTier | None = None
     autonomy_level: AutonomyLevel | None = None
+    tool_access_level: ToolAccessLevel | None = None
     authz: Authz | None = None
     artifact_ref: ArtifactRef | None = None
     destination: Destination | None = None
@@ -4305,7 +4380,7 @@ class PolicyRiskTierTable(BaseModel):
 
 class Providers(BaseModel):
     """
-    Provider-layer configuration as the provider layer loads it (PRD 6.4, 6.6, 14.1): models is config/models.yaml ($defs.models) and prices is config/prices.yaml ($defs.prices). The loader also checks that every role names existing profiles and every profile has a price entry. Model ids appear only in config/ and packages/providers.
+    Provider-layer configuration as the provider layer loads it (PRD 6.4, 6.6, 14.1): models is config/models.yaml ($defs.models) and prices is config/prices.yaml ($defs.prices). The loader also checks that every role names existing profiles and every profile has a price entry, and the speech role's rules below (1.2.0, ADR-0027). Model ids appear only in config/ and packages/providers.
     """
 
     model_config = ConfigDict(
@@ -4571,6 +4646,7 @@ type RegisteredEventType = Literal[
     "calendar.entry_changed",
     "assistant.asked",
     "assistant.replied",
+    "team_rule.changed",
 ]
 
 EVENT_TYPES: Final[tuple[RegisteredEventType, ...]] = (
@@ -4656,6 +4732,7 @@ EVENT_TYPES: Final[tuple[RegisteredEventType, ...]] = (
     "calendar.entry_changed",
     "assistant.asked",
     "assistant.replied",
+    "team_rule.changed",
 )
 
 SIDE_EFFECT_EVENT_TYPES: Final[frozenset[RegisteredEventType]] = frozenset(
@@ -4752,10 +4829,11 @@ EVENT_DATA_MODELS: Final[dict[RegisteredEventType, type[BaseModel]]] = {
     "calendar.entry_changed": CalendarEntryChangedData,
     "assistant.asked": AssistantAskedData,
     "assistant.replied": AssistantRepliedData,
+    "team_rule.changed": TeamRuleChangedData,
 }
 
 EVENT_REGISTRY: Final[EventRegistry] = EventRegistry.model_validate(
-    {'version': '1.1.0',
+    {'version': '1.2.0',
      'unknown_types': 'trace_only',
      'types': {'world.requested': {'family': 'world',
                                    'verb': 'requested',
@@ -5819,5 +5897,21 @@ EVENT_REGISTRY: Final[EventRegistry] = EventRegistry.model_validate(
                                      'trace_row': 'conversation={data.conversation_id} '
                                                   'outcome={data.outcome} decided_by={data.decided_by}',
                                      'data_schema': 'events/data/assistant.replied.schema.json',
-                                     'fixture': 'fixtures/events/valid/assistant.replied.json'}}}
+                                     'fixture': 'fixtures/events/valid/assistant.replied.json'},
+               'team_rule.changed': {'family': 'team_rule',
+                                     'verb': 'changed',
+                                     'priority': 'must',
+                                     'pillar': 'P4',
+                                     'default_severity': 'info',
+                                     'side_effect': False,
+                                     'world_effect': 'The rules board beside Your Desk flips the '
+                                                     'changed rule.',
+                                     'hud_effect': 'The Team page shows the new setting and logs the '
+                                                   'change.',
+                                     'story_template': '{actor} changed a team rule: {data.key} is now '
+                                                       '{data.to}.',
+                                     'trace_row': 'rule={data.rule} key={data.key} from={data.from} '
+                                                  'to={data.to}',
+                                     'data_schema': 'events/data/team_rule.changed.schema.json',
+                                     'fixture': 'fixtures/events/valid/team_rule.changed.json'}}}
 )

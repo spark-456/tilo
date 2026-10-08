@@ -3,6 +3,7 @@
 // the only file under park/ that reads the address bar; pages get `app.page` and `app.params`.
 import { useMemo, useSyncExternalStore } from "react";
 import { PAGE_IDS, type PageId, type Params } from "./AppCtx";
+import { noteFollowed } from "./followed";
 
 export interface ParkRoute {
   page: PageId;
@@ -101,6 +102,7 @@ export function isHomeAddress(): boolean {
 export function navigatePark(to: string): void {
   window.history.pushState({}, "", to);
   window.dispatchEvent(new PopStateEvent("popstate"));
+  noteFollowed(); // after the route has updated: a page reading the address then reads the new one
 }
 
 function subscribe(onChange: () => void): () => void {

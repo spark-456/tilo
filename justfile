@@ -68,6 +68,10 @@ test:
     uv run pytest -q -m "not emulator and not system"
     pnpm -r run test
 
+# The meeting bot's offline tests (FR-MTG-11): fakes only, no browser, network or key. Also part of `just test` (root pytest).
+meet-bot-test:
+    uv run pytest meet-bot/tests -q -p no:cacheprovider
+
 # Format everything in place.
 fmt:
     uv run ruff format .
@@ -125,7 +129,7 @@ live-e2e *args:
 # PL-LIVE-E2E: one real end-to-end run on a typed topic, screened by the safety role (Model Armor) first. The topic is
 # typed at the prompt (`live-run`) or read from a file (`live-run-file <path>`): it never passes through a shell. Flags
 # only: --dry-run --auto-answer --auto-approve-t1t2 --max-credits N --real-connectors (real read-only Gmail, Drive,
-# Calendar). Live switch as live-e2e. docs/live-e2e.md.
+# Calendar) --allow-writes (draft/save after a typed yes) --allow-send. Live switch as live-e2e. docs/live-e2e.md.
 live-run *flags:
     uv run python evals/scripts/live_run.py --topic-stdin {{ if flags =~ '^[-a-z0-9.= ]*$' { flags } else { error("live-run takes flags only; type the topic at the prompt or use live-run-file") } }}
 
