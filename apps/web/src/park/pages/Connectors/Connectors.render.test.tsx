@@ -108,7 +108,7 @@ describe("WEB_11_connectors_render: every designed element", () => {
     for (const b of buttons) expect(textOf(b)).toBe("Connect");
   });
 
-  it("WEB_11_connectors_render_attention_banner_for_hubspot_with_a_reconnect_button", async () => {
+  it("FR_ACC_04_WEB_11_connectors_render_attention_banner_for_hubspot_with_a_reconnect_button", async () => {
     const { root } = await open();
     expect(hasExactText(root, "HubSpot sign-in expires in 3 days")).toBe(true);
     expect(

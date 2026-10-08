@@ -13,7 +13,7 @@ from datetime import UTC, date, datetime
 from typing import Any, Literal
 
 from tilo_providers.config import ProvidersConfig
-from tilo_providers.errors import ProviderError, RequestError, SafetyError
+from tilo_providers.errors import OutputTruncatedError, ProviderError, RequestError, SafetyError
 from tilo_providers.factory import build_provider
 from tilo_providers.interfaces import Capability, GenerateRequest, GenerateResponse, ModelProvider, SearchProvider
 from tilo_providers.prompts import load_prompt, neutralise_marker
@@ -26,11 +26,15 @@ SearchFor = Callable[[str], SearchProvider]
 
 
 class RouterError(Exception):
-    """Router-level error; `attempts` holds every attempt made before it was raised."""
+    """Router-level error; `attempts` holds every attempt made before it was raised. `budget_left` is what is
+    left of the call's budget after charging a truncated call (FR-MTR-01); None when it has none or nothing set it."""
 
-    def __init__(self, message: str, attempts: list[RouterAttempt] | None = None) -> None:
+    def __init__(
+        self, message: str, attempts: list[RouterAttempt] | None = None, budget_left: float | None = None
+    ) -> None:
         super().__init__(message)
         self.attempts = list(attempts or [])
+        self.budget_left = budget_left
 
 
 class BudgetExceededError(RouterError): ...  # PL-03: no candidate left fits the budget; nothing over it is sent
@@ -66,6 +70,7 @@ class RouterAttempt:
     units_overrun: int | None = None  # LW-05: queries beyond reserve_units; they are charged in full (ADR-0029)
     error_type: str | None = None
     reason: str | None = None  # why this attempt was made (the escalation or fallback reason)
+    quoted_credits: float = field(default=0.0, repr=False)  # the pre-call quote: its charge when no usage is known
 
 
 @dataclass
@@ -116,7 +121,9 @@ def _usage(attempt: RouterAttempt, response: Any) -> None:  # a GenerateResponse
 def _fail(run: RouterResult, attempt: RouterAttempt, error: Exception, *, output_started: bool = False) -> None:
     """Records a failed candidate. Returns (the router falls back) for quota, retryable, base ProviderError,
     EFF-03 cap refusals and any unexpected exception (NotImplementedError, an adapter bug); raises a
-    RouterError carrying every attempt, the adapter's error as `__cause__`, for everything with no fallback."""
+    RouterError carrying every attempt, the adapter's error as `__cause__`, for everything with no fallback.
+    A reply cut at its output cap is terminal (EFF-02): every candidate of a call is sent the same cap (BQ-63), so a
+    sibling would burn the same tokens again; the live runner's own retry builds a new request with a larger cap."""
     attempt.outcome = "safety_blocked" if isinstance(error, SafetyError) else "error"
     attempt.error_type, run.last_error = type(error).__name__, error
     where = f"PL-03: role {run.role_id!r} profile {attempt.profile_id!r}"
@@ -126,6 +133,10 @@ def _fail(run: RouterResult, attempt: RouterAttempt, error: Exception, *, output
         raise RouterSafetyError(f"{where} blocked on safety grounds: {error}", run.attempts) from error
     if output_started:  # answers are never spliced
         raise StreamInterruptedError(f"{where} failed after output started", run.attempts) from error
+    if isinstance(error, OutputTruncatedError):  # no sibling: the same cap burns the same tokens
+        cap = run.request.max_output_tokens
+        message = f"{where} reply truncated at its max_output_tokens cap of {cap}; not retried at the same cap"
+        raise RouterExhaustedError(message, run.attempts, run.budget) from error
 
 
 def _exhausted(run: RouterResult) -> RouterError:
@@ -186,11 +197,13 @@ class Router:
         fixtures_dir: Any = None,
         live_permitted: bool = False,
         search_for_profile: SearchFor | None = None,
+        role_thinking: bool = True,
     ) -> None:
         if provider_for_profile is None and fixtures_dir is None:
             raise RouterError("Router needs either provider_for_profile or fixtures_dir")
         self._config, self._provider_for_profile, self._fixtures_dir = config, provider_for_profile, fixtures_dir
         self._search_for_profile = search_for_profile
+        self._role_thinking = role_thinking  # False: never fill a role's `thinking` (the live smoke sends none)
         self._live_permitted = live_permitted  # SEC-15: set by the caller that decided this router may go live
         if live_permitted:
             config.check_live()  # ADR-0029 decisions 3 and 4: no live metering at the wrong region or past a promotion
@@ -227,6 +240,8 @@ class Router:
             yield attempt
         except Exception as error:
             run.attempts.append(attempt)
+            if isinstance(error, OutputTruncatedError):
+                self._charge_truncated(run, attempt, error)
             _fail(run, attempt, error)
         else:
             run.attempts.append(attempt)
@@ -252,6 +267,16 @@ class Router:
         elif cap is not None and measure(prompt) > cap:
             raise TokenCapExceededError(f"EFF-03: role {run.role_id!r} repair prompt is over its cap of {cap}")
         sent = run.request.model_copy(update={"prompt": prompt})
+        role = self._config.roles[run.role_id]
+        if (
+            self._role_thinking
+            and sent.thinking_level is None
+            and role.thinking
+            and Capability.THINKING.value in self._config.profiles[profile_id].caps
+        ):
+            # BQ-LE2E-10: the role's `thinking` is the default for a caller that sets none (an explicit level wins), and
+            # only a profile that declares the thinking capability is sent one (the others would answer a 400).
+            sent = sent.model_copy(update={"thinking_level": role.thinking})
         return sent, self._quote(run, profile_id, provider, _input_text(sent, prompt), sent.max_output_tokens or 0)
 
     def _price_day(self) -> date | None:
@@ -288,6 +313,20 @@ class Router:
             estimate = self._cost(profile_id, tokens_in, tokens_out, cached)
         run.budget -= estimate + (self._cost(profile_id, 0, 0, units=units) if units else 0)
 
+    def _charge_truncated(self, run: RouterResult, attempt: RouterAttempt, error: OutputTruncatedError) -> None:
+        """FR-MTR-01: a reply cut at its cap was billed (input, output and thinking tokens). It is charged from the
+        usage the provider reported (input plus output and thinking, written to the attempt), else at its pre-call
+        quote. This is the one place a call that raised is charged; quota and the like never are."""
+        spent = (error.output_tokens or 0) + (error.thinking_tokens or 0)
+        known = error.output_tokens is not None or error.thinking_tokens is not None
+        if isinstance(error.input_tokens, int) and known:
+            attempt.tokens_in, attempt.tokens_out = error.input_tokens, spent
+            credits = self._cost(attempt.profile_id, error.input_tokens, spent)
+        else:
+            credits = attempt.quoted_credits
+        if run.budget is not None:
+            run.budget -= credits
+
     def generate(
         self,
         role_id: str,
@@ -309,6 +348,7 @@ class Router:
                     with self._candidate(run, profile_id, reason) as attempt:
                         provider = self._provider(role_id, profile_id)
                         sent, estimate = self._prepare(run, profile_id, provider, prompt)
+                        attempt.quoted_credits = estimate
                         response = provider.generate(sent)
                 except RouterSafetyError:  # a safety outcome, never a silent fallback
                     return replace(run, outcome="safety_blocked")
@@ -357,6 +397,7 @@ class Router:
             with self._candidate(run, profile_id, reason) as attempt:
                 provider = self._provider(run.role_id, profile_id)
                 sent, estimate = self._prepare(run, profile_id, provider)
+                attempt.quoted_credits = estimate
                 chunks = iter(provider.stream(sent))
                 chunk = next(chunks, None)
             if attempt.error_type:

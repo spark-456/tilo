@@ -187,7 +187,8 @@ describe("WEB_7_ledger_interactions", () => {
     });
     click(byText(container, "button", "Export CSV"));
     expect(store.getState().toast).toMatchObject({
-      message: "Exported september-2026.csv · also synced to Xero",
+      // Updated for FR-SPD-08 (user approved 8 Oct): a real download with an honest sample name, no accounting-sync claim.
+      message: "Exported tilo-ledger-september-2026-sample.csv · sample data",
       actionLabel: undefined,
     });
   });
