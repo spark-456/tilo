@@ -63,19 +63,30 @@ _KEY_VALUE = re.compile(
 # credential-looking value after it, stays; any other first word is the credential and is masked.
 # The scheme is possessive, so an already masked value is left alone (idempotent).
 _SCHEMES = "basic|bearer|digest|token|negotiate|ntlm|hoba|mutual|vapid|dpop|aws4-hmac-sha256"
-_AUTH_HEADER = re.compile(
-    r"(?i)((?:authorization|(?:set-)?cookie)[\"']?\s{0,8}[=:]\s*+)"
-    rf"(?:{_QUOTED}|((?:(?:{_SCHEMES})[ \t]+(?=[A-Za-z0-9._~+/=\"'\[]))?+)(?!\[masked:)[^\r\n]+)"
-)
+# A `Cookie:` line can hold several pairs, so it is left alone only when every value on it is already a placeholder
+# (`Cookie: <JWT>; refresh=<v>` masks the JWT first and must still lose the refresh value). An `Authorization:` value
+# is one credential, so a leading placeholder is enough.
+_ALL_MASKED = r"(?!\[masked:\w+\](?:[ \t;,]*\[masked:\w+\])*[ \t;,]*(?=[\r\n]|\Z))"
+
+
+def _header(names: str, guard: str) -> re.Pattern[str]:
+    return re.compile(
+        rf"(?i)((?:{names})[\"']?\s{{0,8}}[=:]\s*+)"
+        rf"(?:{_QUOTED}|((?:(?:{_SCHEMES})[ \t]+(?=[A-Za-z0-9._~+/=\"'\[]))?+){guard}[^\r\n]+)"
+    )
+
+
+_AUTH_HEADER = _header("authorization", r"(?!\[masked:)")
+_COOKIE_HEADER = _header("(?:set-)?cookie", _ALL_MASKED)
 # `scheme://userinfo@` anywhere in text (a path, a query, page copy): the userinfo, of any length and
 # with at most one space, is dropped.
 _URL_USERINFO = re.compile(
     r"(?<![A-Za-z0-9+.-])([A-Za-z][A-Za-z0-9+.-]{0,63}://)(?!\[masked:secret\]@)[^\s/?#]+(?: [^\s/?#]+)?@"
 )
 _EMAIL = re.compile(r"[A-Za-z0-9._%+-]{1,64}@[A-Za-z0-9-]{1,63}(?:\.[A-Za-z0-9-]{1,63}){1,8}")
-_PHONE = re.compile(r"(?<![\w+])\+\d[\d ()-]{6,24}\d")
+_PHONE = re.compile(r"(?<![\d+])\+\d[\d ()-]{6,24}\d")
 # Digit groups of 2+ digits joined by one space or dash; a lone digit is never part of a card layout.
-_DIGIT_RUN = re.compile(r"(?<!\w)\d{2,}(?:[ -]\d{2,})*")
+_DIGIT_RUN = re.compile(r"(?<!\d)\d{2,}(?:[ -]\d{2,})*")
 # Every secret shape the free-secret and key-value passes can match contains one of these words
 # (lower-cased); a card needs 13 digits with at most one separator between neighbours. Plain
 # `in` scans and one anchored regex are several times cheaper than running every pass on short strings.
@@ -158,7 +169,7 @@ def _mask(text: str) -> str:
         # a glued secret that is now a placeholder can leave a left-anchored shape next to it (`<id>Bearer <token>`)
         text = _FREE_SECRETS.sub(_MASK, glued) if glued != text else text
     if not ascii_only or "authorization" in low or "cookie" in low:
-        text = _AUTH_HEADER.sub(_auth, text)
+        text = _COOKIE_HEADER.sub(_auth, _AUTH_HEADER.sub(_auth, text))
     if words:
         text = _KEY_VALUE.sub(_kv, text)
     if "://" in text:
