@@ -67,6 +67,7 @@ class ProfilePriceQuote:  # one profile's price plus the file's date and source 
     unit: str | None = None  # the unit_price unit (query, ...) and its US$ per 1,000, charged on top (decision 1)
     per_1k: float | None = None
     valid_until: str | None = None  # last day (UTC) a promotional rate holds (decision 4)
+    audio_input: float | None = None  # US$ per 1M audio input tokens; None: the profile has no audio price (ADR-0027)
 
 
 # ADR-0029 decision 3: the env variable that sets where each adapter sends, and its default.
@@ -126,6 +127,7 @@ class ProvidersConfig:  # the loaded, validated provider-layer config (PRD 6.4)
             fee.unit if fee else None,
             fee.per_1k if fee else None,
             quote.valid_until,
+            quote.audio_input,
         )
 
     def cost_usd(
@@ -136,13 +138,20 @@ class ProvidersConfig:  # the loaded, validated provider-layer config (PRD 6.4)
         *,
         cached: int = 0,
         units: int = 0,
+        audio: int = 0,
         at: date | None = None,
     ) -> float:
         """The one cost formula (ADR-0029 decision 1): tokens at their rates, cached ones at `cached_input` (else
-        `input`), plus units * per_1k / 1,000."""
+        `input`), audio ones at `audio_input` (LW-06; refused if the profile has none, never priced at `input`),
+        plus units * per_1k / 1,000. Cached and audio tokens are parts of `tokens_in` and do not overlap."""
         quote = self.price(profile_id, at=at)
         cached_rate = quote.input if quote.cached_input is None else quote.cached_input
-        tokens = (tokens_in - cached) * quote.input + cached * cached_rate + tokens_out * quote.output
+        if audio and quote.audio_input is None:
+            raise ProviderConfigError(f"PL-06: profile {profile_id!r} has no audio_input price: {audio} audio tokens")
+        if cached + audio > tokens_in:
+            raise ValueError("cached and audio tokens are parts of the input tokens: together at most tokens_in")
+        tokens = (tokens_in - cached - audio) * quote.input + cached * cached_rate + tokens_out * quote.output
+        tokens += audio * (quote.audio_input or 0.0)
         usd = tokens / 1e6
         if units:
             if quote.per_1k is None:

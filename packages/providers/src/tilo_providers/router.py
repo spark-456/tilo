@@ -6,16 +6,17 @@ from __future__ import annotations
 
 import json
 import time
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Collection, Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass, field, replace
 from datetime import UTC, date, datetime
 from typing import Any, Literal
 
 from tilo_providers.config import ProvidersConfig
-from tilo_providers.errors import ProviderError, RequestError, SafetyError
+from tilo_providers.errors import MissingCapabilityError, ProviderError, RequestError, SafetyError
 from tilo_providers.factory import build_provider
 from tilo_providers.interfaces import Capability, GenerateRequest, GenerateResponse, ModelProvider, SearchProvider
+from tilo_providers.media import capabilities_needed, check_parts, estimate_tokens, provider_takes
 from tilo_providers.prompts import load_prompt, neutralise_marker
 from tilo_providers.replay import is_live_mode
 from tilo_providers.schema_guard import first_error, short
@@ -66,6 +67,7 @@ class RouterAttempt:
     units_overrun: int | None = None  # LW-05: queries beyond reserve_units; they are charged in full (ADR-0029)
     error_type: str | None = None
     reason: str | None = None  # why this attempt was made (the escalation or fallback reason)
+    tokens_audio: int | None = None  # LW-06: audio input tokens, a part of tokens_in; None is unknown, never 0
 
 
 @dataclass
@@ -111,6 +113,7 @@ def _usage(attempt: RouterAttempt, response: Any) -> None:  # a GenerateResponse
     if response.usage:
         attempt.tokens_in, attempt.tokens_out = response.usage.get("input_tokens"), response.usage.get("output_tokens")
         attempt.tokens_cached = response.usage.get("cached_tokens")
+        attempt.tokens_audio = response.usage.get("audio_tokens")
 
 
 def _fail(run: RouterResult, attempt: RouterAttempt, error: Exception, *, output_started: bool = False) -> None:
@@ -206,12 +209,16 @@ class Router:
             live_permitted=self._live_permitted,
         )
 
-    def _candidates(self, role_id: str, capability: Capability | None) -> list[str]:
+    def _candidates(self, role_id: str, capability: Capability | None, media: Collection[str] = ()) -> list[str]:
+        """The role's profiles in cascade order that declare `capability` and the capability of each media part
+        (`media`, LW-06: vision, documents, audio, video): a profile without one is never picked for that part."""
         role = self._config.roles[role_id]
         ids = list(role.cascade or dict.fromkeys(p for p in (role.primary, role.fallback) if p))
-        ids = [p for p in ids if capability in {None, *map(Capability, self._config.profiles[p].caps)}]
+        needed = {c for c in (capability, *map(Capability, sorted(media))) if c is not None}
+        ids = [p for p in ids if needed <= set(map(Capability, self._config.profiles[p].caps))]
         if not ids:
-            raise RouterExhaustedError(f"PL-03: role {role_id!r} has no candidate with capability {capability!r}")
+            what = repr(capability) if not media else f"{sorted(c.value for c in needed)}"
+            raise RouterExhaustedError(f"PL-03: role {role_id!r} has no candidate with capability {what}")
         return ids
 
     @contextmanager
@@ -234,7 +241,11 @@ class Router:
             attempt.latency_ms = (time.perf_counter() - start) * 1000
 
     def _start(self, role_id: str, req: GenerateRequest, outs: list[str] | None, cap: Any, budget: Any) -> RouterResult:
-        role, candidates = self._config.roles[role_id], self._candidates(role_id, cap)
+        try:
+            check_parts(req.parts)  # LW-06: count, bytes, types, sha256; a URI part is refused (ADR-0018 T8)
+        except RequestError as error:
+            raise RouterRequestError(f"LW-06: role {role_id!r} rejected the request: {error}") from error
+        role, candidates = self._config.roles[role_id], self._candidates(role_id, cap, capabilities_needed(req.parts))
         max_output = next(n for n in (req.max_output_tokens, role.max_output_tokens, 1024) if n is not None)  # BQ-63
         request = req.model_copy(update={"max_output_tokens": max_output})
         return RouterResult(role_id, request, candidates, budget, raw_prompt=req.prompt, tool_outputs=list(outs or []))
@@ -246,28 +257,63 @@ class Router:
         role's input to max_input_tokens (or refuse a repair `prompt` over it), then price the call (PL-03).
         Never sends anything over the cap."""
         cap = self._config.roles[run.role_id].max_input_tokens
-        measure = lambda text: provider.count_tokens(_input_text(run.request, text))  # noqa: E731
+        media, audio = self._media(run, profile_id)
+        measure = lambda text: provider.count_tokens(_input_text(run.request, text)) + media  # noqa: E731
         if prompt is None:
             prompt = _compact(run.role_id, cap, run.raw_prompt, run.tool_outputs, measure)
         elif cap is not None and measure(prompt) > cap:
             raise TokenCapExceededError(f"EFF-03: role {run.role_id!r} repair prompt is over its cap of {cap}")
         sent = run.request.model_copy(update={"prompt": prompt})
-        return sent, self._quote(run, profile_id, provider, _input_text(sent, prompt), sent.max_output_tokens or 0)
+        text, out = _input_text(sent, prompt), sent.max_output_tokens or 0
+        return sent, self._quote(run, profile_id, provider, text, out, media=media, audio=audio)
+
+    def _media(self, run: RouterResult, profile_id: str) -> tuple[int, int]:
+        """LW-06, per candidate and before anything is sent: (media tokens, of which audio) from the profile's
+        `media_tokens`, an upper bound that goes into the EFF-03 cap and the PL-03 price. A profile without
+        `media_tokens`, whose adapter cannot take a part's type, or with no `audio_input` price for an audio part
+        gets no media: it is recorded as a missing capability and the next candidate is tried."""
+        parts = run.request.parts
+        if not parts:
+            return 0, 0
+        profile = self._config.profiles[profile_id]
+        if profile.media_tokens is None:
+            raise MissingCapabilityError(f"LW-06: profile {profile_id!r} states no media_tokens, so it gets no media")
+        for part in parts:
+            if not provider_takes(profile.provider, part):
+                raise MissingCapabilityError(f"LW-06: profile {profile_id!r} cannot take {part.mime_type}")
+        if self._config.prices.status == "set" and any(p.kind == "audio" for p in parts):
+            if self._config.prices.profiles[profile_id].audio_input is None:
+                raise MissingCapabilityError(f"LW-06: profile {profile_id!r} has no audio_input price for audio")
+        return estimate_tokens(parts, profile.media_tokens)
 
     def _price_day(self) -> date | None:
         """A promotional rate's `valid_until` binds only a call that can go live; a replay uses its recorded dates."""
         return datetime.now(UTC).date() if self._live_permitted or is_live_mode() else None
 
-    def _cost(self, profile_id: str, tokens_in: int, tokens_out: int, cached: int = 0, units: int = 0) -> float:
-        usd = self._config.cost_usd(profile_id, tokens_in, tokens_out, cached=cached, units=units, at=self._price_day())
+    def _cost(
+        self, profile_id: str, tokens_in: int, tokens_out: int, cached: int = 0, units: int = 0, audio: int = 0
+    ) -> float:
+        usd = self._config.cost_usd(
+            profile_id, tokens_in, tokens_out, cached=cached, units=units, audio=audio, at=self._price_day()
+        )
         return self._config.credits(usd)
 
-    def _quote(self, run: RouterResult, profile_id: str, provider: ModelProvider, text: str, out: int) -> float:
+    def _quote(
+        self,
+        run: RouterResult,
+        profile_id: str,
+        provider: ModelProvider,
+        text: str,
+        out: int,
+        *,
+        media: int = 0,
+        audio: int = 0,
+    ) -> float:
         """PL-03: every call (first, repair, fallback, escalation) is priced before it is made (BQ-61) and
         refused if over the budget left. Nothing is taken from the budget until the call returns (`_spend`)."""
         if run.budget is None:
             return 0.0
-        credits = self._cost(profile_id, provider.count_tokens(text), out)
+        credits = self._cost(profile_id, provider.count_tokens(text) + media, out, audio=audio)
         if credits > run.budget:
             message = f"PL-03: a call on {profile_id!r} costs ~{credits:.4f} credits, over {run.budget} left"
             raise BudgetExceededError(message, run.attempts)
@@ -285,8 +331,21 @@ class Router:
         if isinstance(tokens_in, int) and isinstance(tokens_out, int):
             cached = (usage or {}).get("cached_tokens")
             cached = cached if isinstance(cached, int) and 0 <= cached <= tokens_in else 0
-            estimate = self._cost(profile_id, tokens_in, tokens_out, cached)
+            audio = self._audio_tokens(run, profile_id, usage, tokens_in - cached)
+            estimate = self._cost(profile_id, tokens_in, tokens_out, cached, audio=audio)
         run.budget -= estimate + (self._cost(profile_id, 0, 0, units=units) if units else 0)
+
+    def _audio_tokens(self, run: RouterResult, profile_id: str, usage: dict[str, Any] | None, room: int) -> int:
+        """LW-06: the audio tokens of a returned call, charged at `audio_input`. A request with no audio part has
+        none; a reply that reports no usable count is charged the pre-flight estimate (an upper bound: never
+        understated). At most `room`, the input tokens that are not cached."""
+        parts = run.request.parts
+        if not any(p.kind == "audio" for p in parts or ()):
+            return 0
+        reported = (usage or {}).get("audio_tokens")
+        if isinstance(reported, bool) or not isinstance(reported, int) or reported < 0:
+            reported = estimate_tokens(parts, self._config.profiles[profile_id].media_tokens)[1]
+        return min(reported, room)
 
     def generate(
         self,
