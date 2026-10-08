@@ -22,7 +22,7 @@ Ambiguities resolved (listed in the report):
 from __future__ import annotations
 
 import math
-from typing import Any
+from typing import Any, cast
 
 import pytest
 import yaml
@@ -63,7 +63,7 @@ def _request(kind: str = "pointwise", *, metric: str | None = None, item: Any = 
         item = _item(**item_overrides)
     return EvalRequest(
         metric=metric if metric is not None else ("plan_pairwise" if kind == "pairwise" else "plan_groundedness"),
-        kind=kind,
+        kind=cast("Any", kind),  # the tests also pass invalid kinds
         template="Judge the response. Rubric text, sent as is.",
         item=item,
     )
