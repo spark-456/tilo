@@ -27,7 +27,7 @@ export { QUIZ_FIXTURE_PUBLISHERS, QUIZ_FIXTURE_SPEC } from "../api/fixtures/quiz
 export const OPTION_IDS: readonly AppSpecOptionId[] = ["a", "b", "c", "d", "e", "f"];
 const QUESTION_ID_RE = /^q[1-9][0-9]{0,2}$/;
 // The contract's patterns, copied: common.schema.json slug and artifact_id. The production bundle does not carry a
-// JSON Schema validator (the page CSP forbids eval); appspec.draft.parity.test.ts checks this module against the schema.
+// JSON Schema validator (the page CSP forbids eval); pages/QuizPlayer/QuizPlayer.lw14fix.test.tsx checks this module against the schema.
 const SLUG_RE = /^[a-z][a-z0-9_]{0,63}$/;
 const ARTIFACT_ID_RE = /^art_[0-9A-Za-z_]{1,48}$/;
 const TOP_KEYS = new Set(["v", "kind", "title", "theme", "timer", "questions"]);
