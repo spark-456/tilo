@@ -167,27 +167,6 @@ def _wire_models(monkeypatch, tmp_path, replies=(), **kw):
     return providers, provider
 
 
-@pytest.fixture(autouse=True)
-def _fresh_process_state():
-    from tilo_api import app
-
-    # FastAPI lazily binds included routes. Bind the original dependency keys before
-    # _wire_models patches deps.get_router, or later intake requests retain its
-    # assistant-only router even after monkeypatch restores the module attribute (#672).
-    app.openapi()
-    overrides = app.dependency_overrides.copy()
-    app.dependency_overrides.clear()
-    for cached in (deps.get_spend_ledger, deps.get_decision_cache):
-        cached.cache_clear()
-    try:
-        yield
-    finally:
-        app.dependency_overrides.clear()
-        app.dependency_overrides.update(overrides)
-        for cached in (deps.get_spend_ledger, deps.get_decision_cache):
-            cached.cache_clear()
-
-
 def test_FR_PA_19_the_ledger_and_the_cache_are_process_wide_in_memory_objects(_fresh_process_state):
     m = mod("tilo_api.assistant.metering")
     assert deps.get_spend_ledger() is deps.get_spend_ledger()
