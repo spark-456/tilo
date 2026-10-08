@@ -12,6 +12,7 @@ import { HelpSection } from "./HelpSection";
 import { LibrarySection } from "./LibrarySection";
 import "./Skills.css";
 import { TeachCard } from "./TeachCard";
+import { ToolAccess } from "./ToolAccess";
 import { type SkillFixEntry, applySkillFix } from "./skillConfig";
 import { icon } from "./skillsKit";
 import { INTRO, pillTotal } from "./teachData";
@@ -222,6 +223,7 @@ function Ready({ app, data }: { app: AppCtx; data: Data }) {
           scrollTeach();
         }}
       />
+      <ToolAccess skills={skills} tools={learn.tools} />
     </>
   );
 }
