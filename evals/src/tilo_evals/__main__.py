@@ -20,7 +20,7 @@ from pathlib import Path
 from typing import Any
 
 from tilo_providers.batch import BatchProvider
-from tilo_providers.interfaces import ModelProvider, SafetyProvider
+from tilo_providers.interfaces import EvalProvider, ModelProvider, SafetyProvider
 
 from .cases import CaseError
 from .config import EvalsConfig, EvalsConfigError
@@ -59,6 +59,12 @@ def _parser() -> argparse.ArgumentParser:
     )
     for name in ("settings", "bank-dir", "out-dir", "models-file", "prices-file", "report-md"):
         gen.add_argument(f"--{name}", type=Path, default=None)
+    vertex = commands.add_parser(
+        "vertex-eval", help="live autorater runs on the Gen AI evaluation service (VERTEX-EVAL-1)"
+    )
+    from .vertex_eval import add_arguments as vertex_arguments  # noqa: PLC0415
+
+    vertex_arguments(vertex)
     metrics = commands.add_parser("metrics", help="EV-01..EV-15 from a replay pass and the bank on fakes (PRD 3.5)")
     metrics.add_argument("--case", dest="case_ids", action="append", default=[])
     metrics.add_argument("--bank-dir", dest="bank_dir", default="evals/bank")
@@ -261,9 +267,15 @@ def main(
     live_provider_factory: Callable[[str, str], ModelProvider] | None = None,
     safety: SafetyProvider | None = None,
     batch_provider: BatchProvider | None = None,
+    eval_provider: EvalProvider | None = None,
 ) -> int:
-    """Test seams: `environ`, `live_provider_factory`, `safety` (`generate` only), `batch_provider` (`nightly` only)."""
+    """Test seams: `environ`, `live_provider_factory`, `safety` (`generate` only), `batch_provider` (`nightly` only),
+    `eval_provider` (`vertex-eval run` only: it replaces `build_eval_provider`; the gate and cap checks still run)."""
     args = _parser().parse_args(argv)
+    if args.command == "vertex-eval":
+        from .vertex_eval import run_vertex_eval  # noqa: PLC0415
+
+        return run_vertex_eval(args, environ, eval_provider)
     if args.command == "nightly":
         return run_nightly(args, batch_provider)
     if args.command == "generate":
