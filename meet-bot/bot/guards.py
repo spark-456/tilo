@@ -38,7 +38,8 @@ def fakes_refusal() -> str | None:
             "tone, and a fake transcript never reaches a real meeting. Only you set LIVE=1 (README, Providers); use "
             "run-mock to try the bot offline."
         )
-    dev = [n for n in FILE_OVERRIDES if ".dev." in os.environ.get(n, "")]
+    # Only a hint, case-insensitive; the check that counts is what the files resolve to (`providers.start_up_check`).
+    dev = [n for n in FILE_OVERRIDES if ".dev." in os.environ.get(n, "").lower()]
     if dev:
         return f"start and join refuse a dev config file ({', '.join(dev)}): a fake transcript never reaches a meeting."
     return None

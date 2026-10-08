@@ -29,7 +29,7 @@ from collections.abc import AsyncIterator, Callable
 from pathlib import Path
 from typing import Any
 
-from tilo_providers.config import ProvidersConfig, load_providers_config
+from tilo_providers.config import ProviderConfigError, ProvidersConfig, load_providers_config, profiles_used_by
 from tilo_providers.errors import NotConfigured, QuotaError, RequestError, RetryableError
 from tilo_providers.interfaces import GenerateRequest, SpeechProvider
 from tilo_providers.meeting import CallCounter, load_meeting_caps
@@ -126,6 +126,45 @@ def take_call(kind: str) -> bool:
             kind,
         )
     return False
+
+
+def resolved_fakes_refusal() -> str | None:
+    """Why a real meeting must not start on what the config files RESOLVE to, or None. The file-name check in
+    `guards.fakes_refusal` is only a hint (a fake behind an innocent file name passes it); this reads the roles the bot
+    asks for (`meeting`, `meeting_fast`, with their fallbacks) and the speech and voice vendors."""
+    fakes: list[str] = []
+    try:
+        config = load_config()
+        for role in (BRAIN_ROLE, FAST_ROLE):
+            used = profiles_used_by(config.roles[role])
+            if any(config.profiles[profile_id].provider == "fake" for profile_id in used):
+                fakes.append(f"role `{role}`")
+        if load_speech_config(speech_file(), models_path=repo_root() / "config" / "models.yaml").vendor == "fake":
+            fakes.append("the speech vendor")
+        if load_voice_config(voice_file(), models_path=repo_root() / "config" / "models.yaml").vendor == "fake":
+            fakes.append("the voice vendor")
+    except (ProviderConfigError, KeyError) as error:
+        return f"the provider config does not load ({type(error).__name__}): {error}"
+    if fakes:
+        return (
+            f"{', '.join(fakes)} resolve to the dev fake provider (provider `fake`): a fake transcript never reaches "
+            "a real meeting. Use the live config (only you set LIVE=1)."
+        )
+    return None
+
+
+def start_up_check(*, allow_fakes: bool = False) -> None:
+    """Run once when a session starts, before the bot joins anything: builds and validates the meeting's call counter
+    (a bad `config/meeting.yaml` must not surface mid-meeting) and refuses the dev fakes by what the config resolves
+    to. Raises `BotRefused` with a message that says what to change."""
+    try:
+        call_counter()
+    except ProviderConfigError as error:
+        raise BotRefused(f"start-up check failed, nothing was joined: {error}") from None
+    if not allow_fakes:
+        refusal = resolved_fakes_refusal()
+        if refusal:
+            raise BotRefused(f"start-up check failed, nothing was joined: {refusal}")
 
 
 def load_config() -> ProvidersConfig:
@@ -302,8 +341,10 @@ class ProviderTTS:
 
     async def stream(self, text: str) -> AsyncIterator[bytes]:
         spoken = " ".join(text.split())[: self.config.max_chars]
-        if not take_call("speech"):  # permanent: the fallback voice (local, no provider call) speaks for the rest
-            raise TTSError("the meeting's speech call cap is reached (config/meeting.yaml)", permanent=True)
+        if not take_call("speech"):  # the fallback voice (local, no provider call) speaks for the rest of THIS meeting
+            raise TTSError(
+                "the meeting's speech call cap is reached (config/meeting.yaml)", permanent=True, remember=False
+            )
         try:
             pcm = await asyncio.to_thread(self.provider.synthesize, spoken)
         except Exception as error:

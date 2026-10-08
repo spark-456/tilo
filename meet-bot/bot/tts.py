@@ -30,11 +30,13 @@ class TTSError(RuntimeError):
     """Speech could not be produced. The message is safe to show; the chat message is the fallback.
 
     `permanent` marks a refusal that will not clear within the meeting (a voice the plan or key may not use): the
-    fallback voice then speaks for the rest of the meeting and the refusal is remembered for a day."""
+    fallback voice then speaks for the rest of the meeting and the refusal is remembered for a day. `remember=False`
+    keeps it to this meeting (in memory only): the per-meeting call cap is not a fact about the plan or key."""
 
-    def __init__(self, message: str, *, permanent: bool = False) -> None:
+    def __init__(self, message: str, *, permanent: bool = False, remember: bool = True) -> None:
         super().__init__(message)
         self.permanent = permanent
+        self.remember = remember
 
 
 class TTSProvider(Protocol):
@@ -129,7 +131,7 @@ class FallbackTTS:
                     " for the rest of this meeting" if permanent else " this time",
                 )
                 self._primary_dead = permanent
-                if permanent:
+                if permanent and e.remember:
                     self._remember_dead(str(e))
             except StopAsyncIteration:
                 pass

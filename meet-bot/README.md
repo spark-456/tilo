@@ -97,8 +97,14 @@ The bot names no model, vendor or key. `bot/providers.py` is the one module that
   people control next to your own gcloud credentials, until MTG09-c drops that flag outside the container. Never put your own gcloud credentials in the container: they are
   the project Owner's, and the container runs Chromium with `--no-sandbox` behind a VNC session with no password.
 - **A cap per meeting.** `config/meeting.yaml` bounds the provider calls of one meeting (200 model calls, 400 speech
-  calls). At the cap the bot logs one warning and carries on without them: no more answers, the local voice, the
-  transcript still written. SEC-16 spend caps are not wired for the bot (BQ-MTG11-9).
+  calls; one model call is one router call, so a call that tries the primary and then the fallback counts once). At the
+  cap the bot logs one warning and carries on without them: no more answers, the local voice (for the rest of that
+  meeting only, nothing is remembered for the next), the transcript still written. Captions stay the transcript only
+  outside hybrid mode: in hybrid mode (`--stt gemini`) the audio transcript is the transcript, so once the speech cap is
+  reached no further speech is transcribed (the captions still go to `captions.jsonl`, with names and timing only). The
+  config is checked when the session starts, before the bot joins: a bad `config/meeting.yaml`, or a role, speech or voice
+  config that resolves to the dev fake provider, stops the start with a clear error. SEC-16 spend caps are not wired for
+  the bot (BQ-MTG11-9).
 - **No recording.** The bot refuses to start with `TILO_RECORD` set: it would write what people said into `fixtures/`.
 - **Tests** run offline with the repo's venv: `just meet-bot-test` (also part of `just test`).
 - **Docker.** The image carries the provider layer, so the build context is the repository root: `docker compose build`

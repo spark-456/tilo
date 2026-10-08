@@ -6,5 +6,5 @@
 # stay the transcript). The counts are per bot process, which is one meeting. Defaults are conservative: a 60 minute
 # meeting at the bot's own pacing makes well under these. A non-positive or non-integer value fails start-up.
 meeting:
-  max_model_calls: 200 # analysis steps plus direct answers, every attempt counted
+  max_model_calls: 200 # analysis steps plus direct answers, one per router call (a call that tries the primary and then the fallback counts once)
   max_speech_calls: 400 # speech-to-text segments plus voice replies

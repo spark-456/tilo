@@ -22,7 +22,7 @@ KINDS = ("model", "speech")
 
 @dataclass(frozen=True)
 class MeetingCaps:
-    max_model_calls: int  # analysis and direct-answer model calls, every attempt counted
+    max_model_calls: int  # analysis and direct-answer model calls, one per router call (primary plus fallback: one)
     max_speech_calls: int  # speech-to-text segments and voice replies
 
 

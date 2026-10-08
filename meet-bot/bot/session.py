@@ -39,7 +39,7 @@ from .knowledge import KnowledgeBase
 from .llm_fast import FastLLM
 from .people import gate_open, missing_required
 from .playback import write_playback
-from .providers import ProviderFastClient, ProviderLLM, ProviderSpeech, make_router, make_tts
+from .providers import ProviderFastClient, ProviderLLM, ProviderSpeech, make_router, make_tts, start_up_check
 from .speaker import NullSpeaker, VoiceSpeaker
 from .timing import Timeline
 from .trace import Turn, TurnTrace
@@ -248,6 +248,7 @@ class LiveSession:
 
     # -- main ------------------------------------------------------------------------------------------------------
     async def run(self) -> None:
+        start_up_check()  # before anything is opened or joined: the call cap and the resolved providers (FR-MTG-11)
         log.info(
             "required participants: %s | auto-admit: %s | transcript: %s | record audio: %s",
             self.required or "(anyone)",
@@ -329,6 +330,7 @@ class LiveSession:
     # -- hybrid speech-to-text (Gemini, batch) -----------------------------------------------------------------------
     async def _stt_worker(self) -> None:
         speech = ProviderSpeech()
+        last_failure = ""  # the same failure (the speech cap, an outage) is warned about once, not for every segment
         while True:
             a, b = await self.seg_q.get()
             try:
@@ -354,8 +356,11 @@ class LiveSession:
                     end_to_text_s=round(self.elapsed() - b, 2),
                 )
                 self.record(Utterance(speaker or "Speaker", text, a), heard_at=self.start + b)
+                last_failure = ""
             except Exception as e:
-                log.warning("segment %.1f-%.1f could not be transcribed: %s", a, b, e)
+                level = logging.DEBUG if str(e) == last_failure else logging.WARNING
+                last_failure = str(e)
+                log.log(level, "segment %.1f-%.1f could not be transcribed: %s", a, b, e)
 
     # -- typed chat -----------------------------------------------------------------------------------------------
     @staticmethod

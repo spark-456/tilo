@@ -19,7 +19,7 @@ import time
 from pathlib import Path
 
 from .config import IN_CONTAINER, ROOT, Config, load_dotenv, setup_logging
-from .guards import fakes_refusal, recording_refusal
+from .guards import BotRefused, fakes_refusal, recording_refusal
 
 IMAGE = "tilo-meet-bot:latest"
 CONTAINER = "tilo-meet-bot"
@@ -320,6 +320,9 @@ def _live(mode: str, args: argparse.Namespace) -> int:
     except asyncio.CancelledError:
         print("Stopped; left the meeting.")
         return 0
+    except BotRefused as e:
+        print(f"ERROR: {e}")
+        return 2
     except NotLoggedIn as e:
         print(f"ERROR: {e}")
         return 3
