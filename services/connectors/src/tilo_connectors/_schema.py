@@ -93,3 +93,9 @@ def host_rpc_validator(name: str) -> jsonschema.protocols.Validator:
     """One `$defs` entry of meeting_host_rpc.schema.json (ADR-0032): send_request, user_request, send_answer, ..."""
     ref = {"$ref": f"https://contracts.tilo.example/meeting_host_rpc.schema.json#/$defs/{name}"}
     return jsonschema.Draft202012Validator(ref, registry=_registry())
+
+
+@functools.lru_cache(maxsize=8)
+def common_validator(name: str) -> jsonschema.protocols.Validator:  # common.schema.json#/$defs/<name>
+    ref = {"$ref": f"https://contracts.tilo.example/common.schema.json#/$defs/{name}"}
+    return jsonschema.Draft202012Validator(ref, registry=_registry())

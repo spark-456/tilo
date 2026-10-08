@@ -25,6 +25,11 @@ CERT_TIMEOUT_S = 5.0
 MAX_TOKEN_CHARS = 4096
 
 
+class CertsUnavailable(Exception):
+    """Google's certificates cannot be had now (an outage, or inside the retry cooldown): the caller's token is not
+    judged, so the route answers a retryable status instead of a final 401."""
+
+
 class OidcVerifier(Protocol):
     def verify(self, token: str, audience: str) -> Mapping[str, Any]:
         """The verified claims, or any exception: the caller fails closed."""
@@ -65,15 +70,21 @@ class GoogleOidcVerifier:
         return certs
 
     def _certificates(self, kid: str) -> dict[str, str]:
+        held = self._certs  # one read, no lock: a cache hit never waits for a fetch in flight
+        if held is not None and 0 <= self._clock() - held[1] < CERT_TTL_S and kid in held[0]:
+            return held[0]
         with self._lock:
             now = self._clock()
             held = self._certs
             if held is not None and 0 <= now - held[1] < CERT_TTL_S and kid in held[0]:
                 return held[0]
             if 0 <= now - self._tried_at < CERT_RETRY_S:
-                raise ValueError("certificates unavailable")  # an unknown kid or a stale set: refused, not fetched for
+                raise CertsUnavailable("certificates unavailable")  # an unknown kid or a stale set: not fetched for
             self._tried_at = now
-            self._certs = (self._fetch(), now)  # a failed fetch raises here and keeps nothing it did not have
+            try:
+                self._certs = (self._fetch(), now)
+            except Exception:
+                raise CertsUnavailable("certificates unavailable") from None  # keeps nothing it did not have
             return self._certs[0]
 
     def verify(self, token: str, audience: str) -> Mapping[str, Any]:

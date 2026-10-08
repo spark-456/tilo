@@ -34,11 +34,11 @@ from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 from starlette.concurrency import run_in_threadpool
 
-from ._schema import host_rpc_validator
+from ._schema import common_validator, host_rpc_validator
 from ._time import format_ts
 from .adapters.meeting_host import ApprovalBoundBroker, MeetingHostAdapter
 from .errors import OutboxRefused
-from .host_auth import GoogleOidcVerifier, OidcVerifier, caller_status
+from .host_auth import CertsUnavailable, GoogleOidcVerifier, OidcVerifier, caller_status
 from .host_broker import BrokerNotConfigured, BrokerSeam, open_broker, open_transport
 from .meeting_host import CALENDAR_EVENTS_OWNED, CONNECTOR_ID, DRAFT_KIND, HostReceipt
 from .outbox import Outbox
@@ -50,7 +50,13 @@ MAX_PARTS = 16
 AUDIENCE_VAR, CALLER_VAR = "TILO_CONNECTORS_AUDIENCE", "TILO_MEETING_HOST_CALLER"
 _CONNECTION_PARTS = frozenset({"connection.expired", "connection.rate_limited", "connection.revoked"})
 _CONFIG = Path(__file__).resolve().parents[4] / "config" / "connectors.yaml"
-_ERRORS = {401: "unauthenticated", 403: "forbidden", 422: "invalid_request", 503: "not_configured"}
+_ERRORS = {
+    401: "unauthenticated",
+    403: "forbidden",
+    422: "invalid_request",
+    502: "not_configured",
+    503: "not_configured",
+}
 _log = logging.getLogger(__name__)
 
 
@@ -136,7 +142,7 @@ class HostRuntime:
         self._broker = BrokerSeam(env, emit=self._emit, alert=self._alert, opener=broker_opener)
         self._transport = BrokerSeam(env, emit=self._emit, alert=self._alert, opener=lambda e, **_: transport_opener(e))
         self._clock = clock
-        self._closing: set[str] = set()
+        self._closing: dict[str, int] = {}
         self._closing_lock = threading.Lock()
 
     def settings(self) -> tuple[str, str] | None:
@@ -172,7 +178,23 @@ class HostRuntime:
 
     def _stopped(self, user_id: str) -> bool:
         with self._closing_lock:
-            return user_id in self._closing
+            return self._closing.get(user_id, 0) > 0
+
+    @contextlib.contextmanager
+    def closing(self, user_id: str) -> Iterator[None]:
+        """While a disconnect runs, a send that has not fetched its token yet is refused, not retried. Counted, so
+        overlapping disconnects of one user keep it closing until the last ends."""
+        with self._closing_lock:
+            self._closing[user_id] = self._closing.get(user_id, 0) + 1
+        try:
+            yield
+        finally:
+            with self._closing_lock:
+                left = self._closing.get(user_id, 1) - 1
+                if left > 0:
+                    self._closing[user_id] = left
+                else:
+                    self._closing.pop(user_id, None)
 
     # -- the three calls (run in a worker thread) --------------------------------------------------
 
@@ -186,14 +208,8 @@ class HostRuntime:
 
     def disconnect(self, user_id: str) -> dict[str, Any]:
         broker = self._broker.get()
-        with self._closing_lock:
-            self._closing.add(user_id)  # a send that has not fetched its token yet is refused, not retried
-        try:
-            with self.capture(user_id) as parts:
-                result = broker.disconnect(user_id, CONNECTOR_ID)
-        finally:
-            with self._closing_lock:
-                self._closing.discard(user_id)
+        with self.closing(user_id), self.capture(user_id) as parts:
+            result = broker.disconnect(user_id, CONNECTOR_ID)
         return {"revoked_at_provider": bool(result.revoked_at_provider), "parts": parts.items}
 
     def retry_pending_revokes(self, user_id: str) -> int:
@@ -235,15 +251,29 @@ class HostRuntime:
                 outbox.enqueue(dict(entry), dict(evidence))
             except OutboxRefused:
                 return _answer("refused", parts.items)
-            outbox.dispatch_due()
-            settled = outbox.get(entry["id"]) or {}
-        state = settled.get("state")
-        if state == "sent" and receipts.made:
-            receipt = asdict(receipts.made[0])
-            return _answer("sent", parts.items, receipt={**receipt, "draft": dict(receipt["draft"])})
-        if state == "failed":
-            return _answer("possibly_sent" if alerted else "refused", parts.items)
-        return _answer("retry", parts.items, may_have_sent=reach.sent > 0)
+            try:  # from here on Google may have been reached: no exit may say "not configured" (a final refusal)
+                outbox.dispatch_due()
+                answer = _outcome(outbox.get(entry["id"]) or {}, receipts, alerted, parts.items, reach.sent > 0)
+                if not host_rpc_validator("send_answer").is_valid(answer):
+                    raise ValueError("the answer breaks its contract")
+                return answer
+            except Exception as exc:  # noqa: BLE001 - the type only
+                _log.error("a send failed after dispatch began (%s)", type(exc).__name__)
+                if reach.sent:
+                    return _answer("possibly_sent", parts.items)
+                return _answer("retry", parts.items, may_have_sent=False)
+
+
+def _outcome(
+    settled: Mapping[str, Any], receipts: _Receipts, alerted: list[Any], parts: list[dict[str, str]], reached: bool
+) -> dict[str, Any]:
+    state = settled.get("state")
+    if state == "sent" and receipts.made:
+        receipt = asdict(receipts.made[0])
+        return _answer("sent", parts, receipt={**receipt, "draft": dict(receipt["draft"])})
+    if state == "failed":
+        return _answer("possibly_sent" if alerted else "refused", parts)
+    return _answer("retry", parts, may_have_sent=reached)
 
 
 def _answer(
@@ -268,7 +298,11 @@ def _checked_draft(entry: Mapping[str, Any], draft: Mapping[str, Any]) -> dict[s
         document = json.loads(raw)
     except (binascii.Error, ValueError, KeyError, AttributeError, TypeError, RecursionError):
         return None
-    return document if isinstance(document, dict) and document.get("kind") == DRAFT_KIND else None
+    if not (isinstance(document, dict) and document.get("kind") == DRAFT_KIND):
+        return None
+    # the receipt echoes these two: they must fit the contract before anything is enqueued or sent
+    fits = common_validator("meeting_id").is_valid(document.get("meeting_id"))
+    return document if fits and common_validator("user_id").is_valid(document.get("owner")) else None
 
 
 def _error(status: int) -> JSONResponse:
@@ -303,16 +337,19 @@ def host_router(runtime: HostRuntime) -> APIRouter:
         try:
             claims = await run_in_threadpool(runtime.verifier.verify, token, audience)
             refused = caller_status(claims, audience=audience, caller=caller)
+        except CertsUnavailable:  # Google's certificates cannot be had now: retryable, never a final 401
+            return _error(502)
         except Exception:  # noqa: BLE001 - whatever is wrong with the token, the answer is the same
             return _error(401)
         if refused is not None:
             return _error(refused)
-        raw = await _read_body(request)
         try:
+            raw = await _read_body(request)
             body = json.loads(raw) if raw is not None else None
-        except (ValueError, RecursionError):
-            body = None
-        if body is None or not host_rpc_validator(request_def).is_valid(body):
+            valid = body is not None and host_rpc_validator(request_def).is_valid(body)
+        except Exception:  # noqa: BLE001 - not JSON, too deep, a dropped connection: nothing was done
+            valid = False
+        if not valid:
             return _error(422)
         try:
             answer = await run_in_threadpool(work, body)

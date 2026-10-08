@@ -443,11 +443,19 @@ def test_ADR32_T3_FR_MTG_09_a_failed_revoke_is_kept_and_alerted_and_the_hook_ret
 
 def test_ADR32_T3_FR_MTG_09_a_send_after_a_disconnect_began_is_refused_not_retried() -> None:
     rig = Rig()
-    rig.runtime._closing.add(OWNER)  # what disconnect sets while it runs
-    answer = rig.send()
-    assert answer["outcome"] == "refused" and rig.cal.requests == []
-    rig.runtime._closing.discard(OWNER)
+    with rig.runtime.closing(OWNER):
+        answer = rig.send()
+        assert answer["outcome"] == "refused" and rig.cal.requests == []
     assert rig.send()["outcome"] == "sent"
+
+
+def test_ADR32_T3_FR_MTG_09_overlapping_disconnects_keep_the_user_closing_until_the_last_ends() -> None:
+    rig = Rig()
+    with rig.runtime.closing(OWNER):
+        with rig.runtime.closing(OWNER):
+            pass
+        assert rig.runtime._stopped(OWNER)
+    assert not rig.runtime._stopped(OWNER)
 
 
 # ---- nothing secret crosses -------------------------------------------------------------------
@@ -480,7 +488,7 @@ def test_ADR32_T3_FR_MTG_09_an_unexpected_failure_is_a_fixed_503_that_names_only
     def boom(*_: Any, **__: Any) -> Any:
         raise RuntimeError(leak)
 
-    rig.runtime.status = boom  # type: ignore[method-assign]
+    rig.runtime.status = boom  # type: ignore[method-assign,assignment]
     response = rig.call("status", user_body())
     assert (response.status_code, response.json()) == (503, {"error": "not_configured"})
     assert leak not in response.text + caplog.text and "RuntimeError" in caplog.text
@@ -651,3 +659,115 @@ def test_ADR32_T3_FR_MTG_09_a_persons_disconnect_leaves_the_bot_grant_and_revoke
     assert client.docs[("token_grants", "u_owner", "connectors", "meeting_host")] == bot
     assert http.calls.count(REVOKE_URL) == 1  # the person's own grant only
     assert broker.access_token_for_adapter("u_owner", "meeting_host", required_scopes=[CALENDAR_EVENTS_OWNED])
+
+
+# ---- security round 1: no 503 once Google may have been reached --------------------------------
+
+
+def test_ADR32_T3_FR_MTG_09_a_draft_field_the_receipt_echoes_must_fit_its_contract_before_anything_is_enqueued() -> (
+    None
+):
+    for change in (
+        {"meeting_id": "MEETING-1"},
+        {"meeting_id": "mt_" + "x" * 60},
+        {"owner": "U OWNER"},
+        {"meeting_id": 7},
+    ):
+        rig = Rig()
+        answer = rig.send(with_draft(BASE, **change))
+        assert answer["outcome"] == "refused" and rig.cal.requests == [], change
+
+
+def test_ADR32_T3_FR_MTG_09_a_failure_after_the_post_is_never_503_not_configured(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from tilo_connectors import host_routes
+    from tilo_connectors.store import InMemoryOutboxStore
+
+    rig = Rig()
+    monkeypatch.setattr(host_routes.Outbox, "get", lambda self, outbox_id: (_ for _ in ()).throw(RuntimeError("x")))
+    response = rig.call("send", BASE)
+    assert response.status_code == 200 and response.json()["outcome"] == "possibly_sent" and rig.cal.posts()
+    monkeypatch.undo()
+
+    rig2 = Rig()  # the store fails to settle the entry after a successful send
+
+    def boom(self: Any, *a: Any, **k: Any) -> Any:
+        raise RuntimeError("store down")
+
+    monkeypatch.setattr(InMemoryOutboxStore, "_finalize_claim", boom)
+    response2 = rig2.call("send", BASE)
+    assert response2.status_code == 200 and response2.json()["outcome"] == "possibly_sent" and rig2.cal.posts()
+
+
+def test_ADR32_T3_FR_MTG_09_a_failure_before_anything_reached_google_is_a_retry_that_sent_nothing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from tilo_connectors import host_routes
+
+    rig = Rig()
+    monkeypatch.setattr(host_routes.Outbox, "get", lambda self, outbox_id: (_ for _ in ()).throw(RuntimeError("x")))
+    rig.env.clock.set(NOW)
+    rig.cal.fail_next(401, times=9)  # Google never accepts: the request left, so it may have acted
+    answer = rig.send()
+    assert answer["outcome"] in ("possibly_sent", "retry")
+
+
+def test_ADR32_T3_FR_MTG_09_a_409_followed_by_a_refusal_is_possibly_sent() -> None:
+    rig = Rig()
+    assert rig.send()["outcome"] == "sent"
+    calls = iter([False, True])  # the insert gets its token, the read of the earlier event does not
+    rig.runtime._stopped = lambda user: next(calls)  # type: ignore[method-assign,assignment]
+    assert rig.send()["outcome"] == "possibly_sent"
+
+
+def test_ADR32_T3_FR_MTG_09_a_certificate_outage_is_not_a_401() -> None:
+    from tilo_connectors.host_auth import CertsUnavailable
+
+    token, _ = _signed({"iss": "https://accounts.google.com", "aud": AUD})
+    verifier = GoogleOidcVerifier(transport=_Certs({}, status=500), clock=lambda: 0.0)
+    with pytest.raises(CertsUnavailable):
+        verifier.verify(token, AUD)
+    with pytest.raises(CertsUnavailable):  # inside the cooldown
+        verifier.verify(token, AUD)
+    rig = Rig()
+    rig.verifier.verify = lambda t, a: (_ for _ in ()).throw(CertsUnavailable("x"))  # type: ignore[method-assign,assignment]
+    response = rig.call("status", user_body())
+    assert response.status_code == 502 and response.json() == {"error": "not_configured"}
+
+
+def test_ADR32_T3_FR_MTG_09_a_cached_certificate_never_waits_for_a_fetch_in_flight() -> None:
+    token, certs = _signed({"iss": "https://accounts.google.com", "aud": AUD})
+    verifier = GoogleOidcVerifier(transport=_Certs(certs), clock=lambda: 1.0)
+    verifier.verify(token, AUD)
+    assert verifier._lock.acquire(blocking=False)  # a fetch for another kid holds the lock
+    try:
+        done: list[bool] = []
+        thread = threading.Thread(target=lambda: done.append(bool(verifier.verify(token, AUD))))
+        thread.start()
+        thread.join(timeout=5)
+        assert done == [True]
+    finally:
+        verifier._lock.release()
+
+
+def test_ADR32_T3_FR_MTG_09_unknown_paths_and_methods_get_contract_shaped_bodies_and_no_redirect() -> None:
+    rig = Rig()
+    for method, path, status in (
+        ("get", "/internal/meeting-host/send", 405),
+        ("post", "/internal/meeting-host/send/", 404),
+        ("post", "/internal/meeting-host/nope", 404),
+    ):
+        response = getattr(rig.client, method)(path, follow_redirects=False)
+        assert response.status_code == status and response.json() == {"error": "invalid_request"}
+
+
+def test_ADR32_T3_FR_MTG_09_an_unexpected_error_while_validating_is_never_a_500(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from tilo_connectors import host_routes
+
+    rig = Rig()
+    monkeypatch.setattr(host_routes, "host_rpc_validator", lambda name: (_ for _ in ()).throw(RecursionError()))
+    response = rig.call("status", user_body())
+    assert response.status_code == 422 and response.json() == {"error": "invalid_request"}

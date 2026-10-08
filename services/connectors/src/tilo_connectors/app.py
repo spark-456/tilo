@@ -7,14 +7,21 @@ is configured in full (`host_routes`). Other connector routes land with their ow
 
 from __future__ import annotations
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from .host_routes import HostRuntime, host_router
 
 
 def create_app(runtime: HostRuntime | None = None) -> FastAPI:
     # No generated docs: the service may be public, and the route list is not for strangers (issue #411).
-    app = FastAPI(title="tilo-connectors", docs_url=None, redoc_url=None, openapi_url=None)
+    app = FastAPI(title="tilo-connectors", docs_url=None, redoc_url=None, openapi_url=None, redirect_slashes=False)
+
+    @app.exception_handler(StarletteHTTPException)
+    async def not_found_or_not_allowed(request: Request, exc: StarletteHTTPException) -> JSONResponse:
+        # a contract-shaped body (meeting_host_rpc error), never a framework page that names the stack
+        return JSONResponse({"error": "invalid_request"}, status_code=exc.status_code, headers=exc.headers)
 
     @app.get("/health")  # Cloud Run reserves /healthz on run.app; the smoke check uses /health (#397)
     @app.get("/healthz")

@@ -119,7 +119,12 @@ class MeetingHostAdapter(GoogleAdapter):
                 raise SideEffectRefused(f"MH-13: Google refused the invitation ({error.status})") from None
             if error.status != 409:  # a lost answer or a 5xx is ambiguous: retried, and the retry lands on 409
                 raise
-            answer = self._earlier_event(owner, scopes, marker)
+            try:
+                answer = self._earlier_event(owner, scopes, marker)
+            except SideEffectRefused as refusal:  # the 409 proves an earlier attempt made the event: never "refused"
+                if isinstance(refusal, PossiblySent):
+                    raise
+                raise PossiblySent("MH-13: the earlier event cannot be read") from None
         if answer.get("id") != marker:  # MH-14
             raise PossiblySent("MH-14: Google answered another event")
         status = (((answer.get("conferenceData") or {}).get("createRequest") or {}).get("status") or {}).get(
