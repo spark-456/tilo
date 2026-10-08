@@ -102,8 +102,7 @@ def _open(kind: str, project: str) -> ScheduleRepository:
 
 def get_schedule_store() -> ScheduleRepository:
     """Memory by name, or in dev mode by default (never deployed or live); Firestore only by explicit config. Read on
-        every call; a success is cached per config, a refusal never is (503
-    ot_configured`)."""
+    every call; a success is cached per config, a refusal never is (503 `not_configured`)."""
     kind = os.environ.get("TILO_SCHEDULES_STORE") or ""
     if not kind and dev.dev_enabled():
         try:
@@ -355,12 +354,23 @@ MIN_APPROACHES, MAX_APPROACHES, MAX_APPROACH_BYTES = 2, 3, 16_384  # plan.schema
 
 
 def _plannable(offered: object, chosen: dict[str, Any] | None) -> bool:
-    """The list a plan is compiled against: 2 to 3 bounded dicts with the chosen approach among them by id."""
-    if not isinstance(offered, list) or not MIN_APPROACHES <= len(offered) <= MAX_APPROACHES or chosen is None:
+    """The list a plan is compiled against: 2 to 3 bounded dicts with unique str ids, and the entry for the chosen
+    approach EQUAL to it (the planner plans from the list entry). Anything odd, even a nesting too deep, is False."""
+    if not isinstance(offered, list) or not MIN_APPROACHES <= len(offered) <= MAX_APPROACHES or not chosen:
         return False
-    if not all(isinstance(a, dict) and len(json.dumps(a, default=str)) <= MAX_APPROACH_BYTES for a in offered):
+    try:
+        if not all(isinstance(a, dict) and isinstance(a.get("id"), str) for a in offered):
+            return False
+        ids = [a["id"] for a in offered]
+        if len(set(ids)) != len(ids) or chosen.get("id") not in ids:
+            return False
+        if offered[ids.index(chosen["id"])] != chosen:
+            return False
+        return all(
+            len(json.dumps(a, default=str, ensure_ascii=False).encode("utf-8")) <= MAX_APPROACH_BYTES for a in offered
+        )
+    except (RecursionError, TypeError, ValueError):
         return False
-    return any(a.get("id") == chosen.get("id") for a in offered)
 
 
 def _mine(schedules: ScheduleRepository, schedule_id: str, principal: deps.Principal) -> Schedule:
@@ -386,16 +396,18 @@ def create_schedule(
         raise HTTPException(status_code=404, detail="No such task.")
     deps.refuse_if_replay_only(flags)  # NFR-24: after sign-in and the owner check
     with task.lock:
-        approach = next((a for a in task.approaches or [] if a["id"] == body.approach_id), None)
+        approach = next(
+            (a for a in task.approaches or [] if isinstance(a, dict) and a.get("id") == body.approach_id), None
+        )
         grants = [e for e in store.events.get(task.world_id, []) if e["type"] == "budget.granted"]
         if not task.granted or not grants:
             raise HTTPException(status_code=409, detail="Approve this task's budget first.")
         if approach is None:
             raise HTTPException(status_code=422, detail="Pick one of the approaches this task was offered.")
+        if not _plannable(task.approaches, approach):  # before any copy: a hostile nesting must not reach deepcopy
+            raise HTTPException(status_code=409, detail="This task's approaches cannot be scheduled.")
         offered = copy.deepcopy(task.approaches)
         brief, approach, cap = copy.deepcopy(task.brief), copy.deepcopy(approach), grants[0]["data"]["cap"]
-    if not _plannable(offered, approach):
-        raise HTTPException(status_code=409, detail="This task's approaches cannot be scheduled.")
     cadence, now = body.cadence.build(), clock()
     try:
         record = Schedule(
@@ -754,8 +766,9 @@ _REFUSALS = frozenset(
         "snapshot_incomplete",
     }
 )
-# not a missing or disabled one
-_RECORDED = frozenset({"owner_mismatch", "budget_not_granted", "snapshot_missing", "snapshot_incomplete"})
+_RECORDED = frozenset(
+    {"owner_mismatch", "budget_not_granted", "snapshot_missing", "snapshot_incomplete"}
+)  # not a missing or disabled one
 _CLOCK_SLACK = timedelta(seconds=60)  # a slot this far ahead is the clocks of two instances, not a forged future
 _ALERTS = threading.Lock()  # one instance's duplicate deliveries raise the missed-slots alert once
 
