@@ -1,10 +1,8 @@
 # ADR-0032: The meeting-host token broker stays in tilo-connectors; tilo-api reaches it over an internal RPC
 
-- Status: **Proposed (2026-10-08), needs the user's approval.** The choice is the supervisor's; the design is the
-  architect's. It amends ADR-0024 (which service runs the `meeting_host` adapter's token use) and supersedes
-  BQ-MTG09-21 (the two tilo-api seams). This commit is docs only: ticket T1 adds one contract and T5 changes
-  `infra/`, and neither starts before the user says yes. Next free ADR number on every branch and open PR at
-  2026-10-08 (0028 to 0031 are open PRs #671, #684, #679, #683); the merger may renumber.
+- Status: Accepted (user approved 8 Oct 2026, in the supervisor chat, including the infra test change in decision 9).
+  It amends ADR-0024 (which service runs the `meeting_host` adapter's token use) and supersedes BQ-MTG09-21.
+  Ticket T1 adds one contract and T5 changes `infra/`. The merger may renumber.
 - Deciders: user (approval, including the infra test change in decision 9), supervisor (the choice), architect
 - Requirement: FR-MTG-09; SEC-02, SEC-03, SEC-11, SEC-12; FR-CON-02; EFF-01; PRD 6.1, 6.5 (Identity), 12.1 (Token
   broker), 15, 16.1 rule 2; CON-D9, CON-D10; ADR-0002 decision 11, ADR-0024 (decision 4, amendment 4), ADR-0026
