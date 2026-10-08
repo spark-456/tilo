@@ -33,3 +33,13 @@ describe("FR_HIL_12 wiring", () => {
     expect(metas()).toHaveLength(0);
   });
 });
+
+describe("FR_HIL_12 the assistant never gets the token", () => {
+  it("FR_HIL_12 the assistant context for a shared link has a plain label and no token in the route", async () => {
+    const { contextOf } = await import("../assistant/context");
+    const ctx = contextOf(`/share/${TOKEN}`, null);
+    expect(ctx.label).toBe("Shared request");
+    expect(ctx.route).toBe("/share");
+    expect(JSON.stringify(ctx)).not.toContain(TOKEN);
+  });
+});
