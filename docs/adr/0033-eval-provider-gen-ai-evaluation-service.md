@@ -1,7 +1,7 @@
 # ADR-0033: EvalProvider, the Gen AI evaluation service behind packages/providers
 
-- Status: Proposed (architect, 2026-10-08). It changes no contract, so it needs no user gate. It
-  becomes Accepted when the docs PR for VERTEX-EVAL-1 merges.
+- Status: Accepted (user approved 8 Oct 2026, with the cheaper judge: BQ-VEVAL-3). It changes no
+  contract.
 - Deciders: architect; the user approved the feature (VERTEX-EVAL-1).
 - Requirements:
   - PRD 6.3 (the Gen AI evaluation service: "Autoraters for plan quality and groundedness")
