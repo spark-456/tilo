@@ -70,7 +70,12 @@ describe("WEB_10_team_invite: email, validation, pending row", () => {
     async (value) => {
       const app = makeApp();
       const { root } = await renderTeam(app);
-      await invite(root, value);
+      // FR-TEAM-01: the button is disabled while invalid, so the prompt comes from the Enter key.
+      const field = inputNamed(root, "Invite by email");
+      await typeInto(field, value);
+      expect(buttonNamed(root, COPY.invite).disabled).toBe(true);
+      await act(async () => press(field, "Enter"));
+      await settle();
       expect(app.toast).toHaveBeenCalledTimes(1);
       expect(app.toast).toHaveBeenCalledWith("Enter a work email to invite");
       expect(memberRows(root)).toHaveLength(PEOPLE.length);

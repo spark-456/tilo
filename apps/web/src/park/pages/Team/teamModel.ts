@@ -145,3 +145,19 @@ export function memberViews(
     };
   });
 }
+
+const hasControl = (v: string): boolean => /[\p{Cc}\p{Cf}]/u.test(v);
+const EMAIL = /^[^\s@]+@[^\s@.]+(\.[^\s@.]+)*\.[^\s@.]{2,}$/;
+
+/** FR-TEAM-01: an invite needs a plausible work email. Surrounding spaces are ignored; empty, inner spaces,
+ * control characters, no @ or no dotted domain, and anything over 254 characters are not valid. No network. */
+export function isValidEmail(value: string): boolean {
+  if (hasControl(value)) return false;
+  const v = value.trim();
+  return v.length > 0 && v.length <= 254 && EMAIL.test(v);
+}
+
+/** FR-TEAM-01: removing a person hands each of their worlds to the Owner (a new list; the input is not changed). */
+export function reassignWorlds(worlds: readonly World[], from: string, toOwner: string): World[] {
+  return worlds.map((w) => (w.owner === from ? { ...w, owner: toOwner } : w));
+}
