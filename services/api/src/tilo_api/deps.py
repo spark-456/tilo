@@ -41,7 +41,7 @@ from tilo_planning.gaps import Gap
 from tilo_planning.memory import InMemoryPreferenceStore, MemoryLookup
 from tilo_planning.questions import Question
 from tilo_providers.config import ProviderConfigError, ProvidersConfig, load_providers_config, resolve_models_path
-from tilo_providers.interfaces import SafetyProvider
+from tilo_providers.interfaces import SafetyProvider, SpeechProvider
 from tilo_providers.router import Router, RouterExhaustedError
 from tilo_providers.safety import build_safety_provider
 
@@ -578,6 +578,12 @@ class DeskWorlds(Protocol):
 
 def get_desk_worlds() -> DeskWorlds:
     raise HTTPException(status_code=503, detail="not_configured")  # production wiring lands with the Desk
+
+
+def get_speech() -> SpeechProvider:
+    """FR-MTG-17: the `SpeechProvider` behind a recording upload (`config/speech.yaml`). Not wired in production yet:
+    503 `not_configured`, so a recording is refused and a text upload is unaffected; tests use `FakeSpeechProvider`."""
+    raise HTTPException(status_code=503, detail="not_configured")
 
 
 def get_run_archive() -> Callable[..., RunArchive]:

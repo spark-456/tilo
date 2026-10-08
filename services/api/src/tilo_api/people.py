@@ -20,6 +20,7 @@ from tilo_people.stores import PeopleStores
 
 from tilo_api import deps, people_items
 from tilo_api.meeting_host import HostSeams, get_host_seams, host_meeting
+from tilo_api.meeting_transcript import TranscriptSeams, Upload, get_transcript_seams, read_upload, store_upload
 from tilo_api.people_events import WorkEvents, get_work_events
 from tilo_api.people_limits import idempotent, write_limit
 from tilo_api.people_meetings import MeetingEditIn, edit_meeting, get_meeting, read_minutes, set_world
@@ -261,6 +262,28 @@ def host_meeting_route(
     if _MEETING_ID.fullmatch(meeting_id) is None:
         raise _not_found()
     return _answer(lambda: host_meeting(_writer(principal, stores, clock), meeting_id, seams))
+
+
+@router.post("/v1/meetings/{meeting_id}/transcript", status_code=201)
+def upload_transcript_route(
+    meeting_id: str,
+    request: Request,
+    principal: Annotated[deps.Principal, Depends(deps.get_current_principal)],
+    stores: Annotated[PeopleStores, Depends(deps.get_people_stores)],
+    seams: Annotated[TranscriptSeams, Depends(get_transcript_seams)],
+    clock: Annotated[Callable[[], str], Depends(deps.get_clock)],
+    upload: Annotated[Upload, Depends(read_upload)],
+) -> dict[str, Any]:
+    """The owner uploads a transcript file or a recording (FR-MTG-02, FR-MTG-17): the raw body, the `Content-Type` picks
+    the path, its own caps (415, 413) apply before the body is read; the answer is ids and counts only."""
+    if _MEETING_ID.fullmatch(meeting_id) is None:
+        raise _not_found()
+    w = _writer(principal, stores, clock)
+    return _answer(
+        lambda: idempotent(
+            request, principal, stores, upload.fingerprint(), lambda: store_upload(w, seams, meeting_id, upload)
+        )
+    )
 
 
 @router.post("/v1/meetings/{meeting_id}/delete")

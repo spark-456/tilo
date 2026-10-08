@@ -182,17 +182,17 @@ class ItemIn(_Closed):
 MAX_BODY_BYTES = 32768  # BQ-PPL11C-1: a people POST body over this is a 413, whatever the route
 
 
-async def _capped_body(request: Request) -> bytes:
-    """The body, refused once it passes the cap: by the declared length before any read, else by counting as it
+async def _capped_body(request: Request, limit: int = MAX_BODY_BYTES) -> bytes:
+    """The body, refused once it passes `limit`: by the declared length before any read, else by counting as it
     streams, so a client that keeps sending is cut after the cap (and one read-ahead chunk)."""
     declared = request.headers.get("content-length", "")
-    if declared.isdigit() and int(declared) > MAX_BODY_BYTES:
+    if declared.isdigit() and int(declared) > limit:
         raise Refusal(413, "body_too_large")
     chunks: list[bytes] = []
     size = 0
     async for chunk in request.stream():
         size += len(chunk)
-        if size > MAX_BODY_BYTES:
+        if size > limit:
             raise Refusal(413, "body_too_large")
         chunks.append(chunk)
     return b"".join(chunks)

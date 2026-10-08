@@ -210,12 +210,46 @@ def ingest_transcript(
         raise TranscriptRejected("The meeting id is not valid.")
     parsed = parse_transcript(kind, data, state=state)
     content = normalise_segments(parsed.segments, meeting_id=meeting_id, what="transcript")
+    payload = _payload(content)
+    lines = [f"{u['speaker']}: {u['text']}" for u in content["utterances"]]
+    flagged, reason = _screen([*lines, *([parsed.title] if parsed.title else [])], safety)
+    origin: dict[str, Any] = {"kind": kind, "size_bytes": len(data), "sha256": hashlib.sha256(data).hexdigest()}
+    if parsed.skipped:
+        origin["skipped_lines"] = parsed.skipped
+    return store_transcript(
+        content, origin, flagged=flagged, reason=reason, title=parsed.title, scope=scope, run_id=run_id, store=store,
+        ts=ts, actor=actor, seq=seq, cause=cause, parent=parent, payload=payload,
+    )  # fmt: skip
+
+
+def _payload(content: dict[str, Any]) -> bytes:
     payload = json.dumps(content, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
     if len(payload) > MAX_TEXT:
         raise TranscriptRejected("The transcript is too large to store.")
-    lines = [f"{u['speaker']}: {u['text']}" for u in content["utterances"]]
-    flagged, reason = _screen([*lines, *([parsed.title] if parsed.title else [])], safety)
+    return payload
 
+
+def store_transcript(
+    content: dict[str, Any],
+    origin: dict[str, Any],
+    *,
+    flagged: bool,
+    reason: str | None,
+    title: str | None = None,
+    scope: Scope,
+    run_id: str,
+    store: Any,
+    ts: str,
+    actor: str,
+    seq: int,
+    cause: str | None = None,
+    parent: dict[str, Any] | None = None,
+    payload: bytes | None = None,
+) -> TranscriptIngest:
+    """The one store step for every source (FR-MTG-02 files, FR-MTG-17 recordings): `content` is an already normalised
+    and already screened Transcript (`flagged`/`reason` are that screen's verdict; the store's own verdict on the stored
+    bytes can only raise it), `origin` the upload's record without `utterances` (set here from what is stored)."""
+    payload = _payload(content) if payload is None else payload
     hint = "flagged" if flagged else None  # the store can only raise to flagged: its whole-payload screen may miss it
     new = NewVersion("application/json", payload, run_id, Origin(kind="upload"), parent=parent, screening_hint=hint)
     stored = store.put(scope, new)
@@ -224,14 +258,7 @@ def ingest_transcript(
         flagged, reason = True, "flagged by the safety provider"
     if record["redacted"]:  # report what is stored, not what was parsed
         content = json.loads(store.read(scope, stored.ref))
-    origin: dict[str, Any] = {
-        "kind": kind,
-        "size_bytes": len(data),
-        "sha256": hashlib.sha256(data).hexdigest(),
-        "utterances": len(content["utterances"]),
-    }
-    if parsed.skipped:
-        origin["skipped_lines"] = parsed.skipped
+    origin = {**origin, "utterances": len(content["utterances"])}
 
     ref = stored.ref
     summary = (
@@ -254,4 +281,4 @@ def ingest_transcript(
         cause=cause,
         data=event_data,
     )
-    return TranscriptIngest(ref, content, origin, flagged, reason, parsed.title, [event])
+    return TranscriptIngest(ref, content, origin, flagged, reason, title, [event])

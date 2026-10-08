@@ -102,7 +102,9 @@ def test_PPL_11c_s4_BQ_PPL11C_1_every_people_post_route_is_in_the_body_cap_list(
     """A guard (passes once S1 to S3 and S6 have landed, and must keep passing): a people POST route added later
     without a line in `BODY_ROUTES` would silently have no cap. `/v1/assistant/ask` is PPL-11b's, not a people write."""
     rig = people_rig()
-    not_people_writes = {"/v1/assistant/ask"}
+    # the transcript upload takes a raw file under its own caps (415, 413 at 4,000,000 bytes or the speech cap):
+    # test_FR_MTG_02_ROUTE_upload.py
+    not_people_writes = {"/v1/assistant/ask", "/v1/meetings/{meeting_id}/transcript"}
     templates = [
         t
         for t, methods in rig.app.openapi()["paths"].items()
