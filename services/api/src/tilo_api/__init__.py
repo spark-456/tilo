@@ -28,6 +28,7 @@ from tilo_api.console import build_router as _build_console_router
 from tilo_api.costs import router as _costs_router
 from tilo_api.dispatch import router as _dispatch_router
 from tilo_api.effort import router as _effort_router
+from tilo_api.feedback import router as _feedback_router
 from tilo_api.intake import router as intake_router
 from tilo_api.log_context import LogContext as _LogContext
 from tilo_api.log_context import LogRunId as _LogRunId
@@ -110,6 +111,7 @@ app.include_router(_runs.router)
 app.include_router(_assistant_router)
 app.include_router(_people.router)
 app.include_router(_effort_router)
+app.include_router(_feedback_router)
 app.include_router(_schedules.router)
 
 

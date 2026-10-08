@@ -52,6 +52,7 @@ export const API_METHODS = [
   "bookSlot",
   "addBackup",
   "setPref",
+  "submitFeedback",
 ] as const;
 export type ApiMethod = (typeof API_METHODS)[number];
 
@@ -79,4 +80,6 @@ export interface Api {
   bookSlot(slot: AgendaSlot): R<Ack>;
   addBackup(personId: string): R<Ack>;
   setPref(key: string, value: unknown): R<Ack>;
+  /** SEC-16: the lifetime-cap pop-up's feedback; confirmed only by a `source: "live"` answer. */
+  submitFeedback(words: string): R<Ack>;
 }

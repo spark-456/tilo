@@ -2,12 +2,18 @@
 // error rule: what happened, what Tilo did, what is next). Nothing here ever rejects unhandled
 // or logs to the console.
 import { useCallback, useEffect, useRef, useState } from "react";
-import { TiloApiError } from "../api/http";
+import { TiloApiError, isLifetimeCap } from "../api/http";
 import { useNavigate } from "../router";
 
 export type Remote<T> =
   | { readonly status: "loading" }
-  | { readonly status: "error"; readonly message: string; readonly replayOnly?: boolean }
+  | {
+      readonly status: "error";
+      readonly message: string;
+      readonly replayOnly?: boolean;
+      /** SEC-16: the failure is the lifetime allowance (403 `spend_cap_reached`): the pop-up replaces the error. */
+      readonly lifetimeCap?: boolean;
+    }
   | { readonly status: "ready"; readonly value: T };
 
 /** UX-2 / PRD 18.2: the 120 ms press. Busy feedback is held at least this long. */
@@ -56,6 +62,7 @@ export function useRemote<T>(
             status: "error",
             message: describeError(doing, e),
             replayOnly: isReplayOnly(e),
+            lifetimeCap: isLifetimeCap(e),
           }),
       );
     return () => {
@@ -71,6 +78,8 @@ export interface Action {
   readonly error: string | null;
   /** The failed start was the replay-only label: show the banner, not `error`. */
   readonly replayOnly?: boolean;
+  /** SEC-16: the failed start was the lifetime allowance: show the pop-up, not `error`. */
+  readonly lifetimeCap?: boolean;
   readonly go: () => void;
 }
 
@@ -81,6 +90,7 @@ export function useAction(doing: string, run: () => Promise<string | null>): Act
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [replayOnly, setReplayOnly] = useState(false);
+  const [lifetimeCap, setLifetimeCap] = useState(false);
   const busyRef = useRef(false);
   const live = useRef(true);
   useEffect(() => {
@@ -98,6 +108,7 @@ export function useAction(doing: string, run: () => Promise<string | null>): Act
     setBusy(true);
     setError(null);
     setReplayOnly(false);
+    setLifetimeCap(false);
     const hold = new Promise<void>((resolve) => setTimeout(resolve, PRESS_MS));
     // Failure waits out the press too, so the busy feedback is never a flicker.
     const outcome = Promise.resolve()
@@ -120,8 +131,9 @@ export function useAction(doing: string, run: () => Promise<string | null>): Act
       setBusy(false);
       setError(describeError(doing, result.e));
       setReplayOnly(isReplayOnly(result.e));
+      setLifetimeCap(isLifetimeCap(result.e));
     });
   }, [doing, navigate]);
 
-  return { busy, error, replayOnly, go };
+  return { busy, error, replayOnly, lifetimeCap, go };
 }

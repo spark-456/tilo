@@ -46,10 +46,10 @@ def write(tmp_path, **changes):
     return path
 
 
-def test_SEC_16_the_shipped_config_gives_each_uid_a_lifetime_cap_of_1000_inr_in_minor_units():
+def test_SEC_16_the_shipped_config_gives_each_uid_a_lifetime_cap_of_3000_inr_in_minor_units():
     assert CONFIG.is_file(), "config/spend_caps.yaml is missing: the caps must come from config"
     caps = load(None)  # the default path is the shipped file
-    assert caps.uid_lifetime_minor == 100_000, "1,000 INR is 100,000 paise (PRD supplement SEC-16)"
+    assert caps.uid_lifetime_minor == 300_000, "3,000 INR is 300,000 paise (the user, 8 Oct; BQ-SEC16-3)"
     for name in (
         "run_minor",
         "global_day_hard_minor",

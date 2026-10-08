@@ -4,6 +4,7 @@
 // the store and the Api. The notifications and the user come through the Api on mount, so a fixture Api
 // raises the "Sample data" chip without any page asking for data. The city's cars and walkers run on Home (cityMotion.ts).
 import { type ReactNode, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { LifetimeCapDialog } from "../../components/LifetimeCapDialog";
 import type { Decision, Notification, User } from "../api/types";
 import type { PageId } from "../app/AppCtx";
 import { endSession, useApp, useExpectsSample, useParkApi, useParkStore } from "../app/context";
@@ -249,6 +250,16 @@ export function AppShell({ children }: { children: ReactNode }) {
           {...(toast.actionLabel !== undefined ? { actionLabel: toast.actionLabel } : {})}
           {...(toast.action !== undefined ? { onAction: toast.action } : {})}
           onDismiss={store.dismissToast}
+        />
+      ) : null}
+      {state.lifetimeCap ? (
+        <LifetimeCapDialog
+          submit={async (words) => {
+            const answer = await api.submitFeedback(words);
+            // HR-1: only the server's own answer is a confirmation; a fixture answer is not.
+            if (answer.source !== "live") throw new Error("not confirmed by the server");
+          }}
+          onClose={store.dismissLifetimeCap}
         />
       ) : null}
       {card ? (
