@@ -14,13 +14,14 @@ from typing import Any, Literal
 
 import yaml
 
-from tilo_api.assistant.words import question_key
+from tilo_api.assistant.words import MAX_KEY, question_key
 
 _CONFIG = Path(__file__).resolve().parents[4] / "config" / "quick.yaml"
 REASONS = frozenset(
     {"attachments", "side_effect", "deliverable", "needs_tools", "multi_step", "too_long", "scenario", "unclear"}
 )
 _TOKEN = re.compile(r"[a-z0-9]+(?:'[a-z]+)?")
+_RUN = re.compile(r"[.?!;,:]{2,}")
 _SENTENCE = re.compile(r"[.?!;]+(?:\s+|$)")
 _MAX_VERDICT_CHARS = 400
 
@@ -34,6 +35,7 @@ class QuickRules:
     role: str
     budget: float
     answer_max_chars: int
+    answer_max_output_tokens: int
     classifier_max_output_tokens: int
     thinking_level: str
     max_words: int
@@ -61,6 +63,7 @@ def load_quick_rules(path: Path | None = None) -> QuickRules:
             role=str(doc["role"]),
             budget=float(budget),
             answer_max_chars=int(doc["answer_max_chars"]),
+            answer_max_output_tokens=int(doc["answer_max_output_tokens"]),
             classifier_max_output_tokens=int(doc["classifier_max_output_tokens"]),
             thinking_level=str(doc["thinking_level"]),
             max_words=int(doc["max_words"]),
@@ -106,7 +109,10 @@ def classify(rules: QuickRules, text: str, *, max_chars: int, has_files: bool, s
         return Verdict("work", "scenario")
     if len(text) > max_chars:
         return Verdict("work", "too_long")
-    key = question_key(clean(text))
+    cleaned = clean(text)
+    key = _RUN.sub(lambda m: m.group()[0], question_key(cleaned))  # a run of marks is one: linear splitting below
+    cut = len(unicodedata.normalize("NFKC", cleaned)) > MAX_KEY  # the key lost its tail: later words were never read
+    foreign = any(c.isalpha() and not c.isascii() for c in key)  # no stems for these letters: the rules are blind
     breaks = "|".join(sorted(rules.sets["clause_breaks"]))
     clauses = [_stems(c) for c in re.split(rf"[,;:.!?]+|\s(?:{breaks})\s", key) if c.strip()]
     stems = [s for c in clauses for s in c]
@@ -127,7 +133,7 @@ def classify(rules: QuickRules, text: str, *, max_chars: int, has_files: bool, s
     if sum(1 for w in _stems(key) if w in s["sequence"]) >= 2:  # "then" is a clause break: count on the whole text
         return Verdict("work", "multi_step")
     sentences = [x for x in _SENTENCE.split(key) if x.strip()]
-    if led and len(sentences) == 1 and len(stems) <= rules.max_words:
+    if led and not (cut or foreign) and len(sentences) == 1 and len(stems) <= rules.max_words:
         if not s["deictic"] & set(stems):
             return Verdict("simple")
     return Verdict("model")

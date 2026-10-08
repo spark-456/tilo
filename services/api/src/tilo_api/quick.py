@@ -13,6 +13,7 @@ import hashlib
 import logging
 import re
 import threading
+import unicodedata
 import uuid
 import weakref
 from dataclasses import dataclass
@@ -36,6 +37,7 @@ from tilo_api.quick_rules import REASONS, QuickConfigError, QuickRules, classify
 logger = logging.getLogger("tilo_api.quick")
 _KEY = re.compile(r"[A-Za-z0-9._-]{1,64}")
 _UNAVAILABLE = frozenset({"QuotaError", "RetryableError"})  # PL-02: 429 and 5xx or timeouts, not a bad reply
+_BILLED = frozenset({"OutputTruncatedError"})  # sent, ran to the output cap, no usage reported
 _NOT_SENT = {"BudgetExceededError", "TokenCapExceededError"}  # attempts the router refused before sending
 _MODEL_REASONS = ", ".join(sorted(REASONS - {"attachments", "too_long", "scenario"}))
 
@@ -67,6 +69,22 @@ def _limits_of(owner: object) -> Limits:
 
 
 @dataclass
+class _Tally:
+    """What the router has spent of one ask's budget. A call that reached a model and was billed stays charged even
+    when its reply is unusable; only an unsent or refused call (RequestError, quota, 5xx) is released."""
+
+    budget: float
+    left: float = -1.0
+
+    def __post_init__(self) -> None:
+        self.left = self.budget
+
+    @property
+    def spent(self) -> float:
+        return self.budget - self.left
+
+
+@dataclass
 class _Spend:
     """The holds of one ask: the allowance reservation and, deployed and live, the uid ledger unit."""
 
@@ -95,7 +113,10 @@ def _hold(
     if reservation is None:
         raise QuickRefusal(429, "Your allowance for questions today is used up; it renews tomorrow (UTC).")
     guard = plan = None
-    if mode == "live" and isinstance(switches, spend.Switches) and switches.ledger is not None and caps is not None:
+    if mode == "live":  # SEC-16: no ledger or no caps means no hold, so no live call
+        if not (isinstance(switches, spend.Switches) and switches.ledger is not None and caps is not None):
+            allowance.release(reservation)
+            raise deps.ReplayOnly
         guard = spend.SpendGuard(switches.ledger, switches.flags, caps)  # SEC-16: one unit on the uid ledger
         plan = guard.begin_unit(
             "live", uid=uid, run_id=f"quick_{uuid.uuid4().hex}", org_id=deps.ORG_ID,
@@ -108,15 +129,18 @@ def _hold(
 
 
 def _call(
-    router: Router, rules: QuickRules, request: GenerateRequest, budget: float, *, empty_ok: bool = False
-) -> tuple[str, float, int]:
-    """One call on the role within `budget`: (reply text, budget left, calls sent). Failures become fixed answers."""
+    router: Router, rules: QuickRules, request: GenerateRequest, tally: _Tally, *, empty_ok: bool = False
+) -> tuple[str, int]:
+    """One call on the role within the tally's budget: (reply text, calls sent). Failures become fixed answers, and
+    a billed call is left on the tally."""
     try:
-        result = router.generate(rules.role, request, budget=budget)
+        result = router.generate(rules.role, request, budget=tally.left)
     except ReplayMissError as exc:
         raise deps.ModelUnavailable from exc
     except RouterError as exc:  # a budget or cap refusal is a RouterError too: it never reached a model
         tried = [a for a in exc.attempts if a.error_type not in _NOT_SENT]
+        if any(a.error_type in _BILLED for a in tried):
+            tally.left = 0.0  # the model ran to its cap: charge the whole remaining budget, the call's worst case
         if tried and all(a.error_type in _UNAVAILABLE for a in tried):
             raise deps.ModelUnavailable from exc  # NFR-22: quota or availability on every candidate that was tried
         raise QuickRefusal(502, "The model could not answer.") from None
@@ -124,17 +148,18 @@ def _call(
         raise QuickRefusal(502, "The model could not answer.") from None
     reply = None if result.response is None else result.response.text
     reply = "" if reply is None and empty_ok and result.outcome == "ok" else reply
-    left = result.budget if result.budget is not None else budget
+    if result.budget is not None:
+        tally.left = result.budget
     sent = sum(1 for a in result.attempts if a.error_type not in _NOT_SENT)
     if result.outcome != "ok" or type(reply) is not str or not (reply.strip() or empty_ok):
         raise QuickRefusal(502, "The model gave no usable reply.")
-    return reply, left, max(sent, 1)
+    return reply, max(sent, 1)
 
 
-def _ask(rules: QuickRules, router: Router, question: str, *, vet: bool) -> dict[str, Any]:
+def _ask(rules: QuickRules, router: Router, question: str, tally: _Tally, *, vet: bool) -> dict[str, Any]:
     """The classifier call (when `vet`: the rules left this text to the model) and then the answer call."""
     data = neutralise_marker(question, "QUESTION")
-    budget, calls = rules.budget, 0
+    calls = 0
     if vet:
         request = GenerateRequest(
             system=load_prompt("assistant", "quick_classify_system.md", {"reasons": _MODEL_REASONS}),
@@ -143,18 +168,24 @@ def _ask(rules: QuickRules, router: Router, question: str, *, vet: bool) -> dict
             thinking_level=rules.thinking_level,
             max_output_tokens=rules.classifier_max_output_tokens,
         )
-        reply, budget, made = _call(router, rules, request, budget, empty_ok=True)  # a bad verdict is no verdict
+        reply, made = _call(router, rules, request, tally, empty_ok=True)  # a bad verdict is no verdict
         calls += made
         verdict = parse_verdict(reply)
         if verdict is None or verdict.kind == "work":  # no verdict is the offer `unclear`; a model never answers it
-            return {"offer": verdict.reason if verdict else "unclear", "calls": calls, "credits": rules.budget - budget}
+            return {"offer": verdict.reason if verdict else "unclear", "calls": calls}
     request = GenerateRequest(
         system=load_prompt("assistant", "quick_answer_system.md"),
         prompt=load_prompt("assistant", "quick_answer_task.md", {"question": data}),
         thinking_level=rules.thinking_level,
+        max_output_tokens=rules.answer_max_output_tokens,
     )
-    reply, left, made = _call(router, rules, request, budget)
-    return {"text": reply[: rules.answer_max_chars], "calls": calls + made, "credits": rules.budget - left}
+    reply, made = _call(router, rules, request, tally)
+    return {"text": _plain(reply)[: rules.answer_max_chars], "calls": calls + made}
+
+
+def _plain(reply: str) -> str:
+    """A model reply is shown as text only: category C characters (control, bidi, format) go, but not newline or tab."""
+    return "".join(c for c in reply if c in ("\n", "\t") or unicodedata.category(c)[0] != "C")
 
 
 def _offer(reason: str | None) -> dict[str, Any]:
@@ -204,15 +235,16 @@ def respond(
 
     def make() -> dict[str, Any]:
         held = _hold(rules, uid, datetime.now(UTC), allowance, switches, mode, caps)
+        tally = _Tally(rules.budget)
         try:
-            done = _ask(rules, router, question, vet=verdict.kind == "model")
+            done = _ask(rules, router, question, tally, vet=verdict.kind == "model")
         except BaseException:
-            held.release()
+            held.commit(tally.spent) if tally.spent > 0 else held.release()  # billed stays charged
             raise
-        held.commit(done["credits"])
+        held.commit(tally.spent)
         if "offer" in done:
             return _offer(done["offer"])
-        cost = {"model_calls": done["calls"], "credits": float(done["credits"]), "saved_credits": 0.0}
+        cost = {"model_calls": done["calls"], "credits": float(tally.spent), "saved_credits": 0.0}
         return {"mode": "quick", "outcome": "answered", "text": done["text"], "cost": cost}
 
     if key is None:

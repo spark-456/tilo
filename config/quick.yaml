@@ -10,6 +10,7 @@ version: 1
 role: assistant
 budget_credits: 0.5 # one Quick ask in all, the classifier call and the answer call together (PL-03)
 answer_max_chars: 8000 # a longer reply is cut
+answer_max_output_tokens: 600 # EFF-03: below the role's 1000; the answer call asks for no more
 classifier_max_output_tokens: 40 # the verdict is one short JSON object
 thinking_level: minimal
 max_words: 30 # a longer text is never decided "simple" by a rule
