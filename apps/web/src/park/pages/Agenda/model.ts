@@ -169,6 +169,18 @@ export const GROUPS: [string, (v: PinVm) => boolean][] = [
   ["DONE", (v) => !v.pin.suggested && v.done],
 ];
 
+/** How many pins each board draws while `drawn` pins have been drawn in all (FR-UX-12: the boards are drawn one
+ * after the other, top to bottom, a few pins per task). `null` is a board not started yet: it only holds its cell
+ * in the grid, so nothing already drawn moves. A board starts when the ones before it are complete. */
+export function boardLimits(counts: readonly number[], drawn: number): (number | null)[] {
+  let before = 0;
+  return counts.map((n) => {
+    const left = drawn - before;
+    before += n;
+    return left < 0 ? null : Math.min(n, left);
+  });
+}
+
 /** A new pin lands after the board's suggestions, before everything else. */
 export function addPin(pins: AgendaPin[], board: BoardKey, title: string, id: string): AgendaPin[] {
   const fresh: AgendaPin = {
@@ -315,6 +327,9 @@ export function detailOf(
   const days = A.days.concat(A.wkend);
   const wasBriefed = !!briefed[e.id];
   const flag = (k: string, def: boolean) => flags[`${e.id}:${k}`] ?? def;
+  // The brief switch decides whether a brief is claimed: off, there is none to show and none is queued.
+  const briefOn = flag("brief", !!det.brief || wasBriefed);
+  const joins = joinsOf(e, flags);
   let brief = det.brief ?? [
     "Tilo will gather the latest emails, docs and notes for this meeting.",
     "You’ll get it 15 minutes before it starts.",
@@ -328,32 +343,28 @@ export function detailOf(
     det,
     when: `${days[e.d]}${month ? ` ${month}` : ""} · ${fmt(e.s)}–${fmt(e.e)}${e.cal === "booked" ? " · booked by Tilo" : ""}`,
     calLabel: CAL[e.cal][0] + (e.cal === "tilo" || e.cal === "booked" ? "" : " · Google Calendar"),
-    hasBrief: !e.past && (!!det.brief || wasBriefed),
+    hasBrief: !e.past && briefOn,
     brief,
     briefMeta: det.briefMeta ?? "Queued · arrives 15 min before",
-    needsBrief: !e.past && !det.brief && !wasBriefed && !e.tiloOnly,
+    needsBrief: !e.past && !briefOn && !e.tiloOnly,
     past: !!e.past && !!det.notes,
     empty: !!e.past && !det.notes,
     upcoming: !e.past && !e.tiloOnly,
     toggles: [
+      // Notes need Tilo in the meeting, and action items need notes: a switch that is off claims neither.
       [
         "Tilo joins and takes notes",
-        "Shares notes with attendees after",
-        joinsOf(e, flags),
+        joins ? "Shares notes with attendees after" : "Tilo stays out, so no notes are taken",
+        joins,
         "join",
       ],
       [
         "Turn action items into pins",
-        "Pinned to the Team board with owners",
+        joins ? "Pinned to the Team board with owners" : "No notes, so nothing to pin",
         flag("pins", true),
         "pins",
       ],
-      [
-        "Brief before it starts",
-        "15 minutes ahead, in your inbox",
-        flag("brief", !!det.brief || wasBriefed),
-        "brief",
-      ],
+      ["Brief before it starts", "15 minutes ahead, in your inbox", briefOn, "brief"],
     ],
   };
 }

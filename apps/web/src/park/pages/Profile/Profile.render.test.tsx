@@ -294,7 +294,9 @@ describe("WEB_12_profile_copy: every visible string and aria-label is the design
     async (id, label) => {
       const { root } = await renderProfile(makeApp());
       if (id !== "profile") await openTab(root, label);
-      expect(labelsOf(root)).toEqual([...ARIA_LABELS[id as TabId]].sort());
+      // FR-SET-04: each other session's Sign out button is named with its device (an addition to the design's labels).
+      const added = id === "security" ? SESSIONS.slice(1).map((s) => `Sign out ${s[0]}`) : [];
+      expect(labelsOf(root)).toEqual([...ARIA_LABELS[id as TabId], ...added].sort());
     },
   );
 

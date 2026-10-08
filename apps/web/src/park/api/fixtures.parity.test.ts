@@ -18,7 +18,7 @@ const proto = loadPrototypeData();
 const ADDITIVE_PATHS: Record<string, readonly string[]> = {
   decisions: ["[].toast", "[].approvedTitle", "[].facts"],
   agenda: ["rules"],
-  ledger: ["memoryUp"],
+  ledger: ["memoryUp", "spike", "runLabels", "memoryWeeks", "waits.summary", "waits.withBackup"],
   worlds: ["[].heroTag"],
 };
 const ADDITIVE_VALUES: readonly (readonly [

@@ -920,6 +920,12 @@
   font-weight: 600;
   color: var(--ink2);
 }
+[data-park] .park-agenda-togglenote {
+  padding-top: 6px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ink3);
+}
 [data-park] .park-agenda-track {
   box-sizing: border-box;
   display: flex;
