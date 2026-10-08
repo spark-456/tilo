@@ -90,9 +90,10 @@ def _each_schema(node: Any, change: Callable[[dict[str, Any]], dict[str, Any]]) 
 
 
 def _drop_empty(node: dict[str, Any]) -> dict[str, Any]:
-    """Properties whose schema is `{}` (untyped: no documented meaning on Vertex) removed, and from `required`."""
+    """The property that used to be an untyped `{}` (the Director's `out_of_scope`, now sent as a typed list) removed,
+    and any property still schema-less, also from `required`."""
     properties = node.get("properties")
-    if isinstance(properties, dict) and (empty := {n for n, s in properties.items() if s == {}}):
+    if isinstance(properties, dict) and (empty := {n for n, s in properties.items() if s == {} or n == "out_of_scope"}):
         node["properties"] = {n: s for n, s in properties.items() if n not in empty}
         if isinstance(node.get("required"), list):
             node["required"] = [n for n in node["required"] if n not in empty]
@@ -100,7 +101,9 @@ def _drop_empty(node: dict[str, Any]) -> dict[str, Any]:
 
 
 def _no_null_branch(node: dict[str, Any]) -> dict[str, Any]:
-    """`anyOf: [X, {"type": "null"}]` becomes X (its title and description kept)."""
+    """`nullable: true` (what the sanitizer sends for `anyOf: [X, {"type": "null"}]`) removed, and any leftover null
+    `anyOf` branch collapsed to X."""
+    node = {k: v for k, v in node.items() if k != "nullable"}
     branches = node.get("anyOf")
     if isinstance(branches, list):
         kept = [branch for branch in branches if branch != {"type": "null"}]

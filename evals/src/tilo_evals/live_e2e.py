@@ -725,15 +725,14 @@ def _app(
     def principal(request: Request) -> Any:
         return deps.Principal(user_id=_OWNER, role="owner", world_id=request.path_params.get("world_id"))
 
-    app.dependency_overrides.update(
-        {
-            deps.get_current_principal: principal, deps.get_store: lambda: store, deps.get_event_writer: lambda: writer,
-            deps.get_router: lambda: router, deps.get_safety: lambda: safety, deps.get_plan_compiler: compiler,
-            deps.get_unit_runner: lambda: runner, deps.get_action_resolver: lambda: resolve,
-            deps.get_connector_adapters: lambda: adapters, deps.get_must_ask_providers: must_ask_providers,
-            **e2e_stand_ins.overrides(),  # the artifact store, redactor and raw archive the run needs (ADR-0018 T4)
-        }
-    )  # fmt: skip
+    overrides: dict[Callable[..., Any], Callable[..., Any]] = {
+        deps.get_current_principal: principal, deps.get_store: lambda: store, deps.get_event_writer: lambda: writer,
+        deps.get_router: lambda: router, deps.get_safety: lambda: safety, deps.get_plan_compiler: compiler,
+        deps.get_unit_runner: lambda: runner, deps.get_action_resolver: lambda: resolve,
+        deps.get_connector_adapters: lambda: adapters, deps.get_must_ask_providers: must_ask_providers,
+        **e2e_stand_ins.overrides(),  # the artifact store, redactor and raw archive the run needs (ADR-0018 T4)
+    }  # fmt: skip
+    app.dependency_overrides.update(overrides)
     return app
 
 
