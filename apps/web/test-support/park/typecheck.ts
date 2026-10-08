@@ -13,25 +13,66 @@ import { PARK_DIR } from "./prototype";
 
 const WEB_DIR = path.resolve(PARK_DIR, "..", "..");
 const WORKER = path.join(WEB_DIR, "test-support", "park", "typecheckWorker.mjs");
+const DEFAULT_TIMEOUT_MS = 175_000;
 
 let cached: Promise<string[]> | undefined;
 
-function build(): Promise<string[]> {
-  return new Promise((resolve, reject) => {
-    const child = spawn(process.execPath, [WORKER, WEB_DIR], {
+export interface TypecheckWorkerOptions {
+  args?: string[];
+  timeoutMs?: number;
+}
+
+export interface TypecheckWorkerHandle {
+  pid: number | undefined;
+  promise: Promise<string[]>;
+}
+
+export function runTypecheckWorker(options: TypecheckWorkerOptions = {}): TypecheckWorkerHandle {
+  const args = options.args ?? [WORKER, WEB_DIR];
+  const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+  let pid: number | undefined;
+
+  const promise = new Promise<string[]>((resolve, reject) => {
+    const child = spawn(process.execPath, args, {
       cwd: WEB_DIR,
       stdio: ["ignore", "pipe", "pipe"],
     });
+    pid = child.pid;
     let out = "";
     let err = "";
+    let timedOut = false;
+
+    const killChild = (): void => {
+      if (child.exitCode === null && !child.killed) {
+        child.kill();
+      }
+    };
+    const timer = setTimeout(() => {
+      timedOut = true;
+      killChild();
+    }, timeoutMs);
+    process.once("exit", killChild);
+
+    const cleanup = (): void => {
+      clearTimeout(timer);
+      process.removeListener("exit", killChild);
+    };
+
     child.stdout.on("data", (d: Buffer) => {
       out += d.toString();
     });
     child.stderr.on("data", (d: Buffer) => {
       err += d.toString();
     });
-    child.on("error", reject);
+    child.on("error", (e) => {
+      cleanup();
+      reject(e);
+    });
     child.on("close", (code) => {
+      cleanup();
+      if (timedOut) {
+        return reject(new Error(`typecheck worker timed out after ${timeoutMs} ms`));
+      }
       if (code !== 0)
         return reject(new Error(`typecheck worker exited ${code}: ${err.slice(0, 2000)}`));
       try {
@@ -41,9 +82,11 @@ function build(): Promise<string[]> {
       }
     });
   });
+
+  return { pid, promise };
 }
 
 export function parkTypeErrors(): Promise<string[]> {
-  cached ??= build();
+  cached ??= runTypecheckWorker().promise;
   return cached;
 }
