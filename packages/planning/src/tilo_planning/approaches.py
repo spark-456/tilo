@@ -27,6 +27,7 @@ from tilo_planning.gaps import Gap
 DIMENSIONS = ("depth", "sources", "parallelism", "verification", "output_format")
 MIN_DIFFERING = 2
 MAX_SKIPS = 5  # plan.schema.json approach.skips maxItems
+APPROACHES_THINKING = "medium"  # weighing 2-3 approaches needs some thought; the default (high) is billed as output
 
 
 class ApproachProposalError(Exception):
@@ -101,6 +102,7 @@ def _ask(router: Router, prompt: str, budget: float | None) -> tuple[RouterResul
         prompt=prompt,
         json_mode=True,
         response_schema=_Reply.model_json_schema(),
+        thinking_level=APPROACHES_THINKING,
     )
     try:
         run = router.generate(DIRECTOR_ROLE, request, budget=budget, required_capability=Capability.JSON)

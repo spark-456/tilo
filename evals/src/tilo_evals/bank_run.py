@@ -109,6 +109,9 @@ def _detail(response: Any) -> str:
     return said if isinstance(said, str) and said else f"HTTP {response.status_code}"
 
 
+MAX_REASKS = 2  # a person whose answers do not fit the brief is asked again this many times, then the run stops
+
+
 def drive(case: BankCase, obs: Observation, timeout_s: float, app: Any, person: Any = None) -> None:
     """Intake to a terminal state through `app`'s own routes (the live runner passes its own wiring). With `person`,
     a person answers the questions, picks or declines the approach and says yes or no to each gate card."""
@@ -149,9 +152,15 @@ def drive(case: BankCase, obs: Observation, timeout_s: float, app: Any, person: 
             return
         given = case.answers or {}
         pick = person.answer if person else lambda q: given.get(q["field"])
-        answers = [{"field": q["field"], "answer": pick(q)} for q in task["questions"]]
-        obs.answered = {a["field"]: a["answer"] for a in answers}
-        if fail(call("POST", f"/tasks/{task['task_id']}/answers", json={"answers": answers, "brief_edits": {}})):
+        for attempt in range(MAX_REASKS + 1):
+            answers = [{"field": q["field"], "answer": pick(q)} for q in task["questions"]]
+            obs.answered = {a["field"]: a["answer"] for a in answers}
+            posted = call("POST", f"/tasks/{task['task_id']}/answers", json={"answers": answers, "brief_edits": {}})
+            if posted.status_code == 422 and attempt < MAX_REASKS and hasattr(person, "explain"):
+                person.explain(_detail(posted))  # a refused request changed nothing: the person says it again
+                continue
+            break
+        if fail(posted):
             return
         approaches = call("GET", f"/tasks/{task['task_id']}/approaches")
         if fail(approaches, honest=(502,)):  # 502: "The Director could not propose approaches", said on purpose
