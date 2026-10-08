@@ -267,8 +267,13 @@ def test_SEC_10_default_limits_sustain_web_client_polling_cadence_for_several_mi
 
 def test_SEC_10_replaceable_shared_store_interface() -> None:
     calls: list[list[tuple[str, str]]] = []
+    peeks: list[str] = []
 
     class CustomSharedLimiter:
+        def peek(self, key: str, *, capacity: int, refill_per_s: float) -> tuple[bool, int]:
+            peeks.append(key)
+            return True, 0
+
         def consume(self, key: str, *, capacity: int, refill_per_s: float) -> tuple[bool, int]:
             return False, 7
 
@@ -289,7 +294,37 @@ def test_SEC_10_replaceable_shared_store_interface() -> None:
         assert res.status_code == 429
         assert res.headers["Retry-After"] == "7"
         assert res.json()["retry_after_s"] == 7
+        assert peeks == ["ip:testclient"]
         assert calls == [[("ip", "ip:testclient"), ("user", "user:u_alice")]]
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_SEC_10_515_rate_limiter_protocol_requires_peek_before_auth_and_fails_closed_without_it() -> None:
+    assert hasattr(RateLimiter, "peek")
+    auth_calls = {"count": 0}
+
+    def counting_principal() -> Principal:
+        auth_calls["count"] += 1
+        return Principal(user_id="u_alice", role="owner", world_id="w_sec10")
+
+    class StoreWithoutPeek:
+        def consume(self, key: str, *, capacity: int, refill_per_s: float) -> tuple[bool, int]:
+            return True, 0
+
+        def consume_all(
+            self, checks: list[tuple[str, str, int, float]] | tuple[tuple[str, str, int, float], ...]
+        ) -> tuple[str | None, int]:
+            return None, 0
+
+    app.dependency_overrides[get_rate_limiter] = lambda: StoreWithoutPeek()  # type: ignore[return-value]
+    app.dependency_overrides[get_current_principal] = counting_principal
+    try:
+        client = TestClient(app)
+        refused = client.get("/worlds/w_sec10/cards")
+        assert refused.status_code == 503
+        assert refused.json()["code"] == "rate_limiter_unavailable"
+        assert auth_calls["count"] == 0
     finally:
         app.dependency_overrides.clear()
 

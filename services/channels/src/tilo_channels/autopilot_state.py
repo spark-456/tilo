@@ -254,6 +254,14 @@ def enqueue_digest(
     evidence |= {"instruction": None, "earlier_applied": []}
     if not autopilot_gate.opens(entry, evidence):
         return None
+    stored = outbox.enqueue(entry, evidence)
     if emit is not None:
-        emit(copy.deepcopy(policy_applied))
-    return outbox.enqueue(entry, evidence)
+        try:
+            emit(copy.deepcopy(policy_applied))
+        except Exception:
+            try:
+                outbox.cancel(entry["id"])
+            except Exception:
+                pass
+            raise
+    return stored

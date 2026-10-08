@@ -102,6 +102,10 @@ _DEFAULT_CONFIG = load_rate_limit_config()
 class RateLimiter(Protocol):
     """Store interface for rate-limit token buckets (replaceable by a shared Redis/Firestore backend)."""
 
+    def peek(self, key: str, *, capacity: int, refill_per_s: float) -> tuple[bool, int]:
+        """Check whether `key` has at least 1 token without consuming it. Returns `(allowed, retry_after_s)`."""
+        ...
+
     def consume(self, key: str, *, capacity: int, refill_per_s: float) -> tuple[bool, int]:
         """Attempt to consume 1 token from `key`. Returns `(allowed, retry_after_s)`."""
         ...
@@ -307,12 +311,22 @@ async def _decide(scope: dict[str, Any], fastapi_app: FastAPI) -> JSONResponse |
         logger.warning("rate limit configuration unavailable, failing open: %s", type(exc).__name__)
         return None
 
+    peek_fn = getattr(limiter, "peek", None)
+    if not callable(peek_fn):
+        logger.error("rate limiter store missing peek capability, failing closed: %s", type(limiter).__name__)
+        return JSONResponse(
+            status_code=503,
+            content={
+                "detail": "Rate limiter store missing peek capability.",
+                "code": "rate_limiter_unavailable",
+            },
+        )
+
     ip_key = f"ip:{_client_ip(scope, cfg.trusted_hops)}"
     try:
-        if hasattr(limiter, "peek"):
-            ip_ok, ip_retry_s = limiter.peek(ip_key, capacity=cfg.ip_capacity, refill_per_s=cfg.ip_refill_per_s)
-            if not ip_ok:
-                return _rate_limit_response("ip", ip_retry_s)
+        ip_ok, ip_retry_s = peek_fn(ip_key, capacity=cfg.ip_capacity, refill_per_s=cfg.ip_refill_per_s)
+        if not ip_ok:
+            return _rate_limit_response("ip", ip_retry_s)
     except Exception as exc:
         logger.warning("rate limiter store failed, failing open: %s", type(exc).__name__)
         return None

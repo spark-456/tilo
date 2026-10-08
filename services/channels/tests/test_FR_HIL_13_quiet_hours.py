@@ -87,3 +87,44 @@ def test_FR_HIL_13_unconfigured_or_disabled_quiet_hours_do_not_suppress() -> Non
         QuietHours(start="25:00", end="07:00", timezone="UTC")
     with pytest.raises(ValueError):
         QuietHours(start="22:00", end="07:00", timezone="Not/AZone")
+
+
+def test_FR_HIL_13_FR_CHN_18_quiet_hours_fails_closed_on_zoneinfo_not_found_and_logs_reason(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    import logging
+    import tomllib
+    from pathlib import Path
+    from zoneinfo import ZoneInfoNotFoundError
+
+    # 1. Unknown timezone in quiet_hours preferences fails closed (treated as inside quiet hours) and logs reason
+    bad_tz_prefs = {"quiet_hours": {"start": "22:00", "end": "07:00", "timezone": "Invalid/NoSuchZone"}}
+    daytime = "2026-10-06T12:00:00.000Z"
+    with caplog.at_level(logging.WARNING, logger="tilo_channels.quiet_hours"):
+        assert is_quiet_hours(bad_tz_prefs, now=daytime) is True
+        assert should_notify("needs_you", prefs=bad_tz_prefs, now=daytime) is False
+        assert should_notify("digest", prefs=bad_tz_prefs, now=daytime) is False
+        assert should_notify("gate", prefs=bad_tz_prefs, now=daytime) is True
+    assert any("ZoneInfoNotFoundError" in r.getMessage() or "timezone" in r.getMessage() for r in caplog.records)
+    assert all("Invalid/NoSuchZone" not in r.getMessage() for r in caplog.records)
+
+    # 2. Simulated missing tzdata on Windows (ZoneInfo("UTC") raises ZoneInfoNotFoundError): fails closed + logs reason
+    caplog.clear()
+
+    def _missing_tzdata(key: str) -> object:
+        raise ZoneInfoNotFoundError(f"No time zone found with key {key}")
+
+    monkeypatch.setattr("tilo_channels.quiet_hours.ZoneInfo", _missing_tzdata)
+    utc_prefs = {"quiet_hours": {"start": "22:00", "end": "07:00", "timezone": "UTC"}}
+    store = FakePrefs({USER: utc_prefs})
+    sent: list[dict] = []
+    gate = NotificationGate(preferences=store, clock=lambda: daytime, sender=sent.append)
+    with caplog.at_level(logging.WARNING, logger="tilo_channels.quiet_hours"):
+        decision = gate.deliver(USER, {"id": "c_hold", "kind": "needs_you", "rung": "needs_you"})
+    assert decision.notified is False and decision.in_app is True and sent == []
+    assert any("ZoneInfoNotFoundError" in r.getMessage() for r in caplog.records)
+
+    # 3. services/channels/pyproject.toml declares tzdata so Windows venvs resolve "UTC"
+    pyproject = Path(__file__).resolve().parents[1] / "pyproject.toml"
+    deps = tomllib.loads(pyproject.read_text(encoding="utf-8"))["project"]["dependencies"]
+    assert any(d == "tzdata" or d.startswith("tzdata>") or d.startswith("tzdata=") for d in deps)

@@ -112,8 +112,10 @@ def test_FR_CHN_18_refuses_no_policy_raising_policy_raising_emit_and_respects_qu
         raise RuntimeError("event log down")
 
     l3_pol = _digest_policy(level="L3", undo_window_s=60)
-    assert _deliver(_svc(outbox, _RealEnginePort([l3_pol], emitted), artifacts, _raise_emit)) is None
-    assert emitted == [] and store.all_entries() == []
+    emit_fail_store = InMemoryOutboxStore()
+    emit_fail_outbox = Outbox(emit_fail_store, connectors={}, emit=lambda _: None, clock=lambda: NOW_TS, world_id=WORLD)
+    assert _deliver(_svc(emit_fail_outbox, _RealEnginePort([l3_pol], emitted), artifacts, _raise_emit)) is None
+    assert emitted == [] and [e["state"] for e in emit_fail_store.all_entries()] == ["cancelled"]
 
     for blocked in ([_digest_policy(level="L2")], [_digest_policy(level="L1")]):
         assert _deliver(_svc(outbox, _RealEnginePort(blocked, emitted), artifacts, emitted.append)) is None
@@ -153,3 +155,89 @@ def test_FR_CHN_18_real_outbox_and_tilo_policy_decide_l3_stores_one_and_refuses_
     svc2 = _svc(outbox2, port, artifacts, emitted.append)
     assert _deliver(svc2, now="2026-10-06T18:00:15.000Z") is None
     assert store2.all_entries() == [] and len(emitted) == 1
+
+
+def test_FR_CHN_18_662_digest_service_emits_policy_applied_only_after_enqueue_and_logs_exception_type_not_body(
+    caplog: Any,
+) -> None:
+    import logging
+
+    import pytest
+    from tilo_connectors.errors import OutboxRefused
+
+    store, emitted = InMemoryOutboxStore(), list[dict[str, Any]]()
+    real_outbox = Outbox(store, connectors={}, emit=lambda _: None, clock=lambda: NOW_TS, world_id=WORLD)
+    artifacts = DigestArtifacts()
+    l3_pol = _digest_policy(level="L3", undo_window_s=60, per_day=1)
+    port = _RealEnginePort([l3_pol], emitted, now_ts=NOW_TS)
+
+    class _FlakyOutbox:
+        def __init__(self) -> None:
+            self.fail_count = 2
+
+        def enqueue(self, entry: dict[str, Any], evidence: dict[str, Any]) -> dict[str, Any]:
+            if self.fail_count == 2:
+                self.fail_count -= 1
+                raise OutboxRefused("outbox refused secret digest body leak")
+            if self.fail_count == 1:
+                self.fail_count -= 1
+                raise RuntimeError("transient store error secret digest body leak")
+            return real_outbox.enqueue(entry, evidence)
+
+        def cancel(self, outbox_id: str) -> dict[str, Any]:
+            return real_outbox.cancel(outbox_id)
+
+        def get(self, outbox_id: str) -> dict[str, Any] | None:
+            return real_outbox.get(outbox_id)
+
+        def get_by_idempotency_key(self, world_id: str, idempotency_key: str) -> dict[str, Any] | None:
+            return real_outbox.get_by_idempotency_key(world_id, idempotency_key)
+
+        def revoke(self, world_id: str, idempotency_key: str) -> dict[str, Any] | None:
+            return real_outbox.revoke(world_id, idempotency_key)
+
+    flaky = _FlakyOutbox()
+    svc = _svc(flaky, port, artifacts, emitted.append)  # type: ignore[arg-type]
+
+    # 1. Failed enqueues do NOT emit policy.applied, so they do not count toward per_day=1 cap; logged by type only
+    with caplog.at_level(logging.WARNING, logger="tilo_channels.digest"):
+        assert _deliver(svc, now=NOW_EPOCH - 2) is None
+        assert emitted == [] and store.all_entries() == []
+        assert _deliver(svc, now=NOW_EPOCH - 1) is None
+        assert emitted == [] and store.all_entries() == []
+
+    msgs = "\n".join(r.getMessage() for r in caplog.records)
+    assert "OutboxRefused" in msgs and "RuntimeError" in msgs
+    assert "secret digest body leak" not in msgs and "Daily Digest" not in msgs
+
+    # Retry succeeds on the same UTC day because earlier failed enqueues never emitted policy.applied
+    ok = _deliver(svc, now=NOW_EPOCH)
+    assert ok is not None and len(emitted) == 1 and len(store.all_entries()) == 1
+
+    # 2. Quiet hours with unresolvable timezone fails closed in DigestService and holds the send
+    bad_tz_prefs = {USER: {"quiet_hours": {"start": "22:00", "end": "07:00", "timezone": "NoSuch/Zone"}}}
+    store_qh, emitted_qh = InMemoryOutboxStore(), list[dict[str, Any]]()
+    outbox_qh = Outbox(store_qh, connectors={}, emit=lambda _: None, clock=lambda: NOW_TS, world_id=WORLD)
+    svc_qh = _svc(outbox_qh, _RealEnginePort([l3_pol], emitted_qh), DigestArtifacts(), emitted_qh.append, bad_tz_prefs)
+    with caplog.at_level(logging.WARNING):
+        assert _deliver(svc_qh, now=NOW_TS) is None
+    assert emitted_qh == [] and store_qh.all_entries() == []
+
+    # 3. Unexpected bug exceptions are logged by exception type only (never body/message) and not silently swallowed
+    class _UnexpectedBugError(Exception):
+        pass
+
+    class _BuggyPolicy:
+        def decide(self, user_id: str, proposal: tilo_policy.Proposal) -> tilo_policy.Decision:
+            raise _UnexpectedBugError("private body text should never appear in logs")
+
+        def policy_for(self, user_id: str, policy_id: str) -> dict[str, Any] | None:
+            return None
+
+    caplog.clear()
+    bug_svc = _svc(outbox_qh, _BuggyPolicy(), DigestArtifacts(), emitted_qh.append)
+    with caplog.at_level(logging.ERROR, logger="tilo_channels.digest"), pytest.raises(_UnexpectedBugError):
+        _deliver(bug_svc, now=NOW_TS)
+    bug_logs = "\n".join(r.getMessage() for r in caplog.records)
+    assert "_UnexpectedBugError" in bug_logs
+    assert "private body text" not in bug_logs and "Daily Digest" not in bug_logs
