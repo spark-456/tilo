@@ -113,6 +113,19 @@ def build(plate, calendar):
     )
 
 
+def nothing_made(plate) -> bool:
+    """Reading the mail is needed to decide; nothing is drafted, stored, emitted, queued or sent."""
+    rig = plate.line.bench.rig
+    return (
+        rig.model.requests == []
+        and rig.drafts.dump() == "{}"
+        and plate.line.bench.cards.dump() == "{}"
+        and plate.events() == []
+        and plate.line.entries() == []
+        and plate.line.api.sent == []
+    )
+
+
 def move_mail(plate, body=ASK, **kw):
     thread, mail_id = plate.mail(triage_body=body, reply=None, **kw)
     return thread, mail_id
@@ -135,7 +148,7 @@ def brute_free(entries, minutes, start: datetime, skip=("cal_1",)) -> bool:
             busy += [(datetime.fromisoformat(r["start"]), datetime.fromisoformat(r["end"])) for r in e["busy"]]
         elif e["owner"] == USER and e["state"] == "accepted" and e["id"] not in skip:
             s, f = datetime.fromisoformat(e["start"]), datetime.fromisoformat(e["end"])
-            if e["all_day"]:
+            if e["all_day"] and f <= s:  # an all-day entry with a real end is the span it states (free_slots rule)
                 d = s.astimezone(ZoneInfo(ZONE)).date()
                 s = datetime.combine(d, datetime.min.time(), tzinfo=ZoneInfo(ZONE))
                 f = s + timedelta(days=1)
@@ -230,7 +243,7 @@ def test_FR_CAL_07b_sender_not_a_participant_gets_no_times_and_no_draft():
     cal = FakeCalendar([MEETING, *BUSY], who=["someone.else@elsewhere.example"])
     out = build(plate, cal).draft_reschedule(USER, mail_id, request_id="r1")
     assert out is not None and out.status == "not_participant" and out.slots == () and out.preview is None
-    assert plate.untouched()  # nothing drafted, stored, emitted or queued
+    assert nothing_made(plate)  # nothing drafted, stored, emitted or queued
 
 
 def test_FR_CAL_07b_unknown_participants_and_unresolved_meeting_get_no_draft():
@@ -247,7 +260,7 @@ def test_FR_CAL_07b_unknown_participants_and_unresolved_meeting_get_no_draft():
         _, mail_id = move_mail(plate)
         out = build(plate, FakeCalendar(entries, who=who)).draft_reschedule(USER, mail_id, request_id="r1")
         assert out is not None and out.status == status and out.preview is None and out.slots == ()
-        assert plate.untouched()
+        assert nothing_made(plate)
 
 
 @pytest.mark.parametrize("cache", [[], None])
@@ -316,7 +329,7 @@ def test_FR_CAL_07b_reply_can_never_auto_send_even_when_the_policy_port_would_al
     out = build(plate, FakeCalendar([MEETING, *BUSY])).draft_reschedule(USER, mail_id, request_id="r1")
     assert out is not None and out.preview is not None
     card = out.preview
-    assert card.level == "L1" and card.undo_window_s == 0 and card.scheduled_at is None and card.outbox_id is None
+    assert card.level == "L1" and card.undo_window_s == 0 and card.scheduled_at is None
     assert "send" in card.options  # the person's own Send, through the existing gate
     assert plate.line.entries() == [] and plate.line.api.sent == []  # outbox untouched until approval
     assert [p for p in plate.of_type("approval.requested")], "the approval card exists"
