@@ -1,0 +1,10 @@
+# The meeting bot's per-meeting cap on provider calls (FR-MTG-11). Read by tilo_providers.meeting.load_meeting_caps from
+# meet-bot/bot/providers.py (TILO_MEETING_FILE overrides the path). Anyone in a call can make the bot ask a question, and
+# its model, speech and voice calls run outside the router's budget (SEC-16 spend caps are not wired for the bot,
+# BQ-MTG11-9), so one meeting is bounded by count. When a cap is reached the bot logs it once and degrades: no more model
+# answers or analysis (the transcript keeps being written), no more cloud speech (the local voice speaks, the captions
+# stay the transcript). The counts are per bot process, which is one meeting. Defaults are conservative: a 60 minute
+# meeting at the bot's own pacing makes well under these. A non-positive or non-integer value fails start-up.
+meeting:
+  max_model_calls: 200 # analysis steps plus direct answers, every attempt counted
+  max_speech_calls: 400 # speech-to-text segments plus voice replies

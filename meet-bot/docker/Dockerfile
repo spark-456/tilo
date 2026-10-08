@@ -1,5 +1,6 @@
 # Build context is the REPOSITORY ROOT (see docker-compose.yml and meet-bot/docker/Dockerfile.dockerignore): the bot calls
-# Tilo's provider layer (FR-MTG-11), so the image carries packages/providers, packages/contracts-py, config/ and prompts/.
+# Tilo's provider layer (FR-MTG-11), so the image carries packages/providers, packages/contracts-py and the config
+# and prompts they read (not all of config/ and prompts/).
 FROM mcr.microsoft.com/playwright/python:v1.52.0-noble
 
 ENV DEBIAN_FRONTEND=noninteractive \
@@ -23,8 +24,15 @@ RUN pip install --break-system-packages --ignore-installed typing_extensions -r 
 # packages exactly as in the repo (tilo_providers finds both four directories above its own files).
 COPY packages/contracts-py/src /opt/tilo/packages/contracts-py/src
 COPY packages/providers/src /opt/tilo/packages/providers/src
-COPY config /opt/tilo/config
-COPY prompts /opt/tilo/prompts
+# Only what the bot's provider layer reads: the model, price, speech, voice and meeting-cap config, and the two
+# prompt templates it loads (the schema-repair prompt and the transcribe prompt).
+COPY config/models*.yaml /opt/tilo/config/
+COPY config/prices*.yaml /opt/tilo/config/
+COPY config/speech*.yaml /opt/tilo/config/
+COPY config/voice*.yaml /opt/tilo/config/
+COPY config/meeting*.yaml /opt/tilo/config/
+COPY prompts/router /opt/tilo/prompts/router
+COPY prompts/speech /opt/tilo/prompts/speech
 ENV TILO_REPO_ROOT=/opt/tilo \
     PYTHONPATH=/opt/tilo/packages/contracts-py/src:/opt/tilo/packages/providers/src
 

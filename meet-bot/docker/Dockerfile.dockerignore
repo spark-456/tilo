@@ -6,8 +6,15 @@
 !meet-bot/docker
 !packages/contracts-py/src
 !packages/providers/src
-!config
-!prompts
+# Only the config the provider layer reads and the prompts it loads (prompts/router: schema repair; prompts/speech:
+# transcribe), not all of config/ and prompts/.
+!config/models*.yaml
+!config/prices*.yaml
+!config/speech*.yaml
+!config/voice*.yaml
+!config/meeting*.yaml
+!prompts/router
+!prompts/speech
 # Never in the image, at any depth.
 **/__pycache__
 **/*.pyc
@@ -19,6 +26,6 @@
 **/client_secret*.json
 **/token*.json
 **/credentials.json
-service-account*.json
-*-credentials.json
-application_default_credentials.json
+**/service-account*.json
+**/*-credentials.json
+**/application_default_credentials.json

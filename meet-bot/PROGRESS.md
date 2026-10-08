@@ -23,7 +23,7 @@ See Handoff item 4 in the final message. Short version: every Meet selector, the
 
 ## Session end, 2026-09-30 (stopped by the user; nothing is running)
 
-State: 121 tests pass. Live pieces working: auto-admit, "start only when required people are in", hybrid/streaming transcript,
+State: 121 tests pass. Live pieces working: auto-admit (prototype only; never used for bot-hosted meetings, ADR-0024), "start only when required people are in", hybrid/streaming transcript,
 knowledge base, chat reading, voice replies (local espeak fallback), audio recording, latency log.
 The third-party streaming speech and voice clients were removed by FR-MTG-11 (Google only). Google streaming ears and the
 native-audio voice are FR-MTG-16.
@@ -58,8 +58,7 @@ Branches `feat/VA-<nn>-<slug>` are cut from `chore/meet-bot-baseline` and merged
 All four Phase 1 tickets are merged (PRs 75 to 78) and green offline (192 pass, 1 skipped). **None of it has been run in a live meeting yet**, so the 12 s cold-call fix, the unmute wait and the first-sound numbers are unproven until the live test below.
 
 ### Next (in order)
-1. **Live test with the user (blocks everything else).** Needs Docker running, the user's `LIVE=1` and Google project settings (README, Providers), and the user in the meeting. Suggested command (prints `MEETING_URL ...`; join it from the user's own browser):
-   `python -m bot.main start --agenda agenda.md --stt gemini --auto-admit --record-audio --reply both`
+1. **Live test with the user (blocks everything else).** Needs Docker running, the user's `LIVE=1` and Google project settings (README, Providers), and the user in the meeting. Suggested command: `python -m bot.main join <link the user created> --agenda agenda.md --stt gemini --record-audio --reply both`. The bot never clicks Admit and `start` (meet.google.com/new) is disabled for the persistent profile (ADR-0024 decision 7, amendment 3(c) and 3(d)); the hosted-meeting live test waits for MTG09-c's preconditions.
    Ask 5 spoken questions (2 with the name, 1 repeated twice), type 3 chat questions (one without "?", one gibberish), then end the meeting. Then run `python -m bot.main report` and `python -m bot.main audit` and compare with the budget in VOICE_ARCHITECTURE section 4 (model path p50 1.3 s / p90 2.0 s, instant p50 0.8 s). Look in `connections.jsonl` for `timeout` or `busy` attempts and in `latency.jsonl` for `model_s`.
    Voice: the cloud voice is `config/voice.yaml`; if it cannot speak, the local espeak voice does.
 2. **Choose the voice order** (FR-MTG-16, a later ticket): the Live probe was removed with FR-MTG-11 (it spoke a vendor protocol directly); a probe through the provider layer replaces it. Until then the cascade order applies (VA-05 to VA-13).

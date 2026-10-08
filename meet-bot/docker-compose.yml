@@ -4,8 +4,8 @@ services:
   bot:
     image: tilo-meet-bot:latest
     build:
-      # The repository root (FR-MTG-11): the image carries Tilo's provider layer, config/ and prompts/. What goes into the
-      # context is whitelisted in docker/Dockerfile.dockerignore.
+      # The repository root (FR-MTG-11): the image carries Tilo's provider layer and the config and prompts it reads. What goes
+      # into the context is whitelisted in docker/Dockerfile.dockerignore.
       context: ..
       dockerfile: meet-bot/docker/Dockerfile
     init: true

@@ -2,6 +2,7 @@
 `FastClient`; the provider-layer implementation is tested in test_FR_MTG_11_providers.py.)"""
 
 import asyncio
+import json
 import time
 from pathlib import Path
 
@@ -136,12 +137,65 @@ def test_VA_01_the_attempt_log_has_outcome_code_and_first_token_time():
     assert [a["attempt"] for a in attempts] == [1, 2]
 
 
-def test_VA_01_provider_text_never_reaches_the_error_message():
-    secret = "token-" + "ab12" * 6  # assembled at runtime, never a real secret
-    llm, _, attempts = make(FakeClient(ApiError(400, "INVALID_ARGUMENT")))
+def _secret() -> str:
+    return "tok" + "en-" + "ab12" * 6  # assembled at runtime, never a real secret
+
+
+def _every_text(exc: BaseException, attempts: list) -> str:
+    """The raised exception (text and repr), the chain a traceback would print (`from None` hides the implicit context),
+    and every attempt row as the connections.jsonl log holds it."""
+    chain, seen = [], exc
+    while seen is not None and len(chain) < 5:
+        chain.append(f"{seen!s} {seen!r}")
+        seen = seen.__cause__ or (None if seen.__suppress_context__ else seen.__context__)
+    return " ".join([*chain, repr(attempts), json.dumps(attempts, default=str)])
+
+
+def test_VA_01_provider_text_never_reaches_the_error_message_or_the_attempt_log():
+    secret = _secret()
+    leaky = ApiError(400, "INVALID_ARGUMENT", f"bad request for key={secret}")
+    llm, _, attempts = make(FakeClient(leaky))
     with pytest.raises(LLMUnavailable) as exc:
         run(llm.generate("sys", "q"))
-    assert secret not in str(exc.value) and "refused" in str(exc.value)
+    assert "refused" in str(exc.value) and attempts and attempts[0]["code"] == 400
+    assert secret not in _every_text(exc.value, attempts)
+
+
+def test_VA_01_provider_text_never_reaches_the_error_after_two_failed_tries():
+    secret = _secret()
+    llm, _, attempts = make(
+        FakeClient(ApiError(503, "UNAVAILABLE", f"upstream said {secret}")),
+        FakeClient(RuntimeError(f"connection to host?key={secret} failed")),
+    )
+    with pytest.raises(LLMUnavailable) as exc:
+        run(llm.generate("sys", "q"))
+    text = _every_text(exc.value, attempts)
+    assert secret not in text and len(attempts) == 2
+    assert "RuntimeError" in attempts[1]["error"] and "503" in attempts[0]["error"]  # class and code stay: they explain
+
+
+def test_VA_01_provider_text_never_reaches_the_error_when_a_stream_dies_after_its_first_token():
+    secret = _secret()
+
+    class Dying(FakeClient):
+        async def open(self, system, prompt, *, json_mode, max_tokens, thinking):
+            async def chunks():
+                yield "partial "
+                raise RuntimeError(f"stream cut, session={secret}")
+
+            return chunks()
+
+    llm, _, attempts = make(Dying())
+    with pytest.raises(LLMUnavailable) as exc:
+        run(llm.generate("sys", "q"))
+    assert secret not in _every_text(exc.value, attempts) and attempts[-1]["outcome"] == "error"
+
+
+def test_VA_01_provider_text_never_reaches_the_log_when_a_prewarm_fails():
+    secret = _secret()
+    llm, _, attempts = make(FakeClient(warm_error=RuntimeError(f"warm failed {secret}")))
+    run(llm.prewarm())
+    assert attempts and secret not in repr(attempts) and secret not in json.dumps(attempts)
 
 
 def test_VA_01_prewarm_is_rate_limited_to_once_per_10_seconds():

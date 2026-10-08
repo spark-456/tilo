@@ -7,6 +7,11 @@ Everything the bot needs from a model or a speech service goes through here and 
 - `ProviderSpeech`: audio to text through `SpeechProvider` (the hybrid transcript and `retranscribe`).
 - `ProviderTTS` and `make_tts`: the bot's voice through `SpeechProvider.synthesize` (`config/voice.yaml`).
 
+Every one of those calls is counted against the meeting's cap (`config/meeting.yaml`, `call_counter()`): outside
+participants can make the bot ask, and the bot's calls run outside the router's budget. At the cap the call is
+refused before any request, a warning is logged once, and the bot degrades (no more answers, the local voice,
+captions only).
+
 The bot never names a model, a vendor or a key. Roles, profiles, the speech vendor and the caps are Tilo config
 (`config/models*.yaml`, `config/speech*.yaml`); credentials are Google's application default credentials, read by the
 provider layer. Without `LIVE=1` (only the user sets it) the dev config resolves fake providers, so a test, a mock run
@@ -27,13 +32,15 @@ from typing import Any
 from tilo_providers.config import ProvidersConfig, load_providers_config
 from tilo_providers.errors import NotConfigured, QuotaError, RequestError, RetryableError
 from tilo_providers.interfaces import GenerateRequest, SpeechProvider
+from tilo_providers.meeting import CallCounter, load_meeting_caps
 from tilo_providers.router import Router, RouterError, TokenCapExceededError
 from tilo_providers.speech import build_speech_provider, load_speech_config
 from tilo_providers.voice import VoiceConfig, build_voice_provider, load_voice_config
 
 from .brain import Busy, LLMUnavailable
 from .config import ROOT
-from .llm_fast import ModelCallError
+from .guards import BotRefused, recording_refusal
+from .llm_fast import CallCapReached, ModelCallError
 from .tts import FallbackTTS, LocalTTS, TTSError, TTSProvider
 
 log = logging.getLogger("bot.providers")
@@ -74,8 +81,51 @@ def voice_file() -> Path:
     return _config_file("TILO_VOICE_FILE", "voice.yaml", "voice.dev.yaml")
 
 
+def meeting_file() -> Path:
+    """`TILO_MEETING_FILE`, else `config/meeting.yaml` (one file: the caps are as conservative offline as live)."""
+    override = os.environ.get("TILO_MEETING_FILE", "").strip()
+    return Path(override) if override else repo_root() / "config" / "meeting.yaml"
+
+
 def fixtures_dir() -> Path:
-    return repo_root() / "fixtures"  # record-and-replay recordings (EFF-01), the same directory tilo-api uses
+    return repo_root() / "fixtures"  # replay only: the bot refuses TILO_RECORD (guards.py), so it never writes here
+
+
+# -- the per-meeting call cap ----------------------------------------------------------------------------------------
+_counter: CallCounter | None = None
+
+
+def call_counter() -> CallCounter:
+    """The one counter of this bot process (one process is one meeting), built from `config/meeting.yaml`."""
+    global _counter
+    if _counter is None:
+        _counter = CallCounter(load_meeting_caps(meeting_file()))
+    return _counter
+
+
+def set_call_counter(counter: CallCounter | None) -> None:
+    global _counter
+    _counter = counter
+
+
+def reset_call_counter() -> None:
+    set_call_counter(None)
+
+
+def take_call(kind: str) -> bool:
+    """True if one more `model` or `speech` call may be made. At the cap: False, and one warning for the meeting."""
+    counter = call_counter()
+    if counter.take(kind):
+        return True
+    if counter.newly_capped(kind):
+        limit = counter.caps.max_model_calls if kind == "model" else counter.caps.max_speech_calls
+        log.warning(
+            "meeting call cap reached: %d %s calls made (config/meeting.yaml); no more %s calls this meeting",
+            limit,
+            kind,
+            kind,
+        )
+    return False
 
 
 def load_config() -> ProvidersConfig:
@@ -83,6 +133,9 @@ def load_config() -> ProvidersConfig:
 
 
 def make_router(config: ProvidersConfig | None = None, *, router: Router | None = None) -> Router:
+    refusal = recording_refusal()
+    if refusal:
+        raise BotRefused(refusal)
     return router or Router(config or load_config(), fixtures_dir=fixtures_dir())
 
 
@@ -147,6 +200,8 @@ class ProviderLLM:
             prompt=prompt, system=system, json_mode=True, max_output_tokens=self.max_output_tokens
         )
         for attempt in range(1, self.max_attempts + 1):
+            if not take_call("model"):
+                raise LLMUnavailable("the meeting's model call cap is reached (config/meeting.yaml)")
             try:
                 result = self.router.generate(self.role, request)
             except RouterError as error:
@@ -179,6 +234,8 @@ class ProviderFastClient:
             max_output_tokens=max_tokens,
             thinking_level=_thinking(thinking),
         )
+        if not take_call("model"):
+            raise CallCapReached("the meeting's model call cap is reached (config/meeting.yaml)")
         try:
             run = await asyncio.to_thread(self.router.stream, self.role, request)
         except RouterError as error:
@@ -217,6 +274,8 @@ class ProviderSpeech:
         self.provider = provider
 
     def segments(self, wav: bytes, language: str | None = "en") -> list[dict[str, Any]]:
+        if not take_call("speech"):
+            raise LLMUnavailable("the meeting's speech call cap is reached (config/meeting.yaml)")
         try:
             result = self.provider.transcribe(wav, media_type=WAV_TYPE, language=language)
         except Exception as error:  # the provider's own errors carry no secrets, but the bot reports a class name only
@@ -243,6 +302,8 @@ class ProviderTTS:
 
     async def stream(self, text: str) -> AsyncIterator[bytes]:
         spoken = " ".join(text.split())[: self.config.max_chars]
+        if not take_call("speech"):  # permanent: the fallback voice (local, no provider call) speaks for the rest
+            raise TTSError("the meeting's speech call cap is reached (config/meeting.yaml)", permanent=True)
         try:
             pcm = await asyncio.to_thread(self.provider.synthesize, spoken)
         except Exception as error:

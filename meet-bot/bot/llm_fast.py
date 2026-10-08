@@ -16,7 +16,6 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import re
 import time
 from collections.abc import AsyncIterator, Callable
 from typing import Any, Protocol
@@ -33,6 +32,13 @@ class ModelCallError(Exception):
     def __init__(self, code: int | None, status: str = "", message: str = "model call failed") -> None:
         super().__init__(message)
         self.code, self.status = code, status
+
+
+class CallCapReached(ModelCallError):
+    """The meeting's cap on provider calls is reached (config/meeting.yaml): no request was made and none will be."""
+
+    def __init__(self, message: str = "the meeting's model call cap is reached") -> None:
+        super().__init__(None, "CALL_CAP", message)
 
 
 class FastClient(Protocol):
@@ -93,6 +99,9 @@ class FastLLM:
             except Exception as e:
                 code = _code(e)
                 await _close(chunks)
+                if isinstance(e, CallCapReached):  # nothing was sent; a second try is refused the same way
+                    self._report(attempt, "capped", None, None, started)
+                    raise LLMUnavailable(str(e)) from None
                 if code == 429 or _status(e) == "RESOURCE_EXHAUSTED":
                     self._report(attempt, "busy", 429, None, started)
                     raise Busy("the model is rate limited") from None
@@ -177,7 +186,9 @@ class FastLLM:
 
     @staticmethod
     def _redact(e: Exception | None) -> str:
-        return re.sub(r"\s+", " ", f"{type(e).__name__}: {e}")[:200]
+        """Provider error text never reaches a log, a row or a message: the exception class and the status code only."""
+        code = None if e is None else _code(e)
+        return type(e).__name__ if code is None else f"{type(e).__name__} ({code})"
 
     @staticmethod
     def _explain(code: int | None, e: Exception) -> str:

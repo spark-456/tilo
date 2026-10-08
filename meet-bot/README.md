@@ -33,11 +33,15 @@ Run from the `meet-bot/` folder. On Windows use `python`, on Mac/Linux `python3`
 |---|---|
 | `python -m bot.main doctor [--watch]` | Checks Docker, `.env`, login state; prints container CPU/RAM while a meeting runs |
 | `python -m bot.main login` | Starts the container with a plain browser for the one-time manual sign-in |
-| `python -m bot.main start [--agenda FILE] [--duration MIN]` | Opens `meet.google.com/new`, prints `MEETING_URL ...`, joins as host |
+| `python -m bot.main start [--agenda FILE] [--duration MIN]` | Opens `meet.google.com/new`, prints `MEETING_URL ...`, joins as host (prototype only: ADR-0024 disables it for the persistent profile) |
 | `python -m bot.main join URL` | Joins an existing meeting |
 | `python -m bot.main run-mock` | Replays a recorded 30-minute transcript through the brain, offline, no key needed |
 
 Outputs per meeting, in `out/<timestamp>/`: `transcript.jsonl`, `events.jsonl`, `state.json`, `summary.md`. Screenshots go to `debug/`.
+
+`start` and `join` need `LIVE=1` (set by you only): without it the providers are dev fakes, and a fake transcript never
+reaches a real meeting, so both commands refuse and tell you so. `run-mock` works offline without it. The bot never
+clicks Admit for a meeting Tilo hosts (ADR-0024); `--auto-admit` is for prototype test meetings only.
 
 Press Ctrl+C in the terminal to make the bot leave cleanly and write the summary.
 
@@ -82,12 +86,26 @@ The bot names no model, vendor or key. `bot/providers.py` is the one module that
 - **Offline by default.** Without the live switch the bot reads `config/models.dev.yaml`, `config/speech.dev.yaml` and
   `config/voice.dev.yaml`, whose providers are deterministic fakes: canned answers, a tone for a voice, no network, no paid
   call. Only the user sets `LIVE` to `1` (then the real files are read and the Google adapters are built; they need
-  `GOOGLE_CLOUD_PROJECT` and the user's Google application default credentials). There is no API key in `.env`.
+  `GOOGLE_CLOUD_PROJECT` and Google application default credentials). There is no API key in `.env`.
+- **If your `meet-bot/.env` is older, delete these lines and revoke the keys.** The prototype's `.env` may still hold
+  the prototype's model key (Gemini or AI Studio) and its third-party voice key. Nothing reads them now, but
+  `env_file: .env` in `docker-compose.yml` loads the whole file into the container. Remove every `*_API_KEY` line from
+  `.env`, then revoke each key in the console of the service that issued it.
+- **Credentials for a live meeting (BQ-MTG11-4).** Run the bot on the host, or in the container with a dedicated identity
+  that has no project role (ADR-0024 amendment 3(a)). Never put your own gcloud credentials in the container: they are
+  the project Owner's, and the container runs Chromium with `--no-sandbox` behind a VNC session with no password.
+- **A cap per meeting.** `config/meeting.yaml` bounds the provider calls of one meeting (200 model calls, 400 speech
+  calls). At the cap the bot logs one warning and carries on without them: no more answers, the local voice, the
+  transcript still written. SEC-16 spend caps are not wired for the bot (BQ-MTG11-9).
+- **No recording.** The bot refuses to start with `TILO_RECORD` set: it would write what people said into `fixtures/`.
 - **Tests** run offline with the repo's venv: `just meet-bot-test` (also part of `just test`).
 - **Docker.** The image carries the provider layer, so the build context is the repository root: `docker compose build`
   from `meet-bot/` uses `context: ..` and `docker/Dockerfile`; `docker/Dockerfile.dockerignore` whitelists what is copied
-  (`meet-bot/bot`, `packages/providers/src`, `packages/contracts-py/src`, `config/`, `prompts/`). The layout is kept under
-  `/opt/tilo` (`TILO_REPO_ROOT`). How the user's credentials reach the container is not wired (open question BQ-MTG11-4).
+  (`meet-bot/bot`, `packages/providers/src`, `packages/contracts-py/src`, and only the config and prompts the provider layer
+  reads: `config/models*`, `prices*`, `speech*`, `voice*`, `meeting*` and `prompts/router`, `prompts/speech`; key files at any
+  depth are excluded). The layout is kept under `/opt/tilo` (`TILO_REPO_ROOT`). `docker/requirements.txt` pins the provider
+  layer's dependencies to the versions in `uv.lock` (a test compares them). How credentials reach the container is not wired
+  (open question BQ-MTG11-4).
 
 ## Meeting events (for later use inside a bigger system)
 

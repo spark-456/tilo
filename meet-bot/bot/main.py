@@ -19,6 +19,7 @@ import time
 from pathlib import Path
 
 from .config import IN_CONTAINER, ROOT, Config, load_dotenv, setup_logging
+from .guards import fakes_refusal, recording_refusal
 
 IMAGE = "tilo-meet-bot:latest"
 CONTAINER = "tilo-meet-bot"
@@ -89,7 +90,7 @@ def cmd_doctor(args: argparse.Namespace) -> int:
         True,
         "models and speech: live providers (the user set the live switch)"
         if live
-        else "models and speech: fake providers (offline; the live switch is not set)",
+        else "models and speech: fake providers (offline; start and join refuse them, the live switch is not set)",
     )
     agenda = ROOT / os.environ.get("AGENDA_PATH", "agenda.md")
     line(
@@ -250,6 +251,10 @@ def cmd_login(_: argparse.Namespace) -> int:
 
 
 def _live(mode: str, args: argparse.Namespace) -> int:
+    refusal = fakes_refusal()  # a real meeting never gets the dev fakes (host and container alike)
+    if refusal:
+        print(f"ERROR: {refusal}")
+        return 2
     if not IN_CONTAINER:
         if args.api_create:
             print(
@@ -481,6 +486,10 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     setup_logging()
     args = build_parser().parse_args(argv)
+    refusal = recording_refusal()  # nothing the bot hears may be recorded into the repository's fixtures
+    if refusal:
+        print(f"ERROR: {refusal}")
+        return 2
     handlers = {
         "doctor": cmd_doctor,
         "login": cmd_login,

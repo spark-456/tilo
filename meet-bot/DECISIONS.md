@@ -31,7 +31,7 @@ One line of reasoning each. Newest at the bottom.
 - **No study of the reference repos (recallai, attendee) beyond prior knowledge**: web access was not used; approach (persistent login, caption region observation) follows what those projects are known for.
 - **Host via /new lands straight in the call**: `join` checks for "in call" first and closes the "Your meeting's ready" card (found in the first live run).
 - **Bot starts (intro, clock, brain, chat) only when required people are present**: required names come from the agenda `Required:` line, `--require`, or `REQUIRED_PARTICIPANTS`; with none, any other participant opens the gate. The intro chat waits for the gate too.
-- **Auto-admit is opt-in (`--auto-admit`), optionally limited by `ADMIT_ALLOWED_NAMES`**: admitting strangers by default would be unsafe.
+- **Auto-admit is opt-in (`--auto-admit`), optionally limited by `ADMIT_ALLOWED_NAMES`**: admitting strangers by default would be unsafe. Never used for bot-hosted meetings: the bot never clicks Admit and `AUTO_ADMIT` stays 0 there (ADR-0024 decision 7, amendment 3(c)).
 - **Direct questions get their own fast path and budget (default 12 replies, 6 s apart), separate from the 4-message nudge cap**: nudges stay rare; answers must be timely.
 - **`ANSWER_MODE=questions` by default**: live captions garble the assistant's name ("Tilo" -> "Heart", "Tyler"), so any question is offered to the model, which replies only if the meeting info answers it.
 - **Audio recording is opt-in and disclosed in the intro chat line**: it is a recording of other people; it stays in `out/` and is sent only to the speech provider if `retranscribe` is run.

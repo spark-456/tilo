@@ -3,7 +3,15 @@
 Bot model and speech calls go through `packages/providers`; no model id in `meet-bot/`; no ElevenLabs dependency, key
 name or call in the submitted build; speech vendor and voice are config. Static checks over git-tracked files only: no
 network, no process started, and no read of any untracked or `.env` file. Each rule has a failing negative test on
-synthetic input, so a scanner that stopped scanning would be caught."""
+synthetic input, so a scanner that stopped scanning would be caught.
+
+These are tripwires, not a proof. They catch a vendor name in any spelling (`elevenlabs`, `eleven_labs`, `eleven-labs`,
+`11labs`), a static `import`, `importlib.import_module(...)` and `__import__(...)` of a vendor module, and a vendor key
+or name that is written as a constant, as a concatenation, an f-string without placeholders or a `"".join` of constants.
+They do NOT catch a name built from variables, `getattr`/`globals()` lookups, `base64`/`chr`/`bytes` decoding, a
+name read from a file or the network at run time, or a vendor reached through a library that is already allowed (for
+example a URL passed to `httpx`). A dynamic import whose module name is not a constant is reported as a problem, so
+that route is closed by rule rather than by detection. Review catches the rest."""
 
 from __future__ import annotations
 
@@ -25,7 +33,8 @@ BOT = ROOT / "meet-bot"
 # A name that belongs to a non-Google model, speech or voice vendor. `openai_compat` is Tilo's own adapter name and a
 # `/openai/` URL path is Google's own endpoint.
 NON_GOOGLE = re.compile(
-    r"eleven\s*labs|\bscribe[_ -]?v\d|deepgram|assembly\s*ai|whisper|speechmatics|gladia|\bvosk\b|nuance|watson|rev\.ai"
+    r"eleven[\s_-]*labs|\b11[\s_-]?labs\b|\bxi[_-]api|\bscribe[_ -]?v\d|deepgram|assembly\s*ai|whisper|speechmatics"
+    r"|gladia|\bvosk\b|nuance|watson|rev\.ai"
     r"|\bazure\b|amazon\s+(?:transcribe|polly)|aws\s+(?:transcribe|polly)|\bpolly\b|(?<!/)openai(?![_ -]?compat)",
     re.IGNORECASE,
 )
@@ -111,7 +120,8 @@ def test_FR_MTG_11_no_model_id_anywhere_in_meet_bot_code_tests_docs_env_compose_
 
 def test_FR_MTG_11_the_id_scan_would_catch_an_id_in_a_markdown_file(tmp_path):
     lint = load_lint()
-    assert lint.FAMILY_PATTERN.findall("run it with the gemini-9.9-flash model")  # a doc is scanned like code here
+    fake_id = "gemini" + "-9.9-flash"  # built at runtime: PL-01's own lint scans this file too
+    assert lint.FAMILY_PATTERN.findall(f"run it with the {fake_id} model")  # a doc is scanned like code here
 
 
 # -- (2) vendor names ------------------------------------------------------------------------------------------------
@@ -171,6 +181,54 @@ def py_imports(source: str) -> list[tuple[str, int, int]]:
     return found
 
 
+def fold(node: ast.AST) -> str | None:
+    """The string a simple expression always evaluates to, or None: a constant, `a + b`, an f-string with no
+    placeholder, or `"sep".join([constants])`. Anything that needs a variable or a call is not folded."""
+    if isinstance(node, ast.Constant):
+        return node.value if isinstance(node.value, str) else None
+    if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Add):
+        left, right = fold(node.left), fold(node.right)
+        return None if left is None or right is None else left + right
+    if isinstance(node, ast.JoinedStr):
+        parts = [fold(v) for v in node.values]
+        return None if any(p is None for p in parts) else "".join(p for p in parts if p is not None)
+    if (
+        isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Attribute)
+        and node.func.attr == "join"
+        and len(node.args) == 1
+        and isinstance(node.args[0], ast.List | ast.Tuple)
+    ):
+        sep, items = fold(node.func.value), [fold(e) for e in node.args[0].elts]
+        return None if sep is None or any(i is None for i in items) else sep.join(i for i in items if i is not None)
+    return None
+
+
+def computed_strings(source: str) -> list[tuple[int, str]]:
+    """(line, text) of every string built from constants (not a plain literal): `"ELEVEN" + "LABS_API_KEY"`."""
+    found = []
+    for node in ast.walk(ast.parse(source)):
+        if isinstance(node, ast.Constant):
+            continue
+        text = fold(node)
+        if text is not None:
+            found.append((node.lineno, text))  # type: ignore[attr-defined]
+    return found
+
+
+def dynamic_import_modules(source: str) -> list[tuple[int, str | None]]:
+    """(line, module name or None when it is not a constant) of `importlib.import_module(x)` and `__import__(x)`."""
+    found = []
+    for node in ast.walk(ast.parse(source)):
+        if not isinstance(node, ast.Call):
+            continue
+        func = node.func
+        name = func.attr if isinstance(func, ast.Attribute) else func.id if isinstance(func, ast.Name) else ""
+        if name in {"import_module", "__import__"}:
+            found.append((node.lineno, fold(node.args[0]) if node.args else None))
+    return found
+
+
 def vendor_import_problems(source: str, *, allow_tilo_providers: bool) -> list[str]:
     problems = []
     for module, level, line in py_imports(source):
@@ -179,15 +237,30 @@ def vendor_import_problems(source: str, *, allow_tilo_providers: bool) -> list[s
             problems.append(f"line {line}: vendor SDK import {module}")
         if level == 0 and top == "tilo_providers" and not allow_tilo_providers:
             problems.append(f"line {line}: tilo_providers is imported outside the adapter")
+    for line, module in dynamic_import_modules(source):
+        top = (module or "").split(".")[0]
+        if module is None:
+            problems.append(f"line {line}: dynamic import of a module name that is not a constant")
+        elif top in VENDOR_MODULES or NON_GOOGLE.search(module):
+            problems.append(f"line {line}: vendor SDK import {module} through importlib or __import__")
+        elif top == "tilo_providers" and not allow_tilo_providers:
+            problems.append(f"line {line}: tilo_providers is imported outside the adapter")
     return problems
 
 
 def vendor_key_problems(source: str) -> list[str]:
-    return [
-        f"line {n.lineno}: vendor key name {n.value!r}"
+    plain = [
+        (n.lineno, n.value)
         for n in ast.walk(ast.parse(source))
-        if isinstance(n, ast.Constant) and isinstance(n.value, str) and VENDOR_KEY_NAME.match(n.value)
+        if isinstance(n, ast.Constant) and isinstance(n.value, str)
     ]
+    problems = [f"line {line}: vendor key name {text!r}" for line, text in plain if VENDOR_KEY_NAME.match(text)]
+    # a literal is scanned for names too: `'eleven' '-labs'` is one constant once parsed, though the file text hides it
+    problems += [f"line {line}: vendor name {text!r}" for line, text in plain if NON_GOOGLE.search(text)]
+    for line, text in computed_strings(source):
+        if VENDOR_KEY_NAME.match(text) or NON_GOOGLE.search(text):
+            problems.append(f"line {line}: computed vendor key or name {text!r}")
+    return problems
 
 
 def test_FR_MTG_11_no_vendor_sdk_import_and_no_vendor_key_name_in_any_meet_bot_python_file():
@@ -231,7 +304,14 @@ def test_FR_MTG_11_the_adapter_reads_no_environment_variable_except_the_provider
         and isinstance(n.func, ast.Attribute)
         and n.func.attr in {"get", "getenv"}
     }
-    assert env_reads <= {"LIVE", "TILO_REPO_ROOT", "TILO_MODELS_FILE", "TILO_SPEECH_FILE", "TILO_VOICE_FILE"}, env_reads
+    assert env_reads <= {
+        "LIVE",
+        "TILO_REPO_ROOT",
+        "TILO_MODELS_FILE",
+        "TILO_SPEECH_FILE",
+        "TILO_VOICE_FILE",
+        "TILO_MEETING_FILE",
+    }, env_reads
 
 
 def test_FR_MTG_11_the_import_and_key_scans_would_catch_a_violation():
@@ -242,6 +322,31 @@ def test_FR_MTG_11_the_import_and_key_scans_would_catch_a_violation():
     assert not vendor_import_problems("from .brain import Busy\nimport asyncio\n", allow_tilo_providers=False)
     assert vendor_key_problems("import os\nos.environ.get('ELEVENLABS_API_KEY')\n")
     assert vendor_key_problems("k = 'GEMINI_API_KEY'\n") and not vendor_key_problems("k = 'LIVE'\n")
+
+
+def test_FR_MTG_11_the_tripwires_catch_dynamic_imports_other_spellings_and_computed_names():
+    for source in (
+        "import importlib\nm = importlib.import_module('elevenlabs')\n",
+        "from importlib import import_module\nm = import_module('google.genai')\n",
+        "m = __import__('openai')\n",
+        "m = __import__('web' + 'sockets')\n",
+        "import importlib\nm = importlib.import_module(name)\n",  # not a constant: closed by rule
+    ):
+        assert vendor_import_problems(source, allow_tilo_providers=False), source
+    assert not vendor_import_problems("import importlib\nimportlib.import_module('json')\n", allow_tilo_providers=False)
+    assert vendor_import_problems("__import__('tilo_providers')\n", allow_tilo_providers=False)
+    for source in (
+        "k = 'ELEVEN' + 'LABS_API_KEY'\n",
+        "k = ''.join(['GEMINI', '_API_', 'KEY'])\n",
+        "k = f'XI_API_KEY'\n",
+        "n = 'eleven' + '_labs'\n",
+        "n = 'eleven' '-labs'\n",
+    ):
+        assert vendor_key_problems(source), source
+    assert not vendor_key_problems("k = 'a' + 'b'\nj = ','.join(['x', 'y'])\n")
+    for sample in ("eleven_labs", "eleven-labs", "Eleven Labs", "11labs", "11 labs", "xi-api-key"):
+        assert NON_GOOGLE.search(f"uses {sample} here"), sample
+    assert not NON_GOOGLE.search("a 115 labs sample") and not NON_GOOGLE.search("level11 labsolute")
 
 
 # -- (E) Docker and dependencies ------------------------------------------------------------------------------------
@@ -261,6 +366,40 @@ def provider_dependency_names() -> set[str]:
         "pydantic",
         "pyyaml",
     }  # pydantic via tilo-contracts, pyyaml read by config
+
+
+def lock_versions() -> dict[str, str]:
+    packages = tomllib.loads(read("uv.lock"))["package"]
+    return {p["name"].lower().replace("_", "-"): p["version"] for p in packages}
+
+
+def pinned_requirements(text: str) -> dict[str, str | None]:
+    """name -> the exact version of a `name==x.y.z` line, or None for any other specifier."""
+    pins: dict[str, str | None] = {}
+    for line in text.splitlines():
+        line = line.split("#")[0].strip()
+        if line:
+            name = re.split(r"[\[<>=!~ ;]", line, maxsplit=1)[0].lower().replace("_", "-")
+            match = re.fullmatch(r"[A-Za-z0-9_.-]+(?:\[[^\]]*\])?==([0-9][A-Za-z0-9.+!-]*)", line)
+            pins[name] = match.group(1) if match else None
+    return pins
+
+
+def test_FR_MTG_11_every_image_requirement_is_pinned_to_the_version_in_uv_lock():
+    pins, lock = pinned_requirements(read("meet-bot/docker/requirements.txt")), lock_versions()
+    assert pins and set(pins) - {"playwright"}
+    unpinned = sorted(name for name, version in pins.items() if version is None)
+    assert unpinned == [], f"pin with ==: {unpinned}"
+    drift = {n: (v, lock.get(n)) for n, v in pins.items() if n != "playwright" and lock.get(n) != v}
+    assert drift == {}, f"requirements.txt and uv.lock disagree (pin, lock): {drift}"
+    image_tag = re.search(r"playwright/python:v([0-9.]+)", read("meet-bot/docker/Dockerfile"))
+    assert image_tag and pins["playwright"] == image_tag.group(1), "the playwright pin matches the base image tag"
+
+
+def test_FR_MTG_11_the_pin_check_would_catch_a_range_a_missing_pin_and_a_drifted_version():
+    pins = pinned_requirements("pydantic>=2.11\nhttpx==0.28.1 # c\nGoogle_Auth[requests]==2.58.1\n")
+    assert pins == {"pydantic": None, "httpx": "0.28.1", "google-auth": "2.58.1"}
+    assert lock_versions().get("httpx") and lock_versions()["httpx"] != "0.0.1"
 
 
 def test_FR_MTG_11_the_image_requirements_hold_playwright_and_what_the_provider_layer_needs_and_nothing_else():
@@ -293,8 +432,13 @@ def test_FR_MTG_11_the_dockerfile_copies_every_package_the_adapter_imports_and_t
     for module in needed:
         assert f"{package_dirs[module]}/src" in sources, f"the image must COPY {package_dirs[module]}/src for {module}"
     for source in (
-        "config",
-        "prompts",
+        "config/models*.yaml",
+        "config/prices*.yaml",
+        "config/speech*.yaml",
+        "config/voice*.yaml",
+        "config/meeting*.yaml",
+        "prompts/router",
+        "prompts/speech",
         "meet-bot/bot",
         "meet-bot/docker/entrypoint.py",
         "meet-bot/docker/requirements.txt",
@@ -306,6 +450,7 @@ def test_FR_MTG_11_the_dockerfile_copies_every_package_the_adapter_imports_and_t
         and "/opt/tilo/config" in dockerfile
         and "/opt/tilo/prompts" in dockerfile
     )
+    assert "config" not in sources and "prompts" not in sources, "copy only the files the bot reads"
 
 
 def test_FR_MTG_11_the_compose_build_context_is_the_repo_root_and_the_dockerignore_whitelists_what_is_copied():
@@ -324,14 +469,53 @@ def test_FR_MTG_11_the_compose_build_context_is_the_repo_root_and_the_dockerigno
         "!meet-bot/docker",
         "!packages/contracts-py/src",
         "!packages/providers/src",
-        "!config",
-        "!prompts",
+        "!config/models*.yaml",
+        "!config/prices*.yaml",
+        "!config/speech*.yaml",
+        "!config/voice*.yaml",
+        "!config/meeting*.yaml",
+        "!prompts/router",
+        "!prompts/speech",
     ):
         assert keep in lines, keep
-    for secret in ("**/.env", "**/*.pem", "**/credentials.json", "application_default_credentials.json"):
-        assert secret in lines, secret
+    assert "!config" not in lines and "!prompts" not in lines  # not all of config/ and prompts/
+    assert not (set(lines) & {"service-account*.json", "*-credentials.json", "application_default_credentials.json"})
+    assert not missing_deep_secret_patterns(lines)
     env = compose["services"]["bot"]["environment"]
     assert not any(re.search(r"API_KEY|TOKEN|SECRET", str(name)) for name in env), "no key is passed to the container"
+
+
+# A bare `service-account*.json` only matches at the context root; a key file at any depth needs `**/`.
+DEEP_SECRETS = (
+    "**/.env",
+    "**/.env.*",
+    "**/*.pem",
+    "**/*.key",
+    "**/*.p12",
+    "**/service-account*.json",
+    "**/*-credentials.json",
+    "**/credentials.json",
+    "**/application_default_credentials.json",
+    "**/client_secret*.json",
+    "**/token*.json",
+)
+
+
+def missing_deep_secret_patterns(lines: Iterable[str]) -> list[str]:
+    have = set(lines)
+    return [pattern for pattern in DEEP_SECRETS if pattern not in have]
+
+
+def test_FR_MTG_11_the_root_dockerignore_also_excludes_key_files_at_any_depth():
+    lines = [ln.strip() for ln in read(".dockerignore").splitlines() if ln.strip() and not ln.startswith("#")]
+    assert missing_deep_secret_patterns(lines) == []
+    assert not (set(lines) & {"service-account*.json", "*-credentials.json", "application_default_credentials.json"})
+
+
+def test_FR_MTG_11_the_secret_pattern_check_would_catch_a_root_only_pattern():
+    assert missing_deep_secret_patterns(["service-account*.json", "**/.env"])
+    assert "**/service-account*.json" in missing_deep_secret_patterns(["service-account*.json"])
+    assert missing_deep_secret_patterns(DEEP_SECRETS) == []
 
 
 def test_FR_MTG_11_the_requirement_scan_would_catch_a_vendor_package():
