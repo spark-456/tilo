@@ -177,7 +177,9 @@ export function TodayPanel({
       <div className="park-home-rule" />
       <button type="button" className="park-home-spend" onClick={onLedger}>
         <span className="park-home-spend__head">
-          <span className="park-home-title">{spend.month} spend</span>
+          <span className="park-home-title">
+            {spend.month ? `${spend.month} spend` : "Spend so far"}
+          </span>
           <span className="park-home-spend__link">Ledger</span>
         </span>
         <span className="park-home-spend__figures">

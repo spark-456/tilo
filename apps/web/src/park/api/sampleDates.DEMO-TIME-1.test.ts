@@ -136,5 +136,7 @@ describe("DEMO-TIME-1 Home's spend panel names the month", () => {
     const { spendOf } = await import("../pages/Home/homeData");
     expect(spendOf(dated(ledger, FRI_9_OCT)).month).toBe("October");
     expect(spendOf(ledger).month).toBe("September");
+    // the live report is a total with no daily series: no month is named (HR-1)
+    expect(spendOf({ ...ledger, daily: [] }).month).toBeNull();
   });
 });

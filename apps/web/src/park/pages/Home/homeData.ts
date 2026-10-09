@@ -240,8 +240,9 @@ export const money = (n: number): string =>
     .replace(/\B(?=(\d{3})+(?!\d))/g, ",")}`;
 
 export interface Spend {
-  /** The month the ledger shows, as the panel's title names it ("September" when the ledger holds no period). */
-  readonly month: string;
+  /** The month the ledger shows, as the panel's title names it ("September" for a ledger with daily spend and no
+   * period); null when the ledger holds no month (the live report is a total, not a month: HR-1). */
+  readonly month: string | null;
   readonly spent: string;
   readonly of: string;
   readonly forecast: string;
@@ -255,7 +256,7 @@ export function spendOf(ledger: Ledger): Spend {
   const pct = (n: number): number =>
     ledger.budget > 0 ? Math.round((n / ledger.budget) * 100) : 0;
   return {
-    month: ledger.period?.month ?? "September",
+    month: ledger.period?.month ?? (ledger.daily.length > 0 ? "September" : null),
     spent: money(ledger.spent),
     of: `of ${money(ledger.budget)}`,
     forecast: `Forecast ${money(ledger.forecast)} · ${money(waiting)} waiting on you`,
