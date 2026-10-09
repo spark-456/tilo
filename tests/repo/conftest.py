@@ -11,6 +11,8 @@ uv/pnpm workspaces they are checking for.
 from __future__ import annotations
 
 import pathlib
+from collections.abc import Callable
+from functools import cache
 
 import pytest
 
@@ -20,3 +22,14 @@ REPO_ROOT = pathlib.Path(__file__).resolve().parents[2]
 @pytest.fixture(scope="session")
 def repo_root() -> pathlib.Path:
     return REPO_ROOT
+
+
+@pytest.fixture(scope="session")
+def repo_text() -> Callable[[pathlib.Path], str]:
+    """Read immutable checkout inputs once; synthetic test files use their own readers."""
+
+    @cache
+    def read(path: pathlib.Path) -> str:
+        return path.read_text(encoding="utf-8")
+
+    return read

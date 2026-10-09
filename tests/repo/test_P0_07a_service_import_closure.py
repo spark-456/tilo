@@ -11,6 +11,7 @@ import ast
 import pathlib
 import re
 import tomllib
+from collections.abc import Callable
 
 import pytest
 
@@ -18,13 +19,13 @@ SERVICES = ["api", "harness", "channels", "connectors", "browser", "render", "sa
 REQ_NAME = re.compile(r"^\s*([A-Za-z0-9_.-]+)")
 
 
-def _workspace(repo_root: pathlib.Path) -> dict[str, list[str]]:
+def _workspace(repo_root: pathlib.Path, read: Callable[[pathlib.Path], str]) -> dict[str, list[str]]:
     """Workspace package name -> the workspace package names it declares as dependencies."""
-    root = tomllib.loads((repo_root / "pyproject.toml").read_text(encoding="utf-8"))
+    root = tomllib.loads(read(repo_root / "pyproject.toml"))
     members = root["tool"]["uv"]["workspace"]["members"]
     projects = {}
     for member in members:
-        data = tomllib.loads((repo_root / member / "pyproject.toml").read_text(encoding="utf-8"))
+        data = tomllib.loads(read(repo_root / member / "pyproject.toml"))
         projects[data["project"]["name"]] = data["project"].get("dependencies", [])
     names = set(projects)
     return {
@@ -44,11 +45,11 @@ def _closure(graph: dict[str, list[str]], start: str) -> set[str]:
     return seen
 
 
-def _tilo_imports(src: pathlib.Path) -> dict[str, str]:
+def _tilo_imports(src: pathlib.Path, read: Callable[[pathlib.Path], str]) -> dict[str, str]:
     """Top-level tilo_* module -> first file that imports it (lazy imports count: they run in the image too)."""
     found: dict[str, str] = {}
     for path in sorted(src.rglob("*.py")):
-        for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
+        for node in ast.walk(ast.parse(read(path))):
             if isinstance(node, ast.Import):
                 mods = [alias.name for alias in node.names]
             elif isinstance(node, ast.ImportFrom) and node.level == 0 and node.module:
@@ -62,11 +63,18 @@ def _tilo_imports(src: pathlib.Path) -> dict[str, str]:
     return found
 
 
+@pytest.fixture(scope="session")
+def workspace_dependencies(repo_root, repo_text) -> dict[str, list[str]]:
+    return _workspace(repo_root, repo_text)
+
+
 @pytest.mark.parametrize("svc", SERVICES)
-def test_P0_07a_service_imports_are_declared_dependencies(repo_root: pathlib.Path, svc: str) -> None:
-    graph = _workspace(repo_root)
+def test_P0_07a_service_imports_are_declared_dependencies(
+    repo_root: pathlib.Path, svc: str, repo_text, workspace_dependencies
+) -> None:
+    graph = workspace_dependencies
     closure = {name.replace("-", "_") for name in _closure(graph, f"tilo-{svc}")}
-    imports = _tilo_imports(repo_root / "services" / svc / "src")
+    imports = _tilo_imports(repo_root / "services" / svc / "src", repo_text)
     missing = {mod: where for mod, where in imports.items() if mod not in closure}
     assert not missing, (
         f"P0-07a: tilo-{svc} imports workspace packages its image will not install "
