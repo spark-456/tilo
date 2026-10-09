@@ -398,6 +398,8 @@ export interface Team {
   coverage: { id: string; what: string; who: string[]; wait: string; slow?: boolean }[];
 }
 export interface Connector {
+  /** Live list metadata: OAuth scopes are not the demo's agent access levels. */
+  live?: { stateKnown: boolean; scopes: string[] };
   id: string;
   name: string;
   cat: string;
