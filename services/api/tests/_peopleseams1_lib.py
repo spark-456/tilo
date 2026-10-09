@@ -41,7 +41,7 @@ class _Query:
 
     def stream(self) -> Any:
         if self.client.fail:
-            raise RuntimeError("secret store text: tok_abcdefghijklmnopqrstuvwxyz0123456789ABCDEF")
+            raise RuntimeError("secret store text: " + "tok" + "_" + "a" * 40)
         assert self.flt is not None, "a mail read is always by one field"
         self.client.queries.append((self.path, self.flt.field_path, self.flt.value, self.cap))
         rows = [d for d in self.client.docs.get(self.path, []) if d.get(self.flt.field_path) == self.flt.value]
@@ -99,6 +99,11 @@ def seed_world(store: DurableStore, world_id: str, owner: str, *, goal: str | No
     return tid
 
 
+def seed_bare_world(store: DurableStore, world_id: str, owner: str) -> None:
+    """A world of `owner` whose task was never stored (a scheduled routine or a meeting host run)."""
+    store.commit(worlds={world_id: world(owner=owner)}, create=[("worlds", world_id)])
+
+
 def ev(kind: str, ts: str = STAMP, actor: str = "A_director") -> dict[str, Any]:
     return {"type": kind, "ts": ts, "actor": actor}
 
@@ -119,5 +124,5 @@ def card(world_id: str, n: int, *, name: str = "gate_send_reply", created_at: st
 GATE_OUTBOX = ulid(7)
 __all__ = [
     "GATE_OUTBOX", "OTHER", "OWNER", "NOW", "STAMP", "W1", "W2", "W3", "W4", "W5", "WorldWriterAdapter",
-    "card", "ev", "mail_doc", "process", "rig_with_mail", "run_with_cards", "seed_world",
+    "card", "ev", "mail_doc", "process", "rig_with_mail", "run_with_cards", "seed_bare_world", "seed_world",
 ]  # fmt: skip

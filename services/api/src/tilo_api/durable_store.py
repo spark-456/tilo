@@ -50,7 +50,6 @@ _ID = {
 _JSON_FIELDS = {"worlds": ("layout",), "tasks": ("draft", "brief", "edits", "approaches")}  # free-form: may nest arrays
 RESTARTED = "the service restarted, so the work stopped"
 _CLOSE_BUDGET_S = 5.0  # shutdown, well under Cloud Run's 10 s SIGTERM grace
-MAX_OWNER_TASKS = 500  # `load_owner_tasks` adopts at most this many of one owner's tasks (bounded read)
 
 
 class StaleRev(Exception):
@@ -362,19 +361,24 @@ class DurableStore(deps.Store):
             for w in [w for w, r in list(self.worlds.items()) if r.owner == owner]:
                 self.settle(w)
 
-    def load_owner_tasks(self, owner: str) -> None:
-        """Read-only (PEOPLE-SEAMS-1): this owner's tasks that the cache lacks, the first `MAX_OWNER_TASKS` the backend
-        returns. Read again on every call, so a task another instance made is found; a cached one is never replaced."""
+    def load_world_task(self, world_id: str) -> deps.TaskRecord | None:
+        """Read-only (PEOPLE-SEAMS-1): the task stored for this world, cached or read by `world_id` (one document at
+        most); None for none, and for an id that is not a world's."""
+        cached = super().load_world_task(world_id)
+        if cached is not None or not _valid("worlds", world_id):
+            return cached
         with _io():
-            found = self.backend.find("tasks", "owner", owner, limit=MAX_OWNER_TASKS)
+            found = self.backend.find("tasks", "world_id", world_id, limit=1)
         for task_id, d in found:
-            if not _valid("tasks", task_id) or task_id in self.tasks or d.get("owner") != owner:
+            if not _valid("tasks", task_id) or d.get("world_id") != world_id:
                 continue
             with _io():
                 task, rev = _task_from(d), d["rev"]
             with self._held():
                 if task_id not in self.tasks:
                     self.revs[("tasks", task_id)], self.tasks[task_id] = rev, task
+            return self.tasks[task_id]
+        return None
 
     def load_path(self, params: Mapping[str, Any]) -> DurableStore:
         """The ids of a request's path, read-only: this runs before the route has checked who is asking."""

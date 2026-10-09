@@ -9,7 +9,7 @@ that does not match its schema never reaches a backend, and unknown, malformed o
 | Seam | Reads or writes | Scope and bounds |
 | --- | --- | --- |
 | `get_plate_sources().cards(u)` | `CardStore.plate_facts(u)` of every run in the process | open cards of worlds `u` owns (the stored world must name `u` too) and open gates whose live Approver assignment names `u`; one per group; at most 500 |
-| `.runs(u)` | the owner's tasks (`DurableStore.load_owner_tasks`, 500), their worlds and cached events | `world.started`, no `world.completed/failed`, not paused; `blocked` while an `agent.blocked` is unanswered (BQ-PEOPLESEAMS1-2); goal and date from the brief |
+| `.runs(u)` | the person's own worlds (`load_owner`), their cached events, the task stored for the world (`DurableStore.load_world_task`), else the process's `Run.brief` | `world.started`, no `world.completed/failed`, not paused; `blocked` while an `agent.blocked` is unanswered (BQ-PEOPLESEAMS1-2); no task and no Run: a row with a null goal |
 | `.mail(u)` | `orgs/{org}/mail_triage` where `owner == u` | `needs_reply`, not flagged, well formed; 500; none without a Firestore client (BQ-PEOPLESEAMS1-1) |
 | `get_source_owners().owner_of(kind, ref)` | `mail`: the triage record by `message_id`; `request`: the world or task record | one holder or nobody; ref and kind checked first |
 | `get_desk_worlds()` | `desk.ensure_desk` (the panel's Desk) | org must be `deps.ORG_ID`, user a `u_` id; an id held by another owner is refused (503), never adopted; `desk_owner` is the cached record's owner or `None` |

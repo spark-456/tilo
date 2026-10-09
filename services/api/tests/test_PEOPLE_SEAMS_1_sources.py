@@ -5,6 +5,8 @@ comes back. No network; the mail collection is a Firestore-shaped fake."""
 
 from __future__ import annotations
 
+from types import SimpleNamespace
+
 import pytest
 from _cards_lib import FakeClock, add_seconds
 from _peopleseams1_lib import (
@@ -24,11 +26,12 @@ from _peopleseams1_lib import (
     process,
     rig_with_mail,
     run_with_cards,
+    seed_bare_world,
     seed_world,
 )
 from _pw1b_lib import make_rig, started
 from fastapi import HTTPException
-from tilo_api import seams_store
+from tilo_api import deps, seams_store
 
 STRANGER = "u_ps1_stranger"
 HOSTILE = ["", "u_", "u_a\n", "../u_x", "u_" + "a" * 49, "U_abc", 5, None, "u_ａｂｃ", "u_a/b"]
@@ -145,27 +148,58 @@ def test_PEOPLE_SEAMS_1_a_recovered_agent_clears_blocked_and_an_unstarted_world_
     assert [(f["world_id"], f["state"]) for f in _sources(store).runs(OWNER)] == [(W5, "running")]
 
 
-def test_PEOPLE_SEAMS_1_a_task_without_a_goal_or_with_a_bad_date_is_cut_or_dateless():
-    rig = make_rig("memory")
-    store = process(rig)
+def test_PEOPLE_SEAMS_1_a_task_without_a_goal_has_a_null_goal_and_a_bad_date_is_dateless():
+    store = process(make_rig("memory"))
     seed_world(store, W1, OWNER, goal=None)
     seed_world(store, W2, OWNER, deadline="soon")
     store.events[W1] = store.events[W2] = [ev("world.started")]
     facts = _sources(store).runs(OWNER)
-    assert [(f["world_id"], f["deadline"]) for f in facts] == [(W2, None)]
+    assert [(f["world_id"], f["goal"], f["deadline"]) for f in facts] == [
+        (W1, None, None),
+        (W2, "Compare prices", None),
+    ]
 
 
-def test_PEOPLE_SEAMS_1_only_the_persons_own_tasks_are_loaded_and_only_up_to_the_bound(monkeypatch):
+def test_PEOPLE_SEAMS_1_a_scheduled_style_world_with_no_stored_task_is_a_run_with_the_in_process_brief():
+    store = process(make_rig("memory"))
+    for world, owner in ((W1, OWNER), (W2, OTHER), (W3, OWNER)):
+        seed_bare_world(store, world, owner)
+    store.events[W1] = store.events[W2] = store.events[W3] = [ev("world.started")]
+    brief = {"goal": "Weekly report", "deadline": "2026-10-20"}
+    store.runs[W1] = SimpleNamespace(owner=OWNER, brief=brief)  # a routine's Run: its task was never stored
+    store.runs[W2] = SimpleNamespace(owner=OTHER, brief={"goal": "Not yours"})
+    facts = _sources(store).runs(OWNER)
+    assert [(f["world_id"], f["goal"], f["deadline"]) for f in facts] == [
+        (W1, "Weekly report", "2026-10-20"),
+        (W3, None, None),  # no task, no Run: still a running world of the person, with no title
+    ]
+    assert [f["world_id"] for f in _sources(store).runs(OTHER)] == [W2]
+    assert _sources(store).runs(STRANGER) == []
+
+
+def test_PEOPLE_SEAMS_1_a_run_brief_of_another_owner_is_not_read_and_desk_worlds_are_not_runs():
+    store = process(make_rig("memory"))
+    seed_bare_world(store, W1, OWNER)
+    store.events[W1] = [ev("world.started")]
+    store.runs[W1] = SimpleNamespace(owner=OTHER, brief={"goal": "Someone else's goal"})
+    seams_store.StoreDeskWorlds(store).desk_world(deps.ORG_ID, OWNER)  # a Desk world: no `world.started`
+    facts = _sources(store).runs(OWNER)
+    assert [(f["world_id"], f["goal"]) for f in facts] == [(W1, None)]
+
+
+def test_PEOPLE_SEAMS_1_a_task_is_found_by_its_world_and_a_task_of_another_owner_gives_no_goal():
     rig = make_rig("memory")
     first = process(rig)
-    for world, owner in ((W1, OWNER), (W2, OWNER), (W3, OWNER), (W4, OTHER)):
-        seed_world(first, world, owner)
-    monkeypatch.setattr("tilo_api.durable_store.MAX_OWNER_TASKS", 2)
+    seed_world(first, W1, OWNER)
+    seed_world(first, W2, OTHER)  # the stored task and world are OTHER's
     restarted = process(rig)
-    restarted.load_owner_tasks(OWNER)
-    assert len(restarted.tasks) == 2 and {t.owner for t in restarted.tasks.values()} == {OWNER}
-    restarted.load_owner_tasks(STRANGER)
-    assert len(restarted.tasks) == 2, "a person with no tasks loads nothing"
+    assert restarted.load_world_task(W1).owner == OWNER and len(restarted.tasks) == 1
+    assert restarted.load_world_task("w_nobody") is None and restarted.load_world_task("w_x\n") is None
+    restarted.load_world(W2)
+    restarted.worlds[W2].owner = OWNER  # a world record that now names OWNER, with a task still stored for OTHER
+    restarted.events[W2] = [ev("world.started")]
+    facts = [f for f in _sources(restarted).runs(OWNER) if f["world_id"] == W2]
+    assert [f["goal"] for f in facts] == [None], "the other owner's brief is never this person's title"
 
 
 def test_PEOPLE_SEAMS_1_runs_come_from_the_durable_backend_after_a_restart():
@@ -203,7 +237,7 @@ def test_PEOPLE_SEAMS_1_mail_is_only_the_persons_unflagged_needs_reply_messages(
         ("m1", False, False), ("m3", False, False), ("m5", True, False),
     ]  # fmt: skip
     assert {f["account_owner"] for f in facts} == {OWNER}
-    assert [(q[1], q[2], q[3]) for q in client.queries] == [("owner", OWNER, seams_store.MAX_FACTS)]
+    assert [(q[1], q[2], q[3]) for q in client.queries] == [("owner", OWNER, seams_store.MAX_FACTS + 1)]
     assert [f["message_id"] for f in _sources(process(rig)).mail(OTHER)] == ["m9"]
     assert _sources(process(rig)).mail(STRANGER) == []
 
@@ -248,3 +282,25 @@ def test_PEOPLE_SEAMS_1_a_request_is_owned_by_its_world_or_task_owner_and_other_
         ("meeting", W1), ("manual", W1), ("mail", W1), ("", W1), (None, W1), ("request", None), ("request", 7),
     ]:  # fmt: skip
         assert owners.owner_of(kind, ref) is None, (kind, ref)  # type: ignore[arg-type]
+
+
+def test_PEOPLE_SEAMS_1_owner_lookups_are_remembered_for_the_request_misses_included():
+    rig, client = rig_with_mail([mail_doc(OWNER, "m1")])
+    store = process(rig)
+    owners = seams_store.StoreSourceOwners(store)
+    loads = []
+    real = store.load_world
+    store.load_world = lambda world_id, settle=False: loads.append(world_id) or real(world_id, settle)
+    for _ in range(3):
+        assert owners.owner_of("mail", "m1") == OWNER and owners.owner_of("mail", "nope") is None
+        assert owners.owner_of("request", "w_nobody") is None
+    assert len(client.queries) == 2 and loads == ["w_nobody"], "one read per distinct (kind, ref)"
+
+
+def test_PEOPLE_SEAMS_1_a_mail_read_that_hits_the_cap_says_so():
+    docs = [mail_doc(OWNER, f"m{n}") for n in range(120)]
+    sources = _sources(process(rig_with_mail(docs)[0]))
+    assert len(sources.mail(OWNER)) == 120 and sources.truncated is False
+    docs = [mail_doc(OWNER, f"m{n}") for n in range(seams_store.MAX_FACTS + 1)]
+    sources = _sources(process(rig_with_mail(docs)[0]))
+    assert len(sources.mail(OWNER)) == seams_store.MAX_FACTS and sources.truncated is True

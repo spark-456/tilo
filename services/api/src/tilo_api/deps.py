@@ -170,8 +170,9 @@ class Store:
     def load_owner(self, owner: str, settle: bool = False) -> None:
         """Called before a route iterates an owner's worlds or policies; the cache already holds them."""
 
-    def load_owner_tasks(self, owner: str) -> None:
-        """Called before a read joins an owner's tasks to their worlds (PEOPLE-SEAMS-1); the cache holds them."""
+    def load_world_task(self, world_id: str) -> TaskRecord | None:
+        """The task made for a world, if this store holds one (a scheduled or meeting host run stores none)."""
+        return next((t for t in list(self.tasks.values()) if t.world_id == world_id), None)
 
     def load_path(self, params: Mapping[str, Any]) -> Store:
         return self

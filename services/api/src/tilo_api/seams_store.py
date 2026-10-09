@@ -68,8 +68,10 @@ class FirestoreMailTriage:
             raise _store_unavailable() from None  # never the library's text
         return [d for d in docs if isinstance(d, dict)]
 
-    def rows(self, owner: str) -> list[dict[str, Any]]:
-        return self._where("owner", owner, MAX_FACTS)
+    def rows(self, owner: str) -> tuple[list[dict[str, Any]], bool]:
+        """(at most `MAX_FACTS` rows, whether there were more): one extra document is read to know."""
+        found = self._where("owner", owner, MAX_FACTS + 1)
+        return found[:MAX_FACTS], len(found) > MAX_FACTS
 
     def owner_of(self, message_id: str) -> str | None:
         found = self._where("message_id", message_id, 2)
@@ -113,6 +115,7 @@ def _mail_source(store: deps.Store) -> FirestoreMailTriage | None:
 class StorePlateSources:
     def __init__(self, store: deps.Store) -> None:
         self._store = store
+        self.truncated = False  # the mail read hit its cap (the plate builder reads this after `mail`)
 
     def cards(self, user_id: str) -> list[dict[str, Any]]:
         """Open cards of the runs this process holds that the person owns, and gates that name them as Approver."""
@@ -131,33 +134,49 @@ class StorePlateSources:
         return sorted(facts, key=lambda f: (f["data"]["created_at"], f["data"]["id"]))[:MAX_FACTS]
 
     def runs(self, user_id: str) -> list[dict[str, Any]]:
-        """Running or blocked runs of worlds the person owns, with the goal and date of their task's brief."""
+        """Running or blocked runs of the worlds the person owns (PE-27), from the recorded events. The goal and date
+        come from the world's stored task, else from the process's own `Run.brief` (a scheduled routine or a meeting
+        host run stores no task), else the row has no title."""
         if not _valid(_USER, user_id):
             return []
         store = self._store
         store.load_owner(user_id, settle=False)
-        store.load_owner_tasks(user_id)
         facts = []
-        for task in sorted((t for t in list(store.tasks.values()) if t.owner == user_id), key=lambda t: t.world_id):
-            world = store.load_world(task.world_id, settle=False)
-            goal = task.brief.get("goal") if isinstance(task.brief, dict) else None
-            if world is None or world.owner != user_id or world.paused or not isinstance(goal, str) or not goal:
-                continue
-            state = _run_state(store.events.get(task.world_id, []))
+        for world_id in sorted(w for w, rec in list(store.worlds.items()) if rec.owner == user_id):
+            world = store.worlds.get(world_id)
+            state = (
+                None
+                if world is None or world.owner != user_id or world.paused
+                else _run_state(store.events.get(world_id, []))
+            )
             if state is None:
                 continue
-            deadline = task.brief.get("deadline")
+            brief = self._brief(world_id, user_id)
+            goal, deadline = brief.get("goal"), brief.get("deadline")
             facts.append(
                 {
-                    "world_id": task.world_id, "world_owner": user_id, "state": state[1], "goal": goal,
+                    "world_id": world_id, "world_owner": user_id, "state": state[1],
+                    "goal": goal if isinstance(goal, str) and goal else None,
                     "deadline": deadline if _valid(_DATE, deadline) else None, "started_at": state[0],
                 }
             )  # fmt: skip
         return sorted(facts, key=lambda f: (f["started_at"], f["world_id"]))[:MAX_FACTS]
 
+    def _brief(self, world_id: str, user_id: str) -> Mapping[str, Any]:
+        task = self._store.load_world_task(world_id)
+        run = self._store.runs.get(world_id)
+        for owner, brief in ((getattr(task, "owner", None), getattr(task, "brief", None)),
+                             (getattr(run, "owner", None), getattr(run, "brief", None))):  # fmt: skip
+            if owner == user_id and isinstance(brief, dict):
+                return brief
+        return {}
+
     def mail(self, user_id: str) -> list[dict[str, Any]]:
         triage = _mail_source(self._store)
-        return [] if triage is None or not _valid(_USER, user_id) else _mail_facts(triage.rows(user_id), user_id)
+        if triage is None or not _valid(_USER, user_id):
+            return []
+        rows, self.truncated = triage.rows(user_id)
+        return _mail_facts(rows, user_id)
 
 
 def _run_state(stream: Iterable[Mapping[str, Any]]) -> tuple[str, str] | None:
@@ -180,9 +199,17 @@ def _run_state(stream: Iterable[Mapping[str, Any]]) -> tuple[str, str] | None:
 class StoreSourceOwners:
     def __init__(self, store: deps.Store) -> None:
         self._store = store
+        self._known: dict[tuple[str, str], str | None] = {}  # per request: one read per (kind, ref), misses too
 
     def owner_of(self, kind: str, ref: str) -> str | None:
         """Who owns a mail message or a request; None for anything unknown, malformed, ambiguous or of another kind."""
+        if not (isinstance(kind, str) and isinstance(ref, str)):
+            return None
+        if (kind, ref) not in self._known:
+            self._known[(kind, ref)] = self._look_up(kind, ref)
+        return self._known[(kind, ref)]
+
+    def _look_up(self, kind: str, ref: str) -> str | None:
         if kind == "mail" and _valid(_MESSAGE, ref):
             triage = _mail_source(self._store)
             return None if triage is None else triage.owner_of(ref)
