@@ -376,4 +376,4 @@ def test_ADR32_T6_FR_MTG_09_an_entry_that_turns_ambiguous_between_the_read_and_t
 def test_ADR32_T6_FR_MTG_09_the_store_refuses_to_abandon_an_ambiguous_entry_under_its_own_lock(rig):
     entry_id = rig.enqueue(user=OWNER)
     rig.store._retries[entry_id] = {"ambiguous": True}
-    assert rig.store._abandon(entry_id, NOW) is None and rig.state(entry_id) == "queued"
+    assert rig.store._abandon(entry_id, NOW, True) is None and rig.state(entry_id) == "queued"

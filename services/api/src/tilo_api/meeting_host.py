@@ -400,7 +400,7 @@ def abandon_unsent(user: str, outbox_store: Any) -> int:
             if outbox_store.retry_state(entry["id"]).get("ambiguous"):
                 continue  # it may have gone out: it stays for the alert path, never marked failed
             Outbox(outbox_store, {}, emit=lambda part: None, clock=events.now, world_id=entry["world_id"]).abandon(
-                entry["id"]
+                entry["id"], keep_ambiguous=True
             )
             abandoned += 1
         except Exception:  # a live lease (OutboxRefused) or a store error: the next event asks again
