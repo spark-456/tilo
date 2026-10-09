@@ -196,6 +196,7 @@ class Router:
         provider_for_profile: ProviderFor | None = None,
         fixtures_dir: Any = None,
         live_permitted: bool = False,
+        force_replay: bool = False,
         role_thinking: bool = True,
     ) -> None:
         if provider_for_profile is None and fixtures_dir is None:
@@ -203,6 +204,7 @@ class Router:
         self._config, self._provider_for_profile, self._fixtures_dir = config, provider_for_profile, fixtures_dir
         self._role_thinking = role_thinking  # False: never fill a role's `thinking` (the live smoke sends none)
         self._live_permitted = live_permitted  # SEC-15: set by the caller that decided this router may go live
+        self._force_replay = force_replay  # SEC-15: set by the caller that decided this router replays, LIVE or not
 
     def _provider(self, role_id: str, profile_id: str) -> ModelProvider:
         if self._provider_for_profile is not None:
@@ -213,6 +215,7 @@ class Router:
             fixtures_dir=self._fixtures_dir,
             profile_id=profile_id,
             live_permitted=self._live_permitted,
+            force_replay=self._force_replay,
         )
 
     def _candidates(self, role_id: str, capability: Capability | None) -> list[str]:

@@ -100,6 +100,7 @@ def schedule_to_doc(s: Schedule) -> dict[str, Any]:
         "backoff_until": s.backoff_until,
         "last_error": s.last_error,
         "created_at": s.created_at,
+        "demo": s.demo,
     }
 
 
@@ -156,6 +157,8 @@ def schedule_from_doc(doc: Mapping[str, Any]) -> Schedule:
             backoff_until=doc.get("backoff_until"),
             last_error=_typed(doc, "last_error", str, optional=True),
             created_at=doc.get("created_at"),
+            # A record from before the field existed reads as a demo's: it then only replays (safe, BQ-SIGNIN-10).
+            demo=_typed(doc, "demo", bool) if "demo" in doc else True,
         )
     except ValueError:
         raise

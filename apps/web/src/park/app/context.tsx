@@ -12,6 +12,7 @@ import {
 } from "react";
 import { API_URL, appCheckToken, authToken, sessionView } from "../../api/ClientProvider";
 export { endSession } from "../../api/signOut"; // FR-UX-10: the shell's Sign out, through the one api seam
+export { useSessionAuth } from "../../api/sessionAuth"; // FR-UX-10: who is signed in, for the account menu
 import { API_METHODS, type Api, type ApiMethod } from "../api/index";
 import { parkApi, withSession } from "../api/select";
 import type { ApiResult, Source } from "../api/types";

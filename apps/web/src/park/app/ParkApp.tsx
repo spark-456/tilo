@@ -4,11 +4,12 @@
 import { type MouseEvent, Suspense, useEffect, useRef } from "react";
 import { PageSheet } from "../components";
 import { AppShell } from "../shell/AppShell";
+import { ParkAuthProvider } from "../shell/auth";
 import "../tokens/fonts";
 import "../tokens/park.css";
 import { type AppCtx, PAGE_LABEL } from "./AppCtx";
 import "./park-app.css";
-import { ParkProvider, usePageApp } from "./context";
+import { ParkProvider, usePageApp, useSessionAuth } from "./context";
 import { PAGES } from "./pages";
 import { isHomeAddress, useParkRoute } from "./router";
 
@@ -113,9 +114,13 @@ function Shell() {
 }
 
 export function ParkApp() {
+  // FR-UX-10: the account menu reads the page's real sign-in; null (no sign-in here) keeps the prototype's behaviour.
+  const auth = useSessionAuth();
   return (
     <ParkProvider>
-      <Shell />
+      <ParkAuthProvider auth={auth}>
+        <Shell />
+      </ParkAuthProvider>
     </ParkProvider>
   );
 }
