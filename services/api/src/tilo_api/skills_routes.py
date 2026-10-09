@@ -272,7 +272,8 @@ def create_skill_route(
 def _readable(store: SkillStore, stores: PeopleStores, principal: deps.Principal, clock: Callable[[], str]) -> list:
     now = _now(clock)
     teams = _teams(stores, principal.user_id, now)
-    return _sorted(store.list_visible(deps.ORG_ID, principal.user_id, teams))
+    # A capture draft is the owner's working copy for the version flow, not a skill yet: never listed.
+    return _sorted([r for r in store.list_visible(deps.ORG_ID, principal.user_id, teams) if r["status"] != "draft"])
 
 
 @router.get("/v1/skills")
@@ -301,7 +302,7 @@ def get_skill_route(
         found = None if _SKILL_ID.fullmatch(skill_id) is None else store.get(deps.ORG_ID, skill_id)
         if found is None or not (
             found["owner"] == principal.user_id
-            or (found["scope"]["kind"] == "team" and found["scope"]["team"] in teams)
+            or (found["status"] != "draft" and found["scope"]["kind"] == "team" and found["scope"]["team"] in teams)
         ):
             raise HTTPException(status_code=404, detail="not_found")
         return found
