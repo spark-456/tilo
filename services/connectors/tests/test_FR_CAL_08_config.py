@@ -26,6 +26,7 @@ from _calendar_lib import (
 from _oauth_lib import make_env, schema_errors
 
 SYNC_KEYS = {"poll_interval_s", "past_days", "future_days", "max_pages", "backoff_base_s", "backoff_max_s"}
+CALENDAR_EVENTS_OWNED = "https://www.googleapis.com/auth/calendar.events.owned"
 
 
 def _connectors() -> list[dict]:
@@ -50,19 +51,25 @@ def test_FR_CAL_08_google_calendar_validates_against_the_unchanged_connector_sch
     assert schema_errors("connector.schema.json", _declaration()) == []
 
 
-def test_FR_CAL_08_the_only_scope_is_calendar_readonly_and_nothing_can_write():
+def test_FR_CAL_08_reading_asks_only_calendar_readonly_and_the_only_write_scope_is_events_owned():
+    """BQ-CAL8-7 pinned one scope under read. ADR-0035 decision 6 (FR-CAL-04) adds exactly one more, asked only
+    for the write and send capabilities (tests/contracts FR_CON_02_ADR35_L1 pins the actions); nothing wider."""
     decl = _declaration()
     assert decl["auth"] == "oauth2"
-    assert decl["scopes"] == {"read": [CALENDAR_READONLY]}, "exactly the one scope, under read (BQ-CAL8-7)"
-    assert decl["capabilities"] == ["read"]
-    text = yaml.safe_dump(decl)
-    assert "calendar.events" not in text and "auth/calendar\n" not in text and "auth/calendar'" not in text
-    assert [a["capability"] for a in decl["actions"]] == ["read"]
+    assert decl["scopes"]["read"] == [CALENDAR_READONLY], "exactly the one scope, under read (BQ-CAL8-7)"
+    assert decl["scopes"] == {
+        "read": [CALENDAR_READONLY],
+        "write": [CALENDAR_EVENTS_OWNED],
+        "send": [CALENDAR_EVENTS_OWNED],
+    }
+    assert decl["capabilities"] == ["read", "write", "send"]
+    declared = {scope for scopes in decl["scopes"].values() for scope in scopes}
+    assert declared == {CALENDAR_READONLY, CALENDAR_EVENTS_OWNED}, "no full calendar scope, no calendar.events"
+    assert {a["capability"] for a in decl["actions"] if a["gate_type"] == "none"} == {"read"}, "only reads are ungated"
 
 
 def test_FR_CAL_08_read_events_is_T1_ungated_and_reversible():
-    (action,) = _declaration()["actions"]
-    assert action["id"] == "read_events"
+    action = next(a for a in _declaration()["actions"] if a["id"] == "read_events")
     assert (action["capability"], action["risk_tier"], action["gate_type"], action["irreversible"]) == (
         "read",
         "T1",
@@ -79,7 +86,7 @@ def test_FR_CAL_08_limits_and_data_class_are_the_pinned_ones():
 
 def test_FR_CAL_08_autonomy_lists_read_events_at_the_declared_tier():
     table = yaml.safe_load(AUTONOMY_YAML.read_text(encoding="utf-8"))["actions"]
-    (action,) = _declaration()["actions"]
+    action = next(a for a in _declaration()["actions"] if a["id"] == "read_events")
     assert table["read_events"] == "T1" == action["risk_tier"]
 
 
@@ -89,7 +96,7 @@ def test_FR_CAL_08_the_registry_loads_google_calendar():
     registry = load_registry(CONNECTORS_YAML)
 
     assert "google_calendar" in registry
-    assert registry.get("google_calendar")["scopes"] == {"read": [CALENDAR_READONLY]}
+    assert registry.get("google_calendar")["scopes"]["read"] == [CALENDAR_READONLY]
 
 
 def test_FR_CAL_08_a_task_needing_only_read_asks_only_for_the_read_scope():
