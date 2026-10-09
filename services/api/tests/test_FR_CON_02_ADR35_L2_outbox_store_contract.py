@@ -161,6 +161,58 @@ def test_FR_CON_02_ADR35_L2_abandon_refuses_a_live_lease_and_a_settled_entry(rig
     assert store._abandon(outbox_id(99), rig.clock()) is None
 
 
+def _abandoner(store, rig: Rig):
+    from tilo_connectors import Outbox  # noqa: PLC0415
+    from tilo_connectors.errors import OutboxRefused  # noqa: PLC0415
+
+    outbox = Outbox(store, {}, emit=lambda p: None, clock=rig.clock, world_id=WORLD_A)
+
+    def abandon(n: int) -> str:
+        try:
+            return outbox.abandon(outbox_id(n), keep_ambiguous=True)["state"]
+        except OutboxRefused:
+            return "refused"
+
+    return abandon
+
+
+def test_FR_CON_02_ADR35_L2_keep_ambiguous_never_fails_a_lost_answer_or_an_expired_unreleased_lease(rig: Rig) -> None:
+    store = rig.make()
+    rig.put(store, entry(1), entry(2), entry(3))
+    abandon = _abandoner(store, rig)
+    rig.claim(store, 1, "a")
+    store._defer(outbox_id(1), "a", 1, rig.clock(), 0, True)  # a lost answer: ambiguous, lease released
+    assert abandon(1) == "refused" and store.get(outbox_id(1))["state"] != "failed"
+    rig.claim(store, 2, "dead")  # the holder dies: nobody releases or finalizes
+    rig.clock.advance(31)
+    assert abandon(2) == "refused" and store.get(outbox_id(2))["state"] == "sending", "an expired lease may have sent"
+    assert abandon(3) == "failed", "an unsent entry that was never claimed is abandoned"
+
+
+def test_FR_CON_02_ADR35_L2_taking_over_an_expired_lease_marks_the_entry_ambiguous(rig: Rig) -> None:
+    store = rig.make()
+    rig.put(store, entry(1), entry(2))
+    rig.claim(store, 1, "dead")
+    rig.claim(store, 2, "ok")
+    store._finalize_claim(outbox_id(2), "ok", "sent")
+    assert store.retry_state(outbox_id(1))["ambiguous"] is False
+    rig.clock.advance(31)
+    assert rig.claim(rig.make(), 1, "alive")["state"] == "sending"
+    assert rig.make().retry_state(outbox_id(1))["ambiguous"] is True
+    assert _abandoner(rig.make(), rig)(1) == "refused"
+
+
+def test_FR_CON_02_ADR35_L2_all_entries_skips_a_malformed_document_and_logs_only_its_id(fs: Rig, caplog) -> None:
+    store = fs.make()
+    fs.put(store, entry(1), entry(2))
+    fs.db.document(f"outbox/{outbox_id(3)}").set({"junk": True})
+    fs.db.document(f"outbox/{outbox_id(4)}").set({"entry": "not a dict"})
+    with caplog.at_level("WARNING"):
+        got = store.all_entries()
+    assert sorted(e["id"] for e in got) == [outbox_id(1), outbox_id(2)]
+    assert outbox_id(3) in caplog.text and "junk" not in caplog.text
+
+
 def test_FR_CON_02_ADR35_L2_release_lease_frees_the_send_lease_for_its_holder_only(rig: Rig) -> None:
     store = rig.make()
     rig.put(store, entry(1))

@@ -137,7 +137,19 @@ class FirestoreOutboxStore:
         return self.get(self._read(work))
 
     def all_entries(self) -> list[dict]:
-        return self._read(lambda: [s.to_dict()["entry"] for s in self._client.collection("outbox").stream()])
+        def work() -> list[dict]:
+            found: list[dict] = []
+            for snap in self._client.collection("outbox").stream():
+                try:
+                    entry = snap.to_dict()["entry"]
+                    if not isinstance(entry, dict) or entry.get("id") != snap.id:
+                        raise ValueError("not an entry")
+                    found.append(entry)
+                except Exception:  # one malformed document never takes the whole world down
+                    logger.warning("outbox document %s is malformed and was skipped", snap.id)
+            return found
+
+        return self._read(work)
 
     def retry_state(self, outbox_id: str) -> dict:
         base = {"attempts": 0, "not_before": "", "since": None, "ambiguous": False}
@@ -216,11 +228,18 @@ class FirestoreOutboxStore:
 
         return self._run(work)
 
-    def _abandon(self, outbox_id: str, now: str) -> dict | None:  # unsent, no live lease -> failed, for Outbox.abandon
+    def _abandon(
+        self, outbox_id: str, now: str, keep_ambiguous: bool = False
+    ) -> dict | None:  # unsent, no live lease -> failed, for Outbox.abandon
         def change(doc: dict) -> tuple[bool, dict | None]:
-            lease = doc["send_lease"]
-            if doc["entry"]["state"] not in _UNSENT or (lease is not None and now < lease["until"]):
+            lease, at = doc["send_lease"], self._now(now)
+            if doc["entry"]["state"] not in _UNSENT or (lease is not None and at < lease["until"]):
                 return False, None
+            if keep_ambiguous and ((doc["retry"] or {}).get("ambiguous") or lease is not None):
+                return (
+                    False,
+                    None,
+                )  # it may have gone out (a lost answer, or an expired lease): decided in this transaction
             doc["entry"]["state"], doc["retry"] = "failed", None
             return True, deepcopy(doc["entry"])
 
@@ -241,6 +260,8 @@ class FirestoreOutboxStore:
                 return False, None
             if at < (doc["retry"] or {}).get("not_before", "") or (lease is not None and at < lease["until"]):
                 return False, None
+            if lease is not None:  # an expired lease nobody released: the earlier holder may have sent
+                doc["retry"] = {**(doc["retry"] or {}), "ambiguous": True}
             doc["send_lease"] = {"holder": holder, "until": add_seconds(at, lease_seconds)}
             entry["state"] = "sending"  # takes over an expired lease too
             return True, deepcopy(entry)
