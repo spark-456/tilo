@@ -2,7 +2,7 @@
 
 `ConnectorRpcStub` takes `GmailAdapter`, `DriveAdapter` and `CalendarWriteAdapter`'s place in a run's connector map: the
 outbox calls its `execute_side_effect`, which reads the pinned artifacts (hash-checked, AR-01), posts them with the
-evidence to tilo-connectors' `/internal/side-effects/execute` over `MeetingHostRpc` (the one boundary, HB-01) and maps
+evidence to tilo-connectors' execute route over `MeetingHostRpc` (the one boundary, HB-01) and maps
 the answer to the outcome `MeetingHostStub` maps (ADR-0032 decision 6): refused is final, possibly_sent is never
 failed, retry is retried, and a `sent` answer is stored only when its marker is the entry's own (LC-08). Nothing here
 imports `tilo_connectors.tokens`, `.live` or `.adapters` (SEC-02). A stub made by the seam knows no run, so it cannot

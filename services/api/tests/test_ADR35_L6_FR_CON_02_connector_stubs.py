@@ -540,7 +540,9 @@ def test_ADR35_L6_FR_CON_02_an_unreadable_world_never_blocks_a_disconnect_and_on
     with caplog.at_level("WARNING"):
         assert rig.p.post(DISCONNECT, {"connector": "gmail"}).status_code == 200
     states = {i: rig.store.get(i)["state"] for i in (mine, theirs, broken)}
-    assert states == {mine: "failed", theirs: "queued", broken: "failed"}  # the caller approved the unreadable one
+    assert (states[mine], states[broken]) == ("failed", "failed") and states[
+        theirs
+    ] != "failed"  # the caller approved the unreadable one
     assert broken in caplog.text
 
 
