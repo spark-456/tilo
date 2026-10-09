@@ -1,9 +1,11 @@
 # ADR-0034: Taught skills, capture and trust
 
-- Status: **Proposed** (architect, 9 Oct 2026). It needs the user's approval because it changes frozen
-  contracts (CP0, 29 Sep). The changes are all additive: a new `taught_skill` contract, six `skill.*` event
-  types (registry 1.4.0) and two video media types (common 1.7.0). Nothing that depends on them merges
-  before the user says yes. **The user should check decisions 4, 5 and 7 and the config change in 3.**
+- Status: **Accepted, overridable** (9 Oct 2026). The additions are all additive: a new `taught_skill` contract,
+  six `skill.*` event types (registry 1.4.0) and two video media types in `common` 1.7.0. The supervisor ruled
+  the additive contracts a GO under the user's 12:00 authority ("Handle it yourself, i have given u full authority
+  and merge ability"). The one change to an existing frozen schema, `media_type` gaining `video/webm` and
+  `video/mp4`, was approved by the user on 9 Oct ~17:00: "yes to video types". The user may override any decision
+  here; decisions 4, 5 and 7 and the config change in 3 are the ones to check.
 - Deciders: user (approval, the model role and its prices), architect (design)
 - Requirements: FR-SKL-01 to FR-SKL-07 (Should, `docs/prd-supplement-design-2026-10-06.md` 1.1), FR-ACC-02;
   PRD 8.2, 8.3, 10.4, 15.1, 16.3, 23.5; HR-1, HR-7; BQ-DSN-05; ADR-0018, ADR-0027, ADR-0029
