@@ -95,7 +95,8 @@ def _task_doc(t: deps.TaskRecord) -> dict[str, Any]:
 
 def _task_from(d: Mapping[str, Any]) -> deps.TaskRecord:
     asked = [
-        Question(q["field"], q["text"], tuple(q["suggested_answers"]), q["expected_change"]) for q in d["questions"]
+        Question(q["field"], q["text"], tuple(q["suggested_answers"]), q["expected_change"], q.get("label"))
+        for q in d["questions"]
     ]
     t = deps.TaskRecord(d["owner"], d["world_id"], d["run_id"], d["draft"], d["brief"], asked, d["next_seq"])
     t.answers, t.edits, t.approaches, t.granted, t.scenario = (

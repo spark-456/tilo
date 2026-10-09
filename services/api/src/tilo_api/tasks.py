@@ -125,7 +125,12 @@ def create_task(
     task = deps.TaskRecord(owner, intake.world_id, intake.run_id, draft, draft, [], len(intake_events) + 1)
     task.scenario, task.gaps = scenario, extraction.gaps
     asked = generate_questions(
-        draft, extraction.ambiguous_fields, memory=store.memory, base=_base(task, DIRECTOR), seq=task.next_seq
+        draft,
+        extraction.ambiguous_fields,
+        memory=store.memory,
+        base=_base(task, DIRECTOR),
+        seq=task.next_seq,
+        topic_questions=extraction.questions,
     )
     task.draft = task.brief = asked.brief
     task.questions = asked.questions
@@ -184,6 +189,18 @@ def _screen(safety: SafetyProvider, strings: list[str]) -> None:
         raise HTTPException(status_code=422, detail="The safety screen flagged this change; rephrase it.")
 
 
+def _director_strings(task: deps.TaskRecord, answers: list[AnswerIn]) -> list[str]:
+    """The model-written strings an answer or a skip puts into the brief (INTAKE-QUALITY-1): the text of each Director
+    question answered, and the guess a skip takes. A typed answer is screened with the person's other strings."""
+    by_field = {a.field: a.answer for a in answers}
+    return [
+        text
+        for q in task.questions
+        if q.label is not None and q.field in by_field
+        for text in (q.text, *([q.suggested_answers[0]] if by_field[q.field] is None else []))
+    ]
+
+
 def _foreign_sources(task: deps.TaskRecord, edits: dict[str, Any]) -> bool:
     """PRD 10.1: a file, connector or memory source must already be this task's (its own uploads, or what code
     applied); a person may add only url and web sources."""
@@ -220,7 +237,8 @@ def answer_questions(
         raise HTTPException(status_code=422, detail="Answer only the questions that were asked, each once.")
     if _foreign_sources(task, body.brief_edits):
         raise HTTPException(status_code=422, detail="Add only this task's files, or web and url sources.")
-    _screen(safety, [a.answer for a in body.answers if a.answer is not None] + list(_strings(body.brief_edits)))
+    typed = [a.answer for a in body.answers if a.answer is not None]
+    _screen(safety, typed + _director_strings(task, body.answers) + list(_strings(body.brief_edits)))
     with task.lock:
         if task.granted:
             raise HTTPException(status_code=409, detail="The budget is approved; the brief is final.")

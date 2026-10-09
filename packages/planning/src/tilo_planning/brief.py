@@ -8,8 +8,10 @@ from __future__ import annotations
 
 import copy
 import functools
+import math
+import re
 from collections.abc import Iterator
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date
 from typing import Any
 
@@ -44,12 +46,76 @@ class BriefValidationError(ValueError):
     """A brief (or an edit to one) does not satisfy brief.schema.json."""
 
 
+MAX_TOPIC_QUESTIONS = 3  # FR-INT-04: at most 3 questions in all, so at most 3 from the Director
+MAX_TOPIC_ANSWERS = 3
+LABEL_MAX, TEXT_MAX, ANSWER_MAX = 30, 200, 120  # characters of a model-written label, question and suggested answer
+_RAW_LIMIT = 10  # items read from a model list before any is vetted
+_NEUTRAL_CHANGE = 0.5  # expected_change of a question whose number is unusable
+_TAG = re.compile(r"<[^<>]{0,200}>")
+_CONTROL = re.compile(r"[\x00-\x1f\x7f-\x9f​-‏ -‮⁠﻿]")
+
+
+@dataclass(frozen=True)
+class TopicQuestion:
+    """One question the Director chose for this task (FR-INT-04), vetted by `topic_questions`: every string is plain
+    text within its limit, the first suggested answer is the Director's guess (used if the person skips)."""
+
+    label: str  # what is asked, in a word or two ("Branch"); the answer is recorded as "Label: value"
+    text: str
+    suggested_answers: tuple[str, ...]
+    expected_change: float  # 0..1, how much the answer would change the plan
+
+
 @dataclass(frozen=True)
 class ExtractionResult:
     brief: dict[str, Any]
     ambiguous_fields: list[str]
     run: RouterResult  # router attempts, profile and usage for the Trace (PRD 9.3)
+    # FR-INT-04: the Director's questions for this task, at most 3. Keyword-only, so the positional fields stay as they
+    # were (brief, ambiguous_fields, run, gaps) and `gaps` is still the last field.
+    questions: tuple[TopicQuestion, ...] = field(default=(), kw_only=True)
     gaps: tuple[Gap, ...] = ()  # FR-INT-15: the parts of the task Tilo cannot do, named for the person
+
+
+def clean_line(value: Any, limit: int) -> str | None:
+    """A model's or person's short text as one plain line within `limit` characters, else None: control and invisible
+    characters become spaces, tags and the angle brackets and backticks left over are removed, spaces are folded, and
+    the cut is made last. The input is bounded first, so the cost is linear in `limit`."""
+    if not isinstance(value, str):
+        return None
+    text = _CONTROL.sub(" ", value[: limit * 4])
+    text = _TAG.sub("", text).replace("<", "").replace(">", "").replace("`", "")
+    text = " ".join(text.split())
+    if len(text) > limit:
+        text = text[: limit - 1] + "…"
+    return text or None
+
+
+def _expected_change(value: Any) -> float:
+    if isinstance(value, bool) or not isinstance(value, int | float) or not math.isfinite(value):
+        return _NEUTRAL_CHANGE
+    return min(max(float(value), 0.0), 1.0)
+
+
+def topic_questions(value: Any) -> tuple[TopicQuestion, ...]:
+    """The Director's `questions` as vetted questions (FR-INT-04), most useful first, at most `MAX_TOPIC_QUESTIONS`.
+    Code decides everything: an item that is not an object, or lacks a label, a question or one usable answer, is
+    dropped (never an error: the generic questions are the fallback); a repeated label is dropped; answers are
+    cleaned, deduplicated and cut to `MAX_TOPIC_ANSWERS`; `expected_change` is clamped to 0..1."""
+    if not isinstance(value, list):
+        return ()
+    found: dict[str, TopicQuestion] = {}
+    for item in value[:_RAW_LIMIT]:
+        if not isinstance(item, dict):
+            continue
+        label, text = clean_line(item.get("label"), LABEL_MAX), clean_line(item.get("text"), TEXT_MAX)
+        raw = item.get("suggested_answers")
+        cleaned = (clean_line(a, ANSWER_MAX) for a in raw[:_RAW_LIMIT]) if isinstance(raw, list) else ()
+        answers = tuple(dict.fromkeys(a for a in cleaned if a))[:MAX_TOPIC_ANSWERS]
+        if label and text and answers and label.casefold() not in found:
+            found[label.casefold()] = TopicQuestion(label, text, answers, _expected_change(item.get("expected_change")))
+    ranked = sorted(found.values(), key=lambda q: -q.expected_change)  # stable: ties keep the Director's order
+    return tuple(ranked[:MAX_TOPIC_QUESTIONS])
 
 
 def validate_brief(data: Any) -> dict[str, Any]:
@@ -69,7 +135,9 @@ def validate_brief(data: Any) -> dict[str, Any]:
 def complete_brief(data: dict[str, Any]) -> dict[str, Any]:
     """A brief from a brief or from the Director's output: `ambiguous_fields`, `out_of_policy` and `out_of_scope`
     are dropped, and assumptions and applied preferences start empty when absent (only code fills them)."""
-    fields = {k: v for k, v in data.items() if k not in ("ambiguous_fields", "out_of_policy", "out_of_scope")}
+    fields = {
+        k: v for k, v in data.items() if k not in ("ambiguous_fields", "out_of_policy", "out_of_scope", "questions")
+    }
     return validate_brief({"assumptions": [], "applied_preferences": [], **fields})
 
 
@@ -104,6 +172,24 @@ def output_schema() -> dict[str, Any]:
                 "type": "object",
                 "properties": {"category": {"type": "string"}, "part": {"type": "string"}},
                 "required": ["category", "part"],
+            },
+        }
+    }
+    # Optional (FR-INT-04): up to 3 questions for this task. Like `out_of_scope`, listed but unconstrained for the
+    # router (a reply that is odd here is never repaired or escalated: `topic_questions` vets every item in code and
+    # drops what it cannot use); the wire shape is what the provider's sanitizer sends.
+    schema["properties"]["questions"] = {
+        "x-wire-schema": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "label": {"type": "string"},
+                    "text": {"type": "string"},
+                    "suggested_answers": {"type": "array", "items": {"type": "string"}},
+                    "expected_change": {"type": "number"},
+                },
+                "required": ["label", "text", "suggested_answers", "expected_change"],
             },
         }
     }
@@ -219,7 +305,7 @@ def extract_brief(
         brief = complete_brief(output)
     except (pydantic.ValidationError, KeyError, TypeError, BriefValidationError) as error:
         raise BriefExtractionError(f"FR-INT-03: the Director's reply is not a valid brief: {error}") from error
-    return ExtractionResult(brief, ambiguous, run, gaps)
+    return ExtractionResult(brief, ambiguous, run, gaps, questions=topic_questions(output.get("questions")))
 
 
 def _refusal_category(value: Any, policy: RefusalPolicy) -> RefusalCategory | None:
