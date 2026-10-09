@@ -71,6 +71,8 @@ def rig(people_rig):
             self.state = secrets.token_urlsafe(24)
             self.set(())
             self.p.app.dependency_overrides[deps.get_outbox_store] = lambda: self.store
+            self.worlds = deps.Store()  # L6: a person connector's entries are found by the world's owner
+            self.p.app.dependency_overrides[deps.get_store] = lambda: self.worlds
 
         def set(self, replies: tuple) -> None:
             self.transport = Transport(self.store, *replies)

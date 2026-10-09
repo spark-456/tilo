@@ -37,6 +37,7 @@ from tilo_contracts import (
     MeetingHostRpcConnectionView,
     MeetingHostRpcDisconnectAnswer,
     MeetingHostRpcError,
+    MeetingHostRpcExecuteAnswer,
     MeetingHostRpcReceipt,
     MeetingHostRpcSendAnswer,
     MeetingHostRpcStartAnswer,
@@ -49,6 +50,8 @@ logger = logging.getLogger("tilo_api.meeting_host_rpc")
 URL_VAR = "TILO_CONNECTORS_URL"
 TIMEOUT_S = 20.0  # one deadline for the token fetch and the request together, under the outbox's 30 s lease (HB-07)
 MAX_REPLY_BYTES = 65_536
+MAX_REQUEST_BYTES = 65_536  # the connectors body cap (HB-01): a bigger execute is refused here, never half-sent
+EXECUTE_PATH = "/internal/side-effects/execute"
 VIEWS_TIMEOUT_S = 10.0  # a cold connectors instance costs one wait this long at most; the page's next load asks again
 MAX_VIEWS_REPLY_BYTES = 262_144  # 32 views of 16 scopes stay under 160 KiB
 VIEWS_PATH = "/internal/connections/views"
@@ -299,6 +302,28 @@ class MeetingHostRpc:
         if (answer.receipt is not None) != sent or (answer.may_have_sent is not None) != retry:
             raise HostRpcError("unknown")
         return answer
+
+    def execute_entry(
+        self, entry: Mapping[str, Any], evidence: Mapping[str, Any], items: Sequence[Mapping[str, Any]]
+    ) -> MeetingHostRpcExecuteAnswer:
+        """ADR-0035 `execute` for gmail, google_drive and google_calendar. Not a registered SEC-03 name; an AST test
+        pins that only `ConnectorRpcStub.execute_side_effect` calls it, and that stub verifies the outbox Grant first. A
+        request over the connectors cap is `refused` before any call (BQ-ADR35L5-2). Never retried here."""
+        payload = {"entry": entry, "evidence": evidence, "items": list(items)}
+        if len(json.dumps(payload, separators=(",", ":")).encode()) > MAX_REQUEST_BYTES:
+            raise HostRpcError("refused")
+        raw = self._post("execute", payload, path=EXECUTE_PATH)
+        try:
+            return _execute_checked(MeetingHostRpcExecuteAnswer.model_validate_json(raw))
+        except ValidationError:
+            raise HostRpcError("unknown") from None
+
+
+def _execute_checked(answer: MeetingHostRpcExecuteAnswer) -> MeetingHostRpcExecuteAnswer:
+    sent, retry = answer.outcome == "sent", answer.outcome == "retry"  # the schema's if/then, which pydantic drops
+    if (answer.result is not None) != sent or (answer.may_have_sent is not None) != retry:
+        raise HostRpcError("unknown")
+    return answer
 
 
 def open_meeting_host_rpc(

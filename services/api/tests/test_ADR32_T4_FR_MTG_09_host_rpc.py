@@ -406,6 +406,7 @@ def test_ADR32_T4_FR_MTG_09_only_the_stub_may_reach_the_client_send():
     assert {n for n in dir(MeetingHostRpc) if not n.startswith("_")} == {
         "status",
         "send_invitation",
+        "execute_entry",  # ADR-0035 L6: the live Google stubs' call, pinned in test_ADR35_L6_*
         "connection_views",  # ADR-0032a T4b: a read with no side effect
         "disconnect",  # ADR-0032 T6: the owner's own, from the route only
         "connect_start",  # ADR-0035 L4: the person's own connect, from connect_routes only (no side effect on Google)

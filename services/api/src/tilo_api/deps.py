@@ -609,8 +609,18 @@ def get_connector_registry() -> ConnectorRegistry:
     return load_registry(path) if path.is_file() else ConnectorRegistry({})
 
 
-def get_connector_adapters() -> dict[str, Any]:
-    return {}  # no live adapter in dev (EFF-01): a send has nowhere to go
+def get_connector_adapters(request: Request = None) -> dict[str, Any]:  # type: ignore[assignment]
+    """ADR-0035 LC-08: one `ConnectorRpcStub` per live Google connector once `TILO_CONNECTORS_URL` is configured (a run
+    binds its own copy), else `{}` (EFF-01): a send has nowhere to go, and a demo session never sends."""
+    from tilo_api.connector_rpc import PERSON_CONNECTORS, ConnectorRpcStub  # noqa: PLC0415
+
+    if request is not None and _demo(request) is not None:
+        return {}
+    try:
+        client = get_meeting_host_client()
+    except HTTPException:
+        return {}
+    return {name: ConnectorRpcStub(name, client) for name in PERSON_CONNECTORS}
 
 
 @functools.cache

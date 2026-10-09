@@ -9,14 +9,15 @@ the call and nowhere else, and a refused body names fields, never values. A fail
 503 `not_configured` when connectors refused before anything acted, else 503 `unknown` (retry); the callback's own
 three 400s (`start_again`, `not_granted`, `wrong_account`) pass through as their one fixed word. The answer's parts are
 handled as T6 does: only the caller's own connection parts reach the sink (`on_connection_event` abandons a revoked or
-expired `meeting_host` grant's unsent entries); `connection.consented` stays tilo-api's card answer. Every POST counts
+expired grant's unsent entries: the bot's by approval, a person connector's by the worlds the caller owns, L6);
+`connection.consented` stays tilo-api's card answer. Every POST counts
 against the people write limit (it needs the people stores, else 503 `not_configured`).
 """
 
 from __future__ import annotations
 
 import logging
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from typing import Annotated, Any, Literal, Self
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -25,6 +26,7 @@ from tilo_connectors.meeting_host import CONNECTOR_ID
 from tilo_contracts import MeetingHostRpcAlertPart, MeetingHostRpcConnectorPart
 
 from tilo_api import deps
+from tilo_api.connector_rpc import PERSON_CONNECTORS
 from tilo_api.meeting_host import abandon_unsent, on_connection_event
 from tilo_api.meeting_host_rpc import HostRpcError, MeetingHostRpc
 from tilo_api.people import _PeopleRoute
@@ -88,7 +90,20 @@ def _registered(registry: Any, connector: str, capabilities: Sequence[str] | Non
         raise Refusal(422, "invalid_body", fields=[["capabilities"]])
 
 
-def _apply(user: str, parts: list[Any], outbox_store: Any) -> list[str]:
+def _owner_of(store: Any) -> Callable[[str], str | None]:
+    """A world's owner from the request's store, read once per world (a person connector's grant is its owner's)."""
+    seen: dict[str, str | None] = {}
+
+    def owner(world_id: str) -> str | None:
+        if world_id not in seen:
+            world = store.load_world(world_id)
+            seen[world_id] = None if world is None else world.owner
+        return seen[world_id]
+
+    return owner
+
+
+def _apply(user: str, parts: list[Any], outbox_store: Any, store: Any) -> list[str]:
     """The answer's parts: the caller's own connection parts go to the sink; anyone else's are dropped; an alert's id
     is returned (ids only; there is no world here to record it in)."""
     alerts: list[str] = []
@@ -99,6 +114,7 @@ def _apply(user: str, parts: list[Any], outbox_store: Any) -> list[str]:
             on_connection_event(
                 {"type": part.type, "authz": None, "data": {"connector": part.connector}, "user_id": user},
                 outbox_store=outbox_store,
+                owner_of=_owner_of(store),
             )
     return alerts
 
@@ -125,13 +141,14 @@ def callback(
     body: Annotated[CallbackIn, Depends(json_body(CallbackIn))],
     client: Annotated[MeetingHostRpc, Depends(deps.get_meeting_host_client)],
     outbox_store: Annotated[Any, Depends(deps.get_outbox_store)],
+    store: Annotated[deps.Store, Depends(deps.get_store)],
 ) -> dict[str, Any]:
     user = _owner(principal)
     try:
         got = client.connect_callback(user, state=body.state, code=body.code, error=body.error)
     except HostRpcError as exc:
         raise _failed(exc) from None
-    alerts = _apply(user, got.parts, outbox_store)
+    alerts = _apply(user, got.parts, outbox_store, store)
     if alerts:
         logger.warning("connector callback: alert ids %s", ",".join(alerts))
     return {"connector": got.connector, "scope_lines": got.scope_lines}
@@ -144,22 +161,24 @@ def disconnect(
     registry: Annotated[Any, Depends(deps.get_connector_registry)],
     client: Annotated[MeetingHostRpc, Depends(deps.get_meeting_host_client)],
     outbox_store: Annotated[Any, Depends(deps.get_outbox_store)],
+    store: Annotated[deps.Store, Depends(deps.get_store)],
 ) -> dict[str, Any]:
     user = _owner(principal)
     _registered(registry, body.connector)
-    if body.connector == CONNECTOR_ID:
+    if body.connector == CONNECTOR_ID or body.connector in PERSON_CONNECTORS:
+        owner_of = None if body.connector == CONNECTOR_ID else _owner_of(store)
         try:
             abandon_unsent(
-                user, outbox_store
-            )  # first: whatever happens to the call, a reconnect sends nothing for these
-        except Exception:  # noqa: BLE001 - the outbox cannot be read, so nothing is disconnected yet
+                user, outbox_store, owner_of
+            )  # first: whatever happens to the call, a reconnect sends nothing
+        except Exception:  # noqa: BLE001 - the outbox or the worlds cannot be read, so nothing is disconnected yet
             logger.warning("connector disconnect: the outbox could not be read")
             raise HTTPException(status_code=503, detail="unknown") from None
     try:
         got = client.connect_disconnect(user, body.connector)
     except HostRpcError as exc:
         raise _failed(exc) from None
-    alerts = _apply(user, got.parts, outbox_store)
+    alerts = _apply(user, got.parts, outbox_store, store)
     if alerts:  # the ids find connectors' retry record; nothing here or there retries it on its own
         logger.warning("connector disconnect: revoke at Google not confirmed, alert ids %s", ",".join(alerts))
     return {"disconnected": True, "revoked_at_provider": got.revoked_at_provider, "revoke_pending": bool(alerts)}
