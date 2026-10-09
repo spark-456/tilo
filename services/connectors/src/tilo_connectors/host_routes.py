@@ -52,7 +52,7 @@ from .meeting_host import CALENDAR_EVENTS_OWNED, CONNECTOR_ID, DRAFT_KIND, HostR
 from .outbox import Outbox
 from .registry import load_registry
 from .store import InMemoryOutboxStore
-from .tokens import grant_group
+from .tokens import _ulid, grant_group
 
 MAX_BODY_BYTES = 65_536
 MAX_PARTS = 16
@@ -311,12 +311,28 @@ class HostRuntime:
             raise Refused("invalid_request")
         broker, group = self._broker.get(), grant_group(connector)
         sharing = [c for c in registry.ids() if registry.get(c)["auth"] == "oauth2" and grant_group(c) == group]
-        revoked = False
+        confirmed, unconfirmed, spent = False, False, set[str]()
         with self.closing(user_id), self.capture(user_id, wide=True) as parts:
             for name in sharing:
-                if broker.connection_state(user_id, name) is not None:
-                    revoked = bool(broker.disconnect(user_id, name).revoked_at_provider) or revoked
-        return {"revoked_at_provider": revoked, "parts": parts.items}
+                # All or report: one connector failing never stops the others, and what changed is always answered.
+                # Each DISTINCT stored token is revoked (a person's connectors may hold tokens of different consents or
+                # accounts); a token already revoked in this call is not revoked twice.
+                try:
+                    if broker.connection_state(user_id, name) is None:
+                        continue
+                    result = broker.disconnect(user_id, name, spent=spent)
+                except Exception as exc:  # noqa: BLE001 - the type only
+                    _log.error("a connection disconnect failed for one connector (%s)", type(exc).__name__)
+                    unconfirmed = True
+                    continue
+                if result.revoked_at_provider:
+                    confirmed = True
+                else:
+                    unconfirmed = unconfirmed or result.provider_error is not None
+            if unconfirmed and not any(p["type"] == "alert.raised" for p in parts.items):
+                # No kept-revoke alert exists for what failed, so the answer carries one: revoke_pending is true.
+                parts.add({"type": "alert.raised", "alert_id": _ulid(self._clock())})
+        return {"revoked_at_provider": confirmed and not unconfirmed, "parts": parts.items}
 
     def connection_views(self, user_id: str) -> dict[str, Any]:
         """ADR-0032 addendum 1 (HB-08, HB-09): this user's stored grants as display views. A store read only."""

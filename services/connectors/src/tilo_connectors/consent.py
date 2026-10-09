@@ -146,6 +146,9 @@ class ConsentService:
             "response_type": "code",
             "scope": " ".join(needed),
             "access_type": "offline",
+            # Google hands a refresh token only at a first consent unless asked again: an incremental connect of the
+            # 2nd or 3rd person connector would otherwise store a record that cannot refresh (ADR-0035 L3 review).
+            "prompt": "consent",
             "include_granted_scopes": "true",
             "code_challenge": challenge.decode("ascii"),
             "code_challenge_method": "S256",

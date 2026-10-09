@@ -164,7 +164,12 @@ def test_ADR35_L3_FR_CON_02_start_asks_only_for_the_named_capabilities_with_pkce
     q = flow.query
     assert q["client_id"] == rig.env.settings.client_id and q["redirect_uri"] == rig.env.settings.redirect_uri
     assert (q["response_type"], q["code_challenge_method"], q["include_granted_scopes"]) == ("code", "S256", "true")
-    assert q["access_type"] == "offline" and len(q["state"]) >= 16 and len(q["code_challenge"]) == 43
+    assert (
+        q["access_type"] == "offline"
+        and q["prompt"] == "consent"
+        and len(q["state"]) >= 16
+        and len(q["code_challenge"]) == 43
+    )
     assert "client_secret" not in q and "code_verifier" not in q and rig.env.settings.client_secret not in flow.url
     assert rig.env.google.calls == []  # nothing reaches Google when a flow starts
 
@@ -241,6 +246,65 @@ def test_ADR35_L3_FR_CON_02_the_calendar_and_drive_grants_grow_the_one_person_gr
     assert begin(rig, "google_calendar", ("read", "write")).scopes == [CALENDAR_EVENTS_OWNED]
     assert CALENDAR_READONLY in rig.runtime._broker.get().granted_scopes(OWNER, "google_calendar")
     assert DRIVE_FILE in rig.runtime._broker.get().granted_scopes(OWNER, "google_drive")
+
+
+def test_ADR35_L3_FR_CON_02_incremental_connects_leave_every_record_able_to_refresh() -> None:
+    """Review item 4: Google gives a refresh token to a later consent only when asked (`prompt=consent`), so the 2nd
+    and 3rd person connector must each hold one. The fake models Google: no prompt, no refresh token."""
+    rig = Rig(connect_at=None)
+    for connector, capabilities in (("gmail", ("read",)), ("google_drive", ("write",)), ("google_calendar", ("read",))):
+        flow = begin(rig, connector, capabilities)
+        asked = flow.query.get("prompt") == "consent" or not stored(rig)  # a first consent always gets one
+        code = rig.env.google.issue_code(
+            flow.scopes, challenge=flow.query["code_challenge"], redirect_uri=flow.query["redirect_uri"], refresh=asked
+        )
+        assert post(rig, "callback", {"user_id": OWNER, "state": flow.state, "code": code}).status_code == 200
+    broker = rig.runtime._broker.get()
+    rig.env.clock.advance(4000)  # every access token has lapsed: each record must refresh
+    for connector, scope in (
+        ("gmail", GMAIL_READONLY),
+        ("google_drive", DRIVE_FILE),
+        ("google_calendar", CALENDAR_READONLY),
+    ):
+        assert broker.access_token_for_adapter(OWNER, connector, required_scopes=[scope])
+    assert len(rig.env.google.refresh_calls()) == 3
+
+
+def test_ADR35_L3_FR_CON_02_one_connector_failing_mid_disconnect_never_hides_what_changed(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Review item 3: an exception for one connector is caught per connector; the answer carries every part gathered,
+    revoked_at_provider is false and an alert part marks the revoke as pending."""
+    rig = Rig(connect_at=None)
+    person_grant(rig)
+    broker = rig.runtime._broker.get()
+    real = broker.disconnect
+
+    def flaky(user_id: str, connector: str, **kw: Any) -> Any:
+        if connector == "google_drive":
+            raise RuntimeError("store down " + user_id)
+        return real(user_id, connector, **kw)
+
+    monkeypatch.setattr(broker, "disconnect", flaky)
+    response = post(rig, "disconnect", {"user_id": OWNER, "connector": "gmail"})
+    assert response.status_code == 200, response.text
+    answer = response.json()
+    assert answer["revoked_at_provider"] is False
+    types = sorted((p["type"], p.get("connector", "")) for p in answer["parts"])
+    assert ("connection.revoked", "gmail") in types and ("connection.revoked", "google_calendar") in types
+    assert [p["type"] for p in answer["parts"]].count("alert.raised") >= 1
+    assert stored(rig) == [(OWNER, "google_drive")]  # what failed is still there for the next disconnect
+    assert "store down" not in response.text
+
+
+def test_ADR35_L3_FR_CON_02_each_distinct_token_of_the_person_group_is_revoked_once() -> None:
+    """Review item 2: connectors holding tokens of different consents or accounts are all revoked, none twice."""
+    rig = Rig(connect_at=None)
+    person_grant(rig)
+    held = set(rig.env.google.live_refresh)
+    assert len(held) == 3
+    post(rig, "disconnect", {"user_id": OWNER, "connector": "gmail"})
+    assert sorted(rig.env.google.revoked) == sorted(held) and rig.env.google.live_refresh == {}
 
 
 # ---- callback: refusals (LC-05) ---------------------------------------------------------------
@@ -382,7 +446,7 @@ def test_ADR35_L3_FR_CON_02_disconnecting_one_person_connector_revokes_the_share
         ("connection.revoked", "google_drive"),
     ]
     assert all(p["user_id"] == OWNER for p in answer["parts"])
-    assert stored(rig) == [] and len(rig.env.google.calls_to(REVOKE_URL)) == 1
+    assert stored(rig) == [] and len(rig.env.google.calls_to(REVOKE_URL)) == 3  # every DISTINCT stored token
     assert rig.runtime.connection_views(OWNER) == {"views": []}
     again = post(rig, "disconnect", {"user_id": OWNER, "connector": "gmail"}).json()
     assert again == {"revoked_at_provider": False, "parts": []}  # idempotent

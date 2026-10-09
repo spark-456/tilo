@@ -477,10 +477,13 @@ class TokenBroker:
             expires_at = None
         return str(record.get("state")), scopes, expires_at
 
-    def disconnect(self, user_id: str, connector: str) -> DisconnectResult:
+    def disconnect(self, user_id: str, connector: str, *, spent: set[str] | None = None) -> DisconnectResult:
         """Revoke at the provider, then delete whatever it answered (fail toward deletion). A failed
-        revoke keeps the token sealed in the retry store and raises alert.raised."""
-        return self._disconnect(user_id, connector, keep_retry=True)
+        revoke keeps the token sealed in the retry store and raises alert.raised.
+        `spent` (ADR-0035, the person group's disconnect): the set of tokens this call sequence already revoked.
+        When given, this connector's own token is revoked now (never left to "the last sibling"), unless it is in
+        the set, so every DISTINCT stored token of the group is revoked once whatever account it came from."""
+        return self._disconnect(user_id, connector, keep_retry=True, spent=spent)
 
     def delete_user(self, user_id: str) -> None:
         """Delete every token of one user, in every store (PRD 16.5). Each revoke is tried; one that
@@ -694,9 +697,13 @@ class TokenBroker:
         answer = post_form(self._http, REVOKE_URL, {"token": token})
         if answer is None:
             return "the provider could not be reached"
+        if answer[0] == 400 and answer[1].get("error") == "invalid_token":
+            return None  # Google no longer knows it: already revoked (a sibling's revoke ended the same grant)
         return None if answer[0] == 200 else f"the provider answered {answer[0]}"
 
-    def _disconnect(self, user_id: str, connector: str, *, keep_retry: bool) -> DisconnectResult:
+    def _disconnect(
+        self, user_id: str, connector: str, *, keep_retry: bool, spent: set[str] | None = None
+    ) -> DisconnectResult:
         alerts: list[str] = []  # raised once the locks are released: a sink may call back in
         with self._held(user_id, connector):
             record = self._store.get(user_id, connector)
@@ -705,7 +712,7 @@ class TokenBroker:
             payload = self._readable(user_id, connector, record) or {}
             token = payload.get("refresh_token") or payload.get("access_token")
             error: str | None = None
-            if keep_retry and self.has_live_grant(user_id, excluding=connector):  # not in delete_user
+            if keep_retry and spent is None and self.has_live_grant(user_id, excluding=connector):  # not delete_user
                 # Google keeps one grant for every connector of this client; revoking it here would end
                 # the others while Tilo still shows them connected (CON-D10). The last one revokes it, and
                 # when every live sibling is unreadable this token is kept for it (it may never read one).
@@ -714,8 +721,10 @@ class TokenBroker:
                 token = None
             elif record.get("state") == "connected" and not token:
                 error = "the stored record could not be read"
-            elif token:
+            elif token and not (spent is not None and str(token) in spent):
                 error = self._revoke(str(token))
+                if error is None and spent is not None:
+                    spent.add(str(token))
             if error is not None:
                 _log.warning("revoke at the provider failed for connector %r: %s", connector, error)
                 # Sealed and stored before the record is deleted: a KMS failure here leaves the record.
