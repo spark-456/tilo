@@ -1,5 +1,6 @@
 // The composer's Quick / Thinking choice, remembered per person (COST-FAST-1). Kept in this browser only:
-// `localStorage` keyed by the signed-in email (the same approach as the profile settings), with an in-memory
+// `localStorage` keyed by a hash of the signed-in email (never the address itself: a shared machine must not list who used Tilo, BQ-SIGNIN-4;
+// sign-out also clears every key, api/signOut.ts), with an in-memory
 // fallback for when storage is absent or throws (private mode, blocked site data). Thinking is the default: it is
 // what every start has been, so nothing changes for a person who never chooses.
 import type { Effort } from "../../api/types";
@@ -13,8 +14,20 @@ const ANON = "anonymous";
 /** In-memory fallback, per key, for the life of the page: only what storage refused to keep (or could not be read). */
 const memory = new Map<string, Effort>();
 
+/** Two 32-bit FNV-1a passes with different offsets: a short stable name for the email, not a secret. */
+function hashOf(text: string): string {
+  let a = 0x811c9dc5;
+  let b = 0x9747b28c;
+  for (let i = 0; i < text.length; i++) {
+    const c = text.charCodeAt(i);
+    a = Math.imul(a ^ c, 0x01000193);
+    b = Math.imul(b ^ c, 0x01000193);
+  }
+  return (a >>> 0).toString(16).padStart(8, "0") + (b >>> 0).toString(16).padStart(8, "0");
+}
+
 const keyOf = (email: string | null | undefined): string =>
-  `${PREFIX}${email ? email.trim().toLowerCase() : ANON}`;
+  `${PREFIX}${email ? hashOf(email.trim().toLowerCase()) : ANON}`;
 
 const isEffort = (v: unknown): v is Effort => v === "quick" || v === "thinking";
 

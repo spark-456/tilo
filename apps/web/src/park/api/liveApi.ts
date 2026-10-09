@@ -16,7 +16,8 @@ import {
 import { type CostReport, ledgerFromCosts } from "./live/ledgerFromCosts";
 import { worldFromIntake } from "./live/worldFromIntake";
 import { STATE_OF, type WorldListItem, worldsFromList } from "./live/worldsFromList";
-import type { Dec, DecisionKey, Effort, QuickReply, TierKey } from "./types";
+import { nameInitials } from "./nameInitials";
+import type { Dec, DecisionKey, Effort, QuickReply, TierKey, Today, User } from "./types";
 
 export class NotBuilt extends Error {
   readonly code = "not_built";
@@ -34,6 +35,53 @@ export interface LiveApiOptions {
   appCheckToken?: (() => Promise<string | null>) | undefined;
   /** SEC-15: the Firebase ID token getter; every Park request carries `Authorization: Bearer` like the rest of the app. */
   authToken?: (() => Promise<string | null>) | undefined;
+}
+
+export interface Identity {
+  name: string | null;
+  email: string | null;
+}
+
+const titleCase = (w: string): string => w.charAt(0).toUpperCase() + w.slice(1);
+
+/** The signed-in person as the Home greeting needs them: nothing but what the sign-in session holds. */
+export function userOf(who: Identity): User | null {
+  const email = who.email?.trim() ?? "";
+  const name =
+    who.name?.trim() ||
+    email
+      .split("@")[0]
+      ?.replace(/[._-]+/g, " ")
+      .trim() ||
+    "";
+  if (!name) return null;
+  const words = name.split(/\s+/).map(titleCase);
+  const first = words[0] ?? name;
+  const initials = nameInitials(name);
+  const tz = Intl.DateTimeFormat().resolvedOptions().timeZone ?? "";
+  return {
+    first,
+    name: who.name?.trim() || words.join(" "),
+    initials,
+    email,
+    title: "",
+    org: "",
+    plan: "",
+    tz,
+    lang: "",
+    hours: "",
+  };
+}
+
+/** Today from the clock: a date is true wherever it comes from. */
+export function todayOf(d: Date): Today {
+  const part = (o: Intl.DateTimeFormatOptions): string =>
+    new Intl.DateTimeFormat("en-GB", o).format(d);
+  return {
+    long: part({ weekday: "long", day: "numeric", month: "long" }).replace(",", ""),
+    short: part({ weekday: "short", day: "numeric", month: "short" }).replace(",", ""),
+    time: part({ hour: "2-digit", minute: "2-digit", hour12: false }),
+  };
 }
 
 const BAD_REPLY = "Tilo sent a reply this page could not read.";
