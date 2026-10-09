@@ -22,7 +22,7 @@ from typing import Annotated, Any, Literal
 import tilo_planning.plangraph as plangraph
 import tilo_policy
 from fastapi import APIRouter, Depends, HTTPException, Request
-from tilo_connectors import Outbox, OutboxRefused
+from tilo_connectors import Outbox, OutboxRefused, RetryPolicy
 from tilo_harness.config import load_agents_config
 from tilo_harness.executor import UnitOutcome, run_plan
 from tilo_harness.must_ask import MustAsk
@@ -452,6 +452,7 @@ class Run:
         return Outbox(
             self.seams.outbox_store, self.adapters, emit=self._record_transfer, clock=events.now,
             world_id=self.world_id, halted=self.paused, alert=lambda part: self._record_alert(part["data"]["alert_id"]),
+            retry=RetryPolicy() if any(isinstance(a, ConnectorRpcStub) for a in self.adapters.values()) else None,
         )  # fmt: skip
 
     def _read_pinned(self, ref: dict[str, Any]) -> bytes:
@@ -499,11 +500,15 @@ class Run:
             entry = store.get(outbox_id)
             if "committed" in send or entry is None or entry["state"] not in ("queued", "scheduled", "sending"):
                 continue
+            keeps = self._keeps_ambiguous(entry)
             try:
-                if self._keeps_ambiguous(entry) and self._may_have_sent(outbox_id):
+                if keeps and self._may_have_sent(outbox_id):
                     self._record_alert(outbox_id)
                 else:
-                    self._outbox().abandon(outbox_id)
+                    self._outbox().abandon(outbox_id, keep_ambiguous=keeps)
+            except OutboxRefused:
+                if keeps:  # a lease nobody released, or a send in flight: it may have gone out, a person checks
+                    self._record_alert(outbox_id)
             except Exception:
                 logger.warning("run %s left entry %s to its sender", self.run_id, outbox_id)
 

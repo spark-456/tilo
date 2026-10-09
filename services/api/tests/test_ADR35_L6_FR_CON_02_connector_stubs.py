@@ -522,12 +522,26 @@ def test_ADR35_L6_FR_CON_02_an_entry_that_may_have_gone_out_is_never_touched_by_
     assert rig.store.get(entry_id)["state"] != "failed"
 
 
-def test_ADR35_L6_FR_CON_02_unreadable_worlds_stop_a_person_disconnect_before_the_call(rig, monkeypatch):
-    person_entry(rig, "gmail", OWNER, world="w_mine")
-    monkeypatch.setattr(rig.worlds, "load_world", lambda w, settle=False: (_ for _ in ()).throw(RuntimeError("down")))
+def test_ADR35_L6_FR_CON_02_an_unreadable_world_never_blocks_a_disconnect_and_only_the_callers_go(
+    rig, monkeypatch, caplog
+):
+    mine = person_entry(rig, "gmail", OWNER, world="w_mine")
+    theirs = person_entry(rig, "google_drive", STRANGER, world="w_theirs")
+    broken = person_entry(rig, "google_calendar", STRANGER, world="w_broken")
+    real = rig.worlds.load_world
+
+    def load(world_id, settle=False):
+        if world_id == "w_broken":
+            raise RuntimeError("down")
+        return real(world_id, settle)
+
+    monkeypatch.setattr(rig.worlds, "load_world", load)
     rig.set((ok({"revoked_at_provider": True, "parts": []}),))
-    response = rig.p.post(DISCONNECT, {"connector": "gmail"})
-    assert (response.status_code, response.json()) == (503, {"detail": "unknown"}) and rig.transport.calls == []
+    with caplog.at_level("WARNING"):
+        assert rig.p.post(DISCONNECT, {"connector": "gmail"}).status_code == 200
+    states = {i: rig.store.get(i)["state"] for i in (mine, theirs, broken)}
+    assert states == {mine: "failed", theirs: "queued", broken: "failed"}  # the caller approved the unreadable one
+    assert broken in caplog.text
 
 
 @pytest.mark.parametrize("kind", ["connection.revoked", "connection.expired"])
@@ -618,3 +632,129 @@ def test_ADR35_L6_FR_CON_02_end_to_end_a_second_dispatch_after_sent_makes_nothin
     settled, google, _, outbox, _ = through(entry, DRAFT_EV, email_doc())
     outbox.dispatch_due()
     assert settled["state"] == "sent" and len(google.drafts) == 1
+
+
+# ---- round 1: a lost answer, the Firestore store, the pins ---------------------------------------------------------
+
+
+def firestore_store() -> Any:
+    from _adr35_l2_fake import OccFirestore  # noqa: PLC0415
+    from tilo_api.outbox_firestore import FirestoreOutboxStore  # noqa: PLC0415
+
+    return FirestoreOutboxStore(OccFirestore(), clock=lambda: NOW)
+
+
+def test_ADR35_L6_FR_CON_02_disconnect_over_the_firestore_store_leaves_a_lost_answer_and_a_live_send(rig):
+    fs = firestore_store()
+    rig.store = fs
+    rig.p.app.dependency_overrides[deps.get_outbox_store] = lambda: fs
+    rig.set((ok({"revoked_at_provider": True, "parts": []}),))
+    plain = person_entry(rig, "gmail", OWNER, world="w_mine")
+    lost = person_entry(rig, "google_drive", OWNER, world="w_mine")
+    live = person_entry(rig, "google_calendar", OWNER, world="w_mine")
+    fs._claim_for_sending(lost, "h", NOW, 30)
+    fs._defer(lost, "h", 1, NOW, 0, True)  # a lost answer: ambiguous, its lease released
+    fs._claim_for_sending(live, "h", NOW, 30)  # a send in flight
+    assert rig.p.post(DISCONNECT, {"connector": "gmail"}).status_code == 200
+    assert fs.get(plain)["state"] == "failed"
+    assert fs.get(lost)["state"] != "failed" and fs.get(live)["state"] != "failed"
+
+
+def run_like(store: Any, stub: ConnectorRpcStub, puts: list) -> Any:
+    """What `Run._outbox` and `Run._abandon_unsent` read, over a real store: the real methods, nothing else."""
+    import threading  # noqa: PLC0415
+
+    ns = types.SimpleNamespace(
+        adapters={DRAFT["connector"]: stub}, seams=types.SimpleNamespace(outbox_store=store),
+        world_id=DRAFT["world_id"], run_id=DRAFT["run_id"], paused=lambda: False, _record_transfer=lambda t: None,
+        sends={DRAFT["id"]: {"worker": "w", "island": "i", "district": "D1", "cause": "c"}},
+        _alerted=set(), _alert_lock=threading.Lock(), _alert_summary="A person must check.",
+        put=lambda *a, **k: puts.append(a),
+    )  # fmt: skip
+    for name in ("_record_alert", "_keeps_ambiguous", "_may_have_sent", "_outbox"):
+        setattr(ns, name, lambda *a, _n=name, **k: getattr(Run, _n)(ns, *a, **k))
+    return ns
+
+
+@pytest.mark.parametrize("kind", ["memory", "firestore"])
+def test_ADR35_L6_FR_CON_02_a_lost_answer_is_one_post_and_one_alert_and_is_never_failed(kind):
+    store = firestore_store() if kind == "firestore" else InMemoryOutboxStore(clock=lambda: NOW)
+    rig = Rig(*[TransportError() for _ in range(6)])
+    puts: list = []
+    run = run_like(store, rig.stub, puts)
+    outbox = run._outbox()
+    assert outbox._retry.max_delay_s >= 60  # a stub is wired: the 60 s ambiguous delay holds, not "retry at once"
+    outbox.enqueue(copy.deepcopy(DRAFT), copy.deepcopy(DRAFT_EV))
+    for _ in range(6):  # the run's own dispatch loop (_SEND_RETRY_DELAYS_S)
+        outbox.dispatch_due()
+    assert len(rig.transport.calls) == 1
+    Run._abandon_unsent(run)
+    Run._abandon_unsent(run)
+    assert [p[0] for p in puts] == ["alert.raised"] and store.get(DRAFT["id"])["state"] != "failed"
+    assert Run._keeps_ambiguous(run, DRAFT) and Run._may_have_sent(run, DRAFT["id"])
+
+
+def test_ADR35_L6_FR_CON_02_a_run_without_a_stub_keeps_the_immediate_retry_policy():
+    store = InMemoryOutboxStore()
+    run = run_like(store, ConnectorRpcStub("gmail", Rig().rpc), [])
+    run.adapters = {"gmail": types.SimpleNamespace()}
+    assert Run._outbox(run)._retry.max_delay_s == 0
+    assert not Run._keeps_ambiguous(run, DRAFT)
+
+
+def test_ADR35_L6_FR_CON_02_an_expired_lease_is_not_failed_by_a_give_up_but_alerts_once():
+    store = InMemoryOutboxStore(clock=lambda: NOW)
+    rig = Rig(answer("sent"))
+    puts: list = []
+    run = run_like(store, rig.stub, puts)
+    run._outbox().enqueue(copy.deepcopy(DRAFT), copy.deepcopy(DRAFT_EV))
+    store._claim_for_sending(DRAFT["id"], "dead", NOW, 30)  # the holder died with the lease unreleased
+    store._clock = lambda: "2026-10-09T09:45:00.000Z"
+    Run._abandon_unsent(run)
+    assert store.get(DRAFT["id"])["state"] == "sending" and [p[0] for p in puts] == ["alert.raised"]
+
+
+def test_ADR35_L6_FR_CON_02_a_demo_schedule_builds_no_live_adapters(monkeypatch):
+    from tilo_api import ephemeral, runs, schedules  # noqa: PLC0415
+
+    built = types.SimpleNamespace(adapters={"gmail": object()})
+    monkeypatch.setattr(runs, "run_seams", lambda request, mode: dataclasses_replace(built))
+    monkeypatch.setattr(ephemeral, "mark_no_person", lambda request: None)
+    build = schedules.get_seams_factory(types.SimpleNamespace(), "replay")
+    assert build(demo=True).adapters == {} and build().adapters == {"gmail": built.adapters["gmail"]}
+
+
+def dataclasses_replace(ns: Any) -> Any:
+    import dataclasses  # noqa: PLC0415
+
+    @dataclasses.dataclass(frozen=True)
+    class S:
+        adapters: dict
+
+    return S(adapters=dict(ns.adapters))
+
+
+def test_ADR35_L6_FR_CON_02_the_post_path_is_pinned_to_the_two_wire_methods():
+    """`_post`, the execute path and the `send` route are reached from one method each; nothing else in src posts."""
+    tree = ast.parse((SRC / "meeting_host_rpc.py").read_text(encoding="utf-8"))
+    by_route: dict[str, list[str]] = {}
+    for fn in (f for f in ast.walk(tree) if isinstance(f, ast.FunctionDef)):
+        for call in (n for n in ast.walk(fn) if isinstance(n, ast.Call)):
+            if isinstance(call.func, ast.Attribute) and call.func.attr == "_post" and call.args:
+                first = call.args[0]
+                if isinstance(first, ast.Constant):
+                    by_route.setdefault(first.value, []).append(fn.name)
+    assert by_route["execute"] == ["execute_entry"] and by_route["send"] == ["send_invitation"]
+    uses = [
+        fn.name
+        for fn in ast.walk(tree)
+        if isinstance(fn, ast.FunctionDef)
+        and any(isinstance(n, ast.Name) and n.id == "EXECUTE_PATH" for n in ast.walk(fn))
+    ]
+    assert uses == ["execute_entry"]
+    for path in SRC.rglob("*.py"):
+        if path.name == "meeting_host_rpc.py":
+            continue
+        text = path.read_text(encoding="utf-8")
+        assert "/internal/side-effects/execute" not in text and "EXECUTE_PATH" not in text, path.name
+        assert "._post(" not in text and "._call(" not in text, path.name

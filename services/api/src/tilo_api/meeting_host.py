@@ -351,13 +351,22 @@ def abandon_unsent(user: str, outbox_store: Any, owner_of: Callable[[str], str |
     """Abandons every unsent entry of `user`'s and returns how many: without `owner_of` the `meeting_host` entries whose
     approval is `user`'s (`authz.ref`); with `owner_of(world_id)` the person connectors' (gmail, google_drive,
     google_calendar) entries in a world `user` owns, since the owner's grant is the one they use (ADR-0035 decision 5;
-    one shared grant, so any of the three revoked abandons all three). A store that cannot be
-    listed, or an `owner_of` that raises, raises (the caller decides); an entry that may have gone out (ambiguous) is
-    never touched, and one a live lease holds (`OutboxRefused`) or whose own write fails stays for the next call."""
+    one shared grant, so any of the three revoked abandons all three; an entry whose world cannot be read is skipped,
+    its id logged, unless `user` approved it). A store that cannot be listed raises (the caller decides). An entry that
+    may have gone out (ambiguous, or an expired unreleased lease) is never touched; one a live lease holds
+    (`OutboxRefused`) or whose own write fails stays for the next call."""
 
     def mine(entry: Mapping[str, Any]) -> bool:
         if owner_of is not None:
-            return entry["connector"] in PERSON_CONNECTORS and owner_of(entry["world_id"]) == user
+            if entry["connector"] not in PERSON_CONNECTORS:
+                return False
+            try:
+                return owner_of(entry["world_id"]) == user
+            except (
+                Exception
+            ):  # one unreadable world never blocks everyone's disconnect; its approver's own entry still goes
+                logger.warning("outbox entry %s: its world could not be read", entry["id"])
+                return (entry.get("authz") or {}).get("ref") == user
         return entry["connector"] == CONNECTOR_ID and (entry.get("authz") or {}).get("ref") == user
 
     unsent = [e for e in outbox_store.all_entries() if e["state"] in _UNSENT and mine(e)]
