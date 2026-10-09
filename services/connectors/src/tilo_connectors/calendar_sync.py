@@ -43,7 +43,7 @@ from .tokens import ConnectionExpired, InsufficientScope, Kms, KmsError, NotConn
 
 DEFAULT_PERSONAL_CONFIG = Path(__file__).resolve().parents[4] / "config" / "personal.yaml"
 CONNECTOR_ID = "google_calendar"
-# meeting_host.py defines the same constant but imports this module, so it is repeated here (ADR-0035 decision 6)
+# The host adapter defines the same constant but imports this module, so it is repeated here (ADR-0035 decision 6)
 CALENDAR_EVENTS_OWNED = "https://www.googleapis.com/auth/calendar.events.owned"
 SEAL_CONTEXT = b"tilo.calendar_sync.v1"
 MAX_RETRY_AFTER_S = 86400
