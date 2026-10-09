@@ -10,6 +10,7 @@ import copy
 import functools
 import math
 import re
+import unicodedata
 from collections.abc import Iterator
 from dataclasses import dataclass, field
 from datetime import date
@@ -49,6 +50,12 @@ class BriefValidationError(ValueError):
 MAX_TOPIC_QUESTIONS = 3  # FR-INT-04: at most 3 questions in all, so at most 3 from the Director
 MAX_TOPIC_ANSWERS = 3
 LABEL_MAX, TEXT_MAX, ANSWER_MAX = 30, 200, 120  # characters of a model-written label, question and suggested answer
+# Labels a Director question may not use: they would read as something Tilo itself wrote ("Assumed: ...", the chips'
+# own names, the free-text deliverable note), so such a question is dropped and the generic one stands.
+RESERVED_LABELS = frozenset(
+    {"assumed", "deliverable wishes", "goal", "deliverables", "audience", "deadline", "constraints", "sources"}
+    | {"sensitivity"}
+)
 _RAW_LIMIT = 10  # items read from a model list before any is vetted
 _NEUTRAL_CHANGE = 0.5  # expected_change of a question whose number is unusable
 _TAG = re.compile(r"<[^<>]{0,200}>")
@@ -78,12 +85,13 @@ class ExtractionResult:
 
 
 def clean_line(value: Any, limit: int) -> str | None:
-    """A model's or person's short text as one plain line within `limit` characters, else None: control and invisible
-    characters become spaces, tags and the angle brackets and backticks left over are removed, spaces are folded, and
-    the cut is made last. The input is bounded first, so the cost is linear in `limit`."""
+    """A model's or person's short text as one plain line within `limit` characters, else None: folded to NFKC (so
+    full-width letters and brackets read as themselves), control and invisible characters become spaces, tags and the
+    angle brackets and backticks left over are removed, spaces are folded, and the cut is made last. The input is
+    bounded before and after the fold, so the cost is linear in `limit`."""
     if not isinstance(value, str):
         return None
-    text = _CONTROL.sub(" ", value[: limit * 4])
+    text = _CONTROL.sub(" ", unicodedata.normalize("NFKC", value[: limit * 4])[: limit * 4])
     text = _TAG.sub("", text).replace("<", "").replace(">", "").replace("`", "")
     text = " ".join(text.split())
     if len(text) > limit:
@@ -112,7 +120,7 @@ def topic_questions(value: Any) -> tuple[TopicQuestion, ...]:
         raw = item.get("suggested_answers")
         cleaned = (clean_line(a, ANSWER_MAX) for a in raw[:_RAW_LIMIT]) if isinstance(raw, list) else ()
         answers = tuple(dict.fromkeys(a for a in cleaned if a))[:MAX_TOPIC_ANSWERS]
-        if label and text and answers and label.casefold() not in found:
+        if label and text and answers and label.casefold() not in found and label.casefold() not in RESERVED_LABELS:
             found[label.casefold()] = TopicQuestion(label, text, answers, _expected_change(item.get("expected_change")))
     ranked = sorted(found.values(), key=lambda q: -q.expected_change)  # stable: ties keep the Director's order
     return tuple(ranked[:MAX_TOPIC_QUESTIONS])

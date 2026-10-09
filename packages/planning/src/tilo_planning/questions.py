@@ -106,7 +106,9 @@ def generate_questions(
         candidates.remove(hit.field)
         hit_events.append(_memory_hit_event(base, seq + len(hit_events), hit))
 
-    topic = list(topic_questions)[:MAX_QUESTIONS]
+    stated = [c.casefold() for c in brief["constraints"]]  # what the task (or a saved preference) already says
+    topic = [q for q in topic_questions if not any(c.startswith(f"{q.label.casefold()}:") for c in stated)]
+    topic = topic[:MAX_QUESTIONS]  # a label that is already a stated "Label: ..." constraint is not asked
     if topic:  # their answers cover what the generic format and rules questions would have asked
         for field in (f for f in candidates if f in TOPIC_REPLACES):
             brief["assumptions"].append({"question": None, "assumed": _assumed(brief, field)})
@@ -199,9 +201,10 @@ def _topic_value(answer: str) -> str:
 
 
 def _apply_topic(brief: dict[str, Any], question: Question, answer: str) -> dict[str, Any]:
-    prefix = f"{question.label}: "
-    kept = [c for c in brief["constraints"] if not c.startswith(prefix)]
-    return validate_brief({**copy.deepcopy(brief), "constraints": [*kept, prefix + _topic_value(answer)]})
+    """The constraint `Label: value` is appended; a stated constraint is never removed or edited (a Director label that
+    matches one is dropped in `generate_questions`, so no stated constraint carries this label)."""
+    line = f"{question.label}: {_topic_value(answer)}"
+    return validate_brief({**copy.deepcopy(brief), "constraints": list(dict.fromkeys([*brief["constraints"], line]))})
 
 
 def _topic_question(topic: TopicQuestion, number: int) -> Question:

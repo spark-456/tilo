@@ -252,14 +252,60 @@ def test_FR_INT_04_skipping_a_topic_question_records_the_assumption_and_uses_it(
     assert_valid_brief(repo_root, registry, skipped)
 
 
-def test_FR_INT_04_answering_again_replaces_the_earlier_answer_of_the_same_label(tmp_path) -> None:
-    result = _ask(tmp_path)
-    branch = result.questions[0]
+STATED = ["Budget: under 500", "Level: beginner"]
 
-    first = apply_answer(result.brief, branch, "EC", today=TODAY)
-    again = apply_answer(first, branch, "CS", today=TODAY)
 
-    assert [c for c in again["constraints"] if c.startswith("Branch:")] == ["Branch: CS"]
+def _stated_brief(tmp_path, labels):
+    """A brief whose own task already stated two `Label: value` constraints, and a Director that asks `labels`."""
+    questions = [
+        {"label": label, "text": f"{label}?", "suggested_answers": ["2000", "x"], "expected_change": 0.9 - n / 10}
+        for n, label in enumerate(labels)
+    ]
+    extraction = _extract(tmp_path, questions, constraints=STATED)
+    result = generate_questions(
+        extraction.brief,
+        ["deliverables", "constraints"],
+        memory=make_no_memory(),
+        base=sample_event_base(),
+        seq=2,
+        topic_questions=extraction.questions,
+    )
+    return extraction.brief, result
+
+
+@pytest.mark.parametrize("label", ["Budget", "budget", "BUDGET", "Level"])
+def test_FR_INT_04_a_label_that_collides_with_a_stated_constraint_is_dropped_and_the_generic_questions_fill_in(
+    tmp_path, label
+) -> None:
+    brief, result = _stated_brief(tmp_path, [label])
+
+    assert [q.field for q in result.questions] == ["deliverables", "constraints"]  # the generic fallback
+    assert result.brief["constraints"] == STATED and brief["constraints"] == STATED
+
+
+def test_FR_INT_04_only_the_colliding_question_is_dropped_the_others_are_asked_and_never_touch_stated_ones(
+    tmp_path,
+) -> None:
+    brief, result = _stated_brief(tmp_path, ["Budget", "Branch", "Hours per day"])
+
+    assert [(q.field, q.label) for q in result.questions] == [("topic_1", "Branch"), ("topic_2", "Hours per day")]
+    branch, hours = result.questions
+    skipped = record_assumption(result.brief, branch)
+    answered = apply_answer(skipped, hours, "3", today=TODAY)
+    assert answered["constraints"] == [*STATED, "Branch: 2000", "Hours per day: 3"]  # appended; stated ones intact
+    assert answered["constraints"][: len(STATED)] == STATED
+
+
+@pytest.mark.parametrize("label", ["Assumed", "assumed", "Deliverable wishes", "Audience"])
+def test_FR_INT_04_a_reserved_label_is_dropped(tmp_path, label) -> None:
+    assert _extract(tmp_path, [{"label": label, "text": "Which?", "suggested_answers": ["a"]}]).questions == ()
+
+
+def test_FR_INT_04_clean_line_folds_compatibility_forms_before_cleaning() -> None:
+    from tilo_planning.brief import clean_line
+
+    assert clean_line("\uff22\uff55\uff44\uff47\uff45\uff54", 30) == "Budget"  # full-width letters
+    assert clean_line("\uff1cb\uff1eCS\uff1c/b\uff1e", 30) == "CS"  # full-width angle brackets are tags too
 
 
 def test_FR_INT_04_the_topic_event_is_a_valid_questions_asked_event(tmp_path, repo_root, registry) -> None:
