@@ -591,13 +591,12 @@ def get_must_ask_providers(mode: Mode = "replay") -> Mapping[str, Any]:
     return _worker_models(mode)
 
 
-def _no_recipients(*, unit: dict, action_type: str, item: dict, brief: dict) -> dict:
-    raise LookupError("no address book is wired yet, so a send has no recipients")
-
-
 def get_action_resolver() -> Callable[..., dict]:
-    """`resolve(*, unit, action_type, item, brief) -> {destination, recipients, known_recipients?}`."""
-    return _no_recipients
+    """`resolve(*, unit, action_type, item, brief[, answers, supplied]) -> {destination, recipients, known_recipients?,
+    fields?}`: the deterministic resolver of the person's structured answers (ADR-0035 L6c, `side_effect_fields`)."""
+    from tilo_api import side_effect_fields  # noqa: PLC0415
+
+    return side_effect_fields.make_resolver()
 
 
 def get_skill_registry() -> SkillRegistry:

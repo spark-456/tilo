@@ -31,7 +31,7 @@ from tilo_harness.validator import repo_validator
 from tilo_memory.artifacts import NewVersion, Origin, Scope
 from tilo_planning.compiler import DELIVER, PlanInputs
 
-from tilo_api import deps, events, item_documents, team_access, team_store
+from tilo_api import deps, events, item_documents, side_effect_fields, team_access, team_store
 from tilo_api.access import Mode
 from tilo_api.cards import (
     OWNER_ONLY_ACTIONS,
@@ -213,6 +213,10 @@ class Run:
                 if task.answers.get(q.field) and q.field not in task.edits
             )
         )
+        self.person_answers: dict[str, str] = {  # L6c: only what the person typed or chose, by brief field
+            **{f: a for f, a in task.answers.items() if isinstance(a, str)},
+            **{f: v for f, v in task.edits.items() if isinstance(v, str)},
+        }
         self.approaches = copy.deepcopy(task.approaches or [])
         self.cards = CardStore(clock=_CLOCK, writer=self, world_owners={self.world_id: self.owner})
         self.question_wait = _ObservedWait(self)  # a unit that asked a person waits here for the answer (FR-HIL-10)
@@ -244,6 +248,7 @@ class Run:
         self._documents: dict[tuple[str, int, str], tuple[dict[str, Any], str, str | None]] = {}  # (body, kind) -> pin
         self._asking: dict[str, tuple[str, tuple[str, ...]]] = {}  # fields card id -> (action, the missing fields)
         self._supplied: dict[str, dict[str, str]] = {}  # fields card id -> what the person typed (never logged)
+        self._supplied_for_unit: dict[str, dict[str, str]] = {}  # unit id -> recipients the person typed (never logged)
         self.fields_lock = threading.Lock()  # the fields route stages and answers one card at a time
         self.adapters: dict[str, Any] = {  # a live connector's stub is bound to this run (its reader, sink, owner)
             name: adapter.bound(self._read_pinned, self._part_sink, self.owner)
@@ -664,15 +669,28 @@ class Run:
         connector = next((c for c in unit["connectors"] if self._action(c, action)), None)
         if gate is None or connector is None:
             raise _GateFailed(f"no gate or connector for {action}")
-        try:
-            brief, unit_copy = copy.deepcopy(self.brief), copy.deepcopy(unit)
-            to = self.seams.resolver(unit=unit_copy, action_type=action, item=dict(item), brief=brief)
-            recipients, destination, known = to["recipients"], to["destination"], to.get("known_recipients")
-            fields = to.get("fields")
-            declared: Mapping[str, Any] = fields if isinstance(fields, Mapping) else {}  # L6b: declared, never inferred
-        except Exception as exc:
-            raise _GateFailed("the send has no recipients") from exc
         live = bool(item_documents.kind_of(action)) and isinstance(self.adapters.get(connector), ConnectorRpcStub)
+        takes_answers = getattr(self.seams.resolver, "takes_answers", False)  # only the production resolver
+        supplied: dict[str, str] = self._supplied_for_unit.setdefault(unit["id"], {}) if takes_answers else {}
+        for _ in range(3):  # a missing recipient is asked of the person (a needs-you card), then resolved again
+            try:
+                brief, unit_copy = copy.deepcopy(self.brief), copy.deepcopy(unit)
+                extra = (  # only the production resolver is given the person's structured answers
+                    {"answers": dict(self.person_answers), "supplied": dict(supplied)} if takes_answers else {}
+                )
+                to = self.seams.resolver(unit=unit_copy, action_type=action, item=dict(item), brief=brief, **extra)
+                recipients, destination, known = to["recipients"], to["destination"], to.get("known_recipients")
+                fields = to.get("fields")
+                declared: Mapping[str, Any] = fields if isinstance(fields, Mapping) else {}  # declared, never inferred
+                break
+            except side_effect_fields.Missing as exc:
+                if not live:  # nothing to ask for where nothing live can send
+                    raise _GateFailed("the send has no recipients") from exc
+                supplied |= await self._ask_fields(unit, worker, action, exc.fields, exc.reason)
+            except Exception as exc:
+                raise _GateFailed("the send has no recipients") from exc
+        else:
+            raise _GateFailed("the send has no recipients")
         reaches_no_one = live and action in item_documents.NO_RECIPIENT_ACTIONS  # a save or an own-calendar event
         if not ((destination is None and live or isinstance(destination, str) and destination.strip())  # a new mail
                 and isinstance(recipients, list) and (recipients or reaches_no_one)
@@ -941,7 +959,9 @@ class Run:
         ref, line, _ = self._documents[key]
         return ref, line
 
-    async def _ask_fields(self, unit: dict, worker: str, action: str, missing: tuple[str, ...]) -> dict[str, str]:
+    async def _ask_fields(
+        self, unit: dict, worker: str, action: str, missing: tuple[str, ...], reason: str | None = None
+    ) -> dict[str, str]:
         """A needs-you card names the fields the document lacks; the person supplies them on the fields route, which
         answers the card (`provide`). A hold, a default or an answer with nothing supplied fails the step."""
         names, card_id = ", ".join(missing), events.new_part_id()
@@ -949,7 +969,8 @@ class Run:
             "id": card_id, "world_id": self.world_id, "run_id": self.run_id, "kind": "needs_you", "rung": "needs_you",
             "header": {"building": self._building(unit), "agent": worker},
             "what_happened": f"{unit['title']}: needs {names}."[:140],
-            "why_it_matters": "Nothing is sent or saved until you add it. Tilo does not make it up from the text.",
+            "why_it_matters": (f"{reason}. " if reason else "")[:120]
+            + "Nothing is sent or saved until you add it. Tilo does not make it up from the text.",
             "options": [
                 {"id": "provide", "label": "Add it", "suggested": True, "irreversible": False,
                  "reason": "You add it here; the finished item then comes back for your approval."},
@@ -981,14 +1002,22 @@ class Run:
             raise _GateFailed(f"needs {names}: nothing was added")
         return supplied
 
+    def asked_fields(self, card_id: str) -> tuple[str, ...] | None:
+        """The field names an open fields card waits for (the form's labels); None for a card this run did not ask."""
+        asking = self._asking.get(card_id)
+        return asking[1] if asking else None
+
     def stage_fields(self, card_id: str, fields: Any) -> dict[str, str]:
         """The fields route's check, before it answers the card: LookupError for a card this run did not ask,
         ValueError(plain reason) for what the document would refuse. The values are kept for the waiting step only."""
         action, missing = self._asking.get(card_id) or ("", ())
         if not action:
             raise LookupError(card_id)
+        asked = fields if isinstance(fields, Mapping) else {}
         try:
-            got = item_documents.check_fields(action, fields if isinstance(fields, Mapping) else {})
+            got = item_documents.check_fields(action, {k: v for k, v in asked.items() if k != "recipient"})
+            if "recipient" in asked:
+                got["recipient"] = side_effect_fields.check_recipient(action, asked["recipient"])
         except item_documents.DocumentRefused as exc:
             raise ValueError(exc.reason) from None
         if set(got) != set(missing) or set(fields) != set(missing):
