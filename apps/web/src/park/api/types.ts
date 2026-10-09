@@ -384,13 +384,14 @@ export interface Team {
   people: {
     id: string;
     name: string;
-    email: string;
-    dept: string;
-    role: string;
-    active: string;
+    email: string | null;
+    dept: string | null;
+    role: string | null;
+    active: string | null;
     you?: boolean;
     limit?: string;
-    c: string;
+    c: string | null;
+    memberships?: string[] | null;
   }[];
   rules: [string, string, string, boolean][];
   matrix: [string, number][];
