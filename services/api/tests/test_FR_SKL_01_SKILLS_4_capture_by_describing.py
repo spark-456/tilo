@@ -49,6 +49,15 @@ from _skills4_lib import (
 GOLDEN = [CLEAR, AMBIGUOUS, HOSTILE, NO_CHANNEL, COMPOUND, MISLABEL]
 
 
+def _leaf_values(node):
+    """Every string leaf of a JSON value, keys excluded."""
+    if isinstance(node, dict):
+        return [leaf for value in node.values() for leaf in _leaf_values(value)]
+    if isinstance(node, list):
+        return [leaf for value in node for leaf in _leaf_values(value)]
+    return [str(node)]
+
+
 @pytest.mark.parametrize("text", GOLDEN)
 def test_FR_SKL_01_SKILLS_4_golden_descriptions_become_captured_steps_and_a_draft(skills4, text):
     response = skills4.capture(text)
@@ -82,8 +91,15 @@ def test_FR_SKL_01_SKILLS_4_one_skill_captured_event_per_step_in_the_owners_desk
         assert event["world_id"] == PRIYA_DESK
         assert (event["actor"], event["target"], event["vis"], event["authz"]) == (PRIYA, PRIYA, [], None)
         assert event["data"] == {"skill": capture_id, "method": "describe", "step": number, "artifact": None}
+        # No step text (TS-11), checked three ways. (a) "accountant" and "Drive" against the whole event, keys included.
         dumped = json.dumps(event)
-        assert not any(word in dumped for word in ("accountant", "my Drive", "Email me"))  # no step text (TS-11)
+        assert not any(word in dumped for word in ("accountant", "Drive"))
+        # (b) "summary" is a real key name in the event, so it and "Email me" are checked against the data VALUES only.
+        values = " | ".join(_leaf_values(event))
+        assert not any(word in values for word in ("accountant", "Drive", "summary", "Email me"))
+        # (c) every full captured step text and the whole description, case-folded, against values and the dump.
+        for text in (*CAPTURES[CLEAR], CLEAR):
+            assert text.casefold() not in values.casefold() and text.casefold() not in dumped.casefold()
     assert events[0]["credits"] >= 0 and events[0]["trace"]["tokens_in"] == 400
 
 
