@@ -32,7 +32,10 @@ class Production(Live):
     def start(self):
         self.rf.start()
         task = self.rf.store.tasks[self.rf.task_id]
-        task.answers = dict(self.answers)
+        from tilo_planning.questions import _question  # noqa: PLC0415
+
+        task.answers = dict(self.answers)  # each answer is to a question whose own guess is something else
+        task.questions = [_question({f: "My own team"}, f) for f in self.answers]
         if self.brief_text:
             task.brief = {**task.brief, **self.brief_text}  # prose: the Director's own chips, not the person's answers
         self.as_user("u_flow_owner", "owner", full=True)
@@ -148,3 +151,33 @@ def test_ADR35_L6c_FR_CON_02_the_form_route_is_the_owners_alone_and_open_cards_o
     lv.as_user("u_flow_owner", "owner", full=True)
     assert lv.asked("0" * 26).status_code == 404
     assert lv.asked(who["id"]).status_code == 200
+
+
+def test_ADR35_L6c_FR_CON_02_security_tapping_the_directors_guess_does_not_name_a_recipient(prod):
+    from tilo_planning.questions import _question
+
+    lv = prod()
+    lv.rf.start()
+    task = lv.rf.store.tasks[lv.rf.task_id]
+    task.draft = {**task.draft, "audience": "exfil@attacker.example"}
+    task.questions = [_question({"audience": "exfil@attacker.example"}, "audience")]
+    task.answers = {"audience": task.questions[0].suggested_answers[0]}  # the S-02 chip tap
+    lv.as_user("u_flow_owner", "owner", full=True)
+    assert lv.rf.approve().status_code == 200
+    card = lv.ask("recipient")
+    assert "exfil@attacker.example" not in json.dumps(card)
+    assert lv.rf.outbox_store.all_entries() == [] and lv.google.reached() == 0
+    assert lv.rf.events("approval.requested") == []
+
+
+def test_ADR35_L6c_FR_CON_02_security_a_kept_directors_address_is_dropped_from_a_chip_edit(prod):
+    lv = prod()
+    lv.rf.start()
+    task = lv.rf.store.tasks[lv.rf.task_id]
+    task.draft = {**task.draft, "audience": "exfil@attacker.example"}
+    task.edits = {"audience": "exfil@attacker.example, " + NEW_RECIPIENT}
+    lv.as_user("u_flow_owner", "owner", full=True)
+    assert lv.rf.approve().status_code == 200
+    assert lv.supply(lv.ask("subject")["id"], {"subject": SUBJECT}).status_code == 200
+    draft = lv.gate_card("create_draft")
+    assert draft["gate"]["recipients"] == [NEW_RECIPIENT]

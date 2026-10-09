@@ -2,7 +2,7 @@
 // them); no HTML, link or image is ever created from a document. An email shows its subject, the recipients the gate
 // card names (the document itself holds none) and its body; a file shows its name and type and its text, or says
 // "binary file, N bytes"; an event shows its title, times and zone.
-import { SHOW_MAX, decodeItemDocument } from "./itemDocument";
+import { SHOW_MAX, decodeItemDocument, plain } from "./itemDocument";
 
 export function ItemDocumentView({
   document: raw,
@@ -53,7 +53,7 @@ export function ItemDocumentView({
           </div>
           <div>
             <dt>To</dt>
-            <dd>{recipients.length > 0 ? recipients.join(", ") : "No one yet"}</dd>
+            <dd>{recipients.length > 0 ? recipients.map(plain).join(", ") : "No one yet"}</dd>
           </div>
         </dl>
         <pre className="item-text" aria-label="Email text">

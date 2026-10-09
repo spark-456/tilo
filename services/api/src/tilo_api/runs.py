@@ -213,10 +213,16 @@ class Run:
                 if task.answers.get(q.field) and q.field not in task.edits
             )
         )
-        self.person_answers: dict[str, str] = {  # L6c: only what the person typed or chose, by brief field
-            **{f: a for f, a in task.answers.items() if isinstance(a, str)},
-            **{f: v for f, v in task.edits.items() if isinstance(v, str)},
-        }
+        guesses = {q.field: q.suggested_answers for q in task.questions}  # the Director's own proposals (model output)
+        self.person_answers: dict[str, str] = {}  # L6c: only what the person typed, never a guess of the Director's
+        for field_, value in {**task.answers, **task.edits}.items():
+            own = (
+                side_effect_fields.own_answer(value, guesses=guesses.get(field_, ()), draft=task.draft.get(field_))
+                if isinstance(value, str) and (field_ in task.edits or field_ in guesses)
+                else None
+            )
+            if own:
+                self.person_answers[field_] = own
         self.approaches = copy.deepcopy(task.approaches or [])
         self.cards = CardStore(clock=_CLOCK, writer=self, world_owners={self.world_id: self.owner})
         self.question_wait = _ObservedWait(self)  # a unit that asked a person waits here for the answer (FR-HIL-10)

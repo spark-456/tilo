@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import re
 import unicodedata
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -48,10 +48,12 @@ class Rule:
     fields: Mapping[str, str]  # document field -> the brief field whose answer is it
 
 
-def parse_addresses(text: Any, *, cap: int = CONTRACT_CAP) -> list[str]:
+def parse_addresses(text: Any, *, cap: int = CONTRACT_CAP, max_length: int = 1000) -> list[str]:
     """Plain addresses from a comma-separated answer; DocumentRefused (plain reason) for anything else."""
     if not isinstance(text, str) or not text.strip():
         raise DocumentRefused("the recipient must be an email address")
+    if len(text) > max_length:
+        raise DocumentRefused("the recipient list is too long")
     if any(unicodedata.category(c) in ("Cc", "Cf", "Cs", "Zl", "Zp") for c in text):
         raise DocumentRefused("the recipient has line breaks or hidden characters")
     found: dict[str, str] = {}
@@ -63,7 +65,7 @@ def parse_addresses(text: Any, *, cap: int = CONTRACT_CAP) -> list[str]:
             raise DocumentRefused(f"address {number} is not a plain email address like name@example.org")
         found.setdefault(address.lower(), address)
     if len(found) > cap:
-        raise DocumentRefused(f"at most {cap} recipients; this names {len(found)}")
+        raise DocumentRefused("too many recipients")  # no count: the reason reaches the card every member can read
     return list(found.values())
 
 
@@ -72,7 +74,19 @@ def load_config(path: Path = CONFIG) -> tuple[dict[str, Rule], dict[str, dict[st
     raw = yaml.safe_load(path.read_text(encoding="utf-8"))
     if not isinstance(raw, dict) or raw.get("version") != 1 or set(raw) - {"version", "labels", "actions"}:
         raise ValueError("side_effect_fields.yaml: unknown shape")
-    labels = {str(k): dict(v) for k, v in (raw.get("labels") or {}).items()}
+    labels: dict[str, dict[str, Any]] = {}
+    for key, spec in (raw.get("labels") or {}).items():
+        bound = spec.get("max_length") if isinstance(spec, dict) else None
+        if (
+            not isinstance(spec, dict)
+            or not isinstance(spec.get("label"), str)
+            or not isinstance(spec.get("hint"), str)
+            or isinstance(bound, bool)
+            or not isinstance(bound, int)
+            or not 1 <= bound <= 1000
+        ):
+            raise ValueError(f"side_effect_fields.yaml: bad label for {key}")
+        labels[str(key)] = dict(spec)
     rules: dict[str, Rule] = {}
     for action, spec in (raw.get("actions") or {}).items():
         if action not in item_documents.KIND_OF or not isinstance(spec, dict) or set(spec) - {"recipient", "fields"}:
@@ -81,16 +95,20 @@ def load_config(path: Path = CONFIG) -> tuple[dict[str, Rule], dict[str, dict[st
         if set(fields) - _DOCUMENT_FIELDS or not all(isinstance(v, str) and v for v in fields.values()):
             raise ValueError(f"side_effect_fields.yaml: bad fields for {action}")
         recipient = spec.get("recipient")
+        top = recipient.get("max") if isinstance(recipient, dict) else None
         if recipient is not None and (
             action in item_documents.NO_RECIPIENT_ACTIONS
+            or not isinstance(recipient, dict)
             or not isinstance(recipient.get("answer"), str)
-            or not 1 <= int(recipient.get("max", 0)) <= CONTRACT_CAP
+            or isinstance(top, bool)
+            or not isinstance(top, int)
+            or not 1 <= top <= CONTRACT_CAP
         ):
             raise ValueError(f"side_effect_fields.yaml: bad recipient rule for {action}")
         needs_one = action not in item_documents.NO_RECIPIENT_ACTIONS
         rules[action] = Rule(
             recipient.get("answer") if recipient else None,
-            int(recipient["max"]) if recipient else (CONTRACT_CAP if needs_one else 0),
+            recipient["max"] if recipient else (CONTRACT_CAP if needs_one else 0),
             fields,
         )
     return rules, labels
@@ -113,12 +131,29 @@ def describe(names: tuple[str, ...]) -> list[dict[str, Any]]:
              "max_length": labels.get(n, {}).get("max_length", 150)} for n in names]  # fmt: skip
 
 
+def _max_length(labels: Mapping[str, Mapping[str, Any]] | None = None) -> int:
+    return int((labels or _config()[1]).get(RECIPIENT, {}).get("max_length", 1000))
+
+
+_ADDRESS_LIKE = re.compile(r"[^\s,;<>\"']+@[^\s,;<>\"']+")
+
+
+def own_answer(answer: str, *, guesses: Iterable[str], draft: Any) -> str | None:
+    """The part of `answer` that is the person's own, or None. The Director's guess (any suggested answer of the
+    question, the brief's draft value) and any address the draft already holds are model output, never an answer."""
+    if answer in set(guesses) or answer == draft:
+        return None
+    seen = {a.lower() for a in _ADDRESS_LIKE.findall(draft)} if isinstance(draft, str) else set()
+    kept = [p.strip() for p in answer.split(",") if p.strip().lower() not in seen]
+    return ", ".join(kept) or None
+
+
 def check_recipient(action: str, text: Any) -> str:
     """The fields route's check of a supplied recipient list: the normalised, comma-joined addresses."""
     rule = _config()[0].get(action)
     if rule is None or rule.cap == 0:
         raise DocumentRefused("this action has no recipient to add")
-    return ", ".join(parse_addresses(text, cap=rule.cap))
+    return ", ".join(parse_addresses(text, cap=rule.cap, max_length=_max_length()))
 
 
 def make_resolver(
@@ -127,7 +162,8 @@ def make_resolver(
     """`resolve(*, unit, action_type, item, brief, answers, supplied) -> {destination, recipients, known_recipients,
     fields}`. `answers` are the person's structured answers by brief field, `supplied` what they typed on the fields
     route by field name; the unit and the brief's text are not read."""
-    table = _config()[0] if rules is None else rules
+    table, labels = _config() if rules is None else (rules, {})
+    limit = _max_length(labels)
 
     def resolve(
         *, unit: dict, action_type: str, item: dict, brief: dict,
@@ -142,7 +178,7 @@ def make_resolver(
             source = supplied.get(RECIPIENT) or (answers.get(rule.recipient_answer) if rule.recipient_answer else None)
             if isinstance(source, str) and source.strip():
                 try:
-                    recipients = parse_addresses(source, cap=rule.cap)
+                    recipients = parse_addresses(source, cap=rule.cap, max_length=limit)
                 except DocumentRefused as exc:
                     reason = exc.reason if "@" in source else None  # "My own team" is just not an address
             if not recipients:

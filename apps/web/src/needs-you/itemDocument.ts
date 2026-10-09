@@ -28,11 +28,20 @@ const TEXT_TYPES = /^(?:text\/|application\/(?:json|xml|x-yaml|yaml|csv)|image\/
 /** The most a text file shows; a longer one says how much is left out. */
 export const SHOW_MAX = 20_000;
 
-const str = (v: unknown): string | null => (typeof v === "string" ? v : null);
+/** The whole document is at most this many characters (the execute contract's 32 KiB item, as JSON and base64). */
+export const RAW_MAX = 65_536;
+/** `content_b64` is at most this long (the execute contract's maxLength). */
+export const B64_MAX = 43_692;
+
+/** Text for display: format characters (bidi overrides and isolates U+202A-202E and U+2066-2069, zero-width and other
+ * Cf) are removed, so a shown name or line cannot be made to read as something else. Line breaks stay. */
+export const plain = (s: string): string => s.replace(/\p{Cf}/gu, "");
+
+const str = (v: unknown): string | null => (typeof v === "string" ? plain(v) : null);
 
 /** The bytes of a strict base64 string (no whitespace, correct padding), or null. */
 export function decodeBase64(b64: string): Uint8Array | null {
-  if (b64.length % 4 !== 0 || !BASE64.test(b64)) return null;
+  if (b64.length > B64_MAX || b64.length % 4 !== 0 || !BASE64.test(b64)) return null;
   try {
     const raw = atob(b64);
     const out = new Uint8Array(raw.length);
@@ -53,9 +62,12 @@ function textOf(bytes: Uint8Array): string | null {
   }
 }
 
+const plainOrNull = (s: string | null): string | null => (s === null ? null : plain(s));
+
 /** The document in `raw` (the pinned item's JSON text), or `unreadable` for anything that is not one of the three. */
 export function decodeItemDocument(raw: unknown): ItemDocument {
   let parsed: unknown;
+  if (typeof raw === "string" && raw.length > RAW_MAX) return UNREADABLE; // before any parse or decode
   try {
     parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
   } catch {
@@ -71,7 +83,7 @@ export function decodeItemDocument(raw: unknown): ItemDocument {
   if (d.kind === "file") {
     const name = str(d.name);
     const mimeType = str(d.mime_type);
-    const b64 = str(d.content_b64);
+    const b64 = typeof d.content_b64 === "string" ? d.content_b64 : null;
     const bytes = b64 === null ? null : decodeBase64(b64);
     if (name === null || mimeType === null || bytes === null) return UNREADABLE;
     return {
@@ -79,7 +91,7 @@ export function decodeItemDocument(raw: unknown): ItemDocument {
       name,
       mimeType,
       bytes: bytes.length,
-      text: TEXT_TYPES.test(mimeType) ? textOf(bytes) : null,
+      text: TEXT_TYPES.test(mimeType) ? plainOrNull(textOf(bytes)) : null,
     };
   }
   if (d.kind === "calendar_event") {

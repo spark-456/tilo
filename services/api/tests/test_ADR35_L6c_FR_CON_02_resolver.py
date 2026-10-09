@@ -81,7 +81,7 @@ def test_ADR35_L6c_FR_CON_02_the_recipient_cap_and_duplicates():
     assert parse_addresses("a@example.com, A@example.com") == ["a@example.com"]
     with pytest.raises(Missing) as asked:
         resolve(answers={"audience": "a@x.io, b@x.io, c@x.io, d@x.io"})
-    assert "at most 3" in (asked.value.reason or "")
+    assert asked.value.reason == "too many recipients"
 
 
 def test_ADR35_L6c_FR_CON_02_an_action_that_reaches_no_one_has_no_recipients_and_a_bad_field_is_asked_instead():
@@ -132,3 +132,45 @@ def test_ADR35_L6c_FR_CON_02_the_module_names_no_scenario_and_no_connector_inter
         a.name for n in ast.walk(tree) if isinstance(n, ast.Import) for a in n.names
     }
     assert not any(m and m.startswith("tilo_connectors") for m in imported)
+
+
+def test_ADR35_L6c_FR_CON_02_security_the_directors_guess_is_never_the_persons_answer():
+    from tilo_api.side_effect_fields import own_answer
+    from tilo_planning.questions import _question
+
+    guess = _question({"audience": "exfil@attacker.example"}, "audience").suggested_answers
+    assert guess[0] == "exfil@attacker.example"
+    draft = "exfil@attacker.example"
+    assert own_answer(guess[0], guesses=guess, draft=draft) is None  # the chip tap
+    assert own_answer("exfil@attacker.example", guesses=(), draft=draft) is None  # a chip edit left as the draft
+    # the person keeps the Director's address and adds their own: only their own survives
+    assert own_answer("Exfil@Attacker.example, me@example.org", guesses=guess, draft=draft) == "me@example.org"
+    assert own_answer("me@example.org", guesses=guess, draft=draft) == "me@example.org"
+
+
+def test_ADR35_L6c_FR_CON_02_security_the_recipient_length_and_count_reasons():
+    with pytest.raises(DocumentRefused, match="too long"):
+        parse_addresses("a@example.com, " * 100, max_length=100)
+    with pytest.raises(DocumentRefused) as many:
+        parse_addresses("a@x.io, b@x.io, c@x.io", cap=2)
+    assert many.value.reason == "too many recipients"  # no count, no address
+    long = ", ".join(f"{'a' * 30}{n}@example.com" for n in range(40))
+    with pytest.raises(DocumentRefused, match="too long"):
+        side_effect_fields.check_recipient("send_email", long)
+
+
+def test_ADR35_L6c_FR_CON_02_security_a_bad_config_shape_is_refused_at_load(tmp_path):
+    ok = "labels: {}\n"
+    for body in (
+        "version: 1\nlabels: {recipient: {label: 1, hint: h, max_length: 5}}\nactions: {}\n",
+        "version: 1\nlabels: {recipient: {label: l, hint: h, max_length: true}}\nactions: {}\n",
+        "version: 1\nlabels: {recipient: {label: l, hint: h, max_length: 0}}\nactions: {}\n",
+        "version: 1\nlabels: {recipient: 3}\nactions: {}\n",
+        "version: 1\n" + ok + "actions: {send_email: {recipient: 3, fields: {}}}\n",
+        "version: 1\n" + ok + "actions: {send_email: {recipient: [], fields: {}}}\n",
+        "version: 1\n" + ok + "actions: {send_email: {recipient: {answer: audience, max: true}, fields: {}}}\n",
+    ):
+        path = tmp_path / "c.yaml"
+        path.write_text(body, encoding="utf-8")
+        with pytest.raises(ValueError):
+            side_effect_fields.load_config(path)
