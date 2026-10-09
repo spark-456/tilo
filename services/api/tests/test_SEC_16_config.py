@@ -135,8 +135,9 @@ def test_SEC_16_a_missing_config_file_refuses_rather_than_uncapping(tmp_path):
 
 
 def test_SEC_16_no_cap_number_is_written_in_code():
-    """FR-MTR-04 / SEC-16: the caps are config. No source file of tilo-api may carry the 1,000 INR cap as a literal
-    (100000 paise, in any spelling), so raising a cap is a config edit and a reviewable one."""
+    """FR-MTR-04 / SEC-16: the caps are config. No source file of tilo-api may carry the earlier 1,000 INR cap as a
+    literal (100000 paise, in any spelling), so changing a cap is a config edit and a reviewable one. The current and
+    the other earlier values are scanned by test_SEC_16_FEEDBACK_caps_config.py."""
     offenders = []
     for path in sorted(API_SRC.rglob("*.py")):
         tokens = tokenize.generate_tokens(io.StringIO(path.read_text(encoding="utf-8")).readline)
