@@ -198,6 +198,13 @@ export interface Skill {
   used: string[];
   steps: string[];
   ask?: { q: string; a: string[] };
+  /** SKILLS-3: what the teach card chose, so `saveSkill` can post it (scope, trigger and each step's tool); never served. */
+  draft?: SkillDraft;
+}
+export interface SkillDraft {
+  scope: "me" | "team";
+  trigger: "ask" | "weekday" | "arrive";
+  plan: { text: string; tool: string; ask: boolean }[];
 }
 export interface Learn {
   rates: { id: string; name: string; meta: string; steps: string[] }[];

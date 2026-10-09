@@ -59,7 +59,7 @@ const failure = (p: Promise<unknown>) =>
 
 describe("SKILLS_3_getSkills: GET /v1/skills as the Skills library", () => {
   it("SKILLS_3_getSkills_maps_a_record_to_a_Skill_and_says_live", async () => {
-    const spy = vi.fn(async () => json({ skills: [row()] }));
+    const spy = vi.fn(async (_u: unknown) => json({ skills: [row()] }));
     const r = await live(spy).getSkills();
     expect(String(spy.mock.calls[0]?.[0])).toBe(`${BASE}/v1/skills`);
     expect(r.source).toBe("live");
@@ -74,10 +74,7 @@ describe("SKILLS_3_getSkills: GET /v1/skills as the Skills library", () => {
       steps: ["Read the new invoice mail", "Send the summary"],
       ask: { q: "Link or PDF?", a: ["Open the link", "Skip"] },
     });
-    expect(s.tools).toEqual([
-      ["gmail", 1],
-      ["gmail", 2],
-    ]);
+    expect(s.tools).toEqual([["gmail", 2]]); // one chip per tool, at the highest level a step needs
   });
 
   it("SKILLS_3_getSkills_invents_no_numbers", async () => {
@@ -141,7 +138,9 @@ describe("SKILLS_3_getSkills: GET /v1/skills as the Skills library", () => {
 
 describe("SKILLS_3_getLearn: GET /v1/learn as the Learn data", () => {
   it("SKILLS_3_getLearn_has_no_ratings_reviews_helpers_or_tools_to_show", async () => {
-    const spy = vi.fn(async () => json({ learning: [row()], needs_rating: [], helpers: null }));
+    const spy = vi.fn(async (_u: unknown) =>
+      json({ learning: [row()], needs_rating: [], helpers: null }),
+    );
     const r = await live(spy).getLearn();
     expect(String(spy.mock.calls[0]?.[0])).toBe(`${BASE}/v1/learn`);
     expect(r).toEqual({
@@ -244,7 +243,8 @@ describe("SKILLS_3_saveSkill: POST /v1/skills", () => {
 
   it("SKILLS_3_saveSkill_without_a_draft_to_send_is_refused_without_a_request", async () => {
     const spy = vi.fn(async () => json(row(), 201));
-    const err = await failure(live(spy).saveSkill(draft({ draft: undefined })));
+    const { draft: _unused, ...without } = draft();
+    const err = await failure(live(spy).saveSkill(without));
     expect(err).toBeInstanceOf(TiloApiError);
     expect(spy).not.toHaveBeenCalled();
   });
