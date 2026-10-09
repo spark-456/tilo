@@ -28,6 +28,7 @@ from tilo_planning.events import build_event
 from tilo_planning.intake import IntakeResult
 from tilo_planning.questions import apply_answer, generate_questions, record_assumption
 from tilo_planning.scenarios import ScenarioError, load_scenario
+from tilo_providers.clock import Clock
 from tilo_providers.config import ProviderConfigError
 from tilo_providers.errors import ProviderError
 from tilo_providers.interfaces import SafetyProvider
@@ -149,8 +150,8 @@ def _owned(store: deps.Store, task_id: str, principal: deps.Principal) -> deps.T
     return task
 
 
-def _brief(task: deps.TaskRecord, answers: dict[str, str | None], edits: dict[str, Any]) -> dict[str, Any]:
-    brief, today = task.draft, date.today()
+def _brief(task: deps.TaskRecord, answers: dict[str, str | None], edits: dict[str, Any], today: date) -> dict[str, Any]:
+    brief = task.draft
     for question in task.questions:
         if question.field in answers and question.field not in edits:  # an edit stands over the answer (BQ-99)
             answer = answers[question.field]
@@ -208,6 +209,7 @@ def answer_questions(
     store: StoreDep,
     safety: Annotated[SafetyProvider, Depends(deps.get_safety)],
     flags: FlagsDep,
+    clock: Annotated[Clock, Depends(deps.get_today)],
 ) -> dict[str, Any]:
     """FR-INT-03/04: answers, skips (`answer: null`, recorded as "Assumed: ...") and chip edits, every typed
     string screened first (FR-INT-02). No model call; a refused request changes nothing."""
@@ -228,7 +230,7 @@ def answer_questions(
         answered = {a.field for a in body.answers}
         edits = {**{f: v for f, v in task.edits.items() if f not in answered}, **body.brief_edits}
         try:
-            brief = _brief(task, answers, edits)
+            brief = _brief(task, answers, edits, clock())
         except BriefValidationError as exc:
             raise HTTPException(status_code=422, detail=f"That change does not fit the brief: {exc}") from exc
         changes: dict[str, Any] = {"answers": answers, "edits": edits, "brief": brief}
@@ -246,6 +248,7 @@ def get_approaches(
     writer: WriterDep,
     model_router: Annotated[Router, Depends(deps.get_router)],
     flags: FlagsDep,
+    clock: Annotated[Clock, Depends(deps.get_today)],
 ) -> dict[str, Any]:
     """FR-INT-06: the Director's 2-3 approaches for the confirmed brief, proposed once per brief."""
     task = _owned(store, task_id, principal)
@@ -262,7 +265,7 @@ def get_approaches(
             try:
                 base = _base(task, DIRECTOR)
                 result = propose_approaches(
-                    task.brief, router=model_router, base=base, seq=task.next_seq, gaps=task.gaps
+                    task.brief, router=model_router, base=base, seq=task.next_seq, gaps=task.gaps, today=clock()
                 )
             except ApproachProposalError as exc:
                 deps.raise_if_model_unavailable(exc)
