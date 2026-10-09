@@ -12,6 +12,7 @@ import type {
   QuestionAnswer,
   TiloClient,
 } from "./client";
+import { type FieldSpec, type FieldsApi, fieldSpecsOf } from "./fields";
 import { type HostStarted, isHostStarted, refusalOf } from "./meetingHost";
 import {
   type ScheduleRequest,
@@ -80,10 +81,11 @@ export function reasonOf(status: number, text: string): string {
   try {
     const body: unknown = JSON.parse(text);
     if (body && typeof body === "object") {
-      const { detail, error, reason } = body as Record<string, unknown>;
+      const { detail, error, reason, outcome } = body as Record<string, unknown>;
       const coded = typeof reason === "string" ? ANSWER_REASONS.get(reason) : undefined;
       if (coded) return coded;
       said = typeof detail === "string" ? detail : error;
+      if (status === 422 && outcome === "rejected") said = reason; // the fields route's plain reason (L6c)
     }
   } catch {
     said = undefined;
@@ -267,7 +269,7 @@ function quickOf(body: unknown): QuickIntakeResult | null {
   return { kind: "answered", text: b.text, cost: Object.keys(cost).length > 0 ? cost : null };
 }
 
-export class HttpClient implements TiloClient, SchedulesApi {
+export class HttpClient implements TiloClient, SchedulesApi, FieldsApi {
   private readonly base: string;
   private readonly fetchFn: typeof fetch;
   private readonly pollMs: number;
@@ -688,6 +690,35 @@ export class HttpClient implements TiloClient, SchedulesApi {
       this.cardChannels.get(cardId)?.includes("mobile_web") && onPhone()
         ? { option: answer.option_id, channel: "mobile_web" }
         : { option: answer.option_id },
+    );
+  }
+
+  /** `GET /worlds/{id}/cards/{cid}/fields` (ADR-0035 L6c): what an open fields card asks for. The card must have come
+   * from `listCards` (the route is per world). A reply that is not the documented shape is an unreadable reply. */
+  async getCardFields(cardId: string): Promise<FieldSpec[]> {
+    const worldId = this.cardWorlds.get(cardId);
+    if (worldId === undefined) {
+      throw new TiloApiError("Open the card list again, then answer from there.", null, false);
+    }
+    const specs = fieldSpecsOf(
+      await this.request<unknown>(
+        `/worlds/${encodeURIComponent(worldId)}/cards/${encodeURIComponent(cardId)}/fields`,
+      ),
+    );
+    if (!specs) throw new TiloApiError(BAD_REPLY, 200, true);
+    return specs;
+  }
+
+  /** `POST /worlds/{id}/cards/{cid}/fields` `{fields}`: the values go to this one request. A refusal carries the API's
+   * own plain reason (422), which `reasonOf` shows when it is short plain text. */
+  async supplyCardFields(cardId: string, values: Readonly<Record<string, string>>): Promise<void> {
+    const worldId = this.cardWorlds.get(cardId);
+    if (worldId === undefined) {
+      throw new TiloApiError("Open the card list again, then answer from there.", null, false);
+    }
+    await this.post(
+      `/worlds/${encodeURIComponent(worldId)}/cards/${encodeURIComponent(cardId)}/fields`,
+      { fields: values },
     );
   }
 

@@ -12,13 +12,13 @@ they reach the person's approval only as the pinned document.
 from __future__ import annotations
 
 import logging
-from typing import Annotated
+from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict
 
-from tilo_api import deps
+from tilo_api import deps, side_effect_fields
 from tilo_api.cards import _STATUS, CardStore, answering_principal, get_channels_caller, session_allows
 from tilo_api.people import _PeopleRoute
 from tilo_api.people_writes import json_body
@@ -34,6 +34,43 @@ class _FieldsBody(BaseModel):
     fields: dict[str, str]
 
 
+def _owned_run(
+    world_id: str, card_id: str, principal: deps.Principal, from_channels: bool, store: deps.Store,
+    cards: CardStore, record_owner: str | None,
+) -> tuple[Any, deps.Principal]:  # fmt: skip
+    """The run whose open card this is, for the world's owner on a full web session only; else the one 404."""
+    if not principal.full_session:  # an anonymous demo session has no run that sends
+        raise HTTPException(status_code=403, detail="forbidden")
+    actor = answering_principal(
+        principal, world_id, record_owner=record_owner, cards=cards, from_channels=from_channels
+    )
+    run = store.runs.get(world_id)
+    if actor is None or run is None or actor.role != "owner" or not cards.is_open(world_id, card_id):
+        raise HTTPException(status_code=404)  # one answer for every caller who may not supply: no oracle
+    if from_channels or not session_allows(actor, actor.channel, False):
+        raise HTTPException(status_code=404)
+    return run, actor
+
+
+@router.get("/worlds/{world_id}/cards/{card_id}/fields")
+def asked_fields(
+    world_id: str,
+    card_id: str,
+    principal: Annotated[deps.Principal, Depends(deps.get_current_principal)],
+    from_channels: Annotated[bool, Depends(get_channels_caller)],
+    store: Annotated[deps.Store, Depends(deps.get_store)],
+    cards: Annotated[CardStore, Depends(get_card_store)],
+    record_owner: Annotated[str | None, Depends(world_owner)],
+) -> JSONResponse:
+    """What the form asks (ADR-0035 L6c): the fields this card is waiting for, with labels and hints from the config.
+    Same authorisation as the POST; no value is ever returned."""
+    run, _ = _owned_run(world_id, card_id, principal, from_channels, store, cards, record_owner)
+    asked = run.asked_fields(card_id)
+    if asked is None:
+        raise HTTPException(status_code=404)
+    return JSONResponse(status_code=200, content={"fields": side_effect_fields.describe(asked)})
+
+
 @router.post("/worlds/{world_id}/cards/{card_id}/fields", dependencies=[Depends(answer_guard)])
 def supply_fields(
     world_id: str,
@@ -45,16 +82,7 @@ def supply_fields(
     cards: Annotated[CardStore, Depends(get_card_store)],
     record_owner: Annotated[str | None, Depends(world_owner)],
 ) -> JSONResponse:
-    if not principal.full_session:  # an anonymous demo session has no run that sends
-        raise HTTPException(status_code=403, detail="forbidden")
-    actor = answering_principal(
-        principal, world_id, record_owner=record_owner, cards=cards, from_channels=from_channels
-    )
-    run = store.runs.get(world_id)
-    if actor is None or run is None or actor.role != "owner" or not cards.is_open(world_id, card_id):
-        raise HTTPException(status_code=404)  # one answer for every caller who may not supply: no oracle
-    if from_channels or not session_allows(actor, actor.channel, False):
-        raise HTTPException(status_code=404)
+    run, actor = _owned_run(world_id, card_id, principal, from_channels, store, cards, record_owner)
     with run.fields_lock:  # stage and answer as one step: the values belong to the answer that wins
         try:
             staged = run.stage_fields(card_id, body.fields)

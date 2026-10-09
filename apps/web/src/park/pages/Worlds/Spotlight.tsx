@@ -40,9 +40,11 @@ function DecisionCard({
         </div>
       ) : (
         <div className="park-worlds-dec__actions">
-          <button type="button" className="park-worlds-dec__yes" onClick={() => onDecide(d.k)}>
-            {d.yes}
-          </button>
+          {d.yes !== "" && (
+            <button type="button" className="park-worlds-dec__yes" onClick={() => onDecide(d.k)}>
+              {d.yes}
+            </button>
+          )}
           <button type="button" className="park-worlds-dec__open" onClick={() => onOpen(d.world)}>
             Open in world
           </button>

@@ -68,9 +68,11 @@ export function WaitingCard({ mine, dec, night, onDecide, onLater }: WaitingProp
             </div>
           ) : (
             <div className="park-world-dactions">
-              <Button variant="needs" size="sm" onClick={() => onDecide(d.k)}>
-                {d.yes}
-              </Button>
+              {d.yes !== "" && (
+                <Button variant="needs" size="sm" onClick={() => onDecide(d.k)}>
+                  {d.yes}
+                </Button>
+              )}
               <Button variant="secondary" size="sm" onClick={onLater}>
                 Ask me later
               </Button>
