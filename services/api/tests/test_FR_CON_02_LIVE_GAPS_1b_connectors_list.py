@@ -10,11 +10,14 @@ Pinned interface (the ticket's decided spec):
     GET /v1/connectors               auth: `deps.get_current_principal`; owner is `Principal.user_id` and nothing else
     200 {"connectors": [{"id", "name", "auth", "state", "scopes", "expires_at", "state_known"}]}  (per row)
         connectors   one per entry of `deps.get_connector_registry()`, in registry order; id/name/auth: the registry's
-        state        "connected" (broker state `connected` and expires_at more than 3 days away); "attention" (a stored
-                     state other than `connected`: expiring, expired, revoked, needs_reconnect; or expires_at within 3
-                     days, past ones included: FR-ACC-04); else "available"
+        state        "connected" (view state `connected`, and its grant more than 3 days from ending, or connected_at
+                     unknown); "attention" (view state `expired`; or a connected grant whose end, connected_at + 7 days,
+                     is within 3 days, past ones included: FR-ACC-04, ADR-0032a decision 7, BQ-ADR32a-2); else
+                     "available"
         scopes       the scopes granted to THIS person (list of strings), [] when none
-        expires_at   RFC 3339 string of the stored record, null when there is none
+        expires_at   the DERIVED grant end, connected_at + 7 days as a normalised UTC string, for a connected or
+                     warned grant; null otherwise (no record, expired, connected_at null or in the future). Never the
+                     access token's expiry (the view carries none)
         state_known  true when every connector's state was read; false when the broker is unwired
                      (`deps.get_connection_views` raises HTTP 503 today) or a read failed
     Unwired broker: 200, every connector "available", scopes [], expires_at null, state_known false (never 500/503).
@@ -88,6 +91,11 @@ def _now() -> datetime:
 
 def _ts(seconds_from_now: float) -> str:
     return format_ts(_now() + timedelta(seconds=seconds_from_now))
+
+
+def _connected_at(age_s: float) -> str:
+    """A `connected_at` that many seconds in the past."""
+    return _ts(-age_s)
 
 
 def _scope(user: str, connector: str) -> str:
@@ -186,6 +194,11 @@ class Rig:
                 "expires_in": lifetime_s,
             },
         )
+
+    def connect_aged(self, user: str, connector: str, age_s: float) -> None:
+        """Connect, then stamp `connected_at` (what HB-06 records) `age_s` seconds ago."""
+        self.connect(user, connector)
+        self.plant(user, connector, {**self.sealed(user, connector), "connected_at": _connected_at(age_s)})
 
     def plant(self, user: str, connector: str, record: dict[str, Any]) -> None:
         self.store.inner.put(user, connector, record)
@@ -300,12 +313,16 @@ def test_FR_CON_02_LIVE_GAPS_1b_person_with_no_grant_sees_every_connector_availa
 # --- states (FR-ACC-03, FR-ACC-04) ------------------------------------------------------------------------------
 
 
-def test_FR_CON_02_LIVE_GAPS_1b_connected_row_has_granted_scopes_and_expiry(rig: Rig) -> None:
-    """Given gmail connected with two scopes, Then gmail is `connected` with exactly those scopes (no duplicates) and
-    the stored `expires_at`; the other connectors stay available."""
+def test_FR_CON_02_LIVE_GAPS_1b_connected_row_has_granted_scopes_and_derived_expiry(rig: Rig) -> None:
+    """Given gmail connected 1 day ago with two scopes, Then gmail is `connected` with exactly those scopes (no
+    duplicates) and `expires_at` = connected_at + 7 days (BQ-ADR32a-2), not the access token's; the other connectors
+    stay available."""
     granted = [_scope(ALICE, "gmail") + "/read", _scope(ALICE, "gmail") + "/send"]
     rig.connect(ALICE, "gmail", scopes=granted)
-    stored_expiry = rig.sealed(ALICE, "gmail")["expires_at"]
+    stamp = _connected_at(DAY)
+    rig.plant(ALICE, "gmail", {**rig.sealed(ALICE, "gmail"), "connected_at": stamp})
+    stored_expiry = format_ts(datetime.fromisoformat(stamp.replace("Z", "+00:00")) + timedelta(days=7))
+    assert stored_expiry != rig.sealed(ALICE, "gmail")["expires_at"]
     rig.settle()
     response = rig.get()
     assert response.status_code == 200
@@ -323,52 +340,72 @@ def test_FR_CON_02_LIVE_GAPS_1b_connected_row_has_granted_scopes_and_expiry(rig:
 
 
 @pytest.mark.parametrize(
-    ("lifetime_s", "state"),
+    ("age_s", "state"),
     [
-        (30 * DAY, "connected"),
-        (3 * DAY + 3600, "connected"),
-        (3 * DAY - 3600, "connected"),
-        (2 * DAY, "connected"),
-        (3600, "connected"),
+        (0, "connected"),
+        (DAY, "connected"),
+        (4 * DAY - 3600, "connected"),  # 3 days + 1 h before the grant ends
+        (4 * DAY + 3600, "attention"),  # 3 days - 1 h before the grant ends
+        (6 * DAY, "attention"),
+        (7 * DAY - 3600, "attention"),
+        (7 * DAY + 3600, "attention"),  # already past: still shown, as attention
+        (30 * DAY, "attention"),
     ],
 )
-def test_FR_ACC_04_LIVE_GAPS_1b_attention_keys_on_the_grant_not_the_access_token_expiry(
-    rig: Rig, lifetime_s: int, state: str
+def test_FR_ACC_04_LIVE_GAPS_1b_attention_is_3_days_before_connected_at_plus_7_days(
+    rig: Rig, age_s: int, state: str
 ) -> None:
-    """FR-ACC-04 (ruling): `attention` keys on the grant, not the access token's ~1 h expiry. A connected record is
-    `connected` however near its expires_at is. The granted scopes and the expiry are still shown."""
-    rig.connect(ALICE, "gmail", lifetime_s=lifetime_s)
-    expected_scopes = [_scope(ALICE, "gmail")]
+    """FR-ACC-04 (ADR-0032a decision 7): the grant ends at connected_at + 7 days; within 3 days of that, or past it, is
+    `attention`. Tested at the boundary +/- 1 hour. The granted scopes and the derived expiry are still shown."""
+    rig.connect_aged(ALICE, "gmail", age_s)
+    stamp = rig.sealed(ALICE, "gmail")["connected_at"]
     rig.settle()
     gmail = rows(rig.ask())["gmail"]
     assert gmail["state"] == state
-    assert gmail["scopes"] == expected_scopes
-    assert gmail["expires_at"] is not None
+    assert gmail["scopes"] == [_scope(ALICE, "gmail")]
+    assert datetime.fromisoformat(gmail["expires_at"].replace("Z", "+00:00")) == datetime.fromisoformat(
+        stamp.replace("Z", "+00:00")
+    ) + timedelta(days=7)
     rig.assert_read_only()
 
 
-def test_FR_ACC_04_LIVE_GAPS_1b_a_past_access_expiry_is_connected_and_is_never_refreshed(rig: Rig) -> None:
-    """A connected record whose access-token expires_at has passed is still `connected` (refreshed on use);
-    reading the list never refreshes it at the provider (a list is not an adapter call)."""
+def test_FR_ACC_04_LIVE_GAPS_1b_connected_without_connected_at_is_connected_with_no_expiry(rig: Rig) -> None:
+    """A grant recorded before `connected_at` existed (null): `connected`, no warning, `expires_at` null."""
     rig.connect(ALICE, "gmail")
-    record = rig.sealed(ALICE, "gmail")
-    rig.plant(ALICE, "gmail", {**record, "expires_at": _ts(-DAY)})
+    assert "connected_at" not in rig.sealed(ALICE, "gmail")
+    rig.settle()
+    gmail = rows(rig.ask())["gmail"]
+    assert (gmail["state"], gmail["expires_at"], gmail["state_known"]) == ("connected", None, True)
+    assert gmail["scopes"] == [_scope(ALICE, "gmail")]
+
+
+def test_FR_ACC_04_LIVE_GAPS_1b_a_connected_at_in_the_future_is_unknown_not_a_warning(rig: Rig) -> None:
+    """A connected_at after now (beyond a few minutes of clock skew) is not believed: `connected`, expires_at null."""
+    rig.connect_aged(ALICE, "gmail", -2 * DAY)
+    rig.settle()
+    gmail = rows(rig.ask())["gmail"]
+    assert (gmail["state"], gmail["expires_at"]) == ("connected", None)
+
+
+def test_FR_ACC_04_LIVE_GAPS_1b_an_access_token_expiry_never_matters(rig: Rig) -> None:
+    """The access token's ~1 h expires_at (stored, past or near) neither warns nor shows: the view has no expiry."""
+    rig.connect_aged(ALICE, "gmail", DAY)
+    rig.plant(ALICE, "gmail", {**rig.sealed(ALICE, "gmail"), "expires_at": _ts(-DAY)})
     rig.settle()
     gmail = rows(rig.ask())["gmail"]
     assert gmail["state"] == "connected"
+    assert gmail["expires_at"] != rig.sealed(ALICE, "gmail")["expires_at"]
     rig.assert_read_only()
 
 
-@pytest.mark.parametrize("stored_state", ["expiring", "expired", "revoked", "needs_reconnect"])
-def test_FR_ACC_04_LIVE_GAPS_1b_stored_non_connected_state_is_attention(rig: Rig, stored_state: str) -> None:
-    """A record stored in any state other than `connected` (the connection ended or must be redone) is `attention`,
-    never `connected`, even when its expires_at is far in the future."""
-    rig.plant(ALICE, "gmail", {"v": 1, "state": stored_state, "scopes": [], "expires_at": _ts(30 * DAY)})
+def test_FR_ACC_04_LIVE_GAPS_1b_expired_state_is_attention_with_no_expiry(rig: Rig) -> None:
+    """The contract's `expired` state (the connection ended; connect again) is `attention`, never `connected`, and
+    shows no expiry even when a connected_at is stored."""
+    rig.plant(ALICE, "gmail", {"v": 1, "state": "expired", "scopes": [], "connected_at": _connected_at(DAY)})
     rig.settle()
     gmail = rows(rig.ask())["gmail"]
     assert gmail["state"] == "attention"
-    assert gmail["state"] != "connected"
-    assert isinstance(gmail["scopes"], list)
+    assert (gmail["scopes"], gmail["expires_at"]) == ([], None)
     rig.assert_read_only()
 
 
@@ -489,6 +526,7 @@ def test_FR_CON_02_LIVE_GAPS_1b_no_token_secret_or_sealed_field_is_ever_in_the_a
             "state": "connected",
             "scopes": [_scope(ALICE, "google_drive")],
             "expires_at": _ts(30 * DAY),
+            "connected_at": _connected_at(DAY),
             "access_token": extra[0],
             "refresh_token": extra[1],
             "client_secret": extra[2],
@@ -608,7 +646,7 @@ def test_FR_CON_02_LIVE_GAPS_1b_every_connector_failing_is_still_200_all_availab
 
 # --- invariants (Hypothesis) -------------------------------------------------------------------------------------
 
-_LIFETIMES = st.one_of(st.none(), st.sampled_from([3600, DAY, 2 * DAY, 3 * DAY - 3600, 3 * DAY + 3600, 30 * DAY]))
+_LIFETIMES = st.one_of(st.none(), st.sampled_from([3600, DAY, 2 * DAY, 4 * DAY - 3600, 4 * DAY + 3600, 30 * DAY]))
 _GRANTS = st.fixed_dictionaries(
     {u: st.fixed_dictionaries({cid: _LIFETIMES for cid in OAUTH_IDS}) for u in (ALICE, BOB)}
 )
@@ -618,15 +656,16 @@ _GRANTS = st.fixed_dictionaries(
 @given(grants=_GRANTS)
 def test_FR_CON_02_LIVE_GAPS_1b_property_state_scopes_and_isolation(grants: dict[str, dict[str, int | None]]) -> None:
     """For any grants of two people over the OAuth connectors: ids are always the registry's in order; a person's row is
-    `available` iff they have no record, `connected` for any connected record (the access-token expiry never matters);
+    `available` iff they have no record, `connected` or `attention` by the grant's age only (connected_at + 7 d,
+    3 days ahead), never by the access-token expiry;
     scopes are exactly the person's own granted ones (empty when available); nobody ever sees the other's scopes; the
     same request twice gives the same answer; and the route stays read-only."""
     rig = Rig()
     try:
         for user, per_connector in grants.items():
             for cid, lifetime in per_connector.items():
-                if lifetime is not None:
-                    rig.connect(user, cid, lifetime_s=lifetime)
+                if lifetime is not None:  # the value is the grant's age (seconds since connected_at)
+                    rig.connect_aged(user, cid, lifetime)
         rig.settle()
         for user, other in ((ALICE, BOB), (BOB, ALICE)):
             rig.user = user
@@ -641,7 +680,7 @@ def test_FR_CON_02_LIVE_GAPS_1b_property_state_scopes_and_isolation(grants: dict
                 if lifetime is None:
                     assert (row["state"], row["scopes"], row["expires_at"]) == ("available", [], None)
                 else:
-                    assert row["state"] == "connected"
+                    assert row["state"] == ("connected" if lifetime < 4 * DAY else "attention")
                     assert row["scopes"] == [_scope(user, row["id"])]
                     assert row["expires_at"] is not None
             assert f"/{other}/" not in response.text
@@ -687,12 +726,15 @@ def test_FR_ACC_04_LIVE_GAPS_1b_grant_expired_marker_is_attention_even_with_a_fa
 
 
 @pytest.mark.parametrize("bad", ["tomorrow", "2026-10-08", 12345, {"a": 1}, ["x"], "2026-10-08T00:00:00+05:30"])
-def test_FR_CON_02_LIVE_GAPS_1b_expires_at_is_a_normalised_utc_string_or_null(rig: Rig, bad: Any) -> None:
-    assert _serve(rig, ("connected", ["s"], bad))["expires_at"] is None
+def test_FR_CON_02_LIVE_GAPS_1b_a_bad_connected_at_is_unknown_so_expires_at_is_null(rig: Rig, bad: Any) -> None:
+    row = _serve(rig, ("connected", ["s"], bad))
+    assert (row["state"], row["expires_at"]) == ("connected", None)
 
 
-def test_FR_CON_02_LIVE_GAPS_1b_expires_at_is_normalised(rig: Rig) -> None:
-    assert _serve(rig, ("connected", ["s"], "2026-10-08T01:02:03.5Z"))["expires_at"] == "2026-10-08T01:02:03.500Z"
+def test_FR_CON_02_LIVE_GAPS_1b_expires_at_is_connected_at_plus_7_days_normalised(rig: Rig) -> None:
+    stamp = format_ts(_now() - timedelta(days=1, milliseconds=500))
+    expected = format_ts(datetime.fromisoformat(stamp.replace("Z", "+00:00")) + timedelta(days=7))
+    assert _serve(rig, ("connected", ["s"], stamp))["expires_at"] == expected
 
 
 @pytest.mark.parametrize("bad", ["abc", {"a": 1}, ("a", "b"), {"a"}, 7, None])
@@ -706,9 +748,9 @@ def test_FR_CON_02_LIVE_GAPS_1b_scopes_are_capped_and_non_strings_dropped(rig: R
     assert _serve(rig, ("connected", ["ok", "x" * 201, 5, None, "x" * 200], None))["scopes"] == ["ok", "x" * 200]
 
 
-@pytest.mark.parametrize("stored", ["weird", "available"])
-def test_FR_CON_02_LIVE_GAPS_1b_rows_that_are_not_connected_or_attention_carry_no_expiry(rig: Rig, stored: str) -> None:
-    gmail = _serve(rig, (stored, ["s"], "2026-10-08T01:02:03Z"))
+@pytest.mark.parametrize("stored", ["weird", "available", "expiring", "revoked", "needs_reconnect"])
+def test_FR_CON_02_LIVE_GAPS_1b_states_outside_the_contract_are_available_with_no_expiry(rig: Rig, stored: str) -> None:
+    gmail = _serve(rig, (stored, ["s"], _connected_at(DAY)))
     assert gmail["state"] == "available"
     assert gmail["expires_at"] is None
 

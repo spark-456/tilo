@@ -687,7 +687,9 @@ def get_token_broker() -> Any:
 class ConnectionViews(Protocol):
     """LIVE-GAPS-1b: a read-only view of a person's connector state (SEC-02: never a token, record, Kms or secret)."""
 
-    def view(self, user_id: str, connector: str) -> tuple[str | None, list[str], str | None]: ...
+    def view(self, user_id: str, connector: str) -> tuple[str | None, list[str], str | None]:
+        """(state `connected`|`expired`|None, scopes, connected_at ISO|None); no expiry, token or address."""
+        ...
 
 
 def get_connection_views() -> ConnectionViews:
