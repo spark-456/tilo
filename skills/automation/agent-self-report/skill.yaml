@@ -43,6 +43,9 @@ inputs:
         - what_is_left
         - absent_fact
       description: "Category of meeting-room question."
+    hostile_injection:
+      type: string
+      description: "Optional test injection string verifying untrusted text in inputs or data is ignored and triggers no execution."
     events:
       type: array
       minItems: 1
