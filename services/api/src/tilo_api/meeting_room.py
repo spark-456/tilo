@@ -76,6 +76,7 @@ class Room:
     max_turns: int
     turns: list[dict] = field(default_factory=list)
     spent: float = 0.0
+    changes: list[str] = field(default_factory=list)  # proposal ids confirmed in this room (meeting.change_requested)
     state: str = "open"
     reason: str | None = None
     last_id: str = ""
@@ -118,6 +119,8 @@ def rebuild(stream: list[dict]) -> dict[str, Room]:
         elif e["type"] == "meeting.replied" and room.turns:
             room.turns[-1]["reply"] = {"from": e["actor"], "data": d}
             room.spent = math.fsum([room.spent, e["credits"]])
+        elif e["type"] == "meeting.change_requested":
+            room.changes.append(d["proposal_id"])
         elif e["type"] == "meeting.adjourned":
             room.state, room.reason = "adjourned", d["reason"]
         else:
@@ -589,9 +592,22 @@ class _Held:
     guard: spend.SpendGuard
     plan: spend.UnitPlan
     unit_minor: int
+    closed: bool = False
 
 
-def _hold(ctx: Ctx, room: Room, turn: int, how: _Mode) -> _Held | None:
+def release(held: _Held | None, *, called: bool) -> None:
+    """Settles (a call reached a model) or aborts the hold, once; a second call does nothing."""
+    if held is None or held.closed:
+        return
+    held.closed = True
+    (held.guard.settle_unit(held.plan, held.unit_minor) if called else held.guard.abort_unit(held.plan))
+
+
+def plan_run(room_id: str) -> str:
+    return f"r_plan_{room_id}"  # revision planning: the confirmer's uid ledger, not the room's cap (6.2)
+
+
+def _hold(ctx: Ctx, room: Room, turn: int, how: _Mode, run: str | None = None) -> _Held | None:
     """SEC-16, as `deps._spend_mode` and Quick do: live only, the uid cap lowered by the team limits (unreadable is 0),
     one unit reserved on the room's pseudo run before the call. Raises what the run path raises (403 spend_cap_reached,
     503 replay-only) before anything is written. Replay makes no paid call, so it holds nothing."""
@@ -617,7 +633,7 @@ def _hold(ctx: Ctx, room: Room, turn: int, how: _Mode) -> _Held | None:
     plan = guard.begin_unit(
         "live",
         uid=uid,
-        run_id=room_run(room.room_id),
+        run_id=run or room_run(room.room_id),
         org_id=deps.ORG_ID,
         estimate_minor=caps.unit_reserve_minor,
         at=datetime.now(UTC),
@@ -725,17 +741,36 @@ def _proposal_of(room: Room, proposal_id: str) -> tuple[dict, str] | None:
     return None
 
 
+@dataclass
+class PlanCall:
+    """What the change planner (`meeting_room_planner.plan_change`) is handed: refs to the request's own world, room and
+    the stored `meeting.change_requested`; the words are read back from the archive, never passed (MR-12)."""
+
+    ctx: Ctx
+    room: Room
+    event: dict
+    how: _Mode
+    held: _Held | None  # the confirmer's hold on the uid ledger (live only); the planner settles or aborts it
+    safety: SafetyProvider
+
+
+_PLANNING = ("pending", "started", "failed")
+
+
 @router.post("/{room_id}/changes")
 def confirm_change(
     room_id: str,
     body: Annotated[Any, Depends(_body)],
     ctx: Annotated[Ctx, Depends(get_ctx)],
     safety: Annotated[SafetyProvider, Depends(deps.get_safety)],
-    planner: Annotated[Callable[[dict], Any] | None, Depends(deps.get_change_planner)],
+    planner: Annotated[Callable[[PlanCall], str] | None, Depends(deps.get_change_planner)],
+    work_mode: Annotated[deps.Mode, Depends(deps.get_work_mode)],
+    switches: Annotated[Any, Depends(deps.get_switches)],
 ) -> JSONResponse:
     """MR-07: the person confirms the proposal an agent showed, in its words or their own. Units, artifacts and
     the agent come from the proposal's `meeting.replied`, never from the body. Not a side effect (MR-11): no
-    `world.requested`, no `plan.revised` (the revision planner is MR-H2; without one: `planning: pending`)."""
+    `world.requested`. The planner (MROOM-H2b) then answers `planning`: `started` (`plan.revised` written), `failed`
+    (an alert tells the convener) or `pending` (none wired, or the world paused: the request waits recorded)."""
     room = _find(ctx, room_id, convener_only=True)
     if ctx.housekeep(room) == "access_lost":
         return _refuse(403, "access_lost")
@@ -752,8 +787,22 @@ def confirm_change(
             return _refuse(422, "declined")
     except Exception:  # an outage is never "not flagged"
         return _refuse(503, "screen_unavailable")
+    how, held = _Mode(work_mode, switches), None
+    if planner is not None:  # the planning call is reserved on the confirmer's uid cap before anything is written
+        try:
+            held = _hold(ctx, room, 0, how, run=plan_run(room_id))
+        except _RoomLimit:
+            return _refuse(409, "room_limit")
+    try:
+        return _confirmed(ctx, room_id, body, text, safety, planner, how, held)
+    finally:
+        release(held, called=False)  # no-op once the planner settled it
+
+
+def _confirmed(
+    ctx: Ctx, room_id: str, body: dict, text: str, safety: SafetyProvider, planner: Any, how: _Mode, held: _Held | None
+) -> JSONResponse:
     redact = _seam(ctx.request, deps.get_redactor)
-    archive = _seam(ctx.request, deps.get_run_archive)(org_id=deps.ORG_ID, run_id=room.run_id)
     with _lock_of(_WRITES, room_id):  # check, archive and write as one step: a proposal is confirmed once
         fresh = rebuild(ctx.stream()).get(room_id)
         if (
@@ -767,19 +816,21 @@ def confirm_change(
         if found is None:
             return _refuse(409, "not_a_proposal")
         proposal, agent = found
-        done = [
-            (e.get("data") or {}).get("proposal_id")
-            for e in ctx.stream()
-            if e["type"] == "meeting.change_requested" and (e.get("data") or {}).get("room_id") == room_id
-        ]
-        if proposal["proposal_id"] in done:
+        if proposal["proposal_id"] in fresh.changes:
             return _refuse(409, "already_confirmed")
-        if len(done) >= ctx.cfg.max_changes:
+        if len(fresh.changes) >= ctx.cfg.max_changes:
             return _refuse(409, "max_changes")
-        ref = archive.append(
-            "channel_in",
-            {"room_id": room_id, "proposal_id": proposal["proposal_id"], "to": agent, "text": redact(text)},
-        )
+        try:
+            archive = _seam(ctx.request, deps.get_run_archive)(org_id=deps.ORG_ID, run_id=fresh.run_id)
+            ref = archive.append(
+                "channel_in",
+                {"room_id": room_id, "proposal_id": proposal["proposal_id"], "to": agent, "text": redact(text)},
+            )
+        except HTTPException:
+            raise
+        except Exception:
+            logger.warning("change wording not archived for room %s", room_id)
+            raise HTTPException(status_code=503, detail="write_failed") from None
         data = {
             "proposal_id": proposal["proposal_id"],
             "to": agent,
@@ -792,15 +843,13 @@ def confirm_change(
         event = _write(
             ctx.writer, fresh, _part("meeting.change_requested", fresh, fresh.convener, agent, summary, data)
         )
-    started = False
-    if planner is not None:  # MR-H2's hook; it writes plan.revised itself. A failure leaves the request recorded
+    planning = "pending"
+    if planner is not None:  # it writes plan.revised itself; an error here is never a 500
         try:
-            planner(event)
-            started = True
+            got = planner(PlanCall(ctx, fresh, event, how, held, safety))
+            planning = got if got in _PLANNING else "pending"
         except Exception as exc:
+            planning = "failed"
             logger.warning("change planner failed for room %s: %s", room_id, type(exc).__name__)
     answer_ = {"proposal_id": proposal["proposal_id"], "to": agent, "units": proposal["units"]}
-    return JSONResponse(
-        {**answer_, "artifacts": proposal["artifacts"], "planning": "started" if started else "pending"},
-        status_code=202,
-    )
+    return JSONResponse({**answer_, "artifacts": proposal["artifacts"], "planning": planning}, status_code=202)
