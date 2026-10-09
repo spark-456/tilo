@@ -9,13 +9,29 @@
 import { hasSession } from "../auth/auth";
 import { session } from "../auth/session";
 
+/** The Home composer's remembered Quick / Thinking choice (park/pages/Home/effortStore.ts): the person's, not the next one's. */
+const EFFORT_KEYS = "tilo.park.effort.";
+
+function forgetPerson(): void {
+  try {
+    for (const key of Object.keys(window.localStorage)) {
+      if (key.startsWith(EFFORT_KEYS)) window.localStorage.removeItem(key);
+    }
+  } catch {
+    // storage absent or blocked: nothing was kept there
+  }
+}
+
 /** Signs the page's session out. Resolves true after loading "/" afresh when the session really ended, false when the
  * SDK refused (nothing is loaded). Rejects only if the controller itself throws. */
 export async function finishSession(): Promise<boolean> {
   await session.signOut();
   const state = session.getState();
   const ended = state.status === "signed_out" && state.signOutFailed !== true;
-  if (ended) window.location.assign("/");
+  if (ended) {
+    forgetPerson();
+    window.location.assign("/");
+  }
   return ended;
 }
 

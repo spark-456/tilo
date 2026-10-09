@@ -10,11 +10,11 @@ import {
   useState,
   useSyncExternalStore,
 } from "react";
-import { API_URL, appCheckToken, authToken } from "../../api/ClientProvider";
+import { API_URL, appCheckToken, authToken, sessionView } from "../../api/ClientProvider";
 export { endSession } from "../../api/signOut"; // FR-UX-10: the shell's Sign out, through the one api seam
 export { useSessionAuth } from "../../api/sessionAuth"; // FR-UX-10: who is signed in, for the account menu
 import { API_METHODS, type Api, type ApiMethod } from "../api/index";
-import { parkApi } from "../api/select";
+import { parkApi, withSession } from "../api/select";
 import type { ApiResult, Source } from "../api/types";
 import type { AppCtx } from "./AppCtx";
 import { type Pin, screenPins } from "./pins";
@@ -77,7 +77,8 @@ const windowSize = () => ({ vw: window.innerWidth, vh: window.innerHeight });
 export function ParkProvider({ api, navigate, schedule, viewport, children }: ParkProviderProps) {
   const [held] = useState<Held>(() => {
     // SEC-10, SEC-15: the live Api's requests carry the App Check token and the sign-in token; none on local hosts or in fixture mode.
-    const raw = api ?? parkApi({ VITE_TILO_API_URL: API_URL }, appCheckToken, authToken);
+    const built = api ?? parkApi({ VITE_TILO_API_URL: API_URL }, appCheckToken, authToken);
+    const raw = api === undefined && API_URL?.trim() ? withSession(built, sessionView) : built;
     let store: ParkStore | null = null;
     const wrapped = noting(raw, (source) => store?.noteSource(source));
     const timer = schedule ?? realSchedule;
@@ -86,7 +87,12 @@ export function ParkProvider({ api, navigate, schedule, viewport, children }: Pa
       navigate: navigate ?? navigatePark,
       schedule: timer,
     });
-    return { store, api: wrapped, schedule: timer, expectsSample: api === undefined && !API_URL };
+    return {
+      store,
+      api: wrapped,
+      schedule: timer,
+      expectsSample: api === undefined && (!API_URL || sessionView.demo()),
+    };
   });
   const [win, setWin] = useState(windowSize);
   useEffect(() => {
