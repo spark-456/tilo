@@ -1,6 +1,6 @@
 # Taught skill rules beyond the schema (taught_skill.schema.json 1.0.0, ADR-0034)
 
-ADR-0034 is **Proposed**: nothing that depends on it merges before the user's approval. The schema checks one
+ADR-0034 is **Accepted (overridable)**, 9 Oct 2026. The schema checks one
 record, result or event. The rules below also need the config, the team store, the ledger, other records or the
 clock. `TS-` is this file's prefix, and the ids are stable. "Code" means tilo-api or the harness, never a model.
 
