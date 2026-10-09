@@ -328,7 +328,14 @@ def test_FR_TEAM_01_LIVE_GAPS_1a_people_are_ordered_by_display_name_then_id_what
     assert r.status_code == 200, r.text
     rows = [(p["display_name"], p["id"]) for p in r.json()["people"]]
     assert rows == sorted(rows), rows
-    assert [i for _, i in rows] == ["u_z9", "u_c3", OWNER, "u_m5", "u_a1", "u_b1"]
+    assert [i for _, i in rows] == [
+        "u_z9",
+        "u_c3",
+        "u_m5",
+        OWNER,
+        "u_a1",
+        "u_b1",
+    ]  # same name: by id, "u_m5" < "u_owner"
     again = _list(rig, OWNER)
     assert again.json() == r.json(), "a stable answer"
 
