@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.tilo.example/events/data/meeting.adjourned.schema.json",
+  "x-version": "1.0.0",
+  "title": "MeetingAdjournedData",
+  "description": "data of meeting.adjourned (ADR-0028). The room closed, once (MR-05). actor is the convener when reason is person, otherwise system (the idle sweeper, the cap check, Pause all or Stop all, the access check); target is the lead. turns is the number of meeting.asked in the room and credits_spent the sum of its meeting.replied credits (MR-08). A room open at Pause all or Stop all is adjourned (paused) before world.paused is written.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["room_id", "reason", "turns", "credits_spent"],
+  "properties": {
+    "room_id": { "$ref": "../../common.schema.json#/$defs/ulid" },
+    "reason": { "$ref": "../../meeting_room.schema.json#/$defs/adjourn_reason" },
+    "turns": { "type": "integer", "minimum": 0, "maximum": 50 },
+    "credits_spent": { "$ref": "../../common.schema.json#/$defs/credits" }
+  }
+}
