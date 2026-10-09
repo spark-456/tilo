@@ -106,7 +106,7 @@
   border: 0;
   border-radius: 11px;
   background: var(--red);
-  color: #ffffff;
+  color: var(--inv);
   font-family: inherit;
   font-size: 14px;
   font-weight: 800;
@@ -215,7 +215,7 @@
 }
 [data-park] .park-connectors-level--1 {
   background: var(--schSoft);
-  color: var(--sch);
+  color: var(--okInk);
 }
 [data-park] .park-connectors-level--2 {
   background: var(--heroSoft);
@@ -338,7 +338,7 @@
 }
 [data-park] .park-connectors-spin--red {
   border: 2.5px solid rgba(255, 255, 255, 0.4);
-  border-top-color: #ffffff;
+  border-top-color: var(--inv);
 }
 
 /* ---- Not connected yet ---- */

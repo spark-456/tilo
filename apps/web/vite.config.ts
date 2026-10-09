@@ -1,11 +1,9 @@
 import react from "@vitejs/plugin-react";
 import { type Plugin, defineConfig } from "vite";
 
-// The four UI faces main.tsx waits for before it renders (latin subset, woff2). Without a preload
-// the browser finds them only after the CSS and the app script have run, one round trip later than
-// it could (NFR-01 on a phone: that wait is on the way to the first keystroke).
-const PRELOAD_FACES =
-  /(nunito-latin-900|nunito-sans-latin-(400|700)|jetbrains-mono-latin-500)-normal-.*\.woff2$/;
+// The universal UI faces used immediately on every page (latin subset, woff2). Preloading only
+// universally rendered faces avoids Chrome's unused preload warning on SPA routes (#738).
+const PRELOAD_FACES = /(nunito-sans-latin-(400|700))-normal-.*\.woff2$/;
 
 function preloadFonts(): Plugin {
   return {

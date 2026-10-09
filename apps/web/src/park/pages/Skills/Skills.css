@@ -100,7 +100,7 @@
   padding: 0 18px 0 14px;
   border: 0;
   border-radius: 12px;
-  background: var(--hero);
+  background: var(--heroFill);
   color: #ffffff;
   font-size: 15px;
   font-weight: 800;
@@ -224,7 +224,7 @@
   color: #ffffff;
 }
 [data-park] .park-skills-dot--now {
-  background: var(--hero);
+  background: var(--heroFill);
   color: #ffffff;
 }
 [data-park] .park-skills-dot--next {
@@ -481,7 +481,7 @@
   padding: 0 16px;
   border: 0;
   border-radius: 12px;
-  background: var(--hero);
+  background: var(--heroFill);
   color: #ffffff;
   font-weight: 800;
   font-size: 14.5px;
@@ -614,7 +614,7 @@
   cursor: pointer;
 }
 [data-park] .park-skills-next--ready {
-  background: var(--hero);
+  background: var(--heroFill);
   color: #ffffff;
 }
 [data-park] .park-skills-next--locked {
@@ -841,7 +841,7 @@
   height: 44px;
   border: 0;
   border-radius: 12px;
-  background: var(--hero);
+  background: var(--heroFill);
   color: #ffffff;
   font-weight: 800;
   font-size: 15px;
@@ -940,7 +940,7 @@
   color: #ffffff;
 }
 [data-park] .park-skills-run-dot--working {
-  background: var(--hero);
+  background: var(--heroFill);
   color: #ffffff;
 }
 [data-park] .park-skills-run-dot--asking {
@@ -1034,7 +1034,7 @@
   padding: 0 16px;
   border: 0;
   border-radius: 12px;
-  background: var(--hero);
+  background: var(--heroFill);
   color: #ffffff;
   font-weight: 800;
   font-size: 14px;
@@ -1163,7 +1163,7 @@
   padding: 0 16px;
   border: 0;
   border-radius: 12px;
-  background: var(--hero);
+  background: var(--heroFill);
   color: #ffffff;
   font-weight: 800;
   font-size: 14.5px;
@@ -1451,7 +1451,7 @@
   padding: 0 16px;
   border: 0;
   border-radius: 10px;
-  background: var(--hero);
+  background: var(--heroFill);
   color: #ffffff;
   font-weight: 800;
   font-size: 14px;
@@ -1526,7 +1526,7 @@
   padding: 0 14px;
   border: 0;
   border-radius: 11px;
-  background: var(--hero);
+  background: var(--heroFill);
   color: #ffffff;
   font-weight: 800;
   font-size: 14px;
@@ -1640,6 +1640,11 @@
   grid-template-columns: minmax(320px, 0.9fr) minmax(0, 1.5fr);
   gap: 18px;
   align-items: start;
+}
+@media (max-width: 1079px) {
+  [data-park] .park-skills-lib-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 [data-park] .park-skills-lib-list {
   background: var(--card);
@@ -1825,7 +1830,7 @@
   padding: 0 14px 0 12px;
   border: 0;
   border-radius: 11px;
-  background: var(--hero);
+  background: var(--heroFill);
   color: #ffffff;
   font-size: 14px;
   font-weight: 800;
