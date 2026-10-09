@@ -6,20 +6,21 @@ the contract wins. Conventions are in [ADR-0002](../docs/adr/0002-contract-conve
 
 | File | Describes | Version |
 | --- | --- | --- |
-| `common.schema.json` | Shared definitions: ids, ULID, timestamps, credits, severity, risk tier, autonomy level, `authz`, artifact refs, tier, artifact media types, the people ids (`wi_`, `mt_`, `pb_`, `mn_`, `ce_`, `tm_`, utterance), `opaque_ref`, `maker`, `record_ref`; 1.2.0 merges the artifact media types (1.1.0, ADR-0018) and the people ids (1.1.0, ADR-0016); both 1.1.0 releases carried different content, so 1.2.0 is the first version that has both (additive, no breaking change); 1.3.0 adds `mail` to `record_ref.kind` (ADR-0021); 1.4.0 adds `schedule` to `channel` (FR-AGT-14) | 1.4.0 |
+| `common.schema.json` | Shared definitions: ids, ULID, timestamps, credits, severity, risk tier, autonomy level, `authz`, artifact refs, tier, artifact media types, the people ids (`wi_`, `mt_`, `pb_`, `mn_`, `ce_`, `tm_`, utterance), `opaque_ref`, `maker`, `record_ref`; 1.2.0 merges the artifact media types (1.1.0, ADR-0018) and the people ids (1.1.0, ADR-0016); both 1.1.0 releases carried different content, so 1.2.0 is the first version that has both (additive, no breaking change); 1.3.0 adds `mail` to `record_ref.kind` (ADR-0021); 1.4.0 adds `schedule` to `channel` (FR-AGT-14); 1.5.0 adds `tool_access_level` (ADR-0027); 1.7.0 adds `video/webm` and `video/mp4` to `media_type`, for taught-skill capture uploads only (ADR-0034; 1.6.0 is ADR-0029's) | 1.7.0 |
 | `brief.schema.json` | Structured brief from intake (FR-INT-03 to 05) | 1.0.0 |
 | `plan.schema.json` | `PlanGraph`: approaches, units, dependencies, gates, budget cap; rules in `plan.rules.md` | 1.0.0 |
 | `layout.schema.json` | `WorldLayout` v1: semantic part and solver geometry; rules in `layout.rules.md` | 1.0.0 |
 | `event.schema.json` | `TiloEvent` v1; rules EV-01 to EV-16 in `event.rules.md`; 1.1.0 adds the optional `trace.tokens_cached` (EFF-04, ADR-0022) | 1.1.0 |
-| `events/registry.yaml` + `events/registry.schema.json` | Every registered event type (PRD 9.5, plus the CC-PEOPLE families `work_item`, `pinboard`, `mention`, `calendar`, `assistant` and `meeting.minuted`): world, HUD, Story and Trace effects, data schema, fixture, pillar | 1.1.0 |
-| `events/data/<type>.schema.json` | The `data` payload of each registered type (82 files); `question.answered` is 1.1.0 (`decision_id`), `budget.requested` is 1.1.0 (`remaining_units`, `estimate`), `artifact.created` is 1.1.0 (`content_sha256`, `media_type`, `size_bytes`); `meeting.started` and `meeting.ended` are 1.1.0 (optional `meeting_id`, `reason`); `world.requested` is 1.1.0 (channel `schedule`, a scheduled run); the 12 CC-PEOPLE types are 1.0.0 | 1.0.0 |
+| `events/registry.yaml` + `events/registry.schema.json` | Every registered event type (PRD 9.5, plus the CC-PEOPLE families `work_item`, `pinboard`, `mention`, `calendar`, `assistant` and `meeting.minuted`, `team_rule.changed` (1.2.0, ADR-0027) and the six taught-skill `skill.*` types (1.4.0, ADR-0034)): world, HUD, Story and Trace effects, data schema, fixture, pillar | 1.4.0 |
+| `events/data/<type>.schema.json` | The `data` payload of each registered type (89 files); `question.answered` is 1.1.0 (`decision_id`), `budget.requested` is 1.1.0 (`remaining_units`, `estimate`), `artifact.created` is 1.1.0 (`content_sha256`, `media_type`, `size_bytes`); `meeting.started` and `meeting.ended` are 1.1.0 (optional `meeting_id`, `reason`); `world.requested` is 1.1.0 (channel `schedule`, a scheduled run); the 12 CC-PEOPLE types are 1.0.0 | 1.0.0 |
 | `outbox.schema.json` | An authorised side effect waiting to run exactly once; rules in `outbox.rules.md` | 1.0.0 |
 | `card.schema.json` | Needs-you, gate, consent and meeting cards; safe-default rules in `card.rules.md` | 1.0.0 |
 | `policy.schema.json` | Autonomy policies and the risk-tier table shape (`config/autonomy.yaml`) | 1.0.0 |
 | `team_lead.schema.json` | A Team Lead's owner-assigned domain (`config/teams.yaml` entries); who may open a gate is outbox OB-01 | 1.0.0 |
 | `handoff.schema.json` | Context handoff note | 1.0.0 |
 | `envelope.schema.json` | Agent-to-agent handoff envelope | 1.0.0 |
-| `skill.schema.json` | `skill.yaml` | 1.0.0 |
+| `skill.schema.json` | `skill.yaml`, the expert-signed skill (PRD 8.2); 1.1.0 adds `tool_access` (ADR-0027) | 1.1.0 |
+| `taught_skill.schema.json` | `TaughtSkill`: a skill a person taught on the Skills page, a sibling of `skill.yaml` (FR-SKL-01 to 07, ADR-0034, Accepted), with `$defs` `try_run_result`, `rating`, `fix` and `helpers_report`; rules TS-01 to TS-12 in `taught_skill.rules.md` | 1.0.0 |
 | `connector.schema.json` | Connector declarations | 1.0.0 |
 | `providers.schema.json` | `config/models.yaml` and `config/prices.yaml` | 1.0.0 |
 | `agents.schema.json` | `AgentsConfig`: `config/agents.yaml`, the harness's role limits, context thresholds, liveness, retries and question cap | 1.0.0 |

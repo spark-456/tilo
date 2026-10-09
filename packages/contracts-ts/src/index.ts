@@ -8,7 +8,7 @@
  * brief.schema.json 1.0.0 sha256:be4e747f37e399b2
  * calendar_entry.schema.json 1.1.0 sha256:291531543be88320
  * card.schema.json 1.0.0 sha256:2666292eb19087d0
- * common.schema.json 1.5.0 sha256:b1bd17a36819c785
+ * common.schema.json 1.7.0 sha256:4054d75df1d6ab48
  * connector.schema.json 1.0.0 sha256:cc3a7d9b3820e12c
  * decision.schema.json 1.0.0 sha256:06915b6db08dc4b7
  * envelope.schema.json 1.0.0 sha256:8a5c75c61807baa2
@@ -86,7 +86,13 @@
  * events/data/policy.changed.schema.json 1.0.0 sha256:e480c2319e07c2a6
  * events/data/question.answered.schema.json 1.1.0 sha256:27aa69077ee8f813
  * events/data/question.routed.schema.json 1.0.0 sha256:af061a697d8396b2
+ * events/data/skill.captured.schema.json 1.0.0 sha256:6de7eeac396cf5a8
+ * events/data/skill.fixed.schema.json 1.0.0 sha256:a8532b6517841fc5
  * events/data/skill.loaded.schema.json 1.0.0 sha256:acddc05d7bde55d2
+ * events/data/skill.rated.schema.json 1.0.0 sha256:b29d4b724d076f6f
+ * events/data/skill.state_changed.schema.json 1.0.0 sha256:bca4bebcc30d6d6f
+ * events/data/skill.try_run.schema.json 1.0.0 sha256:41d6fdc3a3079a84
+ * events/data/skill.version_proposed.schema.json 1.0.0 sha256:bd3ff89653114f9c
  * events/data/team_rule.changed.schema.json 1.0.0 sha256:c095fa9eb4a68023
  * events/data/work_item.changed.schema.json 1.0.0 sha256:8740c0c65f424dc5
  * events/data/work_item.created.schema.json 1.0.0 sha256:a9fbffc5d3854c81
@@ -120,11 +126,12 @@
  * scenario.schema.json 1.0.0 sha256:b8e044d7e37b92a3
  * skill.schema.json 1.1.0 sha256:9eeee7768b667afa
  * spend_caps.schema.json 1.1.1 sha256:c04bc36ac17dc0ab
+ * taught_skill.schema.json 1.0.0 sha256:ca1c19c1dadd31c0
  * team_lead.schema.json 1.0.0 sha256:19413726e364ffdd
  * transcript.schema.json 1.0.0 sha256:08f934b8f0c9a40e
  * ui_action.schema.json 1.0.0 sha256:2ceb1e0b46368734
  * work_item.schema.json 1.0.0 sha256:7add9f68c1f996fb
- * events/registry.yaml 1.2.0 sha256:8be0da29431a82c4
+ * events/registry.yaml 1.4.0 sha256:5b0bb3270c776e54
  */
 
 /**
@@ -153,7 +160,7 @@ export type RunId = string;
  */
 export type UserId = string;
 /**
- * Media type of a stored artifact version (ADR-0018). Text: Markdown and CSV; structured: JSON; files (made only by tilo-render or an intake upload, never by a model): PDF, PPTX, DOCX, XLSX, PNG and JPEG. Code picks it from the role and the pinned skill, never a model, a file name or sniffing. Closed: no HTML or SVG.
+ * Media type of a stored artifact version (ADR-0018). Text: Markdown and CSV; structured: JSON; files (made only by tilo-render or an intake upload, never by a model): PDF, PPTX, DOCX, XLSX, PNG and JPEG, and since 1.7.0 (ADR-0034) WebM and MP4 video, which only a taught-skill capture upload stores (a screen recording or an uploaded example; never rendered or fetched). Code picks it, never a model: from the role and the pinned skill for a unit or render output, and from the file's own leading bytes for an upload (whose extension must agree) or a fetch (ADR-0029), never from a file name, a URL or a Content-Type header alone. Closed: no HTML or SVG.
  *
  * This interface was referenced by `TiloContracts`'s JSON-Schema
  * via the `definition` "MediaType".
@@ -167,7 +174,9 @@ export type MediaType =
   | "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
   | "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
   | "image/png"
-  | "image/jpeg";
+  | "image/jpeg"
+  | "video/webm"
+  | "video/mp4";
 /**
  * This interface was referenced by `TiloContracts`'s JSON-Schema
  * via the `definition` "UnitId".
@@ -589,6 +598,35 @@ export type UiActionTarget =
   | UiActionTargetWorkItem
   | UiActionTargetCalendarEntry;
 /**
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "TaughtSkillId".
+ */
+export type TaughtSkillId = string;
+/**
+ * How the person showed it (FR-SKL-01): describe (typed words), upload (a finished example file), guided (clicking through in Tilo's browser) or record (a screen recording, video only, no sound).
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "TaughtSkillMethod".
+ */
+export type TaughtSkillMethod = "describe" | "upload" | "guided" | "record";
+/**
+ * 1-based position in plan.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "TaughtSkillStepNumber".
+ */
+export type TaughtSkillStepNumber = number;
+/**
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "TaughtSkillThumb".
+ */
+export type TaughtSkillThumb = "up" | "down";
+/**
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "TaughtSkillCount".
+ */
+export type TaughtSkillCount = number;
+/**
  * switch: one of the five 'When agents stop and ask' switches (FR-TEAM-04). tool_access: the team's level for one connector (FR-ACC-01). Roles, spend limits, invites and removals are not team rules (BQ-ADR27-3).
  *
  * This interface was referenced by `TiloContracts`'s JSON-Schema
@@ -866,6 +904,35 @@ export type ScenarioId = string;
  * via the `definition` "ScenarioSeedPath".
  */
 export type ScenarioSeedPath = string;
+/**
+ * One line written by a person: data, never an instruction.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "TaughtSkillName".
+ */
+export type TaughtSkillName = string;
+/**
+ * draft until saved; a saved skill starts as learning (FR-SKL-04); only the owner marks it trusted, once good_runs reaches the configured threshold (TS-08), and may set it back to learning at any time.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "TaughtSkillStatus".
+ */
+export type TaughtSkillStatus = "draft" | "learning" | "trusted";
+/**
+ * One step in plain words, one line. Written by a person or by the skill_capture role from what the person showed; data, never an instruction to code.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "TaughtSkillStepText".
+ */
+export type TaughtSkillStepText = string;
+/**
+ * What a step does, in the Skills page's words. send, post, pay, delete, share and book always ask (must_ask).
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "TaughtSkillVerb".
+ */
+export type TaughtSkillVerb =
+  "read" | "draft" | "write" | "send" | "post" | "pay" | "delete" | "share" | "book";
 /**
  * Quote text or speaker: one line of at most 240 characters with no control character (Cc), no line or paragraph separator and no format character (Cf) of the Basic Multilingual Plane, so no bidi override or zero-width character. Astral format characters (tag characters U+E0000 to U+E007F and others) are removed by code (PE-24, validator only).
  *
@@ -2801,6 +2868,40 @@ export interface QuestionRoutedData {
   domain: Slug | null;
 }
 /**
+ * data of skill.captured (registry 1.4.0, ADR-0034, FR-SKL-01): one step was added to a taught skill's captured list. Written once per step, after the record write commits, so the list grows only as steps are recorded (HR-1). The envelope follows TS-11: the actor's Desk world, actor and target that person, district, level and item null, vis [] and authz null. credits and trace name the skill_capture role when a model read the recording, upload or description. No step text, file name or media here: the artifact is a pinned id and version.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "SkillCapturedData".
+ */
+export interface SkillCapturedData {
+  skill: TaughtSkillId;
+  method: TaughtSkillMethod;
+  step: TaughtSkillStepNumber;
+  artifact: TaughtSkillPinned | null;
+}
+/**
+ * A stored artifact version (ADR-0018 store, the owner's Desk world) by id and version only, never a label or a file name.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "TaughtSkillPinned".
+ */
+export interface TaughtSkillPinned {
+  artifact_id: ArtifactId;
+  version: number;
+}
+/**
+ * data of skill.fixed (registry 1.4.0, ADR-0034, FR-SKL-05): the owner fixed one step, and to_version (from_version + 1, TS-09) is what the next run uses. It copies the fix record without its text. Envelope as TS-11.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "SkillFixedData".
+ */
+export interface SkillFixedData {
+  skill: TaughtSkillId;
+  from_version: number;
+  to_version: number;
+  step: TaughtSkillStepNumber;
+}
+/**
  * data of skill.loaded (PRD 9.5). The run pins skill versions and the Trace lists them (FR-AGT-03).
  *
  * This interface was referenced by `TiloContracts`'s JSON-Schema
@@ -2809,6 +2910,68 @@ export interface QuestionRoutedData {
 export interface SkillLoadedData {
   skill: SkillId;
   version: Semver;
+}
+/**
+ * data of skill.rated (registry 1.4.0, ADR-0034, FR-SKL-05): the person whose run it was rated it. It copies the rating record without its note. A thumbs down may name the wrong step. The event goes in the rater's Desk world (TS-11).
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "SkillRatedData".
+ */
+export interface SkillRatedData {
+  skill: TaughtSkillId;
+  version: number;
+  run_id: RunId;
+  thumb: TaughtSkillThumb;
+  wrong_step: TaughtSkillStepNumber | null;
+}
+/**
+ * data of skill.state_changed (registry 1.4.0, ADR-0034, FR-SKL-04, FR-SKL-06): the owner saved a draft (it starts as learning), marked the skill trusted, set it back to learning, paused it or resumed it. A trusted change records the good runs and the threshold in force (good_runs >= threshold, TS-08). The owner is the actor, and the record is written before the event. Envelope as TS-11.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "SkillStateChangedData".
+ */
+export interface SkillStateChangedData {
+  skill: TaughtSkillId;
+  version: number;
+  change: "saved" | "trusted" | "learning" | "paused" | "resumed";
+  good_runs: number;
+  threshold: number | null;
+}
+/**
+ * data of skill.try_run (registry 1.4.0, ADR-0034, FR-SKL-03): a try run finished or stopped. It copies its try_run_result (TS-10), so side_effects is always 0. It is written once per try run, after the result is stored. The page shows the steps only after this event; there is no per-step event. The actor is the person who started it, and credits are the try run's total. Envelope as TS-11.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "SkillTryRunData".
+ */
+export interface SkillTryRunData {
+  skill: TaughtSkillId;
+  version: number;
+  try_run: Ulid;
+  match: number;
+  total: TaughtSkillStepNumber;
+  matched: TaughtSkillCount;
+  asked: TaughtSkillCount;
+  skipped: TaughtSkillCount;
+  side_effects: 0;
+  outcome: "completed" | "stopped";
+}
+/**
+ * data of skill.version_proposed (registry 1.4.0, ADR-0034, FR-SKL-02): Tilo restated a draft as plan steps, with at most one question and the estimates code worked out. The actor is the person who asked for it; credits and trace name the skill_capture role. Envelope as TS-11. Counts and the estimate only, never step text.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "SkillVersionProposedData".
+ */
+export interface SkillVersionProposedData {
+  skill: TaughtSkillId;
+  version: number;
+  steps: TaughtSkillStepNumber;
+  asks: TaughtSkillCount;
+  /**
+   * true when the version asks one clarifying question.
+   */
+  question: boolean;
+  credits_per_run: Credits;
+  source: "ledger" | "prior";
 }
 /**
  * data of team_rule.changed (registry 1.2.0, ADR-0027; FR-TEAM-04 'every change is logged', FR-ACC-01). A person changed one team rule: a stop-and-ask switch (rule switch, key the switch, values on or off) or the team's access level for one connector (rule tool_access, key the connector id, values off, read, draft or act). from is the value in force before the change (an unset tool is act, an unset switch its configured default), to the value after it. A Must-ask switch (spend, share, undo; PRD 8.3) can't be switched off, so its to is always on. tilo-api's team routes write it after the team store's compare-and-set succeeded, never an agent or a model: actor and target are the signed-in person who made the change (only the team's Owner may, BQ-TEAMACC-2), the world is that person's Desk world, district is null and vis is [] (owner-only, ADR-0009). It authorises nothing (a level or switch only narrows what reaches the policy engine), so it is not a side effect and authz is null.
@@ -4750,6 +4913,250 @@ export interface SpendCapsConfig {
   rate_limit_window_s: number;
 }
 /**
+ * A skill a person taught Tilo on the Skills page (FR-SKL-01 to FR-SKL-07, ADR-0034), stored at orgs/{org}/taught_skills/{id} and read only through tilo-api. A sibling of the expert-signed, version-pinned skill.yaml (skill.schema.json), never a change to it. One person owns it. Each fix makes a new integer version, and a run pins the version it started with. It acts only through its own tool_access, the team's levels and the policy engine. $defs try_run_result, rating, fix and helpers_report are the records and the report around it. Rules TS-01 to TS-12 are in taught_skill.rules.md.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "TaughtSkill".
+ */
+export interface TaughtSkill {
+  id: TaughtSkillId;
+  org_id: OrgId;
+  owner: UserId;
+  name: TaughtSkillName;
+  scope: TaughtSkillScope;
+  status: TaughtSkillStatus;
+  /**
+   * FR-SKL-06: a paused skill never starts (no trigger, no run on request, no try run). Kept apart from status, so Resume returns to learning or trusted as it was. A draft is never paused.
+   */
+  paused: boolean;
+  method: TaughtSkillMethod;
+  /**
+   * FR-SKL-01: the steps captured so far, in order. Text only, plus the pinned capture artifact a step came from; media bytes are never inline.
+   *
+   * @maxItems 20
+   */
+  captured: TaughtSkillCapturedStep[];
+  /**
+   * FR-SKL-02: Tilo's version, in order. Empty until Tilo has proposed one.
+   *
+   * @maxItems 20
+   */
+  plan: TaughtSkillPlanStep[];
+  question: TaughtSkillQuestion | null;
+  trigger: TaughtSkillTrigger;
+  estimates: TaughtSkillEstimates | null;
+  tool_access: TaughtSkillToolAccess;
+  /**
+   * FR-SKL-06: runs of this skill rated up by the person whose run it was (TS-08); try runs never count.
+   */
+  good_runs: number;
+  /**
+   * 1 for a draft and a new skill; each fix adds 1 (TS-09). Name, scope, trigger, status and pause changes keep it.
+   */
+  version: number;
+  created_at: Timestamp;
+  updated_at: Timestamp;
+}
+/**
+ * Who can use it (FR-SKL-04): just_me, or the members of one team the owner belongs to (team is null exactly for just_me).
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "TaughtSkillScope".
+ */
+export interface TaughtSkillScope {
+  kind: "just_me" | "team";
+  team: TeamId | null;
+}
+/**
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "TaughtSkillCapturedStep".
+ */
+export interface TaughtSkillCapturedStep {
+  text: TaughtSkillStepText;
+  artifact: TaughtSkillPinned | null;
+}
+/**
+ * One step of Tilo's version (FR-SKL-02). tool is the connector it uses and action one of that connector's actions (config/connectors.yaml or config/mcp.yaml), the risk-table key of what it does there. must_ask is set by code, never a model: true when the verb is send, post, pay, delete, share or book, or the action's tier is T2 or T3 (an action the config does not list is T3). The runner works it out again from the current config on every run (TS-04). A must_ask step always has ask_first true. ask_first is the person's 'Ask me first' switch for the other steps; while the skill is learning every step but a read asks anyway (TS-05). Neither one authorises anything: every side effect still goes through the policy engine and its gate.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "TaughtSkillPlanStep".
+ */
+export interface TaughtSkillPlanStep {
+  text: TaughtSkillStepText;
+  tool: ConnectorId;
+  action: ActionType;
+  verb: TaughtSkillVerb;
+  ask_first: boolean;
+  must_ask: boolean;
+}
+/**
+ * FR-SKL-02: the one clarifying question of Tilo's version, its options, and the index of the option the person chose (null until answered).
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "TaughtSkillQuestion".
+ */
+export interface TaughtSkillQuestion {
+  text: TaughtSkillStepText;
+  /**
+   * @minItems 2
+   * @maxItems 4
+   */
+  options: [string, string, ...string[]];
+  answer: number | null;
+}
+/**
+ * FR-SKL-04: when it runs. on_demand: when a person asks. schedule: the /schedules record schedule_id (FR-AGT-14) starts it. event: a registered event of a world the owner owns starts it (TS-07). The other two fields are null.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "TaughtSkillTrigger".
+ */
+export interface TaughtSkillTrigger {
+  kind: "on_demand" | "schedule" | "event";
+  schedule_id: string | null;
+  event: TaughtSkillEventTrigger | null;
+}
+/**
+ * An event type from config/skills.yaml's allow-list, and at most three exact matches on its data fields. Keys are data fields holding an id or an enum value, never free text; there are no patterns or substrings (TS-07).
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "TaughtSkillEventTrigger".
+ */
+export interface TaughtSkillEventTrigger {
+  type: EventFamilyVerb;
+  filter: {
+    [k: string]: string;
+  };
+}
+/**
+ * FR-SKL-02, worked out by code, never a model. Taken from the skill's own runs in the credit ledger once it has some (source ledger), else from config/skills.yaml's per-step prior (source prior). Prices come from config/prices.yaml as of prices_as_of. asks_per_run counts the steps that would stop to ask (TS-05).
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "TaughtSkillEstimates".
+ */
+export interface TaughtSkillEstimates {
+  credits_per_run: Credits;
+  seconds_per_run: number;
+  asks_per_run: TaughtSkillCount;
+  source: "ledger" | "prior";
+  prices_as_of: CalendarDate;
+}
+/**
+ * FR-ACC-02, least privilege: the level each connector may be used at, set by code at save to the lowest level that permits that connector's steps. A connector left out is off, unlike skill.yaml, where a missing entry takes the team's level. A level only ever lowers the team's (effective_level). The owner may lower it further; nothing raises it above what the steps need (TS-06).
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "TaughtSkillToolAccess".
+ */
+export interface TaughtSkillToolAccess {
+  [k: string]: ToolAccessLevel;
+}
+/**
+ * FR-SKL-03: one try run, at orgs/{org}/taught_skills/{skill}/try_runs/{id}. Reads are real, writes are recorded as intents in a dry-run outbox and sent nowhere, so side_effects is 0 by construction (TS-10). match = matched / total. Each step ends matched, skipped or not reached; asked counts the steps that paused to ask.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "TaughtSkillTryRunResult".
+ */
+export interface TaughtSkillTryRunResult {
+  id: Ulid;
+  skill: TaughtSkillId;
+  version: number;
+  by: UserId;
+  match: number;
+  total: TaughtSkillStepNumber;
+  matched: TaughtSkillCount;
+  asked: TaughtSkillCount;
+  skipped: TaughtSkillCount;
+  intents: TaughtSkillCount;
+  /**
+   * Always 0: a try run sends and saves nothing outside Tilo.
+   */
+  side_effects: 0;
+  outcome: "completed" | "stopped";
+  stopped_at: TaughtSkillStop | null;
+  duration_ms: number;
+  credits: Credits;
+  finished_at: Timestamp;
+}
+/**
+ * Where and why a try run stopped: a site wanted a sign-in or a CAPTCHA (a needs-you card; Tilo never types a password or solves one), the try run's credit cap, an error, or the person stopped it.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "TaughtSkillStop".
+ */
+export interface TaughtSkillStop {
+  step: TaughtSkillStepNumber;
+  reason: "needs_sign_in" | "captcha" | "budget" | "error" | "cancelled";
+}
+/**
+ * FR-SKL-05: a thumbs up or down on one finished run, by the person whose run it was, at orgs/{org}/taught_skills/{skill}/ratings/{id}. A thumbs down may name the step that went wrong. The note is kept for the owner to read; it never reaches a prompt.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "TaughtSkillRating".
+ */
+export interface TaughtSkillRating {
+  id: Ulid;
+  skill: TaughtSkillId;
+  version: number;
+  run_id: RunId;
+  by: UserId;
+  thumb: TaughtSkillThumb;
+  wrong_step: TaughtSkillStepNumber | null;
+  note: string | null;
+  at: Timestamp;
+}
+/**
+ * FR-SKL-05: a logged change to one step, by the owner only (TS-09), at orgs/{org}/taught_skills/{skill}/fixes/{id}. It sets the step's text and Ask me first and makes version to_version = from_version + 1, which the next run uses. A fix never changes a step's tool, action or verb.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "TaughtSkillFix".
+ */
+export interface TaughtSkillFix {
+  id: Ulid;
+  skill: TaughtSkillId;
+  from_version: number;
+  to_version: number;
+  step: TaughtSkillStepNumber;
+  text: TaughtSkillStepText;
+  ask_first: boolean;
+  by: UserId;
+  /**
+   * The thumbs-down rating that led to it, or null.
+   */
+  rating: Ulid | null;
+  at: Timestamp;
+}
+/**
+ * FR-SKL-07 under BQ-DSN-05 and PRD 23.5: counts only, served only while the org has opted in. Per person: question cards answered in runs of the org's taught skills, and fixes made, in the month. Mistakes (thumbs-down ratings) are counted for the whole org, never per person. helpers is ordered by user id, never by a count (TS-12), and has no field for message content, time or speed.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "TaughtSkillHelpersReport".
+ */
+export interface TaughtSkillHelpersReport {
+  org_id: OrgId;
+  month: string;
+  /**
+   * @maxItems 500
+   */
+  helpers: TaughtSkillHelper[];
+  mistakes: TaughtSkillMistakes;
+}
+/**
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "TaughtSkillHelper".
+ */
+export interface TaughtSkillHelper {
+  user: UserId;
+  answers: number;
+  fixes: number;
+}
+/**
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "TaughtSkillMistakes".
+ */
+export interface TaughtSkillMistakes {
+  this_month: number;
+  last_month: number;
+}
+/**
  * A Team Lead assignment (PRD 8.3, 10.1, 16.2): the person (user) who acts as Team Lead id, and the one expert domain the owner assigned them. The shape of each entry of config/teams.yaml and of a Team Lead set in the Team Lead console. authz.ref of a Team Lead's answer is id. A Team Lead opens a gate only when the gate names this domain and the owner's policy it names lists the domain in team_lead_domains, and only when the world's owner made this assignment before the answer (outbox OB-01). Removing a Team Lead deletes the record, so a removed Team Lead answers nothing.
  *
  * This interface was referenced by `TiloContracts`'s JSON-Schema
@@ -4924,6 +5331,12 @@ export const EVENT_TYPES = [
   "agent.context_handoff_started",
   "agent.context_handoff_completed",
   "skill.loaded",
+  "skill.captured",
+  "skill.version_proposed",
+  "skill.try_run",
+  "skill.state_changed",
+  "skill.rated",
+  "skill.fixed",
   "question.routed",
   "question.answered",
   "meeting.called",
@@ -5021,6 +5434,12 @@ export interface EventDataByType {
   "agent.context_handoff_started": AgentContextHandoffStartedData;
   "agent.context_handoff_completed": AgentContextHandoffCompletedData;
   "skill.loaded": SkillLoadedData;
+  "skill.captured": SkillCapturedData;
+  "skill.version_proposed": SkillVersionProposedData;
+  "skill.try_run": SkillTryRunData;
+  "skill.state_changed": SkillStateChangedData;
+  "skill.rated": SkillRatedData;
+  "skill.fixed": SkillFixedData;
   "question.routed": QuestionRoutedData;
   "question.answered": QuestionAnsweredData;
   "meeting.called": MeetingCalledData;
@@ -5078,7 +5497,7 @@ export type RegisteredEvent = {
 export const EVENT_REGISTRY: EventRegistry & {
   types: { readonly [T in RegisteredEventType]: EventRegistryEntry };
 } = {
-  "version": "1.2.0",
+  "version": "1.4.0",
   "unknown_types": "trace_only",
   "types": {
     "world.requested": {
@@ -5588,6 +6007,90 @@ export const EVENT_REGISTRY: EventRegistry & {
       "trace_row": "skill={data.skill} version={data.version}",
       "data_schema": "events/data/skill.loaded.schema.json",
       "fixture": "fixtures/events/valid/skill.loaded.json"
+    },
+    "skill.captured": {
+      "family": "skill",
+      "verb": "captured",
+      "priority": "should",
+      "pillar": "P7",
+      "default_severity": "info",
+      "side_effect": false,
+      "world_effect": "A new card joins the skill being taught on Your Desk.",
+      "hud_effect": "The Skills page lists the captured step.",
+      "story_template": "{actor} showed Tilo step {data.step} of a new skill ({data.method}).",
+      "trace_row": "skill={data.skill} method={data.method} step={data.step}",
+      "data_schema": "events/data/skill.captured.schema.json",
+      "fixture": "fixtures/events/valid/skill.captured.json"
+    },
+    "skill.version_proposed": {
+      "family": "skill",
+      "verb": "version_proposed",
+      "priority": "should",
+      "pillar": "P7",
+      "default_severity": "info",
+      "side_effect": false,
+      "world_effect": "Tilo lays its own version of the skill beside the captured cards.",
+      "hud_effect": "The Skills page shows Tilo's version with its estimates.",
+      "story_template": "Tilo proposed a version with {data.steps} steps that stops to ask {data.asks} times.",
+      "trace_row": "skill={data.skill} version={data.version} steps={data.steps} asks={data.asks} credits_per_run={data.credits_per_run} source={data.source}",
+      "data_schema": "events/data/skill.version_proposed.schema.json",
+      "fixture": "fixtures/events/valid/skill.version_proposed.json"
+    },
+    "skill.try_run": {
+      "family": "skill",
+      "verb": "try_run",
+      "priority": "should",
+      "pillar": "P2",
+      "default_severity": "info",
+      "side_effect": false,
+      "world_effect": "The practice desk shows the try run's steps; no parcel leaves.",
+      "hud_effect": "The Skills page shows how closely the try run matched.",
+      "story_template": "A try run matched {data.matched} of {data.total} steps and sent nothing ({data.outcome}).",
+      "trace_row": "skill={data.skill} version={data.version} match={data.match} asked={data.asked} skipped={data.skipped} side_effects={data.side_effects}",
+      "data_schema": "events/data/skill.try_run.schema.json",
+      "fixture": "fixtures/events/valid/skill.try_run.json"
+    },
+    "skill.state_changed": {
+      "family": "skill",
+      "verb": "state_changed",
+      "priority": "should",
+      "pillar": "P7",
+      "default_severity": "info",
+      "side_effect": false,
+      "world_effect": "The skill's card on Your Desk changes its badge.",
+      "hud_effect": "The Skills library shows the skill as learning, trusted or paused.",
+      "story_template": "{actor} marked a skill {data.change}.",
+      "trace_row": "skill={data.skill} version={data.version} change={data.change} good_runs={data.good_runs} threshold={data.threshold}",
+      "data_schema": "events/data/skill.state_changed.schema.json",
+      "fixture": "fixtures/events/valid/skill.state_changed.json"
+    },
+    "skill.rated": {
+      "family": "skill",
+      "verb": "rated",
+      "priority": "should",
+      "pillar": "P7",
+      "default_severity": "info",
+      "side_effect": false,
+      "world_effect": "A thumb stamp lands on the run's card on Your Desk.",
+      "hud_effect": "The skill's run history bar fills in.",
+      "story_template": "{actor} rated a run of a skill: thumbs {data.thumb}.",
+      "trace_row": "skill={data.skill} version={data.version} run={data.run_id} thumb={data.thumb} wrong_step={data.wrong_step}",
+      "data_schema": "events/data/skill.rated.schema.json",
+      "fixture": "fixtures/events/valid/skill.rated.json"
+    },
+    "skill.fixed": {
+      "family": "skill",
+      "verb": "fixed",
+      "priority": "should",
+      "pillar": "P7",
+      "default_severity": "info",
+      "side_effect": false,
+      "world_effect": "The fixed step's card on Your Desk is rewritten.",
+      "hud_effect": "The skill shows its new version and the logged fix.",
+      "story_template": "{actor} fixed step {data.step}; version {data.to_version} runs next time.",
+      "trace_row": "skill={data.skill} from={data.from_version} to={data.to_version} step={data.step}",
+      "data_schema": "events/data/skill.fixed.schema.json",
+      "fixture": "fixtures/events/valid/skill.fixed.json"
     },
     "question.routed": {
       "family": "question",

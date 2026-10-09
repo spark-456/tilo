@@ -7,7 +7,7 @@
 # brief.schema.json 1.0.0 sha256:be4e747f37e399b2
 # calendar_entry.schema.json 1.1.0 sha256:291531543be88320
 # card.schema.json 1.0.0 sha256:2666292eb19087d0
-# common.schema.json 1.5.0 sha256:b1bd17a36819c785
+# common.schema.json 1.7.0 sha256:4054d75df1d6ab48
 # connector.schema.json 1.0.0 sha256:cc3a7d9b3820e12c
 # decision.schema.json 1.0.0 sha256:06915b6db08dc4b7
 # envelope.schema.json 1.0.0 sha256:8a5c75c61807baa2
@@ -85,7 +85,13 @@
 # events/data/policy.changed.schema.json 1.0.0 sha256:e480c2319e07c2a6
 # events/data/question.answered.schema.json 1.1.0 sha256:27aa69077ee8f813
 # events/data/question.routed.schema.json 1.0.0 sha256:af061a697d8396b2
+# events/data/skill.captured.schema.json 1.0.0 sha256:6de7eeac396cf5a8
+# events/data/skill.fixed.schema.json 1.0.0 sha256:a8532b6517841fc5
 # events/data/skill.loaded.schema.json 1.0.0 sha256:acddc05d7bde55d2
+# events/data/skill.rated.schema.json 1.0.0 sha256:b29d4b724d076f6f
+# events/data/skill.state_changed.schema.json 1.0.0 sha256:bca4bebcc30d6d6f
+# events/data/skill.try_run.schema.json 1.0.0 sha256:41d6fdc3a3079a84
+# events/data/skill.version_proposed.schema.json 1.0.0 sha256:bd3ff89653114f9c
 # events/data/team_rule.changed.schema.json 1.0.0 sha256:c095fa9eb4a68023
 # events/data/work_item.changed.schema.json 1.0.0 sha256:8740c0c65f424dc5
 # events/data/work_item.created.schema.json 1.0.0 sha256:a9fbffc5d3854c81
@@ -119,17 +125,19 @@
 # scenario.schema.json 1.0.0 sha256:b8e044d7e37b92a3
 # skill.schema.json 1.1.0 sha256:9eeee7768b667afa
 # spend_caps.schema.json 1.1.1 sha256:c04bc36ac17dc0ab
+# taught_skill.schema.json 1.0.0 sha256:ca1c19c1dadd31c0
 # team_lead.schema.json 1.0.0 sha256:19413726e364ffdd
 # transcript.schema.json 1.0.0 sha256:08f934b8f0c9a40e
 # ui_action.schema.json 1.0.0 sha256:2ceb1e0b46368734
 # work_item.schema.json 1.0.0 sha256:7add9f68c1f996fb
-# events/registry.yaml 1.2.0 sha256:8be0da29431a82c4
+# events/registry.yaml 1.4.0 sha256:5b0bb3270c776e54
 
 from __future__ import annotations
 
 from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
+from typing_extensions import TypeAliasType
 
 
 class AgentsConfigLimits(BaseModel):
@@ -492,9 +500,9 @@ Deliverable format (PRD 12.4), plus email for replies and in_app for answers sho
 """
 
 
-type MediaType = Literal["text/markdown", "text/csv", "application/json", "application/pdf", "application/vnd.openxmlformats-officedocument.presentationml.presentation", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "image/png", "image/jpeg"]
+type MediaType = Literal["text/markdown", "text/csv", "application/json", "application/pdf", "application/vnd.openxmlformats-officedocument.presentationml.presentation", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "image/png", "image/jpeg", "video/webm", "video/mp4"]
 """
-Media type of a stored artifact version (ADR-0018). Text: Markdown and CSV; structured: JSON; files (made only by tilo-render or an intake upload, never by a model): PDF, PPTX, DOCX, XLSX, PNG and JPEG. Code picks it from the role and the pinned skill, never a model, a file name or sniffing. Closed: no HTML or SVG.
+Media type of a stored artifact version (ADR-0018). Text: Markdown and CSV; structured: JSON; files (made only by tilo-render or an intake upload, never by a model): PDF, PPTX, DOCX, XLSX, PNG and JPEG, and since 1.7.0 (ADR-0034) WebM and MP4 video, which only a taught-skill capture upload stores (a screen recording or an uploaded example; never rendered or fetched). Code picks it, never a model: from the role and the pinned skill for a unit or render output, and from the file's own leading bytes for an upload (whose extension must agree) or a fetch (ADR-0029), never from a file name, a URL or a Content-Type header alone. Closed: no HTML or SVG.
 """
 
 
@@ -2795,6 +2803,214 @@ class SpendCapsConfig(BaseModel):
     """
 
 
+type TaughtSkillId = Annotated[str, Field(pattern="^tsk_[0-9A-Za-z_]{1,48}$")]
+
+
+type TaughtSkillName = Annotated[
+    str, Field(max_length=80, min_length=1, pattern="^[^\\r\\n]+$")
+]
+"""
+One line written by a person: data, never an instruction.
+"""
+
+
+type TaughtSkillStepText = Annotated[
+    str, Field(max_length=200, min_length=1, pattern="^[^\\r\\n]+$")
+]
+"""
+One step in plain words, one line. Written by a person or by the skill_capture role from what the person showed; data, never an instruction to code.
+"""
+
+
+type TaughtSkillStepNumber = Annotated[int, Field(ge=1, le=20)]
+"""
+1-based position in plan.
+"""
+
+
+type TaughtSkillCount = Annotated[int, Field(ge=0, le=20)]
+
+
+type TaughtSkillStatus = Literal["draft", "learning", "trusted"]
+"""
+draft until saved; a saved skill starts as learning (FR-SKL-04); only the owner marks it trusted, once good_runs reaches the configured threshold (TS-08), and may set it back to learning at any time.
+"""
+
+
+type TaughtSkillMethod = Literal["describe", "upload", "guided", "record"]
+"""
+How the person showed it (FR-SKL-01): describe (typed words), upload (a finished example file), guided (clicking through in Tilo's browser) or record (a screen recording, video only, no sound).
+"""
+
+
+class TaughtSkillScope(BaseModel):
+    """
+    Who can use it (FR-SKL-04): just_me, or the members of one team the owner belongs to (team is null exactly for just_me).
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    kind: Literal["just_me", "team"]
+    team: TeamId | None
+
+
+class TaughtSkillPinned(BaseModel):
+    """
+    A stored artifact version (ADR-0018 store, the owner's Desk world) by id and version only, never a label or a file name.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    artifact_id: ArtifactId
+    version: Annotated[int, Field(ge=1)]
+
+
+class TaughtSkillCapturedStep(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    text: TaughtSkillStepText
+    artifact: TaughtSkillPinned | None
+
+
+type TaughtSkillVerb = Literal["read", "draft", "write", "send", "post", "pay", "delete", "share", "book"]
+"""
+What a step does, in the Skills page's words. send, post, pay, delete, share and book always ask (must_ask).
+"""
+
+
+class TaughtSkillPlanStep(BaseModel):
+    """
+    One step of Tilo's version (FR-SKL-02). tool is the connector it uses and action one of that connector's actions (config/connectors.yaml or config/mcp.yaml), the risk-table key of what it does there. must_ask is set by code, never a model: true when the verb is send, post, pay, delete, share or book, or the action's tier is T2 or T3 (an action the config does not list is T3). The runner works it out again from the current config on every run (TS-04). A must_ask step always has ask_first true. ask_first is the person's 'Ask me first' switch for the other steps; while the skill is learning every step but a read asks anyway (TS-05). Neither one authorises anything: every side effect still goes through the policy engine and its gate.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    text: TaughtSkillStepText
+    tool: ConnectorId
+    action: ActionType
+    verb: TaughtSkillVerb
+    ask_first: bool
+    must_ask: bool
+
+
+type Option = Annotated[str, Field(max_length=60, min_length=1, pattern="^[^\\r\\n]+$")]
+
+
+class TaughtSkillQuestion(BaseModel):
+    """
+    FR-SKL-02: the one clarifying question of Tilo's version, its options, and the index of the option the person chose (null until answered).
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    text: TaughtSkillStepText
+    options: Annotated[list[Option], Field(max_length=4, min_length=2)]
+    answer: Annotated[int | None, Field(ge=0, le=3)]
+
+
+type ScheduleId = Annotated[str, Field(pattern="^sched_[0-9a-f]{24}$")]
+
+
+FilterAdditionalProperty = TypeAliasType(
+    "FilterAdditionalProperty", Annotated[str, Field(pattern="^[A-Za-z0-9_.:-]{1,64}$")]
+)
+
+
+class TaughtSkillEventTrigger(BaseModel):
+    """
+    An event type from config/skills.yaml's allow-list, and at most three exact matches on its data fields. Keys are data fields holding an id or an enum value, never free text; there are no patterns or substrings (TS-07).
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    type: EventFamilyVerb
+    filter: Annotated[dict[Slug, FilterAdditionalProperty], Field(max_length=3)]
+
+
+class TaughtSkillEstimates(BaseModel):
+    """
+    FR-SKL-02, worked out by code, never a model. Taken from the skill's own runs in the credit ledger once it has some (source ledger), else from config/skills.yaml's per-step prior (source prior). Prices come from config/prices.yaml as of prices_as_of. asks_per_run counts the steps that would stop to ask (TS-05).
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    credits_per_run: Credits
+    seconds_per_run: Annotated[int, Field(ge=0)]
+    asks_per_run: TaughtSkillCount
+    source: Literal["ledger", "prior"]
+    prices_as_of: CalendarDate
+
+
+type TaughtSkillToolAccess = Annotated[
+    dict[ConnectorId, ToolAccessLevel], Field(max_length=20)
+]
+"""
+FR-ACC-02, least privilege: the level each connector may be used at, set by code at save to the lowest level that permits that connector's steps. A connector left out is off, unlike skill.yaml, where a missing entry takes the team's level. A level only ever lowers the team's (effective_level). The owner may lower it further; nothing raises it above what the steps need (TS-06).
+"""
+
+
+class TaughtSkillStop(BaseModel):
+    """
+    Where and why a try run stopped: a site wanted a sign-in or a CAPTCHA (a needs-you card; Tilo never types a password or solves one), the try run's credit cap, an error, or the person stopped it.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    step: TaughtSkillStepNumber
+    reason: Literal["needs_sign_in", "captcha", "budget", "error", "cancelled"]
+
+
+type TaughtSkillThumb = Literal["up", "down"]
+
+
+class TaughtSkillFix(BaseModel):
+    """
+    FR-SKL-05: a logged change to one step, by the owner only (TS-09), at orgs/{org}/taught_skills/{skill}/fixes/{id}. It sets the step's text and Ask me first and makes version to_version = from_version + 1, which the next run uses. A fix never changes a step's tool, action or verb.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    id: Ulid
+    skill: TaughtSkillId
+    from_version: Annotated[int, Field(ge=1)]
+    to_version: Annotated[int, Field(ge=2)]
+    step: TaughtSkillStepNumber
+    text: TaughtSkillStepText
+    ask_first: bool
+    by: UserId
+    rating: Ulid | None
+    """
+    The thumbs-down rating that led to it, or null.
+    """
+    at: Timestamp
+
+
+class TaughtSkillHelper(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    user: UserId
+    answers: Annotated[int, Field(ge=0)]
+    fixes: Annotated[int, Field(ge=0)]
+
+
+class TaughtSkillMistakes(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    this_month: Annotated[int, Field(ge=0)]
+    last_month: Annotated[int, Field(ge=0)]
+
+
 class TeamLeadAssignment(BaseModel):
     """
     Who made an assignment and when: only the world's owner assigns a Team Lead's domain (PRD 16.2) or a gate's Approver (PRD 10.1; approval.requested approver). OB-01 requires by to be the owner and at to be no later than the answer.
@@ -3545,6 +3761,104 @@ class PolicyAppliedData(BaseModel):
     credits: Credits
 
 
+class SkillCapturedData(BaseModel):
+    """
+    data of skill.captured (registry 1.4.0, ADR-0034, FR-SKL-01): one step was added to a taught skill's captured list. Written once per step, after the record write commits, so the list grows only as steps are recorded (HR-1). The envelope follows TS-11: the actor's Desk world, actor and target that person, district, level and item null, vis [] and authz null. credits and trace name the skill_capture role when a model read the recording, upload or description. No step text, file name or media here: the artifact is a pinned id and version.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    skill: TaughtSkillId
+    method: TaughtSkillMethod
+    step: TaughtSkillStepNumber
+    artifact: TaughtSkillPinned | None
+
+
+class SkillFixedData(BaseModel):
+    """
+    data of skill.fixed (registry 1.4.0, ADR-0034, FR-SKL-05): the owner fixed one step, and to_version (from_version + 1, TS-09) is what the next run uses. It copies the fix record without its text. Envelope as TS-11.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    skill: TaughtSkillId
+    from_version: Annotated[int, Field(ge=1)]
+    to_version: Annotated[int, Field(ge=2)]
+    step: TaughtSkillStepNumber
+
+
+class SkillRatedData(BaseModel):
+    """
+    data of skill.rated (registry 1.4.0, ADR-0034, FR-SKL-05): the person whose run it was rated it. It copies the rating record without its note. A thumbs down may name the wrong step. The event goes in the rater's Desk world (TS-11).
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    skill: TaughtSkillId
+    version: Annotated[int, Field(ge=1)]
+    run_id: RunId
+    thumb: TaughtSkillThumb
+    wrong_step: TaughtSkillStepNumber | None
+
+
+class SkillStateChangedData(BaseModel):
+    """
+    data of skill.state_changed (registry 1.4.0, ADR-0034, FR-SKL-04, FR-SKL-06): the owner saved a draft (it starts as learning), marked the skill trusted, set it back to learning, paused it or resumed it. A trusted change records the good runs and the threshold in force (good_runs >= threshold, TS-08). The owner is the actor, and the record is written before the event. Envelope as TS-11.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    skill: TaughtSkillId
+    version: Annotated[int, Field(ge=1)]
+    change: Literal["saved", "trusted", "learning", "paused", "resumed"]
+    good_runs: Annotated[int, Field(ge=0)]
+    threshold: Annotated[int | None, Field(ge=1)]
+
+
+class SkillTryRunData(BaseModel):
+    """
+    data of skill.try_run (registry 1.4.0, ADR-0034, FR-SKL-03): a try run finished or stopped. It copies its try_run_result (TS-10), so side_effects is always 0. It is written once per try run, after the result is stored. The page shows the steps only after this event; there is no per-step event. The actor is the person who started it, and credits are the try run's total. Envelope as TS-11.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    skill: TaughtSkillId
+    version: Annotated[int, Field(ge=1)]
+    try_run: Ulid
+    match: Annotated[float, Field(ge=0.0, le=1.0)]
+    total: TaughtSkillStepNumber
+    matched: TaughtSkillCount
+    asked: TaughtSkillCount
+    skipped: TaughtSkillCount
+    side_effects: Literal[0]
+    outcome: Literal["completed", "stopped"]
+
+
+class SkillVersionProposedData(BaseModel):
+    """
+    data of skill.version_proposed (registry 1.4.0, ADR-0034, FR-SKL-02): Tilo restated a draft as plan steps, with at most one question and the estimates code worked out. The actor is the person who asked for it; credits and trace name the skill_capture role. Envelope as TS-11. Counts and the estimate only, never step text.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    skill: TaughtSkillId
+    version: Annotated[int, Field(ge=1)]
+    steps: TaughtSkillStepNumber
+    asks: TaughtSkillCount
+    question: bool
+    """
+    true when the version asks one clarifying question.
+    """
+    credits_per_run: Credits
+    source: Literal["ledger", "prior"]
+
+
 class TeamRuleChangedData(BaseModel):
     """
     data of team_rule.changed (registry 1.2.0, ADR-0027; FR-TEAM-04 'every change is logged', FR-ACC-01). A person changed one team rule: a stop-and-ask switch (rule switch, key the switch, values on or off) or the team's access level for one connector (rule tool_access, key the connector id, values off, read, draft or act). from is the value in force before the change (an unset tool is act, an unset switch its configured default), to the value after it. A Must-ask switch (spend, share, undo; PRD 8.3) can't be switched off, so its to is always on. tilo-api's team routes write it after the team store's compare-and-set succeeded, never an agent or a model: actor and target are the signed-in person who made the change (only the team's Owner may, BQ-TEAMACC-2), the world is that person's Desk world, district is null and vis is [] (owner-only, ADR-0009). It authorises nothing (a level or switch only narrows what reaches the policy engine), so it is not a side effect and authz is null.
@@ -4115,6 +4429,81 @@ class Skill(BaseModel):
     """
     One line, shown to the planner.
     """
+
+
+class TaughtSkillTrigger(BaseModel):
+    """
+    FR-SKL-04: when it runs. on_demand: when a person asks. schedule: the /schedules record schedule_id (FR-AGT-14) starts it. event: a registered event of a world the owner owns starts it (TS-07). The other two fields are null.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    kind: Literal["on_demand", "schedule", "event"]
+    schedule_id: ScheduleId | None
+    event: TaughtSkillEventTrigger | None
+
+
+class TaughtSkillTryRunResult(BaseModel):
+    """
+    FR-SKL-03: one try run, at orgs/{org}/taught_skills/{skill}/try_runs/{id}. Reads are real, writes are recorded as intents in a dry-run outbox and sent nowhere, so side_effects is 0 by construction (TS-10). match = matched / total. Each step ends matched, skipped or not reached; asked counts the steps that paused to ask.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    id: Ulid
+    skill: TaughtSkillId
+    version: Annotated[int, Field(ge=1)]
+    by: UserId
+    match: Annotated[float, Field(ge=0.0, le=1.0)]
+    total: TaughtSkillStepNumber
+    matched: TaughtSkillCount
+    asked: TaughtSkillCount
+    skipped: TaughtSkillCount
+    intents: TaughtSkillCount
+    side_effects: Literal[0]
+    """
+    Always 0: a try run sends and saves nothing outside Tilo.
+    """
+    outcome: Literal["completed", "stopped"]
+    stopped_at: TaughtSkillStop | None
+    duration_ms: Annotated[int, Field(ge=0)]
+    credits: Credits
+    finished_at: Timestamp
+
+
+class TaughtSkillRating(BaseModel):
+    """
+    FR-SKL-05: a thumbs up or down on one finished run, by the person whose run it was, at orgs/{org}/taught_skills/{skill}/ratings/{id}. A thumbs down may name the step that went wrong. The note is kept for the owner to read; it never reaches a prompt.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    id: Ulid
+    skill: TaughtSkillId
+    version: Annotated[int, Field(ge=1)]
+    run_id: RunId
+    by: UserId
+    thumb: TaughtSkillThumb
+    wrong_step: TaughtSkillStepNumber | None
+    note: Annotated[str | None, Field(max_length=280, min_length=1)]
+    at: Timestamp
+
+
+class TaughtSkillHelpersReport(BaseModel):
+    """
+    FR-SKL-07 under BQ-DSN-05 and PRD 23.5: counts only, served only while the org has opted in. Per person: question cards answered in runs of the org's taught skills, and fixes made, in the month. Mistakes (thumbs-down ratings) are counted for the whole org, never per person. helpers is ordered by user id, never by a count (TS-12), and has no field for message content, time or speed.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    org_id: OrgId
+    month: Annotated[str, Field(pattern="^[0-9]{4}-(0[1-9]|1[0-2])$")]
+    helpers: Annotated[list[TaughtSkillHelper], Field(max_length=500)]
+    mistakes: TaughtSkillMistakes
 
 
 class TeamLead(BaseModel):
@@ -4801,6 +5190,49 @@ class Providers(BaseModel):
     prices: ProvidersPrices
 
 
+class TaughtSkill(BaseModel):
+    """
+    A skill a person taught Tilo on the Skills page (FR-SKL-01 to FR-SKL-07, ADR-0034), stored at orgs/{org}/taught_skills/{id} and read only through tilo-api. A sibling of the expert-signed, version-pinned skill.yaml (skill.schema.json), never a change to it. One person owns it. Each fix makes a new integer version, and a run pins the version it started with. It acts only through its own tool_access, the team's levels and the policy engine. $defs try_run_result, rating, fix and helpers_report are the records and the report around it. Rules TS-01 to TS-12 are in taught_skill.rules.md.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    id: TaughtSkillId
+    org_id: OrgId
+    owner: UserId
+    name: TaughtSkillName
+    scope: TaughtSkillScope
+    status: TaughtSkillStatus
+    paused: bool
+    """
+    FR-SKL-06: a paused skill never starts (no trigger, no run on request, no try run). Kept apart from status, so Resume returns to learning or trusted as it was. A draft is never paused.
+    """
+    method: TaughtSkillMethod
+    captured: Annotated[list[TaughtSkillCapturedStep], Field(max_length=20)]
+    """
+    FR-SKL-01: the steps captured so far, in order. Text only, plus the pinned capture artifact a step came from; media bytes are never inline.
+    """
+    plan: Annotated[list[TaughtSkillPlanStep], Field(max_length=20)]
+    """
+    FR-SKL-02: Tilo's version, in order. Empty until Tilo has proposed one.
+    """
+    question: TaughtSkillQuestion | None
+    trigger: TaughtSkillTrigger
+    estimates: TaughtSkillEstimates | None
+    tool_access: TaughtSkillToolAccess
+    good_runs: Annotated[int, Field(ge=0)]
+    """
+    FR-SKL-06: runs of this skill rated up by the person whose run it was (TS-08); try runs never count.
+    """
+    version: Annotated[int, Field(ge=1)]
+    """
+    1 for a draft and a new skill; each fix adds 1 (TS-09). Name, scope, trigger, status and pause changes keep it.
+    """
+    created_at: Timestamp
+    updated_at: Timestamp
+
+
 type UiAction = Annotated[
     UiActionNavigate | UiActionMarkDone | UiActionSnooze | UiActionDraftReply | UiActionTag | UiActionUntag,
     Field(title="UiAction"),
@@ -5033,6 +5465,12 @@ type RegisteredEventType = Literal[
     "agent.context_handoff_started",
     "agent.context_handoff_completed",
     "skill.loaded",
+    "skill.captured",
+    "skill.version_proposed",
+    "skill.try_run",
+    "skill.state_changed",
+    "skill.rated",
+    "skill.fixed",
     "question.routed",
     "question.answered",
     "meeting.called",
@@ -5119,6 +5557,12 @@ EVENT_TYPES: Final[tuple[RegisteredEventType, ...]] = (
     "agent.context_handoff_started",
     "agent.context_handoff_completed",
     "skill.loaded",
+    "skill.captured",
+    "skill.version_proposed",
+    "skill.try_run",
+    "skill.state_changed",
+    "skill.rated",
+    "skill.fixed",
     "question.routed",
     "question.answered",
     "meeting.called",
@@ -5216,6 +5660,12 @@ EVENT_DATA_MODELS: Final[dict[RegisteredEventType, type[BaseModel]]] = {
     "agent.context_handoff_started": AgentContextHandoffStartedData,
     "agent.context_handoff_completed": AgentContextHandoffCompletedData,
     "skill.loaded": SkillLoadedData,
+    "skill.captured": SkillCapturedData,
+    "skill.version_proposed": SkillVersionProposedData,
+    "skill.try_run": SkillTryRunData,
+    "skill.state_changed": SkillStateChangedData,
+    "skill.rated": SkillRatedData,
+    "skill.fixed": SkillFixedData,
     "question.routed": QuestionRoutedData,
     "question.answered": QuestionAnsweredData,
     "meeting.called": MeetingCalledData,
@@ -5266,7 +5716,7 @@ EVENT_DATA_MODELS: Final[dict[RegisteredEventType, type[BaseModel]]] = {
 }
 
 EVENT_REGISTRY: Final[EventRegistry] = EventRegistry.model_validate(
-    {'version': '1.2.0',
+    {'version': '1.4.0',
      'unknown_types': 'trace_only',
      'types': {'world.requested': {'family': 'world',
                                    'verb': 'requested',
@@ -5729,6 +6179,100 @@ EVENT_REGISTRY: Final[EventRegistry] = EventRegistry.model_validate(
                                 'trace_row': 'skill={data.skill} version={data.version}',
                                 'data_schema': 'events/data/skill.loaded.schema.json',
                                 'fixture': 'fixtures/events/valid/skill.loaded.json'},
+               'skill.captured': {'family': 'skill',
+                                  'verb': 'captured',
+                                  'priority': 'should',
+                                  'pillar': 'P7',
+                                  'default_severity': 'info',
+                                  'side_effect': False,
+                                  'world_effect': 'A new card joins the skill being taught on Your '
+                                                  'Desk.',
+                                  'hud_effect': 'The Skills page lists the captured step.',
+                                  'story_template': '{actor} showed Tilo step {data.step} of a new '
+                                                    'skill ({data.method}).',
+                                  'trace_row': 'skill={data.skill} method={data.method} '
+                                               'step={data.step}',
+                                  'data_schema': 'events/data/skill.captured.schema.json',
+                                  'fixture': 'fixtures/events/valid/skill.captured.json'},
+               'skill.version_proposed': {'family': 'skill',
+                                          'verb': 'version_proposed',
+                                          'priority': 'should',
+                                          'pillar': 'P7',
+                                          'default_severity': 'info',
+                                          'side_effect': False,
+                                          'world_effect': 'Tilo lays its own version of the skill '
+                                                          'beside the captured cards.',
+                                          'hud_effect': "The Skills page shows Tilo's version with its "
+                                                        'estimates.',
+                                          'story_template': 'Tilo proposed a version with {data.steps} '
+                                                            'steps that stops to ask {data.asks} '
+                                                            'times.',
+                                          'trace_row': 'skill={data.skill} version={data.version} '
+                                                       'steps={data.steps} asks={data.asks} '
+                                                       'credits_per_run={data.credits_per_run} '
+                                                       'source={data.source}',
+                                          'data_schema': 'events/data/skill.version_proposed.schema.json',
+                                          'fixture': 'fixtures/events/valid/skill.version_proposed.json'},
+               'skill.try_run': {'family': 'skill',
+                                 'verb': 'try_run',
+                                 'priority': 'should',
+                                 'pillar': 'P2',
+                                 'default_severity': 'info',
+                                 'side_effect': False,
+                                 'world_effect': "The practice desk shows the try run's steps; no "
+                                                 'parcel leaves.',
+                                 'hud_effect': 'The Skills page shows how closely the try run matched.',
+                                 'story_template': 'A try run matched {data.matched} of {data.total} '
+                                                   'steps and sent nothing ({data.outcome}).',
+                                 'trace_row': 'skill={data.skill} version={data.version} '
+                                              'match={data.match} asked={data.asked} '
+                                              'skipped={data.skipped} side_effects={data.side_effects}',
+                                 'data_schema': 'events/data/skill.try_run.schema.json',
+                                 'fixture': 'fixtures/events/valid/skill.try_run.json'},
+               'skill.state_changed': {'family': 'skill',
+                                       'verb': 'state_changed',
+                                       'priority': 'should',
+                                       'pillar': 'P7',
+                                       'default_severity': 'info',
+                                       'side_effect': False,
+                                       'world_effect': "The skill's card on Your Desk changes its "
+                                                       'badge.',
+                                       'hud_effect': 'The Skills library shows the skill as learning, '
+                                                     'trusted or paused.',
+                                       'story_template': '{actor} marked a skill {data.change}.',
+                                       'trace_row': 'skill={data.skill} version={data.version} '
+                                                    'change={data.change} good_runs={data.good_runs} '
+                                                    'threshold={data.threshold}',
+                                       'data_schema': 'events/data/skill.state_changed.schema.json',
+                                       'fixture': 'fixtures/events/valid/skill.state_changed.json'},
+               'skill.rated': {'family': 'skill',
+                               'verb': 'rated',
+                               'priority': 'should',
+                               'pillar': 'P7',
+                               'default_severity': 'info',
+                               'side_effect': False,
+                               'world_effect': "A thumb stamp lands on the run's card on Your Desk.",
+                               'hud_effect': "The skill's run history bar fills in.",
+                               'story_template': '{actor} rated a run of a skill: thumbs {data.thumb}.',
+                               'trace_row': 'skill={data.skill} version={data.version} '
+                                            'run={data.run_id} thumb={data.thumb} '
+                                            'wrong_step={data.wrong_step}',
+                               'data_schema': 'events/data/skill.rated.schema.json',
+                               'fixture': 'fixtures/events/valid/skill.rated.json'},
+               'skill.fixed': {'family': 'skill',
+                               'verb': 'fixed',
+                               'priority': 'should',
+                               'pillar': 'P7',
+                               'default_severity': 'info',
+                               'side_effect': False,
+                               'world_effect': "The fixed step's card on Your Desk is rewritten.",
+                               'hud_effect': 'The skill shows its new version and the logged fix.',
+                               'story_template': '{actor} fixed step {data.step}; version '
+                                                 '{data.to_version} runs next time.',
+                               'trace_row': 'skill={data.skill} from={data.from_version} '
+                                            'to={data.to_version} step={data.step}',
+                               'data_schema': 'events/data/skill.fixed.schema.json',
+                               'fixture': 'fixtures/events/valid/skill.fixed.json'},
                'question.routed': {'family': 'question',
                                    'verb': 'routed',
                                    'priority': 'must',
