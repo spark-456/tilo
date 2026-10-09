@@ -29,11 +29,12 @@ _ACTIONS = ("read_full", "read_membership", "read_directory")
 def list_people(stores: PeopleStores, org: str, actor: str, now: str) -> list[dict[str, Any]] | None:
     """The persons of `org` that `actor` may read, each as the projection PE-20 allows; None when `actor` has no
     record in `org`."""
-    directory = Directory.of(s.record for s in stores.persons.list(org))
+    stored_rows = stores.persons.list(org)  # one snapshot feeds both the directory and the rows
+    directory = Directory.of(s.record for s in stored_rows)
     if directory.record(actor) is None:
         return None
     rows: list[dict[str, Any]] = []
-    for stored in stores.persons.list(org):
+    for stored in stored_rows:
         for action in _ACTIONS:
             got = read(AccessRequest(actor, action, "person", stored.record, now), directory)
             if got is not None:
@@ -51,7 +52,10 @@ def people_route(
 ) -> dict[str, Any]:
     """The team list; no person record for the caller is the one 404, a store that fails a fixed 503."""
     try:
-        rows = list_people(stores, deps.ORG_ID, principal.user_id, clock())
+        now = clock()
+        if not isinstance(now, str):  # a broken clock is a fixed 503, never a silent empty list
+            raise TypeError("clock")
+        rows = list_people(stores, deps.ORG_ID, principal.user_id, now)
     except NotImplementedError:
         raise  # the route class answers 503 not_configured
     except Exception:
