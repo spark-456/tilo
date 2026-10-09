@@ -48,6 +48,9 @@ export function createFixtureApi(): Omit<Api, "getProfileSettings"> & {
       return ok({ ok: true as const, world: fx.makeWorld(mode, query, started) });
     }) as Api["startWorld"],
     saveSkill: ack,
+    // The sample card runs on its own fixture steps and never calls these; they hold nothing to show.
+    captureSkill: () => ok({ id: "sample", steps: [] }),
+    proposeVersion: () => ok({ steps: [], question: null, estimates: null }),
     setToolLevel: ack,
     bookSlot: ack,
     addBackup: ack,

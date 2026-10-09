@@ -90,7 +90,10 @@ interface Server {
   posts: (path: string) => unknown[];
 }
 
-function rig(routes: Record<string, Handler> = {}): { server: Server; mount: () => Promise<SkillsRig> } {
+function rig(routes: Record<string, Handler> = {}): {
+  server: Server;
+  mount: () => Promise<SkillsRig>;
+} {
   const table: Record<string, Handler> = {
     "GET /v1/skills": () => json({ skills: [] }),
     "GET /v1/learn": () => json({ learning: [], needs_rating: [] }),
@@ -205,9 +208,13 @@ describe("SKILLS_5_live_teach: a capture the server cannot make", () => {
     [502, ERR_TRY],
     [422, ERR_UNDERSTOOD],
   ])("SKILLS_5_live_teach_capture_http_%i_says_so_and_shows_no_steps", async (status, line) => {
-    const r = await rig({ "POST /v1/skills/captures": () => json({ detail: "x" }, status) }).mount();
+    const r = await rig({
+      "POST /v1/skills/captures": () => json({ detail: "x" }, status),
+    }).mount();
     await describe_(r);
-    expect(pageText(r.el.querySelector('[data-testid="skills-teach-error"]') as Element)).toBe(line);
+    expect(pageText(r.el.querySelector('[data-testid="skills-teach-error"]') as Element)).toBe(
+      line,
+    );
     expect(text(r)).toContain("0 of 0");
     for (const l of CAP.describe) expect(text(r)).not.toContain(l);
     expect(isDisabled(control(r.el, "Show me Tilo’s version"))).toBe(true);
@@ -226,7 +233,8 @@ describe("SKILLS_5_live_teach: a capture the server cannot make", () => {
   it("SKILLS_5_live_teach_a_second_try_after_an_error_clears_it", async () => {
     let n = 0;
     const r = await rig({
-      "POST /v1/skills/captures": () => (++n === 1 ? json({ detail: "x" }, 502) : json(CAPTURED, 201)),
+      "POST /v1/skills/captures": () =>
+        ++n === 1 ? json({ detail: "x" }, 502) : json(CAPTURED, 201),
     }).mount();
     await describe_(r);
     expect(r.el.querySelector('[data-testid="skills-teach-error"]')).not.toBeNull();
@@ -289,7 +297,8 @@ describe("SKILLS_5_live_teach: Tilo's version (step 2)", () => {
 
   it("SKILLS_5_live_teach_no_question_from_the_server_shows_none", async () => {
     const r = await rig({
-      "POST /v1/skills/captures/tsk_C1/version": () => json({ ...VERSION, clarifying_question: null }),
+      "POST /v1/skills/captures/tsk_C1/version": () =>
+        json({ ...VERSION, clarifying_question: null }),
     }).mount();
     await toVersion(r);
     expect(text(r)).not.toContain("Link or PDF?");
@@ -304,7 +313,9 @@ describe("SKILLS_5_live_teach: Tilo's version (step 2)", () => {
       "POST /v1/skills/captures/tsk_C1/version": () => json({ detail: "x" }, status),
     }).mount();
     await toVersion(r);
-    expect(pageText(r.el.querySelector('[data-testid="skills-teach-error"]') as Element)).toBe(line);
+    expect(pageText(r.el.querySelector('[data-testid="skills-teach-error"]') as Element)).toBe(
+      line,
+    );
     expect(text(r)).toContain("Note the total");
     expect(askSwitches(r.el)).toHaveLength(0);
     for (const l of PLAN.map((p) => p.text)) expect(text(r)).not.toContain(l);
@@ -412,16 +423,19 @@ describe("SKILLS_5_live_teach: save (step 4)", () => {
     ["unknown_action", "Couldn’t save “Match invoices” (unknown_action). Try again"],
     ["ask_first_required", "Couldn’t save “Match invoices” (ask_first_required). Try again"],
     ["some words the server made up", "Couldn’t save “Match invoices”. Try again"],
-  ])("SKILLS_5_live_teach_a_422_%s_says_Couldnt_save_and_nothing_is_saved", async (detail, toast) => {
-    const r = await rig({ "POST /v1/skills": () => json({ detail }, 422) }).mount();
-    await toSave(r);
-    name(r, "Match invoices");
-    clickEl(control(r.el, "Save skill"));
-    await settle();
-    expect(toasts(r.app)).toEqual([[toast]]);
-    expect(text(r)).not.toContain("is now a skill");
-    expect(hasControl(r.el, "Save skill")).toBe(true);
-  });
+  ])(
+    "SKILLS_5_live_teach_a_422_%s_says_Couldnt_save_and_nothing_is_saved",
+    async (detail, toast) => {
+      const r = await rig({ "POST /v1/skills": () => json({ detail }, 422) }).mount();
+      await toSave(r);
+      name(r, "Match invoices");
+      clickEl(control(r.el, "Save skill"));
+      await settle();
+      expect(toasts(r.app)).toEqual([[toast]]);
+      expect(text(r)).not.toContain("is now a skill");
+      expect(hasControl(r.el, "Save skill")).toBe(true);
+    },
+  );
 
   it("SKILLS_5_live_teach_a_500_says_Couldnt_save_and_the_button_works_again", async () => {
     let n = 0;

@@ -251,7 +251,10 @@ describe("SKILLS_3_saveSkill: POST /v1/skills", () => {
 });
 
 // SKILLS-5 (FR-SKL-01/02, web half): the teach flow's two reads of services/api skills_capture.py.
-const CAPTURED = { capture_id: "tsk_C1", captured_steps: [{ text: "Open the mail" }, { text: "Note the total" }] };
+const CAPTURED = {
+  capture_id: "tsk_C1",
+  captured_steps: [{ text: "Open the mail" }, { text: "Note the total" }],
+};
 const VERSION = {
   capture_id: "tsk_C1",
   plan_steps: [STEP, SEND],
@@ -274,7 +277,10 @@ describe("SKILLS_5_captureSkill: POST /v1/skills/captures", () => {
   it("SKILLS_5_captureSkill_posts_method_describe_and_the_text_alone_and_reads_the_steps", async () => {
     const spy = vi.fn(async (_u: unknown, _i?: RequestInit) => json(CAPTURED, 201));
     const r = await live(spy).captureSkill("Check the inbox, then log the total");
-    expect(r).toEqual({ data: { id: "tsk_C1", steps: ["Open the mail", "Note the total"] }, source: "live" });
+    expect(r).toEqual({
+      data: { id: "tsk_C1", steps: ["Open the mail", "Note the total"] },
+      source: "live",
+    });
     const call = sent(spy);
     expect(call.url).toBe(`${BASE}/v1/skills/captures`);
     expect(call.init.method).toBe("POST");
@@ -308,8 +314,22 @@ describe("SKILLS_5_proposeVersion: POST /v1/skills/captures/{id}/version", () =>
     expect(sent(spy).init.method).toBe("POST");
     expect(r.source).toBe("live");
     expect(r.data.steps).toEqual([
-      { text: STEP.text, tool: "gmail", action: "read_email", verb: "read", ask: false, locked: false },
-      { text: SEND.text, tool: "gmail", action: "send_email", verb: "send", ask: true, locked: true },
+      {
+        text: STEP.text,
+        tool: "gmail",
+        action: "read_email",
+        verb: "read",
+        ask: false,
+        locked: false,
+      },
+      {
+        text: SEND.text,
+        tool: "gmail",
+        action: "send_email",
+        verb: "send",
+        ask: true,
+        locked: true,
+      },
     ]);
     expect(r.data.question).toEqual({ text: "Link or PDF?", options: ["Open the link", "Skip"] });
     expect(r.data.estimates).toEqual({ credits: 6, seconds: 40, asks: 1 });
@@ -328,13 +348,16 @@ describe("SKILLS_5_proposeVersion: POST /v1/skills/captures/{id}/version", () =>
     expect(sent(spy).url).toBe(`${BASE}/v1/skills/captures/a%2Fb%3Fc/version`);
   });
 
-  it.each([503, 502, 422, 404])("SKILLS_5_proposeVersion_http_%i_rejects_TiloApiError", async (status) => {
-    const err = await failure(
-      live(vi.fn(async () => json({ detail: "x" }, status))).proposeVersion("tsk_C1"),
-    );
-    expect(err).toBeInstanceOf(TiloApiError);
-    expect((err as TiloApiError).status).toBe(status);
-  });
+  it.each([503, 502, 422, 404])(
+    "SKILLS_5_proposeVersion_http_%i_rejects_TiloApiError",
+    async (status) => {
+      const err = await failure(
+        live(vi.fn(async () => json({ detail: "x" }, status))).proposeVersion("tsk_C1"),
+      );
+      expect(err).toBeInstanceOf(TiloApiError);
+      expect((err as TiloApiError).status).toBe(status);
+    },
+  );
 
   it.each([
     ["no plan_steps", { ...VERSION, plan_steps: undefined }],
@@ -389,8 +412,13 @@ describe("SKILLS_5_saveSkill: a taught version is posted as the server made it",
       { text: SEND.text, tool: "gmail", action: "send_email", verb: "send", ask_first: true },
     ]);
     expect(body.captured_steps).toEqual([{ text: "Open the mail" }, { text: "Note the total" }]);
-    expect(body.clarifying_question).toEqual({ text: "Link or PDF?", options: ["Open the link", "Skip"] });
-    expect(JSON.stringify(body)).not.toMatch(/must_ask|estimates|status|owner|org_id|good_runs|credits/);
+    expect(body.clarifying_question).toEqual({
+      text: "Link or PDF?",
+      options: ["Open the link", "Skip"],
+    });
+    expect(JSON.stringify(body)).not.toMatch(
+      /must_ask|estimates|status|owner|org_id|good_runs|credits/,
+    );
   });
 
   it("SKILLS_5_saveSkill_a_question_the_server_did_not_ask_is_not_sent", async () => {
