@@ -117,7 +117,7 @@
  * providers.schema.json 1.2.0 sha256:4514148b0b6b2f7e
  * scenario.schema.json 1.0.0 sha256:b8e044d7e37b92a3
  * skill.schema.json 1.1.0 sha256:9eeee7768b667afa
- * spend_caps.schema.json 1.1.1 sha256:0b9a2517f48d6cb8
+ * spend_caps.schema.json 1.1.1 sha256:c04bc36ac17dc0ab
  * team_lead.schema.json 1.0.0 sha256:19413726e364ffdd
  * transcript.schema.json 1.0.0 sha256:08f934b8f0c9a40e
  * ui_action.schema.json 1.0.0 sha256:2ceb1e0b46368734
@@ -4290,7 +4290,7 @@ export interface SpendCapsConfig {
    */
   currency: "INR";
   /**
-   * Lifetime live-model spend per signed-in uid, in paise, above zero and never null (SEC-16; shipped at 3,000 INR since the user's decision of 8 Oct 2026, BQ-SEC16-3).
+   * Lifetime live-model spend per signed-in uid, in paise, above zero and never null (SEC-16; shipped at 500 INR since the user's decision of 9 Oct 2026, BQ-SEC16-4).
    */
   uid_lifetime_minor: number;
   /**
