@@ -23,7 +23,7 @@
       "const": "INR"
     },
     "uid_lifetime_minor": {
-      "description": "Lifetime live-model spend per signed-in uid, in paise, above zero and never null (SEC-16; shipped at 3,000 INR since the user's decision of 8 Oct 2026, BQ-SEC16-3).",
+      "description": "Lifetime live-model spend per signed-in uid, in paise, above zero and never null (SEC-16; shipped at 500 INR since the user's decision of 9 Oct 2026, BQ-SEC16-4).",
       "type": "integer",
       "minimum": 1
     },
