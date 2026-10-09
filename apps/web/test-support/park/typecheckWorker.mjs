@@ -20,8 +20,24 @@ function walk(dir) {
 
 const read = ts.readConfigFile(path.join(WEB_DIR, "tsconfig.json"), ts.sys.readFile);
 const parsed = ts.parseJsonConfigFileContent(read.config, ts.sys, WEB_DIR);
-const roots = [...walk(PARK_DIR), ...walk(path.join(WEB_DIR, "test-support", "park"))];
-const program = ts.createProgram({ rootNames: roots, options: parsed.options });
+let roots = [...walk(PARK_DIR), ...walk(path.join(WEB_DIR, "test-support", "park"))];
+const host = ts.createCompilerHost(parsed.options);
+if (process.argv[3] === "kit-probe") {
+  const probe = path.join(PARK_DIR, "engines", "__kit_probe__.ts");
+  const source = Buffer.from(process.argv[4], "base64").toString("utf8");
+  const isProbe = (file) => path.resolve(file) === probe;
+  const realExists = host.fileExists.bind(host);
+  const realRead = host.readFile.bind(host);
+  const realGet = host.getSourceFile.bind(host);
+  host.fileExists = (file) => isProbe(file) || realExists(file);
+  host.readFile = (file) => (isProbe(file) ? source : realRead(file));
+  host.getSourceFile = (file, language, onError, shouldCreate) =>
+    isProbe(file)
+      ? ts.createSourceFile(file, source, language, true)
+      : realGet(file, language, onError, shouldCreate);
+  roots = [probe];
+}
+const program = ts.createProgram({ rootNames: roots, options: parsed.options, host });
 const parkFiles = new Set(roots.map((r) => path.resolve(r)));
 const errors = ts
   .getPreEmitDiagnostics(program)

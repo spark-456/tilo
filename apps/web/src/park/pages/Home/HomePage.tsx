@@ -37,7 +37,8 @@ import {
 interface Base {
   user: User;
   today: Today;
-  agenda: Agenda;
+  /** Null when the Api serves no calendar (live today): the Today panel then lists no events. */
+  agenda: Agenda | null;
   ledger: Ledger;
   /** What the "Waiting on you" tile says and opens; none when the Api serves no decisions. */
   decisions: Decision[];
@@ -71,14 +72,23 @@ export function HomePage({ app }: { app: AppCtx }) {
         () => ({ list: [], served: false }),
       );
     together(() =>
-      Promise.all([api.getUser(), api.getToday(), api.getAgenda(), api.getLedger(), decisions()]),
+      Promise.all([
+        api.getUser(),
+        api.getToday(),
+        api.getAgenda().catch((e: unknown) => {
+          if (e instanceof Error && e.name === "NotBuilt") return null;
+          throw e;
+        }),
+        api.getLedger(),
+        decisions(),
+      ]),
     ).then(
       ([user, today, agenda, ledger, decided]) => {
         if (live)
           setBase({
             user: data(user),
             today: data(today),
-            agenda: data(agenda),
+            agenda: agenda && data(agenda),
             ledger: data(ledger),
             decisions: decided.list,
             decisionsServed: decided.served,
@@ -264,29 +274,31 @@ export function HomePage({ app }: { app: AppCtx }) {
             pins={placedPins(pins, worlds, needs, night, vw || 1440, vh || 900, served)}
             onOpen={open}
           />
-          <Hero
-            dateLine={`${base.today.long}${night ? " · 21:10" : ""}`.toUpperCase()}
-            greeting={`${night ? "Good evening" : "Good morning"}, ${base.user.first}.`}
-            summary={summary}
-            needs={needs}
-            needsKnown={!served || openServed !== null}
-            night={night}
-            worldName={waitingIn?.name ?? null}
-            onReview={() => (waitingIn ? open(waitingIn.id) : go("worlds"))}
-          />
-          {(vw || 1440) >= 1180 ? (
-            <KpiStrip
-              ledger={base.ledger}
-              dec={dec}
-              decisions={base.decisions}
-              fallbackWorld={waitingIn?.id}
-              onWorld={open}
+          <div className="park-home-leftcol">
+            <Hero
+              dateLine={`${base.today.long}${night ? " · 21:10" : ""}`.toUpperCase()}
+              greeting={`${night ? "Good evening" : "Good morning"}, ${base.user.first}.`}
+              summary={summary}
+              needs={needs}
+              needsKnown={!served || openServed !== null}
+              night={night}
+              worldName={waitingIn?.name ?? null}
+              onReview={() => (waitingIn ? open(waitingIn.id) : go("worlds"))}
             />
-          ) : null}
+            {(vw || 1440) >= 1180 ? (
+              <KpiStrip
+                ledger={base.ledger}
+                dec={dec}
+                decisions={base.decisions}
+                fallbackWorld={waitingIn?.id}
+                onWorld={open}
+              />
+            ) : null}
+          </div>
           {(vw || 1440) >= 1180 ? (
             <TodayPanel
               rows={liveRows(worlds, needs, served)}
-              events={nextEvents(base.agenda)}
+              events={base.agenda ? nextEvents(base.agenda) : []}
               spend={spendOf(base.ledger)}
               night={night}
               onWorld={open}

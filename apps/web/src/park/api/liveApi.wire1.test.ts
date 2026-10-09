@@ -109,6 +109,8 @@ describe("WIRE_1_live_api: every other method is still NotBuilt", () => {
           "decide",
           "startWorld",
           "submitFeedback",
+          "getProfileSettings",
+          "setPref",
         ].includes(x),
     )) {
       const err = await Promise.resolve(invoke(api, m, args)).then(

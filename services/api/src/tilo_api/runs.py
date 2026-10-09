@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import asyncio
 import copy
+import dataclasses
 import logging
 import math
 import threading
@@ -30,7 +31,7 @@ from tilo_harness.validator import repo_validator
 from tilo_memory.artifacts import Scope
 from tilo_planning.compiler import DELIVER, PlanInputs
 
-from tilo_api import deps, events
+from tilo_api import deps, events, team_access, team_store
 from tilo_api.access import Mode
 from tilo_api.cards import (
     OWNER_ONLY_ACTIONS,
@@ -91,8 +92,12 @@ class Seams:
     artifacts: Any  # tilo_memory.artifacts.ArtifactStore (ADR-0018 T4)
     redactor: Callable[[str], str]  # the shared secret redactor the store was given
     open_archive: Callable[..., Any]  # (*, org_id, run_id) -> the run's tilo_archive.RunArchive
+    team: Callable[
+        [], Any
+    ]  # the team's settings (FR-ACC-01; team_store.team_reader): no default, every path passes one
 
 
+_CLOCK_SEAMS = frozenset({"plan_compiler", "unit_runner"})  # the seams whose prompts state the date
 _MODE_SEAMS = frozenset({"plan_compiler", "unit_runner", "must_ask_providers"})  # the seams that build a Router
 
 
@@ -103,17 +108,50 @@ def run_seams(request: Request, mode: Annotated[Mode, Depends(deps.get_work_mode
     names = "plan_compiler layout_builder unit_runner action_resolver skill_registry connector_registry"
     names += " connector_adapters outbox_store event_writer must_ask_providers artifact_store redactor run_archive"
 
+    from tilo_api import ephemeral  # noqa: PLC0415
+
+    demo = None if ephemeral.has_no_person(request) else ephemeral.for_request(request)  # the tick has no person
+    mine = (  # the storage seams a demo run takes from its own bundle; connector adapters stay empty: it sends nothing
+        {}
+        if demo is None
+        else {
+            "outbox_store": demo.outbox, "event_writer": demo.writer, "artifact_store": demo.artifacts,
+            "redactor": demo.redactor, "run_archive": demo.open_archive, "connector_adapters": {},
+        }
+    )  # fmt: skip
+
     def build(name: str) -> Any:
         seam = getattr(deps, f"get_{name}")
         if seam in overrides:
             return overrides[seam]()
+        if name in mine:
+            return mine[name]
+        if name in _CLOCK_SEAMS:  # one clock for the whole API: the override a test installs reaches the run too
+            return seam(mode, overrides[deps.get_today]() if deps.get_today in overrides else deps.get_today())
         return seam(mode) if name in _MODE_SEAMS else seam()
 
     try:
-        return Seams(*(build(n) for n in names.split()))
+        built = dict(
+            zip([f.name for f in dataclasses.fields(Seams) if f.name != "team"], map(build, names.split()), strict=True)
+        )
+        return Seams(**built, team=team_store.team_reader(overrides))
     except Exception as exc:
         logger.warning("the run seams are not wired, so no run starts: %s", type(exc).__name__)
         return None
+
+
+def _tool_access(seams: Any, connector: str, action: str, tier: str, skill_ids: Any = ()) -> None:
+    """FR-ACC-01/02: the team's level for this tool, lowered by the unit's skills' `tool_access` (never raised); a
+    refusal or a store that cannot be read fails the step."""
+    try:
+        lowest = team_access.skill_level(seams.skills, skill_ids, connector) if skill_ids else None
+        access = team_access.tool_check(
+            seams.team(), connector, action, tier, registry=seams.connectors, skill_level=lowest
+        )
+    except Exception as exc:
+        raise _GateFailed("tool access could not be checked") from exc
+    if access == "block":
+        raise _GateFailed("tool access does not allow this step")
 
 
 def start_run(store: deps.Store, task: deps.TaskRecord, *, approach: dict, budget_cap: float, seams: Seams) -> None:
@@ -518,7 +556,9 @@ class Run:
             return
         if stopped := result.failed + result.held + result.skipped:
             reason = "a step was held, so the work stopped" if result.held and not result.failed else None
-            self._fail(self.failure or reason or "a unit failed, so the work stopped", stopped[0])
+            failed = result.outcomes.get(stopped[0])  # a unit's own plain stop line, if code wrote one (FR-AGT-12)
+            own = getattr(failed, "reason", None) if failed is not None and not failed.success else None
+            self._fail(self.failure or own or reason or "a unit failed, so the work stopped", stopped[0])
             return
         credits = math.fsum(e["credits"] for e in self.store.events.get(self.world_id, []))  # the meter (HR-1)
         data = {"credits_used": credits, "deliverable_count": len(self.delivered)}
@@ -576,8 +616,12 @@ class Run:
             recipients=tuple(recipients), known_recipients=tuple(known or ()), safety_flags=flagged
         )
         proposal = tilo_policy.Proposal(self.world_id, action, connector, district, destination, facts, item, 0, None)
+        table = tilo_policy.load_risk_table()
+        assessed = max(table.assess(action, facts).tier, gate["risk_tier"], key=_TIERS.index)
+        skills = unit.get("skills") or ()
+        _tool_access(self.seams, connector, action, assessed, skills)  # FR-ACC-01/02: before the engine; only refuses
         decision = tilo_policy.decide(
-            proposal, table=tilo_policy.load_risk_table(), policies=list(self.store.policies.values()),
+            proposal, table=table, policies=list(self.store.policies.values()),
             world_owner=self.owner, applied=self._applied(), now=events.now(),
         )  # fmt: skip
         if decision.outcome == "draft_only":  # an owner's L0 policy: nothing leaves Tilo (PRD 10.4, BQ-90)
@@ -614,6 +658,7 @@ class Run:
             raise RunStopped
         if tilo_policy.open_gate(requested, resolved, world_owner=self.owner).outcome != "run":
             raise _GateFailed("the gate did not open")
+        _tool_access(self.seams, connector, action, assessed, skills)  # again at dispatch: a tool turned Off meanwhile
         created = events.now()
         entry = {
             "id": outbox_id, "idempotency_key": f"{self.run_id}:{unit['id']}:{action}:1", "world_id": self.world_id,

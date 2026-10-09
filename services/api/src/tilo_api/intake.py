@@ -32,13 +32,14 @@ from tilo_planning.intake import (
 )
 from tilo_planning.refusal import RefusalConfigError, TaskRefused
 from tilo_planning.scenarios import ScenarioError, load_scenario
+from tilo_providers.clock import Clock
 from tilo_providers.config import ProviderConfigError
 from tilo_providers.errors import ProviderError
 from tilo_providers.interfaces import SafetyProvider
 from tilo_providers.replay import ReplayMissError
 from tilo_providers.router import Router
 
-from tilo_api import deps, quick
+from tilo_api import deps, ephemeral, quick
 from tilo_api.assistant.metering import SpendLedger
 from tilo_api.deps import get_safety  # the dependency key tests and callers override
 from tilo_api.tasks import create_task
@@ -49,8 +50,9 @@ logger = logging.getLogger("tilo_api.intake")
 _store = InMemoryArtifactStore()
 
 
-def get_store() -> InMemoryArtifactStore:
-    return _store
+def get_store(request: Request = None) -> InMemoryArtifactStore:  # type: ignore[assignment]
+    demo = ephemeral.for_request(request) if request is not None else None
+    return _store if demo is None else demo.uploads  # a demo's uploads are its own, in memory, gone with it
 
 
 @router.post("/intake", status_code=201)
@@ -64,6 +66,7 @@ async def intake(
     model_router: Annotated[Router, Depends(deps.get_router)],
     flags: Annotated[FlagStore, Depends(deps.get_switches)],
     work_mode: Annotated[deps.Mode, Depends(deps.get_work_mode)],
+    today: Annotated[Clock, Depends(deps.get_today)],
     allowance: Annotated[SpendLedger, Depends(deps.get_spend_ledger)],
     text: Annotated[str, Form()] = "",
     scenario: Annotated[str | None, Form()] = None,
@@ -99,7 +102,7 @@ async def intake(
         # The Director reads only the screened text, and runs before anything is stored: a failure leaves no
         # artifacts without a task (BQ-99).
         try:
-            extraction = await run_in_threadpool(extract_brief, text, router=model_router)
+            extraction = await run_in_threadpool(extract_brief, text, router=model_router, today=today())
         except TaskRefused as refused:
             # FR-INT-12: configured text only (reason, nearest task, category); nothing stored, no further call.
             return JSONResponse(
@@ -158,7 +161,7 @@ async def _quick(
         body = await run_in_threadpool(
             quick.respond, text=request.text, uid=uid, has_files=bool(request.files), scenario=scenario,
             safety=safety, router=model_router, allowance=allowance, switches=flags, mode=work_mode,
-            caps=deps.caps_for(http), key=http.headers.get("idempotency-key"),
+            caps=deps.caps_for(http), key=http.headers.get("idempotency-key"), ledger=deps.ledger_writer_for(http),
         )  # fmt: skip
     except quick.QuickRefusal as refusal:
         return JSONResponse(status_code=refusal.status, content={"error": refusal.message})

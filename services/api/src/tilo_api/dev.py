@@ -128,8 +128,11 @@ class DevEventWriter:
     def __init__(self, store: deps.Store, ledger: DevLedger | None = None) -> None:
         self._store, self._ledger, self._lock = store, ledger, threading.Lock()
 
-    def append(self, world_id: str, event: dict) -> dict:
+    def _guard(self) -> None:
         refuse_if_unsafe()
+
+    def append(self, world_id: str, event: dict) -> dict:
+        self._guard()
         world = self._store.worlds.get(world_id)
         if world is None:
             raise deps.EventRejected(f"unknown world {world_id!r}")

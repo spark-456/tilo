@@ -12,7 +12,10 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from datetime import date
 from typing import Any
+
+from tilo_providers.clock import real_today, time_facts
 
 from tilo_harness.untrusted import neutralise
 
@@ -59,8 +62,12 @@ def _items(items: Sequence[str], cap: int, sep: str) -> str:
     return sep.join(kept)
 
 
-def request_variables(brief: Mapping[str, Any] | None, answers: Sequence[tuple[str, str]] = ()) -> dict[str, str]:
-    """The template variables `goal`, `audience`, `deliverables`, `constraints` and `answers` for the request block."""
+def request_variables(
+    brief: Mapping[str, Any] | None, answers: Sequence[tuple[str, str]] = (), *, today: date | None = None
+) -> dict[str, str]:
+    """The template variables `goal`, `audience`, `deliverables`, `constraints` and `answers` for the request block,
+    and `today`, `deadline` and `days_to_deadline` (code facts from the clock, never model text; `today` defaults to
+    the real date, a test passes one). The deadline is read only when it is a `YYYY-MM-DD` date."""
     brief = brief or {}
     deliverables = [
         data_line(f"{d.get('title', '')} ({d['format']})" if d.get("format") else d.get("title", ""), FIELD_CAP)
@@ -74,6 +81,7 @@ def request_variables(brief: Mapping[str, Any] | None, answers: Sequence[tuple[s
         if str(answer).strip()
     ]
     return {
+        **time_facts(today or real_today(), brief.get("deadline")),
         "goal": data_line(brief.get("goal") or "not stated", GOAL_CAP),
         "audience": data_line(brief.get("audience") or "not stated", AUDIENCE_CAP),
         "deliverables": _items([d for d in deliverables if d], DELIVERABLES_CAP, "; ") or "not stated",

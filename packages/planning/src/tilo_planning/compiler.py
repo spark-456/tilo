@@ -13,11 +13,13 @@ import json
 import re
 from collections.abc import Mapping
 from dataclasses import dataclass
+from datetime import date
 from typing import Annotated, Any, Literal
 
 import pydantic
 from tilo_contracts import PlanUnit
 from tilo_policy import RiskTable
+from tilo_providers.clock import real_today, time_facts
 from tilo_providers.interfaces import Capability, GenerateRequest
 from tilo_providers.prompts import load_prompt
 from tilo_providers.router import Router, RouterError, RouterResult
@@ -176,6 +178,7 @@ def compile_plan(
     *,
     router: Router,
     attempts: int = MAX_ATTEMPTS,
+    today: date | None = None,
 ) -> PlanResult:
     """The PlanGraph for `approach` (one of `inputs.approaches`) under `budget_cap`, valid by `validate_plan`
     for `inputs.owner`, or `PlanCompileError`."""
@@ -188,6 +191,7 @@ def compile_plan(
         "brief": _data(json.dumps(brief, ensure_ascii=False, indent=2)),
         "approach": _data(json.dumps(approach, ensure_ascii=False, indent=2)),
         "catalogue": _data(_catalogue(inputs)),
+        **time_facts(today or real_today(), brief.get("deadline")),  # calendar facts from the clock, not a guess
     }
     prompt, runs, found = load_prompt(DIRECTOR_ROLE, "plan.md", variables), [], ["none"]
     for attempt in range(attempts):

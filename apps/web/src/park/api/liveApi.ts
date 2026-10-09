@@ -1,6 +1,6 @@
 // The live Api (WEB-1a, WIRE-1..3, FR-UX-13): `startWorld` makes the real intake call; `getLedger` reads `GET {base}/costs`, `getWorlds` walks `GET {base}/worlds`
 // pages, `getDecisions` walks `GET {base}/cards` pages and `decide` answers one card with one POST (the
-// person's tap, never a retry); every other method is NotBuilt and
+// person's tap, never a retry). Profile defaults and preferences are in-memory page choices; other methods are NotBuilt and
 // fetches nothing. With no base url nothing is fetched at all. It never imports the fixtures, so sample
 // numbers cannot pass as live (HR-1..HR-7). Failures are the shared `TiloApiError` (src/api/http.ts).
 import type { IntakeResult } from "../../api/client";
@@ -14,9 +14,11 @@ import {
   decisionsFromCards,
 } from "./live/decisionsFromCards";
 import { type CostReport, ledgerFromCosts } from "./live/ledgerFromCosts";
+import { profileDefaults } from "./live/profileDefaults";
 import { worldFromIntake } from "./live/worldFromIntake";
 import { STATE_OF, type WorldListItem, worldsFromList } from "./live/worldsFromList";
-import type { Dec, DecisionKey, Effort, QuickReply, TierKey } from "./types";
+import { nameInitials } from "./nameInitials";
+import type { Dec, DecisionKey, Effort, QuickReply, TierKey, Today, User } from "./types";
 
 export class NotBuilt extends Error {
   readonly code = "not_built";
@@ -34,6 +36,53 @@ export interface LiveApiOptions {
   appCheckToken?: (() => Promise<string | null>) | undefined;
   /** SEC-15: the Firebase ID token getter; every Park request carries `Authorization: Bearer` like the rest of the app. */
   authToken?: (() => Promise<string | null>) | undefined;
+}
+
+export interface Identity {
+  name: string | null;
+  email: string | null;
+}
+
+const titleCase = (w: string): string => w.charAt(0).toUpperCase() + w.slice(1);
+
+/** The signed-in person as the Home greeting needs them: nothing but what the sign-in session holds. */
+export function userOf(who: Identity): User | null {
+  const email = who.email?.trim() ?? "";
+  const name =
+    who.name?.trim() ||
+    email
+      .split("@")[0]
+      ?.replace(/[._-]+/g, " ")
+      .trim() ||
+    "";
+  if (!name) return null;
+  const words = name.split(/\s+/).map(titleCase);
+  const first = words[0] ?? name;
+  const initials = nameInitials(name);
+  const tz = Intl.DateTimeFormat().resolvedOptions().timeZone ?? "";
+  return {
+    first,
+    name: who.name?.trim() || words.join(" "),
+    initials,
+    email,
+    title: "",
+    org: "",
+    plan: "",
+    tz,
+    lang: "",
+    hours: "",
+  };
+}
+
+/** Today from the clock: a date is true wherever it comes from. */
+export function todayOf(d: Date): Today {
+  const part = (o: Intl.DateTimeFormatOptions): string =>
+    new Intl.DateTimeFormat("en-GB", o).format(d);
+  return {
+    long: part({ weekday: "long", day: "numeric", month: "long" }).replace(",", ""),
+    short: part({ weekday: "short", day: "numeric", month: "short" }).replace(",", ""),
+    time: part({ hour: "2-digit", minute: "2-digit", hour12: false }),
+  };
 }
 
 const BAD_REPLY = "Tilo sent a reply this page could not read.";
@@ -146,6 +195,17 @@ export function createLiveApi(options: LiveApiOptions = {}): Api {
   const api = Object.fromEntries(stubs) as unknown as Api;
   const baseUrl = options.baseUrl?.trim();
   if (!baseUrl) return api;
+  const prefs = new Map<string, unknown>();
+  api.setPref = async (key, value) => {
+    prefs.set(key, structuredClone(value));
+    return { data: { ok: true }, source: "live" };
+  };
+  api.getProfileSettings = async () => {
+    const data = profileDefaults();
+    const quiet = prefs.get("quiet");
+    if (typeof quiet === "boolean") data.quiet.on = quiet;
+    return { data, source: "live" };
+  };
   const http = new HttpClient({
     baseUrl,
     ...(options.fetch ? { fetch: options.fetch } : {}),

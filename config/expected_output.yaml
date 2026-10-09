@@ -1,0 +1,18 @@
+# PL-03 / EFF-03 (BQ-EXPECTED-OUT-1): the output tokens, thinking included, a call of a role is RESERVED for before it is
+# made. The role's max_output_tokens stays the hard cap on what the model may write; the settled cost is the real usage
+# and may exceed this reserve. A call is refused before sending only when its input plus this size does not fit the
+# budget left, or when its input plus the full cap is over twice the budget left. A role not listed expects 1024 (or its
+# cap if lower), which is what it was reserved for before this file. One file serves every config/models*.yaml (a role a
+# models file lacks is ignored); a size is an integer from 1 up to the role's max_output_tokens. It is a separate file
+# because contracts/providers.schema.json closes the role object.
+#
+# Sizes are estimates, not measurements (the recordings under evals/bank carry a scripted 500 tokens, not usage). Sources:
+# docs/live-e2e.md run-2 table (a Director call at low thinking ~600 out, at high ~6000; a writer note ~1500 out) and the
+# estimate floor in evals/src/tilo_evals/live_e2e.py (director 400, writer 250, lead 100, narrator 200 visible tokens).
+roles:
+  director: 3000 # planning calls think at low/medium: between the ~600 and ~6000 of the run-2 table
+  lead: 1500 # a milestone review, thinking medium
+  specialist: 2000 # a research or analysis note, thinking low
+  verifier: 1500 # a verdict, thinking high (the live runner also caps its own verifier calls at 1024)
+  writer: 3000 # a document: thinking low plus ~1500 visible tokens, with room (cap 16384 for the long case)
+  narrator: 1000 # a few Story beats, no thinking

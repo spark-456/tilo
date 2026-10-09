@@ -78,6 +78,7 @@ BODY_ROUTES = {
     "add membership": "/v1/people/u_priya/memberships",
     "remove membership": "/v1/people/u_priya/memberships/remove",
     "role": "/v1/people/u_priya/role",
+    "team invite": "/v1/team/invites",
 }
 
 

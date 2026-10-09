@@ -5,6 +5,7 @@
 // raises the "Sample data" chip without any page asking for data. The city's cars and walkers run on Home (cityMotion.ts).
 import { type ReactNode, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { LifetimeCapDialog } from "../../components/LifetimeCapDialog";
+import { nameInitials } from "../api/nameInitials";
 import type { Decision, Notification, User } from "../api/types";
 import type { PageId } from "../app/AppCtx";
 import { endSession, useApp, useExpectsSample, useParkApi, useParkStore } from "../app/context";
@@ -22,6 +23,7 @@ import { authInitials, useParkAuth } from "./auth";
 import { useAppearance } from "./cityMotion";
 import { loadShellFonts } from "./fonts";
 import { type Bar, useLeavingCard, useMotionOff, usePageSwap } from "./motion";
+import { useParkTour } from "./tour";
 import "./park.shell.css";
 import { backdropScene } from "./scene";
 
@@ -54,6 +56,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [ready, setReady] = useState(false);
   const expectsSample = useExpectsSample();
   const auth = useParkAuth();
+  const tour = useParkTour();
   const [mobileNote, setMobileNote] = useState(false);
   const signingOut = useRef(false);
   const appearance = useAppearance();
@@ -139,7 +142,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const person: AccountPerson | null = auth
     ? auth.status === "signedIn" && auth.user
       ? {
-          initials: authInitials(auth.user),
+          initials: nameInitials(auth.user.displayName?.trim() || authInitials(auth.user)),
           name:
             auth.user.displayName ?? (auth.user.isAnonymous ? "Guest" : (auth.user.email ?? "")),
           email: auth.user.displayName ? (auth.user.email ?? "") : "",
@@ -150,7 +153,9 @@ export function AppShell({ children }: { children: ReactNode }) {
           initials: user.initials,
           name: user.name,
           email: user.email,
-          detail: `${user.org} · ${user.plan} plan`,
+          detail: [user.org.trim(), user.plan.trim() ? `${user.plan.trim()} plan` : ""]
+            .filter(Boolean)
+            .join(" · "),
         }
       : null;
   // Honest: success is said only after the sign-in layer's promise resolves, a failure says it failed.
@@ -189,7 +194,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         initials={
           auth
             ? auth.status === "signedIn"
-              ? authInitials(auth.user)
+              ? nameInitials(auth.user?.displayName?.trim() || authInitials(auth.user))
               : "?"
             : (user?.initials ?? "")
         }
@@ -222,6 +227,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             user={person}
             canSignOut={!auth || auth.status === "signedIn"}
             onMobile={() => setMobileNote(true)}
+            {...(tour ? { onTour: tour.start } : {})}
             connectorsOn={connectorsOn}
             go={navTo}
             onSignOut={signOutViaSeam}

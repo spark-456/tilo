@@ -144,8 +144,8 @@ Never requested: `mail.google.com`, `gmail.modify`, full `drive`.
    relays the code to connectors through harness. Connectors is internal-only and
    must never be made public to receive the redirect (PRD 6.5 ingress rule).
 2. Put values in the eight secrets (`gcloud secrets versions add`).
-3. Identity Platform: enable Google sign-in and anonymous sign-in; add the
-   hosting domain to authorised domains.
+3. Sign-in (Firebase Authentication): enable Google sign-in and anonymous sign-in
+   and check the authorised domains; the full checklist is section 11.
 4. App Check (SEC-10): done in the console, recorded here. The Firebase web app
    `tilo-web` has app id `1:379216745263:web:8cda5846cf882c2cefc7da` and the
    reCAPTCHA Enterprise score-based site key is

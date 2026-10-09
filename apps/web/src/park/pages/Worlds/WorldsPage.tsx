@@ -36,7 +36,7 @@ export function WorldsPage({ app }: { app: AppCtx }) {
     let live = true;
     Promise.all([
       api.getWorlds(dec, added),
-      api.getDecisions(),
+      api.getDecisions().catch(() => ({ data: [] as Decision[] })),
       api.getPlans(dec).catch(() => ({ data: {} as Record<string, Plan> })),
     ]).then(
       ([w, d, p]) => {

@@ -1,6 +1,6 @@
 """tilo_providers.config — provider-layer config loader (PRD 6.4, 6.6 EFF-03,
 17.2 NFR-25, 14.1 Credits). Loads config/models.yaml + config/prices.yaml,
-validates each against tilo_contracts, and fails loudly with
+validates each against tilo_contracts (+ the optional expected_output.yaml, PL-03), and fails loudly with
 ProviderConfigError: denied model id (PL-07); a role naming an unknown
 profile; a role with no fallback profile (NFR-25); a profile with no price entry; a status "set" prices
 file with a null price, effective_date or source. price() never invents a
@@ -13,7 +13,7 @@ import json
 import os
 import warnings
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -66,6 +66,8 @@ class ProfilePriceQuote:  # one profile's price plus the file's date and source 
 class ProvidersConfig:  # the loaded, validated provider-layer config (PRD 6.4)
     models: ProvidersModels
     prices: ProvidersPrices
+    # PL-03 / EFF-03: output tokens a call of a role is reserved for (`config/expected_output.yaml`, checked at load)
+    expected_output: Mapping[str, int] = field(default_factory=dict)
 
     @property
     def roles(self) -> dict[str, ProvidersRole]:
@@ -182,6 +184,26 @@ def _validate_price_fields_when_set(prices: ProvidersPrices, prices_path: Path) 
             )
 
 
+def _load_expected_output(path: Path, models: ProvidersModels) -> dict[str, int]:
+    """PL-03 / EFF-03: `config/expected_output.yaml` (`roles: {role: tokens}`), next to the models file, is the size a
+    call is reserved for before it is made (the full `max_output_tokens` stays the hard cap). It is not a field of the
+    role because contracts/providers.schema.json closes the role object. Optional; one file serves every models file,
+    so a role the loaded models file lacks is ignored. Each size is an integer from 1 up to the role's own cap."""
+    if not path.is_file():
+        return {}
+    roles = _load_yaml_mapping(path).get("roles")
+    if not isinstance(roles, dict):
+        raise ProviderConfigError(f"expected_output: {path} must have a `roles` mapping of role id to tokens")
+    for role_id, tokens in roles.items():
+        cap = models.roles[role_id].max_output_tokens if role_id in models.roles else None
+        if isinstance(tokens, bool) or not isinstance(tokens, int) or tokens < 1 or (cap is not None and tokens > cap):
+            raise ProviderConfigError(
+                f"expected_output: {path} role {role_id!r} must be an integer from 1 up to its max_output_tokens "
+                f"({cap}), got {tokens!r}"
+            )
+    return {role_id: tokens for role_id, tokens in roles.items() if role_id in models.roles}
+
+
 def profiles_used_by(role: ProvidersRole) -> set[str]:
     return {role.primary, *([role.fallback] if role.fallback else []), *(role.cascade or ())}
 
@@ -209,7 +231,10 @@ def _validate_conformance(models: ProvidersModels, conformance_dir: Path) -> Non
 
 
 def load_providers_config(
-    models_path: Path | str, prices_path: Path | str, conformance_dir: Path | str | None = None
+    models_path: Path | str,
+    prices_path: Path | str,
+    conformance_dir: Path | str | None = None,
+    expected_output_path: Path | str | None = None,
 ) -> ProvidersConfig:
     """Loads, validates and start-up-checks the two config files; raises
     ProviderConfigError loudly rather than starting on a bad config."""
@@ -233,4 +258,7 @@ def load_providers_config(
     if conformance_dir is not None:
         _validate_conformance(models, Path(conformance_dir))
 
-    return ProvidersConfig(models=models, prices=prices)
+    expected = _load_expected_output(
+        Path(expected_output_path) if expected_output_path else models_path.parent / "expected_output.yaml", models
+    )
+    return ProvidersConfig(models=models, prices=prices, expected_output=expected)
