@@ -55,6 +55,7 @@ from tilo_api.appcheck import AppCheckVerifier, default_verifier
 from tilo_api.assistant.config import AssistantConfig, AssistantConfigError, load_assistant_config
 from tilo_api.people_access import NoSourceOwners
 from tilo_api.people_access import SourceOwners as PanelSourceOwners
+from tilo_api.skill_store import SkillStore
 
 if TYPE_CHECKING:
     from tilo_api.assistant.core import Decider
@@ -762,6 +763,12 @@ class DeskWorlds(Protocol):
 
 def get_desk_worlds() -> DeskWorlds:
     raise HTTPException(status_code=503, detail="not_configured")  # production wiring lands with the Desk
+
+
+def get_skill_store() -> SkillStore:
+    """The taught-skill store (SKILLS-2, FR-SKL-04). No production backend yet (BQ-SKILLS-1): refuses, fail closed;
+    dev mode wires one in memory."""
+    raise HTTPException(status_code=503, detail="not_configured")
 
 
 def get_run_archive(request: Request = None) -> Callable[..., RunArchive]:  # type: ignore[assignment]
