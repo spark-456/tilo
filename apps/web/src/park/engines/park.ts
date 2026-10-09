@@ -1,4 +1,4 @@
-import { type Body, type Route, compileTraffic } from "./cityTraffic";
+import { type Body, type Route, compileTraffic, staggerTraffic } from "./cityTraffic";
 // ported from design_handoff_tilo_web_app/design/tilo-park.js (user's prototype, ADR-0003a)
 // The Park City backdrop and glass-friendly world thumbnails. Static art is built as SVG strings and
 // shown as images; only the movers are separate layers. Faithful port: same names, numbers, rounding,
@@ -690,7 +690,8 @@ export function createPark(
         }
       }
       const cyc = 0.56 * (k > 1 ? 1.4 : 1);
-      const movers: unknown[][] = [];
+      const movers: (() => El)[][] = [];
+      const timed: { route: Route; setClock: (delay: number, edge: number) => void }[] = [];
       const reported: LaneRow[] = [];
       for (let j = 0; j <= R; j++) {
         const y = j * PY;
@@ -833,22 +834,32 @@ export function createPark(
             const stops = frames
               .slice(0, 60)
               .map((frame, i) => `${progress(frame)} ${((i * 100) / 60).toFixed(6)}%`);
-            // Duplicate 100% stops make the shared reset discrete (no sweep through the city).
+            // Duplicate 100% stops make the reset discrete (no sweep through the city).
             stops.push(
               `${progress(frames[59] as Body[])} 100%`,
               `${progress(frames[0] as Body[])} 100%`,
             );
-            schedules.push({
-              // Hold opacity at zero on both sides of the reset, then fade scenery back in.
-              // tiloFade already supplies opacity 1 -> 0; the easing reverses it mid-cycle.
-              animation: `mvXY 15s linear(${stops.join(",")}) 0s infinite, tiloFade 15s linear(1 0%,1 3%,0 5%,0 95%,1 97%,1 100%) 0s infinite`,
+            const schedule: Props = {
               "--dx": `${span * 0.866 * s2}px`,
               "--dy": `${span * 0.5 * s2}px`,
+            };
+            schedules.push(schedule);
+            timed.push({
+              route,
+              setClock: (delay, edge) => {
+                const clock = `${delay.toFixed(8)}s infinite`;
+                // tiloFade supplies opacity 1 -> 0; hold transparency around the local reset.
+                schedule.animation = `mvXY 15s linear(${stops.join(",")}) ${clock}, tiloFade 15s linear(1 0%,1 ${edge * 0.6}%,0 ${edge}%,0 ${100 - edge}%,1 ${100 - edge * 0.6}%,1 100%) ${clock}`;
+              },
             });
           });
         }
-        movers.push(list.sort((p, q) => p.ly - q.ly).map((o) => o.el()));
+        movers.push(list.sort((p, q) => p.ly - q.ly).map((o) => o.el));
       }
+      staggerTraffic(
+        timed.map((t) => t.route),
+        o.seed,
+      ).forEach((clock, id) => timed[id]?.setClock(clock.delay, clock.edge));
       const vbS = `${vx.toFixed(1)} ${vy.toFixed(1)} ${VW} ${VH.toFixed(1)}`;
       const sv = (els: unknown): El => cover(svgUrl(o.w, o.h, vbS, els));
       const defs = night
@@ -865,7 +876,7 @@ export function createPark(
         : null;
       const kids: unknown[] = [sv([defs, ground, marks, plots, glows])];
       for (let j = 0; j <= R; j++) {
-        kids.push(movers[j]);
+        kids.push(movers[j]?.map((el) => el()));
         const rj = rows[j];
         if (j < R && rj?.length) kids.push(sv(depthSort(rj).map((q) => q.el)));
       }

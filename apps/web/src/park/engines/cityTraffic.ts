@@ -115,8 +115,36 @@ export class CityTraffic {
   }
 }
 
-// Sixty shared quarter-second segments. Reset together in a discrete final segment;
-// independently looping each mover would invalidate the grid reservations.
+/** Independent lanes can shift clocks; interacting lanes retain their swept reservations. */
+export function staggerTraffic(
+  routes: readonly Route[],
+  seed: number,
+): { delay: number; edge: number }[] {
+  const ordered = routes
+    .map((r, id) => ({ id, lo: r.y - r.halfY, hi: r.y + r.halfY }))
+    .sort((a, b) => a.lo - b.lo);
+  const groups: number[][] = [];
+  let hi = Number.NEGATIVE_INFINITY;
+  for (const lane of ordered) {
+    if (lane.lo > hi) groups.push([]);
+    groups.at(-1)?.push(lane.id);
+    hi = Math.max(hi, lane.hi);
+  }
+  const clocks = routes.map(() => ({ delay: 0, edge: 5 }));
+  const rotation = ((seed >>> 0) % 997) / 997;
+  groups.forEach((ids, i) => {
+    // Fade windows stay disjoint even when the scene has many movers.
+    const clock = {
+      delay: -15 * ((i / groups.length + rotation) % 1),
+      edge: Math.min(5, 40 / groups.length),
+    };
+    for (const id of ids) clocks[id] = clock;
+  });
+  return clocks;
+}
+
+// Sixty quarter-second segments. Lanes that can interact share the same clock;
+// the final reset is discrete and hidden by each mover's opacity schedule.
 export function compileTraffic(
   routes: readonly Route[],
   standing: readonly Body[],

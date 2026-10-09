@@ -5,6 +5,7 @@ import { afterEach, expect, it, vi } from "vitest";
 import { serialiseH } from "../../../test-support/park/engineProto";
 import { useCityMotion } from "../shell/cityMotion";
 import { backdropScene } from "../shell/scene";
+import * as traffic from "./cityTraffic";
 import * as lanes from "./lanes";
 import { createPark } from "./park";
 import type { H } from "./types";
@@ -38,6 +39,74 @@ function movers(tree: unknown, carsOnly = false): Style[] {
 const engine = () =>
   createPark(serialiseH as H, createWorld, { createObjectURL: () => "blob:scene" });
 const opts = { w: 1440, h: 900, seed: 23, avoid: true, traffic: true };
+
+it("WEB_MOTION_1 built city has at most two fading movers throughout its cycle", () => {
+  for (const seed of [0, 1, 7, 23]) {
+    const draw = () =>
+      seed === 0 ? backdropScene("day", "lively").el : engine().scene({ ...opts, seed }).el;
+    const styles = movers(draw());
+    expect(styles.length).toBeGreaterThan(3);
+    const clocks = styles.map((s) => {
+      const clock = /tiloFade 15s linear\(([^)]+)\) (-?[\d.]+)s infinite/.exec(s.animation ?? "");
+      expect(clock).not.toBeNull();
+      const stops = (clock?.[1] ?? "")
+        .split(",")
+        .map((x) => x.trim().split(/\s+/).map(Number.parseFloat));
+      return { delay: Number(clock?.[2]), edge: (stops[2]?.[1] ?? 0) / 100 };
+    });
+    for (let ms = 0; ms < 15000; ms += 5) {
+      const fading = clocks.filter(({ delay, edge }) => {
+        const phase = ((((ms / 1000 - delay) % 15) + 15) % 15) / 15;
+        return phase < edge || phase > 1 - edge;
+      });
+      expect(fading.length, `seed ${seed}, ${ms}ms`).toBeLessThanOrEqual(2);
+    }
+    expect(styles).toEqual(movers(draw()));
+  }
+});
+it("WEB_MOTION_1 built scene stagger retains zero car-walker and same-kind overlaps", () => {
+  const recorded = new Map<traffic.Route, traffic.Body[]>();
+  const compile = traffic.compileTraffic;
+  vi.spyOn(traffic, "compileTraffic").mockImplementation((routes, standing, lanesOnly) => {
+    const frames = compile(routes, standing, lanesOnly);
+    routes.forEach((route, id) =>
+      recorded.set(
+        route,
+        frames.map((frame) => frame[id] as traffic.Body),
+      ),
+    );
+    return frames;
+  });
+  const stagger = vi.spyOn(traffic, "staggerTraffic");
+  const styles = movers(engine().scene(opts).el);
+  const routes = stagger.mock.calls[0]?.[0];
+  const clocks = stagger.mock.results[0]?.value as ReturnType<typeof traffic.staggerTraffic>;
+  expect(routes?.length).toBe(styles.length);
+  const emitted = styles
+    .map((s) => Number(/\) (-?[\d.]+)s infinite/.exec(s.animation ?? "")?.[1]))
+    .sort((a, b) => a - b);
+  expect(emitted).toEqual(clocks.map((c) => Number(c.delay.toFixed(8))).sort((a, b) => a - b));
+  if (!routes) throw new Error("missing actual scene routes");
+  for (let ms = 0; ms < 15000; ms += 25) {
+    const positions = routes.map((route, id) => {
+      const tick = ((((ms / 1000 - (clocks[id]?.delay ?? 0)) % 15) + 15) % 15) * 4;
+      const frames = recorded.get(route);
+      const a = frames?.[Math.floor(tick)];
+      const b = frames?.[Math.min(59, Math.floor(tick) + 1)];
+      if (!a || !b) throw new Error("missing actual scene frame");
+      return { ...a, x: a.x + (b.x - a.x) * (tick % 1) };
+    });
+    for (let i = 0; i < positions.length; i++)
+      for (let j = i + 1; j < positions.length; j++) {
+        const a = positions[i];
+        const b = positions[j];
+        if (!a || !b) throw new Error("missing mover");
+        expect(
+          Math.abs(a.x - b.x) >= a.halfX + b.halfX || Math.abs(a.y - b.y) >= a.halfY + b.halfY,
+        ).toBe(true);
+      }
+  }
+});
 
 it("WEB_MOTION_1 built backdrop schedules hide every visible reset", () => {
   const styles = movers(backdropScene("day", "lively").el);

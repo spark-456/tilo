@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CityTraffic, type Route, compileTraffic } from "./cityTraffic";
+import { CityTraffic, type Route, compileTraffic, staggerTraffic } from "./cityTraffic";
 
 const walker = (x: number, y: number, end = 240): Route => ({
   kind: "walker",
@@ -22,6 +22,36 @@ const car = (x: number, y: number): Route => ({
 const cells = (x: number, y: number) => `${Math.floor(x / 4)},${Math.floor(y / 4)}`;
 
 describe("WEB_MOTION_1 city occupancy", () => {
+  it("WEB_MOTION_1 staggered clocks preserve zero overlaps for interacting lanes", () => {
+    const routes = [car(7, 20), walker(62, 20), walker(34, 60)];
+    const frames = compileTraffic(routes, [], true);
+    const clocks = staggerTraffic(routes, 23);
+    expect(clocks[0]?.delay).toBe(clocks[1]?.delay);
+    expect(clocks[2]?.delay).not.toBe(clocks[0]?.delay);
+    expect(clocks).toEqual(staggerTraffic(routes, 23));
+    expect(clocks).not.toEqual(staggerTraffic(routes, 7));
+    for (let ms = 0; ms < 15000; ms += 25) {
+      const ps = routes.map((_, id) => {
+        const phase = (((ms / 1000 - (clocks[id]?.delay ?? 0)) % 15) + 15) % 15;
+        const tick = phase * 4;
+        const a = frames[Math.floor(tick)]?.[id];
+        const b = frames[Math.min(59, Math.floor(tick) + 1)]?.[id];
+        if (!a || !b) throw new Error("missing compiled mover");
+        return { x: a.x + (b.x - a.x) * (tick % 1), y: a.y };
+      });
+      for (let a = 0; a < ps.length; a++)
+        for (let b = a + 1; b < ps.length; b++) {
+          const p = ps[a];
+          const q = ps[b];
+          const r = routes[a];
+          const s = routes[b];
+          if (!p || !q || !r || !s) throw new Error("missing route");
+          expect(
+            Math.abs(p.x - q.x) >= r.halfX + s.halfX || Math.abs(p.y - q.y) >= r.halfY + s.halfY,
+          ).toBe(true);
+        }
+    }
+  });
   it("WEB_MOTION_1 lane schedules wait at occupied tiles without crossing into another lane", () => {
     const frames = compileTraffic([walker(0, 20)], [{ x: 80, y: 20, halfX: 8, halfY: 8 }], true);
     for (const frame of frames) {
