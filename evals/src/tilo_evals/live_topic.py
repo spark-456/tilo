@@ -206,13 +206,29 @@ class TerminalPerson:
             credits, mark = a["credits"], " (recommended)" if a["id"] == recommended else ""
             what = f"{clean(a['label'])}: {clean(a['summary'])}"
             self._write(f"  {n}. {what} [{credits['min']}-{credits['max']} credits]{mark}")
-        chosen = self._pick("approach number (empty for the recommended): ", options)
-        chosen = chosen if isinstance(chosen, dict) else next(a for a in options if a["id"] == recommended)
-        ok, why = self._yes(f"approve the approach {clean(chosen['label'])!r}?")
+        while True:
+            chosen = self._pick("approach number (empty for the recommended): ", options)
+            chosen = chosen if isinstance(chosen, dict) else next(a for a in options if a["id"] == recommended)
+            confirmation = self._confirm_approach(chosen)
+            if confirmation is not None:
+                ok, why = confirmation
+                break
         said = "approved" if ok else "declined"
         self.log.append(f"approach {clean(chosen['id'])}: {said} by the person ({clean(why) or '-'})")
         self.decline_reason = "" if ok else clean(why)[:200]
         return chosen["id"] if ok else None
+
+    def _confirm_approach(self, chosen: dict[str, Any]) -> tuple[bool, str] | None:
+        """A misplaced number returns to selection; it never confirms the previous choice."""
+        prompt = f"approve the approach {clean(chosen['label'])!r}? [y/n]: "
+        while (said := self._read(prompt)) is not None:
+            if said.isdigit():
+                self._write("That was a number. Please choose the approach again.")
+                return None
+            if said.lower() in ("y", "yes", "n", "no"):
+                return said.lower().startswith("y"), self._read("reason: ") or ""
+            self._write("answer y or n")
+        return False, "no answer (input closed)"
 
     def gate(self, card: dict[str, Any]) -> bool:
         if (real_write := self._write_gate(card)) is not None:
