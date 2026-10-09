@@ -139,6 +139,25 @@ class JwksKeyCache:
             raise TokenRefused("keys_unavailable")
         return None
 
+    def warm(self) -> bool:
+        """Best effort at service start: fetch the key set once so the first request after an idle period (min-instances
+        0 makes every idle period a cold start) finds keys. True when keys are held afterwards. Never raises, never
+        blocks behind a fetch already running, and a failure stores nothing and spends no cooldown: the first request
+        tries for itself."""
+        if not self._lock.acquire(blocking=False):
+            return False
+        try:
+            if self._snapshot is not None:
+                return True
+            fetched = self._fetch()
+            now = self._clock()
+            self._snapshot, self._tried_at = (fetched, now), now
+            return True
+        except Exception:
+            return False
+        finally:
+            self._lock.release()
+
     def _keys(self, kid: str) -> dict[str, rsa.RSAPublicKey]:
         now = self._clock()
         keys = self._usable(kid, now)
@@ -236,6 +255,21 @@ class GoogleAppCheckVerifier(JwksKeyCache):
         return claims
 
 
+def warm_up() -> None:
+    """Warms the App Check and sign-in key sets (best effort; only on Cloud Run: nothing else opens a socket)."""
+    if "K_SERVICE" not in os.environ:
+        return
+    from tilo_api import firebase_auth  # noqa: PLC0415  (firebase_auth imports this module)
+
+    for make in (default_verifier, firebase_auth.default_verifier):
+        try:
+            warm = getattr(make(), "warm", None)
+            if callable(warm):
+                warm()
+        except Exception as exc:  # a start never waits on, or fails for, a key fetch
+            logger.warning("key warm-up skipped (%s)", type(exc).__name__)
+
+
 class RefuseAll:
     """Dev mode and an unconfigured project: nothing is fetched, nothing is verified."""
 
@@ -244,6 +278,9 @@ class RefuseAll:
 
     def verify(self, token: str) -> Mapping[str, Any]:
         raise TokenRefused(self._why)
+
+    def warm(self) -> bool:
+        return False  # nothing to fetch
 
 
 @functools.cache
