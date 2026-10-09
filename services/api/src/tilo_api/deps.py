@@ -307,6 +307,21 @@ def resolve_principal(app: Any, connection: HTTPConnection) -> Principal:
     return resolver(connection) if inspect.signature(resolver).parameters else resolver()
 
 
+def member_world(principal: Principal, store: Store, world_id: str) -> WorldRecord:
+    """The world a request may read or act on: the one the session is bound to, or, for a session bound to no world,
+    one whose record owner is this person with role owner (a deployed sign-in session is role owner and bound to no
+    world, `principal_from_claims`, so an owner reaches their own worlds through ownership). Never wider: a session
+    bound to another world stays bound to it, and another person's world, a non-owner role that carries the owner's
+    id, and an unknown world all get the one unknown-world 404 (no membership oracle)."""
+    world = store.worlds.get(world_id)
+    if world is None:
+        raise HTTPException(status_code=404)
+    unbound_owner = principal.world_id is None and principal.role == "owner" and principal.user_id == world.owner
+    if principal.world_id == world_id or unbound_owner:
+        return world
+    raise HTTPException(status_code=404)
+
+
 def get_store(request: Request = None) -> Store:  # type: ignore[assignment]  # FastAPI injects it; None elsewhere
     """Deployed: the durable store for `TILO_API_STORE`, with the request's path ids loaded (ADR-0026 decisions 1, 3);
     without a valid config 503 `not_configured`, never cached. Dev mode and the tests override this seam."""
