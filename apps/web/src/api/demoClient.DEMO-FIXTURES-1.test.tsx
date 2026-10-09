@@ -20,7 +20,10 @@ const session = vi.hoisted(() => ({
 vi.mock("../auth/session", () => ({
   session: {
     // one object per status: a stable snapshot for useSyncExternalStore
-    getState: () => (session.states[session.status] ??= { status: session.status }),
+    getState: () => {
+      session.states[session.status] ??= { status: session.status };
+      return session.states[session.status];
+    },
     subscribe: () => () => undefined,
   },
 }));
