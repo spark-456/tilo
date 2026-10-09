@@ -7,11 +7,13 @@ import { type ReactNode, useEffect, useRef, useState } from "react";
 import type { Learn, Skill, Source, User } from "../../api/types";
 import type { AppCtx } from "../../app/AppCtx";
 import { useParkApi } from "../../app/context";
+import type { CurrencyCode } from "../../app/ledgerKpis";
 import { PageSheet } from "../../components";
 import { HelpSection } from "./HelpSection";
 import { LibrarySection } from "./LibrarySection";
 import "./Skills.css";
 import { TeachCard } from "./TeachCard";
+import { ToolAccess } from "./ToolAccess";
 import { type SkillFixEntry, applySkillFix } from "./skillConfig";
 import { icon } from "./skillsKit";
 import { INTRO, pillTotal } from "./teachData";
@@ -22,6 +24,7 @@ interface Data {
   learn: Learn;
   user: User;
   source: Source;
+  currency: CurrencyCode;
 }
 type Loaded = Data | "failed" | null;
 
@@ -57,14 +60,22 @@ export function SkillsPage({ app }: { app: AppCtx }) {
   const [data, setData] = useState<Loaded>(null);
   useEffect(() => {
     let live = true;
-    together(() => Promise.all([api.getSkills(), api.getLearn(), api.getUser()])).then(
-      ([skills, learn, user]) => {
+    const ledgerCurrency = (): Promise<CurrencyCode> =>
+      together(() => api.getLedger()).then(
+        (r) => r.data.currency ?? "GBP",
+        () => "GBP",
+      );
+    together(() =>
+      Promise.all([api.getSkills(), api.getLearn(), api.getUser(), ledgerCurrency()]),
+    ).then(
+      ([skills, learn, user, currency]) => {
         if (live)
           setData({
             skills: skills.data,
             learn: learn.data,
             user: user.data,
             source: skills.source,
+            currency,
           });
       },
       () => {
@@ -106,10 +117,10 @@ function withTaught(skills: Skill[], taught: Skill | null): Skill[] {
 
 function Ready({ app, data }: { app: AppCtx; data: Data }) {
   const api = useParkApi();
-  const { user, learn, source } = data;
+  const { user, learn, source, currency } = data;
   const teachRef = useRef<HTMLElement>(null);
   const draft = data.skills.find((s) => s.st === "draft");
-  const t = useTeach({ app, api, user, draft, source });
+  const t = useTeach({ app, api, user, draft, source, currency });
 
   const [sel, setSel] = useState<string | null>(null);
   const [ans, setAns] = useState<Record<string, string>>({});
@@ -205,6 +216,7 @@ function Ready({ app, data }: { app: AppCtx; data: Data }) {
         skills={skills}
         selectedId={selectedId}
         paused={paused}
+        currency={currency}
         onSelect={(id) => setSel(id)}
         onTogglePause={(skill) => {
           const nextPaused = !paused[skill.id];
@@ -222,6 +234,7 @@ function Ready({ app, data }: { app: AppCtx; data: Data }) {
           scrollTeach();
         }}
       />
+      <ToolAccess skills={skills} tools={learn.tools} />
     </>
   );
 }

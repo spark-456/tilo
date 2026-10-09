@@ -1,0 +1,20 @@
+{
+  "world_id": "w_q4_supplier_deck",
+  "card_id": "01JB5VQ0000000000000000210",
+  "what_happened": "Which quarter should the comparison cover?",
+  "created_at": "2026-10-08T09:30:00.000Z",
+  "kind": "needs_you",
+  "options": [
+    {
+      "id": "q3",
+      "label": "Q3"
+    },
+    {
+      "id": "q4",
+      "label": "Q4"
+    }
+  ],
+  "risk_tier": null,
+  "exact": null,
+  "answerable_here": ["q3", "q4"]
+}

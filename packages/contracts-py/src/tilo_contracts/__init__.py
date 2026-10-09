@@ -101,6 +101,7 @@
 # handoff.schema.json 1.0.0 sha256:7ed882f92b634672
 # layout.schema.json 1.0.0 sha256:1db88b1e3b744add
 # manifest.schema.json 1.0.0 sha256:9b885d1826522bb7
+# mcp_tools.schema.json 1.0.0 sha256:46a498402c9b1e4e
 # meeting.schema.json 1.2.0 sha256:034e93898bb28957
 # meeting_join.schema.json 1.0.0 sha256:ea1e8f0945773573
 # mention.schema.json 1.0.0 sha256:ca9c1acbf81616f2
@@ -1840,6 +1841,196 @@ class ManifestClaim(BaseModel):
     verified: bool
 
 
+type McpToolsToolName = Literal["list_worlds", "get_world", "list_artifacts", "read_artifact", "list_cards", "answer_card", "start_run"]
+
+
+class McpToolsListWorldsIn(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    limit: Annotated[int | None, Field(ge=1, le=50)] = None
+
+
+class McpToolsWorldIn(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    world_id: WorldId
+
+
+class McpToolsReadArtifactIn(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    world_id: WorldId
+    artifact_id: ArtifactId
+    version: Annotated[int, Field(ge=1)]
+
+
+class McpToolsListCardsIn(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    world_id: WorldId | None = None
+
+
+class McpToolsAnswerCardIn(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    world_id: WorldId
+    card_id: Ulid
+    option: CardOptionId
+
+
+class McpToolsStartRunIn(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    request: Annotated[
+        str,
+        Field(
+            max_length=2000,
+            min_length=1,
+            pattern="^[^\\u0000-\\u0008\\u000B\\u000C\\u000E-\\u001F\\u007F]+$",
+        ),
+    ]
+    """
+    The person's request in their words, as typed into the client; it goes through intake like a web request (safety screen, brief, questions, approaches, caps). Tab and newline are allowed, other control characters are not.
+    """
+
+
+class McpToolsWorldRow(BaseModel):
+    """
+    The S-14 worlds-list row (`GET /worlds`), unchanged.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    world_id: WorldId
+    title: Annotated[str | None, Field(max_length=140)]
+    status: Literal["idle", "started", "paused", "completed", "failed"]
+    created_at: Timestamp | None
+    last_seq: Annotated[int, Field(ge=0)]
+
+
+class McpToolsListWorldsOut(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    worlds: Annotated[list[McpToolsWorldRow], Field(max_length=50)]
+
+
+class McpToolsStoryLine(BaseModel):
+    """
+    One Story line of the world, as the Story lens shows it to the owner: a Tilo-written event summary.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    seq: Annotated[int, Field(ge=1)]
+    ts: Timestamp
+    line: Annotated[str, Field(max_length=140, min_length=1)]
+
+
+class McpToolsGetWorldOut(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    world: McpToolsWorldRow
+    open_cards: Annotated[int, Field(ge=0)]
+    credits_used: Credits
+    story: Annotated[list[McpToolsStoryLine], Field(max_length=20)]
+
+
+class McpToolsArtifactRow(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    artifact_id: ArtifactId
+    version: Annotated[int, Field(ge=1)]
+    label: Annotated[str | None, Field(max_length=120)]
+    media_type: MediaType
+    size_bytes: Annotated[int, Field(ge=1)]
+    created_at: Timestamp
+
+
+class McpToolsListArtifactsOut(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    artifacts: Annotated[list[McpToolsArtifactRow], Field(max_length=100)]
+
+
+type McpToolsWithheldReason = Literal["not_text", "too_large"]
+
+
+class McpToolsCardOption(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    id: CardOptionId
+    label: Annotated[str, Field(max_length=20, min_length=1)]
+
+
+class McpToolsCardRow(BaseModel):
+    """
+    An open card of the owner's. `answerable_here` lists the option ids `answer_card` accepts for it: only a `needs_you` card can have any; a gate, consent or meeting card has none, so nothing authorises over MCP (MC-09).
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    world_id: WorldId
+    card_id: Ulid
+    kind: CardKind
+    what_happened: Annotated[str, Field(max_length=140, min_length=1)]
+    options: Annotated[list[McpToolsCardOption], Field(max_length=4, min_length=1)]
+    risk_tier: RiskTier | None
+    exact: Annotated[str | None, Field(max_length=500)]
+    created_at: Timestamp
+    answerable_here: Annotated[list[CardOptionId], Field(max_length=4)]
+
+
+class McpToolsListCardsOut(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    cards: Annotated[list[McpToolsCardRow], Field(max_length=50)]
+
+
+class McpToolsAnswerCardOut(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    outcome: Literal["answered"]
+
+
+class McpToolsStartRunOut(BaseModel):
+    """
+    Intake ran: the world exists and waits for the person in Tilo, to answer its questions or approve an approach (MC-10). No run spends past intake from here.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    world_id: WorldId
+    next: Literal["answer_questions_in_tilo", "approve_in_tilo"]
+
+
+class McpToolsToolRefusal(BaseModel):
+    """
+    A refused call (`isError: true`). One closed code, never a server string, a stack or another person's data; an id the caller may not see is `not_found`, byte-equal to a missing one.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    error: Literal["invalid_arguments", "not_found", "insufficient_scope", "not_answerable_here", "already_resolved", "busy", "rate_limited", "over_cap", "rejected_by_intake", "unavailable"]
+
+
 type Series = Annotated[str, Field(pattern="^[a-z0-9_-]{1,64}$")]
 
 
@@ -3421,6 +3612,32 @@ class ManifestProducer(BaseModel):
     skill: ManifestSkillVersion | None
     model_role: Slug | None
     profile: ProvidersProfileId | None
+
+
+class McpTools(BaseModel):
+    """
+    Tilo's MCP server tools (ADR-0031, Proposed). The root is one `tools/call` request as the server accepts it: a tool `name` and its `arguments`, bound to that tool's input shape; anything else is refused before any store is read. Each tool's result (`structuredContent`) is its `*_out` entry. Read tools need the grant scope `tilo.read`; `answer_card` and `start_run` need `tilo.write`, which the person turns on per client. No tool ever answers a gate, consent or meeting card: only `needs_you` questions can be answered here (`card_row.answerable_here`). Results carry ids, titles, labels and Tilo-written lines only; artifact text only from `read_artifact`, only for a clean text version of the owner's. Rules MC-01 to MC-12 in `mcp_tools.rules.md`.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    name: McpToolsToolName
+    arguments: dict[str, Any]
+
+
+class McpToolsReadArtifactOut(BaseModel):
+    """
+    `text` is the version's bytes as UTF-8 for `text/markdown`, `text/csv` and `application/json` up to 262,144 bytes, else null with `withheld` saying why (MC-07).
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    artifact: McpToolsArtifactRow
+    content_sha256: Annotated[str, Field(pattern="^[0-9a-f]{64}$")]
+    text: Annotated[str | None, Field(max_length=262144)]
+    withheld: McpToolsWithheldReason | None
 
 
 class MeetingAgendaItem(BaseModel):

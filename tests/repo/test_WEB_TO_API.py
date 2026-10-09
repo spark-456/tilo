@@ -108,6 +108,4 @@ def test_WEB_TO_API_runbook_lists_the_users_steps_in_order(repo_root: pathlib.Pa
     rollout = (repo_root / "docs" / "routines-rollout.md").read_text(encoding="utf-8")
     assert '"TILO_API_CORS_ORIGINS"' in rollout.split("$Allow", 1)[1].split("$Never", 1)[0]
     questions = (repo_root / "docs" / "open-questions.md").read_text(encoding="utf-8").rstrip().splitlines()
-    assert any(
-        ln.startswith("| BQ-WEBAPI-1 ") for ln in questions[-40:]
-    )  # rows go at the end; later merges add more below
+    assert any(ln.startswith("| BQ-WEBAPI-1 ") for ln in questions)  # rows go at the end; later merges add more below
