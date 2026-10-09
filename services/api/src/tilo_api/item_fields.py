@@ -49,6 +49,8 @@ def _owned_run(
     run = store.runs.get(world_id)
     if actor is None or run is None or actor.role != "owner" or not cards.is_open(world_id, card_id):
         raise HTTPException(status_code=404)  # one answer for every caller who may not supply: no oracle
+    if record_owner is not None and actor.user_id != record_owner:  # defence in depth: the role alone is not the owner
+        raise HTTPException(status_code=404)
     if from_channels or not session_allows(actor, actor.channel, False):
         raise HTTPException(status_code=404)
     return run, actor
@@ -171,7 +173,7 @@ def pinned_item(
         raise HTTPException(status_code=404)
     try:
         shown = shown_document(run.read_pinned(ref), gate.get("recipients"))
-    except ArtifactError:  # absent, corrupt (the hash does not match) or busy
+    except (ArtifactError, ValueError):  # absent, corrupt (the hash does not match), busy or a malformed ref
         shown = None
     if shown is None:
         return JSONResponse(status_code=409, content=_UNAVAILABLE)
