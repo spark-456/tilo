@@ -8,6 +8,11 @@ import { SignUpDeclaration } from "./SignUpDeclaration";
 import type { Declaration } from "./SignUpDeclaration";
 import { UnderConstruction } from "./UnderConstruction";
 
+/** Who the web asks: a Google sign-in on a deployment with an API. A demo session reads the sample company, and a local
+ * host or a build with no API has no gate; the server enforces its own for every call either way. */
+export const needsAccess = (status: string, apiUrl: string | undefined): boolean =>
+  status === "google" && Boolean(apiUrl?.trim());
+
 export interface AccessHttp {
   getJson(path: string): Promise<unknown>;
   postJson(path: string, body: unknown): Promise<unknown>;
@@ -68,6 +73,6 @@ export function AccessLayer({
     );
   }
   if (view.declaration === null) return <SignUpDeclaration onSubmit={declare} busy={busy} />;
-  if (view.declaration === "visitor") return <UnderConstruction />;
-  return <>{children}</>;
+  if (view.declaration === "judge") return <>{children}</>; // only an explicit judge sees the app
+  return <UnderConstruction />;
 }

@@ -6,7 +6,7 @@
 // static public pages: their own chunk, loading neither app (no sign-in, no API). SEC-15: both apps sit behind the
 // sign-in gate; with no Firebase here (a local host, a build with no config) the gate shows the app at once.
 import { type ReactNode, Suspense, lazy, useEffect, useMemo, useSyncExternalStore } from "react";
-import { AccessLayer } from "./access/AccessLayer";
+import { AccessLayer, needsAccess } from "./access/AccessLayer";
 import { API_URL, appCheckToken, authToken } from "./api/ClientProvider";
 import { HttpClient } from "./api/http";
 import { SignInGate } from "./auth/SignInGate";
@@ -31,8 +31,16 @@ function AccessGuard({ children }: { children: ReactNode }) {
     () => (base ? new HttpClient({ baseUrl: base, appCheckToken, authToken }) : null),
     [base],
   );
-  if (!http || state.status !== "google") return <>{children}</>;
-  return <AccessLayer http={http}>{children}</AccessLayer>;
+  if (!http || !needsAccess(state.status, base)) return <>{children}</>;
+  return (
+    // keyed on who is signed in: another account on the same page never inherits the first one's verdict
+    <AccessLayer
+      key={state.status === "google" ? (state.email ?? state.displayName ?? "google") : "google"}
+      http={http}
+    >
+      {children}
+    </AccessLayer>
+  );
 }
 
 export function Root() {

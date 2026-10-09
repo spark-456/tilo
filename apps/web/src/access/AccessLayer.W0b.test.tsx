@@ -8,7 +8,7 @@ import { act } from "react";
 import { type Root, createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { TiloApiError } from "../api/http";
-import { AccessLayer } from "./AccessLayer";
+import { AccessLayer, needsAccess } from "./AccessLayer";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -142,6 +142,27 @@ describe("SEC-15 W0b the access layer", () => {
     await act(async () => retry?.click());
     await settle();
     expect(q('[data-testid="app"]')).not.toBeNull();
+  });
+
+  it("SEC-15 W0b only an explicit judge sees the app: a garbled answer is under construction", async () => {
+    for (const body of [
+      { declaration: "admin" },
+      { declaration: "judge " },
+      { declaration: "Judge" },
+      {},
+      "judge",
+    ]) {
+      await show(http(async () => body));
+      expect(q('[data-testid="app"]'), JSON.stringify(body)).toBeNull();
+    }
+  });
+
+  it("SEC-15 W0b only a Google sign-in on a deployment with an API is asked", () => {
+    expect(needsAccess("google", "https://api.example.test")).toBe(true);
+    for (const status of ["anonymous", "unavailable", "signed_out", "unknown"]) {
+      expect(needsAccess(status, "https://api.example.test"), status).toBe(false);
+    }
+    for (const url of [undefined, "", "   "]) expect(needsAccess("google", url)).toBe(false);
   });
 
   it("SEC-15 W0b the layer holds no password field and no free text", async () => {
