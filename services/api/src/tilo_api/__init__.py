@@ -34,6 +34,7 @@ from tilo_api.log_context import LogContext as _LogContext
 from tilo_api.log_context import LogRunId as _LogRunId
 from tilo_api.notifications import router as _notifications_router
 from tilo_api.people_limits import NoStore as _NoStore
+from tilo_api.people_list import router as _people_list_router
 from tilo_api.redaction import router as _redaction_router
 from tilo_api.sharing import WorldView
 from tilo_api.sharing import build_router as _build_sharing_router
@@ -114,6 +115,7 @@ app.include_router(_build_sharing_router(_world_views))
 app.include_router(_runs.router)
 app.include_router(_assistant_router)
 app.include_router(_people.router)
+app.include_router(_people_list_router)
 app.include_router(_effort_router)
 app.include_router(_schedules.router)
 app.include_router(_team_router)
