@@ -70,6 +70,8 @@ def test_FR_TEAM_02_invites_are_capped_and_deduplicated_by_email() -> None:
         assert api.post("/v1/team/invites", {"email": "Ann@B.co", "role": "Member"}).status_code == 201
         assert api.post("/v1/team/invites", {"email": "ann@b.co", "role": "Viewer"}).status_code == 409
         for n in range(99):
+            if (n + 2) % 50 == 0:
+                api.advance_clock(61)
             assert api.post("/v1/team/invites", {"email": f"p{n}@b.co", "role": "Member"}).status_code == 201
         assert len(api.store.read().invites) == 100
         assert api.post("/v1/team/invites", {"email": "late@b.co", "role": "Member"}).status_code == 409
@@ -89,4 +91,16 @@ def test_FR_TEAM_02_a_store_missing_a_field_is_a_503_not_the_member_404() -> Non
         assert response.status_code == 503 and response.json() != NOT_FOUND
     with team_api() as api:  # a real non-member still gets the one 404
         assert api.as_("u_x").get().json() == NOT_FOUND
+
+
+def test_FR_TEAM_02_SEC_10_team_writes_have_write_limit() -> None:
+    """Team write endpoints are bounded by write_limit (60 writes/min per principal, SEC-10)."""
+    from tilo_api.people_limits import WRITES_PER_MINUTE  # noqa: PLC0415
+
+    with team_api() as api:
+        for n in range(WRITES_PER_MINUTE):
+            assert api.put("/v1/team/switches/weekend", {"on": True}).status_code == 200, n
+        over = api.put("/v1/team/switches/weekend", {"on": True})
+        assert over.status_code == 429 and over.json().get("code") == "rate_limited", over.text
+        assert 1 <= int(over.headers["retry-after"]) <= 60
         assert api.as_(OWNER).get().status_code == 200 and api.store.read().roles == ROLES
