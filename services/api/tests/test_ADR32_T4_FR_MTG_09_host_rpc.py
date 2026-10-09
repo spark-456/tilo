@@ -403,7 +403,11 @@ def test_ADR32_T4_FR_MTG_09_only_the_stub_may_reach_the_client_send():
             getattr(n, "attr", None) == "send_invitation" or getattr(n, "id", None) == "send_invitation"
             for n in ast.walk(tree)
         ), f"{path.name} reaches the RPC client's send_invitation"
-    assert {n for n in dir(MeetingHostRpc) if not n.startswith("_")} == {"status", "send_invitation"}
+    assert {n for n in dir(MeetingHostRpc) if not n.startswith("_")} == {
+        "status",
+        "send_invitation",
+        "connection_views",  # ADR-0032a T4b: a read with no side effect
+    }
     tree = ast.parse((src / "meeting_host_rpc.py").read_text(encoding="utf-8"))
     callers = [
         c.name

@@ -31,6 +31,7 @@ from starlette.requests import HTTPConnection
 from tilo_archive import RunArchive
 from tilo_connectors import InMemoryOutboxStore
 from tilo_connectors.registry import ConnectorRegistry, load_registry
+from tilo_contracts import MeetingHostRpcConnectionView
 from tilo_harness.executor import DefaultUnitRunner
 from tilo_harness.skills import SkillRegistry
 from tilo_memory.artifacts import ArtifactStore
@@ -707,6 +708,16 @@ def get_meeting_host_client() -> MeetingHostRpc:
                 _host_client_retry_at = meeting_host_clock() + MEETING_HOST_BACKOFF_S
                 raise HTTPException(status_code=503, detail="not_configured") from None
         return _host_client
+
+
+def get_connection_views_rpc() -> Callable[[str], list[MeetingHostRpcConnectionView] | None]:
+    """ADR-0032 addendum 1 (T4b): `views(user_id)` for `GET /v1/connectors`, over the same client as the meeting-host
+    calls (503 `not_configured` when it is not configured). It gives the person's display views, or None for "unknown"
+    (every failure), and never raises. It holds no broker, token record, Kms or secret (SEC-02)."""
+    client = get_meeting_host_client()
+    registry = get_connector_registry()
+    order = [c for c in registry.ids() if registry.get(c)["auth"] == "oauth2"]
+    return lambda user_id: client.connection_views(user_id, order=order)
 
 
 def _forget_host_client() -> None:
