@@ -3,6 +3,7 @@
 // world has no API) or any failure means no sample, and the tour is the same without it.
 import { API_URL, appCheckToken, authToken } from "../api/ClientProvider";
 import { HttpClient } from "../api/http";
+import { session } from "../auth/session";
 
 export type WorldsReader = () => Promise<unknown>;
 
@@ -27,8 +28,8 @@ export async function findSampleWorldId(read: WorldsReader | null): Promise<stri
 }
 
 /** The real reader: the first page of the person's worlds, or none without an API address. */
-export function liveWorldsReader(): WorldsReader | null {
-  if (!API_URL?.trim()) return null;
+export function liveWorldsReader(status: string = session.getState().status): WorldsReader | null {
+  if (!API_URL?.trim() || status === "anonymous") return null; // a demo reads the sample company, never the API
   const http = new HttpClient({
     baseUrl: API_URL,
     ...(appCheckToken ? { appCheckToken } : {}),
