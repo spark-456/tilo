@@ -29,7 +29,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
-from tilo_api import events
+from tilo_api import events, meeting_room
 from tilo_api.deps import (
     EventWriter,
     Principal,
@@ -163,7 +163,7 @@ def drain(
     deadline_at: float,
     part_deadline_s: float,
     abandon_after_s: float,
-    only_type: str | None = None,
+    only_type: str | tuple[str, ...] | None = None,
 ) -> None:
     """Attempts the world's pending parts oldest first until the queue is empty, the deadline
     passes, or an attempt does not settle within `part_deadline_s` (that part and everything behind
@@ -209,7 +209,10 @@ def drain(
                     if isinstance(p, dict)
                     and isinstance(p.get("id"), str)
                     and p["id"] not in given_up
-                    and (only_type is None or p.get("type") == only_type)
+                    and (
+                        only_type is None
+                        or p.get("type") in ((only_type,) if isinstance(only_type, str) else only_type)
+                    )
                 ]
                 if not candidates or locks["abandoned"] >= _MAX_ABANDONED:
                     return
@@ -343,7 +346,14 @@ def _policy_ids(plan) -> list[str]:
     return [part["data"]["policy_id"] for _, _, part in plan]
 
 
-def _switch(store: Store, world: WorldRecord, world_id: str, at: str, pause_part: dict | None = None):
+def _switch(
+    store: Store,
+    world: WorldRecord,
+    world_id: str,
+    at: str,
+    pause_part: dict | None = None,
+    before: list[dict] = (),  # type: ignore[assignment]
+):
     """Stop all's change (and Pause all's), cached first: every cached policy of the owner is lowered and the world
     paused with no backend read and no wait on the store's lock; then the rest of the owner's are loaded, within
     `_LOCK_WAIT_S`, and whatever is new is lowered. Returns (plan, already_l1, touched worlds, loaded)."""
@@ -357,6 +367,9 @@ def _switch(store: Store, world: WorldRecord, world_id: str, at: str, pause_part
             if pause_part is not None and not world.paused:
                 world.paused = True
                 _enqueue(store, world_id, pause_part, front=True)  # then world.paused at the head of its queue
+            queued = {p.get("id") for p in store.pending_events.get(world_id) or [] if isinstance(p, dict)}
+            for part in reversed([p for p in before if p["id"] not in queued]):
+                _enqueue(store, world_id, part, front=True)  # room closings (MR-05) ahead of world.paused, once
         return plan, already, touched
 
     plan, already_l1, touched = apply()
@@ -392,7 +405,8 @@ def stop_autopilot(
     world = _require_member_world(principal, store, world_id)
     _require_owner(principal, world)
 
-    plan, already_l1, touched, loaded = _switch(store, world, world_id, events.now())
+    rooms = meeting_room.adjourn_parts(store, world_id)  # MR-05: no I/O; queued with the switch
+    plan, already_l1, touched, loaded = _switch(store, world, world_id, events.now(), None, rooms)
     _persist(store, touched, policies=_policy_ids(plan), loaded=loaded)
 
     deadline_at = time.monotonic() + _CALL_BUDGET_S
@@ -428,11 +442,20 @@ def pause_world(
     pause = events.world_paused_part(
         part_id=events.new_part_id(), world_id=world_id, actor=principal.user_id, channel=principal.channel
     )
-    plan, already_l1, touched, loaded = _switch(store, world, world_id, events.now(), pause)
+    rooms = meeting_room.adjourn_parts(store, world_id)  # MR-05: no I/O; queued ahead of world.paused
+    plan, already_l1, touched, loaded = _switch(store, world, world_id, events.now(), pause, rooms)
     _persist(store, touched, policies=_policy_ids(plan), worlds=[world_id], loaded=loaded)
 
     deadline_at = time.monotonic() + _CALL_BUDGET_S
-    drain(store, world_id, writer, deadline_at, part_deadline_s, abandon_after_s, only_type="world.paused")
+    drain(
+        store,
+        world_id,
+        writer,
+        deadline_at,
+        part_deadline_s,
+        abandon_after_s,
+        only_type=("meeting.adjourned", "world.paused"),
+    )
     pending = _drain_touched(store, touched, writer, deadline_at, part_deadline_s, abandon_after_s)
     store.settle(world_id, writer)
     body_out = {"stopped": len(plan), "already_l1": already_l1, "paused": True, "pending": pending}

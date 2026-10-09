@@ -39,6 +39,7 @@ from tilo_api.intake import router as intake_router
 from tilo_api.item_fields import router as _item_fields_router
 from tilo_api.log_context import LogContext as _LogContext
 from tilo_api.log_context import LogRunId as _LogRunId
+from tilo_api.meeting_room import router as _meeting_room_router
 from tilo_api.notifications import router as _notifications_router
 from tilo_api.people_limits import NoStore as _NoStore
 from tilo_api.people_list import router as _people_list_router
@@ -124,6 +125,7 @@ app.include_router(_build_console_router(_runs.get_card_store, answer_guard=_run
 app.include_router(_build_sharing_router(_world_views))
 app.include_router(_runs.router)
 app.include_router(_item_fields_router)
+app.include_router(_meeting_room_router)
 app.include_router(_assistant_router)
 app.include_router(_people.router)
 app.include_router(_meeting_host_routes.router)

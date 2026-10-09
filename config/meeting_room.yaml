@@ -1,0 +1,10 @@
+# Meeting room limits (ADR-0028 decision 9, MROOM-A1). EXAMPLE values: the user may change every one.
+# Loaded strictly by tilo_api.meeting_room_config: an unknown or missing key, a non-integer (credits are whole
+# numbers here), or an out-of-range value refuses the whole file and the room routes answer 503 not_configured.
+max_agents: 6 # the lead plus up to five agents (schema ceiling: lead + 7)
+max_turns: 20 # per room (schema ceiling 50)
+credit_cap: 20 # credits per room, clipped to the convener's remaining per-user cap
+max_changes: 3 # confirmed changes per room (slice 1b)
+idle_timeout_s: 600 # a room with no event for this long closes (reason idle)
+open_rooms_per_world: 1
+convene_roles: [Owner, Approver, Member] # Park team roles that may call a room; a Viewer never does

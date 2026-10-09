@@ -283,6 +283,11 @@ def install(app: FastAPI, env: Mapping[str, str] | None = None) -> None:
 
     app.dependency_overrides[deps.get_feedback_store] = get_feedback
     app.dependency_overrides.update(_dev_people())  # in-memory people stores, the dev owner an org owner
+    from tilo_api import meeting_room  # noqa: PLC0415
+
+    app.dependency_overrides.update(
+        meeting_room.dev_overrides()
+    )  # MROOM-A1: a free fake room model, an in-memory archive
     app.add_middleware(
         CORSMiddleware,
         allow_origins=origins,

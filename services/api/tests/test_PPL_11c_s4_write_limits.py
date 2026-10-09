@@ -83,6 +83,9 @@ BODY_ROUTES = {
     "connect connector": "/v1/connectors/connect",
     "connector callback": "/v1/connectors/callback",
     "disconnect connector": "/v1/connectors/disconnect",
+    "convene room": "/v1/worlds/w_q4_plan/rooms",
+    "ask in room": "/v1/worlds/w_q4_plan/rooms/01JB5VQ00000000000000R0001/turns",
+    "adjourn room": "/v1/worlds/w_q4_plan/rooms/01JB5VQ00000000000000R0001/adjourn",
 }
 
 
