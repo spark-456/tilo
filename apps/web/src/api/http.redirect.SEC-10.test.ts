@@ -9,8 +9,9 @@ describe("SEC-10 the default fetch refuses redirects", () => {
   it("SEC-10 every call the client makes carries redirect: error", async () => {
     const spy = vi
       .spyOn(globalThis, "fetch")
-      .mockResolvedValue(
-        new Response("{}", { status: 200, headers: { "content-type": "application/json" } }),
+      .mockImplementation(
+        async () =>
+          new Response("{}", { status: 200, headers: { "content-type": "application/json" } }),
       );
     const http = new HttpClient({
       baseUrl: "https://api.example.test",
