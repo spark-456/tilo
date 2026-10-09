@@ -74,7 +74,7 @@ from tilo_harness.writer import new_ulid
 from tilo_metering.flags import FlagStore
 from tilo_planning.events import build_event
 
-from tilo_api import deps, dev, events, runs, team_access, team_store
+from tilo_api import deps, dev, ephemeral, events, runs, team_access, team_store
 from tilo_api.access import Mode
 from tilo_api.durable_store import DurableStore
 from tilo_api.tasks import _json_body
@@ -137,7 +137,12 @@ def get_seams_factory(
 ) -> Callable[..., runs.Seams | None]:
     """Builds nothing (about 80 ms when called): `runs.run_seams`, overrides included, for the tick to call after it.
     `demo=True` builds them for a demo session's schedule: replay, whatever the request's own mode is (BQ-SIGNIN-10)."""
-    return lambda demo=False: runs.run_seams(request, "replay" if demo else mode)
+
+    def build(demo: bool = False) -> runs.Seams | None:
+        ephemeral.mark_no_person(request)  # only the tick calls this, after its OIDC check: no Firebase token to verify
+        return runs.run_seams(request, "replay" if demo else mode)
+
+    return build
 
 
 def _unverified(token: str) -> tuple[dict[str, Any], dict[str, Any]]:
@@ -279,6 +284,7 @@ def get_store_factory(request: Request) -> Callable[[], deps.Store]:
     its token check, so an anonymous call opens no Firestore client and reads nothing."""
 
     def build() -> deps.Store:
+        ephemeral.mark_no_person(request)  # called only after the tick's token check; see `ephemeral.mark_no_person`
         seam = request.app.dependency_overrides.get(deps.get_store, deps.get_store)
         return seam(request) if inspect.signature(seam).parameters else seam()
 
@@ -358,6 +364,8 @@ def create_schedule(
     clock: Clock,
     flags: Flags,
 ) -> dict[str, Any]:
+    if principal.demo_session:  # DEMO-EPHEMERAL-1: a demo stores nothing durable, and a schedule outlives the session
+        raise HTTPException(status_code=403, detail="demo_schedules_unavailable")
     task = store.load_task(body.task_id, settle=False)  # not yet known to be this owner's
     if task is None or task.owner != principal.user_id:  # unknown and another user's task answer alike
         raise HTTPException(status_code=404, detail="No such task.")
@@ -403,6 +411,8 @@ def update_schedule(
     clock: Clock,
     flags: Flags,
 ) -> dict[str, Any]:
+    if principal.demo_session:  # DEMO-EPHEMERAL-1: a demo's schedule is never edited or re-enabled
+        raise HTTPException(status_code=403, detail="demo_schedules_unavailable")
     current = _mine(schedules, schedule_id, principal)
     deps.refuse_if_replay_only(flags)
     cadence = body.cadence.build() if body.cadence is not None else None

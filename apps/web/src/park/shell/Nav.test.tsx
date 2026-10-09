@@ -265,8 +265,7 @@ describe("WEB_3b_nav: bell and avatar", () => {
 });
 
 describe("WEB_3b_chip: Sample data (plan section 6.1)", () => {
-  const SAMPLE =
-    "Northwind Ops is a fictional team. Amounts are examples (£), dates are September 2026.";
+  const SAMPLE = "Northwind Ops is a fictional team. Amounts are examples (£), dates follow today.";
 
   it("WEB_3b_chip_a_fixture_Api_shows_the_chip_in_the_nav_with_no_page_asking_for_data", async () => {
     const { m } = await mountApp();

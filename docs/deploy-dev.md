@@ -270,7 +270,8 @@ live at https://essential-wares-510320-f0.web.app (and the `.firebaseapp.com` al
   `frame-ancestors 'none'`, no `unsafe-eval`: the web app loads `pixi.js/unsafe-eval`; SEC-10 adds exactly
   `https://www.google.com/recaptcha/` and `https://www.gstatic.com/recaptcha/` to `script-src`,
   `https://www.google.com/recaptcha/` to `frame-src` and `https://content-firebaseappcheck.googleapis.com`
-  (the host the web SDK, `@firebase/app-check` 0.13.1, exchanges tokens at) to `connect-src`, for App Check with
+  (the host the web SDK, `@firebase/app-check` 0.13.1, exchanges tokens at) plus `https://www.google.com/recaptcha/`
+  (reCAPTCHA Enterprise's own `enterprise/clr` fetch) to `connect-src`, for App Check with
   reCAPTCHA Enterprise), `X-Content-Type-Options: nosniff` and
   `Referrer-Policy: strict-origin-when-cross-origin`. A new backend origin for the web app must be
   added to `connect-src` when the app is pointed at a deployed `tilo-api`.
