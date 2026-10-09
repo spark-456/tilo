@@ -362,6 +362,26 @@ export interface Agenda {
 }
 export type AgendaSlot = Agenda["slots"][number];
 
+export interface AgendaPlateRow {
+  ref: { kind: string; id: string };
+  title: string | null;
+  due: string | null;
+  at: string | null;
+  from: string | null;
+  group: string;
+}
+/** The plate supplies summaries, not a week, event duration, attendees or board ownership. */
+export type LiveAgenda = { [K in keyof Required<Agenda>]: null } & {
+  plate: {
+    today: string;
+    asOf: string;
+    rows: AgendaPlateRow[];
+    parked: AgendaPlateRow[];
+    truncated: boolean;
+  };
+};
+export type AgendaData = Agenda | LiveAgenda;
+
 // Team, connectors, notifications
 export interface Team {
   people: {

@@ -2,7 +2,7 @@
 // page can always say whether it shows sample data. One list of method names, one interface.
 import type {
   Ack,
-  Agenda,
+  AgendaData,
   AgendaSlot,
   ApiResult,
   Connector,
@@ -65,7 +65,7 @@ export interface Api {
   getSkills(): R<Skill[]>;
   getLearn(): R<Learn>;
   getLedger(): R<Ledger>;
-  getAgenda(): R<Agenda>;
+  getAgenda(): R<AgendaData>;
   getTeam(): R<Team>;
   getConnectors(): R<Connector[]>;
   getNotifications(): R<Notification[]>;

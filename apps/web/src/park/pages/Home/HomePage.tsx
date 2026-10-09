@@ -5,7 +5,7 @@
 // provider's `useSchedule`, so a test never waits and a pending draft is cancelled when the page goes.
 import { useEffect, useRef, useState } from "react";
 import type {
-  Agenda,
+  AgendaData,
   ApiResult,
   Decision,
   Effort,
@@ -38,7 +38,7 @@ interface Base {
   user: User;
   today: Today;
   /** Null when the Api serves no calendar (live today): the Today panel then lists no events. */
-  agenda: Agenda | null;
+  agenda: AgendaData | null;
   ledger: Ledger;
   /** What the "Waiting on you" tile says and opens; none when the Api serves no decisions. */
   decisions: Decision[];
@@ -296,7 +296,7 @@ export function HomePage({ app }: { app: AppCtx }) {
           {(vw || 1440) >= 1180 ? (
             <TodayPanel
               rows={liveRows(worlds, needs, served)}
-              events={base.agenda ? nextEvents(base.agenda) : []}
+              events={base.agenda && base.agenda.days !== null ? nextEvents(base.agenda) : []}
               spend={spendOf(base.ledger)}
               night={night}
               onWorld={open}

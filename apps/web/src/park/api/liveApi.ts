@@ -1,12 +1,13 @@
 // The live Api (WEB-1a, WIRE-1..3, FR-UX-13): `startWorld` makes the real intake call; `getLedger` reads `GET {base}/costs`, `getWorlds` walks `GET {base}/worlds`
 // pages, `getDecisions` walks `GET {base}/cards` pages and `decide` answers one card with one POST (the
-// person's tap, never a retry); every other method is NotBuilt and
+// person's tap, never a retry); getAgenda reads GET /v1/plate summaries with unavailable calendar fields null; every other method is NotBuilt and
 // fetches nothing. With no base url nothing is fetched at all. It never imports the fixtures, so sample
 // numbers cannot pass as live (HR-1..HR-7). Failures are the shared `TiloApiError` (src/api/http.ts).
 import type { IntakeResult } from "../../api/client";
 import { HttpClient, type QuickIntakeResult, TiloApiError, reasonOf } from "../../api/http";
 import { rememberIntake } from "../../api/intakes";
 import { API_METHODS, type Api, type ApiMethod } from "./index";
+import { agendaFromPlate } from "./live/agendaFromPlate";
 import {
   type CardFeedItem,
   answerOption,
@@ -207,6 +208,10 @@ export function createLiveApi(options: LiveApiOptions = {}): Api {
     if (!isCostReport(report)) throw new TiloApiError(BAD_REPLY, 200, true);
     return { data: ledgerFromCosts(report), source: "live" };
   };
+  api.getAgenda = async () => ({
+    data: agendaFromPlate(await http.getJson("/v1/plate")),
+    source: "live",
+  });
   api.getWorlds = async (_dec, added) => {
     const items: WorldListItem[] = [];
     let cursor: string | null = null;

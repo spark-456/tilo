@@ -4,7 +4,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Api } from "../../api/index";
 import { NotBuilt } from "../../api/liveApi";
-import type { Agenda, AgendaPin, AgendaSlot, Decision, Source } from "../../api/types";
+import type { Agenda, AgendaData, AgendaPin, AgendaSlot, Decision, Source } from "../../api/types";
 import type { AppCtx } from "../../app/AppCtx";
 import {
   type BoardKey,
@@ -21,7 +21,7 @@ import {
 
 export type AgendaState =
   | { status: "loading" }
-  | { status: "ready"; data: Agenda; decisions: Decision[]; source: Source }
+  | { status: "ready"; data: AgendaData; decisions: Decision[]; source: Source }
   | { status: "not-built" }
   | { status: "error" };
 

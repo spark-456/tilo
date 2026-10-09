@@ -5,7 +5,7 @@
 // No motion until WEB-3 (BQ-WEB-3).
 import { type ReactNode, useRef } from "react";
 import type { Api } from "../../api/index";
-import type { Agenda, Decision } from "../../api/types";
+import type { Agenda, AgendaPlateRow, Decision, LiveAgenda } from "../../api/types";
 import { useParkApi } from "../../app/context";
 import { useStagedCount } from "../../app/useStaged";
 import { Button, PageSheet } from "../../components";
@@ -105,7 +105,69 @@ export function AgendaPage({ app }: AgendaPageProps) {
   if (state.status === "loading") return <Frame />;
   return (
     <Frame source={state.source}>
-      <Ready A={state.data} decisions={state.decisions} app={app} api={api} />
+      {state.data.days === null ? (
+        <Plate A={state.data} />
+      ) : (
+        <Ready A={state.data} decisions={state.decisions} app={app} api={api} />
+      )}
     </Frame>
+  );
+}
+
+function Plate({ A }: { A: LiveAgenda }) {
+  const list = (rows: AgendaPlateRow[], empty: string) =>
+    rows.length ? (
+      <ul>
+        {rows.map((r) => (
+          <li key={`${r.ref.kind}:${r.ref.id}`}>
+            <strong>{r.title ?? "Untitled item"}</strong>
+            {r.due ? (
+              <p>
+                Due <time dateTime={r.due}>{r.due}</time>
+              </p>
+            ) : null}
+            {r.ref.kind === "calendar_entry" && r.at ? (
+              <p>
+                <time dateTime={r.at}>{r.at}</time>
+              </p>
+            ) : null}
+          </li>
+        ))}
+      </ul>
+    ) : (
+      <p>{empty}</p>
+    );
+  return (
+    <>
+      <div className="park-agenda-titles">
+        <h1 className="park-agenda-title">Agenda</h1>
+        <p className="park-agenda-lede">{A.plate.today}</p>
+      </div>
+      <section aria-label="Your plate" className="park-agenda-state">
+        <h2>Your plate</h2>
+        {list(
+          A.plate.rows.filter((r) => r.ref.kind !== "calendar_entry"),
+          "Nothing on your plate",
+        )}
+        {A.plate.truncated ? <p>Showing a limited list.</p> : null}
+      </section>
+      <section aria-label="Today's calendar" className="park-agenda-state">
+        <h2>Today's calendar</h2>
+        {list(
+          A.plate.rows.filter((r) => r.ref.kind === "calendar_entry"),
+          "No calendar entries for today.",
+        )}
+      </section>
+      <section aria-label="Parked work" className="park-agenda-state">
+        <h2>Parked work</h2>
+        {list(A.plate.parked, "No parked work.")}
+      </section>
+      {["Boards", "Week view", "Event details", "Available times"].map((name) => (
+        <section key={name} aria-label={name} className="park-agenda-state">
+          <h2>{name}</h2>
+          <p>Not available yet</p>
+        </section>
+      ))}
+    </>
   );
 }
