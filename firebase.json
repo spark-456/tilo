@@ -1,5 +1,8 @@
 {
-  "firestore": { "rules": "firestore.rules" },
+  "firestore": [
+    { "database": "(default)", "rules": "firestore.rules" },
+    { "database": "tilo-tokens", "rules": "firestore.tokens.rules" }
+  ],
   "hosting": {
     "public": "apps/web/dist",
     "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],

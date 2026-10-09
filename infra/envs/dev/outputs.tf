@@ -20,6 +20,13 @@ output "token_database" {
   }
 }
 
+output "token_rules" {
+  value = {
+    release_name = google_firebaserules_release.tokens.name
+    source       = google_firebaserules_ruleset.tokens.source[0].files[0].content
+  }
+}
+
 output "pubsub_events_topic_name" {
   value = module.events.topic_name
 }

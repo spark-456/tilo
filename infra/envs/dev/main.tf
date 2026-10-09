@@ -492,8 +492,8 @@ resource "google_firestore_database" "default" {
 
 # Connector token records (state, scopes, sealed grants; ADR-0032 decision 9). Only tilo-connectors reaches this
 # database: datastore.user for api, harness and render is conditioned to (default) in local.project_bindings.
-# It has NO rules release yet: firebase.json deploys to (default) only. T5b ships a deny-all
-# google_firebaserules_ruleset and a release `cloud.firestore/tilo-tokens` (with a tftest pin) before any token moves.
+# Its deny-all Firestore rules are the ruleset and release below (T5b): firebase.json deploys only what a
+# `firebase deploy` names and the CI deployer has no Firebase role, so Terraform releases them.
 resource "google_firestore_database" "tokens" {
   project     = var.project_id
   name        = "tilo-tokens"
@@ -505,6 +505,26 @@ resource "google_firestore_database" "tokens" {
   deletion_policy         = "ABANDON"
 
   depends_on = [google_project_service.apis]
+}
+
+# Same text as the tokens entry in firebase.json; pinned in tests/security_iam.tftest.hcl.
+resource "google_firebaserules_ruleset" "tokens" {
+  project = var.project_id
+
+  source {
+    files {
+      name    = "firestore.tokens.rules"
+      content = file("${path.module}/../../../firestore.tokens.rules")
+    }
+  }
+
+  depends_on = [google_firestore_database.tokens]
+}
+
+resource "google_firebaserules_release" "tokens" {
+  project      = var.project_id
+  name         = "cloud.firestore/${google_firestore_database.tokens.name}"
+  ruleset_name = google_firebaserules_ruleset.tokens.name
 }
 
 module "events" {

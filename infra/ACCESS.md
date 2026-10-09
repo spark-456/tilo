@@ -373,7 +373,9 @@ only, and App Check enforcement on Firebase Authentication is worth considering,
 Firestore IAM conditions name a database, never a collection, so project-wide `datastore.user` could not exclude
 `connector_tokens`. Tokens move to the database `tilo-tokens`; api, harness and render keep `datastore.user` only on
 `(default)` (condition `default-database-only`); connectors holds it unconditionally. `security_iam.tftest.hcl` pins
-this. The database has delete protection on. It has no rules release yet; T5b ships a deny-all ruleset and release for it.
+this. The database has delete protection on. Its rules are Terraform's (T5b): a `google_firebaserules_ruleset` from
+`firestore.tokens.rules` (the one deny-all text, also in `firebase.json`) and the release `cloud.firestore/tilo-tokens`,
+pinned in `security_iam.tftest.hcl`. Connectors reads the database id from `TILO_TOKEN_DATABASE` and refuses `(default)`.
 
 Connectors `TILO_*` settings are set by hand (`ignore_env`, like api). The ordered steps and values: `docs/deploy-dev.md`
 ("Meeting host: connectors and api settings").

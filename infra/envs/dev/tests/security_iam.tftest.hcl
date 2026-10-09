@@ -198,3 +198,25 @@ run "SEC_02_only_connectors_can_reach_the_token_database" {
     error_message = "workspace-oauth-client is readable by connectors only."
   }
 }
+
+# ADR-0032 T5b: the tokens database has a deny-all Firestore rules release, shipped by Terraform because firebase.json
+# deploys only what a `firebase deploy` names and the CI deployer has no Firebase role. Rules never bind a server (IAM
+# does), but a browser or phone SDK must read and write nothing there.
+run "SEC_02_the_token_database_has_a_deny_all_rules_release" {
+  command = plan
+
+  assert {
+    condition     = output.token_rules.release_name == "cloud.firestore/tilo-tokens"
+    error_message = "The rules release must be `cloud.firestore/tilo-tokens` (the tokens database), not the default database's."
+  }
+
+  assert {
+    condition     = length(regexall("allow read, write: if false;", output.token_rules.source)) == 1 && length(regexall("allow ", output.token_rules.source)) == 1
+    error_message = "The tokens ruleset has exactly one allow rule and it is `allow read, write: if false;`."
+  }
+
+  assert {
+    condition     = !strcontains(output.token_rules.source, "if true") && !strcontains(output.token_rules.source, "request.auth") && length(regexall("match ", output.token_rules.source)) == 2
+    error_message = "The tokens ruleset is one catch-all deny: no `if true`, no auth-based allow, no per-path match."
+  }
+}

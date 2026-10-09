@@ -231,15 +231,17 @@ Order, once your infrastructure run (`infra/README.md`) has finished (run it wit
    in the Secret Manager secret `workspace-oauth-client`.
 2. Set `tilo-connectors` (names here, never a value in a file or a log). `<url>` is its own URL.
    `TILO_CONNECTORS_AUDIENCE=<url>`, `TILO_MEETING_HOST_CALLER=tilo-api@<project>.iam.gserviceaccount.com`,
-   `TILO_TOKEN_STORE=firestore`, `TILO_FIRESTORE_PROJECT=<project>`,
+   `TILO_TOKEN_STORE=firestore`, `TILO_FIRESTORE_PROJECT=<project>`, `TILO_TOKEN_DATABASE=tilo-tokens`,
    `TILO_KMS_KEY=projects/<project>/locations/asia-southeast1/keyRings/<ring>/cryptoKeys/oauth-tokens`, the OAuth client
    id and secret as Secret Manager references (`--update-secrets`, which keeps the others; secret
    `workspace-oauth-client`), and no `LIVE`.
    Connectors runs one instance (CON-D9) until ticket T7.
 3. Set `tilo-api`: `TILO_CONNECTORS_URL=<tilo-connectors url>`. api reaches the internal service through its Direct VPC
    egress, and holds `run.invoker` on connectors.
-4. `LIVE=1` on connectors only, and the first live invitation, are yours after T5b and T7. The token database is
-   `tilo-tokens`; connectors' code uses it only after T5b, so the infrastructure and the settings can go first.
+4. `LIVE=1` on connectors only, and the first live invitation, are yours after T7. Connectors (T5b) builds its Firestore
+   client on `TILO_TOKEN_DATABASE` and refuses to start the broker without it: unset, `(default)` or any malformed id
+   is refused, so tokens never land in `(default)`. Order: apply the infrastructure first (it creates `tilo-tokens`, its
+   deny-all ruleset and the release `cloud.firestore/tilo-tokens`), then set the variable, then deploy the T5b image.
 
 ## Web app (Firebase Hosting, manual; P0-07c)
 
