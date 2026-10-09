@@ -49,6 +49,6 @@ export function profileDefaults(): ProfileSettings {
         slack: true,
       },
     ],
-    quiet: { on: true, start: "19:00", end: "08:00", threshold: "£1,000" },
+    quiet: { on: true, start: "19:00", end: "08:00", threshold: "" },
   };
 }

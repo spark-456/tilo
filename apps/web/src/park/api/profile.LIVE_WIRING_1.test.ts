@@ -23,7 +23,7 @@ describe("LIVE_WIRING_1 local profile", () => {
       on: true,
       start: "19:00",
       end: "08:00",
-      threshold: "£1,000",
+      threshold: "",
     });
     expect(fetch).not.toHaveBeenCalled();
   });

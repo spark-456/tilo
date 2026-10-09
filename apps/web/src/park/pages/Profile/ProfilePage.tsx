@@ -359,7 +359,9 @@ export function ProfilePage({ app }: { app: AppCtx }) {
                   <div className="park-profile-grow">
                     <div className="park-profile-mlabel">{`Quiet hours · ${loaded.settings.quiet.start} to ${loaded.settings.quiet.end}`}</div>
                     <div className="park-profile-msub">
-                      {`Phone stays silent, except decisions over ${loaded.settings.quiet.threshold}.`}
+                      {loaded.settings.quiet.threshold
+                        ? `Phone stays silent, except decisions over ${loaded.settings.quiet.threshold}.`
+                        : "Decision threshold: Not available yet"}
                     </div>
                   </div>
                   <Switch

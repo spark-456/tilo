@@ -59,6 +59,8 @@ it("LIVE_WIRING_1 signed-in profile uses identity and local toggles with only th
   expect(fieldInput(root, "Work email").value).toBe("ana@example.test");
   expect(text(root)).not.toContain("Owner on the  plan");
   await openTab(root, "Notifications");
+  expect(text(root)).toContain("Decision threshold: Not available yet");
+  expect(text(root)).not.toContain("£1,000");
   await clickAndSettle(switchNamed(root, "Quiet hours"));
   await openTab(root, "Plan and billing");
   expect(text(root)).toContain("$18");
