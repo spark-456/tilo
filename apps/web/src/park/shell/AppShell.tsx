@@ -18,11 +18,11 @@ import { Enter } from "./Enter";
 import { NotificationsPopover } from "./NotificationsPopover";
 import { TopNav } from "./TopNav";
 import { WorldLoader } from "./WorldLoader";
-import { useParkTour } from "./tour";
 import { authInitials, useParkAuth } from "./auth";
 import { useAppearance } from "./cityMotion";
 import { loadShellFonts } from "./fonts";
 import { type Bar, useLeavingCard, useMotionOff, usePageSwap } from "./motion";
+import { useParkTour } from "./tour";
 import "./park.shell.css";
 import { backdropScene } from "./scene";
 
