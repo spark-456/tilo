@@ -320,5 +320,10 @@ def test_SEC_08_connectors_app_mounts_no_inbound_route_outside_the_signed_surfac
         f"{sorted(unknown)} is an inbound route with no SEC-08 test: add forged, tampered, missing, expired and "
         "replayed cases for it to this file, then list it in SIGNED_ROUTES"
     )
-    assert all(isinstance(r, APIRoute) for r in app.routes), "a mounted router or sub-app: list its routes here"
+
+    def plain(route) -> bool:  # an include_router() entry (newer FastAPI wraps it) is fine when it holds only APIRoutes
+        inner = getattr(route, "original_router", None)
+        return isinstance(route, APIRoute) or (inner is not None and all(isinstance(r, APIRoute) for r in inner.routes))
+
+    assert all(plain(r) for r in app.routes), "a mounted sub-app or non-API route: list its routes here"
     assert app.openapi_url is None
