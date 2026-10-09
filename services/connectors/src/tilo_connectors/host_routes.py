@@ -7,6 +7,12 @@ of 64 KiB read before parsing, request validated against the contract (422), the
 against the contract too. A refusal is a fixed code. No token, OAuth code, Meet link or address is in an answer or a
 log line; a failure logs its exception type only.
 
+ADR-0035 L3 adds `/internal/connections/{start,callback,disconnect}` (LC-05, LC-06): the Google sign-in for any oauth2
+connector, over `ConsentService` and the broker. The consent flows stay in this process (one instance until ADR-0032
+T7). A refusal of the callback is one of three fixed 400 codes; no code, state, verifier or token is ever logged or
+echoed. Their parts may name any connector and `connection.established` (`connector_parts`); the meeting-host routes
+keep the narrower `parts`.
+
 `send` runs tilo-api's entry through an `Outbox` built for that request over a fresh in-memory store (HB-04, SEC-03 as
 everywhere), after the draft is checked (HB-03). The broker is one per process, so the connection parts it emits reach
 the answer through a context-local sink: they come back in the answer to the call that caused them. The grant must
@@ -38,6 +44,7 @@ from starlette.concurrency import run_in_threadpool
 from ._schema import common_validator, host_rpc_validator
 from ._time import format_ts
 from .adapters.meeting_host import ApprovalBoundBroker, MeetingHostAdapter
+from .consent import ConsentRefused, ConsentService
 from .errors import OutboxRefused
 from .host_auth import CertsUnavailable, GoogleOidcVerifier, OidcVerifier, caller_status
 from .host_broker import BrokerNotConfigured, BrokerSeam, open_broker, open_transport
@@ -45,11 +52,20 @@ from .meeting_host import CALENDAR_EVENTS_OWNED, CONNECTOR_ID, DRAFT_KIND, HostR
 from .outbox import Outbox
 from .registry import load_registry
 from .store import InMemoryOutboxStore
+from .tokens import _ulid, grant_group
 
 MAX_BODY_BYTES = 65_536
 MAX_PARTS = 16
 AUDIENCE_VAR, CALLER_VAR = "TILO_CONNECTORS_AUDIENCE", "TILO_MEETING_HOST_CALLER"
 _CONNECTION_PARTS = frozenset({"connection.expired", "connection.rate_limited", "connection.revoked"})
+_WIDE_PARTS = _CONNECTION_PARTS | {"connection.established"}  # never connection.consented or .requested (CR-13)
+_REFUSALS = {
+    "invalid_request": 422,
+    "not_configured": 503,
+    "start_again": 400,
+    "not_granted": 400,
+    "wrong_account": 400,
+}
 _CONFIG = Path(__file__).resolve().parents[4] / "config" / "connectors.yaml"
 _ERRORS = {
     401: "unauthenticated",
@@ -96,11 +112,21 @@ def _data(part: Mapping[str, Any]) -> Mapping[str, Any]:
     return data if isinstance(data, dict) else {}
 
 
-class _Parts:
-    """What the broker and the adapter emitted during one call, for the call's own user (contract `parts`)."""
+class Refused(Exception):
+    """A fixed refusal of a connection route: the status and the contract's `error` code, nothing else."""
 
-    def __init__(self, user_id: str) -> None:
+    def __init__(self, code: str) -> None:
+        super().__init__(code)
+        self.code = code if code in _REFUSALS else "start_again"
+
+
+class _Parts:
+    """What the broker and the adapter emitted during one call, for the call's own user (contract `parts`, or with
+    `wide` the contract's `connector_parts`: any connector, and `connection.established`)."""
+
+    def __init__(self, user_id: str, wide: bool = False) -> None:
         self.user_id = user_id
+        self.wide = wide
         self.items: list[dict[str, str]] = []
 
     def add(self, item: dict[str, str]) -> None:
@@ -164,6 +190,8 @@ class HostRuntime:
         self._broker = BrokerSeam(env, emit=self._emit, alert=self._alert, opener=broker_opener)
         self._transport = BrokerSeam(env, emit=self._emit, alert=self._alert, opener=lambda e, **_: transport_opener(e))
         self._clock = clock
+        self._consent: tuple[Any, ConsentService] | None = None
+        self._consent_lock = threading.Lock()
         self._closing: dict[str, int] = {}
         self._closing_lock = threading.Lock()
 
@@ -178,9 +206,11 @@ class HostRuntime:
     def _emit(self, part: dict[str, Any]) -> None:
         sink = self._sink.get()
         data = _data(part)
-        if sink is not None and part.get("type") in _CONNECTION_PARTS and part.get("user_id") == sink.user_id:
-            if data.get("connector") == CONNECTOR_ID:
-                sink.add({"type": part["type"], "connector": CONNECTOR_ID, "user_id": sink.user_id})
+        allowed = _WIDE_PARTS if sink is not None and sink.wide else _CONNECTION_PARTS
+        if sink is not None and part.get("type") in allowed and part.get("user_id") == sink.user_id:
+            connector = data.get("connector")
+            if isinstance(connector, str) and (sink.wide or connector == CONNECTOR_ID):
+                sink.add({"type": part["type"], "connector": connector, "user_id": sink.user_id})
 
     def _alert(self, part: dict[str, Any]) -> None:
         sink, data = self._sink.get(), _data(part)
@@ -190,8 +220,8 @@ class HostRuntime:
             sink.add({"type": "alert.raised", "alert_id": data["alert_id"]})
 
     @contextlib.contextmanager
-    def capture(self, user_id: str) -> Iterator[_Parts]:
-        parts = _Parts(user_id)
+    def capture(self, user_id: str, *, wide: bool = False) -> Iterator[_Parts]:
+        parts = _Parts(user_id, wide)
         token = self._sink.set(parts)
         try:
             yield parts
@@ -233,6 +263,76 @@ class HostRuntime:
         with self.closing(user_id), self.capture(user_id) as parts:
             result = broker.disconnect(user_id, CONNECTOR_ID)
         return {"revoked_at_provider": bool(result.revoked_at_provider), "parts": parts.items}
+
+    # -- the three connection calls (ADR-0035 L3) ---------------------------------------------------
+
+    def _consent_service(self) -> ConsentService:
+        """One per process and broker: the flows (state, verifier) live in it and nowhere else (LC-03, LC-05)."""
+        broker = self._broker.get()
+        with self._consent_lock:
+            if self._consent is None or self._consent[0] is not broker:
+                http, settings = broker.oauth
+                registry = _registry()
+                known = {name: registry.get(name) for name in registry.ids()}
+                service = ConsentService(
+                    connectors=known, broker=broker, http=http, settings=settings, clock=self._clock, emit=self._emit
+                )
+                self._consent = (broker, service)
+            return self._consent[1]
+
+    def start(self, body: Mapping[str, Any]) -> dict[str, Any]:
+        """LC-06: Google is asked only for the declared scopes of these capabilities minus those already granted."""
+        service = self._consent_service()
+        try:
+            url = service.authorization_url(
+                user_id=body["user_id"], connector=body["connector"], capabilities=body["capabilities"], card_id="web"
+            )
+        except ConsentRefused as refused:
+            raise Refused(refused.code) from None
+        return {"authorize_url": url}
+
+    def callback(self, body: Mapping[str, Any]) -> dict[str, Any]:
+        """LC-05: the state is spent here and must belong to this user; the code is exchanged in this process."""
+        service, user_id = self._consent_service(), body["user_id"]
+        with self.capture(user_id, wide=True) as parts:
+            try:
+                result = service.handle_callback(
+                    user_id=user_id, state=body["state"], code=body.get("code"), error=body.get("error")
+                )
+            except ConsentRefused as refused:
+                raise Refused(refused.code) from None
+        return {"connector": result.connector, "scope_lines": list(result.scope_lines), "parts": parts.items}
+
+    def connection_disconnect(self, body: Mapping[str, Any]) -> dict[str, Any]:
+        """Google keeps one grant per person (CON-D10): every connector resting on it ends, the last one revokes it."""
+        user_id, connector = body["user_id"], body["connector"]
+        registry = _registry()
+        if connector not in registry or registry.get(connector)["auth"] != "oauth2":
+            raise Refused("invalid_request")
+        broker, group = self._broker.get(), grant_group(connector)
+        sharing = [c for c in registry.ids() if registry.get(c)["auth"] == "oauth2" and grant_group(c) == group]
+        confirmed, unconfirmed, spent = False, False, set[str]()
+        with self.closing(user_id), self.capture(user_id, wide=True) as parts:
+            for name in sharing:
+                # All or report: one connector failing never stops the others, and what changed is always answered.
+                # Each DISTINCT stored token is revoked (a person's connectors may hold tokens of different consents or
+                # accounts); a token already revoked in this call is not revoked twice.
+                try:
+                    if broker.connection_state(user_id, name) is None:
+                        continue
+                    result = broker.disconnect(user_id, name, spent=spent)
+                except Exception as exc:  # noqa: BLE001 - the type only
+                    _log.error("a connection disconnect failed for one connector (%s)", type(exc).__name__)
+                    unconfirmed = True
+                    continue
+                if result.revoked_at_provider:
+                    confirmed = True
+                else:
+                    unconfirmed = unconfirmed or result.provider_error is not None
+            if unconfirmed and not any(p["type"] == "alert.raised" for p in parts.items):
+                # No kept-revoke alert exists for what failed, so the answer carries one: revoke_pending is true.
+                parts.add({"type": "alert.raised", "alert_id": _ulid(self._clock())})
+        return {"revoked_at_provider": confirmed and not unconfirmed, "parts": parts.items}
 
     def connection_views(self, user_id: str) -> dict[str, Any]:
         """ADR-0032 addendum 1 (HB-08, HB-09): this user's stored grants as display views. A store read only."""
@@ -385,6 +485,8 @@ def host_router(runtime: HostRuntime) -> APIRouter:
             return _error(422)
         try:
             answer = await run_in_threadpool(work, body)
+        except Refused as refusal:
+            return JSONResponse({"error": refusal.code}, status_code=_REFUSALS[refusal.code])
         except BrokerNotConfigured:
             return _error(503)
         except Exception as exc:  # noqa: BLE001 - the type only: a message could echo a token or an address
@@ -407,6 +509,20 @@ def host_router(runtime: HostRuntime) -> APIRouter:
     async def disconnect(request: Request) -> Any:
         return await serve(
             request, "user_request", "disconnect_answer", lambda body: runtime.disconnect(body["user_id"])
+        )
+
+    @router.post("/connections/start")
+    async def connection_start(request: Request) -> Any:
+        return await serve(request, "start_request", "start_answer", runtime.start)
+
+    @router.post("/connections/callback")
+    async def connection_callback(request: Request) -> Any:
+        return await serve(request, "callback_request", "callback_answer", runtime.callback)
+
+    @router.post("/connections/disconnect")
+    async def connection_disconnect(request: Request) -> Any:
+        return await serve(
+            request, "connection_disconnect_request", "connection_disconnect_answer", runtime.connection_disconnect
         )
 
     @router.post("/connections/views")
