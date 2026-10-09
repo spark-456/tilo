@@ -2,6 +2,7 @@
 // error rule: what happened, what Tilo did, what is next). Nothing here ever rejects unhandled
 // or logs to the console.
 import { useCallback, useEffect, useRef, useState } from "react";
+import { describeError } from "../api/describeError";
 import { TiloApiError, isLifetimeCap } from "../api/http";
 import { useNavigate } from "../router";
 
@@ -23,16 +24,7 @@ export const PRESS_MS = 120;
 export const isReplayOnly = (error: unknown): boolean =>
   error instanceof TiloApiError && error.replayOnly;
 
-export function describeError(doing: string, error: unknown): string {
-  // PRD 18.4, say only what is known: a timeout, a dropped connection or a 5xx on a write may have
-  // happened on the server, so "Nothing was changed" is not true and the person checks first.
-  if (error instanceof TiloApiError && error.retryable && error.write) {
-    return `Something went wrong while trying to ${doing}. We could not confirm it. Check before trying again.`;
-  }
-  const said = error instanceof Error && error.message ? error.message : "an unknown error";
-  const reason = said.replace(/[.!?]+$/, ""); // the sentence below adds its own full stop
-  return `Could not ${doing}: ${reason}. Nothing was changed. You can try again.`;
-}
+export { describeError }; // moved to api/ so the Park forms share it
 
 /** Runs `load` on mount and on every retry; its signal aborts when the screen unmounts or reloads. While `enabled` is false nothing is requested and the
  * state stays "loading" (a call that can only fail until something is on record, such as the

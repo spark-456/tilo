@@ -13,6 +13,7 @@ import type {
   TiloClient,
 } from "./client";
 import { type FieldSpec, type FieldsApi, fieldSpecsOf } from "./fields";
+import { type ItemApi, type PinnedItem, pinnedItemOf } from "./item";
 import { type HostStarted, isHostStarted, refusalOf } from "./meetingHost";
 import {
   type ScheduleRequest,
@@ -269,7 +270,7 @@ function quickOf(body: unknown): QuickIntakeResult | null {
   return { kind: "answered", text: b.text, cost: Object.keys(cost).length > 0 ? cost : null };
 }
 
-export class HttpClient implements TiloClient, SchedulesApi, FieldsApi {
+export class HttpClient implements TiloClient, SchedulesApi, FieldsApi, ItemApi {
   private readonly base: string;
   private readonly fetchFn: typeof fetch;
   private readonly pollMs: number;
@@ -696,30 +697,48 @@ export class HttpClient implements TiloClient, SchedulesApi, FieldsApi {
   /** `GET /worlds/{id}/cards/{cid}/fields` (ADR-0035 L6c): what an open fields card asks for. The card must have come
    * from `listCards` (the route is per world). A reply that is not the documented shape is an unreadable reply. */
   async getCardFields(cardId: string): Promise<FieldSpec[]> {
-    const worldId = this.cardWorlds.get(cardId);
-    if (worldId === undefined) {
-      throw new TiloApiError("Open the card list again, then answer from there.", null, false);
-    }
-    const specs = fieldSpecsOf(
-      await this.request<unknown>(
-        `/worlds/${encodeURIComponent(worldId)}/cards/${encodeURIComponent(cardId)}/fields`,
-      ),
-    );
-    if (!specs) throw new TiloApiError(BAD_REPLY, 200, true);
-    return specs;
+    return await this.cardsOf(this.worldOfCard(cardId)).getCardFields(cardId);
   }
 
   /** `POST /worlds/{id}/cards/{cid}/fields` `{fields}`: the values go to this one request. A refusal carries the API's
    * own plain reason (422), which `reasonOf` shows when it is short plain text. */
   async supplyCardFields(cardId: string, values: Readonly<Record<string, string>>): Promise<void> {
+    return await this.cardsOf(this.worldOfCard(cardId)).supplyCardFields(cardId, values);
+  }
+
+  /** `GET /worlds/{id}/cards/{cid}/item` (ADR-0035 L6d): the document a gate card pins, for the owner's show-me. */
+  async getCardItem(cardId: string): Promise<PinnedItem> {
+    return await this.cardsOf(this.worldOfCard(cardId)).getCardItem(cardId);
+  }
+
+  private worldOfCard(cardId: string): string {
     const worldId = this.cardWorlds.get(cardId);
     if (worldId === undefined) {
       throw new TiloApiError("Open the card list again, then answer from there.", null, false);
     }
-    await this.post(
-      `/worlds/${encodeURIComponent(worldId)}/cards/${encodeURIComponent(cardId)}/fields`,
-      { fields: values },
-    );
+    return worldId;
+  }
+
+  /** The fields and item calls of one world's cards, for a card that names its world itself (the Park Decisions
+   * card does, so no `listCards` is needed). Same requests, same auth and refusals as the methods above. */
+  cardsOf(worldId: string): FieldsApi & ItemApi {
+    const path = (cardId: string, leaf: string) =>
+      `/worlds/${encodeURIComponent(worldId)}/cards/${encodeURIComponent(cardId)}/${leaf}`;
+    return {
+      getCardFields: async (cardId) => {
+        const specs = fieldSpecsOf(await this.request<unknown>(path(cardId, "fields")));
+        if (!specs) throw new TiloApiError(BAD_REPLY, 200, true);
+        return specs;
+      },
+      supplyCardFields: async (cardId, values) => {
+        await this.post(path(cardId, "fields"), { fields: values });
+      },
+      getCardItem: async (cardId) => {
+        const item = pinnedItemOf(await this.request<unknown>(path(cardId, "item")));
+        if (!item) throw new TiloApiError(BAD_REPLY, 200, true);
+        return item;
+      },
+    };
   }
 
   getDelivery(worldId: string): Promise<DeliveryResult> {

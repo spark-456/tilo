@@ -11,12 +11,14 @@ they reach the person's approval only as the pinned document.
 
 from __future__ import annotations
 
+import json
 import logging
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict
+from tilo_memory.artifacts import ArtifactError
 
 from tilo_api import deps, side_effect_fields
 from tilo_api.cards import _STATUS, CardStore, answering_principal, get_channels_caller, session_allows
@@ -47,6 +49,8 @@ def _owned_run(
     run = store.runs.get(world_id)
     if actor is None or run is None or actor.role != "owner" or not cards.is_open(world_id, card_id):
         raise HTTPException(status_code=404)  # one answer for every caller who may not supply: no oracle
+    if record_owner is not None and actor.user_id != record_owner:  # defence in depth: the role alone is not the owner
+        raise HTTPException(status_code=404)
     if from_channels or not session_allows(actor, actor.channel, False):
         raise HTTPException(status_code=404)
     return run, actor
@@ -103,3 +107,74 @@ def supply_fields(
                 content={"outcome": "rejected", "reason": result.reason},
             )
     return JSONResponse(status_code=200, content={"outcome": "answered"})
+
+
+MAX_DOCUMENT_CHARS = 65_536  # one pinned document as shown (show-me); the execute contract's own cap is smaller
+MAX_CONTENT_B64 = 43_692  # a file document's content_b64 (contracts: execute item)
+_ITEM_FIELDS = {  # the allowlist of the L5 formats: nothing else a document might carry is ever returned
+    "email": ("subject", "body_text", "in_reply_to", "references"),
+    "file": ("name", "mime_type", "content_b64"),
+    "calendar_event": ("title", "start", "end", "time_zone"),
+}
+_UNAVAILABLE = {"reason": "item_unavailable"}  # one fixed answer: no error text, no byte of a refused document
+
+
+def shown_document(raw: bytes, recipients: object) -> dict[str, Any] | None:
+    """The pinned document's allowlisted fields (+ the card's recipients), or None when it is not one we can show."""
+    if len(raw) > MAX_DOCUMENT_CHARS * 4:  # bytes before decoding: a UTF-8 char is at most 4
+        return None
+    try:
+        text = raw.decode("utf-8")
+        parsed = json.loads(text) if len(text) <= MAX_DOCUMENT_CHARS else None
+    except (UnicodeDecodeError, ValueError, RecursionError):
+        return None
+    if not isinstance(parsed, dict) or parsed.get("kind") not in _ITEM_FIELDS:
+        return None
+    kind = str(parsed["kind"])
+    out: dict[str, Any] = {"kind": kind}
+    for name in _ITEM_FIELDS[kind]:
+        value = parsed.get(name)
+        if isinstance(value, str) and (name != "content_b64" or len(value) <= MAX_CONTENT_B64):
+            out[name] = value
+        elif value is not None:
+            return None  # a field of the wrong type or size: refused whole, never trimmed
+    if kind == "file" and isinstance(parsed.get("origin"), dict) and parsed["origin"].get("kind") == "render":
+        out["origin"] = {"kind": "render"}
+    guests = parsed.get("attendees")
+    if kind == "calendar_event" and guests is not None:
+        if not (
+            isinstance(guests, list) and len(guests) <= 50 and all(isinstance(g, str) and len(g) <= 254 for g in guests)
+        ):
+            return None
+        out["attendees"] = guests
+    if kind == "email" and isinstance(recipients, list) and all(isinstance(r, str) for r in recipients):
+        out["recipients"] = recipients
+    return out
+
+
+@router.get("/worlds/{world_id}/cards/{card_id}/item")
+def pinned_item(
+    world_id: str,
+    card_id: str,
+    principal: Annotated[deps.Principal, Depends(deps.get_current_principal)],
+    from_channels: Annotated[bool, Depends(get_channels_caller)],
+    store: Annotated[deps.Store, Depends(deps.get_store)],
+    cards: Annotated[CardStore, Depends(get_card_store)],
+    record_owner: Annotated[str | None, Depends(world_owner)],
+) -> JSONResponse:
+    """Show me (ADR-0035 L6d): the document pinned on this open gate card, for the world's owner alone. A READ: no
+    event, no state change. The bytes come hash-checked from the artifact store (AR-01); a mismatch, a missing or
+    oversize or odd document is one fixed 409 and never the bytes. Everyone else gets the fields route's one 404."""
+    run, _ = _owned_run(world_id, card_id, principal, from_channels, store, cards, record_owner)
+    card = cards.get(world_id, card_id)
+    gate: dict[str, Any] = (card or {}).get("gate") or {} if (card or {}).get("kind") == "gate" else {}
+    ref = (gate.get("action") or {}).get("item")
+    if not isinstance(ref, dict):
+        raise HTTPException(status_code=404)
+    try:
+        shown = shown_document(run.read_pinned(ref), gate.get("recipients"))
+    except (ArtifactError, ValueError):  # absent, corrupt (the hash does not match), busy or a malformed ref
+        shown = None
+    if shown is None:
+        return JSONResponse(status_code=409, content=_UNAVAILABLE)
+    return JSONResponse(status_code=200, content=shown)

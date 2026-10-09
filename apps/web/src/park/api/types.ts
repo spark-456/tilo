@@ -41,6 +41,8 @@ export interface Decision {
   toast: string;
   /** Additive designed copy (the notification title once this is approved). */
   approvedTitle: string;
+  /** ADR-0035 L6d: a live card that asks for fields; it is answered by the fields form, never by a tap (`yes` is ""). */
+  provide?: { cardId: string };
   /** Additive (not in the prototype): what the decision is about. Merged in `fixtures/index.ts`. */
   facts?: DecisionFacts;
 }
