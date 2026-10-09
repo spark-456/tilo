@@ -411,7 +411,7 @@ def test_ADR35_L5_FR_CON_02_a_grant_made_after_the_approval_is_refused_with_zero
 
 def test_ADR35_L5_FR_CON_02_an_entry_the_policy_check_refuses_is_refused_untouched() -> None:
     rig, body = Rig5(), the_event()[1]
-    body["entry"]["risk_tier"] = "T3"  # create_event is T1 in config/autonomy.yaml
+    body["entry"]["risk_tier"] = "T3"  # create_event is T1 in config/autonomy.yaml: a wrong label is refused
     assert rig.run(body)["outcome"] == "refused" and rig.google.reached() == 0
 
 
@@ -450,3 +450,97 @@ def test_ADR35_L5_FR_CON_02_no_mail_text_address_title_or_token_is_in_an_answer_
 def test_ADR35_L5_FR_CON_02_only_the_outbox_reaches_an_adapter_in_the_new_code() -> None:
     mine = [SRC / "side_effect_execute.py", SRC / "adapters" / "calendar_write.py", SRC / "host_routes.py"]
     assert scan_for_side_effect_calls(mine, allowed_path=SRC / "outbox.py") == []
+
+
+# ---- security round 1 fixes ---------------------------------------------------------------------
+
+REFUSED = {"outcome": "refused", "result": None, "may_have_sent": None, "parts": []}
+
+
+@pytest.mark.parametrize("label", ["T1", "T2"])
+def test_ADR35_L5_FR_CON_02_a_risk_tier_that_is_not_the_tables_is_refused_with_zero_requests(label: str) -> None:
+    rig, body = Rig5(), guests_request()[1]  # create_event_with_guests is T3 in config/autonomy.yaml
+    body["entry"].update(risk_tier=label, modifiers=[])  # the table says T3 for this action whatever the label
+    body["evidence"]["reserved_by"]["data"]["risk_tier"] = label
+    assert rig.run(body) == REFUSED and rig.google.reached() == 0
+
+
+def test_ADR35_L5_FR_CON_02_an_approval_dated_in_the_future_is_refused_with_zero_requests() -> None:
+    rig, body = Rig5(connect_at="2026-10-09T09:35:00.000Z"), the_event()[1]
+    future = "2099-01-01T00:00:00.000Z"  # a forged time that would sit after the grant (HB-06)
+    body["entry"]["authz"]["at"] = body["evidence"]["authorised_by"]["authz"]["at"] = future
+    assert rig.run(body) == REFUSED and rig.google.reached() == 0
+
+
+def _bad_item_bytes() -> list[tuple[str, bytes]]:
+    good = raw_of(event_doc()).decode()
+    return [
+        ("bom", bytes([0xEF, 0xBB, 0xBF]) + good.encode()),
+        ("utf16", good.encode("utf-16")),
+        ("duplicate_key", good.replace('"kind":"calendar_event"', '"kind":"calendar_event","title":"x"').encode()),
+        ("lone_surrogate", good.replace(TITLE, chr(92) + "ud800").encode()),
+        ("invalid_utf8", good.encode() + bytes([0xFF])),
+    ]
+
+
+@pytest.mark.parametrize(("name", "raw"), _bad_item_bytes(), ids=lambda v: v if isinstance(v, str) else "")
+def test_ADR35_L5_FR_CON_02_an_item_that_is_not_strict_utf8_json_is_refused_untouched(name: str, raw: bytes) -> None:
+    rig, body = Rig5(), the_event()[1]
+    body["items"] = [pinned(body["entry"]["item"], raw)]
+    assert rig.run(body) == REFUSED and rig.google.reached() == 0, name
+
+
+def test_ADR35_L5_FR_CON_02_an_item_that_is_also_its_own_attachment_is_refused_with_zero_requests() -> None:
+    rig, (entry, body) = Rig5(), the_send()
+    entry["attachments"] = [entry["item"]]
+    body["items"] = [pinned(entry["item"], raw_of(email_doc())), pinned(entry["item"], raw_of(file_doc()))]
+    assert rig.run(body) == REFUSED and rig.google.reached() == 0
+
+
+@pytest.mark.parametrize("destination", ["other", "primary2", "fld_x"])
+def test_ADR35_L5_FR_CON_02_a_calendar_destination_other_than_primary_is_refused_untouched(
+    destination: str,
+) -> None:
+    rig, body = Rig5(), the_event()[1]
+    body["entry"]["destination"] = destination
+    assert rig.run(body) == REFUSED and rig.google.reached() == 0
+
+
+def test_ADR35_L5_FR_CON_02_an_earlier_event_whose_organizer_is_not_the_person_is_not_taken_as_ours() -> None:
+    rig, (entry, body) = Rig5(), the_event()
+    rig.cal.seed_event(side_effect_marker(entry))
+    original = rig.cal._body
+    rig.cal._body = lambda ev: {**original(ev), "organizer": {"email": "x@example.org", "self": False}}
+    answer = rig.run(body)
+    assert answer["outcome"] == "possibly_sent" and rig.cal.posts() == []
+    assert "organizer" in rig.cal.gets()[0].params["fields"]
+
+
+def test_ADR35_L5_FR_CON_02_overlapping_calls_for_one_marker_run_one_after_the_other() -> None:
+    import threading
+    import time
+
+    rig, body = Rig5(), the_event()[1]
+    inside, release, seen = threading.Event(), threading.Event(), []
+    real = rig.google.request
+
+    def slow(method: str, url: str, **kw: Any) -> Any:
+        seen.append(method)
+        if len(seen) == 1:
+            inside.set()
+            release.wait(5)
+        return real(method, url, **kw)
+
+    rig.google.request = slow  # type: ignore[method-assign]
+    results: list[Any] = []
+    first = threading.Thread(target=lambda: results.append(rig.run(body)))
+    second = threading.Thread(target=lambda: results.append(rig.run(body)))
+    first.start()
+    assert inside.wait(5)
+    second.start()
+    time.sleep(0.3)
+    assert seen == ["GET"], "the second call waits for the first"
+    release.set()
+    first.join(10)
+    second.join(10)
+    assert [r["outcome"] for r in results] == ["sent", "sent"] and len(rig.cal.posts()) == 1

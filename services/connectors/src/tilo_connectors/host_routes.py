@@ -54,7 +54,7 @@ from .host_broker import BrokerNotConfigured, BrokerSeam, open_broker, open_tran
 from .meeting_host import CALENDAR_EVENTS_OWNED, CONNECTOR_ID, DRAFT_KIND, HostReceipt
 from .outbox import Outbox
 from .registry import load_registry
-from .side_effect_execute import Reach, checked_documents, execute
+from .side_effect_execute import Reach, checked_documents, execute, tier_and_time_ok
 from .side_effect_execute import answer as execute_answer
 from .store import InMemoryOutboxStore
 from .tokens import _ulid, grant_group
@@ -348,15 +348,14 @@ class HostRuntime:
         """ADR-0035 L5 (LC-07): a person connector's side effect, over the same checks as `send`."""
         entry, evidence = body["entry"], body["evidence"]
         documents = checked_documents(entry, body["items"])
-        if documents is None:  # HB-03
+        if documents is None or not tier_and_time_ok(entry, self._clock()):  # HB-03, the table's tier, a real time
             return execute_answer("refused")
         broker, transport = self._broker.get(), self._transport.get()
         with self.capture(evidence["world_owner"], wide=True) as parts:
-            done = execute(
+            return execute(
                 body, documents, declaration=_registry().get(entry["connector"]), broker=broker, transport=transport,
-                stopped=self._stopped, emit=self._emit, clock=self._clock,
+                stopped=self._stopped, emit=self._emit, clock=self._clock, parts=parts,
             )  # fmt: skip
-        return {**done, "parts": parts.items}
 
     def send(self, body: Mapping[str, Any]) -> dict[str, Any]:
         entry, evidence, draft = body["entry"], body["evidence"], body["draft"]

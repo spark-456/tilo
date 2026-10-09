@@ -21,6 +21,7 @@ from .calendar import EVENTS_URL
 
 _KIND = "calendar_event"
 _FIELDS = "id,status"  # never a link, a title or an address
+_LOOKUP_FIELDS = "id,status,organizer(self)"
 _TEXT_KEYS = ("title", "start", "end", "time_zone")
 _MAX_GUESTS = 50
 _MAX_TEXT = 1024
@@ -35,6 +36,8 @@ class CalendarWriteAdapter(GoogleAdapter):
         return self._done(self._final_on_rejection(lambda: self._insert(entry, guests=action != "create_event")))
 
     def _insert(self, entry: Mapping[str, Any], *, guests: bool) -> dict[str, Any]:
+        if entry.get("destination") not in (None, "primary"):
+            raise SideEffectRefused("only the own primary calendar is written")
         recipients = entry.get("recipients")
         document = self._document(entry)
         listed = document.get("attendees", [])
@@ -91,11 +94,15 @@ class CalendarWriteAdapter(GoogleAdapter):
     def _earlier(self, user: str, scopes: list[str], marker: str) -> dict[str, Any] | None:
         """The event an earlier attempt made under this marker, else None. Cancelled counts as made: it was sent."""
         try:
-            found = self._json(user, scopes, "GET", f"{EVENTS_URL}/{marker}", params={"fields": _FIELDS}, patient=False)
+            found = self._json(
+                user, scopes, "GET", f"{EVENTS_URL}/{marker}", params={"fields": _LOOKUP_FIELDS}, patient=False
+            )
         except AdapterError as error:
             if error.status == 404:
                 return None
             raise
-        if found.get("status") == "cancelled" or found.get("id") != marker:
-            raise PossiblySent("an earlier event under this marker was cancelled or cannot be read")
+        organizer = found.get("organizer")
+        mine = isinstance(organizer, Mapping) and organizer.get("self") is True  # not an event we were invited to
+        if found.get("status") == "cancelled" or found.get("id") != marker or not mine:
+            raise PossiblySent("an earlier event under this marker was cancelled, not ours, or cannot be read")
         return {"id": marker}
