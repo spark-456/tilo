@@ -40,6 +40,8 @@ def test_FR_CON_02_ADR35_L7_doc_lists_every_connectors_and_api_setting(repo_root
         assert name in section, name
     assert "workspace-oauth-client:1" in section and "workspace-oauth-client:2" in section
     assert "--update-secrets" in section and "^#^" in section
+    assert "--set-secrets" not in section  # it would replace every secret mounted on the service
+    assert not any("CLIENT_SECRET" in call for call in re.findall(r"--update-env-vars \"([^\"]*)\"", section))
 
 
 def test_FR_CON_02_ADR35_L7_doc_keeps_the_live_switch_and_separate_rollouts_out(repo_root: pathlib.Path) -> None:

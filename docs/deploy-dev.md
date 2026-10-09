@@ -273,7 +273,8 @@ by connectors only). Both services have `ignore_env`, so the settings are `gclou
    ```
 
    `LIVE` stays unset. `--update-*` keeps every other setting. Connectors stays at one instance (ADR-0032 T7).
-5. Set `tilo-api` (`TILO_API_STORE` and `TILO_PEOPLE_STORE` stay out: the separate ADR-0026 rollout):
+5. Confirm the outbox index is READY first (step 2), then set `tilo-api` (same PowerShell session as step 4: `$P`, `$R` and
+   `$Conn` are reused; `TILO_API_STORE` and `TILO_PEOPLE_STORE` stay out: the separate ADR-0026 rollout):
 
    ```powershell
    $Conn = gcloud run services describe tilo-connectors --project $P --region $R --format "value(status.url)"
