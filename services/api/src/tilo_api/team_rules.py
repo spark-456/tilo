@@ -1,8 +1,8 @@
 """FR-TEAM-02 and FR-TEAM-04: team roles, personal limits and the five stop-and-ask switches.
 
-Pure, deterministic rules (no model, no clock, no I/O beyond `config/team_rules.yaml`); no route calls them yet, so
-the web Team page shows the same rules on fixture data. A change returns the new state plus an audit record: no
-registered event type fits a switch change (`policy.changed` is a covering policy's), see BQ-TEAMACC-1."""
+Pure, deterministic rules (no model, no clock, no I/O beyond `config/team_rules.yaml`), called by the team routes
+(`tilo_api.team_routes`) inside the team store's compare-and-set. A change returns the new state plus an audit
+record: no registered event type fits a switch change (`policy.changed` is a covering policy's), see BQ-TEAMACC-1."""
 
 from __future__ import annotations
 
@@ -58,6 +58,15 @@ def effective_user_cap(
     if cap is None:
         raise TypeError("lifetime_cap_minor is required")
     return min([cap, *[x for x in limits if x is not None]])
+
+
+def load_role_limits(path: str | Path | None = None) -> dict[str, int | None]:
+    """`role_limits_minor`: what each role may spend (INR minor units; null = no role limit). Every role, no other."""
+    doc = yaml.safe_load(Path(path if path is not None else _CONFIG).read_text(encoding="utf-8"))
+    rows = doc.get("role_limits_minor") if isinstance(doc, dict) else None
+    if not isinstance(rows, dict) or set(rows) != set(ROLES):
+        raise ValueError("team_rules.yaml: role_limits_minor must name every role")
+    return {role: _minor(rows[role], role) for role in ROLES}
 
 
 @dataclass(frozen=True)
@@ -137,9 +146,8 @@ def set_switch(
     KeyError, a non-bool a TypeError."""
     switch = load_switches()[key]
     tool_roles = load_capabilities()["change_tool_access"].roles
-    if actor_role not in ("Owner", "Approver") or (
-        key in TOOL_SWITCHES and (actor_role != "Owner" or actor_role not in tool_roles)
-    ):
+    # Every switch is Owner-only (#621): PRD 10.1 gives the Approver no policy rights, `weekend` included.
+    if actor_role != "Owner" or (key in TOOL_SWITCHES and actor_role not in tool_roles):
         raise PermissionError(key)
     if type(value) is not bool:
         raise TypeError("a switch is on or off")

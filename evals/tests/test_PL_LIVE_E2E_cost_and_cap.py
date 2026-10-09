@@ -105,7 +105,9 @@ def test_PL_LIVE_E2E_07_the_report_without_a_cap_flag_says_40(tmp_path: Path) ->
 
 
 def test_PL_LIVE_E2E_08_at_the_cap_the_run_stops_honestly_and_never_fakes_a_completion(tmp_path: Path) -> None:
-    cap = 4.0  # a few fake calls: far too few for a whole run (the Director's 16384-token cap quotes ~3.3 credits)
+    # a few fake calls, too few for a whole run (2.7 credits): a Director call is reserved at its expected 3000 tokens
+    # (~0.6) and its 16384-token cap (~3.3) fits within twice the 2.0 left, so the first calls are sent
+    cap = 2.0
     report, world = run_direct(tmp_path, max_credits=cap)
     assert report.outcome_class == "stopped_at_cap"
     assert "stopped_at_cap" in live_e2e().OUTCOME_CLASSES

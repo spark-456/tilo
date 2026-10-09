@@ -364,7 +364,7 @@
   padding: 0 12px;
   border: 0;
   border-radius: 9px;
-  background: var(--hero);
+  background: var(--heroFill);
   color: #ffffff;
   font-size: 13px;
   font-weight: 800;
@@ -419,7 +419,7 @@
   flex: none;
   height: 30px;
   padding: 0 12px;
-  background: var(--hero);
+  background: var(--heroFill);
   font-size: 12.5px;
 }
 [data-park] .park-agenda-notnow--soft {

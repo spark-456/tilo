@@ -32,11 +32,13 @@ from tilo_api.effort import router as _effort_router
 from tilo_api.intake import router as intake_router
 from tilo_api.log_context import LogContext as _LogContext
 from tilo_api.log_context import LogRunId as _LogRunId
+from tilo_api.notifications import router as _notifications_router
 from tilo_api.people_limits import NoStore as _NoStore
 from tilo_api.redaction import router as _redaction_router
 from tilo_api.sharing import WorldView
 from tilo_api.sharing import build_router as _build_sharing_router
 from tilo_api.tasks import router as _tasks_router
+from tilo_api.team_routes import router as _team_router
 from tilo_api.worlds_list import router as _worlds_list_router
 
 # Generated docs only in local dev mode: deployed, the service is public and the route list is not for
@@ -102,6 +104,7 @@ app.include_router(_redaction_router)
 app.include_router(_costs_router)
 app.include_router(_worlds_list_router)
 app.include_router(_cards_feed_router)
+app.include_router(_notifications_router)
 app.include_router(_tasks_router)
 app.include_router(
     _build_cards_router(_runs.get_card_store, answer_guard=_runs.answer_guard, world_owner=_runs.world_owner)
@@ -113,6 +116,7 @@ app.include_router(_assistant_router)
 app.include_router(_people.router)
 app.include_router(_effort_router)
 app.include_router(_schedules.router)
+app.include_router(_team_router)
 
 
 def _world_owner(world_id: str) -> str | None:

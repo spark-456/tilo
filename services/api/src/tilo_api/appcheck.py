@@ -70,7 +70,8 @@ class AppCheckVerifier(Protocol):
         ...
 
 
-def _b64(part: str) -> bytes:
+def b64url_decode(part: str) -> bytes:
+    """Unpadded base64url, as a JWT part is written (shared with `firebase_auth`)."""
     return base64.urlsafe_b64decode(part + "=" * (-len(part) % 4))
 
 
@@ -84,7 +85,9 @@ def fetch_jwks(url: str) -> dict[str, rsa.RSAPublicKey]:
     keys: dict[str, rsa.RSAPublicKey] = {}
     for jwk in response.json().get("keys", []):
         if jwk.get("kty") == "RSA" and isinstance(jwk.get("kid"), str):
-            numbers = rsa.RSAPublicNumbers(int.from_bytes(_b64(jwk["e"]), "big"), int.from_bytes(_b64(jwk["n"]), "big"))
+            numbers = rsa.RSAPublicNumbers(
+                int.from_bytes(b64url_decode(jwk["e"]), "big"), int.from_bytes(b64url_decode(jwk["n"]), "big")
+            )
             keys[jwk["kid"]] = numbers.public_key()
     if not keys:
         raise ValueError("key fetch returned no keys")
@@ -170,7 +173,11 @@ class GoogleAppCheckVerifier(JwksKeyCache):
         if len(parts) != 3 or len(token) > MAX_TOKEN_CHARS:
             raise TokenRefused("not_a_jwt")
         try:
-            header, claims, signature = json.loads(_b64(parts[0])), json.loads(_b64(parts[1])), _b64(parts[2])
+            header, claims, signature = (
+                json.loads(b64url_decode(parts[0])),
+                json.loads(b64url_decode(parts[1])),
+                b64url_decode(parts[2]),
+            )
         except (binascii.Error, ValueError) as exc:
             raise TokenRefused("not_a_jwt") from exc
         if not isinstance(header, dict) or not isinstance(claims, dict) or header.get("alg") != "RS256":
@@ -202,7 +209,7 @@ class GoogleAppCheckVerifier(JwksKeyCache):
         return claims
 
 
-class _RefuseAll:
+class RefuseAll:
     """Dev mode and an unconfigured project: nothing is fetched, nothing is verified."""
 
     def __init__(self, why: str) -> None:
@@ -223,10 +230,10 @@ def default_verifier() -> AppCheckVerifier:
     from tilo_api import dev  # noqa: PLC0415  (dev imports deps, which imports this module)
 
     if dev.dev_enabled():
-        return _RefuseAll("dev_mode")
+        return RefuseAll("dev_mode")
     project = (os.environ.get("TILO_FIRESTORE_PROJECT") or os.environ.get("GOOGLE_CLOUD_PROJECT") or "").strip()
     if not project:
-        return _RefuseAll("no_project")
+        return RefuseAll("no_project")
     return _google_verifier(project)
 
 
