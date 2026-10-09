@@ -131,3 +131,57 @@ run "SEC_12_secrets_are_readable_only_by_their_owning_service" {
     error_message = "Each secret must be readable only by the service that owns it (SEC-12)."
   }
 }
+
+# ADR-0032 decision 9 (T5): tokens live in their own Firestore database. A Firestore IAM condition can name a
+# database (resource.name) but not a collection or document path, so a project-wide datastore.user on api, harness or
+# render would reach connector_tokens in the default database. The tokens database is `tilo-tokens`; only the
+# connectors service account may use it; every other datastore.user binding is limited to the default database.
+run "SEC_02_only_connectors_can_reach_the_token_database" {
+  command = plan
+
+  assert {
+    condition     = output.token_database.name == "tilo-tokens" && output.token_database.type == "FIRESTORE_NATIVE" && output.token_database.location_id == var.region
+    error_message = "A native Firestore database `tilo-tokens` in var.region holds the connector token records."
+  }
+
+  # A binding reaches tilo-tokens when it has no condition, or a condition that does not pin the default database.
+  assert {
+    condition = toset([
+      for b in output.project_iam_bindings : b.member
+      if startswith(b.role, "roles/datastore.") && (b.condition == null || !strcontains(coalesce(b.condition, ""), "databases/(default)"))
+    ]) == toset(["serviceAccount:tilo-connectors@${var.project_id}.iam.gserviceaccount.com"])
+    error_message = "Only tilo-connectors may reach the token database; api, harness and render datastore.user is limited to the (default) database by an IAM condition."
+  }
+
+  assert {
+    condition = alltrue([
+      for b in output.project_iam_bindings : strcontains(b.condition, "projects/${var.project_id}/databases/(default)") && !strcontains(b.condition, "tilo-tokens")
+      if startswith(b.role, "roles/datastore.") && b.condition != null
+    ])
+    error_message = "A datastore binding with a condition must name the (default) database and never tilo-tokens."
+  }
+
+  assert {
+    condition = alltrue([
+      for name in ["api", "harness", "render"] :
+      length([for b in output.project_iam_bindings : b if b.role == "roles/datastore.user" && strcontains(b.member, "tilo-${name}@") && b.condition != null]) == 1
+    ])
+    error_message = "api, harness and render each keep exactly one datastore.user binding, with the (default) database condition."
+  }
+
+  assert {
+    condition     = length([for b in output.project_iam_bindings : b if startswith(b.role, "roles/datastore.") && strcontains(b.member, "tilo-connectors@")]) == 1
+    error_message = "connectors holds one datastore binding."
+  }
+
+  # Unchanged: SEC-02 decrypt rule and the client secret.
+  assert {
+    condition     = length(output.oauth_token_key_decrypters) == 1 && strcontains(output.oauth_token_key_decrypters[0], "connectors")
+    error_message = "Exactly one decrypter on oauth-tokens: connectors (SEC-02)."
+  }
+
+  assert {
+    condition     = output.secret_accessors["workspace-oauth-client"] == ["serviceAccount:tilo-connectors@${var.project_id}.iam.gserviceaccount.com"]
+    error_message = "workspace-oauth-client is readable by connectors only."
+  }
+}

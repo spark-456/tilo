@@ -70,7 +70,7 @@ user-approved step, never from this workflow or recipe).
 Cloud Build and the workflow only swap the image (pinned by digest) and passes `--min-instances 0` and
 `--max-instances 2..3` on an existing service. It never sets ingress, IAM, env vars or secrets;
 Terraform owns those and ignores image changes (`infra/modules/service`). Env vars are Terraform's for every service
-except `tilo-api`: that one has `ignore_env = true`, so its `TILO_*` runtime settings are set by hand with
+except `tilo-api` and `tilo-connectors`: those have `ignore_env = true`, so their `TILO_*` runtime settings are set by hand with
 `gcloud run services update` (`docs/routines-rollout.md`) and a Terraform run leaves them alone.
 
 ## Alternative: GitHub Actions workflow (one-time setup)
@@ -221,6 +221,22 @@ and read the job log in Cloud Logging. The job fails until the `nightly` command
 
 Routines need the runs queue, the `tilo-schedule-tick` Scheduler job and six `tilo-api` settings. The steps, the
 checks and what each tick answer means are in [routines-rollout.md](routines-rollout.md).
+
+## Meeting host: connectors and api settings (ADR-0032 T5)
+
+Order, once your infrastructure run (`infra/README.md`) has finished:
+1. Create the KMS key `oauth-tokens` if it is not there (this ticket does not) and put the OAuth client id and secret in
+   the Secret Manager secret `workspace-oauth-client`.
+2. Set `tilo-connectors` (names here, never a value in a file or a log). `<url>` is its own URL.
+   `TILO_CONNECTORS_AUDIENCE=<url>`, `TILO_MEETING_HOST_CALLER=tilo-api@<project>.iam.gserviceaccount.com`,
+   `TILO_TOKEN_STORE=firestore`, `TILO_FIRESTORE_PROJECT=<project>`,
+   `TILO_KMS_KEY=projects/<project>/locations/asia-southeast1/keyRings/<ring>/cryptoKeys/oauth-tokens`, the OAuth client
+   id and secret as Secret Manager references (`--set-secrets`, secret `workspace-oauth-client`), and no `LIVE`.
+   Connectors runs one instance (CON-D9) until ticket T7.
+3. Set `tilo-api`: `TILO_CONNECTORS_URL=<tilo-connectors url>`. api reaches the internal service through its Direct VPC
+   egress, and holds `run.invoker` on connectors.
+4. `LIVE=1` on connectors only, and the first live invitation, are yours after T5b and T7. The token database is
+   `tilo-tokens`; connectors' code uses it only after T5b, so the infrastructure and the settings can go first.
 
 ## Web app (Firebase Hosting, manual; P0-07c)
 

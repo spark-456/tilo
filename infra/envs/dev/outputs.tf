@@ -12,6 +12,14 @@ output "firestore_database" {
   }
 }
 
+output "token_database" {
+  value = {
+    name        = google_firestore_database.tokens.name
+    location_id = google_firestore_database.tokens.location_id
+    type        = google_firestore_database.tokens.type
+  }
+}
+
 output "pubsub_events_topic_name" {
   value = module.events.topic_name
 }
