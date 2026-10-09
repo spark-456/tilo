@@ -115,9 +115,12 @@ run "SEC_12_secrets_are_readable_only_by_their_owning_service" {
 
   assert {
     condition = output.secret_accessors == {
-      "workspace-oauth-client"       = ["serviceAccount:tilo-connectors@${var.project_id}.iam.gserviceaccount.com"]
-      "whatsapp-api-token"           = ["serviceAccount:tilo-channels@${var.project_id}.iam.gserviceaccount.com"]
-      "channels-webhook-signing-key" = ["serviceAccount:tilo-channels@${var.project_id}.iam.gserviceaccount.com"]
+      "workspace-oauth-client" = ["serviceAccount:tilo-connectors@${var.project_id}.iam.gserviceaccount.com"]
+      # ADR-0035 L7 (additive): the two Secret Manager secrets that fill GOOGLE_OAUTH_CLIENT_ID / _SECRET, connectors only.
+      "workspace-oauth-client-id"     = ["serviceAccount:tilo-connectors@${var.project_id}.iam.gserviceaccount.com"]
+      "workspace-oauth-client-secret" = ["serviceAccount:tilo-connectors@${var.project_id}.iam.gserviceaccount.com"]
+      "whatsapp-api-token"            = ["serviceAccount:tilo-channels@${var.project_id}.iam.gserviceaccount.com"]
+      "channels-webhook-signing-key"  = ["serviceAccount:tilo-channels@${var.project_id}.iam.gserviceaccount.com"]
       # Changed by P0-07b: channels issues and verifies action links (links.py) and no api
       # code uses the key, so channels is the only accessor (was api). The only existing
       # secret expectation edited; the four secrets pinned originally are otherwise unchanged.
@@ -197,6 +200,14 @@ run "SEC_02_only_connectors_can_reach_the_token_database" {
     condition     = output.secret_accessors["workspace-oauth-client"] == ["serviceAccount:tilo-connectors@${var.project_id}.iam.gserviceaccount.com"]
     error_message = "workspace-oauth-client is readable by connectors only."
   }
+
+  assert {
+    condition = alltrue([
+      for s in ["workspace-oauth-client-id", "workspace-oauth-client-secret"] :
+      output.secret_accessors[s] == ["serviceAccount:tilo-connectors@${var.project_id}.iam.gserviceaccount.com"]
+    ])
+    error_message = "workspace-oauth-client-id and workspace-oauth-client-secret are readable by connectors only."
+  }
 }
 
 # ADR-0032 T5b: the tokens database has a deny-all Firestore rules release, shipped by Terraform because firebase.json
@@ -221,14 +232,14 @@ run "SEC_02_the_token_database_has_a_deny_all_rules_release" {
   }
 }
 
-# ADR-0035 L7: the live connectors add no IAM. The OAuth client secret, the oauth-tokens key and the tilo-tokens database
+# ADR-0035 L7: the live connectors add two secrets (client id, client secret), each readable by connectors only. The OAuth client secrets, the oauth-tokens key and the tilo-tokens database
 # stay with connectors; tilo-api (which only starts a connect and calls connectors over RPC) gets none of them.
 run "ADR35_L7_tilo_api_holds_no_oauth_secret_kms_or_token_database_access" {
   command = plan
 
   assert {
     condition     = !contains(flatten(values(output.secret_accessors)), "serviceAccount:tilo-api@${var.project_id}.iam.gserviceaccount.com")
-    error_message = "tilo-api reads no Secret Manager secret, least of all workspace-oauth-client."
+    error_message = "tilo-api reads no Secret Manager secret, least of all the workspace-oauth-client secrets."
   }
 
   assert {
@@ -246,6 +257,14 @@ run "ADR35_L7_tilo_api_holds_no_oauth_secret_kms_or_token_database_access" {
 
   assert {
     condition     = output.secret_accessors["workspace-oauth-client"] == ["serviceAccount:tilo-connectors@${var.project_id}.iam.gserviceaccount.com"]
-    error_message = "workspace-oauth-client is readable by connectors only (the accessor binding already exists; L7 adds none)."
+    error_message = "workspace-oauth-client is readable by connectors only (unchanged by L7)."
+  }
+
+  assert {
+    condition = alltrue([
+      for s in ["workspace-oauth-client-id", "workspace-oauth-client-secret"] :
+      output.secret_accessors[s] == ["serviceAccount:tilo-connectors@${var.project_id}.iam.gserviceaccount.com"]
+    ])
+    error_message = "L7 adds exactly two secrets, workspace-oauth-client-id and -secret, each readable by connectors only."
   }
 }

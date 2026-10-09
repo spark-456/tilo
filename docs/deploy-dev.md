@@ -228,13 +228,13 @@ Order, once your infrastructure run (`infra/README.md`) has finished (run it wit
 0. Smoke: api, harness and render must still read Firestore `(default)` (a schedule tick or a run answers, not 503). That
    proves the `resource.name` condition on their `datastore.user`.
 1. The KMS key `oauth-tokens` is Terraform's (`module.kms`); never create it by hand. Put the OAuth client id and secret
-   in the Secret Manager secret `workspace-oauth-client`.
+   in the Secret Manager secrets `workspace-oauth-client-id` and `workspace-oauth-client-secret` (one version each).
 2. Set `tilo-connectors` (names here, never a value in a file or a log). `<url>` is its own URL.
    `TILO_CONNECTORS_AUDIENCE=<url>`, `TILO_MEETING_HOST_CALLER=tilo-api@<project>.iam.gserviceaccount.com`,
    `TILO_TOKEN_STORE=firestore`, `TILO_FIRESTORE_PROJECT=<project>`, `TILO_TOKEN_DATABASE=tilo-tokens`,
    `TILO_KMS_KEY=projects/<project>/locations/asia-southeast1/keyRings/<ring>/cryptoKeys/oauth-tokens`, the OAuth client
    id and secret as Secret Manager references (`--update-secrets`, which keeps the others; secret
-   `workspace-oauth-client`), and no `LIVE`.
+   `workspace-oauth-client-id` and `-secret`), and no `LIVE`.
    Connectors runs one instance (CON-D9) until ticket T7.
 3. Set `tilo-api`: `TILO_CONNECTORS_URL=<tilo-connectors url>`. api reaches the internal service through its Direct VPC
    egress, and holds `run.invoker` on connectors.
@@ -246,14 +246,17 @@ Order, once your infrastructure run (`infra/README.md`) has finished (run it wit
 ## Live connectors: OAuth client, index, settings (ADR-0035 L7, L8)
 
 Gmail, Drive and Calendar go live through `tilo-connectors` only. Do the steps in this order; Tilo's tooling runs none of
-them. Terraform adds one Firestore composite index and nothing else (no IAM: `workspace-oauth-client` is already readable
-by connectors only). Both services have `ignore_env`, so the settings are `gcloud` steps, and a Terraform run leaves them.
+them. Terraform adds one Firestore composite index and two empty Secret Manager secrets (`workspace-oauth-client-id`,
+`workspace-oauth-client-secret`), each readable by `tilo-connectors` only (BQ-ADR35-L7-1). Both services have `ignore_env`, so the settings are `gcloud` steps, and a Terraform run leaves them.
 
-1. Create the OAuth client and consent screen (`infra/ACCESS.md` section 13). Put the client id as version 1 and the
-   client secret as version 2 of the secret `workspace-oauth-client` (Secret Manager console). One secret cannot fill two
-   variables, so each is mounted by version number (BQ-ADR35-L7-1).
-2. Apply the infrastructure (`infra/README.md`). Expect exactly 1 to add, 0 to change, 0 to destroy:
-   `google_firestore_index.outbox_transfer_pending` (collection `outbox`, `transfer_pending` ASC, `enqueued_at` ASC).
+1. Create the OAuth client and consent screen (`infra/ACCESS.md` section 13). Keep the client id and client secret to
+   hand; do not paste them into a command line, a file or chat.
+2. Apply the infrastructure (`infra/README.md`). Expect exactly 5 to add, 0 to change, 0 to destroy: the index
+   `google_firestore_index.outbox_transfer_pending` (collection `outbox`, `transfer_pending` ASC, `enqueued_at` ASC), the
+   secrets `workspace-oauth-client-id` and `workspace-oauth-client-secret`, and one `secretAccessor` binding on each
+   (`tilo-connectors`). Then add ONE version to each secret, in the Secret Manager console (Add new version, paste the
+   value), or with `gcloud secrets versions add workspace-oauth-client-id --project $P --data-file=-`: type or paste the
+   value on the next line, then Ctrl+Z and Enter. Never put the value in the command line (it lands in history).
    **The index must be built (state READY, a few minutes: Firestore console, Indexes) before `TILO_OUTBOX_STORE=firestore`
    is set.** Without it, claiming a transfer raises 503 after an entry was sent (PI-17).
 3. Run the outbox store suite once against the Firestore emulator (needs Java and `pnpm install`; no cloud credential):
@@ -269,7 +272,7 @@ by connectors only). Both services have `ignore_env`, so the settings are `gclou
    $Conn = gcloud run services describe tilo-connectors --project $P --region $R --format "value(status.url)"
    gcloud run services update tilo-connectors --project $P --region $R `
      --update-env-vars "^#^GOOGLE_OAUTH_REDIRECT_BASE_URL=https://essential-wares-510320-f0.web.app#TILO_TOKEN_STORE=firestore#TILO_FIRESTORE_PROJECT=${P}#TILO_TOKEN_DATABASE=tilo-tokens#TILO_KMS_KEY=projects/${P}/locations/${R}/keyRings/tilo-${R}/cryptoKeys/oauth-tokens#TILO_CONNECTORS_AUDIENCE=${Conn}#TILO_MEETING_HOST_CALLER=tilo-api@${P}.iam.gserviceaccount.com" `
-     --update-secrets "GOOGLE_OAUTH_CLIENT_ID=workspace-oauth-client:1,GOOGLE_OAUTH_CLIENT_SECRET=workspace-oauth-client:2"
+     --update-secrets "GOOGLE_OAUTH_CLIENT_ID=workspace-oauth-client-id:latest,GOOGLE_OAUTH_CLIENT_SECRET=workspace-oauth-client-secret:latest"
    ```
 
    `LIVE` stays unset. `--update-*` keeps every other setting. Connectors stays at one instance (ADR-0032 T7).

@@ -192,7 +192,9 @@ locals {
 
   # secret => services allowed roles/secretmanager.secretAccessor on it.
   secret_accessors = {
-    "workspace-oauth-client"        = ["connectors"]
+    "workspace-oauth-client"        = ["connectors"] # kept: the live connectors mount the two below (ADR-0035 L7)
+    "workspace-oauth-client-id"     = ["connectors"] # one version added by the user (GOOGLE_OAUTH_CLIENT_ID)
+    "workspace-oauth-client-secret" = ["connectors"] # one version added by the user (GOOGLE_OAUTH_CLIENT_SECRET)
     "whatsapp-api-token"            = ["channels"]
     "channels-webhook-signing-key"  = ["channels"]
     "email-action-link-signing-key" = ["channels"] # channels issues and verifies links (links.py); no api code uses it
