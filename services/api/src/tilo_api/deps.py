@@ -770,6 +770,18 @@ def get_token_broker() -> Any:
     raise HTTPException(status_code=503, detail="not_configured")
 
 
+class ConnectionViews(Protocol):
+    """LIVE-GAPS-1b: a read-only view of a person's connector state (SEC-02: never a token, record, Kms or secret)."""
+
+    def view(self, user_id: str, connector: str) -> tuple[str | None, list[str], str | None]: ...
+
+
+def get_connection_views() -> ConnectionViews:
+    """Read-only connector state for `GET /v1/connectors`. Production state comes from tilo-connectors over an internal
+    route (ADR-0032 pattern, BQ-LIVEGAPS-1); unwired: refuses (the list route then shows every connector available)."""
+    raise HTTPException(status_code=503, detail="not_configured")
+
+
 def get_meeting_host_transport() -> Any:
     """FR-MTG-09: the `Transport` behind `MeetingHostAdapter`. No live transport in dev (EFF-01): refuses."""
     raise HTTPException(status_code=503, detail="not_configured")

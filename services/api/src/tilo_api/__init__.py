@@ -25,6 +25,7 @@ from tilo_api.appcheck import AppCheckGate as _AppCheckGate
 from tilo_api.assistant.route import router as _assistant_router
 from tilo_api.cards import build_router as _build_cards_router
 from tilo_api.cards_feed import router as _cards_feed_router
+from tilo_api.connectors_list import router as _connectors_list_router
 from tilo_api.console import build_router as _build_console_router
 from tilo_api.costs import router as _costs_router
 from tilo_api.dispatch import router as _dispatch_router
@@ -115,6 +116,7 @@ app.include_router(_runs.router)
 app.include_router(_assistant_router)
 app.include_router(_people.router)
 app.include_router(_effort_router)
+app.include_router(_connectors_list_router)
 app.include_router(_schedules.router)
 app.include_router(_team_router)
 
