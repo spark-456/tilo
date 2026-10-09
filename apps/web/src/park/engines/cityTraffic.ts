@@ -11,9 +11,6 @@ export interface Route extends Body {
   end: number;
   speed: number;
 }
-interface Position extends Route {
-  lane: number;
-}
 const TILE = 4;
 export const TRAFFIC_TICK = 1 / 60;
 class Grid {
@@ -48,14 +45,14 @@ const swept = (a: Body, b: Body): Body => ({
   halfY: a.halfY + Math.abs(b.y - a.y) / 2,
 });
 export class CityTraffic {
-  readonly positions: Position[];
+  readonly positions: Route[];
   private routes: Route[];
   constructor(
     routes: readonly Route[],
     private standing: readonly Body[],
   ) {
     this.routes = routes.map((r) => ({ ...r }));
-    this.positions = routes.map((r) => ({ ...r, lane: r.y }));
+    this.positions = routes.map((r) => ({ ...r }));
     // Conservatively reserve footprints, including starting phases and standing agents.
     const grid = this.grid();
     this.positions.forEach((p, id) => {

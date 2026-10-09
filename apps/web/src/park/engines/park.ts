@@ -816,7 +816,11 @@ export function createPark(
             );
           }
         }
-        if (o.traffic && o.avoid && !still && routes.length) {
+        const supportsLinear =
+          typeof CSS === "undefined" ||
+          typeof CSS.supports !== "function" ||
+          CSS.supports("animation", "mvXY 1s linear(0,1)");
+        if (o.traffic && o.avoid && !still && routes.length && supportsLinear) {
           // Existing free lanes route around standing tiles; walkers wait rather than cross lanes.
           const frames = compileTraffic(routes, standing, true);
           routes.forEach((route, id) => {
@@ -835,7 +839,9 @@ export function createPark(
               `${progress(frames[0] as Body[])} 100%`,
             );
             schedules.push({
-              animation: `mvXY 15s linear(${stops.join(",")}) 0s infinite`,
+              // Hold opacity at zero on both sides of the reset, then fade scenery back in.
+              // tiloFade already supplies opacity 1 -> 0; the easing reverses it mid-cycle.
+              animation: `mvXY 15s linear(${stops.join(",")}) 0s infinite, tiloFade 15s linear(1 0%,1 3%,0 5%,0 95%,1 97%,1 100%) 0s infinite`,
               "--dx": `${span * 0.866 * s2}px`,
               "--dy": `${span * 0.5 * s2}px`,
             });
