@@ -16,6 +16,11 @@ SKILLS_ROOT = REPO_ROOT / "skills"
 SKILL_DIR = SKILLS_ROOT / "automation" / "skill-from-description"
 
 RISKY_VERBS = {"send", "pay", "delete", "share", "book"}
+MESSAGING_TOOLS = {"slack", "gmail", "teams", "whatsapp", "email"}
+COMPOUND_QUESTION_RE = re.compile(
+    r"\b(?:and|or)\s+(?:who|what|where|when|why|how|which)\b",
+    re.IGNORECASE,
+)
 
 
 def _tokenize_grounding(text: str) -> set[str]:
@@ -70,6 +75,10 @@ def check_skill_from_description_output(case_input: dict[str, Any], output: dict
         if not obj_tokens or not (obj_tokens & desc_tokens):
             errors.append(f"step[{idx}] object '{obj}' is invented (no lexical overlap with description)")
 
+        # Messaging tool check: non-risky steps using messaging tools must have tool explicitly named in description
+        if tool.lower() in MESSAGING_TOOLS and tool.lower() not in desc_tokens:
+            errors.append(f"step[{idx}] uses messaging tool '{tool}' not explicitly named in description")
+
         is_risky = verb in RISKY_VERBS or any(rv in _tokenize_grounding(f"{verb} {obj}") for rv in RISKY_VERBS)
         if is_risky and ask_first is not True:
             errors.append(f"step[{idx}] ('{verb} {obj}') is a risky action and must have ask_me_first=True")
@@ -83,6 +92,8 @@ def check_skill_from_description_output(case_input: dict[str, Any], output: dict
             errors.append("ambiguous description must produce exactly one clarifying question ending with '?'")
         elif question.count("?") != 1:
             errors.append(f"expected exactly one clarifying question, found {question.count('?')} '?' marks")
+        elif COMPOUND_QUESTION_RE.search(question):
+            errors.append(f"clarifying question must be a single inquiry, rejected compound question: {question!r}")
     else:
         if question is not None:
             errors.append(f"clear description must have clarifying_question=None, got {question!r}")
@@ -204,3 +215,26 @@ def test_FR_SKL_01_FR_SKL_02_checker_rejects_invented_steps_and_unchecked_risky_
     )
     errs_inv = check_skill_from_description_output(base_case["input"], invented)
     assert any("step count" in e or "invented" in e for e in errs_inv)
+
+
+def test_FR_SKL_01_checker_rejects_compound_clarifying_question() -> None:
+    golden = json.loads((SKILL_DIR / "examples" / "golden_cases.json").read_text(encoding="utf-8"))
+    ambig_case = next(c for c in golden["cases"] if c["category"] == "ambiguous")
+
+    compound_output = json.loads(json.dumps(ambig_case["output"]))
+    compound_output["clarifying_question"] = (
+        "How old should a draft proposal be before it counts as outdated and who is the client recipient?"
+    )
+    errs = check_skill_from_description_output(ambig_case["input"], compound_output)
+    assert any("rejected compound question" in e for e in errs)
+
+
+def test_FR_SKL_01_checker_rejects_unnamed_messaging_tool_on_non_risky_step() -> None:
+    golden = json.loads((SKILL_DIR / "examples" / "golden_cases.json").read_text(encoding="utf-8"))
+    routine_case = next(c for c in golden["cases"] if c["category"] == "weekly_routine")
+
+    bad_tool_output = json.loads(json.dumps(routine_case["output"]))
+    # Set step 2 tool to slack when description does not mention slack
+    bad_tool_output["steps"][1]["tool"] = "slack"
+    errs = check_skill_from_description_output(routine_case["input"], bad_tool_output)
+    assert any("uses messaging tool 'slack' not explicitly named in description" in e for e in errs)
