@@ -30,13 +30,16 @@ import time
 from collections.abc import Callable, Iterator, Mapping
 from contextvars import ContextVar
 from dataclasses import dataclass, field
+from datetime import date
 from pathlib import Path
 from typing import Any, Literal
 
 from fastapi import FastAPI, Request
 from tilo_harness.outputs import UnitOutput
+from tilo_harness.schedule_dates import date_window_fail
 from tilo_harness.unit_prompt import request_variables
 from tilo_harness.untrusted import neutralise as neutralise_text
+from tilo_providers.clock import parse_deadline, real_today
 from tilo_providers.config import ProviderConfigError, ProvidersConfig, load_providers_config, resolve_models_path
 from tilo_providers.errors import OutputTruncatedError, ProviderError, QuotaError, RequestError
 from tilo_providers.interfaces import Capability, GenerateRequest, GenerateResponse, ModelProvider, SafetyProvider
@@ -62,6 +65,7 @@ SAFETY_NOTE = (
     "trusted_bank_input (by design; Model Armor is the safety role's live adapter, FR-INT-02, #450)"  # BQ-LE2E-5
 )
 SYNTHETIC_MARKER = "SYNTHETIC"  # a file beside `model-recordings/`: a fake provider wrote them (BQ-LE2E-9)
+TODAY_MARKER = "TODAY"  # a file beside `model-recordings/`: the ISO date the prompts stated, so a replay states it too
 _ATTEMPTS_PER_CALL = 3  # attempts one Router call may make (first, repair, fallback) inside its reserved share
 FAKED = (  # what a run never does for real, printed with every report (HR-1: say what is not real)
     "safety screen: trusted bank input only, by design (Model Armor is the safety role's live adapter, "
@@ -740,11 +744,16 @@ class _UnitRunner:
     """One model call per unit by the unit's role (prompts/<role>/unit.md), fed the work of the units it waits for; one
     Lead review per district milestone (the district's last unit). A Verifier's verdict is recorded, not acted on."""
 
-    def __init__(self, router: Router, meter: _Meter) -> None:
+    def __init__(self, router: Router, meter: _Meter, today: date | None = None) -> None:
         self._router, self._meter = router, meter
+        self._today = today or real_today()  # the one date every prompt of this run states (INTAKE-QUALITY-1)
         self._brief: dict[str, Any] = {}
         self._units: list[dict[str, Any]] = []
         self._work: dict[str, str] = {}
+
+    @property
+    def today(self) -> date:
+        return self._today
 
     def capture(self, brief: dict[str, Any], plan: dict[str, Any]) -> None:
         self._brief, self._units = brief, list(plan.get("units", []))
@@ -770,7 +779,8 @@ class _UnitRunner:
         return text, self._meter.cost(response.profile_id, tokens_in, tokens_out)
 
     def _request(self) -> dict[str, str]:
-        return request_variables(self._brief)  # capped, one-line, marker-safe (UNIT-PROMPT); no intake answers here
+        # capped, one-line, marker-safe (UNIT-PROMPT); no intake answers here; today and the time left as facts
+        return request_variables(self._brief, today=self._today)
 
     async def run(self, unit: Any, context: Any) -> Any:
         from tilo_api.runs import MeteredOutcome  # noqa: PLC0415
@@ -781,6 +791,12 @@ class _UnitRunner:
             "inputs": _safe("\n\n".join(earlier) or "(none)"),
             "skills": "\n\n".join(skill.body for skill in context.skills), **self._request(),
         }  # fmt: skip
+        if unit["role"] == "verifier":  # FR-AGT-12: the deterministic date-window check comes before the model
+            deadline = parse_deadline(self._brief.get("deadline"))
+            checked = "\n\n".join(self._work[d] for d in unit["depends_on"] if d in self._work)
+            if (fail := date_window_fail(checked, self._today, deadline)) is not None:
+                # the unit fails: its dependents are skipped and the run stops with `reason` (no model call, no review)
+                return MeteredOutcome(success=False, summary=" ".join(fail.verdict.split()), reason=fail.reason)
         text, credits = await asyncio.to_thread(
             self._ask, unit["role"], load_prompt(unit["role"], "unit.md", variables)
         )
@@ -838,7 +854,7 @@ def _app(
 
     def compiler() -> Any:
         def compile_and_capture(*, brief: dict, approach: dict, budget_cap: float, context: Any) -> dict:
-            plan = compile_plan(brief, approach, budget_cap, context, router=router).plan
+            plan = compile_plan(brief, approach, budget_cap, context, router=router, today=runner.today).plan
             runner.capture(brief, plan)
             return plan
 
@@ -856,6 +872,7 @@ def _app(
     overrides: dict[Callable[..., Any], Callable[..., Any]] = {
         deps.get_current_principal: principal, deps.get_store: lambda: store, deps.get_event_writer: lambda: writer,
         deps.get_router: lambda: router, deps.get_safety: lambda: safety, deps.get_plan_compiler: compiler,
+        deps.get_today: lambda: lambda: runner.today,
         deps.get_unit_runner: lambda: runner, deps.get_action_resolver: lambda: resolve,
         deps.get_connector_adapters: lambda: adapters, deps.get_must_ask_providers: must_ask_providers,
         **e2e_stand_ins.overrides(),  # the artifact store, redactor and raw archive the run needs (ADR-0018 T4)
@@ -1003,6 +1020,24 @@ def _mark_recordings(recordings: Path, *, synthetic: bool) -> None:
         marker.unlink(missing_ok=True)
 
 
+def _mark_today(recordings: Path, day: date) -> None:
+    recordings.mkdir(parents=True, exist_ok=True)
+    (recordings / TODAY_MARKER).write_text(day.isoformat() + "\n", encoding="utf-8", newline="\n")
+
+
+def _run_date(recordings: Path, given: date | None, *, live: bool) -> date:
+    """The date a run's prompts state: the caller's, else (replay) the one the recordings were made with, else the real
+    date. A prompt that stated the real date would change its recording key every day."""
+    if given is not None:
+        return given
+    marker = recordings / TODAY_MARKER
+    if not live and marker.is_file():
+        pinned = parse_deadline(marker.read_text(encoding="utf-8").strip())
+        if pinned is not None:
+            return pinned
+    return real_today()
+
+
 def _execute(
     case: BankCase, router: _MeteredRouter, meter: _Meter, screen: SafetyProvider, env: Mapping[str, str],
     *, live: bool, cap: float, narrate: bool = True, person: Any = None, runner: _UnitRunner | None = None,
@@ -1049,6 +1084,7 @@ def run_live_e2e(
     safety: SafetyProvider | None = None,
     announce: Callable[[Estimate, float], None] | None = None,
     fake_record: bool = False,  # only `record_with_fake` sets this; the command line has no way to
+    today: date | None = None,  # the date the prompts state; a replay reads the recording's own (`TODAY` marker)
     adhoc: BankCase | None = None,  # `just live-run`: an in-memory case for a typed topic, not a bank case
     person: Any = None,  # `just live-run`: a person answers in place of the case script (`live_topic.TerminalPerson`)
     real_connectors: bool = False,  # CL-LIVE-1: real read-only Google connectors in place of the recording mocks
@@ -1107,7 +1143,10 @@ def run_live_e2e(
         _mark_recordings(recordings, synthetic=live_provider_factory is not None)  # only a test injects a provider
     providers = _Providers(config, meter, recordings, factory, fake_record=fake_record)
     router = _MeteredRouter(config, meter, providers)
-    runner = _UnitRunner(router, meter)
+    day = _run_date(recordings, today, live=live)
+    if live and (fake_record or os.environ.get("TILO_RECORD") == "1"):
+        _mark_today(recordings, day)  # a later replay states the same date, so its recording keys still match
+    runner = _UnitRunner(router, meter, day)
     obs, report.outcome_class, report.reason, report.story_lines, report.story_note = _execute(
         case,
         router,
@@ -1150,6 +1189,7 @@ def record_with_fake(
     models_path: Path | None = None,
     max_credits: float = DEFAULT_MAX_CREDITS,
     safety: SafetyProvider | None = None,
+    today: date | None = None,
 ) -> LiveE2EReport:
     """Re-record the synthetic fixture (issue #367) through an injected fake: the real Router, record-and-replay layer
     and pipeline, with every reply from `fake_factory`. Programmatic only: no flag or environment variable reaches it,
@@ -1158,7 +1198,7 @@ def record_with_fake(
     return run_live_e2e(
         case_id, mode="live", max_credits=max_credits, bank_dir=bank_dir, models_path=models_path,
         prices_path=prices_path, recordings_dir=recordings_dir, live_provider_factory=fake_factory, safety=safety,
-        fake_record=True,
+        fake_record=True, today=today,
     )  # fmt: skip
 
 

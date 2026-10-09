@@ -44,6 +44,7 @@ from tilo_planning.compiler import PlanInputs, compile_plan
 from tilo_planning.gaps import Gap
 from tilo_planning.memory import InMemoryPreferenceStore, MemoryLookup
 from tilo_planning.questions import Question
+from tilo_providers.clock import Clock, real_today
 from tilo_providers.config import ProviderConfigError, ProvidersConfig, load_providers_config, resolve_models_path
 from tilo_providers.interfaces import SafetyProvider
 from tilo_providers.router import Router, RouterExhaustedError
@@ -545,15 +546,16 @@ def _seam_router(mode: Mode) -> Router:
     return get_router() if mode == "replay" else get_router(mode)
 
 
-def get_plan_compiler(mode: Mode = "replay") -> Callable[..., dict]:
+def get_plan_compiler(mode: Mode = "replay", today: Clock = real_today) -> Callable[..., dict]:
     """`compile(*, brief, approach, budget_cap, context) -> PlanGraph` (FR-INT-09). The Director drafts it through
-    the Router and `validate_plan` decides (BQ-90); with no `director` role in the provider config it refuses."""
+    the Router and `validate_plan` decides (BQ-90); with no `director` role in the provider config it refuses.
+    `today` is the clock the plan prompt states the date from (INTAKE-QUALITY-1); `run_seams` hands it `get_today`."""
     if "director" not in providers_config().roles:
         return _no_plan_compiler
     router = _seam_router(mode)
 
     def compile_with_director(*, brief: dict, approach: dict, budget_cap: float, context: PlanInputs) -> dict:
-        return compile_plan(brief, approach, budget_cap, context, router=router).plan
+        return compile_plan(brief, approach, budget_cap, context, router=router, today=today()).plan
 
     return compile_with_director
 
@@ -580,8 +582,8 @@ def _worker_models(mode: Mode = "replay") -> Mapping[str, Any]:
     return {role: _RoleModel(router, role) for role in ("specialist", "writer", "verifier")}
 
 
-def get_unit_runner(mode: Mode = "replay") -> Any:
-    return DefaultUnitRunner(cast(Any, _worker_models(mode)))
+def get_unit_runner(mode: Mode = "replay", today: Clock = real_today) -> Any:
+    return DefaultUnitRunner(cast(Any, _worker_models(mode)), clock=today)
 
 
 def get_must_ask_providers(mode: Mode = "replay") -> Mapping[str, Any]:
@@ -612,8 +614,12 @@ def get_connector_adapters() -> dict[str, Any]:
 
 
 @functools.cache
-def get_outbox_store() -> InMemoryOutboxStore:  # a demo's own: `ephemeral.DemoSession.outbox`, built by `run_seams`
-    return InMemoryOutboxStore()  # the process's own until the Firestore store lands
+def get_outbox_store() -> Any:  # a demo's own: `ephemeral.DemoSession.outbox`, built by `run_seams`
+    """ADR-0035 LC-13: the durable Firestore store for `TILO_OUTBOX_STORE=firestore` (503 if the door refuses, never
+    memory), else the process's own in-memory one. A failure is not cached: the next call tries again."""
+    from tilo_api.outbox_firestore import outbox_store_for_env  # noqa: PLC0415
+
+    return outbox_store_for_env() or InMemoryOutboxStore()
 
 
 # ADR-0018 T4: tilo-api has no org until sign-in, so every run's artifact Scope is in this org (PRD 15.1), never a
@@ -725,6 +731,11 @@ def get_founder_gate() -> Callable[[str], bool]:
 
 def get_clock() -> Callable[[], str]:
     return events.now  # a `common#timestamp`; a route reads it once per request
+
+
+def get_today() -> Clock:
+    """The date the Director's prompts state as a fact (INTAKE-QUALITY-1): the real date, a test overrides it."""
+    return real_today
 
 
 def get_plate_sources() -> PlateSources:

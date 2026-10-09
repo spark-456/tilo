@@ -97,6 +97,7 @@ class Seams:
     ]  # the team's settings (FR-ACC-01; team_store.team_reader): no default, every path passes one
 
 
+_CLOCK_SEAMS = frozenset({"plan_compiler", "unit_runner"})  # the seams whose prompts state the date
 _MODE_SEAMS = frozenset({"plan_compiler", "unit_runner", "must_ask_providers"})  # the seams that build a Router
 
 
@@ -125,6 +126,8 @@ def run_seams(request: Request, mode: Annotated[Mode, Depends(deps.get_work_mode
             return overrides[seam]()
         if name in mine:
             return mine[name]
+        if name in _CLOCK_SEAMS:  # one clock for the whole API: the override a test installs reaches the run too
+            return seam(mode, overrides[deps.get_today]() if deps.get_today in overrides else deps.get_today())
         return seam(mode) if name in _MODE_SEAMS else seam()
 
     try:
@@ -553,7 +556,9 @@ class Run:
             return
         if stopped := result.failed + result.held + result.skipped:
             reason = "a step was held, so the work stopped" if result.held and not result.failed else None
-            self._fail(self.failure or reason or "a unit failed, so the work stopped", stopped[0])
+            failed = result.outcomes.get(stopped[0])  # a unit's own plain stop line, if code wrote one (FR-AGT-12)
+            own = getattr(failed, "reason", None) if failed is not None and not failed.success else None
+            self._fail(self.failure or own or reason or "a unit failed, so the work stopped", stopped[0])
             return
         credits = math.fsum(e["credits"] for e in self.store.events.get(self.world_id, []))  # the meter (HR-1)
         data = {"credits_used": credits, "deliverable_count": len(self.delivered)}

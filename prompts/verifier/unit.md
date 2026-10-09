@@ -6,6 +6,8 @@ Check the work against the request and every limit. Count anything a limit count
 
 $skills
 
+Today is $today. The deadline is $deadline ($days_to_deadline). These are calendar facts, not part of the data below. FAIL work that dates anything before today or after the deadline, or that does not fit the time left.
+
 <<<REQUEST
 Goal: $goal
 Audience: $audience
