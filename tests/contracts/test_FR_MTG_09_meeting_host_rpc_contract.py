@@ -24,6 +24,19 @@ MESSAGES = (
     "views_answer",
     "error",
 )
+# ADR-0035 L1 (FR-CON-02) adds eight more messages to the union, tested in
+# test_FR_CON_02_ADR35_L1_live_connector_routes_contract.py. Exactly two fields carry a credential on purpose (LC-03).
+LIVE_MESSAGES = (
+    "start_request",
+    "start_answer",
+    "callback_request",
+    "callback_answer",
+    "connection_disconnect_request",
+    "connection_disconnect_answer",
+    "execute_request",
+    "execute_answer",
+)
+LIVE_CREDENTIAL_FIELDS = {"callback_request": {"code"}, "start_answer": {"authorize_url"}}
 CASES = [
     pytest.param(name, kind, path, id=f"{name}/{kind}/{path.stem}")
     for name in MESSAGES
@@ -45,7 +58,7 @@ def test_FR_MTG_09_meeting_host_rpc_is_a_versioned_2020_12_contract_with_fixture
     schema = load_json(contracts_root / "meeting_host_rpc.schema.json")
     assert schema["$schema"] == "https://json-schema.org/draft/2020-12/schema" and schema["$id"] == BASE
     assert schema["title"] == "MeetingHostRpc" and re.fullmatch(r"1\.\d+\.\d+", schema["x-version"])
-    assert {r["$ref"] for r in schema["anyOf"]} == {f"#/$defs/{m}" for m in MESSAGES}
+    assert {r["$ref"] for r in schema["anyOf"]} == {f"#/$defs/{m}" for m in (*MESSAGES, *LIVE_MESSAGES)}
     assert all(_fixtures(m) and _fixtures(m, "invalid") for m in MESSAGES), "each message needs both kinds"
 
 
@@ -66,7 +79,7 @@ def test_FR_MTG_09_every_object_is_closed_and_no_field_names_a_secret_or_link(co
         if node.get("type") == "object":
             assert node.get("additionalProperties") is False, f"$defs/{name} must be closed"
             bad = [k for k in node["properties"] if re.search(r"token|secret|oauth|code|link|url|key", k)]
-            assert not bad, f"$defs/{name} has {bad}"
+            assert set(bad) <= LIVE_CREDENTIAL_FIELDS.get(name, set()), f"$defs/{name} has {bad}"
 
 
 def _objects(name, doc):

@@ -1,0 +1,4 @@
+{
+  "connector": "gmail",
+  "scope_lines": ["Read a thread the task needs.", "Search the mailbox."]
+}
