@@ -224,8 +224,52 @@ def test_LW_11_health_answers_fast_during_slow_render_and_concurrency_cap_return
     health_elapsed, busy_code, r1_code, after_code = asyncio.run(scenario())
     assert health_elapsed < 0.2 and (busy_code, r1_code, after_code) == (429, 200, 200)
 
-    to_app = _make_app(
-        renderer=lambda _s, _f: (time.sleep(0.4), b"%PDF-1.4\n")[1], render_timeout=0.05, max_concurrency=1
-    )
-    r_to = TestClient(to_app).post("/render", json=REQ_PDF, headers=AUTH)
-    assert r_to.status_code == 504 and r_to.json()["reason"] == "timeout"
+
+def test_LW_11_timeout_holds_concurrency_slot_until_worker_exits() -> None:
+    entered, release = threading.Event(), threading.Event()
+
+    def slow_worker(_spec: DeliverableSpec, _fmt: str) -> bytes:
+        entered.set()
+        release.wait(timeout=1.5)
+        return b"%PDF-1.4\n%%EOF\n"
+
+    app = _make_app(renderer=slow_worker, render_timeout=0.05, max_concurrency=1)
+
+    async def scenario() -> tuple[int, int, int]:
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://render.test") as ac:
+            r1 = await ac.post("/render", json=REQ_PDF, headers=AUTH)
+            r_busy = await ac.post("/render", json=REQ_PDF, headers=AUTH)
+            release.set()
+            for _ in range(50):
+                await asyncio.sleep(0.02)
+                r_ok = await ac.post("/render", json=REQ_PDF, headers=AUTH)
+                if r_ok.status_code == 200:
+                    return r1.status_code, r_busy.status_code, r_ok.status_code
+            return r1.status_code, r_busy.status_code, r_ok.status_code
+
+    r1_code, busy_code, ok_code = asyncio.run(scenario())
+    assert (r1_code, busy_code, ok_code) == (504, 429, 200)
+
+
+def test_LW_11_work_budget_and_huge_content_length_refused() -> None:
+    client = TestClient(_make_app())
+    r_cl = client.post("/render", content=b"{}", headers={**JSON_AUTH, "Content-Length": "9" * 4500})
+    assert r_cl.status_code == 422 and r_cl.json()["reason"] == "invalid_spec"
+
+    bad_cols = {**SAMPLE_SPEC, "tables": [{"id": "t", "columns": [f"c{i}" for i in range(21)], "rows": [[1] * 21]}]}
+    assert client.post("/render", json={"format": "pdf", "spec": bad_cols}, headers=AUTH).status_code == 422
+
+    bad_blocks = {
+        **SAMPLE_SPEC,
+        "sections": [
+            {"heading": f"s{i}", "blocks": [{"type": "paragraph", "text": "p"} for _ in range(3)]} for i in range(41)
+        ],
+    }
+    assert client.post("/render", json={"format": "pdf", "spec": bad_blocks}, headers=AUTH).status_code == 422
+
+    bad_cells = {
+        **SAMPLE_SPEC,
+        "tables": [{"id": "t", "columns": [f"c{i}" for i in range(20)], "rows": [[1] * 20 for _ in range(500)]}],
+        "sections": [{"heading": f"s{i}", "blocks": [{"type": "table", "table_id": "t"}]} for i in range(3)],
+    }
+    assert client.post("/render", json={"format": "pdf", "spec": bad_cells}, headers=AUTH).status_code == 422

@@ -29,6 +29,13 @@ from tilo_render.pdf import render_pdf
 from tilo_render.pptx import render_pptx
 from tilo_render.spec import DeliverableSpec
 
+try:
+    from tilo_logging import configure_logging
+
+    configure_logging()
+except ImportError:
+    pass
+
 log = logging.getLogger("tilo_render")
 MAX_BODY_BYTES = 1024 * 1024  # 1 MiB request payload cap before JSON parsing
 MAX_OUTPUT_BYTES = 20 * 1024 * 1024  # 20 MiB rendered file cap (matches tilo_harness.outputs.MAX_PDF)
@@ -138,10 +145,11 @@ def create_app(
 
         cl_header = request.headers.get("content-length")
         if cl_header is not None:
-            if not _CONTENT_LENGTH_RE.fullmatch(cl_header.strip()):
+            cl_val = cl_header.strip()
+            if len(cl_val) > 10 or not _CONTENT_LENGTH_RE.fullmatch(cl_val):
                 return _refuse(422, "invalid_spec")
-            if int(cl_header) > max_body_bytes:
-                log.warning("render refused: reason=too_large content_length=%d", int(cl_header))
+            if int(cl_val) > max_body_bytes:
+                log.warning("render refused: reason=too_large content_length=%s", cl_val)
                 return _refuse(413, "too_large")
 
         buf = bytearray()
@@ -151,12 +159,15 @@ def create_app(
                 log.warning("render refused: reason=too_large body_bytes=%d", len(buf))
                 return _refuse(413, "too_large")
 
-        try:
-            text = bytes(buf).decode("utf-8").strip()
+        def _parse_and_validate(raw_bytes: bytes) -> RenderRequestPayload:
+            text = raw_bytes.decode("utf-8").strip()
             if not (text.startswith("{") and text.endswith("}")):
                 raise ValueError("not a JSON object")
             raw_data = json.loads(text, object_pairs_hook=_no_dup_keys, parse_constant=_no_nan_inf)
-            req_data = RenderRequestPayload.model_validate(raw_data)
+            return RenderRequestPayload.model_validate(raw_data)
+
+        try:
+            req_data = await run_in_threadpool(_parse_and_validate, bytes(buf))
         except (UnicodeDecodeError, ValueError, ValidationError, RecursionError):
             log.warning("render refused: reason=invalid_spec body_bytes=%d", len(buf))
             return _refuse(422, "invalid_spec")
@@ -165,19 +176,27 @@ def create_app(
             log.warning("render refused: reason=busy format=%s", req_data.format)
             return _refuse(429, "busy")
 
+        worker_started = False
+
+        def _run_worker() -> bytes:
+            nonlocal worker_started
+            worker_started = True
+            try:
+                return eff_renderer(req_data.spec, req_data.format)
+            finally:
+                semaphore.release()
+
         started = time.monotonic()
         try:
-            rendered = await asyncio.wait_for(
-                run_in_threadpool(eff_renderer, req_data.spec, req_data.format), timeout=render_timeout
-            )
+            rendered = await asyncio.wait_for(run_in_threadpool(_run_worker), timeout=render_timeout)
         except TimeoutError:
             log.warning("render refused: reason=timeout format=%s", req_data.format)
             return _refuse(504, "timeout")
         except Exception:
+            if not worker_started:
+                semaphore.release()
             log.warning("render refused: reason=render_failed format=%s", req_data.format)
             return _refuse(502, "render_failed")
-        finally:
-            semaphore.release()
 
         mime_type, disposition, magic = _MIME_BY_FORMAT[req_data.format]
         if not isinstance(rendered, bytes) or not rendered.startswith(magic):
