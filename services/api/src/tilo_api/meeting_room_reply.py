@@ -147,7 +147,7 @@ def _prompt(record: Grounding, text: str, mode: str, note: str, lines: tuple) ->
     )
     variables = {"mode": mode, "agent": record.agent, "question": neutralise(text, limit=2000), "record": rows}
     return (
-        load_prompt("meeting_room", "reply_system.md", {"agent": record.agent}),
+        load_prompt("meeting_room", "reply_system.md"),
         load_prompt("meeting_room", "reply_task.md", {**variables, "note": note}),
     )
 
