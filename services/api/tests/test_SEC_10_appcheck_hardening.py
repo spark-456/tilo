@@ -330,3 +330,97 @@ def test_SEC_10_the_audience_must_equal_projects_slash_the_project(signer, audie
     with pytest.raises(appcheck.TokenRefused) as refused:
         verifier.verify(_token(signer, aud=audience))
     assert refused.value.code == "wrong_project"
+
+
+# --- the warm-up (SEC-SWEEP-1): min-instances 0 makes a true cold start after every idle period ---------
+
+
+def test_SEC_10_a_warmed_cold_start_serves_the_first_caller(signer):
+    verifier = _verifier(lambda: {"k1": signer.public_key()})
+    assert verifier.warm() is True
+    assert verifier.verify(_token(signer))["sub"]  # the first request after the start needs no fetch of its own
+
+
+def test_SEC_10_without_the_warm_up_the_first_concurrent_callers_meet_the_fetch(signer):
+    started, release = threading.Event(), threading.Event()
+
+    def fetch() -> dict[str, rsa.RSAPublicKey]:
+        started.set()
+        release.wait(5)
+        return {"k1": signer.public_key()}
+
+    verifier = _verifier(fetch)
+    first = threading.Thread(target=lambda: verifier.verify(_token(signer)))
+    first.start()
+    assert started.wait(5)
+    with pytest.raises(appcheck.TokenRefused):
+        verifier.verify(_token(signer))  # the case the warm-up removes
+    release.set()
+    first.join(5)
+
+
+def test_SEC_10_a_failed_warm_up_is_quiet_and_changes_nothing(signer):
+    def fetch() -> dict[str, rsa.RSAPublicKey]:
+        raise OSError("keys endpoint down")
+
+    verifier = _verifier(fetch)
+    assert verifier.warm() is False  # best effort: no exception, nothing stored
+    with pytest.raises(OSError):
+        verifier.verify(_token(signer))  # nothing was stored: a later request tries for itself
+
+
+def test_SEC_10_warming_a_warm_cache_fetches_nothing(signer):
+    calls = {"n": 0}
+
+    def fetch() -> dict[str, rsa.RSAPublicKey]:
+        calls["n"] += 1
+        return {"k1": signer.public_key()}
+
+    verifier = _verifier(fetch)
+    assert verifier.warm() and verifier.warm()
+    assert calls["n"] == 1
+
+
+def test_SEC_10_the_app_start_warms_both_verifiers_and_never_blocks_on_failure(monkeypatch):
+    from tilo_api import firebase_auth
+
+    warmed: list[str] = []
+
+    class Quiet:
+        def __init__(self, name: str, ok: bool) -> None:
+            self.name, self.ok = name, ok
+
+        def warm(self) -> bool:
+            warmed.append(self.name)
+            if not self.ok:
+                raise RuntimeError("boom")  # even a surprise must not reach the start
+            return True
+
+    monkeypatch.setattr(appcheck, "default_verifier", lambda: Quiet("appcheck", False))
+    monkeypatch.setattr(firebase_auth, "default_verifier", lambda: Quiet("firebase", True))
+    monkeypatch.setenv("K_SERVICE", "tilo-api")
+    appcheck.warm_up()
+    assert sorted(warmed) == ["appcheck", "firebase"]
+
+
+def test_SEC_10_the_refusing_verifiers_have_nothing_to_warm():
+    appcheck.RefuseAll("dev_mode").warm()  # dev mode and an unconfigured project open no socket
+
+
+def test_SEC_10_outside_cloud_run_the_warm_up_opens_no_socket(monkeypatch):
+    from tilo_api import firebase_auth
+
+    monkeypatch.delenv("K_SERVICE", raising=False)
+    monkeypatch.setattr(appcheck, "default_verifier", lambda: pytest.fail("a laptop or CI never warms"))
+    monkeypatch.setattr(firebase_auth, "default_verifier", lambda: pytest.fail("a laptop or CI never warms"))
+    appcheck.warm_up()
+
+
+def test_SEC_10_the_app_start_runs_the_warm_up_in_the_background(monkeypatch):
+    import tilo_api
+    from fastapi.testclient import TestClient
+
+    ran = threading.Event()
+    monkeypatch.setattr(appcheck, "warm_up", ran.set)
+    with TestClient(tilo_api.app):
+        assert ran.wait(5)

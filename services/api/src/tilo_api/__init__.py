@@ -1,5 +1,6 @@
 """tilo-api: sessions, tasks, cards, approvals, policies, downloads, sharing, RBAC (PRD 6.2)."""
 
+import threading
 from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
 from typing import Annotated, Any
@@ -10,6 +11,7 @@ from starlette.concurrency import run_in_threadpool
 from tilo_harness.writer import WriterBusy as _WriterBusy
 from tilo_logging import configure_logging as _configure_logging
 
+from tilo_api import appcheck as _appcheck
 from tilo_api import cors as _cors
 from tilo_api import deps as _deps
 from tilo_api import dev as _dev
@@ -52,6 +54,9 @@ _DOCS: dict[str, Any] = {} if _dev.dev_enabled() else {"docs_url": None, "redoc_
 
 @asynccontextmanager
 async def _lifespan(_: FastAPI) -> AsyncIterator[None]:
+    # min-instances 0: every idle period ends in a cold start, and the first sign-in must not meet an empty key cache.
+    # A daemon thread, best effort: the start never waits on the keys endpoint and never fails for it.
+    threading.Thread(target=_appcheck.warm_up, name="jwks-warm-up", daemon=True).start()
     yield
     await run_in_threadpool(_durable_store.close_deployed)  # SIGTERM: the writers release their leases (ADR-0026 4)
 
