@@ -1,6 +1,4 @@
 // ADR35_L6c / FR_CON_02: a card that asks for fields has no tap on the Park Decisions page; it is typed on Needs you.
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
 import type { Card } from "@tilo/contracts";
 import { describe, expect, it } from "vitest";
 import { decisionsFromCards } from "./decisionsFromCards";
@@ -29,15 +27,10 @@ const asks = {
 } as unknown as Card;
 
 describe("ADR35_L6c FR_CON_02 Park decisions for a fields card", () => {
-  it("has no yes label and says where to add it", () => {
+  it("has no yes label, carries its card id for the form and says why only", () => {
     const [d] = decisionsFromCards([{ world_id: "w_a", card_id: asks.id, card: asks }]);
     expect(d?.yes).toBe("");
-    expect(d?.body).toContain("Needs you screen");
-  });
-
-  it("both decision panels draw the yes button only when there is a label", () => {
-    for (const file of ["pages/World/Side.tsx", "pages/Worlds/Spotlight.tsx"]) {
-      expect(readFileSync(join(__dirname, "../..", file), "utf8")).toContain('d.yes !== ""');
-    }
+    expect(d?.provide).toEqual({ cardId: asks.id }); // ADR-0035 L6d: the form sits under it
+    expect(d?.body).toBe("Nothing is sent.");
   });
 });

@@ -475,6 +475,10 @@ class Run:
     def _read_pinned(self, ref: dict[str, Any]) -> bytes:
         return bytes(self.seams.artifacts.read(self.scope, ref))  # hash-checked (AR-01)
 
+    def read_pinned(self, ref: dict[str, Any]) -> bytes:
+        """The bytes of an item this run pinned, hash-checked (AR-01); for the owner's show-me."""
+        return self._read_pinned(dict(ref))
+
     def _part_sink(self, part: Mapping[str, Any]) -> None:
         """What connectors' answer carried (ADR-0032 decision 7): an alert is recorded, a connection part abandons."""
         from tilo_api.meeting_host import on_connection_event  # noqa: PLC0415

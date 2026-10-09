@@ -12,6 +12,7 @@ import {
   answerOption,
   decisionKey,
   decisionsFromCards,
+  needsFields,
 } from "./live/decisionsFromCards";
 import { type CostReport, ledgerFromCosts } from "./live/ledgerFromCosts";
 import { profileDefaults } from "./live/profileDefaults";
@@ -245,6 +246,7 @@ export function createLiveApi(options: LiveApiOptions = {}): Api {
     }
     served.clear(); // a card that left the feed can no longer be answered from a stale key (BQ-WIRE3-1)
     for (const { world_id, card_id, card } of items) {
+      if (needsFields(card)) continue; // typed in the fields form: a tap on it would answer `provide` with nothing
       const path = `/worlds/${encodeURIComponent(world_id)}/cards/${encodeURIComponent(card_id)}/answer`;
       served.set(decisionKey(world_id, card_id), { path, option: answerOption(card) as string });
     }

@@ -1,5 +1,6 @@
 // "Waiting for you" (the amber box with one card per decision) and the "all caught up" banner.
 import type { Dec, Decision, DecisionKey } from "../../api/types";
+import { DecisionFields } from "../../app/DecisionFields";
 import { cx } from "../../components/cx";
 import type { Art } from "./art";
 import { plural } from "./model";
@@ -40,6 +41,7 @@ function DecisionCard({
         </div>
       ) : (
         <div className="park-worlds-dec__actions">
+          {d.provide && <DecisionFields d={d} />}
           {d.yes !== "" && (
             <button type="button" className="park-worlds-dec__yes" onClick={() => onDecide(d.k)}>
               {d.yes}

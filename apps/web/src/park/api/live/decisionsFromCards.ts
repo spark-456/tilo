@@ -27,9 +27,7 @@ export const decisionKey = (worldId: string, cardId: string): DecisionKey =>
 
 /** The words a person reads beside a card whose tap does more than answer a question (BQ-WIRE3-4). */
 function bodyOf(card: Card): string {
-  if (needsFields(card))
-    return `${card.why_it_matters}
-Add it on the Needs you screen.`;
+  if (needsFields(card)) return card.why_it_matters; // the fields form sits under it
   const extra =
     card.kind === "gate" && card.gate
       ? [card.gate.action.exact, ...card.gate.recipients]
@@ -39,8 +37,8 @@ Add it on the Needs you screen.`;
   return [card.why_it_matters, ...extra].join("\n");
 }
 
-/** A card that asks for fields (`provide`) is answered by typing them on the Needs you screen, never by a tap (L6c). */
-const needsFields = (card: Card): boolean =>
+/** A card that asks for fields (`provide`) is answered by typing them in the fields form, never by a tap (L6c, L6d). */
+export const needsFields = (card: Card): boolean =>
   card.kind === "needs_you" && card.options.some((o) => o.id === "provide");
 
 function decisionOf({ world_id, card_id, card }: CardFeedItem): Decision {
@@ -55,6 +53,7 @@ function decisionOf({ world_id, card_id, card }: CardFeedItem): Decision {
     done: "",
     toast: "",
     approvedTitle: "",
+    ...(needsFields(card) ? { provide: { cardId: card_id } } : {}),
   };
 }
 
