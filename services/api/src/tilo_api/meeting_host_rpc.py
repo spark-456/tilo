@@ -33,6 +33,7 @@ from tilo_contracts import (
     MeetingHostRpcAlertPart,
     MeetingHostRpcConnectionPart,
     MeetingHostRpcConnectionView,
+    MeetingHostRpcDisconnectAnswer,
     MeetingHostRpcError,
     MeetingHostRpcReceipt,
     MeetingHostRpcSendAnswer,
@@ -193,6 +194,14 @@ class MeetingHostRpc:
         if got.state == "none" and got.scope_ok:
             raise HostRpcError("unknown")
         return got
+
+    def disconnect(self, user_id: str) -> MeetingHostRpcDisconnectAnswer:
+        """The owner's own disconnect (ADR-0032 decision 7). Idempotent at connectors, so the caller may retry any
+        failure. `refused` means nothing acted; `unknown` means it may have (a lost answer): retry. Not retried here."""
+        try:
+            return MeetingHostRpcDisconnectAnswer.model_validate_json(self._post("disconnect", {"user_id": user_id}))
+        except ValidationError:
+            raise HostRpcError("unknown") from None
 
     def connection_views(self, user_id: str, *, order: Sequence[str]) -> list[MeetingHostRpcConnectionView] | None:
         """The principal's own display views (HB-08), or None for "unknown": any failure at all, an answer that breaks
