@@ -219,8 +219,8 @@ def test_LW_06_media_tokens_are_priced_before_the_call_and_the_reported_usage_is
     with pytest.raises(BudgetExceededError):
         router.generate("reader", ask(part("image/png")), budget=estimate * 0.99)
     assert fleet.built == {} or fleet.built["plain"].requests == [], "over the budget is never sent"
-    result = router.generate("reader", ask(part("image/png")), budget=estimate * 1.01)
-    assert result.budget == pytest.approx(estimate * 1.01 - credits(1500, 10)), "the reported usage is billed"
+    result = router.generate("reader", ask(part("image/png")), budget=estimate * 3)  # the budget stops at 0 (#688)
+    assert result.budget == pytest.approx(estimate * 3 - credits(1500, 10)), "the reported usage is billed"
     assert result.attempts[0].tokens_in == 1500
 
 

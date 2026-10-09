@@ -7,6 +7,7 @@ import type { Api } from "../../api/index";
 import type { Skill, Source, User } from "../../api/types";
 import type { AppCtx } from "../../app/AppCtx";
 import { useSchedule } from "../../app/context";
+import type { CurrencyCode } from "../../app/ledgerKpis";
 import {
   CAPTURE_FIXTURE_EVENTS,
   CAPTURE_STEPS,
@@ -31,6 +32,8 @@ export interface TeachInput {
   draft: Skill | undefined;
   /** Source of the loaded Skills data; fixture capture and try-run events only fire when source is "fixture". */
   source?: Source;
+  /** Currency from the Ledger data. */
+  currency?: CurrencyCode;
 }
 
 /** What every pane of the card gets. */
@@ -41,6 +44,8 @@ export interface PaneProps {
 }
 
 export interface Teach {
+  source: Source;
+  currency: CurrencyCode;
   stage: Stage;
   method: MethodKey;
   cap: number;
@@ -79,7 +84,14 @@ export interface Teach {
 const together = <T>(call: () => Promise<T>): Promise<T> =>
   new Promise((resolve) => resolve(call()));
 
-export function useTeach({ app, api, user, draft, source = "fixture" }: TeachInput): Teach {
+export function useTeach({
+  app,
+  api,
+  user,
+  draft,
+  source = "fixture",
+  currency = "GBP",
+}: TeachInput): Teach {
   const schedule = useSchedule();
   const defaultName = draft?.name ?? "";
   const [stage, setStage] = useState<Stage>(0);
@@ -146,6 +158,7 @@ export function useTeach({ app, api, user, draft, source = "fixture" }: TeachInp
   }, []);
 
   const capture = () => {
+    if (source !== "fixture") return;
     if (method === "describe" || method === "upload") {
       setCap(CAPTURE_STEPS);
       return;
@@ -154,10 +167,14 @@ export function useTeach({ app, api, user, draft, source = "fixture" }: TeachInp
     setRec(true);
   };
   const goTo = (i: Stage) => {
+    if (source !== "fixture" && i > 0) return;
     if (i === 2 && stage !== 2) startRun();
     setStage(i);
   };
-  const reach = [true, cap >= CAPTURE_STEPS, cap >= CAPTURE_STEPS, runDone];
+  const reach =
+    source === "fixture"
+      ? [true, cap >= CAPTURE_STEPS, cap >= CAPTURE_STEPS, runDone]
+      : [true, false, false, false];
   const reset = () => {
     setStage(0);
     setCap(0);
@@ -191,6 +208,8 @@ export function useTeach({ app, api, user, draft, source = "fixture" }: TeachInp
   };
 
   return {
+    source,
+    currency,
     stage,
     method,
     cap,

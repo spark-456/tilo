@@ -123,6 +123,7 @@ class FakeVertexSdk:
         errors_mod = pytypes.ModuleType("google.genai.errors")
         types_mod.GenerateContentConfig = FakeGenerateContentConfig  # type: ignore[attr-defined]
         types_mod.ThinkingConfig = FakeThinkingConfig  # type: ignore[attr-defined]
+        types_mod.HttpOptions = FakeThinkingConfig  # type: ignore[attr-defined]  # the adapter's request timeout (PL-02)
         errors_mod.APIError = FakeAPIError  # type: ignore[attr-defined]
         genai_pkg.types = types_mod  # type: ignore[attr-defined]
         genai_pkg.errors = errors_mod  # type: ignore[attr-defined]
