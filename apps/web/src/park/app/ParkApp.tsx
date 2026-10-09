@@ -5,6 +5,7 @@ import { type MouseEvent, Suspense, useEffect, useRef } from "react";
 import { PageSheet } from "../components";
 import { AppShell } from "../shell/AppShell";
 import { ParkAuthProvider } from "../shell/auth";
+import { useParkTour } from "../shell/tour";
 import "../tokens/fonts";
 import "../tokens/park.css";
 import { type AppCtx, PAGE_LABEL } from "./AppCtx";
@@ -101,6 +102,7 @@ function Shell() {
     };
   }, [title]);
   const Page = route ? PAGES[route.page] : null;
+  const Tour = useParkTour()?.Layer; // ONBOARD-1: the first-run welcome and tour, when the Root provides them
   return (
     <div data-park data-time={app.time} data-motion={app.motion}>
       <AppShell>
@@ -109,6 +111,11 @@ function Shell() {
           <FocusHeading routeKey={routeKey} />
         </Suspense>
       </AppShell>
+      {Tour ? (
+        <Suspense fallback={null}>
+          <Tour />
+        </Suspense>
+      ) : null}
     </div>
   );
 }

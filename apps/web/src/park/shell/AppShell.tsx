@@ -17,6 +17,7 @@ import { Enter } from "./Enter";
 import { NotificationsPopover } from "./NotificationsPopover";
 import { TopNav } from "./TopNav";
 import { WorldLoader } from "./WorldLoader";
+import { useParkTour } from "./tour";
 import { authInitials, useParkAuth } from "./auth";
 import { useAppearance } from "./cityMotion";
 import { loadShellFonts } from "./fonts";
@@ -53,6 +54,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [ready, setReady] = useState(false);
   const expectsSample = useExpectsSample();
   const auth = useParkAuth();
+  const tour = useParkTour();
   const [mobileNote, setMobileNote] = useState(false);
   const signingOut = useRef(false);
   const appearance = useAppearance();
@@ -221,6 +223,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             user={person}
             canSignOut={!auth || auth.status === "signedIn"}
             onMobile={() => setMobileNote(true)}
+            {...(tour ? { onTour: tour.start } : {})}
             connectorsOn={connectorsOn}
             go={navTo}
             onSignOut={signOutViaSeam}
