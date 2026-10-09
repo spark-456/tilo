@@ -42,16 +42,21 @@ from tilo_connectors.consent import ConsentRefused
 from tilo_connectors.live import CALLBACK_PATH, CallbackServer
 
 HEALTH_ROUTES = frozenset({("GET", "/health"), ("GET", "/healthz")})
-# Add a route here only with its own forged/replayed cases. The four internal routes are not OAuth callbacks: each
-# takes a Google-signed ID token for the one caller account (HB-01) and keeps no replayable secret; their forged,
-# missing, wrong-audience, wrong-account and oversize cases are in test_ADR32_T3_host_routes.py and
-# test_ADR32A_T4B_FR_MTG_09_connection_views.py.
+# Add a route here only with its own forged/replayed cases. The internal routes are not OAuth redirects: each takes a
+# Google-signed ID token for the one caller account (HB-01) and keeps no replayable secret; their forged, missing,
+# wrong-audience, wrong-account and oversize cases are in test_ADR32_T3_host_routes.py and
+# test_ADR32A_T4B_FR_MTG_09_connection_views.py. /internal/connections/callback carries the browser's one-time state
+# and code (tilo-api relays them); its forged, replayed, expired, other-user and lost-instance cases are in
+# test_ADR35_L3_FR_CON_02_connect_routes.py, and the state rules themselves are tested below on ConsentService.
 SIGNED_ROUTES: frozenset[tuple[str, str]] = frozenset(
     {
         ("POST", "/internal/meeting-host/send"),
         ("POST", "/internal/meeting-host/status"),
         ("POST", "/internal/meeting-host/disconnect"),
         ("POST", "/internal/connections/views"),
+        ("POST", "/internal/connections/start"),
+        ("POST", "/internal/connections/callback"),
+        ("POST", "/internal/connections/disconnect"),
     }
 )
 

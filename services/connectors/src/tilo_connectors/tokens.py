@@ -301,6 +301,11 @@ class TokenBroker:
 
     # -- public ---------------------------------------------------------------------------------
 
+    @property
+    def oauth(self) -> tuple[HttpClient, OAuthSettings]:
+        """The client and settings the consent service shares with this broker (tilo-connectors only)."""
+        return self._http, self._settings
+
     def store_tokens(
         self,
         user_id: str,
