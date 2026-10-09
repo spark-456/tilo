@@ -658,6 +658,8 @@ class PlateSources(Protocol):
     def runs(self, user_id: str) -> Iterable[dict[str, Any]]: ...
     def mail(self, user_id: str) -> Iterable[dict[str, Any]]: ...
 
+    truncated: bool  # a source hit its read cap (optional: the plate builder reads it with getattr)
+
 
 class SourceOwners(Protocol):
     def owner_of(self, kind: str, ref: str) -> str | None: ...  # kind "mail" or "request"
