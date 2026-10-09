@@ -36,7 +36,7 @@ from typing import Any, Literal
 
 from fastapi import FastAPI, Request
 from tilo_harness.outputs import UnitOutput
-from tilo_harness.schedule_dates import date_window_verdict
+from tilo_harness.schedule_dates import date_window_fail
 from tilo_harness.unit_prompt import request_variables
 from tilo_harness.untrusted import neutralise as neutralise_text
 from tilo_providers.clock import parse_deadline, real_today
@@ -791,17 +791,15 @@ class _UnitRunner:
             "inputs": _safe("\n\n".join(earlier) or "(none)"),
             "skills": "\n\n".join(skill.body for skill in context.skills), **self._request(),
         }  # fmt: skip
-        verdict = None
         if unit["role"] == "verifier":  # FR-AGT-12: the deterministic date-window check comes before the model
             deadline = parse_deadline(self._brief.get("deadline"))
             checked = "\n\n".join(self._work[d] for d in unit["depends_on"] if d in self._work)
-            verdict = date_window_verdict(checked, self._today, deadline)
-        if verdict is not None:
-            text, credits = verdict, 0.0
-        else:
-            text, credits = await asyncio.to_thread(
-                self._ask, unit["role"], load_prompt(unit["role"], "unit.md", variables)
-            )
+            if (fail := date_window_fail(checked, self._today, deadline)) is not None:
+                # the unit fails: its dependents are skipped and the run stops with `reason` (no model call, no review)
+                return MeteredOutcome(success=False, summary=" ".join(fail.verdict.split()), reason=fail.reason)
+        text, credits = await asyncio.to_thread(
+            self._ask, unit["role"], load_prompt(unit["role"], "unit.md", variables)
+        )
         self._work[unit["id"]] = text
         summary = f"Finished {unit['title']}."
         if unit["role"] == "verifier":

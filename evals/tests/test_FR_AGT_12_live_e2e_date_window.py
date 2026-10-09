@@ -60,10 +60,10 @@ def test_FR_AGT_12_a_verifier_unit_fails_on_a_date_before_today_without_a_model_
 
     outcome = _run(runner, "U2")
 
-    verdict = outcome.outputs[0].content.decode("utf-8")
-    assert verdict.splitlines()[0] == "FAIL" and '"March 2025"' in verdict
-    assert "Verdict: FAIL" in outcome.summary
-    assert [p for p in asked[before:] if "<<<WORK" in p and "Verify" in p and "Lead" not in p] == []
+    assert outcome.success is False and outcome.outputs == ()  # the unit fails: the executor skips its dependents
+    assert outcome.summary.startswith("FAIL Schedule dates") and '"March 2025"' in outcome.summary
+    assert '"March 2025"' in (outcome.reason or "") and len(outcome.reason or "") <= 140
+    assert len(asked) == before  # no verifier call and no Lead review
 
 
 def test_FR_AGT_12_a_verifier_unit_inside_the_window_goes_to_the_model() -> None:

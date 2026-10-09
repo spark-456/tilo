@@ -28,7 +28,7 @@ def test_FR_AGT_12_iso_dates_before_today_or_after_the_deadline_are_found() -> N
 
 
 def test_FR_AGT_12_month_and_year_is_judged_by_its_month() -> None:
-    assert _quotes("March 2025: basics. Mar 2025 again.") == ["March 2025", "Mar 2025"]
+    assert _quotes("Start: March 2025. Phase two: Mar 2025 again.") == ["March 2025", "Mar 2025"]
     # the current month and the deadline's month are inside the window, even though some of their days are not
     assert _quotes("October 2026 and Oct 2026 and February 2027 and Feb 2027") == []
     assert _quotes("Sept 2026 is last month; March 2027 is after the exam") == ["Sept 2026", "March 2027"]
@@ -44,11 +44,11 @@ def test_FR_AGT_12_day_month_year_and_month_day_year_forms() -> None:
         "Feb 8, 2027",
     ]
     assert _quotes("9 Oct 2026 and Oct 9, 2026 are today") == []
-    assert _quotes("8 Oct 2026") == ["8 Oct 2026"]  # yesterday
+    assert _quotes("Start 8 Oct 2026") == ["8 Oct 2026"]  # yesterday
 
 
 def test_FR_AGT_12_without_a_deadline_only_the_past_is_checked() -> None:
-    assert _quotes("2025-03-01 and 2031-01-01", deadline=None) == ["2025-03-01"]
+    assert _quotes("Start 2025-03-01 and 2031-01-01", deadline=None) == ["2025-03-01"]
 
 
 def test_FR_AGT_12_other_forms_are_not_checked() -> None:
@@ -58,7 +58,7 @@ def test_FR_AGT_12_other_forms_are_not_checked() -> None:
 
 
 def test_FR_AGT_12_a_date_range_is_read_date_by_date() -> None:
-    assert _quotes("Mar 2025 - Jan 2027") == ["Mar 2025"]
+    assert _quotes("Start Mar 2025 - Jan 2027") == ["Mar 2025"]
 
 
 def test_FR_AGT_12_the_verdict_is_fail_and_quotes_the_dates() -> None:
@@ -77,7 +77,7 @@ def test_FR_AGT_12_a_clean_schedule_has_no_verdict() -> None:
 
 
 def test_FR_AGT_12_the_verdict_lists_at_most_five_dates_and_a_huge_text_is_bounded() -> None:
-    verdict = date_window_verdict(" ".join(f"2025-01-{d:02d}" for d in range(1, 29)), TODAY, DEADLINE)
+    verdict = date_window_verdict("Start " + " ".join(f"2025-01-{d:02d}" for d in range(1, 29)), TODAY, DEADLINE)
     assert verdict is not None and verdict.count("2025-01-") == 5 and "more" in verdict
     assert out_of_window("x" * 5_000_000 + " 2025-01-01", TODAY, DEADLINE) == []  # past the scanned prefix
 
@@ -94,15 +94,17 @@ def _verify(work: str, model: ScriptedProvider):
     runner = DefaultUnitRunner({"verifier": model}, clock=lambda: TODAY)
     context = UnitContext("A_verifier", (), brief=BRIEF, upstream=(UpstreamItem("U1", "Draft", work, ()),))
     outcome = asyncio.run(runner.run(VERIFY, context))
-    return outcome, outcome.outputs[0].content.decode("utf-8")
+    return outcome, outcome.outputs[0].content.decode("utf-8") if outcome.outputs else ""
 
 
 def test_FR_AGT_12_the_default_runner_fails_a_verifier_unit_without_a_model_call() -> None:
     model = ScriptedProvider({})
-    outcome, text = _verify("Plan: start March 2025, exam 2027-02-07.", model)
+    outcome, _ = _verify("Plan: start March 2025, exam 2027-02-07.", model)
 
-    assert text.splitlines()[0] == "FAIL" and '"March 2025"' in text
-    assert outcome.success and "Verdict: FAIL" in outcome.summary  # the verdict is the result; the unit itself ran
+    assert outcome.success is False and outcome.outputs == ()  # the unit fails: nothing is stored or handed over
+    assert "Verdict: FAIL" not in outcome.summary and outcome.summary.startswith("FAIL Schedule dates")
+    assert '"March 2025"' in outcome.summary and outcome.reason is not None and '"March 2025"' in outcome.reason
+    assert len(outcome.reason) <= 140
     assert model.prompts == [] and model.misses == []
 
 

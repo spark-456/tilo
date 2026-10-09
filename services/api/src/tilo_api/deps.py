@@ -538,15 +538,16 @@ def _seam_router(mode: Mode) -> Router:
     return get_router() if mode == "replay" else get_router(mode)
 
 
-def get_plan_compiler(mode: Mode = "replay") -> Callable[..., dict]:
+def get_plan_compiler(mode: Mode = "replay", today: Clock = real_today) -> Callable[..., dict]:
     """`compile(*, brief, approach, budget_cap, context) -> PlanGraph` (FR-INT-09). The Director drafts it through
-    the Router and `validate_plan` decides (BQ-90); with no `director` role in the provider config it refuses."""
+    the Router and `validate_plan` decides (BQ-90); with no `director` role in the provider config it refuses.
+    `today` is the clock the plan prompt states the date from (INTAKE-QUALITY-1); `run_seams` hands it `get_today`."""
     if "director" not in providers_config().roles:
         return _no_plan_compiler
     router = _seam_router(mode)
 
     def compile_with_director(*, brief: dict, approach: dict, budget_cap: float, context: PlanInputs) -> dict:
-        return compile_plan(brief, approach, budget_cap, context, router=router).plan
+        return compile_plan(brief, approach, budget_cap, context, router=router, today=today()).plan
 
     return compile_with_director
 
@@ -573,8 +574,8 @@ def _worker_models(mode: Mode = "replay") -> Mapping[str, Any]:
     return {role: _RoleModel(router, role) for role in ("specialist", "writer", "verifier")}
 
 
-def get_unit_runner(mode: Mode = "replay") -> Any:
-    return DefaultUnitRunner(cast(Any, _worker_models(mode)))
+def get_unit_runner(mode: Mode = "replay", today: Clock = real_today) -> Any:
+    return DefaultUnitRunner(cast(Any, _worker_models(mode)), clock=today)
 
 
 def get_must_ask_providers(mode: Mode = "replay") -> Mapping[str, Any]:
