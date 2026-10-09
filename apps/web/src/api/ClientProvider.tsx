@@ -55,7 +55,7 @@ export function clientFor(
   current: TiloClient,
   demo: TiloClient,
   status: string,
-  isDefault: TiloClient = current,
+  isDefault: TiloClient,
 ): TiloClient {
   return status === "anonymous" && current === isDefault ? demo : current;
 }
@@ -77,11 +77,19 @@ export function ClientProvider({
   return <ClientContext.Provider value={client}>{children}</ClientContext.Provider>;
 }
 
-export function useClient(): TiloClient {
-  const context = useContext(ClientContext);
+/** The context's client, or the fixture client for a demo session when it is the default (`isDefault`). */
+export function useSessionClient(context: TiloClient, isDefault: TiloClient): TiloClient {
   const state = useSyncExternalStore(session.subscribe, session.getState);
-  return state.status === "anonymous" && context === defaultClient ? demoFixture() : context;
+  return clientFor(
+    context,
+    state.status === "anonymous" ? demoFixture() : context,
+    state.status,
+    isDefault,
+  );
 }
+
+export const useClient = (): TiloClient =>
+  useSessionClient(useContext(ClientContext), defaultClient);
 
 /** True while the active client serves fixtures, so every screen shows the HR-4/BQ-07 banner. */
 export const useIsFixtureClient = (): boolean => useClient() instanceof FixtureClient;
