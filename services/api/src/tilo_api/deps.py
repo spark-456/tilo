@@ -43,6 +43,7 @@ from tilo_planning.compiler import PlanInputs, compile_plan
 from tilo_planning.gaps import Gap
 from tilo_planning.memory import InMemoryPreferenceStore, MemoryLookup
 from tilo_planning.questions import Question
+from tilo_providers.clock import Clock, real_today
 from tilo_providers.config import ProviderConfigError, ProvidersConfig, load_providers_config, resolve_models_path
 from tilo_providers.interfaces import SafetyProvider
 from tilo_providers.router import Router, RouterExhaustedError
@@ -705,6 +706,11 @@ def get_founder_gate() -> Callable[[str], bool]:
 
 def get_clock() -> Callable[[], str]:
     return events.now  # a `common#timestamp`; a route reads it once per request
+
+
+def get_today() -> Clock:
+    """The date the Director's prompts state as a fact (INTAKE-QUALITY-1): the real date, a test overrides it."""
+    return real_today
 
 
 def get_plate_sources() -> PlateSources:

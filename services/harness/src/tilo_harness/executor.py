@@ -48,9 +48,11 @@ import functools
 import math
 from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass, field
+from datetime import date
 from typing import Any, Protocol
 
 from tilo_logging.context import bound
+from tilo_providers.clock import Clock, parse_deadline, real_today
 from tilo_providers.interfaces import GenerateRequest, ModelProvider
 from tilo_providers.prompts import load_prompt
 
@@ -60,6 +62,7 @@ from tilo_harness.context_handoff import context_pct, next_spare, note_is_valid,
 from tilo_harness.must_ask import Ask, MustAsk
 from tilo_harness.outputs import Kept, UnitOutput, existing, keep
 from tilo_harness.question_wait import Answer, QuestionWait
+from tilo_harness.schedule_dates import date_window_verdict
 from tilo_harness.skills import LoadedSkill, Pins, SkillError, SkillRegistry
 from tilo_harness.unit_prompt import UPSTREAM_ITEM_CAP, UpstreamItem, data_line, inputs_text, request_variables
 from tilo_harness.validator import EventRejected, repo_validator
@@ -127,11 +130,18 @@ class RunResult:
 class DefaultUnitRunner:
     """Does a unit's work with the model for the unit's role, through the provider layer."""
 
-    def __init__(self, providers: Mapping[str, ModelProvider]) -> None:
+    def __init__(self, providers: Mapping[str, ModelProvider], *, clock: Clock = real_today) -> None:
         self._providers = providers
+        self._clock = clock  # today, as a fact in every prompt and the Verifier's date window (INTAKE-QUALITY-1)
 
     async def run(self, unit: Mapping[str, Any], context: UnitContext) -> UnitOutcome:
         provider = self._providers[unit["role"]]
+        today = self._clock()
+        if unit["role"] == "verifier" and (verdict := _date_window_fail(context, today)) is not None:
+            # FR-AGT-12: a date outside [today, deadline] fails here, in code, before any model verifier call
+            output = UnitOutput(media_type="text/markdown", content=verdict.encode("utf-8"))
+            summary = f"Finished {unit['title']}. Verdict: {verdict.splitlines()[0]}"
+            return UnitOutcome(success=True, summary=summary, outputs=(output,))
         prompt = load_prompt(
             unit["role"],
             "unit.md",
@@ -140,7 +150,7 @@ class DefaultUnitRunner:
                 "unit_type": data_line(unit["unit_type"], 80),
                 "skills": "\n\n".join(skill.body for skill in context.skills),
                 "inputs": inputs_text(context.upstream),
-                **request_variables(context.brief, context.intake_answers),
+                **request_variables(context.brief, context.intake_answers, today=today),
             },
         )
         response = await asyncio.to_thread(provider.generate, GenerateRequest(prompt=prompt))
@@ -149,6 +159,13 @@ class DefaultUnitRunner:
         # Code picks the media type; a model never names one (ADR-0018 s1).
         output = UnitOutput(media_type="text/markdown", content=response.text.encode("utf-8"))
         return UnitOutcome(success=True, summary=f"Finished {unit['title']}.", outputs=(output,))
+
+
+def _date_window_fail(context: UnitContext, today: date) -> str | None:
+    """The deterministic date-window verdict for the work a verifier unit checks (its upstream outputs), or None."""
+    deadline = parse_deadline((context.brief or {}).get("deadline"))
+    work = "\n\n".join(item.text for item in context.upstream if item.text)
+    return date_window_verdict(work, today, deadline)
 
 
 @dataclass(frozen=True)
