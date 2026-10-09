@@ -48,6 +48,9 @@ HEALTH_ROUTES = frozenset({("GET", "/health"), ("GET", "/healthz")})
 # test_ADR32A_T4B_FR_MTG_09_connection_views.py. /internal/connections/callback carries the browser's one-time state
 # and code (tilo-api relays them); its forged, replayed, expired, other-user and lost-instance cases are in
 # test_ADR35_L3_FR_CON_02_connect_routes.py, and the state rules themselves are tested below on ConsentService.
+# /internal/side-effects/execute (ADR-0035 L5) takes no OAuth state or code at all: HB-01 caller, hashed items and the
+# approval-bound grant; its forged, missing, wrong-account and oversize cases are in
+# test_ADR35_L5_FR_CON_02_execute_route.py.
 SIGNED_ROUTES: frozenset[tuple[str, str]] = frozenset(
     {
         ("POST", "/internal/meeting-host/send"),
@@ -57,6 +60,7 @@ SIGNED_ROUTES: frozenset[tuple[str, str]] = frozenset(
         ("POST", "/internal/connections/start"),
         ("POST", "/internal/connections/callback"),
         ("POST", "/internal/connections/disconnect"),
+        ("POST", "/internal/side-effects/execute"),
     }
 )
 
