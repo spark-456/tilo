@@ -420,31 +420,15 @@
   transform: translateY(-2px);
 }
 
-/* "Start a real task" (not in the design): out of the column's flow, in the 24px the column leaves below
-   it, so the composer's own boxes keep the positions the design gives them (no layout shift) */
+/* "Start a real task" (not in the design): the last words of the composer's hint line, a plain underlined link */
 [data-park] .park-home-real {
-  position: absolute;
-  top: 100%;
-  left: 50%;
-  transform: translateX(-50%);
-  display: flex;
-  align-items: center;
-  height: 24px;
-  padding: 0 12px;
-  border-radius: 999px;
-  background: var(--pop);
-  border: 1px solid var(--line2);
-  box-shadow: var(--sh);
-  box-sizing: border-box;
-  font-weight: 800;
-  font-size: 13px;
-  line-height: 1;
-  color: var(--ink);
-  text-decoration: none;
   white-space: nowrap;
+  font-weight: 800;
+  color: var(--heroInk);
+  text-decoration: underline;
 }
 [data-park] .park-home-real:hover {
-  text-decoration: underline;
+  text-decoration-thickness: 2px;
 }
 
 /* the drafting line: the ring turns in WEB-3 (BQ-WEB-3) */

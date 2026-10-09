@@ -10,10 +10,17 @@ import {
   useState,
   useSyncExternalStore,
 } from "react";
-import { API_URL, appCheckToken, authToken, sessionView } from "../../api/ClientProvider";
+import {
+  API_URL,
+  appCheckToken,
+  authToken,
+  civilToday,
+  sessionView,
+} from "../../api/ClientProvider";
 export { endSession } from "../../api/signOut"; // FR-UX-10: the shell's Sign out, through the one api seam
 export { useSessionAuth } from "../../api/sessionAuth"; // FR-UX-10: who is signed in, for the account menu
 import { API_METHODS, type Api, type ApiMethod } from "../api/index";
+import { withToday } from "../api/sampleDates";
 import { parkApi, withSession } from "../api/select";
 import type { ApiResult, Source } from "../api/types";
 import type { AppCtx } from "./AppCtx";
@@ -78,7 +85,9 @@ export function ParkProvider({ api, navigate, schedule, viewport, children }: Pa
   const [held] = useState<Held>(() => {
     // SEC-10, SEC-15: the live Api's requests carry the App Check token and the sign-in token; none on local hosts or in fixture mode.
     const built = api ?? parkApi({ VITE_TILO_API_URL: API_URL }, appCheckToken, authToken);
-    const raw = api === undefined && API_URL?.trim() ? withSession(built, sessionView) : built;
+    const keyed = api === undefined && API_URL?.trim() ? withSession(built, sessionView) : built;
+    // The sample company's dates follow today; an Api handed in by a test is left exactly as it is.
+    const raw = api === undefined ? withToday(keyed, civilToday) : keyed;
     let store: ParkStore | null = null;
     const wrapped = noting(raw, (source) => store?.noteSource(source));
     const timer = schedule ?? realSchedule;
