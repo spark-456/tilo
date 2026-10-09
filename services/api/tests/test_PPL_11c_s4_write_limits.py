@@ -80,6 +80,9 @@ BODY_ROUTES = {
     "role": "/v1/people/u_priya/role",
     "team invite": "/v1/team/invites",
     "disconnect meeting host": "/v1/meeting-host/disconnect",
+    "connect connector": "/v1/connectors/connect",
+    "connector callback": "/v1/connectors/callback",
+    "disconnect connector": "/v1/connectors/disconnect",
 }
 
 

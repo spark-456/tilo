@@ -51,7 +51,7 @@ export const SCOPES: { scope: string; what: string }[] = [
   },
   {
     scope: "calendar.events.owned",
-    what: "Google Calendar, meeting host only: create meeting invitations.",
+    what: "Google Calendar: add events to your own calendar, after you approve them (events with guests always need your approval, and Google emails the guests); also used by the meeting host account.",
   },
 ];
 
@@ -104,7 +104,9 @@ export const PRIVACY: LegalDoc = {
             [
               "Google Drive: only files you pick and files Tilo creates (the drive.file scope). Tilo cannot see the rest of your Drive.",
             ],
-            ["Google Calendar: Tilo reads the events on your own calendar to show them to you."],
+            [
+              "Google Calendar: Tilo reads the events on your own calendar to show them to you. If you allow it, Tilo adds an event to your own calendar after you approve it; an event with guests always needs your approval first, because Google emails the guests.",
+            ],
             [
               "Meeting host: if you connect it, a separate Google account run by Tilo creates meeting invitations for the people you approve. This is not your own calendar.",
             ],

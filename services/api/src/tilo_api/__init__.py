@@ -10,6 +10,7 @@ from starlette.concurrency import run_in_threadpool
 from tilo_harness.writer import WriterBusy as _WriterBusy
 from tilo_logging import configure_logging as _configure_logging
 
+from tilo_api import connect_routes as _connect_routes
 from tilo_api import cors as _cors
 from tilo_api import deps as _deps
 from tilo_api import dev as _dev
@@ -118,6 +119,7 @@ app.include_router(_runs.router)
 app.include_router(_assistant_router)
 app.include_router(_people.router)
 app.include_router(_meeting_host_routes.router)
+app.include_router(_connect_routes.router)
 app.include_router(_people_list_router)
 app.include_router(_effort_router)
 app.include_router(_connectors_list_router)
