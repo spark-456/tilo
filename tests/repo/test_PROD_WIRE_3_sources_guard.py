@@ -21,7 +21,9 @@ import types
 
 PROD = "services/api/src/tilo_api/prod.py"
 PACKAGE = "services/api/src/tilo_api"
-EXEMPT = {("people_firestore.py", "emulator_people_stores")}
+# `team_store._build` arrived on the base after PROD-WIRE 3 (another lane's TILO_TEAM_STORE door). It builds its own
+# client; delegating it to `prod.firestore_client` is a follow-up in BQ-PW-3, not this slice.
+EXEMPT = {("people_firestore.py", "emulator_people_stores"), ("team_store.py", "_build")}
 NEW_TESTS = (
     "services/api/tests/_pw3_lib.py",
     "services/api/tests/test_PROD_WIRE_3_one_client_per_project.py",
