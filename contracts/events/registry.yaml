@@ -19,7 +19,7 @@
 # (PRD 10.4 Audit, HR-7). Such an event carries authz (EV-03) from one of authz_by (EV-04), and
 # event.schema.json lists the same types (contracts-check fails if the lists drift).
 
-version: 1.2.0
+version: 1.3.0
 unknown_types: trace_only
 types:
   world.requested:
@@ -139,6 +139,19 @@ types:
     trace_row: "approaches={data.approach_count}"
     data_schema: events/data/plan.approaches_proposed.schema.json
     fixture: fixtures/events/valid/plan.approaches_proposed.json
+  plan.revised:
+    family: plan
+    verb: revised
+    priority: should
+    pillar: P1
+    default_severity: info
+    side_effect: false
+    world_effect: "Revision blueprints appear on the buildings whose work changes."
+    hud_effect: "The plan gains the revision units and the credit estimate updates."
+    story_template: "{actor} planned revision work for a change asked for in the Meeting Hall ({data.run})."
+    trace_row: "proposal={data.proposal_id} run={data.run}"
+    data_schema: events/data/plan.revised.schema.json
+    fixture: fixtures/events/valid/plan.revised.json
   budget.requested:
     family: budget
     verb: requested
@@ -569,6 +582,71 @@ types:
     trace_row: "ended"
     data_schema: events/data/meeting.ended.schema.json
     fixture: fixtures/events/valid/meeting.ended.json
+  meeting.convened:
+    family: meeting
+    verb: convened
+    priority: should
+    pillar: P4
+    default_severity: info
+    side_effect: false
+    world_effect: "The lead and its agents gather in the Meeting Hall."
+    hud_effect: "The meeting room opens with the agents seated round the table."
+    story_template: "{actor} called {target} and its team into the Meeting Hall."
+    trace_row: "room={data.room_id} lead={data.lead} as={data.as_role} run={data.run_state} cap={data.credit_cap} turns={data.max_turns}"
+    data_schema: events/data/meeting.convened.schema.json
+    fixture: fixtures/events/valid/meeting.convened.json
+  meeting.asked:
+    family: meeting
+    verb: asked
+    priority: should
+    pillar: P4
+    default_severity: info
+    side_effect: false
+    world_effect: "A speech bubble shows over the Meeting Hall."
+    hud_effect: "The chat panel shows the person's message."
+    story_template: "{actor} asked {target} something in the Meeting Hall."
+    trace_row: "room={data.room_id} turn={data.turn} to={data.to} mode={data.mode}"
+    data_schema: events/data/meeting.asked.schema.json
+    fixture: fixtures/events/valid/meeting.asked.json
+  meeting.replied:
+    family: meeting
+    verb: replied
+    priority: should
+    pillar: P2
+    default_severity: info
+    side_effect: false
+    world_effect: "A reply bubble shows over the Meeting Hall."
+    hud_effect: "The chat panel shows the reply and its sources; the speaker's cue shows while the reply is on screen."
+    story_template: "{actor} replied in the Meeting Hall ({data.outcome})."
+    trace_row: "room={data.room_id} turn={data.turn} outcome={data.outcome} mode={data.mode}"
+    data_schema: events/data/meeting.replied.schema.json
+    fixture: fixtures/events/valid/meeting.replied.json
+  meeting.change_requested:
+    family: meeting
+    verb: change_requested
+    priority: should
+    pillar: P4
+    default_severity: info
+    side_effect: false
+    world_effect: "A change slip goes from the Meeting Hall to the Town Hall."
+    hud_effect: "The chat panel marks the change as sent to planning."
+    story_template: "{actor} asked {target} for a change; it goes to planning."
+    trace_row: "room={data.room_id} proposal={data.proposal_id} as={data.as_role}"
+    data_schema: events/data/meeting.change_requested.schema.json
+    fixture: fixtures/events/valid/meeting.change_requested.json
+  meeting.adjourned:
+    family: meeting
+    verb: adjourned
+    priority: should
+    pillar: P4
+    default_severity: info
+    side_effect: false
+    world_effect: "The agents leave the Meeting Hall."
+    hud_effect: "The meeting room closes and the chat panel says why."
+    story_template: "The Meeting Hall meeting with {target} ended ({data.reason})."
+    trace_row: "room={data.room_id} reason={data.reason} turns={data.turns} credits={data.credits_spent}"
+    data_schema: events/data/meeting.adjourned.schema.json
+    fixture: fixtures/events/valid/meeting.adjourned.json
   connection.requested:
     family: connection
     verb: requested

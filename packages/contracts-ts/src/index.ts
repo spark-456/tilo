@@ -69,10 +69,15 @@
  * events/data/district.created.schema.json 1.0.0 sha256:1b25e3de1fa3e1fb
  * events/data/level.completed.schema.json 1.0.0 sha256:b99d3220a8e24536
  * events/data/level.created.schema.json 1.0.0 sha256:f404c2d35df9da17
+ * events/data/meeting.adjourned.schema.json 1.0.0 sha256:0c3fb38b0ad2732a
+ * events/data/meeting.asked.schema.json 1.0.0 sha256:7d58ef4c8d45d1b0
  * events/data/meeting.called.schema.json 1.0.0 sha256:af1b23d42d145e42
+ * events/data/meeting.change_requested.schema.json 1.0.0 sha256:3df34dc137ada7dd
+ * events/data/meeting.convened.schema.json 1.0.0 sha256:2c0f55f0f651b348
  * events/data/meeting.decision.schema.json 1.0.0 sha256:359fc3bc20f11676
  * events/data/meeting.ended.schema.json 1.1.0 sha256:9219b0e4934a318e
  * events/data/meeting.minuted.schema.json 1.0.0 sha256:f2a9c646721e5b64
+ * events/data/meeting.replied.schema.json 1.0.0 sha256:1591c9f4ab421e93
  * events/data/meeting.started.schema.json 1.1.0 sha256:3ee754f6effc0b32
  * events/data/memory.hit.schema.json 1.0.0 sha256:ae1d0919f97240c5
  * events/data/memory.saved.schema.json 1.0.0 sha256:e8764ecbbdc670a9
@@ -82,6 +87,7 @@
  * events/data/pinboard.item_changed.schema.json 1.0.0 sha256:2db181d1a51c6c84
  * events/data/plan.approaches_proposed.schema.json 1.0.0 sha256:4e67dfd9f1e856b4
  * events/data/plan.questions_asked.schema.json 1.0.0 sha256:5fe5359427d0e04b
+ * events/data/plan.revised.schema.json 1.0.0 sha256:55005a10fa84656a
  * events/data/policy.applied.schema.json 1.0.0 sha256:3ca104f308b12dce
  * events/data/policy.changed.schema.json 1.0.0 sha256:e480c2319e07c2a6
  * events/data/question.answered.schema.json 1.1.0 sha256:27aa69077ee8f813
@@ -104,6 +110,7 @@
  * mcp_tools.schema.json 1.0.0 sha256:46a498402c9b1e4e
  * meeting.schema.json 1.2.0 sha256:034e93898bb28957
  * meeting_join.schema.json 1.0.0 sha256:ea1e8f0945773573
+ * meeting_room.schema.json 1.0.0 sha256:13c682235d58ce69
  * mention.schema.json 1.0.0 sha256:ca9c1acbf81616f2
  * meter.schema.json 1.0.0 sha256:ad596dcc70e45e09
  * metering.schema.json 1.0.0 sha256:91358a776e6c033a
@@ -112,7 +119,7 @@
  * person.schema.json 1.0.0 sha256:2c928319dd7ab9d1
  * pilot.schema.json 1.0.0 sha256:5d091f814844b3b1
  * pinboard_item.schema.json 1.0.0 sha256:fe6df109871cea93
- * plan.schema.json 1.0.0 sha256:35991402fa6e958d
+ * plan.schema.json 1.1.0 sha256:f0722cc94a84e2d1
  * plate.schema.json 1.0.0 sha256:d2a4e4361a714c8f
  * policy.schema.json 1.0.0 sha256:307bca25f6efc07e
  * providers.schema.json 1.2.0 sha256:4514148b0b6b2f7e
@@ -123,7 +130,7 @@
  * transcript.schema.json 1.0.0 sha256:08f934b8f0c9a40e
  * ui_action.schema.json 1.0.0 sha256:2ceb1e0b46368734
  * work_item.schema.json 1.0.0 sha256:7add9f68c1f996fb
- * events/registry.yaml 1.2.0 sha256:8be0da29431a82c4
+ * events/registry.yaml 1.3.0 sha256:3f97dd289723f292
  */
 
 /**
@@ -588,6 +595,67 @@ export type UiActionTarget =
   | UiActionTargetWorkItem
   | UiActionTargetCalendarEntry;
 /**
+ * person: the convener closed it; idle: no turn for the configured time; capped: the next turn would pass the room's credit or turn cap; paused: Pause all or Stop all; access_lost: the convener's role or scope no longer covers the room; failed: the room could not go on (writer or archive error).
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MeetingRoomAdjournReason".
+ */
+export type MeetingRoomAdjournReason =
+  "person" | "idle" | "capped" | "paused" | "access_lost" | "failed";
+/**
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MeetingRoomTurnNumber".
+ */
+export type MeetingRoomTurnNumber = number;
+/**
+ * The person's Quick or Thinking choice for a turn: quick uses the meeting role, thinking the meeting_thinking role (config/models.yaml).
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MeetingRoomMode".
+ */
+export type MeetingRoomMode = "quick" | "thinking";
+/**
+ * Pinned artifact versions the reply rests on, made by those units.
+ *
+ * @maxItems 10
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MeetingRoomCitedArtifacts".
+ */
+export type MeetingRoomCitedArtifacts = ArtifactRef[];
+/**
+ * Why the convener may hold this room, from the team store and the world record at the time (MR-03): the world's owner, or an Approver or Member of the world's team whose scope covers every attendee's district. A Viewer never convenes.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MeetingRoomAsRole".
+ */
+export type MeetingRoomAsRole = "owner" | "approver" | "member";
+/**
+ * The agents in the room besides the lead, in seating order.
+ *
+ * @maxItems 7
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MeetingRoomAttendees".
+ */
+export type MeetingRoomAttendees = AgentId[];
+/**
+ * answered: a reply grounded in the agent's own units; proposed_change: a reply that also proposes a change for the person to confirm; declined: the agent has no record for it, or the safety screen flagged the message; failed: no reply was produced (no text exists).
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MeetingRoomOutcome".
+ */
+export type MeetingRoomOutcome = "answered" | "proposed_change" | "declined" | "failed";
+/**
+ * Plan units the reply rests on: the replying agent's own units (a lead's: its district's), checked by code against the grounding set (MR-06).
+ *
+ * @maxItems 20
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MeetingRoomCitedUnits".
+ */
+export type MeetingRoomCitedUnits = UnitId[];
+/**
  * switch: one of the five 'When agents stop and ask' switches (FR-TEAM-04). tool_access: the team's level for one connector (FR-ACC-01). Roles, spend limits, invites and removals are not team rules (BQ-ADR27-3).
  *
  * This interface was referenced by `TiloContracts`'s JSON-Schema
@@ -707,6 +775,18 @@ export type McpToolsWithheldReason = "not_text" | "too_large";
  * via the `definition` "MeetingAgendaMinutes".
  */
 export type MeetingAgendaMinutes = number;
+/**
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MeetingRoomPersonText".
+ */
+export type MeetingRoomPersonText = string;
+/**
+ * A reply's text after the secret redactor; a reply's text is null exactly when its outcome is failed.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MeetingRoomReplyText".
+ */
+export type MeetingRoomReplyText = string;
 /**
  * An https URL of host, optional port and path, with no user info, query or fragment. The not-pattern rejects a final line break, which a Python validator's $ lets through.
  *
@@ -2563,6 +2643,31 @@ export interface LevelCreatedData {
   index: number;
 }
 /**
+ * data of meeting.adjourned (ADR-0028). The room closed, once (MR-05). actor is the convener when reason is person, otherwise system (the idle sweeper, the cap check, Pause all or Stop all, the access check); target is the lead. turns is the number of meeting.asked in the room and credits_spent the sum of its meeting.replied credits (MR-08). A room open at Pause all or Stop all is adjourned (paused) before world.paused is written.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MeetingAdjournedData".
+ */
+export interface MeetingAdjournedData {
+  room_id: Ulid;
+  reason: MeetingRoomAdjournReason;
+  turns: number;
+  credits_spent: Credits;
+}
+/**
+ * data of meeting.asked (ADR-0028). The convener said something in the room to one attendee (to; the web sends the lead when nobody is selected). actor is the convener, target the addressed agent. The words are in the redacted raw archive (message_ref), never here (MR-12). Turns count 1, 2, ... per room with one turn in flight (MR-04); mode is the person's Quick or Thinking choice for this turn.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MeetingAskedData".
+ */
+export interface MeetingAskedData {
+  room_id: Ulid;
+  turn: MeetingRoomTurnNumber;
+  to: AgentId;
+  mode: MeetingRoomMode;
+  message_ref: EventArchiveRef;
+}
+/**
  * data of meeting.called (PRD 9.5).
  *
  * This interface was referenced by `TiloContracts`'s JSON-Schema
@@ -2578,6 +2683,40 @@ export interface MeetingCalledData {
     AgentId | UserId | TeamLeadId,
     ...(AgentId | UserId | TeamLeadId)[],
   ];
+}
+/**
+ * data of meeting.change_requested (ADR-0028). The convener confirmed a change an agent proposed in this room. actor is the convener, target the proposing agent (to). units and artifacts equal the proposal's, so the person confirms exactly what was shown (MR-07); message_ref is the confirmed wording in the redacted raw archive (the proposal's words or the person's own). It is not a side effect and authorises nothing: nothing leaves Tilo and nothing is spent until plan.revised and the budget events (MR-09, MR-10); it is never an L2 instruction (OB-01 counts only world.requested) and sets no gate, tier or policy (MR-11).
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MeetingChangeRequestedData".
+ */
+export interface MeetingChangeRequestedData {
+  room_id: Ulid;
+  proposal_id: Ulid;
+  to: AgentId;
+  /**
+   * @minItems 1
+   * @maxItems 10
+   */
+  units: [UnitId, ...UnitId[]];
+  artifacts: MeetingRoomCitedArtifacts;
+  as_role: MeetingRoomAsRole;
+  message_ref: EventArchiveRef;
+}
+/**
+ * data of meeting.convened (ADR-0028, a user-requested addition). A person called a lead agent and the agents it supervises into the Meeting Hall of this world, to talk about the run run_id names. actor is that person (a user id), target the lead; district is the lead's district (null for the Director, whom only the owner calls); vis lists every attendee's district. Written by tilo-api through the world's writer after the access checks (MR-01, MR-03); never by a model, never a side effect (authz null). run_state says whether that run was live or had finished; a paused world opens no room. credit_cap and max_turns are this room's caps, from config/meeting_room.yaml and the convener's remaining spend cap at the time.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MeetingConvenedData".
+ */
+export interface MeetingConvenedData {
+  room_id: Ulid;
+  lead: AgentId;
+  agents: MeetingRoomAttendees;
+  as_role: MeetingRoomAsRole;
+  run_state: "live" | "finished";
+  credit_cap: Credits;
+  max_turns: MeetingRoomTurnNumber;
 }
 /**
  * data of meeting.decision (PRD 9.5).
@@ -2620,6 +2759,40 @@ export interface ArtifactRef1 {
   artifact_id: ArtifactId;
   version: number;
   label?: string;
+}
+/**
+ * data of meeting.replied (ADR-0028). The addressed agent answered one turn. actor is that agent (the turn's to), target the convener. The reply is one model call over that agent's own records only (MR-06): the event's trace names the meeting or meeting_thinking role and profile, and credits what the call cost. The text is in the redacted raw archive (message_ref); a failed reply has none. units and artifacts are what the reply rests on, checked by code against the agent's own grounding set before the event is written; a proposal names what would change and nothing about how (MR-11). The web shows the speaker's cue only while this event's reply is on screen.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MeetingRepliedData".
+ */
+export interface MeetingRepliedData {
+  room_id: Ulid;
+  turn: MeetingRoomTurnNumber;
+  mode: MeetingRoomMode;
+  outcome: MeetingRoomOutcome;
+  message_ref: EventArchiveRef | null;
+  units: MeetingRoomCitedUnits;
+  artifacts: MeetingRoomCitedArtifacts;
+  proposal: MeetingRoomProposal | null;
+}
+/**
+ * A change an agent proposes. It names only WHAT changes (units and artifact versions); its wording is in the reply's archive record. It has no field for an action, a recipient, a connector, a risk tier or a policy: the planner and the policy engine derive those (MR-11).
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MeetingRoomProposal".
+ */
+export interface MeetingRoomProposal {
+  proposal_id: Ulid;
+  /**
+   * @minItems 1
+   * @maxItems 10
+   */
+  units: [UnitId, ...UnitId[]];
+  /**
+   * @maxItems 10
+   */
+  artifacts: ArtifactRef[];
 }
 /**
  * data of meeting.started (PRD 9.5). 1.1.0: the optional meeting_id names the Meeting record of an external meeting a bot or an upload brought in (FR-MTG-01); absent for a meeting the agents called. Optional means absent, never null.
@@ -2716,6 +2889,32 @@ export interface PlanApproachesProposedData {
  */
 export interface PlanQuestionsAskedData {
   question_count: number;
+}
+/**
+ * data of plan.revised (ADR-0028). The planner compiled a confirmed change (the meeting.change_requested with this proposal_id, which is this event's cause) into revision units, and the plan validator accepted the revised plan (PG-13). actor is the world's Director, target the world. run is same_run when the discussed run was still live (the units join it) and revision_run when it had finished: then this event is the first of a new run of the same world (new run_id), and budget.requested, budget.granted and world.started follow (MR-09, MR-10). credits is the revision's estimate. Not a side effect: the units' own side effects wait at gates or policies like any unit's.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "PlanRevisedData".
+ */
+export interface PlanRevisedData {
+  proposal_id: Ulid;
+  run: "same_run" | "revision_run";
+  /**
+   * @minItems 1
+   * @maxItems 10
+   */
+  units: [PlanRevisedDataRevisionUnit, ...PlanRevisedDataRevisionUnit[]];
+  credits: CreditRange;
+}
+/**
+ * A new plan unit and the unit whose work it changes (plan.schema.json unit revises).
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "PlanRevisedDataRevisionUnit".
+ */
+export interface PlanRevisedDataRevisionUnit {
+  id: UnitId;
+  revises: UnitId;
 }
 /**
  * data of policy.applied (PRD 9.5). The deterministic policy engine opened a gate under a policy (PRD 10.4). Never T3, never below L2. authz is by policy with ref equal to policy_id (EV-06), so the world draws a policy stamp and links it (HR-7); the outbox entry and its outgoing data.transfer carry exactly this authz (OB-01). There is no gate card on this path, so this event records what the engine assessed against the policy's scope: the connector, the destination (an opaque id, never an address), the district of the step, the tier, the undo window, and item pinned to its version (null when there is none). The outbox entry equals it on each (OB-05) and the policy's scope covers it (OB-01), so a redraft, another thread or another connector is a new proposal. L2 is 'instruction is approval' (PRD 10.4, FR-HIL-05): instruction_id is the id of the earlier world.requested (web or mobile_web) or channel.message_in (whatsapp, from the owner's bound number) in this world in which the policy's owner asked for this action on this destination, never an email, and HR-7 links it beside the policy; each instruction is named by at most one policy.applied, so a cancelled send uses it up (OB-01); at L2 the destination is set and the undo window is at least 1 s. At L3 (a standing rule within its limits) instruction_id is null. credits is what this action counts against the policy's daily credit limit (limits.credits, BQ-14): the metered credits of the step whose side effect it is, as known at authz.at (PRD 14.1); the event's own spend stays in the envelope's credits. The engine opens a send only while the policy's actions that UTC day in every world of its owner, this one included, stay within limits.per_day and their credits within limits.credits (OB-01, BQ-52). Recipients stay in the outbox entry, never in an event.
@@ -3561,6 +3760,97 @@ export interface MeetingJoin {
   expires_at: Timestamp;
 }
 /**
+ * A meeting room (ADR-0028, user-requested 2026-10-08, Proposed): a person calls a lead agent and the agents it supervises into the Meeting Hall of a live or finished world, asks them what they did and why, and confirms changes they proposed. The root is the room as tilo-api serves it (GET /v1/worlds/{world_id}/rooms/{room_id}); it is rebuilt from the room's meeting.* events plus the redacted archive records they point at, and holds nothing the events do not. $defs hold the three request bodies and the shapes the meeting.* event data share. Text is plain text: the web shows it as text, never as markup or links. Rules MR-01 to MR-12 are in meeting_room.rules.md.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MeetingRoom".
+ */
+export interface MeetingRoom {
+  room_id: Ulid;
+  world_id: WorldId;
+  run_id: RunId;
+  state: "open" | "adjourned";
+  /**
+   * Why the room closed; null exactly while it is open.
+   */
+  reason: MeetingRoomAdjournReason | null;
+  lead: AgentId;
+  agents: MeetingRoomAttendees;
+  as_role: MeetingRoomAsRole;
+  credit_cap: Credits;
+  credits_spent: Credits;
+  max_turns: MeetingRoomTurnNumber;
+  /**
+   * @maxItems 50
+   */
+  turns: MeetingRoomTurn[];
+}
+/**
+ * One turn: what the person asked, the reply (null while it is pending) and the change the person confirmed from it (null if none).
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MeetingRoomTurn".
+ */
+export interface MeetingRoomTurn {
+  turn: MeetingRoomTurnNumber;
+  to: AgentId;
+  mode: MeetingRoomMode;
+  text: MeetingRoomPersonText;
+  reply: MeetingRoomReply | null;
+  change: MeetingRoomConfirmedChange | null;
+}
+/**
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MeetingRoomReply".
+ */
+export interface MeetingRoomReply {
+  from: AgentId;
+  outcome: MeetingRoomOutcome;
+  text: MeetingRoomReplyText | null;
+  units: MeetingRoomCitedUnits;
+  artifacts: MeetingRoomCitedArtifacts;
+  proposal: MeetingRoomProposal | null;
+}
+/**
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MeetingRoomConfirmedChange".
+ */
+export interface MeetingRoomConfirmedChange {
+  proposal_id: Ulid;
+  text: MeetingRoomPersonText;
+}
+/**
+ * POST /v1/worlds/{world_id}/rooms. The server picks the run, the role, the caps and the room id.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MeetingRoomConveneRequest".
+ */
+export interface MeetingRoomConveneRequest {
+  lead: AgentId;
+  agents: MeetingRoomAttendees;
+}
+/**
+ * POST /v1/worlds/{world_id}/rooms/{room_id}/turns. One turn in flight at a time.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MeetingRoomAskRequest".
+ */
+export interface MeetingRoomAskRequest {
+  to: AgentId;
+  text: MeetingRoomPersonText;
+  mode: MeetingRoomMode;
+}
+/**
+ * POST /v1/worlds/{world_id}/rooms/{room_id}/changes: the person confirms a proposal, in the proposal's words or their own. Units and artifacts come from the proposal, never from this body (MR-07).
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MeetingRoomChangeRequest".
+ */
+export interface MeetingRoomChangeRequest {
+  proposal_id: Ulid;
+  text: MeetingRoomPersonText;
+}
+/**
  * An @mention of a team member on a team pinboard entry (FR-PB-04). It names a team because a personal entry cannot be tagged (PE-01, PE-06). The tagged person is a member of the team when tagged; they can always remove themselves, and the entry's `set_up_by` person can remove anyone (PE-06). A removed mention stays as a record; a new tag is a new mention.
  *
  * This interface was referenced by `TiloContracts`'s JSON-Schema
@@ -4056,6 +4346,8 @@ export interface PlanDimensions {
   output_format: DeliverableFormat;
 }
 /**
+ * One plan unit. 1.1.0 (ADR-0028): a revision unit, planned from a change a person confirmed in a meeting room, also carries revises (the unit whose work it changes) and change (the proposal_id of that meeting.change_requested), both or neither (PG-13).
+ *
  * This interface was referenced by `TiloContracts`'s JSON-Schema
  * via the `definition` "PlanUnit".
  */
@@ -4086,6 +4378,8 @@ export interface PlanUnit {
    * @maxItems 50
    */
   depends_on: UnitId[];
+  revises?: UnitId;
+  change?: Ulid;
 }
 /**
  * Authorisation point before a side effect. A T3 gate has no policy: T3 always needs a person.
@@ -4702,6 +4996,7 @@ export const EVENT_TYPES = [
   "world.failed",
   "plan.questions_asked",
   "plan.approaches_proposed",
+  "plan.revised",
   "budget.requested",
   "budget.granted",
   "level.created",
@@ -4735,6 +5030,11 @@ export const EVENT_TYPES = [
   "meeting.started",
   "meeting.decision",
   "meeting.ended",
+  "meeting.convened",
+  "meeting.asked",
+  "meeting.replied",
+  "meeting.change_requested",
+  "meeting.adjourned",
   "connection.requested",
   "connection.consented",
   "connection.established",
@@ -4799,6 +5099,7 @@ export interface EventDataByType {
   "world.failed": WorldFailedData;
   "plan.questions_asked": PlanQuestionsAskedData;
   "plan.approaches_proposed": PlanApproachesProposedData;
+  "plan.revised": PlanRevisedData;
   "budget.requested": BudgetRequestedData;
   "budget.granted": BudgetGrantedData;
   "level.created": LevelCreatedData;
@@ -4832,6 +5133,11 @@ export interface EventDataByType {
   "meeting.started": MeetingStartedData;
   "meeting.decision": MeetingDecisionData;
   "meeting.ended": MeetingEndedData;
+  "meeting.convened": MeetingConvenedData;
+  "meeting.asked": MeetingAskedData;
+  "meeting.replied": MeetingRepliedData;
+  "meeting.change_requested": MeetingChangeRequestedData;
+  "meeting.adjourned": MeetingAdjournedData;
   "connection.requested": ConnectionRequestedData;
   "connection.consented": ConnectionConsentedData;
   "connection.established": ConnectionEstablishedData;
@@ -4883,7 +5189,7 @@ export type RegisteredEvent = {
 export const EVENT_REGISTRY: EventRegistry & {
   types: { readonly [T in RegisteredEventType]: EventRegistryEntry };
 } = {
-  "version": "1.2.0",
+  "version": "1.3.0",
   "unknown_types": "trace_only",
   "types": {
     "world.requested": {
@@ -5011,6 +5317,20 @@ export const EVENT_REGISTRY: EventRegistry & {
       "trace_row": "approaches={data.approach_count}",
       "data_schema": "events/data/plan.approaches_proposed.schema.json",
       "fixture": "fixtures/events/valid/plan.approaches_proposed.json"
+    },
+    "plan.revised": {
+      "family": "plan",
+      "verb": "revised",
+      "priority": "should",
+      "pillar": "P1",
+      "default_severity": "info",
+      "side_effect": false,
+      "world_effect": "Revision blueprints appear on the buildings whose work changes.",
+      "hud_effect": "The plan gains the revision units and the credit estimate updates.",
+      "story_template": "{actor} planned revision work for a change asked for in the Meeting Hall ({data.run}).",
+      "trace_row": "proposal={data.proposal_id} run={data.run}",
+      "data_schema": "events/data/plan.revised.schema.json",
+      "fixture": "fixtures/events/valid/plan.revised.json"
     },
     "budget.requested": {
       "family": "budget",
@@ -5477,6 +5797,76 @@ export const EVENT_REGISTRY: EventRegistry & {
       "trace_row": "ended",
       "data_schema": "events/data/meeting.ended.schema.json",
       "fixture": "fixtures/events/valid/meeting.ended.json"
+    },
+    "meeting.convened": {
+      "family": "meeting",
+      "verb": "convened",
+      "priority": "should",
+      "pillar": "P4",
+      "default_severity": "info",
+      "side_effect": false,
+      "world_effect": "The lead and its agents gather in the Meeting Hall.",
+      "hud_effect": "The meeting room opens with the agents seated round the table.",
+      "story_template": "{actor} called {target} and its team into the Meeting Hall.",
+      "trace_row": "room={data.room_id} lead={data.lead} as={data.as_role} run={data.run_state} cap={data.credit_cap} turns={data.max_turns}",
+      "data_schema": "events/data/meeting.convened.schema.json",
+      "fixture": "fixtures/events/valid/meeting.convened.json"
+    },
+    "meeting.asked": {
+      "family": "meeting",
+      "verb": "asked",
+      "priority": "should",
+      "pillar": "P4",
+      "default_severity": "info",
+      "side_effect": false,
+      "world_effect": "A speech bubble shows over the Meeting Hall.",
+      "hud_effect": "The chat panel shows the person's message.",
+      "story_template": "{actor} asked {target} something in the Meeting Hall.",
+      "trace_row": "room={data.room_id} turn={data.turn} to={data.to} mode={data.mode}",
+      "data_schema": "events/data/meeting.asked.schema.json",
+      "fixture": "fixtures/events/valid/meeting.asked.json"
+    },
+    "meeting.replied": {
+      "family": "meeting",
+      "verb": "replied",
+      "priority": "should",
+      "pillar": "P2",
+      "default_severity": "info",
+      "side_effect": false,
+      "world_effect": "A reply bubble shows over the Meeting Hall.",
+      "hud_effect": "The chat panel shows the reply and its sources; the speaker's cue shows while the reply is on screen.",
+      "story_template": "{actor} replied in the Meeting Hall ({data.outcome}).",
+      "trace_row": "room={data.room_id} turn={data.turn} outcome={data.outcome} mode={data.mode}",
+      "data_schema": "events/data/meeting.replied.schema.json",
+      "fixture": "fixtures/events/valid/meeting.replied.json"
+    },
+    "meeting.change_requested": {
+      "family": "meeting",
+      "verb": "change_requested",
+      "priority": "should",
+      "pillar": "P4",
+      "default_severity": "info",
+      "side_effect": false,
+      "world_effect": "A change slip goes from the Meeting Hall to the Town Hall.",
+      "hud_effect": "The chat panel marks the change as sent to planning.",
+      "story_template": "{actor} asked {target} for a change; it goes to planning.",
+      "trace_row": "room={data.room_id} proposal={data.proposal_id} as={data.as_role}",
+      "data_schema": "events/data/meeting.change_requested.schema.json",
+      "fixture": "fixtures/events/valid/meeting.change_requested.json"
+    },
+    "meeting.adjourned": {
+      "family": "meeting",
+      "verb": "adjourned",
+      "priority": "should",
+      "pillar": "P4",
+      "default_severity": "info",
+      "side_effect": false,
+      "world_effect": "The agents leave the Meeting Hall.",
+      "hud_effect": "The meeting room closes and the chat panel says why.",
+      "story_template": "The Meeting Hall meeting with {target} ended ({data.reason}).",
+      "trace_row": "room={data.room_id} reason={data.reason} turns={data.turns} credits={data.credits_spent}",
+      "data_schema": "events/data/meeting.adjourned.schema.json",
+      "fixture": "fixtures/events/valid/meeting.adjourned.json"
     },
     "connection.requested": {
       "family": "connection",
