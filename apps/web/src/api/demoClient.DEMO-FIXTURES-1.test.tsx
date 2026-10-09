@@ -13,11 +13,17 @@ import type { TiloClient } from "./client";
 import { FixtureClient } from "./fixtureClient";
 import { HttpClient } from "./http";
 
-const session = vi.hoisted(() => ({ status: "anonymous" as string, states: {} as Record<string, { status: string }> }));
-vi.mock("../auth/session", () => ({
-  session: { getState: () => (session.states[session.status] ??= { status: session.status }), // one object per status: a stable snapshot subscribe: () => () => undefined },
+const session = vi.hoisted(() => ({
+  status: "anonymous" as string,
+  states: {} as Record<string, { status: string }>,
 }));
-
+vi.mock("../auth/session", () => ({
+  session: {
+    // one object per status: a stable snapshot for useSyncExternalStore
+    getState: () => (session.states[session.status] ??= { status: session.status }),
+    subscribe: () => () => undefined,
+  },
+}));
 const http = new HttpClient({ baseUrl: "https://api.example.test" });
 const fixture = new FixtureClient({ delayMs: 0, speed: 1 });
 
