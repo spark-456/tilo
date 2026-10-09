@@ -36,6 +36,9 @@ _MSG_ID = re.compile(r"<[^<>\s@]+@[^<>\s@]+>")
 _MIME = re.compile(r"[a-z0-9][a-z0-9!#$&^_.+-]*/[a-z0-9][a-z0-9!#$&^_.+-]*")
 
 
+NO_GUESTS = "an event with guests needs the guest version, which a person must approve"  # LC-09
+
+
 class DocumentRefused(Exception):
     """The document cannot be built from what was declared; `reason` is plain words for the person."""
 
@@ -85,7 +88,7 @@ def check_fields(action: str, fields: Mapping[str, Any]) -> dict[str, str]:
     if kind is None:
         raise DocumentRefused("this action has no document to build")
     if action == "create_event" and (fields.get("attendees") or fields.get("guests")):
-        raise DocumentRefused("an event with guests needs the guest version, which a person must approve")
+        raise DocumentRefused(NO_GUESTS)
     for name in (*_REQUIRED[kind], *({"email": _HEADERS, "file": ("mime_type",)}.get(kind, ()))):
         value = fields.get(name)
         if value is None or (isinstance(value, str) and not value.strip()):

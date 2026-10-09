@@ -43,6 +43,8 @@ from tilo_api.cards import (
 )
 from tilo_api.connector_rpc import NO_DRAFT, ConnectorRpcStub
 
+DESTINATION_CHANGED = "the email goes somewhere other than its draft, so it is not the same item"
+
 logger = logging.getLogger("tilo_api.runs")
 router = APIRouter()
 
@@ -239,9 +241,10 @@ class Run:
         self._alerted: set[str] = set()
         self._alert_lock = threading.Lock()
         self._drafted: dict[tuple[str, int], str] = {}  # LC-10: (artifact id, version) -> content hash at its draft
-        self._documents: dict[tuple[str, int, str], tuple[dict[str, Any], str]] = {}  # L6b: (body, kind) -> (pin, line)
+        self._documents: dict[tuple[str, int, str], tuple[dict[str, Any], str, str | None]] = {}  # (body, kind) -> pin
         self._asking: dict[str, tuple[str, tuple[str, ...]]] = {}  # fields card id -> (action, the missing fields)
         self._supplied: dict[str, dict[str, str]] = {}  # fields card id -> what the person typed (never logged)
+        self.fields_lock = threading.Lock()  # the fields route stages and answers one card at a time
         self.adapters: dict[str, Any] = {  # a live connector's stub is bound to this run (its reader, sink, owner)
             name: adapter.bound(self._read_pinned, self._part_sink, self.owner)
             if hasattr(adapter, "bound")
@@ -670,18 +673,22 @@ class Run:
         except Exception as exc:
             raise _GateFailed("the send has no recipients") from exc
         live = bool(item_documents.kind_of(action)) and isinstance(self.adapters.get(connector), ConnectorRpcStub)
-        reaches_no_one = action in item_documents.NO_RECIPIENT_ACTIONS  # a save or an own-calendar event (L6b)
+        reaches_no_one = live and action in item_documents.NO_RECIPIENT_ACTIONS  # a save or an own-calendar event
         if not ((destination is None and live or isinstance(destination, str) and destination.strip())  # a new mail
                 and isinstance(recipients, list) and (recipients or reaches_no_one)
                 and all(isinstance(r, str) and r.strip() for r in recipients)):  # fmt: skip
             raise _GateFailed("the send has no recipients or no destination")  # fails closed, before any gate
-        line = None
+        line, body_ref = None, dict(item)
+        if live and action == "create_event" and recipients:  # LC-09: the guest-less action refuses a guest first
+            raise _GateFailed(item_documents.NO_GUESTS)
         if live:
             item, line = await self._item_document(unit, worker, action, item, made, destination, declared)
             ref = dict(item)  # the card, the entry and the hash pin all name the document the person approves
         try:  # AR-07, OB-05, BQ-264: from the stored record, never a default; only a `clean` verdict clears the flag
             stored = self.seams.artifacts.head(self.scope, item).record
-            flagged = stored["screening"] != "clean"
+            flagged = stored["screening"] != "clean" or (  # the body's verdict stays with the pin (OB-05)
+                self.seams.artifacts.head(self.scope, body_ref).record["screening"] != "clean"
+            )
         except Exception as exc:
             raise _GateFailed("the item to send is not in the run's store") from exc
         self._draft_first(connector, action, item)  # LC-10: before any card a send that could not go would raise
@@ -885,6 +892,8 @@ class Run:
         key = (body["artifact_id"], body["version"], kind)
         if action == "send_email" and key not in self._documents:
             raise _GateFailed(NO_DRAFT)  # LC-10: no draft step made this content, so no question is asked for a send
+        if key in self._documents and self._documents[key][2] != destination:
+            raise _GateFailed(DESTINATION_CHANGED)  # a send goes where its draft went, or it is not the same item
         if key not in self._documents:
             try:
                 stored = self.seams.artifacts.head(self.scope, body).record  # type: ignore[union-attr]
@@ -924,8 +933,13 @@ class Run:
                 raise
             except Exception as exc:
                 raise _GateFailed("the document to send could not be stored") from exc
-            self._documents[key] = (version.ref, item_documents.summary(built))
-        return self._documents[key]
+            try:  # the card's line is read back from the stored (redacted) bytes, not from what was built
+                line = item_documents.summary(self._read_pinned(version.ref))
+            except Exception as exc:
+                raise _GateFailed("the document to send could not be read back") from exc
+            self._documents[key] = (version.ref, line, destination)
+        ref, line, _ = self._documents[key]
+        return ref, line
 
     async def _ask_fields(self, unit: dict, worker: str, action: str, missing: tuple[str, ...]) -> dict[str, str]:
         """A needs-you card names the fields the document lacks; the person supplies them on the fields route, which
@@ -949,19 +963,25 @@ class Run:
             raise _GateFailed("the question card was refused")
         self._asking[card_id] = (action, missing)
         try:
-            self._store_card(card)
-        except RuntimeError as exc:
-            raise _GateFailed("the question card was refused") from exc
-        district = next(d for level in self.layout["semantic"]["levels"] for d in level["districts"]
-                        if d["id"] == unit["district"])  # fmt: skip
-        answer = await self.question_wait.wait_for(card, lead=district["lead"], director=self.director,
-                                                   district=unit["district"])  # fmt: skip
-        supplied = self._supplied.pop(card_id, None) if answer.option == "provide" else None
+            try:
+                self._store_card(card)
+            except RuntimeError as exc:
+                raise _GateFailed("the question card was refused") from exc
+            district = next(d for level in self.layout["semantic"]["levels"] for d in level["districts"]
+                            if d["id"] == unit["district"])  # fmt: skip
+            answer = await self.question_wait.wait_for(card, lead=district["lead"], director=self.director,
+                                                       district=unit["district"])  # fmt: skip
+        finally:
+            with self.fields_lock:
+                self._asking.pop(card_id, None)  # nothing is supplied for a card that is over, whichever way it ended
+                supplied = self._supplied.pop(card_id, None)
+        if answer.option != "provide":
+            supplied = None
         if supplied is None:
             raise _GateFailed(f"needs {names}: nothing was added")
         return supplied
 
-    def stage_fields(self, card_id: str, fields: Any) -> None:
+    def stage_fields(self, card_id: str, fields: Any) -> dict[str, str]:
         """The fields route's check, before it answers the card: LookupError for a card this run did not ask,
         ValueError(plain reason) for what the document would refuse. The values are kept for the waiting step only."""
         action, missing = self._asking.get(card_id) or ("", ())
@@ -973,10 +993,15 @@ class Run:
             raise ValueError(exc.reason) from None
         if set(got) != set(missing) or set(fields) != set(missing):
             raise ValueError("needs " + ", ".join(missing))
+        if card_id in self._supplied:
+            raise LookupError(card_id)  # another caller's values are already waiting for this card's answer
         self._supplied[card_id] = got
+        return got
 
-    def unstage_fields(self, card_id: str) -> None:
-        self._supplied.pop(card_id, None)
+    def unstage_fields(self, card_id: str, staged: dict[str, str]) -> None:
+        """Takes back only the values this caller staged."""
+        if self._supplied.get(card_id) is staged:
+            del self._supplied[card_id]
 
     def _action(self, connector: str, action: str) -> dict | None:
         declared = self.seams.connectors.get(connector)["actions"] if connector in self.seams.connectors else []

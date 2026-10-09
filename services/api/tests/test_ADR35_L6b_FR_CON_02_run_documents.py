@@ -9,6 +9,7 @@ No network, no paid call, no live switch.
 from __future__ import annotations
 
 import base64
+import dataclasses
 import email
 import email.policy
 import hashlib
@@ -20,7 +21,9 @@ from _clint2_lib import NEW_RECIPIENT, base_plan, build_run_flow, load_json, wai
 from _mtg09b_lib import block_network
 from tilo_api import deps, events
 from tilo_api.connector_rpc import ConnectorRpcStub
+from tilo_api.runs import DESTINATION_CHANGED
 from tilo_connectors.registry import ConnectorRegistry
+from tilo_people.stores import PeopleStores
 
 SUBJECT = "Q3 note for the finance team"
 THREAD = "<m1@example.org>"
@@ -49,6 +52,10 @@ class Live:
         rf.resolve_action = self.resolve_action
         stub = ConnectorRpcStub(connector, self.connectors.rpc)
         rf.flow.app.dependency_overrides[deps.get_connector_adapters] = lambda: {connector: stub}
+        people = PeopleStores.in_memory()  # the people write limit counts the fields route like any people POST
+        rf.flow.app.dependency_overrides[deps.get_people_stores] = lambda: people
+        rf.flow.app.dependency_overrides[deps.get_clock] = lambda: events.now
+        self.destinations: dict[str, str | None] = {}
 
     def compile_plan(self, *, brief, approach, budget_cap, context=None):
         plan = base_plan(approach["id"], budget_cap)
@@ -61,12 +68,19 @@ class Live:
         return plan
 
     def resolve_action(self, *, unit, action_type, item, brief):
-        return {"destination": self.destination, "recipients": self.recipients, "known_recipients": [],
+        destination = self.destinations.get(action_type, self.destination)
+        return {"destination": destination, "recipients": self.recipients, "known_recipients": [],
                 "fields": dict(self.fields)}  # fmt: skip
 
     def start(self):
         self.rf.start()
+        self.as_user("u_flow_owner", "owner", full=True)
         assert self.rf.approve().status_code == 200
+
+    def as_user(self, user: str, role: str, *, full: bool = True, districts: tuple[str, ...] = ()):
+        self.rf.flow.principal = deps.Principal(
+            user_id=user, role=role, world_id=self.rf.world_id, districts=districts, full_session=full
+        )  # type: ignore[arg-type]
 
     def ask_card(self):
         def find():
@@ -281,3 +295,171 @@ def test_ADR35_L6b_FR_CON_02_a_file_with_no_name_asks_for_it_by_name(live):
     lv = live(connector="google_drive", actions=("save_file",), destination="fld_tilo_reports", recipients=())
     lv.start()
     assert "needs name" in lv.ask_card()["what_happened"] and lv.google.reached() == 0
+
+
+def entry_of(lv, action):
+    found = lambda: next((e for e in lv.rf.outbox_store.all_entries() if e["action_type"] == action), None)  # noqa: E731
+    return wait_for(found, what=f"the {action} entry")
+
+
+class Flagging:
+    """A screener that flags Markdown only: the unit's body is flagged, the JSON document made from it is clean."""
+
+    def check(self, text, *, content=None, mime_type=None):
+        return {"flagged": text.startswith("# ")}
+
+
+@pytest.mark.parametrize(
+    "kwargs, action",
+    [
+        ({"actions": ("create_draft",), "fields": {"subject": SUBJECT}}, "create_draft"),
+        ({"connector": "google_drive", "actions": ("save_file",), "fields": {"name": "n.md"},
+          "destination": "fld_tilo_reports", "recipients": ()}, "save_file"),
+    ],
+)  # fmt: skip
+def test_ADR35_L6b_FR_CON_02_the_bodys_flagged_verdict_stays_with_the_pin_and_keeps_the_safety_modifier(
+    live, kwargs, action
+):
+    flagged = live(**kwargs)
+    flagged.rf.rig.store._screener = Flagging()
+    flagged.start()
+    card = flagged.gate_card(action)
+    assert card["gate"]["risk_tier"] == "T3"  # a flagged body is not cleared by its clean document
+    item = card["gate"]["action"]["item"]
+    assert flagged.rf.rig.store.head(flagged.rf.scope(), item).record["screening"] == "clean"
+    assert flagged.rf.answer(card["id"], "approve").status_code == 200
+    entry = entry_of(flagged, action)
+    assert "safety_flag" in entry["modifiers"] and entry["risk_tier"] == "T3"
+
+
+def test_ADR35_L6b_FR_CON_02_a_send_must_go_where_its_draft_went(live):
+    lv = live(fields={"subject": SUBJECT, "in_reply_to": THREAD})
+    lv.destinations = {"create_draft": None, "send_email": "thr_a1"}
+    lv.start()
+    card = lv.gate_card("create_draft")
+    assert lv.rf.answer(card["id"], "approve").status_code == 200
+    failed = wait_for(lambda: lv.rf.events("world.failed"), what="world.failed")[0]
+    assert failed["data"]["reason"] == DESTINATION_CHANGED
+    gates = [c for c in lv.rf.cards().json() if c["kind"] == "gate" and c["gate"]["action"]["type"] == "send_email"]
+    assert gates == [] and len(lv.google.sent) == 0
+
+
+@pytest.mark.parametrize(
+    "who, role, districts",
+    [
+        ("u_viewer1", "viewer", ()),
+        ("u_appr1", "approver", ()),
+        ("u_lead1", "team_lead", ("D9",)),
+        ("u_lead2", "team_lead", ("D2",)),
+    ],
+)
+def test_ADR35_L6b_FR_CON_02_only_the_owner_may_supply_and_a_stranger_learns_nothing(live, who, role, districts):
+    lv = live()
+    lv.start()
+    asked = lv.ask_card()
+    lv.as_user(who, role, full=True, districts=districts)
+    answers = [lv.supply(asked["id"], f) for f in ({"subject": SUBJECT}, {"subject": "a\nb"}, {"name": "x"}, {})]
+    assert {a.status_code for a in answers} == {404} and len({a.text for a in answers}) == 1
+    assert "subject" not in answers[0].text and lv.rf.events("approval.requested") == []
+    lv.as_user("u_flow_owner", "owner", full=True)
+    assert lv.supply(asked["id"], {"subject": SUBJECT}).status_code == 200  # nothing was wiped or answered
+
+
+def test_ADR35_L6b_FR_CON_02_a_demo_session_is_refused_and_json_only_closed_and_capped_bodies_hold(live):
+    lv = live()
+    lv.start()
+    asked = lv.ask_card()
+    lv.as_user("u_flow_owner", "owner", full=False)
+    assert lv.supply(asked["id"], {"subject": SUBJECT}).status_code == 403
+    lv.as_user("u_flow_owner", "owner", full=True)
+    url = f"/worlds/{lv.rf.world_id}/cards/{asked['id']}/fields"
+    client = lv.rf.flow.client
+    plain = client.post(url, content=b'{"fields": {"subject": "x"}}', headers={"content-type": "text/plain"})
+    assert plain.status_code == 415
+    assert client.post(url, json={"fields": {"subject": "x"}, "more": 1}).status_code == 422
+    assert client.post(url, json={"fields": {"subject": "x" * 40_000}}).status_code == 413
+    assert lv.supply(asked["id"], {"subject": SUBJECT}).status_code == 200
+
+
+def test_ADR35_L6b_FR_CON_02_two_answers_do_not_wipe_each_other_and_the_loser_changes_nothing(live):
+    import threading  # noqa: PLC0415
+
+    lv = live()
+    lv.start()
+    asked = lv.ask_card()
+    codes: list[int] = []
+
+    def go(subject: str) -> None:
+        codes.append(lv.supply(asked["id"], {"subject": subject}).status_code)
+
+    threads = [threading.Thread(target=go, args=(f"Subject number {n}",)) for n in range(2)]
+    [t.start() for t in threads]
+    [t.join() for t in threads]
+    assert sorted(codes)[0] == 200 and all(c in (200, 400, 404, 409) for c in codes)
+    card = lv.gate_card("create_draft")
+    document = json.loads(lv.read(card["gate"]["action"]["item"]))
+    assert document["subject"].startswith("Subject number") and lv.google.reached() == 0
+    run = lv.rf.store.runs[lv.rf.world_id]
+    assert run._supplied == {} and asked["id"] not in run._asking  # nothing is left behind
+
+
+def test_ADR35_L6b_FR_CON_02_a_hold_clears_what_was_asked_and_staged(live):
+    lv = live()
+    lv.start()
+    asked = lv.ask_card()
+    assert lv.rf.answer(asked["id"], "hold").status_code == 200
+    wait_for(lambda: lv.rf.events("world.failed"), what="world.failed")
+    run = lv.rf.store.runs[lv.rf.world_id]
+    assert run._asking == {} and run._supplied == {}
+    assert lv.supply(asked["id"], {"subject": SUBJECT}).status_code == 404
+
+
+def test_ADR35_L6b_FR_CON_02_a_guest_on_create_event_from_the_resolver_fails_before_any_card(live):
+    lv = live(connector="google_calendar", actions=("create_event",), destination="primary",
+              recipients=("guest@example.org",), fields={})  # fmt: skip
+    lv.start()
+    failed = wait_for(lambda: lv.rf.events("world.failed"), what="world.failed")[0]
+    assert "guest" in failed["data"]["reason"]
+    assert lv.rf.events("approval.requested") == [] and lv.rf.cards().json() == []
+
+
+def test_ADR35_L6b_FR_CON_02_the_cards_line_is_read_from_the_stored_redacted_version(live):
+    lv = live()
+    lv.start()
+    asked = lv.ask_card()
+    token = "tkn-0123456789abcdef"
+    store = lv.rf.rig.store
+    original = store.put
+
+    def put(scope, new):  # the store redacts the subject on the way in
+        if new.media_type == "application/json":
+            new = dataclasses.replace(new, content=new.content.replace(token.encode(), b"[redacted]"))
+        return original(scope, new)
+
+    store.put = put
+    assert lv.supply(asked["id"], {"subject": "Pay " + token}).status_code == 200
+    exact = lv.gate_card("create_draft")["gate"]["action"]["exact"]
+    assert token not in exact and "[redacted]" in exact
+
+
+def test_ADR35_L6b_FR_CON_02_the_resolver_alone_declares_fields_never_the_brief_or_the_units_text(live):
+    seen = {}
+    lv = live()
+    original = lv.resolve_action
+
+    def spy(**kw):
+        seen.update(kw)
+        return original(**kw)
+
+    lv.rf.resolve_action = spy
+    lv.start()
+    lv.ask_card()  # the brief and the unit's title were offered to the resolver, and none became the subject
+    assert "brief" in seen and lv.rf.events("approval.requested") == []
+
+
+def test_ADR35_L6b_FR_CON_02_a_clean_body_carries_no_safety_modifier(live):
+    lv = live(actions=("create_draft",), fields={"subject": SUBJECT})
+    lv.start()
+    card = lv.gate_card("create_draft")
+    assert lv.rf.answer(card["id"], "approve").status_code == 200
+    assert "safety_flag" not in entry_of(lv, "create_draft")["modifiers"]
