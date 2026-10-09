@@ -332,3 +332,12 @@ def pytest_collection_modifyitems(items):
                 continue
             if any(entry in item.nodeid for entry in FR_CAL_07A_PENDING):
                 item.add_marker(pytest.mark.xfail(strict=True, reason="FR-CAL-07a slice pending"))
+
+
+@pytest.fixture(autouse=True)
+def _fresh_missing_token_log():
+    """The missing-token warning is sampled per process (once a minute): each test starts with a first one."""
+    from tilo_api import appcheck
+
+    appcheck._missing_log.update(at=float("-inf"), skipped=0)
+    yield

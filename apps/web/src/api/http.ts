@@ -276,7 +276,9 @@ export class HttpClient implements TiloClient, SchedulesApi {
 
   constructor(options: HttpClientOptions) {
     this.base = options.baseUrl.trim().replace(/\/+$/, "");
-    this.fetchFn = options.fetch ?? ((url, init) => fetch(url, init));
+    // redirect: "error": the API never redirects a call, so one that does (a stray proxy, a hijacked path) is an error, not a
+    // detour that would carry the sign-in and App Check tokens to another address (SEC-10)
+    this.fetchFn = options.fetch ?? ((url, init) => fetch(url, { ...init, redirect: "error" }));
     this.pollMs = options.pollMs ?? 1000;
     this.appCheckToken = options.appCheckToken;
     this.authToken = options.authToken;

@@ -43,7 +43,7 @@ def install_cors(app: FastAPI, env: Mapping[str, str] | None = None) -> bool:
     app.add_middleware(
         CORSMiddleware,
         allow_origins=origins,
-        allow_methods=["GET", "POST", "OPTIONS"],
+        allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],  # the methods the API's routes use
         allow_headers=["Content-Type", "Idempotency-Key", "X-Firebase-AppCheck", "Authorization", "X-Tilo-Channel"],
         expose_headers=["Retry-After"],
         allow_credentials=False,

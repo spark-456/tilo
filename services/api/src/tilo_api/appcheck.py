@@ -49,6 +49,9 @@ JWKS_URL = "https://firebaseappcheck.googleapis.com/v1/jwks"
 ISSUER_PREFIX = "https://firebaseappcheck.googleapis.com/"
 JWKS_TTL_S = 900.0  # a fetched key set is trusted this long, counted from the fetch
 JWKS_FETCH_TIMEOUT_S = 3.0
+# past its TTL a snapshot may still serve a KNOWN key id for this long, only while a refresh is in flight or has
+# just failed (BQ-SEC10-4)
+JWKS_STALE_GRACE_S = 3600.0
 JWKS_RETRY_COOLDOWN_S = 10.0  # after ANY fetch attempt no other starts this soon (a dead endpoint costs one per 10 s)
 _REFETCH_MIN_S = 30.0  # an unknown key id inside the TTL refetches at most this often
 _MAX_JWKS_BYTES = 65536
@@ -101,8 +104,11 @@ def _fetch_jwks() -> dict[str, rsa.RSAPublicKey]:
 class JwksKeyCache:
     """One immutable snapshot of a JWKS, refreshed single-flight: the snapshot is read without a lock; a refresh takes
     the lock with a non-blocking acquire, so at most one thread is inside a fetch and a caller that finds one running
-    is refused at once. A failed fetch stores nothing, a snapshot past `JWKS_TTL_S` is never served, and no fetch
-    starts within `JWKS_RETRY_COOLDOWN_S` of another. Shared by the App Check and Firebase ID-token verifiers."""
+    is refused at once. A failed fetch stores nothing new, a snapshot past `JWKS_TTL_S` is served only inside the
+    stale grace (`JWKS_STALE_GRACE_S`, for a key id it already holds, and only while a refresh is in flight or has
+    just failed: on a cold start with a refresh running a valid token is not refused for the fetch's sake), and no
+    fetch starts within `JWKS_RETRY_COOLDOWN_S` of another. Shared by the App Check and Firebase ID-token
+    verifiers."""
 
     def __init__(self, fetch: Callable[[], dict[str, rsa.RSAPublicKey]], clock: Callable[[], float]) -> None:
         self._fetch, self._clock = fetch, clock
@@ -110,13 +116,25 @@ class JwksKeyCache:
         self._snapshot: tuple[dict[str, rsa.RSAPublicKey], float] | None = None
         self._tried_at = float("-inf")
 
+    def _stale(self, kid: str, now: float) -> dict[str, rsa.RSAPublicKey] | None:
+        """The held keys when the snapshot is past its TTL but inside the grace and holds `kid`, else None."""
+        snapshot = self._snapshot
+        if snapshot is None:
+            return None
+        keys, fetched = snapshot
+        age = now - fetched
+        return keys if JWKS_TTL_S <= age < JWKS_TTL_S + JWKS_STALE_GRACE_S and kid in keys else None
+
     def _usable(self, kid: str, now: float) -> dict[str, rsa.RSAPublicKey] | None:
         snapshot, tried = self._snapshot, self._tried_at
         if snapshot is not None and 0 <= now - snapshot[1] < JWKS_TTL_S:
             keys, fetched = snapshot
             if kid in keys or now - max(fetched, tried) < _REFETCH_MIN_S:
                 return keys
-        if 0 <= now - tried < JWKS_RETRY_COOLDOWN_S:
+        if 0 <= now - tried < JWKS_RETRY_COOLDOWN_S:  # a refresh has just run (and failed, or nothing new was found)
+            stale = self._stale(kid, now)
+            if stale is not None:
+                return stale
             raise TokenRefused("keys_unavailable")
         return None
 
@@ -126,6 +144,9 @@ class JwksKeyCache:
         if keys is not None:
             return keys
         if not self._lock.acquire(blocking=False):
+            stale = self._stale(kid, now)
+            if stale is not None:
+                return stale  # a refresh is running: the held keys serve a known key id meanwhile
             raise TokenRefused("key_refresh_in_flight")
         try:
             now = self._clock()
@@ -137,8 +158,12 @@ class JwksKeyCache:
                 fetched = self._fetch()
             except Exception:
                 snapshot = self._snapshot
-                if snapshot is None or not 0 <= now - snapshot[1] < JWKS_TTL_S:
-                    self._snapshot = None
+                if snapshot is None or not 0 <= now - snapshot[1] < JWKS_TTL_S + JWKS_STALE_GRACE_S:
+                    self._snapshot = None  # beyond the grace nothing is kept
+                else:
+                    stale = self._stale(kid, now)
+                    if stale is not None:
+                        return stale  # the fetch just failed: a known key id is still served inside the grace
                 raise
             self._snapshot = (fetched, now)
             return fetched
@@ -248,12 +273,32 @@ def _token_of(scope: Scope) -> str:
     return ""
 
 
+_MISSING_LOG_EVERY_S = (
+    60.0  # a flood of tokenless requests is one log line a minute, with a count, never one per request
+)
+_missing_log = {"at": float("-inf"), "skipped": 0}
+_missing_lock = threading.Lock()
+
+
+def _warn_missing(clock: Callable[[], float] = time.monotonic) -> None:
+    """Logs the missing-token warning at most once per `_MISSING_LOG_EVERY_S` per process, naming how many were left
+    out since the last line (an unauthenticated caller must not be able to fill the log or the bill)."""
+    now = clock()
+    with _missing_lock:
+        if now - _missing_log["at"] < _MISSING_LOG_EVERY_S:
+            _missing_log["skipped"] += 1
+            return
+        skipped, _missing_log["at"], _missing_log["skipped"] = _missing_log["skipped"], now, 0
+    suffix = f", {skipped} more since the last line" if skipped else ""
+    logger.warning("App Check token missing from the request (reason=missing%s)", suffix)
+
+
 def _is_verified(scope: Scope, token: str) -> bool:
     """True for a genuine token. Anything else (no token, a refused one, a verifier that fails) is False and logged
     once as a warning with a fixed reason code (`TokenRefused.code`, or `verifier_failed:<error type>` for any other
     failure of the verifier), never the token or an error text."""
     if not token:
-        logger.warning("App Check token missing from the request (reason=missing)")
+        _warn_missing()
         return False
     from tilo_api import deps  # noqa: PLC0415  (deps imports this module)
 
