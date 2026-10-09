@@ -40,6 +40,25 @@ def pytest_configure(config: pytest.Config) -> None:
 
 
 @pytest.fixture(autouse=True)
+def _fresh_process_state():
+    # FastAPI lazily binds included routes. Bind the original dependency keys before
+    # _wire_models patches deps.get_router, or later intake requests retain its
+    # assistant-only router even after monkeypatch restores the module attribute (#672).
+    app.openapi()
+    overrides = app.dependency_overrides.copy()
+    app.dependency_overrides.clear()
+    for cached in (deps.get_spend_ledger, deps.get_decision_cache):
+        cached.cache_clear()
+    try:
+        yield
+    finally:
+        app.dependency_overrides.clear()
+        app.dependency_overrides.update(overrides)
+        for cached in (deps.get_spend_ledger, deps.get_decision_cache):
+            cached.cache_clear()
+
+
+@pytest.fixture(autouse=True)
 def _no_dev_unit_delay(monkeypatch: pytest.MonkeyPatch) -> None:
     """CL-INT-5d: the dev unit runner paces a dev run by default; the suite runs it unpaced unless a test sets it."""
     monkeypatch.setenv("TILO_DEV_UNIT_DELAY_S", "0")
