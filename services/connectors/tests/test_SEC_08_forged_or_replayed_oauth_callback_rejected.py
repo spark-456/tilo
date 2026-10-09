@@ -42,7 +42,12 @@ from tilo_connectors.consent import ConsentRefused
 from tilo_connectors.live import CALLBACK_PATH, CallbackServer
 
 HEALTH_ROUTES = frozenset({("GET", "/health"), ("GET", "/healthz")})
-SIGNED_ROUTES: frozenset[tuple[str, str]] = frozenset()  # add a route here only with its own forged/replayed cases
+# Signed by Google OIDC (HB-01, ADR-0032): tilo-api's ID token for the connectors audience, checked before the body is
+# read. Their forged / missing / wrong-account / wrong-claim / unset-config cases are in test_ADR32_T3_host_routes.py
+# (a replayed token is bounded by its expiry and a replayed send is the outbox's idempotent no-op, ADR-0032 HB-01/04).
+SIGNED_ROUTES: frozenset[tuple[str, str]] = frozenset(
+    {("POST", f"/internal/meeting-host/{name}") for name in ("send", "status", "disconnect")}
+)
 
 
 def _flip(state: str) -> str:
@@ -309,5 +314,10 @@ def test_SEC_08_connectors_app_mounts_no_inbound_route_outside_the_signed_surfac
         f"{sorted(unknown)} is an inbound route with no SEC-08 test: add forged, tampered, missing, expired and "
         "replayed cases for it to this file, then list it in SIGNED_ROUTES"
     )
-    assert all(isinstance(r, APIRoute) for r in app.routes), "a mounted router or sub-app: list its routes here"
+
+    def plain(route) -> bool:  # an include_router() entry (newer FastAPI wraps it) is fine when it holds only APIRoutes
+        inner = getattr(route, "original_router", None)
+        return isinstance(route, APIRoute) or (inner is not None and all(isinstance(r, APIRoute) for r in inner.routes))
+
+    assert all(plain(r) for r in app.routes), "a mounted sub-app or non-API route: list its routes here"
     assert app.openapi_url is None
