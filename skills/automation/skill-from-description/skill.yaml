@@ -5,6 +5,7 @@ description: "Turn a plain-language task description into ordered steps, ask-fir
 author: "tilo.automation"
 reviewer: "automation.lead"
 tools_allowed: []
+tool_access: {}
 inputs:
   $schema: "https://json-schema.org/draft/2020-12/schema"
   type: object
