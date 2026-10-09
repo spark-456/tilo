@@ -20,6 +20,7 @@ from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import JSONResponse
+from tilo_harness.untrusted import neutralise
 from tilo_metering import LedgerEntry
 from tilo_metering.prices import Usage
 from tilo_policy.schemas import conforms
@@ -35,6 +36,7 @@ from tilo_api.meeting_room_reply import (
     RoomModel,
     RoomModelUnavailable,
     RouterRoomModel,
+    _flagged,
     answer,
     ground,
     locate,
@@ -173,14 +175,17 @@ def _adjourn_part(room: Room, reason: str) -> dict:
     return {**part, "id": _closing_id(room.room_id)}
 
 
+def _closing_queued(store: deps.Store, world_id: str, room_id: str) -> bool:
+    return any(
+        isinstance(p, dict) and p.get("id") == _closing_id(room_id) for p in store.pending_events.get(world_id) or []
+    )  # a closing waiting in the dispatcher's queue is a closing
+
+
 def _adjourn(ctx: Ctx, room: Room, reason: str) -> None:
     """Closes the room once: re-reads it under the room's write lock, so no second adjourned and no reply after it."""
     with _lock_of(_WRITES, room.room_id):
         fresh = rebuild(ctx.stream()).get(room.room_id)
-        queued = any(
-            isinstance(p, dict) and p.get("id") == _closing_id(room.room_id)
-            for p in ctx.store.pending_events.get(ctx.world_id) or []
-        )  # a closing waiting in the dispatcher's queue is a closing
+        queued = _closing_queued(ctx.store, ctx.world_id, room.room_id)
         if fresh is not None and fresh.state == "open" and queued:
             room.reason = "paused"
         elif fresh is not None and fresh.state == "open":
@@ -555,7 +560,12 @@ def _finish(ctx: Ctx, room: Room, asked: dict, to: str, turn: int, mode: str, re
     part = _part("meeting.replied", room, to, room.convener, summary, data, credits=reply.credits, cause=asked["id"])
     with _lock_of(_WRITES, room.room_id):
         fresh = rebuild(ctx.stream()).get(room.room_id)
-        if ctx.world.paused or fresh is None or fresh.state != "open":
+        if (
+            ctx.world.paused
+            or fresh is None
+            or fresh.state != "open"
+            or _closing_queued(ctx.store, ctx.world_id, room.room_id)
+        ):
             _drop_locks(room.room_id)
             return False
         _write(ctx.writer, room, {**part, "trace": trace} if trace else part)
@@ -566,6 +576,10 @@ def _finish(ctx: Ctx, room: Room, asked: dict, to: str, turn: int, mode: str, re
 class _Mode:
     mode: str
     switches: Any
+
+
+class _RoomLimit(Exception):
+    """The room's pseudo run has no unit left on the ledger (`run_minor`): answered 409 `room_limit`."""
 
 
 @dataclass
@@ -609,6 +623,8 @@ def _hold(ctx: Ctx, room: Room, turn: int, how: _Mode) -> _Held | None:
         at=datetime.now(UTC),
     )
     if plan.reservation is None:
+        if plan.reason == "run":  # the room's pseudo run is full: the room's own limit, not a replay-only switch
+            raise _RoomLimit
         raise spend.SpendCapReached if plan.reason == "uid_lifetime" else deps.ReplayOnly
     return _Held(guard, plan, caps.unit_reserve_minor)
 
@@ -658,7 +674,10 @@ def _turn(ctx: Ctx, room: Room, model: RoomModel, safety: SafetyProvider, body: 
     redact = _seam(ctx.request, deps.get_redactor)
     archive = _seam(ctx.request, deps.get_run_archive)(org_id=deps.ORG_ID, run_id=room.run_id)
     turn = len(room.turns) + 1
-    held = _hold(ctx, room, turn, how)
+    try:
+        held = _hold(ctx, room, turn, how)
+    except _RoomLimit:
+        return _refuse(409, "room_limit")
     try:
         ref = archive.append(
             "channel_in", {"room_id": room.room_id, "turn": turn, "to": to, "mode": mode, "text": redact(body["text"])}
@@ -696,3 +715,92 @@ def _turn(ctx: Ctx, room: Room, model: RoomModel, safety: SafetyProvider, body: 
     if not written:
         return _refuse(409, "world_paused" if ctx.world.paused else "room_closed")
     return JSONResponse(_view(ctx, rebuild(ctx.stream())[room.room_id])["turns"][-1], status_code=202)
+
+
+def _proposal_of(room: Room, proposal_id: str) -> tuple[dict, str] | None:
+    for t in room.turns:
+        r = t["reply"]
+        if r and r["data"]["outcome"] == "proposed_change" and r["data"]["proposal"]["proposal_id"] == proposal_id:
+            return r["data"]["proposal"], r["from"]
+    return None
+
+
+@router.post("/{room_id}/changes")
+def confirm_change(
+    room_id: str,
+    body: Annotated[Any, Depends(_body)],
+    ctx: Annotated[Ctx, Depends(get_ctx)],
+    safety: Annotated[SafetyProvider, Depends(deps.get_safety)],
+    planner: Annotated[Callable[[dict], Any] | None, Depends(deps.get_change_planner)],
+) -> JSONResponse:
+    """MR-07: the person confirms the proposal an agent showed, in its words or their own. Units, artifacts and
+    the agent come from the proposal's `meeting.replied`, never from the body. Not a side effect (MR-11): no
+    `world.requested`, no `plan.revised` (the revision planner is MR-H2; without one: `planning: pending`)."""
+    room = _find(ctx, room_id, convener_only=True)
+    if ctx.housekeep(room) == "access_lost":
+        return _refuse(403, "access_lost")
+    if ctx.world.paused:
+        return _refuse(409, "world_paused")
+    if room.state != "open":
+        return _refuse(409, "room_closed", reason=room.reason)
+    if not conforms(_ROOM_SCHEMA + "change_request", body):
+        return _refuse(422, "bad_request")
+    text = body["text"]
+    try:
+        clean = neutralise(text, limit=2000)
+        if _flagged(safety, text) or (clean != text and _flagged(safety, clean)):
+            return _refuse(422, "declined")
+    except Exception:  # an outage is never "not flagged"
+        return _refuse(503, "screen_unavailable")
+    redact = _seam(ctx.request, deps.get_redactor)
+    archive = _seam(ctx.request, deps.get_run_archive)(org_id=deps.ORG_ID, run_id=room.run_id)
+    with _lock_of(_WRITES, room_id):  # check, archive and write as one step: a proposal is confirmed once
+        fresh = rebuild(ctx.stream()).get(room_id)
+        if (
+            ctx.world.paused
+            or fresh is None
+            or fresh.state != "open"
+            or _closing_queued(ctx.store, ctx.world_id, room_id)
+        ):
+            return _refuse(409, "world_paused" if ctx.world.paused else "room_closed")
+        found = _proposal_of(fresh, body["proposal_id"])
+        if found is None:
+            return _refuse(409, "not_a_proposal")
+        proposal, agent = found
+        done = [
+            (e.get("data") or {}).get("proposal_id")
+            for e in ctx.stream()
+            if e["type"] == "meeting.change_requested" and (e.get("data") or {}).get("room_id") == room_id
+        ]
+        if proposal["proposal_id"] in done:
+            return _refuse(409, "already_confirmed")
+        if len(done) >= ctx.cfg.max_changes:
+            return _refuse(409, "max_changes")
+        ref = archive.append(
+            "channel_in",
+            {"room_id": room_id, "proposal_id": proposal["proposal_id"], "to": agent, "text": redact(text)},
+        )
+        data = {
+            "proposal_id": proposal["proposal_id"],
+            "to": agent,
+            "units": proposal["units"],
+            "artifacts": proposal["artifacts"],
+            "as_role": fresh.as_role,
+            "message_ref": ref,
+        }
+        summary = "The convener confirmed a change; it goes to planning."
+        event = _write(
+            ctx.writer, fresh, _part("meeting.change_requested", fresh, fresh.convener, agent, summary, data)
+        )
+    started = False
+    if planner is not None:  # MR-H2's hook; it writes plan.revised itself. A failure leaves the request recorded
+        try:
+            planner(event)
+            started = True
+        except Exception as exc:
+            logger.warning("change planner failed for room %s: %s", room_id, type(exc).__name__)
+    answer_ = {"proposal_id": proposal["proposal_id"], "to": agent, "units": proposal["units"]}
+    return JSONResponse(
+        {**answer_, "artifacts": proposal["artifacts"], "planning": "started" if started else "pending"},
+        status_code=202,
+    )
