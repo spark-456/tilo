@@ -13,7 +13,9 @@ import json
 from typing import Any
 
 from _clint1_lib import RoleScriptedProvider, build_router, seam
+from _ppl11a_lib import ORG as ORG  # noqa: PLC0414
 from _ppl11a_lib import PRIYA, Rig
+from _ppl11a_lib import SAM as SAM  # noqa: PLC0414
 from _ppl11a_lib import fake_token as fake_token  # noqa: PLC0414
 from tilo_api.skill_store import MemorySkillStore
 

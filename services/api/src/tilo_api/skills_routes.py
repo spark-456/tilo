@@ -139,9 +139,10 @@ def _declared(registry: Any, tool: str, action: str) -> dict[str, Any] | None:
     return next((a for a in registry.get(tool)["actions"] if a.get("id") == action), None)
 
 
-def _plan(body: SkillIn, w: Writer, registry: Any) -> list[dict[str, Any]]:
+def plan_steps(steps: list[StepIn], text: Callable[[str], str], registry: Any) -> list[dict[str, Any]]:
+    """Plan steps with code-set `must_ask` and `ask_first` (TS-04); SKILLS-4 builds Tilo's version through this too."""
     plan = []
-    for step in body.plan_steps:
+    for step in steps:
         declared = _declared(registry, step.tool, step.action)
         if declared is None:
             raise Refusal(422, "unknown_action")
@@ -150,7 +151,7 @@ def _plan(body: SkillIn, w: Writer, registry: Any) -> list[dict[str, Any]]:
             raise Refusal(422, "ask_first_required")
         plan.append(
             {
-                "text": w.text(step.text),
+                "text": text(step.text),
                 "tool": step.tool,
                 "action": step.action,
                 "verb": step.verb,
@@ -159,6 +160,16 @@ def _plan(body: SkillIn, w: Writer, registry: Any) -> list[dict[str, Any]]:
             }
         )
     return plan
+
+
+def estimates_for(plan: list[dict[str, Any]], cfg: SkillConfig) -> dict[str, Any]:
+    return {  # TS-05: while learning, every step that is not a read stops to ask
+        "credits_per_run": cfg.credits_per_step * len(plan),
+        "seconds_per_run": cfg.seconds_per_step * len(plan),
+        "asks_per_run": sum(1 for s in plan if s["verb"] != "read"),
+        "source": "prior",
+        "prices_as_of": cfg.prices_as_of,
+    }
 
 
 def _trigger(body: TriggerIn, cfg: SkillConfig) -> dict[str, Any]:
@@ -173,7 +184,7 @@ def build_record(
 ) -> dict[str, Any]:
     if body.scope.kind == "team" and body.scope.team not in teams:
         raise Refusal(403, "forbidden")  # TS-02: a team the owner is not in
-    plan = _plan(body, w, registry)
+    plan = plan_steps(body.plan_steps, w.text, registry)
     question = body.clarifying_question
     record = {
         "id": skill_id,
@@ -190,13 +201,7 @@ def build_record(
         if question is None
         else {"text": w.text(question.text), "options": [w.text(o) for o in question.options], "answer": None},
         "trigger": _trigger(body.trigger, cfg),
-        "estimates": {  # TS-05: while learning, every step that is not a read stops to ask
-            "credits_per_run": cfg.credits_per_step * len(plan),
-            "seconds_per_run": cfg.seconds_per_step * len(plan),
-            "asks_per_run": sum(1 for s in plan if s["verb"] != "read"),
-            "source": "prior",
-            "prices_as_of": cfg.prices_as_of,
-        },
+        "estimates": estimates_for(plan, cfg),
         "tool_access": {},
         "good_runs": 0,
         "version": 1,
