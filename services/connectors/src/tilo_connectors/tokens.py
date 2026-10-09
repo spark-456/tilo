@@ -477,7 +477,7 @@ class TokenBroker:
                 connected_at = format_ts(parse_ts(record.get("connected_at")))  # type: ignore[arg-type]
             except (ValueError, TypeError, OverflowError):
                 connected_at = None
-        return str(record.get("state")), scopes, connected_at
+        return ("connected" if connected else "expired"), scopes, connected_at  # the contract has these two only
 
     def disconnect(self, user_id: str, connector: str, *, spent: set[str] | None = None) -> DisconnectResult:
         """Revoke at the provider, then delete whatever it answered (fail toward deletion). A failed
