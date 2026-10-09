@@ -178,6 +178,10 @@ def test_SEC_10_keys_past_their_ttl_and_their_grace_are_never_served_when_the_re
     assert calls["n"] == 4
 
 
+def test_SEC_10_the_stale_grace_is_at_most_one_hour():
+    assert appcheck.JWKS_STALE_GRACE_S <= 3600.0
+
+
 def test_SEC_10_a_valid_token_is_served_from_a_stale_snapshot_while_a_refresh_is_in_flight(signer):
     started, release = threading.Event(), threading.Event()
     calls = {"n": 0}
@@ -196,6 +200,7 @@ def test_SEC_10_a_valid_token_is_served_from_a_stale_snapshot_while_a_refresh_is
     refresher = threading.Thread(target=lambda: verifier.verify(_token(signer)))
     refresher.start()
     assert started.wait(5)
+    clock.now += appcheck.JWKS_RETRY_COOLDOWN_S + 1  # past the cooldown: only the in-flight guard is left
     assert verifier.verify(_token(signer))["sub"]  # a second valid token meanwhile: served, not refused
     assert calls["n"] == 2, "no second fetch starts: the single-flight guard stays"
     release.set()

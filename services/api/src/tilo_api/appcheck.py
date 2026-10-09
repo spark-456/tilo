@@ -106,7 +106,8 @@ class JwksKeyCache:
     the lock with a non-blocking acquire, so at most one thread is inside a fetch and a caller that finds one running
     is refused at once. A failed fetch stores nothing new, a snapshot past `JWKS_TTL_S` is served only inside the
     stale grace (`JWKS_STALE_GRACE_S`, for a key id it already holds, and only while a refresh is in flight or has
-    just failed: on a cold start with a refresh running a valid token is not refused for the fetch's sake), and no
+    just failed: after a restart or a TTL refresh a valid token is not refused for the fetch's sake; a true cold
+    start, with nothing held yet, still refuses until the first fetch lands), and no
     fetch starts within `JWKS_RETRY_COOLDOWN_S` of another. Shared by the App Check and Firebase ID-token
     verifiers."""
 
@@ -157,6 +158,7 @@ class JwksKeyCache:
             try:
                 fetched = self._fetch()
             except Exception:
+                now = self._clock()  # the fetch took time: the grace is judged at the moment it failed
                 snapshot = self._snapshot
                 if snapshot is None or not 0 <= now - snapshot[1] < JWKS_TTL_S + JWKS_STALE_GRACE_S:
                     self._snapshot = None  # beyond the grace nothing is kept
@@ -178,8 +180,8 @@ class GoogleAppCheckVerifier(JwksKeyCache):
     header and claims are read first, from public values only, and a token that cannot pass them is refused before
     any key is fetched. Keys live in one immutable snapshot (read without a lock); a refresh takes the lock with a
     non-blocking acquire, so at most one thread is inside a fetch and a caller that finds one running is refused at
-    once. A failed fetch stores nothing and a snapshot past `JWKS_TTL_S` is never served. `fetch` and the clocks
-    are injectable; tests and dev never reach the default fetch."""
+    once. A failed fetch stores nothing and a snapshot past `JWKS_TTL_S` is served only inside the stale grace.
+    `fetch` and the clocks are injectable; tests and dev never reach the default fetch."""
 
     def __init__(
         self,
