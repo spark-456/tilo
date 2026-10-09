@@ -42,11 +42,17 @@ from tilo_connectors.consent import ConsentRefused
 from tilo_connectors.live import CALLBACK_PATH, CallbackServer
 
 HEALTH_ROUTES = frozenset({("GET", "/health"), ("GET", "/healthz")})
-# Signed by Google OIDC (HB-01, ADR-0032): tilo-api's ID token for the connectors audience, checked before the body is
-# read. Their forged / missing / wrong-account / wrong-claim / unset-config cases are in test_ADR32_T3_host_routes.py
-# (a replayed token is bounded by its expiry and a replayed send is the outbox's idempotent no-op, ADR-0032 HB-01/04).
+# Add a route here only with its own forged/replayed cases. The four internal routes are not OAuth callbacks: each
+# takes a Google-signed ID token for the one caller account (HB-01) and keeps no replayable secret; their forged,
+# missing, wrong-audience, wrong-account and oversize cases are in test_ADR32_T3_host_routes.py and
+# test_ADR32A_T4B_FR_MTG_09_connection_views.py.
 SIGNED_ROUTES: frozenset[tuple[str, str]] = frozenset(
-    {("POST", f"/internal/meeting-host/{name}") for name in ("send", "status", "disconnect")}
+    {
+        ("POST", "/internal/meeting-host/send"),
+        ("POST", "/internal/meeting-host/status"),
+        ("POST", "/internal/meeting-host/disconnect"),
+        ("POST", "/internal/connections/views"),
+    }
 )
 
 

@@ -102,7 +102,7 @@
 # manifest.schema.json 1.0.0 sha256:9b885d1826522bb7
 # mcp_tools.schema.json 1.0.0 sha256:46a498402c9b1e4e
 # meeting.schema.json 1.2.0 sha256:034e93898bb28957
-# meeting_host_rpc.schema.json 1.0.0 sha256:4bb81673d4ef363b
+# meeting_host_rpc.schema.json 1.1.0 sha256:1e6fb7655a1848e0
 # meeting_join.schema.json 1.0.0 sha256:ea1e8f0945773573
 # mention.schema.json 1.0.0 sha256:ca9c1acbf81616f2
 # meter.schema.json 1.0.0 sha256:ad596dcc70e45e09
@@ -2055,7 +2055,7 @@ class MeetingHostRpcDraftRef(BaseModel):
 
 class MeetingHostRpcUserRequest(BaseModel):
     """
-    POST /internal/meeting-host/status and POST /internal/meeting-host/disconnect. user_id is the signed-in principal's own id in tilo-api, never one taken from a body, path or query there (HB-02); the bot account's meeting_host grant is (user_id, meeting_host).
+    POST /internal/meeting-host/status, POST /internal/meeting-host/disconnect and POST /internal/connections/views. user_id is the signed-in principal's own id in tilo-api, never one taken from a body, path or query there (HB-02, HB-08); the bot account's meeting_host grant is (user_id, meeting_host), and views reads only this user's grants.
     """
 
     model_config = ConfigDict(
@@ -2074,6 +2074,14 @@ class MeetingHostRpcStatusAnswer(BaseModel):
     )
     state: Literal["connected", "expired", "none"]
     scope_ok: bool
+
+
+type MeetingHostRpcScope = Annotated[
+    str, Field(pattern="^[A-Za-z0-9][A-Za-z0-9:/._-]{0,299}$")
+]
+"""
+An OAuth scope as config/connectors.yaml declares it: a URL or a word from a closed alphabet, at most 300 characters, with no query, fragment, user info, percent sign or space. A backstop only: HB-09 sends only scopes the registry declares for the view's connector.
+"""
 
 
 class MeetingHostRpcConnectionPart(BaseModel):
@@ -2103,7 +2111,7 @@ class MeetingHostRpcAlertPart(BaseModel):
 
 class MeetingHostRpcError(BaseModel):
     """
-    The body of every refusal on this surface, a fixed code and nothing else: unauthenticated (401, no valid ID token, HB-01), forbidden (403, any account but tilo-api's, HB-01), invalid_request (422, a body over 64 KiB, not JSON or not this contract's request; refused before anything acted) and not_configured (503, a setting is missing or a seam failed to build). Never a value, a setting's value or an exception's text.
+    The body of every refusal on this surface, a fixed code and nothing else: unauthenticated (401, no valid ID token, HB-01), forbidden (403, any account but tilo-api's, HB-01), invalid_request (422, a body over 64 KiB, not JSON or not this contract's request; refused before anything acted) and not_configured (503, a setting is missing or a seam failed to build; also 502 when Google's certificates cannot be had to check the token, which is retryable and never a final 401). Never a value, a setting's value or an exception's text.
     """
 
     model_config = ConfigDict(
@@ -3720,6 +3728,20 @@ class MeetingHostRpcReceipt(BaseModel):
     conference: Literal["pending", "success", "failure"]
 
 
+class MeetingHostRpcConnectionView(BaseModel):
+    """
+    One stored grant of the request's user, from an allowlist: connector, state, scopes and connected_at, nothing else of the record. state is connected when the stored state is exactly connected, else expired (Google refused the grant at refresh, or a record the broker did not write: connect again). scopes are the stored granted scopes that the registry declares for this connector, sorted and unique, and none when expired. connected_at is when the grant was made (HB-06), null when expired or not recorded; it is display data read without KMS and authorises nothing. Never a token, the record's ciphertext, wrapped key or nonce, the client id or secret, the access token's expiry or an account address.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    connector: ConnectorId
+    state: Literal["connected", "expired"]
+    scopes: Annotated[list[MeetingHostRpcScope], Field(max_length=16)]
+    connected_at: Timestamp | None
+
+
 type MeetingHostRpcParts = Annotated[
     list[MeetingHostRpcConnectionPart | MeetingHostRpcAlertPart], Field(max_length=16)
 ]
@@ -4635,6 +4657,17 @@ class MeetingHostRpcDisconnectAnswer(BaseModel):
     parts: MeetingHostRpcParts
 
 
+class MeetingHostRpcViewsAnswer(BaseModel):
+    """
+    The 200 answer to POST /internal/connections/views (ADR-0032 addendum 1, HB-08, HB-09): the connection views of the request's user_id, one per stored grant of a connector that config/connectors.yaml declares with auth oauth2, in registry order, each connector at most once. A connector with no stored grant is absent (tilo-api shows it available); a disconnect deletes the grant, so it is absent too. A store read only, with no token use, no KMS call, no provider call and no event, so it has no parts. At most 32 views. tilo-api treats an answer that breaks this contract or HB-09 as unknown as a whole, never as partly read.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    views: Annotated[list[MeetingHostRpcConnectionView], Field(max_length=32)]
+
+
 class Meter(BaseModel):
     """
     The HUD meter's state for one run (PRD 14.4, FR-MTR-07): credits used (the sum of the run's event credits), credits saved (origin cost minus lookup cost over accepted reuses, PRD 14.3), time saved (estimate) and the run's budget. packages/metering computes it from the run's events up to last_seq, and apps/web renders it. Rules MT-05 and MT-06 in contracts/metering.rules.md.
@@ -4933,11 +4966,11 @@ class LayoutSemantic(BaseModel):
 
 
 type MeetingHostRpc = Annotated[
-    MeetingHostRpcSendRequest | MeetingHostRpcSendAnswer | MeetingHostRpcUserRequest | MeetingHostRpcStatusAnswer | MeetingHostRpcDisconnectAnswer | MeetingHostRpcError,
+    MeetingHostRpcSendRequest | MeetingHostRpcSendAnswer | MeetingHostRpcUserRequest | MeetingHostRpcStatusAnswer | MeetingHostRpcDisconnectAnswer | MeetingHostRpcViewsAnswer | MeetingHostRpcError,
     Field(title="MeetingHostRpc"),
 ]
 """
-The internal meeting-host surface of tilo-connectors (FR-MTG-09, ADR-0032 decision 2): what tilo-api posts to /internal/meeting-host/send, /internal/meeting-host/status and /internal/meeting-host/disconnect, and what each answers. Each route validates its own request and answer ($defs send_request and send_answer; user_request and status_answer; user_request and disconnect_answer; error for any refusal) in both services; this root is any one of them. Every object is closed, and no field holds an access or refresh token, an OAuth code, the client secret, key material or a Meet link (ADR-0024 decision 4, ADR-0032 decision 3). Ids travel in the body, never in a path or query. A route refuses a body over 65536 bytes (64 KiB) before it parses it. Rules that compare values (HB-03 the draft against its hash and the entry, HB-05 the owner, HB-07 the receipt against the entry) are checked by the routes and by tilo-api's client, not by this schema.
+The internal surface of tilo-connectors that tilo-api calls (FR-MTG-09, ADR-0032 decision 2 and addendum 1): what tilo-api posts to /internal/meeting-host/send, /internal/meeting-host/status, /internal/meeting-host/disconnect and /internal/connections/views, and what each answers. Each route validates its own request and answer ($defs send_request and send_answer; user_request and status_answer; user_request and disconnect_answer; user_request and views_answer; error for any refusal) in both services; this root is any one of them. Every object is closed, and no field holds an access or refresh token, an OAuth code, the client secret, key material or a Meet link (ADR-0024 decision 4, ADR-0032 decision 3). Ids travel in the body, never in a path or query. A route refuses a body over 65536 bytes (64 KiB) before it parses it. Rules that compare values (HB-03 the draft against its hash and the entry, HB-05 the owner, HB-07 the receipt against the entry, HB-09 the views against config/connectors.yaml) are checked by the routes and by tilo-api's client, not by this schema. 1.1.0 adds views_answer, connection_view and scope (additive).
 """
 
 

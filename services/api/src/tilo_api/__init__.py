@@ -14,6 +14,7 @@ from tilo_api import cors as _cors
 from tilo_api import deps as _deps
 from tilo_api import dev as _dev
 from tilo_api import durable_store as _durable_store
+from tilo_api import meeting_host_routes as _meeting_host_routes
 from tilo_api import people as _people
 from tilo_api import runs as _runs
 from tilo_api import schedules as _schedules
@@ -116,6 +117,7 @@ app.include_router(_build_sharing_router(_world_views))
 app.include_router(_runs.router)
 app.include_router(_assistant_router)
 app.include_router(_people.router)
+app.include_router(_meeting_host_routes.router)
 app.include_router(_people_list_router)
 app.include_router(_effort_router)
 app.include_router(_connectors_list_router)

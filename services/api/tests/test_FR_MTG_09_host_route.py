@@ -240,7 +240,7 @@ def test_FR_MTG_09_host_route_the_limits_pass_at_exactly_60_minutes_and_50_recip
     assert len(card["gate"]["recipients"]) == 50 and card["gate"]["recipients"][0] == ASHA
 
 
-@pytest.mark.parametrize("seam_name", ["artifact_store", "token_broker", "meeting_host_transport"])
+@pytest.mark.parametrize("seam_name", ["artifact_store", "meeting_host_client"])
 def test_FR_MTG_09_host_route_an_unwired_seam_is_503_not_configured_and_starts_nothing(hr, seam_name):
     hr.rig.require_route(R_HOST)
     hr.rig.unwire(seam_name)

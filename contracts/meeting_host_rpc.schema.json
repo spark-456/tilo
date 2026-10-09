@@ -1,15 +1,16 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://contracts.tilo.example/meeting_host_rpc.schema.json",
-  "x-version": "1.0.0",
+  "x-version": "1.1.0",
   "title": "MeetingHostRpc",
-  "description": "The internal meeting-host surface of tilo-connectors (FR-MTG-09, ADR-0032 decision 2): what tilo-api posts to /internal/meeting-host/send, /internal/meeting-host/status and /internal/meeting-host/disconnect, and what each answers. Each route validates its own request and answer ($defs send_request and send_answer; user_request and status_answer; user_request and disconnect_answer; error for any refusal) in both services; this root is any one of them. Every object is closed, and no field holds an access or refresh token, an OAuth code, the client secret, key material or a Meet link (ADR-0024 decision 4, ADR-0032 decision 3). Ids travel in the body, never in a path or query. A route refuses a body over 65536 bytes (64 KiB) before it parses it. Rules that compare values (HB-03 the draft against its hash and the entry, HB-05 the owner, HB-07 the receipt against the entry) are checked by the routes and by tilo-api's client, not by this schema.",
+  "description": "The internal surface of tilo-connectors that tilo-api calls (FR-MTG-09, ADR-0032 decision 2 and addendum 1): what tilo-api posts to /internal/meeting-host/send, /internal/meeting-host/status, /internal/meeting-host/disconnect and /internal/connections/views, and what each answers. Each route validates its own request and answer ($defs send_request and send_answer; user_request and status_answer; user_request and disconnect_answer; user_request and views_answer; error for any refusal) in both services; this root is any one of them. Every object is closed, and no field holds an access or refresh token, an OAuth code, the client secret, key material or a Meet link (ADR-0024 decision 4, ADR-0032 decision 3). Ids travel in the body, never in a path or query. A route refuses a body over 65536 bytes (64 KiB) before it parses it. Rules that compare values (HB-03 the draft against its hash and the entry, HB-05 the owner, HB-07 the receipt against the entry, HB-09 the views against config/connectors.yaml) are checked by the routes and by tilo-api's client, not by this schema. 1.1.0 adds views_answer, connection_view and scope (additive).",
   "anyOf": [
     { "$ref": "#/$defs/send_request" },
     { "$ref": "#/$defs/send_answer" },
     { "$ref": "#/$defs/user_request" },
     { "$ref": "#/$defs/status_answer" },
     { "$ref": "#/$defs/disconnect_answer" },
+    { "$ref": "#/$defs/views_answer" },
     { "$ref": "#/$defs/error" }
   ],
   "$defs": {
@@ -166,7 +167,7 @@
       }
     },
     "user_request": {
-      "description": "POST /internal/meeting-host/status and POST /internal/meeting-host/disconnect. user_id is the signed-in principal's own id in tilo-api, never one taken from a body, path or query there (HB-02); the bot account's meeting_host grant is (user_id, meeting_host).",
+      "description": "POST /internal/meeting-host/status, POST /internal/meeting-host/disconnect and POST /internal/connections/views. user_id is the signed-in principal's own id in tilo-api, never one taken from a body, path or query there (HB-02, HB-08); the bot account's meeting_host grant is (user_id, meeting_host), and views reads only this user's grants.",
       "type": "object",
       "additionalProperties": false,
       "required": ["user_id"],
@@ -193,6 +194,48 @@
         "revoked_at_provider": { "type": "boolean" },
         "parts": { "$ref": "#/$defs/parts" }
       }
+    },
+    "views_answer": {
+      "description": "The 200 answer to POST /internal/connections/views (ADR-0032 addendum 1, HB-08, HB-09): the connection views of the request's user_id, one per stored grant of a connector that config/connectors.yaml declares with auth oauth2, in registry order, each connector at most once. A connector with no stored grant is absent (tilo-api shows it available); a disconnect deletes the grant, so it is absent too. A store read only, with no token use, no KMS call, no provider call and no event, so it has no parts. At most 32 views. tilo-api treats an answer that breaks this contract or HB-09 as unknown as a whole, never as partly read.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["views"],
+      "properties": {
+        "views": {
+          "type": "array",
+          "maxItems": 32,
+          "items": { "$ref": "#/$defs/connection_view" }
+        }
+      }
+    },
+    "connection_view": {
+      "description": "One stored grant of the request's user, from an allowlist: connector, state, scopes and connected_at, nothing else of the record. state is connected when the stored state is exactly connected, else expired (Google refused the grant at refresh, or a record the broker did not write: connect again). scopes are the stored granted scopes that the registry declares for this connector, sorted and unique, and none when expired. connected_at is when the grant was made (HB-06), null when expired or not recorded; it is display data read without KMS and authorises nothing. Never a token, the record's ciphertext, wrapped key or nonce, the client id or secret, the access token's expiry or an account address.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["connector", "state", "scopes", "connected_at"],
+      "properties": {
+        "connector": { "$ref": "common.schema.json#/$defs/connector_id" },
+        "state": { "type": "string", "enum": ["connected", "expired"] },
+        "scopes": {
+          "type": "array",
+          "maxItems": 16,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/scope" }
+        },
+        "connected_at": {
+          "anyOf": [{ "$ref": "common.schema.json#/$defs/timestamp" }, { "type": "null" }]
+        }
+      },
+      "if": { "properties": { "state": { "const": "expired" } }, "required": ["state"] },
+      "then": {
+        "properties": { "scopes": { "maxItems": 0 }, "connected_at": { "type": "null" } }
+      }
+    },
+    "scope": {
+      "description": "An OAuth scope as config/connectors.yaml declares it: a URL or a word from a closed alphabet, at most 300 characters, with no query, fragment, user info, percent sign or space. A backstop only: HB-09 sends only scopes the registry declares for the view's connector.",
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9:/._-]{0,299}$",
+      "not": { "pattern": "\n" }
     },
     "parts": {
       "description": "What the broker emitted during one call, in order, nothing more (ADR-0032 decision 7): tilo-api hands each connection part to meeting_host.on_connection_event. Every connection part names the call's own user (entry.authz.ref for a send, the request's user_id otherwise); a part naming anyone else is not that call's, and tilo-api's client drops it. At most 16.",
@@ -227,7 +270,7 @@
       }
     },
     "error": {
-      "description": "The body of every refusal on this surface, a fixed code and nothing else: unauthenticated (401, no valid ID token, HB-01), forbidden (403, any account but tilo-api's, HB-01), invalid_request (422, a body over 64 KiB, not JSON or not this contract's request; refused before anything acted) and not_configured (503, a setting is missing or a seam failed to build). Never a value, a setting's value or an exception's text.",
+      "description": "The body of every refusal on this surface, a fixed code and nothing else: unauthenticated (401, no valid ID token, HB-01), forbidden (403, any account but tilo-api's, HB-01), invalid_request (422, a body over 64 KiB, not JSON or not this contract's request; refused before anything acted) and not_configured (503, a setting is missing or a seam failed to build; also 502 when Google's certificates cannot be had to check the token, which is retryable and never a final 401). Never a value, a setting's value or an exception's text.",
       "type": "object",
       "additionalProperties": false,
       "required": ["error"],

@@ -33,6 +33,7 @@ from starlette.requests import HTTPConnection
 from tilo_archive import RunArchive
 from tilo_connectors import InMemoryOutboxStore
 from tilo_connectors.registry import ConnectorRegistry, load_registry
+from tilo_contracts import MeetingHostRpcConnectionView
 from tilo_harness.executor import DefaultUnitRunner
 from tilo_harness.skills import SkillRegistry
 from tilo_memory.artifacts import ArtifactStore
@@ -52,6 +53,7 @@ from tilo_api import events, firebase_auth, spend
 from tilo_api.access import AccessStore, Mode, enforced, provider_mode
 from tilo_api.appcheck import AppCheckVerifier, default_verifier
 from tilo_api.assistant.config import AssistantConfig, AssistantConfigError, load_assistant_config
+from tilo_api.meeting_host_rpc import MeetingHostRpc, open_meeting_host_rpc
 from tilo_api.people_access import NoSourceOwners
 from tilo_api.people_access import SourceOwners as PanelSourceOwners
 
@@ -765,9 +767,52 @@ def get_run_archive(request: Request = None) -> Callable[..., RunArchive]:  # ty
     raise NotImplementedError("no raw-archive store is configured, so no run starts")
 
 
-def get_token_broker() -> Any:
-    """FR-MTG-09: the token broker's adapter-facing half (`access_token_for_adapter`). Unwired: no host run."""
-    raise HTTPException(status_code=503, detail="not_configured")
+_host_client_lock = threading.Lock()
+_host_client: MeetingHostRpc | None = None
+_host_client_retry_at: float | None = None
+MEETING_HOST_BACKOFF_S = 30.0  # after a failed build, no new attempt for this long (ADR-0032 decision 8)
+meeting_host_clock: Callable[[], float] = time.monotonic  # read at call time, so a test can replace it
+
+
+def get_meeting_host_client() -> MeetingHostRpc:
+    """FR-MTG-09, ADR-0032: the one client to tilo-connectors' meeting-host routes, built from `TILO_CONNECTORS_URL` on
+    first use. Unset or malformed is 503 `not_configured` (the value never echoed); a failed build is remembered for
+    `MEETING_HOST_BACKOFF_S`, then the next request tries again, so a fixed setting needs no restart."""
+    global _host_client, _host_client_retry_at
+    built = _host_client
+    if built is not None:
+        return built
+    with _host_client_lock:
+        if _host_client is None:
+            retry_at = _host_client_retry_at
+            if retry_at is not None and meeting_host_clock() < retry_at:
+                raise HTTPException(status_code=503, detail="not_configured")
+            try:
+                _host_client, _host_client_retry_at = open_meeting_host_rpc(os.environ), None
+            except Exception as exc:  # noqa: BLE001 - the type only
+                logger.warning("meeting-host client not built (%s)", type(exc).__name__)
+                _host_client_retry_at = meeting_host_clock() + MEETING_HOST_BACKOFF_S
+                raise HTTPException(status_code=503, detail="not_configured") from None
+        return _host_client
+
+
+def get_connection_views_rpc() -> Callable[[str], list[MeetingHostRpcConnectionView] | None]:
+    """ADR-0032 addendum 1 (T4b): `views(user_id)` for `GET /v1/connectors`, over the same client as the meeting-host
+    calls (503 `not_configured` when it is not configured). It gives the person's display views, or None for "unknown"
+    (every failure), and never raises. It holds no broker, token record, Kms or secret (SEC-02)."""
+    client = get_meeting_host_client()
+    registry = get_connector_registry()
+    order = [c for c in registry.ids() if registry.get(c)["auth"] == "oauth2"]
+    return lambda user_id: client.connection_views(user_id, order=order)
+
+
+def _forget_host_client() -> None:
+    global _host_client, _host_client_retry_at
+    with _host_client_lock:
+        _host_client, _host_client_retry_at = None, None
+
+
+get_meeting_host_client.cache_clear = _forget_host_client  # type: ignore[attr-defined]  # tests start from a cold process
 
 
 class ConnectionViews(Protocol):
@@ -776,15 +821,31 @@ class ConnectionViews(Protocol):
     def view(self, user_id: str, connector: str) -> tuple[str | None, list[str], str | None]: ...
 
 
+class _RpcConnectionViews:
+    """The `ConnectionViews` seam over tilo-connectors (ADR-0032a). One `views(user_id)` call serves the whole
+    `GET /v1/connectors` (the route asks per connector); a failed call (`None`) is remembered, so the other connectors
+    do not repeat it, and every `view` then raises (that row is unknown, never an error). No `expires_at` crosses
+    (BQ-ADR32a-2): the route shows none."""
+
+    def __init__(self, views: Callable[[str], list[MeetingHostRpcConnectionView] | None]) -> None:
+        self._views = views
+        self._asked: tuple[str, dict[str, MeetingHostRpcConnectionView] | None] | None = None
+
+    def view(self, user_id: str, connector: str) -> tuple[str | None, list[str], str | None]:
+        if self._asked is None or self._asked[0] != user_id:
+            got = self._views(user_id)
+            self._asked = (user_id, None if got is None else {v.connector: v for v in got})
+        rows = self._asked[1]
+        if rows is None:
+            raise LookupError("connection views unknown")
+        found = rows.get(connector)
+        return (None, [], None) if found is None else (str(found.state), list(found.scopes), None)
+
+
 def get_connection_views() -> ConnectionViews:
-    """Read-only connector state for `GET /v1/connectors`. Production state comes from tilo-connectors over an internal
-    route (ADR-0032 pattern, BQ-LIVEGAPS-1); unwired: refuses (the list route then shows every connector available)."""
-    raise HTTPException(status_code=503, detail="not_configured")
-
-
-def get_meeting_host_transport() -> Any:
-    """FR-MTG-09: the `Transport` behind `MeetingHostAdapter`. No live transport in dev (EFF-01): refuses."""
-    raise HTTPException(status_code=503, detail="not_configured")
+    """Read-only connector state for `GET /v1/connectors`, from tilo-connectors over the internal route (ADR-0032a,
+    BQ-LIVEGAPS-1). Unconfigured: 503 `not_configured` (the list route then shows every connector available)."""
+    return _RpcConnectionViews(get_connection_views_rpc())
 
 
 REPLAY_ONLY_MESSAGE = "This link is replay-only right now: new work is paused; finished runs can still be replayed."

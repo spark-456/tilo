@@ -86,7 +86,9 @@ class InMemoryOutboxStore:
                 entry["state"] = "cancelled"
             return deepcopy(entry)
 
-    def _abandon(self, outbox_id: str, now: str) -> dict | None:  # unsent, no live lease -> failed, for Outbox.abandon
+    def _abandon(
+        self, outbox_id: str, now: str, keep_ambiguous: bool = False
+    ) -> dict | None:  # unsent, no live lease -> failed, for Outbox.abandon
         with self._lock:
             entry = self._by_id.get(outbox_id)
             if entry is None or entry["state"] not in ("queued", "scheduled", "sending"):
@@ -94,6 +96,8 @@ class InMemoryOutboxStore:
             expiry = self._send_leases.get(outbox_id, (None, None))[1]
             if expiry is not None and now < expiry:
                 return None
+            if keep_ambiguous and self._retries.get(outbox_id, {}).get("ambiguous"):
+                return None  # it may have gone out: decided under this lock, so a concurrent _defer cannot be lost
             entry["state"] = "failed"
             self._retries.pop(outbox_id, None)
             return deepcopy(entry)

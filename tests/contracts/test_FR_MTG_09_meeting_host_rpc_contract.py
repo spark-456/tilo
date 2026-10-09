@@ -15,7 +15,15 @@ from _lib import errors_for, load_json
 
 BASE = "https://contracts.tilo.example/meeting_host_rpc.schema.json"
 FIXTURES = pathlib.Path(__file__).resolve().parents[2] / "contracts" / "fixtures"
-MESSAGES = ("send_request", "send_answer", "user_request", "status_answer", "disconnect_answer", "error")
+MESSAGES = (
+    "send_request",
+    "send_answer",
+    "user_request",
+    "status_answer",
+    "disconnect_answer",
+    "views_answer",
+    "error",
+)
 CASES = [
     pytest.param(name, kind, path, id=f"{name}/{kind}/{path.stem}")
     for name in MESSAGES
@@ -70,6 +78,7 @@ def _objects(name, doc):
     if name == "send_answer" and doc["receipt"] is not None:
         paths += [("receipt",), ("receipt", "draft")]
     paths += [("parts", i) for i in range(len(doc.get("parts", [])))]
+    paths += [("views", i) for i in range(len(doc.get("views", [])))]
     return paths
 
 

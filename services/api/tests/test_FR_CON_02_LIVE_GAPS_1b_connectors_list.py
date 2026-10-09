@@ -42,8 +42,10 @@ No network, no model, no cloud credentials. Sentinel secrets are assembled at ru
 
 from __future__ import annotations
 
+import ast
 import json
 import logging
+import pathlib
 import secrets
 from datetime import UTC, datetime, timedelta
 from typing import Any
@@ -669,12 +671,13 @@ def _serve(rig: Rig, answer: Any) -> dict[str, Any]:
 
 
 def test_FR_CON_02_LIVE_GAPS_1b_the_route_never_asks_the_token_broker_seam(rig: Rig) -> None:
-    """SEC-02 / ADR-0032: tilo-api never holds a broker; the route must not resolve `deps.get_token_broker`."""
+    """SEC-02 / ADR-0032: tilo-api never holds a broker. ADR-0032 T4 deleted the in-api `deps.get_token_broker` seam
+    altogether, so the route cannot resolve it; the list route's source never names it either."""
+    import tilo_api.connectors_list as route_module  # noqa: PLC0415
 
-    def boom() -> Any:
-        raise AssertionError("the list route resolved the token broker")
-
-    app.dependency_overrides[deps.get_token_broker] = boom
+    assert not hasattr(deps, "get_token_broker")
+    tree = ast.parse(pathlib.Path(route_module.__file__).read_text(encoding="utf-8"))
+    assert not any(getattr(n, "attr", None) == "get_token_broker" for n in ast.walk(tree))  # prose may name it
     rig.connect(ALICE, "gmail")
     assert rows(rig.ask())["gmail"]["state"] == "connected"
 
