@@ -770,6 +770,7 @@ describe("WIRE_3_live_api: nothing else is connected", () => {
       "getDecisions",
       "decide",
       "startWorld",
+      "getTeam",
       "getProfileSettings",
       "setPref",
     ]);
