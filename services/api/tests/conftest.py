@@ -332,3 +332,14 @@ def pytest_collection_modifyitems(items):
                 continue
             if any(entry in item.nodeid for entry in FR_CAL_07A_PENDING):
                 item.add_marker(pytest.mark.xfail(strict=True, reason="FR-CAL-07a slice pending"))
+
+
+@pytest.fixture()
+def skills4(people_rig, repo_root):
+    """SKILLS-4: the people rig plus a scripted Router, a fake safety screen and the in-memory skill store."""
+    from _ppl11a_lib import STANDARD_PERSONS
+    from _skills4_lib import Skills4
+
+    rig = people_rig()
+    rig.add_people(STANDARD_PERSONS.values())
+    yield Skills4(rig, repo_root)
