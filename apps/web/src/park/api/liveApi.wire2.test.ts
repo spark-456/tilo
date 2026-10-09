@@ -391,6 +391,7 @@ describe("WIRE_2_live_api: nothing else is connected", () => {
           "getDecisions",
           "decide",
           "startWorld",
+          "getNotifications",
           "getProfileSettings",
           "setPref",
         ].includes(x),

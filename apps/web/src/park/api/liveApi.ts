@@ -14,6 +14,7 @@ import {
   decisionsFromCards,
 } from "./live/decisionsFromCards";
 import { type CostReport, ledgerFromCosts } from "./live/ledgerFromCosts";
+import { notificationsFromFeed } from "./live/notificationsFromFeed";
 import { profileDefaults } from "./live/profileDefaults";
 import { worldFromIntake } from "./live/worldFromIntake";
 import { STATE_OF, type WorldListItem, worldsFromList } from "./live/worldsFromList";
@@ -217,6 +218,10 @@ export function createLiveApi(options: LiveApiOptions = {}): Api {
     if (!isCostReport(report)) throw new TiloApiError(BAD_REPLY, 200, true);
     return { data: ledgerFromCosts(report), source: "live" };
   };
+  api.getNotifications = async () => ({
+    data: notificationsFromFeed(await http.getJson("/v1/notifications?limit=100")),
+    source: "live",
+  });
   api.getWorlds = async (_dec, added) => {
     const items: WorldListItem[] = [];
     let cursor: string | null = null;
