@@ -1641,6 +1641,13 @@
   gap: 18px;
   align-items: start;
 }
+/* A phone's sheet is narrower than the list's 320px track plus the detail: one column (the detail under the list), so
+   the page has no sideways scroll (WEB-MOTION-1: no sideways scroll at 390). */
+@media (max-width: 760px) {
+  [data-park] .park-skills-lib-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
 [data-park] .park-skills-lib-list {
   background: var(--card);
   border: 1px solid var(--line2);

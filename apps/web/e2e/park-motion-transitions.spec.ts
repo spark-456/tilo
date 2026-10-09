@@ -237,11 +237,23 @@ const chrome = (recs: readonly AnimRec[]): AnimRec[] => recs.filter((r) => r.zon
 function expectCompositorOnly(recs: readonly AnimRec[]): void {
   for (const r of chrome(recs)) {
     for (const p of r.props) {
-      expect(["transform", "opacity"], `${r.zone} ${r.name} ${r.tag} animates ${p}`).toContain(p);
+      // background-color and color: the colour fades the user approved on 8 Oct (BQ-WEB-MOTION-3a), on the exact list
+      // that src/park/shell/motion3.micro.css.test.ts pins. Layout and paint properties (width, box-shadow, ...) stay out.
+      expect(
+        ["transform", "opacity", "backgroundColor", "color"],
+        `${r.zone} ${r.name} ${r.tag} animates ${p}`,
+      ).toContain(p);
     }
-    expect(r.blurred, `${r.zone} ${r.name} ${r.tag} is, or sits under, a backdrop-filter`).toBe(
-      false,
-    );
+    // A colour fade (BQ-WEB-MOTION-3a) may sit in the glass nav, which carries the backdrop-filter itself; the fading
+    // control must not carry one. Every other animation neither carries nor sits under one.
+    const colourOnly = r.props.every((p) => p === "backgroundColor" || p === "color");
+    if (colourOnly) {
+      expect(r.selfBlurred, `${r.zone} ${r.name} ${r.tag} carries a backdrop-filter`).toBe(false);
+    } else {
+      expect(r.blurred, `${r.zone} ${r.name} ${r.tag} is, or sits under, a backdrop-filter`).toBe(
+        false,
+      );
+    }
   }
 }
 
@@ -721,8 +733,9 @@ test("FR_UX_12 WEB-MOTION-2 e2e: with the 'still' motion preference (Profile > A
 // ignored). Every page mount and page change is in the tour. The budget is 200 ms (it was 150 ms at first, on the
 // supervisor's later ruling) because a city picture (kit.world) is one indivisible draw per city; to be tightened to
 // 100 ms with cached art in the phone pass (f).
-// Run: vite build --outDir <dir> then vite preview --outDir <dir> --port 5393, and
-//   TILO_WEB_PORT=5393 pnpm --filter @tilo/web exec playwright test e2e/park-motion-transitions.spec.ts -g "long task" ...
+// Run (Playwright builds and serves the production build itself on 127.0.0.1; a hand-started `vite preview` binds
+// `localhost` (IPv6 on Windows), which Playwright cannot see, and the run silently lands on the dev server):
+//   TILO_WEB_PROD=1 TILO_WEB_PORT=5393 pnpm --filter @tilo/web exec playwright test e2e/park-motion-transitions.spec.ts -g "CPU slowed 4x" --project=chromium --no-deps --workers=1
 const LONG_TASK_BUDGET_MS = 200;
 const EXTENSION_SCHEMES = ["chrome-extension://", "edge-extension://"] as const;
 
