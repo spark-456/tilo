@@ -25,6 +25,8 @@ from datetime import date
 MAX_SCAN_CHARS = 200_000  # the prefix of the work that is read
 MAX_FINDINGS = 50
 MAX_SHOWN = 5  # dates quoted in the verdict
+CUE_SCAN_CHARS = 2000  # a line is searched for cues in its first characters only, so every rule stays linear
+BY_WINDOW = 40  # characters before a date that are searched for "by"
 MAX_REASON = 140  # world.failed `reason` (contracts/events/data/world.failed.schema.json)
 MIN_YEAR, MAX_YEAR = 1990, 2100  # a four-digit number outside this is not a year ("May 5000 words")
 RECOGNISED_FORMS = (
@@ -70,9 +72,11 @@ _DATE = re.compile(
 _SCHEDULE = re.compile(
     r"\b(?:start(?:s|ed|ing)?|begin(?:s|ning)?|due|deliver(?:y|ies|s|ed|able|ables)?|milestones?|phases?|weeks?|weekly"
     r"|days?|daily|months?|monthly|sessions?|revis(?:e|es|ed|ion|ions|ing)|mock|exams?|deadlines?|schedules?|sprints?"
-    r"|finish(?:es|ed)?|until)\b|\bfrom\b[^\n]*\bto\b",
+    r"|finish(?:es|ed)?|until)\b",
     re.IGNORECASE,
 )
+_FROM = re.compile(r"\bfrom\b", re.IGNORECASE)  # "from .. to" is two linear searches, never one backtracking pattern
+_TO = re.compile(r"\bto\b", re.IGNORECASE)
 _BY_BEFORE = re.compile(r"\bby\s+(?:the\s+)?(?:end\s+of\s+)?$", re.IGNORECASE)
 _CITATION = re.compile(
     r"\b(?:published|publication|accessed|retrieved|et\s+al|doi|isbn|reference|references|cited|copyright)\b"
@@ -117,6 +121,15 @@ def _key(day: date, month_only: bool) -> tuple[int, int, int]:
     return (day.year, day.month, 0 if month_only else day.day)
 
 
+def _scheduled(line: str) -> bool:
+    """Whether the first `CUE_SCAN_CHARS` characters of `line` hold a schedule cue (every search is linear)."""
+    head = line[:CUE_SCAN_CHARS]
+    if _SCHEDULE.search(head):
+        return True
+    opened = _FROM.search(head)
+    return opened is not None and _TO.search(head, opened.end()) is not None
+
+
 def out_of_window(text: str, today: date, deadline: date | None) -> list[DateFinding]:
     """The dates in `text` (its first `MAX_SCAN_CHARS` characters) after `deadline` anywhere, or before `today` in a
     schedule-like line (see the module notes), in reading order. A month and year is compared by month; a full date by
@@ -125,15 +138,18 @@ def out_of_window(text: str, today: date, deadline: date | None) -> list[DateFin
     lines = text[:MAX_SCAN_CHARS].splitlines()
     index = 0
     while index < len(lines):
+        if not lines[index]:  # an empty line holds no date and ends no table
+            index += 1
+            continue
         end = index + 1
         if lines[index].lstrip().startswith("|"):  # a table: its header's cue covers its rows
             while end < len(lines) and lines[end].lstrip().startswith("|"):
                 end += 1
         block = lines[index:end]
         index = end
-        scheduled = any(_SCHEDULE.search(line) for line in block)
+        scheduled = any(_scheduled(line) for line in block)
         for line in block:
-            cited = _CITATION.search(line) is not None
+            cited = _CITATION.search(line[:CUE_SCAN_CHARS]) is not None
             for match in _DATE.finditer(line):
                 read = _read(match)
                 if read is None:
@@ -141,7 +157,9 @@ def out_of_window(text: str, today: date, deadline: date | None) -> list[DateFin
                 when, month_only = read
                 key, kind = _key(when, month_only), None
                 if key < _key(today, month_only):
-                    if (scheduled or _BY_BEFORE.search(line[: match.start()])) and not cited:
+                    if (
+                        scheduled or _BY_BEFORE.search(line[max(0, match.start() - BY_WINDOW) : match.start()])
+                    ) and not cited:
                         kind = "before_today"
                 elif deadline is not None and key > _key(deadline, month_only):
                     kind = "after_deadline"
