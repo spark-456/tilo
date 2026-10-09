@@ -113,7 +113,18 @@ def test_SEC_10_hosting_csp_stays_tight(repo_root: pathlib.Path) -> None:
     off_origin = {s for name in ("script-src", "connect-src", "frame-src") for s in csp.get(name, []) if "://" in s}
     allowed = RECAPTCHA_SCRIPT_ORIGINS | {RECAPTCHA_FRAME_ORIGIN, APPCHECK_CONNECT_ORIGIN}
     allowed |= {SIGN_IN_SCRIPT_ORIGIN, SIGN_IN_FRAME_ORIGIN} | SIGN_IN_CONNECT_ORIGINS
+    allowed |= {"https://tilo-api-4qhkpsn5ga-as.a.run.app"}  # WEB-TO-API: the one tilo-dev API origin
     assert off_origin <= allowed, off_origin
+
+
+def test_SEC_10_connect_src_allows_the_recaptcha_enterprise_fetch_the_app_check_provider_makes(
+    repo_root: pathlib.Path,
+) -> None:
+    """Seen on the deployed tilo-dev site: reCAPTCHA Enterprise fetches `https://www.google.com/recaptcha/enterprise/clr`,
+    so without this one origin in connect-src the App Check token never completes (enforcement would 401 every call)."""
+    csp = _csp(repo_root)
+    assert RECAPTCHA_FRAME_ORIGIN in csp["connect-src"]
+    assert csp["connect-src"].count(RECAPTCHA_FRAME_ORIGIN) == 1
 
 
 def test_SEC_10_web_depends_on_the_firebase_sdk(repo_root: pathlib.Path) -> None:

@@ -59,7 +59,7 @@ const mail = { href: `mailto:${CONTACT_EMAIL}`, text: CONTACT_EMAIL };
 
 export const PRIVACY: LegalDoc = {
   title: "Tilo privacy policy",
-  updated: "7 October 2026",
+  updated: "9 October 2026",
   intro:
     "This explains what Tilo does with your information, in plain words. Tilo never sees your password.",
   sections: [
@@ -82,7 +82,6 @@ export const PRIVACY: LegalDoc = {
       blocks: [
         {
           p: [
-            // TODO(verify): the sign-in options are PRD 6.3 / infra/ACCESS.md; the web sign-in screen is not mounted yet.
             "You can sign in with Google, or use an anonymous demo session. Google sign-in is handled by Google, so Tilo never sees your password. An anonymous demo session connects no Google account and gives Tilo no access to your Gmail, Drive or Calendar.",
           ],
         },
@@ -131,14 +130,14 @@ export const PRIVACY: LegalDoc = {
         },
         {
           p: [
-            // TODO(verify): config/models.dev.yaml and models.nim.yaml hold dev/test profiles (NVIDIA NIM, fakes); the deployed profile is models.yaml/models.gemini.yaml. Confirm no NIM call carries user data in production.
-            "The models that read your content are Google's Gemini models on Vertex AI, called through Tilo's own provider layer. Google Model Armor screens what goes in and out for prompt injection and unsafe content. Tilo treats every email, web page and file as untrusted data, never as instructions.",
+            // TODO(verify): provider profiles can be overridden; deployed routing and screening are not verified.
+            "Tilo calls models through its provider layer. Its default configuration uses Google's models, but other provider profiles can be selected. We have not verified the model routing in a deployed service. Tilo includes Model Armor screening for prompt injection and unsafe content and treats emails, web pages and files as untrusted data.",
           ],
         },
         {
           p: [
-            // TODO(verify): "never cached" is PRD 16.5 (Minimise); confirm in services/channels and services/connectors.
-            "Tilo does not keep your email bodies in a cache. Analytics, where used, carry no message or file content.",
+            // TODO(verify): confirm deployed recording, analytics and logging settings before a broader content guarantee.
+            "Tilo's result cache excludes email bodies. Test recordings can include message content; this is separate from the result cache. We have not verified that all analytics and logs exclude message or file content.",
           ],
         },
       ],
@@ -154,8 +153,8 @@ export const PRIVACY: LegalDoc = {
         },
         {
           p: [
-            // TODO(verify): the numbers are the PRD 15.1 defaults; confirm each is enforced in the stores (FR-MEM-09 covers deletion).
-            "By default Tilo keeps tasks, worlds, runs, approval cards and the files it creates for 90 days. Live run events are kept for 30 days and the activity ledger for 1 year. Your recorded decisions are kept for 1 year. The record of model calls is kept for 30 days in this demo, with secrets removed. A connection is kept until you disconnect it, and your account until you delete it.",
+            // TODO(verify): PRD 15.1 targets exist in code; automatic purging and complete account deletion are unverified.
+            "Tilo's retention targets for saved data are 90 days for tasks, worlds, runs, approval cards and created files; 30 days for live run events and model-call records; and 1 year for the activity ledger and recorded decisions. The code includes secret redaction for model-call records. We have not verified automatic deletion across all stores, so these are targets rather than guaranteed deletion deadlines. Connections and accounts have no automatic age limit in the retention settings; complete deletion after disconnecting or deleting an account is not verified.",
           ],
         },
       ],
@@ -175,10 +174,10 @@ export const PRIVACY: LegalDoc = {
               ".",
             ],
             [
-              // TODO(verify): the in-app delete/export (S-22) is not built; the 30-day figure is PRD 16.5.
-              "Ask us to delete your data, or to send you a copy, by emailing ",
+              // TODO(verify): verify request handling and erasure across all stores before promising the PRD 16.5 deadline.
+              "In-app export and deletion are not available yet. You can ask us to delete your data, or to send you a copy, by emailing ",
               mail,
-              ". We remove it from every store within 30 days.",
+              ". We cannot yet guarantee deletion from every store within 30 days.",
             ],
           ],
         },
@@ -191,8 +190,8 @@ export const PRIVACY: LegalDoc = {
         { p: [LIMITED_USE, " See ", { href: API_POLICY_URL, text: API_POLICY_URL }, "."] },
         {
           p: [
-            // TODO(verify): the human-access sentence is the policy's own rule; confirm no logging path lets staff read Google data.
-            "In practice: Tilo uses Google user data only to provide the features you see in Tilo. It does not transfer that data to others except to provide those features, to follow the law, or as part of a sale of the project. It does not use it for ads or to train models. People on the Tilo team do not read it unless you ask us to, to look into abuse or a security problem, or where the law requires.",
+            // TODO(verify): verify all logging paths and staff access controls against the Limited Use requirements.
+            "Tilo uses Google user data to provide the features you see in Tilo, not for ads or model training. The Limited Use requirements restrict transfers and human access. We have not verified all logging paths or staff access controls, so we cannot yet guarantee that every path meets those restrictions.",
           ],
         },
       ],
@@ -215,7 +214,7 @@ export const PRIVACY: LegalDoc = {
 
 export const TERMS: LegalDoc = {
   title: "Tilo terms of use",
-  updated: "7 October 2026",
+  updated: "9 October 2026",
   intro: "By using Tilo you agree to these terms. They are short on purpose.",
   sections: [
     {
@@ -278,7 +277,7 @@ export const TERMS: LegalDoc = {
         {
           p: [
             // TODO(legal): wording and governing law need legal review before any commercial launch (PRD 16.5); no jurisdiction is named.
-            "To the extent the law allows, Tilo's builders are not liable for any loss or damage from using Tilo, including indirect or consequential loss. Tilo is free, and our total liability is limited to what you paid for it, which is nothing.",
+            "Tilo is free demo software. These terms have not had a legal review; their enforceability and governing law have not been established. Do not rely on this demo for work where an error or loss of data could cause harm.",
           ],
         },
       ],

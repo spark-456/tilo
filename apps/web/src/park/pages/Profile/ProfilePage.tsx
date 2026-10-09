@@ -12,7 +12,9 @@ import { useFollowed } from "../../app/followed";
 import { PageSheet, StatusChip, Switch } from "../../components";
 import "./Profile.css";
 import { ICONS } from "./icons";
+import { canSwitchOff } from "./notifyRules";
 import { signOutOne, signOutOthers } from "./profileSessions";
+import { loadProfile, saveProfile } from "./profileStore";
 
 const TABS = [
   { id: "profile", label: "Profile", icon: ICONS.profile },
@@ -69,7 +71,8 @@ const SECURITY_ROWS = [
 const SESSION_ICONS = { laptop: ICONS.laptop, phone: ICONS.phone, screen: ICONS.tablet } as const;
 const sessionSub = (s: ProfileSession): string =>
   [s.place, s.lastActive, s.note].filter(Boolean).join(" · ");
-const money = (n: number): string => `£${n.toLocaleString("en-GB")}`;
+const money = (n: number, currency: string): string =>
+  `${currency === "USD" ? "$" : "£"}${n.toLocaleString("en-GB")}`;
 /** The spend bar's fill: 0 when there is no budget to measure against, never past the track. */
 const spendPercent = (spent: number, budget: number): number =>
   budget > 0 ? Math.min(100, Math.max(0, Math.round((spent / budget) * 100))) : 0;
@@ -77,7 +80,7 @@ const spendPercent = (spent: number, budget: number): number =>
 interface Loaded {
   user: User;
   settings: ProfileSettings;
-  spend: { spent: number; budget: number };
+  spend: { spent: number; budget: number; currency: string };
 }
 
 const cls = (...names: (string | false)[]): string => names.filter(Boolean).join(" ");
@@ -95,13 +98,35 @@ function Tile({ tone, children }: { tone: "ok" | "sunk" | "hero"; children: Reac
   return <div className={`park-profile-tile park-profile-tile--${tone}`}>{children}</div>;
 }
 
-function Toggle({ label, on, onChange }: { label: string; on: boolean; onChange: () => void }) {
+function Unavailable({ title }: { title: string }) {
+  return (
+    <div className="park-profile-unavailable">
+      <Head title={title} sub="Not available yet" />
+    </div>
+  );
+}
+
+// FR-SET-01: a save is kept on this device only (no profile endpoint yet); FR-SET-02: quiet hours never hide
+// a gate. Both lines are visible helper text (BQ-SET-2, user approved 8 Oct) and stay accessible descriptions too.
+const SAVE_HINT = "Kept on this device only. Tilo has no profile service to send it to yet.";
+const QUIET_HINT =
+  "Quiet hours silence the phone only. A decision that needs you is never hidden by quiet hours: it waits in Needs you.";
+const NEED_ONE = "Decisions need at least one channel";
+
+function Toggle({
+  label,
+  on,
+  onChange,
+  locked,
+}: { label: string; on: boolean; onChange: () => void; locked?: boolean }) {
   return (
     <button
       type="button"
       role="switch"
       aria-checked={on}
       aria-label={label}
+      aria-disabled={locked ? true : undefined}
+      title={locked ? NEED_ONE : undefined}
       className={cls("park-profile-switch", on && "park-profile-switch--on")}
       onClick={onChange}
     >
@@ -115,6 +140,8 @@ export function ProfilePage({ app }: { app: AppCtx }) {
   const [loaded, setLoaded] = useState<Loaded | null>(null);
   const [problem, setProblem] = useState<"missing" | "failed" | null>(null);
   const [form, setForm] = useState<Form | null>(null);
+  // The last saved (or loaded) form: Cancel returns to it. The user key is the signed-in email.
+  const [base, setBase] = useState<Form | null>(null);
   const routeTab = tabFrom(app.params.tab);
   const [tab, setTab] = useState<TabId>(routeTab);
   // The address names a tab ("?tab=appearance", the notification menu's settings link): follow it whenever a link
@@ -147,12 +174,18 @@ export function ProfilePage({ app }: { app: AppCtx }) {
         setLoaded({
           user: u.data,
           settings: st.data,
-          spend: { spent: led.data.spent, budget: led.data.budget },
+          spend: {
+            spent: led.data.spent,
+            budget: led.data.budget,
+            currency: led.data.currency ?? "GBP",
+          },
         });
-        setForm(formOf(u.data));
+        const start = { ...formOf(u.data), ...loadProfile(u.data.email) };
+        setForm(start);
+        setBase(start);
         setNotif(st.data.notifications.map((n) => [n.phone, n.email, n.slack]));
         setQuiet(st.data.quiet.on);
-        setSessions(st.data.sessions);
+        setSessions(st.data.sessions ?? []);
       },
       (e: unknown) => {
         if (live) setProblem(e instanceof Error && e.name === "NotBuilt" ? "missing" : "failed");
@@ -169,12 +202,9 @@ export function ProfilePage({ app }: { app: AppCtx }) {
   const user = loaded?.user;
   const flip = (r: number, c: number) => {
     const row = notif[r] ?? [];
-    if (
-      loaded?.settings.notifications[r]?.id === "decisions" &&
-      row[c] &&
-      row.filter(Boolean).length === 1
-    ) {
-      app.toast("Decisions need at least one channel");
+    const id = loaded?.settings.notifications[r]?.id;
+    if (id && !canSwitchOff(id, row, c)) {
+      app.toast(NEED_ONE);
       return;
     }
     setNotif(notif.map((cells, i) => (i === r ? cells.map((v, j) => (j === c ? !v : v)) : cells)));
@@ -187,7 +217,9 @@ export function ProfilePage({ app }: { app: AppCtx }) {
   // One head for every state, so the h1 is the same node while the data loads (focus stays on it).
   const subtitle =
     user && form
-      ? `${form.title} · ${user.org} · Owner on the ${user.plan} plan`
+      ? [form.title, user.org, user.plan ? `Owner on the ${user.plan} plan` : ""]
+          .filter(Boolean)
+          .join(" · ")
       : problem === "missing"
         ? "Not connected yet"
         : problem === "failed"
@@ -256,18 +288,26 @@ export function ProfilePage({ app }: { app: AppCtx }) {
                     </label>
                   ))}
                 </div>
+                <p className="park-profile-note">{SAVE_HINT}</p>
                 <div className="park-profile-foot">
                   <button
                     type="button"
                     className="park-profile-btn park-profile-btn--quiet"
-                    onClick={() => setForm(formOf(user))}
+                    onClick={() => setForm(base ?? formOf(user))}
                   >
                     Cancel
                   </button>
+                  {/* biome-ignore lint/a11y/useValidAriaProps: aria-description is ARIA 1.3; biome's list predates it */}
                   <button
                     type="button"
                     className="park-profile-btn park-btn--primary"
-                    onClick={() => app.toast("Profile saved")}
+                    aria-description={SAVE_HINT}
+                    title={SAVE_HINT}
+                    onClick={() => {
+                      saveProfile(user.email, form);
+                      setBase(form);
+                      app.toast("Profile saved");
+                    }}
                   >
                     Save changes
                   </button>
@@ -305,6 +345,7 @@ export function ProfilePage({ app }: { app: AppCtx }) {
                             <Toggle
                               label={`${label} by ${c}`}
                               on={notif[r]?.[i] ?? false}
+                              locked={!canSwitchOff(id, notif[r] ?? [], i)}
                               onChange={() => flip(r, i)}
                             />
                           </div>
@@ -318,11 +359,19 @@ export function ProfilePage({ app }: { app: AppCtx }) {
                   <div className="park-profile-grow">
                     <div className="park-profile-mlabel">{`Quiet hours · ${loaded.settings.quiet.start} to ${loaded.settings.quiet.end}`}</div>
                     <div className="park-profile-msub">
-                      {`Phone stays silent, except decisions over ${loaded.settings.quiet.threshold}.`}
+                      {loaded.settings.quiet.threshold
+                        ? `Phone stays silent, except decisions over ${loaded.settings.quiet.threshold}.`
+                        : "Decision threshold: Not available yet"}
                     </div>
                   </div>
-                  <Switch label="Quiet hours" checked={quiet} onChange={setQuiet} />
+                  <Switch
+                    label="Quiet hours"
+                    description={QUIET_HINT}
+                    checked={quiet}
+                    onChange={setQuiet}
+                  />
                 </div>
+                <p className="park-profile-note">{QUIET_HINT}</p>
               </section>
             ) : null}
 
@@ -413,15 +462,20 @@ export function ProfilePage({ app }: { app: AppCtx }) {
                   <h3 ref={listHeadRef} tabIndex={-1} className="park-profile-group">
                     Signed in on
                   </h3>
-                  <button
-                    ref={triggerRef}
-                    type="button"
-                    className="park-profile-link"
-                    onClick={() => setConfirmOthers(true)}
-                  >
-                    Sign out everywhere else
-                  </button>
+                  {loaded.settings.sessions !== null ? (
+                    <button
+                      ref={triggerRef}
+                      type="button"
+                      className="park-profile-link"
+                      onClick={() => setConfirmOthers(true)}
+                    >
+                      Sign out everywhere else
+                    </button>
+                  ) : null}
                 </div>
+                {loaded.settings.sessions === null ? (
+                  <Unavailable title="Signed-in sessions" />
+                ) : null}
                 {confirmOthers && others > 0 ? (
                   <section
                     role="alertdialog"
@@ -488,30 +542,40 @@ export function ProfilePage({ app }: { app: AppCtx }) {
                 className="park-profile-card park-profile-card--billing"
               >
                 <div className="park-profile-cards">
-                  <div className="park-profile-plan">
-                    <span className="park-profile-eyebrow">PLAN</span>
-                    <span className="park-profile-planname">{loaded.settings.plan.name}</span>
-                    <span className="park-profile-blurb">
-                      {`${loaded.settings.plan.seats} seats, ${loaded.settings.plan.perks}. Renews ${loaded.settings.plan.renews}.`}
-                    </span>
-                    <button
-                      type="button"
-                      className="park-profile-btn park-btn--primary park-profile-btn--fit"
-                      onClick={() => app.toast("Plan comparison opens here")}
-                    >
-                      Compare plans
-                    </button>
-                  </div>
+                  {loaded.settings.plan === null ? (
+                    <Unavailable title="Plan" />
+                  ) : (
+                    <div className="park-profile-plan">
+                      <span className="park-profile-eyebrow">PLAN</span>
+                      <span className="park-profile-planname">{loaded.settings.plan.name}</span>
+                      <span className="park-profile-blurb">
+                        {`${loaded.settings.plan.seats} seats, ${loaded.settings.plan.perks}. Renews ${loaded.settings.plan.renews}.`}
+                      </span>
+                      <button
+                        type="button"
+                        className="park-profile-btn park-btn--primary park-profile-btn--fit"
+                        onClick={() => app.toast("Plan comparison opens here")}
+                      >
+                        Compare plans
+                      </button>
+                    </div>
+                  )}
                   <button
                     type="button"
                     className="park-profile-spend"
                     onClick={() => app.go("ledger")}
                   >
-                    <span className="park-profile-eyebrow">{`AGENT SPEND · ${loaded.settings.plan.spendMonth.toUpperCase()}`}</span>
+                    <span className="park-profile-eyebrow">
+                      {loaded.settings.plan
+                        ? `AGENT SPEND · ${loaded.settings.plan.spendMonth.toUpperCase()}`
+                        : "AGENT SPEND"}
+                    </span>
                     <span className="park-profile-amount">
-                      <span className="park-profile-big">{money(loaded.spend.spent)}</span>
+                      <span className="park-profile-big">
+                        {money(loaded.spend.spent, loaded.spend.currency)}
+                      </span>
                       {loaded.spend.budget > 0 ? (
-                        <span className="park-profile-of">{`of ${money(loaded.spend.budget)}`}</span>
+                        <span className="park-profile-of">{`of ${money(loaded.spend.budget, loaded.spend.currency)}`}</span>
                       ) : null}
                     </span>
                     <span className="park-profile-bar">
@@ -525,38 +589,46 @@ export function ProfilePage({ app }: { app: AppCtx }) {
                     <span className="park-profile-open">Open the Ledger</span>
                   </button>
                 </div>
-                <div className="park-profile-pay">
-                  <Tile tone="hero">{ICONS.billing}</Tile>
-                  <div className="park-profile-grow">
-                    <span className="park-profile-eyebrow">PAYMENT</span>
-                    <div className="park-profile-stitle">{`${loaded.settings.payment.brand} ending ${loaded.settings.payment.last4}`}</div>
-                    <div className="park-profile-ssub">{`Invoices go to ${loaded.settings.payment.billingEmail}`}</div>
+                {loaded.settings.payment === null ? (
+                  <Unavailable title="Payment" />
+                ) : (
+                  <div className="park-profile-pay">
+                    <Tile tone="hero">{ICONS.billing}</Tile>
+                    <div className="park-profile-grow">
+                      <span className="park-profile-eyebrow">PAYMENT</span>
+                      <div className="park-profile-stitle">{`${loaded.settings.payment.brand} ending ${loaded.settings.payment.last4}`}</div>
+                      <div className="park-profile-ssub">{`Invoices go to ${loaded.settings.payment.billingEmail}`}</div>
+                    </div>
+                    <button
+                      type="button"
+                      className="park-profile-small"
+                      onClick={() => app.toast("Card update is handled by our payment provider")}
+                    >
+                      Update
+                    </button>
                   </div>
-                  <button
-                    type="button"
-                    className="park-profile-small"
-                    onClick={() => app.toast("Card update is handled by our payment provider")}
-                  >
-                    Update
-                  </button>
-                </div>
+                )}
                 <div className="park-profile-invoices">
                   <h2 className="park-profile-invoices-title">Invoices</h2>
-                  {loaded.settings.invoices.map((inv) => (
-                    <div key={inv.id} className="park-profile-invoice">
-                      <span>{`${inv.period} · ${inv.seats} seats`}</span>
-                      <span className="park-profile-money">{inv.amount}</span>
-                      <StatusChip tone="ok">{inv.status}</StatusChip>
-                      <button
-                        type="button"
-                        aria-label="Download"
-                        className="park-profile-download"
-                        onClick={() => app.toast(`Downloaded ${inv.period} invoice`)}
-                      >
-                        {ICONS.download}
-                      </button>
-                    </div>
-                  ))}
+                  {loaded.settings.invoices === null ? (
+                    <Unavailable title="Invoice history" />
+                  ) : (
+                    loaded.settings.invoices.map((inv) => (
+                      <div key={inv.id} className="park-profile-invoice">
+                        <span>{`${inv.period} · ${inv.seats} seats`}</span>
+                        <span className="park-profile-money">{inv.amount}</span>
+                        <StatusChip tone="ok">{inv.status}</StatusChip>
+                        <button
+                          type="button"
+                          aria-label="Download"
+                          className="park-profile-download"
+                          onClick={() => app.toast(`Downloaded ${inv.period} invoice`)}
+                        >
+                          {ICONS.download}
+                        </button>
+                      </div>
+                    ))
+                  )}
                 </div>
               </section>
             ) : null}

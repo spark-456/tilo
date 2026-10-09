@@ -5,6 +5,7 @@ import type {
   DecisionKey,
   Ledger,
   LedgerEntry,
+  LedgerPeriod,
 } from "../../api/types";
 import {
   decisionOf,
@@ -19,8 +20,18 @@ import {
 // The Ledger page's arithmetic: a typed port of the renderVals() of
 // design_handoff_tilo_web_app/design/Tilo App Ledger.dc.html (user's prototype, ADR-0003a). Pure functions
 // of the Ledger fixture and `dec`, so a test can pin every number. No clock, no random, no network.
-export { gbp, kpis, money, sign, waitingAmount } from "../../app/ledgerKpis";
-export type { KpiRow } from "../../app/ledgerKpis";
+export {
+  CURRENCY_SYMBOL,
+  STEP_LEDGER_PRICES,
+  currencySymbol,
+  gbp,
+  kpis,
+  money,
+  runMoney,
+  sign,
+  waitingAmount,
+} from "../../app/ledgerKpis";
+export type { CurrencyCode, KpiRow } from "../../app/ledgerKpis";
 
 /** The amount a taken decision's row shows: the money its facts name, or a dash when it names none. */
 const amountOf = (f: DecisionFacts): string => (f.amount === undefined ? "—" : gbp(f.amount));
@@ -39,24 +50,41 @@ const approveLabelOf = (
   return amt === undefined ? "Approve" : `Approve ${gbp(amt)}`;
 };
 
+/** The month the ledger shows: the sample company's follows today (`period`); without one it is the fixture's September. */
+const SEPTEMBER: LedgerPeriod = {
+  month: "September",
+  short: "Sep",
+  year: 2026,
+  days: 30,
+  firstWeekday: 2,
+  today: "Thu 24 Sep",
+  day: 24,
+};
+export const periodOf = (L: Ledger): LedgerPeriod => L.period ?? SEPTEMBER;
+
 /** The lede's "<month> · <n> days left": only when the Ledger holds daily spend for the month so far. */
-export const monthLeft = (L: Ledger): string | null =>
-  L.daily.length > 0 ? `September 2026 · ${30 - L.daily.length} days left` : null;
+export const monthLeft = (L: Ledger): string | null => {
+  const p = periodOf(L);
+  return L.daily.length > 0 ? `${p.month} ${p.year} · ${p.days - L.daily.length} days left` : null;
+};
 
 /** The spend-over-time chart is drawn only when there is a budget to scale it by and a day to plot. */
 export const hasChart = (L: Ledger): boolean => L.budget > 0 && L.daily.length > 0;
 
 // ---- Spend over time (SVG 720x270) ----
 const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
-const X = (d: number): number => 48 + (d - 1) * (652 / 29);
+const dayX = (d: number, days = 30): number => 48 + (d - 1) * (652 / (days - 1));
 const pct = (v: number, of: number): string => `${((v / of) * 100).toFixed(2)}%`;
 
 /** The hovered day (1..) for a pointer at `fx` (0..1 across the chart box). The chart clamps it to 1..24. */
-export const dayFromX = (fx: number): number => Math.round((fx * 720 - 48) / (652 / 29)) + 1;
+export const dayFromX = (fx: number, days = 30): number =>
+  Math.round((fx * 720 - 48) / (652 / (days - 1))) + 1;
 
 export function chartGeometry(L: Ledger, dec: Dec, hover: number | null) {
   const waiting = waitingAmount(L);
   const taken = waitingTaken(L, dec);
+  const per = periodOf(L);
+  const X = (d: number): number => dayX(d, per.days);
   const Y = (v: number): number => 236 - (v / L.budget) * 206;
   const daily = L.daily.slice();
   if (taken && daily.length) daily[daily.length - 1] = (daily[daily.length - 1] ?? 0) + waiting;
@@ -70,8 +98,12 @@ export function chartGeometry(L: Ledger, dec: Dec, hover: number | null) {
     a.map((p, i) => `${i ? "L" : "M"}${p[0].toFixed(1)} ${p[1].toFixed(1)}`).join(" ");
   const now = pts[pts.length - 1] ?? [48, 236];
   const fcPts: [number, number][] = taken
-    ? [now, [X(30), Y(L.forecast)]]
-    : [now, [X(25), Y(L.spent + waiting + 70)], [X(30), Y(L.forecast)]];
+    ? [now, [X(per.days), Y(L.forecast)]]
+    : [
+        now,
+        [X(Math.round((25 * per.days) / 30)), Y(L.spent + waiting + 70)],
+        [X(per.days), Y(L.forecast)],
+      ];
   // "Today" is the last day the ledger holds spend for; the pointer is clamped to the days it holds.
   const today = Math.max(1, daily.length);
   const hd = hover != null ? Math.min(today, Math.max(1, hover)) : null;
@@ -89,12 +121,12 @@ export function chartGeometry(L: Ledger, dec: Dec, hover: number | null) {
     line: P(pts),
     area: `${P(pts)} L${now[0].toFixed(1)} 236 L48 236 Z`,
     fc: P(fcPts),
-    pace: `M${X(1).toFixed(1)} ${Y(0).toFixed(1)} L${X(30).toFixed(1)} ${Y(L.budget).toFixed(1)}`,
+    pace: `M${X(1).toFixed(1)} ${Y(0).toFixed(1)} L${X(per.days).toFixed(1)} ${Y(L.budget).toFixed(1)}`,
     cap: `M48 ${Y(L.budget).toFixed(1)} H700`,
     today: `M${now[0].toFixed(1)} 24 V236`,
     nowX: now[0].toFixed(1),
     nowY: now[1].toFixed(1),
-    endX: X(30).toFixed(1),
+    endX: X(per.days).toFixed(1),
     endY: Y(L.forecast).toFixed(1),
     yLabels: (
       [
@@ -106,13 +138,16 @@ export function chartGeometry(L: Ledger, dec: Dec, hover: number | null) {
     ).map(([v, t]) => ({ t: `${s}${t}`, top: pct(Y(v), 270) })),
     xLabels: (
       [
-        [1, "1 Sep"],
+        [1, `1 ${per.short}`],
         [8, "8"],
         [15, "15"],
         [today, "Today"],
-        [30, "30 Sep"],
+        [per.days, `${per.days} ${per.short}`],
       ] as const
-    ).map(([d, t]) => ({ t, left: pct(X(d), 720) })),
+    )
+      // an early-month "Today" would sit on top of the "8": a day label within two days of it is left out
+      .filter(([d, t]) => t === "Today" || Math.abs(d - today) >= 3)
+      .map(([d, t]) => ({ t, left: pct(X(d), 720) })),
     capTop: pct(Y(L.budget), 270),
     spike:
       spike && spikeShown
@@ -122,7 +157,7 @@ export function chartGeometry(L: Ledger, dec: Dec, hover: number | null) {
             text: `${spike.label} ${money(L, spike.amount)}`,
           }
         : null,
-    fcLeft: pct(X(27.4), 720),
+    fcLeft: pct(X((27.4 * per.days) / 30), 720),
     // The note sits a fixed distance (350 on the budget scale) below the end of the forecast.
     fcTop: pct(Y(L.forecast) + (350 / L.budget) * 206, 270),
     fcLabel: taken ? `Forecast ${money(L, L.forecast)}` : `If you approve ${money(L, waiting)}`,
@@ -132,7 +167,9 @@ export function chartGeometry(L: Ledger, dec: Dec, hover: number | null) {
     hLine: hd != null ? `M${hx.toFixed(1)} 24 V236` : "M0 0",
     tipLeft: hd != null ? pct(hx, 720) : "0%",
     tipA:
-      hd != null ? `${DAY_NAMES[(hd + 1) % 7]} ${hd} Sep · ${money(L, daily[hd - 1] ?? 0)}` : "",
+      hd != null
+        ? `${DAY_NAMES[(per.firstWeekday + hd - 1) % 7]} ${hd} ${per.short} · ${money(L, daily[hd - 1] ?? 0)}`
+        : "",
     tipB: hd != null ? `Running total ${money(L, hv)}` : "",
   };
 }
@@ -310,8 +347,6 @@ export const KINDS = [
 ] as const;
 export type Kind = (typeof KINDS)[number][0];
 
-const TODAY = "Today · Thu 24 Sep";
-
 export interface ActivityRow {
   /** Index in the whole feed (the open row is tracked by it, as in the reference). */
   index: number;
@@ -338,6 +373,7 @@ export function activityGroups(
   kind: Kind,
   decisions: readonly Decision[] = [],
 ) {
+  const TODAY = `Today · ${periodOf(L).today}`;
   let E: LedgerEntry[] = L.activity.filter((e) => !(e.dec && dec[e.dec]));
   // A decision taken is recorded as its own row, worded by the decision's `facts`; a decision the Api
   // does not describe adds no row.

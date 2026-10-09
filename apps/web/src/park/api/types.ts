@@ -1,5 +1,6 @@
 // Typed shapes of the Park City fixtures (WEB-1a; README "State and data"; plan section 5).
 // Each shape follows design_handoff_tilo_web_app/design/tilo-app.js, the user's own prototype data.
+import type { QuickCost, QuickIntakeResult, QuickReason } from "../../api/http";
 
 export type Source = "fixture" | "live";
 export type ApiResult<T> = { data: T; source: Source };
@@ -269,6 +270,23 @@ export interface Ledger {
   runLabels?: Record<string, string>;
   /** One name per entry of `memory` (e.g. "1–7 Sep"); absent, or of another length, means no week names. */
   memoryWeeks?: string[];
+  /** The month the ledger shows (the sample company's follows today); absent means September 2026, as the fixture. */
+  period?: LedgerPeriod;
+}
+
+export interface LedgerPeriod {
+  /** "October" and "Oct". */
+  month: string;
+  short: string;
+  year: number;
+  /** Days in the month. */
+  days: number;
+  /** The month's first day: 0 = Sunday. */
+  firstWeekday: number;
+  /** The label the feed calls the current day, as in "Fri 9 Oct" (the feed prefixes "Today · "). */
+  today: string;
+  /** Today's day of the month: the days the daily series holds. */
+  day: number;
 }
 
 // Agenda
@@ -392,6 +410,8 @@ export interface Connector {
   level?: number;
   used?: string[];
   blurb?: string;
+  /** When the sign-in lapses (ISO 8601). The Connectors page warns 3 days ahead; absent means no expiry is known. */
+  expires?: string;
 }
 export interface Notification {
   id: string;
@@ -413,6 +433,14 @@ export interface DecideAck extends Ack {
 export interface StartAck extends Ack {
   world: World;
 }
+
+/** How deep a start goes (COST-FAST-1): Quick is a direct answer, Thinking the full Director plan. Not a world size. */
+export type Effort = "quick" | "thinking";
+
+/** Why a Quick ask is offered as Thinking, what it cost, and the reply: the one definition is in src/api/http.ts. */
+export type SwitchReason = QuickReason;
+export type { QuickCost };
+export type QuickReply = QuickIntakeResult;
 
 // Page fixtures (WEB-1d): designed content the Team, Connectors and Profile pages must not hard-code.
 // Not in tilo-app.js; hand-written from the reference pages (fixtures/teamPolicy.ts and the others).
@@ -477,10 +505,10 @@ export interface QuietHours {
   threshold: string;
 }
 export interface ProfileSettings {
-  sessions: ProfileSession[];
-  invoices: ProfileInvoice[];
-  payment: PaymentMethod;
-  plan: PlanInfo;
+  sessions: ProfileSession[] | null;
+  invoices: ProfileInvoice[] | null;
+  payment: PaymentMethod | null;
+  plan: PlanInfo | null;
   notifications: NotificationRow[];
   quiet: QuietHours;
 }

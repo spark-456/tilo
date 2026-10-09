@@ -48,6 +48,8 @@ export interface HeroProps {
   readonly greeting: string;
   readonly summary: string;
   readonly needs: number;
+  /** False on the live path when no decisions were served: nothing is claimed either way. */
+  readonly needsKnown?: boolean;
   readonly night: boolean;
   /** The world the waiting decisions are in, from the Api's worlds; null names none. */
   readonly worldName: string | null;
@@ -59,6 +61,7 @@ export function Hero({
   greeting,
   summary,
   needs,
+  needsKnown = true,
   night,
   worldName,
   onReview,
@@ -67,7 +70,7 @@ export function Hero({
     <div className="park-home-hero park-home-glass">
       <div className="park-home-date">{dateLine}</div>
       <h1 className="park-home-h1">{greeting}</h1>
-      <p className="park-home-summary">{summary}</p>
+      {summary ? <p className="park-home-summary">{summary}</p> : null}
       {needs > 0 ? (
         <button type="button" className="park-home-needs" onClick={onReview}>
           <span className="park-home-needs__tile">{needsAgent(30, night)}</span>
@@ -77,12 +80,12 @@ export function Hero({
           </span>
           <span className="park-home-needs__review">Review</span>
         </button>
-      ) : (
+      ) : needsKnown ? (
         <div className="park-home-caught">
           <span className="park-home-caught__disc">{icon("check", 14)}</span>
           You’re all caught up
         </div>
-      )}
+      ) : null}
     </div>
   );
 }
@@ -174,7 +177,9 @@ export function TodayPanel({
       <div className="park-home-rule" />
       <button type="button" className="park-home-spend" onClick={onLedger}>
         <span className="park-home-spend__head">
-          <span className="park-home-title">September spend</span>
+          <span className="park-home-title">
+            {spend.month ? `${spend.month} spend` : "Spend so far"}
+          </span>
           <span className="park-home-spend__link">Ledger</span>
         </span>
         <span className="park-home-spend__figures">

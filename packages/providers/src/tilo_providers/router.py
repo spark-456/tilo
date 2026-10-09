@@ -20,6 +20,12 @@ from tilo_providers.schema_guard import first_error, short
 
 ProviderFor = Callable[[str], ModelProvider]
 
+# PL-03 / EFF-03: a call is reserved at its input plus the role's expected output (`config/expected_output.yaml`; 1024
+# when the role has none, never above the call's cap), and refused before sending when its full cap is over twice the
+# budget left.
+_DEFAULT_EXPECTED_OUTPUT = 1024
+_CAP_HEADROOM = 2
+
 
 class RouterError(Exception):
     """Router-level error; `attempts` holds every attempt made before it was raised. `budget_left` is what is
@@ -64,7 +70,8 @@ class RouterAttempt:
     tokens_cached: int | None = None  # EFF-04: cache reads, a part of tokens_in; None is unknown, never 0
     error_type: str | None = None
     reason: str | None = None  # why this attempt was made (the escalation or fallback reason)
-    quoted_credits: float = field(default=0.0, repr=False)  # the pre-call quote: its charge when no usage is known
+    quoted_credits: float = field(default=0.0, repr=False)  # the pre-call reserve (input + expected output)
+    ceiling_credits: float = field(default=0.0, repr=False)  # input + the full cap: a cut reply's charge with no usage
 
 
 @dataclass
@@ -189,6 +196,7 @@ class Router:
         provider_for_profile: ProviderFor | None = None,
         fixtures_dir: Any = None,
         live_permitted: bool = False,
+        force_replay: bool = False,
         role_thinking: bool = True,
     ) -> None:
         if provider_for_profile is None and fixtures_dir is None:
@@ -196,6 +204,7 @@ class Router:
         self._config, self._provider_for_profile, self._fixtures_dir = config, provider_for_profile, fixtures_dir
         self._role_thinking = role_thinking  # False: never fill a role's `thinking` (the live smoke sends none)
         self._live_permitted = live_permitted  # SEC-15: set by the caller that decided this router may go live
+        self._force_replay = force_replay  # SEC-15: set by the caller that decided this router replays, LIVE or not
 
     def _provider(self, role_id: str, profile_id: str) -> ModelProvider:
         if self._provider_for_profile is not None:
@@ -206,6 +215,7 @@ class Router:
             fixtures_dir=self._fixtures_dir,
             profile_id=profile_id,
             live_permitted=self._live_permitted,
+            force_replay=self._force_replay,
         )
 
     def _candidates(self, role_id: str, capability: Capability | None) -> list[str]:
@@ -245,7 +255,7 @@ class Router:
 
     def _prepare(
         self, run: RouterResult, profile_id: str, provider: ModelProvider, prompt: str | None = None
-    ) -> tuple[GenerateRequest, float]:
+    ) -> tuple[GenerateRequest, float, float]:
         """EFF-03 with this candidate's own `count_tokens`, on everything sent (`_input_text`): compact the
         role's input to max_input_tokens (or refuse a repair `prompt` over it), then price the call (PL-03).
         Never sends anything over the cap."""
@@ -266,46 +276,68 @@ class Router:
             # BQ-LE2E-10: the role's `thinking` is the default for a caller that sets none (an explicit level wins), and
             # only a profile that declares the thinking capability is sent one (the others would answer a 400).
             sent = sent.model_copy(update={"thinking_level": role.thinking})
-        return sent, self._quote(run, profile_id, provider, _input_text(sent, prompt), sent.max_output_tokens or 0)
+        cap = sent.max_output_tokens or 0
+        expected = min(self._config.expected_output.get(run.role_id, _DEFAULT_EXPECTED_OUTPUT), cap)
+        return sent, *self._quote(run, profile_id, provider, _input_text(sent, prompt), cap, expected)
 
     def _cost(self, profile_id: str, tokens_in: int, tokens_out: int) -> float:
         quote = self._config.price(profile_id)
         return self._config.credits((tokens_in * quote.input + tokens_out * quote.output) / 1e6)
 
-    def _quote(self, run: RouterResult, profile_id: str, provider: ModelProvider, text: str, out: int) -> float:
-        """PL-03: every call (first, repair, fallback, escalation) is priced before it is made (BQ-61) and
-        refused if over the budget left. Nothing is taken from the budget until the call returns (`_spend`)."""
+    def _quote(
+        self,
+        run: RouterResult,
+        profile_id: str,
+        provider: ModelProvider,
+        text: str,
+        out: int,
+        expected: int | None = None,
+    ) -> tuple[float, float]:
+        """PL-03: every call (first, repair, fallback, escalation) is priced before it is made (BQ-61). Returns
+        (reserve, ceiling): the input plus the role's EXPECTED output (`expected`, else all of `out`), and the input
+        plus the full cap `out`. Refused (nothing sent) only when (a) the reserve is over the budget left, or (b) the
+        ceiling is over twice the budget left. A call past both is sent and may settle above its reserve; nothing
+        is taken from the budget until it returns (`_spend`)."""
         if run.budget is None:
-            return 0.0
-        credits = self._cost(profile_id, provider.count_tokens(text), out)
-        if credits > run.budget:
-            message = f"PL-03: a call on {profile_id!r} costs ~{credits:.4f} credits, over {run.budget} left"
+            return 0.0, 0.0
+        tokens_in = provider.count_tokens(text)
+        reserve = self._cost(profile_id, tokens_in, out if expected is None else min(expected, out))
+        ceiling = reserve if expected is None else self._cost(profile_id, tokens_in, out)
+        if reserve > run.budget:
+            message = f"PL-03: a call on {profile_id!r} costs ~{reserve:.4f} credits, over {run.budget} left"
             raise BudgetExceededError(message, run.attempts)
-        return credits
+        if ceiling > _CAP_HEADROOM * run.budget:
+            message = (
+                f"PL-03: a call on {profile_id!r} may cost up to ~{ceiling:.4f} credits at its cap, "
+                f"over {_CAP_HEADROOM}x the {run.budget} left"
+            )
+            raise BudgetExceededError(message, run.attempts)
+        return reserve, ceiling
 
     def _spend(self, run: RouterResult, profile_id: str, estimate: float, usage: dict[str, Any] | None) -> None:
         """PL-03: a call that returned is charged from its reported usage, else its estimate. A call that
-        raised (quota, retryable, ...) is never charged, so it cannot starve the fallback."""
+        raised (quota, retryable, ...) is never charged, so it cannot starve the fallback. The budget stops at 0."""
         if run.budget is None:
             return
         tokens_in, tokens_out = (usage or {}).get("input_tokens"), (usage or {}).get("output_tokens")
         if isinstance(tokens_in, int) and isinstance(tokens_out, int):
             estimate = self._cost(profile_id, tokens_in, tokens_out)
-        run.budget -= estimate
+        run.budget = max(0.0, run.budget - estimate)
 
     def _charge_truncated(self, run: RouterResult, attempt: RouterAttempt, error: OutputTruncatedError) -> None:
         """FR-MTR-01: a reply cut at its cap was billed (input, output and thinking tokens). It is charged from the
-        usage the provider reported (input plus output and thinking, written to the attempt), else at its pre-call
-        quote. This is the one place a call that raised is charged; quota and the like never are."""
+        usage the provider reported (input plus output and thinking, written to the attempt), else at its input plus
+        the whole cap (`ceiling_credits`). This is the one place a call that raised is charged; quota and the like never
+        are."""
         spent = (error.output_tokens or 0) + (error.thinking_tokens or 0)
         known = error.output_tokens is not None or error.thinking_tokens is not None
         if isinstance(error.input_tokens, int) and known:
             attempt.tokens_in, attempt.tokens_out = error.input_tokens, spent
             credits = self._cost(attempt.profile_id, error.input_tokens, spent)
         else:
-            credits = attempt.quoted_credits
+            credits = attempt.ceiling_credits  # no usage: a cut reply used its whole cap
         if run.budget is not None:
-            run.budget -= credits
+            run.budget = max(0.0, run.budget - credits)
 
     def generate(
         self,
@@ -327,7 +359,7 @@ class Router:
                 try:
                     with self._candidate(run, profile_id, reason) as attempt:
                         provider = self._provider(role_id, profile_id)
-                        sent, estimate = self._prepare(run, profile_id, provider, prompt)
+                        sent, estimate, attempt.ceiling_credits = self._prepare(run, profile_id, provider, prompt)
                         attempt.quoted_credits = estimate
                         response = provider.generate(sent)
                 except RouterSafetyError:  # a safety outcome, never a silent fallback
@@ -376,7 +408,7 @@ class Router:
             start = time.perf_counter()
             with self._candidate(run, profile_id, reason) as attempt:
                 provider = self._provider(run.role_id, profile_id)
-                sent, estimate = self._prepare(run, profile_id, provider)
+                sent, estimate, attempt.ceiling_credits = self._prepare(run, profile_id, provider)
                 attempt.quoted_credits = estimate
                 chunks = iter(provider.stream(sent))
                 chunk = next(chunks, None)
@@ -411,7 +443,7 @@ class Router:
             with self._candidate(run, profile_id, reason) as attempt:
                 provider = self._provider(role_id, profile_id)
                 # priced like a generate() call with no output tokens (BQ-61), with each candidate's tokenizer
-                estimate = self._quote(run, profile_id, provider, "\n\n".join(_embed_inputs(request)), 0)
+                estimate, _ = self._quote(run, profile_id, provider, "\n\n".join(_embed_inputs(request)), 0)
                 embedding = provider.embed(request)
             if not attempt.error_type:
                 self._spend(run, profile_id, estimate, None)

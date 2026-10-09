@@ -59,6 +59,11 @@ roles:
   # FR-PA-19: the assistant panel's fallback (config/assistant.yaml) on the cheapest profile; the
   # fallback (NFR-25) is used only on a provider error. Per-call caps: 8000 tokens in, 1000 out (EFF-03).
   assistant: { primary: lite-31, fallback: flash-37, max_input_tokens: 8000, max_output_tokens: 1000 }
+  # FR-MTG-11: the meeting bot's two roles (meet-bot/bot/providers.py asks for these, never a model). `meeting` is the
+  # agenda analysis (JSON in, JSON out, about 12000 characters of transcript); `meeting_fast` answers one question in a
+  # sentence on the cheapest profile. Caps per EFF-03; the fallback (NFR-25) serves a quota or provider error only.
+  meeting: { primary: flash-37, fallback: lite-31, max_input_tokens: 16000, max_output_tokens: 2048 }
+  meeting_fast: { primary: lite-31, fallback: flash-37, max_input_tokens: 8000, max_output_tokens: 256 }
   # EFF-03: 65536 is Model Armor's own per-request limit for the prompt-injection, RAI and CSAM filters
   # (https://docs.cloud.google.com/model-armor/quotas, read 2026-10-06); the screen refuses a larger input.
   safety: { primary: armor-default, fallback: armor-default, max_input_tokens: 65536 } # primary only; never a weaker fallback

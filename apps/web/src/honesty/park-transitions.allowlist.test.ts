@@ -59,6 +59,23 @@ describe("WEB-MOTION-2 honesty: UI-chrome motion widens the allowlist by one nar
     ).toBe(true);
   });
 
+  // MOTION3_PINS (BQ-WEB-MOTION-3a, DECIDED 8 Oct, user approved): the same single entry now also covers the
+  // paint-only background-color and color fades, on the list pinned in src/park/shell/motion3.micro.css.test.ts.
+  it("MOTION3_PINS honesty: the css-transition reason says background-color and color are covered, paint only, never a layout property, still no agent or run", () => {
+    const e = entry("css-transition");
+    expect(e, "the css-transition entry is gone").toBeDefined();
+    expect(e?.reason).toMatch(/background-color/);
+    expect(e?.reason).toMatch(/\bcolor\b/);
+    expect(e?.reason, "says it never touches a layout property").toMatch(
+      /never a layout property/i,
+    );
+    expect(e?.reason, "world, stage and agent motion are not covered").toMatch(
+      /nothing here shows or implies an agent, a run or a decision/i,
+    );
+    expect(e?.reason, "reduced motion and still turn it off").toMatch(/reduced motion/i);
+    expect(e?.reason).toMatch(/still/i);
+  });
+
   it("WEB-MOTION-2 honesty: the shell stylesheet's keyframes entry names every @keyframes the file now holds", () => {
     const e = entry("css-keyframes");
     expect(e, "the css-keyframes entry is gone").toBeDefined();
