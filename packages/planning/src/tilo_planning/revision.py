@@ -54,7 +54,7 @@ class _RevisionUnit(pydantic.BaseModel):
     depends_on: Annotated[list[Annotated[str, pydantic.Field(pattern=_UNIT_ID)]], pydantic.Field(max_length=50)]
 
 
-class _RevisionReply(pydantic.BaseModel):
+class RevisionReply(pydantic.BaseModel):
     model_config = pydantic.ConfigDict(extra="forbid")
     units: Annotated[list[_RevisionUnit], pydantic.Field(min_length=1, max_length=MAX_REVISION_UNITS)]
 
@@ -78,7 +78,7 @@ def _summary(unit: Mapping[str, Any]) -> dict[str, Any]:
     return {key: unit.get(key) for key in keys}
 
 
-def _problems(reply: _RevisionReply, plan: dict[str, Any], change: Mapping[str, Any]) -> list[str]:
+def _problems(reply: RevisionReply, plan: dict[str, Any], change: Mapping[str, Any]) -> list[str]:
     """What breaks the change's own rules (MR-09), as a rule id and a pointer, never the model's words."""
     taken = {unit["id"] for unit in plan["units"]}
     allowed = set(change["units"])
@@ -92,7 +92,7 @@ def _problems(reply: _RevisionReply, plan: dict[str, Any], change: Mapping[str, 
     return found
 
 
-def _revised(plan: dict[str, Any], reply: _RevisionReply, proposal_id: str) -> dict[str, Any]:
+def _revised(plan: dict[str, Any], reply: RevisionReply, proposal_id: str) -> dict[str, Any]:
     """The plan with the revision units appended. District and role are the revised unit's; `change` is the
     proposal id the caller confirmed; connectors and actions are empty, so no gate is needed and none is added."""
     revised = copy.deepcopy(plan)
@@ -125,7 +125,7 @@ def _ask(router: Router, prompt: str) -> RouterResult:
         system=load_prompt(DIRECTOR_ROLE, "revision_system.md"),
         prompt=prompt,
         json_mode=True,
-        response_schema=_RevisionReply.model_json_schema(),
+        response_schema=RevisionReply.model_json_schema(),
         thinking_level=PLAN_THINKING,
     )
     try:
@@ -168,7 +168,7 @@ def compile_revision(
         runs.append(run)
         text = (run.response.text if run.response else None) or ""
         try:
-            reply = _RevisionReply.model_validate_json(text)
+            reply = RevisionReply.model_validate_json(text)
         except pydantic.ValidationError as error:
             found = [f"schema: {_pointer(e['loc'])} does not match the revision schema" for e in error.errors()[:20]]
         else:
@@ -190,7 +190,7 @@ def compile_revision(
     raise PlanCompileError(f"MR-09: no valid revision after {attempts} attempts; last broke {', '.join(rules)}")
 
 
-def _result(revised: dict[str, Any], reply: _RevisionReply, runs: list[RouterResult]) -> RevisionResult:
+def _result(revised: dict[str, Any], reply: RevisionReply, runs: list[RouterResult]) -> RevisionResult:
     added = revised["units"][-len(reply.units) :]
     try:
         credits: dict[str, float] | None = estimate_units(added)["credits"]

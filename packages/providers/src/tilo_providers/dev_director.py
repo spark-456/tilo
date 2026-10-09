@@ -155,7 +155,7 @@ class DevDirectorProvider(ModelProvider):
             reply = _brief_reply(request.prompt)
         elif "approaches" in properties:
             reply = _approaches_reply(request.prompt)
-        elif "units" in properties and "<<<CHANGE\n" in request.prompt:
+        elif (request.response_schema or {}).get("title") == "RevisionReply":  # tilo_planning.revision
             reply = _revision_reply(request.prompt)
         elif "units" in properties:
             reply = _plan_reply(request.prompt)
