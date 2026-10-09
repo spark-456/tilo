@@ -38,7 +38,7 @@ from tilo_providers.interfaces import SafetyProvider
 from tilo_providers.replay import ReplayMissError
 from tilo_providers.router import Router
 
-from tilo_api import deps, quick
+from tilo_api import deps, ephemeral, quick
 from tilo_api.assistant.metering import SpendLedger
 from tilo_api.deps import get_safety  # the dependency key tests and callers override
 from tilo_api.tasks import create_task
@@ -49,8 +49,9 @@ logger = logging.getLogger("tilo_api.intake")
 _store = InMemoryArtifactStore()
 
 
-def get_store() -> InMemoryArtifactStore:
-    return _store
+def get_store(request: Request = None) -> InMemoryArtifactStore:  # type: ignore[assignment]
+    demo = ephemeral.for_request(request) if request is not None else None
+    return _store if demo is None else demo.uploads  # a demo's uploads are its own, in memory, gone with it
 
 
 @router.post("/intake", status_code=201)

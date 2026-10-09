@@ -107,10 +107,24 @@ def run_seams(request: Request, mode: Annotated[Mode, Depends(deps.get_work_mode
     names = "plan_compiler layout_builder unit_runner action_resolver skill_registry connector_registry"
     names += " connector_adapters outbox_store event_writer must_ask_providers artifact_store redactor run_archive"
 
+    from tilo_api import ephemeral  # noqa: PLC0415
+
+    demo = None if ephemeral.has_no_person(request) else ephemeral.for_request(request)  # the tick has no person
+    mine = (  # the storage seams a demo run takes from its own bundle; connector adapters stay empty: it sends nothing
+        {}
+        if demo is None
+        else {
+            "outbox_store": demo.outbox, "event_writer": demo.writer, "artifact_store": demo.artifacts,
+            "redactor": demo.redactor, "run_archive": demo.open_archive, "connector_adapters": {},
+        }
+    )  # fmt: skip
+
     def build(name: str) -> Any:
         seam = getattr(deps, f"get_{name}")
         if seam in overrides:
             return overrides[seam]()
+        if name in mine:
+            return mine[name]
         return seam(mode) if name in _MODE_SEAMS else seam()
 
     try:
