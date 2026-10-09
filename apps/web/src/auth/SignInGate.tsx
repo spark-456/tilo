@@ -8,6 +8,8 @@ import { SignInScreen } from "./SignInScreen";
 import type { AuthController, SignInResult } from "./auth";
 
 const FAILED = "Signing in did not work. Please try again.";
+const SIGN_OUT_FAILED =
+  "Signing out did not finish, so your session may still be open on this device. Close this browser window to be sure.";
 
 export function SignInGate({
   auth,
@@ -21,10 +23,13 @@ export function SignInGate({
     return <>{children}</>;
   }
   if (state.status === "unknown") return null;
-  return <SignInPanel auth={auth} />;
+  return <SignInPanel auth={auth} signOutFailed={state.signOutFailed === true} />;
 }
 
-function SignInPanel({ auth }: { readonly auth: AuthController }) {
+function SignInPanel({
+  auth,
+  signOutFailed,
+}: { readonly auth: AuthController; readonly signOutFailed: boolean }) {
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(false);
   // A ref, not the state: two clicks in one batch both see the same render, and only one sign-in may start.
@@ -54,6 +59,7 @@ function SignInPanel({ auth }: { readonly auth: AuthController }) {
       busy={busy}
       failed={failed}
       failedText={FAILED}
+      signOutFailedText={signOutFailed ? SIGN_OUT_FAILED : null}
       onGoogle={() => run(() => auth.signInWithGoogle())}
       onDemo={() => run(() => auth.signInAnonymously())}
     />

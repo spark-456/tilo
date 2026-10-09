@@ -3,17 +3,24 @@
 // end (a local host, the fixture world, a build with no Firebase config): the caller keeps the prototype's behaviour.
 // The controller's sign-out never rejects. Once the session is really over the page is loaded afresh at "/": the
 // module-level HTTP clients, their caches and polls belong to the person who just left, and nothing of them may serve
-// the next person on a shared machine (BQ-SIGNIN-4). The sign-in gate takes it from there.
+// the next person on a shared machine (BQ-SIGNIN-4). A sign-out the SDK refused (`signOutFailed`) loads nothing: the
+// SDK still holds the person, so a full load would restore them; the sign-in gate says so in plain words instead.
+// The gate takes it from there.
 import { hasSession } from "../auth/auth";
 import { session } from "../auth/session";
 
+/** Signs the page's session out. Resolves true after loading "/" afresh when the session really ended, false when the
+ * SDK refused (nothing is loaded). Rejects only if the controller itself throws. */
+export async function finishSession(): Promise<boolean> {
+  await session.signOut();
+  const state = session.getState();
+  const ended = state.status === "signed_out" && state.signOutFailed !== true;
+  if (ended) window.location.assign("/");
+  return ended;
+}
+
 export function endSession(): boolean {
   if (!hasSession(session.getState())) return false;
-  session
-    .signOut()
-    .then(() => {
-      if (session.getState().status === "signed_out") window.location.assign("/");
-    })
-    .catch(() => undefined);
+  finishSession().catch(() => undefined);
   return true;
 }

@@ -47,12 +47,15 @@ export function SignInScreen({
   busy,
   failed,
   failedText,
+  signOutFailedText = null,
   onGoogle,
   onDemo,
 }: {
   readonly busy: boolean;
   readonly failed: boolean;
   readonly failedText: string;
+  /** A refused sign-out: the person is told their session may still be open (SIGNIN-FIX, #644). */
+  readonly signOutFailedText?: string | null;
   readonly onGoogle: () => void;
   readonly onDemo: () => void;
 }) {
@@ -123,6 +126,11 @@ export function SignInScreen({
         <p className="signin__note">
           A sample company to explore. Demo sessions replay recorded runs.
         </p>
+        {signOutFailedText ? (
+          <p className="signin__error" role="alert" data-testid="sign-out-failed">
+            {signOutFailedText}
+          </p>
+        ) : null}
         {failed && (
           <p className="signin__error" role="alert">
             {failedText}
