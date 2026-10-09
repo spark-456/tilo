@@ -416,6 +416,18 @@ def get_access_store() -> AccessStore:
     return access_firestore.deployed()
 
 
+def get_feedback_store() -> Any:
+    """SEC-16 beta-allowance feedback (BQ-FEEDBACK-1): the Firestore store behind `store_door` (`TILO_API_STORE`,
+    ADR-0026), else 503 `not_configured`. Dev mode and the tests override this seam."""
+    from tilo_api import store_door  # noqa: PLC0415
+    from tilo_api.feedback_firestore import open_feedback_store  # noqa: PLC0415
+
+    try:
+        return open_feedback_store()
+    except store_door.ApiStoreNotConfigured:
+        raise HTTPException(status_code=503, detail="not_configured") from None
+
+
 def get_app_check_verifier() -> AppCheckVerifier:
     """SEC-10: checks a client's App Check token (`tilo_api.appcheck`). Google's keys for the API's own project; dev
     mode and an unconfigured project refuse without any call. Tests override it; it never decides authorisation."""

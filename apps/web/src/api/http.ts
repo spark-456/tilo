@@ -100,6 +100,13 @@ export function reasonOf(status: number, text: string): string {
   return GENERIC_4XX[status] ?? "Tilo could not accept that.";
 }
 
+/** SEC-16: the one refusal the lifetime-cap pop-up is keyed on (403 `spend_cap_reached`); every other limit differs. */
+export function isLifetimeCap(error: unknown): boolean {
+  return (
+    error instanceof TiloApiError && error.status === 403 && error.code === "spend_cap_reached"
+  );
+}
+
 /** The refusal's `code` only when it is a short lower-case token (SEC-15); anything else is null. */
 function codeOf(text: string): string | null {
   try {
@@ -737,6 +744,16 @@ export class HttpClient implements TiloClient, SchedulesApi {
       body: JSON.stringify(patch),
     };
     return this.request(`/schedules/${encodeURIComponent(id)}`, init, true);
+  }
+
+  /** `POST /v1/feedback` (SEC-16, BQ-FEEDBACK-1): resolves only when the server said `{received: true}`; the uid is the
+   * sign-in token's, never the body. No automatic retry. */
+  async submitFeedback(words: string): Promise<void> {
+    const reply = await this.post<{ received?: unknown } | null>("/v1/feedback", {
+      text: words,
+      context: "lifetime_cap",
+    });
+    if (reply?.received !== true) throw new TiloApiError(BAD_REPLY, 200, true, true);
   }
 
   /** `DELETE /schedules/{id}`: 204 with no body. */

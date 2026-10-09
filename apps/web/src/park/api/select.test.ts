@@ -50,6 +50,7 @@ describe("WEB_1a_select: an API url means the live Api and no sample values", ()
           "getDecisions",
           "decide",
           "startWorld",
+          "submitFeedback",
           "getProfileSettings",
           "setPref",
         ].includes(x),

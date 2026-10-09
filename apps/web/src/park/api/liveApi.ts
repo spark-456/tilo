@@ -290,5 +290,10 @@ export function createLiveApi(options: LiveApiOptions = {}): Api {
     rememberIntake(intake);
     return { data: { ok: true, world: worldFromIntake(mode, intake, query) }, source: "live" };
   }) as Api["startWorld"];
+  // The lifetime-cap pop-up's feedback (SEC-16): resolves only on the server's `{received: true}`.
+  api.submitFeedback = async (words: string) => {
+    await http.submitFeedback(words);
+    return { data: { ok: true }, source: "live" };
+  };
   return api;
 }

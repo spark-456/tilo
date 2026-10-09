@@ -104,7 +104,8 @@ def test_PPL_11c_s4_BQ_PPL11C_1_every_people_post_route_is_in_the_body_cap_list(
     """A guard (passes once S1 to S3 and S6 have landed, and must keep passing): a people POST route added later
     without a line in `BODY_ROUTES` would silently have no cap. `/v1/assistant/ask` is PPL-11b's, not a people write."""
     rig = people_rig()
-    not_people_writes = {"/v1/assistant/ask"}
+    # /v1/feedback has its own 65536-byte cap (SEC-16, test_SEC_16_FEEDBACK_hardening)
+    not_people_writes = {"/v1/assistant/ask", "/v1/feedback"}
     templates = [
         t
         for t, methods in rig.app.openapi()["paths"].items()
