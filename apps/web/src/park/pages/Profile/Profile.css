@@ -25,6 +25,16 @@
 }
 
 /* ---- Header ---- */
+[data-park] .park-profile-unavailable {
+  box-sizing: border-box;
+  min-width: 0;
+  padding: 18px;
+  border: 1px solid var(--line2);
+  border-radius: 16px;
+  background: var(--card);
+  color: var(--ink);
+}
+
 [data-park] .park-profile-head {
   display: flex;
   align-items: center;

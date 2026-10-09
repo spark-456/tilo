@@ -112,7 +112,7 @@
   height: 42px;
   padding: 0 18px;
   border-radius: 12px;
-  background: var(--hero);
+  background: var(--heroFill);
   color: #ffffff;
   font-size: 14.5px;
   font-weight: 800;
