@@ -80,7 +80,8 @@ class Principal:
     user_id: str  # common.schema.json#/$defs/user_id
     role: Role
     world_id: str | None = None  # the one world this principal is a member of; a mismatch with
-    # the path's world_id gets the same 404 as an unknown world (no membership oracle)
+    # the path's world_id gets the same 404 as an unknown world (no membership oracle); a web sign-in bound to none
+    # reaches the worlds its record owner is (`member_world`)
     channel: Channel = "web"  # the session channel sign-in resolved for this request (FR-HIL-07,
     # world.paused.data.channel is derived from here, never from a request body
     districts: tuple[str, ...] = ()  # visible beyond vis: "all"; ignored for role == "owner"
@@ -308,6 +309,28 @@ def resolve_principal(app: Any, connection: HTTPConnection) -> Principal:
     resolve it. A test double that takes no argument still works. Raises what the seam raises (a 401, usually)."""
     resolver = app.dependency_overrides.get(get_current_principal, get_current_principal)
     return resolver(connection) if inspect.signature(resolver).parameters else resolver()
+
+
+def member_world(principal: Principal, store: Store, world_id: str) -> WorldRecord:
+    """The world a request may read or act on: the one the session is bound to, or, for a session bound to no world,
+    one whose record owner is this person with role owner (a deployed sign-in session is role owner and bound to no
+    world, `principal_from_claims`, so an owner reaches their own worlds through ownership). Never wider: a session
+    bound to another world stays bound to it, and another person's world, a non-owner role that carries the owner's
+    id, a session that is not a web sign-in (an email or signed-link session), and an unknown world all get the one
+    unknown-world 404 (no membership oracle)."""
+    world = store.worlds.get(world_id)
+    if world is None:
+        raise HTTPException(status_code=404)
+    unbound_owner = (
+        principal.world_id is None
+        and principal.role == "owner"
+        and principal.channel
+        in ("web", "mobile_web")  # a sign-in session, never an email or signed-link one (BQ-XWORLD-9)
+        and principal.user_id == world.owner
+    )
+    if principal.world_id == world_id or unbound_owner:
+        return world
+    raise HTTPException(status_code=404)
 
 
 def get_store(request: Request = None) -> Store:  # type: ignore[assignment]  # FastAPI injects it; None elsewhere

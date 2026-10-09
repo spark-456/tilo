@@ -41,6 +41,7 @@ from tilo_api.deps import (
     get_part_write_deadline_s,
     get_store,
 )
+from tilo_api.deps import member_world as _require_member_world
 from tilo_api.durable_store import DurableStore
 
 router = APIRouter()
@@ -241,15 +242,6 @@ def drain(
             return
         except Exception:
             note_failure(part["id"], others_waiting=len(candidates) > 1)
-
-
-def _require_member_world(principal: Principal, store: Store, world_id: str) -> WorldRecord:
-    if principal.world_id != world_id:
-        raise HTTPException(status_code=404)
-    world = store.worlds.get(world_id)
-    if world is None:
-        raise HTTPException(status_code=404)
-    return world
 
 
 def _require_owner(principal: Principal, world: WorldRecord) -> None:
