@@ -43,6 +43,8 @@ from .tokens import ConnectionExpired, InsufficientScope, Kms, KmsError, NotConn
 
 DEFAULT_PERSONAL_CONFIG = Path(__file__).resolve().parents[4] / "config" / "personal.yaml"
 CONNECTOR_ID = "google_calendar"
+# The host adapter defines the same constant but imports this module, so it is repeated here (ADR-0035 decision 6)
+CALENDAR_EVENTS_OWNED = "https://www.googleapis.com/auth/calendar.events.owned"
 SEAL_CONTEXT = b"tilo.calendar_sync.v1"
 MAX_RETRY_AFTER_S = 86400
 CLOCK_SKEW_S = 300  # a clock this far behind the last run is a jump back: the person is due again
@@ -128,16 +130,20 @@ def load_calendar_sync_config(
     declared: dict[str, Any] = registry.get(CONNECTOR_ID) if CONNECTOR_ID in registry else {}
     action: dict[str, Any] = next((a for a in declared.get("actions", []) if a.get("id") == "read_events"), {})
     scopes = declared.get("scopes")
-    # The sync path only ever reads: it needs the read scope and the ungated T1 read_events. The write declarations
-    # (ADR-0035) are not its business and its source never names them (test_FR_MTG_09_hostile).
+    writes_ok = isinstance(scopes, dict) and all(  # ADR-0035: write and send share the one events.owned scope
+        scopes[c] == [CALENDAR_EVENTS_OWNED] for c in scopes if c != "read"
+    )
     if (
         not isinstance(scopes, dict)
         or scopes.get("read") != [CALENDAR_READONLY]
+        or not set(scopes) <= {"read", "write", "send"}
+        or not writes_ok
         or (action.get("capability"), action.get("gate_type"), action.get("risk_tier"), action.get("irreversible"))
         != ("read", "none", "T1", False)
     ):
         raise CalendarConfigError(
-            "google_calendar: must read with calendar.readonly and declare an ungated T1 read_events"
+            "google_calendar: must read with calendar.readonly, write only with calendar.events.owned, "
+            "and declare an ungated T1 read_events"
         )
     limits = declared.get("limits", {})
     page_size = _int(limits.get("batch_size"), 1, 2500, "google_calendar.limits.batch_size")
