@@ -198,3 +198,49 @@ def test_SEC_15_W0_the_gate_lets_a_declared_judge_through_on_a_deployed_process(
         assert client.get("/costs").status_code != 403
     finally:
         app.dependency_overrides.clear()
+
+
+@pytest.fixture(autouse=True)
+def _fresh_seam():
+    from tilo_api import access_firestore
+
+    access_firestore.reset_for_tests()
+    yield
+    access_firestore.reset_for_tests()  # a cached fake store never leaks into another test
+
+
+def test_SEC_15_W0_nothing_declared_is_never_remembered():
+    db = FakeFirestore()
+    store = store_over(db)
+    assert store.get(USER) is None
+    db.put(PATH, {"declaration": "judge"})  # declared on another instance meanwhile
+    assert store.get(USER) == "judge"
+
+
+def test_SEC_15_W0_the_remembered_answers_stay_bounded():
+    from tilo_api import access_firestore
+
+    db = FakeFirestore()
+    store = store_over(db)
+    for n in range(access_firestore._REMEMBERED + 50):
+        uid = f"u_{n:048d}"
+        db.put(f"access/{uid}", {"declaration": "visitor"})
+        store.get(uid)
+    assert len(store._seen) <= access_firestore._REMEMBERED
+
+
+def test_SEC_15_W0_a_document_that_vanishes_after_AlreadyExists_is_an_error_not_a_guess():
+    from google.api_core import exceptions as gexc
+
+    class Vanishing(FakeFirestore):
+        def document(self, path):
+            ref = super().document(path)
+
+            def create(_data):
+                raise gexc.AlreadyExists("exists")
+
+            ref.create = create  # type: ignore[method-assign]
+            return ref
+
+    with pytest.raises(RuntimeError):
+        store_over(Vanishing()).declare(USER, "judge")
