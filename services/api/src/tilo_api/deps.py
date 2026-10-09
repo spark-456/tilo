@@ -612,8 +612,12 @@ def get_connector_adapters() -> dict[str, Any]:
 
 
 @functools.cache
-def get_outbox_store() -> InMemoryOutboxStore:  # a demo's own: `ephemeral.DemoSession.outbox`, built by `run_seams`
-    return InMemoryOutboxStore()  # the process's own until the Firestore store lands
+def get_outbox_store() -> Any:  # a demo's own: `ephemeral.DemoSession.outbox`, built by `run_seams`
+    """ADR-0035 LC-13: the durable Firestore store for `TILO_OUTBOX_STORE=firestore` (503 if the door refuses, never
+    memory), else the process's own in-memory one. A failure is not cached: the next call tries again."""
+    from tilo_api.outbox_firestore import outbox_store_for_env  # noqa: PLC0415
+
+    return outbox_store_for_env() or InMemoryOutboxStore()
 
 
 # ADR-0018 T4: tilo-api has no org until sign-in, so every run's artifact Scope is in this org (PRD 15.1), never a
