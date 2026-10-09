@@ -13,6 +13,9 @@ T7). A refusal of the callback is one of three fixed 400 codes; no code, state, 
 echoed. Their parts may name any connector and `connection.established` (`connector_parts`); the meeting-host routes
 keep the narrower `parts`.
 
+ADR-0035 L5 adds `/internal/side-effects/execute` (`side_effect_execute.py`, LC-07): `send`'s checks for gmail,
+google_drive and google_calendar, with the contract's `result` in place of a receipt.
+
 `send` runs tilo-api's entry through an `Outbox` built for that request over a fresh in-memory store (HB-04, SEC-03 as
 everywhere), after the draft is checked (HB-03). The broker is one per process, so the connection parts it emits reach
 the answer through a context-local sink: they come back in the answer to the call that caused them. The grant must
@@ -51,6 +54,8 @@ from .host_broker import BrokerNotConfigured, BrokerSeam, open_broker, open_tran
 from .meeting_host import CALENDAR_EVENTS_OWNED, CONNECTOR_ID, DRAFT_KIND, HostReceipt
 from .outbox import Outbox
 from .registry import load_registry
+from .side_effect_execute import Reach, checked_documents, execute
+from .side_effect_execute import answer as execute_answer
 from .store import InMemoryOutboxStore
 from .tokens import _ulid, grant_group
 
@@ -158,17 +163,6 @@ class _Receipts:
 
     def get(self, world_id: str, meeting_id: str) -> HostReceipt | None:
         return None
-
-
-class _Reach:
-    """Counts requests that went out to Google: `may_have_sent` after a retry is whether any did."""
-
-    def __init__(self, transport: Any) -> None:
-        self._transport, self.sent = transport, 0
-
-    def request(self, *args: Any, **kwargs: Any) -> Any:
-        self.sent += 1
-        return self._transport.request(*args, **kwargs)
 
 
 class HostRuntime:
@@ -350,6 +344,20 @@ class HostRuntime:
         with self.capture(user_id):
             return int(self._broker.get().retry_pending_revokes(user_id))
 
+    def execute(self, body: Mapping[str, Any]) -> dict[str, Any]:
+        """ADR-0035 L5 (LC-07): a person connector's side effect, over the same checks as `send`."""
+        entry, evidence = body["entry"], body["evidence"]
+        documents = checked_documents(entry, body["items"])
+        if documents is None:  # HB-03
+            return execute_answer("refused")
+        broker, transport = self._broker.get(), self._transport.get()
+        with self.capture(evidence["world_owner"], wide=True) as parts:
+            done = execute(
+                body, documents, declaration=_registry().get(entry["connector"]), broker=broker, transport=transport,
+                stopped=self._stopped, emit=self._emit, clock=self._clock,
+            )  # fmt: skip
+        return {**done, "parts": parts.items}
+
     def send(self, body: Mapping[str, Any]) -> dict[str, Any]:
         entry, evidence, draft = body["entry"], body["evidence"], body["draft"]
         user_id = entry["authz"]["ref"]
@@ -357,7 +365,7 @@ class HostRuntime:
         if document is None:  # HB-03
             return _answer("refused", [])
         broker, transport = self._broker.get(), self._transport.get()
-        reach, receipts = _Reach(transport), _Receipts()
+        reach, receipts = Reach(transport), _Receipts()
         alerted: list[dict[str, Any]] = []
         with self.capture(user_id) as parts:
             adapter = MeetingHostAdapter(
@@ -510,6 +518,10 @@ def host_router(runtime: HostRuntime) -> APIRouter:
         return await serve(
             request, "user_request", "disconnect_answer", lambda body: runtime.disconnect(body["user_id"])
         )
+
+    @router.post("/side-effects/execute")
+    async def side_effect_execute(request: Request) -> Any:
+        return await serve(request, "execute_request", "execute_answer", runtime.execute)
 
     @router.post("/connections/start")
     async def connection_start(request: Request) -> Any:
