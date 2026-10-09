@@ -408,6 +408,9 @@ def test_ADR32_T4_FR_MTG_09_only_the_stub_may_reach_the_client_send():
         "send_invitation",
         "connection_views",  # ADR-0032a T4b: a read with no side effect
         "disconnect",  # ADR-0032 T6: the owner's own, from the route only
+        "connect_start",  # ADR-0035 L4: the person's own connect, from connect_routes only (no side effect on Google)
+        "connect_callback",
+        "connect_disconnect",
     }
     tree = ast.parse((src / "meeting_host_rpc.py").read_text(encoding="utf-8"))
     callers = [

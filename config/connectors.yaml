@@ -79,7 +79,7 @@
 
 # meeting_host (FR-MTG-09, ADR-0024): the meeting bot's OWN Google account creates a Calendar event with a Meet link
 # and Google invites the attendees the Owner approved. The one write scope sits on that account, which holds no
-# personal data; every person's own google_calendar grant stays read-only. Always T3 (the Owner is invited, so
+# personal data; a person's own google_calendar grant writes only to their own primary calendar (above). Always T3 (the Owner is invited, so
 # new_recipients applies). The Meet link is never stored; the request asks Google for none.
 - id: meeting_host
   name: Tilo meeting host

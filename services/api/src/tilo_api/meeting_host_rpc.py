@@ -31,12 +31,15 @@ from tilo_connectors.errors import AdapterError, PossiblySent, ProviderUnavailab
 from tilo_connectors.meeting_host import CONNECTOR_ID, HostReceipt
 from tilo_contracts import (
     MeetingHostRpcAlertPart,
+    MeetingHostRpcCallbackAnswer,
+    MeetingHostRpcConnectionDisconnectAnswer,
     MeetingHostRpcConnectionPart,
     MeetingHostRpcConnectionView,
     MeetingHostRpcDisconnectAnswer,
     MeetingHostRpcError,
     MeetingHostRpcReceipt,
     MeetingHostRpcSendAnswer,
+    MeetingHostRpcStartAnswer,
     MeetingHostRpcStatusAnswer,
     MeetingHostRpcViewsAnswer,
 )
@@ -49,6 +52,9 @@ MAX_REPLY_BYTES = 65_536
 VIEWS_TIMEOUT_S = 10.0  # a cold connectors instance costs one wait this long at most; the page's next load asks again
 MAX_VIEWS_REPLY_BYTES = 262_144  # 32 views of 16 scopes stay under 160 KiB
 VIEWS_PATH = "/internal/connections/views"
+CONNECT_PATH = "/internal/connections/"  # start, callback, disconnect (ADR-0035 decision 2)
+_SECRET_PARAM = re.compile(r"[?&](?:client_secret|code_verifier|code|access_token|refresh_token)=")
+CALLBACK_REFUSALS = frozenset({"start_again", "not_granted", "wrong_account"})  # the callback route's own 400s
 _LABEL = r"[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?"
 _URL = re.compile(rf"https://(?:{_LABEL}\.)+run\.app")  # https only, a Cloud Run host, no user, port, path or query
 
@@ -72,17 +78,25 @@ class HostRpcNotConfigured(Exception):
 
 class HostRpcError(Exception):
     """A call that gave no answer. `kind` is `refused` (connectors refused before anything acted), `not_sent` (the call
-    was never made) or `unknown` (it may have reached connectors). Never holds a token, a body or a cause's text."""
+    was never made), `unknown` (it may have reached connectors) or `rejected` (only the callback: one of its own three
+    400s, named by `code`). Never holds a token, a body or a cause's text."""
 
-    def __init__(self, kind: str) -> None:
+    def __init__(self, kind: str, code: str | None = None) -> None:
         super().__init__(kind)
-        self.kind = kind
+        self.kind, self.code = kind, code
 
 
 class NotSent(AdapterError):
     """Retryable, and nothing reached Google (the outbox reads a 4xx status as that)."""
 
     status = 409
+
+
+def _error_code(body: bytes) -> str | None:
+    try:
+        return str(MeetingHostRpcError.model_validate_json(body).error)
+    except ValidationError:
+        return None
 
 
 def _is_error(body: bytes, code: str) -> bool:
@@ -181,6 +195,11 @@ class MeetingHostRpc:
             raise HostRpcError("unknown") from None
         if reply.status == 200:
             return reply.body
+        if reply.status == 400 and route == "connect-callback":
+            said = _error_code(reply.body)
+            if said in CALLBACK_REFUSALS:
+                logger.warning("meeting-host %s: answered 400", route)
+                raise HostRpcError("rejected", said)
         refused = reply.status in (401, 403, 422) or (reply.status == 503 and _is_error(reply.body, "not_configured"))
         logger.warning("meeting-host %s: answered %s", route, reply.status)
         raise HostRpcError("refused" if refused else "unknown")
@@ -224,6 +243,49 @@ class MeetingHostRpc:
             return list(views)
         except Exception:  # noqa: BLE001 - a broken answer is "unknown" whatever broke it; no text is kept
             return None
+
+    def connect_start(self, user_id: str, connector: str, capabilities: Sequence[str]) -> str | None:
+        """ADR-0035 `start`: the Google sign-in link for the principal, or None when no scope is missing (LC-06). The
+        link has no secret in it (LC-03); the answer is checked against the contract's closed pattern."""
+        payload = {"user_id": user_id, "connector": connector, "capabilities": list(capabilities)}
+        try:
+            raw = self._post("connect-start", payload, path=f"{CONNECT_PATH}start")
+            url = MeetingHostRpcStartAnswer.model_validate_json(raw).authorize_url
+        except ValidationError:
+            raise HostRpcError("unknown") from None
+        if url is not None and _SECRET_PARAM.search(url):  # the schema's `not` clause, which the generated type drops
+            raise HostRpcError("unknown")
+        return url
+
+    def connect_callback(
+        self, user_id: str, *, state: str, code: str | None = None, error: str | None = None
+    ) -> MeetingHostRpcCallbackAnswer:
+        """ADR-0035 `callback`: hands the one-time `state` and `code` (or Google's `error` word) over and nothing else.
+        Neither value is logged, kept or put in an exception here. Its own 400s are `rejected` with a code."""
+        payload: dict[str, str] = {"user_id": user_id, "state": state}
+        if code is not None:
+            payload["code"] = code
+        if error is not None:
+            payload["error"] = error
+        try:
+            return MeetingHostRpcCallbackAnswer.model_validate_json(
+                self._post("connect-callback", payload, path=f"{CONNECT_PATH}callback")
+            )
+        except ValidationError:
+            raise HostRpcError("unknown") from None
+
+    def connect_disconnect(self, user_id: str, connector: str) -> MeetingHostRpcConnectionDisconnectAnswer:
+        """ADR-0035 `disconnect` for any connector; idempotent at connectors, so a caller may retry any failure."""
+        try:
+            return MeetingHostRpcConnectionDisconnectAnswer.model_validate_json(
+                self._post(
+                    "connect-disconnect",
+                    {"user_id": user_id, "connector": connector},
+                    path=f"{CONNECT_PATH}disconnect",
+                )
+            )
+        except ValidationError:
+            raise HostRpcError("unknown") from None
 
     def send_invitation(self, entry: Mapping[str, Any], evidence: Mapping[str, Any], draft: Mapping[str, Any]) -> Any:
         """Not a registered SEC-03 name (that list is the connector adapters' methods); a local AST test pins that only
