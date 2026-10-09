@@ -1,0 +1,38 @@
+{
+  "v": "1.0",
+  "id": "01JB6Z00000000000000SK0002",
+  "seq": 2,
+  "ts": "2026-10-09T09:00:00.000Z",
+  "world_id": "w_desk_priya",
+  "run_id": "r_desk_priya_1",
+  "type": "skill.version_proposed",
+  "actor": "u_priya",
+  "target": "u_priya",
+  "level": null,
+  "district": null,
+  "item": null,
+  "severity": "info",
+  "credits": 4,
+  "summary": "Tilo proposed a version with 4 steps that stops to ask 2 times.",
+  "cause": null,
+  "vis": [],
+  "authz": null,
+  "data": {
+    "skill": "tsk_01JB6Z0000000000000000INV",
+    "version": 1,
+    "steps": 4,
+    "asks": 2,
+    "question": true,
+    "credits_per_run": 76,
+    "source": "prior"
+  },
+  "trace": {
+    "model_role": "skill_capture",
+    "profile": "example-vision",
+    "tokens_in": 1800,
+    "tokens_out": 900,
+    "tool": null,
+    "latency_ms": 2100,
+    "archive_ref": null
+  }
+}

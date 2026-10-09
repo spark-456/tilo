@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.tilo.example/events/data/skill.captured.schema.json",
+  "x-version": "1.0.0",
+  "title": "SkillCapturedData",
+  "description": "data of skill.captured (registry 1.4.0, ADR-0034, FR-SKL-01): one step was added to a taught skill's captured list. Written once per step, after the record write commits, so the list grows only as steps are recorded (HR-1). The envelope follows TS-11: the actor's Desk world, actor and target that person, district, level and item null, vis [] and authz null. credits and trace name the skill_capture role when a model read the recording, upload or description. No step text, file name or media here: the artifact is a pinned id and version.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["skill", "method", "step", "artifact"],
+  "properties": {
+    "skill": { "$ref": "../../taught_skill.schema.json#/$defs/id" },
+    "method": { "$ref": "../../taught_skill.schema.json#/$defs/method" },
+    "step": { "$ref": "../../taught_skill.schema.json#/$defs/step_number" },
+    "artifact": {
+      "anyOf": [{ "$ref": "../../taught_skill.schema.json#/$defs/pinned" }, { "type": "null" }]
+    }
+  }
+}
