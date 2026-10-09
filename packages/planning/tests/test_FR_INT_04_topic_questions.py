@@ -273,7 +273,7 @@ def _stated_brief(tmp_path, labels):
     return extraction.brief, result
 
 
-@pytest.mark.parametrize("label", ["Budget", "budget", "BUDGET", "Level"])
+@pytest.mark.parametrize("label", ["Budget", "budget", "BUDGET", "Level", "level"])
 def test_FR_INT_04_a_label_that_collides_with_a_stated_constraint_is_dropped_and_the_generic_questions_fill_in(
     tmp_path, label
 ) -> None:
@@ -310,3 +310,17 @@ def test_FR_INT_04_clean_line_folds_compatibility_forms_before_cleaning() -> Non
 
 def test_FR_INT_04_the_topic_event_is_a_valid_questions_asked_event(tmp_path, repo_root, registry) -> None:
     assert_valid_event(repo_root, registry, _ask(tmp_path).event)
+
+
+@pytest.mark.parametrize("char", ["\ufdfa", "\ufb01", "\u2461", "\u3392"])
+def test_FR_INT_04_clean_line_is_fast_and_bounded_on_characters_that_expand_under_nfkc(char) -> None:
+    import time
+
+    from tilo_planning.brief import ANSWER_MAX, LABEL_MAX, TEXT_MAX, clean_line
+
+    began = time.perf_counter()
+    for limit in (LABEL_MAX, ANSWER_MAX, TEXT_MAX, 250):
+        out = clean_line(char * 200_000, limit)
+        assert out is not None and len(out) <= limit
+
+    assert time.perf_counter() - began < 2.0

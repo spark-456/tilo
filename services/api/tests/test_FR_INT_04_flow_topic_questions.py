@@ -155,3 +155,20 @@ def test_FR_INT_04_flow_the_directors_questions_survive_the_durable_store():
     restored = _task_from(_task_doc(task))
 
     assert restored.questions == task.questions and restored.questions[0].label == "Branch"
+
+
+def test_FR_INT_04_flow_a_director_label_that_matches_a_stated_constraint_is_never_asked(flow_factory):
+    stated = ["Budget: under 500", "Level: beginner"]
+    colliding = [{**TOPIC[0], "label": "Budget"}, {**TOPIC[1], "label": "level"}, TOPIC[2]]
+    flow = flow_factory(["deliverables", "constraints"])
+    flow.provider.brief["constraints"] = stated
+    flow.provider.brief["questions"] = colliding
+
+    intake = flow.new_task()
+
+    assert [q["field"] for q in intake["questions"]] == ["topic_1"]  # only "Hours per day" is asked
+    assert intake["brief"]["constraints"] == stated
+    for answer in (None, "2000"):  # a dropped question has no id to skip or answer
+        assert flow.answers(intake["task_id"], [{"field": "topic_2", "answer": answer}]).status_code == 422
+    done = flow.answers(intake["task_id"], [{"field": "topic_1", "answer": "3"}])
+    assert done.json()["brief"]["constraints"] == [*stated, "Hours per day: 3"]
