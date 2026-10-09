@@ -176,14 +176,19 @@ describe("ADR35_L4_FR_CON_02_web_connect_flow", () => {
     ]);
   });
 
-  it("ADR35_L4_FR_CON_02_disconnect_is_true_only_on_a_confirmed_answer", async () => {
-    const ok = rig(async () => ({
-      disconnected: true,
-      revoked_at_provider: true,
-      revoke_pending: false,
-    }));
-    expect(await ok.flow.disconnect("gmail")).toBe(true);
-    expect(ok.posts).toEqual([{ path: "/v1/connectors/disconnect", body: { connector: "gmail" } }]);
-    expect(await rig(refused(503, null)).flow.disconnect("gmail")).toBe(false);
+  it.each([
+    [{ disconnected: true, revoked_at_provider: true, revoke_pending: false }, "done"],
+    [{ disconnected: true, revoked_at_provider: false, revoke_pending: true }, "revoke_pending"],
+    [{ disconnected: true, revoked_at_provider: false, revoke_pending: false }, "revoke_pending"],
+    [{ disconnected: false }, "failed"],
+    [null, "failed"],
+  ] as const)("ADR35_L4_FR_CON_02_disconnect_answer_%j_is_%s", async (answer, expected) => {
+    const r = rig(async () => answer);
+    expect(await r.flow.disconnect("gmail")).toBe(expected);
+    expect(r.posts).toEqual([{ path: "/v1/connectors/disconnect", body: { connector: "gmail" } }]);
+  });
+
+  it("ADR35_L4_FR_CON_02_disconnect_that_throws_is_failed", async () => {
+    expect(await rig(refused(503, null)).flow.disconnect("gmail")).toBe("failed");
   });
 });

@@ -34,6 +34,10 @@ export type FinishResult =
   | { kind: "start_again" }
   | { kind: "unavailable" };
 
+/** done: Google confirmed the revoke. revoke_pending: Tilo's side is gone but Google did NOT confirm (the person must
+ * remove Tilo under Google's Third-party access). failed: nothing is known to have changed. */
+export type DisconnectResult = "done" | "revoke_pending" | "failed";
+
 export interface CallbackParams {
   state: string;
   code?: string;
@@ -49,8 +53,7 @@ export interface ConnectFlow {
   finish(params: CallbackParams): Promise<FinishResult>;
   /** Leaves for Google's sign-in (the one place the address changes; pages never touch the location). */
   open(url: string): void;
-  /** True when tilo-api confirmed the disconnect. */
-  disconnect(connector: string): Promise<boolean>;
+  disconnect(connector: string): Promise<DisconnectResult>;
 }
 
 interface Http {
@@ -171,9 +174,12 @@ export function createConnectFlow(
     async disconnect(connector) {
       try {
         const got = await http.postJson("/v1/connectors/disconnect", { connector });
-        return isObject(got) && got.disconnected === true;
+        if (!isObject(got) || got.disconnected !== true) return "failed";
+        return got.revoke_pending === true || got.revoked_at_provider !== true
+          ? "revoke_pending"
+          : "done";
       } catch {
-        return false;
+        return "failed";
       }
     },
   };

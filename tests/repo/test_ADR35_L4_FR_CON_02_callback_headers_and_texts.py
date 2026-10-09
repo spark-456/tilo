@@ -20,6 +20,12 @@ def test_ADR35_L4_FR_CON_02_the_callback_path_is_served_with_no_referrer_and_no_
     assert headers["cache-control"].lower() == "no-store"
 
 
+def test_ADR35_L4_FR_CON_02_the_trailing_slash_form_gets_the_same_headers(repo_root: pathlib.Path) -> None:
+    headers = hosting.effective_headers(repo_root, f"{CALLBACK}/")
+    assert headers["referrer-policy"].lower() == "no-referrer" and headers["cache-control"].lower() == "no-store"
+    assert hosting.rewrite_for(repo_root, f"{CALLBACK}/") == hosting.SPA_DESTINATION
+
+
 def test_ADR35_L4_FR_CON_02_the_callback_path_keeps_every_other_security_header(repo_root: pathlib.Path) -> None:
     here, home = hosting.effective_headers(repo_root, CALLBACK), hosting.effective_headers(repo_root, "/")
     for key in ("content-security-policy", "x-content-type-options"):

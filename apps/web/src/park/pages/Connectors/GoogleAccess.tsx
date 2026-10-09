@@ -24,6 +24,8 @@ const NOTES = {
   nothing: "That access is already connected.",
   off: "Tilo could not disconnect Google. Nothing was changed, so please try again.",
   done: "Google is disconnected. Gmail, Google Drive and Google Calendar are all off.",
+  pending:
+    "Google did not confirm that Tilo's access ended. To be sure, remove Tilo yourself under Google Account > Security > Third-party access.",
 } as const;
 
 export function GoogleAccess({ flow }: { flow: ConnectFlow }) {
@@ -60,10 +62,12 @@ export function GoogleAccess({ flow }: { flow: ConnectFlow }) {
   const disconnect = (id: string) => {
     setBusy(id);
     setConfirm(null);
-    flow.disconnect(id).then((ok) => {
+    flow.disconnect(id).then((result) => {
       setBusy(null);
-      setNote(ok ? NOTES.done : NOTES.off);
-      if (ok) load();
+      setNote(
+        result === "done" ? NOTES.done : result === "revoke_pending" ? NOTES.pending : NOTES.off,
+      );
+      if (result !== "failed") load();
     });
   };
 

@@ -22,7 +22,7 @@ function flowOf(over: Partial<ConnectFlow> = {}) {
     start: vi.fn(async () => ({ kind: "redirect" as const, url: LINK })),
     finish: vi.fn(),
     open: vi.fn(),
-    disconnect: vi.fn(async () => true),
+    disconnect: vi.fn(async () => "done" as const),
     ...over,
   };
   return flow as unknown as ConnectFlow & typeof flow;
@@ -78,7 +78,10 @@ describe("ADR35_L4_FR_CON_02_google_access", () => {
 
   it("ADR35_L4_FR_CON_02_a_failed_disconnect_is_never_shown_as_done", async () => {
     const rows: ConnectionRow[] = [{ id: "gmail", name: "Gmail", state: "connected" }];
-    const flow = flowOf({ list: vi.fn(async () => rows), disconnect: vi.fn(async () => false) });
+    const flow = flowOf({
+      list: vi.fn(async () => rows),
+      disconnect: vi.fn(async () => "failed" as const),
+    });
     const m = mount(<GoogleAccess flow={flow} />);
     await flush();
     click(byText(m.container, "Disconnect"));
@@ -88,6 +91,25 @@ describe("ADR35_L4_FR_CON_02_google_access", () => {
     const text = m.container.textContent ?? "";
     expect(text).toContain("could not disconnect Google");
     expect(text).not.toContain("Google is disconnected");
+  });
+
+  it("ADR35_L4_FR_CON_02_an_unconfirmed_revoke_tells_the_person_to_remove_tilo_at_google", async () => {
+    const rows: ConnectionRow[] = [{ id: "gmail", name: "Gmail", state: "connected" }];
+    const flow = flowOf({
+      list: vi.fn(async () => rows),
+      disconnect: vi.fn(async () => "revoke_pending" as const),
+    });
+    const m = mount(<GoogleAccess flow={flow} />);
+    await flush();
+    click(byText(m.container, "Disconnect"));
+    await flush();
+    click(byText(m.container, "Disconnect all three"));
+    await flush();
+    const text = m.container.textContent ?? "";
+    expect(text).toContain("Google Account > Security > Third-party access");
+    expect(text).toContain("did not confirm");
+    expect(text).not.toContain("Google is disconnected");
+    expect(text).not.toContain("Nothing was changed");
   });
 
   it("ADR35_L4_FR_CON_02_an_unreadable_list_says_so", async () => {
