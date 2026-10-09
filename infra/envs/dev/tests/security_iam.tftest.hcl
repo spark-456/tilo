@@ -220,3 +220,32 @@ run "SEC_02_the_token_database_has_a_deny_all_rules_release" {
     error_message = "The tokens ruleset is one catch-all deny: no `if true`, no auth-based allow, no per-path match."
   }
 }
+
+# ADR-0035 L7: the live connectors add no IAM. The OAuth client secret, the oauth-tokens key and the tilo-tokens database
+# stay with connectors; tilo-api (which only starts a connect and calls connectors over RPC) gets none of them.
+run "ADR35_L7_tilo_api_holds_no_oauth_secret_kms_or_token_database_access" {
+  command = plan
+
+  assert {
+    condition     = !contains(flatten(values(output.secret_accessors)), "serviceAccount:tilo-api@${var.project_id}.iam.gserviceaccount.com")
+    error_message = "tilo-api reads no Secret Manager secret, least of all workspace-oauth-client."
+  }
+
+  assert {
+    condition     = !contains(output.oauth_token_key_decrypters, "serviceAccount:tilo-api@${var.project_id}.iam.gserviceaccount.com")
+    error_message = "tilo-api may not decrypt the oauth-tokens key (SEC-02)."
+  }
+
+  assert {
+    condition = alltrue([
+      for b in output.project_iam_bindings : b.condition == "resource.name == \"projects/${var.project_id}/databases/(default)\""
+      if strcontains(b.member, "tilo-api@") && startswith(b.role, "roles/datastore.")
+    ])
+    error_message = "tilo-api's Firestore role is limited to the (default) database: it cannot reach tilo-tokens."
+  }
+
+  assert {
+    condition     = output.secret_accessors["workspace-oauth-client"] == ["serviceAccount:tilo-connectors@${var.project_id}.iam.gserviceaccount.com"]
+    error_message = "workspace-oauth-client is readable by connectors only (the accessor binding already exists; L7 adds none)."
+  }
+}

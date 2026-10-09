@@ -131,7 +131,7 @@ ever created by Terraform (PRD 16.1 rule 4).
 | `https://www.googleapis.com/auth/gmail.send` | threaded send | restricted |
 | `https://www.googleapis.com/auth/drive.file` | picked files and files Tilo creates, incl. Slides, Docs and Sheets output (the Docs, Sheets and Slides APIs accept it for files the app created) | non-sensitive |
 | `https://www.googleapis.com/auth/calendar.readonly` | availability (FR-CON-14) | sensitive |
-| `https://www.googleapis.com/auth/calendar.events` | event writes | sensitive |
+| `https://www.googleapis.com/auth/calendar.events.owned` | event writes on calendars the person owns (ADR-0035; not `calendar.events`) | sensitive |
 
 Never requested: `mail.google.com`, `gmail.modify`, full `drive`.
 
@@ -379,3 +379,19 @@ pinned in `security_iam.tftest.hcl`. Connectors reads the database id from `TILO
 
 Connectors `TILO_*` settings are set by hand (`ignore_env`, like api). The ordered steps and values: `docs/deploy-dev.md`
 ("Meeting host: connectors and api settings").
+
+## 13. OAuth client for the live connectors (ADR-0035 L7)
+
+Console steps (Terraform cannot do these). APIs and Services, Credentials, then the consent screen:
+- Client type Web application. Authorised redirect URI exactly `https://essential-wares-510320-f0.web.app/oauth/google/callback`.
+  No JavaScript origin (the code exchange is server side).
+- Consent screen in Testing mode, with the section 6 scopes: `gmail.readonly`, `gmail.compose`, `gmail.send`, `drive.file`,
+  `calendar.readonly`, `calendar.events.owned`. Test users: `tilotesting@gmail.com` and the meeting bot account.
+- Testing mode expires a grant after 7 days (PRD 11.5): a connection shows `expired` and the person connects again.
+- Client id = version 1, client secret = version 2 of the secret `workspace-oauth-client`. Readable by `tilo-connectors`
+  only; `tilo-api`, which only starts a connect and calls connectors, holds no secret, KMS or `tilo-tokens` access
+  (`security_iam.tftest.hcl`). The one new resource is the Firestore index `outbox_transfer_pending`.
+
+Order: apply infra incl. the index, wait for it to be READY, run the outbox store suite once on the Firestore emulator, set
+the settings, your go, `LIVE=1` on connectors only, acceptance with `tilotesting@gmail.com`. Commands: `docs/deploy-dev.md`
+("Live connectors").

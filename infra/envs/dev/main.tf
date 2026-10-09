@@ -875,3 +875,24 @@ resource "google_firestore_index" "schedules_due" {
     order      = "ASCENDING"
   }
 }
+
+# The durable outbox's pending-transfer query (`transfer_pending == true`, then `enqueued_at`; tilo_api.outbox_firestore,
+# ADR-0035 decision 9, BQ-ADR35-L2-4) needs this composite index. Build it BEFORE setting TILO_OUTBOX_STORE=firestore:
+# without it claiming a transfer raises 503 after a sent entry (PI-17). The alert query has one equality filter and needs
+# none. The collection-scoped index covers the `outbox` collection of the (default) database.
+resource "google_firestore_index" "outbox_transfer_pending" {
+  project     = var.project_id
+  database    = google_firestore_database.default.name
+  collection  = "outbox"
+  query_scope = "COLLECTION"
+
+  fields {
+    field_path = "transfer_pending"
+    order      = "ASCENDING"
+  }
+
+  fields {
+    field_path = "enqueued_at"
+    order      = "ASCENDING"
+  }
+}

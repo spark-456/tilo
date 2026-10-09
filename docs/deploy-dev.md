@@ -243,6 +243,52 @@ Order, once your infrastructure run (`infra/README.md`) has finished (run it wit
    is refused, so tokens never land in `(default)`. Order: apply the infrastructure first (it creates `tilo-tokens`, its
    deny-all ruleset and the release `cloud.firestore/tilo-tokens`), then set the variable, then deploy the T5b image.
 
+## Live connectors: OAuth client, index, settings (ADR-0035 L7, L8)
+
+Gmail, Drive and Calendar go live through `tilo-connectors` only. Do the steps in this order; Tilo's tooling runs none of
+them. Terraform adds one Firestore composite index and nothing else (no IAM: `workspace-oauth-client` is already readable
+by connectors only). Both services have `ignore_env`, so the settings are `gcloud` steps, and a Terraform run leaves them.
+
+1. Create the OAuth client and consent screen (`infra/ACCESS.md` section 13). Put the client id as version 1 and the
+   client secret as version 2 of the secret `workspace-oauth-client` (Secret Manager console). One secret cannot fill two
+   variables, so each is mounted by version number (BQ-ADR35-L7-1).
+2. Apply the infrastructure (`infra/README.md`). Expect exactly 1 to add, 0 to change, 0 to destroy:
+   `google_firestore_index.outbox_transfer_pending` (collection `outbox`, `transfer_pending` ASC, `enqueued_at` ASC).
+   **The index must be built (state READY, a few minutes: Firestore console, Indexes) before `TILO_OUTBOX_STORE=firestore`
+   is set.** Without it, claiming a transfer raises 503 after an entry was sent (PI-17).
+3. Run the outbox store suite once against the Firestore emulator (needs Java and `pnpm install`; no cloud credential):
+
+   ```powershell
+   pnpm exec firebase emulators:exec --only firestore --project demo-tilo "uv run pytest -q services/api/tests/test_FR_CON_02_ADR35_L2_outbox_store_contract.py"
+   ```
+
+4. Set `tilo-connectors`. `^#^` makes `#` the separator, because the account email holds `@`; every value is quoted:
+
+   ```powershell
+   $P = "essential-wares-510320-f0"; $R = "asia-southeast1"
+   $Conn = gcloud run services describe tilo-connectors --project $P --region $R --format "value(status.url)"
+   gcloud run services update tilo-connectors --project $P --region $R `
+     --update-env-vars "^#^GOOGLE_OAUTH_REDIRECT_BASE_URL=https://essential-wares-510320-f0.web.app#TILO_TOKEN_STORE=firestore#TILO_FIRESTORE_PROJECT=${P}#TILO_TOKEN_DATABASE=tilo-tokens#TILO_KMS_KEY=projects/${P}/locations/${R}/keyRings/tilo-${R}/cryptoKeys/oauth-tokens#TILO_CONNECTORS_AUDIENCE=${Conn}#TILO_MEETING_HOST_CALLER=tilo-api@${P}.iam.gserviceaccount.com" `
+     --update-secrets "GOOGLE_OAUTH_CLIENT_ID=workspace-oauth-client:1,GOOGLE_OAUTH_CLIENT_SECRET=workspace-oauth-client:2"
+   ```
+
+   `LIVE` stays unset. `--update-*` keeps every other setting. Connectors stays at one instance (ADR-0032 T7).
+5. Set `tilo-api` (`TILO_API_STORE` and `TILO_PEOPLE_STORE` stay out: the separate ADR-0026 rollout):
+
+   ```powershell
+   $Conn = gcloud run services describe tilo-connectors --project $P --region $R --format "value(status.url)"
+   gcloud run services update tilo-api --project $P --region $R `
+     --update-env-vars "^#^TILO_OUTBOX_STORE=firestore#TILO_CONNECTORS_URL=${Conn}"
+   ```
+
+6. Deploy the images (`just deploy-dev-cloudbuild connectors`, then `api`) and `just deploy-web` if the web app changed. The
+   Hosting headers for `/oauth/google/callback` are already in `firebase.json`.
+7. Your go. Then `LIVE=1` on connectors only: `gcloud run services update tilo-connectors --project $P --region $R --update-env-vars "LIVE=1"`.
+   Never on `tilo-api`. To switch off, `--remove-env-vars "LIVE"`.
+8. Acceptance (L8) with `tilotesting@gmail.com`: connect Gmail read, then Drive and Calendar write; a draft appears; a send to
+   the same address arrives once; a file lands in the Tilo folder; an event appears and a cancelled one does not; disconnect
+   leaves no Tilo access in the Google account. Testing mode expires a grant after 7 days (PRD 11.5): connect again.
+
 ## Web app (Firebase Hosting, manual; P0-07c)
 
 ```powershell
