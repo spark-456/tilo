@@ -60,5 +60,15 @@ def test_FR_CON_02_connection_view_sanitises_connected_at_scopes_and_non_live_ro
     store.put("u", "d", {**base, "scopes": [f"s{i}" for i in range(80)] + ["x" * 201, 5]})
     assert len(broker.connection_view("u", "d")[1]) == 50
     store.put("u", "e", {**base, "state": "weird"})
-    assert broker.connection_view("u", "e") == ("weird", [], None)
+    assert broker.connection_view("u", "e") == ("expired", [], None)  # ADR-0032a: only connected or expired
+    assert http.calls == 0
+
+
+def test_FR_CON_02_connection_view_state_is_connected_or_expired_only() -> None:
+    # ADR-0032a: `connected` only for an exact stored `connected`; every other stored state is `expired`
+    store, http = InMemoryTokenStore(), _Http()
+    broker = _broker(store, http)
+    for name in ("expiring", "revoked", "needs_reconnect", "weird", "Connected", ""):
+        store.put("u", name, {"v": 1, "state": name, "scopes": ["s1"], "connected_at": "2026-10-08T01:02:03.000Z"})
+        assert broker.connection_view("u", name) == ("expired", [], None), name
     assert http.calls == 0

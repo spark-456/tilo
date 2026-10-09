@@ -749,9 +749,10 @@ def test_FR_CON_02_LIVE_GAPS_1b_scopes_are_capped_and_non_strings_dropped(rig: R
 
 
 @pytest.mark.parametrize("stored", ["weird", "available", "expiring", "revoked", "needs_reconnect"])
-def test_FR_CON_02_LIVE_GAPS_1b_states_outside_the_contract_are_available_with_no_expiry(rig: Rig, stored: str) -> None:
+def test_FR_CON_02_LIVE_GAPS_1b_states_outside_the_contract_are_attention_with_no_expiry(rig: Rig, stored: str) -> None:
+    # a grant that is not `connected` is never shown as plain "not connected": the person is warned (FR-ACC-04)
     gmail = _serve(rig, (stored, ["s"], _connected_at(DAY)))
-    assert gmail["state"] == "available"
+    assert gmail["state"] == "attention"
     assert gmail["expires_at"] is None
 
 

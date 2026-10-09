@@ -74,10 +74,10 @@ def _connected_at(value: Any) -> datetime | None:
 
 def _one(views: Any, user_id: str, declared: dict[str, Any]) -> dict[str, Any]:
     stored, scopes, connected_at = views.view(user_id, declared["id"])
-    if stored == "expired":  # the grant ended: connect again; no expiry to show
-        return _row(declared, "attention", _clean_scopes(scopes), None, known=True)
-    if stored != "connected":  # None (no record) or a state the contract does not have
+    if stored is None:  # no record: never connected
         return _row(declared, "available", [], None, known=True)
+    if stored != "connected":  # expired, or a state the contract does not have: the person is warned, never "Connect"
+        return _row(declared, "attention", _clean_scopes(scopes), None, known=True)
     at = _connected_at(connected_at)
     if at is None:  # recorded before connected_at existed, or not believable: connected, no warning, no expiry
         return _row(declared, "connected", _clean_scopes(scopes), None, known=True)
