@@ -96,8 +96,8 @@ class InMemoryOutboxStore:
             expiry = self._send_leases.get(outbox_id, (None, None))[1]
             if expiry is not None and now < expiry:
                 return None
-            if keep_ambiguous and self._retries.get(outbox_id, {}).get("ambiguous"):
-                return None  # it may have gone out: decided under this lock, so a concurrent _defer cannot be lost
+            if keep_ambiguous and (self._retries.get(outbox_id, {}).get("ambiguous") or expiry is not None):
+                return None  # it may have gone out (a lost answer, or a lease nobody released): decided under this lock
             entry["state"] = "failed"
             self._retries.pop(outbox_id, None)
             return deepcopy(entry)
@@ -115,8 +115,11 @@ class InMemoryOutboxStore:
                     return None
             if now < self._retries.get(outbox_id, {}).get("not_before", ""):  # not before the next attempt
                 return None
+            had_lease = outbox_id in self._send_leases  # still here only if it expired unreleased
             if not _try_claim(self._send_leases, outbox_id, holder, now, lease_seconds):
                 return None
+            if had_lease:  # the earlier holder never said how it ended: it may have sent
+                self._retries[outbox_id] = {**self._retries.get(outbox_id, {}), "ambiguous": True}
             entry["state"] = "sending"  # takes over an expired lease too
             return deepcopy(entry)
 
