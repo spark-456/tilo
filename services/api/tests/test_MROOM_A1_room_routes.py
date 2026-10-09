@@ -246,15 +246,16 @@ def test_MROOM_A1_stop_all_adjourns_open_rooms(tmp_path):
     assert env.room_events()[-1]["data"]["reason"] == "paused"
 
 
-def test_MROOM_A1_unwired_seams_answer_503(tmp_path):
+def test_MROOM_A1_unwired_seams_answer_503_and_write_nothing(tmp_path):
     env = make_env(tmp_path)
     room = env.convene().json()
-    del app.dependency_overrides[deps.get_run_archive]  # production default: no archive
-    assert env.ask(room["room_id"]).status_code == 503
-    app.dependency_overrides[deps.get_run_archive] = lambda: (_ for _ in ()).throw(NotImplementedError())
-    assert env.get(room["room_id"]).status_code == 200  # nothing to read yet
-    del app.dependency_overrides[deps.get_redactor]
-    assert env.ask(room["room_id"]).status_code == 503
+    kept = dict(app.dependency_overrides)
+    for seam in (deps.get_run_archive, deps.get_redactor):  # production defaults: no archive, no redactor
+        del app.dependency_overrides[seam]
+        assert env.ask(room["room_id"]).status_code == 503
+        app.dependency_overrides.update(kept)
+    assert len(env.room_events()) == 1  # not even a meeting.asked
+    assert env.ask(room["room_id"]).status_code == 202
 
 
 def test_MROOM_A1_defaults_are_the_shipped_config():
