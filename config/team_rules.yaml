@@ -21,3 +21,8 @@ capabilities:
   - {key: change_tool_access, label: "Change tool access", roles: [Owner]}
   - {key: invite_people, label: "Invite people", roles: [Owner]}
   - {key: see_the_ledger, label: "See the ledger", roles: [Owner, Approver, Member, Viewer]}
+
+# FR-TEAM-02: what each role may spend, INR minor units like config/spend_caps.yaml; null = no role limit. A role
+# limit and a person's own limit only ever LOWER the SEC-16 lifetime cap (tilo_api.team_access.user_cap_minor). The
+# design's pound amounts are sample copy (BQ-DSN-02), so only the Viewer's "spends nothing" is set (BQ-TEAMRT-1).
+role_limits_minor: {Owner: null, Approver: null, Member: null, Viewer: 0}

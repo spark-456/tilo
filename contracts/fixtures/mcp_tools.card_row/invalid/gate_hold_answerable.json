@@ -1,0 +1,24 @@
+{
+  "world_id": "w_q4_supplier_deck",
+  "card_id": "01JB5VQ0000000000000000210",
+  "what_happened": "The supplier email is ready to send.",
+  "created_at": "2026-10-08T09:30:00.000Z",
+  "kind": "gate",
+  "options": [
+    {
+      "id": "approve",
+      "label": "Send"
+    },
+    {
+      "id": "edit",
+      "label": "Edit"
+    },
+    {
+      "id": "hold",
+      "label": "Hold"
+    }
+  ],
+  "risk_tier": "T3",
+  "exact": "Sends the Q4 price comparison to 3 suppliers.",
+  "answerable_here": ["hold"]
+}

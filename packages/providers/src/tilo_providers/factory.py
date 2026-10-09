@@ -24,7 +24,10 @@ def build_provider(
     fixtures_dir: Path | str,
     profile_id: str | None = None,
     live_permitted: bool = False,
+    force_replay: bool = False,
 ) -> ModelProvider:
+    """`force_replay` (SEC-15): the caller decided this role replays, so the provider never goes live, whatever the
+    live switch or `live_permitted` say, and never records. The fake profiles are never live anyway."""
     profile_id = profile_id or config.roles[role_id].primary  # the router passes any cascade profile
     profile = config.profiles[profile_id]
 
@@ -50,6 +53,7 @@ def build_provider(
         fixtures_dir=Path(fixtures_dir),
         capabilities={Capability(c) for c in profile.caps},
         live_permitted=live_permitted,
+        force_replay=force_replay,
     )
 
 

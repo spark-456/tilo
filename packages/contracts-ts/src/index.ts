@@ -101,6 +101,7 @@
  * handoff.schema.json 1.0.0 sha256:7ed882f92b634672
  * layout.schema.json 1.0.0 sha256:1db88b1e3b744add
  * manifest.schema.json 1.0.0 sha256:9b885d1826522bb7
+ * mcp_tools.schema.json 1.0.0 sha256:46a498402c9b1e4e
  * meeting.schema.json 1.2.0 sha256:034e93898bb28957
  * meeting_host_rpc.schema.json 1.0.0 sha256:4bb81673d4ef363b
  * meeting_join.schema.json 1.0.0 sha256:ea1e8f0945773573
@@ -683,6 +684,23 @@ export type LayoutCommonType =
   | "agent_foundry"
   | "mail_room"
   | "expert_office";
+/**
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "McpToolsToolName".
+ */
+export type McpToolsToolName =
+  | "list_worlds"
+  | "get_world"
+  | "list_artifacts"
+  | "read_artifact"
+  | "list_cards"
+  | "answer_card"
+  | "start_run";
+/**
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "McpToolsWithheldReason".
+ */
+export type McpToolsWithheldReason = "not_text" | "too_large";
 /**
  * Planned minutes for an agenda item.
  *
@@ -3250,6 +3268,224 @@ export interface LayoutBridgeGeometry {
 export interface LayoutGateGeometry {
   id: GateId;
   cell: LayoutPoint;
+}
+/**
+ * Tilo's MCP server tools (ADR-0031, Proposed). The root is one `tools/call` request as the server accepts it: a tool `name` and its `arguments`, bound to that tool's input shape; anything else is refused before any store is read. Each tool's result (`structuredContent`) is its `*_out` entry. Read tools need the grant scope `tilo.read`; `answer_card` and `start_run` need `tilo.write`, which the person turns on per client. No tool ever answers a gate, consent or meeting card: only `needs_you` questions can be answered here (`card_row.answerable_here`). Results carry ids, titles, labels and Tilo-written lines only; artifact text only from `read_artifact`, only for a clean text version of the owner's. Rules MC-01 to MC-12 in `mcp_tools.rules.md`.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "McpTools".
+ */
+export interface McpTools {
+  name: McpToolsToolName;
+  arguments: {};
+}
+/**
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "McpToolsListWorldsIn".
+ */
+export interface McpToolsListWorldsIn {
+  limit?: number;
+}
+/**
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "McpToolsWorldIn".
+ */
+export interface McpToolsWorldIn {
+  world_id: WorldId;
+}
+/**
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "McpToolsReadArtifactIn".
+ */
+export interface McpToolsReadArtifactIn {
+  world_id: WorldId;
+  artifact_id: ArtifactId;
+  version: number;
+}
+/**
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "McpToolsListCardsIn".
+ */
+export interface McpToolsListCardsIn {
+  world_id?: WorldId;
+}
+/**
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "McpToolsAnswerCardIn".
+ */
+export interface McpToolsAnswerCardIn {
+  world_id: WorldId;
+  card_id: Ulid;
+  option: CardOptionId;
+}
+/**
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "McpToolsStartRunIn".
+ */
+export interface McpToolsStartRunIn {
+  /**
+   * The person's request in their words, as typed into the client; it goes through intake like a web request (safety screen, brief, questions, approaches, caps). Tab and newline are allowed, other control characters are not.
+   */
+  request: string;
+}
+/**
+ * The S-14 worlds-list row (`GET /worlds`), unchanged.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "McpToolsWorldRow".
+ */
+export interface McpToolsWorldRow {
+  world_id: WorldId;
+  title: string | null;
+  status: "idle" | "started" | "paused" | "completed" | "failed";
+  created_at: Timestamp | null;
+  last_seq: number;
+}
+/**
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "McpToolsListWorldsOut".
+ */
+export interface McpToolsListWorldsOut {
+  /**
+   * @maxItems 50
+   */
+  worlds: McpToolsWorldRow[];
+}
+/**
+ * One Story line of the world, as the Story lens shows it to the owner: a Tilo-written event summary.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "McpToolsStoryLine".
+ */
+export interface McpToolsStoryLine {
+  seq: number;
+  ts: Timestamp;
+  line: string;
+}
+/**
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "McpToolsGetWorldOut".
+ */
+export interface McpToolsGetWorldOut {
+  world: McpToolsWorldRow;
+  open_cards: number;
+  credits_used: Credits;
+  /**
+   * @maxItems 20
+   */
+  story: McpToolsStoryLine[];
+}
+/**
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "McpToolsArtifactRow".
+ */
+export interface McpToolsArtifactRow {
+  artifact_id: ArtifactId;
+  version: number;
+  label: string | null;
+  media_type: MediaType;
+  size_bytes: number;
+  created_at: Timestamp;
+}
+/**
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "McpToolsListArtifactsOut".
+ */
+export interface McpToolsListArtifactsOut {
+  /**
+   * @maxItems 100
+   */
+  artifacts: McpToolsArtifactRow[];
+}
+/**
+ * `text` is the version's bytes as UTF-8 for `text/markdown`, `text/csv` and `application/json` up to 262,144 bytes, else null with `withheld` saying why (MC-07).
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "McpToolsReadArtifactOut".
+ */
+export interface McpToolsReadArtifactOut {
+  artifact: McpToolsArtifactRow;
+  content_sha256: string;
+  text: string | null;
+  withheld: McpToolsWithheldReason | null;
+}
+/**
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "McpToolsCardOption".
+ */
+export interface McpToolsCardOption {
+  id: CardOptionId;
+  label: string;
+}
+/**
+ * An open card of the owner's. `answerable_here` lists the option ids `answer_card` accepts for it: only a `needs_you` card can have any; a gate, consent or meeting card has none, so nothing authorises over MCP (MC-09).
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "McpToolsCardRow".
+ */
+export interface McpToolsCardRow {
+  world_id: WorldId;
+  card_id: Ulid;
+  kind: CardKind;
+  what_happened: string;
+  /**
+   * @minItems 1
+   * @maxItems 4
+   */
+  options: [McpToolsCardOption, ...McpToolsCardOption[]];
+  risk_tier: RiskTier | null;
+  exact: string | null;
+  created_at: Timestamp;
+  /**
+   * @maxItems 4
+   */
+  answerable_here: CardOptionId[];
+}
+/**
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "McpToolsListCardsOut".
+ */
+export interface McpToolsListCardsOut {
+  /**
+   * @maxItems 50
+   */
+  cards: McpToolsCardRow[];
+}
+/**
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "McpToolsAnswerCardOut".
+ */
+export interface McpToolsAnswerCardOut {
+  outcome: "answered";
+}
+/**
+ * Intake ran: the world exists and waits for the person in Tilo, to answer its questions or approve an approach (MC-10). No run spends past intake from here.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "McpToolsStartRunOut".
+ */
+export interface McpToolsStartRunOut {
+  world_id: WorldId;
+  next: "answer_questions_in_tilo" | "approve_in_tilo";
+}
+/**
+ * A refused call (`isError: true`). One closed code, never a server string, a stack or another person's data; an id the caller may not see is `not_found`, byte-equal to a missing one.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "McpToolsToolRefusal".
+ */
+export interface McpToolsToolRefusal {
+  error:
+    | "invalid_arguments"
+    | "not_found"
+    | "insufficient_scope"
+    | "not_answerable_here"
+    | "already_resolved"
+    | "busy"
+    | "rate_limited"
+    | "over_cap"
+    | "rejected_by_intake"
+    | "unavailable";
 }
 /**
  * A meeting Tilo attended or took a transcript of (FR-MTG-01, -10). Owner-only (PE-05). There is no field for a join link or URL: the bot receives it in its start request and nothing stores it. The transcript is deleted at `delete_transcript_after` (30 days by default), the minutes at `delete_minutes_after` (90 days). `world_id` (1.1.0, optional: absent, never null) is the world that holds the transcript and minutes, written by tilo-api when it creates that world and never taken from a request; a meeting without it yields no evidence quote (PE-23, ADR-0020, BQ-273). The free text (`title`, agenda `title`, attendee `name`) holds no link (PE-13; 1.2.0, ADR-0016 decision 14): no `://` or its backslash forms; no meeting host meet.google.com, teams.microsoft.com, teams.live.com, zoom.us, webex.com or whereby.com, alone or as a suffix (acme.zoom.us); no bare `host.tld/segment` (a last label of 2 to 63 letters other than `js`, an optional port, a slash and a path character), which also catches g.co/meet and teams.live.com/meet; no Cc, Zl, Zp, Basic Multilingual Plane Cf, Hangul filler (U+115F, U+1160, U+3164, U+FFA0), braille blank (U+2800) or unassigned default-ignorable code point anywhere; an invisible combining mark (U+034F, U+17B4, U+17B5, U+180B to U+180D, U+180F, variation selectors U+FE00 to U+FE0F) only after a non-ASCII character, or U+FE0E and U+FE0F after a keycap base (# or * or a digit), so emoji keep their variation selector. Astral format and default-ignorable characters (U+E0000 to U+E0FFF, which include the tag characters and variation selectors 17 to 256, and others) cannot be written portably in a pattern: tilo-api removes or refuses them before the schema check (validator, PE-13).
