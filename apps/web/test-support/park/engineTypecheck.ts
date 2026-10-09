@@ -6,6 +6,7 @@ import fs from "node:fs";
 import path from "node:path";
 import ts from "typescript";
 import { ENGINES_DIR, WEB_DIR } from "./engineProto";
+import { parkTypeErrors } from "./typecheck";
 
 export function engineSources(): string[] {
   if (!fs.existsSync(ENGINES_DIR)) return [];
@@ -18,22 +19,13 @@ export function engineSources(): string[] {
   return walk(ENGINES_DIR);
 }
 
-export function engineTypeErrors(): string[] {
+export async function engineTypeErrors(): Promise<string[]> {
   const roots = engineSources();
   if (roots.length === 0) return [];
-  const cfgPath = path.join(WEB_DIR, "tsconfig.json");
-  const read = ts.readConfigFile(cfgPath, ts.sys.readFile);
-  const parsed = ts.parseJsonConfigFileContent(read.config, ts.sys, WEB_DIR);
-  const program = ts.createProgram({ rootNames: roots, options: parsed.options });
-  const mine = new Set(roots.map((r) => path.resolve(r)));
-  return ts
-    .getPreEmitDiagnostics(program)
-    .filter((d) => d.file && mine.has(path.resolve(d.file.fileName)))
-    .map((d) => {
-      const { line } = d.file?.getLineAndCharacterOfPosition(d.start ?? 0) ?? { line: 0 };
-      const rel = path.relative(WEB_DIR, d.file?.fileName ?? "").replaceAll("\\", "/");
-      return `${rel}:${line + 1} TS${d.code} ${ts.flattenDiagnosticMessageText(d.messageText, " ")}`;
-    });
+  const prefixes = roots.map((file) => `${path.relative(WEB_DIR, file).replaceAll("\\", "/")}:`);
+  return (await parkTypeErrors()).filter((error) =>
+    prefixes.some((prefix) => error.startsWith(prefix)),
+  );
 }
 
 /** `any` used as a type (a keyword node in the AST, so a string or a comment never counts), per file. */

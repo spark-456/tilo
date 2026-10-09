@@ -30,6 +30,7 @@
   --rowHover:rgba(31,29,43,.04);
   --rowOn:rgba(90,63,224,.08);
   --hero:#5A3FE0;
+  --heroFill:#5A3FE0; /* BQ-DS-A11Y-1: the fill under white text (not in the handoff): same as --hero by day */
   --heroInk:#4A31CC;
   --heroSoft:rgba(90,63,224,.1);
   --logo:#5A3FE0;
@@ -92,6 +93,7 @@
   --rowHover:rgba(255,255,255,.05);
   --rowOn:rgba(122,98,245,.2);
   --hero:#7A62F5;
+  --heroFill:#6C52EB; /* BQ-DS-A11Y-1: 5.19:1 under white (--hero is 4.29:1, under WCAG 2.2 AA 4.5:1) */
   --heroInk:#BCAFFF;
   --heroSoft:rgba(122,98,245,.22);
   --logo:#BCAFFF;
