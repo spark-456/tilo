@@ -11,6 +11,11 @@ resource "google_project_iam_member" "this" {
   role    = each.value.role
   member  = each.value.member
 
+  # A changed condition replaces the binding; create the new one first so api, harness and render never lose Firestore.
+  lifecycle {
+    create_before_destroy = true
+  }
+
   # Firestore conditions can name a database but not a collection (ADR-0032 decision 9).
   dynamic "condition" {
     for_each = each.value.condition == null ? [] : [each.value.condition]

@@ -153,12 +153,25 @@ run "SEC_02_only_connectors_can_reach_the_token_database" {
     error_message = "Only tilo-connectors may reach the token database; api, harness and render datastore.user is limited to the (default) database by an IAM condition."
   }
 
+  # The condition is pinned by exact equality (a substring check passed `|| true`, `!=` and an appended startsWith).
   assert {
     condition = alltrue([
-      for b in output.project_iam_bindings : strcontains(b.condition, "projects/${var.project_id}/databases/(default)") && !strcontains(b.condition, "tilo-tokens")
-      if startswith(b.role, "roles/datastore.") && b.condition != null
+      for b in output.project_iam_bindings : b.condition == "resource.name == \"projects/${var.project_id}/databases/(default)\""
+      if startswith(b.role, "roles/datastore.") && !strcontains(b.member, "tilo-connectors@")
     ])
-    error_message = "A datastore binding with a condition must name the (default) database and never tilo-tokens."
+    error_message = "Every datastore binding except connectors' must carry exactly the (default)-database condition."
+  }
+
+  # api, harness and render hold no broad or custom role that could reach tilo-tokens another way.
+  assert {
+    condition = alltrue([
+      for b in output.project_iam_bindings : !contains([
+        "roles/owner", "roles/editor", "roles/viewer", "roles/firebase.admin", "roles/firebase.developAdmin",
+        "roles/datastore.owner", "roles/datastore.viewer", "roles/datastore.importExportAdmin",
+      ], b.role) && (!startswith(b.role, "projects/") || b.role == "projects/${var.project_id}/roles/tiloVertexGenerate")
+      if length([for n in ["api", "harness", "render"] : n if strcontains(b.member, "tilo-${n}@")]) > 0
+    ])
+    error_message = "api, harness and render hold no owner, editor, viewer, firebase.admin, other datastore role or custom role beyond tiloVertexGenerate."
   }
 
   assert {

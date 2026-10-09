@@ -175,7 +175,9 @@ locals {
   default_database_condition = {
     title       = "default-database-only"
     description = "Not the tilo-tokens database (SEC-02, ADR-0032): Firestore conditions cannot exclude a collection."
-    expression  = "resource.type == \"firestore.googleapis.com/Database\" && resource.name == \"projects/${var.project_id}/databases/(default)\""
+    # Only the resource.name form Google documents for per-database conditions; a resource.type clause could not be
+    # confirmed offline and a wrong one would cut api, harness and render off from Firestore.
+    expression = "resource.name == \"projects/${var.project_id}/databases/(default)\""
   }
 
   service_project_roles = {
@@ -489,13 +491,18 @@ resource "google_firestore_database" "default" {
 }
 
 # Connector token records (state, scopes, sealed grants; ADR-0032 decision 9). Only tilo-connectors reaches this
-# database: datastore.user for api, harness and render is conditioned to (default) in local.project_bindings. The
-# client rules for it are deny-all too (firestore.rules ships with the next firebase deploy; no client rule allows it).
+# database: datastore.user for api, harness and render is conditioned to (default) in local.project_bindings.
+# It has NO rules release yet: firebase.json deploys to (default) only. T5b ships a deny-all
+# google_firebaserules_ruleset and a release `cloud.firestore/tilo-tokens` (with a tftest pin) before any token moves.
 resource "google_firestore_database" "tokens" {
   project     = var.project_id
   name        = "tilo-tokens"
   location_id = var.region
   type        = "FIRESTORE_NATIVE"
+
+  # Token records: a stray destroy must fail twice (the API flag, and Terraform's own policy).
+  delete_protection_state = "DELETE_PROTECTION_ENABLED"
+  deletion_policy         = "ABANDON"
 
   depends_on = [google_project_service.apis]
 }

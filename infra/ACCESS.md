@@ -308,6 +308,7 @@ Hard requirements from the security review for the routes the infra points at:
 - `tilo-channels`: Firestore, Pub/Sub publish, Storage.
 - `tilo-api`: decrypt on `oauth-tokens`, any access to `archive`, publish on `tilo-events`.
 - Anyone but `tilo-connectors`: the `oauth-tokens` key.
+- `tilo-api`, `tilo-harness`, `tilo-render`: the `tilo-tokens` database (their `datastore.user` is limited to `(default)`).
 - `modelarmor.user` for connectors and browser (the harness screens tool output
   after it returns).
 - Service account keys (none exist) and secret versions in code.
@@ -367,12 +368,12 @@ that person, which is not the Firebase uid: copy the uid (Firebase console, Auth
 `TILO_JUDGE_LIVE=1` is ever set, read BQ-SIGNIN-9 and BQ-SIGNIN-10: an anonymous demo session already gets replay models
 only, and App Check enforcement on Firebase Authentication is worth considering, since anonymous uids are free.
 
-## 9. Token database and connectors settings (ADR-0032 T5)
+## 12. Token database and connectors settings (ADR-0032 T5)
 
 Firestore IAM conditions name a database, never a collection, so project-wide `datastore.user` could not exclude
 `connector_tokens`. Tokens move to the database `tilo-tokens`; api, harness and render keep `datastore.user` only on
 `(default)` (condition `default-database-only`); connectors holds it unconditionally. `security_iam.tftest.hcl` pins
-this. Rules: a database with no rules deployed denies clients, and no allow rule exists (T5b adds a tokens rules file).
+this. The database has delete protection on. It has no rules release yet; T5b ships a deny-all ruleset and release for it.
 
 Connectors `TILO_*` settings are set by hand (`ignore_env`, like api). The ordered steps and values: `docs/deploy-dev.md`
 ("Meeting host: connectors and api settings").

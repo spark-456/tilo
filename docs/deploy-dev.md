@@ -68,7 +68,7 @@ user-approved step, never from this workflow or recipe).
 | Infrastructure (services, IAM, ingress, env, secrets) | Terraform, applied by you (`infra/README.md`) | `infra/` |
 
 Cloud Build and the workflow only swap the image (pinned by digest) and passes `--min-instances 0` and
-`--max-instances 2..3` on an existing service. It never sets ingress, IAM, env vars or secrets;
+`--max-instances 1..3` on an existing service (connectors = 1 until ticket T7, CON-D9). It never sets ingress, IAM, env vars or secrets;
 Terraform owns those and ignores image changes (`infra/modules/service`). Env vars are Terraform's for every service
 except `tilo-api` and `tilo-connectors`: those have `ignore_env = true`, so their `TILO_*` runtime settings are set by hand with
 `gcloud run services update` (`docs/routines-rollout.md`) and a Terraform run leaves them alone.
@@ -143,7 +143,7 @@ a flag or a shell command cannot be smuggled in through them.
 `cloudbuild.yaml` (repo root) has three steps: check `_SERVICE` (`all` or one of the seven short names, anything
 else fails with `unknown service`), build each image from `services/<svc>/Dockerfile` with the repo root as
 context and push it to `asia-southeast1-docker.pkg.dev/<project>/tilo/<svc>:<build id>`, then
-`gcloud run services update tilo-<svc> --image <repo>@sha256:<digest> --min-instances 0 --max-instances 2..3`,
+`gcloud run services update tilo-<svc> --image <repo>@sha256:<digest> --min-instances 0 --max-instances 1..3` (connectors = 1 until T7),
 after refusing any image reference that is not `asia-southeast1-docker.pkg.dev/<project>/tilo/<svc>@sha256:...`.
 The upload is an allowlist (`.gcloudignore`): only `pyproject.toml`, `uv.lock`, `.dockerignore`, `evals/pyproject.toml`
 and the `packages`, `services`, `config`, `contracts`, `prompts` and `templates` trees leave your machine, and secret
@@ -224,14 +224,17 @@ checks and what each tick answer means are in [routines-rollout.md](routines-rol
 
 ## Meeting host: connectors and api settings (ADR-0032 T5)
 
-Order, once your infrastructure run (`infra/README.md`) has finished:
-1. Create the KMS key `oauth-tokens` if it is not there (this ticket does not) and put the OAuth client id and secret in
-   the Secret Manager secret `workspace-oauth-client`.
+Order, once your infrastructure run (`infra/README.md`) has finished (run it with no run in flight):
+0. Smoke: api, harness and render must still read Firestore `(default)` (a schedule tick or a run answers, not 503). That
+   proves the `resource.name` condition on their `datastore.user`.
+1. The KMS key `oauth-tokens` is Terraform's (`module.kms`); never create it by hand. Put the OAuth client id and secret
+   in the Secret Manager secret `workspace-oauth-client`.
 2. Set `tilo-connectors` (names here, never a value in a file or a log). `<url>` is its own URL.
    `TILO_CONNECTORS_AUDIENCE=<url>`, `TILO_MEETING_HOST_CALLER=tilo-api@<project>.iam.gserviceaccount.com`,
    `TILO_TOKEN_STORE=firestore`, `TILO_FIRESTORE_PROJECT=<project>`,
    `TILO_KMS_KEY=projects/<project>/locations/asia-southeast1/keyRings/<ring>/cryptoKeys/oauth-tokens`, the OAuth client
-   id and secret as Secret Manager references (`--set-secrets`, secret `workspace-oauth-client`), and no `LIVE`.
+   id and secret as Secret Manager references (`--update-secrets`, which keeps the others; secret
+   `workspace-oauth-client`), and no `LIVE`.
    Connectors runs one instance (CON-D9) until ticket T7.
 3. Set `tilo-api`: `TILO_CONNECTORS_URL=<tilo-connectors url>`. api reaches the internal service through its Direct VPC
    egress, and holds `run.invoker` on connectors.
