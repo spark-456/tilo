@@ -287,6 +287,11 @@ def pw1b_rig(request):
     return _pw1b_lib.make_rig(request.param)
 
 
+def pytest_addoption(parser):
+    """ADR35-L2: switch on the `firestore-emulator` rig of the outbox store suite (`just test-outbox-emulator`)."""
+    parser.addoption("--outbox-emulator", action="store_true", default=False, help="run the outbox store emulator rig")
+
+
 def pytest_collection_modifyitems(items):
     """PPL-11a: tests that need a slice B or C route are strict xfails until that slice lands (`SLICE_BC_PENDING`).
     PPL-11c: the same for each slice of the rest of the people API (`SLICE_PENDING`, API_PPL_11c.md section 0)."""

@@ -1,30 +1,89 @@
 """FR-CON-02 / ADR-0035 L2 (LC-11, LC-12): one contract suite over `InMemoryOutboxStore` and `FirestoreOutboxStore`.
 
 The Firestore store runs against `_adr35_l2_fake.OccFirestore` (a faithful fake: real `Transaction` machinery, commit
-aborts if a document read changed, equality queries). The emulator was not started for this ticket (BQ-ADR35-L2-1).
-Every mutator is checked on both stores; the tests after the contract are the Firestore store's own: keys, the
-single-document transaction rule, the lease race, a restart, ids.
+aborts if a document read changed, equality queries), and again, as the rig `firestore-emulator`, over a real
+`google.cloud.firestore.Client` on the Firestore emulator (BQ-ADR35-L2-1). The emulator rig is skipped unless
+`--outbox-emulator` is passed or `TILO_FIRESTORE_EMULATOR_TESTS=1` is set; `just test-outbox-emulator` does the former
+and starts the emulator through `tilo_harness.emulator.running_emulator()` (a `demo-` project, no credentials). Each
+emulator test gets its own `demo-adr35-l2-<random>` project, so runs and tests never share data; it is wiped after.
+Every mutator is checked on every rig; the tests after the contract are the Firestore store's own: keys, the
+single-document transaction rule, the lease race, a restart, ids. Those that read the fake's internals (commit
+batches, raw documents, touched paths) use the `fs` fixture and are FAKE-ONLY; the rest use `fsrig` (fake and emulator).
 """
 
 from __future__ import annotations
 
+import contextlib
 import copy
 import hashlib
+import os
 import threading
+import urllib.request
+import uuid
 
 import pytest
 from _adr35_l2_lib import T0, WORLD_A, WORLD_B, Rig, alert, entry, outbox_id, transfer
 
-KINDS = ["memory", "firestore"]
+EMULATOR = pytest.param("firestore-emulator", marks=pytest.mark.emulator)
+FLAG = "TILO_FIRESTORE_EMULATOR_TESTS"
 
 
-@pytest.fixture(params=KINDS)
+def _emulator_wanted(config) -> bool:
+    return bool(config.getoption("--outbox-emulator", default=False)) or os.environ.get(FLAG) == "1"
+
+
+@pytest.fixture(scope="session")
+def outbox_emulator_host(request):
+    """The repo's emulator helper: reuses FIRESTORE_EMULATOR_HOST when set, else starts one and stops it on exit."""
+    if not _emulator_wanted(request.config):
+        pytest.skip(
+            f"Firestore emulator rig is off: pass --outbox-emulator or set {FLAG}=1 (just test-outbox-emulator)"
+        )
+    from tilo_harness.emulator import running_emulator  # noqa: PLC0415
+
+    with running_emulator() as host:
+        yield host
+
+
+@pytest.fixture
+def emulator_db(outbox_emulator_host):
+    """A real Firestore client on the emulator, on a fresh `demo-` project (own data), wiped afterwards."""
+    from google.auth.credentials import AnonymousCredentials  # noqa: PLC0415
+    from google.cloud import firestore  # noqa: PLC0415
+
+    host = outbox_emulator_host
+    assert host.split(":")[0] in ("127.0.0.1", "localhost", "[::1]"), "the emulator rig is loopback only"
+    project = f"demo-adr35-l2-{uuid.uuid4().hex[:12]}"
+    client = firestore.Client(project=project, credentials=AnonymousCredentials())
+    try:
+        yield client
+    finally:
+        url = f"http://{host}/emulator/v1/projects/{project}/databases/(default)/documents"
+        with contextlib.suppress(OSError):
+            urllib.request.urlopen(urllib.request.Request(url, method="DELETE"), timeout=15).close()  # noqa: S310
+        client.close()
+
+
+def _make_rig(request, kind: str) -> Rig:
+    if kind == "firestore-emulator":
+        return Rig(kind, request.getfixturevalue("emulator_db"))
+    return Rig(kind)
+
+
+@pytest.fixture(params=["memory", "firestore", EMULATOR])
 def rig(request) -> Rig:
-    return Rig(request.param)
+    return _make_rig(request, request.param)
+
+
+@pytest.fixture(params=["firestore", EMULATOR])
+def fsrig(request) -> Rig:
+    """The Firestore store on the fake and on the emulator (rig-neutral tests of the store's own rules)."""
+    return _make_rig(request, request.param)
 
 
 @pytest.fixture
 def fs() -> Rig:
+    """FAKE-ONLY: the tests that use it read `OccFirestore` internals."""
     return Rig("firestore")
 
 
@@ -202,11 +261,11 @@ def test_FR_CON_02_ADR35_L2_taking_over_an_expired_lease_marks_the_entry_ambiguo
     assert _abandoner(rig.make(), rig)(1) == "refused"
 
 
-def test_FR_CON_02_ADR35_L2_all_entries_skips_a_malformed_document_and_logs_only_its_id(fs: Rig, caplog) -> None:
-    store = fs.make()
-    fs.put(store, entry(1), entry(2))
-    fs.db.document(f"outbox/{outbox_id(3)}").set({"junk": True})
-    fs.db.document(f"outbox/{outbox_id(4)}").set({"entry": "not a dict"})
+def test_FR_CON_02_ADR35_L2_all_entries_skips_a_malformed_document_and_logs_only_its_id(fsrig: Rig, caplog) -> None:
+    store = fsrig.make()
+    fsrig.put(store, entry(1), entry(2))
+    fsrig.db.document(f"outbox/{outbox_id(3)}").set({"junk": True})
+    fsrig.db.document(f"outbox/{outbox_id(4)}").set({"entry": "not a dict"})
     with caplog.at_level("WARNING"):
         got = store.all_entries()
     assert sorted(e["id"] for e in got) == [outbox_id(1), outbox_id(2)]
@@ -277,6 +336,7 @@ def _key_path(world: str, key: str) -> str:
 
 
 def test_FR_CON_02_ADR35_L2_the_key_document_is_create_only_hashed_and_written_in_the_inserts_commit(fs: Rig) -> None:
+    """FAKE-ONLY: reads committed batches and attempted ops (the rig-neutral form is the stored-shape test)."""
     store = fs.make()
     e = entry(1)
     fs.put(store, e)
@@ -293,6 +353,7 @@ def test_FR_CON_02_ADR35_L2_the_key_document_is_create_only_hashed_and_written_i
 
 
 def test_FR_CON_02_ADR35_L2_one_entry_one_document_and_every_mutator_is_one_transaction(fs: Rig) -> None:
+    """FAKE-ONLY: reads the fake's committed batches (the emulator keeps no such log)."""
     store = fs.make()
     fs.put(store, entry(1), entry(2, undo=60), entry(3))
     doc = fs.db.raw(f"outbox/{outbox_id(1)}")
@@ -324,14 +385,35 @@ def test_FR_CON_02_ADR35_L2_one_entry_one_document_and_every_mutator_is_one_tran
         assert len(fs.db.committed_batches) - before <= 1, "one transaction, not several writes"
 
 
-def test_FR_CON_02_ADR35_L2_two_instances_racing_for_one_entry_only_one_claim_wins(fs: Rig) -> None:
-    fs.put(fs.make(), *[entry(n) for n in range(1, 6)])
+def test_FR_CON_02_ADR35_L2_the_stored_shape_is_one_document_per_entry_and_one_key_document_per_key(
+    fsrig: Rig,
+) -> None:
+    """Rig-neutral form (fake and emulator) of the shape rules: read back through the client's own API."""
+    store = fsrig.make()
+    fsrig.put(store, entry(1), entry(2, undo=60))
+    store._revoke(WORLD_A, "kk")
+    doc = fsrig.db.document(f"outbox/{outbox_id(1)}").get().to_dict()
+    assert set(doc) == {
+        "entry", "world_id", "enqueued_at", "send_lease", "transfer_lease", "retry", "transfer", "transfer_pending",
+        "alert", "alert_pending", "alerted",
+    }  # fmt: skip
+    assert doc["entry"] == entry(1) and doc["transfer_pending"] is False
+    assert sorted(d.id for d in fsrig.db.collection("outbox").stream()) == [outbox_id(1), outbox_id(2)]
+    key = fsrig.db.document(_key_path(WORLD_A, entry(1)["idempotency_key"])).get().to_dict()
+    assert key == {"outbox_id": outbox_id(1), "revoked": False}
+    assert fsrig.db.document(_key_path(WORLD_A, "kk")).get().to_dict() == {"outbox_id": None, "revoked": True}
+    assert store._insert_if_absent(entry(3, key=entry(1)["idempotency_key"])) is False
+    assert fsrig.db.document(f"outbox/{outbox_id(3)}").get().exists is False
+
+
+def test_FR_CON_02_ADR35_L2_two_instances_racing_for_one_entry_only_one_claim_wins(fsrig: Rig) -> None:
+    fsrig.put(fsrig.make(), *[entry(n) for n in range(1, 6)])
     for n in range(1, 6):
-        stores, wins, gate = [fs.make() for _ in range(8)], [], threading.Barrier(8)
+        stores, wins, gate = [fsrig.make() for _ in range(8)], [], threading.Barrier(8)
 
         def go(i: int, store=None) -> None:
             gate.wait()
-            got = store._claim_for_sending(outbox_id(n), f"holder-{i}", fs.clock(), 30, 0)
+            got = store._claim_for_sending(outbox_id(n), f"holder-{i}", fsrig.clock(), 30, 0)
             if got is not None:
                 wins.append(i)
 
@@ -342,30 +424,30 @@ def test_FR_CON_02_ADR35_L2_two_instances_racing_for_one_entry_only_one_claim_wi
 
 
 def test_FR_CON_02_ADR35_L2_a_new_instance_still_sees_the_ambiguous_retry_state_the_lease_and_the_alert(
-    fs: Rig,
+    fsrig: Rig,
 ) -> None:
-    first = fs.make()
-    fs.put(first, entry(1))
-    fs.claim(first, 1, "dead-instance")
-    first._defer(outbox_id(1), "dead-instance", 4, fs.clock(), 90, ambiguous=True, alert=alert(1))
-    reborn = fs.make()
+    first = fsrig.make()
+    fsrig.put(first, entry(1))
+    fsrig.claim(first, 1, "dead-instance")
+    first._defer(outbox_id(1), "dead-instance", 4, fsrig.clock(), 90, ambiguous=True, alert=alert(1))
+    reborn = fsrig.make()
     state = reborn.retry_state(outbox_id(1))
     assert state["ambiguous"] is True and state["attempts"] == 4 and state["not_before"] == "2026-10-09T10:01:30.000Z"
     assert reborn._pending_alerts_of(None) == [(outbox_id(1), alert(1))]
-    assert fs.claim(reborn, 1, "new") is None, "not_before holds across the restart"
-    fs.clock.advance(91)
-    assert fs.claim(reborn, 1, "new")["state"] == "sending"
+    assert fsrig.claim(reborn, 1, "new") is None, "not_before holds across the restart"
+    fsrig.clock.advance(91)
+    assert fsrig.claim(reborn, 1, "new")["state"] == "sending"
     assert reborn.retry_state(outbox_id(1))["ambiguous"] is True, "ambiguous stays ambiguous; it is never failed"
     assert reborn.get(outbox_id(1))["state"] == "sending"
 
 
-def test_FR_CON_02_ADR35_L2_a_dead_holders_lease_expires_and_a_second_instance_claims_it(fs: Rig) -> None:
-    dead, alive = fs.make(), fs.make()
-    fs.put(dead, entry(1))
-    fs.claim(dead, 1, "dead")  # the instance dies here: nothing releases or finalizes
-    assert fs.claim(alive, 1, "alive") is None
-    fs.clock.advance(31)
-    assert fs.claim(alive, 1, "alive")["state"] == "sending"
+def test_FR_CON_02_ADR35_L2_a_dead_holders_lease_expires_and_a_second_instance_claims_it(fsrig: Rig) -> None:
+    dead, alive = fsrig.make(), fsrig.make()
+    fsrig.put(dead, entry(1))
+    fsrig.claim(dead, 1, "dead")  # the instance dies here: nothing releases or finalizes
+    assert fsrig.claim(alive, 1, "alive") is None
+    fsrig.clock.advance(31)
+    assert fsrig.claim(alive, 1, "alive")["state"] == "sending"
     assert dead._finalize_claim(outbox_id(1), "dead", "sent") is None
 
 

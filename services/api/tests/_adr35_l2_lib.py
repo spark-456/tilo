@@ -70,8 +70,9 @@ class Rig:
     """`make()` is a store as one tilo-api instance would hold it. In memory there is one store; on Firestore each
     call is a new instance over the same database, which is what a second Cloud Run instance is."""
 
-    def __init__(self, kind: str) -> None:
-        self.kind, self.clock, self.db = kind, Clock(), OccFirestore()
+    def __init__(self, kind: str, db: Any = None) -> None:
+        """`kind` is `memory`, `firestore` (the fake) or `firestore-emulator` (a real client passed as `db`)."""
+        self.kind, self.clock, self.db = kind, Clock(), db if db is not None else OccFirestore()
         self._memory = InMemoryOutboxStore(clock=self.clock)
 
     def make(self, clock: Any = None) -> Any:
