@@ -22,7 +22,7 @@ from typing import Annotated, Any, Literal
 import tilo_planning.plangraph as plangraph
 import tilo_policy
 from fastapi import APIRouter, Depends, HTTPException, Request
-from tilo_connectors import Outbox, OutboxRefused
+from tilo_connectors import Outbox, OutboxRefused, RetryPolicy
 from tilo_harness.config import load_agents_config
 from tilo_harness.executor import UnitOutcome, run_plan
 from tilo_harness.must_ask import MustAsk
@@ -41,6 +41,7 @@ from tilo_api.cards import (
     answering_principal,
     get_channels_caller,
 )
+from tilo_api.connector_rpc import NO_DRAFT, ConnectorRpcStub
 
 logger = logging.getLogger("tilo_api.runs")
 router = APIRouter()
@@ -235,6 +236,15 @@ class Run:
         self._live: set[str] = set()  # assigned and not yet retired
         self._handed: set[str] = set()  # units that handed their result over (their dependents may start)
         self._asleep = 0  # live units waiting for a person: a gate card or a question
+        self._alerted: set[str] = set()
+        self._alert_lock = threading.Lock()
+        self._drafted: dict[tuple[str, int], str] = {}  # LC-10: (artifact id, version) -> content hash at its draft
+        self.adapters: dict[str, Any] = {  # a live connector's stub is bound to this run (its reader, sink, owner)
+            name: adapter.bound(self._read_pinned, self._part_sink, self.owner)
+            if hasattr(adapter, "bound")
+            else adapter
+            for name, adapter in seams.adapters.items()
+        }
 
     def now(self) -> datetime:
         return datetime.now(UTC)
@@ -440,18 +450,67 @@ class Run:
         """The run dispatches and records only its own world's entries, and claims none once the world is paused
         (FR-WLD-07)."""
         return Outbox(
-            self.seams.outbox_store, self.seams.adapters, emit=self._record_transfer, clock=events.now,
-            world_id=self.world_id, halted=self.paused,
+            self.seams.outbox_store, self.adapters, emit=self._record_transfer, clock=events.now,
+            world_id=self.world_id, halted=self.paused, alert=lambda part: self._record_alert(part["data"]["alert_id"]),
+            retry=RetryPolicy() if any(isinstance(a, ConnectorRpcStub) for a in self.adapters.values()) else None,
         )  # fmt: skip
 
+    def _read_pinned(self, ref: dict[str, Any]) -> bytes:
+        return bytes(self.seams.artifacts.read(self.scope, ref))  # hash-checked (AR-01)
+
+    def _part_sink(self, part: Mapping[str, Any]) -> None:
+        """What connectors' answer carried (ADR-0032 decision 7): an alert is recorded, a connection part abandons."""
+        from tilo_api.meeting_host import on_connection_event  # noqa: PLC0415
+
+        if part["type"] == "alert.raised":
+            self._record_alert(part["data"]["alert_id"])
+        else:
+            on_connection_event(part, outbox_store=self.seams.outbox_store, owner_of=self._owner_of)
+
+    def _owner_of(self, world_id: str) -> str | None:
+        world = self.store.load_world(world_id)
+        return None if world is None else world.owner
+
+    _alert_summary = "A person must check whether the item went out."
+
+    def _record_alert(self, alert_id: str) -> None:
+        """One `alert.raised` per alert id, ids only (FR-AGT-13): a possibly-sent item is never only a parked alert."""
+        with self._alert_lock:
+            send = self.sends.get(alert_id) or next(iter(self.sends.values()), None)
+            if alert_id in self._alerted or send is None:
+                return
+            self.put(
+                "alert.raised", send["worker"], send["island"], self._alert_summary,
+                {"alert_id": alert_id, "card_id": None}, district=send["district"], cause=send["cause"],
+                severity="needs_you", check_pause=False,
+            )  # fmt: skip
+            self._alerted.add(alert_id)
+
+    def _may_have_sent(self, outbox_id: str) -> bool:
+        return outbox_id in self._alerted or bool(self.seams.outbox_store.retry_state(outbox_id).get("ambiguous"))
+
+    def _keeps_ambiguous(self, entry: Mapping[str, Any]) -> bool:
+        """A live Google send (a stub) that may have gone out is never failed: only a person settles it (FR-AGT-13)."""
+        return isinstance(self.adapters.get(entry["connector"]), ConnectorRpcStub)
+
     def _abandon_unsent(self) -> None:
-        for outbox_id, send in self.sends.items():
-            entry = self.seams.outbox_store.get(outbox_id)
-            if "committed" not in send and entry is not None and entry["state"] in ("queued", "scheduled", "sending"):
-                try:
-                    self._outbox().abandon(outbox_id)
-                except Exception:
-                    logger.warning("run %s left entry %s to its sender", self.run_id, outbox_id)
+        """A live entry that may have gone out is never failed: it stays, with one alert."""
+        store = self.seams.outbox_store
+        for outbox_id, send in list(self.sends.items()):
+            entry = store.get(outbox_id)
+            if "committed" in send or entry is None or entry["state"] not in ("queued", "scheduled", "sending"):
+                continue
+            keeps = self._keeps_ambiguous(entry)
+            try:
+                if keeps and self._may_have_sent(outbox_id):
+                    self._record_alert(outbox_id)
+                else:
+                    self._outbox().abandon(outbox_id, keep_ambiguous=keeps)
+            except OutboxRefused:
+                if keeps:  # a lease nobody released, or a send in flight: it may have gone out, a person checks
+                    self._record_alert(outbox_id)
+            except Exception:
+                logger.warning("run %s left entry %s to its sender", self.run_id, outbox_id)
 
     def _compile(self, context: PlanInputs) -> dict:
         return self.seams.compiler(
@@ -609,9 +668,11 @@ class Run:
                 and all(isinstance(r, str) and r.strip() for r in recipients)):  # fmt: skip
             raise _GateFailed("the send has no recipients or no destination")  # fails closed, before any gate
         try:  # AR-07, OB-05, BQ-264: from the stored record, never a default; only a `clean` verdict clears the flag
-            flagged = self.seams.artifacts.head(self.scope, item).record["screening"] != "clean"
+            stored = self.seams.artifacts.head(self.scope, item).record
+            flagged = stored["screening"] != "clean"
         except Exception as exc:
             raise _GateFailed("the item to send is not in the run's store") from exc
+        self._draft_first(connector, action, item)  # LC-10: before any card a send that could not go would raise
         facts = tilo_policy.SideEffectFacts(
             recipients=tuple(recipients), known_recipients=tuple(known or ()), safety_flags=flagged
         )
@@ -677,6 +738,8 @@ class Run:
             "event_id": events.new_part_id(),  # resent unchanged if the outbox retries the transfer
         }  # fmt: skip
         transfer = await self._send(entry, evidence)
+        if action == "create_draft":
+            self._drafted[(item["artifact_id"], item["version"])] = stored["content_sha256"]
         format_ = _FORMATS.get(action, "in_app")  # artifact.delivered: a format kept in Tilo has outbox_id null
         data = {"artifact": item, "format": format_, "outbox_id": outbox_id if format_ == "email" else None}
         self._deliver(unit, worker, item, data, transfer["id"])
@@ -711,6 +774,10 @@ class Run:
     async def _send(self, entry: dict, evidence: dict[str, Any]) -> dict:
         """Enqueue with the person's authz, then dispatch until the outbox records the entry sent."""
         outbox = self._outbox()
+        self._draft_first(entry["connector"], entry["action_type"], entry["item"])
+        hand = getattr(self.adapters.get(entry["connector"]), "hand_evidence", None)
+        if hand is not None:  # the live stub posts the case this enqueue checked (HB-04)
+            hand(entry["id"], evidence)
         try:
             outbox.enqueue(entry, evidence)
         except OutboxRefused as exc:
@@ -726,7 +793,27 @@ class Run:
             if state in ("failed", "cancelled"):
                 break
         self._abandon_unsent()  # given up: the entry never sends later in a failed world
+        if self._keeps_ambiguous(entry) and self._may_have_sent(entry["id"]):  # say what is known, not "unsent"
+            raise _GateFailed("the item may have gone out; a person must check")
         raise _GateFailed("the send could not be confirmed")
+
+    def _draft_first(self, connector: str, action: str, item: dict[str, Any]) -> None:
+        """ADR-0035 LC-10: a live `send_email` goes only when this world holds a `sent` `create_draft` entry for the
+        same item (artifact id, version) whose content is still the hash the draft carried; else one fixed reason."""
+        if action != "send_email" or not isinstance(self.adapters.get(connector), ConnectorRpcStub):
+            return
+        pinned = self._drafted.get((item["artifact_id"], item["version"]))
+        try:
+            head = self.seams.artifacts.head(self.scope, item)
+            drafted = any(
+                e["world_id"] == self.world_id and e["action_type"] == "create_draft" and e["state"] == "sent"
+                and e["item"] == item for e in self.seams.outbox_store.all_entries()
+            )  # fmt: skip
+            ok = drafted and pinned is not None and head is not None and head.record["content_sha256"] == pinned
+        except Exception:
+            ok = False
+        if not ok:
+            raise _GateFailed(NO_DRAFT)
 
     def _record_transfer(self, transfer: dict) -> None:
         """The outbox's own data.transfer for one of this run's entries (the outbox is scoped to this world)."""

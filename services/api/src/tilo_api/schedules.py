@@ -140,7 +140,9 @@ def get_seams_factory(
 
     def build(demo: bool = False) -> runs.Seams | None:
         ephemeral.mark_no_person(request)  # only the tick calls this, after its OIDC check: no Firebase token to verify
-        return runs.run_seams(request, "replay" if demo else mode)
+        seams = runs.run_seams(request, "replay" if demo else mode)
+        # a demo's schedule sends nothing (ADR-0035 L6): the tick has no person, so the seam would hand it live stubs
+        return dataclasses.replace(seams, adapters={}) if demo and seams is not None else seams
 
     return build
 

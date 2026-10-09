@@ -412,6 +412,9 @@ def sweep_due(
     tick has no world writer (BQ-ADR35-L2-3)."""
     from tilo_connectors import Outbox, RetryPolicy  # noqa: PLC0415
 
+    adapters = {
+        name: a for name, a in adapters.items() if not getattr(a, "needs_run", False)
+    }  # L6: a stub needs its run
     if not adapters:
         return 0
     wired = _Wired(store, frozenset(adapters))
