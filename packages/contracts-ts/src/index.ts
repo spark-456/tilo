@@ -119,7 +119,7 @@
  * providers.schema.json 1.2.0 sha256:4514148b0b6b2f7e
  * scenario.schema.json 1.0.0 sha256:b8e044d7e37b92a3
  * skill.schema.json 1.1.0 sha256:9eeee7768b667afa
- * spend_caps.schema.json 1.1.0 sha256:d337adf13a5337f9
+ * spend_caps.schema.json 1.1.1 sha256:c04bc36ac17dc0ab
  * team_lead.schema.json 1.0.0 sha256:19413726e364ffdd
  * transcript.schema.json 1.0.0 sha256:08f934b8f0c9a40e
  * ui_action.schema.json 1.0.0 sha256:2ceb1e0b46368734
@@ -4710,7 +4710,7 @@ export interface SkillEmbeddedSchema {
   [k: string]: unknown;
 }
 /**
- * config/spend_caps.yaml: the live-model spend caps, the flat reservation per live unit and the per-uid rate limit (SEC-16, PRD supplement 4; FR-MTR-04, PRD 14.1, 17.3), read by tilo-api's spend loader. Money is an integer in INR minor units (paise, 1 INR = 100): never a float, a bool or a string. Every key is required and no other key is allowed; only org_day_minor may be null (ADR-0002 decision 13). The schema checks each value alone. Two rules it cannot express: a whole float such as 1000.0 is the same JSON number as 1000, so the loader also requires a YAML integer; and the shipped file keeps unit_reserve_minor <= run_minor <= uid_lifetime_minor <= global_day_hard_minor. These caps sit beside config/metering.yaml (credits and US dollars) and replace none of it (ADR-0002 decision 16). 1.1.0 adds unit_reserve_minor (BQ-SEC16-1).
+ * config/spend_caps.yaml: the live-model spend caps, the flat reservation per live unit and the per-uid rate limit (SEC-16, PRD supplement 4; FR-MTR-04, PRD 14.1, 17.3), read by tilo-api's spend loader. Money is an integer in INR minor units (paise, 1 INR = 100): never a float, a bool or a string. Every key is required and no other key is allowed; only org_day_minor may be null (ADR-0002 decision 13). The schema checks each value alone. Two rules it cannot express: a whole float such as 1000.0 is the same JSON number as 1000, so the loader also requires a YAML integer; and the shipped file keeps unit_reserve_minor <= run_minor <= uid_lifetime_minor <= global_day_hard_minor. These caps sit beside config/metering.yaml (credits and US dollars) and replace none of it (ADR-0002 decision 16). 1.1.0 adds unit_reserve_minor (BQ-SEC16-1). 1.1.1 changes description text only (ADR-0002 decision 16, amendment of 8 Oct 2026).
  *
  * This interface was referenced by `TiloContracts`'s JSON-Schema
  * via the `definition` "SpendCapsConfig".
@@ -4721,7 +4721,7 @@ export interface SpendCapsConfig {
    */
   currency: "INR";
   /**
-   * Lifetime live-model spend per signed-in uid, in paise, above zero and never null (SEC-16: 1,000 INR).
+   * Lifetime live-model spend per signed-in uid, in paise, above zero and never null (SEC-16; shipped at 500 INR since the user's decision of 9 Oct 2026, BQ-SEC16-4).
    */
   uid_lifetime_minor: number;
   /**
