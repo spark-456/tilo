@@ -23,6 +23,12 @@ export const appCheckToken: (() => Promise<string | null>) | undefined =
 export const authToken: (() => Promise<string | null>) | undefined =
   typeof window === "undefined" ? undefined : () => session.idToken();
 
+/** Today by the person's own clock, as a calendar date: the sample company's dates follow it (park/api/sampleDates.ts). */
+export const civilToday = (): { y: number; m: number; d: number } => {
+  const now = new Date();
+  return { y: now.getFullYear(), m: now.getMonth() + 1, d: now.getDate() };
+};
+
 /** Who is signed in, read at call time from the one sign-in session (LIVE-HOME). */
 export const sessionView: SessionView = {
   now: () => new Date(),

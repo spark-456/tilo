@@ -195,6 +195,8 @@ export type MetroOpts = Opt<{
   height: number | string;
 }>;
 export type SceneOpts = Opt<{
+  /** Compile the ambient traffic schedule once; the compatibility drawing stays unchanged. */
+  traffic: boolean;
   w: number;
   h: number;
   vw: number;
