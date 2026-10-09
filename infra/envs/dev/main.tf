@@ -192,7 +192,9 @@ locals {
 
   # secret => services allowed roles/secretmanager.secretAccessor on it.
   secret_accessors = {
-    "workspace-oauth-client"        = ["connectors"]
+    "workspace-oauth-client"        = ["connectors"] # kept: the live connectors mount the two below (ADR-0035 L7)
+    "workspace-oauth-client-id"     = ["connectors"] # one version added by the user (GOOGLE_OAUTH_CLIENT_ID)
+    "workspace-oauth-client-secret" = ["connectors"] # one version added by the user (GOOGLE_OAUTH_CLIENT_SECRET)
     "whatsapp-api-token"            = ["channels"]
     "channels-webhook-signing-key"  = ["channels"]
     "email-action-link-signing-key" = ["channels"] # channels issues and verifies links (links.py); no api code uses it
@@ -872,6 +874,27 @@ resource "google_firestore_index" "schedules_due" {
 
   fields {
     field_path = "next_due"
+    order      = "ASCENDING"
+  }
+}
+
+# The durable outbox's pending-transfer query (`transfer_pending == true`, then `enqueued_at`; tilo_api.outbox_firestore,
+# ADR-0035 decision 9, BQ-ADR35-L2-4) needs this composite index. Build it BEFORE setting TILO_OUTBOX_STORE=firestore:
+# without it claiming a transfer raises 503 after a sent entry (PI-17). The alert query has one equality filter and needs
+# none. The collection-scoped index covers the `outbox` collection of the (default) database.
+resource "google_firestore_index" "outbox_transfer_pending" {
+  project     = var.project_id
+  database    = google_firestore_database.default.name
+  collection  = "outbox"
+  query_scope = "COLLECTION"
+
+  fields {
+    field_path = "transfer_pending"
+    order      = "ASCENDING"
+  }
+
+  fields {
+    field_path = "enqueued_at"
     order      = "ASCENDING"
   }
 }

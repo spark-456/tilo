@@ -228,13 +228,13 @@ Order, once your infrastructure run (`infra/README.md`) has finished (run it wit
 0. Smoke: api, harness and render must still read Firestore `(default)` (a schedule tick or a run answers, not 503). That
    proves the `resource.name` condition on their `datastore.user`.
 1. The KMS key `oauth-tokens` is Terraform's (`module.kms`); never create it by hand. Put the OAuth client id and secret
-   in the Secret Manager secret `workspace-oauth-client`.
+   in the Secret Manager secrets `workspace-oauth-client-id` and `workspace-oauth-client-secret` (one version each).
 2. Set `tilo-connectors` (names here, never a value in a file or a log). `<url>` is its own URL.
    `TILO_CONNECTORS_AUDIENCE=<url>`, `TILO_MEETING_HOST_CALLER=tilo-api@<project>.iam.gserviceaccount.com`,
    `TILO_TOKEN_STORE=firestore`, `TILO_FIRESTORE_PROJECT=<project>`, `TILO_TOKEN_DATABASE=tilo-tokens`,
    `TILO_KMS_KEY=projects/<project>/locations/asia-southeast1/keyRings/<ring>/cryptoKeys/oauth-tokens`, the OAuth client
    id and secret as Secret Manager references (`--update-secrets`, which keeps the others; secret
-   `workspace-oauth-client`), and no `LIVE`.
+   `workspace-oauth-client-id` and `-secret`), and no `LIVE`.
    Connectors runs one instance (CON-D9) until ticket T7.
 3. Set `tilo-api`: `TILO_CONNECTORS_URL=<tilo-connectors url>`. api reaches the internal service through its Direct VPC
    egress, and holds `run.invoker` on connectors.
@@ -242,6 +242,56 @@ Order, once your infrastructure run (`infra/README.md`) has finished (run it wit
    client on `TILO_TOKEN_DATABASE` and refuses to start the broker without it: unset, `(default)` or any malformed id
    is refused, so tokens never land in `(default)`. Order: apply the infrastructure first (it creates `tilo-tokens`, its
    deny-all ruleset and the release `cloud.firestore/tilo-tokens`), then set the variable, then deploy the T5b image.
+
+## Live connectors: OAuth client, index, settings (ADR-0035 L7, L8)
+
+Gmail, Drive and Calendar go live through `tilo-connectors` only. Do the steps in this order; Tilo's tooling runs none of
+them. Terraform adds one Firestore composite index and two empty Secret Manager secrets (`workspace-oauth-client-id`,
+`workspace-oauth-client-secret`), each readable by `tilo-connectors` only (BQ-ADR35-L7-1). Both services have `ignore_env`, so the settings are `gcloud` steps, and a Terraform run leaves them.
+
+1. Create the OAuth client and consent screen (`infra/ACCESS.md` section 13). Keep the client id and client secret to
+   hand; do not paste them into a command line, a file or chat.
+2. Apply the infrastructure (`infra/README.md`). Expect exactly 5 to add, 0 to change, 0 to destroy: the index
+   `google_firestore_index.outbox_transfer_pending` (collection `outbox`, `transfer_pending` ASC, `enqueued_at` ASC), the
+   secrets `workspace-oauth-client-id` and `workspace-oauth-client-secret`, and one `secretAccessor` binding on each
+   (`tilo-connectors`). Then add ONE version to each secret, in the Secret Manager console (Add new version, paste the
+   value), or with `gcloud secrets versions add workspace-oauth-client-id --project $P --data-file=-`: type or paste the
+   value on the next line, then Ctrl+Z and Enter. Never put the value in the command line (it lands in history).
+   **The index must be built (state READY, a few minutes: Firestore console, Indexes) before `TILO_OUTBOX_STORE=firestore`
+   is set.** Without it, claiming a transfer raises 503 after an entry was sent (PI-17).
+3. Run the outbox store suite once against the Firestore emulator (needs Java and `pnpm install`; no cloud credential):
+
+   ```powershell
+   pnpm exec firebase emulators:exec --only firestore --project demo-tilo "uv run pytest -q services/api/tests/test_FR_CON_02_ADR35_L2_outbox_store_contract.py"
+   ```
+
+4. Set `tilo-connectors`. `^#^` makes `#` the separator, because the account email holds `@`; every value is quoted:
+
+   ```powershell
+   $P = "essential-wares-510320-f0"; $R = "asia-southeast1"
+   $Conn = gcloud run services describe tilo-connectors --project $P --region $R --format "value(status.url)"
+   gcloud run services update tilo-connectors --project $P --region $R `
+     --update-env-vars "^#^GOOGLE_OAUTH_REDIRECT_BASE_URL=https://essential-wares-510320-f0.web.app#TILO_TOKEN_STORE=firestore#TILO_FIRESTORE_PROJECT=${P}#TILO_TOKEN_DATABASE=tilo-tokens#TILO_KMS_KEY=projects/${P}/locations/${R}/keyRings/tilo-${R}/cryptoKeys/oauth-tokens#TILO_CONNECTORS_AUDIENCE=${Conn}#TILO_MEETING_HOST_CALLER=tilo-api@${P}.iam.gserviceaccount.com" `
+     --update-secrets "GOOGLE_OAUTH_CLIENT_ID=workspace-oauth-client-id:latest,GOOGLE_OAUTH_CLIENT_SECRET=workspace-oauth-client-secret:latest"
+   ```
+
+   `LIVE` stays unset. `--update-*` keeps every other setting. Connectors stays at one instance (ADR-0032 T7).
+5. Confirm the outbox index is READY first (step 2), then set `tilo-api` (same PowerShell session as step 4: `$P`, `$R` and
+   `$Conn` are reused; `TILO_API_STORE` and `TILO_PEOPLE_STORE` stay out: the separate ADR-0026 rollout):
+
+   ```powershell
+   $Conn = gcloud run services describe tilo-connectors --project $P --region $R --format "value(status.url)"
+   gcloud run services update tilo-api --project $P --region $R `
+     --update-env-vars "^#^TILO_OUTBOX_STORE=firestore#TILO_CONNECTORS_URL=${Conn}"
+   ```
+
+6. Deploy the images (`just deploy-dev-cloudbuild connectors`, then `api`) and `just deploy-web` if the web app changed. The
+   Hosting headers for `/oauth/google/callback` are already in `firebase.json`.
+7. Your go. Then `LIVE=1` on connectors only: `gcloud run services update tilo-connectors --project $P --region $R --update-env-vars "LIVE=1"`.
+   Never on `tilo-api`. To switch off, `--remove-env-vars "LIVE"`.
+8. Acceptance (L8) with `tilotesting@gmail.com`: connect Gmail read, then Drive and Calendar write; a draft appears; a send to
+   the same address arrives once; a file lands in the Tilo folder; an event appears and a cancelled one does not; disconnect
+   leaves no Tilo access in the Google account. Testing mode expires a grant after 7 days (PRD 11.5): connect again.
 
 ## Web app (Firebase Hosting, manual; P0-07c)
 

@@ -35,7 +35,7 @@ listed only where Google offers no narrower scope.
 | `tilo-api` | Firestore (default database only); calls connectors' `/internal/meeting-host/*` with an ID token over its VPC egress (ADR-0032); Cloud Tasks enqueue; Vertex AI (Router: approaches, Director); Model Armor (intake screen); `artifacts` bucket (uploads FR-INT-02, downloads PRD 6.2); Firebase ID-token and App Check verification (public keys, no IAM); the schedule tick (FR-AGT-14): receives the Scheduler call (api is public, the route checks its own Google OIDC token), fetches Google's public certs from googleapis.com through Private Google Access (no IAM), and reads and writes `orgs/{org}/schedules` with the `datastore.user` it already holds | project: `datastore.user` limited by an IAM condition to the (default) database, `cloudtasks.enqueuer`, custom role `tiloVertexGenerate` (`aiplatform.endpoints.predict` only) and `modelarmor.user` (added). Bucket `artifacts`: `objectCreator`, `objectViewer` (added). `serviceAccountUser` on `tilo-tasks-invoker` | none | mixed, see cells |
 | `tilo-harness` | Firestore; Cloud Tasks; Vertex AI; Model Armor (model output, tool output); Pub/Sub publish on `tilo-events`; buckets `archive`, `artifacts`, `snapshots`; connectors, browser, render | project: `datastore.user` (default database only, conditioned), `cloudtasks.enqueuer`, `aiplatform.user`, `modelarmor.user` (added). Topic `tilo-events`: `pubsub.publisher`. `archive`: `objectCreator` (present), `objectViewer` (added). `artifacts` and `snapshots`: `objectCreator`, `objectViewer` (added). `run.invoker` on connectors, browser, render. Receives the Gmail renew and poll calls from Scheduler | none | mixed |
 | `tilo-channels` | Vertex AI (triage, drafting); Model Armor (inbound mail and WhatsApp text); `tilo-api`; the Gmail push endpoint (forwards to the API) | project: custom role `tiloVertexGenerate`, `modelarmor.user` (added). Holds no Firestore, Pub/Sub or Storage role (writes through the API, SEC-12) | `whatsapp-api-token`, `channels-webhook-signing-key`, `email-action-link-signing-key` (channels only, moved from api in P0-07b: links.py issues and verifies; present); `whatsapp-webhook-verify-token`, `channel-binding-hmac-key`, `channel-number-encryption-key`, `webpush-vapid-private-key` (added) | mixed |
-| `tilo-connectors` | Firestore (token store, outbox); Cloud KMS; Google Workspace APIs with the user's OAuth token (Gmail, Drive, Calendar, Docs, Sheets, Slides) | project: `datastore.user` (unconditional: both databases, the only account that reaches `tilo-tokens`). Key `oauth-tokens`: `cryptoKeyEncrypterDecrypter` (added: replaces `cryptoKeyDecrypter`, because `tokens.py` wraps a fresh data key per record). `run.invoker` for harness and for `tilo-api` only (ADR-0032 T5: the meeting-host RPC). One instance max (CON-D9) | `workspace-oauth-client` | mixed |
+| `tilo-connectors` | Firestore (token store, outbox); Cloud KMS; Google Workspace APIs with the user's OAuth token (Gmail, Drive, Calendar, Docs, Sheets, Slides) | project: `datastore.user` (unconditional: both databases, the only account that reaches `tilo-tokens`). Key `oauth-tokens`: `cryptoKeyEncrypterDecrypter` (added: replaces `cryptoKeyDecrypter`, because `tokens.py` wraps a fresh data key per record). `run.invoker` for harness and for `tilo-api` only (ADR-0032 T5: the meeting-host RPC). One instance max (CON-D9) | `workspace-oauth-client-id`, `workspace-oauth-client-secret` | mixed |
 | `tilo-browser` | Allowlist egress proxy only; model calls for computer use are made by the harness | none (SEC-12: no Firestore, Datastore or Storage) | none | present |
 | `tilo-render` | Firestore; `artifacts` bucket; Slides and Docs go through connectors | project: `datastore.user` (default database only, conditioned). Bucket `artifacts`: `objectAdmin` (only service that may overwrite) | none | present |
 | `tilo-sandbox-web` | nothing | none | none | present |
@@ -115,10 +115,10 @@ Dependencies (none of these routes exist yet):
 
 ## 5. Secret Manager slots (names only; values added by the user)
 
-Existing: `workspace-oauth-client`, `whatsapp-api-token`,
+Existing: `workspace-oauth-client` (superseded, still declared), `whatsapp-api-token`,
 `channels-webhook-signing-key`, `email-action-link-signing-key` (channels only). Added:
 `whatsapp-webhook-verify-token`, `channel-binding-hmac-key`,
-`channel-number-encryption-key`, `webpush-vapid-private-key`. No version is
+`channel-number-encryption-key`, `webpush-vapid-private-key`, and (ADR-0035 L7) `workspace-oauth-client-id`, `workspace-oauth-client-secret` (connectors only). No version is
 ever created by Terraform (PRD 16.1 rule 4).
 
 ## 6. OAuth consent screen: scopes to add once
@@ -131,7 +131,7 @@ ever created by Terraform (PRD 16.1 rule 4).
 | `https://www.googleapis.com/auth/gmail.send` | threaded send | restricted |
 | `https://www.googleapis.com/auth/drive.file` | picked files and files Tilo creates, incl. Slides, Docs and Sheets output (the Docs, Sheets and Slides APIs accept it for files the app created) | non-sensitive |
 | `https://www.googleapis.com/auth/calendar.readonly` | availability (FR-CON-14) | sensitive |
-| `https://www.googleapis.com/auth/calendar.events` | event writes | sensitive |
+| `https://www.googleapis.com/auth/calendar.events.owned` | event writes on calendars the person owns (ADR-0035; not `calendar.events`) | sensitive |
 
 Never requested: `mail.google.com`, `gmail.modify`, full `drive`.
 
@@ -379,3 +379,22 @@ pinned in `security_iam.tftest.hcl`. Connectors reads the database id from `TILO
 
 Connectors `TILO_*` settings are set by hand (`ignore_env`, like api). The ordered steps and values: `docs/deploy-dev.md`
 ("Meeting host: connectors and api settings").
+
+## 13. OAuth client for the live connectors (ADR-0035 L7)
+
+Console steps (Terraform cannot do these). APIs and Services, Credentials, then the consent screen:
+- Client type Web application. Authorised redirect URI exactly `https://essential-wares-510320-f0.web.app/oauth/google/callback`.
+  No JavaScript origin (the code exchange is server side).
+- Consent screen in Testing mode, with the section 6 scopes: `gmail.readonly`, `gmail.compose`, `gmail.send`, `drive.file`,
+  `calendar.readonly`, `calendar.events.owned`. Test users: `tilotesting@gmail.com` and the meeting bot account.
+- Testing mode expires a grant after 7 days (PRD 11.5): a connection shows `expired` and the person connects again.
+- Client id in the secret `workspace-oauth-client-id`, client secret in `workspace-oauth-client-secret` (Terraform creates
+  both empty; you add ONE version to each after the apply, in the console or with
+  `gcloud secrets versions add <name> --project <project> --data-file=-`, typing the value on stdin: never in the command
+  line). Mounted with `:latest`; rotating is a new version, then a new revision. Readable by `tilo-connectors`
+  only; `tilo-api`, which only starts a connect and calls connectors, holds no secret, KMS or `tilo-tokens` access
+  (`security_iam.tftest.hcl`). New resources: the Firestore index `outbox_transfer_pending`, the two secrets and one accessor binding each.
+
+Order: apply infra incl. the index, wait for it to be READY, run the outbox store suite once on the Firestore emulator, set
+the settings, your go, `LIVE=1` on connectors only, acceptance with `tilotesting@gmail.com`. Commands: `docs/deploy-dev.md`
+("Live connectors").
