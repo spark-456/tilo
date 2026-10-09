@@ -17,6 +17,20 @@ import {
 import type { PaneProps } from "./useTeach";
 
 export function ShowPane({ t, night, user }: PaneProps) {
+  if (t.source !== "fixture") {
+    return (
+      <div
+        className="park-skills-pane park-skills-pane--show"
+        data-testid="skills-connect-to-teach"
+      >
+        <div className="park-skills-none">
+          <div>{agent({ role: "research", expr: "neutral" }, 58, night)}</div>
+          <div className="park-skills-picked-title">Connect to start teaching</div>
+          <div>Connect your workspace tools to capture steps and run a practice session.</div>
+        </div>
+      </div>
+    );
+  }
   const screenish = t.method === "record" || t.method === "guided";
   const done = t.cap >= CAPTURE_STEPS;
   const domain = user.email.split("@")[1];
@@ -126,6 +140,12 @@ export function ShowPane({ t, night, user }: PaneProps) {
         <div className="park-skills-picked">
           <div className="park-skills-picked-head">
             <span className="park-skills-picked-title">What Tilo has picked up</span>
+            <span
+              className="park-skills-pill park-skills-pill--chip"
+              data-testid="skills-sample-run"
+            >
+              Sample run
+            </span>
             <span className="park-skills-picked-count">{`${t.cap} of ${CAPTURE_STEPS}`}</span>
           </div>
           {CAP[t.method].slice(0, t.cap).map((text, i) => (
