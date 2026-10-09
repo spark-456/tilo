@@ -5,6 +5,9 @@ address, token or link). `POST /v1/meeting-host/disconnect`: abandon first, then
 returned parts. The person is the verified principal on a full sign-in session and nothing else: no path, query or body
 value names one, so one person can never read or end another's connection. A failure is a fixed 503 (`not_configured`
 when connectors refused before anything acted, else `unknown`: retry), never success and never raw error text. The
+`revoke_pending` is true when connectors kept a revoke it could not confirm: the person must then remove Tilo under
+Google's Third-party access (ADR-0024 runbook step 2). The POST counts against the people write limit, which needs the
+people stores (`TILO_PEOPLE_STORE=firestore`, else 503 `not_configured`); the GET has no limit. The
 disconnect is idempotent at connectors and here: the entries are abandoned (`failed`, never sent) before the call, so
 a reconnect later sends nothing for them, whatever happens to the call.
 """
@@ -75,15 +78,15 @@ def disconnect(
         got = client.disconnect(user)
     except HostRpcError as exc:
         raise _failed(exc) from None
-    alerts = 0
+    alerts: list[str] = []
     for part in got.parts:
         if isinstance(part, MeetingHostRpcAlertPart):
-            alerts += 1  # ids only; there is no world here to record it in (a kept revoke is retried by a disconnect)
+            alerts.append(part.alert_id)  # ids only; there is no world here to record it in
         elif isinstance(part, MeetingHostRpcConnectionPart) and part.user_id == user and part.connector == CONNECTOR_ID:
             try:  # a lease that held an entry before is gone now: this pass takes it
                 abandon_unsent(user, outbox_store)
             except Exception:  # noqa: BLE001 - the answer is already true; the entry stays for the next event
                 logger.warning("meeting-host disconnect: the second pass could not read the outbox")
-    if alerts:
-        logger.warning("meeting-host disconnect: %d revoke(s) kept for a retry", alerts)
-    return {"disconnected": True, "revoked_at_provider": got.revoked_at_provider}
+    if alerts:  # the ids find connectors' retry record; nothing here or there retries it on its own
+        logger.warning("meeting-host disconnect: revoke at Google not confirmed, alert ids %s", ",".join(alerts))
+    return {"disconnected": True, "revoked_at_provider": got.revoked_at_provider, "revoke_pending": bool(alerts)}

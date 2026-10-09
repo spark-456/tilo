@@ -94,6 +94,8 @@ class InMemoryOutboxStore:
             expiry = self._send_leases.get(outbox_id, (None, None))[1]
             if expiry is not None and now < expiry:
                 return None
+            if self._retries.get(outbox_id, {}).get("ambiguous"):
+                return None  # it may have gone out: decided under this lock, so a concurrent _defer cannot be lost
             entry["state"] = "failed"
             self._retries.pop(outbox_id, None)
             return deepcopy(entry)

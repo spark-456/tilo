@@ -181,7 +181,10 @@ def test_ADR32_T6_FR_MTG_09_disconnect_abandons_the_owners_unsent_entries_before
     mine, other = rig.enqueue(user=OWNER, key="1"), rig.enqueue(user="u_stranger", key="2")
     rig.set((ok(REVOKED_OWN),))
     response = rig.p.post("/v1/meeting-host/disconnect")
-    assert (response.status_code, response.json()) == (200, {"disconnected": True, "revoked_at_provider": True})
+    assert (response.status_code, response.json()) == (
+        200,
+        {"disconnected": True, "revoked_at_provider": True, "revoke_pending": False},
+    )
     assert rig.transport.calls[0]["path"] == "/internal/meeting-host/disconnect"
     assert rig.transport.calls[0]["json"] == {"user_id": OWNER}
     assert rig.transport.at_call[0][mine] == "failed" and rig.transport.at_call[0][other] == "queued"  # abandon first
@@ -224,7 +227,10 @@ def test_ADR32_T6_FR_MTG_09_only_the_owners_own_parts_are_applied_and_alerts_rai
     parts = [{**REVOKED, "user_id": "u_stranger"}, {"type": "alert.raised", "alert_id": "01JB5VQ0000000000000000777"}]
     rig.set((ok({"revoked_at_provider": False, "parts": parts}),))
     response = rig.p.post("/v1/meeting-host/disconnect")
-    assert response.json() == {"disconnected": True, "revoked_at_provider": False} and rig.state(stranger) == "queued"
+    assert (
+        response.json() == {"disconnected": True, "revoked_at_provider": False, "revoke_pending": True}
+        and rig.state(stranger) == "queued"
+    )
 
 
 def test_ADR32_T6_FR_MTG_09_a_part_for_the_owner_in_the_answer_abandons_what_a_lease_had_held(rig):
@@ -332,3 +338,42 @@ def test_ADR32_T6_FR_MTG_09_a_token_that_cannot_be_minted_is_not_sent(rig):
     with pytest.raises(HostRpcError) as caught:
         rpc.disconnect(OWNER)
     assert caught.value.kind == "not_sent" and rig.transport.calls == []
+
+
+ALERT_ID = "01JB5VQ0000000000000000777"
+
+
+def test_ADR32_T6_FR_MTG_09_a_kept_revoke_is_revoke_pending_and_its_alert_id_is_logged(rig, caplog):
+    caplog.set_level(logging.WARNING)
+    parts = [{**REVOKED, "user_id": OWNER}, {"type": "alert.raised", "alert_id": ALERT_ID}]
+    rig.set((ok({"revoked_at_provider": False, "parts": parts}),))
+    body = rig.p.post("/v1/meeting-host/disconnect").json()
+    assert body == {"disconnected": True, "revoked_at_provider": False, "revoke_pending": True}
+    assert ALERT_ID in caplog.text and "next disconnect" not in caplog.text
+
+
+def test_ADR32_T6_FR_MTG_09_nothing_stored_is_not_pending_and_a_clean_revoke_is_confirmed(rig):
+    rig.set((ok({"revoked_at_provider": False, "parts": []}), ok(REVOKED_OWN)))
+    nothing = rig.p.post("/v1/meeting-host/disconnect").json()
+    clean = rig.p.post("/v1/meeting-host/disconnect").json()
+    assert nothing == {"disconnected": True, "revoked_at_provider": False, "revoke_pending": False}
+    assert clean == {"disconnected": True, "revoked_at_provider": True, "revoke_pending": False}
+
+
+def test_ADR32_T6_FR_MTG_09_an_entry_that_turns_ambiguous_between_the_read_and_the_abandon_stays(rig):
+    entry_id = rig.enqueue(user=OWNER)
+    real = rig.store.retry_state
+
+    def racing(outbox_id: str) -> dict:
+        seen = real(outbox_id)
+        rig.store._retries[outbox_id] = {"ambiguous": True}  # a send finishes ambiguous right after the read
+        return seen
+
+    rig.store.retry_state = racing  # type: ignore[method-assign]
+    assert meeting_host.abandon_unsent(OWNER, rig.store) == 0 and rig.state(entry_id) == "queued"
+
+
+def test_ADR32_T6_FR_MTG_09_the_store_refuses_to_abandon_an_ambiguous_entry_under_its_own_lock(rig):
+    entry_id = rig.enqueue(user=OWNER)
+    rig.store._retries[entry_id] = {"ambiguous": True}
+    assert rig.store._abandon(entry_id, NOW) is None and rig.state(entry_id) == "queued"
