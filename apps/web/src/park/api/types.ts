@@ -488,10 +488,10 @@ export interface QuietHours {
   threshold: string;
 }
 export interface ProfileSettings {
-  sessions: ProfileSession[];
-  invoices: ProfileInvoice[];
-  payment: PaymentMethod;
-  plan: PlanInfo;
+  sessions: ProfileSession[] | null;
+  invoices: ProfileInvoice[] | null;
+  payment: PaymentMethod | null;
+  plan: PlanInfo | null;
   notifications: NotificationRow[];
   quiet: QuietHours;
 }
