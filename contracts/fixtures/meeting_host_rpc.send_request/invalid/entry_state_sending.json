@@ -1,0 +1,125 @@
+{
+  "entry": {
+    "id": "01JB5VQ0000000000000009310",
+    "idempotency_key": "r_team_sync_1:U1:create_meeting_event:1",
+    "world_id": "w_team_sync",
+    "run_id": "r_team_sync_1",
+    "action_type": "create_meeting_event",
+    "connector": "meeting_host",
+    "recipients": ["owner@example.com", "invitee@example.org"],
+    "attachments": [],
+    "item": {
+      "artifact_id": "art_meeting_draft",
+      "version": 1
+    },
+    "destination": "primary",
+    "modifiers": ["new_recipients"],
+    "risk_tier": "T3",
+    "authz": {
+      "by": "person",
+      "ref": "u_owner",
+      "at": "2026-10-08T09:32:09.500Z"
+    },
+    "undo_window_s": 0,
+    "scheduled_at": "2026-10-08T09:32:10.000Z",
+    "state": "sending",
+    "created_at": "2026-10-08T09:32:10.000Z"
+  },
+  "evidence": {
+    "reserved_by": {
+      "v": "1.0",
+      "id": "01JB5VQ0000000000000000034",
+      "seq": 34,
+      "ts": "2026-10-08T09:31:25.500Z",
+      "world_id": "w_team_sync",
+      "run_id": "r_team_sync_1",
+      "type": "approval.requested",
+      "actor": "A_s1",
+      "target": "G1",
+      "level": "L1",
+      "district": "D1",
+      "item": null,
+      "severity": "gate",
+      "credits": 0,
+      "summary": "The meeting invitation is ready. Sending it needs your approval.",
+      "cause": "01JB5VQ0000000000000000033",
+      "vis": "all",
+      "authz": null,
+      "data": {
+        "gate_id": "G1",
+        "card_id": "01JB5VQ0000000000000009311",
+        "outbox_id": "01JB5VQ0000000000000009310",
+        "action_type": "create_meeting_event",
+        "risk_tier": "T3",
+        "irreversible": true,
+        "item": {
+          "artifact_id": "art_meeting_draft",
+          "version": 1
+        },
+        "approver": null,
+        "team_lead": null
+      },
+      "trace": {
+        "model_role": null,
+        "profile": null,
+        "tokens_in": null,
+        "tokens_out": null,
+        "tool": null,
+        "latency_ms": null,
+        "archive_ref": null
+      }
+    },
+    "authorised_by": {
+      "v": "1.0",
+      "id": "01JB5VQ0000000000000000037",
+      "seq": 37,
+      "ts": "2026-10-08T09:32:09.500Z",
+      "world_id": "w_team_sync",
+      "run_id": "r_team_sync_1",
+      "type": "approval.resolved",
+      "actor": "u_owner",
+      "target": "G1",
+      "level": "L1",
+      "district": "D1",
+      "item": null,
+      "severity": "info",
+      "credits": 0,
+      "summary": "You approved sending the meeting invitation.",
+      "cause": "01JB5VQ0000000000000000036",
+      "vis": "all",
+      "authz": {
+        "by": "person",
+        "ref": "u_owner",
+        "at": "2026-10-08T09:32:09.500Z"
+      },
+      "data": {
+        "gate_id": "G1",
+        "card_id": "01JB5VQ0000000000000009311",
+        "outbox_id": "01JB5VQ0000000000000009310",
+        "option": "approve",
+        "channel": "web",
+        "pin_verified": false
+      },
+      "trace": {
+        "model_role": null,
+        "profile": null,
+        "tokens_in": null,
+        "tokens_out": null,
+        "tool": null,
+        "latency_ms": null,
+        "archive_ref": null
+      }
+    },
+    "world_owner": "u_owner",
+    "policy": null,
+    "team_lead": null,
+    "instruction": null,
+    "earlier_applied": []
+  },
+  "draft": {
+    "artifact_id": "art_meeting_draft",
+    "version": 1,
+    "content_sha256": "7886c0b783de0915a2b69b3963f7c9393cdd7c036e73f54c35a837c84341d7b2",
+    "content_b64": "eyJhdHRlbmRlZXMiOlsib3duZXJAZXhhbXBsZS5jb20iLCJpbnZpdGVlQGV4YW1wbGUub3JnIl0sImNvbmZlcmVuY2UiOiJoYW5nb3V0c01lZXQiLCJlbmQiOiIyMDI2LTEwLTEyVDA1OjAwOjAwLjAwMFoiLCJndWVzdHNfY2FuX2ludml0ZV9vdGhlcnMiOmZhbHNlLCJndWVzdHNfY2FuX21vZGlmeSI6ZmFsc2UsImd1ZXN0c19jYW5fc2VlX290aGVyX2d1ZXN0cyI6ZmFsc2UsImtpbmQiOiJtZWV0aW5nX2V2ZW50IiwibWVldGluZ19pZCI6Im10X3dlZWtseTEiLCJvd25lciI6InVfb3duZXIiLCJzZW5kX3VwZGF0ZXMiOiJhbGwiLCJzdGFydCI6IjIwMjYtMTAtMTJUMDQ6MzA6MDAuMDAwWiIsInRpbWVfem9uZSI6IkFzaWEvS29sa2F0YSIsInRpdGxlIjoiV2Vla2x5IHBsYW5uaW5nIiwidiI6IjEuMCJ9"
+  }
+}

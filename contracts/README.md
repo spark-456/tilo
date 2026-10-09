@@ -44,6 +44,7 @@ the contract wins. Conventions are in [ADR-0002](../docs/adr/0002-contract-conve
 | `plate.schema.json` | A person's plate (FR-PA-02): the read model S-27, the digest and the panel share; rows and parked lanes, groups and order by code (ADR-0021, PE-26 to PE-30) | 1.0.0 |
 | `scenario.schema.json` | `config/scenarios/<id>.yaml` (FR-INT-11, ADR-0014): skills, connectors, seed data, theme and autonomy policy seeds, and nothing else; rules SN-01 to SN-09 in `scenario.rules.md` | 1.0.0 |
 | `spend_caps.schema.json` | `SpendCapsConfig`: `config/spend_caps.yaml`, live-model spend caps in INR minor units (per uid lifetime, per run, per org day, deployment day hard cap), the flat reservation per live unit (1.1.0) and the per-uid rate limit (SEC-16, FR-MTR-04; ADR-0002 decision 16) | 1.1.0 |
+| `meeting_host_rpc.schema.json` | `MeetingHostRpc`: tilo-api to tilo-connectors' internal routes (FR-MTG-09, ADR-0032): `send_request`/`send_answer`, `user_request` with `status_answer`, `disconnect_answer` or `views_answer`, and the `error` body; closed, no token, OAuth code or Meet link; send `entry` narrowed to MH-10, 50 recipients, draft base64 at most 32 KiB, 64 KiB body (BQ-ADR32T1-1, -2); fixtures per message only (`fixtures/meeting_host_rpc.<def>/`), none for the root union. 1.1.0 adds `views_answer`, `connection_view` and `scope` for `/internal/connections/views`: connector, state (`connected`, `expired`), declared scopes and `connected_at` only, at most 32 views (ADR-0032 addendum 1, HB-08, HB-09, LIVE-GAPS) | 1.1.0 |
 
 Still to come: `appspec` (Could).
 
