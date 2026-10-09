@@ -45,7 +45,27 @@ function createDefaultClient(): TiloClient {
   return chooseClient({ apiUrl: API_URL, search, appCheckToken, authToken });
 }
 
-const ClientContext = createContext<TiloClient>(createDefaultClient());
+const defaultClient = createDefaultClient();
+const ClientContext = createContext<TiloClient>(defaultClient);
+
+/** DEMO-FIXTURES-1: a demo (anonymous) session reads the fixture world everywhere, never the API: the server refuses a
+ * demo without a declaration and a demo stores nothing and calls no real model. Only the default client is swapped; a
+ * client a provider or a test supplied is the caller's choice. */
+export function clientFor(
+  current: TiloClient,
+  demo: TiloClient,
+  status: string,
+  isDefault: TiloClient = current,
+): TiloClient {
+  return status === "anonymous" && current === isDefault ? demo : current;
+}
+
+let demoClient: TiloClient | null = null;
+const demoFixture = (): TiloClient => {
+  const search = typeof window === "undefined" ? "" : window.location.search;
+  demoClient ??= chooseClient({ apiUrl: undefined, search });
+  return demoClient;
+};
 
 export function ClientProvider({
   client,
@@ -57,7 +77,11 @@ export function ClientProvider({
   return <ClientContext.Provider value={client}>{children}</ClientContext.Provider>;
 }
 
-export const useClient = (): TiloClient => useContext(ClientContext);
+export function useClient(): TiloClient {
+  const context = useContext(ClientContext);
+  const state = useSyncExternalStore(session.subscribe, session.getState);
+  return state.status === "anonymous" && context === defaultClient ? demoFixture() : context;
+}
 
 /** True while the active client serves fixtures, so every screen shows the HR-4/BQ-07 banner. */
 export const useIsFixtureClient = (): boolean => useClient() instanceof FixtureClient;
