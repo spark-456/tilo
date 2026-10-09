@@ -2,10 +2,10 @@
 `API_MTG09_b.md`, the connector half in services/connectors/tests/API_FR_MTG_09.md).
 
 Named `_mtg09b_lib` for the same global-bare-module-name reason as `_ppl11a_lib.py`. Nothing here is business logic:
-it builds schema-valid records, fakes the two Google seams (the token broker and the HTTP transport behind
-`MeetingHostAdapter`), and drives the real `tilo_api.app` through `TestClient`. A seam production does not have yet
-resolves to a placeholder key (`_clint1_lib.seam`), so a missing seam shows up as a failed request, never as an
-`AttributeError` in set-up.
+it builds schema-valid records, fakes tilo-connectors (its real routes over a fake token broker and a fake Google
+Calendar, `InProcessConnectors`, ADR-0032), and drives the real `tilo_api.app` through `TestClient`. A seam production
+does not have yet resolves to a placeholder key (`_clint1_lib.seam`), so a missing seam shows up as a failed request,
+never as an `AttributeError` in set-up.
 
 What the doubles keep out of production code: `FakeHostCalendar` answers EVERY call with a full event (a planted Meet
 link, a planted `htmlLink`, an entry point and the attendee list) whatever the request's `fields` mask says, so only the
@@ -276,7 +276,7 @@ class FakeBroker:
         self.emit: Callable[[dict[str, Any]], None] | None = None
 
     def access_token_for_adapter(
-        self, user_id: str, connector: str, *, required_scopes: Any, force_refresh: bool = False
+        self, user_id: str, connector: str, *, required_scopes: Any, force_refresh: bool = False, not_before: Any = None
     ) -> str:
         from tilo_connectors.tokens import NotConnected  # noqa: PLC0415
 
@@ -288,6 +288,9 @@ class FakeBroker:
     def connection_state(self, user_id: str, connector: str) -> str | None:
         return "connected" if self.connected else None
 
+    def granted_scopes(self, user_id: str, connector: str) -> list[str]:
+        return [CALENDAR_EVENTS_OWNED] if self.connected else []
+
     def revoked_part(self, user_id: str, connector: str = CONNECTOR_ID) -> dict[str, Any]:
         return {"type": "connection.revoked", "authz": None, "data": {"connector": connector}, "user_id": user_id}
 
@@ -295,6 +298,64 @@ class FakeBroker:
         self.connected = False
         if self.emit is not None:
             self.emit(self.revoked_part(user_id, connector))
+
+
+class InProcessConnectors:
+    """tilo-connectors' real meeting-host routes (ADR-0032) over the fake broker and the fake calendar, reached through
+    `MeetingHostRpc`'s transport seam with a fake ID-token verifier: no network. `down` makes it answer 503
+    `not_configured` the way a connectors that lacks its settings does."""
+
+    def __init__(self, broker: FakeBroker, calendar: FakeHostCalendar) -> None:
+        from fastapi.testclient import TestClient  # noqa: PLC0415
+        from tilo_api.meeting_host_rpc import MeetingHostRpc  # noqa: PLC0415
+        from tilo_connectors.app import create_app  # noqa: PLC0415
+        from tilo_connectors.host_routes import AUDIENCE_VAR, CALLER_VAR, HostRuntime  # noqa: PLC0415
+
+        self.audience = "https://tilo-connectors-" + secrets.token_hex(3) + ".a.run.app"
+        self.script: list[Any] = []  # callables(body) -> Reply, used instead of the real routes, one per call
+        self.lose_answers = 0  # this many calls reach connectors for real, then their answer is lost in transit
+        caller, self.id_token, self.down = (
+            "api-" + secrets.token_hex(3) + "@demo-tilo.example.test",
+            secrets.token_hex(12),
+            False,
+        )
+        claims = {"iss": "https://accounts.google.com", "aud": self.audience, "email": caller, "email_verified": True}
+        outer = self
+
+        class Verifier:
+            def verify(self, token: str, audience: str) -> dict[str, Any]:
+                if token != outer.id_token:
+                    raise ValueError("bad token")
+                return claims
+
+        def opener(_env: Any, *, emit: Any, alert: Any) -> FakeBroker:
+            if broker.emit is None:  # a test that set its own sink keeps it
+                broker.emit = emit
+            return broker
+
+        runtime = HostRuntime(
+            {AUDIENCE_VAR: self.audience, CALLER_VAR: caller}, verifier=Verifier(), broker_opener=opener,
+            transport_opener=lambda env: calendar,
+        )  # fmt: skip
+        self.client = TestClient(create_app(runtime))
+        self.rpc = MeetingHostRpc(self.audience, transport=self, token_for=lambda audience: self.id_token)
+
+    def post(self, url: str, body: bytes, headers: Any, timeout_s: float) -> Any:
+        from tilo_api.meeting_host_rpc import (
+            Reply,  # noqa: PLC0415
+            TransportError,  # noqa: PLC0415
+        )
+
+        if self.down:
+            return Reply(503, b'{"error":"not_configured"}')
+        sending = url.endswith("/send")  # the scripted and lost answers are the send's; a status call is real
+        if self.script and sending:
+            return self.script.pop(0)(body)
+        response = self.client.post(url.removeprefix(self.audience), content=body, headers=dict(headers))
+        if self.lose_answers and sending:
+            self.lose_answers -= 1
+            raise TransportError
+        return Reply(response.status_code, response.content)
 
 
 class _RefusingRunner:
@@ -328,6 +389,7 @@ class HostRig:
         self.outbox_store = InMemoryOutboxStore()
         self.calendar = FakeHostCalendar()
         self.broker = FakeBroker()
+        self.connectors = InProcessConnectors(self.broker, self.calendar)
         self.registry = load_registry(rig.deps._REPO_ROOT / "config" / "connectors.yaml")
         self.compile_calls: list[dict[str, Any]] = []
         self.runner_calls: list[str] = []
@@ -347,8 +409,7 @@ class HostRig:
         ov[seam(deps, "get_outbox_store")] = lambda: self.outbox_store
         ov[seam(deps, "get_connector_registry")] = lambda: self.registry
         ov[seam(deps, "get_connector_adapters")] = lambda: {}  # the host path builds its own adapter (API_MTG09_b.md)
-        ov[seam(deps, "get_token_broker")] = lambda: self.broker
-        ov[seam(deps, "get_meeting_host_transport")] = lambda: self.calendar
+        ov[seam(deps, "get_meeting_host_client")] = lambda: self.connectors.rpc
         ov[seam(deps, "get_plan_compiler")] = lambda: self._compile
         ov[seam(deps, "get_layout_builder")] = lambda: self._layout
         ov[seam(deps, "get_unit_runner")] = lambda: _RefusingRunner(self.runner_calls)
