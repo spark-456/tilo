@@ -13,7 +13,9 @@ const ok = <T>(data: T): Promise<ApiResult<T>> =>
   Promise.resolve({ data: structuredClone(data), source: "fixture" });
 const ack = (): Promise<ApiResult<Ack>> => ok({ ok: true });
 
-export function createFixtureApi(): Api {
+export function createFixtureApi(): Omit<Api, "getProfileSettings"> & {
+  getProfileSettings(): Promise<ApiResult<typeof fx.profileSettings>>;
+} {
   let dec: Dec = {};
   let started = 0;
   const set = (key: DecisionKey, on: boolean) => {

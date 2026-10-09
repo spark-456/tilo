@@ -325,10 +325,10 @@ describe("WEB_1d_types: the new shapes (type-level; checked by the typecheck)", 
       threshold: string;
     }>();
     expectTypeOf<ProfileSettings>().toEqualTypeOf<{
-      sessions: ProfileSession[];
-      invoices: ProfileInvoice[];
-      payment: PaymentMethod;
-      plan: PlanInfo;
+      sessions: ProfileSession[] | null;
+      invoices: ProfileInvoice[] | null;
+      payment: PaymentMethod | null;
+      plan: PlanInfo | null;
       notifications: NotificationRow[];
       quiet: QuietHours;
     }>();
@@ -337,7 +337,9 @@ describe("WEB_1d_types: the new shapes (type-level; checked by the typecheck)", 
   it("WEB_1d_types_the_fixtures_and_the_api_reads_are_typed_with_them", () => {
     expectTypeOf(fx.teamPolicy).toEqualTypeOf<TeamPolicy>();
     expectTypeOf(fx.connectorTerms).toEqualTypeOf<ConnectorTerms>();
-    expectTypeOf(fx.profileSettings).toEqualTypeOf<ProfileSettings>();
+    expectTypeOf(fx.profileSettings).toEqualTypeOf<{
+      [K in keyof ProfileSettings]: NonNullable<ProfileSettings[K]>;
+    }>();
     expectTypeOf<Api["getTeamPolicy"]>().toEqualTypeOf<() => Promise<ApiResult<TeamPolicy>>>();
     expectTypeOf<Api["getConnectorTerms"]>().toEqualTypeOf<
       () => Promise<ApiResult<ConnectorTerms>>

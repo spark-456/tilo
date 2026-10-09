@@ -5,16 +5,10 @@ import type { Skill } from "../../api/types";
 
 export interface SkillTrustConfig {
   readonly minGoodRunsForTrust: number;
-  readonly baseMonthlyAnswersAndFixes: number;
-  readonly mistakesDeltaSinceJuly: string;
-  readonly helperMonthLabel: string;
 }
 
 export const SKILL_TRUST_CONFIG: SkillTrustConfig = {
   minGoodRunsForTrust: 5,
-  baseMonthlyAnswersAndFixes: 41,
-  mistakesDeltaSinceJuly: "−38%",
-  helperMonthLabel: "September",
 };
 
 export interface SkillFixEntry {

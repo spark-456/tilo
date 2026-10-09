@@ -316,15 +316,33 @@ describe("WEB_6_world_states: loading and not built", () => {
     expect(qa(el, "h1").length).toBeLessThanOrEqual(1);
   });
 
-  it.each(["getWorlds", "getPlans", "getDecisions", "getSkills", "getConnectors"] as const)(
-    "WEB_6_world_states_when_%s_is_not_built_the_page_says_Not_connected_yet_and_shows_no_sample_value",
-    async (method) => {
+  it("WEB_6_world_states_when_getWorlds_is_not_built_the_page_says_Not_connected_yet_and_shows_no_sample_value", async () => {
+    const base = createFixtureApi();
+    const { el } = await mountWorld({ api: { ...base, getWorlds: createLiveApi().getWorlds } });
+    const text = pageText(el);
+    expect(text).toContain("Not connected yet");
+    for (const sample of SAMPLE_ONLY) expect(text, sample).not.toContain(sample);
+  });
+
+  // LIVE-HOME: the world itself comes from the worlds; a side read that is not built or fails leaves a gap in its
+  // own card, which says so, and the page still opens.
+  it.each([
+    ["getPlans", "City map: Not available yet"],
+    ["getDecisions", "Waiting on you"],
+    ["getSkills", "Skills"],
+    ["getConnectors", "Tools"],
+  ] as const)(
+    "WEB_6_world_states_when_%s_is_not_built_only_its_card_says_Not_available_yet",
+    async (method, title) => {
       const base = createFixtureApi();
       const live = createLiveApi();
       const { el } = await mountWorld({ api: { ...base, [method]: live[method] } as Api });
       const text = pageText(el);
-      expect(text).toContain("Not connected yet");
-      for (const sample of SAMPLE_ONLY) expect(text, sample).not.toContain(sample);
+      expect(text).not.toContain("Not connected yet");
+      expect(text).toContain("Not available yet");
+      expect(text).toContain(title);
+      expect(text).not.toMatch(/NotBuilt|not_built|getPlans|getDecisions|getSkills|getConnectors/);
+      expect(qa(el, "h1")).toHaveLength(1);
     },
   );
 

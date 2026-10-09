@@ -5,7 +5,7 @@
 // `isKeptPath` are the shared predicates for the split (WEB-CUTOVER). /privacy and /terms (WEB-LEGAL) are
 // static public pages: their own chunk, loading neither app (no sign-in, no API). SEC-15: both apps sit behind the
 // sign-in gate; with no Firebase here (a local host, a build with no config) the gate shows the app at once.
-import { Suspense, lazy } from "react";
+import { Suspense, lazy, useEffect } from "react";
 import { SignInGate } from "./auth/SignInGate";
 import { session } from "./auth/session";
 import { isKeptPath } from "./keptPaths";
@@ -22,6 +22,12 @@ const LegalPage = lazy(() => import("./legal/LegalPage"));
 export function Root() {
   const pathname = usePathname();
   const legal = legalKind(pathname);
+  const park = isParkPath(pathname) || !isKeptPath(pathname);
+  // ONBOARD-1: the first-run welcome and tour register themselves with the Park shell (park/shell/tour.ts): a chunk of
+  // its own, started beside the Park app's and never awaited by it. The kept screens and legal pages never load it.
+  useEffect(() => {
+    if (park && !legal) void import("./onboarding/register");
+  }, [park, legal]);
   if (legal) {
     return (
       <Suspense fallback={null}>
@@ -29,7 +35,6 @@ export function Root() {
       </Suspense>
     );
   }
-  const park = isParkPath(pathname) || !isKeptPath(pathname);
   return (
     <SignInGate auth={session}>
       <Suspense fallback={null}>{park ? <ParkApp /> : <App />}</Suspense>

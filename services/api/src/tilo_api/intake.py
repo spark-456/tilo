@@ -38,7 +38,7 @@ from tilo_providers.interfaces import SafetyProvider
 from tilo_providers.replay import ReplayMissError
 from tilo_providers.router import Router
 
-from tilo_api import deps, quick
+from tilo_api import deps, ephemeral, quick
 from tilo_api.assistant.metering import SpendLedger
 from tilo_api.deps import get_safety  # the dependency key tests and callers override
 from tilo_api.tasks import create_task
@@ -49,8 +49,9 @@ logger = logging.getLogger("tilo_api.intake")
 _store = InMemoryArtifactStore()
 
 
-def get_store() -> InMemoryArtifactStore:
-    return _store
+def get_store(request: Request = None) -> InMemoryArtifactStore:  # type: ignore[assignment]
+    demo = ephemeral.for_request(request) if request is not None else None
+    return _store if demo is None else demo.uploads  # a demo's uploads are its own, in memory, gone with it
 
 
 @router.post("/intake", status_code=201)
@@ -158,7 +159,7 @@ async def _quick(
         body = await run_in_threadpool(
             quick.respond, text=request.text, uid=uid, has_files=bool(request.files), scenario=scenario,
             safety=safety, router=model_router, allowance=allowance, switches=flags, mode=work_mode,
-            caps=deps.caps_for(http), key=http.headers.get("idempotency-key"),
+            caps=deps.caps_for(http), key=http.headers.get("idempotency-key"), ledger=deps.ledger_writer_for(http),
         )  # fmt: skip
     except quick.QuickRefusal as refusal:
         return JSONResponse(status_code=refusal.status, content={"error": refusal.message})

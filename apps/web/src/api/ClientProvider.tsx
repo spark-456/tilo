@@ -1,6 +1,7 @@
 import { type ReactNode, createContext, useContext, useSyncExternalStore } from "react";
 import { createAppCheckTokenGetter } from "../appcheck/appCheck";
 import { session } from "../auth/session";
+import type { SessionView } from "../park/api/select";
 import type { TiloClient } from "./client";
 import { chooseClient } from "./config";
 import { FixtureClient } from "./fixtureClient";
@@ -21,6 +22,22 @@ export const appCheckToken: (() => Promise<string | null>) | undefined =
  * nobody is signed in, on a local host and in a build with no Firebase config (no SDK is loaded then). */
 export const authToken: (() => Promise<string | null>) | undefined =
   typeof window === "undefined" ? undefined : () => session.idToken();
+
+/** Today by the person's own clock, as a calendar date: the sample company's dates follow it (park/api/sampleDates.ts). */
+export const civilToday = (): { y: number; m: number; d: number } => {
+  const now = new Date();
+  return { y: now.getFullYear(), m: now.getMonth() + 1, d: now.getDate() };
+};
+
+/** Who is signed in, read at call time from the one sign-in session (LIVE-HOME). */
+export const sessionView: SessionView = {
+  now: () => new Date(),
+  demo: () => session.getState().status === "anonymous",
+  identity: () => {
+    const state = session.getState();
+    return state.status === "google" ? { name: state.displayName, email: state.email } : null;
+  },
+};
 
 // `VITE_TILO_API_URL` selects the HTTP client (config.ts); the fixture client is the default.
 function createDefaultClient(): TiloClient {
