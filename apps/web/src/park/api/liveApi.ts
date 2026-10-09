@@ -1,6 +1,6 @@
 // The live Api (WEB-1a, WIRE-1..3, FR-UX-13): `startWorld` makes the real intake call; `getLedger` reads `GET {base}/costs`, `getWorlds` walks `GET {base}/worlds`
 // pages, `getDecisions` walks `GET {base}/cards` pages and `decide` answers one card with one POST (the
-// person's tap, never a retry). Profile defaults and preferences are in-memory page choices; other methods are NotBuilt and
+// person's tap, never a retry). `getNotifications` reads `/v1/notifications`. Profile defaults and preferences are in-memory page choices; other methods are NotBuilt and
 // fetches nothing. With no base url nothing is fetched at all. It never imports the fixtures, so sample
 // numbers cannot pass as live (HR-1..HR-7). Failures are the shared `TiloApiError` (src/api/http.ts).
 import type { IntakeResult } from "../../api/client";
@@ -14,6 +14,7 @@ import {
   decisionsFromCards,
 } from "./live/decisionsFromCards";
 import { type CostReport, ledgerFromCosts } from "./live/ledgerFromCosts";
+import { notificationsFromList } from "./live/notificationsFromList";
 import { profileDefaults } from "./live/profileDefaults";
 import { worldFromIntake } from "./live/worldFromIntake";
 import { STATE_OF, type WorldListItem, worldsFromList } from "./live/worldsFromList";
@@ -216,6 +217,11 @@ export function createLiveApi(options: LiveApiOptions = {}): Api {
     const report = await http.getJson("/costs");
     if (!isCostReport(report)) throw new TiloApiError(BAD_REPLY, 200, true);
     return { data: ledgerFromCosts(report), source: "live" };
+  };
+  api.getNotifications = async () => {
+    const data = notificationsFromList(await http.getJson("/v1/notifications?limit=100"));
+    if (data === null) throw new TiloApiError(BAD_REPLY, 200, true);
+    return { data, source: "live" };
   };
   api.getWorlds = async (_dec, added) => {
     const items: WorldListItem[] = [];
