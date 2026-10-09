@@ -7,7 +7,7 @@
 // addresses the browser follows, but only for a world whose data came from the live API: a sample world has no
 // recorded run, so the same elements are disabled with the reason (docs/park-designed-not-in-prd/World.md).
 import { type ChangeEvent, type ReactNode, useEffect, useRef, useState } from "react";
-import type { Connector, Decision, Plan, Skill, World } from "../../api/types";
+import type { ApiResult, Connector, Decision, Plan, Skill, World } from "../../api/types";
 import type { AppCtx } from "../../app/AppCtx";
 import { useParkApi } from "../../app/context";
 import { stagePath } from "../../app/router";
@@ -43,7 +43,18 @@ interface Loaded {
   decisions: Decision[];
   skills: Skill[];
   connectors: Connector[];
+  /** The side reads that failed or are not built: each card says so itself, the page still opens from the worlds. */
+  gaps: { plans: boolean; decisions: boolean; skills: boolean; connectors: boolean };
 }
+
+const NOT_YET = "Not available yet";
+
+/** Runs one side read: its failure is a gap in that card, never the whole page. */
+const optional = <T,>(read: Promise<ApiResult<T>>): Promise<ApiResult<T> | null> =>
+  read.then(
+    (r) => r,
+    () => null,
+  );
 
 /** S-05's first building (screens/meta.ts): a Park plan's own building ids are not stage ids. */
 const INSPECT_BUILDING = "B1";
@@ -101,6 +112,18 @@ function MapArt({
   );
 }
 
+/** A side card whose read is not built or failed: its own plain line, nothing sample in its place. */
+function NotYetCard({ title }: { title: string }) {
+  return (
+    <section className="park-world-spend" aria-label={title}>
+      <div className="park-world-spendhead">
+        <span className="park-world-spendtitle">{title}</span>
+      </div>
+      <div className="park-world-spendnote">{NOT_YET}</div>
+    </section>
+  );
+}
+
 function Frame({ children, worldId }: { children?: ReactNode; worldId?: string }) {
   return (
     <div className="park-world-root" data-testid="park-page-world" data-world-id={worldId}>
@@ -129,20 +152,26 @@ export function WorldPage({ app }: { app: AppCtx }) {
     let live = true;
     Promise.all([
       api.getWorlds(dec, added),
-      api.getPlans(dec),
-      api.getDecisions(),
-      api.getSkills(),
-      api.getConnectors(),
+      optional(api.getPlans(dec)),
+      optional(api.getDecisions()),
+      optional(api.getSkills()),
+      optional(api.getConnectors()),
     ]).then(
       ([worlds, plans, decisions, skills, connectors]) => {
         if (!live) return;
         setLoaded({
           worlds: worlds.data,
           live: worlds.source === "live",
-          plans: plans.data,
-          decisions: decisions.data,
-          skills: skills.data,
-          connectors: connectors.data,
+          plans: plans?.data ?? {},
+          decisions: decisions?.data ?? [],
+          skills: skills?.data ?? [],
+          connectors: connectors?.data ?? [],
+          gaps: {
+            plans: plans === null,
+            decisions: decisions === null,
+            skills: skills === null,
+            connectors: connectors === null,
+          },
         });
       },
       () => {
@@ -373,6 +402,9 @@ export function WorldPage({ app }: { app: AppCtx }) {
         <div className="park-world-mapcard">
           <div className={isCity ? "park-world-map" : "park-world-map park-world-map--art"}>
             <MapArt w={w} plans={loaded.plans} app={app} />
+            {isCity && loaded.gaps.plans ? (
+              <p className="park-world-meta">City map: {NOT_YET}</p>
+            ) : null}
             <div className="park-world-tag">{heroTagOf(w)}</div>
             {isPaused ? (
               <div className="park-world-overlay">
@@ -419,7 +451,9 @@ export function WorldPage({ app }: { app: AppCtx }) {
 
         {part(2) ? (
           <div className="park-world-side">
-            {open > 0 ? (
+            {loaded.gaps.decisions ? (
+              <NotYetCard title="Waiting on you" />
+            ) : open > 0 ? (
               <WaitingCard
                 mine={mine}
                 dec={dec}
@@ -437,6 +471,9 @@ export function WorldPage({ app }: { app: AppCtx }) {
               onSkill={(skill) => app.go("skills", { id: skill })}
               onTools={() => app.go("connectors")}
             />
+            {loaded.gaps.skills || loaded.gaps.connectors ? (
+              <NotYetCard title={loaded.gaps.skills ? "Skills" : "Tools"} />
+            ) : null}
           </div>
         ) : null}
       </div>

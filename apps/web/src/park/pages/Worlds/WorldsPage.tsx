@@ -58,7 +58,7 @@ export function WorldsPage({ app }: { app: AppCtx }) {
         : Promise.resolve({ data: [] as Connector[] });
     Promise.all([
       api.getWorlds(dec, added),
-      api.getDecisions(),
+      api.getDecisions().catch(() => ({ data: [] as Decision[] })),
       api.getPlans(dec).catch(() => ({ data: {} as Record<string, Plan> })),
       readConnectors,
     ]).then(

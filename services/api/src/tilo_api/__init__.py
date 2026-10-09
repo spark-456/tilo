@@ -10,6 +10,7 @@ from starlette.concurrency import run_in_threadpool
 from tilo_harness.writer import WriterBusy as _WriterBusy
 from tilo_logging import configure_logging as _configure_logging
 
+from tilo_api import cors as _cors
 from tilo_api import deps as _deps
 from tilo_api import dev as _dev
 from tilo_api import durable_store as _durable_store
@@ -31,11 +32,13 @@ from tilo_api.effort import router as _effort_router
 from tilo_api.intake import router as intake_router
 from tilo_api.log_context import LogContext as _LogContext
 from tilo_api.log_context import LogRunId as _LogRunId
+from tilo_api.notifications import router as _notifications_router
 from tilo_api.people_limits import NoStore as _NoStore
 from tilo_api.redaction import router as _redaction_router
 from tilo_api.sharing import WorldView
 from tilo_api.sharing import build_router as _build_sharing_router
 from tilo_api.tasks import router as _tasks_router
+from tilo_api.team_routes import router as _team_router
 from tilo_api.worlds_list import router as _worlds_list_router
 
 # Generated docs only in local dev mode: deployed, the service is public and the route list is not for
@@ -55,6 +58,7 @@ app.add_middleware(_AccessGate)  # SEC-15: deployed, every non-public route need
 app.add_middleware(_AppCheckGate)  # SEC-10: App Check token, logged only until the owner sets TILO_APPCHECK_ENFORCE=1
 app.add_middleware(_NoStore)  # added after the gate, so it is outside it: the gate's 403 on `/v1/` is no-store too
 app.add_middleware(_LogContext)  # NFR-26: outermost, no I/O: binds the world id and trace id of the request
+_cors.install_cors(app)  # WEB-TO-API: only with TILO_API_CORS_ORIGINS; outermost, so a preflight needs no token
 _configure_logging()  # NFR-26: a deployed service logs JSON with no further setup
 
 
@@ -100,6 +104,7 @@ app.include_router(_redaction_router)
 app.include_router(_costs_router)
 app.include_router(_worlds_list_router)
 app.include_router(_cards_feed_router)
+app.include_router(_notifications_router)
 app.include_router(_tasks_router)
 app.include_router(
     _build_cards_router(_runs.get_card_store, answer_guard=_runs.answer_guard, world_owner=_runs.world_owner)
@@ -111,6 +116,7 @@ app.include_router(_assistant_router)
 app.include_router(_people.router)
 app.include_router(_effort_router)
 app.include_router(_schedules.router)
+app.include_router(_team_router)
 
 
 def _world_owner(world_id: str) -> str | None:
