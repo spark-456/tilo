@@ -21,7 +21,9 @@ from tilo_planning.deliverable_kinds import (
     MAX_CHOICES,
     DeliverableKind,
     DeliverableKindsError,
+    UnavailableKind,
     load_deliverable_kinds,
+    load_kinds,
 )
 from tilo_planning.questions import KINDS_QUESTION, apply_answer, generate_questions, record_assumption
 
@@ -255,3 +257,94 @@ def test_FR_INT_04_matching_kinds_is_linear_on_a_long_answer() -> None:
 
     assert time.perf_counter() - began < 2.0
     assert questions_module.ANSWER_MAX_CHARS == 300
+
+
+# --- review fixes: kinds that are not available yet are refused, never read as free text -----------------------------
+
+WITHHELD = (
+    UnavailableKind("mock_test_quiz", "Mock-test quiz", "markdown", "LW-12"),
+    UnavailableKind("past_paper_links", "Past-paper links", "markdown", "LW-14"),
+)
+
+
+def _refused(answer: str, unavailable=WITHHELD, kinds=KINDS) -> str:
+    brief, question = _question(kinds)
+    with pytest.raises(BriefValidationError) as caught:
+        apply_answer(brief, question, answer, today=TODAY, kinds=kinds, unavailable=unavailable)
+    return str(caught.value)
+
+
+@pytest.mark.parametrize(
+    ("answer", "label", "needs"),
+    [
+        ("Mock-test quiz", "Mock-test quiz", "LW-12"),
+        ("mock-test QUIZ", "Mock-test quiz", "LW-12"),
+        ("Past-paper links.", "Past-paper links", "LW-14"),
+        ("Study plan; Mock-test quiz", "Mock-test quiz", "LW-12"),
+        ("Study plan and Past-paper links", "Past-paper links", "LW-14"),
+        ("Notes + mock-test quiz + Question bank", "Mock-test quiz", "LW-12"),
+        ("I want a Mock-test quiz for the exam", "Mock-test quiz", "LW-12"),
+    ],
+)
+def test_FR_INT_04_a_kind_that_is_not_available_yet_is_refused_alone_or_in_a_mix(answer, label, needs) -> None:
+    message = _refused(answer)
+
+    assert f"{label} is not available yet" in message and needs in message
+
+
+def test_FR_INT_04_every_unavailable_kind_named_is_listed_in_the_refusal() -> None:
+    message = _refused("Mock-test quiz and Past-paper links")
+
+    assert "Mock-test quiz" in message and "Past-paper links" in message
+
+
+def test_FR_INT_04_only_whole_words_name_an_unavailable_kind_and_the_fallback_ignores_them() -> None:
+    brief, question = _question()
+    assert apply_answer(brief, question, "mock-test quizzes", today=TODAY, kinds=KINDS, unavailable=WITHHELD)
+    # with no kind offered the question is the old format question: nothing is withheld from it
+    bare, plain = _question(())
+    free = apply_answer(bare, plain, "Mock-test quiz", today=TODAY, kinds=(), unavailable=WITHHELD)
+    assert free["deliverables"][0]["title"] == "Mock-test quiz"
+
+
+def test_FR_INT_04_the_config_exposes_the_unavailable_kinds_validated_like_the_others(tmp_path) -> None:
+    config = load_kinds()
+    assert [(u.id, u.needs) for u in config.unavailable] == [("mock_test_quiz", "LW-12"), ("past_paper_links", "LW-14")]
+    assert [k.id for k in config.offered] == [k.id for k in load_deliverable_kinds()]
+    assert config.unavailable[0].label == "Mock-test quiz" and config.unavailable[0].format == "markdown"
+
+
+def test_FR_INT_04_the_default_answer_path_refuses_an_unavailable_shipped_kind() -> None:
+    brief = _brief()
+    question = generate_questions(
+        brief, ["deliverables"], memory=make_no_memory(), base=sample_event_base(), seq=2
+    ).questions[0]
+
+    for answer in ("Mock-test quiz", "Study plan; Past-paper links"):
+        with pytest.raises(BriefValidationError, match="not available yet"):
+            apply_answer(brief, question, answer, today=TODAY)
+
+
+def test_FR_INT_04_the_parsed_config_is_cached_until_the_file_changes(tmp_path) -> None:
+    path = _write(tmp_path, {"kinds": [_entry()]})
+    first = load_kinds(path)
+    assert load_kinds(path) is first
+
+    path.write_text(yaml.safe_dump({"kinds": [_entry(), _entry(id="plan", label="Study plan")]}), encoding="utf-8")
+
+    assert [k.id for k in load_kinds(path).offered] == ["notes", "plan"]
+    path.write_text("kinds: [\n", encoding="utf-8")
+    with pytest.raises(DeliverableKindsError):
+        load_kinds(path)  # a bad file is never served from the cache
+
+
+def test_FR_INT_04_the_guess_is_kept_only_as_a_whole_segment_of_the_answer() -> None:
+    brief, question = _question()
+    guess = question.suggested_answers[0]
+
+    for answer in (f"{guess}; Notes", f"Notes; {guess}", f"Notes and {guess}", f"{guess} and Notes"):
+        kept = apply_answer(brief, question, answer, today=TODAY, kinds=KINDS)
+        assert ("Exam preparation", "pdf") in _titles(kept) and ("Notes", "markdown") in _titles(kept)
+    for glued in (f"{guess} Notes", f"x{guess}; Notes", f"{guess}x; Notes"):
+        with pytest.raises(BriefValidationError):
+            apply_answer(brief, question, glued, today=TODAY, kinds=KINDS)

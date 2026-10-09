@@ -27,7 +27,13 @@ from tilo_planning.brief import (
     complete_brief,
     validate_brief,
 )
-from tilo_planning.deliverable_kinds import MAX_CHOICES, DeliverableKind, load_deliverable_kinds
+from tilo_planning.deliverable_kinds import (
+    MAX_CHOICES,
+    DeliverableKind,
+    UnavailableKind,
+    load_deliverable_kinds,
+    load_kinds,
+)
 from tilo_planning.events import build_event, clip
 from tilo_planning.memory import MemoryHit, MemoryLookup
 
@@ -143,13 +149,14 @@ def record_assumption(
     *,
     today: date | None = None,
     kinds: Sequence[DeliverableKind] | None = None,
+    unavailable: Sequence[UnavailableKind] | None = None,
 ) -> dict[str, Any]:
     """A skipped question keeps `assumed` (default: the Director's guess), recorded as "Label: value" like
     an assumption over the cap, and shown as "Assumed: ...". The assumption is the value the plan uses
     (BQ-97), so the field takes it too: the guess leaves the chip as it is, another value is applied as
     an answer would be."""
     value = assumed if assumed is not None else question.suggested_answers[0]
-    updated = apply_answer(brief, question, value, today=today or date.today(), kinds=kinds)
+    updated = apply_answer(brief, question, value, today=today or date.today(), kinds=kinds, unavailable=unavailable)
     label = question.label if question.label is not None else _WORDING[question.field][0]
     if question.label is not None:  # the assumption shows the cleaned value the plan uses
         value = _topic_value(value)
@@ -164,6 +171,7 @@ def apply_answer(
     *,
     today: date,
     kinds: Sequence[DeliverableKind] | None = None,
+    unavailable: Sequence[UnavailableKind] | None = None,
 ) -> dict[str, Any]:
     """The person's answer to `question` (FR-INT-04). The Director's guess (the first suggested answer) keeps
     the chip; another suggested answer sets the chip value it stands for; anything else is set as typed. An
@@ -172,7 +180,8 @@ def apply_answer(
     the answer, the guess included, as the constraint "Label: value" (appended; a stated constraint is never touched).
     A deliverables answer that names only offered kinds ("Study plan; Notes", "study plan and notes") sets one
     deliverable per kind: the kind's label as its title and its format; `kinds` defaults to the available ones of the
-    config. Any other deliverables answer is read as before (formats, or free text, BQ-FREETEXT-1)."""
+    config. One that names a kind the config marks unavailable is refused (alone or in a mix), saying what it needs.
+    Any other deliverables answer is read as before (formats, or free text, BQ-FREETEXT-1)."""
     if question.label is not None:
         return _apply_topic(brief, question, answer)
     if answer == question.suggested_answers[0]:
@@ -181,6 +190,8 @@ def apply_answer(
     if field == "goal" and answer == DESCRIBE_GOAL:
         raise BriefValidationError("Describe the goal in the goal chip; that answer is not a goal.")
     value: Any = _ANSWER_VALUES.get(field, {}).get(answer, answer)
+    if field == "deliverables":
+        _refuse_unavailable(answer, kinds, unavailable)
     if field == "deliverables" and (chosen := _chosen_kinds(answer, kinds, question.suggested_answers[0])):
         keep, picked = chosen  # the guess ("1") among the choices keeps the deliverables the brief has
         added = [{"title": kind.label, "format": kind.format} for kind in picked]
@@ -215,6 +226,45 @@ def apply_answer(
     return validate_brief({**copy.deepcopy(brief), field: value})
 
 
+def _label_pattern(labels: Iterable[str]) -> re.Pattern[str]:
+    """Whole-word, case-blind match of any of `labels`, longest first."""
+    names = sorted(labels, key=len, reverse=True)
+    return re.compile(r"(?<!\w)(?:" + "|".join(re.escape(n) for n in names) + r")(?!\w)", re.IGNORECASE)
+
+
+def _holds_whole(answer: str, current: str) -> bool:
+    """Whether `current` (the Director's guess) stands in `answer` as a whole segment: at an end, or next to a
+    separator or "and", never glued to other text."""
+    at = answer.find(current)
+    while at >= 0:
+        before, after = answer[:at].rstrip().casefold(), answer[at + len(current) :].lstrip().casefold()
+        starts = not before or before[-1] in ";,+&/" or before.endswith(" and") or before == "and"
+        ends = not after or after[0] in ";,+&/" or after.startswith("and ") or after == "and"
+        if starts and ends and (answer[at - 1 : at].isspace() or at == 0 or answer[at - 1] in ";,+&/"):
+            return True
+        at = answer.find(current, at + 1)
+    return False
+
+
+def _refuse_unavailable(
+    answer: str, kinds: Sequence[DeliverableKind] | None, unavailable: Sequence[UnavailableKind] | None
+) -> None:
+    """When the question offers kinds, an answer that names one the config marks unavailable (whole words, case-blind;
+    alone or beside offered ones) is refused with what it needs, so it is never read as free text."""
+    if not (load_deliverable_kinds() if kinds is None else kinds):
+        return
+    withheld = load_kinds().unavailable if unavailable is None else unavailable
+    by_label = {k.label.casefold(): k for k in withheld}
+    if not by_label:
+        return
+    named = dict.fromkeys(
+        by_label[m.group(0).casefold()] for m in _label_pattern(by_label).finditer(answer[:ANSWER_MAX_CHARS])
+    )
+    if named:
+        said = "; ".join(f"{k.label} is not available yet (it needs {k.needs})" for k in named)
+        raise BriefValidationError(f"{said}. Pick from what is offered.")
+
+
 def _chosen_kinds(
     answer: str, kinds: Sequence[DeliverableKind] | None, current: str
 ) -> tuple[bool, list[DeliverableKind]] | None:
@@ -225,10 +275,9 @@ def _chosen_kinds(
     if not offered:
         return None
     by_label = {k.label.casefold(): k for k in offered}
-    names = sorted(by_label, key=len, reverse=True)
-    pattern = re.compile(r"(?<!\w)(?:" + "|".join(re.escape(n) for n in names) + r")(?!\w)", re.IGNORECASE)
-    keep = current in answer[:ANSWER_MAX_CHARS]
-    text = answer[:ANSWER_MAX_CHARS].replace(current, ";")
+    pattern = _label_pattern(by_label)
+    keep = _holds_whole(answer[:ANSWER_MAX_CHARS], current)
+    text = answer[:ANSWER_MAX_CHARS].replace(current, ";") if keep else answer[:ANSWER_MAX_CHARS]
     found = [by_label[m.group(0).casefold()] for m in pattern.finditer(text)]
     rest = pattern.sub(" ", text)
     if not found or any(part.strip(" .") for part in _ANSWER_SPLIT.split(rest)):

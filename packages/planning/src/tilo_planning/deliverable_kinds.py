@@ -46,7 +46,20 @@ class DeliverableKind:
     format: str
 
 
-def _kind(entry: Any, index: int) -> tuple[DeliverableKind, bool]:
+@dataclass(frozen=True)
+class UnavailableKind(DeliverableKind):
+    """A kind that is not offered yet; `needs` names what must ship first. Naming one in an answer is refused."""
+
+    needs: str
+
+
+@dataclass(frozen=True)
+class KindsConfig:
+    offered: tuple[DeliverableKind, ...]  # the available kinds, in file order, at most MAX_CHOICES
+    unavailable: tuple[UnavailableKind, ...]  # the others, in file order
+
+
+def _kind(entry: Any, index: int) -> tuple[DeliverableKind, bool, str | None]:
     where = f"kinds[{index}]"
     if not isinstance(entry, dict) or not _KEYS <= set(entry) <= _KEYS | {"needs"}:
         raise DeliverableKindsError(f"{where} must have id, label, format and available (and needs)")
@@ -66,12 +79,32 @@ def _kind(entry: Any, index: int) -> tuple[DeliverableKind, bool]:
         not available and needs is None
     ):
         raise DeliverableKindsError(f"{where}.needs must name what must ship first, and is required when unavailable")
-    return DeliverableKind(ident, label, fmt), available
+    return DeliverableKind(ident, label, fmt), available, needs
+
+
+_CACHE: dict[Path, tuple[tuple[int, int], KindsConfig]] = {}  # path -> ((mtime, size), parsed): a good parse only
+
+
+def load_kinds(path: Path | None = None) -> KindsConfig:
+    """The kinds config, every entry checked, available or not. Parsed again only when the file changes."""
+    path = DEFAULT_KINDS_CONFIG if path is None else path
+    try:
+        info = path.stat()
+    except OSError as error:
+        raise DeliverableKindsError(f"cannot read {path.name}: {type(error).__name__}") from error
+    stamp = (info.st_mtime_ns, info.st_size)
+    cached = _CACHE.get(path)
+    if cached is None or cached[0] != stamp:
+        cached = _CACHE[path] = (stamp, _parse(path))
+    return cached[1]
 
 
 def load_deliverable_kinds(path: Path | None = None) -> tuple[DeliverableKind, ...]:
-    """The available kinds in file order (at most `MAX_CHOICES`); every entry is checked, available or not."""
-    path = DEFAULT_KINDS_CONFIG if path is None else path
+    """The available kinds in file order (at most `MAX_CHOICES`)."""
+    return load_kinds(path).offered
+
+
+def _parse(path: Path) -> KindsConfig:
     try:
         data = yaml.safe_load(path.read_text(encoding="utf-8"))
     except (OSError, yaml.YAMLError, UnicodeError) as error:
@@ -79,10 +112,15 @@ def load_deliverable_kinds(path: Path | None = None) -> tuple[DeliverableKind, .
     if not isinstance(data, dict) or set(data) != {"kinds"} or not isinstance(data["kinds"], list):
         raise DeliverableKindsError("the kinds config must be a mapping with only a `kinds` list")
     read = [_kind(entry, i) for i, entry in enumerate(data["kinds"])]
-    ids, labels = [k.id for k, _ in read], [k.label.casefold() for k, _ in read]
+    ids, labels = [k.id for k, _, _ in read], [k.label.casefold() for k, _, _ in read]
     if len(ids) != len(set(ids)) or len(labels) != len(set(labels)):
         raise DeliverableKindsError("kind ids and labels must be unique")
-    offered = tuple(kind for kind, available in read if available)
+    offered = tuple(kind for kind, available, _ in read if available)
     if len(offered) > MAX_CHOICES:
         raise DeliverableKindsError(f"at most {MAX_CHOICES} kinds may be available")
-    return offered
+    withheld = tuple(
+        UnavailableKind(kind.id, kind.label, kind.format, str(needs))
+        for kind, available, needs in read
+        if not available
+    )
+    return KindsConfig(offered, withheld)

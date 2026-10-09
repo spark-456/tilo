@@ -77,3 +77,14 @@ def test_FR_INT_04_flow_a_bad_kinds_file_stops_the_task_before_anything_is_store
 
     assert response.status_code == 503 and "nothing was stored" in response.json()["detail"]
     assert flow.store.tasks == {}
+
+
+def test_FR_INT_04_flow_a_kind_that_is_not_available_yet_is_refused_and_nothing_changes(flow_factory):
+    flow = _flow(flow_factory)
+    task_id = flow.new_task()["task_id"]
+
+    for answer in ("Mock-test quiz", "Study plan; Past-paper links"):
+        refused = flow.answers(task_id, [{"field": "deliverables", "answer": answer}])
+        assert refused.status_code == 422 and "is not available yet" in refused.json()["detail"]
+
+    assert flow.store.tasks[task_id].answers == {}
