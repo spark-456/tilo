@@ -33,6 +33,7 @@ from starlette.requests import HTTPConnection
 from tilo_archive import RunArchive
 from tilo_connectors import InMemoryOutboxStore
 from tilo_connectors.registry import ConnectorRegistry, load_registry
+from tilo_contracts import MeetingHostRpcConnectionView
 from tilo_harness.executor import DefaultUnitRunner
 from tilo_harness.skills import SkillRegistry
 from tilo_memory.artifacts import ArtifactStore
@@ -802,6 +803,16 @@ def get_meeting_host_client() -> MeetingHostRpc:
         return _host_client
 
 
+def get_connection_views_rpc() -> Callable[[str], list[MeetingHostRpcConnectionView] | None]:
+    """ADR-0032 addendum 1 (T4b): `views(user_id)` for `GET /v1/connectors`, over the same client as the meeting-host
+    calls (503 `not_configured` when it is not configured). It gives the person's display views, or None for "unknown"
+    (every failure), and never raises. It holds no broker, token record, Kms or secret (SEC-02)."""
+    client = get_meeting_host_client()
+    registry = get_connector_registry()
+    order = [c for c in registry.ids() if registry.get(c)["auth"] == "oauth2"]
+    return lambda user_id: client.connection_views(user_id, order=order)
+
+
 def _forget_host_client() -> None:
     global _host_client, _host_client_retry_at
     with _host_client_lock:
@@ -817,10 +828,31 @@ class ConnectionViews(Protocol):
     def view(self, user_id: str, connector: str) -> tuple[str | None, list[str], str | None]: ...
 
 
+class _RpcConnectionViews:
+    """The `ConnectionViews` seam over tilo-connectors (ADR-0032a). One `views(user_id)` call serves the whole
+    `GET /v1/connectors` (the route asks per connector); a failed call (`None`) is remembered, so the other connectors
+    do not repeat it, and every `view` then raises (that row is unknown, never an error). No `expires_at` crosses
+    (BQ-ADR32a-2): the route shows none."""
+
+    def __init__(self, views: Callable[[str], list[MeetingHostRpcConnectionView] | None]) -> None:
+        self._views = views
+        self._asked: tuple[str, dict[str, MeetingHostRpcConnectionView] | None] | None = None
+
+    def view(self, user_id: str, connector: str) -> tuple[str | None, list[str], str | None]:
+        if self._asked is None or self._asked[0] != user_id:
+            got = self._views(user_id)
+            self._asked = (user_id, None if got is None else {v.connector: v for v in got})
+        rows = self._asked[1]
+        if rows is None:
+            raise LookupError("connection views unknown")
+        found = rows.get(connector)
+        return (None, [], None) if found is None else (str(found.state), list(found.scopes), None)
+
+
 def get_connection_views() -> ConnectionViews:
-    """Read-only connector state for `GET /v1/connectors`. Production state comes from tilo-connectors over an internal
-    route (ADR-0032 pattern, BQ-LIVEGAPS-1); unwired: refuses (the list route then shows every connector available)."""
-    raise HTTPException(status_code=503, detail="not_configured")
+    """Read-only connector state for `GET /v1/connectors`, from tilo-connectors over the internal route (ADR-0032a,
+    BQ-LIVEGAPS-1). Unconfigured: 503 `not_configured` (the list route then shows every connector available)."""
+    return _RpcConnectionViews(get_connection_views_rpc())
 
 
 REPLAY_ONLY_MESSAGE = "This link is replay-only right now: new work is paused; finished runs can still be replayed."

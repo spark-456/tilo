@@ -420,6 +420,17 @@ class TokenBroker:
             return frozenset()
         return frozenset(record.get("scopes", []))
 
+    def display_records(self, user_id: str) -> dict[str, dict[str, Any]]:
+        """ADR-0032 addendum 1 (HB-08): this user's stored grants as display data, {connector: {state, scopes,
+        connected_at}} with the raw stored values (maybe malformed: the caller checks them). A store read only: no
+        KMS, no refresh, no write, no event, and nothing else of a record (never a token or its sealed parts)."""
+        out: dict[str, dict[str, Any]] = {}
+        for connector in self._store.connectors_of(user_id):
+            record = self._store.get(user_id, connector)
+            if record is not None:
+                out[connector] = {k: record.get(k) for k in ("state", "scopes", "connected_at")}
+        return out
+
     def has_live_grant(self, user_id: str, *, excluding: str | None = None) -> bool:
         """True when the user has a record in state "connected" for any connector (but `excluding`),
         whether or not the KMS can read it now: an outage must never make a connected connector look

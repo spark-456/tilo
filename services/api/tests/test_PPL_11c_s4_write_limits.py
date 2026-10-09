@@ -79,6 +79,7 @@ BODY_ROUTES = {
     "remove membership": "/v1/people/u_priya/memberships/remove",
     "role": "/v1/people/u_priya/role",
     "team invite": "/v1/team/invites",
+    "disconnect meeting host": "/v1/meeting-host/disconnect",
 }
 
 

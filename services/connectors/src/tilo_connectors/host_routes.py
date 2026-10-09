@@ -1,6 +1,7 @@
 """tilo_connectors.host_routes — the internal meeting-host surface (ADR-0032 T3, FR-MTG-09).
 
-Three POST routes (`send`, `status`, `disconnect`) under `/internal/meeting-host/`, shaped by
+Three POST routes (`send`, `status`, `disconnect`) under `/internal/meeting-host/` and `/internal/connections/views`
+(ADR-0032 addendum 1: a store read of the caller's display views, no KMS and no Google call), shaped by
 `contracts/meeting_host_rpc.schema.json`. Order on every call: configuration (503), caller (HB-01: 401, 403), body cap
 of 64 KiB read before parsing, request validated against the contract (422), then the work, and the answer validated
 against the contract too. A refusal is a fixed code. No token, OAuth code, Meet link or address is in an answer or a
@@ -67,6 +68,27 @@ def _now() -> str:
 @functools.lru_cache(maxsize=1)
 def _declaration() -> dict[str, Any]:
     return load_registry(_CONFIG).get(CONNECTOR_ID)
+
+
+@functools.lru_cache(maxsize=1)
+def _registry() -> Any:
+    return load_registry(_CONFIG)
+
+
+def _declared_scopes(declared: Mapping[str, Any]) -> frozenset[str]:
+    """The union of the scopes the registry lists for a connector's capabilities."""
+    return frozenset(s for scopes in declared.get("scopes", {}).values() for s in scopes)
+
+
+def _view(connector: str, stored: Mapping[str, Any], declared: frozenset[str]) -> dict[str, Any]:
+    """HB-09: `connected` only for the exact stored state and a list of scopes, else `expired` (connect again)."""
+    raw = stored.get("scopes")
+    if stored.get("state") != "connected" or not isinstance(raw, list):
+        return {"connector": connector, "state": "expired", "scopes": [], "connected_at": None}
+    scopes = sorted({s for s in raw if isinstance(s, str) and s in declared})
+    since = stored.get("connected_at")
+    stamp = since if isinstance(since, str) and common_validator("timestamp").is_valid(since) else None
+    return {"connector": connector, "state": "connected", "scopes": scopes, "connected_at": stamp}
 
 
 def _data(part: Mapping[str, Any]) -> Mapping[str, Any]:
@@ -212,6 +234,16 @@ class HostRuntime:
             result = broker.disconnect(user_id, CONNECTOR_ID)
         return {"revoked_at_provider": bool(result.revoked_at_provider), "parts": parts.items}
 
+    def connection_views(self, user_id: str) -> dict[str, Any]:
+        """ADR-0032 addendum 1 (HB-08, HB-09): this user's stored grants as display views. A store read only."""
+        stored = self._broker.get().display_records(user_id)
+        registry, views = _registry(), []
+        for connector in registry.ids():
+            declared = registry.get(connector)
+            if declared["auth"] == "oauth2" and connector in stored:
+                views.append(_view(connector, stored[connector], _declared_scopes(declared)))
+        return {"views": views}
+
     def retry_pending_revokes(self, user_id: str) -> int:
         """The scheduler hook for ADR-0032 follow-up 4: retries this user's kept revokes (a pending one is dropped
         after seven days). Not a route: the contract has none, and nothing else calls it yet."""
@@ -324,7 +356,7 @@ async def _read_body(request: Request) -> bytes | None:
 
 
 def host_router(runtime: HostRuntime) -> APIRouter:
-    router = APIRouter(prefix="/internal/meeting-host")
+    router = APIRouter(prefix="/internal")
 
     async def serve(request: Request, request_def: str, answer_def: str, work: Callable[[Any], dict[str, Any]]) -> Any:
         settings = runtime.settings()
@@ -363,18 +395,24 @@ def host_router(runtime: HostRuntime) -> APIRouter:
             return _error(503)
         return JSONResponse(answer)
 
-    @router.post("/send")
+    @router.post("/meeting-host/send")
     async def send(request: Request) -> Any:
         return await serve(request, "send_request", "send_answer", runtime.send)
 
-    @router.post("/status")
+    @router.post("/meeting-host/status")
     async def status(request: Request) -> Any:
         return await serve(request, "user_request", "status_answer", lambda body: runtime.status(body["user_id"]))
 
-    @router.post("/disconnect")
+    @router.post("/meeting-host/disconnect")
     async def disconnect(request: Request) -> Any:
         return await serve(
             request, "user_request", "disconnect_answer", lambda body: runtime.disconnect(body["user_id"])
+        )
+
+    @router.post("/connections/views")
+    async def connection_views(request: Request) -> Any:
+        return await serve(
+            request, "user_request", "views_answer", lambda body: runtime.connection_views(body["user_id"])
         )
 
     return router

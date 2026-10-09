@@ -90,7 +90,7 @@ jobs:
           update api --max-instances 3
           update harness --max-instances 3
           update channels --max-instances 3
-          update connectors --max-instances 2
+          update connectors --max-instances 1
           update browser --max-instances 2
           update render --max-instances 2
           update sandbox-web --max-instances 2

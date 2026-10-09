@@ -6,6 +6,9 @@ keeps the broker's pending revokes at `token_revoke_retry/{user_id}/pending/{key
 document ids and no separator, so `u_a__b` + `c` and `u_a` + `b__c` can never share a document. Records arrive already
 sealed by the broker, so nothing here sees a plaintext token.
 
+Both stores share one client on the database `TILO_TOKEN_DATABASE` (ADR-0032 T5b), which must be a valid database id
+other than `(default)`: connectors refuses the default database for tokens.
+
 `open_broker(env)` builds the broker only when the environment asks for it in full, and `BrokerSeam` builds it once and
 remembers a failed build for 30 s. A failure names a setting, never a value or an exception's text. Nothing here logs.
 No compare-and-swap yet (CON-D9): until ADR-0032 ticket T7, connectors runs one instance.
@@ -35,6 +38,8 @@ _USER = re.compile(r"u_[0-9A-Za-z_]{1,48}")
 _CONNECTOR = re.compile(r"[a-z][a-z0-9_]{1,31}")
 _RETRY_KEY = re.compile(r"[0-9A-HJKMNP-TV-Z]{26}")
 _PROJECT = re.compile(r"[a-z][a-z0-9-]{4,28}[a-z0-9]")
+# A Firestore database id: 4 to 63 lowercase letters, digits, hyphens, first a letter. `(default)` never fits.
+_DATABASE = re.compile(r"[a-z][a-z0-9-]{2,61}[a-z0-9]", re.ASCII)
 _KMS_KEY = re.compile(
     r"projects/[a-z][a-z0-9-]{4,28}[a-z0-9]/locations/[a-z0-9-]{1,40}/keyRings/[\w-]{1,63}/cryptoKeys/[\w-]{1,63}",
     re.ASCII,
@@ -100,12 +105,12 @@ class FirestoreRetryStore(_NestedStore):
     _root, _sub, _key_pattern = RETRY_COLLECTION, "pending", _RETRY_KEY
 
 
-def _default_client(project: str) -> Any:
+def _default_client(project: str, database: str) -> Any:
     try:
         firestore = importlib.import_module("google.cloud.firestore")  # only a deployed install has it
     except ImportError:
         raise BrokerNotConfigured("google-cloud-firestore is not installed") from None
-    return firestore.Client(project=project)
+    return firestore.Client(project=project, database=database)
 
 
 def _default_kms(key_name: str) -> Kms:
@@ -126,7 +131,7 @@ def open_broker(
     emit: Callable[[dict[str, Any]], None],
     alert: Callable[[dict[str, Any]], None],
     clock: Callable[[], str] = _now,
-    client_factory: Callable[[str], Any] | None = None,
+    client_factory: Callable[[str, str], Any] | None = None,
     kms_factory: Callable[[str], Kms] | None = None,
     http_factory: Callable[[Mapping[str, str]], Any] | None = None,
 ) -> TokenBroker:
@@ -140,6 +145,10 @@ def open_broker(
         _require_live(source)  # live.py's own gate; its LiveHttpClient checks again
     except LiveNotEnabled:
         raise BrokerNotConfigured("live access is off") from None
+    # SEC-02, ADR-0032 decision 9: tokens live in their own database, and nothing here falls back to `(default)`.
+    database = source.get("TILO_TOKEN_DATABASE", "")
+    if _DATABASE.fullmatch(database) is None or database == "default":  # a lookalike of the default is refused too
+        raise BrokerNotConfigured("set TILO_TOKEN_DATABASE to the token database id (never the default database)")
     key_name = source.get("TILO_KMS_KEY", "")
     if _KMS_KEY.fullmatch(key_name) is None:
         raise BrokerNotConfigured("set TILO_KMS_KEY to a Cloud KMS crypto key name")
@@ -150,7 +159,7 @@ def open_broker(
         raise BrokerNotConfigured("live access is off") from None
     except ValueError:
         raise BrokerNotConfigured("the Google OAuth settings are missing or invalid") from None
-    client = (client_factory or _default_client)(project)
+    client = (client_factory or _default_client)(project, database)
     return TokenBroker(
         store=FirestoreTokenStore(client),
         kms=(kms_factory or _default_kms)(key_name),

@@ -8,6 +8,10 @@ the outbox calls its `execute_side_effect`, and each answer maps to the outcome 
 imports `tilo_connectors.tokens`, `.live` or `.adapters` (SEC-02); the wire types are `tilo_contracts`. A token is never
 logged, echoed or put in an exception, and an error is a fixed code. The send itself is never retried here: the outbox
 retries, and connectors' MH-13 keeps a second try from sending a second invitation.
+
+`connection_views` (ADR-0032 addendum 1, T4b) asks `POST /internal/connections/views` for a person's display views for
+`GET /v1/connectors`. It has no side effect, so every failure is "unknown" (`None`): it never raises, is never retried
+inside one call and logs a status code at most.
 """
 
 from __future__ import annotations
@@ -19,7 +23,7 @@ import logging
 import re
 import threading
 import time
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Mapping, Sequence
 from typing import Any, NamedTuple, Protocol
 
 from pydantic import ValidationError
@@ -28,10 +32,13 @@ from tilo_connectors.meeting_host import CONNECTOR_ID, HostReceipt
 from tilo_contracts import (
     MeetingHostRpcAlertPart,
     MeetingHostRpcConnectionPart,
+    MeetingHostRpcConnectionView,
+    MeetingHostRpcDisconnectAnswer,
     MeetingHostRpcError,
     MeetingHostRpcReceipt,
     MeetingHostRpcSendAnswer,
     MeetingHostRpcStatusAnswer,
+    MeetingHostRpcViewsAnswer,
 )
 from tilo_memory.artifacts import ArtifactCorrupt  # noqa: E402
 
@@ -39,6 +46,9 @@ logger = logging.getLogger("tilo_api.meeting_host_rpc")
 URL_VAR = "TILO_CONNECTORS_URL"
 TIMEOUT_S = 20.0  # one deadline for the token fetch and the request together, under the outbox's 30 s lease (HB-07)
 MAX_REPLY_BYTES = 65_536
+VIEWS_TIMEOUT_S = 10.0  # a cold connectors instance costs one wait this long at most; the page's next load asks again
+MAX_VIEWS_REPLY_BYTES = 262_144  # 32 views of 16 scopes stay under 160 KiB
+VIEWS_PATH = "/internal/connections/views"
 _LABEL = r"[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?"
 _URL = re.compile(rf"https://(?:{_LABEL}\.)+run\.app")  # https only, a Cloud Run host, no user, port, path or query
 
@@ -93,8 +103,9 @@ class RequestsTransport:
                 url, data=body, headers=dict(headers), timeout=(min(5.0, timeout_s), timeout_s), allow_redirects=False,
                 stream=True,
             ) as response:  # fmt: skip
-                data = response.raw.read(MAX_REPLY_BYTES + 1, decode_content=True)
-                if len(data) > MAX_REPLY_BYTES:
+                cap = MAX_VIEWS_REPLY_BYTES if url.endswith(VIEWS_PATH) else MAX_REPLY_BYTES
+                data = response.raw.read(cap + 1, decode_content=True)
+                if len(data) > cap:
                     raise TransportError
                 return Reply(response.status_code, data)
         except requests.RequestException:
@@ -111,38 +122,50 @@ def metadata_id_token(audience: str) -> str:
 
 class MeetingHostRpc:
     def __init__(
-        self, base_url: str, *, transport: Transport, token_for: Callable[[str], str], timeout_s: float = TIMEOUT_S
+        self,
+        base_url: str,
+        *,
+        transport: Transport,
+        token_for: Callable[[str], str],
+        timeout_s: float = TIMEOUT_S,
+        views_timeout_s: float = VIEWS_TIMEOUT_S,
     ) -> None:
         self._base, self._transport, self._token_for, self._timeout = base_url, transport, token_for, timeout_s
+        self._views_timeout = views_timeout_s
 
     def __repr__(self) -> str:
         return "MeetingHostRpc()"
 
-    def _post(self, route: str, payload: Mapping[str, Any]) -> bytes:
+    def _post(
+        self, route: str, payload: Mapping[str, Any], *, path: str | None = None, timeout_s: float | None = None
+    ) -> bytes:
         """The whole call (token fetch and request) under one deadline. Past it, the call is `not_sent` if the request
         had not been handed to the transport yet, else `unknown`; the worker thread is left to finish on its own."""
         stage = {"posted": False}
         box: dict[str, Any] = {}
         done = threading.Event()
-        deadline = time.monotonic() + self._timeout
+        limit = self._timeout if timeout_s is None else timeout_s
+        deadline = time.monotonic() + limit
 
         def work() -> None:
             try:
-                box["value"] = self._call(route, payload, stage, deadline)
+                box["value"] = self._call(route, payload, stage, deadline, path or f"/internal/meeting-host/{route}")
             except BaseException as exc:  # noqa: BLE001 - handed to the caller below
                 box["error"] = exc
             finally:
                 done.set()
 
         threading.Thread(target=work, name="meeting-host-rpc", daemon=True).start()
-        if not done.wait(self._timeout):
+        if not done.wait(limit):
             logger.warning("meeting-host %s: the deadline passed", route)
             raise HostRpcError("unknown" if stage["posted"] else "not_sent")
         if "error" in box:
             raise box["error"]
         return bytes(box["value"])
 
-    def _call(self, route: str, payload: Mapping[str, Any], stage: dict[str, bool], deadline: float) -> bytes:
+    def _call(
+        self, route: str, payload: Mapping[str, Any], stage: dict[str, bool], deadline: float, path: str
+    ) -> bytes:
         try:  # HB-01: minted per call for the connectors audience; failing here means nothing was sent
             token = self._token_for(self._base)
         except Exception:  # noqa: BLE001 - the metadata server's text is not ours to echo
@@ -152,9 +175,7 @@ class MeetingHostRpc:
         data = json.dumps(payload, separators=(",", ":")).encode()
         stage["posted"] = True
         try:
-            reply = self._transport.post(
-                f"{self._base}/internal/meeting-host/{route}", data, headers, max(0.1, deadline - time.monotonic())
-            )
+            reply = self._transport.post(f"{self._base}{path}", data, headers, max(0.1, deadline - time.monotonic()))
         except Exception:  # noqa: BLE001 - a timeout, a cut connection: it may have arrived
             logger.warning("meeting-host %s: the call failed in transit", route)
             raise HostRpcError("unknown") from None
@@ -173,6 +194,36 @@ class MeetingHostRpc:
         if got.state == "none" and got.scope_ok:
             raise HostRpcError("unknown")
         return got
+
+    def disconnect(self, user_id: str) -> MeetingHostRpcDisconnectAnswer:
+        """The owner's own disconnect (ADR-0032 decision 7). Idempotent at connectors, so the caller may retry any
+        failure. `refused` means nothing acted; `unknown` means it may have (a lost answer): retry. Not retried here."""
+        try:
+            return MeetingHostRpcDisconnectAnswer.model_validate_json(self._post("disconnect", {"user_id": user_id}))
+        except ValidationError:
+            raise HostRpcError("unknown") from None
+
+    def connection_views(self, user_id: str, *, order: Sequence[str]) -> list[MeetingHostRpcConnectionView] | None:
+        """The principal's own display views (HB-08), or None for "unknown": any failure at all, an answer that breaks
+        the contract, or one that breaks HB-09 against `order` (the registry's oauth2 connector ids): ids unique and in
+        that order. Never raises, never retries, and never logs more than a status code."""
+        try:
+            raw = self._post("views", {"user_id": user_id}, path=VIEWS_PATH, timeout_s=self._views_timeout)
+            if len(raw) > MAX_VIEWS_REPLY_BYTES:
+                return None
+            views = MeetingHostRpcViewsAnswer.model_validate_json(raw).views
+            position = {connector: i for i, connector in enumerate(order)}
+            last = -1
+            for view in views:
+                at = position.get(view.connector, -1)
+                if at <= last or len(set(view.scopes)) != len(view.scopes):
+                    return None
+                last = at
+                if view.state == "expired" and (view.scopes or view.connected_at is not None):  # the schema's if/then
+                    return None
+            return list(views)
+        except Exception:  # noqa: BLE001 - a broken answer is "unknown" whatever broke it; no text is kept
+            return None
 
     def send_invitation(self, entry: Mapping[str, Any], evidence: Mapping[str, Any], draft: Mapping[str, Any]) -> Any:
         """Not a registered SEC-03 name (that list is the connector adapters' methods); a local AST test pins that only

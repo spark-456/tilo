@@ -36,6 +36,7 @@ def _env(**drop: bool) -> dict[str, str]:
     env = {
         "TILO_TOKEN_STORE": "firestore",
         "TILO_FIRESTORE_PROJECT": "demo-tilo",
+        "TILO_TOKEN_DATABASE": "tilo-tokens",
         "TILO_KMS_KEY": KMS_KEY,
         "GOOGLE_OAUTH_CLIENT_ID": "client-id-" + "x" * 6,
         "GOOGLE_OAUTH_CLIENT_SECRET": "client-sec-" + "y" * 6,
@@ -130,7 +131,7 @@ def _build(
         emit=lambda part: None,
         alert=alert or (lambda part: None),
         clock=clock or ManualClock(START),
-        client_factory=lambda project: client,
+        client_factory=lambda project, database: client,
         kms_factory=lambda name: kms,
         http_factory=lambda environ: http,
     )

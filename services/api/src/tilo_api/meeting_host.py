@@ -389,6 +389,28 @@ def host_meeting(w: Writer, meeting_id: str, seams: HostSeams) -> dict[str, Any]
     return {"world_id": world_id}
 
 
+def abandon_unsent(user: str, outbox_store: Any) -> int:
+    """Abandons every unsent `meeting_host` entry whose approval is `user`'s (`authz.ref`) and returns how many. A store
+    that cannot be listed raises (the caller decides); an entry that may have gone out (ambiguous) is never touched, and
+    one a live lease holds (`OutboxRefused`) or whose own write fails stays for the next call."""
+    unsent = [
+        e for e in outbox_store.all_entries()
+        if e["connector"] == CONNECTOR_ID and e["state"] in _UNSENT and (e.get("authz") or {}).get("ref") == user
+    ]  # fmt: skip
+    abandoned = 0
+    for entry in unsent:
+        try:
+            if outbox_store.retry_state(entry["id"]).get("ambiguous"):
+                continue  # it may have gone out: it stays for the alert path, never marked failed
+            Outbox(outbox_store, {}, emit=lambda part: None, clock=events.now, world_id=entry["world_id"]).abandon(
+                entry["id"], keep_ambiguous=True
+            )
+            abandoned += 1
+        except Exception:  # a live lease (OutboxRefused) or a store error: the next event asks again
+            continue
+    return abandoned
+
+
 def on_connection_event(part: Mapping[str, Any], *, outbox_store: Any) -> int:
     """The connection sink. A revoked or expired `meeting_host` grant abandons every unsent entry of that person's
     (`authz.ref`), so a reconnect later sends nothing for it. Returns how many it abandoned; an entry a live lease holds
@@ -399,22 +421,6 @@ def on_connection_event(part: Mapping[str, Any], *, outbox_store: Any) -> int:
             or part["data"]["connector"] != CONNECTOR_ID
         ):
             return 0
-        user = part["user_id"]
-        unsent = [
-            e for e in outbox_store.all_entries()
-            if e["connector"] == CONNECTOR_ID and e["state"] in _UNSENT and (e.get("authz") or {}).get("ref") == user
-        ]  # fmt: skip
+        return abandon_unsent(part["user_id"], outbox_store)
     except Exception:  # a malformed part or a store that cannot be read: nothing is abandoned, nothing is raised
         return 0
-    abandoned = 0
-    for entry in unsent:
-        try:
-            if outbox_store.retry_state(entry["id"]).get("ambiguous"):
-                continue  # it may have gone out: it stays for the alert path, never marked failed
-            Outbox(outbox_store, {}, emit=lambda part: None, clock=events.now, world_id=entry["world_id"]).abandon(
-                entry["id"]
-            )
-            abandoned += 1
-        except Exception:  # a live lease (OutboxRefused) or a store error: the next event asks again
-            continue
-    return abandoned
