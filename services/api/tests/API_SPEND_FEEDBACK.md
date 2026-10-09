@@ -1,7 +1,7 @@
 # SPEND-CAPS-FEEDBACK: beta spend caps and the lifetime-cap pop-up with a feedback box (what the acceptance tests pin)
 
-Sources: the user, 8 Oct 2026 (relayed by the supervisor). Part 1 is "user approved 8 Oct", part 2 is "user request
-8 Oct"; neither is in the PRD (BQ rows `BQ-SEC16-3` and `BQ-FEEDBACK-1` go at the END of `docs/open-questions.md`).
+Sources: the user, 8 and 9 Oct 2026 (relayed by the supervisor). Part 1 is "user approved 8 Oct", lowered 9 Oct (`BQ-SEC16-4`), part 2 is "user request
+8 Oct"; neither is in the PRD (BQ rows `BQ-SEC16-3`, `BQ-SEC16-4` and `BQ-FEEDBACK-1` go at the END of `docs/open-questions.md`).
 Builds on SEC-16 (`API_SEC_16.md`), SEC-15 (`API_SEC_15.md`), the web error seam of NFR-22 (`replayOnly.NFR-22.test.tsx`).
 
 Tests: `services/api/tests/test_SEC_16_FEEDBACK_caps_config.py`, `test_SEC_16_FEEDBACK_route.py` (helper
@@ -15,36 +15,30 @@ model like `DeclarationIn`; the record is tilo-api's own). If you want the body 
 
 ## Part 1: the caps (`config/spend_caps.yaml`)
 
-| Key | Was | Now |
-| --- | --- | --- |
-| `run_minor` | 12000 (INR 120) | **50000** (INR 500) |
-| `uid_lifetime_minor` | 100000 (INR 1,000) | **300000** (INR 3,000) |
-| `global_day_hard_minor` | 200000 (INR 2,000) | **500000** (INR 5,000) |
+| Key | Was (BQ-SEC16-1) | BQ-SEC16-3 (8 Oct) | Now (BQ-SEC16-4, 9 Oct) |
+| --- | --- | --- | --- |
+| `run_minor` | 12000 (INR 120) | 50000 (INR 500) | **15000** (INR 150) |
+| `uid_lifetime_minor` | 100000 (INR 1,000) | 300000 (INR 3,000) | **50000** (INR 500) |
+| `global_day_hard_minor` | 200000 (INR 2,000) | 500000 (INR 5,000) | **500000** (INR 5,000) |
+
+The user cut the lifetime cap on 9 Oct ("Cut the lifetime cap to 500 rupees per person. 3000 seems excessive for a free
+service.") and approved the run cap of INR 150 (BQ-SEC16-4). The order holds: `unit_reserve_minor` 1000 <= run 15000 <=
+lifetime 50000 <= day 500000. The lifetime cap is not a whole multiple of the run cap: the tests reach it with three
+runs of 15,000 and a last 5,000, and the day cap with 33 uids of one full run and a last 5,000.
 
 Unchanged: `org_day_minor: null`, `unit_reserve_minor: 1000`, 240 requests per 60 s, and the replay-only fallback at the
 daily cap (settling the UTC day to `>=` the hard cap, or a reserve that would exceed it, flips the durable switch; new
-work is 503 `replay_only`). Update the comment on each line (INR amounts, "the user, 8 Oct"); the daily line keeps
-"replay-only (NFR-24)". INR 5,000 a day is above PRD 17.3's US$25 at the 80 INR per US$ default: say so in
-`BQ-SEC16-3`, which also says it supersedes the shipped values in `BQ-SEC16-1`.
+work is 503 `replay_only`). Update the comment on each line (INR amounts, "the user, 9 Oct"); the daily line keeps
+"replay-only (NFR-24)". INR 5,000 a day is above PRD 17.3's US$25 at the 80 INR per US$ default: said in
+`BQ-SEC16-3`; `BQ-SEC16-4` supersedes its run and lifetime figures.
 
 No number is written anywhere but the config: not in `tilo_api` (tokenised scan for the old and new values) and not in
 the web source (no amount in the pop-up: it says the allowance is used up, never how much).
 
-Stale places the builder updates or the architect decides (the tests do not pin them, except where noted):
-
-- `test_SEC_16_config.py::test_SEC_16_the_shipped_config_gives_each_uid_a_lifetime_cap_of_1000_inr_in_minor_units`
-  asserts `100_000`: change it to `300_000` (the name too). Its `test_SEC_16_no_cap_number_is_written_in_code` scans for
-  `100_000` only: the new test covers the new values.
-- `API_SEC_16.md` ("The 1,000 INR cap is `uid_lifetime_minor: 100000`", the config table's "shipped: 100000", the
-  literal `100000`): update (pinned by `test_SEC_16_FEEDBACK_the_api_doc_names_the_new_lifetime_cap`: it must contain
-  `300000` and `3,000 INR`, and not `shipped: 100000`, `uid_lifetime_minor: 100000` or `1,000 INR cap is`).
-- `contracts/fixtures/spend_caps/valid/shipped_defaults.json` (12000 / 100000 / 200000), the descriptions "SEC-16: 1,000
-  INR" in `contracts/spend_caps.schema.json` and the generated `packages/contracts-py` and `contracts-ts` docstrings,
-  `docs/adr/0002-contract-conventions.md` decision 16 ("`run_minor` 12000 ... `global_day_hard_minor` 200000"), the
-  shipped values in `docs/open-questions.md` `BQ-SEC16-1`, and `docs/prd-supplement-2026-10-05.md` SEC-16 ("1,000 INR").
-  These are contracts or read-only history: needs contract change (architect); the builder does not edit `contracts/`.
-- `config/metering.yaml` run and daily caps are in credits and US dollars (FR-MTR-04, a different ledger) and are not
-  part of this change; `packages/metering` NFR-27 alert thresholds take their cap as a parameter.
+Contract side (done in #670, `contracts/SEC-16-cap-values`): the `shipped_defaults.json` fixture, the schema
+descriptions and the generated docstrings, and `docs/adr/0002-contract-conventions.md` decision 16. `config/metering.yaml`
+run and daily caps are in credits and US dollars (FR-MTR-04, a different ledger) and are not part of this change;
+`packages/metering` NFR-27 alert thresholds take their cap as a parameter.
 
 ## The reason code (already exists)
 

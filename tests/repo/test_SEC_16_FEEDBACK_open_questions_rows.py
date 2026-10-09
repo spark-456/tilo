@@ -69,3 +69,16 @@ def test_SEC_16_FEEDBACK_bq_feedback_1_records_the_request_the_code_and_the_defe
     assert "beta" in row.lower() and "feedback" in row.lower()
     assert "deferred" in row.lower() and "admin" in row.lower(), "the owner/admin read path is explicitly deferred"
     assert "no read route" in row.lower(), "ordinary users have no read route"
+
+
+def test_SEC_16_FEEDBACK_bq_sec16_4_records_the_lowered_caps_with_the_users_words(repo_root: pathlib.Path):
+    number, row = _row(repo_root, "BQ-SEC16-4")
+    anchor, _ = _row(repo_root, "BQ-SEC16-3")
+
+    assert number > anchor and row.rstrip().endswith("| 2026-10-09 |")
+    assert row.count(" | ") == 4, "five columns: ID, question, default, source, raised"
+    assert "Cut the lifetime cap to 500 rupees per person. 3000 seems excessive for a free service." in row
+    assert "Yeah go ahead with your cost analysis and new spend limits. I think it's fair" in row
+    for token in ("50000", "INR 500", "15000", "INR 150", "500000", "INR 5,000", "BQ-SEC16-3", "supersede"):
+        assert token in row, f"the row names `{token}`"
+    assert "user-approved" in row and "overridable" not in row and "supervisor's decision" not in row

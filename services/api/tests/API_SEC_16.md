@@ -21,8 +21,8 @@ USD based, and these caps are INR minor units.
 
 Every amount is an `int` in minor units (paise; 1 INR = 100). No float, no bool, no string anywhere in the ledger,
 the config or the guard (a malformed amount raises `TypeError` or `ValueError` and changes nothing; the guard turns it
-into a replay plan). The 3,000 INR lifetime cap (the user, 8 Oct, BQ-SEC16-3) is `uid_lifetime_minor: 300000` in config, and no source file of tilo-api
-contains the literal 100000 or 300000.
+into a replay plan). The 500 INR lifetime cap (the user, 9 Oct, BQ-SEC16-4) is `uid_lifetime_minor: 50000` in config, and no source file of tilo-api
+contains a cap literal (12000, 15000, 50000, 100000, 200000, 300000 or 500000).
 
 ## Config: `config/spend_caps.yaml`, `tilo_api.spend.load_spend_caps(path=None) -> SpendCaps`
 
@@ -32,7 +32,7 @@ Keys, exactly these (an unknown key is refused), read through a YAML safe loader
 | Key | Meaning |
 | --- | --- |
 | `currency` | `INR`, nothing else |
-| `uid_lifetime_minor` | lifetime spend per uid, positive int, never null (shipped: 300000) |
+| `uid_lifetime_minor` | lifetime spend per uid, positive int, never null (shipped: 50000) |
 | `run_minor` | per-run cap, positive int |
 | `org_day_minor` | per-org per-UTC-day cap, positive int or null for none |
 | `global_day_hard_minor` | the whole deployment's per-UTC-day hard cap (NFR-24's trigger), positive int |
