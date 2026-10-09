@@ -270,6 +270,23 @@ export interface Ledger {
   runLabels?: Record<string, string>;
   /** One name per entry of `memory` (e.g. "1–7 Sep"); absent, or of another length, means no week names. */
   memoryWeeks?: string[];
+  /** The month the ledger shows (the sample company's follows today); absent means September 2026, as the fixture. */
+  period?: LedgerPeriod;
+}
+
+export interface LedgerPeriod {
+  /** "October" and "Oct". */
+  month: string;
+  short: string;
+  year: number;
+  /** Days in the month. */
+  days: number;
+  /** The month's first day: 0 = Sunday. */
+  firstWeekday: number;
+  /** The label the feed calls the current day, as in "Fri 9 Oct" (the feed prefixes "Today · "). */
+  today: string;
+  /** Today's day of the month: the days the daily series holds. */
+  day: number;
 }
 
 // Agenda
