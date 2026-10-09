@@ -29,7 +29,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
-from tilo_api import events
+from tilo_api import events, meeting_room
 from tilo_api.deps import (
     EventWriter,
     Principal,
@@ -400,6 +400,7 @@ def stop_autopilot(
     world = _require_member_world(principal, store, world_id)
     _require_owner(principal, world)
 
+    meeting_room.adjourn_open_rooms(store, world_id, writer)  # MR-05
     plan, already_l1, touched, loaded = _switch(store, world, world_id, events.now())
     _persist(store, touched, policies=_policy_ids(plan), loaded=loaded)
 
@@ -436,6 +437,7 @@ def pause_world(
     pause = events.world_paused_part(
         part_id=events.new_part_id(), world_id=world_id, actor=principal.user_id, channel=principal.channel
     )
+    meeting_room.adjourn_open_rooms(store, world_id, writer)  # MR-05: open rooms close (paused) before world.paused
     plan, already_l1, touched, loaded = _switch(store, world, world_id, events.now(), pause)
     _persist(store, touched, policies=_policy_ids(plan), worlds=[world_id], loaded=loaded)
 
