@@ -130,3 +130,11 @@ describe("DEMO-TIME-1 the Api", () => {
     expect((await createFixtureApi().getToday()).data.long).toBe("Thursday 24 September");
   });
 });
+
+describe("DEMO-TIME-1 Home's spend panel names the month", () => {
+  it("DEMO-TIME-1 the title follows the ledger's month and is September without one", async () => {
+    const { spendOf } = await import("../pages/Home/homeData");
+    expect(spendOf(dated(ledger, FRI_9_OCT)).month).toBe("October");
+    expect(spendOf(ledger).month).toBe("September");
+  });
+});

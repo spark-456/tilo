@@ -430,6 +430,17 @@
 [data-park] .park-home-real:hover {
   text-decoration-thickness: 2px;
 }
+/* a phone: the link looks the same and its touch target reaches 44px (WCAG 2.2 target size) */
+@media (max-width: 480px) {
+  [data-park] .park-home-real {
+    position: relative;
+  }
+  [data-park] .park-home-real::after {
+    content: "";
+    position: absolute;
+    inset: -11px -8px;
+  }
+}
 
 /* the drafting line: the ring turns in WEB-3 (BQ-WEB-3) */
 [data-park] .park-home-drafting {
