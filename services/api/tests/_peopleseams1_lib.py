@@ -99,6 +99,22 @@ def seed_world(store: DurableStore, world_id: str, owner: str, *, goal: str | No
     return tid
 
 
+def directory(*user_ids: str, org: str | None = None) -> Any:
+    """An in-memory people directory (`PeopleStores`) whose members are `user_ids` of `org` (default `deps.ORG_ID`)."""
+    from tilo_people.stores import PeopleStores  # noqa: PLC0415
+
+    stores = PeopleStores.in_memory()
+    for uid in user_ids:
+        stores.persons.create(
+            {
+                "id": uid, "org_id": org or deps.ORG_ID, "display_name": uid, "aliases": [],
+                "email": f"{uid[2:]}@example.com", "time_zone": "UTC", "preferred_channel": "web",
+                "org_role": "member", "memberships": [], "created_by": {"by": uid, "at": STAMP},
+            }
+        )  # fmt: skip
+    return stores
+
+
 def seed_bare_world(store: DurableStore, world_id: str, owner: str) -> None:
     """A world of `owner` whose task was never stored (a scheduled routine or a meeting host run)."""
     store.commit(worlds={world_id: world(owner=owner)}, create=[("worlds", world_id)])
