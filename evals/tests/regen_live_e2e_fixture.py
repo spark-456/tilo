@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import shutil
 import sys
+from datetime import date
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -24,6 +25,7 @@ from tilo_evals.live_e2e import record_with_fake  # noqa: E402
 from tilo_providers.safety import FakeSafetyProvider  # noqa: E402
 
 CASE = "B-007"
+FIXED_TODAY = date(2026, 10, 9)  # the date the prompts state (INTAKE-QUALITY-1); the recording stores it in `TODAY`
 
 
 def main(target: Path | None = None) -> int:
@@ -31,7 +33,12 @@ def main(target: Path | None = None) -> int:
     shutil.rmtree(target, ignore_errors=True)
     world = world_for(CASE, per_million_usd=0.75, delay_s=0.0)  # the fake's usage is fixed: 1000 in, 500 out per call
     report = record_with_fake(
-        CASE, fake_factory=world.factory, recordings_dir=target, prices_path=REAL_PRICES, safety=FakeSafetyProvider()
+        CASE,
+        fake_factory=world.factory,
+        recordings_dir=target,
+        prices_path=REAL_PRICES,
+        safety=FakeSafetyProvider(),
+        today=FIXED_TODAY,
     )
     sys.stdout.write(f"outcome={report.outcome_class} events={report.event_count} written to {target.as_posix()}\n")
     return 0 if report.outcome_class == report.expected else 1
