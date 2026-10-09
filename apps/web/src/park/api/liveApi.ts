@@ -16,6 +16,7 @@ import {
 import { type CostReport, ledgerFromCosts } from "./live/ledgerFromCosts";
 import { worldFromIntake } from "./live/worldFromIntake";
 import { STATE_OF, type WorldListItem, worldsFromList } from "./live/worldsFromList";
+import { nameInitials } from "./nameInitials";
 import type { Dec, DecisionKey, Effort, QuickReply, TierKey, Today, User } from "./types";
 
 export class NotBuilt extends Error {
@@ -56,10 +57,7 @@ export function userOf(who: Identity): User | null {
   if (!name) return null;
   const words = name.split(/\s+/).map(titleCase);
   const first = words[0] ?? name;
-  const last = words.at(-1) ?? first;
-  const initials = (
-    words.length > 1 ? first.charAt(0) + last.charAt(0) : first.slice(0, 2)
-  ).toUpperCase();
+  const initials = nameInitials(name);
   const tz = Intl.DateTimeFormat().resolvedOptions().timeZone ?? "";
   return {
     first,
