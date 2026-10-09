@@ -74,7 +74,7 @@ from tilo_harness.writer import new_ulid
 from tilo_metering.flags import FlagStore
 from tilo_planning.events import build_event
 
-from tilo_api import deps, dev, events, runs
+from tilo_api import deps, dev, ephemeral, events, runs, team_access, team_store
 from tilo_api.access import Mode
 from tilo_api.durable_store import DurableStore
 from tilo_api.tasks import _json_body
@@ -134,9 +134,15 @@ def get_schedule_store_factory(request: Request) -> Callable[[], ScheduleReposit
 
 def get_seams_factory(
     request: Request, mode: Annotated[Mode, Depends(deps.get_mode)]
-) -> Callable[[], runs.Seams | None]:
-    """Builds nothing (about 80 ms when called): `runs.run_seams`, overrides included, for the tick to call after it."""
-    return lambda: runs.run_seams(request, mode)
+) -> Callable[..., runs.Seams | None]:
+    """Builds nothing (about 80 ms when called): `runs.run_seams`, overrides included, for the tick to call after it.
+    `demo=True` builds them for a demo session's schedule: replay, whatever the request's own mode is (BQ-SIGNIN-10)."""
+
+    def build(demo: bool = False) -> runs.Seams | None:
+        ephemeral.mark_no_person(request)  # only the tick calls this, after its OIDC check: no Firebase token to verify
+        return runs.run_seams(request, "replay" if demo else mode)
+
+    return build
 
 
 def _unverified(token: str) -> tuple[dict[str, Any], dict[str, Any]]:
@@ -278,6 +284,7 @@ def get_store_factory(request: Request) -> Callable[[], deps.Store]:
     its token check, so an anonymous call opens no Firestore client and reads nothing."""
 
     def build() -> deps.Store:
+        ephemeral.mark_no_person(request)  # called only after the tick's token check; see `ephemeral.mark_no_person`
         seam = request.app.dependency_overrides.get(deps.get_store, deps.get_store)
         return seam(request) if inspect.signature(seam).parameters else seam()
 
@@ -357,6 +364,8 @@ def create_schedule(
     clock: Clock,
     flags: Flags,
 ) -> dict[str, Any]:
+    if principal.demo_session:  # DEMO-EPHEMERAL-1: a demo stores nothing durable, and a schedule outlives the session
+        raise HTTPException(status_code=403, detail="demo_schedules_unavailable")
     task = store.load_task(body.task_id, settle=False)  # not yet known to be this owner's
     if task is None or task.owner != principal.user_id:  # unknown and another user's task answer alike
         raise HTTPException(status_code=404, detail="No such task.")
@@ -374,7 +383,7 @@ def create_schedule(
         record = Schedule(
             schedule_id="sched_" + secrets.token_hex(12), owner_user_id=principal.user_id, title=body.title,
             cadence=cadence, approved_brief_ref=task.world_id, budget_cap=float(cap), next_due=next_slot(cadence, now),
-            brief=brief, approach=approach, created_at=now,
+            brief=brief, approach=approach, created_at=now, demo=principal.demo_session,
         )  # fmt: skip
     except ValueError as exc:
         raise HTTPException(status_code=409, detail="This task's budget cannot be scheduled.") from exc
@@ -402,6 +411,8 @@ def update_schedule(
     clock: Clock,
     flags: Flags,
 ) -> dict[str, Any]:
+    if principal.demo_session:  # DEMO-EPHEMERAL-1: a demo's schedule is never edited or re-enabled
+        raise HTTPException(status_code=403, detail="demo_schedules_unavailable")
     current = _mine(schedules, schedule_id, principal)
     deps.refuse_if_replay_only(flags)
     cadence = body.cadence.build() if body.cadence is not None else None
@@ -433,6 +444,11 @@ def _stamp(at: datetime) -> str:
     return at.strftime("%Y-%m-%dT%H:%M:%S.") + f"{at.microsecond // 1000:03d}Z"
 
 
+@dataclass(frozen=True)
+class _Reader:
+    read: Callable[[], Any]
+
+
 class ScheduleStarter:
     """The tick's `RunStarter`: reads the stored snapshot, never what it is handed over it (design decisions 3, 4)."""
 
@@ -443,8 +459,10 @@ class ScheduleStarter:
         schedules: ScheduleRepository,
         seams: runs.Seams | None,
         clock: Callable[[], datetime],
+        team: Any = None,  # anything with `read() -> TeamState | None`
     ) -> None:
         self._store, self._schedules, self._seams, self._clock = store, schedules, seams, clock
+        self._team = team  # FR-TEAM-04's weekend switch; None: no team store wired, as before
 
     def start(self, run: RunStart) -> str:
         record = self._schedules.get(run.schedule_id)
@@ -456,6 +474,9 @@ class ScheduleStarter:
             raise StartSkipped("snapshot_missing")
         if not record.enabled:  # claimed just before `disable_for_owner` or a pause: read again here, after the claim
             raise StartSkipped("schedule_disabled", count=False)
+        team = self._team.read() if self._team is not None else None  # unreadable raises: no start (fail closed)
+        if team_access.weekend_hold(team, self._clock(), record.cadence.tz):
+            raise StartSkipped("weekend_hold", count=False)  # held, never counted against the schedule (BQ-TEAMRT-3)
         if self._seams is None:
             raise StartSkipped("run_seams_unwired", count=False)  # the whole service, not this schedule: not counted
         world_id, run_id = slot_ids(run.idempotency_key)
@@ -771,7 +792,7 @@ def tick(
     config: Annotated[tuple[str, str], Depends(_tick_config)],
     tasks_config: Annotated[tuple[str, str], Depends(_tasks_config)],
     schedule_store: Annotated[Callable[[], ScheduleRepository], Depends(get_schedule_store_factory)],
-    seams_factory: Annotated[Callable[[], runs.Seams | None], Depends(get_seams_factory)],
+    seams_factory: Annotated[Callable[..., runs.Seams | None], Depends(get_seams_factory)],
     tasks_client: Annotated[Callable[[], TasksClient], Depends(get_tasks_client_factory)],
     verifier: Annotated[OidcVerifier, Depends(get_oidc_verifier)],
     clock: Clock,
@@ -857,7 +878,7 @@ def _run_task(
     request: Request,
     raw: bytes,
     schedule_store: Callable[[], ScheduleRepository],
-    seams_factory: Callable[[], runs.Seams | None],
+    seams_factory: Callable[..., runs.Seams | None],
     clock: Callable[[], datetime],
     flags: FlagStore,
     store_factory: Callable[[], deps.Store],
@@ -874,7 +895,7 @@ def _run_task(
         return _closed(422, "Invalid task.")
     deps.refuse_if_replay_only(flags)  # NFR-24: 503, so Cloud Tasks retries once the flag is clear
     try:
-        schedules, seams = schedule_store(), seams_factory()
+        schedules = schedule_store()
         store = store_factory()  # the durable store opens here, after the token: an anonymous call costs no client
     except HTTPException as exc:
         return _closed(exc.status_code, str(exc.detail))
@@ -886,6 +907,14 @@ def _run_task(
         return {"ran": 0, "skipped": code}
 
     due, record = body.due_at(), schedules.get(body.schedule_id)
+    demo = record is not None and record.demo  # the tick has no signed-in person: the record says if it was a demo's
+    try:  # built once, after the record (BQ-SIGNIN-10: a demo's replays)
+        seams = seams_factory(demo=True) if demo else seams_factory()
+    except HTTPException as exc:
+        return _closed(exc.status_code, str(exc.detail))
+    except Exception as exc:
+        logger.error("schedule task could not be set up (%s)", type(exc).__name__)
+        return _closed(500, "tick failed")
     if record is None:
         return refused("schedule_missing")
     if due > clock() + _CLOCK_SLACK:
@@ -905,7 +934,8 @@ def _run_task(
         prior_world_id=offered if offered != world_id else None, budget_cap=record.budget_cap, slot=due,
         skipped=body.skipped, cache_namespace=record.schedule_id,
     )  # fmt: skip
-    starter = ScheduleStarter(store=store, schedules=schedules, seams=seams, clock=clock)
+    team = team_store.team_reader(request.app.dependency_overrides)
+    starter = ScheduleStarter(store=store, schedules=schedules, seams=seams, clock=clock, team=_Reader(team))
     try:
         started = starter.start(run)
     except StartSkipped as skip:

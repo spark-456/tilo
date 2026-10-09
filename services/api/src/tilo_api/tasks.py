@@ -322,6 +322,7 @@ def approve(
     the task's one run (CL-INT-2); a run that cannot start never changes this answer."""
     task = _owned(store, task_id, principal)
     deps.refuse_if_replay_only(flags)  # NFR-24: after sign-in and the owner check, before any grant
+    getattr(store, "admit_run", lambda: None)()  # a demo may have only a few runs at once (DEMO-EPHEMERAL-1)
     if body.budget_cap > (ceiling := deps.budget_cap_ceiling()):  # finite already: the body refuses NaN and Infinity
         raise HTTPException(status_code=422, detail=f"One run may use at most {ceiling:g} credits.")
     with store.grant_lock(task.owner), task.lock:  # always in this order: the owner's grants, then the task

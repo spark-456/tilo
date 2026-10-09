@@ -228,13 +228,15 @@ export function ComposerPanel(p: ComposerProps) {
             />
           </div>
           <div className="park-home-hint">{quickMode ? effortNote : mode.hint}</div>
+          {/* Not in the design (docs/park-designed-not-in-prd/Home.md): the composer is fixture-only until FR-UX-13,
+              so this plain link opens the old app's real intake form (a full navigation, not app.go). It ends the
+              mode row, inside the panel: a link below the panel was cut off by the window's bottom edge (the page is
+              at least 720 px tall). */}
+          <a className="park-home-real" href="/start">
+            Start a real task
+          </a>
         </div>
       </div>
-      {/* Not in the design (docs/park-designed-not-in-prd/Home.md): the composer above is fixture-only until
-          FR-UX-13, so this plain link opens the old app's real intake form (a full navigation, not app.go). */}
-      <a className="park-home-real" href="/start">
-        Start a real task
-      </a>
     </div>
   );
 }

@@ -124,7 +124,9 @@ class SafetyRecordReplayProvider(SafetyProvider):
         live_factory: Callable[[], SafetyProvider],
         fixtures_dir: Path | str,
         max_input_tokens: int | None = None,
+        force_replay: bool = False,
     ) -> None:
+        self._force_replay = force_replay  # SEC-15: the caller decided this replays: never live, never records
         self._max_input_tokens = max_input_tokens
         self._role = role
         self._profile_id = profile_id
@@ -145,7 +147,7 @@ class SafetyRecordReplayProvider(SafetyProvider):
         key = safety_recording_key(self._role, self._profile_id, text, content=content, mime_type=native)
         path = self._recordings_dir / f"{key}.json"
 
-        if is_live_mode():
+        if is_live_mode() and not self._force_replay:
             live = self._live()
             raw = live.check(text) if native is None else live.check(text, content=content, mime_type=native)
             result = _categorised(raw)
@@ -198,7 +200,9 @@ class SafetyRecordReplayProvider(SafetyProvider):
             raise
 
 
-def build_safety_provider(config: ProvidersConfig, *, fixtures_dir: Path | str) -> SafetyProvider:
+def build_safety_provider(
+    config: ProvidersConfig, *, fixtures_dir: Path | str, force_replay: bool = False
+) -> SafetyProvider:
     """The "safety" role's primary profile: `provider: fake` gives
     `FakeSafetyProvider` (refused in live mode or in any Cloud Run environment); a
     known live provider gives record-and-replay.
@@ -206,7 +210,8 @@ def build_safety_provider(config: ProvidersConfig, *, fixtures_dir: Path | str) 
     The safety role never falls back: only `primary` is read, so a configured
     `fallback` is ignored and an error, a replay miss or a missing capability fails
     closed instead of passing the content through a weaker or fake profile (BQ-68).
-    Keep it that way when this role joins the router."""
+    Keep it that way when this role joins the router. `force_replay` (SEC-15): the caller decided this request
+    replays, so the screen never goes live (nor records) whatever the live switch says; the fake's refusal stands."""
     if SAFETY_ROLE not in config.roles:
         raise ProviderConfigError(f"FR-INT-02: config/models.yaml has no {SAFETY_ROLE!r} role")
     profile_id = config.roles[SAFETY_ROLE].primary
@@ -228,7 +233,9 @@ def build_safety_provider(config: ProvidersConfig, *, fixtures_dir: Path | str) 
     def live_factory() -> SafetyProvider:
         return _build_live_safety_provider(profile, profile_id, cap)
 
-    return SafetyRecordReplayProvider(SAFETY_ROLE, profile_id, live_factory, fixtures_dir, cap)
+    return SafetyRecordReplayProvider(
+        SAFETY_ROLE, profile_id, live_factory, fixtures_dir, cap, force_replay=force_replay
+    )
 
 
 def _build_live_safety_provider(profile: ProvidersProfile, profile_id: str, cap: int | None) -> SafetyProvider:

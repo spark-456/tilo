@@ -1482,6 +1482,7 @@ source = { editable = "services/channels" }
 dependencies = [
     { name = "fastapi" },
     { name = "pyyaml" },
+    { name = "tilo-people" },
     { name = "tilo-policy" },
     { name = "tilo-providers" },
     { name = "uvicorn" },
@@ -1491,6 +1492,7 @@ dependencies = [
 requires-dist = [
     { name = "fastapi", specifier = ">=0.115" },
     { name = "pyyaml", specifier = ">=6.0" },
+    { name = "tilo-people", editable = "packages/people" },
     { name = "tilo-policy", editable = "packages/policy" },
     { name = "tilo-providers", editable = "packages/providers" },
     { name = "uvicorn", specifier = ">=0.32" },
