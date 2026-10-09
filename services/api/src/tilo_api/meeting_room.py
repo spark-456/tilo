@@ -8,6 +8,7 @@ missing room. `/changes` is slice 1b. Seams with no production backing (archive,
 
 from __future__ import annotations
 
+import json
 import logging
 import math
 import threading
@@ -16,7 +17,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Body, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import JSONResponse
 from tilo_policy.schemas import conforms
 from tilo_providers.interfaces import SafetyProvider
@@ -26,6 +27,7 @@ from tilo_api import deps, events, team_store
 from tilo_api.meeting_room_config import RoomConfig, RoomConfigError, load_room_config
 from tilo_api.meeting_room_reply import (
     FakeRoomModel,
+    Reply,
     RoomCapped,
     RoomModel,
     RoomModelUnavailable,
@@ -34,6 +36,7 @@ from tilo_api.meeting_room_reply import (
     ground,
     locate,
 )
+from tilo_api.people_writes import _capped_body
 
 logger = logging.getLogger("tilo_api.meeting_room")
 router = APIRouter(prefix="/v1/worlds/{world_id}/rooms", tags=["meeting-room"])
@@ -41,7 +44,10 @@ _ROOM_SCHEMA = "meeting_room.schema.json#/$defs/"
 _TEAM_ROLES = {"Approver": "approver", "Member": "member"}
 _WORKERS = ("specialist", "writer", "verifier")
 _LOCKS: dict[str, threading.Lock] = {}  # room id -> the one turn in flight (MR-04); this process only
+_WRITES: dict[str, threading.Lock] = {}  # room id -> check-open-and-write; dropped when the room closes
+_WORLDS: dict[str, threading.Lock] = {}  # world id -> count-and-convene (open_rooms_per_world); this process only
 _LOCKS_GUARD = threading.Lock()
+_REPLIED = "events/data/meeting.replied.schema.json"
 _EPS = 1e-9
 
 
@@ -141,22 +147,45 @@ def _write(writer: deps.EventWriter, room: Room, part: dict) -> dict:
         raise deps.event_failure(room.world_id, exc) from None
 
 
-def _adjourn(writer: deps.EventWriter, room: Room, reason: str) -> None:
+def _lock_of(table: dict[str, threading.Lock], key: str) -> threading.Lock:
+    with _LOCKS_GUARD:
+        return table.setdefault(key, threading.Lock())
+
+
+def _drop_locks(room_id: str) -> None:
+    with _LOCKS_GUARD:  # a closed room needs no locks; a late request makes a fresh one and finds it closed
+        _LOCKS.pop(room_id, None)
+        _WRITES.pop(room_id, None)
+
+
+def _adjourn_part(room: Room, reason: str) -> dict:
     actor = room.convener if reason == "person" else "system"
     data = {"reason": reason, "turns": len(room.turns), "credits_spent": room.spent}
-    _write(writer, room, _part("meeting.adjourned", room, actor, room.lead, "The Meeting Hall meeting ended.", data))
-    room.state, room.reason = "adjourned", reason
+    return _part("meeting.adjourned", room, actor, room.lead, "The Meeting Hall meeting ended.", data)
 
 
-def adjourn_open_rooms(store: deps.Store, world_id: str, writer: deps.EventWriter) -> None:
-    """Pause all / Stop all (MR-05): every open room of the world closes (`paused`) before `world.paused` is written.
-    Best effort: a failed write is logged and never blocks the kill switch (an open room closes on its next access)."""
+def _adjourn(ctx: Ctx, room: Room, reason: str) -> None:
+    """Closes the room once: re-reads it under the room's write lock, so no second adjourned and no reply after it."""
+    with _lock_of(_WRITES, room.room_id):
+        fresh = rebuild(ctx.stream()).get(room.room_id)
+        if fresh is not None and fresh.state == "open":
+            _write(ctx.writer, fresh, _adjourn_part(fresh, reason))
+            room.reason = reason
+        else:
+            room.reason = fresh.reason if fresh is not None else reason
+        room.state = "adjourned"
+    _drop_locks(room.room_id)
+
+
+def adjourn_parts(store: deps.Store, world_id: str) -> list[dict]:
+    """Pause all / Stop all (MR-05): one unwritten `meeting.adjourned` (paused) part per open room, no I/O. The
+    dispatcher queues them AHEAD of `world.paused` under its usual deadlines, so a slow writer cannot hold it."""
     try:
-        for room in rebuild(list(store.events.get(world_id, []))).values():
-            if room.state == "open":
-                _adjourn(writer, room, "paused")
+        rooms = rebuild(list(store.events.get(world_id, []))).values()
+        return [_adjourn_part(r, "paused") for r in rooms if r.state == "open"]
     except Exception as exc:
         logger.warning("rooms not adjourned for world %s (%s)", world_id, type(exc).__name__)
+        return []
 
 
 def _seam(request: Request, seam: Callable[[], Any]) -> Any:
@@ -208,7 +237,7 @@ def dev_overrides() -> dict[Callable[..., Any], Callable[..., Any]]:
     from tilo_api import dev_run  # noqa: PLC0415
 
     lines = _DevLines()
-    redact = lambda p: {**p, "text": dev_run.dev_redact(p["text"])} if isinstance(p.get("text"), str) else p  # noqa: E731
+    redact = lambda p: {k: dev_run.dev_redact(v) if isinstance(v, str) else v for k, v in p.items()}  # noqa: E731
 
     def opener() -> Callable[..., Any]:
         dev_run._refuse()  # noqa: SLF001
@@ -259,20 +288,28 @@ class Ctx:
         return gap.total_seconds() > self.cfg.idle_timeout_s
 
     def housekeep(self, room: Room, *, check_access: bool = True) -> str | None:
-        """Closes an open room that is idle, paused or whose convener lost access; returns the new reason, if any."""
+        """Closes an open room whose convener lost access, or that is paused or idle; returns the reason, if any. The
+        access check comes first: a request refused for it writes nothing but the `access_lost` it caused."""
         if room.state != "open":
             return None
         reason = None
-        if self.world.paused:
-            reason = "paused"
-        elif check_access and self.principal.user_id == room.convener:
+        if check_access and self.principal.user_id == room.convener:
             held = _as_role(self.principal, self.world, self.cfg, self.team, self.districts_of(room, self.stream()))
             reason = None if held is not None else "access_lost"
-        if reason is None and self.idle(room):
-            reason = "idle"
+        if reason is None:
+            reason = "paused" if self.world.paused else "idle" if self.idle(room) else None
         if reason is not None:
-            _adjourn(self.writer, room, reason)
+            _adjourn(self, room, reason)
         return reason
+
+
+async def _body(request: Request) -> Any:
+    """The JSON body, refused with 413 above 32 KiB BEFORE it is read (BQ-PPL11C-1: the people writes' reader)."""
+    raw = await _capped_body(request)
+    try:
+        return json.loads(raw) if raw else None
+    except Exception:  # not JSON, or nested past the parser's limit: the schema check answers 422
+        return None
 
 
 def get_ctx(
@@ -360,7 +397,7 @@ def _find(ctx: Ctx, room_id: str, *, convener_only: bool = False) -> Room:
 
 
 @router.post("")
-def convene(ctx: Annotated[Ctx, Depends(get_ctx)], body: Annotated[Any, Body()] = None) -> JSONResponse:
+def convene(body: Annotated[Any, Depends(_body)], ctx: Annotated[Ctx, Depends(get_ctx)]) -> JSONResponse:
     p, layout, stream = ctx.principal, ctx.world.layout, ctx.stream()
     if p.demo_session:
         return _refuse(403, "demo_session")
@@ -370,10 +407,6 @@ def convene(ctx: Annotated[Ctx, Depends(get_ctx)], body: Annotated[Any, Body()] 
         return _refuse(422, "bad_request")
     if layout is None:
         return _refuse(409, "no_layout")
-    for open_room in (r for r in rebuild(stream).values() if r.state == "open"):
-        ctx.housekeep(open_room, check_access=False)  # sweep on access: an idle or paused room never blocks a new one
-    if ctx.world.paused:
-        return _refuse(409, "world_paused")
     lead, agents = body["lead"], body["agents"]
     found = {a: locate(layout, stream, a) or ("", None) for a in [lead, *agents]}
     rank, district = found[lead]
@@ -386,47 +419,36 @@ def convene(ctx: Annotated[Ctx, Depends(get_ctx)], body: Annotated[Any, Body()] 
     as_role = _as_role(p, ctx.world, ctx.cfg, ctx.team, districts)
     if as_role is None:
         return _refuse(403, "not_allowed")
-    if sum(r.state == "open" for r in rebuild(ctx.stream()).values()) >= ctx.cfg.open_rooms_per_world:
-        return _refuse(409, "room_open")
-    left = _seam(ctx.request, get_room_user_cap)(p.user_id)
-    if left is not None and left <= 0:
-        return _refuse(429, "cap_reached")
-    vis = "all" if rank == "director" else sorted(d for d in districts if d)
-    done = any(e["type"] in ("world.completed", "world.failed") for e in stream)
-    room = Room(
-        events.new_part_id(),
-        ctx.world_id,
-        ctx.world.run_id,
-        p.user_id,
-        lead,
-        list(agents),
-        as_role,
-        vis,
-        district,
-        float(ctx.cfg.credit_cap if left is None else min(ctx.cfg.credit_cap, left)),
-        ctx.cfg.max_turns,
-    )
-    data = {
-        "lead": lead,
-        "agents": room.agents,
-        "as_role": as_role,
-        "run_state": "finished" if done else "live",
-        "credit_cap": room.credit_cap,
-        "max_turns": room.max_turns,
-    }
-    _write(
-        ctx.writer,
-        room,
-        _part(
-            "meeting.convened",
-            room,
-            p.user_id,
-            lead,
-            "A person called the lead and its team into the Meeting Hall.",
-            data,
-            cause=None,
-        ),
-    )
+    with _lock_of(_WORLDS, ctx.world_id):  # count and write as one step (open_rooms_per_world)
+        for open_room in (r for r in rebuild(ctx.stream()).values() if r.state == "open"):
+            ctx.housekeep(open_room, check_access=False)  # sweep: an idle or paused room never blocks a new one
+        if ctx.world.paused:
+            return _refuse(409, "world_paused")
+        stream = ctx.stream()
+        if sum(r.state == "open" for r in rebuild(stream).values()) >= ctx.cfg.open_rooms_per_world:
+            return _refuse(409, "room_open")
+        left = _seam(ctx.request, get_room_user_cap)(p.user_id)
+        if left is not None and left <= 0:
+            return _refuse(429, "cap_reached")
+        vis = (
+            [] if rank == "director" else sorted(d for d in districts if d)
+        )  # SEC-07: the Director's room fails closed
+        done = any(e["type"] in ("world.completed", "world.failed") for e in stream)
+        cap = float(ctx.cfg.credit_cap if left is None else min(ctx.cfg.credit_cap, left))
+        room = Room(
+            events.new_part_id(), ctx.world_id, ctx.world.run_id, p.user_id, lead, list(agents), as_role, vis,
+            district, cap, ctx.cfg.max_turns,
+        )  # fmt: skip
+        data = {
+            "lead": lead,
+            "agents": room.agents,
+            "as_role": as_role,
+            "run_state": "finished" if done else "live",
+            "credit_cap": room.credit_cap,
+            "max_turns": room.max_turns,
+        }
+        summary = "A person called the lead and its team into the Meeting Hall."
+        _write(ctx.writer, room, _part("meeting.convened", room, p.user_id, lead, summary, data, cause=None))
     return JSONResponse(_view(ctx, room), status_code=201)
 
 
@@ -435,31 +457,34 @@ def read_room(room_id: str, ctx: Annotated[Ctx, Depends(get_ctx)]) -> JSONRespon
     room = _find(ctx, room_id)
     if ctx.housekeep(room) == "access_lost":
         return _refuse(403, "access_lost")
+    if room.convener == ctx.principal.user_id and room.state != "open":  # a closed room's words need the access too
+        held = _as_role(ctx.principal, ctx.world, ctx.cfg, ctx.team, ctx.districts_of(room, ctx.stream()))
+        if held is None:
+            return _refuse(403, "access_lost")
     return JSONResponse(_view(ctx, room))
 
 
 @router.post("/{room_id}/adjourn")
-def adjourn(room_id: str, ctx: Annotated[Ctx, Depends(get_ctx)]) -> JSONResponse:
+def adjourn(room_id: str, _: Annotated[Any, Depends(_body)], ctx: Annotated[Ctx, Depends(get_ctx)]) -> JSONResponse:
     room = _find(ctx, room_id, convener_only=True)
     if ctx.housekeep(room) == "access_lost":
         return _refuse(403, "access_lost")
     if room.state == "open":
-        _adjourn(ctx.writer, room, "person")
+        _adjourn(ctx, room, "person")
     return JSONResponse(_view(ctx, room))
 
 
 def _turn_lock(room_id: str) -> threading.Lock:
-    with _LOCKS_GUARD:
-        return _LOCKS.setdefault(room_id, threading.Lock())
+    return _lock_of(_LOCKS, room_id)
 
 
 @router.post("/{room_id}/turns")
 def ask(
     room_id: str,
+    body: Annotated[Any, Depends(_body)],
     ctx: Annotated[Ctx, Depends(get_ctx)],
     model: Annotated[RoomModel, Depends(get_room_model)],
     safety: Annotated[SafetyProvider, Depends(deps.get_safety)],
-    body: Annotated[Any, Body()] = None,
 ) -> JSONResponse:
     room = _find(ctx, room_id, convener_only=True)
     if ctx.housekeep(room) == "access_lost":
@@ -482,63 +507,16 @@ def ask(
         lock.release()
 
 
-def _turn(ctx: Ctx, room: Room, model: RoomModel, safety: SafetyProvider, body: dict) -> JSONResponse:
-    stream, to, mode = ctx.stream(), body["to"], body["mode"]
-    try:
-        quote = model.quote(mode)
-    except RoomModelUnavailable:
-        raise HTTPException(status_code=503, detail="not_configured") from None
-    left = room.credit_cap - room.spent
-    if len(room.turns) >= room.max_turns or quote > left + _EPS:  # MR-08: refused before any call, and the room closes
-        _adjourn(ctx.writer, room, "capped")
-        return _refuse(409, "room_closed", reason="capped")
-    grounding = ground(ctx.world.layout, stream, to)
-    if grounding is None:
-        return _refuse(422, "bad_request")
-    redact = _seam(ctx.request, deps.get_redactor)
-    archive = _seam(ctx.request, deps.get_run_archive)(org_id=deps.ORG_ID, run_id=room.run_id)
-    turn, target = len(room.turns) + 1, grounding.district
-    try:
-        ref = archive.append(
-            "channel_in", {"room_id": room.room_id, "turn": turn, "to": to, "mode": mode, "text": redact(body["text"])}
-        )
-    except Exception:
-        raise HTTPException(status_code=503, detail="write_failed") from None
-    asked = _write(
-        ctx.writer,
-        room,
-        _part(
-            "meeting.asked",
-            room,
-            room.convener,
-            to,
-            "A person asked an agent something in the Meeting Hall.",
-            {"turn": turn, "to": to, "mode": mode, "message_ref": ref},
-            district=target,
-        ),
-    )
-    try:
-        reply = answer(model, grounding, body["text"], mode, safety=safety, redact=redact, budget=left)
-    except RoomCapped:
-        _adjourn(ctx.writer, room, "capped")
-        return _refuse(409, "room_closed", reason="capped")
-    words = None
-    if reply.text is not None:
-        try:
-            words = archive.append(
-                "channel_out",
-                {"room_id": room.room_id, "turn": turn, "from": to, "text": reply.text, "outcome": reply.outcome},
-            )
-        except Exception:
-            raise HTTPException(status_code=503, detail="write_failed") from None
+def _data(turn: int, mode: str, reply: Reply, words: str | None) -> dict:
     proposal = None
     if reply.proposal is not None:
+        units, arts = reply.proposal
         proposal = {
             "proposal_id": events.new_part_id(),
-            "units": list(reply.proposal[0]),
-            "artifacts": [{"artifact_id": a, "version": v} for a, v in reply.proposal[1]],
+            "units": list(units),
+            "artifacts": [{"artifact_id": a, "version": v} for a, v in arts],
         }
-    data = {
+    return {
         "turn": turn,
         "mode": mode,
         "outcome": reply.outcome,
@@ -547,25 +525,73 @@ def _turn(ctx: Ctx, room: Room, model: RoomModel, safety: SafetyProvider, body: 
         "artifacts": [{"artifact_id": a, "version": v} for a, v in reply.artifacts],
         "proposal": proposal,
     }
-    trace = {**(reply.trace or {}), "archive_ref": words} if reply.trace else None
-    extra = {"trace": trace} if trace else {}
+
+
+def _finish(ctx: Ctx, room: Room, asked: dict, to: str, turn: int, mode: str, reply: Reply, archive: Any) -> bool:
+    """Archives the reply text and writes `meeting.replied`; False when the room closed or the world paused while the
+    call ran (nothing is written: no meeting event follows adjourned or world.paused, HR-1, MR-05). A reply that would
+    not validate against the event schema is written as `failed`, its credits kept."""
+    probe = {"room_id": room.room_id, **_data(turn, mode, reply, "r_x/1" if reply.text else None)}
+    if not conforms(_REPLIED, probe):
+        reply = Reply("failed", None, credits=reply.credits, trace=reply.trace)
+    text = {"room_id": room.room_id, "turn": turn, "from": to, "text": reply.text, "outcome": reply.outcome}
+    words = archive.append("channel_out", text) if reply.text is not None else None
+    trace = {**reply.trace, "archive_ref": words} if reply.trace else None
     summary = {"failed": "No reply was recorded.", "declined": "The agent has nothing to say to that."}.get(
         reply.outcome, "The agent replied."
     )
-    _write(
-        ctx.writer,
-        room,
-        _part(
-            "meeting.replied",
-            room,
-            to,
-            room.convener,
-            summary,
-            data,
-            district=target,
-            credits=reply.credits,
-            cause=asked["id"],
-            **extra,
-        ),
-    )
+    data = _data(turn, mode, reply, words)
+    part = _part("meeting.replied", room, to, room.convener, summary, data, credits=reply.credits, cause=asked["id"])
+    with _lock_of(_WRITES, room.room_id):
+        fresh = rebuild(ctx.stream()).get(room.room_id)
+        if ctx.world.paused or fresh is None or fresh.state != "open":
+            _drop_locks(room.room_id)
+            return False
+        _write(ctx.writer, room, {**part, "trace": trace} if trace else part)
+    return True
+
+
+def _turn(ctx: Ctx, room: Room, model: RoomModel, safety: SafetyProvider, body: dict) -> JSONResponse:
+    stream, to, mode = ctx.stream(), body["to"], body["mode"]
+    try:
+        quote = model.quote(mode)
+    except RoomModelUnavailable:
+        raise HTTPException(status_code=503, detail="not_configured") from None
+    left = room.credit_cap - room.spent
+    if len(room.turns) >= room.max_turns or quote > left + _EPS:  # MR-08: refused before any call, and the room closes
+        _adjourn(ctx, room, "capped")
+        return _refuse(409, "room_closed", reason="capped")
+    grounding = ground(ctx.world.layout, stream, to)
+    if grounding is None:
+        return _refuse(422, "bad_request")
+    redact = _seam(ctx.request, deps.get_redactor)
+    archive = _seam(ctx.request, deps.get_run_archive)(org_id=deps.ORG_ID, run_id=room.run_id)
+    turn = len(room.turns) + 1
+    try:
+        ref = archive.append(
+            "channel_in", {"room_id": room.room_id, "turn": turn, "to": to, "mode": mode, "text": redact(body["text"])}
+        )
+    except Exception:
+        raise HTTPException(status_code=503, detail="write_failed") from None
+    summary = "A person asked an agent something in the Meeting Hall."
+    data = {"turn": turn, "to": to, "mode": mode, "message_ref": ref}
+    asked = _write(ctx.writer, room, _part("meeting.asked", room, room.convener, to, summary, data))
+    try:
+        reply = answer(model, grounding, body["text"], mode, safety=safety, redact=redact, budget=left)
+    except RoomCapped:
+        _adjourn(ctx, room, "capped")
+        return _refuse(409, "room_closed", reason="capped")
+    try:
+        written = _finish(ctx, room, asked, to, turn, mode, reply, archive)
+    except Exception:  # decision 10: the turn closes `failed` with no text; if even that fails, so does the room
+        try:
+            written = _finish(ctx, room, asked, to, turn, mode, Reply("failed", None, credits=reply.credits), archive)
+        except Exception:
+            try:
+                _adjourn(ctx, room, "failed")
+            except Exception:
+                logger.warning("room %s could not be closed after a write error", room.room_id)
+            raise HTTPException(status_code=503, detail="write_failed") from None
+    if not written:
+        return _refuse(409, "world_paused" if ctx.world.paused else "room_closed")
     return JSONResponse(_view(ctx, rebuild(ctx.stream())[room.room_id])["turns"][-1], status_code=202)

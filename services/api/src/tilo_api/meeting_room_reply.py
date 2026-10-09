@@ -21,7 +21,7 @@ from tilo_providers.router import BudgetExceededError, Router, RouterError
 ROLES = {"quick": "meeting_room", "thinking": "meeting_room_thinking"}  # config/models*.yaml; `meeting` is the bot's
 DECLINED = "I can't take that message, so I have no answer to give."
 NO_RECORD = "I have no record of that."
-MAX_LINES, MAX_LINE, MAX_TEXT = 60, 300, 4000
+MAX_LINES, MAX_LINE, MAX_TEXT, MAX_UNITS, MAX_ARTIFACTS = 60, 300, 4000, 20, 10
 _UNIT = re.compile(r"U[0-9]{1,4}")
 _ARTIFACT_ID = re.compile(r"art_[0-9A-Za-z_]{1,48}")
 _ARTIFACT_EVENTS = ("artifact.created", "artifact.versioned")
@@ -141,25 +141,34 @@ def ground(layout: Mapping[str, Any] | None, events: list[dict], agent: str) -> 
     return Grounding(agent, rank, district, frozenset(units), frozenset(artifacts), lines)
 
 
-def _prompt(record: Grounding, text: str, mode: str, note: str, lines: tuple) -> tuple[str, str]:
-    rows = (
-        "\n".join(f"{s} | {t} | {u} | {neutralise(m, limit=MAX_LINE)}" for s, t, u, m in lines) or "(nothing recorded)"
-    )
-    variables = {"mode": mode, "agent": record.agent, "question": neutralise(text, limit=2000), "record": rows}
-    return (
-        load_prompt("meeting_room", "reply_system.md"),
-        load_prompt("meeting_room", "reply_task.md", {**variables, "note": note}),
-    )
+def _clean(text: str) -> str:
+    """What the model sees of a recorded line: neutralised, cut, and on one line (no forged record row)."""
+    return " ".join(neutralise(text, limit=MAX_LINE).split())
 
 
-def _screened(safety: SafetyProvider, record: Grounding) -> tuple[tuple, str]:
-    """PRD 16.3: flagged recorded content stays out of the prompt, with a note that some did. One screen over the whole
-    record, then line by line only when that was flagged."""
-    joined = "\n".join(m for *_, m in record.lines)
-    if not joined or not safety.check(joined)["flagged"]:
-        return record.lines, ""
-    kept = tuple(ln for ln in record.lines if not safety.check(ln[3])["flagged"])
-    return kept, "Some recorded lines were left out because they were flagged."
+def _flagged(safety: SafetyProvider, text: str) -> bool:
+    """The screen's verdict; a result that is not a plain True or False is an error, never "clean" (fail closed)."""
+    result = safety.check(text)
+    if not isinstance(result, dict) or type(result.get("flagged")) is not bool:
+        raise ValueError("malformed screen result")
+    return result["flagged"]
+
+
+def _prompt(record: Grounding, question: str, mode: str, note: str, rows: tuple) -> tuple[str, str]:
+    lines = "\n".join(f"{s} | {t} | {u} | {m}" for s, t, u, m in rows) or "(nothing recorded)"
+    variables = {"mode": mode, "agent": record.agent, "question": question, "record": lines, "note": note}
+    return load_prompt("meeting_room", "reply_system.md"), load_prompt("meeting_room", "reply_task.md", variables)
+
+
+def _screened(safety: SafetyProvider, rows: tuple) -> tuple[tuple, str]:
+    """PRD 16.3: the screen sees exactly the rows the model will see. Flagged ones stay out, with a note that some did:
+    one screen over all of them, then row by row only when that was flagged."""
+    joined = "\n".join(r[3] for r in rows)
+    if not joined or not _flagged(safety, joined):
+        return rows, ""
+    return tuple(
+        r for r in rows if not _flagged(safety, r[3])
+    ), "Some recorded lines were left out because they were flagged."
 
 
 def _pairs(items: object) -> tuple[tuple[str, int], ...] | None:
@@ -176,7 +185,7 @@ def _parse(raw: object, record: Grounding) -> dict | None:
     """The exact reply shape with exact types, every id inside the grounding set; anything else is None (failed)."""
     try:
         doc = json.loads(raw) if isinstance(raw, str) else None
-    except ValueError:
+    except Exception:  # bad JSON, or nested past the parser's limit (RecursionError)
         return None
     if not isinstance(doc, dict) or set(doc) != {"has_record", "text", "units", "artifacts", "proposal"}:
         return None
@@ -184,6 +193,8 @@ def _parse(raw: object, record: Grounding) -> dict | None:
     if type(doc["has_record"]) is not bool or not isinstance(text, str) or not 1 <= len(text) <= MAX_TEXT:
         return None
     if arts is None or not isinstance(units, list) or not all(isinstance(u, str) for u in units):
+        return None
+    if len(units) > MAX_UNITS or len(arts) > MAX_ARTIFACTS:  # meeting_room.schema.json cited_units, cited_artifacts
         return None
     if len(set(units)) != len(units) or not set(units) <= record.units or not set(arts) <= record.artifacts:
         return None  # MR-06: one id outside the set fails the reply
@@ -197,7 +208,7 @@ def _parse(raw: object, record: Grounding) -> dict | None:
         ok = shaped and 1 <= len(p_units) <= 10 and all(isinstance(u, str) for u in p_units)
         if not doc["has_record"] or not ok or p_arts is None or len(set(p_units)) != len(p_units):
             return None
-        if not set(p_units) <= record.units or not set(p_arts) <= record.artifacts:
+        if len(p_arts) > MAX_ARTIFACTS or not set(p_units) <= record.units or not set(p_arts) <= record.artifacts:
             return None
         change = (tuple(p_units), p_arts)
     return {"has_record": doc["has_record"], "text": text, "units": tuple(units), "artifacts": arts, "proposal": change}
@@ -216,10 +227,11 @@ def answer(
     """One turn's reply. Never raises for a model or screen problem: that is a `failed` reply with no text. Raises
     RoomCapped when the Router refuses the call against `budget`."""
     try:
-        if safety.check(text)["flagged"]:
+        question = neutralise(text, limit=2000)
+        if _flagged(safety, text) or (question != text and _flagged(safety, question)):
             return Reply("declined", DECLINED)  # a flagged message is never sent to the model, never a proposal
-        lines, note = _screened(safety, record)
-        system, prompt = _prompt(record, text, mode, note, lines)
+        rows, note = _screened(safety, tuple((s, t, u, _clean(m)) for s, t, u, m in record.lines))
+        system, prompt = _prompt(record, question, mode, note, rows)
         got = model.reply(mode, system, prompt, record=record, budget=budget)
     except RoomCapped:
         raise
@@ -234,12 +246,17 @@ def answer(
         "latency_ms": got.latency_ms,
         "archive_ref": None,
     }
-    parsed = _parse(got.text, record)
-    if parsed is None:
+    try:
+        parsed = _parse(got.text, record)
+        if parsed is None:
+            return Reply("failed", None, credits=got.credits, trace=trace)
+        shown = redact(NO_RECORD if not parsed["has_record"] else parsed["text"])
+        if not isinstance(shown, str) or not 1 <= len(shown) <= MAX_TEXT:
+            return Reply("failed", None, credits=got.credits, trace=trace)
+        outcome = "declined" if not parsed["has_record"] else "proposed_change" if parsed["proposal"] else "answered"
+        return Reply(outcome, shown, parsed["units"], parsed["artifacts"], parsed["proposal"], got.credits, trace)
+    except Exception:  # a parse or redactor error is a failed reply, the call's cost kept; the turn is answered
         return Reply("failed", None, credits=got.credits, trace=trace)
-    shown = redact(NO_RECORD if not parsed["has_record"] else parsed["text"])
-    outcome = "declined" if not parsed["has_record"] else "proposed_change" if parsed["proposal"] else "answered"
-    return Reply(outcome, shown, parsed["units"], parsed["artifacts"], parsed["proposal"], got.credits, trace)
 
 
 class RouterRoomModel:

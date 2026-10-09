@@ -98,7 +98,7 @@ def test_MROOM_A1_attendees_come_from_the_layout(tmp_path):
     assert env.convene(agents=["A_ghost"]).status_code == 422  # not in the layout
     assert env.convene(lead="A_dir", agents=["A_s1"]).status_code == 422  # the Director brings Leads only
     assert env.convene(lead="A_dir", agents=["A_l1", "A_l2"]).json()["agents"] == ["A_l1", "A_l2"]
-    assert env.room_events()[0]["vis"] == "all"
+    assert env.room_events()[0]["vis"] == [] and env.room_events()[0]["district"] is None  # SEC-07: fails closed
 
 
 def test_MROOM_A1_more_than_max_agents_is_refused(tmp_path):
