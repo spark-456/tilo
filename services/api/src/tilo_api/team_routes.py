@@ -20,11 +20,14 @@ from dataclasses import replace
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.responses import JSONResponse
+from fastapi.routing import APIRoute
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 from tilo_metering.flags import FlagStore
 
 from tilo_api import deps
-from tilo_api.people_writes import _capped_body, valid_email
+from tilo_api.people_limits import write_limit
+from tilo_api.people_writes import Refusal, _capped_body, valid_email
 from tilo_api.team_events import TeamEvents, get_team_events
 from tilo_api.team_rules import ROLES, MustAskLocked, RoleChangeRefused, load_capabilities, load_switches, set_switch
 from tilo_api.team_store import (
@@ -37,7 +40,27 @@ from tilo_api.team_store import (
 )
 
 logger = logging.getLogger("tilo_api.team_routes")
-router = APIRouter()
+
+
+class _TeamRoute(APIRoute):
+    def get_route_handler(self) -> Callable[[Request], Any]:
+        handler = super().get_route_handler()
+
+        async def guarded(request: Request) -> Any:
+            try:
+                return await handler(request)
+            except HTTPException as refusal:
+                extra = refusal.extra if isinstance(refusal, Refusal) else {}
+                return JSONResponse(
+                    status_code=refusal.status_code,
+                    content={"detail": refusal.detail, **extra},
+                    headers=refusal.headers,
+                )
+
+        return guarded
+
+
+router = APIRouter(route_class=_TeamRoute)
 
 Principal = Annotated[deps.Principal, Depends(deps.get_current_principal)]
 Store = Annotated[TeamRepository, Depends(get_team_store)]
@@ -248,7 +271,7 @@ def get_team(principal: Principal, store: Store) -> dict[str, Any]:
 @router.put("/v1/team/members/{person_id}/role")
 def put_role(
     person_id: str, principal: Principal, body: Annotated[RoleIn, Depends(_json_body(RoleIn))],
-    store: Store, flags: Flags, clock: Clock,
+    store: Store, flags: Flags, clock: Clock, _limit: Annotated[None, Depends(write_limit)] = None,
 ) -> dict[str, Any]:  # fmt: skip
     _session(principal)
     if body.role not in ROLES:  # a legacy contract role ("Team Lead") too, until BQ-DSN-01 maps it
@@ -267,7 +290,7 @@ def put_role(
 @router.put("/v1/team/members/{person_id}/limit")
 def put_limit(
     person_id: str, principal: Principal, body: Annotated[LimitIn, Depends(_json_body(LimitIn))],
-    store: Store, flags: Flags, clock: Clock,
+    store: Store, flags: Flags, clock: Clock, _limit: Annotated[None, Depends(write_limit)] = None,
 ) -> dict[str, Any]:  # fmt: skip
     def change(state: TeamState) -> TeamState:
         _owner(state, principal)
@@ -284,7 +307,10 @@ def put_limit(
 
 
 @router.delete("/v1/team/members/{person_id}")
-def remove_member(person_id: str, principal: Principal, store: Store, flags: Flags, clock: Clock) -> dict[str, Any]:
+def remove_member(
+    person_id: str, principal: Principal, store: Store, flags: Flags, clock: Clock,
+    _limit: Annotated[None, Depends(write_limit)] = None,
+) -> dict[str, Any]:  # fmt: skip
     def change(state: TeamState) -> TeamState:
         _owner(state, principal)
         if person_id not in state.roles:
@@ -304,7 +330,7 @@ def remove_member(person_id: str, principal: Principal, store: Store, flags: Fla
 @router.post("/v1/team/invites", status_code=201)
 def invite(
     principal: Principal, body: Annotated[InviteIn, Depends(_json_body(InviteIn))], store: Store, flags: Flags,
-    clock: Clock,
+    clock: Clock, _limit: Annotated[None, Depends(write_limit)] = None,
 ) -> dict[str, Any]:  # fmt: skip
     invite_id = "inv_" + secrets.token_hex(8)
 
@@ -328,6 +354,7 @@ def invite(
 def put_switch(
     key: str, principal: Principal, body: Annotated[SwitchIn, Depends(_json_body(SwitchIn))],
     store: Store, flags: Flags, clock: Clock, events_: Events,
+    _limit: Annotated[None, Depends(write_limit)] = None,
 ) -> dict[str, Any]:  # fmt: skip
     at = clock()
     seen: dict[str, bool] = {}
@@ -354,6 +381,7 @@ def put_switch(
 def put_tool(
     connector: str, principal: Principal, body: Annotated[ToolIn, Depends(_json_body(ToolIn))],
     store: Store, flags: Flags, events_: Events,
+    _limit: Annotated[None, Depends(write_limit)] = None,
 ) -> dict[str, Any]:  # fmt: skip
     seen: dict[str, str | None] = {}
 

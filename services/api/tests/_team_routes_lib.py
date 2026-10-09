@@ -67,6 +67,13 @@ class TeamApi:
         self.writer, self.desks = Writer(), Desks()
         self.user = OWNER
         self.full_session, self.channel = True, "web"  # a full web sign-in (BQ-XWORLD-10); tests narrow it
+        self.now = "2026-10-08T10:00:00.000Z"
+
+    def advance_clock(self, seconds: int = 61) -> None:
+        from datetime import datetime, timedelta  # noqa: PLC0415
+
+        dt = datetime.fromisoformat(self.now.replace("Z", "+00:00")) + timedelta(seconds=seconds)
+        self.now = dt.strftime("%Y-%m-%dT%H:%M:%S.000Z")
 
     def as_(self, user: str) -> TeamApi:
         self.user = user
@@ -101,11 +108,15 @@ def team_api(snapshot: Any = None, *, store: Any = None) -> Iterator[TeamApi]:
         channel=api.channel,
         full_session=api.full_session,  # type: ignore[arg-type]
     )
+    from tilo_people.stores import PeopleStores  # noqa: PLC0415
+
+    people_stores = PeopleStores.in_memory()
+    app.dependency_overrides[deps.get_people_stores] = lambda: people_stores
     app.dependency_overrides[get_team_store] = lambda: team
     app.dependency_overrides[deps.get_flag_store] = lambda: flags
     app.dependency_overrides[deps.get_event_writer] = lambda: api.writer
     app.dependency_overrides[deps.get_desk_worlds] = lambda: api.desks
-    app.dependency_overrides[deps.get_clock] = lambda: lambda: "2026-10-08T10:00:00.000Z"
+    app.dependency_overrides[deps.get_clock] = lambda: lambda: api.now
     try:
         api.client = TestClient(app)
         yield api

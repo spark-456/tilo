@@ -130,6 +130,58 @@ def test_PPL_11c_s4_BQ_PPL11C_1_a_body_of_exactly_the_cap_is_read_and_one_byte_m
     assert over.status_code == 413 and over.json() == {"detail": "body_too_large"}
 
 
+TEAM_PUT_ROUTES = {
+    "role": "/v1/team/members/u_priya/role",
+    "limit": "/v1/team/members/u_priya/limit",
+    "switch": "/v1/team/switches/weekend",
+    "tool": "/v1/team/tools/gmail",
+}
+
+
+@pytest.mark.parametrize("path", list(TEAM_PUT_ROUTES.values()), ids=list(TEAM_PUT_ROUTES))
+def test_PPL_11c_s4_BQ_PPL11C_1_team_put_routes_oversize_body_is_a_413(people_rig, path):
+    rig = meeting_rig(people_rig)
+    status, consumed, headers, text = stream_post(rig.app, path, method="PUT", total_bytes=5_000_000)
+    assert status == 413 and json.loads(text) == {"detail": "body_too_large"}, (status, text[:120])
+    status, consumed, headers, text = stream_post(
+        rig.app, path, method="PUT", total_bytes=10, declared_length=50_000_000
+    )
+    assert status == 413 and consumed <= 4096
+
+
+def test_PPL_11c_s4_BQ_PPL11C_1_every_put_and_patch_write_route_is_covered(people_rig):
+    """Extend the BQ_PPL11C_1 guard so PUT and PATCH write routes under /v1/ are also verified."""
+    rig = people_rig()
+    templates = [
+        t
+        for t, methods in rig.app.openapi()["paths"].items()
+        if any(m in methods for m in ("put", "patch")) and t.startswith("/v1/")
+    ]
+    patterns = {t: re.compile("^" + re.sub(r"\{[^/}]+\}", "[^/]+", t) + "$") for t in templates}
+    all_covered = list(TEAM_PUT_ROUTES.values())
+    uncovered = [t for t, p in patterns.items() if not any(p.match(path) for path in all_covered)]
+    assert not uncovered, f"PUT/PATCH write routes with no body-cap case: {uncovered}"
+
+
+@pytest.mark.parametrize("bad_cl", ["not-a-number", "-1", "12345678901", "12.34", " 42abc"])
+def test_PPL_11c_s4_BQ_PPL11C_1_non_digit_content_length_returns_400(people_rig, bad_cl):
+    rig = work_rig(people_rig)
+    status, consumed, headers, text = stream_post(
+        rig.app, "/v1/work-items", total_bytes=10, headers={"content-length": bad_cl}
+    )
+    assert status == 400 and json.loads(text) == {"detail": "invalid_content_length"}
+
+
+def test_PPL_11c_s4_BQ_PPL11C_1_tasks_json_body_is_capped_at_413(people_rig):
+    rig = work_rig(people_rig)
+    status, consumed, headers, text = stream_post(rig.app, "/tasks/tsk_fake/answers", total_bytes=5_000_000)
+    assert status == 413 and json.loads(text) == {"detail": "body_too_large"}
+    status, consumed, headers, text = stream_post(
+        rig.app, "/tasks/tsk_fake/answers", total_bytes=10, declared_length=50_000_000
+    )
+    assert status == 413 and consumed <= 4096
+
+
 # --- Idempotency-Key on creates -------------------------------------------------------------------------------------
 
 CREATES = {
