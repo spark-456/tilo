@@ -50,6 +50,7 @@ _ID = {
 _JSON_FIELDS = {"worlds": ("layout",), "tasks": ("draft", "brief", "edits", "approaches")}  # free-form: may nest arrays
 RESTARTED = "the service restarted, so the work stopped"
 _CLOSE_BUDGET_S = 5.0  # shutdown, well under Cloud Run's 10 s SIGTERM grace
+MAX_OWNER_TASKS = 500  # `load_owner_tasks` adopts at most this many of one owner's tasks (bounded read)
 
 
 class StaleRev(Exception):
@@ -133,13 +134,16 @@ class MemoryBackend:
         _check("worlds", world_id)
         return copy.deepcopy(self.queues.get(world_id, []))
 
-    def find(self, collection: str, field: str, value: Any) -> list[tuple[str, dict[str, Any]]]:
+    def find(
+        self, collection: str, field: str, value: Any, limit: int | None = None
+    ) -> list[tuple[str, dict[str, Any]]]:
         def get(doc: Any) -> Any:
             for key in field.split("."):
                 doc = doc.get(key) if isinstance(doc, dict) else None
             return doc
 
-        return [(i, self.read(c, i)) for (c, i), d in list(self.docs.items()) if c == collection and get(d) == value]  # type: ignore[misc]
+        found = [(i, self.read(c, i)) for (c, i), d in list(self.docs.items()) if c == collection and get(d) == value]
+        return found[:limit]  # type: ignore[return-value]
 
     def commit(self, writes: list[tuple[str, str, dict[str, Any], int | None]], appends: dict[str, list[dict]]) -> None:
         for coll, i, *_ in writes:
@@ -191,10 +195,14 @@ class FirestoreBackend:
         doc = self._queue(world_id).get().to_dict() or {}
         return [json.loads(p) for p in doc.get("parts", [])]
 
-    def find(self, collection: str, field: str, value: Any) -> list[tuple[str, dict[str, Any]]]:
+    def find(
+        self, collection: str, field: str, value: Any, limit: int | None = None
+    ) -> list[tuple[str, dict[str, Any]]]:
         from google.cloud.firestore_v1.base_query import FieldFilter
 
         query = self.client.collection(f"orgs/{self.org_id}/{collection}").where(filter=FieldFilter(field, "==", value))
+        if limit is not None:
+            query = query.limit(limit)
         return [(d.id, self._dec(collection, d.to_dict())) for d in query.stream()]
 
     def commit(self, writes: list[tuple[str, str, dict[str, Any], int | None]], appends: dict[str, list[dict]]) -> None:
@@ -353,6 +361,20 @@ class DurableStore(deps.Store):
         if settle:
             for w in [w for w, r in list(self.worlds.items()) if r.owner == owner]:
                 self.settle(w)
+
+    def load_owner_tasks(self, owner: str) -> None:
+        """Read-only (PEOPLE-SEAMS-1): this owner's tasks that the cache lacks, the first `MAX_OWNER_TASKS` the backend
+        returns. Read again on every call, so a task another instance made is found; a cached one is never replaced."""
+        with _io():
+            found = self.backend.find("tasks", "owner", owner, limit=MAX_OWNER_TASKS)
+        for task_id, d in found:
+            if not _valid("tasks", task_id) or task_id in self.tasks or d.get("owner") != owner:
+                continue
+            with _io():
+                task, rev = _task_from(d), d["rev"]
+            with self._held():
+                if task_id not in self.tasks:
+                    self.revs[("tasks", task_id)], self.tasks[task_id] = rev, task
 
     def load_path(self, params: Mapping[str, Any]) -> DurableStore:
         """The ids of a request's path, read-only: this runs before the route has checked who is asking."""

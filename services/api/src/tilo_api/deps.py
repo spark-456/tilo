@@ -170,6 +170,9 @@ class Store:
     def load_owner(self, owner: str, settle: bool = False) -> None:
         """Called before a route iterates an owner's worlds or policies; the cache already holds them."""
 
+    def load_owner_tasks(self, owner: str) -> None:
+        """Called before a read joins an owner's tasks to their worlds (PEOPLE-SEAMS-1); the cache holds them."""
+
     def load_path(self, params: Mapping[str, Any]) -> Store:
         return self
 
@@ -732,12 +735,19 @@ def get_today() -> Clock:
     return real_today
 
 
-def get_plate_sources() -> PlateSources:
-    raise HTTPException(status_code=503, detail="not_configured")
+def get_plate_sources(request: Request = None) -> PlateSources:  # type: ignore[assignment]
+    """The cards, runs and mail of the signed-in person's plate, read from the API's own store (PEOPLE-SEAMS-1,
+    `seams_store`): 503 `not_configured` exactly when `get_store` is, a demo session reads its own in-memory one."""
+    from tilo_api import seams_store  # noqa: PLC0415  (it imports this module)
+
+    return seams_store.StorePlateSources(seams_store.resolve_store(request))
 
 
-def get_source_owners() -> SourceOwners:
-    raise HTTPException(status_code=503, detail="not_configured")
+def get_source_owners(request: Request = None) -> SourceOwners:  # type: ignore[assignment]
+    """Who owns a mail message or a request, from the same store; `None` for anything it cannot vouch for."""
+    from tilo_api import seams_store  # noqa: PLC0415
+
+    return seams_store.StoreSourceOwners(seams_store.resolve_store(request))
 
 
 class MeetingWorlds(Protocol):
@@ -746,8 +756,11 @@ class MeetingWorlds(Protocol):
     def make_meeting_world(self, *, org_id: str, owner: str, meeting_id: str) -> str: ...
 
 
-def get_meeting_worlds() -> MeetingWorlds:
-    raise HTTPException(status_code=503, detail="not_configured")  # production wiring lands with the Outpost world
+def get_meeting_worlds(request: Request = None) -> MeetingWorlds:  # type: ignore[assignment]
+    """One persisted Outpost world per meeting on the API's own store (PEOPLE-SEAMS-1, `seams_store`)."""
+    from tilo_api import seams_store  # noqa: PLC0415
+
+    return seams_store.StoreMeetingWorlds(seams_store.resolve_store(request))
 
 
 class DeskWorlds(Protocol):
@@ -760,8 +773,11 @@ class DeskWorlds(Protocol):
         ...
 
 
-def get_desk_worlds() -> DeskWorlds:
-    raise HTTPException(status_code=503, detail="not_configured")  # production wiring lands with the Desk
+def get_desk_worlds(request: Request = None) -> DeskWorlds:  # type: ignore[assignment]
+    """The person's one Desk world on the API's own store, the one the assistant panel uses (PEOPLE-SEAMS-1)."""
+    from tilo_api import seams_store  # noqa: PLC0415
+
+    return seams_store.StoreDeskWorlds(seams_store.resolve_store(request))
 
 
 def get_run_archive(request: Request = None) -> Callable[..., RunArchive]:  # type: ignore[assignment]
