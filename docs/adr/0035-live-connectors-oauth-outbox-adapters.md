@@ -1,6 +1,6 @@
 # ADR-0035: Live Google connectors: OAuth connect through tilo-api, a durable Firestore outbox, real adapters in tilo-connectors
 
-- Status: Proposed (9 Oct 2026). The supervisor accepts it under the user's delegation; the user applies decision 9.
+- Status: **Accepted** (9 Oct 2026) by the supervisor under the user's blanket delegation ("Handle it yourself, i have given u full authority and merge ability"); defaults BQ-ADR35-1..4 are overridable; the user applies decision 9. Credit rule: the Opus rounds are paired (L2+L6, L3+L4, L5 alone).
   The merger may renumber.
 - Deciders: user (standing order, 9 Oct 2026: every feature fully live by 17 Oct, no fixture-only features; the live
   switch), supervisor (acceptance), architect
