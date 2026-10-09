@@ -1,4 +1,4 @@
-"""`GET /v1/people`: the signed-in person's team list (LIVE-GAPS-1a, FR-TEAM-01; people.rules.md PE-17, PE-20, PE-26).
+"""`GET /v1/people`: the signed-in person's team list (LG-1a, FR-TEAM-01; people.rules.md PE-17, PE-20, PE-26).
 
 The caller is `Principal.user_id` and the org is `deps.ORG_ID`; nothing in the request names a person or an org (query
 parameters are ignored). Every row goes through the PE-20 projection (`tilo_people.access.read`) and nothing is
