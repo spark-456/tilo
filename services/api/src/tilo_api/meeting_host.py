@@ -201,8 +201,12 @@ class HostRun(Run):
     def _must_ask(self, config: Any) -> None:
         return None  # the owner's own request replaces the "go ahead?" question; the gate card is the one authorisation
 
-    def _exact(self, connector: str, action: str, destination: str, recipients: list[str]) -> str:
-        return self.draft.exact if action == ACTION_TYPE else super()._exact(connector, action, destination, recipients)
+    def _exact(
+        self, connector: str, action: str, destination: str | None, recipients: list[str], line: str | None = None
+    ) -> str:
+        if action == ACTION_TYPE:
+            return self.draft.exact
+        return super()._exact(connector, action, destination, recipients, line)
 
     async def gate(self, unit: dict, worker: str, action: str, ref: dict, made: str) -> None:
         self.unit, self.worker = unit, worker

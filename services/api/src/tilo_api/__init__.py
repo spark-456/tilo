@@ -36,6 +36,7 @@ from tilo_api.dispatch import router as _dispatch_router
 from tilo_api.effort import router as _effort_router
 from tilo_api.feedback import router as _feedback_router
 from tilo_api.intake import router as intake_router
+from tilo_api.item_fields import router as _item_fields_router
 from tilo_api.log_context import LogContext as _LogContext
 from tilo_api.log_context import LogRunId as _LogRunId
 from tilo_api.notifications import router as _notifications_router
@@ -122,6 +123,7 @@ app.include_router(
 app.include_router(_build_console_router(_runs.get_card_store, answer_guard=_runs.answer_guard))
 app.include_router(_build_sharing_router(_world_views))
 app.include_router(_runs.router)
+app.include_router(_item_fields_router)
 app.include_router(_assistant_router)
 app.include_router(_people.router)
 app.include_router(_meeting_host_routes.router)

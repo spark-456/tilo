@@ -57,6 +57,7 @@ class FakeGoogle:
     def __init__(self) -> None:
         self.requests: list[tuple[str, str, Any]] = []
         self.drafts: list[Any] = []
+        self.sent: list[Any] = []
         self.folders: list[str] = []
         self.saved: list[bytes] = []
         self.events: dict[str, Any] = {}
@@ -72,6 +73,11 @@ class FakeGoogle:
                 return Resp(200, {})
             self.drafts.append(json)
             return Resp(200, {"id": "dr_" + secrets.token_hex(3), "message": {"id": "m_1", "threadId": ""}})
+        if url == GMAIL_API + "/messages/send" and method == "POST":
+            self.sent.append(json)
+            return Resp(200, {"id": "msg_" + secrets.token_hex(3), "threadId": ""})
+        if url == GMAIL_API + "/messages" and method == "GET":
+            return Resp(200, {})
         if url == DRIVE_API + "/files" and method == "GET":
             q = str((params or {}).get("q", ""))
             found = [{"id": f} for f in self.folders] if "mimeType" in q else []
@@ -96,7 +102,7 @@ class FakeGoogle:
 class InProcessConnectors5:
     """tilo-connectors' real routes (ADR-0035 L5) over the fake broker and `FakeGoogle`, behind `MeetingHostRpc`."""
 
-    def __init__(self, google: FakeGoogle, broker: FakeBroker | None = None) -> None:
+    def __init__(self, google: FakeGoogle, broker: FakeBroker | None = None, clock: Any = None) -> None:
         from fastapi.testclient import TestClient  # noqa: PLC0415
         from tilo_api.meeting_host_rpc import MeetingHostRpc  # noqa: PLC0415
         from tilo_connectors.app import create_app  # noqa: PLC0415
@@ -118,7 +124,7 @@ class InProcessConnectors5:
         runtime = HostRuntime(
             {AUDIENCE_VAR: self.audience, CALLER_VAR: caller}, verifier=Verifier(),
             broker_opener=lambda _env, *, emit, alert: self.broker, transport_opener=lambda env: google,
-            clock=lambda: NOW,
+            clock=clock or (lambda: NOW),
         )  # fmt: skip
         self.client = TestClient(create_app(runtime))
         self.posts: list[dict[str, Any]] = []

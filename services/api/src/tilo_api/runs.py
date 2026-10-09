@@ -28,10 +28,10 @@ from tilo_harness.executor import UnitOutcome, run_plan
 from tilo_harness.must_ask import MustAsk
 from tilo_harness.question_wait import AlreadyAnswered, QuestionWait
 from tilo_harness.validator import repo_validator
-from tilo_memory.artifacts import Scope
+from tilo_memory.artifacts import NewVersion, Origin, Scope
 from tilo_planning.compiler import DELIVER, PlanInputs
 
-from tilo_api import deps, events, team_access, team_store
+from tilo_api import deps, events, item_documents, team_access, team_store
 from tilo_api.access import Mode
 from tilo_api.cards import (
     OWNER_ONLY_ACTIONS,
@@ -42,6 +42,8 @@ from tilo_api.cards import (
     get_channels_caller,
 )
 from tilo_api.connector_rpc import NO_DRAFT, ConnectorRpcStub
+
+DESTINATION_CHANGED = "the email goes somewhere other than its draft, so it is not the same item"
 
 logger = logging.getLogger("tilo_api.runs")
 router = APIRouter()
@@ -239,6 +241,10 @@ class Run:
         self._alerted: set[str] = set()
         self._alert_lock = threading.Lock()
         self._drafted: dict[tuple[str, int], str] = {}  # LC-10: (artifact id, version) -> content hash at its draft
+        self._documents: dict[tuple[str, int, str], tuple[dict[str, Any], str, str | None]] = {}  # (body, kind) -> pin
+        self._asking: dict[str, tuple[str, tuple[str, ...]]] = {}  # fields card id -> (action, the missing fields)
+        self._supplied: dict[str, dict[str, str]] = {}  # fields card id -> what the person typed (never logged)
+        self.fields_lock = threading.Lock()  # the fields route stages and answers one card at a time
         self.adapters: dict[str, Any] = {  # a live connector's stub is bound to this run (its reader, sink, owner)
             name: adapter.bound(self._read_pinned, self._part_sink, self.owner)
             if hasattr(adapter, "bound")
@@ -662,14 +668,27 @@ class Run:
             brief, unit_copy = copy.deepcopy(self.brief), copy.deepcopy(unit)
             to = self.seams.resolver(unit=unit_copy, action_type=action, item=dict(item), brief=brief)
             recipients, destination, known = to["recipients"], to["destination"], to.get("known_recipients")
+            fields = to.get("fields")
+            declared: Mapping[str, Any] = fields if isinstance(fields, Mapping) else {}  # L6b: declared, never inferred
         except Exception as exc:
             raise _GateFailed("the send has no recipients") from exc
-        if not (isinstance(destination, str) and destination.strip() and isinstance(recipients, list) and recipients
+        live = bool(item_documents.kind_of(action)) and isinstance(self.adapters.get(connector), ConnectorRpcStub)
+        reaches_no_one = live and action in item_documents.NO_RECIPIENT_ACTIONS  # a save or an own-calendar event
+        if not ((destination is None and live or isinstance(destination, str) and destination.strip())  # a new mail
+                and isinstance(recipients, list) and (recipients or reaches_no_one)
                 and all(isinstance(r, str) and r.strip() for r in recipients)):  # fmt: skip
             raise _GateFailed("the send has no recipients or no destination")  # fails closed, before any gate
+        line, body_ref = None, dict(item)
+        if live and action == "create_event" and recipients:  # LC-09: the guest-less action refuses a guest first
+            raise _GateFailed(item_documents.NO_GUESTS)
+        if live:
+            item, line = await self._item_document(unit, worker, action, item, made, destination, declared)
+            ref = dict(item)  # the card, the entry and the hash pin all name the document the person approves
         try:  # AR-07, OB-05, BQ-264: from the stored record, never a default; only a `clean` verdict clears the flag
             stored = self.seams.artifacts.head(self.scope, item).record
-            flagged = stored["screening"] != "clean"
+            flagged = stored["screening"] != "clean" or (  # the body's verdict stays with the pin (OB-05)
+                self.seams.artifacts.head(self.scope, body_ref).record["screening"] != "clean"
+            )
         except Exception as exc:
             raise _GateFailed("the item to send is not in the run's store") from exc
         self._draft_first(connector, action, item)  # LC-10: before any card a send that could not go would raise
@@ -692,7 +711,7 @@ class Run:
         irreversible = self._action(connector, action)["irreversible"]  # type: ignore[index]
         card_id, outbox_id = events.new_part_id(), events.new_part_id()
         card = self._gate_card(unit, worker, card_id, gate["id"], connector, action, tier, irreversible)
-        exact = self._exact(connector, action, destination, recipients)
+        exact = self._exact(connector, action, destination, recipients, line)
         if len(exact) > _EXACT_MAX:  # never cut: a cut would hide a recipient from the person approving
             raise _GateFailed("the send names too many recipients to show on one card")
         card["gate"]["action"] |= {"item": ref, "destination": destination, "exact": exact}
@@ -827,10 +846,7 @@ class Run:
     def _gate_card(self, unit: dict, worker: str, card_id: str, gate_id: str, connector: str, action: str,
                    tier: str, irreversible: bool) -> dict:  # fmt: skip
         """The deterministic gate card (PRD 10.3): from the plan gate, the connector action and the send."""
-        building = next(
-            b["id"] for level in self.layout["semantic"]["levels"] for d in level["districts"]
-            for b in d["buildings"] if unit["id"] in b["plan_units"]
-        )  # fmt: skip
+        building = self._building(unit)
         name, undo = self.seams.connectors.get(connector)["name"], "cannot" if irreversible else "can"
         return {
             "id": card_id, "world_id": self.world_id, "run_id": self.run_id, "kind": "gate", "rung": "gate",
@@ -850,11 +866,142 @@ class Run:
             "consent": None,
         }  # fmt: skip
 
-    def _exact(self, connector: str, action: str, destination: str, recipients: list[str]) -> str:
-        """What the send does, from the action, connector, destination and recipients only; no model-written text
-        (a unit's title is not trusted to describe what is sent)."""
+    def _exact(
+        self, connector: str, action: str, destination: str | None, recipients: list[str], line: str | None
+    ) -> str:
+        """What the send does, from the action, connector, destination, recipients and the document's own declared
+        fields only; no model-written text (a unit's title is not trusted to describe what is sent)."""
         name = self.seams.connectors.get(connector)["name"]
-        return f"{action} by {name} to {', '.join(recipients)} (destination {destination})."
+        to = f" to {', '.join(recipients)}" if recipients else ""
+        where = f" (destination {destination})" if destination is not None else ""
+        return f"{action} by {name}{to}{where}." + (f" {line}." if line else "")
+
+    def _building(self, unit: dict) -> str:
+        return next(
+            b["id"] for level in self.layout["semantic"]["levels"] for d in level["districts"]
+            for b in d["buildings"] if unit["id"] in b["plan_units"]
+        )  # fmt: skip
+
+    async def _item_document(
+        self, unit: dict, worker: str, action: str, body: dict, made: str, destination: str | None, declared: Mapping
+    ) -> tuple[dict[str, Any], str]:
+        """ADR-0035 L6b: the L5 document of this action, a new version of the unit's artifact that is pinned, hashed and
+        approved (CR-12). The same body and kind give the same version, so a draft and its send pin one content. A
+        missing declared field asks the person (nothing is enqueued); nothing is ever inferred from the text."""
+        kind = item_documents.kind_of(action) or ""
+        key = (body["artifact_id"], body["version"], kind)
+        if action == "send_email" and key not in self._documents:
+            raise _GateFailed(NO_DRAFT)  # LC-10: no draft step made this content, so no question is asked for a send
+        if key in self._documents and self._documents[key][2] != destination:
+            raise _GateFailed(DESTINATION_CHANGED)  # a send goes where its draft went, or it is not the same item
+        if key not in self._documents:
+            try:
+                stored = self.seams.artifacts.head(self.scope, body).record  # type: ignore[union-attr]
+                content, fields = self._read_pinned(body), dict(declared)
+            except Exception as exc:
+                raise _GateFailed("the item to send is not in the run's store") from exc
+            origin = {"kind": stored["origin"]["kind"]}
+            try:
+                while isinstance(
+                    built := item_documents.build_document(
+                        action,
+                        fields,
+                        body=content,
+                        media_type=stored["media_type"],
+                        origin=origin,
+                        threaded=destination is not None,
+                    ),
+                    item_documents.Needs,
+                ):
+                    fields |= await self._ask_fields(unit, worker, action, built.fields)
+            except item_documents.DocumentRefused as exc:
+                raise _GateFailed(exc.reason) from None
+            parent = {"artifact_id": body["artifact_id"], "version": self.recorded_version(body["artifact_id"])}
+            new = NewVersion(
+                media_type="application/json", content=built, run_id=self.run_id, parent=parent,
+                origin=Origin(kind="unit", unit=unit["id"], agent=worker),
+                idempotency_key=f"{self.run_id}:{unit['id']}:{100 + item_documents.ORDER.index(kind)}:0",
+            )  # fmt: skip
+            try:
+                version = await asyncio.to_thread(self.seams.artifacts.put, self.scope, new)
+                self.put(
+                    "artifact.versioned", worker, version.artifact_id, "The agent made a new version of an item.",
+                    {"artifact": version.ref, "previous_version": parent["version"]},
+                    district=unit["district"], cause=made,
+                )  # fmt: skip
+            except RunStopped:
+                raise
+            except Exception as exc:
+                raise _GateFailed("the document to send could not be stored") from exc
+            try:  # the card's line is read back from the stored (redacted) bytes, not from what was built
+                line = item_documents.summary(self._read_pinned(version.ref))
+            except Exception as exc:
+                raise _GateFailed("the document to send could not be read back") from exc
+            self._documents[key] = (version.ref, line, destination)
+        ref, line, _ = self._documents[key]
+        return ref, line
+
+    async def _ask_fields(self, unit: dict, worker: str, action: str, missing: tuple[str, ...]) -> dict[str, str]:
+        """A needs-you card names the fields the document lacks; the person supplies them on the fields route, which
+        answers the card (`provide`). A hold, a default or an answer with nothing supplied fails the step."""
+        names, card_id = ", ".join(missing), events.new_part_id()
+        card = {
+            "id": card_id, "world_id": self.world_id, "run_id": self.run_id, "kind": "needs_you", "rung": "needs_you",
+            "header": {"building": self._building(unit), "agent": worker},
+            "what_happened": f"{unit['title']}: needs {names}."[:140],
+            "why_it_matters": "Nothing is sent or saved until you add it. Tilo does not make it up from the text.",
+            "options": [
+                {"id": "provide", "label": "Add it", "suggested": True, "irreversible": False,
+                 "reason": "You add it here; the finished item then comes back for your approval."},
+                {"id": "hold", "label": "Hold", "suggested": False, "irreversible": False},
+            ],
+            "add_context": False, "actions": ["show_me"], "answer_channels": ["web", "mobile_web"],
+            "created_at": events.now(), "timeout": _GATE_TIMEOUT_S, "safe_default": "hold",
+            "gate": None, "consent": None,
+        }  # fmt: skip
+        if _card_errors(card):
+            raise _GateFailed("the question card was refused")
+        self._asking[card_id] = (action, missing)
+        try:
+            try:
+                self._store_card(card)
+            except RuntimeError as exc:
+                raise _GateFailed("the question card was refused") from exc
+            district = next(d for level in self.layout["semantic"]["levels"] for d in level["districts"]
+                            if d["id"] == unit["district"])  # fmt: skip
+            answer = await self.question_wait.wait_for(card, lead=district["lead"], director=self.director,
+                                                       district=unit["district"])  # fmt: skip
+        finally:
+            with self.fields_lock:
+                self._asking.pop(card_id, None)  # nothing is supplied for a card that is over, whichever way it ended
+                supplied = self._supplied.pop(card_id, None)
+        if answer.option != "provide":
+            supplied = None
+        if supplied is None:
+            raise _GateFailed(f"needs {names}: nothing was added")
+        return supplied
+
+    def stage_fields(self, card_id: str, fields: Any) -> dict[str, str]:
+        """The fields route's check, before it answers the card: LookupError for a card this run did not ask,
+        ValueError(plain reason) for what the document would refuse. The values are kept for the waiting step only."""
+        action, missing = self._asking.get(card_id) or ("", ())
+        if not action:
+            raise LookupError(card_id)
+        try:
+            got = item_documents.check_fields(action, fields if isinstance(fields, Mapping) else {})
+        except item_documents.DocumentRefused as exc:
+            raise ValueError(exc.reason) from None
+        if set(got) != set(missing) or set(fields) != set(missing):
+            raise ValueError("needs " + ", ".join(missing))
+        if card_id in self._supplied:
+            raise LookupError(card_id)  # another caller's values are already waiting for this card's answer
+        self._supplied[card_id] = got
+        return got
+
+    def unstage_fields(self, card_id: str, staged: dict[str, str]) -> None:
+        """Takes back only the values this caller staged."""
+        if self._supplied.get(card_id) is staged:
+            del self._supplied[card_id]
 
     def _action(self, connector: str, action: str) -> dict | None:
         declared = self.seams.connectors.get(connector)["actions"] if connector in self.seams.connectors else []
