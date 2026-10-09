@@ -38,6 +38,8 @@ export function callTable(): CallTable {
     undo: ["depot"],
     startWorld: ["workspace", "Plan the offsite"],
     saveSkill: [skill],
+    captureSkill: ["Check the inbox and log each invoice"],
+    proposeVersion: ["tsk_01"],
     setToolLevel: ["email", 2],
     bookSlot: [slot],
     addBackup: ["ps"],

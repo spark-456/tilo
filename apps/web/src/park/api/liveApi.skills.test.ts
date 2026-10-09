@@ -80,7 +80,7 @@ describe("SKILLS_3_getSkills: GET /v1/skills as the Skills library", () => {
   it("SKILLS_3_getSkills_invents_no_numbers", async () => {
     const r = await live(vi.fn(async () => json({ skills: [row()] }))).getSkills();
     const s = r.data[0] as Skill;
-    expect([s.runs, s.rate, s.last, s.improved, s.from]).toEqual([0, null, "", "", ""]);
+    expect([s.runs, s.rate, s.last, s.improved, s.from]).toEqual([null, null, "", "", ""]);
     expect(s.first).toBeUndefined();
     expect(s.now).toBeUndefined();
     expect(s.used).toEqual([]);
@@ -247,5 +247,157 @@ describe("SKILLS_3_saveSkill: POST /v1/skills", () => {
     const err = await failure(live(spy).saveSkill(without));
     expect(err).toBeInstanceOf(TiloApiError);
     expect(spy).not.toHaveBeenCalled();
+  });
+});
+
+// SKILLS-5 (FR-SKL-01/02, web half): the teach flow's two reads of services/api skills_capture.py.
+const CAPTURED = { capture_id: "tsk_C1", captured_steps: [{ text: "Open the mail" }, { text: "Note the total" }] };
+const VERSION = {
+  capture_id: "tsk_C1",
+  plan_steps: [STEP, SEND],
+  clarifying_question: { text: "Link or PDF?", options: ["Open the link", "Skip"] },
+  estimates: {
+    credits_per_run: 6,
+    seconds_per_run: 40,
+    asks_per_run: 1,
+    source: "prior",
+    prices_as_of: "2026-10-01",
+  },
+};
+const sent = (spy: ReturnType<typeof vi.fn>, n = 0) => ({
+  url: String(spy.mock.calls[n]?.[0]),
+  init: spy.mock.calls[n]?.[1] as RequestInit,
+  body: JSON.parse(String((spy.mock.calls[n]?.[1] as RequestInit).body)),
+});
+
+describe("SKILLS_5_captureSkill: POST /v1/skills/captures", () => {
+  it("SKILLS_5_captureSkill_posts_method_describe_and_the_text_alone_and_reads_the_steps", async () => {
+    const spy = vi.fn(async (_u: unknown, _i?: RequestInit) => json(CAPTURED, 201));
+    const r = await live(spy).captureSkill("Check the inbox, then log the total");
+    expect(r).toEqual({ data: { id: "tsk_C1", steps: ["Open the mail", "Note the total"] }, source: "live" });
+    const call = sent(spy);
+    expect(call.url).toBe(`${BASE}/v1/skills/captures`);
+    expect(call.init.method).toBe("POST");
+    expect(call.body).toEqual({ method: "describe", text: "Check the inbox, then log the total" });
+  });
+
+  it.each([503, 502, 422])("SKILLS_5_captureSkill_http_%i_rejects_TiloApiError", async (status) => {
+    const err = await failure(
+      live(vi.fn(async () => json({ detail: "x" }, status))).captureSkill("text"),
+    );
+    expect(err).toBeInstanceOf(TiloApiError);
+    expect((err as TiloApiError).status).toBe(status);
+  });
+
+  it.each([
+    ["no steps", { capture_id: "tsk_C1", captured_steps: [] }],
+    ["no id", { captured_steps: [{ text: "a" }] }],
+    ["a step without text", { capture_id: "tsk_C1", captured_steps: [{ nope: 1 }] }],
+    ["not an object", ["x"]],
+  ])("SKILLS_5_captureSkill_a_201_with_%s_is_unreadable_not_steps", async (_n, body) => {
+    const err = await failure(live(vi.fn(async () => json(body, 201))).captureSkill("text"));
+    expect(err).toBeInstanceOf(TiloApiError);
+  });
+});
+
+describe("SKILLS_5_proposeVersion: POST /v1/skills/captures/{id}/version", () => {
+  it("SKILLS_5_proposeVersion_reads_steps_with_the_servers_ask_first_the_question_and_the_estimates", async () => {
+    const spy = vi.fn(async (_u: unknown, _i?: RequestInit) => json(VERSION));
+    const r = await live(spy).proposeVersion("tsk_C1");
+    expect(sent(spy).url).toBe(`${BASE}/v1/skills/captures/tsk_C1/version`);
+    expect(sent(spy).init.method).toBe("POST");
+    expect(r.source).toBe("live");
+    expect(r.data.steps).toEqual([
+      { text: STEP.text, tool: "gmail", action: "read_email", verb: "read", ask: false, locked: false },
+      { text: SEND.text, tool: "gmail", action: "send_email", verb: "send", ask: true, locked: true },
+    ]);
+    expect(r.data.question).toEqual({ text: "Link or PDF?", options: ["Open the link", "Skip"] });
+    expect(r.data.estimates).toEqual({ credits: 6, seconds: 40, asks: 1 });
+  });
+
+  it("SKILLS_5_proposeVersion_no_question_and_no_readable_estimates_are_null_never_made_up", async () => {
+    const odd = { ...VERSION, clarifying_question: null, estimates: { credits_per_run: "6" } };
+    const r = await live(vi.fn(async () => json(odd))).proposeVersion("tsk_C1");
+    expect(r.data.question).toBeNull();
+    expect(r.data.estimates).toBeNull();
+  });
+
+  it("SKILLS_5_proposeVersion_the_id_is_encoded_into_the_path", async () => {
+    const spy = vi.fn(async (_u: unknown, _i?: RequestInit) => json(VERSION));
+    await live(spy).proposeVersion("a/b?c");
+    expect(sent(spy).url).toBe(`${BASE}/v1/skills/captures/a%2Fb%3Fc/version`);
+  });
+
+  it.each([503, 502, 422, 404])("SKILLS_5_proposeVersion_http_%i_rejects_TiloApiError", async (status) => {
+    const err = await failure(
+      live(vi.fn(async () => json({ detail: "x" }, status))).proposeVersion("tsk_C1"),
+    );
+    expect(err).toBeInstanceOf(TiloApiError);
+    expect((err as TiloApiError).status).toBe(status);
+  });
+
+  it.each([
+    ["no plan_steps", { ...VERSION, plan_steps: undefined }],
+    ["an empty plan", { ...VERSION, plan_steps: [] }],
+    ["a step without ask_first", { ...VERSION, plan_steps: [{ ...STEP, ask_first: "yes" }] }],
+    ["a step without a tool", { ...VERSION, plan_steps: [{ ...STEP, tool: 3 }] }],
+    ["a question without options", { ...VERSION, clarifying_question: { text: "q" } }],
+  ])("SKILLS_5_proposeVersion_an_answer_with_%s_is_unreadable", async (_n, body) => {
+    const err = await failure(live(vi.fn(async () => json(body))).proposeVersion("tsk_C1"));
+    expect(err).toBeInstanceOf(TiloApiError);
+  });
+});
+
+describe("SKILLS_5_saveSkill: a taught version is posted as the server made it", () => {
+  const taught = (): Skill => {
+    const d = draft();
+    return {
+      ...d,
+      draft: {
+        scope: "me",
+        trigger: "ask",
+        plan: [
+          { text: STEP.text, tool: "gmail · read_email", ask: false },
+          { text: SEND.text, tool: "gmail · send_email", ask: true },
+        ],
+        server: {
+          captured: ["Open the mail", "Note the total"],
+          question: { text: "Link or PDF?", options: ["Open the link", "Skip"] },
+          steps: [
+            { text: STEP.text, tool: "gmail", action: "read_email", verb: "read", ask: false },
+            { text: SEND.text, tool: "gmail", action: "send_email", verb: "send", ask: true },
+          ],
+        },
+      },
+    };
+  };
+
+  it("SKILLS_5_saveSkill_posts_the_servers_steps_captured_steps_and_question_and_no_server_owned_field", async () => {
+    const spy = vi.fn(async (_u: unknown, _i?: RequestInit) => json(row(), 201));
+    await live(spy).saveSkill(taught());
+    const { body } = sent(spy);
+    expect(Object.keys(body).sort()).toEqual([
+      "captured_steps",
+      "clarifying_question",
+      "name",
+      "plan_steps",
+      "scope",
+      "trigger",
+    ]);
+    expect(body.plan_steps).toEqual([
+      { text: STEP.text, tool: "gmail", action: "read_email", verb: "read", ask_first: false },
+      { text: SEND.text, tool: "gmail", action: "send_email", verb: "send", ask_first: true },
+    ]);
+    expect(body.captured_steps).toEqual([{ text: "Open the mail" }, { text: "Note the total" }]);
+    expect(body.clarifying_question).toEqual({ text: "Link or PDF?", options: ["Open the link", "Skip"] });
+    expect(JSON.stringify(body)).not.toMatch(/must_ask|estimates|status|owner|org_id|good_runs|credits/);
+  });
+
+  it("SKILLS_5_saveSkill_a_question_the_server_did_not_ask_is_not_sent", async () => {
+    const spy = vi.fn(async (_u: unknown, _i?: RequestInit) => json(row(), 201));
+    const s = taught();
+    if (s.draft?.server) s.draft.server.question = null;
+    await live(spy).saveSkill(s);
+    expect("clarifying_question" in sent(spy).body).toBe(false);
   });
 });

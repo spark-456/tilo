@@ -395,6 +395,8 @@ describe("WIRE_2_live_api: nothing else is connected", () => {
           "getSkills",
           "getLearn",
           "saveSkill",
+          "captureSkill",
+          "proposeVersion",
           "setPref",
         ].includes(x),
     )) {
