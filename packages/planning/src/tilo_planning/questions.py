@@ -27,11 +27,19 @@ from tilo_planning.brief import (
     complete_brief,
     validate_brief,
 )
+from tilo_planning.deliverable_kinds import (
+    MAX_CHOICES,
+    DeliverableKind,
+    UnavailableKind,
+    load_deliverable_kinds,
+    load_kinds,
+)
 from tilo_planning.events import build_event, clip
 from tilo_planning.memory import MemoryHit, MemoryLookup
 
 MAX_QUESTIONS = 3
 TOPIC_REPLACES = ("deliverables", "constraints")  # the generic format and rules questions a topic question replaces
+KINDS_QUESTION = "What should Tilo produce for you? Pick one or more."  # the deliverables question with kinds
 TOPIC_PREFIX = "topic_"  # the id (`Question.field`) of the Director's n-th question: topic_1, topic_2, topic_3
 DESCRIBE_GOAL = "Something else, which I will describe"  # a goal prompt, never a goal (BQ-99)
 WEB_SOURCE = {"kind": "web", "ref": "web", "label": "The web"}  # no query yet: the goal is never one (BQ-99)
@@ -89,12 +97,14 @@ def generate_questions(
     base: dict[str, Any],
     seq: int,
     topic_questions: Sequence[TopicQuestion] = (),
+    kinds: Sequence[DeliverableKind] | None = None,
 ) -> QuestionsResult:
     """`brief` is a brief or the Director's output. `base` is the event envelope (v, ts, world_id, run_id,
     actor); events take `seq`, `seq + 1`, ... (memory hits first, then plan.questions_asked). `topic_questions` are the
     Director's own questions for this task (vetted by `brief.topic_questions`): they are asked first, in place of the
     generic deliverables and rules questions (which are then assumed, not asked), and the other ambiguous fields fill
-    only the slots left under the cap of 3. With none, the generic questions are asked as before."""
+    only the slots left under the cap of 3. With none, the generic questions are asked as before. The generic
+    deliverables question lists `kinds` as its choices (default: the available ones of the kinds config)."""
     candidates = [f for f in dict.fromkeys(ambiguous_fields) if f in CHIP_FIELDS]
     brief = complete_brief(brief)
     hit_events: list[dict[str, Any]] = []
@@ -116,7 +126,7 @@ def generate_questions(
     ranked = sorted(candidates, key=lambda f: (-EXPECTED_CHANGE[f], CHIP_FIELDS.index(f)))
     room = MAX_QUESTIONS - len(topic)
     questions = [_topic_question(q, n) for n, q in enumerate(topic, 1)]
-    questions += [_question(brief, f) for f in ranked[:room]]
+    questions += [_question(brief, f, kinds) for f in ranked[:room]]
     for field in ranked[room:]:
         brief["assumptions"].append({"question": None, "assumed": _assumed(brief, field)})
     brief = validate_brief(brief)
@@ -133,14 +143,20 @@ def generate_questions(
 
 
 def record_assumption(
-    brief: dict[str, Any], question: Question, assumed: str | None = None, *, today: date | None = None
+    brief: dict[str, Any],
+    question: Question,
+    assumed: str | None = None,
+    *,
+    today: date | None = None,
+    kinds: Sequence[DeliverableKind] | None = None,
+    unavailable: Sequence[UnavailableKind] | None = None,
 ) -> dict[str, Any]:
     """A skipped question keeps `assumed` (default: the Director's guess), recorded as "Label: value" like
     an assumption over the cap, and shown as "Assumed: ...". The assumption is the value the plan uses
     (BQ-97), so the field takes it too: the guess leaves the chip as it is, another value is applied as
     an answer would be."""
     value = assumed if assumed is not None else question.suggested_answers[0]
-    updated = apply_answer(brief, question, value, today=today or date.today())
+    updated = apply_answer(brief, question, value, today=today or date.today(), kinds=kinds, unavailable=unavailable)
     label = question.label if question.label is not None else _WORDING[question.field][0]
     if question.label is not None:  # the assumption shows the cleaned value the plan uses
         value = _topic_value(value)
@@ -148,12 +164,24 @@ def record_assumption(
     return validate_brief(updated)
 
 
-def apply_answer(brief: dict[str, Any], question: Question, answer: str, *, today: date) -> dict[str, Any]:
+def apply_answer(
+    brief: dict[str, Any],
+    question: Question,
+    answer: str,
+    *,
+    today: date,
+    kinds: Sequence[DeliverableKind] | None = None,
+    unavailable: Sequence[UnavailableKind] | None = None,
+) -> dict[str, Any]:
     """The person's answer to `question` (FR-INT-04). The Director's guess (the first suggested answer) keeps
     the chip; another suggested answer sets the chip value it stands for; anything else is set as typed. An
     answer the chip cannot hold raises BriefValidationError, and the person edits the chip instead.
     The goal prompt is not a goal, so it is refused the same way (BQ-99). A Director question (`label` set) records
-    the answer, the guess included, as the constraint "Label: value" in place of any earlier one with that label."""
+    the answer, the guess included, as the constraint "Label: value" (appended; a stated constraint is never touched).
+    A deliverables answer that names only offered kinds ("Study plan; Notes", "study plan and notes") sets one
+    deliverable per kind: the kind's label as its title and its format; `kinds` defaults to the available ones of the
+    config. One that names a kind the config marks unavailable is refused (alone or in a mix), saying what it needs.
+    Any other deliverables answer is read as before (formats, or free text, BQ-FREETEXT-1)."""
     if question.label is not None:
         return _apply_topic(brief, question, answer)
     if answer == question.suggested_answers[0]:
@@ -163,6 +191,12 @@ def apply_answer(brief: dict[str, Any], question: Question, answer: str, *, toda
         raise BriefValidationError("Describe the goal in the goal chip; that answer is not a goal.")
     value: Any = _ANSWER_VALUES.get(field, {}).get(answer, answer)
     if field == "deliverables":
+        _refuse_unavailable(answer, kinds, unavailable)
+    if field == "deliverables" and (chosen := _chosen_kinds(answer, kinds, question.suggested_answers[0])):
+        keep, picked = chosen  # the guess ("1") among the choices keeps the deliverables the brief has
+        added = [{"title": kind.label, "format": kind.format} for kind in picked]
+        value = [*(brief["deliverables"] if keep else ()), *(d for d in added if d not in brief["deliverables"])]
+    elif field == "deliverables":
         formats = _answer_formats(answer, question.suggested_answers[0], brief)
         if not formats:  # free text with no format: it stays as the content, in the default format (BQ-FREETEXT-1)
             wish = clip(" ".join(_C0.sub(" ", answer[:ANSWER_MAX_CHARS]).split()), 300)  # no control chars or breaks
@@ -190,6 +224,65 @@ def apply_answer(brief: dict[str, Any], question: Question, answer: str, *, toda
     elif field == "deadline" and value == "end_of_week":
         value = (today + timedelta(days=(4 - today.weekday()) % 7)).isoformat()  # the coming Friday
     return validate_brief({**copy.deepcopy(brief), field: value})
+
+
+def _label_pattern(labels: Iterable[str]) -> re.Pattern[str]:
+    """Whole-word, case-blind match of any of `labels`, longest first."""
+    names = sorted(labels, key=len, reverse=True)
+    return re.compile(r"(?<!\w)(?:" + "|".join(re.escape(n) for n in names) + r")(?!\w)", re.IGNORECASE)
+
+
+def _holds_whole(answer: str, current: str) -> bool:
+    """Whether `current` (the Director's guess) stands in `answer` as a whole segment: at an end, or next to a
+    separator or "and", never glued to other text."""
+    at = answer.find(current)
+    while at >= 0:
+        before, after = answer[:at].rstrip().casefold(), answer[at + len(current) :].lstrip().casefold()
+        starts = not before or before[-1] in ";,+&/" or before.endswith(" and") or before == "and"
+        ends = not after or after[0] in ";,+&/" or after.startswith("and ") or after == "and"
+        if starts and ends and (answer[at - 1 : at].isspace() or at == 0 or answer[at - 1] in ";,+&/"):
+            return True
+        at = answer.find(current, at + 1)
+    return False
+
+
+def _refuse_unavailable(
+    answer: str, kinds: Sequence[DeliverableKind] | None, unavailable: Sequence[UnavailableKind] | None
+) -> None:
+    """When the question offers kinds, an answer that names one the config marks unavailable (whole words, case-blind;
+    alone or beside offered ones) is refused with what it needs, so it is never read as free text."""
+    if not (load_deliverable_kinds() if kinds is None else kinds):
+        return
+    withheld = load_kinds().unavailable if unavailable is None else unavailable
+    by_label = {k.label.casefold(): k for k in withheld}
+    if not by_label:
+        return
+    named = dict.fromkeys(
+        by_label[m.group(0).casefold()] for m in _label_pattern(by_label).finditer(answer[:ANSWER_MAX_CHARS])
+    )
+    if named:
+        said = "; ".join(f"{k.label} is not available yet (it needs {k.needs})" for k in named)
+        raise BriefValidationError(f"{said}. Pick from what is offered.")
+
+
+def _chosen_kinds(
+    answer: str, kinds: Sequence[DeliverableKind] | None, current: str
+) -> tuple[bool, list[DeliverableKind]] | None:
+    """(whether `answer` also holds the Director's guess `current`, the offered kinds it names in the order named and
+    once each) when it names nothing else (only separators and "and" between them); else None. Labels are matched
+    whole and case-blind, longest first."""
+    offered = load_deliverable_kinds() if kinds is None else kinds
+    if not offered:
+        return None
+    by_label = {k.label.casefold(): k for k in offered}
+    pattern = _label_pattern(by_label)
+    keep = _holds_whole(answer[:ANSWER_MAX_CHARS], current)
+    text = answer[:ANSWER_MAX_CHARS].replace(current, ";") if keep else answer[:ANSWER_MAX_CHARS]
+    found = [by_label[m.group(0).casefold()] for m in pattern.finditer(text)]
+    rest = pattern.sub(" ", text)
+    if not found or any(part.strip(" .") for part in _ANSWER_SPLIT.split(rest)):
+        return None
+    return keep, list(dict.fromkeys(found))
 
 
 def _topic_value(answer: str) -> str:
@@ -294,9 +387,14 @@ def _current(brief: dict[str, Any], field: str) -> str:
     return str(value)
 
 
-def _question(brief: dict[str, Any], field: str) -> Question:
+def _question(brief: dict[str, Any], field: str, kinds: Sequence[DeliverableKind] | None = None) -> Question:
     _label, text, others = _WORDING[field]
-    answers = tuple(dict.fromkeys((clip(_current(brief, field), 300), *others)))[:3]
+    limit = 3
+    if field == "deliverables":
+        offered = load_deliverable_kinds() if kinds is None else kinds
+        if offered:  # what Tilo can produce today, as choices after the Director's guess (the first answer)
+            text, others, limit = KINDS_QUESTION, tuple(k.label for k in offered[:MAX_CHOICES]), 1 + MAX_CHOICES
+    answers = tuple(dict.fromkeys((clip(_current(brief, field), 300), *others)))[:limit]
     return Question(field, text, answers, EXPECTED_CHANGE[field])
 
 

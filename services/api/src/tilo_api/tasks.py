@@ -13,7 +13,7 @@ from __future__ import annotations
 import copy
 import dataclasses
 import logging
-from collections.abc import Awaitable, Callable, Iterator
+from collections.abc import Awaitable, Callable, Iterator, Sequence
 from datetime import UTC, date, datetime
 from typing import Annotated, Any
 
@@ -24,6 +24,7 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from tilo_metering.flags import FlagStore
 from tilo_planning.approaches import ApproachProposalError, propose_approaches
 from tilo_planning.brief import BriefValidationError, ExtractionResult, edit_brief_field
+from tilo_planning.deliverable_kinds import DeliverableKind, DeliverableKindsError
 from tilo_planning.events import build_event
 from tilo_planning.intake import IntakeResult
 from tilo_planning.questions import apply_answer, generate_questions, record_assumption
@@ -111,6 +112,7 @@ def create_task(
     intake: IntakeResult,
     extraction: ExtractionResult,
     scenario: str | None = None,
+    kinds: Sequence[DeliverableKind] | None = None,
 ) -> tuple[str, deps.TaskRecord]:
     """FR-INT-03/04: the task from its intake and the Director's brief (extracted first, so a failed extraction
     stores nothing), then the questions, decided in code."""
@@ -131,6 +133,7 @@ def create_task(
         base=_base(task, DIRECTOR),
         seq=task.next_seq,
         topic_questions=extraction.questions,
+        kinds=kinds,
     )
     task.draft = task.brief = asked.brief
     task.questions = asked.questions
@@ -251,6 +254,11 @@ def answer_questions(
             brief = _brief(task, answers, edits, clock())
         except BriefValidationError as exc:
             raise HTTPException(status_code=422, detail=f"That change does not fit the brief: {exc}") from exc
+        except DeliverableKindsError as exc:  # the file changed for the worse since the question was asked
+            logger.error("deliverable kinds config unusable: %s", exc)
+            raise HTTPException(
+                status_code=503, detail="Deliverable choices are unavailable; nothing changed."
+            ) from exc
         changes: dict[str, Any] = {"answers": answers, "edits": edits, "brief": brief}
         if brief != task.brief:
             changes["approaches"] = None  # proposed for the old brief
