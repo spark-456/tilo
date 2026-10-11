@@ -31,10 +31,12 @@ export function SavePane({ t, night, user }: PaneProps) {
       </div>
     );
   }
+  // Live, only what POST /v1/skills takes: a skill for the person, run when they ask.
   const scopes = [
     { key: "me", label: "Just me" },
-    { key: "team", label: user.org },
+    ...(t.live ? [] : [{ key: "team", label: user.org } as const]),
   ] as const;
+  const triggers = t.live ? TRIGGERS.filter((o) => o.key === "ask") : TRIGGERS;
   return (
     <div className="park-skills-pane park-skills-pane--grid">
       <div className="park-skills-save-col">
@@ -65,7 +67,7 @@ export function SavePane({ t, night, user }: PaneProps) {
         <div className="park-skills-field">
           <span className="park-skills-label">{SAVE.when}</span>
           <div className="park-skills-picker">
-            {TRIGGERS.map((o) => (
+            {triggers.map((o) => (
               <button
                 key={o.key}
                 type="button"
@@ -93,7 +95,7 @@ export function SavePane({ t, night, user }: PaneProps) {
           <button type="button" className="park-skills-back" onClick={t.back}>
             Back
           </button>
-          <button type="button" className="park-skills-go" onClick={t.save}>
+          <button type="button" className="park-skills-go" disabled={t.busy} onClick={t.save}>
             Save skill
           </button>
         </div>

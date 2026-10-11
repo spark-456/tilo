@@ -1,11 +1,9 @@
 # apps/web/src/park
-
 ## Purpose
 The Park City web app (design handoff of 6 Oct 2026, `docs/web-app-rebuild-plan.md`), built beside the
 old screens until the cutover PR. WEB-1a holds the tokens, fonts, typed fixtures and the `api/` layer.
-
 ## Contracts
-- `api/index.ts`: `Api` (24 methods, one list `API_METHODS`), each returning `Promise<{ data, source }>`.
+- `api/index.ts`: `Api` (26 methods, one list `API_METHODS`), each returning `Promise<{ data, source }>`
   `parkApi(env)` (`api/select.ts`): no `VITE_TILO_API_URL` = fixture Api (`source: "fixture"`), a url =
   live Api, whose methods reject with `NotBuilt` until each endpoint exists. Never sample data as live.
 - `api/fixtures/`: the prototype's data, typed (`api/types.ts`). `worlds.ts` and `index.ts` are
@@ -23,7 +21,6 @@ old screens until the cutover PR. WEB-1a holds the tokens, fonts, typed fixtures
   `Popover`/`Menu` share `Panel.tsx` (Escape on the document, backdrop, focus back to the opener).
 - `dev/Components.tsx`: `/dev/components` (dev build, lazy route in `screens/routes.tsx`), a day and a
   night `data-park` panel with every component; one filled primary button per panel (UX-1).
-
 ## App (WEB-3a, `app/`)
 - `src/Root.tsx` shows the old app, or the lazy `app/ParkApp.tsx` under `/park` (`isParkPath`).
 - `AppCtx.ts` is the `app` prop. `store.ts` (framework-free, injected `schedule`) holds decisions, started
@@ -32,12 +29,10 @@ old screens until the cutover PR. WEB-1a holds the tokens, fonts, typed fixtures
 - `pages.ts`: one line per page, `home: lazy(() => import("../pages/Home/HomePage").then(...)),`; nothing else changes.
 - `pages/Home/` (WEB-4): panels float over the shell's city (no `<main>`, no h1 but the greeting); a failed or
   unbuilt read shows "Not connected yet"; composer copy is page-local (`homeData.ts`); `Home.css` overrides the sliding SegmentedControl.
-
 ## Shell (WEB-3b, `shell/`)
 - `AppShell` (named export, `children` only) holds the nav, popovers, one `<main>`, toast, loader, boot (`park.shell.css`: no motion, blur on the nav only); ParkApp owns `[data-park]`.
 - The city is STATIC (motion and its honesty-scan entry: BQ-WEB-3): `scene.ts` caches a scene per `time|motion` at module level, with the 3 pin points for `app.pins`.
 - `usePageApp()` is what pages get: `go('world')` runs the loader first (`store.openWorld`); `useApp().go` stays immediate.
-
 - `sample/` (STARTER-1, BQ-STARTER-1): the API's recorded sample project `w_sample_village_basic` (`World.sample`, `sample: true` on the list item): `SampleBadge`/`SampleNote` on the Home card, Worlds row and world page; Hide is `localStorage` (`sampleChoice.ts`, try/catch), "Show sample project" makes `getWorlds` ask `?include_sample=1`; `HttpClient.post` never sends a write for its path (the message says the answer was not sent; nothing is simulated).
 
 ## Local rules

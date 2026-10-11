@@ -17,6 +17,14 @@ import {
 } from "./live/decisionsFromCards";
 import { type CostReport, ledgerFromCosts } from "./live/ledgerFromCosts";
 import { profileDefaults } from "./live/profileDefaults";
+import {
+  captureOfBody,
+  isLearnBody,
+  isSkillRow,
+  saveBody,
+  skillsOfBody,
+  versionOfBody,
+} from "./live/skillsFromApi";
 import { worldFromIntake } from "./live/worldFromIntake";
 import { STATE_OF, type WorldListItem, worldsFromList } from "./live/worldsFromList";
 import { nameInitials } from "./nameInitials";
@@ -249,6 +257,46 @@ export function createLiveApi(options: LiveApiOptions = {}): Api {
     const live = worldsFromList(isSampleHidden() ? items.filter((i) => i.sample !== true) : items);
     const liveIds = new Set(live.map((w) => w.id));
     return { data: [...added.filter((w) => !liveIds.has(w.id)), ...live], source: "live" };
+  };
+  // Taught skills (SKILLS-3, FR-SKL-04): the library is `GET /v1/skills`; Learn has nothing served but the list.
+  api.getSkills = async () => {
+    const skills = skillsOfBody(await http.getJson("/v1/skills"));
+    if (!skills) throw new TiloApiError(BAD_REPLY, 200, true);
+    return { data: skills, source: "live" };
+  };
+  api.getLearn = async () => {
+    if (!isLearnBody(await http.getJson("/v1/learn"))) throw new TiloApiError(BAD_REPLY, 200, true);
+    return { data: { rates: [], reviews: [], helpers: [], tools: [] }, source: "live" };
+  };
+  // One POST, no retry. A draft the server cannot take (a team scope, a timed trigger) is refused here, never sent as
+  // something else; only a 201 with the saved record is an Ack.
+  api.saveSkill = async (skill) => {
+    const body = skill.draft ? saveBody(skill.name, skill.draft) : null;
+    if (!body) {
+      throw new TiloApiError(
+        "Tilo can only save a skill for you that runs when you ask, for now.",
+        422,
+        false,
+        true,
+      );
+    }
+    if (!isSkillRow(await http.postJson("/v1/skills", body)))
+      throw new TiloApiError(BAD_REPLY, 201, true, true);
+    return { data: { ok: true }, source: "live" };
+  };
+  // Teach a skill by describing it (SKILLS-5): one POST each, no retry; only a readable answer is data.
+  api.captureSkill = async (text) => {
+    const data = captureOfBody(
+      await http.postJson("/v1/skills/captures", { method: "describe", text }),
+    );
+    if (!data) throw new TiloApiError(BAD_REPLY, 201, true, true);
+    return { data, source: "live" };
+  };
+  api.proposeVersion = async (captureId) => {
+    const path = `/v1/skills/captures/${encodeURIComponent(captureId)}/version`;
+    const data = versionOfBody(await http.postJson(path, {}));
+    if (!data) throw new TiloApiError(BAD_REPLY, 200, true, true);
+    return { data, source: "live" };
   };
   const served = new Map<string, Answerable>();
   const answered: Dec = {};

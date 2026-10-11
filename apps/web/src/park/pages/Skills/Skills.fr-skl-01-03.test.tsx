@@ -149,7 +149,7 @@ describe("FR-SKL-01: Teach by showing", () => {
     expect(pageText(teachCard(rig.el))).toContain("Sample run");
   });
 
-  it("test_FR_SKL_01_non_fixture_data_shows_honest_connect_to_start_teaching_state_instead_of_dead_end", async () => {
+  it("test_FR_SKL_01_non_fixture_data_offers_describing_a_skill_and_no_sample_steps_or_timers", async () => {
     const base = skillsApi();
     const api = skillsApi({
       getSkills: async () => liveResult((await base.getSkills()).data),
@@ -158,9 +158,11 @@ describe("FR-SKL-01: Teach by showing", () => {
     });
     const rig = await mountSkills({ api });
     const text = pageText(teachCard(rig.el));
-    expect(text).toMatch(/connect to start teaching/i);
+    expect(text).not.toMatch(/connect to start teaching/i);
     expect(text).not.toContain("Sample run");
-    expect(hasControl(rig.el, "Show me Tilo’s version")).toBe(false);
+    expect(hasControl(rig.el, "Read my description")).toBe(true);
+    expect(text).toContain("0 of 0"); // nothing is captured until the server answers
+    expect(isDisabled(control(rig.el, "Show me Tilo’s version"))).toBe(true);
     expect(rig.clock.live()).toHaveLength(0);
     rig.clock.advance(10_000);
     expect(rig.clock.live()).toHaveLength(0);
@@ -317,7 +319,7 @@ describe("FR-SKL-03: Try run", () => {
       true,
     );
 
-    // 2. When source is not "fixture", Teach card shows honest "Connect to start teaching" state and schedules no timers
+    // 2. When source is not "fixture", the Teach card describes a skill (SKILLS-5) and schedules no timers
     const base = skillsApi();
     const liveApi = skillsApi({
       getSkills: async () => liveResult((await base.getSkills()).data),
@@ -326,7 +328,8 @@ describe("FR-SKL-03: Try run", () => {
     });
     const rig = await mountSkills({ api: liveApi });
 
-    expect(pageText(teachCard(rig.el))).toMatch(/connect to start teaching/i);
+    expect(pageText(teachCard(rig.el))).not.toMatch(/connect to start teaching/i);
+    expect(pageText(teachCard(rig.el))).not.toContain("Sample run");
     expect(rig.clock.live()).toHaveLength(0);
     rig.clock.advance(60_000);
     expect(rig.clock.live()).toHaveLength(0);

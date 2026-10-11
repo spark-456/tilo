@@ -57,6 +57,7 @@ from tilo_api.assistant.config import AssistantConfig, AssistantConfigError, loa
 from tilo_api.meeting_host_rpc import MeetingHostRpc, open_meeting_host_rpc
 from tilo_api.people_access import NoSourceOwners
 from tilo_api.people_access import SourceOwners as PanelSourceOwners
+from tilo_api.skill_store import SkillStore
 
 if TYPE_CHECKING:
     from tilo_api.assistant.core import Decider
@@ -193,6 +194,10 @@ class Store:
 
     def load_owner(self, owner: str, settle: bool = False) -> None:
         """Called before a route iterates an owner's worlds or policies; the cache already holds them."""
+
+    def load_world_task(self, world_id: str) -> TaskRecord | None:
+        """The task made for a world, if this store holds one (a scheduled or meeting host run stores none)."""
+        return next((t for t in list(self.tasks.values()) if t.world_id == world_id), None)
 
     def load_path(self, params: Mapping[str, Any]) -> Store:
         return self
@@ -770,6 +775,8 @@ class PlateSources(Protocol):
     def runs(self, user_id: str) -> Iterable[dict[str, Any]]: ...
     def mail(self, user_id: str) -> Iterable[dict[str, Any]]: ...
 
+    truncated: bool  # a source hit its read cap (optional: the plate builder reads it with getattr)
+
 
 class SourceOwners(Protocol):
     def owner_of(self, kind: str, ref: str) -> str | None: ...  # kind "mail" or "request"
@@ -848,12 +855,19 @@ def get_today() -> Clock:
     return real_today
 
 
-def get_plate_sources() -> PlateSources:
-    raise HTTPException(status_code=503, detail="not_configured")
+def get_plate_sources(request: Request = None) -> PlateSources:  # type: ignore[assignment]
+    """The cards, runs and mail of the signed-in person's plate, read from the API's own store (PEOPLE-SEAMS-1,
+    `seams_store`): 503 `not_configured` exactly when `get_store` is, a demo session reads its own in-memory one."""
+    from tilo_api import seams_store  # noqa: PLC0415  (it imports this module)
+
+    return seams_store.StorePlateSources(seams_store.resolve_store(request))
 
 
-def get_source_owners() -> SourceOwners:
-    raise HTTPException(status_code=503, detail="not_configured")
+def get_source_owners(request: Request = None) -> SourceOwners:  # type: ignore[assignment]
+    """Who owns a mail message or a request, from the same store; `None` for anything it cannot vouch for."""
+    from tilo_api import seams_store  # noqa: PLC0415
+
+    return seams_store.StoreSourceOwners(seams_store.resolve_store(request))
 
 
 class MeetingWorlds(Protocol):
@@ -862,8 +876,11 @@ class MeetingWorlds(Protocol):
     def make_meeting_world(self, *, org_id: str, owner: str, meeting_id: str) -> str: ...
 
 
-def get_meeting_worlds() -> MeetingWorlds:
-    raise HTTPException(status_code=503, detail="not_configured")  # production wiring lands with the Outpost world
+def get_meeting_worlds(request: Request = None) -> MeetingWorlds:  # type: ignore[assignment]
+    """One persisted Outpost world per meeting on the API's own store (PEOPLE-SEAMS-1, `seams_store`)."""
+    from tilo_api import seams_store  # noqa: PLC0415
+
+    return seams_store.StoreMeetingWorlds(seams_store.resolve_store(request))
 
 
 class DeskWorlds(Protocol):
@@ -876,8 +893,73 @@ class DeskWorlds(Protocol):
         ...
 
 
-def get_desk_worlds() -> DeskWorlds:
-    raise HTTPException(status_code=503, detail="not_configured")  # production wiring lands with the Desk
+def get_desk_worlds(request: Request = None) -> DeskWorlds:  # type: ignore[assignment]
+    """The person's one Desk world on the API's own store, the one the assistant panel uses (PEOPLE-SEAMS-1)."""
+    from tilo_api import seams_store  # noqa: PLC0415
+
+    return seams_store.StoreDeskWorlds(seams_store.resolve_store(request))
+
+
+_skill_store_lock = threading.Lock()
+_skill_store: tuple[tuple[str, ...], SkillStore] | None = None  # (the config it was built for, the store)
+_skill_store_retry_at: float | None = None
+_SKILL_ENV = (
+    "TILO_SKILLS_STORE",
+    "TILO_FIRESTORE_PROJECT",
+    "K_SERVICE",
+    "CLOUD_RUN_JOB",
+    "FIRESTORE_EMULATOR_HOST",
+    "GOOGLE_CLOUD_PROJECT",
+)
+
+
+def get_skill_store() -> SkillStore:
+    """The taught-skill store (SKILLS-2b, FR-SKL-04, BQ-SKILLS-1). `TILO_SKILLS_STORE` = `firestore` (with
+    `TILO_FIRESTORE_PROJECT`; outside Cloud Run only the emulator and a `demo-` project) or `memory` (refused when
+    deployed); unset in dev mode = memory; anything else, or a client that cannot be built, is 503 `not_configured`
+    (the cause never echoed; a failed build backs off like the people stores). The env is read on every call; a store
+    is kept per config, a refusal never is."""
+    global _skill_store, _skill_store_retry_at
+    from tilo_api import dev  # noqa: PLC0415 - dev imports this module
+
+    values = {n: os.environ[n] for n in _SKILL_ENV if n in os.environ}  # presence matters: Cloud Run may set ""
+    if not values.get("TILO_SKILLS_STORE") and dev.dev_enabled():
+        try:
+            dev.refuse_if_unsafe()
+            values["TILO_SKILLS_STORE"] = "memory"
+        except dev.DevModeRefused:
+            pass
+    key = tuple(values.get(n) or "" for n in _SKILL_ENV) + tuple(n for n in _SKILL_ENV if n in values)
+    held = _skill_store
+    if held is not None and held[0] == key:
+        return held[1]
+    retry_at = _skill_store_retry_at
+    if retry_at is not None and people_stores_clock() < retry_at:
+        raise HTTPException(status_code=503, detail="not_configured")
+    from tilo_api.skill_firestore import SkillStoreNotConfigured, open_skill_store  # noqa: PLC0415
+
+    with _skill_store_lock:
+        held = _skill_store
+        if held is not None and held[0] == key:
+            return held[1]
+        try:
+            built = open_skill_store(values)
+            _skill_store, _skill_store_retry_at = (key, built), None
+            return built
+        except Exception as exc:
+            logger.warning("skill store not built (%s)", type(exc).__name__)
+            if not isinstance(exc, SkillStoreNotConfigured):  # a client was tried: back off
+                _skill_store_retry_at = people_stores_clock() + PEOPLE_STORES_BACKOFF_S
+            raise HTTPException(status_code=503, detail="not_configured") from None
+
+
+def _forget_skill_store() -> None:
+    global _skill_store, _skill_store_retry_at
+    with _skill_store_lock:
+        _skill_store, _skill_store_retry_at = None, None
+
+
+get_skill_store.cache_clear = _forget_skill_store  # type: ignore[attr-defined]  # tests start from a cold process
 
 
 def get_run_archive(request: Request = None) -> Callable[..., RunArchive]:  # type: ignore[assignment]

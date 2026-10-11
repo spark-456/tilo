@@ -25,8 +25,8 @@ def _brief(formats: tuple[str, ...] = ("pdf", "docx", "pptx")) -> dict:
 
 def _question(brief: dict):
     return generate_questions(
-        brief, ["deliverables"], memory=make_no_memory(), base=sample_event_base(), seq=2
-    ).questions[0]
+        brief, ["deliverables"], memory=make_no_memory(), base=sample_event_base(), seq=2, kinds=()
+    ).questions[0]  # kinds=(): no offered kind, so the format question this file is about (the fallback)
 
 
 def _formats(brief: dict) -> list[str]:
@@ -38,7 +38,7 @@ def test_FR_INT_04_the_exact_live_case_options_one_and_two_joined_does_not_refus
     question = _question(brief)
     one, two = question.suggested_answers[0], question.suggested_answers[1]  # the person typed "1 and 2"
 
-    result = apply_answer(brief, question, f"{one}; {two}", today=TODAY)
+    result = apply_answer(brief, question, f"{one}; {two}", today=TODAY, kinds=())
 
     assert validate_brief(result) == result
     assert _formats(result) == ["pdf", "docx", "pptx"], "the current deliverables stay; a PDF report is already there"

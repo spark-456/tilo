@@ -110,6 +110,11 @@ describe("WIRE_1_live_api: every other method is still NotBuilt", () => {
           "startWorld",
           "submitFeedback",
           "getProfileSettings",
+          "getSkills",
+          "getLearn",
+          "saveSkill",
+          "captureSkill",
+          "proposeVersion",
           "setPref",
         ].includes(x),
     )) {
