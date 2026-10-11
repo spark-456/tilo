@@ -68,7 +68,7 @@ user-approved step, never from this workflow or recipe).
 | Infrastructure (services, IAM, ingress, env, secrets) | Terraform, applied by you (`infra/README.md`) | `infra/` |
 
 Cloud Build and the workflow only swap the image (pinned by digest) and passes `--min-instances 0` and
-`--max-instances 1..3` on an existing service (connectors = 1 until ticket T7, CON-D9). It never sets ingress, IAM, env vars or secrets;
+`--max-instances` (3 for harness and channels, 1 for connectors until T7 and 2 for the rest, and 1 for `tilo-api`: one instance is the one writer, ADR-0026) on an existing service. It never sets ingress, IAM, env vars or secrets;
 Terraform owns those and ignores image changes (`infra/modules/service`). Env vars are Terraform's for every service
 except `tilo-api` and `tilo-connectors`: those have `ignore_env = true`, so their `TILO_*` runtime settings are set by hand with
 `gcloud run services update` (`docs/routines-rollout.md`) and a Terraform run leaves them alone.
@@ -143,7 +143,7 @@ a flag or a shell command cannot be smuggled in through them.
 `cloudbuild.yaml` (repo root) has three steps: check `_SERVICE` (`all` or one of the seven short names, anything
 else fails with `unknown service`), build each image from `services/<svc>/Dockerfile` with the repo root as
 context and push it to `asia-southeast1-docker.pkg.dev/<project>/tilo/<svc>:<build id>`, then
-`gcloud run services update tilo-<svc> --image <repo>@sha256:<digest> --min-instances 0 --max-instances 1..3` (connectors = 1 until T7),
+`gcloud run services update tilo-<svc> --image <repo>@sha256:<digest> --min-instances 0 --max-instances <n>` (`tilo-api` is always `--max-instances 1`, ADR-0026; connectors stays 1 until T7, the others 2 or 3),
 after refusing any image reference that is not `asia-southeast1-docker.pkg.dev/<project>/tilo/<svc>@sha256:...`.
 The upload is an allowlist (`.gcloudignore`): only `pyproject.toml`, `uv.lock`, `.dockerignore`, `evals/pyproject.toml`
 and the `packages`, `services`, `config`, `contracts`, `prompts` and `templates` trees leave your machine, and secret
@@ -302,8 +302,9 @@ just deploy-web
 ```
 
 `just deploy-web` builds `apps/web` with `VITE_TILO_API_URL` set to empty, then runs
-`pnpm exec firebase deploy --only hosting --project essential-wares-510320-f0`. It takes no argument
-and refuses every other project by construction (the project id is fixed in the recipe). The
+`pnpm exec firebase deploy --only hosting --project essential-wares-510320-f0`. Its one optional
+argument is a tilo-api url (next section); the project id is fixed in the recipe, so it refuses every other
+project by construction. The
 `firebase-tools` CLI is an `apps/web` devDependency, so no global install is needed. The result is
 live at https://essential-wares-510320-f0.web.app (and the `.firebaseapp.com` alias).
 
@@ -400,6 +401,74 @@ Local hosts (localhost, 127.0.0.1) never start it.
 Before you read the `tilo-api` log for refused or missing tokens, set `TILO_FIRESTORE_PROJECT` (or
 `GOOGLE_CLOUD_PROJECT`) on the `tilo-api` Cloud Run service: with neither set the verifier has no project and
 refuses every token, so the log would show every request as unverified.
+
+## Durable stores (PROD-WIRE, ADR-0026; run this yourself, only after you accept ADR-0026)
+
+tilo-api keeps its worlds, people and SEC-15 declarations in Firestore only when two runtime switches are set. They
+are `gcloud` env, not Terraform (tilo-api has `ignore_env = true`), so no apply turns them on by itself:
+
+1. Set `api_durable_stores = true` for the dev env and apply the Terraform plan: CPU stays allocated between
+   requests on the one tilo-api instance (`max_instance_count = 1` holds either way; this raises idle cost).
+2. Turn the stores on (`TILO_FIRESTORE_PROJECT` is already set by the routines rollout):
+
+```powershell
+gcloud run services update tilo-api --project essential-wares-510320-f0 --region asia-southeast1 `
+  --update-env-vars "TILO_API_STORE=firestore,TILO_PEOPLE_STORE=firestore"
+```
+
+3. Check `/health`, that the instance count stays at 1, and run the tilo-api env audit in
+   `docs/routines-rollout.md` ("Env drift check"). To switch back, `--remove-env-vars
+   TILO_API_STORE,TILO_PEOPLE_STORE` (the doors answer 503 `not_configured` again), then set
+   `api_durable_stores = false` and apply, so CPU is billed per request again.
+
+### Against a deployed tilo-api, and the smoke (PROD-WIRE-4)
+
+```powershell
+just deploy-web https://tilo-api-abc123def4-as.a.run.app     # your tilo-api url; the argument is positional
+just smoke-dev https://tilo-api-abc123def4-as.a.run.app
+```
+
+`just deploy-web <api-url>` builds the web app with that url as `VITE_TILO_API_URL` (nothing else gets it; the
+deploy line is unchanged and pinned to the dev project). With no argument the build is still the empty fixture
+build, even if your shell has `VITE_TILO_API_URL` set. The url must be tilo-api's own Cloud Run service (the
+Terraform module names it `tilo-api`) in lower case, no path, port or query:
+`https://tilo-api-<hash>-as.a.run.app` or the deterministic
+`https://tilo-api-<project-number>.asia-southeast1.run.app`. Another service name, a bare label or another region is
+refused, so a typo or a pasted link never builds the app (or sends your token) to a stranger's service. `just`
+checks it before any shell runs, on the first line of each recipe, which must stay first. `tilo-api` itself answers browser calls from the two hosting origins only
+(`https://essential-wares-510320-f0.web.app` and `.firebaseapp.com`; BQ-PW-4); the CSP `connect-src` in
+`firebase.json` is not widened yet (waits on CL-REACH's host list), so a deployed page cannot reach the API until
+it is.
+
+`just smoke-dev <api-url>` drives the deployed API the way a browser does and prints one line per step, stopping
+at the first failure (exit 1):
+
+| Step | What it proves |
+| --- | --- |
+| `health` | the service is up (`GET /health` is 200) |
+| `cors-allowed` | a preflight from the hosting origin to a gated route is granted for that origin, no credentials |
+| `cors-denied` | a preflight from any other origin gets no grant |
+| `gate-closed` | a gated route with no token is refused (401 or 403): SEC-15 fails closed |
+| `intake`, `answers`, `approaches`, `approve` | a signed-in person can start a task and approve an approach (replay mode, budget cap 50) |
+| `gate-card`, `answer-card`, `delivery` | the run reaches its gate card, an in-app card is approved, and the completed run delivers |
+
+The smoke approves nothing that leaves Tilo. It answers a gate card only when the card's tier is T1 or T2, it has no
+recipient, and its action names no connector, item or destination; otherwise it stops with
+`FAIL gate-card: not an in-app card; the smoke approves nothing that leaves Tilo` and sends no answer. Every gate card
+names a connector today (card rule CR-10), so the signed-in steps end at `gate-card` on a real run: the guard
+stays until adapters are wired (BQ-PW-4).
+
+The first four need no sign-in. The rest run only when you set `TILO_SMOKE_ID_TOKEN` in your own shell to a Firebase
+ID token you paste (for example `$env:TILO_SMOKE_ID_TOKEN = Read-Host`); otherwise the run ends with
+`SKIP signed-in steps: set TILO_SMOKE_ID_TOKEN`. The token is sent only as `Authorization: Bearer ...` to the url
+you gave (redirects are not followed), and is never printed, logged or written. It must be a JWT (three dot-separated
+url-safe segments, no line break: a wrapped paste is refused with `FAIL token: TILO_SMOKE_ID_TOKEN is not a JWT`
+before any request). A failure shows the HTTP status plus at most a short `detail` string from a JSON body (120
+characters, withheld when it holds any run of the token), never a raw body; an exception shows its type name only.
+Tilo never asks for or stores a password. The signed-in steps cannot pass on tilo-dev until the Firebase
+ID-token verifier (`deps.get_current_principal`, CL-REACH) is wired; before that the API answers them 401 and the
+smoke stops at `intake`. The smoke needs a real deployment and a person, so no workflow runs it and it is not part
+of `just check` or `just test`.
 
 ## Never
 
