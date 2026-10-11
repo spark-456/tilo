@@ -334,6 +334,8 @@ def open_artifact_store(
     clock: Callable[[], datetime] | None = None,
     archive_lookup: Callable[[Any, str], str | None] | None = None,
     alert_sink: Callable[[dict[str, Any]], None] | None = None,
+    screener: Any | None = None,
+    file_sniffer: Callable[[bytes], str] | None = None,
 ) -> ArtifactStore:
     """Records in Firestore, bytes in GCS: `TILO_ARTIFACTS_STORE=gcs`, `TILO_ARTIFACTS_BUCKET`, a project, under the
     rules of `_settings`. A client that cannot be built is `RunStoreUnavailable`."""
@@ -356,6 +358,8 @@ def open_artifact_store(
         redactor=redactor,
         archive_lookup=archive_lookup or (lambda scope, ref: None),
         alert_sink=alert_sink or alert,
+        screener=screener,
+        file_sniffer=file_sniffer,
     )
 
 
