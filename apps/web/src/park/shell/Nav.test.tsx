@@ -87,8 +87,8 @@ describe("WEB_3b_nav: structure", () => {
       b.getAttribute("aria-label"),
     );
     const named = order.filter((n) => n !== null);
-    expect(named[0]).toBe("Switch to night");
-    expect(named.slice(1)).toEqual(["Notifications", "Account menu"]);
+    expect(named[0]).toBe("Your context");
+    expect(named.slice(1)).toEqual(["Switch to night", "Notifications", "Account menu"]);
     expect(avatar(m.container).textContent).toBe("AM");
   });
 
