@@ -26,23 +26,30 @@ enabling attendance. Infrastructure apply and live switches stay with the user.
   owner host route. The user completes OAuth/password entry. The invitation receipt
   must be stored in that meeting's owner world. A human participant admits the bot.
 
-## User-run infrastructure and image
+## User-run infrastructure and verified image
 
-From the reviewed repository checkout, use your existing dev variables/backend:
+After the bot PRs are reviewed and merged, add `-var=meet_bot_enabled=true` to
+CX-MERGE's complete saved-plan command for the infrastructure sitting. Keep every
+existing variable/backend setting; do not plan with only the bot flag. The flag
+does not exist on phase0-stack until this change is merged. If the plan contains
+any destroy, stop and ask before applying. Only the user applies the saved plan.
+
+The agent has already built and verified the final spoken image below. Reuse its
+digest; there is no additional build for the user to run. After the optional bot
+infrastructure has been applied, deployment can use these exact dev-only commands:
 
 ```powershell
-terraform -chdir=infra/envs/dev plan -var-file=<existing-dev-vars> -var=meet_bot_enabled=true -out=meet-bot.tfplan
-# Review the plan; if any destroy appears, stop and ask. The user applies it.
-terraform -chdir=infra/envs/dev apply meet-bot.tfplan
-$P = '<actual dev project ID>'
+$P = 'essential-wares-510320-f0'
 $R = 'asia-southeast1'
-$Tag = git rev-parse --short HEAD
-$Image = "$R-docker.pkg.dev/$P/tilo/meet-bot:$Tag"
-gcloud builds submit . --project=$P --region=$R --gcs-source-staging-dir="gs://$P-cloudbuild-staging/source" --config=meet-bot/docker/cloudbuild.yaml --ignore-file=meet-bot/docker/cloudbuild.gcloudignore --substitutions="_BOT_IMAGE=$Image"
+$Image = "$R-docker.pkg.dev/$P/tilo/meet-bot@sha256:2f8ab6057a801462219d0fa219fcf81fb70b8cba288a4e4330ddac7969736d2f"
 gcloud run services update tilo-meet-bot --project=$P --region=$R --image=$Image
 $Bot = gcloud run services describe tilo-meet-bot --project=$P --region=$R --format='value(status.url)'
 $Api = gcloud run services describe tilo-api --project=$P --region=$R --format='value(status.url)'
 ```
+
+Cloud Build `a2b73e0f-c1a1-4945-8e7b-ae9a2ba29769` verified this digest from
+runtime source `be6cbc43`. Subsequent branch commits change operator documentation
+only. Do not deploy it before review or enable LIVE before the user's price review.
 
 The optional service has internal ingress, only the API's invoker grant, zero idle
 instances, one active request/instance, 2 CPUs/4 GiB and a 3600-second deadline. It
