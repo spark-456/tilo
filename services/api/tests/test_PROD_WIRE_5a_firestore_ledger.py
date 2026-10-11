@@ -71,7 +71,7 @@ def test_PROD_WIRE_5a_FR_MTR_10_an_entry_is_one_json_safe_document_at_orgs_org_l
 
 def test_PROD_WIRE_5a_ADR_0018_one_org_the_default_is_org_tilo_and_another_orgs_path_is_never_read():
     other, client = _ledger(org_id="org_other")
-    other.append(make_entry(run="r_theirs", credits=999.0), entry_id="01JB5VQ0000000000000000002")
+    other.append(make_entry(run="r_theirs", credits=999.0, org="org_other"), entry_id="01JB5VQ0000000000000000002")
     assert list(client.docs) == [doc_path("01JB5VQ0000000000000000002", "org_other")], "the org is part of the path"
     mine = firestore_ledger()(client)  # the default org
     assert list(mine.entries()) == [], "org_tilo reads nothing of org_other's"

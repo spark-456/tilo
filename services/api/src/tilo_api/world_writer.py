@@ -6,7 +6,8 @@ resend returns the committed event, other content raises `deps.EventRejected` (t
 `WriterBusy` passes through unchanged. The committed event joins `store.events[world]` unless it is already there: the
 only cache write for events.
 With a `ledger`, a committed event that costs credits also appends its Treasury `commit` entry under the event id
-(PROD-WIRE 5a): a resend repeats it harmlessly, and a ledger failure is logged by type, never failing the event write.
+(PROD-WIRE 5a), after the cache write and outside the world's lock: a resend repeats it harmlessly, and a ledger failure
+is logged by type, never failing the event write.
 
 Until the run builds its layout the writer gets one with a single agent, `A_director` (EV-12 accepts the Director's
 planning events); the adapter reopens a writer whose world's `run_id` or `layout` changed. `WriterBusy` from an emit or
@@ -141,11 +142,12 @@ class WorldWriterAdapter:
             except WriterBusy:  # an own lease lapsed while idle, or the head moved: reopen this world once, resend
                 self._close(world_id)
                 committed = self._emit(world_id, record, part)
-            self._record_cost(record, committed)
             events = self._store.events.setdefault(world_id, [])
             if not events or committed["seq"] > events[-1]["seq"]:  # a resend returns an event already cached
                 events.append(committed)
-            return copy.deepcopy(committed)
+            result = copy.deepcopy(committed)
+        self._record_cost(record, result)  # outside the world's lock: a slow ledger never delays its next event
+        return result
 
     def reopen(self, budget_s: float | None = None) -> None:
         """Closes every open writer, releasing its lease; each reopens on its next append. A world whose lock another

@@ -14,6 +14,12 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // FR-MTR-10, COST-FAST-1b: the Treasury's ledger entries carry a person's uid and their spend
+    // (`tilo_api.prod.FirestoreLedger`). Server only.
+    match /orgs/{org}/ledger/{entry} {
+      allow read, write: if false;
+    }
+
     // Everything else: deny by default.
     match /{document=**} {
       allow read, write: if false;

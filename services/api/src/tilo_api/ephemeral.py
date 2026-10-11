@@ -34,6 +34,7 @@ from tilo_people.stores import PeopleStores
 from tilo_planning.artifacts import InMemoryArtifactStore
 
 from tilo_api import deps
+from tilo_api.quick_ledger import MemoryLedger
 
 logger = logging.getLogger("tilo_api.ephemeral")
 
@@ -120,6 +121,18 @@ class _Outbox(_Counted, InMemoryOutboxStore):
         finally:
             if not added:
                 self.session.refund(1, 0)
+
+
+class _Ledger(_Counted, MemoryLedger):
+    """The session's Treasury ledger (Quick's spend): in memory, charged like the rest, gone with the session. Its
+    `append` is `quick_ledger.LedgerWriter`'s; `entries()` is what the cost views read for a demo request."""
+
+    def __init__(self, session: DemoSession) -> None:
+        super().__init__()
+        self.session = session
+
+    def append(self, entry: Any) -> None:
+        self.charged(lambda: super(_Ledger, self).append(entry))
 
 
 class _ArchiveLines:
@@ -218,6 +231,10 @@ class DemoSession:
     @property
     def outbox(self) -> InMemoryOutboxStore:
         return self._once("outbox", lambda: _Outbox(self))
+
+    @property
+    def ledger(self) -> MemoryLedger:
+        return self._once("ledger", lambda: _Ledger(self))
 
     @property
     def uploads(self) -> InMemoryArtifactStore:

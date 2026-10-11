@@ -24,7 +24,7 @@ SEAMS = ("get_ledger", "get_ledger_writer")
 
 @pytest.fixture(autouse=True)
 def _no_leaked_access_backoff(monkeypatch):
-    monkeypatch.setattr(deps, "_access_retry_at", None)  # a failed build elsewhere must not leak into these tests
+    monkeypatch.setattr(deps, "_door_retry_at", None)  # a failed build elsewhere must not leak into these tests
 
 
 def _wired(pw3, client=None):

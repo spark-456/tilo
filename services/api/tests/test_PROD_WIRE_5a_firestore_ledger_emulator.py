@@ -40,7 +40,7 @@ def test_PROD_WIRE_5a_emulator_an_entry_round_trips_exactly_at_orgs_org_ledger_i
     prod, client, make, org = rig()
     ledger = make()
     assert list(ledger.entries()) == []
-    entries = [make_entry(run=f"r_{n}", at=AT + timedelta(minutes=n), credits=n + 0.5) for n in (3, 1, 2)]
+    entries = [make_entry(org=org, run=f"r_{n}", at=AT + timedelta(minutes=n), credits=n + 0.5) for n in (3, 1, 2)]
     for n, entry in zip((3, 1, 2), entries, strict=True):
         ledger.append(entry, entry_id=f"id_{n}")
     assert list(make().entries()) == sorted(entries, key=lambda e: e.at), "stored, not cached; sorted by (at, id)"
@@ -51,15 +51,17 @@ def test_PROD_WIRE_5a_emulator_an_entry_round_trips_exactly_at_orgs_org_ledger_i
 
 def test_PROD_WIRE_5a_emulator_an_identical_append_is_a_no_op_and_a_different_body_is_a_conflict(rig):
     prod, client, make, org = rig()
-    ledger, entry = make(), make_entry()
+    ledger, entry = make(), make_entry(org=org)
     ledger.append(entry, entry_id="same")
     assert ledger.append(entry, entry_id="same") is None
     assert make().append(entry, entry_id="same") is None, "another instance of the service, the same answer"
     with pytest.raises(prod.LedgerConflict):
-        ledger.append(make_entry(credits=99.0), entry_id="same")
+        ledger.append(make_entry(org=org, credits=99.0), entry_id="same")
     assert list(ledger.entries()) == [entry]
     assert client.document(doc_path("same", org)).get().to_dict()["credits"] == 12.5
-    quick = make_entry(step="quick", run="r_quick_pw5")  # append_entry: a deterministic id, so a retry adds nothing
+    quick = make_entry(
+        org=org, step="quick", run="r_quick_pw5"
+    )  # append_entry: a deterministic id, so a retry adds nothing
     for _ in range(3):
         make().append_entry(quick)
     assert len(list(client.collection(f"orgs/{org}/ledger").stream())) == 2
@@ -69,7 +71,7 @@ def test_PROD_WIRE_5a_emulator_an_identical_append_is_a_no_op_and_a_different_bo
 def test_PROD_WIRE_5a_emulator_eight_concurrent_appends_of_one_id_leave_exactly_one_document(rig):
     _prod, client, make, org = rig()
     ledgers = [make() for _ in range(8)]  # eight instances of the service racing on one document
-    entry = make_entry()
+    entry = make_entry(org=org)
     results = threads(8, lambda i: ledgers[i].append(entry, entry_id="race"))
     assert results == [None] * 8, results
     assert len(list(client.collection(f"orgs/{org}/ledger").stream())) == 1
@@ -79,7 +81,7 @@ def test_PROD_WIRE_5a_emulator_eight_concurrent_appends_of_one_id_leave_exactly_
 def test_PROD_WIRE_5a_emulator_eight_concurrent_appends_of_one_id_and_different_bodies_leave_one_winner(rig):
     prod, client, make, org = rig()
     ledgers = [make() for _ in range(8)]
-    entries = [make_entry(credits=float(i + 1)) for i in range(8)]
+    entries = [make_entry(org=org, credits=float(i + 1)) for i in range(8)]
     results = threads(8, lambda i: ledgers[i].append(entries[i], entry_id="race"))
     assert sum(r is None for r in results) == 1, results
     assert all(isinstance(r, prod.LedgerConflict) for r in results if r is not None), results
@@ -90,10 +92,10 @@ def test_PROD_WIRE_5a_emulator_eight_concurrent_appends_of_one_id_and_different_
 
 def test_PROD_WIRE_5a_emulator_a_document_of_another_org_is_never_read(rig):
     prod, client, make, org = rig()
-    mine = make_entry(run="r_mine")
+    mine = make_entry(org=org, run="r_mine")
     make().append(mine, entry_id="a")
     other = prod.FirestoreLedger(client, org_id=f"{org}_other")
-    other.append(make_entry(run="r_theirs", credits=999.0), entry_id="b")
+    other.append(make_entry(run="r_theirs", credits=999.0, org=f"{org}_other"), entry_id="b")
     assert list(make().entries()) == [mine]
     assert [e.run for e in other.entries()] == ["r_theirs"]
 

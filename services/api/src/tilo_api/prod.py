@@ -29,6 +29,7 @@ from datetime import date, datetime
 from typing import Any
 
 from google.api_core import exceptions as gexc
+from google.api_core import retry as retries
 from google.auth import exceptions as gauth_exc
 from tilo_metering import LedgerEntry
 from tilo_metering.prices import Usage
@@ -198,13 +199,25 @@ def _optional_text(data: dict[str, Any], key: str) -> str | None:
     return value
 
 
-def _decode(data: object) -> LedgerEntry:
-    """The entry a stored body holds, or `ValueError`/`TypeError` (the caller logs the type, never a value)."""
+_KINDS = frozenset({"reserve", "commit", "release", "grant", "usage"})  # `tilo_metering.LedgerEntry.kind`
+_CREATE_TIMEOUT_S = 5.0  # one write, with its retries, never waits longer on Firestore than this
+
+
+def _create_retry(timeout: float) -> Any:
+    transient = (gexc.ServiceUnavailable, gexc.DeadlineExceeded, gexc.InternalServerError)
+    return retries.Retry(predicate=retries.if_exception_type(*transient), initial=0.1, maximum=1.0, timeout=timeout)
+
+
+def _decode(data: object, path_org: str | None = None) -> LedgerEntry:
+    """The entry a stored body holds, or `ValueError`/`TypeError` (the caller logs the type, never a value). A body
+    whose `kind` is not a ledger kind, whose `credits` are negative, or whose `org` is not the path's is refused."""
     if not isinstance(data, dict):
         raise ValueError("body")
     kind, run, user, org, at = (data.get(k) for k in ("kind", "run", "user", "org", "at"))
     if not (isinstance(kind, str) and isinstance(run, str) and isinstance(user, str) and isinstance(org, str)):
         raise ValueError("required")
+    if kind not in _KINDS or (path_org is not None and org != path_org):
+        raise ValueError("kind or org")
     if not isinstance(at, str):
         raise ValueError("at")
     moment = datetime.fromisoformat(at)
@@ -214,6 +227,8 @@ def _decode(data: object) -> LedgerEntry:
     if credits is not None and (
         isinstance(credits, bool) or not isinstance(credits, int | float) or not math.isfinite(credits)
     ):
+        raise ValueError("credits")
+    if credits is not None and credits < 0:
         raise ValueError("credits")
     usage = data.get("usage")
     if usage is not None:
@@ -248,21 +263,27 @@ class FirestoreLedger:
             raise ValueError("an entry id is 1 to 128 letters, digits, underscores or hyphens")
         body = _encode(entry)
         ref = self._client.document(f"orgs/{self._org}/ledger/{entry_id}")
+        end = time.monotonic() + _CREATE_TIMEOUT_S
         try:
             for attempt in range(_ATTEMPTS):
+                remaining = max(end - time.monotonic(), 0.05)
                 try:
-                    ref.create(body)
+                    # A bounded wait, transient errors retried: a create that landed before its reply was lost is
+                    # `AlreadyExists` on the retry, which reads back and finds the same body (a no-op).
+                    ref.create(body, retry=_create_retry(remaining), timeout=remaining)
                     return
                 except gexc.AlreadyExists:
-                    snapshot = ref.get()
+                    snapshot = ref.get(timeout=max(end - time.monotonic(), 0.05))
                     try:
-                        held = _decode(snapshot.to_dict() if snapshot.exists else None)
+                        held = _decode(snapshot.to_dict() if snapshot.exists else None, self._org)
                     except (ValueError, TypeError):
                         raise LedgerConflict(entry_id) from None
                     if held != entry:
                         raise LedgerConflict(entry_id) from None
                     return
                 except gexc.Aborted:  # contention on the one document (the emulator's lock timeout): create again
+                    if time.monotonic() >= end:
+                        break
                     time.sleep(random.uniform(0, 0.05 * (attempt + 1)))  # noqa: S311 - jitter, not security
         except _LIBRARY_ERRORS as exc:
             logger.warning("ledger unavailable (%s)", type(exc).__name__)
@@ -284,7 +305,7 @@ class FirestoreLedger:
         found: list[tuple[datetime, str, LedgerEntry]] = []
         for snapshot in snapshots:
             try:
-                entry = _decode(snapshot.to_dict())
+                entry = _decode(snapshot.to_dict(), self._org)
             except (ValueError, TypeError) as exc:
                 logger.warning("skipped a ledger document that does not decode (%s)", type(exc).__name__)
                 continue

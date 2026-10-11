@@ -328,24 +328,39 @@ def get_event_writer(request: Request = None) -> EventWriter:  # type: ignore[as
     return deployed()[1]
 
 
-def get_ledger() -> Sequence[LedgerEntry]:
+def get_ledger(request: Request = None) -> Sequence[LedgerEntry]:  # type: ignore[assignment]  # FastAPI injects it
     """The Treasury's ledger (FR-MTR-10): every entry of `orgs/org_tilo/ledger` on the process's shared client, read
-    afresh on each call, under the access store's door rule (`_api_door`). Dev mode overrides this seam."""
-    from tilo_api import prod  # noqa: PLC0415  (prod imports this module's neighbours)
+    afresh on each call, under the access store's door rule (`_api_door`). An anonymous demo session reads its own
+    in-memory entries and never the durable ledger (DEMO-EPHEMERAL-1). Dev mode overrides this seam."""
+    from tilo_api import ephemeral, prod  # noqa: PLC0415  (prod imports this module's neighbours)
 
+    if request is not None and (demo := ephemeral.for_request(request)) is not None:
+        return demo.ledger.entries()
     return prod.FirestoreLedger(_api_door().client, ORG_ID).entries()
 
 
-def get_ledger_writer() -> Any:
+def get_ledger_writer(request: Request = None) -> Any:  # type: ignore[assignment]  # FastAPI injects it
     """The Treasury's write seam (COST-FAST-1b, BQ-COSTFAST-7): an object with `append(LedgerEntry)`, a retry of one
-    entry being one document. The same door as `get_ledger`; Quick treats a refusal as best effort."""
-    from tilo_api import prod  # noqa: PLC0415
+    entry being one document. The same door as `get_ledger`; Quick treats a refusal as best effort. An anonymous demo
+    session gets its own in-memory ledger, never the durable one (DEMO-EPHEMERAL-1)."""
+    from tilo_api import ephemeral, prod  # noqa: PLC0415
 
+    if request is not None and (demo := ephemeral.for_request(request)) is not None:
+        return demo.ledger
     return prod.FirestoreLedgerWriter(prod.FirestoreLedger(_api_door().client, ORG_ID))
 
 
 def ledger_writer_for(request: Request) -> Any:
-    """The writer as the app is wired (overrides included), or None when it is unwired or fails."""
+    """The writer as the app is wired, or None when it is unwired or fails. A demo session's request is answered before
+    any override or door: its own in-memory ledger, and none at all when its session cannot be resolved."""
+    from tilo_api import ephemeral  # noqa: PLC0415
+
+    try:
+        demo = ephemeral.for_request(request)
+    except Exception:
+        return None
+    if demo is not None:
+        return demo.ledger
     return _resolve(request, get_ledger_writer)
 
 
@@ -393,10 +408,10 @@ def _api_door() -> Any:
     one rather than guess. A failing client build is 503 `store_unavailable`, never with the error text, and is
     remembered for `PEOPLE_STORES_BACKOFF_S` like the people door's (FS-18): inside the window a request is refused at
     once, with no client call; a refusal for configuration is not backed off."""
-    global _access_retry_at
+    global _door_retry_at
     from tilo_api import store_door  # noqa: PLC0415  (it imports this module's neighbours)
 
-    retry_at = _access_retry_at
+    retry_at = _door_retry_at
     if retry_at is not None and people_stores_clock() < retry_at:
         raise store_door.ApiStoreUnavailable
     try:
@@ -404,9 +419,9 @@ def _api_door() -> Any:
     except store_door.ApiStoreNotConfigured:
         raise HTTPException(status_code=503, detail="not_configured") from None
     except store_door.ApiStoreUnavailable:
-        _access_retry_at = people_stores_clock() + PEOPLE_STORES_BACKOFF_S
+        _door_retry_at = people_stores_clock() + PEOPLE_STORES_BACKOFF_S
         raise
-    _access_retry_at = None
+    _door_retry_at = None
     return opened
 
 
@@ -425,7 +440,7 @@ def get_app_check_verifier() -> AppCheckVerifier:
 
 
 # After a failed client build the access door makes no new attempt until then (its FS-18 window).
-_access_retry_at: float | None = None
+_door_retry_at: float | None = None
 
 
 def get_spend_caps() -> spend.SpendCaps:
@@ -736,9 +751,9 @@ def get_people_stores(request: Request = None) -> PeopleStores:  # type: ignore[
 
 
 def _forget_people_stores() -> None:
-    global _people_stores, _people_stores_retry_at, _access_retry_at
+    global _people_stores, _people_stores_retry_at, _door_retry_at
     with _people_stores_lock:
-        _people_stores, _people_stores_retry_at, _access_retry_at = None, None, None
+        _people_stores, _people_stores_retry_at, _door_retry_at = None, None, None
 
 
 get_people_stores.cache_clear = _forget_people_stores  # type: ignore[attr-defined]  # tests start from a cold process
