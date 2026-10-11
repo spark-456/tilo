@@ -2,6 +2,7 @@
 
 import datetime
 import math
+import re
 from enum import StrEnum
 from typing import Annotated, Any, Literal
 
@@ -15,9 +16,22 @@ MAX_TABLE_COLUMNS = 20
 MAX_BULLETS_PER_BLOCK = 500
 MAX_BLOCKS_PER_SECTION = 30
 MAX_TOTAL_BLOCKS = 120
-MAX_REFERENCED_TABLE_CELLS = 25_000
-MAX_REFERENCED_CHARTS = 20
+MAX_REFERENCED_TABLE_CELLS = 1200
+MAX_REFERENCED_CHARTS = 4
 MAX_ESTIMATED_SLIDES = 250
+MAX_TEXT_LINES = 40
+MAX_TABLE_CELL_CHARS = 200
+MAX_RENDER_LINES = 2000
+MAX_RENDER_CHARS = 40_000
+
+
+def _text_work(value: str, *, cell: bool = False) -> tuple[int, int]:
+    # The renderers normalise CR/CRLF before splitting. Count that exact work,
+    # including blank lines, without building hundreds of thousands of flowables.
+    lines = 1 + len(re.findall(r"\r\n|\r|\n", value))
+    if lines > MAX_TEXT_LINES or (cell and len(value) > MAX_TABLE_CELL_CHARS):
+        raise ValueError("Render text exceeds the line or cell-character budget")
+    return lines, len(value)
 
 
 class ParagraphBlock(BaseModel):
@@ -30,6 +44,7 @@ class ParagraphBlock(BaseModel):
     def _validate_text(cls, value: str) -> str:
         if len(value) > MAX_PARAGRAPH_CHARS:
             raise ValueError(f"At most {MAX_PARAGRAPH_CHARS} characters per paragraph allowed")
+        _text_work(value)
         return value
 
 
@@ -46,6 +61,7 @@ class BulletsBlock(BaseModel):
         if len(value) > MAX_BULLETS_PER_BLOCK:
             raise ValueError(f"At most {MAX_BULLETS_PER_BLOCK} bullets per block allowed")
         for item in value:
+            _text_work(item)
             if len(item) > MAX_PARAGRAPH_CHARS:
                 raise ValueError(f"At most {MAX_PARAGRAPH_CHARS} characters per bullet allowed")
         return value
@@ -98,6 +114,8 @@ class Table(BaseModel):
         for row in self.rows:
             if len(row) != len(self.columns):
                 raise ValueError(f"Row length mismatch in table {self.id}")
+        for value in [*self.columns, *(v for row in self.rows for v in row)]:
+            _text_work(str(value), cell=True)
         return self
 
 
@@ -210,24 +228,53 @@ class DeliverableSpec(BaseModel):
 
         referenced_cells = 0
         referenced_charts = 0
+        work_lines = work_chars = 0
+
+        def charge(text: str, copies: int = 1) -> None:
+            nonlocal work_lines, work_chars
+            lines, chars = _text_work(text)
+            work_lines += lines * copies
+            work_chars += chars * copies
+            if work_lines > MAX_RENDER_LINES or work_chars > MAX_RENDER_CHARS:
+                raise ValueError("Render exceeds the total line or character budget")
+
+        charge(self.title)
+        charge(self.subtitle or "")
+        for chart in self.charts:
+            _text_work(chart.title)
         slide_count = 1 + len(self.sections)
         for section in self.sections:
+            charge(section.heading)
             for block in section.blocks:
                 if isinstance(block, ParagraphBlock):
                     slide_count += max(1, math.ceil(len(block.text) / 1000))
+                    charge(block.text)
                 elif isinstance(block, BulletsBlock):
                     slide_count += max(1, math.ceil(len(block.bullets) / 8))
+                    for bullet in block.bullets:
+                        charge(bullet)
                 elif isinstance(block, TableBlock):
                     if block.table_id not in table_ids:
                         raise ValueError(f"Unknown table_id: {block.table_id}")
                     tbl = table_ids[block.table_id]
                     referenced_cells += len(tbl.rows) * len(tbl.columns)
                     slide_count += max(1, math.ceil(len(tbl.rows) / 10))
+                    for column in tbl.columns:
+                        charge(column, 1 + math.ceil(len(tbl.rows) / 10))
+                    for row in tbl.rows:
+                        for value in row:
+                            charge(str(value))
                 elif isinstance(block, ChartBlock):
                     if block.chart_id not in chart_ids:
                         raise ValueError(f"Unknown chart_id: {block.chart_id}")
                     referenced_charts += 1
                     slide_count += 1
+                    chart = next(c for c in self.charts if c.id == block.chart_id)
+                    charge(chart.title)
+                    tbl = table_ids[chart.table_id]
+                    for row in tbl.rows:
+                        for value in row:
+                            charge(str(value))
 
         if referenced_cells > MAX_REFERENCED_TABLE_CELLS:
             raise ValueError(f"At most {MAX_REFERENCED_TABLE_CELLS} referenced table cells allowed")

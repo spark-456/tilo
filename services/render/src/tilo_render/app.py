@@ -40,7 +40,7 @@ log = logging.getLogger("tilo_render")
 MAX_BODY_BYTES = 1024 * 1024  # 1 MiB request payload cap before JSON parsing
 MAX_OUTPUT_BYTES = 20 * 1024 * 1024  # 20 MiB rendered file cap (matches tilo_harness.outputs.MAX_PDF)
 DEFAULT_RENDER_TIMEOUT = 15.0
-DEFAULT_MAX_CONCURRENCY = 4
+DEFAULT_MAX_CONCURRENCY = 2
 _CONTENT_LENGTH_RE = re.compile(r"^[0-9]+$")
 _MIME_BY_FORMAT: dict[str, tuple[str, str, bytes]] = {
     "pdf": ("application/pdf", 'attachment; filename="deliverable.pdf"', b"%PDF-"),
@@ -120,7 +120,7 @@ def create_app(
     eff_audience = audience if audience is not None else os.environ.get("TILO_RENDER_AUDIENCE", "").strip()
     env_callers = tuple(c.strip() for c in os.environ.get("TILO_RENDER_ALLOWED_CALLERS", "").split(",") if c.strip())
     callers = tuple(allowed_callers) if allowed_callers else env_callers
-    semaphore = threading.Semaphore(max_concurrency)
+    semaphore = threading.BoundedSemaphore(max_concurrency)
 
     @fastapi_app.get("/health")  # Cloud Run reserves /healthz on run.app; the smoke check uses /health (#397)
     @fastapi_app.get("/healthz")
@@ -176,11 +176,16 @@ def create_app(
             log.warning("render refused: reason=busy format=%s", req_data.format)
             return _refuse(429, "busy")
 
-        worker_started = False
+        handover = threading.Lock()
+        worker_claimed = False
+        abandoned = False
 
         def _run_worker() -> bytes:
-            nonlocal worker_started
-            worker_started = True
+            nonlocal worker_claimed
+            with handover:
+                if abandoned:
+                    return b""
+                worker_claimed = True
             try:
                 return eff_renderer(req_data.spec, req_data.format)
             finally:
@@ -193,10 +198,15 @@ def create_app(
             log.warning("render refused: reason=timeout format=%s", req_data.format)
             return _refuse(504, "timeout")
         except Exception:
-            if not worker_started:
-                semaphore.release()
             log.warning("render refused: reason=render_failed format=%s", req_data.format)
             return _refuse(502, "render_failed")
+        finally:
+            # Timeout and CancelledError also surrender an unclaimed slot. A late
+            # thread observes abandoned and cannot render or release it again.
+            with handover:
+                abandoned = True
+                if not worker_claimed:
+                    semaphore.release()
 
         mime_type, disposition, magic = _MIME_BY_FORMAT[req_data.format]
         if not isinstance(rendered, bytes) or not rendered.startswith(magic):
