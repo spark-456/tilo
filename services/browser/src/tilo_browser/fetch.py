@@ -15,12 +15,12 @@ Security invariants enforced on every call:
   loop and aborts a stalled socket. Expiry is refused and logged as `timeout` (HTTP 504).
 - Only port 443 is fetched (plus the configured sandbox port for sandbox hosts).
 - Streaming enforces 25 MiB per file and 10 files / 50 MB per unit (FR-INT-01). HTML is capped at
-  `MAX_HTML_BYTES` (2 MiB) before it is decoded or parsed; larger pages are refused as `html_too_large` (HTTP 413),
+  `MAX_HTML_BYTES` (512 KiB) before it is decoded or parsed; larger pages are refused as `html_too_large` (HTTP 413),
   and the transport stops reading an HTML body at the cap. A body shorter than its `Content-Length`, a malformed
   header or any other transport error is refused as `upstream_error` (HTTP 502).
 - Media type is determined strictly from magic bytes (`tilo_planning.extraction.FILE_TYPES`), never from
-  URL extension or `Content-Type`; bare archives and executables are refused; HTML is converted to plain
-  text with `<script>`/`<style>` removed.
+  URL extension or `Content-Type`; bare archives, macro/OLE OOXML packages, and executables are refused; HTML is
+  converted to plain text with `<script>`/`<style>` and hidden elements removed.
 - Every blocked request is logged with its reason and sanitised URL (no query string, no userinfo, no body).
 """
 
@@ -58,10 +58,15 @@ log = logging.getLogger("tilo_browser.fetch")
 
 MAX_FILE_BYTES = 25 * 1024 * 1024  # 25 MiB per file
 MAX_ROBOTS_BYTES = 512 * 1024
-MAX_HTML_BYTES = 2 * 1024 * 1024  # HTML is parsed in memory: refuse larger pages before decoding
+MAX_HTML_BYTES = 512 * 1024  # 512 KiB: HTML is parsed in memory inside the wall-clock deadline
 MAX_UNIT_FILES = 10  # FR-INT-01: max 10 files per unit
 MAX_UNIT_BYTES = 50_000_000  # FR-INT-01 / BQ-98: 50 MB per unit
 MAX_REDIRECTS = 5
+MAX_BLOCKED_HISTORY = 1000
+MAX_ROBOTS_CACHE = 512
+MAX_TRACKED_UNITS = 4096
+DEFAULT_ROBOTS_TTL = 3600.0
+DEFAULT_ROBOTS_ERROR_TTL = 60.0
 DEFAULT_CONNECT_TIMEOUT = 5.0
 DEFAULT_READ_TIMEOUT = 15.0
 DEFAULT_TOTAL_TIMEOUT = 60.0  # wall clock for one fetch(): DNS, robots, every hop, headers and body
@@ -70,6 +75,9 @@ USER_AGENT = "TiloBot/1.0"
 UNIT_ID_RE = re.compile(r"^U[0-9]{1,4}$")
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 _CONTENT_LENGTH_RE = re.compile(r"[0-9]{1,18}")
+_BROKEN_HTML_TAG_RE = re.compile(r"<(?:/(?![A-Za-z][A-Za-z0-9:_-]*\s*>)|!(?!--|\[CDATA\[|DOCTYPE\b))", re.IGNORECASE)
+_HIDDEN_STYLE_RE = re.compile(r"(?:display\s*:\s*none|visibility\s*:\s*hidden)", re.IGNORECASE)
+_LITERAL_SCRIPT_RE = re.compile(r"</?script\b[^>]*>", re.IGNORECASE)
 
 _CGNAT_NET = ipaddress.IPv4Network("100.64.0.0/10")
 _BENCHMARK_NET = ipaddress.IPv4Network("198.18.0.0/15")
@@ -106,7 +114,12 @@ _OOXML_MAIN_PARTS: tuple[tuple[str, str], ...] = (
     ("ppt/presentation.xml", FILE_TYPES[".pptx"][1]),
     ("xl/workbook.xml", FILE_TYPES[".xlsx"][1]),
 )
-_STRIP_HTML_TAGS = frozenset({"script", "style", "noscript", "template", "iframe", "object", "embed", "svg"})
+_OOXML_DANGEROUS_EXTS = (".bin", ".exe", ".dll", ".scr", ".bat", ".cmd", ".ps1", ".vbs", ".js", ".hta")
+_OOXML_DANGEROUS_SEGMENTS = ("vbaproject", "/embeddings/", "/activex/", "oledata")
+_VOID_HTML_TAGS = frozenset(
+    {"area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "param", "source", "track", "wbr"}
+)
+_STRIP_HTML_TAGS = frozenset({"script", "style", "noscript", "template", "iframe", "object", "svg"})
 _BLOCK_HTML_TAGS = frozenset(
     {
         "p",
@@ -285,33 +298,76 @@ def clean_source_url(scheme: str, ascii_host: str, port: int | None, raw_path: s
 
 
 class _HtmlPlainExtractor(HTMLParser):
-    """Extracts visible plain text from HTML while dropping `<script>`, `<style>`, and executable tags."""
+    """Extracts visible plain text from HTML while dropping `<script>`, `<style>`, hidden, and executable tags."""
 
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        *,
+        url: str = "",
+        host: str = "",
+        deadline: float | None = None,
+        monotonic: Callable[[], float] = time.monotonic,
+    ) -> None:
         super().__init__(convert_charrefs=True)
+        self._url = url
+        self._host = host
+        self._deadline = deadline
+        self._monotonic = monotonic
         self._skip_depth = 0
+        self._skip_stack: list[tuple[str, bool]] = []
         self._pieces: list[str] = []
 
+    def _check_deadline(self) -> None:
+        if self._deadline is not None and self._monotonic() >= self._deadline:
+            raise FetchBlocked("timeout", self._url, host=self._host)
+
+    @staticmethod
+    def _is_hidden(attrs: list[tuple[str, str | None]]) -> bool:
+        for key, val in attrs:
+            k = key.lower()
+            if k == "hidden":
+                return True
+            if k == "aria-hidden" and (val or "").strip().lower() == "true":
+                return True
+            if k == "style" and val and _HIDDEN_STYLE_RE.search(val):
+                return True
+        return False
+
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        self._check_deadline()
         low = tag.lower()
-        if low in _STRIP_HTML_TAGS:
+        if low in _VOID_HTML_TAGS:
+            return
+        skip_here = low in _STRIP_HTML_TAGS or self._is_hidden(attrs)
+        self._skip_stack.append((low, skip_here))
+        if skip_here:
             self._skip_depth += 1
         elif self._skip_depth == 0 and low in _BLOCK_HTML_TAGS:
             self._pieces.append("\n")
 
     def handle_endtag(self, tag: str) -> None:
+        self._check_deadline()
         low = tag.lower()
-        if low in _STRIP_HTML_TAGS and self._skip_depth > 0:
-            self._skip_depth -= 1
-        elif self._skip_depth == 0 and low in _BLOCK_HTML_TAGS:
+        if low in _VOID_HTML_TAGS:
+            return
+        for idx in range(len(self._skip_stack) - 1, -1, -1):
+            if self._skip_stack[idx][0] == low:
+                for _popped_tag, skipped in self._skip_stack[idx:]:
+                    if skipped and self._skip_depth > 0:
+                        self._skip_depth -= 1
+                del self._skip_stack[idx:]
+                break
+        if self._skip_depth == 0 and low in _BLOCK_HTML_TAGS:
             self._pieces.append("\n")
 
     def handle_data(self, data: str) -> None:
+        self._check_deadline()
         if self._skip_depth == 0 and data:
             self._pieces.append(data)
 
     def plain_output(self) -> str:
-        lines = [" ".join(line.split()) for line in "".join(self._pieces).splitlines()]
+        raw_text = _LITERAL_SCRIPT_RE.sub("", "".join(self._pieces))
+        lines = [" ".join(line.split()) for line in raw_text.splitlines()]
         return "\n".join(line for line in lines if line)
 
 
@@ -333,13 +389,24 @@ def _detect_ooxml(raw_bytes: bytes, url: str, host: str) -> str:
         raise FetchBlocked("archive_refused", url, host=host) from exc
     if "[Content_Types].xml" not in names:
         raise FetchBlocked("archive_refused", url, host=host)
+    for name in names:
+        low_name = name.lower().replace("\\", "/")
+        if low_name.endswith(_OOXML_DANGEROUS_EXTS) or any(seg in low_name for seg in _OOXML_DANGEROUS_SEGMENTS):
+            raise FetchBlocked("archive_refused", url, host=host)
     for main_part, mime_type in _OOXML_MAIN_PARTS:
         if main_part in names:
             return mime_type
     raise FetchBlocked("archive_refused", url, host=host)
 
 
-def detect_media_type(raw_bytes: bytes, *, url: str, host: str) -> tuple[str, bytes]:
+def detect_media_type(
+    raw_bytes: bytes,
+    *,
+    url: str,
+    host: str,
+    deadline: float | None = None,
+    monotonic: Callable[[], float] = time.monotonic,
+) -> tuple[str, bytes]:
     """Determine media type strictly from magic bytes (`extraction.FILE_TYPES`); convert HTML to script-free text."""
     if not raw_bytes:
         raise FetchBlocked("unsupported_media_type", url, host=host)
@@ -359,12 +426,15 @@ def detect_media_type(raw_bytes: bytes, *, url: str, host: str) -> tuple[str, by
     if _looks_like_html(raw_bytes):
         if len(raw_bytes) > MAX_HTML_BYTES:
             raise FetchBlocked("html_too_large", url, host=host)
+        if deadline is not None and monotonic() >= deadline:
+            raise FetchBlocked("timeout", url, host=host)
         try:
             decoded_html = raw_bytes.decode("utf-8")
         except UnicodeDecodeError as exc:
             raise FetchBlocked("unsupported_media_type", url, host=host) from exc
-        parser = _HtmlPlainExtractor()
-        parser.feed(decoded_html)
+        sanitized_html = _BROKEN_HTML_TAG_RE.sub(" ", decoded_html)
+        parser = _HtmlPlainExtractor(url=url, host=host, deadline=deadline, monotonic=monotonic)
+        parser.feed(sanitized_html)
         parser.close()
         cleaned_plain = mask_text(parser.plain_output())
         plain_bytes = cleaned_plain.encode("utf-8")
@@ -578,6 +648,8 @@ class FetchService:
         read_timeout: float = DEFAULT_READ_TIMEOUT,
         total_timeout: float = DEFAULT_TOTAL_TIMEOUT,
         sandbox_port: int = DEFAULT_SANDBOX_PORT,
+        robots_ttl: float = DEFAULT_ROBOTS_TTL,
+        robots_error_ttl: float = DEFAULT_ROBOTS_ERROR_TTL,
         monotonic: Callable[[], float] = time.monotonic,
     ) -> None:
         if not (math.isfinite(connect_timeout) and connect_timeout > 0):
@@ -588,8 +660,14 @@ class FetchService:
             raise ValueError("total_timeout must be a positive finite number")
         if not 0 < sandbox_port < 65536:
             raise ValueError("sandbox_port must be a valid TCP port")
+        if not (math.isfinite(robots_ttl) and robots_ttl > 0):
+            raise ValueError("robots_ttl must be a positive finite number")
+        if not (math.isfinite(robots_error_ttl) and robots_error_ttl > 0):
+            raise ValueError("robots_error_ttl must be a positive finite number")
         self._total_timeout = total_timeout
         self._sandbox_port = sandbox_port
+        self._robots_ttl = robots_ttl
+        self._robots_error_ttl = robots_error_ttl
         self._monotonic = monotonic
         self._base_allow = tuple(base_allow)
         self._sandbox_hosts = frozenset(norm for h in sandbox_hosts if (norm := _normalise_host(h)) is not None)
@@ -601,6 +679,7 @@ class FetchService:
         self._read_timeout = read_timeout
         self.blocked: list[FetchBlock] = []
         self._robots_cache: dict[tuple[str, str, int], urllib.robotparser.RobotFileParser] = {}
+        self._robots_expiry: dict[tuple[str, str, int], float] = {}
         self._unit_usage: dict[tuple[str, str, str], tuple[int, int]] = {}
         self._lock = threading.Lock()
 
@@ -615,6 +694,8 @@ class FetchService:
     ) -> FetchBlocked:
         exc = FetchBlocked(reason, url, host=host, allowlist=allowlist, redirect_from=redirect_from)
         with self._lock:
+            if len(self.blocked) >= MAX_BLOCKED_HISTORY:
+                del self.blocked[: len(self.blocked) - MAX_BLOCKED_HISTORY + 1]
             self.blocked.append(exc.block)
         log.warning(
             "fetch blocked: reason=%s url=%s host=%s allowlist=%s",
@@ -674,7 +755,7 @@ class FetchService:
 
     def _resolve_and_pin(
         self, host: str, port: int, *, url: str, allowlist: Sequence[str], deadline: float, redirect_from: str | None
-    ) -> str:
+    ) -> tuple[str, ...]:
         if is_forbidden_hostname(host):
             raise self._record_block("ssrf_blocked", url, host=host, allowlist=allowlist)
         left = self._time_left(deadline, url=url, host=host, allowlist=allowlist, redirect_from=redirect_from)
@@ -686,9 +767,13 @@ class FetchService:
             ) from None
         except OSError:
             raise self._record_block("dns_failed", url, host=host, allowlist=allowlist) from None
+        except Exception:
+            raise self._record_block(
+                "upstream_error", url, host=host, allowlist=allowlist, redirect_from=redirect_from
+            ) from None
         if not resolved or not all(is_public_ip(ip) for ip in resolved):
             raise self._record_block("ssrf_blocked", url, host=host, allowlist=allowlist)
-        return resolved[0]
+        return tuple(resolved)
 
     def _check_hop(
         self,
@@ -698,7 +783,7 @@ class FetchService:
         allowlist: tuple[str, ...],
         deadline: float,
         redirect_from: str | None = None,
-    ) -> tuple[str, str, int, str, str, str]:
+    ) -> tuple[str, str, int, tuple[str, ...], str, str]:
         decision = policy.check(url, redirect_from=redirect_from)
         if not decision.allowed:
             raise self._record_block(
@@ -727,14 +812,14 @@ class FetchService:
             raise self._record_block(
                 "port_not_allowed", url, host=ascii_host, allowlist=allowlist, redirect_from=redirect_from
             )
-        pinned_ip = self._resolve_and_pin(
+        pinned_ips = self._resolve_and_pin(
             ascii_host, port, url=url, allowlist=allowlist, deadline=deadline, redirect_from=redirect_from
         )
         raw_path = parts.path or "/"
         clean_path = "/".join(seg.split(";", 1)[0] for seg in raw_path.split("/")) or "/"
         path_and_query = f"{clean_path}?{parts.query}" if parts.query else clean_path
         cleaned = clean_source_url(scheme, ascii_host, parts.port, clean_path)
-        return scheme, ascii_host, port, pinned_ip, path_and_query, cleaned
+        return scheme, ascii_host, port, pinned_ips, path_and_query, cleaned
 
     def _upstream_get(
         self,
@@ -742,7 +827,7 @@ class FetchService:
         scheme: str,
         host: str,
         port: int,
-        pinned_ip: str,
+        pinned_ips: Sequence[str],
         path_and_query: str,
         max_bytes: int,
         url: str,
@@ -751,31 +836,37 @@ class FetchService:
         redirect_from: str | None = None,
         unit_capped: bool = False,
     ) -> UpstreamResponse:
-        """One upstream GET inside the fetch deadline; every failure becomes a logged refusal, never a 500."""
-        left = self._time_left(deadline, url=url, host=host, allowlist=allowlist, redirect_from=redirect_from)
-        try:
-            return self._transport.send_get(
-                scheme=scheme,
-                host=host,
-                port=port,
-                pinned_ip=pinned_ip,
-                path_and_query=path_and_query,
-                headers={},
-                connect_timeout=self._connect_timeout,
-                read_timeout=self._read_timeout,
-                max_bytes=max_bytes,
-                time_budget=left,
-            )
-        except FetchBlocked as exc:
-            reason = exc.block.reason
-            if reason == "file_too_large" and unit_capped:
-                reason = "unit_byte_limit"
-            raise self._record_block(reason, url, host=host, allowlist=allowlist, redirect_from=redirect_from) from None
-        except TimeoutError:
-            reason = "timeout"
-        except (OSError, http.client.HTTPException, ValueError):
-            reason = "upstream_error"
-        raise self._record_block(reason, url, host=host, allowlist=allowlist, redirect_from=redirect_from)
+        """One upstream GET inside the fetch deadline; tries each validated IP on transport error."""
+        last_reason = "upstream_error"
+        for idx, candidate_ip in enumerate(pinned_ips):
+            left = self._time_left(deadline, url=url, host=host, allowlist=allowlist, redirect_from=redirect_from)
+            try:
+                return self._transport.send_get(
+                    scheme=scheme,
+                    host=host,
+                    port=port,
+                    pinned_ip=candidate_ip,
+                    path_and_query=path_and_query,
+                    headers={},
+                    connect_timeout=self._connect_timeout,
+                    read_timeout=self._read_timeout,
+                    max_bytes=max_bytes,
+                    time_budget=left,
+                )
+            except FetchBlocked as exc:
+                reason = exc.block.reason
+                if reason == "file_too_large" and unit_capped:
+                    reason = "unit_byte_limit"
+                last_reason = reason
+            except TimeoutError:
+                last_reason = "timeout"
+            except (OSError, http.client.HTTPException, ValueError):
+                last_reason = "upstream_error"
+            if last_reason != "upstream_error" or idx == len(pinned_ips) - 1:
+                raise self._record_block(
+                    last_reason, url, host=host, allowlist=allowlist, redirect_from=redirect_from
+                ) from None
+        raise self._record_block(last_reason, url, host=host, allowlist=allowlist, redirect_from=redirect_from)
 
     def _check_robots(
         self,
@@ -783,21 +874,26 @@ class FetchService:
         scheme: str,
         host: str,
         port: int,
-        pinned_ip: str,
+        pinned_ips: Sequence[str],
         path_and_query: str,
         url: str,
         allowlist: tuple[str, ...],
         deadline: float,
     ) -> None:
         cache_key = (scheme, host, port)
+        now = self._monotonic()
         with self._lock:
+            exp = self._robots_expiry.get(cache_key)
+            if exp is not None and now >= exp:
+                self._robots_cache.pop(cache_key, None)
+                self._robots_expiry.pop(cache_key, None)
             cached = self._robots_cache.get(cache_key)
         if cached is None:
             resp = self._upstream_get(
                 scheme=scheme,
                 host=host,
                 port=port,
-                pinned_ip=pinned_ip,
+                pinned_ips=pinned_ips,
                 path_and_query="/robots.txt",
                 max_bytes=MAX_ROBOTS_BYTES,
                 url=url,
@@ -808,12 +904,20 @@ class FetchService:
             if resp.status_code == 200:
                 robots_lines = resp.body.decode("utf-8", errors="replace").splitlines()
                 rp.parse(robots_lines)
+                ttl = self._robots_ttl
             elif resp.status_code == 404:
                 rp.parse(["User-agent: *", "Allow: /"])
+                ttl = self._robots_ttl
             else:
                 rp.parse(["User-agent: *", "Disallow: /"])
+                ttl = self._robots_error_ttl
             with self._lock:
+                if cache_key not in self._robots_cache and len(self._robots_cache) >= MAX_ROBOTS_CACHE:
+                    oldest_key = next(iter(self._robots_cache))
+                    self._robots_cache.pop(oldest_key, None)
+                    self._robots_expiry.pop(oldest_key, None)
                 self._robots_cache[cache_key] = rp
+                self._robots_expiry[cache_key] = self._monotonic() + ttl
             cached = rp
         path_only = path_and_query.split("?", 1)[0] or "/"
         if not cached.can_fetch(USER_AGENT, path_only):
@@ -849,7 +953,7 @@ class FetchService:
         current_url = url
         previous_url: str | None = None
         for hop in range(MAX_REDIRECTS + 1):
-            scheme, host, port, pinned_ip, path_and_query, cleaned_url = self._check_hop(
+            scheme, host, port, pinned_ips, path_and_query, cleaned_url = self._check_hop(
                 current_url,
                 policy=policy,
                 allowlist=allowlist,
@@ -860,7 +964,7 @@ class FetchService:
                 scheme=scheme,
                 host=host,
                 port=port,
-                pinned_ip=pinned_ip,
+                pinned_ips=pinned_ips,
                 path_and_query=path_and_query,
                 url=current_url,
                 allowlist=allowlist,
@@ -870,7 +974,7 @@ class FetchService:
                 scheme=scheme,
                 host=host,
                 port=port,
-                pinned_ip=pinned_ip,
+                pinned_ips=pinned_ips,
                 path_and_query=path_and_query,
                 max_bytes=min(MAX_FILE_BYTES, remaining_unit_bytes),
                 url=current_url,
@@ -900,20 +1004,25 @@ class FetchService:
                 raise self._record_block("upstream_error", current_url, host=host, allowlist=allowlist)
 
             try:
-                media_type, stored_bytes = detect_media_type(resp.body, url=current_url, host=host)
+                media_type, stored_bytes = detect_media_type(
+                    resp.body, url=current_url, host=host, deadline=deadline, monotonic=self._monotonic
+                )
             except FetchBlocked as exc:
                 raise self._record_block(exc.block.reason, current_url, host=host, allowlist=allowlist) from None
 
+            charged_bytes = max(len(resp.body), len(stored_bytes))
             # Decide under the lock, record the refusal after releasing it (`_record_block` takes the same lock).
             refusal: str | None = None
             with self._lock:
                 cur_files, cur_bytes = self._unit_usage.get(unit_key, (0, 0))
                 if cur_files >= MAX_UNIT_FILES:
                     refusal = "unit_file_limit"
-                elif cur_bytes + len(stored_bytes) > MAX_UNIT_BYTES:
+                elif cur_bytes + charged_bytes > MAX_UNIT_BYTES:
                     refusal = "unit_byte_limit"
                 else:
-                    self._unit_usage[unit_key] = (cur_files + 1, cur_bytes + len(stored_bytes))
+                    if unit_key not in self._unit_usage and len(self._unit_usage) >= MAX_TRACKED_UNITS:
+                        self._unit_usage.pop(next(iter(self._unit_usage)), None)
+                    self._unit_usage[unit_key] = (cur_files + 1, cur_bytes + charged_bytes)
             if refusal is not None:
                 raise self._record_block(refusal, current_url, host=host, allowlist=allowlist)
 
