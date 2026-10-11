@@ -253,8 +253,13 @@ def test_PL_LIVE_12_vertex_client_uses_adc_project_and_global_location_and_no_ke
     assert result.code == 0, result.err
     assert sdk.client_inits, "the router never built a client"
     for init in sdk.client_inits:
-        # exactly these three arguments: Application Default Credentials, never an api_key or a credentials object
-        assert init == {"vertexai": True, "project": PROJECT, "location": "global"}
+        # Application Default Credentials plus the request timeout (PL-02), never an api_key or a credentials object
+        assert set(init) == {"vertexai", "project", "location", "http_options"}
+        assert {k: init[k] for k in ("vertexai", "project", "location")} == {
+            "vertexai": True,
+            "project": PROJECT,
+            "location": "global",
+        }
 
 
 def test_PL_LIVE_12_location_comes_from_the_environment_when_set(tmp_path: Path) -> None:

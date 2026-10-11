@@ -6,21 +6,35 @@
 example: true
 
 profiles:
+  # ADR-0029 decision 6: video and documents (a PDF read natively, FR-INT-02) are capabilities; media_tokens are
+  # the provider's tokens per image, PDF page and second of audio or video, upper bounds (1,120 is the stated
+  # maximum for an image), used only for pre-flight estimates and the EFF-03 cap check. Billing uses reported usage.
   flash-38:
     provider: google
     model: gemini-3.8-flash
     context: 1000000
-    caps: [json, tools, vision, audio, thinking, computer_use, grounding]
+    caps: [json, tools, vision, audio, video, documents, thinking, computer_use, grounding]
+    media_tokens: { image: 1120, pdf_page: 1120, audio_per_second: 25, video_per_second: 258 }
   flash-37:
     provider: google
     model: gemini-3.7-flash
     context: 1000000
-    caps: [json, tools, vision, audio, thinking]
+    caps: [json, tools, vision, audio, video, documents, thinking]
+    media_tokens: { image: 1120, pdf_page: 1120, audio_per_second: 25, video_per_second: 258 }
   lite-31:
     provider: google
     model: gemini-3.1-flash-lite
     context: 1000000
-    caps: [json, tools]
+    caps: [json, tools, vision, audio, video, documents]
+    media_tokens: { image: 1120, pdf_page: 1120, audio_per_second: 25, video_per_second: 258 }
+  # ADR-0029 decision 7: the search role's profile. Same model as flash-38, its own price row (a fee per search
+  # query on top of the token rates). The SearchProvider adapter sends Gemini's google_search tool and refuses the
+  # URL-context tool: every fetch goes through tilo-browser (egress allowlist, robots.txt, raw archive; LW-08).
+  search-google:
+    provider: google
+    model: gemini-3.8-flash
+    context: 1000000
+    caps: [json, grounding]
   # FR-INT-02 (issue #103): the dev safety screen. The provider layer refuses a fake safety profile in
   # live mode or when deployed (K_SERVICE set); config/models.dev.yaml's safety role uses it, the production role uses armor-default.
   safety-fake:
@@ -71,6 +85,11 @@ roles:
   # EFF-03: 65536 is Model Armor's own per-request limit for the prompt-injection, RAI and CSAM filters
   # (https://docs.cloud.google.com/model-armor/quotas, read 2026-10-06); the screen refuses a larger input.
   safety: { primary: armor-default, fallback: armor-default, max_input_tokens: 65536 } # primary only; never a weaker fallback
+  # ADR-0029 decision 7 (PRD 12.2 web search): every SearchProvider call. A fallback without grounding would answer
+  # from memory, so the fallback is the same profile (retried once, NFR-25). reserve_units: search queries reserved
+  # under the PL-03 budget check before sending, since Gemini decides how many it runs (BQ-LW-10 proposes 5).
+  # max_output_tokens: a grounded answer with its citations; the router default of 1024 (BQ-63) would cut it.
+  search: { primary: search-google, fallback: search-google, max_input_tokens: 8000, max_output_tokens: 4096, reserve_units: 5 }
 
 rules:
   deny: ["gemini-2.5-*", "*-preview*"]
