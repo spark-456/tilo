@@ -39,7 +39,7 @@ describe("LIVE-HOME demo session", () => {
       demo: () => false,
       identity: () => ({ name: "Riya Sharma", email: "riya@example.org" }),
     });
-    await expect(api.getSkills()).rejects.toBeInstanceOf(NotBuilt);
+    await expect(api.getAgenda()).rejects.toBeInstanceOf(NotBuilt);
   });
 });
 

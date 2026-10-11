@@ -302,6 +302,36 @@ export const savedOverride = (owner: string): Partial<Skill> => ({
   owner,
 });
 
+/** SKILLS-3: what a saved skill shows on a live page: it has not run, so no count, rate or time is made up. */
+export const liveSavedOverride = (owner: string): Partial<Skill> => ({
+  st: "learning",
+  status: "live",
+  runs: null,
+  rate: null,
+  last: "",
+  improved: "",
+  from: "",
+  owner,
+});
+
+/** SKILLS-5: the words of the live teach flow (new strings are flagged in the PR). */
+export const LIVE_TEACH = {
+  unavailable: "Not connected yet",
+  retry: "Tilo couldn’t read that just now. Try again.",
+  refused: "Tilo couldn’t make a skill from that. Try describing it differently.",
+  saved: (name: string) => `Saved “${name}”. It starts as Learning`,
+  failed: (name: string, code: string | null) =>
+    `Couldn’t save “${name}”${code ? ` (${code})` : ""}. Try again`,
+} as const;
+/** The server's fixed refusal words for a save; any other text is never shown. */
+export const SAVE_CODES: ReadonlySet<string> = new Set([
+  "unknown_action",
+  "ask_first_required",
+  "forbidden",
+  "event_not_allowed",
+  "not_understood",
+]);
+
 /** A new skill for a person whose data holds no draft to start from. */
 export const blankSkill = (owner: string): Skill => ({
   id: "taught",

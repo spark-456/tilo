@@ -29,6 +29,7 @@ from tilo_people.stores import PeopleStores
 
 from tilo_api import deps, dev_run, events
 from tilo_api.feedback import InMemoryFeedbackStore
+from tilo_api.skill_store import MemorySkillStore
 
 ENV_FLAG = "TILO_API_DEV"  # "1" turns dev mode on; nothing else does
 ENV_ORIGINS = "TILO_API_DEV_ORIGINS"  # comma-separated allowed browser origins
@@ -219,7 +220,18 @@ def _dev_people() -> dict[Callable[..., Any], Callable[[], Any]]:
         refuse_if_unsafe()
         return none
 
-    return {deps.get_people_stores: get_stores, deps.get_plate_sources: get_none, deps.get_source_owners: get_none}
+    skills = MemorySkillStore()  # taught skills (SKILLS-2): in memory, like the people stores
+
+    def get_skills() -> MemorySkillStore:
+        refuse_if_unsafe()
+        return skills
+
+    return {
+        deps.get_people_stores: get_stores,
+        deps.get_plate_sources: get_none,
+        deps.get_source_owners: get_none,
+        deps.get_skill_store: get_skills,
+    }
 
 
 def install(app: FastAPI, env: Mapping[str, str] | None = None) -> None:

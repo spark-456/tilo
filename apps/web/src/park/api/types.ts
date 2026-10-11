@@ -189,7 +189,8 @@ export interface Skill {
   team: string;
   owner: string;
   role: string;
-  runs: number;
+  /** Null when the server serves no run count (a live skill), printed as a dash. */
+  runs: number | null;
   rate: number | null;
   last: string;
   improved: string;
@@ -202,6 +203,37 @@ export interface Skill {
   used: string[];
   steps: string[];
   ask?: { q: string; a: string[] };
+  /** SKILLS-3: what the teach card chose, so `saveSkill` can post it (scope, trigger and each step's tool); never served. */
+  draft?: SkillDraft;
+}
+export interface SkillDraft {
+  scope: "me" | "team";
+  trigger: "ask" | "weekday" | "arrive";
+  plan: { text: string; tool: string; ask: boolean }[];
+  /** SKILLS-5: a taught version as the server made it; `saveSkill` posts these steps, not the labels above. */
+  server?: {
+    captured: string[];
+    question: { text: string; options: string[] } | null;
+    steps: { text: string; tool: string; action: string; verb: string; ask: boolean }[];
+  };
+}
+/** SKILLS-5 (FR-SKL-01): the steps the server read out of a described skill. */
+export interface SkillCapture {
+  id: string;
+  steps: string[];
+}
+/** SKILLS-5 (FR-SKL-02): Tilo's version; `locked` steps were forced to ask first by the server and cannot be switched off. */
+export interface SkillVersion {
+  steps: {
+    text: string;
+    tool: string;
+    action: string;
+    verb: string;
+    ask: boolean;
+    locked: boolean;
+  }[];
+  question: { text: string; options: string[] } | null;
+  estimates: { credits: number; seconds: number; asks: number } | null;
 }
 export interface Learn {
   rates: { id: string; name: string; meta: string; steps: string[] }[];

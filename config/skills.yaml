@@ -1,0 +1,14 @@
+# Taught skills (FR-SKL-04, ADR-0034, contracts/taught_skill.rules.md TS-05, TS-07).
+# Read by tilo_api.skills_routes.load_skill_config; a missing or unusable file falls back to the same numbers there.
+# No model id belongs here. Only what the store and routes need today; the trust, try-run, capture and helpers keys
+# of the ADR arrive with the tickets that read them.
+
+# Estimates before a skill has runs of its own (source "prior"): per step, worked out by code. These are
+# placeholders until measured from replay (BQ-SKILLS-1); prices_as_of is read from config/prices.yaml.
+prior:
+  credits_per_step: 3
+  seconds_per_step: 20
+
+# TS-07: an event trigger's type must be on this list (and registered); the runner's daily cap is a later slice.
+triggers:
+  event_types: [meeting.minuted, work_item.created, world.completed]
