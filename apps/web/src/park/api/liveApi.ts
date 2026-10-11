@@ -121,6 +121,29 @@ async function quickAsk(
 const isRows = (v: unknown): boolean =>
   Array.isArray(v) && v.every((r) => typeof r?.usd === "number");
 
+const isHistory = (v: unknown): boolean =>
+  Array.isArray(v) &&
+  v.every(
+    (e) =>
+      e &&
+      typeof e === "object" &&
+      ["world_id", "run_id", "card_id", "summary", "ts"].every((k) => typeof e[k] === "string") &&
+      ["approval.requested", "approval.resolved"].includes(e.type) &&
+      /(?:Z|[+-]\d{2}:\d{2})$/.test(e.ts) &&
+      Number.isFinite(Date.parse(e.ts)),
+  );
+const isWaits = (v: unknown): boolean =>
+  Array.isArray(v) &&
+  v.every(
+    (w) =>
+      w &&
+      typeof w === "object" &&
+      typeof w.action_type === "string" &&
+      typeof w.seconds === "number" &&
+      Number.isFinite(w.seconds) &&
+      w.seconds >= 0,
+  );
+
 /** A body that is not a cost report is an unreadable reply, never a Ledger. */
 function isCostReport(v: unknown): v is CostReport {
   const r = v as Partial<Record<keyof CostReport, unknown>> | null;
@@ -130,7 +153,21 @@ function isCostReport(v: unknown): v is CostReport {
     totals !== null &&
     typeof totals.usd === "number" &&
     isRows(r?.by_profile) &&
-    isRows(r?.by_task_type)
+    isRows(r?.by_task_type) &&
+    (r?.approval_waits === undefined || isWaits(r.approval_waits)) &&
+    (r?.activity === undefined || isHistory(r.activity)) &&
+    (r?.tasks === undefined ||
+      (Array.isArray(r.tasks) &&
+        r.tasks.every(
+          (t) =>
+            t !== null &&
+            typeof t === "object" &&
+            typeof t.run_id === "string" &&
+            typeof t.usd === "number" &&
+            Number.isFinite(t.usd) &&
+            t.usd >= 0 &&
+            typeof t.completed === "boolean",
+        )))
   );
 }
 

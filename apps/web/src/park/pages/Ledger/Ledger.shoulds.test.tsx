@@ -9,7 +9,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { fakeApi, fakeScheduler } from "../../../../test-support/park/appHarness";
 import { cleanup, click, mount, q, qa } from "../../../../test-support/park/componentsHarness";
 import { decisions, ledger as fixtureLedger } from "../../api/fixtures";
-import type { Ledger } from "../../api/types";
+import { ledgerFromCosts } from "../../api/live/ledgerFromCosts";
+import type { Decision, Ledger } from "../../api/types";
 import { ParkProvider, useApp, useParkStore } from "../../app/context";
 import type { ParkStore } from "../../app/store";
 import { LedgerPage } from "./LedgerPage";
@@ -36,9 +37,13 @@ function Shell({ onStore }: { onStore: (s: ParkStore) => void }) {
 }
 
 /** The Ledger route over an Api that serves exactly `ledger` and the fixture decisions. */
-async function mountLedger(ledger: Ledger = fixtureLedger) {
+async function mountLedger(
+  ledger: Ledger = fixtureLedger,
+  servedDecisions: Decision[] = decisions,
+) {
   window.history.pushState({}, "", "/park/ledger");
   const api = fakeApi();
+  api.getDecisions = async () => ({ data: servedDecisions, source: "fixture" });
   api.getLedger = (() =>
     Promise.resolve({ data: ledger, source: "fixture" })) as typeof api.getLedger;
   const navigate = vi.fn();
@@ -70,6 +75,86 @@ const radio = (root: ParentNode, name: string) =>
   qa<HTMLElement>(root, '[role="radio"]').find((e) => (e.textContent ?? "").trim() === name);
 const sum = (xs: readonly number[]) => xs.reduce((a, v) => a + v, 0);
 const num = (s: string) => Number(s.replace(/[^0-9.]/g, ""));
+
+it("FR_SPD_04_recorded_runs_show_totals_and_completion_without_skill_navigation", async () => {
+  const { container } = await mountLedger({
+    ...fixtureLedger,
+    runs: [],
+    recordedRuns: [
+      { id: "recorded-a", usd: 1.25, completed: true },
+      { id: "recorded-b", usd: 0, completed: false },
+    ],
+    currency: "USD",
+  });
+  const card = region(container, "Recorded run costs");
+  expect(text(card)).toContain("recorded-a");
+  expect(text(card)).toContain("$1.25");
+  expect(text(card)).toContain("Completed");
+  expect(text(card)).toContain("Completion not recorded");
+  expect(qa(card, "button")).toHaveLength(0);
+});
+
+it("FR_SPD_05_06_07_live_history_shows_only_recorded_waits_and_honest_unavailable_estimates", async () => {
+  const L = ledgerFromCosts({
+    totals: { usd: 0 },
+    by_profile: [],
+    by_task_type: [],
+    approval_waits: [{ action_type: "send_email", seconds: 120 }],
+    activity: [
+      {
+        world_id: "recorded-world",
+        run_id: "run-a",
+        card_id: "card-a",
+        type: "approval.resolved",
+        ts: "2026-10-11T09:02:00Z",
+        summary: "Held for edits",
+      },
+    ],
+  });
+  const { container, navigate } = await mountLedger(L);
+  expect(text(region(container, "Approval wait times"))).toContain("2.0 min");
+  expect(text(container)).toContain(
+    "Memory savings by week and hours handed back are not available yet.",
+  );
+  const activity = region(container, "Activity");
+  expect(text(activity)).toContain("Held for edits");
+  expect(text(activity)).toContain("Approval answered");
+  const open = qa<HTMLButtonElement>(activity, "button").find((b) =>
+    b.textContent?.includes("Open in world"),
+  );
+  if (!open) throw new Error("missing world navigation");
+  click(open);
+  expect(navigate).toHaveBeenCalledWith(expect.stringContaining("recorded-world"));
+});
+
+it("FR_SPD_07_recorded_pending_approval_uses_the_existing_decide_once", async () => {
+  const L = ledgerFromCosts({
+    totals: { usd: 0 },
+    by_profile: [],
+    by_task_type: [],
+    activity: [
+      {
+        world_id: "w",
+        run_id: "r",
+        card_id: "c",
+        type: "approval.requested",
+        ts: "2026-10-11T09:00:00Z",
+        summary: "Recorded request",
+      },
+    ],
+  });
+  const key = L.activity[0]?.dec;
+  if (!key || !decisions[0]) throw new Error("missing recorded decision key");
+  const { container, api } = await mountLedger(L, [{ ...decisions[0], k: key }]);
+  const approve = qa<HTMLButtonElement>(region(container, "Activity"), "button").find((b) =>
+    b.textContent?.includes("Approve"),
+  );
+  if (!approve) throw new Error("missing inline approval");
+  click(approve);
+  await settle();
+  expect(api.decide).toHaveBeenCalledTimes(1);
+  expect(api.decide).toHaveBeenCalledWith(key);
+});
 
 /** The fixture ledger with the numbers the tests care about changed to ones it holds nowhere. */
 function varied(patch: Partial<Ledger> = {}): Ledger {

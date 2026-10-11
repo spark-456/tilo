@@ -22,7 +22,7 @@ export function Activity({
     <section aria-label="Activity" className="park-ledger-card park-ledger-card--activity">
       <div className="park-ledger-acthead">
         <h2 className="park-ledger-h2" style={{ marginTop: 0 }}>
-          Activity
+          {L.recordedRuns !== undefined ? "Recorded approval activity" : "Activity"}
         </h2>
         <SegmentedControl
           label="Entry type"
@@ -77,7 +77,7 @@ export function Activity({
                       </div>
                     ))}
                     <div className="park-ledger-detail-actions">
-                      {r.waiting && r.decKey ? (
+                      {r.waiting && r.decKey && decisions.some((d) => d.k === r.decKey) ? (
                         <span className="park-ledger-approve">
                           <Button
                             variant="needs"
@@ -107,7 +107,11 @@ export function Activity({
         </div>
       ))}
       {groups.length === 0 ? (
-        <div className="park-ledger-empty">Nothing here this month.</div>
+        <div className="park-ledger-empty">
+          {L.recordedRuns !== undefined
+            ? "No recorded approvals in this view."
+            : "Nothing here this month."}
+        </div>
       ) : null}
     </section>
   );
