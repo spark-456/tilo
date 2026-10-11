@@ -10,6 +10,7 @@ import urllib.request
 from playwright.async_api import async_playwright
 
 from bot.audio_out import Player, setup_virtual_mic
+from bot.browser import CHROMIUM_ARGS
 
 
 async def main():
@@ -35,7 +36,11 @@ async def main():
 
     assert await Player().play(silence(), 24000, lambda: False)
     async with async_playwright() as playwright:
-        browser = await playwright.chromium.launch(headless=False, args=["--no-sandbox"])
+        browser = await playwright.chromium.launch(
+            headless=False,
+            args=CHROMIUM_ARGS + ["--no-sandbox"],
+            ignore_default_args=["--enable-automation", "--mute-audio"],
+        )
         try:
             context = await browser.new_context(permissions=["microphone"])
             page = await context.new_page()
