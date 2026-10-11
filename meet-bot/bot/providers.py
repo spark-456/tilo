@@ -26,6 +26,7 @@ import logging
 import os
 import time
 from collections.abc import AsyncIterator, Callable
+from contextvars import ContextVar
 from pathlib import Path
 from typing import Any
 
@@ -93,19 +94,25 @@ def fixtures_dir() -> Path:
 
 # -- the per-meeting call cap ----------------------------------------------------------------------------------------
 _counter: CallCounter | None = None
+_counter_context: ContextVar[CallCounter | None] = ContextVar("meeting_call_counter", default=None)
 
 
 def call_counter() -> CallCounter:
-    """The one counter of this bot process (one process is one meeting), built from `config/meeting.yaml`."""
+    """The request's counter. Executor threads inherit it even if a later request resets the process default."""
     global _counter
-    if _counter is None:
-        _counter = CallCounter(load_meeting_caps(meeting_file()))
-    return _counter
+    counter = _counter_context.get()
+    if counter is None:
+        if _counter is None:
+            _counter = CallCounter(load_meeting_caps(meeting_file()))
+        counter = _counter
+        _counter_context.set(counter)
+    return counter
 
 
 def set_call_counter(counter: CallCounter | None) -> None:
     global _counter
     _counter = counter
+    _counter_context.set(counter)
 
 
 def reset_call_counter() -> None:

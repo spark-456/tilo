@@ -191,6 +191,61 @@ def test_FR_MTG_09_capture_log_boundary_restores_state_and_catches_lazy_loggers(
     assert [record.message for record in caplog.records] == ["operational after cleanup"]
 
 
+def test_FR_MTG_09_cloud_keeps_late_worker_logs_private_after_capture(monkeypatch, caplog):
+    import logging
+
+    from bot.cloud_worker import quiet_capture
+
+    monkeypatch.setenv("TILO_CLOUD_CAPTURE", "1")
+    handlers = set(logging.root.handlers)
+    if logging.lastResort is not None:
+        handlers.add(logging.lastResort)
+    before = {handler: list(handler.filters) for handler in handlers}
+    try:
+        with caplog.at_level(logging.WARNING):
+            with quiet_capture():
+                pass
+            logging.getLogger("bot.session").warning("private late SDK completion")
+        assert not caplog.records
+    finally:
+        for handler, filters in before.items():
+            handler.filters[:] = filters
+
+
+def test_FR_MTG_09_old_provider_thread_keeps_its_meeting_counter(monkeypatch):
+    from tilo_providers.meeting import CallCounter, MeetingCaps
+
+    from bot import providers
+
+    providers.reset_call_counter()
+    first, second = CallCounter(MeetingCaps(1, 1)), CallCounter(MeetingCaps(2, 2))
+    import threading
+
+    entered, release = threading.Event(), threading.Event()
+
+    def old_work():
+        entered.set()
+        release.wait(2)
+        assert providers.call_counter() is first
+        assert providers.take_call("model")
+
+    async def check():
+        providers.set_call_counter(first)
+        work = asyncio.create_task(asyncio.to_thread(old_work))
+        while not entered.is_set():
+            await asyncio.sleep(0)
+        providers.set_call_counter(second)
+        release.set()
+        await work
+        assert providers.call_counter() is second and second.used["model"] == 0
+
+    try:
+        asyncio.run(check())
+    finally:
+        release.set()
+        providers.reset_call_counter()
+
+
 def test_FR_MTG_09_disconnected_caller_cancels_and_awaits_browser_cleanup():
     from bot.cloud_run import attend_while_connected
 
