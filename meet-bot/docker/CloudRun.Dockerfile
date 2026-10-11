@@ -27,6 +27,7 @@ ENV TILO_REPO_ROOT=/opt/tilo \
 WORKDIR /app
 COPY --chown=pwuser:pwuser meet-bot/bot /app/bot
 COPY --chown=pwuser:pwuser meet-bot/docker/cloud_entrypoint.py /cloud_entrypoint.py
+COPY --chown=pwuser:pwuser meet-bot/docker/cloud_smoke.py /cloud_smoke.py
 USER pwuser
 EXPOSE 8080
 ENTRYPOINT ["python3", "/cloud_entrypoint.py"]

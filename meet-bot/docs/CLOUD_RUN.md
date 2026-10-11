@@ -2,8 +2,9 @@
 
 Status: offline implementation, not a demonstrated live Meet. No infrastructure has
 been applied and no paid calls have run. The bot image has not built locally because
-Docker Desktop's daemon does not respond. Cloud Build below is an alternative **the
-user runs**, with its normal build charges. Review the PRs first.
+Docker Desktop's daemon does not respond. The coordinator directs the agent to
+build through Cloud Build below; infrastructure apply and live switches stay with
+the user. Review the PRs before enabling live attendance.
 
 ## Prerequisites
 
@@ -15,8 +16,8 @@ user runs**, with its normal build charges. Review the PRs first.
   Existing Terraform variables and backend must already identify that project.
 - Deploy the current API and connectors images through the existing
   `just deploy-dev-cloudbuild api dev` and `just deploy-dev-cloudbuild connectors dev`
-  flow after infrastructure is applied. The coordinator's deployment stub and held
-  production wiring PRs must be resolved before these commands can work.
+  flow. The coordinator is resolving the production wiring PRs and uses this
+  route; `just deploy dev` is a refusing stub and should not be used.
 - The authenticated API needs its existing durable world/people/artifact stores,
   owner sign-in, App Check and screening configuration. Preserve those settings;
   this bot change does not replace the existing production rollout.
