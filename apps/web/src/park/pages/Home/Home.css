@@ -933,3 +933,30 @@
   flex: 1;
   min-width: 0;
 }
+[data-park] .park-home-intake {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+  color: var(--ink2);
+  font-size: 0.875rem;
+}
+[data-park] .park-home-intake__label {
+  font-size: 0.75rem;
+}
+[data-park] .park-home-intake__status {
+  background: var(--chip);
+  border-radius: 0.5rem;
+  padding: 0.25rem 0.5rem;
+}
+[data-park] .park-home-intake textarea {
+  width: 100%;
+  box-sizing: border-box;
+  background: var(--field);
+  color: var(--ink);
+}
+[data-park] .park-home-intake ul {
+  max-height: 12rem;
+  overflow-y: auto;
+  overflow-wrap: anywhere;
+}

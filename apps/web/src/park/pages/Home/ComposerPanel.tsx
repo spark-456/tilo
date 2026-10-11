@@ -4,6 +4,7 @@
 // under the panel is the one element the design does not have.
 import type { Effort, QuickCost, SwitchReason } from "../../api/types";
 import { type SegmentOption, SegmentedControl } from "../../components";
+import { type IntakeClient, IntakeControl } from "./IntakeControl";
 import { EFFORTS, type Mode, SWITCH_WORDS, quickCostLine } from "./homeData";
 
 export type Phase = "idle" | "drafting" | "plan";
@@ -76,6 +77,8 @@ function QuickCard({
 }
 
 export interface ComposerProps {
+  /** I6: absent until an upload route and transport are available. */
+  readonly intakeClient?: IntakeClient;
   readonly mode: Mode;
   readonly modes: readonly Mode[];
   readonly query: string;
@@ -186,28 +189,30 @@ export function ComposerPanel(p: ComposerProps) {
         </div>
       ) : null}
       <div className="park-home-panel park-home-glass">
-        <div className="park-home-input-row">
-          <div className="park-home-logo">
-            <div className="park-home-logo__face">
-              <div className="park-home-logo__dot" />
-              <div className="park-home-logo__dot" />
+        <IntakeControl client={p.intakeClient}>
+          <div className="park-home-input-row">
+            <div className="park-home-logo">
+              <div className="park-home-logo__face">
+                <div className="park-home-logo__dot" />
+                <div className="park-home-logo__dot" />
+              </div>
             </div>
+            <input
+              className="park-home-input"
+              type="text"
+              aria-label="Describe your task"
+              value={p.query}
+              placeholder={`e.g. ${mode.example}`}
+              onChange={(e) => p.onQuery(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") p.onDraft();
+              }}
+            />
+            <button type="button" className="park-home-start" onClick={p.onDraft}>
+              {quickMode ? "Ask" : mode.start}
+            </button>
           </div>
-          <input
-            className="park-home-input"
-            type="text"
-            aria-label="Describe your task"
-            value={p.query}
-            placeholder={`e.g. ${mode.example}`}
-            onChange={(e) => p.onQuery(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") p.onDraft();
-            }}
-          />
-          <button type="button" className="park-home-start" onClick={p.onDraft}>
-            {quickMode ? "Ask" : mode.start}
-          </button>
-        </div>
+        </IntakeControl>
         <div className="park-home-mode-row">
           <div className="park-home-size">
             <SegmentedControl
