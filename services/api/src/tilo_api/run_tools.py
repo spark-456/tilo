@@ -23,6 +23,7 @@ from tilo_providers.safety import SafetyProvider
 
 from tilo_api.access import Mode
 from tilo_api.quiz_apps import source_loader
+from tilo_api.report_render import render_report
 from tilo_api.web_tools import FetchTool, RunArchiveBridge, SearchTool, fetch_service
 
 
@@ -164,6 +165,7 @@ class BoundRunRunner:
             quiz_sources=source_loader(owner.seams.artifacts, owner.scope, owner.store.events[owner.world_id]),
             meter=lambda role, _request, _reply: models[role].take_charge(),
             credit_cap=self.budget.left,
+            report_renderer=render_report,
         )
         return await runner.run(unit, context)
 

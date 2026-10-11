@@ -33,7 +33,7 @@ import asyncio
 import dataclasses
 import math
 import time
-from collections.abc import Callable, Iterable, Mapping, Sequence
+from collections.abc import Awaitable, Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Literal
 
@@ -133,6 +133,7 @@ class ToolUnitRunner:
         scope: str = "",
         today: Clock = real_today,
         quiz_sources: SourceLoader | None = None,
+        report_renderer: Callable[[str], Awaitable[UnitOutput]] | None = None,
     ) -> None:
         if tools and safety is None:
             raise ValueError("LW-07: a runner with tools needs a SafetyProvider; every tool result is screened")
@@ -148,6 +149,7 @@ class ToolUnitRunner:
         self._clock = clock
         self._today = today
         self._quiz_sources = quiz_sources
+        self._report_renderer = report_renderer
         self._scope = scope  # org/world/run: part of every cache key, so a hit is always this run's own
 
     async def run(self, unit: Mapping[str, Any], context: UnitContext) -> UnitOutcome:
@@ -195,7 +197,11 @@ class ToolUnitRunner:
                     return self._finish(UnitOutcome(False, f"No result for {unit['title']}."), loop, "no_text")
                 try:  # LW-10: a PDF deliver unit's reply is a DeliverableSpec, rendered here; any flaw fails the unit
                     output = (
-                        await asyncio.to_thread(render_output, response.text)
+                        (
+                            await self._report_renderer(response.text)
+                            if self._report_renderer is not None
+                            else await asyncio.to_thread(render_output, response.text)
+                        )
                         if wants_pdf(unit, context.brief)
                         else await asyncio.to_thread(quiz_output, response.text, self._quiz_sources)
                         if wants_quiz(unit, context.brief)
