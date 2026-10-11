@@ -70,9 +70,9 @@ def join_router(runtime: HostRuntime) -> APIRouter:
             return refused(status, "forbidden" if status == 403 else "unauthenticated")
         raw = bytearray()
         async for chunk in request.stream():
-            raw.extend(chunk)
-            if len(raw) > 2048:
+            if len(raw) + len(chunk) > 2048:
                 return refused(413, "invalid_request")
+            raw.extend(chunk)
         try:
             receipt = MeetingHostRpcReceipt.model_validate_json(raw)
         except ValidationError:

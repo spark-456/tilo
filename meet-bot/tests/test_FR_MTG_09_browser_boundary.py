@@ -11,6 +11,29 @@ from bot.captions import Utterance
 from bot.session import LiveSession
 
 
+def test_FR_MTG_09_repeated_warm_hints_keep_one_tracked_task():
+    async def check():
+        entered = asyncio.Event()
+
+        async def prepare():
+            entered.set()
+            await asyncio.Event().wait()
+
+        session = LiveSession.__new__(LiveSession)
+        session.fast = SimpleNamespace(prewarm=prepare)
+        session._prewarm()
+        await entered.wait()
+        original = session._preparation_task
+        try:
+            session._prewarm()
+            assert session._preparation_task is original
+        finally:
+            original.cancel()
+            await asyncio.gather(original, return_exceptions=True)
+
+    asyncio.run(check())
+
+
 def browser(tmp_path, email="bot@example.test"):
     cfg = SimpleNamespace(bot_email=email, debug_dir=tmp_path, profile_dir=tmp_path / "profile")
     return MeetBrowser(cfg)
