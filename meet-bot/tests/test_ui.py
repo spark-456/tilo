@@ -449,8 +449,12 @@ def test_VA_03_the_mic_is_opened_when_the_meeting_starts_and_rechecked(session):
 def test_FR_MTG_11_the_stt_final_time_of_a_question_is_kept_and_marked_on_its_turn(session):
     from bot.brain import _norm
     from bot.captions import Utterance
+    from bot.chat import intro_text
 
     s = session
+    s.br = FakeBrowser([[]])
+    assert run(s._post(intro_text(False, False, True), "intro"))
+    s.intro_sent = True
     u = Utterance("Ana", "Tilo, what is the plan for Hiring?", 5.0)
     s.record(u, heard_at=40.0, stt_final_at=41.2)
     (q,) = [s.brain.question_in(u)]
