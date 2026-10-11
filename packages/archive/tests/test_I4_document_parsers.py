@@ -24,7 +24,7 @@ def test_I4_zip_expansion_is_bytes_only_and_deterministic():
     assert expand_zip(data) == (("b.txt", b"two"), ("folder/a.txt", b"one"))
 
 
-@pytest.mark.parametrize("name", ["../x", "/x", "C:/x", "a\\x", "a/../x", "a//x", "a/./x"])
+@pytest.mark.parametrize("name", ["../x", "/x", "C:/x", "a\\x", "a/../x", "a//x", "a/./x", "a//"])
 def test_I4_zip_refuses_path_traversal(name):
     with pytest.raises(Refused, match="^unsafe_path$"):
         expand_zip(archive([(name, b"x")]))

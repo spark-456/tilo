@@ -56,7 +56,7 @@ class _Budget:
 
 
 def _path(name: str, limits: Limits) -> None:
-    parts = name.rstrip("/").split("/")
+    parts = name.removesuffix("/").split("/")
     if (
         any(part in ("", ".", "..") for part in parts)
         or any(character in name for character in ("\\", ":", "\x00"))
@@ -150,8 +150,11 @@ def _xml(data: bytes, limits: Limits) -> ET.Element:
         if depth > limits.xml_depth:
             raise Refused("xml_depth")
         for key, value in node.attrib.items():
+            value = value.strip()
             local = key.rsplit("}", 1)[-1].lower()
             if local == "contenttype" and "macroenabled" in value.lower():
+                raise Refused("active_content")
+            if local == "type" and any(marker in value.lower() for marker in ("vbaproject", "oleobject", "activex")):
                 raise Refused("active_content")
             if (
                 (local == "targetmode" and value.lower() == "external")
