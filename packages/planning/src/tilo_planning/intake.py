@@ -9,12 +9,15 @@ from datetime import UTC, datetime
 from pathlib import PurePosixPath
 from typing import Any
 
+from tilo_providers.errors import RequestError
 from tilo_providers.interfaces import SafetyProvider
+from tilo_providers.media import MediaPart, check_parts
 
 from tilo_planning.artifacts import InMemoryArtifactStore, new_ulid
 from tilo_planning.events import build_event as _event
 from tilo_planning.events import clip as _clip
 from tilo_planning.extraction import FILE_TYPES, Budget, ExtractionError, extract, file_type
+from tilo_planning.extraction import MAX_TEXT_CHARS as MAX_SOURCE_CHARS
 
 MAX_TEXT_CHARS = 4000
 MAX_FILES = 10
@@ -66,10 +69,61 @@ class IntakeResult:
     files: list[IntakeFileResult]
 
 
-def submit_intake(request: IntakeRequest, *, safety: SafetyProvider, store: InMemoryArtifactStore) -> IntakeResult:
+@dataclass(frozen=True)
+class ScreenedIntake:
+    request: IntakeRequest
+    names: list[str]
+    screened: list[tuple[str | None, str | None, bool, str | None]]
+    source_text: str
+    parts: list[MediaPart]
+
+
+def screen_intake(request: IntakeRequest, *, safety: SafetyProvider, director: bool = False) -> ScreenedIntake:
+    """Extract and screen without storing. Director inputs use existing provider media caps;
+    converted text shares the existing extraction character cap across this request."""
     names = _check_limits(request)
-    budget = Budget()  # one decompression budget for the whole request
-    screened = [_screen(n, f.content, safety, budget) for n, f in zip(names, request.files, strict=True)]
+    budget = Budget()
+    screened: list[tuple[str | None, str | None, bool, str | None]] = []
+    sources: list[str] = []
+    parts: list[MediaPart] = []
+    remaining = MAX_SOURCE_CHARS
+    for name, upload in zip(names, request.files, strict=True):
+        kind, mime_type, _magic = FILE_TYPES[PurePosixPath(name.lower()).suffix]
+        part = None
+        if director and kind == "native":
+            try:
+                part = MediaPart(mime_type=mime_type, data=upload.content)
+                check_parts([*parts, part])
+            except RequestError:
+                screened.append((None, "native file is unreadable or exceeds the provider media limits", False, None))
+                continue
+        text, error, flagged, reason = _screen(name, upload.content, safety, budget)
+        if director and error is None and not flagged:
+            if text is not None:
+                source = f"File: {name}\n{text}"
+                if len(source) > remaining:
+                    error = "converted text exceeds the intake context limit"
+                else:
+                    sources.append(source)
+                    remaining -= len(source)
+            elif part is not None:
+                parts.append(part)
+                sources.append(f"Native attachment {len(parts)}: {name}")
+        screened.append((text, error, flagged, reason))
+    return ScreenedIntake(request, names, screened, "\n\n".join(sources), parts)
+
+
+def submit_intake(
+    request: IntakeRequest,
+    *,
+    safety: SafetyProvider,
+    store: InMemoryArtifactStore,
+    prepared: ScreenedIntake | None = None,
+) -> IntakeResult:
+    prepared = prepared or screen_intake(request, safety=safety)
+    if prepared.request != request:
+        raise IntakeRejected("The screened files do not match the intake request.")
+    names, screened = prepared.names, prepared.screened
 
     task_id, world_id, run_id = f"t_{new_ulid()}", f"w_{new_ulid()}", f"r_{new_ulid()}"
     if request.files:

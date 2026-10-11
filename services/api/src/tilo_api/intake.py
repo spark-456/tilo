@@ -29,6 +29,7 @@ from tilo_planning.intake import (
     IntakeFile,
     IntakeRejected,
     IntakeRequest,
+    screen_intake,
     screen_task_text,
     submit_intake,
 )
@@ -114,10 +115,18 @@ async def intake(
             return await _quick(
                 http, request, principal.user_id, safety, model_router, allowance, flags, work_mode, scenario
             )
-        # The Director reads only the screened text, and runs before anything is stored: a failure leaves no
+        prepared = await run_in_threadpool(screen_intake, request, safety=safety, director=True)
+        # The Director reads only screened inputs, and runs before anything is stored: a failure leaves no
         # artifacts without a task (BQ-99).
         try:
-            extraction = await run_in_threadpool(extract_brief, text, router=model_router, today=today())
+            extraction = await run_in_threadpool(
+                extract_brief,
+                text,
+                router=model_router,
+                today=today(),
+                source_text=prepared.source_text,
+                parts=prepared.parts,
+            )
         except TaskRefused as refused:
             # FR-INT-12: configured text only (reason, nearest task, category); nothing stored, no further call.
             return JSONResponse(
@@ -144,7 +153,7 @@ async def intake(
             raise HTTPException(
                 status_code=503, detail="Deliverable choices are unavailable; nothing was stored."
             ) from exc
-        result = await run_in_threadpool(submit_intake, request, safety=safety, store=store)
+        result = await run_in_threadpool(submit_intake, request, safety=safety, store=store, prepared=prepared)
     except IntakeRejected as exc:
         await _abort_uploads(store)
         return _rejected(exc.reason)
