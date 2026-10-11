@@ -233,6 +233,10 @@ class ToolUnitRunner:
         self, role: str, base: str, allowed: Mapping[str, Tool], live: Mapping[str, Tool], loop: _Loop
     ) -> GenerateRequest:
         options = dict(self._options.get(role, {}))
+        parts = {part.sha256: part for part in (*(options.pop("parts", None) or ()), *loop.parts)}
+        check_parts(list(parts.values()))
+        if parts:
+            options["parts"] = list(parts.values())
         if not allowed:  # no tools for this unit: the prompt is the plain unit prompt
             return GenerateRequest(prompt=base, **options)
         listing = "\n".join(f"- {name}: {data_line(tool.description, 200)}" for name, tool in live.items())
@@ -248,7 +252,7 @@ class ToolUnitRunner:
             },
         )
         specs = [_spec(tool) for tool in live.values()]
-        return GenerateRequest(prompt=prompt, tools=specs or None, parts=loop.parts or None, **options)
+        return GenerateRequest(prompt=prompt, tools=specs or None, **options)
 
     async def _calls(self, calls: Sequence[Mapping[str, Any]], live: Mapping[str, Tool], loop: _Loop) -> None:
         """At most MAX_CALLS_PER_STEP calls are handled; the rest are one collapsed refusal (a hostile reply cannot

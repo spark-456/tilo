@@ -598,6 +598,8 @@ class Run:
         try:  # the run's own Scope and raw archive (ADR-0018 T4); never named by a request
             self.scope = scope = Scope(org_id=self.org_id, world_id=self.world_id, owner=self.owner)
             archive = self.seams.open_archive(org_id=self.org_id, run_id=self.run_id)
+            bind = getattr(self.seams.runner, "bind_run", None)
+            self._bound_runner = bind(self, archive) if bind is not None else self.seams.runner
         except Exception as exc:
             logger.warning("run %s: no artifact scope or archive (%s)", self.run_id, type(exc).__name__)
             self._fail("the run's item store could not be opened", None)
@@ -614,7 +616,7 @@ class Run:
                 writer=self,
                 config=config,
                 skills=self.seams.skills,
-                runner=self.seams.runner,
+                runner=self._bound_runner,
                 must_ask=must_ask,
                 question_wait=self.question_wait,
                 artifacts=self.seams.artifacts,
@@ -660,6 +662,9 @@ class Run:
         """The executor stored and announced the unit's items (ADR-0018 T4). A unit with actions stops at its gate (the
         item to send is its first announced version); a `deliver` unit with none delivers in Tilo. False fails it."""
         self.produced[unit["id"]] = [(unit, dict(ref), made) for ref, made in announced]
+        check_app = getattr(getattr(self, "_bound_runner", None), "before_handoff", None)
+        if check_app is not None and not await check_app(unit, worker, announced):
+            return False
         try:
             for action in unit["actions"]:
                 if not announced:
