@@ -24,6 +24,7 @@ RUN pip install --break-system-packages --ignore-installed typing_extensions -r 
 # packages exactly as in the repo (tilo_providers finds both four directories above its own files).
 COPY packages/contracts-py/src /opt/tilo/packages/contracts-py/src
 COPY packages/providers/src /opt/tilo/packages/providers/src
+COPY packages/redact/src /opt/tilo/packages/redact/src
 # Only what the bot's provider layer reads: the model, price, speech, voice and meeting-cap config, and the two
 # prompt templates it loads (the schema-repair prompt and the transcribe prompt).
 COPY config/models*.yaml /opt/tilo/config/
@@ -34,7 +35,7 @@ COPY config/meeting*.yaml /opt/tilo/config/
 COPY prompts/router /opt/tilo/prompts/router
 COPY prompts/speech /opt/tilo/prompts/speech
 ENV TILO_REPO_ROOT=/opt/tilo \
-    PYTHONPATH=/opt/tilo/packages/contracts-py/src:/opt/tilo/packages/providers/src
+    PYTHONPATH=/opt/tilo/packages/contracts-py/src:/opt/tilo/packages/providers/src:/opt/tilo/packages/redact/src
 
 # Profile volume mount point, owned by the non-root user so the named volume inherits it.
 RUN mkdir -p /profile /app && chown pwuser:pwuser /profile /app
