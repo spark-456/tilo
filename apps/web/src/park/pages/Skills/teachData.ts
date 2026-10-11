@@ -302,6 +302,18 @@ export const savedOverride = (owner: string): Partial<Skill> => ({
   owner,
 });
 
+/** SKILLS-3: what a saved skill shows on a live page: it has not run, so no count, rate or time is made up. */
+export const liveSavedOverride = (owner: string): Partial<Skill> => ({
+  st: "learning",
+  status: "live",
+  runs: 0,
+  rate: null,
+  last: "",
+  improved: "",
+  from: "",
+  owner,
+});
+
 /** A new skill for a person whose data holds no draft to start from. */
 export const blankSkill = (owner: string): Skill => ({
   id: "taught",

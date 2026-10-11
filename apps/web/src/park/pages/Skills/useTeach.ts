@@ -19,6 +19,7 @@ import {
   TRY_RUN_FIXTURE_EVENTS,
   type Trigger,
   blankSkill,
+  liveSavedOverride,
   savedOverride,
 } from "./teachData";
 
@@ -192,8 +193,13 @@ export function useTeach({
     if (!nm) return; // a skill with no name cannot be told apart in the library
     const skill: Skill = {
       ...(draft ?? blankSkill(user.name)),
-      ...savedOverride(user.name),
+      ...(source === "fixture" ? savedOverride(user.name) : liveSavedOverride(user.name)),
       name: nm,
+      draft: {
+        scope,
+        trigger: trig,
+        plan: PLAN.map((p, i) => ({ text: p.text, tool: p.tool, ask: ask[i] === true })),
+      },
     };
     const before = taught;
     setSaved(true);
