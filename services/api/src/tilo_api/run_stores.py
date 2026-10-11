@@ -22,7 +22,6 @@ from datetime import UTC, datetime
 from typing import Any
 
 from google.api_core import exceptions as gexc
-from google.cloud import firestore
 from tilo_archive import RunArchive
 from tilo_archive.archive import ORG_ID_RE, RUN_ID_RE
 from tilo_memory.artifacts import ArtifactStore
@@ -275,7 +274,9 @@ def redact_leaves(str_redactor: Callable[[str], str]) -> Callable[[Any], Any]:
 
 
 def _default_firestore(project: str) -> Any:
-    return firestore.Client(project=project)
+    from tilo_api.prod import firestore_client  # noqa: PLC0415
+
+    return firestore_client(project)
 
 
 def _default_storage(project: str) -> Any:

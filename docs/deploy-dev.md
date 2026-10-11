@@ -68,7 +68,8 @@ user-approved step, never from this workflow or recipe).
 | Infrastructure (services, IAM, ingress, env, secrets) | Terraform, applied by you (`infra/README.md`) | `infra/` |
 
 Cloud Build and the workflow only swap the image (pinned by digest) and passes `--min-instances 0` and
-`--max-instances` (3 for harness and channels, 1 for connectors until T7 and 2 for the rest, and 1 for `tilo-api`: one instance is the one writer, ADR-0026) on an existing service. It never sets ingress, IAM, env vars or secrets;
+`--max-instances` (harness and channels 3; connectors = 1 until T7; browser, render and sandbox-web 2;
+`tilo-api` 1: one instance is the one writer, ADR-0026) on an existing service. It never sets ingress, IAM, env vars or secrets;
 Terraform owns those and ignores image changes (`infra/modules/service`). Env vars are Terraform's for every service
 except `tilo-api` and `tilo-connectors`: those have `ignore_env = true`, so their `TILO_*` runtime settings are set by hand with
 `gcloud run services update` (`docs/routines-rollout.md`) and a Terraform run leaves them alone.

@@ -36,7 +36,7 @@ def test_PROD_WIRE_3_cloudbuild_deploys_api_with_one_max_instance(repo_root: pat
 
 
 def test_PROD_WIRE_3_the_other_services_keep_their_maximums(repo_root: pathlib.Path) -> None:
-    expected = {"harness": "3", "channels": "3", "connectors": "2", "browser": "2", "render": "2", "sandbox-web": "2"}
+    expected = {"harness": "3", "channels": "3", "connectors": "1", "browser": "2", "render": "2", "sandbox-web": "2"}
     for path in (".github/workflows/deploy-dev.yml", "cloudbuild.yaml"):
         text = (repo_root / path).read_text(encoding="utf-8")
         for service, value in expected.items():
