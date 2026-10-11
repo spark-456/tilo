@@ -76,6 +76,8 @@ Replay case `evals/web-cases/E-RES/E-RES-11.yaml` (a GATE-exam-style job: read p
 
 Figures below come from the prices file (`flash-38`: US$0.75 in, US$3.75 out per million tokens; 1 credit = US$0.005, so one credit buys about 1,333 output tokens) and the estimate function; no live call was made. "Expected" rows are arithmetic on stated token assumptions, not a measurement. **The live figure (target at most 5 credits for a simple full run) is unconfirmed: only `just live-run` with `LIVE=1`, run by you, can show it.** At these prices the target leaves room for roughly 3,000 output tokens (thinking included) across all Director calls plus one short document, so it holds only if the planning calls think little.
 
+The current low estimate is 3.46775 credits, rounded to 3.468: ADR-0029's user-approved regional rates add 10%, partly offset by using lite-31 for `lead_review` (supervisor ruling, 11 October 2026).
+
 | What | Run 2 / before | After this change |
 | --- | --- | --- |
 | Director calls (brief, approaches, plan), thinking | none sent: the model's default (dynamic, high) ran, billed as output | brief `low`, approaches `medium`, plan `medium`, sent by the planning code; the role's `high` is only the default for callers that set none |
@@ -84,7 +86,7 @@ Figures below come from the prices file (`flash-38`: US$0.75 in, US$3.75 out per
 | Writer, 1,500 output tokens, one call | n/a (it never finished) | about 1.6 credits |
 | Specialist order | flash-37 then lite-31 | lite-31 then flash-37 (cheapest first, EFF-02); `models.nim.yaml` already was |
 | Truncated calls in the meter | words counted, full cap quoted, and billed twice | input from the error's `input_tokens`, output plus thinking tokens as reported, else the provider's own count and the cap burned |
-| Estimate `credits_low` (3 Director calls, 3 writer, 1 lead, 1 narrator), for a 300-character brief (it grows with the brief: 3.61 at 1,000 characters) | 3.32 | 3.36 (the floor ignores thinking) |
+| Estimate `credits_low` (3 Director calls, 3 writer, 1 lead review, 1 narrator), for a 300-character brief (it grows with the brief) | 3.32 | 3.468 (the floor ignores thinking) |
 | Estimate `credits_high` (an explicit worst-case ceiling, not the Router's reserve: every call burns its whole cap: 6 Director, 8 writer, 3 lead, 1 narrator) | 88.5 (director 76.0, writer 9.8, lead 2.3, narrator 0.3) | 184.9 (director 76.0, writer 102.0, lead 6.0, narrator 0.8; unchanged by the reserve rule below) |
 | Pre-call reserve of a Director or writer call (16,384 cap, `flash-38`, 300-character brief) | input plus the full cap: about 12.5 credits, so late units were refused with `stopped_at_cap` | input plus 3,000 expected tokens: about 2.5 credits; refused only if that is over the credits left, or the 12.5-credit cap is over twice the credits left (so at least about 6.3 left) |
 
