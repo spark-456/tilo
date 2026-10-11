@@ -68,7 +68,7 @@ user-approved step, never from this workflow or recipe).
 | Infrastructure (services, IAM, ingress, env, secrets) | Terraform, applied by you (`infra/README.md`) | `infra/` |
 
 Cloud Build and the workflow only swap the image (pinned by digest) and passes `--min-instances 0` and
-`--max-instances 1..3` on an existing service (connectors = 1 until ticket T7, CON-D9). It never sets ingress, IAM, env vars or secrets;
+`--max-instances` (3 for harness and channels, 1 for connectors until T7 and 2 for the rest, and 1 for `tilo-api`: one instance is the one writer, ADR-0026) on an existing service. It never sets ingress, IAM, env vars or secrets;
 Terraform owns those and ignores image changes (`infra/modules/service`). Env vars are Terraform's for every service
 except `tilo-api` and `tilo-connectors`: those have `ignore_env = true`, so their `TILO_*` runtime settings are set by hand with
 `gcloud run services update` (`docs/routines-rollout.md`) and a Terraform run leaves them alone.
@@ -143,7 +143,7 @@ a flag or a shell command cannot be smuggled in through them.
 `cloudbuild.yaml` (repo root) has three steps: check `_SERVICE` (`all` or one of the seven short names, anything
 else fails with `unknown service`), build each image from `services/<svc>/Dockerfile` with the repo root as
 context and push it to `asia-southeast1-docker.pkg.dev/<project>/tilo/<svc>:<build id>`, then
-`gcloud run services update tilo-<svc> --image <repo>@sha256:<digest> --min-instances 0 --max-instances 1..3` (connectors = 1 until T7),
+`gcloud run services update tilo-<svc> --image <repo>@sha256:<digest> --min-instances 0 --max-instances <n>` (`tilo-api` is always `--max-instances 1`, ADR-0026; connectors stays 1 until T7, the others 2 or 3),
 after refusing any image reference that is not `asia-southeast1-docker.pkg.dev/<project>/tilo/<svc>@sha256:...`.
 The upload is an allowlist (`.gcloudignore`): only `pyproject.toml`, `uv.lock`, `.dockerignore`, `evals/pyproject.toml`
 and the `packages`, `services`, `config`, `contracts`, `prompts` and `templates` trees leave your machine, and secret
@@ -400,6 +400,25 @@ Local hosts (localhost, 127.0.0.1) never start it.
 Before you read the `tilo-api` log for refused or missing tokens, set `TILO_FIRESTORE_PROJECT` (or
 `GOOGLE_CLOUD_PROJECT`) on the `tilo-api` Cloud Run service: with neither set the verifier has no project and
 refuses every token, so the log would show every request as unverified.
+
+## Durable stores (PROD-WIRE, ADR-0026; run this yourself, only after you accept ADR-0026)
+
+tilo-api keeps its worlds, people and SEC-15 declarations in Firestore only when two runtime switches are set. They
+are `gcloud` env, not Terraform (tilo-api has `ignore_env = true`), so no apply turns them on by itself:
+
+1. Set `api_durable_stores = true` for the dev env and apply the Terraform plan: CPU stays allocated between
+   requests on the one tilo-api instance (`max_instance_count = 1` holds either way; this raises idle cost).
+2. Turn the stores on (`TILO_FIRESTORE_PROJECT` is already set by the routines rollout):
+
+```powershell
+gcloud run services update tilo-api --project essential-wares-510320-f0 --region asia-southeast1 `
+  --update-env-vars "TILO_API_STORE=firestore,TILO_PEOPLE_STORE=firestore"
+```
+
+3. Check `/health`, that the instance count stays at 1, and run the tilo-api env audit in
+   `docs/routines-rollout.md` ("Env drift check"). To switch back, `--remove-env-vars
+   TILO_API_STORE,TILO_PEOPLE_STORE` (the doors answer 503 `not_configured` again), then set
+   `api_durable_stores = false` and apply, so CPU is billed per request again.
 
 ## Never
 

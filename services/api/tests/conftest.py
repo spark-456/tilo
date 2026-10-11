@@ -292,6 +292,44 @@ def pytest_addoption(parser):
     parser.addoption("--outbox-emulator", action="store_true", default=False, help="run the outbox store emulator rig")
 
 
+# --- PROD-WIRE 3 (one Firestore client per process, the Firestore access store): see _pw3_lib.py ---------------
+
+
+@pytest.fixture(autouse=True)
+def _pw3_cold_client_cache():
+    """`tilo_api.prod` caches one client per project for the process: every test starts and ends with it empty (a
+    no-op until the module exists)."""
+    import _pw3_lib
+
+    _pw3_lib.reset_prod()
+    yield
+    _pw3_lib.reset_prod()
+
+
+@pytest.fixture()
+def pw3(monkeypatch: pytest.MonkeyPatch):
+    """A `_pw3_lib.Pw3`: no ambient config, a cold process, the real Firestore client replaced by a spy."""
+    import _pw3_lib
+
+    return _pw3_lib.make_pw3(monkeypatch)
+
+
+@pytest.fixture()
+def pw3_emulator(pw1b_emulator_host: str, monkeypatch: pytest.MonkeyPatch):
+    """The emulator (a `demo-` project, no credentials) with a cold process; `FIRESTORE_EMULATOR_HOST` stays set, the
+    real `firestore.Client` is NOT replaced, and no `K_SERVICE` is present (a laptop)."""
+    import _pw3_lib
+    from tilo_api import deps, durable_store
+
+    for name in _pw3_lib.AMBIENT:
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setenv("FIRESTORE_EMULATOR_HOST", pw1b_emulator_host)
+    monkeypatch.setattr(durable_store, "_opened", {})
+    deps.get_people_stores.cache_clear()
+    _pw3_lib.reset_prod()
+    return monkeypatch
+
+
 def pytest_collection_modifyitems(items):
     """PPL-11a: tests that need a slice B or C route are strict xfails until that slice lands (`SLICE_BC_PENDING`).
     PPL-11c: the same for each slice of the rest of the people API (`SLICE_PENDING`, API_PPL_11c.md section 0)."""

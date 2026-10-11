@@ -63,8 +63,9 @@ run "PRD_6_6_request_based_cpu_billing" {
   command = plan
 
   assert {
-    condition     = alltrue([for s in values(output.cloud_run_services) : s.cpu_idle == true])
-    error_message = "Every Cloud Run service must bill CPU only during request processing (PRD 6.6 lean infrastructure)."
+    # PROD-WIRE 3 (ADR-0026): tilo-api alone runs with cpu_idle = false (one writer instance; pinned in prod_wire_api.tftest.hcl).
+    condition     = alltrue([for name, s in output.cloud_run_services : s.cpu_idle == true if name != "api"])
+    error_message = "Every Cloud Run service except tilo-api must bill CPU only during request processing (PRD 6.6 lean infrastructure)."
   }
 }
 

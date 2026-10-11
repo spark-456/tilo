@@ -9,6 +9,11 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // SEC-15: a person's visitor-or-judge declaration (`tilo_api.prod.FirestoreAccessStore`). Server only.
+    match /orgs/{org}/access/{uid} {
+      allow read, write: if false;
+    }
+
     // Everything else: deny by default.
     match /{document=**} {
       allow read, write: if false;

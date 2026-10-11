@@ -31,6 +31,9 @@ variable "services" {
     # settings are set with `gcloud run services update`, docs/routines-rollout.md).
     # tilo-api and tilo-connectors; every other service has its env fully managed.
     ignore_env = optional(bool, false)
+    # false keeps CPU allocated between requests (background work); the
+    # default is request-based billing (PRD 6.6).
+    cpu_idle = optional(bool, true)
   }))
 }
 
