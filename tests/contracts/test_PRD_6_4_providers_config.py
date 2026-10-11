@@ -101,9 +101,9 @@ def test_PRD_6_4_models_yaml_is_marked_as_an_example(repo_root, models_yaml):
 
 def test_PL_06_prices_yaml_status_is_set_with_date_and_source(repo_root, prices_yaml):
     _, data = prices_yaml
-    assert data.get("status") == "set", "PL-06: config/prices.yaml carries the user-confirmed prices, status set"
-    assert data.get("effective_date") == "2026-09-24"
-    assert "ai.google.dev" in (data.get("source") or "") and "pricing" in data["source"]
+    assert data.get("status") == "set", "PL-06: config/prices.yaml carries the user-supplied prices, status set"
+    assert data.get("effective_date") == "2026-10-08"  # ADR-0029 draft (regional rates), was 2026-09-24
+    assert "Google price pages" in (data.get("source") or "") and "asia-southeast1" in data["source"]
 
 
 def test_PL_06_status_set_requires_every_value_date_and_source(repo_root, registry, prices_yaml):
@@ -122,14 +122,15 @@ def test_PL_06_status_set_requires_every_value_date_and_source(repo_root, regist
 
 
 def test_PL_06_confirmed_prices_and_credit_rate(repo_root, prices_yaml):
-    """User-confirmed 2026-10-04: USD per 1M tokens, Standard paid tier, promotional where noted."""
+    """User-supplied 2026-10-08 (ADR-0029 draft): USD per 1M tokens, asia-southeast1, Standard paid tier."""
     _, data = prices_yaml
     assert data["credit_usd"] == 0.005  # PRD 14.1: 1 credit = US$0.005
     assert data["currency"] == "USD"
     profiles = data["profiles"]
-    assert profiles["flash-38"] == {"input": 0.75, "output": 3.75}
-    assert profiles["flash-37"] == {"input": 0.75, "output": 3.75}
-    assert profiles["lite-31"] == {"input": 0.25, "output": 1.50}
+    promo = {"cached_input": 0.0825, "valid_until": "2026-12-31"}  # promotional through 2026-12-31 (ADR-0029 4)
+    assert profiles["flash-38"] == {"input": 0.825, "output": 4.125, **promo}
+    assert profiles["flash-37"] == {"input": 0.825, "output": 4.125, **promo}
+    assert profiles["lite-31"] == {"input": 0.275, "output": 1.65, "cached_input": 0.0275, "audio_input": 0.55}
     # Free NVIDIA NIM trial profiles and the dev fakes make no paid call (read from config, not hard-coded here).
     free_profiles = {"safety-fake"}
     for name in ("models.dev.yaml", "models.nim.yaml"):
