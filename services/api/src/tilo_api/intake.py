@@ -20,6 +20,7 @@ from starlette.concurrency import run_in_threadpool
 from tilo_metering.flags import FlagStore
 from tilo_planning.artifacts import InMemoryArtifactStore
 from tilo_planning.brief import BriefExtractionError, extract_brief
+from tilo_planning.deliverable_kinds import DeliverableKindsError, load_deliverable_kinds
 from tilo_planning.gaps import NothingPossible
 from tilo_planning.intake import (
     MAX_FILES,
@@ -122,13 +123,22 @@ async def intake(
             logger.warning("brief extraction failed: %s", type(exc.__cause__ or exc).__name__)
             deps.raise_if_model_unavailable(exc)
             raise HTTPException(status_code=502, detail="The Director could not draft a brief.") from exc
+        try:  # a bad kinds file stops the task before anything is stored, like a bad refusal list
+            kinds = await run_in_threadpool(load_deliverable_kinds)
+        except DeliverableKindsError as exc:
+            logger.error("deliverable kinds config unusable: %s", exc)
+            raise HTTPException(
+                status_code=503, detail="Deliverable choices are unavailable; nothing was stored."
+            ) from exc
         result = await run_in_threadpool(submit_intake, request, safety=safety, store=store)
     except IntakeRejected as exc:
         return _rejected(exc.reason)
     except (ProviderError, ProviderConfigError, ReplayMissError) as exc:
         logger.warning("safety screen failed: %s", type(exc).__name__)
         raise HTTPException(status_code=503, detail="The safety screen is unavailable; nothing was stored.") from exc
-    task_id, task = await run_in_threadpool(create_task, tasks, writer, result, extraction, scenario=scenario)
+    task_id, task = await run_in_threadpool(
+        create_task, tasks, writer, result, extraction, scenario=scenario, kinds=kinds
+    )
     body = asdict(result)  # per-file text and events stay server-side
     body["files"] = [{k: v for k, v in f.items() if k not in ("text", "events")} for f in body["files"]]
     questions = [
