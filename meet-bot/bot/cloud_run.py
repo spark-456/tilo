@@ -16,6 +16,28 @@ from tilo_contracts import MeetingJoin, Transcript
 from .events import remove_meet_links
 
 
+async def attend_while_connected(request: Request, attendance):
+    async def disconnected():
+        while True:
+            if (await request.receive())["type"] == "http.disconnect":
+                return
+
+    worker = asyncio.create_task(attendance)
+    connection = asyncio.create_task(disconnected())
+    try:
+        done, _ = await asyncio.wait({worker, connection}, timeout=3450, return_when=asyncio.FIRST_COMPLETED)
+        if worker in done:
+            return await worker
+        if connection in done:
+            raise ConnectionError("Caller disconnected")
+        raise TimeoutError
+    finally:
+        # A lost request must not leave a browser running while request-based CPU is suspended.
+        worker.cancel()
+        connection.cancel()
+        await asyncio.gather(worker, connection, return_exceptions=True)
+
+
 def create_app(*, attend=None, verifier=None, clock=None) -> FastAPI:
     if attend is None:
         from .cloud_worker import attend_meeting
@@ -75,7 +97,7 @@ def create_app(*, attend=None, verifier=None, clock=None) -> FastAPI:
         async with busy:
             try:
                 # Leave time for cleanup before Cloud Run's 3600s request deadline.
-                result = await asyncio.wait_for(attend(meeting_id, join.join_url), timeout=3450)
+                result = await attend_while_connected(request, attend(meeting_id, join.join_url))
                 transcript = Transcript.model_validate(remove_meet_links(result))
                 if transcript.meeting_id != meeting_id:
                     raise ValueError("wrong meeting")

@@ -172,3 +172,28 @@ def test_FR_MTG_09_worker_uses_guest_and_cleans_capture_files(monkeypatch, fail)
     assert cfg.guest and not cfg.record_audio and not cfg.auto_admit
     assert cfg.max_meeting_minutes == 50
     assert not cfg.out_dir.parent.exists()
+
+
+def test_FR_MTG_09_disconnected_caller_cancels_and_awaits_browser_cleanup():
+    from bot.cloud_run import attend_while_connected
+
+    async def check():
+        entered, cleaned = asyncio.Event(), asyncio.Event()
+
+        async def attendance():
+            try:
+                entered.set()
+                await asyncio.Event().wait()
+            finally:
+                cleaned.set()
+
+        async def disconnected():
+            await entered.wait()
+            return {"type": "http.disconnect"}
+
+        request = SimpleNamespace(receive=disconnected)
+        with pytest.raises(ConnectionError):
+            await attend_while_connected(request, attendance())
+        assert cleaned.is_set()
+
+    asyncio.run(check())
