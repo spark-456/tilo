@@ -396,7 +396,10 @@ def test_PROD_WIRE_2b_seams_still_refuse_when_deployed_with_no_config_and_no_run
 
 
 def test_PROD_WIRE_2b_seams_refuse_while_the_redactor_does_not_exist_and_build_no_client(monkeypatch):
-    monkeypatch.setattr(deps, "get_redactor", REAL_GET_REDACTOR)  # refuses until FR-MEM-05 (BQ-109) lands
+    def unavailable_redactor():
+        raise NotImplementedError("no redactor configured")
+
+    monkeypatch.setattr(deps, "get_redactor", unavailable_redactor)
     fs, st = patch_clients(monkeypatch)
     deploy(monkeypatch, LIVE)
     for seam in (deps.get_artifact_store, deps.get_run_archive):
