@@ -111,7 +111,7 @@ def test_PROD_WIRE_5a_ADR_0018_a_ledger_document_of_another_org_never_changes_th
     before = client.get(f"/worlds/{A1}/costs")
     stray = firestore_ledger()(fsx.client, org_id="org_other")
     for n, entry in enumerate(fsx.entries):
-        stray.append(replace(entry, credits=(entry.credits or 0) + 1000), entry_id=f"s{n:04d}")
+        stray.append(replace(entry, org="org_other", credits=(entry.credits or 0) + 1000), entry_id=f"s{n:04d}")
     after = client.get(f"/worlds/{A1}/costs")
     assert after.status_code == 200 and after.content == before.content
 

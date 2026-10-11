@@ -245,3 +245,38 @@ def test_PROD_WIRE_5a_the_only_derived_event_id_belongs_to_a_zero_credit_event()
 
 def test_PROD_WIRE_5a_the_door_backoff_marker_is_named_for_the_door_not_the_access_store():
     assert hasattr(deps, "_door_retry_at") and not hasattr(deps, "_access_retry_at")
+
+
+# --- security round 2 follow-ups ------------------------------------------------------------------------------
+
+
+def test_PROD_WIRE_5a_append_refuses_an_entry_of_another_org_before_any_client_call():
+    client = LedgerClient()
+    ledger = firestore_ledger()(client, "org_tilo")
+
+    with pytest.raises(ValueError):
+        ledger.append(make_entry(org="org_other"), entry_id="e_other_org")
+
+    assert client.ops == [], "nothing is written that entries() would then skip (the cost silently lost)"
+
+
+def test_PROD_WIRE_5a_the_read_back_after_already_exists_has_its_own_bounded_retry():
+    client = LedgerClient()
+    ledger = firestore_ledger()(client, "org_tilo")
+    entry = make_entry()
+    ledger.append(entry, entry_id="e_read_back")
+    seen: list[dict] = []
+    real_get = Ref.get
+
+    def spy_get(self, *args, **kwargs):
+        seen.append(kwargs)
+        return real_get(self, *args, **kwargs)
+
+    Ref.get = spy_get
+    try:
+        ledger.append(entry, entry_id="e_read_back")  # AlreadyExists, then the read-back
+    finally:
+        Ref.get = real_get
+
+    assert seen and "retry" in seen[0] and seen[0]["retry"] is not None, "the read-back passes its own retry"
+    assert 0 < seen[0]["timeout"] <= 5.0

@@ -44,7 +44,7 @@ def test_PROD_WIRE_5a_FR_MTR_10_get_ledger_reads_the_firestore_entries_of_org_ti
     assert list(got) == [a, b] and all(isinstance(e, LedgerEntry) for e in got)
     firestore_ledger()(client).append(make_entry(run="r_c", at=AT + timedelta(minutes=2)), entry_id="id_c")
     assert [e.run for e in deps.get_ledger()] == ["r_a", "r_b", "r_c"], "a later entry is seen at once"
-    firestore_ledger()(client, org_id="org_other").append(make_entry(run="r_theirs"), entry_id="id_x")
+    firestore_ledger()(client, org_id="org_other").append(make_entry(run="r_theirs", org="org_other"), entry_id="id_x")
     assert [e.run for e in deps.get_ledger()] == ["r_a", "r_b", "r_c"], "ADR-0018 T4: org_tilo only"
     assert deps.ORG_ID == "org_tilo"
 

@@ -261,6 +261,8 @@ class FirestoreLedger:
     def append(self, entry: LedgerEntry, *, entry_id: str) -> None:
         if not isinstance(entry_id, str) or _ENTRY_ID.fullmatch(entry_id) is None:
             raise ValueError("an entry id is 1 to 128 letters, digits, underscores or hyphens")
+        if entry.org != self._org:  # entries() would skip it: refused here, before any write
+            raise ValueError("the entry's org is not this ledger's org")
         body = _encode(entry)
         ref = self._client.document(f"orgs/{self._org}/ledger/{entry_id}")
         end = time.monotonic() + _CREATE_TIMEOUT_S
@@ -273,7 +275,8 @@ class FirestoreLedger:
                     ref.create(body, retry=_create_retry(remaining), timeout=remaining)
                     return
                 except gexc.AlreadyExists:
-                    snapshot = ref.get(timeout=max(end - time.monotonic(), 0.05))
+                    left = max(end - time.monotonic(), 0.05)
+                    snapshot = ref.get(retry=_create_retry(left), timeout=left)  # held to the same budget
                     try:
                         held = _decode(snapshot.to_dict() if snapshot.exists else None, self._org)
                     except (ValueError, TypeError):
