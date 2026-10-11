@@ -878,3 +878,11 @@
     white-space: normal;
   }
 }
+[data-park] .park-world-proposals {
+  padding: var(--space-4);
+  color: var(--ink);
+}
+[data-park] .park-world-proposals pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}

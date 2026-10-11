@@ -19,6 +19,7 @@ import {
 } from "../../api/ClientProvider";
 export { endSession } from "../../api/signOut"; // FR-UX-10: the shell's Sign out, through the one api seam
 export { useSessionAuth } from "../../api/sessionAuth"; // FR-UX-10: who is signed in, for the account menu
+import { HttpClient } from "../../api/http";
 import { API_METHODS, type Api, type ApiMethod } from "../api/index";
 import { withToday } from "../api/sampleDates";
 import { parkApi, withSession } from "../api/select";
@@ -30,6 +31,7 @@ import { type ParkStore, type Schedule, createParkStore, realSchedule } from "./
 
 export interface ParkProviderProps {
   api?: Api;
+  worldClient?: HttpClient | null;
   navigate?: (to: string) => void;
   schedule?: Schedule;
   viewport?: Viewport;
@@ -39,6 +41,7 @@ export interface ParkProviderProps {
 interface Held {
   store: ParkStore;
   api: Api;
+  worldClient: HttpClient | null;
   schedule: Schedule;
   /** The default Api is the fixture one, so every page will read sample data (no injected Api, no url). */
   expectsSample: boolean;
@@ -81,7 +84,14 @@ const EMPTY_PINS: AppCtx["pins"] = [];
 const NO_RAW_PINS: readonly Pin[] = [];
 const windowSize = () => ({ vw: window.innerWidth, vh: window.innerHeight });
 
-export function ParkProvider({ api, navigate, schedule, viewport, children }: ParkProviderProps) {
+export function ParkProvider({
+  api,
+  worldClient,
+  navigate,
+  schedule,
+  viewport,
+  children,
+}: ParkProviderProps) {
   const [held] = useState<Held>(() => {
     // SEC-10, SEC-15: the live Api's requests carry the App Check token and the sign-in token; none on local hosts or in fixture mode.
     const built = api ?? parkApi({ VITE_TILO_API_URL: API_URL }, appCheckToken, authToken);
@@ -100,6 +110,12 @@ export function ParkProvider({ api, navigate, schedule, viewport, children }: Pa
       store,
       api: wrapped,
       schedule: timer,
+      worldClient:
+        worldClient !== undefined
+          ? worldClient
+          : api === undefined && API_URL?.trim() && !sessionView.demo()
+            ? new HttpClient({ baseUrl: API_URL, appCheckToken, authToken })
+            : null,
       expectsSample: api === undefined && (!API_URL || sessionView.demo()),
     };
   });
@@ -137,6 +153,8 @@ function useHeld(): Held {
 
 export const useParkStore = (): ParkStore => useHeld().store;
 export const useParkApi = (): Api => useHeld().api;
+/** World-specific routes share the existing authenticated client; demo sessions have none. */
+export const useWorldClient = (): HttpClient | null => useHeld().worldClient;
 /** The provider's timer: a page that waits (the Home composer's 900 ms) goes through it, never setTimeout. */
 export const useSchedule = (): Schedule => useHeld().schedule;
 
