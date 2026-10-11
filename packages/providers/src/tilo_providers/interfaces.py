@@ -153,6 +153,12 @@ class SpeechProvider(ABC):  # FR-INT-14, FR-CHN-16: voice intake transcription; 
         transcribe-only provider still conforms; it says so instead of guessing."""
         raise NotConfigured("FR-MTG-11: this speech provider cannot synthesize speech")
 
+    def synthesize_stream(self, text: str, *, voice: str | None = None, **kwargs: Any) -> Iterator[bytes]:
+        """FR-MTG-11: the same PCM as `synthesize`, handed on in pieces as the service produces them, so a caller can
+        start playing at the first piece (every piece an even number of bytes). The default is one piece: a provider
+        that cannot stream still works; a streaming one (cloud_tts_adapter) overrides it."""
+        yield self.synthesize(text, voice=voice, **kwargs)
+
 
 class RenderProvider(ABC):  # PRD 12.4: PDF/PPTX deliverables rendered from templates
     @abstractmethod

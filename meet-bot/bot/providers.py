@@ -26,6 +26,7 @@ import logging
 import os
 import time
 from collections.abc import AsyncIterator, Callable
+from contextvars import ContextVar
 from pathlib import Path
 from typing import Any
 
@@ -41,7 +42,7 @@ from .brain import Busy, LLMUnavailable
 from .config import ROOT
 from .guards import BotRefused, recording_refusal
 from .llm_fast import CallCapReached, ModelCallError
-from .tts import FallbackTTS, LocalTTS, TTSError, TTSProvider
+from .tts import STT_END_AT, FallbackTTS, LocalTTS, TTSError, TTSProvider
 
 log = logging.getLogger("bot.providers")
 BRAIN_ROLE = "meeting"
@@ -93,19 +94,25 @@ def fixtures_dir() -> Path:
 
 # -- the per-meeting call cap ----------------------------------------------------------------------------------------
 _counter: CallCounter | None = None
+_counter_context: ContextVar[CallCounter | None] = ContextVar("meeting_call_counter", default=None)
 
 
 def call_counter() -> CallCounter:
-    """The one counter of this bot process (one process is one meeting), built from `config/meeting.yaml`."""
+    """The request's counter. Executor threads inherit it even if a later request resets the process default."""
     global _counter
-    if _counter is None:
-        _counter = CallCounter(load_meeting_caps(meeting_file()))
-    return _counter
+    counter = _counter_context.get()
+    if counter is None:
+        if _counter is None:
+            _counter = CallCounter(load_meeting_caps(meeting_file()))
+        counter = _counter
+        _counter_context.set(counter)
+    return counter
 
 
 def set_call_counter(counter: CallCounter | None) -> None:
     global _counter
     _counter = counter
+    _counter_context.set(counter)
 
 
 def reset_call_counter() -> None:
@@ -328,13 +335,20 @@ class ProviderSpeech:
 # -- the voice (text to speech) -------------------------------------------------------------------------------------
 class ProviderTTS:
     """`tts.TTSProvider` on `SpeechProvider.synthesize`. The vendor, voice and sample rate are `config/voice.yaml`.
-    The provider returns the whole reply as PCM, so the first chunk arrives when synthesis ends (streamed voice is
-    FR-MTG-16); the chunks are then handed on at the player's pace. Refusals that cannot clear within the meeting
+    The provider streams the reply (`synthesize_stream`): the first piece is handed on the moment the service sends it
+    (a provider that cannot stream sends the whole reply as one piece), cut to the player's chunk size, and the text-in
+    to first-audio latency is logged (counts only). Refusals that cannot clear within the meeting
     (no live switch, a refused request) are `permanent`, so the fallback voice takes over for the rest of it."""
 
     name = "provider-voice"
 
-    def __init__(self, provider: SpeechProvider | None = None, config: VoiceConfig | None = None) -> None:
+    def __init__(
+        self,
+        provider: SpeechProvider | None = None,
+        config: VoiceConfig | None = None,
+        clock: Callable[[], float] = time.monotonic,
+    ) -> None:
+        self._clock = clock
         self.config = config or load_voice_config(voice_file(), models_path=repo_root() / "config" / "models.yaml")
         self.provider = provider or build_voice_provider(self.config, fixtures_dir=fixtures_dir())
         self.sample_rate = self.config.sample_rate
@@ -345,16 +359,34 @@ class ProviderTTS:
             raise TTSError(
                 "the meeting's speech call cap is reached (config/meeting.yaml)", permanent=True, remember=False
             )
+        started, first_ms, end = self._clock(), None, object()
+        pieces: Any = None
         try:
-            pcm = await asyncio.to_thread(self.provider.synthesize, spoken)
-        except Exception as error:
-            cause = _cause(error)
-            raise TTSError(
-                f"the voice could not speak ({type(cause).__name__})",
-                permanent=isinstance(cause, NotConfigured | RequestError),
-            ) from None
-        for start in range(0, len(pcm), 4800):
-            yield pcm[start : start + 4800]
+            while True:
+                try:
+                    if pieces is None:  # a refused request (no live switch, a bad voice) raises here, before audio
+                        pieces = await asyncio.to_thread(lambda: iter(self.provider.synthesize_stream(spoken)))
+                    pcm = await asyncio.to_thread(next, pieces, end)
+                except Exception as error:
+                    cause = _cause(error)
+                    raise TTSError(
+                        f"the voice could not speak ({type(cause).__name__})",
+                        permanent=isinstance(cause, NotConfigured | RequestError),
+                    ) from None
+                if pcm is end:
+                    return
+                if first_ms is None:  # FR-MTG-11: text in to first audio out, counts only (never the text)
+                    now = self._clock()
+                    first_ms = (now - started) * 1000
+                    stt_end = STT_END_AT.get()  # when the turn's speech-to-text result came back (bot clock), if known
+                    since_stt = "" if stt_end is None else f" stt_end_to_first_audio_ms={(now - stt_end) * 1000:.0f}"
+                    log.info("voice latency: characters=%d first_audio_ms=%.0f%s", len(spoken), first_ms, since_stt)
+                for start in range(0, len(pcm), 4800):
+                    yield pcm[start : start + 4800]
+        finally:
+            close = getattr(pieces, "close", None)
+            if callable(close):
+                close()
 
 
 def make_tts() -> TTSProvider | None:

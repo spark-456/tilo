@@ -100,7 +100,12 @@ def _load_version(path: str | Path) -> _Version:
             if p.valid_until is not None and v.effective_date is not None and p.valid_until < v.effective_date:
                 raise ValueError(f"profile {name!r}: valid_until {p.valid_until} is before effective_date")
         flat = [x for r in rates.values() for x in (r.input, r.output)]
-        [number(v) for r in rates.values() for v in (r.cached_input, r.per_1k, r.audio_input) if v is not None]
+        [
+            number(value)
+            for r in rates.values()
+            for value in (r.cached_input, r.per_1k, r.audio_input)
+            if value is not None
+        ]
         [number(value) for value in (v.credit_usd, *flat) if value is not None]
     except (ValueError, RecursionError) as exc:  # ValidationError is a ValueError
         raise MeteringConfigError(f"{path}: not a valid prices file: {exc}") from exc

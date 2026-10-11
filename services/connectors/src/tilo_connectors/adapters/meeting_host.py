@@ -9,11 +9,12 @@ conference status: the Meet link is stored nowhere (FR-MTG-01). No log line; mes
 
 from __future__ import annotations
 
+import re
 from collections.abc import Callable, Mapping
 from typing import Any
 
 from .._time import parse_ts
-from ..errors import AdapterError, PossiblySent, SideEffectRefused
+from ..errors import AdapterError, MeetingHostRefused, PossiblySent, ProviderUnavailable, RateLimited, SideEffectRefused
 from ..meeting_host import (
     ACTION_TYPE,
     CALENDAR_EVENTS_OWNED,
@@ -30,6 +31,8 @@ from ._transport import ArtifactSource
 
 EVENTS_URL = "https://www.googleapis.com/calendar/v3/calendars/primary/events"
 EVENT_FIELDS = "id,status,conferenceData(createRequest(status(statusCode)))"  # never hangoutLink
+JOIN_FIELDS = "status,hangoutLink"
+JOIN_LINK = re.compile(r"https://meet\.google\.com/[a-z]{3}-[a-z]{4}-[a-z]{3}")
 _CONFERENCE_STATUSES = ("pending", "success", "failure")
 _DRAFT_TEXT_KEYS = ("meeting_id", "owner", "title", "start", "end", "time_zone")
 
@@ -87,6 +90,32 @@ class MeetingHostAdapter(GoogleAdapter):
             sleep=sleep,
         )
         self._receipts = receipts
+
+    def join_link(self, owner: str, event_ref: str) -> str:
+        """MJ-03/04: one narrow read on the host grant; the capability is returned only."""
+        if re.fullmatch(r"[0-9a-f]{32}", event_ref) is None:
+            raise MeetingHostRefused("MH-20", "not joinable")
+        try:
+            answer = self._json(
+                owner,
+                [CALENDAR_EVENTS_OWNED],
+                "GET",
+                f"{EVENTS_URL}/{event_ref}",
+                params={"fields": JOIN_FIELDS},
+                patient=False,
+            )
+        except RateLimited:
+            raise ProviderUnavailable("Calendar unavailable") from None
+        except AdapterError as error:
+            if error.status in (404, 410):
+                raise MeetingHostRefused("MH-20", "not joinable") from None
+            raise
+        if answer.get("status") == "cancelled":
+            raise MeetingHostRefused("MH-20", "not joinable")
+        link = answer.get("hangoutLink")
+        if not isinstance(link, str) or JOIN_LINK.fullmatch(link) is None:
+            raise MeetingHostRefused("MH-21", "no join link")
+        return link
 
     def execute_side_effect(self, entry: Mapping[str, Any], grant: Grant) -> dict[str, Any]:
         self._check_grant(entry, grant)  # MissingGrant before anything is read

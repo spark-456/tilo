@@ -2,6 +2,20 @@
 
 A bot that joins a Google Meet like a person, reads the live captions, tracks your agenda with a model (through Tilo's provider layer), and occasionally asks a short question in the Meet chat.
 
+The signed-in path requires `BOT_GOOGLE_EMAIL` to match the dedicated bot account exactly. Set it yourself in the
+environment; replace the old account example when preparing your configuration. An unreadable or different account
+refuses to join. Sign in manually; the bot never types credentials. Signed-in Chromium runs with its sandbox enabled.
+
+`BOT_JOIN_MODE=guest` uses a fresh ephemeral browser context with no stored profile or account. Set
+`BOT_DISPLAY_NAME` for the name shown when requesting admission; a human host admits it. Cloud Run refuses
+signed-in mode before launching Chromium. Guest mode disables the Chromium sandbox for the Cloud Run runtime;
+it never holds a signed-in browser session. The dedicated signed-in profile remains the local fallback.
+
+The bot joins an existing approved meeting and never creates a call or admits participants. It posts its disclosure
+before starting audio or captions; a failed disclosure leaves without capture. Any participant can say or type
+`Tilo leave` to stop it. Browser screenshots and DOM dumps are disabled because they can contain account information
+or the Meet capability. Meet links are removed from local transcript text, events and formatted logs.
+
 > **Test meetings only.** Meeting content goes nowhere except local files (`out/`) and the Google models the provider layer calls. Until Google's data terms for that use have been reviewed, do not use real or sensitive meetings.
 >
 > **Terms note.** Automated browser clients for Google Meet may have terms-of-service implications. Review them before any commercial use.

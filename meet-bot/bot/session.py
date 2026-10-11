@@ -25,7 +25,9 @@ from .captions import CaptionMerger, CaptionReader, TranscriptStore, Utterance
 from .chat import ChatPoster, intro_text
 from .clock import SystemClock
 from .config import ROOT, Config
-from .events import EventSink
+from .control import stop_requested
+from .events import EventSink, remove_meet_links
+from .guards import BotRefused
 from .hybrid import (
     AudioBuffer,
     CaptionSpans,
@@ -43,6 +45,7 @@ from .providers import ProviderFastClient, ProviderLLM, ProviderSpeech, make_rou
 from .speaker import NullSpeaker, VoiceSpeaker
 from .timing import Timeline
 from .trace import Turn, TurnTrace
+from .tts import STT_END_AT
 
 log = logging.getLogger("bot.session")
 STATUS_EVERY_S = 3.0  # how often to check who is here before the meeting has started for the bot
@@ -151,6 +154,7 @@ class LiveSession:
         self.gate_at: float | None = None
         self.ignore = {"you", (cfg.bot_display_name or "").lower()}
         self.first_seen: dict[str, float] = {}
+        self.stt_final: dict[str, float] = {}  # FR-MTG-11: question -> clock time its STT result came back
         self.own_texts: set[str] = set()
         self.spans = CaptionSpans()
         self.buffer = AudioBuffer()
@@ -174,6 +178,7 @@ class LiveSession:
         self.bot_tap: WavTap | None = None
         self.others_seen, self.alone_since = False, None
         self.last_wait_msg, self.intro_sent = None, False
+        self.leave_requested = False
 
     def _build_fast(self) -> FastLLM:
         """One long-lived async client for direct answers; every attempt lands in latency.jsonl."""
@@ -189,8 +194,11 @@ class LiveSession:
         """Open the model connection because a question is likely (rate limited inside FastLLM)."""
         if self.fast is None:
             return
+        pending = getattr(self, "_preparation_task", None)
+        if pending is not None and not pending.done():
+            return
         try:
-            asyncio.get_running_loop().create_task(self.fast.prewarm())
+            self._preparation_task = asyncio.get_running_loop().create_task(self.fast.prewarm())
         except RuntimeError:  # no running loop (offline tools): nothing to warm
             pass
 
@@ -222,7 +230,14 @@ class LiveSession:
         return Utterance(u.speaker, u.text, max(0.0, u.t - (self.gate_at or 0.0)), u.ts)
 
     # -- recording of transcript lines -----------------------------------------------------------------------------
-    def record(self, u: Utterance, heard_at: float | None = None) -> None:
+    def record(self, u: Utterance, heard_at: float | None = None, stt_final_at: float | None = None) -> None:
+        if not self.intro_sent:
+            return
+        if stop_requested(u.text):
+            self.leave_requested = True
+            return
+        u.text = remove_meet_links(u.text)
+        u.speaker = remove_meet_links(u.speaker)
         u.t = round(u.t, 1)
         self.store.append(u)
         self.events.emit("transcript.utterance", speaker=u.speaker, text=u.text, t=u.t)
@@ -237,9 +252,17 @@ class LiveSession:
             q = self.brain.question_in(u)
             if q and self.brain.is_fresh(q):
                 self.first_seen.setdefault(_norm(q.text), heard_at if heard_at is not None else self.clock.now())
+                if stt_final_at is not None:
+                    self.stt_final.setdefault(_norm(q.text), stt_final_at)
                 self._prewarm()
 
     def record_caption(self, u: Utterance) -> None:
+        if not self.intro_sent:
+            return
+        if stop_requested(u.text):
+            self.leave_requested = True
+            return
+        u.text, u.speaker = remove_meet_links(u.text), remove_meet_links(u.speaker)
         u.t = round(u.t, 1)
         if self.hybrid:  # the audio transcript is the source of truth; captions only supply names and timing
             self.captions_store.append(u)
@@ -248,6 +271,8 @@ class LiveSession:
 
     # -- main ------------------------------------------------------------------------------------------------------
     async def run(self) -> None:
+        if self.mode != "join" or self.auto_admit:
+            raise BotRefused("The bot joins an approved hosted meeting and never creates a call or admits people.")
         start_up_check()  # before anything is opened or joined: the call cap and the resolved providers (FR-MTG-11)
         log.info(
             "required participants: %s | auto-admit: %s | transcript: %s | record audio: %s",
@@ -276,24 +301,28 @@ class LiveSession:
                 self.merger.t0 = self.start
                 if br.account_name:
                     self.merger.add_ignored(br.account_name)
+                self.chat = ChatPoster(br)
+                if not await self._post(intro_text(self.record_audio, self.hybrid, self.voice), "intro"):
+                    raise BotRefused("The disclosure could not be posted; leaving without capture.")
+                self.intro_sent = True
                 await self._start_audio()
                 self.events.emit(
                     "meeting.joined",
-                    url=self.url,
                     asked_to_join=asked,
                     required=self.required,
                     auto_admit=self.auto_admit,
                 )
-                self.chat = ChatPoster(br)
                 self._prewarm()
                 if not await br.enable_captions():
                     log.error("captions could not be enabled: no speaker names, and no transcript without audio")
-                snap = self.cfg.debug_dir / "caption_snapshots" if self.cfg.save_caption_snapshots else None
                 reader = CaptionReader(
-                    br.page, lambda blocks, now: self.queue.put_nowait((blocks, now)), self.clock, snap
+                    br.page, lambda blocks, now: self.queue.put_nowait((blocks, now)), self.clock, None
                 )
                 await reader.start()
                 await self._loop()
+            except asyncio.CancelledError:
+                self.leave_requested = True
+                raise
             finally:
                 await self._shutdown()
 
@@ -338,6 +367,9 @@ class LiveSession:
                 t0 = time.monotonic()
                 text = (await asyncio.to_thread(speech.text, to_wav(pcm))).strip()
                 stt_s = time.monotonic() - t0
+                final_at = (
+                    self.clock.now()
+                )  # FR-MTG-11: the STT final result is in; the voice logs STT end -> first audio
                 if not text:
                     self.timeline.record("segment_empty", start_s=a, end_s=b, stt_s=round(stt_s, 2))
                     continue
@@ -355,7 +387,7 @@ class LiveSession:
                     text=text[:160],
                     end_to_text_s=round(self.elapsed() - b, 2),
                 )
-                self.record(Utterance(speaker or "Speaker", text, a), heard_at=self.start + b)
+                self.record(Utterance(speaker or "Speaker", text, a), heard_at=self.start + b, stt_final_at=final_at)
                 last_failure = ""
             except Exception as e:
                 level = logging.DEBUG if str(e) == last_failure else logging.WARNING
@@ -377,6 +409,7 @@ class LiveSession:
         seen_now: Counter = Counter()
         for sender, text in msgs:
             text = self._clean_chat_text(text)
+            text = remove_meet_links(text)
             if not text:
                 continue
             key = (sender, text)
@@ -392,6 +425,9 @@ class LiveSession:
                 continue
             if sender == "?":  # Meet did not tag the sender; our own messages were filtered above, so it is a person
                 sender = "Participant"
+            if stop_requested(text):
+                self.leave_requested = True
+                return
             bot = self.brain.bot_name if self.brain else ""
             addressed = text.lstrip("@ ").lower().startswith(bot.lower()) if bot else False
             asked = text.rstrip().endswith("?") or addressed
@@ -441,11 +477,19 @@ class LiveSession:
 
         if want_voice:
             mark("tts_request", t0)
-        speak = asyncio.create_task(self.speaker.say(msg.text, on_first_sound=heard_first)) if want_voice else None
+        speak = None
+        if want_voice:
+            token = STT_END_AT.set(turn.marks.get("stt_final") if turn is not None else None)  # the task copies it
+            try:
+                speak = asyncio.create_task(self.speaker.say(msg.text, on_first_sound=heard_first))
+            finally:
+                STT_END_AT.reset(token)
+        self._speech_task = speak
         chat_ok, chat_s, first_out = False, 0.0, None
         if self.reply_mode != "voice" or not want_voice:
             if speak:
                 waiter = asyncio.ensure_future(first_sound.wait())
+                self._speech_waiter = waiter
                 await asyncio.wait({speak, waiter}, return_when=asyncio.FIRST_COMPLETED)
                 waiter.cancel()
             t1 = self.clock.now()
@@ -556,6 +600,8 @@ class LiveSession:
         turn = self.trace.new_turn(q.speaker, q.text, end, source)
         turn.mark("addressed", meta["first_seen"])
         turn.mark("confirmed_end", meta["detected"])
+        if meta.get("stt_final") is not None:
+            turn.mark("stt_final", meta["stt_final"])
         return turn
 
     async def _finish_quick(self, task: asyncio.Task) -> None:
@@ -606,6 +652,10 @@ class LiveSession:
 
     # -- loop -------------------------------------------------------------------------------------------------------
     async def _loop(self) -> None:
+        if not self.intro_sent:
+            if not await self._post(intro_text(self.record_audio, self.hybrid, self.voice), "intro"):
+                raise BotRefused("The disclosure could not be posted; leaving without capture.")
+            self.intro_sent = True
         cfg, br, brain = self.cfg, self.br, self.brain
         base_interval = cfg.brain_interval_s
         interval = base_interval
@@ -616,6 +666,8 @@ class LiveSession:
         try:
             while True:
                 await asyncio.sleep(0.1)
+                if self.leave_requested:
+                    return
                 while not self.queue.empty():
                     blocks, now = self.queue.get_nowait()
                     for b in blocks:
@@ -649,6 +701,7 @@ class LiveSession:
                                 "question": q[1],
                                 "detected": now,
                                 "first_seen": self.first_seen.get(_norm(q[1]), now),
+                                "stt_final": self.stt_final.get(_norm(q[1])),
                             }
                             meta["turn"] = self._new_turn(q, meta)
                             self.last_question_at = now
@@ -694,6 +747,8 @@ class LiveSession:
                 if self.gate_at is not None and now >= next_chat:
                     next_chat = now + 1.5
                     await self._read_chat()
+                    if self.leave_requested:
+                        return
 
                 # --- admitting (frequent, cheap) -----------------------------------------------------------------
                 if self.auto_admit and now >= next_admit:
@@ -715,8 +770,10 @@ class LiveSession:
                 if status_task is None and now >= self.next_status_at:
                     status_task = asyncio.create_task(self._status_step())
         finally:
-            if status_task:
-                status_task.cancel()
+            pending = [task for task in (status_task, quick_task, brain_task) if task is not None]
+            for task in pending:
+                task.cancel()
+            await asyncio.gather(*pending, return_exceptions=True)
 
     async def _status_step(self) -> bool:
         """Meeting ended? Who is here? Has the meeting started for the bot? True means leave."""
@@ -789,8 +846,14 @@ class LiveSession:
 
     # -- shutdown ---------------------------------------------------------------------------------------------------
     async def _shutdown(self) -> None:
-        if self._out_task:
-            self._out_task.cancel()
+        pending = [
+            task
+            for name in ("_out_task", "_speech_task", "_speech_waiter", "_preparation_task")
+            if (task := getattr(self, name, None)) is not None
+        ]
+        for task in pending:
+            task.cancel()
+        await asyncio.gather(*pending, return_exceptions=True)
         if self.bot_tap:
             self.bot_tap.stop()
         try:
@@ -803,9 +866,10 @@ class LiveSession:
                         await asyncio.sleep(0.5)
                     await asyncio.sleep(2.5)
                     self.stt_task.cancel()
+                    await asyncio.gather(self.stt_task, return_exceptions=True)
             for u in self.merger.flush(self.clock.now()):
                 self.record_caption(u)
-            if self.brain and self.gate_at is not None:
+            if self.brain and self.gate_at is not None and not self.leave_requested:
                 try:
                     window = [self._shift(u) for u in self.store.window(self.elapsed(), 10)]
                     await asyncio.to_thread(self.brain.step, window, self.brain_elapsed())
@@ -815,7 +879,11 @@ class LiveSession:
                 self.events.emit("summary.ready", path=str(self.out_dir / "summary.md"))
             await self.br.leave()
         finally:
-            self.events.emit("meeting.ended", seconds=round(self.elapsed()))
+            self.events.emit(
+                "meeting.ended",
+                seconds=round(self.elapsed()),
+                reason="left_on_request" if self.leave_requested else "completed",
+            )
             page = write_playback(self.out_dir)
             if page:
                 log.info("playback page: %s", page)

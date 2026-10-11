@@ -8,6 +8,7 @@ import type { PinboardItem } from "@tilo/contracts";
 import { Fragment, type ReactNode, useEffect, useRef, useState } from "react";
 import { useClient } from "../api/ClientProvider";
 import { HttpClient } from "../api/http";
+import { LiveLists } from "../people/LiveLists";
 import { MENTIONS, PINS, displayName } from "../people/data";
 import { PersonTag, PreviewNote, SoonButton, pillLabel, shortDate } from "../people/parts";
 import {
@@ -79,12 +80,7 @@ export function S_28() {
   useEffect(() => {
     if (draft) panel.current?.focus();
   }, [draft]);
-  if (live)
-    return (
-      <Page testid="pinboards" title="Pinboards" sub="Your team's pinboards.">
-        <p>Not available yet</p>
-      </Page>
-    );
+  if (live) return <LiveLists kind="pinboards" />;
   // Closing hands focus back to the button that opened the draft (if its row is still listed).
   const closeDraft = () => {
     setDraft(null);

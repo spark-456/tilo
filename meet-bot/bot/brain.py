@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Any, NamedTuple, Protocol
 
 from .captions import Utterance
+from .events import remove_meet_links
 from .instant import instant_answer
 from .people import addressed_sentence, looks_like_followup, question_of
 
@@ -770,8 +771,10 @@ class Brain:
         data["chat_messages_sent"] = self.policy.sent + self.policy.direct_sent
         if elapsed_s is not None:
             data["elapsed_minutes"] = round(elapsed_s / 60, 1)
-        (out_dir / "state.json").write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
-        (out_dir / "summary.md").write_text(self.summary_markdown(elapsed_s), encoding="utf-8")
+        (out_dir / "state.json").write_text(
+            json.dumps(remove_meet_links(data), indent=2, ensure_ascii=False), encoding="utf-8"
+        )
+        (out_dir / "summary.md").write_text(remove_meet_links(self.summary_markdown(elapsed_s)), encoding="utf-8")
 
     def summary_markdown(self, elapsed_s: float | None = None) -> str:
         st = self.state

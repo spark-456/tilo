@@ -127,6 +127,18 @@ def check_synth_request(text: Any, voice: Any, kwargs: dict[str, Any], max_chars
     return text, voice
 
 
+@dataclass(frozen=True)
+class VoiceTiming:
+    """One spoken reply's numbers (FR-MTG-11), for tuning and for metering. Counts and milliseconds only: never the
+    text, the voice or the audio. `characters` is the unit a `character` unit_price (ADR-0029) is charged on."""
+
+    characters: int
+    chunks: int
+    audio_bytes: int
+    first_audio_ms: float | None  # request start to the first audio byte (None: no audio came)
+    total_ms: float
+
+
 class FakeSpeechProvider(SpeechProvider):
     """Deterministic, no network: the given segments, or one segment derived from the audio's digest. Refused when
     `LIVE=1` or deployed (a fake transcript must never reach a real meeting)."""
