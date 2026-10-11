@@ -1,0 +1,35 @@
+/* STARTER-1: the sample project's badge, note and Worlds controls. Every selector sits under [data-park];
+   colours are var(--token); no motion. */
+[data-park] .park-sample-badge {
+  display: inline-block;
+  box-sizing: border-box;
+  margin-left: 8px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--field);
+  color: var(--ink2);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.3px;
+  line-height: 16px;
+  vertical-align: middle;
+}
+[data-park] .park-sample-note {
+  display: block;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ink3);
+}
+[data-park] .park-sample-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 12px 0;
+}
+[data-park] .park-sample-controls__hint {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink3);
+}
