@@ -7,6 +7,8 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 
+from .events import remove_meet_links
+
 ROOT = Path(__file__).resolve().parent.parent
 IN_CONTAINER = os.environ.get("TILO_IN_CONTAINER") == "1"
 # No model id, vendor or key lives in meet-bot (FR-MTG-11): roles and profiles are Tilo's config/, see bot/providers.py.
@@ -133,9 +135,15 @@ class Config:
         )
 
 
+class SafeFormatter(logging.Formatter):
+    def format(self, record: logging.LogRecord) -> str:
+        # Format the exception too: browser errors can embed the navigation capability.
+        return remove_meet_links(super().format(record))
+
+
 def setup_logging(level: int = logging.INFO) -> None:
     handler = logging.StreamHandler()
-    handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s", "%H:%M:%S"))
+    handler.setFormatter(SafeFormatter("%(asctime)s %(levelname)s %(name)s: %(message)s", "%H:%M:%S"))
     root = logging.getLogger()
     root.handlers[:] = [handler]
     root.setLevel(level)
