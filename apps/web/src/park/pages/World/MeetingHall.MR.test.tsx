@@ -84,9 +84,13 @@ it("MR-01/MR-06 reads recorded attendees, convenes, asks, confirms and adjourns 
   await clickLabel("writer · A_two");
   await tap("Convene");
   expect(document.body.textContent).toContain("0 / 5 credits");
+  await enter("Question", "   ");
+  await tap("Send question");
+  expect(calls.filter(([path]) => path.endsWith("/turns"))).toHaveLength(0);
   await enter("Question", "Why?");
   await tap("Send question");
   expect(document.body.textContent).toContain("Revise the draft");
+  expect(document.body.textContent).toContain("Change from turn 1");
   await enter("Change wording", "Revise with sources");
   await tap("Confirm change");
   expect(document.body.textContent).toContain("Change recorded; planning pending.");

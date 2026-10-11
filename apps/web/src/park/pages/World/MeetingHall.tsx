@@ -67,15 +67,21 @@ export function MeetingHall({ worldId, client }: { worldId: string; client: Room
   const path = roomPath(worldId, room?.room_id);
   const open = room?.state === "open";
   const label = (id: string) => [people?.find((a) => a.id === id)?.rank ?? "Agent", id].join(" · ");
-  const proposal = room?.turns.find(
+  const proposedTurn = room?.turns.find(
     (t) => t.reply?.proposal && !t.change && !confirmed[t.reply.proposal.proposal_id],
-  )?.reply?.proposal;
+  );
+  const proposal = proposedTurn?.reply?.proposal;
   async function act(action: string, data = new FormData()) {
     if (held.current) return;
     held.current = true;
     setBusy(true);
     setError("");
     try {
+      if (
+        (action === "Send question" || action === "Confirm change") &&
+        !String(data.get("text") ?? "").trim()
+      )
+        throw new Error("Please enter a question or change wording.");
       let result: Room | null = null;
       if (action === "Convene") {
         const agents = data.getAll("agents").map(String);
@@ -138,7 +144,10 @@ export function MeetingHall({ worldId, client }: { worldId: string; client: Room
     </button>
   );
   const form = (action: string, children: ReactNode, disabled = false) => (
-    <form onSubmit={submit(action)}>
+    <form
+      key={action === "Confirm change" ? proposal?.proposal_id : action}
+      onSubmit={submit(action)}
+    >
       <fieldset disabled={disabled}>
         {children}
         <button
@@ -211,7 +220,18 @@ export function MeetingHall({ worldId, client }: { worldId: string; client: Room
             {Object.entries(confirmed).map(([id, status]) => (
               <output key={id}>{status}</output>
             ))}
-            {proposal && open ? form("Confirm change", text("Change wording")) : null}
+            {proposal && open
+              ? form(
+                  "Confirm change",
+                  <>
+                    <p>
+                      Change from turn {proposedTurn?.turn} · {label(proposedTurn?.to ?? room.lead)}
+                    </p>
+                    <p>Units: {proposal.units.join(", ")}</p>
+                    {text("Change wording")}
+                  </>,
+                )
+              : null}
             {open ? (
               <>
                 {form(
