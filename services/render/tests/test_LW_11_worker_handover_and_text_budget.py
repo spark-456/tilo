@@ -10,7 +10,7 @@ from pydantic import ValidationError
 from tilo_render import app as render_app
 from tilo_render.pdf import render_pdf
 from tilo_render.pptx import render_pptx
-from tilo_render.spec import DeliverableSpec
+from tilo_render.spec import RequestDeliverableSpec
 
 SPEC = {"title": "Report", "date": "2026-10-11", "sections": []}
 AUTH = {"Authorization": "Bearer test-token"}
@@ -77,7 +77,7 @@ def test_LW_11_refuses_text_amplification_before_render(kind: str) -> None:
         raw["tables"] = [{"id": "t", "columns": ["A", "B"], "rows": rows}]
         raw["sections"] = [{"heading": "Body", "blocks": [{"type": "table", "table_id": "t"}]}]
     with pytest.raises(ValidationError):
-        DeliverableSpec.model_validate(raw)
+        RequestDeliverableSpec.model_validate(raw)
 
 
 @pytest.mark.parametrize("fmt", ["pdf", "pptx"])
@@ -100,7 +100,7 @@ def test_LW_11_largest_allowed_work_axes_render_inside_deadline(fmt: str, axis: 
         raw["charts"] = [{"id": "c", "kind": "bar", "table_id": "t", "x": "A", "y": "B", "title": "Chart"}]
         blocks = [{"type": "chart", "chart_id": "c"} for _ in range(4)]
     raw["sections"] = [{"heading": "Body", "blocks": blocks}]
-    spec = DeliverableSpec.model_validate(raw)
+    spec = RequestDeliverableSpec.model_validate(raw)
     started = time.monotonic()
     result = render_pdf(spec) if fmt == "pdf" else render_pptx(spec)
     assert time.monotonic() - started < render_app.DEFAULT_RENDER_TIMEOUT

@@ -27,7 +27,7 @@ from pydantic import BaseModel, ConfigDict, ValidationError
 
 from tilo_render.pdf import render_pdf
 from tilo_render.pptx import render_pptx
-from tilo_render.spec import DeliverableSpec
+from tilo_render.spec import DeliverableSpec, RequestDeliverableSpec
 
 try:
     from tilo_logging import configure_logging
@@ -57,7 +57,7 @@ class RenderRequestPayload(BaseModel):
 
     model_config = ConfigDict(extra="forbid", frozen=True)
     format: Literal["pdf", "pptx"]
-    spec: DeliverableSpec
+    spec: RequestDeliverableSpec
 
 
 def service_caller_ok(claims: Mapping[str, Any], *, audience: str, allowed_callers: Sequence[str]) -> bool:

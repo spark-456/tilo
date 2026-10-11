@@ -16,22 +16,9 @@ MAX_TABLE_COLUMNS = 20
 MAX_BULLETS_PER_BLOCK = 500
 MAX_BLOCKS_PER_SECTION = 30
 MAX_TOTAL_BLOCKS = 120
-MAX_REFERENCED_TABLE_CELLS = 1200
-MAX_REFERENCED_CHARTS = 4
+MAX_REFERENCED_TABLE_CELLS = 25_000
+MAX_REFERENCED_CHARTS = 20
 MAX_ESTIMATED_SLIDES = 250
-MAX_TEXT_LINES = 40
-MAX_TABLE_CELL_CHARS = 200
-MAX_RENDER_LINES = 2000
-MAX_RENDER_CHARS = 40_000
-
-
-def _text_work(value: str, *, cell: bool = False) -> tuple[int, int]:
-    # The renderers normalise CR/CRLF before splitting. Count that exact work,
-    # including blank lines, without building hundreds of thousands of flowables.
-    lines = 1 + len(re.findall(r"\r\n|\r|\n", value))
-    if lines > MAX_TEXT_LINES or (cell and len(value) > MAX_TABLE_CELL_CHARS):
-        raise ValueError("Render text exceeds the line or cell-character budget")
-    return lines, len(value)
 
 
 class ParagraphBlock(BaseModel):
@@ -44,7 +31,6 @@ class ParagraphBlock(BaseModel):
     def _validate_text(cls, value: str) -> str:
         if len(value) > MAX_PARAGRAPH_CHARS:
             raise ValueError(f"At most {MAX_PARAGRAPH_CHARS} characters per paragraph allowed")
-        _text_work(value)
         return value
 
 
@@ -61,7 +47,6 @@ class BulletsBlock(BaseModel):
         if len(value) > MAX_BULLETS_PER_BLOCK:
             raise ValueError(f"At most {MAX_BULLETS_PER_BLOCK} bullets per block allowed")
         for item in value:
-            _text_work(item)
             if len(item) > MAX_PARAGRAPH_CHARS:
                 raise ValueError(f"At most {MAX_PARAGRAPH_CHARS} characters per bullet allowed")
         return value
@@ -114,8 +99,6 @@ class Table(BaseModel):
         for row in self.rows:
             if len(row) != len(self.columns):
                 raise ValueError(f"Row length mismatch in table {self.id}")
-        for value in [*self.columns, *(v for row in self.rows for v in row)]:
-            _text_work(str(value), cell=True)
         return self
 
 
@@ -228,6 +211,64 @@ class DeliverableSpec(BaseModel):
 
         referenced_cells = 0
         referenced_charts = 0
+        slide_count = 1 + len(self.sections)
+        for section in self.sections:
+            for block in section.blocks:
+                if isinstance(block, ParagraphBlock):
+                    slide_count += max(1, math.ceil(len(block.text) / 1000))
+                elif isinstance(block, BulletsBlock):
+                    slide_count += max(1, math.ceil(len(block.bullets) / 8))
+                elif isinstance(block, TableBlock):
+                    if block.table_id not in table_ids:
+                        raise ValueError(f"Unknown table_id: {block.table_id}")
+                    tbl = table_ids[block.table_id]
+                    referenced_cells += len(tbl.rows) * len(tbl.columns)
+                    slide_count += max(1, math.ceil(len(tbl.rows) / 10))
+                elif isinstance(block, ChartBlock):
+                    if block.chart_id not in chart_ids:
+                        raise ValueError(f"Unknown chart_id: {block.chart_id}")
+                    referenced_charts += 1
+                    slide_count += 1
+
+        if referenced_cells > MAX_REFERENCED_TABLE_CELLS:
+            raise ValueError(f"At most {MAX_REFERENCED_TABLE_CELLS} referenced table cells allowed")
+        if referenced_charts > MAX_REFERENCED_CHARTS:
+            raise ValueError(f"At most {MAX_REFERENCED_CHARTS} chart references allowed")
+        if slide_count > MAX_ESTIMATED_SLIDES:
+            raise ValueError(f"At most {MAX_ESTIMATED_SLIDES} estimated slides allowed")
+
+        return self
+
+
+# The HTTP service accepts untrusted requests. Keep its work envelope separate
+# from the renderer's structural model, which also serves trusted local callers.
+MAX_REQUEST_TABLE_CELLS = 1200
+MAX_REQUEST_CHARTS = 4
+MAX_TEXT_LINES = 40
+MAX_TABLE_CELL_CHARS = 200
+MAX_RENDER_LINES = 2000
+MAX_RENDER_CHARS = 40_000
+
+
+def _text_work(value: str, *, cell: bool = False) -> tuple[int, int]:
+    lines = 1 + len(re.findall(r"\r\n|\r|\n", value))
+    if lines > MAX_TEXT_LINES or (cell and len(value) > MAX_TABLE_CELL_CHARS):
+        raise ValueError("Render text exceeds the line or cell-character budget")
+    return lines, len(value)
+
+
+class RequestDeliverableSpec(DeliverableSpec):
+    """Bound repeated table/chart references and every rendered text surface."""
+
+    @model_validator(mode="after")
+    def _request_work_budget(self) -> "RequestDeliverableSpec":
+        table_ids = {table.id: table for table in self.tables}
+        chart_ids = {chart.id for chart in self.charts}
+        for table in self.tables:
+            for value in [*table.columns, *(v for row in table.rows for v in row)]:
+                _text_work(str(value), cell=True)
+        referenced_cells = 0
+        referenced_charts = 0
         work_lines = work_chars = 0
 
         def charge(text: str, copies: int = 1) -> None:
@@ -276,10 +317,10 @@ class DeliverableSpec(BaseModel):
                         for value in row:
                             charge(str(value))
 
-        if referenced_cells > MAX_REFERENCED_TABLE_CELLS:
-            raise ValueError(f"At most {MAX_REFERENCED_TABLE_CELLS} referenced table cells allowed")
-        if referenced_charts > MAX_REFERENCED_CHARTS:
-            raise ValueError(f"At most {MAX_REFERENCED_CHARTS} chart references allowed")
+        if referenced_cells > MAX_REQUEST_TABLE_CELLS:
+            raise ValueError(f"At most {MAX_REQUEST_TABLE_CELLS} referenced table cells allowed")
+        if referenced_charts > MAX_REQUEST_CHARTS:
+            raise ValueError(f"At most {MAX_REQUEST_CHARTS} chart references allowed")
         if slide_count > MAX_ESTIMATED_SLIDES:
             raise ValueError(f"At most {MAX_ESTIMATED_SLIDES} estimated slides allowed")
 
