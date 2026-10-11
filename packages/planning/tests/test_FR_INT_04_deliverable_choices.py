@@ -63,7 +63,9 @@ def test_FR_INT_04_the_shipped_config_loads_and_offers_only_available_kinds() ->
     assert [k.id for k in kinds] == [e["id"] for e in raw if e["available"]]
     assert 1 <= len(kinds) <= MAX_CHOICES
     assert all(not e["available"] and e.get("needs") for e in raw if e["id"] not in {k.id for k in kinds})
-    assert {e["needs"] for e in raw if not e["available"]} >= {"LW-12", "LW-14"}  # not offered until they ship
+    # LW-12/LW-14 are now wired and replayed through the default API run.
+    assert {k.id for k in kinds} >= {"mock_test_quiz", "past_paper_links"}
+    assert next(k.format for k in kinds if k.id == "mock_test_quiz") == "app"
 
 
 def test_FR_INT_04_the_kind_formats_are_the_contracts_deliverable_formats() -> None:
@@ -307,14 +309,29 @@ def test_FR_INT_04_only_whole_words_name_an_unavailable_kind_and_the_fallback_ig
     assert free["deliverables"][0]["title"] == "Mock-test quiz"
 
 
-def test_FR_INT_04_the_config_exposes_the_unavailable_kinds_validated_like_the_others(tmp_path) -> None:
+def _withheld_config(tmp_path, monkeypatch):
+    from tilo_planning import deliverable_kinds
+
+    raw = yaml.safe_load(DEFAULT_KINDS_CONFIG.read_text(encoding="utf-8"))
+    for item in raw["kinds"]:
+        needs = {"mock_test_quiz": "LW-12", "past_paper_links": "LW-14"}.get(item["id"])
+        if needs:
+            item.update(available=False, needs=needs, format="markdown")
+    path = tmp_path / "withheld.yaml"
+    path.write_text(yaml.safe_dump(raw), encoding="utf-8")
+    monkeypatch.setattr(deliverable_kinds, "DEFAULT_KINDS_CONFIG", path)
+
+
+def test_FR_INT_04_the_config_exposes_the_unavailable_kinds_validated_like_the_others(tmp_path, monkeypatch) -> None:
+    _withheld_config(tmp_path, monkeypatch)
     config = load_kinds()
     assert [(u.id, u.needs) for u in config.unavailable] == [("mock_test_quiz", "LW-12"), ("past_paper_links", "LW-14")]
     assert [k.id for k in config.offered] == [k.id for k in load_deliverable_kinds()]
     assert config.unavailable[0].label == "Mock-test quiz" and config.unavailable[0].format == "markdown"
 
 
-def test_FR_INT_04_the_default_answer_path_refuses_an_unavailable_shipped_kind() -> None:
+def test_FR_INT_04_the_default_answer_path_refuses_an_unavailable_configured_kind(tmp_path, monkeypatch) -> None:
+    _withheld_config(tmp_path, monkeypatch)
     brief = _brief()
     question = generate_questions(
         brief, ["deliverables"], memory=make_no_memory(), base=sample_event_base(), seq=2

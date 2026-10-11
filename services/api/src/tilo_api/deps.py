@@ -761,7 +761,10 @@ def _forget_run_stores() -> None:
         _run_stores.clear()
 
 
-def get_artifact_store(request: Request = None) -> ArtifactStore:  # type: ignore[assignment]
+def get_artifact_store(
+    request: Request = None,  # type: ignore[assignment]
+    mode: Annotated[Mode, Depends(get_work_mode)] = "replay",
+) -> ArtifactStore:
     """Where a run's outputs go (PROD-WIRE 2b): Firestore records and GCS bytes for `TILO_ARTIFACTS_STORE=gcs` (see
     `tilo_api.run_stores`); anything else, or no redactor yet, refuses and no run starts (fail closed, BQ-AGT02-T4-1).
     Config is read per call; a built store is kept per config. The redactor is checked before any client is built."""
@@ -790,12 +793,12 @@ def get_artifact_store(request: Request = None) -> ArtifactStore:  # type: ignor
 
     class SourceSafety:
         def check(self, *args: Any, **kwargs: Any) -> Any:
-            return get_safety().check(*args, **kwargs)
+            return get_safety(mode).check(*args, **kwargs)
 
     return cast(
         ArtifactStore,
         _run_store(
-            "artifacts",
+            f"artifacts:{mode}",
             ("TILO_ARTIFACTS_STORE", "TILO_ARTIFACTS_BUCKET"),
             lambda: run_stores.open_artifact_store(
                 redactor=redactor, archive_lookup=archived, screener=SourceSafety(), file_sniffer=sniff

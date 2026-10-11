@@ -9,7 +9,7 @@ import threading
 from collections.abc import Callable, Mapping
 from datetime import date
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from tilo_archive import RunArchive
 from tilo_harness.executor import DefaultUnitRunner, UnitContext, UnitOutcome
@@ -192,7 +192,7 @@ class BoundRunRunner:
             )
             model = BoundModel(self.providers["verifier"], self.budget)
             load = source_loader(owner.seams.artifacts, owner.scope, owner.store.events[owner.world_id])
-            passed = await asyncio.to_thread(verify_answers, spec, model, load)
+            passed = await asyncio.to_thread(verify_answers, spec, cast(Any, model), load)
             owner.put(
                 "app.tested",
                 verifier,
