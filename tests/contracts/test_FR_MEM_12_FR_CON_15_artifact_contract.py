@@ -66,7 +66,9 @@ def _scripts(repo_root):
 def test_FR_MEM_12_artifact_schema_is_artifact_version_1_0_0(repo_root):
     schema = load_schema(repo_root, "artifact")
     assert schema["$id"] == "https://contracts.tilo.example/artifact.schema.json"
-    assert (schema["x-version"], schema["title"]) == ("1.0.0", "ArtifactVersion")
+    version = tuple(int(p) for p in schema["x-version"].split("."))
+    assert version >= (1, 0, 0) and version[0] == 1, "1.1.0 adds the fetch origin (ADR-0029), additive"
+    assert schema["title"] == "ArtifactVersion"
     assert set(schema["required"]) == REQUIRED == set(schema["properties"]), "ADR-0018 4: no blob path field"
     assert schema["additionalProperties"] is False
     stages = set(schema["$defs"]["manifest_revision"]["properties"]["stage"]["enum"])
@@ -84,7 +86,7 @@ def test_FR_MEM_12_media_type_is_a_closed_enum_of_nine(repo_root):
 def test_FR_MEM_12_valid_records_cover_every_origin_and_both_caps(repo_root, registry):
     records = [load_json(p) for p in sorted((repo_root / "contracts/fixtures/artifact/valid").glob("*.json"))]
     assert all(not errors_for(_ref("artifact"), record, registry) for record in records)
-    assert {r["origin"]["kind"] for r in records} == {"unit", "render", "upload", "restore"}
+    assert {r["origin"]["kind"] for r in records} == {"unit", "render", "upload", "restore", "fetch"}
     caps = {("application/json", 2_000_000), ("application/pdf", 50_000_000)}
     assert {(r["media_type"], r["size_bytes"]) for r in records} >= caps, "the text and file caps are inclusive"
 
@@ -96,9 +98,9 @@ def test_FR_MEM_12_each_rule_has_an_invalid_fixture_that_fails(repo_root, regist
 
 
 def _foreign_sources(record):
-    """AR-03 reference check: a unit or render output's sources are records of its own run (the run in the
+    """AR-03 reference check: a unit, render or fetch output's sources are records of its own run (the run in the
     Scope). A restore copies the copied version's sources, and an upload has none (schema)."""
-    if record["origin"]["kind"] not in ("unit", "render"):
+    if record["origin"]["kind"] not in ("unit", "render", "fetch"):
         return []
     return [s["archive_ref"] for s in record["sources"] if s["archive_ref"].split("/", 1)[0] != record["run_id"]]
 

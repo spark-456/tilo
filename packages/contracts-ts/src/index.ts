@@ -3,12 +3,13 @@
  * contracts/events/registry.yaml. Do not edit. Regenerate with `just contracts-gen`;
  * `just contracts-check` fails CI on drift (FR-WLD-02, FR-WLD-03).
  * agents.schema.json 1.0.0 sha256:f2ba3955260a80eb
- * artifact.schema.json 1.0.0 sha256:358508330e9ee2f2
+ * appspec.schema.json 1.0.0 sha256:e3638e1ae19f9b9b
+ * artifact.schema.json 1.1.0 sha256:ce5a30aeae826180
  * attention.schema.json 1.0.0 sha256:f35cff84728304af
  * brief.schema.json 1.0.0 sha256:be4e747f37e399b2
  * calendar_entry.schema.json 1.1.0 sha256:291531543be88320
  * card.schema.json 1.0.0 sha256:2666292eb19087d0
- * common.schema.json 1.5.0 sha256:b1bd17a36819c785
+ * common.schema.json 1.6.0 sha256:b8cebbb5b7f350f1
  * connector.schema.json 1.0.0 sha256:cc3a7d9b3820e12c
  * decision.schema.json 1.0.0 sha256:06915b6db08dc4b7
  * envelope.schema.json 1.0.0 sha256:8a5c75c61807baa2
@@ -115,7 +116,7 @@
  * plan.schema.json 1.0.0 sha256:35991402fa6e958d
  * plate.schema.json 1.0.0 sha256:d2a4e4361a714c8f
  * policy.schema.json 1.0.0 sha256:307bca25f6efc07e
- * providers.schema.json 1.2.0 sha256:4514148b0b6b2f7e
+ * providers.schema.json 1.3.0 sha256:ecc5063d4926f11c
  * scenario.schema.json 1.0.0 sha256:b8e044d7e37b92a3
  * skill.schema.json 1.1.0 sha256:9eeee7768b667afa
  * spend_caps.schema.json 1.1.0 sha256:d337adf13a5337f9
@@ -127,10 +128,57 @@
  */
 
 /**
+ * The quiz's name, shown as plain text.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "AppSpecTitle".
+ */
+export type AppSpecTitle = string;
+/**
+ * Lower-case machine name.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "Slug".
+ */
+export type Slug = string;
+/**
+ * q1 to q999, unique within the spec (AS-01).
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "AppSpecQuestionId".
+ */
+export type AppSpecQuestionId = string;
+/**
+ * The question text, shown as plain text (AS-03).
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "AppSpecStem".
+ */
+export type AppSpecStem = string;
+/**
+ * One choice, shown as plain text (AS-03).
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "AppSpecOptionText".
+ */
+export type AppSpecOptionText = string;
+/**
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "AppSpecOptionId".
+ */
+export type AppSpecOptionId = "a" | "b" | "c" | "d" | "e" | "f";
+/**
  * This interface was referenced by `TiloContracts`'s JSON-Schema
  * via the `definition` "ArtifactId".
  */
 export type ArtifactId = string;
+/**
+ * 1-based page of the cited PDF.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "AppSpecPage".
+ */
+export type AppSpecPage = number;
 /**
  * This interface was referenced by `TiloContracts`'s JSON-Schema
  * via the `definition` "OrgId".
@@ -152,7 +200,7 @@ export type RunId = string;
  */
 export type UserId = string;
 /**
- * Media type of a stored artifact version (ADR-0018). Text: Markdown and CSV; structured: JSON; files (made only by tilo-render or an intake upload, never by a model): PDF, PPTX, DOCX, XLSX, PNG and JPEG. Code picks it from the role and the pinned skill, never a model, a file name or sniffing. Closed: no HTML or SVG.
+ * Media type of a stored artifact version (ADR-0018). Text: Markdown and CSV; structured: JSON; files (made only by tilo-render or an intake upload, never by a model): PDF, PPTX, DOCX, XLSX, PNG and JPEG. Code picks it, never a model: from the role and the pinned skill for a unit or render output, and from the file's own leading bytes for an upload (whose extension must agree) or a fetch (ADR-0029), never from a file name, a URL or a Content-Type header alone. Closed: no HTML or SVG.
  *
  * This interface was referenced by `TiloContracts`'s JSON-Schema
  * via the `definition` "MediaType".
@@ -178,13 +226,6 @@ export type UnitId = string;
  */
 export type AgentId = string;
 /**
- * Lower-case machine name.
- *
- * This interface was referenced by `TiloContracts`'s JSON-Schema
- * via the `definition` "Slug".
- */
-export type Slug = string;
-/**
  * Raw archive record (PRD 13.2): <run id>/<record seq in that run's archive>.
  *
  * This interface was referenced by `TiloContracts`'s JSON-Schema
@@ -199,7 +240,7 @@ export type EventArchiveRef = string;
  */
 export type Timestamp = string;
 /**
- * <run_id>:<unit_id>:<attempt>:<index> (AR-05). index is the output's 0-based position, 0 to 9, since a unit has at most 10 outputs (BQ-257).
+ * <run_id>:<unit_id>:<attempt>:<index> (AR-05). index is the output's 0-based position, 0 to 9, since a unit has at most 10 outputs (BQ-257); a fetch's index is f0 to f9, the file's 0-based position among the unit's fetched files, at most 10 (FR-INT-01, ADR-0029 8).
  *
  * This interface was referenced by `TiloContracts`'s JSON-Schema
  * via the `definition` "ArtifactVersionIdempotencyKey".
@@ -237,7 +278,7 @@ export type Semver = string;
  */
 export type ProvidersProfileId = string;
 /**
- * Deliverable format (PRD 12.4), plus email for replies and in_app for answers shown in Tilo.
+ * Deliverable format (PRD 12.4), plus email for replies, in_app for answers shown in Tilo and, since 1.6.0 (ADR-0029), app: an AppSpec (appspec.schema.json) that fixed web code renders (FR-AGT-16).
  *
  * This interface was referenced by `TiloContracts`'s JSON-Schema
  * via the `definition` "DeliverableFormat".
@@ -253,7 +294,8 @@ export type DeliverableFormat =
   | "google_docs"
   | "google_sheets"
   | "email"
-  | "in_app";
+  | "in_app"
+  | "app";
 /**
  * Calendar date YYYY-MM-DD (RFC 3339 full-date).
  *
@@ -807,7 +849,7 @@ export type PlateTitle = string;
  */
 export type PlateAction = "open" | "done" | "snooze" | "not_mine" | "put_back" | "draft_reply";
 /**
- * structured output (json), tool calling, vision, audio input, thinking levels, computer use, search grounding, code execution.
+ * structured output (json), tool calling, vision, audio input, thinking levels, computer use, search grounding, code execution; 1.3.0 (ADR-0029): video input and documents (a PDF read natively, FR-INT-02).
  *
  * This interface was referenced by `TiloContracts`'s JSON-Schema
  * via the `definition` "ProvidersCapability".
@@ -820,7 +862,9 @@ export type ProvidersCapability =
   | "thinking"
   | "computer_use"
   | "grounding"
-  | "code_execution";
+  | "code_execution"
+  | "video"
+  | "documents";
 /**
  * Scenario id: a letter, then up to 31 letters, digits, hyphens or underscores. Equals the file name without .yaml (SN-01). The not-pattern rejects a final line break, which a Python validator's $ lets through.
  *
@@ -920,7 +964,83 @@ export interface AgentsConfigQuestions {
   hourly_cap_per_person: number;
 }
 /**
- * One immutable, hash-checked, owner-scoped version in the artifact store (ADR-0018, FR-MEM-12; PRD 13.2, 15.1): the metadata record at orgs/{org}/worlds/{world}/artifacts/{artifact_id}/versions/{version:06d}. The bytes live under a key derived from the ids, so the record holds no blob path. Read by the harness, tilo-api, tilo-render and erasure; only the store writes it. Rules the schema cannot express are AR-01 to AR-08 in artifact.rules.md.
+ * A declarative app (FR-AGT-16, ADR-0029 decision 9): JSON that a unit writes and the artifact store keeps as an application/json version with origin unit, and that fixed web code renders at an owner-only route. Nothing in it is ever run as code or markup, and no link or URL comes from it. 1.0.0 has one kind, quiz: single-answer multiple-choice questions under one countdown timer, each citing the stored file it came from. Rules the schema cannot express are AS-01 to AS-04 in appspec.rules.md.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "AppSpec".
+ */
+export interface AppSpec {
+  v: "1.0";
+  kind: "quiz";
+  title: AppSpecTitle;
+  theme: Slug;
+  timer: AppSpecTimer;
+  /**
+   * @minItems 1
+   * @maxItems 200
+   */
+  questions: [AppSpecQuestion, ...AppSpecQuestion[]];
+}
+/**
+ * One countdown for the whole attempt, in seconds (1 minute to 6 hours). The person may pause it; at 0 the attempt is submitted. The clock is the person's own, so it emits no event.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "AppSpecTimer".
+ */
+export interface AppSpecTimer {
+  seconds: number;
+}
+/**
+ * One question. answer is the id of the one correct option and always names an option the question has. topic is an optional tag the person can filter by.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "AppSpecQuestion".
+ */
+export interface AppSpecQuestion {
+  id: AppSpecQuestionId;
+  stem: AppSpecStem;
+  options: AppSpecOptions;
+  answer: AppSpecOptionId;
+  topic?: Slug;
+  source: AppSpecSource;
+}
+/**
+ * Two to six choices keyed a to f and shown in that order: a and b always, each later id only with the one before it.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "AppSpecOptions".
+ */
+export interface AppSpecOptions {
+  a: AppSpecOptionText;
+  b: AppSpecOptionText;
+  c?: AppSpecOptionText;
+  d?: AppSpecOptionText;
+  e?: AppSpecOptionText;
+  f?: AppSpecOptionText;
+}
+/**
+ * Where the question came from: a stored version in the spec's own world, made by a fetch or an upload (AS-02), and for a PDF the page. The web shows the publisher from that version's manifest, never from the spec (AS-03).
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "AppSpecSource".
+ */
+export interface AppSpecSource {
+  artifact: ArtifactRef;
+  page?: AppSpecPage;
+}
+/**
+ * A pinned version of a stored artifact.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "ArtifactRef".
+ */
+export interface ArtifactRef {
+  artifact_id: ArtifactId;
+  version: number;
+  label?: string;
+}
+/**
+ * One immutable, hash-checked, owner-scoped version in the artifact store (ADR-0018, FR-MEM-12; PRD 13.2, 15.1): the metadata record at orgs/{org}/worlds/{world}/artifacts/{artifact_id}/versions/{version:06d}. The bytes live under a key derived from the ids, so the record holds no blob path. Read by the harness, tilo-api, tilo-render and erasure; only the store writes it. Rules the schema cannot express are AR-01 to AR-09 in artifact.rules.md. 1.1.0 (ADR-0029) adds the fetch origin: a file a unit downloaded through tilo-browser.
  *
  * This interface was referenced by `TiloContracts`'s JSON-Schema
  * via the `definition` "ArtifactVersion".
@@ -949,7 +1069,7 @@ export interface ArtifactVersion {
   parents: ArtifactRef[];
   origin: ArtifactVersionOrigin;
   /**
-   * Raw-archive pointers of the version's sources, for the Verifier (FR-CON-10, FR-AGT-12): records of the record's own run for a unit or render output, the copied version's for a restore, none for an upload (AR-03). They never leave Tilo (AR-06).
+   * Raw-archive pointers of the version's sources, for the Verifier (FR-CON-10, FR-AGT-12): records of the record's own run for a unit, render or fetch output (a fetch has exactly one, the fetch's own record, which holds the cleaned URL, BQ-104), the copied version's for a restore, none for an upload (AR-03, AR-09). They never leave Tilo (AR-06).
    */
   sources: ArtifactVersionSource[];
   /**
@@ -965,30 +1085,19 @@ export interface ArtifactVersion {
    */
   redacted: boolean;
   /**
-   * Set for unit and render outputs (AR-05); null for uploads and restores.
+   * Set for unit, render and fetch outputs (AR-05); null for uploads and restores.
    */
   idempotency_key: ArtifactVersionIdempotencyKey | null;
   created_at: Timestamp;
 }
 /**
- * A pinned version of a stored artifact.
- *
- * This interface was referenced by `TiloContracts`'s JSON-Schema
- * via the `definition` "ArtifactRef".
- */
-export interface ArtifactRef {
-  artifact_id: ArtifactId;
-  version: number;
-  label?: string;
-}
-/**
- * What made the version: a unit's runner (unit and the worker agent set), tilo-render (for a unit), an intake upload (neither) or a restore (FR-MEM-06; no unit). Set by the store from the run, never by a runner.
+ * What made the version: a unit's runner (unit and the worker agent set), tilo-render (for a unit), an intake upload (neither), a restore (FR-MEM-06; no unit) or, since 1.1.0 (ADR-0029), a fetch: a file a unit's worker agent downloaded through tilo-browser (unit and agent set). Set by the store from the run, never by a runner.
  *
  * This interface was referenced by `TiloContracts`'s JSON-Schema
  * via the `definition` "ArtifactVersionOrigin".
  */
 export interface ArtifactVersionOrigin {
-  kind: "unit" | "render" | "upload" | "restore";
+  kind: "unit" | "render" | "upload" | "restore" | "fetch";
   unit: UnitId | null;
   agent: AgentId | null;
 }
@@ -4305,7 +4414,7 @@ export interface PolicyMaxLevel {
   T3: "L1";
 }
 /**
- * Provider-layer configuration as the provider layer loads it (PRD 6.4, 6.6, 14.1): models is config/models.yaml ($defs.models) and prices is config/prices.yaml ($defs.prices). The loader also checks that every role names existing profiles and every profile has a price entry, and the speech role's rules below (1.2.0, ADR-0027). Model ids appear only in config/ and packages/providers.
+ * Provider-layer configuration as the provider layer loads it (PRD 6.4, 6.6, 14.1): models is config/models.yaml ($defs.models) and prices is config/prices.yaml ($defs.prices). The loader also checks that every role names existing profiles and every profile has a price entry, the speech role's rules below (1.2.0, ADR-0027), and the search role, unit price, region and valid_until rules below (1.3.0, ADR-0029). Model ids appear only in config/ and packages/providers.
  *
  * This interface was referenced by `TiloContracts`'s JSON-Schema
  * via the `definition` "Providers".
@@ -4327,7 +4436,7 @@ export interface ProvidersModels {
     [k: string]: ProvidersProfile;
   };
   /**
-   * Business code asks for a role, never a model (PL-01). speech (1.2.0, ADR-0027) is the role every SpeechProvider call asks for (FR-MTG-17, FR-MTG-11, FR-INT-14, FR-CHN-16): the loader refuses it unless it states max_output_tokens and its primary, fallback and cascade profiles declare the audio capability and, while prices are set, carry an audio_input price.
+   * Business code asks for a role, never a model (PL-01). speech (1.2.0, ADR-0027) is the role every SpeechProvider call asks for (FR-MTG-17, FR-MTG-11, FR-INT-14, FR-CHN-16): the loader refuses it unless it states max_output_tokens and its primary, fallback and cascade profiles declare the audio capability and, while prices are set, carry an audio_input price. search (1.3.0, ADR-0029) is the role every SearchProvider call asks for (PRD 12.2): the loader refuses it unless it states reserve_units and its primary, fallback and cascade profiles declare the grounding capability and, while prices are set, carry a unit_price with unit query. Any role whose profiles carry a unit_price must state reserve_units.
    */
   roles: {
     [k: string]: ProvidersRole;
@@ -4335,7 +4444,7 @@ export interface ProvidersModels {
   rules: ProvidersRules;
 }
 /**
- * One model profile. Its cost rank (PRD 6.6) is derived from prices, never declared here. base_url and api_key_env are allowed only when provider is openai_compat (ADR-0002, ADR-0003).
+ * One model profile. Its cost rank (PRD 6.6) is derived from prices, never declared here. base_url and api_key_env are allowed only when provider is openai_compat (ADR-0002, ADR-0003). media_tokens (1.3.0, ADR-0029) holds the tokens the provider counts for one image, one PDF page and one second of audio or video, as upper bounds; the router uses them only for the pre-flight estimate and the EFF-03 cap check before it sends a media part, never for billing (the reported usage is billed). A profile without media_tokens gets no media part: the router refuses it before sending.
  *
  * This interface was referenced by `TiloContracts`'s JSON-Schema
  * via the `definition` "ProvidersProfile".
@@ -4351,6 +4460,7 @@ export interface ProvidersProfile {
    */
   context: number;
   caps: ProvidersCapability[];
+  media_tokens?: ProvidersMediaTokens;
   /**
    * openai_compat endpoint. https only, with no user info, query or fragment, so no credential can sit in the URL (PRD 16.1 rule 4). The not-pattern rejects a final line break, which a Python validator's $ lets through.
    */
@@ -4361,6 +4471,20 @@ export interface ProvidersProfile {
   api_key_env?: string;
 }
 /**
+ * Tokens per unit of media input (ADR-0029 decision 6): image is one image, pdf_page one PDF page, audio_per_second and video_per_second one second. Upper bounds, so an estimate never understates.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "ProvidersMediaTokens".
+ */
+export interface ProvidersMediaTokens {
+  image: number;
+  pdf_page: number;
+  audio_per_second: number;
+  video_per_second: number;
+}
+/**
+ * reserve_units (1.3.0, ADR-0029) is how many units of the profile's unit_price the router reserves under the PL-03 budget check before it sends, because the provider cannot cap them (a grounded call runs as many searches as the model decides). A reply that reports no unit count is charged the reserved amount.
+ *
  * This interface was referenced by `TiloContracts`'s JSON-Schema
  * via the `definition` "ProvidersRole".
  */
@@ -4374,6 +4498,7 @@ export interface ProvidersRole {
   thinking?: "low" | "medium" | "high";
   max_input_tokens?: number;
   max_output_tokens?: number;
+  reserve_units?: number;
 }
 /**
  * This interface was referenced by `TiloContracts`'s JSON-Schema
@@ -4386,7 +4511,7 @@ export interface ProvidersRules {
   deny: string[];
 }
 /**
- * Prices per profile (PL-06, FR-MTR-01). Prices, the date and the source may be null only while status is unset, and the loader refuses live metering until status is set.
+ * Prices per profile (PL-06, FR-MTR-01). Prices, the date and the source may be null only while status is unset, and the loader refuses live metering until status is set. region (1.3.0, ADR-0029), optional, is the provider location the rates were quoted for (for example a regional endpoint's rates): the loader refuses live metering of a profile whose adapter sends to another location; an adapter with no location setting (fake, openai_compat) is not checked.
  *
  * This interface was referenced by `TiloContracts`'s JSON-Schema
  * via the `definition` "ProvidersPrices".
@@ -4395,6 +4520,7 @@ export interface ProvidersPrices {
   status: "unset" | "set";
   effective_date: CalendarDate | null;
   source: string | null;
+  region?: string;
   currency: "USD";
   /**
    * PRD 14.1: 1 credit = US$0.005.
@@ -4405,7 +4531,7 @@ export interface ProvidersPrices {
   };
 }
 /**
- * Standard list price in US dollars per million tokens. audio_input (1.2.0, ADR-0027) is the price per million audio input tokens where the provider bills audio input at its own rate (Gemini); left out, the profile has no audio price and cannot serve the speech role. The other input tokens of the same call are priced at input.
+ * The rate charged, in US dollars per million tokens. audio_input (1.2.0, ADR-0027) is the price per million audio input tokens where the provider bills audio input at its own rate (Gemini); left out, the profile has no audio price and cannot serve the speech role. The other input tokens of the same call are priced at input. 1.3.0 (ADR-0029): cached_input is the price per million input tokens served from the provider's prompt cache (the Trace's tokens_cached, ADR-0022); left out, cached tokens are priced at input. unit_price is a fee per 1,000 units charged on top of the token rates (a call costs tokens times their rates plus units times per_1k / 1000). valid_until is the last calendar day (UTC) the price holds, for a promotional rate: after it the loader refuses live metering of the profile until the file is updated. Promotions, credits and free allowances are never subtracted here (the meter overstates, never understates).
  *
  * This interface was referenced by `TiloContracts`'s JSON-Schema
  * via the `definition` "ProvidersPrice".
@@ -4414,6 +4540,19 @@ export interface ProvidersPrice {
   input: number | null;
   output: number | null;
   audio_input?: number | null;
+  cached_input?: number | null;
+  unit_price?: ProvidersUnitPrice;
+  valid_until?: CalendarDate;
+}
+/**
+ * A fee per 1,000 units (ADR-0029 decision 1): query is one search the provider ran (Gemini grounding reports them in grounding_metadata.web_search_queries), minute one minute of audio, character one input character, image one generated image. per_1k is US dollars per 1,000 units, null only while prices are unset.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "ProvidersUnitPrice".
+ */
+export interface ProvidersUnitPrice {
+  unit: "query" | "minute" | "character" | "image";
+  per_1k: number | null;
 }
 /**
  * A scenario config, config/scenarios/<id>.yaml (PRD 4.3, 7.1 FR-INT-11, ADR-0014): the skill set, connectors, seed data, autonomy policy and world theme a scenario preloads, and nothing else. Data only: no code, prompt, model id, brief text or plan, so a scenario that needs any of those becomes a pillar requirement first, and no platform source names a scenario id. The same shape serves any scenario, a demo, a held-out bank case or a generated brief. theme is the world theme, the same slug as layout.schema.json theme (config/themes/, FR-WLD-15; only its shape is checked until that folder exists, BQ-202). Rules that need other files (the id equals the file name, connectors in config/connectors.yaml, seed files exist inside the repo, each autonomy level within its risk tier's max_level, T3 at L1 only) are SN-01 to SN-09 in contracts/scenario.rules.md, checked by the loader.

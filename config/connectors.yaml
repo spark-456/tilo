@@ -87,3 +87,22 @@
     - {id: create_meeting_event, capability: send, description: "On the meeting bot's own Google account (sign in as the bot, not as yourself): create a meeting with a Meet link and invite the people you approve.", risk_tier: T3, gate_type: approval, irreversible: true}
   limits: {per_minute: 30, batch_size: 50}
   data_class: {returns: [business], redact: []}
+
+# web (PRD 12.2 web search, Must; ADR-0029 decision 7): public web reads for a unit. web_search runs through the
+# SearchProvider (the `search` role in config/models.yaml, Google Search grounding by default); fetch_url downloads
+# one public page or file through tilo-browser (egress allowlist plus the task's allowlist, BQ-LW-1; robots.txt,
+# BQ-LW-5; type by leading bytes; raw archive). Neither holds a key or a person's token, so auth is none and there
+# are no scopes. Both only read, so T1 with no gate (also listed in config/autonomy.yaml). A unit that read fetched
+# content gets no side-effect tool (SEC-05). per_minute bounds web calls per world; batch_size is FR-INT-01's
+# 10 files. Listed last: the dev Director takes the first gated action in catalogue order.
+- id: web
+  name: The Web
+  icon: globe
+  auth: none
+  scopes: {}
+  capabilities: [search, read]
+  actions:
+    - {id: web_search, capability: search, description: "Search the public web through the search provider.", risk_tier: T1, gate_type: none, irreversible: false}
+    - {id: fetch_url, capability: read, description: "Download one public page or file from a host this task allows.", risk_tier: T1, gate_type: none, irreversible: false}
+  limits: {per_minute: 30, batch_size: 10}
+  data_class: {returns: [public], redact: []}
