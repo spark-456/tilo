@@ -1563,12 +1563,14 @@ dependencies = [
     { name = "referencing" },
     { name = "tilo-api" },
     { name = "tilo-archive" },
+    { name = "tilo-browser" },
     { name = "tilo-contracts" },
     { name = "tilo-harness" },
     { name = "tilo-memory" },
     { name = "tilo-metering" },
     { name = "tilo-planning" },
     { name = "tilo-providers" },
+    { name = "tilo-sandbox-web" },
 ]
 
 [package.metadata]
@@ -1579,12 +1581,14 @@ requires-dist = [
     { name = "referencing", specifier = ">=0.30" },
     { name = "tilo-api", editable = "services/api" },
     { name = "tilo-archive", editable = "packages/archive" },
+    { name = "tilo-browser", editable = "services/browser" },
     { name = "tilo-contracts", editable = "packages/contracts-py" },
     { name = "tilo-harness", editable = "services/harness" },
     { name = "tilo-memory", editable = "packages/memory" },
     { name = "tilo-metering", editable = "packages/metering" },
     { name = "tilo-planning", editable = "packages/planning" },
     { name = "tilo-providers", editable = "packages/providers" },
+    { name = "tilo-sandbox-web", editable = "services/sandbox-web" },
 ]
 
 [[package]]

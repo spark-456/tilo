@@ -228,3 +228,7 @@ licence terms are tracked in `design/source/INDEX.md`, not here.
 
 `tilo-memory` declares `jsonschema` and `referencing` as runtime dependencies (FR-MEM-06 artifact store),
 both already listed above (MIT). No new licence.
+
+## Python (`evals`)
+
+`tilo-evals` (LW-16) now depends on the in-workspace `tilo-browser` and `tilo-sandbox-web` (not external): the web-research replay case runs tilo-browser's fetch service over the sandbox-web fixtures in process. No new licence.
