@@ -346,3 +346,14 @@ def _fresh_missing_token_log():
 
     appcheck._missing_log.update(at=float("-inf"), skipped=0)
     yield
+
+
+@pytest.fixture()
+def skills4(people_rig, repo_root):
+    """SKILLS-4: the people rig plus a scripted Router, a fake safety screen and the in-memory skill store."""
+    from _ppl11a_lib import STANDARD_PERSONS
+    from _skills4_lib import Skills4
+
+    rig = people_rig()
+    rig.add_people(STANDARD_PERSONS.values())
+    yield Skills4(rig, repo_root)
