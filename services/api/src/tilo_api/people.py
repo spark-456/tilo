@@ -22,7 +22,7 @@ from tilo_api import deps, people_items
 from tilo_api.meeting_host import HostSeams, get_host_seams, host_meeting
 from tilo_api.people_events import WorkEvents, get_work_events
 from tilo_api.people_limits import idempotent, write_limit
-from tilo_api.people_meetings import MeetingEditIn, edit_meeting, get_meeting, read_minutes, set_world
+from tilo_api.people_meetings import MeetingEditIn, edit_meeting, get_meeting, list_meetings, read_minutes, set_world
 from tilo_api.people_plate import build_plate
 from tilo_api.people_quotes import Reader, item_quote, meeting_quotes
 from tilo_api.people_writes import (
@@ -188,6 +188,15 @@ def confirm_meeting_route(
     if _MEETING_ID.fullmatch(meeting_id) is None:
         raise _not_found()
     return _answer(lambda: confirm_minutes(_writer(principal, stores, clock), meeting_id))
+
+
+@router.get("/v1/meetings")
+def list_meetings_route(
+    principal: Annotated[deps.Principal, Depends(deps.get_current_principal)],
+    stores: Annotated[PeopleStores, Depends(deps.get_people_stores)],
+    clock: Annotated[Callable[[], str], Depends(deps.get_clock)],
+) -> dict[str, Any]:
+    return _answer(lambda: list_meetings(_writer(principal, stores, clock)))
 
 
 @router.get("/v1/meetings/{meeting_id}")
