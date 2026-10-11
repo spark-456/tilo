@@ -67,7 +67,7 @@ export async function attendees(client: RoomClient, worldId: string): Promise<At
   });
 }
 export function roomPath(worldId: string, roomId?: string): string {
-  return `/worlds/${encodeURIComponent(worldId)}/rooms${roomId ? `/${encodeURIComponent(roomId)}` : ""}`;
+  return `/v1/worlds/${encodeURIComponent(worldId)}/rooms${roomId ? `/${encodeURIComponent(roomId)}` : ""}`;
 }
 export async function readRoom(client: RoomClient, worldId: string, roomId: string): Promise<Room> {
   const r = roomOf(await client.getJson(roomPath(worldId, roomId)), worldId);

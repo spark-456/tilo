@@ -25,7 +25,7 @@ it("MR-01/MR-06 reads recorded attendees, convenes, asks, confirms and adjourns 
   const calls: [string, unknown][] = [];
   let held: Omit<typeof room, "reason"> & { reason: string | null } = { ...room };
   const fetcher = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-    const path = String(input).replace("https://api.test/v1", "");
+    const path = String(input).replace("https://api.test", "");
     const body = init?.body ? JSON.parse(String(init.body)) : null;
     calls.push([path, body]);
     let value: unknown = held;
@@ -76,7 +76,7 @@ it("MR-01/MR-06 reads recorded attendees, convenes, asks, confirms and adjourns 
     mount(
       <MeetingHall
         worldId="w_one"
-        client={new HttpClient({ baseUrl: "https://api.test/v1", fetch: fetcher })}
+        client={new HttpClient({ baseUrl: "https://api.test", fetch: fetcher })}
       />,
     );
   });
@@ -92,13 +92,13 @@ it("MR-01/MR-06 reads recorded attendees, convenes, asks, confirms and adjourns 
   expect(document.body.textContent).toContain("Change recorded; planning pending.");
   await tap("Adjourn");
   expect(document.body.textContent).toContain("Adjourned · person");
-  expect(calls).toContainEqual(["/worlds/w_one/rooms", { lead: "A_one", agents: ["A_two"] }]);
+  expect(calls).toContainEqual(["/v1/worlds/w_one/rooms", { lead: "A_one", agents: ["A_two"] }]);
   expect(calls).toContainEqual([
-    "/worlds/w_one/rooms/01ARZ3NDEKTSV4RRFFQ69G5FAV/turns",
+    "/v1/worlds/w_one/rooms/01ARZ3NDEKTSV4RRFFQ69G5FAV/turns",
     { to: "A_one", mode: "quick", text: "Why?" },
   ]);
   expect(calls).toContainEqual([
-    "/worlds/w_one/rooms/01ARZ3NDEKTSV4RRFFQ69G5FAV/changes",
+    "/v1/worlds/w_one/rooms/01ARZ3NDEKTSV4RRFFQ69G5FAV/changes",
     { proposal_id: "01ARZ3NDEKTSV4RRFFQ69G5FAW", text: "Revise with sources" },
   ]);
 });
