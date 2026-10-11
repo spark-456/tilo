@@ -277,6 +277,20 @@ places (BQ-01, BQ-02 and the gaps listed under decision 9).
     because nothing reads the file yet, as for `budget.requested` in decision 13. The SEC-16 config
     test's key set and invalid cases were extended to match, as a one-off exception agreed with the
     test-writer.
+    **Amendment, 8 Oct 2026 (revised 9 Oct 2026):** values set by the user: day 5,000 INR (8 Oct), then
+    "Cut the lifetime cap to 500 rupees per person. 3000 seems excessive for a free service." (9 Oct), so
+    uid 500 INR; the run cap is 150 INR, confirmed by the user the same day ("Yeah go ahead with your cost
+    analysis and new spend limits. I think it's fair", reported by the supervisor): 500 INR per run would
+    let one run spend a person's whole allowance, and 150 INR still covers the deep job estimate of 60 to
+    140 INR; BQ-SEC16-4). The day cap is above PRD 17.3's US$25 by the user's decision (BQ-SEC16-3). So is the
+    run cap (INR 150 is about US$1.88 at 80 INR per US$, against 300 credits, US$1.50), so the "no INR cap
+    exceeds its US$ counterpart" rule above no longer holds for these two. The text above stays as history.
+    The shape is unchanged: `spend_caps` 1.1.1 rewrites one description only, and the `shipped_defaults`
+    fixture carries `run_minor` 15000, `uid_lifetime_minor` 50000 and `global_day_hard_minor` 500000
+    (ordering: `unit_reserve_minor` 1000 <= run 15000 <= lifetime 50000 <= day 500000). The replay-only switch
+    at the daily cap, `unit_reserve_minor`, the null per-org cap and the rate limit are unchanged;
+    `config/spend_caps.yaml` changes with the SEC-16 beta-caps build. PRD 17.3 and the PRD supplement's
+    SEC-16 row (1,000 INR) are read-only and keep their figures.
 
 ## Consequences
 - Builders import `tilo_contracts` or `@tilo/contracts` and never hand-write these shapes.

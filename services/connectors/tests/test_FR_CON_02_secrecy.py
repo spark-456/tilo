@@ -213,25 +213,90 @@ def test_FR_CON_02_the_access_token_is_reachable_only_from_the_adapter_path():
     assert violations == []
 
 
+# ADR-0032 decision 1: the broker, the live Google transport and every adapter (each takes a token) stay in connectors.
+# tilo-api may keep the pure modules (meeting_host, outbox, provenance, registry, errors).
+TOKEN_MODULES = ("tilo_connectors.tokens", "tilo_connectors.live", "tilo_connectors.adapters")
+TOKEN_NAMES = ("tokens", "TokenBroker", "FakeKms", "live", "adapters")
+
+
+def _is_token_module(name: str) -> bool:
+    return any(name == m or name.startswith(m + ".") for m in TOKEN_MODULES)
+
+
+def token_module_uses(tree: ast.AST) -> list[int]:
+    """Every line that reaches tilo_connectors.tokens, .live or .adapters: an import, a from-import, an attribute
+    access (`tilo_connectors.live.X`), a dotted or relative import_module/__import__ string, or getattr by name."""
+    found: list[int] = []
+    wanted = {m.rsplit(".", 1)[1] for m in TOKEN_MODULES}
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ImportFrom) and _is_token_module(node.module or ""):
+            found.append(node.lineno)
+        elif isinstance(node, ast.ImportFrom) and node.module == "tilo_connectors":
+            if any(a.name in TOKEN_NAMES for a in node.names):
+                found.append(node.lineno)
+        elif isinstance(node, ast.Import):
+            found += [node.lineno for a in node.names if _is_token_module(a.name)]
+        elif isinstance(node, ast.Attribute):
+            if node.attr in TOKEN_NAMES and isinstance(node.value, ast.Name) and node.value.id == "tilo_connectors":
+                found.append(node.lineno)
+        elif isinstance(node, ast.Constant) and isinstance(node.value, str) and _is_token_module(node.value):
+            found.append(node.lineno)  # importlib.import_module("tilo_connectors.live")
+        elif isinstance(node, ast.Call):
+            args = [a.value for a in node.args if isinstance(a, ast.Constant) and isinstance(a.value, str)]
+            args += [k.value.value for k in node.keywords if isinstance(k.value, ast.Constant)]
+            name = getattr(node.func, "id", None) or getattr(node.func, "attr", None)
+            relative = (
+                name in ("import_module", "__import__")
+                and "tilo_connectors" in args
+                and any(a.startswith(".") and a.lstrip(".") in wanted for a in args)
+            )
+            first = node.args[0] if node.args else None
+            by_getattr = (
+                name == "getattr"
+                and isinstance(first, ast.Name)
+                and first.id == "tilo_connectors"
+                and any(a in TOKEN_NAMES for a in args)
+            )
+            if relative or by_getattr:
+                found.append(node.lineno)
+    return found
+
+
+@pytest.mark.parametrize(
+    "snippet",
+    [
+        "import tilo_connectors.live",
+        "from tilo_connectors.adapters import GmailAdapter",
+        "from tilo_connectors import live",
+        "import tilo_connectors\ntilo_connectors.tokens.TokenBroker",
+        "import tilo_connectors\nx = tilo_connectors.adapters",
+        "import importlib\nimportlib.import_module('tilo_connectors.live')",
+        "import importlib\nimportlib.import_module('.tokens', 'tilo_connectors')",
+        "import importlib\nimportlib.import_module('.adapters', package='tilo_connectors')",
+        "import tilo_connectors\ngetattr(tilo_connectors, 'live')",
+    ],
+)
+def test_FR_CON_02_the_import_scan_catches_every_form_that_reaches_a_token_module(snippet):
+    assert token_module_uses(ast.parse(snippet)), snippet
+
+
+def test_FR_CON_02_the_import_scan_lets_the_pure_modules_through():
+    pure = (
+        "from tilo_connectors.meeting_host import HostReceipt\n"
+        "from tilo_connectors import Outbox\n"
+        "import tilo_connectors"
+    )
+    assert token_module_uses(ast.parse(pure)) == []
+
+
 def test_FR_CON_02_no_service_outside_tilo_connectors_imports_the_broker():
-    """SEC-02 / PRD 6.5: only tilo-connectors can decrypt OAuth tokens, so no other service or
-    package imports tilo_connectors.tokens."""
+    """SEC-02 / PRD 6.5 / ADR-0032: only tilo-connectors can decrypt OAuth tokens or use them, so no other service or
+    package reaches tilo_connectors.tokens, .live or .adapters, by any form `token_module_uses` knows."""
     own = (REPO_ROOT / "services" / "connectors").resolve()
     violations = []
     for path in production_files():
         if own in path.resolve().parents:
             continue
         tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
-        for node in ast.walk(tree):
-            if isinstance(node, ast.ImportFrom) and (node.module or "").startswith("tilo_connectors.tokens"):
-                violations.append(f"{path.relative_to(REPO_ROOT)}:{node.lineno}")
-            elif isinstance(node, ast.ImportFrom) and node.module == "tilo_connectors":
-                if any(a.name in ("tokens", "TokenBroker", "FakeKms") for a in node.names):
-                    violations.append(f"{path.relative_to(REPO_ROOT)}:{node.lineno}")
-            elif isinstance(node, ast.Import):
-                violations += [
-                    f"{path.relative_to(REPO_ROOT)}:{node.lineno}"
-                    for a in node.names
-                    if a.name.startswith("tilo_connectors.tokens")
-                ]
+        violations += [f"{path.relative_to(REPO_ROOT)}:{n}" for n in token_module_uses(tree)]
     assert violations == []

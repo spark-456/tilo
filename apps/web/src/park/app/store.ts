@@ -2,7 +2,7 @@
 // addWorld, toast, go, needsLeft). Framework-free: React reads it through useSyncExternalStore in
 // context.tsx. State is replaced on every change, never mutated. The one timer is the toast's, and it
 // is injected as `schedule` so a test never waits.
-import { TiloApiError } from "../../api/http";
+import { TiloApiError, isLifetimeCap } from "../../api/http";
 import { needsLeft as countNeedsLeft, makeWorld, worlds } from "../api/fixtures/worlds";
 import { type Api, askQuick } from "../api/index";
 import { NotBuilt } from "../api/liveApi";
@@ -78,6 +78,8 @@ export interface ParkState {
   read: boolean;
   menu: "notif" | "acct" | null;
   wl: WorldLaunch | null;
+  /** SEC-16: a start was refused at the lifetime allowance: the shell shows the pop-up (no toast, no world). */
+  lifetimeCap: boolean;
   time: "day" | "night";
   motion: Motion;
   sources: { fixture: boolean; live: boolean };
@@ -101,6 +103,7 @@ export interface ParkStore {
   askQuick(mode: TierKey, query: string): Promise<QuickOutcome>;
   toast(message: string, actionLabel?: string, action?: () => void): void;
   dismissToast(): void;
+  dismissLifetimeCap(): void;
   setPref(key: string, value: unknown): void;
   go(page: PageId, params?: Params): void;
   /** The loader first (README "Open a world"), the page at its third step. An unknown id just goes. */
@@ -182,6 +185,7 @@ export function createParkStore({ api, navigate, schedule }: ParkStoreDeps): Par
     read: false,
     menu: null,
     wl: null,
+    lifetimeCap: false,
     sources: { fixture: false, live: false },
     ...derive(initialPrefs, {}),
   };
@@ -306,6 +310,10 @@ export function createParkStore({ api, navigate, schedule }: ParkStoreDeps): Par
         },
         (e: unknown) => {
           starting = null;
+          if (isLifetimeCap(e)) {
+            set({ ...state, lifetimeCap: true }); // the pop-up says it; no toast with the server's words, nothing added
+            return false;
+          }
           toast(
             e instanceof TiloApiError
               ? e.message
@@ -349,6 +357,9 @@ export function createParkStore({ api, navigate, schedule }: ParkStoreDeps): Par
     },
     toast,
     dismissToast,
+    dismissLifetimeCap() {
+      if (state.lifetimeCap) set({ ...state, lifetimeCap: false });
+    },
     setPref(key, value) {
       writeStoredPref(key, value);
       quiet(api.setPref(key, value));

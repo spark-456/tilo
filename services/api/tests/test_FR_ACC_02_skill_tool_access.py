@@ -46,7 +46,7 @@ def _gate(registry, team, skills, skill_ids):  # type: ignore[no-untyped-def]
             connectors=registry, team=team, skills=skills,
         ),
         brief={}, scope=None, world_id="w_1", owner=OWNER, store=SimpleNamespace(policies={}),
-        _applied=lambda: [],
+        _applied=lambda: [], adapters={}, _draft_first=lambda *_: None,
     )  # fmt: skip
     fake._action = lambda c, a: runs.Run._action(fake, c, a)  # type: ignore[arg-type]
     unit = {"id": "u1", "district": "d1", "connectors": ["gmail"], "skills": skill_ids}

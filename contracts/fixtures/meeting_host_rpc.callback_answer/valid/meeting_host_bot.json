@@ -1,0 +1,13 @@
+{
+  "connector": "meeting_host",
+  "scope_lines": [
+    "On the meeting bot's own Google account: create a meeting and invite the people you approve."
+  ],
+  "parts": [
+    {
+      "type": "connection.established",
+      "connector": "meeting_host",
+      "user_id": "u_owner"
+    }
+  ]
+}

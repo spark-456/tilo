@@ -42,6 +42,7 @@ export function callTable(): CallTable {
     bookSlot: [slot],
     addBackup: ["ps"],
     setPref: ["backup", "ps"],
+    submitFeedback: ["Honest words."],
   };
 }
 

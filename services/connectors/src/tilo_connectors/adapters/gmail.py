@@ -123,7 +123,7 @@ class GmailAdapter(GoogleAdapter):
 
     def execute_side_effect(self, entry: Mapping[str, Any], grant: Grant) -> dict[str, Any]:  # the only one (SEC-03)
         self._check_grant(entry, grant)
-        return self._final_on_rejection(lambda: self._draft_or_send(entry))
+        return self._done(self._final_on_rejection(lambda: self._draft_or_send(entry)))
 
     def _draft_or_send(self, entry: Mapping[str, Any]) -> dict[str, Any]:
         capability = _CAPABILITY.get(str(entry.get("action_type")))

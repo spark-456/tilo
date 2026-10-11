@@ -140,7 +140,9 @@ def get_seams_factory(
 
     def build(demo: bool = False) -> runs.Seams | None:
         ephemeral.mark_no_person(request)  # only the tick calls this, after its OIDC check: no Firebase token to verify
-        return runs.run_seams(request, "replay" if demo else mode)
+        seams = runs.run_seams(request, "replay" if demo else mode)
+        # a demo's schedule sends nothing (ADR-0035 L6): the tick has no person, so the seam would hand it live stubs
+        return dataclasses.replace(seams, adapters={}) if demo and seams is not None else seams
 
     return build
 
@@ -827,8 +829,41 @@ def tick(
     if as_scheduler:
         if raw:  # the Scheduler sends no body: a task's body from it is the other mode's, refused with no side effect
             return _closed(422, "This caller sends no body.")
-        return _fan_out(schedule_store, tasks_client, clock, flags, audience=audience, caller=tasks_caller, queue=queue)
+        answer = _fan_out(
+            schedule_store, tasks_client, clock, flags, audience=audience, caller=tasks_caller, queue=queue
+        )
+        _sweep_outbox(request, clock, store_factory)
+        return answer
     return _run_task(request, raw, schedule_store, seams_factory, clock, flags, store_factory)
+
+
+def _sweep_outbox(request: Request, clock: Callable[[], datetime], store_factory: Callable[[], deps.Store]) -> None:
+    """ADR-0035 LC-12: the Scheduler's tick also dispatches the durable outbox's due entries, so a dead instance's entry
+    goes out within one tick. Only for `TILO_OUTBOX_STORE=firestore`; best effort: whatever fails is logged by type and
+    the tick's own answer is unchanged. A world that cannot be read is treated as paused."""
+    if os.environ.get("TILO_OUTBOX_STORE") != "firestore":
+        return
+    from tilo_api.outbox_firestore import sweep_due  # noqa: PLC0415
+
+    overrides = request.app.dependency_overrides
+
+    opened: list[deps.Store] = []
+
+    def paused(world_id: str) -> bool:
+        try:
+            if not opened:
+                opened.append(store_factory())
+            world = opened[0].load_world(world_id)
+        except Exception:
+            return True
+        return world is None or world.paused
+
+    try:
+        store = overrides.get(deps.get_outbox_store, deps.get_outbox_store)()
+        adapters = overrides.get(deps.get_connector_adapters, deps.get_connector_adapters)()
+        sweep_due(store, adapters, lambda: _stamp(clock()), paused)
+    except Exception as exc:
+        logger.error("outbox sweep failed (%s)", type(exc).__name__)
 
 
 def _fan_out(

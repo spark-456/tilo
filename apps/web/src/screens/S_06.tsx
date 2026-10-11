@@ -7,6 +7,7 @@
 import type { Layout } from "@tilo/contracts";
 import { useEffect, useRef, useState } from "react";
 import { useClient } from "../api/ClientProvider";
+import { isFieldsApi } from "../api/fields";
 import { CardView, useAnswer } from "../needs-you/CardView";
 import { type QueueItem, askedBy, deriveQueue, rungOf } from "../needs-you/queue";
 import { elapsed } from "../world/runLog";
@@ -19,7 +20,9 @@ import { useRemote } from "./remote";
 /** The card of one waiting question, answerable; or what the event says when the client has no
  * question card for it (a gate's card is never answered from the queue: it has its own sheet). */
 function QuestionCard({ item, layout }: { item: QueueItem; layout: Layout | null }) {
-  const answer = useAnswer(useClient(), item.cardId);
+  const client = useClient();
+  const answer = useAnswer(client, item.cardId);
+  const fields = isFieldsApi(client) ? client : null;
   if (item.card?.kind !== "needs_you") {
     return (
       <>
@@ -31,7 +34,7 @@ function QuestionCard({ item, layout }: { item: QueueItem; layout: Layout | null
       </>
     );
   }
-  return <CardView card={item.card} layout={layout} answer={answer} />;
+  return <CardView card={item.card} layout={layout} answer={answer} fields={fields} />;
 }
 
 export function S_06() {

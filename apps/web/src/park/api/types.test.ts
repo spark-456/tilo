@@ -105,6 +105,7 @@ describe("WEB_1a_types: entity shapes follow the README data model", () => {
       // additive designed copy (WEB-3b): the shell reads the toast and the approved title from the Api
       toast: string;
       approvedTitle: string;
+      provide?: { cardId: string }; // additive (ADR-0035 L6d): a live card answered by the fields form
       facts?: DecisionFacts; // additive (WEB-9c), not in the prototype
     }>();
   });
