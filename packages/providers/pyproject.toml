@@ -10,7 +10,11 @@ dependencies = [
     "jsonschema>=4.18",
     "pypdf>=6.19",  # LW-06: measures the pages of an untrusted PDF part, in a child process (media.py)
     "referencing>=0.30",
+    "tilo-redact",
 ]
+
+[tool.uv.sources]
+tilo-redact = { workspace = true }
 
 [build-system]
 requires = ["hatchling"]

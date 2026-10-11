@@ -71,7 +71,7 @@ steps:
           gcloud run services update "tilo-$${svc}" --project "$PROJECT_ID" --region asia-southeast1 \
             --image "$$digest_ref" --min-instances 0 "$$@" --quiet
         }
-        update api --max-instances 3
+        update api --max-instances 1
         update harness --max-instances 3
         update channels --max-instances 3
         update connectors --max-instances 1

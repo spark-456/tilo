@@ -686,3 +686,10 @@
   font-weight: 600;
   color: var(--ink2);
 }
+[data-park] .park-worlds-routines {
+  margin: 16px 0;
+  padding: 16px;
+  border-radius: 16px;
+  background: var(--paper);
+  color: var(--ink);
+}

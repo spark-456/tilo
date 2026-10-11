@@ -407,6 +407,13 @@ def emulator_people_stores(project_id: str = "demo-tilo") -> PeopleStores:
     return firestore_people_stores(firestore.Client(project=project_id))
 
 
+def _shared_client(project: str) -> Any:
+    """The process's one client (PROD-WIRE 3: `tilo_api.prod`, which also guards it; it imports this module)."""
+    from tilo_api import prod
+
+    return prod.firestore_client(project)
+
+
 def open_people_stores(
     env: Mapping[str, str] | None = None, *, client_factory: Callable[[str], Any] | None = None
 ) -> PeopleStores:
@@ -416,5 +423,4 @@ def open_people_stores(
     project = source.get("TILO_FIRESTORE_PROJECT", "")
     if source.get("TILO_PEOPLE_STORE") != "firestore" or _PROJECT.fullmatch(project) is None:
         raise PeopleStoreNotConfigured("set TILO_PEOPLE_STORE=firestore and a valid TILO_FIRESTORE_PROJECT")
-    make = client_factory or (lambda name: firestore.Client(project=name))
-    return firestore_people_stores(make(project))
+    return firestore_people_stores((client_factory or _shared_client)(project))

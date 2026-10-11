@@ -81,12 +81,19 @@ locals {
     "api" = {
       image              = local.placeholder_image
       min_instance_count = 0
-      max_instance_count = 3
-      ingress            = "INGRESS_TRAFFIC_ALL"
-      public             = true
-      invoked_by         = []
-      vpc_egress         = local.caller_vpc_egress # calls harness directly
-      ignore_env         = true                    # TILO_* runtime settings via gcloud (docs/routines-rollout.md)
+      # ADR-0026: one instance is the one writer (a lease, an in-process
+      # cache): kill switches and revocation live in that process. The
+      # deploy pipelines pass --max-instances 1 for api too.
+      max_instance_count = 1
+      # Opt-in (var.api_durable_stores, ADR-0023 and ADR-0026): CPU stays
+      # allocated between requests (the in-process kill-switch state, the run
+      # threads) only when the user turns the durable stores on.
+      cpu_idle   = !var.api_durable_stores
+      ingress    = "INGRESS_TRAFFIC_ALL"
+      public     = true
+      invoked_by = []
+      vpc_egress = local.caller_vpc_egress # calls harness directly
+      ignore_env = true                    # TILO_* runtime settings via gcloud (docs/routines-rollout.md)
     }
     "harness" = {
       image              = local.placeholder_image

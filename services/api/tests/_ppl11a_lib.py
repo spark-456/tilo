@@ -155,6 +155,10 @@ class SpyRedactor:
         return _TOKEN.sub("[REDACTED]", text)
 
 
+def _no_redactor() -> Any:
+    raise NotImplementedError("no redactor is wired")
+
+
 class IdentityRedactor:
     def __call__(self, text: str) -> str:
         return text
@@ -420,10 +424,13 @@ class Rig:
 
     def unwire(self, *names: str) -> None:
         """Back to the production default of a seam (`people_stores`, `artifact_store`, `redactor`, `clock`,
-        `plate_sources`, `source_owners`)."""
+        `plate_sources`, `source_owners`). The production redactor exists since FR-MEM-05, so `redactor` is unwired to a
+        seam that refuses, the way every other production seam still does: the routes' 503 on a missing seam is kept."""
         for name in names:
             key = seam(self.deps, f"get_{name}")
             self.app.dependency_overrides.pop(key, None)
+            if name == "redactor":
+                self.app.dependency_overrides[key] = _no_redactor
 
     def close(self) -> None:
         self.app.dependency_overrides.clear()

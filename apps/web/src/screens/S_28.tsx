@@ -6,6 +6,8 @@
 // export covers it, so it follows the pills of "Tilo Worlds" and the people rows of "Tilo Team".
 import type { PinboardItem } from "@tilo/contracts";
 import { Fragment, type ReactNode, useEffect, useRef, useState } from "react";
+import { useClient } from "../api/ClientProvider";
+import { HttpClient } from "../api/http";
 import { MENTIONS, PINS, displayName } from "../people/data";
 import { PersonTag, PreviewNote, SoonButton, pillLabel, shortDate } from "../people/parts";
 import {
@@ -67,6 +69,7 @@ function Entry({ pin, action, setUp }: { pin: PinboardItem; action?: ReactNode; 
 }
 
 export function S_28() {
+  const live = useClient() instanceof HttpClient;
   const [board, setBoard] = useState<"team" | "personal">("team");
   const [kind, setKind] = useState<Kind | "all">("all");
   const [sort, setSort] = useState<Sort>({ key: "updated", dir: -1 });
@@ -76,6 +79,12 @@ export function S_28() {
   useEffect(() => {
     if (draft) panel.current?.focus();
   }, [draft]);
+  if (live)
+    return (
+      <Page testid="pinboards" title="Pinboards" sub="Your team's pinboards.">
+        <p>Not available yet</p>
+      </Page>
+    );
   // Closing hands focus back to the button that opened the draft (if its row is still listed).
   const closeDraft = () => {
     setDraft(null);

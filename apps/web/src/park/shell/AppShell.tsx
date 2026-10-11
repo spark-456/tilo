@@ -51,6 +51,10 @@ export function AppShell({ children }: { children: ReactNode }) {
   const quizRoute = useQuizAppRoute();
   const state = useSyncExternalStore(store.subscribe, store.getState);
   const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [notificationStatus, setNotificationStatus] = useState<"loading" | "ready" | "failed">(
+    "loading",
+  );
+  const [liveNotifications, setLiveNotifications] = useState(false);
   const [decisions, setDecisions] = useState<Decision[]>([]);
   const [user, setUser] = useState<User | null>(null);
   const [connectorsOn, setConnectorsOn] = useState<number | null>(null);
@@ -71,10 +75,16 @@ export function AppShell({ children }: { children: ReactNode }) {
   useEffect(() => {
     let live = true;
     const quiet = (): void => undefined; // a read that fails leaves the part empty; the page says why
+    setNotificationStatus("loading");
     api
       .getNotifications()
-      .then((r) => live && setNotifications(r.data))
-      .catch(quiet);
+      .then((r) => {
+        if (!live) return;
+        setNotifications(r.data);
+        setLiveNotifications(r.source === "live");
+        setNotificationStatus("ready");
+      })
+      .catch(() => live && setNotificationStatus("failed"));
     api
       .getDecisions()
       .then((r) => {
@@ -197,7 +207,12 @@ export function AppShell({ children }: { children: ReactNode }) {
         needsLeft={app.needsLeft}
         night={appearance.night}
         menu={state.menu}
-        unread={!state.read && app.needsLeft > 0}
+        unread={
+          !state.read &&
+          (liveNotifications
+            ? notifications.some((n) => n.dec === undefined || !app.dec[n.dec])
+            : app.needsLeft > 0)
+        }
         initials={
           auth
             ? auth.status === "signedIn"
@@ -220,6 +235,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         <Enter>
           <NotificationsPopover
             notifications={notifications}
+            status={notificationStatus}
             decisions={decisions}
             dec={state.dec}
             onOpen={open}

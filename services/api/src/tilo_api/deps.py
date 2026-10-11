@@ -48,6 +48,7 @@ from tilo_providers.config import ProviderConfigError, ProvidersConfig, load_pro
 from tilo_providers.interfaces import SafetyProvider
 from tilo_providers.router import Router, RouterExhaustedError
 from tilo_providers.safety import build_safety_provider
+from tilo_redact import redact
 
 from tilo_api import events, firebase_auth, spend
 from tilo_api.access import AccessStore, Mode, enforced, provider_mode
@@ -440,12 +441,27 @@ def budget_cap_ceiling() -> float:
 
 
 def get_access_store() -> AccessStore:
-    """SEC-15: where each person's visitor-or-judge declaration is kept: the Firestore store when `TILO_API_STORE` is
-    `firestore` (`access_firestore`, through `store_door`); without a valid config 503 `not_configured` (never memory),
-    so a deployed process closes every gated route rather than guess. Tests override it."""
-    from tilo_api import access_firestore
+    """SEC-15: where each person's visitor-or-judge declaration is kept. Deployed: a `FirestoreAccessStore` on the
+    process's shared client when `TILO_API_STORE=firestore` and the api store door opens (the same rules as
+    `store_door.open_api_store`); otherwise 503 `not_configured`, never cached, so a deployed process closes every
+    gated route rather than guess. A failing client build is 503 `store_unavailable`, never with the error text, and is
+    remembered for `PEOPLE_STORES_BACKOFF_S` like the people door's (FS-18): inside the window a request is refused at
+    once, with no client call; a refusal for configuration is not backed off."""
+    global _access_retry_at
+    from tilo_api import prod, store_door  # noqa: PLC0415  (they import this module's neighbours)
 
-    return access_firestore.deployed()
+    retry_at = _access_retry_at
+    if retry_at is not None and people_stores_clock() < retry_at:
+        raise store_door.ApiStoreUnavailable
+    try:
+        opened = store_door.open_api_store()
+    except store_door.ApiStoreNotConfigured:
+        raise HTTPException(status_code=503, detail="not_configured") from None
+    except store_door.ApiStoreUnavailable:
+        _access_retry_at = people_stores_clock() + PEOPLE_STORES_BACKOFF_S
+        raise
+    _access_retry_at = None
+    return prod.FirestoreAccessStore(opened.client, ORG_ID)
 
 
 def get_feedback_store() -> Any:
@@ -464,6 +480,10 @@ def get_app_check_verifier() -> AppCheckVerifier:
     """SEC-10: checks a client's App Check token (`tilo_api.appcheck`). Google's keys for the API's own project; dev
     mode and an unconfigured project refuse without any call. Tests override it; it never decides authorisation."""
     return default_verifier()
+
+
+# After a failed client build the access door makes no new attempt until then (its FS-18 window).
+_access_retry_at: float | None = None
 
 
 def get_spend_caps() -> spend.SpendCaps:
@@ -788,10 +808,10 @@ get_artifact_store.cache_clear = _forget_run_stores  # type: ignore[attr-defined
 
 
 def get_redactor(request: Request = None) -> Callable[[str], str]:  # type: ignore[assignment]
-    """The shared secret redactor the store was given (MF-06). Not built until FR-MEM-05 (BQ-109): refuses."""
+    """The shared secret redactor (MF-06, FR-MEM-05); demo and production use the same implementation."""
     if (demo := _demo(request)) is not None:
         return demo.redactor
-    raise NotImplementedError("the shared secret redactor is not built, so no run starts")
+    return redact
 
 
 # --- the people API seams (PPL-11a, services/api/tests/API_PPL_11a.md section 4); production fails closed ---
@@ -857,9 +877,9 @@ def get_people_stores(request: Request = None) -> PeopleStores:  # type: ignore[
 
 
 def _forget_people_stores() -> None:
-    global _people_stores, _people_stores_retry_at
+    global _people_stores, _people_stores_retry_at, _access_retry_at
     with _people_stores_lock:
-        _people_stores, _people_stores_retry_at = None, None
+        _people_stores, _people_stores_retry_at, _access_retry_at = None, None, None
 
 
 get_people_stores.cache_clear = _forget_people_stores  # type: ignore[attr-defined]  # tests start from a cold process

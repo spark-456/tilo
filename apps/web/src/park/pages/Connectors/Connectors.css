@@ -3,6 +3,15 @@
    fade and turning spinners wait for WEB-3b (motion: restored in WEB-3b, BQ-WEB-3). */
 
 /* ---- Top row: title, count, search ---- */
+[data-park] .park-connectors-live {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  cursor: default;
+}
+[data-park] .park-connectors-live p {
+  margin: 0;
+}
+
 [data-park] .park-connectors-top {
   display: flex;
   align-items: flex-end;

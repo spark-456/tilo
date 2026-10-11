@@ -33,6 +33,7 @@ import { type ParkStore, type Schedule, createParkStore, realSchedule } from "./
 
 export interface ParkProviderProps {
   api?: Api;
+  worldClient?: HttpClient | null;
   navigate?: (to: string) => void;
   schedule?: Schedule;
   viewport?: Viewport;
@@ -45,6 +46,7 @@ export interface ParkProviderProps {
 interface Held {
   store: ParkStore;
   api: Api;
+  worldClient: HttpClient | null;
   schedule: Schedule;
   /** The default Api is the fixture one, so every page will read sample data (no injected Api, no url). */
   expectsSample: boolean;
@@ -97,6 +99,7 @@ function liveFieldsFor(): FieldsFor | null {
 
 export function ParkProvider({
   api,
+  worldClient,
   navigate,
   schedule,
   viewport,
@@ -124,6 +127,12 @@ export function ParkProvider({
       store,
       api: wrapped,
       schedule: timer,
+      worldClient:
+        worldClient !== undefined
+          ? worldClient
+          : api === undefined && API_URL?.trim() && !sessionView.demo()
+            ? new HttpClient({ baseUrl: API_URL, appCheckToken, authToken })
+            : null,
       expectsSample: api === undefined && (!API_URL || sessionView.demo()),
     };
   });
@@ -163,6 +172,8 @@ function useHeld(): Held {
 
 export const useParkStore = (): ParkStore => useHeld().store;
 export const useParkApi = (): Api => useHeld().api;
+/** World-specific routes share the existing authenticated client; demo sessions have none. */
+export const useWorldClient = (): HttpClient | null => useHeld().worldClient;
 /** The provider's timer: a page that waits (the Home composer's 900 ms) goes through it, never setTimeout. */
 export const useSchedule = (): Schedule => useHeld().schedule;
 
