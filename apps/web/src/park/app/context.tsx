@@ -21,6 +21,7 @@ export { endSession } from "../../api/signOut"; // FR-UX-10: the shell's Sign ou
 export { useSessionAuth } from "../../api/sessionAuth"; // FR-UX-10: who is signed in, for the account menu
 import { HttpClient } from "../../api/http";
 import { API_METHODS, type Api, type ApiMethod } from "../api/index";
+import { carryQuizReader } from "../api/quizApps";
 import { withToday } from "../api/sampleDates";
 import { parkApi, withSession } from "../api/select";
 import type { ApiResult, Source } from "../api/types";
@@ -79,7 +80,7 @@ function noting(api: Api, note: (source: Source) => void): Api {
         }),
     ]),
   );
-  return wrapped as unknown as Api;
+  return carryQuizReader(api, wrapped as unknown as Api);
 }
 
 const EMPTY_PINS: AppCtx["pins"] = [];

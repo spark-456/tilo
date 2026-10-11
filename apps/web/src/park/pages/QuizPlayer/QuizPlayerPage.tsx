@@ -11,6 +11,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { type QuizView, readQuizApp } from "../../api/quizApps";
 import type { AppCtx } from "../../app/AppCtx";
 import {
   type AppSpecOptionId,
@@ -26,7 +27,7 @@ import {
   scoreQuizAttempt,
   validateAppSpec,
 } from "../../app/appspec.draft";
-import { useApp, useExpectsSample, useSchedule } from "../../app/context";
+import { useApp, useExpectsSample, useParkApi, useSchedule } from "../../app/context";
 import { Button, PageSheet } from "../../components";
 import "./QuizPlayer.css";
 
@@ -43,7 +44,7 @@ export function QuizPlayerPage({
   worldId: worldIdProp,
   artifactId: artifactIdProp,
   spec: rawSpecProp,
-  publishers = QUIZ_FIXTURE_PUBLISHERS,
+  publishers: publishersProp,
 }: QuizPlayerPageProps) {
   const ctxApp = useApp();
   const app = appProp ?? ctxApp;
@@ -52,9 +53,29 @@ export function QuizPlayerPage({
   const artifactId = artifactIdProp ?? app.params.artifactId ?? "quiz";
 
   // The fictional sample quiz is shown only where the shell shows its Sample chip (the fixture Api). Under a live
-  // Api the page has no spec to read yet, so it says so instead of inventing questions (HR-1..HR-7).
+  // Api the page reads only the owner route; an unavailable spec stays unavailable (HR-1..HR-7).
   const sample = useExpectsSample();
-  const raw = rawSpecProp !== undefined ? rawSpecProp : sample ? QUIZ_FIXTURE_SPEC : undefined;
+  const api = useParkApi();
+  const key = `${worldId}/${artifactId}`;
+  const [loaded, setLoaded] = useState<{ key: string; view: QuizView } | undefined>();
+  useEffect(() => {
+    if (sample || rawSpecProp !== undefined) return;
+    let active = true;
+    void readQuizApp(api, worldId, artifactId)
+      .then((view) => {
+        if (active) setLoaded({ key, view });
+      })
+      .catch(() => {
+        if (active) setLoaded(undefined);
+      });
+    return () => {
+      active = false;
+    };
+  }, [api, key, worldId, artifactId, sample, rawSpecProp]);
+  const liveView = loaded?.key === key ? loaded.view : undefined;
+  const publishers =
+    publishersProp ?? (sample ? QUIZ_FIXTURE_PUBLISHERS : (liveView?.publishers ?? {}));
+  const raw = rawSpecProp !== undefined ? rawSpecProp : sample ? QUIZ_FIXTURE_SPEC : liveView?.spec;
   const validation = useMemo(
     () => (raw === undefined ? { ok: false as const, reason: "" } : validateAppSpec(raw)),
     [raw],

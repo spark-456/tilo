@@ -19,6 +19,7 @@ from tilo_api import dev as _dev
 from tilo_api import durable_store as _durable_store
 from tilo_api import meeting_host_routes as _meeting_host_routes
 from tilo_api import people as _people
+from tilo_api import quiz_apps as _quiz_apps
 from tilo_api import runs as _runs
 from tilo_api import schedules as _schedules
 from tilo_api import skill_proposals as _skill_proposals
@@ -131,6 +132,7 @@ app.include_router(_meeting_room_router)
 app.include_router(_assistant_router)
 app.include_router(_people.router)
 app.include_router(_meeting_host_routes.router)
+app.include_router(_quiz_apps.router)
 app.include_router(_connect_routes.router)
 app.include_router(_people_list_router)
 app.include_router(_effort_router)

@@ -1,10 +1,11 @@
+import type { Api } from "./index";
 // The sample company's dates follow today (DEMO-TIME-1). The fixtures are written for Thursday 24 September 2026; a
 // demo opened on another day would say "Thursday 24 September" on Home, which is a wrong sense of time. `dated` moves
 // every date in a sample answer by the number of days between the fixture's day and `today`, and rebuilds the
 // pieces that are positional (the Agenda's week, the Ledger's month). Pure: the caller hands in today as a calendar
 // date (the app reads its clock in app/context.tsx; this layer reads none), so a test passes any day it likes and a
 // fixture Api with no clock stays exactly as written. Only results whose `source` is "fixture" are changed.
-import type { Api } from "./index";
+import { carryQuizReader } from "./quizApps";
 import type { Agenda, ApiResult, Ledger, Source } from "./types";
 
 export interface CivilDate {
@@ -284,5 +285,5 @@ export function withToday(api: Api, today: () => CivilDate): Api {
         ),
     ]),
   );
-  return wrapped as unknown as Api;
+  return carryQuizReader(api, wrapped as unknown as Api);
 }
