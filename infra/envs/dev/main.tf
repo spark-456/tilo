@@ -111,10 +111,13 @@ locals {
     "connectors" = {
       image              = local.placeholder_image
       min_instance_count = 0
-      max_instance_count = 2
+      max_instance_count = 1 # CON-D9: one instance until the Firestore CAS (ADR-0032 T7)
       ingress            = "INGRESS_TRAFFIC_INTERNAL_ONLY"
       public             = false
-      invoked_by         = ["harness"] # PRD 6.1: harness --> connectors
+      # PRD 6.1: harness --> connectors. ADR-0032 decision 9: api --> connectors (meeting-host RPC) over api's Direct
+      # VPC egress; api is TILO_MEETING_HOST_CALLER, the one account the route accepts.
+      invoked_by = ["harness", "api"]
+      ignore_env = true # TILO_* runtime settings via gcloud (docs/deploy-dev.md, connectors)
     }
     "browser" = {
       image              = local.placeholder_image
@@ -165,6 +168,18 @@ locals {
   # templates have resource-level IAM, so these stay project-level.
   vertex_generate_role = "projects/${var.project_id}/roles/tiloVertexGenerate"
 
+  # Firestore IAM conditions name a database, never a collection or document path. A project-wide datastore.user would
+  # reach `connector_tokens` in the default database, so the tokens live in the database `tilo-tokens` (ADR-0032
+  # decision 9) and every datastore.user except connectors' is limited to the default database. Connectors holds the
+  # unconditional role, which covers both.
+  default_database_condition = {
+    title       = "default-database-only"
+    description = "Not the tilo-tokens database (SEC-02, ADR-0032): Firestore conditions cannot exclude a collection."
+    # Only the resource.name form Google documents for per-database conditions; a resource.type clause could not be
+    # confirmed offline and a wrong one would cut api, harness and render off from Firestore.
+    expression = "resource.name == \"projects/${var.project_id}/databases/(default)\""
+  }
+
   service_project_roles = {
     "api"         = ["roles/datastore.user", "roles/cloudtasks.enqueuer", local.vertex_generate_role, "roles/modelarmor.user"]
     "harness"     = ["roles/datastore.user", "roles/cloudtasks.enqueuer", "roles/aiplatform.user", "roles/modelarmor.user"]
@@ -177,7 +192,9 @@ locals {
 
   # secret => services allowed roles/secretmanager.secretAccessor on it.
   secret_accessors = {
-    "workspace-oauth-client"        = ["connectors"]
+    "workspace-oauth-client"        = ["connectors"] # kept: the live connectors mount the two below (ADR-0035 L7)
+    "workspace-oauth-client-id"     = ["connectors"] # one version added by the user (GOOGLE_OAUTH_CLIENT_ID)
+    "workspace-oauth-client-secret" = ["connectors"] # one version added by the user (GOOGLE_OAUTH_CLIENT_SECRET)
     "whatsapp-api-token"            = ["channels"]
     "channels-webhook-signing-key"  = ["channels"]
     "email-action-link-signing-key" = ["channels"] # channels issues and verifies links (links.py); no api code uses it
@@ -206,7 +223,12 @@ locals {
         member = "serviceAccount:${module.service.service_accounts[name]}"
       }
     ]
-    ]) : combo.key => { role = combo.role, member = combo.member }
+    ]) : combo.key => {
+    role   = combo.role
+    member = combo.member
+    condition = (combo.role == "roles/datastore.user" && split("::", combo.key)[0] != "connectors"
+    ? local.default_database_condition : null)
+    }
     },
     { for r in var.deployer_project_roles : "deployer::${r}" => {
       role = r, member = "serviceAccount:${module.wif.deployer_service_account_email}"
@@ -468,6 +490,43 @@ resource "google_firestore_database" "default" {
   type        = "FIRESTORE_NATIVE"
 
   depends_on = [google_project_service.apis]
+}
+
+# Connector token records (state, scopes, sealed grants; ADR-0032 decision 9). Only tilo-connectors reaches this
+# database: datastore.user for api, harness and render is conditioned to (default) in local.project_bindings.
+# Its deny-all Firestore rules are the ruleset and release below (T5b): firebase.json deploys only what a
+# `firebase deploy` names and the CI deployer has no Firebase role, so Terraform releases them.
+resource "google_firestore_database" "tokens" {
+  project     = var.project_id
+  name        = "tilo-tokens"
+  location_id = var.region
+  type        = "FIRESTORE_NATIVE"
+
+  # Token records: a stray destroy must fail twice (the API flag, and Terraform's own policy).
+  delete_protection_state = "DELETE_PROTECTION_ENABLED"
+  deletion_policy         = "ABANDON"
+
+  depends_on = [google_project_service.apis]
+}
+
+# Same text as the tokens entry in firebase.json; pinned in tests/security_iam.tftest.hcl.
+resource "google_firebaserules_ruleset" "tokens" {
+  project = var.project_id
+
+  source {
+    files {
+      name    = "firestore.tokens.rules"
+      content = file("${path.module}/../../../firestore.tokens.rules")
+    }
+  }
+
+  depends_on = [google_firestore_database.tokens]
+}
+
+resource "google_firebaserules_release" "tokens" {
+  project      = var.project_id
+  name         = "cloud.firestore/${google_firestore_database.tokens.name}"
+  ruleset_name = google_firebaserules_ruleset.tokens.name
 }
 
 module "events" {
@@ -815,6 +874,27 @@ resource "google_firestore_index" "schedules_due" {
 
   fields {
     field_path = "next_due"
+    order      = "ASCENDING"
+  }
+}
+
+# The durable outbox's pending-transfer query (`transfer_pending == true`, then `enqueued_at`; tilo_api.outbox_firestore,
+# ADR-0035 decision 9, BQ-ADR35-L2-4) needs this composite index. Build it BEFORE setting TILO_OUTBOX_STORE=firestore:
+# without it claiming a transfer raises 503 after a sent entry (PI-17). The alert query has one equality filter and needs
+# none. The collection-scoped index covers the `outbox` collection of the (default) database.
+resource "google_firestore_index" "outbox_transfer_pending" {
+  project     = var.project_id
+  database    = google_firestore_database.default.name
+  collection  = "outbox"
+  query_scope = "COLLECTION"
+
+  fields {
+    field_path = "transfer_pending"
+    order      = "ASCENDING"
+  }
+
+  fields {
+    field_path = "enqueued_at"
     order      = "ASCENDING"
   }
 }

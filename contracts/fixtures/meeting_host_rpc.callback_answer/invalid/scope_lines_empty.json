@@ -1,0 +1,11 @@
+{
+  "connector": "gmail",
+  "scope_lines": [],
+  "parts": [
+    {
+      "type": "connection.established",
+      "connector": "gmail",
+      "user_id": "u_priya"
+    }
+  ]
+}

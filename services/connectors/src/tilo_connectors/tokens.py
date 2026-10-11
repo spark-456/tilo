@@ -79,6 +79,10 @@ class _Expired(ConnectionExpired):
     """Raised under the connector lock; connection.expired is emitted once the lock is released."""
 
 
+class GrantPredatesApproval(TokenError):
+    """ADR-0032 HB-06: the grant was made after the approval being sent, so that approval must not use it."""
+
+
 class InsufficientScope(TokenError):
     def __init__(self, missing: list[str]) -> None:
         super().__init__("scopes not granted: " + ", ".join(missing))
@@ -297,6 +301,11 @@ class TokenBroker:
 
     # -- public ---------------------------------------------------------------------------------
 
+    @property
+    def oauth(self) -> tuple[HttpClient, OAuthSettings]:
+        """The client and settings the consent service shares with this broker (tilo-connectors only)."""
+        return self._http, self._settings
+
     def store_tokens(
         self,
         user_id: str,
@@ -311,9 +320,14 @@ class TokenBroker:
         key = (user_id, connector)
         with self._held(user_id, connector):  # user then connector: no revoke of the user's grant in between
             previous = self._store.get(user_id, connector)
+            before = self._readable(user_id, connector, previous)
             if not refresh:
-                refresh = (self._readable(user_id, connector, previous) or {}).get("refresh_token")
-            self._put_connected(user_id, connector, access, refresh, scopes or [], lifetime)
+                refresh = (before or {}).get("refresh_token")
+            # connected_at (ADR-0032 HB-06): set when a connection is made from nothing or from expired, kept while a
+            # readable connected record stands (re-consent); sealed, so only a verified record's value is kept.
+            kept = (previous or {}).get("connected_at") if before is not None else None
+            since = kept if isinstance(kept, str) and (previous or {}).get("state") == "connected" else self._clock()
+            self._put_connected(user_id, connector, access, refresh, scopes or [], lifetime, since)
             with self._settled:
                 self._saving[key] = threading.get_ident()
         # No lock is held while the hook and the emit run (either may call back in); until the events land,
@@ -338,11 +352,19 @@ class TokenBroker:
                 self._settled.notify_all()
 
     def access_token_for_adapter(
-        self, user_id: str, connector: str, *, required_scopes: Iterable[str], force_refresh: bool = False
+        self,
+        user_id: str,
+        connector: str,
+        *,
+        required_scopes: Iterable[str],
+        force_refresh: bool = False,
+        not_before: str | None = None,
     ) -> str:
         """The one call that returns a plaintext token; refreshes first when it is about to expire.
         `force_refresh` is the adapters' 401 path (Google dropped the token before its expiry): it refreshes
-        this same user and connector's record now, after the same connected and scope checks."""
+        this same user and connector's record now, after the same connected and scope checks. `not_before` (HB-06) is
+        an approval time: a grant whose sealed `connected_at` is later raises `GrantPredatesApproval`, checked in this
+        same locked step as the token fetch, so no reconnect can slip in between."""
         try:
             with self._held(user_id, connector, user=False):
                 record = self._store.get(user_id, connector)
@@ -356,6 +378,8 @@ class TokenBroker:
                 payload = self._payload(user_id, connector, record)
                 if payload is None:
                     raise TokenError("the stored record could not be read")
+                if not_before is not None and not self._connected_by(record, not_before):
+                    raise GrantPredatesApproval("the grant was made after the approval")
                 now = parse_ts(add_seconds(self._clock(), self._skew))
                 if not force_refresh and now < parse_ts(record["expires_at"]):
                     return str(payload["access_token"])
@@ -376,11 +400,41 @@ class TokenBroker:
         if error is not None:
             _log.warning("discarded tokens for connector %r could not be revoked", connector)
 
+    def connected_at(self, user_id: str, connector: str) -> str | None:
+        """When this connection was made (ADR-0032 HB-06), or None when it is not connected. The value is sealed
+        into the record's AAD: a record that was moved or edited raises TokenError instead of answering."""
+        record = self._store.get(user_id, connector)
+        if record is None or record.get("state") != "connected" or self._payload(user_id, connector, record) is None:
+            return None
+        since = record.get("connected_at")
+        return since if isinstance(since, str) else None
+
+    @staticmethod
+    def _connected_by(record: Mapping[str, Any], moment: str) -> bool:
+        """True when the (already authenticated) record's connected_at is not later than `moment`; a record
+        without a readable connected_at is never old enough."""
+        since = record.get("connected_at")
+        try:
+            return isinstance(since, str) and parse_ts(since) <= parse_ts(moment)
+        except (ValueError, TypeError, OverflowError):
+            return False
+
     def granted_scopes(self, user_id: str, connector: str) -> frozenset[str]:
         record = self._store.get(user_id, connector)
         if record is None or record.get("state") != "connected":
             return frozenset()
         return frozenset(record.get("scopes", []))
+
+    def display_records(self, user_id: str) -> dict[str, dict[str, Any]]:
+        """ADR-0032 addendum 1 (HB-08): this user's stored grants as display data, {connector: {state, scopes,
+        connected_at}} with the raw stored values (maybe malformed: the caller checks them). A store read only: no
+        KMS, no refresh, no write, no event, and nothing else of a record (never a token or its sealed parts)."""
+        out: dict[str, dict[str, Any]] = {}
+        for connector in self._store.connectors_of(user_id):
+            record = self._store.get(user_id, connector)
+            if record is not None:
+                out[connector] = {k: record.get(k) for k in ("state", "scopes", "connected_at")}
+        return out
 
     def has_live_grant(self, user_id: str, *, excluding: str | None = None) -> bool:
         """True when the user has a record in state "connected" for any connector (but `excluding`),
@@ -423,10 +477,13 @@ class TokenBroker:
             expires_at = None
         return str(record.get("state")), scopes, expires_at
 
-    def disconnect(self, user_id: str, connector: str) -> DisconnectResult:
+    def disconnect(self, user_id: str, connector: str, *, spent: set[str] | None = None) -> DisconnectResult:
         """Revoke at the provider, then delete whatever it answered (fail toward deletion). A failed
-        revoke keeps the token sealed in the retry store and raises alert.raised."""
-        return self._disconnect(user_id, connector, keep_retry=True)
+        revoke keeps the token sealed in the retry store and raises alert.raised.
+        `spent` (ADR-0035, the person group's disconnect): the set of tokens this call sequence already revoked.
+        When given, this connector's own token is revoked now (never left to "the last sibling"), unless it is in
+        the set, so every DISTINCT stored token of the group is revoked once whatever account it came from."""
+        return self._disconnect(user_id, connector, keep_retry=True, spent=spent)
 
     def delete_user(self, user_id: str) -> None:
         """Delete every token of one user, in every store (PRD 16.5). Each revoke is tried; one that
@@ -557,7 +614,7 @@ class TokenBroker:
         raises TokenError."""
         if record is None or "ciphertext" not in record:
             return None
-        bind = [record.get("scopes"), record.get("expires_at")]
+        bind = [record.get("scopes"), record.get("expires_at"), record.get("connected_at")]
         if kind == "revoke":
             bind = [record.get("alert_id"), record.get("connector"), record.get("created_at")]
         context = self._context(kind, user_id, connector)
@@ -579,12 +636,26 @@ class TokenBroker:
             return None
 
     def _put_connected(
-        self, user_id: str, connector: str, access: str, refresh: str | None, scopes: list[str], lifetime: int
+        self,
+        user_id: str,
+        connector: str,
+        access: str,
+        refresh: str | None,
+        scopes: list[str],
+        lifetime: int,
+        connected_at: str,
     ) -> None:
         expires_at = add_seconds(self._clock(), lifetime)
         plain = {"access_token": access, "refresh_token": refresh}
-        sealed = self._seal("token", user_id, connector, plain, [scopes, expires_at])
-        record = {"v": 1, "state": "connected", "scopes": scopes, "expires_at": expires_at, **sealed}
+        sealed = self._seal("token", user_id, connector, plain, [scopes, expires_at, connected_at])
+        record = {
+            "v": 1,
+            "state": "connected",
+            "scopes": scopes,
+            "expires_at": expires_at,
+            "connected_at": connected_at,
+            **sealed,
+        }
         self._store.put(user_id, connector, record)
 
     def _refresh(self, user_id: str, connector: str, record: dict[str, Any], payload: dict[str, Any]) -> str:
@@ -607,7 +678,10 @@ class TokenBroker:
         except TokenError:
             raise TokenRefreshFailed("the token refresh did not get through; try again later") from None
         try:
-            self._put_connected(user_id, connector, access, rotated or refresh, scopes or record["scopes"], lifetime)
+            since = record.get("connected_at") or self._clock()
+            self._put_connected(
+                user_id, connector, access, rotated or refresh, scopes or record["scopes"], lifetime, since
+            )
         except Exception:  # noqa: BLE001 - a KMS or store error text must not travel
             raise TokenRefreshFailed("the refreshed token could not be saved; try again later") from None
         return access
@@ -623,9 +697,13 @@ class TokenBroker:
         answer = post_form(self._http, REVOKE_URL, {"token": token})
         if answer is None:
             return "the provider could not be reached"
+        if answer[0] == 400 and answer[1].get("error") == "invalid_token":
+            return None  # Google no longer knows it: already revoked (a sibling's revoke ended the same grant)
         return None if answer[0] == 200 else f"the provider answered {answer[0]}"
 
-    def _disconnect(self, user_id: str, connector: str, *, keep_retry: bool) -> DisconnectResult:
+    def _disconnect(
+        self, user_id: str, connector: str, *, keep_retry: bool, spent: set[str] | None = None
+    ) -> DisconnectResult:
         alerts: list[str] = []  # raised once the locks are released: a sink may call back in
         with self._held(user_id, connector):
             record = self._store.get(user_id, connector)
@@ -634,7 +712,7 @@ class TokenBroker:
             payload = self._readable(user_id, connector, record) or {}
             token = payload.get("refresh_token") or payload.get("access_token")
             error: str | None = None
-            if keep_retry and self.has_live_grant(user_id, excluding=connector):  # not in delete_user
+            if keep_retry and spent is None and self.has_live_grant(user_id, excluding=connector):  # not delete_user
                 # Google keeps one grant for every connector of this client; revoking it here would end
                 # the others while Tilo still shows them connected (CON-D10). The last one revokes it, and
                 # when every live sibling is unreadable this token is kept for it (it may never read one).
@@ -643,8 +721,10 @@ class TokenBroker:
                 token = None
             elif record.get("state") == "connected" and not token:
                 error = "the stored record could not be read"
-            elif token:
+            elif token and not (spent is not None and str(token) in spent):
                 error = self._revoke(str(token))
+                if error is None and spent is not None:
+                    spent.add(str(token))
             if error is not None:
                 _log.warning("revoke at the provider failed for connector %r: %s", connector, error)
                 # Sealed and stored before the record is deleted: a KMS failure here leaves the record.

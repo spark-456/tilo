@@ -52,5 +52,6 @@ export function createFixtureApi(): Omit<Api, "getProfileSettings"> & {
     bookSlot: ack,
     addBackup: ack,
     setPref: ack,
+    submitFeedback: ack, // source "fixture": never a server confirmation, so the pop-up never says Thanks
   };
 }

@@ -6,9 +6,11 @@
 // authorisation (HR-7, BQ-49: a round "Policy" stamp with a check glyph in the policy colour). No
 // design export shows the policy variant.
 import type { Card, Event, Layout } from "@tilo/contracts";
+import type { ItemApi } from "../api/item";
 import { AppLink } from "../screens/AppLink";
 import { Chip, Soon, authzText, nameOf, stamp, words } from "../screens/kit";
 import { type Answer, CardHead, CardOptions } from "./CardView";
+import { ShowItem } from "./ShowItem";
 import { DONE, type GateRecord, isOpen, openedBy, policyLine, policyName } from "./gates";
 import { RUNG, askedBy } from "./queue";
 import { field, numField } from "./reduce";
@@ -179,12 +181,25 @@ export function GateSheet({
   card,
   layout,
   answer,
-}: { record: GateRecord; card: Card | null; layout: Layout | null; answer: Answer | null }) {
+  item = null,
+}: {
+  record: GateRecord;
+  card: Card | null;
+  layout: Layout | null;
+  answer: Answer | null;
+  /** ADR-0035 L6d: the owner-only read of the pinned item; null offline (nothing is pinned to show). */
+  item?: ItemApi | null;
+}) {
   const out = record.outcome;
   const policy: Event | null = out.state === "policy" ? out.event : null;
   const lead = policy ?? record.requested;
   const facts = factsOf(record, card);
   const policyId = policy ? field(policy, "policy_id") : null;
+  const showMe =
+    item !== null &&
+    out.state === "waiting" &&
+    card?.gate?.action.item != null &&
+    card.actions.includes("show_me");
   return (
     <article
       className="gate-sheet"
@@ -214,6 +229,7 @@ export function GateSheet({
         )
       )}
       {facts && <GateFacts f={facts} />}
+      {showMe && card && item && <ShowItem api={item} cardId={card.id} />}
       {lead && (
         <AppLink to={`/world/${encodeURIComponent(lead.world_id)}/trace`} className="pill">
           See authorisation
@@ -228,7 +244,11 @@ export function GateSheet({
             This gate does not say what it holds, so it cannot be answered here.
           </p>
         ) : card ? (
-          <CardOptions card={card} answer={answer} preselect={!needsDeliberateChoice(facts)} />
+          <CardOptions
+            card={showMe ? { ...card, actions: card.actions.filter((a) => a !== "show_me") } : card}
+            answer={answer}
+            preselect={!needsDeliberateChoice(facts)}
+          />
         ) : (
           <>
             <p className="section-note">

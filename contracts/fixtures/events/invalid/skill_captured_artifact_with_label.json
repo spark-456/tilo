@@ -1,0 +1,39 @@
+{
+  "v": "1.0",
+  "id": "01JB6Z00000000000000SK0001",
+  "seq": 1,
+  "ts": "2026-10-09T09:00:00.000Z",
+  "world_id": "w_desk_priya",
+  "run_id": "r_desk_priya_1",
+  "type": "skill.captured",
+  "actor": "u_priya",
+  "target": "u_priya",
+  "level": null,
+  "district": null,
+  "item": null,
+  "severity": "info",
+  "credits": 9,
+  "summary": "Priya showed Tilo step 1 of a new skill (record).",
+  "cause": null,
+  "vis": [],
+  "authz": null,
+  "data": {
+    "skill": "tsk_01JB6Z0000000000000000INV",
+    "method": "record",
+    "step": 1,
+    "artifact": {
+      "artifact_id": "art_capture_01",
+      "version": 1,
+      "label": "invoice.webm"
+    }
+  },
+  "trace": {
+    "model_role": "skill_capture",
+    "profile": "example-vision",
+    "tokens_in": 21000,
+    "tokens_out": 640,
+    "tool": null,
+    "latency_ms": 5400,
+    "archive_ref": null
+  }
+}
