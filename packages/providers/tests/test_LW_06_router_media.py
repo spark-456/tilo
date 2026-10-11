@@ -98,7 +98,8 @@ def make_config(tmp_path: pathlib.Path, role: dict[str, Any]) -> ProvidersConfig
 
 class Stub(ModelProvider):
     def __init__(self, profile_id: str, usage: dict[str, int] | None = None) -> None:
-        self.profile_id, self.usage, self.requests = profile_id, usage, []
+        self.profile_id, self.usage = profile_id, usage
+        self.requests: list[GenerateRequest] = []
 
     def generate(self, request: GenerateRequest) -> GenerateResponse:
         self.requests.append(request)
@@ -124,7 +125,8 @@ class Fleet:
     """provider_for_profile that builds a Stub per profile and remembers which profiles were ever built."""
 
     def __init__(self, usage: dict[str, dict[str, int]] | None = None) -> None:
-        self.usage, self.built = usage or {}, {}
+        self.usage = usage or {}
+        self.built: dict[str, Stub] = {}
 
     def __call__(self, profile_id: str) -> Stub:
         return self.built.setdefault(profile_id, Stub(profile_id, self.usage.get(profile_id)))
