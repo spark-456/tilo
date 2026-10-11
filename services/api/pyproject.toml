@@ -12,6 +12,7 @@ dependencies = [
     "python-multipart>=0.0.18",
     "google-auth>=2.30",
     "google-cloud-firestore>=2.20.0",
+    "google-cloud-storage>=2.18",
     "requests>=2.31",
     "cryptography>=42",
     "tilo-planning",

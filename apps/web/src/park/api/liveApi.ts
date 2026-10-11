@@ -6,6 +6,7 @@
 import type { IntakeResult } from "../../api/client";
 import { HttpClient, type QuickIntakeResult, TiloApiError, reasonOf } from "../../api/http";
 import { rememberIntake } from "../../api/intakes";
+import { isSampleHidden, wantsSample } from "../sample/sampleChoice";
 import { API_METHODS, type Api, type ApiMethod } from "./index";
 import {
   type CardFeedItem,
@@ -223,12 +224,14 @@ export function createLiveApi(options: LiveApiOptions = {}): Api {
     let cursor: string | null = null;
     for (let n = 0; n < MAX_PAGES && (n === 0 || cursor !== null); n++) {
       const query = cursor === null ? "" : `&cursor=${encodeURIComponent(cursor)}`;
-      const body = await http.getJson(`/worlds?limit=100${query}`);
+      const sample = wantsSample() ? "&include_sample=1" : ""; // STARTER-1: "Show sample project"
+      const body = await http.getJson(`/worlds?limit=100${sample}${query}`);
       if (!isWorldPage(body)) throw new TiloApiError(BAD_REPLY, 200, true);
       items.push(...body.worlds);
       cursor = body.next_cursor;
     }
-    const live = worldsFromList(items);
+    // STARTER-1: a person's "Hide" is this browser's; the server stores nothing about it.
+    const live = worldsFromList(isSampleHidden() ? items.filter((i) => i.sample !== true) : items);
     const liveIds = new Set(live.map((w) => w.id));
     return { data: [...added.filter((w) => !liveIds.has(w.id)), ...live], source: "live" };
   };

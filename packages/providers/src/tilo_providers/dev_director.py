@@ -1,8 +1,8 @@
 """tilo_providers.dev_director — the deterministic dev fake for the Director role (CL-INT-5, EFF-01, PL-01).
 
 `config/models.dev.yaml`'s `director-dev` profile is served by this class, so `just dev-api` needs no recordings or
-paid call. It answers the brief, approaches and plan-draft (`units`, FR-INT-09) requests (and their schema-repair
-re-asks), chosen by `response_schema`.
+paid call. It answers the brief, approaches, plan-draft (`units`, FR-INT-09) and revision-unit (MROOM-H2a) requests
+(and their schema-repair re-asks), chosen by `response_schema`.
 Replies are derived only from the task text or brief it is sent plus fixed demo constants, tagged "(dev)", and every
 guessed field is flagged ambiguous so questions appear (FR-INT-05). `dev_only`: never conforms (PL-05); refused when
 deployed or live (EFF-01). No network, clock or randomness."""
@@ -22,6 +22,8 @@ from tilo_providers.interfaces import Capability, GenerateRequest, GenerateRespo
 TAG = "(dev)"
 _TASK = re.compile(r"<<<TASK\n(.*?)\nTASK>>>", re.DOTALL)
 _BRIEF = re.compile(r"<<<BRIEF\n(.*?)\nBRIEF>>>", re.DOTALL)
+_CHANGE = re.compile(r"<<<CHANGE\n(.*?)\nCHANGE>>>", re.DOTALL)
+_PLAN = re.compile(r"<<<PLAN\n(.*?)\nPLAN>>>", re.DOTALL)
 _CATALOGUE = re.compile(r"<<<CATALOGUE\n(.*?)\nCATALOGUE>>>", re.DOTALL)
 _DATE = re.compile(r"\b(\d{4}-\d{2}-\d{2})\b")
 _GOAL_MAX = 500  # brief.schema.json goal.maxLength
@@ -122,6 +124,23 @@ def _plan_reply(prompt: str) -> dict[str, Any]:
     return {"units": units}
 
 
+def _revision_reply(prompt: str) -> dict[str, Any]:
+    """One revision unit per unit of the change (MROOM-H2a): fresh ids after the plan's highest, each revising its unit.
+    No connector, action or tier is named: code sets the district, role and `change`."""
+    try:
+        wanted = json.loads(_block(_CHANGE, prompt))["units"]
+        current = {u["id"]: u for u in json.loads(_block(_PLAN, prompt))}
+        first = max(int(i[1:]) for i in current) + 1
+        return {"units": [
+            {"id": f"U{first + n}", "revises": uid, "unit_type": current[uid]["unit_type"],
+             "title": f"Revise: {current[uid]['title']}"[: 80 - len(TAG) - 1] + f" {TAG}", "skills": [],
+             "depends_on": [uid]}
+            for n, uid in enumerate(wanted[:10])
+        ]}  # fmt: skip
+    except (ValueError, KeyError, TypeError):
+        return {"units": []}  # an unreadable change gets an empty list, which the planner's schema refuses
+
+
 class DevDirectorProvider(ModelProvider):
     dev_only = True  # PL-05: never counted as conforming for a real role
 
@@ -136,6 +155,8 @@ class DevDirectorProvider(ModelProvider):
             reply = _brief_reply(request.prompt)
         elif "approaches" in properties:
             reply = _approaches_reply(request.prompt)
+        elif (request.response_schema or {}).get("title") == "RevisionReply":  # tilo_planning.revision
+            reply = _revision_reply(request.prompt)
         elif "units" in properties:
             reply = _plan_reply(request.prompt)
         else:
