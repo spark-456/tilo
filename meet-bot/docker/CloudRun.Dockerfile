@@ -23,7 +23,7 @@ COPY config/meeting*.yaml /opt/tilo/config/
 COPY prompts/router /opt/tilo/prompts/router
 COPY prompts/speech /opt/tilo/prompts/speech
 ENV TILO_REPO_ROOT=/opt/tilo \
-    PYTHONPATH=/opt/tilo/packages/contracts-py/src:/opt/tilo/packages/providers/src:/opt/tilo/packages/redact/src:/opt/tilo/services/connectors/src \
+    PYTHONPATH=/app:/opt/tilo/packages/contracts-py/src:/opt/tilo/packages/providers/src:/opt/tilo/packages/redact/src:/opt/tilo/services/connectors/src \
     BOT_JOIN_MODE=guest TILO_CLOUD_CAPTURE=1
 WORKDIR /app
 COPY --chown=pwuser:pwuser meet-bot/bot /app/bot
