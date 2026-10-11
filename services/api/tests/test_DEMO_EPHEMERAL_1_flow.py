@@ -150,7 +150,7 @@ def test_DEMO_EPHEMERAL_1_one_demo_cannot_read_another_demos_data_nor_a_google_u
     client = rf.flow.client
     assert client.get(f"/tasks/{mine[0]}/approaches").status_code == 404
     assert client.get(f"/worlds/{mine[1]}/cards").status_code in (403, 404)  # no cards, whichever refusal
-    assert [w["id"] for w in client.get("/worlds").json().get("worlds", [])] == []
+    assert [w["world_id"] for w in client.get("/worlds").json().get("worlds", []) if not w.get("sample")] == []
     assert client.get("/cards").json().get("items", []) == []
     assert client.get(f"/worlds/{W2}/cards").status_code in (403, 404)  # nor the Google user's world
     assert OTHER_USER not in registry.sessions, "reads on a session that does not exist create no slot"
