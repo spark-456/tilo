@@ -4,6 +4,30 @@ import pytest
 from tilo_api import deps
 
 
+def test_grounded_publisher_hosts_survive_search_redirects():
+    from tilo_api.web_tools import SearchTool
+    from tilo_providers.search import SearchResult, SearchSource
+
+    result = SearchResult(
+        query="papers",
+        answer="Recorded publishers",
+        queries=["papers"],
+        profile_id="fixture",
+        sources=[
+            SearchSource(
+                title="Paper",
+                domain="papers.example.test",
+                redirect_url="https://search.example.test/grounding/opaque",
+                resolved_url="https://cdn.example.test/paper.pdf",
+            )
+        ],
+    )
+    hosts = set()
+    tool = SearchTool(lambda _: (result, 0.0), hosts)
+    tool.run({"query": "papers"})
+    assert hosts == {"search.example.test", "papers.example.test", "cdn.example.test"}
+
+
 def test_default_runner_binds_per_run(monkeypatch):
     monkeypatch.setattr(deps, "_worker_models", lambda mode: {})
     runner = deps.get_unit_runner("replay")
