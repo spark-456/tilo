@@ -1,0 +1,8 @@
+steps:
+  - name: gcr.io/cloud-builders/docker
+    args: [build, -f, meet-bot/docker/CloudRun.Dockerfile, -t, '${_BOT_IMAGE}', .]
+images: ['${_BOT_IMAGE}']
+timeout: 1200s
+serviceAccount: projects/$PROJECT_ID/serviceAccounts/tilo-cloudbuild@$PROJECT_ID.iam.gserviceaccount.com
+options:
+  logging: CLOUD_LOGGING_ONLY
