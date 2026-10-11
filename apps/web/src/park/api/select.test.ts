@@ -53,6 +53,7 @@ describe("WEB_1a_select: an API url means the live Api and no sample values", ()
           "getConnectors",
           "getNotifications",
           "getTeam",
+          "getAgenda",
           "submitFeedback",
           "getProfileSettings",
           "getSkills",

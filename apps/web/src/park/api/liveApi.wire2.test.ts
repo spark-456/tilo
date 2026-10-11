@@ -394,6 +394,7 @@ describe("WIRE_2_live_api: nothing else is connected", () => {
           "getConnectors",
           "getNotifications",
           "getTeam",
+          "getAgenda",
           "submitFeedback",
           "getProfileSettings",
           "getSkills",

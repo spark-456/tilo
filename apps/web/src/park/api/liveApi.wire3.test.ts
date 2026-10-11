@@ -773,6 +773,7 @@ describe("WIRE_3_live_api: nothing else is connected", () => {
       "getConnectors",
       "getNotifications",
       "getTeam",
+      "getAgenda",
       "submitFeedback",
       "getProfileSettings",
       "getSkills",

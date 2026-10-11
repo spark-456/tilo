@@ -111,6 +111,7 @@ describe("WIRE_1_live_api: every other method is still NotBuilt", () => {
           "getConnectors",
           "getNotifications",
           "getTeam",
+          "getAgenda",
           "submitFeedback",
           "getProfileSettings",
           "getSkills",
