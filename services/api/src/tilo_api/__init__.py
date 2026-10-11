@@ -1,5 +1,6 @@
 """tilo-api: sessions, tasks, cards, approvals, policies, downloads, sharing, RBAC (PRD 6.2)."""
 
+import threading
 from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
 from typing import Annotated, Any
@@ -10,10 +11,13 @@ from starlette.concurrency import run_in_threadpool
 from tilo_harness.writer import WriterBusy as _WriterBusy
 from tilo_logging import configure_logging as _configure_logging
 
+from tilo_api import appcheck as _appcheck
+from tilo_api import connect_routes as _connect_routes
 from tilo_api import cors as _cors
 from tilo_api import deps as _deps
 from tilo_api import dev as _dev
 from tilo_api import durable_store as _durable_store
+from tilo_api import meeting_host_routes as _meeting_host_routes
 from tilo_api import people as _people
 from tilo_api import runs as _runs
 from tilo_api import schedules as _schedules
@@ -30,9 +34,12 @@ from tilo_api.console import build_router as _build_console_router
 from tilo_api.costs import router as _costs_router
 from tilo_api.dispatch import router as _dispatch_router
 from tilo_api.effort import router as _effort_router
+from tilo_api.feedback import router as _feedback_router
 from tilo_api.intake import router as intake_router
+from tilo_api.item_fields import router as _item_fields_router
 from tilo_api.log_context import LogContext as _LogContext
 from tilo_api.log_context import LogRunId as _LogRunId
+from tilo_api.meeting_room import router as _meeting_room_router
 from tilo_api.notifications import router as _notifications_router
 from tilo_api.people_limits import NoStore as _NoStore
 from tilo_api.people_list import router as _people_list_router
@@ -50,6 +57,9 @@ _DOCS: dict[str, Any] = {} if _dev.dev_enabled() else {"docs_url": None, "redoc_
 
 @asynccontextmanager
 async def _lifespan(_: FastAPI) -> AsyncIterator[None]:
+    # min-instances 0: every idle period ends in a cold start, and the first sign-in must not meet an empty key cache.
+    # A daemon thread, best effort: the start never waits on the keys endpoint and never fails for it.
+    threading.Thread(target=_appcheck.warm_up, name="jwks-warm-up", daemon=True).start()
     yield
     await run_in_threadpool(_durable_store.close_deployed)  # SIGTERM: the writers release their leases (ADR-0026 4)
 
@@ -114,10 +124,15 @@ app.include_router(
 app.include_router(_build_console_router(_runs.get_card_store, answer_guard=_runs.answer_guard))
 app.include_router(_build_sharing_router(_world_views))
 app.include_router(_runs.router)
+app.include_router(_item_fields_router)
+app.include_router(_meeting_room_router)
 app.include_router(_assistant_router)
 app.include_router(_people.router)
+app.include_router(_meeting_host_routes.router)
+app.include_router(_connect_routes.router)
 app.include_router(_people_list_router)
 app.include_router(_effort_router)
+app.include_router(_feedback_router)
 app.include_router(_connectors_list_router)
 app.include_router(_schedules.router)
 app.include_router(_team_router)

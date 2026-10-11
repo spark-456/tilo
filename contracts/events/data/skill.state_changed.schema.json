@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.tilo.example/events/data/skill.state_changed.schema.json",
+  "x-version": "1.0.0",
+  "title": "SkillStateChangedData",
+  "description": "data of skill.state_changed (registry 1.4.0, ADR-0034, FR-SKL-04, FR-SKL-06): the owner saved a draft (it starts as learning), marked the skill trusted, set it back to learning, paused it or resumed it. A trusted change records the good runs and the threshold in force (good_runs >= threshold, TS-08). The owner is the actor, and the record is written before the event. Envelope as TS-11.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["skill", "version", "change", "good_runs", "threshold"],
+  "properties": {
+    "skill": { "$ref": "../../taught_skill.schema.json#/$defs/id" },
+    "version": { "type": "integer", "minimum": 1 },
+    "change": { "type": "string", "enum": ["saved", "trusted", "learning", "paused", "resumed"] },
+    "good_runs": { "type": "integer", "minimum": 0 },
+    "threshold": { "type": ["integer", "null"], "minimum": 1 }
+  },
+  "if": { "properties": { "change": { "const": "trusted" } }, "required": ["change"] },
+  "then": { "properties": { "threshold": { "type": "integer" } } },
+  "else": { "properties": { "threshold": { "type": "null" } } }
+}

@@ -6,7 +6,9 @@
 // and 1.5 s on timers; page code holds no timer before WEB-3b, so the wait is one awaited step: the busy
 // label shows at once and the result lands on the promise continuation. The S-08 consent hand-off belongs to
 // live mode, when the Api has a connect endpoint. The "Sample data" chip belongs to the shell.
-import { type ReactNode, useCallback, useEffect, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useMemo, useState } from "react";
+import type { ConnectFlow } from "../../../api/connect";
+import { liveConnectFlow } from "../../../api/connectEnv";
 import type { Connector, ConnectorTerms, Skill, World } from "../../api/types";
 import type { AppCtx } from "../../app/AppCtx";
 import { useParkApi } from "../../app/context";
@@ -14,6 +16,7 @@ import { PageSheet } from "../../components";
 import "./Connectors.css";
 import { AttentionBanner, AvailableRow, ConnectedTile } from "./ConnectorParts";
 import { Drawer } from "./Drawer";
+import { GoogleAccess } from "./GoogleAccess";
 import { LiveConnectors } from "./LiveConnectors";
 import { icon } from "./icons";
 import { type Overrides, type UsedRow, isOn, matches, merge, usedBy } from "./view";
@@ -60,8 +63,14 @@ function Heading({ count, children }: { count?: string; children?: ReactNode }) 
  * `now` is the clock the sign-in warning reads (FR-ACC-04); a test fixes it. The warning needs a connector's
  * `expires`, so a tool with none is never flagged here.
  */
-export function ConnectorsPage({ app, now = Date.now }: { app: AppCtx; now?: () => number }) {
+export function ConnectorsPage({
+  app,
+  now = Date.now,
+  flow,
+}: { app: AppCtx; now?: () => number; flow?: ConnectFlow | null }) {
   const api = useParkApi();
+  // ADR-0035 L4: the live Google connect flow, or null (fixture world, demo session): then the page is exactly as before.
+  const live = useMemo(() => (flow === undefined ? liveConnectFlow() : flow), [flow]);
   const [load, setLoad] = useState<Load>({ kind: "loading" });
   const [q, setQ] = useState("");
   const [open, setOpen] = useState<string | null>(null);
@@ -101,6 +110,7 @@ export function ConnectorsPage({ app, now = Date.now }: { app: AppCtx; now?: () 
     return (
       <Frame>
         <Heading />
+        {live ? <GoogleAccess flow={live} /> : null}
         <LiveConnectors connectors={load.connectors} />
       </Frame>
     );
@@ -110,6 +120,7 @@ export function ConnectorsPage({ app, now = Date.now }: { app: AppCtx; now?: () 
     return (
       <Frame>
         <Heading />
+        {live ? <GoogleAccess flow={live} /> : null}
         <div className="park-connectors-empty">
           <span className="park-connectors-empty-glyph">{icon("plug", 22)}</span>
           <div className="park-connectors-empty-title">Not connected yet</div>
@@ -186,6 +197,8 @@ export function ConnectorsPage({ app, now = Date.now }: { app: AppCtx; now?: () 
           />
         </div>
       </Heading>
+
+      {live ? <GoogleAccess flow={live} /> : null}
 
       {attn.map((c) => (
         <AttentionBanner
