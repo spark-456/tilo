@@ -3,10 +3,12 @@
 // with the real counts. Fixture data only (src/people/data.ts) and a notice that says so; no design
 // export covers it, so it follows the pills of "Tilo Worlds" and the people rows of "Tilo Team" in
 // neutral role tokens. Only the person's own items are read (PE-03): of anyone else, a display
-// name. Cards, mail, pins and the calendar join the plate when their sources are connected; none
-// is shown or counted here.
+// name. With an HTTP client, the complete served plate uses its own live view (CX-W1-6), never this sample reducer.
 import type { WorkItem } from "@tilo/contracts";
 import { useEffect, useReducer, useRef, useState } from "react";
+import { useClient, useIsFixtureClient } from "../api/ClientProvider";
+import { HttpClient } from "../api/http";
+import { LivePlate } from "../people/LivePlate";
 import { QUOTES, WORK_ITEMS, displayName } from "../people/data";
 import { Evidence, PersonTag, PreviewNote, SourceIcon, pillLabel } from "../people/parts";
 import {
@@ -79,6 +81,19 @@ function Source({ item: i }: { item: WorkItem }) {
 }
 
 export function S_27() {
+  const client = useClient();
+  const fixture = useIsFixtureClient();
+  if (client instanceof HttpClient) return <LivePlate client={client} />;
+  if (!fixture)
+    return (
+      <Page testid="my-plate" title="My plate" sub="What is waiting on you, in one place.">
+        <p>My plate is not connected yet.</p>
+      </Page>
+    );
+  return <SamplePlate />;
+}
+
+function SamplePlate() {
   const [items, act] = useReducer(reducePlate, WORK_ITEMS);
   const [toast, setToast] = useState<{ text: string; undo: string | null } | null>(null);
   const slot = useRef<HTMLDivElement>(null);
