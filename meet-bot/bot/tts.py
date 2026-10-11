@@ -19,11 +19,16 @@ import shutil
 import time
 import wave
 from collections.abc import AsyncIterator
+from contextvars import ContextVar
 from pathlib import Path
 from typing import Protocol
 
 log = logging.getLogger("bot.tts")
 MAX_CHARS = 400
+# FR-MTG-11: the bot-clock time (time.monotonic) at which the speech-to-text final result for the turn being answered
+# came back, or None (typed chat, no turn). The session sets it around the speak task (a task copies the context when
+# it is created), so the voice can log STT end -> first audio without a signature change on every provider.
+STT_END_AT: ContextVar[float | None] = ContextVar("stt_end_at", default=None)
 
 
 class TTSError(RuntimeError):

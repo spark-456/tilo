@@ -90,6 +90,7 @@ def test_PRD_6_4_shipped_config_loads(repo_root):
         "generator",  # issue #272 (b), GEN-07: the live scenario generator
         "autorater",  # issue #272 (b), GEN-10: scores the generator's plans
         "assistant",  # PPL-11b, FR-PA-19: the assistant panel's fallback (services/api/tests/API_PPL_11b.md)
+        "search",  # ADR-0029, PRD 12.2: every SearchProvider call (falls back to the same grounded profile)
         "meeting",  # FR-MTG-11: the meeting bot's agenda analysis
         "meeting_fast",  # FR-MTG-11: the meeting bot's one-sentence direct answers
         "meeting_room",  # MROOM-A1, ADR-0028: the meeting room's quick replies (`meeting` is the bot's)

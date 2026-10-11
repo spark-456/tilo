@@ -6,21 +6,32 @@ from __future__ import annotations
 
 import json
 import time
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Collection, Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass, field, replace
+from datetime import UTC, date, datetime
 from typing import Any, Literal
 
 from tilo_redact import redact
 
 from tilo_providers.config import ProvidersConfig
-from tilo_providers.errors import OutputTruncatedError, ProviderError, RequestError, SafetyError
+from tilo_providers.errors import (
+    MissingCapabilityError,
+    OutputTruncatedError,
+    ProviderError,
+    RequestError,
+    SafetyError,
+)
 from tilo_providers.factory import build_provider
-from tilo_providers.interfaces import Capability, GenerateRequest, GenerateResponse, ModelProvider
+from tilo_providers.interfaces import Capability, GenerateRequest, GenerateResponse, ModelProvider, SearchProvider
+from tilo_providers.media import capabilities_needed, check_parts, estimate_tokens, provider_takes
 from tilo_providers.prompts import load_prompt, neutralise_marker
+from tilo_providers.replay import is_live_mode
 from tilo_providers.schema_guard import first_error, short
+from tilo_providers.search import redact_query
 
 ProviderFor = Callable[[str], ModelProvider]
+SearchFor = Callable[[str], SearchProvider]
 
 # PL-03 / EFF-03: a call is reserved at its input plus the role's expected output (`config/expected_output.yaml`; 1024
 # when the role has none, never above the call's cap), and refused before sending when its full cap is over twice the
@@ -70,8 +81,11 @@ class RouterAttempt:
     tokens_in: int | None = None
     tokens_out: int | None = None
     tokens_cached: int | None = None  # EFF-04: cache reads, a part of tokens_in; None is unknown, never 0
+    search_queries: int | None = None  # LW-05: the search queries charged (reported, else the role's reserve_units)
+    units_overrun: int | None = None  # LW-05: queries beyond reserve_units; they are charged in full (ADR-0029)
     error_type: str | None = None
     reason: str | None = None  # why this attempt was made (the escalation or fallback reason)
+    tokens_audio: int | None = None  # LW-06: audio input tokens, a part of tokens_in; None is unknown, never 0
     quoted_credits: float = field(default=0.0, repr=False)  # the pre-call reserve (input + expected output)
     ceiling_credits: float = field(default=0.0, repr=False)  # input + the full cap: a cut reply's charge with no usage
 
@@ -94,6 +108,7 @@ class RouterResult:
     outcome: Literal["ok", "safety_blocked"] = "ok"
     response: GenerateResponse | None = None
     embedding: Any = None  # embed()'s result (the adapter's raw {"vectors": [...]} shape), attempts alongside it
+    search_result: Any = None  # search()'s `SearchResult`, attempts alongside it (LW-05)
     chunks: Iterator[GenerateResponse] = field(default_factory=lambda: iter(()))
     last_error: Exception | None = field(default=None, repr=False)
 
@@ -114,10 +129,11 @@ def schema_error(response: GenerateResponse, schema: dict[str, Any]) -> str | No
         return "/: the output could not be validated"
 
 
-def _usage(attempt: RouterAttempt, response: GenerateResponse) -> None:
+def _usage(attempt: RouterAttempt, response: Any) -> None:  # a GenerateResponse or a SearchResult: both carry .usage
     if response.usage:
         attempt.tokens_in, attempt.tokens_out = response.usage.get("input_tokens"), response.usage.get("output_tokens")
         attempt.tokens_cached = response.usage.get("cached_tokens")
+        attempt.tokens_audio = response.usage.get("audio_tokens")
 
 
 def _fail(run: RouterResult, attempt: RouterAttempt, error: Exception, *, output_started: bool = False) -> None:
@@ -199,14 +215,18 @@ class Router:
         fixtures_dir: Any = None,
         live_permitted: bool = False,
         force_replay: bool = False,
+        search_for_profile: SearchFor | None = None,
         role_thinking: bool = True,
     ) -> None:
         if provider_for_profile is None and fixtures_dir is None:
             raise RouterError("Router needs either provider_for_profile or fixtures_dir")
         self._config, self._provider_for_profile, self._fixtures_dir = config, provider_for_profile, fixtures_dir
+        self._search_for_profile = search_for_profile
         self._role_thinking = role_thinking  # False: never fill a role's `thinking` (the live smoke sends none)
         self._live_permitted = live_permitted  # SEC-15: set by the caller that decided this router may go live
         self._force_replay = force_replay  # SEC-15: set by the caller that decided this router replays, LIVE or not
+        if live_permitted and not force_replay:
+            config.check_live()  # ADR-0029 decisions 3 and 4: no live metering at the wrong region or past a promotion
 
     def _provider(self, role_id: str, profile_id: str) -> ModelProvider:
         if self._provider_for_profile is not None:
@@ -220,12 +240,16 @@ class Router:
             force_replay=self._force_replay,
         )
 
-    def _candidates(self, role_id: str, capability: Capability | None) -> list[str]:
+    def _candidates(self, role_id: str, capability: Capability | None, media: Collection[str] = ()) -> list[str]:
+        """The role's profiles in cascade order that declare `capability` and the capability of each media part
+        (`media`, LW-06: vision, documents, audio, video): a profile without one is never picked for that part."""
         role = self._config.roles[role_id]
         ids = list(role.cascade or dict.fromkeys(p for p in (role.primary, role.fallback) if p))
-        ids = [p for p in ids if capability in {None, *map(Capability, self._config.profiles[p].caps)}]
+        needed = {c for c in (capability, *map(Capability, sorted(media))) if c is not None}
+        ids = [p for p in ids if needed <= set(map(Capability, self._config.profiles[p].caps))]
         if not ids:
-            raise RouterExhaustedError(f"PL-03: role {role_id!r} has no candidate with capability {capability!r}")
+            what = repr(capability) if not media else f"{sorted(c.value for c in needed)}"
+            raise RouterExhaustedError(f"PL-03: role {role_id!r} has no candidate with capability {what}")
         return ids
 
     @contextmanager
@@ -250,12 +274,19 @@ class Router:
             attempt.latency_ms = (time.perf_counter() - start) * 1000
 
     def _start(self, role_id: str, req: GenerateRequest, outs: list[str] | None, cap: Any, budget: Any) -> RouterResult:
-        role, candidates = self._config.roles[role_id], self._candidates(role_id, cap)
+        parts = list(req.parts) if req.parts else req.parts  # a snapshot: the caller's list cannot change under the run
+        try:
+            check_parts(parts)  # LW-06: count, bytes, types, sha256, pages; a URI part is refused (ADR-0018 T8)
+        except RequestError as error:
+            raise RouterRequestError(f"LW-06: role {role_id!r} rejected the request: {error}") from error
+        role, candidates = self._config.roles[role_id], self._candidates(role_id, cap, capabilities_needed(parts))
         max_output = next(n for n in (req.max_output_tokens, role.max_output_tokens, 1024) if n is not None)  # BQ-63
         # FR-MEM-05 (PRD 16.1 rule 4): no secret leaves in a prompt, system text or tool output, nor stays in what the
         # result keeps for the trace and archive. Text with no secret is returned as is, so replay keys do not drift.
         prompt, system = redact(req.prompt), redact(req.system) if req.system is not None else None
-        request = req.model_copy(update={"prompt": prompt, "system": system, "max_output_tokens": max_output})
+        request = req.model_copy(
+            update={"prompt": prompt, "system": system, "max_output_tokens": max_output, "parts": parts}
+        )
         return RouterResult(
             role_id, request, candidates, budget, raw_prompt=prompt, tool_outputs=[redact(o) for o in outs or []]
         )
@@ -267,7 +298,8 @@ class Router:
         role's input to max_input_tokens (or refuse a repair `prompt` over it), then price the call (PL-03).
         Never sends anything over the cap."""
         cap = self._config.roles[run.role_id].max_input_tokens
-        measure = lambda text: provider.count_tokens(_input_text(run.request, text))  # noqa: E731
+        media, audio = self._media(run, profile_id)
+        measure = lambda text: provider.count_tokens(_input_text(run.request, text)) + media  # noqa: E731
         if prompt is None:
             prompt = _compact(run.role_id, cap, run.raw_prompt, run.tool_outputs, measure)
         else:
@@ -287,11 +319,39 @@ class Router:
             sent = sent.model_copy(update={"thinking_level": role.thinking})
         cap = sent.max_output_tokens or 0
         expected = min(self._config.expected_output.get(run.role_id, _DEFAULT_EXPECTED_OUTPUT), cap)
-        return sent, *self._quote(run, profile_id, provider, _input_text(sent, prompt), cap, expected)
+        text = _input_text(sent, prompt)
+        return sent, *self._quote(run, profile_id, provider, text, cap, expected, media=media, audio=audio)
 
-    def _cost(self, profile_id: str, tokens_in: int, tokens_out: int) -> float:
-        quote = self._config.price(profile_id)
-        return self._config.credits((tokens_in * quote.input + tokens_out * quote.output) / 1e6)
+    def _media(self, run: RouterResult, profile_id: str) -> tuple[int, int]:
+        """LW-06, per candidate and before anything is sent: (media tokens, of which audio) from the profile's
+        `media_tokens`, an upper bound that goes into the EFF-03 cap and the PL-03 price. A profile without
+        `media_tokens`, whose adapter cannot take a part's type, or with no `audio_input` price for an audio part
+        gets no media: it is recorded as a missing capability and the next candidate is tried."""
+        parts = run.request.parts
+        if not parts:
+            return 0, 0
+        profile = self._config.profiles[profile_id]
+        if profile.media_tokens is None:
+            raise MissingCapabilityError(f"LW-06: profile {profile_id!r} states no media_tokens, so it gets no media")
+        for part in parts:
+            if not provider_takes(profile.provider, part):
+                raise MissingCapabilityError(f"LW-06: profile {profile_id!r} cannot take {part.mime_type}")
+        if self._config.prices.status == "set" and any(p.kind == "audio" for p in parts):
+            if self._config.prices.profiles[profile_id].audio_input is None:
+                raise MissingCapabilityError(f"LW-06: profile {profile_id!r} has no audio_input price for audio")
+        return estimate_tokens(parts, profile.media_tokens)
+
+    def _price_day(self) -> date | None:
+        """A promotional rate's `valid_until` binds only a call that can go live; a replay uses its recorded dates."""
+        return datetime.now(UTC).date() if self._live_permitted or is_live_mode() else None
+
+    def _cost(
+        self, profile_id: str, tokens_in: int, tokens_out: int, cached: int = 0, units: int = 0, audio: int = 0
+    ) -> float:
+        usd = self._config.cost_usd(
+            profile_id, tokens_in, tokens_out, cached=cached, units=units, audio=audio, at=self._price_day()
+        )
+        return self._config.credits(usd)
 
     def _quote(
         self,
@@ -301,17 +361,20 @@ class Router:
         text: str,
         out: int,
         expected: int | None = None,
+        *,
+        media: int = 0,
+        audio: int = 0,
     ) -> tuple[float, float]:
         """PL-03: every call (first, repair, fallback, escalation) is priced before it is made (BQ-61). Returns
-        (reserve, ceiling): the input plus the role's EXPECTED output (`expected`, else all of `out`), and the input
-        plus the full cap `out`. Refused (nothing sent) only when (a) the reserve is over the budget left, or (b) the
-        ceiling is over twice the budget left. A call past both is sent and may settle above its reserve; nothing
-        is taken from the budget until it returns (`_spend`)."""
+        (reserve, ceiling): the input (LW-06: media tokens included, audio at its own rate) plus the role's EXPECTED
+        output (`expected`, else all of `out`), and the input plus the full cap `out`. Refused (nothing sent) only
+        when (a) the reserve is over the budget left, or (b) the ceiling is over twice the budget left. A call past
+        both is sent and may settle above its reserve; nothing is taken from the budget until it returns (`_spend`)."""
         if run.budget is None:
             return 0.0, 0.0
-        tokens_in = provider.count_tokens(text)
-        reserve = self._cost(profile_id, tokens_in, out if expected is None else min(expected, out))
-        ceiling = reserve if expected is None else self._cost(profile_id, tokens_in, out)
+        tokens_in = provider.count_tokens(text) + media
+        reserve = self._cost(profile_id, tokens_in, out if expected is None else min(expected, out), audio=audio)
+        ceiling = reserve if expected is None else self._cost(profile_id, tokens_in, out, audio=audio)
         if reserve > run.budget:
             message = f"PL-03: a call on {profile_id!r} costs ~{reserve:.4f} credits, over {run.budget} left"
             raise BudgetExceededError(message, run.attempts)
@@ -323,15 +386,33 @@ class Router:
             raise BudgetExceededError(message, run.attempts)
         return reserve, ceiling
 
-    def _spend(self, run: RouterResult, profile_id: str, estimate: float, usage: dict[str, Any] | None) -> None:
-        """PL-03: a call that returned is charged from its reported usage, else its estimate. A call that
-        raised (quota, retryable, ...) is never charged, so it cannot starve the fallback. The budget stops at 0."""
+    def _spend(
+        self, run: RouterResult, profile_id: str, estimate: float, usage: dict[str, Any] | None, units: int = 0
+    ) -> None:
+        """PL-03: a call that returned is charged from its reported usage (cached tokens at their own rate, `units`
+        at the profile's unit price), else its estimate. A call that raised (quota, retryable, ...) is never charged,
+        so it cannot starve the fallback. The budget stops at 0."""
         if run.budget is None:
             return
         tokens_in, tokens_out = (usage or {}).get("input_tokens"), (usage or {}).get("output_tokens")
         if isinstance(tokens_in, int) and isinstance(tokens_out, int):
-            estimate = self._cost(profile_id, tokens_in, tokens_out)
-        run.budget = max(0.0, run.budget - estimate)
+            cached = (usage or {}).get("cached_tokens")
+            cached = cached if isinstance(cached, int) and 0 <= cached <= tokens_in else 0
+            audio = self._audio_tokens(run, profile_id, usage, tokens_in - cached)
+            estimate = self._cost(profile_id, tokens_in, tokens_out, cached, audio=audio)
+        run.budget = max(0.0, run.budget - (estimate + (self._cost(profile_id, 0, 0, units=units) if units else 0)))
+
+    def _audio_tokens(self, run: RouterResult, profile_id: str, usage: dict[str, Any] | None, room: int) -> int:
+        """LW-06: the audio tokens of a returned call, charged at `audio_input`. A request with no audio part has
+        none; a reply that reports no usable count is charged the pre-flight estimate (an upper bound: never
+        understated). At most `room`, the input tokens that are not cached."""
+        parts = run.request.parts
+        if not any(p.kind == "audio" for p in parts or ()):
+            return 0
+        reported = (usage or {}).get("audio_tokens")
+        if isinstance(reported, bool) or not isinstance(reported, int) or reported < 0:
+            reported = estimate_tokens(parts, self._config.profiles[profile_id].media_tokens)[1]
+        return min(reported, room)
 
     def _charge_truncated(self, run: RouterResult, attempt: RouterAttempt, error: OutputTruncatedError) -> None:
         """FR-MTR-01: a reply cut at its cap was billed (input, output and thinking tokens). It is charged from the
@@ -342,7 +423,8 @@ class Router:
         known = error.output_tokens is not None or error.thinking_tokens is not None
         if isinstance(error.input_tokens, int) and known:
             attempt.tokens_in, attempt.tokens_out = error.input_tokens, spent
-            credits = self._cost(attempt.profile_id, error.input_tokens, spent)
+            audio = self._audio_tokens(run, attempt.profile_id, None, error.input_tokens)  # LW-06: audio is priced
+            credits = self._cost(attempt.profile_id, error.input_tokens, spent, audio=audio)
         else:
             credits = attempt.ceiling_credits  # no usage: a cut reply used its whole cap
         if run.budget is not None:
@@ -436,6 +518,68 @@ class Router:
             finally:
                 attempt.latency_ms = (time.perf_counter() - start) * 1000
             return
+        raise _exhausted(run) from run.last_error
+
+    def _search_provider(self, role_id: str, profile_id: str) -> SearchProvider:
+        if self._search_for_profile is not None:
+            return self._search_for_profile(profile_id)
+        from tilo_providers.search import build_search_provider  # noqa: PLC0415
+
+        return build_search_provider(
+            role_id,
+            self._config,
+            fixtures_dir=self._fixtures_dir,
+            profile_id=profile_id,
+            live_permitted=self._live_permitted,
+            force_replay=self._force_replay,
+        )
+
+    def _search_quote(self, run: RouterResult, profile_id: str, query: str, out: int, reserve: int) -> float:
+        """PL-03/EFF-03 before a search is sent: refuse a query over the role's `max_input_tokens` (it cannot be
+        compacted; the estimate is two bytes a token, an upper bound), then price the call with `reserve` queries
+        reserved, since the provider decides how many it runs (ADR-0029 decision 1). Returns the token estimate."""
+        cap = self._config.roles[run.role_id].max_input_tokens
+        tokens = len(query.encode("utf-8")) // 2 + 1
+        if cap is not None and tokens > cap:
+            raise TokenCapExceededError(f"EFF-03: role {run.role_id!r} query is over its max_input_tokens cap of {cap}")
+        if run.budget is None:
+            return 0.0
+        estimate = self._cost(profile_id, tokens, out)
+        total = estimate + self._cost(profile_id, 0, 0, units=reserve)
+        if total > run.budget:
+            message = f"PL-03: a search on {profile_id!r} costs ~{total:.4f} credits ({reserve} queries reserved)"
+            raise BudgetExceededError(f"{message}, over {run.budget} left", run.attempts)
+        return estimate
+
+    def search(
+        self, role_id: str, query: str, *, budget: float | None = None, max_output_tokens: int | None = None
+    ) -> RouterResult:
+        """LW-05: one grounded search through the role's `SearchProvider`. The role's `reserve_units` queries are
+        reserved under the budget check before sending; the reply is charged its reported `search_queries` (else
+        the reserve), an overrun is charged in full and recorded on the attempt (`units_overrun`)."""
+        role = self._config.roles[role_id]
+        if role.reserve_units is None:
+            raise RouterError(f"LW-05: role {role_id!r} states no reserve_units; a search role must (ADR-0029)")
+        reserve = role.reserve_units
+        out = next(n for n in (max_output_tokens, role.max_output_tokens, 1024) if n is not None)  # BQ-63
+        shown = redact_query(query) if isinstance(query, str) else ""  # the run (and so the Trace) never holds a secret
+        request = GenerateRequest(prompt=shown, max_output_tokens=out)
+        run = RouterResult(role_id, request, self._candidates(role_id, Capability.GROUNDING), budget, raw_prompt=shown)
+        reason: str | None = None
+        for profile_id in run.candidates:
+            with self._candidate(run, profile_id, reason) as attempt:
+                provider = self._search_provider(role_id, profile_id)
+                estimate = self._search_quote(run, profile_id, shown, out, reserve)
+                result = provider.search(query, max_output_tokens=out)
+            if attempt.error_type:
+                reason = f"fallback after {attempt.error_type}"
+                continue
+            reported = (result.usage or {}).get("search_queries")
+            units = reported if isinstance(reported, int) and reported >= 0 else reserve  # no count: the reserve
+            attempt.search_queries, attempt.units_overrun = units, max(0, units - reserve)
+            self._spend(run, profile_id, estimate, result.usage, units)
+            _usage(attempt, result)
+            return replace(run, search_result=result)
         raise _exhausted(run) from run.last_error
 
     def embed(

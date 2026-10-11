@@ -10,6 +10,7 @@ import { type ReactNode, useState } from "react";
 import { useClient } from "../api/ClientProvider";
 import { HttpClient } from "../api/http";
 import { HostMeeting } from "../people/HostMeeting";
+import { LiveLists } from "../people/LiveLists";
 import { ALL_MEETINGS, MEETINGS, MINUTES, PREVIEW_NOW, SIGNED_IN } from "../people/data";
 import { Evidence, PersonTag, PreviewNote, pillLabel } from "../people/parts";
 import { AppLink } from "./AppLink";
@@ -80,12 +81,7 @@ export function S_26({ params }: ScreenProps) {
   const live = useClient() instanceof HttpClient;
   const [confirmedAt, setConfirmedAt] = useState<Readonly<Record<string, string>>>({});
   const [group, setGroup] = useState<Group>("all");
-  if (live)
-    return (
-      <Page testid="meetings" title="Meetings" sub="Your meetings and their minutes.">
-        <p>Not available yet</p>
-      </Page>
-    );
+  if (live) return <LiveLists kind="meetings" />;
   const confirmedOf = (m: Meeting): string | null =>
     confirmedAt[m.id] ?? m.minutes_confirmed_by?.at ?? null;
   const groupOf = (m: Meeting): Group =>

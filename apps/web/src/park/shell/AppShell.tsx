@@ -9,12 +9,13 @@ import { nameInitials } from "../api/nameInitials";
 import type { Decision, Notification, User } from "../api/types";
 import type { PageId } from "../app/AppCtx";
 import { endSession, useApp, useExpectsSample, useParkApi, useParkStore } from "../app/context";
-import { useParkRoute } from "../app/router";
+import { useParkRoute, useQuizAppRoute } from "../app/router";
 import { Button, Popover, Toast } from "../components";
 import "../tokens/fonts";
 import { AccountMenu, type AccountPerson } from "./AccountMenu";
 import { BootSplash } from "./BootSplash";
 import { CityBackdrop } from "./CityBackdrop";
+import { ContextPanel, useContextChoice } from "./ContextPanel";
 import { Enter } from "./Enter";
 import { NotificationsPopover } from "./NotificationsPopover";
 import { TopNav } from "./TopNav";
@@ -48,6 +49,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const store = useParkStore();
   const api = useParkApi();
   const route = useParkRoute();
+  const quizRoute = useQuizAppRoute();
   const state = useSyncExternalStore(store.subscribe, store.getState);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [notificationStatus, setNotificationStatus] = useState<"loading" | "ready" | "failed">(
@@ -60,6 +62,8 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [ready, setReady] = useState(false);
   const expectsSample = useExpectsSample();
   const auth = useParkAuth();
+  const contextPerson = auth ? (auth.user?.email ?? "guest-session") : (user?.email ?? "device");
+  const [contextOpen, toggleContext] = useContextChoice(contextPerson);
   const tour = useParkTour();
   const [mobileNote, setMobileNote] = useState(false);
   const signingOut = useRef(false);
@@ -125,7 +129,13 @@ export function AppShell({ children }: { children: ReactNode }) {
   const page = route?.page ?? null;
   // A tab or menu click fades the old page out and the new one in. Everything else (the browser's back button, a
   // link inside a page, a world loader's card that covers the swap, reduced motion) swaps at once.
-  const key = route ? (route.page === "world" ? `world/${route.params.id}` : route.page) : "none";
+  const key = route
+    ? route.page === "world"
+      ? `world/${route.params.id}`
+      : route.page
+    : quizRoute
+      ? `world/${quizRoute.worldId}/app/${quizRoute.artifactId}`
+      : "none";
   const swap = usePageSwap(
     children,
     key,
@@ -223,7 +233,10 @@ export function AppShell({ children }: { children: ReactNode }) {
         onToggleTime={appearance.toggleTime}
         onBell={() => store.toggleMenu("notif")}
         onAvatar={() => store.toggleMenu("acct")}
+        contextOpen={contextOpen}
+        onContext={toggleContext}
       />
+      {contextOpen && <ContextPanel key={contextPerson} onClose={toggleContext} />}
       {state.menu === "notif" ? (
         <Enter>
           <NotificationsPopover
