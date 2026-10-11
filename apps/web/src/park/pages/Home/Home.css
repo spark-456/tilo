@@ -26,12 +26,26 @@
 }
 
 /* ---- greeting panel (top left) ---- */
-[data-park] .park-home-hero {
+/* the greeting panel and the spend tiles under it share one column, so the tiles follow the panel's real height
+   (a longer greeting or summary pushes them down) and stop above the composer, never over either */
+[data-park] .park-home-leftcol {
   position: absolute;
   left: 24px;
   top: 96px;
+  bottom: 218px;
   width: 500px;
   max-width: calc(100% - 48px);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  z-index: 3;
+  pointer-events: none;
+}
+[data-park] .park-home-leftcol > * {
+  pointer-events: auto;
+}
+[data-park] .park-home-hero {
+  flex: none;
   box-sizing: border-box;
   padding: 24px 26px 22px;
   border-radius: 28px;
@@ -53,6 +67,17 @@
   font-size: 50px;
   line-height: 1;
   letter-spacing: -1.4px;
+}
+/* a phone: the stacked composer is tall, so the greeting is a size smaller to keep the suggestion chips off the panel */
+@media (max-width: 480px) {
+  [data-park] .park-home-h1 {
+    font-size: 40px;
+    letter-spacing: -1.1px;
+  }
+  [data-park] .park-home-hero {
+    padding: 20px 22px 18px;
+    gap: 10px;
+  }
 }
 [data-park] .park-home-summary {
   margin: 0;
@@ -395,31 +420,26 @@
   transform: translateY(-2px);
 }
 
-/* "Start a real task" (not in the design): out of the column's flow, in the 24px the column leaves below
-   it, so the composer's own boxes keep the positions the design gives them (no layout shift) */
+/* "Start a real task" (not in the design): the last words of the composer's hint line, a plain underlined link */
 [data-park] .park-home-real {
-  position: absolute;
-  top: 100%;
-  left: 50%;
-  transform: translateX(-50%);
-  display: flex;
-  align-items: center;
-  height: 24px;
-  padding: 0 12px;
-  border-radius: 999px;
-  background: var(--pop);
-  border: 1px solid var(--line2);
-  box-shadow: var(--sh);
-  box-sizing: border-box;
-  font-weight: 800;
-  font-size: 13px;
-  line-height: 1;
-  color: var(--ink);
-  text-decoration: none;
   white-space: nowrap;
+  font-weight: 800;
+  color: var(--heroInk);
+  text-decoration: underline;
 }
 [data-park] .park-home-real:hover {
-  text-decoration: underline;
+  text-decoration-thickness: 2px;
+}
+/* a phone: the link looks the same and its touch target reaches 44px (WCAG 2.2 target size) */
+@media (max-width: 480px) {
+  [data-park] .park-home-real {
+    position: relative;
+  }
+  [data-park] .park-home-real::after {
+    content: "";
+    position: absolute;
+    inset: -11px -8px;
+  }
 }
 
 /* the drafting line: the ring turns in WEB-3 (BQ-WEB-3) */
@@ -543,7 +563,7 @@
   padding: 0 22px;
   border: 0;
   border-radius: 14px;
-  background: var(--hero);
+  background: var(--heroFill);
   color: #ffffff;
   font-size: 15px;
   font-weight: 800;
@@ -630,7 +650,7 @@
   padding: 0 24px;
   border: 0;
   border-radius: 18px;
-  background: var(--hero);
+  background: var(--heroFill);
   color: #ffffff;
   font-size: 16px;
   font-weight: 800;
@@ -728,7 +748,7 @@
   color: #1f1d2b;
 }
 [data-park] .park-home-pin__icon--run {
-  background: var(--hero);
+  background: var(--heroFill);
   color: #ffffff;
 }
 [data-park] .park-home-pin__icon--sch {
@@ -764,12 +784,8 @@
 
 /* ---- the five spend tiles (FR-SPD-01), under the greeting panel ---- */
 [data-park] .park-home-kpis {
-  position: absolute;
-  left: 24px;
-  top: 360px;
-  width: 500px;
-  max-width: calc(100% - 48px);
-  max-height: calc(100% - 560px);
+  flex: 0 1 auto;
+  min-height: 0;
   overflow-y: auto;
   box-sizing: border-box;
   padding: 8px;
@@ -796,21 +812,44 @@
   outline-offset: 2px;
 }
 
-/* ---- legal links (WEB-LEGAL): a quiet strip under the composer, on the page's bottom edge ---- */
+/* ---- legal links (WEB-LEGAL): a quiet strip on the page's bottom edge, at the right ---- */
 [data-park] .park-home-legal {
   position: absolute;
-  left: 50%;
-  bottom: 0;
-  transform: translateX(-50%);
+  right: 24px;
+  bottom: 0; /* the centre of this edge is "Start a real task" (the two overlapped); the legal strip sits at the right */
   z-index: 4;
   height: 24px;
   display: flex;
   align-items: center;
   gap: 6px;
+  padding: 0 12px; /* a backing like "Start a real task": the text sits on the map, so it needs a fill to be readable */
+  border-radius: 999px;
+  background: var(--pop);
+  border: 1px solid var(--line2);
+  box-shadow: var(--sh);
+  box-sizing: border-box;
   font-size: 12px;
   font-weight: 700;
-  color: var(--ink3);
+  color: var(--ink2);
   white-space: nowrap;
+}
+/* a phone: the composer's "Start a real task" is centred, so the strip hugs the right edge and shrinks to leave a gap */
+@media (max-width: 480px) {
+  [data-park] .park-home-legal {
+    right: 12px;
+    gap: 4px;
+    padding: 0 8px;
+    font-size: 11px;
+  }
+  /* the links stay 24px tall to the eye; their touch target reaches 44px (WCAG 2.2 target size) */
+  [data-park] .park-home-legal a {
+    position: relative;
+  }
+  [data-park] .park-home-legal a::after {
+    content: "";
+    position: absolute;
+    inset: -10px -6px;
+  }
 }
 [data-park] .park-home-legal a {
   display: inline-flex;

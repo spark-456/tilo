@@ -1,0 +1,12 @@
+{
+  "outcome": "refused",
+  "receipt": null,
+  "may_have_sent": null,
+  "parts": [
+    {
+      "type": "alert.raised",
+      "alert_id": "01JB5VQ0000000000000009320",
+      "user_id": "u_owner"
+    }
+  ]
+}

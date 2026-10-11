@@ -5,6 +5,7 @@
 // No motion until WEB-3 (BQ-WEB-3).
 import { type ReactNode, useRef } from "react";
 import type { Api } from "../../api/index";
+import { isCalendarEntry } from "../../api/live/agendaFromPlate";
 import type { Agenda, AgendaPlateRow, Decision, LiveAgenda } from "../../api/types";
 import { useParkApi } from "../../app/context";
 import { useStagedCount } from "../../app/useStaged";
@@ -126,7 +127,7 @@ function Plate({ A }: { A: LiveAgenda }) {
                 Due <time dateTime={r.due}>{r.due}</time>
               </p>
             ) : null}
-            {r.ref.kind === "calendar_entry" && r.at ? (
+            {isCalendarEntry(r) && r.at ? (
               <p>
                 <time dateTime={r.at}>{r.at}</time>
               </p>
@@ -146,17 +147,14 @@ function Plate({ A }: { A: LiveAgenda }) {
       <section aria-label="Your plate" className="park-agenda-state">
         <h2>Your plate</h2>
         {list(
-          A.plate.rows.filter((r) => r.ref.kind !== "calendar_entry"),
+          A.plate.rows.filter((r) => !isCalendarEntry(r)),
           "Nothing on your plate",
         )}
         {A.plate.truncated ? <p>Showing a limited list.</p> : null}
       </section>
       <section aria-label="Today's calendar" className="park-agenda-state">
         <h2>Today's calendar</h2>
-        {list(
-          A.plate.rows.filter((r) => r.ref.kind === "calendar_entry"),
-          "No calendar entries for today.",
-        )}
+        {list(A.plate.rows.filter(isCalendarEntry), "No calendar entries for today.")}
       </section>
       <section aria-label="Parked work" className="park-agenda-state">
         <h2>Parked work</h2>

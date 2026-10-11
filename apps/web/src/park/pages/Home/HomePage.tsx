@@ -274,25 +274,27 @@ export function HomePage({ app }: { app: AppCtx }) {
             pins={placedPins(pins, worlds, needs, night, vw || 1440, vh || 900, served)}
             onOpen={open}
           />
-          <Hero
-            dateLine={`${base.today.long}${night ? " · 21:10" : ""}`.toUpperCase()}
-            greeting={`${night ? "Good evening" : "Good morning"}, ${base.user.first}.`}
-            summary={summary}
-            needs={needs}
-            needsKnown={!served || openServed !== null}
-            night={night}
-            worldName={waitingIn?.name ?? null}
-            onReview={() => (waitingIn ? open(waitingIn.id) : go("worlds"))}
-          />
-          {(vw || 1440) >= 1180 ? (
-            <KpiStrip
-              ledger={base.ledger}
-              dec={dec}
-              decisions={base.decisions}
-              fallbackWorld={waitingIn?.id}
-              onWorld={open}
+          <div className="park-home-leftcol">
+            <Hero
+              dateLine={`${base.today.long}${night ? " · 21:10" : ""}`.toUpperCase()}
+              greeting={`${night ? "Good evening" : "Good morning"}, ${base.user.first}.`}
+              summary={summary}
+              needs={needs}
+              needsKnown={!served || openServed !== null}
+              night={night}
+              worldName={waitingIn?.name ?? null}
+              onReview={() => (waitingIn ? open(waitingIn.id) : go("worlds"))}
             />
-          ) : null}
+            {(vw || 1440) >= 1180 ? (
+              <KpiStrip
+                ledger={base.ledger}
+                dec={dec}
+                decisions={base.decisions}
+                fallbackWorld={waitingIn?.id}
+                onWorld={open}
+              />
+            ) : null}
+          </div>
           {(vw || 1440) >= 1180 ? (
             <TodayPanel
               rows={liveRows(worlds, needs, served)}

@@ -1,6 +1,6 @@
 // The live Api (WEB-1a, WIRE-1..3, FR-UX-13): `startWorld` makes the real intake call; `getLedger` reads `GET {base}/costs`, `getWorlds` walks `GET {base}/worlds`
 // pages, `getDecisions` walks `GET {base}/cards` pages and `decide` answers one card with one POST (the
-// person's tap, never a retry); getAgenda reads GET /v1/plate summaries with unavailable calendar fields null; every other method is NotBuilt and
+// person's tap, never a retry). getAgenda reads /v1/plate; profile defaults and preferences are in-memory choices. Other methods are NotBuilt and
 // fetches nothing. With no base url nothing is fetched at all. It never imports the fixtures, so sample
 // numbers cannot pass as live (HR-1..HR-7). Failures are the shared `TiloApiError` (src/api/http.ts).
 import type { IntakeResult } from "../../api/client";
@@ -13,10 +13,13 @@ import {
   answerOption,
   decisionKey,
   decisionsFromCards,
+  needsFields,
 } from "./live/decisionsFromCards";
 import { type CostReport, ledgerFromCosts } from "./live/ledgerFromCosts";
+import { profileDefaults } from "./live/profileDefaults";
 import { worldFromIntake } from "./live/worldFromIntake";
 import { STATE_OF, type WorldListItem, worldsFromList } from "./live/worldsFromList";
+import { nameInitials } from "./nameInitials";
 import type { Dec, DecisionKey, Effort, QuickReply, TierKey, Today, User } from "./types";
 
 export class NotBuilt extends Error {
@@ -57,10 +60,7 @@ export function userOf(who: Identity): User | null {
   if (!name) return null;
   const words = name.split(/\s+/).map(titleCase);
   const first = words[0] ?? name;
-  const last = words.at(-1) ?? first;
-  const initials = (
-    words.length > 1 ? first.charAt(0) + last.charAt(0) : first.slice(0, 2)
-  ).toUpperCase();
+  const initials = nameInitials(name);
   const tz = Intl.DateTimeFormat().resolvedOptions().timeZone ?? "";
   return {
     first,
@@ -197,6 +197,17 @@ export function createLiveApi(options: LiveApiOptions = {}): Api {
   const api = Object.fromEntries(stubs) as unknown as Api;
   const baseUrl = options.baseUrl?.trim();
   if (!baseUrl) return api;
+  const prefs = new Map<string, unknown>();
+  api.setPref = async (key, value) => {
+    prefs.set(key, structuredClone(value));
+    return { data: { ok: true }, source: "live" };
+  };
+  api.getProfileSettings = async () => {
+    const data = profileDefaults();
+    const quiet = prefs.get("quiet");
+    if (typeof quiet === "boolean") data.quiet.on = quiet;
+    return { data, source: "live" };
+  };
   const http = new HttpClient({
     baseUrl,
     ...(options.fetch ? { fetch: options.fetch } : {}),
@@ -240,6 +251,7 @@ export function createLiveApi(options: LiveApiOptions = {}): Api {
     }
     served.clear(); // a card that left the feed can no longer be answered from a stale key (BQ-WIRE3-1)
     for (const { world_id, card_id, card } of items) {
+      if (needsFields(card)) continue; // typed in the fields form: a tap on it would answer `provide` with nothing
       const path = `/worlds/${encodeURIComponent(world_id)}/cards/${encodeURIComponent(card_id)}/answer`;
       served.set(decisionKey(world_id, card_id), { path, option: answerOption(card) as string });
     }
@@ -285,5 +297,10 @@ export function createLiveApi(options: LiveApiOptions = {}): Api {
     rememberIntake(intake);
     return { data: { ok: true, world: worldFromIntake(mode, intake, query) }, source: "live" };
   }) as Api["startWorld"];
+  // The lifetime-cap pop-up's feedback (SEC-16): resolves only on the server's `{received: true}`.
+  api.submitFeedback = async (words: string) => {
+    await http.submitFeedback(words);
+    return { data: { ok: true }, source: "live" };
+  };
   return api;
 }

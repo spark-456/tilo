@@ -30,13 +30,16 @@ import time
 from collections.abc import Callable, Iterator, Mapping
 from contextvars import ContextVar
 from dataclasses import dataclass, field
+from datetime import date
 from pathlib import Path
 from typing import Any, Literal
 
 from fastapi import FastAPI, Request
 from tilo_harness.outputs import UnitOutput
+from tilo_harness.schedule_dates import date_window_fail
 from tilo_harness.unit_prompt import request_variables
 from tilo_harness.untrusted import neutralise as neutralise_text
+from tilo_providers.clock import parse_deadline, real_today
 from tilo_providers.config import ProviderConfigError, ProvidersConfig, load_providers_config, resolve_models_path
 from tilo_providers.errors import OutputTruncatedError, ProviderError, QuotaError, RequestError
 from tilo_providers.interfaces import Capability, GenerateRequest, GenerateResponse, ModelProvider, SafetyProvider
@@ -62,6 +65,8 @@ SAFETY_NOTE = (
     "trusted_bank_input (by design; Model Armor is the safety role's live adapter, FR-INT-02, #450)"  # BQ-LE2E-5
 )
 SYNTHETIC_MARKER = "SYNTHETIC"  # a file beside `model-recordings/`: a fake provider wrote them (BQ-LE2E-9)
+TODAY_MARKER = "TODAY"  # a file beside `model-recordings/`: the ISO date the prompts stated, so a replay states it too
+_ATTEMPTS_PER_CALL = 3  # attempts one Router call may make (first, repair, fallback) inside its reserved share
 FAKED = (  # what a run never does for real, printed with every report (HR-1: say what is not real)
     "safety screen: trusted bank input only, by design (Model Armor is the safety role's live adapter, "
     "FR-INT-02, #450)",
@@ -338,7 +343,11 @@ def _estimate(config: ProvidersConfig, case: BankCase) -> Estimate:
 
 
 def _estimate_chars(config: ProvidersConfig, chars: int) -> Estimate:
-    """One run of a brief with `chars` characters of input (the generator reuses it for each brief it will run)."""
+    """One run of a brief with `chars` characters of input (the generator reuses it for each brief it will run).
+    `credits_low` is the floor (a 300-character brief: 3.36 credits at the shipped prices). `credits_high` is the
+    explicit WORST-CASE CEILING, every call burning its whole output cap; it is not the Router's reserve (PL-03
+    reserves a call at its input plus the role's expected output, `config/expected_output.yaml`), so it does not
+    follow that rule."""
     base = _PROMPT_TOKENS + chars // 3
 
     def credits(role: str, calls: int, tokens_in: int, tokens_out: int) -> float:
@@ -369,7 +378,11 @@ class _Meter:
         self.failure: tuple[str, BaseException] | None = None  # (role, error): the first call the Router gave up on
         self.quoted_calls = 0  # calls that returned no usage: charged at the pre-call quote, not at what was used
         self.counters: dict[str, Callable[[str], int]] = {}  # profile -> the provider's own token count (FR-MTR-01)
-        self.lock = threading.RLock()  # one model call at a time, so the cap is checked against what was really spent
+        self.lock = threading.RLock()  # guards the rows and the reservations; never held across a model call
+        self.cond = threading.Condition(self.lock)  # a call that cannot be reserved waits here for the others to settle
+        self.reserved = 0.0  # credits held for calls in flight: the cap is checked against spent plus reserved
+        self.progress: Callable[[str], None] | None = None  # a numbers-only line per finished call (LIVE-RUN)
+        self.started = time.perf_counter()
 
     def cost(self, profile: str, tokens_in: int, tokens_out: int) -> float:
         quote = self.config.price(profile)
@@ -415,9 +428,9 @@ class _Meter:
     def add_unreturned(
         self, role: str, profile: str, request: GenerateRequest, tokens_in: int, latency_ms: float
     ) -> None:
-        """A call that raised after it may have been billed (a blocked reply, a timeout): charged at the Router's own
-        pre-call quote, the input and the full output cap, because the provider reported no usage for it. The cap is a
-        quote, not usage, so it is left out of `tokens_out` (`quoted_calls` counts them for the printed note)."""
+        """A call that raised after it may have been billed (a blocked reply, a timeout): charged at the input and the
+        full output cap (the Router's ceiling, not its smaller reserve), because the provider reported no usage for it.
+        The cap is a quote, not usage, so it is left out of `tokens_out` (`quoted_calls` counts them for the note)."""
         with self.lock:
             key = (_stage(role, request), role, profile)
             row = self.rows.setdefault(key, Row(*key))
@@ -449,6 +462,18 @@ class _Meter:
             row.tokens_out += tokens_out
             row.credits += self.cost(profile, tokens_in, tokens_out)
             row.latency_ms += latency_ms
+
+    def report_call(self, stage: str, role: str, profile: str) -> None:
+        """One numbers-only line per finished call (never a prompt, reply or error): a long live run is not silent."""
+        if self.progress is None:
+            return
+        with self.lock:
+            row = self.rows[(stage, role, profile)]
+            line = (
+                f"progress stage={stage} role={role} profile={profile} calls={row.calls} "
+                f"total_credits={self.total:.4f} cap={self.cap:.4f} elapsed_s={time.perf_counter() - self.started:.1f}"
+            )
+        self.progress(line)
 
     def stopped(self, kind: str, role: str, detail: str = "", stage: str = "") -> None:
         with self.lock:
@@ -529,6 +554,7 @@ class _Metered(_Redacting):
             self._meter.add_unreturned(self._role, self._profile, request, tokens_in, elapsed)
             raise
         self._meter.add(self._role, request, response, (time.perf_counter() - started) * 1000)
+        self._meter.report_call(_stage(self._role, request), self._role, response.profile_id)
         return response
 
 
@@ -594,25 +620,43 @@ class _MeteredRouter(Router):
         super().__init__(config, provider_for_profile=lambda profile: providers(_ROLE.get(), profile))
         self.meter, self._cfg = meter, config
 
+    def _worst_quote(self, role_id: str, request: GenerateRequest) -> float:
+        """The dearest single attempt this call could make: the priciest candidate, the input and the full output cap,
+        plus a tenth for the difference between our token count and the Router's own."""
+        return 1.1 * max(
+            self.meter.cost(profile, self.meter.count(profile, _sent_text(request)), request.max_output_tokens or 0)
+            for profile in self._candidates(role_id, None)
+        )
+
     def generate(self, role_id: str, request: GenerateRequest, *, budget: float | None = None, **kwargs: Any) -> Any:
         if request.max_output_tokens is None:  # the Router's own default of 1024 would cut a Director plan short
             request = request.model_copy(update={"max_output_tokens": _output_cap(self._cfg, role_id)})
-        with self.meter.lock:
-            left = self.meter.left()
-            token = _ROLE.set(role_id)
-            try:
-                return super().generate(
-                    role_id, request, budget=left if budget is None else min(budget, left), **kwargs
-                )
-            except BudgetExceededError:
-                self.meter.stopped("stopped_at_cap", role_id)
-                raise
-            except Exception as error:
-                if role_id != "narrator":  # a Narrator that fails leaves no Story; it never ends the run (see `_story`)
-                    self.meter.failed(role_id, error)
-                raise
-            finally:
-                _ROLE.reset(token)
+        # Calls of independent units run side by side. The cap is kept by reservation: a call is sent with a budget
+        # of its own, taken out of what is left beside the calls in flight, and the Router never spends past it.
+        # When the rest cannot cover even one more attempt while others are in flight, it waits for them to settle.
+        worst = self._worst_quote(role_id, request)
+        meter = self.meter
+        with meter.cond:
+            while (available := meter.left() - meter.reserved) < worst and meter.reserved > 0:
+                meter.cond.wait()
+            share = max(available, 0.0) if budget is None else min(budget, max(available, 0.0))
+            share = min(share, _ATTEMPTS_PER_CALL * worst)
+            meter.reserved += share
+        token = _ROLE.set(role_id)
+        try:
+            return super().generate(role_id, request, budget=share, **kwargs)
+        except BudgetExceededError:
+            meter.stopped("stopped_at_cap", role_id)
+            raise
+        except Exception as error:
+            if role_id != "narrator":  # a Narrator that fails leaves no Story; it never ends the run (see `_story`)
+                meter.failed(role_id, error)
+            raise
+        finally:
+            _ROLE.reset(token)
+            with meter.cond:  # the call is in the rows by now (`_Metered`), so releasing never lets spend slip past
+                meter.reserved = max(meter.reserved - share, 0.0)
+                meter.cond.notify_all()
 
 
 # --- the screen a live run uses (BQ-LE2E-5) -----------------------------------------------------------------------
@@ -700,11 +744,16 @@ class _UnitRunner:
     """One model call per unit by the unit's role (prompts/<role>/unit.md), fed the work of the units it waits for; one
     Lead review per district milestone (the district's last unit). A Verifier's verdict is recorded, not acted on."""
 
-    def __init__(self, router: Router, meter: _Meter) -> None:
+    def __init__(self, router: Router, meter: _Meter, today: date | None = None) -> None:
         self._router, self._meter = router, meter
+        self._today = today or real_today()  # the one date every prompt of this run states (INTAKE-QUALITY-1)
         self._brief: dict[str, Any] = {}
         self._units: list[dict[str, Any]] = []
         self._work: dict[str, str] = {}
+
+    @property
+    def today(self) -> date:
+        return self._today
 
     def capture(self, brief: dict[str, Any], plan: dict[str, Any]) -> None:
         self._brief, self._units = brief, list(plan.get("units", []))
@@ -730,7 +779,8 @@ class _UnitRunner:
         return text, self._meter.cost(response.profile_id, tokens_in, tokens_out)
 
     def _request(self) -> dict[str, str]:
-        return request_variables(self._brief)  # capped, one-line, marker-safe (UNIT-PROMPT); no intake answers here
+        # capped, one-line, marker-safe (UNIT-PROMPT); no intake answers here; today and the time left as facts
+        return request_variables(self._brief, today=self._today)
 
     async def run(self, unit: Any, context: Any) -> Any:
         from tilo_api.runs import MeteredOutcome  # noqa: PLC0415
@@ -741,6 +791,12 @@ class _UnitRunner:
             "inputs": _safe("\n\n".join(earlier) or "(none)"),
             "skills": "\n\n".join(skill.body for skill in context.skills), **self._request(),
         }  # fmt: skip
+        if unit["role"] == "verifier":  # FR-AGT-12: the deterministic date-window check comes before the model
+            deadline = parse_deadline(self._brief.get("deadline"))
+            checked = "\n\n".join(self._work[d] for d in unit["depends_on"] if d in self._work)
+            if (fail := date_window_fail(checked, self._today, deadline)) is not None:
+                # the unit fails: its dependents are skipped and the run stops with `reason` (no model call, no review)
+                return MeteredOutcome(success=False, summary=" ".join(fail.verdict.split()), reason=fail.reason)
         text, credits = await asyncio.to_thread(
             self._ask, unit["role"], load_prompt(unit["role"], "unit.md", variables)
         )
@@ -798,7 +854,7 @@ def _app(
 
     def compiler() -> Any:
         def compile_and_capture(*, brief: dict, approach: dict, budget_cap: float, context: Any) -> dict:
-            plan = compile_plan(brief, approach, budget_cap, context, router=router).plan
+            plan = compile_plan(brief, approach, budget_cap, context, router=router, today=runner.today).plan
             runner.capture(brief, plan)
             return plan
 
@@ -816,6 +872,7 @@ def _app(
     overrides: dict[Callable[..., Any], Callable[..., Any]] = {
         deps.get_current_principal: principal, deps.get_store: lambda: store, deps.get_event_writer: lambda: writer,
         deps.get_router: lambda: router, deps.get_safety: lambda: safety, deps.get_plan_compiler: compiler,
+        deps.get_today: lambda: lambda: runner.today,
         deps.get_unit_runner: lambda: runner, deps.get_action_resolver: lambda: resolve,
         deps.get_connector_adapters: lambda: adapters, deps.get_must_ask_providers: must_ask_providers,
         **e2e_stand_ins.overrides(),  # the artifact store, redactor and raw archive the run needs (ADR-0018 T4)
@@ -894,7 +951,18 @@ def _provider_failure(error: BaseException, env: Mapping[str, str]) -> tuple[str
     """(code, reason) of a call the Router gave up on. Only a rejected request (HTTP 400) gives a reason: the adapter's
     redacted server text, scrubbed again here, one line, scrubbed before it is capped. Any other status: code only."""
     code = classify(error)
+    if code == "unknown":  # class names only (no text, no values): the next run says what kind of failure it was
+        return code, _error_classes(error)
     return code, (_scrub_known(scrubbed_server_text(error), env)[:MAX_REASON_CHARS] if code == "rejected" else "")
+
+
+def _error_classes(error: BaseException) -> str:
+    names: list[str] = []
+    link: BaseException | None = error
+    while link is not None and len(names) < 6:
+        names.append(type(link).__name__)
+        link = link.__cause__ or link.__context__
+    return " <- ".join(dict.fromkeys(names))
 
 
 def _classify(
@@ -923,7 +991,9 @@ def _classify(
         else ((obs.outcome or "failed"), obs.reason)
     )
     if code and meter.failure and outcome not in ("completed", "held_at_gate", "needs_answers"):
-        reason = f"{reason or 'the run did not finish'}; provider call failed ({meter.failure[0]} role): {code}"
+        reason = f"{reason or 'the run did not finish'}; provider call failed ({meter.failure[0]} role): {code}" + (
+            f" ({said})" if said else ""
+        )
     return outcome, reason
 
 
@@ -948,6 +1018,24 @@ def _mark_recordings(recordings: Path, *, synthetic: bool) -> None:
         )
     else:
         marker.unlink(missing_ok=True)
+
+
+def _mark_today(recordings: Path, day: date) -> None:
+    recordings.mkdir(parents=True, exist_ok=True)
+    (recordings / TODAY_MARKER).write_text(day.isoformat() + "\n", encoding="utf-8", newline="\n")
+
+
+def _run_date(recordings: Path, given: date | None, *, live: bool) -> date:
+    """The date a run's prompts state: the caller's, else (replay) the one the recordings were made with, else the real
+    date. A prompt that stated the real date would change its recording key every day."""
+    if given is not None:
+        return given
+    marker = recordings / TODAY_MARKER
+    if not live and marker.is_file():
+        pinned = parse_deadline(marker.read_text(encoding="utf-8").strip())
+        if pinned is not None:
+            return pinned
+    return real_today()
 
 
 def _execute(
@@ -996,12 +1084,14 @@ def run_live_e2e(
     safety: SafetyProvider | None = None,
     announce: Callable[[Estimate, float], None] | None = None,
     fake_record: bool = False,  # only `record_with_fake` sets this; the command line has no way to
+    today: date | None = None,  # the date the prompts state; a replay reads the recording's own (`TODAY` marker)
     adhoc: BankCase | None = None,  # `just live-run`: an in-memory case for a typed topic, not a bank case
     person: Any = None,  # `just live-run`: a person answers in place of the case script (`live_topic.TerminalPerson`)
     real_connectors: bool = False,  # CL-LIVE-1: real read-only Google connectors in place of the recording mocks
     real_connectors_factory: Callable[[], dict[str, Any]] | None = None,  # the only way the run gets them
     allow_writes: bool = False,  # CL-LIVE-2: Gmail drafts and Drive saves, each after a typed terminal approval
     allow_send: bool = False,  # CL-LIVE-2: also Gmail send, the same gate
+    progress: Callable[[str], None] | None = None,  # a numbers-only line per finished model call (LIVE-RUN)
 ) -> LiveE2EReport:
     env: Mapping[str, str] = {} if fake_record else os.environ if environ is None else environ
     if fake_record and (live_provider_factory is None or mode != "live"):
@@ -1047,12 +1137,16 @@ def run_live_e2e(
     if mode == "dry-run":
         return report
     meter = _Meter(config, max_credits)
+    meter.progress = progress
     recordings = Path(recordings_dir) if recordings_dir else default_recordings_dir(case_id)
     if live and not fake_record and os.environ.get("TILO_RECORD") == "1":
         _mark_recordings(recordings, synthetic=live_provider_factory is not None)  # only a test injects a provider
     providers = _Providers(config, meter, recordings, factory, fake_record=fake_record)
     router = _MeteredRouter(config, meter, providers)
-    runner = _UnitRunner(router, meter)
+    day = _run_date(recordings, today, live=live)
+    if live and (fake_record or os.environ.get("TILO_RECORD") == "1"):
+        _mark_today(recordings, day)  # a later replay states the same date, so its recording keys still match
+    runner = _UnitRunner(router, meter, day)
     obs, report.outcome_class, report.reason, report.story_lines, report.story_note = _execute(
         case,
         router,
@@ -1095,6 +1189,7 @@ def record_with_fake(
     models_path: Path | None = None,
     max_credits: float = DEFAULT_MAX_CREDITS,
     safety: SafetyProvider | None = None,
+    today: date | None = None,
 ) -> LiveE2EReport:
     """Re-record the synthetic fixture (issue #367) through an injected fake: the real Router, record-and-replay layer
     and pipeline, with every reply from `fake_factory`. Programmatic only: no flag or environment variable reaches it,
@@ -1103,7 +1198,7 @@ def record_with_fake(
     return run_live_e2e(
         case_id, mode="live", max_credits=max_credits, bank_dir=bank_dir, models_path=models_path,
         prices_path=prices_path, recordings_dir=recordings_dir, live_provider_factory=fake_factory, safety=safety,
-        fake_record=True,
+        fake_record=True, today=today,
     )  # fmt: skip
 
 
@@ -1172,6 +1267,10 @@ def _print_report(report: LiveE2EReport) -> None:
         print(f"story: {line.text}")
 
 
+def print_progress(line: str) -> None:
+    print(line, flush=True)
+
+
 def announce(estimate: Estimate, cap: float) -> None:
     print(
         f"estimate credits_low={estimate.credits_low:.4f} credits_high={estimate.credits_high:.4f} cap={cap:.4f}",
@@ -1195,7 +1294,7 @@ def main(
             models_path=args.models_file, prices_path=args.prices_file, recordings_dir=args.recordings_dir,
             live_provider_factory=live_provider_factory, safety=safety, announce=announce,
             real_connectors=args.real_connectors, real_connectors_factory=real_connectors_factory,
-            allow_writes=args.allow_writes, allow_send=args.allow_send,
+            allow_writes=args.allow_writes, allow_send=args.allow_send, progress=print_progress,
         )  # fmt: skip
     except LiveE2ERefused as refusal:
         print(f"REFUSED {refusal.code}: {refusal}", file=sys.stderr)

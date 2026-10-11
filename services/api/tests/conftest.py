@@ -40,6 +40,25 @@ def pytest_configure(config: pytest.Config) -> None:
 
 
 @pytest.fixture(autouse=True)
+def _fresh_process_state():
+    # FastAPI lazily binds included routes. Bind the original dependency keys before
+    # _wire_models patches deps.get_router, or later intake requests retain its
+    # assistant-only router even after monkeypatch restores the module attribute (#672).
+    app.openapi()
+    overrides = app.dependency_overrides.copy()
+    app.dependency_overrides.clear()
+    for cached in (deps.get_spend_ledger, deps.get_decision_cache):
+        cached.cache_clear()
+    try:
+        yield
+    finally:
+        app.dependency_overrides.clear()
+        app.dependency_overrides.update(overrides)
+        for cached in (deps.get_spend_ledger, deps.get_decision_cache):
+            cached.cache_clear()
+
+
+@pytest.fixture(autouse=True)
 def _no_dev_unit_delay(monkeypatch: pytest.MonkeyPatch) -> None:
     """CL-INT-5d: the dev unit runner paces a dev run by default; the suite runs it unpaced unless a test sets it."""
     monkeypatch.setenv("TILO_DEV_UNIT_DELAY_S", "0")
@@ -268,6 +287,11 @@ def pw1b_rig(request):
     return _pw1b_lib.make_rig(request.param)
 
 
+def pytest_addoption(parser):
+    """ADR35-L2: switch on the `firestore-emulator` rig of the outbox store suite (`just test-outbox-emulator`)."""
+    parser.addoption("--outbox-emulator", action="store_true", default=False, help="run the outbox store emulator rig")
+
+
 def pytest_collection_modifyitems(items):
     """PPL-11a: tests that need a slice B or C route are strict xfails until that slice lands (`SLICE_BC_PENDING`).
     PPL-11c: the same for each slice of the rest of the people API (`SLICE_PENDING`, API_PPL_11c.md section 0)."""
@@ -313,3 +337,12 @@ def pytest_collection_modifyitems(items):
                 continue
             if any(entry in item.nodeid for entry in FR_CAL_07A_PENDING):
                 item.add_marker(pytest.mark.xfail(strict=True, reason="FR-CAL-07a slice pending"))
+
+
+@pytest.fixture(autouse=True)
+def _fresh_missing_token_log():
+    """The missing-token warning is sampled per process (once a minute): each test starts with a first one."""
+    from tilo_api import appcheck
+
+    appcheck._missing_log.update(at=float("-inf"), skipped=0)
+    yield

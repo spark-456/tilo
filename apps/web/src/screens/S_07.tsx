@@ -7,6 +7,7 @@
 import type { Card, Layout } from "@tilo/contracts";
 import { useEffect, useState } from "react";
 import { useClient } from "../api/ClientProvider";
+import { isItemApi } from "../api/item";
 import { useAnswer } from "../needs-you/CardView";
 import { GateSheet } from "../needs-you/GateSheet";
 import { type GateRecord, gatesOf } from "../needs-you/gates";
@@ -24,8 +25,18 @@ function GatePanel({
   layout,
 }: { record: GateRecord; cards: readonly Card[]; layout: Layout | null }) {
   const card = cardFor(cards, record.cardId, record.runId);
-  const answer = useAnswer(useClient(), card?.id ?? "");
-  return <GateSheet record={record} card={card} layout={layout} answer={card ? answer : null} />;
+  const client = useClient();
+  const answer = useAnswer(client, card?.id ?? "");
+  const item = isItemApi(client) ? client : null; // the live client only: a fixture run pins nothing to show
+  return (
+    <GateSheet
+      record={record}
+      card={card}
+      layout={layout}
+      answer={card ? answer : null}
+      item={item}
+    />
+  );
 }
 
 /** The gate the address asks for: null when it names none, `false` when none (or, with no run

@@ -1,0 +1,25 @@
+# ADR-0035 L6c (FR-CON-02): which structured answers fill a live side-effect step, and how the person is asked when
+# they do not. DATA for tilo_api.side_effect_fields; the code branches on action types, never on scenario words.
+#
+# `recipient.answer` names the brief field whose answer (the person's own typed answer or chip edit, never the
+# Director's text) may hold the recipients: only when the WHOLE answer is a comma-separated list of plain addresses.
+# `fields` maps a document field (subject, name, title, start, end, time_zone) to the brief field whose answer is it.
+# The brief has no field for a subject, a file name or an event time yet, so those are asked of the person on the
+# needs-you card (BQ-ADR35L6c-1). Actions in NO_RECIPIENT_ACTIONS (item_documents.py) must not name a recipient.
+# `max` is at most the contract cap (card.gate.recipients and outbox.recipients: 50).
+version: 1
+labels:
+  recipient: {label: "Send to", hint: "One or more email addresses, separated by commas. Replies only go to these.", max_length: 1000}
+  subject: {label: "Subject", hint: "A short line, no line breaks.", max_length: 150}
+  name: {label: "File name", hint: "No slashes.", max_length: 150}
+  title: {label: "Event title", hint: "A short line, no line breaks.", max_length: 150}
+  start: {label: "Starts", hint: "Date and time like 2026-10-12T09:00:00Z.", max_length: 40}
+  end: {label: "Ends", hint: "Date and time like 2026-10-12T09:30:00Z.", max_length: 40}
+  time_zone: {label: "Time zone", hint: "A time zone name like Asia/Kolkata.", max_length: 64}
+actions:
+  create_draft: {recipient: {answer: audience, max: 10}, fields: {}}
+  send_email: {recipient: {answer: audience, max: 10}, fields: {}}
+  create_event_with_guests: {recipient: {answer: audience, max: 10}, fields: {}}
+  create_event: {fields: {}}
+  save_file: {fields: {}}
+  save_as_google_file: {fields: {}}

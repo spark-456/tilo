@@ -128,6 +128,11 @@ class _ClientSideFailure(Exception):
     """Stands in for a pydantic error from the SDK as the `__cause__` of a mapped error: its class name, no values."""
 
 
+# One request may not wait longer than this: a live run of 8 Oct 2026 hung 300-425 s on verifier and narrator calls
+# that never answered (no usage, an unmapped failure). The SDK takes milliseconds; a timeout maps to a retryable 504.
+REQUEST_TIMEOUT_MS = 120_000
+
+
 class GoogleModelProvider(ModelProvider):
     def __init__(
         self,
@@ -153,7 +158,8 @@ class GoogleModelProvider(ModelProvider):
                 )
             validate_google_settings(project, location)  # before any client exists
             genai = _genai_module("google.genai")
-            client = genai.Client(vertexai=True, project=project, location=location)
+            http_options = _genai_module("google.genai.types").HttpOptions(timeout=REQUEST_TIMEOUT_MS)
+            client = genai.Client(vertexai=True, project=project, location=location, http_options=http_options)
         self._client = client
 
     def _schema_for_send(self, schema: dict[str, Any]) -> dict[str, Any]:

@@ -10,12 +10,22 @@ import {
   useState,
   useSyncExternalStore,
 } from "react";
-import { API_URL, appCheckToken, authToken, sessionView } from "../../api/ClientProvider";
+import {
+  API_URL,
+  appCheckToken,
+  authToken,
+  civilToday,
+  sessionView,
+} from "../../api/ClientProvider";
 export { endSession } from "../../api/signOut"; // FR-UX-10: the shell's Sign out, through the one api seam
+export { useSessionAuth } from "../../api/sessionAuth"; // FR-UX-10: who is signed in, for the account menu
+import { HttpClient } from "../../api/http";
 import { API_METHODS, type Api, type ApiMethod } from "../api/index";
+import { withToday } from "../api/sampleDates";
 import { parkApi, withSession } from "../api/select";
 import type { ApiResult, Source } from "../api/types";
 import type { AppCtx } from "./AppCtx";
+import { FieldsContext, type FieldsFor } from "./fieldsContext";
 import { type Pin, screenPins } from "./pins";
 import { navigatePark, useParkRoute } from "./router";
 import { type ParkStore, type Schedule, createParkStore, realSchedule } from "./store";
@@ -25,6 +35,9 @@ export interface ParkProviderProps {
   navigate?: (to: string) => void;
   schedule?: Schedule;
   viewport?: Viewport;
+  /** ADR-0035 L6d: the fields calls of a world's cards. Default: the signed-in person's own API on a configured
+   * deployment (never a demo session), none otherwise; a test hands one in. */
+  fields?: FieldsFor | null;
   children: ReactNode;
 }
 
@@ -73,11 +86,31 @@ const EMPTY_PINS: AppCtx["pins"] = [];
 const NO_RAW_PINS: readonly Pin[] = [];
 const windowSize = () => ({ vw: window.innerWidth, vh: window.innerHeight });
 
-export function ParkProvider({ api, navigate, schedule, viewport, children }: ParkProviderProps) {
+/** The fields calls over the API the Park pages use: one `HttpClient` with the same tokens, none for a demo session. */
+function liveFieldsFor(): FieldsFor | null {
+  const baseUrl = API_URL?.trim();
+  if (!baseUrl) return null;
+  const http = new HttpClient({ baseUrl, appCheckToken, authToken });
+  return (worldId) => (sessionView.demo() ? null : http.cardsOf(worldId));
+}
+
+export function ParkProvider({
+  api,
+  navigate,
+  schedule,
+  viewport,
+  fields,
+  children,
+}: ParkProviderProps) {
+  const [fieldsFor] = useState<FieldsFor | null>(() =>
+    fields !== undefined ? fields : api === undefined ? liveFieldsFor() : null,
+  );
   const [held] = useState<Held>(() => {
     // SEC-10, SEC-15: the live Api's requests carry the App Check token and the sign-in token; none on local hosts or in fixture mode.
     const built = api ?? parkApi({ VITE_TILO_API_URL: API_URL }, appCheckToken, authToken);
-    const raw = api === undefined && API_URL?.trim() ? withSession(built, sessionView) : built;
+    const keyed = api === undefined && API_URL?.trim() ? withSession(built, sessionView) : built;
+    // The sample company's dates follow today; an Api handed in by a test is left exactly as it is.
+    const raw = api === undefined ? withToday(keyed, civilToday) : keyed;
     let store: ParkStore | null = null;
     const wrapped = noting(raw, (source) => store?.noteSource(source));
     const timer = schedule ?? realSchedule;
@@ -112,9 +145,11 @@ export function ParkProvider({ api, navigate, schedule, viewport, children }: Pa
   const channel = useMemo(() => ({ raw, set: setRaw }), [raw]);
   return (
     <HeldContext.Provider value={held}>
-      <ViewportContext.Provider value={sized}>
-        <PinsContext.Provider value={channel}>{children}</PinsContext.Provider>
-      </ViewportContext.Provider>
+      <FieldsContext.Provider value={fieldsFor}>
+        <ViewportContext.Provider value={sized}>
+          <PinsContext.Provider value={channel}>{children}</PinsContext.Provider>
+        </ViewportContext.Provider>
+      </FieldsContext.Provider>
     </HeldContext.Provider>
   );
 }

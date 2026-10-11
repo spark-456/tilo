@@ -15,7 +15,16 @@ import { SpendChart } from "./SpendChart";
 import { downloadCsv } from "./downloadCsv";
 import { icon } from "./icons";
 import { ledgerCsv, ledgerCsvFileName } from "./ledgerCsv";
-import { chartHeadline, groupsWithRows, hasChart, hasWaits, kpis, money, monthLeft } from "./model";
+import {
+  chartHeadline,
+  groupsWithRows,
+  hasChart,
+  hasWaits,
+  kpis,
+  money,
+  monthLeft,
+  periodOf,
+} from "./model";
 import { useLedger } from "./useLedger";
 import "./Ledger.css";
 
@@ -39,7 +48,7 @@ function Frame({ source, children }: { source?: string; children?: ReactNode }) 
 /** FR-SPD-08: the month as a CSV file that holds the rows the page shows. Honest about sample data and about
  * accounting sync, which comes later. */
 function exportCsv(app: AppCtx, L: Ledger, decisions: Decision[], source: Source): void {
-  const name = ledgerCsvFileName({ label: "September 2026" }, source);
+  const name = ledgerCsvFileName({ label: `${periodOf(L).month} ${periodOf(L).year}` }, source);
   downloadCsv(name, ledgerCsv(L, app.dec, decisions));
   app.toast(`Exported ${name}${source === "live" ? "" : " · sample data"}`);
 }
@@ -90,7 +99,7 @@ export function LedgerPage({ app }: LedgerPageProps) {
                 variant="secondary"
                 onClick={() => app.toast("August and earlier months live here")}
               >
-                September 2026
+                {periodOf(L).month} {periodOf(L).year}
                 {icon("chevD", 13)}
               </Button>
             </span>
@@ -139,7 +148,7 @@ export function LedgerPage({ app }: LedgerPageProps) {
                   <div className="park-ledger-eyebrow">SPEND OVER TIME</div>
                   <h2 className="park-ledger-h2">{chartHeadline(L)}</h2>
                   <div className="park-ledger-sub">
-                    Running total for September. Hover for daily spend.
+                    Running total for {periodOf(L).month}. Hover for daily spend.
                   </div>
                 </div>
                 <div className="park-ledger-legend">

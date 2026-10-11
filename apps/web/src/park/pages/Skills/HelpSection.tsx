@@ -4,6 +4,7 @@
 // - Ready for your review (FR-SKL-06: run-history bars, Mark as trusted / Keep learning gated by SKILL_TRUST_CONFIG)
 // - Who helped this month (FR-SKL-07: Mistakes since July, Answers and fixes, per-person counts only, never message content)
 import { useState } from "react";
+import { HELPER_SUMMARY_FIXTURE } from "../../api/index";
 import type { Learn, Skill } from "../../api/types";
 import type { AppCtx } from "../../app/AppCtx";
 import { cx } from "../../components/cx";
@@ -342,19 +343,21 @@ export function HelpSection({
           <div className="park-skills-help-card">
             <div className="park-skills-help-card-head">
               <h3 className="park-skills-h3">Who helped this month</h3>
-              <span className="park-skills-help-hint">{SKILL_TRUST_CONFIG.helperMonthLabel}</span>
+              <span className="park-skills-help-hint">
+                {HELPER_SUMMARY_FIXTURE.helperMonthLabel}
+              </span>
             </div>
             <div className="park-skills-who-stats">
               <div className="park-skills-who-stat park-skills-who-stat--ok">
                 <div className="park-skills-who-stat-k">Mistakes since July</div>
                 <div className="park-skills-who-stat-v">
-                  {SKILL_TRUST_CONFIG.mistakesDeltaSinceJuly}
+                  {HELPER_SUMMARY_FIXTURE.mistakesDeltaSinceJuly}
                 </div>
               </div>
               <div className="park-skills-who-stat park-skills-who-stat--hero">
                 <div className="park-skills-who-stat-k">Answers and fixes</div>
                 <div className="park-skills-who-stat-v">
-                  {String(SKILL_TRUST_CONFIG.baseMonthlyAnswersAndFixes + mine)}
+                  {String(HELPER_SUMMARY_FIXTURE.baseMonthlyAnswersAndFixes + mine)}
                 </div>
               </div>
             </div>

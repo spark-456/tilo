@@ -28,6 +28,7 @@ from tilo_metering.flags import process_flags
 from tilo_people.stores import PeopleStores
 
 from tilo_api import deps, dev_run, events
+from tilo_api.feedback import InMemoryFeedbackStore
 
 ENV_FLAG = "TILO_API_DEV"  # "1" turns dev mode on; nothing else does
 ENV_ORIGINS = "TILO_API_DEV_ORIGINS"  # comma-separated allowed browser origins
@@ -127,8 +128,11 @@ class DevEventWriter:
     def __init__(self, store: deps.Store, ledger: DevLedger | None = None) -> None:
         self._store, self._ledger, self._lock = store, ledger, threading.Lock()
 
-    def append(self, world_id: str, event: dict) -> dict:
+    def _guard(self) -> None:
         refuse_if_unsafe()
+
+    def append(self, world_id: str, event: dict) -> dict:
+        self._guard()
         world = self._store.worlds.get(world_id)
         if world is None:
             raise deps.EventRejected(f"unknown world {world_id!r}")
@@ -271,7 +275,19 @@ def install(app: FastAPI, env: Mapping[str, str] | None = None) -> None:
 
     app.dependency_overrides[deps.get_desk_worlds] = get_desks  # the Desk worlds of the work-item events (PE-12)
     app.dependency_overrides.update(dev_run.overrides())  # fake unit runner, recipient and send (CL-INT-5c)
+    feedback = InMemoryFeedbackStore()  # BQ-FEEDBACK-1: kept in memory, never read back
+
+    def get_feedback() -> InMemoryFeedbackStore:
+        refuse_if_unsafe()
+        return feedback
+
+    app.dependency_overrides[deps.get_feedback_store] = get_feedback
     app.dependency_overrides.update(_dev_people())  # in-memory people stores, the dev owner an org owner
+    from tilo_api import meeting_room  # noqa: PLC0415
+
+    app.dependency_overrides.update(
+        meeting_room.dev_overrides()
+    )  # MROOM-A1: a free fake room model, an in-memory archive
     app.add_middleware(
         CORSMiddleware,
         allow_origins=origins,

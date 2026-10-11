@@ -1,0 +1,20 @@
+{
+  "revoked_at_provider": true,
+  "parts": [
+    {
+      "type": "connection.revoked",
+      "connector": "gmail",
+      "user_id": "u_priya"
+    },
+    {
+      "type": "connection.revoked",
+      "connector": "google_drive",
+      "user_id": "u_priya"
+    },
+    {
+      "type": "connection.revoked",
+      "connector": "google_calendar",
+      "user_id": "u_priya"
+    }
+  ]
+}

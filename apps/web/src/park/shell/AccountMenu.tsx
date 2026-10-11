@@ -20,6 +20,8 @@ export interface AccountMenuProps {
   /** False when a sign-in layer exists and nobody is signed in: there is nothing to sign out of. */
   canSignOut: boolean;
   onMobile: () => void;
+  /** "Take the tour" (ONBOARD-1): replays the first-run walkthrough; the row is left out when there is none. */
+  onTour?: () => void;
   /** Connectors that are on (connected or needing attention), or null until they have been read. */
   connectorsOn: number | null;
   go: (page: PageId) => void;
@@ -31,6 +33,7 @@ export function AccountMenu({
   user,
   canSignOut,
   onMobile,
+  onTour,
   connectorsOn,
   go,
   onSignOut,
@@ -58,6 +61,9 @@ export function AccountMenu({
       hint: "Concept",
       onSelect: onMobile,
     },
+    ...(onTour
+      ? [{ id: "tour", label: "Take the tour", icon: icon("search", 17), onSelect: onTour }]
+      : []),
     ...(canSignOut
       ? [{ id: "signout", label: "Sign out", icon: icon("logout", 17), onSelect: onSignOut }]
       : []),

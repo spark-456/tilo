@@ -1,0 +1,4 @@
+{
+  "connector": "gmail",
+  "capabilities": ["read"]
+}

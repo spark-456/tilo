@@ -13,8 +13,9 @@ const ok = <T>(data: T): Promise<ApiResult<T>> =>
   Promise.resolve({ data: structuredClone(data), source: "fixture" });
 const ack = (): Promise<ApiResult<Ack>> => ok({ ok: true });
 
-export function createFixtureApi(): Omit<Api, "getAgenda"> & {
+export function createFixtureApi(): Omit<Api, "getAgenda" | "getProfileSettings"> & {
   getAgenda(): Promise<ApiResult<Agenda>>;
+  getProfileSettings(): Promise<ApiResult<typeof fx.profileSettings>>;
 } {
   let dec: Dec = {};
   let started = 0;
@@ -52,5 +53,6 @@ export function createFixtureApi(): Omit<Api, "getAgenda"> & {
     bookSlot: ack,
     addBackup: ack,
     setPref: ack,
+    submitFeedback: ack, // source "fixture": never a server confirmation, so the pop-up never says Thanks
   };
 }

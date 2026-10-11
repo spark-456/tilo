@@ -29,7 +29,7 @@ variable "services" {
     vpc_egress = optional(string)
     # true: Terraform ignores the container env of this service (runtime
     # settings are set with `gcloud run services update`, docs/routines-rollout.md).
-    # Only tilo-api; every other service has its env fully managed.
+    # tilo-api and tilo-connectors; every other service has its env fully managed.
     ignore_env = optional(bool, false)
   }))
 }

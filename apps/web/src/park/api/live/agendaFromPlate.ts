@@ -1,6 +1,10 @@
 import { TiloApiError } from "../../../api/http";
 import type { AgendaPlateRow, LiveAgenda } from "../types";
 
+/** Keep the server's calendar-entry discriminator at the mapping boundary. */
+export const isCalendarEntry = (item: AgendaPlateRow): boolean =>
+  item.ref.kind === "calendar_entry";
+
 const object = (v: unknown): v is Record<string, unknown> =>
   typeof v === "object" && v !== null && !Array.isArray(v);
 const text = (v: unknown): v is string => typeof v === "string";

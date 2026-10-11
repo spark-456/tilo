@@ -51,7 +51,7 @@ const LOOK = {
     color: "var(--ink)",
     border: "1px solid var(--line)",
   },
-  hero: { weight: "800", bg: "var(--hero)", color: "#ffffff" },
+  hero: { weight: "800", bg: "var(--herofill)", color: "#ffffff" }, // BQ-DS-A11Y-1: heroFill, lower-cased by the computed style
 } as const;
 
 function check(label: string, el: Element, want: Look): void {
