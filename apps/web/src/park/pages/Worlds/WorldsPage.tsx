@@ -2,6 +2,7 @@
 // 10). Data comes only from the Api (getWorlds, getDecisions, getPlans for the city art); a person moves with
 // app.go and approves with app.decide. Filters are page state. No timers: nothing here moves by itself.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createRoutinesClient } from "../../api/live/routines";
 import type { Decision, Plan, World } from "../../api/types";
 import type { AppCtx } from "../../app/AppCtx";
 import { useParkApi } from "../../app/context";
@@ -12,6 +13,7 @@ import { hideSample, showSample } from "../../sample/sampleChoice";
 import { CityCard, TownCard, VillageCard } from "./Cards";
 import { Filters } from "./Filters";
 import { Header } from "./Header";
+import { RoutinesPanel } from "./RoutinesPanel";
 import { EmptyBox, Section } from "./Sections";
 import { Spotlight } from "./Spotlight";
 import { makeArt, makeKit } from "./art";
@@ -27,6 +29,7 @@ interface Loaded {
 
 export function WorldsPage({ app }: { app: AppCtx }) {
   const api = useParkApi();
+  const [routines] = useState(createRoutinesClient);
   const { dec, added, needsLeft, night } = app;
   const plans = useRef<Record<string, Plan>>({});
   const kit = useMemo(() => makeKit(() => plans.current), []);
@@ -87,6 +90,7 @@ export function WorldsPage({ app }: { app: AppCtx }) {
           onQuery={setQuery}
           onNew={() => app.go("home")}
         />
+        {routines ? <RoutinesPanel client={routines} /> : null}
         {failed ? (
           <EmptyBox title="Not connected yet" />
         ) : data ? (

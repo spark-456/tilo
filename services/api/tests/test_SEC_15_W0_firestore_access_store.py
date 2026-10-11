@@ -160,21 +160,24 @@ def test_SEC_15_W0_memory_is_never_a_fallback(monkeypatch):
 
 
 def test_SEC_15_W0_with_the_config_the_seam_is_the_firestore_store_over_one_cached_client(monkeypatch):
-    from tilo_api import access_firestore, deps
+    from tilo_api import deps, prod
 
     for name, value in CONFIG.items():
         monkeypatch.setenv(name, value)
     monkeypatch.delenv("K_SERVICE", raising=False)
     made: list[str] = []
     db = FakeFirestore()
-    monkeypatch.setattr(access_firestore, "client_factory", lambda project: made.append(project) or db)
-    access_firestore.reset_for_tests()
+    monkeypatch.setattr(prod, "build_client", lambda project: made.append(project) or db)
+    prod.reset()
+    deps.get_people_stores.cache_clear()
     first = deps.get_access_store()
-    assert isinstance(first, access_firestore.FirestoreAccessStore)
-    assert deps.get_access_store() is first, "one store per config, one client"
+    assert isinstance(first, prod.FirestoreAccessStore)
+    assert deps.get_access_store()._client is first._client, "one shared client per config"
     assert made == ["demo-tilo"]
     first.declare(USER, "judge")
-    assert db.raw(PATH)["declaration"] == "judge"
+    assert db.raw(f"orgs/org_tilo/access/{USER}")["declaration"] == "judge"
+    prod.reset()
+    deps.get_people_stores.cache_clear()
 
 
 def test_SEC_15_W0_the_gate_lets_a_declared_judge_through_on_a_deployed_process(monkeypatch):

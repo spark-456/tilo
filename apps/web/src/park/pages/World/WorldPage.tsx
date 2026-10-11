@@ -7,16 +7,19 @@
 // addresses the browser follows, but only for a world whose data came from the live API: a sample world has no
 // recorded run, so the same elements are disabled with the reason (docs/park-designed-not-in-prd/World.md).
 import { type ReactNode, useEffect, useState } from "react";
+import { createRoomClient } from "../../api/live/meetingHall";
 import type { ApiResult, Connector, Decision, Plan, Skill, World } from "../../api/types";
 import type { AppCtx } from "../../app/AppCtx";
-import { useParkApi } from "../../app/context";
+import { useParkApi, useWorldClient } from "../../app/context";
 import { stagePath } from "../../app/router";
 import { useStaged } from "../../app/useStaged";
 import { Button, PageSheet } from "../../components";
 import { SampleBadge, SampleNote } from "../../sample/SampleBadge";
 import { icon } from "../../shell/kit";
 import { Activity, Districts, Result, RunHistory } from "./Lower";
+import { MeetingHall } from "./MeetingHall";
 import { FactsCard, GoLink, SpendCard, WaitingCard } from "./Side";
+import { SkillProposals } from "./SkillProposals";
 import "./World.css";
 import { cityArt, rowArt, singleArt } from "./worldArt";
 import {
@@ -126,6 +129,8 @@ function Frame({ children, worldId }: { children?: ReactNode; worldId?: string }
 
 export function WorldPage({ app }: { app: AppCtx }) {
   const api = useParkApi();
+  const worldClient = useWorldClient();
+  const [roomClient] = useState(createRoomClient);
   const [loaded, setLoaded] = useState<Loaded | "failed" | null>(null);
   const [paused, setPaused] = useState<Record<string, boolean>>({});
   // The map and head first, then the side cards, then the lower part: one task each (WEB-MOTION-2).
@@ -274,6 +279,7 @@ export function WorldPage({ app }: { app: AppCtx }) {
         </div>
       </div>
 
+      {loaded.live && worldClient ? <SkillProposals client={worldClient} worldId={w.id} /> : null}
       <div
         className="park-world-top"
         style={{
@@ -358,6 +364,9 @@ export function WorldPage({ app }: { app: AppCtx }) {
         ) : null}
       </div>
 
+      {hasStage && roomClient && !w.sample ? (
+        <MeetingHall key={w.id} worldId={w.id} client={roomClient} />
+      ) : null}
       {part(3) ? (
         <div className="park-world-lower">
           {isCity ? <Districts districts={w.districts ?? []} /> : null}

@@ -95,7 +95,8 @@ def _task_doc(t: deps.TaskRecord) -> dict[str, Any]:
 
 def _task_from(d: Mapping[str, Any]) -> deps.TaskRecord:
     asked = [
-        Question(q["field"], q["text"], tuple(q["suggested_answers"]), q["expected_change"]) for q in d["questions"]
+        Question(q["field"], q["text"], tuple(q["suggested_answers"]), q["expected_change"], q.get("label"))
+        for q in d["questions"]
     ]
     t = deps.TaskRecord(d["owner"], d["world_id"], d["run_id"], d["draft"], d["brief"], asked, d["next_seq"])
     t.answers, t.edits, t.approaches, t.granted, t.scenario = (
@@ -133,13 +134,16 @@ class MemoryBackend:
         _check("worlds", world_id)
         return copy.deepcopy(self.queues.get(world_id, []))
 
-    def find(self, collection: str, field: str, value: Any) -> list[tuple[str, dict[str, Any]]]:
+    def find(
+        self, collection: str, field: str, value: Any, limit: int | None = None
+    ) -> list[tuple[str, dict[str, Any]]]:
         def get(doc: Any) -> Any:
             for key in field.split("."):
                 doc = doc.get(key) if isinstance(doc, dict) else None
             return doc
 
-        return [(i, self.read(c, i)) for (c, i), d in list(self.docs.items()) if c == collection and get(d) == value]  # type: ignore[misc]
+        found = [(i, self.read(c, i)) for (c, i), d in list(self.docs.items()) if c == collection and get(d) == value]
+        return found[:limit]  # type: ignore[return-value]
 
     def commit(self, writes: list[tuple[str, str, dict[str, Any], int | None]], appends: dict[str, list[dict]]) -> None:
         for coll, i, *_ in writes:
@@ -191,10 +195,14 @@ class FirestoreBackend:
         doc = self._queue(world_id).get().to_dict() or {}
         return [json.loads(p) for p in doc.get("parts", [])]
 
-    def find(self, collection: str, field: str, value: Any) -> list[tuple[str, dict[str, Any]]]:
+    def find(
+        self, collection: str, field: str, value: Any, limit: int | None = None
+    ) -> list[tuple[str, dict[str, Any]]]:
         from google.cloud.firestore_v1.base_query import FieldFilter
 
         query = self.client.collection(f"orgs/{self.org_id}/{collection}").where(filter=FieldFilter(field, "==", value))
+        if limit is not None:
+            query = query.limit(limit)
         return [(d.id, self._dec(collection, d.to_dict())) for d in query.stream()]
 
     def commit(self, writes: list[tuple[str, str, dict[str, Any], int | None]], appends: dict[str, list[dict]]) -> None:
@@ -355,6 +363,25 @@ class DurableStore(deps.Store):
         if settle:
             for w in [w for w, r in list(self.worlds.items()) if r.owner == owner]:
                 self.settle(w)
+
+    def load_world_task(self, world_id: str) -> deps.TaskRecord | None:
+        """Read-only (PEOPLE-SEAMS-1): the task stored for this world, cached or read by `world_id` (one document at
+        most); None for none, and for an id that is not a world's."""
+        cached = super().load_world_task(world_id)
+        if cached is not None or not _valid("worlds", world_id):
+            return cached
+        with _io():
+            found = self.backend.find("tasks", "world_id", world_id, limit=1)
+        for task_id, d in found:
+            if not _valid("tasks", task_id) or d.get("world_id") != world_id:
+                continue
+            with _io():
+                task, rev = _task_from(d), d["rev"]
+            with self._held():
+                if task_id not in self.tasks:
+                    self.revs[("tasks", task_id)], self.tasks[task_id] = rev, task
+            return self.tasks[task_id]
+        return None
 
     def load_path(self, params: Mapping[str, Any]) -> DurableStore:
         """The ids of a request's path, read-only: this runs before the route has checked who is asking."""

@@ -189,7 +189,8 @@ export interface Skill {
   team: string;
   owner: string;
   role: string;
-  runs: number;
+  /** Null when the server serves no run count (a live skill), printed as a dash. */
+  runs: number | null;
   rate: number | null;
   last: string;
   improved: string;
@@ -202,6 +203,37 @@ export interface Skill {
   used: string[];
   steps: string[];
   ask?: { q: string; a: string[] };
+  /** SKILLS-3: what the teach card chose, so `saveSkill` can post it (scope, trigger and each step's tool); never served. */
+  draft?: SkillDraft;
+}
+export interface SkillDraft {
+  scope: "me" | "team";
+  trigger: "ask" | "weekday" | "arrive";
+  plan: { text: string; tool: string; ask: boolean }[];
+  /** SKILLS-5: a taught version as the server made it; `saveSkill` posts these steps, not the labels above. */
+  server?: {
+    captured: string[];
+    question: { text: string; options: string[] } | null;
+    steps: { text: string; tool: string; action: string; verb: string; ask: boolean }[];
+  };
+}
+/** SKILLS-5 (FR-SKL-01): the steps the server read out of a described skill. */
+export interface SkillCapture {
+  id: string;
+  steps: string[];
+}
+/** SKILLS-5 (FR-SKL-02): Tilo's version; `locked` steps were forced to ask first by the server and cannot be switched off. */
+export interface SkillVersion {
+  steps: {
+    text: string;
+    tool: string;
+    action: string;
+    verb: string;
+    ask: boolean;
+    locked: boolean;
+  }[];
+  question: { text: string; options: string[] } | null;
+  estimates: { credits: number; seconds: number; asks: number } | null;
 }
 export interface Learn {
   rates: { id: string; name: string; meta: string; steps: string[] }[];
@@ -383,18 +415,39 @@ export interface Agenda {
 }
 export type AgendaSlot = Agenda["slots"][number];
 
+export interface AgendaPlateRow {
+  ref: { kind: string; id: string };
+  title: string | null;
+  due: string | null;
+  at: string | null;
+  from: string | null;
+  group: string;
+}
+/** The plate supplies summaries, not a week, event duration, attendees or board ownership. */
+export type LiveAgenda = { [K in keyof Required<Agenda>]: null } & {
+  plate: {
+    today: string;
+    asOf: string;
+    rows: AgendaPlateRow[];
+    parked: AgendaPlateRow[];
+    truncated: boolean;
+  };
+};
+export type AgendaData = Agenda | LiveAgenda;
+
 // Team, connectors, notifications
 export interface Team {
   people: {
     id: string;
     name: string;
-    email: string;
-    dept: string;
-    role: string;
-    active: string;
+    email: string | null;
+    dept: string | null;
+    role: string | null;
+    active: string | null;
     you?: boolean;
     limit?: string;
-    c: string;
+    c: string | null;
+    memberships?: string[] | null;
   }[];
   rules: [string, string, string, boolean][];
   matrix: [string, number][];
@@ -402,6 +455,8 @@ export interface Team {
   coverage: { id: string; what: string; who: string[]; wait: string; slow?: boolean }[];
 }
 export interface Connector {
+  /** Live list metadata: OAuth scopes are not the demo's agent access levels. */
+  live?: { stateKnown: boolean; scopes: string[] };
   id: string;
   name: string;
   cat: string;
@@ -515,4 +570,15 @@ export interface ProfileSettings {
   plan: PlanInfo | null;
   notifications: NotificationRow[];
   quiet: QuietHours;
+}
+/** FR-AGT-15: fields supplied by the proposal route. */
+export interface SkillProposal {
+  id: string;
+  skill_id: string;
+  domain: string;
+  status: "proposed" | "approved" | "rejected";
+  from_version: string;
+  to_version: string;
+  diff: string;
+  provenance: { world_id: string; proposed_by: string; proposed_at: string };
 }

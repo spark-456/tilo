@@ -1,6 +1,7 @@
 // The live Api (WEB-1a, WIRE-1..3, FR-UX-13): `startWorld` makes the real intake call; `getLedger` reads `GET {base}/costs`, `getWorlds` walks `GET {base}/worlds`
 // pages, `getDecisions` walks `GET {base}/cards` pages and `decide` answers one card with one POST (the
-// person's tap, never a retry). Profile defaults and preferences are in-memory page choices; other methods are NotBuilt and
+// person's tap, never a retry). Connectors, notifications, Team and Agenda read live endpoints.
+// Profile defaults and preferences are in-memory page choices; other methods are NotBuilt and
 // fetches nothing. With no base url nothing is fetched at all. It never imports the fixtures, so sample
 // numbers cannot pass as live (HR-1..HR-7). Failures are the shared `TiloApiError` (src/api/http.ts).
 import type { IntakeResult } from "../../api/client";
@@ -8,6 +9,8 @@ import { HttpClient, type QuickIntakeResult, TiloApiError, reasonOf } from "../.
 import { rememberIntake } from "../../api/intakes";
 import { isSampleHidden, wantsSample } from "../sample/sampleChoice";
 import { API_METHODS, type Api, type ApiMethod } from "./index";
+import { agendaFromPlate } from "./live/agendaFromPlate";
+import { connectorsFromList } from "./live/connectorsFromList";
 import {
   type CardFeedItem,
   answerOption,
@@ -16,7 +19,17 @@ import {
   needsFields,
 } from "./live/decisionsFromCards";
 import { type CostReport, ledgerFromCosts } from "./live/ledgerFromCosts";
+import { notificationsFromFeed } from "./live/notificationsFromFeed";
 import { profileDefaults } from "./live/profileDefaults";
+import {
+  captureOfBody,
+  isLearnBody,
+  isSkillRow,
+  saveBody,
+  skillsOfBody,
+  versionOfBody,
+} from "./live/skillsFromApi";
+import { teamFromPeople } from "./live/teamFromPeople";
 import { worldFromIntake } from "./live/worldFromIntake";
 import { STATE_OF, type WorldListItem, worldsFromList } from "./live/worldsFromList";
 import { nameInitials } from "./nameInitials";
@@ -219,6 +232,24 @@ export function createLiveApi(options: LiveApiOptions = {}): Api {
     if (!isCostReport(report)) throw new TiloApiError(BAD_REPLY, 200, true);
     return { data: ledgerFromCosts(report), source: "live" };
   };
+  api.getConnectors = async () => {
+    const data = connectorsFromList(await http.getJson("/v1/connectors"));
+    if (data === null) throw new TiloApiError(BAD_REPLY, 200, true);
+    return { data, source: "live" };
+  };
+  api.getNotifications = async () => ({
+    data: notificationsFromFeed(await http.getJson("/v1/notifications?limit=100")),
+    source: "live",
+  });
+  api.getTeam = async () => {
+    const data = teamFromPeople(await http.getJson("/v1/people"));
+    if (!data) throw new TiloApiError(BAD_REPLY, 200, true);
+    return { data, source: "live" };
+  };
+  api.getAgenda = async () => ({
+    data: agendaFromPlate(await http.getJson("/v1/plate")),
+    source: "live",
+  });
   api.getWorlds = async (_dec, added) => {
     const items: WorldListItem[] = [];
     let cursor: string | null = null;
@@ -234,6 +265,46 @@ export function createLiveApi(options: LiveApiOptions = {}): Api {
     const live = worldsFromList(isSampleHidden() ? items.filter((i) => i.sample !== true) : items);
     const liveIds = new Set(live.map((w) => w.id));
     return { data: [...added.filter((w) => !liveIds.has(w.id)), ...live], source: "live" };
+  };
+  // Taught skills (SKILLS-3, FR-SKL-04): the library is `GET /v1/skills`; Learn has nothing served but the list.
+  api.getSkills = async () => {
+    const skills = skillsOfBody(await http.getJson("/v1/skills"));
+    if (!skills) throw new TiloApiError(BAD_REPLY, 200, true);
+    return { data: skills, source: "live" };
+  };
+  api.getLearn = async () => {
+    if (!isLearnBody(await http.getJson("/v1/learn"))) throw new TiloApiError(BAD_REPLY, 200, true);
+    return { data: { rates: [], reviews: [], helpers: [], tools: [] }, source: "live" };
+  };
+  // One POST, no retry. A draft the server cannot take (a team scope, a timed trigger) is refused here, never sent as
+  // something else; only a 201 with the saved record is an Ack.
+  api.saveSkill = async (skill) => {
+    const body = skill.draft ? saveBody(skill.name, skill.draft) : null;
+    if (!body) {
+      throw new TiloApiError(
+        "Tilo can only save a skill for you that runs when you ask, for now.",
+        422,
+        false,
+        true,
+      );
+    }
+    if (!isSkillRow(await http.postJson("/v1/skills", body)))
+      throw new TiloApiError(BAD_REPLY, 201, true, true);
+    return { data: { ok: true }, source: "live" };
+  };
+  // Teach a skill by describing it (SKILLS-5): one POST each, no retry; only a readable answer is data.
+  api.captureSkill = async (text) => {
+    const data = captureOfBody(
+      await http.postJson("/v1/skills/captures", { method: "describe", text }),
+    );
+    if (!data) throw new TiloApiError(BAD_REPLY, 201, true, true);
+    return { data, source: "live" };
+  };
+  api.proposeVersion = async (captureId) => {
+    const path = `/v1/skills/captures/${encodeURIComponent(captureId)}/version`;
+    const data = versionOfBody(await http.postJson(path, {}));
+    if (!data) throw new TiloApiError(BAD_REPLY, 200, true, true);
+    return { data, source: "live" };
   };
   const served = new Map<string, Answerable>();
   const answered: Dec = {};

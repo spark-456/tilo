@@ -770,8 +770,17 @@ describe("WIRE_3_live_api: nothing else is connected", () => {
       "getDecisions",
       "decide",
       "startWorld",
+      "getConnectors",
+      "getNotifications",
+      "getTeam",
+      "getAgenda",
       "submitFeedback",
       "getProfileSettings",
+      "getSkills",
+      "getLearn",
+      "saveSkill",
+      "captureSkill",
+      "proposeVersion",
       "setPref",
     ]);
     for (const m of API_METHODS.filter((x) => !built.has(x))) {

@@ -233,3 +233,7 @@ both already listed above (MIT). No new licence.
 ## Python (`evals`)
 
 `tilo-evals` (LW-16) now depends on the in-workspace `tilo-browser` and `tilo-sandbox-web` (not external): the web-research replay case runs tilo-browser's fetch service over the sandbox-web fixtures in process. No new licence.
+## Python (`packages/redact`)
+
+`tilo-redact` (FR-MEM-05, SEC-14: the shared secret redactor) is in-workspace and has no external runtime
+dependency (standard library only). `tilo-providers` and `tilo-api` depend on it. No new licence.

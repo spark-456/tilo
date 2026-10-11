@@ -20,6 +20,7 @@ export interface NotificationsPopoverProps {
   onOpen: (n: Notification) => void;
   onSettings: () => void;
   onClose: () => void;
+  status?: "loading" | "ready" | "failed";
 }
 
 export function NotificationsPopover({
@@ -29,6 +30,7 @@ export function NotificationsPopover({
   onOpen,
   onSettings,
   onClose,
+  status = "ready",
 }: NotificationsPopoverProps): ReactNode {
   return (
     <Popover label="Notifications" width={392} className="park-shell__notif" onClose={onClose}>
@@ -38,6 +40,13 @@ export function NotificationsPopover({
           Settings
         </button>
       </div>
+      {status === "failed" ? (
+        <output>Notifications are unavailable. Try again later.</output>
+      ) : status === "loading" ? (
+        <output>Loading notifications…</output>
+      ) : notifications.length === 0 ? (
+        <output>No notifications yet</output>
+      ) : null}
       {notifications.map((n) => {
         const approved = n.dec !== undefined && dec[n.dec] === true;
         const kind: Kind = approved ? "done" : n.kind;

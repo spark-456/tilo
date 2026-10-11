@@ -47,6 +47,8 @@ from tilo_api.redaction import router as _redaction_router
 from tilo_api.sample_world import router as _sample_router
 from tilo_api.sharing import WorldView
 from tilo_api.sharing import build_router as _build_sharing_router
+from tilo_api.skills_capture import router as _skills_capture_router
+from tilo_api.skills_routes import router as _skills_router
 from tilo_api.tasks import router as _tasks_router
 from tilo_api.team_routes import router as _team_router
 from tilo_api.worlds_list import router as _worlds_list_router
@@ -63,6 +65,11 @@ async def _lifespan(_: FastAPI) -> AsyncIterator[None]:
     threading.Thread(target=_appcheck.warm_up, name="jwks-warm-up", daemon=True).start()
     yield
     await run_in_threadpool(_durable_store.close_deployed)  # SIGTERM: the writers release their leases (ADR-0026 4)
+
+
+# The two Firebase Hosting origins of the tilo-dev web app (BQ-SIGNIN-7, CL-REACH): exact strings, never a wildcard,
+# a suffix match or `allow_origin_regex`. Not credentialed: the API reads a bearer token, no cookie.
+PRODUCTION_ORIGINS = _cors.PRODUCTION_ORIGINS
 
 
 app = FastAPI(title="tilo-api", lifespan=_lifespan, **_DOCS)
@@ -133,6 +140,8 @@ app.include_router(_people.router)
 app.include_router(_meeting_host_routes.router)
 app.include_router(_connect_routes.router)
 app.include_router(_people_list_router)
+app.include_router(_skills_router)
+app.include_router(_skills_capture_router)
 app.include_router(_effort_router)
 app.include_router(_feedback_router)
 app.include_router(_connectors_list_router)

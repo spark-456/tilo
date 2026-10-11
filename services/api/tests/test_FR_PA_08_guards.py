@@ -22,6 +22,7 @@ from _ppl11b_lib import (
     plate_s1,
     principal,
     run_answer,
+    unwire_plate_sources,
 )
 from _ppl11b_lib import rig_factory as rig_factory  # noqa: PLC0414  (the fixture)
 from _ppl11b_lib import world as world  # noqa: PLC0414  (the fixture)
@@ -94,12 +95,13 @@ def test_FR_PA_08_guard_a_failing_plate_source_is_a_failed_answer_never_a_partia
 
 
 @pytest.mark.parametrize("question", [STATUS_QUESTIONS[0], WEEKLY_QUESTIONS[0]])
-def test_FR_PA_08_guard_an_email_principal_is_refused_and_an_unwired_seam_is_503(rig_factory, question):
+def test_FR_PA_08_guard_an_email_principal_is_refused_and_an_unwired_seam_is_503(rig_factory, question, monkeypatch):
     rig = rig_factory(who=principal(SAM, channel="email"))
     refused = rig.ask(question)
     assert refused.status_code == 403 and refused.json() == {"error": "channel"} and rig.nothing_stored()
     rig.set_principal(principal(SAM))
     rig.unwire("get_plate_source")
+    unwire_plate_sources(monkeypatch)  # the sources under it now read the store (PEOPLE-SEAMS-1): unwired on purpose
     unwired = rig.ask(question)
     assert unwired.status_code == 503 and unwired.json() == {"detail": "not_configured"} and rig.nothing_stored()
 

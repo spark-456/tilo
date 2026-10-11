@@ -30,7 +30,7 @@ from unittest.mock import MagicMock
 
 import pytest
 from _prod_wire_2b_lib import PROJECT, SECRET, ClientSpy, FakeStorageClient, mask, patch_clients
-from tilo_api import deps, runs
+from tilo_api import deps, prod, runs
 from tilo_api.run_stores import (
     FirestoreMetaBackend,
     GcsArchiveStore,
@@ -74,12 +74,14 @@ def door(kind: str, env, **kwargs):
 
 @pytest.fixture(autouse=True)
 def _cold_process(monkeypatch):
+    prod.reset()
     for name in [*LIVE, *EMU, "TILO_SCHEDULES_STORE", "TILO_PEOPLE_STORE", "TILO_API_STORE", *PARITY]:
         monkeypatch.delenv(name, raising=False)
     monkeypatch.setattr(deps, "get_redactor", lambda: mask)
     for seam in (deps.get_artifact_store, deps.get_run_archive):
         seam.cache_clear()
     yield
+    prod.reset()
     for seam in (deps.get_artifact_store, deps.get_run_archive):
         seam.cache_clear()
 
@@ -162,6 +164,8 @@ def wire(monkeypatch, via: str):
 
 @pytest.mark.parametrize("via", ["default", "injected"])
 def test_PROD_WIRE_2b_door_opens_the_artifact_store_in_cloud_run_over_firestore_and_gcs_with_no_io(monkeypatch, via):
+    for name, value in LIVE.items():
+        monkeypatch.setenv(name, value)
     fs_client, st_client, fs_spy, st_spy, kwargs = wire(monkeypatch, via)
     store = open_artifact_store(LIVE, redactor=mask, **kwargs)
     assert isinstance(store, ArtifactStore)
@@ -260,6 +264,8 @@ def test_PROD_WIRE_2b_door_refuses_an_api_endpoint_override(monkeypatch, kind, w
 
 @pytest.mark.parametrize("kind", KINDS)
 def test_PROD_WIRE_2b_door_refuses_a_google_cloud_project_other_than_the_store_project(monkeypatch, kind):
+    for name, value in LIVE.items():
+        monkeypatch.setenv(name, value)
     _, _, fs_spy, st_spy, _ = wire(monkeypatch, "default")
     with pytest.raises(RunStoreNotConfigured, match="GOOGLE_CLOUD_PROJECT"):
         door(kind, {**LIVE, "GOOGLE_CLOUD_PROJECT": "tilo-other-project"})
@@ -396,7 +402,10 @@ def test_PROD_WIRE_2b_seams_still_refuse_when_deployed_with_no_config_and_no_run
 
 
 def test_PROD_WIRE_2b_seams_refuse_while_the_redactor_does_not_exist_and_build_no_client(monkeypatch):
-    monkeypatch.setattr(deps, "get_redactor", REAL_GET_REDACTOR)  # refuses until FR-MEM-05 (BQ-109) lands
+    def unavailable_redactor():
+        raise NotImplementedError("no redactor configured")
+
+    monkeypatch.setattr(deps, "get_redactor", unavailable_redactor)
     fs, st = patch_clients(monkeypatch)
     deploy(monkeypatch, LIVE)
     for seam in (deps.get_artifact_store, deps.get_run_archive):

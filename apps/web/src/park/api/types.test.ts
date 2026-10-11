@@ -7,6 +7,7 @@ import type { Api, ApiMethod } from "./index";
 import type {
   Ack,
   Agenda,
+  AgendaData,
   AgendaSlot,
   ApiResult,
   Connector,
@@ -20,6 +21,8 @@ import type {
   Notification,
   Plan,
   Skill,
+  SkillCapture,
+  SkillVersion,
   Source,
   StartAck,
   Team,
@@ -192,7 +195,7 @@ describe("WEB_1a_types: the Api interface returns typed envelopes", () => {
     expectTypeOf<ReturnType<Api["getSkills"]>>().toExtend<R<readonly Skill[]>>();
     expectTypeOf<ReturnType<Api["getLearn"]>>().toEqualTypeOf<R<Learn>>();
     expectTypeOf<ReturnType<Api["getLedger"]>>().toEqualTypeOf<R<Ledger>>();
-    expectTypeOf<ReturnType<Api["getAgenda"]>>().toEqualTypeOf<R<Agenda>>();
+    expectTypeOf<ReturnType<Api["getAgenda"]>>().toEqualTypeOf<R<AgendaData>>();
     expectTypeOf<ReturnType<Api["getTeam"]>>().toEqualTypeOf<R<Team>>();
     expectTypeOf<ReturnType<Api["getConnectors"]>>().toExtend<R<readonly Connector[]>>();
     expectTypeOf<ReturnType<Api["getNotifications"]>>().toExtend<R<readonly Notification[]>>();
@@ -216,6 +219,10 @@ describe("WEB_1a_types: the Api interface returns typed envelopes", () => {
     expectTypeOf<ReturnType<Api["bookSlot"]>>().toEqualTypeOf<R<Ack>>();
     expectTypeOf<Parameters<Api["addBackup"]>>().toEqualTypeOf<[personId: string]>();
     expectTypeOf<ReturnType<Api["addBackup"]>>().toEqualTypeOf<R<Ack>>();
+    expectTypeOf<Parameters<Api["captureSkill"]>>().toEqualTypeOf<[text: string]>();
+    expectTypeOf<Parameters<Api["proposeVersion"]>>().toEqualTypeOf<[captureId: string]>();
+    expectTypeOf<ReturnType<Api["captureSkill"]>>().toEqualTypeOf<R<SkillCapture>>();
+    expectTypeOf<ReturnType<Api["proposeVersion"]>>().toEqualTypeOf<R<SkillVersion>>();
     expectTypeOf<Parameters<Api["setPref"]>>().toEqualTypeOf<[key: string, value: unknown]>();
     expectTypeOf<ReturnType<Api["setPref"]>>().toEqualTypeOf<R<Ack>>();
   });
