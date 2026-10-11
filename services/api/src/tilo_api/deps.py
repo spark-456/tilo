@@ -57,6 +57,7 @@ from tilo_api.assistant.config import AssistantConfig, AssistantConfigError, loa
 from tilo_api.meeting_host_rpc import MeetingHostRpc, open_meeting_host_rpc
 from tilo_api.people_access import NoSourceOwners
 from tilo_api.people_access import SourceOwners as PanelSourceOwners
+from tilo_api.skill_store import SkillStore
 
 if TYPE_CHECKING:
     from tilo_api.assistant.core import Decider
@@ -897,6 +898,12 @@ def get_desk_worlds(request: Request = None) -> DeskWorlds:  # type: ignore[assi
     from tilo_api import seams_store  # noqa: PLC0415
 
     return seams_store.StoreDeskWorlds(seams_store.resolve_store(request))
+
+
+def get_skill_store() -> SkillStore:
+    """The taught-skill store (SKILLS-2, FR-SKL-04). No production backend yet (BQ-SKILLS-1): refuses, fail closed;
+    dev mode wires one in memory."""
+    raise HTTPException(status_code=503, detail="not_configured")
 
 
 def get_run_archive(request: Request = None) -> Callable[..., RunArchive]:  # type: ignore[assignment]
