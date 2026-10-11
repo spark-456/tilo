@@ -463,7 +463,10 @@ async def _read_body(request: Request) -> bytes | None:
 
 
 def host_router(runtime: HostRuntime) -> APIRouter:
+    from .host_join import join_router
+
     router = APIRouter(prefix="/internal")
+    router.include_router(join_router(runtime))
 
     async def serve(request: Request, request_def: str, answer_def: str, work: Callable[[Any], dict[str, Any]]) -> Any:
         settings = runtime.settings()
