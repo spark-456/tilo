@@ -27,6 +27,7 @@ from tilo_api.meeting_join import owner_join
 from tilo_api.people_events import WorkEvents, get_work_events
 from tilo_api.people_limits import idempotent, write_limit
 from tilo_api.people_meetings import MeetingEditIn, edit_meeting, get_meeting, list_meetings, read_minutes, set_world
+from tilo_api.people_pins import list_pins
 from tilo_api.people_plate import build_plate
 from tilo_api.people_quotes import Reader, item_quote, meeting_quotes
 from tilo_api.people_writes import (
@@ -476,6 +477,16 @@ def _item_writer(
     if _ITEM_ID.fullmatch(item_id) is None:
         raise _not_found()
     return _writer(principal, stores, clock, redact, events)
+
+
+@router.get("/v1/pinboards")
+def list_pinboards_route(
+    principal: Annotated[deps.Principal, Depends(deps.get_current_principal)],
+    stores: Annotated[PeopleStores, Depends(deps.get_people_stores)],
+    clock: Annotated[Callable[[], str], Depends(deps.get_clock)],
+    owners: Annotated[deps.SourceOwners, Depends(deps.get_source_owners)],
+) -> dict[str, Any]:
+    return _answer(lambda: list_pins(_writer(principal, stores, clock), owners))
 
 
 @router.get("/v1/work-items")
