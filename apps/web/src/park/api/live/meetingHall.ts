@@ -1,10 +1,8 @@
 import type { MeetingRoom as Room } from "@tilo/contracts";
 export type { MeetingRoom as Room } from "@tilo/contracts";
-import Ajv2020 from "ajv/dist/2020";
-import common from "../../../../../../contracts/common.schema.json";
-import schema from "../../../../../../contracts/meeting_room.schema.json";
 import { API_URL, appCheckToken, authToken, sessionView } from "../../../api/ClientProvider";
 import { HttpClient, TiloApiError } from "../../../api/http";
+import roomGuard from "./meetingRoom.guard.js";
 
 export type RoomClient = Pick<HttpClient, "getJson" | "postJson">;
 export function createRoomClient(): RoomClient | null {
@@ -19,13 +17,10 @@ export interface Attendee {
 }
 const record = (v: unknown): v is Record<string, unknown> =>
   !!v && typeof v === "object" && !Array.isArray(v);
-const validate = new Ajv2020({ strict: false, validateFormats: false })
-  .addSchema(common)
-  .compile<Room>(schema);
 const bad = () => new TiloApiError("Could not read the Meeting Hall reply.", 200, true);
 export function roomOf(v: unknown, worldId: string): Room {
-  if (!validate(v) || v.world_id !== worldId) throw bad();
-  return v;
+  if (!roomGuard(v) || !record(v) || v.world_id !== worldId) throw bad();
+  return v as unknown as Room;
 }
 /** MR-02: the same layout + recorded district association the server uses; nothing inferred from names. */
 export async function attendees(client: RoomClient, worldId: string): Promise<Attendee[]> {
