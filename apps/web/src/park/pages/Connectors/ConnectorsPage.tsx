@@ -1,7 +1,7 @@
 // Park Connectors page (WEB-11; design `Tilo App Connectors.dc.html`, inventory.md). Data comes through
 // useParkApi(); navigation only through app.go; toasts through app.toast with the design's exact copy.
 //
-// The Api has no connector write yet (README lists connector reconnect/sync as a call to add), so Connect,
+// Live data uses a read-only list with unavailable facts labelled (CX-W1-1). In the demo only, Connect,
 // Reconnect, Disconnect and the access level are page-local state, as in the design. The design waits 1.4 s
 // and 1.5 s on timers; page code holds no timer before WEB-3b, so the wait is one awaited step: the busy
 // label shows at once and the result lands on the promise continuation. The S-08 consent hand-off belongs to
@@ -17,11 +17,13 @@ import "./Connectors.css";
 import { AttentionBanner, AvailableRow, ConnectedTile } from "./ConnectorParts";
 import { Drawer } from "./Drawer";
 import { GoogleAccess } from "./GoogleAccess";
+import { LiveConnectors } from "./LiveConnectors";
 import { icon } from "./icons";
 import { type Overrides, type UsedRow, isOn, matches, merge, usedBy } from "./view";
 
 type Load =
   | { kind: "loading" }
+  | { kind: "live"; connectors: Connector[] }
   | {
       kind: "ready";
       connectors: Connector[];
@@ -80,22 +82,39 @@ export function ConnectorsPage({
   useEffect(() => {
     let live = true;
     // Worlds only feed the "Used by" list: a failed read leaves the skills and drops the worlds.
-    const worlds = api.getWorlds(app.dec, app.added).then(
-      (w) => w.data,
-      () => [] as World[],
-    );
-    Promise.all([api.getConnectors(), api.getSkills(), api.getConnectorTerms(), worlds]).then(
-      ([c, s, t, w]) =>
-        live &&
-        setLoad({ kind: "ready", connectors: c.data, skills: s.data, worlds: w, terms: t.data }),
-      () => live && setLoad({ kind: "unavailable" }),
-    );
+    void api
+      .getConnectors()
+      .then(async (c) => {
+        if (!live) return;
+        if (c.source === "live") {
+          setLoad({ kind: "live", connectors: c.data });
+          return;
+        }
+        const worlds = api.getWorlds(app.dec, app.added).then(
+          (w) => w.data,
+          () => [] as World[],
+        );
+        const [s, t, w] = await Promise.all([api.getSkills(), api.getConnectorTerms(), worlds]);
+        if (live)
+          setLoad({ kind: "ready", connectors: c.data, skills: s.data, worlds: w, terms: t.data });
+      })
+      .catch(() => live && setLoad({ kind: "unavailable" }));
     return () => {
       live = false;
     };
   }, [api, app.dec, app.added]);
 
   const close = useCallback(() => setOpen(null), []);
+
+  if (load.kind === "live") {
+    return (
+      <Frame>
+        <Heading />
+        {live ? <GoogleAccess flow={live} /> : null}
+        <LiveConnectors connectors={load.connectors} />
+      </Frame>
+    );
+  }
 
   if (load.kind === "unavailable") {
     return (

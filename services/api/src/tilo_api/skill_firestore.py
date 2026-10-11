@@ -107,10 +107,10 @@ class FirestoreSkillStore:
 
 
 def client_factory(project: str) -> Any:
-    """The Firestore client for `project` with the runtime identity's ADC; built only here, only on demand."""
-    from google.cloud import firestore  # noqa: PLC0415
+    """The production root's shared client for `project`, built only on demand."""
+    from tilo_api.prod import firestore_client  # noqa: PLC0415
 
-    return firestore.Client(project=project)
+    return firestore_client(project)
 
 
 def open_skill_store(env: Mapping[str, str] | None = None) -> SkillStore:
