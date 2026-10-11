@@ -550,3 +550,14 @@ export interface ProfileSettings {
   notifications: NotificationRow[];
   quiet: QuietHours;
 }
+/** FR-AGT-15: fields supplied by the proposal route. */
+export interface SkillProposal {
+  id: string;
+  skill_id: string;
+  domain: string;
+  status: "proposed" | "approved" | "rejected";
+  from_version: string;
+  to_version: string;
+  diff: string;
+  provenance: { world_id: string; proposed_by: string; proposed_at: string };
+}
