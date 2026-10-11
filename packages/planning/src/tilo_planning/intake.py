@@ -72,6 +72,8 @@ def submit_intake(request: IntakeRequest, *, safety: SafetyProvider, store: InMe
     screened = [_screen(n, f.content, safety, budget) for n, f in zip(names, request.files, strict=True)]
 
     task_id, world_id, run_id = f"t_{new_ulid()}", f"w_{new_ulid()}", f"r_{new_ulid()}"
+    if request.files:
+        store.bind(world_id=world_id, run_id=run_id, owner=request.user_id)
     now = datetime.now(UTC)
     received_at = now.strftime("%Y-%m-%dT%H:%M:%S.") + f"{now.microsecond // 1000:03d}Z"
     base = {"v": "1.0", "ts": received_at, "world_id": world_id, "run_id": run_id, "actor": request.user_id}
@@ -92,6 +94,9 @@ def submit_intake(request: IntakeRequest, *, safety: SafetyProvider, store: InMe
                            screening="unscreened" if error else ("flagged" if flagged else "clean"),
                            screening_reason=reason)  # fmt: skip
         ref = {"artifact_id": stored.artifact_id, "version": stored.version}
+        flagged = flagged or stored.screening == "flagged"
+        if error is None and stored.screening == "unscreened":
+            error = "the stored file could not be screened"
         if error is not None:
             severity, summary, tool = "fyi", f"Could not read {name}: {error}", None
         elif flagged:
@@ -102,6 +107,7 @@ def submit_intake(request: IntakeRequest, *, safety: SafetyProvider, store: InMe
             base, seq=seq, type="artifact.created", target=stored.artifact_id, severity=severity, tool=tool,
             item={"kind": "document", "artifact_id": stored.artifact_id, "label": _clip(name, 80)},
             summary=summary, cause=world_event["id"], data={"artifact": ref},
+            archive_ref=stored.archive_ref,
         )  # fmt: skip
         status, origin = ("failed" if error else "ok"), dict(stored.origin)
         files.append(IntakeFileResult(name, status, kind, text, error, flagged, reason, ref, origin, [event]))
