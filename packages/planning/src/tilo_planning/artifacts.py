@@ -34,12 +34,19 @@ class StoredArtifact:
     origin: dict[str, Any]
     screening: str = "unscreened"  # "clean" | "flagged" | "unscreened"
     screening_reason: str | None = None
+    archive_ref: str | None = None
 
 
 class InMemoryArtifactStore:
     def __init__(self) -> None:
         self._versions: dict[str, list[StoredArtifact]] = {}
         self._lock = threading.Lock()
+
+    def bind(self, *, world_id: str, run_id: str, owner: str) -> None:
+        """The API's durable adapter binds server-generated scope; local uploads stay in memory."""
+
+    def abort(self) -> None:
+        """Local storage has no durable request transaction to clean up."""
 
     def put(
         self,

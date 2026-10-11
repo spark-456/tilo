@@ -11,6 +11,7 @@ answer closes intake with 503 before anything is stored or sent to a model.
 from __future__ import annotations
 
 import logging
+import os
 from dataclasses import asdict
 from typing import Annotated, Any
 
@@ -52,9 +53,22 @@ logger = logging.getLogger("tilo_api.intake")
 _store = InMemoryArtifactStore()
 
 
-def get_store(request: Request = None) -> InMemoryArtifactStore:  # type: ignore[assignment]
+def get_store(
+    request: Request = None,  # type: ignore[assignment]
+    mode: Annotated[deps.Mode, Depends(deps.get_work_mode)] = "replay",
+) -> InMemoryArtifactStore:
     demo = ephemeral.for_request(request) if request is not None else None
-    return _store if demo is None else demo.uploads  # a demo's uploads are its own, in memory, gone with it
+    if demo is not None:
+        return demo.uploads
+    if request is None or not ({"K_SERVICE", "CLOUD_RUN_JOB"} & os.environ.keys()):
+        return _store
+    from tilo_api.intake_uploads import RunUploads
+
+    return RunUploads(
+        org_id=deps.ORG_ID,
+        artifacts=lambda: deps.get_artifact_store(request, mode),
+        archive=lambda **scope: deps.get_run_archive(request)(**scope),
+    )  # configured stores are opened only after the Director succeeds
 
 
 @router.post("/intake", status_code=201)
@@ -141,13 +155,25 @@ async def intake(
             ) from exc
         result = await run_in_threadpool(submit_intake, request, safety=safety, store=store, prepared=prepared)
     except IntakeRejected as exc:
+        await _abort_uploads(store)
         return _rejected(exc.reason)
     except (ProviderError, ProviderConfigError, ReplayMissError) as exc:
         logger.warning("safety screen failed: %s", type(exc).__name__)
         raise HTTPException(status_code=503, detail="The safety screen is unavailable; nothing was stored.") from exc
-    task_id, task = await run_in_threadpool(
-        create_task, tasks, writer, result, extraction, scenario=scenario, kinds=kinds
-    )
+    except HTTPException:
+        raise
+    except Exception as exc:
+        await _abort_uploads(store)
+        logger.warning("upload persistence failed: %s", type(exc).__name__)
+        raise HTTPException(status_code=503, detail="Upload storage is unavailable; retry.") from exc
+    try:
+        task_id, task = await run_in_threadpool(
+            create_task, tasks, writer, result, extraction, scenario=scenario, kinds=kinds
+        )
+    except Exception as exc:
+        await _abort_uploads(store)
+        logger.warning("intake persistence failed: %s", type(exc).__name__)
+        raise HTTPException(status_code=503, detail="Upload storage is unavailable; retry.") from exc
     body = asdict(result)  # per-file text and events stay server-side
     body["files"] = [{k: v for k, v in f.items() if k not in ("text", "events")} for f in body["files"]]
     questions = [
@@ -185,6 +211,13 @@ async def _quick(
     except quick.QuickRefusal as refusal:
         return JSONResponse(status_code=refusal.status, content={"error": refusal.message})
     return JSONResponse(body)
+
+
+async def _abort_uploads(store: InMemoryArtifactStore) -> None:
+    try:
+        await run_in_threadpool(store.abort)
+    except Exception as exc:
+        logger.warning("upload cleanup pending: %s", type(exc).__name__)
 
 
 def _rejected(reason: str) -> JSONResponse:
