@@ -1,6 +1,6 @@
 """PlanGraph validator (FR-INT-09, PRD 7.1 and 10.4). Deterministic code, no model: a plan is checked
 against contracts/plan.schema.json and then against every computable rule in contracts/plan.rules.md
-(PG-01..PG-11; PG-12 is the schema's). A plan with any violation is rejected before it reaches a
+(PG-01..PG-11 and PG-13; PG-12 is the schema's). A plan with any violation is rejected before it reaches a
 person. Each violation names its rule id; a shape failure is reported as `schema` and stops the
 cross-reference checks, since they assume the shape.
 
@@ -14,7 +14,7 @@ import functools
 import itertools
 import json
 import math
-from collections.abc import Iterator, Mapping
+from collections.abc import Collection, Iterator, Mapping
 from collections.abc import Set as AbstractSet
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -359,6 +359,31 @@ def _pg11(plan: dict[str, Any], skills: AbstractSet[str], connectors: Mapping[st
                 )
 
 
+def _pg13(plan: dict[str, Any], changes: Mapping[str, Collection[str]] | None) -> Iterator[Violation]:
+    """Revision units (plan 1.1.0, ADR-0028, MR-09): `revises` and `change` come together, `change` is a confirmed
+    change request's proposal id, `revises` is one of that request's units and an earlier unit of the plan with the
+    same district and role. Without `changes` no unit may be a revision unit. The rest (PG-01..PG-11) applies to
+    a revision unit as to any unit, and no rule here lets a change set a gate, tier or policy (MR-11)."""
+    earlier: dict[str, Any] = {}
+    for unit in plan["units"]:
+        uid, revises, change = unit["id"], unit.get("revises"), unit.get("change")
+        if (revises is None) != (change is None):
+            yield Violation("PG-13", f"unit {uid} has only one of revises and change")
+        elif revises is not None:
+            if changes is None:
+                yield Violation("PG-13", f"unit {uid} is a revision unit but no confirmed change was given")
+            elif change not in changes:
+                yield Violation("PG-13", f"unit {uid}: change {change} is not a confirmed change of the world")
+            elif revises not in changes[change]:
+                yield Violation("PG-13", f"unit {uid} revises {revises}, which change {change} does not include")
+            target = earlier.get(revises)
+            if target is None:
+                yield Violation("PG-13", f"unit {uid} revises {revises}, which is not an earlier unit of the plan")
+            elif (target["district"], target["role"]) != (unit["district"], unit["role"]):
+                yield Violation("PG-13", f"unit {uid} does not keep the district and role of {revises}")
+        earlier[uid] = unit
+
+
 def validate_plan(
     plan: Any,
     *,
@@ -368,6 +393,7 @@ def validate_plan(
     policies: Mapping[str, Any],
     owner: str | None = None,
     now: str | None = None,
+    changes: Mapping[str, Collection[str]] | None = None,
 ) -> list[Violation]:
     """Every violation the plan has, in rule order; an empty list means valid.
 
@@ -376,6 +402,10 @@ def validate_plan(
     the world owner whose policies may open gates; None binds each policy to its own recorded owner
     (every stamp still by that owner). `now` (a common.schema.json timestamp; anything else fails
     every policy gate) decides which policy level is in force; it defaults to the clock.
+
+    `changes` maps the proposal id of each confirmed change request of the world to the ids of the units it includes
+    (MR-09, PG-13); the caller reads them from the world's `meeting.change_requested` events, never from the plan.
+    None means no change was confirmed, so any unit carrying `revises` or `change` is a violation.
 
     BQ-72: `owner=None` trusts each policy's own recorded owner, so the first caller that passes
     client-supplied plan JSON (FR-INT-10) must pass the world owner, with a test (issue #124).
@@ -398,5 +428,6 @@ def validate_plan(
         _pg09(plan),
         _pg10(plan, policies, connectors, owner, _utc_now() if now is None else now, risk_table),
         _pg11(plan, skills, connectors),
+        _pg13(plan, changes),
     )
     return [v for check in checks for v in check]
