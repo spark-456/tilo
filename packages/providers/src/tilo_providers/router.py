@@ -12,6 +12,8 @@ from dataclasses import dataclass, field, replace
 from datetime import UTC, date, datetime
 from typing import Any, Literal
 
+from tilo_redact import redact
+
 from tilo_providers.config import ProvidersConfig
 from tilo_providers.errors import OutputTruncatedError, ProviderError, RequestError, SafetyError
 from tilo_providers.factory import build_provider
@@ -261,8 +263,13 @@ class Router:
     def _start(self, role_id: str, req: GenerateRequest, outs: list[str] | None, cap: Any, budget: Any) -> RouterResult:
         role, candidates = self._config.roles[role_id], self._candidates(role_id, cap)
         max_output = next(n for n in (req.max_output_tokens, role.max_output_tokens, 1024) if n is not None)  # BQ-63
-        request = req.model_copy(update={"max_output_tokens": max_output})
-        return RouterResult(role_id, request, candidates, budget, raw_prompt=req.prompt, tool_outputs=list(outs or []))
+        # FR-MEM-05 (PRD 16.1 rule 4): no secret leaves in a prompt, system text or tool output, nor stays in what the
+        # result keeps for the trace and archive. Text with no secret is returned as is, so replay keys do not drift.
+        prompt, system = redact(req.prompt), redact(req.system) if req.system is not None else None
+        request = req.model_copy(update={"prompt": prompt, "system": system, "max_output_tokens": max_output})
+        return RouterResult(
+            role_id, request, candidates, budget, raw_prompt=prompt, tool_outputs=[redact(o) for o in outs or []]
+        )
 
     def _prepare(
         self, run: RouterResult, profile_id: str, provider: ModelProvider, prompt: str | None = None
@@ -274,8 +281,10 @@ class Router:
         measure = lambda text: provider.count_tokens(_input_text(run.request, text))  # noqa: E731
         if prompt is None:
             prompt = _compact(run.role_id, cap, run.raw_prompt, run.tool_outputs, measure)
-        elif cap is not None and measure(prompt) > cap:
-            raise TokenCapExceededError(f"EFF-03: role {run.role_id!r} repair prompt is over its cap of {cap}")
+        else:
+            prompt = redact(prompt)  # a repair prompt quotes the response's validation error
+            if cap is not None and measure(prompt) > cap:
+                raise TokenCapExceededError(f"EFF-03: role {run.role_id!r} repair prompt is over its cap of {cap}")
         sent = run.request.model_copy(update={"prompt": prompt})
         role = self._config.roles[run.role_id]
         if (

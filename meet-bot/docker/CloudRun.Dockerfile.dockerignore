@@ -6,6 +6,7 @@
 !meet-bot/docker
 !packages/contracts-py/src
 !packages/providers/src
+!packages/redact/src
 # Only the config the provider layer reads and the prompts it loads (prompts/router: schema repair; prompts/speech:
 # transcribe), not all of config/ and prompts/.
 !config/models*.yaml

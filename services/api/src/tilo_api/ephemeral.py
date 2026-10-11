@@ -15,9 +15,7 @@ never "persist".
 
 from __future__ import annotations
 
-import json
 import logging
-import re
 import threading
 import time
 import weakref
@@ -32,6 +30,8 @@ from tilo_connectors import InMemoryOutboxStore
 from tilo_memory.artifacts import ArtifactStore, MemoryBlobBackend, MemoryMetaBackend
 from tilo_people.stores import PeopleStores
 from tilo_planning.artifacts import InMemoryArtifactStore
+from tilo_redact import redact as _redact
+from tilo_redact import redact_value as _redact_payload
 
 from tilo_api import deps
 
@@ -46,19 +46,10 @@ MAX_TOTAL_BYTES = 100_000_000
 MAX_RUNS = 2  # a demo's runs at once
 IDLE_EMPTY_S = 60.0  # an empty session older than this may be evicted for a new one
 CAPACITY = "demo_capacity"
-_SECRET = re.compile(r"(?:sk-|AIza|ghp_|xox[abp]-)[0-9A-Za-z_-]{16,}")  # the stand-in redactor (FR-MEM-05 is not built)
 
 
 def _capacity(status: int) -> HTTPException:
     return HTTPException(status_code=status, detail=CAPACITY)
-
-
-def _redact(text: str) -> str:
-    return _SECRET.sub("[REDACTED]", text)
-
-
-def _redact_payload(payload: Any) -> Any:
-    return json.loads(_redact(json.dumps(payload)))
 
 
 class _Counted:

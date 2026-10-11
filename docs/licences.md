@@ -233,3 +233,8 @@ licence terms are tracked in `design/source/INDEX.md`, not here.
 
 `tilo-memory` declares `jsonschema` and `referencing` as runtime dependencies (FR-MEM-06 artifact store),
 both already listed above (MIT). No new licence.
+
+## Python (`packages/redact`)
+
+`tilo-redact` (FR-MEM-05, SEC-14: the shared secret redactor) is in-workspace and has no external runtime
+dependency (standard library only). `tilo-providers` and `tilo-api` depend on it. No new licence.

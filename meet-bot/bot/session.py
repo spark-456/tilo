@@ -25,6 +25,7 @@ from .captions import CaptionMerger, CaptionReader, TranscriptStore, Utterance
 from .chat import ChatPoster, intro_text
 from .clock import SystemClock
 from .config import ROOT, Config
+from .control import stop_requested
 from .events import EventSink, remove_meet_links
 from .guards import BotRefused
 from .hybrid import (
@@ -193,6 +194,9 @@ class LiveSession:
         """Open the model connection because a question is likely (rate limited inside FastLLM)."""
         if self.fast is None:
             return
+        pending = getattr(self, "_preparation_task", None)
+        if pending is not None and not pending.done():
+            return
         try:
             self._preparation_task = asyncio.get_running_loop().create_task(self.fast.prewarm())
         except RuntimeError:  # no running loop (offline tools): nothing to warm
@@ -229,7 +233,7 @@ class LiveSession:
     def record(self, u: Utterance, heard_at: float | None = None, stt_final_at: float | None = None) -> None:
         if not self.intro_sent:
             return
-        if u.text.strip().casefold() == "tilo leave":
+        if stop_requested(u.text):
             self.leave_requested = True
             return
         u.text = remove_meet_links(u.text)
@@ -255,7 +259,7 @@ class LiveSession:
     def record_caption(self, u: Utterance) -> None:
         if not self.intro_sent:
             return
-        if u.text.strip().casefold() == "tilo leave":
+        if stop_requested(u.text):
             self.leave_requested = True
             return
         u.text, u.speaker = remove_meet_links(u.text), remove_meet_links(u.speaker)
@@ -421,7 +425,7 @@ class LiveSession:
                 continue
             if sender == "?":  # Meet did not tag the sender; our own messages were filtered above, so it is a person
                 sender = "Participant"
-            if text.strip().casefold() == "tilo leave":
+            if stop_requested(text):
                 self.leave_requested = True
                 return
             bot = self.brain.bot_name if self.brain else ""

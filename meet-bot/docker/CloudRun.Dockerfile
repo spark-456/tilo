@@ -11,6 +11,7 @@ RUN pip install --break-system-packages --ignore-installed typing_extensions \
     -r /tmp/requirements.txt -r /tmp/cloud-requirements.txt
 COPY packages/contracts-py/src /opt/tilo/packages/contracts-py/src
 COPY packages/providers/src /opt/tilo/packages/providers/src
+COPY packages/redact/src /opt/tilo/packages/redact/src
 # Import only the pure OIDC boundary, rather than the connector broker or its stores.
 COPY services/connectors/src/tilo_connectors/host_auth.py /opt/tilo/services/connectors/src/tilo_connectors/host_auth.py
 RUN touch /opt/tilo/services/connectors/src/tilo_connectors/__init__.py
@@ -22,11 +23,12 @@ COPY config/meeting*.yaml /opt/tilo/config/
 COPY prompts/router /opt/tilo/prompts/router
 COPY prompts/speech /opt/tilo/prompts/speech
 ENV TILO_REPO_ROOT=/opt/tilo \
-    PYTHONPATH=/opt/tilo/packages/contracts-py/src:/opt/tilo/packages/providers/src:/opt/tilo/services/connectors/src \
-    BOT_JOIN_MODE=guest
+    PYTHONPATH=/opt/tilo/packages/contracts-py/src:/opt/tilo/packages/providers/src:/opt/tilo/packages/redact/src:/opt/tilo/services/connectors/src \
+    BOT_JOIN_MODE=guest TILO_CLOUD_CAPTURE=1
 WORKDIR /app
 COPY --chown=pwuser:pwuser meet-bot/bot /app/bot
 COPY --chown=pwuser:pwuser meet-bot/docker/cloud_entrypoint.py /cloud_entrypoint.py
+COPY --chown=pwuser:pwuser meet-bot/docker/cloud_smoke.py /cloud_smoke.py
 USER pwuser
 EXPOSE 8080
 ENTRYPOINT ["python3", "/cloud_entrypoint.py"]

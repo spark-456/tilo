@@ -11,9 +11,49 @@ from bot.captions import Utterance
 from bot.session import LiveSession
 
 
+def test_FR_MTG_09_repeated_warm_hints_keep_one_tracked_task():
+    async def check():
+        entered = asyncio.Event()
+
+        async def prepare():
+            entered.set()
+            await asyncio.Event().wait()
+
+        session = LiveSession.__new__(LiveSession)
+        session.fast = SimpleNamespace(prewarm=prepare)
+        session._prewarm()
+        await entered.wait()
+        original = session._preparation_task
+        try:
+            session._prewarm()
+            assert session._preparation_task is original
+        finally:
+            original.cancel()
+            await asyncio.gather(original, return_exceptions=True)
+
+    asyncio.run(check())
+
+
 def browser(tmp_path, email="bot@example.test"):
     cfg = SimpleNamespace(bot_email=email, debug_dir=tmp_path, profile_dir=tmp_path / "profile")
     return MeetBrowser(cfg)
+
+
+@pytest.mark.parametrize("phrase", ["Tilo leave", "Tilo, leave.", "TILO LEAVE!", "  Tilo  leave...  "])
+def test_FR_MTG_10_caption_punctuation_does_not_block_a_leave_request(phrase):
+    session = LiveSession.__new__(LiveSession)
+    session.intro_sent = True
+    session.leave_requested = False
+    session.store = SimpleNamespace(append=lambda item: pytest.fail("stop command was captured"))
+    session.record(Utterance("Participant", phrase, 1.0))
+    assert session.leave_requested
+
+
+@pytest.mark.parametrize("phrase", ["Someone said Tilo leave", "Tilo leave tomorrow", "Don't leave", "leave"])
+def test_FR_MTG_10_mentioning_leave_is_not_a_stop_request(phrase):
+    from bot.control import stop_requested
+
+    assert not stop_requested(phrase)
 
 
 @pytest.mark.parametrize("label", [None, "Google Account: Other (other@example.test)", "Google Account: Unknown"])
