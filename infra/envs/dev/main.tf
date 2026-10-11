@@ -77,7 +77,7 @@ locals {
 
   # PRD 6.2 services, 6.5 ingress rule: public only for api, channels
   # (webhooks) and sandbox-web; everything else internal only.
-  cloud_run_services = merge({
+  cloud_run_services = {
     "api" = {
       image              = local.placeholder_image
       min_instance_count = 0
@@ -144,7 +144,8 @@ locals {
       public             = true
       invoked_by         = []
     }
-    }, var.meet_bot_enabled ? {
+  }
+  enabled_cloud_run_services = merge(local.cloud_run_services, var.meet_bot_enabled ? {
     "meet-bot" = {
       image               = local.placeholder_image
       min_instance_count  = 0
@@ -152,7 +153,7 @@ locals {
       ingress             = "INGRESS_TRAFFIC_INTERNAL_ONLY"
       public              = false
       invoked_by          = ["api"]
-      ignore_env          = true # Runtime settings and the user-only LIVE switch are set after the image is deployed.
+      ignore_env          = false
       cpu                 = "2"
       memory              = "4Gi"
       timeout             = "3600s"
@@ -283,7 +284,7 @@ module "service" {
 
   project_id = var.project_id
   region     = var.region
-  services   = local.cloud_run_services
+  services   = local.enabled_cloud_run_services
 
   vpc_network    = google_compute_network.vpc.name
   vpc_subnetwork = google_compute_subnetwork.run_egress.name
@@ -379,7 +380,7 @@ resource "google_project_iam_custom_role" "vertex_generate" {
 
 # The deployer may act as each runtime SA it deploys, and nothing else.
 resource "google_service_account_iam_member" "deployer_act_as" {
-  for_each = local.cloud_run_services
+  for_each = local.enabled_cloud_run_services
 
   service_account_id = "projects/${var.project_id}/serviceAccounts/${module.service.service_accounts[each.key]}"
   role               = "roles/iam.serviceAccountUser"
@@ -398,7 +399,7 @@ resource "google_service_account" "cloudbuild" {
 }
 
 resource "google_service_account_iam_member" "cloudbuild_act_as" {
-  for_each = local.cloud_run_services
+  for_each = local.enabled_cloud_run_services
 
   service_account_id = "projects/${var.project_id}/serviceAccounts/${module.service.service_accounts[each.key]}"
   role               = "roles/iam.serviceAccountUser"
@@ -697,7 +698,7 @@ module "monitoring" {
 
   project_id              = var.project_id
   alert_email             = var.alert_email
-  cloud_run_service_names = [for k in keys(local.cloud_run_services) : "tilo-${k}"]
+  cloud_run_service_names = [for k in keys(local.enabled_cloud_run_services) : "tilo-${k}"]
   events_subscription_id  = module.events.subscription_name
   eval_nightly_job_name   = google_cloud_run_v2_job.eval_nightly.name
 

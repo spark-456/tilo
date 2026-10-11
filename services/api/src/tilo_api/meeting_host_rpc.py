@@ -24,9 +24,9 @@ import re
 import threading
 import time
 from collections.abc import Callable, Mapping, Sequence
-from typing import Any, NamedTuple, Protocol
+from typing import Any, Literal, NamedTuple, Protocol
 
-from pydantic import ValidationError
+from pydantic import BaseModel, ConfigDict, ValidationError
 from tilo_connectors.errors import AdapterError, PossiblySent, ProviderUnavailable, SideEffectRefused
 from tilo_connectors.meeting_host import CONNECTOR_ID, HostReceipt
 from tilo_contracts import (
@@ -138,6 +138,11 @@ def metadata_id_token(audience: str) -> str:
     return str(id_token.fetch_id_token(Request(), audience))
 
 
+class _JoinRefusal(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    error: Literal["not_joinable", "no_join_link", "host_not_connected"]
+
+
 class MeetingHostRpc:
     def __init__(
         self,
@@ -201,15 +206,11 @@ class MeetingHostRpc:
             return reply.body
         if route == "join" and reply.status == 409:
             try:
-                body = json.loads(reply.body)
-            except (ValueError, TypeError):
-                body = None
-            if isinstance(body, dict) and body in (
-                {"error": "not_joinable"},
-                {"error": "no_join_link"},
-                {"error": "host_not_connected"},
-            ):
-                raise HostRpcError("rejected", body["error"])
+                refusal = _JoinRefusal.model_validate_json(reply.body)
+            except ValidationError:
+                pass
+            else:
+                raise HostRpcError("rejected", refusal.error)
         if reply.status == 400 and route == "connect-callback":
             said = _error_code(reply.body)
             if said in CALLBACK_REFUSALS:
