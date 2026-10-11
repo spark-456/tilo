@@ -1,11 +1,44 @@
 // @vitest-environment happy-dom
 import { act } from "react";
 import { afterEach, expect, it, vi } from "vitest";
+import { fakeScheduler } from "../../../../test-support/park/appHarness";
 import { cleanup, mount } from "../../../../test-support/park/componentsHarness";
+import { appFor } from "../../../../test-support/park/worldHarness";
 import { HttpClient } from "../../../api/http";
+import { createFixtureApi } from "../../api/fixtureApi";
+import { ParkProvider } from "../../app/context";
 import { SkillProposals } from "./SkillProposals";
+import { WorldPage } from "./WorldPage";
 
 afterEach(cleanup);
+it("FR_AGT_15 the live World page reaches proposals and the demo World never requests them", async () => {
+  for (const source of ["live", "fixture"] as const) {
+    const api = createFixtureApi();
+    const result = await api.getWorlds({}, []);
+    const world = result.data[0];
+    if (!world) throw new Error("Test world missing");
+    api.getWorlds = async () => ({ data: result.data, source });
+    const fetch = vi.fn(async () => new Response(JSON.stringify({ proposals: [] })));
+    const sch = fakeScheduler();
+    await act(async () => {
+      mount(
+        <ParkProvider
+          api={api}
+          worldClient={new HttpClient({ baseUrl: "https://api.test", fetch })}
+          schedule={sch.schedule}
+        >
+          <WorldPage app={appFor(world.id)} />
+        </ParkProvider>,
+      );
+    });
+    expect(fetch).toHaveBeenCalledTimes(source === "live" ? 1 : 0);
+    if (source === "live")
+      expect(fetch.mock.calls[0]?.[0]).toBe(
+        `https://api.test/worlds/${encodeURIComponent(world.id)}/skill-proposals`,
+      );
+    cleanup();
+  }
+});
 const p = {
   id: "p /1",
   skill_id: "writing",
