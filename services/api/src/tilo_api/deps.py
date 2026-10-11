@@ -680,12 +680,47 @@ def _demo(request: Request | None) -> Any:
     return ephemeral.for_request(request) if request is not None else None
 
 
+_run_stores_lock = threading.Lock()
+_run_stores: dict[tuple[str | None, ...], Any] = {}  # a built store per config; a refusal is never kept
+_RUN_STORE_ENV = (
+    *("K_SERVICE", "TILO_FIRESTORE_PROJECT", "FIRESTORE_EMULATOR_HOST", "STORAGE_EMULATOR_HOST"),
+    *("GOOGLE_CLOUD_PROJECT", "API_ENDPOINT_OVERRIDE", "TILO_ARTIFACTS_BUCKET", "TILO_ARCHIVE_BUCKET"),
+)  # every variable a door's rules read: a kept store never outlives a config that would now be refused
+
+
+def _run_store(kind: str, switches: tuple[str, str], build: Callable[[], Any]) -> Any:
+    key = (kind, *(os.environ.get(name) for name in (*_RUN_STORE_ENV, *switches)))
+    with _run_stores_lock:
+        if key not in _run_stores:
+            _run_stores[key] = build()
+        return _run_stores[key]
+
+
+def _forget_run_stores() -> None:
+    with _run_stores_lock:
+        _run_stores.clear()
+
+
 def get_artifact_store(request: Request = None) -> ArtifactStore:  # type: ignore[assignment]
-    """Where a run's outputs go. No production backend exists until ADR-0018 T8 (Firestore, GCS), so this refuses and
-    no run starts (fail closed, BQ-AGT02-T4-1); dev mode wires one in-memory store, and a demo session its own."""
+    """Where a run's outputs go (PROD-WIRE 2b): Firestore records and GCS bytes for `TILO_ARTIFACTS_STORE=gcs` (see
+    `tilo_api.run_stores`); anything else, or no redactor yet, refuses and no run starts (fail closed, BQ-AGT02-T4-1).
+    Config is read per call; a built store is kept per config. The redactor is checked before any client is built."""
     if (demo := _demo(request)) is not None:
         return demo.artifacts
-    raise NotImplementedError("no artifact store is configured, so no run starts")
+    from tilo_api import run_stores  # noqa: PLC0415
+
+    redactor = get_redactor()
+    return cast(
+        ArtifactStore,
+        _run_store(
+            "artifacts",
+            ("TILO_ARTIFACTS_STORE", "TILO_ARTIFACTS_BUCKET"),
+            lambda: run_stores.open_artifact_store(redactor=redactor),
+        ),
+    )
+
+
+get_artifact_store.cache_clear = _forget_run_stores  # type: ignore[attr-defined]  # tests start from a cold process
 
 
 def get_redactor(request: Request = None) -> Callable[[str], str]:  # type: ignore[assignment]
@@ -818,11 +853,25 @@ def get_desk_worlds() -> DeskWorlds:
 
 
 def get_run_archive(request: Request = None) -> Callable[..., RunArchive]:  # type: ignore[assignment]
-    """`open_archive(*, org_id, run_id) -> RunArchive`, the run's raw archive. No production store yet: refuses
-    (a demo session's is in memory and dies with it)."""
+    """`open_archive(*, org_id, run_id) -> RunArchive`, the run's raw archive on GCS for `TILO_ARCHIVE_STORE=gcs`
+    (PROD-WIRE 2b). It masks every string of a payload with the shared redactor, checked before any client is built;
+    unconfigured it refuses."""
     if (demo := _demo(request)) is not None:
         return demo.open_archive
-    raise NotImplementedError("no raw-archive store is configured, so no run starts")
+    from tilo_api import run_stores  # noqa: PLC0415
+
+    redactor = get_redactor()
+    return cast(
+        "Callable[..., RunArchive]",
+        _run_store(
+            "archive",
+            ("TILO_ARCHIVE_STORE", "TILO_ARCHIVE_BUCKET"),
+            lambda: run_stores.open_run_archive(redactor=run_stores.redact_leaves(redactor)),
+        ),
+    )
+
+
+get_run_archive.cache_clear = _forget_run_stores  # type: ignore[attr-defined]
 
 
 _host_client_lock = threading.Lock()
