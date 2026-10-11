@@ -42,6 +42,7 @@ from tilo_providers.clock import Clock, real_today
 from tilo_providers.interfaces import GenerateRequest, GenerateResponse, ModelProvider, SafetyProvider
 from tilo_providers.prompts import load_prompt
 
+from tilo_harness.deliverable import DeliverableRefused, render_output, wants_pdf
 from tilo_harness.outputs import UnitOutput
 from tilo_harness.tools import (
     CachedCall,
@@ -158,7 +159,7 @@ class ToolUnitRunner:
         holds_effects = not loop.tainted and any(self._tools.is_side_effect(tool) for tool in allowed.values())
         base = load_prompt(
             role,
-            "unit.md",
+            "unit_pdf.md" if wants_pdf(unit, context.brief) else "unit.md",  # LW-10: a PDF deliver unit writes a spec
             {
                 "title": data_line(unit["title"], 120),
                 "unit_type": data_line(unit["unit_type"], 80),
@@ -181,7 +182,14 @@ class ToolUnitRunner:
             if not (response.tool_calls and live):
                 if not response.text:
                     return self._finish(UnitOutcome(False, f"No result for {unit['title']}."), loop, "no_text")
-                output = UnitOutput(media_type="text/markdown", content=response.text.encode("utf-8"))
+                try:  # LW-10: a PDF deliver unit's reply is a DeliverableSpec, rendered here; any flaw fails the unit
+                    output = (
+                        await asyncio.to_thread(render_output, response.text)
+                        if wants_pdf(unit, context.brief)
+                        else UnitOutput(media_type="text/markdown", content=response.text.encode("utf-8"))
+                    )
+                except DeliverableRefused as refused:
+                    return self._finish(UnitOutcome(False, f"No report was made: {refused}."), loop, "done")
                 outcome = UnitOutcome(True, f"Finished {unit['title']}.", outputs=(output,), provenance_ids=_refs(loop))
                 return self._finish(outcome, loop, "done")
             await self._calls(response.tool_calls, live, loop)
