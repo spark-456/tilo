@@ -26,6 +26,7 @@ test: `OutputTruncatedError(message, *, output_tokens=None, thinking_tokens=None
 
 from __future__ import annotations
 
+import json
 from dataclasses import replace
 from pathlib import Path
 from typing import Any
@@ -55,6 +56,7 @@ from tilo_providers.config import load_providers_config
 from tilo_providers.errors import ProviderError
 from tilo_providers.interfaces import GenerateRequest, GenerateResponse
 
+REPO = Path(__file__).resolve().parents[2]
 DIRECTOR_FLOOR = 4096  # live_e2e._DIRECTOR_OUT, the cap the incident's Director call carried
 STOP_TEXT = "The Director could not draft a brief."  # services/api intake.py: the 502 detail, said on purpose
 
@@ -159,7 +161,8 @@ def _credits_high(tmp_path: Path, models: Path) -> float:
 def test_PL_LIVE_E2E_35_the_estimate_grows_linearly_with_the_directors_configured_cap(tmp_path: Path) -> None:
     # guard (passes before the fix): `_output_cap` already prefers the role's `max_output_tokens` to the 4096 floor
     low, mid, high = (
-        _credits_high(tmp_path, _models_file(tmp_path, f"m{cap}.yaml", cap)) for cap in (8192, 16384, 24576)
+        _credits_high(tmp_path, _models_file(tmp_path, f"m{cap}.yaml", cap))
+        for cap in (2048, 4096, 6144)  # COST-AUDIT: under the Director's p90 (8192), where the cap still sets the count
     )
     assert low < mid < high
     assert (mid - low) == pytest.approx(high - mid, rel=1e-6)
@@ -173,7 +176,11 @@ def test_PL_LIVE_E2E_35_the_shipped_config_gives_the_director_a_cap_and_the_esti
     per_token = (
         _credits_high(tmp_path, _models_file(tmp_path, "twice.yaml", 2 * DIRECTOR_FLOOR)) - at_floor
     ) / DIRECTOR_FLOOR
-    assert shipped - at_floor == pytest.approx(per_token * (cap - DIRECTOR_FLOOR), rel=1e-6)
+    p90 = json.loads((REPO / "evals" / "live_usage_p90.json").read_text(encoding="utf-8"))["output_tokens_p90"][
+        "director"
+    ]
+    # COST-AUDIT: the estimate counts min(cap, p90); the old whole-cap figure stays reachable as the hard bound
+    assert shipped - at_floor == pytest.approx(per_token * (min(cap, p90) - DIRECTOR_FLOOR), rel=1e-6)
     assert shipped > at_floor, "the estimate before a live run must show what the new cap can cost"
 
 

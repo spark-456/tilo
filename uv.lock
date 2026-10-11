@@ -1510,6 +1510,9 @@ source = { editable = "services/browser" }
 dependencies = [
     { name = "fastapi" },
     { name = "idna" },
+    { name = "tilo-archive" },
+    { name = "tilo-logging" },
+    { name = "tilo-planning" },
     { name = "tilo-providers" },
     { name = "uvicorn" },
 ]
@@ -1518,6 +1521,9 @@ dependencies = [
 requires-dist = [
     { name = "fastapi", specifier = ">=0.115" },
     { name = "idna", specifier = ">=3.7" },
+    { name = "tilo-archive", editable = "packages/archive" },
+    { name = "tilo-logging", editable = "packages/logging" },
+    { name = "tilo-planning", editable = "packages/planning" },
     { name = "tilo-providers", editable = "packages/providers" },
     { name = "uvicorn", specifier = ">=0.32" },
 ]
@@ -1604,12 +1610,14 @@ dependencies = [
     { name = "referencing" },
     { name = "tilo-api" },
     { name = "tilo-archive" },
+    { name = "tilo-browser" },
     { name = "tilo-contracts" },
     { name = "tilo-harness" },
     { name = "tilo-memory" },
     { name = "tilo-metering" },
     { name = "tilo-planning" },
     { name = "tilo-providers" },
+    { name = "tilo-sandbox-web" },
 ]
 
 [package.metadata]
@@ -1620,12 +1628,14 @@ requires-dist = [
     { name = "referencing", specifier = ">=0.30" },
     { name = "tilo-api", editable = "services/api" },
     { name = "tilo-archive", editable = "packages/archive" },
+    { name = "tilo-browser", editable = "services/browser" },
     { name = "tilo-contracts", editable = "packages/contracts-py" },
     { name = "tilo-harness", editable = "services/harness" },
     { name = "tilo-memory", editable = "packages/memory" },
     { name = "tilo-metering", editable = "packages/metering" },
     { name = "tilo-planning", editable = "packages/planning" },
     { name = "tilo-providers", editable = "packages/providers" },
+    { name = "tilo-sandbox-web", editable = "services/sandbox-web" },
 ]
 
 [[package]]
@@ -1646,6 +1656,7 @@ dependencies = [
     { name = "tilo-memory" },
     { name = "tilo-policy" },
     { name = "tilo-providers" },
+    { name = "tilo-render" },
     { name = "tzdata" },
     { name = "uvicorn" },
 ]
@@ -1670,6 +1681,7 @@ requires-dist = [
     { name = "tilo-memory", editable = "packages/memory" },
     { name = "tilo-policy", editable = "packages/policy" },
     { name = "tilo-providers", editable = "packages/providers" },
+    { name = "tilo-render", editable = "services/render" },
     { name = "tzdata", specifier = ">=2024.1" },
     { name = "uvicorn", specifier = ">=0.32" },
 ]
@@ -1778,6 +1790,7 @@ dependencies = [
     { name = "google-genai" },
     { name = "httpx" },
     { name = "jsonschema" },
+    { name = "pypdf" },
     { name = "referencing" },
     { name = "tilo-redact" },
 ]
@@ -1788,6 +1801,7 @@ requires-dist = [
     { name = "google-genai", specifier = ">=1.0" },
     { name = "httpx", specifier = ">=0.27" },
     { name = "jsonschema", specifier = ">=4.18" },
+    { name = "pypdf", specifier = ">=6.19" },
     { name = "referencing", specifier = ">=0.30" },
     { name = "tilo-redact", editable = "packages/redact" },
 ]

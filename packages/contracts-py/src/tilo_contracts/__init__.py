@@ -2,12 +2,13 @@
 # contracts/events/registry.yaml. Do not edit. Regenerate with `just contracts-gen`;
 # `just contracts-check` fails CI on drift (FR-WLD-02, FR-WLD-03).
 # agents.schema.json 1.0.0 sha256:f2ba3955260a80eb
-# artifact.schema.json 1.0.0 sha256:358508330e9ee2f2
+# appspec.schema.json 1.0.0 sha256:e3638e1ae19f9b9b
+# artifact.schema.json 1.1.0 sha256:ce5a30aeae826180
 # attention.schema.json 1.0.0 sha256:f35cff84728304af
 # brief.schema.json 1.0.0 sha256:be4e747f37e399b2
 # calendar_entry.schema.json 1.1.0 sha256:291531543be88320
 # card.schema.json 1.0.0 sha256:2666292eb19087d0
-# common.schema.json 1.7.0 sha256:4054d75df1d6ab48
+# common.schema.json 1.7.0 sha256:71b116e3caa126a8
 # connector.schema.json 1.0.0 sha256:cc3a7d9b3820e12c
 # decision.schema.json 1.0.0 sha256:06915b6db08dc4b7
 # envelope.schema.json 1.0.0 sha256:8a5c75c61807baa2
@@ -128,7 +129,7 @@
 # plan.schema.json 1.1.0 sha256:f0722cc94a84e2d1
 # plate.schema.json 1.0.0 sha256:d2a4e4361a714c8f
 # policy.schema.json 1.0.0 sha256:307bca25f6efc07e
-# providers.schema.json 1.2.0 sha256:4514148b0b6b2f7e
+# providers.schema.json 1.3.0 sha256:ecc5063d4926f11c
 # scenario.schema.json 1.0.0 sha256:b8e044d7e37b92a3
 # skill.schema.json 1.1.0 sha256:9eeee7768b667afa
 # spend_caps.schema.json 1.1.1 sha256:c04bc36ac17dc0ab
@@ -216,11 +217,71 @@ class AgentsConfigQuestions(BaseModel):
     hourly_cap_per_person: Annotated[int, Field(ge=1)]
 
 
+type AppSpecTitle = Annotated[str, Field(max_length=120, min_length=1)]
+"""
+The quiz's name, shown as plain text.
+"""
+
+
+class AppSpecTimer(BaseModel):
+    """
+    One countdown for the whole attempt, in seconds (1 minute to 6 hours). The person may pause it; at 0 the attempt is submitted. The clock is the person's own, so it emits no event.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    seconds: Annotated[int, Field(ge=60, le=21600)]
+
+
+type AppSpecQuestionId = Annotated[str, Field(pattern="^q[1-9][0-9]{0,2}$")]
+"""
+q1 to q999, unique within the spec (AS-01).
+"""
+
+
+type AppSpecStem = Annotated[str, Field(max_length=2000, min_length=1)]
+"""
+The question text, shown as plain text (AS-03).
+"""
+
+
+type AppSpecOptionId = Literal["a", "b", "c", "d", "e", "f"]
+
+
+type AppSpecOptionText = Annotated[str, Field(max_length=500, min_length=1)]
+"""
+One choice, shown as plain text (AS-03).
+"""
+
+
+class AppSpecOptions(BaseModel):
+    """
+    Two to six choices keyed a to f and shown in that order: a and b always, each later id only with the one before it.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    a: AppSpecOptionText
+    b: AppSpecOptionText
+    c: AppSpecOptionText | None = None
+    d: AppSpecOptionText | None = None
+    e: AppSpecOptionText | None = None
+    f: AppSpecOptionText | None = None
+
+
+type AppSpecPage = Annotated[int, Field(ge=1, le=100000)]
+"""
+1-based page of the cited PDF.
+"""
+
+
 type ArtifactVersionIdempotencyKey = Annotated[
-    str, Field(pattern="^r_[0-9A-Za-z_]{1,48}:U[0-9]{1,4}:(0|[1-9][0-9]{0,3}):[0-9]$")
+    str, Field(pattern="^r_[0-9A-Za-z_]{1,48}:U[0-9]{1,4}:(0|[1-9][0-9]{0,3}):f?[0-9]$")
 ]
 """
-<run_id>:<unit_id>:<attempt>:<index> (AR-05). index is the output's 0-based position, 0 to 9, since a unit has at most 10 outputs (BQ-257).
+<run_id>:<unit_id>:<attempt>:<index> (AR-05). index is the output's 0-based position, 0 to 9, since a unit has at most 10 outputs (BQ-257); a fetch's index is f0 to f9, the file's 0-based position among the unit's fetched files, at most 10 (FR-INT-01, ADR-0029 8).
 """
 
 
@@ -501,9 +562,9 @@ Data class (PRD 12.1): personal, business or public.
 """
 
 
-type DeliverableFormat = Literal["pdf", "pptx", "docx", "xlsx", "csv", "markdown", "google_slides", "google_docs", "google_sheets", "email", "in_app"]
+type DeliverableFormat = Literal["pdf", "pptx", "docx", "xlsx", "csv", "markdown", "google_slides", "google_docs", "google_sheets", "email", "in_app", "app"]
 """
-Deliverable format (PRD 12.4), plus email for replies and in_app for answers shown in Tilo.
+Deliverable format (PRD 12.4), plus email for replies, in_app for answers shown in Tilo and, since 1.6.0 (ADR-0029), app: an AppSpec (appspec.schema.json) that fixed web code renders (FR-AGT-16).
 """
 
 
@@ -2828,47 +2889,31 @@ class PolicyMaxLevel(BaseModel):
 type ProvidersProfileId = Annotated[str, Field(pattern="^[a-z][a-z0-9-]{0,31}$")]
 
 
-type ProvidersCapability = Literal["json", "tools", "vision", "audio", "thinking", "computer_use", "grounding", "code_execution"]
+type ProvidersCapability = Literal["json", "tools", "vision", "audio", "thinking", "computer_use", "grounding", "code_execution", "video", "documents"]
 """
-structured output (json), tool calling, vision, audio input, thinking levels, computer use, search grounding, code execution.
+structured output (json), tool calling, vision, audio input, thinking levels, computer use, search grounding, code execution; 1.3.0 (ADR-0029): video input and documents (a PDF read natively, FR-INT-02).
 """
 
 
-class ProvidersProfile(BaseModel):
+class ProvidersMediaTokens(BaseModel):
     """
-    One model profile. Its cost rank (PRD 6.6) is derived from prices, never declared here. base_url and api_key_env are allowed only when provider is openai_compat (ADR-0002, ADR-0003).
+    Tokens per unit of media input (ADR-0029 decision 6): image is one image, pdf_page one PDF page, audio_per_second and video_per_second one second. Upper bounds, so an estimate never understates.
     """
 
     model_config = ConfigDict(
         extra="forbid",
     )
-    provider: Slug
-    """
-    Adapter name in packages/providers, e.g. google.
-    """
-    model: Annotated[str, Field(max_length=128, min_length=1)]
-    context: Annotated[int, Field(ge=1)]
-    """
-    Context window in tokens.
-    """
-    caps: list[ProvidersCapability]
-    base_url: Annotated[
-        str | None,
-        Field(
-            max_length=512,
-            pattern="^https://[A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?(?::[0-9]{1,5})?(?:/[A-Za-z0-9._~%/-]*)?$",
-        ),
-    ] = None
-    """
-    openai_compat endpoint. https only, with no user info, query or fragment, so no credential can sit in the URL (PRD 16.1 rule 4). The not-pattern rejects a final line break, which a Python validator's $ lets through.
-    """
-    api_key_env: Annotated[str | None, Field(pattern="^[A-Z][A-Z0-9_]{2,63}$")] = None
-    """
-    Name of the environment variable that holds the key, never the key itself. The not-pattern rejects a final line break, which a Python validator's $ lets through.
-    """
+    image: Annotated[int, Field(ge=1)]
+    pdf_page: Annotated[int, Field(ge=1)]
+    audio_per_second: Annotated[int, Field(ge=1)]
+    video_per_second: Annotated[int, Field(ge=1)]
 
 
 class ProvidersRole(BaseModel):
+    """
+    reserve_units (1.3.0, ADR-0029) is how many units of the profile's unit_price the router reserves under the PL-03 budget check before it sends, because the provider cannot cap them (a grounded call runs as many searches as the model decides). A reply that reports no unit count is charged the reserved amount.
+    """
+
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -2881,6 +2926,7 @@ class ProvidersRole(BaseModel):
     thinking: Literal["low", "medium", "high"] | None = None
     max_input_tokens: Annotated[int | None, Field(ge=1)] = None
     max_output_tokens: Annotated[int | None, Field(ge=1)] = None
+    reserve_units: Annotated[int | None, Field(ge=1)] = None
 
 
 type DenyItem = Annotated[str, Field(max_length=128, min_length=1)]
@@ -2896,17 +2942,16 @@ class ProvidersRules(BaseModel):
     """
 
 
-class ProvidersPrice(BaseModel):
+class ProvidersUnitPrice(BaseModel):
     """
-    Standard list price in US dollars per million tokens. audio_input (1.2.0, ADR-0027) is the price per million audio input tokens where the provider bills audio input at its own rate (Gemini); left out, the profile has no audio price and cannot serve the speech role. The other input tokens of the same call are priced at input.
+    A fee per 1,000 units (ADR-0029 decision 1): query is one search the provider ran (Gemini grounding reports them in grounding_metadata.web_search_queries), minute one minute of audio, character one input character, image one generated image. per_1k is US dollars per 1,000 units, null only while prices are unset.
     """
 
     model_config = ConfigDict(
         extra="forbid",
     )
-    input: Annotated[float | None, Field(ge=0.0)]
-    output: Annotated[float | None, Field(ge=0.0)]
-    audio_input: Annotated[float | None, Field(ge=0.0)] = None
+    unit: Literal["query", "minute", "character", "image"]
+    per_1k: Annotated[float | None, Field(ge=0.0)]
 
 
 type ScenarioId = Annotated[str, Field(pattern="^[A-Za-z][A-Za-z0-9_-]{0,31}$")]
@@ -3399,13 +3444,13 @@ class AgentsConfig(BaseModel):
 
 class ArtifactVersionOrigin(BaseModel):
     """
-    What made the version: a unit's runner (unit and the worker agent set), tilo-render (for a unit), an intake upload (neither) or a restore (FR-MEM-06; no unit). Set by the store from the run, never by a runner.
+    What made the version: a unit's runner (unit and the worker agent set), tilo-render (for a unit), an intake upload (neither), a restore (FR-MEM-06; no unit) or, since 1.1.0 (ADR-0029), a fetch: a file a unit's worker agent downloaded through tilo-browser (unit and agent set). Set by the store from the run, never by a runner.
     """
 
     model_config = ConfigDict(
         extra="forbid",
     )
-    kind: Literal["unit", "render", "upload", "restore"]
+    kind: Literal["unit", "render", "upload", "restore", "fetch"]
     unit: UnitId | None
     agent: AgentId | None
 
@@ -4644,39 +4689,55 @@ class PolicyTierModifier(BaseModel):
     raises_to: Literal["T3"]
 
 
-class ProvidersModels(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    example: bool
+class ProvidersProfile(BaseModel):
     """
-    true while the profiles are the PRD's examples; the user chooses final models.
-    """
-    profiles: Annotated[dict[ProvidersProfileId, ProvidersProfile], Field(min_length=1)]
-    roles: Annotated[dict[Slug, ProvidersRole], Field(min_length=1)]
-    """
-    Business code asks for a role, never a model (PL-01). speech (1.2.0, ADR-0027) is the role every SpeechProvider call asks for (FR-MTG-17, FR-MTG-11, FR-INT-14, FR-CHN-16): the loader refuses it unless it states max_output_tokens and its primary, fallback and cascade profiles declare the audio capability and, while prices are set, carry an audio_input price.
-    """
-    rules: ProvidersRules
-
-
-class ProvidersPrices(BaseModel):
-    """
-    Prices per profile (PL-06, FR-MTR-01). Prices, the date and the source may be null only while status is unset, and the loader refuses live metering until status is set.
+    One model profile. Its cost rank (PRD 6.6) is derived from prices, never declared here. base_url and api_key_env are allowed only when provider is openai_compat (ADR-0002, ADR-0003). media_tokens (1.3.0, ADR-0029) holds the tokens the provider counts for one image, one PDF page and one second of audio or video, as upper bounds; the router uses them only for the pre-flight estimate and the EFF-03 cap check before it sends a media part, never for billing (the reported usage is billed). A profile without media_tokens gets no media part: the router refuses it before sending.
     """
 
     model_config = ConfigDict(
         extra="forbid",
     )
-    status: Literal["unset", "set"]
-    effective_date: CalendarDate | None
-    source: Annotated[str | None, Field(max_length=500, min_length=1)]
-    currency: Literal["USD"]
-    credit_usd: float
+    provider: Slug
     """
-    PRD 14.1: 1 credit = US$0.005.
+    Adapter name in packages/providers, e.g. google.
     """
-    profiles: Annotated[dict[ProvidersProfileId, ProvidersPrice], Field(min_length=1)]
+    model: Annotated[str, Field(max_length=128, min_length=1)]
+    context: Annotated[int, Field(ge=1)]
+    """
+    Context window in tokens.
+    """
+    caps: list[ProvidersCapability]
+    media_tokens: ProvidersMediaTokens | None = None
+    base_url: Annotated[
+        str | None,
+        Field(
+            max_length=512,
+            pattern="^https://[A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?(?::[0-9]{1,5})?(?:/[A-Za-z0-9._~%/-]*)?$",
+        ),
+    ] = None
+    """
+    openai_compat endpoint. https only, with no user info, query or fragment, so no credential can sit in the URL (PRD 16.1 rule 4). The not-pattern rejects a final line break, which a Python validator's $ lets through.
+    """
+    api_key_env: Annotated[str | None, Field(pattern="^[A-Z][A-Z0-9_]{2,63}$")] = None
+    """
+    Name of the environment variable that holds the key, never the key itself. The not-pattern rejects a final line break, which a Python validator's $ lets through.
+    """
+
+
+class ProvidersPrice(BaseModel):
+    """
+    The rate charged, in US dollars per million tokens. audio_input (1.2.0, ADR-0027) is the price per million audio input tokens where the provider bills audio input at its own rate (Gemini); left out, the profile has no audio price and cannot serve the speech role. The other input tokens of the same call are priced at input. 1.3.0 (ADR-0029): cached_input is the price per million input tokens served from the provider's prompt cache (the Trace's tokens_cached, ADR-0022); left out, cached tokens are priced at input. unit_price is a fee per 1,000 units charged on top of the token rates (a call costs tokens times their rates plus units times per_1k / 1000). valid_until is the last calendar day (UTC) the price holds, for a promotional rate: after it the loader refuses live metering of the profile until the file is updated. Promotions, credits and free allowances are never subtracted here (the meter overstates, never understates).
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    input: Annotated[float | None, Field(ge=0.0)]
+    output: Annotated[float | None, Field(ge=0.0)]
+    audio_input: Annotated[float | None, Field(ge=0.0)] = None
+    cached_input: Annotated[float | None, Field(ge=0.0)] = None
+    unit_price: ProvidersUnitPrice | None = None
+    valid_until: CalendarDate | None = None
 
 
 class Scenario(BaseModel):
@@ -4915,9 +4976,21 @@ class WorkItem(BaseModel):
     updated_at: Timestamp
 
 
+class AppSpecSource(BaseModel):
+    """
+    Where the question came from: a stored version in the spec's own world, made by a fetch or an upload (AS-02), and for a PDF the page. The web shows the publisher from that version's manifest, never from the spec (AS-03).
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    artifact: ArtifactRef
+    page: AppSpecPage | None = None
+
+
 class ArtifactVersion(BaseModel):
     """
-    One immutable, hash-checked, owner-scoped version in the artifact store (ADR-0018, FR-MEM-12; PRD 13.2, 15.1): the metadata record at orgs/{org}/worlds/{world}/artifacts/{artifact_id}/versions/{version:06d}. The bytes live under a key derived from the ids, so the record holds no blob path. Read by the harness, tilo-api, tilo-render and erasure; only the store writes it. Rules the schema cannot express are AR-01 to AR-08 in artifact.rules.md.
+    One immutable, hash-checked, owner-scoped version in the artifact store (ADR-0018, FR-MEM-12; PRD 13.2, 15.1): the metadata record at orgs/{org}/worlds/{world}/artifacts/{artifact_id}/versions/{version:06d}. The bytes live under a key derived from the ids, so the record holds no blob path. Read by the harness, tilo-api, tilo-render and erasure; only the store writes it. Rules the schema cannot express are AR-01 to AR-09 in artifact.rules.md. 1.1.0 (ADR-0029) adds the fetch origin: a file a unit downloaded through tilo-browser.
     """
 
     model_config = ConfigDict(
@@ -4947,7 +5020,7 @@ class ArtifactVersion(BaseModel):
     origin: ArtifactVersionOrigin
     sources: list[ArtifactVersionSource]
     """
-    Raw-archive pointers of the version's sources, for the Verifier (FR-CON-10, FR-AGT-12): records of the record's own run for a unit or render output, the copied version's for a restore, none for an upload (AR-03). They never leave Tilo (AR-06).
+    Raw-archive pointers of the version's sources, for the Verifier (FR-CON-10, FR-AGT-12): records of the record's own run for a unit, render or fetch output (a fetch has exactly one, the fetch's own record, which holds the cleaned URL, BQ-104), the copied version's for a restore, none for an upload (AR-03, AR-09). They never leave Tilo (AR-06).
     """
     screening: Literal["clean", "flagged", "unscreened"]
     """
@@ -4963,7 +5036,7 @@ class ArtifactVersion(BaseModel):
     """
     idempotency_key: ArtifactVersionIdempotencyKey | None
     """
-    Set for unit and render outputs (AR-05); null for uploads and restores.
+    Set for unit, render and fetch outputs (AR-05); null for uploads and restores.
     """
     created_at: Timestamp
 
@@ -5593,16 +5666,42 @@ class PolicyRiskTierTable(BaseModel):
     max_level: PolicyMaxLevel
 
 
-class Providers(BaseModel):
+class ProvidersModels(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    example: bool
     """
-    Provider-layer configuration as the provider layer loads it (PRD 6.4, 6.6, 14.1): models is config/models.yaml ($defs.models) and prices is config/prices.yaml ($defs.prices). The loader also checks that every role names existing profiles and every profile has a price entry, and the speech role's rules below (1.2.0, ADR-0027). Model ids appear only in config/ and packages/providers.
+    true while the profiles are the PRD's examples; the user chooses final models.
+    """
+    profiles: Annotated[dict[ProvidersProfileId, ProvidersProfile], Field(min_length=1)]
+    roles: Annotated[dict[Slug, ProvidersRole], Field(min_length=1)]
+    """
+    Business code asks for a role, never a model (PL-01). speech (1.2.0, ADR-0027) is the role every SpeechProvider call asks for (FR-MTG-17, FR-MTG-11, FR-INT-14, FR-CHN-16): the loader refuses it unless it states max_output_tokens and its primary, fallback and cascade profiles declare the audio capability and, while prices are set, carry an audio_input price. search (1.3.0, ADR-0029) is the role every SearchProvider call asks for (PRD 12.2): the loader refuses it unless it states reserve_units and its primary, fallback and cascade profiles declare the grounding capability and, while prices are set, carry a unit_price with unit query. Any role whose profiles carry a unit_price must state reserve_units.
+    """
+    rules: ProvidersRules
+
+
+class ProvidersPrices(BaseModel):
+    """
+    Prices per profile (PL-06, FR-MTR-01). Prices, the date and the source may be null only while status is unset, and the loader refuses live metering until status is set. region (1.3.0, ADR-0029), optional, is the provider location the rates were quoted for (for example a regional endpoint's rates): the loader refuses live metering of a profile whose adapter sends to another location; an adapter with no location setting (fake, openai_compat) is not checked.
     """
 
     model_config = ConfigDict(
         extra="forbid",
     )
-    models: ProvidersModels
-    prices: ProvidersPrices
+    status: Literal["unset", "set"]
+    effective_date: CalendarDate | None
+    source: Annotated[str | None, Field(max_length=500, min_length=1)]
+    region: Annotated[
+        str | None, Field(max_length=32, pattern="^(global|us|eu|[a-z]+-[a-z]+[0-9]+)$")
+    ] = None
+    currency: Literal["USD"]
+    credit_usd: float
+    """
+    PRD 14.1: 1 credit = US$0.005.
+    """
+    profiles: Annotated[dict[ProvidersProfileId, ProvidersPrice], Field(min_length=1)]
 
 
 class TaughtSkill(BaseModel):
@@ -5655,6 +5754,22 @@ type UiAction = Annotated[
 """
 The allow-list of what the assistant panel may do on the page (FR-PA-14, PE-10): a closed union on `kind`. The web app has one executor that maps each kind to a handler; a document that does not validate is dropped, so a model can never click, type, read the page or go anywhere outside these routes and targets. State-changing kinds act on the signed-in person's own records through the same API routes as the buttons; `draft_reply` makes a draft (T1) and sends nothing; no kind sends to another person.
 """
+
+
+class AppSpecQuestion(BaseModel):
+    """
+    One question. answer is the id of the one correct option and always names an option the question has. topic is an optional tag the person can filter by.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    id: AppSpecQuestionId
+    stem: AppSpecStem
+    options: AppSpecOptions
+    answer: AppSpecOptionId
+    topic: Slug | None = None
+    source: AppSpecSource
 
 
 class ArtifactVersionManifestRevision(BaseModel):
@@ -5796,6 +5911,34 @@ class MeetingRoom(BaseModel):
     credits_spent: Credits
     max_turns: MeetingRoomTurnNumber
     turns: Annotated[list[MeetingRoomTurn], Field(max_length=50)]
+
+
+class Providers(BaseModel):
+    """
+    Provider-layer configuration as the provider layer loads it (PRD 6.4, 6.6, 14.1): models is config/models.yaml ($defs.models) and prices is config/prices.yaml ($defs.prices). The loader also checks that every role names existing profiles and every profile has a price entry, the speech role's rules below (1.2.0, ADR-0027), and the search role, unit price, region and valid_until rules below (1.3.0, ADR-0029). Model ids appear only in config/ and packages/providers.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    models: ProvidersModels
+    prices: ProvidersPrices
+
+
+class AppSpec(BaseModel):
+    """
+    A declarative app (FR-AGT-16, ADR-0029 decision 9): JSON that a unit writes and the artifact store keeps as an application/json version with origin unit, and that fixed web code renders at an owner-only route. Nothing in it is ever run as code or markup, and no link or URL comes from it. 1.0.0 has one kind, quiz: single-answer multiple-choice questions under one countdown timer, each citing the stored file it came from. Rules the schema cannot express are AS-01 to AS-04 in appspec.rules.md.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    v: Literal["1.0"]
+    kind: Literal["quiz"]
+    title: AppSpecTitle
+    theme: Slug
+    timer: AppSpecTimer
+    questions: Annotated[list[AppSpecQuestion], Field(max_length=200, min_length=1)]
 
 
 class Card(BaseModel):

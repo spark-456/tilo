@@ -220,7 +220,7 @@
       "enum": ["personal", "business", "public"]
     },
     "deliverable_format": {
-      "description": "Deliverable format (PRD 12.4), plus email for replies and in_app for answers shown in Tilo.",
+      "description": "Deliverable format (PRD 12.4), plus email for replies, in_app for answers shown in Tilo and, since 1.6.0 (ADR-0029), app: an AppSpec (appspec.schema.json) that fixed web code renders (FR-AGT-16).",
       "type": "string",
       "enum": [
         "pdf",
@@ -233,7 +233,8 @@
         "google_docs",
         "google_sheets",
         "email",
-        "in_app"
+        "in_app",
+        "app"
       ]
     },
     "media_type": {

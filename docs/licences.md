@@ -47,7 +47,9 @@ CLAUDE.md's "record every dependency's licence" rule. Updated whenever a depende
 `services/harness` also uses `pyyaml`, `jsonschema` and `referencing` (already listed under the
 root dev dependency group), declared as its own direct dependencies since its code imports them
 directly rather than relying only on the shared dev group. FR-AGT-01/02/03 adds the in-workspace
-`tilo-contracts` and `tilo-providers` members (not external; no new licence).
+`tilo-contracts` and `tilo-providers` members (not external; no new licence). LW-10 adds the in-workspace
+`tilo-render` member, so `reportlab` (BSD), `python-pptx` (MIT) and `pydantic` (MIT) now install in the harness image
+too; each is already listed (under `services/render` and `packages/contracts-py`), so no new licence.
 
 ## Python (`packages/providers`)
 
@@ -136,6 +138,8 @@ Its tests use `jsonschema` and `referencing` from the root dev group (above).
 | python-pptx | MIT | https://pypi.org/project/python-pptx/ |
 | reportlab | BSD | https://pypi.org/project/reportlab/ |
 | pypdf | BSD-3-Clause | https://pypi.org/project/pypdf/ |
+
+`tilo-providers` (LW-06) also uses `pypdf` (listed above) to count the pages of an untrusted PDF part.
 
 `tilo-render` (AGR-01/02/03 / FR-CON-09) also uses `pydantic` (already listed under `packages/contracts-py`, MIT) and `pyyaml` (already listed under the root dev dependency group, MIT).
 
@@ -226,6 +230,9 @@ licence terms are tracked in `design/source/INDEX.md`, not here.
 `tilo-memory` declares `jsonschema` and `referencing` as runtime dependencies (FR-MEM-06 artifact store),
 both already listed above (MIT). No new licence.
 
+## Python (`evals`)
+
+`tilo-evals` (LW-16) now depends on the in-workspace `tilo-browser` and `tilo-sandbox-web` (not external): the web-research replay case runs tilo-browser's fetch service over the sandbox-web fixtures in process. No new licence.
 ## Python (`packages/redact`)
 
 `tilo-redact` (FR-MEM-05, SEC-14: the shared secret redactor) is in-workspace and has no external runtime

@@ -13,6 +13,7 @@ from typing import Any, TypedDict
 from pydantic import BaseModel, ConfigDict, Field
 
 from tilo_providers.errors import NotConfigured, RequestError
+from tilo_providers.media import MAX_PARTS, MediaPart
 
 
 class Capability(enum.StrEnum):
@@ -26,10 +27,12 @@ class Capability(enum.StrEnum):
     COMPUTER_USE = "computer_use"
     GROUNDING = "grounding"
     CODE_EXECUTION = "code_execution"
+    VIDEO = "video"  # providers 1.3.0, ADR-0029 decision 6
+    DOCUMENTS = "documents"  # a PDF read natively (FR-INT-02); providers 1.3.0, ADR-0029 decision 6
 
 
 class GenerateRequest(BaseModel):  # one ModelProvider.generate() / .stream() call
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", hide_input_in_errors=True)  # LW-06: an error never echoes media content
     prompt: str
     system: str | None = None
     max_output_tokens: int | None = None
@@ -38,6 +41,8 @@ class GenerateRequest(BaseModel):  # one ModelProvider.generate() / .stream() ca
     response_schema: dict[str, Any] | None = None  # PL-02 structured output: JSON output validated against this schema
     # google only; None sends no thinking config. A pattern, not a Literal, so callers' type checkers stay quiet.
     thinking_level: str | None = Field(default=None, pattern="^(minimal|low|medium|high)$")
+    # LW-06 media input (ADR-0029): images, PDFs, audio, video the model reads natively. Untrusted: see `media`.
+    parts: list[MediaPart] | None = Field(default=None, max_length=MAX_PARTS)
 
 
 class GenerateResponse(BaseModel):  # one generate() result, or one stream() chunk
@@ -89,9 +94,12 @@ class ModelProvider(ABC):  # PRD 6.4: generate, stream, embed, count_tokens, cap
         return text
 
 
-class SearchProvider(ABC):  # PRD 6.1: grounded search
+class SearchProvider(ABC):  # PRD 6.1: grounded search; the typed result is `tilo_providers.search.SearchResult` (LW-05)
     @abstractmethod
     def search(self, query: str, **kwargs: Any) -> Any: ...
+
+    def redact(self, text: str) -> str:  # same role as ModelProvider.redact (PRD 16.1 rule 4)
+        return text
 
 
 class SafetyResult(TypedDict):  # CC-SP-47: the one fixed SafetyProvider.check() result

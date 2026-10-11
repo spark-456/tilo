@@ -35,9 +35,11 @@ from pathlib import Path
 from typing import Any, Literal
 
 from fastapi import FastAPI, Request
+from tilo_harness.lead_review import REVIEW_ROLE, review_milestones
 from tilo_harness.outputs import UnitOutput
 from tilo_harness.schedule_dates import date_window_fail
-from tilo_harness.unit_prompt import request_variables
+from tilo_harness.tool_runner import ToolUnitRunner
+from tilo_harness.unit_prompt import UpstreamItem, request_variables
 from tilo_harness.untrusted import neutralise as neutralise_text
 from tilo_providers.clock import parse_deadline, real_today
 from tilo_providers.config import ProviderConfigError, ProvidersConfig, load_providers_config, resolve_models_path
@@ -73,6 +75,8 @@ FAKED = (  # what a run never does for real, printed with every report (HR-1: sa
     "connectors and recipient: recording mocks; no real mailbox, chat or Drive write",
     "Verifier verdict: recorded in the unit's summary, not acted on",
     "must-ask judgement: a fixed 'nothing to ask' stand-in, no model call; the deterministic rules still ask",
+    "web fetch: the fetch tool reads the in-process sandbox-web fixtures only, never the internet; tool results are "
+    "screened by the marker-list fake, not Model Armor; no skill grants it to a unit yet (LW-17)",
 )
 NO_CONNECTION = "no Google connection is available to this run; nothing was sent"
 REAL_FAKED = (
@@ -95,12 +99,14 @@ _OUT = {
     "specialist": 8192,
     "verifier": 1024,
     "lead": 2048,
+    REVIEW_ROLE: 1024,
     "narrator": 2048,
 }  # output caps of our own calls; thinking tokens count against them, so a call that writes text states room for both
 _RETRY_OUT_MAX = 32768  # a reply cut at its cap is asked once more with twice the room, up to this
 _DEFAULT_OUT = 1024  # the Router's default when neither the request nor the role gives one (BQ-63)
 _DIRECTOR_OUT = 4096  # the Director's floor when its role sets no cap: thinking tokens count against it (BQ-LE2E-9)
 _PROMPT_TOKENS, _UNITS, _DIRECTOR_RETRIES, _MAX_BEATS = 1500, (3, 8), 3, 8  # estimate assumptions; Narrator beats
+_REVIEWS_HIGH = 3  # Lead reviews in the worst case (districts of 2+ units in a plan of up to 8 units)
 _ROLE: ContextVar[str] = ContextVar("live_e2e_role")
 _PERSONAL = re.compile(
     "|".join(
@@ -307,7 +313,7 @@ def _load_config(
         raise LiveE2ERefused("config_invalid", f"the models or prices file did not load: {error}") from None
     if config.prices.status != "set":
         raise LiveE2ERefused("prices_unset", "config/prices.yaml is unset: confirm the prices, then set status to set")
-    needed = ("director", "lead", "specialist", "verifier", "writer", "narrator", *extra_roles)
+    needed = ("director", REVIEW_ROLE, "specialist", "verifier", "writer", "narrator", *extra_roles)
     absent = [r for r in needed if r not in config.roles]
     if absent:
         raise LiveE2ERefused("config_invalid", f"the models file has no role {absent[0]!r}")
@@ -342,25 +348,34 @@ def _estimate(config: ProvidersConfig, case: BankCase) -> Estimate:
     return _estimate_chars(config, len(case.brief) + sum(len(f["text"]) for f in case.files))
 
 
-def _estimate_chars(config: ProvidersConfig, chars: int) -> Estimate:
+def _p90_out() -> dict[str, int]:
+    """Output tokens at the 90th percentile per role (`evals/live_usage_p90.json`, with its provenance)."""
+    return json.loads((_REPO / "evals" / "live_usage_p90.json").read_text(encoding="utf-8"))["output_tokens_p90"]
+
+
+def _estimate_chars(config: ProvidersConfig, chars: int, *, at_cap: bool = False, repairs: int = 1) -> Estimate:
     """One run of a brief with `chars` characters of input (the generator reuses it for each brief it will run).
-    `credits_low` is the floor (a 300-character brief: 3.36 credits at the shipped prices). `credits_high` is the
-    explicit WORST-CASE CEILING, every call burning its whole output cap; it is not the Router's reserve (PL-03
-    reserves a call at its input plus the role's expected output, `config/expected_output.yaml`), so it does not
-    follow that rule."""
+
+    COST-AUDIT: the high figure counts each call at the role's p90 output (never above its output cap) plus `repairs`
+    repair attempts per Director call, not every call at its whole cap. `at_cap=True` is the old worst case, the hard
+    upper bound the high figure never exceeds; the meter still bounds a live run."""
     base = _PROMPT_TOKENS + chars // 3
+    p90 = _p90_out()
 
     def credits(role: str, calls: int, tokens_in: int, tokens_out: int) -> float:
         quote = config.price(config.roles[role].primary)
         return calls * config.credits((tokens_in * quote.input + tokens_out * quote.output) / 1e6)
 
     def out(role: str) -> int:
-        return _output_cap(config, role)
+        cap = _output_cap(config, role)
+        return cap if at_cap else min(cap, p90.get(role, cap))
 
+    director_calls = 3 + _DIRECTOR_RETRIES if at_cap else 3 * (1 + repairs)
     low = credits("director", 3, base, 400) + credits("writer", _UNITS[0], base, 250)
-    low += credits("lead", 1, base, 100) + credits("narrator", 1, base, 200)
-    high = credits("director", 3 + _DIRECTOR_RETRIES, base + 1000, out("director"))
-    high += credits("writer", _UNITS[1], base + 1500, out("writer")) + credits("lead", 3, base + 1500, out("lead"))
+    low += credits(REVIEW_ROLE, 1, base, 100) + credits("narrator", 1, base, 200)
+    high = credits("director", director_calls, base + 1000, out("director"))
+    high += credits("writer", _UNITS[1], base + 1500, out("writer"))
+    high += credits(REVIEW_ROLE, _REVIEWS_HIGH, base + 1500, out(REVIEW_ROLE))
     high += credits("narrator", 1, base + 1500, out("narrator"))
     return Estimate(low, high)
 
@@ -740,23 +755,88 @@ class _Writer:
             return stamped
 
 
+class _RoleModel(ModelProvider):
+    """One role seen as a provider, for the shared runner: every call goes through the metered Router."""
+
+    def __init__(self, router: Router, role: str) -> None:
+        self._router, self._role = router, role
+
+    def generate(self, request: GenerateRequest) -> GenerateResponse:
+        try:
+            response = self._router.generate(self._role, request).response
+        except RouterError as exc:  # a reply cut at its cap is asked once more with twice the room (as `_ask` does)
+            if not isinstance(exc.__cause__, OutputTruncatedError) or not request.max_output_tokens:
+                raise
+            request = request.model_copy(
+                update={"max_output_tokens": min(request.max_output_tokens * 2, _RETRY_OUT_MAX)}
+            )
+            response = self._router.generate(self._role, request).response  # a second cut is the failure
+        if not response or not (response.text or "").strip():
+            raise ProviderError("the model returned no text")
+        return response
+
+    def stream(self, request: GenerateRequest) -> Iterator[GenerateResponse]:
+        raise NotImplementedError
+
+    def embed(self, request: Any) -> Any:
+        raise NotImplementedError
+
+    def count_tokens(self, text: str) -> int:
+        raise NotImplementedError
+
+    def capabilities(self) -> set[Capability]:
+        return set()
+
+    def price(self) -> Any:
+        raise NotImplementedError
+
+
+class _RoleModels(dict[str, ModelProvider]):
+    def __init__(self, router: Router) -> None:
+        super().__init__()
+        self._router = router
+
+    def __missing__(self, role: str) -> ModelProvider:
+        return _RoleModel(self._router, role)
+
+
 class _UnitRunner:
     """One model call per unit by the unit's role (prompts/<role>/unit.md), fed the work of the units it waits for; one
-    Lead review per district milestone (the district's last unit). A Verifier's verdict is recorded, not acted on."""
+    Lead review per district of two or more units (at its last unit, on the cheap `lead_review` role). A Verifier's
+    verdict is recorded, not acted on."""
 
     def __init__(self, router: Router, meter: _Meter, today: date | None = None) -> None:
+        from .web_replay import FixtureWeb  # noqa: PLC0415 (lazy: the 160-case replay never loads the fetch service)
+
         self._router, self._meter = router, meter
-        self._today = today or real_today()  # the one date every prompt of this run states (INTAKE-QUALITY-1)
+        self._today = today or real_today()
+        self._web = FixtureWeb()  # LW-16: the fetch tool over the sandbox-web fixtures, in process, in every mode
+        self._shared = ToolUnitRunner(
+            _RoleModels(router),
+            today=lambda: self._today,
+            tools=self._web.registry(),
+            safety=FakeSafetyProvider(),  # every tool result is screened; the marker-list fake, named in `FAKED`
+            role_tools={"specialist": ("fetch_url",)},
+            meter=lambda role, request, response: meter.cost(response.profile_id, *meter.tokens(response, request)),
+            request_options={
+                role: {"max_output_tokens": cap, "thinking_level": "minimal"} for role, cap in _OUT.items()
+            },
+        )
         self._brief: dict[str, Any] = {}
         self._units: list[dict[str, Any]] = []
+        self._milestones: frozenset[str] = frozenset()
         self._work: dict[str, str] = {}
 
     @property
     def today(self) -> date:
         return self._today
 
+    def close(self) -> None:
+        self._web.close()
+
     def capture(self, brief: dict[str, Any], plan: dict[str, Any]) -> None:
         self._brief, self._units = brief, list(plan.get("units", []))
+        self._milestones = review_milestones(self._units)
 
     def work(self) -> list[tuple[str, str]]:
         return [(u["title"], self._work[u["id"]]) for u in self._units if u["id"] in self._work]  # in plan order
@@ -785,34 +865,37 @@ class _UnitRunner:
     async def run(self, unit: Any, context: Any) -> Any:
         from tilo_api.runs import MeteredOutcome  # noqa: PLC0415
 
-        earlier = [f"[{d}] {self._work[d]}" for d in unit["depends_on"] if d in self._work]
-        variables = {
-            "title": _safe(unit["title"]), "unit_type": unit["unit_type"],
-            "inputs": _safe("\n\n".join(earlier) or "(none)"),
-            "skills": "\n\n".join(skill.body for skill in context.skills), **self._request(),
-        }  # fmt: skip
         if unit["role"] == "verifier":  # FR-AGT-12: the deterministic date-window check comes before the model
             deadline = parse_deadline(self._brief.get("deadline"))
             checked = "\n\n".join(self._work[d] for d in unit["depends_on"] if d in self._work)
             if (fail := date_window_fail(checked, self._today, deadline)) is not None:
                 # the unit fails: its dependents are skipped and the run stops with `reason` (no model call, no review)
                 return MeteredOutcome(success=False, summary=" ".join(fail.verdict.split()), reason=fail.reason)
-        text, credits = await asyncio.to_thread(
-            self._ask, unit["role"], load_prompt(unit["role"], "unit.md", variables)
+        titles = {u["id"]: u["title"] for u in self._units}
+        upstream = tuple(  # the work of the units this one waits for, as the default runner shows it (unit_prompt)
+            UpstreamItem(d, titles.get(d, d), self._work[d], (), "unscreened")
+            for d in unit["depends_on"]
+            if d in self._work
         )
+        shown = dataclasses.replace(context, brief=self._brief, intake_answers=(), upstream=upstream)
+        done = await self._shared.run_unit(unit, shown)  # the shared ToolUnitRunner (LW-07); no tools offered here
+        if not done.outcome.success:
+            raise ProviderError("the model returned no text")
+        text = done.outcome.outputs[0].content.decode("utf-8").strip()
+        credits = done.credits
         self._work[unit["id"]] = text
         summary = f"Finished {unit['title']}."
         if unit["role"] == "verifier":
             summary += f" Verdict: {text.splitlines()[0][:80]}"
         district = unit["district"]
-        if not any(unit["id"] in u["depends_on"] and u["district"] == district for u in self._units):  # the milestone
+        if unit["id"] in self._milestones:  # COST-AUDIT: one review per district of 2+ units (tilo_harness.lead_review)
             work = "\n\n".join(
                 f"[{u['id']}] {u['title']}: {self._work[u['id']]}"
                 for u in self._units
                 if u["id"] in self._work and u["district"] == district
             )
             prompt = load_prompt("lead", "review.md", {"district": district, "work": _safe(work), **self._request()})
-            review, spent = await asyncio.to_thread(self._ask, "lead", prompt)
+            review, spent = await asyncio.to_thread(self._ask, REVIEW_ROLE, prompt)
             summary, credits = f"{summary} Lead review: {review[:200]}", credits + spent
         item = UnitOutput(media_type="text/markdown", content=text.encode("utf-8"))  # the executor stores it (ADR-0018)
         return MeteredOutcome(success=True, summary=summary, outputs=(item,), credits=credits)
@@ -1049,7 +1132,8 @@ def _execute(
     obs = Observation(case=dataclasses.replace(case, approve=approve))
     story: list[StoryLine] = []
     note: str | None = None
-    app = _app(router, screen, runner or _UnitRunner(router, meter), connectors)
+    own = runner or _UnitRunner(router, meter)  # the caller closes a runner it passed in
+    app = _app(router, screen, own, connectors)
     if connectors is not None:  # CL-LIVE-2: write-gated connectors get this run's store, redactor and person
         from .live_writes import bind_writes  # noqa: PLC0415
 
@@ -1060,6 +1144,8 @@ def _execute(
         except Exception as error:  # noqa: BLE001 - a crash is an observation; the error's text is never kept
             obs.crash = type(error).__name__
         finally:
+            if runner is None:
+                own.close()
             if connectors is not None:  # an approval nobody used does not outlive the run
                 from .live_writes import release_writes  # noqa: PLC0415
 
@@ -1147,18 +1233,21 @@ def run_live_e2e(
     if live and (fake_record or os.environ.get("TILO_RECORD") == "1"):
         _mark_today(recordings, day)  # a later replay states the same date, so its recording keys still match
     runner = _UnitRunner(router, meter, day)
-    obs, report.outcome_class, report.reason, report.story_lines, report.story_note = _execute(
-        case,
-        router,
-        meter,
-        screen,
-        env,
-        live=live,
-        cap=max_credits,
-        person=person,
-        runner=runner,
-        connectors=connectors,
-    )
+    try:
+        obs, report.outcome_class, report.reason, report.story_lines, report.story_note = _execute(
+            case,
+            router,
+            meter,
+            screen,
+            env,
+            live=live,
+            cap=max_credits,
+            person=person,
+            runner=runner,
+            connectors=connectors,
+        )
+    finally:
+        runner.close()
     report.work = runner.work()
     if report.reason:  # a last line of defence: nothing printed names the project, an ADC path or a token
         report.reason = _scrub_known(" ".join(report.reason.split()), env)
