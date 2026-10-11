@@ -13,7 +13,18 @@ export function Activity({
 }: { L: Ledger; decisions: readonly Decision[]; app: AppCtx }) {
   const [kind, setKind] = useState<Kind>("all");
   const [open, setOpen] = useState(0);
-  const { groups, waitN } = activityGroups(L, app.dec, kind, decisions);
+  const shown =
+    L.recordedRuns === undefined
+      ? L
+      : {
+          ...L,
+          activity: L.activity.map((e) => {
+            if (!e.dec || decisions.some((d) => d.k === e.dec)) return e;
+            const { dec: _key, ...recorded } = e;
+            return { ...recorded, k: "request" };
+          }),
+        };
+  const { groups, waitN } = activityGroups(shown, app.dec, kind, decisions);
   const options = KINDS.map(([value, label]) => ({
     value,
     label: value === "waiting" && waitN ? `${label} · ${waitN}` : label,

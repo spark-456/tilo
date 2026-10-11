@@ -156,6 +156,29 @@ it("FR_SPD_07_recorded_pending_approval_uses_the_existing_decide_once", async ()
   expect(api.decide).toHaveBeenCalledWith(key);
 });
 
+it("FR_SPD_07_a_recorded_request_without_a_current_card_is_history_only", async () => {
+  const L = ledgerFromCosts({
+    totals: { usd: 0 },
+    by_profile: [],
+    by_task_type: [],
+    activity: [
+      {
+        world_id: "w",
+        run_id: "r",
+        card_id: "gone",
+        type: "approval.requested",
+        ts: "2026-10-11T09:00:00Z",
+        summary: "Old request",
+      },
+    ],
+  });
+  const { container } = await mountLedger(L, []);
+  const feed = region(container, "Activity");
+  expect(text(feed)).toContain("Approval requested");
+  expect(text(feed)).not.toContain("Waiting on you");
+  expect(qa(feed, "button").some((b) => b.textContent?.includes("Approve"))).toBe(false);
+});
+
 /** The fixture ledger with the numbers the tests care about changed to ones it holds nowhere. */
 function varied(patch: Partial<Ledger> = {}): Ledger {
   const L = structuredClone(fixtureLedger);
