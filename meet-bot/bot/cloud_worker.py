@@ -16,6 +16,14 @@ from .providers import reset_call_counter
 from .session import LiveSession
 
 
+class CapturedTranscript(dict):
+    """Reason travels in an HTTP header; the body remains the existing Transcript contract."""
+
+    def __init__(self, transcript, reason):
+        super().__init__(transcript)
+        self.reason = reason
+
+
 def transcript_from_items(meeting_id: str, items) -> dict:
     def clean(text, limit):
         text = re.sub(r"[\x00-\x1f\x7f]", " ", remove_meet_links(text))
@@ -71,4 +79,7 @@ async def attend_meeting(meeting_id: str, join_url: str) -> dict:
         session = LiveSession(cfg, "join", join_url, agenda, 50, False, [], False, False, [], "captions", "both")
         session.events.echo = False
         await session.run()
-        return transcript_from_items(meeting_id, session.store.items)
+        return CapturedTranscript(
+            transcript_from_items(meeting_id, session.store.items),
+            "left_on_request" if getattr(session, "leave_requested", False) else "completed",
+        )

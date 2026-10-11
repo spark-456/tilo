@@ -92,6 +92,7 @@ class Player:
                     await asyncio.wait_for(proc.wait(), timeout=2)
                 except TimeoutError:
                     proc.kill()
+                    await proc.wait()
         return not cut
 
 

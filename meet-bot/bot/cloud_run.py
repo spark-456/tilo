@@ -82,9 +82,9 @@ def create_app(*, attend=None, verifier=None, clock=None) -> FastAPI:
         # A bounded stream avoids collecting arbitrary bodies or validation errors containing the capability.
         raw = bytearray()
         async for chunk in request.stream():
-            raw.extend(chunk)
-            if len(raw) > 2048:
+            if len(raw) + len(chunk) > 2048:
                 return reply(413, "Request is too large")
+            raw.extend(chunk)
         try:
             join = MeetingJoin.model_validate_json(raw)
             expires = datetime.fromisoformat(str(join.expires_at).replace("Z", "+00:00"))
@@ -101,7 +101,16 @@ def create_app(*, attend=None, verifier=None, clock=None) -> FastAPI:
                 transcript = Transcript.model_validate(remove_meet_links(result))
                 if transcript.meeting_id != meeting_id:
                     raise ValueError("wrong meeting")
-                return JSONResponse(transcript.model_dump(mode="json"), headers={"Cache-Control": "no-store"})
+                reason = getattr(result, "reason", "completed")
+                if reason not in ("completed", "left_on_request", "removed", "timeout", "failed"):
+                    raise ValueError("Invalid end reason")
+                return JSONResponse(
+                    transcript.model_dump(mode="json"),
+                    headers={
+                        "Cache-Control": "no-store",
+                        "X-Tilo-Meeting-End-Reason": reason,
+                    },
+                )
             except TimeoutError:
                 return reply(504, "Meeting duration exceeded")
             except Exception:

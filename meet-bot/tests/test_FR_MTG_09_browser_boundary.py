@@ -200,3 +200,37 @@ def test_FR_MTG_01_summary_and_latency_files_remove_pasted_meet_links(tmp_path):
     trace.finish(trace.new_turn("Person", url, 0), "spoken")
     for path in tmp_path.iterdir():
         assert url not in path.read_text(), path.name
+
+
+def test_FR_MTG_09_shutdown_awaits_voice_cleanup_before_browser_leave(tmp_path, monkeypatch):
+    from bot import session as module
+
+    monkeypatch.setattr(module, "write_playback", lambda _: None)
+
+    async def check():
+        entered, cleaned = asyncio.Event(), asyncio.Event()
+
+        async def voice():
+            try:
+                entered.set()
+                await asyncio.Event().wait()
+            finally:
+                cleaned.set()
+
+        async def leave():
+            assert cleaned.is_set(), "audio must stop before browser/profile cleanup"
+
+        session = LiveSession.__new__(LiveSession)
+        session._out_task = None
+        session._speech_task = asyncio.create_task(voice())
+        session.bot_tap = session.recorder = session.brain = None
+        session.merger = SimpleNamespace(flush=lambda _: [])
+        session.clock = SimpleNamespace(now=lambda: 0)
+        session.elapsed = lambda: 0
+        session.br = SimpleNamespace(leave=leave)
+        session.events = SimpleNamespace(emit=lambda *a, **kw: None)
+        session.out_dir, session.leave_requested = tmp_path, True
+        await entered.wait()
+        await session._shutdown()
+
+    asyncio.run(check())

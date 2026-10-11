@@ -192,7 +192,7 @@ class LiveSession:
         if self.fast is None:
             return
         try:
-            asyncio.get_running_loop().create_task(self.fast.prewarm())
+            self._prewarm_task = asyncio.get_running_loop().create_task(self.fast.prewarm())
         except RuntimeError:  # no running loop (offline tools): nothing to warm
             pass
 
@@ -312,6 +312,9 @@ class LiveSession:
                 )
                 await reader.start()
                 await self._loop()
+            except asyncio.CancelledError:
+                self.leave_requested = True
+                raise
             finally:
                 await self._shutdown()
 
@@ -464,10 +467,12 @@ class LiveSession:
         if want_voice:
             mark("tts_request", t0)
         speak = asyncio.create_task(self.speaker.say(msg.text, on_first_sound=heard_first)) if want_voice else None
+        self._speech_task = speak
         chat_ok, chat_s, first_out = False, 0.0, None
         if self.reply_mode != "voice" or not want_voice:
             if speak:
                 waiter = asyncio.ensure_future(first_sound.wait())
+                self._speech_waiter = waiter
                 await asyncio.wait({speak, waiter}, return_when=asyncio.FIRST_COMPLETED)
                 waiter.cancel()
             t1 = self.clock.now()
@@ -745,8 +750,10 @@ class LiveSession:
                 if status_task is None and now >= self.next_status_at:
                     status_task = asyncio.create_task(self._status_step())
         finally:
-            if status_task:
-                status_task.cancel()
+            pending = [task for task in (status_task, quick_task, brain_task) if task is not None]
+            for task in pending:
+                task.cancel()
+            await asyncio.gather(*pending, return_exceptions=True)
 
     async def _status_step(self) -> bool:
         """Meeting ended? Who is here? Has the meeting started for the bot? True means leave."""
@@ -819,8 +826,14 @@ class LiveSession:
 
     # -- shutdown ---------------------------------------------------------------------------------------------------
     async def _shutdown(self) -> None:
-        if self._out_task:
-            self._out_task.cancel()
+        pending = [
+            task
+            for name in ("_out_task", "_speech_task", "_speech_waiter", "_prewarm_task")
+            if (task := getattr(self, name, None)) is not None
+        ]
+        for task in pending:
+            task.cancel()
+        await asyncio.gather(*pending, return_exceptions=True)
         if self.bot_tap:
             self.bot_tap.stop()
         try:
@@ -833,6 +846,7 @@ class LiveSession:
                         await asyncio.sleep(0.5)
                     await asyncio.sleep(2.5)
                     self.stt_task.cancel()
+                    await asyncio.gather(self.stt_task, return_exceptions=True)
             for u in self.merger.flush(self.clock.now()):
                 self.record_caption(u)
             if self.brain and self.gate_at is not None and not self.leave_requested:

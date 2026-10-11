@@ -19,6 +19,8 @@ from tilo_memory.artifacts import ArtifactStore
 from tilo_people.stores import PeopleStores
 
 from tilo_api import deps, people_items
+from tilo_api.meeting_bot import attend_meeting
+from tilo_api.meeting_bot_rpc import MeetingBotRpc, get_meeting_bot_client
 from tilo_api.meeting_host import HostSeams, get_host_seams, host_meeting
 from tilo_api.meeting_host_rpc import MeetingHostRpc
 from tilo_api.meeting_join import owner_join
@@ -48,6 +50,7 @@ from tilo_api.people_writes import (
     remove_team,
     set_role,
 )
+from tilo_api.request_work import while_connected
 
 _MEETING_ID = re.compile(r"mt_[0-9A-Za-z_]{1,48}")
 _ITEM_ID = re.compile(r"wi_[0-9A-Za-z_]{1,48}")
@@ -261,6 +264,28 @@ def join_meeting_route(
     clock: Annotated[Callable[[], str], Depends(deps.get_clock)],
 ) -> dict[str, Any]:
     return _answer(lambda: owner_join(_writer(principal, stores, clock), store, artifacts, client, meeting_id))
+
+
+@router.post("/v1/meetings/{meeting_id}/attend")
+async def attend_meeting_route(
+    meeting_id: str,
+    request: Request,
+    _: Annotated[Empty, Depends(json_body(Empty))],
+    principal: Annotated[deps.Principal, Depends(deps.get_current_principal)],
+    stores: Annotated[PeopleStores, Depends(deps.get_people_stores)],
+    store: Annotated[deps.Store, Depends(deps.get_store)],
+    artifacts: Annotated[ArtifactStore, Depends(deps.get_artifact_store)],
+    host: Annotated[MeetingHostRpc, Depends(deps.get_meeting_host_client)],
+    bot: Annotated[MeetingBotRpc, Depends(get_meeting_bot_client)],
+    clock: Annotated[Callable[[], str], Depends(deps.get_clock)],
+) -> dict[str, Any]:
+    work = attend_meeting(_writer(principal, stores, clock), store, artifacts, host, bot, meeting_id, clock)
+    try:
+        return await while_connected(request, work)
+    except HTTPException:
+        raise
+    except Exception:
+        raise _unreadable() from None
 
 
 @router.post("/v1/meetings/{meeting_id}/host")
