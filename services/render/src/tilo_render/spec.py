@@ -11,6 +11,13 @@ MAX_SECTIONS = 60
 MAX_TABLE_ROWS = 500
 MAX_CHART_POINTS = 200
 MAX_PARAGRAPH_CHARS = 20_000
+MAX_TABLE_COLUMNS = 20
+MAX_BULLETS_PER_BLOCK = 500
+MAX_BLOCKS_PER_SECTION = 30
+MAX_TOTAL_BLOCKS = 120
+MAX_REFERENCED_TABLE_CELLS = 25_000
+MAX_REFERENCED_CHARTS = 20
+MAX_ESTIMATED_SLIDES = 250
 
 
 class ParagraphBlock(BaseModel):
@@ -36,6 +43,8 @@ class BulletsBlock(BaseModel):
     def _validate_bullets(cls, value: list[str]) -> list[str]:
         if not value:
             raise ValueError("Bullets block cannot be empty")
+        if len(value) > MAX_BULLETS_PER_BLOCK:
+            raise ValueError(f"At most {MAX_BULLETS_PER_BLOCK} bullets per block allowed")
         for item in value:
             if len(item) > MAX_PARAGRAPH_CHARS:
                 raise ValueError(f"At most {MAX_PARAGRAPH_CHARS} characters per bullet allowed")
@@ -62,6 +71,13 @@ class Section(BaseModel):
     heading: str = Field(min_length=1)
     blocks: list[Block] = Field(default_factory=list)
 
+    @field_validator("blocks")
+    @classmethod
+    def _validate_blocks_length(cls, value: list[Block]) -> list[Block]:
+        if len(value) > MAX_BLOCKS_PER_SECTION:
+            raise ValueError(f"At most {MAX_BLOCKS_PER_SECTION} blocks per section allowed")
+        return value
+
 
 class Table(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -73,6 +89,8 @@ class Table(BaseModel):
     def _validate_table(self) -> "Table":
         if not self.columns or not self.rows:
             raise ValueError("Table cannot be empty")
+        if len(self.columns) > MAX_TABLE_COLUMNS:
+            raise ValueError(f"At most {MAX_TABLE_COLUMNS} columns per table allowed")
         if len(set(self.columns)) != len(self.columns):
             raise ValueError(f"Duplicate column names in table {self.id}")
         if len(self.rows) > MAX_TABLE_ROWS:
@@ -186,11 +204,36 @@ class DeliverableSpec(BaseModel):
             if chart.kind == ChartKind.PIE and pie_total == 0:
                 raise ValueError("Pie chart total cannot be zero")
 
+        total_blocks = sum(len(section.blocks) for section in self.sections)
+        if total_blocks > MAX_TOTAL_BLOCKS:
+            raise ValueError(f"At most {MAX_TOTAL_BLOCKS} blocks across all sections allowed")
+
+        referenced_cells = 0
+        referenced_charts = 0
+        slide_count = 1 + len(self.sections)
         for section in self.sections:
             for block in section.blocks:
-                if isinstance(block, TableBlock) and block.table_id not in table_ids:
-                    raise ValueError(f"Unknown table_id: {block.table_id}")
-                if isinstance(block, ChartBlock) and block.chart_id not in chart_ids:
-                    raise ValueError(f"Unknown chart_id: {block.chart_id}")
+                if isinstance(block, ParagraphBlock):
+                    slide_count += max(1, math.ceil(len(block.text) / 1000))
+                elif isinstance(block, BulletsBlock):
+                    slide_count += max(1, math.ceil(len(block.bullets) / 8))
+                elif isinstance(block, TableBlock):
+                    if block.table_id not in table_ids:
+                        raise ValueError(f"Unknown table_id: {block.table_id}")
+                    tbl = table_ids[block.table_id]
+                    referenced_cells += len(tbl.rows) * len(tbl.columns)
+                    slide_count += max(1, math.ceil(len(tbl.rows) / 10))
+                elif isinstance(block, ChartBlock):
+                    if block.chart_id not in chart_ids:
+                        raise ValueError(f"Unknown chart_id: {block.chart_id}")
+                    referenced_charts += 1
+                    slide_count += 1
+
+        if referenced_cells > MAX_REFERENCED_TABLE_CELLS:
+            raise ValueError(f"At most {MAX_REFERENCED_TABLE_CELLS} referenced table cells allowed")
+        if referenced_charts > MAX_REFERENCED_CHARTS:
+            raise ValueError(f"At most {MAX_REFERENCED_CHARTS} chart references allowed")
+        if slide_count > MAX_ESTIMATED_SLIDES:
+            raise ValueError(f"At most {MAX_ESTIMATED_SLIDES} estimated slides allowed")
 
         return self
