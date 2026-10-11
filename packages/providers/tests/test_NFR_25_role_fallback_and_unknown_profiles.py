@@ -92,6 +92,8 @@ def test_PRD_6_4_shipped_config_loads(repo_root):
         "assistant",  # PPL-11b, FR-PA-19: the assistant panel's fallback (services/api/tests/API_PPL_11b.md)
         "meeting",  # FR-MTG-11: the meeting bot's agenda analysis
         "meeting_fast",  # FR-MTG-11: the meeting bot's one-sentence direct answers
+        "meeting_room",  # MROOM-A1, ADR-0028: the meeting room's quick replies (`meeting` is the bot's)
+        "meeting_room_thinking",  # MROOM-A1: the room's thinking replies
     }
     assert config.roles["director"].primary == "flash-38"
     assert config.roles["director"].fallback == "flash-37"

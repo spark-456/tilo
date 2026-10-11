@@ -2983,3 +2983,55 @@ html[data-density="professional"] .app-shell {
     flex-basis: 100%;
   }
 }
+/* ADR-0035 L6c: the form of a needs-you card that asks for fields (Park tokens only). */
+.need-fields {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-12);
+}
+.need-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.need-field label {
+  font-weight: 700;
+  font-size: var(--text-14);
+}
+.need-field input {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 480px;
+  min-height: 44px;
+  padding: var(--space-8) var(--space-12);
+  border: 2px solid var(--color-ink-2);
+  border-radius: var(--radius-controls);
+  background: var(--color-surface-0);
+  color: var(--color-ink-1);
+  font: 400 var(--text-14) / 1.4 var(--font-ui);
+}
+.need-field input[aria-invalid="true"] {
+  border-color: var(--color-signal-blocked);
+}
+.need-field input:disabled {
+  cursor: not-allowed;
+}
+.need-field input:focus-visible {
+  outline: 2px solid var(--color-brand-primary);
+  outline-offset: 2px;
+}
+.item-text {
+  box-sizing: border-box;
+  max-width: 100%;
+  max-height: 320px;
+  margin: var(--space-8) 0;
+  padding: var(--space-8) var(--space-12);
+  overflow: auto;
+  border: 2px solid var(--color-surface-2);
+  border-radius: var(--radius-controls);
+  background: var(--color-surface-0);
+  color: var(--color-ink-1);
+  font: 400 var(--text-14) / 1.4 var(--font-ui);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}

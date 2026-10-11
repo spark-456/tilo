@@ -42,6 +42,9 @@ class PlanCompileError(Exception):
     """No valid plan could be compiled; nothing is returned."""
 
 
+_NO_REVISION = {"revises", "change"}  # plan.schema 1.1.0 (ADR-0028): both or neither, so a null is not "neither"
+
+
 class _Unit(PlanUnit):
     role: Literal["specialist", "writer", "verifier"]  # the roles the harness runs units as
 
@@ -153,12 +156,25 @@ def _with_deliver(units: list[dict[str, Any]], brief: dict[str, Any]) -> list[di
     return [*units, deliver]
 
 
+def _director_schema() -> dict[str, Any]:
+    """The reply schema the Director sees. A revision unit (`revises`, `change`: plan.schema 1.1.0) comes only from a
+    confirmed meeting-room change, never from the Director's own plan, so its fields are not offered."""
+    schema = _Reply.model_json_schema()
+    for definition in schema.get("$defs", {}).values():
+        properties = definition.get("properties", {})
+        if _NO_REVISION <= properties.keys():
+            for name in _NO_REVISION:
+                del properties[name]
+            definition.pop("description", None)
+    return schema
+
+
 def _ask(router: Router, prompt: str) -> RouterResult:
     request = GenerateRequest(
         system=load_prompt(DIRECTOR_ROLE, "plan_system.md"),
         prompt=prompt,
         json_mode=True,
-        response_schema=_Reply.model_json_schema(),
+        response_schema=_director_schema(),
         thinking_level=PLAN_THINKING,
     )
     try:
@@ -199,7 +215,10 @@ def compile_plan(
         runs.append(run)
         text = (run.response.text if run.response else None) or ""
         try:
-            units = [u.model_dump(mode="json") for u in _Reply.model_validate_json(text).units]
+            units = [
+                u.model_dump(mode="json", exclude=_NO_REVISION if u.revises is None and u.change is None else None)
+                for u in _Reply.model_validate_json(text).units
+            ]
         except pydantic.ValidationError as error:
             found = [f"schema: {_pointer(e['loc'])} does not match the units schema" for e in error.errors()[:20]]
         else:

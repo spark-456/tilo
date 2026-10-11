@@ -31,7 +31,12 @@ _ACCESS_LINE = "You sign in with Google; Tilo never sees your password."  # PRD 
 
 
 class ConsentRefused(Exception):
-    """The consent service will not do this. Messages are fixed text, never a code or a secret."""
+    """The consent service will not do this. Messages are fixed text, never a code or a secret. `code` is the answer
+    the internal route gives (meeting_host_rpc `error`): start_again, not_granted, wrong_account, invalid_request."""
+
+    def __init__(self, message: str, code: str = "start_again") -> None:
+        super().__init__(message)
+        self.code = code
 
 
 @dataclass(frozen=True)
@@ -39,6 +44,7 @@ class ConsentResult:
     connector: str
     card_id: str
     granted_scopes: frozenset[str]
+    scope_lines: tuple[str, ...] = ()  # the plain-language lines of what was granted, in the order asked
 
 
 @dataclass(frozen=True)
@@ -140,6 +146,9 @@ class ConsentService:
             "response_type": "code",
             "scope": " ".join(needed),
             "access_type": "offline",
+            # Google hands a refresh token only at a first consent unless asked again: an incremental connect of the
+            # 2nd or 3rd person connector would otherwise store a record that cannot refresh (ADR-0035 L3 review).
+            "prompt": "consent",
             "include_granted_scopes": "true",
             "code_challenge": challenge.decode("ascii"),
             "code_challenge_method": "S256",
@@ -155,7 +164,7 @@ class ConsentService:
         if flow is None or flow.user_id != user_id or parse_ts(self._clock()) > parse_ts(flow.expires_at):
             raise ConsentRefused("this consent link is not valid; start again")
         if error is not None or not code:
-            raise ConsentRefused("consent was not granted")
+            raise ConsentRefused("consent was not granted", "not_granted")
         form = {
             "grant_type": "authorization_code",
             "code": code,
@@ -174,11 +183,11 @@ class ConsentService:
             # MH-C1: with include_granted_scopes, anything more means this account already granted this client
             # Gmail, Drive or Calendar read: a person's own account, not the bot's. Nothing stored, nothing
             # revoked (a revoke would end that account's other grant, CON-D10). A heuristic, not proof.
-            raise ConsentRefused("this is not the meeting bot account: sign in with the bot's account")
+            raise ConsentRefused("this is not the meeting bot account: sign in with the bot's account", "wrong_account")
         lines = list(dict.fromkeys(line for s, line in flow.lines.items() if s in granted))  # one per text
         if not lines:
             self._discard(user_id, flow.connector, response)
-            raise ConsentRefused("none of the access asked for was granted")
+            raise ConsentRefused("none of the access asked for was granted", "not_granted")
 
         def consented() -> None:  # runs after the record is stored, before connection.established
             authz = {"by": "person", "ref": user_id, "at": self._clock()}
@@ -190,7 +199,7 @@ class ConsentService:
         except Exception:  # noqa: BLE001 - a bad body or a KMS failure: nothing connected, nothing kept
             self._discard(user_id, flow.connector, response)
             raise ConsentRefused("the connection could not be saved; start again") from None
-        return ConsentResult(flow.connector, flow.card_id, granted)
+        return ConsentResult(flow.connector, flow.card_id, granted, tuple(lines))
 
     # -- internals ------------------------------------------------------------------------------
 
@@ -202,10 +211,10 @@ class ConsentService:
     def _declaration(self, connector: str, capabilities: Sequence[str]) -> Mapping[str, Any]:
         decl = self._connectors.get(connector)
         if decl is None or decl.get("auth") != "oauth2":
-            raise ConsentRefused("this connector has no sign-in to consent to")
+            raise ConsentRefused("this connector has no sign-in to consent to", "invalid_request")
         declared = decl.get("scopes", {})
         if any(c not in declared for c in capabilities):
-            raise ConsentRefused("this connector does not declare that capability")
+            raise ConsentRefused("this connector does not declare that capability", "invalid_request")
         return decl
 
     def _needed(self, user_id: str, connector: str, capabilities: Sequence[str]) -> list[str]:
@@ -226,7 +235,7 @@ class ConsentService:
                     if scope in lines and action["capability"] == capability and text not in lines[scope]:
                         lines[scope].append(text)
         if any(not texts for texts in lines.values()):
-            raise ConsentRefused("a scope has no plain-language description; it cannot be asked for")
+            raise ConsentRefused("a scope has no plain-language description; it cannot be asked for", "not_configured")
         return {scope: " ".join(texts) for scope, texts in lines.items()}
 
     def _discard(self, user_id: str, connector: str, response: Mapping[str, Any]) -> None:

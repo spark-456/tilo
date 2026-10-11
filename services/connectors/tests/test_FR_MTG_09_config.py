@@ -104,10 +104,17 @@ def test_FR_MTG_09_the_only_scope_is_calendar_events_owned_under_send_and_nothin
     assert decl["scopes"] == {"send": [CALENDAR_EVENTS_OWNED]}, "exactly the one scope, under send (ADR-0024 d2)"
     assert decl["capabilities"] == ["send"]
     entries = yaml.safe_load(CONNECTORS_YAML.read_text(encoding="utf-8"))
-    for other in (e for e in entries if e["id"] != CONNECTOR_ID):
+    for other in (e for e in entries if e["id"] not in (CONNECTOR_ID, "google_calendar")):
         assert "calendar.events" not in yaml.safe_dump(other), f"{other['id']} gains no calendar write scope"
+    # ADR-0035 decision 6 (supersedes ADR-0024's "every google_calendar grant stays read-only"): a person's own
+    # calendar gains the same scope under write and send, asked only when a task needs it, and nothing wider.
     calendar = next(e for e in entries if e["id"] == "google_calendar")
-    assert calendar["scopes"] == {"read": [CALENDAR_READONLY]} and calendar["capabilities"] == ["read"]
+    assert calendar["scopes"] == {
+        "read": [CALENDAR_READONLY],
+        "write": [CALENDAR_EVENTS_OWNED],
+        "send": [CALENDAR_EVENTS_OWNED],
+    }
+    assert calendar["capabilities"] == ["read", "write", "send"]
 
 
 def test_FR_MTG_09_create_meeting_event_is_the_one_action_send_T3_approval_and_irreversible():
@@ -209,7 +216,22 @@ def test_FR_MTG_09_the_three_config_files_still_validate_and_load_with_meeting_h
     assert mh().load_meeting_host_config(DEFAULT_PERSONAL_CONFIG, registry=registry).max_duration_min == 60
 
 
-def test_FR_MTG_09_the_calendar_loader_still_refuses_a_writable_google_calendar_declaration(tmp_path):
+WIDER_CALENDAR_SCOPES = {
+    "a broader write scope": {
+        "read": [CALENDAR_READONLY],
+        "write": ["https://www.googleapis.com/auth/calendar.events"],
+    },
+    "the full calendar scope": {"read": [CALENDAR_READONLY], "send": ["https://www.googleapis.com/auth/calendar"]},
+    "a second write scope": {"read": [CALENDAR_READONLY], "write": [CALENDAR_EVENTS_OWNED, CALENDAR_READONLY]},
+    "owned under read": {"read": [CALENDAR_READONLY, CALENDAR_EVENTS_OWNED]},
+    "owned instead of readonly": {"read": [CALENDAR_EVENTS_OWNED]},
+    "share with owned": {"read": [CALENDAR_READONLY], "share": [CALENDAR_EVENTS_OWNED]},
+}
+
+
+@pytest.mark.parametrize("name", sorted(WIDER_CALENDAR_SCOPES))
+def test_FR_MTG_09_the_calendar_loader_still_refuses_a_google_calendar_declaration_wider_than_ADR_0035(tmp_path, name):
+    """ADR-0035 sanctions exactly `calendar.events.owned` under write and send; the sync loader refuses any other."""
     from tilo_connectors.calendar_sync import load_calendar_sync_config
     from tilo_connectors.errors import CalendarConfigError
     from tilo_connectors.registry import load_registry
@@ -217,7 +239,7 @@ def test_FR_MTG_09_the_calendar_loader_still_refuses_a_writable_google_calendar_
     entries = yaml.safe_load(CONNECTORS_YAML.read_text(encoding="utf-8"))
     for entry in entries:
         if entry["id"] == "google_calendar":
-            entry["scopes"] = {"read": [CALENDAR_READONLY], "send": [CALENDAR_EVENTS_OWNED]}
+            entry["scopes"] = WIDER_CALENDAR_SCOPES[name]
     path = tmp_path / "connectors.yaml"
     path.write_text(yaml.safe_dump(entries, sort_keys=False), encoding="utf-8")
     with pytest.raises(CalendarConfigError):

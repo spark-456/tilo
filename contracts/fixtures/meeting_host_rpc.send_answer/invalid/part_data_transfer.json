@@ -1,0 +1,12 @@
+{
+  "outcome": "refused",
+  "receipt": null,
+  "may_have_sent": null,
+  "parts": [
+    {
+      "type": "data.transfer",
+      "connector": "meeting_host",
+      "user_id": "u_owner"
+    }
+  ]
+}

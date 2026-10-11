@@ -102,6 +102,10 @@ tf-validate:
 harness-skeleton:
     uv run --package tilo-harness python -m tilo_harness.skeleton --world w_harness_skeleton --run r_harness_skeleton
 
+# ADR-0035 L2 (BQ-ADR35-L2-1): the outbox store contract suite's `firestore-emulator` rig. Starts the Firestore emulator through tilo_harness.emulator.running_emulator() (demo- project, no credentials), runs only that rig, stops the emulator it started (or reuses FIRESTORE_EMULATOR_HOST if set). Heavy: about 2.5 minutes cold; take heavy.lock first.
+test-outbox-emulator:
+    uv run --package tilo-api pytest services/api/tests/test_FR_CON_02_ADR35_L2_outbox_store_contract.py -q -k emulator --outbox-emulator -m emulator
+
 # Replay the eval set (no paid calls) into the git-ignored evals/results.local.md (evals/results.md is the committed pass record); exit 0 all passed, 1 a case failed, 2 error, 3 stopped at the credit cap (EFF-07).
 eval:
     uv run python -m tilo_evals run --pass full --results-md evals/results.local.md

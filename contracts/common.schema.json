@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://contracts.tilo.example/common.schema.json",
-  "x-version": "1.5.0",
+  "x-version": "1.7.0",
   "title": "Common",
   "description": "Definitions shared by every Tilo contract. The root is a sampler with one optional property per definition so that fixtures and generated types cover each one; no service sends a Common document.",
   "type": "object",
@@ -237,7 +237,7 @@
       ]
     },
     "media_type": {
-      "description": "Media type of a stored artifact version (ADR-0018). Text: Markdown and CSV; structured: JSON; files (made only by tilo-render or an intake upload, never by a model): PDF, PPTX, DOCX, XLSX, PNG and JPEG. Code picks it from the role and the pinned skill, never a model, a file name or sniffing. Closed: no HTML or SVG.",
+      "description": "Media type of a stored artifact version (ADR-0018). Text: Markdown and CSV; structured: JSON; files (made only by tilo-render or an intake upload, never by a model): PDF, PPTX, DOCX, XLSX, PNG and JPEG, and since 1.7.0 (ADR-0034) WebM and MP4 video, which only a taught-skill capture upload stores (a screen recording or an uploaded example; never rendered or fetched). Code picks it, never a model: from the role and the pinned skill for a unit or render output, and from the file's own leading bytes for an upload (whose extension must agree) or a fetch (ADR-0029), never from a file name, a URL or a Content-Type header alone. Closed: no HTML or SVG.",
       "type": "string",
       "enum": [
         "text/markdown",
@@ -248,7 +248,9 @@
         "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         "image/png",
-        "image/jpeg"
+        "image/jpeg",
+        "video/webm",
+        "video/mp4"
       ]
     },
     "credit_range": {

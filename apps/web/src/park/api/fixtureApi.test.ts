@@ -138,6 +138,7 @@ describe("WEB_1a_fixture_api: writes", () => {
       await api.bookSlot(...t.bookSlot),
       await api.addBackup(...t.addBackup),
       await api.setPref(...t.setPref),
+      await api.submitFeedback(...t.submitFeedback),
     ];
     for (const r of results) {
       expect(r.source).toBe("fixture");

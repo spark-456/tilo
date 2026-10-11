@@ -36,6 +36,11 @@ def test_P0_07a_firebase_hosting_serves_the_vite_build_as_a_spa(repo_root: pathl
     for origin in ("https://essential-wares-510320-f0.firebaseapp.com/__/auth/", "https://securetoken.googleapis.com"):
         assert text.count(origin) == 1, f"{origin} appears exactly once in the CSP"  # SIGNIN-FIX
         text = text.replace(origin, "")
+    # ADR32 T5b (documented test change): the second Firestore database is named `tilo-tokens` and its rules file
+    # `firestore.tokens.rules` in the `firestore` list; both are public names holding the word `token`, each named once.
+    for name in ('"tilo-tokens"', "firestore.tokens.rules"):
+        assert text.count(name) == 1, f"{name} appears exactly once, in the firestore list"
+        text = text.replace(name, "")
     assert not re.search(r"tilo-demo|apiKey|secret|token|essential-wares", text, re.I), "no project id or secrets here"
 
 
