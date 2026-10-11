@@ -91,7 +91,7 @@ it("MR-01/MR-06 reads recorded attendees, convenes, asks, confirms and adjourns 
   await tap("Confirm change");
   expect(document.body.textContent).toContain("Change recorded; planning pending.");
   await tap("Adjourn");
-  expect(document.body.textContent).toContain("Adjourned · person");
+  expect(document.body.textContent).toContain("Adjourned · Closed by request");
   expect(calls).toContainEqual(["/v1/worlds/w_one/rooms", { lead: "A_one", agents: ["A_two"] }]);
   expect(calls).toContainEqual([
     "/v1/worlds/w_one/rooms/01ARZ3NDEKTSV4RRFFQ69G5FAV/turns",

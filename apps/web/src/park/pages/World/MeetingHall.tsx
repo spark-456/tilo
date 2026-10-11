@@ -11,6 +11,21 @@ import {
 } from "../../api/live/meetingHall";
 import "./MeetingHall.css";
 
+const CLOSED = {
+  person: "Closed by request",
+  idle: "Inactive",
+  capped: "Room limit reached",
+  paused: "Work paused",
+  access_lost: "Access changed",
+  failed: "Could not continue",
+};
+const OUTCOME = {
+  answered: "Answered",
+  proposed_change: "Change proposed",
+  declined: "Declined",
+  failed: "Reply failed",
+};
+
 export function MeetingHall({ worldId, client }: { worldId: string; client: RoomClient }) {
   const [people, setPeople] = useState<Attendee[] | null>(null);
   const [lead, setLead] = useState("");
@@ -114,7 +129,11 @@ export function MeetingHall({ worldId, client }: { worldId: string; client: Room
     </label>
   );
   const button = (action: string) => (
-    <button type="button" onClick={() => void act(action)}>
+    <button
+      type="button"
+      className="park-btn park-btn--secondary park-btn--md"
+      onClick={() => void act(action)}
+    >
       {action}
     </button>
   );
@@ -122,7 +141,12 @@ export function MeetingHall({ worldId, client }: { worldId: string; client: Room
     <form onSubmit={submit(action)}>
       <fieldset disabled={disabled}>
         {children}
-        <button type="submit">{action}</button>
+        <button
+          type="submit"
+          className={`park-btn park-btn--${action === "Confirm change" ? "secondary" : "primary"} park-btn--md`}
+        >
+          {action}
+        </button>
       </fieldset>
     </form>
   );
@@ -136,7 +160,7 @@ export function MeetingHall({ worldId, client }: { worldId: string; client: Room
         ["Turn", t.turn, "·", label(t.to), "·", t.mode].join(" "),
         t.text ?? "Question unavailable",
         t.reply ? (t.reply.text ?? "No reply was produced.") : "Reply pending. Refresh to check.",
-        t.reply ? [t.reply.outcome, t.reply.units.length, "cited units"].join(" · ") : "",
+        t.reply ? [OUTCOME[t.reply.outcome], t.reply.units.length, "cited units"].join(" · ") : "",
       ].join("\n"),
     )
     .join("\n\n");
@@ -180,7 +204,7 @@ export function MeetingHall({ worldId, client }: { worldId: string; client: Room
             <p>
               {open
                 ? [room.turns.length, " / ", room.max_turns, " turns"].join("")
-                : `Adjourned · ${room.reason}`}
+                : `Adjourned · ${room.reason ? CLOSED[room.reason] : "Reason unavailable"}`}
             </p>
             {button("Refresh replies")}
             <pre>{transcript}</pre>
