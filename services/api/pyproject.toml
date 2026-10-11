@@ -25,6 +25,7 @@ dependencies = [
     "tilo-memory",
     "tilo-people",
     "tilo-logging",
+    "tilo-redact",
 ]
 
 [tool.uv.sources]
@@ -32,6 +33,7 @@ tilo-archive = { workspace = true }
 tilo-logging = { workspace = true }
 tilo-memory = { workspace = true }
 tilo-people = { workspace = true }
+tilo-redact = { workspace = true }
 tilo-planning = { workspace = true }
 tilo-policy = { workspace = true }
 tilo-harness = { workspace = true }
