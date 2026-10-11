@@ -1812,6 +1812,7 @@ dependencies = [
     { name = "pyyaml" },
     { name = "reportlab" },
     { name = "tilo-contracts" },
+    { name = "tilo-logging" },
     { name = "uvicorn" },
 ]
 
@@ -1829,6 +1830,7 @@ requires-dist = [
     { name = "pyyaml", specifier = ">=6.0.2" },
     { name = "reportlab", specifier = ">=4.2.5" },
     { name = "tilo-contracts", editable = "packages/contracts-py" },
+    { name = "tilo-logging", editable = "packages/logging" },
     { name = "uvicorn", specifier = ">=0.32" },
 ]
 
