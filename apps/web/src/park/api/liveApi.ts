@@ -9,8 +9,8 @@ import { HttpClient, type QuickIntakeResult, TiloApiError, reasonOf } from "../.
 import { rememberIntake } from "../../api/intakes";
 import { isSampleHidden, wantsSample } from "../sample/sampleChoice";
 import { API_METHODS, type Api, type ApiMethod } from "./index";
-import { connectorsFromList } from "./live/connectorsFromList";
 import { agendaFromPlate } from "./live/agendaFromPlate";
+import { connectorsFromList } from "./live/connectorsFromList";
 import {
   type CardFeedItem,
   answerOption,
