@@ -1,10 +1,10 @@
 # FR-MTG-09 operator rehearsal
 
-Status: offline implementation, not a demonstrated live Meet. No infrastructure has
-been applied and no paid calls have run. The bot image has not built locally because
-Docker Desktop's daemon does not respond. The coordinator directs the agent to
-build through Cloud Build below; infrastructure apply and live switches stay with
-the user. Review the PRs before enabling live attendance.
+Status: Cloud Build's image startup, auth refusal, guest Chromium and synthetic
+virtual-microphone tone checks have passed with LIVE off. This is not a demonstrated
+live Meet. No infrastructure has been applied and no paid model calls have run.
+Review #826 (deployment), #827 (Chirp integration) and #828 (Live probe) before
+enabling attendance. Infrastructure apply and live switches stay with the user.
 
 ## Prerequisites
 
@@ -32,7 +32,7 @@ From the reviewed repository checkout, use your existing dev variables/backend:
 
 ```powershell
 terraform -chdir=infra/envs/dev plan -var-file=<existing-dev-vars> -var=meet_bot_enabled=true -out=meet-bot.tfplan
-# Review the plan; the user applies it, never the agent.
+# Review the plan; if any destroy appears, stop and ask. The user applies it.
 terraform -chdir=infra/envs/dev apply meet-bot.tfplan
 $P = '<actual dev project ID>'
 $R = 'asia-southeast1'
@@ -87,6 +87,8 @@ Cloud worker logs suppress participant/provider content. Transient capture files
 are deleted. The API screens/redacts and attaches a scoped Transcript artifact with
 30-day retention. A join GET starts no bot or world event. Owner deletion or a
 concurrent conflicting attachment prevents the transcript from being attached.
+An already-running synchronous provider SDK call can finish after cancellation;
+cloud content-log filters and per-capture counters isolate its late completion.
 
 Known limits: minutes summarization and a web attendance button are not included;
 the transcript is the saved notes. The existing join limiter is per API process.
