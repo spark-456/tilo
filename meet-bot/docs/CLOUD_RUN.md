@@ -2,7 +2,9 @@
 
 Status: Cloud Build's image startup, auth refusal, guest Chromium and synthetic
 virtual-microphone tone checks have passed with LIVE off. This is not a demonstrated
-live Meet. No infrastructure has been applied and no paid model calls have run.
+live Meet. The user completed the production infrastructure sitting and Workspace
+OAuth secret versions on 12 October. The optional bot infrastructure still needs
+its reviewed opt-in apply. No paid model calls have run in this implementation.
 Review #826 (deployment), #827 (Chirp integration) and #828 (Live probe) before
 enabling attendance. Infrastructure apply and live switches stay with the user.
 
@@ -29,7 +31,7 @@ enabling attendance. Infrastructure apply and live switches stay with the user.
 ## User-run infrastructure and verified image
 
 After the bot PRs are reviewed and merged, add `-var=meet_bot_enabled=true` to
-CX-MERGE's complete saved-plan command for the infrastructure sitting. Keep every
+CX-MERGE's complete saved-plan command for the optional bot follow-up. Keep every
 existing variable/backend setting; do not plan with only the bot flag. The flag
 does not exist on phase0-stack until this change is merged. If the plan contains
 any destroy, stop and ask before applying. Only the user applies the saved plan.
