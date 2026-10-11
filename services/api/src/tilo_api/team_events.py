@@ -46,5 +46,5 @@ def get_team_events(
     writer: Annotated[deps.EventWriter, Depends(deps.get_event_writer)],
     desks: Annotated[deps.DeskWorlds, Depends(deps.get_desk_worlds)],
 ) -> TeamEvents:
-    """Unwired in production: 503 `not_configured` before the route commits anything."""
+    """The writer and Desk seams as wired (503 `not_configured` before the route commits when the store is not)."""
     return TeamEvents(writer, desks)
