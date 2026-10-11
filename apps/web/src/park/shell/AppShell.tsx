@@ -15,6 +15,7 @@ import "../tokens/fonts";
 import { AccountMenu, type AccountPerson } from "./AccountMenu";
 import { BootSplash } from "./BootSplash";
 import { CityBackdrop } from "./CityBackdrop";
+import { ContextPanel, useContextChoice } from "./ContextPanel";
 import { Enter } from "./Enter";
 import { NotificationsPopover } from "./NotificationsPopover";
 import { TopNav } from "./TopNav";
@@ -60,6 +61,8 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [ready, setReady] = useState(false);
   const expectsSample = useExpectsSample();
   const auth = useParkAuth();
+  const contextPerson = auth ? (auth.user?.email ?? "guest-session") : (user?.email ?? "device");
+  const [contextOpen, toggleContext] = useContextChoice(contextPerson);
   const tour = useParkTour();
   const [mobileNote, setMobileNote] = useState(false);
   const signingOut = useRef(false);
@@ -223,7 +226,10 @@ export function AppShell({ children }: { children: ReactNode }) {
         onToggleTime={appearance.toggleTime}
         onBell={() => store.toggleMenu("notif")}
         onAvatar={() => store.toggleMenu("acct")}
+        contextOpen={contextOpen}
+        onContext={toggleContext}
       />
+      {contextOpen && <ContextPanel key={contextPerson} onClose={toggleContext} />}
       {state.menu === "notif" ? (
         <Enter>
           <NotificationsPopover
