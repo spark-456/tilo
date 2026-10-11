@@ -1,7 +1,9 @@
 """Offline image smoke: no Meet URL, account, provider call or persistent profile."""
 
 import asyncio
+import math
 import os
+import struct
 import urllib.error
 import urllib.request
 
@@ -40,12 +42,48 @@ async def main():
             await page.goto("about:blank")
             assert await page.evaluate("1 + 1") == 2
             await page.goto("http://127.0.0.1:8080/health")
-            label = await page.evaluate("""async () => {
-              const stream = await navigator.mediaDevices.getUserMedia({audio: true});
-              try { return stream.getAudioTracks()[0].label; }
-              finally { stream.getTracks().forEach(track => track.stop()); }
+            await page.evaluate("""async () => {
+              const stream = await navigator.mediaDevices.getUserMedia({audio: {
+                echoCancellation: false, noiseSuppression: false, autoGainControl: false
+              }});
+              const audio = new AudioContext();
+              await audio.resume();
+              const source = audio.createMediaStreamSource(stream);
+              const analyser = audio.createAnalyser();
+              analyser.fftSize = 2048;
+              source.connect(analyser);
+              window.smokeAudio = {stream, audio, analyser};
             }""")
-            assert "Tilo" in label, "Chromium did not select the virtual microphone"
+
+            async def tone():
+                # A synthetic 880Hz tone proves the actual input route, independent of device labels.
+                block = b"".join(
+                    struct.pack("<h", int(8000 * math.sin(2 * math.pi * 880 * n / 24000))) for n in range(24000)
+                )
+                yield block
+
+            async def receive():
+                return await page.evaluate("""async () => {
+                  const {stream, audio, analyser} = window.smokeAudio;
+                  let peak = 0;
+                  const samples = new Float32Array(analyser.fftSize);
+                  try {
+                    for (let i = 0; i < 80; i++) {
+                      analyser.getFloatTimeDomainData(samples);
+                      const rms = Math.sqrt(samples.reduce((sum, x) => sum + x*x, 0) / samples.length);
+                      peak = Math.max(peak, rms);
+                      await new Promise(resolve => setTimeout(resolve, 25));
+                    }
+                    return peak;
+                  } finally {
+                    stream.getTracks().forEach(track => track.stop());
+                    await audio.close();
+                    delete window.smokeAudio;
+                  }
+                }""")
+
+            played, level = await asyncio.gather(Player().play(tone(), 24000, lambda: False), receive())
+            assert played and level > 0.02, "Chromium did not receive the synthetic virtual-microphone tone"
             await context.close()
         finally:
             await browser.close()
