@@ -38,7 +38,7 @@ $P = '<actual dev project ID>'
 $R = 'asia-southeast1'
 $Tag = git rev-parse --short HEAD
 $Image = "$R-docker.pkg.dev/$P/tilo/meet-bot:$Tag"
-gcloud builds submit . --project=$P --region=$R --config=meet-bot/docker/cloudbuild.yaml --ignore-file=meet-bot/docker/cloudbuild.gcloudignore --substitutions="_BOT_IMAGE=$Image"
+gcloud builds submit . --project=$P --region=$R --gcs-source-staging-dir="gs://$P-cloudbuild-staging/source" --config=meet-bot/docker/cloudbuild.yaml --ignore-file=meet-bot/docker/cloudbuild.gcloudignore --substitutions="_BOT_IMAGE=$Image"
 gcloud run services update tilo-meet-bot --project=$P --region=$R --image=$Image
 $Bot = gcloud run services describe tilo-meet-bot --project=$P --region=$R --format='value(status.url)'
 $Api = gcloud run services describe tilo-api --project=$P --region=$R --format='value(status.url)'

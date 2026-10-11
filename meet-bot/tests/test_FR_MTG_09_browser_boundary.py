@@ -39,6 +39,23 @@ def browser(tmp_path, email="bot@example.test"):
     return MeetBrowser(cfg)
 
 
+@pytest.mark.parametrize("phrase", ["Tilo leave", "Tilo, leave.", "TILO LEAVE!", "  Tilo  leave...  "])
+def test_FR_MTG_10_caption_punctuation_does_not_block_a_leave_request(phrase):
+    session = LiveSession.__new__(LiveSession)
+    session.intro_sent = True
+    session.leave_requested = False
+    session.store = SimpleNamespace(append=lambda item: pytest.fail("stop command was captured"))
+    session.record(Utterance("Participant", phrase, 1.0))
+    assert session.leave_requested
+
+
+@pytest.mark.parametrize("phrase", ["Someone said Tilo leave", "Tilo leave tomorrow", "Don't leave", "leave"])
+def test_FR_MTG_10_mentioning_leave_is_not_a_stop_request(phrase):
+    from bot.control import stop_requested
+
+    assert not stop_requested(phrase)
+
+
 @pytest.mark.parametrize("label", [None, "Google Account: Other (other@example.test)", "Google Account: Unknown"])
 def test_FR_MTG_09_unreadable_or_wrong_account_refuses_without_address_in_error(tmp_path, caplog, label):
     bot = browser(tmp_path)

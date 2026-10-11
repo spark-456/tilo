@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import re
 from contextlib import contextmanager
 from dataclasses import replace
@@ -59,19 +60,25 @@ def quiet_capture():
         def filter(self, record):
             return not record.name.startswith(("bot.", "tilo_providers"))
 
-    boundary = ContentFilter()
+    boundary = ContentFilter("tilo-content-boundary")
     handlers = set(logging.root.handlers)
+    if logging.lastResort is not None:
+        handlers.add(logging.lastResort)
     for logger in loggers:
         handlers.update(logger.handlers)
-    for handler in handlers:
+    added = [handler for handler in handlers if not any(f.name == boundary.name for f in handler.filters)]
+    for handler in added:
         handler.addFilter(boundary)
     for logger, _ in states:
         logger.disabled = True
     try:
         yield
     finally:
-        for handler in handlers:
-            handler.removeFilter(boundary)
+        # A synchronous SDK executor may finish after browser cancellation. Image logs must
+        # remain private across captures; local tools/tests recover their original handlers.
+        if os.environ.get("TILO_CLOUD_CAPTURE") != "1":
+            for handler in added:
+                handler.removeFilter(boundary)
         for logger, disabled in states:
             logger.disabled = disabled
 
