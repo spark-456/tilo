@@ -33,7 +33,7 @@ from tilo_providers.schema_guard import first_error
 from tilo_api import deps, events
 from tilo_api.people import _PeopleRoute
 from tilo_api.people_events import _DESK_WORLD, WorkEvents, get_work_events
-from tilo_api.people_writes import Refusal, Writer, _Closed, json_body
+from tilo_api.people_writes import Refusal, Writer, _capped_body, _Closed, json_body
 from tilo_api.skill_store import SkillStore
 from tilo_api.skills_routes import (
     _SKILL_ID,
@@ -321,6 +321,7 @@ def _one_question(question: dict[str, Any] | None, text: Callable[[str], str]) -
 @router.post("/v1/skills/captures/{capture_id}/version")
 def version_route(
     capture_id: str,
+    _: Annotated[bytes, Depends(_capped_body)],
     principal: Annotated[deps.Principal, Depends(deps.get_current_principal)],
     store: Annotated[SkillStore, Depends(deps.get_skill_store)],
     stores: Annotated[Any, Depends(deps.get_people_stores)],

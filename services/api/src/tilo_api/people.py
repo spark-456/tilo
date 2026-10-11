@@ -27,7 +27,7 @@ from tilo_api.meeting_join import owner_join
 from tilo_api.people_events import WorkEvents, get_work_events
 from tilo_api.people_limits import idempotent, write_limit
 from tilo_api.people_meetings import MeetingEditIn, edit_meeting, get_meeting, list_meetings, read_minutes, set_world
-from tilo_api.people_pins import list_pins
+from tilo_api.people_pins import PinIn, create_pin, delete_pin, list_pins
 from tilo_api.people_plate import build_plate
 from tilo_api.people_quotes import Reader, item_quote, meeting_quotes
 from tilo_api.people_writes import (
@@ -487,6 +487,42 @@ def list_pinboards_route(
     owners: Annotated[deps.SourceOwners, Depends(deps.get_source_owners)],
 ) -> dict[str, Any]:
     return _answer(lambda: list_pins(_writer(principal, stores, clock), owners))
+
+
+@router.post("/v1/pinboards", status_code=201)
+def create_pin_route(
+    request: Request,
+    body: Annotated[PinIn, Depends(json_body(PinIn))],
+    principal: Annotated[deps.Principal, Depends(deps.get_current_principal)],
+    stores: Annotated[PeopleStores, Depends(deps.get_people_stores)],
+    redact: Annotated[Callable[[str], str], Depends(deps.get_redactor)],
+    clock: Annotated[Callable[[], str], Depends(deps.get_clock)],
+    events: Annotated[WorkEvents, Depends(get_work_events)],
+) -> dict[str, Any]:
+    return _answer(
+        lambda: idempotent(
+            request,
+            principal,
+            stores,
+            body,
+            lambda: create_pin(_writer(principal, stores, clock, redact, events), body),
+        )
+    )
+
+
+@router.post("/v1/pinboards/{pin_id}/delete")
+def delete_pin_route(
+    pin_id: str,
+    body: Annotated[Empty, Depends(json_body(Empty))],
+    principal: Annotated[deps.Principal, Depends(deps.get_current_principal)],
+    stores: Annotated[PeopleStores, Depends(deps.get_people_stores)],
+    clock: Annotated[Callable[[], str], Depends(deps.get_clock)],
+    owners: Annotated[deps.SourceOwners, Depends(deps.get_source_owners)],
+    events: Annotated[WorkEvents, Depends(get_work_events)],
+) -> dict[str, Any]:
+    if re.fullmatch(r"pb_[0-9A-Za-z_]{1,48}", pin_id) is None:
+        raise _not_found()
+    return _answer(lambda: delete_pin(_writer(principal, stores, clock, events=events), pin_id, owners))
 
 
 @router.get("/v1/work-items")
