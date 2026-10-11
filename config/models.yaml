@@ -59,6 +59,8 @@ roles:
   # plan compile medium (thinking tokens are billed as output), so `high` is not what a plain planning call pays for.
   director: { primary: flash-38, fallback: flash-37, thinking: high, max_input_tokens: 100000, max_output_tokens: 16384 }
   lead: { primary: flash-38, fallback: flash-37, thinking: medium, max_output_tokens: 16384 }
+  # COST-AUDIT: the Lead's district review is a short plain-text verdict on the cheap tier, no thinking (tilo_harness.lead_review)
+  lead_review: { primary: lite-31, fallback: flash-37, max_output_tokens: 1024 }
   # Long-text roles (8 Oct 2026, live run 2: both writer calls stopped `truncated` with 0 visible tokens): without a cap the
   # Router sends 1024 (BQ-63) and the model's own thinking uses all of it, so a role that writes a document or a research
   # note states a cap that fits thinking plus the text, and thinks little.
