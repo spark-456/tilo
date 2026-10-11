@@ -1459,6 +1459,7 @@ dependencies = [
     { name = "referencing" },
     { name = "requests" },
     { name = "tilo-archive" },
+    { name = "tilo-browser" },
     { name = "tilo-connectors" },
     { name = "tilo-harness" },
     { name = "tilo-logging" },
@@ -1485,6 +1486,7 @@ requires-dist = [
     { name = "referencing", specifier = ">=0.30" },
     { name = "requests", specifier = ">=2.31" },
     { name = "tilo-archive", editable = "packages/archive" },
+    { name = "tilo-browser", editable = "services/browser" },
     { name = "tilo-connectors", editable = "services/connectors" },
     { name = "tilo-harness", editable = "services/harness" },
     { name = "tilo-logging", editable = "packages/logging" },
@@ -1822,6 +1824,7 @@ dependencies = [
     { name = "pyyaml" },
     { name = "reportlab" },
     { name = "tilo-contracts" },
+    { name = "tilo-logging" },
     { name = "uvicorn" },
 ]
 
@@ -1839,6 +1842,7 @@ requires-dist = [
     { name = "pyyaml", specifier = ">=6.0.2" },
     { name = "reportlab", specifier = ">=4.2.5" },
     { name = "tilo-contracts", editable = "packages/contracts-py" },
+    { name = "tilo-logging", editable = "packages/logging" },
     { name = "uvicorn", specifier = ">=0.32" },
 ]
 
