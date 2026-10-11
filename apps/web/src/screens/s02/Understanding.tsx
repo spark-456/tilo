@@ -1,3 +1,4 @@
+import { pickedLabels, toggleLabel } from "../../api/intakeChoices";
 import type { Brief, DeliverableFormat } from "@tilo/contracts";
 import { useState } from "react";
 import { useClient } from "../../api/ClientProvider";
@@ -194,4 +195,3 @@ export function Understanding({ taskId }: { taskId: string }) {
     </div>
   );
 }
-import { pickedLabels, toggleLabel } from "../../api/intakeChoices";
