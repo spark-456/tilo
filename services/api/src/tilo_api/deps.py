@@ -49,6 +49,7 @@ from tilo_providers.config import ProviderConfigError, ProvidersConfig, load_pro
 from tilo_providers.interfaces import SafetyProvider
 from tilo_providers.router import Router, RouterExhaustedError
 from tilo_providers.safety import build_safety_provider
+from tilo_redact import redact
 
 from tilo_api import events, firebase_auth, spend
 from tilo_api.access import AccessStore, Mode, enforced, provider_mode
@@ -724,10 +725,10 @@ get_artifact_store.cache_clear = _forget_run_stores  # type: ignore[attr-defined
 
 
 def get_redactor(request: Request = None) -> Callable[[str], str]:  # type: ignore[assignment]
-    """The shared secret redactor the store was given (MF-06). Not built until FR-MEM-05 (BQ-109): refuses."""
+    """The shared secret redactor (MF-06, FR-MEM-05); demo and production use the same implementation."""
     if (demo := _demo(request)) is not None:
         return demo.redactor
-    raise NotImplementedError("the shared secret redactor is not built, so no run starts")
+    return redact
 
 
 # --- the people API seams (PPL-11a, services/api/tests/API_PPL_11a.md section 4); production fails closed ---
