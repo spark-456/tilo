@@ -5,6 +5,7 @@
 // fetches nothing. With no base url nothing is fetched at all. It never imports the fixtures, so sample
 // numbers cannot pass as live (HR-1..HR-7). Failures are the shared `TiloApiError` (src/api/http.ts).
 import type { IntakeResult } from "../../api/client";
+export { peopleListsApi } from "./live/peopleLists";
 import { HttpClient, type QuickIntakeResult, TiloApiError, reasonOf } from "../../api/http";
 import { rememberIntake } from "../../api/intakes";
 import { isSampleHidden, wantsSample } from "../sample/sampleChoice";
