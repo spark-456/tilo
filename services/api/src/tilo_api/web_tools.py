@@ -98,9 +98,15 @@ class SearchTool:
     def run(self, args):
         result, credits = self.search(args["query"])
         for source in result.sources:
-            parsed = urlsplit(source.redirect_url)
-            if parsed.scheme == "https" and parsed.hostname and not parsed.username:
-                self.hosts.add(parsed.hostname)
+            urls = [source.redirect_url, source.resolved_url]
+            if source.domain:
+                urls.append(f"https://{source.domain}/")
+            for url in urls:
+                if not url:
+                    continue
+                parsed = urlsplit(url)
+                if parsed.scheme == "https" and parsed.hostname and not parsed.username:
+                    self.hosts.add(parsed.hostname)
         return ToolResult(result.model_dump_json(), credits)
 
 
