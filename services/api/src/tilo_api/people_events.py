@@ -63,5 +63,5 @@ def get_work_events(
     writer: Annotated[deps.EventWriter, Depends(deps.get_event_writer)],
     desks: Annotated[deps.DeskWorlds, Depends(deps.get_desk_worlds)],
 ) -> WorkEvents:
-    """Unwired in production: 503 `not_configured` before the route commits anything."""
+    """The writer and Desk seams as wired (503 `not_configured` before the route commits when the store is not)."""
     return WorkEvents(writer, desks)

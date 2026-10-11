@@ -4,6 +4,8 @@
 # check of untrusted text (PRD 16.3, 16.5); none chooses what a run does from the subject of a task.
 branch | packages/memory/src/tilo_memory/cache.py | _normalise | collapses whitespace in a cache key so two spellings of one text share an entry; every text gets the same treatment
 branch | packages/planning/src/tilo_planning/compiler.py | _data | neutralises prompt block delimiters in delimited task data (PRD 16.3 item 1)
+branch | packages/planning/src/tilo_planning/brief.py | clean_line | cleans a model's or a person's short text to one plain line (control characters, tags, brackets, spaces) before it is shown or recorded (PRD 16.3); every text gets the same treatment
+branch | packages/planning/src/tilo_planning/questions.py | _chosen_kinds | matches the labels of the kinds in config/deliverable_kinds.yaml against a person's answer to the deliverables question, to read a multi-pick; the labels are configuration, the match names no subject and chooses nothing but which offered kinds the person picked
 branch | packages/providers/src/tilo_providers/dev_director.py | _block | dev-only fake: reads the delimited TASK, BRIEF and CATALOGUE blocks of a prompt
 branch | packages/providers/src/tilo_providers/dev_director.py | _brief_reply | dev-only fake: takes an ISO date out of the task text and echoes the text; every task gets the same shape
 branch | packages/providers/src/tilo_providers/prompts.py | neutralise_marker | neutralises prompt block delimiters in untrusted text

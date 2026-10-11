@@ -169,6 +169,8 @@ export interface World {
   owner: string;
   started: string;
   isNew?: boolean;
+  /** STARTER-1: the recorded sample project, served by tilo-api; a replay, not the person's work. */
+  sample?: boolean;
   plan?: string | null;
   districts?: WorldDistrict[] | null;
   activity?: ActivityItem[];

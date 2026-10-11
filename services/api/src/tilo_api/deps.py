@@ -96,6 +96,27 @@ class DistrictRecord:
     summary: str
 
 
+SAMPLE_WORLD_ID = "w_sample_village_basic"  # STARTER-1: the read-only sample project (`tilo_api.sample_world`)
+
+
+def refuse_reserved(
+    worlds: Mapping[str, Any] | None = None,
+    *,
+    parts: Mapping[str, Any] | None = None,
+    policy_worlds: Mapping[str, str] | None = None,
+    tasks: Mapping[str, Any] | None = None,
+) -> None:
+    """A real world can never take the sample project's id: not as a world key, a parts key, a policy's world or a
+    task's `world_id` (create or import)."""
+    if (
+        SAMPLE_WORLD_ID in (worlds or {})
+        or SAMPLE_WORLD_ID in (parts or {})
+        or SAMPLE_WORLD_ID in (policy_worlds or {}).values()
+        or any(getattr(t, "world_id", None) == SAMPLE_WORLD_ID for t in (tasks or {}).values())
+    ):
+        raise ValueError("world id is reserved for the sample project")
+
+
 @dataclass
 class WorldRecord:
     owner: str  # common.schema.json#/$defs/user_id
@@ -173,6 +194,10 @@ class Store:
     def load_owner(self, owner: str, settle: bool = False) -> None:
         """Called before a route iterates an owner's worlds or policies; the cache already holds them."""
 
+    def load_world_task(self, world_id: str) -> TaskRecord | None:
+        """The task made for a world, if this store holds one (a scheduled or meeting host run stores none)."""
+        return next((t for t in list(self.tasks.values()) if t.world_id == world_id), None)
+
     def load_path(self, params: Mapping[str, Any]) -> Store:
         return self
 
@@ -194,6 +219,7 @@ class Store:
         create: Iterable[tuple[str, str]] = (),
         evict: bool = True,
     ) -> None:
+        refuse_reserved(worlds, parts=parts, policy_worlds=policy_worlds, tasks=tasks)
         self.worlds.update(worlds or {})
         self.tasks.update(tasks or {})
         self.policies.update(policies or {})
@@ -204,6 +230,12 @@ class Store:
     ) -> None:
         """A route's new records and events. The events go through `writer` first (it reads the world's record, so a
         new one is stored before them); a failure removes the worlds this call created and changes nothing else."""
+        refuse_reserved(
+            records.get("worlds"),
+            parts=parts,
+            policy_worlds=records.get("policy_worlds"),
+            tasks=records.get("tasks"),
+        )
         self.worlds.update(records.get("worlds") or {})
         sending = ""
         try:
@@ -742,6 +774,8 @@ class PlateSources(Protocol):
     def runs(self, user_id: str) -> Iterable[dict[str, Any]]: ...
     def mail(self, user_id: str) -> Iterable[dict[str, Any]]: ...
 
+    truncated: bool  # a source hit its read cap (optional: the plate builder reads it with getattr)
+
 
 class SourceOwners(Protocol):
     def owner_of(self, kind: str, ref: str) -> str | None: ...  # kind "mail" or "request"
@@ -820,12 +854,19 @@ def get_today() -> Clock:
     return real_today
 
 
-def get_plate_sources() -> PlateSources:
-    raise HTTPException(status_code=503, detail="not_configured")
+def get_plate_sources(request: Request = None) -> PlateSources:  # type: ignore[assignment]
+    """The cards, runs and mail of the signed-in person's plate, read from the API's own store (PEOPLE-SEAMS-1,
+    `seams_store`): 503 `not_configured` exactly when `get_store` is, a demo session reads its own in-memory one."""
+    from tilo_api import seams_store  # noqa: PLC0415  (it imports this module)
+
+    return seams_store.StorePlateSources(seams_store.resolve_store(request))
 
 
-def get_source_owners() -> SourceOwners:
-    raise HTTPException(status_code=503, detail="not_configured")
+def get_source_owners(request: Request = None) -> SourceOwners:  # type: ignore[assignment]
+    """Who owns a mail message or a request, from the same store; `None` for anything it cannot vouch for."""
+    from tilo_api import seams_store  # noqa: PLC0415
+
+    return seams_store.StoreSourceOwners(seams_store.resolve_store(request))
 
 
 class MeetingWorlds(Protocol):
@@ -834,8 +875,11 @@ class MeetingWorlds(Protocol):
     def make_meeting_world(self, *, org_id: str, owner: str, meeting_id: str) -> str: ...
 
 
-def get_meeting_worlds() -> MeetingWorlds:
-    raise HTTPException(status_code=503, detail="not_configured")  # production wiring lands with the Outpost world
+def get_meeting_worlds(request: Request = None) -> MeetingWorlds:  # type: ignore[assignment]
+    """One persisted Outpost world per meeting on the API's own store (PEOPLE-SEAMS-1, `seams_store`)."""
+    from tilo_api import seams_store  # noqa: PLC0415
+
+    return seams_store.StoreMeetingWorlds(seams_store.resolve_store(request))
 
 
 class DeskWorlds(Protocol):
@@ -848,8 +892,11 @@ class DeskWorlds(Protocol):
         ...
 
 
-def get_desk_worlds() -> DeskWorlds:
-    raise HTTPException(status_code=503, detail="not_configured")  # production wiring lands with the Desk
+def get_desk_worlds(request: Request = None) -> DeskWorlds:  # type: ignore[assignment]
+    """The person's one Desk world on the API's own store, the one the assistant panel uses (PEOPLE-SEAMS-1)."""
+    from tilo_api import seams_store  # noqa: PLC0415
+
+    return seams_store.StoreDeskWorlds(seams_store.resolve_store(request))
 
 
 def get_run_archive(request: Request = None) -> Callable[..., RunArchive]:  # type: ignore[assignment]
@@ -953,6 +1000,15 @@ def get_connection_views() -> ConnectionViews:
     """Read-only connector state for `GET /v1/connectors`, from tilo-connectors over the internal route (ADR-0032a,
     BQ-LIVEGAPS-1). Unconfigured: 503 `not_configured` (the list route then shows every connector available)."""
     return _RpcConnectionViews(get_connection_views_rpc())
+
+
+def get_change_planner() -> Callable[[Any], str] | None:
+    """MROOM-H2b: the revision planner (`meeting_room_planner.plan_change`, ADR-0028 decisions 6 and 8). It plans only:
+    the owner's in-person `budget.granted` and starting the units are the next ticket (H2c). None: a confirmed change is
+    recorded and waits."""
+    from tilo_api import meeting_room_planner  # noqa: PLC0415 (it imports this module)
+
+    return meeting_room_planner.plan_change
 
 
 REPLAY_ONLY_MESSAGE = "This link is replay-only right now: new work is paused; finished runs can still be replayed."

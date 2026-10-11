@@ -402,7 +402,8 @@ def create_work_item_route(
     """A person adds their own item; a mail or request source is checked against its owner (PE-08)."""
 
     def owners() -> deps.SourceOwners:  # resolved only when the source is mail or a request
-        return request.app.dependency_overrides.get(deps.get_source_owners, deps.get_source_owners)()  # type: ignore[no-any-return]
+        seam = request.app.dependency_overrides.get(deps.get_source_owners)
+        return seam() if seam is not None else deps.get_source_owners(request)  # an override takes no argument
 
     return _answer(
         lambda: idempotent(
