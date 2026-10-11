@@ -21,7 +21,7 @@ locals {
   # from the account id like the other non-runtime service accounts below.
   cloudbuild_service_account_email = "${google_service_account.cloudbuild.account_id}@${var.project_id}.iam.gserviceaccount.com"
 
-  required_apis = toset([
+  required_apis = toset(concat([
     "run.googleapis.com",
     "artifactregistry.googleapis.com",
     "firestore.googleapis.com",
@@ -63,7 +63,7 @@ locals {
     "sheets.googleapis.com",
     "slides.googleapis.com",
     "bigquerystorage.googleapis.com",
-  ])
+  ], var.meet_bot_enabled ? ["texttospeech.googleapis.com"] : []))
 
   # ALL_TRAFFIC: every request from api and harness leaves through the VPC
   # subnet, so calls to internal-only services pass the ingress check and
@@ -77,7 +77,7 @@ locals {
 
   # PRD 6.2 services, 6.5 ingress rule: public only for api, channels
   # (webhooks) and sandbox-web; everything else internal only.
-  cloud_run_services = {
+  cloud_run_services = merge({
     "api" = {
       image              = local.placeholder_image
       min_instance_count = 0
@@ -87,6 +87,7 @@ locals {
       invoked_by         = []
       vpc_egress         = local.caller_vpc_egress # calls harness directly
       ignore_env         = true                    # TILO_* runtime settings via gcloud (docs/routines-rollout.md)
+      timeout            = var.meet_bot_enabled ? "3600s" : null
     }
     "harness" = {
       image              = local.placeholder_image
@@ -143,7 +144,21 @@ locals {
       public             = true
       invoked_by         = []
     }
-  }
+    }, var.meet_bot_enabled ? {
+    "meet-bot" = {
+      image               = local.placeholder_image
+      min_instance_count  = 0
+      max_instance_count  = 1
+      ingress             = "INGRESS_TRAFFIC_INTERNAL_ONLY"
+      public              = false
+      invoked_by          = ["api"]
+      ignore_env          = true # Runtime settings and the user-only LIVE switch are set after the image is deployed.
+      cpu                 = "2"
+      memory              = "4Gi"
+      timeout             = "3600s"
+      request_concurrency = 1
+    }
+  } : {})
 
   # Project-level roles per service (PRD 6.5 one least-privilege SA per
   # service; SEC-12: tilo-browser holds no Firestore/Datastore or Storage
@@ -180,7 +195,7 @@ locals {
     expression = "resource.name == \"projects/${var.project_id}/databases/(default)\""
   }
 
-  service_project_roles = {
+  service_project_roles = merge({
     "api"         = ["roles/datastore.user", "roles/cloudtasks.enqueuer", local.vertex_generate_role, "roles/modelarmor.user"]
     "harness"     = ["roles/datastore.user", "roles/cloudtasks.enqueuer", "roles/aiplatform.user", "roles/modelarmor.user"]
     "channels"    = [local.vertex_generate_role, "roles/modelarmor.user"]
@@ -188,7 +203,9 @@ locals {
     "browser"     = []
     "render"      = ["roles/datastore.user"]
     "sandbox-web" = []
-  }
+    }, var.meet_bot_enabled ? {
+    "meet-bot" = [local.vertex_generate_role, "roles/serviceusage.serviceUsageConsumer"]
+  } : {})
 
   # secret => services allowed roles/secretmanager.secretAccessor on it.
   secret_accessors = {

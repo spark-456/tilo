@@ -12,6 +12,12 @@ variable "project_id" {
   default     = "tilo-dev"
 }
 
+variable "meet_bot_enabled" {
+  description = "Opt in to the private, ephemeral guest Meet service and long API attendance requests. LIVE remains user-managed."
+  type        = bool
+  default     = false
+}
+
 variable "region" {
   description = "Region for all Tilo services and data (PRD 6.5)."
   type        = string

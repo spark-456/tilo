@@ -170,7 +170,7 @@ def test_FR_MTG_09_worker_uses_guest_and_cleans_capture_files(monkeypatch, fail)
         assert asyncio.run(cloud_worker.attend_meeting("mt_demo", body()["join_url"]))["utterances"] == []
     cfg = configs[0]
     assert cfg.guest and not cfg.record_audio and not cfg.auto_admit
-    assert cfg.max_meeting_minutes == 50
+    assert cfg.max_meeting_minutes == 45
     assert not cfg.out_dir.parent.exists()
 
 

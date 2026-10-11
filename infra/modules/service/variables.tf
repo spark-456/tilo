@@ -30,7 +30,11 @@ variable "services" {
     # true: Terraform ignores the container env of this service (runtime
     # settings are set with `gcloud run services update`, docs/routines-rollout.md).
     # tilo-api and tilo-connectors; every other service has its env fully managed.
-    ignore_env = optional(bool, false)
+    ignore_env          = optional(bool, false)
+    cpu                 = optional(string, "1")
+    memory              = optional(string, "512Mi")
+    timeout             = optional(string)
+    request_concurrency = optional(number)
   }))
 }
 

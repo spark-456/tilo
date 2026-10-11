@@ -53,7 +53,7 @@ async def attend_meeting(meeting_id: str, join_url: str) -> dict:
     with TemporaryDirectory(prefix="tilo-meet-") as directory:
         root = Path(directory)
         agenda = root / "agenda.md"
-        agenda.write_text("# Meeting\n\nDuration: 50 min\n\n1. Discussion and decisions (50 min)\n", encoding="utf-8")
+        agenda.write_text("# Meeting\n\nDuration: 45 min\n\n1. Discussion and decisions (45 min)\n", encoding="utf-8")
         cfg = replace(
             Config.from_env(),
             guest=True,
@@ -64,8 +64,8 @@ async def attend_meeting(meeting_id: str, join_url: str) -> dict:
             debug_dir=root / "debug",
             context_dir=root / "context",
             profile_dir=root / "unused",
-            max_meeting_minutes=50,
-            meeting_minutes=50,
+            max_meeting_minutes=45,
+            meeting_minutes=45,
             auto_admit=False,
             required=[],
             admit_allowed=[],
@@ -76,7 +76,7 @@ async def attend_meeting(meeting_id: str, join_url: str) -> dict:
             reply_mode="both",
             context_urls=[],
         )
-        session = LiveSession(cfg, "join", join_url, agenda, 50, False, [], False, False, [], "captions", "both")
+        session = LiveSession(cfg, "join", join_url, agenda, 45, False, [], False, False, [], "captions", "both")
         session.events.echo = False
         await session.run()
         return CapturedTranscript(

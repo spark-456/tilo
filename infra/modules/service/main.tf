@@ -38,7 +38,9 @@ resource "google_cloud_run_v2_service" "this" {
   ingress             = each.value.ingress
 
   template {
-    service_account = local.service_account_emails[each.key]
+    service_account                  = local.service_account_emails[each.key]
+    timeout                          = each.value.timeout
+    max_instance_request_concurrency = each.value.request_concurrency
 
     # Direct VPC egress for callers of internal-only services (PRD 6.1):
     # a Cloud Run service that calls another over the public internet is
@@ -69,8 +71,8 @@ resource "google_cloud_run_v2_service" "this" {
         cpu_idle = true
 
         limits = {
-          cpu    = "1"
-          memory = "512Mi"
+          cpu    = each.value.cpu
+          memory = each.value.memory
         }
       }
     }
@@ -102,7 +104,9 @@ resource "google_cloud_run_v2_service" "env_ignored" {
   ingress             = each.value.ingress
 
   template {
-    service_account = local.service_account_emails[each.key]
+    service_account                  = local.service_account_emails[each.key]
+    timeout                          = each.value.timeout
+    max_instance_request_concurrency = each.value.request_concurrency
 
     # Direct VPC egress for callers of internal-only services (PRD 6.1):
     # a Cloud Run service that calls another over the public internet is
@@ -133,8 +137,8 @@ resource "google_cloud_run_v2_service" "env_ignored" {
         cpu_idle = true
 
         limits = {
-          cpu    = "1"
-          memory = "512Mi"
+          cpu    = each.value.cpu
+          memory = each.value.memory
         }
       }
     }
