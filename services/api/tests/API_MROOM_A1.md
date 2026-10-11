@@ -2,7 +2,7 @@
 
 Source: ADR-0028 decisions 1 to 5, 7, 9, 10, 13; `contracts/meeting_room.rules.md` MR-01 to MR-05, MR-06 (reply step), MR-08,
 MR-11 (reply step), MR-12; skill `agent-self-report`. Tests: `test_MROOM_A1_room_routes.py`, `test_MROOM_A1_reply_step.py`,
-`test_MROOM_A1_dev_mode.py`; rig `_mroom_a1_lib.py`. Not in this slice: `POST .../changes` (1b), the revision planner (MR-H2).
+`test_MROOM_A1_dev_mode.py`; rig `_mroom_a1_lib.py`. `POST .../changes` is MROOM-1b (`test_MROOM_1b_changes.py`, BQ-MROOM-1b-1). Not built: the revision planner (MR-H2).
 
 ## Routes (`tilo_api.meeting_room`, mounted at `/v1/worlds/{world_id}/rooms`)
 - `POST` (convene_request): 201 the room (root shape); 403 `not_allowed` (Viewer, team Viewer, no team role, district outside

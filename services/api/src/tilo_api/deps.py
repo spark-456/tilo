@@ -983,6 +983,11 @@ def get_connection_views() -> ConnectionViews:
     return _RpcConnectionViews(get_connection_views_rpc())
 
 
+def get_change_planner() -> Callable[[dict], object] | None:
+    """MROOM-1b: the revision planner (MR-H2 wires it). None until then: a confirmed change is recorded and waits."""
+    return None
+
+
 REPLAY_ONLY_MESSAGE = "This link is replay-only right now: new work is paused; finished runs can still be replayed."
 
 
