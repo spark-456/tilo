@@ -13,16 +13,26 @@ from __future__ import annotations
 
 import copy
 import re
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from datetime import date, timedelta
 from typing import Any
 
-from tilo_planning.brief import CHIP_FIELDS, BriefValidationError, complete_brief, validate_brief
+from tilo_planning.brief import (
+    ANSWER_MAX,
+    CHIP_FIELDS,
+    BriefValidationError,
+    TopicQuestion,
+    clean_line,
+    complete_brief,
+    validate_brief,
+)
 from tilo_planning.events import build_event, clip
 from tilo_planning.memory import MemoryHit, MemoryLookup
 
 MAX_QUESTIONS = 3
+TOPIC_REPLACES = ("deliverables", "constraints")  # the generic format and rules questions a topic question replaces
+TOPIC_PREFIX = "topic_"  # the id (`Question.field`) of the Director's n-th question: topic_1, topic_2, topic_3
 DESCRIBE_GOAL = "Something else, which I will describe"  # a goal prompt, never a goal (BQ-99)
 WEB_SOURCE = {"kind": "web", "ref": "web", "label": "The web"}  # no query yet: the goal is never one (BQ-99)
 
@@ -60,6 +70,7 @@ class Question:
     text: str
     suggested_answers: tuple[str, ...]  # the first is the Director's guess, used if the question is skipped
     expected_change: float
+    label: str | None = None  # a Director question (`field` is topic_N): the answer is recorded as "Label: value"
 
 
 @dataclass(frozen=True)
@@ -77,9 +88,13 @@ def generate_questions(
     memory: MemoryLookup,
     base: dict[str, Any],
     seq: int,
+    topic_questions: Sequence[TopicQuestion] = (),
 ) -> QuestionsResult:
     """`brief` is a brief or the Director's output. `base` is the event envelope (v, ts, world_id, run_id,
-    actor); events take `seq`, `seq + 1`, ... (memory hits first, then plan.questions_asked)."""
+    actor); events take `seq`, `seq + 1`, ... (memory hits first, then plan.questions_asked). `topic_questions` are the
+    Director's own questions for this task (vetted by `brief.topic_questions`): they are asked first, in place of the
+    generic deliverables and rules questions (which are then assumed, not asked), and the other ambiguous fields fill
+    only the slots left under the cap of 3. With none, the generic questions are asked as before."""
     candidates = [f for f in dict.fromkeys(ambiguous_fields) if f in CHIP_FIELDS]
     brief = complete_brief(brief)
     hit_events: list[dict[str, Any]] = []
@@ -91,9 +106,18 @@ def generate_questions(
         candidates.remove(hit.field)
         hit_events.append(_memory_hit_event(base, seq + len(hit_events), hit))
 
+    stated = [c.casefold() for c in brief["constraints"]]  # what the task (or a saved preference) already says
+    topic = [q for q in topic_questions if not any(c.startswith(f"{q.label.casefold()}:") for c in stated)]
+    topic = topic[:MAX_QUESTIONS]  # a label that is already a stated "Label: ..." constraint is not asked
+    if topic:  # their answers cover what the generic format and rules questions would have asked
+        for field in (f for f in candidates if f in TOPIC_REPLACES):
+            brief["assumptions"].append({"question": None, "assumed": _assumed(brief, field)})
+        candidates = [f for f in candidates if f not in TOPIC_REPLACES]
     ranked = sorted(candidates, key=lambda f: (-EXPECTED_CHANGE[f], CHIP_FIELDS.index(f)))
-    questions = [_question(brief, f) for f in ranked[:MAX_QUESTIONS]]
-    for field in ranked[MAX_QUESTIONS:]:
+    room = MAX_QUESTIONS - len(topic)
+    questions = [_topic_question(q, n) for n, q in enumerate(topic, 1)]
+    questions += [_question(brief, f) for f in ranked[:room]]
+    for field in ranked[room:]:
         brief["assumptions"].append({"question": None, "assumed": _assumed(brief, field)})
     brief = validate_brief(brief)
 
@@ -117,9 +141,10 @@ def record_assumption(
     an answer would be."""
     value = assumed if assumed is not None else question.suggested_answers[0]
     updated = apply_answer(brief, question, value, today=today or date.today())
-    updated["assumptions"].append(
-        {"question": question.text, "assumed": clip(f"{_WORDING[question.field][0]}: {value}", 300)}
-    )
+    label = question.label if question.label is not None else _WORDING[question.field][0]
+    if question.label is not None:  # the assumption shows the cleaned value the plan uses
+        value = _topic_value(value)
+    updated["assumptions"].append({"question": clip(question.text, 300), "assumed": clip(f"{label}: {value}", 300)})
     return validate_brief(updated)
 
 
@@ -127,7 +152,10 @@ def apply_answer(brief: dict[str, Any], question: Question, answer: str, *, toda
     """The person's answer to `question` (FR-INT-04). The Director's guess (the first suggested answer) keeps
     the chip; another suggested answer sets the chip value it stands for; anything else is set as typed. An
     answer the chip cannot hold raises BriefValidationError, and the person edits the chip instead.
-    The goal prompt is not a goal, so it is refused the same way (BQ-99)."""
+    The goal prompt is not a goal, so it is refused the same way (BQ-99). A Director question (`label` set) records
+    the answer, the guess included, as the constraint "Label: value" in place of any earlier one with that label."""
+    if question.label is not None:
+        return _apply_topic(brief, question, answer)
     if answer == question.suggested_answers[0]:
         return validate_brief(copy.deepcopy(brief))
     field = question.field
@@ -162,6 +190,26 @@ def apply_answer(brief: dict[str, Any], question: Question, answer: str, *, toda
     elif field == "deadline" and value == "end_of_week":
         value = (today + timedelta(days=(4 - today.weekday()) % 7)).isoformat()  # the coming Friday
     return validate_brief({**copy.deepcopy(brief), field: value})
+
+
+def _topic_value(answer: str) -> str:
+    """The answer to a Director question as one plain line (`brief.clean_line`), or BriefValidationError."""
+    value = clean_line(answer, ANSWER_MAX_CHARS - 50)  # a 30-character label and ": " still fit a 300-character string
+    if value is None:
+        raise BriefValidationError("Give a short answer, or skip the question.")
+    return value
+
+
+def _apply_topic(brief: dict[str, Any], question: Question, answer: str) -> dict[str, Any]:
+    """The constraint `Label: value` is appended; a stated constraint is never removed or edited (a Director label that
+    matches one is dropped in `generate_questions`, so no stated constraint carries this label)."""
+    line = f"{question.label}: {_topic_value(answer)}"
+    return validate_brief({**copy.deepcopy(brief), "constraints": list(dict.fromkeys([*brief["constraints"], line]))})
+
+
+def _topic_question(topic: TopicQuestion, number: int) -> Question:
+    answers = tuple(a for a in (clean_line(a, ANSWER_MAX) for a in topic.suggested_answers) if a)
+    return Question(f"{TOPIC_PREFIX}{number}", topic.text, answers, topic.expected_change, topic.label)
 
 
 ANSWER_MAX_CHARS = 300  # the answers route's own limit: a longer answer is cut, never scanned
