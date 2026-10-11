@@ -105,3 +105,5 @@ None for these tests. No new event type is needed: `approval.requested`, `approv
 `artifact.created` (and `world.*`) are registered and fixtured. Open question for the architect, not asserted anywhere:
 whether a meeting world's stream may carry these events with no `budget.granted` / `world.started` before them
 (event.rules.md EV rules). The tests validate each event against its schema and the registry only, not the sequence rules.
+
+**Superseded in part by ADR-0032 (T4):** `deps.get_token_broker` and `deps.get_meeting_host_transport` are gone; the host run's connector is `MeetingHostStub` over `deps.get_meeting_host_client` (tests: `InProcessConnectors` in `_mtg09b_lib.py`, `test_ADR32_T4_*`). The rest of this file holds.

@@ -1,6 +1,7 @@
 // The side column of the World page: the Waiting for you card, Spend, and the facts with skills and tools.
 import type { MouseEvent, ReactNode } from "react";
 import type { Dec, Decision, DecisionKey, Skill, World } from "../../api/types";
+import { DecisionFields } from "../../app/DecisionFields";
 import { Button } from "../../components";
 import { icon } from "../../shell/kit";
 import { agentArt } from "./worldArt";
@@ -68,9 +69,12 @@ export function WaitingCard({ mine, dec, night, onDecide, onLater }: WaitingProp
             </div>
           ) : (
             <div className="park-world-dactions">
-              <Button variant="needs" size="sm" onClick={() => onDecide(d.k)}>
-                {d.yes}
-              </Button>
+              {d.provide && <DecisionFields d={d} />}
+              {d.yes !== "" && (
+                <Button variant="needs" size="sm" onClick={() => onDecide(d.k)}>
+                  {d.yes}
+                </Button>
+              )}
               <Button variant="secondary" size="sm" onClick={onLater}>
                 Ask me later
               </Button>

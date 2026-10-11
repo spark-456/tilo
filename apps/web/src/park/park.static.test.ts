@@ -143,7 +143,10 @@ describe("WEB_1a_static: park stays beside the old app", () => {
         if (target.startsWith(PARK)) continue;
         const inSrc = relative(SRC, target).replaceAll("\\", "/");
         // Only the shared API client seam (src/api) may be reused from outside park.
-        if (!(inSrc === "api" || inSrc.startsWith("api/"))) bad.push(`${rel(p)} imports ${m[1]}`);
+        // SEC-16: and the one shared lifetime-cap dialog (src/components, like ReplayBanner: neither tree imports the other).
+        const shared = inSrc === "components/LifetimeCapDialog";
+        if (!(inSrc === "api" || inSrc.startsWith("api/") || shared))
+          bad.push(`${rel(p)} imports ${m[1]}`);
       }
     }
     expect(bad).toEqual([]);

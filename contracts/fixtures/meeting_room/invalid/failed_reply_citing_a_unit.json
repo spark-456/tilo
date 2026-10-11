@@ -1,0 +1,70 @@
+{
+  "room_id": "01JB5VQ00000000000000R0001",
+  "world_id": "w_village_basic",
+  "run_id": "r_village_basic_1",
+  "state": "open",
+  "reason": null,
+  "lead": "A_l1",
+  "agents": ["A_s1", "A_s2"],
+  "as_role": "member",
+  "credit_cap": 20,
+  "credits_spent": 0.84,
+  "max_turns": 20,
+  "turns": [
+    {
+      "turn": 1,
+      "to": "A_s2",
+      "mode": "quick",
+      "text": "Why does quote B look cheaper than last month?",
+      "reply": {
+        "from": "A_s2",
+        "outcome": "proposed_change",
+        "text": "I used last week's prices for quote B. I can redo the comparison with the new price list.",
+        "units": ["U2"],
+        "artifacts": [
+          {
+            "artifact_id": "art_quote_table",
+            "version": 2
+          }
+        ],
+        "proposal": {
+          "proposal_id": "01JB5VQ00000000000000P0001",
+          "units": ["U2"],
+          "artifacts": [
+            {
+              "artifact_id": "art_quote_table",
+              "version": 2
+            }
+          ]
+        }
+      },
+      "change": {
+        "proposal_id": "01JB5VQ00000000000000P0001",
+        "text": "Redo the comparison with the new price list."
+      }
+    },
+    {
+      "turn": 2,
+      "to": "A_l1",
+      "mode": "thinking",
+      "text": "Who checked the totals?",
+      "reply": {
+        "from": "A_l1",
+        "outcome": "failed",
+        "text": null,
+        "units": ["U3"],
+        "artifacts": [],
+        "proposal": null
+      },
+      "change": null
+    },
+    {
+      "turn": 3,
+      "to": "A_s1",
+      "mode": "quick",
+      "text": "Did you read the warranty terms?",
+      "reply": null,
+      "change": null
+    }
+  ]
+}

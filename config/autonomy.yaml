@@ -20,6 +20,9 @@
 # T3 and always needs a person; listed for the same reason as build_handoff (the FR-MTG-09 config test pins it).
 # read_events (google_calendar, FR-CAL-08) reads the person's own calendar: no side effect, never
 # gated, never an outbox entry. Listed so the table and config/connectors.yaml agree on its tier.
+# create_event (google_calendar, ADR-0035 decision 6) adds an event with no guests to the person's own primary
+# calendar: T1, an approval card and an undo window. create_event_with_guests invites guests and Google emails them
+# (FR-CAL-04), so it is T3 and always needs a person, listed so removing the line cannot pass unnoticed.
 actions:
   read_events: T1
   create_draft: T1
@@ -32,6 +35,8 @@ actions:
   delete_file: T3
   build_handoff: T3
   create_meeting_event: T3
+  create_event: T1
+  create_event_with_guests: T3
 modifiers:
   - {condition: new_recipients, raises_to: T3}
   - {condition: attachments, raises_to: T3}

@@ -12,6 +12,8 @@ import type {
   QuestionAnswer,
   TiloClient,
 } from "./client";
+import { type FieldSpec, type FieldsApi, fieldSpecsOf } from "./fields";
+import { type ItemApi, type PinnedItem, pinnedItemOf } from "./item";
 import { type HostStarted, isHostStarted, refusalOf } from "./meetingHost";
 import {
   type ScheduleRequest,
@@ -80,10 +82,11 @@ export function reasonOf(status: number, text: string): string {
   try {
     const body: unknown = JSON.parse(text);
     if (body && typeof body === "object") {
-      const { detail, error, reason } = body as Record<string, unknown>;
+      const { detail, error, reason, outcome } = body as Record<string, unknown>;
       const coded = typeof reason === "string" ? ANSWER_REASONS.get(reason) : undefined;
       if (coded) return coded;
       said = typeof detail === "string" ? detail : error;
+      if (status === 422 && outcome === "rejected") said = reason; // the fields route's plain reason (L6c)
     }
   } catch {
     said = undefined;
@@ -98,6 +101,13 @@ export function reasonOf(status: number, text: string): string {
     return said;
   }
   return GENERIC_4XX[status] ?? "Tilo could not accept that.";
+}
+
+/** SEC-16: the one refusal the lifetime-cap pop-up is keyed on (403 `spend_cap_reached`); every other limit differs. */
+export function isLifetimeCap(error: unknown): boolean {
+  return (
+    error instanceof TiloApiError && error.status === 403 && error.code === "spend_cap_reached"
+  );
 }
 
 /** The refusal's `code` only when it is a short lower-case token (SEC-15); anything else is null. */
@@ -260,7 +270,7 @@ function quickOf(body: unknown): QuickIntakeResult | null {
   return { kind: "answered", text: b.text, cost: Object.keys(cost).length > 0 ? cost : null };
 }
 
-export class HttpClient implements TiloClient, SchedulesApi {
+export class HttpClient implements TiloClient, SchedulesApi, FieldsApi, ItemApi {
   private readonly base: string;
   private readonly fetchFn: typeof fetch;
   private readonly pollMs: number;
@@ -276,7 +286,9 @@ export class HttpClient implements TiloClient, SchedulesApi {
 
   constructor(options: HttpClientOptions) {
     this.base = options.baseUrl.trim().replace(/\/+$/, "");
-    this.fetchFn = options.fetch ?? ((url, init) => fetch(url, init));
+    // redirect: "error": the API never redirects a call, so one that does (a stray proxy, a hijacked path) is an error, not a
+    // detour that would carry the sign-in and App Check tokens to another address (SEC-10)
+    this.fetchFn = options.fetch ?? ((url, init) => fetch(url, { ...init, redirect: "error" }));
     this.pollMs = options.pollMs ?? 1000;
     this.appCheckToken = options.appCheckToken;
     this.authToken = options.authToken;
@@ -682,6 +694,53 @@ export class HttpClient implements TiloClient, SchedulesApi {
     );
   }
 
+  /** `GET /worlds/{id}/cards/{cid}/fields` (ADR-0035 L6c): what an open fields card asks for. The card must have come
+   * from `listCards` (the route is per world). A reply that is not the documented shape is an unreadable reply. */
+  async getCardFields(cardId: string): Promise<FieldSpec[]> {
+    return await this.cardsOf(this.worldOfCard(cardId)).getCardFields(cardId);
+  }
+
+  /** `POST /worlds/{id}/cards/{cid}/fields` `{fields}`: the values go to this one request. A refusal carries the API's
+   * own plain reason (422), which `reasonOf` shows when it is short plain text. */
+  async supplyCardFields(cardId: string, values: Readonly<Record<string, string>>): Promise<void> {
+    return await this.cardsOf(this.worldOfCard(cardId)).supplyCardFields(cardId, values);
+  }
+
+  /** `GET /worlds/{id}/cards/{cid}/item` (ADR-0035 L6d): the document a gate card pins, for the owner's show-me. */
+  async getCardItem(cardId: string): Promise<PinnedItem> {
+    return await this.cardsOf(this.worldOfCard(cardId)).getCardItem(cardId);
+  }
+
+  private worldOfCard(cardId: string): string {
+    const worldId = this.cardWorlds.get(cardId);
+    if (worldId === undefined) {
+      throw new TiloApiError("Open the card list again, then answer from there.", null, false);
+    }
+    return worldId;
+  }
+
+  /** The fields and item calls of one world's cards, for a card that names its world itself (the Park Decisions
+   * card does, so no `listCards` is needed). Same requests, same auth and refusals as the methods above. */
+  cardsOf(worldId: string): FieldsApi & ItemApi {
+    const path = (cardId: string, leaf: string) =>
+      `/worlds/${encodeURIComponent(worldId)}/cards/${encodeURIComponent(cardId)}/${leaf}`;
+    return {
+      getCardFields: async (cardId) => {
+        const specs = fieldSpecsOf(await this.request<unknown>(path(cardId, "fields")));
+        if (!specs) throw new TiloApiError(BAD_REPLY, 200, true);
+        return specs;
+      },
+      supplyCardFields: async (cardId, values) => {
+        await this.post(path(cardId, "fields"), { fields: values });
+      },
+      getCardItem: async (cardId) => {
+        const item = pinnedItemOf(await this.request<unknown>(path(cardId, "item")));
+        if (!item) throw new TiloApiError(BAD_REPLY, 200, true);
+        return item;
+      },
+    };
+  }
+
   getDelivery(worldId: string): Promise<DeliveryResult> {
     return this.request(`/worlds/${encodeURIComponent(worldId)}/delivery`);
   }
@@ -737,6 +796,16 @@ export class HttpClient implements TiloClient, SchedulesApi {
       body: JSON.stringify(patch),
     };
     return this.request(`/schedules/${encodeURIComponent(id)}`, init, true);
+  }
+
+  /** `POST /v1/feedback` (SEC-16, BQ-FEEDBACK-1): resolves only when the server said `{received: true}`; the uid is the
+   * sign-in token's, never the body. No automatic retry. */
+  async submitFeedback(words: string): Promise<void> {
+    const reply = await this.post<{ received?: unknown } | null>("/v1/feedback", {
+      text: words,
+      context: "lifetime_cap",
+    });
+    if (reply?.received !== true) throw new TiloApiError(BAD_REPLY, 200, true, true);
   }
 
   /** `DELETE /schedules/{id}`: 204 with no body. */

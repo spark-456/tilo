@@ -92,8 +92,8 @@ if ($Bad.Count) { $Bad | ForEach-Object { Write-Host $_ -ForegroundColor Red } }
 Routines that were due during any 503 stay due, and fire once the cause is fixed. None is disabled by an outage.
 
 ## Known caveats
-- The tilo-api settings in step 2 are set with gcloud. Only tilo-api has `ignore_env = true` in `infra/envs/dev`, so the
-  module ignores `env` drift on that one service (`ignore_changes` on `template[0].containers[0].env`) and a later
+- The tilo-api settings in step 2 are set with gcloud. Only tilo-api and tilo-connectors have `ignore_env = true` in `infra/envs/dev`, so the
+  module ignores `env` drift on those services (`ignore_changes` on `template[0].containers[0].env`) and a later
   Terraform run leaves the settings alone; every other service's env stays fully managed. The service module declares
   no `env` block (a tests/repo guard), because declared env would never be applied.
 - Secrets only via `--update-secrets` (Secret Manager references), never in `--update-env-vars`.
