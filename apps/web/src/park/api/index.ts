@@ -18,6 +18,8 @@ import type {
   ProfileSettings,
   QuickReply,
   Skill,
+  SkillCapture,
+  SkillVersion,
   StartAck,
   Team,
   TeamPolicy,
@@ -50,6 +52,8 @@ export const API_METHODS = [
   "undo",
   "startWorld",
   "saveSkill",
+  "captureSkill",
+  "proposeVersion",
   "setToolLevel",
   "bookSlot",
   "addBackup",
@@ -78,6 +82,8 @@ export interface Api {
   undo(key: DecisionKey): R<DecideAck>;
   startWorld(mode: TierKey, query: string): R<StartAck>;
   saveSkill(skill: Skill): R<Ack>;
+  captureSkill(text: string): R<SkillCapture>;
+  proposeVersion(captureId: string): R<SkillVersion>;
   setToolLevel(tool: string, level: number): R<Ack>;
   bookSlot(slot: AgendaSlot): R<Ack>;
   addBackup(personId: string): R<Ack>;

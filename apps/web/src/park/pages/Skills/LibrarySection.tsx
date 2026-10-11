@@ -68,7 +68,7 @@ export function LibrarySection({
       : "0%";
 
   const stats = [
-    { k: "Runs", v: String(cur.runs) },
+    { k: "Runs", v: cur.runs == null ? "—" : String(cur.runs) },
     { k: "Success", v: cur.rate != null ? `${cur.rate}%` : "—" },
     { k: "Last run", v: cur.last },
     { k: "Improved", v: cur.improved },
