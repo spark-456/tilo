@@ -900,10 +900,66 @@ def get_desk_worlds(request: Request = None) -> DeskWorlds:  # type: ignore[assi
     return seams_store.StoreDeskWorlds(seams_store.resolve_store(request))
 
 
+_skill_store_lock = threading.Lock()
+_skill_store: tuple[tuple[str, ...], SkillStore] | None = None  # (the config it was built for, the store)
+_skill_store_retry_at: float | None = None
+_SKILL_ENV = (
+    "TILO_SKILLS_STORE",
+    "TILO_FIRESTORE_PROJECT",
+    "K_SERVICE",
+    "CLOUD_RUN_JOB",
+    "FIRESTORE_EMULATOR_HOST",
+    "GOOGLE_CLOUD_PROJECT",
+)
+
+
 def get_skill_store() -> SkillStore:
-    """The taught-skill store (SKILLS-2, FR-SKL-04). No production backend yet (BQ-SKILLS-1): refuses, fail closed;
-    dev mode wires one in memory."""
-    raise HTTPException(status_code=503, detail="not_configured")
+    """The taught-skill store (SKILLS-2b, FR-SKL-04, BQ-SKILLS-1). `TILO_SKILLS_STORE` = `firestore` (with
+    `TILO_FIRESTORE_PROJECT`; outside Cloud Run only the emulator and a `demo-` project) or `memory` (refused when
+    deployed); unset in dev mode = memory; anything else, or a client that cannot be built, is 503 `not_configured`
+    (the cause never echoed; a failed build backs off like the people stores). The env is read on every call; a store
+    is kept per config, a refusal never is."""
+    global _skill_store, _skill_store_retry_at
+    from tilo_api import dev  # noqa: PLC0415 - dev imports this module
+
+    values = {n: os.environ[n] for n in _SKILL_ENV if n in os.environ}  # presence matters: Cloud Run may set ""
+    if not values.get("TILO_SKILLS_STORE") and dev.dev_enabled():
+        try:
+            dev.refuse_if_unsafe()
+            values["TILO_SKILLS_STORE"] = "memory"
+        except dev.DevModeRefused:
+            pass
+    key = tuple(values.get(n) or "" for n in _SKILL_ENV) + tuple(n for n in _SKILL_ENV if n in values)
+    held = _skill_store
+    if held is not None and held[0] == key:
+        return held[1]
+    retry_at = _skill_store_retry_at
+    if retry_at is not None and people_stores_clock() < retry_at:
+        raise HTTPException(status_code=503, detail="not_configured")
+    from tilo_api.skill_firestore import SkillStoreNotConfigured, open_skill_store  # noqa: PLC0415
+
+    with _skill_store_lock:
+        held = _skill_store
+        if held is not None and held[0] == key:
+            return held[1]
+        try:
+            built = open_skill_store(values)
+            _skill_store, _skill_store_retry_at = (key, built), None
+            return built
+        except Exception as exc:
+            logger.warning("skill store not built (%s)", type(exc).__name__)
+            if not isinstance(exc, SkillStoreNotConfigured):  # a client was tried: back off
+                _skill_store_retry_at = people_stores_clock() + PEOPLE_STORES_BACKOFF_S
+            raise HTTPException(status_code=503, detail="not_configured") from None
+
+
+def _forget_skill_store() -> None:
+    global _skill_store, _skill_store_retry_at
+    with _skill_store_lock:
+        _skill_store, _skill_store_retry_at = None, None
+
+
+get_skill_store.cache_clear = _forget_skill_store  # type: ignore[attr-defined]  # tests start from a cold process
 
 
 def get_run_archive(request: Request = None) -> Callable[..., RunArchive]:  # type: ignore[assignment]

@@ -312,5 +312,5 @@ def learn_route(
     clock: Annotated[Callable[[], str], Depends(deps.get_clock)],
 ) -> dict[str, Any]:
     """Skills still learning that the caller may read; ratings and the helpers report are later slices."""
-    rows = _guarded(lambda: _readable(store, stores, principal, clock))
-    return {"learning": [r for r in rows if r["status"] == "learning"], "needs_rating": [], "helpers": None}
+    learning = _guarded(lambda: [r for r in _readable(store, stores, principal, clock) if r["status"] == "learning"])
+    return {"learning": learning, "needs_rating": [], "helpers": None}

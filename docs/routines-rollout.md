@@ -64,7 +64,7 @@ set on a deployed service, and flags names that are not on the allowlist. It nev
 ```powershell
 $Project = "essential-wares-510320-f0"; $Region = "asia-southeast1"
 $Allow = @("TILO_SCHEDULE_TICK_AUDIENCE","TILO_SCHEDULE_TICK_CALLER","TILO_SCHEDULES_STORE","TILO_FIRESTORE_PROJECT",
-  "TILO_RUNS_QUEUE","TILO_TASKS_CALLER","TILO_TEAM_STORE","TILO_API_CORS_ORIGINS")        # extend per service as settings are added
+  "TILO_RUNS_QUEUE","TILO_TASKS_CALLER","TILO_TEAM_STORE","TILO_SKILLS_STORE","TILO_API_CORS_ORIGINS")        # extend per service as settings are added
 $Never = @("LIVE","TILO_API_DEV","TILO_JUDGE_LIVE","FIRESTORE_EMULATOR_HOST","TILO_MODELS_FILE")
 $Svc = gcloud run services describe tilo-api --project $Project --region $Region --format json | ConvertFrom-Json
 $Vars = @($Svc.spec.template.spec.containers[0].env)

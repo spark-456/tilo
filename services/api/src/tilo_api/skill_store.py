@@ -3,7 +3,7 @@
 A repository of plain dicts that conform to the schema. A store never mutates what it is handed and returns copies.
 `list_visible` is the owner's own skills plus every skill of the org whose scope is `team` and whose team is in the
 caller's current teams; the caller works the teams out from the people record on every call. In memory only: the
-Firestore store is a later slice (BQ-SKILLS-1), so a deployed install refuses (`deps.get_skill_store`, 503).
+Firestore store is `skill_firestore.py` (SKILLS-2b, BQ-SKILLS-1); `deps.get_skill_store` picks by env.
 """
 
 from __future__ import annotations
@@ -12,6 +12,10 @@ import copy
 import threading
 from collections.abc import Iterable
 from typing import Any, Protocol
+
+
+class SkillStoreError(RuntimeError):
+    """A store refused or failed; the message names no record text and no cause (the route says 503 `unavailable`)."""
 
 
 class SkillStore(Protocol):
