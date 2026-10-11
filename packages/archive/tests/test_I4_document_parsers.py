@@ -93,3 +93,20 @@ def test_I4_zip_refuses_nested_output_collisions():
     data = archive([("inner", archive([("leaf", b"a")])), ("inner/leaf", b"b")])
     with pytest.raises(Refused, match="^duplicate_path$"):
         expand_zip(data)
+
+
+def test_I4_zip_refuses_encrypted_flags_without_password_requests():
+    data = bytearray(archive([("leaf", b"x")]))
+    data[6] |= 1
+    data[data.index(b"PK\x01\x02") + 8] |= 1
+    with pytest.raises(Refused, match="^encrypted_zip$"):
+        expand_zip(bytes(data))
+
+
+def test_I4_zip_refuses_unsupported_compression_and_bad_crc():
+    with pytest.raises(Refused, match="^compression_method$"):
+        expand_zip(archive([("leaf", b"x")], zipfile.ZIP_BZIP2))
+    data = bytearray(archive([("leaf", b"private-content")]))
+    data[34] ^= 1
+    with pytest.raises(Refused, match="^invalid_zip$"):
+        expand_zip(bytes(data))
