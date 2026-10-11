@@ -5,7 +5,9 @@ scope, provenance and safety screening before using any returned text or bytes.
 """
 
 import io
+import re
 import stat
+import xml.etree.ElementTree as ET
 import zipfile
 import zlib
 from dataclasses import dataclass, field
@@ -23,11 +25,23 @@ class Limits:
     nesting: int = 2
     path_depth: int = 16
     ratio: int = 100
+    xml_nodes: int = 20000
+    xml_depth: int = 64
+    output_chars: int = 1024 * 1024
 
     def validate(self) -> None:
         if any(
             type(value) is not int or value <= 0
-            for value in (self.input_bytes, self.expanded_bytes, self.entries, self.path_depth, self.ratio)
+            for value in (
+                self.input_bytes,
+                self.expanded_bytes,
+                self.entries,
+                self.path_depth,
+                self.ratio,
+                self.xml_nodes,
+                self.xml_depth,
+                self.output_chars,
+            )
         ):
             raise ValueError("invalid_limits")
         if type(self.nesting) is not int or self.nesting < 0:
@@ -116,3 +130,76 @@ def expand_zip(data: bytes, *, limits: Limits = Limits()) -> tuple[tuple[str, by
         raise
     except (zipfile.BadZipFile, RuntimeError, NotImplementedError, EOFError, OSError, ValueError, zlib.error):
         raise Refused("invalid_zip") from None
+
+
+def _xml(data: bytes, limits: Limits) -> ET.Element:
+    try:
+        text = data.decode("utf-8-sig")
+        if "<!DOCTYPE" in text.upper() or "<!ENTITY" in text.upper():
+            raise Refused("xml_declaration")
+        root = ET.fromstring(text)
+    except (UnicodeError, ET.ParseError):
+        raise Refused("invalid_xml") from None
+    pending = [(root, 1)]
+    nodes = 0
+    while pending:
+        node, depth = pending.pop()
+        nodes += 1
+        if nodes > limits.xml_nodes:
+            raise Refused("xml_nodes")
+        if depth > limits.xml_depth:
+            raise Refused("xml_depth")
+        for key, value in node.attrib.items():
+            local = key.rsplit("}", 1)[-1].lower()
+            if local == "contenttype" and "macroenabled" in value.lower():
+                raise Refused("active_content")
+            if (
+                (local == "targetmode" and value.lower() == "external")
+                or local == "base"
+                or (local == "target" and re.match(r"(?:[a-zA-Z][\w+.-]*:|//)", value))
+            ):
+                raise Refused("external_reference")
+        pending.extend((child, depth + 1) for child in node)
+    return root
+
+
+def parse_docx(data: bytes, *, limits: Limits = Limits()) -> tuple[tuple[str, str], ...]:
+    """Read UTF-8 DOCX paragraph text; refuse active content and external references.
+
+    All XML parts are screened, including parts that contribute no returned text.
+    Paragraph labels cite package parts, not page numbers (pagination needs layout).
+    """
+    parts = dict(expand_zip(data, limits=limits))
+    kind = b"application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"
+    if "word/document.xml" not in parts or kind not in parts.get("[Content_Types].xml", b""):
+        raise Refused("unknown_type")
+    roots: dict[str, ET.Element] = {}
+    for name, content in parts.items():
+        lower = name.lower()
+        if (
+            lower.endswith((".bin", ".docm", ".xlsm", ".pptm"))
+            or any(marker in lower for marker in ("vbaproject", "activex/", "embeddings/"))
+            or (lower == "[content_types].xml" and b"macroenabled" in content.lower())
+        ):
+            raise Refused("active_content")
+        if lower.endswith((".xml", ".rels")):
+            roots[name] = _xml(content, limits)
+    word = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
+    if roots["word/document.xml"].tag != word + "document" or not any(
+        node.attrib.get("PartName") == "/word/document.xml" and node.attrib.get("ContentType") == kind.decode()
+        for node in roots["[Content_Types].xml"]
+    ):
+        raise Refused("unknown_type")
+    output: list[tuple[str, str]] = []
+    size = 0
+    for name, root in roots.items():
+        if not name.startswith("word/"):
+            continue
+        for index, paragraph in enumerate(root.iter(word + "p"), 1):
+            text = "".join(node.text or "" for node in paragraph.iter(word + "t"))
+            size += len(text)
+            if size > limits.output_chars:
+                raise Refused("output_size")
+            if text:
+                output.append((f"{name}#p{index}", text))
+    return tuple(output)

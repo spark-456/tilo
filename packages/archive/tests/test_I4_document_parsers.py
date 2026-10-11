@@ -3,7 +3,7 @@ import zipfile
 from dataclasses import replace
 
 import pytest
-from tilo_archive.document_parsers import Limits, Refused, expand_zip
+from tilo_archive.document_parsers import Limits, Refused, expand_zip, parse_docx
 
 
 def archive(entries, compression=zipfile.ZIP_STORED):
@@ -110,3 +110,55 @@ def test_I4_zip_refuses_unsupported_compression_and_bad_crc():
     data[34] ^= 1
     with pytest.raises(Refused, match="^invalid_zip$"):
         expand_zip(bytes(data))
+
+
+WORD = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+
+
+def docx(xml, extras=()):
+    return archive(
+        [
+            (
+                "[Content_Types].xml",
+                b'<Types><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-'
+                b'officedocument.wordprocessingml.document.main+xml"/></Types>',
+            ),
+            ("word/document.xml", xml),
+            *extras,
+        ]
+    )
+
+
+def test_I4_docx_reads_text_with_part_and_paragraph_provenance():
+    xml = f'<w:document xmlns:w="{WORD}"><w:p><w:r><w:t>Hello</w:t></w:r></w:p></w:document>'.encode()
+    assert parse_docx(docx(xml)) == (("word/document.xml#p1", "Hello"),)
+
+
+@pytest.mark.parametrize(
+    "xml,code",
+    [
+        (b'<!DOCTYPE x [<!ENTITY a "bomb">]><x>&a;</x>', "xml_declaration"),
+        (b"<x>", "invalid_xml"),
+        (b'<Relationship TargetMode="External" Target="https://example.invalid"/>', "external_reference"),
+        (b'<x xml:base="https://example.invalid"/>', "external_reference"),
+    ],
+)
+def test_I4_docx_refuses_hostile_xml_in_any_part(xml, code):
+    with pytest.raises(Refused, match=f"^{code}$"):
+        parse_docx(docx(b"<x/>", [("customXml/item.xml", xml)]))
+
+
+def test_I4_docx_refuses_macros_unknown_types_and_output_overflow():
+    with pytest.raises(Refused, match="^active_content$"):
+        parse_docx(docx(b"<x/>", [("word/vbaProject.bin", b"macro")]))
+    with pytest.raises(Refused, match="^unknown_type$"):
+        parse_docx(archive([("renamed.docx", b"not office")]))
+    xml = f'<w:document xmlns:w="{WORD}"><w:p><w:t>too much</w:t></w:p></w:document>'.encode()
+    with pytest.raises(Refused, match="^output_size$"):
+        parse_docx(docx(xml), limits=replace(Limits(), output_chars=1))
+
+
+def test_I4_docx_xml_depth_and_node_caps():
+    for limits, code in [(replace(Limits(), xml_depth=1), "xml_depth"), (replace(Limits(), xml_nodes=1), "xml_nodes")]:
+        with pytest.raises(Refused, match=f"^{code}$"):
+            parse_docx(docx(b"<a><b/></a>"), limits=limits)

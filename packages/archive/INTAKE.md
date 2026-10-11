@@ -11,7 +11,12 @@ Invalid limits raise `ValueError`; refused input raises `Refused` with a stable 
 and no uploaded content. Encrypted ZIPs, unsupported compression, special entries,
 ambiguous paths and duplicate output labels are refused.
 
-This primitive does not interpret or execute leaf bytes. Office/CSV parsing and
-macro/external-reference screening belong to the subsequent document-parser slice.
+`parse_docx` reads UTF-8 Word paragraph text with part/paragraph provenance. All XML
+parts are screened: DTD/entities, external references and active content are refused.
+Limits additionally cap XML at 20,000 nodes and depth 64 per part, and returned text
+at 1 Mi characters. Embedded objects and binary parts are conservatively refused.
+It does not render page numbers, recover layout, interpret fields, execute content,
+or read images. XLSX, PPTX and CSV remain for subsequent slices. Generic ZIP leaf
+bytes remain inert and unscreened; use a document parser before offering them as text.
 No route, archive persistence, consent, scope or KnowledgeItem schema is added here.
 Callers must apply content screening before offering any returned bytes to a model.
