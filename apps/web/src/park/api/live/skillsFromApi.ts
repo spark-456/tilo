@@ -9,6 +9,7 @@ interface Step {
   tool: string;
   action: string;
   ask_first: boolean;
+  must_ask?: boolean;
 }
 interface Question {
   text: string;
@@ -16,6 +17,7 @@ interface Question {
   answer: unknown;
 }
 export interface SkillRow {
+  version?: number;
   id: string;
   name: string;
   scope: { kind: "just_me" | "team"; team: string | null };
@@ -84,6 +86,15 @@ export function skillFromRow(r: SkillRow): Skill {
     tools: toolsOf(r.plan),
     used: [],
     steps: r.plan.map((s) => s.text),
+    ...(Number.isInteger(r.version) && (r.version ?? 0) > 0
+      ? {
+          fix: {
+            version: r.version as number,
+            asks: r.plan.map((s) => s.ask_first),
+            locked: r.plan.map((s) => s.must_ask !== false),
+          },
+        }
+      : {}),
     ...ask,
   };
 }

@@ -23,12 +23,33 @@ class SkillStore(Protocol):
     def get(self, org: str, skill_id: str) -> dict[str, Any] | None: ...
     def list_for_owner(self, org: str, owner: str) -> list[dict[str, Any]]: ...
     def list_visible(self, org: str, user: str, team_ids: Iterable[str]) -> list[dict[str, Any]]: ...
+    def exchange(self, before: dict, after: dict, fix: dict, *, undo: bool = False) -> bool: ...
+    def list_fixes(self, org: str, skill_id: str) -> list[dict[str, Any]]: ...
 
 
 class MemorySkillStore:
     def __init__(self) -> None:
         self._rows: dict[tuple[str, str], dict[str, Any]] = {}
         self._lock = threading.Lock()
+        self._fixes: dict[tuple[str, str, str], dict] = {}
+
+    def exchange(self, before: dict, after: dict, fix: dict, *, undo: bool = False) -> bool:
+        """Atomically compare the complete record and change it with its fix log (TS-09)."""
+        key = (before["org_id"], before["id"])
+        log_key = (*key, fix["id"])
+        with self._lock:
+            if self._rows.get(key) != before or (not undo and log_key in self._fixes):
+                return False
+            self._rows[key] = copy.deepcopy(after)
+            if undo:
+                self._fixes.pop(log_key, None)
+            else:
+                self._fixes[log_key] = copy.deepcopy(fix)
+            return True
+
+    def list_fixes(self, org: str, skill_id: str) -> list[dict[str, Any]]:
+        with self._lock:
+            return [copy.deepcopy(r) for (o, s, _), r in self._fixes.items() if (o, s) == (org, skill_id)]
 
     def put(self, record: dict[str, Any]) -> None:
         with self._lock:

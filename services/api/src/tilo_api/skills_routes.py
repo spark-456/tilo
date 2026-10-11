@@ -10,6 +10,7 @@ body for every refusal to read. Writes the store only: no event (the next slice)
 
 from __future__ import annotations
 
+import copy
 import logging
 import re
 from collections.abc import Callable
@@ -27,6 +28,7 @@ from tilo_policy.schemas import conforms
 
 from tilo_api import deps
 from tilo_api.people import _PeopleRoute
+from tilo_api.people_events import WorkEvents, get_work_events
 from tilo_api.people_writes import Refusal, Text, Writer, _Closed, json_body
 from tilo_api.skill_store import SkillStore
 
@@ -320,3 +322,71 @@ def learn_route(
     """Skills still learning that the caller may read; ratings and the helpers report are later slices."""
     learning = _guarded(lambda: [r for r in _readable(store, stores, principal, clock) if r["status"] == "learning"])
     return {"learning": learning, "needs_rating": [], "helpers": None}
+
+
+class FixIn(_Closed):
+    from_version: Annotated[int, Field(strict=True, ge=1)]
+    step: Annotated[int, Field(strict=True, ge=1, le=20)]
+    text: Annotated[str, Field(min_length=1, max_length=280)]
+    ask_first: StrictBool
+
+
+@router.post("/v1/skills/{skill_id}/fixes")
+def fix_route(
+    skill_id: str,
+    body: Annotated[FixIn, Depends(json_body(FixIn))],
+    principal: Annotated[deps.Principal, Depends(deps.get_current_principal)],
+    store: Annotated[SkillStore, Depends(deps.get_skill_store)],
+    stores: Annotated[PeopleStores, Depends(deps.get_people_stores)],
+    redact: Annotated[Callable[[str], str], Depends(deps.get_redactor)],
+    clock: Annotated[Callable[[], str], Depends(deps.get_clock)],
+    we: Annotated[WorkEvents, Depends(get_work_events)],
+) -> dict:
+    def save() -> dict:
+        from tilo_api.skills_capture import _desk, _part  # noqa: PLC0415 - capture also uses this router
+
+        owner, now = principal.user_id, _now(clock)
+        _teams(stores, owner, now)
+        before = store.get(deps.ORG_ID, skill_id) if _SKILL_ID.fullmatch(skill_id) else None
+        if before is None or before["owner"] != owner or before["status"] == "draft":
+            raise HTTPException(404, "not_found")
+        if before["version"] != body.from_version:
+            raise HTTPException(409, "version_conflict")
+        if body.step > len(before["plan"]) or (before["plan"][body.step - 1]["must_ask"] and not body.ask_first):
+            raise HTTPException(422, "invalid_fix")
+        text = Writer(stores, deps.ORG_ID, owner, now, redact).text(body.text)
+        fix = {
+            "id": new_ulid(),
+            "skill": skill_id,
+            "from_version": body.from_version,
+            "to_version": body.from_version + 1,
+            "step": body.step,
+            "text": text,
+            "ask_first": body.ask_first,
+            "by": owner,
+            "rating": None,
+            "at": now,
+        }
+        after = copy.deepcopy(before)
+        after["plan"][body.step - 1].update(text=text, ask_first=body.ask_first)
+        after.update(version=fix["to_version"], updated_at=now)
+        after["estimates"]["asks_per_run"] = sum(
+            s["ask_first"] if after["status"] == "trusted" else s["verb"] != "read" for s in after["plan"]
+        )
+        if not conforms("taught_skill.schema.json", after) or not conforms("taught_skill.schema.json#/$defs/fix", fix):
+            raise HTTPException(422, "invalid_fix")
+        world = _desk(we, deps.ORG_ID, owner)
+        if not store.exchange(before, after, fix):
+            raise HTTPException(409, "version_conflict")
+        data = {key: fix[key] for key in ("skill", "from_version", "to_version", "step")}
+        try:
+            we.writer.append(
+                world,
+                _part("skill.fixed", owner, "A skill was fixed.", data, (skill_id, "fixed", str(fix["id"])), {}),
+            )
+        except Exception:
+            store.exchange(after, before, fix, undo=True)
+            raise
+        return after
+
+    return _guarded(save)

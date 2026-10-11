@@ -21,6 +21,7 @@ from typing import Any
 
 from google.api_core import exceptions as gexc
 from tilo_harness.schedule_store import _PROJECT as GCP_PROJECT
+from tilo_policy.schemas import conforms
 
 from tilo_api.skill_store import MemorySkillStore, SkillStore, SkillStoreError
 
@@ -45,6 +46,41 @@ def _sort_key(row: dict[str, Any]) -> tuple[str, str]:
 class FirestoreSkillStore:
     def __init__(self, client: Any) -> None:
         self._client = client
+
+    def exchange(self, before: dict, after: dict, fix: dict, *, undo: bool = False) -> bool:
+        """Skill and fix are one transaction; a stale writer never overwrites another change."""
+        from google.cloud.firestore_v1 import transactional  # noqa: PLC0415
+
+        if not conforms("taught_skill.schema.json", after) or not conforms("taught_skill.schema.json#/$defs/fix", fix):
+            raise _failed()
+        ref = self._client.document(f"orgs/{before['org_id']}/taught_skills/{before['id']}")
+        log = ref.collection("fixes").document(fix["id"])
+
+        @transactional
+        def change(tx: Any) -> bool:
+            held, logged = ref.get(transaction=tx).to_dict(), log.get(transaction=tx)
+            if held != before or (not undo and logged.exists):
+                return False
+            tx.set(ref, copy.deepcopy(after))
+            if undo:
+                tx.delete(log)
+            else:
+                tx.create(log, copy.deepcopy(fix))
+            return True
+
+        try:
+            return bool(change(self._client.transaction()))
+        except Exception:
+            raise _failed() from None
+
+    def list_fixes(self, org: str, skill_id: str) -> list[dict[str, Any]]:
+        if not self._addressable(org) or not _ID.fullmatch(skill_id):
+            return []
+        try:
+            col = self._client.collection(f"orgs/{org}/taught_skills/{skill_id}/fixes")
+            return sorted((s.to_dict() for s in col.stream()), key=lambda r: (r["at"], r["id"]))
+        except Exception:
+            raise _failed() from None
 
     @staticmethod
     def _addressable(org: Any) -> bool:
