@@ -13,7 +13,7 @@ from _api_contracts_lib import make_safety_provider
 from _api_lib import OWNER, REPO_ROOT, WORLD, FakeEventWriter, make_principal, make_store, validate_event
 from fastapi.testclient import TestClient
 from tilo_api import app, deps, team_store
-from tilo_api.meeting_room import get_room_config, get_room_model, get_room_user_cap
+from tilo_api.meeting_room import get_room_config, get_room_model
 from tilo_api.meeting_room_config import RoomConfig
 from tilo_api.meeting_room_reply import Grounding, ModelReply
 from tilo_archive import RunArchive
@@ -228,8 +228,8 @@ def make_env(
     overrides[deps.get_safety] = lambda: safety or make_safety_provider()
     overrides[get_room_model] = lambda: env.model
     overrides[get_room_config] = lambda: config
-    overrides[get_room_user_cap] = lambda: lambda user: None
     overrides[deps.get_clock] = lambda: lambda: env.clock[0]
+    overrides[deps.get_change_planner] = lambda: None  # unwired unless a test installs the planner (MROOM-H2b)
     if team_roles is not None:
         overrides[team_store.get_team_store] = lambda: team_store.InMemoryTeamStore(
             team_store.TeamState(roles=team_roles)
