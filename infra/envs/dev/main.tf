@@ -21,7 +21,7 @@ locals {
   # from the account id like the other non-runtime service accounts below.
   cloudbuild_service_account_email = "${google_service_account.cloudbuild.account_id}@${var.project_id}.iam.gserviceaccount.com"
 
-  required_apis = toset([
+  required_apis = toset(concat([
     "run.googleapis.com",
     "artifactregistry.googleapis.com",
     "firestore.googleapis.com",
@@ -63,7 +63,7 @@ locals {
     "sheets.googleapis.com",
     "slides.googleapis.com",
     "bigquerystorage.googleapis.com",
-  ])
+  ], var.meet_bot_enabled ? ["texttospeech.googleapis.com"] : []))
 
   # ALL_TRAFFIC: every request from api and harness leaves through the VPC
   # subnet, so calls to internal-only services pass the ingress check and
@@ -94,6 +94,7 @@ locals {
       invoked_by = []
       vpc_egress = local.caller_vpc_egress # calls harness directly
       ignore_env = true                    # TILO_* runtime settings via gcloud (docs/routines-rollout.md)
+      timeout    = var.meet_bot_enabled ? "3600s" : null
     }
     "harness" = {
       image              = local.placeholder_image
@@ -151,6 +152,21 @@ locals {
       invoked_by         = []
     }
   }
+  enabled_cloud_run_services = merge(local.cloud_run_services, var.meet_bot_enabled ? {
+    "meet-bot" = {
+      image               = local.placeholder_image
+      min_instance_count  = 0
+      max_instance_count  = 1
+      ingress             = "INGRESS_TRAFFIC_INTERNAL_ONLY"
+      public              = false
+      invoked_by          = ["api"]
+      ignore_env          = false
+      cpu                 = "2"
+      memory              = "4Gi"
+      timeout             = "3600s"
+      request_concurrency = 1
+    }
+  } : {})
 
   # Project-level roles per service (PRD 6.5 one least-privilege SA per
   # service; SEC-12: tilo-browser holds no Firestore/Datastore or Storage
@@ -187,7 +203,7 @@ locals {
     expression = "resource.name == \"projects/${var.project_id}/databases/(default)\""
   }
 
-  service_project_roles = {
+  service_project_roles = merge({
     "api"         = ["roles/datastore.user", "roles/cloudtasks.enqueuer", local.vertex_generate_role, "roles/modelarmor.user"]
     "harness"     = ["roles/datastore.user", "roles/cloudtasks.enqueuer", "roles/aiplatform.user", "roles/modelarmor.user"]
     "channels"    = [local.vertex_generate_role, "roles/modelarmor.user"]
@@ -195,7 +211,9 @@ locals {
     "browser"     = []
     "render"      = ["roles/datastore.user"]
     "sandbox-web" = []
-  }
+    }, var.meet_bot_enabled ? {
+    "meet-bot" = [local.vertex_generate_role, "roles/serviceusage.serviceUsageConsumer"]
+  } : {})
 
   # secret => services allowed roles/secretmanager.secretAccessor on it.
   secret_accessors = {
@@ -273,7 +291,7 @@ module "service" {
 
   project_id = var.project_id
   region     = var.region
-  services   = local.cloud_run_services
+  services   = local.enabled_cloud_run_services
 
   vpc_network    = google_compute_network.vpc.name
   vpc_subnetwork = google_compute_subnetwork.run_egress.name
@@ -369,7 +387,7 @@ resource "google_project_iam_custom_role" "vertex_generate" {
 
 # The deployer may act as each runtime SA it deploys, and nothing else.
 resource "google_service_account_iam_member" "deployer_act_as" {
-  for_each = local.cloud_run_services
+  for_each = local.enabled_cloud_run_services
 
   service_account_id = "projects/${var.project_id}/serviceAccounts/${module.service.service_accounts[each.key]}"
   role               = "roles/iam.serviceAccountUser"
@@ -388,7 +406,7 @@ resource "google_service_account" "cloudbuild" {
 }
 
 resource "google_service_account_iam_member" "cloudbuild_act_as" {
-  for_each = local.cloud_run_services
+  for_each = local.enabled_cloud_run_services
 
   service_account_id = "projects/${var.project_id}/serviceAccounts/${module.service.service_accounts[each.key]}"
   role               = "roles/iam.serviceAccountUser"
@@ -687,7 +705,7 @@ module "monitoring" {
 
   project_id              = var.project_id
   alert_email             = var.alert_email
-  cloud_run_service_names = [for k in keys(local.cloud_run_services) : "tilo-${k}"]
+  cloud_run_service_names = [for k in keys(local.enabled_cloud_run_services) : "tilo-${k}"]
   events_subscription_id  = module.events.subscription_name
   eval_nightly_job_name   = google_cloud_run_v2_job.eval_nightly.name
 

@@ -24,9 +24,9 @@ import re
 import threading
 import time
 from collections.abc import Callable, Mapping, Sequence
-from typing import Any, NamedTuple, Protocol
+from typing import Any, Literal, NamedTuple, Protocol
 
-from pydantic import ValidationError
+from pydantic import BaseModel, ConfigDict, ValidationError
 from tilo_connectors.errors import AdapterError, PossiblySent, ProviderUnavailable, SideEffectRefused
 from tilo_connectors.meeting_host import CONNECTOR_ID, HostReceipt
 from tilo_contracts import (
@@ -43,6 +43,7 @@ from tilo_contracts import (
     MeetingHostRpcStartAnswer,
     MeetingHostRpcStatusAnswer,
     MeetingHostRpcViewsAnswer,
+    MeetingJoin,
 )
 from tilo_memory.artifacts import ArtifactCorrupt  # noqa: E402
 
@@ -137,6 +138,11 @@ def metadata_id_token(audience: str) -> str:
     return str(id_token.fetch_id_token(Request(), audience))
 
 
+class _JoinRefusal(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    error: Literal["not_joinable", "no_join_link", "host_not_connected"]
+
+
 class MeetingHostRpc:
     def __init__(
         self,
@@ -198,6 +204,13 @@ class MeetingHostRpc:
             raise HostRpcError("unknown") from None
         if reply.status == 200:
             return reply.body
+        if route == "join" and reply.status == 409:
+            try:
+                refusal = _JoinRefusal.model_validate_json(reply.body)
+            except ValidationError:
+                pass
+            else:
+                raise HostRpcError("rejected", refusal.error)
         if reply.status == 400 and route == "connect-callback":
             said = _error_code(reply.body)
             if said in CALLBACK_REFUSALS:
@@ -206,6 +219,14 @@ class MeetingHostRpc:
         refused = reply.status in (401, 403, 422) or (reply.status == 503 and _is_error(reply.body, "not_configured"))
         logger.warning("meeting-host %s: answered %s", route, reply.status)
         raise HostRpcError("refused" if refused else "unknown")
+
+    def join_link(self, receipt: Mapping[str, Any]) -> MeetingJoin:
+        """The API supplies its scoped receipt; connectors alone reads the host grant."""
+        try:
+            checked = MeetingHostRpcReceipt.model_validate(receipt)
+            return MeetingJoin.model_validate_json(self._post("join", checked.model_dump(mode="json")))
+        except ValidationError:
+            raise HostRpcError("unknown") from None
 
     def status(self, user_id: str) -> MeetingHostRpcStatusAnswer:
         """The principal's own bot-grant state. Any failure is a `HostRpcError`; a store read, so no parts."""

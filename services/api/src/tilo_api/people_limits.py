@@ -59,7 +59,7 @@ class Limits:
         self._hits: dict[str, deque[float]] = {}
         self._keys: OrderedDict[str, OrderedDict[tuple[str, str], _Entry]] = OrderedDict()
 
-    def attempt(self, user_id: str, now: float) -> None:
+    def attempt(self, user_id: str, now: float, *, limit: int = WRITES_PER_MINUTE) -> None:
         """Counts one write attempt in the minute ending `now`, or refuses it (the refused one is not counted)."""
         with self._lock:
             if len(self._hits) > _MAX_PRINCIPALS:
@@ -67,7 +67,7 @@ class Limits:
             hits = self._hits.setdefault(user_id, deque())
             while hits and hits[0] <= now - 60:
                 hits.popleft()
-            if len(hits) >= WRITES_PER_MINUTE:
+            if len(hits) >= limit:
                 wait = min(60, max(1, math.ceil(hits[0] + 60 - now)))
                 raise Refusal(429, "rate_limited", headers={"Retry-After": str(wait)}, code="rate_limited")
             hits.append(now)
