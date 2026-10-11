@@ -16,7 +16,7 @@ parts are screened: DTD/entities, external references and active content are ref
 Limits additionally cap XML at 20,000 nodes and depth 64 per part, and returned text
 at 1 Mi characters. Embedded objects and binary parts are conservatively refused.
 It does not render page numbers, recover layout, interpret fields, execute content,
-or read images. PPTX remains for a subsequent slice. Generic ZIP leaf
+or read images. Generic ZIP leaf
 bytes remain inert and unscreened; use a document parser before offering them as text.
 No route, archive persistence, consent, scope or KnowledgeItem schema is added here.
 Callers must apply content screening before offering any returned bytes to a model.
@@ -37,3 +37,10 @@ use the same bounded Office screening as DOCX; external-link parts are refused.
 Invalid/duplicate cell references, unknown cell types and missing shared-string
 indices are refused. The entry cap also bounds emitted cells; text caps apply to
 resolved output. Numeric, boolean, date and error values preserve stored text.
+
+`parse_pptx` reads DrawingML paragraphs from slide parts, including table cells,
+with `ppt/slides/slideN.xml#pN` provenance and explicit line breaks. Stored part
+order is preserved; labels are package parts, not presentation display positions.
+All XML parts use the same Office screening; text and paragraph caps apply,
+including empty paragraphs. Notes, layouts, images and animation are not read;
+no fields or links are evaluated. Text remains untrusted data requiring screening.
