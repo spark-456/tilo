@@ -174,6 +174,23 @@ def test_FR_MTG_09_worker_uses_guest_and_cleans_capture_files(monkeypatch, fail)
     assert not cfg.out_dir.parent.exists()
 
 
+def test_FR_MTG_09_capture_log_boundary_restores_state_and_catches_lazy_loggers(caplog):
+    import logging
+
+    from bot.cloud_worker import quiet_capture
+
+    logger = logging.getLogger("bot.session")
+    original = logger.disabled
+    with caplog.at_level(logging.WARNING):
+        with pytest.raises(RuntimeError), quiet_capture():
+            logger.warning("private existing participant")
+            logging.getLogger("tilo_providers.lazy_capture_test").warning("private lazy participant")
+            raise RuntimeError("capture failed")
+        assert logger.disabled == original
+        logger.warning("operational after cleanup")
+    assert [record.message for record in caplog.records] == ["operational after cleanup"]
+
+
 def test_FR_MTG_09_disconnected_caller_cancels_and_awaits_browser_cleanup():
     from bot.cloud_run import attend_while_connected
 

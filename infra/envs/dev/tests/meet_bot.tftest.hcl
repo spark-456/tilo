@@ -42,7 +42,7 @@ run "FR_MTG_09_guest_service_is_api_only_bounded_and_keyless" {
   }
   assert {
     condition = toset(output.cloud_run_services["meet-bot"].invokers) == toset([
-      "serviceAccount:${output.service_accounts["api"]}"
+      "serviceAccount:${output.cloud_run_services["api"].service_account_email}"
     ])
     error_message = "Only tilo-api may invoke the bot."
   }
@@ -50,7 +50,7 @@ run "FR_MTG_09_guest_service_is_api_only_bounded_and_keyless" {
     condition = alltrue([
       for binding in output.project_iam_bindings :
       contains(["projects/tilo-dev-test/roles/tiloVertexGenerate", "roles/serviceusage.serviceUsageConsumer"], binding.role)
-      if binding.member == "serviceAccount:${output.service_accounts["meet-bot"]}"
+      if binding.member == "serviceAccount:${output.cloud_run_services["meet-bot"].service_account_email}"
     ]) && output.service_account_key_count == 0
     error_message = "The guest bot holds no data, OAuth KMS or broad project role, and no service account key."
   }

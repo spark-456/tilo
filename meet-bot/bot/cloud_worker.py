@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import re
+from contextlib import contextmanager
 from dataclasses import replace
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -44,13 +45,40 @@ def transcript_from_items(meeting_id: str, items) -> dict:
     return Transcript(v="1.0", meeting_id=meeting_id, utterances=utterances).model_dump(mode="json")
 
 
-async def attend_meeting(meeting_id: str, join_url: str) -> dict:
+@contextmanager
+def quiet_capture():
     # Cloud logs are operational only. Session modules can log untrusted participant text at any level.
-    for name in logging.root.manager.loggerDict:
-        if name.startswith(("bot.", "tilo_providers")):
-            logging.getLogger(name).disabled = True
+    loggers = [
+        logging.getLogger(name)
+        for name in list(logging.root.manager.loggerDict)
+        if name.startswith(("bot.", "tilo_providers"))
+    ]
+    states = [(logger, logger.disabled) for logger in loggers]
+
+    class ContentFilter(logging.Filter):
+        def filter(self, record):
+            return not record.name.startswith(("bot.", "tilo_providers"))
+
+    boundary = ContentFilter()
+    handlers = set(logging.root.handlers)
+    for logger in loggers:
+        handlers.update(logger.handlers)
+    for handler in handlers:
+        handler.addFilter(boundary)
+    for logger, _ in states:
+        logger.disabled = True
+    try:
+        yield
+    finally:
+        for handler in handlers:
+            handler.removeFilter(boundary)
+        for logger, disabled in states:
+            logger.disabled = disabled
+
+
+async def attend_meeting(meeting_id: str, join_url: str) -> dict:
     reset_call_counter()
-    with TemporaryDirectory(prefix="tilo-meet-") as directory:
+    with quiet_capture(), TemporaryDirectory(prefix="tilo-meet-") as directory:
         root = Path(directory)
         agenda = root / "agenda.md"
         agenda.write_text("# Meeting\n\nDuration: 45 min\n\n1. Discussion and decisions (45 min)\n", encoding="utf-8")

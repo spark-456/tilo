@@ -194,7 +194,7 @@ class LiveSession:
         if self.fast is None:
             return
         try:
-            self._prewarm_task = asyncio.get_running_loop().create_task(self.fast.prewarm())
+            self._preparation_task = asyncio.get_running_loop().create_task(self.fast.prewarm())
         except RuntimeError:  # no running loop (offline tools): nothing to warm
             pass
 
@@ -844,7 +844,7 @@ class LiveSession:
     async def _shutdown(self) -> None:
         pending = [
             task
-            for name in ("_out_task", "_speech_task", "_speech_waiter", "_prewarm_task")
+            for name in ("_out_task", "_speech_task", "_speech_waiter", "_preparation_task")
             if (task := getattr(self, name, None)) is not None
         ]
         for task in pending:
