@@ -119,12 +119,16 @@ async def _read(request: Request, principal: deps.Principal, config: AssistantCo
 
 
 def _archive_opener(request: Request) -> Callable[..., RunArchive]:
-    """`deps.get_run_archive` refuses with NotImplementedError until the raw archive is wired: answer 503."""
+    """`deps.get_run_archive` refuses with NotImplementedError until the raw archive is wired: answer 503; a door
+    whose client could not be built (`RunStoreUnavailable`) is 503 `store_unavailable`."""
     provider = request.app.dependency_overrides.get(deps.get_run_archive, deps.get_run_archive)
     try:
         return provider()
-    except NotImplementedError:
-        raise HTTPException(status_code=503, detail="not_configured") from None
+    except NotImplementedError as exc:
+        from tilo_api.run_stores import RunStoreUnavailable  # noqa: PLC0415 - builds nothing on import
+
+        detail = "store_unavailable" if isinstance(exc, RunStoreUnavailable) else "not_configured"
+        raise HTTPException(status_code=503, detail=detail) from None
 
 
 def _part(
