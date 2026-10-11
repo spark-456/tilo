@@ -12,6 +12,9 @@
 !/packages/providers/
 /packages/providers/*
 !/packages/providers/src/
+!/packages/redact/
+/packages/redact/*
+!/packages/redact/src/
 !/services/
 /services/*
 !/services/connectors/

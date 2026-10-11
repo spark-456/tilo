@@ -1,6 +1,20 @@
 steps:
   - name: gcr.io/cloud-builders/docker
     args: [build, -f, meet-bot/docker/CloudRun.Dockerfile, -t, '${_BOT_IMAGE}', .]
+  - name: gcr.io/cloud-builders/docker
+    entrypoint: bash
+    args:
+      - -c
+      - |
+        set -euo pipefail
+        container="tilo-bot-smoke-$BUILD_ID"
+        trap 'docker rm -f "$$container" >/dev/null 2>&1 || true' EXIT
+        docker run -d --name "$$container" --cpus=2 --memory=4g --pids-limit=512 '${_BOT_IMAGE}'
+        for attempt in $$(seq 1 30); do
+          if docker exec "$$container" python3 -c "import urllib.request; assert urllib.request.urlopen('http://127.0.0.1:8080/health',timeout=2).status == 200" >/dev/null 2>&1; then break; fi
+          sleep 1
+        done
+        docker exec -e XDG_RUNTIME_DIR=/tmp/runtime-pwuser -e PULSE_SERVER=unix:/tmp/runtime-pwuser/pulse/native "$$container" python3 /cloud_smoke.py
 images: ['${_BOT_IMAGE}']
 timeout: 1200s
 serviceAccount: projects/$PROJECT_ID/serviceAccounts/tilo-cloudbuild@$PROJECT_ID.iam.gserviceaccount.com

@@ -193,6 +193,9 @@ class LiveSession:
         """Open the model connection because a question is likely (rate limited inside FastLLM)."""
         if self.fast is None:
             return
+        pending = getattr(self, "_preparation_task", None)
+        if pending is not None and not pending.done():
+            return
         try:
             self._preparation_task = asyncio.get_running_loop().create_task(self.fast.prewarm())
         except RuntimeError:  # no running loop (offline tools): nothing to warm
