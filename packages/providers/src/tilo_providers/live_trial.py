@@ -16,6 +16,7 @@ import re
 import time
 from collections.abc import Callable
 from contextlib import asynccontextmanager
+from datetime import date
 from pathlib import Path
 from typing import Any, Literal
 
@@ -34,6 +35,12 @@ class TrialConfig(BaseModel):
     timeout_s: float = Field(gt=0, le=20)
     max_audio_bytes: int = Field(gt=0, le=1_440_000)
     max_output_tokens: int = Field(gt=0, le=512)
+    price_status: Literal["unset", "set"] = "unset"
+    input_usd_per_million: float | None = Field(default=None, ge=0, allow_inf_nan=False)
+    output_usd_per_million: float | None = Field(default=None, ge=0, allow_inf_nan=False)
+    price_source: str | None = None
+    price_region: str | None = None
+    price_date: date | None = None
 
 
 class TrialResult(BaseModel):
@@ -63,6 +70,17 @@ async def _google_session(config: TrialConfig):
         raise NotConfigured("The synthetic trial requires the user's LIVE switch")
     project, location = os.environ.get("GOOGLE_CLOUD_PROJECT", ""), os.environ.get("GOOGLE_LOCATION", "")
     validate_google_settings(project, location)
+    if (
+        config.price_status != "set"
+        or config.input_usd_per_million is None
+        or config.output_usd_per_million is None
+        or not config.price_source
+        or not config.price_source.startswith("https://")
+        or config.price_region != location
+        or config.price_date is None
+        or not 0 <= (date.today() - config.price_date).days <= 30
+    ):
+        raise NotConfigured("PL-06: approve a current regional text-input/audio-output trial price quote first")
     from google import genai  # dev replay never imports or constructs the SDK client
     from google.genai import types
 

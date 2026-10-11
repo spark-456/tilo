@@ -6,3 +6,12 @@ prompt: Say ready in one short spoken sentence.
 timeout_s: 20
 max_audio_bytes: 1440000 # 30 seconds of 24kHz mono s16le
 max_output_tokens: 256
+# PL-06: the experimental Live quote is separate from the Chirp character price.
+# The user supplies and approves the current regional text-input / native-audio-output rates.
+# Until then even LIVE=1 refuses before constructing an SDK client.
+price_status: unset
+input_usd_per_million: null
+output_usd_per_million: null
+price_source: null
+price_region: null
+price_date: null

@@ -72,6 +72,18 @@ def test_FR_MTG_16_recording_requires_users_live_switch_before_client_build(tmp_
     assert not list(tmp_path.iterdir())
 
 
+def test_FR_MTG_16_unpriced_live_trial_refuses_before_sdk_client(tmp_path, monkeypatch):
+    from google import genai
+
+    monkeypatch.setenv("LIVE", "1")
+    monkeypatch.setenv("GOOGLE_CLOUD_PROJECT", "tilo-dev-test")
+    monkeypatch.setenv("GOOGLE_LOCATION", "asia-southeast1")
+    monkeypatch.setattr(genai, "Client", lambda **kwargs: pytest.fail("unpriced SDK client"))
+    with pytest.raises(NotConfigured, match="price quote"):
+        asyncio.run(run_trial(settings(), tmp_path, record=True))
+    assert not list(tmp_path.iterdir())
+
+
 @pytest.mark.parametrize("reply", [message(audio=b"x" * 66), message(audio=b"x"), message(audio=b"")])
 def test_FR_MTG_16_invalid_or_over_cap_audio_closes_without_recording(tmp_path, reply):
     session = Session([reply])
