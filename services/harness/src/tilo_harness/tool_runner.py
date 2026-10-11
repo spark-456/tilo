@@ -33,17 +33,19 @@ import asyncio
 import dataclasses
 import math
 import time
-from collections.abc import Callable, Iterable, Mapping, Sequence
+from collections.abc import Awaitable, Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Literal
 
 import jsonschema
 from tilo_providers.clock import Clock, real_today
 from tilo_providers.interfaces import GenerateRequest, GenerateResponse, ModelProvider, SafetyProvider
+from tilo_providers.media import MediaPart, check_parts
 from tilo_providers.prompts import load_prompt
 
 from tilo_harness.deliverable import DeliverableRefused, render_output, wants_pdf
 from tilo_harness.outputs import UnitOutput
+from tilo_harness.quiz import SourceLoader, quiz_output, wants_quiz
 from tilo_harness.tools import (
     CachedCall,
     MemoryToolCache,
@@ -106,6 +108,7 @@ class _Loop:
     step: int = 0
     shown: int = 0  # characters of results shown so far
     capped: bool = False  # RESULTS_TOTAL_CAP is spent: no more blocks
+    parts: list[MediaPart] = dataclasses.field(default_factory=list)
     blocks: list[str] = dataclasses.field(default_factory=list)
     calls: list[ToolCallRecord] = dataclasses.field(default_factory=list)
 
@@ -129,6 +132,8 @@ class ToolUnitRunner:
         clock: Callable[[], float] = time.monotonic,
         scope: str = "",
         today: Clock = real_today,
+        quiz_sources: SourceLoader | None = None,
+        report_renderer: Callable[[str], Awaitable[UnitOutput]] | None = None,
     ) -> None:
         if tools and safety is None:
             raise ValueError("LW-07: a runner with tools needs a SafetyProvider; every tool result is screened")
@@ -143,6 +148,8 @@ class ToolUnitRunner:
         self._options = request_options or {}
         self._clock = clock
         self._today = today
+        self._quiz_sources = quiz_sources
+        self._report_renderer = report_renderer
         self._scope = scope  # org/world/run: part of every cache key, so a hit is always this run's own
 
     async def run(self, unit: Mapping[str, Any], context: UnitContext) -> UnitOutcome:
@@ -168,6 +175,12 @@ class ToolUnitRunner:
                 **request_variables(context.brief, context.intake_answers, today=self._today()),
             },
         )
+        if wants_quiz(unit, context.brief):
+            base += (
+                "\nReturn only a quiz AppSpec JSON object (v=1.0, kind=quiz, title, theme, timer, questions). "
+                "Every question has id, stem, options keyed a..f, answer and source.artifact plus PDF page. "
+                "Use only the recorded source refs in the inputs; no code, HTML or URLs.\n"
+            )
         stop: Stop = "step_cap"
         while loop.step < self._max_steps:
             if loop.credits >= self._credit_cap:
@@ -184,8 +197,14 @@ class ToolUnitRunner:
                     return self._finish(UnitOutcome(False, f"No result for {unit['title']}."), loop, "no_text")
                 try:  # LW-10: a PDF deliver unit's reply is a DeliverableSpec, rendered here; any flaw fails the unit
                     output = (
-                        await asyncio.to_thread(render_output, response.text)
+                        (
+                            await self._report_renderer(response.text)
+                            if self._report_renderer is not None
+                            else await asyncio.to_thread(render_output, response.text)
+                        )
                         if wants_pdf(unit, context.brief)
+                        else await asyncio.to_thread(quiz_output, response.text, self._quiz_sources)
+                        if wants_quiz(unit, context.brief)
                         else UnitOutput(media_type="text/markdown", content=response.text.encode("utf-8"))
                     )
                 except DeliverableRefused as refused:
@@ -220,6 +239,10 @@ class ToolUnitRunner:
         self, role: str, base: str, allowed: Mapping[str, Tool], live: Mapping[str, Tool], loop: _Loop
     ) -> GenerateRequest:
         options = dict(self._options.get(role, {}))
+        parts = {part.sha256: part for part in (*(options.pop("parts", None) or ()), *loop.parts)}
+        check_parts(list(parts.values()))
+        if parts:
+            options["parts"] = list(parts.values())
         if not allowed:  # no tools for this unit: the prompt is the plain unit prompt
             return GenerateRequest(prompt=base, **options)
         listing = "\n".join(f"- {name}: {data_line(tool.description, 200)}" for name, tool in live.items())
@@ -298,6 +321,7 @@ class ToolUnitRunner:
         cache_key = args_hash(self._scope, {"key": key})
         hit = self._cache.get(cache_key)
         if hit is not None:
+            self._add_parts(loop, hit.parts)
             shown = hit.text or DROPPED
             self._note(
                 loop, tool.name, shown, dataclasses.replace(record, outcome="cached", archive_ref=hit.archive_ref)
@@ -311,16 +335,41 @@ class ToolUnitRunner:
             )
             return
         await self._shown(
-            loop, tool, args, cache_key, record, result.content, _credits(result.credits), started, cache=True
+            loop,
+            tool,
+            args,
+            cache_key,
+            record,
+            result.content,
+            _credits(result.credits),
+            started,
+            cache=True,
+            parts=result.parts,
         )
 
     async def _shown(
         self, loop: _Loop, tool: Tool, args: dict[str, Any], key: str, record: ToolCallRecord,
-        raw: str, credits: float, started: float, *, cache: bool, ok: Outcome = "ok",
+        raw: str, credits: float, started: float, *, cache: bool, ok: Outcome = "ok", parts: tuple[MediaPart, ...] = (),
     ) -> None:  # fmt: skip
         """Screen, archive and cache one result, then add it to the data the model sees."""
         text = neutralise(str(raw), limit=RESULT_CAP)
         flagged = await self._flagged(text)
+        if parts:
+            loop.tainted = True
+            try:
+                check_parts([*loop.parts, *parts])
+                for part in parts:
+                    assert self._safety is not None
+                    verdict = await asyncio.to_thread(
+                        self._safety.check, "", content=part.data, mime_type=part.mime_type
+                    )
+                    if verdict.get("flagged") is not False:
+                        flagged = True
+            except Exception:
+                flagged = True
+        # Native bytes require a recorded source before reaching a model.
+        if parts and self._archive is None:
+            flagged = True
         ref: str | None = None
         try:
             if self._archive is not None:
@@ -331,6 +380,7 @@ class ToolUnitRunner:
                         "args_hash": record.args_hash,
                         "flagged": flagged,
                         "content": str(raw)[:ARCHIVE_CAP],
+                        **({"parts": [p.model_dump() for p in parts]} if parts else {}),
                     }
                 )
         except Exception:
@@ -341,12 +391,22 @@ class ToolUnitRunner:
         shown = None if flagged else text
         outcome: Outcome = "dropped" if flagged else ok
         if cache:
-            self._cache.put(key, CachedCall(shown, outcome, ref))
+            self._cache.put(key, CachedCall(shown, outcome, ref, () if flagged else parts))
+        if not flagged:
+            self._add_parts(loop, parts)
         loop.credits += credits
         done = dataclasses.replace(
             record, outcome=outcome, credits=credits, latency_ms=self._ms(started), archive_ref=ref
         )
         self._note(loop, tool.name, shown or DROPPED, done)
+
+    @staticmethod
+    def _add_parts(loop: _Loop, parts: Sequence[MediaPart]) -> None:
+        seen = {part.sha256 for part in loop.parts}
+        for part in parts:
+            if part.sha256 not in seen:
+                loop.parts.append(part)
+                seen.add(part.sha256)
 
     async def _flagged(self, text: str) -> bool:
         """True unless the screen answers `flagged: False` (a failure or odd verdict is flagged: fail closed)."""
