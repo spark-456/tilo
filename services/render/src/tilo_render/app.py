@@ -38,7 +38,7 @@ except ImportError:
 
 log = logging.getLogger("tilo_render")
 MAX_BODY_BYTES = 1024 * 1024  # 1 MiB request payload cap before JSON parsing
-MAX_OUTPUT_BYTES = 20 * 1024 * 1024  # 20 MiB rendered file cap (matches tilo_harness.outputs.MAX_PDF)
+MAX_OUTPUT_BYTES = 20 * 1024 * 1024  # 20 MiB rendered file cap (matches the writer output cap)
 DEFAULT_RENDER_TIMEOUT = 15.0
 DEFAULT_MAX_CONCURRENCY = 2
 _CONTENT_LENGTH_RE = re.compile(r"^[0-9]+$")
