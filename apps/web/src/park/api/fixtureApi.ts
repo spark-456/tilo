@@ -3,7 +3,7 @@
 // instance's own `dec`; started worlds are counted per instance. Writes are acknowledged, nothing more.
 import * as fx from "./fixtures";
 import type { Api } from "./index";
-import type { Ack, ApiResult, Dec, DecisionKey, QuickReply, TierKey } from "./types";
+import type { Ack, Agenda, ApiResult, Dec, DecisionKey, QuickReply, TierKey } from "./types";
 
 /** The fixture's Quick answer: plainly a sample, with no cost (nothing was spent). */
 export const SAMPLE_QUICK =
@@ -13,7 +13,8 @@ const ok = <T>(data: T): Promise<ApiResult<T>> =>
   Promise.resolve({ data: structuredClone(data), source: "fixture" });
 const ack = (): Promise<ApiResult<Ack>> => ok({ ok: true });
 
-export function createFixtureApi(): Omit<Api, "getProfileSettings"> & {
+export function createFixtureApi(): Omit<Api, "getAgenda" | "getProfileSettings"> & {
+  getAgenda(): Promise<ApiResult<Agenda>>;
   getProfileSettings(): Promise<ApiResult<typeof fx.profileSettings>>;
 } {
   let dec: Dec = {};

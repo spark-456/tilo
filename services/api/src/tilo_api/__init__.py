@@ -67,6 +67,11 @@ async def _lifespan(_: FastAPI) -> AsyncIterator[None]:
     await run_in_threadpool(_durable_store.close_deployed)  # SIGTERM: the writers release their leases (ADR-0026 4)
 
 
+# The two Firebase Hosting origins of the tilo-dev web app (BQ-SIGNIN-7, CL-REACH): exact strings, never a wildcard,
+# a suffix match or `allow_origin_regex`. Not credentialed: the API reads a bearer token, no cookie.
+PRODUCTION_ORIGINS = _cors.PRODUCTION_ORIGINS
+
+
 app = FastAPI(title="tilo-api", lifespan=_lifespan, **_DOCS)
 app.add_middleware(_LogRunId)  # NFR-26: innermost, so the world is looked up only for a request the gate admitted
 app.add_middleware(_AccessGate)  # SEC-15: deployed, every non-public route needs a stored judge declaration

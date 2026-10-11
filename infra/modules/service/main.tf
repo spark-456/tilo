@@ -66,9 +66,11 @@ resource "google_cloud_run_v2_service" "this" {
       image = each.value.image
 
       resources {
-        # Request-based CPU billing: CPU is only allocated while a request
-        # is being processed (PRD 6.6 lean infrastructure).
-        cpu_idle = true
+        # Request-based CPU billing by default: CPU is only allocated while a
+        # request is being processed (PRD 6.6 lean infrastructure). An entry
+        # sets cpu_idle = false only where background work needs CPU between
+        # requests (tilo-api, ADR-0026).
+        cpu_idle = each.value.cpu_idle
 
         limits = {
           cpu    = each.value.cpu
@@ -132,9 +134,9 @@ resource "google_cloud_run_v2_service" "env_ignored" {
       image = each.value.image
 
       resources {
-        # Request-based CPU billing: CPU is only allocated while a request
-        # is being processed (PRD 6.6 lean infrastructure).
-        cpu_idle = true
+        # Request-based CPU billing unless the entry says otherwise (tilo-api
+        # with var.api_durable_stores, ADR-0026); PRD 6.6 lean infrastructure.
+        cpu_idle = each.value.cpu_idle
 
         limits = {
           cpu    = each.value.cpu

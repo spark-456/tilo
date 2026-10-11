@@ -415,18 +415,39 @@ export interface Agenda {
 }
 export type AgendaSlot = Agenda["slots"][number];
 
+export interface AgendaPlateRow {
+  ref: { kind: string; id: string };
+  title: string | null;
+  due: string | null;
+  at: string | null;
+  from: string | null;
+  group: string;
+}
+/** The plate supplies summaries, not a week, event duration, attendees or board ownership. */
+export type LiveAgenda = { [K in keyof Required<Agenda>]: null } & {
+  plate: {
+    today: string;
+    asOf: string;
+    rows: AgendaPlateRow[];
+    parked: AgendaPlateRow[];
+    truncated: boolean;
+  };
+};
+export type AgendaData = Agenda | LiveAgenda;
+
 // Team, connectors, notifications
 export interface Team {
   people: {
     id: string;
     name: string;
-    email: string;
-    dept: string;
-    role: string;
-    active: string;
+    email: string | null;
+    dept: string | null;
+    role: string | null;
+    active: string | null;
     you?: boolean;
     limit?: string;
-    c: string;
+    c: string | null;
+    memberships?: string[] | null;
   }[];
   rules: [string, string, string, boolean][];
   matrix: [string, number][];
@@ -434,6 +455,8 @@ export interface Team {
   coverage: { id: string; what: string; who: string[]; wait: string; slow?: boolean }[];
 }
 export interface Connector {
+  /** Live list metadata: OAuth scopes are not the demo's agent access levels. */
+  live?: { stateKnown: boolean; scopes: string[] };
   id: string;
   name: string;
   cat: string;
@@ -547,4 +570,15 @@ export interface ProfileSettings {
   plan: PlanInfo | null;
   notifications: NotificationRow[];
   quiet: QuietHours;
+}
+/** FR-AGT-15: fields supplied by the proposal route. */
+export interface SkillProposal {
+  id: string;
+  skill_id: string;
+  domain: string;
+  status: "proposed" | "approved" | "rejected";
+  from_version: string;
+  to_version: string;
+  diff: string;
+  provenance: { world_id: string; proposed_by: string; proposed_at: string };
 }
