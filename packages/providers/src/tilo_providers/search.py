@@ -157,8 +157,10 @@ class SearchRecordReplayProvider(SearchProvider):
         live_factory: Callable[[], SearchProvider],
         fixtures_dir: Path | str,
         live_permitted: bool = False,
+        force_replay: bool = False,
     ) -> None:
         self._profile_id, self._live_factory, self._live_permitted = profile_id, live_factory, live_permitted
+        self._force_replay = force_replay
         self._live_provider: SearchProvider | None = None
         self._dir = Path(fixtures_dir) / "search-recordings"
 
@@ -166,7 +168,7 @@ class SearchRecordReplayProvider(SearchProvider):
         request = prepare_search(query, kwargs)  # before the lookup, replay or live
         key = search_recording_key(self._profile_id, request.query, request.max_output_tokens)
         path = self._dir / f"{key}.json"
-        if self._live_permitted or is_live_mode():  # SEC-15: permission is injected, never read from the environment
+        if not self._force_replay and (self._live_permitted or is_live_mode()):
             if self._live_provider is None:
                 self._live_provider = self._live_factory()
             result = self._live_provider.search(request.query, **kwargs)
@@ -209,6 +211,7 @@ def build_search_provider(
     fixtures_dir: Path | str,
     profile_id: str | None = None,
     live_permitted: bool = False,
+    force_replay: bool = False,
 ) -> SearchProvider:
     """`fake` gives the fake; `google` gives record-and-replay whose live adapter (Gemini grounding) is built lazily,
     only when a call goes live; a profile without `grounding` or any other adapter is refused (a search answered from
@@ -231,4 +234,6 @@ def build_search_provider(
         location = os.environ.get("GOOGLE_LOCATION", "global")  # PRD 6.5; the price region is checked at load
         return GoogleSearchProvider(profile, profile_id, project, location, live_permitted=live_permitted)
 
-    return SearchRecordReplayProvider(profile_id, live_factory, fixtures_dir, live_permitted=live_permitted)
+    return SearchRecordReplayProvider(
+        profile_id, live_factory, fixtures_dir, live_permitted=live_permitted, force_replay=force_replay
+    )

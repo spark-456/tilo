@@ -460,6 +460,7 @@ class Router:
             fixtures_dir=self._fixtures_dir,
             profile_id=profile_id,
             live_permitted=self._live_permitted,
+            force_replay=self._force_replay,
         )
 
     def _search_quote(self, run: RouterResult, profile_id: str, query: str, out: int, reserve: int) -> float:
