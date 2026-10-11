@@ -40,10 +40,10 @@ from tilo_providers.search import (
     search_recording_key,
 )
 
-from .web_replay import SANDBOX_HOST, FixtureWeb, ScriptedModel
+from .web_replay import SANDBOX_HOST, FixtureSendTool, FixtureWeb, ScriptedModel
 
 REPO = Path(__file__).resolve().parents[3]
-FIXTURES = REPO / "fixtures/liveweb-complete"
+FIXTURES = REPO / "evals/fixtures/liveweb-complete"
 WORLD, RUN, OWNER = "w_liveweb", "r_gate_1", "u_gate_owner"
 QUERY = "Northbridge fictional past paper and answer key"
 NOW = datetime(2026, 10, 11, tzinfo=UTC)
@@ -164,13 +164,17 @@ def _id(*parts):
 
 async def _run(web: FixtureWeb, seed: bool) -> dict[str, Any]:
     scope = Scope(deps.ORG_ID, WORLD, OWNER)
-    archive = RunArchive(
-        LocalDirStore(web.root), org_id=scope.org_id, run_id=RUN, redactor=lambda data: data, clock=lambda: NOW
-    )
+
+    def open_archive():
+        return RunArchive(
+            LocalDirStore(web.root), org_id=scope.org_id, run_id=RUN, redactor=lambda data: data, clock=lambda: NOW
+        )
+
+    archive = open_archive()
     counter = iter(range(1, 20))
 
     def archived(_scope, ref):
-        for record in archive.records():
+        for record in open_archive().records():
             if f"{RUN}/{record['seq']}" == ref:
                 return json.dumps(record["payload"])
         return None
@@ -199,17 +203,33 @@ async def _run(web: FixtureWeb, seed: bool) -> dict[str, Any]:
     urls = [f"https://{SANDBOX_HOST}/papers/{path}" for path in ("paper-1.pdf", "answer-key.pdf", "wrong-magic.pdf")]
     specialist = RecordedModel(
         "specialist",
-        [[("web_search", {"query": QUERY})], [("fetch_url", {"url": url}) for url in urls], "Sources read."],
+        [
+            [("web_search", {"query": QUERY})],
+            [("fetch_url", {"url": url}) for url in urls],
+            [("send_email", {"to": "fixture@example.test"})],
+            "Sources read.",
+        ],
         seed,
     )
     skill = LoadedSkill(
-        "web-research", "1.0.0", "Find and cite the papers.", "0" * 64, tools_allowed=("web_search", "fetch_url")
+        "web-research",
+        "1.0.0",
+        "Find and cite the papers.",
+        "0" * 64,
+        tools_allowed=("web_search", "fetch_url", "send_email"),
     )
+    outbox = []
+
+    def effect_gate(unit, tool, args):
+        outbox.append((unit, tool, args))
+        return "fixture-queued"
+
     runner = ToolUnitRunner(
         {"specialist": specialist},
-        tools=ToolRegistry([search, fetch]),
+        tools=ToolRegistry([search, fetch, FixtureSendTool()]),
         safety=FakeSafetyProvider(),
         archive=MemoryToolArchive(),
+        effect_gate=effect_gate,
         today=lambda: date(2026, 10, 11),
     )
     research = await runner.run_unit(
@@ -217,6 +237,10 @@ async def _run(web: FixtureWeb, seed: bool) -> dict[str, Any]:
         UnitContext("A_s1", (skill,)),
     )
     assert research.outcome.success
+    assert len(research.calls) == 5 and all(c.outcome == "ok" for c in research.calls[:4]), research.calls
+    assert research.calls[-1].tool == "send_email" and research.calls[-1].outcome == "refused"
+    assert not outbox
+    archive = open_archive()
     load = source_loader(artifacts, scope, state.events[WORLD])
     quiz: dict[str, Any] = {
         "v": "1.0",
@@ -360,6 +384,7 @@ async def _run(web: FixtureWeb, seed: bool) -> dict[str, Any]:
         denied = client.get(f"/worlds/{WORLD}/apps/{kept[1].artifact_id}")
     facts = {
         "search_outcome": research.calls[0].outcome,
+        "side_effect_refused": research.calls[-1].outcome == "refused" and not outbox,
         "native_types": [p.mime_type for p in native],
         "native_bytes_match_archive": all(artifacts.read(scope, v.ref) == part.data for v, part in fetch.files),
         "report_cites_fetched_urls": set(urls) == {r["payload"]["source"]["ref"] for r in archive.records()},
@@ -377,7 +402,9 @@ async def _run(web: FixtureWeb, seed: bool) -> dict[str, Any]:
             "publisher": served.json()["publishers"],
         },
         "app_events": [e["type"] for e in state.events[WORLD] if e["type"].startswith("app.")],
-        "verifier_received_pdf": verifier.requests[0].parts[0].sha256 == native[0].sha256,
+        "verifier_received_pdf": bool(
+            verifier.requests[0].parts and verifier.requests[0].parts[0].sha256 == native[0].sha256
+        ),
         "credits": 0,
     }
     writer.reopen()

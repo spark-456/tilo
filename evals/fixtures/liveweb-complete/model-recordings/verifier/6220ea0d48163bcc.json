@@ -1,0 +1,9 @@
+{
+  "key": "6220ea0d48163bcc",
+  "profile": "fixture",
+  "response": {
+    "profile_id": "scripted",
+    "text": "{\"confirmed\":true}"
+  },
+  "role": "verifier"
+}
