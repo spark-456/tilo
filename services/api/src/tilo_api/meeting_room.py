@@ -8,22 +8,26 @@ missing room. `/changes` is slice 1b. Seams with no production backing (archive,
 
 from __future__ import annotations
 
+import dataclasses
 import json
 import logging
 import math
 import threading
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import JSONResponse
+from tilo_harness.untrusted import neutralise
+from tilo_metering import LedgerEntry
+from tilo_metering.prices import Usage
 from tilo_policy.schemas import conforms
 from tilo_providers.interfaces import SafetyProvider
 from tilo_providers.router import Router
 
-from tilo_api import deps, events, team_store
+from tilo_api import deps, events, spend, team_access, team_store
 from tilo_api.meeting_room_config import RoomConfig, RoomConfigError, load_room_config
 from tilo_api.meeting_room_reply import (
     FakeRoomModel,
@@ -32,6 +36,7 @@ from tilo_api.meeting_room_reply import (
     RoomModel,
     RoomModelUnavailable,
     RouterRoomModel,
+    _flagged,
     answer,
     ground,
     locate,
@@ -49,6 +54,7 @@ _WORLDS: dict[str, threading.Lock] = {}  # world id -> count-and-convene (open_r
 _LOCKS_GUARD = threading.Lock()
 _REPLIED = "events/data/meeting.replied.schema.json"
 _EPS = 1e-9
+NOT_FOUND = "That room or world was not found for this sign-in."  # the one 404 of every room route (MR-12)
 
 
 def _refuse(status: int, error: str, **more: Any) -> JSONResponse:
@@ -70,6 +76,7 @@ class Room:
     max_turns: int
     turns: list[dict] = field(default_factory=list)
     spent: float = 0.0
+    changes: list[str] = field(default_factory=list)  # proposal ids confirmed in this room (meeting.change_requested)
     state: str = "open"
     reason: str | None = None
     last_id: str = ""
@@ -112,6 +119,8 @@ def rebuild(stream: list[dict]) -> dict[str, Room]:
         elif e["type"] == "meeting.replied" and room.turns:
             room.turns[-1]["reply"] = {"from": e["actor"], "data": d}
             room.spent = math.fsum([room.spent, e["credits"]])
+        elif e["type"] == "meeting.change_requested":
+            room.changes.append(d["proposal_id"])
         elif e["type"] == "meeting.adjourned":
             room.state, room.reason = "adjourned", d["reason"]
         else:
@@ -152,6 +161,10 @@ def _lock_of(table: dict[str, threading.Lock], key: str) -> threading.Lock:
         return table.setdefault(key, threading.Lock())
 
 
+def _closing_id(room_id: str) -> str:
+    return events.stable_part_id(room_id, "adjourned")  # one closing per room, whoever writes it first (MR-05)
+
+
 def _drop_locks(room_id: str) -> None:
     with _LOCKS_GUARD:  # a closed room needs no locks; a late request makes a fresh one and finds it closed
         _LOCKS.pop(room_id, None)
@@ -161,14 +174,24 @@ def _drop_locks(room_id: str) -> None:
 def _adjourn_part(room: Room, reason: str) -> dict:
     actor = room.convener if reason == "person" else "system"
     data = {"reason": reason, "turns": len(room.turns), "credits_spent": room.spent}
-    return _part("meeting.adjourned", room, actor, room.lead, "The Meeting Hall meeting ended.", data)
+    part = _part("meeting.adjourned", room, actor, room.lead, "The Meeting Hall meeting ended.", data)
+    return {**part, "id": _closing_id(room.room_id)}
+
+
+def _closing_queued(store: deps.Store, world_id: str, room_id: str) -> bool:
+    return any(
+        isinstance(p, dict) and p.get("id") == _closing_id(room_id) for p in store.pending_events.get(world_id) or []
+    )  # a closing waiting in the dispatcher's queue is a closing
 
 
 def _adjourn(ctx: Ctx, room: Room, reason: str) -> None:
     """Closes the room once: re-reads it under the room's write lock, so no second adjourned and no reply after it."""
     with _lock_of(_WRITES, room.room_id):
         fresh = rebuild(ctx.stream()).get(room.room_id)
-        if fresh is not None and fresh.state == "open":
+        queued = _closing_queued(ctx.store, ctx.world_id, room.room_id)
+        if fresh is not None and fresh.state == "open" and queued:
+            room.reason = "paused"
+        elif fresh is not None and fresh.state == "open":
             _write(ctx.writer, fresh, _adjourn_part(fresh, reason))
             room.reason = reason
         else:
@@ -205,12 +228,6 @@ def get_room_config() -> RoomConfig:
 
 def get_room_model(router: Annotated[Router, Depends(deps.get_router)]) -> RoomModel:
     return RouterRoomModel(router, deps.providers_config())
-
-
-def get_room_user_cap() -> Callable[[str], float | None]:
-    """The convener's remaining per-user credits (SEC-16, lowered by their team role); None = no source wired, so the
-    room's own cap is the only limit (BQ-MROOM-A1-4)."""
-    return lambda user: None
 
 
 class _DevLines:
@@ -305,6 +322,9 @@ class Ctx:
 
 async def _body(request: Request) -> Any:
     """The JSON body, refused with 413 above 32 KiB BEFORE it is read (BQ-PPL11C-1: the people writes' reader)."""
+    sends = request.headers.get("content-length", "0") not in ("", "0") or "transfer-encoding" in request.headers
+    if sends and request.headers.get("content-type", "").split(";")[0].strip().lower() != "application/json":
+        raise HTTPException(status_code=415, detail="Send application/json.")  # the people rule: no form or text/plain
     raw = await _capped_body(request)
     try:
         return json.loads(raw) if raw else None
@@ -323,7 +343,7 @@ def get_ctx(
 ) -> Ctx:
     world = store.worlds.get(world_id)
     if principal.world_id != world_id or world is None:
-        raise HTTPException(status_code=404)  # the same 404 as an unknown world: no membership oracle
+        raise HTTPException(status_code=404, detail=NOT_FOUND)  # one message for unknown and not yours: no oracle
     return Ctx(request, principal, world, world_id, cfg, store, writer, now)
 
 
@@ -392,7 +412,7 @@ def _find(ctx: Ctx, room_id: str, *, convener_only: bool = False) -> Room:
     p, room = ctx.principal, rebuild(ctx.stream()).get(room_id)
     owner = p.role == "owner" and p.user_id == ctx.world.owner and not convener_only
     if room is None or not (owner or p.user_id == room.convener):
-        raise HTTPException(status_code=404)
+        raise HTTPException(status_code=404, detail=NOT_FOUND)
     return room
 
 
@@ -427,14 +447,11 @@ def convene(body: Annotated[Any, Depends(_body)], ctx: Annotated[Ctx, Depends(ge
         stream = ctx.stream()
         if sum(r.state == "open" for r in rebuild(stream).values()) >= ctx.cfg.open_rooms_per_world:
             return _refuse(409, "room_open")
-        left = _seam(ctx.request, get_room_user_cap)(p.user_id)
-        if left is not None and left <= 0:
-            return _refuse(429, "cap_reached")
         vis = (
             [] if rank == "director" else sorted(d for d in districts if d)
         )  # SEC-07: the Director's room fails closed
         done = any(e["type"] in ("world.completed", "world.failed") for e in stream)
-        cap = float(ctx.cfg.credit_cap if left is None else min(ctx.cfg.credit_cap, left))
+        cap = float(ctx.cfg.credit_cap)
         room = Room(
             events.new_part_id(), ctx.world_id, ctx.world.run_id, p.user_id, lead, list(agents), as_role, vis,
             district, cap, ctx.cfg.max_turns,
@@ -485,6 +502,8 @@ def ask(
     ctx: Annotated[Ctx, Depends(get_ctx)],
     model: Annotated[RoomModel, Depends(get_room_model)],
     safety: Annotated[SafetyProvider, Depends(deps.get_safety)],
+    work_mode: Annotated[deps.Mode, Depends(deps.get_work_mode)],
+    switches: Annotated[Any, Depends(deps.get_switches)],
 ) -> JSONResponse:
     room = _find(ctx, room_id, convener_only=True)
     if ctx.housekeep(room) == "access_lost":
@@ -502,7 +521,7 @@ def ask(
         room = rebuild(ctx.stream())[room_id]  # fresh, inside the lock
         if room.turns and room.turns[-1]["reply"] is None:
             return _refuse(409, "turn_in_flight")
-        return _turn(ctx, room, model, safety, body)
+        return _turn(ctx, room, model, safety, body, _Mode(work_mode, switches))
     finally:
         lock.release()
 
@@ -544,14 +563,118 @@ def _finish(ctx: Ctx, room: Room, asked: dict, to: str, turn: int, mode: str, re
     part = _part("meeting.replied", room, to, room.convener, summary, data, credits=reply.credits, cause=asked["id"])
     with _lock_of(_WRITES, room.room_id):
         fresh = rebuild(ctx.stream()).get(room.room_id)
-        if ctx.world.paused or fresh is None or fresh.state != "open":
+        if (
+            ctx.world.paused
+            or fresh is None
+            or fresh.state != "open"
+            or _closing_queued(ctx.store, ctx.world_id, room.room_id)
+        ):
             _drop_locks(room.room_id)
             return False
         _write(ctx.writer, room, {**part, "trace": trace} if trace else part)
     return True
 
 
-def _turn(ctx: Ctx, room: Room, model: RoomModel, safety: SafetyProvider, body: dict) -> JSONResponse:
+@dataclass
+class _Mode:
+    mode: str
+    switches: Any
+
+
+class _RoomLimit(Exception):
+    """The room's pseudo run has no unit left on the ledger (`run_minor`): answered 409 `room_limit`."""
+
+
+@dataclass
+class _Held:
+    """One model call's hold on the uid ledger (SEC-16): the guard, its plan and the unit it reserved."""
+
+    guard: spend.SpendGuard
+    plan: spend.UnitPlan
+    unit_minor: int
+    closed: bool = False
+
+
+def release(held: _Held | None, *, called: bool) -> None:
+    """Settles (a call reached a model) or aborts the hold, once; a second call does nothing."""
+    if held is None or held.closed:
+        return
+    held.closed = True
+    (held.guard.settle_unit(held.plan, held.unit_minor) if called else held.guard.abort_unit(held.plan))
+
+
+def plan_run(room_id: str) -> str:
+    return f"r_plan_{room_id}"  # revision planning: the confirmer's uid ledger, not the room's cap (6.2)
+
+
+def _hold(ctx: Ctx, room: Room, turn: int, how: _Mode, run: str | None = None) -> _Held | None:
+    """SEC-16, as `deps._spend_mode` and Quick do: live only, the uid cap lowered by the team limits (unreadable is 0),
+    one unit reserved on the room's pseudo run before the call. Raises what the run path raises (403 spend_cap_reached,
+    503 replay-only) before anything is written. Replay makes no paid call, so it holds nothing."""
+    if how.mode != "live":
+        return None
+    caps, uid = deps.caps_for(ctx.request), ctx.principal.user_id
+    if not (isinstance(how.switches, spend.Switches) and how.switches.ledger is not None and caps is not None):
+        raise deps.ReplayOnly
+    try:
+        cap = team_access.user_cap_minor(ctx.team(), uid, caps.uid_lifetime_minor)
+    except Exception as exc:
+        logger.warning("team limits unreadable, so the room call is denied: %s", type(exc).__name__)
+        cap = 0
+    if cap <= 0:
+        raise spend.SpendCapReached
+    guard = spend.SpendGuard(
+        how.switches.ledger,
+        how.switches.flags,
+        dataclasses.replace(caps, uid_lifetime_minor=min(cap, caps.uid_lifetime_minor)),
+    )
+    if guard.uid_capped(uid) or not guard.live_allowed(uid):  # the team-lowered cap is the guard's, not the ledger's
+        raise spend.SpendCapReached
+    plan = guard.begin_unit(
+        "live",
+        uid=uid,
+        run_id=run or room_run(room.room_id),
+        org_id=deps.ORG_ID,
+        estimate_minor=caps.unit_reserve_minor,
+        at=datetime.now(UTC),
+    )
+    if plan.reservation is None:
+        if plan.reason == "run":  # the room's pseudo run is full: the room's own limit, not a replay-only switch
+            raise _RoomLimit
+        raise spend.SpendCapReached if plan.reason == "uid_lifetime" else deps.ReplayOnly
+    return _Held(guard, plan, caps.unit_reserve_minor)
+
+
+def room_run(room_id: str) -> str:
+    return f"r_room_{room_id}"  # the room's own pseudo run on the ledger: the run's budget pays for none of it
+
+
+def _charge(ctx: Ctx, room: Room, turn: int, held: _Held | None, reply: Reply) -> None:
+    """Settles the hold and writes one ledger row, with the credits actually spent (also after an error)."""
+    called = reply.credits > 0 or reply.trace is not None
+    if held is not None:
+        (held.guard.settle_unit(held.plan, held.unit_minor) if called else held.guard.abort_unit(held.plan))
+    writer = deps.ledger_writer_for(ctx.request)
+    if writer is None or reply.credits <= 0:
+        return
+    t = reply.trace or {}
+    ok = (
+        isinstance(t.get("profile"), str)
+        and isinstance(t.get("tokens_in"), int)
+        and isinstance(t.get("tokens_out"), int)
+    )
+    usage = Usage(t["profile"], max(t["tokens_in"], 0), max(t["tokens_out"], 0)) if ok else None
+    entry = LedgerEntry(
+        "commit", room_run(room.room_id), ctx.principal.user_id, deps.ORG_ID, datetime.now(UTC),
+        step=f"turn_{turn}", credits=float(reply.credits), usage=usage,
+    )  # fmt: skip
+    try:
+        writer.append(entry)
+    except Exception as exc:
+        logger.warning("room ledger write failed: %s", type(exc).__name__)
+
+
+def _turn(ctx: Ctx, room: Room, model: RoomModel, safety: SafetyProvider, body: dict, how: _Mode) -> JSONResponse:
     stream, to, mode = ctx.stream(), body["to"], body["mode"]
     try:
         quote = model.quote(mode)
@@ -568,19 +691,32 @@ def _turn(ctx: Ctx, room: Room, model: RoomModel, safety: SafetyProvider, body: 
     archive = _seam(ctx.request, deps.get_run_archive)(org_id=deps.ORG_ID, run_id=room.run_id)
     turn = len(room.turns) + 1
     try:
+        held = _hold(ctx, room, turn, how)
+    except _RoomLimit:
+        return _refuse(409, "room_limit")
+    try:
         ref = archive.append(
             "channel_in", {"room_id": room.room_id, "turn": turn, "to": to, "mode": mode, "text": redact(body["text"])}
         )
-    except Exception:
+        summary = "A person asked an agent something in the Meeting Hall."
+        data = {"turn": turn, "to": to, "mode": mode, "message_ref": ref}
+        asked = _write(ctx.writer, room, _part("meeting.asked", room, room.convener, to, summary, data))
+    except BaseException as exc:  # nothing was sent to a model: the hold is released
+        if held is not None:
+            held.guard.abort_unit(held.plan)
+        if isinstance(exc, HTTPException):
+            raise
         raise HTTPException(status_code=503, detail="write_failed") from None
-    summary = "A person asked an agent something in the Meeting Hall."
-    data = {"turn": turn, "to": to, "mode": mode, "message_ref": ref}
-    asked = _write(ctx.writer, room, _part("meeting.asked", room, room.convener, to, summary, data))
     try:
         reply = answer(model, grounding, body["text"], mode, safety=safety, redact=redact, budget=left)
-    except RoomCapped:
+    except BaseException as exc:
+        if held is not None:
+            held.guard.abort_unit(held.plan)
+        if not isinstance(exc, RoomCapped):
+            raise
         _adjourn(ctx, room, "capped")
         return _refuse(409, "room_closed", reason="capped")
+    _charge(ctx, room, turn, held, reply)  # before the write: a failed write still leaves the call charged
     try:
         written = _finish(ctx, room, asked, to, turn, mode, reply, archive)
     except Exception:  # decision 10: the turn closes `failed` with no text; if even that fails, so does the room
@@ -595,3 +731,125 @@ def _turn(ctx: Ctx, room: Room, model: RoomModel, safety: SafetyProvider, body: 
     if not written:
         return _refuse(409, "world_paused" if ctx.world.paused else "room_closed")
     return JSONResponse(_view(ctx, rebuild(ctx.stream())[room.room_id])["turns"][-1], status_code=202)
+
+
+def _proposal_of(room: Room, proposal_id: str) -> tuple[dict, str] | None:
+    for t in room.turns:
+        r = t["reply"]
+        if r and r["data"]["outcome"] == "proposed_change" and r["data"]["proposal"]["proposal_id"] == proposal_id:
+            return r["data"]["proposal"], r["from"]
+    return None
+
+
+@dataclass
+class PlanCall:
+    """What the change planner (`meeting_room_planner.plan_change`) is handed: refs to the request's own world, room and
+    the stored `meeting.change_requested`; the words are read back from the archive, never passed (MR-12)."""
+
+    ctx: Ctx
+    room: Room
+    event: dict
+    how: _Mode
+    held: _Held | None  # the confirmer's hold on the uid ledger (live only); the planner settles or aborts it
+    safety: SafetyProvider
+
+
+_PLANNING = ("pending", "started", "failed")
+
+
+@router.post("/{room_id}/changes")
+def confirm_change(
+    room_id: str,
+    body: Annotated[Any, Depends(_body)],
+    ctx: Annotated[Ctx, Depends(get_ctx)],
+    safety: Annotated[SafetyProvider, Depends(deps.get_safety)],
+    planner: Annotated[Callable[[PlanCall], str] | None, Depends(deps.get_change_planner)],
+    work_mode: Annotated[deps.Mode, Depends(deps.get_work_mode)],
+    switches: Annotated[Any, Depends(deps.get_switches)],
+) -> JSONResponse:
+    """MR-07: the person confirms the proposal an agent showed, in its words or their own. Units, artifacts and
+    the agent come from the proposal's `meeting.replied`, never from the body. Not a side effect (MR-11): no
+    `world.requested`. The planner (MROOM-H2b) then answers `planning`: `started` (`plan.revised` written), `failed`
+    (an alert tells the convener) or `pending` (none wired, or the world paused: the request waits recorded)."""
+    room = _find(ctx, room_id, convener_only=True)
+    if ctx.housekeep(room) == "access_lost":
+        return _refuse(403, "access_lost")
+    if ctx.world.paused:
+        return _refuse(409, "world_paused")
+    if room.state != "open":
+        return _refuse(409, "room_closed", reason=room.reason)
+    if not conforms(_ROOM_SCHEMA + "change_request", body):
+        return _refuse(422, "bad_request")
+    text = body["text"]
+    try:
+        clean = neutralise(text, limit=2000)
+        if _flagged(safety, text) or (clean != text and _flagged(safety, clean)):
+            return _refuse(422, "declined")
+    except Exception:  # an outage is never "not flagged"
+        return _refuse(503, "screen_unavailable")
+    how, held = _Mode(work_mode, switches), None
+    if planner is not None:  # the planning call is reserved on the confirmer's uid cap before anything is written
+        try:
+            held = _hold(ctx, room, 0, how, run=plan_run(room_id))
+        except _RoomLimit:
+            return _refuse(409, "room_limit")
+    try:
+        return _confirmed(ctx, room_id, body, text, safety, planner, how, held)
+    finally:
+        release(held, called=False)  # no-op once the planner settled it
+
+
+def _confirmed(
+    ctx: Ctx, room_id: str, body: dict, text: str, safety: SafetyProvider, planner: Any, how: _Mode, held: _Held | None
+) -> JSONResponse:
+    redact = _seam(ctx.request, deps.get_redactor)
+    with _lock_of(_WRITES, room_id):  # check, archive and write as one step: a proposal is confirmed once
+        fresh = rebuild(ctx.stream()).get(room_id)
+        if (
+            ctx.world.paused
+            or fresh is None
+            or fresh.state != "open"
+            or _closing_queued(ctx.store, ctx.world_id, room_id)
+        ):
+            return _refuse(409, "world_paused" if ctx.world.paused else "room_closed")
+        found = _proposal_of(fresh, body["proposal_id"])
+        if found is None:
+            return _refuse(409, "not_a_proposal")
+        proposal, agent = found
+        if proposal["proposal_id"] in fresh.changes:
+            return _refuse(409, "already_confirmed")
+        if len(fresh.changes) >= ctx.cfg.max_changes:
+            return _refuse(409, "max_changes")
+        try:
+            archive = _seam(ctx.request, deps.get_run_archive)(org_id=deps.ORG_ID, run_id=fresh.run_id)
+            ref = archive.append(
+                "channel_in",
+                {"room_id": room_id, "proposal_id": proposal["proposal_id"], "to": agent, "text": redact(text)},
+            )
+        except HTTPException:
+            raise
+        except Exception:
+            logger.warning("change wording not archived for room %s", room_id)
+            raise HTTPException(status_code=503, detail="write_failed") from None
+        data = {
+            "proposal_id": proposal["proposal_id"],
+            "to": agent,
+            "units": proposal["units"],
+            "artifacts": proposal["artifacts"],
+            "as_role": fresh.as_role,
+            "message_ref": ref,
+        }
+        summary = "The convener confirmed a change; it goes to planning."
+        event = _write(
+            ctx.writer, fresh, _part("meeting.change_requested", fresh, fresh.convener, agent, summary, data)
+        )
+    planning = "pending"
+    if planner is not None:  # it writes plan.revised itself; an error here is never a 500
+        try:
+            got = planner(PlanCall(ctx, fresh, event, how, held, safety))
+            planning = got if got in _PLANNING else "pending"
+        except Exception as exc:
+            planning = "failed"
+            logger.warning("change planner failed for room %s: %s", room_id, type(exc).__name__)
+    answer_ = {"proposal_id": proposal["proposal_id"], "to": agent, "units": proposal["units"]}
+    return JSONResponse({**answer_, "artifacts": proposal["artifacts"], "planning": planning}, status_code=202)

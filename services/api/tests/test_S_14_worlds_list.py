@@ -162,10 +162,10 @@ def test_S_14_worlds_list_a_member_with_no_world_or_an_unknown_one_gets_an_empty
 
 
 def test_S_14_worlds_list_a_new_user_gets_an_empty_list(client, store):
-    sign_in("u_new")
-    assert listing(client).json() == {"worlds": [], "next_cursor": None}
+    sign_in("u_new")  # STARTER-1: "empty" is only the sample project, never one of this person's own worlds
+    assert ids(listing(client)) == ["w_sample_village_basic"]
     seed_world(store, "w_a1", ALICE)  # other people's worlds exist; they are not this person's
-    assert listing(client).json() == {"worlds": [], "next_cursor": None}
+    assert ids(listing(client)) == ["w_sample_village_basic"]
 
 
 def test_S_14_worlds_list_never_shows_a_fixture_or_sample_world(client, store):
@@ -177,7 +177,7 @@ def test_S_14_worlds_list_never_shows_a_fixture_or_sample_world(client, store):
     assert sorted(shown) == sorted(w for w, rec in store.worlds.items() if rec.owner == ALICE)
     store.worlds.clear()
     store.events.clear()
-    assert listing(client).json() == {"worlds": [], "next_cursor": None}
+    assert ids(listing(client)) == ["w_sample_village_basic"]  # STARTER-1: the one recorded sample, flagged `sample`
 
 
 # --- 4. item shape: only what already exists (title, status, created time, last seq) -------------
@@ -426,12 +426,14 @@ def test_S_14_worlds_list_property_pages_have_no_duplicates_no_gaps_and_no_cross
 
     sign_in(ALICE)
     items, alice_cursors = walk(client, limit)
+    items = [w for w in items if not w.get("sample")]  # STARTER-1: an owner with no worlds also gets the sample
     assert [w["world_id"] for w in items] == expected_order(mine)  # exactly Alice's, once each, in the pinned order
     assert len(alice_cursors) == (max(math.ceil(len(mine) / limit) - 1, 0))  # a cursor between pages only
     assert all(set(w) == ITEM_KEYS for w in items)
 
     sign_in(BOB)
     bobs, _ = walk(client, limit)
+    bobs = [w for w in bobs if not w.get("sample")]
     assert [w["world_id"] for w in bobs] == expected_order(theirs)
     for cursor in alice_cursors:  # Alice's cursors in Bob's hands: an error, or Bob's own worlds only
         response = listing(client, limit=limit, cursor=cursor)

@@ -10,6 +10,8 @@ export interface WorldListItem {
   status: WorldListStatus;
   created_at: string | null;
   last_seq: number;
+  /** STARTER-1: true only for the recorded sample project (`w_sample_village_basic`). */
+  sample?: boolean;
 }
 
 /** `needs` comes only from a recorded open card and `running` only from `world.started`/`resumed` (BQ-WIRE2-2). */
@@ -39,6 +41,7 @@ function worldOf(item: WorldListItem): World {
     nextV: "",
     owner: "",
     started: item.created_at ?? "",
+    ...(item.sample === true ? { sample: true } : {}),
   };
 }
 
