@@ -51,3 +51,12 @@ def test_LW_16_dockerignore_lets_design_tokens_through_and_nothing_else_of_desig
     assert "design" in lines and "!design/tokens.json" in lines
     assert lines.index("!design/tokens.json") > lines.index("design"), "the exception must come after the exclusion"
     assert not any(line.startswith("!design/") and line != "!design/tokens.json" for line in lines)
+
+
+def test_LW_16_cloudbuild_uploads_the_render_tokens_and_no_other_design_file(repo_root: pathlib.Path) -> None:
+    from test_P0_07f_cloudbuild import _ignore_rules, _uploaded
+
+    rules = _ignore_rules((repo_root / ".gcloudignore").read_text(encoding="utf-8").splitlines())
+    assert _uploaded(rules, "design/tokens.json"), "Cloud Build must upload the render image COPY source"
+    for excluded in ("design/source/x.js", "design/private.json", "design/sub/tokens.json", "design/.env"):
+        assert not _uploaded(rules, excluded), f"{excluded}: only the root design tokens are needed"
