@@ -55,6 +55,8 @@ describe("WEB_1a_select: an API url means the live Api and no sample values", ()
           "getSkills",
           "getLearn",
           "saveSkill",
+          "captureSkill",
+          "proposeVersion",
           "setPref",
         ].includes(x),
     )) {

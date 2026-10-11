@@ -2,7 +2,7 @@
 // the body of POST /v1/skills. Nothing is invented: the server serves no runs, success rate, last run or
 // improvement yet, so those read as 0, null and "" (the page prints "—" or the empty text). A row that does not
 // match the shape is left out, never repaired.
-import type { Skill, SkillDraft } from "../types";
+import type { Skill, SkillCapture, SkillDraft, SkillVersion } from "../types";
 
 interface Step {
   text: string;
@@ -74,7 +74,7 @@ export function skillFromRow(r: SkillRow): Skill {
     team: r.scope.team ?? "",
     owner: r.scope.kind === "just_me" ? "You" : "",
     role: "",
-    runs: 0,
+    runs: null,
     rate: null,
     last: "",
     improved: "",
@@ -111,6 +111,24 @@ const slug = (s: string): string => s.toLowerCase().replace(/[^a-z0-9]+/g, "_");
  * id, a timed trigger without a schedule): the caller refuses without a request. */
 export function saveBody(name: string, d: SkillDraft): Record<string, unknown> | null {
   if (d.scope !== "me" || d.trigger !== "ask" || d.plan.length === 0) return null;
+  const { server } = d;
+  if (server) {
+    // A taught version goes back as the server made it (SKILLS-5); only the person's "ask first" choices differ.
+    return {
+      name,
+      scope: { kind: "just_me", team: null },
+      trigger: { kind: "on_demand" },
+      plan_steps: server.steps.map((s) => ({
+        text: s.text,
+        tool: s.tool,
+        action: s.action,
+        verb: s.verb,
+        ask_first: s.ask,
+      })),
+      captured_steps: server.captured.map((text) => ({ text })),
+      ...(server.question ? { clarifying_question: server.question } : {}),
+    };
+  }
   return {
     name,
     scope: { kind: "just_me", team: null },
@@ -121,5 +139,49 @@ export function saveBody(name: string, d: SkillDraft): Record<string, unknown> |
       const verb = level === "Read" ? "read" : "write";
       return { text: p.text, tool, action, verb, ask_first: p.ask };
     }),
+  };
+}
+
+/** The answer of `POST /v1/skills/captures`: the draft's id and the steps it read, or null when unreadable. */
+export function captureOfBody(v: unknown): SkillCapture | null {
+  if (!isObject(v) || !isText(v.capture_id) || v.capture_id === "") return null;
+  const steps = v.captured_steps;
+  if (!Array.isArray(steps) || steps.length === 0) return null;
+  if (!steps.every((s) => isObject(s) && isText(s.text))) return null;
+  return { id: v.capture_id, steps: steps.map((s) => (s as { text: string }).text) };
+}
+
+const isCount = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v) && v >= 0;
+
+/** The answer of `POST /v1/skills/captures/{id}/version`; estimates the page cannot read are null, never guessed. */
+export function versionOfBody(v: unknown): SkillVersion | null {
+  if (!isObject(v) || !Array.isArray(v.plan_steps) || v.plan_steps.length === 0) return null;
+  const steps: SkillVersion["steps"] = [];
+  for (const s of v.plan_steps) {
+    const raw = s as Record<string, unknown>;
+    if (!isStep(s) || !isText(raw.verb) || typeof raw.must_ask !== "boolean") return null;
+    steps.push({
+      text: s.text,
+      tool: s.tool,
+      action: s.action,
+      verb: raw.verb,
+      ask: s.ask_first,
+      locked: raw.must_ask,
+    });
+  }
+  const q = v.clarifying_question ?? null;
+  if (q !== null && !isQuestion(q)) return null;
+  const e = v.estimates;
+  const estimates =
+    isObject(e) &&
+    isCount(e.credits_per_run) &&
+    isCount(e.seconds_per_run) &&
+    isCount(e.asks_per_run)
+      ? { credits: e.credits_per_run, seconds: e.seconds_per_run, asks: e.asks_per_run }
+      : null;
+  return {
+    steps,
+    question: q === null ? null : { text: q.text, options: [...q.options] },
+    estimates,
   };
 }

@@ -17,22 +17,11 @@ import {
 import type { PaneProps } from "./useTeach";
 
 export function ShowPane({ t, night, user }: PaneProps) {
-  if (t.source !== "fixture") {
-    return (
-      <div
-        className="park-skills-pane park-skills-pane--show"
-        data-testid="skills-connect-to-teach"
-      >
-        <div className="park-skills-none">
-          <div>{agent({ role: "research", expr: "neutral" }, 58, night)}</div>
-          <div className="park-skills-picked-title">Connect to start teaching</div>
-          <div>Connect your workspace tools to capture steps and run a practice session.</div>
-        </div>
-      </div>
-    );
-  }
-  const screenish = t.method === "record" || t.method === "guided";
-  const done = t.cap >= CAPTURE_STEPS;
+  const live = t.live;
+  const screenish = !live && (t.method === "record" || t.method === "guided");
+  const shown: readonly string[] = live ? t.steps : CAP[t.method].slice(0, t.cap);
+  const done = live ? t.steps.length > 0 : t.cap >= CAPTURE_STEPS;
+  const of = live ? t.steps.length : CAPTURE_STEPS;
   const domain = user.email.split("@")[1];
   const url = t.method === "guided" ? GUIDED.url : domain ? `mail.${domain}/accounts` : GUIDED.url;
   const hint = t.method === "guided" ? GUIDED.hint : RECORD.hint;
@@ -40,23 +29,25 @@ export function ShowPane({ t, night, user }: PaneProps) {
   const label = t.rec ? "Recording…" : done ? "Record again" : start;
   return (
     <div className="park-skills-pane park-skills-pane--show">
-      <div className="park-skills-methods">
-        {METHODS.map((m) => (
-          <button
-            key={m.key}
-            type="button"
-            aria-pressed={t.method === m.key}
-            className={cx("park-skills-method", t.method === m.key && "park-skills-method--on")}
-            onClick={() => t.setMethod(m.key)}
-          >
-            <span className="park-skills-method-ic">{icon(m.icon, 18)}</span>
-            <span className="park-skills-method-text">
-              <span className="park-skills-method-name">{m.name}</span>
-              <span className="park-skills-method-desc">{m.desc}</span>
-            </span>
-          </button>
-        ))}
-      </div>
+      {live ? null : (
+        <div className="park-skills-methods">
+          {METHODS.map((m) => (
+            <button
+              key={m.key}
+              type="button"
+              aria-pressed={t.method === m.key}
+              className={cx("park-skills-method", t.method === m.key && "park-skills-method--on")}
+              onClick={() => t.setMethod(m.key)}
+            >
+              <span className="park-skills-method-ic">{icon(m.icon, 18)}</span>
+              <span className="park-skills-method-text">
+                <span className="park-skills-method-name">{m.name}</span>
+                <span className="park-skills-method-desc">{m.desc}</span>
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
       <div className="park-skills-cols">
         <div className="park-skills-col">
           {screenish ? (
@@ -117,9 +108,23 @@ export function ShowPane({ t, night, user }: PaneProps) {
                 value={t.desc}
                 onChange={(e) => t.setDesc(e.target.value)}
               />
+              {live && t.failure ? (
+                <div
+                  className="park-skills-describe-help"
+                  role="alert"
+                  data-testid="skills-teach-error"
+                >
+                  {t.failure}
+                </div>
+              ) : null}
               <div className="park-skills-describe-foot">
                 <div className="park-skills-describe-help">{DESCRIBE_HELP}</div>
-                <button type="button" className="park-skills-read" onClick={t.capture}>
+                <button
+                  type="button"
+                  className="park-skills-read"
+                  disabled={live && (t.busy || !t.desc.trim())}
+                  onClick={t.capture}
+                >
                   Read my description
                 </button>
               </div>
@@ -140,21 +145,23 @@ export function ShowPane({ t, night, user }: PaneProps) {
         <div className="park-skills-picked">
           <div className="park-skills-picked-head">
             <span className="park-skills-picked-title">What Tilo has picked up</span>
-            <span
-              className="park-skills-pill park-skills-pill--chip"
-              data-testid="skills-sample-run"
-            >
-              Sample run
-            </span>
-            <span className="park-skills-picked-count">{`${t.cap} of ${CAPTURE_STEPS}`}</span>
+            {live ? null : (
+              <span
+                className="park-skills-pill park-skills-pill--chip"
+                data-testid="skills-sample-run"
+              >
+                Sample run
+              </span>
+            )}
+            <span className="park-skills-picked-count">{`${live ? shown.length : t.cap} of ${of}`}</span>
           </div>
-          {CAP[t.method].slice(0, t.cap).map((text, i) => (
-            <div key={text} className="park-skills-cap-row">
+          {shown.map((text, i) => (
+            <div key={`${i}:${text}`} className="park-skills-cap-row">
               <span className="park-skills-cap-n">{i + 1}</span>
               <span className="park-skills-cap-text">{text}</span>
             </div>
           ))}
-          {t.cap === 0 ? (
+          {shown.length === 0 ? (
             <div className="park-skills-none">
               <div>
                 {agent({ role: "research", expr: t.rec ? "focused" : "neutral" }, 58, night)}
@@ -175,7 +182,7 @@ export function ShowPane({ t, night, user }: PaneProps) {
               "park-skills-next",
               done ? "park-skills-next--ready" : "park-skills-next--locked",
             )}
-            disabled={!done}
+            disabled={!done || t.busy}
             onClick={t.next}
           >
             Show me Tilo’s version

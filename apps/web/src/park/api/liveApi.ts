@@ -17,7 +17,14 @@ import {
 } from "./live/decisionsFromCards";
 import { type CostReport, ledgerFromCosts } from "./live/ledgerFromCosts";
 import { profileDefaults } from "./live/profileDefaults";
-import { isLearnBody, isSkillRow, saveBody, skillsOfBody } from "./live/skillsFromApi";
+import {
+  captureOfBody,
+  isLearnBody,
+  isSkillRow,
+  saveBody,
+  skillsOfBody,
+  versionOfBody,
+} from "./live/skillsFromApi";
 import { worldFromIntake } from "./live/worldFromIntake";
 import { STATE_OF, type WorldListItem, worldsFromList } from "./live/worldsFromList";
 import { nameInitials } from "./nameInitials";
@@ -261,6 +268,20 @@ export function createLiveApi(options: LiveApiOptions = {}): Api {
     if (!isSkillRow(await http.postJson("/v1/skills", body)))
       throw new TiloApiError(BAD_REPLY, 201, true, true);
     return { data: { ok: true }, source: "live" };
+  };
+  // Teach a skill by describing it (SKILLS-5): one POST each, no retry; only a readable answer is data.
+  api.captureSkill = async (text) => {
+    const data = captureOfBody(
+      await http.postJson("/v1/skills/captures", { method: "describe", text }),
+    );
+    if (!data) throw new TiloApiError(BAD_REPLY, 201, true, true);
+    return { data, source: "live" };
+  };
+  api.proposeVersion = async (captureId) => {
+    const path = `/v1/skills/captures/${encodeURIComponent(captureId)}/version`;
+    const data = versionOfBody(await http.postJson(path, {}));
+    if (!data) throw new TiloApiError(BAD_REPLY, 200, true, true);
+    return { data, source: "live" };
   };
   const served = new Map<string, Answerable>();
   const answered: Dec = {};
