@@ -191,7 +191,8 @@ def test_PL_LIVE_E2E_35_the_estimate_is_the_worst_case_ceiling_not_the_routers_e
     shipped = live_e2e()._estimate_chars(config, 300)
     without = live_e2e()._estimate_chars(replace(config, expected_output={}), 300)
     assert (shipped.credits_low, shipped.credits_high) == (without.credits_low, without.credits_high)
-    assert shipped.credits_low == pytest.approx(3.36, abs=0.005), (
+    # Supervisor-approved: ADR-0029 regional rates (+10%), offset by lite-31 lead_review (3.46775).
+    assert shipped.credits_low == pytest.approx(3.468, abs=0.005), (
         "docs/live-e2e.md: credits_low for a 300-character brief"
     )
 
