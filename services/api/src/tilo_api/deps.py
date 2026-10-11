@@ -983,9 +983,13 @@ def get_connection_views() -> ConnectionViews:
     return _RpcConnectionViews(get_connection_views_rpc())
 
 
-def get_change_planner() -> Callable[[dict], object] | None:
-    """MROOM-1b: the revision planner (MR-H2 wires it). None until then: a confirmed change is recorded and waits."""
-    return None
+def get_change_planner() -> Callable[[Any], str] | None:
+    """MROOM-H2b: the revision planner (`meeting_room_planner.plan_change`, ADR-0028 decisions 6 and 8). It plans only:
+    the owner's in-person `budget.granted` and starting the units are the next ticket (H2c). None: a confirmed change is
+    recorded and waits."""
+    from tilo_api import meeting_room_planner  # noqa: PLC0415 (it imports this module)
+
+    return meeting_room_planner.plan_change
 
 
 REPLAY_ONLY_MESSAGE = "This link is replay-only right now: new work is paused; finished runs can still be replayed."

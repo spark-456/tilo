@@ -229,6 +229,7 @@ def make_env(
     overrides[get_room_model] = lambda: env.model
     overrides[get_room_config] = lambda: config
     overrides[deps.get_clock] = lambda: lambda: env.clock[0]
+    overrides[deps.get_change_planner] = lambda: None  # unwired unless a test installs the planner (MROOM-H2b)
     if team_roles is not None:
         overrides[team_store.get_team_store] = lambda: team_store.InMemoryTeamStore(
             team_store.TeamState(roles=team_roles)

@@ -177,7 +177,7 @@ def test_MROOM_1b_a_screen_that_errors_refuses_and_writes_nothing(tmp_path):
 def test_MROOM_1b_a_planner_seam_is_called_once_and_never_fabricates_a_plan(tmp_path):
     env, room, pid = _setup(tmp_path)
     seen = []
-    app.dependency_overrides[deps.get_change_planner] = lambda: lambda event: seen.append(event["id"])
+    app.dependency_overrides[deps.get_change_planner] = lambda: lambda call: seen.append(call.event["id"])
     got = _confirm(env, room, {"proposal_id": pid, "text": "ok"})
     assert got.status_code == 202 and seen == [_changes(env)[0]["id"]]
     assert not any(x["type"] == "plan.revised" for x in env.store.events[WORLD])
