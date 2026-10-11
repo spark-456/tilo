@@ -34,6 +34,7 @@ import { teamFromPeople } from "./live/teamFromPeople";
 import { worldFromIntake } from "./live/worldFromIntake";
 import { STATE_OF, type WorldListItem, worldsFromList } from "./live/worldsFromList";
 import { nameInitials } from "./nameInitials";
+import { installQuizReader } from "./quizApps";
 import type { Dec, DecisionKey, Effort, QuickReply, TierKey, Today, User } from "./types";
 
 export class NotBuilt extends Error {
@@ -227,6 +228,20 @@ export function createLiveApi(options: LiveApiOptions = {}): Api {
     ...(options.fetch ? { fetch: options.fetch } : {}),
     ...(options.appCheckToken ? { appCheckToken: options.appCheckToken } : {}),
     ...(options.authToken ? { authToken: options.authToken } : {}),
+  });
+  installQuizReader(api, async (world, artifact) => {
+    const raw = await http.getJson(
+      `/worlds/${encodeURIComponent(world)}/apps/${encodeURIComponent(artifact)}`,
+    );
+    if (
+      !isObject(raw) ||
+      !("spec" in raw) ||
+      !isObject(raw.publishers) ||
+      !Object.values(raw.publishers).every((p) => typeof p === "string" && p.length <= 253)
+    ) {
+      throw new TiloApiError(BAD_REPLY, 200, true);
+    }
+    return { spec: raw.spec, publishers: raw.publishers as Record<string, string> };
   });
   api.getLedger = async () => {
     const report = await http.getJson("/costs");

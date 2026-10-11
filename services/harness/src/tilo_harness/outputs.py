@@ -11,6 +11,11 @@ store's next version ahead of EV-15's (#393), so every refusal known before a pu
 kind, size and text (UTF-8, not blank), a parent the world recorded (then put as that checked ref), and a dry run of
 the manifest (claims MF-01, MF-06, sources). Only refusals the store alone sees can still leave such a version (the
 store has no purge API).
+A PDF is the one file a unit may store, and only as a `RenderedPdf` (LW-10): `deliverable.render_output` makes it from a
+validated DeliverableSpec by `tilo_render.pdf.render_pdf`, in process, and `keep` stores it with origin `render` (no
+agent) under the same AR-05 key, up to `MAX_PDF` bytes. Any other `UnitOutput` stays text or JSON only (AR-04).
+The store cannot redact a file, so `keep` runs the redactor over the spec's text (`spec_text`) and refuses the unit if
+it would change anything (AR-07 for a file: a secret never reaches a stored PDF).
 `existing` accepts refs of versions the store holds in the run's Scope (AR-03) and the world recorded (`recorded`).
 """
 
@@ -32,6 +37,7 @@ from tilo_memory.artifacts import (
 )
 
 MAX_OUTPUTS = 10  # a unit's cap (BQ-257)
+MAX_PDF = 20 * 1024 * 1024  # a rendered PDF's cap (LW-10); the store's own file cap is 50 MB
 _LABEL_MAX = 80  # event.schema.json item.label
 _DRY_REF = {"artifact_id": "art_preflight", "version": 1}  # the manifest dry run's stand-in for a new artifact
 
@@ -51,6 +57,21 @@ class UnitOutput:
     parent: Mapping[str, Any] | None = None
     sources: tuple[Mapping[str, str], ...] = ()
     claims: tuple[Mapping[str, Any], ...] = ()
+
+
+@dataclass(frozen=True)
+class RenderedPdf(UnitOutput):
+    """A PDF that `tilo_render` made from a validated spec (LW-10). Only `deliverable.render_output` builds one; `keep`
+    stores exactly this type (not a subclass) as origin `render`, and nothing else as a file. `spec_text` is the
+    validated spec as JSON: what the PDF says, for the redactor."""
+
+    spec_text: str = ""
+
+    def __post_init__(self) -> None:
+        if self.media_type != "application/pdf" or not isinstance(self.content, bytes):
+            raise ValueError("a rendered PDF is application/pdf bytes")
+        if not self.content.startswith(b"%PDF-") or len(self.content) > MAX_PDF:
+            raise ValueError(f"a rendered PDF starts with %PDF- and is at most {MAX_PDF} bytes")
 
 
 @dataclass(frozen=True)
@@ -100,6 +121,8 @@ def keep(
         plain = type(label) is str and 0 < len(label) <= _LABEL_MAX and label.isprintable()
         if label is not None and not (plain and redact(label) == label):
             raise OutputRefused("an output label is not 1 to 80 characters free of secrets")
+        if type(out) is RenderedPdf and redact(out.spec_text) != out.spec_text:  # a PDF cannot be redacted
+            raise OutputRefused("a rendered report holds a secret")
 
     def manifest_of(out: UnitOutput, ref: Any, content: bytes, parents: Any, sources: Any) -> dict[str, Any]:
         return build_manifest(
@@ -143,9 +166,12 @@ def _preflight(
     """Raises for what the store or the manifest would refuse that is known before a put: a unit's kind, size and
     text (UTF-8, not blank; AR-04), a parent the world never recorded, and a dry run of the manifest (claims, sources;
     MF-01, MF-06). Returns the parent as the store's own ref, or None."""
-    if out.media_type not in TEXT_TYPES or not 0 < memoryview(out.content).nbytes <= MAX_TEXT:
+    if type(out) is RenderedPdf:  # frozen, but re-checked: the file kind is only ever the render path's
+        if out.media_type != "application/pdf" or not 5 < len(out.content) <= MAX_PDF or out.content[:5] != b"%PDF-":
+            raise OutputRefused("a rendered PDF is not %PDF- bytes of at most 20 MiB")
+    elif out.media_type not in TEXT_TYPES or not 0 < memoryview(out.content).nbytes <= MAX_TEXT:
         raise OutputRefused("an output is not 1 byte to 2 MB of text or JSON")
-    if not bytes(memoryview(out.content)).decode("utf-8").strip():  # UnicodeDecodeError on bad UTF-8
+    elif not bytes(memoryview(out.content)).decode("utf-8").strip():  # UnicodeDecodeError on bad UTF-8
         raise OutputRefused("an output's text is blank")
     parents = existing(artifacts, scope, [out.parent], recorded) if out.parent is not None else []
     ref = {"artifact_id": parents[0]["artifact_id"], "version": parents[0]["version"] + 1} if parents else _DRY_REF
@@ -167,7 +193,9 @@ def _put(
         media_type=out.media_type,
         content=bytes(memoryview(out.content)),  # the buffer's bytes: never a subclass's len() or __bytes__
         run_id=run_id,
-        origin=Origin(kind="unit", unit=unit["id"], agent=worker),
+        origin=Origin(kind="render", unit=unit["id"], agent=None)
+        if type(out) is RenderedPdf
+        else Origin(kind="unit", unit=unit["id"], agent=worker),
         sources=tuple(dict(source) for source in out.sources),
         idempotency_key=f"{run_id}:{unit['id']}:{at}",
         parent=parent,  # the ref the preflight checked, never the runner's object again

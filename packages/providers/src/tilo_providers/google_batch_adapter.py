@@ -14,7 +14,15 @@ from typing import Any
 
 from tilo_contracts import ProvidersProfile
 
-from tilo_providers.batch import BatchJob, BatchProvider, BatchRequest, BatchResult, BatchState, BatchStatus
+from tilo_providers.batch import (
+    BatchJob,
+    BatchProvider,
+    BatchRequest,
+    BatchResult,
+    BatchState,
+    BatchStatus,
+    refuse_media,
+)
 from tilo_providers.errors import ProviderError, RequestError
 from tilo_providers.google_adapter import GoogleModelProvider, _genai_module, validate_google_settings
 from tilo_providers.interfaces import GenerateResponse
@@ -57,6 +65,7 @@ class GoogleBatchProvider(BatchProvider):
         self._client = client
 
     def submit(self, requests: Sequence[BatchRequest], *, idempotency_key: str) -> BatchJob:
+        refuse_media(requests)
         if not idempotency_key.strip() or not requests:
             raise RequestError("EFF-05: a batch needs requests and a non-blank idempotency key")
         name = f"tilo-{idempotency_key}"

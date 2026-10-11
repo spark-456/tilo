@@ -153,7 +153,32 @@ def _with_deliver(units: list[dict[str, Any]], brief: dict[str, Any]) -> list[di
         "district": leaves[-1]["district"] if leaves else units[-1]["district"], "skills": [], "connectors": [],
         "actions": [], "depends_on": [unit["id"] for unit in leaves],
     }  # fmt: skip
-    return [*units, deliver]
+    items = brief.get("deliverables")
+    items = items if isinstance(items, list) and items else [{"title": _deliver_title(brief)}]
+    result = list(units)
+    if any(item.get("format") == "app" for item in items) and not any(u["role"] == "verifier" for u in units):
+        result.append(
+            {
+                **deliver,
+                "id": f"U{number}",
+                "unit_type": "verify",
+                "role": "verifier",
+                "title": "Verify the source material",
+            }
+        )
+        deliver["depends_on"] = [f"U{number}"]
+        number += 1
+    for item in items:
+        title = item.get("title")
+        result.append(
+            {
+                **deliver,
+                "id": f"U{number}",
+                "title": title.strip()[:80] if isinstance(title, str) and title.strip() else DELIVER_TITLE,
+            }
+        )
+        number += 1
+    return result
 
 
 def _director_schema() -> dict[str, Any]:

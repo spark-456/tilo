@@ -1,0 +1,9 @@
+{
+  "key": "153cd39a63413006",
+  "profile": "fixture",
+  "response": {
+    "profile_id": "scripted",
+    "text": "{\"v\": \"1.0\", \"kind\": \"quiz\", \"title\": \"Fictional practice\", \"theme\": \"metropolis\", \"timer\": {\"seconds\": 60}, \"questions\": [{\"id\": \"q1\", \"stem\": \"What value stabilizes the clockwork valve?\", \"options\": {\"a\": \"7 units\", \"b\": \"42.0 units\"}, \"answer\": \"b\", \"source\": {\"artifact\": {\"artifact_id\": \"art_liveweb_1\", \"version\": 1}, \"page\": 1}}]}"
+  },
+  "role": "writer-quiz"
+}

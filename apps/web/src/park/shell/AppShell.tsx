@@ -9,7 +9,7 @@ import { nameInitials } from "../api/nameInitials";
 import type { Decision, Notification, User } from "../api/types";
 import type { PageId } from "../app/AppCtx";
 import { endSession, useApp, useExpectsSample, useParkApi, useParkStore } from "../app/context";
-import { useParkRoute } from "../app/router";
+import { useParkRoute, useQuizAppRoute } from "../app/router";
 import { Button, Popover, Toast } from "../components";
 import "../tokens/fonts";
 import { AccountMenu, type AccountPerson } from "./AccountMenu";
@@ -48,6 +48,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const store = useParkStore();
   const api = useParkApi();
   const route = useParkRoute();
+  const quizRoute = useQuizAppRoute();
   const state = useSyncExternalStore(store.subscribe, store.getState);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [notificationStatus, setNotificationStatus] = useState<"loading" | "ready" | "failed">(
@@ -125,7 +126,13 @@ export function AppShell({ children }: { children: ReactNode }) {
   const page = route?.page ?? null;
   // A tab or menu click fades the old page out and the new one in. Everything else (the browser's back button, a
   // link inside a page, a world loader's card that covers the swap, reduced motion) swaps at once.
-  const key = route ? (route.page === "world" ? `world/${route.params.id}` : route.page) : "none";
+  const key = route
+    ? route.page === "world"
+      ? `world/${route.params.id}`
+      : route.page
+    : quizRoute
+      ? `world/${quizRoute.worldId}/app/${quizRoute.artifactId}`
+      : "none";
   const swap = usePageSwap(
     children,
     key,
