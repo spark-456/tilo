@@ -1,4 +1,4 @@
-"""Draft offline acceptance checks, to land in the bot worktree after the first push."""
+"""Offline acceptance checks for the bot's account, disclosure, shutdown and privacy boundaries."""
 
 import asyncio
 from types import SimpleNamespace

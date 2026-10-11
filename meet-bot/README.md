@@ -4,7 +4,12 @@ A bot that joins a Google Meet like a person, reads the live captions, tracks yo
 
 The signed-in path requires `BOT_GOOGLE_EMAIL` to match the dedicated bot account exactly. Set it yourself in the
 environment; replace the old account example when preparing your configuration. An unreadable or different account
-refuses to join. Sign in manually; the bot never types credentials. Chromium runs with its sandbox enabled.
+refuses to join. Sign in manually; the bot never types credentials. Signed-in Chromium runs with its sandbox enabled.
+
+`BOT_JOIN_MODE=guest` uses a fresh ephemeral browser context with no stored profile or account. Set
+`BOT_DISPLAY_NAME` for the name shown when requesting admission; a human host admits it. Cloud Run refuses
+signed-in mode before launching Chromium. Guest mode disables the Chromium sandbox for the Cloud Run runtime;
+it never holds a signed-in browser session. The dedicated signed-in profile remains the local fallback.
 
 The bot joins an existing approved meeting and never creates a call or admits participants. It posts its disclosure
 before starting audio or captions; a failed disclosure leaves without capture. Any participant can say or type

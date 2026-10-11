@@ -89,6 +89,7 @@ class Config:
     reply_mode: str
     voice_nudges: bool
     mic_policy: str
+    guest: bool = False
 
     @classmethod
     def from_env(cls) -> Config:
@@ -132,6 +133,7 @@ class Config:
             stt=e("STT_PROVIDER", "").strip().lower()
             or ("gemini" if e("HYBRID_TRANSCRIPT", "0") == "1" else "captions"),
             answer_mode="addressed" if e("ANSWER_MODE", "questions") == "addressed" else "questions",
+            guest=_choice("BOT_JOIN_MODE", "signed-in", ("signed-in", "guest")) == "guest",
         )
 
 
