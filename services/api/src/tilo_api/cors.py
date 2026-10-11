@@ -16,7 +16,8 @@ from collections.abc import Mapping
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from starlette.types import ASGIApp, Receive, Scope, Send
+from starlette.datastructures import MutableHeaders
+from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 ENV = "TILO_API_CORS_ORIGINS"
 PRODUCTION_ORIGINS = (
@@ -44,7 +45,14 @@ class ProductionCors:
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         from tilo_api.access import enforced
 
-        await (self.production if enforced() else self.configured)(scope, receive, send)
+        async def with_exposure(message: Message) -> None:
+            if message["type"] == "http.response.start":
+                headers = MutableHeaders(scope=message)
+                if "access-control-allow-origin" in headers:
+                    headers["access-control-expose-headers"] = "Retry-After"
+            await send(message)
+
+        await (self.production if enforced() else self.configured)(scope, receive, with_exposure)
 
 
 def cors_origins(env: Mapping[str, str] | None = None) -> list[str]:
