@@ -121,6 +121,12 @@ export function Understanding({ taskId }: { taskId: string }) {
   const [answers, setAnswers] = useState<Record<number, string | null>>({});
   const [skipped, setSkipped] = useState<Record<number, boolean>>({});
   const pick = (i: number, val: string | null, isSkip: boolean) => { setSkipped((m) => ({ ...m, [i]: isSkip })); setAnswers((a) => ({ ...a, [i]: val })); };
+  const choose = (i: number, label: string) => {
+    const question = questions[i];
+    if (!question || question.field !== "deliverables") { pick(i, label, false); return; }
+    setSkipped(m => ({ ...m, [i]: false }));
+    setAnswers(a => ({ ...a, [i]: toggleLabel(skipped[i] ? null : a[i], question.suggested_answers, label) }));
+  };
   const reason = continueReason(Boolean(intake), bad);
   const action = useAction("confirm the brief", async () => {
     if (!intake || !activeDraft) throw new Error("no brief is loaded");
@@ -167,9 +173,10 @@ export function Understanding({ taskId }: { taskId: string }) {
                 {questions.map((q, i) => (
                   <fieldset key={`${q.field}-${i}`} className="question-item" data-testid="question-item">
                     <legend>{q.text}</legend>
+                    {q.field === "deliverables" && <p className="section-note">Select all outputs you want.</p>}
                     <div className="question-actions">
                       {q.suggested_answers.map((s) => (
-                        <button key={s} type="button" className="secondary suggestion-btn" aria-pressed={!skipped[i] && answers[i] === s} onClick={() => pick(i, s, false)}>{s}</button>
+                        <button key={s} type="button" className="secondary suggestion-btn" aria-pressed={!skipped[i] && (q.field === "deliverables" ? pickedLabels(answers[i], q.suggested_answers).includes(s) : answers[i] === s)} onClick={() => choose(i, s)}>{s}</button>
                       ))}
                       <button type="button" className="secondary skip-btn" data-testid={`skip-question-${i}`} aria-pressed={Boolean(skipped[i])} onClick={() => pick(i, null, true)}>Skip</button>
                     </div>
@@ -187,3 +194,4 @@ export function Understanding({ taskId }: { taskId: string }) {
     </div>
   );
 }
+import { pickedLabels, toggleLabel } from "../../api/intakeChoices";
