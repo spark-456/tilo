@@ -4,6 +4,7 @@ ZIP expansion returns inert bytes, not trusted content. Callers must still perfo
 scope, provenance and safety screening before using any returned text or bytes.
 """
 
+import csv
 import io
 import re
 import stat
@@ -205,4 +206,37 @@ def parse_docx(data: bytes, *, limits: Limits = Limits()) -> tuple[tuple[str, st
                 raise Refused("output_size")
             if text:
                 output.append((f"{name}#p{index}", text))
+    return tuple(output)
+
+
+def parse_csv(data: bytes, *, limits: Limits = Limits()) -> tuple[tuple[str, str], ...]:
+    """Read comma-separated UTF-8 cells as inert text, with logical row/cell labels.
+
+    No dialect/encoding guesses, formula evaluation or global CSV limit changes.
+    The entry budget counts every cell, including empty cells; blank rows count too.
+    Python's CSV field-size limit also applies and yields a stable refusal.
+    """
+    limits.validate()
+    if len(data) > limits.input_bytes:
+        raise Refused("input_size")
+    try:
+        text = data.decode("utf-8-sig")
+    except UnicodeError:
+        raise Refused("invalid_encoding") from None
+    if "\x00" in text:
+        raise Refused("invalid_csv")
+    output: list[tuple[str, str]] = []
+    entries = size = 0
+    try:
+        for row_index, row in enumerate(csv.reader(io.StringIO(text, newline=""), strict=True), 1):
+            entries += max(1, len(row))
+            if entries > limits.entries:
+                raise Refused("entry_count")
+            for column, cell in enumerate(row, 1):
+                size += len(cell)
+                if size > limits.output_chars:
+                    raise Refused("output_size")
+                output.append((f"csv#r{row_index}c{column}", cell))
+    except csv.Error:
+        raise Refused("invalid_csv") from None
     return tuple(output)
