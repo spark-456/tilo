@@ -18,6 +18,8 @@ from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from typing import Any, Literal, Protocol, runtime_checkable
 
+from tilo_providers.media import MediaPart
+
 _CROCKFORD = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
 
 Outcome = Literal["ok", "cached", "dropped", "refused", "error", "queued"]
@@ -27,6 +29,7 @@ Outcome = Literal["ok", "cached", "dropped", "refused", "error", "queued"]
 class ToolResult:
     content: str  # what the tool returned; for an external-content tool this is UNTRUSTED text
     credits: float = 0.0  # what this call cost
+    parts: tuple[MediaPart, ...] = ()  # native files; screened before a model sees them
 
 
 @runtime_checkable
@@ -112,6 +115,7 @@ class CachedCall:
     text: str | None
     outcome: Outcome
     archive_ref: str | None
+    parts: tuple[MediaPart, ...] = ()
 
 
 class ToolCache(Protocol):
