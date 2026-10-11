@@ -167,15 +167,9 @@ def _xml(data: bytes, limits: Limits) -> ET.Element:
     return root
 
 
-def parse_docx(data: bytes, *, limits: Limits = Limits()) -> tuple[tuple[str, str], ...]:
-    """Read UTF-8 DOCX paragraph text; refuse active content and external references.
-
-    All XML parts are screened, including parts that contribute no returned text.
-    Paragraph labels cite package parts, not page numbers (pagination needs layout).
-    """
+def _office(data: bytes, limits: Limits, main: str, kind: str, tag: str) -> dict[str, ET.Element]:
     parts = dict(expand_zip(data, limits=limits))
-    kind = b"application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"
-    if "word/document.xml" not in parts or kind not in parts.get("[Content_Types].xml", b""):
+    if main not in parts or kind.encode() not in parts.get("[Content_Types].xml", b""):
         raise Refused("unknown_type")
     roots: dict[str, ET.Element] = {}
     for name, content in parts.items():
@@ -186,14 +180,31 @@ def parse_docx(data: bytes, *, limits: Limits = Limits()) -> tuple[tuple[str, st
             or (lower == "[content_types].xml" and b"macroenabled" in content.lower())
         ):
             raise Refused("active_content")
+        if "externallinks/" in lower:
+            raise Refused("external_reference")
         if lower.endswith((".xml", ".rels")):
             roots[name] = _xml(content, limits)
-    word = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
-    if roots["word/document.xml"].tag != word + "document" or not any(
-        node.attrib.get("PartName") == "/word/document.xml" and node.attrib.get("ContentType") == kind.decode()
+    if roots[main].tag != tag or not any(
+        node.attrib.get("PartName") == "/" + main and node.attrib.get("ContentType") == kind
         for node in roots["[Content_Types].xml"]
     ):
         raise Refused("unknown_type")
+    return roots
+
+
+def parse_docx(data: bytes, *, limits: Limits = Limits()) -> tuple[tuple[str, str], ...]:
+    """Read UTF-8 DOCX paragraphs with part citations; screen every XML part.
+
+    No pagination/layout interpretation. Active content and external refs refused.
+    """
+    word = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
+    roots = _office(
+        data,
+        limits,
+        "word/document.xml",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml",
+        word + "document",
+    )
     output: list[tuple[str, str]] = []
     size = 0
     for name, root in roots.items():
@@ -206,6 +217,65 @@ def parse_docx(data: bytes, *, limits: Limits = Limits()) -> tuple[tuple[str, st
                 raise Refused("output_size")
             if text:
                 output.append((f"{name}#p{index}", text))
+    return tuple(output)
+
+
+def parse_xlsx(data: bytes, *, limits: Limits = Limits()) -> tuple[tuple[str, str], ...]:
+    """Read stored worksheet values with package-part/cell provenance.
+
+    Shared/inline strings are resolved; formula cached values remain inert text.
+    Missing cached values are empty. No formulas, styles, dates or layouts evaluated.
+    """
+    sheet = "{http://schemas.openxmlformats.org/spreadsheetml/2006/main}"
+    roots = _office(
+        data,
+        limits,
+        "xl/workbook.xml",
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml",
+        sheet + "workbook",
+    )
+
+    def string(node: ET.Element) -> str:
+        return "".join(
+            item.text or "" for path in (sheet + "t", sheet + "r/" + sheet + "t") for item in node.findall(path)
+        )
+
+    shared = roots.get("xl/sharedStrings.xml")
+    if shared is not None and shared.tag != sheet + "sst":
+        raise Refused("invalid_spreadsheet")
+    strings = [] if shared is None else [string(item) for item in shared.findall(sheet + "si")]
+    output: list[tuple[str, str]] = []
+    size = 0
+    cells = 0
+    for name, root in roots.items():
+        if not name.startswith("xl/worksheets/") or not name.endswith(".xml"):
+            continue
+        if root.tag != sheet + "worksheet":
+            raise Refused("invalid_spreadsheet")
+        seen: set[str] = set()
+        for cell in root.iter(sheet + "c"):
+            cells += 1
+            if cells > limits.entries:
+                raise Refused("entry_count")
+            ref = cell.get("r", "")
+            if not re.fullmatch(r"[A-Z]{1,3}[1-9][0-9]{0,6}", ref) or ref in seen:
+                raise Refused("invalid_spreadsheet")
+            seen.add(ref)
+            kind = cell.get("t", "n")
+            value = cell.findtext(sheet + "v", "")
+            if kind == "s":
+                if not re.fullmatch(r"[0-9]+", value) or len(value) > 9 or int(value) >= len(strings):
+                    raise Refused("invalid_spreadsheet")
+                value = strings[int(value)]
+            elif kind == "inlineStr":
+                inline = cell.find(sheet + "is")
+                value = "" if inline is None else string(inline)
+            elif kind not in ("n", "b", "d", "str", "e"):
+                raise Refused("invalid_spreadsheet")
+            size += len(value)
+            if size > limits.output_chars:
+                raise Refused("output_size")
+            output.append((f"{name}#{ref}", value))
     return tuple(output)
 
 

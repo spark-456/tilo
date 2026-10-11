@@ -16,7 +16,7 @@ parts are screened: DTD/entities, external references and active content are ref
 Limits additionally cap XML at 20,000 nodes and depth 64 per part, and returned text
 at 1 Mi characters. Embedded objects and binary parts are conservatively refused.
 It does not render page numbers, recover layout, interpret fields, execute content,
-or read images. XLSX and PPTX remain for subsequent slices. Generic ZIP leaf
+or read images. PPTX remains for a subsequent slice. Generic ZIP leaf
 bytes remain inert and unscreened; use a document parser before offering them as text.
 No route, archive persistence, consent, scope or KnowledgeItem schema is added here.
 Callers must apply content screening before offering any returned bytes to a model.
@@ -28,3 +28,12 @@ are refused. Input/text caps apply; the entry cap counts cells (blank rows count
 as one entry). Python's field-size cap also applies without global mutation.
 CSV has no reliable magic signature: the caller must explicitly select this parser.
 Cells remain untrusted data and need screening before use or spreadsheet export.
+
+`parse_xlsx` resolves shared and inline strings and reads stored worksheet cell
+values with `xl/worksheets/<part>.xml#<cell>` citations. Formula cached values are
+returned as inert text; a missing cached value is empty. It never evaluates formulas
+or interprets styles, dates, layout, charts or sheet display names. All XML parts
+use the same bounded Office screening as DOCX; external-link parts are refused.
+Invalid/duplicate cell references, unknown cell types and missing shared-string
+indices are refused. The entry cap also bounds emitted cells; text caps apply to
+resolved output. Numeric, boolean, date and error values preserve stored text.
