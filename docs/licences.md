@@ -136,6 +136,8 @@ Its tests use `jsonschema` and `referencing` from the root dev group (above).
 | reportlab | BSD | https://pypi.org/project/reportlab/ |
 | pypdf | BSD-3-Clause | https://pypi.org/project/pypdf/ |
 
+`tilo-providers` (LW-06) also uses `pypdf` (listed above) to count the pages of an untrusted PDF part.
+
 `tilo-render` (AGR-01/02/03 / FR-CON-09) also uses `pydantic` (already listed under `packages/contracts-py`, MIT) and `pyyaml` (already listed under the root dev dependency group, MIT).
 
 ## JavaScript / TypeScript (root `package.json` and `apps/web`, `pnpm`-managed)
