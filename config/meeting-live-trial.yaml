@@ -1,0 +1,8 @@
+# Standalone synthetic FR-MTG-16 probe; never connected to a real meeting.
+# GA model reference: https://docs.cloud.google.com/gemini-enterprise-agent-platform/models/guides/gemini-3-8-live
+# One explicitly requested turn only. LIVE is set only by the user; replay is always the default.
+model: gemini-3.8-live
+prompt: Say ready in one short spoken sentence.
+timeout_s: 20
+max_audio_bytes: 1440000 # 30 seconds of 24kHz mono s16le
+max_output_tokens: 256
