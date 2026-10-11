@@ -77,6 +77,52 @@ const EMPTY_REPORT = {
   by_tier_profile: [],
 };
 
+it("FR_SPD_04_preserves_recorded_run_totals_without_inventing_skill_curves", () => {
+  const L = ledgerFromCosts(REPORT);
+  expect(L.recordedRuns).toEqual(
+    REPORT.tasks.map(({ run_id, usd, completed }) => ({
+      id: run_id,
+      usd,
+      completed,
+    })),
+  );
+  expect(L.runs).toEqual([]);
+  expect(
+    ledgerFromCosts({ totals: { usd: 0 }, by_profile: [], by_task_type: [] }).recordedRuns,
+  ).toEqual([]);
+});
+
+it("FR_SPD_05_07_maps_recorded_waits_and_history_without_assuming_approval", () => {
+  const L = ledgerFromCosts({
+    ...EMPTY_REPORT,
+    approval_waits: [{ action_type: "send_email", seconds: 120 }],
+    activity: [
+      {
+        world_id: "world-a",
+        card_id: "card-a",
+        run_id: "run-a",
+        type: "approval.resolved",
+        ts: "2026-10-11T09:02:00Z",
+        summary: "Held for edits",
+      },
+    ],
+  });
+  expect(L.waits.buckets).toEqual([
+    ["Under 1 min", 0],
+    ["1–5 min", 1],
+    ["5–60 min", 0],
+    ["1 hour or more", 0],
+  ]);
+  expect(L.waits.types).toEqual([["send_email", "2.0 min", "neutral"]]);
+  expect(L.activity[0]).toMatchObject({
+    day: "2026-10-11",
+    t: "09:02 UTC",
+    k: "answer",
+    what: "Held for edits",
+  });
+  expect(L.activity[0]?.dec).toBeUndefined();
+});
+
 /** Every number anywhere in `v`. */
 function numbers(v: unknown): number[] {
   if (typeof v === "number") return [v];
