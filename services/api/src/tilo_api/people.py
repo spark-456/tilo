@@ -20,6 +20,8 @@ from tilo_people.stores import PeopleStores
 
 from tilo_api import deps, people_items
 from tilo_api.meeting_host import HostSeams, get_host_seams, host_meeting
+from tilo_api.meeting_host_rpc import MeetingHostRpc
+from tilo_api.meeting_join import owner_join
 from tilo_api.people_events import WorkEvents, get_work_events
 from tilo_api.people_limits import idempotent, write_limit
 from tilo_api.people_meetings import MeetingEditIn, edit_meeting, get_meeting, read_minutes, set_world
@@ -246,6 +248,19 @@ def meeting_world_route(
     if _MEETING_ID.fullmatch(meeting_id) is None:
         raise _not_found()
     return _answer(lambda: set_world(_writer(principal, stores, clock), worlds, meeting_id))
+
+
+@router.get("/v1/meetings/{meeting_id}/join")
+def join_meeting_route(
+    meeting_id: str,
+    principal: Annotated[deps.Principal, Depends(deps.get_current_principal)],
+    stores: Annotated[PeopleStores, Depends(deps.get_people_stores)],
+    store: Annotated[deps.Store, Depends(deps.get_store)],
+    artifacts: Annotated[ArtifactStore, Depends(deps.get_artifact_store)],
+    client: Annotated[MeetingHostRpc, Depends(deps.get_meeting_host_client)],
+    clock: Annotated[Callable[[], str], Depends(deps.get_clock)],
+) -> dict[str, Any]:
+    return _answer(lambda: owner_join(_writer(principal, stores, clock), store, artifacts, client, meeting_id))
 
 
 @router.post("/v1/meetings/{meeting_id}/host")

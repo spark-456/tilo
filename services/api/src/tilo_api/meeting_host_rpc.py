@@ -43,6 +43,7 @@ from tilo_contracts import (
     MeetingHostRpcStartAnswer,
     MeetingHostRpcStatusAnswer,
     MeetingHostRpcViewsAnswer,
+    MeetingJoin,
 )
 from tilo_memory.artifacts import ArtifactCorrupt  # noqa: E402
 
@@ -198,6 +199,17 @@ class MeetingHostRpc:
             raise HostRpcError("unknown") from None
         if reply.status == 200:
             return reply.body
+        if route == "join" and reply.status == 409:
+            try:
+                body = json.loads(reply.body)
+            except (ValueError, TypeError):
+                body = None
+            if isinstance(body, dict) and body in (
+                {"error": "not_joinable"},
+                {"error": "no_join_link"},
+                {"error": "host_not_connected"},
+            ):
+                raise HostRpcError("rejected", body["error"])
         if reply.status == 400 and route == "connect-callback":
             said = _error_code(reply.body)
             if said in CALLBACK_REFUSALS:
@@ -206,6 +218,14 @@ class MeetingHostRpc:
         refused = reply.status in (401, 403, 422) or (reply.status == 503 and _is_error(reply.body, "not_configured"))
         logger.warning("meeting-host %s: answered %s", route, reply.status)
         raise HostRpcError("refused" if refused else "unknown")
+
+    def join_link(self, receipt: Mapping[str, Any]) -> MeetingJoin:
+        """The API supplies its scoped receipt; connectors alone reads the host grant."""
+        try:
+            checked = MeetingHostRpcReceipt.model_validate(receipt)
+            return MeetingJoin.model_validate_json(self._post("join", checked.model_dump(mode="json")))
+        except ValidationError:
+            raise HostRpcError("unknown") from None
 
     def status(self, user_id: str) -> MeetingHostRpcStatusAnswer:
         """The principal's own bot-grant state. Any failure is a `HostRpcError`; a store read, so no parts."""
