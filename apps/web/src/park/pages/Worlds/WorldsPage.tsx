@@ -7,6 +7,8 @@ import type { AppCtx } from "../../app/AppCtx";
 import { useParkApi } from "../../app/context";
 import { useStaged } from "../../app/useStaged";
 import { PageSheet } from "../../components";
+import { SampleControls } from "../../sample/SampleControls";
+import { hideSample, showSample } from "../../sample/sampleChoice";
 import { CityCard, TownCard, VillageCard } from "./Cards";
 import { Filters } from "./Filters";
 import { Header } from "./Header";
@@ -19,6 +21,8 @@ import { type StatusFilter, type TierFilter, countFor, statusOf, visibleWorlds }
 interface Loaded {
   worlds: World[];
   decisions: Decision[];
+  /** The worlds came from tilo-api: only then is there a sample project to hide or show (STARTER-1). */
+  live: boolean;
 }
 
 export function WorldsPage({ app }: { app: AppCtx }) {
@@ -31,7 +35,9 @@ export function WorldsPage({ app }: { app: AppCtx }) {
   const [status, setStatus] = useState<StatusFilter>("all");
   const [tier, setTier] = useState<TierFilter>("all");
   const [query, setQuery] = useState("");
+  const [reload, setReload] = useState(0); // STARTER-1: Hide / Show sample project read the list again
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `reload` only asks for the list again (Hide / Show sample project)
   useEffect(() => {
     let live = true;
     Promise.all([
@@ -42,7 +48,7 @@ export function WorldsPage({ app }: { app: AppCtx }) {
       ([w, d, p]) => {
         if (!live) return;
         plans.current = p.data;
-        setData({ worlds: w.data, decisions: d.data });
+        setData({ worlds: w.data, decisions: d.data, live: w.source === "live" });
         setFailed(false);
       },
       () => {
@@ -52,7 +58,7 @@ export function WorldsPage({ app }: { app: AppCtx }) {
     return () => {
       live = false;
     };
-  }, [api, dec, added]);
+  }, [api, dec, added, reload]);
 
   // One object per input, so the memoised cards below are not rendered again for nothing.
   // biome-ignore lint/correctness/useExhaustiveDependencies: `data` is when the plans in the ref have arrived
@@ -85,6 +91,19 @@ export function WorldsPage({ app }: { app: AppCtx }) {
           <EmptyBox title="Not connected yet" />
         ) : data ? (
           <>
+            {data.live ? (
+              <SampleControls
+                listed={all.some((w) => w.sample)}
+                onHide={() => {
+                  hideSample();
+                  setReload((n) => n + 1);
+                }}
+                onShow={() => {
+                  showSample();
+                  setReload((n) => n + 1);
+                }}
+              />
+            ) : null}
             <Filters
               status={status}
               tier={tier}

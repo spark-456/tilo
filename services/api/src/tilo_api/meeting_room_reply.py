@@ -28,7 +28,12 @@ _ARTIFACT_EVENTS = ("artifact.created", "artifact.versioned")
 
 
 class RoomModelUnavailable(Exception):
-    """The role is missing, uncapped or unpriced, or every candidate failed (decision 10: the reply is `failed`)."""
+    """The role is missing, uncapped or unpriced, or every candidate failed (decision 10: the reply is `failed`).
+    `credits` is what billed attempts already cost (SEC-16: charged, never recorded as 0)."""
+
+    def __init__(self, message: str = "", credits: float = 0.0) -> None:
+        super().__init__(message)
+        self.credits = credits
 
 
 class RoomCapped(Exception):
@@ -235,8 +240,8 @@ def answer(
         got = model.reply(mode, system, prompt, record=record, budget=budget)
     except RoomCapped:
         raise
-    except Exception:  # an outage is never "not flagged" and never a made-up reply (fail closed)
-        return Reply("failed", None)
+    except Exception as exc:  # an outage is never "not flagged" and never a made-up reply (fail closed)
+        return Reply("failed", None, credits=float(getattr(exc, "credits", 0.0)))
     trace = {
         "model_role": got.role,
         "profile": got.profile,
@@ -278,6 +283,22 @@ class RouterRoomModel:
         except ProviderConfigError:
             raise RoomModelUnavailable("a candidate of the room role has no price") from None
 
+    def _billed(self, attempts: list, budget: float) -> float:
+        """Credits the attempts that reached a model cost: their tokens at the profile's price; a call that ran to its
+        output cap reports none, so it costs the whole budget (its worst case). Unsent attempts cost nothing."""
+        sent = [a for a in attempts if a.error_type not in ("BudgetExceededError", "TokenCapExceededError")]
+        if any(a.error_type == "OutputTruncatedError" for a in sent):
+            return budget
+        total = 0.0
+        try:
+            for a in sent:
+                if a.tokens_in is not None and a.tokens_out is not None:
+                    q = self._providers.price(a.profile_id)
+                    total += self._providers.credits((a.tokens_in * q.input + a.tokens_out * q.output) / 1e6)
+        except Exception:
+            return budget
+        return min(total, budget)
+
     def reply(self, mode: str, system: str, prompt: str, *, record: Grounding, budget: float) -> ModelReply:
         started = time.monotonic()
         try:
@@ -286,10 +307,10 @@ class RouterRoomModel:
             )
         except BudgetExceededError:
             raise RoomCapped from None
-        except RouterError:
-            raise RoomModelUnavailable("every candidate failed") from None
+        except RouterError as exc:
+            raise RoomModelUnavailable("every candidate failed", self._billed(exc.attempts, budget)) from None
         if result.outcome != "ok" or result.response is None:
-            raise RoomModelUnavailable("no usable reply")
+            raise RoomModelUnavailable("no usable reply", max(0.0, budget - (result.budget or budget)))
         last = result.attempts[-1] if result.attempts else None
         spent = max(0.0, budget - result.budget) if result.budget is not None else 0.0
         return ModelReply(

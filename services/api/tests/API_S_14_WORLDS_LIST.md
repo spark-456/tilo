@@ -11,7 +11,9 @@ field below is read from events and world records that already exist.
   it exists. No world, or an unknown one: an empty list, never a 404 (no membership oracle). Another person's world never appears.
 
 ## Response
-`200 {"worlds": [item, ...], "next_cursor": str | null}`. Empty: `{"worlds": [], "next_cursor": null}`. No fixture or sample world, ever.
+`200 {"worlds": [item, ...], "next_cursor": str | null}`. Empty: `{"worlds": [], "next_cursor": null}`. No fixture world is ever listed, with one exception (STARTER-1, BQ-STARTER-1,
+`tests/test_STARTER_1_sample_project.py`): the recorded sample project `w_sample_village_basic`, an item with `sample: true` and
+title `Sample: <its world.requested title>`, listed for an owner with no worlds of their own or on `?include_sample=1`.
 
 Item, exactly these keys (BQ-S14-2):
 
