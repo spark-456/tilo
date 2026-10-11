@@ -528,6 +528,7 @@ _CONFIG = (store_door.ENV_STORE, store_door.ENV_PROJECT, "FIRESTORE_EMULATOR_HOS
 
 def deployed() -> tuple[DurableStore, deps.EventWriter]:
     """The cached store and writer for this config, or 503: `not_configured` (never cached) or `store_unavailable`."""
+    from tilo_api import prod
     from tilo_api.world_writer import WorldWriterAdapter
 
     key = tuple(os.environ.get(name) for name in _CONFIG)
@@ -538,7 +539,9 @@ def deployed() -> tuple[DurableStore, deps.EventWriter]:
             except store_door.ApiStoreNotConfigured:
                 raise HTTPException(status_code=503, detail="not_configured") from None
             store = DurableStore(opened.records, opened.events)
-            store.writer = WorldWriterAdapter(store, opened.events)
+            store.writer = WorldWriterAdapter(
+                store, opened.events, ledger=prod.FirestoreLedger(opened.client, deps.ORG_ID)
+            )
             _opened[key] = (store, store.writer)
         return _opened[key]
 

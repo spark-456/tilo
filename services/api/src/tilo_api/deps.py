@@ -329,14 +329,19 @@ def get_event_writer(request: Request = None) -> EventWriter:  # type: ignore[as
 
 
 def get_ledger() -> Sequence[LedgerEntry]:
-    """The Treasury's ledger (FR-MTR-10). No ledger store is wired in yet (BQ-MTR10-4): fail closed."""
-    raise HTTPException(status_code=503, detail="not_configured")
+    """The Treasury's ledger (FR-MTR-10): every entry of `orgs/org_tilo/ledger` on the process's shared client, read
+    afresh on each call, under the access store's door rule (`_api_door`). Dev mode overrides this seam."""
+    from tilo_api import prod  # noqa: PLC0415  (prod imports this module's neighbours)
+
+    return prod.FirestoreLedger(_api_door().client, ORG_ID).entries()
 
 
 def get_ledger_writer() -> Any:
-    """The Treasury's write seam (COST-FAST-1b, BQ-COSTFAST-7): an object with `append(LedgerEntry)`. Not wired
-    yet, like `get_ledger`: fail closed. Quick treats that as best effort (`ledger_writer_for`)."""
-    raise HTTPException(status_code=503, detail="not_configured")
+    """The Treasury's write seam (COST-FAST-1b, BQ-COSTFAST-7): an object with `append(LedgerEntry)`, a retry of one
+    entry being one document. The same door as `get_ledger`; Quick treats a refusal as best effort."""
+    from tilo_api import prod  # noqa: PLC0415
+
+    return prod.FirestoreLedgerWriter(prod.FirestoreLedger(_api_door().client, ORG_ID))
 
 
 def ledger_writer_for(request: Request) -> Any:
@@ -381,15 +386,15 @@ def budget_cap_ceiling() -> float:
     return float(value)
 
 
-def get_access_store() -> AccessStore:
-    """SEC-15: where each person's visitor-or-judge declaration is kept. Deployed: a `FirestoreAccessStore` on the
-    process's shared client when `TILO_API_STORE=firestore` and the api store door opens (the same rules as
-    `store_door.open_api_store`); otherwise 503 `not_configured`, never cached, so a deployed process closes every
-    gated route rather than guess. A failing client build is 503 `store_unavailable`, never with the error text, and is
+def _api_door() -> Any:
+    """The api store door's opening (its shared Firestore client) for the seams kept beside the store: SEC-15's access
+    store and the Treasury's ledger. Only `TILO_API_STORE=firestore` with a config `store_door.open_api_store` accepts
+    (the same rules); otherwise 503 `not_configured`, never cached, so a deployed process closes every route that needs
+    one rather than guess. A failing client build is 503 `store_unavailable`, never with the error text, and is
     remembered for `PEOPLE_STORES_BACKOFF_S` like the people door's (FS-18): inside the window a request is refused at
     once, with no client call; a refusal for configuration is not backed off."""
     global _access_retry_at
-    from tilo_api import prod, store_door  # noqa: PLC0415  (they import this module's neighbours)
+    from tilo_api import store_door  # noqa: PLC0415  (it imports this module's neighbours)
 
     retry_at = _access_retry_at
     if retry_at is not None and people_stores_clock() < retry_at:
@@ -402,7 +407,15 @@ def get_access_store() -> AccessStore:
         _access_retry_at = people_stores_clock() + PEOPLE_STORES_BACKOFF_S
         raise
     _access_retry_at = None
-    return prod.FirestoreAccessStore(opened.client, ORG_ID)
+    return opened
+
+
+def get_access_store() -> AccessStore:
+    """SEC-15: where each person's visitor-or-judge declaration is kept: a `FirestoreAccessStore` on the door's shared
+    client (`_api_door`'s rules), else 503, so a deployed process closes every gated route."""
+    from tilo_api import prod  # noqa: PLC0415
+
+    return prod.FirestoreAccessStore(_api_door().client, ORG_ID)
 
 
 def get_app_check_verifier() -> AppCheckVerifier:

@@ -11,21 +11,27 @@ host, single-flight, by `build_client`; a build that raises is not cached and su
 never with the exception text (only its type is logged).
 
 `store_door.client_factory` and the people door's default factory delegate here lazily (this module imports both of
-them), so the api store, the people stores and the access store share one client object.
+them), so the api store, the people stores, the access store and the ledger share one client object.
 """
 
 from __future__ import annotations
 
+import hashlib
+import json
 import logging
+import math
 import os
 import random
 import re
 import threading
 import time
+from datetime import date, datetime
 from typing import Any
 
 from google.api_core import exceptions as gexc
 from google.auth import exceptions as gauth_exc
+from tilo_metering import LedgerEntry
+from tilo_metering.prices import Usage
 
 from tilo_api.people_firestore import PeopleStoreNotConfigured
 from tilo_api.store_door import GCP_PROJECT, ApiStoreNotConfigured, ApiStoreUnavailable
@@ -159,3 +165,139 @@ class FirestoreAccessStore:
             raise FirestoreUnavailable from None
         logger.warning("access declaration contended beyond %d attempts", _ATTEMPTS)
         raise FirestoreUnavailable from None
+
+
+_ENTRY_ID = re.compile(r"[A-Za-z0-9_-]{1,128}")
+_ISO_DAY = re.compile(r"\d{4}-\d{2}-\d{2}")
+
+
+class LedgerConflict(Exception):  # noqa: N818 - the name is the ticket's
+    """An entry id already holds another body: the first stands, the ledger never overwrites."""
+
+
+def _encode(entry: LedgerEntry) -> dict[str, Any]:
+    """The JSON-safe document body of an entry (`at` and `day` ISO strings, `usage` a dict)."""
+    if not isinstance(entry.at, datetime) or entry.at.tzinfo is None:
+        raise ValueError("a ledger entry's `at` is a timezone-aware datetime")
+    usage = entry.usage
+    return {
+        "kind": entry.kind, "run": entry.run, "user": entry.user, "org": entry.org, "at": entry.at.isoformat(),
+        "step": entry.step, "credits": entry.credits,
+        "usage": None if usage is None else {
+            "profile": usage.profile, "tokens_in": usage.tokens_in, "tokens_out": usage.tokens_out,
+        },
+        "price_effective_date": entry.price_effective_date, "price_source": entry.price_source,
+        "day": None if entry.day is None else entry.day.isoformat(),
+    }  # fmt: skip
+
+
+def _optional_text(data: dict[str, Any], key: str) -> str | None:
+    value = data.get(key)
+    if value is not None and not isinstance(value, str):
+        raise ValueError(key)
+    return value
+
+
+def _decode(data: object) -> LedgerEntry:
+    """The entry a stored body holds, or `ValueError`/`TypeError` (the caller logs the type, never a value)."""
+    if not isinstance(data, dict):
+        raise ValueError("body")
+    kind, run, user, org, at = (data.get(k) for k in ("kind", "run", "user", "org", "at"))
+    if not (isinstance(kind, str) and isinstance(run, str) and isinstance(user, str) and isinstance(org, str)):
+        raise ValueError("required")
+    if not isinstance(at, str):
+        raise ValueError("at")
+    moment = datetime.fromisoformat(at)
+    if moment.tzinfo is None:
+        raise ValueError("at")
+    credits = data.get("credits")
+    if credits is not None and (
+        isinstance(credits, bool) or not isinstance(credits, int | float) or not math.isfinite(credits)
+    ):
+        raise ValueError("credits")
+    usage = data.get("usage")
+    if usage is not None:
+        if not isinstance(usage, dict) or not isinstance(usage.get("profile"), str):
+            raise ValueError("usage")
+        usage = Usage(usage["profile"], usage.get("tokens_in"), usage.get("tokens_out"))
+    day = data.get("day")
+    if day is not None and not (isinstance(day, str) and _ISO_DAY.fullmatch(day)):
+        raise ValueError("day")
+    return LedgerEntry(
+        kind, run, user, org, moment,
+        step=_optional_text(data, "step"), credits=None if credits is None else float(credits), usage=usage,
+        price_effective_date=_optional_text(data, "price_effective_date"),
+        price_source=_optional_text(data, "price_source"), day=None if day is None else date.fromisoformat(day),
+    )  # fmt: skip
+
+
+class FirestoreLedger:
+    """The Treasury's ledger kept at `orgs/{org}/ledger/{entry_id}` (FR-MTR-10, COST-FAST-1b; ADR-0018 T4: one org).
+    Append-only: `append` is one create-if-absent and, on `AlreadyExists`, a read-back (an equal entry is a no-op,
+    another body is `LedgerConflict` and changes nothing); it never overwrites or deletes. `entries()` reads the whole
+    org collection each time, skips a document that does not decode (logged by exception type) and sorts by
+    `(at, entry_id)`. A Google API error is `FirestoreUnavailable` (503, only its type logged)."""
+
+    def __init__(self, client: Any, org_id: str = "org_tilo") -> None:
+        if not _is_document_id(org_id):
+            raise ValueError("not a Firestore document id")
+        self._client, self._org = client, org_id
+
+    def append(self, entry: LedgerEntry, *, entry_id: str) -> None:
+        if not isinstance(entry_id, str) or _ENTRY_ID.fullmatch(entry_id) is None:
+            raise ValueError("an entry id is 1 to 128 letters, digits, underscores or hyphens")
+        body = _encode(entry)
+        ref = self._client.document(f"orgs/{self._org}/ledger/{entry_id}")
+        try:
+            for attempt in range(_ATTEMPTS):
+                try:
+                    ref.create(body)
+                    return
+                except gexc.AlreadyExists:
+                    snapshot = ref.get()
+                    try:
+                        held = _decode(snapshot.to_dict() if snapshot.exists else None)
+                    except (ValueError, TypeError):
+                        raise LedgerConflict(entry_id) from None
+                    if held != entry:
+                        raise LedgerConflict(entry_id) from None
+                    return
+                except gexc.Aborted:  # contention on the one document (the emulator's lock timeout): create again
+                    time.sleep(random.uniform(0, 0.05 * (attempt + 1)))  # noqa: S311 - jitter, not security
+        except _LIBRARY_ERRORS as exc:
+            logger.warning("ledger unavailable (%s)", type(exc).__name__)
+            raise FirestoreUnavailable from None
+        logger.warning("ledger append contended beyond %d attempts", _ATTEMPTS)
+        raise FirestoreUnavailable from None
+
+    def append_entry(self, entry: LedgerEntry) -> None:
+        """`append` under an id derived from the body, so a retry of the same entry is the same document."""
+        canonical = json.dumps(_encode(entry), sort_keys=True, separators=(",", ":"))
+        self.append(entry, entry_id=hashlib.sha256(canonical.encode()).hexdigest())
+
+    def entries(self) -> tuple[LedgerEntry, ...]:
+        try:
+            snapshots = list(self._client.collection(f"orgs/{self._org}/ledger").stream())
+        except _LIBRARY_ERRORS as exc:
+            logger.warning("ledger unavailable (%s)", type(exc).__name__)
+            raise FirestoreUnavailable from None
+        found: list[tuple[datetime, str, LedgerEntry]] = []
+        for snapshot in snapshots:
+            try:
+                entry = _decode(snapshot.to_dict())
+            except (ValueError, TypeError) as exc:
+                logger.warning("skipped a ledger document that does not decode (%s)", type(exc).__name__)
+                continue
+            found.append((entry.at, snapshot.id, entry))
+        found.sort(key=lambda item: (item[0], item[1]))
+        return tuple(entry for _, _, entry in found)
+
+
+class FirestoreLedgerWriter:
+    """COST-FAST-1b's write seam (`append(entry)`) over a `FirestoreLedger`: a retry of one entry is one document."""
+
+    def __init__(self, ledger: FirestoreLedger) -> None:
+        self._ledger = ledger
+
+    def append(self, entry: LedgerEntry) -> None:
+        self._ledger.append_entry(entry)

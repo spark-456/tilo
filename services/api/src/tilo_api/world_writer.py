@@ -5,6 +5,8 @@ layout of the world's cached record, never the part's. `append` commits under th
 resend returns the committed event, other content raises `deps.EventRejected` (the harness one is mapped), and
 `WriterBusy` passes through unchanged. The committed event joins `store.events[world]` unless it is already there: the
 only cache write for events.
+With a `ledger`, a committed event that costs credits also appends its Treasury `commit` entry under the event id
+(PROD-WIRE 5a): a resend repeats it harmlessly, and a ledger failure is logged by type, never failing the event write.
 
 Until the run builds its layout the writer gets one with a single agent, `A_director` (EV-12 accepts the Director's
 planning events); the adapter reopens a writer whose world's `run_id` or `layout` changed. `WriterBusy` from an emit or
@@ -27,6 +29,7 @@ from tilo_harness.validator import EventRejected as HarnessEventRejected
 from tilo_harness.writer import WorldWriter, WriterBusy
 
 from tilo_api import deps
+from tilo_api.cost_entries import entry_from_cost_event
 
 logger = logging.getLogger("tilo_api.world_writer")
 
@@ -48,8 +51,10 @@ class WorldWriterAdapter:
         org_id: str = deps.ORG_ID,
         clock: Callable[[], datetime] | None = None,
         lease_s: float = 30.0,
+        ledger: Any = None,
     ) -> None:
         self._store, self._backend, self._org_id, self._clock, self._lease_s = store, backend, org_id, clock, lease_s
+        self._ledger = ledger  # anything with `append(entry, *, entry_id)`: the Treasury's durable ledger
         # world -> ((run_id, layout) it was opened for, its writer)
         self._open: dict[str, tuple[tuple[str, dict[str, Any] | None], WorldWriter]] = {}
         # A fixed table, so it never grows: a world takes the stripe of its id (two worlds sharing one only take turns;
@@ -112,6 +117,18 @@ class WorldWriterAdapter:
         except HarnessEventRejected as exc:
             raise deps.EventRejected(str(exc)) from exc
 
+    def _record_cost(self, record: deps.WorldRecord, committed: dict[str, Any]) -> None:
+        """A committed cost event becomes its ledger entry under the event id, so a resend of the event is a no-op there
+        and repairs an append that failed. The ledger is never allowed to fail or undo the event write."""
+        if self._ledger is None:
+            return
+        try:
+            entry = entry_from_cost_event({**committed, "run_id": record.run_id}, record.owner)
+            if entry is not None:
+                self._ledger.append(entry, entry_id=committed["id"])
+        except Exception as exc:  # the type only: a message may carry a value
+            logger.warning("cost ledger append for event %s failed (%s)", committed.get("id"), type(exc).__name__)
+
     def append(self, world_id: str, part: dict[str, Any]) -> dict[str, Any]:
         if not isinstance(part.get("id"), str) or part.get("vis") is None:
             raise deps.EventRejected("an event needs its own `id` and says who may see it (`vis`)")
@@ -124,6 +141,7 @@ class WorldWriterAdapter:
             except WriterBusy:  # an own lease lapsed while idle, or the head moved: reopen this world once, resend
                 self._close(world_id)
                 committed = self._emit(world_id, record, part)
+            self._record_cost(record, committed)
             events = self._store.events.setdefault(world_id, [])
             if not events or committed["seq"] > events[-1]["seq"]:  # a resend returns an event already cached
                 events.append(committed)

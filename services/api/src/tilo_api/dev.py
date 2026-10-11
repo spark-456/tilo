@@ -13,7 +13,6 @@ import os
 import re
 import threading
 from collections.abc import Callable, Mapping
-from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -28,6 +27,7 @@ from tilo_metering.flags import process_flags
 from tilo_people.stores import PeopleStores
 
 from tilo_api import deps, dev_run, events
+from tilo_api.cost_entries import entry_from_cost_event
 
 ENV_FLAG = "TILO_API_DEV"  # "1" turns dev mode on; nothing else does
 ENV_ORIGINS = "TILO_API_DEV_ORIGINS"  # comma-separated allowed browser origins
@@ -101,14 +101,9 @@ class DevLedger:
         self._lock = threading.Lock()
 
     def record(self, event: Mapping[str, Any], owner: str) -> None:
-        credits = event.get("credits")
-        if isinstance(credits, bool) or not isinstance(credits, int | float) or credits <= 0:
+        entry = entry_from_cost_event(event, owner, usage=dev_run.UNIT_USAGE)
+        if entry is None:
             return
-        item = event.get("item")
-        entry = LedgerEntry(
-            kind="commit", run=event["run_id"], user=owner, org=deps.ORG_ID, at=datetime.fromisoformat(event["ts"]),
-            step=item if isinstance(item, str) else None, credits=float(credits), usage=dev_run.UNIT_USAGE,
-        )  # fmt: skip
         with self._lock:
             self._entries.append(entry)
 
