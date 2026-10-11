@@ -10,6 +10,8 @@ def test_grounded_publisher_hosts_survive_search_redirects():
 
     result = SearchResult(
         query="papers",
+        answer="Recorded publishers",
+        queries=["papers"],
         profile_id="fixture",
         sources=[
             SearchSource(
