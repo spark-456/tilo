@@ -18,7 +18,9 @@ it("FR_AGT_15 the live World page reaches proposals and the demo World never req
     const world = result.data[0];
     if (!world) throw new Error("Test world missing");
     api.getWorlds = async () => ({ data: result.data, source });
-    const fetch = vi.fn(async () => new Response(JSON.stringify({ proposals: [] })));
+    const fetch = vi.fn(
+      async (_url: RequestInfo | URL) => new Response(JSON.stringify({ proposals: [] })),
+    );
     const sch = fakeScheduler();
     await act(async () => {
       mount(

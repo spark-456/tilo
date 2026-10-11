@@ -1,17 +1,15 @@
 import { useEffect, useRef, useState } from "react";
-import { type HttpClient, TiloApiError } from "../../../api/http";
-import { proposalsFromList } from "../../api/live/skillProposals";
+import { type ProposalClient, readProposals, reviewProposal } from "../../api/live/skillProposals";
 import type { SkillProposal } from "../../api/types";
 
 /** The server determines who may review; the page records success only from its response. */
-export function SkillProposals({ client, worldId }: { client: HttpClient; worldId: string }) {
+export function SkillProposals({ client, worldId }: { client: ProposalClient; worldId: string }) {
   const [rows, setRows] = useState<SkillProposal[] | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [attempt, setAttempt] = useState(0);
   const generation = useRef(0);
   const writing = useRef(false);
-  const path = `/worlds/${encodeURIComponent(worldId)}/skill-proposals`;
   useEffect(() => {
     generation.current++;
     writing.current = false;
@@ -21,11 +19,8 @@ export function SkillProposals({ client, worldId }: { client: HttpClient; worldI
     let active = true;
     setRows(null);
     setError("");
-    client
-      .getJson(path)
-      .then((body) => {
-        const list = proposalsFromList(body, worldId);
-        if (!list) throw new TiloApiError("Could not read skill proposals.", 200, true);
+    readProposals(client, worldId)
+      .then((list) => {
         if (active) setRows(list);
       })
       .catch(() => {
@@ -36,7 +31,7 @@ export function SkillProposals({ client, worldId }: { client: HttpClient; worldI
       active = false;
       generation.current++;
     };
-  }, [client, path, worldId, attempt]);
+  }, [client, worldId, attempt]);
   const decide = async (p: SkillProposal, verb: "approve" | "reject") => {
     if (writing.current) return;
     writing.current = true;
@@ -44,16 +39,7 @@ export function SkillProposals({ client, worldId }: { client: HttpClient; worldI
     setBusy(true);
     setError("");
     try {
-      const body = await client.postJson(`${path}/${encodeURIComponent(p.id)}/${verb}`, {});
-      const proposal = (body as { proposal?: unknown } | null)?.proposal;
-      const list = proposalsFromList({ proposals: [proposal] }, worldId);
-      const done = list?.[0];
-      if (
-        !done ||
-        done.id !== p.id ||
-        done.status !== (verb === "approve" ? "approved" : "rejected")
-      )
-        throw new Error("Unreadable decision");
+      const done = await reviewProposal(client, worldId, p.id, verb);
       if (current === generation.current)
         setRows((old) => old?.map((row) => (row.id === done.id ? done : row)) ?? null);
     } catch {
