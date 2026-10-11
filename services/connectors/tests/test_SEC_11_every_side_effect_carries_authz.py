@@ -9,7 +9,8 @@ authorisation that opened it. The side-effect set is DISCOVERED, not hard-coded,
 coverage fails this file:
 
 - the action catalogue: every action type in the risk table (config/autonomy.yaml, `tilo_policy.load_risk_table`)
-  except the read-only `read_events` and the connector-less `grant_budget` (its authz is the `budget.granted` event,
+  except the read-only `read_events`, `web_search` and `fetch_url` (ADR-0029) and the connector-less `grant_budget`
+  (its authz is the `budget.granted` event,
   checked in the harness SEC-11 file), paired with the connector that declares it in config/connectors.yaml;
 - every gated or non-read action of every connector in config/connectors.yaml (`load_registry`);
 - every adapter class under `tilo_connectors.adapters` (and the in-process fakes) that exposes a method named in
@@ -57,7 +58,8 @@ CONTRACTS = REPO_ROOT / "contracts"
 NOW = "2026-09-29T09:00:00.000Z"
 
 READ_ONLY_CAPABILITIES = {"read", "search", "list"}
-NOT_AN_OUTBOX_ACTION = {"read_events", "grant_budget"}  # read-only; and a budget grant that goes through no connector
+# read-only (each declared ungated with a read capability, checked below); and a budget grant through no connector
+NOT_AN_OUTBOX_ACTION = {"read_events", "web_search", "fetch_url", "grant_budget"}
 MUTATION_VERBS = ("send", "create", "save", "share", "delete", "insert", "patch", "update", "upload", "post", "write")
 
 
@@ -141,6 +143,11 @@ def test_SEC_11_the_discovered_side_effect_set_is_consistent_between_config_and_
     )
     assert {"send_email", "create_draft", "save_file", "save_as_google_file", "build_handoff"} <= set(ACTION_TYPES)
     assert "create_meeting_event" in ACTION_TYPES
+    registry = load_registry(REPO_ROOT / "config" / "connectors.yaml")
+    actions = {a["id"]: a for c in registry.ids() for a in registry.get(c)["actions"]}
+    for read_only in NOT_AN_OUTBOX_ACTION - {"grant_budget"}:  # excluded only while it stays an ungated read
+        assert actions[read_only]["gate_type"] == "none", read_only
+        assert actions[read_only]["capability"] in READ_ONLY_CAPABILITIES, read_only
 
 
 def test_SEC_11_every_adapter_that_can_perform_a_side_effect_runs_only_from_the_outbox():

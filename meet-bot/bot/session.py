@@ -45,6 +45,7 @@ from .providers import ProviderFastClient, ProviderLLM, ProviderSpeech, make_rou
 from .speaker import NullSpeaker, VoiceSpeaker
 from .timing import Timeline
 from .trace import Turn, TurnTrace
+from .tts import STT_END_AT
 
 log = logging.getLogger("bot.session")
 STATUS_EVERY_S = 3.0  # how often to check who is here before the meeting has started for the bot
@@ -153,6 +154,7 @@ class LiveSession:
         self.gate_at: float | None = None
         self.ignore = {"you", (cfg.bot_display_name or "").lower()}
         self.first_seen: dict[str, float] = {}
+        self.stt_final: dict[str, float] = {}  # FR-MTG-11: question -> clock time its STT result came back
         self.own_texts: set[str] = set()
         self.spans = CaptionSpans()
         self.buffer = AudioBuffer()
@@ -228,7 +230,7 @@ class LiveSession:
         return Utterance(u.speaker, u.text, max(0.0, u.t - (self.gate_at or 0.0)), u.ts)
 
     # -- recording of transcript lines -----------------------------------------------------------------------------
-    def record(self, u: Utterance, heard_at: float | None = None) -> None:
+    def record(self, u: Utterance, heard_at: float | None = None, stt_final_at: float | None = None) -> None:
         if not self.intro_sent:
             return
         if stop_requested(u.text):
@@ -250,6 +252,8 @@ class LiveSession:
             q = self.brain.question_in(u)
             if q and self.brain.is_fresh(q):
                 self.first_seen.setdefault(_norm(q.text), heard_at if heard_at is not None else self.clock.now())
+                if stt_final_at is not None:
+                    self.stt_final.setdefault(_norm(q.text), stt_final_at)
                 self._prewarm()
 
     def record_caption(self, u: Utterance) -> None:
@@ -363,6 +367,9 @@ class LiveSession:
                 t0 = time.monotonic()
                 text = (await asyncio.to_thread(speech.text, to_wav(pcm))).strip()
                 stt_s = time.monotonic() - t0
+                final_at = (
+                    self.clock.now()
+                )  # FR-MTG-11: the STT final result is in; the voice logs STT end -> first audio
                 if not text:
                     self.timeline.record("segment_empty", start_s=a, end_s=b, stt_s=round(stt_s, 2))
                     continue
@@ -380,7 +387,7 @@ class LiveSession:
                     text=text[:160],
                     end_to_text_s=round(self.elapsed() - b, 2),
                 )
-                self.record(Utterance(speaker or "Speaker", text, a), heard_at=self.start + b)
+                self.record(Utterance(speaker or "Speaker", text, a), heard_at=self.start + b, stt_final_at=final_at)
                 last_failure = ""
             except Exception as e:
                 level = logging.DEBUG if str(e) == last_failure else logging.WARNING
@@ -470,7 +477,13 @@ class LiveSession:
 
         if want_voice:
             mark("tts_request", t0)
-        speak = asyncio.create_task(self.speaker.say(msg.text, on_first_sound=heard_first)) if want_voice else None
+        speak = None
+        if want_voice:
+            token = STT_END_AT.set(turn.marks.get("stt_final") if turn is not None else None)  # the task copies it
+            try:
+                speak = asyncio.create_task(self.speaker.say(msg.text, on_first_sound=heard_first))
+            finally:
+                STT_END_AT.reset(token)
         self._speech_task = speak
         chat_ok, chat_s, first_out = False, 0.0, None
         if self.reply_mode != "voice" or not want_voice:
@@ -587,6 +600,8 @@ class LiveSession:
         turn = self.trace.new_turn(q.speaker, q.text, end, source)
         turn.mark("addressed", meta["first_seen"])
         turn.mark("confirmed_end", meta["detected"])
+        if meta.get("stt_final") is not None:
+            turn.mark("stt_final", meta["stt_final"])
         return turn
 
     async def _finish_quick(self, task: asyncio.Task) -> None:
@@ -686,6 +701,7 @@ class LiveSession:
                                 "question": q[1],
                                 "detected": now,
                                 "first_seen": self.first_seen.get(_norm(q[1]), now),
+                                "stt_final": self.stt_final.get(_norm(q[1])),
                             }
                             meta["turn"] = self._new_turn(q, meta)
                             self.last_question_at = now

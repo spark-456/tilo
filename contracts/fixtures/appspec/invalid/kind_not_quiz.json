@@ -1,0 +1,67 @@
+{
+  "v": "1.0",
+  "kind": "website",
+  "title": "Digital logic practice set",
+  "theme": "metropolis",
+  "timer": {
+    "seconds": 1800
+  },
+  "questions": [
+    {
+      "id": "q1",
+      "stem": "How many rows does the truth table of a 3-input Boolean function have?",
+      "options": {
+        "a": "3",
+        "b": "6",
+        "c": "8",
+        "d": "9"
+      },
+      "answer": "c",
+      "topic": "digital_logic",
+      "source": {
+        "artifact": {
+          "artifact_id": "art_sample_paper",
+          "version": 1
+        },
+        "page": 2
+      }
+    },
+    {
+      "id": "q2",
+      "stem": "Which gate alone can build every other Boolean function?",
+      "options": {
+        "a": "XOR",
+        "b": "NAND",
+        "c": "AND",
+        "d": "OR"
+      },
+      "answer": "b",
+      "topic": "digital_logic",
+      "source": {
+        "artifact": {
+          "artifact_id": "art_sample_paper",
+          "version": 1
+        },
+        "page": 3
+      }
+    },
+    {
+      "id": "q3",
+      "stem": "A queue removes items in which order?",
+      "options": {
+        "a": "Last in, first out",
+        "b": "Random",
+        "c": "By priority",
+        "d": "First in, first out"
+      },
+      "answer": "d",
+      "topic": "data_structures",
+      "source": {
+        "artifact": {
+          "artifact_id": "art_notes_upload",
+          "version": 2
+        }
+      }
+    }
+  ]
+}

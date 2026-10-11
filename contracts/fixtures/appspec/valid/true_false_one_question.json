@@ -1,0 +1,26 @@
+{
+  "v": "1.0",
+  "kind": "quiz",
+  "title": "Digital logic practice set",
+  "theme": "metropolis",
+  "timer": {
+    "seconds": 60
+  },
+  "questions": [
+    {
+      "id": "q1",
+      "stem": "A stack is last in, first out.",
+      "options": {
+        "a": "True",
+        "b": "False"
+      },
+      "answer": "a",
+      "source": {
+        "artifact": {
+          "artifact_id": "art_sample_paper",
+          "version": 1
+        }
+      }
+    }
+  ]
+}
