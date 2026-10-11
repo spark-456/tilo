@@ -7,7 +7,7 @@ MR-11 (reply step), MR-12; skill `agent-self-report`. Tests: `test_MROOM_A1_room
 ## Routes (`tilo_api.meeting_room`, mounted at `/v1/worlds/{world_id}/rooms`)
 - `POST` (convene_request): 201 the room (root shape); 403 `not_allowed` (Viewer, team Viewer, no team role, district outside
   the person's view, the Director's room for anyone but the owner) or `demo_session`; 409 `world_paused`, `room_open`,
-  `no_layout`; 422 `bad_request`, `bad_attendees`; 429 `cap_reached`; 503 `not_configured`.
+  `no_layout`; 422 `bad_request`, `bad_attendees`; 503 `not_configured`.
 - `GET /{room_id}`: the room; the words come from the archive. The world's owner or the convener; anyone else, a missing
   room and another world are one 404 body.
 - `POST /{room_id}/turns` (ask_request): 202 with the finished turn (slice 1 computes the reply inside the request: `meeting.asked`,
