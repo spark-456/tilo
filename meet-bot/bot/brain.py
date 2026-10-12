@@ -569,6 +569,7 @@ class Brain:
         self.wake_settings = wake_settings
         self._attention = Attention()
         self.meeting_scope = meeting_scope
+        self.model_event: Any = None
         self.present: list[str] = []
         self.sole_human = False  # exactly one other person is in the meeting: whatever they say is for Tilo
         self.last_engaged_at = -1e9  # when the last question put to Tilo was asked
@@ -598,22 +599,16 @@ class Brain:
             error = str(e)
             self.last_error = error
             log.warning("brain step failed: %s", error)
-        question = self._pending_question(utterances) if self.wake_settings else None
-        direct = (
-            self.policy.decide_direct(reply, utterances, self.bot_name, elapsed_s, question=question)
-            if question is not None or self.wake_settings is None
-            else None
-        )
-        if direct is not None and question is not None:
-            self._attention = Attention(question.speaker.removesuffix(CHAT_SUFFIX), question.t)
-        question = self._pending_question(utterances) if self.meeting_scope else None
+        question = self._pending_question(utterances) if self.wake_settings or self.meeting_scope else None
         if self.meeting_scope:
             reply = scoped_answer(question.text, self.bot_name, question.speaker, self.state) if question else None
         direct = (
             self.policy.decide_direct(reply, utterances, self.bot_name, elapsed_s, question=question)
-            if question is not None or not self.meeting_scope
+            if question is not None or (self.wake_settings is None and not self.meeting_scope)
             else None
         )
+        if direct is not None and question is not None and self.wake_settings is not None:
+            self._attention = Attention(question.speaker.removesuffix(CHAT_SUFFIX), question.t)
         chat = direct or self.policy.decide(self.state, elapsed_s, self.duration_s, model_msg)
         return StepResult(ok=error is None, chat=chat, error=error)
 
@@ -714,14 +709,19 @@ class Brain:
         if self.fast is None:
             return await asyncio.to_thread(self._ask_quick_sync, prompt, q, utterances, elapsed_s)
         try:
+            if self.model_event:
+                self.model_event("model_start")
             raw = await self.fast.generate(QUICK_PROMPT, prompt, json_mode=True)
             return self._quick_message(raw, utterances, elapsed_s, q)
         except (LLMUnavailable, json.JSONDecodeError) as e:  # Busy is an LLMUnavailable
             return self._quick_failed(e, utterances, elapsed_s, q)
+        finally:
+            if self.model_event:
+                self.model_event("model_end")
 
     def _ask_quick_sync(self, prompt: str, q: Question, utterances: list[Any], elapsed_s: float) -> ChatMessage | None:
         try:
-            return self._quick_message(self.llm.generate(QUICK_PROMPT, prompt), utterances, elapsed_s, q)
+            return self._quick_message(self._model_generate(QUICK_PROMPT, prompt), utterances, elapsed_s, q)
         except (LLMUnavailable, json.JSONDecodeError) as e:
             return self._quick_failed(e, utterances, elapsed_s, q)
 
@@ -748,7 +748,7 @@ class Brain:
         prompt = "INPUT_JSON:\n" + json.dumps(payload, ensure_ascii=False)
         last = ""
         for attempt in range(self.max_attempts):
-            reply = self.llm.generate(SYSTEM_PROMPT, prompt)
+            reply = self._model_generate(SYSTEM_PROMPT, prompt)
             try:
                 return validate_output(parse_json_reply(reply))
             except (json.JSONDecodeError, SchemaError) as e:
@@ -760,6 +760,15 @@ class Brain:
                     + f"\n\nYour previous reply was invalid ({last}). Reply with ONLY valid JSON of the required shape."
                 )
         raise SchemaError(f"model kept returning invalid JSON: {last}")
+
+    def _model_generate(self, system: str, prompt: str) -> str:
+        if self.model_event:
+            self.model_event("model_start")
+        try:
+            return self.llm.generate(system, prompt)
+        finally:
+            if self.model_event:
+                self.model_event("model_end")
 
     def _match_item(self, title: str) -> ItemState | None:
         t = _norm(title)

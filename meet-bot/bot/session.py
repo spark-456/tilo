@@ -245,6 +245,7 @@ class LiveSession:
         u.speaker = remove_meet_links(u.speaker)
         u.t = round(u.t, 1)
         self.store.append(u)
+        self.emit_face("heard")
         self.events.emit("transcript.utterance", speaker=u.speaker, text=u.text, t=u.t)
         self.timeline.record(
             "utterance",
@@ -287,7 +288,12 @@ class LiveSession:
             self.record_audio,
         )
         self._setup_voice()
-        async with MeetBrowser(self.cfg, voice=self.voice) as br:
+        async with MeetBrowser(self.cfg, voice=self.voice, face=True) as br:
+            self._face_loop = asyncio.get_running_loop()
+            if isinstance(self.speaker, VoiceSpeaker):
+                self.speaker.player.on_level = lambda level: self.emit_face("audio_level", level)
+            if self.brain:
+                self.brain.model_event = self.emit_face
             self.br = br
             try:
                 if self.mode == "start":
@@ -451,10 +457,27 @@ class LiveSession:
     async def _post(self, text: str, kind: str) -> bool:
         self.own_texts.add(text)
         ok = await self.chat.send(text)
+        if not self.voice:
+            self.emit_face("success" if ok else "failure")
         if ok:
             self.events.emit("chat.posted", kind=kind, text=text)
             await self.br.shot(f"chat_{kind}")
         return ok
+
+    def emit_face(self, kind: str, value: float = 0) -> None:
+        loop = getattr(self, "_face_loop", None)
+        if loop is not None and not loop.is_closed():
+
+            def send() -> None:
+                async def apply() -> None:
+                    try:
+                        await self.br.face_event(kind, value)
+                    except Exception:
+                        log.debug("face event unavailable")
+
+                loop.create_task(apply())
+
+            loop.call_soon_threadsafe(send)
 
     def _setup_voice(self) -> None:
         """Voice replies need a TTS provider and a virtual microphone; without them the bot stays chat-only."""
@@ -484,6 +507,7 @@ class LiveSession:
 
         def heard_first() -> None:
             first_sound.set()
+            self.emit_face("audio_start")
             mark("first_sample")
 
         if want_voice:
@@ -508,7 +532,11 @@ class LiveSession:
             chat_s, first_out = self.clock.now() - t1, self.clock.now() - t0
             if chat_ok:
                 mark("chat_posted")
-        res = await speak if speak else None
+        try:
+            res = await speak if speak else None
+        finally:
+            if speak:
+                self.emit_face("audio_end")
         if res is not None:
             mark("playback_end")
             if res.first_audio_s is not None:
