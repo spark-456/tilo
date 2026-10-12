@@ -31,7 +31,7 @@ __all__ = ["MAX_LISTED", "OPTIONS", "PlateActionPort", "PlateDigest", "PlateDige
 
 OPTIONS = ("done", "snooze")  # the only two things an emailed link can ask for
 MAX_LISTED = 25  # rows in one mail; the rest are counted, not listed
-_ITEM_ID = re.compile(r"[A-Za-z0-9_]{1,64}\Z")
+_ITEM_ID = re.compile(r"wi_[0-9A-Za-z_]{1,48}\Z")  # the work_item_id shape: a question card's link is not spent here
 _SPACE = re.compile(r"\s+")
 # PE-24: a link or an address in a title becomes `[removed]` before a mail client can linkify it beside the real links
 _DEFANG = re.compile(r"(?i)\b(?:[a-z][a-z0-9+.-]{1,15}://|www\.)\S+|[^\s@<>()]+@[^\s@<>()]+\.[a-z0-9-]{2,}")

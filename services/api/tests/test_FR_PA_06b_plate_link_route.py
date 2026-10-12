@@ -19,10 +19,10 @@ import pytest
 from _ppl11a_lib import NOW, ORG, PRIYA, SAM, own_item
 from _ppl11c_lib import emitted, work_rig
 from fastapi import Request
-from tilo_api import access, plate_links
+from tilo_api import access, appcheck, deps, durable_store, plate_links
 from tilo_api.people_plate import build_plate
 from tilo_channels.digest import DigestArtifacts  # noqa: F401  (the digest package must import in the API image)
-from tilo_channels.links import KeyRing
+from tilo_channels.links import CardState, KeyRing, LinkService
 from tilo_channels.plate_digest import PlateDigestBuilder
 
 BASE = "https://api.tilo.example"
@@ -306,3 +306,103 @@ def test_FR_PA_06b_a_desk_event_that_cannot_be_recorded_leaves_the_row_where_it_
     got = rig.client.post(done)
     assert got.status_code == 200 and "can't be changed" in got.text
     assert rig.stored("work_items", "wi_own1")["status"] == "open"
+
+
+# -- the deployed route: a mail click has no sign-in (security review 6b) ------------------------------------------
+
+
+def _bare_deployed(people_rig: Any, monkeypatch: pytest.MonkeyPatch) -> tuple[Any, PlateDigestBuilder, list[str]]:
+    """The deployed-style rig with NO principal override and NO store, writer or Desk override: what is left is the
+    process's own durable seams (`deps._people_stores`, `durable_store.deployed`), as a Cloud Run revision has them. The
+    list records every time the durable store was opened."""
+    rig = people_rig(deployed=True)
+    rig.add_people()
+    rig.add("work_items", own_item("wi_own1", PRIYA))
+    rig.as_user(PRIYA)
+    made = _builder()
+    rig.app.dependency_overrides[plate_links.get_link_builder] = lambda: made
+    links = [deps.get_current_principal, deps.get_people_stores, deps.get_event_writer, deps.get_desk_worlds]
+    for seam in links:
+        rig.app.dependency_overrides.pop(seam, None)
+    opened: list[str] = []
+    store = rig.event_store
+    monkeypatch.setattr(store, "load_path", lambda params: store, raising=False)
+
+    def deployed() -> Any:
+        opened.append("deployed")
+        return store, rig.events
+
+    monkeypatch.setattr(deps, "_people_stores", rig.stores)
+    monkeypatch.setattr(durable_store, "deployed", deployed)
+    return rig, made, opened
+
+
+def test_FR_PA_06b_a_deployed_mail_click_with_no_sign_in_applies_once(
+    people_rig: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    rig, builder, _opened = _bare_deployed(people_rig, monkeypatch)
+    done, _snooze = _links(rig, builder)
+
+    assert rig.client.get(done).status_code == 200
+    posted = rig.client.post(done)
+    assert posted.status_code == 200 and "Marked done" in posted.text
+    assert rig.stored("work_items", "wi_own1")["status"] == "done"
+    assert [p["type"] for _w, p in emitted(rig)] == ["work_item.changed"]
+    desk = emitted(rig)[0][0]
+    assert desk.startswith("w_desk_") and rig.event_store.worlds[desk].owner == PRIYA  # the token's person, nobody else
+    assert rig.client.post(done).status_code == 410 and len(emitted(rig)) == 1  # single use
+
+
+def test_FR_PA_06b_with_app_check_enforced_a_link_request_is_not_401_and_a_normal_route_still_is(
+    people_rig: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    class Refuses:
+        def verify(self, token: str) -> Any:
+            raise appcheck.TokenRefused("missing")
+
+    rig, builder, _opened = _bare_deployed(people_rig, monkeypatch)
+    monkeypatch.setenv(appcheck.ENFORCE_ENV, "1")
+    rig.app.dependency_overrides[deps.get_app_check_verifier] = lambda: Refuses()
+    done, _snooze = _links(rig, builder)
+
+    assert rig.client.get("/v1/plate").status_code == 401  # the exemption is the link prefix only
+    assert rig.client.get("/v1/plate").json()["code"] == "app_check_required"
+    assert rig.client.get("/l/x/y").status_code == 401  # not one path segment: not a link
+    assert rig.client.get(done).status_code == 200
+    assert rig.client.post(done).status_code == 200
+    assert rig.stored("work_items", "wi_own1")["status"] == "done" and len(emitted(rig)) == 1
+
+
+def test_FR_PA_06b_an_unsigned_or_malformed_token_never_reaches_a_store_or_the_event_writer(
+    people_rig: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    rig, builder, opened = _bare_deployed(people_rig, monkeypatch)
+    other_key, _snooze = _links(rig, _builder())  # same key id, another key: a forged MAC
+    tokens = ["x", "a.b.c", "k_test.AAAA.BBBB", "A" * 512, other_key.rsplit("/", 1)[1]]
+
+    for token in tokens:
+        assert rig.client.get(f"/l/{token}").status_code == 404, token
+        assert rig.client.post(f"/l/{token}").status_code == 410, token
+    assert rig.client.post("/l/" + "A" * 513).status_code == 401  # over the path cap: not public, the gate answers
+    assert opened == [] and rig.store_calls == [] and emitted(rig) == []
+    assert rig.stored("work_items", "wi_own1")["status"] == "open"
+
+
+def test_FR_PA_06b_a_question_card_link_cannot_be_spent_on_the_plate_route(
+    people_rig: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    rig, builder, opened = _bare_deployed(people_rig, monkeypatch)
+    card = {"kind": "needs_you", "rung": "needs_you", "gate": None, "consent": None, "answer_channels": ["email"]}
+    nonces = plate_links.MemoryNonces()
+    ring = builder._keys  # noqa: SLF001  (the same signing key as the plate links)
+    other = LinkService(
+        keys=ring,
+        nonces=nonces,
+        clock=lambda: dt.datetime(2026, 10, 6, 10, 0, tzinfo=dt.UTC),
+        cards=lambda _id: CardState(card=card | {"options": [{"id": "done"}, {"id": "snooze"}]}, answered=False),
+        base_url=BASE,
+    )
+    link = other.issue(card_id="c_question1", user_id=PRIYA, action="answer", option="done").url.removeprefix(BASE)
+
+    assert rig.client.get(link).status_code == 404 and rig.client.post(link).status_code == 410
+    assert opened == [] and emitted(rig) == []

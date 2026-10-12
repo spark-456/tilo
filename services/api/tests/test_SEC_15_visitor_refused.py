@@ -23,6 +23,7 @@ from _sec15_lib import (
     JUDGE,
     NEWCOMER,
     OTHER,
+    PINNED_PUBLIC_LINK_ROUTES,
     PINNED_PUBLIC_ROUTES,
     VISITOR,
     concrete,
@@ -73,6 +74,29 @@ def test_SEC_15_route_table_is_not_empty_and_public_allowlist_is_exactly_the_pin
     )
     missing = sorted(set(PINNED_PUBLIC_ROUTES) - set(table))
     assert not missing, f"the pinned public routes are not served: {missing}"
+
+
+def test_SEC_15_the_mail_link_prefix_is_the_only_extra_public_set_and_is_named_on_purpose():
+    """FR-PA-06b (the owner's decision, BQ-PA06B-1): `GET` and `POST` of `/l/<token>` are public to the gate because a
+    mail click has no session; the signed single-use token is the credential. Nothing else is public by prefix."""
+    from tilo_api import access
+
+    table = route_table(app)
+    by_prefix = {r for r in table if access.public_link(r[0], concrete(r[1]))}
+    assert by_prefix == set(PINNED_PUBLIC_LINK_ROUTES), "a new public path is the owner's decision: update this test"
+    assert set(PINNED_PUBLIC_LINK_ROUTES) <= set(table)
+    assert not set(PINNED_PUBLIC_LINK_ROUTES) & set(PINNED_PUBLIC_ROUTES)
+    for method, path in [
+        ("PUT", "/l/x"),
+        ("DELETE", "/l/x"),
+        ("GET", "/l/"),
+        ("GET", "/l/a/b"),
+        ("GET", "/l"),
+        ("GET", "/L/x"),
+    ]:
+        assert not access.public_link(method, path), (method, path)
+    assert not access.public_link("GET", "/l/" + "a" * 513)  # past the cap it is an ordinary, gated path
+    assert not access.public_link("POST", "/v1/plate") and not access.public_link("GET", "/links/x")
 
 
 @pytest.mark.parametrize(("method", "path"), NON_PUBLIC, ids=IDS)
