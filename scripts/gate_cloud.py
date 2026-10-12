@@ -165,13 +165,15 @@ def main() -> int:
         with tempfile.TemporaryDirectory(prefix="tilo-cloud-gate-") as temporary:
             source = Path(temporary) / "source.tgz"
             archive(ref, source)
+            config = Path(temporary) / "cloudbuild.tests.yaml"
+            config.write_bytes((ROOT / "cloudbuild.tests.yaml").read_bytes())
             command = [
                 shutil.which("gcloud") or "gcloud",
                 "builds",
                 "submit",
                 str(source),
                 "--config",
-                str(ROOT / "cloudbuild.tests.yaml"),
+                str(config),
                 "--project",
                 PROJECT,
                 "--region",
