@@ -19,6 +19,7 @@ import unicodedata
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from typing import Any, Literal, Protocol
+from urllib.parse import urlsplit
 
 from tilo_policy.schemas import conforms
 
@@ -32,6 +33,8 @@ OPTIONS = ("done", "snooze")  # the only two things an emailed link can ask for
 MAX_LISTED = 25  # rows in one mail; the rest are counted, not listed
 _ITEM_ID = re.compile(r"[A-Za-z0-9_]{1,64}\Z")
 _SPACE = re.compile(r"\s+")
+# PE-24: a link or an address in a title becomes `[removed]` before a mail client can linkify it beside the real links
+_DEFANG = re.compile(r"(?i)\b(?:[a-z][a-z0-9+.-]{1,15}://|www\.)\S+|[^\s@<>()]+@[^\s@<>()]+\.[a-z0-9-]{2,}")
 _REMINDER_GROUPS = ("overdue", "soon")
 _GROUPS = {"attention": "Needs you now", "overdue": "Overdue", "soon": "Due soon", "rest": "Everything else"}
 _REASONS = {
@@ -77,14 +80,16 @@ class PlateDigest:
     window_end: str
     items: tuple[PlateItem, ...]
     more: int
+    flagged: int  # rows left out because the safety screen flagged them (PE-21); only their count is mailed
     rendered_text: str = field(repr=False)
 
 
 def _line(text: Any, limit: int = 140) -> str:
-    """One plain line: every control, format, separator and unassigned character becomes a space (the plate has
-    already cleaned a title; this is the second wall), whitespace collapsed, cut at `limit`."""
+    """One plain line: every control, format, separator and unassigned character becomes a space, whitespace is
+    collapsed, a link or an address becomes `[removed]` (the plate has cleaned controls only; this is the second
+    wall), cut at `limit`."""
     kept = "".join(" " if unicodedata.category(c)[0] in "CZ" else c for c in str(text))
-    return _SPACE.sub(" ", kept).strip()[:limit]
+    return _DEFANG.sub("[removed]", _SPACE.sub(" ", kept)).strip()[:limit]
 
 
 def _work_item_card(item_id: str) -> CardState | None:
@@ -110,8 +115,11 @@ class PlateDigestBuilder:
         nonces: NonceStore,
         clock: Callable[[], dt.datetime] | None = None,
     ) -> None:
-        if not isinstance(base_url, str) or not base_url.strip():
-            raise ValueError("base_url is required")
+        parts = urlsplit(base_url) if isinstance(base_url, str) else None
+        if parts is None or parts.scheme != "https" or not parts.hostname or parts.username or parts.password:
+            raise ValueError("base_url must be https without user info")
+        if parts.query or parts.fragment:
+            raise ValueError("base_url must have no query or fragment")
         self._base_url, self._keys, self._nonces = base_url.rstrip("/"), keys, nonces
         self._clock = clock or (lambda: dt.datetime.now(dt.UTC))
 
@@ -147,6 +155,9 @@ class PlateDigestBuilder:
             return None
         if kind == "reminder":
             rows = [r for r in rows if r["ref"]["kind"] == "work_item" and r["group"] in _REMINDER_GROUPS]
+        # PE-21, PRD 16.2: a flagged record never reaches an unattended mail; no title, id or link of it is rendered
+        flagged = sum(1 for r in rows if r["flagged"] is not False)
+        rows = [r for r in rows if r["flagged"] is False]
         if not rows:
             return None
         at = self._at(now)
@@ -170,8 +181,10 @@ class PlateDigestBuilder:
         more = len(rows) - len(listed)
         if more:
             lines += ["", f"{more} more on your plate in Tilo."]
+        if flagged:
+            lines += ["", f"{flagged} more need a look in Tilo."]
         lines += ["", *_FOOTER]
-        return PlateDigest(user_id, kind, window_end, tuple(items), more, "\n".join(lines))
+        return PlateDigest(user_id, kind, window_end, tuple(items), more, flagged, "\n".join(lines))
 
     def redeem(
         self,
@@ -201,7 +214,7 @@ class PlateDigestBuilder:
         """Redeems the link, then asks the caller's port to apply it once. False when the port declines (the item is
         no longer the person's own open item); the link is spent either way."""
         got = self.redeem(token, item_id=item_id, option=option, viewer=viewer, now=now)
-        if got.option not in OPTIONS:  # unreachable: the claims are checked against the card; fail closed
+        if got.requires_sign_in or got.option not in OPTIONS:  # fail closed, whatever LinkService later learns
             return False
         return bool(port.apply(got.user_id, got.card_id, got.option, authn=got.authn))
 

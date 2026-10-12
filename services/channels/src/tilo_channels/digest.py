@@ -412,6 +412,19 @@ class DigestService:
         FR-CHN-18 path (L3 policy decision, policy.applied, outbox) for every owner-only digest mail (FR-PA-06)."""
         if self._policy is None or not re.fullmatch(r"[a-z][a-z_]{0,23}", kind):
             return None
+        # the recipient is resolved here, server side, again: only the world owner's own trusted mailbox can be named
+        try:
+            mailbox = self._mailbox(user_id)
+        except Exception:
+            return None
+        if (
+            user_id != self._world_owner
+            or not _valid_str("common.schema.json#/$defs/user_id", user_id)
+            or not isinstance(mailbox, str)
+            or owner_addr != mailbox
+            or not _valid_str("common.schema.json#/$defs/email_address", owner_addr)
+        ):
+            return None
         utc_day, idem_key = window_end[:10], f"{kind}:{user_id}:{window_end[:10]}"
         if self._outbox.get_by_idempotency_key(self._world_id, idem_key) is not None:
             return None
