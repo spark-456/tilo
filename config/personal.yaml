@@ -21,3 +21,7 @@ calendar_sync:
 # FR-MTG-09 (bot-hosted meeting): the longest meeting the bot will host, 1..1440 minutes. Google ends a free
 # account's group call at 60 minutes and the bot counts as a participant (BQ-MTG09-9).
 meeting_host: {max_duration_min: 60}
+
+# FR-PA-15 nudges (services/channels/src/tilo_channels/nudges.py): proactive panel nudges go out only inside
+# working_window, in the person's time zone, at most daily_cap a person a day (1 to 50; the PRD default is 5).
+nudges: {daily_cap: 5}
