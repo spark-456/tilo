@@ -19,7 +19,7 @@ class UploadStorageError(RuntimeError):
 
 
 class RunUploads(InMemoryArtifactStore):
-    """One request's adapter; scope is supplied by submit_intake, never by multipart fields.
+    """One request's adapter; the API generates scope before screening, never from multipart fields.
 
     Completed puts can be rolled back through scoped lookups. A failed backend put retains
     the artifact store's existing partial-write repair/retention semantics. The archive is
@@ -166,10 +166,16 @@ class RunUploads(InMemoryArtifactStore):
         return stored
 
     def abort(self) -> None:
-        if self.scope is None or self.artifacts is None:
-            return
-        for version in reversed(self.completed):
-            if self.artifacts.head(self.scope, version.ref) is not None:
-                prefix = f"orgs/{self.scope.org_id}/worlds/{self.scope.world_id}/artifacts/{version.artifact_id}"
-                self.artifacts.retention().delete(f"{prefix}/versions/{version.version:06d}")
-        self.completed.clear()
+        try:
+            if self.scope is None or self.artifacts is None:
+                return
+            for version in reversed(self.completed):
+                if self.artifacts.head(self.scope, version.ref) is not None:
+                    prefix = f"orgs/{self.scope.org_id}/worlds/{self.scope.world_id}/artifacts/{version.artifact_id}"
+                    self.artifacts.retention().delete(f"{prefix}/versions/{version.version:06d}")
+        finally:
+            # A retry must rebind and screen; cached references may now name deleted versions.
+            self.completed.clear()
+            self.prepared.clear()
+            self.converted.clear()
+            self.scope = self.artifacts = self.archive = None

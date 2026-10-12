@@ -355,6 +355,8 @@ def _strings(value: Any) -> Iterator[str]:
 
 
 class ArtifactStore:
+    _upload_text: Callable[[bytes, str], str] | None = None
+
     def with_upload_text(self, convert: Callable[[bytes, str], str]) -> ArtifactStore:
         """A request-local view: the store still screens exact stored bytes, with Office text conversion first.
 

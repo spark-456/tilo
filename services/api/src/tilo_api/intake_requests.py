@@ -4,7 +4,7 @@ import asyncio
 import hashlib
 import json
 import re
-from collections.abc import Awaitable, Callable
+from collections.abc import Callable, Coroutine
 from typing import Any
 
 from fastapi import HTTPException
@@ -45,7 +45,7 @@ async def once(
     key: str,
     request: IntakeRequest,
     scenario: str | None,
-    perform: Callable[[], Awaitable[Any]],
+    perform: Callable[[], Coroutine[Any, Any, Any]],
 ) -> Any:
     if re.fullmatch(r"[A-Za-z0-9._-]{1,64}", key) is None:
         raise HTTPException(status_code=422, detail="The Idempotency-Key is not valid.")

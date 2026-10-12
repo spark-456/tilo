@@ -1,5 +1,6 @@
 """Task intake (FR-INT-01/02, PRD 7.1). Limits first, then extract and screen every file (PRD 16.3
-item 2), then store: a rejection or a provider error stores nothing. Events are built and validated
+item 2), then submit. A supplied store screen may stage versions before the Director;
+the API cleans pre-commit refusals. Events are built and validated
 here, not written; the harness is the single writer per world."""
 
 from __future__ import annotations
@@ -87,7 +88,8 @@ def screen_intake(
     file_screen: Callable[[str, bytes, SafetyProvider, Budget], tuple[str | None, str | None, bool, str | None]]
     | None = None,
 ) -> ScreenedIntake:
-    """Extract and screen without storing. Director inputs use existing provider media caps;
+    """Extract and screen; a supplied file_screen may stage authoritative stored versions.
+    Director inputs use existing provider media caps;
     converted text shares the existing extraction character cap across this request."""
     names = _check_limits(request)
     budget = Budget()

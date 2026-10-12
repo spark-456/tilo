@@ -69,7 +69,7 @@ def get_store(
         org_id=deps.ORG_ID,
         artifacts=lambda: deps.get_artifact_store(request, mode),
         archive=lambda **scope: deps.get_run_archive(request)(**scope),
-    )  # configured stores are opened only after the Director succeeds
+    )  # attached-file Thinking requests bind both stores before screening and the Director
 
 
 @router.post("/intake", status_code=201)
@@ -155,7 +155,7 @@ async def _thinking(
     text = request.text
     ids = intake_requests.identifiers(principal.user_id, key)
     if key is not None and not (chosen and chosen[0] == "quick"):
-        tasks.load_path({"task_id": ids[0]})
+        await run_in_threadpool(tasks.load_path, {"task_id": ids[0]})
         existing = tasks.tasks.get(ids[0])
         if existing is not None:
             if existing.owner != principal.user_id:
@@ -196,12 +196,14 @@ async def _thinking(
                 parts=prepared.parts,
             )
         except TaskRefused as refused:
+            await _abort_uploads(store)
             # FR-INT-12: configured text only (reason, nearest task, category); nothing stored, no further call.
             return JSONResponse(
                 status_code=422,
                 content={"error": refused.reason, "alternative": refused.alternative, "category": refused.category},
             )
         except NothingPossible as nothing:
+            await _abort_uploads(store)
             # FR-INT-15: acceptable but nothing Tilo can do; plain, with the alternatives, never a refusal.
             return JSONResponse(
                 status_code=422, content={"error": nothing.message, "gaps": [g.as_dict() for g in nothing.gaps]}
@@ -221,19 +223,25 @@ async def _thinking(
             raise HTTPException(
                 status_code=503, detail="Deliverable choices are unavailable; nothing was stored."
             ) from exc
-        result = await run_in_threadpool(
-            submit_intake,
-            request,
-            safety=safety,
-            store=store,
-            prepared=prepared,
-            identifiers=ids,
-            put_failed=not isinstance(store, RunUploads),
-        )
+        try:
+            result = await run_in_threadpool(
+                submit_intake,
+                request,
+                safety=safety,
+                store=store,
+                prepared=prepared,
+                identifiers=ids,
+                put_failed=not isinstance(store, RunUploads),
+            )
+        except (HTTPException, IntakeRejected, UploadStorageError):
+            raise
+        except Exception as exc:
+            raise UploadStorageError("upload submission failed") from exc
     except IntakeRejected as exc:
         await _abort_uploads(store)
         return _rejected(exc.reason)
     except (ProviderError, ProviderConfigError, ReplayMissError) as exc:
+        await _abort_uploads(store)
         logger.warning("safety screen failed: %s", type(exc).__name__)
         raise HTTPException(status_code=503, detail="The safety screen is unavailable; nothing was stored.") from exc
     except HTTPException:
