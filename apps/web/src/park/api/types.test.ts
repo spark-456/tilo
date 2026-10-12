@@ -41,7 +41,7 @@ describe("WEB_1a_types: the result envelope", () => {
   });
 
   it("WEB_1a_types_decision_key_and_dec", () => {
-    expectTypeOf<DecisionKey>().toEqualTypeOf<"depot" | "mail">();
+    expectTypeOf<DecisionKey>().toEqualTypeOf<"depot" | "mail" | "lovable">();
     expectTypeOf<TierKey>().toEqualTypeOf<"quick" | "routine" | "workspace">();
     // A full record, and an empty object, are both a valid `dec` (the prototype tolerates missing keys).
     expectTypeOf<Record<DecisionKey, boolean>>().toExtend<Dec>();
