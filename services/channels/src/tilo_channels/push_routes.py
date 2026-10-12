@@ -19,7 +19,7 @@ from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from typing import Annotated, Any, Protocol
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import Depends, HTTPException, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
@@ -35,7 +35,7 @@ from tilo_channels.web_push import (
 )
 from tilo_channels.web_push_sender import production_sender
 
-router = APIRouter()
+SEND_PATH = "/internal/push/send"  # added to the app by `tilo_channels.app`, a plain route
 ENV_AUDIENCE, ENV_CALLER = "TILO_PUSH_AUDIENCE", "TILO_PUSH_CALLER"
 MAX_BODY_BYTES = 8192
 _PATH = re.compile(rf"^{re.escape(OPEN_PATH)}(\?card=[A-Za-z0-9_-]{{1,64}})?\Z")
@@ -118,7 +118,6 @@ async def _body(request: Request) -> SendIn:
         raise HTTPException(status_code=422, detail="invalid_body") from None
 
 
-@router.post("/internal/push/send")
 async def send(
     request: Request,
     verifier: Annotated[Verifier, Depends(get_verifier)],
