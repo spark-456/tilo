@@ -15,6 +15,7 @@ import re
 import threading
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
+from itertools import islice
 from typing import Any, Protocol
 
 from tilo_people._schema import valid
@@ -36,6 +37,9 @@ INDEXES: Mapping[str, tuple[str, ...]] = {
     "mention": ("pin_id", "user"),
     "calendar_entry": ("owner",),
 }
+
+# Internal capped context reads; the PE-16 public list selectors remain unchanged.
+BOUNDED_INDEXES = {**INDEXES, "work_item": ("owner", "created_by.ref", "source.ref")}
 
 _MISSING = object()
 _SAFE_ID = re.compile(r"[A-Za-z0-9_.-]{1,128}")
@@ -59,6 +63,7 @@ class RecordStore(Protocol):
     def replace(self, record: Mapping[str, Any], *, expected_version: int) -> Stored: ...
     def delete(self, org_id: str, record_id: str, *, expected_version: int) -> None: ...
     def list(self, org_id: str, field: str | None = None, value: str | None = None) -> tuple[Stored, ...]: ...
+    def list_bounded(self, org_id: str, field: str, value: str, *, limit: int) -> tuple[Stored, ...]: ...
 
 
 def _safe(value: Any) -> str:
@@ -187,6 +192,17 @@ class MemoryStore:
                 for _, (version, rec) in rows
                 if field is None or _at(rec, field) == value
             )
+
+    def list_bounded(self, org_id: str, field: str, value: str, *, limit: int) -> tuple[Stored, ...]:
+        if field not in BOUNDED_INDEXES[self.kind] or not isinstance(value, str) or type(limit) is not int or limit < 1:
+            raise PeopleInputError("invalid bounded index query")
+        with self._lock:
+            matches = (
+                Stored(self.kind, copy.deepcopy(rec), version)
+                for (org, _), (version, rec) in self._rows.items()
+                if org == org_id and _at(rec, field) == value
+            )
+            return tuple(islice(matches, limit))
 
 
 class _PersonMemoryStore(MemoryStore):
