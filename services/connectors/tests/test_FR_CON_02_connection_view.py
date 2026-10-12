@@ -31,9 +31,8 @@ def test_FR_CON_02_connection_view_returns_only_state_scopes_connected_at() -> N
     store, http = InMemoryTokenStore(), _Http()
     broker = _broker(store, http)
     assert broker.connection_view("u_a", "gmail") == (None, [], None)
-    broker.store_tokens(
-        "u_a", "gmail", {"access_token": "a", "refresh_token": "r", "scope": "s2 s1", "expires_in": 3600}
-    )
+    # Legacy record predates connected_at; the current broker always stamps new grants.
+    store.put("u_a", "gmail", {"v": 1, "state": "connected", "scopes": ["s1", "s2"]})
     assert broker.connection_view("u_a", "gmail") == ("connected", ["s1", "s2"], None)  # no connected_at stored yet
     record = store.get("u_a", "gmail")
     assert record is not None
