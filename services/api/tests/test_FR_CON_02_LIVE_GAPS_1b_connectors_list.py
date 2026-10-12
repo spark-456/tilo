@@ -373,7 +373,7 @@ def test_FR_ACC_04_LIVE_GAPS_1b_attention_is_3_days_before_connected_at_plus_7_d
 
 def test_FR_ACC_04_LIVE_GAPS_1b_connected_without_connected_at_is_connected_with_no_expiry(rig: Rig) -> None:
     """A grant recorded before `connected_at` existed (null): `connected`, no warning, `expires_at` null."""
-    rig.connect(ALICE, "gmail")
+    rig.plant(ALICE, "gmail", {"state": "connected", "scopes": [_scope(ALICE, "gmail")]})
     assert "connected_at" not in rig.sealed(ALICE, "gmail")
     rig.settle()
     gmail = rows(rig.ask())["gmail"]
