@@ -15,6 +15,7 @@ from _ppl11a_lib import OWNER, PRIYA
 from test_S_06_cards_feed import START, World, at
 from tilo_api import deps, push_feed, push_policy
 from tilo_api.push_send import ChannelsPushRpc, PushRpcAdapter
+from tilo_channels import web_push
 from tilo_channels.web_push import SubscriptionStore
 from tilo_connectors import InMemoryOutboxStore
 from tilo_connectors.errors import SideEffectRefused
@@ -159,3 +160,62 @@ def test_FR_CHN_17f_nothing_is_sent_without_the_channels_url_or_with_a_wrong_one
         assert deps.get_push_rpc() is None
     monkeypatch.setenv("TILO_CHANNELS_URL", URL)
     assert isinstance(deps.get_push_rpc(), ChannelsPushRpc)
+
+
+# --- security review 7b: B3 the daily cap holds in one pass; B4 no durable outbox, no sweep ---------------------
+
+
+def test_FR_CHN_17f_the_daily_cap_holds_inside_one_pass_and_across_ticks(feed) -> None:
+    per_day = web_push.load_config().per_day
+    world = World(feed.store, "w_a", OWNER)
+    for _ in range(per_day + 16):  # 66 fresh gate cards in one world for one person
+        world.add("gate", created_at=at(30))
+    feed.turn_on(OWNER)
+    assert feed.sweep() <= per_day
+    assert len(feed.channels.calls) <= per_day and len(feed.outbox_store.all_entries()) <= per_day
+    applied = [e for evs in feed.store.events.values() for e in evs if e["type"] == "policy.applied"]
+    assert len(applied) == len(feed.channels.calls)
+    assert feed.sweep() == 0 and len(feed.channels.calls) <= per_day  # the next tick adds nothing past the cap
+
+
+class _Durable:
+    """An outbox store that is not the process's own in-memory class (stands in for the Firestore one)."""
+
+    def __init__(self) -> None:
+        self.inner = InMemoryOutboxStore()
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self.inner, name)
+
+
+def _tick(feed: Feed, outbox_store_factory: Any) -> None:
+    from types import SimpleNamespace
+
+    from tilo_api import schedules
+
+    overrides = {
+        deps.get_push_rpc: lambda: feed.adapter._rpc,
+        deps.get_push_store: lambda: feed.subs,
+        deps.get_outbox_store: outbox_store_factory,
+        deps.get_people_stores: lambda: feed.p.real,
+        deps.get_event_writer: lambda: feed.writer,
+    }
+    request = SimpleNamespace(app=SimpleNamespace(dependency_overrides=overrides))
+    schedules._sweep_push(request, lambda: feed.now, lambda: feed.store)  # type: ignore[arg-type]
+
+
+def test_FR_CHN_17f_the_tick_sends_nothing_while_the_outbox_store_is_not_durable(feed) -> None:
+    World(feed.store, "w_a", OWNER).add("gate", created_at=at(30))
+    feed.turn_on(OWNER)
+    for _ in range(3):  # a fresh in-memory store per call, as an instance restart would give
+        _tick(feed, InMemoryOutboxStore)
+    assert feed.channels.calls == []
+
+
+def test_FR_CHN_17f_two_ticks_on_the_shared_durable_store_send_a_card_once(feed) -> None:
+    World(feed.store, "w_a", OWNER).add("gate", created_at=at(30))
+    feed.turn_on(OWNER)
+    shared = _Durable()
+    _tick(feed, lambda: shared)
+    _tick(feed, lambda: shared)
+    assert len(feed.channels.calls) == 1 and len(shared.all_entries()) == 1

@@ -109,23 +109,23 @@ def _one(user, subs, store, outbox_store, adapter, people, writer, clock, prefer
         return 0
     applied = [e for e in store.events.get(desk_ref.world_id, []) if e.get("type") == "policy.applied"]
 
-    def record(part: dict[str, Any], *, actor: str, target: str, summary: str, key: str) -> None:
-        writer.append(
-            desk_ref.world_id,
-            {
-                "id": events.stable_part_id(part["type"], key),
-                "actor": actor,
-                "target": target,
-                "summary": summary,
-                "vis": "all",
-                **part,
-            },  # fmt: skip
-        )
+    def record(part: dict[str, Any], *, actor: str, target: str, summary: str, key: str) -> dict[str, Any]:
+        event = {
+            "id": events.stable_part_id(part["type"], key),
+            "actor": actor,
+            "target": target,
+            "summary": summary,
+            "vis": "all",
+            **part,
+        }  # fmt: skip
+        writer.append(desk_ref.world_id, event)
+        return event
 
     def emit_applied(part: dict[str, Any]) -> None:
         d = part["data"]
-        record(part, actor=d["policy_id"], target=d["gate_id"], key=d["outbox_id"],
-               summary="The owner's push policy opened a notice.")  # fmt: skip
+        event = record(part, actor=d["policy_id"], target=d["gate_id"], key=d["outbox_id"],
+                       summary="The owner's push policy opened a notice.")  # fmt: skip
+        applied.append(event)  # the engine counts per_day from this list: a second notice in this pass sees the first
 
     def emit_transfer(part: dict[str, Any]) -> None:
         record(part, actor="system", target=desk_ref.world_id, key=part["data"]["outbox_id"],
