@@ -2,6 +2,12 @@
 import type { MouseEvent, ReactNode } from "react";
 import type { Dec, Decision, DecisionKey, Skill, World } from "../../api/types";
 import { DecisionFields } from "../../app/DecisionFields";
+import {
+  type SlackShareRequest,
+  slackApprovalBody,
+  slackApprovalStatusLabel,
+  slackApprovalTitle,
+} from "../../app/slackShare";
 import { Button } from "../../components";
 import { icon } from "../../shell/kit";
 import { agentArt } from "./worldArt";
@@ -38,11 +44,12 @@ export interface WaitingProps {
   night: boolean;
   onDecide: (key: DecisionKey) => void;
   onLater: () => void;
+  slackPending?: SlackShareRequest | null;
 }
 
 /** The decisions this world is waiting on; the ones already taken stay in the card with their done line. */
-export function WaitingCard({ mine, dec, night, onDecide, onLater }: WaitingProps) {
-  const open = mine.filter((d) => !dec[d.k]).length;
+export function WaitingCard({ mine, dec, night, onDecide, onLater, slackPending }: WaitingProps) {
+  const open = mine.filter((d) => !dec[d.k]).length + (slackPending ? 1 : 0);
   return (
     <div className="park-world-waiting">
       <div className="park-world-waitinghead">
@@ -82,6 +89,17 @@ export function WaitingCard({ mine, dec, night, onDecide, onLater }: WaitingProp
           )}
         </div>
       ))}
+      {slackPending ? (
+        <div className="park-world-decision">
+          <div className="park-world-dtext">
+            <div className="park-world-dtitle">{slackApprovalTitle(slackPending.channel)}</div>
+            <div className="park-world-dbody">{slackApprovalBody(slackPending)}</div>
+          </div>
+          <div className="park-world-dpendingbadge">
+            {slackApprovalStatusLabel(slackPending.sample)}
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
