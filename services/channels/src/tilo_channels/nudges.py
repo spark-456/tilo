@@ -53,6 +53,7 @@ _CROCKFORD = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
 _ID = re.compile(r"[A-Za-z0-9_]{1,64}\Z")
 _HM = re.compile(r"([01]\d|2[0-3]):([0-5]\d)\Z")
 _KEEP_KEYS = 400
+_KEEP_ALERTS = 200
 T = TypeVar("T")
 
 
@@ -196,7 +197,10 @@ class NudgeGate:
             days[day] = days.get(day, 0) + 1
             keys.append(key)
             del keys[:-_KEEP_KEYS]
-            alerts[alert_id] = {"item": nudge.item_id, "rule": nudge.rule, "gen": 0}
+            alerts[alert_id] = {"item": nudge.item_id, "rule": nudge.rule, "day": day, "gen": 0}
+            for old in list(alerts)[:-_KEEP_ALERTS]:  # bounded: the panel only needs today's
+                alerts.pop(old, None)
+                state.get("snoozed", {}).pop(old, None)
             state["days"] = {d: n for d, n in days.items() if d >= day}  # only today's count can still matter
             return NudgeResult("raised", alert_id=alert_id)
 
@@ -252,3 +256,25 @@ class NudgeGate:
     def item_of(self, user_id: str, alert_id: str) -> str | None:
         """The work item id a raised nudge is about, for the panel; None for another person's or an unknown alert."""
         return self._store.update(user_id, lambda state: (state.get("alerts", {}).get(alert_id) or {}).get("item"))
+
+    def active(self, user_id: str, *, now: dt.datetime | None = None) -> list[dict[str, Any]]:
+        """The person's nudges raised on their local day, newest first: `alert_id`, `rule`, the template `summary`
+        and `snoozed_until` (None when not snoozed). Ids and fixed words only; the panel finds the item with
+        `item_of`."""
+        _local, day = self._local(user_id, now)
+
+        def read(state: dict[str, Any]) -> list[dict[str, Any]]:
+            snoozed = state.get("snoozed", {})
+            found = [
+                {
+                    "alert_id": alert_id,
+                    "rule": rec["rule"],
+                    "summary": RULES[rec["rule"]],
+                    "snoozed_until": snoozed.get(alert_id),
+                }
+                for alert_id, rec in state.get("alerts", {}).items()
+                if rec.get("day") == day and rec.get("rule") in RULES
+            ]
+            return found[::-1]
+
+        return self._store.update(user_id, read)

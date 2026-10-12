@@ -18,6 +18,7 @@ from tilo_api import deps as _deps
 from tilo_api import dev as _dev
 from tilo_api import durable_store as _durable_store
 from tilo_api import meeting_host_routes as _meeting_host_routes
+from tilo_api import nudge_sweep as _nudge_sweep
 from tilo_api import people as _people
 from tilo_api import quiz_apps as _quiz_apps
 from tilo_api import runs as _runs
@@ -148,6 +149,7 @@ app.include_router(_effort_router)
 app.include_router(_feedback_router)
 app.include_router(_connectors_list_router)
 app.include_router(_schedules.router)
+app.include_router(_nudge_sweep.router)  # FR-PA-15b: GET /v1/nudges, POST /v1/nudges/{id}/snooze
 app.include_router(_team_router)
 
 
