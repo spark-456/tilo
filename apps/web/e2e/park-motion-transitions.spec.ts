@@ -204,8 +204,7 @@ const clickTab = (page: Page, label: string, restart = true) =>
         // a phone has one page button that opens the menu of the six (QA-DEMO-1 B2); a click opens it at once
         (document.querySelector("button.park-shell__pagebtn") as HTMLElement | null)?.click();
         tab = [...document.querySelectorAll('[role="menuitem"]')].find(
-          (a) =>
-            (a.textContent ?? "").replace(/Current page|\d+ decisions?/g, "").trim() === name,
+          (a) => (a.textContent ?? "").replace(/Current page|\d+ decisions?/g, "").trim() === name,
         ) as HTMLElement | undefined;
       }
       if (!tab) throw new Error(`no tab named ${name}`);
