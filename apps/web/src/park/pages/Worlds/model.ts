@@ -67,7 +67,13 @@ export const plural = (n: number, one: string, many: string): string =>
 export function statusOf(w: World, needsLeft: number): Status {
   if (w.isNew) return { label: "Starting", tone: TONE[w.st] };
   return {
-    label: w.st === "needs" ? plural(needsLeft, "decision", "decisions") : WORD[w.st],
+    // No served count (none loaded, or a failed read) says no number rather than "0 decisions" (BQ-UX11-1)
+    label:
+      w.st === "needs"
+        ? needsLeft > 0
+          ? plural(needsLeft, "decision", "decisions")
+          : "Needs you"
+        : WORD[w.st],
     tone: TONE[w.st],
   };
 }
