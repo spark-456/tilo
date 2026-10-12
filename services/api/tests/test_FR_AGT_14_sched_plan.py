@@ -205,3 +205,10 @@ def test_FR_AGT_14_SCHED_PLAN_a_non_dict_entry_fails_closed_at_the_store_and_at_
     assert rig.schedules.due(MON_0330Z, 10) == []
     rig.store.tasks[source.task_id].approaches[1] = "not a dict"
     assert rig.create(source).status_code == 409
+
+
+def test_FR_AGT_14_SCHED_PLAN_a_non_dict_before_the_chosen_entry_is_refused_never_a_500(rig: SchedApi) -> None:
+    source = armed(rig)
+    chosen = copy.deepcopy(rig.store.tasks[source.task_id].approaches[0])
+    rig.store.tasks[source.task_id].approaches = ["not a dict", chosen]
+    assert rig.create(source).status_code == 409
