@@ -24,7 +24,7 @@ from .browser import MeetBrowser
 from .captions import CaptionMerger, CaptionReader, TranscriptStore, Utterance
 from .chat import ChatPoster, intro_text
 from .clock import SystemClock
-from .config import ROOT, Config
+from .config import ROOT, Config, load_wake_settings
 from .control import stop_requested
 from .events import EventSink, remove_meet_links
 from .guards import BotRefused
@@ -46,6 +46,7 @@ from .speaker import NullSpeaker, VoiceSpeaker
 from .timing import Timeline
 from .trace import Turn, TurnTrace
 from .tts import STT_END_AT
+from .wake import Attention, wake_gate
 
 log = logging.getLogger("bot.session")
 STATUS_EVERY_S = 3.0  # how often to check who is here before the meeting has started for the bot
@@ -68,7 +69,7 @@ def build_brain(cfg: Config, agenda_path: Path | None, duration: float | None, k
         log.warning("no agenda at %s: transcript only, no brain (copy agenda.example.md to agenda.md)", path)
         return None
     agenda = Agenda.load(path)
-    return Brain(
+    brain = Brain(
         agenda,
         ProviderLLM(),
         agenda.resolve_duration(duration or cfg.meeting_minutes),
@@ -77,7 +78,10 @@ def build_brain(cfg: Config, agenda_path: Path | None, duration: float | None, k
         max_direct=cfg.max_direct_replies,
         direct_gap_s=cfg.direct_reply_gap_s,
         knowledge=kb,
+        wake_settings=load_wake_settings(),
     )
+    brain.policy.proactive = cfg.voice_nudges  # existing operator opt-in; off by default for chat AND voice
+    return brain
 
 
 async def run_live(
@@ -434,7 +438,13 @@ class LiveSession:
             log.info("chat from %s: %s", sender, text[:120])
             if not asked and len(text) >= 20:
                 self.kb.add_chat(sender, text)  # pasted notes/links become answerable context
-            self.record(chat_utterance(sender, text, self.elapsed()), heard_at=self.clock.now())
+            directed = (
+                self.brain is None
+                or self.brain.wake_settings is None
+                or wake_gate(text, sender, self.brain_elapsed(), Attention(), self.brain.wake_settings).allowed
+            )
+            line = chat_utterance(sender, text, self.elapsed()) if directed else Utterance(sender, text, self.elapsed())
+            self.record(line, heard_at=self.clock.now())
 
     # -- answering ---------------------------------------------------------------------------------------------------
     async def _post(self, text: str, kind: str) -> bool:

@@ -18,6 +18,7 @@ from .captions import Utterance
 from .events import remove_meet_links
 from .instant import instant_answer
 from .people import addressed_sentence, looks_like_followup, question_of
+from .wake import Attention, WakeSettings, wake_gate
 
 log = logging.getLogger("bot.brain")
 
@@ -352,8 +353,10 @@ class ChatPolicy:
         answer_mode: str = "questions",
         max_direct: int = 12,
         direct_gap_s: float = 6.0,
+        proactive: bool = True,
     ) -> None:
         self.answer_mode = answer_mode
+        self.proactive = proactive
         self.max_direct, self.direct_gap_s = max_direct, direct_gap_s
         self.max_messages, self.min_gap_s, self.warn_remaining_s = max_messages, min_gap_s, warn_remaining_s
         self.sent: list[dict[str, Any]] = []
@@ -375,7 +378,7 @@ class ChatPolicy:
     def decide(
         self, state: MeetingState, elapsed_s: float, duration_s: float, model_message: str | None = None
     ) -> ChatMessage | None:
-        if len(self.sent) >= self.max_messages:
+        if not self.proactive or len(self.sent) >= self.max_messages:
             return None
         if self.sent and elapsed_s - self.sent[-1]["elapsed_s"] < self.min_gap_s:
             return None
@@ -555,11 +558,14 @@ class Brain:
         direct_gap_s: float = 6.0,
         knowledge: Any = None,
         fast: Any = None,
+        wake_settings: WakeSettings | None = None,
     ) -> None:
         self.agenda, self.llm = agenda, llm
         self.fast = fast  # async FastLLM for direct answers; without it they use the thread-bound `llm`
         self.knowledge = knowledge
         self.bot_name = bot_name
+        self.wake_settings = wake_settings
+        self._attention = Attention()
         self.present: list[str] = []
         self.sole_human = False  # exactly one other person is in the meeting: whatever they say is for Tilo
         self.last_engaged_at = -1e9  # when the last question put to Tilo was asked
@@ -589,12 +595,24 @@ class Brain:
             error = str(e)
             self.last_error = error
             log.warning("brain step failed: %s", error)
-        chat = self.policy.decide_direct(reply, utterances, self.bot_name, elapsed_s) or self.policy.decide(
-            self.state, elapsed_s, self.duration_s, model_msg
+        question = self._pending_question(utterances) if self.wake_settings else None
+        direct = (
+            self.policy.decide_direct(reply, utterances, self.bot_name, elapsed_s, question=question)
+            if question is not None or self.wake_settings is None
+            else None
         )
+        if direct is not None and question is not None:
+            self._attention = Attention(question.speaker.removesuffix(CHAT_SUFFIX), question.t)
+        chat = direct or self.policy.decide(self.state, elapsed_s, self.duration_s, model_msg)
         return StepResult(ok=error is None, chat=chat, error=error)
 
     def question_in(self, u: Any) -> Question | None:
+        if self.wake_settings is not None:
+            speaker = u.speaker.removesuffix(CHAT_SUFFIX)
+            result = wake_gate(
+                u.text, speaker, u.t, self._attention, self.wake_settings, typed_to_bot=u.speaker.endswith(CHAT_SUFFIX)
+            )
+            return Question(u.speaker, u.text.strip(), u.t, True) if result.allowed else None
         sent = self.policy.direct_sent
         last = max([sent[-1]["elapsed_s"] if sent else -1e9, self.last_engaged_at])
         following = 0 < u.t - last <= FOLLOWUP_S
@@ -624,6 +642,8 @@ class Brain:
         if question is None:
             return None
         self._attempted[_norm(question.text)] = question.t
+        if self.wake_settings is not None:
+            self._attention = Attention(question.speaker.removesuffix(CHAT_SUFFIX), question.t)
         if question.addressed:
             self.last_engaged_at = max(self.last_engaged_at, question.t)
         st = self.state
