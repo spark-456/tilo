@@ -138,7 +138,7 @@ def test_FR_SKL_05_an_unknown_foreign_unfinished_or_not_own_run_is_the_one_404(c
 def test_FR_SKL_05_the_body_is_closed_and_a_down_may_name_only_a_step_of_the_pinned_plan(ctx):
     ctx.skill()
     ctx.run()
-    for extra in ({"version": 2}, {"by": SAM}, {"id": "x"}, {"run_id": "r_one"}):
+    for extra in ({"version": 2}, {"by": SAM}, {"id": "x"}, {"outcome": "completed"}):
         assert ctx.rate(PRIYA, **extra).status_code == 422, extra
     assert ctx.rate(PRIYA, wrong_step=1).status_code == 422  # a thumbs up names no step
     assert ctx.rate(PRIYA, thumb="down", wrong_step=3).status_code == 422  # the plan has two steps
