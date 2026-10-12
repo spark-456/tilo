@@ -24,7 +24,7 @@ def test_PL_LIVE_E2E_topic_and_each_prompt_consume_their_own_line(
     monkeypatch: pytest.MonkeyPatch,
     newline: str,
 ) -> None:
-    stream = io.TextIOWrapper(io.BytesIO(newline.join(["A team note", "", "1", "", "2", "y", "", ""]).encode()))
+    stream = io.TextIOWrapper(io.BytesIO(newline.join(["A team note", "/end", "1", "", "2", "y", "", ""]).encode()))
     monkeypatch.setattr("sys.stdin", stream)
     seen: list[str] = []
 
