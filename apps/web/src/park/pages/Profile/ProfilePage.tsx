@@ -11,6 +11,7 @@ import { useParkApi } from "../../app/context";
 import { useFollowed } from "../../app/followed";
 import { PageSheet, StatusChip, Switch } from "../../components";
 import "./Profile.css";
+import { BetaPlan } from "./BetaPlan";
 import { ICONS } from "./icons";
 import { canSwitchOff } from "./notifyRules";
 import { signOutOne, signOutOthers } from "./profileSessions";
@@ -98,10 +99,10 @@ function Tile({ tone, children }: { tone: "ok" | "sunk" | "hero"; children: Reac
   return <div className={`park-profile-tile park-profile-tile--${tone}`}>{children}</div>;
 }
 
-function Unavailable({ title }: { title: string }) {
+function Unavailable({ title, sub = "Not available yet" }: { title: string; sub?: string }) {
   return (
     <div className="park-profile-unavailable">
-      <Head title={title} sub="Not available yet" />
+      <Head title={title} sub={sub} />
     </div>
   );
 }
@@ -543,7 +544,7 @@ export function ProfilePage({ app }: { app: AppCtx }) {
               >
                 <div className="park-profile-cards">
                   {loaded.settings.plan === null ? (
-                    <Unavailable title="Plan" />
+                    <BetaPlan />
                   ) : (
                     <div className="park-profile-plan">
                       <span className="park-profile-eyebrow">PLAN</span>
@@ -611,7 +612,7 @@ export function ProfilePage({ app }: { app: AppCtx }) {
                 <div className="park-profile-invoices">
                   <h2 className="park-profile-invoices-title">Invoices</h2>
                   {loaded.settings.invoices === null ? (
-                    <Unavailable title="Invoice history" />
+                    <Unavailable title="Invoice history" sub="No invoices during beta" />
                   ) : (
                     loaded.settings.invoices.map((inv) => (
                       <div key={inv.id} className="park-profile-invoice">

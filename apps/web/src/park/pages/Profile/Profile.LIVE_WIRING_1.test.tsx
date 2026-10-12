@@ -44,10 +44,19 @@ it("LIVE_WIRING_1 null billing and sessions show unavailable panels without acti
   expect(last.getAttribute("aria-checked")).toBe("true");
 });
 
-it("LIVE_WIRING_1 signed-in profile uses identity and local toggles with only the costs read", async () => {
+it("LIVE_WIRING_1 signed-in profile uses identity and local toggles with costs and on-demand team read", async () => {
   const fetch = vi.fn(
-    async (_url: RequestInfo | URL) =>
-      new Response(JSON.stringify({ totals: { usd: 18 }, by_profile: [], by_task_type: [] })),
+    async (url: RequestInfo | URL) =>
+      new Response(
+        JSON.stringify(
+          String(url).endsWith("/v1/people")
+            ? {
+                you: "u_ana",
+                people: [{ id: "u_ana", display_name: "Ana Silva", org_role: "owner" }],
+              }
+            : { totals: { usd: 18 }, by_profile: [], by_task_type: [] },
+        ),
+      ),
   );
   const api = withSession(createLiveApi({ baseUrl: "https://api.example", fetch }), {
     demo: () => false,
@@ -64,9 +73,11 @@ it("LIVE_WIRING_1 signed-in profile uses identity and local toggles with only th
   await clickAndSettle(switchNamed(root, "Quiet hours"));
   await openTab(root, "Plan and billing");
   expect(text(root)).toContain("$18");
+  expect(text(root)).toContain("1 seat");
   expect(text(root)).not.toContain("£18");
   await openTab(root, "Notifications");
   expect(switchNamed(root, "Quiet hours").getAttribute("aria-checked")).toBe("false");
-  expect(fetch).toHaveBeenCalledTimes(1);
+  expect(fetch).toHaveBeenCalledTimes(2);
   expect(String(fetch.mock.calls[0]?.[0])).toBe("https://api.example/costs");
+  expect(String(fetch.mock.calls[1]?.[0])).toBe("https://api.example/v1/people");
 });
