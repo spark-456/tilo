@@ -25,8 +25,12 @@
 # create_event (google_calendar, ADR-0035 decision 6) adds an event with no guests to the person's own primary
 # calendar: T1, an approval card and an undo window. create_event_with_guests invites guests and Google emails them
 # (FR-CAL-04), so it is T3 and always needs a person, listed so removing the line cannot pass unnoticed.
+# send_push (web_push, FR-CHN-17) shows a short notice on the person's own signed-in device: no new recipient, no
+# attachment, no content beyond the card title. T1, so a standing L3 policy of the owner (made when they turn push on)
+# opens it through the outbox; with no such policy it gates like any action (BQ-CHN17-1).
 actions:
   read_events: T1
+  send_push: T1
   web_search: T1
   fetch_url: T1
   create_draft: T1

@@ -1,0 +1,19 @@
+# Web push notifications (FR-CHN-17; PRD 6.2, 11, 16). Read by services/channels `tilo_channels.web_push`.
+# The VAPID private key is never in code, config, fixtures or logs: only the NAME of its Secret Manager secret is
+# here (infra/envs/dev/main.tf grants it to tilo-channels alone). The public key is derived from it at send time.
+# A subscription endpoint is untrusted input from a browser: it must be https, at most `max_endpoint_length`
+# characters, on a push service host listed below (the server POSTs to it, so an open host list would be an SSRF
+# hole), and each person keeps at most `max_subscriptions_per_person` devices.
+# `send_within_s` is the PRD bound from enqueue to hand-off to the push service (a fake clock proves it in tests).
+version: 1
+vapid_private_key_secret: webpush-vapid-private-key
+max_subscriptions_per_person: 5
+max_endpoint_length: 2048
+allowed_endpoint_hosts:
+  - fcm.googleapis.com
+  - push.services.mozilla.com
+  - notify.windows.com
+  - web.push.apple.com
+send_within_s: 10
+title_max: 80
+body_max: 200
