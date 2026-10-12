@@ -25,6 +25,7 @@ import { carryQuizReader } from "../api/quizApps";
 import { withToday } from "../api/sampleDates";
 import { parkApi, withSession } from "../api/select";
 import type { ApiResult, Source } from "../api/types";
+import { type FirstRun, createFirstRun } from "../sample/firstRun";
 import type { AppCtx } from "./AppCtx";
 import { FieldsContext, type FieldsFor } from "./fieldsContext";
 import { type Pin, screenPins } from "./pins";
@@ -50,6 +51,7 @@ interface Held {
   schedule: Schedule;
   /** The default Api is the fixture one, so every page will read sample data (no injected Api, no url). */
   expectsSample: boolean;
+  firstRun: FirstRun;
 }
 
 interface Viewport {
@@ -123,6 +125,22 @@ export function ParkProvider({
       navigate: navigate ?? navigatePark,
       schedule: timer,
     });
+    const expectsSample = api === undefined && (!API_URL || sessionView.demo());
+    const firstRun = createFirstRun(wrapped, store, expectsSample);
+    const readWorlds = wrapped.getWorlds;
+    wrapped.getWorlds = (...args) => {
+      const ticket = firstRun.ticket();
+      return readWorlds(...args).then(
+        (result) => {
+          firstRun.note(result, ticket);
+          return result;
+        },
+        (error: unknown) => {
+          firstRun.fail(ticket);
+          throw error;
+        },
+      );
+    };
     return {
       store,
       api: wrapped,
@@ -133,7 +151,8 @@ export function ParkProvider({
           : api === undefined && API_URL?.trim() && !sessionView.demo()
             ? new HttpClient({ baseUrl: API_URL, appCheckToken, authToken })
             : null,
-      expectsSample: api === undefined && (!API_URL || sessionView.demo()),
+      expectsSample,
+      firstRun,
     };
   });
   const [win, setWin] = useState(windowSize);
@@ -148,7 +167,13 @@ export function ParkProvider({
     window.addEventListener("resize", onResize);
     return () => window.removeEventListener("resize", onResize);
   }, [viewport]);
-  useEffect(() => () => held.store.dispose(), [held]); // no timer outlives the app
+  useEffect(
+    () => () => {
+      held.firstRun.dispose();
+      held.store.dispose();
+    },
+    [held],
+  ); // no timer or first-run read outlives the app
   const size = viewport ?? win;
   const sized = useMemo(() => ({ vw: size.vw, vh: size.vh }), [size.vw, size.vh]);
   const [raw, setRaw] = useState<readonly Pin[]>(NO_RAW_PINS);
@@ -172,6 +197,7 @@ function useHeld(): Held {
 
 export const useParkStore = (): ParkStore => useHeld().store;
 export const useParkApi = (): Api => useHeld().api;
+export const useFirstRunController = (): FirstRun => useHeld().firstRun;
 /** World-specific routes share the existing authenticated client; demo sessions have none. */
 export const useWorldClient = (): HttpClient | null => useHeld().worldClient;
 /** The provider's timer: a page that waits (the Home composer's 900 ms) goes through it, never setTimeout. */
