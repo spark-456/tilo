@@ -14,6 +14,7 @@ from difflib import SequenceMatcher
 from pathlib import Path
 from typing import Any, NamedTuple, Protocol
 
+from .answer_scope import scoped_answer
 from .captions import Utterance
 from .events import remove_meet_links
 from .instant import instant_answer
@@ -555,11 +556,13 @@ class Brain:
         direct_gap_s: float = 6.0,
         knowledge: Any = None,
         fast: Any = None,
+        meeting_scope: bool = False,
     ) -> None:
         self.agenda, self.llm = agenda, llm
         self.fast = fast  # async FastLLM for direct answers; without it they use the thread-bound `llm`
         self.knowledge = knowledge
         self.bot_name = bot_name
+        self.meeting_scope = meeting_scope
         self.present: list[str] = []
         self.sole_human = False  # exactly one other person is in the meeting: whatever they say is for Tilo
         self.last_engaged_at = -1e9  # when the last question put to Tilo was asked
@@ -589,9 +592,15 @@ class Brain:
             error = str(e)
             self.last_error = error
             log.warning("brain step failed: %s", error)
-        chat = self.policy.decide_direct(reply, utterances, self.bot_name, elapsed_s) or self.policy.decide(
-            self.state, elapsed_s, self.duration_s, model_msg
+        question = self._pending_question(utterances) if self.meeting_scope else None
+        if self.meeting_scope:
+            reply = scoped_answer(question.text, self.bot_name, question.speaker, self.state) if question else None
+        direct = (
+            self.policy.decide_direct(reply, utterances, self.bot_name, elapsed_s, question=question)
+            if question is not None or not self.meeting_scope
+            else None
         )
+        chat = direct or self.policy.decide(self.state, elapsed_s, self.duration_s, model_msg)
         return StepResult(ok=error is None, chat=chat, error=error)
 
     def question_in(self, u: Any) -> Question | None:
@@ -626,6 +635,14 @@ class Brain:
         self._attempted[_norm(question.text)] = question.t
         if question.addressed:
             self.last_engaged_at = max(self.last_engaged_at, question.t)
+        if self.meeting_scope:
+            self.last_quick_source = "local"
+            return self._direct(
+                scoped_answer(question.text, self.bot_name, question.speaker, self.state),
+                utterances,
+                elapsed_s,
+                question,
+            )
         st = self.state
         local = instant_answer(question.text, st, elapsed_s, self.duration_s, self.present)
         if local:  # answered from the meeting notes: no model call, no waiting

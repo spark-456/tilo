@@ -77,6 +77,7 @@ def build_brain(cfg: Config, agenda_path: Path | None, duration: float | None, k
         max_direct=cfg.max_direct_replies,
         direct_gap_s=cfg.direct_reply_gap_s,
         knowledge=kb,
+        meeting_scope=True,
     )
 
 
