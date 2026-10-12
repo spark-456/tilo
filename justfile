@@ -146,11 +146,12 @@ live-run-file path *flags:
 skills-test:
     python -c "import subprocess,sys; r=subprocess.run(['uv','run','pytest','skills']); sys.exit(0 if r.returncode in (0, 5) else r.returncode)"
 
-# Apply infrastructure. Refuses everything but dev, and infra isn't applied yet
-# either way. Usage: `just deploy dev` (an `env=dev`-style prefix is stripped
-# too, so the older documented form keeps working).
+# Deploy existing dev services through Cloud Build: api first, then all.
+# Accepts `just deploy dev` and the older `just deploy env=dev` form.
+# just validates the environment before any shell; infrastructure stays manual.
 deploy env="dev":
-    python -c "import sys; env='{{env}}'; env=env[4:] if env.startswith('env=') else env; sys.exit(sys.stderr.write(f'deploy: only env=dev is allowed here, got {env!r}\n') or 1) if env != 'dev' else sys.exit(sys.stderr.write('deploy: infra/ is not applied yet (ticket P0-07 defines the plan; the user runs terraform apply)\n') or 1)"
+    just deploy-dev-cloudbuild api {{ if env =~ '^(dev|env=dev)$' { 'dev' } else { error('deploy: only env=dev is allowed here, got ' + env) } }}
+    just deploy-dev-cloudbuild all dev
 
 # Dispatch the tilo-dev deploy workflow (P0-07a) on main: it builds the images, swaps them on Cloud Run and
 # smoke-tests. Refuses everything but dev; needs `gh` signed in. Steps and variables: docs/deploy-dev.md.
