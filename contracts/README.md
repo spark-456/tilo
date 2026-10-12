@@ -32,12 +32,12 @@ the contract wins. Conventions are in [ADR-0002](../docs/adr/0002-contract-conve
 | `attention.schema.json` | One measured span of a person's steering or review time, subtracted from time saved | 1.0.0 |
 | `evals.schema.json` | `config/evals.yaml`: eval pass credit caps, deploy-gate repeats, cost-regression threshold, case counts per group | 1.0.0 |
 | `pilot.schema.json` | EV-G3 pilot records by pseudonymous tester id: consent, run and card tags, diary entries, survey responses | 1.0.0 |
-| `person.schema.json` | A person of an org: aliases, time zone, preferred channel, team memberships assigned by an org owner (ADR-0015); rules PE-01 to PE-30 in `people.rules.md` | 1.0.0 |
+| `person.schema.json` | A person of an org: aliases, time zone, preferred channel, team memberships assigned by an org owner (ADR-0015); rules PE-01 to PE-30 in `people.rules.md` (PE-36, proposed, is pin placement) | 1.0.0 |
 | `meeting.schema.json` | A meeting Tilo attended or took a transcript of: owner, agenda, attendees as said, attestation, retention; no field for a join link; 1.1.0 adds an optional `world_id` (ADR-0020); 1.2.0 refuses more link forms and hidden characters in the title, agenda titles and attendee names (PE-13, ADR-0016 decision 14) | 1.2.0 |
 | `meeting_room.schema.json` | A meeting room with an agent team (ADR-0028, Proposed): the room as tilo-api serves it, the convene, ask and confirm request bodies and the shapes the `meeting.*` room events share; rules MR-01 to MR-12 in `meeting_room.rules.md` | 1.0.0 |
 | `minutes.schema.json` | The structured minutes of one meeting: summary, decisions, action items, agenda coverage, every item citing utterance ids | 1.0.0 |
 | `work_item.schema.json` | One thing a person has to do; proposed until the meeting Owner confirms an item Tilo made | 1.0.0 |
-| `pinboard_item.schema.json` | An entry on a personal or team pinboard; Tilo's entries carry a source and, on the team board, a confirmation | 1.0.0 |
+| `pinboard_item.schema.json` | An entry on a personal or team pinboard; Tilo's entries carry a source and, on the team board, a confirmation; 1.1.0 adds the optional `placement` (ADR-0038, rule PE-36 proposed) | 1.1.0 |
 | `mention.schema.json` | An @mention of a team member on a team entry | 1.0.0 |
 | `calendar_entry.schema.json` | A stored calendar entry (cached Google event, own or proposed), plus the `agenda_item` read-model row and `free_busy`; 1.1.0 adds the row's optional `joinable` (ADR-0024 amendment 4, MJ-10); no field holds a link | 1.1.0 |
 | `meeting_join.schema.json` | The answer of `GET /v1/meetings/{id}/join`: a hosted meeting's Meet link for its owner, read on click and stored nowhere, with `expires_at` (ADR-0024 amendment 4); rules MJ-01 to MJ-10 in `meeting_join.rules.md` | 1.0.0 |
