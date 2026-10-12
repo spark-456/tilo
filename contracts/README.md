@@ -20,7 +20,7 @@ the contract wins. Conventions are in [ADR-0002](../docs/adr/0002-contract-conve
 | `handoff.schema.json` | Context handoff note | 1.0.0 |
 | `envelope.schema.json` | Agent-to-agent handoff envelope | 1.0.0 |
 | `skill.schema.json` | `skill.yaml`, the expert-signed skill (PRD 8.2); 1.1.0 adds `tool_access` (ADR-0027) | 1.1.0 |
-| `taught_skill.schema.json` | `TaughtSkill`: a skill a person taught on the Skills page, a sibling of `skill.yaml` (FR-SKL-01 to 07, ADR-0034, Accepted), with `$defs` `try_run_result`, `rating`, `fix` and `helpers_report`; rules TS-01 to TS-12 in `taught_skill.rules.md` | 1.0.0 |
+| `taught_skill.schema.json` | `TaughtSkill`: a skill a person taught on the Skills page, a sibling of `skill.yaml` (FR-SKL-01 to 07, ADR-0034, Accepted), with `$defs` `try_run_result`, `rating`, `fix`, `real_run`, `run_answer` and `helpers_report`; rules TS-01 to TS-17 in `taught_skill.rules.md` (ADR-0037 adds `real_run` and `run_answer`) | 1.1.0 |
 | `connector.schema.json` | Connector declarations | 1.0.0 |
 | `providers.schema.json` | `config/models.yaml` and `config/prices.yaml`; 1.1.0 openai_compat endpoints, 1.2.0 the speech role and `audio_input` (ADR-0027), 1.3.0 the search role, `reserve_units`, `unit_price`, `cached_input`, `valid_until`, `region`, `media_tokens` and the `video`/`documents` capabilities (ADR-0029) | 1.3.0 |
 | `agents.schema.json` | `AgentsConfig`: `config/agents.yaml`, the harness's role limits, context thresholds, liveness, retries and question cap | 1.0.0 |
