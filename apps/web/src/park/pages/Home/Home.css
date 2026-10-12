@@ -642,6 +642,30 @@
   flex: none;
   white-space: nowrap;
 }
+/* QA-DEMO-1 m8: on a phone the input had about 120px beside the logo and the button. The logo gives its place up and the
+   button its padding, so the placeholder reads. */
+@media (max-width: 480px) {
+  [data-park] .park-home-input-row {
+    gap: 8px;
+  }
+  [data-park] .park-home-logo {
+    display: none;
+  }
+  [data-park] .park-home-input {
+    font-size: 16px;
+  }
+  [data-park] .park-home-start {
+    padding: 0 16px;
+  }
+}
+@media (max-width: 360px) {
+  [data-park] .park-home-input-row {
+    padding-left: 8px;
+  }
+  [data-park] .park-home-start {
+    padding: 0 12px;
+  }
+}
 [data-park] .park-home-start:hover,
 [data-park] .park-home-confirm:hover {
   filter: brightness(1.08);

@@ -63,7 +63,11 @@ for (const [name, viewport] of Object.entries({ desktop: DESKTOP, mobile: MOBILE
         );
         if (i === 0 || i === 7) await shot(page, `${name}-2-step-${i + 1}`);
         if (i === 1) {
-          const target = page.locator('nav[aria-label="Main"] a[href="/worlds"]');
+          // a phone has one page button instead of the tab strip (QA-DEMO-1 B2)
+          const target =
+            name === "mobile"
+              ? page.locator('nav[aria-label="Main"] button.park-shell__pagebtn')
+              : page.locator('nav[aria-label="Main"] a[href="/worlds"]');
           await expect(target).toHaveAttribute("aria-describedby", /onb-body/);
           const [r, t] = [
             await page.locator(".onb-ring").boundingBox(),

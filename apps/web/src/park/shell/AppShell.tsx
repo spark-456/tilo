@@ -42,6 +42,8 @@ import { backdropScene } from "./scene";
 const SIGN_OUT = "This is a prototype, so you stay signed in";
 const SIGNED_OUT = "You are signed out";
 const SIGN_OUT_FAILED = "Could not sign out. Try again.";
+/** Below this width the six tabs and the tools do not fit in the nav: one menu names the current page (B2). */
+const COMPACT_NAV_BELOW = 840;
 const MOBILE_NOTE = "The Tilo mobile app is a concept. It is not available yet.";
 
 /** Sign out (FR-UX-10): ends the real session when there is one; with none (a local host, the fixture world, a build
@@ -251,6 +253,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         onAvatar={() => store.toggleMenu("acct")}
         contextOpen={contextOpen}
         onContext={toggleContext}
+        compact={app.vw > 0 && app.vw < COMPACT_NAV_BELOW}
       />
       {contextOpen && <ContextPanel key={contextPerson} onClose={toggleContext} />}
       {state.menu === "notif" ? (
@@ -300,9 +303,13 @@ export function AppShell({ children }: { children: ReactNode }) {
         className={`park-shell__main ${ready ? "" : "park-shell__booting"}`}
         data-phase={swap.phase === "in" ? undefined : swap.phase}
       >
-        <FirstRunBanner first={first} page={page} person={bannerPerson} />
+        {/* QA-DEMO-1 M1: inside the column on a page (below the fixed nav's padding), pinned under the nav on Home */}
+        {inner ? null : <FirstRunBanner first={first} page={page} person={bannerPerson} floating />}
         <div className={inner ? "park-shell__page" : undefined}>
-          <div className={inner ? "park-shell__column" : undefined}>{swap.node}</div>
+          <div className={inner ? "park-shell__column" : undefined}>
+            {inner ? <FirstRunBanner first={first} page={page} person={bannerPerson} /> : null}
+            {swap.node}
+          </div>
         </div>
       </main>
       {toast ? (
