@@ -134,7 +134,7 @@
  * scenario.schema.json 1.0.0 sha256:b8e044d7e37b92a3
  * skill.schema.json 1.1.0 sha256:9eeee7768b667afa
  * spend_caps.schema.json 1.1.1 sha256:c04bc36ac17dc0ab
- * taught_skill.schema.json 1.0.0 sha256:ca1c19c1dadd31c0
+ * taught_skill.schema.json 1.1.0 sha256:b23321ed0cd570d4
  * team_lead.schema.json 1.0.0 sha256:19413726e364ffdd
  * transcript.schema.json 1.0.0 sha256:08f934b8f0c9a40e
  * ui_action.schema.json 1.0.0 sha256:2ceb1e0b46368734
@@ -1076,6 +1076,13 @@ export type TaughtSkillStepText = string;
  */
 export type TaughtSkillVerb =
   "read" | "draft" | "write" | "send" | "post" | "pay" | "delete" | "share" | "book";
+/**
+ * How a real run ended (ADR-0037): completed after world.completed, failed after world.failed. Pause all and the kill switch end nothing here, so a run they stop stays unfinished and is never rateable (TS-14).
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "TaughtSkillRunOutcome".
+ */
+export type TaughtSkillRunOutcome = "completed" | "failed";
 /**
  * Quote text or speaker: one line of at most 240 characters with no control character (Cc), no line or paragraph separator and no format character (Cf) of the Basic Multilingual Plane, so no bidi override or zero-width character. Astral format characters (tag characters U+E0000 to U+E007F and others) are removed by code (PE-24, validator only).
  *
@@ -5525,7 +5532,7 @@ export interface SpendCapsConfig {
   rate_limit_window_s: number;
 }
 /**
- * A skill a person taught Tilo on the Skills page (FR-SKL-01 to FR-SKL-07, ADR-0034), stored at orgs/{org}/taught_skills/{id} and read only through tilo-api. A sibling of the expert-signed, version-pinned skill.yaml (skill.schema.json), never a change to it. One person owns it. Each fix makes a new integer version, and a run pins the version it started with. It acts only through its own tool_access, the team's levels and the policy engine. $defs try_run_result, rating, fix and helpers_report are the records and the report around it. Rules TS-01 to TS-12 are in taught_skill.rules.md.
+ * A skill a person taught Tilo on the Skills page (FR-SKL-01 to FR-SKL-07, ADR-0034), stored at orgs/{org}/taught_skills/{id} and read only through tilo-api. A sibling of the expert-signed, version-pinned skill.yaml (skill.schema.json), never a change to it. One person owns it. Each fix makes a new integer version, and a run pins the version it started with. It acts only through its own tool_access, the team's levels and the policy engine. $defs try_run_result, rating, fix, real_run, run_answer and helpers_report are the records and the report around it (real_run and run_answer are 1.1.0, ADR-0037). Rules TS-01 to TS-17 are in taught_skill.rules.md.
  *
  * This interface was referenced by `TiloContracts`'s JSON-Schema
  * via the `definition` "TaughtSkill".
@@ -5734,6 +5741,44 @@ export interface TaughtSkillFix {
    * The thumbs-down rating that led to it, or null.
    */
   rating: Ulid | null;
+  at: Timestamp;
+}
+/**
+ * FR-SKL-05 to 07, ADR-0037: the record that one real run of one saved skill version started and how it ended, at orgs/{org}/taught_skills/{skill}/real_runs/{run_id} (the run id is the key, so a run is recorded once). tilo-api or the harness writes it from its own records, never from a request body (TS-13). by is the verified person whose run it is, set by the server. org_id, skill, version, run_id, world_id, by, plan and started_at are fixed at the start. finished_at and outcome are null together until the run's own world writes its terminal event, then set once together (TS-14). plan is the skill's plan at that version, kept so a later fix cannot rewrite what the run followed. A try run is never one of these (TS-10), and a rating and its note are the rating record's.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "TaughtSkillRealRun".
+ */
+export interface TaughtSkillRealRun {
+  org_id: OrgId;
+  skill: TaughtSkillId;
+  version: number;
+  run_id: RunId;
+  world_id: WorldId;
+  by: UserId;
+  /**
+   * @minItems 1
+   * @maxItems 20
+   */
+  plan: [TaughtSkillPlanStep, ...TaughtSkillPlanStep[]];
+  started_at: Timestamp;
+  finished_at: Timestamp | null;
+  outcome: TaughtSkillRunOutcome | null;
+}
+/**
+ * FR-SKL-07, ADR-0037: one question card that a person answered in a recorded real run, at orgs/{org}/taught_skills/{skill}/real_runs/{run_id}/answers/{card_id} (one for each card). It links records that already exist and holds no text of the question or the answer. by and at are the card's recorded answerer (the person, never a Team Lead id) and answer time, copied once when the answer commits (TS-16). The helpers report counts these and nothing else (TS-12).
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "TaughtSkillRunAnswer".
+ */
+export interface TaughtSkillRunAnswer {
+  org_id: OrgId;
+  skill: TaughtSkillId;
+  version: number;
+  run_id: RunId;
+  world_id: WorldId;
+  card_id: Ulid;
+  by: UserId;
   at: Timestamp;
 }
 /**
