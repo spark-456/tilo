@@ -1730,6 +1730,7 @@ version = "0.1.0"
 source = { editable = "services/channels" }
 dependencies = [
     { name = "fastapi" },
+    { name = "google-auth" },
     { name = "pywebpush" },
     { name = "pyyaml" },
     { name = "tilo-people" },
@@ -1742,6 +1743,7 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "fastapi", specifier = ">=0.115" },
+    { name = "google-auth", specifier = ">=2.30" },
     { name = "pywebpush", specifier = ">=2.0" },
     { name = "pyyaml", specifier = ">=6.0" },
     { name = "tilo-people", editable = "packages/people" },
