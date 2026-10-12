@@ -139,6 +139,12 @@ const STEP_MS = { City: 340, other: 250 } as const;
 const MOTIONS: readonly Motion[] = ["lively", "calm", "still"];
 const TIME_STORAGE_KEY = "tilo.time";
 const MOTION_STORAGE_KEY = "tilo.motion";
+const THEME_STORAGE_KEY = "tilo.theme";
+const STORED_PREFS = new Map([
+  ["time", TIME_STORAGE_KEY],
+  ["motion", MOTION_STORAGE_KEY],
+  ["theme", THEME_STORAGE_KEY],
+]);
 
 function readStoredPrefs(): Record<string, unknown> {
   const out: Record<string, unknown> = {};
@@ -147,6 +153,8 @@ function readStoredPrefs(): Record<string, unknown> {
     if (t === "day" || t === "night") out.time = t;
     const m = window.localStorage.getItem(MOTION_STORAGE_KEY);
     if (m === "lively" || m === "calm" || m === "still") out.motion = m;
+    const th = window.localStorage.getItem(THEME_STORAGE_KEY); // FR-WLD-15: validated by themeFor where it is used
+    if (th !== null && /^[a-z][a-z0-9-]{0,31}$/.test(th)) out.theme = th;
   } catch {
     // storage absent (Node tests) or blocked (private mode)
   }
@@ -154,12 +162,10 @@ function readStoredPrefs(): Record<string, unknown> {
 }
 
 function writeStoredPref(key: string, value: unknown): void {
-  if (key !== "time" && key !== "motion") return;
+  const storageKey = STORED_PREFS.get(key);
+  if (storageKey === undefined) return;
   try {
-    window.localStorage.setItem(
-      key === "time" ? TIME_STORAGE_KEY : MOTION_STORAGE_KEY,
-      String(value),
-    );
+    window.localStorage.setItem(storageKey, String(value));
   } catch {
     // storage absent or blocked: preference still applies for this session
   }

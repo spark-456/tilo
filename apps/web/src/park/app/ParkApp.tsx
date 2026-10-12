@@ -7,6 +7,8 @@ import { ParkAuthProvider } from "../shell/auth";
 import { useParkTour } from "../shell/tour";
 import "../tokens/fonts";
 import "../tokens/park.css";
+import "../tokens/themes.css";
+import { themeFor } from "../tokens/themes";
 import { PAGE_LABEL } from "./AppCtx";
 import { NOT_FOUND_TITLE, NotFound } from "./NotFound";
 import "./park-app.css";
@@ -88,7 +90,12 @@ function Shell() {
   const Page = route ? PAGES[route.page] : null;
   const Tour = useParkTour()?.Layer; // ONBOARD-1: the first-run welcome and tour, when the Root provides them
   return (
-    <div data-park data-time={app.time} data-motion={app.motion}>
+    <div
+      data-park
+      data-time={app.time}
+      data-motion={app.motion}
+      data-theme={themeFor(app.prefs.theme)}
+    >
       <AppShell>
         <Suspense fallback={null}>
           {Page ? (
