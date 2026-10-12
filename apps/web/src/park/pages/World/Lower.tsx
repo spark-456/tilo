@@ -107,10 +107,16 @@ export function Result({
   w,
   onOpen,
   onSlack,
+  slackConnected = true,
+  slackReason = "",
+  noSlackId,
 }: {
   w: World;
   onOpen: () => void;
-  onSlack: () => void;
+  onSlack: (trigger: HTMLButtonElement) => void;
+  slackConnected?: boolean;
+  slackReason?: string;
+  noSlackId?: string;
 }) {
   return (
     <section aria-label="Result" className="park-world-section">
@@ -122,7 +128,15 @@ export function Result({
             <Button variant="primary" size="sm" onClick={onOpen}>
               Open result
             </Button>
-            <Button variant="secondary" size="sm" onClick={onSlack}>
+            <Button
+              variant="secondary"
+              size="sm"
+              disabled={!slackConnected}
+              aria-disabled={!slackConnected ? "true" : undefined}
+              aria-describedby={!slackConnected ? noSlackId : undefined}
+              title={!slackConnected ? slackReason : "Share this world link to Slack"}
+              onClick={(e) => onSlack(e.currentTarget)}
+            >
               Share to Slack
             </Button>
           </div>

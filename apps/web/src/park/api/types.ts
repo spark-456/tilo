@@ -471,6 +471,7 @@ export interface Connector {
   level?: number;
   used?: string[];
   blurb?: string;
+  channels?: string[];
   /** When the sign-in lapses (ISO 8601). The Connectors page warns 3 days ahead; absent means no expiry is known. */
   expires?: string;
 }

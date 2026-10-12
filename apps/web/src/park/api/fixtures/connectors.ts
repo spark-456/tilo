@@ -74,6 +74,7 @@ export const connectors: Connector[] = [
     ],
     level: 2,
     used: ["Triage the Accounts inbox", "Set up a new starter"],
+    channels: ["#ops", "#k1-firmware"],
   },
   {
     id: "xero",
