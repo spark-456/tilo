@@ -275,7 +275,7 @@ export function HomePage({ app }: { app: AppCtx }) {
       data-testid="park-page-home"
     >
       {ready ? (
-        <>
+        <div className={preview ? "park-home-preview-account" : undefined}>
           <Pins
             pins={placedPins(pins, worlds, needs, night, vw || 1440, vh || 900, served)}
             onOpen={open}
@@ -291,7 +291,7 @@ export function HomePage({ app }: { app: AppCtx }) {
               worldName={waitingIn?.name ?? null}
               onReview={() => (waitingIn ? open(waitingIn.id) : go("worlds"))}
             />
-            {(vw || 1440) >= 1180 ? (
+            {(vw || 1440) >= 1180 && !preview ? (
               <KpiStrip
                 ledger={base.ledger}
                 dec={dec}
@@ -314,7 +314,7 @@ export function HomePage({ app }: { app: AppCtx }) {
               onLedger={() => go("ledger")}
             />
           ) : null}
-        </>
+        </div>
       ) : null}
       {preview ? <FirstRunOverview page="home" app={app} /> : null}
       {failed && !preview ? (
