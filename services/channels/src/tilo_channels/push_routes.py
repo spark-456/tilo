@@ -3,7 +3,8 @@ PRD 6.2, 16; SEC-REVIEW-7). tilo-api's outbox adapter is the only caller: the VA
 the outbox lives in tilo-api and its adapter hands the already authorised notice here over an OIDC ID token.
 
 The caller is proven first (a Google-signed token for `TILO_PUSH_AUDIENCE`, a verified email equal to
-`TILO_PUSH_CALLER`); an unset audience or caller is 503 and nothing is read. The body is JSON only and at most 8 KiB;
+`TILO_PUSH_CALLER`; `push_verifier`: junk is refused before any certificate fetch, which is cached and bounded, and
+runs off the event loop); an unset audience or caller is 503 and nothing is read. The body is JSON only, <= 8 KiB;
 every device is checked again as an allowed push service address; the notice is the fixed shape (title, body, tag, a
 relative path of the one allowlisted page). Devices go out in parallel so five slow ones cost one timeout. The answer
 holds counts and positions, never an endpoint, key, payload or the vendor's text. The real sender exists only on Cloud
@@ -15,14 +16,16 @@ from __future__ import annotations
 import json
 import os
 import re
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from concurrent.futures import ThreadPoolExecutor
 from typing import Annotated, Any, Protocol
 
 from fastapi import Depends, HTTPException, Request
+from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
+from tilo_channels.push_verifier import shared_verifier
 from tilo_channels.web_push import (
     OPEN_PATH,
     PushSender,
@@ -64,30 +67,22 @@ class SendIn(_Closed):
 
 
 class Verifier(Protocol):
-    def verify(self, token: str, audience: str) -> dict[str, Any]: ...
-
-
-class GoogleVerifier:
-    def verify(self, token: str, audience: str) -> dict[str, Any]:
-        from google.auth.transport import requests as g_requests  # noqa: PLC0415
-        from google.oauth2 import id_token  # noqa: PLC0415
-
-        return dict(id_token.verify_oauth2_token(token, g_requests.Request(), audience))
+    def verify(self, token: str, audience: str) -> Mapping[str, Any]: ...
 
 
 def get_verifier() -> Verifier:
-    return GoogleVerifier()
+    return shared_verifier()  # bounded, cached certificate fetch; junk refused before any fetch (SEC-REVIEW-7b B2)
 
 
 def get_sender() -> PushSender | None:
     return production_sender()
 
 
-def _caller_ok(request: Request, verifier: Verifier) -> None:
+def _caller_ok(header: str, verifier: Verifier) -> None:
+    """Blocking (a certificate fetch may run): the route calls it in the threadpool, never on the event loop."""
     audience, caller = os.environ.get(ENV_AUDIENCE, ""), os.environ.get(ENV_CALLER, "")
     if not audience or not caller:
         raise HTTPException(status_code=503, detail="not_configured")
-    header = request.headers.get("authorization", "")
     scheme, _, token = header.partition(" ")
     if scheme.lower() != "bearer" or not token:
         raise HTTPException(status_code=401, detail="unauthorized")
@@ -123,7 +118,7 @@ async def send(
     verifier: Annotated[Verifier, Depends(get_verifier)],
     sender: Annotated[PushSender | None, Depends(get_sender)],
 ) -> JSONResponse:
-    _caller_ok(request, verifier)
+    await run_in_threadpool(_caller_ok, request.headers.get("authorization", ""), verifier)
     if sender is None:
         raise HTTPException(status_code=503, detail="not_configured")
     body = await _body(request)
@@ -133,7 +128,8 @@ async def send(
     payload = json.dumps(
         {"title": body.title, "body": body.body, "tag": body.tag, "path": body.path}, separators=(",", ":")
     ).encode("utf-8")
-    results = _fan_out(sender, cfg.vapid, payload, [_subscription(d) for d in body.devices])
+    subs = [_subscription(d) for d in body.devices]
+    results = await run_in_threadpool(_fan_out, sender, cfg.vapid, payload, subs)
     return JSONResponse(
         {
             "delivered": results.count("delivered"),
