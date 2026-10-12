@@ -5,12 +5,15 @@
 // raises the "Sample data" chip without any page asking for data. The city's cars and walkers run on Home (cityMotion.ts).
 import { type ReactNode, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { LifetimeCapDialog } from "../../components/LifetimeCapDialog";
+import { notifications as sampleNotifications } from "../api/fixtures/notifications";
 import { nameInitials } from "../api/nameInitials";
 import type { Decision, Notification, User } from "../api/types";
 import type { PageId } from "../app/AppCtx";
 import { endSession, useApp, useExpectsSample, useParkApi, useParkStore } from "../app/context";
 import { useParkRoute, useQuizAppRoute } from "../app/router";
 import { Button, Popover, Toast } from "../components";
+import { FirstRunBanner } from "../sample/FirstRunBanner";
+import { useFirstRun } from "../sample/useFirstRun";
 import "../tokens/fonts";
 import { AccountMenu, type AccountPerson } from "./AccountMenu";
 import { BootSplash } from "./BootSplash";
@@ -64,8 +67,12 @@ export function AppShell({ children }: { children: ReactNode }) {
   const expectsSample = useExpectsSample();
   const auth = useParkAuth();
   const contextPerson = auth ? (auth.user?.email ?? "guest-session") : (user?.email ?? "device");
+  const bannerPerson = auth ? (auth.user?.email ?? null) : (user?.email ?? null);
   const [contextOpen, toggleContext] = useContextChoice(contextPerson);
   const tour = useParkTour();
+  const first = useFirstRun();
+  const sampleNotes =
+    first && liveNotifications && notificationStatus === "ready" && notifications.length === 0;
   const [mobileNote, setMobileNote] = useState(false);
   const signingOut = useRef(false);
   const appearance = useAppearance();
@@ -241,11 +248,14 @@ export function AppShell({ children }: { children: ReactNode }) {
       {state.menu === "notif" ? (
         <Enter>
           <NotificationsPopover
-            notifications={notifications}
+            notifications={sampleNotes ? sampleNotifications : notifications}
+            sample={sampleNotes}
             status={notificationStatus}
             decisions={decisions}
             dec={state.dec}
-            onOpen={open}
+            onOpen={
+              sampleNotes ? () => store.toast("This is sample data. No action is taken.") : open
+            }
             onSettings={() => store.go("profile", { tab: "notifications" })}
             onClose={store.closeMenu}
           />
@@ -281,6 +291,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         className={`park-shell__main ${ready ? "" : "park-shell__booting"}`}
         data-phase={swap.phase === "in" ? undefined : swap.phase}
       >
+        <FirstRunBanner first={first} page={page} person={bannerPerson} />
         <div className={inner ? "park-shell__page" : undefined}>
           <div className={inner ? "park-shell__column" : undefined}>{swap.node}</div>
         </div>
