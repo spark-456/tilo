@@ -114,7 +114,11 @@
 
 # FR-UX-18 setup catalogue. No scopes or adapters are granted here.
 # MCP OAuth/transport and a reviewed allowlist entry are required before these tools execute.
+# Explicit catalogue -> reserved MCP server mapping lives beside each entry below.
+# These comments reserve names for the later OAuth ticket; they do not allowlist or bind servers.
+# The frozen connector schema has no transport field. Registry IDs cannot be MCP server IDs.
 - id: slack
+  # MCP mapping: slack -> mcp_slack (owner OAuth app/setup required).
   name: Slack
   icon: link
   auth: oauth2
@@ -125,6 +129,7 @@
   limits: {per_minute: null, batch_size: null}
   data_class: {returns: [business], redact: []}
 - id: notion
+  # MCP mapping: notion -> mcp_notion (owner OAuth app/setup required).
   name: Notion
   icon: link
   auth: oauth2
@@ -135,6 +140,7 @@
   limits: {per_minute: null, batch_size: null}
   data_class: {returns: [business], redact: []}
 - id: github
+  # MCP mapping: github -> mcp_github (owner OAuth app/setup required).
   name: GitHub
   icon: link
   auth: oauth2
@@ -145,6 +151,7 @@
   limits: {per_minute: null, batch_size: null}
   data_class: {returns: [business], redact: []}
 - id: xero
+  # MCP mapping: xero -> mcp_xero (owner OAuth app/setup required).
   name: Xero
   icon: link
   auth: oauth2
@@ -155,6 +162,7 @@
   limits: {per_minute: null, batch_size: null}
   data_class: {returns: [business], redact: []}
 - id: hubspot
+  # MCP mapping: hubspot -> mcp_hubspot (owner OAuth app/setup required).
   name: HubSpot
   icon: link
   auth: oauth2
@@ -165,6 +173,7 @@
   limits: {per_minute: null, batch_size: null}
   data_class: {returns: [business], redact: []}
 - id: stripe
+  # MCP mapping: stripe -> mcp_stripe (owner OAuth app/setup required).
   name: Stripe
   icon: link
   auth: oauth2
@@ -175,6 +184,7 @@
   limits: {per_minute: null, batch_size: null}
   data_class: {returns: [business], redact: []}
 - id: microsoft365
+  # MCP mapping: microsoft365 -> mcp_microsoft365 (owner OAuth app/setup required).
   name: Microsoft 365
   icon: link
   auth: oauth2
@@ -185,6 +195,7 @@
   limits: {per_minute: null, batch_size: null}
   data_class: {returns: [business], redact: []}
 - id: jira
+  # MCP mapping: jira -> mcp_jira (owner OAuth app/setup required).
   name: Jira
   icon: link
   auth: oauth2
@@ -195,6 +206,7 @@
   limits: {per_minute: null, batch_size: null}
   data_class: {returns: [business], redact: []}
 - id: bamboohr
+  # MCP mapping: bamboohr -> mcp_bamboohr (owner OAuth app/setup required).
   name: BambooHR
   icon: link
   auth: oauth2
