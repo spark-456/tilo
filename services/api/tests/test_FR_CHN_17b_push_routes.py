@@ -42,13 +42,16 @@ def rig(people_rig):
 
 def test_FR_CHN_17b_subscribe_stores_for_the_principal_and_says_push_is_off_until_the_owner_policy(rig) -> None:
     res = rig.sub()
-    assert (res.status_code, res.json()) == (200, {"devices": 1, "delivery": "off_until_owner_policy"})
+    assert (res.status_code, res.json()) == (
+        200,
+        {"devices": 1, "delivery": "off_until_owner_policy", "public_key": None},
+    )
     assert res.headers["cache-control"] == "no-store"
     assert [s.endpoint for s in rig.push.for_user(OWNER)] == [ENDPOINT] and rig.push.for_user(PRIYA) == ()
     assert ENDPOINT not in res.text and KEYS["auth"] not in res.text
     assert rig.sub().json()["devices"] == 1  # the same device again replaces
     rig.world_store.policies["pol_push_l3"] = _policy(OWNER)
-    assert rig.p.get(STATUS).json() == {"devices": 1, "delivery": "ready"}
+    assert rig.p.get(STATUS).json() == {"devices": 1, "delivery": "ready", "public_key": None}
     rig.world_store.policies["pol_push_l3"] = _policy(OWNER, level="L1")
     assert rig.p.get(STATUS).json()["delivery"] == "off_until_owner_policy"
     rig.world_store.policies["pol_push_l3"] = _policy(PRIYA)  # someone else's policy covers nothing
@@ -109,3 +112,14 @@ def test_FR_CHN_17b_without_a_wired_store_the_route_is_503_not_configured(rig) -
     rig.p.app.dependency_overrides.pop(deps.get_push_store)
     res = rig.sub()
     assert (res.status_code, res.json()["detail"]) == (503, "not_configured")
+
+
+def test_FR_CHN_17d_status_carries_the_public_key_only_when_it_has_the_shape_of_one(
+    rig, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    key = "B" + "x" * 86
+    monkeypatch.setenv("TILO_WEBPUSH_VAPID_PUBLIC_KEY", key)
+    assert rig.p.get(STATUS).json()["public_key"] == key
+    for bad in ("short", "has space " + "x" * 90, "<script>" + "x" * 90):
+        monkeypatch.setenv("TILO_WEBPUSH_VAPID_PUBLIC_KEY", bad)
+        assert rig.p.get(STATUS).json()["public_key"] is None

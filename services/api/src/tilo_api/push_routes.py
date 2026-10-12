@@ -7,11 +7,15 @@ body field. The endpoint is untrusted input: tilo-channels' `parse_subscription`
 service host allowlist, key shape) and the store caps the devices per person; a refusal names the problem, never the
 value. Endpoint and keys are never logged or returned. A stored subscription alone sends nothing: push needs the
 owner's standing L3 `send_push` policy (BQ-CHN17-1, the user's decision), and until it exists the answer says
-`off_until_owner_policy` plainly. Every POST counts against the people write limit; every answer is no-store.
+`off_until_owner_policy` plainly. `public_key` is the deployment's VAPID public key
+(`TILO_WEBPUSH_VAPID_PUBLIC_KEY`, not a secret) or null when push is not set up. Every POST counts against the
+people write limit; every answer is no-store.
 """
 
 from __future__ import annotations
 
+import os
+import re
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends
@@ -24,6 +28,8 @@ from tilo_api.people_writes import Refusal, _Closed, json_body
 
 router = APIRouter(route_class=_PeopleRoute)
 ACTION = "send_push"
+ENV_PUBLIC_KEY = "TILO_WEBPUSH_VAPID_PUBLIC_KEY"  # the VAPID PUBLIC key (not a secret), set at deploy
+_KEY_SHAPE = re.compile(r"^[A-Za-z0-9_-]{80,100}\Z")
 
 
 class _Keys(_Closed):
@@ -60,7 +66,9 @@ def _delivery(store: Any, user: str) -> str:
 
 
 def _state(push: Any, store: Any, user: str) -> dict[str, Any]:
-    return {"devices": len(push.for_user(user)), "delivery": _delivery(store, user)}
+    key = os.environ.get(ENV_PUBLIC_KEY, "")
+    public = key if _KEY_SHAPE.match(key) else None  # the browser needs it to subscribe; None = not set up
+    return {"devices": len(push.for_user(user)), "delivery": _delivery(store, user), "public_key": public}
 
 
 @router.get("/v1/push")
