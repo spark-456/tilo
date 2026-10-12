@@ -29,52 +29,16 @@ INR_PER_MINUTE = 3.2
 RESERVATION = 32 * INR_PER_MINUTE
 STOP_INR = 400
 CAP_INR = 500
-ROOTS = {
-    ".claude",
-    ".github",
-    "apps",
-    "config",
-    "contracts",
-    "design",
-    "design_handoff_tilo_web_app",
-    "docs",
-    "evals",
-    "infra",
-    "meet-bot",
-    "packages",
-    "prompts",
-    "scripts",
-    "services",
-    "skills",
-    "templates",
-    "tests",
-}
-FILES = {
-    ".dockerignore",
-    ".editorconfig",
-    ".env.example",
-    ".gcloudignore",
-    ".gitattributes",
-    ".gitignore",
-    ".pre-commit-config.yaml",
-    ".python-version",
-    "CLAUDE.md",
-    "LICENSE",
-    "README.md",
-    "biome.json",
-    "cloudbuild.yaml",
-    "cloudbuild.tests.yaml",
-    "firebase.json",
-    "firestore.rules",
-    "firestore.tokens.rules",
-    "justfile",
-    "package.json",
-    "pnpm-lock.yaml",
-    "pnpm-workspace.yaml",
-    "pyproject.toml",
-    "tsconfig.base.json",
-    "uv.lock",
-}
+ROOTS = set(
+    ".claude .github apps config contracts design design_handoff_tilo_web_app docs evals infra "
+    "meet-bot packages prompts scripts services skills templates tests".split()
+)
+FILES = set(
+    ".dockerignore .editorconfig .env.example .gcloudignore .gitattributes .gitignore "
+    ".pre-commit-config.yaml .python-version CLAUDE.md LICENSE README.md biome.json "
+    "cloudbuild.yaml cloudbuild.tests.yaml firebase.json firestore.rules firestore.tokens.rules "
+    "justfile package.json pnpm-lock.yaml pnpm-workspace.yaml pyproject.toml tsconfig.base.json uv.lock".split()
+)
 DENIES = (
     ".env",
     ".env.*",
@@ -100,7 +64,7 @@ def allowed(name: str) -> bool:
         return False
     if any(p in {".git", "node_modules", ".venv", "__pycache__"} for p in path.parts):
         return False
-    if name == ".env.example":
+    if name in {".env.example", "design/tokens.json"}:
         return True
     return not any(fnmatch.fnmatch(path.name, pattern) for pattern in DENIES)
 
@@ -111,6 +75,32 @@ def archive(ref: str, target: Path) -> None:
         for member in source:
             if member.isfile() and allowed(member.name):
                 output.addfile(member, source.extractfile(member))
+
+
+def build_result(result: subprocess.CompletedProcess) -> dict:
+    try:
+        return json.loads(result.stdout)
+    except json.JSONDecodeError:
+        found = re.search(r"/builds/([0-9a-f-]{36})", result.stderr)
+        if found is None:
+            raise ValueError("build creation/completion unknown") from None
+        return json.loads(
+            subprocess.check_output(
+                [
+                    shutil.which("gcloud") or "gcloud",
+                    "builds",
+                    "describe",
+                    found.group(1),
+                    "--project",
+                    PROJECT,
+                    "--region",
+                    REGION,
+                    "--format=json",
+                ],
+                cwd=ROOT,
+                text=True,
+            )
+        )
 
 
 def write_ledger(path: Path, rows: list[dict]) -> None:
@@ -189,7 +179,7 @@ def main() -> int:
             print(f"Gate ref={ref} machine={MACHINE}; reserved INR{RESERVATION:.2f}", flush=True)
             result = subprocess.run(command, cwd=ROOT, text=True, capture_output=True)
         try:
-            build = json.loads(result.stdout)
+            build = build_result(result)
             if isinstance(build, list):
                 build = build[0]
             row.update(id=build["id"], status=build["status"], logUrl=build.get("logUrl", ""))
@@ -198,7 +188,7 @@ def main() -> int:
             minutes = (finish - start).total_seconds() / 60
             row["minutes"] = round(minutes, 3)
             row["inr"] = math.ceil(minutes) * INR_PER_MINUTE
-        except (ValueError, KeyError, TypeError, IndexError):
+        except (ValueError, KeyError, TypeError, IndexError, subprocess.CalledProcessError, OSError):
             row["status"] = "UNKNOWN" if result.returncode == 0 else "FAILED_OR_UNKNOWN"
             # Never silently refund a build whose creation/completion is unknown.
             (args.ledger_dir / f"cloud-gate-{ref[:12]}-submit.log").write_text(

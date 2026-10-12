@@ -18,7 +18,7 @@ steps:
         export PATH=/workspace/.cloud-tools/node_modules/.bin:$$PATH
         pnpm install --frozen-lockfile
         git init -q
-        git add . ':!.cloud-tools' ':!.venv'
+        git add . ':!.cloud-tools'
         git -c user.name=cloud-gate -c user.email=cloud-gate@example.invalid commit -q -m 'Tracked test source'
   - id: python-dependencies
     name: python:3.12-bookworm
@@ -31,7 +31,7 @@ steps:
         pip install uv==0.12.18
         cp "$$(command -v uv)" /workspace/.cloud-tools/bin/uv
         curl -fsSL https://github.com/casey/just/releases/download/1.58.0/just-1.58.0-x86_64-unknown-linux-musl.tar.gz | tar -xz -C /workspace/.cloud-tools/bin just
-        uv sync --locked
+        uv sync --locked --all-packages
   - id: repository
     name: python:3.12-bookworm
     waitFor: [node-dependencies, python-dependencies]
