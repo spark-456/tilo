@@ -325,6 +325,8 @@ export const METHODS = {
 // ---- Activity ----
 /** Kind -> [icon, tile, ink, tag, filter group]. */
 const KM: Record<string, readonly [string, string, string, string, string]> = {
+  request: ["help", "var(--chip)", "var(--ink2)", "Approval requested", "approval"],
+  answer: ["check", "var(--chip)", "var(--ink2)", "Approval answered", "approval"],
   spend: ["coin", "var(--heroSoft)", "var(--heroInk)", "Spend", "spend"],
   approval: ["check", "var(--okSoft)", "var(--ok)", "Approved", "approval"],
   declined: ["lock", "var(--redSoft)", "var(--redInk)", "Declined", "approval"],

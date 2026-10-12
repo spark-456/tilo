@@ -16,6 +16,8 @@
 !/contracts/
 !/prompts/
 !/templates/
+!/design/
+/design/*
 
 .env
 .env.*
@@ -34,3 +36,6 @@ node_modules/
 .venv/
 __pycache__/
 *.pyc
+
+# Public render theme tokens: exact file exception after the token credential deny.
+!/design/tokens.json

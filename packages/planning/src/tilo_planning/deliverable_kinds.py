@@ -28,6 +28,7 @@ FORMATS = (  # brief.schema.json deliverable formats (a test pins this list to t
     "google_sheets",
     "email",
     "in_app",
+    "app",
 )
 _SLUG = re.compile(r"[a-z][a-z0-9_]{0,63}")
 _NEEDS = re.compile(r"[A-Za-z0-9][A-Za-z0-9 ._-]{0,39}")

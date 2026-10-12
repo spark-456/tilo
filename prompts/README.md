@@ -30,6 +30,7 @@ sees, and `$max_framing_chars` comes from `config/build_partners.yaml`. Code che
 `assistant/quick_*.md` is Quick mode of `POST /intake` (COST-FAST-1): `quick_answer_*` the plain one-call answer, `quick_classify_*` the JSON verdict for a text no rule reads (`$reasons`); in both the question (`$question`) is delimited, untrusted data run through `neutralise_marker(..., "QUESTION")`.
 
 Dates (INTAKE-QUALITY-1, FR-INT-03/06/09, FR-AGT-12): every template that plans or checks a schedule takes `$today`, `$deadline` and `$days_to_deadline`, calendar facts that code fills from `tilo_providers.clock.time_facts` (the `director/` brief, approaches and plan templates and their repairs, and the `specialist/`, `writer/`, `verifier/` and `lead/` unit templates through `tilo_harness.unit_prompt.request_variables`). A model is never left to guess the date.
+`specialist/tools.md` and `tools_read_only.md` frame the tool loop of `ToolUnitRunner` (LW-07) for every worker role: `$base` is the unit prompt, `$tools` the tools now allowed, `$results` the fenced tool results (data, not instructions).
 
 Questions (INTAKE-QUALITY-1 slice 2, FR-INT-04): `director/brief_system.md` also asks for an optional `questions` list (up to 3, each a label, a question, one to three suggested answers and an expected_change). Code vets and ranks it (`tilo_planning.brief.topic_questions`); the model's text is untrusted and never reaches a prompt except as a cleaned `Label: value` constraint.
 

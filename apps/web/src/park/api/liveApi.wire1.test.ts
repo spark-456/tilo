@@ -53,6 +53,49 @@ const okFetch = () =>
   vi.fn(async (_url: string | URL | Request, _init?: RequestInit) => json(REPORT));
 const asFetch = (f: unknown) => f as typeof fetch;
 
+it("FR_SPD_04_live_cost_report_rejects_malformed_optional_run_totals", async () => {
+  for (const tasks of [
+    null,
+    {},
+    [null],
+    [{ run_id: "r", usd: -1, completed: true }],
+    [{ run_id: "r", usd: 2, completed: "yes" }],
+    [{ usd: 2, completed: true }],
+  ]) {
+    const api = createLiveApi({
+      baseUrl: BASE,
+      fetch: asFetch(vi.fn(async () => json({ ...REPORT, tasks }))),
+    });
+    await expect(api.getLedger()).rejects.toBeInstanceOf(TiloApiError);
+  }
+});
+
+it("FR_SPD_05_07_live_cost_report_rejects_invalid_waits_and_history", async () => {
+  for (const patch of [
+    { approval_waits: null },
+    { approval_waits: [{ action_type: "send", seconds: -1 }] },
+    { activity: [{}] },
+    {
+      activity: [
+        {
+          world_id: "w",
+          run_id: "r",
+          card_id: "c",
+          summary: "x",
+          ts: "2026-10-11T09:00:00",
+          type: "approval.requested",
+        },
+      ],
+    },
+  ]) {
+    const api = createLiveApi({
+      baseUrl: BASE,
+      fetch: asFetch(vi.fn(async () => json({ ...REPORT, ...patch }))),
+    });
+    await expect(api.getLedger()).rejects.toBeInstanceOf(TiloApiError);
+  }
+});
+
 afterEach(() => {
   vi.unstubAllGlobals();
 });

@@ -2,6 +2,11 @@
 
 A bot that joins a Google Meet like a person, reads the live captions, tracks your agenda with a model (through Tilo's provider layer), and occasionally asks a short question in the Meet chat.
 
+Cloud transcript ingestion assigns utterance ids in speech-start timestamp order,
+keeping capture order for ties and preserving repeated speech. Overlapping captions
+may finalize out of order; this keeps stored notes chronological without changing
+their text or speaker labels.
+
 The signed-in path requires `BOT_GOOGLE_EMAIL` to match the dedicated bot account exactly. Set it yourself in the
 environment; replace the old account example when preparing your configuration. An unreadable or different account
 refuses to join. Sign in manually; the bot never types credentials. Signed-in Chromium runs with its sandbox enabled.

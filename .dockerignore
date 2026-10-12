@@ -33,6 +33,7 @@ node_modules
 **/*-credentials.json
 **/application_default_credentials.json
 design
+!design/tokens.json
 docs
 infra
 apps
