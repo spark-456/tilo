@@ -158,7 +158,18 @@ def test_FR_CON_19_the_valid_hand_written_request_still_sends_so_the_probes_are_
     assert dispatch(env, forged_case(env, valid_document(env, content, refs, grant))) == ["sent"]
 
 
-@pytest.mark.parametrize("raw", [b"not json", b"[1, 2]", b'"text"', b"null"])
+@pytest.mark.parametrize(
+    "raw",
+    [
+        b"not json",
+        b"[1, 2]",
+        b'"text"',
+        b"null",
+        # review 8b: deep nesting raised RecursionError and left the entry at sending, retried forever
+        pytest.param(b"[" * 5000, id="deep-nesting"),
+        pytest.param(b'{"pad": "' + b"a" * (70 * 1024) + b'"}', id="over-64-kib"),
+    ],
+)
 def test_FR_CON_19_a_stored_request_that_is_not_a_document_is_refused(raw):
     env = _env()
     assert dispatch(env, forged_case(env, raw)) == ["failed"] and _acted(env) == []

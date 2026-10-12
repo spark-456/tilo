@@ -213,9 +213,11 @@ class CanvaAdapter:
         raw = self._artifacts.read(world_id, ref)
         if head.get("world_id") != world_id or hashlib.sha256(raw).hexdigest() != head.get("content_sha256"):
             raise SideEffectRefused("the stored request is not intact")
+        if len(raw) > 64 * 1024:  # a design request is a few KiB: a bigger document is not one (security review 8b)
+            raise SideEffectRefused("the stored request is too large to be a Canva design request")
         try:
             request = json.loads(raw)
-        except ValueError:
+        except (ValueError, RecursionError):  # deeply nested input is a refusal, not an entry stuck at sending
             raise SideEffectRefused("the stored request is not JSON") from None
         if not isinstance(request, dict):
             raise SideEffectRefused("the stored request is not a Canva design request")
