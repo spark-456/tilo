@@ -64,7 +64,7 @@ def allowed(name: str) -> bool:
         return False
     if any(p in {".git", "node_modules", ".venv", "__pycache__"} for p in path.parts):
         return False
-    if name in {".env.example", "design/tokens.json"}:
+    if name in {".env.example", "meet-bot/.env.example", "design/tokens.json"}:
         return True
     return not any(fnmatch.fnmatch(path.name, pattern) for pattern in DENIES)
 
@@ -72,9 +72,15 @@ def allowed(name: str) -> bool:
 def archive(ref: str, target: Path) -> None:
     raw = subprocess.check_output(["git", "archive", ref], cwd=ROOT)
     with tarfile.open(fileobj=io.BytesIO(raw)) as source, tarfile.open(target, "w:gz") as output:
+        tracked = []
         for member in source:
             if member.isfile() and allowed(member.name):
                 output.addfile(member, source.extractfile(member))
+                tracked.append(member.name)
+        manifest = "\0".join(tracked).encode() + b"\0"
+        entry = tarfile.TarInfo(".cloud-source-files")
+        entry.size = len(manifest)
+        output.addfile(entry, io.BytesIO(manifest))
 
 
 def build_result(result: subprocess.CompletedProcess) -> dict:

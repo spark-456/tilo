@@ -38,6 +38,7 @@ def test_CLOUD_GATE_secret_state_and_local_artifacts_never_upload(name):
         "tests/repo/test_CLOUD_GATE_budget.py",
         "contracts/transcript.schema.json",
         "design/tokens.json",
+        "meet-bot/.env.example",
         ".env.example",
         "uv.lock",
     ],

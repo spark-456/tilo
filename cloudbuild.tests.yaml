@@ -12,14 +12,14 @@ steps:
     args:
       - -ceu
       - |
+        git init -q
+        git --literal-pathspecs add -f --pathspec-from-file=.cloud-source-files --pathspec-file-nul
+        git -c user.name=cloud-gate -c user.email=cloud-gate@example.invalid commit -q -m 'Tracked test source'
         mkdir -p /workspace/.cloud-tools/bin
         cp /usr/local/bin/node /workspace/.cloud-tools/bin/node
         npm install --prefix /workspace/.cloud-tools pnpm@10.14.0
         export PATH=/workspace/.cloud-tools/node_modules/.bin:$$PATH
         pnpm install --frozen-lockfile
-        git init -q
-        git add . ':!.cloud-tools'
-        git -c user.name=cloud-gate -c user.email=cloud-gate@example.invalid commit -q -m 'Tracked test source'
   - id: python-dependencies
     name: python:3.12-bookworm
     waitFor: ['-']
