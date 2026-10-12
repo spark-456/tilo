@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { act } from "react";
+import { StrictMode, act } from "react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { cleanup, click, mount } from "../../test-support/park/componentsHarness";
 import { PAGE_IDS, PAGE_LABEL, type PageId } from "../park/app/AppCtx";
@@ -9,20 +9,22 @@ import { pageTourSteps } from "./pageSteps";
 import { requestTour } from "./tourEvents";
 
 const seam = vi.hoisted(() => ({
-  firstRun: undefined as boolean | undefined,
+  firstRun: false,
   identity: { status: "unavailable" },
 }));
-vi.mock("./firstRunStub", () => ({ useFirstRun: () => seam.firstRun }));
+vi.mock("../park/sample/useFirstRun", () => ({ useFirstRun: () => seam.firstRun }));
 vi.mock("../park/app/context", () => ({ useApp: () => ({ page: "home", go: vi.fn() }) }));
 vi.mock("../auth/session", () => ({
   session: { subscribe: () => () => {}, getState: () => seam.identity },
 }));
 
 beforeEach(() => {
+  window.history.replaceState(null, "", "/?onboarding=1");
   window.localStorage.clear();
-  seam.firstRun = undefined;
+  seam.firstRun = false;
 });
 afterEach(() => {
+  window.history.replaceState(null, "", "/");
   cleanup();
   window.localStorage.clear();
 });
@@ -67,6 +69,11 @@ function view(page: PageId = "home", firstRun = true, userKey = "person-one") {
     </div>
   );
 }
+
+it("FIRST_RUN_FR_UX_13_effect_replay_keeps_the_first_invitation_visible", () => {
+  mount(<StrictMode>{view()}</StrictMode>);
+  expect(dialog()?.textContent).toContain("Take a tour of Home?");
+});
 
 it.each(PAGE_IDS)("FIRST_RUN asks once for %s, scoped per person and page", (page) => {
   const root = mount(view(page));

@@ -11,6 +11,7 @@ import { onTourRequest } from "./tourEvents";
 export interface PageTourLayerProps {
   page: PageId;
   firstRun: boolean;
+  autoInvite?: boolean;
   userKey: string;
 }
 type Phase = { key: string; step: number | null } | null;
@@ -56,7 +57,7 @@ function Invitation({
 }
 
 /** FIRST-RUN: display state and per-person/per-page local storage only; no sample data, writes or model calls. */
-export function PageTourLayer({ page, firstRun, userKey }: PageTourLayerProps) {
+export function PageTourLayer({ page, firstRun, autoInvite = true, userKey }: PageTourLayerProps) {
   const key = `page:${JSON.stringify([userKey, page])}`;
   const [phase, setPhase] = useState<Phase>(null);
   const opener = useRef<HTMLElement | null>(null);
@@ -81,13 +82,14 @@ export function PageTourLayer({ page, firstRun, userKey }: PageTourLayerProps) {
     [],
   );
   useEffect(() => {
-    if (!firstRun || hasSeen(key)) {
+    if (!firstRun) {
       setPhase(null);
       return;
     }
+    if (!autoInvite || hasSeen(key)) return; // effect replay preserves this mount's already-open invitation
     markSeen(key);
     open(null);
-  }, [firstRun, key, open]);
+  }, [firstRun, autoInvite, key, open]);
   useEffect(
     () =>
       onTourRequest(() => {

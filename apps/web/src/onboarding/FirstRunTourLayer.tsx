@@ -1,9 +1,9 @@
 import { useSyncExternalStore } from "react";
 import { session } from "../auth/session";
 import { useApp } from "../park/app/context";
-import { OnboardingLayer } from "./OnboardingLayer";
+import { useFirstRun } from "../park/sample/useFirstRun";
+import { OnboardingLayer, autoShowAllowed } from "./OnboardingLayer";
 import { PageTourLayer } from "./PageTourLayer";
-import { useFirstRun } from "./firstRunStub";
 import { userKeyOf } from "./storage";
 
 export default function FirstRunTourLayer() {
@@ -11,8 +11,13 @@ export default function FirstRunTourLayer() {
   const firstRun = useFirstRun();
   const identity = useSyncExternalStore(session.subscribe, session.getState, session.getState);
   return firstRun === true ? (
-    <PageTourLayer page={app.page} firstRun userKey={userKeyOf(identity)} />
+    <PageTourLayer
+      page={app.page}
+      firstRun
+      autoInvite={autoShowAllowed()}
+      userKey={userKeyOf(identity)}
+    />
   ) : (
-    <OnboardingLayer {...(firstRun === false ? { enabled: false } : {})} />
+    <OnboardingLayer enabled={false} />
   );
 }

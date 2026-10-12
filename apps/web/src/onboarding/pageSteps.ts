@@ -58,7 +58,10 @@ export function pageTourSteps(page: PageId): TourStep[] {
       id: `${page}-content`,
       title,
       body,
-      target: () => root()?.querySelector("section, article, input, textarea, button") ?? root(),
+      target: () =>
+        (page === "home" ? root()?.querySelector(".park-home-composer") : null) ??
+        root()?.querySelector("section, article, input, textarea, button") ??
+        root(),
     },
     {
       id: `${page}-help`,
