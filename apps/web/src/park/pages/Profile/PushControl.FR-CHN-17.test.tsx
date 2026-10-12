@@ -13,6 +13,7 @@ function flowOf(first: PushView) {
   const calls: string[] = [];
   const flow: PushFlow = {
     read: async () => view,
+    release: async () => undefined,
     enable: async () => {
       calls.push("enable");
       view = {

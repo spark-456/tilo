@@ -1558,6 +1558,7 @@ dependencies = [
     { name = "tilo-people" },
     { name = "tilo-policy" },
     { name = "tilo-providers" },
+    { name = "tilo-redact" },
     { name = "uvicorn" },
 ]
 
@@ -1568,6 +1569,7 @@ requires-dist = [
     { name = "tilo-people", editable = "packages/people" },
     { name = "tilo-policy", editable = "packages/policy" },
     { name = "tilo-providers", editable = "packages/providers" },
+    { name = "tilo-redact", editable = "packages/redact" },
     { name = "uvicorn", specifier = ">=0.32" },
 ]
 

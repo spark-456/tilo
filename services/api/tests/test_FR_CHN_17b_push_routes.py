@@ -114,6 +114,42 @@ def test_FR_CHN_17b_without_a_wired_store_the_route_is_503_not_configured(rig) -
     assert (res.status_code, res.json()["detail"]) == (503, "not_configured")
 
 
+def test_FR_CHN_17b_cross_site_simple_posts_oversize_and_unknown_fields_are_refused_without_echo(rig) -> None:
+    form = rig.p.client.post(SUBSCRIBE, data={"endpoint": ENDPOINT}, headers={"content-type": "text/plain"})
+    assert form.status_code == 415
+    urlenc = rig.p.client.post(
+        SUBSCRIBE, content=f"endpoint={ENDPOINT}", headers={"content-type": "application/x-www-form-urlencoded"}
+    )
+    assert urlenc.status_code == 415
+    big = rig.p.client.post(SUBSCRIBE, json={"endpoint": ENDPOINT, "keys": KEYS, "pad": "x" * 5000})
+    assert big.status_code == 413 and ENDPOINT not in big.text
+    extra = rig.p.client.post(SUBSCRIBE, json={"endpoint": ENDPOINT, "keys": KEYS, "secret_field": "s3cr3t-value"})
+    assert extra.status_code == 422 and "s3cr3t-value" not in extra.text and ENDPOINT not in extra.text
+    assert rig.push.for_user(OWNER) == ()  # nothing was stored by any refused request
+
+
+def test_FR_CHN_17b_a_shared_browser_moves_to_whoever_subscribes_next_and_erase_removes_a_person(rig) -> None:
+    assert rig.sub().status_code == 200
+    rig.p.as_user(PRIYA)
+    assert rig.sub(ENDPOINT.replace("https", "HTTPS")).json()["devices"] == 1
+    assert rig.push.for_user(OWNER) == () and len(rig.push.for_user(PRIYA)) == 1  # the endpoint has one owner
+    assert rig.push.erase(PRIYA) == 1 and rig.push.for_user(PRIYA) == ()
+
+
+def test_FR_CHN_17b_the_write_rate_limit_applies_to_every_push_post(rig) -> None:
+    codes = {rig.p.post(UNSUBSCRIBE, {"endpoint": ENDPOINT}).status_code for _ in range(70)}
+    assert 429 in codes and codes <= {200, 429}
+
+
+def test_FR_CHN_17b_firestore_rules_deny_every_client_on_the_push_paths() -> None:
+    from pathlib import Path
+
+    rules = (Path(__file__).resolve().parents[3] / "firestore.rules").read_text(encoding="utf-8")
+    for path in ("/orgs/{org}/push/{uid}/devices/{device}", "/orgs/{org}/push_endpoints/{endpoint}"):
+        block = rules.split(f"match {path} {{")[1].split("}")[0]
+        assert "allow read, write: if false;" in block, path
+
+
 def test_FR_CHN_17d_status_carries_the_public_key_only_when_it_has_the_shape_of_one(
     rig, monkeypatch: pytest.MonkeyPatch
 ) -> None:
