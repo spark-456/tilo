@@ -2,6 +2,7 @@
 // deployment with an API url. A demo (anonymous) session reads the fixture company and makes no request; a Google
 // session gets the live Api plus the two reads that need no endpoint (who is signed in, what day it is).
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { TiloApiError } from "../../api/http";
 import * as fx from "./fixtures";
 import { NotBuilt } from "./liveApi";
 import { parkApi, withSession } from "./select";
@@ -26,6 +27,7 @@ describe("LIVE-HOME demo session", () => {
     expect(user.data).toEqual(fx.user);
     expect((await api.getLedger()).source).toBe("fixture");
     expect((await api.getSkills()).data).toEqual(fx.skills);
+    expect(await api.getAgenda()).toEqual({ data: fx.agenda, source: "fixture" });
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
@@ -39,7 +41,36 @@ describe("LIVE-HOME demo session", () => {
       demo: () => false,
       identity: () => ({ name: "Riya Sharma", email: "riya@example.org" }),
     });
-    await expect(api.getAgenda()).rejects.toBeInstanceOf(NotBuilt);
+    await expect(api.getAgenda()).rejects.toBeInstanceOf(TiloApiError);
+    await expect(api.getAgenda()).rejects.toMatchObject({ status: 401 });
+  });
+
+  it("HR_1 live Agenda shows only the recorded plate, never fixture-derived items", async () => {
+    const plate = {
+      v: "1.0",
+      user: "person-a",
+      as_of: "2026-10-12T01:30:00Z",
+      today: "2026-10-12",
+      rows: [],
+      parked: [],
+      truncated: false,
+    };
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response(JSON.stringify(plate))),
+    );
+    const api = withSession(parkApi(LIVE_ENV), {
+      now: () => new Date("2026-10-12T01:30:00Z"),
+      demo: () => false,
+      identity: () => ({ name: "Riya Sharma", email: "riya@example.org" }),
+    });
+    const result = await api.getAgenda();
+    expect(result.source).toBe("live");
+    expect(result.data).toMatchObject({ events: null, pins: null, plate: { rows: [] } });
+    expect(result.data).not.toEqual(fx.agenda);
+    for (const event of fx.agenda.events ?? []) {
+      expect(JSON.stringify(result.data)).not.toContain(event.t);
+    }
   });
 });
 
