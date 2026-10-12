@@ -181,19 +181,19 @@ def refused_field(update: dict[str, Any]) -> str | None:
     return None
 
 
-def _shape_fields(body: Any) -> list[str]:
+def _shape_fields(payload: Any) -> list[str]:
     """Where a body that the schema refused is wrong: top-level and section names only, never a value."""
-    if not isinstance(body, dict):
+    if not isinstance(payload, dict):
         return ["body"]
-    fields = ["?" for key in body if key not in {"version", *_SECTIONS}]
-    fields += [key for key in ("version", *_SECTIONS) if key not in body]
-    version = body.get("version")
-    if "version" in body and not (type(version) is int and 0 <= version <= VERSION_MAX):
+    fields = ["?" for key in payload if key not in {"version", *_SECTIONS}]
+    fields += [key for key in ("version", *_SECTIONS) if key not in payload]
+    version = payload.get("version")
+    if "version" in payload and not (type(version) is int and 0 <= version <= VERSION_MAX):
         fields.append("version")
     for key in _SECTIONS:
-        if key in body and not conforms(f"{SCHEMA}#/$defs/{key}", body[key]):
-            deeper = key == "notifications" and isinstance(body[key], dict) and "decisions" in body[key]
-            decisions_bad = deeper and not conforms(f"{SCHEMA}#/$defs/decision_channels", body[key]["decisions"])
+        if key in payload and not conforms(f"{SCHEMA}#/$defs/{key}", payload[key]):
+            deeper = key == "notifications" and isinstance(payload[key], dict) and "decisions" in payload[key]
+            decisions_bad = deeper and not conforms(f"{SCHEMA}#/$defs/decision_channels", payload[key]["decisions"])
             fields.append("notifications.decisions" if decisions_bad else key)
     return fields or ["body"]
 
