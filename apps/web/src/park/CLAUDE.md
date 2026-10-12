@@ -30,7 +30,7 @@ old screens until the cutover PR. WEB-1a holds the tokens, fonts, typed fixtures
 - `pages/Home/` (WEB-4): panels float over the shell's city (no `<main>`, no h1 but the greeting); a failed or
   unbuilt read shows "Not connected yet"; composer copy is page-local (`homeData.ts`); `Home.css` overrides the sliding SegmentedControl.
 ## Shell (WEB-3b, `shell/`)
-- `AppShell` (named export, `children` only) holds the nav, popovers, one `<main>`, toast, loader, boot (`park.shell.css`: no motion, blur on the nav only); ParkApp owns `[data-park]`.
+- `AppShell` (named export, `children` only) holds the nav, popovers, one `<main>`, toast, loader, boot (`park.shell.css`: no motion, blur on the nav only); ParkApp owns `[data-park]`. QA-DEMO-1: below 840px the tabs are one page button + `Menu` (`TopNav compact`); the sample banner sits in the page column, pinned under the nav on Home.
 - The city is STATIC (motion and its honesty-scan entry: BQ-WEB-3): `scene.ts` caches a scene per `time|motion` at module level, with the 3 pin points for `app.pins`.
 - `usePageApp()` is what pages get: `go('world')` runs the loader first (`store.openWorld`); `useApp().go` stays immediate.
 - `sample/` (STARTER-1, BQ-STARTER-1): the API's recorded sample project `w_sample_village_basic` (`World.sample`, `sample: true` on the list item): `SampleBadge`/`SampleNote` on the Home card, Worlds row and world page; Hide is `localStorage` (`sampleChoice.ts`, try/catch), "Show sample project" makes `getWorlds` ask `?include_sample=1`; `HttpClient.post` never sends a write for its path (the message says the answer was not sent; nothing is simulated).
