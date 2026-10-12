@@ -1,5 +1,5 @@
 // SEC-15: what a visitor sees. No form, no upload, no way into the product: the server refuses every call.
-import { AccessScreen } from "../park/components/AccessScreen";
+import { AccessScreen } from "./AccessScreen";
 export function UnderConstruction() {
   return (
     <AccessScreen>

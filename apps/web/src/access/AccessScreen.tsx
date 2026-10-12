@@ -1,8 +1,8 @@
 import { Component, type ReactNode, Suspense, lazy, useState } from "react";
-import "../tokens/park.css";
+import "../park/tokens/park.css";
 import "./AccessScreen.css";
 
-const City = lazy(() => import("../../auth/SignInBackdrop"));
+const City = lazy(() => import("../auth/SignInBackdrop"));
 
 class QuietCity extends Component<{ children: ReactNode }, { failed: boolean }> {
   state = { failed: false };

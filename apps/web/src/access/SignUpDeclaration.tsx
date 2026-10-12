@@ -2,7 +2,7 @@
 // preselected), no password or other field: Tilo never handles passwords. The answer is a request the server
 // stores once and enforces; this page only asks it.
 import { useId, useState } from "react";
-import { AccessScreen } from "../park/components/AccessScreen";
+import { AccessScreen } from "./AccessScreen";
 
 export type Declaration = "visitor" | "judge";
 
