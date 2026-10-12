@@ -1,20 +1,19 @@
 // The Park app (README "Routes", "The `app` prop", "Focus"): the data-park root around the shell (shell/AppShell:
 // nav, backdrop, the one <main>, toast, world loader), the page for the route, the document title and the
 // focus move after a route change. Lazy-imported by src/Root.tsx, so a landing visit never loads it (NFR-01).
-import { type MouseEvent, Suspense, lazy, useEffect, useRef } from "react";
-import { PageSheet } from "../components";
+import { Suspense, lazy, useEffect, useRef } from "react";
 import { AppShell } from "../shell/AppShell";
 import { ParkAuthProvider } from "../shell/auth";
 import { useParkTour } from "../shell/tour";
 import "../tokens/fonts";
 import "../tokens/park.css";
-import { type AppCtx, PAGE_LABEL } from "./AppCtx";
+import { PAGE_LABEL } from "./AppCtx";
+import { NOT_FOUND_TITLE, NotFound } from "./NotFound";
 import "./park-app.css";
 import { ParkProvider, usePageApp, useSessionAuth } from "./context";
 import { PAGES } from "./pages";
 import { isHomeAddress, useParkRoute, useQuizAppRoute } from "./router";
 
-const NOT_FOUND_TITLE = "Page not found";
 const QuizPlayerPage = lazy(() =>
   import("../pages/QuizPlayer/QuizPlayerPage").then((m) => ({ default: m.QuizPlayerPage })),
 );
@@ -22,27 +21,6 @@ const QuizPlayerPage = lazy(() =>
 // The landing visit (`/`) is the Home page: its chunk request starts when the shell module is evaluated, not
 // when the page first renders. `lazy()` in the registry reuses the same module, so nothing loads twice.
 if (isHomeAddress()) void import("../pages/Home/HomePage");
-
-function NotFound({ go }: { go: AppCtx["go"] }) {
-  const open = (e: MouseEvent<HTMLAnchorElement>) => {
-    if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
-    e.preventDefault();
-    go("home");
-  };
-  return (
-    <div data-testid="park-not-found">
-      <PageSheet>
-        <h1 className="park-app__title" tabIndex={-1}>
-          {NOT_FOUND_TITLE}
-        </h1>
-        <p className="park-app__note">There is no page at this address.</p>
-        <a className="park-app__link" href="/" onClick={open}>
-          Go to Home
-        </a>
-      </PageSheet>
-    </div>
-  );
-}
 
 /** Moves focus to the page heading when the route changes, never on the first load. */
 // Suspense hides the page it is replacing with an inline `display: none` until the new chunk arrives.
