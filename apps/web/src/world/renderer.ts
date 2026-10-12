@@ -441,6 +441,9 @@ export function renderAgents(
       fig?.g.destroy();
       const g = new Graphics();
       drawAgent(g, agent.rank, agent.tint, shadows);
+      // FR-WLD-13: the rig never changes during a walk; rasterize its many faces once.
+      // Position/depth still follow the caller's recorded choreography on every frame.
+      g.cacheAsTexture({ resolution: 2, antialias: true });
       layer.objects.addChild(g);
       fig = { g, key };
       layer.figures.set(agent.id, fig);
