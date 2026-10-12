@@ -137,6 +137,7 @@
 # team_lead.schema.json 1.0.0 sha256:19413726e364ffdd
 # transcript.schema.json 1.0.0 sha256:08f934b8f0c9a40e
 # ui_action.schema.json 1.0.0 sha256:2ceb1e0b46368734
+# user_settings.schema.json 1.0.0 sha256:dfc439371ba69131
 # work_item.schema.json 1.0.0 sha256:7add9f68c1f996fb
 # events/registry.yaml 1.4.0 sha256:94fe429dabf876f7
 
@@ -3448,6 +3449,151 @@ class UiActionUntag(BaseModel):
     user: UserId
 
 
+type UserSettingsLine = Annotated[
+    str, Field(max_length=80, min_length=1, pattern="^[^\\u0000-\\u001F\\u007F]+$")
+]
+"""
+One line typed by a person, 1 to 80 characters: data, never an instruction.
+"""
+
+
+type UserSettingsEmail = Annotated[
+    str, Field(max_length=254, pattern="^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$")
+]
+"""
+A display address, at most 254 characters, with one @ and a dotted host. It is not verified and is never a recipient (USET-06).
+"""
+
+
+type UserSettingsTimeZone = Annotated[
+    str,
+    Field(max_length=64, pattern="^(UTC|[A-Z][A-Za-z_+-]*(/[A-Za-z0-9_+-]+){1,2})$"),
+]
+"""
+An IANA time zone name (Asia/Kolkata) or UTC, in the same shape as person.time_zone. The schema checks the shape; tilo-api also refuses a name the zone database does not know (USET-03).
+"""
+
+
+type UserSettingsLanguage = Annotated[
+    str, Field(max_length=16, pattern="^[a-z]{2,3}(-[A-Z][a-z]{3})?(-[A-Z]{2})?$")
+]
+"""
+A BCP 47 language tag of the drafts Tilo writes for the person: language, an optional four-letter script and an optional two-letter region (en, en-GB, zh-Hans-CN). A display name such as English (UK) is the client's label, never stored.
+"""
+
+
+type UserSettingsClock = Annotated[
+    str, Field(pattern="^([01][0-9]|2[0-3]):[0-5][0-9]$")
+]
+"""
+A wall-clock time, HH:MM on a 24-hour clock, 00:00 to 23:59, in the zone of the object that holds it.
+"""
+
+
+type UserSettingsWeekday = Literal["mon", "tue", "wed", "thu", "fri", "sat", "sun"]
+
+
+class UserSettingsWorkingHours(BaseModel):
+    """
+    The days and the window Tilo books inside, in profile.time_zone. start is inclusive, end exclusive, and start is before end: no overnight window (USET-03, as config/personal.yaml working_window).
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    days: Annotated[list[UserSettingsWeekday], Field(max_length=7, min_length=1)]
+    start: UserSettingsClock
+    end: UserSettingsClock
+
+
+class UserSettingsProfile(BaseModel):
+    """
+    FR-SET-01. The title is null when the person has none.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    name: UserSettingsLine
+    email: UserSettingsEmail
+    title: UserSettingsLine | None
+    time_zone: UserSettingsTimeZone
+    language: UserSettingsLanguage
+    working_hours: UserSettingsWorkingHours
+
+
+class UserSettingsChannels(BaseModel):
+    """
+    Whether one kind of notice reaches the person by phone, email and Slack. Saving a choice verifies no channel and proves no delivery.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    phone: bool
+    email: bool
+    slack: bool
+
+
+type UserSettingsDecisionChannels = UserSettingsChannels
+
+
+class UserSettingsNotifications(BaseModel):
+    """
+    FR-SET-02: the matrix, one row for each kind of notice. The decisions row keeps at least one channel on (USET-04): the rule is in the schema, so a client that skips its own guard is refused. Any other row may be all off.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    decisions: UserSettingsDecisionChannels
+    spend: UserSettingsChannels
+    finished: UserSettingsChannels
+    digest: UserSettingsChannels
+    weekly: UserSettingsChannels
+
+
+class UserSettingsMoney(BaseModel):
+    """
+    An amount in the minor unit of its currency (paise, pence, cents): an integer from 1 to 1000000000000, never a float, a bool or a string with a symbol. currency is an ISO 4217 code; tilo-api refuses a code it has no minor unit for (USET-03).
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    amount_minor: Annotated[int, Field(ge=1, le=1000000000000)]
+    currency: Annotated[str, Field(pattern="^[A-Z]{3}$")]
+
+
+class UserSettingsQuietHours(BaseModel):
+    """
+    FR-SET-02 and FR-HIL-13, in the shape tilo_channels.quiet_hours.parse_quiet_hours already reads. During the window only gate and blocked notices notify; this object has no field that could hide a gate (USET-05). start and end are in timezone, the window may cross midnight, and start is never end (USET-03). threshold is typed money or null; nothing delivers by it in this release (USET-05).
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    enabled: bool
+    start: UserSettingsClock
+    end: UserSettingsClock
+    timezone: UserSettingsTimeZone
+    threshold: UserSettingsMoney | None
+
+
+class UserSettingsUpdate(BaseModel):
+    """
+    The body of PUT /v1/me/settings: the whole document except what the server owns. version is the one the client read (0 when nothing was saved yet). It names no owner or org: they come from the verified principal, so a body that carries one, or updated_at, is refused (USET-01).
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    version: Annotated[int, Field(ge=0, le=1000000)]
+    profile: UserSettingsProfile
+    notifications: UserSettingsNotifications
+    quiet_hours: UserSettingsQuietHours
+
+
 class WorkItemSource(BaseModel):
     """
     Where the item came from; evidence lists the utterances of a meeting transcript.
@@ -4987,6 +5133,23 @@ class UiActionNavigate(BaseModel):
     kind: Literal["navigate"]
     route: UiActionRoute
     target: UiActionTarget | None
+
+
+class UserSettings(BaseModel):
+    """
+    One person's saved profile and notification preferences (FR-SET-01, FR-SET-02, ADR-0039), stored and served by tilo-api for the verified principal only, keyed by org and user; no request names another person's. A document with version 0 is the server's unsaved defaults, never a stored record, and its updated_at is null. version counts saved writes: a write carries the version it read and is refused as stale when it is not the stored one (USET-02). Every object is closed, so an unknown field is refused. Profile email and the rest of the profile are display data: they change no sign-in identity, verified destination, directory record or connector grant (USET-06). Preferences authorise nothing and start no work (USET-07). Rules USET-01 to USET-08 are in user_settings.rules.md. $defs update is the request body of a write.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    owner_id: UserId
+    org_id: OrgId
+    version: Annotated[int, Field(ge=0, le=1000000)]
+    profile: UserSettingsProfile
+    notifications: UserSettingsNotifications
+    quiet_hours: UserSettingsQuietHours
+    updated_at: Timestamp | None
 
 
 class WorkItem(BaseModel):

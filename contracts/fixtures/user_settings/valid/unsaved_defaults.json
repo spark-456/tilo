@@ -1,0 +1,52 @@
+{
+  "owner_id": "u_alex",
+  "org_id": "org_example",
+  "version": 0,
+  "profile": {
+    "name": "Alex Morgan",
+    "email": "alex@example.com",
+    "title": null,
+    "time_zone": "UTC",
+    "language": "en",
+    "working_hours": {
+      "days": ["mon", "tue", "wed", "thu", "fri"],
+      "start": "08:30",
+      "end": "17:30"
+    }
+  },
+  "notifications": {
+    "decisions": {
+      "phone": true,
+      "email": true,
+      "slack": false
+    },
+    "spend": {
+      "phone": false,
+      "email": true,
+      "slack": false
+    },
+    "finished": {
+      "phone": true,
+      "email": false,
+      "slack": false
+    },
+    "digest": {
+      "phone": false,
+      "email": true,
+      "slack": false
+    },
+    "weekly": {
+      "phone": false,
+      "email": false,
+      "slack": false
+    }
+  },
+  "quiet_hours": {
+    "enabled": false,
+    "start": "19:00",
+    "end": "08:00",
+    "timezone": "UTC",
+    "threshold": null
+  },
+  "updated_at": null
+}
