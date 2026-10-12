@@ -126,7 +126,7 @@
  * outbox.schema.json 1.0.0 sha256:0b9b172f230a6347
  * person.schema.json 1.0.0 sha256:2c928319dd7ab9d1
  * pilot.schema.json 1.0.0 sha256:5d091f814844b3b1
- * pinboard_item.schema.json 1.0.0 sha256:fe6df109871cea93
+ * pinboard_item.schema.json 1.1.0 sha256:edf4c50a588211ee
  * plan.schema.json 1.1.0 sha256:f0722cc94a84e2d1
  * plate.schema.json 1.0.0 sha256:d2a4e4361a714c8f
  * policy.schema.json 1.0.0 sha256:307bca25f6efc07e
@@ -974,6 +974,13 @@ export type MinutesEvidence = UtteranceId[];
  * via the `definition` "PilotTesterId".
  */
 export type PilotTesterId = string;
+/**
+ * A board or column id: lower-case letters, digits and underscore, starting with a letter, at most 32 characters.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "PinboardItemPlaceId".
+ */
+export type PinboardItemPlaceId = string;
 /**
  * This interface was referenced by `TiloContracts`'s JSON-Schema
  * via the `definition` "PlanApproachId".
@@ -4946,7 +4953,7 @@ export interface PilotSurveyResponse {
   quote_consent: boolean;
 }
 /**
- * One entry on a pinboard (FR-PB-01 to -07). A personal entry is private to `scope.user`: no owner, no mention, never proposed (PE-01). A team entry is read by the members of `scope.team` once `active`; until then only `set_up_by` sees it (PE-02). `set_up_by` is the accountable person shown in the table and the target of "get in touch" (PE-09); for an entry Tilo made it is the person who confirmed or owns the meeting. Tilo's entries carry a `source` ("added by Tilo from ..."); a Tilo-made team entry is `active` only with `confirmed_by` (PE-07, PE-08). `url` is https with no user info, query or fragment, and passes the secret redactor before it is stored.
+ * One entry on a pinboard (FR-PB-01 to -07). A personal entry is private to `scope.user`: no owner, no mention, never proposed (PE-01). A team entry is read by the members of `scope.team` once `active`; until then only `set_up_by` sees it (PE-02). `set_up_by` is the accountable person shown in the table and the target of "get in touch" (PE-09); for an entry Tilo made it is the person who confirmed or owns the meeting. Tilo's entries carry a `source` ("added by Tilo from ..."); a Tilo-made team entry is `active` only with `confirmed_by` (PE-07, PE-08). `url` is https with no user info, query or fragment, and passes the secret redactor before it is stored. `placement` (1.1.0, ADR-0038) is optional presentation only: where the entry sits on the board of its own scope. It is no access grant and it never changes the scope or the title (PE-36).
  *
  * This interface was referenced by `TiloContracts`'s JSON-Schema
  * via the `definition` "PinboardItem".
@@ -4976,6 +4983,7 @@ export interface PinboardItem {
   history: [PinboardItemHistoryEntry, ...PinboardItemHistoryEntry[]];
   created_at: Timestamp;
   updated_at: Timestamp;
+  placement?: PinboardItemPlacement;
 }
 /**
  * This interface was referenced by `TiloContracts`'s JSON-Schema
@@ -5016,6 +5024,17 @@ export interface PinboardItemHistoryEntry {
   by: EventActor;
   change: "created" | "edited" | "accepted" | "removed" | "undone" | "owner_changed";
   status: "proposed" | "active" | "removed";
+}
+/**
+ * ADR-0038, FR-PB: where one entry sits on the board of its own scope, left out until it is placed and never null (ADR-0011). board and column are short ids of a presentation place inside that scope, never a user, team or access grant, and the scope itself is not here. order is a sort key inside one board and column across the entries of the scope, lowest first and ties by pin id ascending, so a move writes this one entry and never renumbers another, which may belong to someone else. A move changes this object only: not the title, the content, the scope, the owner, the status, the history or updated_at (PE-36).
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "PinboardItemPlacement".
+ */
+export interface PinboardItemPlacement {
+  board: PinboardItemPlaceId;
+  column: PinboardItemPlaceId;
+  order: number;
 }
 /**
  * PlanGraph (PRD 7.1 FR-INT-06, FR-INT-09): the approaches offered, the chosen one compiled to units, dependencies, roles, skills, connectors and gates, and the confirmed budget cap. Cross-reference rules PG-01.. are in contracts/plan.rules.md.
