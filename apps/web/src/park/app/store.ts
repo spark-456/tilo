@@ -19,6 +19,7 @@ import type {
 import { TOAST_MS } from "../components/Toast";
 import type { Motion, PageId, Params } from "./AppCtx";
 import { parkPath } from "./router";
+import { openServedCount } from "./servedDecisions";
 
 /** A live answer that failed in a way the Api did not describe. */
 const NOT_RECORDED = "Tilo could not record that answer. Nothing was sent.";
@@ -232,9 +233,13 @@ export function createParkStore({ api, navigate, schedule }: ParkStoreDeps): Par
     cancelLoader = null;
   };
 
+  // On the live path the count is the served decisions still open (BQ-UX11-1); the fixture path keeps the sample count.
+  const needsFor = (s: ParkState): number =>
+    s.sources.live ? openServedCount(decisions, s.dec) : countNeedsLeft(s.dec);
+
   const update = (patch: Partial<Pick<ParkState, "dec" | "added" | "prefs" | "toast">>): void => {
     const merged = { ...state, ...patch };
-    set({ ...merged, ...derive(merged.prefs, merged.dec) });
+    set({ ...merged, ...derive(merged.prefs, merged.dec), needsLeft: needsFor(merged) });
   };
 
   const undo = (key: DecisionKey): void => {
@@ -411,10 +416,12 @@ export function createParkStore({ api, navigate, schedule }: ParkStoreDeps): Par
     },
     noteSource(source) {
       if (state.sources[source]) return;
-      set({ ...state, sources: { ...state.sources, [source]: true } });
+      const next = { ...state, sources: { ...state.sources, [source]: true } };
+      set({ ...next, needsLeft: needsFor(next) });
     },
     setDecisions(list) {
       decisions = list;
+      if (state.sources.live) set({ ...state, needsLeft: needsFor(state) });
     },
     dispose() {
       stopLoader();
