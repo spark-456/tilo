@@ -16,7 +16,8 @@ import type {
   World,
 } from "../../api/types";
 import type { AppCtx } from "../../app/AppCtx";
-import { useParkApi, useParkStore, useSchedule } from "../../app/context";
+import { useDemoSession, useParkApi, useParkStore, useSchedule } from "../../app/context";
+import { DEMO_START } from "../../app/store";
 import { ComposerPanel, type Phase, QUICK_IDLE, type QuickView } from "./ComposerPanel";
 import "./Home.css";
 import { Hero, KpiStrip, Pins, TodayPanel } from "./Panels";
@@ -57,6 +58,8 @@ export function HomePage({ app }: { app: AppCtx }) {
   const api = useParkApi();
   const schedule = useSchedule();
   const store = useParkStore();
+  // QA-DEMO-1: a demo session (the sample company) replays recorded data and starts no run.
+  const demo = useDemoSession();
   const { go, dec, added, night, vw, vh, pins, needsLeft } = app;
 
   const [base, setBase] = useState<Loaded<Base>>(null);
@@ -164,6 +167,15 @@ export function HomePage({ app }: { app: AppCtx }) {
   const confirmStart = () => {
     if (sendingNow.current) return;
     const text = query.trim();
+    if (demo) {
+      // HR-1: no world, no progress and no "Director read your brief" without a recorded event. Say so plainly
+      // and open the sample world, whose data is labelled Sample.
+      store.toast(DEMO_START);
+      toIdle();
+      if (waitingIn) go("world", { id: waitingIn.id });
+      else go("worlds");
+      return;
+    }
     if (!store.getState().sources.live) {
       app.addWorld(modeKey, text);
       setQuery("");
@@ -319,6 +331,7 @@ export function HomePage({ app }: { app: AppCtx }) {
       {!failed || (worldsLive && worlds !== "failed") ? (
         <ComposerPanel
           sending={sending}
+          sample={demo}
           mode={mode}
           modes={MODES}
           query={query}

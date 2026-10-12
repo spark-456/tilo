@@ -10,7 +10,7 @@ import { type ChangeEvent, type ReactNode, useEffect, useRef, useState } from "r
 import { createRoomClient } from "../../api/live/meetingHall";
 import type { ApiResult, Connector, Decision, Plan, Skill, World } from "../../api/types";
 import type { AppCtx } from "../../app/AppCtx";
-import { useParkApi, useWorldClient } from "../../app/context";
+import { useDemoSession, useParkApi, useWorldClient } from "../../app/context";
 import { stagePath } from "../../app/router";
 import {
   SLACK_NOTE_MAX,
@@ -139,6 +139,7 @@ function Frame({ children, worldId }: { children?: ReactNode; worldId?: string }
 export function WorldPage({ app }: { app: AppCtx }) {
   const api = useParkApi();
   const worldClient = useWorldClient();
+  const demo = useDemoSession(); // QA-DEMO-1: the sample company: labelled, and approving records nothing
   const [roomClient] = useState(createRoomClient);
   const [loaded, setLoaded] = useState<Loaded | "failed" | null>(null);
   const [paused, setPaused] = useState<Record<string, boolean>>({});
@@ -296,7 +297,7 @@ export function WorldPage({ app }: { app: AppCtx }) {
           </div>
           <h1 className="park-world-h1" tabIndex={-1}>
             {w.name}
-            {w.sample ? <SampleBadge /> : null}
+            {w.sample || demo ? <SampleBadge /> : null}
           </h1>
           <p className="park-world-meta">
             {w.sample
@@ -304,6 +305,11 @@ export function WorldPage({ app }: { app: AppCtx }) {
               : `Owned by ${w.owner} · started ${w.started} · ${agentsWord(w.agents)}`}
           </p>
           {w.sample ? <SampleNote /> : null}
+          {demo && !w.sample ? (
+            <span className="park-sample-note">
+              Sample data from a demo session. Approving here records nothing.
+            </span>
+          ) : null}
         </div>
         <div className="park-world-actions">
           <Button

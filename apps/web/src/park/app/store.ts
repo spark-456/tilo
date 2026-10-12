@@ -26,6 +26,10 @@ const NOT_RECORDED = "Tilo could not record that answer. Nothing was sent.";
 /** What a start that failed says when the Api did not describe it, or the API is not connected (FR-UX-13). */
 const NOT_STARTED = "Tilo could not start that task. Try again.";
 const NOT_CONNECTED = "Starting work is not connected yet.";
+/** QA-DEMO-1 (HR-1): a demo session replays recorded data, so an approval there records nothing and says so. */
+export const DEMO_DECIDE = "Sample data: nothing was approved. Sign in to approve real decisions.";
+/** QA-DEMO-1: a demo session starts no run; the composer says so instead of inventing progress. */
+export const DEMO_START = "Demo sessions replay a recorded run; sign in to start your own.";
 
 /** What a Quick ask came to: an answer (`sample` when the Api is the fixture), an offer to switch, or a plain failure. */
 export type QuickOutcome =
@@ -125,6 +129,8 @@ export interface ParkStoreDeps {
   navigate: (to: string) => void;
   schedule: Schedule;
   now?: () => number;
+  /** QA-DEMO-1: a demo session (sample company): a decision is explained, never recorded or shown as done. */
+  demo?: boolean;
 }
 
 /** Milliseconds per loader step: cities take longer to wake (README "Open a world"). */
@@ -176,7 +182,7 @@ function answeredText(decision: Decision | undefined): string {
   return decision ? `${decision.yes} recorded: ${decision.title}` : "Answer recorded";
 }
 
-export function createParkStore({ api, navigate, schedule }: ParkStoreDeps): ParkStore {
+export function createParkStore({ api, navigate, schedule, demo }: ParkStoreDeps): ParkStore {
   const initialPrefs = readStoredPrefs();
   let state: ParkState = {
     dec: {},
@@ -257,6 +263,10 @@ export function createParkStore({ api, navigate, schedule }: ParkStoreDeps): Par
       };
     },
     decide(key) {
+      if (demo === true) {
+        toast(DEMO_DECIDE);
+        return;
+      }
       if (state.dec[key] || pending.has(key)) return;
       if (state.sources.live) {
         // Live (WIRE-3): a decision is taken only when tilo-api recorded the answer (HR-1). No Undo: no route

@@ -86,6 +86,8 @@ export interface ComposerProps {
   readonly phase: Phase;
   /** A start is on its way to the server: the confirm control waits (live only). */
   readonly sending?: boolean;
+  /** QA-DEMO-1: a demo session. The plan is a labelled sample and confirming opens the sample world. */
+  readonly sample?: boolean;
   /** Quick or Thinking (COST-FAST-1); Thinking when not given. */
   readonly effort?: Effort;
   readonly onEffort?: (effort: Effort) => void;
@@ -133,7 +135,9 @@ export function ComposerPanel(p: ComposerProps) {
         <div role="status" className="park-home-drafting">
           {/* a still ring: the draft is a fixed-timer stand-in with no call behind it, so it does not turn (HR-1) */}
           <span className="park-home-spin" aria-hidden="true" />
-          {`Tilo is drafting a ${mode.word} for “${p.shown}”`}
+          {p.sample
+            ? `Showing a sample plan for “${p.shown}”`
+            : `Tilo is drafting a ${mode.word} for “${p.shown}”`}
         </div>
       ) : null}
       {phase === "plan" ? (
@@ -165,6 +169,11 @@ export function ComposerPanel(p: ComposerProps) {
                 </li>
               ))}
             </ol>
+            {p.sample ? (
+              <p className="park-home-plan__sample">
+                Sample plan. Demo sessions replay a recorded run; sign in to start your own.
+              </p>
+            ) : null}
           </div>
           <div className="park-home-plan__actions">
             <button
@@ -174,7 +183,7 @@ export function ComposerPanel(p: ComposerProps) {
               aria-busy={p.sending ? true : undefined}
               onClick={p.onConfirm}
             >
-              {mode.confirm}
+              {p.sample ? "Open the sample world" : mode.confirm}
             </button>
             <button
               type="button"
