@@ -128,7 +128,7 @@ def _nonce_store() -> Any:
 def get_link_builder() -> PlateDigestBuilder:
     """One builder per process for the configured key. 503 `not_configured` with no key, a key under 32 bytes, a base
     URL that is not https without user info, query or fragment, or, deployed, no durable nonce store."""
-    key, kid, base = os.environ.get(ENV_KEY, ""), os.environ.get(ENV_KEY_ID, "k1"), os.environ.get(ENV_BASE, "")
+    key, kid, base = os.environ.get(ENV_KEY, ""), os.environ.get(ENV_KEY_ID, "key_a"), os.environ.get(ENV_BASE, "")
     if len(key.encode()) < _MIN_KEY or not re.fullmatch(r"[A-Za-z0-9_-]{1,32}", kid):
         raise _unconfigured()
     with _lock:
