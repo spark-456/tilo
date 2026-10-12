@@ -9,6 +9,7 @@ from __future__ import annotations
 import copy
 import importlib
 import itertools
+import json
 import pathlib
 from dataclasses import dataclass
 from typing import Any
@@ -21,7 +22,7 @@ from tilo_connectors.errors import AdapterError
 from tilo_connectors.grants import GrantItem, GrantStore
 from tilo_connectors.registry import load_registry
 from tilo_connectors.store import InMemoryOutboxStore
-from tilo_connectors.tokens import NotConnected
+from tilo_connectors.tokens import InsufficientScope, NotConnected
 from tilo_policy import load_risk_table
 
 CONFIG = pathlib.Path(__file__).resolve().parents[3] / "config"
@@ -52,6 +53,10 @@ class FakeCanva:
         self.caps_status = caps_status  # an HTTP status the capabilities call answers with
         self.autofill_status: int | None = None
         self.export_fails = 0
+        self.export_bytes: bytes | None = None  # what export answers, instead of a real PDF or PPTX
+        self.caps_failures = 0  # the next N capabilities calls answer 503
+        self.create_raises: Exception | None = None  # raised by create_design (an ambiguous failure)
+        self.share_raises: Exception | None = None
         self.calls: list[tuple[str, Any]] = []
         self.on_upload = None  # a hook run after each upload (a revoke mid-task)
         self.designs: dict[str, dict] = {}
@@ -61,6 +66,9 @@ class FakeCanva:
 
     def capabilities(self, token: str) -> frozenset[str]:
         self.calls.append(("capabilities", token))
+        if self.caps_failures:
+            self.caps_failures -= 1
+            raise cv().CanvaApiError(503)
         if self.caps_status:
             raise cv().CanvaApiError(self.caps_status)
         return self.capabilities_
@@ -74,6 +82,8 @@ class FakeCanva:
 
     def create_design(self, token: str, *, design_kind: str, title: str, pages: list, asset_ids: list) -> dict:
         self.calls.append(("create", {"design_kind": design_kind, "title": title, "pages": pages, "assets": asset_ids}))
+        if self.create_raises is not None:
+            raise self.create_raises
         return self._design("plain", title, pages, asset_ids)
 
     def autofill(self, token: str, *, brand_template_id: str, title: str, pages: list, asset_ids: list) -> dict:
@@ -92,10 +102,14 @@ class FakeCanva:
         if self.export_fails:
             self.export_fails -= 1
             raise CanvaDown("export failed")
+        if self.export_bytes is not None:
+            return self.export_bytes
         return PDF if fmt == "pdf" else PPTX
 
     def share(self, token: str, design_id: str, emails: list) -> None:
         self.calls.append(("share", {"design_id": design_id, "emails": list(emails)}))
+        if self.share_raises is not None:
+            raise self.share_raises
 
 
 class FakeTokens:
@@ -103,12 +117,15 @@ class FakeTokens:
 
     def __init__(self, *, connected: bool = True) -> None:
         self.connected = connected
+        self.missing: set[str] = set()  # scopes the person did not grant
         self.asked: list[dict] = []
 
     def access_token_for_adapter(self, user_id: str, connector: str, *, required_scopes, **kw: Any) -> str:
         self.asked.append({"user": user_id, "connector": connector, "scopes": list(required_scopes), **kw})
         if not self.connected:
             raise NotConnected("no connection for this user and connector")
+        if gone := [s for s in required_scopes if s in self.missing]:
+            raise InsufficientScope(gone)
         return "tok" + "en-" + user_id
 
 
@@ -139,6 +156,7 @@ def make_env(*, enabled: bool = True, secrets: tuple[str, ...] = (), flag_if: tu
     artifacts, exports = FakeTextArtifacts(), cva().InMemoryExportStore()
     grants = GrantStore({"canva": cv().canva_partner()})
     table = load_risk_table()
+    redact, safety = make_redact(*secrets), FakeSafety(flag_if)
     adapter = cva().CanvaAdapter(
         declaration=declaration(),
         api=api_double,
@@ -147,6 +165,8 @@ def make_env(*, enabled: bool = True, secrets: tuple[str, ...] = (), flag_if: tu
         exports=exports,
         grants=grants,
         owner_of=lambda world_id: OWNER,
+        redact=redact,
+        safety=safety,
         risk_table=table,
         enabled=enabled,
     )
@@ -161,8 +181,8 @@ def make_env(*, enabled: bool = True, secrets: tuple[str, ...] = (), flag_if: tu
         adapter,
         outbox,
         emitted,
-        make_redact(*secrets),
-        FakeSafety(flag_if),
+        redact,
+        safety,
         table,
     )
 
@@ -263,3 +283,41 @@ def run_design(env: Env, content, refs=(), grant=None, **over: Any) -> tuple[lis
     case, prepared = design_case(env, content, refs, grant, **over)
     enqueue(env, case)
     return [e["state"] for e in env.outbox.dispatch_due()], prepared
+
+
+def valid_document(env: Env, content, refs=(), grant=None, **over: Any) -> dict:
+    """A copy of what prepare_design writes: the base a probe edits by hand."""
+    return copy.deepcopy(prepare(env, content, refs, grant, **over).document)
+
+
+def forged_case(env: Env, document: Any, *, attachments=None, risk_tier="T3", modifiers=None) -> dict:
+    """An outbox case whose stored request is a hand-written document no prepare_design made."""
+    raw = document if isinstance(document, bytes) else json.dumps(document, sort_keys=True).encode()
+    item = env.artifacts.put(
+        f"art_forged_{next(_ids)}",
+        1,
+        data=raw,
+        media_type="application/json",
+        origin={"kind": "unit", "unit": UNIT, "agent": AGENT},
+    )
+    assets = document.get("assets", []) if isinstance(document, dict) else []
+    shown = (
+        attachments
+        if attachments is not None
+        else [{"artifact_id": a["artifact_id"], "version": a["version"]} for a in assets if isinstance(a, dict)]
+    )
+    mods = modifiers if modifiers is not None else (["attachments"] if shown else [])
+    fields = {
+        "action_type": "create_design",
+        "risk_tier": risk_tier,
+        "modifiers": mods,
+        "recipients": [],
+        "attachments": shown,
+        "item": item,
+    }
+    return case_for(fields)
+
+
+def dispatch(env: Env, case: dict) -> list[str]:
+    enqueue(env, case)
+    return [e["state"] for e in env.outbox.dispatch_due()]

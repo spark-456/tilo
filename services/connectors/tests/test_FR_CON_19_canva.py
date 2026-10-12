@@ -355,6 +355,7 @@ def test_FR_CON_19_config_declares_canva_oauth_and_lists_both_actions_in_the_ris
     assert entry["id"] == "canva" and entry["auth"] == "oauth2"
     assert {a["id"] for a in entry["actions"]} == {"create_design", "share_design"}
     assert all(a["gate_type"] == "approval" for a in entry["actions"])
+    assert {a["id"]: a["risk_tier"] for a in entry["actions"]} == {"create_design": "T3", "share_design": "T3"}
     from tilo_policy import load_risk_table
 
     table = load_risk_table()
