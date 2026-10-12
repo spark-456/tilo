@@ -1,9 +1,9 @@
 # ADR-0040: Team-shared worlds
 
-- Status: Proposed (2026-10-12, architect), awaiting the user's one-line acceptance. It amends a frozen
-  people rule (PE-03), adds one schema, one optional field and one event type, so nothing in `contracts/`,
-  `packages/` or `services/` changes until the user accepts. The direction below reached the architect
-  through the supervisor, so it still needs the user's own confirmation of the design (as ADR-0015/0016 did).
+- Status: Accepted (user, 12 Oct 2026, relayed by the supervisor and recorded by the architect on the same
+  day); builders start after the architect's contract PR (TSW-0) merges. Written as Proposed earlier the same
+  day; the design below is the one accepted, unchanged. It amends a frozen people rule (PE-03) and adds one
+  schema, one optional field and one event type, all of which land in TSW-0 and nowhere else.
 - Deciders: user (acceptance), architect (proposal)
 - Requirement: BQ-CTX-TEAMWORLD (Context aggregate, PR #851); FR-TEAM-01 to FR-TEAM-06; FR-HIL-09, SEC-07;
   PRD 10.1 (Viewer: "shared scope"); PE-01 to PE-12, PE-20, PE-26 to PE-30; ADR-0006, ADR-0009, ADR-0012,
@@ -35,7 +35,7 @@ What exists, read from the code on `phase0-stack` (2b156ac0):
   bytes to "a scoped viewer whose district saw the creating event". `vis: []` is owner-only (ADR-0009).
 - **Pins** already do what the user wants: an active team pin is read by the members of its team (PE-02).
 
-## Decision (proposed)
+## Decision
 
 1. **The link is its own record, `world_share`, in the people stores; the world record is untouched.** One
    record per (world, team): `{id, org_id, world_id, team, granted_by: {by, at}, revoked: null | {by, at}}`.
@@ -316,12 +316,12 @@ top of this one.
 
 ## Consequences
 
-- Contracts change on acceptance only: new `world_share` 1.0.0, `work_item` 1.1.0, registry 1.5.0 with one
+- Contracts change in TSW-0 only: new `world_share` 1.0.0, `work_item` 1.1.0, registry 1.5.0 with one
   type and one data schema, `people.rules.md` (PE-03, PE-12, PE-31 to PE-35). Regeneration steps for the
   builder: `contracts_codegen.py gen`, `node apps/web/scripts/generate-registry.mjs` then biome, and a grep for
   `x-version" ==` and `["version"] ==` pins. Nothing a team reader receives is new content: it is what a
   Viewer receives today, now reachable by a teammate.
-- **Residual risks the user accepts by saying yes.** (a) Sharing is whole-world and retroactive: everything
+- **Residual risks the user accepted by saying yes.** (a) Sharing is whole-world and retroactive: everything
   in the world's `vis: "all"` or district events, artifacts and runs, past and future, is readable by every
   member, including members added to the team later. (b) A member's item in a shared world is visible to all
   teammates as long as the member stays in the team, with no per-item "make private" (drop it). (c) Because a
