@@ -357,6 +357,26 @@ TSW-1 to TSW-5 run in that order; TSW-4a and TSW-5 can overlap after TSW-2. TSW-
 fixtures. Dev mode binds the dev owner to the path's world (`dev.py`), so tests use explicit principals, as the
 existing viewer tests do.
 
+## Decisions (contract lane, TSW-0, 13 Oct 2026)
+
+TSW-0 landed `world_share` 1.0.0, `work_item` 1.1.0, registry 1.5.0 with `world.share_changed`, PE-03 and PE-12
+amended, PE-31 to PE-35, fixtures and the reference clause `world_share_permits` in
+`tests/contracts/_people_lib.py`. The text above is the accepted design; the contracts are what shipped, and
+where this section and the text above differ, this section and the contracts win (BQ-TEAMWORLD-2).
+
+1. **`world.share_changed.target` is the world's own id, not null.** `event.schema.json` is frozen and has
+   no null target, so every "target null" above reads "target the world's id", as for `world.paused`.
+2. **The crossref cases are in `fixtures/world_share/crossref/{valid,invalid}/`, not `person/crossref/`.**
+   `tilo_people` PPL-10a and `tests/contracts` run every file of the latter with the old case keys and
+   14 actions, and `decide` refuses `read_team` until TSW-1, so landing them there turns the base red. TSW-1
+   runs the new folder through `decide` against `world_share_permits`, and may move the files into
+   `person/crossref` in the change that teaches `CASE_KEYS` and the PPL-10a counts the new keys.
+3. **Two refusals the accepted text left implicit**, each with a named invalid case: a share's `org_id` is
+   the owner's org (PE-31) and a reader is of the item's org (PE-33). The teammate-edits, marks-done,
+   reads-in-full and create-for-another-person cases are named `pe03_*`, since PE-03 refuses them.
+4. **Not checkable on one record.** PE-32 and PE-34 have no record to validate (the `tilo-api` tests of
+   TSW-2 to TSW-5 enforce them), and "`world_id` never changes" is a write-path refusal in TSW-1.
+
 ## Open questions
 
 Logged as BQ-TEAMWORLD-1 in `docs/open-questions.md` with the defaults used here: org owners cannot revoke;
