@@ -355,6 +355,30 @@ class DigestService:
         recipient: str | None = None,
         now: float | int | str | dt.datetime | None = None,
     ) -> dict[str, Any] | None:
+        cleared = self.ready(user_id, recipient=recipient, now=now)
+        if cleared is None:
+            return None
+        owner_addr, check_now = cleared
+        scoped_worlds = {self._world_id} if world_ids is None else (set(world_ids) & {self._world_id})
+        digest = self._builder.build(
+            user_id=user_id,
+            world_ids=scoped_worlds,
+            events=events,
+            outbox_entries=outbox_entries,
+            fyi_mail=fyi_mail,
+            now=check_now,
+        )
+        if digest is None:
+            return None
+        return self.enqueue_text(
+            user_id=user_id, owner_addr=owner_addr, window_end=digest.window_end, rendered_text=digest.rendered_text
+        )
+
+    def ready(
+        self, user_id: str, *, recipient: str | None = None, now: float | int | str | dt.datetime | None = None
+    ) -> tuple[str, float | int | str | dt.datetime] | None:
+        """The owner's own address and the clock to build with, or None: no policy port, not the world owner, a
+        recipient that is not the owner's trusted mailbox, or quiet hours. Checked before anything is built."""
         if (
             self._policy is None
             or user_id != self._world_owner
@@ -372,26 +396,29 @@ class DigestService:
                 return None
         except Exception:
             return None
-        scoped_worlds = {self._world_id} if world_ids is None else (set(world_ids) & {self._world_id})
-        digest = self._builder.build(
-            user_id=user_id,
-            world_ids=scoped_worlds,
-            events=events,
-            outbox_entries=outbox_entries,
-            fyi_mail=fyi_mail,
-            now=check_now,
-        )
-        if digest is None:
+        return owner_addr, check_now
+
+    def enqueue_text(
+        self,
+        *,
+        user_id: str,
+        owner_addr: str,
+        window_end: str,
+        rendered_text: str,
+        kind: str = "digest",
+        subject: str = "Daily Digest",
+    ) -> dict[str, Any] | None:
+        """Stores `rendered_text` as an artifact and sends it to `owner_addr` once per UTC day and `kind`: the
+        FR-CHN-18 path (L3 policy decision, policy.applied, outbox) for every owner-only digest mail (FR-PA-06)."""
+        if self._policy is None or not re.fullmatch(r"[a-z][a-z_]{0,23}", kind):
             return None
-        utc_day, idem_key = digest.window_end[:10], f"digest:{user_id}:{digest.window_end[:10]}"
+        utc_day, idem_key = window_end[:10], f"{kind}:{user_id}:{window_end[:10]}"
         if self._outbox.get_by_idempotency_key(self._world_id, idem_key) is not None:
             return None
-        if (now_ms := parse_ms(digest.window_end)) is None:
+        if (now_ms := parse_ms(window_end)) is None:
             return None
         outbox_id = ulid(now_ms)
-        item = self._artifacts.store(
-            f"art_digest_{outbox_id[:16].lower()}", f"Daily Digest ({utc_day})", digest.rendered_text
-        )
+        item = self._artifacts.store(f"art_{kind}_{outbox_id[:16].lower()}", f"{subject} ({utc_day})", rendered_text)
         if not conforms("common.schema.json#/$defs/artifact_ref", item):
             return None
         facts = tilo_policy.SideEffectFacts(recipients=(owner_addr,), known_recipients=(owner_addr,))
@@ -409,7 +436,7 @@ class DigestService:
         if (checked := _allowed_l3_decision(decision, now_ms, pol_undo if type(pol_undo) is int else 60)) is None:
             return None
         authz, at_ms, undo = checked
-        pdata: dict[str, Any] = {"policy_id": decision.policy_id, "gate_id": gate_id_for(f"digest_{outbox_id}")}
+        pdata: dict[str, Any] = {"policy_id": decision.policy_id, "gate_id": gate_id_for(f"{kind}_{outbox_id}")}
         pdata |= {"outbox_id": outbox_id, "action_type": ACTION_TYPE, "connector": self._connector, "destination": None}
         pdata |= {"district": self._district, "risk_tier": decision.tier, "level": "L3", "instruction_id": None}
         pdata |= {"undo_window_s": undo, "item": copy.deepcopy(item), "credits": 0}
