@@ -118,11 +118,13 @@ describe("WEB_6_shell: /park/world/<id> inside the shell", () => {
     expect(document.activeElement).toBe(h1);
   });
 
-  it("WEB_6_shell_an_unknown_id_still_opens_the_page_with_the_fallback_world", async () => {
+  it("WEB_6_shell_an_unknown_id_is_page_not_found_not_another_world", async () => {
+    // QA-DEMO-1 M2
     const m = await visit("/park/home");
     expect(m.container.querySelector('[data-testid="park-page-world"]')).toBeNull();
     await goTo("/park/world/nope");
-    expect(m.container.querySelector('[data-testid="park-page-world"]')).not.toBeNull();
+    expect(m.container.querySelector('[data-testid="park-page-world"]')).toBeNull();
+    expect(m.container.querySelector('[data-testid="park-not-found"]')).not.toBeNull();
   });
 
   it("WEB_6_shell_the_breadcrumb_goes_back_to_worlds_and_the_Spend_link_to_the_ledger", async () => {

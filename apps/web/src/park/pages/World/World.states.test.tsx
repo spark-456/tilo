@@ -127,10 +127,11 @@ describe("WEB_6_world_states: the data comes through the Api", () => {
 });
 
 describe("WEB_6_world_states: which world opens", () => {
-  it("WEB_6_world_states_an_unknown_id_falls_back_to_the_first_world_as_the_reference_does", async () => {
-    // Reference: all.find(id) || all.find(k1); with no started worlds the first world is K1.
+  it("WEB_6_world_states_an_unknown_id_is_page_not_found_never_another_world", async () => {
+    // QA-DEMO-1 M2: the reference falls back to K1, which showed another job (with Approve buttons) under a stale link.
     const { el } = await mountWorld({ id: "nope" });
-    expect(textOf(q(el, "h1"))).toBe(K1.name);
+    expect(textOf(q(el, "h1"))).toBe("Page not found");
+    expect(el.querySelector('[data-testid="park-page-world"]')).toBeNull();
   });
 
   it("WEB_6_world_states_no_id_in_params_falls_back_the_same_way", async () => {

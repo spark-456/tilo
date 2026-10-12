@@ -16,6 +16,7 @@ import type {
   World,
 } from "../../api/types";
 import type { AppCtx } from "../../app/AppCtx";
+import { BUILD_SHA } from "../../app/buildStamp";
 import { useDemoSession, useParkApi, useParkStore, useSchedule } from "../../app/context";
 import { DEMO_START } from "../../app/store";
 import { ComposerPanel, type Phase, QUICK_IDLE, type QuickView } from "./ComposerPanel";
@@ -365,7 +366,10 @@ export function HomePage({ app }: { app: AppCtx }) {
         />
       ) : null}
       <nav className="park-home-legal" aria-label="Legal">
-        <a href="/privacy">Privacy</a> · <a href="/terms">Terms</a>
+        <a href="/privacy">Privacy</a> · <a href="/terms">Terms</a> ·{" "}
+        <span className="park-home-build" title="The commit this page was built from">
+          Build {BUILD_SHA}
+        </span>
       </nav>
     </div>
   );

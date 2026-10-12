@@ -18,6 +18,7 @@ import type {
   World,
 } from "../../api/types";
 import type { AppCtx } from "../../app/AppCtx";
+import { NotFound } from "../../app/NotFound";
 import { useDemoSession, useParkApi, useWorldClient } from "../../app/context";
 import { stagePath } from "../../app/router";
 import {
@@ -224,12 +225,17 @@ export function WorldPage({ app }: { app: AppCtx }) {
   }, [slackOpen]);
 
   if (loaded === null) return <Frame />;
+  const wanted = app.params.id;
+  // QA-DEMO-1 M2: an id the list does not hold is "Page not found", never another job (with its Approve buttons).
+  // Only an address with no id (the bare /world) falls back to the first world.
   const world =
     loaded === "failed"
       ? undefined
-      : (loaded.worlds.find((x) => x.id === app.params.id) ??
-        loaded.worlds.find((x) => !added.some((a) => a.id === x.id)) ??
-        loaded.worlds[0]);
+      : (loaded.worlds.find((x) => x.id === wanted) ??
+        (wanted
+          ? undefined
+          : (loaded.worlds.find((x) => !added.some((a) => a.id === x.id)) ?? loaded.worlds[0])));
+  if (loaded !== "failed" && wanted && !world) return <NotFound go={app.go} />;
   if (loaded === "failed" || !world) {
     return (
       <Frame>
@@ -379,11 +385,6 @@ export function WorldPage({ app }: { app: AppCtx }) {
               {icon("play", 14)}Watch the replay
             </a>
           ) : null}
-          {isCity && !hasStage ? (
-            <span id={NO_STAGE_ID} className="park-world-sr">
-              {NO_STAGE}
-            </span>
-          ) : null}
         </div>
       </div>
 
@@ -476,6 +477,12 @@ export function WorldPage({ app }: { app: AppCtx }) {
               </nav>
             ) : null}
           </div>
+          {isCity && !hasStage ? (
+            // QA-DEMO-1 m3: the reason the lens links and "Open live view" are off is words on the page, not a tooltip
+            <p id={NO_STAGE_ID} className="park-world-nostage">
+              {NO_STAGE}
+            </p>
+          ) : null}
           <div className="park-world-progrow">
             <div className="park-world-progwrap">
               <div className="park-world-track">

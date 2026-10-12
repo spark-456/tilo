@@ -154,6 +154,9 @@ export function AppShell({ children }: { children: ReactNode }) {
     : quizRoute
       ? `world/${quizRoute.worldId}/app/${quizRoute.artifactId}`
       : "none";
+  // QA-DEMO-1 m5: the "Mobile app" note belongs to the page it was opened on; going elsewhere closes it.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `key` is the signal (the route changed)
+  useEffect(() => setMobileNote(false), [key]);
   const swap = usePageSwap(
     children,
     key,

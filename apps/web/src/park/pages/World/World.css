@@ -124,16 +124,30 @@
   filter: brightness(1.08);
 }
 
-/* a sample world's disabled stage links keep their look; they only stop looking pressable */
-[data-park] .park-world-live[aria-disabled="true"],
+/* QA-DEMO-1 m3: a disabled stage link looks disabled (muted, not the pressable purple, no hover) and the reason is
+   written beside the lenses (.park-world-nostage) */
+[data-park] .park-world-live[aria-disabled="true"] {
+  background: var(--chip);
+  color: var(--ink3);
+  cursor: not-allowed;
+}
 [data-park] .park-world-lenses a[aria-disabled="true"] {
+  color: var(--ink3);
   cursor: not-allowed;
 }
 [data-park] .park-world-live[aria-disabled="true"]:hover {
+  color: var(--ink3);
   filter: none;
 }
 [data-park] .park-world-lenses a[aria-disabled="true"]:hover {
   background: transparent;
+}
+[data-park] .park-world-nostage {
+  margin: 0;
+  padding: 0 6px;
+  color: var(--ink2);
+  font-size: 12.5px;
+  font-weight: 700;
 }
 /* the reason a stage link is disabled, for assistive technology; out of the flow, so nothing moves */
 [data-park] .park-world-sr {
@@ -967,6 +981,7 @@
 [data-park] .park-world-proposals pre {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
+}
 
 /* ---- Share to Slack dialog & pending approval badge (FR-UX-17) ---- */
 [data-park] .park-world-dpending {
