@@ -18,6 +18,7 @@ from typing import Annotated, Any
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import JSONResponse
 from starlette.concurrency import run_in_threadpool
+from tilo_harness.writer import WriterBusy
 from tilo_metering.flags import FlagStore
 from tilo_planning.artifacts import InMemoryArtifactStore
 from tilo_planning.brief import BriefExtractionError, extract_brief
@@ -45,7 +46,7 @@ from tilo_providers.router import Router
 from tilo_api import deps, ephemeral, intake_requests, quick
 from tilo_api.assistant.metering import SpendLedger
 from tilo_api.deps import get_safety  # the dependency key tests and callers override
-from tilo_api.intake_uploads import RunUploads, UploadStorageError
+from tilo_api.intake_uploads import FILE_SCREEN_UNAVAILABLE, RunUploads, UploadStorageError
 from tilo_api.tasks import create_task
 
 router = APIRouter()
@@ -185,6 +186,8 @@ async def _thinking(
         prepared = await run_in_threadpool(
             screen_intake, request, safety=safety, director=True, file_screen=file_screen
         )
+        if prepared.screened and all(error == FILE_SCREEN_UNAVAILABLE for _, error, _, _ in prepared.screened):
+            raise HTTPException(status_code=503, detail="The attached files could not be screened; retry.")
         # The Director receives only the stored verdict; failed pre-commit attempts clean their owned versions.
         try:
             extraction = await run_in_threadpool(
@@ -249,7 +252,7 @@ async def _thinking(
         raise
     except UploadStorageError as exc:
         await _abort_uploads(store)
-        logger.warning("upload persistence failed: %s", type(exc).__name__)
+        logger.warning("upload persistence failed: %s", type(exc.__cause__ or exc).__name__)
         raise HTTPException(status_code=503, detail="Upload storage is unavailable; retry.") from exc
     except BaseException:
         await _abort_uploads(store)
@@ -258,13 +261,17 @@ async def _thinking(
         task_id, task = await run_in_threadpool(
             create_task, tasks, writer, result, extraction, scenario=scenario, kinds=kinds
         )
-    except HTTPException:
-        await _abort_uncommitted(store, tasks, ids)
+    except WriterBusy:
+        raise  # the existing app handler preserves store_unavailable; retain sources after any ambiguous write
+    except HTTPException as exc:
+        if exc.status_code in (429, 409):
+            await _abort_uncommitted(store, tasks, ids)
         raise
     except Exception as exc:
-        await _abort_uncommitted(store, tasks, ids)
+        # A timed-out write can land after an empty read. Keep owned versions for retention/owner erasure.
         logger.warning("intake persistence failed: %s", type(exc).__name__)
-        raise HTTPException(status_code=503, detail="Upload storage is unavailable; retry.") from exc
+        detail = "Upload storage is unavailable; retry." if request.files else "store_unavailable"
+        raise HTTPException(status_code=503, detail=detail) from exc
     body = asdict(result)  # per-file text and events stay server-side
     body["files"] = [{k: v for k, v in f.items() if k not in ("text", "events")} for f in body["files"]]
     questions = [
