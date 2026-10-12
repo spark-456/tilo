@@ -17,6 +17,8 @@ import type {
 } from "../../api/types";
 import type { AppCtx } from "../../app/AppCtx";
 import { useParkApi, useParkStore, useSchedule } from "../../app/context";
+import { FirstRunOverview } from "../../sample/FirstRunOverview";
+import { useFirstRunPreview } from "../../sample/useFirstRunPreview";
 import { ComposerPanel, type Phase, QUICK_IDLE, type QuickView } from "./ComposerPanel";
 import "./Home.css";
 import { Hero, KpiStrip, Pins, TodayPanel } from "./Panels";
@@ -57,6 +59,7 @@ export function HomePage({ app }: { app: AppCtx }) {
   const api = useParkApi();
   const schedule = useSchedule();
   const store = useParkStore();
+  const preview = useFirstRunPreview();
   const { go, dec, added, night, vw, vh, pins, needsLeft } = app;
 
   const [base, setBase] = useState<Loaded<Base>>(null);
@@ -267,7 +270,10 @@ export function HomePage({ app }: { app: AppCtx }) {
     : summaryLine(needs, night);
 
   return (
-    <div className="park-home-root" data-testid="park-page-home">
+    <div
+      className={`park-home-root${preview ? " park-home-root--preview" : ""}`}
+      data-testid="park-page-home"
+    >
       {ready ? (
         <>
           <Pins
@@ -310,7 +316,8 @@ export function HomePage({ app }: { app: AppCtx }) {
           ) : null}
         </>
       ) : null}
-      {failed ? (
+      {preview ? <FirstRunOverview page="home" app={app} /> : null}
+      {failed && !preview ? (
         <div className="park-home-hero park-home-glass">
           <h1 className="park-home-h1">Home</h1>
           <p className="park-home-summary">Not connected yet</p>
