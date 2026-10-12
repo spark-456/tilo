@@ -37,6 +37,8 @@ export interface AnimRec {
   tag: string;
   /** The element or one of its ancestors has a backdrop-filter. */
   blurred: boolean;
+  /** The element itself has a backdrop-filter (an ancestor's does not count). */
+  selfBlurred: boolean;
 }
 
 export interface Sample {
@@ -97,11 +99,14 @@ export function installProbe(): void {
     }
     return op;
   };
+  const hasBlur = (n: Element): boolean => {
+    const s = getComputedStyle(n);
+    const wk = (s as unknown as Record<string, string>).webkitBackdropFilter ?? "none";
+    return Boolean(s.backdropFilter && s.backdropFilter !== "none") || wk !== "none";
+  };
   const blurredUp = (el: Element | null): boolean => {
     for (let n: Element | null = el; n && n !== document.documentElement; n = n.parentElement) {
-      const s = getComputedStyle(n);
-      const wk = (s as unknown as Record<string, string>).webkitBackdropFilter ?? "none";
-      if ((s.backdropFilter && s.backdropFilter !== "none") || wk !== "none") return true;
+      if (hasBlur(n)) return true;
     }
     return false;
   };
@@ -153,6 +158,7 @@ export function installProbe(): void {
       zone: zoneOf(target),
       tag: target ? `${target.tagName.toLowerCase()}.${String(target.className).slice(0, 60)}` : "",
       blurred: blurredUp(target),
+      selfBlurred: target ? hasBlur(target) : false,
     };
     recs.push(rec);
     if (a.startTime !== null) rec.start = Number(a.startTime) - t0;
