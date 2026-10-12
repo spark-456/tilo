@@ -14,6 +14,15 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // FR-CHN-17b: a person's browser push subscriptions (the endpoint is a capability URL, the keys encrypt
+    // payloads) and the one-owner-per-endpoint index. Server only (`tilo_api.push_firestore`).
+    match /orgs/{org}/push/{uid}/devices/{device} {
+      allow read, write: if false;
+    }
+    match /orgs/{org}/push_endpoints/{endpoint} {
+      allow read, write: if false;
+    }
+
     // Everything else: deny by default.
     match /{document=**} {
       allow read, write: if false;

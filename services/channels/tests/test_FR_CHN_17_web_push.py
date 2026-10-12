@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import ast
 import datetime as dt
+import json
 import logging
 from pathlib import Path
 from typing import Any
@@ -107,7 +108,7 @@ class Rig:
             policy=_Policy([_policy()] if policies is None else policies, self.applied, self.clock),
             artifacts=self.artifacts,
             emit=self.applied.append,
-            mailbox=lambda uid: OWNER_EMAIL if uid == USER else None,
+            mailbox=lambda uid: OWNER_EMAIL,  # even for others
             world_id=WORLD,
             world_owner=USER,
             run_id=RUN,
@@ -116,8 +117,11 @@ class Rig:
         )
 
 
-def _item(card: str = "card_0001", kind: str = "gate", title: str = "Approve the supplier reply") -> dict[str, str]:
-    return {"id": card, "kind": kind, "title": title, "body": "Tilo needs your decision."}
+def _item(
+    card: str = "card_0001", kind: str = "gate", title: str = "Approve the supplier reply", **over: Any
+) -> dict[str, Any]:
+    item: dict[str, Any] = {"id": card, "kind": kind, "title": title, "body": "Tilo needs your decision."}
+    return item | {"flagged": False} | over  # a card known to be clean
 
 
 def test_FR_CHN_17_subscription_is_untrusted_input_https_bounded_allowlisted_and_capped_per_person() -> None:
@@ -295,3 +299,247 @@ def test_FR_CHN_17_module_makes_no_network_call_and_imports_no_connector_or_prov
             modules.add(node.module)
     banned = {"socket", "http", "requests", "httpx", "pywebpush", "tilo_connectors", "tilo_providers"}
     assert not {m for m in modules if m.split(".")[0] in banned or m == "urllib.request"}, modules
+
+
+# ---- the security review's four blocking findings, and the follow-ups -----------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "endpoint",
+    [
+        "https://evil.example%2f.fcm.googleapis.com/x",
+        "https://evil.example%40.fcm.googleapis.com/x",
+        "https://evil.example%23.fcm.googleapis.com/x",
+        "https://evil.example%3f.fcm.googleapis.com/x",
+        "https://evil.example%5c.fcm.googleapis.com/x",
+        "https://evil.example%00.fcm.googleapis.com/x",
+        "https://evil.example%2e.fcm.googleapis.com/x",
+        "https://127.0.0.1%2f.fcm.googleapis.com/x",
+        "https://a..fcm.googleapis.com/x",
+        "https://.fcm.googleapis.com/x",
+        "https://-.fcm.googleapis.com/x",
+        "https://a-.fcm.googleapis.com/x",
+        "https://fcm.googleapis.com./x",
+        "https://" + "a" * 64 + ".fcm.googleapis.com/x",
+        "https://FCM.GOOGLEAPIS.COM.evil.example/x",
+        "https://fcm_.googleapis.com/x",
+        "https://[::1]/x",
+    ],
+)
+def test_FR_CHN_17_host_must_be_a_plain_host_name_before_the_allowlist_suffix_test(endpoint: str) -> None:
+    assert not web_push.endpoint_ok(endpoint)
+    with pytest.raises(web_push.SubscriptionRefused):
+        web_push.SubscriptionStore().add(USER, {"endpoint": endpoint, "keys": KEYS})
+
+
+def test_FR_CHN_17_allowed_hosts_are_exactly_the_four_push_services_and_xn_labels_pass() -> None:
+    cfg = web_push.load_config()
+    assert cfg.allowed_hosts == (
+        "fcm.googleapis.com",
+        "push.services.mozilla.com",
+        "notify.windows.com",
+        "web.push.apple.com",
+    )
+    assert web_push.endpoint_ok("https://updates.push.services.mozilla.com/wpush/v2/abc")
+    assert web_push.endpoint_ok("https://xn--bcher-kva.notify.windows.com/?token=AwYAAA%3d%3d&chid=1")
+    store = web_push.SubscriptionStore()
+    sub = store.add(USER, {"endpoint": "HTTPS://FCM.GoogleAPIs.com:443/fcm/send/x" + "a" * 20, "keys": KEYS})
+    assert sub.endpoint == "https://fcm.googleapis.com/fcm/send/x" + "a" * 20  # canonical scheme and host
+
+
+def test_FR_CHN_17_one_owner_per_endpoint_resubscribe_moves_it() -> None:
+    store = web_push.SubscriptionStore()
+    store.add(USER, {"endpoint": FCM, "keys": KEYS})
+    store.add(OTHER, {"endpoint": FCM.replace("https", "HTTPS"), "keys": KEYS})  # same device, signed in as another
+    assert store.for_user(USER) == () and [s.endpoint for s in store.for_user(OTHER)] == [FCM]
+    assert store.users() == (OTHER,)
+
+
+@pytest.mark.parametrize("flagged", [True, None, "missing"])
+def test_FR_CHN_17_a_flagged_or_unknown_card_is_a_persons_decision_so_no_push(flagged: Any) -> None:
+    rig = Rig()
+    rig.subs.add(USER, {"endpoint": FCM, "keys": KEYS})
+    item = _item()
+    if flagged == "missing":
+        del item["flagged"]
+    else:
+        item["flagged"] = flagged
+    res = rig.notifier.notify(USER, item)
+    assert res.status in ("no_policy", "refused") and res.in_app and res.outbox_id is None
+    assert rig.store.all_entries() == [] and rig.applied == []
+    rig.clock.advance(5)
+    assert rig.outbox.dispatch_due() == [] and rig.push.sent == []
+    clean = rig.notifier.notify(USER, _item("card_0002"))  # a card known to be clean still goes
+    assert clean.status == "queued"
+
+
+def test_FR_CHN_17_notice_text_is_cleaned_like_a_quote() -> None:
+    secret = "tok" + "en" + ": " + "Zq" * 12  # a labelled secret, assembled at run time
+    item = _item(
+        title="Approve\u202e the \x07supplier\u200b reply for bob@example.com " + secret,
+        body="Call +44 7700 900123 or see https://evil.example/login?t=1 and www.evil.example now",
+    )
+    rig = Rig()
+    rig.subs.add(USER, {"endpoint": FCM, "keys": KEYS})
+    res = rig.notifier.notify(USER, item)
+    assert res.status == "queued"
+    entry = rig.store.get(res.outbox_id or "")
+    assert entry is not None
+    doc = rig.artifacts.get(entry["item"]["artifact_id"], entry["item"]["version"])
+    shown = doc["subject"] + " | " + doc["body_text"]
+    for gone in ("\u202e", "\x07", "\u200b", "bob@example.com", "Zq" * 12, "+44 7700", "evil.example", "www."):
+        assert gone not in shown, gone
+    assert shown.count("[removed]") >= 3 and "supplier" in shown
+    rig.clock.advance(1)
+    rig.outbox.dispatch_due()
+    assert "evil.example" not in rig.push.sent[0]["payload"].decode()
+
+
+def test_FR_CHN_17_title_and_body_are_cut_on_a_word_boundary_within_their_limits() -> None:
+    cfg = web_push.load_config()
+    rig = Rig()
+    rig.subs.add(USER, {"endpoint": FCM, "keys": KEYS})
+    words = " ".join(["approval"] * 40)
+    res = rig.notifier.notify(USER, _item(title=words, body=words * 3))
+    entry = rig.store.get(res.outbox_id or "")
+    assert entry is not None
+    doc = rig.artifacts.get(entry["item"]["artifact_id"], entry["item"]["version"])
+    for text, limit in ((doc["subject"], cfg.title_max), (doc["body_text"], cfg.body_max)):
+        assert 0 < len(text) <= limit and text.split(" ")[-1] == "approval", text  # whole words only
+    assert rig.notifier.notify(USER, _item("card_0003", title="\u200b \x00 ")).status == "refused"  # nothing left
+
+
+@pytest.mark.parametrize("kind", ["consent", "nudge", "question", "info", "", "GATE", "needs"])
+def test_FR_CHN_17_kind_set_is_closed(kind: str) -> None:
+    rig = Rig()
+    rig.subs.add(USER, {"endpoint": FCM, "keys": KEYS})
+    res = rig.notifier.notify(USER, _item(kind=kind))
+    assert res.status == "refused" and res.in_app and rig.store.all_entries() == []
+
+
+def test_FR_CHN_17_notify_never_raises_and_the_card_is_still_shown() -> None:
+    class Boom:
+        def get(self, *_: Any) -> Any:
+            raise RuntimeError("down")
+
+    rig = Rig()
+    rig.subs.add(USER, {"endpoint": FCM, "keys": KEYS})
+    for attr, value in (
+        ("_prefs", Boom()),
+        ("_mailbox", lambda uid: (_ for _ in ()).throw(RuntimeError("down"))),
+        ("_outbox", Boom()),
+        ("_artifacts", Boom()),
+        ("_emit", lambda part: (_ for _ in ()).throw(RuntimeError("down"))),
+    ):
+        broken = Rig()
+        broken.subs.add(USER, {"endpoint": FCM, "keys": KEYS})
+        setattr(broken.notifier, attr, value)
+        res = broken.notifier.notify(USER, _item())
+        assert res.status == "refused" and res.in_app, attr
+        assert broken.push.sent == []
+    assert rig.notifier.notify(USER, "not a mapping").status == "refused"  # type: ignore[arg-type]
+
+
+def test_FR_CHN_17_both_settings_shapes_are_read() -> None:
+    quiet = {"quiet_hours": {"enabled": True, "start": "08:00", "end": "10:00", "timezone": "UTC"}}
+    for prefs in ({USER: quiet}, quiet):  # by user id, or one person's own settings
+        rig = Rig(prefs=prefs)
+        rig.subs.add(USER, {"endpoint": FCM, "keys": KEYS})
+        assert rig.notifier.notify(USER, _item(kind="finished")).status == "quiet"
+        assert rig.notifier.notify(USER, _item("card_0009", kind="gate")).status == "queued"
+
+
+def test_FR_CHN_17_guards_owner_world_and_undo_window_are_pinned() -> None:
+    rig = Rig()
+    rig.subs.add(OTHER, {"endpoint": FCM, "keys": KEYS})
+    assert rig.notifier.notify(OTHER, _item()).status == "refused"  # not the world's owner, mailbox answers anyway
+    rig.subs.add(USER, {"endpoint": FCM + "2", "keys": KEYS})
+    assert rig.notifier.notify(USER, _item(), world_ids={"w_other0001"}).status == "refused"
+    assert rig.notifier.notify(USER, _item(), world_ids={WORLD}).status == "queued"
+    held = Rig(policies=[_policy(level="L3", undo=60)])  # an L3 policy with an undo window is refused
+    held.subs.add(USER, {"endpoint": FCM, "keys": KEYS})
+    assert held.notifier.notify(USER, _item()).status == "no_policy" and held.store.all_entries() == []
+
+
+def test_FR_CHN_17_same_card_twice_is_one_entry_with_one_id_and_one_event() -> None:
+    rig = Rig()
+    rig.subs.add(USER, {"endpoint": FCM, "keys": KEYS})
+    first, second = rig.notifier.notify(USER, _item()), rig.notifier.notify(USER, _item())
+    assert (first.status, second.status) == ("queued", "duplicate")
+    assert first.outbox_id == second.outbox_id is not None
+    assert len(rig.applied) == 1 and rig.applied[0]["data"]["outbox_id"] == first.outbox_id
+    other_world = Rig()  # the id derives from the world and the key: the same card elsewhere is its own entry
+    other_world.subs.add(USER, {"endpoint": FCM, "keys": KEYS})
+    assert other_world.notifier.notify(USER, _item()).outbox_id == first.outbox_id  # same world id, same card
+
+
+def test_FR_CHN_17_payload_carries_a_relative_path_built_from_the_card_id_only() -> None:
+    rig = Rig()
+    rig.subs.add(USER, {"endpoint": FCM, "keys": KEYS})
+    rig.notifier.notify(USER, _item("card_0042", title="Open https://evil.example/x now"))
+    rig.clock.advance(1)
+    rig.outbox.dispatch_due()
+    payload = json.loads(rig.push.sent[0]["payload"])
+    assert payload["path"] == "/park/home?card=card_0042" == f"{web_push.OPEN_PATH}?card=card_0042"
+    assert payload["tag"] == "card_0042" and set(payload) == {"title", "body", "tag", "path"}
+    assert "actions" not in payload and "evil" not in payload["title"]
+
+
+def test_FR_CHN_17_adapter_tries_every_device_and_ends_with_a_final_refusal_when_there_is_none() -> None:
+    class Flaky(FakePushService):
+        def send(self, sub: web_push.PushSubscription, payload: bytes, vapid: web_push.VapidRef) -> None:
+            if sub.endpoint == FCM:
+                raise OSError("push service down")
+            super().send(sub, payload, vapid)
+
+    rig = Rig()
+    rig.push = Flaky(rig.clock)
+    rig.adapter._sender = rig.push
+    rig.subs.add(USER, {"endpoint": FCM, "keys": KEYS})
+    rig.subs.add(USER, {"endpoint": FCM + "2", "keys": KEYS})
+    assert rig.notifier.notify(USER, _item()).status == "queued"
+    rig.outbox.dispatch_due()
+    assert [s["endpoint"] for s in rig.push.sent] == [FCM + "2"]  # the healthy second device got it
+    assert [e["state"] for e in rig.store.all_entries()] == ["sent"]
+
+    class Final(Exception): ...
+
+    solo = web_push.WebPushAdapter(
+        subscriptions=web_push.SubscriptionStore(),
+        sender=rig.push,
+        artifacts=rig.artifacts,
+        owner=USER,
+        vapid=web_push.load_config().vapid,
+        final_error=Final,
+    )
+
+    class Grant:
+        def verify(self, key: str) -> None:
+            return None
+
+    entry = rig.store.all_entries()[0]
+    with pytest.raises(Final):
+        solo.execute_side_effect(entry, Grant())  # nothing to send to: final, not retried
+    rig.subs.remove(USER, FCM)
+    rig.subs.remove(USER, FCM + "2")
+    rig.subs.add(USER, {"endpoint": FCM, "keys": KEYS})
+    with pytest.raises(web_push.PushUndelivered):
+        rig.adapter.execute_side_effect(entry, Grant())  # a device failed and none took it: retriable
+
+
+def test_FR_CHN_17_digest_never_lists_a_push() -> None:
+    import test_FR_CHN_18_daily_digest as d
+    from tilo_channels.digest import DailyDigestBuilder
+
+    ob = "01J8Z3K4M5N6P7Q8R9S0T1V2C1"
+    ts = "2026-10-06T15:00:00.000Z"
+    builder = DailyDigestBuilder(base_url="https://app.tilo.example", keys=d._keys(), nonces=d._NonceStore())
+    events = [d._policy_ev(1, ts, ob, "L3", action_type="send_push")]
+    built = builder.build(
+        user_id=d.USER,
+        world_ids={d.WORLD},
+        events=events,
+        outbox_entries=[d._outbox_entry(ob, ts)],
+        now=d.NOW_TS,
+    )
+    assert built is None

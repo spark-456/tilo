@@ -196,6 +196,8 @@ class DailyDigestBuilder:
             ):
                 continue
             lvl, outbox_id = data.get("level"), data.get("outbox_id")
+            if data.get("action_type") == "send_push":  # a notice to the owner's own device, not an action to undo
+                continue
             if lvl not in AUTOMATED_LEVELS or not (
                 isinstance(outbox_id, str) and _valid_str("common.schema.json#/$defs/ulid", outbox_id)
             ):

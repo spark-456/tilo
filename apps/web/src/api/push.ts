@@ -23,6 +23,9 @@ export interface PushFlow {
   read(): Promise<PushView>;
   enable(): Promise<PushResult>;
   disable(): Promise<PushResult>;
+  /** Sign-out: removes this browser's subscription (tilo-api and the browser), leaving the owner's policy alone,
+   * so a shared browser never keeps delivering one person's cards to the next. Never throws. */
+  release(): Promise<void>;
 }
 
 interface Http {
@@ -133,6 +136,16 @@ export function createPushFlow(http: Http, env: PushEnv = browserEnv()): PushFlo
       } catch {
         await sub?.unsubscribe().catch(() => false); // nothing was saved: leave no half-made subscription
         return fail("failed");
+      }
+    },
+    async release() {
+      try {
+        const sub = await (await env.registration()).pushManager.getSubscription();
+        const endpoint = sub?.toJSON().endpoint;
+        if (endpoint) await http.postJson("/v1/push/unsubscribe", { endpoint });
+        await sub?.unsubscribe();
+      } catch {
+        // nothing was stored on this device, or tilo-api was unreachable: the server drops the device on its next 404
       }
     },
     async disable() {
