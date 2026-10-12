@@ -20,10 +20,18 @@ export interface LovableLimits {
  * exceeds either cap.
  */
 export function buildLovableUrl(prompt: string, limits: LovableLimits = {}): string | null {
-  const maxPrompt = limits.maxPromptChars ?? MAX_LOVABLE_PROMPT_CHARS;
-  const maxUrl = limits.maxUrlLength ?? MAX_LOVABLE_URL_LENGTH;
+  const maxPrompt = Math.min(
+    limits.maxPromptChars ?? MAX_LOVABLE_PROMPT_CHARS,
+    MAX_LOVABLE_PROMPT_CHARS,
+  );
+  const maxUrl = Math.min(limits.maxUrlLength ?? MAX_LOVABLE_URL_LENGTH, MAX_LOVABLE_URL_LENGTH);
   if (prompt.length === 0 || prompt.length > maxPrompt) return null;
-  const url = `${LOVABLE_LINK_PREFIX}${encodeURIComponent(prompt)}`;
-  if (url.length > maxUrl) return null;
-  return url;
+  if (!Number.isFinite(maxPrompt) || !Number.isFinite(maxUrl)) return null;
+  try {
+    const url = `${LOVABLE_LINK_PREFIX}${encodeURIComponent(prompt)}`;
+    return url.length > maxUrl ? null : url;
+  } catch (error) {
+    if (error instanceof URIError) return null;
+    throw error;
+  }
 }

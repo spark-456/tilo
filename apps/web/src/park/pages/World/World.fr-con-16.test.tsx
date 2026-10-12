@@ -1,10 +1,10 @@
 // @vitest-environment happy-dom
 // FR-CON-16 (Must): Lovable link card on the World page. When a run has a build-handoff artifact,
-// the World page shows a "Build this in Lovable" card with the exact prompt text, the files that
-// would leave Tilo, and an "Open in Lovable" control that stays disabled until the person approves
+// the World page shows a "Build this in Lovable" card with the exact prompt text and actual link payload, and an "Open in Lovable" control that stays disabled until the person approves
 // the card through app.decide(key); once approved, it links to `https://lovable.dev/#prompt=...`
 // in a new tab (target="_blank" rel="noopener noreferrer"). Nothing is sent by Tilo itself.
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { fakeApi, fakeScheduler } from "../../../../test-support/park/appHarness";
 import { cleanup, click, q } from "../../../../test-support/park/componentsHarness";
 import {
   climb,
@@ -18,9 +18,11 @@ import {
 } from "../../../../test-support/park/worldHarness";
 import { createFixtureApi } from "../../api/fixtureApi";
 import * as fx from "../../api/fixtures";
+import { buildHandoffDecisions } from "../../api/fixtures/buildHandoff";
 import type { Api } from "../../api/index";
 import { NotBuilt, createLiveApi } from "../../api/liveApi";
 import type { BuildHandoff } from "../../api/types";
+import { createParkStore } from "../../app/store";
 import {
   LOVABLE_LINK_PREFIX,
   MAX_LOVABLE_PROMPT_CHARS,
@@ -39,7 +41,7 @@ const lovableCard = (root: HTMLElement): HTMLElement =>
   );
 
 describe("FR_CON_16: Build this in Lovable card on the World page", () => {
-  it("FR_CON_16_world_page_shows_Build_this_in_Lovable_card_with_exact_prompt_and_files_leaving_Tilo", async () => {
+  it("FR_CON_16_world_page_shows_Build_this_in_Lovable_card_with_exact_prompt_and_honest_payload", async () => {
     const handoff = fx.buildHandoffs[0] as BuildHandoff;
     expect(handoff).toBeDefined();
 
@@ -51,10 +53,13 @@ describe("FR_CON_16: Build this in Lovable card on the World page", () => {
     const pre = q(card, "pre");
     expect(pre.textContent).toBe(handoff.prompt);
 
-    // Every granted file that would leave Tilo is listed on the card.
+    expect(textOf(card)).toContain("Link carries the prompt shown above");
+    expect(textOf(card)).toContain(
+      "Approved data excerpts, when included, are part of that prompt",
+    );
+    expect(textOf(card)).not.toContain("Files leaving Tilo");
     for (const file of handoff.files) {
-      expect(textOf(card), file.path).toContain(file.path);
-      expect(textOf(card), file.summary).toContain(file.summary);
+      expect(textOf(card)).not.toContain(file.path);
     }
     expect(textOf(card)).toContain("Nothing is sent by Tilo itself");
 
@@ -155,6 +160,74 @@ describe("FR_CON_16: Build this in Lovable card on the World page", () => {
       openCtrl.hasAttribute("disabled") || openCtrl.getAttribute("aria-disabled") === "true",
     ).toBe(true);
     expect(openCtrl.getAttribute("href")).toBeNull();
+  });
+
+  it("FR_CON_16_mail_and_handoff_approvals_are_mutually_isolated", async () => {
+    const handoff = fx.buildHandoffs[0] as BuildHandoff;
+    expect(handoff.decisionKey).not.toBe("mail");
+    const entry = buildHandoffDecisions.find((d) => d.k === handoff.decisionKey);
+    expect(entry?.yes).toBe(handoff.approveLabel);
+    expect(entry?.body).toContain(handoff.prompt);
+    const store = createParkStore({
+      api: fakeApi(),
+      navigate: vi.fn(),
+      schedule: fakeScheduler().schedule,
+    });
+    store.setDecisions(fx.decisions);
+    store.decide(handoff.decisionKey);
+    expect(store.getState().dec).toEqual({ [handoff.decisionKey]: true });
+    expect(store.getState().toast?.message).toBe(entry?.toast);
+    expect(store.getState().toast?.message).not.toContain("Supplier brief");
+    store.dispose();
+    const rig = await mountWorld({ id: handoff.world, dec: { mail: true } });
+    expect(control(lovableCard(rig.el), "Open in Lovable").getAttribute("href")).toBeNull();
+    click(control(lovableCard(rig.el), handoff.approveLabel));
+    expect(decideCalls(rig.app)).toEqual([[handoff.decisionKey]]);
+    await rig.setDec({ [handoff.decisionKey]: true });
+    expect(control(lovableCard(rig.el), "Open in Lovable").getAttribute("href")).not.toBeNull();
+    expect(rig.app.dec.mail).toBeUndefined();
+    expect(hasControl(rig.el, "Send brief")).toBe(true);
+  });
+
+  it("FR_CON_16_sample_world_cannot_approve_or_open_even_with_prior_approval", async () => {
+    const base = createFixtureApi();
+    const handoff = fx.buildHandoffs[0] as BuildHandoff;
+    const api: Api = {
+      ...base,
+      getWorlds: async (...args) => {
+        const r = await base.getWorlds(...args);
+        return { ...r, data: r.data.map((w) => ({ ...w, sample: true })) };
+      },
+    };
+    const rig = await mountWorld({ id: handoff.world, api });
+    const card = lovableCard(rig.el);
+    expect(control(card, handoff.approveLabel).hasAttribute("disabled")).toBe(true);
+    click(control(card, handoff.approveLabel));
+    expect(decideCalls(rig.app)).toEqual([]);
+    await rig.setDec({ [handoff.decisionKey]: true });
+    expect(control(lovableCard(rig.el), "Open in Lovable").getAttribute("href")).toBeNull();
+  });
+
+  it("FR_CON_16_untrusted_limits_and_invalid_unicode_fail_closed", async () => {
+    expect(
+      buildLovableUrl("x".repeat(50_001), { maxPromptChars: 100_000, maxUrlLength: 100_000 }),
+    ).toBeNull();
+    expect(
+      buildLovableUrl("x".repeat(32_000), { maxPromptChars: 100_000, maxUrlLength: 100_000 }),
+    ).toBeNull();
+    expect(buildLovableUrl("x".repeat(10), { maxPromptChars: 9 })).toBeNull();
+    expect(buildLovableUrl("\ud800")).toBeNull();
+    const base = createFixtureApi();
+    const handoff = fx.buildHandoffs[0] as BuildHandoff;
+    const api: Api = {
+      ...base,
+      getBuildHandoff: async () => ({
+        source: "fixture",
+        data: [{ ...handoff, prompt: "\ud800" }],
+      }),
+    };
+    const rig = await mountWorld({ id: handoff.world, api, dec: { [handoff.decisionKey]: true } });
+    expect(control(lovableCard(rig.el), "Open in Lovable").getAttribute("href")).toBeNull();
   });
 
   it("FR_CON_16_fixture_and_live_Api_getBuildHandoff_contract", async () => {

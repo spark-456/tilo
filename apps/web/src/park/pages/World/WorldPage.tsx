@@ -378,7 +378,12 @@ export function WorldPage({ app }: { app: AppCtx }) {
               />
             ) : null}
             {handoff ? (
-              <LovableCard handoff={handoff} dec={dec} onDecide={(key) => app.decide(key)} />
+              <LovableCard
+                handoff={handoff}
+                dec={dec}
+                sample={Boolean(w.sample)}
+                onDecide={(key) => app.decide(key)}
+              />
             ) : null}
             <SpendCard w={w} mine={mine} dec={dec} onLedger={() => app.go("ledger")} />
             <FactsCard

@@ -1,12 +1,13 @@
 // Hand-written fixture for the World page's Lovable build-handoff card (FR-CON-16; not in tilo-app.js,
-// not generated). Holds the demo world's build-handoff prompt, granted files that would leave Tilo,
+// not generated). Holds the demo world's build-handoff prompt, source-file references (not uploaded by the link),
 // decision key and contract size limits from config/build_partners.yaml (50,000 prompt chars, 32,000 URL chars).
-import type { BuildHandoff } from "../types";
+import type { BuildHandoff, Decision } from "../types";
+import { decisionFacts } from "./additive";
 
 export const buildHandoffs: BuildHandoff[] = [
   {
     world: "k1",
-    decisionKey: "mail",
+    decisionKey: "lovable",
     approveLabel: "Approve Lovable handoff",
     doneLabel: "Approved · ready to open in Lovable",
     prompt: [
@@ -33,3 +34,17 @@ export const buildHandoffs: BuildHandoff[] = [
     maxUrlLength: 32_000,
   },
 ];
+
+/** Separate approval; this never resolves the supplier-mail decision. */
+export const buildHandoffDecisions: Decision[] = buildHandoffs.map((h) => ({
+  k: h.decisionKey,
+  world: h.world,
+  title: "Lovable build handoff",
+  body: `${h.prompt}\n\nThe link carries this prompt only. No files are uploaded.`,
+  yes: h.approveLabel,
+  icon: "arrowR",
+  done: h.doneLabel,
+  toast: "Lovable handoff approved",
+  approvedTitle: "You approved the Lovable handoff",
+  facts: decisionFacts[h.decisionKey],
+}));

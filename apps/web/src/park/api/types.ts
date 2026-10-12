@@ -5,7 +5,7 @@ import type { QuickCost, QuickIntakeResult, QuickReason } from "../../api/http";
 export type Source = "fixture" | "live";
 export type ApiResult<T> = { data: T; source: Source };
 
-export type DecisionKey = "depot" | "mail";
+export type DecisionKey = "depot" | "mail" | "lovable";
 /** Which decisions the person has taken so far. A missing key means not yet. */
 export type Dec = Partial<Record<DecisionKey, boolean>>;
 export type TierKey = "quick" | "routine" | "workspace";

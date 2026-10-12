@@ -188,16 +188,17 @@ export interface LovableCardProps {
   handoff: BuildHandoff;
   dec: Dec;
   onDecide: (key: DecisionKey) => void;
+  sample?: boolean;
 }
 
-/** FR-CON-16: "Build this in Lovable" card showing exact prompt, files leaving Tilo, and approval-gated link. */
-export function LovableCard({ handoff, dec, onDecide }: LovableCardProps) {
+/** FR-CON-16: "Build this in Lovable" card showing exact prompt, honest payload copy, and approval-gated link. */
+export function LovableCard({ handoff, dec, onDecide, sample = false }: LovableCardProps) {
   const approved = Boolean(dec[handoff.decisionKey]);
   const url = buildLovableUrl(handoff.prompt, {
     maxPromptChars: handoff.maxPromptChars,
     maxUrlLength: handoff.maxUrlLength,
   });
-  const canOpen = approved && url !== null;
+  const canOpen = !sample && approved && url !== null;
 
   return (
     <div className="park-world-lovable">
@@ -207,13 +208,11 @@ export function LovableCard({ handoff, dec, onDecide }: LovableCardProps) {
       </div>
       <pre className="park-world-lovableprompt">{handoff.prompt}</pre>
       <div className="park-world-lovablefiles">
-        <span className="park-world-rowlabel">Files leaving Tilo</span>
-        {handoff.files.map((f) => (
-          <div key={f.path} className="park-world-lovablefile">
-            <span className="park-world-lovablepath">{f.path}</span>
-            <span className="park-world-lovablesummary">{f.summary}</span>
-          </div>
-        ))}
+        <span className="park-world-rowlabel">Link carries the prompt shown above</span>
+        <div className="park-world-lovablesummary">
+          Approved data excerpts, when included, are part of that prompt. Files are not uploaded by
+          this link.
+        </div>
       </div>
       <div className="park-world-dactions">
         {approved ? (
@@ -222,7 +221,14 @@ export function LovableCard({ handoff, dec, onDecide }: LovableCardProps) {
             {handoff.doneLabel}
           </div>
         ) : (
-          <Button variant="needs" size="sm" onClick={() => onDecide(handoff.decisionKey)}>
+          <Button
+            variant="needs"
+            size="sm"
+            disabled={sample}
+            onClick={() => {
+              if (!sample) onDecide(handoff.decisionKey);
+            }}
+          >
             {handoff.approveLabel}
           </Button>
         )}
@@ -241,9 +247,11 @@ export function LovableCard({ handoff, dec, onDecide }: LovableCardProps) {
             size="sm"
             disabled
             title={
-              url === null
-                ? "Prompt exceeds Lovable URL size limit"
-                : "Approve the handoff card first to open in Lovable"
+              sample
+                ? "A recorded sample cannot open a build handoff"
+                : url === null
+                  ? "Prompt is invalid or exceeds Lovable size limits"
+                  : "Approve the handoff card first to open in Lovable"
             }
           >
             Open in Lovable
