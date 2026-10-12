@@ -83,6 +83,20 @@ including its native heap. The existing tracemalloc probes are insufficient for
 that deployment claim. CSV cells are counted before row materialization, with
 quoted separators, multiline fields and doubled quotes respected. Blank records
 and empty cells consume the budget. Encoding/CSV refusals retain no exception
-context. No sandbox, route, deployment or production-runtime verification is
-implemented by this library slice. Office verdicts remain converted-text-only;
+context. Office verdicts remain converted-text-only;
 outbound attachments remain T3 pending the screening-scope ADR amendment.
+
+`process_reader.read_isolated` runs the reader in an isolated Python child and
+installs a 256 MiB memory ceiling before reading uploaded bytes (Linux address
+space via RLIMIT_AS; Windows committed memory via a Job Object). The default and
+maximum wall timeout is 10 seconds; expiry kills and reaps the child. Callers may
+lower memory to at least 64 MiB and lower the timeout. Unsupported systems or
+failed memory-limit installation refuse before parsing. Office parsing refuses
+Expat older than 2.6 at runtime. The worker inherits only OS/temp-directory
+settings, never cloud credentials; stderr and unknown failures become stable
+refusals. Input, output and parser limits apply inside the child.
+
+This is resource isolation for the fixed byte-only parsers, not an arbitrary-code
+execution sandbox or a safety verdict. Safety screening and the quarantined
+reader still precede model use. No route is wired here; production process-peak
+and deployed-runtime evidence remain MERGE prerequisites.
