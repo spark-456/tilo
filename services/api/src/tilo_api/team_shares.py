@@ -1,6 +1,7 @@
 """Team-shared worlds, the write half (BQ-CTX-TEAMWORLD, ADR-0040 decisions 2 and 9, FR-TEAM-01/02, PE-31, PE-35):
 `PUT` and `DELETE /worlds/{world_id}/team-shares/{team}`. Security-flagged: these two routes are the only way a world
-is opened to a team.
+is opened to a team. `GET /worlds/{world_id}/team-shares` (TSW-2a) is the owner's read of the same records, with the
+same guard: each share's `in_force` and, when it is not, a fixed reason word.
 
 Only the world's record owner, on a full web or mobile-web sign-in session bound to no world, may call them; every
 other caller, an unknown world and a malformed team are the one unknown-world 404 (no membership oracle). To grant,
@@ -41,12 +42,13 @@ def _unavailable() -> HTTPException:
     return HTTPException(status_code=503, detail="unavailable")
 
 
-def _owner_world(principal: deps.Principal, store: deps.Store, world_id: str, team: str) -> deps.WorldRecord:
-    """The world, for its record owner's full web or mobile-web session bound to no world; else the unknown 404."""
+def _owner_world(principal: deps.Principal, store: deps.Store, world_id: str, team: str | None) -> deps.WorldRecord:
+    """The world, for its record owner's full web or mobile-web session bound to no world; else the unknown 404.
+    `team` is None for the listing, which names none."""
     world = store.worlds.get(world_id)
     if (
         world is None
-        or _TEAM.fullmatch(team) is None
+        or (team is not None and _TEAM.fullmatch(team) is None)
         or principal.world_id is not None
         or principal.role != "owner"
         or principal.channel not in ("web", "mobile_web")
@@ -132,6 +134,51 @@ def _withdraw(shares: Any, world_id: str, team: str, owner: str, now: str) -> di
         except NotFound:
             raise HTTPException(status_code=404) from None
     raise _unavailable()
+
+
+def _reason(record: dict[str, Any], world_owner: str, now: str) -> str:
+    """The fixed word for a share that is not in force (PE-31), checked in the order the rule states it."""
+    if record["revoked"] is not None:
+        return "revoked"
+    if record["granted_by"]["by"] != world_owner:
+        return "owner_changed"
+    if record["granted_by"]["at"] > now:
+        return "not_yet"
+    return "owner_left_team"
+
+
+@router.get("/worlds/{world_id}/team-shares")
+def list_team_shares(
+    world_id: str,
+    response: Response,
+    principal: Annotated[deps.Principal, Depends(deps.get_current_principal)],
+    store: Annotated[deps.Store, Depends(deps.get_store)],
+    people: Annotated[PeopleStores, Depends(deps.get_people_stores)],
+    clock: Annotated[Callable[[], str], Depends(deps.get_clock)],
+) -> dict[str, Any]:
+    """The owner's view of the world's shares: team, `in_force`, and why not (a fixed word: revoked, owner_left_team,
+    owner_changed, not_yet). Same guard as the writes; a team reader, who may read the world, gets the 404."""
+    world = _owner_world(principal, store, world_id, None)
+    now = clock()
+    try:
+        directory = _directory(people)
+        stored = people.world_shares.list(deps.ORG_ID, "world_id", world_id)
+    except Exception:
+        raise _unavailable() from None
+    rows = []
+    for item in sorted(stored, key=lambda s: s.record["team"]):
+        record = item.record
+        live = in_force(record, world.owner, directory, now)
+        rows.append(
+            {
+                "team": record["team"],
+                "in_force": live,
+                "reason": None if live else _reason(record, world.owner, now),
+                "granted_at": record["granted_by"]["at"],
+            }
+        )
+    response.headers["Cache-Control"] = "no-store"
+    return {"world_id": world_id, "shares": rows}
 
 
 @router.put("/worlds/{world_id}/team-shares/{team}", dependencies=[Depends(write_limit)])
