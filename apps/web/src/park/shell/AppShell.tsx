@@ -9,7 +9,14 @@ import { notifications as sampleNotifications } from "../api/fixtures/notificati
 import { nameInitials } from "../api/nameInitials";
 import type { Decision, Notification, User } from "../api/types";
 import type { PageId } from "../app/AppCtx";
-import { endSession, useApp, useExpectsSample, useParkApi, useParkStore } from "../app/context";
+import {
+  endSession,
+  useApp,
+  useDemoSession,
+  useExpectsSample,
+  useParkApi,
+  useParkStore,
+} from "../app/context";
 import { useParkRoute, useQuizAppRoute } from "../app/router";
 import { Button, Popover, Toast } from "../components";
 import { FirstRunBanner } from "../sample/FirstRunBanner";
@@ -65,6 +72,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [connectorsOn, setConnectorsOn] = useState<number | null>(null);
   const [ready, setReady] = useState(false);
   const expectsSample = useExpectsSample();
+  const demo = useDemoSession();
   const auth = useParkAuth();
   const contextPerson = auth ? (auth.user?.email ?? "guest-session") : (user?.email ?? "device");
   const bannerPerson = auth ? (auth.user?.email ?? null) : (user?.email ?? null);
@@ -250,6 +258,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           <NotificationsPopover
             notifications={sampleNotes ? sampleNotifications : notifications}
             sample={sampleNotes}
+            labelled={demo && !liveNotifications}
             status={notificationStatus}
             decisions={decisions}
             dec={state.dec}

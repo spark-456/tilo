@@ -488,6 +488,12 @@
   font-weight: 800;
   min-width: 0;
 }
+[data-park] .park-home-plan__sample {
+  margin: 0;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--ink3);
+}
 [data-park] .park-home-meta {
   display: flex;
   gap: 22px;

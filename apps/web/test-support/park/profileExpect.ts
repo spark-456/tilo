@@ -110,13 +110,8 @@ export const SWATCHES = {
 export const SECURITY_COPY = {
   sub: "Sign-in, devices and how approvals are confirmed.",
   rows: [
+    // QA-DEMO-1: the design's "Confirm approvals with Face ID" row is gone (the mobile app is a concept).
     ["Two-step sign-in", "On · authenticator app", "Manage", "Two-step settings"],
-    [
-      "Confirm approvals with Face ID",
-      "On the Tilo phone app, for spend over £250",
-      "Change",
-      "Approval confirmation settings",
-    ],
   ],
   signedIn: "Signed in on",
   everywhere: "Sign out everywhere else",

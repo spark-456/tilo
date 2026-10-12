@@ -7,9 +7,10 @@
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import type { ProfileSession, ProfileSettings, User } from "../../api/types";
 import type { AppCtx } from "../../app/AppCtx";
-import { useParkApi } from "../../app/context";
+import { useDemoSession, useParkApi } from "../../app/context";
 import { useFollowed } from "../../app/followed";
 import { PageSheet, StatusChip, Switch } from "../../components";
+import { SampleBadge } from "../../sample/SampleBadge";
 import "./Profile.css";
 import { ICONS } from "./icons";
 import { canSwitchOff } from "./notifyRules";
@@ -59,15 +60,12 @@ const MOTIONS = [
   ["still", "Still", "Nothing moves. Best for older laptops and long sessions."],
 ] as const;
 
+// QA-DEMO-1: the Face ID row is gone everywhere (the mobile app is a concept), and a row is shown only where it is
+// labelled Sample (a demo session) or read from the fixture company: a real account never gets an invented claim.
 const SECURITY_ROWS = [
   ["Two-step sign-in", "On · authenticator app", "Manage", "Two-step settings"],
-  [
-    "Confirm approvals with Face ID",
-    "On the Tilo phone app, for spend over £250",
-    "Change",
-    "Approval confirmation settings",
-  ],
 ] as const;
+const SAMPLE_ACCOUNT = "Sample account: these are not your account's details.";
 const SESSION_ICONS = { laptop: ICONS.laptop, phone: ICONS.phone, screen: ICONS.tablet } as const;
 const sessionSub = (s: ProfileSession): string =>
   [s.place, s.lastActive, s.note].filter(Boolean).join(" · ");
@@ -78,6 +76,8 @@ const spendPercent = (spent: number, budget: number): number =>
   budget > 0 ? Math.min(100, Math.max(0, Math.round((spent / budget) * 100))) : 0;
 
 interface Loaded {
+  /** The settings came from the live API (not the fixture company). */
+  live: boolean;
   user: User;
   settings: ProfileSettings;
   spend: { spent: number; budget: number; currency: string };
@@ -85,10 +85,13 @@ interface Loaded {
 
 const cls = (...names: (string | false)[]): string => names.filter(Boolean).join(" ");
 
-function Head({ title, sub }: { title: string; sub: string }) {
+function Head({ title, sub, sample }: { title: string; sub: string; sample?: boolean }) {
   return (
     <div>
-      <h2 className="park-profile-title">{title}</h2>
+      <h2 className="park-profile-title">
+        {title}
+        {sample ? <SampleBadge /> : null}
+      </h2>
       <p className="park-profile-blurb">{sub}</p>
     </div>
   );
@@ -137,6 +140,7 @@ function Toggle({
 
 export function ProfilePage({ app }: { app: AppCtx }) {
   const api = useParkApi();
+  const demo = useDemoSession();
   const [loaded, setLoaded] = useState<Loaded | null>(null);
   const [problem, setProblem] = useState<"missing" | "failed" | null>(null);
   const [form, setForm] = useState<Form | null>(null);
@@ -172,6 +176,7 @@ export function ProfilePage({ app }: { app: AppCtx }) {
       ([u, st, led]) => {
         if (!live) return;
         setLoaded({
+          live: st.source === "live",
           user: u.data,
           settings: st.data,
           spend: {
@@ -185,7 +190,8 @@ export function ProfilePage({ app }: { app: AppCtx }) {
         setBase(start);
         setNotif(st.data.notifications.map((n) => [n.phone, n.email, n.slack]));
         setQuiet(st.data.quiet.on);
-        setSessions(st.data.sessions ?? []);
+        // A demo session shows no phone-app session: the mobile app is a concept (QA-DEMO-1 M4).
+        setSessions((st.data.sessions ?? []).filter((s) => !(demo && s.icon === "phone")));
       },
       (e: unknown) => {
         if (live) setProblem(e instanceof Error && e.name === "NotBuilt" ? "missing" : "failed");
@@ -194,7 +200,7 @@ export function ProfilePage({ app }: { app: AppCtx }) {
     return () => {
       live = false;
     };
-  }, [api]);
+  }, [api, demo]);
 
   const currentId = sessions.find((s) => s.current)?.id ?? "";
   const others = sessions.some((s) => s.id === currentId) ? sessions.length - 1 : 0;
@@ -441,10 +447,15 @@ export function ProfilePage({ app }: { app: AppCtx }) {
 
             {tab === "security" ? (
               <section aria-label="Security" className="park-profile-card park-profile-card--list">
-                <Head title="Security" sub="Sign-in, devices and how approvals are confirmed." />
-                {SECURITY_ROWS.map(([title, sub, action, message], i) => (
+                <Head
+                  title="Security"
+                  sub="Sign-in, devices and how approvals are confirmed."
+                  sample={demo}
+                />
+                {demo ? <p className="park-profile-note">{SAMPLE_ACCOUNT}</p> : null}
+                {(loaded.live ? [] : SECURITY_ROWS).map(([title, sub, action, message]) => (
                   <div key={title} className="park-profile-srow">
-                    <Tile tone="ok">{i === 0 ? ICONS.security : ICONS.phone}</Tile>
+                    <Tile tone="ok">{ICONS.security}</Tile>
                     <div className="park-profile-grow">
                       <div className="park-profile-stitle">{title}</div>
                       <div className="park-profile-ssub">{sub}</div>
@@ -541,6 +552,12 @@ export function ProfilePage({ app }: { app: AppCtx }) {
                 aria-label="Plan and billing"
                 className="park-profile-card park-profile-card--billing"
               >
+                {demo ? (
+                  <p className="park-profile-note">
+                    <SampleBadge />
+                    {SAMPLE_ACCOUNT}
+                  </p>
+                ) : null}
                 <div className="park-profile-cards">
                   {loaded.settings.plan === null ? (
                     <Unavailable title="Plan" />
