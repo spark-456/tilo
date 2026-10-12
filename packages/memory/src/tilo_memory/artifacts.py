@@ -355,6 +355,16 @@ def _strings(value: Any) -> Iterator[str]:
 
 
 class ArtifactStore:
+    def with_upload_text(self, convert: Callable[[bytes, str], str]) -> ArtifactStore:
+        """A request-local view: the store still screens exact stored bytes, with Office text conversion first.
+
+        No producer supplies a verdict; the configured safety provider remains authoritative.
+        Backends, caps, redaction, scope checks and locks are shared; other requests are unchanged.
+        """
+        view = copy.copy(self)
+        view._upload_text = convert
+        return view
+
     def __init__(
         self,
         meta: MetaBackend,
@@ -806,7 +816,10 @@ class ArtifactStore:
         if self._screener is None:
             return "unscreened", None
         try:
-            if media_type in TEXT_TYPES:
+            convert = getattr(self, "_upload_text", None)
+            if media_type.startswith("application/vnd.openxmlformats-officedocument.") and convert is not None:
+                verdict = self._screener.check(convert(data, media_type))
+            elif media_type in TEXT_TYPES:
                 verdict = self._screener.check(data.decode("utf-8"))
             else:
                 verdict = self._screener.check("", content=data, mime_type=media_type)

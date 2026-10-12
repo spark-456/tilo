@@ -14,6 +14,57 @@ class Clean:
         return {"flagged": False}
 
 
+@pytest.mark.parametrize(
+    "error,status,code", [("spend", 403, "spend_cap_reached"), ("model", 503, "model_unavailable")]
+)
+def test_I2_FR_INT_02_files_preserve_model_or_spend_failure(uploads, monkeypatch, error, status, code):
+    from tilo_api import deps, spend
+
+    client, _, artifacts, _ = uploads
+
+    def fail(*_args, **_kwargs):
+        raise spend.SpendCapReached() if error == "spend" else deps.ModelUnavailable()
+
+    monkeypatch.setattr(intake, "extract_brief", fail)
+    response = post(client)
+    assert response.status_code == status
+    assert response.json()["code"] == code
+    assert artifacts.retention().records() == []
+
+
+@pytest.mark.parametrize("status,detail", [(429, "demo_capacity"), (503, "store_unavailable"), (409, "stale")])
+def test_I2_FR_INT_02_commit_preserves_http_failure_and_cleans_only_uncommitted(uploads, monkeypatch, status, detail):
+    from fastapi import HTTPException
+
+    client, _, artifacts, _ = uploads
+
+    def fail(*_args, **_kwargs):
+        raise HTTPException(status_code=status, detail=detail)
+
+    monkeypatch.setattr(intake, "create_task", fail)
+    response = post(client)
+    assert response.status_code == status
+    assert response.json() == {"detail": detail}
+    assert artifacts.retention().records() == []
+
+
+def test_I2_FR_INT_02_an_unknown_commit_that_landed_keeps_its_uploads(uploads, store, monkeypatch):
+    from fastapi import HTTPException
+
+    client, _, artifacts, _ = uploads
+    create = intake.create_task
+
+    def landed(*args, **kwargs):
+        create(*args, **kwargs)
+        raise HTTPException(status_code=503, detail="store_unavailable")
+
+    monkeypatch.setattr(intake, "create_task", landed)
+    assert post(client).status_code == 503
+    task = next(iter(store.tasks.values()))
+    ref = next(s["ref"] for s in task.brief["sources"] if s["kind"] == "file")
+    assert artifacts.read(Scope("org_tilo", task.world_id, task.owner), {"artifact_id": ref, "version": 1})
+
+
 @pytest.fixture
 def uploads(client, tmp_path):
     meta, blobs, raw = MemoryMetaBackend(), MemoryBlobBackend(), LocalDirStore(tmp_path)

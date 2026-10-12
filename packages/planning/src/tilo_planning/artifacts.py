@@ -48,6 +48,10 @@ class InMemoryArtifactStore:
     def abort(self) -> None:
         """Local storage has no durable request transaction to clean up."""
 
+    def peek_prepared(self, filename: str, content: bytes) -> StoredArtifact | None:
+        """The run-upload adapter may have already stored and screened this exact file."""
+        return None
+
     def put(
         self,
         *,

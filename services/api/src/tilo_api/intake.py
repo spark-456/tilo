@@ -42,9 +42,10 @@ from tilo_providers.interfaces import SafetyProvider
 from tilo_providers.replay import ReplayMissError
 from tilo_providers.router import Router
 
-from tilo_api import deps, ephemeral, quick
+from tilo_api import deps, ephemeral, intake_requests, quick
 from tilo_api.assistant.metering import SpendLedger
 from tilo_api.deps import get_safety  # the dependency key tests and callers override
+from tilo_api.intake_uploads import RunUploads, UploadStorageError
 from tilo_api.tasks import create_task
 
 router = APIRouter()
@@ -108,6 +109,61 @@ async def intake(
             return _rejected(f"The files total more than {MAX_TOTAL_BYTES // 1_000_000} MB.")
         uploads.append(IntakeFile(filename=upload.filename or "", content=content))
     request = IntakeRequest(text=text, files=uploads, user_id=principal.user_id)
+    key = http.headers.get("idempotency-key")
+
+    async def perform() -> Any:
+        return await _thinking(
+            http,
+            principal,
+            safety,
+            store,
+            tasks,
+            writer,
+            model_router,
+            flags,
+            work_mode,
+            today,
+            allowance,
+            request,
+            chosen,
+            scenario,
+            key,
+        )
+
+    if key is None or (chosen and chosen[0] == "quick"):
+        return await perform()
+    return await intake_requests.once(allowance, principal.user_id, key, request, scenario, perform)
+
+
+async def _thinking(
+    http: Request,
+    principal: deps.Principal,
+    safety: SafetyProvider,
+    store: InMemoryArtifactStore,
+    tasks: deps.Store,
+    writer: deps.EventWriter,
+    model_router: Router,
+    flags: FlagStore,
+    work_mode: deps.Mode,
+    today: Clock,
+    allowance: SpendLedger,
+    request: IntakeRequest,
+    chosen: list[Any],
+    scenario: str | None,
+    key: str | None,
+) -> Any:
+    text = request.text
+    ids = intake_requests.identifiers(principal.user_id, key)
+    if key is not None and not (chosen and chosen[0] == "quick"):
+        tasks.load_path({"task_id": ids[0]})
+        existing = tasks.tasks.get(ids[0])
+        if existing is not None:
+            if existing.owner != principal.user_id:
+                raise HTTPException(status_code=404, detail="No such task.")
+            raise HTTPException(
+                status_code=409,
+                detail={"code": "intake_already_committed", "task_id": ids[0], "world_id": existing.world_id},
+            )
     try:
         # CPU-bound extraction and blocking screen and model calls stay off the event loop.
         await run_in_threadpool(screen_task_text, request, safety=safety)
@@ -115,9 +171,21 @@ async def intake(
             return await _quick(
                 http, request, principal.user_id, safety, model_router, allowance, flags, work_mode, scenario
             )
-        prepared = await run_in_threadpool(screen_intake, request, safety=safety, director=True)
-        # The Director reads only screened inputs, and runs before anything is stored: a failure leaves no
-        # artifacts without a task (BQ-99).
+        file_screen = None
+        if request.files and isinstance(store, RunUploads):
+            try:
+                store.task_id = ids[0]
+                await run_in_threadpool(store.bind, world_id=ids[1], run_id=ids[2], owner=principal.user_id)
+            except HTTPException:
+                raise
+            except Exception:
+                await _abort_uploads(store)
+                raise HTTPException(status_code=503, detail="Upload storage is unavailable; retry.") from None
+            file_screen = store.screen_file
+        prepared = await run_in_threadpool(
+            screen_intake, request, safety=safety, director=True, file_screen=file_screen
+        )
+        # The Director receives only the stored verdict; failed pre-commit attempts clean their owned versions.
         try:
             extraction = await run_in_threadpool(
                 extract_brief,
@@ -153,7 +221,15 @@ async def intake(
             raise HTTPException(
                 status_code=503, detail="Deliverable choices are unavailable; nothing was stored."
             ) from exc
-        result = await run_in_threadpool(submit_intake, request, safety=safety, store=store, prepared=prepared)
+        result = await run_in_threadpool(
+            submit_intake,
+            request,
+            safety=safety,
+            store=store,
+            prepared=prepared,
+            identifiers=ids,
+            put_failed=not isinstance(store, RunUploads),
+        )
     except IntakeRejected as exc:
         await _abort_uploads(store)
         return _rejected(exc.reason)
@@ -161,17 +237,24 @@ async def intake(
         logger.warning("safety screen failed: %s", type(exc).__name__)
         raise HTTPException(status_code=503, detail="The safety screen is unavailable; nothing was stored.") from exc
     except HTTPException:
+        await _abort_uploads(store)
         raise
-    except Exception as exc:
+    except UploadStorageError as exc:
         await _abort_uploads(store)
         logger.warning("upload persistence failed: %s", type(exc).__name__)
         raise HTTPException(status_code=503, detail="Upload storage is unavailable; retry.") from exc
+    except BaseException:
+        await _abort_uploads(store)
+        raise
     try:
         task_id, task = await run_in_threadpool(
             create_task, tasks, writer, result, extraction, scenario=scenario, kinds=kinds
         )
+    except HTTPException:
+        await _abort_uncommitted(store, tasks, ids)
+        raise
     except Exception as exc:
-        await _abort_uploads(store)
+        await _abort_uncommitted(store, tasks, ids)
         logger.warning("intake persistence failed: %s", type(exc).__name__)
         raise HTTPException(status_code=503, detail="Upload storage is unavailable; retry.") from exc
     body = asdict(result)  # per-file text and events stay server-side
@@ -188,6 +271,16 @@ async def intake(
         "scenario": scenario,
         "gaps": [g.as_dict() for g in task.gaps],
     }
+
+
+async def _abort_uncommitted(store: InMemoryArtifactStore, tasks: deps.Store, ids: tuple[str, str, str]) -> None:
+    try:
+        await run_in_threadpool(tasks.load_path, {"task_id": ids[0]})
+        if ids[0] in tasks.tasks or ids[1] in tasks.worlds:
+            return  # commit may have landed: retention and owner erasure keep the sources intact
+    except Exception:
+        return  # a failed read cannot establish that deletion is safe
+    await _abort_uploads(store)
 
 
 async def _quick(
