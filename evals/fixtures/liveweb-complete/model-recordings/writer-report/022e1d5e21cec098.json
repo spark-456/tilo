@@ -1,0 +1,9 @@
+{
+  "key": "022e1d5e21cec098",
+  "profile": "fixture",
+  "response": {
+    "profile_id": "scripted",
+    "text": "{\"title\": \"Practice report: fictional past paper\", \"date\": \"2026-10-11\", \"sections\": [{\"heading\": \"Summary\", \"blocks\": [{\"type\": \"paragraph\", \"text\": \"The clockwork valve stabilizes at 42.0 units; see the cited paper and key.\"}]}, {\"heading\": \"Sources\", \"blocks\": [{\"type\": \"bullets\", \"bullets\": [\"https://sandbox-web.example/papers/paper-1.pdf\", \"https://sandbox-web.example/papers/answer-key.pdf\", \"https://sandbox-web.example/papers/wrong-magic.pdf\"]}]}]}"
+  },
+  "role": "writer-report"
+}
