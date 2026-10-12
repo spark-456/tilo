@@ -102,6 +102,7 @@ class PushConfig:
     send_within_s: int
     title_max: int
     body_max: int
+    per_day: int
 
 
 def load_config(path: Path = CONFIG_PATH) -> PushConfig:
@@ -112,16 +113,19 @@ def load_config(path: Path = CONFIG_PATH) -> PushConfig:
         raise ValueError(f"web push config unreadable: {type(exc).__name__}") from exc
     if not isinstance(doc, dict):
         raise ValueError("web push config must be a mapping")
-    names = ("max_subscriptions_per_person", "max_endpoint_length", "send_within_s", "title_max", "body_max")
+    names = (
+        *("max_subscriptions_per_person", "max_endpoint_length", "send_within_s"),
+        *("title_max", "body_max", "policy_per_day"),
+    )
     raw: list[Any] = [doc.get(k) for k in names]
     hosts = doc.get("allowed_endpoint_hosts")
     if not all(type(v) is int and v >= 1 for v in raw):
         raise ValueError("web push config limits must be positive integers")
     if not isinstance(hosts, list) or not hosts or not all(type(h) is str and "." in h for h in hosts):
         raise ValueError("allowed_endpoint_hosts must list push service host names")
-    subs, endpoint_len, within, title_max, body_max = (int(v) for v in raw)
+    subs, endpoint_len, within, title_max, body_max, per_day = (int(v) for v in raw)
     vapid = VapidRef(str(doc.get("vapid_private_key_secret")))
-    return PushConfig(vapid, subs, endpoint_len, tuple(h.lower() for h in hosts), within, title_max, body_max)
+    return PushConfig(vapid, subs, endpoint_len, tuple(h.lower() for h in hosts), within, title_max, body_max, per_day)
 
 
 @dataclass(frozen=True)

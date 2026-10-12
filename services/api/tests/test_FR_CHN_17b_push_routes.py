@@ -11,7 +11,7 @@ import logging
 
 import pytest
 from _ppl11a_lib import OWNER, PRIYA
-from tilo_api import deps
+from tilo_api import deps, push_policy
 from tilo_channels.web_push import SubscriptionStore, load_config
 
 ENDPOINT = "https://fcm.googleapis.com/fcm/send/" + "a" * 40
@@ -20,7 +20,7 @@ SUBSCRIBE, UNSUBSCRIBE, STATUS = "/v1/push/subscribe", "/v1/push/unsubscribe", "
 
 
 def _policy(owner: str, level: str = "L3") -> dict:
-    return {"id": "pol_push_l3", "owner": owner, "action_type": "send_push", "level": level}
+    return {"id": push_policy.policy_id(owner), "owner": owner, "action_type": "send_push", "level": level}
 
 
 @pytest.fixture()
@@ -50,11 +50,12 @@ def test_FR_CHN_17b_subscribe_stores_for_the_principal_and_says_push_is_off_unti
     assert [s.endpoint for s in rig.push.for_user(OWNER)] == [ENDPOINT] and rig.push.for_user(PRIYA) == ()
     assert ENDPOINT not in res.text and KEYS["auth"] not in res.text
     assert rig.sub().json()["devices"] == 1  # the same device again replaces
-    rig.world_store.policies["pol_push_l3"] = _policy(OWNER)
+    rig.world_store.policies[push_policy.policy_id(OWNER)] = _policy(OWNER)
     assert rig.p.get(STATUS).json() == {"devices": 1, "delivery": "ready", "public_key": None}
-    rig.world_store.policies["pol_push_l3"] = _policy(OWNER, level="L1")
+    rig.world_store.policies[push_policy.policy_id(OWNER)] = _policy(OWNER, level="L1")
     assert rig.p.get(STATUS).json()["delivery"] == "off_until_owner_policy"
-    rig.world_store.policies["pol_push_l3"] = _policy(PRIYA)  # someone else's policy covers nothing
+    rig.world_store.policies.clear()
+    rig.world_store.policies[push_policy.policy_id(PRIYA)] = _policy(PRIYA)  # someone else's covers nothing
     assert rig.p.get(STATUS).json()["delivery"] == "off_until_owner_policy"
 
 

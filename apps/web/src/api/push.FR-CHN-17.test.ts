@@ -18,6 +18,7 @@ function rig(
   const calls: string[] = [];
   let sub: PushSub | null = null;
   let stored = 0;
+  let policy = false;
   let permission: NotificationPermission = over.permission ?? "default";
   const body = (delivery = "off_until_owner_policy") => ({
     devices: stored,
@@ -31,8 +32,10 @@ function rig(
     },
     postJson: async (path: string, payload: unknown) => {
       calls.push(`POST ${path} ${JSON.stringify(payload)}`);
-      stored = path.endsWith("subscribe") && !path.endsWith("unsubscribe") ? 1 : 0;
-      return body();
+      if (path.endsWith("/subscribe")) stored = 1;
+      if (path.endsWith("/unsubscribe")) stored = 0;
+      if (path.endsWith("/policy")) policy = (payload as { on: boolean }).on;
+      return body(policy ? "ready" : "off_until_owner_policy");
     },
   };
   const env: PushEnv = {
@@ -77,7 +80,7 @@ describe("FR-CHN-17d the push flow", () => {
     const result = await flow.enable();
     expect(result).toEqual({
       ok: true,
-      state: { devices: 1, delivery: "off_until_owner_policy" },
+      state: { devices: 1, delivery: "ready" },
     });
     expect(calls.slice(1)).toEqual([
       "GET /v1/push",
@@ -85,6 +88,7 @@ describe("FR-CHN-17d the push flow", () => {
       `register ${WORKER_PATH}`,
       "subscribe visible=true key=65",
       `POST /v1/push/subscribe ${JSON.stringify({ endpoint: ENDPOINT, keys: KEYS })}`,
+      `POST /v1/push/policy ${JSON.stringify({ on: true, confirm: true })}`,
     ]);
     expect((await flow.read()).here).toBe(true);
   });
@@ -101,6 +105,7 @@ describe("FR-CHN-17d the push flow", () => {
       `register ${WORKER_PATH}`,
       `POST /v1/push/unsubscribe ${JSON.stringify({ endpoint: ENDPOINT })}`,
       "unsubscribe local",
+      `POST /v1/push/policy ${JSON.stringify({ on: false })}`,
     ]);
   });
 

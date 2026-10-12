@@ -7,6 +7,8 @@ import type { PushFlow, PushProblem, PushView } from "../../../api/push";
 import { livePushFlow } from "../../../api/pushEnv";
 import { Switch } from "../../components";
 
+const CONSENT =
+  "Tilo may send notifications to this device for your own approvals and updates. You can turn this off any time.";
 const TEXT = {
   checking: "Checking this browser.",
   off: "Off. Turn on to let this browser show a notice when something needs you.",
@@ -33,6 +35,7 @@ function PushRow({ flow }: { flow: PushFlow }) {
   const [view, setView] = useState<PushView | null>(null);
   const [problem, setProblem] = useState<PushProblem | null>(null);
   const [busy, setBusy] = useState(false);
+  const [asking, setAsking] = useState(false);
   useEffect(() => {
     let live = true;
     flow.read().then((v) => live && setView(v));
@@ -42,6 +45,7 @@ function PushRow({ flow }: { flow: PushFlow }) {
   }, [flow]);
 
   const change = async (on: boolean) => {
+    setAsking(false);
     setBusy(true);
     setProblem(null);
     const result = await (on ? flow.enable() : flow.disable());
@@ -51,20 +55,43 @@ function PushRow({ flow }: { flow: PushFlow }) {
   };
   const unavailable = view?.permission === "unsupported";
   return (
-    <div className="park-profile-quiet">
-      <div className="park-profile-grow">
-        <div className="park-profile-mlabel">Browser notifications</div>
-        <div className="park-profile-msub" aria-live="polite">
-          {words(view, problem)}
+    <>
+      <div className="park-profile-quiet">
+        <div className="park-profile-grow">
+          <div className="park-profile-mlabel">Browser notifications</div>
+          <div className="park-profile-msub" aria-live="polite">
+            {words(view, problem)}
+          </div>
         </div>
+        <Switch
+          label="Browser notifications"
+          checked={view?.here ?? false}
+          disabled={busy || view === null || unavailable}
+          onChange={(on) => (on ? setAsking(true) : change(false))}
+        />
       </div>
-      <Switch
-        label="Browser notifications"
-        checked={view?.here ?? false}
-        disabled={busy || view === null || unavailable}
-        onChange={change}
-      />
-    </div>
+      {asking ? (
+        <div className="park-profile-quiet">
+          <div className="park-profile-grow">
+            <div className="park-profile-msub">{CONSENT}</div>
+          </div>
+          <button
+            type="button"
+            className="park-profile-btn park-profile-btn--quiet"
+            onClick={() => change(true)}
+          >
+            Turn on
+          </button>
+          <button
+            type="button"
+            className="park-profile-btn park-profile-btn--quiet"
+            onClick={() => setAsking(false)}
+          >
+            Not now
+          </button>
+        </div>
+      ) : null}
+    </>
   );
 }
 

@@ -15,5 +15,6 @@ allowed_endpoint_hosts:
   - notify.windows.com
   - web.push.apple.com
 send_within_s: 10
+policy_per_day: 50
 title_max: 80
 body_max: 200

@@ -7,6 +7,12 @@ import type { PushFlow, PushView } from "../../../api/push";
 import { PushControl } from "./PushControl";
 
 const settle = () => act(async () => undefined);
+const CONSENT =
+  "Tilo may send notifications to this device for your own approvals and updates. You can turn this off any time.";
+const button = (root: ParentNode, text: string) =>
+  [...root.querySelectorAll<HTMLButtonElement>("button")].find(
+    (b) => b.textContent === text,
+  ) as HTMLButtonElement;
 
 function flowOf(first: PushView) {
   let view = first;
@@ -62,10 +68,20 @@ describe("FR-CHN-17d Browser notifications control", () => {
     expect(calls).toEqual([]); // reading never enables anything
     click(sw);
     await settle();
+    expect(calls).toEqual([]); // the switch only asks: nothing is enabled before the owner confirms
+    expect(m.container.textContent).toContain(CONSENT);
+    click(button(m.container, "Not now"));
+    await settle();
+    expect(m.container.textContent).not.toContain(CONSENT);
+    expect(calls).toEqual([]);
+    click(q(m.container, '[role="switch"]'));
+    await settle();
+    click(button(m.container, "Turn on"));
+    await settle();
     await settle();
     expect(calls).toEqual(["enable"]);
     expect(q(m.container, '[role="switch"]').getAttribute("aria-checked")).toBe("true");
-    expect(m.container.textContent).toContain("nothing is sent yet");
+    expect(m.container.textContent).toContain("nothing is sent yet"); // this fake answers: no policy took effect
     expect(m.container.textContent).toContain("owner's push policy");
     click(q(m.container, '[role="switch"]'));
     await settle();

@@ -2,6 +2,8 @@
 // person's own click: it asks tilo-api for the deployment's public key (`GET /v1/push`), asks the browser's permission,
 // registers the service worker, subscribes this browser and posts the subscription to tilo-api, which stores it for
 // the signed-in person. The subscription (a capability URL and its keys) is never stored here, shown or logged.
+// `enable` is called only after the control has shown the consent line and the owner confirmed: it then also
+// asks tilo-api for the owner's standing push policy (`POST /v1/push/policy`, confirm true), and `disable` ends it.
 // `delivery` is tilo-api's word: `off_until_owner_policy` means nothing is sent yet, and the page says so.
 export type PushDelivery = "ready" | "off_until_owner_policy";
 export type PushProblem = "unsupported" | "not_configured" | "denied" | "failed";
@@ -84,6 +86,8 @@ function stateOf(body: unknown): { state: PushState; publicKey: string | null } 
 
 export function createPushFlow(http: Http, env: PushEnv = browserEnv()): PushFlow {
   const fail = (problem: PushProblem): PushResult => ({ ok: false, problem });
+  const turn = async (on: boolean) =>
+    stateOf(await http.postJson("/v1/push/policy", on ? { on, confirm: true } : { on }));
   return {
     async read() {
       const permission = env.supported ? env.permission() : "unsupported";
@@ -124,7 +128,8 @@ export function createPushFlow(http: Http, env: PushEnv = browserEnv()): PushFlo
         const { endpoint, keys } = sub.toJSON();
         const saved = stateOf(await http.postJson("/v1/push/subscribe", { endpoint, keys }));
         if (saved === null) throw new Error("answer");
-        return { ok: true, state: saved.state };
+        const policy = await turn(true).catch(() => null); // a member is refused: the device stays, delivery off
+        return { ok: true, state: (policy ?? saved).state };
       } catch {
         await sub?.unsubscribe().catch(() => false); // nothing was saved: leave no half-made subscription
         return fail("failed");
@@ -141,7 +146,8 @@ export function createPushFlow(http: Http, env: PushEnv = browserEnv()): PushFlo
         );
         if (answer === null) throw new Error("answer");
         await sub?.unsubscribe();
-        return { ok: true, state: answer.state };
+        const ended = await turn(false).catch(() => null);
+        return { ok: true, state: (ended ?? answer).state };
       } catch {
         return fail("failed");
       }
