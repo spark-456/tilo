@@ -368,7 +368,7 @@ class Rig:
 
         wrapped = {
             f: SpyStore(getattr(real, f), self.store_calls, flags.get(f, False))
-            for f in ("persons", "meetings", "work_items", "pins", "mentions", "calendar")
+            for f in ("persons", "meetings", "work_items", "pins", "mentions", "calendar", "world_shares")
         }
         return PeopleStores(**wrapped)
 

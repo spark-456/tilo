@@ -35,6 +35,7 @@ INDEXES: Mapping[str, tuple[str, ...]] = {
     "pinboard_item": ("scope.user", "scope.team", "set_up_by"),
     "mention": ("pin_id", "user"),
     "calendar_entry": ("owner",),
+    "world_share": ("world_id", "team"),  # ADR-0040 PE-31: a world's shares, a team's shares
 }
 
 _MISSING = object()
@@ -247,6 +248,7 @@ class PeopleStores:
     pins: RecordStore
     mentions: RecordStore
     calendar: RecordStore
+    world_shares: RecordStore  # required, no in-memory default: a door that forgets it fails at build (ADR-0040)
 
     @classmethod
     def in_memory(cls) -> PeopleStores:
@@ -257,6 +259,7 @@ class PeopleStores:
             pins=MemoryStore("pinboard_item"),
             mentions=MemoryStore("mention"),
             calendar=MemoryStore("calendar_entry"),
+            world_shares=MemoryStore("world_share"),
         )
 
 
@@ -372,8 +375,11 @@ def _refuse_last_person(stores: PeopleStores, org_id: str, user: str) -> None:
 
 def erase_person(stores: PeopleStores, org_id: str, user: str) -> dict[str, int]:
     """PE-16 (BQ-PPL10-8): tombstones their meetings, then deletes their work items, personal pins,
-    mentions naming them, calendar entries and finally their person record. Idempotent."""
-    counts = dict.fromkeys(("meeting", "work_item", "pinboard_item", "mention", "calendar_entry", "person"), 0)
+    mentions naming them, calendar entries, the world shares they granted (PE-35) and finally their person record.
+    Idempotent."""
+    counts = dict.fromkeys(
+        ("meeting", "work_item", "pinboard_item", "mention", "calendar_entry", "world_share", "person"), 0
+    )
     _refuse_last_person(stores, org_id, user)
     for stored in stores.meetings.list(org_id, "owner", user):
         counts["meeting"] += _tombstone(stores.meetings, org_id, stored.record["id"])
@@ -386,6 +392,11 @@ def erase_person(stores: PeopleStores, org_id: str, user: str) -> dict[str, int]
     for name, store, index in plan:
         for stored in store.list(org_id, index, user):
             counts[name] += _delete_matching(store, org_id, stored.record["id"], _holds(index, user))
+    for stored in stores.world_shares.list(org_id):  # PE-35: the shares they granted go with them
+        if stored.record["granted_by"]["by"] == user:
+            counts["world_share"] += _delete_matching(
+                stores.world_shares, org_id, stored.record["id"], _holds("granted_by.by", user)
+            )
     # the sole-person check is repeated inside the delete, atomically, by a store that has `delete_not_last` (FS-17)
     delete = getattr(stores.persons, "delete_not_last", None)
     counts["person"] += _delete_matching(stores.persons, org_id, user, _always, delete)

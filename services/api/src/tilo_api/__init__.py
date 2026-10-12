@@ -52,6 +52,7 @@ from tilo_api.skills_capture import router as _skills_capture_router
 from tilo_api.skills_routes import router as _skills_router
 from tilo_api.tasks import router as _tasks_router
 from tilo_api.team_routes import router as _team_router
+from tilo_api.team_shares import router as _team_shares_router
 from tilo_api.worlds_list import router as _worlds_list_router
 
 # Generated docs only in local dev mode: deployed, the service is public and the route list is not for
@@ -138,6 +139,7 @@ app.include_router(_item_fields_router)
 app.include_router(_meeting_room_router)
 app.include_router(_assistant_router)
 app.include_router(_people.router)
+app.include_router(_team_shares_router)  # ADR-0040: owner-only PUT/DELETE of a world's team share
 app.include_router(_meeting_host_routes.router)
 app.include_router(_quiz_apps.router)
 app.include_router(_connect_routes.router)
