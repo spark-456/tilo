@@ -1,6 +1,6 @@
 # ADR-0037: Recorded provenance for real taught-skill runs
 
-- Status: **Proposed**; no schema or event change is authorised by this draft.
+- Status: Accepted (user, 12 Oct 2026); builders start after the architect's contract PR merges.
 - Date: 12 Oct 2026.
 - Requirements: FR-SKL-05, FR-SKL-06, FR-SKL-07.
 - Predecessor: ADR-0034; rules TS-01, TS-08, TS-09, TS-11, TS-12.

@@ -1,6 +1,6 @@
-# ADR-0037: Per-user profile and notification preferences
+# ADR-0039: Per-user profile and notification preferences
 
-- Status: Proposed; requires user acceptance before any contract or event change.
+- Status: Accepted (user, 12 Oct 2026); builders start after the architect's contract PR merges.
 - Decider: user; author: CX-MEETBOT, 12 October 2026.
 - Requirements: FR-SET-01/02, FR-HIL-13; 12 Oct 05:00 supervisor assignment.
 - Sources: `docs/prd-supplement-design-2026-10-06.md` section 1.5;

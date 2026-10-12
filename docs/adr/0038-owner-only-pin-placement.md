@@ -1,8 +1,11 @@
 # ADR-0038: Owner-only pin placement without scope transfer
 
-- Status: Proposed; requires user acceptance and contract-lane work before implementation.
+- Status: Accepted (user, 12 Oct 2026); builders start after the architect's contract PR merges.
 - Decider: user; author: CX-MERGE, 12 October 2026.
 - Requirements: FR-PB-01..07; supervisor ruling, 12 October 07:00 IST.
+
+Acceptance note (issue #893): pinboard titles are typed only by the person; content inside remains editable.
+Do not implement that note until the user confirms the reading.
 
 ## Context
 
