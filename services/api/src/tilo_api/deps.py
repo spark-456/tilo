@@ -34,7 +34,6 @@ from tilo_archive import RunArchive
 from tilo_connectors import InMemoryOutboxStore
 from tilo_connectors.registry import ConnectorRegistry, load_registry
 from tilo_contracts import MeetingHostRpcConnectionView
-from tilo_harness.executor import DefaultUnitRunner
 from tilo_harness.skills import SkillRegistry
 from tilo_memory.artifacts import ArtifactStore
 from tilo_metering import LedgerEntry
@@ -667,6 +666,12 @@ class _RoleModel:
     def generate(self, request: Any) -> Any:
         return self._router.generate(self._role, request).response
 
+    def generate_budgeted(self, request: Any, budget: Any) -> Any:
+        result, credits = budget.call(self._router.generate, self._role, request)
+        if result.response is None:
+            raise ValueError("no worker response")
+        return result.response, credits
+
 
 def _worker_models(mode: Mode = "replay") -> Mapping[str, Any]:
     router = _seam_router(mode)
@@ -674,7 +679,9 @@ def _worker_models(mode: Mode = "replay") -> Mapping[str, Any]:
 
 
 def get_unit_runner(mode: Mode = "replay", today: Clock = real_today) -> Any:
-    return DefaultUnitRunner(cast(Any, _worker_models(mode)), clock=today)
+    from tilo_api.run_tools import ApiUnitRunner
+
+    return ApiUnitRunner(_worker_models(mode), mode=mode, clock=today)
 
 
 def get_must_ask_providers(mode: Mode = "replay") -> Mapping[str, Any]:
@@ -754,7 +761,10 @@ def _forget_run_stores() -> None:
         _run_stores.clear()
 
 
-def get_artifact_store(request: Request = None) -> ArtifactStore:  # type: ignore[assignment]
+def get_artifact_store(
+    request: Request = None,  # type: ignore[assignment]
+    mode: Annotated[Mode, Depends(get_work_mode)] = "replay",
+) -> ArtifactStore:
     """Where a run's outputs go (PROD-WIRE 2b): Firestore records and GCS bytes for `TILO_ARTIFACTS_STORE=gcs` (see
     `tilo_api.run_stores`); anything else, or no redactor yet, refuses and no run starts (fail closed, BQ-AGT02-T4-1).
     Config is read per call; a built store is kept per config. The redactor is checked before any client is built."""
@@ -763,12 +773,36 @@ def get_artifact_store(request: Request = None) -> ArtifactStore:  # type: ignor
     from tilo_api import run_stores  # noqa: PLC0415
 
     redactor = get_redactor()
+
+    def archived(scope: Any, ref: str) -> str | None:
+        import json
+
+        run_id, seq = ref.rsplit("/", 1)
+        worlds = get_store()
+        load = getattr(worlds, "load_world", None)
+        world = load(scope.world_id) if load is not None else worlds.worlds.get(scope.world_id)
+        if world is None or world.owner != scope.owner or world.run_id != run_id or scope.org_id != ORG_ID:
+            return None
+        archive = get_run_archive()(org_id=scope.org_id, run_id=run_id)
+        return next((json.dumps(r["payload"]) for r in archive.records() if str(r["seq"]) == seq), None)
+
+    def sniff(raw: bytes) -> str:
+        from tilo_browser.fetch import detect_media_type
+
+        return detect_media_type(raw, url="https://source.invalid/file", host="source.invalid")[0]
+
+    class SourceSafety:
+        def check(self, *args: Any, **kwargs: Any) -> Any:
+            return get_safety(mode).check(*args, **kwargs)
+
     return cast(
         ArtifactStore,
         _run_store(
-            "artifacts",
+            f"artifacts:{mode}",
             ("TILO_ARTIFACTS_STORE", "TILO_ARTIFACTS_BUCKET"),
-            lambda: run_stores.open_artifact_store(redactor=redactor),
+            lambda: run_stores.open_artifact_store(
+                redactor=redactor, archive_lookup=archived, screener=SourceSafety(), file_sniffer=sniff
+            ),
         ),
     )
 

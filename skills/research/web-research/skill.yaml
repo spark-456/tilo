@@ -1,0 +1,59 @@
+id: "web-research"
+version: "1.0.0"
+domain: "research"
+author: "Northbridge Research Team"
+reviewer: "Research Domain Expert"
+tools_allowed: ["web_search", "fetch_url"]
+tool_access:
+  web: "read"
+inputs:
+  type: object
+  additionalProperties: false
+  required: ["topic", "max_queries", "search_results"]
+  properties:
+    topic: { type: string, minLength: 1 }
+    max_queries: { type: integer, minimum: 1, maximum: 10 }
+    search_results:
+      type: array
+      items:
+        type: object
+        additionalProperties: false
+        required: ["query", "archive_ref", "title", "snippet"]
+        properties:
+          query: { type: string, minLength: 1 }
+          archive_ref: { type: string, pattern: "^r_[0-9A-Za-z_]{1,48}/[A-Za-z0-9_.-]{1,64}$" }
+          title: { type: string, minLength: 1 }
+          snippet: { type: string, minLength: 1 }
+outputs:
+  type: object
+  additionalProperties: false
+  required: ["planned_queries", "findings", "findings_note", "untrusted_instructions_ignored"]
+  properties:
+    planned_queries:
+      type: array
+      minItems: 1
+      maxItems: 10
+      items: { type: string, minLength: 1 }
+    findings:
+      type: array
+      minItems: 1
+      items:
+        type: object
+        additionalProperties: false
+        required: ["claim", "quoted_evidence", "citations"]
+        properties:
+          claim: { type: string, minLength: 1 }
+          quoted_evidence: { type: string, minLength: 1 }
+          citations:
+            type: array
+            minItems: 1
+            items:
+              type: object
+              additionalProperties: false
+              required: ["archive_ref", "title"]
+              properties:
+                archive_ref: { type: string, pattern: "^r_[0-9A-Za-z_]{1,48}/[A-Za-z0-9_.-]{1,64}$" }
+                title: { type: string, minLength: 1 }
+    findings_note: { type: string, minLength: 1 }
+    untrusted_instructions_ignored: { type: boolean }
+description: "Plan queries, search the public web with web_search, cite archive refs, and write a findings note."

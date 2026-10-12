@@ -23,11 +23,9 @@ kinds:
     available: true
   - id: mock_test_quiz
     label: Mock-test quiz
-    format: markdown
-    available: false
-    needs: LW-12
+    format: app
+    available: true
   - id: past_paper_links
     label: Past-paper links
     format: markdown
-    available: false
-    needs: LW-14
+    available: true

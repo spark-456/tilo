@@ -282,6 +282,8 @@ export interface Ledger {
   by: Record<"world" | "tool" | "role", { head: string; rows: [string, number][] }>;
   tx: LedgerTx[];
   runs: [string, number[], number, string][];
+  /** Recorded task totals; these are not ordered repetitions of a skill. */
+  recordedRuns?: { id: string; usd: number; completed: boolean }[];
   waits: {
     buckets: [string, number][];
     types: [string, string, string][];

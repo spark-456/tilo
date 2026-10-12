@@ -37,9 +37,30 @@ class WorkEvents:
     def record(self, org: str, actor: str, after: dict[str, Any]) -> None:
         """Append the one event of the write that just committed `after`; any failure raises (the caller undoes the
         write). The Desk world is the owner's: the assignee's for a confirm (PE-12 "confirmed for P")."""
-        owner, entry = after["owner"], after["history"][-1]
+        pin = "scope" in after
+        owner = (
+            after["scope"]["user"]
+            if pin and after["scope"]["kind"] == "personal"
+            else after["set_up_by"]
+            if pin
+            else after["owner"]
+        )
+        entry = after["history"][-1]
         change, status = entry["change"], after["status"]
-        if change == "created":
+        if pin:
+            kind = "pinboard.item_added" if change == "created" else "pinboard.item_changed"
+            data = (
+                {
+                    "scope_kind": after["scope"]["kind"],
+                    "team": after["scope"].get("team"),
+                    "status": status,
+                    "made_by": after["created_by"]["by"],
+                    "source_kind": None if after["source"] is None else after["source"]["kind"],
+                }
+                if change == "created"
+                else {"change": change, "status": status}
+            )
+        elif change == "created":
             kind, data = "work_item.created", {"owner": owner, "status": status, "source_kind": after["source"]["kind"]}
         else:
             kind, data = "work_item.changed", {"change": change, "status": status}
@@ -48,10 +69,10 @@ class WorkEvents:
             "type": kind,
             "actor": actor,
             "target": owner,
-            "summary": f"A work item was {_PHRASE.get(change, 'changed')}.",
+            "summary": f"A {'pin' if pin else 'work item'} was {_PHRASE.get(change, 'changed')}.",
             "vis": [],
             "authz": None,
-            "data": {"work_item_id": after["id"], **data},
+            "data": {"pin_id" if pin else "work_item_id": after["id"], **data},
         }
         world = self.desks.desk_world(org, owner)
         if type(world) is not str or _DESK_WORLD.fullmatch(world) is None or self.desks.desk_owner(world) != owner:

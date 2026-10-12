@@ -15,6 +15,7 @@ from tilo_metering.costs import cost_report, load_credit_usd
 from tilo_metering.savings import InconsistentMemoryHit
 
 from tilo_api import deps
+from tilo_api.cost_history import cost_history
 from tilo_api.deps import Principal, Store, WorldRecord, get_current_principal, get_ledger, get_store
 from tilo_api.quick_ledger import QUICK_STEP, QUICK_TASK_TYPE, quick_run_id
 
@@ -68,7 +69,8 @@ def _report(
         unit_types[quick_run_id(quick_uid)] = {QUICK_STEP: QUICK_TASK_TYPE}
     credit_usd = _credit_usd()
     try:
-        return cost_report([e for e in ledger if e.run in runs], events, unit_types=unit_types, credit_usd=credit_usd)
+        report = cost_report([e for e in ledger if e.run in runs], events, unit_types=unit_types, credit_usd=credit_usd)
+        return report | cost_history(events)
     except InconsistentMemoryHit as exc:  # a hit that disagrees with its own costs (BQ-MTR10-5): refuse, never a 500
         raise HTTPException(status_code=422, detail="inconsistent_ledger") from exc
 

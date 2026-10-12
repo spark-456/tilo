@@ -46,6 +46,8 @@ export interface TopNavProps {
   onToggleTime: () => void;
   onBell: () => void;
   onAvatar: () => void;
+  contextOpen?: boolean;
+  onContext?: () => void;
 }
 
 export function TopNav(p: TopNavProps) {
@@ -93,6 +95,19 @@ export function TopNav(p: TopNavProps) {
           })}
         </nav>
         <div className="park-shell__tools">
+          {p.onContext && (
+            <button
+              type="button"
+              className="park-shell__iconbtn"
+              aria-label="Your context"
+              title="Your context (Alt+Shift+C)"
+              aria-expanded={p.contextOpen}
+              aria-haspopup="dialog"
+              onClick={p.onContext}
+            >
+              {icon("grid", 18)}
+            </button>
+          )}
           {p.sample ? <SampleChip org={p.org} /> : p.reserveSample ? <SampleChip ghost /> : null}
           <button
             type="button"

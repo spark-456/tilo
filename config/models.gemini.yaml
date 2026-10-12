@@ -51,6 +51,8 @@ roles:
   # set low (brief) or medium (approaches, plan) themselves.
   director: { primary: flash-38, fallback: flash-37, thinking: high, max_input_tokens: 100000, max_output_tokens: 16384 }
   lead: { primary: flash-38, fallback: flash-37, thinking: medium, max_output_tokens: 16384 }
+  # COST-AUDIT: the Lead's district review is a short plain-text verdict on the cheap tier, no thinking (tilo_harness.lead_review)
+  lead_review: { primary: lite-31, fallback: flash-37, max_output_tokens: 1024 }
   specialist: { primary: lite-31, fallback: flash-37, thinking: low, max_output_tokens: 8192 } # EFF-02: cheapest first
   verifier: { primary: flash-38, fallback: flash-37, thinking: high, max_output_tokens: 16384 }
   writer: { primary: flash-38, fallback: flash-37, thinking: low, max_output_tokens: 16384 }

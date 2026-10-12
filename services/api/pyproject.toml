@@ -18,6 +18,7 @@ dependencies = [
     "tilo-planning",
     "tilo-policy",
     "tilo-harness",
+    "tilo-browser",
     "tilo-connectors",
     "tilo-metering",
     "tilo-world",
@@ -37,6 +38,7 @@ tilo-redact = { workspace = true }
 tilo-planning = { workspace = true }
 tilo-policy = { workspace = true }
 tilo-harness = { workspace = true }
+tilo-browser = { workspace = true }
 tilo-connectors = { workspace = true }
 tilo-metering = { workspace = true }
 tilo-world = { workspace = true }

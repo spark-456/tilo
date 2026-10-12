@@ -318,6 +318,7 @@ _FORMATS = (
     "google_sheets",
     "email",
     "in_app",
+    "app",
 )
 _FORMAT_WORDS = {  # what a person types for a format
     "powerpoint": "pptx", "ppt": "pptx", "slides": "pptx", "slide deck": "pptx", "deck": "pptx", "word": "docx",
