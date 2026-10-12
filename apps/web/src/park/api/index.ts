@@ -1,5 +1,6 @@
 // The Park api (WEB-1a; plan section 6.1): every method returns a Promise of `{ data, source }`, so a
 // page can always say whether it shows sample data. One list of method names, one interface.
+import type { UserSettings, UserSettingsUpdate } from "@tilo/contracts";
 import type {
   Ack,
   AgendaData,
@@ -49,6 +50,7 @@ export const API_METHODS = [
   "getTeamPolicy",
   "getConnectorTerms",
   "getProfileSettings",
+  "getUserSettings",
   "getBuildHandoff",
   "decide",
   "undo",
@@ -60,6 +62,7 @@ export const API_METHODS = [
   "bookSlot",
   "addBackup",
   "setPref",
+  "saveUserSettings",
   "submitFeedback",
 ] as const;
 export type ApiMethod = (typeof API_METHODS)[number];
@@ -81,6 +84,10 @@ export interface Api {
   getConnectorTerms(): R<ConnectorTerms>;
   getProfileSettings(): R<ProfileSettings>;
   getBuildHandoff(): R<BuildHandoff[]>;
+  /** FR-SET-01/02: the signed-in person's saved profile and notification preferences (`GET /v1/me/settings`). */
+  getUserSettings(): R<UserSettings>;
+  /** The whole document, answered by the stored one. Saved only when the answer's `source` is "live". */
+  saveUserSettings(update: UserSettingsUpdate): R<UserSettings>;
   decide(key: DecisionKey): R<DecideAck>;
   undo(key: DecisionKey): R<DecideAck>;
   startWorld(mode: TierKey, query: string): R<StartAck>;

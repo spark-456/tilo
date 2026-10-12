@@ -384,6 +384,16 @@ export class HttpClient implements TiloClient, SchedulesApi, FieldsApi, ItemApi 
     return this.post<unknown>(path, body);
   }
 
+  /** A plain PUT of `body` as JSON, decoded as JSON, with the same typed failures and `write` true (FR-SET-01). */
+  putJson(path: string, body: unknown): Promise<unknown> {
+    const init = {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body),
+    };
+    return this.request<unknown>(path, init, true);
+  }
+
   private post<T>(path: string, body: unknown): Promise<T> {
     // STARTER-1: the sample project is a recorded replay. A write for it is refused here and never sent: no
     // request leaves for it, whoever asks. Nothing is simulated.
