@@ -476,6 +476,18 @@ def get_feedback_store() -> Any:
         raise HTTPException(status_code=503, detail="not_configured") from None
 
 
+def get_push_rpc() -> Any:
+    """FR-CHN-17f: the client of tilo-channels' `POST /internal/push/send`, or None while `TILO_CHANNELS_URL` is
+    unset or not an https Cloud Run address (then no push is sent: dev, CI and a demo send nothing)."""
+    from tilo_api.push_send import ChannelsPushRpc  # noqa: PLC0415
+
+    url = os.environ.get("TILO_CHANNELS_URL", "")
+    try:
+        return ChannelsPushRpc(url) if url else None
+    except ValueError:
+        return None
+
+
 def get_push_store() -> Any:
     """FR-CHN-17b: the person's web-push subscriptions, in Firestore behind `store_door` (`TILO_API_STORE`, ADR-0026),
     else 503 `not_configured`. Dev mode and the tests override this seam."""
