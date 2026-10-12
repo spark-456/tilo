@@ -190,7 +190,16 @@ class SkillLedger:
             record = {**fix, "skill": skill_id, "to_version": skill["version"] + 1}
             _valid("fix", record)
             plan[step - 1] = {**plan[step - 1], "text": fix["text"], "ask_first": fix["ask_first"]}
-            after = {**skill, "plan": plan, "version": record["to_version"], "updated_at": fix["at"]}
+            asks = sum(s["ask_first"] if skill["status"] == "trusted" else s["verb"] != "read" for s in plan)  # TS-05
+            after = {
+                **skill,
+                "plan": plan,
+                "version": record["to_version"],
+                "estimates": {**skill["estimates"], "asks_per_run": asks},
+                "updated_at": fix["at"],
+            }
+            if not conforms("taught_skill.schema.json", after):
+                raise SkillRefused("invalid_record")
             tx.create(f"{root}/fixes/{fix['id']}", record)
             tx.set(root, after)
             return after

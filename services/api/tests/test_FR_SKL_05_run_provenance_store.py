@@ -249,6 +249,13 @@ def test_FR_SKL_05_a_fix_sets_text_and_ask_first_and_makes_the_next_version(stor
     assert store.list_fixes(ORG, SKILL) == [{**_fix(), "skill": SKILL, "to_version": 2}]
 
 
+def test_FR_SKL_05_a_fix_keeps_the_estimated_asks_of_the_current_status(store):
+    store.put(skill(status="trusted"))
+    assert store.apply_fix(ORG, SKILL, _fix(step=2, ask_first=False))["estimates"]["asks_per_run"] == 1  # TS-05
+    store.put({**skill(), "id": "tsk_two"})
+    assert store.apply_fix(ORG, "tsk_two", _fix(step=2, ask_first=False))["estimates"]["asks_per_run"] == 2
+
+
 def test_FR_SKL_05_a_stale_or_unowned_or_unsafe_fix_writes_nothing(store):
     store.put(skill())
     assert refused(lambda: store.apply_fix(ORG, SKILL, _fix(from_version=3))) == "stale_version"
