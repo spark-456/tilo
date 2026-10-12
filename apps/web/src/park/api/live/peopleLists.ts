@@ -7,6 +7,8 @@ export interface PeopleRow {
   at: string;
   body: string | null;
   scope: string | null;
+  setter: string | null;
+  personalUser: string | null;
 }
 export interface PeopleList {
   rows: PeopleRow[];
@@ -33,6 +35,8 @@ export function peopleListFromReply(v: unknown, kind: "meetings" | "pinboards"):
     let at = r.created_at;
     let body: string | null = null;
     let scope: string | null = null;
+    let setter: string | null = null;
+    let personalUser: string | null = null;
     if (kind === "meetings") {
       if (
         !["scheduled", "joining", "live", "ended", "minuted", "discarded", "deleted"].includes(
@@ -55,8 +59,10 @@ export function peopleListFromReply(v: unknown, kind: "meetings" | "pinboards"):
       else if (r.scope.kind === "team" && text(r.scope.team)) scope = `Team ${r.scope.team}`;
       else throw bad();
       body = r.body;
+      setter = text(r.set_up_by) ? r.set_up_by : null;
+      personalUser = r.scope.kind === "personal" ? String(r.scope.user) : null;
     }
-    return { id: r.id, title: r.title, status: r.status, at, body, scope };
+    return { id: r.id, title: r.title, status: r.status, at, body, scope, setter, personalUser };
   });
   if (new Set(rows.map((r) => r.id)).size !== rows.length) throw bad();
   return {

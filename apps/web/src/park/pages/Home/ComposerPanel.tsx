@@ -1,9 +1,9 @@
 // The composer column of Home (reference "Tilo App Home.dc.html"): the example chips while idle, the
 // "drafting" line, the plan card, and the glass panel with the task input and the size of job.
-// Presentation only: the phase, the query and the 900 ms draft are HomePage's. The "Start a real task" link
-// under the panel is the one element the design does not have.
+// Presentation only: the phase, the query and the 900 ms draft are HomePage's.
 import type { Effort, QuickCost, SwitchReason } from "../../api/types";
 import { type SegmentOption, SegmentedControl } from "../../components";
+import { type IntakeClient, IntakeControl } from "./IntakeControl";
 import { EFFORTS, type Mode, SWITCH_WORDS, quickCostLine } from "./homeData";
 
 export type Phase = "idle" | "drafting" | "plan";
@@ -76,6 +76,8 @@ function QuickCard({
 }
 
 export interface ComposerProps {
+  /** I6: absent until an upload route and transport are available. */
+  readonly intakeClient?: IntakeClient;
   readonly mode: Mode;
   readonly modes: readonly Mode[];
   readonly query: string;
@@ -186,28 +188,30 @@ export function ComposerPanel(p: ComposerProps) {
         </div>
       ) : null}
       <div className="park-home-panel park-home-glass">
-        <div className="park-home-input-row">
-          <div className="park-home-logo">
-            <div className="park-home-logo__face">
-              <div className="park-home-logo__dot" />
-              <div className="park-home-logo__dot" />
+        <IntakeControl client={p.intakeClient}>
+          <div className="park-home-input-row">
+            <div className="park-home-logo">
+              <div className="park-home-logo__face">
+                <div className="park-home-logo__dot" />
+                <div className="park-home-logo__dot" />
+              </div>
             </div>
+            <input
+              className="park-home-input"
+              type="text"
+              aria-label="Describe your task"
+              value={p.query}
+              placeholder={`e.g. ${mode.example}`}
+              onChange={(e) => p.onQuery(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") p.onDraft();
+              }}
+            />
+            <button type="button" className="park-home-start" onClick={p.onDraft}>
+              {quickMode ? "Ask" : mode.start}
+            </button>
           </div>
-          <input
-            className="park-home-input"
-            type="text"
-            aria-label="Describe your task"
-            value={p.query}
-            placeholder={`e.g. ${mode.example}`}
-            onChange={(e) => p.onQuery(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") p.onDraft();
-            }}
-          />
-          <button type="button" className="park-home-start" onClick={p.onDraft}>
-            {quickMode ? "Ask" : mode.start}
-          </button>
-        </div>
+        </IntakeControl>
         <div className="park-home-mode-row">
           <div className="park-home-size">
             <SegmentedControl
@@ -228,13 +232,6 @@ export function ComposerPanel(p: ComposerProps) {
             />
           </div>
           <div className="park-home-hint">{quickMode ? effortNote : mode.hint}</div>
-          {/* Not in the design (docs/park-designed-not-in-prd/Home.md): the composer is fixture-only until FR-UX-13,
-              so this plain link opens the old app's real intake form (a full navigation, not app.go). It ends the
-              mode row, inside the panel: a link below the panel was cut off by the window's bottom edge (the page is
-              at least 720 px tall). */}
-          <a className="park-home-real" href="/start">
-            Start a real task
-          </a>
         </div>
       </div>
     </div>

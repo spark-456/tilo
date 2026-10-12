@@ -27,12 +27,15 @@ class CapturedTranscript(dict):
 
 
 def transcript_from_items(meeting_id: str, items) -> dict:
+    """Assign evidence ids in speech-start order; capture order breaks timestamp ties."""
+
     def clean(text, limit):
         text = re.sub(r"[\x00-\x1f\x7f]", " ", remove_meet_links(text))
         return " ".join(text.split())[:limit]
 
     utterances = []
-    for item in items:
+    # Overlapping speakers can settle in a different order from when they began.
+    for item in sorted(items, key=lambda item: item.t):
         text = clean(item.text, 4000)
         if text:
             utterances.append(
