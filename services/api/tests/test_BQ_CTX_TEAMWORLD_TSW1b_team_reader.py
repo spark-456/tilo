@@ -169,7 +169,7 @@ def test_BQ_CTX_TEAMWORLD_PE_31_the_owner_leaving_the_team_lapses_the_share_and_
 
 
 def test_BQ_CTX_TEAMWORLD_PE_31_a_world_that_changed_owner_shares_nothing_until_the_new_owner_shares(rig):
-    rig.store.worlds[WORLD].owner = CARA
+    rig.store.worlds[WORLD].owner = ORGOWNER  # a member of the team, but not the person who granted the share
     rig.as_(web(BEN))
     assert rig.client.get(f"/worlds/{WORLD}").status_code == 404
 
