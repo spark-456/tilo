@@ -8,13 +8,14 @@ world, and the row moves only after that event is recorded (PE-30). A link is a 
 access log masks it), never put in a page, and only the nonce's SHA-256 is kept. Every refusal is one generic page.
 Missing signing key, nonce store, people store or event writer fail closed (503) before anything is spent. A mail reply
 is never read (PRD 10.3). `sweep` is the daily trigger hook the Scheduler's tick calls: off unless
-`TILO_PLATE_DIGEST=1`, and it sends nothing until a `PlateMailer` is wired (`get_plate_mailer`).
+`TILO_PLATE_DIGEST=1`, and it sends only through `plate_mailer` (the owner's standing L3 rule, the outbox, Gmail).
 """
 
 from __future__ import annotations
 
 import datetime as dt
 import hashlib
+import inspect
 import logging
 import os
 import re
@@ -278,10 +279,18 @@ class PlateMailer(Protocol):
         ...
 
 
-def get_plate_mailer() -> PlateMailer:
-    """No production mailer yet: the digest send needs a policy source, an artifact store port and a mailbox lookup
-    that FR-CHN-18 has no production adapters for either. 503 `not_configured` until they are wired."""
-    raise _unconfigured()
+def get_plate_mailer(request: Request | None = None) -> PlateMailer:
+    """The production mailer (FR-CHN-18b, FR-PA-06c, `plate_mailer.production_mailer`): the person's own standing L3
+    rule, Desk-world artifact and events, own mailbox, outbox and the live Gmail stub. 503 `not_configured` while any
+    seam is missing (no signing key, no store, no connector), so nothing is sent."""
+    from tilo_api import plate_mailer  # noqa: PLC0415
+
+    try:
+        return plate_mailer.production_mailer({} if request is None else request.app.dependency_overrides)
+    except Exception as exc:  # a missing seam raises its own 503 or NotConfigured: either way, nothing is sent
+        if isinstance(exc, HTTPException):
+            raise
+        raise _unconfigured() from None
 
 
 def _inside_window(now: str, zone_name: str, window: tuple[str, str]) -> bool:
@@ -301,7 +310,8 @@ def sweep(request: Request, now: str) -> int:
         return 0
     overrides = request.app.dependency_overrides
     try:
-        mailer = overrides.get(get_plate_mailer, get_plate_mailer)()
+        seam = overrides.get(get_plate_mailer, get_plate_mailer)
+        mailer = seam(request) if inspect.signature(seam).parameters else seam()
         stores = overrides.get(deps.get_people_stores, deps.get_people_stores)()
         sources = overrides.get(deps.get_plate_sources, deps.get_plate_sources)()
         owners = overrides.get(deps.get_source_owners, deps.get_source_owners)()

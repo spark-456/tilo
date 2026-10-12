@@ -24,7 +24,7 @@ from urllib.parse import urlsplit
 from tilo_policy.schemas import conforms
 
 from tilo_channels.autopilot_state import timestamp
-from tilo_channels.digest import DigestService, _to_epoch_s
+from tilo_channels.digest import DailyDigestBuilder, DigestService, _to_epoch_s
 from tilo_channels.links import CardState, KeyRing, LinkRefused, LinkService, NonceStore, Redemption
 
 __all__ = ["MAX_LISTED", "OPTIONS", "PlateActionPort", "PlateDigest", "PlateDigestBuilder", "PlateDigestService"]
@@ -122,6 +122,11 @@ class PlateDigestBuilder:
             raise ValueError("base_url must have no query or fragment")
         self._base_url, self._keys, self._nonces = base_url.rstrip("/"), keys, nonces
         self._clock = clock or (lambda: dt.datetime.now(dt.UTC))
+
+    def daily_builder(self) -> DailyDigestBuilder:
+        """The FR-CHN-18 builder over the same https base, key ring, nonce store and clock, for the `DigestService`
+        that sends this mail (it asks only for the clock; no daily digest is built from it here)."""
+        return DailyDigestBuilder(base_url=self._base_url, keys=self._keys, nonces=self._nonces, clock=self._clock)
 
     def _at(self, now: float | int | str | dt.datetime | None) -> dt.datetime:
         if now is None:
