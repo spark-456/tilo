@@ -18,6 +18,7 @@ import { CityBackdrop } from "./CityBackdrop";
 import { ContextPanel, useContextChoice } from "./ContextPanel";
 import { Enter } from "./Enter";
 import { NotificationsPopover } from "./NotificationsPopover";
+import { RunBar } from "./RunBar";
 import { TopNav } from "./TopNav";
 import { WorldLoader } from "./WorldLoader";
 import { authInitials, useParkAuth } from "./auth";
@@ -304,6 +305,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           onClose={store.dismissLifetimeCap}
         />
       ) : null}
+      <RunBar />
       {card ? (
         <WorldLoader
           launch={card}
