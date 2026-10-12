@@ -232,6 +232,9 @@
   display: flex;
   align-items: center;
   gap: 4px;
+  /* A fixed basis, so a longer or shorter page name never moves the chevron (no layout shift across a page change);
+     it still gives way to the tools on a 320 px screen. */
+  flex: 0 1 132px;
   min-width: 0;
   max-width: 100%;
   height: 40px;
@@ -245,7 +248,9 @@
   cursor: pointer;
 }
 [data-park] .park-shell__pagelabel {
+  flex: 1;
   min-width: 0;
+  text-align: left;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
