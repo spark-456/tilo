@@ -560,6 +560,7 @@ class Brain:
         self.fast = fast  # async FastLLM for direct answers; without it they use the thread-bound `llm`
         self.knowledge = knowledge
         self.bot_name = bot_name
+        self.model_event: Any = None
         self.present: list[str] = []
         self.sole_human = False  # exactly one other person is in the meeting: whatever they say is for Tilo
         self.last_engaged_at = -1e9  # when the last question put to Tilo was asked
@@ -675,14 +676,19 @@ class Brain:
         if self.fast is None:
             return await asyncio.to_thread(self._ask_quick_sync, prompt, q, utterances, elapsed_s)
         try:
+            if self.model_event:
+                self.model_event("model_start")
             raw = await self.fast.generate(QUICK_PROMPT, prompt, json_mode=True)
             return self._quick_message(raw, utterances, elapsed_s, q)
         except (LLMUnavailable, json.JSONDecodeError) as e:  # Busy is an LLMUnavailable
             return self._quick_failed(e, utterances, elapsed_s, q)
+        finally:
+            if self.model_event:
+                self.model_event("model_end")
 
     def _ask_quick_sync(self, prompt: str, q: Question, utterances: list[Any], elapsed_s: float) -> ChatMessage | None:
         try:
-            return self._quick_message(self.llm.generate(QUICK_PROMPT, prompt), utterances, elapsed_s, q)
+            return self._quick_message(self._model_generate(QUICK_PROMPT, prompt), utterances, elapsed_s, q)
         except (LLMUnavailable, json.JSONDecodeError) as e:
             return self._quick_failed(e, utterances, elapsed_s, q)
 
@@ -709,7 +715,7 @@ class Brain:
         prompt = "INPUT_JSON:\n" + json.dumps(payload, ensure_ascii=False)
         last = ""
         for attempt in range(self.max_attempts):
-            reply = self.llm.generate(SYSTEM_PROMPT, prompt)
+            reply = self._model_generate(SYSTEM_PROMPT, prompt)
             try:
                 return validate_output(parse_json_reply(reply))
             except (json.JSONDecodeError, SchemaError) as e:
@@ -721,6 +727,15 @@ class Brain:
                     + f"\n\nYour previous reply was invalid ({last}). Reply with ONLY valid JSON of the required shape."
                 )
         raise SchemaError(f"model kept returning invalid JSON: {last}")
+
+    def _model_generate(self, system: str, prompt: str) -> str:
+        if self.model_event:
+            self.model_event("model_start")
+        try:
+            return self.llm.generate(system, prompt)
+        finally:
+            if self.model_event:
+                self.model_event("model_end")
 
     def _match_item(self, title: str) -> ItemState | None:
         t = _norm(title)
