@@ -420,28 +420,6 @@
   transform: translateY(-2px);
 }
 
-/* "Start a real task" (not in the design): the last words of the composer's hint line, a plain underlined link */
-[data-park] .park-home-real {
-  white-space: nowrap;
-  font-weight: 800;
-  color: var(--heroInk);
-  text-decoration: underline;
-}
-[data-park] .park-home-real:hover {
-  text-decoration-thickness: 2px;
-}
-/* a phone: the link looks the same and its touch target reaches 44px (WCAG 2.2 target size) */
-@media (max-width: 480px) {
-  [data-park] .park-home-real {
-    position: relative;
-  }
-  [data-park] .park-home-real::after {
-    content: "";
-    position: absolute;
-    inset: -11px -8px;
-  }
-}
-
 /* the drafting line: the ring turns in WEB-3 (BQ-WEB-3) */
 [data-park] .park-home-drafting {
   display: flex;
@@ -803,7 +781,6 @@
 [data-park] .park-home-event:focus-visible,
 [data-park] .park-home-spend:focus-visible,
 [data-park] .park-home-chip:focus-visible,
-[data-park] .park-home-real:focus-visible,
 [data-park] .park-home-start:focus-visible,
 [data-park] .park-home-confirm:focus-visible,
 [data-park] .park-home-change:focus-visible,
@@ -816,13 +793,13 @@
 [data-park] .park-home-legal {
   position: absolute;
   right: 24px;
-  bottom: 0; /* the centre of this edge is "Start a real task" (the two overlapped); the legal strip sits at the right */
+  bottom: 0;
   z-index: 4;
   height: 24px;
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 0 12px; /* a backing like "Start a real task": the text sits on the map, so it needs a fill to be readable */
+  padding: 0 12px;
   border-radius: 999px;
   background: var(--pop);
   border: 1px solid var(--line2);
