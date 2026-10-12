@@ -3,20 +3,13 @@ name = "tilo-channels"
 version = "0.1.0"
 description = "tilo_channels — email triage, drafting, Email Autopilot, signed links (PRD 6.2, 11)"
 requires-python = "==3.12.*"
-dependencies = [
-    "tilo-providers",
-    "tilo-policy",
-    "tilo-people",
-    "fastapi>=0.115",
-    "uvicorn>=0.32",
-    "pyyaml>=6.0",
-    "pywebpush>=2.0",
-]
+dependencies = ["tilo-providers", "tilo-policy", "tilo-people", "tilo-redact", "fastapi>=0.115", "uvicorn>=0.32", "pyyaml>=6.0", "pywebpush>=2.0"]
 
 [tool.uv.sources]
 tilo-providers = { workspace = true }
 tilo-policy = { workspace = true }
 tilo-people = { workspace = true }
+tilo-redact = { workspace = true }
 
 [build-system]
 requires = ["hatchling"]

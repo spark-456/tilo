@@ -14,16 +14,45 @@ from __future__ import annotations
 
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends
-from pydantic import Field
+from fastapi import APIRouter, Depends, Request
+from pydantic import BaseModel, Field, ValidationError
 from tilo_channels.web_push import SubscriptionLimit, SubscriptionRefused
 
 from tilo_api import deps
 from tilo_api.people import _PeopleRoute
-from tilo_api.people_writes import Refusal, _Closed, json_body
+from tilo_api.people_writes import Refusal, _Closed
 
 router = APIRouter(route_class=_PeopleRoute)
 ACTION = "send_push"
+
+
+MAX_BODY_BYTES = 4096  # a subscription is under 1 KiB: nothing larger is read, let alone parsed
+
+
+def small_json_body[Body: BaseModel](model: type[Body]):  # noqa: ANN201
+    """Strict JSON only (415: a cross-site form or `text/plain` POST needs no preflight, so it is refused),
+    4 KiB at most before anything is parsed (413), a 422 that never echoes the input (it holds a capability)."""
+
+    async def parse(request: Request) -> Body:
+        if request.headers.get("content-type", "").split(";")[0].strip().lower() != "application/json":
+            raise Refusal(415, "Send application/json.")
+        declared = request.headers.get("content-length", "")
+        if declared.isdigit() and int(declared) > MAX_BODY_BYTES:
+            raise Refusal(413, "body_too_large")
+        chunks: list[bytes] = []
+        size = 0
+        async for chunk in request.stream():
+            size += len(chunk)
+            if size > MAX_BODY_BYTES:
+                raise Refusal(413, "body_too_large")
+            chunks.append(chunk)
+        try:
+            return model.model_validate_json(b"".join(chunks))
+        except ValidationError as exc:
+            fields = [[*e["loc"][:-1], "?"] if e["type"] == "extra_forbidden" else list(e["loc"]) for e in exc.errors()]
+            raise Refusal(422, "invalid_body", fields=fields) from None
+
+    return parse
 
 
 class _Keys(_Closed):
@@ -75,7 +104,7 @@ def status(
 @router.post("/v1/push/subscribe")
 def subscribe(
     principal: Annotated[deps.Principal, Depends(deps.get_current_principal)],
-    body: Annotated[SubscribeIn, Depends(json_body(SubscribeIn))],
+    body: Annotated[SubscribeIn, Depends(small_json_body(SubscribeIn))],
     push: Annotated[Any, Depends(deps.get_push_store)],
     store: Annotated[Any, Depends(deps.get_store)],
 ) -> dict[str, Any]:
@@ -92,7 +121,7 @@ def subscribe(
 @router.post("/v1/push/unsubscribe")
 def unsubscribe(
     principal: Annotated[deps.Principal, Depends(deps.get_current_principal)],
-    body: Annotated[UnsubscribeIn, Depends(json_body(UnsubscribeIn))],
+    body: Annotated[UnsubscribeIn, Depends(small_json_body(UnsubscribeIn))],
     push: Annotated[Any, Depends(deps.get_push_store)],
     store: Annotated[Any, Depends(deps.get_store)],
 ) -> dict[str, Any]:
