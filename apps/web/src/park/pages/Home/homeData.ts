@@ -187,7 +187,9 @@ export function liveRows(worlds: readonly World[], needs: number, served = false
     .map((w) => {
       const nd = w.st === "needs";
       const sub = nd
-        ? decisionsWaiting(needs)
+        ? needs > 0
+          ? decisionsWaiting(needs)
+          : "Needs you" // no served count: no number (BQ-UX11-1)
         : w.isNew
           ? "Starting now"
           : w.tier === "Village"
@@ -299,7 +301,9 @@ export function pinDefs(
       icon: nd ? "flag" : "bolt",
       tone: nd ? "needs" : "run",
       sub: nd
-        ? `${needs} ${plural(needs, "decision needs you", "decisions need you")}`
+        ? needs > 0
+          ? `${needs} ${plural(needs, "decision needs you", "decisions need you")}`
+          : "Needs you" // no served count: no number (BQ-UX11-1)
         : served && first.prog === undefined
           ? "Running"
           : `Running · ${first.prog ?? 0}%`,
