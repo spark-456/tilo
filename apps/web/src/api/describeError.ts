@@ -2,6 +2,9 @@
 import { TiloApiError } from "./http";
 
 export function describeError(doing: string, error: unknown): string {
+  if (error instanceof TiloApiError && error.code === "intake_already_committed") {
+    return error.message;
+  }
   // PRD 18.4, say only what is known: a timeout, a dropped connection or a 5xx on a write may have
   // happened on the server, so "Nothing was changed" is not true and the person checks first.
   if (error instanceof TiloApiError && error.retryable && error.write) {
