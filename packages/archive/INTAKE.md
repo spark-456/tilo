@@ -20,10 +20,18 @@ used and dropped; trees are not retained for the whole package. Limits have hard
 ceilings (32 MiB cumulative expanded bytes; other ceilings match their defaults).
 Embedded objects and binary parts are conservatively refused.
 It does not render page numbers, recover layout, interpret fields, execute content,
-or read images. XLSX, PPTX and CSV remain for subsequent slices. Generic ZIP leaf
+or read images. XLSX and PPTX remain for subsequent slices. Generic ZIP leaf
 bytes remain inert and unscreened; use a document parser before offering them as text.
 No route, archive persistence, consent, scope or KnowledgeItem schema is added here.
 Callers must apply content screening before offering any returned bytes to a model.
+
+`parse_csv` reads comma-separated UTF-8 (optional BOM), preserving quoted multiline
+and empty cells with logical `csv#rNcN` provenance. It never evaluates formulas.
+No delimiter or encoding is guessed. Malformed quoting, invalid UTF-8 and NUL bytes
+are refused. Input/text caps apply; the entry cap counts cells (blank rows count
+as one entry). Python's field-size cap also applies without global mutation.
+CSV has no reliable magic signature: the caller must explicitly select this parser.
+Cells remain untrusted data and need screening before use or spreadsheet export.
 Structural XML screening covers declarations, relationship targets, xml:base and
 active-content markers; it is not a safety verdict on arbitrary text or attributes.
 When wired, both parsing and safety screening require a sandbox memory limit.
