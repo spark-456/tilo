@@ -53,12 +53,16 @@ it("I6_absent_transport_disables_intake_and_preserves_prompt_paste", () => {
       <input aria-label="Prompt" />
     </IntakeControl>,
   );
-  expect(m.container.querySelector<HTMLButtonElement>("button")?.disabled).toBe(true);
-  expect(m.container.textContent).toContain("File intake is not available yet");
+  expect(m.container.querySelector("button")).toBeNull();
+  expect(m.container.querySelector('input[type="file"]')).toBeNull();
+  expect(m.container.textContent).not.toContain("Add anything");
+  expect(m.container.textContent).not.toContain("Task and sources");
+  expect(m.container.textContent).not.toContain("File intake is not available yet");
   expect(transfer(required(m.container, "input"), "paste", []).defaultPrevented).toBe(false);
   expect(
-    transfer(required(m.container, "fieldset"), "drop", [new File(["x"], "x.txt")])
-      .defaultPrevented,
+    transfer(required(m.container, ".park-home-intake--unavailable"), "drop", [
+      new File(["x"], "x.txt"),
+    ]).defaultPrevented,
   ).toBe(true);
   expect(m.container.textContent).not.toContain("Reading");
 });
