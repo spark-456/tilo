@@ -88,6 +88,12 @@ class FirestorePushStore:
             if {"endpoint", "p256dh", "auth"} <= r.keys() and endpoint_ok(r["endpoint"], self._cfg)
         )
 
+    def users(self) -> tuple[str, ...]:
+        """Everyone with a stored device (the feed visits them), bounded to 1000 people."""
+        refs = self._client.collection(f"orgs/{self._org_id}/push").list_documents(page_size=500)
+        found = [r.id for _, r in zip(range(1000), refs, strict=False)]
+        return tuple(u for u in found if conforms("common.schema.json#/$defs/user_id", u))
+
     def erase(self, user_id: str) -> int:
         """FR-MEM-09: every device and owner index entry of one person; returns how many devices went."""
         gone = 0
