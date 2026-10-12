@@ -186,6 +186,14 @@ class PlateDigestBuilder:
         lines += ["", *_FOOTER]
         return PlateDigest(user_id, kind, window_end, tuple(items), more, flagged, "\n".join(lines))
 
+    def peek(self, token: str, *, now: float | int | str | dt.datetime | None = None) -> tuple[str, str, str]:
+        """(item id, option, user) of a well-signed, unexpired Done or Snooze link, for a confirm page; consumes
+        nothing (a GET must not redeem). `LinkRefused` for anything that is not one of ours."""
+        card_id, action, option, user = self._links(self._at(now)).peek(token)
+        if action != "answer" or option not in OPTIONS or not _ITEM_ID.match(card_id):
+            raise LinkRefused("malformed")
+        return card_id, option, user
+
     def redeem(
         self,
         token: str,

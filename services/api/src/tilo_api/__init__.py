@@ -19,6 +19,7 @@ from tilo_api import dev as _dev
 from tilo_api import durable_store as _durable_store
 from tilo_api import meeting_host_routes as _meeting_host_routes
 from tilo_api import people as _people
+from tilo_api import plate_links as _plate_links
 from tilo_api import quiz_apps as _quiz_apps
 from tilo_api import runs as _runs
 from tilo_api import schedules as _schedules
@@ -138,6 +139,7 @@ app.include_router(_item_fields_router)
 app.include_router(_meeting_room_router)
 app.include_router(_assistant_router)
 app.include_router(_people.router)
+app.include_router(_plate_links.router)  # FR-PA-06b: /l/<token> (public to the gate; the route checks the link)
 app.include_router(_meeting_host_routes.router)
 app.include_router(_quiz_apps.router)
 app.include_router(_connect_routes.router)

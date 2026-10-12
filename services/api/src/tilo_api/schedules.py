@@ -74,7 +74,7 @@ from tilo_harness.writer import new_ulid
 from tilo_metering.flags import FlagStore
 from tilo_planning.events import build_event
 
-from tilo_api import deps, dev, ephemeral, events, runs, team_access, team_store
+from tilo_api import deps, dev, ephemeral, events, plate_links, runs, team_access, team_store
 from tilo_api.access import Mode, enforced
 from tilo_api.durable_store import DurableStore
 from tilo_api.tasks import _json_body
@@ -874,6 +874,9 @@ def tick(
             schedule_store, tasks_client, clock, flags, audience=audience, caller=tasks_caller, queue=queue
         )
         _sweep_outbox(request, clock, store_factory)
+        plate_links.sweep(
+            request, _stamp(clock())
+        )  # FR-PA-06b: off unless TILO_PLATE_DIGEST=1; never changes the answer
         return answer
     return _run_task(request, raw, schedule_store, seams_factory, clock, flags, store_factory)
 
