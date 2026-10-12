@@ -39,7 +39,7 @@ INDEXES: Mapping[str, tuple[str, ...]] = {
 }
 
 # Internal capped context reads; the PE-16 public list selectors remain unchanged.
-BOUNDED_INDEXES = {**INDEXES, "work_item": ("owner", "created_by.ref", "source.ref")}
+BOUNDED_INDEXES = {**INDEXES, "work_item": ("owner", "created_by.ref", "source.ref", "assigned_by.by")}
 
 _MISSING = object()
 _SAFE_ID = re.compile(r"[A-Za-z0-9_.-]{1,128}")

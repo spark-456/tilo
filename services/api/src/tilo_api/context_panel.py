@@ -131,14 +131,13 @@ def _context(
         return rows.values()
 
     items = {}
-    selectors = [("owner", w.actor), ("created_by.ref", w.actor)]
-    selectors.extend(("source.ref", wid) for wid in ordered[:DEFAULT_LIMIT])
+    selectors = [("owner", w.actor), ("assigned_by.by", w.actor)]
     for record in candidates("work_items", selectors):
         owner = record.get("owner")
-        made = record.get("created_by", {})
-        if not isinstance(made, dict):
+        assigned = record.get("assigned_by") or {}
+        if not isinstance(assigned, dict):
             continue
-        if owner != w.actor and not (made.get("by") == "person" and made.get("ref") == w.actor):
+        if owner != w.actor and assigned.get("by") != w.actor:
             continue
         got = readable("work_item", record, "read_full" if owner == w.actor else "read_status")
         if got is not None:

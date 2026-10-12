@@ -6,7 +6,7 @@ import json
 import pytest
 from _api_lib import make_world
 from _ppl11a_lib import CONTRACTS, DEV, ORG, OWNER, PRIYA, SAM, own_item
-from _ppl11c_lib import meeting_rig
+from _ppl11c_lib import confirmed_item, meeting_rig
 from tilo_api import deps
 from tilo_api.skill_store import MemorySkillStore
 
@@ -228,6 +228,7 @@ def test_CONTEXT_P2_candidates_use_indexed_bounded_reads(people_rig, store):
     response = rig.get("/v1/context")
     assert response.status_code == 200
     assert calls
+    assert ("work_items", "assigned_by.by", OWNER, 201) in calls
 
 
 def test_CONTEXT_P2_personal_scope_wins_over_setup_and_world_source(people_rig, store):
@@ -328,3 +329,39 @@ def test_CONTEXT_P2_missing_person_or_failed_source_returns_no_partial_context(p
     response = rig.get("/v1/context")
     assert response.status_code == (404 if failure == "missing" else 503)
     assert "worlds" not in response.json() and "private" not in response.text
+
+
+def test_CONTEXT_P2_assigner_status_does_not_require_creator_identity(people_rig, store):
+    rig = seed_context(people_rig, store)
+    item = confirmed_item()
+    item["id"] = "wi_assigned_not_created"
+    assert item["created_by"]["by"] == "tilo" and item["assigned_by"]["by"] == OWNER
+    rig.add("work_items", item)
+    rig.as_user(OWNER)
+    response = rig.get("/v1/context")
+    assert response.status_code == 200
+    got = next(row for row in response.json()["work_items"]["items"] if row["id"] == item["id"])
+    assert got == {"id": item["id"], "status": "open"}
+    assert "title" not in got and "due" not in got
+    rig.as_user(DEV)
+    assert item["id"] not in rig.get("/v1/context").text
+
+
+def test_CONTEXT_P2_teammate_never_gets_work_item_personal_pin_or_plate_in_accessible_world(people_rig, store):
+    rig = seed_context(people_rig, store)
+    item = own_item("wi_teammate_shared_source", PRIYA)
+    item["source"] = {"kind": "request", "ref": "w_context_other", "evidence": []}
+    rig.add("work_items", item)
+    rig.as_user(DEV, role="viewer", world_id="w_context_other")
+
+    def forbidden():
+        pytest.fail("context resolved another person's plate")
+
+    rig.app.dependency_overrides[deps.get_plate_sources] = forbidden
+    response = rig.get("/v1/context")
+    assert response.status_code == 200
+    assert "pb_launch_date" in response.text
+    assert item["id"] not in response.text
+    assert "wi_context_other" not in response.text
+    assert "pb_context_private" not in response.text
+    assert "plate" not in response.json()
