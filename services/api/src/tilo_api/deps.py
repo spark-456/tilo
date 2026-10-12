@@ -476,6 +476,18 @@ def get_feedback_store() -> Any:
         raise HTTPException(status_code=503, detail="not_configured") from None
 
 
+def get_push_store() -> Any:
+    """FR-CHN-17b: the person's web-push subscriptions, in Firestore behind `store_door` (`TILO_API_STORE`, ADR-0026),
+    else 503 `not_configured`. Dev mode and the tests override this seam."""
+    from tilo_api import store_door  # noqa: PLC0415
+    from tilo_api.push_firestore import open_push_store  # noqa: PLC0415
+
+    try:
+        return open_push_store()
+    except store_door.ApiStoreNotConfigured:
+        raise HTTPException(status_code=503, detail="not_configured") from None
+
+
 def get_app_check_verifier() -> AppCheckVerifier:
     """SEC-10: checks a client's App Check token (`tilo_api.appcheck`). Google's keys for the API's own project; dev
     mode and an unconfigured project refuse without any call. Tests override it; it never decides authorisation."""

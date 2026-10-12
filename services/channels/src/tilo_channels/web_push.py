@@ -42,11 +42,13 @@ __all__ = [
     "PushSubscription",
     "PushUndelivered",
     "SubscriptionGone",
+    "SubscriptionLimit",
     "SubscriptionRefused",
     "SubscriptionStore",
     "VapidRef",
     "WebPushAdapter",
     "load_config",
+    "parse_subscription",
 ]
 
 ACTION_TYPE = "send_push"
@@ -62,6 +64,10 @@ _ROW_BY_KIND |= {"digest": "digest", "weekly": "weekly"}
 
 class SubscriptionRefused(ValueError):
     """The subscription (untrusted browser input) or its owner is not acceptable; nothing was stored."""
+
+
+class SubscriptionLimit(SubscriptionRefused):
+    """The person already holds the most devices allowed; nothing was stored."""
 
 
 class SubscriptionGone(Exception):
@@ -152,6 +158,20 @@ def _endpoint_ok(endpoint: Any, cfg: PushConfig) -> bool:
     return any(host == h or host.endswith("." + h) for h in cfg.allowed_hosts)
 
 
+def parse_subscription(raw: Any, cfg: PushConfig) -> PushSubscription:
+    """A `PushSubscription.toJSON()` body as an untrusted value: raises `SubscriptionRefused`, never echoes it."""
+    if not isinstance(raw, Mapping):
+        raise SubscriptionRefused("not a subscription")
+    keys = raw.get("keys")
+    p256dh, auth = (keys.get("p256dh"), keys.get("auth")) if isinstance(keys, Mapping) else (None, None)
+    if not _endpoint_ok(raw.get("endpoint"), cfg):
+        raise SubscriptionRefused("endpoint must be an https push service address")
+    for value, lo, hi in ((p256dh, 80, 100), (auth, 20, 32)):
+        if type(value) is not str or not lo <= len(value) <= hi or not _B64URL_RE.match(value):
+            raise SubscriptionRefused("subscription keys are malformed")
+    return PushSubscription(raw["endpoint"], p256dh, auth)  # type: ignore[arg-type]
+
+
 class SubscriptionStore:
     """Subscriptions per person, in memory (the durable store is a port the service wires). Capped, validated."""
 
@@ -162,20 +182,13 @@ class SubscriptionStore:
 
     def add(self, user_id: str, raw: Mapping[str, Any]) -> PushSubscription:
         """Stores `raw` (a PushSubscription.toJSON() body) for the signed-in `user_id`; the same endpoint replaces."""
-        if not _valid_user(user_id) or not isinstance(raw, Mapping):
+        if not _valid_user(user_id):
             raise SubscriptionRefused("not a signed-in person's subscription")
-        keys = raw.get("keys")
-        p256dh, auth = (keys.get("p256dh"), keys.get("auth")) if isinstance(keys, Mapping) else (None, None)
-        if not _endpoint_ok(raw.get("endpoint"), self._cfg):
-            raise SubscriptionRefused("endpoint must be an https push service address")
-        for value, lo, hi in ((p256dh, 80, 100), (auth, 20, 32)):
-            if type(value) is not str or not lo <= len(value) <= hi or not _B64URL_RE.match(value):
-                raise SubscriptionRefused("subscription keys are malformed")
-        sub = PushSubscription(raw["endpoint"], p256dh, auth)  # type: ignore[arg-type]
+        sub = parse_subscription(raw, self._cfg)
         with self._lock:
             mine = self._by_user.setdefault(user_id, {})
             if sub.endpoint not in mine and len(mine) >= self._cfg.max_subscriptions:
-                raise SubscriptionRefused("this person already has the most devices allowed")
+                raise SubscriptionLimit("this person already has the most devices allowed")
             mine[sub.endpoint] = sub
         return sub
 
