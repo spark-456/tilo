@@ -146,6 +146,10 @@ live-run-file path *flags:
 skills-test:
     python -c "import subprocess,sys; r=subprocess.run(['uv','run','pytest','skills']); sys.exit(0 if r.returncode in (0, 5) else r.returncode)"
 
+# Test-only cloud gate; the script pins project/region/identity and enforces the spend cap.
+gate-cloud ref="HEAD":
+    python scripts/gate_cloud.py {{ if ref =~ '^[A-Za-z0-9_][A-Za-z0-9_./-]*$' { ref } else { error('gate-cloud: expected a Git ref') } }}
+
 # Deploy existing dev services through Cloud Build: api first, then all.
 # Accepts `just deploy dev` and the older `just deploy env=dev` form.
 # just validates the environment before any shell; infrastructure stays manual.
