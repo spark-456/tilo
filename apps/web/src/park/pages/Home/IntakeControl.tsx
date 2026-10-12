@@ -55,6 +55,17 @@ export function IntakeControl({
       patch(item.key, { removing: false, error: "Could not remove this item. Try again." });
     }
   }
+  if (!client) {
+    return (
+      <div
+        className="park-home-intake--unavailable"
+        onDragOver={(event) => event.preventDefault()}
+        onDrop={(event) => event.preventDefault()}
+      >
+        {children}
+      </div>
+    );
+  }
   return (
     <fieldset
       className="park-home-intake"

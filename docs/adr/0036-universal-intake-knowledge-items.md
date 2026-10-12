@@ -1,6 +1,6 @@
 # ADR-0036: Universal intake and sourced knowledge items
 
-- Status: Proposed; requires user acceptance before any contract or event change.
+- Status: Accepted (user, 12 Oct 2026); contract changes remain architect-owned prerequisites.
 - Decider: user; author: CX-LIVEWEB, 12 October 2026.
 - Requirement: product-owner specification `agy-bridge/tasks/SPEC-UNIVERSAL-INTAKE-AND-CONTEXT-PANEL.md`;
   existing FR-INT-01/02/03/05/14, FR-MEM-05/09/12, FR-MTG-17, SEC-05, PL-01, EFF-01/03, HR-1..7.

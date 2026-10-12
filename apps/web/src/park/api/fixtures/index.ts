@@ -34,6 +34,7 @@ export const ledger: Ledger = {
   waits: { ...generatedLedger.waits, ...ledgerCopy.waits },
 };
 
+export { buildHandoffs } from "./buildHandoff";
 export { connectors } from "./connectors";
 export { connectorTerms } from "./connectorTerms";
 export { learn } from "./learn";

@@ -5,7 +5,7 @@ import type { QuickCost, QuickIntakeResult, QuickReason } from "../../api/http";
 export type Source = "fixture" | "live";
 export type ApiResult<T> = { data: T; source: Source };
 
-export type DecisionKey = "depot" | "mail";
+export type DecisionKey = "depot" | "mail" | "lovable";
 /** Which decisions the person has taken so far. A missing key means not yet. */
 export type Dec = Partial<Record<DecisionKey, boolean>>;
 export type TierKey = "quick" | "routine" | "workspace";
@@ -584,4 +584,28 @@ export interface SkillProposal {
   to_version: string;
   diff: string;
   provenance: { world_id: string; proposed_by: string; proposed_at: string };
+}
+
+// FR-CON-16: Lovable build-handoff artifact on the World page.
+export interface BuildHandoffFile {
+  path: string;
+  summary: string;
+}
+export interface BuildHandoff {
+  /** World id this build handoff belongs to. */
+  world: string;
+  /** Decision key in `app.dec` / `app.decide(key)` that gates opening Lovable. */
+  decisionKey: DecisionKey;
+  /** Label on the approval button while waiting for approval. */
+  approveLabel: string;
+  /** Status line shown once approved. */
+  doneLabel: string;
+  /** Exact prompt text prepared for Lovable (`1..50,000` characters). */
+  prompt: string;
+  /** Granted files/artifacts that would leave Tilo (`1..6` items). */
+  files: BuildHandoffFile[];
+  /** Contract prompt size cap (characters). */
+  maxPromptChars: number;
+  /** Contract total URL length cap (characters). */
+  maxUrlLength: number;
 }
