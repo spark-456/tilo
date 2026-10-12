@@ -80,7 +80,9 @@ Before route wiring, parsing must run in a process sandbox with an enforced
 memory limit and wall-clock timeout; safety screening and a quarantined reader
 must precede model use. Verify production Expat >= 2.6 and measure process peak
 including its native heap. The existing tracemalloc probes are insufficient for
-that deployment claim. CSV row allocation remains a prerequisite to bound before
-wiring. No sandbox, route, deployment or production-runtime verification is
+that deployment claim. CSV cells are counted before row materialization, with
+quoted separators, multiline fields and doubled quotes respected. Blank records
+and empty cells consume the budget. Encoding/CSV refusals retain no exception
+context. No sandbox, route, deployment or production-runtime verification is
 implemented by this library slice. Office verdicts remain converted-text-only;
 outbound attachments remain T3 pending the screening-scope ADR amendment.

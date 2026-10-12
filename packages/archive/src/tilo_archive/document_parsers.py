@@ -378,6 +378,43 @@ def parse_pptx(data: bytes, *, limits: Limits = Limits()) -> tuple[tuple[str, st
     return tuple(output)
 
 
+def _csv_cell_preflight(text: str, limit: int) -> None:
+    """Count cells before csv.reader can allocate a large row, without a row list.
+
+    Match its fixed comma/double-quote dialect; syntax validation stays with the
+    reader. Quoted newlines/commas and doubled quotes remain inert cell text.
+    """
+    cells = index = 0
+    quoted = active = False
+    field_start = True
+    while index < len(text):
+        char = text[index]
+        if quoted:
+            if char == '"':
+                if index + 1 < len(text) and text[index + 1] == '"':
+                    index += 2
+                    continue
+                quoted = False
+        else:
+            if not active:
+                cells += 1  # includes a blank logical row
+                active = True
+            if char == ",":
+                cells += 1
+                field_start = True
+            elif char in "\r\n":
+                active = False
+                field_start = True
+                if char == "\r" and index + 1 < len(text) and text[index + 1] == "\n":
+                    index += 1
+            else:
+                quoted = char == '"' and field_start
+                field_start = False
+            if cells > limit:
+                raise Refused("cell_count")
+        index += 1
+
+
 def parse_csv(data: bytes, *, limits: Limits = Limits()) -> tuple[tuple[str, str], ...]:
     """Read comma-separated UTF-8 cells as inert text, with logical row/cell labels.
 
@@ -388,12 +425,16 @@ def parse_csv(data: bytes, *, limits: Limits = Limits()) -> tuple[tuple[str, str
     limits.validate()
     if len(data) > limits.input_bytes:
         raise Refused("input_size")
+    text = None
     try:
         text = data.decode("utf-8-sig")
     except UnicodeError:
-        raise Refused("invalid_encoding") from None
+        pass
+    if text is None:
+        raise Refused("invalid_encoding")
     if "\x00" in text:
         raise Refused("invalid_csv")
+    _csv_cell_preflight(text, limits.cells)
     output: list[tuple[str, str]] = []
     entries = size = 0
     try:
@@ -407,8 +448,10 @@ def parse_csv(data: bytes, *, limits: Limits = Limits()) -> tuple[tuple[str, str
                     raise Refused("output_size")
                 output.append((f"csv#r{row_index}c{column}", cell))
     except csv.Error:
-        raise Refused("invalid_csv") from None
-    return tuple(output)
+        pass
+    else:
+        return tuple(output)
+    raise Refused("invalid_csv")
 
 
 def read_document(data: bytes, *, kind: str, limits: Limits = Limits()) -> DocumentRead:
