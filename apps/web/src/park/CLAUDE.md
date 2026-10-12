@@ -12,7 +12,7 @@ old screens until the cutover PR. WEB-1a holds the tokens, fonts, typed fixtures
   `design_handoff_tilo_web_app/design/tilo-app.js` in a vm and compares. `additive.ts` (hand-written, WEB-9c) holds
   `Decision.facts` and `Agenda.rules`, merged in `index.ts`; page logic stays free of scenario literals.
 - `tokens/park.css`: handoff `tokens.css` scoped to `[data-park]`, night on `[data-time="night"]`,
-  values verbatim (`biome-ignore format`), no motion. `tokens/ramp.ts` is the README type ramp.
+  values verbatim (`biome-ignore format`), no motion. `tokens/ramp.ts` is the README type ramp. Themes (FR-WLD-15, BQ-WLD15-1/2): `config/themes/<id>.json` (role tokens a theme changes, day and night) -> `tokens/themes.{css,generated.ts}` by `just tokens`; `ParkApp` sets `data-theme={themeFor(prefs.theme)}`, unknown = Metropolis.
 - `components/` (WEB-2): the README "Core components", named exports from `index.ts`, all styled by
   `park.components.css` (BEM `park-btn park-btn--primary park-btn--md`). CSS rules: every selector
   `[data-park] .class...`, literal values, `var(--token)` colours, no `transition`/`animation`; the
