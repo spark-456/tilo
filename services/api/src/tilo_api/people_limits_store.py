@@ -60,6 +60,15 @@ def _hash(*parts: str) -> str:
     return hashlib.sha256("\0".join(parts).encode()).hexdigest()
 
 
+def _ordered(value: Any) -> Any:
+    """Same response bytes before/after Firestore's map ordering, without storing answer text."""
+    if isinstance(value, dict):
+        return {key: _ordered(item) for key, item in sorted(value.items())}
+    if isinstance(value, list):
+        return [_ordered(item) for item in value]
+    return value
+
+
 def _live(doc: dict[str, Any] | None, now: datetime) -> bool:
     stamp = None if doc is None else doc.get("expires_at")
     return isinstance(stamp, datetime) and stamp > now
@@ -157,7 +166,7 @@ class DurableLimits(Limits):
         if now is None or route not in _KINDS:
             raise _unavailable()
         kind, at = _KINDS[route], datetime.fromtimestamp(now, UTC)
-        fp = hashlib.sha256(body.model_dump_json().encode()).hexdigest()
+        fp = _hash("fp", user_id, route, key, body.model_dump_json())
         ref = self._c.document(f"{self._collection('limiter_keys')}/{_hash('k', user_id, route, key)}")
         token = secrets.token_hex(8)
         claim = {"p": _hash("p", user_id), "fp": fp, "kind": kind, "rid": None, "state": "pending", "token": token}
@@ -177,7 +186,7 @@ class DurableLimits(Limits):
             if doc["state"] == "done":
                 replay = self._read(kind, doc["rid"] or user_id)
                 if replay is not None:
-                    return replay
+                    return _ordered(replay)
                 stale = doc["token"]  # the record is gone (erased or undone): the key is free
             else:
                 time.sleep(0.05)  # another request holds the claim: its answer is what this one replays
@@ -191,7 +200,7 @@ class DurableLimits(Limits):
         rid = answer["id"]
         done = {**claim, "rid": None if rid == user_id else rid, "state": "done", "expires_at": at + KEY_TTL}
         self._retry(lambda: ref.set(done))  # if this never lands the claim lapses; the answer was created, so it stands
-        return answer
+        return _ordered(answer)
 
     def erase_person(self, org_id: str, user_id: str) -> int:
         if _ORG.fullmatch(org_id) is None or _UID.fullmatch(user_id) is None:

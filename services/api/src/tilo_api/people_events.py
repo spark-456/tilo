@@ -83,7 +83,14 @@ class WorkEvents:
             try:  # and lost its answer commits nothing twice (FS-2 (b), EV-10)
                 self.writer.append(world, part)
                 return
-            except Exception:
+            except Exception as exc:
+                # Same optional seam as dispatch.py; tilo-api does not import the harness.
+                reopen = getattr(self.writer, "reopen", None)
+                if type(exc).__name__ == "WriterBusy" and callable(reopen):
+                    try:
+                        reopen()
+                    except Exception:
+                        pass  # preserve the original failure and bounded retries; no library text is exposed
                 if attempt == MAX_ATTEMPTS - 1:
                     raise
 
