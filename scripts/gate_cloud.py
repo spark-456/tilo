@@ -131,22 +131,26 @@ def write_ledger(path: Path, rows: list[dict]) -> None:
     path.with_suffix(".md").write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
-def main() -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("ref")
+def ledger_directory() -> Path:
     common = Path(
         subprocess.check_output(
             ["git", "rev-parse", "--path-format=absolute", "--git-common-dir"], cwd=ROOT, text=True
         ).strip()
     )
-    parser.add_argument("--ledger-dir", type=Path, default=common.parent / "agy-bridge" / "reports")
+    return common.parent / "agy-bridge" / "reports"
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("ref")
     args = parser.parse_args()
     if not re.fullmatch(r"[A-Za-z0-9_][A-Za-z0-9_./-]*", args.ref):
         parser.error("expected a local Git ref")
     ref = subprocess.check_output(["git", "rev-parse", "--verify", args.ref + "^{commit}"], cwd=ROOT, text=True).strip()
-    args.ledger_dir.mkdir(parents=True, exist_ok=True)
-    ledger = args.ledger_dir / "CLOUD-GATE-SPEND.json"
-    lock = args.ledger_dir / "CLOUD-GATE-SPEND.lock"
+    ledger_dir = ledger_directory()
+    ledger_dir.mkdir(parents=True, exist_ok=True)
+    ledger = ledger_dir / "CLOUD-GATE-SPEND.json"
+    lock = ledger_dir / "CLOUD-GATE-SPEND.lock"
     fd = os.open(lock, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
     try:
         rows = json.loads(ledger.read_text()) if ledger.exists() else []
@@ -199,7 +203,7 @@ def main() -> int:
         except (ValueError, KeyError, TypeError, IndexError, subprocess.CalledProcessError, OSError):
             row["status"] = "UNKNOWN" if result.returncode == 0 else "FAILED_OR_UNKNOWN"
             # Never silently refund a build whose creation/completion is unknown.
-            (args.ledger_dir / f"cloud-gate-{ref[:12]}-submit.log").write_text(
+            (ledger_dir / f"cloud-gate-{ref[:12]}-submit.log").write_text(
                 result.stdout + result.stderr, encoding="utf-8"
             )
         write_ledger(ledger, rows)

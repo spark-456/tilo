@@ -49,7 +49,8 @@ def test_CLOUD_GATE_tracked_test_inputs_are_allowed(name):
 
 def test_CLOUD_GATE_budget_refuses_before_any_cloud_command(tmp_path, monkeypatch):
     (tmp_path / "CLOUD-GATE-SPEND.json").write_text(json.dumps([{"inr": 399}]))
-    monkeypatch.setattr(sys, "argv", ["gate-cloud", "HEAD", "--ledger-dir", str(tmp_path)])
+    monkeypatch.setattr(sys, "argv", ["gate-cloud", "HEAD"])
+    monkeypatch.setattr(gate, "ledger_directory", lambda: tmp_path)
     real_run = gate.subprocess.run
 
     def git_only(command, **kwargs):
@@ -61,6 +62,19 @@ def test_CLOUD_GATE_budget_refuses_before_any_cloud_command(tmp_path, monkeypatc
         gate.main()
     assert not (tmp_path / "CLOUD-GATE-SPEND.lock").exists()
     assert json.loads((tmp_path / "CLOUD-GATE-SPEND.json").read_text()) == [{"inr": 399}]
+
+
+def test_CLOUD_GATE_caller_cannot_override_shared_ledger(tmp_path, monkeypatch):
+    monkeypatch.setattr(sys, "argv", ["gate-cloud", "HEAD", "--ledger-dir", str(tmp_path)])
+
+    def refuse_command(*args, **kwargs):
+        pytest.fail("overriding the shared ledger must fail before any command")
+
+    monkeypatch.setattr(gate.subprocess, "check_output", refuse_command)
+    with pytest.raises(SystemExit) as error:
+        gate.main()
+    assert error.value.code == 2
+    assert not (tmp_path / "CLOUD-GATE-SPEND.json").exists()
 
 
 def test_CLOUD_GATE_only_tests_existing_identity_and_parallel_shards():
