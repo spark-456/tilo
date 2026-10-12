@@ -111,3 +111,96 @@
     - {id: fetch_url, capability: read, description: "Download one public page or file from a host this task allows.", risk_tier: T1, gate_type: none, irreversible: false}
   limits: {per_minute: 30, batch_size: 10}
   data_class: {returns: [public], redact: []}
+
+# FR-UX-18 setup catalogue. No scopes or adapters are granted here.
+# MCP OAuth/transport and a reviewed allowlist entry are required before these tools execute.
+- id: slack
+  name: Slack
+  icon: link
+  auth: oauth2
+  scopes: {read: []}
+  capabilities: [read]
+  actions:
+    - {id: read_slack, capability: read, description: "Read approved Slack data after workspace OAuth and MCP setup.", risk_tier: T3, gate_type: approval, irreversible: false}
+  limits: {per_minute: null, batch_size: null}
+  data_class: {returns: [business], redact: []}
+- id: notion
+  name: Notion
+  icon: link
+  auth: oauth2
+  scopes: {read: []}
+  capabilities: [read]
+  actions:
+    - {id: read_notion, capability: read, description: "Read approved Notion data after workspace OAuth and MCP setup.", risk_tier: T3, gate_type: approval, irreversible: false}
+  limits: {per_minute: null, batch_size: null}
+  data_class: {returns: [business], redact: []}
+- id: github
+  name: GitHub
+  icon: link
+  auth: oauth2
+  scopes: {read: []}
+  capabilities: [read]
+  actions:
+    - {id: read_github, capability: read, description: "Read approved GitHub data after workspace OAuth and MCP setup.", risk_tier: T3, gate_type: approval, irreversible: false}
+  limits: {per_minute: null, batch_size: null}
+  data_class: {returns: [business], redact: []}
+- id: xero
+  name: Xero
+  icon: link
+  auth: oauth2
+  scopes: {read: []}
+  capabilities: [read]
+  actions:
+    - {id: read_xero, capability: read, description: "Read approved Xero data after workspace OAuth and MCP setup.", risk_tier: T3, gate_type: approval, irreversible: false}
+  limits: {per_minute: null, batch_size: null}
+  data_class: {returns: [business], redact: []}
+- id: hubspot
+  name: HubSpot
+  icon: link
+  auth: oauth2
+  scopes: {read: []}
+  capabilities: [read]
+  actions:
+    - {id: read_hubspot, capability: read, description: "Read approved HubSpot data after workspace OAuth and MCP setup.", risk_tier: T3, gate_type: approval, irreversible: false}
+  limits: {per_minute: null, batch_size: null}
+  data_class: {returns: [business], redact: []}
+- id: stripe
+  name: Stripe
+  icon: link
+  auth: oauth2
+  scopes: {read: []}
+  capabilities: [read]
+  actions:
+    - {id: read_stripe, capability: read, description: "Read approved Stripe data after workspace OAuth and MCP setup.", risk_tier: T3, gate_type: approval, irreversible: false}
+  limits: {per_minute: null, batch_size: null}
+  data_class: {returns: [business], redact: []}
+- id: microsoft365
+  name: Microsoft 365
+  icon: link
+  auth: oauth2
+  scopes: {read: []}
+  capabilities: [read]
+  actions:
+    - {id: read_microsoft365, capability: read, description: "Read approved Microsoft 365 data after workspace OAuth and MCP setup.", risk_tier: T3, gate_type: approval, irreversible: false}
+  limits: {per_minute: null, batch_size: null}
+  data_class: {returns: [business], redact: []}
+- id: jira
+  name: Jira
+  icon: link
+  auth: oauth2
+  scopes: {read: []}
+  capabilities: [read]
+  actions:
+    - {id: read_jira, capability: read, description: "Read approved Jira data after workspace OAuth and MCP setup.", risk_tier: T3, gate_type: approval, irreversible: false}
+  limits: {per_minute: null, batch_size: null}
+  data_class: {returns: [business], redact: []}
+- id: bamboohr
+  name: BambooHR
+  icon: link
+  auth: oauth2
+  scopes: {read: []}
+  capabilities: [read]
+  actions:
+    - {id: read_bamboohr, capability: read, description: "Read approved BambooHR data after workspace OAuth and MCP setup.", risk_tier: T3, gate_type: approval, irreversible: false}
+  limits: {per_minute: null, batch_size: null}
+  data_class: {returns: [business], redact: []}
