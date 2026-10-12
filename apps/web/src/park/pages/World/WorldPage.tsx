@@ -8,7 +8,15 @@
 // recorded run, so the same elements are disabled with the reason (docs/park-designed-not-in-prd/World.md).
 import { type ChangeEvent, type ReactNode, useEffect, useRef, useState } from "react";
 import { createRoomClient } from "../../api/live/meetingHall";
-import type { ApiResult, Connector, Decision, Plan, Skill, World } from "../../api/types";
+import type {
+  ApiResult,
+  BuildHandoff,
+  Connector,
+  Decision,
+  Plan,
+  Skill,
+  World,
+} from "../../api/types";
 import type { AppCtx } from "../../app/AppCtx";
 import { useDemoSession, useParkApi, useWorldClient } from "../../app/context";
 import { stagePath } from "../../app/router";
@@ -26,7 +34,7 @@ import { SampleBadge, SampleNote } from "../../sample/SampleBadge";
 import { icon } from "../../shell/kit";
 import { Activity, Districts, Result, RunHistory } from "./Lower";
 import { MeetingHall } from "./MeetingHall";
-import { FactsCard, GoLink, SpendCard, WaitingCard } from "./Side";
+import { FactsCard, GoLink, LovableCard, SpendCard, WaitingCard } from "./Side";
 import { SkillProposals } from "./SkillProposals";
 import "./World.css";
 import { cityArt, rowArt, singleArt } from "./worldArt";
@@ -49,6 +57,7 @@ interface Loaded {
   connectors: Connector[];
   /** The side reads that failed or are not built: each card says so itself, the page still opens from the worlds. */
   gaps: { plans: boolean; decisions: boolean; skills: boolean; connectors: boolean };
+  handoffs: BuildHandoff[];
 }
 
 const NOT_YET = "Not available yet";
@@ -157,14 +166,31 @@ export function WorldPage({ app }: { app: AppCtx }) {
 
   useEffect(() => {
     let live = true;
+    const handoffRead =
+      typeof api.getBuildHandoff === "function"
+        ? api.getBuildHandoff().then(
+            (r) => r.data,
+            (err: unknown) => {
+              if (
+                err &&
+                typeof err === "object" &&
+                (err as { code?: unknown }).code === "not_built"
+              ) {
+                return [];
+              }
+              throw err;
+            },
+          )
+        : Promise.resolve([]);
     Promise.all([
       api.getWorlds(dec, added),
       optional(api.getPlans(dec)),
       optional(api.getDecisions()),
       optional(api.getSkills()),
       optional(api.getConnectors()),
+      handoffRead,
     ]).then(
-      ([worlds, plans, decisions, skills, connectors]) => {
+      ([worlds, plans, decisions, skills, connectors, handoffs]) => {
         if (!live) return;
         setLoaded({
           worlds: worlds.data,
@@ -179,6 +205,7 @@ export function WorldPage({ app }: { app: AppCtx }) {
             skills: skills === null,
             connectors: connectors === null,
           },
+          handoffs,
         });
       },
       () => {
@@ -220,6 +247,7 @@ export function WorldPage({ app }: { app: AppCtx }) {
   const isPaused = Boolean(paused[w.id]);
   const mine = loaded.decisions.filter((d) => d.world === w.id);
   const slackPending = slackPendingByWorld[w.id] ?? null;
+  const handoff = loaded.handoffs.find((h) => h.world === w.id) ?? null;
   const open = mine.filter((d) => !dec[d.k]).length + (slackPending ? 1 : 0);
   const look = stateLook(w, isPaused);
   const chip =
@@ -485,6 +513,14 @@ export function WorldPage({ app }: { app: AppCtx }) {
                 onDecide={(key) => app.decide(key)}
                 onLater={() => app.toast("Tilo will remind you at 16:00")}
                 slackPending={slackPending}
+              />
+            ) : null}
+            {handoff ? (
+              <LovableCard
+                handoff={handoff}
+                dec={dec}
+                sample={Boolean(w.sample)}
+                onDecide={(key) => app.decide(key)}
               />
             ) : null}
             <SpendCard w={w} mine={mine} dec={dec} onLedger={() => app.go("ledger")} />

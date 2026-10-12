@@ -3,6 +3,7 @@
 // context.tsx. State is replaced on every change, never mutated. The one timer is the toast's, and it
 // is injected as `schedule` so a test never waits.
 import { TiloApiError, isLifetimeCap } from "../../api/http";
+import { buildHandoffDecisions } from "../api/fixtures/buildHandoff";
 import { needsLeft as countNeedsLeft, makeWorld, worlds } from "../api/fixtures/worlds";
 import { type Api, askQuick } from "../api/index";
 import { NotBuilt } from "../api/liveApi";
@@ -297,7 +298,13 @@ export function createParkStore({ api, navigate, schedule, demo }: ParkStoreDeps
       quiet(api.decide(key));
       update({
         dec: { ...state.dec, [key]: true },
-        toast: arm(decidedText(decisions.find((d) => d.k === key)), "Undo", () => undo(key)),
+        toast: arm(
+          decidedText(
+            decisions.find((d) => d.k === key) ?? buildHandoffDecisions.find((d) => d.k === key),
+          ),
+          "Undo",
+          () => undo(key),
+        ),
       });
     },
     undo,

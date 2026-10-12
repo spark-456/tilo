@@ -5,6 +5,7 @@ import type {
   AgendaData,
   AgendaSlot,
   ApiResult,
+  BuildHandoff,
   Connector,
   ConnectorTerms,
   Dec,
@@ -48,6 +49,7 @@ export const API_METHODS = [
   "getTeamPolicy",
   "getConnectorTerms",
   "getProfileSettings",
+  "getBuildHandoff",
   "decide",
   "undo",
   "startWorld",
@@ -78,6 +80,7 @@ export interface Api {
   getTeamPolicy(): R<TeamPolicy>;
   getConnectorTerms(): R<ConnectorTerms>;
   getProfileSettings(): R<ProfileSettings>;
+  getBuildHandoff(): R<BuildHandoff[]>;
   decide(key: DecisionKey): R<DecideAck>;
   undo(key: DecisionKey): R<DecideAck>;
   startWorld(mode: TierKey, query: string): R<StartAck>;
