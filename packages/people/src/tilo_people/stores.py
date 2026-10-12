@@ -31,7 +31,7 @@ from tilo_people.errors import (
 INDEXES: Mapping[str, tuple[str, ...]] = {
     "person": (),
     "meeting": ("owner",),
-    "work_item": ("owner",),
+    "work_item": ("owner", "world_id"),  # ADR-0040: the items of one world (the team view list)
     "pinboard_item": ("scope.user", "scope.team", "set_up_by"),
     "mention": ("pin_id", "user"),
     "calendar_entry": ("owner",),

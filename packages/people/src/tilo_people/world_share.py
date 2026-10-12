@@ -12,7 +12,7 @@ plain bool; a share that is not in force is "no share", never an error.
 from __future__ import annotations
 
 import hashlib
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from typing import Any
 
 from ._schema import is_timestamp, is_user_id, valid
@@ -55,3 +55,23 @@ def _in_force(share: Any, world_owner: Any, directory: Directory, now: Any) -> b
         and directory.is_member(world_owner, team, now)
         and any(m["team"] == team and m["assigned_by"]["at"] <= granted["at"] for m in owner["memberships"])
     )
+
+
+def reader_share(
+    shares: Iterable[Any], world_id: str, world_owner: Any, directory: Directory, actor: str, now: Any
+) -> Mapping[str, Any] | None:
+    """The first of `shares` (the world's own, listed by the caller) that is in force for `world_id` and whose team
+    `actor` belongs to at `now`: the share that makes `actor` a team reader (PE-32). None when there is none; never
+    raises. The team is never an input: it comes from the share."""
+    try:
+        for share in shares:
+            if (
+                isinstance(share, Mapping)
+                and share.get("world_id") == world_id
+                and in_force(share, world_owner, directory, now)
+                and directory.is_member(actor, share["team"], now)
+            ):
+                return share
+    except Exception:
+        return None
+    return None

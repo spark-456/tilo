@@ -106,3 +106,67 @@ class Rig:
     def events_of(self, world: str = WORLD, type_: str | None = None) -> list[dict]:
         found = self.store.events.get(world, [])
         return [e for e in found if type_ is None or e["type"] == type_]
+
+
+# --- TSW-1b: layout, work items of the shared world -----------------------------------------------------------------
+LAYOUT = {
+    "v": "1.0",
+    "world_id": WORLD,
+    "tier": "village",
+    "theme": "metropolis",
+    "geometry": None,
+    "semantic": {
+        "levels": [
+            {
+                "id": "L1",
+                "name": "Level One",
+                "districts": [
+                    {
+                        "id": d,
+                        "name": f"District {d}",
+                        "icon": "inbox",
+                        "lead": f"A_lead{d[1:]}",
+                        "buildings": [
+                            {
+                                "id": f"B{d[1:]}",
+                                "name": "Workshop",
+                                "kind": "common",
+                                "common_type": "workshop",
+                                "plan_units": [f"u{d[1:]}"],
+                            }
+                        ],
+                    }
+                    for d in ("D1", "D2")
+                ],
+            }
+        ],
+        "islands": [],
+        "gates": [],
+        "agents": [{"id": "A_director", "rank": "director"}, {"id": "A_lead1", "rank": "lead"}],
+    },
+}
+
+
+def work_item(wid: str, owner: str, *, world: str | None = WORLD, status: str = "open", flagged: bool = False) -> dict:
+    stamp = "2026-10-03T09:00:00.000Z"
+    record: dict[str, Any] = {
+        "id": wid,
+        "org_id": ORG,
+        "owner": owner,
+        "title": f"Title of {wid}",
+        "due": None,
+        "due_text": None,
+        "status": status,
+        "source": {"kind": "manual", "ref": None, "evidence": []},
+        "created_by": {"by": "person", "ref": owner, "at": stamp},
+        "assigned_by": None,
+        "confirmed_by": None,
+        "snoozed_until": None,
+        "flagged": flagged,
+        "history": [{"at": stamp, "by": owner, "change": "created", "status": status}],
+        "created_at": stamp,
+        "updated_at": stamp,
+    }
+    if world is not None:
+        record["world_id"] = world
+    return record
