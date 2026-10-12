@@ -103,7 +103,12 @@ export function PageTourLayer({ page, firstRun, autoInvite = true, userKey }: Pa
       wasOpen.current = true;
       return;
     }
-    if (wasOpen.current && opener.current?.isConnected) opener.current.focus();
+    if (wasOpen.current) {
+      const back = opener.current?.isConnected
+        ? opener.current
+        : document.querySelector<HTMLElement>('button[aria-label="Account menu"]');
+      back?.focus();
+    }
     wasOpen.current = false;
     opener.current = null;
   }, [visible]);

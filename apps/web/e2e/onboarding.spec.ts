@@ -98,7 +98,10 @@ for (const width of [1440, 390])
         }
         await page.keyboard.press("Escape");
         await expect(dialog(page)).toHaveCount(0);
-        await expect(page.getByRole("button", { name: "Account menu" })).toBeFocused();
+        await expect(
+          page.getByRole("button", { name: "Account menu" }),
+          `${name} focus return`,
+        ).toBeFocused();
         expect(await page.locator('[aria-describedby*="onb-"]').count()).toBe(0);
       }
       expect(problems).toEqual([]);

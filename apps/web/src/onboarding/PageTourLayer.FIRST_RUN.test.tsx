@@ -75,6 +75,20 @@ it("FIRST_RUN_FR_UX_13_effect_replay_keeps_the_first_invitation_visible", () => 
   expect(dialog()?.textContent).toContain("Take a tour of Home?");
 });
 
+it("FIRST_RUN_FR_UX_13_returns_focus_when_the_account_button_is_replaced", () => {
+  mount(view());
+  click(button("Not now"));
+  const original = document.querySelector<HTMLButtonElement>('button[aria-label="Account menu"]');
+  if (!original) throw new Error("Missing account menu");
+  act(() => original.focus());
+  act(() => requestTour());
+  const replacement = document.createElement("button");
+  replacement.setAttribute("aria-label", "Account menu");
+  original.replaceWith(replacement);
+  act(() => document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true })));
+  expect(document.activeElement).toBe(replacement);
+});
+
 it.each(PAGE_IDS)("FIRST_RUN asks once for %s, scoped per person and page", (page) => {
   const root = mount(view(page));
   expect(dialog()?.textContent).toContain(`Take a tour of ${PAGE_LABEL[page]}?`);
