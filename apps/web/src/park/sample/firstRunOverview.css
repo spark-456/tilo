@@ -44,6 +44,10 @@
   max-width: 1040px;
   margin: 0 auto;
 }
+[data-park] .park-home-root--preview .park-home-today {
+  max-height: none;
+  overflow: visible;
+}
 [data-park] .park-home-root--preview .park-first-run-grid {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
