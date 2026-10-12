@@ -63,8 +63,15 @@ def _context(
     # Only the verified caller and named membership assigners; never list people.
     facts = [me]
     for membership in me["memberships"][:MAX_ROWS]:
-        assigner = stores.persons.get(w.org, membership["assigned_by"]["by"])
-        if assigner is not None and isinstance(assigner.record, Mapping) and assigner.record.get("id") != w.actor:
+        assigned_by = membership["assigned_by"]["by"]
+        assigner = stores.persons.get(w.org, assigned_by)
+        if (
+            assigner is not None
+            and isinstance(assigner.record, Mapping)
+            and assigner.record.get("id") == assigned_by
+            and assigner.record.get("org_id") == w.org
+            and assigned_by != w.actor
+        ):
             facts.append(assigner.record)
     directory = Directory.of({fact["id"]: fact for fact in facts}.values())
     teams = [m["team"] for m in me["memberships"][:MAX_ROWS] if directory.is_member(w.actor, m["team"], w.now)]
