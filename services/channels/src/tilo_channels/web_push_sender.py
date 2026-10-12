@@ -131,12 +131,12 @@ def _plain_session() -> Any:
 def production_sender(env: Mapping[str, str] | None = None) -> VapidSender | None:
     """The real sender, or None (use the fake) off Cloud Run, without the mounted key or without a valid subject."""
     env = os.environ if env is None else env
-    subject = env.get(ENV_SUBJECT, "")
+    contact = env.get(ENV_SUBJECT, "")
     secret = load_config().vapid.secret_name
-    if "K_SERVICE" not in env or not _SUBJECT_RE.match(subject) or not env.get(secret_env_name(secret)):
+    if "K_SERVICE" not in env or not _SUBJECT_RE.match(contact) or not env.get(secret_env_name(secret)):
         return None
     from pywebpush import webpush  # noqa: PLC0415
 
     return VapidSender(
-        read_key=lambda name: env.get(secret_env_name(name)), subject=subject, push=webpush, session=_plain_session
+        read_key=lambda name: env.get(secret_env_name(name)), subject=contact, push=webpush, session=_plain_session
     )
