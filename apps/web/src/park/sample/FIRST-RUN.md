@@ -19,4 +19,10 @@ An empty, successfully read live notification list gets labelled sample rows
 until the first real start. Clicking those rows only explains sample mode:
 it never opens a world, approves a decision or sends anything to the API.
 Actual notifications continue to use their existing actions and unread count.
-Tour prompts and the per-page sample panels are separate follow-up slices.
+Agenda, Skills, Ledger and Team now have read-only previews for empty HTTP
+accounts, using the existing fixtures with a Sample tag on every panel.
+Team people are explicitly fictional. No preview data is substituted into API
+results, personal counters or writes. Loading/failed worlds reads and accounts
+with personal worlds keep the normal page. Real starts remove every preview
+on the next render; the existing demo-session UI stays as it was.
+Home/Worlds previews and tour prompts are separate follow-up slices.
