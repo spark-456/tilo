@@ -20,7 +20,7 @@ used and dropped; trees are not retained for the whole package. Limits have hard
 ceilings (32 MiB cumulative expanded bytes; other ceilings match their defaults).
 Embedded objects and binary parts are conservatively refused.
 It does not render page numbers, recover layout, interpret fields, execute content,
-or read images. PPTX remains for a subsequent slice. Generic ZIP leaf
+or read images. Generic ZIP leaf
 bytes remain inert and unscreened; use a document parser before offering them as text.
 No route, archive persistence, consent, scope or KnowledgeItem schema is added here.
 Callers must apply content screening before offering any returned bytes to a model.
@@ -41,6 +41,13 @@ use the same bounded Office screening as DOCX; external-link parts are refused.
 Invalid/duplicate cell references, unknown cell types and missing shared-string
 indices are refused. The entry cap also bounds emitted cells; text caps apply to
 resolved output. Numeric, boolean, date and error values preserve stored text.
+
+`parse_pptx` reads DrawingML paragraphs from slide parts, including table cells,
+with `ppt/slides/slideN.xml#pN` provenance and explicit line breaks. Stored part
+order is preserved; labels are package parts, not presentation display positions.
+All XML parts use the same Office screening; text and paragraph caps apply,
+including empty paragraphs. Notes, layouts, images and animation are not read;
+no fields or links are evaluated. Text remains untrusted data requiring screening.
 Structural XML screening covers declarations, relationship targets, xml:base and
 active-content markers; it is not a safety verdict on arbitrary text or attributes.
 When wired, both parsing and safety screening require a sandbox memory limit.
@@ -50,3 +57,5 @@ layout, images and altChunk payloads are not interpreted. A caller must describe
 this coverage and the skipped content when presenting the result.
 
 XLSX coverage: stored values on hidden sheets are included; images, charts, styles, dates and layout are not interpreted. The caller must state this coverage.
+
+PPTX coverage: hidden slide parts are included; speaker notes, images, layouts and animation are not interpreted. The caller must state this coverage.

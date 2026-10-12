@@ -325,6 +325,45 @@ def parse_xlsx(data: bytes, *, limits: Limits = Limits()) -> tuple[tuple[str, st
     return tuple(output)
 
 
+def parse_pptx(data: bytes, *, limits: Limits = Limits()) -> tuple[tuple[str, str], ...]:
+    """Read slide DrawingML paragraphs in stored part order, with part citations.
+
+    Tables contribute paragraphs; explicit line breaks are preserved. No rendering,
+    slide-order inference, notes, layouts, images, animation or field evaluation.
+    """
+    presentation = "{http://schemas.openxmlformats.org/presentationml/2006/main}"
+    drawing = "{http://schemas.openxmlformats.org/drawingml/2006/main}"
+    roots = _office(
+        data,
+        limits,
+        "ppt/presentation.xml",
+        "application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml",
+        presentation + "presentation",
+    )
+    output: list[tuple[str, str]] = []
+    size = paragraphs = 0
+    for name, root in roots:
+        if not re.fullmatch(r"ppt/slides/slide[1-9][0-9]*\.xml", name):
+            continue
+        if root.tag != presentation + "sld":
+            raise Refused("invalid_presentation")
+        for index, paragraph in enumerate(root.iter(drawing + "p"), 1):
+            paragraphs += 1
+            if paragraphs > limits.entries:
+                raise Refused("entry_count")
+            text = "".join(
+                "\n" if node.tag == drawing + "br" else node.text or ""
+                for node in paragraph.iter()
+                if node.tag in (drawing + "t", drawing + "br")
+            )
+            size += len(text)
+            if size > limits.output_chars:
+                raise Refused("output_size")
+            if text:
+                output.append((f"{name}#p{index}", text))
+    return tuple(output)
+
+
 def parse_csv(data: bytes, *, limits: Limits = Limits()) -> tuple[tuple[str, str], ...]:
     """Read comma-separated UTF-8 cells as inert text, with logical row/cell labels.
 
