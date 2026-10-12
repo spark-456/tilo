@@ -268,3 +268,20 @@ def test_PPL_11c_FS_2_limit_13_racing_requests_on_two_instances_never_get_more_t
     assert all(r.json() == {"detail": "unavailable"} for r in results if r.status_code == 503)
     if 503 not in codes:
         assert codes.count(201) == WRITES_PER_MINUTE
+
+
+@pytest.mark.parametrize("store", BACKENDS)
+def test_PPL_11c_FS_2_limit_preserves_existing_per_route_cap_across_instances(people_rig, store):
+    from tilo_api.people_limits import limits_of
+    from tilo_api.people_writes import Refusal
+
+    rig = backend_rig(people_rig, store)
+    for _ in range(10):
+        limits_of(rig.stores).attempt("meeting_join:" + PRIYA, 1_000_000.0, limit=10)
+    if store == "firestore":
+        new_instance(rig)
+    with pytest.raises(Refusal) as denied:
+        limits_of(rig.stores).attempt("meeting_join:" + PRIYA, 1_000_000.0, limit=10)
+    assert denied.value.status_code == 429
+    limits_of(rig.stores).attempt("meeting_join:" + SAM, 1_000_000.0, limit=10)
+    limits_of(rig.stores).attempt("meeting_join:" + PRIYA, 1_000_061.0, limit=10)

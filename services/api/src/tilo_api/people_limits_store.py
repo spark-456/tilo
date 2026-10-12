@@ -86,7 +86,7 @@ class DurableLimits(Limits):
                 break
         raise _unavailable() from None
 
-    def attempt(self, user_id: str, now: float) -> None:
+    def attempt(self, user_id: str, now: float, *, limit: int = WRITES_PER_MINUTE) -> None:
         ref = self._c.document(f"{self._collection('limiter_counters')}/{_hash('c', user_id)}")
         at = datetime.fromtimestamp(now, UTC)
 
@@ -94,7 +94,7 @@ class DurableLimits(Limits):
             snap = ref.get(transaction=txn)
             doc = snap.to_dict() if snap.exists else None
             held = sorted(h for h in doc["hits"] if h > now - 60) if _live(doc, at) and doc else []
-            if len(held) >= WRITES_PER_MINUTE:
+            if len(held) >= limit:
                 return min(60, max(1, math.ceil(held[0] + 60 - now)))  # a refused attempt is not counted
             txn.set(ref, {"hits": [*held, now], "expires_at": at + COUNTER_TTL})
             return None
