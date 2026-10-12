@@ -14,7 +14,7 @@
 // Ambiguity (PRD default, open-questions BQ-WIRE1-1): which by_* group is a "tool" and which a "role". The PRD
 // has no mapping; profile (what ran the work) is the tool and unit type (what the work was) is the role.
 import fc from "fast-check";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { ledger as fixtureLedger } from "../fixtures";
 import { ledgerFromCosts } from "./ledgerFromCosts";
 
@@ -121,6 +121,42 @@ it("FR_SPD_05_07_maps_recorded_waits_and_history_without_assuming_approval", () 
     what: "Held for edits",
   });
   expect(L.activity[0]?.dec).toBeUndefined();
+});
+
+it("FR_SPD_07 recorded timestamps are independent of the injected fixed clock", () => {
+  const ts = "2026-10-11T14:32:00+05:30";
+  const report = {
+    ...EMPTY_REPORT,
+    activity: [
+      {
+        world_id: "world-a",
+        card_id: "card-a",
+        run_id: "run-a",
+        type: "approval.requested",
+        ts,
+        summary: "Recorded request",
+      },
+    ],
+  };
+  vi.useFakeTimers({ now: new Date("2020-01-01T00:00:00Z") });
+  try {
+    const first = ledgerFromCosts(report);
+    vi.setSystemTime(new Date("2030-01-01T00:00:00Z"));
+    expect(ledgerFromCosts(report)).toEqual(first);
+    expect(first.activity[0]).toMatchObject({
+      day: "2026-10-11",
+      t: "09:02 UTC",
+      k: "waiting",
+      what: "Recorded request",
+      detail: [
+        ["Event", "approval.requested"],
+        ["Recorded at", ts],
+        ["Run", "run-a"],
+      ],
+    });
+  } finally {
+    vi.useRealTimers();
+  }
 });
 
 /** Every number anywhere in `v`. */
