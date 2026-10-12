@@ -5,6 +5,7 @@
 import type { ReactNode } from "react";
 import type { Dec, Decision, Notification } from "../api/types";
 import { Popover } from "../components";
+import { SampleBadge } from "../sample/SampleBadge";
 import { icon } from "./kit";
 
 type Kind = Notification["kind"];
@@ -21,6 +22,7 @@ export interface NotificationsPopoverProps {
   onSettings: () => void;
   onClose: () => void;
   status?: "loading" | "ready" | "failed";
+  sample?: boolean;
 }
 
 export function NotificationsPopover({
@@ -31,6 +33,7 @@ export function NotificationsPopover({
   onSettings,
   onClose,
   status = "ready",
+  sample = false,
 }: NotificationsPopoverProps): ReactNode {
   return (
     <Popover label="Notifications" width={392} className="park-shell__notif" onClose={onClose}>
@@ -48,7 +51,7 @@ export function NotificationsPopover({
         <output>No notifications yet</output>
       ) : null}
       {notifications.map((n) => {
-        const approved = n.dec !== undefined && dec[n.dec] === true;
+        const approved = !sample && n.dec !== undefined && dec[n.dec] === true;
         const kind: Kind = approved ? "done" : n.kind;
         return (
           <button
@@ -64,6 +67,7 @@ export function NotificationsPopover({
             <span className="park-shell__ntext">
               <span className="park-shell__ntitle">
                 {approved ? approvedTitle(decisions.find((d) => d.k === n.dec)) : n.title}
+                {sample && <SampleBadge />}
               </span>
               <span className="park-shell__nsub">{n.sub}</span>
             </span>
