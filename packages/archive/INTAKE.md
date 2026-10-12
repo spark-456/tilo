@@ -32,6 +32,10 @@ are refused. Input/text caps apply; the entry cap counts cells (blank rows count
 as one entry). Python's field-size cap also applies without global mutation.
 CSV has no reliable magic signature: the caller must explicitly select this parser.
 Cells remain untrusted data and need screening before use or spreadsheet export.
+Row width is checked before csv.reader allocates cells, while preserving quoted
+commas, escaped quotes and multiline cells. CSV refusals retain no decode/parser
+exception context. ZIP labels also refuse Unicode line/paragraph separators,
+surrogates, private-use and unassigned characters; UNC relationship targets refuse.
 
 `parse_xlsx` resolves shared and inline strings and reads stored worksheet cell
 values with `xl/worksheets/<part>.xml#<cell>` citations. Formula cached values are

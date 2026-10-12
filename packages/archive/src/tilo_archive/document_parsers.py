@@ -79,7 +79,7 @@ def _path(name: str, limits: Limits) -> None:
     if (
         any(part in ("", ".", "..") for part in parts)
         or any(character in name for character in ("\\", ":", "\x00"))
-        or any(unicodedata.category(character) in ("Cc", "Cf") for character in name)
+        or any(unicodedata.category(character) in ("Cc", "Cf", "Zl", "Zp", "Cs", "Co", "Cn") for character in name)
     ):
         raise Refused("unsafe_path")
     if len(parts) > limits.path_depth:
@@ -179,7 +179,7 @@ class _BoundedTree(ET.TreeBuilder):
             if (
                 (local == "targetmode" and value.lower() == "external")
                 or local == "base"
-                or (local == "target" and re.match(r"(?:[a-zA-Z][\w+.-]*:|//)", value))
+                or (local == "target" and (value.startswith("\\\\") or re.match(r"(?:[a-zA-Z][\w+.-]*:|//)", value)))
             ):
                 raise Refused("external_reference")
         return super().start(tag, attrs)
@@ -364,6 +364,30 @@ def parse_pptx(data: bytes, *, limits: Limits = Limits()) -> tuple[tuple[str, st
     return tuple(output)
 
 
+def _check_csv_width(text: str, limit: int) -> None:
+    # Only separators outside quoted fields create cells. Bound them BEFORE
+    # csv.reader builds a list; escaped quotes and quoted newlines are inert.
+    state = "start"
+    cells = 1
+    for character in text:
+        if state == "quoted":
+            if character == '"':
+                state = "closed"
+        elif state == "closed" and character == '"':
+            state = "quoted"
+        elif character == ",":
+            cells += 1
+            if cells > limit:
+                raise Refused("entry_count")
+            state = "start"
+        elif character in "\r\n":
+            cells, state = 1, "start"
+        elif state == "start" and character == '"':
+            state = "quoted"
+        else:
+            state = "plain"
+
+
 def parse_csv(data: bytes, *, limits: Limits = Limits()) -> tuple[tuple[str, str], ...]:
     """Read comma-separated UTF-8 cells as inert text, with logical row/cell labels.
 
@@ -374,12 +398,16 @@ def parse_csv(data: bytes, *, limits: Limits = Limits()) -> tuple[tuple[str, str
     limits.validate()
     if len(data) > limits.input_bytes:
         raise Refused("input_size")
+    text: str | None = None
     try:
         text = data.decode("utf-8-sig")
     except UnicodeError:
-        raise Refused("invalid_encoding") from None
+        pass
+    if text is None:
+        raise Refused("invalid_encoding")
     if "\x00" in text:
         raise Refused("invalid_csv")
+    _check_csv_width(text, limits.entries)
     output: list[tuple[str, str]] = []
     entries = size = 0
     try:
@@ -392,6 +420,7 @@ def parse_csv(data: bytes, *, limits: Limits = Limits()) -> tuple[tuple[str, str
                 if size > limits.output_chars:
                     raise Refused("output_size")
                 output.append((f"csv#r{row_index}c{column}", cell))
+        return tuple(output)
     except csv.Error:
-        raise Refused("invalid_csv") from None
-    return tuple(output)
+        pass
+    raise Refused("invalid_csv")

@@ -93,7 +93,18 @@ def test_I4_xml_attribute_budget_is_total_and_single_part_bytes_are_capped():
         parse_docx(docx(root), limits=replace(Limits(), xml_part_bytes=16))
 
 
-@pytest.mark.parametrize("name", ["bidi\u202e.xml", "del\x7f.xml", "c1\x85.xml"])
+@pytest.mark.parametrize(
+    "name",
+    [
+        "bidi\u202e.xml",
+        "del\x7f.xml",
+        "c1\x85.xml",
+        "line\u2028.xml",
+        "paragraph\u2029.xml",
+        "private\ue000.xml",
+        "unassigned\u0378.xml",
+    ],
+)
 def test_I4_labels_refuse_display_controls(name):
     from tilo_archive.document_parsers import expand_zip
 
@@ -129,6 +140,7 @@ def test_I4_limit_configuration_cannot_remove_hard_resource_ceilings(field):
     [
         (b'<x Target="http://x"/>', "external_reference"),
         (b'<x Target="//h/x"/>', "external_reference"),
+        (b'<x Target="\\\\host/share"/>', "external_reference"),
         (b'<x Type="urn:oleObject"/>', "active_content"),
         (b'<x Type="urn:activeX"/>', "active_content"),
         (b'<x ContentType="application/macroEnabled"/>', "active_content"),
@@ -146,3 +158,39 @@ def test_I4_content_types_bytes_are_screened_even_outside_contenttype_attribute(
             b'ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>'
         )
         parse_docx(archive([("[Content_Types].xml", types), ("word/document.xml", b"<x/>")]))
+
+
+def test_I4_doctype_system_without_entity_is_refused():
+    main = f'<!DOCTYPE document SYSTEM "https://example.invalid/dtd"><w:document xmlns:w="{WORD}"/>'.encode()
+    with pytest.raises(Refused, match="^xml_declaration$"):
+        parse_docx(docx(main))
+
+
+def test_I4_end_of_parse_checks_office_main_root_type():
+    with pytest.raises(Refused, match="^unknown_type$"):
+        parse_docx(docx(b"<unrelated/>"))
+
+
+def test_I4_labels_refuse_surrogates_before_encoding():
+    from tilo_archive.document_parsers import _path
+
+    with pytest.raises(Refused, match="^unsafe_path$"):
+        _path("surrogate\ud800.xml", Limits())
+
+
+@pytest.mark.parametrize(
+    "field,exact,over,cap,code",
+    [
+        ("xml_nodes", b"<x><a/></x>", b"<x><a/><b/></x>", 2, "xml_nodes"),
+        ("xml_attributes", b'<x a="1" b="2"/>', b'<x a="1" b="2" c="3"/>', 2, "xml_attributes"),
+        ("xml_depth", b"<x><a/></x>", b"<x><a><b/></a></x>", 2, "xml_depth"),
+        ("xml_part_bytes", b"<x/>", b"<x />", 4, "xml_part_size"),
+    ],
+)
+def test_I4_xml_caps_accept_exact_boundary_and_refuse_one_over(field, exact, over, cap, code):
+    from tilo_archive.document_parsers import _xml, _XmlBudget
+
+    limits = replace(Limits(), **{field: cap})
+    assert _xml(exact, limits, _XmlBudget()).tag == "x"
+    with pytest.raises(Refused, match=f"^{code}$"):
+        _xml(over, limits, _XmlBudget())

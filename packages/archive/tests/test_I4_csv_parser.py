@@ -53,3 +53,37 @@ def test_I4_csv_enforces_input_cell_and_text_caps(data, limits, code):
 def test_I4_csv_refuses_invalid_limits():
     with pytest.raises(ValueError, match="^invalid_limits$"):
         parse_csv(b"a", limits=replace(Limits(), entries=0))
+
+
+@pytest.mark.parametrize("data", [b"bad\xff", b'"unterminated'])
+def test_I4_csv_refusal_carries_no_uploaded_exception_context(data):
+    with pytest.raises(Refused) as caught:
+        parse_csv(data)
+    assert caught.value.__context__ is None
+
+
+def test_I4_csv_wide_hostile_row_is_refused_before_csv_reader_allocates(monkeypatch):
+    import tilo_archive.document_parsers as parsers
+
+    def forbidden(*args, **kwargs):
+        raise AssertionError("wide row reached the allocating CSV reader")
+
+    monkeypatch.setattr(parsers.csv, "reader", forbidden)
+    with pytest.raises(Refused, match="^entry_count$"):
+        parse_csv(b"," * (4 * 1024 * 1024))
+
+
+def test_I4_csv_width_guard_preserves_quoted_commas_escapes_and_multiline():
+    cell = "," * 1000
+    assert parse_csv(f'"{cell}","a""b\nc"\r\n'.encode(), limits=replace(Limits(), entries=2)) == (
+        ("csv#r1c1", cell),
+        ("csv#r1c2", 'a"b\nc'),
+    )
+    assert parse_csv(b'a"b,c', limits=replace(Limits(), entries=2))[0][1] == 'a"b'
+
+
+def test_I4_csv_blank_rows_count_towards_entry_budget_at_exact_boundary():
+    limits = replace(Limits(), entries=2)
+    assert parse_csv(b"\n\n", limits=limits) == ()
+    with pytest.raises(Refused, match="^entry_count$"):
+        parse_csv(b"\n\n\n", limits=limits)
