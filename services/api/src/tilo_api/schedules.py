@@ -350,6 +350,29 @@ def _view(s: Schedule) -> dict[str, Any]:
     }  # fmt: skip
 
 
+MIN_APPROACHES, MAX_APPROACHES, MAX_APPROACH_BYTES = 2, 3, 16_384  # plan.schema.json `approaches`; one item's JSON size
+
+
+def _plannable(offered: object, chosen: dict[str, Any] | None) -> bool:
+    """The list a plan is compiled against: 2 to 3 bounded dicts with unique str ids, and the entry for the chosen
+    approach EQUAL to it (the planner plans from the list entry). Anything odd, even a nesting too deep, is False."""
+    if not isinstance(offered, list) or not MIN_APPROACHES <= len(offered) <= MAX_APPROACHES or not chosen:
+        return False
+    try:
+        if not all(isinstance(a, dict) and isinstance(a.get("id"), str) for a in offered):
+            return False
+        ids = [a["id"] for a in offered]
+        if len(set(ids)) != len(ids) or chosen.get("id") not in ids:
+            return False
+        if offered[ids.index(chosen["id"])] != chosen:
+            return False
+        return all(
+            len(json.dumps(a, default=str, ensure_ascii=False).encode("utf-8")) <= MAX_APPROACH_BYTES for a in offered
+        )
+    except (RecursionError, TypeError, ValueError):
+        return False
+
+
 def _mine(schedules: ScheduleRepository, schedule_id: str, principal: deps.Principal) -> Schedule:
     found = schedules.get(schedule_id)
     if found is None or found.owner_user_id != principal.user_id:  # no oracle for another user's schedule
@@ -373,19 +396,24 @@ def create_schedule(
         raise HTTPException(status_code=404, detail="No such task.")
     deps.refuse_if_replay_only(flags)  # NFR-24: after sign-in and the owner check
     with task.lock:
-        approach = next((a for a in task.approaches or [] if a["id"] == body.approach_id), None)
+        approach = next(
+            (a for a in task.approaches or [] if isinstance(a, dict) and a.get("id") == body.approach_id), None
+        )
         grants = [e for e in store.events.get(task.world_id, []) if e["type"] == "budget.granted"]
         if not task.granted or not grants:
             raise HTTPException(status_code=409, detail="Approve this task's budget first.")
         if approach is None:
             raise HTTPException(status_code=422, detail="Pick one of the approaches this task was offered.")
+        if not _plannable(task.approaches, approach):  # before any copy: a hostile nesting must not reach deepcopy
+            raise HTTPException(status_code=409, detail="This task's approaches cannot be scheduled.")
+        offered = copy.deepcopy(task.approaches)
         brief, approach, cap = copy.deepcopy(task.brief), copy.deepcopy(approach), grants[0]["data"]["cap"]
     cadence, now = body.cadence.build(), clock()
     try:
         record = Schedule(
             schedule_id="sched_" + secrets.token_hex(12), owner_user_id=principal.user_id, title=body.title,
             cadence=cadence, approved_brief_ref=task.world_id, budget_cap=float(cap), next_due=next_slot(cadence, now),
-            brief=brief, approach=approach, created_at=now, demo=principal.demo_session,
+            brief=brief, approach=approach, approaches=offered, created_at=now, demo=principal.demo_session,
         )  # fmt: skip
     except ValueError as exc:
         raise HTTPException(status_code=409, detail="This task's budget cannot be scheduled.") from exc
@@ -474,6 +502,8 @@ class ScheduleStarter:
             raise StartSkipped("owner_mismatch")
         if record.brief is None or record.approach is None:
             raise StartSkipped("snapshot_missing")
+        if not _plannable(record.approaches, record.approach):  # before any world or grant: nothing to orphan
+            raise StartSkipped("snapshot_incomplete")
         if not record.enabled:  # claimed just before `disable_for_owner` or a pause: read again here, after the claim
             raise StartSkipped("schedule_disabled", count=False)
         team = self._team.read() if self._team is not None else None  # unreadable raises: no start (fail closed)
@@ -495,7 +525,7 @@ class ScheduleStarter:
                 store.drain(world_id, self._seams.writer)
         task = deps.TaskRecord(
             owner, world_id, run_id, copy.deepcopy(record.brief), copy.deepcopy(record.brief), [], 3,
-            approaches=[copy.deepcopy(record.approach)], granted=True,
+            approaches=copy.deepcopy(record.approaches), granted=True,
         )  # fmt: skip
         # start_run keeps one run per world, so a repeat (or a retry after a failed start) starts nothing twice
         runs.start_run(store, task, approach=record.approach, budget_cap=record.budget_cap, seams=self._seams)
@@ -727,9 +757,18 @@ class TaskRunIn(BaseModel):
 
 # the starter's own codes that no retry can change: a 2xx, so Cloud Tasks does not retry (run_seams_unwired is a 5xx)
 _REFUSALS = frozenset(
-    {"schedule_missing", "schedule_disabled", "owner_mismatch", "budget_not_granted", "snapshot_missing"}
+    {
+        "schedule_missing",
+        "schedule_disabled",
+        "owner_mismatch",
+        "budget_not_granted",
+        "snapshot_missing",
+        "snapshot_incomplete",
+    }
 )
-_RECORDED = frozenset({"owner_mismatch", "budget_not_granted", "snapshot_missing"})  # not a missing or disabled one
+_RECORDED = frozenset(
+    {"owner_mismatch", "budget_not_granted", "snapshot_missing", "snapshot_incomplete"}
+)  # not a missing or disabled one
 _CLOCK_SLACK = timedelta(seconds=60)  # a slot this far ahead is the clocks of two instances, not a forged future
 _ALERTS = threading.Lock()  # one instance's duplicate deliveries raise the missed-slots alert once
 
