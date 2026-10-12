@@ -529,7 +529,6 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/1f/92/a59d62405b3e4f8cbbb9dc6f7e3c81beda9585bb49dfbc02ae773de839ae/google_cloud_texttospeech-2.38.0-py3-none-any.whl", hash = "sha256:a9a4e5cf3b848c2c93e24e769b8acb11442c64a2fffff14a98be80379919bc5e", size = 198330, upload-time = "2026-10-01T18:12:45.443Z" },
 ]
 
-
 [[package]]
 name = "google-crc32c"
 version = "1.9.0"
@@ -1477,6 +1476,7 @@ dependencies = [
     { name = "requests" },
     { name = "tilo-archive" },
     { name = "tilo-browser" },
+    { name = "tilo-channels" },
     { name = "tilo-connectors" },
     { name = "tilo-harness" },
     { name = "tilo-logging" },
@@ -1504,6 +1504,7 @@ requires-dist = [
     { name = "requests", specifier = ">=2.31" },
     { name = "tilo-archive", editable = "packages/archive" },
     { name = "tilo-browser", editable = "services/browser" },
+    { name = "tilo-channels", editable = "services/channels" },
     { name = "tilo-connectors", editable = "services/connectors" },
     { name = "tilo-harness", editable = "services/harness" },
     { name = "tilo-logging", editable = "packages/logging" },
