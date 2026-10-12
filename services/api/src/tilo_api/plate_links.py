@@ -32,7 +32,7 @@ from tilo_channels.links import KeyRing, LinkRefused
 from tilo_channels.plate_digest import PlateActionPort, PlateDigestBuilder
 from tilo_people.stores import PeopleStores
 
-from tilo_api import access, deps, people_items, store_door
+from tilo_api import access, deps, ephemeral, people_items, store_door
 from tilo_api.people_events import WorkEvents, get_work_events
 from tilo_api.people_plate import build_plate
 from tilo_api.people_writes import Refusal, Writer
@@ -249,17 +249,47 @@ def confirm(
     return _page(200, question, button)
 
 
+def _durable_seams(request: Request) -> tuple[PeopleStores, WorkEvents]:
+    """The process's durable people store and event writer for a mail click, which carries no sign-in: the signed token
+    is the only credential and names the person. Called only after `peek` verified the signature and expiry, so a
+    forged or malformed token never reaches a store. `ephemeral.mark_no_person` is the tick's pattern: the seams then
+    hand out the durable store (never a demo session's) without resolving a principal. A seam that is not wired is a
+    503 before the link is spent; the app's own overrides are honoured."""
+    ephemeral.mark_no_person(request)
+    overrides = request.app.dependency_overrides
+
+    def call(seam: Any) -> Any:
+        wired = overrides.get(seam, seam)
+        return wired(request) if inspect.signature(wired).parameters else wired()
+
+    try:
+        wired_events = overrides.get(get_work_events)
+        if wired_events is not None:
+            work = wired_events()
+        else:
+            work = get_work_events(call(deps.get_event_writer), call(deps.get_desk_worlds))
+        return call(deps.get_people_stores), work
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.warning("plate link seams not available (%s)", type(exc).__name__)
+        raise _unconfigured() from None
+
+
 @router.post("/l/{token}")
 def redeem(
     token: str,
+    request: Request,
     builder: Annotated[PlateDigestBuilder, Depends(get_link_builder)],
-    stores: Annotated[PeopleStores, Depends(deps.get_people_stores)],
     clock: Annotated[Any, Depends(deps.get_clock)],
-    events: Annotated[WorkEvents, Depends(get_work_events)],
 ) -> HTMLResponse:
     now = clock()
     try:
-        item, option, _user = builder.peek(token, now=now)
+        item, option, _user = builder.peek(token, now=now)  # nothing is read or written before this verifies
+    except LinkRefused:
+        return _page(410, _REFUSED)
+    stores, events = _durable_seams(request)  # a 503 here leaves the link unspent
+    try:
         port: PlateActionPort = PlateActions(stores, now, events)
         applied = builder.redeem_and_apply(token, item_id=item, option=option, port=port, now=now)
     except LinkRefused:
