@@ -30,7 +30,9 @@ from tilo_channels.nudges import MemoryNudgeStore, Nudge, NudgeGate, NudgeRules,
 from tilo_people.stores import PeopleStores
 
 from tilo_api import access, deps, store_door
+from tilo_api.people import _PeopleRoute
 from tilo_api.people_plate import build_plate
+from tilo_api.people_writes import json_body
 
 logger = logging.getLogger("tilo_api.nudge_sweep")
 ENV_NUDGES = "TILO_NUDGES"
@@ -167,7 +169,7 @@ def sweep(request: Request, now: str) -> int:
 
 # -- the person's own routes -----------------------------------------------------------------------------------------
 
-router = APIRouter()
+router = APIRouter(route_class=_PeopleRoute)  # the people write stack: write limit, 413 cap, 415, no-store
 
 
 class SnoozeIn(BaseModel):
@@ -201,7 +203,7 @@ def list_nudges(
 @router.post("/v1/nudges/{alert_id}/snooze")
 def snooze_nudge(
     alert_id: str,
-    body: SnoozeIn,
+    body: Annotated[SnoozeIn, Depends(json_body(SnoozeIn))],
     principal: Annotated[deps.Principal, Depends(deps.get_current_principal)],
     gate: Annotated[NudgeGate, Depends(_gate)],
     clock: Annotated[Callable[[], str], Depends(deps.get_clock)],

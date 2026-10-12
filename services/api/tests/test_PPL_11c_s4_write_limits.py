@@ -85,6 +85,7 @@ BODY_ROUTES = {
     "remove membership": "/v1/people/u_priya/memberships/remove",
     "role": "/v1/people/u_priya/role",
     "team invite": "/v1/team/invites",
+    "snooze nudge": "/v1/nudges/01JB5VQ0000000000000000000/snooze",
     "disconnect meeting host": "/v1/meeting-host/disconnect",
     "connect connector": "/v1/connectors/connect",
     "connector callback": "/v1/connectors/callback",
