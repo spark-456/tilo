@@ -1,13 +1,14 @@
+import { createFixtureApi } from "./fixtureApi";
+import type { Api } from "./index";
+import { API_METHODS } from "./index";
+import { type Identity, NotBuilt, createLiveApi, todayOf, userOf } from "./liveApi";
 // Which Api the Park pages use (WEB-1a; plan section 6.1). No VITE_TILO_API_URL (or a blank one) means
 // the fixture Api; a url means the live Api (getLedger reads GET /costs; the other methods reject with
 // NotBuilt until each endpoint exists), so a configured deployment never shows sample numbers. Same switch as src/api/config.ts (chooseClient).
 // LIVE-HOME: a demo (anonymous) session on a configured deployment reads the fixture company instead, labelled as sample
 // and with no request (the server only replays for a demo session); a signed-in person gets the live Api plus who they
 // are, from the sign-in session.
-import { createFixtureApi } from "./fixtureApi";
-import type { Api } from "./index";
-import { API_METHODS } from "./index";
-import { type Identity, NotBuilt, createLiveApi, todayOf, userOf } from "./liveApi";
+import { carryQuizReader } from "./quizApps";
 import type { ApiResult } from "./types";
 
 export interface SessionView {
@@ -57,5 +58,5 @@ export function withSession(live: Api, who: SessionView): Api {
       async () => ({ data: todayOf(who.now()), source: "live" as const }),
       () => fixture.getToday(),
     );
-  return api;
+  return carryQuizReader(live, api, () => !who.demo());
 }

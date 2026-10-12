@@ -8,9 +8,11 @@ import csv
 import io
 import re
 import stat
+import unicodedata
 import xml.etree.ElementTree as ET
 import zipfile
 import zlib
+from collections.abc import Iterator
 from dataclasses import dataclass, field
 
 
@@ -28,6 +30,8 @@ class Limits:
     ratio: int = 100
     xml_nodes: int = 20000
     xml_depth: int = 64
+    xml_attributes: int = 20000
+    xml_part_bytes: int = 1024 * 1024
     output_chars: int = 1024 * 1024
 
     def validate(self) -> None:
@@ -41,11 +45,19 @@ class Limits:
                 self.ratio,
                 self.xml_nodes,
                 self.xml_depth,
+                self.xml_attributes,
+                self.xml_part_bytes,
                 self.output_chars,
             )
         ):
             raise ValueError("invalid_limits")
         if type(self.nesting) is not int or self.nesting < 0:
+            raise ValueError("invalid_limits")
+        maxima = Limits()
+        if any(
+            value > (32 * 1024 * 1024 if name == "expanded_bytes" else getattr(maxima, name))
+            for name, value in vars(self).items()
+        ):
             raise ValueError("invalid_limits")
 
 
@@ -56,12 +68,18 @@ class _Budget:
     paths: set[str] = field(default_factory=set)
 
 
+@dataclass
+class _XmlBudget:
+    nodes: int = 0
+    attributes: int = 0
+
+
 def _path(name: str, limits: Limits) -> None:
     parts = name.removesuffix("/").split("/")
     if (
         any(part in ("", ".", "..") for part in parts)
         or any(character in name for character in ("\\", ":", "\x00"))
-        or any(ord(character) < 32 for character in name)
+        or any(unicodedata.category(character) in ("Cc", "Cf") for character in name)
     ):
         raise Refused("unsafe_path")
     if len(parts) > limits.path_depth:
@@ -83,9 +101,10 @@ def _expand(data: bytes, limits: Limits, budget: _Budget, depth: int, prefix: st
             _path(info.orig_filename, limits)
             label = prefix + info.filename.rstrip("/")
             _path(label, limits)
-            if label in names:
+            canonical = unicodedata.normalize("NFC", label).casefold()
+            if canonical in names:
                 raise Refused("duplicate_path")
-            names.add(label)
+            names.add(canonical)
             mode = stat.S_IFMT(info.external_attr >> 16)
             if mode not in (0, stat.S_IFREG, stat.S_IFDIR):
                 raise Refused("special_entry")
@@ -109,9 +128,10 @@ def _expand(data: bytes, limits: Limits, budget: _Budget, depth: int, prefix: st
             if content.startswith(b"PK"):
                 output.extend(_expand(content, limits, budget, depth + 1, label + "/"))
             else:
-                if label in budget.paths:
+                canonical = unicodedata.normalize("NFC", label).casefold()
+                if canonical in budget.paths:
                     raise Refused("duplicate_path")
-                budget.paths.add(label)
+                budget.paths.add(canonical)
                 output.append((label, content))
     return output
 
@@ -130,27 +150,26 @@ def expand_zip(data: bytes, *, limits: Limits = Limits()) -> tuple[tuple[str, by
     except Refused:
         raise
     except (zipfile.BadZipFile, RuntimeError, NotImplementedError, EOFError, OSError, ValueError, zlib.error):
-        raise Refused("invalid_zip") from None
+        pass
+    raise Refused("invalid_zip")
 
 
-def _xml(data: bytes, limits: Limits) -> ET.Element:
-    try:
-        text = data.decode("utf-8-sig")
-        if "<!DOCTYPE" in text.upper() or "<!ENTITY" in text.upper():
-            raise Refused("xml_declaration")
-        root = ET.fromstring(text)
-    except (UnicodeError, ET.ParseError):
-        raise Refused("invalid_xml") from None
-    pending = [(root, 1)]
-    nodes = 0
-    while pending:
-        node, depth = pending.pop()
-        nodes += 1
-        if nodes > limits.xml_nodes:
+class _BoundedTree(ET.TreeBuilder):
+    def __init__(self, limits: Limits, budget: _XmlBudget) -> None:
+        super().__init__()
+        self.limits, self.budget, self.depth = limits, budget, 0
+
+    def start(self, tag: str, attrs: dict[str, str]) -> ET.Element:
+        self.budget.nodes += 1
+        self.budget.attributes += len(attrs)
+        self.depth += 1
+        if self.budget.nodes > self.limits.xml_nodes:
             raise Refused("xml_nodes")
-        if depth > limits.xml_depth:
+        if self.depth > self.limits.xml_depth:
             raise Refused("xml_depth")
-        for key, value in node.attrib.items():
+        if self.budget.attributes > self.limits.xml_attributes:
+            raise Refused("xml_attributes")
+        for key, value in attrs.items():
             value = value.strip()
             local = key.rsplit("}", 1)[-1].lower()
             if local == "contenttype" and "macroenabled" in value.lower():
@@ -163,16 +182,41 @@ def _xml(data: bytes, limits: Limits) -> ET.Element:
                 or (local == "target" and re.match(r"(?:[a-zA-Z][\w+.-]*:|//)", value))
             ):
                 raise Refused("external_reference")
-        pending.extend((child, depth + 1) for child in node)
-    return root
+        return super().start(tag, attrs)
+
+    def end(self, tag: str) -> ET.Element:
+        node = super().end(tag)
+        self.depth -= 1
+        return node
 
 
-def _office(data: bytes, limits: Limits, main: str, kind: str, tag: str) -> dict[str, ET.Element]:
+def _xml(data: bytes, limits: Limits, budget: _XmlBudget) -> ET.Element:
+    # Bound a whole start tag before Expat can allocate its attributes, too.
+    if len(data) > limits.xml_part_bytes:
+        raise Refused("xml_part_size")
+    try:
+        text = data.decode("utf-8-sig")
+        if "<!DOCTYPE" in text.upper() or "<!ENTITY" in text.upper():
+            raise Refused("xml_declaration")
+        parser = ET.XMLParser(target=_BoundedTree(limits, budget))
+        for offset in range(0, len(text), 4096):
+            parser.feed(text[offset : offset + 4096])
+        return parser.close()
+    except (UnicodeError, ET.ParseError):
+        pass
+    raise Refused("invalid_xml")
+
+
+def _office(
+    data: bytes, limits: Limits, main: str, kind: str, tag: str, *, first: str | None = None
+) -> Iterator[tuple[str, ET.Element]]:
     parts = dict(expand_zip(data, limits=limits))
     if main not in parts or kind.encode() not in parts.get("[Content_Types].xml", b""):
         raise Refused("unknown_type")
-    roots: dict[str, ET.Element] = {}
-    for name, content in parts.items():
+    budget = _XmlBudget()
+    main_ok = types_ok = False
+    for name in sorted(parts, key=lambda name: name != first):
+        content = parts[name]
         lower = name.lower()
         if (
             lower.endswith((".bin", ".docm", ".xlsm", ".pptm"))
@@ -183,20 +227,19 @@ def _office(data: bytes, limits: Limits, main: str, kind: str, tag: str) -> dict
         if "externallinks/" in lower:
             raise Refused("external_reference")
         if lower.endswith((".xml", ".rels")):
-            roots[name] = _xml(content, limits)
-    if roots[main].tag != tag or not any(
-        node.attrib.get("PartName") == "/" + main and node.attrib.get("ContentType") == kind
-        for node in roots["[Content_Types].xml"]
-    ):
+            root = _xml(content, limits, budget)
+            if name == main:
+                main_ok = root.tag == tag
+            if name == "[Content_Types].xml":
+                types_ok = any(node.get("PartName") == "/" + main and node.get("ContentType") == kind for node in root)
+            yield name, root
+            del root
+    if not main_ok or not types_ok:
         raise Refused("unknown_type")
-    return roots
 
 
 def parse_docx(data: bytes, *, limits: Limits = Limits()) -> tuple[tuple[str, str], ...]:
-    """Read UTF-8 DOCX paragraphs with part citations; screen every XML part.
-
-    No pagination/layout interpretation. Active content and external refs refused.
-    """
+    """Read UTF-8 paragraphs with part citations, screening and dropping each XML tree."""
     word = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
     roots = _office(
         data,
@@ -207,7 +250,7 @@ def parse_docx(data: bytes, *, limits: Limits = Limits()) -> tuple[tuple[str, st
     )
     output: list[tuple[str, str]] = []
     size = 0
-    for name, root in roots.items():
+    for name, root in roots:
         if not name.startswith("word/"):
             continue
         for index, paragraph in enumerate(root.iter(word + "p"), 1):
@@ -233,6 +276,7 @@ def parse_xlsx(data: bytes, *, limits: Limits = Limits()) -> tuple[tuple[str, st
         "xl/workbook.xml",
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml",
         sheet + "workbook",
+        first="xl/sharedStrings.xml",
     )
 
     def string(node: ET.Element) -> str:
@@ -240,14 +284,16 @@ def parse_xlsx(data: bytes, *, limits: Limits = Limits()) -> tuple[tuple[str, st
             item.text or "" for path in (sheet + "t", sheet + "r/" + sheet + "t") for item in node.findall(path)
         )
 
-    shared = roots.get("xl/sharedStrings.xml")
-    if shared is not None and shared.tag != sheet + "sst":
-        raise Refused("invalid_spreadsheet")
-    strings = [] if shared is None else [string(item) for item in shared.findall(sheet + "si")]
+    strings: list[str] = []
     output: list[tuple[str, str]] = []
     size = 0
     cells = 0
-    for name, root in roots.items():
+    for name, root in roots:
+        if name == "xl/sharedStrings.xml":
+            if root.tag != sheet + "sst":
+                raise Refused("invalid_spreadsheet")
+            strings = [string(item) for item in root.findall(sheet + "si")]
+            continue
         if not name.startswith("xl/worksheets/") or not name.endswith(".xml"):
             continue
         if root.tag != sheet + "worksheet":
@@ -296,7 +342,7 @@ def parse_pptx(data: bytes, *, limits: Limits = Limits()) -> tuple[tuple[str, st
     )
     output: list[tuple[str, str]] = []
     size = paragraphs = 0
-    for name, root in roots.items():
+    for name, root in roots:
         if not re.fullmatch(r"ppt/slides/slide[1-9][0-9]*\.xml", name):
             continue
         if root.tag != presentation + "sld":

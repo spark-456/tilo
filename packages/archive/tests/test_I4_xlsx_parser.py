@@ -77,3 +77,15 @@ def test_I4_xlsx_output_and_cell_caps_and_unknown_type():
             parse_xlsx(xlsx('<c r="A1"><v>123</v></c><c r="B1"/><c r="C1"/><c r="D1"/>'), limits=limits)
     with pytest.raises(Refused, match="^unknown_type$"):
         parse_xlsx(archive([("renamed.xlsx", b"text")]))
+
+
+def test_I4_xlsx_hostile_expanded_xml_has_bounded_peak_and_time():
+    from test_I4_xml_allocation import assert_bounded_refusal, compressed_office, hostile_xml
+
+    data = compressed_office(
+        "xl/workbook.xml",
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml",
+        f'<workbook xmlns="{SHEET}"/>'.encode(),
+        [("xl/worksheets/hostile.xml", hostile_xml("flat"))],
+    )
+    assert_bounded_refusal(parse_xlsx, data, replace(Limits(), expanded_bytes=32 * 1024 * 1024))

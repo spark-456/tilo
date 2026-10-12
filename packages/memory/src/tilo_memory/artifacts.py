@@ -21,6 +21,7 @@ from collections.abc import Callable, Iterator, Mapping
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from typing import Any, Protocol
+from urllib.parse import urlsplit
 
 import jsonschema
 from referencing import Registry, Resource
@@ -52,6 +53,7 @@ _RUN_ID, _UNIT_ID, _AGENT_ID = re.compile(_RUN), re.compile(_UNIT), re.compile(_
 _SLUG = re.compile(r"[a-z][a-z0-9_]{0,63}")
 _ARCHIVE_REF = re.compile(r"(r_[0-9A-Za-z_]{1,48})/[0-9]{1,9}")
 _KEY = re.compile(rf"({_RUN}):({_UNIT}):(?:0|[1-9][0-9]{{0,3}}):[0-9]")
+_FETCH_KEY = re.compile(rf"({_RUN}):({_UNIT}):(?:0|[1-9][0-9]{{0,3}}):f[0-9]")
 _SEGMENT = re.compile(r"[0-9A-Za-z_]+")
 _ULID = re.compile(r"[0-7][0-9A-HJKMNP-TV-Z]{25}")
 _RECORD_PATH = re.compile(rf"orgs/({_ORG})/worlds/({_WORLD})/artifacts/({_ART})/versions/([0-9]{{6}})")
@@ -107,7 +109,7 @@ class Scope:
 
 @dataclass(frozen=True)
 class Origin:
-    kind: str  # unit | render | upload | restore
+    kind: str  # unit | render | upload | restore | fetch
     unit: str | None = None
     agent: str | None = None
 
@@ -366,11 +368,13 @@ class ArtifactStore:
         hasher: Callable[[bytes], str] | None = None,
         record_validator: Callable[[dict[str, Any]], None] | None = None,
         new_id: Callable[[], str] | None = None,
+        file_sniffer: Callable[[bytes], str] | None = None,
     ) -> None:
         self._meta, self._blobs, self._clock, self._redact = meta, blobs, clock, redactor
         self._archive, self._alert, self._screener = archive_lookup, alert_sink, screener
         self._hash = hasher or (lambda data: hashlib.sha256(data).hexdigest())
         self._validate_record = record_validator or validate_record
+        self._file_sniffer = file_sniffer
         self._new_id = new_id or (lambda: "art_" + _ulid())
         self._lock = threading.RLock()
         self._alerted: set[tuple[str, str, str, int]] = set()  # corrupt versions already announced
@@ -669,6 +673,7 @@ class ArtifactStore:
         existing, _ = self._plan(scope, new.idempotency_key, parent, size)
         if existing is not None and self._blob_state(scope, existing) == "ok":
             return StoredVersion(existing)  # a restarted unit gets its version back; the first bytes win (AR-05)
+        fetch_digest = None
         for source in new.sources:
             try:
                 found = self._archive(scope, source["archive_ref"])
@@ -676,8 +681,32 @@ class ArtifactStore:
                 found = None
             if found is None:
                 raise _refuse("AR-03", f"source {source['id']} is not a raw-archive record of this run, org and world")
+            if new.origin.kind == "fetch":
+                try:
+                    payload = json.loads(found)
+                    source_url = payload["source"]["ref"]
+                    parsed = urlsplit(source_url)
+                    if (
+                        payload["tool"] != "fetch_url"
+                        or payload["source"]["kind"] != "web"
+                        or parsed.scheme not in {"https", "http"}
+                        or not parsed.hostname
+                        or parsed.username
+                        or parsed.password
+                        or parsed.query
+                        or parsed.fragment
+                        or payload["media_type"] != new.media_type
+                        or type(payload["size"]) is not int
+                        or payload["size"] != size
+                    ):
+                        raise ValueError("not matching fetch metadata")
+                    fetch_digest = payload["sha256"]
+                except Exception:
+                    raise _refuse("AR-09", "a fetch needs its own matching archived metadata") from None
         data, redacted = self._prepare(new)
         digest = self._hash(data)
+        if new.origin.kind == "fetch" and fetch_digest != digest:
+            raise _refuse("AR-09", "fetched bytes do not match their archived fingerprint")
         screening, screened_at = self._screen(data, new.media_type)
         fields = {
             "run_id": new.run_id,
@@ -693,12 +722,11 @@ class ArtifactStore:
         }
         return self._append(scope, parent, data, fields)
 
-    @staticmethod
-    def _check_new(new: NewVersion) -> dict[str, Any] | None:
+    def _check_new(self, new: NewVersion) -> dict[str, Any] | None:
         """Shape, kinds and caps: everything that can be refused without hashing. Returns the normalised parent."""
         origin, media = new.origin, new.media_type
-        if not isinstance(origin, Origin) or origin.kind not in ("unit", "render", "upload"):
-            raise _refuse("AR-02", "origin must be unit, render or upload (restore has its own call)")
+        if not isinstance(origin, Origin) or origin.kind not in ("unit", "render", "upload", "fetch"):
+            raise _refuse("AR-02", "origin must be unit, render, upload or fetch (restore has its own call)")
         if type(media) is not str or media not in TEXT_TYPES | FILE_TYPES:
             raise _refuse("AR-04", "media type is not one of the nine")
         if origin.kind == "unit" and media not in TEXT_TYPES:
@@ -707,7 +735,7 @@ class ArtifactStore:
             raise _refuse("AR-04", "render makes only files")
         if type(new.run_id) is not str or _RUN_ID.fullmatch(new.run_id) is None:
             raise _refuse("AR-03", "run id is malformed")
-        has_unit, has_agent = origin.kind in ("unit", "render"), origin.kind == "unit"
+        has_unit, has_agent = origin.kind in ("unit", "render", "fetch"), origin.kind in ("unit", "fetch")
         if (
             (origin.unit is not None) != has_unit
             or (has_agent and origin.agent is None)
@@ -720,7 +748,8 @@ class ArtifactStore:
             raise _refuse("AR-03", "origin ids are malformed")
         key = new.idempotency_key
         if has_unit:
-            match = _KEY.fullmatch(key) if type(key) is str else None  # also bounds the output index to 0..9
+            pattern = _FETCH_KEY if origin.kind == "fetch" else _KEY
+            match = pattern.fullmatch(key) if type(key) is str else None  # also bounds the output index to 0..9
             if match is None or match.group(1) != new.run_id or match.group(2) != origin.unit:
                 raise _refuse("AR-05", "the idempotency key must be <run>:<unit>:<attempt>:<index> of this output")
         elif key is not None:
@@ -729,6 +758,15 @@ class ArtifactStore:
             raise _refuse("AR-04", "content must be at least 1 byte")
         if len(new.content) > (MAX_TEXT if media in TEXT_TYPES else MAX_FILE):
             raise _refuse("AR-04", "content is over the size cap for its kind")
+        if origin.kind == "fetch":
+            if media not in FILE_TYPES or len(new.sources) != 1 or self._file_sniffer is None:
+                raise _refuse("AR-09", "a fetch needs a file sniffer and one archived source")
+            try:
+                sniffed = self._file_sniffer(new.content)
+            except Exception:
+                raise _refuse("AR-09", "fetched bytes are not an allowed file") from None
+            if sniffed != media:
+                raise _refuse("AR-09", "fetched bytes do not match their file kind")
         seen: set[str] = set()
         for source in new.sources:
             ident, ref = source.get("id"), source.get("archive_ref")

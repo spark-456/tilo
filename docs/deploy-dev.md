@@ -61,6 +61,12 @@ user-approved step, never from this workflow or recipe).
 
 ## What deploys what
 
+`just deploy dev` (also `just deploy env=dev`) deploys existing dev services through
+Cloud Build: API first, then all services. If the API build fails, the second build
+does not start. Non-dev arguments are rejected before any shell runs. This entry
+point does not apply infrastructure or deploy Hosting; use the web recipe below
+for Hosting. GitHub Actions remains unused under the current user policy.
+
 | Piece | How | Where it is defined |
 | --- | --- | --- |
 | Services `tilo-api`, `tilo-harness`, `tilo-channels`, `tilo-connectors`, `tilo-browser`, `tilo-render`, `tilo-sandbox-web` | Google Cloud Build: `just deploy-dev-cloudbuild` runs `cloudbuild.yaml` (P0-07f). Alternative: `.github/workflows/deploy-dev.yml` (`workflow_dispatch` only). Both build `services/<svc>/Dockerfile` with the repo root as context | PRD 6.2, 6.5 |

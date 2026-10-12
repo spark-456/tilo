@@ -18,22 +18,26 @@ MAX_TOKENS = 10**15  # keeps tokens * price inside float range in credits()
 @dataclass(frozen=True)
 class Usage:
     """One call. `tokens_cached` is a part of `tokens_in` served from the provider's prompt cache (ADR-0029 decision 2);
-    `units` counts the profile's `unit_price` unit, for example the search queries a grounded call ran (decision 1)."""
+    `units` counts the profile's `unit_price` unit, for example the search queries a grounded call ran (decision 1).
+    `tokens_audio` (LW-06) is the audio part of `tokens_in`, priced at `audio_input`, apart from `tokens_cached`."""
 
     profile: str
     tokens_in: int
     tokens_out: int
     tokens_cached: int = 0
     units: int = 0
+    tokens_audio: int = 0
 
     def __post_init__(self) -> None:
-        for tokens in (self.tokens_in, self.tokens_out, self.tokens_cached, self.units):
+        for tokens in (self.tokens_in, self.tokens_out, self.tokens_cached, self.units, self.tokens_audio):
             if isinstance(tokens, bool) or not isinstance(tokens, int):
                 raise TypeError(f"token counts must be ints, got {type(tokens).__name__}")
             if not 0 <= tokens <= MAX_TOKENS:
                 raise ValueError(f"token counts must be in 0..{MAX_TOKENS}")
         if self.tokens_cached > self.tokens_in:
             raise ValueError("cached tokens are a part of the input tokens: tokens_cached must be <= tokens_in")
+        if self.tokens_cached + self.tokens_audio > self.tokens_in:
+            raise ValueError("cached and audio tokens are parts of the input tokens: together at most tokens_in")
 
 
 @dataclass(frozen=True)
@@ -48,6 +52,7 @@ class PriceQuote:
     per_1k: float | None = None
     valid_until: str | None = None
     region: str | None = None  # the provider location the rates were quoted for (checked by tilo_providers at start-up)
+    audio_input: float | None = None  # US$ per 1M audio input tokens; None: no audio price (LW-06 refuses audio)
 
 
 @dataclass(frozen=True)
@@ -58,6 +63,7 @@ class _Rate:
     unit: str | None
     per_1k: float | None
     valid_until: str | None
+    audio_input: float | None = None
 
 
 @dataclass(frozen=True)
@@ -76,7 +82,13 @@ def _load_version(path: str | Path) -> _Version:
         for name, p in v.profiles.items():
             fee = p.unit_price
             rates[name] = _Rate(
-                p.input, p.output, p.cached_input, fee.unit if fee else None, fee.per_1k if fee else None, p.valid_until
+                p.input,
+                p.output,
+                p.cached_input,
+                fee.unit if fee else None,
+                fee.per_1k if fee else None,
+                p.valid_until,
+                p.audio_input,
             )
             fields = p.model_fields_set
             if v.status == "set" and (
@@ -88,7 +100,12 @@ def _load_version(path: str | Path) -> _Version:
             if p.valid_until is not None and v.effective_date is not None and p.valid_until < v.effective_date:
                 raise ValueError(f"profile {name!r}: valid_until {p.valid_until} is before effective_date")
         flat = [x for r in rates.values() for x in (r.input, r.output)]
-        [number(value) for r in rates.values() for value in (r.cached_input, r.per_1k) if value is not None]
+        [
+            number(value)
+            for r in rates.values()
+            for value in (r.cached_input, r.per_1k, r.audio_input)
+            if value is not None
+        ]
         [number(value) for value in (v.credit_usd, *flat) if value is not None]
     except (ValueError, RecursionError) as exc:  # ValidationError is a ValueError
         raise MeteringConfigError(f"{path}: not a valid prices file: {exc}") from exc
@@ -140,13 +157,18 @@ class PriceBook:
             rate.per_1k,
             rate.valid_until,
             version.region,
+            rate.audio_input,
         )
 
     def credits(self, usage: Usage, at: datetime) -> float:
-        """Tokens at their rates (cached ones at `cached_input`, else `input`) plus units * per_1k / 1,000."""
+        """Tokens at their rates (cached ones at `cached_input`, else `input`; audio ones at `audio_input`, refused
+        if the profile has none) plus units * per_1k / 1,000."""
         quote = self.quote(usage.profile, at)
         cached_rate = quote.input if quote.cached_input is None else quote.cached_input
-        tokens = (usage.tokens_in - usage.tokens_cached) * quote.input + usage.tokens_cached * cached_rate
+        if usage.tokens_audio and quote.audio_input is None:
+            raise UnpricedError(f"profile {usage.profile!r} has no audio_input price: audio tokens cannot be priced")
+        plain = usage.tokens_in - usage.tokens_cached - usage.tokens_audio
+        tokens = plain * quote.input + usage.tokens_cached * cached_rate + usage.tokens_audio * (quote.audio_input or 0)
         usd = (tokens + usage.tokens_out * quote.output) / 1_000_000
         if usage.units:
             if quote.per_1k is None:

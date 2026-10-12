@@ -5,6 +5,7 @@ Director's guess with its assumption, and a bad kinds file stops the task before
 from __future__ import annotations
 
 import tilo_planning.deliverable_kinds as kinds_module
+import yaml
 from tilo_planning.deliverable_kinds import load_deliverable_kinds
 from tilo_planning.questions import KINDS_QUESTION
 
@@ -79,7 +80,17 @@ def test_FR_INT_04_flow_a_bad_kinds_file_stops_the_task_before_anything_is_store
     assert flow.store.tasks == {}
 
 
-def test_FR_INT_04_flow_a_kind_that_is_not_available_yet_is_refused_and_nothing_changes(flow_factory):
+def test_FR_INT_04_flow_a_kind_that_is_not_available_yet_is_refused_and_nothing_changes(
+    flow_factory, tmp_path, monkeypatch
+):
+    raw = yaml.safe_load(kinds_module.DEFAULT_KINDS_CONFIG.read_text(encoding="utf-8"))
+    for item in raw["kinds"]:
+        needs = {"mock_test_quiz": "LW-12", "past_paper_links": "LW-14"}.get(item["id"])
+        if needs:
+            item.update(available=False, needs=needs)
+    path = tmp_path / "withheld.yaml"
+    path.write_text(yaml.safe_dump(raw), encoding="utf-8")
+    monkeypatch.setattr(kinds_module, "DEFAULT_KINDS_CONFIG", path)
     flow = _flow(flow_factory)
     task_id = flow.new_task()["task_id"]
 

@@ -37,6 +37,7 @@ class LoadedSkill:
     body: str
     sha256: str
     tool_access: Mapping[str, Any] = field(default_factory=dict)  # FR-ACC-02: connector id -> level, as declared
+    tools_allowed: tuple[str, ...] = ()  # the tools the skill may use (LW-07); a unit gets these intersect its role's
 
 
 def _read_capped(path: Path) -> bytes:
@@ -72,7 +73,12 @@ def _parse_skill(folder: Path) -> tuple[dict[str, Any], LoadedSkill]:
             raise SkillError(f"{folder.name}: {name} is not a valid JSON Schema") from error
     sha256 = hashlib.sha256(raw_yaml + raw_md).hexdigest()
     return data, LoadedSkill(
-        id=data["id"], version=data["version"], body=body, sha256=sha256, tool_access=data.get("tool_access") or {}
+        id=data["id"],
+        version=data["version"],
+        body=body,
+        sha256=sha256,
+        tool_access=data.get("tool_access") or {},
+        tools_allowed=tuple(data["tools_allowed"]),
     )
 
 

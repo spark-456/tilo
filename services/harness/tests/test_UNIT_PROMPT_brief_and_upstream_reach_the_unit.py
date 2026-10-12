@@ -268,16 +268,30 @@ def test_UNIT_PROMPT_a_long_brief_cuts_at_item_boundaries_and_keeps_room_for_the
     variables = caps.request_variables(brief, ANSWERS)
     assert variables["answers"] != "none" and "deep_mastery" in variables["answers"]
     assert "left out" in variables["constraints"] and len(variables["constraints"]) <= caps.CONSTRAINTS_CAP + 40
-    assert not variables["constraints"].replace("(more left out: too long)", "").rstrip("; ").endswith("xx" + "y")
+    parts = variables["constraints"].split("; ")
+    whole = [p for p in parts if p != caps.LEFT_OUT]
+    assert whole and parts[-1] == caps.LEFT_OUT  # the cut came at an item boundary, with a note
+    assert all(p.startswith("limit number ") and p.endswith("x" * 200) for p in whole)  # no half item
 
 
 def test_UNIT_PROMPT_an_upstream_body_is_cut_when_the_item_is_built() -> None:
+    from types import SimpleNamespace
+
     from tilo_harness import unit_prompt as caps
-    from tilo_harness.executor import _upstream_item
+    from tilo_harness.executor import UnitOutcome, _upstream_item
 
-    class Out:
-        media_type, content = "text/markdown", b"Z" * 2_000_000
+    reads: list[bytes] = []
 
-    outcome = __import__("tilo_harness.executor", fromlist=["UnitOutcome"]).UnitOutcome(success=True, outputs=(Out(),))
-    item = _upstream_item({"id": "U1", "title": "t"}, outcome, [], None)
-    assert item.text is None or len(item.text) <= caps.UPSTREAM_ITEM_CAP
+    class Artifacts:
+        def read(self, scope, ref) -> bytes:
+            body = ("€" * 3_000_000).encode()  # a 3-byte character: the byte cut can split one
+            reads.append(body)
+            return body
+
+    stored = SimpleNamespace(version=SimpleNamespace(ref="v1", record={"media_type": "text/markdown"}))
+    item = _upstream_item(
+        {"id": "U1", "title": "t"}, UnitOutcome(success=True), [stored], {"artifacts": Artifacts(), "scope": "s"}
+    )
+    assert reads, "the stored version was read"
+    assert item.text is not None and len(item.text) == caps.UPSTREAM_ITEM_CAP  # cut to the cap, not the 3M characters
+    assert set(item.text) == {"€"}  # the 16000-byte decode cut left no replacement character inside the cap

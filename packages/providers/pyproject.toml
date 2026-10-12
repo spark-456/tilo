@@ -9,6 +9,7 @@ dependencies = [
     "google-genai>=1.0",
     "httpx>=0.27",
     "jsonschema>=4.18",
+    "pypdf>=6.19",  # LW-06: measures the pages of an untrusted PDF part, in a child process (media.py)
     "referencing>=0.30",
     "tilo-redact",
 ]

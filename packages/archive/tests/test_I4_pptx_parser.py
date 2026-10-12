@@ -100,3 +100,15 @@ def test_I4_pptx_refuses_wrong_slide_root_and_unknown_type():
         parse_pptx(pptx([("ppt/slides/slide1.xml", b"<wrong/>")]))
     with pytest.raises(Refused, match="^unknown_type$"):
         parse_pptx(archive([("renamed.pptx", b"text")]))
+
+
+def test_I4_pptx_hostile_expanded_xml_has_bounded_peak_and_time():
+    from test_I4_xml_allocation import assert_bounded_refusal, compressed_office, hostile_xml
+
+    data = compressed_office(
+        "ppt/presentation.xml",
+        "application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml",
+        f'<presentation xmlns="{PRESENTATION}"/>'.encode(),
+        [("ppt/slides/slide1.xml", hostile_xml("flat"))],
+    )
+    assert_bounded_refusal(parse_pptx, data, replace(Limits(), expanded_bytes=32 * 1024 * 1024))

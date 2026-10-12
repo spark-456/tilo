@@ -20,6 +20,7 @@ import pydantic
 from tilo_contracts import Brief
 from tilo_providers.clock import real_today
 from tilo_providers.interfaces import Capability, GenerateRequest
+from tilo_providers.media import MediaPart
 from tilo_providers.prompts import load_prompt, neutralise_marker
 from tilo_providers.router import Router, RouterError, RouterResult
 
@@ -251,6 +252,8 @@ def brief_request(
     refusal_policy: RefusalPolicy | None = None,
     gap_policy: GapPolicy | None = None,
     today: date | None = None,
+    source_text: str = "",
+    parts: list[MediaPart] | None = None,
 ) -> GenerateRequest:
     """The Director's brief request as `extract_brief` sends it to the router; `just vertex-probe-schema` replays it
     (PL-02), so the probe cannot drift from the real request. `today` is the date the prompt states as a fact
@@ -264,16 +267,26 @@ def brief_request(
         "gaps": "\n".join(f"- {c.id}: {c.reason}" for c in gap_config.categories),
         "services": ", ".join(gap_config.services) or "no other service",
     }
+    prompt = load_prompt(
+        DIRECTOR_ROLE,
+        "brief_task.md",
+        {"task": neutralise_marker(task_text, "TASK"), "today": (today or real_today()).isoformat()},
+    )
+    if source_text:
+        prompt += "\n\n" + load_prompt(
+            DIRECTOR_ROLE,
+            "brief_uploads.md",
+            {
+                "sources": neutralise_marker(source_text, "UPLOADS"),
+            },
+        )
     return GenerateRequest(
         system=load_prompt(DIRECTOR_ROLE, "brief_system.md", variables),
-        prompt=load_prompt(
-            DIRECTOR_ROLE,
-            "brief_task.md",
-            {"task": neutralise_marker(task_text, "TASK"), "today": (today or real_today()).isoformat()},
-        ),
+        prompt=prompt,
         json_mode=True,
         response_schema=output_schema(),
         thinking_level=BRIEF_THINKING,
+        parts=parts or None,
     )
 
 
@@ -285,13 +298,22 @@ def extract_brief(
     refusal_policy: RefusalPolicy | None = None,
     gap_policy: GapPolicy | None = None,
     today: date | None = None,
+    source_text: str = "",
+    parts: list[MediaPart] | None = None,
 ) -> ExtractionResult:
     """PRD 16.3 item 1: the task text is passed only as delimited data, after the instructions. An out-of-policy
     category from the Director raises `TaskRefused` carrying the configured text (FR-INT-12), never a brief. Parts
     Tilo cannot do come back as `gaps` (FR-INT-15); a task with no possible part raises `NothingPossible`."""
     policy = load_refusal_policy() if refusal_policy is None else refusal_policy
     gap_config = load_gap_policy() if gap_policy is None else gap_policy
-    request = brief_request(task_text, refusal_policy=policy, gap_policy=gap_config, today=today)
+    request = brief_request(
+        task_text,
+        refusal_policy=policy,
+        gap_policy=gap_config,
+        today=today,
+        source_text=source_text,
+        parts=parts,
+    )
     try:
         run = router.generate(DIRECTOR_ROLE, request, budget=budget, required_capability=Capability.JSON)
     except RouterError as error:
