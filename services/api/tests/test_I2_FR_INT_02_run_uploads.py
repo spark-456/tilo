@@ -159,6 +159,9 @@ def test_I2_FR_INT_02_archive_failure_cleans_upload_bytes(uploads, monkeypatch):
     client, bridge, artifacts, _ = uploads
 
     class Broken:
+        def records(self):
+            return []  # bind succeeds; exercise failure after the artifact version was actually written
+
         def append(self, *_):
             raise RuntimeError("archive unavailable")
 
