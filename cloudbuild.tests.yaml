@@ -1,0 +1,55 @@
+# Test-only gate. The existing deployment allowlist and identity are unchanged.
+timeout: 1800s
+serviceAccount: projects/$PROJECT_ID/serviceAccounts/tilo-cloudbuild@$PROJECT_ID.iam.gserviceaccount.com
+options:
+  logging: CLOUD_LOGGING_ONLY
+  machineType: E2_HIGHCPU_8
+steps:
+  - id: node-dependencies
+    name: node:22-bookworm
+    waitFor: ['-']
+    entrypoint: bash
+    args:
+      - -ceu
+      - |
+        mkdir -p /workspace/.cloud-tools/bin
+        cp /usr/local/bin/node /workspace/.cloud-tools/bin/node
+        npm install --prefix /workspace/.cloud-tools pnpm@10.14.0
+        export PATH=/workspace/.cloud-tools/node_modules/.bin:$$PATH
+        pnpm install --frozen-lockfile
+        git init -q
+        git add . ':!.cloud-tools' ':!.venv'
+        git -c user.name=cloud-gate -c user.email=cloud-gate@example.invalid commit -q -m 'Tracked test source'
+  - id: python-dependencies
+    name: python:3.12-bookworm
+    waitFor: ['-']
+    entrypoint: bash
+    args:
+      - -ceu
+      - |
+        mkdir -p /workspace/.cloud-tools/bin
+        pip install uv==0.12.18
+        cp "$$(command -v uv)" /workspace/.cloud-tools/bin/uv
+        curl -fsSL https://github.com/casey/just/releases/download/1.58.0/just-1.58.0-x86_64-unknown-linux-musl.tar.gz | tar -xz -C /workspace/.cloud-tools/bin just
+        uv sync --locked
+  - id: repository
+    name: python:3.12-bookworm
+    waitFor: [node-dependencies, python-dependencies]
+    entrypoint: bash
+    env: ['LIVE=0', 'TILO_API_STORE=memory', 'TILO_PEOPLE_STORE=memory']
+    args:
+      - -ceu
+      - |
+        export PATH=/workspace/.venv/bin:/workspace/.cloud-tools/bin:/workspace/.cloud-tools/node_modules/.bin:$$PATH
+        /workspace/.venv/bin/python -m pytest tests/repo -q -p no:cacheprovider
+  - id: web
+    name: node:22-bookworm
+    waitFor: [node-dependencies]
+    entrypoint: bash
+    env: ['LIVE=0']
+    args:
+      - -ceu
+      - |
+        export PATH=/workspace/.cloud-tools/bin:/workspace/.cloud-tools/node_modules/.bin:$$PATH
+        pnpm --filter @tilo/web exec vitest run --maxWorkers=4
+        pnpm --filter @tilo/web exec tsc --noEmit
