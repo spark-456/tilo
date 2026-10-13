@@ -7,6 +7,7 @@ options:
 steps:
   - id: node-dependencies
     name: node:22-bookworm
+    env: ['npm_config_store_dir=/workspace/.cloud-tools/pnpm-store']
     waitFor: ['-']
     entrypoint: bash
     args:
@@ -58,7 +59,7 @@ steps:
     name: python:3.12-bookworm
     waitFor: [node-dependencies, python-dependencies]
     entrypoint: bash
-    env: ['LIVE=0', 'TILO_API_STORE=memory', 'TILO_PEOPLE_STORE=memory']
+    env: ['LIVE=0', 'TILO_API_STORE=memory', 'TILO_PEOPLE_STORE=memory', 'npm_config_store_dir=/workspace/.cloud-tools/pnpm-store']
     args:
       - -ceu
       - |
