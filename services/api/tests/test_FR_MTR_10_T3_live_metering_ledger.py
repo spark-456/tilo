@@ -18,7 +18,8 @@ Ledger shows live cost. Pinned:
 from __future__ import annotations
 
 import logging
-from datetime import UTC, datetime
+import math
+from datetime import UTC, date, datetime
 from typing import Any
 
 import pytest
@@ -27,12 +28,24 @@ from _sec15_lib import REPO_ROOT
 from _sec16_lib import JUDGE_A, ORG, make_caps, make_ledger
 from test_SEC_16_api_spend_cap import BIG_LIMIT
 from test_SEC_16_GOLIVE_935_metering import UNIT, FakeRouter, Screen, attempt
+from tilo_api.spend_units import INR_MINOR_PER_USD
 from tilo_metering import LedgerEntry
 
 wired_rig = metering_tests.wired  # the deployed harness of the metering suite, as a fixture of this module
 
 CREDIT_USD = 0.005
-MINOR_PER_USD = 8000  # BQ-GOLIVE935-4: spend_units.INR_MINOR_PER_USD
+MINOR_PER_USD = INR_MINOR_PER_USD  # BQ-GOLIVE935-4/-7: every expected amount below follows the product's rate
+
+
+def settled_minor_of(tokens_in: int, tokens_out: int, profile: str = "flash-38") -> int:
+    """What the cap ledger must settle for one billed call: the profile's price x the rate, rounded up, at least 1."""
+    from tilo_providers.config import load_providers_config
+
+    config = load_providers_config(REPO_ROOT / "config" / "models.yaml", REPO_ROOT / "config" / "prices.yaml")
+    return max(1, math.ceil(config.cost_usd(profile, tokens_in, tokens_out, at=date.today()) * MINOR_PER_USD))
+
+
+ONE_UNIT = settled_minor_of(1_000, 500)  # the director call of 1,000 tokens in and 500 out used by these tests
 
 
 def credits_of(minor: int) -> float:
@@ -88,10 +101,10 @@ def test_FR_MTR_10_BQ_MTR10_4_T3_a_settled_unit_is_one_entry_for_exactly_what_th
     ledger, book = make_ledger(**BIG_LIMIT), Book()
     routed(ledger, book, attempts=[attempt(tokens_in=1_000, tokens_out=500)]).generate("director", object())
 
-    assert ledger.settled_minor(JUDGE_A) == 24
+    assert ledger.settled_minor(JUDGE_A) == ONE_UNIT
     (entry,) = book.entries
     assert (entry.kind, entry.run, entry.user, entry.org) == ("commit", "r_unit", JUDGE_A, ORG)
-    assert entry.credits == pytest.approx(credits_of(24)) and entry.at.tzinfo is not None
+    assert entry.credits == pytest.approx(credits_of(ONE_UNIT)) and entry.at.tzinfo is not None
     assert (entry.usage.profile, entry.usage.tokens_in, entry.usage.tokens_out) == ("flash-38", 1_000, 500)
     assert entry.step == "model"
 
@@ -121,7 +134,7 @@ def test_FR_MTR_10_BQ_MTR10_4_T3_a_billed_failure_and_a_safety_check_are_entries
     MeteredSafety(Screen(ledger), meter_with(ledger, book)).check("a" * 3_000)  # type: ignore[arg-type]
 
     assert [(e.step, round(e.credits, 6)) for e in book.entries] == [
-        ("model", round(credits_of(24), 6)),
+        ("model", round(credits_of(ONE_UNIT), 6)),
         ("safety", round(credits_of(1), 6)),
     ]
     assert sum(e.credits for e in book.entries) == pytest.approx(credits_of(ledger.settled_minor(JUDGE_A)))
@@ -170,7 +183,7 @@ def test_FR_MTR_10_BQ_MTR10_4_T3_a_failed_ledger_write_keeps_the_settled_spend_a
         result = router.generate("director", object())
 
     assert result is not None, "the call's answer is untouched"
-    assert ledger.settled_minor(JUDGE_A) == ledger.spent_minor(JUDGE_A) == 24, "the settle stands"
+    assert ledger.settled_minor(JUDGE_A) == ledger.spent_minor(JUDGE_A) == ONE_UNIT, "the settle stands"
     assert book.entries == []
     assert "treasury_ledger_write_failed" in caplog.text and "secret detail" not in caplog.text
 

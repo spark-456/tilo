@@ -14,7 +14,7 @@ from _sec16_lib import JUDGE_A, make_ledger
 from _t3_ledger_lib import ORG, OTHER, OWNER, Flaky, entry, make
 from fastapi import FastAPI, HTTPException
 from fastapi.testclient import TestClient
-from test_FR_MTR_10_T3_live_metering_ledger import routed
+from test_FR_MTR_10_T3_live_metering_ledger import MINOR_PER_USD, ONE_UNIT, routed
 from test_FR_MTR_10_T3_treasury_ledger_seams import PROJECT, _app, _deployed, _request, _wire
 from test_SEC_16_api_spend_cap import BIG_LIMIT
 from test_SEC_16_GOLIVE_935_metering import attempt
@@ -136,7 +136,7 @@ def test_FR_MTR_10_SEC_16_a_total_below_the_spend_ledger_is_marked_partial(monke
 
     routed(spend, writer, **call).generate("director", object())
     whole = client.get("/costs").json()
-    one_unit = 24 / 8000 / costs.credit_usd()  # what the cap ledger settled, as credits
+    one_unit = ONE_UNIT / MINOR_PER_USD / costs.credit_usd()  # what the cap ledger settled, as credits
     assert (whole["partial"], whole["partial_reason"]) == (False, None)
     assert whole["totals"]["credits"] == pytest.approx(one_unit)
 
@@ -144,7 +144,7 @@ def test_FR_MTR_10_SEC_16_a_total_below_the_spend_ledger_is_marked_partial(monke
     routed(spend, writer, **call).generate("director", object())
     db.broken = False
     short = client.get("/costs").json()
-    assert spend.settled_minor(JUDGE_A) == 48 and short["totals"]["credits"] == pytest.approx(one_unit)
+    assert spend.settled_minor(JUDGE_A) == 2 * ONE_UNIT and short["totals"]["credits"] == pytest.approx(one_unit)
     assert (short["partial"], short["partial_reason"]) == (True, "below_spend_ledger")
 
 
@@ -181,7 +181,7 @@ def test_FR_MTR_10_SEC_16_the_cap_ledger_settles_before_the_treasury_write_is_ma
             seen.append((spend.settled_minor(JUDGE_A), spend.spent_minor(JUDGE_A)))
 
     routed(spend, Watch(), attempts=[attempt(tokens_in=1_000, tokens_out=500)]).generate("director", object())
-    assert seen == [(24, 24)], "at the write the unit is already settled, not held"
+    assert seen == [(ONE_UNIT, ONE_UNIT)], "at the write the unit is already settled, not held"
 
 
 @pytest.mark.parametrize("service", ["slack", "notion", "github", "stripe"])
