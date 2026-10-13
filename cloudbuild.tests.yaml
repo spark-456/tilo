@@ -53,6 +53,17 @@ steps:
       - |
         export PATH=/workspace/.venv/bin:/workspace/.cloud-tools/bin:$$PATH
         /workspace/.venv/bin/python -m pytest services/api/tests/test_ADR32_T4_FR_MTG_09_host_rpc.py services/api/tests/test_ADR35_L6_FR_CON_02_connector_stubs.py services/api/tests/test_FR_MTG_09_JOIN_b.py services/api/tests/test_FR_MTG_09_attend.py services/api/tests/test_FR_TEAM_04_switch_routes.py services/api/tests/test_MROOM_776b_SEC_16_SEC_07.py services/api/tests/test_SEC_15_SIGNIN_fix_demo_replay.py services/api/tests/test_SEC_16_FEEDBACK_caps_config.py services/api/tests/test_SEC_16_config.py -q -p no:cacheprovider
+  - id: voice-affected
+    name: python:3.12-bookworm
+    waitFor: [python-dependencies]
+    entrypoint: bash
+    env: ['LIVE=0']
+    args:
+      - -ceu
+      - |
+        export PATH=/workspace/.venv/bin:/workspace/.cloud-tools/bin:$$PATH
+        /workspace/.venv/bin/python -m pytest packages/providers/tests/test_FR_MTG_11_gemini_live_voice.py packages/providers/tests/test_FR_MTG_17_speech_providers.py -q -p no:cacheprovider
+        /workspace/.venv/bin/python -m pytest meet-bot/tests/test_FR_MTG_11_gemini_live_replay.py -q -p no:cacheprovider
   - id: web
     name: node:22-bookworm
     waitFor: [node-dependencies]

@@ -406,6 +406,21 @@ test("WEB-MOTION-2 e2e: after the splash has gone the page bundles of the other 
   test.setTimeout(90_000);
   const page = await newPage(browser, baseURL);
   const problems = collectConsoleProblems(page);
+  await page.addInitScript(() => {
+    // Vite's module graph can exceed the browser's default 250 resource entries.
+    performance.setResourceTimingBufferSize(2000);
+    // Observe removal in the mutation microtask, before module evaluation can delay
+    // the polling probe's next sample. Both timestamps use the resource timing clock.
+    let shown = false;
+    const observer = new MutationObserver(() => {
+      if (document.querySelector('[aria-label="Loading Tilo"]')) shown = true;
+      else if (shown) {
+        Reflect.set(window, "__prefetchSplashGoneAt", performance.now());
+        observer.disconnect();
+      }
+    });
+    observer.observe(document, { childList: true, subtree: true });
+  });
   await page.goto("/park/home");
   await booted(page);
   const names = (): Promise<{ name: string; start: number }[]> =>
@@ -421,9 +436,8 @@ test("WEB-MOTION-2 e2e: after the splash has gone the page bundles of the other 
       { timeout: 10_000, message: "the page bundles are never prefetched" },
     )
     .toBe(BUNDLES.length);
-  const { samples } = await readProbe(page);
-  const lastUp = samples.map((s) => s.splash !== null).lastIndexOf(true);
-  const goneAt = samples[lastUp + 1]?.t ?? Number.NaN;
+  const goneAt = await page.evaluate(() => Reflect.get(window, "__prefetchSplashGoneAt") as number);
+  expect(Number.isFinite(goneAt), "the splash removal must be observed").toBe(true);
   const early = (await names()).filter(
     (e) => BUNDLES.some((b) => e.name.includes(`/pages/${b}`)) && e.start < goneAt - 10,
   );
