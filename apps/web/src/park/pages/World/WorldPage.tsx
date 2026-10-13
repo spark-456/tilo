@@ -36,6 +36,7 @@ import { Activity, Districts, Result, RunHistory } from "./Lower";
 import { MeetingHall } from "./MeetingHall";
 import { FactsCard, GoLink, LovableCard, SpendCard, WaitingCard } from "./Side";
 import { SkillProposals } from "./SkillProposals";
+import { ShareWithTeam } from "./TeamShare";
 import "./World.css";
 import { cityArt, rowArt, singleArt } from "./worldArt";
 import {
@@ -358,6 +359,9 @@ export function WorldPage({ app }: { app: AppCtx }) {
           >
             Share to Slack
           </Button>
+          {loaded.live && worldClient && !w.sample ? (
+            <ShareWithTeam client={worldClient} worldId={w.id} worldName={w.name} />
+          ) : null}
           {!slackState.connected ? (
             <span id={NO_SLACK_ID} className="park-world-sr">
               {slackState.disabledReason}
