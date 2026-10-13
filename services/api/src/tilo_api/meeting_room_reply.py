@@ -52,7 +52,7 @@ class Grounding:
 
 @dataclass(frozen=True)
 class ModelReply:
-    text: str
+    text: str | None
     credits: float
     role: str
     profile: str | None = None

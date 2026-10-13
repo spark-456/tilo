@@ -116,6 +116,8 @@ class _Outbox(_Counted, InMemoryOutboxStore):
 class _ArchiveLines:
     """The raw archive's line store (`tilo_archive.Store`): in memory, charged, gone with the session."""
 
+    _lines: dict[tuple[str, str], list[str]]
+
     def __init__(self, session: DemoSession) -> None:
         self._session, self._lines, self._lock = session, {}, threading.Lock()
 
