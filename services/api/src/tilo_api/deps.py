@@ -738,10 +738,35 @@ def meter_for(request: Request | None, mode: Any, switches: Any, *, run_id: str 
     )
     path = request.path_params
     run = run_id or next((f"{k}_{path[k]}" for k in ("task_id", "world_id") if isinstance(path.get(k), str)), None)
+    run = run or f"req_{uuid.uuid4().hex}"
     return spend_units.SpendMeter(
-        guard, uid=uid, run_id=run or f"req_{uuid.uuid4().hex}", org_id=ORG_ID,
-        unit_minor=caps.unit_reserve_minor, config=providers_config(),
+        guard, uid=uid, run_id=run, org_id=ORG_ID, unit_minor=caps.unit_reserve_minor, config=providers_config(),
+        sink=_ledger_sink(request, uid, run),
     )  # fmt: skip
+
+
+def _ledger_sink(request: Request, uid: str, meter_run: str) -> Any:
+    """T3 (BQ-T3-3): the meter's Treasury sink, or None when no writer is wired (the spend is then not recorded in the
+    ledger, an ERROR marker says so, and the cap ledger is unaffected). The entry's run is the run id of the path's task
+    or world when it is this person's own, so it lands on that world's cost report; else it keeps the meter's id."""
+    from tilo_api import costs, spend_units  # noqa: PLC0415
+
+    writer = ledger_writer_for(request)
+    if writer is None:
+        logger.error("treasury_ledger_write_failed (no writer is wired)")
+        return None
+    path, run = request.path_params, meter_run
+    try:
+        override = request.app.dependency_overrides.get(get_store)
+        store = override() if override is not None else get_store(request)
+        task, world = store.tasks.get(path.get("task_id")), store.worlds.get(path.get("world_id"))
+        if task is not None and task.owner == uid:  # only the person's own task or world names the run
+            run = task.run_id
+        elif world is not None and world.owner == uid:
+            run = world.run_id
+    except Exception as exc:  # no store to look in: the meter's own id, reported as unattributed
+        logger.warning("treasury entry run not resolved: %s", type(exc).__name__)
+    return spend_units.LedgerSink(writer, uid=uid, org_id=ORG_ID, run_id=run, credit_usd=costs.credit_usd)
 
 
 def _live_or_replay(mode: Any, meter: Any) -> Mode:
