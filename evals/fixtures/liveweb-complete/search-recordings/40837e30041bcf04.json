@@ -4,9 +4,7 @@
   "result": {
     "answer": "Fictional past paper and answer key.",
     "profile_id": "fixture",
-    "queries": [
-      "Northbridge fictional past paper and answer key"
-    ],
+    "queries": ["Northbridge fictional past paper and answer key"],
     "query": "Northbridge fictional past paper and answer key",
     "sources": [
       {
