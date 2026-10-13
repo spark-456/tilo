@@ -1,8 +1,9 @@
 // The mount point: the Park app serves the root paths (/, /worlds, /world/:id, /team, ...), the /park alias
 // and every address no screen owns (its own "Page not found"); the old app serves exactly the addresses it
 // keeps (`isKeptPath`: /start, the live stage at /world/:id/stage and the other kept screens). W20's
-// ?fixture= recorded stage composes the existing player with Park chrome at this boundary. Both apps are
-// dynamic imports, so a visit to a kept screen never loads the Park app (NFR-01). `isParkPath` and
+// ?fixture= recorded stage composes the existing player with Park chrome at this boundary. W21 gives every
+// reachable kept screen Park chrome; development-only galleries retain their shell. Both apps are dynamic
+// imports, so a kept screen does not load the Park page app (NFR-01). `isParkPath` and
 // `isKeptPath` are the shared predicates for the split (WEB-CUTOVER). /privacy and /terms (WEB-LEGAL) are
 // static public pages: their own chunk, loading neither app (no sign-in, no API). /oauth/google/callback (ADR-0035 L4) is its own chunk
 // behind the sign-in gate; it loads neither app. SEC-15: both apps sit behind the
@@ -58,6 +59,7 @@ export function Root() {
   const recording =
     /^\/world\/[^/]+\/stage\/?$/.test(pathname) &&
     !!new URLSearchParams(window.location.search).get("fixture");
+  const developmentScreen = /^\/(?:screens(?:\/cards)?|dev\/components)\/?$/.test(pathname);
   // ONBOARD-1: the first-run welcome and tour register themselves with the Park shell (park/shell/tour.ts): a chunk of
   // its own, started beside the Park app's and never awaited by it. The kept screens and legal pages never load it.
   useEffect(() => {
@@ -81,7 +83,13 @@ export function Root() {
     <SignInGate auth={session}>
       <AccessGuard>
         <Suspense fallback={null}>
-          {recording ? <RecordedReplay /> : park ? <ParkApp /> : <App />}
+          {recording ? (
+            <RecordedReplay />
+          ) : park ? (
+            <ParkApp />
+          ) : (
+            <App parkChrome={!developmentScreen} />
+          )}
         </Suspense>
       </AccessGuard>
     </SignInGate>

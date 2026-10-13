@@ -4,7 +4,12 @@
 import { type ReactNode, Suspense, useEffect, useRef } from "react";
 import { ChunkBoundary } from "./ChunkBoundary";
 
-export function ScreenPage({ screenId, children }: { screenId: string; children: ReactNode }) {
+export function ScreenPage({
+  screenId,
+  children,
+  embedded = false,
+}: { screenId: string; children: ReactNode; embedded?: boolean }) {
+  const Tag = embedded ? "section" : "main";
   const ref = useRef<HTMLElement>(null);
   useEffect(() => {
     const page = ref.current;
@@ -39,7 +44,7 @@ export function ScreenPage({ screenId, children }: { screenId: string; children:
     };
   }, []);
   return (
-    <main ref={ref} className="screen-page" data-testid="screen-page" data-screen={screenId}>
+    <Tag ref={ref} className="screen-page" data-testid="screen-page" data-screen={screenId}>
       {/* The frame is already on screen; the fallback fills the same box, so nothing shifts. */}
       <ChunkBoundary>
         <Suspense
@@ -52,6 +57,6 @@ export function ScreenPage({ screenId, children }: { screenId: string; children:
           {children}
         </Suspense>
       </ChunkBoundary>
-    </main>
+    </Tag>
   );
 }

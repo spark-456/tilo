@@ -1,4 +1,5 @@
 import { memo, useEffect, useMemo, useRef } from "react";
+import { KeptShell } from "./KeptShell";
 import { useClient, useIsFixtureClient, useReplaySpeed, useWorldKnown } from "./api/ClientProvider";
 import { AssistantPanel } from "./assistant/AssistantPanel";
 import { useStageMode } from "./display/stageMode";
@@ -55,7 +56,7 @@ const NEEDS_YOU_SCREENS: ReadonlySet<string> = new Set(["S-06", "S-07"]);
 const NOT_FOUND: ScreenMatch = { id: "not-found", params: [], Component: NotFound };
 
 /** PRD 18.3 layout frame: desktop rails either side of the stage; mobile bottom tabs; 1920x1080 stage mode. */
-export function App() {
+export function App({ parkChrome = false }: { parkChrome?: boolean } = {}) {
   const mobile = useMediaQuery("(max-width: 767px)");
   const wideStage = useMediaQuery("(min-width: 1920px)");
   const [stageMode] = useStageMode();
@@ -159,17 +160,18 @@ export function App() {
     <LoggedScrubber worldId={worldId} fixture={fixtureClient} />
   ) : null;
   if (parkOnlyWorld) return null; // the effect above is moving to the Park page
-  return (
+  const content = (
     <div
       className="app-shell"
+      data-park-chrome={parkChrome ? "on" : "off"}
       data-stage-mode={stageMode ? "on" : "off"}
       data-stage-layout={stageLayout ? "1920x1080" : "off"}
       data-strip={world.active || fixtureClient ? "on" : "off"}
       data-replay-badge={speedBadge ? "on" : "off"}
       data-replay-dock={dock ? "on" : "off"}
     >
-      {!stageLayout && <TopBar fixture={world.active} />}
-      {!mobile && !stageLayout && <PrimaryNav id="left-rail" mobile={false} />}
+      {!parkChrome && !stageLayout && <TopBar fixture={world.active} />}
+      {!parkChrome && !mobile && !stageLayout && <PrimaryNav id="left-rail" mobile={false} />}
       {!screen && hudWorld && !mobile && !stageMode && (
         <LevelsPanel
           key={`levels:${hudWorld}`}
@@ -178,7 +180,7 @@ export function App() {
         />
       )}
       {screen ? (
-        <ScreenPage key={screen.id} screenId={screen.id}>
+        <ScreenPage key={screen.id} screenId={screen.id} embedded={parkChrome}>
           <screen.Component
             key={`${screen.id}:${screen.params.join("/")}`}
             params={screen.params}
@@ -209,7 +211,9 @@ export function App() {
         <div className="status-strip">
           {/* biome-ignore lint/a11y/useSemanticElements: <output> is for a form/calculation result; this is a persistent mode banner, so an explicit role="status" region fits better. */}
           <div className="fixture-replay-banner" data-testid="fixture-replay-banner" role="status">
-            Fixture replay — dev data, not a real run
+            {parkChrome
+              ? "Sample run data — recorded, not your task"
+              : "Fixture replay — dev data, not a real run"}
           </div>
           {speedBadge && (
             // biome-ignore lint/a11y/useSemanticElements: same persistent status region as the banner above, not a form result.
@@ -267,7 +271,7 @@ export function App() {
               />
             </details>
           )}
-          <PrimaryNav id="bottom-tabs" mobile />
+          {!parkChrome && <PrimaryNav id="bottom-tabs" mobile />}
         </>
       ) : (
         <aside className="right-rail" data-testid="right-rail">
@@ -324,4 +328,5 @@ export function App() {
       <AssistantPanel />
     </div>
   );
+  return parkChrome ? <KeptShell>{content}</KeptShell> : content;
 }

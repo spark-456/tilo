@@ -1,0 +1,43 @@
+/* UI-10 W21: the kept player fits inside Park's outlet, below its navigation. */
+[data-park] .app-shell[data-park-chrome="on"] {
+  --bar-h: 0px;
+  position: relative;
+  height: 80vh;
+  min-height: 480px;
+  min-width: 0;
+  overflow: auto;
+  border-radius: var(--radius-cards);
+  background: var(--color-surface-1);
+}
+[data-park] .app-shell[data-park-chrome="on"] .status-strip {
+  position: absolute;
+}
+[data-park] .app-shell[data-park-chrome="on"] .flow-shell {
+  position: absolute;
+  left: var(--space-16);
+  max-width: calc(100% - var(--space-32));
+  max-height: calc(100% - var(--chrome-h) - var(--space-32));
+  overflow: auto;
+}
+[data-park] .app-shell[data-park-chrome="on"] .hud-sheet {
+  position: relative;
+  bottom: 0;
+  flex: none;
+}
+[data-park] .app-shell[data-park-chrome="on"] .fixture-load-alert,
+[data-park] .app-shell[data-park-chrome="on"] .live-world-note {
+  position: absolute;
+}
+[data-park] .app-shell[data-park-chrome="on"] .live-world-note {
+  left: var(--space-16);
+}
+[data-park]:has([data-park-chrome="on"][data-stage-layout="1920x1080"]) .park-shell__nav {
+  display: none;
+}
+[data-park] .app-shell[data-park-chrome="on"][data-stage-layout="1920x1080"] {
+  position: fixed;
+  inset: 0;
+  z-index: 800;
+  height: 100vh;
+  border-radius: 0;
+}
