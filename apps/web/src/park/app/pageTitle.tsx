@@ -7,13 +7,18 @@ type SetTitle = (title: string | null) => void;
 
 export const PageTitleContext = createContext<SetTitle | null>(null);
 
-/** Renders nothing; while mounted the document title is `<title> · Tilo`. Outside the shell it does nothing. */
-export function PageTitle({ title }: { title: string }) {
+/** While the calling component is mounted the document title is `<title> · Tilo`. Outside the shell: nothing. */
+export function usePageTitle(title: string): void {
   const set = useContext(PageTitleContext);
   useEffect(() => {
     if (!set) return undefined;
     set(title);
     return () => set(null);
   }, [set, title]);
+}
+
+/** `usePageTitle` for a place a hook cannot go (after an early return); renders nothing. */
+export function PageTitle({ title }: { title: string }) {
+  usePageTitle(title);
   return null;
 }
