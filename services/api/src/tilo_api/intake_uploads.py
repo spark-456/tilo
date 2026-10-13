@@ -13,6 +13,8 @@ from tilo_planning.extraction import FILE_TYPES, Budget, ExtractionError, extrac
 from tilo_planning.intake import IntakeRejected
 from tilo_providers.interfaces import SafetyProvider
 
+FILE_SCREEN_UNAVAILABLE = "the stored file could not be screened"
+
 
 class UploadStorageError(RuntimeError):
     """Only the run artifact/archive operations failed; no input or backend message is exposed."""
@@ -88,7 +90,7 @@ class RunUploads(InMemoryArtifactStore):
         except IntakeRejected as exc:
             return None, exc.reason, False, None
         if stored.screening == "unscreened":
-            return None, "the stored file could not be screened", False, None
+            return None, FILE_SCREEN_UNAVAILABLE, False, None
         flagged = stored.screening == "flagged"
         if mime == "text/csv":
             text = stored.content.decode("utf-8-sig")  # the Director sees the exact redacted stored text
@@ -120,7 +122,7 @@ class RunUploads(InMemoryArtifactStore):
         except Exception:
             failed = True
         if refused:
-            raise IntakeRejected("the file exceeds the existing artifact limits")
+            raise IntakeRejected("the file could not be stored")
         if failed:
             raise UploadStorageError("upload artifact storage failed")
         if version.written:
