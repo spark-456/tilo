@@ -54,6 +54,28 @@ steps:
         # The unchanged deployed base 2a066515 fails this catalogue check with KeyError('read_slack').
         # Keep every per-action authorization case, including the real push outbox path; no assertion changes.
         /workspace/.venv/bin/python -m pytest services/channels/tests/test_FR_CHN_17*.py services/channels/tests/test_FR_PA_07*.py services/channels/tests/test_SEC_08_forged_or_replayed_requests_rejected.py services/api/tests/test_FR_CHN_17*.py services/connectors/tests/test_SEC_11_every_side_effect_carries_authz.py --deselect=services/connectors/tests/test_SEC_11_every_side_effect_carries_authz.py::test_SEC_11_the_discovered_side_effect_set_is_consistent_between_config_and_risk_table -q -p no:cacheprovider
+  - id: batch-api
+    name: python:3.12-bookworm
+    waitFor: [python-dependencies]
+    entrypoint: bash
+    env: ['LIVE=0', 'TILO_API_STORE=memory', 'TILO_PEOPLE_STORE=memory']
+    args:
+      - -ceu
+      - |
+        export PATH=/workspace/.venv/bin:/workspace/.cloud-tools/bin:$$PATH
+        /workspace/.venv/bin/python -m pytest services/api/tests/test_CONTEXT_P2_owner.py services/api/tests/test_FR_SKL_05*.py services/api/tests/test_FR_SET_01_02_user_settings_routes.py services/api/tests/test_I2_FR_INT_02_run_uploads.py services/api/tests/test_PPL_11c_s4_write_limits.py services/api/tests/test_FR_PA_06b_plate_link_route.py services/api/tests/test_FR_CHN_18b_plate_mailer.py services/api/tests/test_SEC_15_visitor_refused.py services/api/tests/test_SEC_15_gate_hardening.py services/api/tests/test_SEC_15_declaration.py services/api/tests/test_SEC_16_api_rate_limit.py services/api/tests/test_SEC_16_api_spend_cap.py services/api/tests/test_SEC_08_forged_or_replayed_tick_rejected.py services/api/tests/test_SEC_10_appcheck*.py services/api/tests/test_FR_AGT_14_schedule_routes.py -q -p no:cacheprovider
+        /workspace/.venv/bin/python -m pytest tests/system/test_SYS_fail_closed_and_services.py -k tilo_api -q -p no:cacheprovider
+  - id: batch-libraries
+    name: python:3.12-bookworm
+    waitFor: [python-dependencies]
+    entrypoint: bash
+    env: ['LIVE=0', 'TILO_API_STORE=memory', 'TILO_PEOPLE_STORE=memory']
+    args:
+      - -ceu
+      - |
+        export PATH=/workspace/.venv/bin:/workspace/.cloud-tools/bin:$$PATH
+        /workspace/.venv/bin/python -m pytest packages/people/tests packages/skills/tests tests/contracts packages/archive/tests/test_I4*.py services/connectors/tests/test_FR_CON_19*.py services/channels/tests/test_FR_PA_06*.py services/channels/tests/test_FR_CHN_18*.py -q -p no:cacheprovider
+        /workspace/.venv/bin/python -c 'import pyexpat; print("Linux parser runtime:", pyexpat.EXPAT_VERSION)'
   - id: web
     name: node:22-bookworm
     waitFor: [node-dependencies]
