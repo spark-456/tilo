@@ -12,6 +12,7 @@ from tilo_harness.writer import WriterBusy as _WriterBusy
 from tilo_logging import configure_logging as _configure_logging
 
 from tilo_api import appcheck as _appcheck
+from tilo_api import byok_routes as _byok_routes
 from tilo_api import connect_routes as _connect_routes
 from tilo_api import cors as _cors
 from tilo_api import deps as _deps
@@ -151,6 +152,7 @@ app.include_router(_plate_links.router)  # FR-PA-06b: /l/<token> (public to the 
 app.include_router(_team_shares_router)  # ADR-0040: owner-only PUT/DELETE of a world's team share
 app.include_router(_team_items_router)  # ADR-0040: the team view of a shared world's work items
 app.include_router(_meeting_host_routes.router)
+app.include_router(_byok_routes.router)  # ADR-0041: /v1/org/model-key; 503 not_configured while config/byok.yaml is off
 app.include_router(_quiz_apps.router)
 app.include_router(_connect_routes.router)
 app.include_router(_people_list_router)

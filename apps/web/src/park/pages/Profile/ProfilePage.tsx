@@ -13,6 +13,7 @@ import { useDemoSession, useParkApi } from "../../app/context";
 import { useFollowed } from "../../app/followed";
 import { PageSheet, StatusChip, Switch } from "../../components";
 import { SampleBadge } from "../../sample/SampleBadge";
+import { ModelKeyControl } from "./ModelKey";
 import "./Profile.css";
 import { BetaPlan } from "./BetaPlan";
 import { PushControl } from "./PushControl";
@@ -788,6 +789,7 @@ export function ProfilePage({ app }: { app: AppCtx }) {
                     ))
                   )}
                 </div>
+                <ModelKeyControl demo={demo} />
               </section>
             ) : null}
           </div>
