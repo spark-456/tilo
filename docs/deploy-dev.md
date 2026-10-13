@@ -500,8 +500,12 @@ more (K = 1).
    `voice.live.price_approved: true` and `voice.live.enabled: true` in `config/voice.yaml`, and redeploy both images
    (step 3). Until this step nothing calls the meter. Without the row, 15 replies fill a meeting's run cap (150 INR) and 50
    a person's lifetime cap (500 INR).
-7. Check `LIVE=1` is on `tilo-meet-bot` (already so for attendance) and **not** on `tilo-api`: the meter routes never
-   read it, and the env drift check in `docs/routines-rollout.md` forbids it there.
+7. Check `LIVE=1` is on `tilo-meet-bot` (already so for attendance): that is the bot's own gate (with `TILO_API_URL`
+   and a valid claim header). The meter routes on `tilo-api` never read `LIVE`, so whether `tilo-api` carries it does
+   not matter to them and nothing changes there for this feature (the deployed API keeps the user's switch for live
+   Home tasks). The env drift check in `docs/routines-rollout.md` lists `LIVE` under `$Never` from before go-live and
+   will print `FORBIDDEN: LIVE is set` for as long as the user keeps it: expected, not a defect of this feature
+   (BQ-M2-13).
 8. The X4 probe and one real meeting with `tilotesting@gmail.com` (`meet-bot/scripts/attend-owner.ps1`). Check C, after a
    spoken Live reply:
 

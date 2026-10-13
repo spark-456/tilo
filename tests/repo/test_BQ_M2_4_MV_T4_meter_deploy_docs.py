@@ -65,7 +65,9 @@ def test_BQ_M2_4_T4_the_runbook_has_the_checks_the_rollback_and_the_unchanged_li
         assert phrase in runbook, phrase
     steps = [line for line in runbook.splitlines() if line[:3] in {f"{n}. " for n in range(1, 10)}]
     assert len(steps) == 8, "the user's ordered steps are numbered 1 to 8"
-    assert "LIVE" in runbook and "not** on `tilo-api`" in runbook  # the meter routes never read LIVE
+    # the meter routes never read LIVE: the API's own switch (the user's, for live Home tasks) is irrelevant to them
+    assert "never read `LIVE`" in runbook and "not matter to them" in runbook
+    assert "on `tilo-meet-bot`" in runbook and "BQ-M2-13" in runbook
 
 
 def test_BQ_M2_4_T4_the_voice_meter_settings_are_on_the_env_drift_allowlist(repo_root: pathlib.Path) -> None:
@@ -75,9 +77,10 @@ def test_BQ_M2_4_T4_the_voice_meter_settings_are_on_the_env_drift_allowlist(repo
         assert f'"{name}"' in optional, name
 
 
-def test_BQ_M2_4_T4_the_refusal_memory_finding_is_the_last_open_question(repo_root: pathlib.Path) -> None:
-    rows = [line for line in _read(repo_root, "docs/open-questions.md").splitlines() if line.startswith("| BQ-")]
-    last = rows[-1]
-    assert last.startswith("| BQ-M2-12 |")
+def test_BQ_M2_4_T4_the_refusal_memory_finding_is_an_open_question_row(repo_root: pathlib.Path) -> None:
+    # Rows are appended at the END of the file (BQ row order), so a later row may follow this one: it is found by id.
+    rows = [line for line in _read(repo_root, "docs/open-questions.md").splitlines() if line.startswith("| BQ-M2-12 |")]
+    assert len(rows) == 1, "exactly one BQ-M2-12 row"
+    last = rows[0]
     for word in ("FallbackTTS", "NotConfigured", "out/.tts_state.json", "packages/providers", "NOT done"):
         assert word in last, word
