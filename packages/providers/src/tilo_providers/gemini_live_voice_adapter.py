@@ -107,8 +107,8 @@ class GeminiLiveVoiceProvider(SpeechProvider):
         self.last_timing: VoiceTiming | None = None
         self.last_usage: dict[str, int] = {}
 
-    def redact(self, text: str) -> str:
-        return _GOOGLE_SECRET_RE.sub("[redacted]", text)
+    def redact(self, payload: str) -> str:
+        return _GOOGLE_SECRET_RE.sub("[redacted]", payload)
 
     def transcribe(self, audio: bytes, **kwargs: Any) -> Any:
         raise RequestError("FR-MTG-11: the Live voice only synthesizes; transcribe through the speech provider")
