@@ -245,6 +245,99 @@ def test_BK_16_an_overrun_is_committed_in_full() -> None:
     assert spend.spent(ORG, "2026-10-13") == pytest.approx(30.0)
 
 
+# --- SEC-REVIEW-29 B3: no zero-cost loophole at the cap -------------------------------------------------------------
+
+
+def _at_cap(spend: ByokSpend, cap: int = 100) -> None:
+    assert spend.reserve(ORG, "2026-10-13", float(cap), cap)
+    spend.commit(ORG, "2026-10-13", float(cap), float(cap))
+    assert spend.spent(ORG, "2026-10-13") == cap
+
+
+@pytest.mark.parametrize("estimate", [0.0, -1.0, -1e9, float("nan"), float("-inf"), float("inf"), 0.0001])
+def test_BK_16_B3_at_the_exact_cap_no_estimate_passes_not_zero_negative_nan_or_tiny(estimate: float) -> None:
+    spend, vault = ByokSpend(), _vault(ORG)
+    _at_cap(spend)
+    got = plan(_ref(day_cap_credits=100), vault, spend, estimate_credits=estimate)
+    assert (got.refused, got.payer, got.uses_tilo_meter, got.binding) == ("cap_reached", "tilo", False, None)
+    assert got.reserved_credits == 0.0 and spend.spent(ORG, "2026-10-13") == 100.0 and vault.calls == []
+
+
+@pytest.mark.parametrize("estimate", [0.0, -3.0, float("nan"), float("-inf"), float("inf")])
+def test_BK_16_B3_a_unit_below_the_cap_always_reserves_at_least_one_credit(estimate: float) -> None:
+    spend = ByokSpend()
+    got = plan(_ref(day_cap_credits=100), spend=spend, estimate_credits=estimate)
+    assert got.payer == "org_key" and got.reserved_credits == 1.0
+    assert spend.spent(ORG, "2026-10-13") == 1.0, "a held credit is a held credit"
+    abort_unit(got, spend)
+    assert spend.spent(ORG, "2026-10-13") == 0.0
+
+
+def test_BK_16_B3_less_than_one_credit_of_headroom_is_no_headroom() -> None:
+    spend = ByokSpend()
+    assert spend.reserve(ORG, "2026-10-13", 99.5, 100)
+    assert plan(_ref(day_cap_credits=100), spend=spend, estimate_credits=0.0).refused == "cap_reached"
+    assert spend.spent(ORG, "2026-10-13") == 99.5
+
+
+def test_BK_16_B3_a_direct_reserve_of_nothing_or_nonsense_holds_nothing_and_is_refused() -> None:
+    spend = ByokSpend()
+    for credits in (0.0, -5.0, 0.5, float("nan"), float("inf"), float("-inf")):
+        assert spend.reserve(ORG, "2026-10-13", credits, 100) is False, credits
+    assert spend.spent(ORG, "2026-10-13") == 0.0
+    _at_cap(spend)
+    assert spend.reserve(ORG, "2026-10-13", 1.0, 100) is False
+
+
+def test_BK_16_B3_parallel_zero_estimate_units_cannot_all_pass_a_small_cap() -> None:
+    import threading
+
+    spend, vault, plans = ByokSpend(), _vault(ORG), []
+    gate = threading.Barrier(24)
+
+    def one() -> None:
+        gate.wait()
+        plans.append(plan(_ref(day_cap_credits=5), vault, spend, estimate_credits=0.0))
+
+    threads = [threading.Thread(target=one) for _ in range(24)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    passed = [p for p in plans if p.payer == "org_key"]
+    assert len(plans) == 24 and len(passed) == 5, "exactly the cap's worth of minimum reservations"
+    assert {p.refused for p in plans if p.payer != "org_key"} == {"cap_reached"}
+    assert spend.spent(ORG, "2026-10-13") == 5.0
+
+
+# --- SEC-REVIEW-29 B4: a key whose bundle left the config never silently runs on Tilo's key ------------------------
+
+GONE = ByokConfig(enabled=True, day_cap_credits_max=10_000, calls_per_org_per_minute=120, consent_version=1, bundles={})
+
+
+def test_BK_17_B4_a_reference_whose_bundle_left_the_config_blocks_the_unit_and_never_falls_back() -> None:
+    spend, vault = ByokSpend(), _vault(ORG)
+    got = plan(_ref(fallback_to_tilo=False), vault, spend, config=GONE)
+    assert (got.refused, got.payer, got.uses_tilo_meter, got.reason, got.binding) == (
+        "not_configured", "tilo", False, None, None,
+    )  # fmt: skip
+    assert got.blocked and got.reserved_credits == 0.0
+    assert spend.spent(ORG, "2026-10-13") == 0.0 and vault.calls == []
+
+
+def test_BK_17_B4_only_the_owners_opt_in_lets_it_run_on_tilos_key_and_the_reason_is_stated() -> None:
+    got = plan(_ref(fallback_to_tilo=True), config=GONE)
+    assert (got.payer, got.uses_tilo_meter, got.blocked, got.reason) == ("tilo", True, False, "not_configured")
+
+
+def test_BK_17_B4_personal_scope_and_flag_off_are_unchanged() -> None:
+    assert plan(_ref(), config=GONE, personal_scope=True) == byok_unit._TILO  # noqa: SLF001
+    off = ByokConfig()
+    assert plan(_ref(), config=off) == byok_unit._TILO  # noqa: SLF001
+    assert plan(_ref(), config=GONE, mode="replay") == byok_unit._TILO  # noqa: SLF001
+    assert plan(_ref(), config=GONE, demo=True) == byok_unit._TILO  # noqa: SLF001
+
+
 # --- BQ-BYOK-3 and the other org -----------------------------------------------------------------------------------
 
 

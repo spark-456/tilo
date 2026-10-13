@@ -37,6 +37,21 @@ Both "Google" modes of BQ-BYOK-2 are modelled: `google_api_key` (the org's Gemin
 A service-account JSON key is refused by the key charset check. The Google adapter side, which runs in connectors, is
 BYOK-4/BYOK-6.
 
+## Fail-closed rules of the unit order (SEC-REVIEW-29)
+
+- The org's day cap has no zero-cost loophole: a unit holds at least one credit (a zero, negative or non-finite estimate
+  holds the minimum), and `ByokSpend.reserve` refuses a hold under one credit or one that does not fit, so a day that
+  has reached its cap refuses every unit at its start and parallel units cannot all pass (BK-16).
+- A key whose bundle is no longer in `config/byok.yaml` (flag on) is step 4, `not_configured`: the unit is refused, or
+  runs on Tilo's key only when the owner turned `fallback_to_tilo` on, with that reason. Which roles the vanished
+  bundle covered is unknown, so every org-scope unit of that org is refused until the owner rotates to a bundle that
+  exists or removes the key; personal-scope units stay on Tilo's key as always. `GET /v1/org/model-key` says
+  `active: false` and `last_error: not_configured` to the owner and `active: false, label: null` to members.
+- A `google_vertex_iam` bundle is refused on `PUT` (422 `key_refused`) until `byok_routes.VERTEX_GRANT_CHECKED` is
+  turned on by the ticket that proves the project is the org's (BQ-BYOK-2, BYOK-4/6): an owner-typed project would be
+  called with Tilo's own identity.
+- A pause is accepted only from `active`; a resume restores only a key that was verified when paused.
+
 ## Not built (left, in order)
 
 1. Contract changes below (architect), then `tilo_contracts` codegen.

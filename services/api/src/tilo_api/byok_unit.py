@@ -8,17 +8,21 @@ model decides whose key a unit uses, whether it may run, or whether Tilo's key i
    SEC-16, as today;
 3. key active, role covered, the org's day cap not reached, connectors answering: the org's key, `payer: org_key`;
    SEC-16 is not consulted (BK-15) but the unit's mode (the shared replay switch, LIVE, the declaration) already was;
-4. the key is paused, invalid, unverified or removed, connectors refused or is unreachable, or the cap is reached:
-   REFUSED with a fixed code. No call is made and Tilo's key is not tried;
+4. the key is paused, invalid, unverified or removed, its bundle is no longer in the config (`not_configured`; which
+   roles it covered is unknown, so every org-scope unit is refused), connectors refused or is unreachable, or the cap is
+   reached: REFUSED with a fixed code. No call is made and Tilo's key is not tried;
 5. step 4 and the owner opted in (`fallback_to_tilo`): Tilo's key under SEC-16, per unit, with the reason.
 
-The plan carries a reservation against the org's own day (`ByokSpend`): estimate plus 15%, committed at the actual
-(MT-03). The Firestore transaction with the ledger row, the per-path wiring in the live run paths and `trace.payer` on
-the event are not here (they need contract changes and the SEC-16 wiring of issue 935 first; docs/byok.md).
+The plan carries a reservation against the org's own day (`ByokSpend`): estimate plus 15%, at least one credit (a zero,
+negative or non-finite estimate holds the minimum, and the day's cap is refused at once when no credit is left),
+committed at the actual (MT-03). The Firestore transaction with the ledger row, the per-path wiring in the live run
+paths and `trace.payer` on the event are not here (they need contract changes and the SEC-16 wiring of issue 935
+first; docs/byok.md).
 """
 
 from __future__ import annotations
 
+import math
 import threading
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -30,6 +34,7 @@ from tilo_providers.byok import ByokConfig, OrgBinding, OrgProviderSource
 from tilo_api.byok_store import SLOT, KeyReference, ModelKeyVault
 
 RESERVE_MARGIN = 1.15  # BK-16: estimate plus 15%
+MIN_RESERVE = 1.0  # BK-16: one credit, the least a unit ever holds (a zero, negative or non-finite estimate included)
 _STATE_CODE = {"paused": "key_paused", "invalid": "invalid_key", "unverified": "unverified"}
 
 
@@ -43,6 +48,10 @@ class ByokSpend:
         self._held: dict[tuple[str, str], float] = {}
 
     def reserve(self, org_id: str, day: str, credits: float, cap: int) -> bool:
+        """Holds `credits` of the org's day, or refuses. A hold is at least `MIN_RESERVE` and finite: nothing is free,
+        so an estimate of 0 can never pass at the cap or let parallel units each pass (SEC-REVIEW-29 B3)."""
+        if not math.isfinite(credits) or credits < MIN_RESERVE:
+            return False
         with self._lock:
             key = (org_id, day)
             if self._committed.get(key, 0.0) + self._held.get(key, 0.0) + credits > cap:
@@ -105,23 +114,33 @@ def plan_unit(
     # 1. replay as today: the shared switch, LIVE, the declaration and the demo session all arrive as `mode`/`demo`
     if demo or mode != "live":
         return _TILO
-    # 2. Tilo's key as today: BYOK off, no key for this org, personal scope, or a role the bundle leaves out
+    # 2. Tilo's key as today: BYOK off, no key for this org, personal scope, or a role the bundle leaves out. A key
+    #    whose bundle is no longer in the config is NOT this row: which roles it covered is unknown, so it is step 4
     bundle = config.bundles.get(ref.bundle_id) if ref is not None else None
-    if not config.enabled or ref is None or bundle is None or personal_scope or role not in bundle.roles:
+    if not config.enabled or ref is None or personal_scope or (bundle is not None and role not in bundle.roles):
         return _TILO
     # 3 and 4
-    code = _refusal(ref, vault, org_id)
-    day = now().astimezone(UTC).date().isoformat()
-    reserve = max(0.0, estimate_credits) * RESERVE_MARGIN
-    if code is None and not spend.reserve(org_id, day, reserve, ref.day_cap_credits):
-        code = "cap_reached"
-    if code is None:
-        binding = OrgBinding(org_id=org_id, slot=SLOT, run_id=run_id, bundle=bundle, source=source)
-        return ByokUnitPlan("org_key", False, binding=binding, reserved_credits=reserve, day=day, org_id=org_id)
+    if bundle is None:  # SEC-REVIEW-29 B4: never a silent move onto Tilo's key and meter
+        code: str | None = "not_configured"
+    else:
+        code = _refusal(ref, vault, org_id)
+        day = now().astimezone(UTC).date().isoformat()
+        reserve = _reservation(estimate_credits)
+        if code is None and not spend.reserve(org_id, day, reserve, ref.day_cap_credits):
+            code = "cap_reached"
+        if code is None:
+            binding = OrgBinding(org_id=org_id, slot=SLOT, run_id=run_id, bundle=bundle, source=source)
+            return ByokUnitPlan("org_key", False, binding=binding, reserved_credits=reserve, day=day, org_id=org_id)
     # 5. the owner's opt-in (a T3 act to turn on) lets this unit, never a call in flight, run on Tilo's key
     if ref.fallback_to_tilo:
         return ByokUnitPlan("tilo", True, reason=code)
     return ByokUnitPlan("tilo", False, refused=code)
+
+
+def _reservation(estimate_credits: float) -> float:
+    """Estimate plus 15%, never less than one credit; a negative or non-finite estimate holds the minimum (B3)."""
+    estimate = estimate_credits if math.isfinite(estimate_credits) and estimate_credits > 0 else 0.0
+    return max(MIN_RESERVE, estimate * RESERVE_MARGIN)
 
 
 def _refusal(ref: KeyReference, vault: ModelKeyVault, org_id: str) -> str | None:
