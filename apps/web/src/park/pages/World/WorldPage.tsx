@@ -102,6 +102,7 @@ function StageLink({
       className={className}
       // biome-ignore lint/a11y/useSemanticElements: the disabled-link pattern: role="link" + aria-disabled
       role="link"
+      tabIndex={0} // UI-10 B4: still reachable by keyboard, so the reason it is off can be read
       aria-disabled="true"
       aria-describedby={NO_STAGE_ID}
       title={NO_STAGE}
