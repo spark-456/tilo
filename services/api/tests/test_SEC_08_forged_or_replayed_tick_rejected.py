@@ -46,7 +46,7 @@ from _fr_agt_14_lib import (
     SchedApi,
     l3_budget_policy,
 )
-from _sec15_lib import route_table
+from _sec15_lib import PINNED_PUBLIC_LINK_ROUTES, route_table
 from google.auth import crypt, jwt
 
 KID = "kid-sec08-one"
@@ -351,8 +351,8 @@ def test_SEC_08_api_has_exactly_one_public_signed_route_and_every_other_route_ne
     sched.sign_out()  # nobody is signed in and no token is presented
     exposed = []
     for method, path in route_table(sched.app):
-        if (method, path) in health | signed:
-            continue
+        if (method, path) in health | signed | PINNED_PUBLIC_LINK_ROUTES:
+            continue  # the mail-link set is public on purpose; its token cases are test_FR_PA_06b's
         status = sched.flow.client.request(method, _concrete(path), json={}).status_code
         if status not in (401, 403):
             exposed.append((method, path, status))

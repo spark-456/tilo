@@ -35,15 +35,28 @@ export function callTable(): CallTable {
     getTeamPolicy: [],
     getConnectorTerms: [],
     getProfileSettings: [],
+    getBuildHandoff: [],
+    getUserSettings: [],
+    saveUserSettings: [
+      {
+        version: fx.userSettings.version,
+        profile: fx.userSettings.profile,
+        notifications: fx.userSettings.notifications,
+        quiet_hours: fx.userSettings.quiet_hours,
+      },
+    ],
     decide: ["depot"],
     undo: ["depot"],
     startWorld: ["workspace", "Plan the offsite"],
     saveSkill: [skill],
+    captureSkill: ["Check the inbox and log each invoice"],
+    proposeVersion: ["tsk_01"],
     setToolLevel: ["email", 2],
     bookSlot: [slot],
     addBackup: ["ps"],
     setPref: ["backup", "ps"],
     writeTeam: [{ kind: "remove", id: "ps" }],
+    submitFeedback: ["Honest words."],
   };
 }
 

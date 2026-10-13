@@ -93,7 +93,7 @@ function Person({
             className={
               p.pending ? "park-team-avatar park-team-avatar--pending" : "park-team-avatar"
             }
-            style={p.pending ? undefined : { background: p.c }}
+            style={p.pending || p.c === null ? undefined : { background: p.c }}
           >
             {p.pending ? "?" : initialsOf(p.name)}
           </span>
@@ -112,7 +112,7 @@ function Person({
           <select
             className="park-team-select"
             aria-label={`Role for ${p.name}`}
-            value={p.role}
+            value={p.role ?? ""}
             disabled={!canChange(p)}
             onChange={(e) => onRole(p, e.target.value)}
           >

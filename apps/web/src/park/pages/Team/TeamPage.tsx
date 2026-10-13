@@ -11,13 +11,16 @@ import {
   useRef,
   useState,
 } from "react";
-import type { World } from "../../api/types";
+import type { Team, World } from "../../api/types";
 import type { AppCtx } from "../../app/AppCtx";
 import { useParkApi } from "../../app/context";
-import { useLiveTeam } from "../../app/useLiveTeam";
+import { isNotBuilt, useLiveTeam } from "../../app/useLiveTeam";
 import { useStaged } from "../../app/useStaged";
 import { Button, PageSheet } from "../../components";
+import { FirstRunPanels } from "../../sample/FirstRunPanels";
+import { useFirstRunPreview } from "../../sample/useFirstRunPreview";
 import { Coverage } from "./Coverage";
+import { LiveMembers } from "./LiveMembers";
 import { LiveBody, LiveInvite, StatusLine } from "./LiveTeam";
 import { Members } from "./Members";
 import { MatrixCard, RulesCard } from "./Rules";
@@ -65,27 +68,37 @@ function Frame({ children }: { children: ReactNode }) {
 }
 
 export function TeamPage({ app }: { app: AppCtx }) {
+  const preview = useFirstRunPreview();
+  return preview ? <FirstRunPanels page="team" app={app} /> : <PersonalTeamPage app={app} />;
+}
+function PersonalTeamPage({ app }: { app: AppCtx }) {
   const api = useParkApi();
   const { dec, added, toast } = app;
   const [loaded, setLoaded] = useState<Loaded | "failed" | null>(null);
+  const [controlsOnly, setControlsOnly] = useState(false);
+  const [controlsOpen, setControlsOpen] = useState(false);
+  const [liveTeam, setLiveTeam] = useState<Team | null>(null);
   const [people, setPeople] = useState<Member[] | null>(null);
   const [email, setEmail] = useState("");
   const sent = useRef(0);
-  // TEAM-WEB: ask the live Api first. A live server answers with its team (or a refusal we say in words); the
-  // fixture Api answers `null` and an unbuilt one rejects, and both leave the sample page below as it was.
-  const lt = useLiveTeam(api);
-  const sample = lt.state.phase === "fixture";
   useEffect(() => {
-    if (!sample) return;
     let live = true;
-    Promise.all([
-      api.getTeam(),
-      api.getTeamPolicy(),
-      api.getLearn(),
-      api.getSkills(),
-      api.getWorlds(dec, added),
-    ])
-      .then(([t, pol, l, s, w]) => {
+    setLiveTeam(null);
+    setLoaded(null);
+    api
+      .getTeam()
+      .then(async (t) => {
+        if (!live) return;
+        if (t.source === "live") {
+          setLiveTeam(t.data);
+          return;
+        }
+        const [pol, l, s, w] = await Promise.all([
+          api.getTeamPolicy(),
+          api.getLearn(),
+          api.getSkills(),
+          api.getWorlds(dec, added),
+        ]);
         if (!live) return;
         setPeople((ps) => ps ?? t.data.people);
         setLoaded({
@@ -96,11 +109,15 @@ export function TeamPage({ app }: { app: AppCtx }) {
           worlds: w.data,
         });
       })
-      .catch(() => live && setLoaded("failed"));
+      .catch((e: unknown) => {
+        if (!live) return;
+        if (isNotBuilt(e)) setControlsOnly(true);
+        else setLoaded("failed");
+      });
     return () => {
       live = false;
     };
-  }, [api, dec, added, sample]);
+  }, [api, dec, added]);
 
   const valid = isValidEmail(email);
   const invite = () => {
@@ -118,40 +135,30 @@ export function TeamPage({ app }: { app: AppCtx }) {
 
   // One stable root: the frame and the heading are the same elements while loading, loaded or failed, so
   // the h1 the shell focuses on arrival is not remounted when the data lands.
-  const liveView = lt.state.phase === "ready" ? lt.state.view : null;
-  if (!sample) {
-    const count = liveView
-      ? `${liveView.members.length + liveView.invites.length} people`
-      : undefined;
-    return (
-      <Frame>
-        <Top count={count}>{liveView ? <LiveInvite live={lt} toast={toast} /> : null}</Top>
-        {liveView ? <StatusLine text={lt.note} /> : null}
-        {liveView ? (
-          <LiveBody live={lt} view={liveView} toast={toast} />
-        ) : lt.state.phase === "error" ? (
-          <section className="park-team-card park-team-empty">
-            <h2 className="park-team-h2">Team</h2>
-            <p className="park-team-intro">{lt.state.text}</p>
-          </section>
-        ) : null}
-      </Frame>
-    );
-  }
+  if (controlsOnly) return <LiveControlsPage app={app} />;
+
   const ready =
-    loaded && loaded !== "failed" && people
+    !liveTeam && loaded && loaded !== "failed" && people
       ? {
           data: loaded,
           people,
           // The invite placeholder takes the owner's mail domain from the team data.
           domain:
-            loaded.team.people.find((p) => p.role === "Owner")?.email.split("@")[1] ??
+            loaded.team.people.find((p) => p.role === "Owner")?.email?.split("@")[1] ??
             "company.com",
         }
       : null;
   return (
     <Frame>
-      <Top count={ready ? `${ready.people.length} people` : undefined}>
+      <Top
+        count={
+          liveTeam
+            ? `${liveTeam.people.length} people`
+            : ready
+              ? `${ready.people.length} people`
+              : undefined
+        }
+      >
         {ready ? (
           <div className="park-team-invite">
             <div className="park-team-field">
@@ -168,6 +175,11 @@ export function TeamPage({ app }: { app: AppCtx }) {
             <Button
               variant="primary"
               disabled={!valid}
+              title={
+                valid
+                  ? undefined
+                  : `Enter a work email at ${ready?.domain ?? "your company"} to invite`
+              }
               style={{ opacity: valid ? 1 : 0.6 }}
               onClick={invite}
             >
@@ -176,7 +188,15 @@ export function TeamPage({ app }: { app: AppCtx }) {
           </div>
         ) : null}
       </Top>
-      {ready ? (
+      {liveTeam ? (
+        <>
+          <LiveMembers team={liveTeam} />
+          <details onToggle={(e) => setControlsOpen(e.currentTarget.open)}>
+            <summary>Manage team settings</summary>
+            {controlsOpen ? <LiveControls app={app} /> : null}
+          </details>
+        </>
+      ) : ready ? (
         <TeamBody app={app} data={ready.data} people={ready.people} setPeople={setPeople} />
       ) : loaded === "failed" ? (
         <section className="park-team-card park-team-empty">
@@ -249,7 +269,12 @@ function TeamBody({ app, data, people, setPeople }: BodyProps) {
         open={open}
         onOpen={(id) => setOpen((o) => (o === id ? null : id))}
         onRole={setRole}
-        canChange={(p) => !!you && canChangeRole(you, p)}
+        canChange={(p) =>
+          !!you &&
+          you.role !== null &&
+          p.role !== null &&
+          canChangeRole({ id: you.id, role: you.role }, { id: p.id, role: p.role })
+        }
         onRemove={remove}
         onResend={(p) => toast(`Invite sent again to ${p.email}`)}
       />
@@ -281,5 +306,31 @@ function TeamBody({ app, data, people, setPeople }: BodyProps) {
         </div>
       ) : null}
     </>
+  );
+}
+
+/** The owner settings view supplements the people directory; failures do not hide the directory. */
+function LiveControls({ app }: { app: AppCtx }) {
+  const lt = useLiveTeam(useParkApi());
+  return (
+    <>
+      {lt.state.phase === "ready" ? <LiveInvite live={lt} toast={app.toast} /> : null}
+      <StatusLine text={lt.note} />
+      {lt.state.phase === "ready" ? (
+        <LiveBody live={lt} view={lt.state.view} toast={app.toast} />
+      ) : lt.state.phase === "error" ? (
+        <p className="park-team-intro">{lt.state.text}</p>
+      ) : lt.state.phase === "fixture" ? (
+        <p>Not connected yet</p>
+      ) : null}
+    </>
+  );
+}
+function LiveControlsPage({ app }: { app: AppCtx }) {
+  return (
+    <Frame>
+      <Top />
+      <LiveControls app={app} />
+    </Frame>
   );
 }

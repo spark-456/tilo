@@ -13,6 +13,7 @@ import {
   readErrorText,
   teamErrorText,
 } from "../api/live/teamLive";
+import { NotBuilt } from "../api/liveApi";
 
 export type LiveState =
   | { phase: "probing" }
@@ -31,6 +32,7 @@ export interface LiveTeam {
 
 export const REFRESH_FAILED = "Saved; could not refresh";
 export const READ_ONLY = "Only an Owner can change the team. You can look at it.";
+export const isNotBuilt = (e: unknown): boolean => e instanceof NotBuilt;
 
 export function useLiveTeam(api: Api): LiveTeam {
   const [state, setState] = useState<LiveState>({ phase: "probing" });

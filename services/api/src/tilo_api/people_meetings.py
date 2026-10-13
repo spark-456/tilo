@@ -13,7 +13,7 @@ from typing import Annotated, Any
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 from tilo_memory.artifacts import ArtifactStore, Scope
-from tilo_people.access import AccessRequest, decide
+from tilo_people.access import AccessRequest, decide, read
 from tilo_people.directory import Directory
 from tilo_people.text import clean_line
 from tilo_policy.schemas import conforms
@@ -61,6 +61,23 @@ def _mine(w: Writer, meeting_id: str, action: str, gone: tuple[str, ...]) -> tup
 def get_meeting(w: Writer, meeting_id: str) -> dict[str, Any]:
     """The stored meeting, a discarded one too; a deleted meeting is gone for everyone (FR-MTG-10)."""
     return _mine(w, meeting_id, "read_full", ("deleted",))[0]
+
+
+def list_meetings(w: Writer) -> dict[str, Any]:
+    """Owner-indexed, oracle-vetted records; deleted meetings never leave the store."""
+    directory = w.directory()
+    if directory.record(w.actor) is None:
+        raise _not_found()
+    rows = []
+    for stored in w.stores.meetings.list(w.org, "owner", w.actor):
+        record = stored.record
+        if record["owner"] != w.actor or record["status"] == "deleted":
+            continue
+        got = read(AccessRequest(w.actor, "read_full", "meeting", record, w.now), directory)
+        if got is not None:
+            rows.append(got)
+    rows.sort(key=lambda row: (row["created_at"], row["id"]))
+    return {"items": rows[:200], "truncated": len(rows) > 200}
 
 
 def edit_meeting(w: Writer, meeting_id: str, body: MeetingEditIn) -> dict[str, Any]:

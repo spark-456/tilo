@@ -2,7 +2,9 @@
 // the next step) that AGW-02 to AGW-05 fill in. S-12 (Delivery) is S_12.tsx, routed by routes.tsx.
 // Every client call has loading, empty and error states with a retry (PRD 18.4); one filled
 // primary button per screen (UX-1).
-import { type ReactNode, Suspense, lazy, useEffect, useRef } from "react";
+import { type ReactNode, Suspense, lazy, useEffect, useRef, useState } from "react";
+import { useClient } from "../api/ClientProvider";
+import { LifetimeCapDialog } from "../components/LifetimeCapDialog";
 import { ReplayBanner } from "../components/ReplayBanner";
 import { useFlowRoute } from "../router";
 import { ChunkBoundary } from "./ChunkBoundary";
@@ -31,6 +33,22 @@ function Notice({ message, onRetry }: { message: string; onRetry?: (() => void) 
         </button>
       )}
     </div>
+  );
+}
+
+/** SEC-16: the lifetime-allowance pop-up in the place of the generic error. Close hides it; `rearm` changing (the next
+ * try starts) lets the next failure show it again. Its feedback goes through the client (nothing says Thanks early). */
+function CapDialog({ rearm }: { rearm: unknown }) {
+  const client = useClient();
+  const [closed, setClosed] = useState(false);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `rearm` is the trigger, not a value read here.
+  useEffect(() => setClosed(false), [rearm]);
+  if (closed) return null;
+  return (
+    <LifetimeCapDialog
+      submit={(words) => client.submitFeedback(words)}
+      onClose={() => setClosed(true)}
+    />
   );
 }
 
@@ -63,6 +81,8 @@ export function Loaded<T>({
     body = <output className="flow-loading">Loading {what}…</output>;
   } else if (remote.status === "error" && remote.replayOnly) {
     body = <ReplayBanner />; // NFR-22: the label replaces the generic error, in the same slot
+  } else if (remote.status === "error" && remote.lifetimeCap) {
+    body = <CapDialog rearm={remote} />; // SEC-16: the allowance pop-up replaces it too
   } else if (remote.status === "error") {
     body = <Notice message={remote.message} onRetry={retry} />;
   } else if (isEmpty(remote.value)) {
@@ -88,6 +108,8 @@ export function Primary({
     <>
       {action.replayOnly ? (
         <ReplayBanner />
+      ) : action.lifetimeCap ? (
+        <CapDialog rearm={action.busy} />
       ) : (
         action.error && <Notice message={action.error} onRetry={action.go} />
       )}

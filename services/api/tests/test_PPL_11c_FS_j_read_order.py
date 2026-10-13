@@ -94,7 +94,9 @@ def test_PPL_11c_FS_20_a_request_inside_the_backoff_window_does_not_wait_for_a_h
     for name in ("TILO_PEOPLE_BOOTSTRAP_UID", "K_SERVICE", "CLOUD_RUN_JOB", "TILO_API_DEV"):
         monkeypatch.delenv(name, raising=False)
     monkeypatch.setenv("TILO_PEOPLE_STORE", "firestore")
-    monkeypatch.setenv("TILO_FIRESTORE_PROJECT", "tilo-test-project")
+    monkeypatch.setenv("TILO_FIRESTORE_PROJECT", "demo-test-project")
+    # PROD-WIRE 3: the one guard (emulator + demo- project)
+    monkeypatch.setenv("FIRESTORE_EMULATOR_HOST", "127.0.0.1:9")
     calls = []
 
     def failing_client(*args, **kwargs):

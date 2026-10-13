@@ -75,10 +75,31 @@ BODY_ROUTES = {
     "delete meeting": "/v1/meetings/mt_q4_plan/delete",
     "meeting world": "/v1/meetings/mt_q4_plan/world",
     "host meeting": "/v1/meetings/mt_q4_plan/host",
+    "attend meeting": "/v1/meetings/mt_q4_plan/attend",
+    "create pin": "/v1/pinboards",
+    "delete pin": "/v1/pinboards/pb_priya_note/delete",
+    "create skill": "/v1/skills",
+    "capture skill": "/v1/skills/captures",
+    "version capture": "/v1/skills/captures/tsk_missing/version",
+    "rate skill run": "/v1/skills/tsk_missing/runs/run_missing/rating",
+    "fix skill": "/v1/skills/tsk_missing/fixes",
+    "skill state": "/v1/skills/tsk_missing/state",
     "add membership": "/v1/people/u_priya/memberships",
     "remove membership": "/v1/people/u_priya/memberships/remove",
     "role": "/v1/people/u_priya/role",
     "team invite": "/v1/team/invites",
+    "snooze nudge": "/v1/nudges/01JB5VQ0000000000000000000/snooze",
+    "subscribe push": "/v1/push/subscribe",
+    "unsubscribe push": "/v1/push/unsubscribe",
+    "push policy": "/v1/push/policy",
+    "disconnect meeting host": "/v1/meeting-host/disconnect",
+    "connect connector": "/v1/connectors/connect",
+    "connector callback": "/v1/connectors/callback",
+    "disconnect connector": "/v1/connectors/disconnect",
+    "convene room": "/v1/worlds/w_q4_plan/rooms",
+    "ask in room": "/v1/worlds/w_q4_plan/rooms/01JB5VQ00000000000000R0001/turns",
+    "adjourn room": "/v1/worlds/w_q4_plan/rooms/01JB5VQ00000000000000R0001/adjourn",
+    "confirm change": "/v1/worlds/w_q4_plan/rooms/01JB5VQ00000000000000R0001/changes",
 }
 
 
@@ -103,7 +124,8 @@ def test_PPL_11c_s4_BQ_PPL11C_1_every_people_post_route_is_in_the_body_cap_list(
     """A guard (passes once S1 to S3 and S6 have landed, and must keep passing): a people POST route added later
     without a line in `BODY_ROUTES` would silently have no cap. `/v1/assistant/ask` is PPL-11b's, not a people write."""
     rig = people_rig()
-    not_people_writes = {"/v1/assistant/ask"}
+    # /v1/feedback has its own 65536-byte cap (SEC-16, test_SEC_16_FEEDBACK_hardening)
+    not_people_writes = {"/v1/assistant/ask", "/v1/feedback"}
     templates = [
         t
         for t, methods in rig.app.openapi()["paths"].items()

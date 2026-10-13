@@ -72,7 +72,11 @@ def test_WEB_TO_API_cors_is_the_outermost_middleware_and_never_wildcard_or_crede
     first = app.user_middleware[0]
     assert first.cls is CORSMiddleware
     assert first.kwargs["allow_origins"] == [WEB, ALT]
-    assert first.kwargs["allow_methods"] == ["GET", "POST", "OPTIONS"]
+    from tilo_api import app as real_app
+
+    used = {m.upper() for path in real_app.openapi()["paths"].values() for m in path}
+    assert set(first.kwargs["allow_methods"]) == used | {"OPTIONS"}, "exactly the methods the API's routes use"
+    assert {"PATCH", "DELETE"} <= used
     assert set(first.kwargs["allow_headers"]) == {
         "Content-Type",
         "Idempotency-Key",

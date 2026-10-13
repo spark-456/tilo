@@ -772,6 +772,20 @@ describe("WIRE_3_live_api: nothing else is connected", () => {
       "getTeamLive",
       "writeTeam",
       "startWorld",
+      "getConnectors",
+      "getNotifications",
+      "getTeam",
+      "getAgenda",
+      "submitFeedback",
+      "getProfileSettings",
+      "getSkills",
+      "getLearn",
+      "saveSkill",
+      "captureSkill",
+      "proposeVersion",
+      "setPref",
+      "getUserSettings",
+      "saveUserSettings",
     ]);
     for (const m of API_METHODS.filter((x) => !built.has(x))) {
       const err = await Promise.resolve(invoke(api, m, args)).then(

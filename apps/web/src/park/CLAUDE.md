@@ -1,11 +1,9 @@
 # apps/web/src/park
-
 ## Purpose
 The Park City web app (design handoff of 6 Oct 2026, `docs/web-app-rebuild-plan.md`), built beside the
 old screens until the cutover PR. WEB-1a holds the tokens, fonts, typed fixtures and the `api/` layer.
-
 ## Contracts
-- `api/index.ts`: `Api` (25 methods, one list `API_METHODS`), each returning `Promise<{ data, source }>`.
+- `api/index.ts`: `Api` (26 methods, one list `API_METHODS`), each returning `Promise<{ data, source }>`
   `parkApi(env)` (`api/select.ts`): no `VITE_TILO_API_URL` = fixture Api (`source: "fixture"`), a url =
   live Api, whose methods reject with `NotBuilt` until each endpoint exists. Never sample data as live.
 - `api/fixtures/`: the prototype's data, typed (`api/types.ts`). `worlds.ts` and `index.ts` are
@@ -14,7 +12,7 @@ old screens until the cutover PR. WEB-1a holds the tokens, fonts, typed fixtures
   `design_handoff_tilo_web_app/design/tilo-app.js` in a vm and compares. `additive.ts` (hand-written, WEB-9c) holds
   `Decision.facts` and `Agenda.rules`, merged in `index.ts`; page logic stays free of scenario literals.
 - `tokens/park.css`: handoff `tokens.css` scoped to `[data-park]`, night on `[data-time="night"]`,
-  values verbatim (`biome-ignore format`), no motion. `tokens/ramp.ts` is the README type ramp.
+  values verbatim (`biome-ignore format`), no motion. `tokens/ramp.ts` is the README type ramp. Themes (FR-WLD-15, BQ-WLD15-1/2): `config/themes/<id>.json` (role tokens a theme changes, day and night) -> `tokens/themes.{css,generated.ts}` by `just tokens`; `ParkApp` sets `data-theme={themeFor(prefs.theme)}`, unknown = Metropolis.
 - `components/` (WEB-2): the README "Core components", named exports from `index.ts`, all styled by
   `park.components.css` (BEM `park-btn park-btn--primary park-btn--md`). CSS rules: every selector
   `[data-park] .class...`, literal values, `var(--token)` colours, no `transition`/`animation`; the
@@ -23,7 +21,6 @@ old screens until the cutover PR. WEB-1a holds the tokens, fonts, typed fixtures
   `Popover`/`Menu` share `Panel.tsx` (Escape on the document, backdrop, focus back to the opener).
 - `dev/Components.tsx`: `/dev/components` (dev build, lazy route in `screens/routes.tsx`), a day and a
   night `data-park` panel with every component; one filled primary button per panel (UX-1).
-
 ## App (WEB-3a, `app/`)
 - `src/Root.tsx` shows the old app, or the lazy `app/ParkApp.tsx` under `/park` (`isParkPath`).
 - `AppCtx.ts` is the `app` prop. `store.ts` (framework-free, injected `schedule`) holds decisions, started
@@ -32,12 +29,14 @@ old screens until the cutover PR. WEB-1a holds the tokens, fonts, typed fixtures
 - `pages.ts`: one line per page, `home: lazy(() => import("../pages/Home/HomePage").then(...)),`; nothing else changes.
 - `pages/Home/` (WEB-4): panels float over the shell's city (no `<main>`, no h1 but the greeting); a failed or
   unbuilt read shows "Not connected yet"; composer copy is page-local (`homeData.ts`); `Home.css` overrides the sliding SegmentedControl.
-
 ## Shell (WEB-3b, `shell/`)
-- `AppShell` (named export, `children` only) holds the nav, popovers, one `<main>`, toast, loader, boot (`park.shell.css`: no motion, blur on the nav only); ParkApp owns `[data-park]`.
+- `AppShell` (named export, `children` only) holds the nav, popovers, one `<main>`, toast, loader, boot (`park.shell.css`: no motion, blur on the nav only); ParkApp owns `[data-park]`. QA-DEMO-1: below 840px the tabs are one page button + `Menu` (`TopNav compact`); the sample banner sits in the page column, pinned under the nav on Home.
 - The city is STATIC (motion and its honesty-scan entry: BQ-WEB-3): `scene.ts` caches a scene per `time|motion` at module level, with the 3 pin points for `app.pins`.
-- `usePageApp()` is what pages get: `go('world')` runs the loader first (`store.openWorld`); `useApp().go` stays immediate.
+- `usePageApp()` is what pages get: `go('world')` runs the loader first (`store.openWorld`); `useApp().go` stays immediate. `app/NotFound.tsx` is an unknown route and an unknown world id; `app/buildStamp.ts` is the vite-defined short commit sha (Home footer, `<meta name="tilo-build">`).
+- `sample/` (STARTER-1, BQ-STARTER-1): the API's recorded sample project `w_sample_village_basic` (`World.sample`, `sample: true` on the list item): `SampleBadge`/`SampleNote` on the Home card, Worlds row and world page; Hide is `localStorage` (`sampleChoice.ts`, try/catch), "Show sample project" makes `getWorlds` ask `?include_sample=1`; `HttpClient.post` and `sendJson` never sends a write for its path (the message says the answer was not sent; nothing is simulated). QA-DEMO-1: `ParkProvider.demo` (`useDemoSession`: no injected Api, a url, an anonymous session) makes a start say "Demo sessions replay a recorded run" and opens the sample world, and `decide` toast "Sample data: nothing was approved", never a simulated run or approval (HR-1).
+
+- Team worlds (BQ-CTX-TEAMWORLD, ADR-0040, `api/live/teamShares.ts`, `pages/World/TeamShare.tsx`): the owner's Share with team dialog (consent copy, the person's own memberships from `GET /v1/people`, live list, `HttpClient.sendJson` PUT/DELETE; a row says Shared only from the re-read list). `TeamWorld.tsx`: a listed world with `World.access` `team` (the list item's `access: "team"`, TSW-4b) opens read only through `GET /worlds/{id}` (404 = missing world); a live id the list does not carry is the same missing world with no request (`MissingWorld`); team items are list rows (owner's page reads them on a click).
 
 ## Local rules
 - Import nothing from `screens/`, `world/`, `stage/` (only the shared `src/api`, `src/router` seams). No `window` globals, no model ids, no design runtime port.
-- `engines/kit.ts`: `createKit` builds a fresh cache per call; hold one kit per document (a provider), or world and building memoisation is lost.
+- `engines/kit.ts`: `createKit` builds a fresh cache per call; hold one kit per document (a provider), or world and building memoisation is lost. Browser notifications (FR-CHN-17d, BQ-CHN17d-1): `pages/Profile/PushControl.tsx` (live signed-in session only, off by default), `api/push.ts`, worker `public/push-sw.js`.

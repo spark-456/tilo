@@ -1,0 +1,10 @@
+{
+  "views": [
+    {
+      "connector": "gmail",
+      "state": "connected",
+      "scopes": ["https://www.googleapis.com/auth/gmail.readonly"],
+      "connected_at": "2026-10-08"
+    }
+  ]
+}

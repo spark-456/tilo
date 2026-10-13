@@ -98,7 +98,8 @@ def snapshot(response) -> tuple[int, dict | str]:
 def test_SEC_10_enforcement_is_off_by_default_a_request_with_no_token_is_served(verifier, client):
     response = client.get(PROTECTED)
     assert response.status_code == 200, response.text
-    assert response.json()["worlds"] == []
+    # STARTER-1 (#739): an owner with no worlds also gets the read-only sample world; it is a fixture, not user data.
+    assert [w for w in response.json()["worlds"] if not w.get("sample")] == []
 
 
 @pytest.mark.parametrize("value", ["", "0", "true", "TRUE", "yes", "on", " 1", "1 ", "01", "2"])

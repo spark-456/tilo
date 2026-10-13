@@ -8,3 +8,4 @@ jsonschema==4.26.0
 referencing==0.37.0
 google-auth[requests]==2.58.1
 google-genai==2.25.0
+google-cloud-texttospeech==2.38.0

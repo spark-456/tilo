@@ -40,10 +40,12 @@ def test_CC_PEOPLE_FR_WLD_02_schema_file_follows_the_contract_conventions(repo_r
     jsonschema.Draft202012Validator.check_schema(schema)
     assert schema["$schema"] == "https://json-schema.org/draft/2020-12/schema"
     assert schema["$id"] == f"https://contracts.tilo.example/{name}.schema.json"
-    if name == "meeting":  # 1.1.0 adds world_id (ADR-0020); 1.2.0 tightens the link check (ADR-0016 decision 14)
+    if name == "work_item":  # 1.1.0 adds the optional world_id (ADR-0040, PE-33)
+        assert tuple(map(int, schema["x-version"].split("."))) >= (1, 1, 0), "work_item is 1.1.0 or later"
+    elif name == "meeting":  # 1.1.0 adds world_id (ADR-0020); 1.2.0 tightens the link check (ADR-0016 decision 14)
         assert tuple(map(int, schema["x-version"].split("."))) >= (1, 2, 0), "meeting is 1.2.0 or later"
-    elif name == "calendar_entry":  # 1.1.0 adds agenda_item.joinable (ADR-0024 amendment 4, MJ-10)
-        assert tuple(map(int, schema["x-version"].split("."))) >= (1, 1, 0), "calendar_entry is 1.1.0 or later"
+    elif name in ("calendar_entry", "pinboard_item"):  # 1.1.0: agenda_item.joinable (MJ-10); placement (ADR-0038)
+        assert tuple(map(int, schema["x-version"].split("."))) >= (1, 1, 0), f"{name} is 1.1.0 or later"
     else:
         assert schema["x-version"] == "1.0.0"
     assert schema["title"] == title

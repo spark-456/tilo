@@ -206,13 +206,29 @@ class TerminalPerson:
             credits, mark = a["credits"], " (recommended)" if a["id"] == recommended else ""
             what = f"{clean(a['label'])}: {clean(a['summary'])}"
             self._write(f"  {n}. {what} [{credits['min']}-{credits['max']} credits]{mark}")
-        chosen = self._pick("approach number (empty for the recommended): ", options)
-        chosen = chosen if isinstance(chosen, dict) else next(a for a in options if a["id"] == recommended)
-        ok, why = self._yes(f"approve the approach {clean(chosen['label'])!r}?")
+        while True:
+            chosen = self._pick("approach number (empty for the recommended): ", options)
+            chosen = chosen if isinstance(chosen, dict) else next(a for a in options if a["id"] == recommended)
+            confirmation = self._confirm_approach(chosen)
+            if confirmation is not None:
+                ok, why = confirmation
+                break
         said = "approved" if ok else "declined"
         self.log.append(f"approach {clean(chosen['id'])}: {said} by the person ({clean(why) or '-'})")
         self.decline_reason = "" if ok else clean(why)[:200]
         return chosen["id"] if ok else None
+
+    def _confirm_approach(self, chosen: dict[str, Any]) -> tuple[bool, str] | None:
+        """A misplaced number returns to selection; it never confirms the previous choice."""
+        prompt = f"approve the approach {clean(chosen['label'])!r}? [y/n]: "
+        while (said := self._read(prompt)) is not None:
+            if said.isdigit():
+                self._write("That was a number. Please choose the approach again.")
+                return None
+            if said.lower() in ("y", "yes", "n", "no"):
+                return said.lower().startswith("y"), self._read("reason: ") or ""
+            self._write("answer y or n")
+        return False, "no answer (input closed)"
 
     def gate(self, card: dict[str, Any]) -> bool:
         if (real_write := self._write_gate(card)) is not None:
@@ -317,17 +333,24 @@ def run_topic(
 
 
 def _typed(read: Callable[[str], str]) -> str:
-    print("Type your request; finish with an empty line (or end of input):", flush=True)
+    print("Type your request; finish with /end on its own line (or end of input):", flush=True)
     lines: list[str] = []
     while True:
         try:
             line = read("")
         except EOFError:
             break
-        if not line.strip():
+        if line == "/end":
             break
         lines.append(line)
-    return "\n".join(lines)
+    return "\n".join(lines).rstrip()  # blank lines inside stay (#594); trailing ones mean nothing
+
+
+def _exit_code(report: e2e.LiveE2EReport) -> int:
+    if report.outcome_class == "stopped_at_cap":
+        return 3
+    bad = report.outcome_class not in ("completed", "held_at_gate", "declined") or any(f.hard for f in report.findings)
+    return int(bad)
 
 
 def main(
@@ -383,9 +406,8 @@ def main(
     label = "deliverable" if report.outcome_class == "completed" else "draft (not delivered)"
     for title, work in report.work:
         print(f"{label}: {clean(title)}\n{clean(work, lines=True)}\n")
-    bad = report.outcome_class not in ("completed", "held_at_gate", "declined") or any(f.hard for f in report.findings)
-    code = 3 if report.outcome_class == "stopped_at_cap" else int(bad)
+    code = _exit_code(report)
     if code:
-        why = " ".join((report.reason or "the run did not finish, or a hard check failed").split())
+        why = clean(report.reason or "the run did not finish, or a hard check failed")
         print(f"STOP {report.outcome_class}: {why}", file=sys.stderr)
     return code

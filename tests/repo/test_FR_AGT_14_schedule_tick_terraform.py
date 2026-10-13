@@ -189,7 +189,9 @@ def test_FR_AGT_14c_firestore_rules_deny_every_client_the_schedules_collection(r
     assert not re.search(r"allow[^;]*:\s*if\s+true", rules), "FR-AGT-14c: no allow-all in firestore.rules"
     assert re.search(r"allow\s+read\s*,\s*write\s*:\s*if\s+false\s*;", rules)
     firebase = json.loads((repo_root / "firebase.json").read_text(encoding="utf-8"))
-    assert firebase["firestore"]["rules"] == "firestore.rules"
+    # ADR-0032 T5b: one entry per database; the (default) one carries firestore.rules
+    default = [e for e in firebase["firestore"] if e["database"] == "(default)"]
+    assert [e["rules"] for e in default] == ["firestore.rules"]
 
 
 def test_FR_AGT_14_nothing_applies_itself(repo_root):

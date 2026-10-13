@@ -8,10 +8,14 @@ output "services" {
   value = {
     for k, svc in local.run_services : k => {
       region                = svc.location
+      cpu                   = svc.template[0].containers[0].resources[0].limits["cpu"]
+      memory                = svc.template[0].containers[0].resources[0].limits["memory"]
+      timeout               = svc.template[0].timeout
+      request_concurrency   = svc.template[0].max_instance_request_concurrency
       min_instance_count    = var.services[k].min_instance_count
       max_instance_count    = var.services[k].max_instance_count
       ingress               = svc.ingress
-      cpu_idle              = true
+      cpu_idle              = var.services[k].cpu_idle
       service_account_email = local.service_account_emails[k]
       public                = var.services[k].public
       vpc_egress            = var.services[k].vpc_egress
