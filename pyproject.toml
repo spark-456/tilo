@@ -20,7 +20,7 @@ dev = [
 ]
 
 [tool.uv.workspace]
-members = ["services/api", "services/harness", "services/sandbox-web", "packages/providers", "packages/contracts-py", "packages/policy", "packages/metering", "evals", "services/connectors", "packages/archive", "packages/memory", "packages/planning", "packages/world", "services/render", "services/channels", "services/browser", "packages/people", "packages/logging"]
+members = ["services/api", "services/harness", "services/sandbox-web", "packages/providers", "packages/contracts-py", "packages/policy", "packages/metering", "evals", "services/connectors", "packages/archive", "packages/memory", "packages/planning", "packages/world", "services/render", "services/channels", "services/browser", "packages/people", "packages/logging", "packages/redact"]
 
 [tool.pytest.ini_options]
 # meet-bot/tests import `bot` (FR-MTG-11): its package root is on the path so `just test` collects them offline too.

@@ -1,0 +1,7 @@
+{
+  "name": "start_run",
+  "arguments": {
+    "request": "Compare prices",
+    "budget_cap": 500
+  }
+}

@@ -19,7 +19,7 @@
 # (PRD 10.4 Audit, HR-7). Such an event carries authz (EV-03) from one of authz_by (EV-04), and
 # event.schema.json lists the same types (contracts-check fails if the lists drift).
 
-version: 1.2.0
+version: 1.5.0
 unknown_types: trace_only
 types:
   world.requested:
@@ -139,6 +139,19 @@ types:
     trace_row: "approaches={data.approach_count}"
     data_schema: events/data/plan.approaches_proposed.schema.json
     fixture: fixtures/events/valid/plan.approaches_proposed.json
+  plan.revised:
+    family: plan
+    verb: revised
+    priority: should
+    pillar: P1
+    default_severity: info
+    side_effect: false
+    world_effect: "Revision blueprints appear on the buildings whose work changes."
+    hud_effect: "The plan gains the revision units and the credit estimate updates."
+    story_template: "{actor} planned revision work for a change asked for in the Meeting Hall ({data.run})."
+    trace_row: "proposal={data.proposal_id} run={data.run}"
+    data_schema: events/data/plan.revised.schema.json
+    fixture: fixtures/events/valid/plan.revised.json
   budget.requested:
     family: budget
     verb: requested
@@ -491,6 +504,86 @@ types:
     trace_row: "skill={data.skill} version={data.version}"
     data_schema: events/data/skill.loaded.schema.json
     fixture: fixtures/events/valid/skill.loaded.json
+  # Taught skills (1.4.0, ADR-0034, FR-SKL-01 to 06): written in the acting person's Desk world,
+  # owner-only, ids and counts only (TS-11 in taught_skill.rules.md). None authorises anything.
+  skill.captured:
+    family: skill
+    verb: captured
+    priority: should
+    pillar: P7
+    default_severity: info
+    side_effect: false
+    world_effect: "A new card joins the skill being taught on Your Desk."
+    hud_effect: "The Skills page lists the captured step."
+    story_template: "{actor} showed Tilo step {data.step} of a new skill ({data.method})."
+    trace_row: "skill={data.skill} method={data.method} step={data.step}"
+    data_schema: events/data/skill.captured.schema.json
+    fixture: fixtures/events/valid/skill.captured.json
+  skill.version_proposed:
+    family: skill
+    verb: version_proposed
+    priority: should
+    pillar: P7
+    default_severity: info
+    side_effect: false
+    world_effect: "Tilo lays its own version of the skill beside the captured cards."
+    hud_effect: "The Skills page shows Tilo's version with its estimates."
+    story_template: "Tilo proposed a version with {data.steps} steps that stops to ask {data.asks} times."
+    trace_row: "skill={data.skill} version={data.version} steps={data.steps} asks={data.asks} credits_per_run={data.credits_per_run} source={data.source}"
+    data_schema: events/data/skill.version_proposed.schema.json
+    fixture: fixtures/events/valid/skill.version_proposed.json
+  skill.try_run:
+    family: skill
+    verb: try_run
+    priority: should
+    pillar: P2
+    default_severity: info
+    side_effect: false
+    world_effect: "The practice desk shows the try run's steps; no parcel leaves."
+    hud_effect: "The Skills page shows how closely the try run matched."
+    story_template: "A try run matched {data.matched} of {data.total} steps and sent nothing ({data.outcome})."
+    trace_row: "skill={data.skill} version={data.version} match={data.match} asked={data.asked} skipped={data.skipped} side_effects={data.side_effects}"
+    data_schema: events/data/skill.try_run.schema.json
+    fixture: fixtures/events/valid/skill.try_run.json
+  skill.state_changed:
+    family: skill
+    verb: state_changed
+    priority: should
+    pillar: P7
+    default_severity: info
+    side_effect: false
+    world_effect: "The skill's card on Your Desk changes its badge."
+    hud_effect: "The Skills library shows the skill as learning, trusted or paused."
+    story_template: "{actor} marked a skill {data.change}."
+    trace_row: "skill={data.skill} version={data.version} change={data.change} good_runs={data.good_runs} threshold={data.threshold}"
+    data_schema: events/data/skill.state_changed.schema.json
+    fixture: fixtures/events/valid/skill.state_changed.json
+  skill.rated:
+    family: skill
+    verb: rated
+    priority: should
+    pillar: P7
+    default_severity: info
+    side_effect: false
+    world_effect: "A thumb stamp lands on the run's card on Your Desk."
+    hud_effect: "The skill's run history bar fills in."
+    story_template: "{actor} rated a run of a skill: thumbs {data.thumb}."
+    trace_row: "skill={data.skill} version={data.version} run={data.run_id} thumb={data.thumb} wrong_step={data.wrong_step}"
+    data_schema: events/data/skill.rated.schema.json
+    fixture: fixtures/events/valid/skill.rated.json
+  skill.fixed:
+    family: skill
+    verb: fixed
+    priority: should
+    pillar: P7
+    default_severity: info
+    side_effect: false
+    world_effect: "The fixed step's card on Your Desk is rewritten."
+    hud_effect: "The skill shows its new version and the logged fix."
+    story_template: "{actor} fixed step {data.step}; version {data.to_version} runs next time."
+    trace_row: "skill={data.skill} from={data.from_version} to={data.to_version} step={data.step}"
+    data_schema: events/data/skill.fixed.schema.json
+    fixture: fixtures/events/valid/skill.fixed.json
   question.routed:
     family: question
     verb: routed
@@ -569,6 +662,71 @@ types:
     trace_row: "ended"
     data_schema: events/data/meeting.ended.schema.json
     fixture: fixtures/events/valid/meeting.ended.json
+  meeting.convened:
+    family: meeting
+    verb: convened
+    priority: should
+    pillar: P4
+    default_severity: info
+    side_effect: false
+    world_effect: "The lead and its agents gather in the Meeting Hall."
+    hud_effect: "The meeting room opens with the agents seated round the table."
+    story_template: "{actor} called {target} and its team into the Meeting Hall."
+    trace_row: "room={data.room_id} lead={data.lead} as={data.as_role} run={data.run_state} cap={data.credit_cap} turns={data.max_turns}"
+    data_schema: events/data/meeting.convened.schema.json
+    fixture: fixtures/events/valid/meeting.convened.json
+  meeting.asked:
+    family: meeting
+    verb: asked
+    priority: should
+    pillar: P4
+    default_severity: info
+    side_effect: false
+    world_effect: "A speech bubble shows over the Meeting Hall."
+    hud_effect: "The chat panel shows the person's message."
+    story_template: "{actor} asked {target} something in the Meeting Hall."
+    trace_row: "room={data.room_id} turn={data.turn} to={data.to} mode={data.mode}"
+    data_schema: events/data/meeting.asked.schema.json
+    fixture: fixtures/events/valid/meeting.asked.json
+  meeting.replied:
+    family: meeting
+    verb: replied
+    priority: should
+    pillar: P2
+    default_severity: info
+    side_effect: false
+    world_effect: "A reply bubble shows over the Meeting Hall."
+    hud_effect: "The chat panel shows the reply and its sources; the speaker's cue shows while the reply is on screen."
+    story_template: "{actor} replied in the Meeting Hall ({data.outcome})."
+    trace_row: "room={data.room_id} turn={data.turn} outcome={data.outcome} mode={data.mode}"
+    data_schema: events/data/meeting.replied.schema.json
+    fixture: fixtures/events/valid/meeting.replied.json
+  meeting.change_requested:
+    family: meeting
+    verb: change_requested
+    priority: should
+    pillar: P4
+    default_severity: info
+    side_effect: false
+    world_effect: "A change slip goes from the Meeting Hall to the Town Hall."
+    hud_effect: "The chat panel marks the change as sent to planning."
+    story_template: "{actor} asked {target} for a change; it goes to planning."
+    trace_row: "room={data.room_id} proposal={data.proposal_id} as={data.as_role}"
+    data_schema: events/data/meeting.change_requested.schema.json
+    fixture: fixtures/events/valid/meeting.change_requested.json
+  meeting.adjourned:
+    family: meeting
+    verb: adjourned
+    priority: should
+    pillar: P4
+    default_severity: info
+    side_effect: false
+    world_effect: "The agents leave the Meeting Hall."
+    hud_effect: "The meeting room closes and the chat panel says why."
+    story_template: "The Meeting Hall meeting with {target} ended ({data.reason})."
+    trace_row: "room={data.room_id} reason={data.reason} turns={data.turns} credits={data.credits_spent}"
+    data_schema: events/data/meeting.adjourned.schema.json
+    fixture: fixtures/events/valid/meeting.adjourned.json
   connection.requested:
     family: connection
     verb: requested
@@ -1107,3 +1265,16 @@ types:
     trace_row: "rule={data.rule} key={data.key} from={data.from} to={data.to}"
     data_schema: events/data/team_rule.changed.schema.json
     fixture: fixtures/events/valid/team_rule.changed.json
+  world.share_changed:
+    family: world
+    verb: share_changed
+    priority: should
+    pillar: P4
+    default_severity: info
+    side_effect: false
+    world_effect: "A team badge shows on the world's gate while the share stands and comes down when it is withdrawn."
+    hud_effect: "The world's sharing line names the team, or says it is not shared."
+    story_template: "{actor} turned team sharing {data.state} for this world."
+    trace_row: "team={data.team} state={data.state}"
+    data_schema: events/data/world.share_changed.schema.json
+    fixture: fixtures/events/valid/world.share_changed.json

@@ -28,15 +28,17 @@ async function waitFor<T extends Element = Element>(
   root: ParentNode,
   selector: string,
 ): Promise<T> {
-  for (let i = 0; i < 200; i++) {
-    const found = root.querySelector<T>(selector);
-    if (found) return found;
-    await act(async () => {
-      await vi.dynamicImportSettled();
-      await new Promise((done) => setTimeout(done, 10));
-    });
-  }
-  throw new Error(`Timed out waiting for ${selector}`);
+  return vi.waitFor(
+    async () => {
+      await act(async () => {
+        await vi.dynamicImportSettled();
+      });
+      const found = root.querySelector<T>(selector);
+      expect(found, `Waiting for ${selector}`).not.toBeNull();
+      return found as T;
+    },
+    { timeout: 5_000 },
+  );
 }
 
 describe("PRD-18.3 S-04 levels panel (FR-WLD-08 replay point): the layout and the replayed events", () => {

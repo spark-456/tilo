@@ -164,6 +164,11 @@ export function HostMeeting({
           Open Needs you
         </AppLink>
       )}
+      {view.kind === "error" && view.message === NOT_CONNECTED && (
+        <AppLink to="/connectors" className="pill">
+          Open Connectors
+        </AppLink>
+      )}
       {view.kind === "card" && <HostGate card={view.card} client={client} />}
     </div>
   );

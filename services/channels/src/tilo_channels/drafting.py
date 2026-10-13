@@ -253,10 +253,15 @@ class Drafter:
         preset: str | None = None,
         style: Mapping[str, Any] | None = None,
         answers: str | None = None,
+        fixed_body: str | None = None,
     ) -> DraftResult:
-        """`answers` (optional) is the reader id of the message the draft must answer (FR-PA-07). If the thread no
+        """`fixed_body` (optional, FR-CAL-07 b) is a reply body made by code: the model is not called and the body
+        is not checked for invented facts; recipients, headers and the safety screen are unchanged.
+        `answers` (optional) is the reader id of the message the draft must answer (FR-PA-07). If the thread no
         longer gives a reply to that message, `ReplyTargetMoved` is raised before anything is stored or emitted and
         before the model is called; a draft already stored for `instruction_id` is returned as it is."""
+        if fixed_body is not None and instruction.strip():  # a code-made body never rides an instruction (T3/L1 only)
+            raise ValueError("fixed_body takes no instruction")
         if not isinstance(thread_id, str) or not thread_id:  # a thread-less (new email) context has nothing to reply to
             raise ValueError("a reply is drafted from a thread")
         if mode not in MODES or (preset is not None and preset not in PRESETS) or "#" in instruction_id:
@@ -266,7 +271,7 @@ class Drafter:
         doc = self._drafts.get(user_id, instruction_id)
         if doc is None:
             request = {"thread_id": thread_id, "instruction": instruction, "mode": mode, "preset": preset or "none"}
-            doc = self._make(user_id, mailbox, style or {}, request, answers)
+            doc = self._make(user_id, mailbox, style or {}, request, answers, fixed_body)
             if self._drafts.create(user_id, instruction_id, doc):  # BQ-150: keyed by the instruction
                 _LOG.info("drafting %s: %s", instruction_id, doc["status"])
             else:  # another call or instance stored it first: theirs is the result
@@ -304,8 +309,19 @@ class Drafter:
             self._emit({"type": "artifact.created", "data": {"artifact": artifact}})
             self._drafts.create(user_id, f"{instruction_id}#emitted", {})
 
+    @staticmethod
+    def _ready(ask: Mapping[str, str], envelope: Mapping[str, Any], body: str, flagged: bool) -> dict[str, Any]:
+        draft = {"artifact_id": "art_" + secrets.token_hex(12), "version": 1, "thread_id": ask["thread_id"]}
+        return draft | {"mode": ask["mode"], **envelope, "body": body, "safety_flag": flagged}
+
     def _make(
-        self, user_id: str, mailbox: str, style: Mapping[str, Any], ask: dict[str, str], answers: str | None = None
+        self,
+        user_id: str,
+        mailbox: str,
+        style: Mapping[str, Any],
+        ask: dict[str, str],
+        answers: str | None = None,
+        fixed: str | None = None,
     ) -> dict[str, Any]:
         listed = self._reader.get_thread(user_id, ask["thread_id"]).get("messages")
         messages = [m for m in (listed if isinstance(listed, list) else [])[-MAX_MESSAGES:] if isinstance(m, dict)]
@@ -337,6 +353,8 @@ class Drafter:
         if replied is None or not _addresses(replied.get("from")):  # no one to reply to: fail closed
             return {**doc, "status": "failed", "questions": []}
         envelope = _envelope(replied, own, ask["mode"])
+        if fixed is not None:
+            return {**doc, "status": "ready", "draft": self._ready(ask, envelope, fixed, flagged), "questions": []}
         thread_facts = [v for f in reversed(fields) for v in f.values()]  # newest first: read first
         checker = Checker(instruction=ask["instruction"], thread=thread_facts, trusted=[*settings.values()])
         check = checker.find  # sources are read once per draft, for every attempt and question
@@ -362,9 +380,7 @@ class Drafter:
                 }
             findings = check(body)
             if not findings:
-                draft = {"artifact_id": "art_" + secrets.token_hex(12), "version": 1, "thread_id": ask["thread_id"]}
-                draft |= {"mode": ask["mode"], **envelope, "body": body, "safety_flag": flagged}
-                return {**doc, "status": "ready", "draft": draft, "questions": []}
+                return {**doc, "status": "ready", "draft": self._ready(ask, envelope, body, flagged), "questions": []}
             variables["problems"] = ", ".join(sorted({f.kind for f in findings}))
             prompt = load_prompt(ROLE, "draft_task.md", variables | {"thread": thread})
         findings_doc = [{"kind": f.kind, "text": f.text} for f in findings]

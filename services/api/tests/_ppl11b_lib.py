@@ -103,6 +103,18 @@ def seam(name: str) -> Any:
     return getattr(deps, name)
 
 
+def unwire_plate_sources(monkeypatch: Any) -> None:
+    """The plate's sources and source owners refused by default; since PEOPLE-SEAMS-1 they read the store, so a test of
+    an unwired plate takes them back to that refusal (503 `not_configured`) for its own duration."""
+    from fastapi import HTTPException  # noqa: PLC0415
+
+    def refuse() -> None:
+        raise HTTPException(status_code=503, detail="not_configured")
+
+    for name in ("get_plate_sources", "get_source_owners"):
+        monkeypatch.setitem(app.dependency_overrides, getattr(deps, name), refuse)
+
+
 def desk_ids(user: str, org: str = ORG) -> tuple[str, str]:
     """The Desk world and run of a person (API_PPL_11b.md section 13), derived independently of tilo_api.desk."""
     h = hashlib.sha256(f"{org}:{user}".encode()).hexdigest()[:24]
@@ -306,7 +318,7 @@ class SpyStore:
         return self._inner.delete(org_id, record_id, expected_version=expected_version)
 
 
-KINDS = ("persons", "meetings", "work_items", "pins", "mentions", "calendar")
+KINDS = ("persons", "meetings", "work_items", "pins", "mentions", "calendar", "world_shares")
 
 
 @dataclass

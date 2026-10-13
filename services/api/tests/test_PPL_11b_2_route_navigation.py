@@ -73,6 +73,7 @@ from _ppl11b_lib import (
     run_answer,
     strip_volatile,
     ulid,
+    unwire_plate_sources,
 )
 from _ppl11b_lib import rig_factory as rig_factory  # noqa: PLC0414  (the fixture)
 from _ppl11b_lib import world as world  # noqa: PLC0414  (the fixture)
@@ -426,9 +427,15 @@ def test_FR_PA_17_logs_carry_codes_and_ids_only_never_text(rig_factory):
 @pytest.mark.parametrize(
     "seam_name", ["get_store", "get_event_writer", "get_run_archive", "get_people_stores", "get_plate_source"]
 )
-def test_FR_PA_17_a_seam_that_is_not_wired_answers_503_not_configured_and_stores_nothing(rig_factory, seam_name):
+def test_FR_PA_17_a_seam_that_is_not_wired_answers_503_not_configured_and_stores_nothing(
+    rig_factory, seam_name, monkeypatch
+):
     rig = rig_factory()
     rig.unwire(seam_name)
+    if seam_name == "get_plate_source":
+        unwire_plate_sources(
+            monkeypatch
+        )  # the sources under it read the store now (PEOPLE-SEAMS-1): unwired on purpose
     response = rig.ask("What is on my plate?")
     assert response.status_code == 503 and response.json() == {"detail": "not_configured"}, seam_name
     assert rig.writer.calls == [] and rig.archive.lines.lines == {} and rig.all_events() == []
@@ -1367,6 +1374,7 @@ def test_FR_PA_17_a_failure_to_read_the_org_gives_a_failed_answer_never_an_unche
         pins=spied.pins,
         mentions=spied.mentions,
         calendar=spied.calendar,
+        world_shares=spied.world_shares,
     )
     body = _ok(rig.ask("What is on my plate?"))
     assert (body["outcome"], body["text"], body["sources"]) == ("failed", DECLINES["failed"], [])

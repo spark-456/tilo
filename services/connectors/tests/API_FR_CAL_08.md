@@ -25,13 +25,15 @@ commit is in. Nothing here opens a socket, calls a model, or reads `LIVE`.
 ## Shipped config (in this commit)
 
 - `config/connectors.yaml` declares `google_calendar` after `google_drive`: `auth: oauth2`, `scopes: {read:
-  ["https://www.googleapis.com/auth/calendar.readonly"]}` and no other scope, `capabilities: [read]`, one
-  action `{id: read_events, capability: read, risk_tier: T1, gate_type: none, irreversible: false}`,
+  ["https://www.googleapis.com/auth/calendar.readonly"]}` for the read path (ADR-0035 L1 added `write` and `send`,
+  each `calendar.events.owned`, with `create_event` T1 and `create_event_with_guests` T3; this sync reads with
+  `read` only and never needs them), `capabilities: [read, write, send]`, the read action
+  `{id: read_events, capability: read, risk_tier: T1, gate_type: none, irreversible: false}`,
   `limits: {per_minute: 60, batch_size: 2500}`, `data_class: {returns: [personal, business], redact: []}`.
   It loads through `load_registry`. `consent.scopes_needed(user_id=u, connector="google_calendar",
   capabilities=["read"])` for a person with no grant is exactly `[CALENDAR_READONLY]` (FR-CAL-02 "a task
   needing only read asks only for the read scope"); no `calendar.events` or `calendar` scope appears anywhere in
-  the entry.
+  the `read` capability (the write scope is asked only when a task needs it).
 - `config/autonomy.yaml` lists `read_events: T1` (it equals the declared tier; reads are never gated).
 - `config/personal.yaml` (new; loader-checked, no contract yet, BQ-CAL8-1): `working_window: {start: "09:00",
   end: "18:00"}` and `calendar_sync: {poll_interval_s: 900, past_days: 7, future_days: 366, max_pages: 25,

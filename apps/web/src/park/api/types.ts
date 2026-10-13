@@ -5,7 +5,7 @@ import type { QuickCost, QuickIntakeResult, QuickReason } from "../../api/http";
 export type Source = "fixture" | "live";
 export type ApiResult<T> = { data: T; source: Source };
 
-export type DecisionKey = "depot" | "mail";
+export type DecisionKey = "depot" | "mail" | "lovable";
 /** Which decisions the person has taken so far. A missing key means not yet. */
 export type Dec = Partial<Record<DecisionKey, boolean>>;
 export type TierKey = "quick" | "routine" | "workspace";
@@ -41,6 +41,8 @@ export interface Decision {
   toast: string;
   /** Additive designed copy (the notification title once this is approved). */
   approvedTitle: string;
+  /** ADR-0035 L6d: a live card that asks for fields; it is answered by the fields form, never by a tap (`yes` is ""). */
+  provide?: { cardId: string };
   /** Additive (not in the prototype): what the decision is about. Merged in `fixtures/index.ts`. */
   facts?: DecisionFacts;
 }
@@ -167,6 +169,10 @@ export interface World {
   owner: string;
   started: string;
   isNew?: boolean;
+  /** STARTER-1: the recorded sample project, served by tilo-api; a replay, not the person's work. */
+  sample?: boolean;
+  /** BQ-CTX-TEAMWORLD: `team` for a teammate's world the person reads through a share (read only); absent = theirs. */
+  access?: "team";
   plan?: string | null;
   districts?: WorldDistrict[] | null;
   activity?: ActivityItem[];
@@ -185,7 +191,8 @@ export interface Skill {
   team: string;
   owner: string;
   role: string;
-  runs: number;
+  /** Null when the server serves no run count (a live skill), printed as a dash. */
+  runs: number | null;
   rate: number | null;
   last: string;
   improved: string;
@@ -198,6 +205,37 @@ export interface Skill {
   used: string[];
   steps: string[];
   ask?: { q: string; a: string[] };
+  /** SKILLS-3: what the teach card chose, so `saveSkill` can post it (scope, trigger and each step's tool); never served. */
+  draft?: SkillDraft;
+}
+export interface SkillDraft {
+  scope: "me" | "team";
+  trigger: "ask" | "weekday" | "arrive";
+  plan: { text: string; tool: string; ask: boolean }[];
+  /** SKILLS-5: a taught version as the server made it; `saveSkill` posts these steps, not the labels above. */
+  server?: {
+    captured: string[];
+    question: { text: string; options: string[] } | null;
+    steps: { text: string; tool: string; action: string; verb: string; ask: boolean }[];
+  };
+}
+/** SKILLS-5 (FR-SKL-01): the steps the server read out of a described skill. */
+export interface SkillCapture {
+  id: string;
+  steps: string[];
+}
+/** SKILLS-5 (FR-SKL-02): Tilo's version; `locked` steps were forced to ask first by the server and cannot be switched off. */
+export interface SkillVersion {
+  steps: {
+    text: string;
+    tool: string;
+    action: string;
+    verb: string;
+    ask: boolean;
+    locked: boolean;
+  }[];
+  question: { text: string; options: string[] } | null;
+  estimates: { credits: number; seconds: number; asks: number } | null;
 }
 export interface Learn {
   rates: { id: string; name: string; meta: string; steps: string[] }[];
@@ -246,6 +284,8 @@ export interface Ledger {
   by: Record<"world" | "tool" | "role", { head: string; rows: [string, number][] }>;
   tx: LedgerTx[];
   runs: [string, number[], number, string][];
+  /** Recorded task totals; these are not ordered repetitions of a skill. */
+  recordedRuns?: { id: string; usd: number; completed: boolean }[];
   waits: {
     buckets: [string, number][];
     types: [string, string, string][];
@@ -270,6 +310,23 @@ export interface Ledger {
   runLabels?: Record<string, string>;
   /** One name per entry of `memory` (e.g. "1–7 Sep"); absent, or of another length, means no week names. */
   memoryWeeks?: string[];
+  /** The month the ledger shows (the sample company's follows today); absent means September 2026, as the fixture. */
+  period?: LedgerPeriod;
+}
+
+export interface LedgerPeriod {
+  /** "October" and "Oct". */
+  month: string;
+  short: string;
+  year: number;
+  /** Days in the month. */
+  days: number;
+  /** The month's first day: 0 = Sunday. */
+  firstWeekday: number;
+  /** The label the feed calls the current day, as in "Fri 9 Oct" (the feed prefixes "Today · "). */
+  today: string;
+  /** Today's day of the month: the days the daily series holds. */
+  day: number;
 }
 
 // Agenda
@@ -362,18 +419,39 @@ export interface Agenda {
 }
 export type AgendaSlot = Agenda["slots"][number];
 
+export interface AgendaPlateRow {
+  ref: { kind: string; id: string };
+  title: string | null;
+  due: string | null;
+  at: string | null;
+  from: string | null;
+  group: string;
+}
+/** The plate supplies summaries, not a week, event duration, attendees or board ownership. */
+export type LiveAgenda = { [K in keyof Required<Agenda>]: null } & {
+  plate: {
+    today: string;
+    asOf: string;
+    rows: AgendaPlateRow[];
+    parked: AgendaPlateRow[];
+    truncated: boolean;
+  };
+};
+export type AgendaData = Agenda | LiveAgenda;
+
 // Team, connectors, notifications
 export interface Team {
   people: {
     id: string;
     name: string;
-    email: string;
-    dept: string;
-    role: string;
-    active: string;
+    email: string | null;
+    dept: string | null;
+    role: string | null;
+    active: string | null;
     you?: boolean;
     limit?: string;
-    c: string;
+    c: string | null;
+    memberships?: string[] | null;
   }[];
   rules: [string, string, string, boolean][];
   matrix: [string, number][];
@@ -381,6 +459,8 @@ export interface Team {
   coverage: { id: string; what: string; who: string[]; wait: string; slow?: boolean }[];
 }
 export interface Connector {
+  /** Live list metadata: OAuth scopes are not the demo's agent access levels. */
+  live?: { stateKnown: boolean; scopes: string[] };
   id: string;
   name: string;
   cat: string;
@@ -393,6 +473,7 @@ export interface Connector {
   level?: number;
   used?: string[];
   blurb?: string;
+  channels?: string[];
   /** When the sign-in lapses (ISO 8601). The Connectors page warns 3 days ahead; absent means no expiry is known. */
   expires?: string;
 }
@@ -488,10 +569,45 @@ export interface QuietHours {
   threshold: string;
 }
 export interface ProfileSettings {
-  sessions: ProfileSession[];
-  invoices: ProfileInvoice[];
-  payment: PaymentMethod;
-  plan: PlanInfo;
+  sessions: ProfileSession[] | null;
+  invoices: ProfileInvoice[] | null;
+  payment: PaymentMethod | null;
+  plan: PlanInfo | null;
   notifications: NotificationRow[];
   quiet: QuietHours;
+}
+/** FR-AGT-15: fields supplied by the proposal route. */
+export interface SkillProposal {
+  id: string;
+  skill_id: string;
+  domain: string;
+  status: "proposed" | "approved" | "rejected";
+  from_version: string;
+  to_version: string;
+  diff: string;
+  provenance: { world_id: string; proposed_by: string; proposed_at: string };
+}
+
+// FR-CON-16: Lovable build-handoff artifact on the World page.
+export interface BuildHandoffFile {
+  path: string;
+  summary: string;
+}
+export interface BuildHandoff {
+  /** World id this build handoff belongs to. */
+  world: string;
+  /** Decision key in `app.dec` / `app.decide(key)` that gates opening Lovable. */
+  decisionKey: DecisionKey;
+  /** Label on the approval button while waiting for approval. */
+  approveLabel: string;
+  /** Status line shown once approved. */
+  doneLabel: string;
+  /** Exact prompt text prepared for Lovable (`1..MAX_LOVABLE_PROMPT_CHARS` characters). */
+  prompt: string;
+  /** Granted files/artifacts that would leave Tilo (`1..6` items). */
+  files: BuildHandoffFile[];
+  /** Contract prompt size cap (characters). */
+  maxPromptChars: number;
+  /** Contract total URL length cap (characters). */
+  maxUrlLength: number;
 }

@@ -64,7 +64,7 @@ CLOUD_SDK = "gcr.io/google.com/cloudsdktool/cloud-sdk"
 CLOUD_SDK_TAG = "587.0.0"  # 530.0.0 does not exist in the registry (cost review, PR #373)
 TAGGED = re.compile(r"^[\w./-]+(:[\w][\w.-]*|@sha256:[0-9a-f]{64})$")
 UPLOAD_ROOT_FILES = {"pyproject.toml", "uv.lock", ".dockerignore"}
-UPLOAD_ROOT_DIRS = {"evals", "packages", "services", "config", "contracts", "prompts", "templates"}
+UPLOAD_ROOT_DIRS = {"evals", "packages", "services", "config", "contracts", "prompts", "templates", "design"}
 REINCLUDES = [
     "!/pyproject.toml",
     "!/uv.lock",
@@ -77,6 +77,8 @@ REINCLUDES = [
     "!/contracts/",
     "!/prompts/",
     "!/templates/",
+    "!/design/",
+    "!/design/tokens.json",
 ]
 NESTED_DENIES = [
     ".env",
@@ -493,8 +495,10 @@ def test_P0_07f_gcloudignore_is_an_allowlist_of_exactly_what_the_dockerfiles_cop
     )
     for need in UPLOAD_ROOT_FILES:
         assert _uploaded(rules, need), f"{need} is COPY'd or needed by the build and must be uploaded"
+    assert _uploaded(rules, "design/tokens.json"), "design/tokens.json is COPY'd by render-enabled images"
+    assert not _uploaded(rules, "design/sub/ok.txt"), "design allows only the root tokens file"
     assert _uploaded(rules, "evals/pyproject.toml"), "evals/pyproject.toml is COPY'd by the Dockerfiles"
-    for root in sorted(UPLOAD_ROOT_DIRS - {"evals"}):
+    for root in sorted(UPLOAD_ROOT_DIRS - {"evals", "design"}):
         assert _uploaded(rules, f"{root}/sub/ok.txt"), f"{root}/ must be uploaded"
     for gone in [
         "evals/scripts/live_e2e.py",

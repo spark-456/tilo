@@ -21,6 +21,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.responses import PlainTextResponse
 from starlette.types import ASGIApp, Receive, Scope, Send
+from tilo_channels.web_push import SubscriptionStore
 from tilo_harness.schedule_store import InMemoryScheduleStore
 from tilo_harness.validator import repo_validator
 from tilo_metering import InMemoryFlagStore, LedgerEntry
@@ -28,6 +29,8 @@ from tilo_metering.flags import process_flags
 from tilo_people.stores import PeopleStores
 
 from tilo_api import deps, dev_run, events
+from tilo_api.feedback import InMemoryFeedbackStore
+from tilo_api.skill_store import MemorySkillStore
 
 ENV_FLAG = "TILO_API_DEV"  # "1" turns dev mode on; nothing else does
 ENV_ORIGINS = "TILO_API_DEV_ORIGINS"  # comma-separated allowed browser origins
@@ -98,6 +101,7 @@ class DevLedger:
 
     def __init__(self) -> None:
         self._entries: list[LedgerEntry] = []
+        self._ids: set[str] = set()
         self._lock = threading.Lock()
 
     def record(self, event: Mapping[str, Any], owner: str) -> None:
@@ -111,6 +115,19 @@ class DevLedger:
         )  # fmt: skip
         with self._lock:
             self._entries.append(entry)
+
+    def append(self, entry: LedgerEntry) -> None:
+        """The writer seam (`deps.get_ledger_writer`, ticket T3): Quick, a room turn or a metered unit in dev mode."""
+        self.append_once(None, entry)
+
+    def append_once(self, entry_id: str | None, entry: LedgerEntry) -> None:
+        refuse_if_unsafe()
+        with self._lock:
+            if entry_id is not None and entry_id in self._ids:
+                return
+            self._entries.append(entry)
+            if entry_id is not None:
+                self._ids.add(entry_id)
 
     def entries(self) -> tuple[LedgerEntry, ...]:
         refuse_if_unsafe()
@@ -127,8 +144,11 @@ class DevEventWriter:
     def __init__(self, store: deps.Store, ledger: DevLedger | None = None) -> None:
         self._store, self._ledger, self._lock = store, ledger, threading.Lock()
 
-    def append(self, world_id: str, event: dict) -> dict:
+    def _guard(self) -> None:
         refuse_if_unsafe()
+
+    def append(self, world_id: str, event: dict) -> dict:
+        self._guard()
         world = self._store.worlds.get(world_id)
         if world is None:
             raise deps.EventRejected(f"unknown world {world_id!r}")
@@ -215,7 +235,18 @@ def _dev_people() -> dict[Callable[..., Any], Callable[[], Any]]:
         refuse_if_unsafe()
         return none
 
-    return {deps.get_people_stores: get_stores, deps.get_plate_sources: get_none, deps.get_source_owners: get_none}
+    skills = MemorySkillStore()  # taught skills (SKILLS-2): in memory, like the people stores
+
+    def get_skills() -> MemorySkillStore:
+        refuse_if_unsafe()
+        return skills
+
+    return {
+        deps.get_people_stores: get_stores,
+        deps.get_plate_sources: get_none,
+        deps.get_source_owners: get_none,
+        deps.get_skill_store: get_skills,
+    }
 
 
 def install(app: FastAPI, env: Mapping[str, str] | None = None) -> None:
@@ -253,6 +284,7 @@ def install(app: FastAPI, env: Mapping[str, str] | None = None) -> None:
 
     app.dependency_overrides[deps.get_event_writer] = get_writer
     app.dependency_overrides[deps.get_ledger] = ledger.entries  # the cost routes' seam (FR-MTR-10, BQ-MTR10-4)
+    app.dependency_overrides[deps.get_ledger_writer] = lambda: ledger  # and the write seam (T3): one dev memory
     from tilo_api import dev_tick, schedules  # noqa: PLC0415 (they import this module)
 
     schedule_store = InMemoryScheduleStore()  # per install: dev never reads TILO_SCHEDULES_STORE or a real project
@@ -271,7 +303,26 @@ def install(app: FastAPI, env: Mapping[str, str] | None = None) -> None:
 
     app.dependency_overrides[deps.get_desk_worlds] = get_desks  # the Desk worlds of the work-item events (PE-12)
     app.dependency_overrides.update(dev_run.overrides())  # fake unit runner, recipient and send (CL-INT-5c)
+    feedback = InMemoryFeedbackStore()  # BQ-FEEDBACK-1: kept in memory, never read back
+
+    def get_feedback() -> InMemoryFeedbackStore:
+        refuse_if_unsafe()
+        return feedback
+
+    app.dependency_overrides[deps.get_feedback_store] = get_feedback
+    push = SubscriptionStore()  # FR-CHN-17b: in memory, never sent (the fake push is the default in dev)
+
+    def get_push() -> SubscriptionStore:
+        refuse_if_unsafe()
+        return push
+
+    app.dependency_overrides[deps.get_push_store] = get_push
     app.dependency_overrides.update(_dev_people())  # in-memory people stores, the dev owner an org owner
+    from tilo_api import meeting_room  # noqa: PLC0415
+
+    app.dependency_overrides.update(
+        meeting_room.dev_overrides()
+    )  # MROOM-A1: a free fake room model, an in-memory archive
     app.add_middleware(
         CORSMiddleware,
         allow_origins=origins,

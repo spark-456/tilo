@@ -13,7 +13,11 @@ Nothing is written to disk and nothing is printed. VITE_TILO_API_URL is set empt
 fixture / replay world (P0-07c), except with the first argument --tilo-dev-api (`just deploy-web-live`, WEB-TO-API):
 then it is the one fixed tilo-dev tilo-api origin below and the Firebase config is required.
 
-Usage: python scripts/web_build_env.py <build command...>   (stdlib only; runs on Windows and Linux)
+Nothing is written to disk and nothing is printed. VITE_TILO_API_URL comes only from `--api <url>` (PROD-WIRE-4):
+empty, or tilo-api's own Cloud Run url, checked here as well as by `just`. Without it the deployed web app stays the
+fixture / replay world (P0-07c); a VITE_TILO_API_URL already in the shell is always ignored.
+
+Usage: python scripts/web_build_env.py [--api <url>] <build command...>   (stdlib only; runs on Windows and Linux)
 """
 
 from __future__ import annotations
@@ -37,6 +41,9 @@ BAKE_FLAG = "TILO_BAKE_FIREBASE_KEY"  # "1" (exactly) once the owner has restric
 
 _API_KEY_SHAPE = re.compile(r"^AIza[0-9A-Za-z_-]{35}$")
 _LIVE_ORIGIN_SHAPE = re.compile(r"^https://tilo-api-[0-9a-z]+-as\.a\.run\.app$")
+
+# tilo-api's own Cloud Run urls (the `just deploy-web` check, kept in step by tests/repo/test_PROD_WIRE_4_*).
+API_URL = re.compile(r"https://tilo-api-[a-z0-9]+-as\.a\.run\.app|https://tilo-api-[0-9]+\.asia-southeast1\.run\.app")
 _FIELDS = (("apiKey", "VITE_FIREBASE_API_KEY"), ("projectId", "VITE_FIREBASE_PROJECT_ID"))
 
 
@@ -132,7 +139,13 @@ def build_env(base: Mapping[str, str], firebase: Mapping[str, str], api_url: str
 def main(argv: list[str]) -> int:
     live = bool(argv) and argv[0] == LIVE_FLAG
     argv = argv[1:] if live else argv
-    if not argv:
+    api = ""
+    if argv[:1] == ["--api"]:
+        if len(argv) < 2 or not (argv[1] == "" or API_URL.fullmatch(argv[1])):
+            print("web_build_env.py: --api must be empty or tilo-api's own Cloud Run url", file=sys.stderr)
+            return 2
+        api, argv = argv[1], argv[2:]
+    if not argv or argv[0].startswith("-"):
         print("usage: web_build_env.py [--tilo-dev-api] <build command...>", file=sys.stderr)
         return 2
     firebase = sdk_env(os.environ)
@@ -143,7 +156,7 @@ def main(argv: list[str]) -> int:
             file=sys.stderr,
         )
         return 2
-    return _run(argv, env=build_env(os.environ, firebase, LIVE_API_ORIGIN if live else "")).returncode
+    return _run(argv, env=build_env(os.environ, firebase, LIVE_API_ORIGIN if live else api)).returncode
 
 
 if __name__ == "__main__":

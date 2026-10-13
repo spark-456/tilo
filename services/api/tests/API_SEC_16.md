@@ -21,8 +21,8 @@ USD based, and these caps are INR minor units.
 
 Every amount is an `int` in minor units (paise; 1 INR = 100). No float, no bool, no string anywhere in the ledger,
 the config or the guard (a malformed amount raises `TypeError` or `ValueError` and changes nothing; the guard turns it
-into a replay plan). The 1,000 INR cap is `uid_lifetime_minor: 100000` in config, and no source file of tilo-api
-contains the literal 100000.
+into a replay plan). The 500 INR lifetime cap (the user, 9 Oct, BQ-SEC16-4) is `uid_lifetime_minor: 50000` in config, and no source file of tilo-api
+contains a cap literal (12000, 15000, 50000, 100000, 200000, 300000 or 500000).
 
 ## Config: `config/spend_caps.yaml`, `tilo_api.spend.load_spend_caps(path=None) -> SpendCaps`
 
@@ -32,7 +32,7 @@ Keys, exactly these (an unknown key is refused), read through a YAML safe loader
 | Key | Meaning |
 | --- | --- |
 | `currency` | `INR`, nothing else |
-| `uid_lifetime_minor` | lifetime spend per uid, positive int, never null (shipped: 100000) |
+| `uid_lifetime_minor` | lifetime spend per uid, positive int, never null (shipped: 50000) |
 | `run_minor` | per-run cap, positive int |
 | `org_day_minor` | per-org per-UTC-day cap, positive int or null for none |
 | `global_day_hard_minor` | the whole deployment's per-UTC-day hard cap (NFR-24's trigger), positive int |
@@ -101,6 +101,9 @@ Never raises; every failure means live denied, not an error.
    request would be live (`provider_mode` is live before the cap) and whose `uid_capped` is true: 4xx (402, 403 or 409; the
    PRD fixes none) `{"detail": <a sentence naming the cap>, "code": "spend_cap_reached"}`, no side effect, no router built.
    Requests that would be replay are never refused for a cap and never write the ledger. Reads are never refused.
+   That includes every read and delete that only needs the artifact store (a quiz app view, the minutes, the quotes,
+   a meeting delete, the join read): `deps.get_artifact_store` takes `get_mode`, not `get_work_mode` (SEC-REVIEW-15 B1).
+   Hosting or attending a meeting starts a bot, so those two routes take `get_work_mode` themselves.
 4. **`GET /access`** reports `models: "replay"` for a judge when capped, when either switch is set, or when live cannot be
    checked (ledger or switch store unreachable, ledger unwired). It reports `"live"` otherwise (SEC-15's rules).
 5. **The switch.** Either store set: new work is refused 503 `{"detail": <says replay>, "replay_only": true}` (NFR-24's

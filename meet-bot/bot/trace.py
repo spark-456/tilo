@@ -11,6 +11,8 @@ from collections.abc import Sequence
 from pathlib import Path
 from typing import Any, Protocol
 
+from .events import remove_meet_links
+
 MARKS = (
     "addressed",
     "probable_end",
@@ -88,7 +90,7 @@ class TurnTrace:
             "marks": {k: round(v - turn.speech_end, 3) for k, v in turn.marks.items()},
         }
         with self.path.open("a", encoding="utf-8") as fh:
-            fh.write(json.dumps(row, ensure_ascii=False) + "\n")
+            fh.write(json.dumps(remove_meet_links(row), ensure_ascii=False) + "\n")
 
 
 def load_turns(path: Path) -> list[dict[str, Any]]:

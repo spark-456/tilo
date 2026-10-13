@@ -43,6 +43,8 @@ from .tokens import ConnectionExpired, InsufficientScope, Kms, KmsError, NotConn
 
 DEFAULT_PERSONAL_CONFIG = Path(__file__).resolve().parents[4] / "config" / "personal.yaml"
 CONNECTOR_ID = "google_calendar"
+# The host adapter defines the same constant but imports this module, so it is repeated here (ADR-0035 decision 6)
+CALENDAR_EVENTS_OWNED = "https://www.googleapis.com/auth/calendar.events.owned"
 SEAL_CONTEXT = b"tilo.calendar_sync.v1"
 MAX_RETRY_AFTER_S = 86400
 CLOCK_SKEW_S = 300  # a clock this far behind the last run is a jump back: the person is due again
@@ -127,13 +129,22 @@ def load_calendar_sync_config(
         raise CalendarConfigError("calendar_sync.backoff_max_s: must not be below backoff_base_s")
     declared: dict[str, Any] = registry.get(CONNECTOR_ID) if CONNECTOR_ID in registry else {}
     action: dict[str, Any] = next((a for a in declared.get("actions", []) if a.get("id") == "read_events"), {})
-    if declared.get("scopes") != {"read": [CALENDAR_READONLY]} or (
-        action.get("capability"),
-        action.get("gate_type"),
-        action.get("risk_tier"),
-        action.get("irreversible"),
-    ) != ("read", "none", "T1", False):
-        raise CalendarConfigError("google_calendar: must declare only calendar.readonly and an ungated T1 read_events")
+    scopes = declared.get("scopes")
+    writes_ok = isinstance(scopes, dict) and all(  # ADR-0035: write and send share the one events.owned scope
+        scopes[c] == [CALENDAR_EVENTS_OWNED] for c in scopes if c != "read"
+    )
+    if (
+        not isinstance(scopes, dict)
+        or scopes.get("read") != [CALENDAR_READONLY]
+        or not set(scopes) <= {"read", "write", "send"}
+        or not writes_ok
+        or (action.get("capability"), action.get("gate_type"), action.get("risk_tier"), action.get("irreversible"))
+        != ("read", "none", "T1", False)
+    ):
+        raise CalendarConfigError(
+            "google_calendar: must read with calendar.readonly, write only with calendar.events.owned, "
+            "and declare an ungated T1 read_events"
+        )
     limits = declared.get("limits", {})
     page_size = _int(limits.get("batch_size"), 1, 2500, "google_calendar.limits.batch_size")
     per_minute = _int(limits.get("per_minute"), 1, 1_000_000, "google_calendar.limits.per_minute")

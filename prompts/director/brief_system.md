@@ -12,6 +12,7 @@ Reply with a single JSON object and nothing else, with these keys:
 - sources: where material comes from, each with a kind (file, url, connector, web or memory) and a ref.
 - sensitivity: the most sensitive class of data the task touches: personal, business or public.
 - ambiguous_fields: the names of the fields above whose value you had to guess because the task leaves it open and a different answer would change the plan. An empty list when the task is clear.
+- questions: up to 3 questions for the person about this task, most useful first, only where the answer would change the plan and the task does not already say it. Each is an object with label (one or two words naming what is asked, such as Level), text (one short question), suggested_answers (one to three short answers; the first is your best guess and is used if the person skips) and expected_change (a number from 0 to 1: how much the answer would change the plan). For a study topic, for example, ask about the exam paper or branch, the current level, the hours per day and whether practice material is wanted, leaving out whatever the task states. These questions replace generic ones about format and rules, so make them specific to this task. Give an empty list when the task is clear.
 
 When a field is unclear, still give your best guess for it and list the field in ambiguous_fields. Do not invent facts that are not in the task.
 

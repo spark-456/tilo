@@ -117,7 +117,10 @@ describe("FR_HIL_12 through the sign-in gate", () => {
       (b.textContent ?? "").includes("Google"),
     );
     if (!google) throw new Error("no Google button");
-    click(google);
+    await act(async () => {
+      click(google);
+      await Promise.resolve();
+    });
     expect(auth.signInWithGoogle).toHaveBeenCalledTimes(1);
     expect(urlsAtSignIn).toHaveLength(1);
     expect(urlsAtSignIn[0]).not.toContain(TOKEN);
@@ -140,7 +143,10 @@ describe("FR_HIL_12 through the sign-in gate", () => {
       (b.textContent ?? "").toLowerCase().includes("demo"),
     );
     if (!demo) throw new Error("no demo button");
-    click(demo);
+    await act(async () => {
+      click(demo);
+      await Promise.resolve();
+    });
     expect(urlsAtSignIn[0]).not.toContain(TOKEN);
   });
 });

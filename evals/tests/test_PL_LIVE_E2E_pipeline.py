@@ -105,12 +105,14 @@ def test_PL_LIVE_E2E_11_calls_per_stage_and_role_cover_director_lead_writer_veri
     for stage in ("intake", "approaches", "plan"):
         assert (stage, "director") in rows, sorted(rows)
         assert rows[(stage, "director")].calls == 1  # a valid reply costs one call, no repeats
-    for role in plan_roles | {"lead"}:
+    for role in plan_roles | {"lead_review"}:
         assert ("run", role) in rows, sorted(rows)
     assert ("narrate", "narrator") in rows
     assert rows[("narrate", "narrator")].calls == 1  # one Narrator call per world (PRD 8.1)
     units = len(bank_case("B-007").director["plan"]["units"])
-    assert 1 <= rows[("run", "lead")].calls < units  # supervisors review at milestones, not every step (PRD 8.1)
+    assert (
+        1 <= rows[("run", "lead_review")].calls < units
+    )  # milestones, not every step (PRD 8.1); COST-AUDIT: cheap role
     assert rows[("run", "verifier")].calls >= 1
     # every call the model saw is in exactly one row, with the fake's own token counts
     assert sum(row.calls for row in report.rows) == len(world.calls)

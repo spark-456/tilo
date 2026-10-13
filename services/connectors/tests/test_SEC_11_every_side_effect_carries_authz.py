@@ -9,7 +9,8 @@ authorisation that opened it. The side-effect set is DISCOVERED, not hard-coded,
 coverage fails this file:
 
 - the action catalogue: every action type in the risk table (config/autonomy.yaml, `tilo_policy.load_risk_table`)
-  except the read-only `read_events` and the connector-less `grant_budget` (its authz is the `budget.granted` event,
+  except the read-only `read_events`, `web_search` and `fetch_url` (ADR-0029) and the connector-less `grant_budget`
+  (its authz is the `budget.granted` event,
   checked in the harness SEC-11 file), paired with the connector that declares it in config/connectors.yaml;
 - every gated or non-read action of every connector in config/connectors.yaml (`load_registry`);
 - every adapter class under `tilo_connectors.adapters` (and the in-process fakes) that exposes a method named in
@@ -57,7 +58,11 @@ CONTRACTS = REPO_ROOT / "contracts"
 NOW = "2026-09-29T09:00:00.000Z"
 
 READ_ONLY_CAPABILITIES = {"read", "search", "list"}
-NOT_AN_OUTBOX_ACTION = {"read_events", "grant_budget"}  # read-only; and a budget grant that goes through no connector
+# read-only (each declared ungated with a read capability, checked below); and a budget grant through no connector
+# send_push: a risk-table action whose adapter lives in tilo-channels (`WebPushAdapter`, FR-CHN-17), not in
+# config/connectors.yaml: nothing for a person to connect. Its per-action case below runs the real push path.
+PUSH_ACTION, PUSH_CONNECTOR = "send_push", "web_push"
+NOT_AN_OUTBOX_ACTION = {"read_events", "web_search", "fetch_url", "grant_budget"}
 MUTATION_VERBS = ("send", "create", "save", "share", "delete", "insert", "patch", "update", "upload", "post", "write")
 
 
@@ -79,7 +84,10 @@ def _declared() -> dict[str, tuple[str, dict]]:
 DECLARED = _declared()
 RISK = load_risk_table()
 ACTION_TYPES = sorted(set(RISK.actions) - NOT_AN_OUTBOX_ACTION)
-CONNECTOR_OF = {action: DECLARED[action][0] if action in DECLARED else "gmail" for action in ACTION_TYPES}
+CONNECTOR_OF = {
+    action: DECLARED[action][0] if action in DECLARED else (PUSH_CONNECTOR if action == PUSH_ACTION else "gmail")
+    for action in ACTION_TYPES
+}
 REGISTRY = yaml.safe_load((CONTRACTS / "events" / "registry.yaml").read_text(encoding="utf-8"))["types"]
 SIDE_EFFECT_EVENT_TYPES = {t for t, v in REGISTRY.items() if v["side_effect"]}
 
@@ -113,6 +121,34 @@ def _outbox(emitted: list[dict], *, connectors: dict | None = None, clock: Manua
     return tilo_connectors.Outbox(store, registered, emitted.append, clock or ManualClock(NOW)), gmail, store
 
 
+class _PushSink:
+    """The browser vendors' push service, in process: every send lands in `sent`."""
+
+    def __init__(self) -> None:
+        self.sent: list[bytes] = []
+
+    def send(self, sub, payload: bytes, vapid) -> None:
+        self.sent.append(payload)
+
+
+def _push_outbox(emitted: list[dict], owner: str):
+    """The real path of FR-CHN-17: tilo-channels' `WebPushAdapter` behind the real `Outbox` (the grant is
+    checked by the outbox), one stored device of the owner, the notice read back from the stored item."""
+    from tilo_channels.digest import DigestArtifacts
+    from tilo_channels.web_push import SubscriptionStore, VapidRef, WebPushAdapter
+
+    subs, artifacts, sink = SubscriptionStore(), DigestArtifacts(), _PushSink()
+    endpoint = "https://fcm.googleapis.com/fcm/send/" + "a" * 40
+    subs.add(owner, {"endpoint": endpoint, "keys": {"p256dh": "B" + "x" * 86, "auth": "y" * 22}})
+    artifacts.store("art_reply_draft", "A send is waiting for your approval", "")
+    adapter = WebPushAdapter(
+        subscriptions=subs, sender=sink, artifacts=artifacts, owner=owner, vapid=VapidRef("webpush-vapid-private-key")
+    )
+    store = tilo_connectors.InMemoryOutboxStore()
+    outbox = tilo_connectors.Outbox(store, {PUSH_CONNECTOR: adapter}, emitted.append, ManualClock(NOW))
+    return outbox, sink, store
+
+
 def _case(gate_case_factory, action: str, **over):
     return gate_case_factory(
         action_type=action,
@@ -135,12 +171,17 @@ def test_SEC_11_the_discovered_side_effect_set_is_consistent_between_config_and_
     for action, (connector, declared) in DECLARED.items():
         assert declared["risk_tier"] == RISK.actions[action], f"{connector}/{action}: config and risk table disagree"
     assert gated <= set(ACTION_TYPES), "a gated connector action is missing from the risk table"
-    assert set(ACTION_TYPES) - set(DECLARED) == {"post_status_update", "share_file", "delete_file"}, (
+    assert set(ACTION_TYPES) - set(DECLARED) == {"post_status_update", "share_file", "delete_file", PUSH_ACTION}, (
         "an action type changed between 'no connector declares it' and 'a connector declares it': it now needs an "
         "adapter that runs only from the outbox, and the SEC-11 cases below already cover it by name"
     )
     assert {"send_email", "create_draft", "save_file", "save_as_google_file", "build_handoff"} <= set(ACTION_TYPES)
     assert "create_meeting_event" in ACTION_TYPES
+    registry = load_registry(REPO_ROOT / "config" / "connectors.yaml")
+    actions = {a["id"]: a for c in registry.ids() for a in registry.get(c)["actions"]}
+    for read_only in NOT_AN_OUTBOX_ACTION - {"grant_budget"}:  # excluded only while it stays an ungated read
+        assert actions[read_only]["gate_type"] == "none", read_only
+        assert actions[read_only]["capability"] in READ_ONLY_CAPABILITIES, read_only
 
 
 def test_SEC_11_every_adapter_that_can_perform_a_side_effect_runs_only_from_the_outbox():
@@ -181,13 +222,18 @@ def test_SEC_11_no_adapter_has_an_unregistered_method_that_looks_like_a_mutation
 def test_SEC_11_every_side_effect_action_runs_with_authz_and_emits_the_same_authz(action, gate_case_factory):
     case = _case(gate_case_factory, action)
     emitted: list[dict] = []
-    outbox, gmail, _ = _outbox(emitted)
+    if action == PUSH_ACTION:  # the real push path, not a fake mailbox
+        outbox, sink, _ = _push_outbox(emitted, case["entry"]["authz"]["ref"])
+        executed = lambda: len(sink.sent)  # noqa: E731
+    else:
+        outbox, gmail, _ = _outbox(emitted)
+        executed = lambda: len(gmail.sent)  # noqa: E731
     stored = outbox.enqueue(case["entry"], evidence_from_case(case))
     assert list(AUTHZ_ERRORS.iter_errors(stored["authz"])) == []
 
     (sent,) = outbox.dispatch_due()
 
-    assert sent["state"] == "sent" and len(gmail.sent) == 1
+    assert sent["state"] == "sent" and executed() == 1
     transfers = [p for p in emitted if p["type"] == "data.transfer"]
     assert len(transfers) == 1, "each executed side effect is recorded exactly once"
     (transfer,) = transfers

@@ -6,6 +6,8 @@ Keep to every limit. If a limit cannot be met, say so in one plain sentence inst
 
 $skills
 
+Today is $today. The deadline is $deadline ($days_to_deadline). These are calendar facts, not part of the data below. Any date you write starts no earlier than today and ends no later than the deadline; fit the work to the time left, and never date anything in the past.
+
 <<<REQUEST
 Goal: $goal
 Audience: $audience

@@ -44,6 +44,7 @@ from _cards_lib import FakeEventWriter as CardWriter
 from fastapi import FastAPI, HTTPException
 from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
+from starlette.requests import HTTPConnection
 from tilo_api import app, cards, deps, dev
 from tilo_api.cards import CardStore
 
@@ -171,7 +172,7 @@ def test_S_06_xworld_the_dev_mode_principal_is_the_full_session(monkeypatch):
 def test_S_06_xworld_production_principal_seam_still_refuses_without_sign_in():
     """No sign-in is wired, so no request can mint any principal, let alone a full one: the seam is still 401."""
     with pytest.raises(HTTPException) as raised:
-        deps.get_current_principal()
+        deps.get_current_principal(HTTPConnection({"type": "http", "headers": [], "app": FastAPI()}))
     assert raised.value.status_code == 401
 
 

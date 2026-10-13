@@ -7,7 +7,7 @@ import { Popover, StatusChip } from "../components";
 
 /** What the sample is, in the team's own name (from the user the Api returned). */
 export const sampleNote = (org: string | null): string =>
-  `${org ?? "This team"} is a fictional team. Amounts are examples (£), dates are September 2026.`;
+  `${org ?? "This team"} is a fictional team. Amounts are examples (£), dates follow today.`;
 
 /** `ghost`: the same box, invisible and out of the accessibility tree, held where the chip will appear. */
 export function SampleChip({
