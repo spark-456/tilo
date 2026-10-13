@@ -126,7 +126,7 @@
  * outbox.schema.json 1.0.0 sha256:0b9b172f230a6347
  * person.schema.json 1.0.0 sha256:2c928319dd7ab9d1
  * pilot.schema.json 1.0.0 sha256:5d091f814844b3b1
- * pinboard_item.schema.json 1.0.0 sha256:fe6df109871cea93
+ * pinboard_item.schema.json 1.1.0 sha256:edf4c50a588211ee
  * plan.schema.json 1.1.0 sha256:f0722cc94a84e2d1
  * plate.schema.json 1.0.0 sha256:d2a4e4361a714c8f
  * policy.schema.json 1.0.0 sha256:307bca25f6efc07e
@@ -134,10 +134,11 @@
  * scenario.schema.json 1.0.0 sha256:b8e044d7e37b92a3
  * skill.schema.json 1.1.0 sha256:9eeee7768b667afa
  * spend_caps.schema.json 1.1.1 sha256:c04bc36ac17dc0ab
- * taught_skill.schema.json 1.0.0 sha256:ca1c19c1dadd31c0
+ * taught_skill.schema.json 1.1.0 sha256:b23321ed0cd570d4
  * team_lead.schema.json 1.0.0 sha256:19413726e364ffdd
  * transcript.schema.json 1.0.0 sha256:08f934b8f0c9a40e
  * ui_action.schema.json 1.0.0 sha256:2ceb1e0b46368734
+ * user_settings.schema.json 1.0.0 sha256:dfc439371ba69131
  * work_item.schema.json 1.0.0 sha256:7add9f68c1f996fb
  * events/registry.yaml 1.4.0 sha256:94fe429dabf876f7
  */
@@ -975,6 +976,13 @@ export type MinutesEvidence = UtteranceId[];
  */
 export type PilotTesterId = string;
 /**
+ * A board or column id: lower-case letters, digits and underscore, starting with a letter, at most 32 characters.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "PinboardItemPlaceId".
+ */
+export type PinboardItemPlaceId = string;
+/**
  * This interface was referenced by `TiloContracts`'s JSON-Schema
  * via the `definition` "PlanApproachId".
  */
@@ -1077,12 +1085,59 @@ export type TaughtSkillStepText = string;
 export type TaughtSkillVerb =
   "read" | "draft" | "write" | "send" | "post" | "pay" | "delete" | "share" | "book";
 /**
+ * How a real run ended (ADR-0037): completed after world.completed, failed after world.failed. Pause all and the kill switch end nothing here, so a run they stop stays unfinished and is never rateable (TS-14).
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "TaughtSkillRunOutcome".
+ */
+export type TaughtSkillRunOutcome = "completed" | "failed";
+/**
  * Quote text or speaker: one line of at most 240 characters with no control character (Cc), no line or paragraph separator and no format character (Cf) of the Basic Multilingual Plane, so no bidi override or zero-width character. Astral format characters (tag characters U+E0000 to U+E007F and others) are removed by code (PE-24, validator only).
  *
  * This interface was referenced by `TiloContracts`'s JSON-Schema
  * via the `definition` "TranscriptQuoteLine".
  */
 export type TranscriptQuoteLine = string;
+/**
+ * One line typed by a person, 1 to 80 characters: data, never an instruction.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "UserSettingsLine".
+ */
+export type UserSettingsLine = string;
+/**
+ * A display address, at most 254 characters, with one @ and a dotted host. It is not verified and is never a recipient (USET-06).
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "UserSettingsEmail".
+ */
+export type UserSettingsEmail = string;
+/**
+ * An IANA time zone name (Asia/Kolkata) or UTC, in the same shape as person.time_zone. The schema checks the shape; tilo-api also refuses a name the zone database does not know (USET-03).
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "UserSettingsTimeZone".
+ */
+export type UserSettingsTimeZone = string;
+/**
+ * A BCP 47 language tag of the drafts Tilo writes for the person: language, an optional four-letter script and an optional two-letter region (en, en-GB, zh-Hans-CN). A display name such as English (UK) is the client's label, never stored.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "UserSettingsLanguage".
+ */
+export type UserSettingsLanguage = string;
+/**
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "UserSettingsWeekday".
+ */
+export type UserSettingsWeekday = "mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun";
+/**
+ * A wall-clock time, HH:MM on a 24-hour clock, 00:00 to 23:59, in the zone of the object that holds it.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "UserSettingsClock".
+ */
+export type UserSettingsClock = string;
 
 /**
  * Index of the generated contract types; not a document.
@@ -4946,7 +5001,7 @@ export interface PilotSurveyResponse {
   quote_consent: boolean;
 }
 /**
- * One entry on a pinboard (FR-PB-01 to -07). A personal entry is private to `scope.user`: no owner, no mention, never proposed (PE-01). A team entry is read by the members of `scope.team` once `active`; until then only `set_up_by` sees it (PE-02). `set_up_by` is the accountable person shown in the table and the target of "get in touch" (PE-09); for an entry Tilo made it is the person who confirmed or owns the meeting. Tilo's entries carry a `source` ("added by Tilo from ..."); a Tilo-made team entry is `active` only with `confirmed_by` (PE-07, PE-08). `url` is https with no user info, query or fragment, and passes the secret redactor before it is stored.
+ * One entry on a pinboard (FR-PB-01 to -07). A personal entry is private to `scope.user`: no owner, no mention, never proposed (PE-01). A team entry is read by the members of `scope.team` once `active`; until then only `set_up_by` sees it (PE-02). `set_up_by` is the accountable person shown in the table and the target of "get in touch" (PE-09); for an entry Tilo made it is the person who confirmed or owns the meeting. Tilo's entries carry a `source` ("added by Tilo from ..."); a Tilo-made team entry is `active` only with `confirmed_by` (PE-07, PE-08). `url` is https with no user info, query or fragment, and passes the secret redactor before it is stored. `placement` (1.1.0, ADR-0038) is optional presentation only: where the entry sits on the board of its own scope. It is no access grant and it never changes the scope or the title (PE-36).
  *
  * This interface was referenced by `TiloContracts`'s JSON-Schema
  * via the `definition` "PinboardItem".
@@ -4976,6 +5031,7 @@ export interface PinboardItem {
   history: [PinboardItemHistoryEntry, ...PinboardItemHistoryEntry[]];
   created_at: Timestamp;
   updated_at: Timestamp;
+  placement?: PinboardItemPlacement;
 }
 /**
  * This interface was referenced by `TiloContracts`'s JSON-Schema
@@ -5016,6 +5072,17 @@ export interface PinboardItemHistoryEntry {
   by: EventActor;
   change: "created" | "edited" | "accepted" | "removed" | "undone" | "owner_changed";
   status: "proposed" | "active" | "removed";
+}
+/**
+ * ADR-0038, FR-PB: where one entry sits on the board of its own scope, left out until it is placed and never null (ADR-0011). board and column are short ids of a presentation place inside that scope, never a user, team or access grant, and the scope itself is not here. order is a sort key inside one board and column across the entries of the scope, lowest first and ties by pin id ascending, so a move writes this one entry and never renumbers another, which may belong to someone else. A move changes this object only: not the title, the content, the scope, the owner, the status, the history or updated_at (PE-36).
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "PinboardItemPlacement".
+ */
+export interface PinboardItemPlacement {
+  board: PinboardItemPlaceId;
+  column: PinboardItemPlaceId;
+  order: number;
 }
 /**
  * PlanGraph (PRD 7.1 FR-INT-06, FR-INT-09): the approaches offered, the chosen one compiled to units, dependencies, roles, skills, connectors and gates, and the confirmed budget cap. Cross-reference rules PG-01.. are in contracts/plan.rules.md.
@@ -5525,7 +5592,7 @@ export interface SpendCapsConfig {
   rate_limit_window_s: number;
 }
 /**
- * A skill a person taught Tilo on the Skills page (FR-SKL-01 to FR-SKL-07, ADR-0034), stored at orgs/{org}/taught_skills/{id} and read only through tilo-api. A sibling of the expert-signed, version-pinned skill.yaml (skill.schema.json), never a change to it. One person owns it. Each fix makes a new integer version, and a run pins the version it started with. It acts only through its own tool_access, the team's levels and the policy engine. $defs try_run_result, rating, fix and helpers_report are the records and the report around it. Rules TS-01 to TS-12 are in taught_skill.rules.md.
+ * A skill a person taught Tilo on the Skills page (FR-SKL-01 to FR-SKL-07, ADR-0034), stored at orgs/{org}/taught_skills/{id} and read only through tilo-api. A sibling of the expert-signed, version-pinned skill.yaml (skill.schema.json), never a change to it. One person owns it. Each fix makes a new integer version, and a run pins the version it started with. It acts only through its own tool_access, the team's levels and the policy engine. $defs try_run_result, rating, fix, real_run, run_answer and helpers_report are the records and the report around it (real_run and run_answer are 1.1.0, ADR-0037). Rules TS-01 to TS-17 are in taught_skill.rules.md.
  *
  * This interface was referenced by `TiloContracts`'s JSON-Schema
  * via the `definition` "TaughtSkill".
@@ -5737,6 +5804,44 @@ export interface TaughtSkillFix {
   at: Timestamp;
 }
 /**
+ * FR-SKL-05 to 07, ADR-0037: the record that one real run of one saved skill version started and how it ended, at orgs/{org}/taught_skills/{skill}/real_runs/{run_id} (the run id is the key, so a run is recorded once). tilo-api or the harness writes it from its own records, never from a request body (TS-13). by is the verified person whose run it is, set by the server. org_id, skill, version, run_id, world_id, by, plan and started_at are fixed at the start. finished_at and outcome are null together until the run's own world writes its terminal event, then set once together (TS-14). plan is the skill's plan at that version, kept so a later fix cannot rewrite what the run followed. A try run is never one of these (TS-10), and a rating and its note are the rating record's.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "TaughtSkillRealRun".
+ */
+export interface TaughtSkillRealRun {
+  org_id: OrgId;
+  skill: TaughtSkillId;
+  version: number;
+  run_id: RunId;
+  world_id: WorldId;
+  by: UserId;
+  /**
+   * @minItems 1
+   * @maxItems 20
+   */
+  plan: [TaughtSkillPlanStep, ...TaughtSkillPlanStep[]];
+  started_at: Timestamp;
+  finished_at: Timestamp | null;
+  outcome: TaughtSkillRunOutcome | null;
+}
+/**
+ * FR-SKL-07, ADR-0037: one question card that a person answered in a recorded real run, at orgs/{org}/taught_skills/{skill}/real_runs/{run_id}/answers/{card_id} (one for each card). It links records that already exist and holds no text of the question or the answer. by and at are the card's recorded answerer (the person, never a Team Lead id) and answer time, copied once when the answer commits (TS-16). The helpers report counts these and nothing else (TS-12).
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "TaughtSkillRunAnswer".
+ */
+export interface TaughtSkillRunAnswer {
+  org_id: OrgId;
+  skill: TaughtSkillId;
+  version: number;
+  run_id: RunId;
+  world_id: WorldId;
+  card_id: Ulid;
+  by: UserId;
+  at: Timestamp;
+}
+/**
  * FR-SKL-07 under BQ-DSN-05 and PRD 23.5: counts only, served only while the org has opted in. Per person: question cards answered in runs of the org's taught skills, and fixes made, in the month. Mistakes (thumbs-down ratings) are counted for the whole org, never per person. helpers is ordered by user id, never by a count (TS-12), and has no field for message content, time or speed.
  *
  * This interface was referenced by `TiloContracts`'s JSON-Schema
@@ -5828,6 +5933,128 @@ export interface TranscriptEvidenceQuotes {
    * @maxItems 20
    */
   quotes: TranscriptEvidenceQuote[];
+}
+/**
+ * One person's saved profile and notification preferences (FR-SET-01, FR-SET-02, ADR-0039), stored and served by tilo-api for the verified principal only, keyed by org and user; no request names another person's. A document with version 0 is the server's unsaved defaults, never a stored record, and its updated_at is null. version counts saved writes: a write carries the version it read and is refused as stale when it is not the stored one (USET-02). Every object is closed, so an unknown field is refused. Profile email and the rest of the profile are display data: they change no sign-in identity, verified destination, directory record or connector grant (USET-06). Preferences authorise nothing and start no work (USET-07). Rules USET-01 to USET-08 are in user_settings.rules.md. $defs update is the request body of a write.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "UserSettings".
+ */
+export interface UserSettings {
+  owner_id: UserId;
+  org_id: OrgId;
+  version: number;
+  profile: UserSettingsProfile;
+  notifications: UserSettingsNotifications;
+  quiet_hours: UserSettingsQuietHours;
+  updated_at: Timestamp | null;
+}
+/**
+ * FR-SET-01. The title is null when the person has none.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "UserSettingsProfile".
+ */
+export interface UserSettingsProfile {
+  name: UserSettingsLine;
+  email: UserSettingsEmail;
+  title: UserSettingsLine | null;
+  time_zone: UserSettingsTimeZone;
+  language: UserSettingsLanguage;
+  working_hours: UserSettingsWorkingHours;
+}
+/**
+ * The days and the window Tilo books inside, in profile.time_zone. start is inclusive, end exclusive, and start is before end: no overnight window (USET-03, as config/personal.yaml working_window).
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "UserSettingsWorkingHours".
+ */
+export interface UserSettingsWorkingHours {
+  /**
+   * @minItems 1
+   * @maxItems 7
+   */
+  days: [UserSettingsWeekday, ...UserSettingsWeekday[]];
+  start: UserSettingsClock;
+  end: UserSettingsClock;
+}
+/**
+ * FR-SET-02: the matrix, one row for each kind of notice. The decisions row keeps at least one channel on (USET-04): the rule is in the schema, so a client that skips its own guard is refused. Any other row may be all off.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "UserSettingsNotifications".
+ */
+export interface UserSettingsNotifications {
+  decisions: UserSettingsDecisionChannels;
+  spend: UserSettingsChannels;
+  finished: UserSettingsChannels;
+  digest: UserSettingsChannels;
+  weekly: UserSettingsChannels;
+}
+/**
+ * Whether one kind of notice reaches the person by phone, email and Slack. Saving a choice verifies no channel and proves no delivery.
+ */
+export interface UserSettingsDecisionChannels {
+  phone: boolean;
+  email: boolean;
+  slack: boolean;
+}
+/**
+ * Whether one kind of notice reaches the person by phone, email and Slack. Saving a choice verifies no channel and proves no delivery.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "UserSettingsChannels".
+ */
+export interface UserSettingsChannels {
+  phone: boolean;
+  email: boolean;
+  slack: boolean;
+}
+/**
+ * FR-SET-02 and FR-HIL-13, in the shape tilo_channels.quiet_hours.parse_quiet_hours already reads. During the window only gate and blocked notices notify; this object has no field that could hide a gate (USET-05). start and end are in timezone, the window may cross midnight, and start is never end (USET-03). threshold is typed money or null; nothing delivers by it in this release (USET-05).
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "UserSettingsQuietHours".
+ */
+export interface UserSettingsQuietHours {
+  enabled: boolean;
+  start: UserSettingsClock;
+  end: UserSettingsClock;
+  timezone: UserSettingsTimeZone;
+  threshold: UserSettingsMoney | null;
+}
+/**
+ * An amount in the minor unit of its currency (paise, pence, cents): an integer from 1 to 1000000000000, never a float, a bool or a string with a symbol. currency is an ISO 4217 code; tilo-api refuses a code it has no minor unit for (USET-03).
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "UserSettingsMoney".
+ */
+export interface UserSettingsMoney {
+  amount_minor: number;
+  currency: string;
+}
+/**
+ * Whether one kind of notice reaches the person by phone, email and Slack. Saving a choice verifies no channel and proves no delivery.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "UserSettingsDecisionChannels".
+ */
+export interface UserSettingsChannels1 {
+  phone: boolean;
+  email: boolean;
+  slack: boolean;
+}
+/**
+ * The body of PUT /v1/me/settings: the whole document except what the server owns. version is the one the client read (0 when nothing was saved yet). It names no owner or org: they come from the verified principal, so a body that carries one, or updated_at, is refused (USET-01).
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "UserSettingsUpdate".
+ */
+export interface UserSettingsUpdate {
+  version: number;
+  profile: UserSettingsProfile;
+  notifications: UserSettingsNotifications;
+  quiet_hours: UserSettingsQuietHours;
 }
 /**
  * One thing a person has to do (FR-PA-01): from confirmed minutes, from mail the person marked, or by hand. Visible to its `owner`; the person who assigned it sees its status only, and only once it is no longer `proposed` (PE-03). An item Tilo made starts `proposed`, is readable by no one until confirmed (PE-03; the meeting Owner sees it in the minutes), carries the meeting Owner as `assigned_by` from the start, and leaves `proposed` only with `confirmed_by`, that Owner (PE-07). A model never sets `due`: code computes it from `due_text` (PE-15).

@@ -21,6 +21,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.responses import PlainTextResponse
 from starlette.types import ASGIApp, Receive, Scope, Send
+from tilo_channels.web_push import SubscriptionStore
 from tilo_harness.schedule_store import InMemoryScheduleStore
 from tilo_harness.validator import repo_validator
 from tilo_metering import InMemoryFlagStore, LedgerEntry
@@ -294,6 +295,13 @@ def install(app: FastAPI, env: Mapping[str, str] | None = None) -> None:
         return feedback
 
     app.dependency_overrides[deps.get_feedback_store] = get_feedback
+    push = SubscriptionStore()  # FR-CHN-17b: in memory, never sent (the fake push is the default in dev)
+
+    def get_push() -> SubscriptionStore:
+        refuse_if_unsafe()
+        return push
+
+    app.dependency_overrides[deps.get_push_store] = get_push
     app.dependency_overrides.update(_dev_people())  # in-memory people stores, the dev owner an org owner
     from tilo_api import meeting_room  # noqa: PLC0415
 

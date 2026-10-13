@@ -367,9 +367,9 @@ export const OUT = {
 
 export const TOASTS = {
   later: "Tilo will remind you at 16:00",
-  paused: "Paused. No spend while paused",
-  resumed: "Resumed. Agents are back at work",
-  shared: "Link copied. Only your team can open it",
+  paused: "Sample only: paused on this page. Nothing real changed.", // issue 932: a sample world claims no real outcome
+  resumed: "Sample only: resumed on this page. Nothing real changed.",
+  shared: "Link copied. This is a sample world, so there is nothing real to share.",
   run: "Run started. You’ll get a notification when it finishes",
   open: "Opening the result in Google Drive",
   slack: "Shared to #ops in Slack",

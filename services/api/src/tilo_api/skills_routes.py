@@ -37,6 +37,7 @@ _ROOT = Path(__file__).resolve().parents[4] / "config"
 _SKILL_ID = re.compile(r"tsk_[0-9A-Za-z_]{1,48}")
 _DATE = re.compile(r"[0-9]{4}-[0-9]{2}-[0-9]{2}")
 _MUST_ASK_VERBS = frozenset({"send", "post", "pay", "delete", "share", "book"})
+_NEEDS_RATING_MAX = 50  # newest first; the person rates a few, not a backlog
 Verb = Literal["read", "draft", "write", "send", "post", "pay", "delete", "share", "book"]
 
 
@@ -46,12 +47,15 @@ class SkillConfig:
     seconds_per_step: int
     event_types: frozenset[str]
     prices_as_of: str
+    good_runs: int = 5  # TS-08: verified up-rated runs before a skill may be marked trusted
 
 
 def load_skill_config(root: Path = _ROOT) -> SkillConfig:
-    """`config/skills.yaml` (prior per step, TS-07 event allow-list) and the price date of `config/prices.yaml`; a file
-    that is missing or unusable falls back to the shipped numbers (the three registered event types)."""
+    """`config/skills.yaml` (prior per step, TS-07 event allow-list, TS-08 `trust.good_runs`) and the price date of
+    `config/prices.yaml`; a file that is missing or unusable falls back to the shipped numbers (the three registered
+    event types, five good runs)."""
     credits, seconds, events, as_of = 3, 20, ("meeting.minuted", "work_item.created", "world.completed"), "2026-09-24"
+    good_runs = 5
     try:
         data = yaml.safe_load((root / "skills.yaml").read_text(encoding="utf-8"))
         prior, listed = data["prior"], data["triggers"]["event_types"]
@@ -64,6 +68,8 @@ def load_skill_config(root: Path = _ROOT) -> SkillConfig:
             and all(isinstance(e, str) for e in listed)
         ):
             credits, seconds, events = prior["credits_per_step"], prior["seconds_per_step"], tuple(listed)
+        trusted = (data.get("trust") or {}).get("good_runs")
+        good_runs = trusted if type(trusted) is int and trusted >= 1 else good_runs
     except Exception:
         logger.warning("config/skills.yaml not read; using the shipped defaults")
     try:
@@ -71,7 +77,7 @@ def load_skill_config(root: Path = _ROOT) -> SkillConfig:
         as_of = found if _DATE.fullmatch(found) else as_of
     except Exception:
         logger.warning("config/prices.yaml date not read; using the shipped default")
-    return SkillConfig(credits, seconds, frozenset(events), as_of)
+    return SkillConfig(credits, seconds, frozenset(events), as_of, good_runs)
 
 
 # --- the body ---------------------------------------------------------------------------------------------------
@@ -317,6 +323,29 @@ def learn_route(
     stores: Annotated[PeopleStores, Depends(deps.get_people_stores)],
     clock: Annotated[Callable[[], str], Depends(deps.get_clock)],
 ) -> dict[str, Any]:
-    """Skills still learning that the caller may read; ratings and the helpers report are later slices."""
-    learning = _guarded(lambda: [r for r in _readable(store, stores, principal, clock) if r["status"] == "learning"])
-    return {"learning": learning, "needs_rating": [], "helpers": None}
+    """Skills still learning that the caller may read, and the caller's own recorded runs that finished and wait for
+    a rating (FR-SKL-05, TS-15). Both come from stored records only: no recorded run is an empty list, never a made-up
+    bar (HR-1). The helpers report (FR-SKL-07) is a later slice."""
+
+    def build() -> dict[str, Any]:
+        readable, user = _readable(store, stores, principal, clock), principal.user_id
+        waiting = []
+        for skill in readable:
+            rated = {r["run_id"] for r in store.list_ratings(deps.ORG_ID, skill["id"])}
+            for run in store.list_real_runs(deps.ORG_ID, skill["id"]):
+                if run["by"] == user and run["outcome"] is not None and run["run_id"] not in rated:
+                    waiting.append(
+                        {
+                            "skill": skill["id"],
+                            "name": skill["name"],
+                            "run_id": run["run_id"],
+                            "version": run["version"],
+                            "outcome": run["outcome"],
+                            "finished_at": run["finished_at"],
+                        }
+                    )
+        waiting.sort(key=lambda r: (r["finished_at"], r["run_id"]), reverse=True)
+        learning = [r for r in readable if r["status"] == "learning"]
+        return {"learning": learning, "needs_rating": waiting[:_NEEDS_RATING_MAX], "helpers": None}
+
+    return _guarded(build)

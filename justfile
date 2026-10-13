@@ -35,9 +35,10 @@ parity pages="":
 system-test:
     uv run pytest tests/system -q -p no:cacheprovider
 
-# Regenerate apps/web design tokens from design/tokens.json (drift-tested).
+# Regenerate apps/web design tokens from design/tokens.json and the Park themes from config/themes/ (drift-tested).
 tokens:
     node apps/web/scripts/generate-tokens.mjs
+    node apps/web/scripts/generate-themes.mjs
 
 # Format check + lint + typecheck + all tests (the full gate; matches PRD 20.4 "make check").
 # contracts-check runs first so CI fails on contract drift (FR-WLD-02).

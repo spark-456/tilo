@@ -126,6 +126,9 @@ class NewVersion:
     idempotency_key: str | None = None
     parent: Mapping[str, Any] | None = None
     label: str | None = None
+    # A producer that screened its own input in pieces may say "flagged". It can only raise the stored verdict (the
+    # store takes flagged if its own screen or the hint says so) and is never stored or applied to a replay.
+    screening_hint: str | None = None
 
 
 @dataclass(frozen=True)
@@ -355,6 +358,18 @@ def _strings(value: Any) -> Iterator[str]:
 
 
 class ArtifactStore:
+    _upload_text: Callable[[bytes, str], str] | None = None
+
+    def with_upload_text(self, convert: Callable[[bytes, str], str]) -> ArtifactStore:
+        """A request-local view: the store still screens exact stored bytes, with Office text conversion first.
+
+        No producer supplies a verdict; the configured safety provider remains authoritative.
+        Backends, caps, redaction, scope checks and locks are shared; other requests are unchanged.
+        """
+        view = copy.copy(self)
+        view._upload_text = convert
+        return view
+
     def __init__(
         self,
         meta: MetaBackend,
@@ -708,6 +723,8 @@ class ArtifactStore:
         if new.origin.kind == "fetch" and fetch_digest != digest:
             raise _refuse("AR-09", "fetched bytes do not match their archived fingerprint")
         screening, screened_at = self._screen(data, new.media_type)
+        if new.screening_hint == "flagged" and screening != "flagged":  # the hint only ever raises (AR-07)
+            screening, screened_at = "flagged", screened_at or _iso(self._clock())
         fields = {
             "run_id": new.run_id,
             "media_type": new.media_type,
@@ -725,6 +742,8 @@ class ArtifactStore:
     def _check_new(self, new: NewVersion) -> dict[str, Any] | None:
         """Shape, kinds and caps: everything that can be refused without hashing. Returns the normalised parent."""
         origin, media = new.origin, new.media_type
+        if new.screening_hint is not None and (type(new.screening_hint) is not str or new.screening_hint != "flagged"):
+            raise _refuse("AR-07", "a screening hint can only be 'flagged'; the store alone says clean")
         if not isinstance(origin, Origin) or origin.kind not in ("unit", "render", "upload", "fetch"):
             raise _refuse("AR-02", "origin must be unit, render, upload or fetch (restore has its own call)")
         if type(media) is not str or media not in TEXT_TYPES | FILE_TYPES:
@@ -806,7 +825,10 @@ class ArtifactStore:
         if self._screener is None:
             return "unscreened", None
         try:
-            if media_type in TEXT_TYPES:
+            convert = getattr(self, "_upload_text", None)
+            if media_type.startswith("application/vnd.openxmlformats-officedocument.") and convert is not None:
+                verdict = self._screener.check(convert(data, media_type))
+            elif media_type in TEXT_TYPES:
                 verdict = self._screener.check(data.decode("utf-8"))
             else:
                 verdict = self._screener.check("", content=data, mime_type=media_type)

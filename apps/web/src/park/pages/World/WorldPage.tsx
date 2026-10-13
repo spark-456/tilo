@@ -8,9 +8,18 @@
 // recorded run, so the same elements are disabled with the reason (docs/park-designed-not-in-prd/World.md).
 import { type ChangeEvent, type ReactNode, useEffect, useRef, useState } from "react";
 import { createRoomClient } from "../../api/live/meetingHall";
-import type { ApiResult, Connector, Decision, Plan, Skill, World } from "../../api/types";
+import type {
+  ApiResult,
+  BuildHandoff,
+  Connector,
+  Decision,
+  Plan,
+  Skill,
+  World,
+} from "../../api/types";
 import type { AppCtx } from "../../app/AppCtx";
-import { useParkApi, useWorldClient } from "../../app/context";
+import { NotFound } from "../../app/NotFound";
+import { useDemoSession, useParkApi, useWorldClient } from "../../app/context";
 import { stagePath } from "../../app/router";
 import {
   SLACK_NOTE_MAX,
@@ -26,7 +35,7 @@ import { SampleBadge, SampleNote } from "../../sample/SampleBadge";
 import { icon } from "../../shell/kit";
 import { Activity, Districts, Result, RunHistory } from "./Lower";
 import { MeetingHall } from "./MeetingHall";
-import { FactsCard, GoLink, SpendCard, WaitingCard } from "./Side";
+import { FactsCard, GoLink, LovableCard, SpendCard, WaitingCard } from "./Side";
 import { SkillProposals } from "./SkillProposals";
 import "./World.css";
 import { cityArt, rowArt, singleArt } from "./worldArt";
@@ -49,6 +58,7 @@ interface Loaded {
   connectors: Connector[];
   /** The side reads that failed or are not built: each card says so itself, the page still opens from the worlds. */
   gaps: { plans: boolean; decisions: boolean; skills: boolean; connectors: boolean };
+  handoffs: BuildHandoff[];
 }
 
 const NOT_YET = "Not available yet";
@@ -139,6 +149,7 @@ function Frame({ children, worldId }: { children?: ReactNode; worldId?: string }
 export function WorldPage({ app }: { app: AppCtx }) {
   const api = useParkApi();
   const worldClient = useWorldClient();
+  const demo = useDemoSession(); // QA-DEMO-1: the sample company: labelled, and approving records nothing
   const [roomClient] = useState(createRoomClient);
   const [loaded, setLoaded] = useState<Loaded | "failed" | null>(null);
   const [paused, setPaused] = useState<Record<string, boolean>>({});
@@ -156,14 +167,31 @@ export function WorldPage({ app }: { app: AppCtx }) {
 
   useEffect(() => {
     let live = true;
+    const handoffRead =
+      typeof api.getBuildHandoff === "function"
+        ? api.getBuildHandoff().then(
+            (r) => r.data,
+            (err: unknown) => {
+              if (
+                err &&
+                typeof err === "object" &&
+                (err as { code?: unknown }).code === "not_built"
+              ) {
+                return [];
+              }
+              throw err;
+            },
+          )
+        : Promise.resolve([]);
     Promise.all([
       api.getWorlds(dec, added),
       optional(api.getPlans(dec)),
       optional(api.getDecisions()),
       optional(api.getSkills()),
       optional(api.getConnectors()),
+      handoffRead,
     ]).then(
-      ([worlds, plans, decisions, skills, connectors]) => {
+      ([worlds, plans, decisions, skills, connectors, handoffs]) => {
         if (!live) return;
         setLoaded({
           worlds: worlds.data,
@@ -178,6 +206,7 @@ export function WorldPage({ app }: { app: AppCtx }) {
             skills: skills === null,
             connectors: connectors === null,
           },
+          handoffs,
         });
       },
       () => {
@@ -196,12 +225,17 @@ export function WorldPage({ app }: { app: AppCtx }) {
   }, [slackOpen]);
 
   if (loaded === null) return <Frame />;
+  const wanted = app.params.id;
+  // QA-DEMO-1 M2: an id the list does not hold is "Page not found", never another job (with its Approve buttons).
+  // Only an address with no id (the bare /world) falls back to the first world.
   const world =
     loaded === "failed"
       ? undefined
-      : (loaded.worlds.find((x) => x.id === app.params.id) ??
-        loaded.worlds.find((x) => !added.some((a) => a.id === x.id)) ??
-        loaded.worlds[0]);
+      : (loaded.worlds.find((x) => x.id === wanted) ??
+        (wanted
+          ? undefined
+          : (loaded.worlds.find((x) => !added.some((a) => a.id === x.id)) ?? loaded.worlds[0])));
+  if (loaded !== "failed" && wanted && !world) return <NotFound go={app.go} />;
   if (loaded === "failed" || !world) {
     return (
       <Frame>
@@ -219,6 +253,7 @@ export function WorldPage({ app }: { app: AppCtx }) {
   const isPaused = Boolean(paused[w.id]);
   const mine = loaded.decisions.filter((d) => d.world === w.id);
   const slackPending = slackPendingByWorld[w.id] ?? null;
+  const handoff = loaded.handoffs.find((h) => h.world === w.id) ?? null;
   const open = mine.filter((d) => !dec[d.k]).length + (slackPending ? 1 : 0);
   const look = stateLook(w, isPaused);
   const chip =
@@ -230,10 +265,20 @@ export function WorldPage({ app }: { app: AppCtx }) {
   // A world has a stage only when its data came from the live API; a world started on this page is local state.
   const hasStage = loaded.live && !added.some((a) => a.id === w.id);
   const stage = (to: string): string | null => (hasStage ? to : null);
+  const real = hasStage && !demo; // a live world of a real account: its toasts may claim real outcomes
 
   const togglePause = () => {
     setPaused((p) => ({ ...p, [w.id]: !isPaused }));
-    app.toast(isPaused ? "Resumed. Agents are back at work" : "Paused. No spend while paused");
+    // Issue 932: a sample world has no run behind it, so the toast says what happened: this page only.
+    app.toast(
+      real
+        ? isPaused
+          ? "Resumed. Agents are back at work"
+          : "Paused. No spend while paused"
+        : isPaused
+          ? "Sample only: resumed on this page. Nothing real changed."
+          : "Sample only: paused on this page. Nothing real changed.",
+    );
   };
   const share = () => {
     try {
@@ -242,7 +287,11 @@ export function WorldPage({ app }: { app: AppCtx }) {
     } catch {
       // no clipboard here: the toast still says what the button is for
     }
-    app.toast("Link copied. Only your team can open it");
+    app.toast(
+      real
+        ? "Link copied. Only your team can open it"
+        : "Link copied. This is a sample world, so there is nothing real to share.",
+    );
   };
 
   const openSlackDialog = (trigger: HTMLButtonElement) => {
@@ -296,7 +345,7 @@ export function WorldPage({ app }: { app: AppCtx }) {
           </div>
           <h1 className="park-world-h1" tabIndex={-1}>
             {w.name}
-            {w.sample ? <SampleBadge /> : null}
+            {w.sample || demo ? <SampleBadge /> : null}
           </h1>
           <p className="park-world-meta">
             {w.sample
@@ -304,6 +353,11 @@ export function WorldPage({ app }: { app: AppCtx }) {
               : `Owned by ${w.owner} · started ${w.started} · ${agentsWord(w.agents)}`}
           </p>
           {w.sample ? <SampleNote /> : null}
+          {demo && !w.sample ? (
+            <span className="park-sample-note">
+              Sample data from a demo session. Approving here records nothing.
+            </span>
+          ) : null}
         </div>
         <div className="park-world-actions">
           <Button
@@ -344,11 +398,6 @@ export function WorldPage({ app }: { app: AppCtx }) {
             <a className="park-world-live" href={stagePath(w.id)}>
               {icon("play", 14)}Watch the replay
             </a>
-          ) : null}
-          {isCity && !hasStage ? (
-            <span id={NO_STAGE_ID} className="park-world-sr">
-              {NO_STAGE}
-            </span>
           ) : null}
         </div>
       </div>
@@ -442,6 +491,12 @@ export function WorldPage({ app }: { app: AppCtx }) {
               </nav>
             ) : null}
           </div>
+          {isCity && !hasStage ? (
+            // QA-DEMO-1 m3: the reason the lens links and "Open live view" are off is words on the page, not a tooltip
+            <p id={NO_STAGE_ID} className="park-world-nostage">
+              {NO_STAGE}
+            </p>
+          ) : null}
           <div className="park-world-progrow">
             <div className="park-world-progwrap">
               <div className="park-world-track">
@@ -479,6 +534,14 @@ export function WorldPage({ app }: { app: AppCtx }) {
                 onDecide={(key) => app.decide(key)}
                 onLater={() => app.toast("Tilo will remind you at 16:00")}
                 slackPending={slackPending}
+              />
+            ) : null}
+            {handoff ? (
+              <LovableCard
+                handoff={handoff}
+                dec={dec}
+                sample={Boolean(w.sample)}
+                onDecide={(key) => app.decide(key)}
               />
             ) : null}
             <SpendCard w={w} mine={mine} dec={dec} onLedger={() => app.go("ledger")} />

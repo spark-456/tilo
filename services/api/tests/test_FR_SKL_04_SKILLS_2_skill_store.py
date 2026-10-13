@@ -157,6 +157,12 @@ class MemorySkillStore:
             if o == org and (r["owner"] == user or (r["scope"]["kind"] == "team" and r["scope"]["team"] in teams))
         ]
 
+    def list_real_runs(self, org: str, skill_id: str) -> list[dict[str, Any]]:  # FR-SKL-05: this fake has no runs
+        return []
+
+    def list_ratings(self, org: str, skill_id: str) -> list[dict[str, Any]]:
+        return []
+
     def writes(self) -> list[str]:
         return [name for name, _ in self.calls if name == "put"]
 

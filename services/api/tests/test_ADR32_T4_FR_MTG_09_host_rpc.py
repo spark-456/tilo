@@ -89,7 +89,9 @@ class Rig:
         self.audiences: list[str] = []
         self.transport = Scripted(*replies)
         self.sunk: list[dict[str, Any]] = []
-        self.rpc = MeetingHostRpc(URL, transport=self.transport, token_for=fetch or self._fetch)
+        # a frozen deadline clock: the request's timeout is the limit minus the time spent, which under load (or on
+        # a coarse clock) is not a stable 20 s, so the `20 <= timeout_s < 30` check below could not be exact
+        self.rpc = MeetingHostRpc(URL, transport=self.transport, token_for=fetch or self._fetch, clock=lambda: 0.0)
         self.receipts: list[HostReceipt] = []
         self.stub = MeetingHostStub(self.rpc, read_draft or (lambda ref: RAW), self.sunk.append, self.receipts.append)
         self.stub.hand_evidence(ENTRY["id"], EVIDENCE)
@@ -408,6 +410,7 @@ def test_ADR32_T4_FR_MTG_09_only_the_stub_may_reach_the_client_send():
         "send_invitation",
         "execute_entry",  # ADR-0035 L6: the live Google stubs' call, pinned in test_ADR35_L6_*
         "connection_views",  # ADR-0032a T4b: a read with no side effect
+        "join_link",  # ADR-0024 amendment 4 (BQ-JOIN-1..3): reads the owner's expiring Meet link; sends nothing
         "disconnect",  # ADR-0032 T6: the owner's own, from the route only
         "connect_start",  # ADR-0035 L4: the person's own connect, from connect_routes only (no side effect on Google)
         "connect_callback",

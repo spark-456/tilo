@@ -14,10 +14,13 @@ export function FirstRunBanner({
   first,
   page,
   person,
+  floating = false,
 }: {
   first: boolean;
   page: string | null;
   person: string | null;
+  /** Home: the page is a full-height scene, so the banner is pinned under the nav (M1). */
+  floating?: boolean;
 }) {
   const key = `tilo:first-run-banner:${JSON.stringify([person, page])}`;
   const [dismissed, setDismissed] = useState<ReadonlySet<string>>(() => new Set());
@@ -34,7 +37,10 @@ export function FirstRunBanner({
     }
   };
   return (
-    <aside className="park-first-run-banner" aria-label="Sample data">
+    <aside
+      className={`park-first-run-banner${floating ? " park-first-run-banner--home" : ""}`}
+      aria-label="Sample data"
+    >
       <span>
         <SampleBadge /> You are looking at sample data. It goes away after your first run.
       </span>
