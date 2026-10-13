@@ -89,6 +89,8 @@ class Principal:
     demo_session: bool = False  # an anonymous demo session (SEC-15, BQ-SIGNIN-10): models are replay only, always
     full_session: bool = False  # a full web sign-in session (BQ-XWORLD-10): set only by the server that resolves the
     # session, never from anything in a request; needed to answer, or read in full, another owned world's cards
+    auth_time: float | None = None  # ADR-0041 BK-06: the verified token's `auth_time` (epoch s), server-set only; a key
+    # act older than 10 minutes needs a fresh sign-in. None (a dev, email or test session) is never fresh.
 
 
 @dataclass

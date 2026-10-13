@@ -12,6 +12,7 @@ from tilo_harness.writer import WriterBusy as _WriterBusy
 from tilo_logging import configure_logging as _configure_logging
 
 from tilo_api import appcheck as _appcheck
+from tilo_api import byok_routes as _byok_routes
 from tilo_api import connect_routes as _connect_routes
 from tilo_api import cors as _cors
 from tilo_api import deps as _deps
@@ -147,6 +148,7 @@ app.include_router(_assistant_router)
 app.include_router(_people.router)
 app.include_router(_plate_links.router)  # FR-PA-06b: /l/<token> (public to the gate; the route checks the link)
 app.include_router(_meeting_host_routes.router)
+app.include_router(_byok_routes.router)  # ADR-0041: /v1/org/model-key; 503 not_configured while config/byok.yaml is off
 app.include_router(_quiz_apps.router)
 app.include_router(_connect_routes.router)
 app.include_router(_people_list_router)
