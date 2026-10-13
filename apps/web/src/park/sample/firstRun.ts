@@ -32,7 +32,7 @@ export function createFirstRun(api: Api, store: ParkStore, demo: boolean) {
       if (ticket !== generation) return;
       loaded = true;
       fixtureSession = result.source === "fixture";
-      if (result.source === "live" && result.data.some((world) => world.sample !== true)) {
+      if (result.source === "live" && result.data.some((world) => world.sample !== true && world.access !== "team")) {
         realSeen = true;
       }
       noteAdded();
