@@ -424,14 +424,16 @@ def _treasury(request: Request | None) -> Any:
 
 
 def get_ledger(request: Request = None) -> Sequence[LedgerEntry]:  # type: ignore[assignment]  # FastAPI injects it
-    """The Treasury's ledger (FR-MTR-10) as the signed-in person's own recorded entries, oldest first. A ledger that
-    cannot be built or read is 503, never an empty report (HR-1); nobody signed in is the sign-in 401."""
+    """The Treasury's ledger (FR-MTR-10) as the signed-in person's own recorded spend: entries (memory), or one
+    `commit` per run, step and profile from their rollups (deployed). A ledger that cannot be built or read is 503,
+    never an empty report (HR-1); nobody signed in is the sign-in 401."""
     store = _treasury(request)
     if request is None:  # no request, no person to read for
         raise HTTPException(status_code=503, detail="not_configured")
     uid = resolve_principal(request.app, request).user_id
+    read = getattr(store, "summary_for", None) or store.entries_for  # durable: the rollups (BQ-T3-5); memory: entries
     try:
-        return cast(Sequence[LedgerEntry], store.entries_for(uid))
+        return cast(Sequence[LedgerEntry], read(uid))
     except Exception as exc:  # a store error, a document that is not an entry, too many rows: the whole read is refused
         logger.warning("treasury ledger unreadable: %s", type(exc).__name__)
         raise HTTPException(status_code=503, detail="store_unavailable") from exc

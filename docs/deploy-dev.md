@@ -452,7 +452,14 @@ index), no rules change (`firestore.rules` denies every client path), no `TILO_A
 credentials the routes answer 503 (`not_configured`, `store_unavailable`), never an empty report. Each live unit the
 meter settles (GOLIVE-935) is also one entry here, written after the settle: a write that fails, or no writer wired,
 logs one `treasury_ledger_write_failed` line at ERROR (the error type only; a log-based alert on that text is the
-alert-able marker), is not retried, and never undoes the settled spend. The Ledger then under-reports that unit.
+alert-able marker), is not retried, and never undoes the settled spend. The Ledger then under-reports that unit, and
+`GET /costs` says so itself: `partial: true`, `partial_reason: below_spend_ledger` while its total is below what the
+SEC-16 ledger settled (BQ-T3-6).
+
+T3b (BQ-T3-5): each entry is also folded, in the same transaction, into one rollup per person per run at
+`orgs/{org}/treasury_rollup/{id}`, which the three routes read instead of every entry. Nothing for you to apply: no
+composite index (one equality query on `user`), no rules change (`firestore.rules` denies every client path), no IAM
+change (`roles/datastore.user` covers the transaction). Optional alert text: `treasury_rollup_too_large` at ERROR.
 
 ### Against a deployed tilo-api, and the smoke (PROD-WIRE-4)
 
