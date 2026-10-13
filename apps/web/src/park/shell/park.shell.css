@@ -943,6 +943,16 @@
 [data-park] .park-shell__enter > .park-popover {
   transition: opacity 0.2s ease, transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
+/* WEB-W2 (issue 933): the sample banner sits where the toast's top 92 lands, so while the banner is on the page the
+   toast rises from the bottom instead, above the run bar (fixed, 16px up, about 44px tall). One place at a time,
+   never over the bar or the banner, at 1440 and 390. */
+[data-park]:has(.park-first-run-banner) .park-toast:not(.park-toast--inline) {
+  top: auto;
+  bottom: calc(76px + env(safe-area-inset-bottom, 0px));
+}
+[data-park]:has(.park-first-run-banner) .park-shell__enter[data-enter="pre"] > .park-toast {
+  transform: translateX(-50%) translateY(8px);
+}
 [data-park] .park-shell__enter[data-enter="pre"] > .park-toast {
   opacity: 0;
   transform: translateX(-50%) translateY(-8px);
