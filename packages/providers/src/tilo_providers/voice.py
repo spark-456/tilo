@@ -14,11 +14,12 @@ from __future__ import annotations
 
 import dataclasses
 import fnmatch
+import logging
 import os
-from collections.abc import Iterator
+from collections.abc import Iterator, Mapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Protocol
 
 import yaml
 
@@ -29,6 +30,7 @@ from tilo_providers.interfaces import SpeechProvider
 from tilo_providers.replay import is_live_mode
 from tilo_providers.speech import FakeSpeechProvider, check_synth_request
 
+log = logging.getLogger("tilo_providers.voice")
 VOICE_VENDORS = frozenset(
     {"google-cloud-tts", "google", "fake"}
 )  # D-1 (FR-MTG-11): Google only; `fake` is the dev vendor
@@ -55,6 +57,17 @@ class LiveVoiceConfig:
     timeout_s: float  # the deadline of one spoken reply
     max_output_tokens: int  # the model's own output cap for one reply
     price_approved: bool
+
+
+class LiveVoiceMeter(Protocol):
+    """The SEC-16 hook (BQ-M2-1): one spoken Live reply is one unit on the process's spend ledger. Called from the
+    thread that drives the reply, so it must be thread-safe. `reserve` returns an opaque hold, or None when the ledger
+    will not take the unit (capped uid, replay-only switch, no headroom); raising counts as a refusal (fail closed).
+    `settle` gets that reply's own whole-number token counts (maybe empty); `release` frees a hold no model reached."""
+
+    def reserve(self) -> object | None: ...
+    def settle(self, hold: object, usage: Mapping[str, int]) -> None: ...
+    def release(self, hold: object) -> None: ...
 
 
 @dataclass(frozen=True)
@@ -245,16 +258,23 @@ class GoogleVoiceProvider(SpeechProvider):
         )
 
 
-def build_voice_provider(config: VoiceConfig, *, fixtures_dir: Path | str | None = None) -> SpeechProvider:
+def build_voice_provider(
+    config: VoiceConfig, *, fixtures_dir: Path | str | None = None, meter: LiveVoiceMeter | None = None
+) -> SpeechProvider:
     """`fake` gives the deterministic fake; `google-cloud-tts` and `google` the lazily built live voice; anything else
     is refused. `fixtures_dir` is accepted for symmetry with `build_speech_provider`: speech output is not recorded,
-    except that the flagged Gemini Live voice (`voice.live.enabled`, M2) replays hand-written recordings from it."""
+    except that the flagged Gemini Live voice (`voice.live.enabled`, M2) replays hand-written recordings from it.
+    SEC-16 (BQ-M2-1): under the live switch the Live voice is built only with a `meter`, the process's ledger hook;
+    without one the flag is ignored and Chirp is built, so a live reply no ledger counts cannot happen."""
     if config.vendor == "fake":
         return FakeSpeechProvider(max_chars=config.max_chars)
     if config.vendor not in VOICE_VENDORS:
         raise ProviderConfigError(f"FR-MTG-11: voice vendor {config.vendor!r} is not allowed; Google only")
     if config.live is not None and config.live.enabled:  # M2: the flag alone selects it; off, Chirp stays the voice
+        if meter is None and is_live_mode():
+            log.warning("the Live voice is flagged on but this process has no spend meter: Chirp is the voice")
+            return GoogleVoiceProvider(config)
         from tilo_providers.gemini_live_voice_adapter import GeminiLiveVoiceProvider  # noqa: PLC0415
 
-        return GeminiLiveVoiceProvider(config, fixtures_dir=fixtures_dir)
+        return GeminiLiveVoiceProvider(config, fixtures_dir=fixtures_dir, meter=meter)
     return GoogleVoiceProvider(config)
