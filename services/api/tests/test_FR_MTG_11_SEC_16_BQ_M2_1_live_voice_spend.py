@@ -1,6 +1,7 @@
 """FR-MTG-11 (M2b), SEC-16, BQ-M2-1: the Gemini Live voice's hook, backed by the production `SpendGuard` over the
 in-memory ledger (the Firestore ledger is the same Protocol). One spoken reply is one unit: reserved before any session
-opens, settled with the call's own usage, released when nothing reached the model. A capped uid, the replay-only switch,
+opens, settled with the call's own usage once the text was sent (even if no reply comes), released only when the text
+never reached the model. A capped uid, the replay-only switch,
 an unreadable ledger or switch store and a uid with less than a unit left each refuse, and a fake session records that
 the provider was never reached. No network, no SDK."""
 
@@ -37,8 +38,16 @@ CONFIG = VoiceConfig("google-cloud-tts", "chirp3-hd", "chirp-3-hd", "en-US-Chirp
 class Sessions:
     """A fake Live session factory that counts how often the provider was reached."""
 
-    def __init__(self, *, error: Exception | None = None, usage: Any = None) -> None:
+    def __init__(
+        self,
+        *,
+        error: Exception | None = None,
+        usage: Any = None,
+        connect_error: Exception | None = None,
+        send_error: Exception | None = None,
+    ) -> None:
         self.opened, self.error, self.usage = 0, error, usage
+        self.connect_error, self.send_error, self.sent = connect_error, send_error, 0
 
     def __call__(self, settings: Any):
         self.opened += 1
@@ -46,7 +55,9 @@ class Sessions:
 
         class Session:
             async def send_client_content(self, **kwargs: Any) -> None:
-                return None
+                if factory.send_error is not None:
+                    raise factory.send_error
+                factory.sent += 1
 
             async def receive(self):
                 if factory.error is not None:
@@ -57,6 +68,8 @@ class Sessions:
 
         @asynccontextmanager
         async def connect():
+            if factory.connect_error is not None:
+                raise factory.connect_error
             yield Session()
 
         return connect()
@@ -98,12 +111,21 @@ def test_FR_MTG_11_SEC_16_BQ_M2_1_a_priced_hook_settles_the_price_of_the_usage_i
     assert ledger.settled_minor(JUDGE_A) == 50 + UNIT
 
 
-def test_FR_MTG_11_SEC_16_BQ_M2_1_a_session_that_fails_before_any_audio_releases_the_hold_and_costs_nothing():
-    ledger, sessions = SpyLedger(make_ledger()), Sessions(error=RuntimeError("connect failed"))
+@pytest.mark.parametrize("kind", ["connect_error", "send_error"])
+def test_FR_MTG_11_SEC_16_BQ_M2_1_a_session_the_text_never_reached_releases_the_hold_and_costs_nothing(kind):
+    ledger, sessions = SpyLedger(make_ledger()), Sessions(**{kind: RuntimeError("failed")})
     with pytest.raises(ProviderError):
         voice(sessions, meter_for(make_guard(ledger))).synthesize("Hello.")
-    assert ledger.writes == ["reserve", "release"] and sessions.opened == 1
+    assert ledger.writes == ["reserve", "release"] and sessions.opened == 1 and sessions.sent == 0
     assert ledger.spent_minor(JUDGE_A) == 0
+
+
+def test_FR_MTG_11_SEC_16_BQ_M2_1_a_failure_after_the_send_settles_the_whole_unit_not_zero():
+    ledger, sessions = SpyLedger(make_ledger()), Sessions(error=RuntimeError("stream dropped"))
+    with pytest.raises(ProviderError):
+        voice(sessions, meter_for(make_guard(ledger))).synthesize("Hello.")
+    assert ledger.writes == ["reserve", "settle"] and sessions.sent == 1  # input tokens are billable
+    assert ledger.spent_minor(JUDGE_A) == ledger.settled_minor(JUDGE_A) == UNIT
 
 
 def test_FR_MTG_11_SEC_16_BQ_M2_1_a_capped_uid_is_refused_and_the_provider_is_never_reached():

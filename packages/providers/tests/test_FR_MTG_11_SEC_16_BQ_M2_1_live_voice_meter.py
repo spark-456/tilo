@@ -137,13 +137,71 @@ def test_FR_MTG_11_SEC_16_BQ_M2_1_a_call_without_usage_metadata_still_settles_on
     assert meter.events == [("reserve", "hold-1"), ("settle", "hold-1", {})]
 
 
-def test_FR_MTG_11_SEC_16_BQ_M2_1_a_session_that_fails_before_anything_arrives_releases_the_hold():
+class NoConnect(Transport):
+    """The session never opens: the provider was not reached, nothing was sent."""
+
+    @asynccontextmanager
+    async def connect(self, *args: Any, **kwargs: Any):
+        self.opened += 1
+        raise RuntimeError("connect failed")
+        yield self  # pragma: no cover
+
+
+class SendFails(Transport):
+    """The session opens but the text cannot be sent: the provider never got the input."""
+
+    async def send_client_content(self, **kwargs: Any) -> None:
+        raise RuntimeError("send failed")
+
+
+def test_FR_MTG_11_SEC_16_BQ_M2_1_a_session_that_never_opens_releases_the_hold():
     meter = Meter()
-    transport = Transport([], error=RuntimeError("connect failed"))
+    transport = NoConnect([])
     with pytest.raises(ProviderError):
         metered(transport, meter).synthesize(TEXT)
     assert meter.events == [("reserve", "hold-1"), ("release", "hold-1")]
+    assert transport.opened == 1 and transport.sent == []
+
+
+def test_FR_MTG_11_SEC_16_BQ_M2_1_a_send_that_fails_releases_the_hold():
+    meter = Meter()
+    transport = SendFails([])
+    with pytest.raises(ProviderError):
+        metered(transport, meter).synthesize(TEXT)
+    assert meter.events == [("reserve", "hold-1"), ("release", "hold-1")]
+    assert transport.closed == transport.opened == 1 and transport.sent == []
+
+
+def test_FR_MTG_11_SEC_16_BQ_M2_1_a_failure_after_the_text_was_sent_settles_not_releases():
+    """The input tokens are billable once the text is accepted, even if no reply ever arrives: settle with the usage
+    known (none here: the meter charges its whole reserve for an empty usage), never a free release."""
+    meter = Meter()
+    transport = Transport([], error=RuntimeError("stream dropped"))
+    with pytest.raises(ProviderError):
+        metered(transport, meter).synthesize(TEXT)
+    assert len(transport.sent) == 1
+    assert meter.events == [("reserve", "hold-1"), ("settle", "hold-1", {})]
     assert transport.closed == transport.opened == 1
+
+
+def test_FR_MTG_11_SEC_16_BQ_M2_1_a_turn_that_ends_without_a_reply_after_the_send_settles_once():
+    meter = Meter()
+    with pytest.raises(ProviderError):  # the stream closes with no reply and no turn_complete
+        metered(Transport([]), meter).synthesize(TEXT)
+    assert meter.events == [("reserve", "hold-1"), ("settle", "hold-1", {})]
+
+
+def test_FR_MTG_11_SEC_16_BQ_M2_1_a_cancel_after_the_send_settles_the_hold():
+    class CancelledAfterSend(Transport):
+        async def receive(self):
+            raise asyncio.CancelledError()
+            yield  # pragma: no cover
+
+    meter, transport = Meter(), CancelledAfterSend([])
+    with pytest.raises(asyncio.CancelledError):
+        metered(transport, meter).synthesize(TEXT)
+    assert len(transport.sent) == 1
+    assert meter.events == [("reserve", "hold-1"), ("settle", "hold-1", {})]
 
 
 @pytest.mark.parametrize(
@@ -173,7 +231,7 @@ def test_FR_MTG_11_SEC_16_BQ_M2_1_a_failure_after_the_model_ran_is_charged_with_
     ]
 
 
-def test_FR_MTG_11_SEC_16_BQ_M2_1_a_timeout_and_a_cancel_never_leak_the_hold():
+def test_FR_MTG_11_SEC_16_BQ_M2_1_a_timeout_after_the_send_settles_and_a_barge_in_settles_once():
     stalled, meter = Transport([]), Meter()
 
     async def forever():
@@ -184,7 +242,8 @@ def test_FR_MTG_11_SEC_16_BQ_M2_1_a_timeout_and_a_cancel_never_leak_the_hold():
     quick = with_live(timeout_s=0.05)
     with pytest.raises(ProviderError, match="timed out"):
         GeminiLiveVoiceProvider(quick, fixtures_dir=FIXTURES, session_factory=stalled, meter=meter).synthesize(TEXT)
-    assert meter.events == [("reserve", "hold-1"), ("release", "hold-1")]
+    assert len(stalled.sent) == 1  # the text went out before the stall: its input tokens are billable
+    assert meter.events == [("reserve", "hold-1"), ("settle", "hold-1", {})]
 
     cancelled = Meter()
     pieces = metered(Transport(GOOD_USAGE), cancelled).synthesize_stream(TEXT)
