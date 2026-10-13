@@ -50,6 +50,20 @@ const SERVER_TROUBLE = "Tilo had a problem on its side.";
 const REPLAY_ONLY =
   "Live models are unavailable right now, so nothing new was started. Finished runs can still be replayed.";
 const BAD_REPLY = "Tilo sent a reply this page could not read.";
+const INTAKE_COMMITTED =
+  "This task was already submitted. Check your worlds before starting another task.";
+
+function isIntakeCommitted(status: number, text: string): boolean {
+  if (status !== 409) return false;
+  try {
+    return (
+      (JSON.parse(text) as { detail?: { code?: unknown } } | null)?.detail?.code ===
+      "intake_already_committed"
+    );
+  } catch {
+    return false;
+  }
+}
 /** STARTER-1: the recorded sample project (`tilo_api.sample_world`); its path is read-only. */
 const SAMPLE_PATH = "/worlds/w_sample_village_basic";
 const SAMPLE_SIMULATED =
@@ -287,6 +301,10 @@ export class HttpClient implements TiloClient, SchedulesApi, FieldsApi, ItemApi 
   private readonly feeds = new Map<string, Feed>();
   private readonly missing = new Set<string>(); // worlds whose events answered 404
   private readonly missingListeners = new Set<() => void>();
+  // Keep only the current uncertain intent. File identity matters: same metadata can hide different bytes.
+  private intakeIntent:
+    | { text: string; files: File[]; mode: "quick" | undefined; key: string }
+    | undefined;
 
   constructor(options: HttpClientOptions) {
     this.base = options.baseUrl.trim().replace(/\/+$/, "");
@@ -349,6 +367,9 @@ export class HttpClient implements TiloClient, SchedulesApi, FieldsApi, ItemApi 
         throw new TiloApiError(SERVER_TROUBLE, res.status, true, write);
       }
       const body = await res.text().catch(() => "");
+      if (path === "/intake" && isIntakeCommitted(res.status, body)) {
+        throw new TiloApiError(INTAKE_COMMITTED, 409, false, write, "intake_already_committed");
+      }
       if (isReplayOnly(res.status, body)) {
         throw new TiloApiError(REPLAY_ONLY, 503, false, write, codeOf(body), true);
       }
@@ -411,12 +432,43 @@ export class HttpClient implements TiloClient, SchedulesApi, FieldsApi, ItemApi 
     files: File[],
     mode?: "quick",
   ): Promise<IntakeResult | QuickIntakeResult> {
+    let intent = this.intakeIntent;
+    if (
+      !intent ||
+      intent.text !== text ||
+      intent.mode !== mode ||
+      intent.files.length !== files.length ||
+      !intent.files.every((file, i) => file === files[i])
+    ) {
+      intent = { text, files: [...files], mode, key: crypto.randomUUID() };
+      this.intakeIntent = intent;
+    }
+    try {
+      const result = await this.sendIntake(text, intent.files, mode, intent.key);
+      if (this.intakeIntent === intent) this.intakeIntent = undefined;
+      return result;
+    } catch (error) {
+      // A network/5xx/unreadable reply can follow a committed write: a manual retry keeps the key.
+      if (error instanceof TiloApiError && !error.retryable && this.intakeIntent === intent) {
+        this.intakeIntent = undefined;
+      }
+      throw error;
+    }
+  }
+
+  private async sendIntake(
+    text: string,
+    files: File[],
+    mode: "quick" | undefined,
+    key: string,
+  ): Promise<IntakeResult | QuickIntakeResult> {
     const form = new FormData();
     form.append("text", text);
     for (const file of files) form.append("files", file);
+    const init = { method: "POST", body: form, headers: { "Idempotency-Key": key } };
     if (mode === "quick") {
       form.append("mode", mode);
-      const body = await this.request<unknown>("/intake", { method: "POST", body: form }, true);
+      const body = await this.request<unknown>("/intake", init, true);
       const quick = quickOf(body);
       if (!quick) throw new TiloApiError(BAD_REPLY, 200, true, true);
       return quick;
@@ -425,7 +477,7 @@ export class HttpClient implements TiloClient, SchedulesApi, FieldsApi, ItemApi 
       Omit<IntakeResult, "files"> & {
         files: Array<{ filename: string; status: "ok" | "failed"; safety_flagged: boolean }>;
       }
-    >("/intake", { method: "POST", body: form }, true);
+    >("/intake", init, true);
     return {
       task_id: r.task_id,
       brief: r.brief,
