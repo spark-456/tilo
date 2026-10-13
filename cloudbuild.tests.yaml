@@ -56,13 +56,13 @@ steps:
         /workspace/.venv/bin/python -m pytest services/channels/tests/test_FR_CHN_17*.py services/channels/tests/test_FR_PA_07*.py services/channels/tests/test_SEC_08_forged_or_replayed_requests_rejected.py services/api/tests/test_FR_CHN_17*.py services/connectors/tests/test_SEC_11_every_side_effect_carries_authz.py --deselect=services/connectors/tests/test_SEC_11_every_side_effect_carries_authz.py::test_SEC_11_the_discovered_side_effect_set_is_consistent_between_config_and_risk_table -q -p no:cacheprovider
   - id: batch-libraries
     name: python:3.12-bookworm
-    waitFor: [python-dependencies]
+    waitFor: [node-dependencies, python-dependencies]
     entrypoint: bash
     env: ['LIVE=0', 'TILO_API_STORE=memory', 'TILO_PEOPLE_STORE=memory']
     args:
       - -ceu
       - |
-        export PATH=/workspace/.venv/bin:/workspace/.cloud-tools/bin:$$PATH
+        export PATH=/workspace/.venv/bin:/workspace/.cloud-tools/bin:/workspace/.cloud-tools/node_modules/.bin:$$PATH
         /workspace/.venv/bin/python -m pytest packages/people/tests tests/contracts packages/archive/tests/test_I4*.py -q -p no:cacheprovider
         /workspace/.venv/bin/python -m pytest services/connectors/tests/test_FR_CON_19*.py -q -p no:cacheprovider
         /workspace/.venv/bin/python -m pytest services/channels/tests/test_FR_PA_06*.py services/channels/tests/test_FR_CHN_18*.py -q -p no:cacheprovider
