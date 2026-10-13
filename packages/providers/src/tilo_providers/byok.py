@@ -7,9 +7,10 @@ built with no `org=` is exactly what it was before.
 
 What is here (and what is not):
 * `ByokConfig` / `load_byok_config`: the flag, the ceiling and the bundles (an allow-list of role -> org profiles).
-  Org profiles are ordinary profiles of `config/models*.yaml` that no Tilo role names, with a fixed https `base_url`
-  and no `api_key_env` (an org call never reads the environment, BK-10). Until providers.schema.json 1.4.0 adds
-  `credential: "org"` this "named by a bundle and by no role" is the marker (BQ-BYOK-8).
+  An openai_compat org profile is a profile of `config/models*.yaml` with `credential: "org"` (providers.schema.json
+  1.4.0, BK-12), a fixed https `base_url` and no `api_key_env` (an org call never reads the environment, BK-10); no
+  Tilo role names it (`config.py` refuses that at load). The two Google kinds have no contract case yet (BQ-BYOKC-2):
+  until BQ-BYOK-2 is answered they keep the interim marker, "named by a bundle and by no role" (BQ-BYOK-8).
 * `OrgProviderSource` / `OrgBinding`: the seam the Router asks for a provider per org.
   Variant P: `ProxyOrgProviderSource` returns a `ProxyModelProvider` whose `generate` hands the call to
   tilo-connectors over a `ModelCallTransport`; no credential type exists in this process, so there is nothing here
@@ -21,6 +22,7 @@ What is here (and what is not):
 from __future__ import annotations
 
 import hashlib
+import re
 from collections.abc import Iterator, Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -29,7 +31,7 @@ from typing import Any, Protocol
 import yaml
 
 from tilo_providers.config import ProviderConfigError, ProvidersConfig
-from tilo_providers.errors import NotConfigured, ProviderError, QuotaError, RetryableError
+from tilo_providers.errors import MissingCapabilityError, NotConfigured, ProviderError, QuotaError, RetryableError
 from tilo_providers.interfaces import Capability, GenerateRequest, GenerateResponse, ModelProvider, PriceQuote
 
 _REPO_ROOT = Path(__file__).resolve().parents[4]
@@ -45,6 +47,10 @@ REFUSAL_CODES = frozenset(
     }
 )  # fmt: skip
 _BUNDLE_KEYS = frozenset({"label", "kind", "roles"})
+# byok.schema.json 1.0.0 `bundle_id` and `bundle.label`, verbatim (tests pin them to the schema): every member sees
+# the label, so a closed alphabet with no markup, link or address (BQ-BYOKC-5a).
+_BUNDLE_ID = re.compile(r"^[a-z][a-z0-9-]{0,63}$")
+_LABEL = re.compile(r"^[A-Za-z0-9][A-Za-z0-9 ().,'/_+-]{0,79}$")
 _FILE_KEYS = frozenset(
     {"version", "example", "enabled", "day_cap_credits_max", "calls_per_org_per_minute", "consent_version", "bundles"}
 )
@@ -134,10 +140,14 @@ def load_byok_config(path: Path | str | None = None, *, providers: ProvidersConf
 
 def _bundle(bundle_id: str, raw: Any, providers: ProvidersConfig) -> OrgBundle:
     where = f"BK-13: bundle {bundle_id!r}"
+    if _BUNDLE_ID.fullmatch(bundle_id) is None:
+        raise ByokConfigError(f"BK-13: bundle id {bundle_id!r} is not lower-case words joined by hyphens")
     if not isinstance(raw, dict) or set(raw) != _BUNDLE_KEYS or raw["kind"] not in KINDS:
         raise ByokConfigError(f"{where} must have exactly label, kind (one of {KINDS}) and roles")
-    if not isinstance(raw["label"], str) or not raw["label"].strip() or not isinstance(raw["roles"], dict):
-        raise ByokConfigError(f"{where} needs a label and a roles mapping")
+    if not isinstance(raw["label"], str) or _LABEL.fullmatch(raw["label"]) is None:
+        raise ByokConfigError(f"{where} label must be 1 to 80 plain characters (BK-20: every member sees it)")
+    if not isinstance(raw["roles"], dict):
+        raise ByokConfigError(f"{where} needs a roles mapping")
     roles: dict[str, tuple[str, str | None]] = {}
     for role, pair in raw["roles"].items():
         if role in _NEVER_ROLES or role not in providers.roles:
@@ -158,8 +168,11 @@ def _bundle(bundle_id: str, raw: Any, providers: ProvidersConfig) -> OrgBundle:
             raise ByokConfigError(f"{where} names unknown profile {profile_id!r}")
         if profile.provider != _PROVIDER_OF_KIND[bundle.kind]:
             raise ByokConfigError(f"{where}: profile {profile_id!r} is not a {_PROVIDER_OF_KIND[bundle.kind]} profile")
-        if bundle.kind == "openai_compat" and (profile.base_url is None or profile.api_key_env is not None):
-            raise ByokConfigError(f"{where}: {profile_id!r} must have a fixed base_url and no api_key_env (BK-10)")
+        if bundle.kind == "openai_compat":
+            if profile.credential != "org":  # providers.schema.json 1.4.0: the contract's marker (BQ-BYOK-8 interim)
+                raise ByokConfigError(f"BK-12: {where}: profile {profile_id!r} is not an org profile (credential: org)")
+            if profile.base_url is None or profile.api_key_env is not None:
+                raise ByokConfigError(f"{where}: {profile_id!r} must have a fixed base_url and no api_key_env (BK-10)")
         if profile_id in named_by_roles:
             raise ByokConfigError(f"BK-12: a Tilo role names org profile {profile_id!r}; an org profile is org-only")
         if providers.prices.status != "set" or profile_id not in providers.prices.profiles:
@@ -197,6 +210,35 @@ class ModelCallTransport(Protocol):
 
 
 _REPLY_KEYS = frozenset({"text", "tool_calls", "usage"})
+_USAGE_KEYS = frozenset({"input_tokens", "output_tokens", "total_tokens", "cached_tokens"})
+
+
+def _conforms(reply: Mapping[str, Any]) -> bool:
+    """model_call_rpc.generate_answer, which the pydantic types of the answer cannot say: `text` is present (a string
+    or null), a tool call is exactly `{name, args}`, and a usage that is present has whole `input_tokens` and
+    `output_tokens` and nothing beyond the four counts. Anything else is a bad reply (BK-17), never relayed."""
+    if "text" not in reply:
+        return False
+    text, calls, usage = reply["text"], reply.get("tool_calls"), reply.get("usage")
+    if not (text is None or (isinstance(text, str) and len(text) <= 400_000)):
+        return False
+    if calls is not None and not (
+        isinstance(calls, list)
+        and len(calls) <= 64
+        and all(
+            isinstance(c, dict)
+            and set(c) == {"name", "args"}
+            and isinstance(c["name"], str)
+            and 1 <= len(c["name"]) <= 128
+            and isinstance(c["args"], dict)
+            for c in calls
+        )
+    ):
+        return False
+    if usage is None:
+        return True
+    counts = isinstance(usage, dict) and {"input_tokens", "output_tokens"} <= set(usage) <= _USAGE_KEYS
+    return bool(counts and all(type(n) is int and n >= 0 for n in usage.values()))
 
 
 class ProxyModelProvider(ModelProvider):
@@ -223,13 +265,15 @@ class ProxyModelProvider(ModelProvider):
         return f"ProxyModelProvider(profile={self._profile_id!r})"
 
     def generate(self, request: GenerateRequest) -> GenerateResponse:
+        if request.parts:  # model_call_rpc.request has no `parts`: v1 is text only (BK-10), refused before any send
+            raise MissingCapabilityError("BK-10: an org-key profile takes text only; media stays on Tilo's profile")
         reply: Mapping[str, Any] | None = None
         refused: str | None = None
         try:
             got = self._transport.generate(
                 org_id=self._org_id, slot=self._slot, run_id=self._run_id, profile_id=self._profile_id, request=request
             )
-            if isinstance(got, Mapping) and set(got) <= _REPLY_KEYS:  # closed: a stray field (a key) is a bad reply
+            if isinstance(got, Mapping) and set(got) <= _REPLY_KEYS and _conforms(got):  # closed: a stray field is bad
                 reply = dict(got)
             else:
                 refused = "unreachable"
@@ -239,10 +283,12 @@ class ProxyModelProvider(ModelProvider):
             refused = "unreachable"
         if reply is None:
             raise _error_for(refused or "unreachable")
-        text, calls, usage = reply.get("text"), reply.get("tool_calls"), reply.get("usage")
-        if not (text is None or isinstance(text, str)) or not (usage is None or isinstance(usage, dict)):
-            raise _error_for("unreachable")
-        return GenerateResponse(text=text, profile_id=self._profile_id, tool_calls=calls, usage=usage)
+        return GenerateResponse(
+            text=reply["text"],
+            profile_id=self._profile_id,
+            tool_calls=reply.get("tool_calls"),
+            usage=reply.get("usage"),
+        )
 
     def stream(self, request: GenerateRequest) -> Iterator[GenerateResponse]:
         yield self.generate(request)
