@@ -108,7 +108,7 @@ describe("WEB_12_profile_render: the frame (header and tabs)", () => {
     expect(text(root.querySelector("button.park-btn--primary"))).toBe("Save changes");
     for (const id of ["notifications", "appearance", "security"] as const) {
       await openTab(root, TABS.find((t) => t.id === id)?.label ?? "");
-      expect(primaries(), id).toBe(0);
+      expect(primaries(), id).toBe(id === "notifications" ? 1 : 0); // FR-SET-02: its own Save changes
     }
     await openTab(root, "Plan and billing");
     expect(primaries(), "billing: Compare plans").toBe(1);
@@ -306,8 +306,8 @@ describe("WEB_12_profile_copy: every visible string and aria-label is the design
     expect(strings(root).has(SUBTITLE)).toBe(true);
     await openTab(root, "Notifications");
     expect(strings(root).has("What happened overnight and what’s next")).toBe(true);
-    expect(strings(root).has("Phone stays silent, except decisions over £1,000.")).toBe(true);
-    expect(strings(root).has("Phone stays silent, except decisions over £1,000")).toBe(false);
+    expect(strings(root).has("Decision threshold: Not available yet")).toBe(true);
+    expect(strings(root).has("Phone stays silent, except decisions over £1,000.")).toBe(false);
   });
 
   it("WEB_12_profile_the_page_has_no_sample_data_chip_and_no_recorded_for_the_demo_line", async () => {

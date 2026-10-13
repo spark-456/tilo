@@ -33,6 +33,9 @@ PUBLIC_BY_DESIGN = {"sandbox-web": {"/manifest.json"}}
 # (the production default, fail closed). The 401/403 for a missing, bad or wrong-caller token needs a wired verifier and
 # store, which no real process has here: the services' own tests drive it (test_FR_AGT_14_schedule_routes.py).
 TICK = "/internal/schedules/tick"
+# FR-PA-06b (the owner's decision, 13 Oct 2026): the plate digest's mail links are public to the gate, because a mail
+# click has no sign-in; the signed single-use token is the credential. Unconfigured (no signing key) the route is 503.
+LINK_ROUTES = {("GET", "/l/{token}"), ("POST", "/l/{token}")}
 
 
 def _refuses_anonymous(method: str, path: str, status: int) -> bool:
@@ -86,7 +89,12 @@ def test_SYS_SEC_05_a_service_route_that_is_not_public_by_design_refuses_an_anon
 
 
 def test_SYS_SEC_05_tilo_api_without_dev_mode_serves_nothing_that_needs_a_person(prod_api):
-    ops = [(m, p) for m, p in _operations("tilo_api:app") if p not in OPEN]
+    served = [(m, p) for m, p in _operations("tilo_api:app") if p not in OPEN]
+    assert LINK_ROUTES <= set(served), "the mail-link routes are the named exception"
+    for method, path in sorted(LINK_ROUTES):  # no signing key here: closed, not open, and never a sign-in 401
+        answer = httpx.request(method, prod_api.url + _fill(path), timeout=15)
+        assert answer.status_code == 503, f"{method} {path} answered {answer.status_code}"
+    ops = [r for r in served if r not in LINK_ROUTES]
     assert ("POST", "/intake") in ops and ("GET", "/worlds/{world_id}/events") in ops, "the route list was read"
     for method, path in ops:
         response = httpx.request(method, prod_api.url + _fill(path), json={} if method == "POST" else None, timeout=15)

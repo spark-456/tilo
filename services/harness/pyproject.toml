@@ -19,6 +19,7 @@ dependencies = [
     "tilo-memory",
     "tilo-policy",
     "tilo-providers",
+    "tilo-render",
 ]
 
 [dependency-groups]
@@ -35,6 +36,7 @@ tilo-logging = { workspace = true }
 tilo-memory = { workspace = true }
 tilo-policy = { workspace = true }
 tilo-providers = { workspace = true }
+tilo-render = { workspace = true }
 
 [build-system]
 requires = ["hatchling"]

@@ -1,0 +1,451 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.tilo.example/taught_skill.schema.json",
+  "x-version": "1.1.0",
+  "title": "TaughtSkill",
+  "description": "A skill a person taught Tilo on the Skills page (FR-SKL-01 to FR-SKL-07, ADR-0034), stored at orgs/{org}/taught_skills/{id} and read only through tilo-api. A sibling of the expert-signed, version-pinned skill.yaml (skill.schema.json), never a change to it. One person owns it. Each fix makes a new integer version, and a run pins the version it started with. It acts only through its own tool_access, the team's levels and the policy engine. $defs try_run_result, rating, fix, real_run, run_answer and helpers_report are the records and the report around it (real_run and run_answer are 1.1.0, ADR-0037). Rules TS-01 to TS-17 are in taught_skill.rules.md.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "org_id",
+    "owner",
+    "name",
+    "scope",
+    "status",
+    "paused",
+    "method",
+    "captured",
+    "plan",
+    "question",
+    "trigger",
+    "estimates",
+    "tool_access",
+    "good_runs",
+    "version",
+    "created_at",
+    "updated_at"
+  ],
+  "properties": {
+    "id": { "$ref": "#/$defs/id" },
+    "org_id": { "$ref": "common.schema.json#/$defs/org_id" },
+    "owner": { "$ref": "common.schema.json#/$defs/user_id" },
+    "name": { "$ref": "#/$defs/name" },
+    "scope": { "$ref": "#/$defs/scope" },
+    "status": { "$ref": "#/$defs/status" },
+    "paused": {
+      "description": "FR-SKL-06: a paused skill never starts (no trigger, no run on request, no try run). Kept apart from status, so Resume returns to learning or trusted as it was. A draft is never paused.",
+      "type": "boolean"
+    },
+    "method": { "$ref": "#/$defs/method" },
+    "captured": {
+      "description": "FR-SKL-01: the steps captured so far, in order. Text only, plus the pinned capture artifact a step came from; media bytes are never inline.",
+      "type": "array",
+      "maxItems": 20,
+      "items": { "$ref": "#/$defs/captured_step" }
+    },
+    "plan": {
+      "description": "FR-SKL-02: Tilo's version, in order. Empty until Tilo has proposed one.",
+      "type": "array",
+      "maxItems": 20,
+      "items": { "$ref": "#/$defs/plan_step" }
+    },
+    "question": { "anyOf": [{ "$ref": "#/$defs/question" }, { "type": "null" }] },
+    "trigger": { "$ref": "#/$defs/trigger" },
+    "estimates": { "anyOf": [{ "$ref": "#/$defs/estimates" }, { "type": "null" }] },
+    "tool_access": { "$ref": "#/$defs/tool_access" },
+    "good_runs": {
+      "description": "FR-SKL-06: runs of this skill rated up by the person whose run it was (TS-08); try runs never count.",
+      "type": "integer",
+      "minimum": 0
+    },
+    "version": {
+      "description": "1 for a draft and a new skill; each fix adds 1 (TS-09). Name, scope, trigger, status and pause changes keep it.",
+      "type": "integer",
+      "minimum": 1
+    },
+    "created_at": { "$ref": "common.schema.json#/$defs/timestamp" },
+    "updated_at": { "$ref": "common.schema.json#/$defs/timestamp" }
+  },
+  "dependentSchemas": {
+    "status": {
+      "description": "A draft is never paused; a saved skill (learning or trusted) has a plan and estimates. Keyed by a required field, so it always applies.",
+      "if": { "properties": { "status": { "const": "draft" } }, "required": ["status"] },
+      "then": { "properties": { "paused": { "const": false } } },
+      "else": {
+        "properties": { "plan": { "minItems": 1 }, "estimates": { "$ref": "#/$defs/estimates" } }
+      }
+    }
+  },
+  "$defs": {
+    "id": { "type": "string", "pattern": "^tsk_[0-9A-Za-z_]{1,48}$" },
+    "name": {
+      "description": "One line written by a person: data, never an instruction.",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 80,
+      "pattern": "^[^\\r\\n]+$"
+    },
+    "step_text": {
+      "description": "One step in plain words, one line. Written by a person or by the skill_capture role from what the person showed; data, never an instruction to code.",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200,
+      "pattern": "^[^\\r\\n]+$"
+    },
+    "step_number": {
+      "description": "1-based position in plan.",
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 20
+    },
+    "count": { "type": "integer", "minimum": 0, "maximum": 20 },
+    "status": {
+      "description": "draft until saved; a saved skill starts as learning (FR-SKL-04); only the owner marks it trusted, once good_runs reaches the configured threshold (TS-08), and may set it back to learning at any time.",
+      "type": "string",
+      "enum": ["draft", "learning", "trusted"]
+    },
+    "method": {
+      "description": "How the person showed it (FR-SKL-01): describe (typed words), upload (a finished example file), guided (clicking through in Tilo's browser) or record (a screen recording, video only, no sound).",
+      "type": "string",
+      "enum": ["describe", "upload", "guided", "record"]
+    },
+    "scope": {
+      "description": "Who can use it (FR-SKL-04): just_me, or the members of one team the owner belongs to (team is null exactly for just_me).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "team"],
+      "properties": {
+        "kind": { "type": "string", "enum": ["just_me", "team"] },
+        "team": { "anyOf": [{ "$ref": "common.schema.json#/$defs/team_id" }, { "type": "null" }] }
+      },
+      "if": { "properties": { "kind": { "const": "team" } }, "required": ["kind"] },
+      "then": { "properties": { "team": { "$ref": "common.schema.json#/$defs/team_id" } } },
+      "else": { "properties": { "team": { "type": "null" } } }
+    },
+    "pinned": {
+      "description": "A stored artifact version (ADR-0018 store, the owner's Desk world) by id and version only, never a label or a file name.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["artifact_id", "version"],
+      "properties": {
+        "artifact_id": { "$ref": "common.schema.json#/$defs/artifact_id" },
+        "version": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "captured_step": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["text", "artifact"],
+      "properties": {
+        "text": { "$ref": "#/$defs/step_text" },
+        "artifact": { "anyOf": [{ "$ref": "#/$defs/pinned" }, { "type": "null" }] }
+      }
+    },
+    "verb": {
+      "description": "What a step does, in the Skills page's words. send, post, pay, delete, share and book always ask (must_ask).",
+      "type": "string",
+      "enum": ["read", "draft", "write", "send", "post", "pay", "delete", "share", "book"]
+    },
+    "plan_step": {
+      "description": "One step of Tilo's version (FR-SKL-02). tool is the connector it uses and action one of that connector's actions (config/connectors.yaml or config/mcp.yaml), the risk-table key of what it does there. must_ask is set by code, never a model: true when the verb is send, post, pay, delete, share or book, or the action's tier is T2 or T3 (an action the config does not list is T3). The runner works it out again from the current config on every run (TS-04). A must_ask step always has ask_first true. ask_first is the person's 'Ask me first' switch for the other steps; while the skill is learning every step but a read asks anyway (TS-05). Neither one authorises anything: every side effect still goes through the policy engine and its gate.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["text", "tool", "action", "verb", "ask_first", "must_ask"],
+      "properties": {
+        "text": { "$ref": "#/$defs/step_text" },
+        "tool": { "$ref": "common.schema.json#/$defs/connector_id" },
+        "action": { "$ref": "common.schema.json#/$defs/action_type" },
+        "verb": { "$ref": "#/$defs/verb" },
+        "ask_first": { "type": "boolean" },
+        "must_ask": { "type": "boolean" }
+      },
+      "if": {
+        "properties": { "verb": { "enum": ["send", "post", "pay", "delete", "share", "book"] } },
+        "required": ["verb"]
+      },
+      "then": { "properties": { "must_ask": { "const": true }, "ask_first": { "const": true } } },
+      "else": {
+        "if": { "properties": { "must_ask": { "const": true } }, "required": ["must_ask"] },
+        "then": { "properties": { "ask_first": { "const": true } } }
+      }
+    },
+    "question": {
+      "description": "FR-SKL-02: the one clarifying question of Tilo's version, its options, and the index of the option the person chose (null until answered).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["text", "options", "answer"],
+      "properties": {
+        "text": { "$ref": "#/$defs/step_text" },
+        "options": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 4,
+          "items": { "type": "string", "minLength": 1, "maxLength": 60, "pattern": "^[^\\r\\n]+$" }
+        },
+        "answer": { "type": ["integer", "null"], "minimum": 0, "maximum": 3 }
+      }
+    },
+    "trigger": {
+      "description": "FR-SKL-04: when it runs. on_demand: when a person asks. schedule: the /schedules record schedule_id (FR-AGT-14) starts it. event: a registered event of a world the owner owns starts it (TS-07). The other two fields are null.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "schedule_id", "event"],
+      "properties": {
+        "kind": { "type": "string", "enum": ["on_demand", "schedule", "event"] },
+        "schedule_id": {
+          "anyOf": [{ "type": "string", "pattern": "^sched_[0-9a-f]{24}$" }, { "type": "null" }]
+        },
+        "event": { "anyOf": [{ "$ref": "#/$defs/event_trigger" }, { "type": "null" }] }
+      },
+      "if": { "properties": { "kind": { "const": "schedule" } }, "required": ["kind"] },
+      "then": {
+        "properties": { "schedule_id": { "type": "string" }, "event": { "type": "null" } }
+      },
+      "else": {
+        "properties": { "schedule_id": { "type": "null" } },
+        "if": { "properties": { "kind": { "const": "event" } }, "required": ["kind"] },
+        "then": { "properties": { "event": { "$ref": "#/$defs/event_trigger" } } },
+        "else": { "properties": { "event": { "type": "null" } } }
+      }
+    },
+    "event_trigger": {
+      "description": "An event type from config/skills.yaml's allow-list, and at most three exact matches on its data fields. Keys are data fields holding an id or an enum value, never free text; there are no patterns or substrings (TS-07).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "filter"],
+      "properties": {
+        "type": { "$ref": "event.schema.json#/$defs/family_verb" },
+        "filter": {
+          "type": "object",
+          "maxProperties": 3,
+          "propertyNames": { "$ref": "common.schema.json#/$defs/slug" },
+          "additionalProperties": { "type": "string", "pattern": "^[A-Za-z0-9_.:-]{1,64}$" }
+        }
+      }
+    },
+    "estimates": {
+      "description": "FR-SKL-02, worked out by code, never a model. Taken from the skill's own runs in the credit ledger once it has some (source ledger), else from config/skills.yaml's per-step prior (source prior). Prices come from config/prices.yaml as of prices_as_of. asks_per_run counts the steps that would stop to ask (TS-05).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["credits_per_run", "seconds_per_run", "asks_per_run", "source", "prices_as_of"],
+      "properties": {
+        "credits_per_run": { "$ref": "common.schema.json#/$defs/credits" },
+        "seconds_per_run": { "type": "integer", "minimum": 0 },
+        "asks_per_run": { "$ref": "#/$defs/count" },
+        "source": { "type": "string", "enum": ["ledger", "prior"] },
+        "prices_as_of": { "$ref": "common.schema.json#/$defs/calendar_date" }
+      }
+    },
+    "tool_access": {
+      "description": "FR-ACC-02, least privilege: the level each connector may be used at, set by code at save to the lowest level that permits that connector's steps. A connector left out is off, unlike skill.yaml, where a missing entry takes the team's level. A level only ever lowers the team's (effective_level). The owner may lower it further; nothing raises it above what the steps need (TS-06).",
+      "type": "object",
+      "maxProperties": 20,
+      "propertyNames": { "$ref": "common.schema.json#/$defs/connector_id" },
+      "additionalProperties": { "$ref": "common.schema.json#/$defs/tool_access_level" }
+    },
+    "try_run_result": {
+      "description": "FR-SKL-03: one try run, at orgs/{org}/taught_skills/{skill}/try_runs/{id}. Reads are real, writes are recorded as intents in a dry-run outbox and sent nowhere, so side_effects is 0 by construction (TS-10). match = matched / total. Each step ends matched, skipped or not reached; asked counts the steps that paused to ask.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "skill",
+        "version",
+        "by",
+        "match",
+        "total",
+        "matched",
+        "asked",
+        "skipped",
+        "intents",
+        "side_effects",
+        "outcome",
+        "stopped_at",
+        "duration_ms",
+        "credits",
+        "finished_at"
+      ],
+      "properties": {
+        "id": { "$ref": "common.schema.json#/$defs/ulid" },
+        "skill": { "$ref": "#/$defs/id" },
+        "version": { "type": "integer", "minimum": 1 },
+        "by": { "$ref": "common.schema.json#/$defs/user_id" },
+        "match": { "type": "number", "minimum": 0, "maximum": 1 },
+        "total": { "$ref": "#/$defs/step_number" },
+        "matched": { "$ref": "#/$defs/count" },
+        "asked": { "$ref": "#/$defs/count" },
+        "skipped": { "$ref": "#/$defs/count" },
+        "intents": { "$ref": "#/$defs/count" },
+        "side_effects": {
+          "description": "Always 0: a try run sends and saves nothing outside Tilo.",
+          "const": 0
+        },
+        "outcome": { "type": "string", "enum": ["completed", "stopped"] },
+        "stopped_at": { "anyOf": [{ "$ref": "#/$defs/stop" }, { "type": "null" }] },
+        "duration_ms": { "type": "integer", "minimum": 0 },
+        "credits": { "$ref": "common.schema.json#/$defs/credits" },
+        "finished_at": { "$ref": "common.schema.json#/$defs/timestamp" }
+      },
+      "if": { "properties": { "outcome": { "const": "completed" } }, "required": ["outcome"] },
+      "then": { "properties": { "stopped_at": { "type": "null" } } },
+      "else": { "properties": { "stopped_at": { "$ref": "#/$defs/stop" } } }
+    },
+    "stop": {
+      "description": "Where and why a try run stopped: a site wanted a sign-in or a CAPTCHA (a needs-you card; Tilo never types a password or solves one), the try run's credit cap, an error, or the person stopped it.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["step", "reason"],
+      "properties": {
+        "step": { "$ref": "#/$defs/step_number" },
+        "reason": {
+          "type": "string",
+          "enum": ["needs_sign_in", "captcha", "budget", "error", "cancelled"]
+        }
+      }
+    },
+    "rating": {
+      "description": "FR-SKL-05: a thumbs up or down on one finished run, by the person whose run it was, at orgs/{org}/taught_skills/{skill}/ratings/{id}. A thumbs down may name the step that went wrong. The note is kept for the owner to read; it never reaches a prompt.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "skill", "version", "run_id", "by", "thumb", "wrong_step", "note", "at"],
+      "properties": {
+        "id": { "$ref": "common.schema.json#/$defs/ulid" },
+        "skill": { "$ref": "#/$defs/id" },
+        "version": { "type": "integer", "minimum": 1 },
+        "run_id": { "$ref": "common.schema.json#/$defs/run_id" },
+        "by": { "$ref": "common.schema.json#/$defs/user_id" },
+        "thumb": { "$ref": "#/$defs/thumb" },
+        "wrong_step": { "anyOf": [{ "$ref": "#/$defs/step_number" }, { "type": "null" }] },
+        "note": { "type": ["string", "null"], "minLength": 1, "maxLength": 280 },
+        "at": { "$ref": "common.schema.json#/$defs/timestamp" }
+      },
+      "if": { "properties": { "thumb": { "const": "up" } }, "required": ["thumb"] },
+      "then": { "properties": { "wrong_step": { "type": "null" } } }
+    },
+    "thumb": { "type": "string", "enum": ["up", "down"] },
+    "fix": {
+      "description": "FR-SKL-05: a logged change to one step, by the owner only (TS-09), at orgs/{org}/taught_skills/{skill}/fixes/{id}. It sets the step's text and Ask me first and makes version to_version = from_version + 1, which the next run uses. A fix never changes a step's tool, action or verb.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "skill",
+        "from_version",
+        "to_version",
+        "step",
+        "text",
+        "ask_first",
+        "by",
+        "rating",
+        "at"
+      ],
+      "properties": {
+        "id": { "$ref": "common.schema.json#/$defs/ulid" },
+        "skill": { "$ref": "#/$defs/id" },
+        "from_version": { "type": "integer", "minimum": 1 },
+        "to_version": { "type": "integer", "minimum": 2 },
+        "step": { "$ref": "#/$defs/step_number" },
+        "text": { "$ref": "#/$defs/step_text" },
+        "ask_first": { "type": "boolean" },
+        "by": { "$ref": "common.schema.json#/$defs/user_id" },
+        "rating": {
+          "description": "The thumbs-down rating that led to it, or null.",
+          "anyOf": [{ "$ref": "common.schema.json#/$defs/ulid" }, { "type": "null" }]
+        },
+        "at": { "$ref": "common.schema.json#/$defs/timestamp" }
+      }
+    },
+    "run_outcome": {
+      "description": "How a real run ended (ADR-0037): completed after world.completed, failed after world.failed. Pause all and the kill switch end nothing here, so a run they stop stays unfinished and is never rateable (TS-14).",
+      "type": "string",
+      "enum": ["completed", "failed"]
+    },
+    "real_run": {
+      "description": "FR-SKL-05 to 07, ADR-0037: the record that one real run of one saved skill version started and how it ended, at orgs/{org}/taught_skills/{skill}/real_runs/{run_id} (the run id is the key, so a run is recorded once). tilo-api or the harness writes it from its own records, never from a request body (TS-13). by is the verified person whose run it is, set by the server. org_id, skill, version, run_id, world_id, by, plan and started_at are fixed at the start. finished_at and outcome are null together until the run's own world writes its terminal event, then set once together (TS-14). plan is the skill's plan at that version, kept so a later fix cannot rewrite what the run followed. A try run is never one of these (TS-10), and a rating and its note are the rating record's.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "org_id",
+        "skill",
+        "version",
+        "run_id",
+        "world_id",
+        "by",
+        "plan",
+        "started_at",
+        "finished_at",
+        "outcome"
+      ],
+      "properties": {
+        "org_id": { "$ref": "common.schema.json#/$defs/org_id" },
+        "skill": { "$ref": "#/$defs/id" },
+        "version": { "type": "integer", "minimum": 1 },
+        "run_id": { "$ref": "common.schema.json#/$defs/run_id" },
+        "world_id": { "$ref": "common.schema.json#/$defs/world_id" },
+        "by": { "$ref": "common.schema.json#/$defs/user_id" },
+        "plan": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 20,
+          "items": { "$ref": "#/$defs/plan_step" }
+        },
+        "started_at": { "$ref": "common.schema.json#/$defs/timestamp" },
+        "finished_at": {
+          "anyOf": [{ "$ref": "common.schema.json#/$defs/timestamp" }, { "type": "null" }]
+        },
+        "outcome": { "anyOf": [{ "$ref": "#/$defs/run_outcome" }, { "type": "null" }] }
+      },
+      "if": { "properties": { "outcome": { "type": "null" } }, "required": ["outcome"] },
+      "then": { "properties": { "finished_at": { "type": "null" } } },
+      "else": { "properties": { "finished_at": { "$ref": "common.schema.json#/$defs/timestamp" } } }
+    },
+    "run_answer": {
+      "description": "FR-SKL-07, ADR-0037: one question card that a person answered in a recorded real run, at orgs/{org}/taught_skills/{skill}/real_runs/{run_id}/answers/{card_id} (one for each card). It links records that already exist and holds no text of the question or the answer. by and at are the card's recorded answerer (the person, never a Team Lead id) and answer time, copied once when the answer commits (TS-16). The helpers report counts these and nothing else (TS-12).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["org_id", "skill", "version", "run_id", "world_id", "card_id", "by", "at"],
+      "properties": {
+        "org_id": { "$ref": "common.schema.json#/$defs/org_id" },
+        "skill": { "$ref": "#/$defs/id" },
+        "version": { "type": "integer", "minimum": 1 },
+        "run_id": { "$ref": "common.schema.json#/$defs/run_id" },
+        "world_id": { "$ref": "common.schema.json#/$defs/world_id" },
+        "card_id": { "$ref": "common.schema.json#/$defs/ulid" },
+        "by": { "$ref": "common.schema.json#/$defs/user_id" },
+        "at": { "$ref": "common.schema.json#/$defs/timestamp" }
+      }
+    },
+    "helpers_report": {
+      "description": "FR-SKL-07 under BQ-DSN-05 and PRD 23.5: counts only, served only while the org has opted in. Per person: question cards answered in runs of the org's taught skills, and fixes made, in the month. Mistakes (thumbs-down ratings) are counted for the whole org, never per person. helpers is ordered by user id, never by a count (TS-12), and has no field for message content, time or speed.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["org_id", "month", "helpers", "mistakes"],
+      "properties": {
+        "org_id": { "$ref": "common.schema.json#/$defs/org_id" },
+        "month": { "type": "string", "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])$" },
+        "helpers": { "type": "array", "maxItems": 500, "items": { "$ref": "#/$defs/helper" } },
+        "mistakes": { "$ref": "#/$defs/mistakes" }
+      }
+    },
+    "helper": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["user", "answers", "fixes"],
+      "properties": {
+        "user": { "$ref": "common.schema.json#/$defs/user_id" },
+        "answers": { "type": "integer", "minimum": 0 },
+        "fixes": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "mistakes": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["this_month", "last_month"],
+      "properties": {
+        "this_month": { "type": "integer", "minimum": 0 },
+        "last_month": { "type": "integer", "minimum": 0 }
+      }
+    }
+  }
+}

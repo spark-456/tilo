@@ -44,7 +44,7 @@ export function useRepeatWeekly(): Repeat {
         <span>Repeat weekly</span>
       </label>
       {on && (
-        <div className="repeat-weekly-fields">
+        <fieldset className="repeat-weekly-fields" aria-label="Repeat weekly">
           <label htmlFor={`${id}-day`}>Day</label>
           <select
             id={`${id}-day`}
@@ -65,15 +65,18 @@ export function useRepeatWeekly(): Repeat {
             type="time"
             value={time}
             aria-invalid={parts === null}
+            aria-describedby={parts === null ? `${id}-hint` : undefined}
             onChange={(e) => setTime(e.target.value)}
           />
           <span className="repeat-weekly-tz">
             Time zone: <output data-testid="repeat-tz">{tz}</output>
           </span>
           {parts === null && (
-            <span className="repeat-weekly-hint">Enter a time such as 09:00.</span>
+            <span id={`${id}-hint`} className="repeat-weekly-hint">
+              Enter a time such as 09:00.
+            </span>
           )}
-        </div>
+        </fieldset>
       )}
     </div>
   );

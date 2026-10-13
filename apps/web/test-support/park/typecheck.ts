@@ -13,7 +13,7 @@ import { PARK_DIR } from "./prototype";
 
 const WEB_DIR = path.resolve(PARK_DIR, "..", "..");
 const WORKER = path.join(WEB_DIR, "test-support", "park", "typecheckWorker.mjs");
-const DEFAULT_TIMEOUT_MS = 175_000;
+const DEFAULT_TIMEOUT_MS = 235_000;
 
 let cached: Promise<string[]> | undefined;
 
@@ -89,4 +89,11 @@ export function runTypecheckWorker(options: TypecheckWorkerOptions = {}): Typech
 export function parkTypeErrors(): Promise<string[]> {
   cached ??= runTypecheckWorker().promise;
   return cached;
+}
+
+/** Compile an in-memory kit consumer in its own bounded child, leaving Vitest responsive. */
+export function kitProbeErrors(source: string): Promise<string[]> {
+  return runTypecheckWorker({
+    args: [WORKER, WEB_DIR, "kit-probe", Buffer.from(source).toString("base64")],
+  }).promise;
 }

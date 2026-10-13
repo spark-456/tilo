@@ -25,9 +25,10 @@ CLAUDE.md's "record every dependency's licence" rule. Updated whenever a depende
 | fastapi | MIT | https://pypi.org/project/fastapi/ |
 | python-multipart (`tilo-api` form uploads) | Apache-2.0 | https://pypi.org/project/python-multipart/ |
 | uvicorn | BSD-3-Clause | https://pypi.org/project/uvicorn/ |
-| google-auth (`tilo_api.schedules`: OIDC verification of the Scheduler tick, FR-AGT-14) | Apache-2.0 | https://pypi.org/project/google-auth/ |
+| google-auth (`tilo_api.schedules`: OIDC verification of the Scheduler tick, FR-AGT-14; `tilo_connectors.host_auth`: HB-01 caller check, ADR-0032 T3) | Apache-2.0 | https://pypi.org/project/google-auth/ |
 | requests (the transport google-auth fetches Google's public certs with) | Apache-2.0 | https://pypi.org/project/requests/ |
 | cryptography (`tilo_api.appcheck`: RS256 verification of App Check tokens, SEC-10; already listed under `services/connectors`, now declared by `tilo-api` itself) | Apache-2.0 OR BSD-3-Clause | https://pypi.org/project/cryptography/ |
+| google-cloud-storage (`tilo_api.run_stores`: GCS artifact blobs and the raw archive, PROD-WIRE 2b) | Apache-2.0 | https://pypi.org/project/google-cloud-storage/ |
 
 ## Python (`packages/contracts-py`)
 
@@ -46,7 +47,9 @@ CLAUDE.md's "record every dependency's licence" rule. Updated whenever a depende
 `services/harness` also uses `pyyaml`, `jsonschema` and `referencing` (already listed under the
 root dev dependency group), declared as its own direct dependencies since its code imports them
 directly rather than relying only on the shared dev group. FR-AGT-01/02/03 adds the in-workspace
-`tilo-contracts` and `tilo-providers` members (not external; no new licence).
+`tilo-contracts` and `tilo-providers` members (not external; no new licence). LW-10 adds the in-workspace
+`tilo-render` member, so `reportlab` (BSD), `python-pptx` (MIT) and `pydantic` (MIT) now install in the harness image
+too; each is already listed (under `services/render` and `packages/contracts-py`), so no new licence.
 
 ## Python (`packages/providers`)
 
@@ -55,6 +58,14 @@ declared none of its own): `tilo_providers.config` uses `pydantic` (already list
 `packages/contracts-py`, via the `tilo-contracts` workspace member it imports) and `pyyaml`
 (already listed under the root dev dependency group); both are already installed into the
 shared `uv` workspace venv by `uv sync --all-packages`.
+
+FR-MTG-11 adds one direct runtime dependency to `packages/providers/pyproject.toml`:
+
+| Dependency | Licence | Source |
+| --- | --- | --- |
+| google-cloud-texttospeech (`tilo_providers.cloud_tts_adapter`, imported lazily and only for a real client; licence read from the installed 2.38.0 metadata) | Apache-2.0 | https://pypi.org/project/google-cloud-texttospeech/ |
+
+Its other dependencies (`google-api-core`, `google-auth`, `grpcio`, `proto-plus`, `protobuf`) were already in `uv.lock`.
 
 ## Python (`packages/policy`)
 
@@ -106,6 +117,8 @@ loader. No new licence. FR-CON-02 adds `cryptography` for AES-GCM envelope encry
 | --- | --- | --- |
 | cryptography (`tilo_connectors.tokens`, FR-CON-02) | Apache-2.0 OR BSD-3-Clause | https://pypi.org/project/cryptography/ |
 | tzdata (`tilo_connectors.calendar_sync`, FR-CAL-08: the IANA zone database `zoneinfo` needs on Windows) | Apache-2.0 | https://pypi.org/project/tzdata/ |
+| google-cloud-firestore (`tilo_connectors.host_broker`: the token and revoke-retry stores, ADR-0032 T2) | Apache-2.0 | https://pypi.org/project/google-cloud-firestore/ |
+| google-cloud-kms (`tilo_connectors.host_broker`: `CloudKms` client, ADR-0032 T2; pulls `grpc-google-iam-v1`, Apache-2.0) | Apache-2.0 | https://pypi.org/project/google-cloud-kms/ |
 
 FR-CON-10 (`tilo_connectors.provenance`) adds the in-workspace `tilo-archive` and `tilo-contracts`
 (not external). No new licence.
@@ -133,6 +146,8 @@ Its tests use `jsonschema` and `referencing` from the root dev group (above).
 | python-pptx | MIT | https://pypi.org/project/python-pptx/ |
 | reportlab | BSD | https://pypi.org/project/reportlab/ |
 | pypdf | BSD-3-Clause | https://pypi.org/project/pypdf/ |
+
+`tilo-providers` (LW-06) also uses `pypdf` (listed above) to count the pages of an untrusted PDF part.
 
 `tilo-render` (AGR-01/02/03 / FR-CON-09) also uses `pydantic` (already listed under `packages/contracts-py`, MIT) and `pyyaml` (already listed under the root dev dependency group, MIT).
 
@@ -222,3 +237,28 @@ licence terms are tracked in `design/source/INDEX.md`, not here.
 
 `tilo-memory` declares `jsonschema` and `referencing` as runtime dependencies (FR-MEM-06 artifact store),
 both already listed above (MIT). No new licence.
+
+## Python (`evals`)
+
+`tilo-evals` (LW-16) now depends on the in-workspace `tilo-browser` and `tilo-sandbox-web` (not external): the web-research replay case runs tilo-browser's fetch service over the sandbox-web fixtures in process. No new licence.
+## Python (`packages/redact`)
+
+`tilo-redact` (FR-MEM-05, SEC-14: the shared secret redactor) is in-workspace and has no external runtime
+dependency (standard library only). `tilo-providers` and `tilo-api` depend on it. No new licence.
+
+## Python (`services/channels`, FR-CHN-17b web push sender)
+
+`tilo-channels` declares `pywebpush` (VAPID signing and RFC 8291 payload encryption for the production
+`PushSender`; imported lazily, constructed only on Cloud Run with the mounted VAPID secret). Its tree:
+
+| Package | Licence | Source |
+| --- | --- | --- |
+| pywebpush | MPL-2.0 | https://pypi.org/project/pywebpush/ |
+| py-vapid | MPL-2.0 | https://pypi.org/project/py-vapid/ |
+| http-ece | MIT | https://pypi.org/project/http-ece/ |
+| aiohttp | Apache-2.0 AND MIT | https://pypi.org/project/aiohttp/ |
+| aiohappyeyeballs | PSF-2.0 | https://pypi.org/project/aiohappyeyeballs/ |
+| aiosignal, frozenlist, multidict, propcache, yarl | Apache-2.0 | https://pypi.org/project/aiohttp/ (its dependencies) |
+
+MPL-2.0 is file-level copyleft: Tilo ships these packages unmodified and does not copy their files, so no Tilo
+source is affected.

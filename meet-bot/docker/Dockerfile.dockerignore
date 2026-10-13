@@ -1,0 +1,32 @@
+# Build context for meet-bot/docker/Dockerfile is the repository root (FR-MTG-11). BuildKit reads this file, not the root
+# .dockerignore (which ignores meet-bot/), because it sits next to the Dockerfile and is named after it.
+# Everything is out except what the Dockerfile copies.
+*
+!meet-bot/bot
+!meet-bot/docker
+!packages/contracts-py/src
+!packages/providers/src
+!packages/redact/src
+# Only the config the provider layer reads and the prompts it loads (prompts/router: schema repair; prompts/speech:
+# transcribe), not all of config/ and prompts/.
+!config/models*.yaml
+!config/prices*.yaml
+!config/speech*.yaml
+!config/voice*.yaml
+!config/meeting*.yaml
+!prompts/router
+!prompts/speech
+# Never in the image, at any depth.
+**/__pycache__
+**/*.pyc
+**/.env
+**/.env.*
+**/*.pem
+**/*.key
+**/*.p12
+**/client_secret*.json
+**/token*.json
+**/credentials.json
+**/service-account*.json
+**/*-credentials.json
+**/application_default_credentials.json

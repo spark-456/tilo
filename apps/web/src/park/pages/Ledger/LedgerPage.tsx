@@ -3,16 +3,28 @@
 // Data comes only from the Park Api (fixture or live, with its `source`); every approval goes through
 // `app.decide(key)`; navigation only through `app.go`. No motion until WEB-3 (BQ-WEB-3).
 import type { ReactNode } from "react";
+import type { Decision, Ledger, Source } from "../../api/types";
 import type { AppCtx } from "../../app/AppCtx";
 import { useParkApi } from "../../app/context";
 import { useStaged } from "../../app/useStaged";
 import { Button, KpiTile, PageSheet } from "../../components";
 import "../../components/park.components.css";
 import { Activity } from "./Activity";
-import { ApprovalWaits, CostPerRun, GaveBack, WhereItGoes } from "./Sections";
+import { ApprovalWaits, CostPerRun, GaveBack, RecordedRuns, WhereItGoes } from "./Sections";
 import { SpendChart } from "./SpendChart";
+import { downloadCsv } from "./downloadCsv";
 import { icon } from "./icons";
-import { chartHeadline, groupsWithRows, hasChart, hasWaits, kpis, money, monthLeft } from "./model";
+import { ledgerCsv, ledgerCsvFileName } from "./ledgerCsv";
+import {
+  chartHeadline,
+  groupsWithRows,
+  hasChart,
+  hasWaits,
+  kpis,
+  money,
+  monthLeft,
+  periodOf,
+} from "./model";
 import { useLedger } from "./useLedger";
 import "./Ledger.css";
 
@@ -31,6 +43,14 @@ function Frame({ source, children }: { source?: string; children?: ReactNode }) 
       <PageSheet gap={20}>{children}</PageSheet>
     </div>
   );
+}
+
+/** FR-SPD-08: the month as a CSV file that holds the rows the page shows. Honest about sample data and about
+ * accounting sync, which comes later. */
+function exportCsv(app: AppCtx, L: Ledger, decisions: Decision[], source: Source): void {
+  const name = ledgerCsvFileName({ label: `${periodOf(L).month} ${periodOf(L).year}` }, source);
+  downloadCsv(name, ledgerCsv(L, app.dec, decisions));
+  app.toast(`Exported ${name}${source === "live" ? "" : " · sample data"}`);
 }
 
 export function LedgerPage({ app }: LedgerPageProps) {
@@ -79,14 +99,14 @@ export function LedgerPage({ app }: LedgerPageProps) {
                 variant="secondary"
                 onClick={() => app.toast("August and earlier months live here")}
               >
-                September 2026
+                {periodOf(L).month} {periodOf(L).year}
                 {icon("chevD", 13)}
               </Button>
             </span>
             <Button
               variant="secondary"
               icon={icon("download", 15)}
-              onClick={() => app.toast("Exported september-2026.csv · also synced to Xero")}
+              onClick={() => exportCsv(app, L, state.decisions, state.source)}
             >
               Export CSV
             </Button>
@@ -128,7 +148,7 @@ export function LedgerPage({ app }: LedgerPageProps) {
                   <div className="park-ledger-eyebrow">SPEND OVER TIME</div>
                   <h2 className="park-ledger-h2">{chartHeadline(L)}</h2>
                   <div className="park-ledger-sub">
-                    Running total for September. Hover for daily spend.
+                    Running total for {periodOf(L).month}. Hover for daily spend.
                   </div>
                 </div>
                 <div className="park-ledger-legend">
@@ -153,15 +173,24 @@ export function LedgerPage({ app }: LedgerPageProps) {
         </div>
       ) : null}
 
-      {part(3) && (L.runs.length > 0 || hasWaits(L)) ? (
+      {part(3) && (L.runs.length > 0 || hasWaits(L) || L.recordedRuns !== undefined) ? (
         <div className="park-ledger-pair">
           {L.runs.length > 0 ? <CostPerRun L={L} go={app.go} /> : null}
+          {L.recordedRuns !== undefined ? <RecordedRuns L={L} /> : null}
           {hasWaits(L) ? <ApprovalWaits L={L} app={app} /> : null}
+          {L.recordedRuns !== undefined && !hasWaits(L) ? (
+            <p className="park-ledger-sub">No completed approval waits recorded yet.</p>
+          ) : null}
         </div>
       ) : null}
 
       {part(4) && (L.memory.length > 0 || L.hours.length > 0) ? <GaveBack L={L} /> : null}
-      {part(5) && L.activity.length > 0 ? (
+      {part(4) && L.recordedRuns !== undefined && !L.memory.length && !L.hours.length ? (
+        <p className="park-ledger-sub">
+          Memory savings by week and hours handed back are not available yet.
+        </p>
+      ) : null}
+      {part(5) && (L.activity.length > 0 || L.recordedRuns !== undefined) ? (
         <Activity L={L} decisions={state.decisions} app={app} />
       ) : null}
     </Frame>

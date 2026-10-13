@@ -9,16 +9,21 @@ export interface SwitchProps {
   checked: boolean;
   onChange: (checked: boolean) => void;
   disabled?: boolean;
+  /** A hint for assistive technology and the hover title; never a visible string. */
+  description?: string;
 }
 
-export function Switch({ label, checked, onChange, disabled }: SwitchProps) {
+export function Switch({ label, checked, onChange, disabled, description }: SwitchProps) {
   return (
+    // biome-ignore lint/a11y/useValidAriaProps: aria-description is ARIA 1.3 (supported by current browsers); biome's list predates it
     <button
       type="button"
       role="switch"
       aria-checked={checked}
       aria-label={label}
       disabled={disabled}
+      aria-description={description}
+      title={description}
       className={cx("park-switch", checked && "park-switch--on")}
       onClick={() => onChange(!checked)}
     >

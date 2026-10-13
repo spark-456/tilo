@@ -2,8 +2,10 @@
 // Reference: design_handoff_tilo_web_app/README.md "Interactions and motion" and the inline styles of
 // design_handoff_tilo_web_app/design/Tilo App *.dc.html (hover lifts .3s cubic-bezier(.2,.8,.2,1), the sliding
 // thumb .4s cubic-bezier(.34,1.3,.5,1), the switch knob .25s cubic-bezier(.3,1.3,.5,1), the pin spring .45s).
-// Hard limits from the earlier tickets (kept, not loosened): only park.shell.css may transition; only transform
-// and opacity; no backdrop-filter on anything that moves; no new keyframes; reduced motion and 'still' turn it off.
+// Hard limits from the earlier tickets: only park.shell.css may transition; no backdrop-filter on anything that
+// moves; no new keyframes; reduced motion and 'still' turn it off. WIDENED (user approved 8 Oct, BQ-WEB-MOTION-3a):
+// the paint-only properties background-color and color may transition too, on the exact list pinned below
+// (MOTION3_PINS), still never a layout property, box-shadow, filter or width.
 import fs from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
@@ -71,18 +73,29 @@ describe("WEB-MOTION-3 css: hover, press and slide feedback is a transform trans
     expect(press?.decls.get("transform")).toBe("translateY(1px)");
   });
 
-  it("FR_UX_12 WEB-MOTION-3 css: the nav's hover fade is an opacity overlay (a background colour never transitions)", () => {
+  // MOTION3_PINS (8 Oct, user approved): the nav's hover wash is the reference's own background-color fade (.2s)
+  // on the element itself, not an opacity overlay under the glass: the three ::before overlays are gone.
+  it("MOTION3_PINS FR_UX_12 WEB-MOTION-3 css: the nav's hover wash fades background-color .2s on the element itself, with no ::before overlay left", () => {
     const rules = parseRules(shell()).rules;
     for (const cls of ["park-shell__tab", "park-shell__iconbtn", "park-shell__nrow"]) {
-      const over = rule(rules, `[data-park] .${cls}::before`);
-      expect(over, `${cls}::before`).toBeDefined();
-      expect(over?.decls.get("opacity")).toBe("0");
-      expect(norm(over?.decls.get("transition"))).toMatch(/^opacity \.2s/);
-      const on = rules.find(
-        (r) => r.selector === `[data-park] .${cls}:hover::before` && r.decls.get("opacity") === "1",
+      const fade = rules.find(
+        (r) => r.selector === `[data-park] .${cls}` && r.decls.has("transition"),
       );
-      expect(on, `${cls}:hover::before shows the overlay`).toBeDefined();
+      expect(norm(fade?.decls.get("transition")), `${cls} transition`).toMatch(
+        /^background-color \.2s ease/,
+      );
+      expect(
+        rules.filter((r) => r.selector.includes(`${cls}::before`)),
+        `${cls}::before is gone`,
+      ).toEqual([]);
     }
+    const bg = (selector: string): string | undefined =>
+      rule(rules, selector)?.decls.get("background");
+    expect(bg("[data-park] .park-shell__nrow:hover")).toBe("var(--rowHover)");
+    expect(bg("[data-park] .park-shell__iconbtn:hover")).toBe("var(--chip)");
+    // The tab you are on keeps its own fill.
+    expect(bg("[data-park] .park-shell__tab:not(.park-shell__tab--on):hover")).toBe("var(--chip)");
+    expect(bg("[data-park] .park-shell__tab--on:hover")).toBe("var(--heroSoft)");
   });
 
   it("FR_UX_12 WEB-MOTION-3 css: no page ring turns (the Home draft and the Connectors connect are stand-ins with no call behind them, HR-1)", () => {
@@ -200,9 +213,10 @@ describe("WEB-MOTION-3 css: reduced motion and the 'still' preference turn every
     expect(m, "the file ends with the reduced-motion block").not.toBeNull();
     const block = m?.[1] ?? "";
     expect(block).toMatch(/\.park-shell__main \*/);
-    expect(block).toMatch(/park-shell__tab::before/);
-    expect(block).toMatch(/park-shell__iconbtn::before/);
-    expect(block).toMatch(/park-shell__nrow::before/);
+    // MOTION3_PINS: the nav pieces are listed themselves now (their wash no longer sits on a ::before).
+    expect(block).toMatch(/park-shell__tab,/);
+    expect(block).toMatch(/park-shell__iconbtn,/);
+    expect(block).toMatch(/park-shell__nrow,/);
     expect(block).toMatch(/park-shell__enter > \.park-toast/);
     expect(block).toMatch(/park-shell__enter > \.park-popover/);
     expect(block).toMatch(/transition:\s*none\s*!important/);
@@ -220,14 +234,104 @@ describe("WEB-MOTION-3 css: reduced motion and the 'still' preference turn every
     const reduceTails = new Set(reduce.map((r) => r.selector.replace("[data-park]", "").trim()));
     for (const tail of [
       ".park-shell__main *",
-      ".park-shell__tab::before",
-      ".park-shell__iconbtn::before",
-      ".park-shell__nrow::before",
+      ".park-shell__tab",
+      ".park-shell__iconbtn",
+      ".park-shell__nrow",
       ".park-shell__enter > .park-toast",
       ".park-shell__enter > .park-popover",
     ]) {
       expect(reduceTails.has(tail), `reduced motion: ${tail}`).toBe(true);
       expect(stillTails.has(tail), `still: ${tail}`).toBe(true);
     }
+  });
+});
+
+// MOTION3_PINS (BQ-WEB-MOTION-3a, DECIDED 8 Oct, user approved): colour fades are allowed on this exact list and on
+// nothing else. Each entry is a thing the handoff fades (design_handoff_tilo_web_app/design/Tilo App *.dc.html:
+// `transition:background-color .2s` on the nav and list-row hover washes, on the switch tracks, on the Worlds and
+// Agenda chips; `transition:color .25s` on the sliding segmented text). Paint only, nothing that lays out.
+describe("MOTION3_PINS: background-color and color fades are on an exact list in the shell stylesheet", () => {
+  const MAIN_PREFIX = "[data-park] .park-shell__main";
+  const BG = "background-color .2s ease";
+  const CHROME: Readonly<Record<string, string>> = {
+    "[data-park] .park-shell__tab": `${BG}, color .2s ease`,
+    "[data-park] .park-shell__iconbtn": BG,
+    "[data-park] .park-shell__nrow": BG,
+  };
+  const MAIN: Readonly<Record<string, string>> = {
+    // switch tracks (the on state recolours the track as the knob travels)
+    ".park-switch": BG,
+    ".park-profile-switch": BG,
+    ".park-agenda-track": BG,
+    ".park-skills-ask-track": BG,
+    // hover washes on list rows
+    ".park-home-live": BG,
+    ".park-home-event": BG,
+    ".park-home-spend": BG,
+    ".park-ledger-run": BG,
+    ".park-ledger-arow-btn": BG,
+    ".park-row--action": BG,
+    // chips that fill when chosen
+    ".park-agenda-filter": `${BG}, color .2s ease`,
+    ".park-worlds-tab": `${BG}, color .2s ease`,
+    // the sliding segmented control only recolours its text
+    ".park-seg--sliding .park-seg__item": "color .25s ease",
+  };
+  const PINNED: Readonly<Record<string, string>> = {
+    ...CHROME,
+    ...Object.fromEntries(Object.entries(MAIN).map(([s, v]) => [`${MAIN_PREFIX} ${s}`, v])),
+  };
+  const colourFades = (): Record<string, string> =>
+    Object.fromEntries(
+      parseRules(shell())
+        .rules.filter((r) => /\b(?:background-color|color)\b/.test(r.decls.get("transition") ?? ""))
+        .map((r) => [r.selector, norm(r.decls.get("transition")).replace(/\s+/g, " ")]),
+    );
+
+  it("MOTION3_PINS css: the rules that transition background-color or color are exactly the pinned list, with the pinned values", () => {
+    expect(colourFades()).toEqual(PINNED);
+  });
+
+  it("MOTION3_PINS css: every colour fade sits under a park-shell__ class and no property outside transform, opacity, background-color, color is ever transitioned", () => {
+    for (const selector of Object.keys(colourFades())) {
+      expect(selector).toMatch(/^\[data-park\][^,]*\.park-shell__/);
+    }
+    const allowed = new Set(["transform", "opacity", "background-color", "color"]);
+    for (const r of parseRules(shell()).rules) {
+      const t = r.decls.get("transition");
+      if (t === undefined || t.startsWith("none")) continue;
+      for (const item of t.split(/,(?![^(]*\))/)) {
+        const prop = item.trim().split(/\s+/)[0] ?? "";
+        expect(allowed.has(prop), `${r.selector} transitions ${prop}`).toBe(true);
+      }
+      expect(r.decls.has("transition-property"), `${r.selector} longhand`).toBe(false);
+    }
+  });
+
+  it("MOTION3_PINS css: nothing that fades colour carries a backdrop-filter, and no colour fade is declared on the nav itself", () => {
+    const rules = parseRules(shell()).rules;
+    const blurred = new Set(
+      rules.filter((r) => r.decls.has("backdrop-filter")).map((r) => r.selector),
+    );
+    for (const selector of Object.keys(colourFades())) {
+      expect(blurred.has(selector), `${selector} blurs and fades`).toBe(false);
+    }
+    expect(colourFades()["[data-park] .park-shell__nav"]).toBeUndefined();
+  });
+
+  it("MOTION3_PINS css: the primary button's brightness hover, box-shadow, filter and width stay instant (no transition names them)", () => {
+    const text = stripComments(shell());
+    expect(text).not.toMatch(/transition[^;}]*\b(?:filter|box-shadow|width|height|border-color)\b/);
+  });
+
+  it("MOTION3_PINS css: the honesty reason for css-transition says background-color and color are covered, paint only, never a layout property", () => {
+    const e = ALLOWLIST.find(
+      (a) => a.file === "src/park/shell/park.shell.css" && a.rule === "css-transition",
+    );
+    expect(e?.reason).toMatch(/background-color/);
+    expect(e?.reason).toMatch(/\bcolor\b/);
+    expect(e?.reason).toMatch(/never a layout property/i);
+    expect(e?.reason).toMatch(/non-agent/i);
+    expect(e?.reason).toMatch(/event/i);
   });
 });

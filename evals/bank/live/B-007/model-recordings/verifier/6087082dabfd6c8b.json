@@ -1,0 +1,14 @@
+{
+  "key": "6087082dabfd6c8b",
+  "profile": "flash-38",
+  "response": {
+    "profile_id": "flash-38",
+    "text": "Synthetic verifier reply for the test.",
+    "usage": {
+      "input_tokens": 1000,
+      "output_tokens": 500,
+      "total_tokens": 1500
+    }
+  },
+  "role": "verifier"
+}

@@ -14,7 +14,8 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import JSONResponse
 
-from tilo_api.deps import Principal, Store, WorldRecord, get_current_principal, get_store
+from tilo_api.deps import Principal, Store, get_current_principal, get_store
+from tilo_api.deps import member_world as _require_member_world
 from tilo_api.layout import visible_layout
 
 router = APIRouter()
@@ -50,16 +51,6 @@ _MAX_DATA_DEPTH = 60  # a scoped viewer fails closed (event dropped) past this; 
 
 def _is_owner(principal: Principal, owner: str) -> bool:
     return principal.role == "owner" and principal.user_id == owner
-
-
-def _require_member_world(principal: Principal, store: Store, world_id: str) -> WorldRecord:
-    """A membership mismatch (wrong world or none) gets the same 404 as an unknown world_id."""
-    if principal.world_id != world_id:
-        raise HTTPException(status_code=404)
-    world = store.worlds.get(world_id)
-    if world is None:
-        raise HTTPException(status_code=404)
-    return world
 
 
 def _safe_districts(value: Any) -> tuple[str, ...]:

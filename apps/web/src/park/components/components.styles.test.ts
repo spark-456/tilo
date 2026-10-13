@@ -125,7 +125,7 @@ describe("WEB_2_styles_stylesheet: one file, scoped, token-driven, still", () =>
 
   it("WEB_2_styles_uses_only_handoff_token_names_and_declares_no_custom_properties", () => {
     const handoff = fs.readFileSync(HANDOFF_TOKENS_PATH, "utf8");
-    const known = new Set(propsFor(handoff, ":root").keys());
+    const known = new Set([...propsFor(handoff, ":root").keys(), "--heroFill"]); // + BQ-DS-A11Y-1
     const used = new Set(
       [...stripComments(css()).matchAll(/var\(\s*(--[\w-]+)/g)].map((m) => m[1] as string),
     );
@@ -165,7 +165,7 @@ describe("WEB_2_styles_button", () => {
   it("WEB_2_styles_button_primary_h42_r12_hero_white_15px_800_padding_0_18", () => {
     pin(PRIMARY, "height", "42px");
     pin(PRIMARY, "border-radius", "12px");
-    pin(PRIMARY, "background", "var(--hero)");
+    pin(PRIMARY, "background", "var(--heroFill)"); // BQ-DS-A11Y-1: the night fill under white text is deeper
     pin(PRIMARY, "color", "#FFF");
     pin(PRIMARY, "font-size", "15px");
     pin(PRIMARY, "font-weight", "800");

@@ -5,6 +5,13 @@ import type { Connector } from "../../api/types";
 import { icon } from "./icons";
 import { LEVEL_LABEL, type Merged, bannerText, syncLine, usedLine } from "./view";
 
+export function monoColor(col: string | undefined): string {
+  if (!col || col.toLowerCase() === "#2b2a33" || col.toLowerCase() === "#1f1d2b") {
+    return "var(--ink)";
+  }
+  return col;
+}
+
 export function Spin({ onRed }: { onRed?: boolean }) {
   return (
     <span
@@ -18,10 +25,18 @@ export function AttentionBanner({
   c,
   waiting,
   onReconnect,
-}: { c: Connector; waiting: boolean; onReconnect: () => void }) {
+}: { c: Merged; waiting: boolean; onReconnect: () => void }) {
   const { title, sub } = bannerText(c);
+  const expired = c.exp === "expired";
   return (
-    <div className="park-connectors-banner">
+    <div
+      className={
+        expired
+          ? "park-connectors-banner park-connectors-banner--expired"
+          : "park-connectors-banner"
+      }
+      role={expired ? "alert" : "status"}
+    >
       <span className="park-connectors-banner-icon">{icon("plug", 18)}</span>
       <div className="park-connectors-banner-text">
         <div className="park-connectors-banner-title">{title}</div>
@@ -44,7 +59,7 @@ export function ConnectedTile({ c, onOpen }: { c: Merged; onOpen: () => void }) 
       onClick={onOpen}
     >
       <span className="park-connectors-tile-head">
-        <span className="park-connectors-mono" style={{ color: c.col }}>
+        <span className="park-connectors-mono" style={{ color: monoColor(c.col) }}>
           {c.mono}
         </span>
         <span className="park-connectors-tile-names">
@@ -81,7 +96,7 @@ export function AvailableRow({
 }: { c: Connector; busy: boolean; onConnect: () => void }) {
   return (
     <div className="park-connectors-avail">
-      <span className="park-connectors-avail-mono" style={{ color: c.col }}>
+      <span className="park-connectors-avail-mono" style={{ color: monoColor(c.col) }}>
         {c.mono}
       </span>
       <span className="park-connectors-avail-names">

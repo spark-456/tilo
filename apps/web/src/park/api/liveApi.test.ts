@@ -26,16 +26,22 @@ const READS = [
   "getTeamPolicy",
   "getConnectorTerms",
   "getProfileSettings",
+  "getUserSettings",
+  "getBuildHandoff",
 ] as const;
 const WRITES = [
   "decide",
   "undo",
   "startWorld",
   "saveSkill",
+  "captureSkill",
+  "proposeVersion",
   "setToolLevel",
   "bookSlot",
   "addBackup",
   "setPref",
+  "saveUserSettings",
+  "submitFeedback",
 ] as const;
 
 afterEach(() => {
@@ -46,7 +52,7 @@ describe("WEB_1a_api_methods: one list of methods", () => {
   it("WEB_1a_api_methods_const_lists_every_read_and_write_once", () => {
     expect([...API_METHODS].sort()).toEqual([...READS, ...WRITES].sort());
     expect(new Set(API_METHODS).size).toBe(API_METHODS.length);
-    expect(API_METHODS).toHaveLength(23);
+    expect(API_METHODS).toHaveLength(29);
   });
 
   it("WEB_1a_api_methods_the_test_call_table_covers_every_method", () => {

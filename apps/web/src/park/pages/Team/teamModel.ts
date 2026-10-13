@@ -116,19 +116,19 @@ export function memberViews(
         limit: "—",
         active: "Pending",
         facts: [
-          ["INVITED AS", p.role],
+          ["INVITED AS", p.role ?? "Not available"],
           ["SENT", "Just now · expires in 7 days"],
         ],
       };
     }
     return {
       ...base,
-      sub: `${p.email} · ${p.dept}`,
+      sub: `${p.email ?? "Not available"} · ${p.dept ?? "Not available"}`,
       limit:
         p.limit && p.role === "Approver"
           ? p.limit
           : (data.policy.roleLimits[p.role as keyof TeamPolicy["roleLimits"]] ?? "—"),
-      active: p.active,
+      active: p.active ?? "Not available",
       facts: [
         [
           "SIGNS OFF",

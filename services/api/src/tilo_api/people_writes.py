@@ -138,6 +138,11 @@ _LABEL = r"[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?"
 _EMAIL = re.compile(rf"[A-Za-z0-9%+_'-]+(?:\.[A-Za-z0-9%+_'-]+)*@(?:{_LABEL}\.)+[A-Za-z]{{2,63}}")
 
 
+def valid_email(value: str) -> bool:
+    """The directory's address rule (an ASCII dot-atom, at most 254 characters), shared with team invites."""
+    return len(value) <= 254 and _EMAIL.fullmatch(value) is not None
+
+
 class PersonIn(_Closed):
     display_name: Text
     aliases: Annotated[list[Text], Field(max_length=8)]
@@ -149,7 +154,7 @@ class PersonIn(_Closed):
     @classmethod
     def _address(cls, value: str) -> str:
         """An ASCII dot-atom address only (PE-09: a recipient is resolved from it); a 422 never names the value."""
-        if len(value) > 254 or _EMAIL.fullmatch(value) is None:
+        if not valid_email(value):
             raise ValueError("email")
         return value
 
@@ -227,7 +232,7 @@ class Writer:
     actor: str
     now: str
     redact: Callable[[str], str] = _identity
-    events: WorkEvents | None = None  # a work-item write needs it (PE-12); the other writes emit nothing
+    events: WorkEvents | None = None  # work-item and pin writes need their existing Desk events (PE-12)
 
     def directory(self) -> Directory:
         """The actor's own record, read by id: a write lists no whole-org directory (BQ-PPL11C-12)."""
@@ -271,8 +276,9 @@ class Writer:
             also()
         if problems:
             raise Refusal(409, "write_refused", code="write_refused", problems=list(problems))
-        work_events = self.events if request.record_kind == "work_item" else None
-        if request.record_kind == "work_item" and work_events is None:
+        event_kind = request.record_kind in ("work_item", "pinboard_item")
+        work_events = self.events if event_kind else None
+        if event_kind and work_events is None:
             raise Refusal(503, "not_configured")  # a write whose event could never be recorded does not happen
         try:
             stored = store.create(after) if version is None else store.replace(after, expected_version=version)

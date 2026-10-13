@@ -21,6 +21,7 @@ const rejectingClient: TiloClient = {
   listCards: fail,
   answerCard: fail,
   getDelivery: fail,
+  submitFeedback: fail,
 };
 
 let container: HTMLElement;

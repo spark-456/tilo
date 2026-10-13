@@ -41,6 +41,14 @@ class ProviderUnavailable(AdapterError):
     """5xx or a TransportError, still after the attempts: ambiguous, the provider may have acted."""
 
 
+class CanvaApiError(AdapterError):
+    """Canva answered with this HTTP status (FR-CON-19). Fixed text plus the status: never a body or a token."""
+
+    def __init__(self, status: int) -> None:
+        super().__init__(f"Canva answered {status}")
+        self.status = status
+
+
 class SyncTokenExpired(AdapterError):
     """Google answered 410 to a request that carried a sync token (FR-CAL-08): the next sync lists in full."""
 

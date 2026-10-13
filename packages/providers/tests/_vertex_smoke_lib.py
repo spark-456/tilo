@@ -123,6 +123,7 @@ class FakeVertexSdk:
         errors_mod = pytypes.ModuleType("google.genai.errors")
         types_mod.GenerateContentConfig = FakeGenerateContentConfig  # type: ignore[attr-defined]
         types_mod.ThinkingConfig = FakeThinkingConfig  # type: ignore[attr-defined]
+        types_mod.HttpOptions = FakeThinkingConfig  # type: ignore[attr-defined]  # the adapter's request timeout (PL-02)
         errors_mod.APIError = FakeAPIError  # type: ignore[attr-defined]
         genai_pkg.types = types_mod  # type: ignore[attr-defined]
         genai_pkg.errors = errors_mod  # type: ignore[attr-defined]
@@ -346,10 +347,13 @@ def write_prices(
     raw["status"] = "set"
     raw["effective_date"] = "2026-10-01"
     raw["source"] = "Test fixture only. Not a real price page."
-    for profile_id in raw["profiles"]:
+    raw.pop("region", None)  # a fixture sheet is quoted for no location (ADR-0029 decision 3)
+    for profile_id, real in raw["profiles"].items():
         price_in, price_out = uniform or per_profile.get(profile_id, (1.0, 1.0))
         scaled = (price_in, price_out) if uniform else (price_in * scale, price_out * scale)
         raw["profiles"][profile_id] = {"input": scaled[0], "output": scaled[1]}
+        if "unit_price" in real:  # the search role wants a unit price (ADR-0029 decision 7): a fake fee of 1 per 1,000
+            raw["profiles"][profile_id]["unit_price"] = {"unit": real["unit_price"]["unit"], "per_1k": 1.0}
     path = tmp_path / name
     path.write_text(yaml.safe_dump(raw, sort_keys=False), encoding="utf-8")
     return path

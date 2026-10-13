@@ -13,6 +13,11 @@ class ProviderError(Exception):
     """Base for every error a ModelProvider adapter raises."""
 
 
+class NotConfigured(ProviderError):
+    """The provider has no such capability configured (FR-MTG-11): a `SpeechProvider` without a voice, a voice vendor
+    without the live switch. Not retried and not a fallback trigger: the caller (or the config) has to change."""
+
+
 class QuotaError(ProviderError):
     """Rate limit or quota exceeded (HTTP 429). The router may fall back."""
 
@@ -23,6 +28,11 @@ class RetryableError(ProviderError):
 
 class RequestError(ProviderError):
     """The request itself was rejected (other 4xx). Retrying unchanged will not help."""
+
+
+class MissingCapabilityError(ProviderError):
+    """The provider cannot take this input, for example a media type (LW-06). Not a bad request: the router falls
+    back to the next candidate. The message names the type, never the content."""
 
 
 class SafetyError(ProviderError):

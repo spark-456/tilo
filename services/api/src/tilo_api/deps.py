@@ -13,7 +13,9 @@ world_id string never share lock state.
 
 from __future__ import annotations
 
+import dataclasses
 import functools
+import inspect
 import logging
 import math
 import os
@@ -31,7 +33,7 @@ from starlette.requests import HTTPConnection
 from tilo_archive import RunArchive
 from tilo_connectors import InMemoryOutboxStore
 from tilo_connectors.registry import ConnectorRegistry, load_registry
-from tilo_harness.executor import DefaultUnitRunner
+from tilo_contracts import MeetingHostRpcConnectionView
 from tilo_harness.skills import SkillRegistry
 from tilo_memory.artifacts import ArtifactStore
 from tilo_metering import LedgerEntry
@@ -41,17 +43,21 @@ from tilo_planning.compiler import PlanInputs, compile_plan
 from tilo_planning.gaps import Gap
 from tilo_planning.memory import InMemoryPreferenceStore, MemoryLookup
 from tilo_planning.questions import Question
+from tilo_providers.clock import Clock, real_today
 from tilo_providers.config import ProviderConfigError, ProvidersConfig, load_providers_config, resolve_models_path
 from tilo_providers.interfaces import SafetyProvider
 from tilo_providers.router import Router, RouterExhaustedError
 from tilo_providers.safety import build_safety_provider
+from tilo_redact import redact
 
 from tilo_api import events, firebase_auth, spend
 from tilo_api.access import AccessStore, Mode, enforced, provider_mode
 from tilo_api.appcheck import AppCheckVerifier, default_verifier
 from tilo_api.assistant.config import AssistantConfig, AssistantConfigError, load_assistant_config
+from tilo_api.meeting_host_rpc import MeetingHostRpc, open_meeting_host_rpc
 from tilo_api.people_access import NoSourceOwners
 from tilo_api.people_access import SourceOwners as PanelSourceOwners
+from tilo_api.skill_store import SkillStore
 
 if TYPE_CHECKING:
     from tilo_api.assistant.core import Decider
@@ -75,7 +81,8 @@ class Principal:
     user_id: str  # common.schema.json#/$defs/user_id
     role: Role
     world_id: str | None = None  # the one world this principal is a member of; a mismatch with
-    # the path's world_id gets the same 404 as an unknown world (no membership oracle)
+    # the path's world_id gets the same 404 as an unknown world (no membership oracle); a web sign-in bound to none
+    # reaches the worlds its record owner is (`member_world`)
     channel: Channel = "web"  # the session channel sign-in resolved for this request (FR-HIL-07,
     # world.paused.data.channel is derived from here, never from a request body
     districts: tuple[str, ...] = ()  # visible beyond vis: "all"; ignored for role == "owner"
@@ -88,6 +95,27 @@ class Principal:
 class DistrictRecord:
     name: str
     summary: str
+
+
+SAMPLE_WORLD_ID = "w_sample_village_basic"  # STARTER-1: the read-only sample project (`tilo_api.sample_world`)
+
+
+def refuse_reserved(
+    worlds: Mapping[str, Any] | None = None,
+    *,
+    parts: Mapping[str, Any] | None = None,
+    policy_worlds: Mapping[str, str] | None = None,
+    tasks: Mapping[str, Any] | None = None,
+) -> None:
+    """A real world can never take the sample project's id: not as a world key, a parts key, a policy's world or a
+    task's `world_id` (create or import)."""
+    if (
+        SAMPLE_WORLD_ID in (worlds or {})
+        or SAMPLE_WORLD_ID in (parts or {})
+        or SAMPLE_WORLD_ID in (policy_worlds or {}).values()
+        or any(getattr(t, "world_id", None) == SAMPLE_WORLD_ID for t in (tasks or {}).values())
+    ):
+        raise ValueError("world id is reserved for the sample project")
 
 
 @dataclass
@@ -167,6 +195,10 @@ class Store:
     def load_owner(self, owner: str, settle: bool = False) -> None:
         """Called before a route iterates an owner's worlds or policies; the cache already holds them."""
 
+    def load_world_task(self, world_id: str) -> TaskRecord | None:
+        """The task made for a world, if this store holds one (a scheduled or meeting host run stores none)."""
+        return next((t for t in list(self.tasks.values()) if t.world_id == world_id), None)
+
     def load_path(self, params: Mapping[str, Any]) -> Store:
         return self
 
@@ -188,6 +220,7 @@ class Store:
         create: Iterable[tuple[str, str]] = (),
         evict: bool = True,
     ) -> None:
+        refuse_reserved(worlds, parts=parts, policy_worlds=policy_worlds, tasks=tasks)
         self.worlds.update(worlds or {})
         self.tasks.update(tasks or {})
         self.policies.update(policies or {})
@@ -198,6 +231,12 @@ class Store:
     ) -> None:
         """A route's new records and events. The events go through `writer` first (it reads the world's record, so a
         new one is stored before them); a failure removes the worlds this call created and changes nothing else."""
+        refuse_reserved(
+            records.get("worlds"),
+            parts=parts,
+            policy_worlds=records.get("policy_worlds"),
+            tasks=records.get("tasks"),
+        )
         self.worlds.update(records.get("worlds") or {})
         sending = ""
         try:
@@ -260,19 +299,31 @@ def get_firebase_verifier() -> firebase_auth.FirebaseVerifier:
     return firebase_auth.default_verifier()
 
 
-def get_current_principal(request: HTTPConnection = None) -> Principal:  # type: ignore[assignment]
+def get_current_principal(request: HTTPConnection) -> Principal:
     """The signed-in person (SEC-15, BQ-SIGNIN-6): `Authorization: Bearer <Firebase ID token>`, verified through
     `get_firebase_verifier`; `X-Tilo-Channel: mobile_web` picks the channel, nothing else in a request sets anything.
     Every other case is a 401 with one fixed body, whatever the cause. Dev mode replaces this whole function
     (`tilo_api.dev.install`), so a token is never looked at there."""
-    # FastAPI always injects the request; the default only lets a bare call (no sign-in) refuse with a 401.
-    if request is not None:
-        resolved = getattr(
-            request.state, "principal", None
-        )  # the access gate already verified this request (server-set)
-        if isinstance(resolved, Principal):
-            return resolved
-    token = None if request is None else firebase_auth.bearer_token(request.headers.getlist("authorization"))
+    resolved = getattr(request.state, "principal", None)  # the access gate already verified this request (server-set)
+    if isinstance(resolved, Principal):
+        return resolved
+    # With no gate, the token is verified once per request (BQ-SIGNIN-9(e)): `spend_mode` and the route share it.
+    earlier = getattr(request.state, "signin_attempt", None)
+    if isinstance(earlier, Principal):
+        return earlier
+    if earlier is not None:
+        raise HTTPException(status_code=401, detail=SIGN_IN_REQUIRED, headers={"WWW-Authenticate": "Bearer"})
+    try:
+        principal = _verified_principal(request)
+    except HTTPException:
+        request.state.signin_attempt = "refused"
+        raise
+    request.state.signin_attempt = principal
+    return principal
+
+
+def _verified_principal(request: HTTPConnection) -> Principal:
+    token = firebase_auth.bearer_token(request.headers.getlist("authorization"))
     if token is None:
         raise HTTPException(status_code=401, detail=SIGN_IN_REQUIRED, headers={"WWW-Authenticate": "Bearer"})
     try:
@@ -286,24 +337,70 @@ def get_current_principal(request: HTTPConnection = None) -> Principal:  # type:
         raise HTTPException(status_code=401, detail=SIGN_IN_REQUIRED, headers={"WWW-Authenticate": "Bearer"}) from None
 
 
+def resolve_principal(app: Any, connection: HTTPConnection) -> Principal:
+    """The principal for `connection` through the seam as the app is wired (overrides included), the way FastAPI would
+    resolve it. A test double that takes no argument still works. Raises what the seam raises (a 401, usually)."""
+    resolver = app.dependency_overrides.get(get_current_principal, get_current_principal)
+    return resolver(connection) if inspect.signature(resolver).parameters else resolver()
+
+
+def member_world(principal: Principal, store: Store, world_id: str) -> WorldRecord:
+    """The world a request may read or act on: the one the session is bound to, or, for a session bound to no world,
+    one whose record owner is this person with role owner (a deployed sign-in session is role owner and bound to no
+    world, `principal_from_claims`, so an owner reaches their own worlds through ownership). Never wider: a session
+    bound to another world stays bound to it, and another person's world, a non-owner role that carries the owner's
+    id, a session that is not a web sign-in (an email or signed-link session), and an unknown world all get the one
+    unknown-world 404 (no membership oracle)."""
+    world = store.worlds.get(world_id)
+    if world is None:
+        raise HTTPException(status_code=404)
+    unbound_owner = (
+        principal.world_id is None
+        and principal.role == "owner"
+        and principal.channel
+        in ("web", "mobile_web")  # a sign-in session, never an email or signed-link one (BQ-XWORLD-9)
+        and principal.user_id == world.owner
+    )
+    if principal.world_id == world_id or unbound_owner:
+        return world
+    raise HTTPException(status_code=404)
+
+
 def get_store(request: Request = None) -> Store:  # type: ignore[assignment]  # FastAPI injects it; None elsewhere
     """Deployed: the durable store for `TILO_API_STORE`, with the request's path ids loaded (ADR-0026 decisions 1, 3);
     without a valid config 503 `not_configured`, never cached. Dev mode and the tests override this seam."""
+    from tilo_api import ephemeral
     from tilo_api.durable_store import deployed
 
+    if request is not None and (demo := ephemeral.for_request(request)) is not None:
+        return demo.store  # an anonymous demo session stores nothing durable (DEMO-EPHEMERAL-1)
     store = deployed()[0]
     return store.load_path(request.path_params) if request is not None else store
 
 
-def get_event_writer() -> EventWriter:
+def get_event_writer(request: Request = None) -> EventWriter:  # type: ignore[assignment]
+    from tilo_api import ephemeral
     from tilo_api.durable_store import deployed
 
+    if request is not None and (demo := ephemeral.for_request(request)) is not None:
+        return demo.writer
     return deployed()[1]
 
 
 def get_ledger() -> Sequence[LedgerEntry]:
     """The Treasury's ledger (FR-MTR-10). No ledger store is wired in yet (BQ-MTR10-4): fail closed."""
     raise HTTPException(status_code=503, detail="not_configured")
+
+
+def get_ledger_writer() -> Any:
+    """The Treasury's write seam (COST-FAST-1b, BQ-COSTFAST-7): an object with `append(LedgerEntry)`. Not wired
+    yet, like `get_ledger`: fail closed. Quick treats that as best effort (`ledger_writer_for`)."""
+    raise HTTPException(status_code=503, detail="not_configured")
+
+
+def ledger_writer_for(request: Request) -> Any:
+    """The writer as the app is wired (overrides included), or None when it is unwired or fails."""
+    return _resolve(request, get_ledger_writer)
 
 
 def get_time_baselines() -> Any:
@@ -344,15 +441,73 @@ def budget_cap_ceiling() -> float:
 
 
 def get_access_store() -> AccessStore:
-    """SEC-15: where each person's visitor-or-judge declaration is kept. Production has none wired yet, so a
-    deployed process closes every gated route (503) rather than guess; tests and the Firestore store override it."""
-    raise HTTPException(status_code=503, detail="not_configured")
+    """SEC-15: where each person's visitor-or-judge declaration is kept. Deployed: a `FirestoreAccessStore` on the
+    process's shared client when `TILO_API_STORE=firestore` and the api store door opens (the same rules as
+    `store_door.open_api_store`); otherwise 503 `not_configured`, never cached, so a deployed process closes every
+    gated route rather than guess. A failing client build is 503 `store_unavailable`, never with the error text, and is
+    remembered for `PEOPLE_STORES_BACKOFF_S` like the people door's (FS-18): inside the window a request is refused at
+    once, with no client call; a refusal for configuration is not backed off."""
+    global _access_retry_at
+    from tilo_api import prod, store_door  # noqa: PLC0415  (they import this module's neighbours)
+
+    retry_at = _access_retry_at
+    if retry_at is not None and people_stores_clock() < retry_at:
+        raise store_door.ApiStoreUnavailable
+    try:
+        opened = store_door.open_api_store()
+    except store_door.ApiStoreNotConfigured:
+        raise HTTPException(status_code=503, detail="not_configured") from None
+    except store_door.ApiStoreUnavailable:
+        _access_retry_at = people_stores_clock() + PEOPLE_STORES_BACKOFF_S
+        raise
+    _access_retry_at = None
+    return prod.FirestoreAccessStore(opened.client, ORG_ID)
+
+
+def get_feedback_store() -> Any:
+    """SEC-16 beta-allowance feedback (BQ-FEEDBACK-1): the Firestore store behind `store_door` (`TILO_API_STORE`,
+    ADR-0026), else 503 `not_configured`. Dev mode and the tests override this seam."""
+    from tilo_api import store_door  # noqa: PLC0415
+    from tilo_api.feedback_firestore import open_feedback_store  # noqa: PLC0415
+
+    try:
+        return open_feedback_store()
+    except store_door.ApiStoreNotConfigured:
+        raise HTTPException(status_code=503, detail="not_configured") from None
+
+
+def get_push_rpc() -> Any:
+    """FR-CHN-17f: the client of tilo-channels' `POST /internal/push/send`, or None while `TILO_CHANNELS_URL` is
+    unset or not an https Cloud Run address (then no push is sent: dev, CI and a demo send nothing)."""
+    from tilo_api.push_send import ChannelsPushRpc  # noqa: PLC0415
+
+    url = os.environ.get("TILO_CHANNELS_URL", "")
+    try:
+        return ChannelsPushRpc(url) if url else None
+    except ValueError:
+        return None
+
+
+def get_push_store() -> Any:
+    """FR-CHN-17b: the person's web-push subscriptions, in Firestore behind `store_door` (`TILO_API_STORE`, ADR-0026),
+    else 503 `not_configured`. Dev mode and the tests override this seam."""
+    from tilo_api import store_door  # noqa: PLC0415
+    from tilo_api.push_firestore import open_push_store  # noqa: PLC0415
+
+    try:
+        return open_push_store()
+    except store_door.ApiStoreNotConfigured:
+        raise HTTPException(status_code=503, detail="not_configured") from None
 
 
 def get_app_check_verifier() -> AppCheckVerifier:
     """SEC-10: checks a client's App Check token (`tilo_api.appcheck`). Google's keys for the API's own project; dev
     mode and an unconfigured project refuse without any call. Tests override it; it never decides authorisation."""
     return default_verifier()
+
+
+# After a failed client build the access door makes no new attempt until then (its FS-18 window).
+_access_retry_at: float | None = None
 
 
 def get_spend_caps() -> spend.SpendCaps:
@@ -380,6 +535,11 @@ def _resolve(request: Request, seam: Callable[[], Any]) -> Any:
         return None
 
 
+def caps_for(request: Request) -> spend.SpendCaps | None:
+    """SEC-16 caps as the app is wired (overrides included), or None when unreadable (COST-FAST-1 reserves a unit)."""
+    return _resolve(request, get_spend_caps)
+
+
 def get_switches(request: Request, flags: Annotated[FlagStore, Depends(get_flag_store)]) -> FlagStore:
     """Deployed, NFR-24's flags plus the ledger's durable `replay_only` (FR-MTR-04); not deployed, the flags alone."""
     return spend.Switches(flags, _resolve(request, get_spend_cap_ledger)) if enforced() else flags
@@ -389,11 +549,28 @@ def spend_mode(
     request: Request, uid: str | None, declaration: str | None, switches: FlagStore, *, demo: bool | None = None
 ) -> tuple[Mode, bool]:
     """(mode, capped): SEC-15's decision, then deployed the `SpendGuard`'s; any doubt is replay (fail closed). An
-    anonymous demo session (`Principal.demo_session`, set by the gate from the verified token) is replay whatever
-    `TILO_JUDGE_LIVE` or the guard say (BQ-SIGNIN-10); its cap is still read, so new work is refused the same way."""
+    anonymous demo session (`Principal.demo_session`, set by the gate from the verified token, or with no gate the
+    request's own sign-in) is replay whatever `LIVE`, `TILO_JUDGE_LIVE` or the guard say (BQ-SIGNIN-10): a "replay"
+    mode reaches the providers as `force_replay` (`router_for_mode`, `get_safety`), so `LIVE=1` cannot override it.
+    Its cap is still read, so new work is refused the same way."""
     mode, capped = _spend_mode(request, uid, declaration, switches)
-    demo = getattr(request.state, "demo_session", False) if demo is None else demo  # the gate's flag, or the caller's
+    if demo is None:  # the gate's flag, or what the request's own sign-in says where there is no gate
+        demo = getattr(request.state, "demo_session", False) is True or _signed_in_as_demo(request)
     return ("replay" if demo is True else mode), capped
+
+
+def _signed_in_as_demo(request: Request) -> bool:
+    """True when this request's own sign-in is an anonymous demo session. Only a process the access gate does not
+    guard (not deployed) looks: deployed, the gate has already set the flag, and a public route has no person to
+    resolve. Nobody signed in (no `Authorization` header) is False: the answer is then the user's own switch. A token
+    that is present but cannot be verified fails closed: replay (BQ-SIGNIN-10). The verification is the route's own,
+    done once per request (`get_current_principal`), so this adds no second check and no second log line."""
+    if enforced():
+        return False
+    try:
+        return resolve_principal(request.app, request).demo_session is True
+    except Exception:
+        return bool(request.headers.getlist("authorization"))
 
 
 def _spend_mode(request: Request, uid: str | None, declaration: str | None, switches: FlagStore) -> tuple[Mode, bool]:
@@ -403,6 +580,18 @@ def _spend_mode(request: Request, uid: str | None, declaration: str | None, swit
     caps = _resolve(request, get_spend_caps)
     if switches.ledger is None or caps is None:
         return "replay", False
+    from tilo_api import team_access, team_store  # late: team_store's dev seam imports this module
+
+    try:  # FR-TEAM-02: the team's role and personal limits, a MIN on the lifetime cap; unreadable is capped
+        cap = team_access.user_cap_minor(
+            team_store.team_reader(request.app.dependency_overrides)(), uid, caps.uid_lifetime_minor
+        )
+    except Exception as exc:
+        logger.warning("team limits unreadable, so live is denied: %s", type(exc).__name__)
+        cap = 0
+    if cap <= 0:
+        return "replay", True
+    caps = dataclasses.replace(caps, uid_lifetime_minor=min(cap, caps.uid_lifetime_minor))
     guard = spend.SpendGuard(switches.ledger, switches.flags, caps)
     capped = guard.uid_capped(uid)
     return provider_mode(declaration, os.environ, replay_only=not guard.live_allowed(uid), capped=capped), capped
@@ -429,9 +618,12 @@ def router_for_mode(mode: Mode) -> Router:
     """The one place a request's Router is built (PL-01). It replays recordings unless `mode` is "live", which only
     `access.provider_mode` returns: the user's own global switch, or a deployed judge where the user set
     `TILO_JUDGE_LIVE=1` (SEC-15). The permission is injected into the Router, never read-and-written from the
-    environment, so no request can turn live mode on for the process (EFF-01)."""
+    environment, so no request can turn live mode on for the process (EFF-01). Any other mode is a replay decision
+    (a demo session, NFR-24's switch, SEC-16's cap, no live declaration), injected as `force_replay`: it holds at the
+    provider layer even where `LIVE=1` is set, and never records (BQ-SIGNIN-10)."""
     try:
-        return Router(providers_config(), fixtures_dir=FIXTURES_DIR, live_permitted=(mode == "live"))
+        live = mode == "live"
+        return Router(providers_config(), fixtures_dir=FIXTURES_DIR, live_permitted=live, force_replay=not live)
     except ProviderConfigError as exc:
         logger.warning("model router unavailable: %s", exc)
         raise HTTPException(status_code=503, detail="The model router is not configured.") from exc
@@ -442,11 +634,12 @@ def get_router(mode: Annotated[Mode, Depends(get_work_mode)] = "replay") -> Rout
     return router_for_mode(mode)
 
 
-def get_safety() -> SafetyProvider:
+def get_safety(mode: Annotated[Mode | None, Depends(get_mode)] = None) -> SafetyProvider:
     """PRD 16.3 item 2: built from the `safety` role on every call; no role, or a provider the factory refuses
-    (the fake when live or deployed), closes the screened routes with 503."""
+    (the fake when live or deployed), closes the screened routes with 503. A request in replay mode screens from
+    recordings only, `LIVE=1` or not (BQ-SIGNIN-10); `None` (a direct call with no request) follows the live switch."""
     try:
-        return build_safety_provider(providers_config(), fixtures_dir=FIXTURES_DIR)
+        return build_safety_provider(providers_config(), fixtures_dir=FIXTURES_DIR, force_replay=mode == "replay")
     except ProviderConfigError as exc:
         logger.warning("safety provider unavailable: %s", exc)
         raise HTTPException(
@@ -467,15 +660,16 @@ def _seam_router(mode: Mode) -> Router:
     return get_router() if mode == "replay" else get_router(mode)
 
 
-def get_plan_compiler(mode: Mode = "replay") -> Callable[..., dict]:
+def get_plan_compiler(mode: Mode = "replay", today: Clock = real_today) -> Callable[..., dict]:
     """`compile(*, brief, approach, budget_cap, context) -> PlanGraph` (FR-INT-09). The Director drafts it through
-    the Router and `validate_plan` decides (BQ-90); with no `director` role in the provider config it refuses."""
+    the Router and `validate_plan` decides (BQ-90); with no `director` role in the provider config it refuses.
+    `today` is the clock the plan prompt states the date from (INTAKE-QUALITY-1); `run_seams` hands it `get_today`."""
     if "director" not in providers_config().roles:
         return _no_plan_compiler
     router = _seam_router(mode)
 
     def compile_with_director(*, brief: dict, approach: dict, budget_cap: float, context: PlanInputs) -> dict:
-        return compile_plan(brief, approach, budget_cap, context, router=router).plan
+        return compile_plan(brief, approach, budget_cap, context, router=router, today=today()).plan
 
     return compile_with_director
 
@@ -496,14 +690,22 @@ class _RoleModel:
     def generate(self, request: Any) -> Any:
         return self._router.generate(self._role, request).response
 
+    def generate_budgeted(self, request: Any, budget: Any) -> Any:
+        result, credits = budget.call(self._router.generate, self._role, request)
+        if result.response is None:
+            raise ValueError("no worker response")
+        return result.response, credits
+
 
 def _worker_models(mode: Mode = "replay") -> Mapping[str, Any]:
     router = _seam_router(mode)
     return {role: _RoleModel(router, role) for role in ("specialist", "writer", "verifier")}
 
 
-def get_unit_runner(mode: Mode = "replay") -> Any:
-    return DefaultUnitRunner(cast(Any, _worker_models(mode)))
+def get_unit_runner(mode: Mode = "replay", today: Clock = real_today) -> Any:
+    from tilo_api.run_tools import ApiUnitRunner
+
+    return ApiUnitRunner(_worker_models(mode), mode=mode, clock=today)
 
 
 def get_must_ask_providers(mode: Mode = "replay") -> Mapping[str, Any]:
@@ -511,13 +713,12 @@ def get_must_ask_providers(mode: Mode = "replay") -> Mapping[str, Any]:
     return _worker_models(mode)
 
 
-def _no_recipients(*, unit: dict, action_type: str, item: dict, brief: dict) -> dict:
-    raise LookupError("no address book is wired yet, so a send has no recipients")
-
-
 def get_action_resolver() -> Callable[..., dict]:
-    """`resolve(*, unit, action_type, item, brief) -> {destination, recipients, known_recipients?}`."""
-    return _no_recipients
+    """`resolve(*, unit, action_type, item, brief[, answers, supplied]) -> {destination, recipients, known_recipients?,
+    fields?}`: the deterministic resolver of the person's structured answers (ADR-0035 L6c, `side_effect_fields`)."""
+    from tilo_api import side_effect_fields  # noqa: PLC0415
+
+    return side_effect_fields.make_resolver()
 
 
 def get_skill_registry() -> SkillRegistry:
@@ -529,13 +730,27 @@ def get_connector_registry() -> ConnectorRegistry:
     return load_registry(path) if path.is_file() else ConnectorRegistry({})
 
 
-def get_connector_adapters() -> dict[str, Any]:
-    return {}  # no live adapter in dev (EFF-01): a send has nowhere to go
+def get_connector_adapters(request: Request = None) -> dict[str, Any]:  # type: ignore[assignment]
+    """ADR-0035 LC-08: one `ConnectorRpcStub` per live Google connector once `TILO_CONNECTORS_URL` is configured (a run
+    binds its own copy), else `{}` (EFF-01): a send has nowhere to go, and a demo session never sends."""
+    from tilo_api.connector_rpc import PERSON_CONNECTORS, ConnectorRpcStub  # noqa: PLC0415
+
+    if request is not None and _demo(request) is not None:
+        return {}
+    try:
+        client = get_meeting_host_client()
+    except HTTPException:
+        return {}
+    return {name: ConnectorRpcStub(name, client) for name in PERSON_CONNECTORS}
 
 
 @functools.cache
-def get_outbox_store() -> InMemoryOutboxStore:
-    return InMemoryOutboxStore()  # the process's own until the Firestore store lands
+def get_outbox_store() -> Any:  # a demo's own: `ephemeral.DemoSession.outbox`, built by `run_seams`
+    """ADR-0035 LC-13: the durable Firestore store for `TILO_OUTBOX_STORE=firestore` (503 if the door refuses, never
+    memory), else the process's own in-memory one. A failure is not cached: the next call tries again."""
+    from tilo_api.outbox_firestore import outbox_store_for_env  # noqa: PLC0415
+
+    return outbox_store_for_env() or InMemoryOutboxStore()
 
 
 # ADR-0018 T4: tilo-api has no org until sign-in, so every run's artifact Scope is in this org (PRD 15.1), never a
@@ -543,15 +758,87 @@ def get_outbox_store() -> InMemoryOutboxStore:
 ORG_ID = "org_tilo"
 
 
-def get_artifact_store() -> ArtifactStore:
-    """Where a run's outputs go. No production backend exists until ADR-0018 T8 (Firestore, GCS), so this refuses and
-    no run starts (fail closed, BQ-AGT02-T4-1); dev mode wires one in-memory store."""
-    raise NotImplementedError("no artifact store is configured, so no run starts")
+def _demo(request: Request | None) -> Any:
+    from tilo_api import ephemeral
+
+    return ephemeral.for_request(request) if request is not None else None
 
 
-def get_redactor() -> Callable[[str], str]:
-    """The shared secret redactor the store was given (MF-06). Not built until FR-MEM-05 (BQ-109): refuses."""
-    raise NotImplementedError("the shared secret redactor is not built, so no run starts")
+_run_stores_lock = threading.Lock()
+_run_stores: dict[tuple[str | None, ...], Any] = {}  # a built store per config; a refusal is never kept
+_RUN_STORE_ENV = (
+    *("K_SERVICE", "TILO_FIRESTORE_PROJECT", "FIRESTORE_EMULATOR_HOST", "STORAGE_EMULATOR_HOST"),
+    *("GOOGLE_CLOUD_PROJECT", "API_ENDPOINT_OVERRIDE", "TILO_ARTIFACTS_BUCKET", "TILO_ARCHIVE_BUCKET"),
+)  # every variable a door's rules read: a kept store never outlives a config that would now be refused
+
+
+def _run_store(kind: str, switches: tuple[str, str], build: Callable[[], Any]) -> Any:
+    key = (kind, *(os.environ.get(name) for name in (*_RUN_STORE_ENV, *switches)))
+    with _run_stores_lock:
+        if key not in _run_stores:
+            _run_stores[key] = build()
+        return _run_stores[key]
+
+
+def _forget_run_stores() -> None:
+    with _run_stores_lock:
+        _run_stores.clear()
+
+
+def get_artifact_store(
+    request: Request = None,  # type: ignore[assignment]
+    mode: Annotated[Mode, Depends(get_work_mode)] = "replay",
+) -> ArtifactStore:
+    """Where a run's outputs go (PROD-WIRE 2b): Firestore records and GCS bytes for `TILO_ARTIFACTS_STORE=gcs` (see
+    `tilo_api.run_stores`); anything else, or no redactor yet, refuses and no run starts (fail closed, BQ-AGT02-T4-1).
+    Config is read per call; a built store is kept per config. The redactor is checked before any client is built."""
+    if (demo := _demo(request)) is not None:
+        return demo.artifacts
+    from tilo_api import run_stores  # noqa: PLC0415
+
+    redactor = get_redactor()
+
+    def archived(scope: Any, ref: str) -> str | None:
+        import json
+
+        run_id, seq = ref.rsplit("/", 1)
+        worlds = get_store()
+        load = getattr(worlds, "load_world", None)
+        world = load(scope.world_id) if load is not None else worlds.worlds.get(scope.world_id)
+        if world is None or world.owner != scope.owner or world.run_id != run_id or scope.org_id != ORG_ID:
+            return None
+        archive = get_run_archive()(org_id=scope.org_id, run_id=run_id)
+        return next((json.dumps(r["payload"]) for r in archive.records() if str(r["seq"]) == seq), None)
+
+    def sniff(raw: bytes) -> str:
+        from tilo_browser.fetch import detect_media_type
+
+        return detect_media_type(raw, url="https://source.invalid/file", host="source.invalid")[0]
+
+    class SourceSafety:
+        def check(self, *args: Any, **kwargs: Any) -> Any:
+            return get_safety(mode).check(*args, **kwargs)
+
+    return cast(
+        ArtifactStore,
+        _run_store(
+            f"artifacts:{mode}",
+            ("TILO_ARTIFACTS_STORE", "TILO_ARTIFACTS_BUCKET"),
+            lambda: run_stores.open_artifact_store(
+                redactor=redactor, archive_lookup=archived, screener=SourceSafety(), file_sniffer=sniff
+            ),
+        ),
+    )
+
+
+get_artifact_store.cache_clear = _forget_run_stores  # type: ignore[attr-defined]  # tests start from a cold process
+
+
+def get_redactor(request: Request = None) -> Callable[[str], str]:  # type: ignore[assignment]
+    """The shared secret redactor (MF-06, FR-MEM-05); demo and production use the same implementation."""
+    if (demo := _demo(request)) is not None:
+        return demo.redactor
+    return redact
 
 
 # --- the people API seams (PPL-11a, services/api/tests/API_PPL_11a.md section 4); production fails closed ---
@@ -565,6 +852,8 @@ class PlateSources(Protocol):
     def cards(self, user_id: str) -> Iterable[dict[str, Any]]: ...
     def runs(self, user_id: str) -> Iterable[dict[str, Any]]: ...
     def mail(self, user_id: str) -> Iterable[dict[str, Any]]: ...
+
+    truncated: bool  # a source hit its read cap (optional: the plate builder reads it with getattr)
 
 
 class SourceOwners(Protocol):
@@ -583,13 +872,15 @@ def _inside_backoff() -> bool:
     return retry_at is not None and people_stores_clock() < retry_at
 
 
-def get_people_stores() -> PeopleStores:
+def get_people_stores(request: Request = None) -> PeopleStores:  # type: ignore[assignment]
     """The process's one `PeopleStores` (the write limiter and idempotency keys live on it, #549). Built on the first
     request, single-flight, only for `TILO_PEOPLE_STORE=firestore` plus a valid `TILO_FIRESTORE_PROJECT` (ADR-0023);
     anything else, or a build that fails, is 503 `not_configured` (the error never echoed). A failed build is
     remembered for `PEOPLE_STORES_BACKOFF_S`: inside the window a request is refused at once, without the lock and
     without a client call; after it one request tries again (FS-18)."""
     global _people_stores, _people_stores_retry_at
+    if (demo := _demo(request)) is not None:
+        return demo.people  # in memory, per demo session, gone with it
     built = _people_stores
     if built is not None:
         return built
@@ -613,9 +904,9 @@ def get_people_stores() -> PeopleStores:
 
 
 def _forget_people_stores() -> None:
-    global _people_stores, _people_stores_retry_at
+    global _people_stores, _people_stores_retry_at, _access_retry_at
     with _people_stores_lock:
-        _people_stores, _people_stores_retry_at = None, None
+        _people_stores, _people_stores_retry_at, _access_retry_at = None, None, None
 
 
 get_people_stores.cache_clear = _forget_people_stores  # type: ignore[attr-defined]  # tests start from a cold process
@@ -637,12 +928,24 @@ def get_clock() -> Callable[[], str]:
     return events.now  # a `common#timestamp`; a route reads it once per request
 
 
-def get_plate_sources() -> PlateSources:
-    raise HTTPException(status_code=503, detail="not_configured")
+def get_today() -> Clock:
+    """The date the Director's prompts state as a fact (INTAKE-QUALITY-1): the real date, a test overrides it."""
+    return real_today
 
 
-def get_source_owners() -> SourceOwners:
-    raise HTTPException(status_code=503, detail="not_configured")
+def get_plate_sources(request: Request = None) -> PlateSources:  # type: ignore[assignment]
+    """The cards, runs and mail of the signed-in person's plate, read from the API's own store (PEOPLE-SEAMS-1,
+    `seams_store`): 503 `not_configured` exactly when `get_store` is, a demo session reads its own in-memory one."""
+    from tilo_api import seams_store  # noqa: PLC0415  (it imports this module)
+
+    return seams_store.StorePlateSources(seams_store.resolve_store(request))
+
+
+def get_source_owners(request: Request = None) -> SourceOwners:  # type: ignore[assignment]
+    """Who owns a mail message or a request, from the same store; `None` for anything it cannot vouch for."""
+    from tilo_api import seams_store  # noqa: PLC0415
+
+    return seams_store.StoreSourceOwners(seams_store.resolve_store(request))
 
 
 class MeetingWorlds(Protocol):
@@ -651,8 +954,11 @@ class MeetingWorlds(Protocol):
     def make_meeting_world(self, *, org_id: str, owner: str, meeting_id: str) -> str: ...
 
 
-def get_meeting_worlds() -> MeetingWorlds:
-    raise HTTPException(status_code=503, detail="not_configured")  # production wiring lands with the Outpost world
+def get_meeting_worlds(request: Request = None) -> MeetingWorlds:  # type: ignore[assignment]
+    """One persisted Outpost world per meeting on the API's own store (PEOPLE-SEAMS-1, `seams_store`)."""
+    from tilo_api import seams_store  # noqa: PLC0415
+
+    return seams_store.StoreMeetingWorlds(seams_store.resolve_store(request))
 
 
 class DeskWorlds(Protocol):
@@ -665,23 +971,187 @@ class DeskWorlds(Protocol):
         ...
 
 
-def get_desk_worlds() -> DeskWorlds:
-    raise HTTPException(status_code=503, detail="not_configured")  # production wiring lands with the Desk
+def get_desk_worlds(request: Request = None) -> DeskWorlds:  # type: ignore[assignment]
+    """The person's one Desk world on the API's own store, the one the assistant panel uses (PEOPLE-SEAMS-1)."""
+    from tilo_api import seams_store  # noqa: PLC0415
+
+    return seams_store.StoreDeskWorlds(seams_store.resolve_store(request))
 
 
-def get_run_archive() -> Callable[..., RunArchive]:
-    """`open_archive(*, org_id, run_id) -> RunArchive`, the run's raw archive. No production store yet: refuses."""
-    raise NotImplementedError("no raw-archive store is configured, so no run starts")
+_skill_store_lock = threading.Lock()
+_skill_store: tuple[tuple[str, ...], SkillStore] | None = None  # (the config it was built for, the store)
+_skill_store_retry_at: float | None = None
+_SKILL_ENV = (
+    "TILO_SKILLS_STORE",
+    "TILO_FIRESTORE_PROJECT",
+    "K_SERVICE",
+    "CLOUD_RUN_JOB",
+    "FIRESTORE_EMULATOR_HOST",
+    "GOOGLE_CLOUD_PROJECT",
+)
 
 
-def get_token_broker() -> Any:
-    """FR-MTG-09: the token broker's adapter-facing half (`access_token_for_adapter`). Unwired: no host run."""
-    raise HTTPException(status_code=503, detail="not_configured")
+def get_skill_store() -> SkillStore:
+    """The taught-skill store (SKILLS-2b, FR-SKL-04, BQ-SKILLS-1). `TILO_SKILLS_STORE` = `firestore` (with
+    `TILO_FIRESTORE_PROJECT`; outside Cloud Run only the emulator and a `demo-` project) or `memory` (refused when
+    deployed); unset in dev mode = memory; anything else, or a client that cannot be built, is 503 `not_configured`
+    (the cause never echoed; a failed build backs off like the people stores). The env is read on every call; a store
+    is kept per config, a refusal never is."""
+    global _skill_store, _skill_store_retry_at
+    from tilo_api import dev  # noqa: PLC0415 - dev imports this module
+
+    values = {n: os.environ[n] for n in _SKILL_ENV if n in os.environ}  # presence matters: Cloud Run may set ""
+    if not values.get("TILO_SKILLS_STORE") and dev.dev_enabled():
+        try:
+            dev.refuse_if_unsafe()
+            values["TILO_SKILLS_STORE"] = "memory"
+        except dev.DevModeRefused:
+            pass
+    key = tuple(values.get(n) or "" for n in _SKILL_ENV) + tuple(n for n in _SKILL_ENV if n in values)
+    held = _skill_store
+    if held is not None and held[0] == key:
+        return held[1]
+    retry_at = _skill_store_retry_at
+    if retry_at is not None and people_stores_clock() < retry_at:
+        raise HTTPException(status_code=503, detail="not_configured")
+    from tilo_api.skill_firestore import SkillStoreNotConfigured, open_skill_store  # noqa: PLC0415
+
+    with _skill_store_lock:
+        held = _skill_store
+        if held is not None and held[0] == key:
+            return held[1]
+        try:
+            built = open_skill_store(values)
+            _skill_store, _skill_store_retry_at = (key, built), None
+            return built
+        except Exception as exc:
+            logger.warning("skill store not built (%s)", type(exc).__name__)
+            if not isinstance(exc, SkillStoreNotConfigured):  # a client was tried: back off
+                _skill_store_retry_at = people_stores_clock() + PEOPLE_STORES_BACKOFF_S
+            raise HTTPException(status_code=503, detail="not_configured") from None
 
 
-def get_meeting_host_transport() -> Any:
-    """FR-MTG-09: the `Transport` behind `MeetingHostAdapter`. No live transport in dev (EFF-01): refuses."""
-    raise HTTPException(status_code=503, detail="not_configured")
+def _forget_skill_store() -> None:
+    global _skill_store, _skill_store_retry_at
+    with _skill_store_lock:
+        _skill_store, _skill_store_retry_at = None, None
+
+
+get_skill_store.cache_clear = _forget_skill_store  # type: ignore[attr-defined]  # tests start from a cold process
+
+
+def get_run_archive(request: Request = None) -> Callable[..., RunArchive]:  # type: ignore[assignment]
+    """`open_archive(*, org_id, run_id) -> RunArchive`, the run's raw archive on GCS for `TILO_ARCHIVE_STORE=gcs`
+    (PROD-WIRE 2b). It masks every string of a payload with the shared redactor, checked before any client is built;
+    unconfigured it refuses."""
+    if (demo := _demo(request)) is not None:
+        return demo.open_archive
+    from tilo_api import run_stores  # noqa: PLC0415
+
+    redactor = get_redactor()
+    return cast(
+        "Callable[..., RunArchive]",
+        _run_store(
+            "archive",
+            ("TILO_ARCHIVE_STORE", "TILO_ARCHIVE_BUCKET"),
+            lambda: run_stores.open_run_archive(redactor=run_stores.redact_leaves(redactor)),
+        ),
+    )
+
+
+get_run_archive.cache_clear = _forget_run_stores  # type: ignore[attr-defined]
+
+
+_host_client_lock = threading.Lock()
+_host_client: MeetingHostRpc | None = None
+_host_client_retry_at: float | None = None
+MEETING_HOST_BACKOFF_S = 30.0  # after a failed build, no new attempt for this long (ADR-0032 decision 8)
+meeting_host_clock: Callable[[], float] = time.monotonic  # read at call time, so a test can replace it
+
+
+def get_meeting_host_client() -> MeetingHostRpc:
+    """FR-MTG-09, ADR-0032: the one client to tilo-connectors' meeting-host routes, built from `TILO_CONNECTORS_URL` on
+    first use. Unset or malformed is 503 `not_configured` (the value never echoed); a failed build is remembered for
+    `MEETING_HOST_BACKOFF_S`, then the next request tries again, so a fixed setting needs no restart."""
+    global _host_client, _host_client_retry_at
+    built = _host_client
+    if built is not None:
+        return built
+    with _host_client_lock:
+        if _host_client is None:
+            retry_at = _host_client_retry_at
+            if retry_at is not None and meeting_host_clock() < retry_at:
+                raise HTTPException(status_code=503, detail="not_configured")
+            try:
+                _host_client, _host_client_retry_at = open_meeting_host_rpc(os.environ), None
+            except Exception as exc:  # noqa: BLE001 - the type only
+                logger.warning("meeting-host client not built (%s)", type(exc).__name__)
+                _host_client_retry_at = meeting_host_clock() + MEETING_HOST_BACKOFF_S
+                raise HTTPException(status_code=503, detail="not_configured") from None
+        return _host_client
+
+
+def get_connection_views_rpc() -> Callable[[str], list[MeetingHostRpcConnectionView] | None]:
+    """ADR-0032 addendum 1 (T4b): `views(user_id)` for `GET /v1/connectors`, over the same client as the meeting-host
+    calls (503 `not_configured` when it is not configured). It gives the person's display views, or None for "unknown"
+    (every failure), and never raises. It holds no broker, token record, Kms or secret (SEC-02)."""
+    client = get_meeting_host_client()
+    registry = get_connector_registry()
+    order = [c for c in registry.ids() if registry.get(c)["auth"] == "oauth2"]
+    return lambda user_id: client.connection_views(user_id, order=order)
+
+
+def _forget_host_client() -> None:
+    global _host_client, _host_client_retry_at
+    with _host_client_lock:
+        _host_client, _host_client_retry_at = None, None
+
+
+get_meeting_host_client.cache_clear = _forget_host_client  # type: ignore[attr-defined]  # tests start from a cold process
+
+
+class ConnectionViews(Protocol):
+    """LIVE-GAPS-1b: a read-only view of a person's connector state (SEC-02: never a token, record, Kms or secret)."""
+
+    def view(self, user_id: str, connector: str) -> tuple[str | None, list[str], str | None]:
+        """(state `connected`|`expired`|None, scopes, connected_at ISO|None); no expiry, token or address."""
+        ...
+
+
+class _RpcConnectionViews:
+    """The `ConnectionViews` seam over tilo-connectors (ADR-0032a). One `views(user_id)` call serves the whole
+    `GET /v1/connectors` (the route asks per connector); a failed call (`None`) is remembered, so the other connectors
+    do not repeat it, and every `view` then raises (that row is unknown, never an error). No `expires_at` crosses
+    (BQ-ADR32a-2): the route shows none."""
+
+    def __init__(self, views: Callable[[str], list[MeetingHostRpcConnectionView] | None]) -> None:
+        self._views = views
+        self._asked: tuple[str, dict[str, MeetingHostRpcConnectionView] | None] | None = None
+
+    def view(self, user_id: str, connector: str) -> tuple[str | None, list[str], str | None]:
+        if self._asked is None or self._asked[0] != user_id:
+            got = self._views(user_id)
+            self._asked = (user_id, None if got is None else {v.connector: v for v in got})
+        rows = self._asked[1]
+        if rows is None:
+            raise LookupError("connection views unknown")
+        found = rows.get(connector)
+        return (None, [], None) if found is None else (str(found.state), list(found.scopes), None)
+
+
+def get_connection_views() -> ConnectionViews:
+    """Read-only connector state for `GET /v1/connectors`, from tilo-connectors over the internal route (ADR-0032a,
+    BQ-LIVEGAPS-1). Unconfigured: 503 `not_configured` (the list route then shows every connector available)."""
+    return _RpcConnectionViews(get_connection_views_rpc())
+
+
+def get_change_planner() -> Callable[[Any], str] | None:
+    """MROOM-H2b: the revision planner (`meeting_room_planner.plan_change`, ADR-0028 decisions 6 and 8). It plans only:
+    the owner's in-person `budget.granted` and starting the units are the next ticket (H2c). None: a confirmed change is
+    recorded and waits."""
+    from tilo_api import meeting_room_planner  # noqa: PLC0415 (it imports this module)
+
+    return meeting_room_planner.plan_change
 
 
 REPLAY_ONLY_MESSAGE = "This link is replay-only right now: new work is paused; finished runs can still be replayed."
@@ -835,7 +1305,9 @@ def get_assistant_decider(mode: Annotated[Mode, Depends(get_mode)] = "replay") -
         if config.model["role"] not in providers.roles:
             return None
         router = _seam_router(mode)
-        inner = ModelDecider(router=router, providers=providers, safety=get_safety(), config=config)
+        # this request's mode reaches the screen too (BQ-SIGNIN-10); a stand-in that takes no argument still works
+        safety = get_safety(mode) if inspect.signature(get_safety).parameters else get_safety()
+        inner = ModelDecider(router=router, providers=providers, safety=safety, config=config)
         return MeteredDecider(inner, ledger=get_spend_ledger(), cache=get_decision_cache(), config=config)
     except (HTTPException, ProviderConfigError, AssistantModelUnavailable):
         return None

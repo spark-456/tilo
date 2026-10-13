@@ -7,7 +7,11 @@
 // pills of "Tilo Worlds" and the people rows of "Tilo Team" in neutral role tokens.
 import type { Meeting, Minutes } from "@tilo/contracts";
 import { type ReactNode, useState } from "react";
-import { MEETINGS, MINUTES, PREVIEW_NOW } from "../people/data";
+import { useClient } from "../api/ClientProvider";
+import { HttpClient } from "../api/http";
+import { HostMeeting } from "../people/HostMeeting";
+import { LiveLists } from "../people/LiveLists";
+import { ALL_MEETINGS, MEETINGS, MINUTES, PREVIEW_NOW, SIGNED_IN } from "../people/data";
 import { Evidence, PersonTag, PreviewNote, pillLabel } from "../people/parts";
 import { AppLink } from "./AppLink";
 import { Chip, Page, Section, longDate, stamp } from "./kit";
@@ -74,8 +78,10 @@ function Item({
 }
 
 export function S_26({ params }: ScreenProps) {
+  const live = useClient() instanceof HttpClient;
   const [confirmedAt, setConfirmedAt] = useState<Readonly<Record<string, string>>>({});
   const [group, setGroup] = useState<Group>("all");
+  if (live) return <LiveLists kind="meetings" />;
   const confirmedOf = (m: Meeting): string | null =>
     confirmedAt[m.id] ?? m.minutes_confirmed_by?.at ?? null;
   const groupOf = (m: Meeting): Group =>
@@ -83,6 +89,7 @@ export function S_26({ params }: ScreenProps) {
   const count = (g: Group) => newest.filter((m) => g === "all" || groupOf(m) === g).length;
   const picked =
     newest.find((m) => m.id === params[0]) ??
+    ALL_MEETINGS.find((m) => m.id === params[0]) ?? // an upcoming meeting is opened by address, not listed here
     newest.find((m) => m.status === "minuted" && m.minutes_confirmed_by === null) ??
     newest.find((m) => m.status === "minuted") ??
     newest[0];
@@ -144,6 +151,7 @@ export function S_26({ params }: ScreenProps) {
               </li>
             ))}
           </ul>
+          <HostMeeting meeting={picked} me={SIGNED_IN} />
           {minutes === undefined ? (
             <p className="empty-note" data-testid="no-minutes">
               {picked.status === "discarded" || picked.status === "deleted"

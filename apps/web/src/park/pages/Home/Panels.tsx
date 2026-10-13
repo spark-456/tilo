@@ -2,9 +2,10 @@
 // Tilo App Home.dc.html): map pins, the greeting panel, the Today panel and the composer's panels.
 // Presentation only: HomePage.tsx owns the data, the composer state and every navigation call.
 import type { MouseEvent, ReactNode } from "react";
-import type { Dec, Decision, Ledger } from "../../api/types";
+import type { Dec, Decision, Ledger, World } from "../../api/types";
 import { kpis } from "../../app/ledgerKpis";
 import { KpiTile } from "../../components";
+import { SampleBadge, SampleNote } from "../../sample/SampleBadge";
 import {
   type LiveRow,
   type NextEvent,
@@ -48,6 +49,8 @@ export interface HeroProps {
   readonly greeting: string;
   readonly summary: string;
   readonly needs: number;
+  /** False on the live path when no decisions were served: nothing is claimed either way. */
+  readonly needsKnown?: boolean;
   readonly night: boolean;
   /** The world the waiting decisions are in, from the Api's worlds; null names none. */
   readonly worldName: string | null;
@@ -59,6 +62,7 @@ export function Hero({
   greeting,
   summary,
   needs,
+  needsKnown = true,
   night,
   worldName,
   onReview,
@@ -67,7 +71,7 @@ export function Hero({
     <div className="park-home-hero park-home-glass">
       <div className="park-home-date">{dateLine}</div>
       <h1 className="park-home-h1">{greeting}</h1>
-      <p className="park-home-summary">{summary}</p>
+      {summary ? <p className="park-home-summary">{summary}</p> : null}
       {needs > 0 ? (
         <button type="button" className="park-home-needs" onClick={onReview}>
           <span className="park-home-needs__tile">{needsAgent(30, night)}</span>
@@ -77,12 +81,12 @@ export function Hero({
           </span>
           <span className="park-home-needs__review">Review</span>
         </button>
-      ) : (
+      ) : needsKnown ? (
         <div className="park-home-caught">
           <span className="park-home-caught__disc">{icon("check", 14)}</span>
           You’re all caught up
         </div>
-      )}
+      ) : null}
     </div>
   );
 }
@@ -104,6 +108,8 @@ function GoLink({ href, onGo, children }: { href: string; onGo: () => void; chil
 
 export interface TodayProps {
   readonly rows: readonly LiveRow[];
+  /** STARTER-1: the recorded sample project, when the Api served it and the person has not hidden it. */
+  readonly sample?: World | undefined;
   readonly events: readonly NextEvent[];
   readonly spend: Spend;
   readonly night: boolean;
@@ -115,6 +121,7 @@ export interface TodayProps {
 
 export function TodayPanel({
   rows,
+  sample,
   events,
   spend,
   night,
@@ -155,6 +162,17 @@ export function TodayPanel({
           </span>
         </button>
       ))}
+      {sample ? (
+        <button type="button" className="park-home-live" onClick={() => onWorld(sample.id)}>
+          <span className="park-home-live__text">
+            <span className="park-home-live__name">
+              {sample.short}
+              <SampleBadge />
+            </span>
+            <SampleNote className="park-home-live__sub" />
+          </span>
+        </button>
+      ) : null}
       <div className="park-home-rule" />
       <div className="park-home-head park-home-head--next">
         <span className="park-home-title">Up next today</span>
@@ -174,7 +192,9 @@ export function TodayPanel({
       <div className="park-home-rule" />
       <button type="button" className="park-home-spend" onClick={onLedger}>
         <span className="park-home-spend__head">
-          <span className="park-home-title">September spend</span>
+          <span className="park-home-title">
+            {spend.month ? `${spend.month} spend` : "Spend so far"}
+          </span>
           <span className="park-home-spend__link">Ledger</span>
         </span>
         <span className="park-home-spend__figures">

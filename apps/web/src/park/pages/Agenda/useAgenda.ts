@@ -4,7 +4,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Api } from "../../api/index";
 import { NotBuilt } from "../../api/liveApi";
-import type { Agenda, AgendaPin, AgendaSlot, Decision, Source } from "../../api/types";
+import type { Agenda, AgendaData, AgendaPin, AgendaSlot, Decision, Source } from "../../api/types";
 import type { AppCtx } from "../../app/AppCtx";
 import {
   type BoardKey,
@@ -21,7 +21,7 @@ import {
 
 export type AgendaState =
   | { status: "loading" }
-  | { status: "ready"; data: Agenda; decisions: Decision[]; source: Source }
+  | { status: "ready"; data: AgendaData; decisions: Decision[]; source: Source }
   | { status: "not-built" }
   | { status: "error" };
 
@@ -87,6 +87,9 @@ export function useAgendaUi(A: Agenda, decisions: Decision[], app: AppCtx, api: 
     finding,
     cancelFind: () => setFinding(false),
     findTime,
+    // ADR-0024 am4: the agenda carries no Meet URL. The Tilo meeting page fetches the transient join link,
+    // and the Park shell has no such page yet, so this says so instead of opening anything.
+    openMeeting: (title: string) => app.toast(`The meeting page for ${title} is not connected yet`),
     booked,
     flags,
     briefed,
