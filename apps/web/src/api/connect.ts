@@ -12,6 +12,11 @@ const STATE_KEY = "tilo.google.connect.state";
 /** The three connectors of one Google sign-in (CON-D10): disconnecting any one ends all three (LC-06). */
 export const GOOGLE_PERSON_CONNECTORS = ["gmail", "google_drive", "google_calendar"] as const;
 
+/** The meeting bot's own Google account, a connector apart from the person's three (ADR-0024 decisions 1 and 5). */
+export const MEETING_HOST = "meeting_host";
+/** Its one capability: create meetings on the bot's own calendar (ADR-0024 decision 2). */
+export const MEETING_HOST_CAPABILITIES = ["send"] as const;
+
 const STATE_SHAPE = /^[A-Za-z0-9_-]{16,128}$/;
 const AUTHORIZE_HOST = "accounts.google.com";
 
@@ -27,8 +32,12 @@ export type StartResult =
   | { kind: "nothing_missing" }
   | { kind: "failed" };
 
+/** What `GET /v1/connectors` says of the meeting host; `unknown` unless the server says it read the state. */
+export type HostState = ConnectionState | "unknown";
+
 export type FinishResult =
-  | { kind: "connected"; lines: string[] }
+  /** `connector` is carried only for the meeting host (the one id this page words differently). */
+  | { kind: "connected"; lines: string[]; connector?: typeof MEETING_HOST }
   | { kind: "not_granted" }
   | { kind: "wrong_account" }
   | { kind: "start_again" }
@@ -47,6 +56,8 @@ export interface CallbackParams {
 export interface ConnectFlow {
   /** The person's three Google connectors and where each stands (`GET /v1/connectors`). */
   list(): Promise<ConnectionRow[]>;
+  /** The meeting host's connection, read live; rejects when the read fails (M1, FR-MTG-09). */
+  meetingHost(): Promise<HostState>;
   /** Asks for the link and saves its state; the caller opens `url`. */
   start(connector: string, capabilities: readonly string[]): Promise<StartResult>;
   /** The callback page's step (see the header). */
@@ -121,6 +132,17 @@ export function createConnectFlow(
       return out;
     },
 
+    async meetingHost() {
+      const body = await http.getJson("/v1/connectors");
+      const rows = isObject(body) && Array.isArray(body.connectors) ? body.connectors : [];
+      const row = rows.find((r) => isObject(r) && r.id === MEETING_HOST);
+      if (!isObject(row) || row.state_known !== true) return "unknown";
+      const { state } = row;
+      return state === "connected" || state === "attention" || state === "available"
+        ? state
+        : "unknown";
+    },
+
     async start(connector, capabilities) {
       const saved = store();
       if (!saved) return { kind: "failed" };
@@ -159,7 +181,9 @@ export function createConnectFlow(
           isObject(got) && Array.isArray(got.scope_lines)
             ? got.scope_lines.filter((l): l is string => typeof l === "string")
             : [];
-        return lines.length > 0 ? { kind: "connected", lines } : { kind: "unavailable" };
+        if (lines.length === 0) return { kind: "unavailable" };
+        const host = isObject(got) && got.connector === MEETING_HOST;
+        return { kind: "connected", lines, ...(host ? { connector: MEETING_HOST } : {}) };
       } catch (e) {
         if (e instanceof TiloApiError && e.status === 400) {
           if (e.refusal === "not_granted" || e.refusal === "wrong_account") {
@@ -184,6 +208,9 @@ export function createConnectFlow(
     },
   };
 }
+
+/** The heading when the connected account was the meeting host. */
+export const HOST_CONNECTED_TEXT = "The meeting host is connected.";
 
 /** The plain sentence for each result (no codes, no Google text). */
 export const RESULT_TEXT: Record<FinishResult["kind"], string> = {

@@ -18,6 +18,7 @@ import { AttentionBanner, AvailableRow, ConnectedTile } from "./ConnectorParts";
 import { Drawer } from "./Drawer";
 import { GoogleAccess } from "./GoogleAccess";
 import { LiveConnectors } from "./LiveConnectors";
+import { MeetingHostAccess } from "./MeetingHostAccess";
 import { icon } from "./icons";
 import { type Overrides, type UsedRow, isOn, matches, merge, usedBy } from "./view";
 
@@ -111,6 +112,7 @@ export function ConnectorsPage({
       <Frame>
         <Heading />
         {live ? <GoogleAccess flow={live} /> : null}
+        <MeetingHostAccess flow={live} />
         <LiveConnectors connectors={load.connectors} />
       </Frame>
     );
@@ -121,6 +123,7 @@ export function ConnectorsPage({
       <Frame>
         <Heading />
         {live ? <GoogleAccess flow={live} /> : null}
+        {live ? <MeetingHostAccess flow={live} /> : null}
         <div className="park-connectors-empty">
           <span className="park-connectors-empty-glyph">{icon("plug", 22)}</span>
           <div className="park-connectors-empty-title">Not connected yet</div>
@@ -199,6 +202,7 @@ export function ConnectorsPage({
       </Heading>
 
       {live ? <GoogleAccess flow={live} /> : null}
+      {live ? <MeetingHostAccess flow={live} /> : null}
 
       {attn.map((c) => (
         <AttentionBanner
