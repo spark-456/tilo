@@ -13,7 +13,7 @@ from __future__ import annotations
 import copy
 import dataclasses
 import logging
-from collections.abc import Awaitable, Callable, Iterator
+from collections.abc import Awaitable, Callable, Iterator, Sequence
 from datetime import UTC, date, datetime
 from typing import Annotated, Any
 
@@ -24,10 +24,12 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from tilo_metering.flags import FlagStore
 from tilo_planning.approaches import ApproachProposalError, propose_approaches
 from tilo_planning.brief import BriefValidationError, ExtractionResult, edit_brief_field
+from tilo_planning.deliverable_kinds import DeliverableKind, DeliverableKindsError
 from tilo_planning.events import build_event
 from tilo_planning.intake import IntakeResult
 from tilo_planning.questions import apply_answer, generate_questions, record_assumption
 from tilo_planning.scenarios import ScenarioError, load_scenario
+from tilo_providers.clock import Clock
 from tilo_providers.config import ProviderConfigError
 from tilo_providers.errors import ProviderError
 from tilo_providers.interfaces import SafetyProvider
@@ -110,6 +112,7 @@ def create_task(
     intake: IntakeResult,
     extraction: ExtractionResult,
     scenario: str | None = None,
+    kinds: Sequence[DeliverableKind] | None = None,
 ) -> tuple[str, deps.TaskRecord]:
     """FR-INT-03/04: the task from its intake and the Director's brief (extracted first, so a failed extraction
     stores nothing), then the questions, decided in code."""
@@ -124,7 +127,13 @@ def create_task(
     task = deps.TaskRecord(owner, intake.world_id, intake.run_id, draft, draft, [], len(intake_events) + 1)
     task.scenario, task.gaps = scenario, extraction.gaps
     asked = generate_questions(
-        draft, extraction.ambiguous_fields, memory=store.memory, base=_base(task, DIRECTOR), seq=task.next_seq
+        draft,
+        extraction.ambiguous_fields,
+        memory=store.memory,
+        base=_base(task, DIRECTOR),
+        seq=task.next_seq,
+        topic_questions=extraction.questions,
+        kinds=kinds,
     )
     task.draft = task.brief = asked.brief
     task.questions = asked.questions
@@ -149,8 +158,8 @@ def _owned(store: deps.Store, task_id: str, principal: deps.Principal) -> deps.T
     return task
 
 
-def _brief(task: deps.TaskRecord, answers: dict[str, str | None], edits: dict[str, Any]) -> dict[str, Any]:
-    brief, today = task.draft, date.today()
+def _brief(task: deps.TaskRecord, answers: dict[str, str | None], edits: dict[str, Any], today: date) -> dict[str, Any]:
+    brief = task.draft
     for question in task.questions:
         if question.field in answers and question.field not in edits:  # an edit stands over the answer (BQ-99)
             answer = answers[question.field]
@@ -183,6 +192,18 @@ def _screen(safety: SafetyProvider, strings: list[str]) -> None:
         raise HTTPException(status_code=422, detail="The safety screen flagged this change; rephrase it.")
 
 
+def _director_strings(task: deps.TaskRecord, answers: list[AnswerIn]) -> list[str]:
+    """The model-written strings an answer or a skip puts into the brief (INTAKE-QUALITY-1): the text of each Director
+    question answered, and the guess a skip takes. A typed answer is screened with the person's other strings."""
+    by_field = {a.field: a.answer for a in answers}
+    return [
+        text
+        for q in task.questions
+        if q.label is not None and q.field in by_field
+        for text in (q.text, *([q.suggested_answers[0]] if by_field[q.field] is None else []))
+    ]
+
+
 def _foreign_sources(task: deps.TaskRecord, edits: dict[str, Any]) -> bool:
     """PRD 10.1: a file, connector or memory source must already be this task's (its own uploads, or what code
     applied); a person may add only url and web sources."""
@@ -208,6 +229,7 @@ def answer_questions(
     store: StoreDep,
     safety: Annotated[SafetyProvider, Depends(deps.get_safety)],
     flags: FlagsDep,
+    clock: Annotated[Clock, Depends(deps.get_today)],
 ) -> dict[str, Any]:
     """FR-INT-03/04: answers, skips (`answer: null`, recorded as "Assumed: ...") and chip edits, every typed
     string screened first (FR-INT-02). No model call; a refused request changes nothing."""
@@ -218,7 +240,8 @@ def answer_questions(
         raise HTTPException(status_code=422, detail="Answer only the questions that were asked, each once.")
     if _foreign_sources(task, body.brief_edits):
         raise HTTPException(status_code=422, detail="Add only this task's files, or web and url sources.")
-    _screen(safety, [a.answer for a in body.answers if a.answer is not None] + list(_strings(body.brief_edits)))
+    typed = [a.answer for a in body.answers if a.answer is not None]
+    _screen(safety, typed + _director_strings(task, body.answers) + list(_strings(body.brief_edits)))
     with task.lock:
         if task.granted:
             raise HTTPException(status_code=409, detail="The budget is approved; the brief is final.")
@@ -228,9 +251,14 @@ def answer_questions(
         answered = {a.field for a in body.answers}
         edits = {**{f: v for f, v in task.edits.items() if f not in answered}, **body.brief_edits}
         try:
-            brief = _brief(task, answers, edits)
+            brief = _brief(task, answers, edits, clock())
         except BriefValidationError as exc:
             raise HTTPException(status_code=422, detail=f"That change does not fit the brief: {exc}") from exc
+        except DeliverableKindsError as exc:  # the file changed for the worse since the question was asked
+            logger.error("deliverable kinds config unusable: %s", exc)
+            raise HTTPException(
+                status_code=503, detail="Deliverable choices are unavailable; nothing changed."
+            ) from exc
         changes: dict[str, Any] = {"answers": answers, "edits": edits, "brief": brief}
         if brief != task.brief:
             changes["approaches"] = None  # proposed for the old brief
@@ -246,6 +274,7 @@ def get_approaches(
     writer: WriterDep,
     model_router: Annotated[Router, Depends(deps.get_router)],
     flags: FlagsDep,
+    clock: Annotated[Clock, Depends(deps.get_today)],
 ) -> dict[str, Any]:
     """FR-INT-06: the Director's 2-3 approaches for the confirmed brief, proposed once per brief."""
     task = _owned(store, task_id, principal)
@@ -262,7 +291,7 @@ def get_approaches(
             try:
                 base = _base(task, DIRECTOR)
                 result = propose_approaches(
-                    task.brief, router=model_router, base=base, seq=task.next_seq, gaps=task.gaps
+                    task.brief, router=model_router, base=base, seq=task.next_seq, gaps=task.gaps, today=clock()
                 )
             except ApproachProposalError as exc:
                 deps.raise_if_model_unavailable(exc)
@@ -322,6 +351,7 @@ def approve(
     the task's one run (CL-INT-2); a run that cannot start never changes this answer."""
     task = _owned(store, task_id, principal)
     deps.refuse_if_replay_only(flags)  # NFR-24: after sign-in and the owner check, before any grant
+    getattr(store, "admit_run", lambda: None)()  # a demo may have only a few runs at once (DEMO-EPHEMERAL-1)
     if body.budget_cap > (ceiling := deps.budget_cap_ceiling()):  # finite already: the body refuses NaN and Infinity
         raise HTTPException(status_code=422, detail=f"One run may use at most {ceiling:g} credits.")
     with store.grant_lock(task.owner), task.lock:  # always in this order: the owner's grants, then the task

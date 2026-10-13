@@ -128,7 +128,17 @@ describe("WEB_1a_static: the api layer is deterministic and offline", () => {
   it("WEB_1a_static_api_has_no_clock_no_random_no_network", () => {
     const banned =
       /\bMath\.random\b|\bDate\.now\b|\bnew\s+Date\s*\(|\bperformance\.now\b|\bfetch\s*\(|\bXMLHttpRequest\b|\bWebSocket\b|\bEventSource\b|\bsendBeacon\b/;
-    const hits = apiFiles.filter((p) => banned.test(code(p))).map(rel);
+    // FR-SPD-07 parses only a recorded timestamp. No zero-argument constructor
+    // or other Date construction is exempt; fixed-clock behavior is tested below.
+    const hits = apiFiles
+      .filter((p) => {
+        const source =
+          rel(p) === "api/live/ledgerFromCosts.ts"
+            ? code(p).replace(/\bnew\s+Date\s*\(\s*e\.ts\s*\)/g, "recordedTimestamp")
+            : code(p);
+        return banned.test(source);
+      })
+      .map(rel);
     expect(hits, "fixtures are fixed at September 2026 and nothing is live yet").toEqual([]);
     expect(apiFiles.length).toBeGreaterThan(0);
   });
@@ -143,7 +153,10 @@ describe("WEB_1a_static: park stays beside the old app", () => {
         if (target.startsWith(PARK)) continue;
         const inSrc = relative(SRC, target).replaceAll("\\", "/");
         // Only the shared API client seam (src/api) may be reused from outside park.
-        if (!(inSrc === "api" || inSrc.startsWith("api/"))) bad.push(`${rel(p)} imports ${m[1]}`);
+        // SEC-16: and the one shared lifetime-cap dialog (src/components, like ReplayBanner: neither tree imports the other).
+        const shared = inSrc === "components/LifetimeCapDialog";
+        if (!(inSrc === "api" || inSrc.startsWith("api/") || shared))
+          bad.push(`${rel(p)} imports ${m[1]}`);
       }
     }
     expect(bad).toEqual([]);

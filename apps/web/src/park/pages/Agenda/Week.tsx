@@ -47,7 +47,7 @@ function Calendar({ A, EV, ui, app }: { A: Agenda; EV: Ev[]; ui: AgendaUi; app: 
               <span
                 className="park-agenda-daynum"
                 style={{
-                  background: d.today ? "var(--hero)" : "transparent",
+                  background: d.today ? "var(--heroFill)" : "transparent",
                   color: d.today ? "#FFFFFF" : "var(--ink)",
                 }}
               >

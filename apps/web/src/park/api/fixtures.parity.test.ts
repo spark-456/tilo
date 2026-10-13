@@ -20,6 +20,7 @@ const ADDITIVE_PATHS: Record<string, readonly string[]> = {
   agenda: ["rules"],
   ledger: ["memoryUp", "spike", "runLabels", "memoryWeeks", "waits.summary", "waits.withBackup"],
   worlds: ["[].heroTag"],
+  connectors: ["[].channels"],
 };
 const ADDITIVE_VALUES: readonly (readonly [
   member: string,
@@ -166,7 +167,13 @@ describe("WEB_1a_fixtures_match_prototype: data members", () => {
       expect(reference, `the reference shell has "${want}"`).toContain(want);
     }
     // no extra key outside the listed ones: stripping them leaves exactly the prototype's keys (the test above)
-    expect(Object.keys(ADDITIVE_PATHS)).toEqual(["decisions", "agenda", "ledger", "worlds"]);
+    expect(Object.keys(ADDITIVE_PATHS)).toEqual([
+      "decisions",
+      "agenda",
+      "ledger",
+      "worlds",
+      "connectors",
+    ]);
     // WEB-6: the K1 hero tag is the World reference page's own line (`heroTag` is the only extra world key, on one world)
     const world = fs.readFileSync(
       path.join(HANDOFF_DIR, "design", "Tilo App World.dc.html"),

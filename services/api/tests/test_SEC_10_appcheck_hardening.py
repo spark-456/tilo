@@ -149,7 +149,7 @@ def test_SEC_10_the_verifier_names_the_other_refusals(signer):
 # --- mutants the PR-1 review found alive -------------------------------------------------------------
 
 
-def test_SEC_10_keys_past_their_ttl_are_never_served_when_the_refresh_fails(signer):
+def test_SEC_10_keys_past_their_ttl_and_their_grace_are_never_served_when_the_refresh_fails(signer):
     calls = {"n": 0}
 
     def fetch() -> dict[str, rsa.RSAPublicKey]:
@@ -165,12 +165,101 @@ def test_SEC_10_keys_past_their_ttl_are_never_served_when_the_refresh_fails(sign
     verifier.verify(_token(signer))  # still inside the TTL: served from the snapshot
     assert calls["n"] == 1
     clock.now = appcheck.JWKS_TTL_S + 1
+    verifier.verify(
+        _token(signer)
+    )  # past the TTL: a refresh is tried and fails; the known key still serves in the grace
+    assert calls["n"] == 2
+    clock.now = appcheck.JWKS_TTL_S + appcheck.JWKS_STALE_GRACE_S + 1
     with pytest.raises(OSError):
-        verifier.verify(_token(signer))  # past the TTL: a refresh is tried, and it fails
-    clock.now = appcheck.JWKS_TTL_S + 1 + appcheck.JWKS_RETRY_COOLDOWN_S + 1
+        verifier.verify(_token(signer))  # beyond the grace: a refresh is tried, fails, and nothing is served
+    clock.now += appcheck.JWKS_RETRY_COOLDOWN_S + 1
     with pytest.raises(OSError):
         verifier.verify(_token(signer))  # the stale keys are gone, not served as a fallback
-    assert calls["n"] == 3
+    assert calls["n"] == 4
+
+
+def test_SEC_10_the_stale_grace_is_at_most_one_hour():
+    assert appcheck.JWKS_STALE_GRACE_S <= 3600.0
+
+
+def test_SEC_10_a_valid_token_is_served_from_a_stale_snapshot_while_a_refresh_is_in_flight(signer):
+    started, release = threading.Event(), threading.Event()
+    calls = {"n": 0}
+
+    def fetch() -> dict[str, rsa.RSAPublicKey]:
+        calls["n"] += 1
+        if calls["n"] == 2:
+            started.set()
+            release.wait(5)
+        return {"k1": signer.public_key()}
+
+    clock = Clock()
+    verifier = _verifier(fetch, clock)
+    verifier.verify(_token(signer))  # snapshot at t=0
+    clock.now = appcheck.JWKS_TTL_S + 5  # past the TTL: the next caller refreshes
+    refresher = threading.Thread(target=lambda: verifier.verify(_token(signer)))
+    refresher.start()
+    assert started.wait(5)
+    clock.now += appcheck.JWKS_RETRY_COOLDOWN_S + 1  # past the cooldown: only the in-flight guard is left
+    assert verifier.verify(_token(signer))["sub"]  # a second valid token meanwhile: served, not refused
+    assert calls["n"] == 2, "no second fetch starts: the single-flight guard stays"
+    release.set()
+    refresher.join(5)
+
+
+def test_SEC_10_the_stale_grace_serves_only_a_key_id_it_holds_and_never_past_one_hour(signer):
+    started, release = threading.Event(), threading.Event()
+    calls = {"n": 0}
+
+    def fetch() -> dict[str, rsa.RSAPublicKey]:
+        calls["n"] += 1
+        if calls["n"] == 2:
+            started.set()
+            release.wait(5)
+        return {"k1": signer.public_key()}
+
+    clock = Clock()
+    verifier = _verifier(fetch, clock)
+    verifier.verify(_token(signer))
+    clock.now = appcheck.JWKS_TTL_S + 5
+    refresher = threading.Thread(target=lambda: verifier.verify(_token(signer)))
+    refresher.start()
+    assert started.wait(5)
+    with pytest.raises(appcheck.TokenRefused) as unknown:
+        verifier.verify(_token(signer, kid="never_seen"))
+    assert unknown.value.code in {
+        "key_refresh_in_flight",
+        "keys_unavailable",
+        "unknown_key",
+    }  # an unknown key id is never guessed at
+    clock.now = appcheck.JWKS_TTL_S + appcheck.JWKS_STALE_GRACE_S + 5
+    with pytest.raises(appcheck.TokenRefused) as old:
+        verifier.verify(_token(signer))
+    assert old.value.code in {
+        "key_refresh_in_flight",
+        "keys_unavailable",
+    }  # one hour past the TTL nothing is served from the snapshot
+    release.set()
+    refresher.join(5)
+
+
+def test_SEC_10_a_cold_start_with_nothing_held_still_refuses_while_the_first_fetch_runs(signer):
+    started, release = threading.Event(), threading.Event()
+
+    def fetch() -> dict[str, rsa.RSAPublicKey]:
+        started.set()
+        release.wait(5)
+        return {"k1": signer.public_key()}
+
+    verifier = _verifier(fetch)
+    first = threading.Thread(target=lambda: verifier.verify(_token(signer)))
+    first.start()
+    assert started.wait(5)
+    with pytest.raises(appcheck.TokenRefused) as refused:
+        verifier.verify(_token(signer))
+    assert refused.value.code in {"key_refresh_in_flight", "keys_unavailable"}  # no snapshot exists to serve from
+    release.set()
+    first.join(5)
 
 
 def test_SEC_10_a_well_formed_signed_token_over_the_size_cap_is_refused_before_any_key_fetch(signer):
@@ -241,3 +330,97 @@ def test_SEC_10_the_audience_must_equal_projects_slash_the_project(signer, audie
     with pytest.raises(appcheck.TokenRefused) as refused:
         verifier.verify(_token(signer, aud=audience))
     assert refused.value.code == "wrong_project"
+
+
+# --- the warm-up (SEC-SWEEP-1): min-instances 0 makes a true cold start after every idle period ---------
+
+
+def test_SEC_10_a_warmed_cold_start_serves_the_first_caller(signer):
+    verifier = _verifier(lambda: {"k1": signer.public_key()})
+    assert verifier.warm() is True
+    assert verifier.verify(_token(signer))["sub"]  # the first request after the start needs no fetch of its own
+
+
+def test_SEC_10_without_the_warm_up_the_first_concurrent_callers_meet_the_fetch(signer):
+    started, release = threading.Event(), threading.Event()
+
+    def fetch() -> dict[str, rsa.RSAPublicKey]:
+        started.set()
+        release.wait(5)
+        return {"k1": signer.public_key()}
+
+    verifier = _verifier(fetch)
+    first = threading.Thread(target=lambda: verifier.verify(_token(signer)))
+    first.start()
+    assert started.wait(5)
+    with pytest.raises(appcheck.TokenRefused):
+        verifier.verify(_token(signer))  # the case the warm-up removes
+    release.set()
+    first.join(5)
+
+
+def test_SEC_10_a_failed_warm_up_is_quiet_and_changes_nothing(signer):
+    def fetch() -> dict[str, rsa.RSAPublicKey]:
+        raise OSError("keys endpoint down")
+
+    verifier = _verifier(fetch)
+    assert verifier.warm() is False  # best effort: no exception, nothing stored
+    with pytest.raises(OSError):
+        verifier.verify(_token(signer))  # nothing was stored: a later request tries for itself
+
+
+def test_SEC_10_warming_a_warm_cache_fetches_nothing(signer):
+    calls = {"n": 0}
+
+    def fetch() -> dict[str, rsa.RSAPublicKey]:
+        calls["n"] += 1
+        return {"k1": signer.public_key()}
+
+    verifier = _verifier(fetch)
+    assert verifier.warm() and verifier.warm()
+    assert calls["n"] == 1
+
+
+def test_SEC_10_the_app_start_warms_both_verifiers_and_never_blocks_on_failure(monkeypatch):
+    from tilo_api import firebase_auth
+
+    warmed: list[str] = []
+
+    class Quiet:
+        def __init__(self, name: str, ok: bool) -> None:
+            self.name, self.ok = name, ok
+
+        def warm(self) -> bool:
+            warmed.append(self.name)
+            if not self.ok:
+                raise RuntimeError("boom")  # even a surprise must not reach the start
+            return True
+
+    monkeypatch.setattr(appcheck, "default_verifier", lambda: Quiet("appcheck", False))
+    monkeypatch.setattr(firebase_auth, "default_verifier", lambda: Quiet("firebase", True))
+    monkeypatch.setenv("K_SERVICE", "tilo-api")
+    appcheck.warm_up()
+    assert sorted(warmed) == ["appcheck", "firebase"]
+
+
+def test_SEC_10_the_refusing_verifiers_have_nothing_to_warm():
+    appcheck.RefuseAll("dev_mode").warm()  # dev mode and an unconfigured project open no socket
+
+
+def test_SEC_10_outside_cloud_run_the_warm_up_opens_no_socket(monkeypatch):
+    from tilo_api import firebase_auth
+
+    monkeypatch.delenv("K_SERVICE", raising=False)
+    monkeypatch.setattr(appcheck, "default_verifier", lambda: pytest.fail("a laptop or CI never warms"))
+    monkeypatch.setattr(firebase_auth, "default_verifier", lambda: pytest.fail("a laptop or CI never warms"))
+    appcheck.warm_up()
+
+
+def test_SEC_10_the_app_start_runs_the_warm_up_in_the_background(monkeypatch):
+    import tilo_api
+    from fastapi.testclient import TestClient
+
+    ran = threading.Event()
+    monkeypatch.setattr(appcheck, "warm_up", ran.set)
+    with TestClient(tilo_api.app):
+        assert ran.wait(5)

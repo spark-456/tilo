@@ -67,7 +67,7 @@
 }
 /* primary: h42 r12 --hero #FFF 15px 800, padding 0 18 (14 with an icon), hover brightness 1.08 */
 [data-park] .park-btn--primary {
-  background: var(--hero);
+  background: var(--heroFill);
   color: #ffffff;
 }
 [data-park] .park-btn--primary:hover:not(:disabled) {

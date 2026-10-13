@@ -71,7 +71,9 @@ from hypothesis import strategies as st
 
 # Every route tilo-channels may expose without a person's session. Empty until a webhook route is mounted; add the
 # route here only together with forged / tampered / missing / expired / replayed tests for it in this file.
-SIGNED_ROUTES: frozenset[tuple[str, str]] = frozenset()
+# FR-CHN-17f: `POST /internal/push/send` is not a webhook but an internal route, proven by a Google-signed OIDC token
+# of tilo-api's service account (cases at the end of this file).
+SIGNED_ROUTES: frozenset[tuple[str, str]] = frozenset({("POST", "/internal/push/send")})
 HEALTH_ROUTES = frozenset({("GET", "/health"), ("GET", "/healthz")})
 
 SIGNATURE_REFUSALS = {"malformed", "bad_signature", "unknown_key"}
@@ -482,3 +484,105 @@ def test_SEC_08_channels_app_mounts_no_inbound_route_that_is_not_in_the_signed_s
     )
     assert all(isinstance(r, APIRoute) for r in app.routes), "a mounted router or sub-app: list its routes here"
     assert app.openapi_url is None, "the route list is not published to strangers (issue #411)"
+
+
+# ---------------------------------------------------------------------------------------------------------------
+# 4. FR-CHN-17f: the internal push send route (OIDC, tilo-api's service account only)
+
+
+class _PushVerifier:
+    def __init__(self, outcome: Any) -> None:
+        self.outcome = outcome
+
+    def verify(self, token: str, audience: str) -> dict[str, Any]:
+        if isinstance(self.outcome, Exception):
+            raise self.outcome
+        return self.outcome
+
+
+class _PushSink:
+    def __init__(self) -> None:
+        self.sent: list[bytes] = []
+
+    def send(self, sub: Any, payload: bytes, vapid: Any) -> None:
+        self.sent.append(payload)
+
+
+def _push_client(monkeypatch: pytest.MonkeyPatch, outcome: Any):
+    from fastapi.testclient import TestClient
+    from tilo_channels.app import app
+    from tilo_channels.push_routes import ENV_AUDIENCE, ENV_CALLER, get_sender, get_verifier
+
+    monkeypatch.setenv(ENV_AUDIENCE, "https://tilo-channels-abc.a.run.app")
+    monkeypatch.setenv(ENV_CALLER, "tilo-api@proj.iam.gserviceaccount.com")
+    sink = _PushSink()
+    app.dependency_overrides[get_verifier] = lambda: _PushVerifier(outcome)
+    app.dependency_overrides[get_sender] = lambda: sink
+    return TestClient(app, raise_server_exceptions=False), sink, app
+
+
+_PUSH_BODY = {
+    "devices": [
+        {
+            "endpoint": "https://fcm.googleapis.com/fcm/send/" + "a" * 40,
+            "keys": {"p256dh": "B" + "x" * 86, "auth": "y" * 22},
+        }
+    ],
+    "title": "A send is waiting for your approval",
+    "body": "",
+    "tag": "gate-card_1",
+    "path": "/park/home?card=card_1",
+}
+_GOOD = {
+    "email": "tilo-api@proj.iam.gserviceaccount.com",
+    "email_verified": True,
+    "aud": "https://tilo-channels-abc.a.run.app",
+}
+
+
+@pytest.mark.parametrize(
+    ("case", "headers", "outcome", "status"),
+    [
+        ("missing", {}, _GOOD, 401),
+        ("malformed scheme", {"authorization": "Token abc"}, _GOOD, 401),
+        ("forged", {"authorization": "Bearer forged"}, ValueError("bad signature"), 401),
+        ("expired", {"authorization": "Bearer old"}, ValueError("token expired"), 401),
+        ("tampered: another account", {"authorization": "Bearer t"}, {**_GOOD, "email": "evil@x.iam"}, 403),
+        ("tampered: another audience", {"authorization": "Bearer t"}, {**_GOOD, "aud": "https://x.a.run.app"}, 403),
+        ("tampered: unverified email", {"authorization": "Bearer t"}, {**_GOOD, "email_verified": False}, 403),
+    ],
+)
+def test_SEC_08_push_send_refuses_missing_forged_expired_and_tampered_tokens_and_sends_nothing(
+    monkeypatch: pytest.MonkeyPatch, case: str, headers: dict[str, str], outcome: Any, status: int
+) -> None:
+    client, sink, app = _push_client(monkeypatch, outcome)
+    try:
+        assert client.post("/internal/push/send", json=_PUSH_BODY, headers=headers).status_code == status, case
+        assert sink.sent == []
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_SEC_08_push_send_a_replayed_valid_token_cannot_widen_what_it_can_do(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A bearer token cannot be told from its replay inside its lifetime (Google ID tokens live under an hour, over
+    TLS, minted for the one audience): a replay repeats the same fixed notice, which the device collapses by its tag.
+    What a replay can NOT do is send anything but the fixed shape to an allowed push host."""
+    client, sink, app = _push_client(monkeypatch, _GOOD)
+    headers = {"authorization": "Bearer same-token"}
+    try:
+        first = client.post("/internal/push/send", json=_PUSH_BODY, headers=headers)
+        again = client.post("/internal/push/send", json=_PUSH_BODY, headers=headers)
+        assert first.status_code == again.status_code == 200 and first.json() == again.json()
+        assert sink.sent[0] == sink.sent[1]  # the same bytes, the same tag: collapsed on the device
+        widened = {
+            **_PUSH_BODY,
+            "path": "https://evil.example/x",
+            "devices": [{**_PUSH_BODY["devices"][0], "endpoint": "https://evil.example/x" + "a" * 20}],
+        }
+        assert client.post("/internal/push/send", json=widened, headers=headers).status_code == 422
+        off_host = {**_PUSH_BODY, "devices": widened["devices"]}
+        res = client.post("/internal/push/send", json=off_host, headers=headers)
+        assert res.json()["delivered"] == 0 and res.json()["refused"] == [0]
+        assert len(sink.sent) == 2
+    finally:
+        app.dependency_overrides.clear()

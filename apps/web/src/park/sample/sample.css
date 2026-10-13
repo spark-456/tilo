@@ -1,0 +1,87 @@
+/* STARTER-1: the sample project's badge, note and Worlds controls. Every selector sits under [data-park];
+   colours are var(--token); no motion. */
+[data-park] .park-sample-badge {
+  display: inline-block;
+  box-sizing: border-box;
+  margin-left: 8px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--field);
+  color: var(--ink2);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.3px;
+  line-height: 16px;
+  vertical-align: middle;
+}
+[data-park] .park-sample-note {
+  display: block;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ink3);
+}
+[data-park] .park-sample-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 12px 0;
+}
+[data-park] .park-sample-controls__hint {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink3);
+}
+[data-park] .park-first-run-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  color: var(--ink2);
+  background: var(--field);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+[data-park] .park-first-run-banner button {
+  color: var(--ink2);
+  background: var(--field);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 6px 10px;
+  cursor: pointer;
+}
+/* QA-DEMO-1 M1: Home is a full-height scene, so its banner is pinned under the fixed nav (14 + 62 + 8) instead of
+   sitting behind it, and the greeting column starts below it. */
+[data-park] .park-first-run-banner--home {
+  position: fixed;
+  top: 84px;
+  left: 24px;
+  z-index: 4;
+  box-sizing: border-box;
+  width: min(640px, calc(100vw - 48px));
+  margin: 0;
+  flex-wrap: nowrap;
+  padding: 6px 8px 6px 12px;
+  font-size: 12.5px;
+}
+[data-park] .park-first-run-banner--home button {
+  flex: none;
+  min-height: 28px;
+  padding: 4px 10px;
+  font-size: 12.5px;
+}
+[data-park] .park-shell__main:has(.park-first-run-banner--home) .park-home-leftcol {
+  top: 148px;
+}
+@media (max-width: 480px) {
+  [data-park] .park-first-run-banner--home {
+    left: 16px;
+    width: calc(100vw - 32px);
+  }
+}

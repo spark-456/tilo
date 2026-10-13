@@ -1,43 +1,28 @@
 // The Park app (README "Routes", "The `app` prop", "Focus"): the data-park root around the shell (shell/AppShell:
 // nav, backdrop, the one <main>, toast, world loader), the page for the route, the document title and the
 // focus move after a route change. Lazy-imported by src/Root.tsx, so a landing visit never loads it (NFR-01).
-import { type MouseEvent, Suspense, useEffect, useRef } from "react";
-import { PageSheet } from "../components";
+import { Suspense, lazy, useEffect, useRef } from "react";
 import { AppShell } from "../shell/AppShell";
+import { ParkAuthProvider } from "../shell/auth";
+import { useParkTour } from "../shell/tour";
 import "../tokens/fonts";
 import "../tokens/park.css";
-import { type AppCtx, PAGE_LABEL } from "./AppCtx";
+import "../tokens/themes.css";
+import { themeFor } from "../tokens/themes";
+import { PAGE_LABEL } from "./AppCtx";
+import { NOT_FOUND_TITLE, NotFound } from "./NotFound";
 import "./park-app.css";
-import { ParkProvider, usePageApp } from "./context";
+import { ParkProvider, usePageApp, useSessionAuth } from "./context";
 import { PAGES } from "./pages";
-import { isHomeAddress, useParkRoute } from "./router";
+import { isHomeAddress, useParkRoute, useQuizAppRoute } from "./router";
 
-const NOT_FOUND_TITLE = "Page not found";
+const QuizPlayerPage = lazy(() =>
+  import("../pages/QuizPlayer/QuizPlayerPage").then((m) => ({ default: m.QuizPlayerPage })),
+);
 
 // The landing visit (`/`) is the Home page: its chunk request starts when the shell module is evaluated, not
 // when the page first renders. `lazy()` in the registry reuses the same module, so nothing loads twice.
 if (isHomeAddress()) void import("../pages/Home/HomePage");
-
-function NotFound({ go }: { go: AppCtx["go"] }) {
-  const open = (e: MouseEvent<HTMLAnchorElement>) => {
-    if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
-    e.preventDefault();
-    go("home");
-  };
-  return (
-    <div data-testid="park-not-found">
-      <PageSheet>
-        <h1 className="park-app__title" tabIndex={-1}>
-          {NOT_FOUND_TITLE}
-        </h1>
-        <p className="park-app__note">There is no page at this address.</p>
-        <a className="park-app__link" href="/" onClick={open}>
-          Go to Home
-        </a>
-      </PageSheet>
-    </div>
-  );
-}
 
 /** Moves focus to the page heading when the route changes, never on the first load. */
 // Suspense hides the page it is replacing with an inline `display: none` until the new chunk arrives.
@@ -85,13 +70,16 @@ function FocusHeading({ routeKey }: { routeKey: string }) {
 function Shell() {
   const app = usePageApp();
   const route = useParkRoute();
-  const title = route ? PAGE_LABEL[route.page] : NOT_FOUND_TITLE;
+  const quizRoute = useQuizAppRoute();
+  const title = route ? PAGE_LABEL[route.page] : quizRoute ? "Quiz" : NOT_FOUND_TITLE;
   // A world is a different page per id; the other pages keep focus where it is when only a query changes.
   const routeKey = route
     ? route.page === "world"
       ? `world/${route.params.id}`
       : route.page
-    : "none";
+    : quizRoute
+      ? `world/${quizRoute.worldId}/app/${quizRoute.artifactId}`
+      : "none";
   useEffect(() => {
     const before = document.title;
     document.title = `${title} · Tilo`;
@@ -100,22 +88,47 @@ function Shell() {
     };
   }, [title]);
   const Page = route ? PAGES[route.page] : null;
+  const Tour = useParkTour()?.Layer; // ONBOARD-1: the first-run welcome and tour, when the Root provides them
   return (
-    <div data-park data-time={app.time} data-motion={app.motion}>
+    <div
+      data-park
+      data-time={app.time}
+      data-motion={app.motion}
+      data-theme={themeFor(app.prefs.theme)}
+    >
       <AppShell>
         <Suspense fallback={null}>
-          {Page ? <Page app={app} /> : <NotFound go={app.go} />}
+          {Page ? (
+            <Page app={app} />
+          ) : quizRoute ? (
+            <QuizPlayerPage
+              app={app}
+              worldId={quizRoute.worldId}
+              artifactId={quizRoute.artifactId}
+            />
+          ) : (
+            <NotFound go={app.go} />
+          )}
           <FocusHeading routeKey={routeKey} />
         </Suspense>
       </AppShell>
+      {Tour ? (
+        <Suspense fallback={null}>
+          <Tour />
+        </Suspense>
+      ) : null}
     </div>
   );
 }
 
 export function ParkApp() {
+  // FR-UX-10: the account menu reads the page's real sign-in; null (no sign-in here) keeps the prototype's behaviour.
+  const auth = useSessionAuth();
   return (
     <ParkProvider>
-      <Shell />
+      <ParkAuthProvider auth={auth}>
+        <Shell />
+      </ParkAuthProvider>
     </ParkProvider>
   );
 }

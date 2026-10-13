@@ -63,6 +63,7 @@ CONFIG_SHAPES = {
 ROOT_NAMES = {
     "events/registry": "EventRegistry",
     "agents": "AgentsConfig",
+    "appspec": "AppSpec",
     "artifact": "ArtifactVersion",
     "spend_caps": "SpendCapsConfig",  # tilo_api.spend.SpendCaps is the loaded six-field value
 }

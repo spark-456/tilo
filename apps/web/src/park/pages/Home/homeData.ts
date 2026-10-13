@@ -187,7 +187,9 @@ export function liveRows(worlds: readonly World[], needs: number, served = false
     .map((w) => {
       const nd = w.st === "needs";
       const sub = nd
-        ? decisionsWaiting(needs)
+        ? needs > 0
+          ? decisionsWaiting(needs)
+          : "Needs you" // no served count: no number (BQ-UX11-1)
         : w.isNew
           ? "Starting now"
           : w.tier === "Village"
@@ -240,6 +242,9 @@ export const money = (n: number): string =>
     .replace(/\B(?=(\d{3})+(?!\d))/g, ",")}`;
 
 export interface Spend {
+  /** The month the ledger shows, as the panel's title names it ("September" for a ledger with daily spend and no
+   * period); null when the ledger holds no month (the live report is a total, not a month: HR-1). */
+  readonly month: string | null;
   readonly spent: string;
   readonly of: string;
   readonly forecast: string;
@@ -253,6 +258,7 @@ export function spendOf(ledger: Ledger): Spend {
   const pct = (n: number): number =>
     ledger.budget > 0 ? Math.round((n / ledger.budget) * 100) : 0;
   return {
+    month: ledger.period?.month ?? (ledger.daily.length > 0 ? "September" : null),
     spent: money(ledger.spent),
     of: `of ${money(ledger.budget)}`,
     forecast: `Forecast ${money(ledger.forecast)} · ${money(waiting)} waiting on you`,
@@ -295,7 +301,9 @@ export function pinDefs(
       icon: nd ? "flag" : "bolt",
       tone: nd ? "needs" : "run",
       sub: nd
-        ? `${needs} ${plural(needs, "decision needs you", "decisions need you")}`
+        ? needs > 0
+          ? `${needs} ${plural(needs, "decision needs you", "decisions need you")}`
+          : "Needs you" // no served count: no number (BQ-UX11-1)
         : served && first.prog === undefined
           ? "Running"
           : `Running · ${first.prog ?? 0}%`,

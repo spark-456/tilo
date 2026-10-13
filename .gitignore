@@ -20,6 +20,7 @@ application_default_credentials.json
 
 # Build output and caches
 dist/
+dist-e2e/
 build/
 out/
 coverage/

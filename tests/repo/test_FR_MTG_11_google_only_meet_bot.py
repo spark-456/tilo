@@ -418,7 +418,11 @@ def test_FR_MTG_11_the_dockerfile_copies_every_package_the_adapter_imports_and_t
     dockerfile = read("meet-bot/docker/Dockerfile")
     copies = re.findall(r"^COPY(?: --chown=\S+)? (\S+) (\S+)$", dockerfile, re.MULTILINE)
     sources = {src for src, _ in copies}
-    package_dirs = {"tilo_providers": "packages/providers", "tilo_contracts": "packages/contracts-py"}
+    package_dirs = {
+        "tilo_providers": "packages/providers",
+        "tilo_contracts": "packages/contracts-py",
+        "tilo_redact": "packages/redact",
+    }
     needed = {m.split(".")[0] for m, level, _ in py_imports(read(ADAPTER)) if level == 0 and m.startswith("tilo_")}
     provider_src = ROOT / "packages" / "providers" / "src" / "tilo_providers"
     for path in provider_src.glob("*.py"):  # what the provider layer imports from Tilo, transitively one hop
@@ -469,6 +473,7 @@ def test_FR_MTG_11_the_compose_build_context_is_the_repo_root_and_the_dockerigno
         "!meet-bot/docker",
         "!packages/contracts-py/src",
         "!packages/providers/src",
+        "!packages/redact/src",
         "!config/models*.yaml",
         "!config/prices*.yaml",
         "!config/speech*.yaml",
@@ -531,6 +536,6 @@ def test_FR_MTG_11_the_requirement_scan_would_catch_a_vendor_package():
 def test_FR_MTG_11_speech_and_voice_vendors_are_config_and_google_or_fake_only():
     for name in ("speech.yaml", "speech.dev.yaml", "voice.yaml", "voice.dev.yaml"):
         section = yaml.safe_load(read(f"config/{name}"))[name.split(".")[0]]
-        assert section["vendor"] in {"google", "fake"}, name
-    assert yaml.safe_load(read("config/voice.yaml"))["voice"]["vendor"] == "google"
+        assert section["vendor"] in {"google", "google-cloud-tts", "fake"}, name  # Google only (D-1)
+    assert yaml.safe_load(read("config/voice.yaml"))["voice"]["vendor"] == "google-cloud-tts"  # BQ-MTG11-13
     assert yaml.safe_load(read("config/voice.yaml"))["voice"]["voice"]  # the voice name is config, not code

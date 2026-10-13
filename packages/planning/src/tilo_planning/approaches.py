@@ -13,10 +13,12 @@ import math
 import re
 from collections.abc import Sequence
 from dataclasses import dataclass
+from datetime import date
 from typing import Annotated, Any
 
 import pydantic
 from tilo_contracts import PlanApproach
+from tilo_providers.clock import real_today, time_facts
 from tilo_providers.interfaces import Capability, GenerateRequest
 from tilo_providers.prompts import load_prompt, neutralise_marker
 from tilo_providers.router import Router, RouterError, RouterResult
@@ -133,20 +135,22 @@ def propose_approaches(
     seq: int,
     budget: float | None = None,
     gaps: Sequence[Gap] = (),
+    today: date | None = None,
 ) -> ApproachesResult:
     """`base` holds the event's v/ts/world_id/run_id/actor; the event gets `seq`. The brief goes in as data. FR-INT-15:
     the model is told its skips room (5 minus the gaps); on a usable set code puts the gap lines first in every
     approach's `skips`, so the plan names what was not done. The model never sees or writes those lines."""
     room = MAX_SKIPS - len(gaps)  # at least 2: extract_brief keeps at most MAX_GAPS (3)
     brief_text = _data(json.dumps(brief, ensure_ascii=False, indent=2), "BRIEF")
-    prompt = load_prompt(DIRECTOR_ROLE, "approaches_task.md", {"brief": brief_text, "skip_room": room})
+    facts = time_facts(today or real_today(), brief.get("deadline"))  # a calendar fact from the clock, not a guess
+    prompt = load_prompt(DIRECTOR_ROLE, "approaches_task.md", {"brief": brief_text, "skip_room": room, **facts})
     run, approaches = _ask(router, prompt, budget)
     approaches = trim_skips(approaches, room)  # over the room: cut in code, never a repair call (COST-FAST-2)
     runs = [run]
     if found := problems(approaches, skip_room=room):  # PG-07/08/09 only: one repair, then reject
         previous = _data(json.dumps({"approaches": approaches}, ensure_ascii=False, indent=2), "PREVIOUS")
         listed = _data("\n".join(f"- {p}" for p in found), "PROBLEMS")
-        variables = {"problems": listed, "brief": brief_text, "previous": previous}
+        variables = {"problems": listed, "brief": brief_text, "previous": previous, **facts}
         remaining = None if budget is None else run.budget
         run, approaches = _ask(router, load_prompt(DIRECTOR_ROLE, "approaches_repair.md", variables), remaining)
         runs.append(run)

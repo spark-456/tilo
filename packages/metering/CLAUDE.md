@@ -16,7 +16,7 @@ both on `commit` and pre-emptively in `reserve` when a reservation alone would c
   stub; tests use `tests/data/metering.stub.yaml` (PRD 14.1/14.5 demo defaults).
 
 ## Requirement IDs
-- FR-MTR-01 (part a): credit unit, dated and sourced prices from config, refuse rather than guess, no mutation API.
+- FR-MTR-01 (part a): credit unit, dated and sourced prices from config, refuse rather than guess, no mutation API. LW-05: `cached_input`, `unit_price` (units * per_1k / 1000 on top) and `valid_until` (no quote after it, no fallback to an older price).
 - FR-MTR-02, FR-MTR-04 (part b): reserve-then-commit with a 15% margin, run/user-day/org-day caps, ledger.
 - FR-MTR-04 (part c): daily USD spend soft/hard caps and the `replay_only` kill switch (NFR-24).
 

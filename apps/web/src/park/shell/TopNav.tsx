@@ -3,9 +3,10 @@
 // until the notifications are read) and the AM avatar (ringed in the hero colour on Profile and
 // Connectors). The 3px progress bar on its bottom edge follows the world loader and the page swap: it fades
 // with its opacity and fills with a scaleX (the stylesheet times both).
-import type { MouseEvent } from "react";
-import type { PageId } from "../app/AppCtx";
+import { type MouseEvent, useState } from "react";
+import { PAGE_LABEL, type PageId } from "../app/AppCtx";
 import { parkPath } from "../app/router";
+import { Menu } from "../components";
 import { SampleChip } from "./SampleChip";
 import { icon } from "./kit";
 import type { Bar } from "./motion";
@@ -46,6 +47,11 @@ export interface TopNavProps {
   onToggleTime: () => void;
   onBell: () => void;
   onAvatar: () => void;
+  contextOpen?: boolean;
+  onContext?: () => void;
+  /** QA-DEMO-1 B2: a narrow screen. The six tabs do not fit beside the tools, so one button names the current page
+   * and opens a menu of all of them. */
+  compact?: boolean;
 }
 
 export function TopNav(p: TopNavProps) {
@@ -54,6 +60,10 @@ export function TopNav(p: TopNavProps) {
     e.preventDefault();
     p.go(page);
   };
+  const [pagesOpen, setPagesOpen] = useState(false);
+  const current = TABS.find(([id]) => p.page === id || (id === "worlds" && p.page === "world"));
+  // The page's own name, also for Profile and Connectors, which have no tab.
+  const shown = current ? current[1] : p.page ? PAGE_LABEL[p.page] : "Pages";
   const timeLabel = p.night ? "Switch to day" : "Switch to night";
   const ringed = p.menu === "acct" || p.page === "profile" || p.page === "connectors";
   return (
@@ -73,26 +83,69 @@ export function TopNav(p: TopNavProps) {
           </div>
           <div className="park-shell__wordmark">tilo</div>
         </a>
-        <nav aria-label="Main" className="park-shell__tabs">
-          {TABS.map(([id, label]) => {
-            const on = p.page === id || (id === "worlds" && p.page === "world");
-            return (
-              <a
-                key={id}
-                href={parkPath(id)}
-                aria-current={on ? "page" : undefined}
-                className={`park-shell__tab ${on ? "park-shell__tab--on" : ""}`}
-                onClick={link(id)}
-              >
-                {label}
-                {id === "worlds" && p.needsLeft > 0 ? (
-                  <span className="park-shell__badge">{p.needsLeft}</span>
-                ) : null}
-              </a>
-            );
-          })}
-        </nav>
+        {p.compact ? (
+          <nav aria-label="Main" className="park-shell__pages">
+            <button
+              type="button"
+              className="park-shell__pagebtn"
+              aria-haspopup="menu"
+              aria-expanded={pagesOpen}
+              aria-label={`Pages, now on ${shown}${
+                p.needsLeft > 0
+                  ? `, ${p.needsLeft} decision${p.needsLeft === 1 ? "" : "s"} waiting`
+                  : ""
+              }`}
+              onClick={() => setPagesOpen(true)}
+            >
+              <span className="park-shell__pagelabel">{shown}</span>
+              {p.needsLeft > 0 ? <span className="park-shell__pagedot" aria-hidden="true" /> : null}
+              <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" focusable="false">
+                <path
+                  d="M2 4.5 L6 8.5 L10 4.5"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </button>
+          </nav>
+        ) : (
+          <nav aria-label="Main" className="park-shell__tabs">
+            {TABS.map(([id, label]) => {
+              const on = p.page === id || (id === "worlds" && p.page === "world");
+              return (
+                <a
+                  key={id}
+                  href={parkPath(id)}
+                  aria-current={on ? "page" : undefined}
+                  className={`park-shell__tab ${on ? "park-shell__tab--on" : ""}`}
+                  onClick={link(id)}
+                >
+                  {label}
+                  {id === "worlds" && p.needsLeft > 0 ? (
+                    <span className="park-shell__badge">{p.needsLeft}</span>
+                  ) : null}
+                </a>
+              );
+            })}
+          </nav>
+        )}
         <div className="park-shell__tools">
+          {p.onContext && (
+            <button
+              type="button"
+              className="park-shell__iconbtn"
+              aria-label="Your context"
+              title="Your context (Alt+Shift+C)"
+              aria-expanded={p.contextOpen}
+              aria-haspopup="dialog"
+              onClick={p.onContext}
+            >
+              {icon("grid", 18)}
+            </button>
+          )}
           {p.sample ? <SampleChip org={p.org} /> : p.reserveSample ? <SampleChip ghost /> : null}
           <button
             type="button"
@@ -126,6 +179,29 @@ export function TopNav(p: TopNavProps) {
           </button>
         </div>
       </header>
+      {/* Outside the header: its backdrop-filter would make a fixed panel position against the nav (B2). */}
+      {p.compact && pagesOpen ? (
+        <Menu
+          label="Pages"
+          className="park-shell__pagemenu"
+          width={240}
+          onClose={() => setPagesOpen(false)}
+          items={TABS.map(([id, label]) => {
+            const on = current?.[0] === id;
+            const waiting =
+              id === "worlds" && p.needsLeft > 0
+                ? `${p.needsLeft} decision${p.needsLeft === 1 ? "" : "s"}`
+                : "";
+            const hint = [on ? "Current page" : "", waiting].filter(Boolean).join(" · ");
+            return {
+              id,
+              label,
+              ...(hint ? { hint } : {}),
+              onSelect: () => p.go(id),
+            };
+          })}
+        />
+      ) : null}
       {/* Over the nav's bottom edge but not inside it: the nav's glass blur must not sit under a moving layer. */}
       <div
         aria-hidden="true"

@@ -5,8 +5,9 @@ stores the draft, a single T3 gate card, then the outbox sends exactly the appro
 `HostRun` is the generic `Run` with four differences: its plan is fixed, no question comes before the gate, the gate
 card says the draft's own sentence to the draft's own recipients, and after the send it records the receipt, the draft's
 `sent` revision and, when Google added no Meet link, a needs-you card. The Meet link, the title and the addresses are
-in no event, log, receipt or card but where the pins allow. `on_connection_event` abandons what a revoked grant leaves
-unsent. Deterministic code only.
+in no event, log, receipt or card but where the pins allow. `on_connection_event` abandons what a revoked or expired
+grant leaves unsent. The Google call is tilo-connectors' (ADR-0032): the run's connector is `MeetingHostStub`.
+Deterministic code only.
 """
 
 from __future__ import annotations
@@ -18,10 +19,9 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from typing import Annotated, Any
 
-from fastapi import Depends, HTTPException
+from fastapi import Depends, HTTPException, Request
 from tilo_archive import RunArchive
 from tilo_connectors import Outbox
-from tilo_connectors.adapters.meeting_host import MeetingHostAdapter
 from tilo_connectors.errors import MeetingHostConfigError, MeetingHostRefused, SideEffectRefused
 from tilo_connectors.meeting_host import (
     ACTION_TYPE,
@@ -40,7 +40,9 @@ from tilo_harness.outputs import UnitOutput
 from tilo_harness.skills import SkillRegistry
 from tilo_memory.artifacts import ArtifactStore, NewVersion, Origin, Scope
 
-from tilo_api import deps, events
+from tilo_api import deps, events, team_store
+from tilo_api.connector_rpc import PERSON_CONNECTORS
+from tilo_api.meeting_host_rpc import HostRpcError, MeetingHostRpc, MeetingHostStub
 from tilo_api.people_writes import Refusal, Writer
 from tilo_api.runs import Run, Seams, _GateFailed
 
@@ -63,11 +65,12 @@ class HostSeams:
     open_archive: Callable[..., RunArchive]
     layout_builder: Callable[..., dict]
     skills: SkillRegistry
-    broker: Any
-    transport: Any
+    host_client: MeetingHostRpc
+    team: Callable[[], Any]  # the team's settings (FR-ACC-01): the host gate checks the tool level like any run
 
 
 def get_host_seams(
+    request: Request,
     store: Annotated[deps.Store, Depends(deps.get_store)],
     writer: Annotated[deps.EventWriter, Depends(deps.get_event_writer)],
     outbox_store: Annotated[Any, Depends(deps.get_outbox_store)],
@@ -77,8 +80,7 @@ def get_host_seams(
     open_archive: Annotated[Callable[..., RunArchive], Depends(deps.get_run_archive)],
     layout_builder: Annotated[Callable[..., dict], Depends(deps.get_layout_builder)],
     skills: Annotated[SkillRegistry, Depends(deps.get_skill_registry)],
-    broker: Annotated[Any, Depends(deps.get_token_broker)],
-    transport: Annotated[Any, Depends(deps.get_meeting_host_transport)],
+    host_client: Annotated[MeetingHostRpc, Depends(deps.get_meeting_host_client)],
 ) -> HostSeams:
     return HostSeams(
         store,
@@ -90,24 +92,13 @@ def get_host_seams(
         open_archive,
         layout_builder,
         skills,
-        broker,
-        transport,
+        host_client,
+        team_store.team_reader(request.app.dependency_overrides),
     )
 
 
 def _canonical(doc: Mapping[str, Any]) -> bytes:
     return json.dumps(doc, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode("ascii")
-
-
-class _Drafts:
-    """The adapter's `ArtifactSource`: the hash-checked read of the run's own store, parsed."""
-
-    def __init__(self, artifacts: ArtifactStore, scope: Scope) -> None:
-        self._artifacts, self._scope = artifacts, scope
-
-    def get(self, artifact_id: str, version: int) -> Mapping[str, Any]:
-        doc = json.loads(self._artifacts.read(self._scope, {"artifact_id": artifact_id, "version": version}))
-        return doc if isinstance(doc, dict) else {}
 
 
 class _Receipts:
@@ -135,11 +126,6 @@ class _Receipts:
             raise SideEffectRefused("a different receipt is already stored for this send")
         self.made[(receipt.world_id, receipt.outbox_id)] = (receipt, stored.ref)
         return stored.ref
-
-    def get(self, world_id: str, meeting_id: str) -> HostReceipt | None:
-        return next(
-            (r for (w, _), (r, _ref) in self.made.items() if w == world_id and r.meeting_id == meeting_id), None
-        )
 
 
 class _DraftRunner:
@@ -187,10 +173,9 @@ class HostRun(Run):
         self.draft, self.still_hosted = draft, still_hosted
         scope = Scope(deps.ORG_ID, task.world_id, task.owner)
         self.receipts = _Receipts(seams.artifacts, scope, task.run_id)
-        adapter = MeetingHostAdapter(  # built per run from the two Google seams and this run's own store
-            declaration=seams.registry.get(CONNECTOR_ID), broker=seams.broker, transport=seams.transport,
-            artifacts=_Drafts(seams.artifacts, scope), owner_of=lambda world_id: seams.store.worlds[world_id].owner,
-            receipts=self.receipts, clock=events.now, emit=lambda part: None, sleep=lambda seconds: None,
+        self.stub = MeetingHostStub(  # the Google call is connectors' (ADR-0032); this run keeps the draft and receipts
+            seams.host_client, lambda ref: seams.artifacts.read(scope, ref),
+            self._part_sink, self.receipts.put,
         )  # fmt: skip
 
         def resolver(**_: Any) -> dict:  # step 5 of the gate: the draft's own list, never the address book
@@ -198,8 +183,8 @@ class HostRun(Run):
 
         run_seams = Seams(
             _no_director, seams.layout_builder, _DraftRunner(draft), resolver, seams.skills, seams.registry,
-            {CONNECTOR_ID: adapter}, seams.outbox_store, seams.writer, {}, seams.artifacts, seams.redactor,
-            seams.open_archive,
+            {CONNECTOR_ID: self.stub}, seams.outbox_store, seams.writer, {}, seams.artifacts, seams.redactor,
+            seams.open_archive, seams.team,
         )  # fmt: skip
         super().__init__(seams.store, task, {}, _CAP, run_seams)
         self.unit: dict[str, Any] = {}
@@ -208,11 +193,20 @@ class HostRun(Run):
     def _compile(self, context: Any) -> dict:
         return _plan()
 
+    _alert_summary = "A person must check whether the invitation went out."
+
+    def _keeps_ambiguous(self, entry: Mapping[str, Any]) -> bool:
+        return True
+
     def _must_ask(self, config: Any) -> None:
         return None  # the owner's own request replaces the "go ahead?" question; the gate card is the one authorisation
 
-    def _exact(self, connector: str, action: str, destination: str, recipients: list[str]) -> str:
-        return self.draft.exact if action == ACTION_TYPE else super()._exact(connector, action, destination, recipients)
+    def _exact(
+        self, connector: str, action: str, destination: str | None, recipients: list[str], line: str | None = None
+    ) -> str:
+        if action == ACTION_TYPE:
+            return self.draft.exact
+        return super()._exact(connector, action, destination, recipients, line)
 
     async def gate(self, unit: dict, worker: str, action: str, ref: dict, made: str) -> None:
         self.unit, self.worker = unit, worker
@@ -237,7 +231,12 @@ class HostRun(Run):
             ok = False  # fail closed
         if not ok:
             raise _GateFailed("the meeting changed or was deleted, so nothing was sent")
-        transfer = await super()._send(entry, evidence)
+        try:
+            transfer = await super()._send(entry, evidence)
+        except _GateFailed:
+            if self._may_have_sent(entry["id"]):  # the world says what it knows, not that nothing was sent
+                raise _GateFailed("the invitation may have gone out; check the host calendar") from None
+            raise
         try:
             self._after_send(entry, transfer)
         except Exception as exc:  # the invitation went out; the run says so plainly
@@ -320,6 +319,10 @@ def host_meeting(w: Writer, meeting_id: str, seams: HostSeams) -> dict[str, Any]
         draft = draft_meeting_event(meeting=meeting, persons=persons, actor=w.actor, now=w.now, config=config)
     except MeetingHostRefused as exc:
         raise Refusal(422, str(exc), rule=exc.rule) from None
+    try:  # ADR-0032 decision 8: no gate card is raised that could never send
+        seams.host_client.status(w.actor)
+    except HostRpcError:
+        raise HTTPException(status_code=503, detail="not_configured") from None
     task = deps.TaskRecord(
         owner=w.actor, world_id=world_id, run_id=world.run_id, draft={}, brief={}, questions=[], next_seq=1
     )
@@ -348,29 +351,57 @@ def host_meeting(w: Writer, meeting_id: str, seams: HostSeams) -> dict[str, Any]
     return {"world_id": world_id}
 
 
-def on_connection_event(part: Mapping[str, Any], *, outbox_store: Any) -> int:
-    """The token broker's `emit` sink. A revoked `meeting_host` grant abandons every unsent entry of that person's
-    (`authz.ref`), so a reconnect later sends nothing for it. Returns how many it abandoned; an entry a live lease holds
-    stays for the next event; any other or malformed part does nothing."""
-    try:
-        if part["type"] != "connection.revoked" or part["data"]["connector"] != CONNECTOR_ID:
-            return 0
-        user = part["user_id"]
-        unsent = [
-            e for e in outbox_store.all_entries()
-            if e["connector"] == CONNECTOR_ID and e["state"] in _UNSENT and (e.get("authz") or {}).get("ref") == user
-        ]  # fmt: skip
-    except Exception:  # a malformed part or a store that cannot be read: nothing is abandoned, nothing is raised
-        return 0
+def abandon_unsent(user: str, outbox_store: Any, owner_of: Callable[[str], str | None] | None = None) -> int:
+    """Abandons every unsent entry of `user`'s and returns how many: without `owner_of` the `meeting_host` entries whose
+    approval is `user`'s (`authz.ref`); with `owner_of(world_id)` the person connectors' (gmail, google_drive,
+    google_calendar) entries in a world `user` owns, since the owner's grant is the one they use (ADR-0035 decision 5;
+    one shared grant, so any of the three revoked abandons all three; an entry whose world cannot be read is skipped,
+    its id logged, unless `user` approved it). A store that cannot be listed raises (the caller decides). An entry that
+    may have gone out (ambiguous, or an expired unreleased lease) is never touched; one a live lease holds
+    (`OutboxRefused`) or whose own write fails stays for the next call."""
+
+    def mine(entry: Mapping[str, Any]) -> bool:
+        if owner_of is not None:
+            if entry["connector"] not in PERSON_CONNECTORS:
+                return False
+            try:
+                return owner_of(entry["world_id"]) == user
+            except (
+                Exception
+            ):  # one unreadable world never blocks everyone's disconnect; its approver's own entry still goes
+                logger.warning("outbox entry %s: its world could not be read", entry["id"])
+                return (entry.get("authz") or {}).get("ref") == user
+        return entry["connector"] == CONNECTOR_ID and (entry.get("authz") or {}).get("ref") == user
+
+    unsent = [e for e in outbox_store.all_entries() if e["state"] in _UNSENT and mine(e)]
     abandoned = 0
     for entry in unsent:
         try:
             if outbox_store.retry_state(entry["id"]).get("ambiguous"):
                 continue  # it may have gone out: it stays for the alert path, never marked failed
             Outbox(outbox_store, {}, emit=lambda part: None, clock=events.now, world_id=entry["world_id"]).abandon(
-                entry["id"]
+                entry["id"], keep_ambiguous=True
             )
             abandoned += 1
         except Exception:  # a live lease (OutboxRefused) or a store error: the next event asks again
             continue
     return abandoned
+
+
+def on_connection_event(
+    part: Mapping[str, Any], *, outbox_store: Any, owner_of: Callable[[str], str | None] | None = None
+) -> int:
+    """The connection sink. A revoked or expired `meeting_host` grant abandons every unsent entry of that person's
+    (`authz.ref`); a person connector's does the same for the entries of the worlds they own (`owner_of`). Returns how
+    many it abandoned; an entry a live lease holds stays for the next event; any other or malformed part does
+    nothing."""
+    try:
+        if part["type"] not in ("connection.revoked", "connection.expired"):
+            return 0
+        if part["data"]["connector"] == CONNECTOR_ID:
+            return abandon_unsent(part["user_id"], outbox_store)
+        if part["data"]["connector"] in PERSON_CONNECTORS and owner_of is not None:
+            return abandon_unsent(part["user_id"], outbox_store, owner_of)
+        return 0
+    except Exception:  # a malformed part or a store that cannot be read: nothing is abandoned, nothing is raised
+        return 0

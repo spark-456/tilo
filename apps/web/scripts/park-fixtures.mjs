@@ -51,9 +51,18 @@ const ADDITIVE = {
       approvedTitle: "You sent the supplier brief",
     },
   },
+  connectors: {
+    slack: {
+      channels: ["#ops", "#k1-firmware"],
+    },
+  },
 };
 const withAdditive = (member, value) =>
-  member === "decisions" ? value.map((d) => ({ ...d, ...ADDITIVE.decisions[d.k] })) : value;
+  member === "decisions"
+    ? value.map((d) => ({ ...d, ...ADDITIVE.decisions[d.k] }))
+    : member === "connectors"
+      ? value.map((c) => (ADDITIVE.connectors[c.id] ? { ...c, ...ADDITIVE.connectors[c.id] } : c))
+      : value;
 
 for (const [file, members] of Object.entries(FILES)) {
   const names = [...new Set(members.flatMap(([, type]) => type.match(/[A-Z]\w+/g)))]

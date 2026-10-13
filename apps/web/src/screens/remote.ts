@@ -2,12 +2,19 @@
 // error rule: what happened, what Tilo did, what is next). Nothing here ever rejects unhandled
 // or logs to the console.
 import { useCallback, useEffect, useRef, useState } from "react";
-import { TiloApiError } from "../api/http";
+import { describeError } from "../api/describeError";
+import { TiloApiError, isLifetimeCap } from "../api/http";
 import { useNavigate } from "../router";
 
 export type Remote<T> =
   | { readonly status: "loading" }
-  | { readonly status: "error"; readonly message: string; readonly replayOnly?: boolean }
+  | {
+      readonly status: "error";
+      readonly message: string;
+      readonly replayOnly?: boolean;
+      /** SEC-16: the failure is the lifetime allowance (403 `spend_cap_reached`): the pop-up replaces the error. */
+      readonly lifetimeCap?: boolean;
+    }
   | { readonly status: "ready"; readonly value: T };
 
 /** UX-2 / PRD 18.2: the 120 ms press. Busy feedback is held at least this long. */
@@ -17,16 +24,7 @@ export const PRESS_MS = 120;
 export const isReplayOnly = (error: unknown): boolean =>
   error instanceof TiloApiError && error.replayOnly;
 
-export function describeError(doing: string, error: unknown): string {
-  // PRD 18.4, say only what is known: a timeout, a dropped connection or a 5xx on a write may have
-  // happened on the server, so "Nothing was changed" is not true and the person checks first.
-  if (error instanceof TiloApiError && error.retryable && error.write) {
-    return `Something went wrong while trying to ${doing}. We could not confirm it. Check before trying again.`;
-  }
-  const said = error instanceof Error && error.message ? error.message : "an unknown error";
-  const reason = said.replace(/[.!?]+$/, ""); // the sentence below adds its own full stop
-  return `Could not ${doing}: ${reason}. Nothing was changed. You can try again.`;
-}
+export { describeError }; // moved to api/ so the Park forms share it
 
 /** Runs `load` on mount and on every retry; its signal aborts when the screen unmounts or reloads. While `enabled` is false nothing is requested and the
  * state stays "loading" (a call that can only fail until something is on record, such as the
@@ -56,6 +54,7 @@ export function useRemote<T>(
             status: "error",
             message: describeError(doing, e),
             replayOnly: isReplayOnly(e),
+            lifetimeCap: isLifetimeCap(e),
           }),
       );
     return () => {
@@ -71,6 +70,8 @@ export interface Action {
   readonly error: string | null;
   /** The failed start was the replay-only label: show the banner, not `error`. */
   readonly replayOnly?: boolean;
+  /** SEC-16: the failed start was the lifetime allowance: show the pop-up, not `error`. */
+  readonly lifetimeCap?: boolean;
   readonly go: () => void;
 }
 
@@ -81,6 +82,7 @@ export function useAction(doing: string, run: () => Promise<string | null>): Act
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [replayOnly, setReplayOnly] = useState(false);
+  const [lifetimeCap, setLifetimeCap] = useState(false);
   const busyRef = useRef(false);
   const live = useRef(true);
   useEffect(() => {
@@ -98,6 +100,7 @@ export function useAction(doing: string, run: () => Promise<string | null>): Act
     setBusy(true);
     setError(null);
     setReplayOnly(false);
+    setLifetimeCap(false);
     const hold = new Promise<void>((resolve) => setTimeout(resolve, PRESS_MS));
     // Failure waits out the press too, so the busy feedback is never a flicker.
     const outcome = Promise.resolve()
@@ -120,8 +123,9 @@ export function useAction(doing: string, run: () => Promise<string | null>): Act
       setBusy(false);
       setError(describeError(doing, result.e));
       setReplayOnly(isReplayOnly(result.e));
+      setLifetimeCap(isLifetimeCap(result.e));
     });
   }, [doing, navigate]);
 
-  return { busy, error, replayOnly, go };
+  return { busy, error, replayOnly, lifetimeCap, go };
 }

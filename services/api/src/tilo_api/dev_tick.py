@@ -78,6 +78,7 @@ def _refuse_real_store() -> None:
 
 @router.post("/dev/schedules/tick", dependencies=[Depends(_json_only)])
 def dev_tick(
+    request: Request,
     schedule_store: Annotated[Any, Depends(schedules.get_schedule_store_factory)],
     seams_factory: Annotated[Any, Depends(schedules.get_seams_factory)],
     flags: schedules.Flags,
@@ -98,7 +99,8 @@ def dev_tick(
     )
     if isinstance(fanned, JSONResponse):
         return fanned
-    delivery = Request({"type": "http", "headers": [(b"content-type", b"application/json")]})
+    # the app rides in the scope: `_run_task` reads `request.app.dependency_overrides` for the stores it wires
+    delivery = Request({"type": "http", "headers": [(b"content-type", b"application/json")], "app": request.app})
     ran: list[Any] = []
     for task in tasks.tasks:  # one task failing never loses the slots after it
         try:
