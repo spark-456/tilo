@@ -43,6 +43,11 @@ ACTION = "org_model_key_change"  # config/autonomy.yaml, pinned T3
 FRESH_S = 600  # BK-06: a sign-in older than 10 minutes cannot widen
 _KEY = re.compile(r"[A-Za-z0-9_\-.~+/=]{8,512}")  # a bearer token's characters: JSON, spaces and quotes never match
 _PROJECT = re.compile(r"[a-z][a-z0-9-]{4,28}[a-z0-9]")
+# SEC-REVIEW-29 B1. A `google_vertex_iam` bundle is the org's own Vertex project reached by Tilo's service identity,
+# so a project the owner types could be Tilo's own (Tilo-billed spend that SEC-16 never sees). Nothing proves a
+# project is the org's yet (BQ-BYOK-2 is open; the grant check is BYOK-4/6), so the route refuses the bundle. Only
+# that ticket flips it.
+VERTEX_GRANT_CHECKED = False
 router = APIRouter(route_class=_PeopleRoute)
 
 
@@ -232,6 +237,8 @@ def _widening(store: OrgKeyStore, who: Actor, config: ByokConfig, confirm: bool 
 def _mode(bundle: OrgBundle, body: PutIn) -> str:
     """BQ-BYOK-2: an API key is a secret; Vertex IAM takes a project and never a key."""
     if bundle.kind == "google_vertex_iam":
+        if not VERTEX_GRANT_CHECKED:  # SEC-REVIEW-29 B1: refused before any act is counted or any vault is asked
+            raise Refusal(422, "key_refused", code="key_refused")
         if body.key is not None or body.project_id is None or not _PROJECT.fullmatch(body.project_id):
             raise Refusal(422, "key_refused", code="key_refused")
         return "vertex_iam"
@@ -298,6 +305,10 @@ def change_settings(
     changes: dict[str, Any] = {}
     widening = False
     if body.paused is not None and body.paused != (held.status == "paused"):
+        if (
+            body.paused and held.status != "active"
+        ):  # B2: only a verified key is paused, so a resume restores a verified one
+            raise Refusal(422, "invalid_body", code="invalid_body")
         changes["status"] = "paused" if body.paused else "active"
         widening |= not body.paused
     if body.day_cap_credits is not None:
@@ -311,8 +322,6 @@ def change_settings(
     if widening:
         fresh_owner(who)
         _widening(store, who, config, body.confirm, body.consent_version)
-    if changes.get("status") == "active" and held.status not in ("paused",):
-        changes.pop("status")  # a resume only undoes a pause: an unverified or invalid key is never made active here
     updated = held.bumped(**changes, consent_version=body.consent_version if widening else held.consent_version)
     try:
         stored = store.cas(who.org, updated, expected_rev=held.rev)
