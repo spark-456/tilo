@@ -19,7 +19,9 @@ for (const route of ["worlds", "agenda", "team"]) {
       await target.scrollIntoViewIfNeeded();
       const result = await target.evaluate((element) => {
         const box = element.getBoundingClientRect();
-        const primary = element.matches(".park-btn--primary");
+        const primary = element.matches(
+          ".park-btn--primary, .park-worlds-new, .park-worlds-dec__yes, .park-agenda-accept, .park-agenda-pinit, .park-agenda-addbtn",
+        );
         return {
           name:
             element.getAttribute("aria-label") ?? element.textContent?.trim() ?? element.tagName,

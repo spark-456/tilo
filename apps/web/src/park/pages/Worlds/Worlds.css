@@ -63,6 +63,7 @@
   outline-offset: 2px;
 }
 [data-park] .park-worlds-search__input {
+  min-height: 24px;
   flex: 1;
   min-width: 0;
   border: 0;
@@ -692,6 +693,23 @@
   border-radius: 16px;
   background: var(--paper);
   color: var(--ink);
+}
+
+/* UI-10 W19: keep text controls tappable independently of their surrounding panel. */
+[data-park] .park-worlds-routines a,
+[data-park] .park-worlds-routines button {
+  display: inline-flex;
+  align-items: center;
+  min-width: 24px;
+  min-height: 24px;
+}
+
+@media (max-width: 600px) {
+  [data-park] .park-worlds-new,
+  [data-park] .park-worlds-dec__yes {
+    min-width: 44px;
+    min-height: 44px;
+  }
 }
 
 /* ---- Share to Slack (FR-UX-17) ---- */
