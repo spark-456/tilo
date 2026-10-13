@@ -27,6 +27,7 @@ const ROOT_PAGES = new Set<string>([
   "profile",
 ]);
 const ROOT_WORLD = /^\/world\/[^/]+\/?$/;
+const ROOT_WORLD_APP = /^\/(?:park\/)?world\/([^/]+)\/app\/([^/]+)\/?$/;
 
 /**
  * The live stage (S-04) of a world: an old-app address next to the Park pages (`/world/:id` is the Park overview).
@@ -40,7 +41,7 @@ export const stagePath = (worldId: string): string => `/world/${encodeURICompone
  */
 export function isParkPath(pathname: string): boolean {
   if (pathname === "/park" || pathname.startsWith("/park/") || pathname === "/") return true;
-  if (ROOT_WORLD.test(pathname)) return true;
+  if (ROOT_WORLD.test(pathname) || ROOT_WORLD_APP.test(pathname)) return true;
   const m = /^\/([^/]+)\/?$/.exec(pathname);
   return m?.[1] !== undefined && ROOT_PAGES.has(m[1]);
 }
@@ -117,5 +118,28 @@ export function useParkRoute(): ParkRoute | null {
   return useMemo(() => {
     const q = url.indexOf("?");
     return q < 0 ? parseParkPath(url, "") : parseParkPath(url.slice(0, q), url.slice(q));
+  }, [url]);
+}
+
+export interface QuizAppRoute {
+  readonly worldId: string;
+  readonly artifactId: string;
+}
+
+export function parseQuizAppPath(pathname: string): QuizAppRoute | null {
+  const m = ROOT_WORLD_APP.exec(pathname);
+  if (!m?.[1] || !m?.[2]) return null;
+  const worldId = decodeSegment(m[1]);
+  const artifactId = decodeSegment(m[2]);
+  if (!worldId || !artifactId) return null;
+  return { worldId, artifactId };
+}
+
+export function useQuizAppRoute(): QuizAppRoute | null {
+  const url = useSyncExternalStore(subscribe, snapshot);
+  return useMemo(() => {
+    const q = url.indexOf("?");
+    const pathname = q < 0 ? url : url.slice(0, q);
+    return parseQuizAppPath(pathname);
   }, [url]);
 }

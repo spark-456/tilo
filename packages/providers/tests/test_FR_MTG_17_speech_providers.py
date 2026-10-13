@@ -286,8 +286,11 @@ def test_FR_MTG_17_no_non_google_speech_dependency_in_any_pyproject():
 
 
 def test_FR_MTG_17_only_google_fake_and_replay_speech_providers_exist():
+    import tilo_providers.cloud_tts_adapter  # noqa: F401
+    import tilo_providers.gemini_live_voice_adapter  # noqa: F401
     import tilo_providers.google_speech_adapter  # noqa: F401
     import tilo_providers.speech  # noqa: F401
+    import tilo_providers.voice  # noqa: F401
 
     def walk(cls: type) -> set[type]:
         return {cls}.union(*(walk(sub) for sub in cls.__subclasses__()))
@@ -299,4 +302,6 @@ def test_FR_MTG_17_only_google_fake_and_replay_speech_providers_exist():
         "SpeechRecordReplayProvider",
         "GoogleSpeechProvider",
         "GoogleVoiceProvider",  # FR-MTG-11: Gemini speech output behind the live switch (tilo_providers.voice)
+        "GoogleCloudTTSProvider",  # FR-MTG-11: Cloud TTS Chirp 3 HD, streamed (tilo_providers.cloud_tts_adapter)
+        "GeminiLiveVoiceProvider",  # FR-MTG-11 (M2): optional Gemini Live voice, flagged off (own adapter module)
     }

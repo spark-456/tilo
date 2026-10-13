@@ -1,0 +1,10 @@
+{
+  "views": [
+    {
+      "connector": "gmail",
+      "state": "connected",
+      "scopes": ["openid email"],
+      "connected_at": "2026-10-08T09:30:00.000Z"
+    }
+  ]
+}

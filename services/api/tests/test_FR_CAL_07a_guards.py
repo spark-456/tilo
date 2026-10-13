@@ -36,6 +36,7 @@ from _ppl11b_lib import (
     plate_s1,
     principal,
     run_answer,
+    unwire_plate_sources,
 )
 from _ppl11b_lib import rig_factory as rig_factory  # noqa: PLC0414  (the fixture)
 from tilo_api.assistant.gate import Ref
@@ -183,7 +184,7 @@ def test_FR_CAL_07_guard_open_the_3pm_one_is_still_a_question_for_the_model_not_
 # --------------------------------------------------------------------------------------------- failure and static
 @pytest.mark.parametrize("question", ["What is on my calendar today?", "What should I prepare for the 3pm?"])
 def test_FR_CAL_07_guard_a_failing_plate_source_is_a_failed_answer_an_email_principal_403_an_unwired_seam_503(
-    rig_factory, question
+    rig_factory, question, monkeypatch
 ):
     rig = rig_factory(world=cal_world(keep_plan=True))
 
@@ -208,6 +209,7 @@ def test_FR_CAL_07_guard_a_failing_plate_source_is_a_failed_answer_an_email_prin
     assert refused.status_code == 403 and refused.json() == {"error": "channel"}
     rig.set_principal(principal(SAM))
     rig.unwire("get_plate_source")
+    unwire_plate_sources(monkeypatch)  # the sources under it now read the store (PEOPLE-SEAMS-1): unwired on purpose
     unwired = rig.ask(question)
     assert unwired.status_code == 503 and unwired.json() == {"detail": "not_configured"}
 

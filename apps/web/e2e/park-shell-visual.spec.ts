@@ -643,17 +643,14 @@ for (const [name, viewport] of Object.entries(SIZES)) {
 test.describe("park shell at 390 wide", () => {
   test.use({ viewport: MOBILE });
 
-  test("WEB_3b_e2e_mobile_the_tab_strip_scrolls_sideways_inside_the_nav", async ({ page }) => {
+  test("WEB_3b_e2e_mobile_the_tabs_are_one_page_menu_inside_the_nav", async ({ page }) => {
     await open(page, "/");
-    const css = await nav(page)
-      .locator("nav")
-      .evaluate((el) => ({
-        overflowX: getComputedStyle(el).overflowX,
-        scroll: el.scrollWidth,
-        client: el.clientWidth,
-      }));
-    expect(css.overflowX).toBe("auto");
-    expect(css.scroll).toBeGreaterThan(css.client); // six tabs do not fit the strip at 390
+    // QA-DEMO-1 B2: six tabs do not fit beside the tools at 390, so one button names the page and opens the menu
+    const button = nav(page).locator("button.park-shell__pagebtn");
+    await expect(button).toContainText("Home");
+    await expect(nav(page).locator("nav a")).toHaveCount(0);
+    await button.click();
+    await expect(page.getByRole("menuitem")).toHaveCount(6);
     const bar = await box(nav(page));
     expect(bar.x + bar.width).toBe(MOBILE.width - 16);
   });

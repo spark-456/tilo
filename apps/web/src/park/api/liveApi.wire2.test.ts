@@ -384,7 +384,28 @@ describe("WIRE_2_live_api: nothing else is connected", () => {
     const api = createLiveApi({ baseUrl: BASE, fetch: asFetch(fetchSpy) });
     const args = callTable();
     for (const m of API_METHODS.filter(
-      (x) => !["getLedger", "getWorlds", "getDecisions", "decide", "startWorld"].includes(x),
+      (x) =>
+        ![
+          "getLedger",
+          "getWorlds",
+          "getDecisions",
+          "decide",
+          "startWorld",
+          "getConnectors",
+          "getNotifications",
+          "getTeam",
+          "getAgenda",
+          "submitFeedback",
+          "getProfileSettings",
+          "getSkills",
+          "getLearn",
+          "saveSkill",
+          "captureSkill",
+          "proposeVersion",
+          "setPref",
+          "getUserSettings",
+          "saveUserSettings",
+        ].includes(x),
     )) {
       const err = await Promise.resolve(invoke(api, m, args)).then(
         (value) => ({ resolved: value }),

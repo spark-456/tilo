@@ -29,8 +29,15 @@ variable "services" {
     vpc_egress = optional(string)
     # true: Terraform ignores the container env of this service (runtime
     # settings are set with `gcloud run services update`, docs/routines-rollout.md).
-    # Only tilo-api; every other service has its env fully managed.
-    ignore_env = optional(bool, false)
+    # tilo-api and tilo-connectors; every other service has its env fully managed.
+    ignore_env          = optional(bool, false)
+    cpu                 = optional(string, "1")
+    memory              = optional(string, "512Mi")
+    timeout             = optional(string)
+    request_concurrency = optional(number)
+    # false keeps CPU allocated between requests (background work); the
+    # default is request-based billing (PRD 6.6).
+    cpu_idle = optional(bool, true)
   }))
 }
 

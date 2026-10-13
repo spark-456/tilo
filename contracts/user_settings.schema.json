@@ -1,0 +1,171 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.tilo.example/user_settings.schema.json",
+  "x-version": "1.0.0",
+  "title": "UserSettings",
+  "description": "One person's saved profile and notification preferences (FR-SET-01, FR-SET-02, ADR-0039), stored and served by tilo-api for the verified principal only, keyed by org and user; no request names another person's. A document with version 0 is the server's unsaved defaults, never a stored record, and its updated_at is null. version counts saved writes: a write carries the version it read and is refused as stale when it is not the stored one (USET-02). Every object is closed, so an unknown field is refused. Profile email and the rest of the profile are display data: they change no sign-in identity, verified destination, directory record or connector grant (USET-06). Preferences authorise nothing and start no work (USET-07). Rules USET-01 to USET-08 are in user_settings.rules.md. $defs update is the request body of a write.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "owner_id",
+    "org_id",
+    "version",
+    "profile",
+    "notifications",
+    "quiet_hours",
+    "updated_at"
+  ],
+  "properties": {
+    "owner_id": { "$ref": "common.schema.json#/$defs/user_id" },
+    "org_id": { "$ref": "common.schema.json#/$defs/org_id" },
+    "version": { "type": "integer", "minimum": 0, "maximum": 1000000 },
+    "profile": { "$ref": "#/$defs/profile" },
+    "notifications": { "$ref": "#/$defs/notifications" },
+    "quiet_hours": { "$ref": "#/$defs/quiet_hours" },
+    "updated_at": {
+      "anyOf": [{ "$ref": "common.schema.json#/$defs/timestamp" }, { "type": "null" }]
+    }
+  },
+  "if": { "properties": { "version": { "const": 0 } }, "required": ["version"] },
+  "then": { "properties": { "updated_at": { "type": "null" } } },
+  "else": { "properties": { "updated_at": { "$ref": "common.schema.json#/$defs/timestamp" } } },
+  "$defs": {
+    "line": {
+      "description": "One line typed by a person, 1 to 80 characters: data, never an instruction.",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 80,
+      "pattern": "^[^\\u0000-\\u001F\\u007F]+$",
+      "not": { "pattern": "[\\n\\r]" }
+    },
+    "email": {
+      "description": "A display address, at most 254 characters, with one @ and a dotted host. It is not verified and is never a recipient (USET-06).",
+      "type": "string",
+      "maxLength": 254,
+      "pattern": "^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$",
+      "not": { "pattern": "\\n" }
+    },
+    "time_zone": {
+      "description": "An IANA time zone name (Asia/Kolkata) or UTC, in the same shape as person.time_zone. The schema checks the shape; tilo-api also refuses a name the zone database does not know (USET-03).",
+      "type": "string",
+      "maxLength": 64,
+      "pattern": "^(UTC|[A-Z][A-Za-z_+-]*(/[A-Za-z0-9_+-]+){1,2})$",
+      "not": { "pattern": "\\n" }
+    },
+    "language": {
+      "description": "A BCP 47 language tag of the drafts Tilo writes for the person: language, an optional four-letter script and an optional two-letter region (en, en-GB, zh-Hans-CN). A display name such as English (UK) is the client's label, never stored.",
+      "type": "string",
+      "maxLength": 16,
+      "pattern": "^[a-z]{2,3}(-[A-Z][a-z]{3})?(-[A-Z]{2})?$",
+      "not": { "pattern": "\\n" }
+    },
+    "clock": {
+      "description": "A wall-clock time, HH:MM on a 24-hour clock, 00:00 to 23:59, in the zone of the object that holds it.",
+      "type": "string",
+      "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9]$",
+      "not": { "pattern": "\\n" }
+    },
+    "weekday": { "type": "string", "enum": ["mon", "tue", "wed", "thu", "fri", "sat", "sun"] },
+    "working_hours": {
+      "description": "The days and the window Tilo books inside, in profile.time_zone. start is inclusive, end exclusive, and start is before end: no overnight window (USET-03, as config/personal.yaml working_window).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["days", "start", "end"],
+      "properties": {
+        "days": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 7,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/weekday" }
+        },
+        "start": { "$ref": "#/$defs/clock" },
+        "end": { "$ref": "#/$defs/clock" }
+      }
+    },
+    "profile": {
+      "description": "FR-SET-01. The title is null when the person has none.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "email", "title", "time_zone", "language", "working_hours"],
+      "properties": {
+        "name": { "$ref": "#/$defs/line" },
+        "email": { "$ref": "#/$defs/email" },
+        "title": { "anyOf": [{ "$ref": "#/$defs/line" }, { "type": "null" }] },
+        "time_zone": { "$ref": "#/$defs/time_zone" },
+        "language": { "$ref": "#/$defs/language" },
+        "working_hours": { "$ref": "#/$defs/working_hours" }
+      }
+    },
+    "channels": {
+      "description": "Whether one kind of notice reaches the person by phone, email and Slack. Saving a choice verifies no channel and proves no delivery.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["phone", "email", "slack"],
+      "properties": {
+        "phone": { "type": "boolean" },
+        "email": { "type": "boolean" },
+        "slack": { "type": "boolean" }
+      }
+    },
+    "decision_channels": {
+      "$ref": "#/$defs/channels",
+      "not": {
+        "properties": {
+          "phone": { "const": false },
+          "email": { "const": false },
+          "slack": { "const": false }
+        },
+        "required": ["phone", "email", "slack"]
+      }
+    },
+    "notifications": {
+      "description": "FR-SET-02: the matrix, one row for each kind of notice. The decisions row keeps at least one channel on (USET-04): the rule is in the schema, so a client that skips its own guard is refused. Any other row may be all off.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["decisions", "spend", "finished", "digest", "weekly"],
+      "properties": {
+        "decisions": { "$ref": "#/$defs/decision_channels" },
+        "spend": { "$ref": "#/$defs/channels" },
+        "finished": { "$ref": "#/$defs/channels" },
+        "digest": { "$ref": "#/$defs/channels" },
+        "weekly": { "$ref": "#/$defs/channels" }
+      }
+    },
+    "money": {
+      "description": "An amount in the minor unit of its currency (paise, pence, cents): an integer from 1 to 1000000000000, never a float, a bool or a string with a symbol. currency is an ISO 4217 code; tilo-api refuses a code it has no minor unit for (USET-03).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["amount_minor", "currency"],
+      "properties": {
+        "amount_minor": { "type": "integer", "minimum": 1, "maximum": 1000000000000 },
+        "currency": { "type": "string", "pattern": "^[A-Z]{3}$", "not": { "pattern": "\\n" } }
+      }
+    },
+    "quiet_hours": {
+      "description": "FR-SET-02 and FR-HIL-13, in the shape tilo_channels.quiet_hours.parse_quiet_hours already reads. During the window only gate and blocked notices notify; this object has no field that could hide a gate (USET-05). start and end are in timezone, the window may cross midnight, and start is never end (USET-03). threshold is typed money or null; nothing delivers by it in this release (USET-05).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["enabled", "start", "end", "timezone", "threshold"],
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "start": { "$ref": "#/$defs/clock" },
+        "end": { "$ref": "#/$defs/clock" },
+        "timezone": { "$ref": "#/$defs/time_zone" },
+        "threshold": { "anyOf": [{ "$ref": "#/$defs/money" }, { "type": "null" }] }
+      }
+    },
+    "update": {
+      "description": "The body of PUT /v1/me/settings: the whole document except what the server owns. version is the one the client read (0 when nothing was saved yet). It names no owner or org: they come from the verified principal, so a body that carries one, or updated_at, is refused (USET-01).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["version", "profile", "notifications", "quiet_hours"],
+      "properties": {
+        "version": { "type": "integer", "minimum": 0, "maximum": 1000000 },
+        "profile": { "$ref": "#/$defs/profile" },
+        "notifications": { "$ref": "#/$defs/notifications" },
+        "quiet_hours": { "$ref": "#/$defs/quiet_hours" }
+      }
+    }
+  }
+}

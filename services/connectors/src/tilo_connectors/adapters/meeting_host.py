@@ -9,11 +9,12 @@ conference status: the Meet link is stored nowhere (FR-MTG-01). No log line; mes
 
 from __future__ import annotations
 
+import re
 from collections.abc import Callable, Mapping
 from typing import Any
 
 from .._time import parse_ts
-from ..errors import AdapterError, PossiblySent, SideEffectRefused
+from ..errors import AdapterError, MeetingHostRefused, PossiblySent, ProviderUnavailable, RateLimited, SideEffectRefused
 from ..meeting_host import (
     ACTION_TYPE,
     CALENDAR_EVENTS_OWNED,
@@ -24,13 +25,44 @@ from ..meeting_host import (
     ReceiptStore,
 )
 from ..outbox import Grant
+from ..tokens import GrantPredatesApproval
 from ._google import GoogleAdapter, side_effect_marker
 from ._transport import ArtifactSource
 
 EVENTS_URL = "https://www.googleapis.com/calendar/v3/calendars/primary/events"
 EVENT_FIELDS = "id,status,conferenceData(createRequest(status(statusCode)))"  # never hangoutLink
+JOIN_FIELDS = "status,hangoutLink"
+JOIN_LINK = re.compile(r"https://meet\.google\.com/[a-z]{3}-[a-z]{4}-[a-z]{3}")
 _CONFERENCE_STATUSES = ("pending", "success", "failure")
 _DRAFT_TEXT_KEYS = ("meeting_id", "owner", "title", "start", "end", "time_zone")
+
+
+class ApprovalBoundBroker:
+    """What the adapter sees of the broker when tilo-api sends (ADR-0032 HB-06): every token fetch carries the
+    approval's own time as `not_before`, so a grant made after the approval is refused in the broker's own locked
+    step (`GrantPredatesApproval` becomes a final `SideEffectRefused`), and a user whose disconnect has begun gets
+    no token at all. Refusing is final: the entry fails, and nothing was sent."""
+
+    def __init__(self, broker: Any, *, approved_at: str, stopped: Callable[[str], bool]) -> None:
+        self._broker, self._approved_at, self._stopped = broker, approved_at, stopped
+
+    def access_token_for_adapter(
+        self, user_id: str, connector: str, *, required_scopes: Any, force_refresh: bool = False
+    ) -> str:
+        if self._stopped(user_id):
+            raise SideEffectRefused("HB-06: the grant is being disconnected")
+        try:
+            return str(
+                self._broker.access_token_for_adapter(
+                    user_id,
+                    connector,
+                    required_scopes=required_scopes,
+                    force_refresh=force_refresh,
+                    not_before=self._approved_at,
+                )
+            )
+        except GrantPredatesApproval:
+            raise SideEffectRefused("HB-06: the grant is newer than the approval") from None
 
 
 class MeetingHostAdapter(GoogleAdapter):
@@ -58,6 +90,32 @@ class MeetingHostAdapter(GoogleAdapter):
             sleep=sleep,
         )
         self._receipts = receipts
+
+    def join_link(self, owner: str, event_ref: str) -> str:
+        """MJ-03/04: one narrow read on the host grant; the capability is returned only."""
+        if re.fullmatch(r"[0-9a-f]{32}", event_ref) is None:
+            raise MeetingHostRefused("MH-20", "not joinable")
+        try:
+            answer = self._json(
+                owner,
+                [CALENDAR_EVENTS_OWNED],
+                "GET",
+                f"{EVENTS_URL}/{event_ref}",
+                params={"fields": JOIN_FIELDS},
+                patient=False,
+            )
+        except RateLimited:
+            raise ProviderUnavailable("Calendar unavailable") from None
+        except AdapterError as error:
+            if error.status in (404, 410):
+                raise MeetingHostRefused("MH-20", "not joinable") from None
+            raise
+        if answer.get("status") == "cancelled":
+            raise MeetingHostRefused("MH-20", "not joinable")
+        link = answer.get("hangoutLink")
+        if not isinstance(link, str) or JOIN_LINK.fullmatch(link) is None:
+            raise MeetingHostRefused("MH-21", "no join link")
+        return link
 
     def execute_side_effect(self, entry: Mapping[str, Any], grant: Grant) -> dict[str, Any]:
         self._check_grant(entry, grant)  # MissingGrant before anything is read
@@ -90,7 +148,12 @@ class MeetingHostAdapter(GoogleAdapter):
                 raise SideEffectRefused(f"MH-13: Google refused the invitation ({error.status})") from None
             if error.status != 409:  # a lost answer or a 5xx is ambiguous: retried, and the retry lands on 409
                 raise
-            answer = self._earlier_event(owner, scopes, marker)
+            try:
+                answer = self._earlier_event(owner, scopes, marker)
+            except SideEffectRefused as refusal:  # the 409 proves an earlier attempt made the event: never "refused"
+                if isinstance(refusal, PossiblySent):
+                    raise
+                raise PossiblySent("MH-13: the earlier event cannot be read") from None
         if answer.get("id") != marker:  # MH-14
             raise PossiblySent("MH-14: Google answered another event")
         status = (((answer.get("conferenceData") or {}).get("createRequest") or {}).get("status") or {}).get(

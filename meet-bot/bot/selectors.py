@@ -52,6 +52,7 @@ CLOSE_DIALOG = _s("close_dialog", ("role", "button", r"^close$"))
 GOT_IT = _s("got_it", ("role", "button", r"^(got it|dismiss|ok)$"))
 ACCOUNT_BUTTON = _s("account_button", ("aria", "Google Account"))
 SIGN_IN = _s("sign_in", ("role", "link", r"^sign in$"), ("role", "button", r"^sign in$"))
+GUEST_NAME = _s("guest_name", ("role", "textbox", r"your name"), ("placeholder", "Your name"))
 
 # --- waiting / ended states ------------------------------------------------------------------------------------
 WAITING_TEXT = _s(

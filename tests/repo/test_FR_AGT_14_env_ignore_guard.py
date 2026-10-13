@@ -3,7 +3,7 @@
 * the service module ignores `containers[0].env` only in the `env_ignored` resource, never in `this`;
 * the module declares no `env` block anywhere (declared env would be silently never applied while env is ignored);
 * a `moved` block keeps tilo-api's state address (no destroy and recreate);
-* `ignore_env = true` is set for the api service only in the dev environment.
+* `ignore_env = true` is set for the api and connectors services only in the dev environment (connectors: ADR-0032 T5).
 """
 
 from __future__ import annotations
@@ -45,13 +45,14 @@ def test_FR_AGT_14_module_declares_no_env_block() -> None:
 
 def test_FR_AGT_14_moved_block_keeps_api_address() -> None:
     code = _code(MODULE.read_text(encoding="utf-8"))
-    m = re.search(r"moved\s*\{[^}]*\}", code)
-    assert m is not None
-    assert 'google_cloud_run_v2_service.this["api"]' in m.group(0)
-    assert 'google_cloud_run_v2_service.env_ignored["api"]' in m.group(0)
+    moved = re.findall(r"moved\s*\{[^}]*\}", code)
+    for name in ("api", "connectors"):
+        old = f'google_cloud_run_v2_service.this["{name}"]'
+        new = f'google_cloud_run_v2_service.env_ignored["{name}"]'
+        assert any(old in m and new in m for m in moved), name
 
 
-def test_FR_AGT_14_ignore_env_true_for_api_only() -> None:
+def test_FR_AGT_14_ignore_env_true_for_api_and_connectors_only() -> None:
     code = _code(DEV.read_text(encoding="utf-8"))
     start = code.index("cloud_run_services = {")
     body = code[start : code.index("\n  }\n", start)]
@@ -61,5 +62,5 @@ def test_FR_AGT_14_ignore_env_true_for_api_only() -> None:
         block = body[m.end() : end]
         if re.search(r"ignore_env\s*=\s*true", block):
             flagged.append(m.group(1))
-    assert flagged == ["api"]
-    assert len(re.findall(r"ignore_env\s*=\s*true", body)) == 1
+    assert flagged == ["api", "connectors"]
+    assert len(re.findall(r"ignore_env\s*=\s*true", body)) == 2

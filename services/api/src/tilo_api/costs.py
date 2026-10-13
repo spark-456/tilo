@@ -15,7 +15,9 @@ from tilo_metering.costs import cost_report, load_credit_usd
 from tilo_metering.savings import InconsistentMemoryHit
 
 from tilo_api import deps
+from tilo_api.cost_history import cost_history
 from tilo_api.deps import Principal, Store, WorldRecord, get_current_principal, get_ledger, get_store
+from tilo_api.quick_ledger import QUICK_STEP, QUICK_TASK_TYPE, quick_run_id
 
 router = APIRouter()
 
@@ -49,8 +51,11 @@ def _credit_usd() -> float:
     return _credit_usd_cache
 
 
-def _report(store: Store, ledger: Sequence[LedgerEntry], worlds: Iterable[tuple[str, WorldRecord]]) -> dict[str, Any]:
-    """The report for these worlds: their runs (the world's own run id plus any on its events) and no others."""
+def _report(
+    store: Store, ledger: Sequence[LedgerEntry], worlds: Iterable[tuple[str, WorldRecord]], quick_uid: str | None = None
+) -> dict[str, Any]:
+    """The report for these worlds: their runs (the world's own run id plus any on its events) and no others. With
+    `quick_uid`, also that person's Quick pseudo run (COST-FAST-1b), labelled by task type `quick_answer`."""
     events: list[dict] = []
     unit_types: dict[str, dict[str, str]] = {}
     runs: set[str] = set()
@@ -59,9 +64,13 @@ def _report(store: Store, ledger: Sequence[LedgerEntry], worlds: Iterable[tuple[
         events += world_events
         runs |= {world.run_id} | {e["run_id"] for e in world_events if isinstance(e.get("run_id"), str)}
         unit_types[world.run_id] = _unit_types(store, world_id)
+    if quick_uid is not None:
+        runs.add(quick_run_id(quick_uid))
+        unit_types[quick_run_id(quick_uid)] = {QUICK_STEP: QUICK_TASK_TYPE}
     credit_usd = _credit_usd()
     try:
-        return cost_report([e for e in ledger if e.run in runs], events, unit_types=unit_types, credit_usd=credit_usd)
+        report = cost_report([e for e in ledger if e.run in runs], events, unit_types=unit_types, credit_usd=credit_usd)
+        return report | cost_history(events)
     except InconsistentMemoryHit as exc:  # a hit that disagrees with its own costs (BQ-MTR10-5): refuse, never a 500
         raise HTTPException(status_code=422, detail="inconsistent_ledger") from exc
 
@@ -93,4 +102,4 @@ def get_costs(
         raise HTTPException(status_code=403)
     store.load_owner(principal.user_id, settle=True)
     mine = sorted((w, rec) for w, rec in store.worlds.items() if rec.owner == principal.user_id)
-    return JSONResponse(content=_report(store, ledger, mine))
+    return JSONResponse(content=_report(store, ledger, mine, principal.user_id))

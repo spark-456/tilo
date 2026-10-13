@@ -1,0 +1,13 @@
+[project]
+name = "tilo-redact"
+version = "0.1.0"
+description = "tilo_redact — the shared secret redactor: text, JSON trees and a logging filter (FR-MEM-05, SEC-14)"
+requires-python = "==3.12.*"
+dependencies = []
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/tilo_redact"]

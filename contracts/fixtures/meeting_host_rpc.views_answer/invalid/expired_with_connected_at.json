@@ -1,0 +1,10 @@
+{
+  "views": [
+    {
+      "connector": "google_drive",
+      "state": "expired",
+      "scopes": [],
+      "connected_at": "2026-10-08T09:30:00.000Z"
+    }
+  ]
+}

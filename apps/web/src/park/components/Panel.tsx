@@ -36,14 +36,16 @@ export function Panel({
     if (inline) return;
     const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     const first = ref.current?.querySelector<HTMLElement>('[role="menuitem"]') ?? ref.current;
-    first?.focus();
+    // preventScroll: opening or closing a menu must not move the window (the phone page menu closes just before a
+    // page swap, and the swap scrolls to the top only at its own midpoint).
+    first?.focus({ preventScroll: true });
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") close.current();
     };
     document.addEventListener("keydown", onKey);
     return () => {
       document.removeEventListener("keydown", onKey);
-      if (opener?.isConnected) opener.focus();
+      if (opener?.isConnected) opener.focus({ preventScroll: true });
     };
   }, [inline]);
 

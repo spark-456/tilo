@@ -1,9 +1,9 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://contracts.tilo.example/artifact.schema.json",
-  "x-version": "1.0.0",
+  "x-version": "1.1.0",
   "title": "ArtifactVersion",
-  "description": "One immutable, hash-checked, owner-scoped version in the artifact store (ADR-0018, FR-MEM-12; PRD 13.2, 15.1): the metadata record at orgs/{org}/worlds/{world}/artifacts/{artifact_id}/versions/{version:06d}. The bytes live under a key derived from the ids, so the record holds no blob path. Read by the harness, tilo-api, tilo-render and erasure; only the store writes it. Rules the schema cannot express are AR-01 to AR-08 in artifact.rules.md.",
+  "description": "One immutable, hash-checked, owner-scoped version in the artifact store (ADR-0018, FR-MEM-12; PRD 13.2, 15.1): the metadata record at orgs/{org}/worlds/{world}/artifacts/{artifact_id}/versions/{version:06d}. The bytes live under a key derived from the ids, so the record holds no blob path. Read by the harness, tilo-api, tilo-render and erasure; only the store writes it. Rules the schema cannot express are AR-01 to AR-09 in artifact.rules.md. 1.1.0 (ADR-0029) adds the fetch origin: a file a unit downloaded through tilo-browser.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -54,7 +54,7 @@
     },
     "origin": { "$ref": "#/$defs/origin" },
     "sources": {
-      "description": "Raw-archive pointers of the version's sources, for the Verifier (FR-CON-10, FR-AGT-12): records of the record's own run for a unit or render output, the copied version's for a restore, none for an upload (AR-03). They never leave Tilo (AR-06).",
+      "description": "Raw-archive pointers of the version's sources, for the Verifier (FR-CON-10, FR-AGT-12): records of the record's own run for a unit, render or fetch output (a fetch has exactly one, the fetch's own record, which holds the cleaned URL, BQ-104), the copied version's for a restore, none for an upload (AR-03, AR-09). They never leave Tilo (AR-06).",
       "type": "array",
       "items": { "$ref": "#/$defs/source" }
     },
@@ -72,14 +72,17 @@
       "type": "boolean"
     },
     "idempotency_key": {
-      "description": "Set for unit and render outputs (AR-05); null for uploads and restores.",
+      "description": "Set for unit, render and fetch outputs (AR-05); null for uploads and restores.",
       "anyOf": [{ "$ref": "#/$defs/idempotency_key" }, { "type": "null" }]
     },
     "created_at": { "$ref": "common.schema.json#/$defs/timestamp" }
   },
   "if": {
     "properties": {
-      "origin": { "properties": { "kind": { "enum": ["unit", "render"] } }, "required": ["kind"] }
+      "origin": {
+        "properties": { "kind": { "enum": ["unit", "render", "fetch"] } },
+        "required": ["kind"]
+      }
     },
     "required": ["origin"]
   },
@@ -93,10 +96,27 @@
     },
     "then": {
       "description": "A model writes only text and JSON, never a file (ADR-0018 1).",
-      "properties": { "media_type": { "enum": ["text/markdown", "text/csv", "application/json"] } }
+      "properties": {
+        "media_type": { "enum": ["text/markdown", "text/csv", "application/json"] },
+        "idempotency_key": { "not": { "pattern": ":f[0-9]$" } }
+      }
     },
     "else": {
-      "description": "tilo-render makes only files.",
+      "description": "tilo-render makes only files, and a fetch keeps only files (ADR-0029 8: never HTML, SVG, an archive or a program).",
+      "if": {
+        "properties": {
+          "origin": { "properties": { "kind": { "const": "fetch" } }, "required": ["kind"] }
+        },
+        "required": ["origin"]
+      },
+      "then": {
+        "description": "A fetch has its own key form and exactly one source, the fetch's raw-archive record (AR-09).",
+        "properties": {
+          "idempotency_key": { "pattern": ":f[0-9]$" },
+          "sources": { "minItems": 1, "maxItems": 1 }
+        }
+      },
+      "else": { "properties": { "idempotency_key": { "not": { "pattern": ":f[0-9]$" } } } },
       "properties": {
         "media_type": {
           "enum": [
@@ -141,21 +161,24 @@
   },
   "$defs": {
     "origin": {
-      "description": "What made the version: a unit's runner (unit and the worker agent set), tilo-render (for a unit), an intake upload (neither) or a restore (FR-MEM-06; no unit). Set by the store from the run, never by a runner.",
+      "description": "What made the version: a unit's runner (unit and the worker agent set), tilo-render (for a unit), an intake upload (neither), a restore (FR-MEM-06; no unit) or, since 1.1.0 (ADR-0029), a fetch: a file a unit's worker agent downloaded through tilo-browser (unit and agent set). Set by the store from the run, never by a runner.",
       "type": "object",
       "additionalProperties": false,
       "required": ["kind", "unit", "agent"],
       "properties": {
-        "kind": { "type": "string", "enum": ["unit", "render", "upload", "restore"] },
+        "kind": { "type": "string", "enum": ["unit", "render", "upload", "restore", "fetch"] },
         "unit": { "anyOf": [{ "$ref": "common.schema.json#/$defs/unit_id" }, { "type": "null" }] },
         "agent": {
           "anyOf": [{ "$ref": "common.schema.json#/$defs/agent_id" }, { "type": "null" }]
         }
       },
-      "if": { "properties": { "kind": { "enum": ["unit", "render"] } }, "required": ["kind"] },
+      "if": {
+        "properties": { "kind": { "enum": ["unit", "render", "fetch"] } },
+        "required": ["kind"]
+      },
       "then": {
         "properties": { "unit": { "$ref": "common.schema.json#/$defs/unit_id" } },
-        "if": { "properties": { "kind": { "const": "unit" } }, "required": ["kind"] },
+        "if": { "properties": { "kind": { "enum": ["unit", "fetch"] } }, "required": ["kind"] },
         "then": { "properties": { "agent": { "$ref": "common.schema.json#/$defs/agent_id" } } }
       },
       "else": {
@@ -175,9 +198,9 @@
       }
     },
     "idempotency_key": {
-      "description": "<run_id>:<unit_id>:<attempt>:<index> (AR-05). index is the output's 0-based position, 0 to 9, since a unit has at most 10 outputs (BQ-257).",
+      "description": "<run_id>:<unit_id>:<attempt>:<index> (AR-05). index is the output's 0-based position, 0 to 9, since a unit has at most 10 outputs (BQ-257); a fetch's index is f0 to f9, the file's 0-based position among the unit's fetched files, at most 10 (FR-INT-01, ADR-0029 8).",
       "type": "string",
-      "pattern": "^r_[0-9A-Za-z_]{1,48}:U[0-9]{1,4}:(0|[1-9][0-9]{0,3}):[0-9]$",
+      "pattern": "^r_[0-9A-Za-z_]{1,48}:U[0-9]{1,4}:(0|[1-9][0-9]{0,3}):f?[0-9]$",
       "not": { "pattern": "\n" }
     },
     "manifest_revision": {

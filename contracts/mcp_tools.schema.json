@@ -1,0 +1,287 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.tilo.example/mcp_tools.schema.json",
+  "x-version": "1.0.0",
+  "title": "McpTools",
+  "description": "Tilo's MCP server tools (ADR-0031, Proposed). The root is one `tools/call` request as the server accepts it: a tool `name` and its `arguments`, bound to that tool's input shape; anything else is refused before any store is read. Each tool's result (`structuredContent`) is its `*_out` entry. Read tools need the grant scope `tilo.read`; `answer_card` and `start_run` need `tilo.write`, which the person turns on per client. No tool ever answers a gate, consent or meeting card: only `needs_you` questions can be answered here (`card_row.answerable_here`). Results carry ids, titles, labels and Tilo-written lines only; artifact text only from `read_artifact`, only for a clean text version of the owner's. Rules MC-01 to MC-12 in `mcp_tools.rules.md`.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["name", "arguments"],
+  "properties": {
+    "name": { "$ref": "#/$defs/tool_name" },
+    "arguments": { "type": "object" }
+  },
+  "if": { "properties": { "name": { "const": "list_worlds" } }, "required": ["name"] },
+  "then": { "properties": { "arguments": { "$ref": "#/$defs/list_worlds_in" } } },
+  "else": {
+    "if": {
+      "properties": { "name": { "enum": ["get_world", "list_artifacts"] } },
+      "required": ["name"]
+    },
+    "then": { "properties": { "arguments": { "$ref": "#/$defs/world_in" } } },
+    "else": {
+      "if": { "properties": { "name": { "const": "read_artifact" } }, "required": ["name"] },
+      "then": { "properties": { "arguments": { "$ref": "#/$defs/read_artifact_in" } } },
+      "else": {
+        "if": { "properties": { "name": { "const": "list_cards" } }, "required": ["name"] },
+        "then": { "properties": { "arguments": { "$ref": "#/$defs/list_cards_in" } } },
+        "else": {
+          "if": { "properties": { "name": { "const": "answer_card" } }, "required": ["name"] },
+          "then": { "properties": { "arguments": { "$ref": "#/$defs/answer_card_in" } } },
+          "else": { "properties": { "arguments": { "$ref": "#/$defs/start_run_in" } } }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "tool_name": {
+      "type": "string",
+      "enum": [
+        "list_worlds",
+        "get_world",
+        "list_artifacts",
+        "read_artifact",
+        "list_cards",
+        "answer_card",
+        "start_run"
+      ]
+    },
+    "list_worlds_in": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": { "limit": { "type": "integer", "minimum": 1, "maximum": 50 } }
+    },
+    "world_in": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["world_id"],
+      "properties": { "world_id": { "$ref": "common.schema.json#/$defs/world_id" } }
+    },
+    "read_artifact_in": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["world_id", "artifact_id", "version"],
+      "properties": {
+        "world_id": { "$ref": "common.schema.json#/$defs/world_id" },
+        "artifact_id": { "$ref": "common.schema.json#/$defs/artifact_id" },
+        "version": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "list_cards_in": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": { "world_id": { "$ref": "common.schema.json#/$defs/world_id" } }
+    },
+    "answer_card_in": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["world_id", "card_id", "option"],
+      "properties": {
+        "world_id": { "$ref": "common.schema.json#/$defs/world_id" },
+        "card_id": { "$ref": "common.schema.json#/$defs/ulid" },
+        "option": { "$ref": "card.schema.json#/$defs/option_id" }
+      }
+    },
+    "start_run_in": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["request"],
+      "properties": {
+        "request": {
+          "description": "The person's request in their words, as typed into the client; it goes through intake like a web request (safety screen, brief, questions, approaches, caps). Tab and newline are allowed, other control characters are not.",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2000,
+          "pattern": "^[^\\u0000-\\u0008\\u000B\\u000C\\u000E-\\u001F\\u007F]+$"
+        }
+      }
+    },
+    "world_row": {
+      "description": "The S-14 worlds-list row (`GET /worlds`), unchanged.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["world_id", "title", "status", "created_at", "last_seq"],
+      "properties": {
+        "world_id": { "$ref": "common.schema.json#/$defs/world_id" },
+        "title": { "type": ["string", "null"], "maxLength": 140 },
+        "status": {
+          "type": "string",
+          "enum": ["idle", "started", "paused", "completed", "failed"]
+        },
+        "created_at": {
+          "anyOf": [{ "$ref": "common.schema.json#/$defs/timestamp" }, { "type": "null" }]
+        },
+        "last_seq": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "list_worlds_out": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["worlds"],
+      "properties": {
+        "worlds": { "type": "array", "maxItems": 50, "items": { "$ref": "#/$defs/world_row" } }
+      }
+    },
+    "story_line": {
+      "description": "One Story line of the world, as the Story lens shows it to the owner: a Tilo-written event summary.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["seq", "ts", "line"],
+      "properties": {
+        "seq": { "type": "integer", "minimum": 1 },
+        "ts": { "$ref": "common.schema.json#/$defs/timestamp" },
+        "line": { "type": "string", "minLength": 1, "maxLength": 140 }
+      }
+    },
+    "get_world_out": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["world", "open_cards", "credits_used", "story"],
+      "properties": {
+        "world": { "$ref": "#/$defs/world_row" },
+        "open_cards": { "type": "integer", "minimum": 0 },
+        "credits_used": { "$ref": "common.schema.json#/$defs/credits" },
+        "story": { "type": "array", "maxItems": 20, "items": { "$ref": "#/$defs/story_line" } }
+      }
+    },
+    "artifact_row": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["artifact_id", "version", "label", "media_type", "size_bytes", "created_at"],
+      "properties": {
+        "artifact_id": { "$ref": "common.schema.json#/$defs/artifact_id" },
+        "version": { "type": "integer", "minimum": 1 },
+        "label": { "type": ["string", "null"], "maxLength": 120 },
+        "media_type": { "$ref": "common.schema.json#/$defs/media_type" },
+        "size_bytes": { "type": "integer", "minimum": 1 },
+        "created_at": { "$ref": "common.schema.json#/$defs/timestamp" }
+      }
+    },
+    "list_artifacts_out": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["artifacts"],
+      "properties": {
+        "artifacts": {
+          "type": "array",
+          "maxItems": 100,
+          "items": { "$ref": "#/$defs/artifact_row" }
+        }
+      }
+    },
+    "read_artifact_out": {
+      "description": "`text` is the version's bytes as UTF-8 for `text/markdown`, `text/csv` and `application/json` up to 262,144 bytes, else null with `withheld` saying why (MC-07).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["artifact", "content_sha256", "text", "withheld"],
+      "properties": {
+        "artifact": { "$ref": "#/$defs/artifact_row" },
+        "content_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "text": { "type": ["string", "null"], "maxLength": 262144 },
+        "withheld": { "anyOf": [{ "$ref": "#/$defs/withheld_reason" }, { "type": "null" }] }
+      },
+      "if": { "properties": { "text": { "type": "null" } }, "required": ["text"] },
+      "then": { "properties": { "withheld": { "$ref": "#/$defs/withheld_reason" } } },
+      "else": { "properties": { "withheld": { "type": "null" } } }
+    },
+    "withheld_reason": { "type": "string", "enum": ["not_text", "too_large"] },
+    "card_option": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "label"],
+      "properties": {
+        "id": { "$ref": "card.schema.json#/$defs/option_id" },
+        "label": { "type": "string", "minLength": 1, "maxLength": 20 }
+      }
+    },
+    "card_row": {
+      "description": "An open card of the owner's. `answerable_here` lists the option ids `answer_card` accepts for it: only a `needs_you` card can have any; a gate, consent or meeting card has none, so nothing authorises over MCP (MC-09).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "world_id",
+        "card_id",
+        "kind",
+        "what_happened",
+        "options",
+        "risk_tier",
+        "exact",
+        "created_at",
+        "answerable_here"
+      ],
+      "properties": {
+        "world_id": { "$ref": "common.schema.json#/$defs/world_id" },
+        "card_id": { "$ref": "common.schema.json#/$defs/ulid" },
+        "kind": { "$ref": "card.schema.json#/$defs/kind" },
+        "what_happened": { "type": "string", "minLength": 1, "maxLength": 140 },
+        "options": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 4,
+          "items": { "$ref": "#/$defs/card_option" }
+        },
+        "risk_tier": {
+          "anyOf": [{ "$ref": "common.schema.json#/$defs/risk_tier" }, { "type": "null" }]
+        },
+        "exact": { "type": ["string", "null"], "maxLength": 500 },
+        "created_at": { "$ref": "common.schema.json#/$defs/timestamp" },
+        "answerable_here": {
+          "type": "array",
+          "maxItems": 4,
+          "uniqueItems": true,
+          "items": { "$ref": "card.schema.json#/$defs/option_id" }
+        }
+      },
+      "if": { "properties": { "kind": { "const": "needs_you" } }, "required": ["kind"] },
+      "then": { "properties": { "risk_tier": { "type": "null" }, "exact": { "type": "null" } } },
+      "else": { "properties": { "answerable_here": { "maxItems": 0 } } }
+    },
+    "list_cards_out": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["cards"],
+      "properties": {
+        "cards": { "type": "array", "maxItems": 50, "items": { "$ref": "#/$defs/card_row" } }
+      }
+    },
+    "answer_card_out": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["outcome"],
+      "properties": { "outcome": { "type": "string", "enum": ["answered"] } }
+    },
+    "start_run_out": {
+      "description": "Intake ran: the world exists and waits for the person in Tilo, to answer its questions or approve an approach (MC-10). No run spends past intake from here.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["world_id", "next"],
+      "properties": {
+        "world_id": { "$ref": "common.schema.json#/$defs/world_id" },
+        "next": { "type": "string", "enum": ["answer_questions_in_tilo", "approve_in_tilo"] }
+      }
+    },
+    "tool_refusal": {
+      "description": "A refused call (`isError: true`). One closed code, never a server string, a stack or another person's data; an id the caller may not see is `not_found`, byte-equal to a missing one.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["error"],
+      "properties": {
+        "error": {
+          "type": "string",
+          "enum": [
+            "invalid_arguments",
+            "not_found",
+            "insufficient_scope",
+            "not_answerable_here",
+            "already_resolved",
+            "busy",
+            "rate_limited",
+            "over_cap",
+            "rejected_by_intake",
+            "unavailable"
+          ]
+        }
+      }
+    }
+  }
+}
