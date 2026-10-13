@@ -967,3 +967,45 @@
   overflow-y: auto;
   overflow-wrap: anywhere;
 }
+
+/* WEB-W1: the composer's attach row and its chips */
+[data-park] .park-home-attach {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+[data-park] .park-home-attach__note {
+  font-size: 12px;
+  opacity: 0.75;
+}
+[data-park] .park-home-attach [aria-disabled="true"] {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+[data-park] .park-home-attach__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+}
+[data-park] .park-home-attach__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  background: var(--chip);
+  color: var(--ink);
+}
+[data-park] .park-home-attach__remove {
+  background: none;
+  border: 0;
+  color: inherit;
+  cursor: pointer;
+  padding: 0 2px;
+}

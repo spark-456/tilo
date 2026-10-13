@@ -107,3 +107,22 @@ export const askQuick = (api: Api, mode: TierKey, query: string): R<QuickReply> 
     query,
     "quick",
   );
+
+/**
+ * WEB-W1: a Thinking start with attached files. Like `askQuick`, the files travel as a fourth run-time argument so
+ * `startWorld`'s pinned two-parameter type is unchanged; the live Api sends them on the one `POST /intake`.
+ */
+export const startWithFiles = (
+  api: Api,
+  mode: TierKey,
+  query: string,
+  files: readonly File[],
+): R<StartAck> =>
+  (
+    api.startWorld as unknown as (
+      m: TierKey,
+      q: string,
+      effort: undefined,
+      files: readonly File[],
+    ) => R<StartAck>
+  )(mode, query, undefined, files);
