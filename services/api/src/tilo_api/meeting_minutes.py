@@ -8,15 +8,73 @@ from typing import Any
 
 from pydantic import ValidationError
 from tilo_contracts import Minutes, Transcript
-from tilo_memory.artifacts import ArtifactNotFound, ArtifactStore, NewVersion, Origin, Scope
+from tilo_memory.artifacts import ArtifactError, ArtifactNotFound, ArtifactStore, NewVersion, Origin, Scope
 from tilo_people.errors import NotFound, VersionConflict
 from tilo_policy.schemas import conforms
+from tilo_providers.interfaces import SafetyProvider
+from tilo_providers.router import Router
 
 from tilo_api import deps
 from tilo_api import events as event_parts
+from tilo_api.meeting_analysis import analyze_minutes
 from tilo_api.people_meetings import _clean, _mine
 from tilo_api.people_quotes import GONE
 from tilo_api.people_writes import Refusal, Writer, _purge
+
+
+def analyze_and_publish_minutes(
+    w: Writer,
+    store: deps.Store,
+    artifacts: ArtifactStore,
+    meeting_id: str,
+    *,
+    router: Router,
+    meeting_at: str,
+    budget: float,
+    safety: SafetyProvider,
+    events: deps.EventWriter,
+) -> dict[str, Any]:
+    """Internal service seam, never a client body. Router/budget/mode and actual meeting start are trusted inputs.
+
+    Authorise before reading content or spending. ArtifactStore reads the exact immutable, hash-checked version.
+    Publication rechecks access/retention/world and requires the same meeting version seen before generation.
+    No confirmation, proposed item, recipient, approval card or outbox entry is created here.
+    """
+    meeting, version, _ = _mine(w, meeting_id, "read_full", GONE)
+    if meeting["status"] != "ended" or meeting["minutes"] is not None:
+        raise Refusal(409, "not_publishable")
+    world_id, ref, until = meeting.get("world_id"), meeting["transcript"], meeting["delete_transcript_after"]
+    if world_id is None or ref is None or until is None or w.now >= until:
+        raise Refusal(409, "transcript_unavailable")
+    world = store.load_world(world_id, settle=False)
+    if world is None or world.owner != w.actor:
+        raise Refusal(404, "not_found")
+    scope = Scope(w.org, world_id, w.actor)
+    try:
+        head = artifacts.head(scope, ref)
+        if head is None or head.doc["screening"] != "clean":
+            raise Refusal(409, "transcript_unavailable")
+        transcript = json.loads(artifacts.read(scope, ref))
+        if not isinstance(transcript, dict) or transcript.get("meeting_id") != meeting_id:
+            raise Refusal(409, "transcript_unavailable")
+    except (ArtifactError, ValueError):
+        raise Refusal(409, "transcript_unavailable") from None
+    try:
+        # Directory is server-owned; match_name applies directory visibility. None of its records go to the model.
+        doc = analyze_minutes(
+            router,
+            transcript,
+            ref,
+            directory=w.org_directory(),
+            viewer=w.actor,
+            meeting_at=meeting_at,
+            now=w.now,
+            budget=budget,
+            safety=safety,
+        )
+    except ValueError:
+        raise Refusal(502, "analysis_failed") from None
+    return publish_minutes(w, store, artifacts, meeting_id, doc, events=events, expected_version=version)
 
 
 def publish_minutes(
@@ -27,6 +85,7 @@ def publish_minutes(
     minutes: dict[str, Any],
     *,
     events: deps.EventWriter,
+    expected_version: int | None = None,
 ) -> dict[str, Any]:
     """Internal offline import seam. Caller supplies analysed data, never an authorisation or confirmation stamp.
 
@@ -34,6 +93,8 @@ def publish_minutes(
     accepts this input; no work item, card or outbox entry is produced here.
     """
     meeting, version, _ = _mine(w, meeting_id, "read_full", GONE)
+    if expected_version is not None and version != expected_version:
+        raise Refusal(409, "version_conflict")
     if meeting["status"] != "ended" or meeting["minutes"] is not None:
         raise Refusal(409, "not_publishable")
     world_id, transcript_ref = meeting.get("world_id"), meeting["transcript"]
