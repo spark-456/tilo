@@ -194,7 +194,7 @@ async def _capped_body(request: Request) -> bytes:
     streams, so a client that keeps sending is cut after the cap (and one read-ahead chunk)."""
     if "content-length" in request.headers:
         raw_cl = request.headers["content-length"].strip()
-        if len(raw_cl) > 10 or not raw_cl.isdigit():
+        if len(raw_cl) > 10 or not (raw_cl.isascii() and raw_cl.isdigit()):  # `isdigit` alone admits '\xb2'
             raise Refusal(400, "invalid_content_length")
         if int(raw_cl) > MAX_BODY_BYTES:
             raise Refusal(413, "body_too_large")
