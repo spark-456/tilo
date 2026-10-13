@@ -242,3 +242,55 @@ def test_BQ_CTX_TEAMWORLD_S_14_the_list_writes_nothing(rig):
     after = (len(rig.shares()), {w: len(e) for w, e in rig.store.events.items()}, dict(rig.store.worlds))
     assert before == after
     assert rig.store.pending_events == {}
+
+
+# --- cost on the hot route (SEC-REVIEW-14, user "fix it", 13 Oct) ----------------------------------------------------
+def _count_reads(rig: Rig, monkeypatch) -> dict[str, int]:
+    calls = {"persons.list": 0, "shares.list": 0}
+    persons, shares = rig.people.persons, rig.people.world_shares
+    real_persons, real_shares = persons.list, shares.list
+
+    def counted_persons(*a, **kw):
+        calls["persons.list"] += 1
+        return real_persons(*a, **kw)
+
+    def counted_shares(*a, **kw):
+        calls["shares.list"] += 1
+        return real_shares(*a, **kw)
+
+    monkeypatch.setattr(persons, "list", counted_persons)
+    monkeypatch.setattr(shares, "list", counted_shares)
+    return calls
+
+
+def test_BQ_CTX_TEAMWORLD_S_14_cost_a_caller_with_no_team_makes_no_directory_or_share_queries(rig, monkeypatch):
+    rig.people.persons.create(
+        {**rig.people.persons.get(ORG, BEN).record, "id": "u_loner", "email": "loner@example.com", "memberships": []}
+    )
+    rig.as_(web("u_loner"))
+    calls = _count_reads(rig, monkeypatch)
+    response = _list(rig)
+    assert response.status_code == 200
+    assert calls == {"persons.list": 0, "shares.list": 0}
+    assert all("access" not in w for w in response.json()["worlds"])
+
+
+def test_BQ_CTX_TEAMWORLD_S_14_cost_a_caller_with_no_person_record_makes_no_directory_or_share_queries(
+    rig, monkeypatch
+):
+    rig.as_(web("u_unknown"))
+    calls = _count_reads(rig, monkeypatch)
+    assert _list(rig).status_code == 200
+    assert calls == {"persons.list": 0, "shares.list": 0}
+
+
+def test_BQ_CTX_TEAMWORLD_S_14_cost_the_team_candidates_are_capped_in_a_fixed_order(rig, monkeypatch):
+    for n in range(4):
+        _add(rig, f"w_cap_{n}", ASHA, title=f"Cap {n}", ts=T[2])
+        rig.grant(world=f"w_cap_{n}")
+    monkeypatch.setattr(deps, "TEAM_WORLD_CANDIDATES", 2)
+    rig.as_(web(BEN))
+    first = [w["world_id"] for w in _list(rig).json()["worlds"] if w.get("access") == "team"]
+    second = [w["world_id"] for w in _list(rig).json()["worlds"] if w.get("access") == "team"]
+    assert first == second, "the same cap picks the same worlds"
+    assert sorted(first) == ["w_cap_0", "w_cap_1"], "lowest world ids first, the rest are left out"

@@ -446,6 +446,9 @@ def readable_world(
         return team_reader(principal, store, people, clock, world_id)
 
 
+TEAM_WORLD_CANDIDATES = 50  # at most this many shared worlds are decided per list request (lowest world ids first)
+
+
 def team_readable_worlds(
     principal: Principal,
     store: Store,
@@ -463,10 +466,13 @@ def team_readable_worlds(
         stores = people()
         if stores is None:
             return {}
+        me = stores.persons.get(ORG_ID, principal.user_id)  # their own record first: no team, nothing else is read
+        teams = sorted({m["team"] for m in me.record["memberships"]}) if me is not None else []
+        if not teams:
+            return {}
         directory = Directory.of(s.record for s in stores.persons.list(ORG_ID))
-        me = directory.record(principal.user_id)
-        teams = sorted({m["team"] for m in me["memberships"]}) if me is not None else []
-        candidates = sorted({s.record["world_id"] for t in teams for s in stores.world_shares.list(ORG_ID, "team", t)})
+        shared = sorted({s.record["world_id"] for t in teams for s in stores.world_shares.list(ORG_ID, "team", t)})
+        candidates = shared[:TEAM_WORLD_CANDIDATES]
     except Exception as exc:
         logger.warning("team worlds not listed (%s)", type(exc).__name__)
         return {}
