@@ -4,6 +4,7 @@
 import { expect, test } from "@playwright/test";
 
 test("UI_10_B6_the_demo_recorded_run_address_shows_a_replay_not_not_found", async ({ page }) => {
+  test.setTimeout(150_000); // a cold dev server optimises the stage's dependencies on the first request
   await page.goto("/world/w_village_basic/stage?fixture=village-basic");
   await expect(page.locator('[data-stage-ready="true"]')).toBeVisible({ timeout: 60_000 });
   await expect(page.getByText("Fixture replay")).toBeVisible();
