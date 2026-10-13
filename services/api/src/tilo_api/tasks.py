@@ -37,6 +37,7 @@ from tilo_providers.replay import ReplayMissError
 from tilo_providers.router import Router
 
 from tilo_api import deps, runs
+from tilo_api.people_writes import _capped_body
 
 logger = logging.getLogger("tilo_api.tasks")
 router = APIRouter()
@@ -71,8 +72,9 @@ def _json_body[Body: BaseModel](model: type[Body]) -> Callable[[Request], Awaita
     async def parse(request: Request) -> Body:
         if request.headers.get("content-type", "").split(";")[0].strip().lower() != "application/json":
             raise HTTPException(status_code=415, detail="Send application/json.")
+        raw = await _capped_body(request)
         try:
-            return model.model_validate_json(await request.body())
+            return model.model_validate_json(raw)
         except ValidationError as exc:
             detail = [{"loc": list(e["loc"]), "msg": e["msg"]} for e in exc.errors()]
             raise HTTPException(status_code=422, detail=detail) from exc

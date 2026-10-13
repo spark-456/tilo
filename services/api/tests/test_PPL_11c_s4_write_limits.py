@@ -152,6 +152,197 @@ def test_PPL_11c_s4_BQ_PPL11C_1_a_body_of_exactly_the_cap_is_read_and_one_byte_m
     assert over.status_code == 413 and over.json() == {"detail": "body_too_large"}
 
 
+TEAM_PUT_ROUTES = {
+    "role": "/v1/team/members/u_priya/role",
+    "limit": "/v1/team/members/u_priya/limit",
+    "switch": "/v1/team/switches/weekend",
+    "tool": "/v1/team/tools/gmail",
+}
+
+
+@pytest.mark.parametrize("path", list(TEAM_PUT_ROUTES.values()), ids=list(TEAM_PUT_ROUTES))
+def test_PPL_11c_s4_BQ_PPL11C_1_team_put_routes_oversize_body_is_a_413(people_rig, path):
+    rig = meeting_rig(people_rig)
+    status, consumed, headers, text = stream_post(rig.app, path, method="PUT", total_bytes=5_000_000)
+    assert status == 413 and json.loads(text) == {"detail": "body_too_large"}, (status, text[:120])
+    status, consumed, headers, text = stream_post(
+        rig.app, path, method="PUT", total_bytes=10, declared_length=50_000_000
+    )
+    assert status == 413 and consumed <= 4096
+
+
+# `/v1/me/settings` (ADR-0039) has its own 16 KiB cap and a route-level `write_limit` (user_settings.py)
+SETTINGS_PUT_ROUTES = {"settings": "/v1/me/settings"}
+SETTINGS_MAX_BODY_BYTES = 16384
+
+
+@pytest.mark.parametrize("path", list(SETTINGS_PUT_ROUTES.values()), ids=list(SETTINGS_PUT_ROUTES))
+def test_PPL_11c_s4_BQ_PPL11C_1_settings_put_oversize_body_is_a_413(people_rig, path):
+    """The settings PUT is a write route like the team ones: over its own cap is a 413 and the rest is never read."""
+    rig = meeting_rig(people_rig)
+    status, consumed, headers, text = stream_post(rig.app, path, method="PUT", total_bytes=5_000_000)
+    assert status == 413 and json.loads(text) == {"detail": "body_too_large"}, (status, text[:120])
+    assert consumed <= SETTINGS_MAX_BODY_BYTES + 64 * 1024
+    status, consumed, headers, text = stream_post(
+        rig.app, path, method="PUT", total_bytes=10, declared_length=50_000_000
+    )
+    assert status == 413 and consumed <= 4096
+
+
+def test_PPL_11c_s4_BQ_PPL11C_1_every_put_and_patch_write_route_is_covered(people_rig):
+    """Extend the BQ_PPL11C_1 guard so PUT and PATCH write routes under /v1/ are also verified."""
+    rig = people_rig()
+    templates = [
+        t
+        for t, methods in rig.app.openapi()["paths"].items()
+        if any(m in methods for m in ("put", "patch")) and t.startswith("/v1/")
+    ]
+    patterns = {t: re.compile("^" + re.sub(r"\{[^/}]+\}", "[^/]+", t) + "$") for t in templates}
+    all_covered = [*TEAM_PUT_ROUTES.values(), *SETTINGS_PUT_ROUTES.values()]
+    uncovered = [t for t, p in patterns.items() if not any(p.match(path) for path in all_covered)]
+    assert not uncovered, f"PUT/PATCH write routes with no body-cap case: {uncovered}"
+
+
+@pytest.mark.parametrize("bad_cl", ["not-a-number", "-1", "12345678901", "12.34", " 42abc"])
+def test_PPL_11c_s4_BQ_PPL11C_1_non_digit_content_length_returns_400(people_rig, bad_cl):
+    rig = work_rig(people_rig)
+    status, consumed, headers, text = stream_post(
+        rig.app, "/v1/work-items", total_bytes=10, headers={"content-length": bad_cl}
+    )
+    assert status == 400 and json.loads(text) == {"detail": "invalid_content_length"}
+
+
+def test_PPL_11c_s4_BQ_PPL11C_1_tasks_json_body_is_capped_at_413(people_rig):
+    rig = work_rig(people_rig)
+    status, consumed, headers, text = stream_post(rig.app, "/tasks/tsk_fake/answers", total_bytes=5_000_000)
+    assert status == 413 and json.loads(text) == {"detail": "body_too_large"}
+    status, consumed, headers, text = stream_post(
+        rig.app, "/tasks/tsk_fake/answers", total_bytes=10, declared_length=50_000_000
+    )
+    assert status == 413 and consumed <= 4096
+
+
+# --- the limiter runs before any body dependency (BQ-PPL11C-2, -13) --------------------------------------------------
+
+TEAM_BODY_WRITES = {
+    "role": ("PUT", "/v1/team/members/u_priya/role"),
+    "limit": ("PUT", "/v1/team/members/u_priya/limit"),
+    "switch": ("PUT", "/v1/team/switches/weekend"),
+    "tool": ("PUT", "/v1/team/tools/gmail"),
+    "invite": ("POST", "/v1/team/invites"),
+}
+JSON = {"content-type": "application/json"}
+REFUSED_ATTEMPTS = {  # what a body dependency refuses: it must still take a slot (BQ-PPL11C-13)
+    "413 oversize": (413, JSON, b" " * (MAX_BODY_BYTES + 1)),
+    "415 text/plain": (415, {"content-type": "text/plain"}, b"{}"),
+    "422 malformed": (422, JSON, b'{"unknown_key": 1}'),
+}
+
+
+@pytest.mark.parametrize("attempt", list(REFUSED_ATTEMPTS))
+@pytest.mark.parametrize("write", list(TEAM_BODY_WRITES))
+def test_PPL_11c_s4_BQ_PPL11C_2_refused_team_writes_count_and_the_61st_is_a_429(write, attempt):
+    """A 413, 415 or 422 is a write attempt like any other: after 60 of them the 61st is a 429 with `Retry-After`,
+    on every team write that reads a body (the limiter is a route dependency, so it runs before the body one)."""
+    from _team_routes_lib import team_api  # noqa: PLC0415
+
+    method, path = TEAM_BODY_WRITES[write]
+    expected, headers, content = REFUSED_ATTEMPTS[attempt]
+    with team_api() as api:
+        for n in range(WRITES_PER_MINUTE):
+            refused = api.client.request(method, path, headers=headers, content=content)
+            assert refused.status_code == expected, (n, refused.status_code, refused.text[:120])
+        over = api.client.request(method, path, headers=headers, content=content)
+        assert over.status_code == 429 and over.json().get("code") == "rate_limited", (
+            over.status_code,
+            over.text[:120],
+        )
+        assert 1 <= int(over.headers["retry-after"]) <= 60
+        assert api.put("/v1/team/switches/weekend", {"on": True}).status_code == 429  # a valid write is over its minute
+        api.advance_clock(61)
+        assert api.put("/v1/team/switches/weekend", {"on": True}).status_code == 200
+
+
+def test_PPL_11c_s4_BQ_PPL11C_2_refused_team_deletes_count_and_the_61st_is_a_429() -> None:
+    from _team_routes_lib import team_api  # noqa: PLC0415
+
+    with team_api() as api:
+        for n in range(WRITES_PER_MINUTE):
+            refused = api.delete("/v1/team/members/u_nobody")
+            assert refused.status_code == 404, (n, refused.status_code)
+        over = api.delete("/v1/team/members/u_nobody")
+        assert over.status_code == 429 and 1 <= int(over.headers["retry-after"]) <= 60
+
+
+def test_PPL_11c_s4_BQ_PPL11C_2_settings_put_refused_attempts_count_too(people_rig) -> None:
+    """`/v1/me/settings` is the same: a 415 is an attempt, and the 61st is a 429."""
+    rig = work_rig(people_rig)
+    for n in range(WRITES_PER_MINUTE):
+        refused = rig.client.put("/v1/me/settings", headers={"content-type": "text/plain"}, content=b"{}")
+        assert refused.status_code == 415, (n, refused.status_code)
+    over = rig.client.put("/v1/me/settings", headers={"content-type": "text/plain"}, content=b"{}")
+    assert over.status_code == 429 and 1 <= int(over.headers["retry-after"]) <= 60
+
+
+# --- a Content-Length that is not ASCII digits is a 4xx, never a 500 -------------------------------------------------
+
+
+def _raw_asgi_status(app, method: str, path: str, headers: list[tuple[bytes, bytes]]) -> int:
+    """One request straight into the ASGI app, with header bytes an HTTP server would have refused first."""
+    import asyncio  # noqa: PLC0415
+
+    sent: list[dict] = []
+
+    async def receive() -> dict:
+        return {"type": "http.request", "body": b"", "more_body": False}
+
+    async def send(message: dict) -> None:
+        sent.append(message)
+
+    scope = {
+        "type": "http",
+        "asgi": {"version": "3.0"},
+        "http_version": "1.1",
+        "method": method,
+        "scheme": "http",
+        "path": path,
+        "raw_path": path.encode(),
+        "query_string": b"",
+        "headers": headers,
+        "client": ("127.0.0.1", 50000),
+        "server": ("testserver", 80),
+    }
+    asyncio.run(app(scope, receive, send))
+    return next(m["status"] for m in sent if m["type"] == "http.response.start")
+
+
+CL_ROUTES = {
+    "people create": ("POST", "/v1/work-items"),
+    "team switch": ("PUT", "/v1/team/switches/weekend"),
+    "settings": ("PUT", "/v1/me/settings"),
+    "feedback": ("POST", "/v1/feedback"),
+    "push subscribe": ("POST", "/v1/push/subscribe"),
+}
+
+
+@pytest.mark.parametrize("value", [b"\xb2", b"\xb3", b"\xb9"], ids=["superscript2", "superscript3", "superscript1"])
+@pytest.mark.parametrize("route", list(CL_ROUTES))
+def test_PPL_11c_s4_BQ_PPL11C_1_a_non_ascii_digit_content_length_is_a_4xx_not_a_500(people_rig, route, value):
+    """`str.isdigit()` is true for the superscript digits and `int()` then raises: a header the HTTP servers refuse
+    first, but the app must not depend on that."""
+    from tilo_api import deps  # noqa: PLC0415
+    from tilo_api.feedback import InMemoryFeedbackStore  # noqa: PLC0415
+
+    method, path = CL_ROUTES[route]
+    rig = work_rig(people_rig)
+    store = InMemoryFeedbackStore()  # so the feedback route reaches its body (a 503 there would prove nothing)
+    rig.app.dependency_overrides[deps.get_feedback_store] = lambda: store
+    status = _raw_asgi_status(
+        rig.app, method, path, [(b"content-type", b"application/json"), (b"content-length", value)]
+    )
+    assert 400 <= status < 500, status
+
+
 # --- Idempotency-Key on creates -------------------------------------------------------------------------------------
 
 CREATES = {
