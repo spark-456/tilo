@@ -63,7 +63,9 @@ class LiveVoiceMeter(Protocol):
     """The SEC-16 hook (BQ-M2-1): one spoken Live reply is one unit on the process's spend ledger. Called from the
     thread that drives the reply, so it must be thread-safe. `reserve` returns an opaque hold, or None when the ledger
     will not take the unit (capped uid, replay-only switch, no headroom); raising counts as a refusal (fail closed).
-    `settle` gets that reply's own whole-number token counts (maybe empty); `release` frees a hold no model reached."""
+    `settle` gets that reply's own whole-number token counts (maybe empty: the text was sent but no usage came back,
+    and the input is billable, so an empty usage is charged at the hold's whole reserve, never zero); `release` frees a
+    hold the text never reached (no session, or the send failed)."""
 
     def reserve(self) -> object | None: ...
     def settle(self, hold: object, usage: Mapping[str, int]) -> None: ...

@@ -163,3 +163,19 @@ steps:
     -k tilo_api -q -p no:cacheprovider
 
     '
+- id: web
+  name: node:22-bookworm
+  waitFor:
+  - node-dependencies
+  entrypoint: bash
+  env:
+  - LIVE=0
+  args:
+  - -ceu
+  - 'export PATH=/workspace/.cloud-tools/bin:/workspace/.cloud-tools/node_modules/.bin:$$PATH
+
+    pnpm --filter @tilo/web exec vitest run --maxWorkers=4
+
+    pnpm --filter @tilo/web exec tsc --noEmit
+
+    '

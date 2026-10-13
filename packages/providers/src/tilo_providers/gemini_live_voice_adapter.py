@@ -15,8 +15,11 @@ Three ways to get audio, none of them silent:
 Spend (SEC-16): a live reply is one unit on the process's ledger, through the `LiveVoiceMeter` the process supplies. No
 meter means no live factory (a code gate: `NotConfigured`, and `voice.build_voice_provider` builds Chirp instead). The
 meter reserves BEFORE any session opens (a refusal or an unreadable ledger raises `NotConfigured`; the provider is never
-reached), settles with that reply's own usage once, and is released when nothing reached the model, on a failure or a
-cancel. Usage lives in the call, never on the instance, so concurrent replies cannot mix.
+reached), settles once with the usage that reply knows, and releases only a hold the text never reached (the session
+did not open or the send failed). The call is reached as soon as `send_client_content` succeeds: input tokens are
+billable even if no reply arrives, so a failure, a timeout or a cancel after the send settles (usage maybe empty: the
+meter then charges its whole reserve, an upper bound of the input estimate), it never releases the hold unpaid. Usage
+lives in the call, never on the instance, so concurrent replies cannot mix.
 Nothing is recorded: audio of a meeting reply is not kept."""
 
 from __future__ import annotations
@@ -64,7 +67,8 @@ SessionFactory = Callable[[LiveSessionSettings], AbstractAsyncContextManager[Any
 
 @dataclass
 class _LiveCall:
-    """What one reply knows about itself: its hold, whether the model answered and the usage it reported."""
+    """What one reply knows about itself: its hold, whether the model was reached (the text was sent) and the usage it
+    reported."""
 
     hold: object | None = None
     reached: bool = False
@@ -224,8 +228,8 @@ class GeminiLiveVoiceProvider(SpeechProvider):
         mime, complete = f"audio/pcm;rate={self._config.sample_rate}", False
         async with factory(settings) as session:
             await session.send_client_content(turns={"role": "user", "parts": [{"text": text}]}, turn_complete=True)
+            call.reached = True  # the text was accepted: its input tokens are billed even if no reply ever comes
             async for reply in session.receive():
-                call.reached = True  # the model answered: whatever follows is billed, never released
                 usage = getattr(reply, "usage_metadata", None)
                 if usage is not None:  # whole numbers only: the meter reads these, never the content
                     counts = {name: getattr(usage, name, None) for name in _USAGE_FIELDS}
@@ -306,8 +310,9 @@ class GeminiLiveVoiceProvider(SpeechProvider):
         call.hold = hold
 
     def _close_hold(self, call: _LiveCall | None) -> None:
-        """Exactly once per reply: settle what the model reported (also after a failure or a cancel once it answered:
-        it ran), release a hold nothing reached. A failing ledger is logged by class and never breaks the voice."""
+        """Exactly once per reply: settle what is known (also after a failure, a timeout or a cancel once the text was
+        sent: the input is billable), release a hold nothing reached. A failing ledger is logged by class and never
+        breaks the voice."""
         if call is None or call.hold is None or self._meter is None:
             return
         hold, call.hold = call.hold, None
