@@ -34,8 +34,9 @@ def declared():
 
 
 def fill(h, uid, minor):
-    """Puts `minor` on a uid's lifetime total, then forgets the setup calls the spy recorded."""
-    spend(h.ledger, uid, minor)
+    """Brings a uid's lifetime total to `minor` (a live request before it now spends: every live call is a unit,
+    GOLIVE-935), then forgets the setup calls the spy recorded."""
+    spend(h.ledger, uid, minor - h.ledger.spent_minor(uid))
     h.ledger.calls.clear()
 
 

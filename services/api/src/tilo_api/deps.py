@@ -22,6 +22,7 @@ import os
 import re
 import threading
 import time
+import uuid
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from contextlib import AbstractContextManager, nullcontext
 from dataclasses import dataclass, field
@@ -661,17 +662,88 @@ def router_for_mode(mode: Mode) -> Router:
         raise HTTPException(status_code=503, detail="The model router is not configured.") from exc
 
 
-def get_router(mode: Annotated[Mode, Depends(get_work_mode)] = "replay") -> Router:
-    """Every model call goes through the provider layer's Router (PL-01), built for this request's mode."""
-    return router_for_mode(mode)
+def meter_for(request: Request | None, mode: Any, switches: Any, *, run_id: str | None = None) -> Any:
+    """SEC-16 (GOLIVE-935): this request's meter on the uid ledger, or None when live cannot be metered: not live, no
+    request, no verified uid, no ledger or caps, or team limits that cannot be read (`spend_mode`'s rules, and the uid
+    cap lowered by the team). One meter per request; its run id is the task or world in the path (their calls share
+    that run's cap), else a fresh one."""
+    if mode != "live" or request is None or not isinstance(switches, spend.Switches):
+        return None
+    from tilo_api import spend_units, team_access, team_store  # noqa: PLC0415
+
+    uid, caps = getattr(request.state, "uid", None), _resolve(request, get_spend_caps)
+    if not isinstance(uid, str) or switches.ledger is None or caps is None:
+        return None
+    try:
+        cap = team_access.user_cap_minor(
+            team_store.team_reader(request.app.dependency_overrides)(), uid, caps.uid_lifetime_minor
+        )
+    except Exception as exc:
+        logger.warning("team limits unreadable, so no live meter: %s", type(exc).__name__)
+        return None
+    if cap <= 0:
+        return None
+    guard = spend.SpendGuard(
+        switches.ledger, switches.flags, dataclasses.replace(caps, uid_lifetime_minor=min(cap, caps.uid_lifetime_minor))
+    )
+    path = request.path_params
+    run = run_id or next((f"{k}_{path[k]}" for k in ("task_id", "world_id") if isinstance(path.get(k), str)), None)
+    return spend_units.SpendMeter(
+        guard, uid=uid, run_id=run or f"req_{uuid.uuid4().hex}", org_id=ORG_ID,
+        unit_minor=caps.unit_reserve_minor, config=providers_config(),
+    )  # fmt: skip
 
 
-def get_safety(mode: Annotated[Mode | None, Depends(get_mode)] = None) -> SafetyProvider:
+def _live_or_replay(mode: Any, meter: Any) -> Mode:
+    """Deployed, a live provider exists only with a meter: with none the mode is replay, never an unmetered live."""
+    return "replay" if mode != "replay" and meter is None and enforced() else mode
+
+
+def _no_meter() -> None:
+    """The `meter` parameter of the two provider seams is a dependency that is always None, so it is never a query or
+    body input: only `_seam_router` and the run seams pass one, in code."""
+    return None
+
+
+def get_router(
+    mode: Annotated[Mode, Depends(get_work_mode)] = "replay",
+    request: Request = None,  # type: ignore[assignment]
+    switches: Annotated[FlagStore, Depends(get_switches)] = None,  # type: ignore[assignment]
+    *,
+    meter: Annotated[Any, Depends(_no_meter)] = None,
+) -> Router:
+    """Every model call goes through the provider layer's Router (PL-01), built for this request's mode. Live and
+    deployed it is a `MeteredRouter` (SEC-16): each call is a unit on the uid ledger; with no meter, replay."""
+    meter = meter or meter_for(request, mode, switches)
+    mode = _live_or_replay(mode, meter)
+    router = router_for_mode(mode)
+    if mode == "live" and meter is not None:
+        from tilo_api.spend_units import MeteredRouter  # noqa: PLC0415
+
+        return cast(Router, MeteredRouter(router, meter))
+    return router
+
+
+def get_safety(
+    mode: Annotated[Mode | None, Depends(get_mode)] = None,
+    request: Request = None,  # type: ignore[assignment]
+    switches: Annotated[FlagStore, Depends(get_switches)] = None,  # type: ignore[assignment]
+    *,
+    meter: Annotated[Any, Depends(_no_meter)] = None,
+) -> SafetyProvider:
     """PRD 16.3 item 2: built from the `safety` role on every call; no role, or a provider the factory refuses
     (the fake when live or deployed), closes the screened routes with 503. A request in replay mode screens from
-    recordings only, `LIVE=1` or not (BQ-SIGNIN-10); `None` (a direct call with no request) follows the live switch."""
+    recordings only, `LIVE=1` or not (BQ-SIGNIN-10); `None` (a direct call with no request) follows the live switch.
+    Live and deployed each check is a SEC-16 unit (`MeteredSafety`); with no meter it screens from recordings."""
+    meter = meter or meter_for(request, mode, switches)
+    mode = _live_or_replay(mode, meter)
     try:
-        return build_safety_provider(providers_config(), fixtures_dir=FIXTURES_DIR, force_replay=mode == "replay")
+        provider = build_safety_provider(providers_config(), fixtures_dir=FIXTURES_DIR, force_replay=mode == "replay")
+        if mode == "live" and meter is not None:
+            from tilo_api.spend_units import MeteredSafety  # noqa: PLC0415
+
+            return MeteredSafety(provider, meter)
+        return provider
     except ProviderConfigError as exc:
         logger.warning("safety provider unavailable: %s", exc)
         raise HTTPException(
@@ -686,19 +758,23 @@ def _no_plan_compiler(*, brief: dict, approach: dict, budget_cap: float, context
     raise NotImplementedError("no `director` role is configured, so no plan can be compiled and no run starts")
 
 
-def _seam_router(mode: Mode) -> Router:
-    """The run seams build their Router through `get_router`, the request's mode threaded in by `runs.run_seams`.
-    The replay default stays a zero-argument call, so a zero-argument override of `get_router` keeps working."""
-    return get_router() if mode == "replay" else get_router(mode)
+def _seam_router(mode: Mode, meter: Any = None) -> Router:
+    """The run seams build their Router through `get_router`, the request's mode and its SEC-16 meter threaded in by
+    `runs.run_seams`. The replay default stays a zero-argument call, so a zero-argument override of `get_router`
+    keeps working; live with no meter is replay when deployed (`get_router`)."""
+    if mode == "replay":
+        return get_router()
+    return get_router(mode, meter=meter) if meter is not None else get_router(mode)
 
 
-def get_plan_compiler(mode: Mode = "replay", today: Clock = real_today) -> Callable[..., dict]:
+def get_plan_compiler(mode: Mode = "replay", today: Clock = real_today, meter: Any = None) -> Callable[..., dict]:
     """`compile(*, brief, approach, budget_cap, context) -> PlanGraph` (FR-INT-09). The Director drafts it through
     the Router and `validate_plan` decides (BQ-90); with no `director` role in the provider config it refuses.
-    `today` is the clock the plan prompt states the date from (INTAKE-QUALITY-1); `run_seams` hands it `get_today`."""
+    `today` is the clock the plan prompt states the date from (INTAKE-QUALITY-1); `run_seams` hands it `get_today`.
+    `meter` is the request's SEC-16 meter (a run seam, never a request input): live calls are units on it."""
     if "director" not in providers_config().roles:
         return _no_plan_compiler
-    router = _seam_router(mode)
+    router = _seam_router(mode, meter)
 
     def compile_with_director(*, brief: dict, approach: dict, budget_cap: float, context: PlanInputs) -> dict:
         return compile_plan(brief, approach, budget_cap, context, router=router, today=today()).plan
@@ -729,20 +805,21 @@ class _RoleModel:
         return result.response, credits
 
 
-def _worker_models(mode: Mode = "replay") -> Mapping[str, Any]:
-    router = _seam_router(mode)
+def _worker_models(mode: Mode = "replay", meter: Any = None) -> Mapping[str, Any]:
+    router = _seam_router(mode, meter)
     return {role: _RoleModel(router, role) for role in ("specialist", "writer", "verifier")}
 
 
-def get_unit_runner(mode: Mode = "replay", today: Clock = real_today) -> Any:
+def get_unit_runner(mode: Mode = "replay", today: Clock = real_today, meter: Any = None) -> Any:
     from tilo_api.run_tools import ApiUnitRunner
 
-    return ApiUnitRunner(_worker_models(mode), mode=mode, clock=today)
+    models = _worker_models(mode, meter) if meter is not None else _worker_models(mode)
+    return ApiUnitRunner(models, mode=mode, clock=today, meter=meter)
 
 
-def get_must_ask_providers(mode: Mode = "replay") -> Mapping[str, Any]:
+def get_must_ask_providers(mode: Mode = "replay", meter: Any = None) -> Mapping[str, Any]:
     """The models `MustAsk` judges a unit with (FR-AGT-05), keyed by the unit's role; always the Router's roles."""
-    return _worker_models(mode)
+    return _worker_models(mode, meter) if meter is not None else _worker_models(mode)
 
 
 def get_action_resolver() -> Callable[..., dict]:
@@ -1324,10 +1401,14 @@ def get_decision_cache() -> DecisionCache:
     return InMemoryDecisionCache(per_user_entries=config.cache_per_user_entries, ttl_hours=config.cache_ttl_hours)
 
 
-def get_assistant_decider(mode: Annotated[Mode, Depends(get_mode)] = "replay") -> Decider | None:
+def get_assistant_decider(
+    mode: Annotated[Mode, Depends(get_mode)] = "replay",
+    request: Request = None,  # type: ignore[assignment]
+    switches: Annotated[FlagStore, Depends(get_switches)] = None,  # type: ignore[assignment]
+) -> Decider | None:
     """The model fallback (FR-PA-14, FR-PA-19): the metered decider over the Router, or None, and the panel answers
     by rules only. None when the `assistant` role is not configured (dev mode), has no caps or no price, or the
-    router or the safety provider is unavailable."""
+    router or the safety provider is unavailable. Live and deployed its calls are also SEC-16 units (GOLIVE-935)."""
     from tilo_api.assistant.metering import MeteredDecider  # noqa: PLC0415
     from tilo_api.assistant.model import AssistantModelUnavailable, ModelDecider  # noqa: PLC0415
 
@@ -1336,9 +1417,13 @@ def get_assistant_decider(mode: Annotated[Mode, Depends(get_mode)] = "replay") -
         providers = providers_config()
         if config.model["role"] not in providers.roles:
             return None
-        router = _seam_router(mode)
+        meter = meter_for(request, mode, switches)
+        router = _seam_router(mode, meter)
         # this request's mode reaches the screen too (BQ-SIGNIN-10); a stand-in that takes no argument still works
-        safety = get_safety(mode) if inspect.signature(get_safety).parameters else get_safety()
+        if not inspect.signature(get_safety).parameters:
+            safety = get_safety()
+        else:
+            safety = get_safety(mode, meter=meter) if meter is not None else get_safety(mode)
         inner = ModelDecider(router=router, providers=providers, safety=safety, config=config)
         return MeteredDecider(inner, ledger=get_spend_ledger(), cache=get_decision_cache(), config=config)
     except (HTTPException, ProviderConfigError, AssistantModelUnavailable):

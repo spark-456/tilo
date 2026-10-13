@@ -302,11 +302,13 @@ async def _quick(
     work_mode: deps.Mode,
     scenario: str | None,
 ) -> JSONResponse:
-    """COST-FAST-1: nothing is created or stored; the body is the answer or the offer to switch to Thinking."""
+    """COST-FAST-1: nothing is created or stored; the body is the answer or the offer to switch to Thinking. Quick holds
+    its own SEC-16 unit around the whole ask, so it gets the Router unmetered (`raw`): one hold, not one per call."""
     try:
         body = await run_in_threadpool(
             quick.respond, text=request.text, uid=uid, has_files=bool(request.files), scenario=scenario,
-            safety=safety, router=model_router, allowance=allowance, switches=flags, mode=work_mode,
+            safety=safety, router=getattr(model_router, "raw", model_router), allowance=allowance, switches=flags,
+            mode=work_mode,
             caps=deps.caps_for(http), key=http.headers.get("idempotency-key"), ledger=deps.ledger_writer_for(http),
         )  # fmt: skip
     except quick.QuickRefusal as refusal:
