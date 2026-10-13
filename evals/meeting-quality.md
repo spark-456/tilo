@@ -29,3 +29,5 @@ Run `uv run python -m tilo_evals.meeting_quality <private-bundle.json>`. The rep
 Action mappings must cover every output action, including unverified rows, and contain only a gold action ID or null. Unknown/empty matches or missing row mappings remain pending. Planted false action and decision annotations must have null semantic matches; matching them to genuine gold is contradictory and fails the rubric, even when the output is unverified.
 
 CLI bundles must use unique object keys at every depth and valid JSON numbers. Duplicate keys (even equal values) and `NaN`/`Infinity` constants are malformed: exit 2 with provider quality pending. A later score, scenario ID, basis or annotation must never silently overwrite earlier failed evidence. Parser errors disclose no meeting content or field values.
+
+A bundle below the 20 MB size limit may still exceed the JSON decoder or evaluator recursion limit. The CLI treats that input as unreadable: exit 2 with the same generic pending report, without a traceback or input content. No quality verdict is available for that bundle.

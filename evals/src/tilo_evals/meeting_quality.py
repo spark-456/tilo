@@ -289,7 +289,7 @@ def main() -> int:
                 parse_constant=_reject_constant,
             )
         )
-    except (OSError, ValueError, TypeError, KeyError):
+    except (OSError, ValueError, TypeError, KeyError, RecursionError):
         print(json.dumps({"provider_quality": "pending", "pending": ["bundle unreadable or malformed"]}))
         return 2
     print(json.dumps(report, sort_keys=True))
