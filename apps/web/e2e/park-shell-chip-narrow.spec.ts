@@ -7,7 +7,7 @@
 // e2e/park-shell-chip-narrow.spec.ts --project=chromium --no-deps --workers=1
 import { expect, test } from "@playwright/test";
 
-const WIDTHS = [360, 375, 390, 414, 560] as const;
+const WIDTHS = [320, 360, 375, 390, 414, 560] as const;
 const HOME_WHOLE_FROM = 390; // the narrowest width at which the reference nav leaves the Home tab room
 
 for (const width of WIDTHS) {
@@ -65,6 +65,16 @@ for (const width of WIDTHS) {
       const box = await chip.boundingBox();
       expect(box?.width, "WCAG 2.5.8 target width").toBeGreaterThanOrEqual(24);
       expect(box?.height, "WCAG 2.5.8 target height").toBeGreaterThanOrEqual(24);
+      // P0-08b W4: a 24px box is insufficient if another control covers its hit area.
+      const unobscured = await chip.evaluate((el) => {
+        const r = el.getBoundingClientRect();
+        return [1, r.width / 2, r.width - 1].every((x) =>
+          [1, r.height / 2, r.height - 1].every((y) =>
+            el.contains(document.elementFromPoint(r.left + x, r.top + y)),
+          ),
+        );
+      });
+      expect(unobscured, "P0_08b_W4 sample target is fully clickable").toBe(true);
       await chip.focus();
       await page.keyboard.press("Shift+Tab");
       await page.keyboard.press("Tab");

@@ -59,7 +59,8 @@ const TOKENS = {
     ink: "rgb(244, 242, 250)",
     ink2: "rgb(210, 206, 227)",
     ink3: "rgb(210, 206, 227)", // not measured at night: unused by the checks below
-    hero: "rgb(122, 98, 245)",
+    // W4 supervisor ruling: BQ-DS-A11Y-1 gives WCAG AA precedence over the export.
+    hero: "rgb(108, 82, 235)",
     heroInk: "rgb(188, 175, 255)",
     seg: "rgba(255, 255, 255, 0.08)",
     tabOn: "rgba(255, 255, 255, 0.16)",
@@ -198,6 +199,7 @@ for (const [sizeName, viewport] of Object.entries(SIZES)) {
           return {
             position: s.position,
             height: el.getBoundingClientRect().height,
+            width: el.getBoundingClientRect().width,
             overflow: s.overflow,
           };
         });
@@ -228,22 +230,33 @@ for (const [sizeName, viewport] of Object.entries(SIZES)) {
           true,
         );
         expectFacts("hero", heroP, {
-          position: "absolute",
-          left: "24px",
-          top: "96px",
-          padding: "24px 26px 22px",
+          // W4: #995 / f60aa4eb and the 13 Oct QA layout place the hero in a column.
+          position: "static",
+          left: "auto",
+          top: "auto",
+          padding: sizeName === "mobile" ? "20px 22px 18px" : "24px 26px 22px",
           "border-top-left-radius": "28px",
           "border-top-width": "1px",
           "border-top-color": T.gBd,
           "background-color": T.gBg,
           "backdrop-filter": T.fx,
           "box-shadow": T.sh,
-          gap: "12px",
+          gap: sizeName === "mobile" ? "10px" : "12px",
           "z-index": "3",
           display: "flex",
           "flex-direction": "column",
         });
-        near("hero width", Number(heroP.w), Math.min(500, Number(heroP.cbW) - 48));
+        const leftColumn = await facts(page.locator(".park-home-leftcol"), [
+          "position",
+          "left",
+          "top",
+        ]);
+        expectFacts("hero column (#995)", leftColumn, {
+          position: sizeName === "mobile" ? "static" : "absolute",
+          left: "24px",
+          top: "96px",
+        });
+        near("hero width", Number(heroP.w), Math.min(500, root.width - 48));
         if (wide) near("hero height (reference: 292.8 at 500 wide)", Number(heroP.h), 292.8, 3);
 
         // Today panel (only from 1180): right 24, top 96, 352 wide, p 8, r26, gap 6, scrolls, max height root - 330.
@@ -352,10 +365,11 @@ for (const [sizeName, viewport] of Object.entries(SIZES)) {
         ]);
         expect(String(h1["font-family"])).toMatch(/^"?Nunito"?,/);
         expectFacts("h1", h1, {
-          "font-size": "50px",
+          // W4: phone typography follows the 13 Oct responsive rules (#995).
+          "font-size": sizeName === "mobile" ? "40px" : "50px",
           "font-weight": "900",
-          "letter-spacing": "-1.4px",
-          "line-height": "50px",
+          "letter-spacing": sizeName === "mobile" ? "-1.1px" : "-1.4px",
+          "line-height": sizeName === "mobile" ? "40px" : "50px",
           color: T.ink,
           "margin-top": "0px",
         });
@@ -693,7 +707,12 @@ for (const [sizeName, viewport] of Object.entries(SIZES)) {
       }) => {
         const problems = await openHome(page, theme);
         const f = await facts(input(page), ["font-size", "font-weight", "color", "font-family"]);
-        expectFacts("input", f, { "font-size": "20px", "font-weight": "700", color: T.ink });
+        // W4: #995 retains the short phone placeholder and 13 Oct's 16px input type.
+        expectFacts("input", f, {
+          "font-size": sizeName === "mobile" ? "16px" : "20px",
+          "font-weight": "700",
+          color: T.ink,
+        });
         expect(String(f["font-family"])).toMatch(/Nunito Sans/);
         near("input height", Number(f.h), 60);
         // A phone's input cannot wrap its placeholder, so it shows the example in few words (13 Oct QA).
