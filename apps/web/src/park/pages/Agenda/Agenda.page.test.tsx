@@ -40,7 +40,7 @@ describe("WEB_9_agenda_copy: the designed text, verbatim", () => {
     q(container, '[role="radiogroup"][aria-label="Board style"]');
     const t = text(container);
     for (const s of [
-      "Thursday 24 September. Pins from your team and Tilo, and a week that stays in sync.",
+      "Thursday 24 September. Pins from your team and Tilo, and your week.",
       "Sample data · no calendar sync recorded",
       "Anyone on the team can pin. Tilo pins action items from meetings and things that need you.",
       "Pinboard",

@@ -116,6 +116,9 @@ export const CAPTURE_FIXTURE_EVENTS = Object.fromEntries(
 
 export const DEFAULT_DESC =
   "When an invoice email arrives in the Accounts inbox, open the PDF, copy the supplier, amount and due date into the “Invoices 2026” sheet, then label the email “Logged”.";
+/** W10: with nothing written the read button is off, and the line beside it says what is missing. */
+export const DESCRIBE_EMPTY =
+  "Write a sentence about the work first, then press Read my description.";
 export const DESCRIBE_HELP =
   "Write it like you’d explain it to a new colleague. Tilo asks if anything is unclear.";
 /** No API session (a demo): "Read my description" cannot read the text, so the steps are a sample and say so (HR-1). */

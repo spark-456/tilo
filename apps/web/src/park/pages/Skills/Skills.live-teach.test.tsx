@@ -170,9 +170,26 @@ describe("SKILLS_5_live_teach: describe it (step 1)", () => {
     const { server, mount } = rig();
     const r = await mount();
     expect(isDisabled(control(r.el, "Read my description"))).toBe(true);
+    // W10: an empty box says what is missing instead of a silent, unexplained off button.
+    expect(text(r)).toContain("Write a sentence about the work first");
+    typeInto(describeField(r.el), "Check the invoice mail");
+    expect(text(r)).not.toContain("Write a sentence about the work first");
+    typeInto(describeField(r.el), "");
     clickEl(control(r.el, "Read my description"));
     await settle();
     expect(server.posts("/v1/skills/captures")).toEqual([]);
+  });
+
+  it("W10_FR_SKL_05_signed_in_library_disables_pause_and_edit_steps_and_says_why", async () => {
+    const { mount } = rig({ "GET /v1/skills": () => json({ skills: [SAVED] }) });
+    const r = await mount();
+    const why = "Pausing and editing steps are not available from this page yet.";
+    expect(isDisabled(control(r.el, "Pause"))).toBe(true);
+    expect(isDisabled(control(r.el, "Edit steps"))).toBe(true);
+    expect(pageText(r.el)).toContain(why);
+    clickEl(control(r.el, "Pause"));
+    clickEl(control(r.el, "Edit steps"));
+    expect(toasts(r.app)).toEqual([]);
   });
 
   it("SKILLS_5_live_teach_reading_posts_the_text_and_shows_the_servers_captured_steps", async () => {
