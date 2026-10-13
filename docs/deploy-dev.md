@@ -510,6 +510,16 @@ ID-token verifier (`deps.get_current_principal`, CL-REACH) is wired; before that
 smoke stops at `intake`. The smoke needs a real deployment and a person, so no workflow runs it and it is not part
 of `just check` or `just test`.
 
+## Web push certificate egress (FR-CHN-17f)
+
+Before activating web push, include HTTPS egress from `tilo-channels` to `www.googleapis.com` for
+`https://www.googleapis.com/oauth2/v1/certs` (`tilo_channels.push_verifier.CERT_URL`). The internal push route
+uses these public certificates to verify Google's signed caller token; a cold or expired certificate cache
+cannot authenticate the caller if that fetch is blocked. No additional IAM role is needed for this public read.
+Keep the four delivery hosts in `config/web_push.yaml` allowed too. The certificate host belongs only in the
+runtime network egress rules: do not add it to `allowed_endpoint_hosts`, which restricts subscription destinations.
+This runbook records a prerequisite; network/IAM changes remain a separately reviewed user infrastructure action.
+
 ## Never
 
 - Never put a service-account key file in the repository or in Actions secrets: WIF only.
