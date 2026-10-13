@@ -93,7 +93,18 @@ def test_I4_xml_attribute_budget_is_total_and_single_part_bytes_are_capped():
         parse_docx(docx(root), limits=replace(Limits(), xml_part_bytes=16))
 
 
-@pytest.mark.parametrize("name", ["bidi\u202e.xml", "del\x7f.xml", "c1\x85.xml"])
+@pytest.mark.parametrize(
+    "name",
+    [
+        "bidi\u202e.xml",
+        "del\x7f.xml",
+        "c1\x85.xml",
+        "line\u2028.xml",
+        "paragraph\u2029.xml",
+        "private\ue000.xml",
+        "unassigned\u0378.xml",
+    ],
+)
 def test_I4_labels_refuse_display_controls(name):
     from tilo_archive.document_parsers import expand_zip
 
@@ -129,6 +140,7 @@ def test_I4_limit_configuration_cannot_remove_hard_resource_ceilings(field):
     [
         (b'<x Target="http://x"/>', "external_reference"),
         (b'<x Target="//h/x"/>', "external_reference"),
+        (b'<x Target="\\\\host/share"/>', "external_reference"),
         (b'<x Type="urn:oleObject"/>', "active_content"),
         (b'<x Type="urn:activeX"/>', "active_content"),
         (b'<x ContentType="application/macroEnabled"/>', "active_content"),
@@ -146,3 +158,10 @@ def test_I4_content_types_bytes_are_screened_even_outside_contenttype_attribute(
             b'ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>'
         )
         parse_docx(archive([("[Content_Types].xml", types), ("word/document.xml", b"<x/>")]))
+
+
+def test_I4_labels_refuse_surrogates_before_encoding():
+    from tilo_archive.document_parsers import _path
+
+    with pytest.raises(Refused, match="^unsafe_path$"):
+        _path("surrogate\ud800.xml", Limits())

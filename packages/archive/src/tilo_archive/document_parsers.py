@@ -90,7 +90,7 @@ def _path(name: str, limits: Limits) -> None:
     if (
         any(part in ("", ".", "..") for part in parts)
         or any(character in name for character in ("\\", ":", "\x00"))
-        or any(unicodedata.category(character) in ("Cc", "Cf") for character in name)
+        or any(unicodedata.category(character) in ("Cc", "Cf", "Zl", "Zp", "Cs", "Co", "Cn") for character in name)
     ):
         raise Refused("unsafe_path")
     if len(parts) > limits.path_depth:
@@ -190,7 +190,7 @@ class _BoundedTree(ET.TreeBuilder):
             if (
                 (local == "targetmode" and value.lower() == "external")
                 or local == "base"
-                or (local == "target" and re.match(r"(?:[a-zA-Z][\w+.-]*:|//)", value))
+                or (local == "target" and (value.startswith("\\\\") or re.match(r"(?:[a-zA-Z][\w+.-]*:|//)", value)))
             ):
                 raise Refused("external_reference")
         return super().start(tag, attrs)
