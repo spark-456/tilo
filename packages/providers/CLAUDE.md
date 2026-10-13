@@ -1,7 +1,7 @@
 # packages/providers — `tilo_providers`
 
 ## Purpose
-The model provider layer (PRD 6.4): one interface (`ModelProvider`, plus `SearchProvider`, `SafetyProvider`, `SpeechProvider`,
+The model provider layer (PRD 6.4): one interface (`ModelProvider`, plus `SearchProvider`, `SafetyProvider`, `SpeechProvider`, `EvalProvider` (VERTEX-EVAL-1, ADR-0033, `evaluation.py`, `vertex_eval_adapter.py`): `evaluate(EvalRequest)->EvalScore` on the `eval_judge` role, primary only; the fake for dev/CI, the live REST adapter only with the user's live switch.
 `RenderProvider`, `HandsProvider` per PRD 12.5) every service calls instead of naming a model; business code asks for a **role** (PL-01).
 
 ## Commands

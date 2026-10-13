@@ -64,6 +64,10 @@ def write_conformance_result(result: dict[str, Any], conformance_dir: Path | str
     return path
 
 
+# Sibling interfaces (SafetyProvider, EvalProvider): PL-05 is for ModelProviders only.
+NON_MODEL_PROVIDERS = frozenset({"model_armor", "vertex_eval"})
+
+
 def main() -> int:  # pragma: no cover -- exercised via `just conformance`
     from tilo_providers.config import DEV_ONLY_MODELS, load_providers_config, profiles_used_by, resolve_models_path
     from tilo_providers.factory import build_provider
@@ -74,6 +78,9 @@ def main() -> int:  # pragma: no cover -- exercised via `just conformance`
     for profile_id, role_id in sorted(role_by_profile.items()):
         if config.profiles[profile_id].model in DEV_ONLY_MODELS:
             print(f"{profile_id}: skipped (dev-only fake, never conforms)")
+            continue
+        if config.profiles[profile_id].provider in NON_MODEL_PROVIDERS:
+            print(f"{profile_id}: skipped (not a ModelProvider; PL-05 does not apply)")
             continue
         provider = build_provider(role_id, config, fixtures_dir=root / "fixtures", profile_id=profile_id)
         result = run_conformance_suite(profile_id, provider, build="dev")
