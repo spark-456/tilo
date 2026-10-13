@@ -502,6 +502,7 @@ def test_FR_PA_17_read_as_canonicalises_what_a_store_hands_back(world, monkeypat
         pins=PoisonedStore(world.spied.pins),
         mentions=world.spied.mentions,
         calendar=PoisonedStore(world.spied.calendar),
+        world_shares=world.spied.world_shares,
     )
     for kind, rid, _ in OWN:
         got = _read(world, kind, rid, people=people)

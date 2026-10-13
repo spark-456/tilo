@@ -30,7 +30,7 @@ import _ppl10_testlib as t
 import pytest
 from _ppl10_testlib import errors, pl, stores
 
-KINDS = ("person", "meeting", "work_item", "pinboard_item", "mention", "calendar_entry")
+KINDS = ("person", "meeting", "work_item", "pinboard_item", "mention", "calendar_entry")  # + world_share: TSW-1a
 STORE_OF = {
     "person": "persons",
     "meeting": "meetings",
@@ -38,6 +38,7 @@ STORE_OF = {
     "pinboard_item": "pins",
     "mention": "mentions",
     "calendar_entry": "calendar",
+    "world_share": "world_shares",
 }
 ORG = t.ORG
 OTHER = t.OTHER_ORG
@@ -120,6 +121,7 @@ def test_PPL_10d_PE_16_indexes_are_pinned():
         "pinboard_item": ("scope.user", "scope.team", "set_up_by"),
         "mention": ("pin_id", "user"),
         "calendar_entry": ("owner",),
+        "world_share": ("world_id", "team"),
     }
 
 
@@ -140,12 +142,12 @@ def test_PPL_10d_PE_16_a_memory_store_has_the_record_store_surface(kind):
     assert store.list(ORG) == ()
 
 
-def test_PPL_10d_PE_16_people_stores_in_memory_gives_six_fresh_stores_of_the_right_kinds():
+def test_PPL_10d_PE_16_people_stores_in_memory_gives_seven_fresh_stores_of_the_right_kinds():
     one, two = stores.PeopleStores.in_memory(), stores.PeopleStores.in_memory()
     for kind, name in STORE_OF.items():
         assert getattr(one, name).kind == kind
         assert getattr(one, name) is not getattr(two, name)
-    assert len({id(getattr(one, name)) for name in STORE_OF.values()}) == 6
+    assert len({id(getattr(one, name)) for name in STORE_OF.values()}) == 7
     one.work_items.create(make("work_item", 1))
     assert two.work_items.get(ORG, "wi_w1") is None  # no hidden global state
     assert one.work_items.get(ORG, "wi_w1") is not None
@@ -901,7 +903,7 @@ def _erasure_world(spy=False):
     return (s, log) if spy else s
 
 
-EXPECTED_KEYS = ["calendar_entry", "meeting", "mention", "person", "pinboard_item", "work_item"]
+EXPECTED_KEYS = ["calendar_entry", "meeting", "mention", "person", "pinboard_item", "work_item", "world_share"]
 
 
 def _ids(store, org=ORG):
@@ -911,7 +913,15 @@ def _ids(store, org=ORG):
 def test_PPL_10d_PE_16_erase_person_counts_and_deletes_what_is_theirs_only():
     s = _erasure_world()
     counts = stores.erase_person(s, ORG, "u_riya")
-    assert counts == {"meeting": 1, "work_item": 2, "pinboard_item": 1, "mention": 2, "calendar_entry": 2, "person": 1}
+    assert counts == {
+        "meeting": 1,
+        "work_item": 2,
+        "pinboard_item": 1,
+        "mention": 2,
+        "calendar_entry": 2,
+        "world_share": 0,
+        "person": 1,
+    }
     assert sorted(counts) == EXPECTED_KEYS and all(type(v) is int for v in counts.values())
     # their meeting is a tombstone (so other people's confirmed items stay checkable), not gone
     tomb = s.meetings.get(ORG, "mt_r1").record
@@ -1002,7 +1012,15 @@ def test_PPL_10d_PE_16_erase_person_survives_a_second_run_after_a_partial_one():
     stores.delete_meeting(s, ORG, "mt_r1", expected_version=1)
     s.work_items.delete(ORG, "wi_r1", expected_version=1)
     counts = stores.erase_person(s, ORG, "u_riya")
-    assert counts == {"meeting": 0, "work_item": 1, "pinboard_item": 1, "mention": 2, "calendar_entry": 2, "person": 1}
+    assert counts == {
+        "meeting": 0,
+        "work_item": 1,
+        "pinboard_item": 1,
+        "mention": 2,
+        "calendar_entry": 2,
+        "world_share": 0,
+        "person": 1,
+    }
     assert _ids(s.persons) == ["u_owner", "u_sam"] and _ids(s.work_items) == ["wi_o1"]
 
 
