@@ -6,6 +6,7 @@ written, so `replay_only` (NFR-24) does not close them; the body is the report a
 from __future__ import annotations
 
 from collections.abc import Iterable, Sequence
+from dataclasses import replace
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -18,6 +19,7 @@ from tilo_api import deps
 from tilo_api.cost_history import cost_history
 from tilo_api.deps import Principal, Store, WorldRecord, get_current_principal, get_ledger, get_store
 from tilo_api.quick_ledger import QUICK_STEP, QUICK_TASK_TYPE, quick_run_id
+from tilo_api.spend_units import LIVE_STEPS, LIVE_TASK_TYPE, UNATTRIBUTED, live_run_id
 
 router = APIRouter()
 
@@ -60,7 +62,8 @@ def _report(
     store: Store, ledger: Sequence[LedgerEntry], worlds: Iterable[tuple[str, WorldRecord]], quick_uid: str | None = None
 ) -> dict[str, Any]:
     """The report for these worlds: their runs (the world's own run id plus any on its events) and no others. With
-    `quick_uid`, also that person's Quick pseudo run (COST-FAST-1b), labelled by task type `quick_answer`."""
+    `quick_uid`, also that person's Quick pseudo run (COST-FAST-1b), labelled by task type `quick_answer`, and their
+    live spend no world's run could be named for (a meter's own `req_`/`task_`/`world_` id, T3) as one pseudo run."""
     events: list[dict] = []
     unit_types: dict[str, dict[str, str]] = {}
     runs: set[str] = set()
@@ -72,6 +75,10 @@ def _report(
     if quick_uid is not None:
         runs.add(quick_run_id(quick_uid))
         unit_types[quick_run_id(quick_uid)] = {QUICK_STEP: QUICK_TASK_TYPE}
+        live = live_run_id(quick_uid)
+        runs.add(live)
+        unit_types[live] = dict.fromkeys(LIVE_STEPS, LIVE_TASK_TYPE)
+        ledger = [replace(e, run=live) if e.user == quick_uid and e.run.startswith(UNATTRIBUTED) else e for e in ledger]
     credit_usd = _credit_usd()
     try:
         report = cost_report([e for e in ledger if e.run in runs], events, unit_types=unit_types, credit_usd=credit_usd)
