@@ -138,11 +138,43 @@ describe("WEB_6_world_interactions: Pause and Resume", () => {
     expect(
       overlay?.querySelector("svg") ?? overlay?.parentElement?.querySelector("svg"),
     ).not.toBeNull();
-    expect(elWithText(rig.el, "Paused"), "the status chip").toBeTruthy();
-    expect(elWithText(rig.el, "2 decisions"), "replaced by Paused while paused").toBeUndefined();
+    // UI-10 B2: the cards still say "before agents continue", so the count stays beside the paused state
+    expect(elWithText(rig.el, "Paused · 2 decisions"), "the status chip").toBeTruthy();
     // the world's decisions are still there to take
     expect(hasControl(rig.el, DECISIONS.depot.yes)).toBe(true);
     expect(decideCalls(rig.app)).toEqual([]);
+  });
+
+  it("UI_10_B2_a_finished_or_scheduled_world_offers_no_Pause", async () => {
+    for (const id of ["audit", "comp", "invoice"]) {
+      const rig = await mountWorld({ id });
+      expect(hasControl(rig.el, "Pause"), `${id} has nothing running to pause`).toBe(false);
+      expect(pageText(rig.el)).not.toContain("agents are waiting");
+      cleanup();
+    }
+  });
+
+  it("UI_10_B2_a_recording_says_so_in_the_header_the_facts_and_the_running_line", async () => {
+    const rig = await mountWorld({ id: "calls" });
+    expect(pageText(rig.el)).toContain("Recorded sample state, not live");
+    expect(pageText(rig.el)).toContain("Recorded sample state: About 3 min left");
+    expect(pageText(rig.el)).not.toMatch(/Ends\s*in 3 min/);
+  });
+
+  it("UI_10_B2_a_live_world_keeps_its_plain_running_state", async () => {
+    const rig = await mountWorld({ id: "calls", api: liveWorldsApi() });
+    expect(pageText(rig.el)).not.toContain("Recorded sample state");
+    expect(pageText(rig.el)).toContain("About 3 min left");
+  });
+
+  it("UI_10_B2_the_paused_state_is_page_local_and_a_fresh_mount_starts_unpaused", async () => {
+    const first = await mountWorld();
+    click(control(first.el, "Pause"));
+    expect(hasControl(first.el, "Resume")).toBe(true);
+    cleanup();
+    const second = await mountWorld();
+    expect(hasControl(second.el, "Pause")).toBe(true);
+    expect(elWithText(second.el, "2 decisions")).toBeTruthy();
   });
 
   it("WEB_6_world_interactions_Resume_toasts_and_puts_everything_back", async () => {
@@ -159,6 +191,7 @@ describe("WEB_6_world_interactions: Pause and Resume", () => {
   it("WEB_6_world_interactions_a_running_world_shows_Paused_then_Running_again", async () => {
     const rig = await mountWorld({ id: "calls" });
     expect(elWithText(rig.el, "Running")).toBeTruthy();
+    expect(pageText(rig.el)).toContain("Recorded sample state, not live"); // UI-10 B2
     click(control(rig.el, "Pause"));
     expect(elWithText(rig.el, "Paused")).toBeTruthy();
     expect(elWithText(rig.el, "Running")).toBeUndefined();

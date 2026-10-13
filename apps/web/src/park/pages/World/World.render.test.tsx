@@ -415,13 +415,15 @@ describe("WEB_6_world_render: Result (Village)", () => {
     const { el } = await mountWorld({ id: "calls" });
     const section = region(el, "Result");
     expect(textOf(q(section, "h2"))).toBe("Result");
-    expect(textOf(section)).toContain(CALLS.mainSub); // the header's right side: w.when
+    // UI-10 B2: a sample is a recording: the header says Sample and the running line says whose state it is
+    const recorded = `Recorded sample state: ${CALLS.mainSub}`;
+    expect(textOf(section)).toContain(recorded);
     expect(elWithText(section, OUT.calls)).toBeTruthy();
-    const line = elWithText(section, CALLS.mainSub);
+    const line = elWithText(section, recorded);
     expect(line, "the running line").toBeTruthy();
     // spinner (an empty element) then the text, as in the reference
     const running = qa(section, "*").filter(
-      (e) => textOf(e) === CALLS.mainSub && e.children.length >= 1,
+      (e) => textOf(e) === recorded && e.children.length >= 1,
     );
     expect(running.length, "a spinner element sits in the running line").toBeGreaterThanOrEqual(1);
     expect(hasControl(section, "Open result")).toBe(false);

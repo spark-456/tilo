@@ -170,7 +170,7 @@ export const CALLS: WorldCopy = {
   facts: [
     ["Owner", "Alex Morgan"],
     ["Started", "09:04"],
-    ["Ends", "in 3 min"],
+    ["Recorded state", "ends in 3 min"],
     ["Agents", "1"],
   ],
   skills: ["Summarise call notes"],
@@ -228,7 +228,7 @@ export const VENUES: WorldCopy = {
   facts: [
     ["Owner", "Alex Morgan"],
     ["Started", "09:01"],
-    ["Ends", "in 6 min"],
+    ["Recorded state", "ends in 6 min"],
     ["Agents", "2"],
   ],
   skills: [],

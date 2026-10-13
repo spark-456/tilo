@@ -3,7 +3,7 @@ import type { ActivityItem, World, WorldDistrict, WorldRun } from "../../api/typ
 import { Button } from "../../components";
 import { icon } from "../../shell/kit";
 import { agentArt } from "./worldArt";
-import { ACTIVITY_DOT, DISTRICT_LOOK, keyed } from "./worldModel";
+import { ACTIVITY_DOT, DISTRICT_LOOK, keyed, recordedLine } from "./worldModel";
 
 function SectionHead({ title, sub }: { title: string; sub: string }) {
   return (
@@ -110,8 +110,11 @@ export function Result({
   slackConnected = true,
   slackReason = "",
   noSlackId,
+  recorded = false,
 }: {
   w: World;
+  /** UI-10 B2: a running line of a sample world is a recording, not a live countdown. */
+  recorded?: boolean;
   onOpen: () => void;
   onSlack: (trigger: HTMLButtonElement) => void;
   slackConnected?: boolean;
@@ -120,7 +123,7 @@ export function Result({
 }) {
   return (
     <section aria-label="Result" className="park-world-section">
-      <SectionHead title="Result" sub={w.when ?? ""} />
+      <SectionHead title="Result" sub={recorded ? "Sample" : (w.when ?? "")} />
       <div className="park-world-result">
         <div className="park-world-out">{w.out ?? ""}</div>
         {w.st === "finished" ? (
@@ -143,7 +146,7 @@ export function Result({
         ) : (
           <div className="park-world-running">
             <span className="park-world-spinner" />
-            <span>{w.when ?? ""}</span>
+            <span>{recorded && w.when ? recordedLine(w.when) : (w.when ?? "")}</span>
           </div>
         )}
       </div>

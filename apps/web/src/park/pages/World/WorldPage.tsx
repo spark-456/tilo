@@ -44,8 +44,10 @@ import { cityArt, rowArt, singleArt } from "./worldArt";
 import {
   LEGEND,
   agentsWord,
+  canPause,
   decisionsWord,
   heroTagOf,
+  isRecordedRunning,
   skillsAndTools,
   stateLook,
 } from "./worldModel";
@@ -266,8 +268,6 @@ export function WorldPage({ app }: { app: AppCtx }) {
   const handoff = loaded.handoffs.find((h) => h.world === w.id) ?? null;
   const open = mine.filter((d) => !dec[d.k]).length + (slackPending ? 1 : 0);
   const look = stateLook(w, isPaused);
-  const chip =
-    w.st === "needs" && !isPaused && app.needsLeft > 0 ? decisionsWord(app.needsLeft) : look[0];
   const { skills, tools } = skillsAndTools(w, loaded.skills, loaded.connectors);
   const slackState = slackConnectorState(loaded.connectors);
   const wide = (app.vw || 1440) >= 1060;
@@ -276,6 +276,15 @@ export function WorldPage({ app }: { app: AppCtx }) {
   const hasStage = loaded.live && !added.some((a) => a.id === w.id);
   const stage = (to: string): string | null => (hasStage ? to : null);
   const real = hasStage && !demo; // a live world of a real account: its toasts may claim real outcomes
+  const recorded = isRecordedRunning(w, real);
+  // UI-10 B2: pausing keeps the decision count (the cards still say "before agents continue"); a recording says so.
+  const chip = isPaused
+    ? w.st === "needs" && app.needsLeft > 0
+      ? `Paused · ${decisionsWord(app.needsLeft)}`
+      : look[0]
+    : w.st === "needs" && app.needsLeft > 0
+      ? decisionsWord(app.needsLeft)
+      : look[0];
 
   const togglePause = () => {
     setPaused((p) => ({ ...p, [w.id]: !isPaused }));
@@ -352,6 +361,9 @@ export function WorldPage({ app }: { app: AppCtx }) {
               <span className="park-world-dot" style={{ background: look[3] }} />
               {chip}
             </span>
+            {recorded && !isPaused ? (
+              <span className="park-world-sub">Recorded sample state, not live</span>
+            ) : null}
           </div>
           <h1 className="park-world-h1" tabIndex={-1}>
             {w.name}
@@ -370,14 +382,16 @@ export function WorldPage({ app }: { app: AppCtx }) {
           ) : null}
         </div>
         <div className="park-world-actions">
-          <Button
-            variant="secondary"
-            icon={icon(isPaused ? "play" : "pause", 14)}
-            onClick={togglePause}
-            {...(w.sample ? { disabled: true, title: "A recorded replay cannot be paused" } : {})}
-          >
-            {isPaused ? "Resume" : "Pause"}
-          </Button>
+          {canPause(w) || isPaused ? (
+            <Button
+              variant="secondary"
+              icon={icon(isPaused ? "play" : "pause", 14)}
+              onClick={togglePause}
+              {...(w.sample ? { disabled: true, title: "A recorded replay cannot be paused" } : {})}
+            >
+              {isPaused ? "Resume" : "Pause"}
+            </Button>
+          ) : null}
           <Button variant="secondary" icon={icon("share", 16)} onClick={share}>
             Share
           </Button>
@@ -563,6 +577,7 @@ export function WorldPage({ app }: { app: AppCtx }) {
             <SpendCard w={w} mine={mine} dec={dec} onLedger={() => app.go("ledger")} />
             <FactsCard
               w={w}
+              recorded={recorded}
               skills={skills}
               tools={tools}
               onSkill={(skill) => app.go("skills", { id: skill })}
@@ -591,6 +606,7 @@ export function WorldPage({ app }: { app: AppCtx }) {
           {!isCity && !isTown ? (
             <Result
               w={w}
+              recorded={recorded}
               onOpen={() => app.toast("Opening the result in Google Drive")}
               onSlack={openSlackDialog}
               slackConnected={slackState.connected}
