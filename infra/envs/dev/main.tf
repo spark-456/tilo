@@ -67,9 +67,11 @@ locals {
 
   # ALL_TRAFFIC: every request from api and harness leaves through the VPC
   # subnet, so calls to internal-only services pass the ingress check and
-  # Google APIs are reached via Private Google Access (network.tf). There is
-  # no Cloud NAT, so these two services have no public-internet egress;
-  # third-party calls belong in connectors or channels (PRD 6.1).
+  # Google's global API VIPs and *.run.app are reached via Private Google Access
+  # and everything else (the regional Model Armor endpoint, NIM, vendor hosts)
+  # through Cloud NAT on this subnet only (network.tf, INFRA-SITTING2). Without
+  # the NAT those calls hang until the client times out. Third-party calls
+  # still belong in connectors or channels where PRD 6.1 puts them.
   caller_vpc_egress = "ALL_TRAFFIC"
 
   # Public placeholder image until CI deploys real images per service.

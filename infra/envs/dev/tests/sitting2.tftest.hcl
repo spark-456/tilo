@@ -90,6 +90,33 @@ run "P870_test_only_cloud_build_identity_reads_source_and_writes_logs_only" {
   }
 }
 
+run "INFRA_SITTING2_cloud_nat_serves_only_the_egress_subnet_and_vpc_egress_stays_all_traffic" {
+  command = plan
+
+  assert {
+    condition = (
+      output.nat_egress.router == "tilo-nat-router" &&
+      output.nat_egress.router_network == "tilo-vpc" &&
+      output.nat_egress.region == "asia-southeast1" &&
+      output.nat_egress.ip_allocation == "AUTO_ONLY" &&
+      output.nat_egress.subnetwork_selection == "LIST_OF_SUBNETWORKS" &&
+      length(output.nat_egress.subnetwork_range_modes) == 1 &&
+      output.nat_egress.log_filter == "ERRORS_ONLY"
+    )
+    error_message = "One NAT on tilo-nat-router: automatic IPs, exactly one subnetwork (tilo-run-egress), errors-only logs."
+  }
+
+  assert {
+    condition     = output.cloud_run_services["api"].vpc_egress == "ALL_TRAFFIC" && output.cloud_run_services["harness"].vpc_egress == "ALL_TRAFFIC"
+    error_message = "api and harness keep ALL_TRAFFIC: calls to internal-only services need it, and the NAT now carries the rest."
+  }
+
+  assert {
+    condition     = output.cloud_run_services["channels"].vpc_egress == null
+    error_message = "tilo-channels has no VPC egress (default internet egress), so the NAT is not on its path."
+  }
+}
+
 run "INFRA_SITTING2_the_bot_stays_off_by_default_and_channels_stay_public" {
   command = plan
 

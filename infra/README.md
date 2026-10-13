@@ -161,12 +161,13 @@ infra ticket adds `timeout` to the service module (open in BQ-AGT14-5).
 
 ### Sitting 2 (INFRA-SITTING2): uploads IAM, TTLs, test-only gate identity, channels env
 
-Without the bot: **11 to add, 0 to change, 0 to destroy**, plus one state move (`tilo-channels` into the `ignore_env`
-resource; its image, scaling and ingress do not change). The 11: custom role `tiloArtifactObjectDelete`, three
-`google_firestore_field.ttl` (`limiter_counters`, `limiter_keys`, `link_nonces`), the accessor on `tilo-link-signing-key`,
-the service account `tilo-cloudbuild-tests` with its staging-bucket and `logWriter` grants, and api's three storage
-grants (`archive` creator and viewer, `artifacts` delete). With `-var=meet_bot_enabled=true` it is 21 to add, 3 to
-change. The steps, the review gate that stops on any destroy or replace, the runtime settings and the rollback are in
+Without the bot: **13 to add, 0 to change, 0 to destroy**, plus one state move (`tilo-channels` into the `ignore_env`
+resource; its image, scaling and ingress do not change). The 13: the Cloud Router `tilo-nat-router` and the Cloud NAT
+`tilo-run-egress-nat` on `tilo-run-egress` (api and harness had no route to the regional Model Armor endpoint or any
+non-Google host: the Home 503), custom role `tiloArtifactObjectDelete`, three `google_firestore_field.ttl`
+(`limiter_counters`, `limiter_keys`, `link_nonces`), the accessor on `tilo-link-signing-key`, the service account
+`tilo-cloudbuild-tests` with its staging-bucket and `logWriter` grants, and api's three storage grants (`archive` creator
+and viewer, `artifacts` delete). With `-var=meet_bot_enabled=true` it is 23 to add, 3 to change. The steps, the review gate that stops on any destroy or replace, the runtime settings and the rollback are in
 [docs/runbooks/infra-sitting-2.md](../docs/runbooks/infra-sitting-2.md).
 
 ## Destroy

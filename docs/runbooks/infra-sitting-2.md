@@ -16,11 +16,23 @@ Sources: `agy-bridge/tasks/USER-INFRA-SITTING-2.md`, `USER-INFRA-SITTING-2-DETAI
 | Test-only gate identity (#870) | `tilo-cloudbuild-tests`: staging-source read and build logs only. The gate keeps `tilo-cloudbuild` until you change `serviceAccount` | `sitting2.tf` |
 | Link signing key | api may read `tilo-link-signing-key` (the secret was made by hand; only the accessor binding is Terraform's) | `sitting2.tf` |
 | Channels env | `tilo-channels` gets `ignore_env`, so the gcloud-set push settings survive a later apply (a `moved` block: no destroy) | `modules/service`, `main.tf` |
+| **Egress NAT (apply first, blocking)** | Cloud Router `tilo-nat-router` plus a Cloud NAT on `tilo-run-egress` only (automatic IPs, errors-only logs). Fixes the live Home 503 ("safety screen failed" after about 10.9 s): api and harness send ALL_TRAFFIC into `tilo-vpc`, which had no NAT, and the regional Model Armor endpoint (and NIM, Canva, Lovable, vendor hosts) is not reached by Private Google Access | `network.tf` |
 | Optional Meet bot | plan made with `meet_bot_enabled=true` (variable default stays false) | existing flag |
+| Skills store | `TILO_SKILLS_STORE=firestore` on tilo-api (`GET /v1/skills` was 503 `SkillStoreNotConfigured`); a gcloud setting, section 6.3 | none |
 | Left OFF | `TILO_PLATE_DIGEST` (section 6.4 says why); the live switch; Gemini Live (`voice.live.enabled` and `price_approved` stay false) | none |
 
 Expected plan with the bot, from the code (not from a refreshed plan; the script in section 3 enforces it):
-**21 to add, 3 to change, 0 to destroy**, plus one "has moved" (channels). Anything else: stop and send it for review.
+**23 to add, 3 to change, 0 to destroy**, plus one "has moved" (channels). Without the bot it is 13 to add, 0 to change.
+Anything else: stop and send it for review.
+
+**Order of the sitting:** sections 1 to 3 (plan and review), then 4 (apply). The saved plan already contains the NAT, so the
+apply creates it with everything else. Then do the section 4 verification (NAT, then a Home task) before any env step in
+sections 5 and 6: if Home still answers 503 after the NAT shows READY, stop there and send the log lines.
+
+**Cost of the NAT:** Cloud NAT bills a small per-hour charge for the gateway while it exists plus a per-GiB charge on the
+traffic through it, and automatically allocated external IPs may carry a small address charge while in use. At this
+project's traffic that is cents a month, not a budget item; check the regional price before you apply if it matters. Only
+`tilo-run-egress` is NATed, nothing else in the project gains internet egress.
 
 ## 1. Preflight (read-only)
 
@@ -92,6 +104,8 @@ $expectAdd = @(
   'google_storage_bucket_iam_member.service_access["archive::api::roles/storage.objectCreator"]',
   'google_storage_bucket_iam_member.service_access["archive::api::roles/storage.objectViewer"]',
   'google_storage_bucket_iam_member.service_access["artifacts::api::projects/essential-wares-510320-f0/roles/tiloArtifactObjectDelete"]',
+  # egress NAT (network.tf): the fix for the Home 503
+  'google_compute_router.nat', 'google_compute_router_nat.run_egress',
   # the optional bot (MEETING-OPTIONAL-BOT-PLAN-14OCT.md items 1 to 10)
   'google_project_service.apis["texttospeech.googleapis.com"]',
   'module.service.google_service_account.this["meet-bot"]',
@@ -159,6 +173,33 @@ gcloud secrets get-iam-policy tilo-link-signing-key --project $P --format='value
 If a TTL field shows an empty `indexConfig` (all indexes disabled) where it had indexes before, say so before going on:
 the policy was written without an index configuration on purpose.
 
+### 4.1 Verify the NAT with a Home task, before any env step
+
+The NAT needs no new Cloud Run revision: running instances use it on their next outbound connection. Order: NAT exists and
+serves the subnet, then one Home task, then (only if it passes) sections 5 and 6.
+
+```powershell
+$P = 'essential-wares-510320-f0'; $R = 'asia-southeast1'
+# The NAT exists, serves exactly the egress subnet, and has automatic IPs:
+gcloud compute routers nats describe tilo-run-egress-nat --router tilo-nat-router --region $R --project $P `
+  --format='yaml(natIpAllocateOption,sourceSubnetworkIpRangesToNat,subnetworks,logConfig)'
+gcloud compute routers get-status tilo-nat-router --region $R --project $P --format='yaml(result.natStatus)'
+```
+
+Then, in the web app (signed in as the owner), submit one short synthetic task from Home (for example one sentence asking
+for a two-line plan). Expect it to be accepted. Server side, read-only:
+
+```powershell
+# POST /intake: status 200 (or 2xx) and a latency well under 10 s; before the NAT it was 503 after about 10.9 s.
+gcloud logging read 'resource.type="cloud_run_revision" AND resource.labels.service_name="tilo-api" AND httpRequest.requestUrl:"/intake"' `
+  --project $P --freshness 15m --limit 10 --format='table(timestamp,httpRequest.status,httpRequest.latency)'
+# NAT errors only (dropped connections, port exhaustion); no lines is the expected answer:
+gcloud logging read 'resource.type="nat_gateway"' --project $P --freshness 15m --limit 10 --format='table(timestamp,jsonPayload.allocation_status,jsonPayload.connection.dest_ip)'
+```
+
+If `/intake` is still 503 with `safety screen failed`, the NAT is not the whole story: stop, and send those log lines and
+the `nats describe` output. Do not continue to sections 5 and 6 on a failing Home task.
+
 ## 5. Meet bot image (the digest from the details file, section 2)
 
 The digest below still exists in Artifact Registry (checked read-only 14 Oct, tag `be6cbc43`, built 11 Oct). It predates
@@ -183,7 +224,8 @@ Check: image is the digest, `timeoutSeconds` 3600, `containerConcurrency` 1, `ma
 
 ## 6. Runtime settings (gcloud; `--update-*` keeps every other setting; secrets only as secret references)
 
-Order matters: channels first (api needs its URL), then api, then the bot. Do 6.1 to 6.3 before 6.5. No command here
+Only after section 4.1 passed (the NAT is in place and a Home task is accepted). Order matters: channels first (api
+needs its URL), then api, then the bot. Do 6.1 to 6.3 before 6.5. No command here
 removes or rewrites an existing setting (LIVE, the stores, the schedule tick settings stay).
 
 ```powershell
@@ -220,8 +262,12 @@ if ($LASTEXITCODE -ne 0 -or $Pub -notmatch '^[A-Za-z0-9_-]{87}$') { throw 'could
 "public key length: $($Pub.Length)"
 ```
 
-### 6.3 tilo-api: push, uploads, link signing
+### 6.3 tilo-api: push, uploads, link signing, skills store
 
+* `TILO_SKILLS_STORE=firestore` (with `TILO_FIRESTORE_PROJECT`, already set): `GET /v1/skills` answers 503 `not_configured`
+  (`SkillStoreNotConfigured`, `deps.get_skill_store`) until it is set. Documents live at `orgs/{org}/taught_skills/{id}` in
+  the `(default)` database with single-field queries only, so no index is needed and tilo-api's existing
+  `datastore.user` (conditioned to `(default)`) covers it. Roll back with `--remove-env-vars TILO_SKILLS_STORE`.
 * `TILO_ARTIFACTS_STORE` / `TILO_ARCHIVE_STORE` = `gcs` with the two real buckets. The code refuses the same bucket for both,
   and refuses `GOOGLE_CLOUD_PROJECT` differing from `TILO_FIRESTORE_PROJECT` (both are already set and equal).
   Setting these makes run archives and artifacts durable and opens uploads; uploads were `503 not_configured` before.
@@ -233,7 +279,7 @@ if ($LASTEXITCODE -ne 0 -or $Pub -notmatch '^[A-Za-z0-9_-]{87}$') { throw 'could
 ```powershell
 gcloud run services update tilo-api --project $P --region $R `
   --update-secrets 'TILO_LINK_SIGNING_KEY=tilo-link-signing-key:latest' `
-  --update-env-vars "^#^TILO_WEBPUSH_VAPID_PUBLIC_KEY=$Pub#TILO_CHANNELS_URL=$ChUrl#TILO_ARTIFACTS_STORE=gcs#TILO_ARTIFACTS_BUCKET=$P-artifacts#TILO_ARCHIVE_STORE=gcs#TILO_ARCHIVE_BUCKET=$P-archive#TILO_LINK_KEY_ID=key_a#TILO_LINK_BASE_URL=$ApiUrl"
+  --update-env-vars "^#^TILO_WEBPUSH_VAPID_PUBLIC_KEY=$Pub#TILO_CHANNELS_URL=$ChUrl#TILO_ARTIFACTS_STORE=gcs#TILO_ARTIFACTS_BUCKET=$P-artifacts#TILO_ARCHIVE_STORE=gcs#TILO_ARCHIVE_BUCKET=$P-archive#TILO_LINK_KEY_ID=key_a#TILO_LINK_BASE_URL=$ApiUrl#TILO_SKILLS_STORE=firestore"
 if ($LASTEXITCODE -ne 0) { throw 'api update failed; stop' }
 ```
 
@@ -292,7 +338,7 @@ $ApiNames = 'TILO_SCHEDULE_TICK_AUDIENCE', 'TILO_SCHEDULE_TICK_CALLER', 'TILO_RU
   'TILO_TASKS_CALLER', 'TILO_SCHEDULES_STORE', 'TILO_TEAM_STORE', 'TILO_API_STORE', 'TILO_PEOPLE_STORE', 'TILO_OUTBOX_STORE', 'TILO_CONNECTORS_URL',
   'LIVE', 'GOOGLE_CLOUD_PROJECT', 'GOOGLE_LOCATION',
   'TILO_WEBPUSH_VAPID_PUBLIC_KEY', 'TILO_CHANNELS_URL', 'TILO_ARTIFACTS_STORE', 'TILO_ARTIFACTS_BUCKET', 'TILO_ARCHIVE_STORE', 'TILO_ARCHIVE_BUCKET',
-  'TILO_LINK_SIGNING_KEY', 'TILO_LINK_KEY_ID', 'TILO_LINK_BASE_URL', 'TILO_MEET_BOT_URL'
+  'TILO_LINK_SIGNING_KEY', 'TILO_LINK_KEY_ID', 'TILO_LINK_BASE_URL', 'TILO_MEET_BOT_URL', 'TILO_SKILLS_STORE'
 $Emul = 'API_ENDPOINT_OVERRIDE', 'FIRESTORE_EMULATOR_HOST', 'STORAGE_EMULATOR_HOST', 'TILO_API_DEV', 'TILO_JUDGE_LIVE', 'TILO_MODELS_FILE', 'TILO_RECORD', 'TILO_PLATE_DIGEST'
 Test-Env 'tilo-api' ($ApiNames + @('TILO_NUDGES')) $Emul   # TILO_NUDGES shows MISSING until 6.6; that is expected
 Test-Env 'tilo-channels' @('WEBPUSH_VAPID_PRIVATE_KEY', 'TILO_WEBPUSH_VAPID_SUBJECT', 'TILO_PUSH_AUDIENCE', 'TILO_PUSH_CALLER') ($Emul + 'LIVE')
@@ -348,14 +394,21 @@ with `TILO_CHANNELS_URL`, `TILO_PUSH_CALLER` with the tilo-api service account).
 
 ### Network: what is already allowed, and what is not
 
-* **Egress from tilo-channels**: nothing to change. `channels` has no VPC egress in `main.tf`, so it uses Cloud Run's
-  default direct egress to the internet. The environment has no firewall rule, no Cloud NAT and no egress allow-list at all
-  (`infra/envs/dev/network.tf` is one VPC and one subnet with Private Google Access, used only by api, harness, which call
-  internal services). HTTPS to `fcm.googleapis.com`, `push.services.mozilla.com`, `notify.windows.com`,
-  `web.push.apple.com` and `www.googleapis.com` is therefore already open. The sender still checks the host list in
+* **Egress from tilo-channels (push hosts)**: nothing to change for channels itself. `channels` has no VPC egress in
+  `main.tf`, so it uses Cloud Run's default direct egress to the internet, and the environment has no firewall rule or egress
+  allow-list. HTTPS to `fcm.googleapis.com`, `push.services.mozilla.com`, `notify.windows.com`, `web.push.apple.com` and
+  `www.googleapis.com` is therefore already open and does not use the NAT. The sender still checks the host list in
   `config/web_push.yaml`, and that every resolved address is public, per request.
+* **Egress from tilo-api and tilo-harness: this was broken, and the plan fixes it.** (An earlier version of this runbook and
+  of BQ-INFRA-S2-1 said "egress needs no change"; that holds for channels only.) Both send ALL_TRAFFIC into
+  `tilo-vpc/tilo-run-egress`, which had Private Google Access but **no Cloud Router or Cloud NAT**. Private Google Access
+  reaches Google's global API VIPs and `*.run.app`; it does not reach the regional Model Armor endpoint
+  (`modelarmor.asia-southeast1.rep.googleapis.com`) or any non-Google host (NVIDIA NIM, Canva, Lovable, vendor sites), so those
+  calls hung until the client timed out (the Home 503 after about 10.9 s). `network.tf` now adds `tilo-nat-router` and the NAT
+  `tilo-run-egress-nat` for that one subnet. ALL_TRAFFIC stays: calls to internal-only services need it.
 * **tilo-api to tilo-channels**: api's egress is `ALL_TRAFFIC` through the subnet, and `*.run.app` is reached with Private Google
-  Access (the same path api uses to reach connectors and harness). Channels has ingress `all`, so the call passes.
+  Access (the same path api uses to reach connectors and harness), not through the NAT. Channels has ingress `all`, so the
+  call passes.
 * **Ingress from tilo-api only**: NOT what is deployed, and not changeable by a firewall entry. `tilo-channels` must stay
   public (`INGRESS_TRAFFIC_ALL`, `allUsers` invoker): the Gmail push subscription and WhatsApp webhooks call it from outside
   the VPC. `POST /internal/push/send` is protected by the route itself: a Google-signed ID token for
@@ -427,7 +480,7 @@ Settings (each is a merge; nothing else is touched):
 gcloud run services update tilo-channels --project $P --region $R `
   --remove-env-vars 'TILO_WEBPUSH_VAPID_SUBJECT,TILO_PUSH_AUDIENCE,TILO_PUSH_CALLER' --remove-secrets 'WEBPUSH_VAPID_PRIVATE_KEY'
 gcloud run services update tilo-api --project $P --region $R `
-  --remove-env-vars 'TILO_WEBPUSH_VAPID_PUBLIC_KEY,TILO_CHANNELS_URL,TILO_ARTIFACTS_STORE,TILO_ARTIFACTS_BUCKET,TILO_ARCHIVE_STORE,TILO_ARCHIVE_BUCKET,TILO_LINK_KEY_ID,TILO_LINK_BASE_URL,TILO_NUDGES,TILO_MEET_BOT_URL' `
+  --remove-env-vars 'TILO_WEBPUSH_VAPID_PUBLIC_KEY,TILO_CHANNELS_URL,TILO_ARTIFACTS_STORE,TILO_ARTIFACTS_BUCKET,TILO_ARCHIVE_STORE,TILO_ARCHIVE_BUCKET,TILO_LINK_KEY_ID,TILO_LINK_BASE_URL,TILO_NUDGES,TILO_MEET_BOT_URL,TILO_SKILLS_STORE' `
   --remove-secrets 'TILO_LINK_SIGNING_KEY'
 gcloud run services update tilo-meet-bot --project $P --region $R `
   --remove-env-vars 'BOT_JOIN_MODE,TILO_MEET_BOT_AUDIENCE,TILO_MEET_BOT_CALLER'
@@ -443,6 +496,8 @@ Infrastructure: the additions are removable, but only by a reviewed plan, never 
   `ignore_env` flag and the `moved` block for tilo-channels** (removing only the `moved` block would plan a destroy and
   create of the channels service). Plan with the same variables as section 2 and read it: the only destroys allowed are the
   resources of this sitting (custom role, three TTL fields, accessor, test identity and its two grants, the three storage
-  grants and, if you also set `meet_bot_enabled=false`, the bot's ten resources). Any other destroy: stop.
+  grants and, if you also set `meet_bot_enabled=false`, the bot's ten resources). Any other destroy: stop. Do not roll the
+  NAT back unless you accept that Home's safety screen (Model Armor) and every non-Google call from api and harness hang
+  again; if you must, it is two resources (`tilo-run-egress-nat`, `tilo-nat-router`) and removing them changes nothing else.
 * A deleted custom role is soft-deleted for 7 days; recreate it within that window with `gcloud iam roles undelete`.
 * Destroying a TTL field config only stops deletion; it does not restore deleted documents.

@@ -417,4 +417,10 @@ additive: no destroy, no replacement, no change to a bucket's lifecycle, retenti
   `WEBPUSH_VAPID_PRIVATE_KEY` are gcloud's. Terraform declares no env block (tests/repo guard).
 - api reads `tilo-link-signing-key`: a standalone accessor binding, because the secret was made by hand (automatic
   replication; the placeholders are `user_managed` in `asia-southeast1`), see BQ-INFRA-S2-3.
+- Cloud NAT (`network.tf`: `tilo-nat-router`, `tilo-run-egress-nat`): api and harness send ALL_TRAFFIC into
+  `tilo-vpc/tilo-run-egress`, and Private Google Access does not reach the regional Model Armor endpoint or any non-Google
+  host, so those calls hung (Home `/intake` 503 "safety screen failed" after about 10.9 s). The NAT serves that one subnet
+  with automatic IPs and errors-only logs. There is still no firewall rule and no egress allow-list; the browser worker's
+  allow-list proxy (PRD 6.5) is not in Terraform. `tilo-channels` has no VPC egress and does not use the NAT.
+- `TILO_SKILLS_STORE=firestore` on tilo-api is a gcloud setting (runbook 6.3); no IAM change (its `datastore.user` covers it).
 - `meet_bot_enabled` stays false by default; the runbook plans with it true for the optional bot.

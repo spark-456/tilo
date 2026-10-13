@@ -145,6 +145,20 @@ output "vpc_egress_subnetwork" {
   }
 }
 
+output "nat_egress" {
+  description = "Cloud NAT for the egress subnet (INFRA-SITTING2): the one subnet it serves and how it allocates IPs."
+  value = {
+    router                 = google_compute_router.nat.name
+    router_network         = google_compute_network.vpc.name
+    nat                    = google_compute_router_nat.run_egress.name
+    region                 = google_compute_router_nat.run_egress.region
+    ip_allocation          = google_compute_router_nat.run_egress.nat_ip_allocate_option
+    subnetwork_selection   = google_compute_router_nat.run_egress.source_subnetwork_ip_ranges_to_nat
+    subnetwork_range_modes = [for s in google_compute_router_nat.run_egress.subnetwork : s.source_ip_ranges_to_nat]
+    log_filter             = google_compute_router_nat.run_egress.log_config[0].filter
+  }
+}
+
 output "oauth_token_key_role" {
   description = "The single role bound on the oauth-tokens key (connectors only)."
   value       = module.kms.oauth_token_key_role
