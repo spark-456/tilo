@@ -135,3 +135,19 @@ export function problemOf(e: unknown, saving: boolean): string {
     f.message && f.name === "TiloApiError" ? f.message : "Tilo could not read the reply.";
   return saving ? `${said} Nothing was saved. Your changes are still here.` : said;
 }
+
+/**
+ * Issue 588 / BQ-SETWEB-1: the design shows "(GMT+1)" beside the zone. A display-only label for an IANA name
+ * ("Europe/London" -> "GMT+1" in summer); null for anything the runtime does not know. It is never saved.
+ */
+export function gmtLabel(zone: string, at: Date = new Date()): string | null {
+  try {
+    const parts = new Intl.DateTimeFormat("en", {
+      timeZone: zone.trim(),
+      timeZoneName: "shortOffset",
+    }).formatToParts(at);
+    return parts.find((p) => p.type === "timeZoneName")?.value ?? null;
+  } catch {
+    return null;
+  }
+}
