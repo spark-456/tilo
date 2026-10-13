@@ -415,6 +415,11 @@ export class HttpClient implements TiloClient, SchedulesApi, FieldsApi, ItemApi 
     return this.request<unknown>(path, init, true);
   }
 
+  /** A plain DELETE of `path`, decoded as JSON, with `write` true (ADR-0041 model key removal). */
+  deleteJson(path: string): Promise<unknown> {
+    return this.request<unknown>(path, { method: "DELETE" }, true);
+  }
+
   private post<T>(path: string, body: unknown): Promise<T> {
     // STARTER-1: the sample project is a recorded replay. A write for it is refused here and never sent: no
     // request leaves for it, whoever asks. Nothing is simulated.
