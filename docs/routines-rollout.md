@@ -65,7 +65,7 @@ set on a deployed service, and flags names that are not on the allowlist. It nev
 $Project = "essential-wares-510320-f0"; $Region = "asia-southeast1"
 $Allow = @("TILO_SCHEDULE_TICK_AUDIENCE","TILO_SCHEDULE_TICK_CALLER","TILO_SCHEDULES_STORE","TILO_FIRESTORE_PROJECT",
   "TILO_RUNS_QUEUE","TILO_TASKS_CALLER","TILO_TEAM_STORE","TILO_SKILLS_STORE","TILO_API_CORS_ORIGINS","TILO_APPCHECK_ENFORCE","TILO_PEOPLE_BOOTSTRAP_UID")        # extend per service as settings are added
-$Optional = @("TILO_API_STORE","TILO_PEOPLE_STORE")  # PROD-WIRE durable stores (docs/deploy-dev.md), set once ADR-0026 is accepted
+$Optional = @("TILO_API_STORE","TILO_PEOPLE_STORE","TILO_VOICE_METER","TILO_VOICE_METER_AUDIENCE","TILO_VOICE_METER_CALLER")  # PROD-WIRE durable stores (set once ADR-0026 is accepted); the meeting bot's voice meter (ADR-0042; docs/deploy-dev.md)
 $Never = @("LIVE","TILO_API_DEV","TILO_JUDGE_LIVE","FIRESTORE_EMULATOR_HOST","TILO_MODELS_FILE")
 $Svc = gcloud run services describe tilo-api --project $Project --region $Region --format json | ConvertFrom-Json
 $Vars = @($Svc.spec.template.spec.containers[0].env)
