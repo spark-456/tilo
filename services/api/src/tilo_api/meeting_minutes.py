@@ -71,6 +71,7 @@ def analyze_and_publish_minutes(
             now=w.now,
             budget=budget,
             safety=safety,
+            agenda=meeting["agenda"],
         )
     except ValueError:
         raise Refusal(502, "analysis_failed") from None
