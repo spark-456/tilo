@@ -124,7 +124,7 @@ describe("FR_ACC_03 sync status shows a spinner only while a sync is in flight",
     expect(spinners(root).length).toBe(0);
     const d = openTile(root, "Google Drive");
     expect(spinners(d).length).toBe(0);
-    expect(hasExactText(d, "Healthy · synced 8 min ago")).toBe(true);
+    expect(hasExactText(d, "Example only · no sync or health check recorded")).toBe(true);
   });
 
   it("FR_ACC_03_sync_now_shows_a_spinner_and_Syncing_until_the_sync_ends", async () => {
@@ -135,7 +135,7 @@ describe("FR_ACC_03 sync status shows a spinner only while a sync is in flight",
     expect(textOf(d)).toContain("Syncing");
     await flush();
     expect(spinners(d).length, "settled").toBe(0);
-    expect(hasExactText(d, "Healthy · synced just now")).toBe(true);
+    expect(hasExactText(d, "Example only · no sync or health check recorded")).toBe(true);
   });
 });
 
@@ -155,7 +155,7 @@ describe("FR_ACC_04 the sign-in expiry warning shows 3 days ahead", () => {
   it("FR_ACC_04_four_days_ahead_shows_no_warning", async () => {
     const { root } = await open(withHubspotExpiry(NOW + 4 * DAY));
     expect(banner(root)).toBeNull();
-    expect(textOf(tileFor(root, "HubSpot") as HTMLElement)).toContain("Synced 2 min ago");
+    expect(textOf(tileFor(root, "HubSpot") as HTMLElement)).toContain("Example only: not synced");
   });
 
   it("FR_ACC_04_just_over_three_days_ahead_shows_no_warning", async () => {
@@ -204,7 +204,7 @@ describe("FR_ACC_04 reconnect is one click and never shows Tilo a password", () 
     click(buttonText(banner(root) as HTMLElement, "Reconnect") as HTMLElement);
     await waitFor(() => banner(root) === null, "the banner clears");
     expect(app.toast.mock.calls.at(-1)?.[0]).toBe("HubSpot reconnected for 90 days");
-    expect(textOf(tileFor(root, "HubSpot") as HTMLElement)).toContain("Synced just now");
+    expect(textOf(tileFor(root, "HubSpot") as HTMLElement)).toContain("Example only: not synced");
   });
 
   it("FR_ACC_04_the_detail_panel_of_an_expiring_tool_has_its_own_one_click_reconnect", async () => {
@@ -213,7 +213,7 @@ describe("FR_ACC_04 reconnect is one click and never shows Tilo a password", () 
     expect(textOf(d)).toContain("Sign-in expires in 1 day");
     click(buttonText(d, "Reconnect") as HTMLElement);
     await waitFor(() => banner(root) === null, "the banner clears");
-    expect(hasExactText(d, "Healthy · synced just now")).toBe(true);
+    expect(hasExactText(d, "Example only · no sync or health check recorded")).toBe(true);
     expect(buttonText(d, "Reconnect")).toBeUndefined();
   });
 

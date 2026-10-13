@@ -1009,3 +1009,55 @@
   cursor: pointer;
   padding: 0 2px;
 }
+
+/* ---- a phone (13 Oct QA, 390x844): the greeting and the stacked composer are taller than the screen together,
+   so two panels pinned by offsets lay chips over the "decisions waiting" pill. Here the page is one column that
+   scrolls: nothing is placed by a fixed top or bottom, so nothing can overlap, whatever height the panels take. ---- */
+@media (max-width: 480px) {
+  [data-park] .park-home-root {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    box-sizing: border-box;
+    height: 100vh;
+    min-height: 0;
+    padding: 96px 24px 16px;
+    overflow-x: hidden;
+    overflow-y: auto;
+  }
+  /* the sample banner is pinned under the nav (sample.css); the column starts below it */
+  [data-park] .park-shell__main:has(.park-first-run-banner--home) .park-home-root {
+    padding-top: 148px;
+  }
+  [data-park] .park-home-leftcol,
+  [data-park] .park-home-composer {
+    position: static;
+    transform: none;
+    width: auto;
+    max-width: none;
+    flex: none;
+  }
+  [data-park] .park-home-legal {
+    position: static;
+    align-self: flex-end;
+    flex: none;
+    max-width: 100%;
+    height: auto;
+    min-height: 24px;
+    flex-wrap: wrap;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+  /* the input gets the full width of its row (its placeholder is the only hint of what to write) and the start
+     button the row under it */
+  [data-park] .park-home-input-row {
+    flex-wrap: wrap;
+  }
+  [data-park] .park-home-input {
+    flex: 1 1 100%;
+    height: 48px;
+  }
+  [data-park] .park-home-start {
+    flex: 1 1 100%;
+  }
+}
