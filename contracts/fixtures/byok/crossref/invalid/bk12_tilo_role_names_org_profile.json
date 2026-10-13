@@ -1,0 +1,87 @@
+{
+  "byok": {
+    "version": 1,
+    "example": true,
+    "enabled": true,
+    "day_cap_credits_max": 10000,
+    "calls_per_org_per_minute": 120,
+    "consent_version": 1,
+    "bundles": {
+      "openai-compat-example": {
+        "label": "OpenAI-compatible endpoint (example)",
+        "kind": "openai_compat",
+        "roles": {
+          "director": {
+            "primary": "byok-large",
+            "fallback": "byok-small"
+          },
+          "writer": {
+            "primary": "byok-large",
+            "fallback": "byok-small"
+          }
+        }
+      }
+    }
+  },
+  "providers": {
+    "models": {
+      "example": true,
+      "profiles": {
+        "large": {
+          "provider": "fake",
+          "model": "example-large",
+          "context": 1000000,
+          "caps": ["json", "tools"]
+        },
+        "byok-large": {
+          "provider": "openai_compat",
+          "model": "example-org-model-large",
+          "context": 128000,
+          "caps": ["json", "tools"],
+          "base_url": "https://api.example.com/v1",
+          "credential": "org"
+        },
+        "byok-small": {
+          "provider": "openai_compat",
+          "model": "example-org-model-small",
+          "context": 128000,
+          "caps": ["json"],
+          "base_url": "https://api.example.com/v1",
+          "credential": "org"
+        }
+      },
+      "roles": {
+        "director": {
+          "primary": "byok-large"
+        },
+        "writer": {
+          "primary": "large"
+        }
+      },
+      "rules": {
+        "deny": ["*-preview*"]
+      }
+    },
+    "prices": {
+      "status": "set",
+      "effective_date": "2026-10-13",
+      "source": "example list prices, replaced by the user's own",
+      "currency": "USD",
+      "credit_usd": 0.005,
+      "profiles": {
+        "large": {
+          "input": 0.1,
+          "output": 0.4
+        },
+        "byok-large": {
+          "input": 0.2,
+          "output": 0.6
+        },
+        "byok-small": {
+          "input": 0.05,
+          "output": 0.15
+        }
+      }
+    }
+  }
+}

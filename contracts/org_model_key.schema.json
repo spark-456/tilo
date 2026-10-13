@@ -1,0 +1,246 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.tilo.example/org_model_key.schema.json",
+  "x-version": "1.0.0",
+  "title": "OrgModelKey",
+  "description": "An organisation's own model key as tilo-api keeps and serves it (ADR-0041 decisions 2, 3 and 10, BK-01 to BK-08, BK-20; Proposed and inert until config/byok.yaml enabled is true): the stored reference orgs/{org}/model_keys/models, the audit entry orgs/{org}/byok_audit/{id}, and the bodies and answers of GET, PUT, PATCH and DELETE /v1/org/model-key; this root is any one of them. The key itself is in exactly one place on this surface: put_request.key, in transit, handed to the vault and dropped (BK-02). Every other object is closed and has no field for a key, a length, a hash, the last four characters, a secret name, a URL or a model id (BK-04); the org is never a field of a route body or answer (BK-08), it is the verified principal's. A body is JSON only. The rules that compare values or need the directory, the clock, the vault or config/byok.yaml are in byok.rules.md and are checked by the routes.",
+  "anyOf": [
+    { "$ref": "#/$defs/reference" },
+    { "$ref": "#/$defs/audit_entry" },
+    { "$ref": "#/$defs/put_request" },
+    { "$ref": "#/$defs/put_answer" },
+    { "$ref": "#/$defs/patch_request" },
+    { "$ref": "#/$defs/member_view" },
+    { "$ref": "#/$defs/owner_view" },
+    { "$ref": "#/$defs/remove_answer" },
+    { "$ref": "#/$defs/error" }
+  ],
+  "$defs": {
+    "slot": {
+      "description": "The one slot of the first slice: one active key per org (ADR-0041 decision 1). Part of the vault's secret name and of every RPC body that names a key.",
+      "const": "models"
+    },
+    "key": {
+      "description": "A model provider's API key as it is typed: 8 to 512 characters of a bearer token's alphabet (letters, digits and _ . ~ + / = -), nothing else, so a service-account JSON, a quoted string or a pasted sentence never matches and is refused (BQ-BYOK-2; the route answers key_refused). A trailing newline is refused in every engine. Never stored, logged, echoed or returned (BK-02), and never a field of any answer.",
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_.~+/=-]{8,512}$",
+      "not": { "pattern": "\n" }
+    },
+    "consent_version": { "type": "integer", "minimum": 1 },
+    "day_cap_credits": {
+      "description": "The org's own cap on this key's daily spend in credits (BK-16): at least 1, never null, at most config/byok.yaml day_cap_credits_max (the route checks).",
+      "type": "integer",
+      "minimum": 1
+    },
+    "status": {
+      "description": "The reference's state: unverified (stored but never validated, no run can use it), active, paused (the owner stopped it, BK-07) or invalid (the provider refused it three times and the re-validation, BK-17). A removed key has no record at all.",
+      "type": "string",
+      "enum": ["unverified", "active", "paused", "invalid"]
+    },
+    "last_error": {
+      "description": "The fixed code of the provider's last refusal (BK-17), never the provider's text: some providers echo key fragments.",
+      "type": "string",
+      "enum": ["invalid_key", "quota", "rate_limited", "unreachable"]
+    },
+    "reference": {
+      "description": "orgs/{org}/model_keys/models (ADR-0041 decision 2, BK-04): the org's choices and stamps and the version of the vault secret, never a key character, length, hash or last four. rotated_at is null until a rotation; rev starts at 1 and is the compare-and-set counter of every write. The record is written by tilo-api's routes only and never by a model, a skill or a tool (BK-18).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "bundle_id",
+        "status",
+        "secret_version",
+        "set_by",
+        "set_at",
+        "rotated_at",
+        "day_cap_credits",
+        "fallback_to_tilo",
+        "refusals",
+        "last_error",
+        "last_used_at",
+        "consent_version",
+        "rev"
+      ],
+      "properties": {
+        "bundle_id": { "$ref": "byok.schema.json#/$defs/bundle_id" },
+        "status": { "$ref": "#/$defs/status" },
+        "secret_version": { "type": "integer", "minimum": 1 },
+        "set_by": { "$ref": "common.schema.json#/$defs/user_id" },
+        "set_at": { "$ref": "common.schema.json#/$defs/timestamp" },
+        "rotated_at": {
+          "anyOf": [{ "$ref": "common.schema.json#/$defs/timestamp" }, { "type": "null" }]
+        },
+        "day_cap_credits": { "$ref": "#/$defs/day_cap_credits" },
+        "fallback_to_tilo": { "type": "boolean" },
+        "refusals": {
+          "description": "Consecutive provider refusals since the last success (BK-17).",
+          "type": "integer",
+          "minimum": 0
+        },
+        "last_error": { "anyOf": [{ "$ref": "#/$defs/last_error" }, { "type": "null" }] },
+        "last_used_at": {
+          "anyOf": [{ "$ref": "common.schema.json#/$defs/timestamp" }, { "type": "null" }]
+        },
+        "consent_version": { "$ref": "#/$defs/consent_version" },
+        "rev": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "audit_entry": {
+      "description": "orgs/{org}/byok_audit/{id}: one entry per act on the key (ADR-0041 decision 2), written by the route after the act and never by a model. id is 32 lower-case hex characters. action is set, rotate, change (pause, resume, cap, fallback) or remove. bundle and version are the reference's after the act, null when none. outcome is ok, or the fixed code of an act that reached the vault and failed. authz is the owner's person authz (common.schema.json authz): the person act that BK-07 asks for, the owner's own act for a narrowing one; its ref equals actor and its at is the act's time (validator, byok.rules.md BK-07).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "at", "actor", "action", "bundle", "version", "outcome", "authz"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[0-9a-f]{32}$", "not": { "pattern": "\n" } },
+        "at": { "$ref": "common.schema.json#/$defs/timestamp" },
+        "actor": { "$ref": "common.schema.json#/$defs/user_id" },
+        "action": { "type": "string", "enum": ["set", "rotate", "change", "remove"] },
+        "bundle": {
+          "anyOf": [{ "$ref": "byok.schema.json#/$defs/bundle_id" }, { "type": "null" }]
+        },
+        "version": { "anyOf": [{ "type": "integer", "minimum": 1 }, { "type": "null" }] },
+        "outcome": { "type": "string", "enum": ["ok", "key_refused", "unavailable"] },
+        "authz": { "$ref": "common.schema.json#/$defs/authz" }
+      },
+      "if": { "required": ["authz"] },
+      "then": { "properties": { "authz": { "properties": { "by": { "const": "person" } } } } }
+    },
+    "put_request": {
+      "description": "PUT /v1/org/model-key: set or rotate (T3, org_model_key_change, BK-07). confirm is exactly true and consent_version the version of the line the person saw, else 422 confirm_required (BK-06). bundle_id is one of config/byok.yaml's; day_cap_credits is required; fallback_to_tilo is left out for off. key is the one secret on this surface and the body is no-store: no log, trace, error or audit entry holds it, and a refused body answers a fixed code, never its input (BK-02).",
+      "x-no-store": true,
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["confirm", "consent_version", "bundle_id", "day_cap_credits", "key"],
+      "properties": {
+        "confirm": { "const": true },
+        "consent_version": { "$ref": "#/$defs/consent_version" },
+        "bundle_id": { "$ref": "byok.schema.json#/$defs/bundle_id" },
+        "day_cap_credits": { "$ref": "#/$defs/day_cap_credits" },
+        "fallback_to_tilo": { "type": "boolean" },
+        "key": { "$ref": "#/$defs/key" }
+      }
+    },
+    "put_answer": {
+      "description": "The 200 answer to put: the state the reference now has, the vault's secret version and whether the provider accepted the key. validated is false only when the process may not go live (EFF-01), and then the state is unverified and no run can use the key (decision 2); a refused key is 422 key_refused and nothing is kept.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["state", "secret_version", "validated"],
+      "properties": {
+        "state": { "type": "string", "enum": ["unverified", "active"] },
+        "secret_version": { "type": "integer", "minimum": 1 },
+        "validated": { "type": "boolean" }
+      },
+      "if": { "properties": { "validated": { "const": true } }, "required": ["validated"] },
+      "then": { "properties": { "state": { "const": "active" } } },
+      "else": { "properties": { "state": { "const": "unverified" } } }
+    },
+    "patch_request": {
+      "description": "PATCH /v1/org/model-key: pause or resume, change the cap, turn fallback on or off (BQ-BYOKC-1 for the verb). At least one of paused, day_cap_credits and fallback_to_tilo. Narrowing (pause, a lower cap, fallback off) is immediate and needs no confirm; resume, a higher cap and fallback on are T3 widening acts and need confirm true with consent_version, together (BK-07: the route compares with the reference, the schema cannot). No key and no bundle: a different key or bundle is a put.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "paused": { "type": "boolean" },
+        "day_cap_credits": { "$ref": "#/$defs/day_cap_credits" },
+        "fallback_to_tilo": { "type": "boolean" },
+        "confirm": { "const": true },
+        "consent_version": { "$ref": "#/$defs/consent_version" }
+      },
+      "dependentRequired": { "confirm": ["consent_version"], "consent_version": ["confirm"] },
+      "not": {
+        "properties": { "paused": false, "day_cap_credits": false, "fallback_to_tilo": false }
+      }
+    },
+    "member_view": {
+      "description": "GET answer for any signed-in member of the org who is not its owner (BK-20): whether the org's own key is active and its bundle label, so people know where their work goes. Nothing else.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["active", "label"],
+      "properties": {
+        "active": { "type": "boolean" },
+        "label": {
+          "anyOf": [{ "type": "string", "minLength": 1, "maxLength": 80 }, { "type": "null" }]
+        }
+      }
+    },
+    "owner_view": {
+      "description": "GET answer for the org owner, and the 200 answer to patch (BK-20: only the owner reads status, spend and errors). state is none when the org has no key; then active is false, label null and no record field is present. Otherwise every record field is present and active is true exactly when state is active. consent_version here is the version the owner must confirm for the next widening act (config/byok.yaml's), not the stored one. spent_today_credits (committed plus reserved against today's UTC cap) is left out when the spend store cannot be read; never null. No key, secret name, URL, or provider text.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["active", "label", "state", "consent_version"],
+      "properties": {
+        "active": { "type": "boolean" },
+        "label": {
+          "anyOf": [{ "type": "string", "minLength": 1, "maxLength": 80 }, { "type": "null" }]
+        },
+        "state": {
+          "type": "string",
+          "enum": ["none", "unverified", "active", "paused", "invalid"]
+        },
+        "consent_version": { "$ref": "#/$defs/consent_version" },
+        "bundle_id": { "$ref": "byok.schema.json#/$defs/bundle_id" },
+        "secret_version": { "type": "integer", "minimum": 1 },
+        "set_at": { "$ref": "common.schema.json#/$defs/timestamp" },
+        "rotated_at": {
+          "anyOf": [{ "$ref": "common.schema.json#/$defs/timestamp" }, { "type": "null" }]
+        },
+        "day_cap_credits": { "$ref": "#/$defs/day_cap_credits" },
+        "fallback_to_tilo": { "type": "boolean" },
+        "last_error": { "anyOf": [{ "$ref": "#/$defs/last_error" }, { "type": "null" }] },
+        "last_used_at": {
+          "anyOf": [{ "$ref": "common.schema.json#/$defs/timestamp" }, { "type": "null" }]
+        },
+        "spent_today_credits": { "$ref": "common.schema.json#/$defs/credits" }
+      },
+      "if": { "properties": { "state": { "const": "none" } }, "required": ["state"] },
+      "then": {
+        "properties": { "active": { "const": false }, "label": { "type": "null" } },
+        "maxProperties": 4
+      },
+      "else": {
+        "required": [
+          "bundle_id",
+          "secret_version",
+          "set_at",
+          "rotated_at",
+          "day_cap_credits",
+          "fallback_to_tilo",
+          "last_error",
+          "last_used_at"
+        ],
+        "if": { "properties": { "state": { "const": "active" } }, "required": ["state"] },
+        "then": { "properties": { "active": { "const": true } } },
+        "else": { "properties": { "active": { "const": false } } }
+      }
+    },
+    "remove_answer": {
+      "description": "The 200 answer to DELETE: every vault version destroyed, then the reference (BK-01, decision 2). The call is idempotent, so removed is true also when nothing was stored.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["removed"],
+      "properties": { "removed": { "const": true } }
+    },
+    "error": {
+      "description": "The body of every refusal on these routes (BK-02): a fixed word in detail and, on the coded refusals, the same word in code, and nothing else, never a value, the input, the provider's text or an exception's. owner_only (403: not the org owner, a demo or non-full session), reauth_required (401, BK-06), confirm_required (422), key_refused (422: the key or the body is not accepted), invalid_body (422), rate_limited (429, with Retry-After, 5 acts an hour, BK-08), not_configured (503: byok.yaml missing or enabled false, or a seam is not wired) and unavailable (503: connectors, the vault or a store). Sign-in, size and media-type refusals use the platform's shared bodies.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["detail"],
+      "properties": {
+        "detail": { "$ref": "#/$defs/error_code" },
+        "code": { "$ref": "#/$defs/error_code" }
+      }
+    },
+    "error_code": {
+      "type": "string",
+      "enum": [
+        "owner_only",
+        "reauth_required",
+        "confirm_required",
+        "key_refused",
+        "invalid_body",
+        "rate_limited",
+        "not_configured",
+        "unavailable"
+      ]
+    }
+  }
+}
