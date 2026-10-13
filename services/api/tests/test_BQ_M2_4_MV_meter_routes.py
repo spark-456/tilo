@@ -6,6 +6,7 @@ on the SEC-16 ledger. Fake verifier, the in-memory ledger behind a spy, no netwo
 from __future__ import annotations
 
 import logging
+import math
 
 import pytest
 from _mv_lib import (
@@ -22,9 +23,17 @@ from _mv_lib import (
     TICK_SA,
     UNIT,
     Rig,
+    cost_usd,
     new_key,
 )
 from _sec16_lib import DeadFlags, DeadLedger, spend
+
+
+def _priced(tokens_in: int, tokens_out: int) -> int:
+    """The expected minor units, from the one rate the API prices with (never a literal)."""
+    from tilo_api.spend_units import INR_MINOR_PER_USD
+
+    return max(1, math.ceil(cost_usd(tokens_in, tokens_out) * INR_MINOR_PER_USD))
 
 
 @pytest.fixture
@@ -325,8 +334,8 @@ def test_BQ_M2_4_MV_05_a_second_settle_after_a_release_and_a_release_after_a_set
 def test_BQ_M2_4_MV_09_usage_is_priced_in_tilo_api_from_config_rounded_up_to_at_least_one_paisa(rig):
     for counts, expected in (
         ({"prompt_token_count": 1}, 1),  # 0.0000003 USD is under one paisa: at least 1
-        ({"prompt_token_count": 100, "response_token_count": 100}, 2),  # 0.00015 USD x 8000 = 1.2, up
-        ({"prompt_token_count": 1000, "response_token_count": 900}, 12),  # 0.00138 x 8000 = 11.04, up
+        ({"prompt_token_count": 100, "response_token_count": 100}, _priced(100, 100)),
+        ({"prompt_token_count": 1000, "response_token_count": 900}, _priced(1000, 900)),
     ):
         nonce, key = rig.attend(), new_key()
         rig.reserve(nonce, key)
@@ -379,7 +388,7 @@ def test_BQ_M2_4_MV_15_a_count_at_the_ceiling_is_priced_and_the_total_may_be_twi
     rig.reserve(nonce, key)
     usage = {"prompt_token_count": CEILING, "response_token_count": CEILING, "total_token_count": 2 * CEILING}
     assert rig.close(nonce, key, usage=usage).status_code == 200
-    assert rig.settled() == 25  # (2048 x 0.30 + 2048 x 1.20) / 1e6 USD x 8000 = 24.576, up
+    assert rig.settled() == _priced(CEILING, CEILING)  # (2048 x 0.30 + 2048 x 1.20) / 1e6 USD, priced up
 
 
 def test_BQ_M2_4_MV_15_a_priced_charge_above_the_unit_books_the_unit_and_never_more(rig):
@@ -431,7 +440,7 @@ def test_BQ_M2_4_MV_15_the_ceiling_follows_the_config_and_a_ceiling_sized_reply_
     assert rig.settled() == UNIT  # above the (lowered) ceiling
     rig.claims.end(MEETING, nonce)
     nonce, key = rig.attend(), new_key()
-    rig.config = replace(rig.config, cost_usd=lambda i, o: 1.0)  # a ceiling-sized reply costs 8000 paise: unit is 100
+    rig.config = replace(rig.config, cost_usd=lambda i, o: 1.0)  # a ceiling-sized reply costs far more than the unit
     for call in (rig.reserve(nonce, key), rig.close(nonce, key)):
         assert (call.status_code, call.json()) == (503, {"error": "not_configured"})
 
