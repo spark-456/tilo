@@ -74,7 +74,9 @@ steps:
       - -ceu
       - |
         export PATH=/workspace/.venv/bin:/workspace/.cloud-tools/bin:$$PATH
-        /workspace/.venv/bin/python -m pytest packages/people/tests tests/contracts packages/archive/tests/test_I4*.py services/connectors/tests/test_FR_CON_19*.py services/channels/tests/test_FR_PA_06*.py services/channels/tests/test_FR_CHN_18*.py -q -p no:cacheprovider
+        /workspace/.venv/bin/python -m pytest packages/people/tests tests/contracts packages/archive/tests/test_I4*.py -q -p no:cacheprovider
+        /workspace/.venv/bin/python -m pytest services/connectors/tests/test_FR_CON_19*.py -q -p no:cacheprovider
+        /workspace/.venv/bin/python -m pytest services/channels/tests/test_FR_PA_06*.py services/channels/tests/test_FR_CHN_18*.py -q -p no:cacheprovider
         /workspace/.venv/bin/python -c 'import pyexpat; print("Linux parser runtime:", pyexpat.EXPAT_VERSION)'
   - id: web
     name: node:22-bookworm
