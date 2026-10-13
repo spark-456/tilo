@@ -10,6 +10,8 @@ import type { Agenda, AgendaPlateRow, Decision, LiveAgenda } from "../../api/typ
 import { useParkApi } from "../../app/context";
 import { useStagedCount } from "../../app/useStaged";
 import { Button, PageSheet } from "../../components";
+import { FirstRunPanels } from "../../sample/FirstRunPanels";
+import { useFirstRunPreview } from "../../sample/useFirstRunPreview";
 import "../../components/park.components.css";
 import type { AppCtx } from "../../app/AppCtx";
 import { Boards } from "./Boards";
@@ -83,6 +85,10 @@ function Ready({
 }
 
 export function AgendaPage({ app }: AgendaPageProps) {
+  const preview = useFirstRunPreview();
+  return preview ? <FirstRunPanels page="agenda" app={app} /> : <PersonalAgendaPage app={app} />;
+}
+function PersonalAgendaPage({ app }: AgendaPageProps) {
   const api = useParkApi();
   const state = useAgenda(api);
 

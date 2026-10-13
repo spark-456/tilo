@@ -8,6 +8,8 @@ import type { AppCtx } from "../../app/AppCtx";
 import { useParkApi } from "../../app/context";
 import { useStaged } from "../../app/useStaged";
 import { Button, KpiTile, PageSheet } from "../../components";
+import { FirstRunPanels } from "../../sample/FirstRunPanels";
+import { useFirstRunPreview } from "../../sample/useFirstRunPreview";
 import "../../components/park.components.css";
 import { Activity } from "./Activity";
 import { ApprovalWaits, CostPerRun, GaveBack, RecordedRuns, WhereItGoes } from "./Sections";
@@ -54,6 +56,10 @@ function exportCsv(app: AppCtx, L: Ledger, decisions: Decision[], source: Source
 }
 
 export function LedgerPage({ app }: LedgerPageProps) {
+  const preview = useFirstRunPreview();
+  return preview ? <FirstRunPanels page="ledger" app={app} /> : <PersonalLedgerPage app={app} />;
+}
+function PersonalLedgerPage({ app }: LedgerPageProps) {
   const state = useLedger(useParkApi());
   const part = useStaged(5); // drawn top to bottom, one task each, so the page never holds the thread
 

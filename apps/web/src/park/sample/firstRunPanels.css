@@ -1,0 +1,46 @@
+[data-park] .park-first-run-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
+  gap: 16px;
+}
+[data-park] .park-first-run-card {
+  min-width: 0;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--field);
+  color: var(--ink2);
+  overflow-wrap: anywhere;
+}
+[data-park] .park-first-run-card h2 {
+  margin: 0 0 14px;
+  font-size: 17px;
+  color: var(--ink);
+}
+[data-park] .park-first-run-card ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+[data-park] .park-first-run-card li {
+  margin: 0 0 14px;
+}
+[data-park] .park-first-run-card li span {
+  display: block;
+  margin-top: 4px;
+  color: var(--ink3);
+}
+[data-park] .park-first-run-card svg {
+  display: block;
+  width: 100%;
+  max-height: 100px;
+}
+[data-park] .park-first-run-explain {
+  justify-self: start;
+  color: var(--ink2);
+  background: var(--field);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 8px 12px;
+  cursor: pointer;
+}
