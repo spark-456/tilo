@@ -1,0 +1,9 @@
+{
+  "outcome": "sent",
+  "result": {
+    "resource_id": "r-1234567890abcdef",
+    "marker": "0123456789abcdef0123456789abcdef\n"
+  },
+  "may_have_sent": null,
+  "parts": []
+}

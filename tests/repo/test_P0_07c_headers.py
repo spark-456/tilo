@@ -68,6 +68,7 @@ OFF_ORIGIN_ALLOWED = {
     ],
     "connect-src": [
         "https://content-firebaseappcheck.googleapis.com",
+        "https://www.google.com/recaptcha/",  # SEC-10: reCAPTCHA Enterprise's own fetch (enterprise/clr), App Check
         "https://identitytoolkit.googleapis.com",
         "https://securetoken.googleapis.com",
         "https://tilo-api-4qhkpsn5ga-as.a.run.app",  # WEB-TO-API: the deployed tilo-dev tilo-api, the one API origin

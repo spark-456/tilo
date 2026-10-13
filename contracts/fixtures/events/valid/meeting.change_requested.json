@@ -1,0 +1,43 @@
+{
+  "v": "1.0",
+  "id": "01JB5VQ0000000000000000704",
+  "seq": 704,
+  "ts": "2026-10-08T10:04:00.000Z",
+  "world_id": "w_village_basic",
+  "run_id": "r_village_basic_1",
+  "type": "meeting.change_requested",
+  "actor": "u_owner",
+  "target": "A_s2",
+  "level": "L1",
+  "district": "D1",
+  "item": null,
+  "severity": "info",
+  "credits": 0,
+  "summary": "The owner confirmed a change; it goes to planning.",
+  "cause": "01JB5VQ0000000000000000703",
+  "vis": ["D1"],
+  "authz": null,
+  "data": {
+    "room_id": "01JB5VQ00000000000000R0001",
+    "proposal_id": "01JB5VQ00000000000000P0001",
+    "to": "A_s2",
+    "units": ["U2"],
+    "artifacts": [
+      {
+        "artifact_id": "art_quote_table",
+        "version": 2
+      }
+    ],
+    "as_role": "owner",
+    "message_ref": "r_village_basic_1/704"
+  },
+  "trace": {
+    "model_role": null,
+    "profile": null,
+    "tokens_in": null,
+    "tokens_out": null,
+    "tool": null,
+    "latency_ms": null,
+    "archive_ref": null
+  }
+}

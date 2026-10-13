@@ -1,0 +1,157 @@
+id: agent-self-report
+domain: automation
+version: "1.0.0"
+description: "Answer meeting-room questions in first person from a unit's recorded events only, citing event seq numbers on every sentence or stating no record exists."
+author: "tilo.automation"
+reviewer: "automation.lead"
+tools_allowed: []
+inputs:
+  $schema: "https://json-schema.org/draft/2020-12/schema"
+  type: object
+  additionalProperties: false
+  required:
+    - agent_id
+    - question
+    - question_kind
+    - events
+  properties:
+    agent_id:
+      type: string
+      pattern: "^A_[0-9A-Za-z_]{1,48}$"
+      description: "Identifier of the addressed agent seated in the Meeting Hall."
+    unit_id:
+      type:
+        - string
+        - "null"
+      description: "Optional plan unit identifier (e.g. U1, U2) scoped to the addressed agent."
+    up_to_seq:
+      type:
+        - integer
+        - "null"
+      minimum: 1
+      description: "Optional event sequence ceiling when inspecting a live run mid-flight."
+    question:
+      type: string
+      minLength: 3
+      maxLength: 1000
+      description: "Question asked by the convener in the meeting room."
+    question_kind:
+      type: string
+      enum:
+        - what_did_you_do
+        - why
+        - what_is_left
+        - absent_fact
+      description: "Category of meeting-room question."
+    hostile_injection:
+      type: string
+      description: "Optional test injection string verifying untrusted text in inputs or data is ignored and triggers no execution."
+    events:
+      type: array
+      minItems: 1
+      items:
+        type: object
+        required:
+          - seq
+          - type
+          - actor
+          - summary
+        properties:
+          seq:
+            type: integer
+            minimum: 1
+          type:
+            type: string
+          actor:
+            type: string
+          target:
+            type:
+              - string
+              - "null"
+          summary:
+            type: string
+          data:
+            type: object
+      description: "Recorded events of the addressed agent unit."
+outputs:
+  $schema: "https://json-schema.org/draft/2020-12/schema"
+  type: object
+  additionalProperties: false
+  required:
+    - answer
+    - has_record
+    - cited_seqs
+    - what_i_did
+    - why
+    - what_is_left
+  properties:
+    answer:
+      type: string
+      minLength: 10
+      maxLength: 4000
+      description: "First-person reply where every sentence ends with or includes [seq: N] citations from the unit's recorded events."
+    has_record:
+      type: boolean
+      description: "True when the question can be answered from the recorded events; False when asked about an absent fact."
+    cited_seqs:
+      type: array
+      minItems: 1
+      uniqueItems: true
+      items:
+        type: integer
+        minimum: 1
+      description: "Sorted list of event sequence numbers cited in answer."
+    what_i_did:
+      type: array
+      items:
+        type: object
+        additionalProperties: false
+        required:
+          - claim
+          - seqs
+        properties:
+          claim:
+            type: string
+            minLength: 5
+          seqs:
+            type: array
+            minItems: 1
+            items:
+              type: integer
+              minimum: 1
+    why:
+      type: array
+      items:
+        type: object
+        additionalProperties: false
+        required:
+          - claim
+          - seqs
+        properties:
+          claim:
+            type: string
+            minLength: 5
+          seqs:
+            type: array
+            minItems: 1
+            items:
+              type: integer
+              minimum: 1
+    what_is_left:
+      type: array
+      items:
+        type: object
+        additionalProperties: false
+        required:
+          - claim
+          - seqs
+        properties:
+          claim:
+            type: string
+            minLength: 5
+          seqs:
+            type: array
+            minItems: 1
+            items:
+              type: integer
+              minimum: 1

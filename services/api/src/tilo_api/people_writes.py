@@ -232,7 +232,7 @@ class Writer:
     actor: str
     now: str
     redact: Callable[[str], str] = _identity
-    events: WorkEvents | None = None  # a work-item write needs it (PE-12); the other writes emit nothing
+    events: WorkEvents | None = None  # work-item and pin writes need their existing Desk events (PE-12)
 
     def directory(self) -> Directory:
         """The actor's own record, read by id: a write lists no whole-org directory (BQ-PPL11C-12)."""
@@ -276,8 +276,9 @@ class Writer:
             also()
         if problems:
             raise Refusal(409, "write_refused", code="write_refused", problems=list(problems))
-        work_events = self.events if request.record_kind == "work_item" else None
-        if request.record_kind == "work_item" and work_events is None:
+        event_kind = request.record_kind in ("work_item", "pinboard_item")
+        work_events = self.events if event_kind else None
+        if event_kind and work_events is None:
             raise Refusal(503, "not_configured")  # a write whose event could never be recorded does not happen
         try:
             stored = store.create(after) if version is None else store.replace(after, expected_version=version)

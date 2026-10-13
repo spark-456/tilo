@@ -36,4 +36,6 @@ export interface TiloClient {
   listCards(worldId: string): Promise<Card[]>;
   answerCard(cardId: string, answer: CardAnswer): Promise<void>;
   getDelivery(worldId: string): Promise<DeliveryResult>;
+  /** SEC-16: resolves only when the server confirmed receipt (the lifetime-cap pop-up's feedback box). */
+  submitFeedback(words: string): Promise<void>;
 }

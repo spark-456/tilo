@@ -297,9 +297,11 @@ def test_PPL_11c_FS_06_the_config_door_reads_the_process_environment_by_default(
         open_people_stores()
     calls, _client = _spy_client(monkeypatch)
     monkeypatch.setenv("TILO_PEOPLE_STORE", "firestore")
-    monkeypatch.setenv("TILO_FIRESTORE_PROJECT", "tilo-test-project")
+    # PROD-WIRE 3: the one guard (emulator + demo- project)
+    monkeypatch.setenv("FIRESTORE_EMULATOR_HOST", "127.0.0.1:9")
+    monkeypatch.setenv("TILO_FIRESTORE_PROJECT", "demo-test-project")
     assert isinstance(open_people_stores(), PeopleStores)
-    assert len(calls) == 1 and "tilo-test-project" in repr(calls[0])
+    assert len(calls) == 1 and "demo-test-project" in repr(calls[0])
 
 
 def test_PPL_11c_FS_06_building_the_stores_from_a_client_does_no_io():

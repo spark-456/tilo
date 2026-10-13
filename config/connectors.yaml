@@ -54,27 +54,32 @@
     - {id: build_handoff, capability: send, description: "Hand the accepted requirements to Lovable as a build prompt you send yourself.", risk_tier: T3, gate_type: approval, irreversible: true}
   limits: {per_minute: null, batch_size: null}
   data_class: {returns: [business], redact: []}
-# Google Calendar (FR-CAL-02, FR-CAL-08, FR-CON-14; services/connectors/tests/API_FR_CAL_08.md): read only in
-# this release. Events of the person's own primary calendar, synced with a sync token inside their working
-# window (config/personal.yaml). The request's field mask asks Google for no description, attendee address,
-# conference link or location, so there is nothing to redact (PE-13). Writing (FR-CAL-04, calendar.events)
-# is not declared until it is built. per_minute is per connected person; batch_size is the page size
-# (Google's maximum for events.list).
+# Google Calendar (FR-CAL-02, FR-CAL-08, FR-CON-14, FR-CAL-04; ADR-0035 decision 6): the person's own primary calendar.
+# Reads sync with a sync token inside their working window (config/personal.yaml); the request's field mask asks
+# Google for no description, attendee address, conference link or location, so there is nothing to redact (PE-13).
+# Writing adds the one scope calendar.events.owned (events on calendars the person owns), asked only when a task
+# needs it (incremental scopes, CON-D10): create_event (write) makes an event with no guests on their own primary
+# calendar and is T1; create_event_with_guests (send) makes Google email the guests, so it is T3 and always needs a
+# person (FR-CAL-04). per_minute is per connected person; batch_size is the page size (Google's maximum for events.list).
 - id: google_calendar
   name: Google Calendar
   icon: calendar
   auth: oauth2
   scopes:
     read: ["https://www.googleapis.com/auth/calendar.readonly"]
-  capabilities: [read]
+    write: ["https://www.googleapis.com/auth/calendar.events.owned"]
+    send: ["https://www.googleapis.com/auth/calendar.events.owned"]
+  capabilities: [read, write, send]
   actions:
     - {id: read_events, capability: read, description: "Read the events on your own calendar to show them in Tilo.", risk_tier: T1, gate_type: none, irreversible: false}
+    - {id: create_event, capability: write, description: "Add an event with no guests to your own Google Calendar.", risk_tier: T1, gate_type: approval, irreversible: false}
+    - {id: create_event_with_guests, capability: send, description: "Add an event to your own Google Calendar and invite guests; Google emails them.", risk_tier: T3, gate_type: approval, irreversible: true}
   limits: {per_minute: 60, batch_size: 2500}
   data_class: {returns: [personal, business], redact: []}
 
 # meeting_host (FR-MTG-09, ADR-0024): the meeting bot's OWN Google account creates a Calendar event with a Meet link
 # and Google invites the attendees the Owner approved. The one write scope sits on that account, which holds no
-# personal data; every person's own google_calendar grant stays read-only. Always T3 (the Owner is invited, so
+# personal data; a person's own google_calendar grant writes only to their own primary calendar (above). Always T3 (the Owner is invited, so
 # new_recipients applies). The Meet link is never stored; the request asks Google for none.
 - id: meeting_host
   name: Tilo meeting host
@@ -87,3 +92,127 @@
     - {id: create_meeting_event, capability: send, description: "On the meeting bot's own Google account (sign in as the bot, not as yourself): create a meeting with a Meet link and invite the people you approve.", risk_tier: T3, gate_type: approval, irreversible: true}
   limits: {per_minute: 30, batch_size: 50}
   data_class: {returns: [business], redact: []}
+
+# FR-UX-18 setup catalogue. No scopes or adapters are granted here.
+# MCP OAuth/transport and a reviewed allowlist entry are required before these tools execute.
+# Explicit catalogue -> reserved MCP server mapping lives beside each entry below.
+# These comments reserve names for the later OAuth ticket; they do not allowlist or bind servers.
+# The frozen connector schema has no transport field. Registry IDs cannot be MCP server IDs.
+- id: slack
+  # MCP mapping: slack -> mcp_slack (owner OAuth app/setup required).
+  name: Slack
+  icon: link
+  auth: oauth2
+  scopes: {read: []}
+  capabilities: [read]
+  actions:
+    - {id: read_slack, capability: read, description: "Read approved Slack data after workspace OAuth and MCP setup.", risk_tier: T3, gate_type: approval, irreversible: false}
+  limits: {per_minute: null, batch_size: null}
+  data_class: {returns: [business], redact: []}
+- id: notion
+  # MCP mapping: notion -> mcp_notion (owner OAuth app/setup required).
+  name: Notion
+  icon: link
+  auth: oauth2
+  scopes: {read: []}
+  capabilities: [read]
+  actions:
+    - {id: read_notion, capability: read, description: "Read approved Notion data after workspace OAuth and MCP setup.", risk_tier: T3, gate_type: approval, irreversible: false}
+  limits: {per_minute: null, batch_size: null}
+  data_class: {returns: [business], redact: []}
+- id: github
+  # MCP mapping: github -> mcp_github (owner OAuth app/setup required).
+  name: GitHub
+  icon: link
+  auth: oauth2
+  scopes: {read: []}
+  capabilities: [read]
+  actions:
+    - {id: read_github, capability: read, description: "Read approved GitHub data after workspace OAuth and MCP setup.", risk_tier: T3, gate_type: approval, irreversible: false}
+  limits: {per_minute: null, batch_size: null}
+  data_class: {returns: [business], redact: []}
+- id: xero
+  # MCP mapping: xero -> mcp_xero (owner OAuth app/setup required).
+  name: Xero
+  icon: link
+  auth: oauth2
+  scopes: {read: []}
+  capabilities: [read]
+  actions:
+    - {id: read_xero, capability: read, description: "Read approved Xero data after workspace OAuth and MCP setup.", risk_tier: T3, gate_type: approval, irreversible: false}
+  limits: {per_minute: null, batch_size: null}
+  data_class: {returns: [business], redact: []}
+- id: hubspot
+  # MCP mapping: hubspot -> mcp_hubspot (owner OAuth app/setup required).
+  name: HubSpot
+  icon: link
+  auth: oauth2
+  scopes: {read: []}
+  capabilities: [read]
+  actions:
+    - {id: read_hubspot, capability: read, description: "Read approved HubSpot data after workspace OAuth and MCP setup.", risk_tier: T3, gate_type: approval, irreversible: false}
+  limits: {per_minute: null, batch_size: null}
+  data_class: {returns: [business], redact: []}
+- id: stripe
+  # MCP mapping: stripe -> mcp_stripe (owner OAuth app/setup required).
+  name: Stripe
+  icon: link
+  auth: oauth2
+  scopes: {read: []}
+  capabilities: [read]
+  actions:
+    - {id: read_stripe, capability: read, description: "Read approved Stripe data after workspace OAuth and MCP setup.", risk_tier: T3, gate_type: approval, irreversible: false}
+  limits: {per_minute: null, batch_size: null}
+  data_class: {returns: [business], redact: []}
+- id: microsoft365
+  # MCP mapping: microsoft365 -> mcp_microsoft365 (owner OAuth app/setup required).
+  name: Microsoft 365
+  icon: link
+  auth: oauth2
+  scopes: {read: []}
+  capabilities: [read]
+  actions:
+    - {id: read_microsoft365, capability: read, description: "Read approved Microsoft 365 data after workspace OAuth and MCP setup.", risk_tier: T3, gate_type: approval, irreversible: false}
+  limits: {per_minute: null, batch_size: null}
+  data_class: {returns: [business], redact: []}
+- id: jira
+  # MCP mapping: jira -> mcp_jira (owner OAuth app/setup required).
+  name: Jira
+  icon: link
+  auth: oauth2
+  scopes: {read: []}
+  capabilities: [read]
+  actions:
+    - {id: read_jira, capability: read, description: "Read approved Jira data after workspace OAuth and MCP setup.", risk_tier: T3, gate_type: approval, irreversible: false}
+  limits: {per_minute: null, batch_size: null}
+  data_class: {returns: [business], redact: []}
+- id: bamboohr
+  # MCP mapping: bamboohr -> mcp_bamboohr (owner OAuth app/setup required).
+  name: BambooHR
+  icon: link
+  auth: oauth2
+  scopes: {read: []}
+  capabilities: [read]
+  actions:
+    - {id: read_bamboohr, capability: read, description: "Read approved BambooHR data after workspace OAuth and MCP setup.", risk_tier: T3, gate_type: approval, irreversible: false}
+  limits: {per_minute: null, batch_size: null}
+  data_class: {returns: [business], redact: []}
+
+# web (PRD 12.2 web search, Must; ADR-0029 decision 7): public web reads for a unit. web_search runs through the
+# SearchProvider (the `search` role in config/models.yaml, Google Search grounding by default); fetch_url downloads
+# one public page or file through tilo-browser (egress allowlist plus the task's allowlist, BQ-LW-1; robots.txt,
+# BQ-LW-5; type by leading bytes; raw archive). Neither holds a key or a person's token, so auth is none and there
+# are no scopes. Both only read, so T1 with no gate (also listed in config/autonomy.yaml). A unit that read fetched
+# content gets no side-effect tool (SEC-05). per_minute bounds web calls per world; batch_size is FR-INT-01's
+# 10 files. Listed last: the dev Director takes the first gated action in catalogue order.
+- id: web
+  name: The Web
+  icon: globe
+  auth: none
+  scopes: {}
+  capabilities: [search, read]
+  actions:
+    - {id: web_search, capability: search, description: "Search the public web through the search provider.", risk_tier: T1, gate_type: none, irreversible: false}
+    - {id: fetch_url, capability: read, description: "Download one public page or file from a host this task allows.", risk_tier: T1, gate_type: none, irreversible: false}
+  limits: {per_minute: 30, batch_size: 10}
+  data_class: {returns: [public], redact: []}

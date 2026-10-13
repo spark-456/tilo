@@ -63,6 +63,13 @@ class GoogleAdapter:
         self._broker, self._transport, self._artifacts = broker, transport, artifacts
         self._owner_of, self._clock, self._emit, self._sleep = owner_of, clock, emit, sleep
         self._max_attempts = max(1, int(max_attempts))
+        self.on_result: Callable[[Mapping[str, Any]], None] | None = None  # LC-07: the execute route reads the outcome
+
+    def _done(self, result: dict[str, Any]) -> dict[str, Any]:
+        """A side effect that ended well (or was found already done, OB-03): tell the one who asked, return it."""
+        if self.on_result is not None:
+            self.on_result(result)
+        return result
 
     @property
     def id(self) -> str:

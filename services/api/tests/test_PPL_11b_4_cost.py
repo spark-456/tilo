@@ -167,13 +167,6 @@ def _wire_models(monkeypatch, tmp_path, replies=(), **kw):
     return providers, provider
 
 
-@pytest.fixture(autouse=False)
-def _fresh_process_state():
-    yield
-    for name in ("get_spend_ledger", "get_decision_cache"):
-        getattr(getattr(deps, name, None), "cache_clear", lambda: None)()
-
-
 def test_FR_PA_19_the_ledger_and_the_cache_are_process_wide_in_memory_objects(_fresh_process_state):
     m = mod("tilo_api.assistant.metering")
     assert deps.get_spend_ledger() is deps.get_spend_ledger()

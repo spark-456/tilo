@@ -1,0 +1,36 @@
+{
+  "v": "1.0",
+  "id": "01JB5VQ0000000000000000702",
+  "seq": 702,
+  "ts": "2026-10-08T10:02:00.000Z",
+  "world_id": "w_village_basic",
+  "run_id": "r_village_basic_1",
+  "type": "meeting.asked",
+  "actor": "u_owner",
+  "target": "A_s2",
+  "level": "L1",
+  "district": "D1",
+  "item": null,
+  "severity": "info",
+  "credits": 0,
+  "summary": "The owner asked a question in the Meeting Hall.",
+  "cause": "01JB5VQ0000000000000000701",
+  "vis": ["D1"],
+  "authz": null,
+  "data": {
+    "room_id": "01JB5VQ00000000000000R0001",
+    "turn": 1,
+    "to": "A_s2",
+    "mode": "deep",
+    "message_ref": "r_village_basic_1/702"
+  },
+  "trace": {
+    "model_role": null,
+    "profile": null,
+    "tokens_in": null,
+    "tokens_out": null,
+    "tool": null,
+    "latency_ms": null,
+    "archive_ref": null
+  }
+}

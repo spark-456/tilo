@@ -1,0 +1,37 @@
+{
+  "id": "tsk_01JB6Z0000000000000000DRF",
+  "org_id": "org_example",
+  "owner": "u_priya",
+  "name": "Log supplier invoices",
+  "scope": {
+    "kind": "just_me",
+    "team": null
+  },
+  "status": "draft",
+  "paused": false,
+  "method": "describe",
+  "captured": [
+    {
+      "text": "Watch the Accounts inbox for invoice emails",
+      "artifact": null
+    }
+  ],
+  "plan": [],
+  "question": null,
+  "trigger": {
+    "kind": "on_demand",
+    "schedule_id": null,
+    "event": {
+      "type": "meeting.minuted",
+      "filter": {
+        "meeting_id": "mt_weekly_finance"
+      }
+    }
+  },
+  "estimates": null,
+  "tool_access": {},
+  "good_runs": 0,
+  "version": 1,
+  "created_at": "2026-10-08T10:00:00.000Z",
+  "updated_at": "2026-10-09T09:00:00.000Z"
+}

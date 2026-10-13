@@ -12,6 +12,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from .events import remove_meet_links
+
 
 class Timeline:
     def __init__(self, path: Path | None) -> None:
@@ -24,4 +26,4 @@ class Timeline:
             return
         row = {"ts": datetime.now(UTC).isoformat(timespec="milliseconds"), "kind": kind, **data}
         with self.path.open("a", encoding="utf-8") as fh:
-            fh.write(json.dumps(row, ensure_ascii=False) + "\n")
+            fh.write(json.dumps(remove_meet_links(row), ensure_ascii=False) + "\n")

@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://contracts.tilo.example/plan.schema.json",
-  "x-version": "1.0.0",
+  "x-version": "1.1.0",
   "title": "Plan",
   "description": "PlanGraph (PRD 7.1 FR-INT-06, FR-INT-09): the approaches offered, the chosen one compiled to units, dependencies, roles, skills, connectors and gates, and the confirmed budget cap. Cross-reference rules PG-01.. are in contracts/plan.rules.md.",
   "type": "object",
@@ -85,8 +85,10 @@
       }
     },
     "unit": {
+      "description": "One plan unit. 1.1.0 (ADR-0028): a revision unit, planned from a change a person confirmed in a meeting room, also carries revises (the unit whose work it changes) and change (the proposal_id of that meeting.change_requested), both or neither (PG-13).",
       "type": "object",
       "additionalProperties": false,
+      "dependentRequired": { "revises": ["change"], "change": ["revises"] },
       "required": [
         "id",
         "unit_type",
@@ -131,7 +133,9 @@
           "uniqueItems": true,
           "maxItems": 50,
           "items": { "$ref": "common.schema.json#/$defs/unit_id" }
-        }
+        },
+        "revises": { "$ref": "common.schema.json#/$defs/unit_id" },
+        "change": { "$ref": "common.schema.json#/$defs/ulid" }
       }
     },
     "gate": {

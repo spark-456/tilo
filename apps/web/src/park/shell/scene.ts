@@ -59,6 +59,7 @@ export function backdropScene(time: "day" | "night", motion: CityMotion): Backdr
     still: motion === "still",
     // FR-UX-12: cars and walkers keep to their own lanes, clear of each other and of the kerb agents.
     avoid: true,
+    traffic: true,
   });
   const scene = { el: drawn.el as ReactNode, pins: pickPins(drawn.spots) };
   cache.set(key, scene);

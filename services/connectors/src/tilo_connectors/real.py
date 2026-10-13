@@ -23,6 +23,7 @@ from typing import Any
 from ._time import format_ts
 from .adapters import CalendarAdapter, DriveAdapter, GmailAdapter, InMemoryPicks, SideEffectRefused, Transport
 from .adapters._google import GoogleAdapter, has_token
+from .meeting_host import CALENDAR_EVENTS_OWNED
 from .real_writes import SEND_SCOPE, WriteFlags, WriteGate, write_plan
 from .recording import RecordingTransport, ReplayTransport
 from .registry import ConnectorRegistry
@@ -218,10 +219,13 @@ def _refuse_unless_allowed(  # noqa: PLR0913
     if isinstance(transport, ReplayTransport | RecordingTransport):
         raise RealConnectorsRefused("replay_transport")
     for connector_id in (c for c in REAL_SCOPES if c in registry):
+        allowed = set(REAL_SCOPES[connector_id])
+        if connector_id == "google_calendar":
+            allowed.add(CALENDAR_EVENTS_OWNED)  # ADR-0035 declares it for the live path; this tool never asks for it
         for capability, scopes in registry.get(connector_id)["scopes"].items():
             if capability == "send" and allow_send and connector_id == "gmail" and tuple(scopes) != (SEND_SCOPE,):
                 raise RealConnectorsRefused("scope_widened")  # the one send scope, nothing wider
-            if capability != "send" and not set(scopes) <= set(REAL_SCOPES[connector_id]):
+            if capability != "send" and not set(scopes) <= allowed:
                 raise RealConnectorsRefused("scope_widened")
 
 
