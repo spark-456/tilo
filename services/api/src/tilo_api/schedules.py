@@ -921,6 +921,8 @@ def _sweep_spend(request: Request, clock: Callable[[], datetime]) -> None:
         ledger = request.app.dependency_overrides.get(deps.get_spend_cap_ledger, deps.get_spend_cap_ledger)()
         if (settle_expired := getattr(ledger, "settle_expired", None)) is not None:
             settle_expired(clock())
+    except HTTPException:
+        return  # no ledger wired (503): nothing to sweep, and no warning on every tick
     except Exception as exc:
         logger.warning("spend hold sweep failed (%s)", type(exc).__name__)
 
