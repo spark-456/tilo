@@ -36,6 +36,12 @@ it("UI-10 W7 More names its browser tab", async () => {
   await visit("/more");
   expect(document.title).toBe("More · Tilo");
 });
+it("UI-10 W7-FIX Settings provides a Park routine empty state and creation link", async () => {
+  const m = await visit("/settings");
+  expect(m.container.textContent).toContain("No routines yet.");
+  expect(m.container.querySelector('a[href="/start"]')?.textContent).toBe("Create a routine");
+  expect(m.container.querySelector('[data-testid="density"]')).not.toBeNull();
+});
 it("UI-10 W7 unknown routes name the not-found browser tab", async () => {
   await visit("/unknown-page");
   expect(document.title).toBe("Not found · Tilo");

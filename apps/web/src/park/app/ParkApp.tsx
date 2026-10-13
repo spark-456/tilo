@@ -1,8 +1,7 @@
 // The Park app (README "Routes", "The `app` prop", "Focus"): the data-park root around the shell (shell/AppShell:
 // nav, backdrop, the one <main>, toast, world loader), the page for the route, the document title and the
 // focus move after a route change. Lazy-imported by src/Root.tsx, so a landing visit never loads it (NFR-01).
-import { Suspense, lazy, useEffect, useRef } from "react";
-import { useDocumentTitle } from "../../documentTitle";
+import { Suspense, lazy, useEffect, useRef, useState } from "react";
 import { AppShell } from "../shell/AppShell";
 import { ParkAuthProvider } from "../shell/auth";
 import { useParkTour } from "../shell/tour";
@@ -14,6 +13,7 @@ import { PAGE_LABEL } from "./AppCtx";
 import { NotFound } from "./NotFound";
 import "./park-app.css";
 import { ParkProvider, usePageApp, useSessionAuth } from "./context";
+import { PageTitleContext } from "./pageTitle";
 import { PAGES } from "./pages";
 import { isHomeAddress, useParkRoute, useQuizAppRoute } from "./router";
 
@@ -72,7 +72,8 @@ function Shell() {
   const app = usePageApp();
   const route = useParkRoute();
   const quizRoute = useQuizAppRoute();
-  const title = route ? PAGE_LABEL[route.page] : quizRoute ? "Quiz" : "Not found";
+  const [named, setNamed] = useState<string | null>(null);
+  const title = named ?? (route ? PAGE_LABEL[route.page] : quizRoute ? "Quiz" : "Not found");
   // A world is a different page per id; the other pages keep focus where it is when only a query changes.
   const routeKey = route
     ? route.page === "world"
@@ -81,38 +82,46 @@ function Shell() {
     : quizRoute
       ? `world/${quizRoute.worldId}/app/${quizRoute.artifactId}`
       : "none";
-  useDocumentTitle(title);
+  useEffect(() => {
+    const before = document.title;
+    document.title = `${title} · Tilo`;
+    return () => {
+      document.title = before;
+    };
+  }, [title]);
   const Page = route ? PAGES[route.page] : null;
   const Tour = useParkTour()?.Layer; // ONBOARD-1: the first-run welcome and tour, when the Root provides them
   return (
-    <div
-      data-park
-      data-time={app.time}
-      data-motion={app.motion}
-      data-theme={themeFor(app.prefs.theme)}
-    >
-      <AppShell>
-        <Suspense fallback={null}>
-          {Page ? (
-            <Page app={app} />
-          ) : quizRoute ? (
-            <QuizPlayerPage
-              app={app}
-              worldId={quizRoute.worldId}
-              artifactId={quizRoute.artifactId}
-            />
-          ) : (
-            <NotFound go={app.go} />
-          )}
-          <FocusHeading routeKey={routeKey} />
-        </Suspense>
-      </AppShell>
-      {Tour ? (
-        <Suspense fallback={null}>
-          <Tour />
-        </Suspense>
-      ) : null}
-    </div>
+    <PageTitleContext.Provider value={setNamed}>
+      <div
+        data-park
+        data-time={app.time}
+        data-motion={app.motion}
+        data-theme={themeFor(app.prefs.theme)}
+      >
+        <AppShell>
+          <Suspense fallback={null}>
+            {Page ? (
+              <Page app={app} />
+            ) : quizRoute ? (
+              <QuizPlayerPage
+                app={app}
+                worldId={quizRoute.worldId}
+                artifactId={quizRoute.artifactId}
+              />
+            ) : (
+              <NotFound go={app.go} />
+            )}
+            <FocusHeading routeKey={routeKey} />
+          </Suspense>
+        </AppShell>
+        {Tour ? (
+          <Suspense fallback={null}>
+            <Tour />
+          </Suspense>
+        ) : null}
+      </div>
+    </PageTitleContext.Provider>
   );
 }
 
