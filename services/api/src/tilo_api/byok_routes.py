@@ -189,14 +189,20 @@ def body_of[Model: BaseModel](model: type[Model]) -> Any:
 
 def _public(ref: KeyReference | None, config: ByokConfig, *, owner_view: bool) -> dict[str, Any]:
     bundle = config.bundles.get(ref.bundle_id) if ref else None
-    base: dict[str, Any] = {"active": bool(ref and ref.active()), "label": bundle.label if bundle and ref else None}
+    # B4: a key whose bundle left the config is refused `not_configured` at every unit, so it is never said to be active
+    left = ref is not None and bundle is None
+    base: dict[str, Any] = {
+        "active": bool(ref and ref.active() and not left),
+        "label": bundle.label if bundle and ref else None,
+    }
     if not owner_view:
         return base  # every member may see where their work goes, and nothing more (BK-20)
     if ref is None:
         return {**base, "state": "none", "consent_version": config.consent_version}
     keep = ("bundle_id", "auth_mode", "project_id", "secret_version", "set_at", "rotated_at", "day_cap_credits")
     keep += ("fallback_to_tilo", "last_error", "last_used_at", "consent_version")
-    return {**base, "state": ref.status, **{k: v for k, v in ref.to_dict().items() if k in keep}}
+    shown = {k: v for k, v in ref.to_dict().items() if k in keep}
+    return {**base, "state": ref.status, **shown, **({"last_error": "not_configured"} if left else {})}
 
 
 @router.get(ROUTE)
