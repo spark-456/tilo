@@ -297,6 +297,54 @@ def test_BK_03_an_unverified_put_cannot_be_used(monkeypatch: pytest.MonkeyPatch)
     assert rig.vault.status(ORG, "models").state == "unverified"
 
 
+# --- BK-17 (SEC-REVIEW-29 B2): a pause and a resume never make an unverified or invalid key usable ------------------
+
+
+def _force_status(rig: Rig, status: str) -> None:
+    held = rig.store.get(ORG)
+    assert held is not None
+    assert rig.store.cas(ORG, held.bumped(status=status), expected_rev=held.rev)
+
+
+@pytest.mark.parametrize("status", ["invalid", "unverified"])
+def test_BK_17_B2_an_invalid_or_unverified_key_cannot_be_paused_and_resumed_to_active(rig: Rig, status: str) -> None:
+    rig.put()
+    _force_status(rig, status)
+    refused = rig.client.patch(PATH, json={"paused": True})
+    assert refused.status_code == 422 and refused.json()["code"] == "invalid_body"
+    assert rig.store.get(ORG).status == status  # type: ignore[union-attr]
+    resumed = rig.client.patch(PATH, json={"paused": False, "confirm": True, "consent_version": 3})
+    assert rig.store.get(ORG).status == status, "a resume never makes it active"  # type: ignore[union-attr]
+    assert resumed.status_code in (200, 422)
+    assert rig.client.get(PATH).json()["state"] == status
+    rig.user = MEMBER
+    assert rig.client.get(PATH).json()["active"] is False
+
+
+def test_BK_17_B2_a_key_that_went_invalid_while_paused_stays_invalid_on_resume(rig: Rig) -> None:
+    rig.put()
+    assert rig.client.patch(PATH, json={"paused": True}).json()["state"] == "paused"
+    _force_status(rig, "invalid")
+    got = rig.client.patch(PATH, json={"paused": False, "confirm": True, "consent_version": 3})
+    assert got.status_code in (200, 422)
+    assert rig.store.get(ORG).status == "invalid"  # type: ignore[union-attr]
+
+
+def test_BK_17_B2_pause_then_resume_of_a_verified_key_still_works(rig: Rig) -> None:
+    rig.put()
+    assert rig.client.patch(PATH, json={"paused": True}).json()["state"] == "paused"
+    resumed = rig.client.patch(PATH, json={"paused": False, "confirm": True, "consent_version": 3})
+    assert resumed.status_code == 200 and resumed.json()["state"] == "active"
+    assert [e["action"] for e in rig.store.audit_entries(ORG)] == ["set", "change", "change"]
+
+
+def test_BK_17_B2_pausing_twice_changes_nothing(rig: Rig) -> None:
+    rig.put()
+    assert rig.client.patch(PATH, json={"paused": True}).status_code == 200
+    again = rig.client.patch(PATH, json={"paused": True})
+    assert again.status_code == 200 and again.json()["state"] == "paused"
+
+
 # --- BK-07, BK-08: widening is T3, narrowing is immediate ---------------------------------------------------------
 
 
@@ -355,7 +403,31 @@ def test_BQ_BYOK_2_the_gemini_api_key_mode_takes_a_key_and_no_project(rig: Rig) 
     assert got.status_code == 200 and rig.store.get(ORG).auth_mode == "api_key"  # type: ignore[union-attr]
 
 
-def test_BQ_BYOK_2_the_vertex_iam_mode_takes_a_project_and_never_a_key(rig: Rig) -> None:
+def test_BQ_BYOK_2_B1_a_vertex_iam_bundle_is_refused_whatever_project_is_typed(rig: Rig) -> None:
+    """SEC-REVIEW-29 B1: in variant P Tilo's own identity would call the typed project, so an owner-typed project id
+    (Tilo's own first of all) would be Tilo-billed spend outside SEC-16. Refused with a fixed code, nothing written,
+    until BQ-BYOK-2 is answered and BYOK-4/6 prove the project is the org's."""
+    for project in ("my-vertex-project", "essential-wares-510320-f0", "tilo-dev-project", "NOT A PROJECT"):
+        got = rig.put(bundle_id="vx", key=None, project_id=project)
+        assert (got.status_code, got.json()["code"]) == (422, "key_refused"), project
+        assert project not in got.text
+    assert rig.put(bundle_id="vx", key=None).status_code == 422
+    assert rig.put(bundle_id="vx", key=fake_key(), project_id="my-vertex-project").status_code == 422
+    assert rig.vault.versions(ORG) == {} and rig.store.get(ORG) is None and rig.store.audit_entries(ORG) == []
+    assert rig.client.patch(PATH, json={"paused": True}).status_code == 422, "no reference was created either"
+    assert rig.put(bundle_id="gk").status_code == 200, "the Gemini API-key bundle is unaffected"
+
+
+def test_BQ_BYOK_2_B1_a_refused_vertex_put_does_not_spend_a_widening_act(rig: Rig) -> None:
+    for _ in range(8):
+        assert rig.put(bundle_id="vx", key=None, project_id="my-vertex-project").status_code == 422
+    assert rig.put().status_code == 200, "refused before the hourly act limiter, so five real acts remain"
+
+
+def test_BQ_BYOK_2_the_vertex_iam_mode_takes_a_project_and_never_a_key(
+    rig: Rig, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(byok_routes, "VERTEX_GRANT_CHECKED", True)  # the later BYOK-4/6 state: a grant check exists
     assert rig.put(bundle_id="vx", project_id="my-vertex-project").status_code == 422, "a key sent with IAM mode"
     assert rig.put(bundle_id="vx", key=None).status_code == 422, "IAM mode needs a project"
     assert rig.put(bundle_id="vx", key=None, project_id="NOT A PROJECT").status_code == 422
