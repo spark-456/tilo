@@ -21,8 +21,10 @@ from tilo_providers.router import RouterError
 from tilo_api import deps, spend
 
 T = TypeVar("T")
-# BQ-SEC16-1's default, 80 INR per US$. The market rate is higher, so this undercounts real INR (BQ-GOLIVE935-6).
-INR_MINOR_PER_USD = 8000
+# BQ-GOLIVE935-7's default, 95 INR per US$ (BQ-SEC16-1 had 80, which undercounted real INR by about 10 percent,
+# BQ-GOLIVE935-6). The market is about 88, so the meter over-counts a little and a cap is never undercounted. A
+# constant, not config: config/spend_caps.yaml has no rate key and its schema is frozen. The user may set it.
+INR_MINOR_PER_USD = 9500
 _BYTES_PER_TOKEN = 3  # a screened text is priced at one token per three bytes: over-counted on purpose
 _BILLED_ERRORS = frozenset({"OutputTruncatedError"})  # sent and ran to its cap, no usage reported
 
