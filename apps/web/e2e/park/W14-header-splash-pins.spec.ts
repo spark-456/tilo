@@ -46,6 +46,11 @@ for (const viewport of [
     await page.keyboard.press("Escape");
 
     await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+    if (viewport.width === 1440) {
+      await expect(
+        page.locator(".park-home-pin__card", { hasText: "Onboard 12 new hires" }),
+      ).toBeVisible();
+    }
     expect(
       await page.locator(".park-home-pin__card").evaluateAll((buttons) =>
         buttons.every((button) => {
@@ -60,5 +65,9 @@ for (const viewport of [
         }),
       ),
     ).toBe(true);
+    if (viewport.width === 1440) {
+      await page.locator(".park-home-pin__card", { hasText: "Onboard 12 new hires" }).click();
+      await expect(page).toHaveURL(/\/world\//);
+    }
   });
 }
