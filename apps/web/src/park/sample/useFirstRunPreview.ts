@@ -3,11 +3,11 @@ import { useParkStore } from "../app/context";
 import { useFirstRun } from "./useFirstRun";
 
 /** The existing demo UI keeps its behavior; previews are for empty HTTP accounts. */
-export function useFirstRunPreview(): boolean {
+export function useFirstRunPreview(loadWorlds = true): boolean {
   const store = useParkStore();
   const state = useSyncExternalStore(store.subscribe, store.getState);
   const live = state.sources.live && !state.sources.fixture;
   // Fixture pages cannot show this preview, so they need no eligibility read.
-  const first = useFirstRun(live);
+  const first = useFirstRun(live && loadWorlds);
   return first && live;
 }

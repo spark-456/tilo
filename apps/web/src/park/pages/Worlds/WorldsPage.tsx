@@ -41,7 +41,8 @@ interface Loaded {
 
 export function WorldsPage({ app }: { app: AppCtx }) {
   const api = useParkApi();
-  const preview = useFirstRunPreview();
+  // This page's list read already updates the provider's first-run controller.
+  const preview = useFirstRunPreview(false);
   const [routines] = useState(createRoutinesClient);
   const { dec, added, needsLeft, night } = app;
   const plans = useRef<Record<string, Plan>>({});
