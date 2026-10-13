@@ -41,7 +41,7 @@ def test_I4_csv_refuses_malformed_or_binary_without_echo(data, code):
     "data,limits,code",
     [
         (b"abc", replace(Limits(), input_bytes=2), "input_size"),
-        (b"a,b", replace(Limits(), entries=1), "entry_count"),
+        (b"a,b", replace(Limits(), cells=1), "cell_count"),
         (b"abc", replace(Limits(), output_chars=2), "output_size"),
     ],
 )

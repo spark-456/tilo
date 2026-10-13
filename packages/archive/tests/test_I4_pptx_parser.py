@@ -85,8 +85,8 @@ def test_I4_pptx_caps(limits, code):
 
 def test_I4_pptx_paragraph_cap_counts_empty_paragraphs():
     content = slide().replace(b"</p:sld>", b"<a:p/><a:p/><a:p/></p:sld>")
-    with pytest.raises(Refused, match="^entry_count$"):
-        parse_pptx(pptx([("ppt/slides/slide1.xml", content)]), limits=replace(Limits(), entries=3))
+    with pytest.raises(Refused, match="^paragraph_count$"):
+        parse_pptx(pptx([("ppt/slides/slide1.xml", content)]), limits=replace(Limits(), paragraphs=3))
 
 
 def test_I4_pptx_refuses_compressed_bomb_before_reading():
