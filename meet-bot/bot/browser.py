@@ -68,8 +68,9 @@ def locate(page: Any, strat: S.Strategy) -> Any:
 
 
 class MeetBrowser:
-    def __init__(self, cfg: Config, voice: bool = False) -> None:
+    def __init__(self, cfg: Config, voice: bool = False, face: bool = False) -> None:
         self.cfg = cfg
+        self.face = face
         self.guest = bool(getattr(cfg, "guest", False))
         self.voice = voice  # a virtual microphone exists: let Meet use it without a permission prompt
         self.ui = UIScheduler()  # one UI action at a time, mic first; see bot/ui.py
@@ -106,6 +107,8 @@ class MeetBrowser:
                 self.ctx = await self._pw.chromium.launch_persistent_context(
                     str(self.cfg.profile_dir), **launch, **context
                 )
+            if self.face:
+                await self.ctx.add_init_script(Path(__file__).with_name("face.js").read_text(encoding="utf-8"))
             self.page = self.ctx.pages[0] if self.ctx.pages else await self.ctx.new_page()
         except BaseException:
             await self.__aexit__()
@@ -242,8 +245,20 @@ class MeetBrowser:
         return asked
 
     async def _after_join(self) -> None:
+        if self.face:
+            await self.page.evaluate(
+                Path(__file__).with_name("face.js").read_text(encoding="utf-8")
+            ) if not await self.page.evaluate("Boolean(globalThis.__tiloFace)") else None
+            if await self.visible(S.CAM_TURN_ON):
+                await self.click(S.CAM_TURN_ON)
         await self.click(S.CLOSE_DIALOG, timeout_s=2)  # "Your meeting's ready" card
         await self.shot("03_in_call")
+
+    async def face_event(self, kind: str, value: float = 0) -> None:
+        if self.face:
+            await self.page.evaluate(
+                "({kind,value}) => globalThis.__tiloFace?.event(kind,value)", {"kind": kind, "value": value}
+            )
 
     async def _wait_in_call(self, asked: bool) -> None:
         timeout = self.cfg.ask_to_join_timeout_s if asked else self.cfg.join_timeout_s
