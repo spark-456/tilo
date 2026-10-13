@@ -5,9 +5,9 @@ Rows for plan section 8b (AG-WEB folds them in). Each element is built as design
 
 | Element | Fixture source | Status |
 | --- | --- | --- |
-| Profile form (six fields), Cancel and "Save changes" | `getUser()` fixture; edits are page state, Save only toasts "Profile saved" | literal/local state; no write endpoint |
-| Notification matrix (5 events x Phone/Email/Slack) and the "decisions keep one channel" rule | literal in `ProfilePage.tsx` (the design's initial matrix) | local state, calls nothing |
-| Quiet hours switch | literal (on) | local state, calls nothing |
+| Profile form (six fields), Cancel and "Save changes" | `getUserSettings()` (`GET /v1/me/settings`, FR-SET-01, ADR-0039); a version 0 document starts from the sign-in name and email | `saveUserSettings()` (`PUT`), "Profile saved" only after a live answer; failures keep the form (BQ-SETWEB-1) |
+| Notification matrix (5 events x Phone/Email/Slack) and the "decisions keep one channel" rule | the stored document (FR-SET-02); labels from `getProfileSettings()` | drafts until its own "Save changes" (`PUT`); the rule is also the server's |
+| Quiet hours switch | the stored `quiet_hours.enabled`; the threshold line is always "Not available yet" (BQ-USET-3) | saved with the matrix |
 | Time of day and motion cards | the shell's prefs through `app.setPref("time" or "motion", ...)` | wired to the shell store (the only persisted settings on the page) |
 | Two-step sign-in "Manage", Face ID "Change" | literal rows | toast only |
 | Signed-in devices, "Sign out", "Sign out everywhere else" | literal three sessions | local state; toasts |

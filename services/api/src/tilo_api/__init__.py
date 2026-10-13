@@ -57,6 +57,7 @@ from tilo_api.skills_feedback import router as _skills_feedback_router
 from tilo_api.skills_routes import router as _skills_router
 from tilo_api.tasks import router as _tasks_router
 from tilo_api.team_routes import router as _team_router
+from tilo_api.user_settings import router as _user_settings_router
 from tilo_api.worlds_list import router as _worlds_list_router
 
 # Generated docs only in local dev mode: deployed, the service is public and the route list is not for
@@ -159,6 +160,7 @@ app.include_router(_connectors_list_router)
 app.include_router(_schedules.router)
 app.include_router(_nudge_sweep.router)  # FR-PA-15b: GET /v1/nudges, POST /v1/nudges/{id}/snooze
 app.include_router(_team_router)
+app.include_router(_user_settings_router)  # FR-SET-01/02: GET and PUT /v1/me/settings
 
 
 def _world_owner(world_id: str) -> str | None:

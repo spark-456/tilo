@@ -10,7 +10,7 @@ export const USER = {
   initials: "AM",
   email: "alex@northwind.co",
   title: "Operations lead",
-  tz: "Europe/London (GMT+1)",
+  tz: "Europe/London",
   lang: "English (UK)",
   hours: "08:30 – 17:30, Monday to Friday",
 } as const;
@@ -32,7 +32,7 @@ export const CONNECTORS = "Connectors";
 /** `[label, help, initial value]`: the six form fields in design order. */
 export const FIELDS = [
   ["Full name", "Shown to your team", USER.name],
-  ["Work email", "Verified · used for sign-in", USER.email],
+  ["Work email", "Display only · does not change how you sign in", USER.email],
   ["Job title", "Helps Tilo route approvals", USER.title],
   ["Time zone", "Agenda and routines use this", USER.tz],
   ["Language", "For drafts Tilo writes for you", USER.lang],
@@ -44,7 +44,7 @@ export const PROFILE_COPY = {
   cancel: "Cancel",
   save: "Save changes",
   /** BQ-SET-2: FR-SET-01, shown above the footer (also the Save button's aria-description and title). */
-  saveNote: "Kept on this device only. Tilo has no profile service to send it to yet.",
+  saveNote: "Saved to your Tilo account, so it follows you to your other devices.",
 } as const;
 
 export const CHANNELS = ["Phone", "Email", "Slack"] as const;
@@ -77,7 +77,7 @@ export const NOTIF_COPY = {
   sub: "Choose where Tilo reaches you. Decisions always reach you somewhere.",
   columns: ["WHEN", "PHONE", "EMAIL", "SLACK"],
   quiet: "Quiet hours · 19:00 to 08:00",
-  quietSub: "Phone stays silent, except decisions over £1,000.",
+  quietSub: "Decision threshold: Not available yet",
   quietLabel: "Quiet hours",
   needOne: "Decisions need at least one channel",
   /** BQ-SET-2: FR-SET-02, shown under the Quiet hours row (also that switch's aria-description). */
@@ -180,6 +180,8 @@ export const STRINGS: Record<TabId, readonly string[]> = {
     NOTIF_COPY.quiet,
     NOTIF_COPY.quietSub,
     NOTIF_COPY.quietNote,
+    PROFILE_COPY.cancel,
+    PROFILE_COPY.save,
   ],
   appearance: [
     ...header,

@@ -1,10 +1,12 @@
 // The Park "Profile" page (WEB-12; design "Tilo App Profile.dc.html"): the person, notifications,
 // appearance, security and plan on five tabs. The user, the profile settings (sessions, invoices, payment,
 // plan, notification defaults, quiet hours) and the ledger (agent spend) all come through useParkApi();
-// the matrix, quiet hours, sessions and the form are page state and call nothing
-// (docs/park-designed-not-in-prd/Profile.md). Time and motion are the shell's prefs, written with
+// the sessions are page state and call nothing (docs/park-designed-not-in-prd/Profile.md). The Profile form, the
+// notification matrix and quiet hours are the person's own UserSettings document (FR-SET-01/02, ADR-0039): read
+// and saved through the Api, shown saved only after the server answers (settingsForm.ts). Time and motion are the shell's prefs, written with
 // app.setPref and read back from the AppCtx. Navigation is app.go only.
-import { type ReactNode, useEffect, useRef, useState } from "react";
+import type { UserSettings, UserSettingsUpdate } from "@tilo/contracts";
+import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import type { ProfileSession, ProfileSettings, User } from "../../api/types";
 import type { AppCtx } from "../../app/AppCtx";
 import { useDemoSession, useParkApi } from "../../app/context";
@@ -16,7 +18,18 @@ import { PushControl } from "./PushControl";
 import { ICONS } from "./icons";
 import { canSwitchOff } from "./notifyRules";
 import { signOutOne, signOutOthers } from "./profileSessions";
-import { loadProfile, saveProfile } from "./profileStore";
+import {
+  type Channels,
+  type Form,
+  HOURS_FORMAT,
+  type RowId,
+  baseForm,
+  channelsOf,
+  isConflict,
+  notificationsOf,
+  problemOf,
+  profileOf,
+} from "./settingsForm";
 
 const TABS = [
   { id: "profile", label: "Profile", icon: ICONS.profile },
@@ -30,21 +43,12 @@ const tabFrom = (v: string | undefined): TabId => TABS.find((t) => t.id === v)?.
 
 const FIELDS = [
   ["name", "Full name", "Shown to your team"],
-  ["email", "Work email", "Verified · used for sign-in"],
+  ["email", "Work email", "Display only · does not change how you sign in"],
   ["title", "Job title", "Helps Tilo route approvals"],
   ["tz", "Time zone", "Agenda and routines use this"],
   ["lang", "Language", "For drafts Tilo writes for you"],
   ["hours", "Working hours", "Tilo won’t book outside these"],
 ] as const;
-type Form = Record<(typeof FIELDS)[number][0], string>;
-const formOf = (u: User): Form => ({
-  name: u.name,
-  email: u.email,
-  title: u.title,
-  tz: u.tz,
-  lang: u.lang,
-  hours: u.hours,
-});
 
 const CHANNELS = ["Phone", "Email", "Slack"] as const;
 const SWATCH = {
@@ -110,9 +114,15 @@ function Unavailable({ title }: { title: string }) {
   );
 }
 
-// FR-SET-01: a save is kept on this device only (no profile endpoint yet); FR-SET-02: quiet hours never hide
-// a gate. Both lines are visible helper text (BQ-SET-2, user approved 8 Oct) and stay accessible descriptions too.
-const SAVE_HINT = "Kept on this device only. Tilo has no profile service to send it to yet.";
+// FR-SET-01: a save goes to the person's Tilo account, shown done only after the server answers; FR-SET-02: quiet
+// hours never hide a gate. Both lines are visible helper text (BQ-SET-2, user approved 8 Oct) and accessible descriptions.
+const SAVE_HINT = "Saved to your Tilo account, so it follows you to your other devices.";
+const SAMPLE_NOT_SAVED = "This is a demo, so nothing was saved. Sign in to save your own settings.";
+const ZERO_ROW: Channels = [false, false, false];
+type Remote =
+  | { kind: "loading" }
+  | { kind: "ready"; doc: UserSettings }
+  | { kind: "error"; text: string };
 const QUIET_HINT =
   "Quiet hours silence the phone only. A decision that needs you is never hidden by quiet hours: it waits in Needs you.";
 const NEED_ONE = "Decisions need at least one channel";
@@ -139,14 +149,83 @@ function Toggle({
   );
 }
 
+/** FR-SET-01/02: the person's settings are still loading or could not be read. Never a form of guessed values. */
+function SettingsState({ remote, retry }: { remote: Remote; retry: () => void }) {
+  if (remote.kind !== "error") {
+    return <output className="park-profile-note">Loading your settings…</output>;
+  }
+  return (
+    <div className="park-profile-unavailable">
+      <p role="alert" className="park-profile-alert">
+        {remote.text}
+      </p>
+      <button type="button" className="park-profile-small" onClick={retry}>
+        Try again
+      </button>
+    </div>
+  );
+}
+
+/** Cancel and Save for one settings tab, with the honest reason when a save did not happen. */
+function SaveFoot(props: {
+  problem: { text: string; conflict: boolean } | null;
+  saving: boolean;
+  hint?: string;
+  onCancel: () => void;
+  onSave: () => void;
+  onReload: () => void;
+}) {
+  const { problem, saving, hint, onCancel, onSave, onReload } = props;
+  return (
+    <>
+      {problem ? (
+        <p role="alert" className="park-profile-alert">
+          {problem.text}{" "}
+          {problem.conflict ? (
+            <button type="button" className="park-profile-link" onClick={onReload}>
+              Reload settings
+            </button>
+          ) : null}
+        </p>
+      ) : null}
+      <div className="park-profile-foot">
+        <button
+          type="button"
+          className="park-profile-btn park-profile-btn--quiet"
+          onClick={onCancel}
+        >
+          Cancel
+        </button>
+        {/* biome-ignore lint/a11y/useValidAriaProps: aria-description is ARIA 1.3; biome's list predates it */}
+        <button
+          type="button"
+          className="park-profile-btn park-btn--primary"
+          aria-description={hint}
+          aria-busy={saving}
+          title={hint}
+          onClick={onSave}
+        >
+          {saving ? "Saving…" : "Save changes"}
+        </button>
+      </div>
+    </>
+  );
+}
+
 export function ProfilePage({ app }: { app: AppCtx }) {
   const api = useParkApi();
   const demo = useDemoSession();
   const [loaded, setLoaded] = useState<Loaded | null>(null);
   const [problem, setProblem] = useState<"missing" | "failed" | null>(null);
-  const [form, setForm] = useState<Form | null>(null);
-  // The last saved (or loaded) form: Cancel returns to it. The user key is the signed-in email.
-  const [base, setBase] = useState<Form | null>(null);
+  // FR-SET-01/02: the person's stored document, read and saved through the Api. The drafts below are only what
+  // they changed since; Cancel clears them, and a save clears them only after the server answered.
+  const [remote, setRemote] = useState<Remote>({ kind: "loading" });
+  const [attempt, setAttempt] = useState(0);
+  const [edits, setEdits] = useState<Partial<Form>>({});
+  const [rowEdits, setRowEdits] = useState<Partial<Record<RowId, Channels>>>({});
+  const [quietEdit, setQuietEdit] = useState<boolean | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [saveProblem, setSaveProblem] = useState<{ text: string; conflict: boolean } | null>(null);
   const routeTab = tabFrom(app.params.tab);
   const [tab, setTab] = useState<TabId>(routeTab);
   // The address names a tab ("?tab=appearance", the notification menu's settings link): follow it whenever a link
@@ -155,8 +234,6 @@ export function ProfilePage({ app }: { app: AppCtx }) {
   const followed = useFollowed();
   // biome-ignore lint/correctness/useExhaustiveDependencies: `followed` is the signal, routeTab the value
   useEffect(() => setTab(routeTab), [followed, routeTab]);
-  const [notif, setNotif] = useState<boolean[][]>([]);
-  const [quiet, setQuiet] = useState(false);
   const [sessions, setSessions] = useState<ProfileSession[]>([]);
   const [confirmOthers, setConfirmOthers] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -186,11 +263,6 @@ export function ProfilePage({ app }: { app: AppCtx }) {
             currency: led.data.currency ?? "GBP",
           },
         });
-        const start = { ...formOf(u.data), ...loadProfile(u.data.email) };
-        setForm(start);
-        setBase(start);
-        setNotif(st.data.notifications.map((n) => [n.phone, n.email, n.slack]));
-        setQuiet(st.data.quiet.on);
         // A demo session shows no phone-app session: the mobile app is a concept (QA-DEMO-1 M4).
         setSessions((st.data.sessions ?? []).filter((s) => !(demo && s.icon === "phone")));
       },
@@ -203,18 +275,85 @@ export function ProfilePage({ app }: { app: AppCtx }) {
     };
   }, [api, demo]);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `attempt` is the Try again / Reload signal
+  useEffect(() => {
+    let live = true;
+    setRemote({ kind: "loading" });
+    api.getUserSettings().then(
+      (r) => {
+        if (live) setRemote({ kind: "ready", doc: r.data });
+      },
+      (e: unknown) => {
+        if (live) setRemote({ kind: "error", text: problemOf(e, false) });
+      },
+    );
+    return () => {
+      live = false;
+    };
+  }, [api, attempt]);
+
   const currentId = sessions.find((s) => s.current)?.id ?? "";
   const others = sessions.some((s) => s.id === currentId) ? sessions.length - 1 : 0;
   const wide = app.vw >= 980;
   const user = loaded?.user;
-  const flip = (r: number, c: number) => {
-    const row = notif[r] ?? [];
-    const id = loaded?.settings.notifications[r]?.id;
-    if (id && !canSwitchOff(id, row, c)) {
+  const doc = remote.kind === "ready" ? remote.doc : null;
+  const base = useMemo(() => (doc && user ? baseForm(doc, user) : null), [doc, user]);
+  const form: Form | null = base && { ...base, ...edits };
+  const channels = (id: RowId): Channels => rowEdits[id] ?? (doc ? channelsOf(doc, id) : ZERO_ROW);
+  const quiet = quietEdit ?? doc?.quiet_hours.enabled ?? false;
+  const flip = (id: RowId, c: number) => {
+    const row = channels(id);
+    if (!canSwitchOff(id, row, c)) {
       app.toast(NEED_ONE);
       return;
     }
-    setNotif(notif.map((cells, i) => (i === r ? cells.map((v, j) => (j === c ? !v : v)) : cells)));
+    setRowEdits({ ...rowEdits, [id]: row.map((v, j) => (j === c ? !v : v)) as Channels });
+  };
+  const discard = () => {
+    setEdits({});
+    setRowEdits({});
+    setQuietEdit(null);
+    setSaveProblem(null);
+  };
+  const reload = () => {
+    discard();
+    setAttempt(attempt + 1);
+  };
+  // One PUT of the whole document (USET-02), never retried by the page. "Saved" is said only for a live answer.
+  const save = async (section: "profile" | "notifications") => {
+    if (!doc || !base || !form || saving) return;
+    const mine = section === "profile";
+    const profile = profileOf(mine ? form : base) ?? (mine ? null : doc.profile);
+    if (!profile) {
+      setSaveProblem({ text: HOURS_FORMAT, conflict: false });
+      return;
+    }
+    const update: UserSettingsUpdate = {
+      version: doc.version,
+      profile,
+      notifications: mine ? doc.notifications : notificationsOf(channels),
+      quiet_hours: mine ? doc.quiet_hours : { ...doc.quiet_hours, enabled: quiet },
+    };
+    setSaving(true);
+    setSaveProblem(null);
+    try {
+      const r = await api.saveUserSettings(update);
+      if (r.source !== "live") {
+        setSaveProblem({ text: SAMPLE_NOT_SAVED, conflict: false });
+        return;
+      }
+      setRemote({ kind: "ready", doc: r.data });
+      if (mine) setEdits({});
+      else {
+        setRowEdits({});
+        setQuietEdit(null);
+      }
+      app.toast(mine ? "Profile saved" : "Notification settings saved");
+    } catch (e) {
+      setSaveProblem({ text: problemOf(e, true), conflict: isConflict(e) });
+    } finally {
+      setSaving(false);
+    }
   };
   const signOut = (s: ProfileSession) => {
     listHeadRef.current?.focus(); // the pressed button is about to unmount: keep focus on a stable node
@@ -222,16 +361,15 @@ export function ProfilePage({ app }: { app: AppCtx }) {
     app.toast(`Signed out of ${s.device}`);
   };
   // One head for every state, so the h1 is the same node while the data loads (focus stays on it).
-  const subtitle =
-    user && form
-      ? [form.title, user.org, user.plan ? `Owner on the ${user.plan} plan` : ""]
-          .filter(Boolean)
-          .join(" · ")
-      : problem === "missing"
-        ? "Not connected yet"
-        : problem === "failed"
-          ? "Your profile could not be loaded"
-          : "";
+  const subtitle = user
+    ? [form?.title, user.org, user.plan ? `Owner on the ${user.plan} plan` : ""]
+        .filter(Boolean)
+        .join(" · ")
+    : problem === "missing"
+      ? "Not connected yet"
+      : problem === "failed"
+        ? "Your profile could not be loaded"
+        : "";
   // An unknown value reads as the default, calm (the store and the handoff default), not as the first option.
   const motion = MOTIONS.find((m) => m[0] === app.motion) ?? MOTIONS[1];
 
@@ -242,7 +380,7 @@ export function ProfilePage({ app }: { app: AppCtx }) {
           <div className="park-profile-avatar">{user?.initials}</div>
           <div className="park-profile-who">
             <h1 className="park-profile-name" tabIndex={-1}>
-              {user && form ? form.name : "Profile"}
+              {form ? form.name : "Profile"}
             </h1>
             <p className="park-profile-sub">{subtitle}</p>
           </div>
@@ -255,7 +393,7 @@ export function ProfilePage({ app }: { app: AppCtx }) {
             Connectors
           </button>
         </div>
-        {loaded && user && form ? (
+        {loaded && user ? (
           <div className={cls("park-profile-layout", wide && "park-profile-layout--wide")}>
             <nav
               aria-label="Settings"
@@ -267,7 +405,10 @@ export function ProfilePage({ app }: { app: AppCtx }) {
                   type="button"
                   aria-current={t.id === tab ? "page" : undefined}
                   className={cls("park-profile-tab", t.id === tab && "park-profile-tab--on")}
-                  onClick={() => setTab(t.id)}
+                  onClick={() => {
+                    setTab(t.id);
+                    setSaveProblem(null);
+                  }}
                 >
                   {t.icon}
                   {t.label}
@@ -275,7 +416,11 @@ export function ProfilePage({ app }: { app: AppCtx }) {
               ))}
             </nav>
 
-            {tab === "profile" ? (
+            {(tab === "profile" || tab === "notifications") && !doc ? (
+              <SettingsState remote={remote} retry={() => setAttempt(attempt + 1)} />
+            ) : null}
+
+            {tab === "profile" && doc && form ? (
               <section aria-label="Profile" className="park-profile-card">
                 <Head
                   title="Profile"
@@ -289,40 +434,25 @@ export function ProfilePage({ app }: { app: AppCtx }) {
                         className="park-profile-input"
                         type={key === "email" ? "email" : "text"}
                         value={form[key]}
-                        onChange={(e) => setForm({ ...form, [key]: e.target.value })}
+                        onChange={(e) => setEdits({ ...edits, [key]: e.target.value })}
                       />
                       <span className="park-profile-help">{help}</span>
                     </label>
                   ))}
                 </div>
                 <p className="park-profile-note">{SAVE_HINT}</p>
-                <div className="park-profile-foot">
-                  <button
-                    type="button"
-                    className="park-profile-btn park-profile-btn--quiet"
-                    onClick={() => setForm(base ?? formOf(user))}
-                  >
-                    Cancel
-                  </button>
-                  {/* biome-ignore lint/a11y/useValidAriaProps: aria-description is ARIA 1.3; biome's list predates it */}
-                  <button
-                    type="button"
-                    className="park-profile-btn park-btn--primary"
-                    aria-description={SAVE_HINT}
-                    title={SAVE_HINT}
-                    onClick={() => {
-                      saveProfile(user.email, form);
-                      setBase(form);
-                      app.toast("Profile saved");
-                    }}
-                  >
-                    Save changes
-                  </button>
-                </div>
+                <SaveFoot
+                  problem={saveProblem}
+                  saving={saving}
+                  hint={SAVE_HINT}
+                  onCancel={discard}
+                  onSave={() => save("profile")}
+                  onReload={reload}
+                />
               </section>
             ) : null}
 
-            {tab === "notifications" ? (
+            {tab === "notifications" && doc ? (
               <section
                 aria-label="Notifications"
                 className="park-profile-card park-profile-card--list"
@@ -341,7 +471,7 @@ export function ProfilePage({ app }: { app: AppCtx }) {
                         </span>
                       ))}
                     </div>
-                    {loaded.settings.notifications.map(({ id, label, description: sub }, r) => (
+                    {loaded.settings.notifications.map(({ id, label, description: sub }) => (
                       <div key={id} className="park-profile-mrow">
                         <div>
                           <div className="park-profile-mlabel">{label}</div>
@@ -351,9 +481,9 @@ export function ProfilePage({ app }: { app: AppCtx }) {
                           <div key={c} className="park-profile-cell">
                             <Toggle
                               label={`${label} by ${c}`}
-                              on={notif[r]?.[i] ?? false}
-                              locked={!canSwitchOff(id, notif[r] ?? [], i)}
-                              onChange={() => flip(r, i)}
+                              on={channels(id)[i] ?? false}
+                              locked={!canSwitchOff(id, channels(id), i)}
+                              onChange={() => flip(id, i)}
                             />
                           </div>
                         ))}
@@ -364,22 +494,26 @@ export function ProfilePage({ app }: { app: AppCtx }) {
                 <div className="park-profile-quiet">
                   <Tile tone="hero">{ICONS.moon}</Tile>
                   <div className="park-profile-grow">
-                    <div className="park-profile-mlabel">{`Quiet hours · ${loaded.settings.quiet.start} to ${loaded.settings.quiet.end}`}</div>
-                    <div className="park-profile-msub">
-                      {loaded.settings.quiet.threshold
-                        ? `Phone stays silent, except decisions over ${loaded.settings.quiet.threshold}.`
-                        : "Decision threshold: Not available yet"}
-                    </div>
+                    <div className="park-profile-mlabel">{`Quiet hours · ${doc.quiet_hours.start} to ${doc.quiet_hours.end}`}</div>
+                    {/* A saved threshold is kept, but nothing delivers by it yet (USET-05, BQ-USET-3): never promise it. */}
+                    <div className="park-profile-msub">Decision threshold: Not available yet</div>
                   </div>
                   <Switch
                     label="Quiet hours"
                     description={QUIET_HINT}
                     checked={quiet}
-                    onChange={setQuiet}
+                    onChange={setQuietEdit}
                   />
                 </div>
                 <p className="park-profile-note">{QUIET_HINT}</p>
                 <PushControl />
+                <SaveFoot
+                  problem={saveProblem}
+                  saving={saving}
+                  onCancel={discard}
+                  onSave={() => save("notifications")}
+                  onReload={reload}
+                />
               </section>
             ) : null}
 

@@ -31,6 +31,7 @@ import {
   versionOfBody,
 } from "./live/skillsFromApi";
 import { teamFromPeople } from "./live/teamFromPeople";
+import { isUserSettings } from "./live/userSettings";
 import { worldFromIntake } from "./live/worldFromIntake";
 import { STATE_OF, type WorldListItem, worldsFromList } from "./live/worldsFromList";
 import { nameInitials } from "./nameInitials";
@@ -280,6 +281,18 @@ export function createLiveApi(options: LiveApiOptions = {}): Api {
     }
     return { spec: raw.spec, publishers: raw.publishers as Record<string, string> };
   });
+  // FR-SET-01/02: the signed-in person's own document (the server derives owner and org from the token). A save is
+  // one PUT, never retried; only the stored document the server answers with is `live`.
+  api.getUserSettings = async () => {
+    const body = await http.getJson("/v1/me/settings");
+    if (!isUserSettings(body)) throw new TiloApiError(BAD_REPLY, 200, true);
+    return { data: body, source: "live" };
+  };
+  api.saveUserSettings = async (update) => {
+    const body = await http.putJson("/v1/me/settings", update);
+    if (!isUserSettings(body)) throw new TiloApiError(BAD_REPLY, 200, true, true);
+    return { data: body, source: "live" };
+  };
   api.getLedger = async () => {
     const report = await http.getJson("/costs");
     if (!isCostReport(report)) throw new TiloApiError(BAD_REPLY, 200, true);
