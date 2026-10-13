@@ -33,11 +33,16 @@ it("FR_AGT_15 the live World page reaches proposals and the demo World never req
         </ParkProvider>,
       );
     });
-    expect(fetch).toHaveBeenCalledTimes(source === "live" ? 1 : 0);
-    if (source === "live")
-      expect(fetch.mock.calls[0]?.[0]).toBe(
-        `https://api.test/worlds/${encodeURIComponent(world.id)}/skill-proposals`,
-      );
+    // A live page also reads the world's events once for its sharing line (BQ-CTX-TEAMWORLD, TSW-5b); proposals
+    // are the one request this test is about.
+    const urls = fetch.mock.calls.map((c) => String(c[0]));
+    const base = `https://api.test/worlds/${encodeURIComponent(world.id)}`;
+    expect(urls.filter((u) => u.endsWith("/skill-proposals"))).toEqual(
+      source === "live" ? [`${base}/skill-proposals`] : [],
+    );
+    expect(urls.filter((u) => !u.endsWith("/skill-proposals"))).toEqual(
+      source === "live" ? [`${base}/events`] : [],
+    );
     cleanup();
   }
 });

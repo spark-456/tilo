@@ -34,6 +34,7 @@ import { SampleBadge, SampleNote } from "../../sample/SampleBadge";
 import { icon } from "../../shell/kit";
 import { Activity, Districts, Result, RunHistory } from "./Lower";
 import { MeetingHall } from "./MeetingHall";
+import { ShareLine } from "./ShareLine";
 import { FactsCard, GoLink, LovableCard, SpendCard, WaitingCard } from "./Side";
 import { SkillProposals } from "./SkillProposals";
 import { ShareWithTeam } from "./TeamShare";
@@ -347,6 +348,9 @@ export function WorldPage({ app }: { app: AppCtx }) {
               : `Owned by ${w.owner} · started ${w.started} · ${agentsWord(w.agents)}`}
           </p>
           {w.sample ? <SampleNote /> : null}
+          {loaded.live && worldClient && !w.sample ? (
+            <ShareLine client={worldClient} worldId={w.id} />
+          ) : null}
         </div>
         <div className="park-world-actions">
           <Button

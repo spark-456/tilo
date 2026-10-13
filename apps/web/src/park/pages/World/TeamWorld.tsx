@@ -10,6 +10,7 @@ import type { AppCtx } from "../../app/AppCtx";
 import { useParkApi } from "../../app/context";
 import { Button, PageSheet } from "../../components";
 import { AddWorkItem } from "./AddWorkItem";
+import { ShareLine } from "./ShareLine";
 import { GoLink } from "./Side";
 import { useRead } from "./TeamShare";
 
@@ -130,6 +131,7 @@ export function TeamWorld({
     body = (
       <>
         <p className="park-world-meta">You can read this world. Only its owner can change it.</p>
+        <ShareLine client={client} worldId={worldId} />
         <nav aria-label="Run views" className="park-world-lenses">
           <a href={`/world/${id}/story`}>Story</a>
           <a href={`/world/${id}/trace`}>Trace</a>
