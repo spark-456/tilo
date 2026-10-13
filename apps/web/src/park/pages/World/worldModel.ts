@@ -103,6 +103,8 @@ export function spendNoteOf(w: World, mine: readonly Decision[], dec: Dec): stri
   if (noted?.facts?.spendNote) {
     return dec[noted.k] ? noted.facts.spendNote.decided : noted.facts.spendNote.waiting;
   }
+  // UI-10 B3: a project with a budget shows what it has spent in all, which is not a per-run cost.
+  if (w.tier === "Town" && w.budget) return `${w.spend} so far. Billed monthly.`;
   if (w.tier === "Town") return `Each run costs about ${w.spend}. Billed monthly.`;
   if (w.budget) return `${Math.round(spendShare(w))}% of budget used. Forecast within budget.`;
   return "Quick tasks are billed when they finish.";

@@ -147,7 +147,7 @@ for (const [sizeName, viewport] of Object.entries(SIZES)) {
         page,
       }) => {
         const problems = await openWorld(page, "k1", theme);
-        await expect(page).toHaveTitle("World · Tilo");
+        await expect(page).toHaveTitle("K1 electric scooter · Tilo");
         await expect(page.getByRole("main")).toHaveCount(1);
         await expect(page.getByRole("main").getByTestId("park-page-world")).toHaveCount(1);
         await expect(page.getByRole("heading", { level: 1 })).toHaveCount(1);

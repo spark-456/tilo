@@ -20,6 +20,7 @@ import type {
 import type { AppCtx } from "../../app/AppCtx";
 import { NotFound } from "../../app/NotFound";
 import { useDemoSession, useParkApi, useWorldClient } from "../../app/context";
+import { PageTitle } from "../../app/pageTitle";
 import { stagePath } from "../../app/router";
 import {
   SLACK_NOTE_MAX,
@@ -245,7 +246,14 @@ export function WorldPage({ app }: { app: AppCtx }) {
         (wanted
           ? undefined
           : (loaded.worlds.find((x) => !added.some((a) => a.id === x.id)) ?? loaded.worlds[0])));
-  if (loaded !== "failed" && wanted && !world) return <NotFound go={app.go} />;
+  if (loaded !== "failed" && wanted && !world) {
+    return (
+      <>
+        <PageTitle title="Not found" />
+        <NotFound go={app.go} />
+      </>
+    );
+  }
   if (loaded === "failed" || !world) {
     return (
       <Frame>
@@ -336,6 +344,7 @@ export function WorldPage({ app }: { app: AppCtx }) {
 
   return (
     <Frame worldId={w.id}>
+      <PageTitle title={w.name} />
       <nav aria-label="Breadcrumb" className="park-world-crumb">
         <GoLink className="park-world-back" href="#worlds" onGo={() => app.go("worlds")}>
           {icon("arrowL", 15)}Worlds
@@ -605,7 +614,7 @@ export function WorldPage({ app }: { app: AppCtx }) {
                   t: w.started,
                   rank: "director",
                   who: "Director",
-                  text: `Started ${w.name.toLowerCase()}.`,
+                  text: `Started “${w.name}”.`,
                   kind: "info",
                 },
               ]

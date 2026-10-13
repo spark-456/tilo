@@ -494,12 +494,36 @@ describe("WEB_6_world_render: Activity", () => {
   });
 
   it("WEB_6_world_render_a_world_without_activity_shows_one_Director_line_from_its_start", async () => {
-    // Reference: [{ t: w.started, rank: 'director', who: 'Director', text: 'Started ' + w.name.toLowerCase() + '.' }]
+    // UI-10 B3: the world's name keeps its own capitals (a lowercased "northline" was wrong), quoted
     const { el } = await mountWorld({ id: "calls" });
     const section = region(el, "Activity");
-    const row = rowOf(section, "Started summarise yesterday’s calls.", "09:04");
-    expect(flat(textOf(row))).toBe(flat("Director Started summarise yesterday’s calls. 09:04"));
+    const row = rowOf(section, "Started “Summarise yesterday’s calls”.", "09:04");
+    expect(flat(textOf(row))).toBe(flat("Director Started “Summarise yesterday’s calls”. 09:04"));
     expect(row.querySelector(ART)).not.toBeNull();
+  });
+
+  it("UI_10_B3_the_default_activity_line_keeps_the_names_capitals", async () => {
+    const { el } = await mountWorld({ id: "reply" });
+    const text = textOf(region(el, "Activity"));
+    expect(text).toContain("Started “Reply to Northline”.");
+    expect(text).not.toContain("northline");
+  });
+
+  it("UI_10_B3_the_Activity_header_says_Today_only_when_every_row_is_from_today", async () => {
+    const today = await mountWorld(); // K1: rows stamped with the time of day
+    expect(textOf(q(region(today.el, "Activity"), ".park-world-sub"))).toBe("Today");
+    cleanup();
+    const older = await mountWorld({ id: "hires" }); // a row stamped "Yesterday"
+    expect(textOf(q(region(older.el, "Activity"), ".park-world-sub"))).toBe("Recent");
+  });
+
+  it("UI_10_B3_a_project_with_a_budget_shows_spend_so_far_not_a_per_run_cost", async () => {
+    const project = await mountWorld({ id: "northline" });
+    expect(pageText(project.el)).toContain("£342 so far. Billed monthly.");
+    expect(pageText(project.el)).not.toContain("Each run costs about £342");
+    cleanup();
+    const routine = await mountWorld({ id: "invoice" });
+    expect(pageText(routine.el)).toContain("Each run costs about £0.60. Billed monthly.");
   });
 
   it("WEB_6_world_render_the_second_city_activity_has_its_three_rows", async () => {

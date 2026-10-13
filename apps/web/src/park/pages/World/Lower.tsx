@@ -177,10 +177,15 @@ function ActivityRow({ a, night }: { a: ActivityItem; night: boolean }) {
   );
 }
 
+// UI-10 B3: "Today" only when every row is from today; a row dated "6 Oct" under "Today" contradicts itself.
+const TODAY_ROW = /^(today( |$)|\d{1,2}:\d{2}$|just now$)/i;
+const activitySub = (items: readonly ActivityItem[]): string =>
+  items.every((a) => TODAY_ROW.test(a.t)) ? "Today" : "Recent";
+
 export function Activity({ items, night }: { items: readonly ActivityItem[]; night: boolean }) {
   return (
     <section aria-label="Activity" className="park-world-section">
-      <SectionHead title="Activity" sub="Today" />
+      <SectionHead title="Activity" sub={activitySub(items)} />
       {keyed(items, (a) => `${a.t}|${a.who}|${a.text}`).map(([key, a]) => (
         <ActivityRow key={key} a={a} night={night} />
       ))}
