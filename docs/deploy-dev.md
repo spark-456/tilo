@@ -441,6 +441,26 @@ credentials the seam answers 503 and every request is replay, never uncapped. Re
 durable kill switch after the daily hard cap tripped it, delete the document `orgs/org_tilo/spend_ledger/switch`
 (Firestore console) or set its `on` field to `false`; nothing in the API can.
 
+### The Treasury credit ledger (T3, BQ-T3-1, BQ-MTR10-4; nothing for you to apply)
+
+`GET /costs`, `GET /worlds/{id}/costs` (FR-MTR-10), `GET /v1/effort` and the web Ledger read, and Quick, the Meeting
+Hall and the live metering write, one Firestore collection: `tilo_api.treasury_firestore`, documents
+`orgs/{org}/treasury_ledger/{entry id}`, each written once (`create`), never updated or deleted. It needs only what is
+already there, as the SEC-16 ledger above: `TILO_FIRESTORE_PROJECT` on `tilo-api` and the service account's existing
+`roles/datastore.user`. No composite index (one equality query on `user`, served by Firestore's automatic single-field
+index), no rules change (`firestore.rules` denies every client path), no `TILO_API_STORE`. With no valid project or no
+credentials the routes answer 503 (`not_configured`, `store_unavailable`), never an empty report. Each live unit the
+meter settles (GOLIVE-935) is also one entry here, written after the settle: a write that fails, or no writer wired,
+logs one `treasury_ledger_write_failed` line at ERROR (the error type only; a log-based alert on that text is the
+alert-able marker), is not retried, and never undoes the settled spend. The Ledger then under-reports that unit, and
+`GET /costs` says so itself: `partial: true`, `partial_reason: below_spend_ledger` while its total is below what the
+SEC-16 ledger settled (BQ-T3-6).
+
+T3b (BQ-T3-5): each entry is also folded, in the same transaction, into one rollup per person per run at
+`orgs/{org}/treasury_rollup/{id}`, which the three routes read instead of every entry. Nothing for you to apply: no
+composite index (one equality query on `user`), no rules change (`firestore.rules` denies every client path), no IAM
+change (`roles/datastore.user` covers the transaction). Optional alert text: `treasury_rollup_too_large` at ERROR.
+
 ### Against a deployed tilo-api, and the smoke (PROD-WIRE-4)
 
 ```powershell
@@ -489,6 +509,16 @@ Tilo never asks for or stores a password. The signed-in steps cannot pass on til
 ID-token verifier (`deps.get_current_principal`, CL-REACH) is wired; before that the API answers them 401 and the
 smoke stops at `intake`. The smoke needs a real deployment and a person, so no workflow runs it and it is not part
 of `just check` or `just test`.
+
+## Web push certificate egress (FR-CHN-17f)
+
+Before activating web push, include HTTPS egress from `tilo-channels` to `www.googleapis.com` for
+`https://www.googleapis.com/oauth2/v1/certs` (`tilo_channels.push_verifier.CERT_URL`). The internal push route
+uses these public certificates to verify Google's signed caller token; a cold or expired certificate cache
+cannot authenticate the caller if that fetch is blocked. No additional IAM role is needed for this public read.
+Keep the four delivery hosts in `config/web_push.yaml` allowed too. The certificate host belongs only in the
+runtime network egress rules: do not add it to `allowed_endpoint_hosts`, which restricts subscription destinations.
+This runbook records a prerequisite; network/IAM changes remain a separately reviewed user infrastructure action.
 
 ## Never
 

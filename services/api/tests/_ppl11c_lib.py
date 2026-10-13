@@ -288,12 +288,13 @@ def stream_post(
     app: Any,
     path: str,
     *,
+    method: str = "POST",
     total_bytes: int,
     declared_length: int | None = None,
     chunk: int = 1024,
     headers: dict[str, str] | None = None,
 ) -> tuple[int, int, dict[str, str], str]:
-    """POST `total_bytes` of body, `chunk` bytes at a time, straight into the ASGI app (no client buffering), pulling
+    """Send `total_bytes` of body, `chunk` bytes at a time, straight into the ASGI app (no client buffering), pulling
     the next chunk only when the app asks for it. Returns (status, bytes the app consumed, response headers, text).
     `declared_length` sets a `Content-Length` that need not match what is then sent."""
     import httpx  # noqa: PLC0415
@@ -315,7 +316,7 @@ def stream_post(
             sent_headers = {"content-type": "application/json", **(headers or {})}
             if declared_length is not None:
                 sent_headers["content-length"] = str(declared_length)
-            response = await client.post(path, content=body(), headers=sent_headers)
+            response = await client.request(method, path, content=body(), headers=sent_headers)
             return response.status_code, dict(response.headers), response.text
 
     status, response_headers, text = asyncio.run(go())

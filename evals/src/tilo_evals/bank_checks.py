@@ -138,6 +138,11 @@ def terminal_honest(obs: Observation) -> list[Finding]:
     elif obs.outcome == "needs_answers":
         if not obs.questions or "budget.granted" in types:
             found.append(Finding("terminal_honest", "needs_answers without questions, or the budget was granted"))
+    elif obs.outcome == "declined":
+        if not (obs.reason or "").strip():
+            found.append(Finding("terminal_honest", "declined with no reason shown to the person"))
+        if {"budget.granted", "world.started", "world.completed", "artifact.delivered"} & set(types) or obs.sent_total:
+            found.append(Finding("terminal_honest", "declined, yet the run started, completed or something was sent"))
     return found
 
 

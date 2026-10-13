@@ -28,6 +28,7 @@ def case_request(case: Mapping[str, Any]) -> tuple[AccessRequest, Directory]:
                 raise _bad()
             action = "read_" + view
         extra = {key: record.get(key) for key in ("meeting", "work_item", "source_owner", "pin")}
+        extra.update(world_share=case.get("world_share"), world_owner=case.get("world_owner"))  # ADR-0040 cases
         built = AccessRequest(
             actor=request["actor"],
             action=action,

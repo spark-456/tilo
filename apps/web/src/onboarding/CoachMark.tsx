@@ -57,7 +57,18 @@ export function CoachMark({
   const bodyId = `onb-body-${id}`;
   const [target, setTarget] = useState<Element | null>(null);
   const [box, setBox] = useState<Box | null>(null);
+  const [height, setHeight] = useState(ROOM);
   const last = index === total - 1;
+
+  useLayoutEffect(() => {
+    const card = ref.current;
+    if (!card) return;
+    const measure = () => setHeight(card.getBoundingClientRect().height);
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(card);
+    return () => observer.disconnect();
+  }, []);
 
   // Find the step's real element and measure it; again whenever the window changes shape or the page scrolls.
   useLayoutEffect(() => {
@@ -129,10 +140,9 @@ export function CoachMark({
       MARGIN,
       Math.min(box.left + box.width / 2 - width / 2, vw - width - MARGIN),
     );
-    const below = box.top + box.height + GAP + ROOM <= vh;
-    style = below
-      ? { width, left, top: box.top + box.height + GAP }
-      : { width, left, bottom: Math.max(MARGIN, vh - box.top + GAP) };
+    const below = box.top + box.height + GAP;
+    const preferred = below + height <= vh - MARGIN ? below : box.top - GAP - height;
+    style = { width, left, top: Math.max(MARGIN, Math.min(preferred, vh - height - MARGIN)) };
   }
 
   return (
