@@ -51,7 +51,7 @@ _LIVE_KEYS = frozenset(
         "max_consecutive_refusals",
     }
 )
-MAX_CONSECUTIVE_REFUSALS = 20  # the largest `voice.live.max_consecutive_refusals` the loader accepts
+MAX_CONSECUTIVE_REFUSALS = 10  # the largest `voice.live.max_consecutive_refusals` the loader accepts
 # BQ-M2-12: why a meter refused ONE reply, as a closed vocabulary of fixed words (the bot's meter publishes one in
 # `last_refusal`; its text, its exception and its body never travel). TRANSIENT words may clear by the next reply: the
 # one-at-a-time hold still open, a ledger that could not be read, an unreachable or slow meter, 429, a 5xx that is not

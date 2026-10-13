@@ -53,8 +53,9 @@ _REFRESH_MARGIN_S = 120
 _ERROR_CODES = frozenset(
     {"unauthenticated", "forbidden", "invalid_request", "not_configured", "not_attending", "no_hold", "key_used"}
 )
-# Reasons after which tilo-api cannot have opened a hold: no token, or an answer that was a refusal by status.
-_NO_HOLD = frozenset({"refused", "no_token", "rate_limited", "server_error"}) | _ERROR_CODES
+# Reasons after which tilo-api cannot have opened a hold: no token, or an answer that was a refusal by status. A 5xx
+# is not one: the API may have opened the hold and failed after it, so a `server_error` is followed by a release.
+_NO_HOLD = frozenset({"refused", "no_token", "rate_limited"}) | _ERROR_CODES
 
 
 class _Failed(Exception):

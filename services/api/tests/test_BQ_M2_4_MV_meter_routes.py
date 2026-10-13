@@ -570,6 +570,16 @@ def test_BQ_M2_4_MV_04_the_persons_team_limit_lowers_the_cap_and_an_unreadable_o
     assert answer == {"decision": "replay", "reason": "unavailable"} and rig.spent(OWNER_2) == 0
 
 
+@pytest.mark.parametrize("cap", [0, -50])
+def test_BQ_M2_4_MV_04_a_team_cap_of_nothing_is_capped_not_unavailable(rig, monkeypatch, cap):
+    from tilo_api import team_access
+
+    monkeypatch.setattr(team_access, "user_cap_minor", lambda *_a: cap)
+    nonce = rig.attend()
+    assert rig.reserve(nonce, new_key()).json() == {"decision": "replay", "reason": "capped"}
+    assert rig.spent() == 0  # nothing was held
+
+
 def test_BQ_M2_4_MV_11_no_event_outbox_entry_world_write_or_model_call(rig):
     def forbidden(*_a, **_k):
         raise AssertionError("the meter route reached a seam it must not")

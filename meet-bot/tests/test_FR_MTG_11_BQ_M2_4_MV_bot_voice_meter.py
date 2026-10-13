@@ -161,6 +161,16 @@ def test_FR_MTG_11_BQ_M2_4_a_lost_reserve_answer_is_followed_by_one_release_of_t
     assert freed["key"] == body["key"] and freed["outcome"] == "released" and "usage" not in freed
 
 
+def test_FR_MTG_11_BQ_M2_4_a_5xx_reserve_answer_is_followed_by_one_release_of_the_same_key():
+    api = Api(reserve=(500, {"detail": "boom"}))  # the API may have opened the hold and failed after it
+    meter = meter_for(api)
+    assert meter.reserve() is None
+    assert meter.last_free is not None
+    meter.last_free.join(5)
+    (_, body, _), (_, freed, _) = api.reserves[0], api.closes[0]
+    assert freed["key"] == body["key"] and freed["outcome"] == "released" and "usage" not in freed
+
+
 def test_FR_MTG_11_BQ_M2_4_a_refusal_opens_no_hold_so_nothing_is_released():
     api = Api(reserve=(409, {"error": "not_attending"}))
     meter = meter_for(api)

@@ -72,11 +72,11 @@ def make(meter, transport=None, *, bound: int = 3):
 def test_FR_MTG_11_BQ_M2_12_the_shipped_config_names_the_bound_and_no_code_does():
     real = load_voice_config(REPO / "config" / "voice.yaml", models_path=MODELS)
     assert real.live is not None and type(real.live.max_consecutive_refusals) is int
-    assert 1 <= real.live.max_consecutive_refusals <= 20
+    assert 1 <= real.live.max_consecutive_refusals <= 10  # the loader accepts at most 10 transients in a row
     assert "max_consecutive_refusals" in (REPO / "config" / "voice.yaml").read_text(encoding="utf-8")
 
 
-@pytest.mark.parametrize("bad", [0, -1, 21, True, 2.5, "3", None])
+@pytest.mark.parametrize("bad", [0, -1, 11, 21, True, 2.5, "3", None])
 def test_FR_MTG_11_BQ_M2_12_a_bad_bound_fails_start_up_loudly(tmp_path, bad):
     from test_FR_MTG_11_gemini_live_voice import write_voice_yaml
 
