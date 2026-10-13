@@ -77,6 +77,16 @@ describe("WEB_4_home_composer: idle", () => {
     expect(rig.sch.timers).toHaveLength(0); // nothing is scheduled until the person starts
   });
 
+  it("QA_13OCT_home_composer_on_a_phone_the_placeholder_shows_the_example_in_few_words", async () => {
+    const wide = await mountHome();
+    expect(taskInput(wide.el).placeholder).toBe(`e.g. ${QUICK.example}`);
+    cleanup();
+    const phone = await mountHome({ app: { vw: 390 } });
+    const placeholder = taskInput(phone.el).placeholder;
+    expect(placeholder).toBe("e.g. Summarise this week’s feedback");
+    expect(placeholder.length).toBeLessThan(`e.g. ${QUICK.example}`.length);
+  });
+
   it.each(MODES)(
     "WEB_4_home_composer_size_sets_start_placeholder_hint_and_chips_for_$label",
     async (mode) => {
