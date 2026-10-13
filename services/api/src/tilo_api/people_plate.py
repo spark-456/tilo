@@ -301,7 +301,9 @@ def build_plate(
         "today": today,
         "rows": rows[:ROWS_CAP],
         "parked": parked[:PARKED_CAP],
-        "truncated": len(rows) > ROWS_CAP or len(parked) > PARKED_CAP,
+        "truncated": len(rows) > ROWS_CAP
+        or len(parked) > PARKED_CAP
+        or (getattr(sources, "truncated", False) is True and len(rows) >= ROWS_CAP),  # a source hit its read cap
         "fingerprint": _fingerprint(rows[:ROWS_CAP]),
     }
     if not conforms("plate.schema.json", plate):

@@ -34,7 +34,13 @@ def test_P0_07a_firebase_hosting_serves_the_vite_build_as_a_spa(repo_root: pathl
     # searched word: the project's own sign-in iframe on its auth domain and the SDK's Secure Token REST host (`token`).
     # Only those two are removed first (test_P0_07c_deploy_web.py pins that each appears exactly once).
     for origin in ("https://essential-wares-510320-f0.firebaseapp.com/__/auth/", "https://securetoken.googleapis.com"):
+        assert text.count(origin) == 1, f"{origin} appears exactly once in the CSP"  # SIGNIN-FIX
         text = text.replace(origin, "")
+    # ADR32 T5b (documented test change): the second Firestore database is named `tilo-tokens` and its rules file
+    # `firestore.tokens.rules` in the `firestore` list; both are public names holding the word `token`, each named once.
+    for name in ('"tilo-tokens"', "firestore.tokens.rules"):
+        assert text.count(name) == 1, f"{name} appears exactly once, in the firestore list"
+        text = text.replace(name, "")
     assert not re.search(r"tilo-demo|apiKey|secret|token|essential-wares", text, re.I), "no project id or secrets here"
 
 
@@ -50,7 +56,14 @@ def test_P0_07a_just_deploy_dev_refuses_anything_but_dev_and_dispatches_the_work
     assert body.index("deploy-dev.yml") > refusal.start(), "the refusal comes before the dispatch"
     for banned in ["tilo-demo", "terraform", "LIVE"]:
         assert banned not in body, f"{banned} must not appear in deploy-dev"
-    assert "only env=dev is allowed here" in text, "the existing `deploy` recipe keeps its refusal"
+    deploy = re.search(r'^deploy env="dev":\n(?P<body>(?:[ \t]+[^\n]*\n)+)', text, re.M)
+    assert deploy, "the deploy entry point stays available"
+    deploy_body = deploy.group("body")
+    assert "error('deploy: only env=dev is allowed here" in deploy_body, "non-dev is refused before a shell"
+    assert "env =~ '^(dev|env=dev)$'" in deploy_body, "only the two documented dev forms are accepted"
+    assert deploy_body.index("deploy-dev-cloudbuild api") < deploy_body.index("deploy-dev-cloudbuild all dev")
+    for banned in ["workflow", "terraform", "tilo-demo", "LIVE"]:
+        assert banned not in deploy_body
     check_header = re.search(r"^check:.*$", text, re.M).group(0)
     assert "deploy" not in check_header, "`just check` must never deploy"
 

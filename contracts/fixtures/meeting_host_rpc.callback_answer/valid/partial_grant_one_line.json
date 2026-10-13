@@ -1,0 +1,11 @@
+{
+  "connector": "google_calendar",
+  "scope_lines": ["Read the events on your own calendar."],
+  "parts": [
+    {
+      "type": "connection.established",
+      "connector": "google_calendar",
+      "user_id": "u_priya"
+    }
+  ]
+}

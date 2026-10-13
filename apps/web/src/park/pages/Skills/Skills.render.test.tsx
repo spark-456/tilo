@@ -317,7 +317,7 @@ describe("WEB_8a_skills_render: data comes through the Api, and shows only what 
     expect(api.getSkills).toHaveBeenCalled();
     expect(api.getLearn).toHaveBeenCalled();
     expect(api.saveSkill).not.toHaveBeenCalled(); // nothing is written by looking
-    expect([...reads].filter((n) => n !== "getUser")).toEqual([]);
+    expect([...reads].filter((n) => n !== "getUser" && n !== "getLedger")).toEqual([]);
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 

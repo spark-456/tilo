@@ -13,8 +13,9 @@
 * `NoStore`: every `/v1/` answer is `Cache-Control: no-store`, the SEC-15 gate's 403 and a validation 422 included.
 
 Counters and keys live in a `Limits` that belongs to one install's `PeopleStores` (never to the module), keyed by the
-stores object's lifetime. They are in memory: a restart or a second instance forgets them (a Firestore-backed `Limits`
-is the follow-up). The clock is the `deps.get_clock` seam, read once per request. No model, no log, no value echoed.
+stores object's lifetime. For stores built over Firestore they are `people_limits_store.DurableLimits` on the same
+client (FS-2); otherwise in memory, and a restart forgets them. The clock is the `deps.get_clock` seam, read once per
+request. No model, no log, no value echoed.
 """
 
 from __future__ import annotations
@@ -36,6 +37,7 @@ from starlette.types import ASGIApp, Message, Receive, Scope, Send
 from tilo_people.stores import PeopleStores
 
 from tilo_api import deps
+from tilo_api.people_firestore import FirestoreRecordStore
 from tilo_api.people_writes import Refusal
 
 WRITES_PER_MINUTE = 60  # BQ-PPL11C-2 (SEC-10 gives no number)
@@ -59,7 +61,7 @@ class Limits:
         self._hits: dict[str, deque[float]] = {}
         self._keys: OrderedDict[str, OrderedDict[tuple[str, str], _Entry]] = OrderedDict()
 
-    def attempt(self, user_id: str, now: float) -> None:
+    def attempt(self, user_id: str, now: float, *, limit: int = WRITES_PER_MINUTE) -> None:
         """Counts one write attempt in the minute ending `now`, or refuses it (the refused one is not counted)."""
         with self._lock:
             if len(self._hits) > _MAX_PRINCIPALS:
@@ -67,13 +69,27 @@ class Limits:
             hits = self._hits.setdefault(user_id, deque())
             while hits and hits[0] <= now - 60:
                 hits.popleft()
-            if len(hits) >= WRITES_PER_MINUTE:
+            if len(hits) >= limit:
                 wait = min(60, max(1, math.ceil(hits[0] + 60 - now)))
                 raise Refusal(429, "rate_limited", headers={"Retry-After": str(wait)}, code="rate_limited")
             hits.append(now)
 
+    def erase_person(self, org_id: str, user_id: str) -> int:
+        """FR-MEM-09: forgets one person's counter and keys (the in-memory limiter has no org); how many were."""
+        if not re.fullmatch(r"u_[0-9A-Za-z_]{1,48}", user_id):
+            raise ValueError("malformed id")
+        with self._lock:
+            gone = (self._hits.pop(user_id, None) is not None) + len(self._keys.pop(user_id, {}))
+        return gone
+
     def once(
-        self, user_id: str, route: str, key: str, body: BaseModel, make: Callable[[], dict[str, Any]]
+        self,
+        user_id: str,
+        route: str,
+        key: str,
+        body: BaseModel,
+        make: Callable[[], dict[str, Any]],
+        now: float | None = None,
     ) -> dict[str, Any]:
         if _KEY.fullmatch(key) is None:
             raise Refusal(422, "invalid_idempotency_key")  # never echoes the key
@@ -133,18 +149,28 @@ def limits_of(stores: PeopleStores) -> Limits:
     with _LIMITS_LOCK:
         found = _LIMITS.get(id(stores))
         if found is None:
-            found = _LIMITS[id(stores)] = Limits()
+            if isinstance(stores.work_items, FirestoreRecordStore):  # the stores' own client: no second one (FS-2)
+                from tilo_api.people_limits_store import DurableLimits  # noqa: PLC0415 - it imports this module
+
+                kinds = {"meeting": stores.meetings, "person": stores.persons, "work_item": stores.work_items}
+                found = DurableLimits(stores.work_items._client, kinds)
+            else:
+                found = Limits()
+            _LIMITS[id(stores)] = found
             weakref.finalize(stores, _LIMITS.pop, id(stores), None)
         return found
 
 
 def write_limit(
+    request: Request,
     principal: Annotated[deps.Principal, Depends(deps.get_current_principal)],
     stores: Annotated[PeopleStores, Depends(deps.get_people_stores)],
     clock: Annotated[Callable[[], str], Depends(deps.get_clock)],
 ) -> None:
-    """A dependency of every people POST route; it runs before the body dependency, so before any body is read."""
-    limits_of(stores).attempt(principal.user_id, datetime.fromisoformat(clock()).timestamp())
+    """A dependency of every people POST route; it runs before the body dependency, so before any body is read. The
+    clock is read once here and kept for the request (`idempotent` uses it for the key's expiry)."""
+    request.state.limiter_now = datetime.fromisoformat(clock()).timestamp()
+    limits_of(stores).attempt(principal.user_id, request.state.limiter_now)
 
 
 def idempotent(
@@ -158,7 +184,8 @@ def idempotent(
     key = request.headers.get("idempotency-key")
     if key is None:
         return make()
-    return limits_of(stores).once(principal.user_id, request.url.path, key, body, make)
+    now = getattr(request.state, "limiter_now", None)
+    return limits_of(stores).once(principal.user_id, request.url.path, key, body, make, now)
 
 
 class NoStore:

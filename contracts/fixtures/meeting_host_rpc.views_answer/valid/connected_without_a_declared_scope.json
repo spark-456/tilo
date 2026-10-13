@@ -1,0 +1,10 @@
+{
+  "views": [
+    {
+      "connector": "google_calendar",
+      "state": "connected",
+      "scopes": [],
+      "connected_at": "2026-10-08T09:30:00.000Z"
+    }
+  ]
+}

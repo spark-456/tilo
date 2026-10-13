@@ -122,7 +122,7 @@ class TaskRunIn(BaseModel):  # extra="forbid"
 - Permanent refusals answer **200** (any 2xx is accepted by the tests) `{"ran": 0, "skipped": "<code>"}`, no world, no
   event, no run, the same answer on a repeat so Cloud Tasks does not retry; the codes are the starter's own:
   `schedule_missing` (gone or erased), `schedule_disabled` (disabled, or `disable_for_owner`), `owner_mismatch` (the slot's
-  world belongs to someone else), `budget_not_granted`, `snapshot_missing`.
+  world belongs to someone else), `budget_not_granted`, `snapshot_missing`, `snapshot_incomplete`.
 - A start that raises (anything from `runs.start_run` or the setup) and `run_seams_unwired` (the uncounted skip, a
   condition of the whole service): a **5xx** with a FIXED body (the same for any failure text, no text of it), nothing
   counted against the schedule. The ids are deterministic, so Cloud Tasks' retry meets the world the failed start made.

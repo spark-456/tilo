@@ -19,11 +19,21 @@ export interface MenuProps {
   onClose: () => void;
   width?: number;
   inline?: boolean;
+  /** An extra class, so the shell can place this menu (the page menu opens at the left edge). */
+  className?: string;
   /** Above the rows, inside the panel (the account menu's name, email and plan, then its rule). */
   header?: ReactNode;
 }
 
-export function Menu({ label, items, onClose, width, inline = false, header }: MenuProps) {
+export function Menu({
+  label,
+  items,
+  onClose,
+  width,
+  inline = false,
+  className,
+  header,
+}: MenuProps) {
   const [current, setCurrent] = useState(0);
 
   const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
@@ -47,6 +57,7 @@ export function Menu({ label, items, onClose, width, inline = false, header }: M
       label={label}
       width={width}
       inline={inline}
+      className={className}
       onClose={onClose}
       onKeyDown={onKeyDown}
     >

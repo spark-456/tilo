@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.tilo.example/events/data/meeting.convened.schema.json",
+  "x-version": "1.0.0",
+  "title": "MeetingConvenedData",
+  "description": "data of meeting.convened (ADR-0028, a user-requested addition). A person called a lead agent and the agents it supervises into the Meeting Hall of this world, to talk about the run run_id names. actor is that person (a user id), target the lead; district is the lead's district (null for the Director, whom only the owner calls); vis lists every attendee's district. Written by tilo-api through the world's writer after the access checks (MR-01, MR-03); never by a model, never a side effect (authz null). run_state says whether that run was live or had finished; a paused world opens no room. credit_cap and max_turns are this room's caps, from config/meeting_room.yaml and the convener's remaining spend cap at the time.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["room_id", "lead", "agents", "as_role", "run_state", "credit_cap", "max_turns"],
+  "properties": {
+    "room_id": { "$ref": "../../common.schema.json#/$defs/ulid" },
+    "lead": { "$ref": "../../common.schema.json#/$defs/agent_id" },
+    "agents": { "$ref": "../../meeting_room.schema.json#/$defs/attendees" },
+    "as_role": { "$ref": "../../meeting_room.schema.json#/$defs/as_role" },
+    "run_state": { "type": "string", "enum": ["live", "finished"] },
+    "credit_cap": { "$ref": "../../common.schema.json#/$defs/credits" },
+    "max_turns": { "$ref": "../../meeting_room.schema.json#/$defs/turn_number" }
+  }
+}

@@ -197,7 +197,7 @@ def test_PROD_WIRE_1b_a_run_loads_the_owners_records_and_counts_the_daily_cap_fr
 
     seams = SimpleNamespace(
         connectors=SimpleNamespace(ids=lambda: []), skills=SimpleNamespace(catalog=lambda: {}), compiler=no_plan,
-        writer=cold_writer,
+        writer=cold_writer, adapters={},
     )  # fmt: skip
     run = Run(cold, cold.tasks[T1], {}, 40.0, seams)  # type: ignore[arg-type]
     assert run._prepare() is None

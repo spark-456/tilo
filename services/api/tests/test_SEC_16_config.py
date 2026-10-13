@@ -46,10 +46,10 @@ def write(tmp_path, **changes):
     return path
 
 
-def test_SEC_16_the_shipped_config_gives_each_uid_a_lifetime_cap_of_1000_inr_in_minor_units():
+def test_SEC_16_the_shipped_config_gives_each_uid_a_lifetime_cap_of_500_inr_in_minor_units():
     assert CONFIG.is_file(), "config/spend_caps.yaml is missing: the caps must come from config"
     caps = load(None)  # the default path is the shipped file
-    assert caps.uid_lifetime_minor == 100_000, "1,000 INR is 100,000 paise (PRD supplement SEC-16)"
+    assert caps.uid_lifetime_minor == 50_000, "500 INR is 50,000 paise (the user, 9 Oct; BQ-SEC16-4)"
     for name in (
         "run_minor",
         "global_day_hard_minor",
@@ -135,8 +135,9 @@ def test_SEC_16_a_missing_config_file_refuses_rather_than_uncapping(tmp_path):
 
 
 def test_SEC_16_no_cap_number_is_written_in_code():
-    """FR-MTR-04 / SEC-16: the caps are config. No source file of tilo-api may carry the 1,000 INR cap as a literal
-    (100000 paise, in any spelling), so raising a cap is a config edit and a reviewable one."""
+    """FR-MTR-04 / SEC-16: the caps are config. No source file of tilo-api may carry the earlier 1,000 INR cap as a
+    literal (100000 paise, in any spelling), so changing a cap is a config edit and a reviewable one. The current and
+    the other earlier values are scanned by test_SEC_16_FEEDBACK_caps_config.py."""
     offenders = []
     for path in sorted(API_SRC.rglob("*.py")):
         tokens = tokenize.generate_tokens(io.StringIO(path.read_text(encoding="utf-8")).readline)

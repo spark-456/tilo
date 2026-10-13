@@ -39,8 +39,12 @@ describe("WEB_1a_tokens: park.css carries the handoff tokens, scoped", () => {
     for (const [name, value] of handoffDay) {
       expect(day.get(name), `${name} under ${DAY}`).toBe(value);
     }
-    // No custom property that the handoff does not have (names and values stay the design's).
-    expect([...day.keys()].sort()).toEqual([...handoffDay.keys()].sort());
+    // No custom property that the handoff does not have (names and values stay the design's), but the one documented
+    // addition: --heroFill (BQ-DS-A11Y-1), the fill under white text, equal to --hero by day.
+    expect(day.get("--heroFill")).toBe(day.get("--hero"));
+    expect([...day.keys()].filter((k) => k !== "--heroFill").sort()).toEqual(
+      [...handoffDay.keys()].sort(),
+    );
   });
 
   it("WEB_1a_tokens_night_values_on_data_park_data_time_night", () => {
@@ -48,7 +52,11 @@ describe("WEB_1a_tokens: park.css carries the handoff tokens, scoped", () => {
     for (const [name, value] of handoffNight) {
       expect(night.get(name), `${name} under ${NIGHT}`).toBe(value);
     }
-    expect([...night.keys()].sort()).toEqual([...handoffNight.keys()].sort());
+    // --heroFill (BQ-DS-A11Y-1) is the one addition: #6C52EB, 5.19:1 under white where --hero #7A62F5 is 4.29:1.
+    expect(night.get("--heroFill")).toBe("#6C52EB");
+    expect([...night.keys()].filter((k) => k !== "--heroFill").sort()).toEqual(
+      [...handoffNight.keys()].sort(),
+    );
   });
 
   it("WEB_1a_tokens_night_does_not_redefine_day_only_tokens", () => {

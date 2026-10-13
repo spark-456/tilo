@@ -16,7 +16,7 @@ from fastapi.responses import HTMLResponse, PlainTextResponse, RedirectResponse,
 
 router = APIRouter()
 
-OVERSIZE_TOTAL_Bytes = 25 * 1024 * 1024 + 64 * 1024
+OVERSIZE_TOTAL_BYTES = 25 * 1024 * 1024 + 64 * 1024
 _STREAM_CHUNK = b"0123456789abcdef" * 4096  # 64 KiB
 
 
@@ -147,7 +147,7 @@ STUDY_GUIDE_HTML = (
 def _stream_oversize_pdf() -> Iterator[bytes]:
     header = b"%PDF-1.4\n% fictional oversize stream\n"
     yield header
-    remaining = OVERSIZE_TOTAL_Bytes - len(header)
+    remaining = OVERSIZE_TOTAL_BYTES - len(header)
     while remaining > 0:
         piece = _STREAM_CHUNK if remaining >= len(_STREAM_CHUNK) else _STREAM_CHUNK[:remaining]
         remaining -= len(piece)
