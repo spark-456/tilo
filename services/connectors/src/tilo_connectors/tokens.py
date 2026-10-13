@@ -458,24 +458,26 @@ class TokenBroker:
         return None if record is None else str(record.get("state"))
 
     def connection_view(self, user_id: str, connector: str) -> tuple[str | None, list[str], str | None]:
-        """LIVE-GAPS-1b: a pure read for the connector list: (state, granted scopes, expires_at), nothing of the
-        record (never a token, ciphertext, key or nonce). No refresh, write or event. No record: (None, [], None)."""
+        """LIVE-GAPS-1b / ADR-0032a: a pure read for the connector list: (state, granted scopes, connected_at), nothing
+        else of the record (never a token, ciphertext, key, nonce or the access token's expires_at). No refresh, write
+        or event. No record: (None, [], None). connected_at is null unless the state is connected and it parses."""
         record = self._store.get(user_id, connector)
         if record is None:
             return None, [], None
+        connected = record.get("state") == "connected"
         raw = record.get("scopes")
         scopes = (
             sorted({s for s in raw if isinstance(s, str) and len(s) <= 200})[:50]
-            if record.get("state") == "connected" and isinstance(raw, list)
+            if connected and isinstance(raw, list)
             else []
         )
-        try:
-            expires_at = format_ts(parse_ts(record.get("expires_at")))  # type: ignore[arg-type]
-        except (ValueError, TypeError, OverflowError):
-            expires_at = None
-        if record.get("state") not in ("connected", "expiring", "expired", "revoked", "needs_reconnect"):
-            expires_at = None
-        return str(record.get("state")), scopes, expires_at
+        connected_at = None
+        if connected:
+            try:
+                connected_at = format_ts(parse_ts(record.get("connected_at")))  # type: ignore[arg-type]
+            except (ValueError, TypeError, OverflowError):
+                connected_at = None
+        return ("connected" if connected else "expired"), scopes, connected_at  # the contract has these two only
 
     def disconnect(self, user_id: str, connector: str, *, spent: set[str] | None = None) -> DisconnectResult:
         """Revoke at the provider, then delete whatever it answered (fail toward deletion). A failed

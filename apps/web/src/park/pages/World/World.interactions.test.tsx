@@ -278,7 +278,8 @@ describe("WEB_6_world_interactions: Town and Village buttons", () => {
     click(control(rig.el, "Open result"));
     expect(toastCalls(rig.app)).toEqual([[TOASTS.open]]);
     click(control(rig.el, "Share to Slack"));
-    expect(toastCalls(rig.app)).toEqual([[TOASTS.open], [TOASTS.slack]]);
+    expect(rig.el.querySelector('[role="dialog"]')).not.toBeNull();
+    expect(toastCalls(rig.app)).toEqual([[TOASTS.open]]);
     expect(goCalls(rig.app)).toBe(0);
   });
 });

@@ -12,7 +12,10 @@ def hosted(people_rig, monkeypatch):
     block_network(monkeypatch)
     h = HostRig(people_rig())
     h.approve_and_wait_sent()
-    wait_for(lambda: h.events("artifact.created"), what="host receipt")
+    # The run writes its receipt, delivery, handoff and completion after `data.transfer`; the draft already made one
+    # `artifact.created`, so waiting for that event returned mid-run and a late event moved the counts the tests
+    # below compare. The terminal event is the one deterministic point at which the run has written everything.
+    wait_for(lambda: h.events("world.completed"), what="the hosted run to finish")
     h.rig.as_user(OWNER)
     return h
 

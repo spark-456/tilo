@@ -32,7 +32,7 @@ email-body result is reused when fresh and a fit check and the Verifier accept i
   records never deleted, incomplete registry refused before any delete, done = fresh re-read (`verify_erasure`).
 - Artifacts (FR-MEM-06/12): `ArtifactStore` over create-only `MetaBackend`/`BlobBackend` (memory, local dir
   `TILO_ARTIFACT_DIR`). Ids matched whole (`fullmatch`) before any key; other scope reads as absent; caps
-  before hashing; redactor error fails the put; screening only from the screener verdict; restore = exact
+  before hashing; redactor error fails the put; screening from the screener verdict, raised only by `screening_hint='flagged'`; restore = exact
   copy; record before blob (a blob always has a listed record); a blobless record is repaired only after
   `GRACE` (else `ArtifactBusy`); `retention()` is `gcs_artifacts`. Firestore/GCS backends: ticket T8.
 

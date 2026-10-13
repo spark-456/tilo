@@ -31,6 +31,8 @@ export interface ShellOpts {
   path?: string;
   api?: Api;
   viewport?: { vw: number; vh: number };
+  /** QA-DEMO-1: mount as a demo session (recorded sample data), whatever Api is injected. */
+  demo?: boolean;
 }
 
 /** The fixture Api with every result marked as read from a live service. */
@@ -57,7 +59,13 @@ export function mountShell(ui: ReactNode, o: ShellOpts = {}) {
   const navigate = vi.fn();
   const sch = fakeScheduler();
   const tree = (viewport: { vw: number; vh: number }): ReactElement => (
-    <ParkProvider api={api} navigate={navigate} schedule={sch.schedule} viewport={viewport}>
+    <ParkProvider
+      api={api}
+      navigate={navigate}
+      schedule={sch.schedule}
+      viewport={viewport}
+      {...(o.demo !== undefined ? { demo: o.demo } : {})}
+    >
       <div data-park="" data-time="day">
         <Probe />
         {ui}

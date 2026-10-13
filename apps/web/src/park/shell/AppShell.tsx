@@ -5,12 +5,22 @@
 // raises the "Sample data" chip without any page asking for data. The city's cars and walkers run on Home (cityMotion.ts).
 import { type ReactNode, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { LifetimeCapDialog } from "../../components/LifetimeCapDialog";
+import { notifications as sampleNotifications } from "../api/fixtures/notifications";
 import { nameInitials } from "../api/nameInitials";
 import type { Decision, Notification, User } from "../api/types";
 import type { PageId } from "../app/AppCtx";
-import { endSession, useApp, useExpectsSample, useParkApi, useParkStore } from "../app/context";
+import {
+  endSession,
+  useApp,
+  useDemoSession,
+  useExpectsSample,
+  useParkApi,
+  useParkStore,
+} from "../app/context";
 import { useParkRoute, useQuizAppRoute } from "../app/router";
 import { Button, Popover, Toast } from "../components";
+import { FirstRunBanner } from "../sample/FirstRunBanner";
+import { useFirstRun } from "../sample/useFirstRun";
 import "../tokens/fonts";
 import { AccountMenu, type AccountPerson } from "./AccountMenu";
 import { BootSplash } from "./BootSplash";
@@ -32,6 +42,8 @@ import { backdropScene } from "./scene";
 const SIGN_OUT = "This is a prototype, so you stay signed in";
 const SIGNED_OUT = "You are signed out";
 const SIGN_OUT_FAILED = "Could not sign out. Try again.";
+/** Below this width the six tabs and the tools do not fit in the nav: one menu names the current page (B2). */
+const COMPACT_NAV_BELOW = 840;
 const MOBILE_NOTE = "The Tilo mobile app is a concept. It is not available yet.";
 
 /** Sign out (FR-UX-10): ends the real session when there is one; with none (a local host, the fixture world, a build
@@ -62,10 +74,15 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [connectorsOn, setConnectorsOn] = useState<number | null>(null);
   const [ready, setReady] = useState(false);
   const expectsSample = useExpectsSample();
+  const demo = useDemoSession();
   const auth = useParkAuth();
   const contextPerson = auth ? (auth.user?.email ?? "guest-session") : (user?.email ?? "device");
+  const bannerPerson = auth ? (auth.user?.email ?? null) : (user?.email ?? null);
   const [contextOpen, toggleContext] = useContextChoice(contextPerson);
   const tour = useParkTour();
+  const first = useFirstRun();
+  const sampleNotes =
+    first && liveNotifications && notificationStatus === "ready" && notifications.length === 0;
   const [mobileNote, setMobileNote] = useState(false);
   const signingOut = useRef(false);
   const appearance = useAppearance();
@@ -137,6 +154,9 @@ export function AppShell({ children }: { children: ReactNode }) {
     : quizRoute
       ? `world/${quizRoute.worldId}/app/${quizRoute.artifactId}`
       : "none";
+  // QA-DEMO-1 m5: the "Mobile app" note belongs to the page it was opened on; going elsewhere closes it.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `key` is the signal (the route changed)
+  useEffect(() => setMobileNote(false), [key]);
   const swap = usePageSwap(
     children,
     key,
@@ -236,16 +256,21 @@ export function AppShell({ children }: { children: ReactNode }) {
         onAvatar={() => store.toggleMenu("acct")}
         contextOpen={contextOpen}
         onContext={toggleContext}
+        compact={app.vw > 0 && app.vw < COMPACT_NAV_BELOW}
       />
       {contextOpen && <ContextPanel key={contextPerson} onClose={toggleContext} />}
       {state.menu === "notif" ? (
         <Enter>
           <NotificationsPopover
-            notifications={notifications}
+            notifications={sampleNotes ? sampleNotifications : notifications}
+            sample={sampleNotes}
+            labelled={demo && !liveNotifications}
             status={notificationStatus}
             decisions={decisions}
             dec={state.dec}
-            onOpen={open}
+            onOpen={
+              sampleNotes ? () => store.toast("This is sample data. No action is taken.") : open
+            }
             onSettings={() => store.go("profile", { tab: "notifications" })}
             onClose={store.closeMenu}
           />
@@ -281,8 +306,13 @@ export function AppShell({ children }: { children: ReactNode }) {
         className={`park-shell__main ${ready ? "" : "park-shell__booting"}`}
         data-phase={swap.phase === "in" ? undefined : swap.phase}
       >
+        {/* QA-DEMO-1 M1: inside the column on a page (below the fixed nav's padding), pinned under the nav on Home */}
+        {inner ? null : <FirstRunBanner first={first} page={page} person={bannerPerson} floating />}
         <div className={inner ? "park-shell__page" : undefined}>
-          <div className={inner ? "park-shell__column" : undefined}>{swap.node}</div>
+          <div className={inner ? "park-shell__column" : undefined}>
+            {inner ? <FirstRunBanner first={first} page={page} person={bannerPerson} /> : null}
+            {swap.node}
+          </div>
         </div>
       </main>
       {toast ? (

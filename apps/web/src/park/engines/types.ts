@@ -220,7 +220,7 @@ export interface Spot {
 
 // ---- the render kit (kit.ts, WEB-1c; ported from tilo-app.js `kit(h)`) ----
 /** The decisions taken so far (structurally the same as `Dec` of ../api/types, which engines may not import). */
-export type Dec = Partial<Record<"depot" | "mail", boolean>>;
+export type Dec = Partial<Record<"depot" | "mail" | "lovable", boolean>>;
 /** The plan source: the prototype's `D.plans(dec)`, every plan by id. */
 export type PlanSource = (dec?: Dec) => Record<string, Plan>;
 /** What `createKit(h, deps)` needs: the plan source and the optional browser calls of the park engine. */

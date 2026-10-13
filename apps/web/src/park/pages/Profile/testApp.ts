@@ -5,11 +5,14 @@
 // The repo has no @testing-library, so this mounts with react-dom in happy-dom. It lives in the page folder
 // and park.static.test.ts reads it as park code: it imports nothing from outside park. No timers: async
 // work is flushed with microtasks.
+import type { UserSettings, UserSettingsUpdate } from "@tilo/contracts";
 import { type ReactElement, act, createElement } from "react";
 import { type Root, createRoot } from "react-dom/client";
 import { type Mock, vi } from "vitest";
+import { TiloApiError } from "../../../api/http";
 import { API_METHODS, type Api, type ApiMethod } from "../../api";
 import { createFixtureApi } from "../../api/fixtureApi";
+import { userSettings } from "../../api/fixtures";
 import type { AppCtx } from "../../app/AppCtx";
 import { ParkProvider, type ParkProviderProps } from "../../app/context";
 import { ProfilePage } from "./ProfilePage";
@@ -53,8 +56,74 @@ export function cleanup(): void {
 
 export type SpyApi = Api & { [M in ApiMethod]: Mock };
 
-/** The fixture Api with every method wrapped in a spy (results unchanged: `source: "fixture"`). */
-export function spyApi(base: Api = createFixtureApi()): SpyApi {
+export interface FakeSettings {
+  puts: UserSettingsUpdate[];
+  stored: () => UserSettings;
+  /** The next save fails with this error and stores nothing. */
+  failNext: (e: unknown) => void;
+  /** The next save waits until the returned function is called. */
+  hold: () => () => void;
+}
+
+/** A fake settings server (FR-SET-01/02): the contract's compare-and-set on `version`, in memory, answering `live`. */
+export function withFakeSettings(
+  base: Api = createFixtureApi(),
+  start: UserSettings = userSettings,
+): { api: Api; server: FakeSettings } {
+  let stored = structuredClone(start);
+  let fail: unknown = null;
+  let held: Promise<void> | null = null;
+  const puts: UserSettingsUpdate[] = [];
+  const answer = () => ({ data: structuredClone(stored), source: "live" as const });
+  const api = {
+    ...base,
+    getUserSettings: async () => answer(),
+    saveUserSettings: async (u: UserSettingsUpdate) => {
+      await held;
+      if (fail) {
+        const e = fail;
+        fail = null;
+        throw e;
+      }
+      puts.push(structuredClone(u));
+      if (u.version !== stored.version) {
+        throw new TiloApiError(
+          "That cannot be done right now.",
+          409,
+          false,
+          true,
+          "version_conflict",
+        );
+      }
+      stored = {
+        ...stored,
+        ...structuredClone(u),
+        version: u.version + 1,
+        updated_at: "2026-10-12T10:00:00Z",
+      };
+      return answer();
+    },
+  } as Api;
+  const server: FakeSettings = {
+    puts,
+    stored: () => structuredClone(stored),
+    failNext: (e) => {
+      fail = e;
+      held = null;
+    },
+    hold: () => {
+      let release = () => {};
+      held = new Promise<void>((r) => {
+        release = r;
+      });
+      return release;
+    },
+  };
+  return { api, server };
+}
+
+/** The fixture Api, with a fake settings server, every method wrapped in a spy. */
+export function spyApi(base: Api = withFakeSettings().api): SpyApi {
   const entries = API_METHODS.map((m) => [
     m,
     vi.fn((...a: never[]) => (base[m] as (...args: unknown[]) => unknown)(...a)),

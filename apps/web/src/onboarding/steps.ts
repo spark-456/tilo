@@ -73,8 +73,10 @@ export const SAMPLE_STEP_ID = COPY.sample.id;
 const visible = (el: Element | null): Element | null =>
   el instanceof HTMLElement && el.isConnected && !el.hidden ? el : null;
 
+// A phone has no tab strip (QA-DEMO-1 B2): its one page button, which opens the menu of the six, is the target.
 const nav = (id: PageId) => (): Element | null =>
-  visible(document.querySelector(`nav[aria-label="Main"] a[href="${parkPath(id)}"]`));
+  visible(document.querySelector(`nav[aria-label="Main"] a[href="${parkPath(id)}"]`)) ??
+  visible(document.querySelector('nav[aria-label="Main"] button.park-shell__pagebtn'));
 
 /** The real element each step points at, looked up when the step shows (null: the mark sits in the middle). */
 export const TARGETS: Record<string, () => Element | null> = {

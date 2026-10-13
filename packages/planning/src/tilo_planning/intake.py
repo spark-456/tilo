@@ -1,9 +1,11 @@
 """Task intake (FR-INT-01/02, PRD 7.1). Limits first, then extract and screen every file (PRD 16.3
-item 2), then store: a rejection or a provider error stores nothing. Events are built and validated
+item 2), then submit. A supplied store screen may stage versions before the Director;
+the API cleans pre-commit refusals. Events are built and validated
 here, not written; the harness is the single writer per world."""
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import PurePosixPath
@@ -78,8 +80,16 @@ class ScreenedIntake:
     parts: list[MediaPart]
 
 
-def screen_intake(request: IntakeRequest, *, safety: SafetyProvider, director: bool = False) -> ScreenedIntake:
-    """Extract and screen without storing. Director inputs use existing provider media caps;
+def screen_intake(
+    request: IntakeRequest,
+    *,
+    safety: SafetyProvider,
+    director: bool = False,
+    file_screen: Callable[[str, bytes, SafetyProvider, Budget], tuple[str | None, str | None, bool, str | None]]
+    | None = None,
+) -> ScreenedIntake:
+    """Extract and screen; a supplied file_screen may stage authoritative stored versions.
+    Director inputs use existing provider media caps;
     converted text shares the existing extraction character cap across this request."""
     names = _check_limits(request)
     budget = Budget()
@@ -97,7 +107,7 @@ def screen_intake(request: IntakeRequest, *, safety: SafetyProvider, director: b
             except RequestError:
                 screened.append((None, "native file is unreadable or exceeds the provider media limits", False, None))
                 continue
-        text, error, flagged, reason = _screen(name, upload.content, safety, budget)
+        text, error, flagged, reason = (file_screen or _screen)(name, upload.content, safety, budget)
         if director and error is None and not flagged:
             if text is not None:
                 source = f"File: {name}\n{text}"
@@ -119,13 +129,17 @@ def submit_intake(
     safety: SafetyProvider,
     store: InMemoryArtifactStore,
     prepared: ScreenedIntake | None = None,
+    identifiers: tuple[str, str, str] | None = None,
+    put_failed: bool = True,
 ) -> IntakeResult:
     prepared = prepared or screen_intake(request, safety=safety)
     if prepared.request != request:
         raise IntakeRejected("The screened files do not match the intake request.")
     names, screened = prepared.names, prepared.screened
 
-    task_id, world_id, run_id = f"t_{new_ulid()}", f"w_{new_ulid()}", f"r_{new_ulid()}"
+    task_id, world_id, run_id = identifiers or (f"t_{new_ulid()}", f"w_{new_ulid()}", f"r_{new_ulid()}")
+    if request.files:
+        store.bind(world_id=world_id, run_id=run_id, owner=request.user_id)
     now = datetime.now(UTC)
     received_at = now.strftime("%Y-%m-%dT%H:%M:%S.") + f"{now.microsecond // 1000:03d}Z"
     base = {"v": "1.0", "ts": received_at, "world_id": world_id, "run_id": run_id, "actor": request.user_id}
@@ -141,11 +155,18 @@ def submit_intake(
         range(2, 2 + len(names)), names, request.files, screened, strict=True
     ):
         kind, mime_type, _magic = FILE_TYPES[PurePosixPath(name.lower()).suffix]
-        stored = store.put(artifact_id=None, filename=name, content=upload.content, content_type=mime_type,
-                           task_id=task_id, received_at=received_at,
-                           screening="unscreened" if error else ("flagged" if flagged else "clean"),
-                           screening_reason=reason)  # fmt: skip
+        stored = store.peek_prepared(name, upload.content) if not put_failed else None
+        if error is not None and stored is None and not put_failed:
+            files.append(IntakeFileResult(name, "failed", kind, None, error, flagged, reason, {}, {}, []))
+            continue  # no version, reference or artifact.created event for refused bytes
+        stored = stored or store.put(artifact_id=None, filename=name, content=upload.content, content_type=mime_type,
+                                    task_id=task_id, received_at=received_at,
+                                    screening="unscreened" if error else ("flagged" if flagged else "clean"),
+                                    screening_reason=reason)  # fmt: skip
         ref = {"artifact_id": stored.artifact_id, "version": stored.version}
+        flagged = flagged or stored.screening == "flagged"
+        if error is None and stored.screening == "unscreened":
+            error = "the stored file could not be screened"
         if error is not None:
             severity, summary, tool = "fyi", f"Could not read {name}: {error}", None
         elif flagged:
@@ -156,6 +177,7 @@ def submit_intake(
             base, seq=seq, type="artifact.created", target=stored.artifact_id, severity=severity, tool=tool,
             item={"kind": "document", "artifact_id": stored.artifact_id, "label": _clip(name, 80)},
             summary=summary, cause=world_event["id"], data={"artifact": ref},
+            archive_ref=stored.archive_ref,
         )  # fmt: skip
         status, origin = ("failed" if error else "ok"), dict(stored.origin)
         files.append(IntakeFileResult(name, status, kind, text, error, flagged, reason, ref, origin, [event]))

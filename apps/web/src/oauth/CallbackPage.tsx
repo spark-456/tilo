@@ -9,6 +9,8 @@ import {
   type CallbackParams,
   type ConnectFlow,
   type FinishResult,
+  HOST_CONNECTED_TEXT,
+  MEETING_HOST,
   RESULT_TEXT,
 } from "../api/connect";
 import "./callback.css";
@@ -35,12 +37,16 @@ export default function CallbackPage({
     else void live.finish(params).then(setShown, () => setShown({ kind: "unavailable" }));
   }, [flow, params]);
   const done = shown.kind !== "working";
+  const heading =
+    shown.kind === "working"
+      ? "Finishing your Google sign-in"
+      : shown.kind === "connected" && shown.connector === MEETING_HOST
+        ? HOST_CONNECTED_TEXT
+        : RESULT_TEXT[shown.kind];
   return (
     <div data-park data-time="day" className="oauth-root">
       <main className="oauth-main" data-testid="oauth-callback">
-        <h1>
-          {shown.kind === "working" ? "Finishing your Google sign-in" : RESULT_TEXT[shown.kind]}
-        </h1>
+        <h1>{heading}</h1>
         {shown.kind === "connected" ? (
           <>
             <p>Tilo can now use this access, and no more:</p>
@@ -54,7 +60,7 @@ export default function CallbackPage({
         {shown.kind === "working" ? <p>One moment.</p> : null}
         {done ? (
           <button type="button" className="oauth-back" onClick={back}>
-            Back to Connectors
+            {shown.kind === "connected" ? "Back to Connectors" : "Try again from Connectors"}
           </button>
         ) : null}
       </main>

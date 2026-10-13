@@ -19,12 +19,14 @@ dependencies = [
     "tilo-policy",
     "tilo-harness",
     "tilo-browser",
+    "tilo-channels",
     "tilo-connectors",
     "tilo-metering",
     "tilo-world",
     "tilo-archive",
     "tilo-memory",
     "tilo-people",
+    "tilo-channels",
     "tilo-logging",
     "tilo-redact",
 ]
@@ -34,6 +36,7 @@ tilo-archive = { workspace = true }
 tilo-logging = { workspace = true }
 tilo-memory = { workspace = true }
 tilo-people = { workspace = true }
+tilo-channels = { workspace = true }
 tilo-redact = { workspace = true }
 tilo-planning = { workspace = true }
 tilo-policy = { workspace = true }

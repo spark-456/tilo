@@ -224,7 +224,7 @@ describe("FR-SKL-06: Trust and pause", () => {
     expect(isDisabled(control(lib, "Test run"))).toBe(false);
     clickEl(control(lib, "Test run"));
     expect(toasts(rig.app)).toContainEqual([
-      "Test run started on yesterday’s data. Results in about a minute",
+      "Test runs are not connected yet. Nothing was started.",
     ]);
   });
 });

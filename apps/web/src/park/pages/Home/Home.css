@@ -488,6 +488,12 @@
   font-weight: 800;
   min-width: 0;
 }
+[data-park] .park-home-plan__sample {
+  margin: 0;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--ink3);
+}
 [data-park] .park-home-meta {
   display: flex;
   gap: 22px;
@@ -635,6 +641,30 @@
   cursor: pointer;
   flex: none;
   white-space: nowrap;
+}
+/* QA-DEMO-1 m8: on a phone the input had about 120px beside the logo and the button. The logo gives its place up and the
+   button its padding, so the placeholder reads. */
+@media (max-width: 480px) {
+  [data-park] .park-home-input-row {
+    gap: 8px;
+  }
+  [data-park] .park-home-logo {
+    display: none;
+  }
+  [data-park] .park-home-input {
+    font-size: 16px;
+  }
+  [data-park] .park-home-start {
+    padding: 0 16px;
+  }
+}
+@media (max-width: 360px) {
+  [data-park] .park-home-input-row {
+    padding-left: 8px;
+  }
+  [data-park] .park-home-start {
+    padding: 0 12px;
+  }
 }
 [data-park] .park-home-start:hover,
 [data-park] .park-home-confirm:hover {
@@ -936,4 +966,46 @@
   max-height: 12rem;
   overflow-y: auto;
   overflow-wrap: anywhere;
+}
+
+/* WEB-W1: the composer's attach row and its chips */
+[data-park] .park-home-attach {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+[data-park] .park-home-attach__note {
+  font-size: 12px;
+  opacity: 0.75;
+}
+[data-park] .park-home-attach [aria-disabled="true"] {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+[data-park] .park-home-attach__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+}
+[data-park] .park-home-attach__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  background: var(--chip);
+  color: var(--ink);
+}
+[data-park] .park-home-attach__remove {
+  background: none;
+  border: 0;
+  color: inherit;
+  cursor: pointer;
+  padding: 0 2px;
 }

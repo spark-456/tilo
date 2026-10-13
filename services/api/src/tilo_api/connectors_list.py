@@ -1,7 +1,8 @@
 """`GET /v1/connectors` (LIVE-GAPS-1b; FR-CON-01/02, FR-ACC-03/04; services/api/tests/test_FR_CON_02_LIVE_GAPS_1b_*).
 
 The signed-in person's connectors (the registry's, in its order) with their connection state, read ONLY through the
-read-only seam `deps.get_connection_views` (state, scopes, expiry, nothing else). SEC-02 / ADR-0032: tilo-api never
+read-only seam `deps.get_connection_views` (state, scopes, connected_at, nothing else;
+ADR-0032a). SEC-02 / ADR-0032: tilo-api never
 holds a TokenBroker, token records, a Kms or the OAuth client secret, so this module never touches
 `deps.get_token_broker`. The owner is `Principal.user_id` and nothing in the request. A pure read: no store write, no
 provider call, no event. An unwired seam (production today, BQ-LIVEGAPS-1), a seam override that needs parameters, or
@@ -11,6 +12,7 @@ when that row was read from a wired seam). No error text reaches the body, the h
 
 from __future__ import annotations
 
+from datetime import UTC, datetime, timedelta
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, Request
@@ -19,8 +21,12 @@ from tilo_connectors._time import format_ts, parse_ts
 from tilo_api import deps
 from tilo_api.people import _PeopleRoute
 
-# FR-ACC-04: `attention` keys on the GRANT (the broker's stored state), never on the access token's ~1 h expiry.
-_ATTENTION_STATES = frozenset({"expiring", "expired", "revoked", "needs_reconnect"})
+# FR-ACC-04 (ADR-0032a decision 7, BQ-ADR32a-2): the view has no expiry. The sign-in expires GRANT_LIFETIME after
+# `connected_at` (testing-mode sign-ins, PRD 11.5; drop once the OAuth app is verified); the warning comes WARN_AHEAD
+# before that. `expires_at` in a row is this derived instant or null, never an access-token expiry.
+GRANT_LIFETIME = timedelta(days=7)
+WARN_AHEAD = timedelta(days=3)
+_CLOCK_SKEW = timedelta(minutes=5)  # a connected_at further in the future than this is not believed (unknown)
 
 
 _MAX_SCOPES, _MAX_SCOPE_LEN = 50, 200
@@ -57,31 +63,27 @@ def _clean_scopes(scopes: Any) -> list[str]:
     return seen[:_MAX_SCOPES]
 
 
-def _clean_expiry(value: Any) -> str | None:
-    """Only a parsed, normalised RFC 3339 UTC string; anything else is null."""
+def _connected_at(value: Any) -> datetime | None:
+    """Only a parsed UTC instant that is not in the future; anything else is unknown (None)."""
     try:
-        return format_ts(parse_ts(value))
+        at = parse_ts(value)
     except (ValueError, TypeError, OverflowError):
         return None
-
-
-def _state(stored: str | None) -> str:
-    if stored is None:
-        return "available"
-    if stored == "connected":
-        return "connected"
-    return "attention" if stored in _ATTENTION_STATES else "available"
+    return None if at > datetime.now(UTC) + _CLOCK_SKEW else at
 
 
 def _one(views: Any, user_id: str, declared: dict[str, Any]) -> dict[str, Any]:
-    stored, scopes, expires_at = views.view(user_id, declared["id"])
-    if stored is None:
+    stored, scopes, connected_at = views.view(user_id, declared["id"])
+    if stored is None:  # no record: never connected
         return _row(declared, "available", [], None, known=True)
-    stamp = _clean_expiry(expires_at)
-    state = _state(str(stored))
-    return _row(
-        declared, state, _clean_scopes(scopes), stamp if state in ("connected", "attention") else None, known=True
-    )
+    if stored != "connected":  # expired, or a state the contract does not have: the person is warned, never "Connect"
+        return _row(declared, "attention", _clean_scopes(scopes), None, known=True)
+    at = _connected_at(connected_at)
+    if at is None:  # recorded before connected_at existed, or not believable: connected, no warning, no expiry
+        return _row(declared, "connected", _clean_scopes(scopes), None, known=True)
+    ends = at + GRANT_LIFETIME
+    state = "attention" if ends - datetime.now(UTC) <= WARN_AHEAD else "connected"
+    return _row(declared, state, _clean_scopes(scopes), format_ts(ends), known=True)
 
 
 router = APIRouter(route_class=_PeopleRoute)
