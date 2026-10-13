@@ -38,7 +38,7 @@ for (const viewport of [
 
     test("UI_10_W9_agenda_events_have_24px_targets", async ({ page }) => {
       await page.goto("/agenda");
-      const events = page.locator("button.park-agenda-ev");
+      const events = page.locator("button.park-agenda-event");
       await expect(events.first()).toBeVisible();
       const boxes = await events.evaluateAll((els) =>
         els.map((el) => {
