@@ -4,7 +4,24 @@
 // at narrow widths an information icon (the name stays "Sample data" for assistive technology).
 import { useId, useState } from "react";
 import { Popover, StatusChip } from "../components";
-import { icon } from "./kit";
+
+function SampleInfoIcon() {
+  return (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 20 20"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      aria-hidden="true"
+    >
+      <circle cx="10" cy="10" r="8" />
+      <path d="M10 9v5" />
+      <circle cx="10" cy="6" r="1" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
 
 /** What the sample is, in the team's own name (from the user the Api returned). */
 export const sampleNote = (org: string | null): string =>
@@ -21,7 +38,9 @@ export function SampleChip({
     return (
       <span aria-hidden="true" className="park-shell__sample park-shell__booting">
         <StatusChip tone="neutral">
-          <span className="park-shell__sampledot">{icon("info", 16)}</span>
+          <span className="park-shell__sampledot">
+            <SampleInfoIcon />
+          </span>
           <span className="park-shell__samplelabel">Sample data</span>
         </StatusChip>
       </span>
@@ -39,7 +58,7 @@ export function SampleChip({
       >
         <StatusChip tone="neutral">
           <span className="park-shell__sampledot" aria-hidden="true">
-            {icon("info", 16)}
+            <SampleInfoIcon />
           </span>
           <span id={labelId} className="park-shell__samplelabel">
             Sample data
