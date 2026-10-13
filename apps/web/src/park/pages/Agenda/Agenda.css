@@ -350,6 +350,7 @@
   color: var(--ink2);
 }
 [data-park] .park-agenda-addinput {
+  min-height: 24px;
   flex: 1;
   min-width: 0;
   border: 0;
@@ -986,5 +987,20 @@
   [data-park] [data-testid="park-page-agenda"] .park-agenda-findtext {
     min-width: 0;
     max-width: 100%;
+  }
+}
+
+/* UI-10 W19: primary phone actions retain a full 44px target in both board views. */
+@media (max-width: 600px) {
+  [data-park] .park-agenda-actions .park-btn--primary,
+  [data-park] .park-agenda-accept,
+  [data-park] .park-agenda-pinit,
+  [data-park] .park-agenda-addbtn {
+    min-width: 44px;
+    min-height: 44px;
+  }
+  [data-park] .park-agenda-addrow {
+    height: auto;
+    min-height: 54px;
   }
 }

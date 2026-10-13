@@ -69,6 +69,7 @@
   outline-offset: 2px;
 }
 [data-park] .park-team-input {
+  min-height: 24px;
   flex: 1;
   min-width: 0;
   border: 0;
@@ -570,5 +571,13 @@
   }
   [data-park] [data-testid="park-page-team"] .park-team-titlerow {
     flex-wrap: wrap;
+  }
+}
+
+/* UI-10 W19: the invite is the page's primary phone action. */
+@media (max-width: 600px) {
+  [data-park] .park-team-invite button {
+    min-width: 44px;
+    min-height: 44px;
   }
 }
