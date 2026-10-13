@@ -262,6 +262,19 @@ def evaluate(cases: list[dict[str, Any]]) -> dict[str, Any]:
     }
 
 
+def _unique_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    result: dict[str, Any] = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError("duplicate JSON key")
+        result[key] = value
+    return result
+
+
+def _reject_constant(value: str) -> Any:
+    raise ValueError("non-JSON numeric constant")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("bundle", type=Path)
@@ -269,7 +282,13 @@ def main() -> int:
     try:
         if args.bundle.stat().st_size > 20_000_000:
             raise ValueError("bundle too large")
-        report = evaluate(json.loads(args.bundle.read_text(encoding="utf-8")))
+        report = evaluate(
+            json.loads(
+                args.bundle.read_text(encoding="utf-8"),
+                object_pairs_hook=_unique_object,
+                parse_constant=_reject_constant,
+            )
+        )
     except (OSError, ValueError, TypeError, KeyError):
         print(json.dumps({"provider_quality": "pending", "pending": ["bundle unreadable or malformed"]}))
         return 2
