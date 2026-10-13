@@ -177,6 +177,23 @@ def test_BQ_M2_4_MV_17_no_ledger_wired_is_not_a_warning_on_every_tick(caplog):
     assert not [r for r in caplog.records if "spend hold sweep failed" in r.getMessage()]
 
 
+def test_BQ_M2_4_MV_17_a_swallowed_503_is_logged_once_for_the_process(caplog, monkeypatch):
+    from fastapi import HTTPException
+    from tilo_api import deps, schedules
+
+    def unwired():
+        raise HTTPException(status_code=503, detail="not_configured")
+
+    monkeypatch.setattr(schedules, "_sweep_spend_503_logged", False)
+    request = SimpleNamespace(app=SimpleNamespace(dependency_overrides={deps.get_spend_cap_ledger: unwired}))
+    with caplog.at_level("WARNING"):
+        for _ in range(3):
+            schedules._sweep_spend(request, lambda: AT)  # type: ignore[arg-type]
+    skipped = [r for r in caplog.records if "spend hold sweep skipped" in r.getMessage()]
+    assert len(skipped) == 1
+    assert "503" in skipped[0].getMessage()
+
+
 def test_BQ_M2_4_MV_17_a_failing_whole_settle_is_logged_once_by_class_and_still_raises(caplog):
     from tilo_api.meeting_voice_claims import Hold
 
