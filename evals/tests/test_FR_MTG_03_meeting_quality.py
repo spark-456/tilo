@@ -31,14 +31,22 @@ def bank(basis="scripted_fakes"):
                 "agenda": minutes["agenda"],
                 "summary_score": 4,
                 "planted_false_ids": ["ai2"],
+                "decision_ids": ["decision1"],
+                "planted_false_decision_indices": [1],
+                "planted_false_owner_ids": ["ai2"],
             },
             "annotation": {
                 "action_matches": {"ai1": "gold1"},
                 "invented_commitment_ids": [],
                 "dates_correct": True,
                 "ambiguous_names_safe": True,
+                "decision_matches": ["decision1", None],
+                "owner_expected": {"ai1": "u_priya", "ai2": None},
             },
         }
+        case["minutes"]["decisions"].append(
+            {"text": "Synthetic false decision.", "state": "unverified", "evidence": []}
+        )
         case["transcript"]["meeting_id"] = case["minutes"]["meeting_id"] = f"mt_synthetic_{i}"
         case["transcript"]["utterances"].append(
             {"id": "u0030", "speaker": "Fixture", "t_ms": 90000, "text": f"Synthetic case {i}."}
@@ -104,6 +112,7 @@ def test_FR_MTG_03_duplicate_matches_are_false_positives():
         action["id"] = "ai3"
         case["minutes"]["action_items"].append(action)
         case["annotation"]["action_matches"]["ai3"] = "gold1"
+        case["annotation"]["owner_expected"]["ai3"] = "u_priya"
         bind(case)
     report = evaluate(cases)
     assert report["metrics"]["action_recall"] == 1
