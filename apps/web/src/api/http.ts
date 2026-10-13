@@ -379,9 +379,10 @@ export class HttpClient implements TiloClient, SchedulesApi, FieldsApi, ItemApi 
     return this.request<unknown>(path);
   }
 
-  /** A plain POST of `body` as JSON, decoded as JSON, with the same typed failures and `write` true (WIRE-3). No credentials. */
-  postJson(path: string, body: unknown): Promise<unknown> {
-    return this.post<unknown>(path, body);
+  /** A plain POST of `body` as JSON, decoded as JSON, with the same typed failures and `write` true (WIRE-3). No credentials.
+   * `headers` adds request headers (BQ-CTX-TEAMWORLD: an `Idempotency-Key` so a retried create is made once). */
+  postJson(path: string, body: unknown, headers?: Record<string, string>): Promise<unknown> {
+    return this.post<unknown>(path, body, headers);
   }
 
   /** A PUT or DELETE of `path` with no body, decoded as JSON, `write` true (BQ-CTX-TEAMWORLD: team shares). */
@@ -398,12 +399,12 @@ export class HttpClient implements TiloClient, SchedulesApi, FieldsApi, ItemApi 
     );
   }
 
-  private post<T>(path: string, body: unknown): Promise<T> {
+  private post<T>(path: string, body: unknown, headers?: Record<string, string>): Promise<T> {
     const refused = this.refusedSample(path);
     if (refused) return refused;
     const init = {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: { ...headers, "content-type": "application/json" },
       body: JSON.stringify(body),
     };
     return this.request<T>(path, init, true);

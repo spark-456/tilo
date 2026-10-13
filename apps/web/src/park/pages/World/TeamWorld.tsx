@@ -5,15 +5,21 @@
 // that does not exist, are the same ordinary missing world. `TeamItems` is a read model: list rows, never a link.
 import { useState } from "react";
 import { type ShareClient, readSharedWorld, readTeamItems } from "../../api/live/teamShares";
+import type { WorkItemClient } from "../../api/live/workItems";
 import type { AppCtx } from "../../app/AppCtx";
 import { useParkApi } from "../../app/context";
 import { Button, PageSheet } from "../../components";
+import { AddWorkItem } from "./AddWorkItem";
 import { GoLink } from "./Side";
 import { useRead } from "./TeamShare";
 
 const STATUS = { open: "Open", done: "Done" } as const;
 
-function TeamItemsList({ client, worldId }: { client: ShareClient; worldId: string }) {
+function TeamItemsList({
+  client,
+  worldId,
+  version,
+}: { client: ShareClient; worldId: string; version: number }) {
   const api = useParkApi();
   const [view, reload] = useRead(async () => {
     const [got, team] = await Promise.all([
@@ -28,7 +34,7 @@ function TeamItemsList({ client, worldId }: { client: ShareClient; worldId: stri
       ...got,
       items: got.items.map((i) => ({ ...i, who: names.get(i.owner) ?? "A teammate" })),
     };
-  }, [client, worldId, api]);
+  }, [client, worldId, api, version]);
   if (view.status === "loading") return <output>Loading the team’s work items…</output>;
   if (view.status === "failed")
     return (
@@ -64,24 +70,32 @@ function TeamItemsList({ client, worldId }: { client: ShareClient; worldId: stri
   );
 }
 
-/** The team's items made in this world. `auto` reads at once (a teammate's page); otherwise on a click. */
+/**
+ * The team's items made in this world, and the form that adds one (BQ-CTX-TEAMWORLD, TSW-5). `auto` reads at once
+ * (a teammate's page); otherwise on a click. An item added here makes the list read again, so the row shown is
+ * the server's.
+ */
 export function TeamItems({
   client,
   worldId,
   auto,
-}: { client: ShareClient; worldId: string; auto: boolean }) {
+}: { client: ShareClient & WorkItemClient; worldId: string; auto: boolean }) {
   const [asked, setAsked] = useState(auto);
+  const [version, setVersion] = useState(0);
   return (
-    <section className="park-world-proposals" aria-label="Team work items">
-      <h2>Team work items</h2>
-      {asked ? (
-        <TeamItemsList client={client} worldId={worldId} />
-      ) : (
-        <Button variant="secondary" size="sm" onClick={() => setAsked(true)}>
-          Show team work items
-        </Button>
-      )}
-    </section>
+    <>
+      <section className="park-world-proposals" aria-label="Team work items">
+        <h2>Team work items</h2>
+        {asked ? (
+          <TeamItemsList client={client} worldId={worldId} version={version} />
+        ) : (
+          <Button variant="secondary" size="sm" onClick={() => setAsked(true)}>
+            Show team work items
+          </Button>
+        )}
+      </section>
+      <AddWorkItem client={client} worldId={worldId} onAdded={() => setVersion((n) => n + 1)} />
+    </>
   );
 }
 
@@ -89,7 +103,7 @@ export function TeamWorld({
   client,
   worldId,
   app,
-}: { client: ShareClient; worldId: string; app: AppCtx }) {
+}: { client: ShareClient & WorkItemClient; worldId: string; app: AppCtx }) {
   const [view, reload] = useRead(() => readSharedWorld(client, worldId), [client, worldId]);
   const id = encodeURIComponent(worldId);
   const crumb = (
