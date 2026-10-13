@@ -28,7 +28,9 @@ logger = logging.getLogger("tilo_api.spend_firestore")
 COLLECTION = "spend_ledger"
 _ATTEMPTS = 4  # on top of the library's own five per call: contention only ever ends in replay, never in a pass
 _REASONS = ("uid_lifetime", "run", "org_day", "global_hard")
-HOLD_TTL = timedelta(hours=1)  # ADR-0042 MV-17(b): above any meeting claim's 3500 s; then a held hold is stranded
+HOLD_TTL = timedelta(hours=1)  # ADR-0042 MV-17(b): above any meeting claim's 3500 s; then a held hold is stranded.
+# Applies to EVERY unit kind (Director, intake screen, plan, runs, voice), not only meeting voice: a unit still held
+# after an hour is settled at its own amount by the sweep.
 _SWEEP_EVERY = timedelta(seconds=60)  # a uid's reserves sweep its expired holds at most this often per process
 
 

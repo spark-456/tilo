@@ -440,7 +440,9 @@ credentials the seam answers 503 and every request is replay, never uncapped. A 
 (its reserve time plus one hour, ADR-0042 MV-17); one still `held` after that (a restart or a lost claim) is settled at
 its own amount, so the count is unchanged and only its status closes, by the next reserve of that uid (at most once a
 minute per uid per instance) and by the Scheduler's tick. That is a query on equality filters of `status` and `uid`
-(Firestore's automatic single-field indexes serve it: still no composite index to create). Reading it: `GET /access` says
+(Firestore's automatic single-field indexes serve it: still no composite index to create). The sweep is NOT behind
+`TILO_VOICE_METER`: on merge every SEC-16 reserve gains that synchronous query (once a minute per uid per instance) and
+every tick scans the whole org's `held` holds, with no uid filter and no limit (caps and totals are unchanged). Reading it: `GET /access` says
 `models: "live"` only while the ledger is readable, the uid is under its cap and the switch is off. To reset the
 durable kill switch after the daily hard cap tripped it, delete the document `orgs/org_tilo/spend_ledger/switch`
 (Firestore console) or set its `on` field to `false`; nothing in the API can.
