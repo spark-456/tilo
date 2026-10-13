@@ -34,6 +34,7 @@ from tilo_api.cards import build_router as _build_cards_router
 from tilo_api.cards_feed import router as _cards_feed_router
 from tilo_api.connectors_list import router as _connectors_list_router
 from tilo_api.console import build_router as _build_console_router
+from tilo_api.context_panel import router as _context_panel_router
 from tilo_api.costs import router as _costs_router
 from tilo_api.dispatch import router as _dispatch_router
 from tilo_api.effort import router as _effort_router
@@ -127,6 +128,7 @@ app.include_router(intake_router)
 app.include_router(_dispatch_router)
 app.include_router(_redaction_router)
 app.include_router(_costs_router)
+app.include_router(_context_panel_router)
 app.include_router(_worlds_list_router)
 app.include_router(_cards_feed_router)
 app.include_router(_notifications_router)
