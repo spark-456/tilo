@@ -162,7 +162,7 @@ describe("WEB_6_shell: /park/world/<id> inside the shell", () => {
     const m = await visit("/park/world/k1");
     click(control(m.container, "Pause"));
     await settle();
-    expect(toastWith("Paused. No spend while paused")).toBeTruthy();
+    expect(toastWith("Sample only: paused on this page. Nothing real changed.")).toBeTruthy();
     expect(elWithText(m.container, "Paused · agents are waiting")).toBeTruthy();
   });
 

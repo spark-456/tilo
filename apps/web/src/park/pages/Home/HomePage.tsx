@@ -183,6 +183,11 @@ export function HomePage({ app }: { app: AppCtx }) {
       toIdle();
       return;
     }
+    if (text === "") {
+      // Issue 932: the plan on show is the example for an empty box; sending it would post nothing to the server.
+      store.toast("Describe your task first, then press Start.");
+      return;
+    }
     sendingNow.current = true;
     setSending(true);
     store.startWorld(modeKey, text).then((ok) => {
