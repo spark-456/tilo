@@ -460,6 +460,26 @@ T3b (BQ-T3-5): each entry is also folded, in the same transaction, into one roll
 `orgs/{org}/treasury_rollup/{id}`, which the three routes read instead of every entry. Nothing for you to apply: no
 composite index (one equality query on `user`), no rules change (`firestore.rules` denies every client path), no IAM
 change (`roles/datastore.user` covers the transaction). Optional alert text: `treasury_rollup_too_large` at ERROR.
+### The meeting bot's Live voice meter (ADR-0042, BQ-M2-4, BQ-M2-5; INERT, nothing for you to apply yet)
+
+`tilo_api.meeting_voice_meter` adds two public routes, `POST /internal/meeting-voice/reserve` and `.../close`, on which
+the meeting bot reserves and settles one SEC-16 unit per spoken Gemini Live reply. They are **off by default**: with
+`TILO_VOICE_METER` unset (or anything but `1`) both answer a plain 404 and the attend call to the bot is unchanged, so
+nothing in production moves until you answer BQ-M2-5. After a yes and a deploy of the build tickets, set on `tilo-api`
+(`gcloud run services update tilo-api --region asia-southeast1 --update-env-vars ...`, as `docs/CLOUD_RUN.md` does):
+
+| Variable | Value |
+| --- | --- |
+| `TILO_VOICE_METER` | `1` (the switch; exactly `1`) |
+| `TILO_VOICE_METER_AUDIENCE` | tilo-api's own service URL, `https://host` with no path, query or fragment |
+| `TILO_VOICE_METER_CALLER` | the meeting bot's runtime service account email; must differ from `TILO_SCHEDULE_TICK_CALLER` and `TILO_TASKS_CALLER` (equal, unset or malformed answers 503 `not_configured`) |
+
+The bot's account needs no new role (it mints its ID token from its metadata server for audience `TILO_API_URL`, and
+tilo-api is public: `INGRESS_TRAFFIC_ALL`, `allUsers` invoker). The ledger is the one above (`TILO_FIRESTORE_PROJECT`);
+without one both routes answer 503 and the bot speaks the local voice. tilo-api must stay one instance (the attend claim
+and its nonce live in the process: a restart or a second instance answers 409 and the bot stays on its local voice).
+The reply price is read from `config/prices.yaml` for the profile `voice.live.profile` names; with no row a reply books
+the whole `unit_reserve_minor` and never more (K = 1). To turn it off again unset `TILO_VOICE_METER`.
 
 ### Against a deployed tilo-api, and the smoke (PROD-WIRE-4)
 
