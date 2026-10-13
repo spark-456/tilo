@@ -265,10 +265,20 @@ export function WorldPage({ app }: { app: AppCtx }) {
   // A world has a stage only when its data came from the live API; a world started on this page is local state.
   const hasStage = loaded.live && !added.some((a) => a.id === w.id);
   const stage = (to: string): string | null => (hasStage ? to : null);
+  const real = hasStage && !demo; // a live world of a real account: its toasts may claim real outcomes
 
   const togglePause = () => {
     setPaused((p) => ({ ...p, [w.id]: !isPaused }));
-    app.toast(isPaused ? "Resumed. Agents are back at work" : "Paused. No spend while paused");
+    // Issue 932: a sample world has no run behind it, so the toast says what happened: this page only.
+    app.toast(
+      real
+        ? isPaused
+          ? "Resumed. Agents are back at work"
+          : "Paused. No spend while paused"
+        : isPaused
+          ? "Sample only: resumed on this page. Nothing real changed."
+          : "Sample only: paused on this page. Nothing real changed.",
+    );
   };
   const share = () => {
     try {
@@ -277,7 +287,11 @@ export function WorldPage({ app }: { app: AppCtx }) {
     } catch {
       // no clipboard here: the toast still says what the button is for
     }
-    app.toast("Link copied. Only your team can open it");
+    app.toast(
+      real
+        ? "Link copied. Only your team can open it"
+        : "Link copied. This is a sample world, so there is nothing real to share.",
+    );
   };
 
   const openSlackDialog = (trigger: HTMLButtonElement) => {

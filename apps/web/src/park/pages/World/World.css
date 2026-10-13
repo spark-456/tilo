@@ -129,10 +129,12 @@
 [data-park] .park-world-live[aria-disabled="true"] {
   background: var(--chip);
   color: var(--ink3);
+  opacity: 0.55; /* issue 932: dimmed like the other disabled controls */
   cursor: not-allowed;
 }
 [data-park] .park-world-lenses a[aria-disabled="true"] {
   color: var(--ink3);
+  opacity: 0.55;
   cursor: not-allowed;
 }
 [data-park] .park-world-live[aria-disabled="true"]:hover {

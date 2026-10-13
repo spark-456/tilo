@@ -172,6 +172,11 @@ export function ComposerPanel(p: ComposerProps) {
                 </li>
               ))}
             </ol>
+            {p.query.trim() === "" ? (
+              <p className="park-home-plan__sample">
+                Example only: the box is empty. Type your task, then press Start to plan it.
+              </p>
+            ) : null}
             {p.sample ? (
               <p className="park-home-plan__sample">
                 Sample plan. Demo sessions replay a recorded run; sign in to start your own.
