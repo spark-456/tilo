@@ -189,7 +189,8 @@ describe("WEB_CUTOVER_parkapp: the Park NotFound page", () => {
     const m = await visit("/park/nope");
     const link = q<HTMLAnchorElement>(m.container, '[data-testid="park-not-found"] a');
     expect(link.getAttribute("href")).toBe("/");
-    expect(document.title).toBe("Page not found · Tilo");
+    // UI-10 W7 specifies the browser title; the visible heading stays Page not found.
+    expect(document.title).toBe("Not found · Tilo");
   });
 
   it("WEB_CUTOVER_06_clicking_the_not_found_link_goes_to_slash_without_a_page_load", async () => {

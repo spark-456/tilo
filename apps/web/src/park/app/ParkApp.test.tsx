@@ -132,7 +132,8 @@ describe("WEB_3a_parkapp: a path that is not a page", () => {
     const m = await visit("/park/nope");
     expect(q(m.container, "h1").textContent).toBe("Page not found");
     expect(qa(m.container, "main")).toHaveLength(1);
-    expect(document.title).toBe("Page not found · Tilo");
+    // UI-10 W7 specifies the browser title; the visible heading stays Page not found.
+    expect(document.title).toBe("Not found · Tilo");
   });
 
   it("WEB_3a_parkapp_not_found_links_back_to_home", async () => {

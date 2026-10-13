@@ -34,6 +34,10 @@ const CONTENT: Record<PageId, [string, string]> = {
     "Check real connections",
     "Connections show their real state. A tour never connects a tool or grants access.",
   ],
+  settings: [
+    "Review display and data preferences",
+    "Display controls apply at once. Review routines and consent here; unavailable actions say so.",
+  ],
   profile: [
     "Review your settings",
     "Your profile shows your real account and preferences. A tour changes nothing.",
@@ -49,7 +53,7 @@ export function pageTourSteps(page: PageId): TourStep[] {
       id: `${page}-overview`,
       title: PAGE_LABEL[page],
       body:
-        page === "connectors" || page === "profile"
+        page === "connectors" || page === "profile" || page === "settings"
           ? `This is ${PAGE_LABEL[page]}. It shows your real state; the tour changes nothing.`
           : `This is ${PAGE_LABEL[page]}. Sample content is labelled; your own data replaces it after your first run.`,
       target: () => root()?.querySelector("h1") ?? root(),

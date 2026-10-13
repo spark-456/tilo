@@ -2,6 +2,7 @@
 // nav, backdrop, the one <main>, toast, world loader), the page for the route, the document title and the
 // focus move after a route change. Lazy-imported by src/Root.tsx, so a landing visit never loads it (NFR-01).
 import { Suspense, lazy, useEffect, useRef } from "react";
+import { useDocumentTitle } from "../../documentTitle";
 import { AppShell } from "../shell/AppShell";
 import { ParkAuthProvider } from "../shell/auth";
 import { useParkTour } from "../shell/tour";
@@ -10,7 +11,7 @@ import "../tokens/park.css";
 import "../tokens/themes.css";
 import { themeFor } from "../tokens/themes";
 import { PAGE_LABEL } from "./AppCtx";
-import { NOT_FOUND_TITLE, NotFound } from "./NotFound";
+import { NotFound } from "./NotFound";
 import "./park-app.css";
 import { ParkProvider, usePageApp, useSessionAuth } from "./context";
 import { PAGES } from "./pages";
@@ -71,7 +72,7 @@ function Shell() {
   const app = usePageApp();
   const route = useParkRoute();
   const quizRoute = useQuizAppRoute();
-  const title = route ? PAGE_LABEL[route.page] : quizRoute ? "Quiz" : NOT_FOUND_TITLE;
+  const title = route ? PAGE_LABEL[route.page] : quizRoute ? "Quiz" : "Not found";
   // A world is a different page per id; the other pages keep focus where it is when only a query changes.
   const routeKey = route
     ? route.page === "world"
@@ -80,13 +81,7 @@ function Shell() {
     : quizRoute
       ? `world/${quizRoute.worldId}/app/${quizRoute.artifactId}`
       : "none";
-  useEffect(() => {
-    const before = document.title;
-    document.title = `${title} · Tilo`;
-    return () => {
-      document.title = before;
-    };
-  }, [title]);
+  useDocumentTitle(title);
   const Page = route ? PAGES[route.page] : null;
   const Tour = useParkTour()?.Layer; // ONBOARD-1: the first-run welcome and tour, when the Root provides them
   return (
