@@ -5,6 +5,34 @@ import { cx } from "../../components/cx";
 
 export type Scale = "City" | "Town" | "Village";
 
+/** Static placeholders use the real grid and card dimensions; no invented world data or motion. */
+export function CardSkeleton({ scale }: { scale: Scale }) {
+  return (
+    <div
+      aria-hidden="true"
+      className={`park-worlds-card park-worlds-card--${scale.toLowerCase()} park-worlds-skeleton`}
+    >
+      <span className="park-worlds-skeleton__line" />
+      <span className="park-worlds-skeleton__art" />
+      <span className="park-worlds-skeleton__line" />
+    </div>
+  );
+}
+
+export function LoadingWorlds() {
+  return (
+    // biome-ignore lint/a11y/useSemanticElements: loading status contains a block card grid, not a form output
+    <div role="status" aria-label="Loading worlds" className="park-worlds-section">
+      <span className="park-worlds-section__title">Loading worlds…</span>
+      <div aria-hidden="true" className="park-worlds-grid park-worlds-grid--city">
+        {[0, 1, 2].map((n) => (
+          <CardSkeleton key={n} scale="City" />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 const COPY: Record<Scale, { title: string; blurb: string; lit: number }> = {
   City: { title: "Cities", blurb: "big projects with districts and gates", lit: 3 },
   Town: { title: "Towns", blurb: "routines and small projects", lit: 2 },

@@ -40,7 +40,8 @@ const WORD: Record<WorldState, string> = {
 
 /** The search and scale filters, which the status tab counts also follow. */
 const inBase = (w: World, q: string, tier: TierFilter): boolean =>
-  (!q || w.name.toLowerCase().includes(q.toLowerCase())) && (tier === "all" || w.tier === tier);
+  (!q.trim() || w.name.toLowerCase().includes(q.trim().toLowerCase())) &&
+  (tier === "all" || w.tier === tier);
 /** "Running" also holds a world that needs you. */
 const inStatus = (w: World, f: StatusFilter): boolean =>
   f === "all" || w.st === f || (f === "running" && w.st === "needs");

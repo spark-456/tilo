@@ -23,7 +23,7 @@ import { CityCard, TownCard, VillageCard } from "./Cards";
 import { Filters } from "./Filters";
 import { Header } from "./Header";
 import { RoutinesPanel } from "./RoutinesPanel";
-import { EmptyBox, Section } from "./Sections";
+import { CardSkeleton, EmptyBox, LoadingWorlds, Section } from "./Sections";
 import { Spotlight } from "./Spotlight";
 import { makeArt, makeKit } from "./art";
 import "./Worlds.css";
@@ -263,19 +263,18 @@ export function WorldsPage({ app }: { app: AppCtx }) {
               onStatus={setStatus}
               onTier={setTier}
             />
-            {part(2) ? (
-              <Spotlight
-                art={art}
-                decisions={data.decisions}
-                worldName={all.find((w) => w.id === data.decisions[0]?.world)?.name ?? ""}
-                dec={dec}
-                needsLeft={needsLeft}
-                onDecide={(key) => app.decide(key)}
-                onOpen={open}
-                slackPending={slackPending}
-              />
-            ) : null}
-            {part(at("City", 0)) && cities.length > 0 ? (
+            {/* Keep the decision summary above the grids in place while card art is staged. */}
+            <Spotlight
+              art={art}
+              decisions={data.decisions}
+              worldName={all.find((w) => w.id === data.decisions[0]?.world)?.name ?? ""}
+              dec={dec}
+              needsLeft={needsLeft}
+              onDecide={(key) => app.decide(key)}
+              onOpen={open}
+              slackPending={slackPending}
+            />
+            {cities.length > 0 ? (
               <Section scale="City" count={cities.length}>
                 {cities.map((w, i) =>
                   part(at("City", i)) ? (
@@ -286,11 +285,13 @@ export function WorldsPage({ app }: { app: AppCtx }) {
                       status={statusOf(w, needsLeft)}
                       onOpen={open}
                     />
-                  ) : null,
+                  ) : (
+                    <CardSkeleton key={w.id} scale="City" />
+                  ),
                 )}
               </Section>
             ) : null}
-            {part(at("Town", 0)) && towns.length > 0 ? (
+            {towns.length > 0 ? (
               <Section scale="Town" count={towns.length}>
                 {towns.map((w, i) =>
                   part(at("Town", i)) ? (
@@ -301,11 +302,13 @@ export function WorldsPage({ app }: { app: AppCtx }) {
                       status={statusOf(w, needsLeft)}
                       onOpen={open}
                     />
-                  ) : null,
+                  ) : (
+                    <CardSkeleton key={w.id} scale="Town" />
+                  ),
                 )}
               </Section>
             ) : null}
-            {part(at("Village", 0)) && villages.length > 0 ? (
+            {villages.length > 0 ? (
               <Section scale="Village" count={villages.length}>
                 {villages.map((w, i) =>
                   part(at("Village", i)) ? (
@@ -316,7 +319,9 @@ export function WorldsPage({ app }: { app: AppCtx }) {
                       status={statusOf(w, needsLeft)}
                       onOpen={open}
                     />
-                  ) : null,
+                  ) : (
+                    <CardSkeleton key={w.id} scale="Village" />
+                  ),
                 )}
               </Section>
             ) : null}
@@ -327,7 +332,9 @@ export function WorldsPage({ app }: { app: AppCtx }) {
               />
             ) : null}
           </>
-        ) : null}
+        ) : (
+          <LoadingWorlds />
+        )}
       </PageSheet>
     </div>
   );
