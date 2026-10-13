@@ -687,8 +687,11 @@ for (const [sizeName, viewport] of Object.entries(SIZES)) {
         expectFacts("input", f, { "font-size": "20px", "font-weight": "700", color: T.ink });
         expect(String(f["font-family"])).toMatch(/Nunito Sans/);
         near("input height", Number(f.h), 60);
+        // A phone's input cannot wrap its placeholder, so it shows the example in few words (13 Oct QA).
         expect(await input(page).getAttribute("placeholder")).toBe(
-          "e.g. Summarise this week’s customer feedback",
+          sizeName === "mobile"
+            ? "e.g. Summarise this week’s feedback"
+            : "e.g. Summarise this week’s customer feedback",
         );
         const s = await facts(start(page), [
           "background-color",

@@ -1049,15 +1049,15 @@
     overflow-wrap: anywhere;
   }
   /* the input gets the full width of its row (its placeholder is the only hint of what to write) and the start
-     button the row under it */
+     button the row under it, at its own size on the right: the reference's input height and button size stay */
   [data-park] .park-home-input-row {
     flex-wrap: wrap;
   }
   [data-park] .park-home-input {
     flex: 1 1 100%;
-    height: 48px;
   }
   [data-park] .park-home-start {
-    flex: 1 1 100%;
+    flex: none;
+    margin-left: auto;
   }
 }
