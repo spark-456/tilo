@@ -190,11 +190,6 @@ def test_BYOK_6_every_state_answer_matches_its_schema(monkeypatch: pytest.Monkey
     assert removed == {"removed": True} and verdict("remove_answer", removed) == []
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="needs contract change: org_model_key owner_view.last_error lacks `not_configured`, the word SEC-REVIEW-29 "
-    "B4 and BQ-BYOK-FIX-2 tell the owner when a key's bundle left config/byok.yaml (BQ-BYOKC-6 follow-up)",
-)
 def test_BYOK_6_owner_view_of_a_key_whose_bundle_left_the_config_matches_the_schema(rig: Rig) -> None:
     put(rig)
     gone = replace(CFG, bundles={"other": OrgBundle("other", "Other", "openai_compat", {"writer": ("a", "b")})})
