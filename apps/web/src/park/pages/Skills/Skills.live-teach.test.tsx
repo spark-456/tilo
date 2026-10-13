@@ -155,6 +155,23 @@ const gate = () => {
 };
 
 describe("SKILLS_5_live_teach: describe it (step 1)", () => {
+  it("FR_SKL_01_W11_describing_announces_loading_until_the_capture_finishes", async () => {
+    const g = gate();
+    const { mount } = rig({ "POST /v1/skills/captures": () => g.waiting });
+    const r = await mount();
+    typeInto(describeField(r.el), "Check the mail");
+    clickEl(control(r.el, "Read my description"));
+    await settle();
+    const pending = r.el.querySelector("output");
+    expect(pending).not.toBeNull();
+    expect(pending?.textContent).toBe("Reading your description…");
+    expect(isDisabled(control(r.el, "Read my description"))).toBe(true);
+    g.release(json(CAPTURED, 201));
+    await settle();
+    expect(r.el.querySelector("output")).toBeNull();
+    expect(text(r)).toContain("Note the total");
+  });
+
   it("SKILLS_5_live_teach_the_first_step_is_an_empty_describe_box_and_no_sample_content", async () => {
     const r = await rig().mount();
     expect(describeField(r.el).value).toBe("");
