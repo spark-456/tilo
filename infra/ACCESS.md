@@ -398,3 +398,34 @@ Console steps (Terraform cannot do these). APIs and Services, Credentials, then 
 Order: apply infra incl. the index, wait for it to be READY, run the outbox store suite once on the Firestore emulator, set
 the settings, your go, `LIVE=1` on connectors only, acceptance with `tilotesting@gmail.com`. Commands: `docs/deploy-dev.md`
 ("Live connectors").
+
+## 14. The meeting bot's Live voice meter (ADR-0042, BQ-M2-4, BQ-M2-5; INERT, no IAM or Terraform change)
+
+The bot (`tilo-meet-bot`, only with `meet_bot_enabled`) meters each spoken Gemini Live reply on the SEC-16 ledger by
+calling two public routes of `tilo-api`. Access changes: none.
+
+| Identity | Holds (unchanged) | Added by the meter |
+| --- | --- | --- |
+| `tilo-meet-bot` | project roles `tiloVertexGenerate` and `serviceusage.serviceUsageConsumer` only; no Firestore, Storage, KMS or secret role (`meet_bot.tftest.hcl`); internal ingress, invokable by `tilo-api` only | Nothing. It mints a Google ID token from its metadata server for audience `TILO_API_URL` (no key, no role needed) and sends it to tilo-api |
+| `tilo-api` | section 2 | Two public routes (`access.PUBLIC_ROUTES`, `appcheck.EXEMPT_ROUTES`), each checking its own token. No role. The call arrives because tilo-api already carries `allUsers` as `run.invoker` |
+
+Route checks (code, not IAM; `TILO_VOICE_METER`, `TILO_VOICE_METER_AUDIENCE`, `TILO_VOICE_METER_CALLER` on tilo-api):
+a Google ID token whose audience is the tilo-api URL and whose account is `tilo-meet-bot` with `email_verified`. The
+three public routes of tilo-api each have their own caller and each answers 403 to the others' accounts:
+
+| Route | Caller pin | Account |
+| --- | --- | --- |
+| `POST /internal/schedules/tick` | `TILO_SCHEDULE_TICK_CALLER` (and `TILO_TASKS_CALLER` for the Tasks hand-off) | `tilo-schedule-scheduler`, `tilo-tasks-invoker` |
+| `POST /internal/meeting-voice/reserve` and `/close` | `TILO_VOICE_METER_CALLER` | `tilo-meet-bot`; equal to either pin above is 503, so one setting never opens two doors |
+
+Whose spend it is never comes from the caller: the uid and org are the attend claim's, made by the owner's own attend
+request (`meeting_voice_claims`), and a body can name neither. A fully compromised bot still holds Vertex generate and
+the ledger does not stop it (ADR-0042 context 5); project quota and the budget alert are that bound.
+
+Not granted, on purpose: `roles/datastore.user` for the bot (a condition names a database, not a collection, so it
+would reach every world and every person's ledger counter); a `run.invoker` binding for the bot on tilo-api (redundant
+while `allUsers` holds; the FR-AGT-14e guard keeps `api` out of `extra_invokers`, so if you ever drop `allUsers` it is
+one `gcloud run services add-iam-policy-binding tilo-api --member serviceAccount:tilo-meet-bot@<project>... --role
+roles/run.invoker`, `docs/deploy-dev.md` step 5); any token-creator role. The four settings are runtime env, set by hand
+(tilo-api has `ignore_env`; the service module declares no env): ordered steps, checks and rollback in
+`docs/deploy-dev.md` ("The meeting bot's Live voice meter"), values in `meet-bot/docs/CLOUD_RUN.md`.
