@@ -4,6 +4,7 @@
 import type { Effort, QuickCost, SwitchReason } from "../../api/types";
 import { type SegmentOption, SegmentedControl } from "../../components";
 import { type IntakeClient, IntakeControl } from "./IntakeControl";
+import type { Staging } from "./StagedFiles";
 import { EFFORTS, type Mode, SWITCH_WORDS, quickCostLine } from "./homeData";
 
 export type Phase = "idle" | "drafting" | "plan";
@@ -78,6 +79,8 @@ function QuickCard({
 export interface ComposerProps {
   /** I6: absent until an upload route and transport are available. */
   readonly intakeClient?: IntakeClient;
+  /** WEB-W1: files held for the next Start (the button is shown with a reason when uploads cannot work). */
+  readonly staging?: Staging;
   readonly mode: Mode;
   readonly modes: readonly Mode[];
   readonly query: string;
@@ -197,7 +200,7 @@ export function ComposerPanel(p: ComposerProps) {
         </div>
       ) : null}
       <div className="park-home-panel park-home-glass">
-        <IntakeControl client={p.intakeClient}>
+        <IntakeControl client={p.intakeClient} staging={p.staging}>
           <div className="park-home-input-row">
             <div className="park-home-logo">
               <div className="park-home-logo__face">

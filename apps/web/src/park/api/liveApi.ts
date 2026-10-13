@@ -416,12 +416,17 @@ export function createLiveApi(options: LiveApiOptions = {}): Api {
   // The real intake call, the legacy S-01's (FR-UX-13): one POST of the text alone (the intake has no size, routine
   // or workspace field; the size only picks the tier shown, BQ-UX13-2). A reply the page cannot read, including
   // one without its `files`, is a TiloApiError, never a TypeError or a world. The brief goes to S-02.
-  api.startWorld = (async (mode: TierKey, query: string, effort?: Effort) => {
+  api.startWorld = (async (
+    mode: TierKey,
+    query: string,
+    effort?: Effort,
+    files: readonly File[] = [],
+  ) => {
     // Quick (COST-FAST-1): a direct answer or an offer to switch. No world, no event, and nothing is remembered.
     if (effort === "quick") return quickAsk(http, query);
     let intake: IntakeResult;
     try {
-      intake = await http.submitIntake(query, []);
+      intake = await http.submitIntake(query, [...files]);
     } catch (e) {
       if (e instanceof TiloApiError) throw e;
       throw new TiloApiError(BAD_REPLY, 200, true, true);

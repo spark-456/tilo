@@ -165,6 +165,8 @@ export function HomePage({ app }: { app: AppCtx }) {
   // A start in flight (live only): the confirm control waits, nothing is cleared and nothing else is edited.
   const [sending, setSending] = useState(false);
   const sendingNow = useRef(false);
+  // WEB-W1: files picked or pasted for the next Thinking start. They leave with Start on the one POST /intake.
+  const [files, setFiles] = useState<File[]>([]);
   const confirmStart = () => {
     if (sendingNow.current) return;
     const text = query.trim();
@@ -185,11 +187,12 @@ export function HomePage({ app }: { app: AppCtx }) {
     }
     sendingNow.current = true;
     setSending(true);
-    store.startWorld(modeKey, text).then((ok) => {
+    store.startWorld(modeKey, text, files).then((ok) => {
       sendingNow.current = false;
       setSending(false);
       if (!ok) return; // the card stays open and the text stays, so the person can try again
       setQuery("");
+      setFiles([]);
       toIdle();
     });
   };
@@ -333,6 +336,17 @@ export function HomePage({ app }: { app: AppCtx }) {
         <ComposerPanel
           sending={sending}
           sample={demo}
+          staging={{
+            files,
+            onChange: setFiles,
+            disabledReason: demo
+              ? "Uploads are off in the demo; sign in to attach files."
+              : !worldsLive
+                ? "Uploads need setup; the owner has not finished it."
+                : effort === "quick"
+                  ? "Uploads work with Thinking tasks; a Quick ask makes no task."
+                  : null,
+          }}
           mode={mode}
           modes={MODES}
           query={query}

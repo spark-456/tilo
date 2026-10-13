@@ -5,7 +5,7 @@
 import { TiloApiError, isLifetimeCap } from "../../api/http";
 import { buildHandoffDecisions } from "../api/fixtures/buildHandoff";
 import { needsLeft as countNeedsLeft, makeWorld, worlds } from "../api/fixtures/worlds";
-import { type Api, askQuick } from "../api/index";
+import { type Api, askQuick, startWithFiles } from "../api/index";
 import { NotBuilt } from "../api/liveApi";
 import type {
   Dec,
@@ -101,7 +101,7 @@ export interface ParkStore {
   addWorld(mode: TierKey, query: string): World;
   /** The live path (FR-UX-13): the Api is asked first and the promise settles with whether the server accepted
    * the task; a world is added, and Open offered, only then (HR-1). The shell picks one of the two (`useApp`). */
-  startWorld(mode: TierKey, query: string): Promise<boolean>;
+  startWorld(mode: TierKey, query: string, files?: readonly File[]): Promise<boolean>;
   /**
    * Quick (COST-FAST-1): one direct question. It makes no world, adds nothing, toasts nothing and never animates;
    * the page shows the outcome. `mode` is only the size on screen. A second call while one is in flight shares it.
@@ -314,12 +314,14 @@ export function createParkStore({ api, navigate, schedule, demo }: ParkStoreDeps
       });
     },
     undo,
-    startWorld(mode, query) {
+    startWorld(mode, query, files) {
       // Live (FR-UX-13): the intake call is made first; the world is added, and Open offered, only after the
       // server accepted the task. The task is not approved yet, so Open goes to its understanding screen and
       // nothing says it is running (HR-1). A failure adds nothing and says why.
       if (starting) return starting;
-      starting = api.startWorld(mode, query).then(
+      starting = (
+        files?.length ? startWithFiles(api, mode, query, files) : api.startWorld(mode, query)
+      ).then(
         ({ data }) => {
           starting = null;
           const { world } = data;
