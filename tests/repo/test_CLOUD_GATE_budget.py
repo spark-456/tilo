@@ -47,7 +47,7 @@ def test_CLOUD_GATE_tracked_test_inputs_are_allowed(name):
     assert gate.allowed(name)
 
 
-@pytest.mark.parametrize("spent", [399, 397.61])
+@pytest.mark.parametrize("spent", [899, 897.61])
 def test_CLOUD_GATE_budget_refuses_before_any_cloud_command(tmp_path, monkeypatch, spent):
     (tmp_path / "CLOUD-GATE-SPEND.json").write_text(json.dumps([{"inr": spent}]))
     monkeypatch.setattr(sys, "argv", ["gate-cloud", "HEAD"])
