@@ -5,19 +5,13 @@ import { useApp, useParkApi } from "../app/context";
 import { useParkRoute } from "../app/router";
 import { Button, Popover } from "../components";
 import "./ContextPanel.css";
+// A4 (14 Oct QA): the panel is closed on every load. A choice made earlier in a stored place used to reopen it
+// after a reload, over the page's own panels; now it lasts only while the page is open, per person.
 const memory = new Map<string, boolean>();
 function keyOf(person: string): string {
-  let hash = 0x811c9dc5;
-  for (const c of person.trim().toLowerCase()) hash = Math.imul(hash ^ c.charCodeAt(0), 0x01000193);
-  return `tilo.park.context.${(hash >>> 0).toString(16)}`;
+  return person.trim().toLowerCase();
 }
 function read(key: string): boolean {
-  try {
-    const v = window.localStorage.getItem(key);
-    if (v !== null) return v === "1";
-  } catch {
-    /* blocked storage */
-  }
   return memory.get(key) ?? false;
 }
 export function useContextChoice(person: string): readonly [boolean, () => void] {
@@ -27,11 +21,6 @@ export function useContextChoice(person: string): readonly [boolean, () => void]
   const toggle = useCallback(() => {
     const next = !open;
     memory.set(key, next);
-    try {
-      window.localStorage.setItem(key, next ? "1" : "0");
-    } catch {
-      /* page memory remains */
-    }
     setChoice({ key, open: next });
   }, [key, open]);
   useEffect(() => {
