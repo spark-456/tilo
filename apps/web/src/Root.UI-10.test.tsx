@@ -1,8 +1,9 @@
 // @vitest-environment happy-dom
 import { act } from "react";
 import { afterEach, expect, it, vi } from "vitest";
-import { cleanup, mount, qa } from "../test-support/park/componentsHarness";
+import { cleanup, click, mount, q, qa } from "../test-support/park/componentsHarness";
 import { Root } from "./Root";
+import { setDensity } from "./park/shell/density";
 
 const visit = async (path: string) => {
   window.history.pushState({}, "", path);
@@ -15,6 +16,8 @@ const visit = async (path: string) => {
 };
 afterEach(() => {
   cleanup();
+  setDensity("friendly");
+  window.localStorage.removeItem("tilo.density");
   window.history.pushState({}, "", "/");
 });
 it("UI-10 W7 Settings uses the Park navigation and one main without the flow replay pill", async () => {
@@ -63,4 +66,30 @@ it("UI-10 W7-FIX2 shares world names and Settings/More titles through route chan
     });
     await vi.waitFor(() => expect(document.title).toBe(`${title} · Tilo`));
   }
+});
+it("UI-10 W8b Settings Appearance changes the shell and persists to Profile", async () => {
+  const m = await visit("/settings");
+  const button = (label: string) => {
+    const el = qa<HTMLButtonElement>(m.container, "button").find((b) =>
+      b.textContent?.includes(label),
+    );
+    expect(el, label).toBeDefined();
+    return el as HTMLButtonElement;
+  };
+  click(button("Night"));
+  click(button("Still"));
+  expect(q(m.container, "[data-park]").getAttribute("data-time")).toBe("night");
+  expect(q(m.container, "[data-park]").getAttribute("data-motion")).toBe("still");
+  const professional = q<HTMLInputElement>(m.container, 'input[value="professional"]');
+  click(professional);
+  expect(professional.checked).toBe(true);
+  expect(m.container.textContent).toContain("No routines yet.");
+  expect(q(m.container, 'a[href="/start"]').textContent).toBe("Create a routine");
+  await act(async () => {
+    window.history.pushState({}, "", "/profile?tab=appearance");
+    window.dispatchEvent(new PopStateEvent("popstate"));
+    await vi.dynamicImportSettled();
+  });
+  await vi.waitFor(() => expect(button("Night").getAttribute("aria-pressed")).toBe("true"));
+  expect(button("Still").getAttribute("aria-pressed")).toBe("true");
 });

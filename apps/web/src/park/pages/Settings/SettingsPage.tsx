@@ -1,8 +1,10 @@
 // UI-10 W7-FIX: Settings uses Park components and the existing routines client.
 import { type ReactNode, useState } from "react";
 import { createRoutinesClient } from "../../api/live/routines";
+import type { AppCtx } from "../../app/AppCtx";
 import { Card, PageSheet } from "../../components";
 import { type Density, useDensity } from "../../shell/density";
+import { AppearanceControls } from "../Profile/AppearanceControls";
 import { RoutinesPanel } from "../Worlds/RoutinesPanel";
 
 function SettingsSection({
@@ -51,7 +53,7 @@ const MODES: ReadonlyArray<readonly [Density, string, string]> = [
   ["professional", "Professional", "Tighter spacing, no decoration"],
 ];
 
-export function SettingsPage() {
+export function SettingsPage({ app }: { app: AppCtx }) {
   const [density, setDensity] = useDensity();
   const [routines] = useState(createRoutinesClient);
   return (
@@ -62,9 +64,10 @@ export function SettingsPage() {
           <p>Your data, what Tilo may use, and how the app looks.</p>
         </div>
         <SettingsSection
-          title="Display"
+          title="Appearance"
           note="Friendly is the default. Professional tightens the spacing and keeps decoration out. It changes how the app looks, never what happened, and it applies at once."
         >
+          <AppearanceControls app={app} />
           <fieldset className="segmented" data-testid="density">
             <legend className="visually-hidden">Display mode</legend>
             {MODES.map(([id, name, what]) => (
