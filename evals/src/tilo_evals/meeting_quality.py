@@ -33,10 +33,73 @@ def _provenance(case: dict[str, Any]) -> bool:
     )
 
 
+def _attribution(
+    minutes: dict[str, Any], gold: dict[str, Any], annotation: dict[str, Any], failures: set[str], pending: set[str]
+) -> dict[str, tuple[int, int]]:
+    """Semantic mappings are independent input assertions, never inferred from citations."""
+    totals: dict[str, tuple[int, int]] = {}
+    decisions = minutes["decisions"]
+    ids, matches = gold.get("decision_ids"), annotation.get("decision_matches")
+    if (
+        not _strings(ids)
+        or len(set(ids)) != len(ids)
+        or not isinstance(matches, list)
+        or len(matches) != len(decisions)
+        or any(v is not None and (not isinstance(v, str) or v not in ids) for v in matches)
+    ):
+        pending.add("decision annotations incomplete")
+    else:
+        used: set[str] = set()
+        for row, match in zip(decisions, matches, strict=True):
+            if row["state"] == "verified":
+                if match is None or match in used:
+                    failures.add("unsupported or duplicate decisions")
+                elif match is not None:
+                    used.add(match)
+    owners = annotation.get("owner_expected")
+    rows = minutes["action_items"]
+    if (
+        not isinstance(owners, dict)
+        or not {row["id"] for row in rows} <= owners.keys()
+        or any(
+            not isinstance(k, str) or (v is not None and (not isinstance(v, str) or not v)) for k, v in owners.items()
+        )
+    ):
+        pending.add("owner annotations incomplete")
+    elif any(row["owner"] != owners[row["id"]] for row in rows):
+        failures.add("owner attribution")
+    planted = gold.get("planted_false_decision_indices")
+    if (
+        not isinstance(planted, list)
+        or any(type(i) is not int or i < 0 for i in planted)
+        or len(set(planted)) != len(planted)
+    ):
+        pending.add("planted false decision annotations missing")
+    else:
+        # Out-of-range positions represent silent drops and earn no detection credit.
+        totals["decision"] = (
+            len(planted),
+            sum(i < len(decisions) and decisions[i]["state"] == "unverified" for i in planted),
+        )
+    planted_owners = gold.get("planted_false_owner_ids")
+    if not _strings(planted_owners) or len(set(planted_owners)) != len(planted_owners):
+        pending.add("planted false owner annotations missing")
+    else:
+        totals["owner"] = (
+            len(planted_owners),
+            sum(
+                any(row["id"] == i and row["state"] == "unverified" and row["owner"] is None for row in rows)
+                for i in planted_owners
+            ),
+        )
+    return totals
+
+
 def _group(cases: list[dict[str, Any]], basis: str) -> dict[str, Any]:
     failures: set[str] = set()
     pending: set[str] = set()
     hits = predicted = expected = valid = false_total = false_caught = 0
+    attribution_totals: dict[str, list[int]] = {key: [0, 0] for key in ("decision", "owner")}
     ids = [case.get("id") for case in cases]
     if len(cases) != 12 or any(not isinstance(i, str) or not i for i in ids) or len(set(ids)) != len(ids):
         pending.add("requires 12 distinct case IDs")
@@ -77,6 +140,9 @@ def _group(cases: list[dict[str, Any]], basis: str) -> dict[str, Any]:
         if not isinstance(gold, dict) or not isinstance(annotation, dict):
             pending.add("independent annotations missing")
             continue
+        for key, counts in _attribution(minutes, gold, annotation, failures, pending).items():
+            for i, count in enumerate(counts):
+                attribution_totals[key][i] += count
         gold_ids, planted = gold.get("action_ids"), gold.get("planted_false_ids")
         matches = annotation.get("action_matches")
         inventions = annotation.get("invented_commitment_ids")
@@ -135,6 +201,14 @@ def _group(cases: list[dict[str, Any]], basis: str) -> dict[str, Any]:
         pending.add("planted false coverage missing")
     elif false_rate < 0.90:
         failures.add("planted false detection")
+    attribution_rates = {}
+    for key, (total, caught) in attribution_totals.items():
+        rate = caught / total if total else None
+        attribution_rates[f"planted_false_{key}_detection"] = rate
+        if rate is None:
+            pending.add(f"planted false {key} coverage missing")
+        elif rate < 0.90:
+            failures.add(f"planted false {key} detection")
     state = "pending" if pending else "fail" if failures else "pass"
     return {
         "mechanics": state,
@@ -145,6 +219,7 @@ def _group(cases: list[dict[str, Any]], basis: str) -> dict[str, Any]:
             "action_precision": precision,
             "schema_valid_rate": valid / len(cases) if cases else None,
             "planted_false_detection": false_rate,
+            **attribution_rates,
         },
         "failures": sorted(failures),
         "pending": sorted(pending),
