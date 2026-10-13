@@ -36,7 +36,7 @@ def bank(basis="scripted_fakes"):
                 "planted_false_owner_ids": ["ai2"],
             },
             "annotation": {
-                "action_matches": {"ai1": "gold1"},
+                "action_matches": {"ai1": "gold1", "ai2": None},
                 "invented_commitment_ids": [],
                 "dates_correct": True,
                 "ambiguous_names_safe": True,

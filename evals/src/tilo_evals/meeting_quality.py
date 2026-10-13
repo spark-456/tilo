@@ -76,6 +76,12 @@ def _attribution(
     ):
         pending.add("planted false decision annotations missing")
     else:
+        if (
+            isinstance(matches, list)
+            and len(matches) == len(decisions)
+            and any(i < len(decisions) and matches[i] is not None for i in planted)
+        ):
+            failures.add("contradictory planted false decision annotation")
         # Out-of-range positions represent silent drops and earn no detection credit.
         totals["decision"] = (
             len(planted),
@@ -153,13 +159,18 @@ def _group(cases: list[dict[str, Any]], basis: str) -> dict[str, Any]:
             or len(set(planted)) != len(planted)
             or not isinstance(matches, dict)
             or not _strings(inventions)
-            or any(not isinstance(k, str) or (v is not None and not isinstance(v, str)) for k, v in matches.items())
+            or any(
+                not isinstance(k, str) or not k or (v is not None and (not isinstance(v, str) or v not in gold_ids))
+                for k, v in matches.items()
+            )
         ):
             pending.add("annotation shape")
             continue
         verified = [row for row in rows if row["state"] == "verified"]
-        if not {row["id"] for row in verified} <= matches.keys():
+        if not {row["id"] for row in rows} <= matches.keys():
             pending.add("action matching incomplete")
+        if any(matches.get(i) is not None for i in planted):
+            failures.add("contradictory planted false action annotation")
         unmatched = set(gold_ids)
         expected += len(gold_ids)
         predicted += len(verified)
