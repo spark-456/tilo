@@ -127,10 +127,10 @@ def run_seams(request: Request, mode: Annotated[Mode, Depends(deps.get_work_mode
         seam = getattr(deps, f"get_{name}")
         if seam in overrides:
             return overrides[seam]()
-        if name == "artifact_store":
-            return seam(mode=mode)
         if name in mine:
             return mine[name]
+        if name == "artifact_store":
+            return seam(mode=mode)
         if name in _CLOCK_SEAMS:  # one clock for the whole API: the override a test installs reaches the run too
             return seam(mode, overrides[deps.get_today]() if deps.get_today in overrides else deps.get_today())
         return seam(mode) if name in _MODE_SEAMS else seam()

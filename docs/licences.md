@@ -245,3 +245,20 @@ both already listed above (MIT). No new licence.
 
 `tilo-redact` (FR-MEM-05, SEC-14: the shared secret redactor) is in-workspace and has no external runtime
 dependency (standard library only). `tilo-providers` and `tilo-api` depend on it. No new licence.
+
+## Python (`services/channels`, FR-CHN-17b web push sender)
+
+`tilo-channels` declares `pywebpush` (VAPID signing and RFC 8291 payload encryption for the production
+`PushSender`; imported lazily, constructed only on Cloud Run with the mounted VAPID secret). Its tree:
+
+| Package | Licence | Source |
+| --- | --- | --- |
+| pywebpush | MPL-2.0 | https://pypi.org/project/pywebpush/ |
+| py-vapid | MPL-2.0 | https://pypi.org/project/py-vapid/ |
+| http-ece | MIT | https://pypi.org/project/http-ece/ |
+| aiohttp | Apache-2.0 AND MIT | https://pypi.org/project/aiohttp/ |
+| aiohappyeyeballs | PSF-2.0 | https://pypi.org/project/aiohappyeyeballs/ |
+| aiosignal, frozenlist, multidict, propcache, yarl | Apache-2.0 | https://pypi.org/project/aiohttp/ (its dependencies) |
+
+MPL-2.0 is file-level copyleft: Tilo ships these packages unmodified and does not copy their files, so no Tilo
+source is affected.

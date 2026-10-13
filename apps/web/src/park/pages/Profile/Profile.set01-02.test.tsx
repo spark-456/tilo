@@ -1,11 +1,12 @@
 // @vitest-environment happy-dom
-// FR-SET-01 / FR-SET-02 on the Profile page (AGY-WEB-4). The honest lines ("kept on this device only", "never
-// hidden by quiet hours") are accessible descriptions (aria-description / title) here and, since BQ-SET-2 (user
-// approved 8 Oct), visible helper text too (pinned in Profile.BQ_SET_2.test.tsx).
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+// FR-SET-01 / FR-SET-02 on the Profile page (ADR-0039): the Profile form, the notification matrix and quiet hours
+// are the person's own UserSettings document, read and saved through the Api. A save is shown only after the server
+// answered; every failure keeps the form and says nothing was saved. Fake settings server: testApp.withFakeSettings.
+import { afterEach, describe, expect, it } from "vitest";
 import { makeApp } from "../../../../test-support/park/profileApp";
-import type { ApiResult, User } from "../../api/types";
-import { clearProfileStore, profileKey } from "./profileStore";
+import { TiloApiError } from "../../../api/http";
+import { createFixtureApi } from "../../api/fixtureApi";
+import { userSettings } from "../../api/fixtures";
 import {
   buttonNamed,
   cleanup,
@@ -13,152 +14,238 @@ import {
   fieldInput,
   openTab,
   renderProfile,
+  settle,
   spyApi,
   switchNamed,
+  text,
   typeInto,
+  withFakeSettings,
 } from "./testApp";
 
-beforeEach(() => {
-  window.localStorage.clear();
-  clearProfileStore();
-});
-afterEach(() => {
-  cleanup();
-  vi.restoreAllMocks();
-  window.localStorage.clear();
-  clearProfileStore();
-});
+afterEach(cleanup);
 
-const as = (user: Partial<User>) => {
-  const api = spyApi();
-  const base = api.getUser;
-  api.getUser = vi.fn(async () => {
-    const r = (await base()) as ApiResult<User>;
-    return { ...r, data: { ...r.data, ...user } };
-  });
-  return api;
-};
+const boom = new TiloApiError("Tilo had a problem on its side.", 500, true, true);
+const stale = new TiloApiError(
+  "That cannot be done right now.",
+  409,
+  false,
+  true,
+  "version_conflict",
+);
+const alertText = (root: HTMLElement) => text(root.querySelector('[role="alert"]'));
+const save = (root: HTMLElement) => buttonNamed(root, "Save changes");
+const named = (root: HTMLElement, label: string) => fieldInput(root, label).value;
 
-describe("FR_SET_01_profile_save_persists_per_user", () => {
-  it("test_FR_SET_01_save_toasts_and_the_saved_values_come_back_after_a_remount", async () => {
+describe("FR_SET_01_profile_saved_per_person", () => {
+  it("test_FR_SET_01_saved_is_said_only_after_the_server_answers_and_the_values_survive_a_new_session", async () => {
+    const { api, server } = withFakeSettings();
     const app = makeApp();
-    const first = await renderProfile(app);
-    await typeInto(fieldInput(first.root, "Full name"), "Ada Lovelace");
-    await typeInto(fieldInput(first.root, "Job title"), "Analyst");
-    await clickAndSettle(buttonNamed(first.root, "Save changes"));
+    const a = await renderProfile(app, spyApi(api));
+    await typeInto(fieldInput(a.root, "Full name"), "Ada Lovelace");
+    const release = server.hold();
+    await clickAndSettle(save(a.root));
+    expect(app.toast, "no Profile saved before the answer").not.toHaveBeenCalled();
+    expect(text(a.root)).toContain("Saving…");
+    release();
+    await settle();
     expect(app.toast).toHaveBeenCalledWith("Profile saved");
-    first.m.unmount();
-
-    const second = await renderProfile(makeApp());
-    expect(fieldInput(second.root, "Full name").value).toBe("Ada Lovelace");
-    expect(fieldInput(second.root, "Job title").value).toBe("Analyst");
-    expect(second.root.querySelector("h1")?.textContent).toBe("Ada Lovelace");
-  });
-
-  it("test_FR_SET_01_an_unsaved_edit_does_not_persist", async () => {
-    const first = await renderProfile(makeApp());
-    await typeInto(fieldInput(first.root, "Full name"), "Never Saved");
-    first.m.unmount();
-    const second = await renderProfile(makeApp());
-    expect(fieldInput(second.root, "Full name").value).toBe("Alex Morgan");
-  });
-
-  it("test_FR_SET_01_another_user_does_not_see_the_saved_values", async () => {
-    const a = await renderProfile(makeApp(), as({ email: "alex@northwind.co" }));
-    await typeInto(fieldInput(a.root, "Full name"), "Ada Lovelace");
-    await clickAndSettle(buttonNamed(a.root, "Save changes"));
+    expect(server.stored().profile.name).toBe("Ada Lovelace");
     a.m.unmount();
-    expect(window.localStorage.getItem(profileKey("alex@northwind.co"))).not.toBeNull();
-
-    const b = await renderProfile(makeApp(), as({ email: "sam@northwind.co", name: "Sam Stone" }));
-    expect(fieldInput(b.root, "Full name").value).toBe("Sam Stone");
+    const b = await renderProfile(makeApp(), spyApi(api));
+    expect(named(b.root, "Full name")).toBe("Ada Lovelace");
   });
 
-  it("test_FR_SET_01_the_signed_in_identity_keys_the_save_even_when_the_email_field_is_edited", async () => {
-    const a = await renderProfile(makeApp());
-    await typeInto(fieldInput(a.root, "Work email"), "new@northwind.co");
-    await clickAndSettle(buttonNamed(a.root, "Save changes"));
-    a.m.unmount();
-    const b = await renderProfile(makeApp());
-    expect(fieldInput(b.root, "Work email").value).toBe("new@northwind.co");
+  it("test_FR_SET_01_the_write_carries_the_version_it_read_and_no_owner_org_or_time", async () => {
+    const { api, server } = withFakeSettings();
+    const a = await renderProfile(makeApp(), spyApi(api));
+    await typeInto(fieldInput(a.root, "Job title"), "Analyst");
+    await clickAndSettle(save(a.root));
+    const [put] = server.puts;
+    expect(Object.keys(put ?? {}).sort()).toEqual([
+      "notifications",
+      "profile",
+      "quiet_hours",
+      "version",
+    ]);
+    expect(put?.version).toBe(userSettings.version);
+    expect(put?.profile.title).toBe("Analyst");
+    expect(put?.profile.language).toBe("en-GB");
+    expect(put?.profile.working_hours).toEqual(userSettings.profile.working_hours);
   });
 
-  it("test_FR_SET_01_cancel_restores_the_last_saved_values", async () => {
-    const a = await renderProfile(makeApp());
+  it("test_FR_SET_01_a_failed_save_keeps_the_form_says_nothing_was_saved_and_a_retry_works", async () => {
+    const { api, server } = withFakeSettings();
+    const app = makeApp();
+    const a = await renderProfile(app, spyApi(api));
     await typeInto(fieldInput(a.root, "Full name"), "Ada Lovelace");
-    await clickAndSettle(buttonNamed(a.root, "Save changes"));
+    server.failNext(boom);
+    await clickAndSettle(save(a.root));
+    expect(alertText(a.root)).toMatch(/Nothing was saved/);
+    expect(named(a.root, "Full name")).toBe("Ada Lovelace");
+    expect(app.toast).not.toHaveBeenCalled();
+    expect(server.stored().profile.name).toBe("Alex Morgan");
+    await clickAndSettle(save(a.root));
+    expect(app.toast).toHaveBeenCalledWith("Profile saved");
+    expect(a.root.querySelector('[role="alert"]')).toBeNull();
+  });
+
+  it("test_FR_SET_01_a_stale_version_is_refused_and_reload_shows_the_stored_document", async () => {
+    const { api, server } = withFakeSettings();
+    const a = await renderProfile(makeApp(), spyApi(api));
+    await typeInto(fieldInput(a.root, "Full name"), "Ada Lovelace");
+    server.failNext(stale);
+    await clickAndSettle(save(a.root));
+    expect(alertText(a.root)).toMatch(/changed on another device. Nothing was saved/);
+    await clickAndSettle(buttonNamed(a.root, "Reload settings"));
+    expect(named(a.root, "Full name")).toBe("Alex Morgan");
+    expect(a.root.querySelector('[role="alert"]')).toBeNull();
+  });
+
+  it("test_FR_SET_01_unreadable_working_hours_are_not_sent_and_say_how_to_write_them", async () => {
+    const { api, server } = withFakeSettings();
+    const a = await renderProfile(makeApp(), spyApi(api));
+    await typeInto(fieldInput(a.root, "Working hours"), "whenever");
+    await clickAndSettle(save(a.root));
+    expect(server.puts).toEqual([]);
+    expect(alertText(a.root)).toMatch(/08:30 – 17:30, Monday to Friday/);
+  });
+
+  it("test_FR_SET_01_nothing_saved_yet_starts_from_who_signed_in_not_the_server_placeholder", async () => {
+    const profile = {
+      ...userSettings.profile,
+      name: "Tilo user",
+      email: "not-set@example.invalid",
+    };
+    const unsaved = { ...userSettings, version: 0, updated_at: null, profile };
+    const { api, server } = withFakeSettings(createFixtureApi(), unsaved);
+    const a = await renderProfile(makeApp(), spyApi(api));
+    expect(named(a.root, "Full name")).toBe("Alex Morgan");
+    expect(named(a.root, "Work email")).toBe("alex@northwind.co");
+    await clickAndSettle(save(a.root));
+    expect(server.puts[0]?.version).toBe(0);
+    expect(server.puts[0]?.profile.name).toBe("Alex Morgan");
+    expect(server.stored().version).toBe(1);
+  });
+
+  it("test_FR_SET_01_loading_failed_and_signed_out_are_honest_states_with_a_retry", async () => {
+    const { api } = withFakeSettings();
+    let calls = 0;
+    const signedOut = new TiloApiError("You need to sign in to do this.", 401, false);
+    const flaky = spyApi({
+      ...api,
+      getUserSettings: async () => {
+        calls += 1;
+        if (calls === 1) throw boom;
+        if (calls === 2) throw signedOut;
+        return api.getUserSettings();
+      },
+    });
+    const a = await renderProfile(makeApp(), flaky);
+    expect(a.root.querySelectorAll("input")).toHaveLength(0);
+    expect(alertText(a.root)).toBe("Tilo had a problem on its side.");
+    await clickAndSettle(buttonNamed(a.root, "Try again"));
+    expect(alertText(a.root)).toBe("Sign in to see and save your settings.");
+    await clickAndSettle(buttonNamed(a.root, "Try again"));
+    expect(named(a.root, "Full name")).toBe("Alex Morgan");
+  });
+
+  it("test_FR_SET_01_a_demo_session_is_never_shown_as_saved", async () => {
+    const app = makeApp();
+    const a = await renderProfile(app, spyApi(createFixtureApi()));
+    await typeInto(fieldInput(a.root, "Full name"), "Ada Lovelace");
+    await clickAndSettle(save(a.root));
+    expect(alertText(a.root)).toMatch(/demo, so nothing was saved/);
+    expect(app.toast).not.toHaveBeenCalled();
+  });
+
+  it("test_FR_SET_01_cancel_returns_to_the_stored_values_and_an_unsaved_edit_does_not_persist", async () => {
+    const { api } = withFakeSettings();
+    const a = await renderProfile(makeApp(), spyApi(api));
     await typeInto(fieldInput(a.root, "Full name"), "Scratch");
     await clickAndSettle(buttonNamed(a.root, "Cancel"));
-    expect(fieldInput(a.root, "Full name").value).toBe("Ada Lovelace");
-  });
-
-  it("test_FR_SET_01_save_still_works_and_persists_for_the_session_when_localStorage_throws", async () => {
-    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
-      throw new Error("blocked");
-    });
-    vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
-      throw new Error("blocked");
-    });
-    const app = makeApp();
-    const a = await renderProfile(app);
-    await typeInto(fieldInput(a.root, "Full name"), "Ada Lovelace");
-    await clickAndSettle(buttonNamed(a.root, "Save changes"));
-    expect(app.toast).toHaveBeenCalledWith("Profile saved");
+    expect(named(a.root, "Full name")).toBe("Alex Morgan");
+    await typeInto(fieldInput(a.root, "Full name"), "Never Saved");
     a.m.unmount();
-    const b = await renderProfile(makeApp());
-    expect(fieldInput(b.root, "Full name").value).toBe("Ada Lovelace");
-  });
-
-  it("test_FR_SET_01_save_is_honest_it_is_kept_on_this_device_only_and_calls_no_api", async () => {
-    const api = spyApi();
-    const a = await renderProfile(makeApp(), api);
-    const calls = () => Object.values(api).reduce((n, f) => n + f.mock.calls.length, 0);
-    const before = calls();
-    const save = buttonNamed(a.root, "Save changes");
-    expect(save.getAttribute("aria-description") ?? "").toMatch(/this device only/i);
-    await clickAndSettle(save);
-    expect(calls(), "Save invents no server call").toBe(before);
+    const b = await renderProfile(makeApp(), spyApi(api));
+    expect(named(b.root, "Full name")).toBe("Alex Morgan");
   });
 });
 
-describe("FR_SET_02_notifications_page", () => {
+describe("FR_SET_02_notifications_saved_per_person", () => {
   const decisions = (root: HTMLElement, c: string) =>
     switchNamed(root, `A decision needs you by ${c}`);
+  const on = (root: HTMLElement, label: string) =>
+    switchNamed(root, label).getAttribute("aria-checked");
 
-  it("test_FR_SET_02_the_last_decisions_channel_is_marked_unavailable_and_refused_with_copy", async () => {
+  it("test_FR_SET_02_a_changed_row_and_quiet_hours_are_saved_whole_and_come_back", async () => {
+    const { api, server } = withFakeSettings();
     const app = makeApp();
-    const { root } = await renderProfile(app);
-    await openTab(root, "Notifications");
-    await clickAndSettle(decisions(root, "Phone"));
-    await clickAndSettle(decisions(root, "Email"));
-    const slack = decisions(root, "Slack");
+    const a = await renderProfile(app, spyApi(api));
+    await openTab(a.root, "Notifications");
+    await clickAndSettle(switchNamed(a.root, "Spend goes over a limit by Email"));
+    await clickAndSettle(switchNamed(a.root, "Quiet hours"));
+    expect(server.puts).toEqual([]);
+    await clickAndSettle(save(a.root));
+    expect(app.toast).toHaveBeenCalledWith("Notification settings saved");
+    expect(server.stored().notifications.spend.email).toBe(false);
+    expect(server.stored().quiet_hours.enabled).toBe(false);
+    a.m.unmount();
+    const b = await renderProfile(makeApp(), spyApi(api));
+    await openTab(b.root, "Notifications");
+    expect(on(b.root, "Spend goes over a limit by Email")).toBe("false");
+    expect(on(b.root, "Quiet hours")).toBe("false");
+  });
+
+  it("test_FR_SET_02_a_failed_save_keeps_the_toggles_and_claims_nothing", async () => {
+    const { api, server } = withFakeSettings();
+    const app = makeApp();
+    const a = await renderProfile(app, spyApi(api));
+    await openTab(a.root, "Notifications");
+    await clickAndSettle(switchNamed(a.root, "Work is ready by Phone"));
+    server.failNext(boom);
+    await clickAndSettle(save(a.root));
+    expect(alertText(a.root)).toMatch(/Nothing was saved/);
+    expect(on(a.root, "Work is ready by Phone")).toBe("false");
+    expect(app.toast).not.toHaveBeenCalled();
+    expect(server.stored().notifications.finished.phone).toBe(true);
+  });
+
+  it("test_FR_SET_02_the_last_decisions_channel_is_refused_and_never_sent_all_off", async () => {
+    const { api, server } = withFakeSettings();
+    const app = makeApp();
+    const a = await renderProfile(app, spyApi(api));
+    await openTab(a.root, "Notifications");
+    await clickAndSettle(decisions(a.root, "Phone"));
+    await clickAndSettle(decisions(a.root, "Email"));
+    const slack = decisions(a.root, "Slack");
     expect(slack.getAttribute("aria-disabled")).toBe("true");
-    expect(slack.getAttribute("title")).toBe("Decisions need at least one channel");
-    expect(decisions(root, "Phone").getAttribute("aria-disabled")).not.toBe("true");
     await clickAndSettle(slack);
     expect(app.toast).toHaveBeenCalledWith("Decisions need at least one channel");
-    expect(slack.getAttribute("aria-checked")).toBe("true");
-    await clickAndSettle(decisions(root, "Phone"));
-    expect(slack.getAttribute("aria-disabled")).not.toBe("true");
+    await clickAndSettle(save(a.root));
+    expect(server.puts[0]?.notifications.decisions).toEqual({
+      phone: false,
+      email: false,
+      slack: true,
+    });
   });
 
-  it("test_FR_SET_02_other_events_never_show_the_unavailable_mark", async () => {
-    const { root } = await renderProfile(makeApp());
-    await openTab(root, "Notifications");
-    await clickAndSettle(switchNamed(root, "Morning digest at 08:00 by Email"));
-    for (const s of root.querySelectorAll('[role="switch"]')) {
-      if (!(s.getAttribute("aria-label") ?? "").startsWith("A decision")) {
-        expect(s.getAttribute("aria-disabled")).not.toBe("true");
-      }
-    }
+  it("test_FR_SET_02_a_profile_edit_not_yet_saved_is_not_sent_with_the_notifications", async () => {
+    const { api, server } = withFakeSettings();
+    const a = await renderProfile(makeApp(), spyApi(api));
+    await typeInto(fieldInput(a.root, "Full name"), "Not Saved Here");
+    await openTab(a.root, "Notifications");
+    await clickAndSettle(switchNamed(a.root, "Morning digest at 08:00 by Phone"));
+    await clickAndSettle(save(a.root));
+    expect(server.puts[0]?.profile.name).toBe("Alex Morgan");
+    expect(server.stored().notifications.digest.phone).toBe(true);
   });
 
-  it("test_FR_SET_02_the_quiet_hours_control_says_a_gate_is_never_hidden", async () => {
-    const { root } = await renderProfile(makeApp());
-    await openTab(root, "Notifications");
-    const quiet = switchNamed(root, "Quiet hours");
-    expect(quiet.getAttribute("aria-description") ?? "").toMatch(
-      /decision.*never hidden.*Needs you/i,
-    );
+  it("test_FR_SET_02_quiet_hours_note_stays_and_a_saved_threshold_is_never_promised_as_a_push_rule", async () => {
+    const { api } = withFakeSettings();
+    const a = await renderProfile(makeApp(), spyApi(api));
+    await openTab(a.root, "Notifications");
+    expect(text(a.root)).toMatch(/never hidden by quiet hours: it waits in Needs you/);
+    expect(text(a.root)).not.toMatch(/except decisions over/);
+    expect(text(a.root)).toContain("Quiet hours · 19:00 to 08:00");
   });
 });

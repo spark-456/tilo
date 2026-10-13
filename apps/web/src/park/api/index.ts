@@ -1,10 +1,12 @@
 // The Park api (WEB-1a; plan section 6.1): every method returns a Promise of `{ data, source }`, so a
 // page can always say whether it shows sample data. One list of method names, one interface.
+import type { UserSettings, UserSettingsUpdate } from "@tilo/contracts";
 import type {
   Ack,
   AgendaData,
   AgendaSlot,
   ApiResult,
+  BuildHandoff,
   Connector,
   ConnectorTerms,
   Dec,
@@ -48,6 +50,8 @@ export const API_METHODS = [
   "getTeamPolicy",
   "getConnectorTerms",
   "getProfileSettings",
+  "getUserSettings",
+  "getBuildHandoff",
   "decide",
   "undo",
   "startWorld",
@@ -58,6 +62,7 @@ export const API_METHODS = [
   "bookSlot",
   "addBackup",
   "setPref",
+  "saveUserSettings",
   "submitFeedback",
 ] as const;
 export type ApiMethod = (typeof API_METHODS)[number];
@@ -78,6 +83,11 @@ export interface Api {
   getTeamPolicy(): R<TeamPolicy>;
   getConnectorTerms(): R<ConnectorTerms>;
   getProfileSettings(): R<ProfileSettings>;
+  getBuildHandoff(): R<BuildHandoff[]>;
+  /** FR-SET-01/02: the signed-in person's saved profile and notification preferences (`GET /v1/me/settings`). */
+  getUserSettings(): R<UserSettings>;
+  /** The whole document, answered by the stored one. Saved only when the answer's `source` is "live". */
+  saveUserSettings(update: UserSettingsUpdate): R<UserSettings>;
   decide(key: DecisionKey): R<DecideAck>;
   undo(key: DecisionKey): R<DecideAck>;
   startWorld(mode: TierKey, query: string): R<StartAck>;
@@ -104,3 +114,22 @@ export const askQuick = (api: Api, mode: TierKey, query: string): R<QuickReply> 
     query,
     "quick",
   );
+
+/**
+ * WEB-W1: a Thinking start with attached files. Like `askQuick`, the files travel as a fourth run-time argument so
+ * `startWorld`'s pinned two-parameter type is unchanged; the live Api sends them on the one `POST /intake`.
+ */
+export const startWithFiles = (
+  api: Api,
+  mode: TierKey,
+  query: string,
+  files: readonly File[],
+): R<StartAck> =>
+  (
+    api.startWorld as unknown as (
+      m: TierKey,
+      q: string,
+      effort: undefined,
+      files: readonly File[],
+    ) => R<StartAck>
+  )(mode, query, undefined, files);

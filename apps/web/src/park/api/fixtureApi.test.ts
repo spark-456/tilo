@@ -73,13 +73,14 @@ describe("WEB_1a_fixture_api: reads", () => {
       ["getTeamPolicy", await api.getTeamPolicy(), fx.teamPolicy],
       ["getConnectorTerms", await api.getConnectorTerms(), fx.connectorTerms],
       ["getProfileSettings", await api.getProfileSettings(), fx.profileSettings],
+      ["getBuildHandoff", await api.getBuildHandoff(), fx.buildHandoffs],
     ];
     for (const dec of DEC_COMBOS) {
       reads.push(["getWorlds", await api.getWorlds(dec, []), fx.worlds(dec, [])]);
       reads.push(["getWorlds+added", await api.getWorlds(dec, added), fx.worlds(dec, added)]);
       reads.push(["getPlans", await api.getPlans(dec), fx.plans(dec)]);
     }
-    expect(reads.length).toBe(13 + 3 * DEC_COMBOS.length);
+    expect(reads.length).toBe(14 + 3 * DEC_COMBOS.length);
     for (const [name, result, expected] of reads) {
       expect(result.source, `${name}.source`).toBe("fixture");
       expect(result.data, `${name}.data`).toEqual(expected);

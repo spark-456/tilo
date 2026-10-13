@@ -62,6 +62,8 @@ describe("WEB_1a_select: an API url means the live Api and no sample values", ()
           "captureSkill",
           "proposeVersion",
           "setPref",
+          "getUserSettings",
+          "saveUserSettings",
         ].includes(x),
     )) {
       const p = invoke(api, m, args);

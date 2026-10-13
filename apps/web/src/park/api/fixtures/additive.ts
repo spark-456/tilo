@@ -6,6 +6,12 @@ import type { AgendaRules, DecisionFacts, DecisionKey, Ledger } from "../types";
 
 /** What each decision is about, by key; read as `Decision.facts`. */
 export const decisionFacts: Record<DecisionKey, DecisionFacts> = {
+  lovable: {
+    project: "K1 electric scooter",
+    subject: "Lovable build handoff",
+    approver: "Alex Morgan",
+    activity: "Approved the Lovable handoff",
+  },
   depot: {
     project: "K1 electric scooter",
     subject: "Laptop Depot",

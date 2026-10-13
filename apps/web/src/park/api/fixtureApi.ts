@@ -39,6 +39,10 @@ export function createFixtureApi(): Omit<Api, "getAgenda" | "getProfileSettings"
     getTeamPolicy: () => ok(fx.teamPolicy),
     getConnectorTerms: () => ok(fx.connectorTerms),
     getProfileSettings: () => ok(fx.profileSettings),
+    getBuildHandoff: () => ok(fx.buildHandoffs),
+    getUserSettings: () => ok(fx.userSettings),
+    // Nothing is stored: the answer is the sample document, source "fixture", which the page never reads as saved.
+    saveUserSettings: () => ok(fx.userSettings),
     decide: (key) => set(key, true),
     undo: (key) => set(key, false),
     startWorld: ((mode: TierKey, query: string, effort?: string) => {

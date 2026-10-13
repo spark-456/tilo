@@ -403,6 +403,8 @@ describe("WIRE_2_live_api: nothing else is connected", () => {
           "captureSkill",
           "proposeVersion",
           "setPref",
+          "getUserSettings",
+          "saveUserSettings",
         ].includes(x),
     )) {
       const err = await Promise.resolve(invoke(api, m, args)).then(

@@ -34,6 +34,16 @@ export function callTable(): CallTable {
     getTeamPolicy: [],
     getConnectorTerms: [],
     getProfileSettings: [],
+    getBuildHandoff: [],
+    getUserSettings: [],
+    saveUserSettings: [
+      {
+        version: fx.userSettings.version,
+        profile: fx.userSettings.profile,
+        notifications: fx.userSettings.notifications,
+        quiet_hours: fx.userSettings.quiet_hours,
+      },
+    ],
     decide: ["depot"],
     undo: ["depot"],
     startWorld: ["workspace", "Plan the offsite"],

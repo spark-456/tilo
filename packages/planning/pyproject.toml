@@ -5,6 +5,7 @@ description = "tilo_planning — intake and planning: limits, file extraction, s
 requires-python = "==3.12.*"
 dependencies = [
     "tilo-contracts",
+    "tilo-memory",
     "tilo-policy",
     "tilo-providers",
     "pyyaml>=6.0",
@@ -14,6 +15,7 @@ dependencies = [
 
 [tool.uv.sources]
 tilo-contracts = { workspace = true }
+tilo-memory = { workspace = true }
 tilo-policy = { workspace = true }
 tilo-providers = { workspace = true }
 
