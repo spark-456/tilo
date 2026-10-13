@@ -12,6 +12,8 @@ import type {
   QuestionAnswer,
   TiloClient,
 } from "./client";
+import { type FieldSpec, type FieldsApi, fieldSpecsOf } from "./fields";
+import { type ItemApi, type PinnedItem, pinnedItemOf } from "./item";
 import { type HostStarted, isHostStarted, refusalOf } from "./meetingHost";
 import {
   type ScheduleRequest,
@@ -48,6 +50,24 @@ const SERVER_TROUBLE = "Tilo had a problem on its side.";
 const REPLAY_ONLY =
   "Live models are unavailable right now, so nothing new was started. Finished runs can still be replayed.";
 const BAD_REPLY = "Tilo sent a reply this page could not read.";
+const INTAKE_COMMITTED =
+  "This task was already submitted. Check your worlds before starting another task.";
+
+function isIntakeCommitted(status: number, text: string): boolean {
+  if (status !== 409) return false;
+  try {
+    return (
+      (JSON.parse(text) as { detail?: { code?: unknown } } | null)?.detail?.code ===
+      "intake_already_committed"
+    );
+  } catch {
+    return false;
+  }
+}
+/** STARTER-1: the recorded sample project (`tilo_api.sample_world`); its path is read-only. */
+const SAMPLE_PATH = "/worlds/w_sample_village_basic";
+const SAMPLE_SIMULATED =
+  "This is a recorded sample replay, so your answer was not sent. Nothing here can be approved.";
 const GENERIC_4XX: Readonly<Record<number, string>> = {
   401: "You need to sign in to do this.",
   403: "You do not have access to this.",
@@ -80,10 +100,11 @@ export function reasonOf(status: number, text: string): string {
   try {
     const body: unknown = JSON.parse(text);
     if (body && typeof body === "object") {
-      const { detail, error, reason } = body as Record<string, unknown>;
+      const { detail, error, reason, outcome } = body as Record<string, unknown>;
       const coded = typeof reason === "string" ? ANSWER_REASONS.get(reason) : undefined;
       if (coded) return coded;
       said = typeof detail === "string" ? detail : error;
+      if (status === 422 && outcome === "rejected") said = reason; // the fields route's plain reason (L6c)
     }
   } catch {
     said = undefined;
@@ -98,6 +119,13 @@ export function reasonOf(status: number, text: string): string {
     return said;
   }
   return GENERIC_4XX[status] ?? "Tilo could not accept that.";
+}
+
+/** SEC-16: the one refusal the lifetime-cap pop-up is keyed on (403 `spend_cap_reached`); every other limit differs. */
+export function isLifetimeCap(error: unknown): boolean {
+  return (
+    error instanceof TiloApiError && error.status === 403 && error.code === "spend_cap_reached"
+  );
 }
 
 /** The refusal's `code` only when it is a short lower-case token (SEC-15); anything else is null. */
@@ -260,7 +288,7 @@ function quickOf(body: unknown): QuickIntakeResult | null {
   return { kind: "answered", text: b.text, cost: Object.keys(cost).length > 0 ? cost : null };
 }
 
-export class HttpClient implements TiloClient, SchedulesApi {
+export class HttpClient implements TiloClient, SchedulesApi, FieldsApi, ItemApi {
   private readonly base: string;
   private readonly fetchFn: typeof fetch;
   private readonly pollMs: number;
@@ -273,10 +301,16 @@ export class HttpClient implements TiloClient, SchedulesApi {
   private readonly feeds = new Map<string, Feed>();
   private readonly missing = new Set<string>(); // worlds whose events answered 404
   private readonly missingListeners = new Set<() => void>();
+  // Keep only the current uncertain intent. File identity matters: same metadata can hide different bytes.
+  private intakeIntent:
+    | { text: string; files: File[]; mode: "quick" | undefined; key: string }
+    | undefined;
 
   constructor(options: HttpClientOptions) {
     this.base = options.baseUrl.trim().replace(/\/+$/, "");
-    this.fetchFn = options.fetch ?? ((url, init) => fetch(url, init));
+    // redirect: "error": the API never redirects a call, so one that does (a stray proxy, a hijacked path) is an error, not a
+    // detour that would carry the sign-in and App Check tokens to another address (SEC-10)
+    this.fetchFn = options.fetch ?? ((url, init) => fetch(url, { ...init, redirect: "error" }));
     this.pollMs = options.pollMs ?? 1000;
     this.appCheckToken = options.appCheckToken;
     this.authToken = options.authToken;
@@ -333,6 +367,9 @@ export class HttpClient implements TiloClient, SchedulesApi {
         throw new TiloApiError(SERVER_TROUBLE, res.status, true, write);
       }
       const body = await res.text().catch(() => "");
+      if (path === "/intake" && isIntakeCommitted(res.status, body)) {
+        throw new TiloApiError(INTAKE_COMMITTED, 409, false, write, "intake_already_committed");
+      }
       if (isReplayOnly(res.status, body)) {
         throw new TiloApiError(REPLAY_ONLY, 503, false, write, codeOf(body), true);
       }
@@ -368,7 +405,33 @@ export class HttpClient implements TiloClient, SchedulesApi {
     return this.post<unknown>(path, body);
   }
 
+  /** A plain PUT of `body` as JSON, decoded as JSON, with the same typed failures and `write` true (FR-SET-01). */
+  putJson(path: string, body: unknown): Promise<unknown> {
+    const init = {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body),
+    };
+    return this.request<unknown>(path, init, true);
+  }
+
+  /** A PUT or DELETE of `path` with no body, decoded as JSON, `write` true (BQ-CTX-TEAMWORLD: team shares). */
+  sendJson(method: "PUT" | "DELETE", path: string): Promise<unknown> {
+    return this.refusedSample(path) ?? this.request<unknown>(path, { method }, true);
+  }
+
+  /** STARTER-1: the sample project is a recorded replay. A write for it is refused here and never sent: no
+   * request leaves for it, whoever asks. Nothing is simulated. */
+  private refusedSample(path: string): Promise<never> | null {
+    if (path !== SAMPLE_PATH && !path.startsWith(`${SAMPLE_PATH}/`)) return null;
+    return Promise.reject(
+      new TiloApiError(SAMPLE_SIMULATED, null, false, false, "sample_is_a_replay"),
+    );
+  }
+
   private post<T>(path: string, body: unknown): Promise<T> {
+    const refused = this.refusedSample(path);
+    if (refused) return refused;
     const init = {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -388,12 +451,43 @@ export class HttpClient implements TiloClient, SchedulesApi {
     files: File[],
     mode?: "quick",
   ): Promise<IntakeResult | QuickIntakeResult> {
+    let intent = this.intakeIntent;
+    if (
+      !intent ||
+      intent.text !== text ||
+      intent.mode !== mode ||
+      intent.files.length !== files.length ||
+      !intent.files.every((file, i) => file === files[i])
+    ) {
+      intent = { text, files: [...files], mode, key: crypto.randomUUID() };
+      this.intakeIntent = intent;
+    }
+    try {
+      const result = await this.sendIntake(text, intent.files, mode, intent.key);
+      if (this.intakeIntent === intent) this.intakeIntent = undefined;
+      return result;
+    } catch (error) {
+      // A network/5xx/unreadable reply can follow a committed write: a manual retry keeps the key.
+      if (error instanceof TiloApiError && !error.retryable && this.intakeIntent === intent) {
+        this.intakeIntent = undefined;
+      }
+      throw error;
+    }
+  }
+
+  private async sendIntake(
+    text: string,
+    files: File[],
+    mode: "quick" | undefined,
+    key: string,
+  ): Promise<IntakeResult | QuickIntakeResult> {
     const form = new FormData();
     form.append("text", text);
     for (const file of files) form.append("files", file);
+    const init = { method: "POST", body: form, headers: { "Idempotency-Key": key } };
     if (mode === "quick") {
       form.append("mode", mode);
-      const body = await this.request<unknown>("/intake", { method: "POST", body: form }, true);
+      const body = await this.request<unknown>("/intake", init, true);
       const quick = quickOf(body);
       if (!quick) throw new TiloApiError(BAD_REPLY, 200, true, true);
       return quick;
@@ -402,7 +496,7 @@ export class HttpClient implements TiloClient, SchedulesApi {
       Omit<IntakeResult, "files"> & {
         files: Array<{ filename: string; status: "ok" | "failed"; safety_flagged: boolean }>;
       }
-    >("/intake", { method: "POST", body: form }, true);
+    >("/intake", init, true);
     return {
       task_id: r.task_id,
       brief: r.brief,
@@ -682,6 +776,53 @@ export class HttpClient implements TiloClient, SchedulesApi {
     );
   }
 
+  /** `GET /worlds/{id}/cards/{cid}/fields` (ADR-0035 L6c): what an open fields card asks for. The card must have come
+   * from `listCards` (the route is per world). A reply that is not the documented shape is an unreadable reply. */
+  async getCardFields(cardId: string): Promise<FieldSpec[]> {
+    return await this.cardsOf(this.worldOfCard(cardId)).getCardFields(cardId);
+  }
+
+  /** `POST /worlds/{id}/cards/{cid}/fields` `{fields}`: the values go to this one request. A refusal carries the API's
+   * own plain reason (422), which `reasonOf` shows when it is short plain text. */
+  async supplyCardFields(cardId: string, values: Readonly<Record<string, string>>): Promise<void> {
+    return await this.cardsOf(this.worldOfCard(cardId)).supplyCardFields(cardId, values);
+  }
+
+  /** `GET /worlds/{id}/cards/{cid}/item` (ADR-0035 L6d): the document a gate card pins, for the owner's show-me. */
+  async getCardItem(cardId: string): Promise<PinnedItem> {
+    return await this.cardsOf(this.worldOfCard(cardId)).getCardItem(cardId);
+  }
+
+  private worldOfCard(cardId: string): string {
+    const worldId = this.cardWorlds.get(cardId);
+    if (worldId === undefined) {
+      throw new TiloApiError("Open the card list again, then answer from there.", null, false);
+    }
+    return worldId;
+  }
+
+  /** The fields and item calls of one world's cards, for a card that names its world itself (the Park Decisions
+   * card does, so no `listCards` is needed). Same requests, same auth and refusals as the methods above. */
+  cardsOf(worldId: string): FieldsApi & ItemApi {
+    const path = (cardId: string, leaf: string) =>
+      `/worlds/${encodeURIComponent(worldId)}/cards/${encodeURIComponent(cardId)}/${leaf}`;
+    return {
+      getCardFields: async (cardId) => {
+        const specs = fieldSpecsOf(await this.request<unknown>(path(cardId, "fields")));
+        if (!specs) throw new TiloApiError(BAD_REPLY, 200, true);
+        return specs;
+      },
+      supplyCardFields: async (cardId, values) => {
+        await this.post(path(cardId, "fields"), { fields: values });
+      },
+      getCardItem: async (cardId) => {
+        const item = pinnedItemOf(await this.request<unknown>(path(cardId, "item")));
+        if (!item) throw new TiloApiError(BAD_REPLY, 200, true);
+        return item;
+      },
+    };
+  }
+
   getDelivery(worldId: string): Promise<DeliveryResult> {
     return this.request(`/worlds/${encodeURIComponent(worldId)}/delivery`);
   }
@@ -737,6 +878,16 @@ export class HttpClient implements TiloClient, SchedulesApi {
       body: JSON.stringify(patch),
     };
     return this.request(`/schedules/${encodeURIComponent(id)}`, init, true);
+  }
+
+  /** `POST /v1/feedback` (SEC-16, BQ-FEEDBACK-1): resolves only when the server said `{received: true}`; the uid is the
+   * sign-in token's, never the body. No automatic retry. */
+  async submitFeedback(words: string): Promise<void> {
+    const reply = await this.post<{ received?: unknown } | null>("/v1/feedback", {
+      text: words,
+      context: "lifetime_cap",
+    });
+    if (reply?.received !== true) throw new TiloApiError(BAD_REPLY, 200, true, true);
   }
 
   /** `DELETE /schedules/{id}`: 204 with no body. */

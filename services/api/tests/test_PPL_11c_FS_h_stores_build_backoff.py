@@ -66,7 +66,9 @@ def backoff(monkeypatch):
     for name in ("TILO_PEOPLE_BOOTSTRAP_UID", "K_SERVICE", "CLOUD_RUN_JOB", "TILO_API_DEV"):
         monkeypatch.delenv(name, raising=False)
     monkeypatch.setenv(ENV_STORE, "firestore")
-    monkeypatch.setenv(ENV_PROJECT, "tilo-test-project")
+    monkeypatch.setenv(ENV_PROJECT, "demo-test-project")
+    # PROD-WIRE 3: the one guard (emulator + demo- project)
+    monkeypatch.setenv("FIRESTORE_EMULATOR_HOST", "127.0.0.1:9")
     clock, build = FakeClock(), Build()
     monkeypatch.setattr(deps, "people_stores_clock", clock, raising=False)
     monkeypatch.setattr("google.cloud.firestore.Client", build)
@@ -174,6 +176,9 @@ def test_PPL_11c_FS_18_guard_a_success_clears_the_backoff(backoff):
     build.fail = False
     assert isinstance(deps.get_people_stores(), PeopleStores) and build.calls == 2
     deps.get_people_stores.cache_clear()
+    from _pw3_lib import reset_prod
+
+    reset_prod()  # PROD-WIRE 3: a new process also has no cached client (one per process, tilo_api.prod)
     build.fail = True
     assert _is_the_fixed_503(_refused(deps)) and build.calls == 3, "no window survived the success"
 

@@ -471,6 +471,12 @@
 [data-park] .park-ledger-type span + span {
   white-space: nowrap;
 }
+[data-park] .park-ledger-recorded {
+  flex-wrap: wrap;
+}
+[data-park] .park-ledger-recorded span + span {
+  white-space: normal;
+}
 [data-park] .park-ledger-callout {
   display: flex;
   align-items: center;

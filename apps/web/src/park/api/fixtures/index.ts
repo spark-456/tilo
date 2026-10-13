@@ -34,6 +34,7 @@ export const ledger: Ledger = {
   waits: { ...generatedLedger.waits, ...ledgerCopy.waits },
 };
 
+export { buildHandoffs } from "./buildHandoff";
 export { connectors } from "./connectors";
 export { connectorTerms } from "./connectorTerms";
 export { learn } from "./learn";
@@ -44,4 +45,5 @@ export { team } from "./team";
 export { teamPolicy } from "./teamPolicy";
 export { LEVELS, TIERS } from "./tiers";
 export { today, user } from "./user";
+export { userSettings } from "./userSettings";
 export { makeWorld, needsLeft, plans, worlds } from "./worlds";

@@ -1,12 +1,14 @@
 // Park Connectors page (WEB-11; design `Tilo App Connectors.dc.html`, inventory.md). Data comes through
 // useParkApi(); navigation only through app.go; toasts through app.toast with the design's exact copy.
 //
-// The Api has no connector write yet (README lists connector reconnect/sync as a call to add), so Connect,
+// Live data uses a read-only list with unavailable facts labelled (CX-W1-1). In the demo only, Connect,
 // Reconnect, Disconnect and the access level are page-local state, as in the design. The design waits 1.4 s
 // and 1.5 s on timers; page code holds no timer before WEB-3b, so the wait is one awaited step: the busy
 // label shows at once and the result lands on the promise continuation. The S-08 consent hand-off belongs to
 // live mode, when the Api has a connect endpoint. The "Sample data" chip belongs to the shell.
-import { type ReactNode, useCallback, useEffect, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useMemo, useState } from "react";
+import type { ConnectFlow } from "../../../api/connect";
+import { liveConnectFlow } from "../../../api/connectEnv";
 import type { Connector, ConnectorTerms, Skill, World } from "../../api/types";
 import type { AppCtx } from "../../app/AppCtx";
 import { useParkApi } from "../../app/context";
@@ -14,11 +16,15 @@ import { PageSheet } from "../../components";
 import "./Connectors.css";
 import { AttentionBanner, AvailableRow, ConnectedTile } from "./ConnectorParts";
 import { Drawer } from "./Drawer";
+import { GoogleAccess } from "./GoogleAccess";
+import { LiveConnectors } from "./LiveConnectors";
+import { MeetingHostAccess } from "./MeetingHostAccess";
 import { icon } from "./icons";
 import { type Overrides, type UsedRow, isOn, matches, merge, usedBy } from "./view";
 
 type Load =
   | { kind: "loading" }
+  | { kind: "live"; connectors: Connector[] }
   | {
       kind: "ready";
       connectors: Connector[];
@@ -58,8 +64,14 @@ function Heading({ count, children }: { count?: string; children?: ReactNode }) 
  * `now` is the clock the sign-in warning reads (FR-ACC-04); a test fixes it. The warning needs a connector's
  * `expires`, so a tool with none is never flagged here.
  */
-export function ConnectorsPage({ app, now = Date.now }: { app: AppCtx; now?: () => number }) {
+export function ConnectorsPage({
+  app,
+  now = Date.now,
+  flow,
+}: { app: AppCtx; now?: () => number; flow?: ConnectFlow | null }) {
   const api = useParkApi();
+  // ADR-0035 L4: the live Google connect flow, or null (fixture world, demo session): then the page is exactly as before.
+  const live = useMemo(() => (flow === undefined ? liveConnectFlow() : flow), [flow]);
   const [load, setLoad] = useState<Load>({ kind: "loading" });
   const [q, setQ] = useState("");
   const [open, setOpen] = useState<string | null>(null);
@@ -71,16 +83,23 @@ export function ConnectorsPage({ app, now = Date.now }: { app: AppCtx; now?: () 
   useEffect(() => {
     let live = true;
     // Worlds only feed the "Used by" list: a failed read leaves the skills and drops the worlds.
-    const worlds = api.getWorlds(app.dec, app.added).then(
-      (w) => w.data,
-      () => [] as World[],
-    );
-    Promise.all([api.getConnectors(), api.getSkills(), api.getConnectorTerms(), worlds]).then(
-      ([c, s, t, w]) =>
-        live &&
-        setLoad({ kind: "ready", connectors: c.data, skills: s.data, worlds: w, terms: t.data }),
-      () => live && setLoad({ kind: "unavailable" }),
-    );
+    void api
+      .getConnectors()
+      .then(async (c) => {
+        if (!live) return;
+        if (c.source === "live") {
+          setLoad({ kind: "live", connectors: c.data });
+          return;
+        }
+        const worlds = api.getWorlds(app.dec, app.added).then(
+          (w) => w.data,
+          () => [] as World[],
+        );
+        const [s, t, w] = await Promise.all([api.getSkills(), api.getConnectorTerms(), worlds]);
+        if (live)
+          setLoad({ kind: "ready", connectors: c.data, skills: s.data, worlds: w, terms: t.data });
+      })
+      .catch(() => live && setLoad({ kind: "unavailable" }));
     return () => {
       live = false;
     };
@@ -88,10 +107,23 @@ export function ConnectorsPage({ app, now = Date.now }: { app: AppCtx; now?: () 
 
   const close = useCallback(() => setOpen(null), []);
 
+  if (load.kind === "live") {
+    return (
+      <Frame>
+        <Heading />
+        {live ? <GoogleAccess flow={live} /> : null}
+        <MeetingHostAccess flow={live} />
+        <LiveConnectors connectors={load.connectors} />
+      </Frame>
+    );
+  }
+
   if (load.kind === "unavailable") {
     return (
       <Frame>
         <Heading />
+        {live ? <GoogleAccess flow={live} /> : null}
+        {live ? <MeetingHostAccess flow={live} /> : null}
         <div className="park-connectors-empty">
           <span className="park-connectors-empty-glyph">{icon("plug", 22)}</span>
           <div className="park-connectors-empty-title">Not connected yet</div>
@@ -168,6 +200,9 @@ export function ConnectorsPage({ app, now = Date.now }: { app: AppCtx; now?: () 
           />
         </div>
       </Heading>
+
+      {live ? <GoogleAccess flow={live} /> : null}
+      {live ? <MeetingHostAccess flow={live} /> : null}
 
       {attn.map((c) => (
         <AttentionBanner

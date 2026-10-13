@@ -22,16 +22,18 @@ from typing import Annotated, Any, Literal
 import tilo_planning.plangraph as plangraph
 import tilo_policy
 from fastapi import APIRouter, Depends, HTTPException, Request
-from tilo_connectors import Outbox, OutboxRefused
+from tilo_connectors import Outbox, OutboxRefused, RetryPolicy
 from tilo_harness.config import load_agents_config
 from tilo_harness.executor import UnitOutcome, run_plan
 from tilo_harness.must_ask import MustAsk
 from tilo_harness.question_wait import AlreadyAnswered, QuestionWait
 from tilo_harness.validator import repo_validator
-from tilo_memory.artifacts import Scope
+from tilo_memory.artifacts import NewVersion, Origin, Scope
+from tilo_metering.flags import FlagStore
+from tilo_people.stores import PeopleStores
 from tilo_planning.compiler import DELIVER, PlanInputs
 
-from tilo_api import deps, events, team_access, team_store
+from tilo_api import deps, events, item_documents, side_effect_fields, team_access, team_store
 from tilo_api.access import Mode
 from tilo_api.cards import (
     OWNER_ONLY_ACTIONS,
@@ -41,6 +43,9 @@ from tilo_api.cards import (
     answering_principal,
     get_channels_caller,
 )
+from tilo_api.connector_rpc import NO_DRAFT, ConnectorRpcStub
+
+DESTINATION_CHANGED = "the email goes somewhere other than its draft, so it is not the same item"
 
 logger = logging.getLogger("tilo_api.runs")
 router = APIRouter()
@@ -97,21 +102,51 @@ class Seams:
     ]  # the team's settings (FR-ACC-01; team_store.team_reader): no default, every path passes one
 
 
+_CLOCK_SEAMS = frozenset({"plan_compiler", "unit_runner"})  # the seams whose prompts state the date
 _MODE_SEAMS = frozenset({"plan_compiler", "unit_runner", "must_ask_providers"})  # the seams that build a Router
 
 
-def run_seams(request: Request, mode: Annotated[Mode, Depends(deps.get_work_mode)]) -> Seams | None:
+def run_seams(
+    request: Request,
+    mode: Annotated[Mode, Depends(deps.get_work_mode)],
+    switches: Annotated[FlagStore, Depends(deps.get_switches)] = None,  # type: ignore[assignment]
+) -> Seams | None:
     """The seams as the app wires them, overrides included; if any cannot be built, no run starts. The model
-    seams get this request's mode (SEC-15), so a judge's run is live and everyone else's is replay."""
+    seams get this request's mode (SEC-15), so a judge's run is live and everyone else's is replay, and its SEC-16
+    meter (GOLIVE-935): every live call of the plan and the run is a unit on the uid ledger. Deployed, a live
+    request that cannot be metered (the tick has no person's uid) builds replay seams, never unmetered live ones."""
     overrides = request.app.dependency_overrides
+    meter = deps.meter_for(request, mode, switches)
+    mode = deps._live_or_replay(mode, meter)
     names = "plan_compiler layout_builder unit_runner action_resolver skill_registry connector_registry"
     names += " connector_adapters outbox_store event_writer must_ask_providers artifact_store redactor run_archive"
+
+    from tilo_api import ephemeral  # noqa: PLC0415
+
+    demo = None if ephemeral.has_no_person(request) else ephemeral.for_request(request)  # the tick has no person
+    mine = (  # the storage seams a demo run takes from its own bundle; connector adapters stay empty: it sends nothing
+        {}
+        if demo is None
+        else {
+            "outbox_store": demo.outbox, "event_writer": demo.writer, "artifact_store": demo.artifacts,
+            "redactor": demo.redactor, "run_archive": demo.open_archive, "connector_adapters": {},
+        }
+    )  # fmt: skip
 
     def build(name: str) -> Any:
         seam = getattr(deps, f"get_{name}")
         if seam in overrides:
             return overrides[seam]()
-        return seam(mode) if name in _MODE_SEAMS else seam()
+        if name in mine:
+            return mine[name]
+        if name == "artifact_store":
+            return seam(mode=mode)
+        if name in _CLOCK_SEAMS:  # one clock for the whole API: the override a test installs reaches the run too
+            today = overrides[deps.get_today]() if deps.get_today in overrides else deps.get_today()
+            return seam(mode, today, meter=meter) if meter is not None else seam(mode, today)
+        if name in _MODE_SEAMS:  # a seam written before the meter still gets the call it knows when there is none
+            return seam(mode, meter=meter) if meter is not None else seam(mode)
+        return seam()
 
     try:
         built = dict(
@@ -193,6 +228,16 @@ class Run:
                 if task.answers.get(q.field) and q.field not in task.edits
             )
         )
+        guesses = {q.field: q.suggested_answers for q in task.questions}  # the Director's own proposals (model output)
+        self.person_answers: dict[str, str] = {}  # L6c: only what the person typed, never a guess of the Director's
+        for field_, value in {**task.answers, **task.edits}.items():
+            own = (
+                side_effect_fields.own_answer(value, guesses=guesses.get(field_, ()), draft=task.draft.get(field_))
+                if isinstance(value, str) and (field_ in task.edits or field_ in guesses)
+                else None
+            )
+            if own:
+                self.person_answers[field_] = own
         self.approaches = copy.deepcopy(task.approaches or [])
         self.cards = CardStore(clock=_CLOCK, writer=self, world_owners={self.world_id: self.owner})
         self.question_wait = _ObservedWait(self)  # a unit that asked a person waits here for the answer (FR-HIL-10)
@@ -218,6 +263,20 @@ class Run:
         self._live: set[str] = set()  # assigned and not yet retired
         self._handed: set[str] = set()  # units that handed their result over (their dependents may start)
         self._asleep = 0  # live units waiting for a person: a gate card or a question
+        self._alerted: set[str] = set()
+        self._alert_lock = threading.Lock()
+        self._drafted: dict[tuple[str, int], str] = {}  # LC-10: (artifact id, version) -> content hash at its draft
+        self._documents: dict[tuple[str, int, str], tuple[dict[str, Any], str, str | None]] = {}  # (body, kind) -> pin
+        self._asking: dict[str, tuple[str, tuple[str, ...]]] = {}  # fields card id -> (action, the missing fields)
+        self._supplied: dict[str, dict[str, str]] = {}  # fields card id -> what the person typed (never logged)
+        self._supplied_for_unit: dict[str, dict[str, str]] = {}  # unit id -> recipients the person typed (never logged)
+        self.fields_lock = threading.Lock()  # the fields route stages and answers one card at a time
+        self.adapters: dict[str, Any] = {  # a live connector's stub is bound to this run (its reader, sink, owner)
+            name: adapter.bound(self._read_pinned, self._part_sink, self.owner)
+            if hasattr(adapter, "bound")
+            else adapter
+            for name, adapter in seams.adapters.items()
+        }
 
     def now(self) -> datetime:
         return datetime.now(UTC)
@@ -423,18 +482,71 @@ class Run:
         """The run dispatches and records only its own world's entries, and claims none once the world is paused
         (FR-WLD-07)."""
         return Outbox(
-            self.seams.outbox_store, self.seams.adapters, emit=self._record_transfer, clock=events.now,
-            world_id=self.world_id, halted=self.paused,
+            self.seams.outbox_store, self.adapters, emit=self._record_transfer, clock=events.now,
+            world_id=self.world_id, halted=self.paused, alert=lambda part: self._record_alert(part["data"]["alert_id"]),
+            retry=RetryPolicy() if any(isinstance(a, ConnectorRpcStub) for a in self.adapters.values()) else None,
         )  # fmt: skip
 
+    def _read_pinned(self, ref: dict[str, Any]) -> bytes:
+        return bytes(self.seams.artifacts.read(self.scope, ref))  # hash-checked (AR-01)
+
+    def read_pinned(self, ref: dict[str, Any]) -> bytes:
+        """The bytes of an item this run pinned, hash-checked (AR-01); for the owner's show-me."""
+        return self._read_pinned(dict(ref))
+
+    def _part_sink(self, part: Mapping[str, Any]) -> None:
+        """What connectors' answer carried (ADR-0032 decision 7): an alert is recorded, a connection part abandons."""
+        from tilo_api.meeting_host import on_connection_event  # noqa: PLC0415
+
+        if part["type"] == "alert.raised":
+            self._record_alert(part["data"]["alert_id"])
+        else:
+            on_connection_event(part, outbox_store=self.seams.outbox_store, owner_of=self._owner_of)
+
+    def _owner_of(self, world_id: str) -> str | None:
+        world = self.store.load_world(world_id)
+        return None if world is None else world.owner
+
+    _alert_summary = "A person must check whether the item went out."
+
+    def _record_alert(self, alert_id: str) -> None:
+        """One `alert.raised` per alert id, ids only (FR-AGT-13): a possibly-sent item is never only a parked alert."""
+        with self._alert_lock:
+            send = self.sends.get(alert_id) or next(iter(self.sends.values()), None)
+            if alert_id in self._alerted or send is None:
+                return
+            self.put(
+                "alert.raised", send["worker"], send["island"], self._alert_summary,
+                {"alert_id": alert_id, "card_id": None}, district=send["district"], cause=send["cause"],
+                severity="needs_you", check_pause=False,
+            )  # fmt: skip
+            self._alerted.add(alert_id)
+
+    def _may_have_sent(self, outbox_id: str) -> bool:
+        return outbox_id in self._alerted or bool(self.seams.outbox_store.retry_state(outbox_id).get("ambiguous"))
+
+    def _keeps_ambiguous(self, entry: Mapping[str, Any]) -> bool:
+        """A live Google send (a stub) that may have gone out is never failed: only a person settles it (FR-AGT-13)."""
+        return isinstance(self.adapters.get(entry["connector"]), ConnectorRpcStub)
+
     def _abandon_unsent(self) -> None:
-        for outbox_id, send in self.sends.items():
-            entry = self.seams.outbox_store.get(outbox_id)
-            if "committed" not in send and entry is not None and entry["state"] in ("queued", "scheduled", "sending"):
-                try:
-                    self._outbox().abandon(outbox_id)
-                except Exception:
-                    logger.warning("run %s left entry %s to its sender", self.run_id, outbox_id)
+        """A live entry that may have gone out is never failed: it stays, with one alert."""
+        store = self.seams.outbox_store
+        for outbox_id, send in list(self.sends.items()):
+            entry = store.get(outbox_id)
+            if "committed" in send or entry is None or entry["state"] not in ("queued", "scheduled", "sending"):
+                continue
+            keeps = self._keeps_ambiguous(entry)
+            try:
+                if keeps and self._may_have_sent(outbox_id):
+                    self._record_alert(outbox_id)
+                else:
+                    self._outbox().abandon(outbox_id, keep_ambiguous=keeps)
+            except OutboxRefused:
+                if keeps:  # a lease nobody released, or a send in flight: it may have gone out, a person checks
+                    self._record_alert(outbox_id)
+            except Exception:
+                logger.warning("run %s left entry %s to its sender", self.run_id, outbox_id)
 
     def _compile(self, context: PlanInputs) -> dict:
         return self.seams.compiler(
@@ -501,6 +613,8 @@ class Run:
         try:  # the run's own Scope and raw archive (ADR-0018 T4); never named by a request
             self.scope = scope = Scope(org_id=self.org_id, world_id=self.world_id, owner=self.owner)
             archive = self.seams.open_archive(org_id=self.org_id, run_id=self.run_id)
+            bind = getattr(self.seams.runner, "bind_run", None)
+            self._bound_runner = bind(self, archive) if bind is not None else self.seams.runner
         except Exception as exc:
             logger.warning("run %s: no artifact scope or archive (%s)", self.run_id, type(exc).__name__)
             self._fail("the run's item store could not be opened", None)
@@ -517,7 +631,7 @@ class Run:
                 writer=self,
                 config=config,
                 skills=self.seams.skills,
-                runner=self.seams.runner,
+                runner=self._bound_runner,
                 must_ask=must_ask,
                 question_wait=self.question_wait,
                 artifacts=self.seams.artifacts,
@@ -539,7 +653,9 @@ class Run:
             return
         if stopped := result.failed + result.held + result.skipped:
             reason = "a step was held, so the work stopped" if result.held and not result.failed else None
-            self._fail(self.failure or reason or "a unit failed, so the work stopped", stopped[0])
+            failed = result.outcomes.get(stopped[0])  # a unit's own plain stop line, if code wrote one (FR-AGT-12)
+            own = getattr(failed, "reason", None) if failed is not None and not failed.success else None
+            self._fail(self.failure or own or reason or "a unit failed, so the work stopped", stopped[0])
             return
         credits = math.fsum(e["credits"] for e in self.store.events.get(self.world_id, []))  # the meter (HR-1)
         data = {"credits_used": credits, "deliverable_count": len(self.delivered)}
@@ -561,6 +677,9 @@ class Run:
         """The executor stored and announced the unit's items (ADR-0018 T4). A unit with actions stops at its gate (the
         item to send is its first announced version); a `deliver` unit with none delivers in Tilo. False fails it."""
         self.produced[unit["id"]] = [(unit, dict(ref), made) for ref, made in announced]
+        check_app = getattr(getattr(self, "_bound_runner", None), "before_handoff", None)
+        if check_app is not None and not await check_app(unit, worker, announced):
+            return False
         try:
             for action in unit["actions"]:
                 if not announced:
@@ -580,19 +699,47 @@ class Run:
         connector = next((c for c in unit["connectors"] if self._action(c, action)), None)
         if gate is None or connector is None:
             raise _GateFailed(f"no gate or connector for {action}")
-        try:
-            brief, unit_copy = copy.deepcopy(self.brief), copy.deepcopy(unit)
-            to = self.seams.resolver(unit=unit_copy, action_type=action, item=dict(item), brief=brief)
-            recipients, destination, known = to["recipients"], to["destination"], to.get("known_recipients")
-        except Exception as exc:
-            raise _GateFailed("the send has no recipients") from exc
-        if not (isinstance(destination, str) and destination.strip() and isinstance(recipients, list) and recipients
+        live = bool(item_documents.kind_of(action)) and isinstance(self.adapters.get(connector), ConnectorRpcStub)
+        takes_answers = getattr(self.seams.resolver, "takes_answers", False)  # only the production resolver
+        supplied: dict[str, str] = self._supplied_for_unit.setdefault(unit["id"], {}) if takes_answers else {}
+        for _ in range(3):  # a missing recipient is asked of the person (a needs-you card), then resolved again
+            try:
+                brief, unit_copy = copy.deepcopy(self.brief), copy.deepcopy(unit)
+                extra = (  # only the production resolver is given the person's structured answers
+                    {"answers": dict(self.person_answers), "supplied": dict(supplied)} if takes_answers else {}
+                )
+                to = self.seams.resolver(unit=unit_copy, action_type=action, item=dict(item), brief=brief, **extra)
+                recipients, destination, known = to["recipients"], to["destination"], to.get("known_recipients")
+                fields = to.get("fields")
+                declared: Mapping[str, Any] = fields if isinstance(fields, Mapping) else {}  # declared, never inferred
+                break
+            except side_effect_fields.Missing as exc:
+                if not live:  # nothing to ask for where nothing live can send
+                    raise _GateFailed("the send has no recipients") from exc
+                supplied |= await self._ask_fields(unit, worker, action, exc.fields, exc.reason)
+            except Exception as exc:
+                raise _GateFailed("the send has no recipients") from exc
+        else:
+            raise _GateFailed("the send has no recipients")
+        reaches_no_one = live and action in item_documents.NO_RECIPIENT_ACTIONS  # a save or an own-calendar event
+        if not ((destination is None and live or isinstance(destination, str) and destination.strip())  # a new mail
+                and isinstance(recipients, list) and (recipients or reaches_no_one)
                 and all(isinstance(r, str) and r.strip() for r in recipients)):  # fmt: skip
             raise _GateFailed("the send has no recipients or no destination")  # fails closed, before any gate
+        line, body_ref = None, dict(item)
+        if live and action == "create_event" and recipients:  # LC-09: the guest-less action refuses a guest first
+            raise _GateFailed(item_documents.NO_GUESTS)
+        if live:
+            item, line = await self._item_document(unit, worker, action, item, made, destination, declared)
+            ref = dict(item)  # the card, the entry and the hash pin all name the document the person approves
         try:  # AR-07, OB-05, BQ-264: from the stored record, never a default; only a `clean` verdict clears the flag
-            flagged = self.seams.artifacts.head(self.scope, item).record["screening"] != "clean"
+            stored = self.seams.artifacts.head(self.scope, item).record
+            flagged = stored["screening"] != "clean" or (  # the body's verdict stays with the pin (OB-05)
+                self.seams.artifacts.head(self.scope, body_ref).record["screening"] != "clean"
+            )
         except Exception as exc:
             raise _GateFailed("the item to send is not in the run's store") from exc
+        self._draft_first(connector, action, item)  # LC-10: before any card a send that could not go would raise
         facts = tilo_policy.SideEffectFacts(
             recipients=tuple(recipients), known_recipients=tuple(known or ()), safety_flags=flagged
         )
@@ -612,7 +759,7 @@ class Run:
         irreversible = self._action(connector, action)["irreversible"]  # type: ignore[index]
         card_id, outbox_id = events.new_part_id(), events.new_part_id()
         card = self._gate_card(unit, worker, card_id, gate["id"], connector, action, tier, irreversible)
-        exact = self._exact(connector, action, destination, recipients)
+        exact = self._exact(connector, action, destination, recipients, line)
         if len(exact) > _EXACT_MAX:  # never cut: a cut would hide a recipient from the person approving
             raise _GateFailed("the send names too many recipients to show on one card")
         card["gate"]["action"] |= {"item": ref, "destination": destination, "exact": exact}
@@ -658,6 +805,8 @@ class Run:
             "event_id": events.new_part_id(),  # resent unchanged if the outbox retries the transfer
         }  # fmt: skip
         transfer = await self._send(entry, evidence)
+        if action == "create_draft":
+            self._drafted[(item["artifact_id"], item["version"])] = stored["content_sha256"]
         format_ = _FORMATS.get(action, "in_app")  # artifact.delivered: a format kept in Tilo has outbox_id null
         data = {"artifact": item, "format": format_, "outbox_id": outbox_id if format_ == "email" else None}
         self._deliver(unit, worker, item, data, transfer["id"])
@@ -692,6 +841,10 @@ class Run:
     async def _send(self, entry: dict, evidence: dict[str, Any]) -> dict:
         """Enqueue with the person's authz, then dispatch until the outbox records the entry sent."""
         outbox = self._outbox()
+        self._draft_first(entry["connector"], entry["action_type"], entry["item"])
+        hand = getattr(self.adapters.get(entry["connector"]), "hand_evidence", None)
+        if hand is not None:  # the live stub posts the case this enqueue checked (HB-04)
+            hand(entry["id"], evidence)
         try:
             outbox.enqueue(entry, evidence)
         except OutboxRefused as exc:
@@ -707,7 +860,27 @@ class Run:
             if state in ("failed", "cancelled"):
                 break
         self._abandon_unsent()  # given up: the entry never sends later in a failed world
+        if self._keeps_ambiguous(entry) and self._may_have_sent(entry["id"]):  # say what is known, not "unsent"
+            raise _GateFailed("the item may have gone out; a person must check")
         raise _GateFailed("the send could not be confirmed")
+
+    def _draft_first(self, connector: str, action: str, item: dict[str, Any]) -> None:
+        """ADR-0035 LC-10: a live `send_email` goes only when this world holds a `sent` `create_draft` entry for the
+        same item (artifact id, version) whose content is still the hash the draft carried; else one fixed reason."""
+        if action != "send_email" or not isinstance(self.adapters.get(connector), ConnectorRpcStub):
+            return
+        pinned = self._drafted.get((item["artifact_id"], item["version"]))
+        try:
+            head = self.seams.artifacts.head(self.scope, item)
+            drafted = any(
+                e["world_id"] == self.world_id and e["action_type"] == "create_draft" and e["state"] == "sent"
+                and e["item"] == item for e in self.seams.outbox_store.all_entries()
+            )  # fmt: skip
+            ok = drafted and pinned is not None and head is not None and head.record["content_sha256"] == pinned
+        except Exception:
+            ok = False
+        if not ok:
+            raise _GateFailed(NO_DRAFT)
 
     def _record_transfer(self, transfer: dict) -> None:
         """The outbox's own data.transfer for one of this run's entries (the outbox is scoped to this world)."""
@@ -721,10 +894,7 @@ class Run:
     def _gate_card(self, unit: dict, worker: str, card_id: str, gate_id: str, connector: str, action: str,
                    tier: str, irreversible: bool) -> dict:  # fmt: skip
         """The deterministic gate card (PRD 10.3): from the plan gate, the connector action and the send."""
-        building = next(
-            b["id"] for level in self.layout["semantic"]["levels"] for d in level["districts"]
-            for b in d["buildings"] if unit["id"] in b["plan_units"]
-        )  # fmt: skip
+        building = self._building(unit)
         name, undo = self.seams.connectors.get(connector)["name"], "cannot" if irreversible else "can"
         return {
             "id": card_id, "world_id": self.world_id, "run_id": self.run_id, "kind": "gate", "rung": "gate",
@@ -744,11 +914,153 @@ class Run:
             "consent": None,
         }  # fmt: skip
 
-    def _exact(self, connector: str, action: str, destination: str, recipients: list[str]) -> str:
-        """What the send does, from the action, connector, destination and recipients only; no model-written text
-        (a unit's title is not trusted to describe what is sent)."""
+    def _exact(
+        self, connector: str, action: str, destination: str | None, recipients: list[str], line: str | None
+    ) -> str:
+        """What the send does, from the action, connector, destination, recipients and the document's own declared
+        fields only; no model-written text (a unit's title is not trusted to describe what is sent)."""
         name = self.seams.connectors.get(connector)["name"]
-        return f"{action} by {name} to {', '.join(recipients)} (destination {destination})."
+        to = f" to {', '.join(recipients)}" if recipients else ""
+        where = f" (destination {destination})" if destination is not None else ""
+        return f"{action} by {name}{to}{where}." + (f" {line}." if line else "")
+
+    def _building(self, unit: dict) -> str:
+        return next(
+            b["id"] for level in self.layout["semantic"]["levels"] for d in level["districts"]
+            for b in d["buildings"] if unit["id"] in b["plan_units"]
+        )  # fmt: skip
+
+    async def _item_document(
+        self, unit: dict, worker: str, action: str, body: dict, made: str, destination: str | None, declared: Mapping
+    ) -> tuple[dict[str, Any], str]:
+        """ADR-0035 L6b: the L5 document of this action, a new version of the unit's artifact that is pinned, hashed and
+        approved (CR-12). The same body and kind give the same version, so a draft and its send pin one content. A
+        missing declared field asks the person (nothing is enqueued); nothing is ever inferred from the text."""
+        kind = item_documents.kind_of(action) or ""
+        key = (body["artifact_id"], body["version"], kind)
+        if action == "send_email" and key not in self._documents:
+            raise _GateFailed(NO_DRAFT)  # LC-10: no draft step made this content, so no question is asked for a send
+        if key in self._documents and self._documents[key][2] != destination:
+            raise _GateFailed(DESTINATION_CHANGED)  # a send goes where its draft went, or it is not the same item
+        if key not in self._documents:
+            try:
+                stored = self.seams.artifacts.head(self.scope, body).record  # type: ignore[union-attr]
+                content, fields = self._read_pinned(body), dict(declared)
+            except Exception as exc:
+                raise _GateFailed("the item to send is not in the run's store") from exc
+            origin = {"kind": stored["origin"]["kind"]}
+            try:
+                while isinstance(
+                    built := item_documents.build_document(
+                        action,
+                        fields,
+                        body=content,
+                        media_type=stored["media_type"],
+                        origin=origin,
+                        threaded=destination is not None,
+                    ),
+                    item_documents.Needs,
+                ):
+                    fields |= await self._ask_fields(unit, worker, action, built.fields)
+            except item_documents.DocumentRefused as exc:
+                raise _GateFailed(exc.reason) from None
+            parent = {"artifact_id": body["artifact_id"], "version": self.recorded_version(body["artifact_id"])}
+            new = NewVersion(
+                media_type="application/json", content=built, run_id=self.run_id, parent=parent,
+                origin=Origin(kind="unit", unit=unit["id"], agent=worker),
+                idempotency_key=f"{self.run_id}:{unit['id']}:{100 + item_documents.ORDER.index(kind)}:0",
+            )  # fmt: skip
+            try:
+                version = await asyncio.to_thread(self.seams.artifacts.put, self.scope, new)
+                self.put(
+                    "artifact.versioned", worker, version.artifact_id, "The agent made a new version of an item.",
+                    {"artifact": version.ref, "previous_version": parent["version"]},
+                    district=unit["district"], cause=made,
+                )  # fmt: skip
+            except RunStopped:
+                raise
+            except Exception as exc:
+                raise _GateFailed("the document to send could not be stored") from exc
+            try:  # the card's line is read back from the stored (redacted) bytes, not from what was built
+                line = item_documents.summary(self._read_pinned(version.ref))
+            except Exception as exc:
+                raise _GateFailed("the document to send could not be read back") from exc
+            self._documents[key] = (version.ref, line, destination)
+        ref, line, _ = self._documents[key]
+        return ref, line
+
+    async def _ask_fields(
+        self, unit: dict, worker: str, action: str, missing: tuple[str, ...], reason: str | None = None
+    ) -> dict[str, str]:
+        """A needs-you card names the fields the document lacks; the person supplies them on the fields route, which
+        answers the card (`provide`). A hold, a default or an answer with nothing supplied fails the step."""
+        names, card_id = ", ".join(missing), events.new_part_id()
+        card = {
+            "id": card_id, "world_id": self.world_id, "run_id": self.run_id, "kind": "needs_you", "rung": "needs_you",
+            "header": {"building": self._building(unit), "agent": worker},
+            "what_happened": f"{unit['title']}: needs {names}."[:140],
+            "why_it_matters": (f"{reason}. " if reason else "")[:120]
+            + "Nothing is sent or saved until you add it. Tilo does not make it up from the text.",
+            "options": [
+                {"id": "provide", "label": "Add it", "suggested": True, "irreversible": False,
+                 "reason": "You add it here; the finished item then comes back for your approval."},
+                {"id": "hold", "label": "Hold", "suggested": False, "irreversible": False},
+            ],
+            "add_context": False, "actions": ["show_me"], "answer_channels": ["web", "mobile_web"],
+            "created_at": events.now(), "timeout": _GATE_TIMEOUT_S, "safe_default": "hold",
+            "gate": None, "consent": None,
+        }  # fmt: skip
+        if _card_errors(card):
+            raise _GateFailed("the question card was refused")
+        self._asking[card_id] = (action, missing)
+        try:
+            try:
+                self._store_card(card)
+            except RuntimeError as exc:
+                raise _GateFailed("the question card was refused") from exc
+            district = next(d for level in self.layout["semantic"]["levels"] for d in level["districts"]
+                            if d["id"] == unit["district"])  # fmt: skip
+            answer = await self.question_wait.wait_for(card, lead=district["lead"], director=self.director,
+                                                       district=unit["district"])  # fmt: skip
+        finally:
+            with self.fields_lock:
+                self._asking.pop(card_id, None)  # nothing is supplied for a card that is over, whichever way it ended
+                supplied = self._supplied.pop(card_id, None)
+        if answer.option != "provide":
+            supplied = None
+        if supplied is None:
+            raise _GateFailed(f"needs {names}: nothing was added")
+        return supplied
+
+    def asked_fields(self, card_id: str) -> tuple[str, ...] | None:
+        """The field names an open fields card waits for (the form's labels); None for a card this run did not ask."""
+        asking = self._asking.get(card_id)
+        return asking[1] if asking else None
+
+    def stage_fields(self, card_id: str, fields: Any) -> dict[str, str]:
+        """The fields route's check, before it answers the card: LookupError for a card this run did not ask,
+        ValueError(plain reason) for what the document would refuse. The values are kept for the waiting step only."""
+        action, missing = self._asking.get(card_id) or ("", ())
+        if not action:
+            raise LookupError(card_id)
+        asked = fields if isinstance(fields, Mapping) else {}
+        try:
+            got = item_documents.check_fields(action, {k: v for k, v in asked.items() if k != "recipient"})
+            if "recipient" in asked:
+                got["recipient"] = side_effect_fields.check_recipient(action, asked["recipient"])
+        except item_documents.DocumentRefused as exc:
+            raise ValueError(exc.reason) from None
+        if set(got) != set(missing) or set(fields) != set(missing):
+            raise ValueError("needs " + ", ".join(missing))
+        if card_id in self._supplied:
+            raise LookupError(card_id)  # another caller's values are already waiting for this card's answer
+        self._supplied[card_id] = got
+        return got
+
+    def unstage_fields(self, card_id: str, staged: dict[str, str]) -> None:
+        """Takes back only the values this caller staged."""
+        if self._supplied.get(card_id) is staged:
+            del self._supplied[card_id]
 
     def _action(self, connector: str, action: str) -> dict | None:
         declared = self.seams.connectors.get(connector)["actions"] if connector in self.seams.connectors else []
@@ -797,13 +1109,21 @@ def get_delivery(
     world_id: str,
     principal: Annotated[deps.Principal, Depends(deps.get_current_principal)],
     store: Annotated[deps.Store, Depends(deps.get_store)],
+    people: Annotated[Callable[[], PeopleStores | None], Depends(deps.get_people_provider)],
+    clock: Annotated[Callable[[], str], Depends(deps.get_clock)],
 ) -> dict[str, Any]:
-    """Issue #80's DeliveryResult, for the world's owner only, once `world.completed` is written."""
+    """Issue #80's DeliveryResult, for the world's owner and, on purpose (ADR-0040 decision 4), for a team reader of a
+    share in force, who gets it from the events they already see (never a `vis: []` one), once `world.completed`."""
     world = store.worlds.get(world_id)
     owner = world.owner if world is not None else None
-    if principal.world_id != world_id or (principal.role, principal.user_id) != ("owner", owner):
-        raise HTTPException(status_code=404)
     stream = store.events.get(world_id, [])
+    if principal.world_id != world_id or (principal.role, principal.user_id) != ("owner", owner):
+        _, viewer = deps.team_reader(principal, store, people, clock, world_id)  # the one unknown-world 404 otherwise
+        stream = [
+            e
+            for e in stream
+            if e.get("vis") == "all" or (isinstance(e.get("vis"), list) and set(e["vis"]) & set(viewer.districts))
+        ]
     completed = next((e for e in stream if e["type"] == "world.completed"), None)
     if completed is None:
         raise HTTPException(status_code=409, detail="Nothing is delivered until the work is done.")

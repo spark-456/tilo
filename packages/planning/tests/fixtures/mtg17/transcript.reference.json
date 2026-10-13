@@ -2,17 +2,77 @@
   "v": "1.0",
   "meeting_id": "mt_fixture17",
   "utterances": [
-    {"id": "u0001", "speaker": "Speaker 1", "t_ms": 0, "text": "Good morning everyone, thanks for joining the planning call."},
-    {"id": "u0002", "speaker": "Speaker 2", "t_ms": 7500, "text": "Morning. I have the supplier quotes ready, there are three of them."},
-    {"id": "u0003", "speaker": "Speaker 1", "t_ms": 14200, "text": "Great. Which one is the cheapest for the first batch of two hundred units?"},
-    {"id": "u0004", "speaker": "Speaker 2", "t_ms": 21000, "text": "The second supplier, at four dollars twenty a unit, with delivery in ten days."},
-    {"id": "u0005", "speaker": "Speaker 3", "t_ms": 31800, "text": "The first supplier is slower but their quality record is much better than the others."},
-    {"id": "u0006", "speaker": "Speaker 1", "t_ms": 42600, "text": "Let us not decide on price alone. Priya, can you check the quality reports before Friday?"},
-    {"id": "u0007", "speaker": "Speaker 3", "t_ms": 55300, "text": "Yes, I will review the reports and send a short summary to the team by Thursday evening."},
-    {"id": "u0008", "speaker": "Speaker 2", "t_ms": 68000, "text": "I will also ask the second supplier whether they can improve the delivery time."},
-    {"id": "u0009", "speaker": "Speaker 1", "t_ms": 79400, "text": "Good. We still need an owner for the budget approval, that should be Marcus."},
-    {"id": "u0010", "speaker": "Speaker 3", "t_ms": 91200, "text": "Marcus is on leave until Monday, so the approval will wait until next week."},
-    {"id": "u0011", "speaker": "Speaker 1", "t_ms": 103500, "text": "That is fine. We will decide on the supplier at the Tuesday meeting."},
-    {"id": "u0012", "speaker": "Speaker 2", "t_ms": 114800, "text": "Sounds good. Thanks everyone, talk to you on Tuesday."}
+    {
+      "id": "u0001",
+      "speaker": "Speaker 1",
+      "t_ms": 0,
+      "text": "Good morning everyone, thanks for joining the planning call."
+    },
+    {
+      "id": "u0002",
+      "speaker": "Speaker 2",
+      "t_ms": 7500,
+      "text": "Morning. I have the supplier quotes ready, there are three of them."
+    },
+    {
+      "id": "u0003",
+      "speaker": "Speaker 1",
+      "t_ms": 14200,
+      "text": "Great. Which one is the cheapest for the first batch of two hundred units?"
+    },
+    {
+      "id": "u0004",
+      "speaker": "Speaker 2",
+      "t_ms": 21000,
+      "text": "The second supplier, at four dollars twenty a unit, with delivery in ten days."
+    },
+    {
+      "id": "u0005",
+      "speaker": "Speaker 3",
+      "t_ms": 31800,
+      "text": "The first supplier is slower but their quality record is much better than the others."
+    },
+    {
+      "id": "u0006",
+      "speaker": "Speaker 1",
+      "t_ms": 42600,
+      "text": "Let us not decide on price alone. Priya, can you check the quality reports before Friday?"
+    },
+    {
+      "id": "u0007",
+      "speaker": "Speaker 3",
+      "t_ms": 55300,
+      "text": "Yes, I will review the reports and send a short summary to the team by Thursday evening."
+    },
+    {
+      "id": "u0008",
+      "speaker": "Speaker 2",
+      "t_ms": 68000,
+      "text": "I will also ask the second supplier whether they can improve the delivery time."
+    },
+    {
+      "id": "u0009",
+      "speaker": "Speaker 1",
+      "t_ms": 79400,
+      "text": "Good. We still need an owner for the budget approval, that should be Marcus."
+    },
+    {
+      "id": "u0010",
+      "speaker": "Speaker 3",
+      "t_ms": 91200,
+      "text": "Marcus is on leave until Monday, so the approval will wait until next week."
+    },
+    {
+      "id": "u0011",
+      "speaker": "Speaker 1",
+      "t_ms": 103500,
+      "text": "That is fine. We will decide on the supplier at the Tuesday meeting."
+    },
+    {
+      "id": "u0012",
+      "speaker": "Speaker 2",
+      "t_ms": 114800,
+      "text": "Sounds good. Thanks everyone, talk to you on Tuesday."
+    }
   ]
 }

@@ -18,6 +18,7 @@ from ._transport import Transport as Transport
 from ._transport import TransportError as TransportError
 from .calendar import CALENDAR_API as CALENDAR_API
 from .calendar import CalendarAdapter as CalendarAdapter
+from .calendar_write import CalendarWriteAdapter as CalendarWriteAdapter
 from .drive import DRIVE_API as DRIVE_API
 from .drive import DRIVE_UPLOAD_API as DRIVE_UPLOAD_API
 from .drive import MAX_DOWNLOAD_BYTES as MAX_DOWNLOAD_BYTES

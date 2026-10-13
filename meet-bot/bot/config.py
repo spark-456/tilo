@@ -2,15 +2,25 @@
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 from dataclasses import dataclass
 from pathlib import Path
 
+from .events import remove_meet_links
+from .wake import WakeSettings
+
 ROOT = Path(__file__).resolve().parent.parent
 IN_CONTAINER = os.environ.get("TILO_IN_CONTAINER") == "1"
 # No model id, vendor or key lives in meet-bot (FR-MTG-11): roles and profiles are Tilo's config/, see bot/providers.py.
 THINKING_LEVELS = ("off", "minimal", "low", "medium", "high")
+
+
+def load_wake_settings() -> WakeSettings:
+    root = Path(os.environ.get("TILO_REPO_ROOT", str(ROOT.parent)))
+    data = json.loads((root / "config/meeting-wake.json").read_text(encoding="utf-8"))
+    return WakeSettings(aliases=tuple(data["aliases"]), attention_s=data["attention_s"])
 
 
 def parse_dotenv(text: str) -> dict[str, str]:
@@ -87,6 +97,7 @@ class Config:
     reply_mode: str
     voice_nudges: bool
     mic_policy: str
+    guest: bool = False
 
     @classmethod
     def from_env(cls) -> Config:
@@ -130,12 +141,19 @@ class Config:
             stt=e("STT_PROVIDER", "").strip().lower()
             or ("gemini" if e("HYBRID_TRANSCRIPT", "0") == "1" else "captions"),
             answer_mode="addressed" if e("ANSWER_MODE", "questions") == "addressed" else "questions",
+            guest=_choice("BOT_JOIN_MODE", "signed-in", ("signed-in", "guest")) == "guest",
         )
+
+
+class SafeFormatter(logging.Formatter):
+    def format(self, record: logging.LogRecord) -> str:
+        # Format the exception too: browser errors can embed the navigation capability.
+        return remove_meet_links(super().format(record))
 
 
 def setup_logging(level: int = logging.INFO) -> None:
     handler = logging.StreamHandler()
-    handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s", "%H:%M:%S"))
+    handler.setFormatter(SafeFormatter("%(asctime)s %(levelname)s %(name)s: %(message)s", "%H:%M:%S"))
     root = logging.getLogger()
     root.handlers[:] = [handler]
     root.setLevel(level)

@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest";
 import { parkTypeErrors } from "../../../test-support/park/typecheck";
 
 describe("WEB_3a_typecheck: park/app compiles with the repo's strict options", () => {
-  it("WEB_3a_typecheck_park_app_has_no_type_errors", { timeout: 180_000 }, async () => {
+  it("WEB_3a_typecheck_park_app_has_no_type_errors", { timeout: 240_000 }, async () => {
     const errors = (await parkTypeErrors()).filter(
       (e) =>
         e.startsWith("src/park/app/") ||

@@ -11,7 +11,9 @@ field below is read from events and world records that already exist.
   it exists. No world, or an unknown one: an empty list, never a 404 (no membership oracle). Another person's world never appears.
 
 ## Response
-`200 {"worlds": [item, ...], "next_cursor": str | null}`. Empty: `{"worlds": [], "next_cursor": null}`. No fixture or sample world, ever.
+`200 {"worlds": [item, ...], "next_cursor": str | null}`. Empty: `{"worlds": [], "next_cursor": null}`. No fixture world is ever listed, with one exception (STARTER-1, BQ-STARTER-1,
+`tests/test_STARTER_1_sample_project.py`): the recorded sample project `w_sample_village_basic`, an item with `sample: true` and
+title `Sample: <its world.requested title>`, listed for an owner with no worlds of their own or on `?include_sample=1`.
 
 Item, exactly these keys (BQ-S14-2):
 
@@ -35,3 +37,9 @@ A member who is not the owner gets `last_seq` from their own view of the events,
 
 ## Defaults chosen where the PRD is silent
 Default page size 20, maximum 100; error status for a bad limit 422 and a bad cursor 400 (the tests accept 400 or 422 for both); the wrapper keys `worlds` and `next_cursor`; the item key names (`world_id` as `GET /worlds/{id}` uses it); order newest first by `created_at` with the id as tie-break.
+
+## Team worlds (TSW-4b, BQ-CTX-TEAMWORLD, BQ-TEAMWORLD-8)
+`test_BQ_CTX_TEAMWORLD_TSW4b_worlds_list_access_team.py`. A full web or mobile-web sign-in bound to no world also lists the worlds it
+reads as a team reader (a share in force, decided per request by `deps.team_reader`), in the same order and with the same cursor as above.
+A team item has the same five keys as the reader's own view of the world gives, plus `"access": "team"`; the person's own items carry
+no `access` key. Revoked, lapsed or left-team shares are gone on the next request; a people store that cannot be opened is the own list.

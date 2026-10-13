@@ -1,0 +1,31 @@
+# What Tilo offers to produce when it asks "what should I deliver?" (FR-INT-04, INTAKE-QUALITY-1 slice 3; BQ-IQ1-5).
+# The deliverables question lists the kinds with `available: true`, in this order, as choices (the terminal numbers
+# them and sends the labels); a person may pick several. A chosen kind becomes a deliverable with `label` as its title
+# and `format` as its format. A kind that needs work that does not exist yet stays `available: false` and is never
+# offered; set it to true when that work has shipped. Until then an answer that names it is refused, saying what it
+# needs. With no available kind the question falls back to asking for a format.
+# Shape: kinds: [{id (slug), label (1..60 characters, none of ; , + & / < >), format (a brief deliverable format),
+# available (true or false), needs (what must ship first; required when available is false)}], ids and labels
+# unique, at most 6 kinds available. A bad file fails loudly at load. No scenario or subject belongs here: these are
+# generic kinds of work product.
+kinds:
+  - id: study_plan
+    label: Study plan
+    format: markdown
+    available: true
+  - id: notes
+    label: Notes
+    format: markdown
+    available: true
+  - id: question_bank
+    label: Question bank
+    format: markdown
+    available: true
+  - id: mock_test_quiz
+    label: Mock-test quiz
+    format: app
+    available: true
+  - id: past_paper_links
+    label: Past-paper links
+    format: markdown
+    available: true

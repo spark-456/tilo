@@ -7,6 +7,7 @@ import io
 import re
 import zipfile
 
+import httpx
 import pytest
 
 PAST_PAPER_PATHS = ("/papers/paper-1.pdf", "/papers/paper-2.pdf", "/papers/paper-3.pdf")
@@ -42,6 +43,12 @@ def test_LW_09_answer_key_pdf_matches_past_papers(client) -> None:
     assert resp.content.rstrip().endswith(b"%%EOF")
     assert len(resp.content) < 50 * 1024
     assert b"Answer Key" in resp.content
+    answer_lines = re.findall(rb"\((Paper [123] Answers:.*?)\) Tj", resp.content)
+    assert answer_lines == [
+        b"Paper 1 Answers: Q1 = 14.0 flux units; Q2 = negative feedback loop; Q3 = triple point at 300 K.",
+        b"Paper 2 Answers: Q1 = 3:2 ratio; Q2 = 0.35 damping; Q3 = cyclic avoids head-of-line blocking.",
+        b"Paper 3 Answers: Q1 = 101.3 kPa; Q2 = 3; Q3 = uniform heat capacity and zero radiation loss.",
+    ]
 
 
 def test_LW_09_robots_txt_allows_papers_and_disallows_private(client) -> None:
@@ -121,3 +128,11 @@ def test_LW_09_html_page_with_script_tag_and_no_real_hosts(client) -> None:
         for host in _URL_RE.findall(body):
             bare = host.split(":", 1)[0].lower()
             assert bare.endswith((".example", ".invalid")), f"{path} references real host {host!r}"
+
+
+@pytest.mark.parametrize("limit", [0, 3])
+def test_LW_09_redirect_loop_stops_at_the_clients_redirect_limit(client, monkeypatch, limit: int) -> None:
+    monkeypatch.setattr(client, "max_redirects", limit)
+    with pytest.raises(httpx.TooManyRedirects) as caught:
+        client.get("/papers/redirect-loop/0", follow_redirects=True)
+    assert caught.value.request.url.path == f"/papers/redirect-loop/{limit + 1}"

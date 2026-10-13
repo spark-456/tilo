@@ -1,6 +1,6 @@
 import { type MouseEvent, useState } from "react";
 import type { Dec, Ledger } from "../../api/types";
-import { chartGeometry, dayFromX, money } from "./model";
+import { chartGeometry, dayFromX, money, periodOf } from "./model";
 
 /** Spend over the month: the SVG 720x270 chart, its labels and the hover tooltip. */
 export function SpendChart({ L, dec }: { L: Ledger; dec: Dec }) {
@@ -9,7 +9,7 @@ export function SpendChart({ L, dec }: { L: Ledger; dec: Dec }) {
   const move = (e: MouseEvent<HTMLDivElement>) => {
     const r = e.currentTarget.getBoundingClientRect();
     if (!r.width) return;
-    const d = dayFromX((e.clientX - r.left) / r.width);
+    const d = dayFromX((e.clientX - r.left) / r.width, periodOf(L).days);
     if (d !== hover) setHover(d);
   };
   return (
@@ -25,7 +25,7 @@ export function SpendChart({ L, dec }: { L: Ledger; dec: Dec }) {
         width="100%"
         height="100%"
         role="img"
-        aria-label="Running total of spend for September, with a forecast to the month end"
+        aria-label={`Running total of spend for ${periodOf(L).month}, with a forecast to the month end`}
       >
         <path className="park-ledger-p-grid" d={c.grid} />
         <path className="park-ledger-p-pace" d={c.pace} />

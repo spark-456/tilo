@@ -1,8 +1,8 @@
-// WEB-3b follow-up: at narrow widths the "Sample data" chip must not overlap or clip the nav tabs. The tabs scroll sideways
-// inside their own container (`.park-shell__tabs`), so "not clipped" means every tab's text is reachable: the chip's box
-// never intersects the tabs container's box, and where the reference itself shows Home whole (Tilo App.dc.html: the tab
-// strip is ~78px at 390 and Home needs 68; below ~380 the reference scrolls too) so does ours, and the chip keeps its
-// accessible name "Sample data".
+// WEB-3b follow-up: at narrow widths the "Sample data" chip must not overlap or clip the nav. Below 840px the six tabs
+// are one page button (`.park-shell__pagebtn`, QA-DEMO-1 B2) that names the current page and opens a menu of all six,
+// so "not clipped" means the page name is whole and every page is reachable from the menu: the chip's box never
+// intersects the page button's box, the label is not truncated at 390 and wider, and the chip keeps its accessible
+// name "Sample data".
 // Run on a private port: TILO_WEB_PORT=<own port> pnpm --filter @tilo/web exec playwright test
 // e2e/park-shell-chip-narrow.spec.ts --project=chromium --no-deps --workers=1
 import { expect, test } from "@playwright/test";
@@ -27,17 +27,15 @@ for (const width of WIDTHS) {
           const r = el.getBoundingClientRect();
           return { l: r.left, r: r.right, t: r.top, b: r.bottom };
         };
-        const tabs = header.querySelector(".park-shell__tabs") as HTMLElement;
+        const tabs = header.querySelector(".park-shell__pagebtn") as HTMLElement;
         const chipEl = header.querySelector("button.park-shell__sample") as HTMLElement;
-        const home = tabs.querySelector(".park-shell__tab") as HTMLElement;
+        const home = tabs.querySelector(".park-shell__pagelabel") as HTMLElement;
         return {
           chip: box(chipEl),
           tabs: box(tabs),
           home: box(home),
           homeText: home.textContent,
-          tabsScroll: tabs.scrollWidth,
-          tabsClient: tabs.clientWidth,
-          allTabs: [...tabs.querySelectorAll(".park-shell__tab")].map((t) => box(t)),
+          clipped: home.scrollWidth > home.clientWidth,
         };
       });
       const overlap = (a: { l: number; r: number }, b: { l: number; r: number }) =>
@@ -47,14 +45,11 @@ for (const width of WIDTHS) {
         overlap(m.chip, m.tabs),
         `chip ${JSON.stringify(m.chip)} vs tabs ${JSON.stringify(m.tabs)}`,
       ).toBe(false);
-      // The first tab is fully inside the visible strip: its text is not clipped ("Home", not "Hom").
+      // The page is named whole ("Home", not "Ho..."), and every page is in the menu.
       expect(m.homeText).toBe("Home");
-      if (width >= HOME_WHOLE_FROM) {
-        expect(m.home.l).toBeGreaterThanOrEqual(m.tabs.l - 0.5);
-        expect(m.home.r).toBeLessThanOrEqual(m.tabs.r + 0.5);
-      }
-      // The other tabs are still reachable by scrolling the strip.
-      expect(m.allTabs).toHaveLength(6);
+      if (width >= HOME_WHOLE_FROM) expect(m.clipped).toBe(false);
+      await nav.locator("button.park-shell__pagebtn").click();
+      await expect(page.getByRole("menuitem")).toHaveCount(6);
       await expect(chip).toHaveAccessibleName("Sample data");
     });
 

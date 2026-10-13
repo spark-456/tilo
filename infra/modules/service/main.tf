@@ -38,7 +38,9 @@ resource "google_cloud_run_v2_service" "this" {
   ingress             = each.value.ingress
 
   template {
-    service_account = local.service_account_emails[each.key]
+    service_account                  = local.service_account_emails[each.key]
+    timeout                          = each.value.timeout
+    max_instance_request_concurrency = each.value.request_concurrency
 
     # Direct VPC egress for callers of internal-only services (PRD 6.1):
     # a Cloud Run service that calls another over the public internet is
@@ -64,13 +66,15 @@ resource "google_cloud_run_v2_service" "this" {
       image = each.value.image
 
       resources {
-        # Request-based CPU billing: CPU is only allocated while a request
-        # is being processed (PRD 6.6 lean infrastructure).
-        cpu_idle = true
+        # Request-based CPU billing by default: CPU is only allocated while a
+        # request is being processed (PRD 6.6 lean infrastructure). An entry
+        # sets cpu_idle = false only where background work needs CPU between
+        # requests (tilo-api, ADR-0026).
+        cpu_idle = each.value.cpu_idle
 
         limits = {
-          cpu    = "1"
-          memory = "512Mi"
+          cpu    = each.value.cpu
+          memory = each.value.memory
         }
       }
     }
@@ -102,7 +106,9 @@ resource "google_cloud_run_v2_service" "env_ignored" {
   ingress             = each.value.ingress
 
   template {
-    service_account = local.service_account_emails[each.key]
+    service_account                  = local.service_account_emails[each.key]
+    timeout                          = each.value.timeout
+    max_instance_request_concurrency = each.value.request_concurrency
 
     # Direct VPC egress for callers of internal-only services (PRD 6.1):
     # a Cloud Run service that calls another over the public internet is
@@ -128,13 +134,13 @@ resource "google_cloud_run_v2_service" "env_ignored" {
       image = each.value.image
 
       resources {
-        # Request-based CPU billing: CPU is only allocated while a request
-        # is being processed (PRD 6.6 lean infrastructure).
-        cpu_idle = true
+        # Request-based CPU billing unless the entry says otherwise (tilo-api
+        # with var.api_durable_stores, ADR-0026); PRD 6.6 lean infrastructure.
+        cpu_idle = each.value.cpu_idle
 
         limits = {
-          cpu    = "1"
-          memory = "512Mi"
+          cpu    = each.value.cpu
+          memory = each.value.memory
         }
       }
     }
@@ -145,7 +151,7 @@ resource "google_cloud_run_v2_service" "env_ignored" {
   lifecycle {
     ignore_changes = [
       template[0].containers[0].image,
-      # Runtime settings (TILO_* env vars) of services with ignore_env = true (only tilo-api) are set with
+      # Runtime settings (TILO_* env vars) of services with ignore_env = true (tilo-api and tilo-connectors) are set with
       # `gcloud run services update` (docs/routines-rollout.md, FR-AGT-14 and the team store), not by Terraform.
       # Without this, a later run would strip them. Terraform stays authoritative for everything else. This block
       # must therefore declare NO `env` block (tests/repo guard): declared env would be silently never applied.
@@ -163,6 +169,12 @@ resource "google_cloud_run_v2_service" "env_ignored" {
 moved {
   from = google_cloud_run_v2_service.this["api"]
   to   = google_cloud_run_v2_service.env_ignored["api"]
+}
+
+# ADR-0032 T5: connectors' TILO_* settings are set by hand too.
+moved {
+  from = google_cloud_run_v2_service.this["connectors"]
+  to   = google_cloud_run_v2_service.env_ignored["connectors"]
 }
 
 locals {

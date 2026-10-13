@@ -63,8 +63,9 @@ run "PRD_6_6_request_based_cpu_billing" {
   command = plan
 
   assert {
-    condition     = alltrue([for s in values(output.cloud_run_services) : s.cpu_idle == true])
-    error_message = "Every Cloud Run service must bill CPU only during request processing (PRD 6.6 lean infrastructure)."
+    # PROD-WIRE 3 (ADR-0026): tilo-api alone runs with cpu_idle = false (one writer instance; pinned in prod_wire_api.tftest.hcl).
+    condition     = alltrue([for name, s in output.cloud_run_services : s.cpu_idle == true if name != "api"])
+    error_message = "Every Cloud Run service except tilo-api must bill CPU only during request processing (PRD 6.6 lean infrastructure)."
   }
 }
 
@@ -133,10 +134,43 @@ run "PRD_6_1_internal_services_invokable_only_by_their_callers" {
 
   assert {
     condition = alltrue([
-      for name in ["connectors", "browser", "render"] :
+      for name in ["browser", "render"] :
       output.cloud_run_services[name].invokers == ["serviceAccount:tilo-harness@${var.project_id}.iam.gserviceaccount.com"]
     ])
-    error_message = "connectors, browser and render must be invokable only by tilo-harness (PRD 6.1)."
+    error_message = "browser and render must be invokable only by tilo-harness (PRD 6.1)."
+  }
+}
+
+# ADR-0032 decision 9 (T5): the meeting-host RPC. tilo-api calls tilo-connectors, so connectors has exactly two
+# invokers: harness (PRD 6.1) and api. Nobody else (not channels, render, browser, a Scheduler or Tasks identity,
+# allUsers), and a single instance until the Firestore CAS lands (CON-D9, ticket T7).
+run "ADR_0032_connectors_invokable_only_by_harness_and_api_and_single_instance" {
+  command = plan
+
+  assert {
+    condition = toset(output.cloud_run_services["connectors"].invokers) == toset([
+      "serviceAccount:tilo-harness@${var.project_id}.iam.gserviceaccount.com",
+      "serviceAccount:tilo-api@${var.project_id}.iam.gserviceaccount.com",
+    ]) && length(output.cloud_run_services["connectors"].invokers) == 2
+    error_message = "connectors must be invokable by exactly tilo-harness and tilo-api (ADR-0032 decision 9)."
+  }
+
+  assert {
+    condition     = output.cloud_run_services["connectors"].max_instance_count == 1 && output.cloud_run_services["connectors"].min_instance_count == 0
+    error_message = "connectors runs at most one instance (CON-D9) and still scales to zero."
+  }
+
+  assert {
+    condition     = output.cloud_run_services["connectors"].ingress == "INGRESS_TRAFFIC_INTERNAL_ONLY" && !output.cloud_run_services["connectors"].public
+    error_message = "connectors stays internal-only; api reaches it through its Direct VPC egress (ADR-0032 decision 9)."
+  }
+
+  assert {
+    condition = alltrue([
+      for name in ["channels", "browser", "render", "sandbox-web"] :
+      !contains(output.cloud_run_services["connectors"].invokers, "serviceAccount:tilo-${name}@${var.project_id}.iam.gserviceaccount.com")
+    ])
+    error_message = "Only api and harness may invoke connectors; channels, browser, render and sandbox-web may not."
   }
 }
 

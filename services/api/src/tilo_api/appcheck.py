@@ -6,7 +6,8 @@ the flag `TILO_APPCHECK_ENFORCE`, read on every request, and ONLY exactly "1" tu
 (infra/ACCESS.md section 7: the owner alone flips it). Off, a missing, empty, refused or unverifiable token is logged
 once as a WARNING on `tilo_api.appcheck` (never the token, never the error text) and the answer is unchanged. On, it
 is a 401 and the route never runs. `/health`, `/healthz` and `POST /internal/schedules/tick` (its own Google OIDC
-check, FR-AGT-14b) are never checked: probes and Cloud Scheduler carry no App Check token.
+check, FR-AGT-14b) are never checked: probes and Cloud Scheduler carry no App Check token; nor is `GET`/`POST
+/l/<token>` (FR-PA-06b), a mail link whose signed single-use token is its own credential.
 
 Deterministic code only: no model decides who is let in. Dev mode (`TILO_API_DEV=1`) and CI open no socket: the
 dev verifier refuses every token without a fetch, and a verifier with no project configured refuses before one.
@@ -32,6 +33,8 @@ from starlette.concurrency import run_in_threadpool
 from starlette.responses import JSONResponse
 from starlette.types import ASGIApp, Receive, Scope, Send
 
+from tilo_api import access
+
 logger = logging.getLogger("tilo_api.appcheck")
 
 HEADER = b"x-firebase-appcheck"  # ASGI header names are lower-case bytes
@@ -43,12 +46,19 @@ EXEMPT_ROUTES: frozenset[tuple[str, str]] = frozenset(
     {("GET", "/health"), ("GET", "/healthz"), ("POST", "/internal/schedules/tick")}
 )
 
+# FR-PA-06b: `GET` and `POST` of `/l/<token>` are the plate digest's emailed Done and Snooze links. A mail client or
+# browser opened from a mail sends no App Check token, and the single-use HMAC-signed token in the path is the
+# credential, checked by the route itself. Only this prefix is exempt (`access.public_link`: one path segment, so the
+# access gate and this one agree on exactly which paths); the exact-route list above is unchanged.
 MAX_TOKEN_CHARS = 4096  # a real token is about 1 KiB; a longer one is refused without being parsed or verified
 
 JWKS_URL = "https://firebaseappcheck.googleapis.com/v1/jwks"
 ISSUER_PREFIX = "https://firebaseappcheck.googleapis.com/"
 JWKS_TTL_S = 900.0  # a fetched key set is trusted this long, counted from the fetch
 JWKS_FETCH_TIMEOUT_S = 3.0
+# past its TTL a snapshot may still serve a KNOWN key id for this long, only while a refresh is in flight or has
+# just failed (BQ-SEC10-4)
+JWKS_STALE_GRACE_S = 3600.0
 JWKS_RETRY_COOLDOWN_S = 10.0  # after ANY fetch attempt no other starts this soon (a dead endpoint costs one per 10 s)
 _REFETCH_MIN_S = 30.0  # an unknown key id inside the TTL refetches at most this often
 _MAX_JWKS_BYTES = 65536
@@ -70,7 +80,8 @@ class AppCheckVerifier(Protocol):
         ...
 
 
-def _b64(part: str) -> bytes:
+def b64url_decode(part: str) -> bytes:
+    """Unpadded base64url, as a JWT part is written (shared with `firebase_auth`)."""
     return base64.urlsafe_b64decode(part + "=" * (-len(part) % 4))
 
 
@@ -84,7 +95,9 @@ def fetch_jwks(url: str) -> dict[str, rsa.RSAPublicKey]:
     keys: dict[str, rsa.RSAPublicKey] = {}
     for jwk in response.json().get("keys", []):
         if jwk.get("kty") == "RSA" and isinstance(jwk.get("kid"), str):
-            numbers = rsa.RSAPublicNumbers(int.from_bytes(_b64(jwk["e"]), "big"), int.from_bytes(_b64(jwk["n"]), "big"))
+            numbers = rsa.RSAPublicNumbers(
+                int.from_bytes(b64url_decode(jwk["e"]), "big"), int.from_bytes(b64url_decode(jwk["n"]), "big")
+            )
             keys[jwk["kid"]] = numbers.public_key()
     if not keys:
         raise ValueError("key fetch returned no keys")
@@ -98,8 +111,12 @@ def _fetch_jwks() -> dict[str, rsa.RSAPublicKey]:
 class JwksKeyCache:
     """One immutable snapshot of a JWKS, refreshed single-flight: the snapshot is read without a lock; a refresh takes
     the lock with a non-blocking acquire, so at most one thread is inside a fetch and a caller that finds one running
-    is refused at once. A failed fetch stores nothing, a snapshot past `JWKS_TTL_S` is never served, and no fetch
-    starts within `JWKS_RETRY_COOLDOWN_S` of another. Shared by the App Check and Firebase ID-token verifiers."""
+    is refused at once. A failed fetch stores nothing new, a snapshot past `JWKS_TTL_S` is served only inside the
+    stale grace (`JWKS_STALE_GRACE_S`, for a key id it already holds, and only while a refresh is in flight or has
+    just failed: after a restart or a TTL refresh a valid token is not refused for the fetch's sake; a true cold
+    start, with nothing held yet, still refuses until the first fetch lands), and no
+    fetch starts within `JWKS_RETRY_COOLDOWN_S` of another. Shared by the App Check and Firebase ID-token
+    verifiers."""
 
     def __init__(self, fetch: Callable[[], dict[str, rsa.RSAPublicKey]], clock: Callable[[], float]) -> None:
         self._fetch, self._clock = fetch, clock
@@ -107,15 +124,46 @@ class JwksKeyCache:
         self._snapshot: tuple[dict[str, rsa.RSAPublicKey], float] | None = None
         self._tried_at = float("-inf")
 
+    def _stale(self, kid: str, now: float) -> dict[str, rsa.RSAPublicKey] | None:
+        """The held keys when the snapshot is past its TTL but inside the grace and holds `kid`, else None."""
+        snapshot = self._snapshot
+        if snapshot is None:
+            return None
+        keys, fetched = snapshot
+        age = now - fetched
+        return keys if JWKS_TTL_S <= age < JWKS_TTL_S + JWKS_STALE_GRACE_S and kid in keys else None
+
     def _usable(self, kid: str, now: float) -> dict[str, rsa.RSAPublicKey] | None:
         snapshot, tried = self._snapshot, self._tried_at
         if snapshot is not None and 0 <= now - snapshot[1] < JWKS_TTL_S:
             keys, fetched = snapshot
             if kid in keys or now - max(fetched, tried) < _REFETCH_MIN_S:
                 return keys
-        if 0 <= now - tried < JWKS_RETRY_COOLDOWN_S:
+        if 0 <= now - tried < JWKS_RETRY_COOLDOWN_S:  # a refresh has just run (and failed, or nothing new was found)
+            stale = self._stale(kid, now)
+            if stale is not None:
+                return stale
             raise TokenRefused("keys_unavailable")
         return None
+
+    def warm(self) -> bool:
+        """Best effort at service start: fetch the key set once so the first request after an idle period (min-instances
+        0 makes every idle period a cold start) finds keys. True when keys are held afterwards. Never raises, never
+        blocks behind a fetch already running, and a failure stores nothing and spends no cooldown: the first request
+        tries for itself."""
+        if not self._lock.acquire(blocking=False):
+            return False
+        try:
+            if self._snapshot is not None:
+                return True
+            fetched = self._fetch()
+            now = self._clock()
+            self._snapshot, self._tried_at = (fetched, now), now
+            return True
+        except Exception:
+            return False
+        finally:
+            self._lock.release()
 
     def _keys(self, kid: str) -> dict[str, rsa.RSAPublicKey]:
         now = self._clock()
@@ -123,6 +171,9 @@ class JwksKeyCache:
         if keys is not None:
             return keys
         if not self._lock.acquire(blocking=False):
+            stale = self._stale(kid, now)
+            if stale is not None:
+                return stale  # a refresh is running: the held keys serve a known key id meanwhile
             raise TokenRefused("key_refresh_in_flight")
         try:
             now = self._clock()
@@ -133,9 +184,14 @@ class JwksKeyCache:
             try:
                 fetched = self._fetch()
             except Exception:
+                now = self._clock()  # the fetch took time: the grace is judged at the moment it failed
                 snapshot = self._snapshot
-                if snapshot is None or not 0 <= now - snapshot[1] < JWKS_TTL_S:
-                    self._snapshot = None
+                if snapshot is None or not 0 <= now - snapshot[1] < JWKS_TTL_S + JWKS_STALE_GRACE_S:
+                    self._snapshot = None  # beyond the grace nothing is kept
+                else:
+                    stale = self._stale(kid, now)
+                    if stale is not None:
+                        return stale  # the fetch just failed: a known key id is still served inside the grace
                 raise
             self._snapshot = (fetched, now)
             return fetched
@@ -150,8 +206,8 @@ class GoogleAppCheckVerifier(JwksKeyCache):
     header and claims are read first, from public values only, and a token that cannot pass them is refused before
     any key is fetched. Keys live in one immutable snapshot (read without a lock); a refresh takes the lock with a
     non-blocking acquire, so at most one thread is inside a fetch and a caller that finds one running is refused at
-    once. A failed fetch stores nothing and a snapshot past `JWKS_TTL_S` is never served. `fetch` and the clocks
-    are injectable; tests and dev never reach the default fetch."""
+    once. A failed fetch stores nothing and a snapshot past `JWKS_TTL_S` is served only inside the stale grace.
+    `fetch` and the clocks are injectable; tests and dev never reach the default fetch."""
 
     def __init__(
         self,
@@ -170,7 +226,11 @@ class GoogleAppCheckVerifier(JwksKeyCache):
         if len(parts) != 3 or len(token) > MAX_TOKEN_CHARS:
             raise TokenRefused("not_a_jwt")
         try:
-            header, claims, signature = json.loads(_b64(parts[0])), json.loads(_b64(parts[1])), _b64(parts[2])
+            header, claims, signature = (
+                json.loads(b64url_decode(parts[0])),
+                json.loads(b64url_decode(parts[1])),
+                b64url_decode(parts[2]),
+            )
         except (binascii.Error, ValueError) as exc:
             raise TokenRefused("not_a_jwt") from exc
         if not isinstance(header, dict) or not isinstance(claims, dict) or header.get("alg") != "RS256":
@@ -202,7 +262,22 @@ class GoogleAppCheckVerifier(JwksKeyCache):
         return claims
 
 
-class _RefuseAll:
+def warm_up() -> None:
+    """Warms the App Check and sign-in key sets (best effort; only on Cloud Run: nothing else opens a socket)."""
+    if "K_SERVICE" not in os.environ:
+        return
+    from tilo_api import firebase_auth  # noqa: PLC0415  (firebase_auth imports this module)
+
+    for make in (default_verifier, firebase_auth.default_verifier):
+        try:
+            warm = getattr(make(), "warm", None)
+            if callable(warm):
+                warm()
+        except Exception as exc:  # a start never waits on, or fails for, a key fetch
+            logger.warning("key warm-up skipped (%s)", type(exc).__name__)
+
+
+class RefuseAll:
     """Dev mode and an unconfigured project: nothing is fetched, nothing is verified."""
 
     def __init__(self, why: str) -> None:
@@ -210,6 +285,9 @@ class _RefuseAll:
 
     def verify(self, token: str) -> Mapping[str, Any]:
         raise TokenRefused(self._why)
+
+    def warm(self) -> bool:
+        return False  # nothing to fetch
 
 
 @functools.cache
@@ -223,10 +301,10 @@ def default_verifier() -> AppCheckVerifier:
     from tilo_api import dev  # noqa: PLC0415  (dev imports deps, which imports this module)
 
     if dev.dev_enabled():
-        return _RefuseAll("dev_mode")
+        return RefuseAll("dev_mode")
     project = (os.environ.get("TILO_FIRESTORE_PROJECT") or os.environ.get("GOOGLE_CLOUD_PROJECT") or "").strip()
     if not project:
-        return _RefuseAll("no_project")
+        return RefuseAll("no_project")
     return _google_verifier(project)
 
 
@@ -241,12 +319,32 @@ def _token_of(scope: Scope) -> str:
     return ""
 
 
+_MISSING_LOG_EVERY_S = (
+    60.0  # a flood of tokenless requests is one log line a minute, with a count, never one per request
+)
+_missing_log = {"at": float("-inf"), "skipped": 0}
+_missing_lock = threading.Lock()
+
+
+def _warn_missing(clock: Callable[[], float] = time.monotonic) -> None:
+    """Logs the missing-token warning at most once per `_MISSING_LOG_EVERY_S` per process, naming how many were left
+    out since the last line (an unauthenticated caller must not be able to fill the log or the bill)."""
+    now = clock()
+    with _missing_lock:
+        if now - _missing_log["at"] < _MISSING_LOG_EVERY_S:
+            _missing_log["skipped"] += 1
+            return
+        skipped, _missing_log["at"], _missing_log["skipped"] = _missing_log["skipped"], now, 0
+    suffix = f", {skipped} more since the last line" if skipped else ""
+    logger.warning("App Check token missing from the request (reason=missing%s)", suffix)
+
+
 def _is_verified(scope: Scope, token: str) -> bool:
     """True for a genuine token. Anything else (no token, a refused one, a verifier that fails) is False and logged
     once as a warning with a fixed reason code (`TokenRefused.code`, or `verifier_failed:<error type>` for any other
     failure of the verifier), never the token or an error text."""
     if not token:
-        logger.warning("App Check token missing from the request (reason=missing)")
+        _warn_missing()
         return False
     from tilo_api import deps  # noqa: PLC0415  (deps imports this module)
 
@@ -269,7 +367,12 @@ class AppCheckGate:
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         kind = scope["type"]
-        if kind not in {"http", "websocket"} or (kind == "http" and (scope["method"], scope["path"]) in EXEMPT_ROUTES):
+        if kind not in {"http", "websocket"} or (
+            kind == "http"
+            and (
+                (scope["method"], scope["path"]) in EXEMPT_ROUTES or access.public_link(scope["method"], scope["path"])
+            )
+        ):
             await self.app(scope, receive, send)
             return
         token = _token_of(scope)

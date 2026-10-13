@@ -105,6 +105,30 @@ def test_CL_INT_5c_plan_reply_ends_with_the_first_approval_action_and_names_no_g
     assert all(u["title"].endswith("(dev)") for u in reply["units"])
 
 
+def test_CL_INT_5c_plan_reply_skips_gated_read_actions_of_connectors_that_sort_first():
+    # FR-UX-18 catalogue cards: `bamboohr`/`github` carry only a T3 `read_*` action behind an approval gate and sort
+    # ahead of `gmail`; a dev run must still end on gmail's draft, not on a read that raises a sensitive-step ask.
+    catalogue = json.dumps({"skills": [], "connectors": [
+        {"id": "bamboohr", "actions": [{"id": "read_bamboohr", "gate_type": "approval"}]},
+        {"id": "github", "actions": [{"id": "read_github", "gate_type": "approval"}]},
+        {"id": "gmail", "actions": [
+            {"id": "read_email", "gate_type": "none"}, {"id": "create_draft", "gate_type": "approval"},
+        ]},
+    ]})  # fmt: skip
+
+    units = _reply(_plan_request(catalogue))["units"]
+
+    assert (units[-1]["connectors"], units[-1]["actions"]) == (["gmail"], ["create_draft"])
+
+
+def test_CL_INT_5c_plan_reply_with_only_gated_reads_has_nothing_to_send():
+    catalogue = json.dumps({"skills": [], "connectors": [
+        {"id": "bamboohr", "actions": [{"id": "read_bamboohr", "gate_type": "approval"}]},
+    ]})  # fmt: skip
+
+    assert [u["actions"] for u in _reply(_plan_request(catalogue))["units"]] == [[], [], []]
+
+
 @pytest.mark.parametrize("catalogue", ["not json", "{}", '{"connectors": [{"id": "m", "actions": "x"}]}'])
 def test_CL_INT_5c_plan_reply_without_a_usable_gated_action_has_nothing_to_send(catalogue):
     assert [u["actions"] for u in _reply(_plan_request(catalogue))["units"]] == [[], [], []]

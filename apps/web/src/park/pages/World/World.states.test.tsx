@@ -127,10 +127,11 @@ describe("WEB_6_world_states: the data comes through the Api", () => {
 });
 
 describe("WEB_6_world_states: which world opens", () => {
-  it("WEB_6_world_states_an_unknown_id_falls_back_to_the_first_world_as_the_reference_does", async () => {
-    // Reference: all.find(id) || all.find(k1); with no started worlds the first world is K1.
+  it("WEB_6_world_states_an_unknown_id_is_page_not_found_never_another_world", async () => {
+    // QA-DEMO-1 M2: the reference falls back to K1, which showed another job (with Approve buttons) under a stale link.
     const { el } = await mountWorld({ id: "nope" });
-    expect(textOf(q(el, "h1"))).toBe(K1.name);
+    expect(textOf(q(el, "h1"))).toBe("Page not found");
+    expect(el.querySelector('[data-testid="park-page-world"]')).toBeNull();
   });
 
   it("WEB_6_world_states_no_id_in_params_falls_back_the_same_way", async () => {
@@ -316,15 +317,33 @@ describe("WEB_6_world_states: loading and not built", () => {
     expect(qa(el, "h1").length).toBeLessThanOrEqual(1);
   });
 
-  it.each(["getWorlds", "getPlans", "getDecisions", "getSkills", "getConnectors"] as const)(
-    "WEB_6_world_states_when_%s_is_not_built_the_page_says_Not_connected_yet_and_shows_no_sample_value",
-    async (method) => {
+  it("WEB_6_world_states_when_getWorlds_is_not_built_the_page_says_Not_connected_yet_and_shows_no_sample_value", async () => {
+    const base = createFixtureApi();
+    const { el } = await mountWorld({ api: { ...base, getWorlds: createLiveApi().getWorlds } });
+    const text = pageText(el);
+    expect(text).toContain("Not connected yet");
+    for (const sample of SAMPLE_ONLY) expect(text, sample).not.toContain(sample);
+  });
+
+  // LIVE-HOME: the world itself comes from the worlds; a side read that is not built or fails leaves a gap in its
+  // own card, which says so, and the page still opens.
+  it.each([
+    ["getPlans", "City map: Not available yet"],
+    ["getDecisions", "Waiting on you"],
+    ["getSkills", "Skills"],
+    ["getConnectors", "Tools"],
+  ] as const)(
+    "WEB_6_world_states_when_%s_is_not_built_only_its_card_says_Not_available_yet",
+    async (method, title) => {
       const base = createFixtureApi();
       const live = createLiveApi();
       const { el } = await mountWorld({ api: { ...base, [method]: live[method] } as Api });
       const text = pageText(el);
-      expect(text).toContain("Not connected yet");
-      for (const sample of SAMPLE_ONLY) expect(text, sample).not.toContain(sample);
+      expect(text).not.toContain("Not connected yet");
+      expect(text).toContain("Not available yet");
+      expect(text).toContain(title);
+      expect(text).not.toMatch(/NotBuilt|not_built|getPlans|getDecisions|getSkills|getConnectors/);
+      expect(qa(el, "h1")).toHaveLength(1);
     },
   );
 

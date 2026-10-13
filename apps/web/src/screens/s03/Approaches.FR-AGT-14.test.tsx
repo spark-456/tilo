@@ -132,6 +132,21 @@ afterEach(async () => {
 });
 
 describe("FR-AGT-14 S-03 Repeat weekly", () => {
+  it("FR-AGT-14 groups the cadence and connects an invalid time to its hint", async () => {
+    await open();
+    await turnOn();
+    const time = q<HTMLInputElement>('[data-testid="repeat-time"]');
+    expect(time?.closest('[role="group"], fieldset')?.getAttribute("aria-label")).toBe(
+      "Repeat weekly",
+    );
+    await act(async () => {
+      if (time) setValue(time, "");
+    });
+    const hintId = time?.getAttribute("aria-describedby");
+    expect(hintId).toBeTruthy();
+    expect(document.getElementById(hintId ?? "")?.textContent).toContain("Enter a time");
+  });
+
   it("FR-AGT-14 S-03: a 'Repeat weekly' checkbox is present and off by default", async () => {
     await open();
     expect(repeat()).not.toBeNull();
@@ -269,4 +284,24 @@ describe("FR-AGT-14 S-03 Repeat weekly", () => {
     expect(schedules()).toHaveLength(0);
     expect(window.location.pathname).toBe("/task/t1/approaches");
   });
+});
+
+it("FR_AGT_14 repeat controls share a named group and invalid time describes its hint", async () => {
+  await open();
+  await turnOn();
+  const time = q<HTMLInputElement>('[data-testid="repeat-time"]');
+  const group = time?.closest('[role="group"], fieldset');
+  expect(group?.getAttribute("aria-label")).toBe("Repeat weekly");
+  expect(group?.contains(q('[data-testid="repeat-weekday"]'))).toBe(true);
+  expect(group?.contains(q('[data-testid="repeat-tz"]'))).toBe(true);
+  await act(async () => {
+    if (time) setValue(time, "");
+  });
+  const hintId = time?.getAttribute("aria-describedby");
+  expect(hintId).toBeTruthy();
+  expect(document.getElementById(hintId ?? "")?.textContent).toBe("Enter a time such as 09:00.");
+  await act(async () => {
+    if (time) setValue(time, "09:00");
+  });
+  expect(time?.hasAttribute("aria-describedby")).toBe(false);
 });

@@ -59,6 +59,7 @@ describe("FR-TEAM-01 invites", () => {
     const { root } = await renderTeam(makeApp());
     const btn = buttonNamed(root, "Invite");
     expect(btn.disabled).toBe(true);
+    expect(btn.title, "issue 932: a disabled Invite says why").toMatch(/^Enter a work email at /);
     await typeInto(inputNamed(root, "Invite by email"), "a@b");
     expect(btn.disabled).toBe(true);
     await typeInto(inputNamed(root, "Invite by email"), "a@b.co");
