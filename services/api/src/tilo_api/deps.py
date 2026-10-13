@@ -388,20 +388,70 @@ def get_event_writer(request: Request = None) -> EventWriter:  # type: ignore[as
     return deployed()[1]
 
 
-def get_ledger() -> Sequence[LedgerEntry]:
-    """The Treasury's ledger (FR-MTR-10). No ledger store is wired in yet (BQ-MTR10-4): fail closed."""
-    raise HTTPException(status_code=503, detail="not_configured")
+_treasury_retry_at: float | None = None  # after a failed client build, no new attempt until then (FS-18 window)
 
 
-def get_ledger_writer() -> Any:
-    """The Treasury's write seam (COST-FAST-1b, BQ-COSTFAST-7): an object with `append(LedgerEntry)`. Not wired
-    yet, like `get_ledger`: fail closed. Quick treats that as best effort (`ledger_writer_for`)."""
-    raise HTTPException(status_code=503, detail="not_configured")
+def _treasury(request: Request | None) -> Any:
+    """The Treasury's ledger store (FR-MTR-10, BQ-MTR10-4, ticket T3), one object for the read and the write.
+    Deployed (`K_SERVICE` or `CLOUD_RUN_JOB`): an anonymous demo session's own in-memory ledger (it stores nothing
+    durable), else `FirestoreTreasuryLedger` on the process's one client for a valid `TILO_FIRESTORE_PROJECT`, with the
+    FS-18 back-off after a failed build. Anything else is 503, never an empty or invented ledger. Not deployed: 503
+    `not_configured` (dev mode and the tests wire their own ledger on these seams)."""
+    global _treasury_retry_at
+    from tilo_api import ephemeral, prod, store_door  # noqa: PLC0415  (they import this module's neighbours)
+
+    if not enforced():
+        raise HTTPException(status_code=503, detail="not_configured")
+    if request is not None and (demo := ephemeral.for_request(request)) is not None:
+        return demo.treasury
+    project = os.environ.get(store_door.ENV_PROJECT, "")
+    if not store_door.GCP_PROJECT.fullmatch(project):
+        raise HTTPException(status_code=503, detail="not_configured")
+    retry_at = _treasury_retry_at
+    if retry_at is not None and people_stores_clock() < retry_at:
+        raise HTTPException(status_code=503, detail="store_unavailable")
+    try:
+        client = prod.firestore_client(project)
+    except prod.FirestoreNotConfigured as exc:
+        raise HTTPException(status_code=503, detail="not_configured") from exc
+    except Exception as exc:  # no credentials or no network: closed, backed off, never the text
+        _treasury_retry_at = people_stores_clock() + PEOPLE_STORES_BACKOFF_S
+        raise HTTPException(status_code=503, detail="store_unavailable") from exc
+    _treasury_retry_at = None
+    from tilo_api.treasury_firestore import FirestoreTreasuryLedger  # noqa: PLC0415
+
+    return FirestoreTreasuryLedger(client, org_id=ORG_ID)
+
+
+def get_ledger(request: Request = None) -> Sequence[LedgerEntry]:  # type: ignore[assignment]  # FastAPI injects it
+    """The Treasury's ledger (FR-MTR-10) as the signed-in person's own recorded entries, oldest first. A ledger that
+    cannot be built or read is 503, never an empty report (HR-1); nobody signed in is the sign-in 401."""
+    store = _treasury(request)
+    if request is None:  # no request, no person to read for
+        raise HTTPException(status_code=503, detail="not_configured")
+    uid = resolve_principal(request.app, request).user_id
+    try:
+        return cast(Sequence[LedgerEntry], store.entries_for(uid))
+    except Exception as exc:  # a store error, a document that is not an entry, too many rows: the whole read is refused
+        logger.warning("treasury ledger unreadable: %s", type(exc).__name__)
+        raise HTTPException(status_code=503, detail="store_unavailable") from exc
+
+
+def get_ledger_writer(request: Request = None) -> Any:  # type: ignore[assignment]  # FastAPI injects it; None elsewhere
+    """The Treasury's write seam (COST-FAST-1b, BQ-COSTFAST-7): an object with `append(LedgerEntry)` and
+    `append_once(entry_id, LedgerEntry)` (the live metering's idempotent write). Callers treat a refusal or a failure
+    as best effort (`ledger_writer_for`)."""
+    return _treasury(request)
 
 
 def ledger_writer_for(request: Request) -> Any:
-    """The writer as the app is wired (overrides included), or None when it is unwired or fails."""
-    return _resolve(request, get_ledger_writer)
+    """The writer as the app is wired (overrides included, which take no argument), or None when it is unwired or
+    fails: a person's spend is then not recorded here, and nothing else changes."""
+    try:
+        override = request.app.dependency_overrides.get(get_ledger_writer)
+        return override() if override is not None else get_ledger_writer(request)
+    except Exception:
+        return None
 
 
 def get_time_baselines() -> Any:
