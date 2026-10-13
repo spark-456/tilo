@@ -20,6 +20,8 @@ COPY config/prices*.yaml /opt/tilo/config/
 COPY config/speech*.yaml /opt/tilo/config/
 COPY config/voice*.yaml /opt/tilo/config/
 COPY config/meeting*.yaml /opt/tilo/config/
+# The Live voice meter's answers are checked against the contract's JSON Schema itself (ADR-0042, MV-07).
+COPY contracts/meeting_voice_meter.schema.json contracts/common.schema.json /opt/tilo/contracts/
 COPY prompts/router /opt/tilo/prompts/router
 COPY prompts/speech /opt/tilo/prompts/speech
 ENV TILO_REPO_ROOT=/opt/tilo \

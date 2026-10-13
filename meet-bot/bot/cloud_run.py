@@ -14,6 +14,7 @@ from tilo_connectors.host_auth import GOOGLE_ISSUERS, CertsUnavailable, GoogleOi
 from tilo_contracts import MeetingJoin, Transcript
 
 from .events import remove_meet_links
+from .voice_meter import CLAIM_HEADER, CLAIM_RE
 
 
 async def attend_while_connected(request: Request, attendance):
@@ -94,10 +95,14 @@ def create_app(*, attend=None, verifier=None, clock=None) -> FastAPI:
             return reply(422, "Invalid or expired join capability")
         if busy.locked():
             return reply(409, "Bot is attending another meeting")
+        # ADR-0042 (MV-16): tilo-api's nonce for this attend. Held in memory, handed to the worker only, never logged;
+        # absent or malformed (an older caller) means no meter: the call is exactly what it was.
+        claim = request.headers.get(CLAIM_HEADER, "")
+        extra = {"claim": claim} if CLAIM_RE.fullmatch(claim) else {}
         async with busy:
             try:
                 # Leave time for cleanup before Cloud Run's 3600s request deadline.
-                result = await attend_while_connected(request, attend(meeting_id, join.join_url))
+                result = await attend_while_connected(request, attend(meeting_id, join.join_url, **extra))
                 transcript = Transcript.model_validate(remove_meet_links(result))
                 if transcript.meeting_id != meeting_id:
                     raise ValueError("wrong meeting")
