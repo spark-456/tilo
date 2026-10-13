@@ -343,7 +343,7 @@ def _typed(read: Callable[[str], str]) -> str:
         if line == "/end":
             break
         lines.append(line)
-    return "\n".join(lines)
+    return "\n".join(lines).rstrip()  # blank lines inside stay (#594); trailing ones mean nothing
 
 
 def _exit_code(report: e2e.LiveE2EReport) -> int:
