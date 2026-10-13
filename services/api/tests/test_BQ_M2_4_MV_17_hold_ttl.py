@@ -15,7 +15,7 @@ import pytest
 from _adr35_l2_fake import OccFirestore
 from _mv_lib import MEETING, OTHER_MEETING, OWNER, OWNER_2, UNIT, Rig, new_key
 from _sec16_lib import AT, JUDGE_A, JUDGE_B, ORG, SpyLedger
-from test_SEC_16_GOLIVE_935_firestore_spend_ledger import make, reserve
+from test_SEC_16_GOLIVE_935_firestore_spend_ledger import emulator_db, make, reserve  # noqa: F401  (fixture)
 
 
 @pytest.fixture
@@ -162,3 +162,33 @@ def test_BQ_M2_4_MV_17_the_schedule_tick_settles_expired_ledger_holds_and_a_fail
     schedules._sweep_spend(request, lambda: AT + timedelta(hours=3))  # type: ignore[arg-type]  # never raises
     request.app.dependency_overrides[deps.get_spend_cap_ledger] = lambda: SpyLedger(object())  # no such method
     schedules._sweep_spend(request, lambda: AT + timedelta(hours=3))  # type: ignore[arg-type]
+
+
+def test_BQ_M2_4_MV_17_no_ledger_wired_is_not_a_warning_on_every_tick(caplog):
+    from fastapi import HTTPException
+    from tilo_api import deps, schedules
+
+    def unwired():
+        raise HTTPException(status_code=503, detail="not_configured")
+
+    request = SimpleNamespace(app=SimpleNamespace(dependency_overrides={deps.get_spend_cap_ledger: unwired}))
+    with caplog.at_level("WARNING"):
+        schedules._sweep_spend(request, lambda: AT)  # type: ignore[arg-type]
+    assert not [r for r in caplog.records if "spend hold sweep failed" in r.getMessage()]
+
+
+def test_BQ_M2_4_MV_17_a_failing_whole_settle_is_logged_once_by_class_and_still_raises(caplog):
+    from tilo_api.meeting_voice_claims import Hold
+
+    class Broken:
+        def settle_unit(self, *_a: object) -> None:
+            raise RuntimeError("store down: secret detail")
+
+    hold = Hold(plan=object(), guard=Broken(), unit=100, reserved_at=0.0)  # type: ignore[arg-type]
+    with caplog.at_level("WARNING"):
+        for _ in range(3):
+            with pytest.raises(RuntimeError):
+                hold.settle_whole()
+    lines = [r.getMessage() for r in caplog.records if "settle failed" in r.getMessage()]
+    assert lines == ["meeting voice hold settle failed (RuntimeError)"], "once, by class, no detail"
+    assert hold.state == "open"
