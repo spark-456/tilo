@@ -18,9 +18,12 @@ The owner must still confirm minutes using the existing confirmation route. This
 never creates or opens items, picks recipients, drafts email, or enqueues an outbox entry.
 FR-MTG-08's existing `meeting_followup` drafter keeps its T3 approval/outbox guards.
 
-Remaining integration: provider-backed analyst and semantic verifier, deterministic
-owner/date resolution, proposed-item creation, and API wiring of the follow-up drafter.
-The offline import seam does not establish FR-MTG-03's extraction recall/precision gate.
+The owner-scoped `analyze_and_publish_minutes` seam now supplies the pinned transcript
+and stored agenda to the analyst and semantic verifier, with deterministic owner/date
+resolution and a publication version guard; see API_FR_MTG_03_INTEGRATION.md.
+Remaining: recorded provider-quality evaluation, proposed-item creation, public
+mode/spend wiring and API wiring of the follow-up drafter. The import seam alone
+does not establish extraction quality; the synthetic offline gate tests its plumbing.
 
 Validation: `uv run --package tilo-api pytest
 services/api/tests/test_FR_MTG_03_minutes_publication.py -q -p no:cacheprovider`.
