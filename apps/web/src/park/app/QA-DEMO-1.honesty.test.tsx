@@ -10,7 +10,7 @@ import { mountApp, mountShell, seen, settle } from "../../../test-support/park/s
 import { HomePage } from "../pages/Home/HomePage";
 import { ProfilePage } from "../pages/Profile/ProfilePage";
 import { useApp } from "./context";
-import { DEMO_DECIDE, DEMO_START } from "./store";
+import { DEMO_DECIDE } from "./store";
 
 vi.mock("../engines/park", async () =>
   (await import("../../../test-support/park/shellEngine")).parkMock(),
@@ -54,16 +54,14 @@ describe("QA_DEMO_1_B1 the composer in a demo session", () => {
     expect(text(plan)).toContain(
       "Sample plan. Demo sessions replay a recorded run; sign in to start your own.",
     );
-    expect(text(q(plan, ".park-home-confirm"))).toBe("Open the sample world");
+    // UI-10 B6: the control is a link to the recorded run that plays (the bundled village-basic stream)
+    const confirm = q<HTMLAnchorElement>(plan, ".park-home-confirm");
+    expect(text(confirm)).toBe("Watch the recorded run");
+    expect(confirm.getAttribute("href")).toBe("/world/w_village_basic/stage?fixture=village-basic");
+    expect(text(plan)).toContain("Whatever you type, the replay is the same recorded run");
     expect(text(plan)).not.toContain("Start now");
-    click(q(plan, ".park-home-confirm"));
-    await settle();
     expect(api.startWorld).not.toHaveBeenCalled();
     expect(seen.store.getState().added).toHaveLength(0);
-    expect(seen.store.getState().toast?.message).toBe(DEMO_START);
-    // it opens an existing sample world (never "new1"), so nothing is left "Starting 4%"
-    const target = String(rig.navigate.mock.calls.at(-1)?.[0] ?? "");
-    expect(target).toMatch(/^\/world\/(?!new)/);
   });
 
   it("QA_DEMO_1_B1_the_drafting_line_does_not_claim_a_model_is_drafting", async () => {
