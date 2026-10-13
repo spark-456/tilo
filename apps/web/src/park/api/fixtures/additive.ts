@@ -6,6 +6,12 @@ import type { AgendaRules, DecisionFacts, DecisionKey, Ledger } from "../types";
 
 /** What each decision is about, by key; read as `Decision.facts`. */
 export const decisionFacts: Record<DecisionKey, DecisionFacts> = {
+  lovable: {
+    project: "K1 electric scooter",
+    subject: "Lovable build handoff",
+    approver: "Alex Morgan",
+    activity: "Approved the Lovable handoff",
+  },
   depot: {
     project: "K1 electric scooter",
     subject: "Laptop Depot",
@@ -96,6 +102,13 @@ export const ledgerMemoryUp: NonNullable<Ledger["memoryUp"]> = {
   since: "August",
   total: 640,
 };
+
+/** Monthly helper summary display fixtures for the Skills "Who helped this month" card. */
+export const HELPER_SUMMARY_FIXTURE = {
+  baseMonthlyAnswersAndFixes: 41,
+  mistakesDeltaSinceJuly: "−38%",
+  helperMonthLabel: "September",
+} as const;
 
 /**
  * The designed copy of the Ledger that the prototype typed into its page (WEB-9c pattern): the spike note, the

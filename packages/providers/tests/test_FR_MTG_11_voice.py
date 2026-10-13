@@ -46,7 +46,7 @@ def write_voice_yaml(tmp_path: pathlib.Path, **overrides: Any) -> pathlib.Path:
 
 def test_FR_MTG_11_real_and_dev_voice_configs_load_and_name_google_or_fake():
     real = load_voice_config(REPO / "config" / "voice.yaml", models_path=REPO / "config" / "models.yaml")
-    assert real.vendor == "google" and real.model and real.voice and real.sample_rate == 24000
+    assert real.vendor in ("google-cloud-tts", "google") and real.model and real.voice and real.sample_rate == 24000
     dev = load_voice_config(REPO / "config" / "voice.dev.yaml", models_path=REPO / "config" / "models.yaml")
     assert dev.vendor == "fake" and 0 < dev.max_chars <= 2000 and dev.max_audio_bytes > 0
 

@@ -128,6 +128,32 @@ export function CostPerRun({ L, go }: { L: Ledger; go: AppCtx["go"] }) {
   );
 }
 
+export function RecordedRuns({ L }: { L: Ledger }) {
+  return (
+    <section aria-label="Recorded run costs" className="park-ledger-card">
+      <Head eyebrow="COST PER RUN" title="Recorded run totals" />
+      <p className="park-ledger-sub">
+        Costs recorded so far. Skill cost trends are not available yet.
+      </p>
+      <div className="park-ledger-types">
+        {L.recordedRuns?.map((run) => (
+          <div key={run.id} className="park-ledger-type park-ledger-recorded">
+            <span className="park-ledger-ellipsis" title={run.id}>
+              {run.id}
+            </span>
+            <span>
+              {money(L, run.usd)} · {run.completed ? "Completed" : "Completion not recorded"}
+            </span>
+          </div>
+        ))}
+        {!L.recordedRuns?.length ? (
+          <p className="park-ledger-sub">No run costs recorded yet.</p>
+        ) : null}
+      </div>
+    </section>
+  );
+}
+
 export function ApprovalWaits({ L, app }: { L: Ledger; app: AppCtx }) {
   const backup = app.prefs.backup;
   return (
@@ -152,7 +178,11 @@ export function ApprovalWaits({ L, app }: { L: Ledger; app: AppCtx }) {
           </div>
         ))}
       </div>
-      {backup ? null : (
+      {L.recordedRuns !== undefined ? (
+        <p className="park-ledger-sub">
+          Measured from recorded requests to answers. Backup impact is not available yet.
+        </p>
+      ) : backup ? null : (
         <div className="park-ledger-callout">
           <span className="park-ledger-callout-text">
             Jin approves all outside sharing. A backup approver would cut the wait.

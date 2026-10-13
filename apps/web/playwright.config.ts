@@ -44,6 +44,12 @@ const LIVE_API_PORT = Number(process.env.TILO_LIVE_API_PORT ?? 5398);
 const LIVE_ORIGIN = `http://127.0.0.1:${LIVE_PORT}`;
 const LIVE_API = `http://127.0.0.1:${LIVE_API_PORT}`;
 const LIVE_SPECS = "**/live/**";
+// PROD (`TILO_WEB_PROD=1`, local only): the main web server is a production build served by `vite preview`, bound to
+// 127.0.0.1 (the origin the specs use), instead of the dev server. The 4x-CPU phone budgets (park-motion-backdrop,
+// park-motion-transitions "CPU slowed 4x") measure a production build; a hand-started `vite preview` binds `localhost`
+// (IPv6 on Windows), so Playwright did not see it and silently started the dev server on the same port. Never reused.
+// Run: TILO_WEB_PROD=1 TILO_WEB_PORT=5393 pnpm exec playwright test <spec> -g "CPU slowed 4x" --project=chromium --no-deps --workers=1
+const PROD = process.env.TILO_WEB_PROD === "1";
 const TIMING_SPECS = [
   "**/world-perf.spec.ts",
   "**/world-reduced-motion-toggle.spec.ts",
@@ -127,15 +133,17 @@ export default defineConfig({
         ]
       : []),
     {
-      command: `pnpm exec vite --host 127.0.0.1 --port ${PORT} --strictPort`,
+      command: PROD
+        ? `pnpm exec vite build --outDir dist-e2e --emptyOutDir && pnpm exec vite preview --outDir dist-e2e --host 127.0.0.1 --port ${PORT} --strictPort`
+        : `pnpm exec vite --host 127.0.0.1 --port ${PORT} --strictPort`,
       // Vite's own client script, not "/": it 200s as soon as the dev server is
       // up, even before apps/web has an index.html — so readiness reflects
       // "the dev server started", and a missing app surfaces as each test's own
       // failure (e.g. a selector not found) instead of one opaque global
-      // webServer timeout.
-      url: `${ORIGIN}/@vite/client`,
-      reuseExistingServer: !process.env.CI,
-      timeout: 30_000,
+      // webServer timeout. A production build has no such script: "/" then.
+      url: PROD ? `${ORIGIN}/` : `${ORIGIN}/@vite/client`,
+      reuseExistingServer: PROD ? false : !process.env.CI,
+      timeout: PROD ? 240_000 : 30_000,
     },
     ...(PARITY
       ? [

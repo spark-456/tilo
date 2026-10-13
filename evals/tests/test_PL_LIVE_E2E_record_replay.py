@@ -68,7 +68,7 @@ def test_PL_LIVE_E2E_18_recording_saves_every_reply_redacted_beside_the_case(tmp
     assert result.code == 0, result.err
     files = recording_files(recordings)
     roles = {path.parent.name for path in files}
-    assert {"director", "lead", "writer", "verifier", "narrator"} <= roles, roles
+    assert {"director", "lead_review", "writer", "verifier", "narrator"} <= roles  # COST-AUDIT: the review role, roles
     assert len(files) >= 7 and len(files) <= len(world.calls)
     for path in files:
         payload = json.loads(path.read_text(encoding="utf-8"))

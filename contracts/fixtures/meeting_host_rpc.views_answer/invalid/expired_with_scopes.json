@@ -1,0 +1,10 @@
+{
+  "views": [
+    {
+      "connector": "google_drive",
+      "state": "expired",
+      "scopes": ["https://www.googleapis.com/auth/drive.file"],
+      "connected_at": null
+    }
+  ]
+}

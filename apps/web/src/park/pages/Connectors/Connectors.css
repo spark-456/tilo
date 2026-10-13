@@ -3,6 +3,15 @@
    fade and turning spinners wait for WEB-3b (motion: restored in WEB-3b, BQ-WEB-3). */
 
 /* ---- Top row: title, count, search ---- */
+[data-park] .park-connectors-live {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  cursor: default;
+}
+[data-park] .park-connectors-live p {
+  margin: 0;
+}
+
 [data-park] .park-connectors-top {
   display: flex;
   align-items: flex-end;
@@ -106,7 +115,7 @@
   border: 0;
   border-radius: 11px;
   background: var(--red);
-  color: #ffffff;
+  color: var(--inv);
   font-family: inherit;
   font-size: 14px;
   font-weight: 800;
@@ -215,7 +224,7 @@
 }
 [data-park] .park-connectors-level--1 {
   background: var(--schSoft);
-  color: var(--sch);
+  color: var(--okInk);
 }
 [data-park] .park-connectors-level--2 {
   background: var(--heroSoft);
@@ -338,7 +347,7 @@
 }
 [data-park] .park-connectors-spin--red {
   border: 2.5px solid rgba(255, 255, 255, 0.4);
-  border-top-color: #ffffff;
+  border-top-color: var(--inv);
 }
 
 /* ---- Not connected yet ---- */

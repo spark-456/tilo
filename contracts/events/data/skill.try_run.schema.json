@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.tilo.example/events/data/skill.try_run.schema.json",
+  "x-version": "1.0.0",
+  "title": "SkillTryRunData",
+  "description": "data of skill.try_run (registry 1.4.0, ADR-0034, FR-SKL-03): a try run finished or stopped. It copies its try_run_result (TS-10), so side_effects is always 0. It is written once per try run, after the result is stored. The page shows the steps only after this event; there is no per-step event. The actor is the person who started it, and credits are the try run's total. Envelope as TS-11.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "skill",
+    "version",
+    "try_run",
+    "match",
+    "total",
+    "matched",
+    "asked",
+    "skipped",
+    "side_effects",
+    "outcome"
+  ],
+  "properties": {
+    "skill": { "$ref": "../../taught_skill.schema.json#/$defs/id" },
+    "version": { "type": "integer", "minimum": 1 },
+    "try_run": { "$ref": "../../common.schema.json#/$defs/ulid" },
+    "match": { "type": "number", "minimum": 0, "maximum": 1 },
+    "total": { "$ref": "../../taught_skill.schema.json#/$defs/step_number" },
+    "matched": { "$ref": "../../taught_skill.schema.json#/$defs/count" },
+    "asked": { "$ref": "../../taught_skill.schema.json#/$defs/count" },
+    "skipped": { "$ref": "../../taught_skill.schema.json#/$defs/count" },
+    "side_effects": { "const": 0 },
+    "outcome": { "type": "string", "enum": ["completed", "stopped"] }
+  }
+}

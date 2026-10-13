@@ -221,6 +221,58 @@
   overflow-x: auto;
   scrollbar-width: none;
 }
+/* QA-DEMO-1 B2: below 840px one button names the current page and opens a menu of the six (TopNav `compact`). */
+[data-park] .park-shell__pages {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+}
+[data-park] .park-shell__pagebtn {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  /* A fixed basis, so a longer or shorter page name never moves the chevron (no layout shift across a page change);
+     it still gives way to the tools on a 320 px screen. */
+  flex: 0 1 132px;
+  min-width: 0;
+  max-width: 100%;
+  height: 40px;
+  padding: 0 8px 0 12px;
+  border: 0;
+  border-radius: 14px;
+  background: var(--heroSoft);
+  color: var(--heroInk);
+  font-size: 15px;
+  font-weight: 800;
+  cursor: pointer;
+}
+[data-park] .park-shell__pagelabel {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* The amber dot says decisions wait (the number is in the menu and the button's name). */
+[data-park] .park-shell__pagedot {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  width: 9px;
+  height: 9px;
+  border-radius: 99px;
+  background: #f0a500;
+  box-shadow: 0 0 0 2px var(--pop);
+}
+[data-park] .park-shell__pagebtn svg {
+  flex: none;
+}
+[data-park] .park-popover.park-shell__pagemenu {
+  left: 16px;
+  right: auto;
+}
 [data-park] .park-shell__tab {
   display: flex;
   flex: none;
@@ -421,6 +473,34 @@
     height: auto;
     padding: 0;
     background: transparent;
+  }
+}
+
+@media (max-width: 430px) {
+  [data-park] .park-shell__nav {
+    gap: 10px;
+  }
+}
+/* QA-DEMO-1 B2: at 320 the page button needs room: the nav's gaps and the tool buttons give back a little. */
+@media (max-width: 360px) {
+  [data-park] .park-shell__nav {
+    gap: 8px;
+    padding: 0 6px 0 8px;
+  }
+  [data-park] .park-shell__tools {
+    gap: 0;
+  }
+  [data-park] .park-shell__iconbtn {
+    width: 34px;
+  }
+  [data-park] .park-shell__avatar {
+    width: 34px;
+    height: 34px;
+    margin-left: 4px;
+  }
+  [data-park] .park-shell__pagebtn {
+    padding: 0 8px 0 10px;
+    font-size: 14px;
   }
 }
 
@@ -863,6 +943,16 @@
 [data-park] .park-shell__enter > .park-popover {
   transition: opacity 0.2s ease, transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
+/* WEB-W2 (issue 933): the sample banner sits where the toast's top 92 lands, so while the banner is on the page the
+   toast rises from the bottom instead, above the run bar (fixed, 16px up, about 44px tall). One place at a time,
+   never over the bar or the banner, at 1440 and 390. */
+[data-park]:has(.park-first-run-banner) .park-toast:not(.park-toast--inline) {
+  top: auto;
+  bottom: calc(76px + env(safe-area-inset-bottom, 0px));
+}
+[data-park]:has(.park-first-run-banner) .park-shell__enter[data-enter="pre"] > .park-toast {
+  transform: translateX(-50%) translateY(8px);
+}
 [data-park] .park-shell__enter[data-enter="pre"] > .park-toast {
   opacity: 0;
   transform: translateX(-50%) translateY(-8px);
@@ -875,6 +965,68 @@
 /* Reduced motion (README): no animation and no transition at all in the shell's chrome or the page's controls.
    The shell also skips its own waits (motion.ts), so a page swaps at once and a splash or card goes the moment it
    is done. The person's 'still' (Profile > Appearance, data-motion on the root) is the same list. */
+/* ---- Run bar (RUN-INDICATOR): a pill at the bottom while a recorded run is in progress or held ----
+   Fixed and only as wide as its text, so nothing around it is covered or blocked; above the page (z 1), below the
+   nav (30). It has no motion rule of its own: the moving ring is the loader's .park-shell__ring (tiloSpin), and
+   the still look (reduced motion, 'still', or a held run) is a dot. */
+[data-park] .park-shell__runbar {
+  position: fixed;
+  left: 50%;
+  bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  transform: translateX(-50%);
+  z-index: 25;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 40px;
+  max-width: calc(100vw - 32px);
+  padding: 0 16px;
+  border: 1px solid var(--line);
+  border-radius: 99px;
+  background: var(--paper);
+  color: var(--ink);
+  box-shadow: var(--shPop);
+  font-family: "Nunito Sans", sans-serif;
+  font-size: 14px;
+  font-weight: 700;
+}
+[data-park] .park-shell__runbar-label {
+  flex: none;
+}
+[data-park] .park-shell__runbar-sep {
+  flex: none;
+  color: var(--ink3);
+}
+[data-park] .park-shell__runbar-detail {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ink2);
+  font-weight: 600;
+}
+[data-park] .park-shell__runbar-dot {
+  display: block;
+  flex: none;
+  box-sizing: border-box;
+  width: 16px;
+  height: 16px;
+  border-radius: 99px;
+  background: var(--hero);
+}
+/* Held: a pause mark (two bars), so the state is not told by colour alone. */
+[data-park] .park-shell__runbar-dot--held {
+  width: 16px;
+  height: 16px;
+  border-radius: 0;
+  background: transparent;
+  border-left: 5px solid var(--ink2);
+  border-right: 5px solid var(--ink2);
+}
+
+/* Reduced motion (README): no animation and no transition at all in the shell's chrome. The shell also skips
+   its own waits (motion.ts), so a page swaps at once and a splash or card goes the moment it is done. */
 @media (prefers-reduced-motion: reduce) {
   [data-park] .park-shell__main,
   [data-park] .park-shell__main *,

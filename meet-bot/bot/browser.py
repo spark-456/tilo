@@ -4,10 +4,10 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 import random
 import re
 import time
-from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -20,7 +20,6 @@ from .ui import ADMIT, CHAT_READ, MIC, PEOPLE, UIScheduler
 log = logging.getLogger("bot.browser")
 
 CHROMIUM_ARGS = [
-    "--no-sandbox",
     "--disable-gpu",
     "--disable-extensions",
     "--disable-background-networking",
@@ -71,30 +70,46 @@ def locate(page: Any, strat: S.Strategy) -> Any:
 class MeetBrowser:
     def __init__(self, cfg: Config, voice: bool = False) -> None:
         self.cfg = cfg
+        self.guest = bool(getattr(cfg, "guest", False))
         self.voice = voice  # a virtual microphone exists: let Meet use it without a permission prompt
         self.ui = UIScheduler()  # one UI action at a time, mic first; see bot/ui.py
         self.page: Any = None
         self.ctx: Any = None
         self._pw: Any = None
+        self._browser: Any = None
         self.account_name: str | None = None
         self._shot_n = 0
 
     # -- lifecycle -----------------------------------------------------------------------------------------------
     async def __aenter__(self) -> MeetBrowser:
+        if "K_SERVICE" in os.environ and not self.guest:
+            raise NotLoggedIn("Cloud Run requires guest mode; signed-in profiles stay on the demo machine.")
         from playwright.async_api import async_playwright
 
         self.cfg.debug_dir.mkdir(parents=True, exist_ok=True)
-        clean_singleton_locks(self.cfg.profile_dir)
         self._pw = await async_playwright().start()
-        self.ctx = await self._pw.chromium.launch_persistent_context(
-            str(self.cfg.profile_dir),
-            headless=False,
-            args=CHROMIUM_ARGS + (["--use-fake-ui-for-media-stream"] if self.voice else []),
-            ignore_default_args=["--enable-automation", "--mute-audio"],
-            viewport={"width": 1280, "height": 720},
-            locale="en-US",
-        )
-        self.page = self.ctx.pages[0] if self.ctx.pages else await self.ctx.new_page()
+        launch = {
+            "headless": False,
+            "args": CHROMIUM_ARGS
+            + (["--use-fake-ui-for-media-stream"] if self.voice else [])
+            + (["--no-sandbox"] if self.guest else []),
+            "ignore_default_args": ["--enable-automation", "--mute-audio"],
+            "chromium_sandbox": not self.guest,
+        }
+        context = {"viewport": {"width": 1280, "height": 720}, "locale": "en-US"}
+        try:
+            if self.guest:
+                self._browser = await self._pw.chromium.launch(**launch)
+                self.ctx = await self._browser.new_context(**context)
+            else:
+                clean_singleton_locks(self.cfg.profile_dir)
+                self.ctx = await self._pw.chromium.launch_persistent_context(
+                    str(self.cfg.profile_dir), **launch, **context
+                )
+            self.page = self.ctx.pages[0] if self.ctx.pages else await self.ctx.new_page()
+        except BaseException:
+            await self.__aexit__()
+            raise
         return self
 
     async def __aexit__(self, *exc: Any) -> None:
@@ -102,18 +117,18 @@ class MeetBrowser:
             if self.ctx:
                 await self.ctx.close()
         finally:
-            if self._pw:
-                await self._pw.stop()
+            try:
+                if self._browser:
+                    await self._browser.close()
+            finally:
+                if self._pw:
+                    await self._pw.stop()
 
     # -- helpers -------------------------------------------------------------------------------------------------
     async def shot(self, label: str) -> Path:
-        self._shot_n += 1
-        path = self.cfg.debug_dir / f"{datetime.now():%Y%m%d-%H%M%S}_{self._shot_n:02d}_{label}.png"
-        try:
-            await self.page.screenshot(path=str(path))
-        except Exception as e:
-            log.warning("screenshot %s failed: %s", label, e)
-        return path
+        # Account labels and the Meet capability can appear anywhere in the UI (ADR-0024).
+        # Keep the caller API, but persist no browser pixels.
+        return self.cfg.debug_dir / f"{label}.png"
 
     async def find(self, sel: S.Sel, timeout_s: float = 0.0) -> Any | None:
         """First visible match over the selector's strategies, polling up to timeout_s. None if not found."""
@@ -148,8 +163,7 @@ class MeetBrowser:
             return False
 
     async def selector_miss(self, sel: S.Sel) -> None:
-        path = await self.shot(f"selector-miss_{sel.name}")
-        log.warning("selector '%s' did not match; screenshot %s", sel.name, path)
+        log.warning("selector '%s' did not match", sel.name)
 
     # -- account -------------------------------------------------------------------------------------------------
     def _check_url_login(self) -> None:
@@ -157,20 +171,23 @@ class MeetBrowser:
             raise NotLoggedIn("The browser profile is not signed in. Run `login` and sign in through noVNC first.")
 
     async def check_account(self) -> None:
-        """Sanity-check the signed-in account against BOT_GOOGLE_EMAIL (label only, never authentication)."""
+        """Refuse an unreadable or different account before joining; never log account labels."""
+        if self.guest:
+            if await self.find(S.ACCOUNT_BUTTON, 1) is not None:
+                raise NotLoggedIn("Guest mode must use an unsigned ephemeral browser.")
+            return
+        if not self.cfg.bot_email:
+            raise NotLoggedIn("Set BOT_GOOGLE_EMAIL to the dedicated bot account before joining.")
         loc = await self.find(S.ACCOUNT_BUTTON, 3)
         if loc is None:
-            log.warning("could not read the signed-in account label (selector 'account_button')")
-            return
+            raise NotLoggedIn("The bot account could not be verified; sign in manually first.")
         label = (await loc.get_attribute("aria-label")) or ""
         m = re.search(r"[\w.+-]+@[\w.-]+", label)
         nm = re.match(r"Google Account:\s*(.+?)\s*[\n(]", label)
+        if not m or m.group(0).lower() != self.cfg.bot_email.lower():
+            raise NotLoggedIn("The browser must use the configured dedicated bot account.")
         if nm:
             self.account_name = nm.group(1).strip()
-        if m and self.cfg.bot_email and m.group(0).lower() != self.cfg.bot_email.lower():
-            log.warning("signed in as %s but BOT_GOOGLE_EMAIL is %s", m.group(0), self.cfg.bot_email)
-        elif m:
-            log.info("signed in as %s", m.group(0))
 
     # -- open / join ---------------------------------------------------------------------------------------------
     async def open_new_meeting(self) -> str:
@@ -186,8 +203,8 @@ class MeetBrowser:
         raise JoinFailed("meet.google.com/new did not produce a meeting link within 60 s")
 
     async def open_meeting(self, url: str) -> None:
-        if not S.MEETING_URL_RE.match(url):
-            raise JoinFailed(f"not a Meet link: {url}")
+        if not S.MEETING_URL_RE.fullmatch(url):
+            raise JoinFailed("The meeting link does not have the required Meet shape.")
         await self.page.goto(url, wait_until="domcontentloaded")
         self._check_url_login()
 
@@ -206,6 +223,8 @@ class MeetBrowser:
             await self.click(S.GOT_IT)
             await self.click(S.MIC_TURN_OFF)  # only visible when the mic is on
             await self.click(S.CAM_TURN_OFF)
+            if self.guest and (name := await self.find(S.GUEST_NAME)) is not None:
+                await name.fill(self.cfg.bot_display_name or "Tilo notetaker", timeout=5000)
             if not shot_done and (await self.visible(S.JOIN_NOW) or await self.visible(S.ASK_TO_JOIN)):
                 await self.check_account()
                 await self.shot("02_prejoin_mic_cam_off")
@@ -343,15 +362,8 @@ class MeetBrowser:
         return admitted
 
     async def _dump(self, label: str) -> None:
-        if label in getattr(self, "_dumped", set()):
-            return
-        self._dumped = getattr(self, "_dumped", set()) | {label}
-        try:
-            html = await self.page.evaluate("() => document.body.innerText.slice(0, 4000)")
-            (self.cfg.debug_dir / f"{label}.txt").write_text(html, encoding="utf-8")
-            await self.shot(label)
-        except Exception:
-            pass
+        # DOM dumps can contain account labels and Meet links too.
+        return None
 
     async def participants(self) -> dict[str, Any] | None:
         """{'others': [...], 'waiting': [...], 'self': name|None} read from the People panel, or None if unreadable."""

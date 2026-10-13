@@ -67,10 +67,10 @@ class FirestoreApiStore:
 
 
 def client_factory(project: str) -> Any:
-    """Builds the Firestore client for `project` with the runtime identity's ADC; tests inject theirs in its place."""
-    from google.cloud import firestore
+    """The process's one Firestore client for `project` (`tilo_api.prod`, which also guards it); tests inject theirs."""
+    from tilo_api import prod  # it imports this module
 
-    return firestore.Client(project=project)
+    return prod.firestore_client(project)
 
 
 def open_api_store(
@@ -96,6 +96,8 @@ def open_api_store(
         raise ApiStoreNotConfigured("the client reads os.environ, which names another emulator host than env")
     try:
         client = (firestore_client_factory or client_factory)(project)
+    except (ApiStoreNotConfigured, ApiStoreUnavailable):  # the shared root's own refusals, already final
+        raise
     except Exception as exc:  # no credentials or no network: closed, and never the text
         logger.warning("api store client unavailable (%s)", type(exc).__name__)
         raise ApiStoreUnavailable from exc

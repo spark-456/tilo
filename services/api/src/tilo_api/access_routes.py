@@ -47,16 +47,29 @@ def _view(request: Request, principal: deps.Principal, declaration: Declaration 
     return AccessOut(declaration=declaration, allowed=allowed, models=models)
 
 
+def _refuse_an_unstorable_id() -> HTTPException:
+    """The store holds nobody under a uid Firestore refuses as a document id: the same fail-closed 503 the gate gives
+    (`access._decide`), never a 500 and never the id."""
+    return HTTPException(status_code=503, detail="not_configured")
+
+
 @router.get("/access")
 def get_access(request: Request, principal: Principal, store: Store, flags: Flags) -> AccessOut:
-    return _view(request, principal, store.get(principal.user_id), flags)
+    try:
+        declaration = store.get(principal.user_id)
+    except ValueError:
+        raise _refuse_an_unstorable_id() from None
+    return _view(request, principal, declaration, flags)
 
 
 @router.post("/access/declaration", dependencies=[Depends(_json_only)], response_model=None)
 def declare(
     request: Request, body: DeclarationIn, principal: Principal, store: Store, flags: Flags
 ) -> AccessOut | JSONResponse:
-    stored = store.declare(principal.user_id, body.declaration)  # atomic, first write wins
+    try:
+        stored = store.declare(principal.user_id, body.declaration)  # atomic, first write wins
+    except ValueError:
+        raise _refuse_an_unstorable_id() from None
     if stored != body.declaration:
         return JSONResponse(
             status_code=409,

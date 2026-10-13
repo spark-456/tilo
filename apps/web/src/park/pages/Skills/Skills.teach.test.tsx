@@ -647,6 +647,7 @@ describe("WEB_8a_skills_teach: save (step 4)", () => {
       ...log,
       ...SAVED_OVERRIDE,
       name: DEFAULT_NAME,
+      draft: expect.objectContaining({ scope: "team", trigger: "arrive" }), // SKILLS-3: what a live save posts
     });
   });
 

@@ -129,7 +129,9 @@ describe("QUICK_THINKING the choice is remembered", () => {
     await choose(first.el, "Quick");
     const keys = Object.keys(window.localStorage).filter((k) => k.includes("effort"));
     expect(keys).toHaveLength(1);
-    expect(keys[0]).toContain("@");
+    // LIVE-HOME (BQ-SIGNIN-4): the key is per person but never holds the address itself.
+    expect(keys[0]).not.toContain("@");
+    expect(keys[0]).not.toMatch(/alex|northwind/i);
   });
 
   it("QUICK_THINKING_survives_storage_throwing_and_keeps_the_choice_in_memory", async () => {

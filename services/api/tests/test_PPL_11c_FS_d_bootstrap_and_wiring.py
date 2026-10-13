@@ -319,11 +319,13 @@ def test_PPL_11c_FS_13_an_explicit_config_builds_the_firestore_stores_once_per_p
     deps = fresh_stores_cache
     calls, _client = _spy_client(monkeypatch)
     monkeypatch.setenv(ENV_STORE, "firestore")
-    monkeypatch.setenv(ENV_PROJECT, "tilo-test-project")
+    monkeypatch.setenv(ENV_PROJECT, "demo-test-project")
+    # PROD-WIRE 3: the one guard (emulator + demo- project)
+    monkeypatch.setenv("FIRESTORE_EMULATOR_HOST", "127.0.0.1:9")
     first = deps.get_people_stores()
     assert isinstance(first, PeopleStores)
     assert deps.get_people_stores() is first, "one PeopleStores per process: the limiter and the keys live on it"
-    assert len(calls) == 1 and "tilo-test-project" in repr(calls[0])
+    assert len(calls) == 1 and "demo-test-project" in repr(calls[0])
     monkeypatch.setenv(ENV_STORE, "")  # the object is the process's: a later change of the setting is not re-read
     assert deps.get_people_stores() is first
 
@@ -334,7 +336,9 @@ def test_PPL_11c_FS_13_eight_first_requests_build_one_set_of_stores(fresh_stores
     deps = fresh_stores_cache
     calls, _client = _spy_client(monkeypatch, delay=0.05)
     monkeypatch.setenv(ENV_STORE, "firestore")
-    monkeypatch.setenv(ENV_PROJECT, "tilo-test-project")
+    monkeypatch.setenv(ENV_PROJECT, "demo-test-project")
+    # PROD-WIRE 3: the one guard (emulator + demo- project)
+    monkeypatch.setenv("FIRESTORE_EMULATOR_HOST", "127.0.0.1:9")
     results = race([lambda: deps.get_people_stores() for _ in range(8)])
     assert not errs(results), errs(results)
     assert len(calls) == 1, f"{len(calls)} clients were built"
@@ -355,7 +359,9 @@ def test_PPL_11c_FS_13_a_failed_build_is_a_503_that_is_not_cached_and_leaks_noth
 
     monkeypatch.setattr("google.cloud.firestore.Client", build)
     monkeypatch.setenv(ENV_STORE, "firestore")
-    monkeypatch.setenv(ENV_PROJECT, "tilo-test-project")
+    monkeypatch.setenv(ENV_PROJECT, "demo-test-project")
+    # PROD-WIRE 3: the one guard (emulator + demo- project)
+    monkeypatch.setenv("FIRESTORE_EMULATOR_HOST", "127.0.0.1:9")
     # PPL-11c-FS-1c (FS-18, issue #577 item 5): a failed build is negative-cached for a short window, so "the next
     # request tries again" means the next request after the window. A fake clock (replaced with `raising=False`, so this
     # test is the same before the seam exists) moves past it without sleeping.
