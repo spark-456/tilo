@@ -207,6 +207,7 @@ def _decide(request: Request, route: str, body: Any) -> JSONResponse:
         if claims is None or claim is None:  # absent, wrong nonce, another attend's, expired: one (MV-14, MV-16)
             return _error(409, "not_attending", route)
         with claim.lock:
+            claim.settle_stale(claims.now(), cfg.hold_ttl_s)  # MV-17(a), before any answer is decided
             if route == RESERVE:
                 return _reserve(request, claims, claim, cfg, body.key)
             return _close(claim, cfg, body)
