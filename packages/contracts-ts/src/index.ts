@@ -7,6 +7,7 @@
  * artifact.schema.json 1.1.0 sha256:ce5a30aeae826180
  * attention.schema.json 1.0.0 sha256:f35cff84728304af
  * brief.schema.json 1.0.0 sha256:be4e747f37e399b2
+ * byok.schema.json 1.0.0 sha256:683d5d2b4fc8b0fe
  * calendar_entry.schema.json 1.1.0 sha256:291531543be88320
  * card.schema.json 1.0.0 sha256:2666292eb19087d0
  * common.schema.json 1.7.0 sha256:71b116e3caa126a8
@@ -116,13 +117,15 @@
  * manifest.schema.json 1.0.0 sha256:9b885d1826522bb7
  * mcp_tools.schema.json 1.0.0 sha256:46a498402c9b1e4e
  * meeting.schema.json 1.2.0 sha256:034e93898bb28957
- * meeting_host_rpc.schema.json 1.2.0 sha256:a5856b07b3f6501c
+ * meeting_host_rpc.schema.json 1.3.0 sha256:76c124635c8ad9c2
  * meeting_join.schema.json 1.0.0 sha256:ea1e8f0945773573
  * meeting_room.schema.json 1.0.0 sha256:13c682235d58ce69
  * mention.schema.json 1.0.0 sha256:ca9c1acbf81616f2
  * meter.schema.json 1.0.0 sha256:ad596dcc70e45e09
  * metering.schema.json 1.0.0 sha256:91358a776e6c033a
  * minutes.schema.json 1.0.0 sha256:b8bbe5f69603a5a8
+ * model_call_rpc.schema.json 1.0.0 sha256:3f585f8e5d092538
+ * org_model_key.schema.json 1.0.0 sha256:d1d48e78635ccede
  * outbox.schema.json 1.0.0 sha256:0b9b172f230a6347
  * person.schema.json 1.0.0 sha256:2c928319dd7ab9d1
  * pilot.schema.json 1.0.0 sha256:5d091f814844b3b1
@@ -130,7 +133,7 @@
  * plan.schema.json 1.1.0 sha256:f0722cc94a84e2d1
  * plate.schema.json 1.0.0 sha256:d2a4e4361a714c8f
  * policy.schema.json 1.0.0 sha256:307bca25f6efc07e
- * providers.schema.json 1.3.0 sha256:ecc5063d4926f11c
+ * providers.schema.json 1.4.0 sha256:e39a636e4de90ab6
  * scenario.schema.json 1.0.0 sha256:b8e044d7e37b92a3
  * skill.schema.json 1.1.0 sha256:9eeee7768b667afa
  * spend_caps.schema.json 1.1.1 sha256:c04bc36ac17dc0ab
@@ -321,6 +324,13 @@ export type DeliverableFormat =
  * via the `definition` "CalendarDate".
  */
 export type CalendarDate = string;
+/**
+ * The id the owner picks a bundle by: lower-case words joined by hyphens, at most 64 characters.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "ByokConfigBundleId".
+ */
+export type ByokConfigBundleId = string;
 /**
  * This interface was referenced by `TiloContracts`'s JSON-Schema
  * via the `definition` "CalendarEntryId".
@@ -858,7 +868,7 @@ export type McpToolsWithheldReason = "not_text" | "too_large";
  */
 export type MeetingAgendaMinutes = number;
 /**
- * The internal surface of tilo-connectors that tilo-api calls (FR-MTG-09, ADR-0032 decision 2 and addendum 1; FR-CON-02, ADR-0035 decision 2): what tilo-api posts to /internal/meeting-host/send, /internal/meeting-host/status, /internal/meeting-host/disconnect, /internal/connections/views, /internal/connections/start, /internal/connections/callback, /internal/connections/disconnect and /internal/side-effects/execute, and what each answers. Each route validates its own request and answer ($defs send_request and send_answer; user_request and status_answer; user_request and disconnect_answer; user_request and views_answer; start_request and start_answer; callback_request and callback_answer; connection_disconnect_request and connection_disconnect_answer; execute_request and execute_answer; error for any refusal) in both services; this root is any one of them. Every object is closed, and no field holds an access or refresh token, the client secret, a PKCE verifier, key material or a Meet link (ADR-0024 decision 4, ADR-0032 decision 3). Two fields carry a credential on purpose and nothing else does: callback_request.state and .code, the one-time values Google handed the browser (ADR-0035 LC-03; useless without the verifier and the client secret, which stay in tilo-connectors), and start_answer.authorize_url, the public part of the sign-in link. Ids travel in the body, never in a path or query. A route refuses a body over 65536 bytes (64 KiB) before it parses it. Rules that compare values (HB-03 the draft against its hash and the entry, HB-05 the owner, HB-07 the receipt against the entry, HB-09 the views against config/connectors.yaml, LC-05 the flow's person against the caller, LC-07 the items against the entry) are checked by the routes and by tilo-api's client, not by this schema. 1.1.0 adds views_answer, connection_view and scope; 1.2.0 adds the four live-connector routes' defs and the error codes start_again, not_granted and wrong_account (additive).
+ * The internal surface of tilo-connectors that tilo-api calls (FR-MTG-09, ADR-0032 decision 2 and addendum 1; FR-CON-02, ADR-0035 decision 2): what tilo-api posts to /internal/meeting-host/send, /internal/meeting-host/status, /internal/meeting-host/disconnect, /internal/connections/views, /internal/connections/start, /internal/connections/callback, /internal/connections/disconnect and /internal/side-effects/execute, and what each answers. Each route validates its own request and answer ($defs send_request and send_answer; user_request and status_answer; user_request and disconnect_answer; user_request and views_answer; start_request and start_answer; callback_request and callback_answer; connection_disconnect_request and connection_disconnect_answer; execute_request and execute_answer; error for any refusal) in both services; this root is any one of them. Every object is closed, and no field holds an access or refresh token, the client secret, a PKCE verifier, key material or a Meet link (ADR-0024 decision 4, ADR-0032 decision 3). Two fields carry a credential on purpose and nothing else does: callback_request.state and .code, the one-time values Google handed the browser (ADR-0035 LC-03; useless without the verifier and the client secret, which stay in tilo-connectors), and start_answer.authorize_url, the public part of the sign-in link. Ids travel in the body, never in a path or query. A route refuses a body over 65536 bytes (64 KiB) before it parses it. Rules that compare values (HB-03 the draft against its hash and the entry, HB-05 the owner, HB-07 the receipt against the entry, HB-09 the views against config/connectors.yaml, LC-05 the flow's person against the caller, LC-07 the items against the entry) are checked by the routes and by tilo-api's client, not by this schema. 1.1.0 adds views_answer, connection_view and scope; 1.2.0 adds the four live-connector routes' defs and the error codes start_again, not_granted and wrong_account (additive). 1.3.0 adds the three model-key routes of ADR-0041 decision 2 (Proposed and inert until config/byok.yaml enabled is true): /internal/model-keys/put, /internal/model-keys/remove and /internal/model-keys/status with the defs model_key_put_request and model_key_put_answer, model_key_remove_request and model_key_remove_answer, model_key_status_request and model_key_status_answer, and the error code key_refused (additive). model_key_put_request.key is the one more credential on this surface (BK-02): it is no-store and, like state and code above, nothing logs, stores or echoes it. /internal/model-keys/generate is model_call_rpc.schema.json's.
  *
  * This interface was referenced by `TiloContracts`'s JSON-Schema
  * via the `definition` "MeetingHostRpc".
@@ -878,6 +888,12 @@ export type MeetingHostRpc =
   | MeetingHostRpcConnectionDisconnectAnswer
   | MeetingHostRpcExecuteRequest
   | MeetingHostRpcExecuteAnswer
+  | MeetingHostRpcModelKeyPutRequest
+  | MeetingHostRpcModelKeyPutAnswer
+  | MeetingHostRpcModelKeyRemoveRequest
+  | MeetingHostRpcModelKeyRemoveAnswer
+  | MeetingHostRpcModelKeyStatusRequest
+  | MeetingHostRpcModelKeyStatusAnswer
   | MeetingHostRpcError;
 /**
  * A PRD 10.4 context condition that raises any action to T3; also listed on the outbox entry it applies to (outbox.schema.json modifiers).
@@ -919,6 +935,20 @@ export type MeetingHostRpcScope = string;
 export type MeetingHostRpcConnectorParts = (
   MeetingHostRpcConnectorPart | MeetingHostRpcAlertPart
 )[];
+/**
+ * The one slot of the first slice: one active key per org (ADR-0041 decision 1). Part of the vault's secret name and of every RPC body that names a key.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "OrgModelKeySlot".
+ */
+export type OrgModelKeySlot = "models";
+/**
+ * A model provider's API key as it is typed: 8 to 512 characters of a bearer token's alphabet (letters, digits and _ . ~ + / = -), nothing else, so a service-account JSON, a quoted string or a pasted sentence never matches and is refused (BQ-BYOK-2; the route answers key_refused). A trailing newline is refused in every engine. Never stored, logged, echoed or returned (BK-02), and never a field of any answer.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "OrgModelKeyKey".
+ */
+export type OrgModelKeyKey = string;
 /**
  * This interface was referenced by `TiloContracts`'s JSON-Schema
  * via the `definition` "MeetingRoomPersonText".
@@ -968,6 +998,69 @@ export type MeteringBillingService = string;
  * via the `definition` "MinutesEvidence".
  */
 export type MinutesEvidence = UtteranceId[];
+/**
+ * What tilo-api posts to tilo-connectors' POST /internal/model-keys/generate to run one model call on an organisation's own key, and what it answers (ADR-0041 decision 2, BK-09, BK-11, BK-21 variant P, the proxy; Proposed and inert until config/byok.yaml enabled is true and BQ-BYOK-7 is answered); this root is any one of them. tilo-connectors reads the secret for that one call, makes the provider call from its own process to the profile's fixed host and returns the reply and its usage; tilo-api never holds the key. There is no key field, secret name, credential, URL or host in either direction and every object is closed, so a model, a document or a compromised caller has nothing to put one in (BK-22). The call carries the prompt, so this route has its own body cap, 2097152 bytes (2 MiB), refused before it is parsed, instead of HB-01's 64 KiB; a request over it, or with a media part, is invalid_request. Generate-only: no stream, no embedding (BK-10). The caller is tilo-api's runtime identity (HB-01); the rules that need the vault, the clock and the profile table are in byok.rules.md.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "ModelCallRpc".
+ */
+export type ModelCallRpc =
+  ModelCallRpcGenerateRequest | ModelCallRpcGenerateAnswer | ModelCallRpcError;
+/**
+ * An organisation's own model key as tilo-api keeps and serves it (ADR-0041 decisions 2, 3 and 10, BK-01 to BK-08, BK-20; Proposed and inert until config/byok.yaml enabled is true): the stored reference orgs/{org}/model_keys/models, the audit entry orgs/{org}/byok_audit/{id}, and the bodies and answers of GET, PUT, PATCH and DELETE /v1/org/model-key; this root is any one of them. The key itself is in exactly one place on this surface: put_request.key, in transit, handed to the vault and dropped (BK-02). Every other object is closed and has no field for a key, a length, a hash, the last four characters, a secret name, a URL or a model id (BK-04); the org is never a field of a route body or answer (BK-08), it is the verified principal's. A body is JSON only. The rules that compare values or need the directory, the clock, the vault or config/byok.yaml are in byok.rules.md and are checked by the routes.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "OrgModelKey".
+ */
+export type OrgModelKey =
+  | OrgModelKeyReference
+  | OrgModelKeyAuditEntry
+  | OrgModelKeyPutRequest
+  | OrgModelKeyPutAnswer
+  | OrgModelKeyPatchRequest
+  | OrgModelKeyMemberView
+  | OrgModelKeyOwnerView
+  | OrgModelKeyRemoveAnswer
+  | OrgModelKeyError;
+/**
+ * The reference's state: unverified (stored but never validated, no run can use it), active, paused (the owner stopped it, BK-07) or invalid (the provider refused it three times and the re-validation, BK-17). A removed key has no record at all.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "OrgModelKeyStatus".
+ */
+export type OrgModelKeyStatus = "unverified" | "active" | "paused" | "invalid";
+/**
+ * The org's own cap on this key's daily spend in credits (BK-16): at least 1, never null, at most config/byok.yaml day_cap_credits_max (the route checks).
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "OrgModelKeyDayCapCredits".
+ */
+export type OrgModelKeyDayCapCredits = number;
+/**
+ * The fixed code of the provider's last refusal (BK-17), never the provider's text: some providers echo key fragments.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "OrgModelKeyLastError".
+ */
+export type OrgModelKeyLastError = "invalid_key" | "quota" | "rate_limited" | "unreachable";
+/**
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "OrgModelKeyConsentVersion".
+ */
+export type OrgModelKeyConsentVersion = number;
+/**
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "OrgModelKeyErrorCode".
+ */
+export type OrgModelKeyErrorCode =
+  | "owner_only"
+  | "reauth_required"
+  | "confirm_required"
+  | "key_refused"
+  | "invalid_body"
+  | "rate_limited"
+  | "not_configured"
+  | "unavailable";
 /**
  * Pseudonymous tester id: t_ and 6 to 32 lower-case letters or digits, assigned by Tilo. Never an email address, a name or a Tilo user id (PRD 16.5). The not-pattern rejects a final line break, which a Python validator's $ lets through.
  *
@@ -1584,6 +1677,64 @@ export interface BriefCitation {
   kind: "preference" | "decision";
   ref: string;
   recorded_at: Timestamp;
+}
+/**
+ * config/byok.yaml (ADR-0041 decisions 5 and 12, BK-12, BK-13, BK-16, BK-20; Proposed and inert: enabled is false in the shipped file, and while it is every route and Router ignores the file). The master flag, the most an org may set for its own key's daily spend, connectors' per-org rate cap on generate, the version of the consent line the owner confirms, and the bundles: an allow-list the owner picks from by id and never types a model id, a role or a URL into. A bundle names only roles that generate or verify work (never safety, search or speech), each with its own primary and fallback profile, and holds no key, secret name, URL or provider field: its profiles are ordinary entries of config/models*.yaml with credential org (providers.schema.json 1.4.0). The schema checks this file alone; the rules that compare it with config/models*.yaml and config/prices.yaml (BK-12, BK-13) are in byok.rules.md and the loader. Example values only: the user chooses the final models and the ceiling.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "ByokConfig".
+ */
+export interface ByokConfig {
+  /**
+   * The file's own format version (optional, as config/web_push.yaml).
+   */
+  version?: 1;
+  /**
+   * true while the bundles are examples; the user chooses final models.
+   */
+  example: boolean;
+  /**
+   * The master switch, false until the user turns it on after the credential-handling review and BQ-BYOK-1, BQ-BYOK-2, BQ-BYOK-3 and BQ-BYOK-7. While false nothing is Tilo-keyed by accident and every route answers not_configured. An enabled file needs at least one bundle (if/then below).
+   */
+  enabled: boolean;
+  /**
+   * The most credits (1 credit = US$0.005) an org may set as its own key's daily cap (BK-16, BQ-BYOK-4). Never null: the owner's cap is required.
+   */
+  day_cap_credits_max: number;
+  /**
+   * Connectors' per-org rate cap on generate (ADR-0041 decision 2), so a compromised tilo-api cannot call at will.
+   */
+  calls_per_org_per_minute: number;
+  /**
+   * The version of the consent line the owner sees and confirms (BK-06). Raising it makes every earlier confirmation stale for the next widening act.
+   */
+  consent_version: number;
+  bundles: {
+    [k: string]: ByokConfigBundle;
+  };
+}
+/**
+ * One allow-listed way to use an org's key. label is what every member sees (BK-20): a plain name from a closed alphabet, no markup, link or address. kind is openai_compat only in the first slice (BK-13; the Google modes wait for BQ-BYOK-2 and are an additive minor). roles maps a role of config/models.yaml to profiles of its own: never a Tilo profile in a BYOK cascade, and no safety, search or speech role (BK-13). An embedding call is never a bundle's: it stays on Tilo's profile.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "ByokConfigBundle".
+ */
+export interface ByokConfigBundle {
+  label: string;
+  kind: "openai_compat";
+  roles: {
+    [k: string]: ByokConfigRoleProfiles;
+  };
+}
+/**
+ * The org profiles one role runs on: a primary and a fallback of the bundle's own (NFR-25 holds inside the bundle; both may name the same profile). Each must be a profile with credential org that no Tilo role names and that has a price (BK-12, PL-06); the loader checks that against config/models*.yaml.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "ByokConfigRoleProfiles".
+ */
+export interface ByokConfigRoleProfiles {
+  primary: ProvidersProfileId;
+  fallback: ProvidersProfileId;
 }
 /**
  * One entry on a person's calendar that Tilo stores (FR-CAL-01, -03): a cached Google Calendar event, an entry the person made, or one Tilo proposed. Work-item due dates, pin deadlines and Tilo's meetings are not stored here: the agenda merges them at read time as `agenda_item` rows that cite their record. Private to `owner` unless `share` names a team (PE-04), which only an accepted entry may do; teammates otherwise get `free_busy` only. A Tilo-made entry (`created_by.by` tilo, source manual or tilo) is accepted only with `confirmed_by` (PE-07). What a Google event keeps is title, times, an all-day flag and a count of other attendees: no description, attendee names or addresses, conference link or location (PE-13). `attendee_count` above 0 makes a write to Google T3 (PE-14).
@@ -4583,7 +4734,68 @@ export interface MeetingHostRpcExecuteResult {
   marker: string;
 }
 /**
- * The body of every refusal on this surface, a fixed code and nothing else: unauthenticated (401, no valid ID token, HB-01), forbidden (403, any account but tilo-api's, HB-01), invalid_request (422, a body over 64 KiB, not JSON or not this contract's request; refused before anything acted) and not_configured (503, a setting is missing or a seam failed to build, or LIVE is not set on tilo-connectors; also 502 when Google's certificates cannot be had to check the token, which is retryable and never a final 401). Only /internal/connections/callback adds three, each 400: start_again (the state is unknown, spent, expired, another person's or lost with an instance, or Google did not accept the code, or the grant could not be saved; one text for all, so the answer says nothing about which, LC-05), not_granted (the person did not agree, or none of the access asked for was granted) and wrong_account (meeting_host only: the sign-in was a person's own account, not the bot's, MH-C1). Never a value, a setting's value or an exception's text.
+ * POST /internal/model-keys/put (ADR-0041 decision 2, BK-01 to BK-03): store the org's key as a new version of its Secret Manager secret, then validate it with the provider's free list-models call from tilo-connectors, to the profile's pinned host, with no redirect and a 3 second limit (BK-19). org_id is the verified principal's org in tilo-api, never a browser value (BK-08); the secret's name comes from org_id and slot, never from the body. key has the shape of the owner's PUT body and is the one credential on this request; the body is no-store.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MeetingHostRpcModelKeyPutRequest".
+ */
+export interface MeetingHostRpcModelKeyPutRequest {
+  org_id: OrgId;
+  slot: OrgModelKeySlot;
+  key: OrgModelKeyKey;
+}
+/**
+ * The 200 answer to put: the new secret version and whether the provider accepted the key. validated false means the version was created disabled because the process may not go live (EFF-01): the status is unverified and no run can use it. A key the provider refuses is the error key_refused and no version is kept. A rotation disables every earlier version only once the new one validated (decision 2).
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MeetingHostRpcModelKeyPutAnswer".
+ */
+export interface MeetingHostRpcModelKeyPutAnswer {
+  secret_version: number;
+  validated: boolean;
+}
+/**
+ * POST /internal/model-keys/remove: with secret_version, destroy that one version and re-enable the one it displaced (the compensating act when tilo-api's reference write failed after put, so the old key stays active); without it, destroy every version and delete the secret (the owner's removal). Idempotent. Nothing is ever left enabled after a rotation or a removal (BK-01).
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MeetingHostRpcModelKeyRemoveRequest".
+ */
+export interface MeetingHostRpcModelKeyRemoveRequest {
+  org_id: OrgId;
+  slot: OrgModelKeySlot;
+  secret_version?: number;
+}
+/**
+ * The 200 answer to remove: true when a version or the secret existed and is gone, false when there was nothing to remove (still a 200).
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MeetingHostRpcModelKeyRemoveAnswer".
+ */
+export interface MeetingHostRpcModelKeyRemoveAnswer {
+  removed: boolean;
+}
+/**
+ * POST /internal/model-keys/status: a store read only, with no secret access, no provider call and no event.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MeetingHostRpcModelKeyStatusRequest".
+ */
+export interface MeetingHostRpcModelKeyStatusRequest {
+  org_id: OrgId;
+  slot: OrgModelKeySlot;
+}
+/**
+ * The 200 answer to status, about the org's latest version: none (no version), active (enabled and validated), unverified (created disabled, never validated) or disabled (a rotation, three refusals or a failed re-validation disabled it, BK-17). secret_version is null exactly when state is none. No key character, length or hash.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MeetingHostRpcModelKeyStatusAnswer".
+ */
+export interface MeetingHostRpcModelKeyStatusAnswer {
+  state: "none" | "active" | "unverified" | "disabled";
+  secret_version: number | null;
+}
+/**
+ * The body of every refusal on this surface, a fixed code and nothing else: unauthenticated (401, no valid ID token, HB-01), forbidden (403, any account but tilo-api's, HB-01), invalid_request (422, a body over 64 KiB, not JSON or not this contract's request; refused before anything acted) and not_configured (503, a setting is missing or a seam failed to build, or LIVE is not set on tilo-connectors; also 502 when Google's certificates cannot be had to check the token, which is retryable and never a final 401). Only /internal/connections/callback adds three, each 400: start_again (the state is unknown, spent, expired, another person's or lost with an instance, or Google did not accept the code, or the grant could not be saved; one text for all, so the answer says nothing about which, LC-05), not_granted (the person did not agree, or none of the access asked for was granted) and wrong_account (meeting_host only: the sign-in was a person's own account, not the bot's, MH-C1). Only /internal/model-keys/put adds one, 422: key_refused (the provider refused the key; no version was kept, ADR-0041 decision 2). Never a value, a setting's value or an exception's text.
  *
  * This interface was referenced by `TiloContracts`'s JSON-Schema
  * via the `definition` "MeetingHostRpcError".
@@ -4596,7 +4808,8 @@ export interface MeetingHostRpcError {
     | "not_configured"
     | "start_again"
     | "not_granted"
-    | "wrong_account";
+    | "wrong_account"
+    | "key_refused";
 }
 /**
  * The answer of `GET /v1/meetings/{meeting_id}/join` (ADR-0024 amendment 4): the Google Meet link of a meeting Tilo hosts, for that meeting's owner only, read from the host account's event when the owner clicks and stored nowhere (rules MJ-01 to MJ-10 in `meeting_join.rules.md`). It is a response body, never a record: no store, cache, event, card, notification, archive record or log line holds it, and `meeting.schema.json` and `calendar_entry.schema.json` still have no field that can. `join_url` is exactly `https://meet.google.com/` and a three-four-three lower-case meeting code: no other scheme, host, user info, port, path, query or fragment (36 characters, so a trailing newline is refused in every engine). `expires_at` is the server's clock plus 60 seconds: the client drops the link then, or when the view closes, and asks again on the next click.
@@ -4892,6 +5105,220 @@ export interface MinutesAgendaPoint {
   title: string;
   coverage: "covered" | "partial" | "not_discussed";
   evidence: MinutesEvidence;
+}
+/**
+ * POST /internal/model-keys/generate. org_id is the run's org (tilo-api derives it, never the browser), slot the one slot, run_id the run the call belongs to (connectors logs the ids and the outcome code, never the prompt) and profile_id a profile of config/models*.yaml with credential org that the org's bundle names for this role; connectors refuses any other. request is a closed subset of the provider layer's GenerateRequest.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "ModelCallRpcGenerateRequest".
+ */
+export interface ModelCallRpcGenerateRequest {
+  org_id: OrgId;
+  slot: OrgModelKeySlot;
+  run_id: RunId;
+  profile_id: ProvidersProfileId;
+  request: ModelCallRpcRequest;
+}
+/**
+ * What one call may carry: prompt, system, max_output_tokens, tools, json_mode, response_schema and thinking_level of GenerateRequest, and no media part (v1 is text only). prompt and system are at most 400000 characters each, four times the largest shipped role cap max_input_tokens (100000, EFF-03); the body cap above is the bound that holds. Optional fields are left out, never null.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "ModelCallRpcRequest".
+ */
+export interface ModelCallRpcRequest {
+  prompt: string;
+  system?: string;
+  max_output_tokens?: number;
+  /**
+   * @maxItems 64
+   */
+  tools?: {}[];
+  json_mode?: boolean;
+  response_schema?: {};
+  thinking_level?: "minimal" | "low" | "medium" | "high";
+}
+/**
+ * The 200 answer: the provider's reply and the usage it reported. text is null for a tool-call-only turn; tool_calls and usage are left out when the provider sent none (a left-out usage is unknown and the router charges the call's ceiling, never zero). Nothing the provider sent beyond these three fields is relayed (BK-17, BK-22).
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "ModelCallRpcGenerateAnswer".
+ */
+export interface ModelCallRpcGenerateAnswer {
+  text: string | null;
+  /**
+   * @maxItems 64
+   */
+  tool_calls?: ModelCallRpcToolCall[];
+  usage?: ModelCallRpcUsage;
+}
+/**
+ * One call the model asked for, as the provider layer's GenerateResponse carries it: a name and its arguments.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "ModelCallRpcToolCall".
+ */
+export interface ModelCallRpcToolCall {
+  name: string;
+  args: {};
+}
+/**
+ * The provider's own whole-number counts (GenerateResponse usage, EFF-04, ADR-0022). cached_tokens is a part of input_tokens and is left out when the provider did not report it; that it is at most input_tokens is checked by the router. tilo-api prices them at config/prices.yaml, never connectors (BK-14).
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "ModelCallRpcUsage".
+ */
+export interface ModelCallRpcUsage {
+  input_tokens: number;
+  output_tokens: number;
+  total_tokens?: number;
+  cached_tokens?: number;
+}
+/**
+ * The body of every refusal, a fixed code and nothing else, never a value, the key, the provider's text or an exception's (BK-17). unauthenticated (401) and forbidden (403) are HB-01's; invalid_request is 422 (a body over the cap, not JSON, not this contract, a profile the org's bundle does not name); not_configured is 503 (byok.yaml or the vault is not wired, or LIVE is not set on tilo-connectors); no_key, unverified and invalid_key are 409 (no active version, a version never validated, or refused three times and again at re-validation); rate_limited and quota are 429 (connectors' per-org cap, or the provider's own limit); unreachable is 502 (the provider or the vault could not be reached or did not answer in time). Reasons that belong to tilo-api (paused, removed, cap reached) are never sent by connectors.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "ModelCallRpcError".
+ */
+export interface ModelCallRpcError {
+  error:
+    | "unauthenticated"
+    | "forbidden"
+    | "invalid_request"
+    | "not_configured"
+    | "no_key"
+    | "unverified"
+    | "invalid_key"
+    | "rate_limited"
+    | "quota"
+    | "unreachable";
+}
+/**
+ * orgs/{org}/model_keys/models (ADR-0041 decision 2, BK-04): the org's choices and stamps and the version of the vault secret, never a key character, length, hash or last four. rotated_at is null until a rotation; rev starts at 1 and is the compare-and-set counter of every write. The record is written by tilo-api's routes only and never by a model, a skill or a tool (BK-18).
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "OrgModelKeyReference".
+ */
+export interface OrgModelKeyReference {
+  bundle_id: ByokConfigBundleId;
+  status: OrgModelKeyStatus;
+  secret_version: number;
+  set_by: UserId;
+  set_at: Timestamp;
+  rotated_at: Timestamp | null;
+  day_cap_credits: OrgModelKeyDayCapCredits;
+  fallback_to_tilo: boolean;
+  /**
+   * Consecutive provider refusals since the last success (BK-17).
+   */
+  refusals: number;
+  last_error: OrgModelKeyLastError | null;
+  last_used_at: Timestamp | null;
+  consent_version: OrgModelKeyConsentVersion;
+  rev: number;
+}
+/**
+ * orgs/{org}/byok_audit/{id}: one entry per act on the key (ADR-0041 decision 2), written by the route after the act and never by a model. id is 32 lower-case hex characters. action is set, rotate, change (pause, resume, cap, fallback) or remove. bundle and version are the reference's after the act, null when none. outcome is ok, or the fixed code of an act that reached the vault and failed. authz is the owner's person authz (common.schema.json authz): the person act that BK-07 asks for, the owner's own act for a narrowing one; its ref equals actor and its at is the act's time (validator, byok.rules.md BK-07).
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "OrgModelKeyAuditEntry".
+ */
+export interface OrgModelKeyAuditEntry {
+  id: string;
+  at: Timestamp;
+  actor: UserId;
+  action: "set" | "rotate" | "change" | "remove";
+  bundle: ByokConfigBundleId | null;
+  version: number | null;
+  outcome: "ok" | "key_refused" | "unavailable";
+  authz: Authz;
+}
+/**
+ * PUT /v1/org/model-key: set or rotate (T3, org_model_key_change, BK-07). confirm is exactly true and consent_version the version of the line the person saw, else 422 confirm_required (BK-06). bundle_id is one of config/byok.yaml's; day_cap_credits is required; fallback_to_tilo is left out for off. key is the one secret on this surface and the body is no-store: no log, trace, error or audit entry holds it, and a refused body answers a fixed code, never its input (BK-02).
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "OrgModelKeyPutRequest".
+ */
+export interface OrgModelKeyPutRequest {
+  confirm: true;
+  consent_version: OrgModelKeyConsentVersion;
+  bundle_id: ByokConfigBundleId;
+  day_cap_credits: OrgModelKeyDayCapCredits;
+  fallback_to_tilo?: boolean;
+  key: OrgModelKeyKey;
+}
+/**
+ * The 200 answer to put: the state the reference now has, the vault's secret version and whether the provider accepted the key. validated is false only when the process may not go live (EFF-01), and then the state is unverified and no run can use the key (decision 2); a refused key is 422 key_refused and nothing is kept.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "OrgModelKeyPutAnswer".
+ */
+export interface OrgModelKeyPutAnswer {
+  state: "unverified" | "active";
+  secret_version: number;
+  validated: boolean;
+}
+/**
+ * PATCH /v1/org/model-key: pause or resume, change the cap, turn fallback on or off (BQ-BYOKC-1 for the verb). At least one of paused, day_cap_credits and fallback_to_tilo. Narrowing (pause, a lower cap, fallback off) is immediate and needs no confirm; resume, a higher cap and fallback on are T3 widening acts and need confirm true with consent_version, together (BK-07: the route compares with the reference, the schema cannot). No key and no bundle: a different key or bundle is a put.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "OrgModelKeyPatchRequest".
+ */
+export interface OrgModelKeyPatchRequest {
+  paused?: boolean;
+  day_cap_credits?: OrgModelKeyDayCapCredits;
+  fallback_to_tilo?: boolean;
+  confirm?: true;
+  consent_version?: OrgModelKeyConsentVersion;
+}
+/**
+ * GET answer for any signed-in member of the org who is not its owner (BK-20): whether the org's own key is active and its bundle label, so people know where their work goes. Nothing else.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "OrgModelKeyMemberView".
+ */
+export interface OrgModelKeyMemberView {
+  active: boolean;
+  label: string | null;
+}
+/**
+ * GET answer for the org owner, and the 200 answer to patch (BK-20: only the owner reads status, spend and errors). state is none when the org has no key; then active is false, label null and no record field is present. Otherwise every record field is present and active is true exactly when state is active. consent_version here is the version the owner must confirm for the next widening act (config/byok.yaml's), not the stored one. spent_today_credits (committed plus reserved against today's UTC cap) is left out when the spend store cannot be read; never null. No key, secret name, URL, or provider text.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "OrgModelKeyOwnerView".
+ */
+export interface OrgModelKeyOwnerView {
+  active: boolean;
+  label: string | null;
+  state: "none" | "unverified" | "active" | "paused" | "invalid";
+  consent_version: OrgModelKeyConsentVersion;
+  bundle_id?: ByokConfigBundleId;
+  secret_version?: number;
+  set_at?: Timestamp;
+  rotated_at?: Timestamp | null;
+  day_cap_credits?: OrgModelKeyDayCapCredits;
+  fallback_to_tilo?: boolean;
+  last_error?: OrgModelKeyLastError | null;
+  last_used_at?: Timestamp | null;
+  spent_today_credits?: Credits;
+}
+/**
+ * The 200 answer to DELETE: every vault version destroyed, then the reference (BK-01, decision 2). The call is idempotent, so removed is true also when nothing was stored.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "OrgModelKeyRemoveAnswer".
+ */
+export interface OrgModelKeyRemoveAnswer {
+  removed: true;
+}
+/**
+ * The body of every refusal on these routes (BK-02): a fixed word in detail and, on the coded refusals, the same word in code, and nothing else, never a value, the input, the provider's text or an exception's. owner_only (403: not the org owner, a demo or non-full session), reauth_required (401, BK-06), confirm_required (422), key_refused (422: the key or the body is not accepted), invalid_body (422), rate_limited (429, with Retry-After, 5 acts an hour, BK-08), not_configured (503: byok.yaml missing or enabled false, or a seam is not wired) and unavailable (503: connectors, the vault or a store). Sign-in, size and media-type refusals use the platform's shared bodies.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "OrgModelKeyError".
+ */
+export interface OrgModelKeyError {
+  detail: OrgModelKeyErrorCode;
+  code?: OrgModelKeyErrorCode;
 }
 /**
  * A person of an org (PRD 15.1 User entity, ADR-0015): who they are, how they are called in a meeting, how Tilo reaches them, and which teams an org owner put them in. `aliases` are names others use for them; a spoken name that matches more than one person is never assigned (PE-15). A membership counts only as people.rules.md defines it (PE-02). Contact details are never shown to teammates; `tilo-api` resolves a recipient from this record (PE-09).
@@ -5312,7 +5739,7 @@ export interface PolicyMaxLevel {
   T3: "L1";
 }
 /**
- * Provider-layer configuration as the provider layer loads it (PRD 6.4, 6.6, 14.1): models is config/models.yaml ($defs.models) and prices is config/prices.yaml ($defs.prices). The loader also checks that every role names existing profiles and every profile has a price entry, the speech role's rules below (1.2.0, ADR-0027), and the search role, unit price, region and valid_until rules below (1.3.0, ADR-0029). Model ids appear only in config/ and packages/providers.
+ * Provider-layer configuration as the provider layer loads it (PRD 6.4, 6.6, 14.1): models is config/models.yaml ($defs.models) and prices is config/prices.yaml ($defs.prices). The loader also checks that every role names existing profiles and every profile has a price entry, the speech role's rules below (1.2.0, ADR-0027), the search role, unit price, region and valid_until rules below (1.3.0, ADR-0029), and the org-profile rules of profile.credential (1.4.0, ADR-0041 BK-12, Proposed and inert until the BYOK flag is on). Model ids appear only in config/ and packages/providers.
  *
  * This interface was referenced by `TiloContracts`'s JSON-Schema
  * via the `definition` "Providers".
@@ -5342,7 +5769,7 @@ export interface ProvidersModels {
   rules: ProvidersRules;
 }
 /**
- * One model profile. Its cost rank (PRD 6.6) is derived from prices, never declared here. base_url and api_key_env are allowed only when provider is openai_compat (ADR-0002, ADR-0003). media_tokens (1.3.0, ADR-0029) holds the tokens the provider counts for one image, one PDF page and one second of audio or video, as upper bounds; the router uses them only for the pre-flight estimate and the EFF-03 cap check before it sends a media part, never for billing (the reported usage is billed). A profile without media_tokens gets no media part: the router refuses it before sending.
+ * One model profile. Its cost rank (PRD 6.6) is derived from prices, never declared here. base_url and api_key_env are allowed only when provider is openai_compat (ADR-0002, ADR-0003). media_tokens (1.3.0, ADR-0029) holds the tokens the provider counts for one image, one PDF page and one second of audio or video, as upper bounds; the router uses them only for the pre-flight estimate and the EFF-03 cap check before it sends a media part, never for billing (the reported usage is billed). A profile without media_tokens gets no media part: the router refuses it before sending. credential (1.4.0, ADR-0041 BK-12) is the one way to mark an org-only profile: only an organisation's own key serves it (set by the org owner and held in Secret Manager, never in the environment), so it takes the place of api_key_env, needs the fixed base_url and is openai_compat only. The loader (config.py, BK-12, rules in byok.rules.md) also refuses a Tilo role that names such a profile, a bundle of config/byok.yaml that names a profile without it, and one with no price (PL-06).
  *
  * This interface was referenced by `TiloContracts`'s JSON-Schema
  * via the `definition` "ProvidersProfile".
@@ -5367,6 +5794,10 @@ export interface ProvidersProfile {
    * Name of the environment variable that holds the key, never the key itself. The not-pattern rejects a final line break, which a Python validator's $ lets through.
    */
   api_key_env?: string;
+  /**
+   * org: a profile only an organisation's own key serves (ADR-0041 BK-12). Left out for every Tilo profile. Never with api_key_env, never on another provider than openai_compat, and always with a base_url.
+   */
+  credential?: "org";
 }
 /**
  * Tokens per unit of media input (ADR-0029 decision 6): image is one image, pdf_page one PDF page, audio_per_second and video_per_second one second. Upper bounds, so an estimate never understates.

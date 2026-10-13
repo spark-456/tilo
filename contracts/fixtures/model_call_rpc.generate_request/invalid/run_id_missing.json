@@ -1,0 +1,8 @@
+{
+  "org_id": "org_example",
+  "slot": "models",
+  "profile_id": "byok-large",
+  "request": {
+    "prompt": "Summarise the attached notes in three bullet points."
+  }
+}

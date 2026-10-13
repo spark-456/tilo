@@ -227,7 +227,8 @@ def get_room_config() -> RoomConfig:
 
 
 def get_room_model(router: Annotated[Router, Depends(deps.get_router)]) -> RoomModel:
-    return RouterRoomModel(router, deps.providers_config())
+    # the room holds its own SEC-16 unit per turn (`_hold`), so its model is the Router unmetered: one hold, not two
+    return RouterRoomModel(getattr(router, "raw", router), deps.providers_config())
 
 
 class _DevLines:

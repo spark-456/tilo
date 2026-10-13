@@ -237,7 +237,8 @@ def test_BK_02_BK_04_a_set_stores_a_reference_with_no_key_characters_and_answers
     )  # fmt: skip
     assert key not in seen and key[:8] not in seen and key[-8:] not in seen
     audit = rig.store.audit_entries(ORG)
-    assert [e["action"] for e in audit] == ["set"] and audit[0]["authz"]["tier"] == "T3"
+    # BQ-BYOKC-5c: the entry's authz is the common person authz (the T3 tier is the act's, pinned in autonomy.yaml)
+    assert [e["action"] for e in audit] == ["set"] and audit[0]["authz"] == {"by": "person", "ref": OWNER, "at": NOW}
 
 
 def test_BK_04_a_member_reads_active_and_label_only_the_owner_reads_the_rest(rig: Rig) -> None:
@@ -248,6 +249,20 @@ def test_BK_04_a_member_reads_active_and_label_only_the_owner_reads_the_rest(rig
     owner = rig.client.get(PATH).json()
     assert owner["state"] == "active" and owner["day_cap_credits"] == 500 and owner["bundle_id"] == "oa"
     assert not {"key", "secret", "hash", "last4"} & set(owner)
+
+
+def test_BK_17_B4_the_owner_and_members_are_told_when_the_keys_bundle_left_the_config(rig: Rig) -> None:
+    """SEC-REVIEW-29 B4 (route half): units of that key are refused `not_configured`, so no screen may say active."""
+    rig.put()
+    assert rig.client.get(PATH).json()["active"] is True
+    gone = ByokConfig(
+        enabled=True, day_cap_credits_max=10_000, calls_per_org_per_minute=120, consent_version=3, bundles={}
+    )
+    app.dependency_overrides[byok_routes.get_byok_config] = lambda: gone
+    owner = rig.client.get(PATH).json()
+    assert owner["active"] is False and owner["last_error"] == "not_configured" and owner["bundle_id"] == "oa"
+    rig.user = MEMBER
+    assert rig.client.get(PATH).json() == {"active": False, "label": None}
 
 
 def test_BK_20_another_orgs_key_is_never_seen_or_used(rig: Rig, monkeypatch: pytest.MonkeyPatch) -> None:

@@ -7,6 +7,7 @@ at runtime (no literal looks like a key), nothing goes to the network, nothing i
 
 from __future__ import annotations
 
+import dataclasses
 import json
 import secrets
 import traceback
@@ -20,6 +21,7 @@ from conftest import (
     prices_config_for,
     write_providers_config,
 )
+from tilo_contracts import ProvidersModels
 from tilo_providers.byok import (
     ByokConfig,
     ByokConfigError,
@@ -30,7 +32,7 @@ from tilo_providers.byok import (
     ProxyRefusal,
     load_byok_config,
 )
-from tilo_providers.config import load_providers_config
+from tilo_providers.config import ProviderConfigError, load_providers_config
 from tilo_providers.errors import NotConfigured
 from tilo_providers.interfaces import GenerateRequest
 from tilo_providers.router import Router, RouterCredentialError
@@ -48,6 +50,7 @@ def _models() -> dict[str, Any]:
         profile: dict[str, Any] = {"provider": kind, "model": model, "context": 100_000, "caps": ["json", "tools"]}
         if kind == "openai_compat":
             profile["base_url"] = URL
+            profile["credential"] = "org"  # providers.schema.json 1.4.0, BK-12: the contract's marker (BQ-BYOK-8)
         return profile
 
     return {
@@ -158,6 +161,7 @@ def test_BK_13_loader_refuses_a_bad_bundle(tmp_path, bundle_patch, why):
 
 def test_BK_12_a_profile_with_an_env_key_is_never_an_org_profile(tmp_path):
     models = _models()
+    del models["profiles"]["org-big"]["credential"]  # with both, config.py refuses the pair at load (BYOK-6 tests)
     models["profiles"]["org-big"]["api_key_env"] = "TILO_SOME_TILO_KEY"  # a Tilo credential: never an org's
     with pytest.raises(ByokConfigError):
         load_byok_config(_byok_yaml(tmp_path), providers=_providers(tmp_path, models))
@@ -166,8 +170,12 @@ def test_BK_12_a_profile_with_an_env_key_is_never_an_org_profile(tmp_path):
 def test_BK_12_a_tilo_role_that_names_an_org_profile_is_refused(tmp_path):
     models = _models()
     models["roles"]["director"] = {"primary": "org-big", "fallback": "tilo-b"}
+    with pytest.raises(ProviderConfigError):  # BK-12 lives in config.py now (providers.schema.json 1.4.0)
+        _providers(tmp_path, models)
+    # defence in depth: the bundle loader refuses it too for a config assembled without that loader
+    unchecked = dataclasses.replace(_providers(tmp_path), models=ProvidersModels.model_validate(models))
     with pytest.raises(ByokConfigError):
-        load_byok_config(_byok_yaml(tmp_path), providers=_providers(tmp_path, models))
+        load_byok_config(_byok_yaml(tmp_path), providers=unchecked)
 
 
 def test_BK_12_an_unpriced_org_profile_is_refused_PL_06(tmp_path):

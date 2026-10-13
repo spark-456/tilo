@@ -115,8 +115,8 @@ def actor(
         record = Writer(stores, deps.ORG_ID, principal.user_id, now).directory().record(principal.user_id)
     except Exception:  # noqa: BLE001 - the directory cannot be read: nothing is decided
         raise HTTPException(status_code=503, detail="unavailable") from None
-    if record is None:
-        raise Refusal(403, "forbidden")
+    if record is None:  # org_model_key.error: one word for "not the owner", whatever the reason (BQ-BYOKC-6)
+        raise Refusal(403, "owner_only")
     return Actor(
         principal.user_id, deps.ORG_ID, record.get("org_role") == "owner", now, getattr(principal, "auth_time", None)
     )
@@ -189,14 +189,23 @@ def body_of[Model: BaseModel](model: type[Model]) -> Any:
 
 def _public(ref: KeyReference | None, config: ByokConfig, *, owner_view: bool) -> dict[str, Any]:
     bundle = config.bundles.get(ref.bundle_id) if ref else None
-    base: dict[str, Any] = {"active": bool(ref and ref.active()), "label": bundle.label if bundle and ref else None}
+    # B4: a key whose bundle left the config is refused `not_configured` at every unit, so it is never said to be active
+    left = ref is not None and bundle is None
+    base: dict[str, Any] = {
+        "active": bool(ref and ref.active() and not left),
+        "label": bundle.label if bundle and ref else None,
+    }
     if not owner_view:
         return base  # every member may see where their work goes, and nothing more (BK-20)
     if ref is None:
         return {**base, "state": "none", "consent_version": config.consent_version}
-    keep = ("bundle_id", "auth_mode", "project_id", "secret_version", "set_at", "rotated_at", "day_cap_credits")
-    keep += ("fallback_to_tilo", "last_error", "last_used_at", "consent_version")
-    return {**base, "state": ref.status, **{k: v for k, v in ref.to_dict().items() if k in keep}}
+    # org_model_key.owner_view: no auth_mode or project_id (the Google modes wait for BQ-BYOK-2), and consent_version
+    # is the config's current one, the line the owner must confirm for the next widening act, not the stored one
+    keep = ("bundle_id", "secret_version", "set_at", "rotated_at", "day_cap_credits")
+    keep += ("fallback_to_tilo", "last_error", "last_used_at")
+    shown = {k: v for k, v in ref.to_dict().items() if k in keep}
+    answer = {**base, "state": ref.status, "consent_version": config.consent_version, **shown}
+    return {**answer, **({"last_error": "not_configured"} if left else {})}
 
 
 @router.get(ROUTE)
@@ -208,14 +217,13 @@ def read_key(
     return _public(store.get(who.org), config, owner_view=who.owner)
 
 
-def _audit(store: OrgKeyStore, who: Actor, action: str, ref: KeyReference | None, *, widening: bool, cfg: int) -> None:
+def _audit(store: OrgKeyStore, who: Actor, action: str, ref: KeyReference | None) -> None:
+    """org_model_key.audit_entry: `authz` is the common person authz (BK-07; ref equals actor, at equals at), and
+    bundle and version are the reference's after the act, null when there is none (BQ-BYOKC-5c)."""
     entry = {
         "id": uuid.uuid4().hex, "at": who.now, "actor": who.user, "action": action,
         "bundle": ref.bundle_id if ref else None, "version": ref.secret_version if ref else None, "outcome": "ok",
-        "authz": {
-            "actor": who.user, "org_role": "owner", "basis": "owner_confirm" if widening else "owner_narrowing",
-            "tier": "T3" if widening else None, "consent_version": cfg if widening else None,
-        },
+        "authz": {"by": "person", "ref": who.user, "at": who.now},
     }  # fmt: skip
     try:
         store.audit(who.org, entry)
@@ -287,7 +295,7 @@ def put_key(
         except Exception as exc:  # noqa: BLE001
             logger.warning("byok compensating remove failed (%s)", type(exc).__name__)
         raise HTTPException(status_code=503, detail="unavailable")
-    _audit(store, who, "rotate" if held else "set", record, widening=True, cfg=body.consent_version)
+    _audit(store, who, "rotate" if held else "set", record)
     return {"state": record.status, "secret_version": record.secret_version, "validated": put.validated}
 
 
@@ -299,6 +307,9 @@ def change_settings(
     store: Annotated[OrgKeyStore, Depends(get_org_key_store)],
 ) -> dict[str, Any]:
     """Narrowing is immediate; the same body that raises something is a person act (confirm and a fresh sign-in)."""
+    if body.confirm is False or (body.confirm is None) != (body.consent_version is None):
+        # patch_request: confirm is exactly true and comes with its consent version, or neither is sent (BK-06)
+        raise Refusal(422, "confirm_required", code="confirm_required")
     held = store.get(who.org)
     if held is None or body.model_dump(exclude={"confirm", "consent_version"}, exclude_none=True) == {}:
         raise Refusal(422, "invalid_body", code="invalid_body")
@@ -329,7 +340,7 @@ def change_settings(
         stored = False
     if not stored:
         raise HTTPException(status_code=503, detail="unavailable")
-    _audit(store, who, "change", updated, widening=widening, cfg=updated.consent_version)
+    _audit(store, who, "change", updated)
     return _public(updated, config, owner_view=True)
 
 
@@ -340,7 +351,6 @@ def remove_key(
     vault: Annotated[ModelKeyVault, Depends(get_model_key_vault)],
 ) -> dict[str, Any]:
     """Destroy every version, then the reference: the org returns to Tilo's own key (BK-17 step 2). Idempotent."""
-    held = store.get(who.org)
     try:
         vault.remove(who.org, SLOT, None)
     except Exception:  # noqa: BLE001 - nothing is claimed removed that is not
@@ -349,5 +359,5 @@ def remove_key(
         store.delete(who.org)
     except Exception:  # noqa: BLE001
         raise HTTPException(status_code=503, detail="unavailable") from None
-    _audit(store, who, "remove", held, widening=False, cfg=0)
+    _audit(store, who, "remove", None)
     return {"removed": True}

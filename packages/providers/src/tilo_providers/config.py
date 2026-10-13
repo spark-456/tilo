@@ -205,13 +205,28 @@ def _validate_profile_endpoint_fields(models: ProvidersModels) -> None:
     not enforce a JSON Schema if/else (same gap P0-04 handled for prices'
     if/then in `_validate_price_fields_when_set`) — a `google` or `fake`
     profile carrying either field validates against the model fine and
-    would only be caught here, at load time."""
+    would only be caught here, at load time.
+
+    1.4.0 (ADR-0041 BK-12) adds `credential: org`, the one marker of an org-only profile: openai_compat only (the
+    else branch), never with `api_key_env` (the then branch) and always with `base_url` (`dependentRequired`)."""
     for profile_id, profile in models.profiles.items():
         if profile.provider != "openai_compat" and (profile.base_url is not None or profile.api_key_env is not None):
             raise ProviderConfigError(
                 f"PL-02: profile {profile_id!r} has provider {profile.provider!r} but declares "
                 "base_url/api_key_env -- only an openai_compat profile may (contracts/providers.schema.json "
                 "$defs.profile)"
+            )
+        if profile.credential is None and "credential" not in profile.model_fields_set:
+            continue  # a Tilo profile; an explicit `credential: null` is not (the schema's const is "org", never null)
+        if (
+            profile.credential != "org"
+            or profile.provider != "openai_compat"
+            or profile.api_key_env is not None
+            or profile.base_url is None
+        ):
+            raise ProviderConfigError(
+                f"BK-12: profile {profile_id!r} has credential 'org', which needs provider openai_compat, a fixed "
+                "base_url and no api_key_env (contracts/providers.schema.json $defs.profile)"
             )
 
 
@@ -238,6 +253,9 @@ def _validate_startup_rules(models: ProvidersModels, prices: ProvidersPrices) ->
                 raise ProviderConfigError(f"NFR-25: role {role_id!r} 'cascade' names unknown profile {cascade_id!r}")
         if role.fallback is None:
             raise ProviderConfigError(f"NFR-25: role {role_id!r} has no fallback profile")
+        for profile_id in sorted(profiles_used_by(role)):
+            if models.profiles[profile_id].credential is not None:  # ADR-0041 BK-12: an org profile is org-only
+                raise ProviderConfigError(f"BK-12: role {role_id!r} names profile {profile_id!r}, which is org-only")
         _validate_unit_price_rules(role_id, role, models, prices)
 
 

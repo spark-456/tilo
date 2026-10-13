@@ -272,6 +272,14 @@ class SpendGuard:
     def replay_only(self) -> bool:
         return _quiet(self._switch)
 
+    def headroom_minor(self, uid: str) -> int:
+        """What the uid may still spend under its (team-lowered) lifetime cap; 0 when it cannot be read."""
+        try:
+            return max(0, self._caps.uid_lifetime_minor - self._ledger.spent_minor(uid))
+        except Exception as exc:
+            logger.warning("a spend store is unreachable: %s", type(exc).__name__)
+            return 0
+
 
 def _quiet(read: Callable[[], object]) -> bool:
     """The answer, or False when a store cannot be reached (logged by error type only)."""

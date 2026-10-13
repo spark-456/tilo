@@ -222,6 +222,13 @@ class DemoSession:
         ))  # fmt: skip
 
     @property
+    def treasury(self) -> Any:
+        """The Treasury seams' ledger for this session (T3): memory only, bounded, gone with the session."""
+        from tilo_api.quick_ledger import MemoryLedger  # noqa: PLC0415
+
+        return self._once("treasury", lambda: MemoryLedger(limit=200))
+
+    @property
     def redactor(self) -> Callable[[str], str]:
         return _redact
 

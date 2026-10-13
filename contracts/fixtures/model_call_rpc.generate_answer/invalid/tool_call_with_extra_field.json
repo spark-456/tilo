@@ -1,0 +1,10 @@
+{
+  "text": null,
+  "tool_calls": [
+    {
+      "name": "lookup",
+      "args": {},
+      "id": "c1"
+    }
+  ]
+}
