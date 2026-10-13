@@ -37,7 +37,9 @@ describe("RUN_INDICATOR logic: nothing recorded, nothing shown", () => {
 
 describe("RUN_INDICATOR logic: team worlds are not the person's own work (BQ-CTX-TEAMWORLD)", () => {
   it("RUN_INDICATOR_a_teammates_running_or_held_world_shows_no_bar", () => {
-    expect(runBarOf([world({ access: "team" }), world({ id: "w2", st: "needs", access: "team" })])).toBeNull();
+    expect(
+      runBarOf([world({ access: "team" }), world({ id: "w2", st: "needs", access: "team" })]),
+    ).toBeNull();
   });
   it("RUN_INDICATOR_own_running_world_counts_alone_beside_a_teammates", () => {
     const bar = runBarOf([world({ agents: 2 }), world({ id: "w2", agents: 5, access: "team" })]);
