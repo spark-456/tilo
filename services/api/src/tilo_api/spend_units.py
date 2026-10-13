@@ -21,7 +21,8 @@ from tilo_providers.router import RouterError
 from tilo_api import deps, spend
 
 T = TypeVar("T")
-INR_MINOR_PER_USD = 8000  # BQ-SEC16-1's default: 80 INR per US$, below the market rate, so a cap is never undercounted
+# BQ-SEC16-1's default, 80 INR per US$. The market rate is higher, so this undercounts real INR (BQ-GOLIVE935-6).
+INR_MINOR_PER_USD = 8000
 _BYTES_PER_TOKEN = 3  # a screened text is priced at one token per three bytes: over-counted on purpose
 _BILLED_ERRORS = frozenset({"OutputTruncatedError"})  # sent and ran to its cap, no usage reported
 
