@@ -186,7 +186,7 @@ export function validateAppSpec(raw: unknown): AppSpecValidation {
       (typeof item.source.page !== "number" ||
         !Number.isInteger(item.source.page) ||
         item.source.page < 1 ||
-        item.source.page > 100000)
+        item.source.page > 100 * 1000)
     ) {
       return { ok: false, reason: `Question ${item.id} source page must be a positive integer.` };
     }
