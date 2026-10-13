@@ -11,8 +11,8 @@ from types import SimpleNamespace
 from typing import Any, cast
 
 from fastapi import Request
-from tilo_channels.autopilot import Autopilot, Preview
-from tilo_channels.drafting import DraftStore
+from tilo_channels.autopilot import Autopilot, DraftContext, Preview
+from tilo_channels.drafting import DraftResult, DraftStore
 from tilo_channels.meeting_followup import MeetingFollowUp
 from tilo_contracts import Minutes
 from tilo_memory.artifacts import ArtifactError, ArtifactStore, Scope
@@ -40,6 +40,22 @@ class _Guarded:
             return getattr(self.port, name)(*args, **kwargs)
 
         return invoke
+
+
+class _PublishedPreview(_Guarded):
+    def __init__(self, port: Autopilot, check: Callable[[], None], emit: Callable[[dict], None]) -> None:
+        super().__init__(port, check)
+        self.emit = emit
+
+    def preview(self, user_id: str, context: DraftContext, result: DraftResult) -> Preview:
+        self.check()
+        if result.draft is not None:
+            # A failed channel announcement retains its lease. Repair before any card even within that lease;
+            # the registered writer deduplicates this snapshot's stable event id after a successful announcement.
+            artifact = {"artifact_id": result.draft.artifact_id, "version": result.draft.version}
+            self.emit({"type": "artifact.created", "data": {"artifact": artifact}})
+        self.check()
+        return cast(Preview, self.port.preview(user_id, context, result))
 
 
 def draft_owner_followup(
@@ -215,7 +231,7 @@ def draft_owner_followup(
         model=SimpleNamespace(generate=generate),
         safety=cast(SafetyProvider, _Safety(safety, calls)),
         drafts=cast(DraftStore, _Guarded(drafts, check)),
-        autopilot=cast(Autopilot, _Guarded(ap, check)),
+        autopilot=cast(Autopilot, _PublishedPreview(ap, check, emit)),
         mailbox=lambda uid: addresses.get(uid),
         clock=lambda: now,
         emit=emit,
