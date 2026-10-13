@@ -94,6 +94,24 @@ describe("HOME_SUMMARY_LIVE: the summary is derived from served worlds and decis
     expect(today).toContain("Served a");
     expect(today).not.toMatch(/Running · 0%|\b0%/);
   });
+
+  it("QA_13OCT_home_only_served_worlds_are_titled_live_now_and_the_fixture_panel_says_sample", async () => {
+    const rig = await mountLiveHome(
+      live({
+        getWorlds: async () => servedWorlds(item("a", "started")),
+        getDecisions: async () => ({ data: [], source: "live" }),
+      }),
+    );
+    const served = textOf(todayRegion(rig.el));
+    expect(served).toContain("Live now");
+    expect(served).not.toContain("Sample worlds");
+    cleanup();
+    const { el } = await mountHome();
+    await settle();
+    const sample = textOf(todayRegion(el));
+    expect(sample).toContain("Sample worlds");
+    expect(sample).not.toContain("Live now"); // no recorded event stands behind "live" on sample data (HR-1)
+  });
 });
 
 describe("HOME_SUMMARY_LIVE: the fixture path is unchanged", () => {

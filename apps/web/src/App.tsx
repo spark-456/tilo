@@ -1,6 +1,7 @@
 import { memo, useEffect, useMemo, useRef } from "react";
 import { useClient, useIsFixtureClient, useReplaySpeed, useWorldKnown } from "./api/ClientProvider";
 import { AssistantPanel } from "./assistant/AssistantPanel";
+import { useStageMode } from "./display/stageMode";
 import { useMediaQuery } from "./hooks/useMediaQuery";
 import { NeedsYouRail } from "./needs-you/NeedsYouRail";
 import { matchFlowRoute, usePathname } from "./router";
@@ -11,6 +12,7 @@ import { ReplayPauseSlot } from "./screens/PauseSlot";
 import { PrimaryNav } from "./screens/PrimaryNav";
 import { LoggedScrubber, ReplayScrubber } from "./screens/ReplayScrubber";
 import { ScreenPage } from "./screens/ScreenPage";
+import { StagePresenter } from "./screens/StagePresenter";
 import { TopBar } from "./screens/TopBar";
 import { HudGlance, WorldPanels } from "./screens/WorldPanels";
 import { type ScreenMatch, matchScreen } from "./screens/routes";
@@ -21,7 +23,7 @@ import { useClientWorld } from "./world/useClientWorld";
 import { useWorldFixture } from "./world/useWorldFixture";
 import { useRunWorld } from "./world/worldContext";
 
-// Stage mode is a display setting (PRD 9.6).
+// Stage mode is a display setting (PRD 9.6, FR-WLD-12).
 // Memoised so each applied event adds one row instead of re-rendering the whole list.
 const TraceRow = memo(({ seq, type }: { seq: number; type: string }) => (
   <li data-testid="trace-row" data-seq={seq} data-event-type={type}>
@@ -50,11 +52,13 @@ const RUN_SCREENS: ReadonlySet<string> = new Set([
 /** The Needs-you screens keep their own rail (the cards queue); the badge still applies to them. */
 const NEEDS_YOU_SCREENS: ReadonlySet<string> = new Set(["S-06", "S-07"]);
 const NOT_FOUND: ScreenMatch = { id: "not-found", params: [], Component: NotFound };
-const stageMode = new URLSearchParams(window.location.search).get("display") === "stage";
 
-/** PRD 18.3 layout frame: desktop rails either side of the stage; mobile bottom tabs. */
+/** PRD 18.3 layout frame: desktop rails either side of the stage; mobile bottom tabs; 1920x1080 stage mode. */
 export function App() {
   const mobile = useMediaQuery("(max-width: 767px)");
+  const wideStage = useMediaQuery("(min-width: 1920px)");
+  const [stageMode] = useStageMode();
+  const stageLayout = stageMode && (wideStage || window.innerWidth >= 1920);
   const world = useWorldFixture();
   const fixtureClient = useIsFixtureClient();
   const client = useClient();
@@ -149,13 +153,14 @@ export function App() {
     <div
       className="app-shell"
       data-stage-mode={stageMode ? "on" : "off"}
+      data-stage-layout={stageLayout ? "1920x1080" : "off"}
       data-strip={world.active || fixtureClient ? "on" : "off"}
       data-replay-badge={speedBadge ? "on" : "off"}
       data-replay-dock={dock ? "on" : "off"}
     >
-      <TopBar fixture={world.active} />
-      {!mobile && <PrimaryNav id="left-rail" mobile={false} />}
-      {!screen && hudWorld && !mobile && (
+      {!stageLayout && <TopBar fixture={world.active} />}
+      {!mobile && !stageLayout && <PrimaryNav id="left-rail" mobile={false} />}
+      {!screen && hudWorld && !mobile && !stageMode && (
         <LevelsPanel
           key={`levels:${hudWorld}`}
           worldId={hudWorld}
@@ -185,7 +190,7 @@ export function App() {
           paused={stagePaused}
         />
       )}
-      {!screen && !world.active && <FlowShell />}
+      {!screen && !world.active && !stageLayout && <FlowShell />}
       {(world.active || fixtureClient) && (
         // HR-4/BQ-07: permanent (fixture mode, and whenever the fixture client is active), never
         // dismissable, exposed to assistive tech. It sits in a reserved strip along the top edge
@@ -302,6 +307,10 @@ export function App() {
           )}
         </aside>
       )}
+      <StagePresenter
+        worldId={world.active ? world.worldId : railWorld}
+        {...(world.active ? { fixtureEvents: world.events, fixtureFinished: world.finished } : {})}
+      />
       <AssistantPanel />
     </div>
   );

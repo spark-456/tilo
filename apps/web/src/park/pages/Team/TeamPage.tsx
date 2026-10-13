@@ -16,6 +16,8 @@ import type { AppCtx } from "../../app/AppCtx";
 import { useParkApi } from "../../app/context";
 import { useStaged } from "../../app/useStaged";
 import { Button, PageSheet } from "../../components";
+import { FirstRunPanels } from "../../sample/FirstRunPanels";
+import { useFirstRunPreview } from "../../sample/useFirstRunPreview";
 import { Coverage } from "./Coverage";
 import { LiveMembers } from "./LiveMembers";
 import { Members } from "./Members";
@@ -64,6 +66,10 @@ function Frame({ children }: { children: ReactNode }) {
 }
 
 export function TeamPage({ app }: { app: AppCtx }) {
+  const preview = useFirstRunPreview();
+  return preview ? <FirstRunPanels page="team" app={app} /> : <PersonalTeamPage app={app} />;
+}
+function PersonalTeamPage({ app }: { app: AppCtx }) {
   const api = useParkApi();
   const { dec, added, toast } = app;
   const [loaded, setLoaded] = useState<Loaded | "failed" | null>(null);

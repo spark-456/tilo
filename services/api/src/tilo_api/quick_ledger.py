@@ -42,17 +42,33 @@ def quick_entry(
 class MemoryLedger:
     """Thread-safe, in memory: the writer and, through `entries()`, the `get_ledger` reader of a dev or test app."""
 
-    def __init__(self) -> None:
+    def __init__(self, limit: int | None = None) -> None:
         self._lock = threading.Lock()
         self._entries: list[LedgerEntry] = []
+        self._ids: set[str] = set()
+        self._limit = limit  # a demo session's cap: past it a write raises (the caller's write is best effort)
 
     def append(self, entry: LedgerEntry) -> None:
+        self.append_once(None, entry)
+
+    def append_once(self, entry_id: str | None, entry: LedgerEntry) -> None:
+        """T3: the same entry id counts once (as `FirestoreTreasuryLedger.append_once`); no id is always new."""
         with self._lock:
+            if entry_id is not None and entry_id in self._ids:
+                return
+            if self._limit is not None and len(self._entries) >= self._limit:
+                raise OverflowError("the ledger is full")
             self._entries.append(entry)
+            if entry_id is not None:
+                self._ids.add(entry_id)
 
     def entries(self) -> list[LedgerEntry]:
         with self._lock:
             return list(self._entries)
+
+    def entries_for(self, user_id: str) -> list[LedgerEntry]:
+        with self._lock:
+            return [e for e in self._entries if e.user == user_id]
 
     def erase_quick(self, uid: str) -> None:
         """FR-MEM-09: forget a person's Quick run."""

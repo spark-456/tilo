@@ -85,9 +85,24 @@ def test_SEC_16_a_live_call_reserves_before_the_provider_and_settles_what_it_cos
     metered(router, ledger).generate("director", object())
 
     assert router.held_at_call == [UNIT], "the unit was reserved before the call reached the provider"
-    # flash-38: (1000 * 0.825 + 500 * 4.125) / 1e6 US$ = 0.0028875, at 8,000 minor units per US$ = 23.1 -> 24 paise
-    assert ledger.settled_minor(JUDGE_A) == ledger.spent_minor(JUDGE_A) == 24
+    # flash-38: (1000 * 0.825 + 500 * 4.125) / 1e6 US$ = 0.0028875, at 9,500 minor units per US$ = 27.4 -> 28 paise
+    assert ledger.settled_minor(JUDGE_A) == ledger.spent_minor(JUDGE_A) == 28
     assert [n for n in ledger.names if n in ("reserve", "settle", "release")] == ["reserve", "settle"]
+
+
+def test_SEC_16_GOLIVE_935_BQ_GOLIVE935_7_the_metering_rate_is_95_inr_per_usd_so_a_cap_is_never_undercounted():
+    """BQ-GOLIVE935-7: 9,500 minor units per US$ (95 INR). The market is about 88, so the meter over-counts a little and
+    never undercounts a cap (BQ-GOLIVE935-6 recorded the ~10 percent undercount at 80). A constant, not config:
+    `config/spend_caps.yaml` has no rate key and its schema is frozen."""
+    from tilo_api import spend_units
+
+    assert spend_units.INR_MINOR_PER_USD == 9_500
+    assert spend_units.INR_MINOR_PER_USD >= 88 * 100, "never below the market rate"
+    ledger = make_ledger(**BIG_LIMIT)  # US$0.0028875 -> 27.43 paise -> 28, where 80 INR per US$ gave 24 (23.1)
+    metered(FakeRouter(ledger, attempts=[attempt(tokens_in=1_000, tokens_out=500)]), ledger).generate(
+        "director", object()
+    )
+    assert ledger.settled_minor(JUDGE_A) == 28
 
 
 def test_SEC_16_a_call_with_no_reported_usage_settles_the_whole_reserve():
@@ -103,7 +118,7 @@ def test_SEC_16_search_is_a_unit_too_priced_by_its_queries():
     )
     metered(router, ledger).search("search", "a question")
     assert router.held_at_call == [UNIT]
-    assert ledger.settled_minor(JUDGE_A) == 112  # US$14 per 1,000 queries = US$0.014 = 112 paise
+    assert ledger.settled_minor(JUDGE_A) == 133  # US$14 per 1,000 queries = US$0.014 = 133 paise at 9,500
 
 
 def test_SEC_16_a_failed_call_releases_its_hold():
@@ -128,7 +143,7 @@ def test_SEC_16_a_failed_call_that_was_billed_stays_charged():
     )
     with pytest.raises(RouterError):
         metered(failing, ledger).generate("director", object())
-    assert ledger.settled_minor(JUDGE_A) == 24
+    assert ledger.settled_minor(JUDGE_A) == 28
 
 
 @pytest.mark.parametrize("boom", [RuntimeError("x"), asyncio.CancelledError(), KeyboardInterrupt()])
@@ -170,16 +185,16 @@ def test_SEC_16_under_the_cap_with_less_than_a_unit_left_one_call_at_a_time_runs
 
     caps = make_caps(**BIG_LIMIT)
     ledger = make_ledger(caps)
-    held = ledger.reserve(uid=JUDGE_A, run_id="r_x", org_id=ORG, amount_minor=caps.uid_lifetime_minor - 50, at=AT)
-    ledger.settle(held, caps.uid_lifetime_minor - 50)  # under the cap, but a unit (100) no longer fits
-    router = FakeRouter(ledger, attempts=[attempt(tokens_in=1_000, tokens_out=500)])  # a call costs 24 paise
+    held = ledger.reserve(uid=JUDGE_A, run_id="r_x", org_id=ORG, amount_minor=caps.uid_lifetime_minor - 60, at=AT)
+    ledger.settle(held, caps.uid_lifetime_minor - 60)  # under the cap, but a unit (100) no longer fits
+    router = FakeRouter(ledger, attempts=[attempt(tokens_in=1_000, tokens_out=500)])  # a call costs 28 paise
     meter = metered(router, ledger, caps=caps)
 
     for held_at_call in (caps.uid_lifetime_minor, caps.uid_lifetime_minor, caps.uid_lifetime_minor):
-        meter.generate("director", object())  # held for what is left (50, then 26, then 2), settled at 24
+        meter.generate("director", object())  # held for what is left (60, then 32, then 4), settled at 28
         assert router.held_at_call[-1] <= held_at_call, "a hold never takes the uid past its cap"
     assert len(router.calls) == 3
-    assert ledger.spent_minor(JUDGE_A) == caps.uid_lifetime_minor - 50 + 3 * 24  # over by less than one call (22)
+    assert ledger.spent_minor(JUDGE_A) == caps.uid_lifetime_minor - 60 + 3 * 28  # over by less than one call (24)
 
     with pytest.raises(SpendCapReached):
         meter.generate("director", object())

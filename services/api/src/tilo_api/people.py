@@ -454,12 +454,19 @@ def create_work_item_route(
     redact: Annotated[Callable[[str], str], Depends(deps.get_redactor)],
     clock: Annotated[Callable[[], str], Depends(deps.get_clock)],
     events: Annotated[WorkEvents, Depends(get_work_events)],
+    lookup: Annotated[Callable[[str], deps.WorldRecord | None], Depends(deps.get_world_lookup)],
 ) -> dict[str, Any]:
-    """A person adds their own item; a mail or request source is checked against its owner (PE-08)."""
+    """A person adds their own item; a mail or request source is checked against its owner (PE-08). A `world_id`
+    binds it to a world its creator owns or reads as a team reader (ADR-0040, PE-33): only a full web or mobile-web
+    sign-in session bound to no world may name one, and the world and its shares come from the stores."""
 
     def owners() -> deps.SourceOwners:  # resolved only when the source is mail or a request
         seam = request.app.dependency_overrides.get(deps.get_source_owners)
         return seam() if seam is not None else deps.get_source_owners(request)  # an override takes no argument
+
+    def worlds(world_id: str) -> deps.WorldRecord | None:  # a session of another shape reads no world (PE-32)
+        full = principal.full_session is True and not principal.demo_session and principal.world_id is None
+        return lookup(world_id) if full and principal.channel in ("web", "mobile_web") else None
 
     return _answer(
         lambda: idempotent(
@@ -467,7 +474,7 @@ def create_work_item_route(
             principal,
             stores,
             body,
-            lambda: create_item(_writer(principal, stores, clock, redact, events), body, owners),
+            lambda: create_item(_writer(principal, stores, clock, redact, events), body, owners, worlds),
         )
     )
 

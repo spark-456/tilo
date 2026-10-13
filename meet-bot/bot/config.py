@@ -2,17 +2,25 @@
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 from dataclasses import dataclass
 from pathlib import Path
 
 from .events import remove_meet_links
+from .wake import WakeSettings
 
 ROOT = Path(__file__).resolve().parent.parent
 IN_CONTAINER = os.environ.get("TILO_IN_CONTAINER") == "1"
 # No model id, vendor or key lives in meet-bot (FR-MTG-11): roles and profiles are Tilo's config/, see bot/providers.py.
 THINKING_LEVELS = ("off", "minimal", "low", "medium", "high")
+
+
+def load_wake_settings() -> WakeSettings:
+    root = Path(os.environ.get("TILO_REPO_ROOT", str(ROOT.parent)))
+    data = json.loads((root / "config/meeting-wake.json").read_text(encoding="utf-8"))
+    return WakeSettings(aliases=tuple(data["aliases"]), attention_s=data["attention_s"])
 
 
 def parse_dotenv(text: str) -> dict[str, str]:

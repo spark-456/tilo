@@ -100,7 +100,7 @@ describe("WEB_4_home_render: Today panel", () => {
   it("WEB_4_home_render_live_now_lists_the_five_worlds_with_their_lines_and_progress", async () => {
     const { el } = await mountHome();
     const today = todayRegion(el);
-    expect(textOf(today)).toContain("Live now");
+    expect(textOf(today)).toContain("Sample worlds"); // fixture rows: never titled "Live now" (HR-1)
     let last = -1;
     for (const w of LIVE_OPEN) {
       const row = controlWith(today, w.name);
@@ -159,10 +159,10 @@ describe("WEB_4_home_render: Today panel", () => {
   it("WEB_4_home_render_sections_follow_the_reference_order", async () => {
     const { el } = await mountHome();
     const today = textOf(todayRegion(el));
-    expect(today.indexOf("Live now")).toBeLessThan(today.indexOf("Up next today"));
+    expect(today.indexOf("Sample worlds")).toBeLessThan(today.indexOf("Up next today"));
     expect(today.indexOf("Up next today")).toBeLessThan(today.indexOf("September spend"));
     const page = pageText(el);
-    expect(page.indexOf("Good morning")).toBeLessThan(page.indexOf("Live now"));
+    expect(page.indexOf("Good morning")).toBeLessThan(page.indexOf("Sample worlds"));
     expect(page.indexOf("September spend")).toBeLessThan(page.indexOf(QUICK.start));
   });
 
@@ -219,7 +219,8 @@ describe("WEB_4_home_render: inventory.md", () => {
     const withNeeds = pageText(rig.el);
     await rig.setDec({ depot: true, mail: true });
     const caughtUp = pageText(rig.el);
-    for (const s of staticCopy) {
+    // the design's "Live now" is the live path's title; the fixture panel carries the sample title instead
+    for (const s of staticCopy.map((c) => (c === "Live now" ? "Sample worlds" : c))) {
       expect(`${withNeeds} ${caughtUp}`, `inventory string "${s}"`).toContain(s);
     }
     expect(withNeeds).toContain("Review");
