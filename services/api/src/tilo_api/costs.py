@@ -51,6 +51,11 @@ def _credit_usd() -> float:
     return _credit_usd_cache
 
 
+def credit_usd() -> float:
+    """US$ per credit (config/prices.yaml) for `spend_units.LedgerSink`; the routes' 503 when it cannot be read."""
+    return _credit_usd()
+
+
 def _report(
     store: Store, ledger: Sequence[LedgerEntry], worlds: Iterable[tuple[str, WorldRecord]], quick_uid: str | None = None
 ) -> dict[str, Any]:

@@ -449,7 +449,10 @@ Hall and the live metering write, one Firestore collection: `tilo_api.treasury_f
 already there, as the SEC-16 ledger above: `TILO_FIRESTORE_PROJECT` on `tilo-api` and the service account's existing
 `roles/datastore.user`. No composite index (one equality query on `user`, served by Firestore's automatic single-field
 index), no rules change (`firestore.rules` denies every client path), no `TILO_API_STORE`. With no valid project or no
-credentials the routes answer 503 (`not_configured`, `store_unavailable`), never an empty report.
+credentials the routes answer 503 (`not_configured`, `store_unavailable`), never an empty report. Each live unit the
+meter settles (GOLIVE-935) is also one entry here, written after the settle: a write that fails, or no writer wired,
+logs one `treasury_ledger_write_failed` line at ERROR (the error type only; a log-based alert on that text is the
+alert-able marker), is not retried, and never undoes the settled spend. The Ledger then under-reports that unit.
 
 ### Against a deployed tilo-api, and the smoke (PROD-WIRE-4)
 
