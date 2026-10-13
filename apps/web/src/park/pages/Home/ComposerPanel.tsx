@@ -1,6 +1,7 @@
 // The composer column of Home (reference "Tilo App Home.dc.html"): the example chips while idle, the
 // "drafting" line, the plan card, and the glass panel with the task input and the size of job.
 // Presentation only: the phase, the query and the 900 ms draft are HomePage's.
+import type { Ref } from "react";
 import type { Effort, QuickCost, SwitchReason } from "../../api/types";
 import { type SegmentOption, SegmentedControl } from "../../components";
 import { type IntakeClient, IntakeControl } from "./IntakeControl";
@@ -93,6 +94,10 @@ export interface ComposerProps {
   readonly sample?: boolean;
   /** A phone: the input cannot wrap its placeholder, so it shows the example in few words. */
   readonly compact?: boolean;
+  /** The task box: the page focuses it when the plan card closes. */
+  readonly inputRef?: Ref<HTMLInputElement>;
+  /** The most characters the task box takes. */
+  readonly maxLength?: number;
   /** Quick or Thinking (COST-FAST-1); Thinking when not given. */
   readonly effort?: Effort;
   readonly onEffort?: (effort: Effort) => void;
@@ -140,9 +145,11 @@ export function ComposerPanel(p: ComposerProps) {
         <div role="status" className="park-home-drafting">
           {/* a still ring: the draft is a fixed-timer stand-in with no call behind it, so it does not turn (HR-1) */}
           <span className="park-home-spin" aria-hidden="true" />
-          {p.sample
-            ? `Showing a sample plan for “${p.shown}”`
-            : `Tilo is drafting a ${mode.word} for “${p.shown}”`}
+          <span className="park-home-drafting__text">
+            {p.sample
+              ? `Showing a sample plan for “${p.shown}”`
+              : `Tilo is drafting a ${mode.word} for “${p.shown}”`}
+          </span>
         </div>
       ) : null}
       {phase === "plan" ? (
@@ -150,7 +157,9 @@ export function ComposerPanel(p: ComposerProps) {
           <div className="park-home-plan__main">
             <div className="park-home-plan__head">
               <span className="park-home-tier">{mode.tier.toUpperCase()}</span>
-              <span className="park-home-plan__query">{p.shown}</span>
+              <span className="park-home-plan__query" title={p.shown}>
+                {p.shown}
+              </span>
             </div>
             <div className="park-home-meta">
               {(
@@ -216,8 +225,10 @@ export function ComposerPanel(p: ComposerProps) {
               </div>
             </div>
             <input
+              ref={p.inputRef}
               className="park-home-input"
               type="text"
+              maxLength={p.maxLength}
               aria-label="Describe your task"
               value={p.query}
               placeholder={`e.g. ${p.compact ? mode.short : mode.example}`}
