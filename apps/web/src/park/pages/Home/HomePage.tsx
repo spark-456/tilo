@@ -333,9 +333,11 @@ export function HomePage({ app }: { app: AppCtx }) {
         </>
       ) : null}
       {failed ? (
-        <div className="park-home-hero park-home-glass">
-          <h1 className="park-home-h1">Home</h1>
-          <p className="park-home-summary">Not connected yet</p>
+        <div className="park-home-leftcol">
+          <div className="park-home-hero park-home-glass">
+            <h1 className="park-home-h1">Home</h1>
+            <p className="park-home-summary">Not connected yet</p>
+          </div>
         </div>
       ) : null}
       {!failed || (worldsLive && worlds !== "failed") ? (
