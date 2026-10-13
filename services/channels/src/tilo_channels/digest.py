@@ -29,6 +29,7 @@ __all__ = [
     "DigestPolicyPort",
     "DigestService",
     "WINDOW_S",
+    "allowed_l3_decision",
 ]
 
 WINDOW_S = 86_400
@@ -195,6 +196,8 @@ class DailyDigestBuilder:
             ):
                 continue
             lvl, outbox_id = data.get("level"), data.get("outbox_id")
+            if data.get("action_type") == "send_push":  # a notice to the owner's own device, not an action to undo
+                continue
             if lvl not in AUTOMATED_LEVELS or not (
                 isinstance(outbox_id, str) and _valid_str("common.schema.json#/$defs/ulid", outbox_id)
             ):
@@ -320,6 +323,9 @@ def _allowed_l3_decision(d: Any, now_ms: int, default_undo_s: int) -> tuple[dict
         return None
     undo = d.undo_window_s if type(d.undo_window_s) is int else default_undo_s
     return ({"by": "policy", "ref": ref, "at": str(stamp)}, at_ms, undo) if 0 <= undo <= 3600 else None
+
+
+allowed_l3_decision = _allowed_l3_decision  # public name for web push (FR-CHN-17): the same L3 run check
 
 
 class DigestService:

@@ -45,6 +45,7 @@ from tilo_api.meeting_room import router as _meeting_room_router
 from tilo_api.notifications import router as _notifications_router
 from tilo_api.people_limits import NoStore as _NoStore
 from tilo_api.people_list import router as _people_list_router
+from tilo_api.push_routes import router as _push_router
 from tilo_api.redaction import router as _redaction_router
 from tilo_api.sample_world import router as _sample_router
 from tilo_api.sharing import WorldView
@@ -147,6 +148,7 @@ app.include_router(_skills_router)
 app.include_router(_skills_capture_router)
 app.include_router(_effort_router)
 app.include_router(_feedback_router)
+app.include_router(_push_router)
 app.include_router(_connectors_list_router)
 app.include_router(_schedules.router)
 app.include_router(_nudge_sweep.router)  # FR-PA-15b: GET /v1/nudges, POST /v1/nudges/{id}/snooze

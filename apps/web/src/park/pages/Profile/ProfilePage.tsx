@@ -12,6 +12,7 @@ import { useFollowed } from "../../app/followed";
 import { PageSheet, StatusChip, Switch } from "../../components";
 import { SampleBadge } from "../../sample/SampleBadge";
 import "./Profile.css";
+import { PushControl } from "./PushControl";
 import { ICONS } from "./icons";
 import { canSwitchOff } from "./notifyRules";
 import { signOutOne, signOutOthers } from "./profileSessions";
@@ -378,6 +379,7 @@ export function ProfilePage({ app }: { app: AppCtx }) {
                   />
                 </div>
                 <p className="park-profile-note">{QUIET_HINT}</p>
+                <PushControl />
               </section>
             ) : null}
 

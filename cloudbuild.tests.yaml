@@ -42,6 +42,16 @@ steps:
       - |
         export PATH=/workspace/.venv/bin:/workspace/.cloud-tools/bin:/workspace/.cloud-tools/node_modules/.bin:$$PATH
         /workspace/.venv/bin/python -m pytest tests/repo -q -p no:cacheprovider
+  - id: push-affected
+    name: python:3.12-bookworm
+    waitFor: [python-dependencies]
+    entrypoint: bash
+    env: ['LIVE=0', 'TILO_API_STORE=memory', 'TILO_PEOPLE_STORE=memory']
+    args:
+      - -ceu
+      - |
+        export PATH=/workspace/.venv/bin:/workspace/.cloud-tools/bin:$$PATH
+        /workspace/.venv/bin/python -m pytest services/channels/tests/test_FR_CHN_17*.py services/channels/tests/test_FR_PA_07*.py services/channels/tests/test_SEC_08_forged_or_replayed_requests_rejected.py services/api/tests/test_FR_CHN_17*.py services/connectors/tests/test_SEC_11_every_side_effect_carries_authz.py -q -p no:cacheprovider
   - id: web
     name: node:22-bookworm
     waitFor: [node-dependencies]

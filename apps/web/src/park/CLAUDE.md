@@ -37,4 +37,4 @@ old screens until the cutover PR. WEB-1a holds the tokens, fonts, typed fixtures
 
 ## Local rules
 - Import nothing from `screens/`, `world/`, `stage/` (only the shared `src/api`, `src/router` seams). No `window` globals, no model ids, no design runtime port.
-- `engines/kit.ts`: `createKit` builds a fresh cache per call; hold one kit per document (a provider), or world and building memoisation is lost.
+- `engines/kit.ts`: `createKit` builds a fresh cache per call; hold one kit per document (a provider), or world and building memoisation is lost. Browser notifications (FR-CHN-17d, BQ-CHN17d-1): `pages/Profile/PushControl.tsx` (live signed-in session only, off by default), `api/push.ts`, worker `public/push-sw.js`.

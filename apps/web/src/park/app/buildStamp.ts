@@ -1,5 +1,5 @@
 // QA-DEMO-1 m12: the short commit sha this bundle was built from (vite.config.ts `define`), shown in the Home footer
-// and in <meta name="tilo-build">. A short hex string, no branch, path or secret; "dev" where no build defined it
+// and in <meta name="tilo-build">. A hex string, no branch, path or secret; "dev" where no build defined it
 // (the unit tests).
 declare const __TILO_BUILD_SHA__: string | undefined;
 

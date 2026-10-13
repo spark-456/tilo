@@ -8,6 +8,7 @@
 // The gate takes it from there.
 import { hasSession } from "../auth/auth";
 import { session } from "../auth/session";
+import { livePushFlow } from "./pushEnv";
 
 /** The Home composer's remembered Quick / Thinking choice (park/pages/Home/effortStore.ts): the person's, not the next one's. */
 const EFFORT_KEYS = "tilo.park.effort.";
@@ -22,9 +23,18 @@ function forgetPerson(): void {
   }
 }
 
+/** FR-CHN-17d: this browser's push subscription is the person's, so it goes before they do (best effort,
+ * two seconds at most; none in the fixture world, a demo or a browser that never turned it on). */
+async function releasePush(): Promise<void> {
+  const flow = livePushFlow();
+  if (flow === null) return;
+  await Promise.race([flow.release(), new Promise<void>((done) => setTimeout(done, 2000))]);
+}
+
 /** Signs the page's session out. Resolves true after loading "/" afresh when the session really ended, false when the
  * SDK refused (nothing is loaded). Rejects only if the controller itself throws. */
 export async function finishSession(): Promise<boolean> {
+  await releasePush();
   await session.signOut();
   const state = session.getState();
   const ended = state.status === "signed_out" && state.signOutFailed !== true;
