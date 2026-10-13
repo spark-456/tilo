@@ -7,6 +7,7 @@ BK-22); the key alphabet (BQ-BYOK-2); BK-12, BK-13 and PL-06 across documents; `
 
 from __future__ import annotations
 
+import json
 import pathlib
 import re
 
@@ -121,6 +122,46 @@ def test_ADR_0041_BQ_BYOK_2_key_alphabet_refuses_json_blobs_spaces_and_a_newline
         ("meeting_host_rpc", "model_key_put_request", rpc),
     ):
         assert (not errors_for(_ref(schema, name), {**doc, "key": value}, registry)) is ok
+
+
+def test_ADR_0041_BQ_BYOK_RECON_1_not_configured_is_in_the_owner_view_enum_only(contracts_root):
+    schema = _schema(contracts_root, "org_model_key")
+    defs, four = schema["$defs"], ["invalid_key", "quota", "rate_limited", "unreachable"]
+    assert tuple(map(int, schema["x-version"].split("."))) >= (1, 1, 0)
+    assert defs["last_error"]["enum"] == four, "the stored code is the provider's refusal only (BK-17)"
+    assert defs["owner_last_error"]["enum"] == [*four, "not_configured"]
+
+    def nullable(name):
+        return {"anyOf": [{"$ref": f"#/$defs/{name}"}, {"type": "null"}]}
+
+    assert defs["reference"]["properties"]["last_error"] == nullable("last_error")
+    assert defs["owner_view"]["properties"]["last_error"] == nullable("owner_last_error")
+    users = [n for n, node in defs.items() if "owner_last_error" in json.dumps(node) and n != "owner_last_error"]
+    assert users == ["owner_view"], "only the owner's answer may say not_configured"
+    assert set(defs["member_view"]["properties"]) == {"active", "label"}
+
+
+@pytest.mark.parametrize(
+    ("state", "active", "last_error", "ok"),
+    [("active", False, "not_configured", True), ("paused", False, "not_configured", True)]
+    + [("unverified", False, "not_configured", True), ("invalid", False, "not_configured", True)]
+    + [("active", True, "not_configured", False), ("paused", True, "not_configured", False)]
+    + [("active", True, None, True), ("active", True, "quota", True), ("invalid", False, "invalid_key", True)]
+    + [("active", False, None, False), ("active", False, "quota", False), ("active", False, "key_paused", False)],
+    ids=lambda v: str(v),
+)
+def test_ADR_0041_BQ_BYOK_RECON_1_a_key_whose_bundle_left_the_config_is_never_said_to_be_active(
+    registry, state, active, last_error, ok
+):
+    doc = load_json(FIXTURES / "org_model_key.owner_view" / "valid" / "active.json")
+    doc = {**doc, "state": state, "active": active, "last_error": last_error}
+    assert (not errors_for(_ref("org_model_key", "owner_view"), doc, registry)) is ok
+
+
+def test_ADR_0041_BQ_BYOK_RECON_1_the_stored_reference_refuses_not_configured(registry):
+    held = load_json(FIXTURES / "org_model_key.reference" / "valid" / "first_set.json")
+    assert not errors_for(_ref("org_model_key", "reference"), {**held, "last_error": "quota"}, registry)
+    assert errors_for(_ref("org_model_key", "reference"), {**held, "last_error": "not_configured"}, registry)
 
 
 @pytest.mark.parametrize(("field", "limit"), [("prompt", 400000), ("system", 400000)])

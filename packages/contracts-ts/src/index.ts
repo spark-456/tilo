@@ -125,7 +125,7 @@
  * metering.schema.json 1.0.0 sha256:91358a776e6c033a
  * minutes.schema.json 1.0.0 sha256:b8bbe5f69603a5a8
  * model_call_rpc.schema.json 1.0.0 sha256:3f585f8e5d092538
- * org_model_key.schema.json 1.0.0 sha256:d1d48e78635ccede
+ * org_model_key.schema.json 1.1.0 sha256:ba443cf35d658c90
  * outbox.schema.json 1.0.0 sha256:0b9b172f230a6347
  * person.schema.json 1.0.0 sha256:2c928319dd7ab9d1
  * pilot.schema.json 1.0.0 sha256:5d091f814844b3b1
@@ -1048,6 +1048,14 @@ export type OrgModelKeyLastError = "invalid_key" | "quota" | "rate_limited" | "u
  * via the `definition` "OrgModelKeyConsentVersion".
  */
 export type OrgModelKeyConsentVersion = number;
+/**
+ * last_error as the owner is told it (BQ-BYOK-RECON-1): the four codes of a provider refusal, plus not_configured, said while the key's bundle is no longer in config/byok.yaml (SEC-REVIEW-29 B4, BQ-BYOK-FIX-2). not_configured is the route's own word and is never stored: the reference holds the four only.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "OrgModelKeyOwnerLastError".
+ */
+export type OrgModelKeyOwnerLastError =
+  "invalid_key" | "quota" | "rate_limited" | "unreachable" | "not_configured";
 /**
  * This interface was referenced by `TiloContracts`'s JSON-Schema
  * via the `definition` "OrgModelKeyErrorCode".
@@ -5281,7 +5289,7 @@ export interface OrgModelKeyMemberView {
   label: string | null;
 }
 /**
- * GET answer for the org owner, and the 200 answer to patch (BK-20: only the owner reads status, spend and errors). state is none when the org has no key; then active is false, label null and no record field is present. Otherwise every record field is present and active is true exactly when state is active. consent_version here is the version the owner must confirm for the next widening act (config/byok.yaml's), not the stored one. spent_today_credits (committed plus reserved against today's UTC cap) is left out when the spend store cannot be read; never null. No key, secret name, URL, or provider text.
+ * GET answer for the org owner, and the 200 answer to patch (BK-20: only the owner reads status, spend and errors). state is none when the org has no key; then active is false, label null and no record field is present. Otherwise every record field is present and active is true exactly when state is active and last_error is not not_configured: a key whose bundle left the config is shown with its stored state, active false and last_error not_configured (BQ-BYOK-RECON-1). consent_version here is the version the owner must confirm for the next widening act (config/byok.yaml's), not the stored one. spent_today_credits (committed plus reserved against today's UTC cap) is left out when the spend store cannot be read; never null. No key, secret name, URL, or provider text.
  *
  * This interface was referenced by `TiloContracts`'s JSON-Schema
  * via the `definition` "OrgModelKeyOwnerView".
@@ -5297,7 +5305,7 @@ export interface OrgModelKeyOwnerView {
   rotated_at?: Timestamp | null;
   day_cap_credits?: OrgModelKeyDayCapCredits;
   fallback_to_tilo?: boolean;
-  last_error?: OrgModelKeyLastError | null;
+  last_error?: OrgModelKeyOwnerLastError | null;
   last_used_at?: Timestamp | null;
   spent_today_credits?: Credits;
 }

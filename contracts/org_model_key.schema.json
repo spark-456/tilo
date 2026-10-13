@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://contracts.tilo.example/org_model_key.schema.json",
-  "x-version": "1.0.0",
+  "x-version": "1.1.0",
   "title": "OrgModelKey",
   "description": "An organisation's own model key as tilo-api keeps and serves it (ADR-0041 decisions 2, 3 and 10, BK-01 to BK-08, BK-20; Proposed and inert until config/byok.yaml enabled is true): the stored reference orgs/{org}/model_keys/models, the audit entry orgs/{org}/byok_audit/{id}, and the bodies and answers of GET, PUT, PATCH and DELETE /v1/org/model-key; this root is any one of them. The key itself is in exactly one place on this surface: put_request.key, in transit, handed to the vault and dropped (BK-02). Every other object is closed and has no field for a key, a length, a hash, the last four characters, a secret name, a URL or a model id (BK-04); the org is never a field of a route body or answer (BK-08), it is the verified principal's. A body is JSON only. The rules that compare values or need the directory, the clock, the vault or config/byok.yaml are in byok.rules.md and are checked by the routes.",
   "anyOf": [
@@ -41,6 +41,11 @@
       "description": "The fixed code of the provider's last refusal (BK-17), never the provider's text: some providers echo key fragments.",
       "type": "string",
       "enum": ["invalid_key", "quota", "rate_limited", "unreachable"]
+    },
+    "owner_last_error": {
+      "description": "last_error as the owner is told it (BQ-BYOK-RECON-1): the four codes of a provider refusal, plus not_configured, said while the key's bundle is no longer in config/byok.yaml (SEC-REVIEW-29 B4, BQ-BYOK-FIX-2). not_configured is the route's own word and is never stored: the reference holds the four only.",
+      "type": "string",
+      "enum": ["invalid_key", "quota", "rate_limited", "unreachable", "not_configured"]
     },
     "reference": {
       "description": "orgs/{org}/model_keys/models (ADR-0041 decision 2, BK-04): the org's choices and stamps and the version of the vault secret, never a key character, length, hash or last four. rotated_at is null until a rotation; rev starts at 1 and is the compare-and-set counter of every write. The record is written by tilo-api's routes only and never by a model, a skill or a tool (BK-18).",
@@ -163,7 +168,7 @@
       }
     },
     "owner_view": {
-      "description": "GET answer for the org owner, and the 200 answer to patch (BK-20: only the owner reads status, spend and errors). state is none when the org has no key; then active is false, label null and no record field is present. Otherwise every record field is present and active is true exactly when state is active. consent_version here is the version the owner must confirm for the next widening act (config/byok.yaml's), not the stored one. spent_today_credits (committed plus reserved against today's UTC cap) is left out when the spend store cannot be read; never null. No key, secret name, URL, or provider text.",
+      "description": "GET answer for the org owner, and the 200 answer to patch (BK-20: only the owner reads status, spend and errors). state is none when the org has no key; then active is false, label null and no record field is present. Otherwise every record field is present and active is true exactly when state is active and last_error is not not_configured: a key whose bundle left the config is shown with its stored state, active false and last_error not_configured (BQ-BYOK-RECON-1). consent_version here is the version the owner must confirm for the next widening act (config/byok.yaml's), not the stored one. spent_today_credits (committed plus reserved against today's UTC cap) is left out when the spend store cannot be read; never null. No key, secret name, URL, or provider text.",
       "type": "object",
       "additionalProperties": false,
       "required": ["active", "label", "state", "consent_version"],
@@ -185,7 +190,7 @@
         },
         "day_cap_credits": { "$ref": "#/$defs/day_cap_credits" },
         "fallback_to_tilo": { "type": "boolean" },
-        "last_error": { "anyOf": [{ "$ref": "#/$defs/last_error" }, { "type": "null" }] },
+        "last_error": { "anyOf": [{ "$ref": "#/$defs/owner_last_error" }, { "type": "null" }] },
         "last_used_at": {
           "anyOf": [{ "$ref": "common.schema.json#/$defs/timestamp" }, { "type": "null" }]
         },
@@ -207,7 +212,13 @@
           "last_error",
           "last_used_at"
         ],
-        "if": { "properties": { "state": { "const": "active" } }, "required": ["state"] },
+        "if": {
+          "properties": {
+            "state": { "const": "active" },
+            "last_error": { "not": { "const": "not_configured" } }
+          },
+          "required": ["state"]
+        },
         "then": { "properties": { "active": { "const": true } } },
         "else": { "properties": { "active": { "const": false } } }
       }
