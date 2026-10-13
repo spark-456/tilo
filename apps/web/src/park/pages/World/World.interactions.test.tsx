@@ -11,7 +11,7 @@
 import { act } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, click, qa } from "../../../../test-support/park/componentsHarness";
-import { DECISIONS, K1, TOASTS } from "../../../../test-support/park/worldCopy";
+import { DECISIONS, K1, OFF, TOASTS } from "../../../../test-support/park/worldCopy";
 import {
   MODIFIED,
   type SpiedApi,
@@ -138,11 +138,43 @@ describe("WEB_6_world_interactions: Pause and Resume", () => {
     expect(
       overlay?.querySelector("svg") ?? overlay?.parentElement?.querySelector("svg"),
     ).not.toBeNull();
-    expect(elWithText(rig.el, "Paused"), "the status chip").toBeTruthy();
-    expect(elWithText(rig.el, "2 decisions"), "replaced by Paused while paused").toBeUndefined();
+    // UI-10 B2: the cards still say "before agents continue", so the count stays beside the paused state
+    expect(elWithText(rig.el, "Paused · 2 decisions"), "the status chip").toBeTruthy();
     // the world's decisions are still there to take
     expect(hasControl(rig.el, DECISIONS.depot.yes)).toBe(true);
     expect(decideCalls(rig.app)).toEqual([]);
+  });
+
+  it("UI_10_B2_a_finished_or_scheduled_world_offers_no_Pause", async () => {
+    for (const id of ["audit", "comp", "invoice"]) {
+      const rig = await mountWorld({ id });
+      expect(hasControl(rig.el, "Pause"), `${id} has nothing running to pause`).toBe(false);
+      expect(pageText(rig.el)).not.toContain("agents are waiting");
+      cleanup();
+    }
+  });
+
+  it("UI_10_B2_a_recording_says_so_in_the_header_the_facts_and_the_running_line", async () => {
+    const rig = await mountWorld({ id: "calls" });
+    expect(pageText(rig.el)).toContain("Recorded sample state, not live");
+    expect(pageText(rig.el)).toContain("Recorded sample state: About 3 min left");
+    expect(pageText(rig.el)).not.toMatch(/Ends\s*in 3 min/);
+  });
+
+  it("UI_10_B2_a_live_world_keeps_its_plain_running_state", async () => {
+    const rig = await mountWorld({ id: "calls", api: liveWorldsApi() });
+    expect(pageText(rig.el)).not.toContain("Recorded sample state");
+    expect(pageText(rig.el)).toContain("About 3 min left");
+  });
+
+  it("UI_10_B2_the_paused_state_is_page_local_and_a_fresh_mount_starts_unpaused", async () => {
+    const first = await mountWorld();
+    click(control(first.el, "Pause"));
+    expect(hasControl(first.el, "Resume")).toBe(true);
+    cleanup();
+    const second = await mountWorld();
+    expect(hasControl(second.el, "Pause")).toBe(true);
+    expect(elWithText(second.el, "2 decisions")).toBeTruthy();
   });
 
   it("WEB_6_world_interactions_Resume_toasts_and_puts_everything_back", async () => {
@@ -159,6 +191,7 @@ describe("WEB_6_world_interactions: Pause and Resume", () => {
   it("WEB_6_world_interactions_a_running_world_shows_Paused_then_Running_again", async () => {
     const rig = await mountWorld({ id: "calls" });
     expect(elWithText(rig.el, "Running")).toBeTruthy();
+    expect(pageText(rig.el)).toContain("Recorded sample state, not live"); // UI-10 B2
     click(control(rig.el, "Pause"));
     expect(elWithText(rig.el, "Paused")).toBeTruthy();
     expect(elWithText(rig.el, "Running")).toBeUndefined();
@@ -257,13 +290,28 @@ describe("WEB_6_world_interactions: Share", () => {
 });
 
 describe("WEB_6_world_interactions: Town and Village buttons", () => {
-  it("WEB_6_world_interactions_Run_now_toasts_the_notification_line", async () => {
+  it("UI_10_B1_demo_Run_now_says_nothing_was_started", async () => {
     const rig = await mountWorld({ id: "invoice" });
     click(control(rig.el, "Run now"));
     expect(toastCalls(rig.app)).toEqual([[TOASTS.run]]);
+    expect(TOASTS.run).toContain("nothing was started");
+    expect(TOASTS.run).not.toMatch(/notification/i);
     expect(goCalls(rig.app)).toBe(0);
     const api = rig.api as SpiedApi;
     expect(api.startWorld).not.toHaveBeenCalled();
+  });
+
+  it("UI_10_B1_a_live_world_Run_now_is_off_with_its_reason_in_words_and_toasts_nothing", async () => {
+    const rig = await mountWorld({ id: "invoice", api: liveWorldsApi() });
+    const run = control(rig.el, "Run now");
+    expect(run.getAttribute("aria-disabled")).toBe("true");
+    expect(run.hasAttribute("disabled")).toBe(false); // focusable: the reason is reachable by keyboard
+    const reasonId = run.getAttribute("aria-describedby");
+    expect(reasonId).toBeTruthy();
+    expect(textOf(rig.el.querySelector(`#${reasonId}`) as Element)).toBe(OFF.run);
+    click(run);
+    expect(toastCalls(rig.app)).toEqual([]);
+    expect(goCalls(rig.app)).toBe(0);
   });
 
   it("WEB_6_world_interactions_See_in_Agenda_goes_to_the_agenda_page", async () => {
@@ -273,10 +321,24 @@ describe("WEB_6_world_interactions: Town and Village buttons", () => {
     expect(goCalls(rig.app)).toBe(1);
   });
 
-  it("WEB_6_world_interactions_Open_result_and_Share_to_Slack_toast_their_lines", async () => {
+  it("UI_10_B1_a_live_world_Open_result_is_off_with_its_reason_in_words_and_toasts_nothing", async () => {
+    const rig = await mountWorld({ id: "comp", api: liveWorldsApi() });
+    const open = control(rig.el, "Open result");
+    expect(open.getAttribute("aria-disabled")).toBe("true");
+    expect(open.hasAttribute("disabled")).toBe(false);
+    const reasonId = open.getAttribute("aria-describedby");
+    expect(reasonId).toBeTruthy();
+    expect(textOf(rig.el.querySelector(`#${reasonId}`) as Element)).toBe(OFF.open);
+    click(open);
+    expect(toastCalls(rig.app)).toEqual([]);
+  });
+
+  it("UI_10_B1_demo_Open_result_says_nothing_was_opened_and_Share_to_Slack_opens_its_dialog", async () => {
     const rig = await mountWorld({ id: "comp" });
     click(control(rig.el, "Open result"));
     expect(toastCalls(rig.app)).toEqual([[TOASTS.open]]);
+    expect(TOASTS.open).toContain("nothing was opened");
+    expect(TOASTS.open).not.toMatch(/Google Drive/);
     click(control(rig.el, "Share to Slack"));
     expect(rig.el.querySelector('[role="dialog"]')).not.toBeNull();
     expect(toastCalls(rig.app)).toEqual([[TOASTS.open]]);

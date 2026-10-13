@@ -33,6 +33,22 @@ const STARTING: StateLook = [
 export const stateLook = (w: World, paused: boolean): StateLook =>
   paused ? PAUSED : w.isNew ? STARTING : STATES[w.st];
 
+/**
+ * UI-10 B2 (HR-1): only a world with agents on it can be paused. A finished or scheduled world has nothing running,
+ * so "Paused · agents are waiting" would describe agents that do not exist.
+ */
+export const canPause = (w: World): boolean => w.st === "running" || w.st === "needs";
+
+/**
+ * UI-10 B2: a world whose data is a recorded sample (fixture or demo session) carries a state with no event behind it
+ * now. The page says so instead of presenting "Running" or a countdown as live.
+ */
+export const isRecordedRunning = (w: World, real: boolean): boolean =>
+  !real && w.st === "running" && !w.isNew;
+
+/** A running line of a recorded world: the recorded words behind a plain label, never a live countdown. */
+export const recordedLine = (line: string): string => `Recorded sample state: ${line}`;
+
 /** A district's chip: label, chip fill, chip text, tile fill, tile icon colour, bar colour. */
 export type DistrictLook = readonly [
   label: string,

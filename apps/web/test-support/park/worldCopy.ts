@@ -170,7 +170,7 @@ export const CALLS: WorldCopy = {
   facts: [
     ["Owner", "Alex Morgan"],
     ["Started", "09:04"],
-    ["Ends", "in 3 min"],
+    ["Recorded state", "ends in 3 min"],
     ["Agents", "1"],
   ],
   skills: ["Summarise call notes"],
@@ -228,7 +228,7 @@ export const VENUES: WorldCopy = {
   facts: [
     ["Owner", "Alex Morgan"],
     ["Started", "09:01"],
-    ["Ends", "in 6 min"],
+    ["Recorded state", "ends in 6 min"],
     ["Agents", "2"],
   ],
   skills: [],
@@ -370,9 +370,15 @@ export const TOASTS = {
   paused: "Sample only: paused on this page. Nothing real changed.", // issue 932: a sample world claims no real outcome
   resumed: "Sample only: resumed on this page. Nothing real changed.",
   shared: "Link copied. This is a sample world, so there is nothing real to share.",
-  run: "Run started. You’ll get a notification when it finishes",
-  open: "Opening the result in Google Drive",
+  run: "Sample only: nothing was started. This demo world has no runner behind it.", // UI-10 B1: no run is claimed
+  open: "Sample only: nothing was opened. This demo world has no result file behind it.",
   slack: "Shared to #ops in Slack",
+} as const;
+
+/** UI-10 B1: a real (signed-in, live) world has no run-now or open-result route yet, so the buttons say why they are off. */
+export const OFF = {
+  run: "Starting a run from this page is not connected yet. No run would start.",
+  open: "This result has no file linked yet, so there is nothing to open.",
 } as const;
 
 export const NO_RUNS = "No runs yet. The first run waits for your approval.";

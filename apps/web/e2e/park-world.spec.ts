@@ -991,9 +991,7 @@ test.describe("park world: the other tiers at 1440", () => {
     // Run now toasts
     await runs.getByRole("button", { name: "Run now" }).click();
     await expect(
-      page
-        .getByRole("status")
-        .filter({ hasText: "Run started. You’ll get a notification when it finishes" }),
+      page.getByRole("status").filter({ hasText: "Sample only: nothing was started." }),
     ).toBeVisible();
     // See in Agenda goes to the agenda page
     await runs.getByRole("button", { name: "See in Agenda" }).click();
@@ -1029,8 +1027,10 @@ test.describe("park world: the other tiers at 1440", () => {
       "font-weight": "700",
     });
     near("result line height", Number.parseFloat(String(out["line-height"])), 22.5, 0.2);
-    // running: the 16px ring (a --track ring with a --hero top) beside "About 3 min left"; no buttons
-    const running = result.getByText("About 3 min left", { exact: true }).last();
+    // running: the 16px ring (a --track ring with a --hero top) beside the recorded line; no buttons
+    const running = result
+      .getByText("Recorded sample state: About 3 min left", { exact: true })
+      .last();
     const ring = running.locator("xpath=preceding-sibling::*[1]");
     const rf = await facts(ring, [
       "border-top-width",
@@ -1085,7 +1085,7 @@ test.describe("park world: the other tiers at 1440", () => {
     });
     await region(page, "Result").getByRole("button", { name: "Open result" }).click();
     await expect(
-      page.getByRole("status").filter({ hasText: "Opening the result in Google Drive" }),
+      page.getByRole("status").filter({ hasText: "Sample only: nothing was opened." }),
     ).toBeVisible();
     expect(problems).toEqual([]);
   });
