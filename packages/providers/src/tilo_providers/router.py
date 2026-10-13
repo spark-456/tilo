@@ -14,6 +14,7 @@ from typing import Any, Literal
 
 from tilo_redact import redact
 
+from tilo_providers.byok import CredentialRefused, OrgBinding
 from tilo_providers.config import ProvidersConfig
 from tilo_providers.errors import (
     MissingCapabilityError,
@@ -52,6 +53,15 @@ class RouterError(Exception):
         self.budget_left = budget_left
 
 
+class RouterCredentialError(RouterError):
+    """ADR-0041 BK-17: the org's credential was refused (a fixed `code`). The unit blocks: no second profile, no
+    fallback to Tilo's key (that is a unit-level opt-in the caller makes before the unit starts)."""
+
+    def __init__(self, message: str, attempts: list[RouterAttempt] | None = None, *, code: str) -> None:
+        super().__init__(message, attempts)
+        self.code = code
+
+
 class BudgetExceededError(RouterError): ...  # PL-03: no candidate left fits the budget; nothing over it is sent
 
 
@@ -88,6 +98,7 @@ class RouterAttempt:
     tokens_audio: int | None = None  # LW-06: audio input tokens, a part of tokens_in; None is unknown, never 0
     quoted_credits: float = field(default=0.0, repr=False)  # the pre-call reserve (input + expected output)
     ceiling_credits: float = field(default=0.0, repr=False)  # input + the full cap: a cut reply's charge with no usage
+    payer: Literal["tilo", "org_key"] = "tilo"  # ADR-0041 BK-14: whose credential and whose meter this attempt used
 
 
 @dataclass
@@ -149,6 +160,10 @@ def _fail(run: RouterResult, attempt: RouterAttempt, error: Exception, *, output
         raise RouterRequestError(f"{where} rejected the request: {error}", run.attempts) from error
     if isinstance(error, SafetyError):  # stream/embed; generate() turns this into a safety_blocked result
         raise RouterSafetyError(f"{where} blocked on safety grounds: {error}", run.attempts) from error
+    if isinstance(error, CredentialRefused):  # BK-17: terminal for the unit; never another profile, never Tilo's key
+        raise RouterCredentialError(
+            f"{where} credential refused ({error.code})", run.attempts, code=error.code
+        ) from error
     if output_started:  # answers are never spliced
         raise StreamInterruptedError(f"{where} failed after output started", run.attempts) from error
     if isinstance(error, OutputTruncatedError):  # no sibling: the same cap burns the same tokens
@@ -217,6 +232,7 @@ class Router:
         force_replay: bool = False,
         search_for_profile: SearchFor | None = None,
         role_thinking: bool = True,
+        org: OrgBinding | None = None,
     ) -> None:
         if provider_for_profile is None and fixtures_dir is None:
             raise RouterError("Router needs either provider_for_profile or fixtures_dir")
@@ -225,10 +241,23 @@ class Router:
         self._role_thinking = role_thinking  # False: never fill a role's `thinking` (the live smoke sends none)
         self._live_permitted = live_permitted  # SEC-15: set by the caller that decided this router may go live
         self._force_replay = force_replay  # SEC-15: set by the caller that decided this router replays, LIVE or not
+        self._org = org  # ADR-0041 BK-10: one org's bundle for this unit; None (the default) changes nothing
         if live_permitted and not force_replay:
             config.check_live()  # ADR-0029 decisions 3 and 4: no live metering at the wrong region or past a promotion
 
+    def _org_profiles(self, role_id: str) -> tuple[str, ...]:
+        """BK-10: the org bundle's (primary, fallback) for `role_id`, or () when none applies. A router that cannot go
+        live (replay, dev, a demo session) never takes the bundle: replay is as before (BK-17 step 1)."""
+        if self._org is None or not self._live_permitted or self._force_replay:
+            return ()
+        pair = self._org.bundle.roles.get(role_id)
+        return tuple(p for p in pair if p) if pair else ()
+
     def _provider(self, role_id: str, profile_id: str) -> ModelProvider:
+        if self._org is not None and profile_id in self._org_profiles(
+            role_id
+        ):  # the one place an org's provider is made
+            return self._org.source.provider_for(self._org.org_id, self._org.slot, profile_id, self._org.run_id)
         if self._provider_for_profile is not None:
             return self._provider_for_profile(profile_id)
         return build_provider(
@@ -244,7 +273,9 @@ class Router:
         """The role's profiles in cascade order that declare `capability` and the capability of each media part
         (`media`, LW-06: vision, documents, audio, video): a profile without one is never picked for that part."""
         role = self._config.roles[role_id]
-        ids = list(role.cascade or dict.fromkeys(p for p in (role.primary, role.fallback) if p))
+        ids = list(
+            self._org_profiles(role_id) or role.cascade or dict.fromkeys(p for p in (role.primary, role.fallback) if p)
+        )
         needed = {c for c in (capability, *map(Capability, sorted(media))) if c is not None}
         ids = [p for p in ids if needed <= set(map(Capability, self._config.profiles[p].caps))]
         if not ids:
@@ -260,6 +291,8 @@ class Router:
         `error_type` is set and the caller moves on), anything else leaves as a RouterError. A candidate the
         budget cannot cover is recorded like that too (BudgetExceededError, never sent) and the next one tried."""
         attempt = RouterAttempt(profile_id, self._config.profiles[profile_id].provider, "ok", reason=reason)
+        if profile_id in self._org_profiles(run.role_id):
+            attempt.payer = "org_key"
         start = time.perf_counter()
         try:
             yield attempt
