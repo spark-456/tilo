@@ -25,6 +25,9 @@
 # create_event (google_calendar, ADR-0035 decision 6) adds an event with no guests to the person's own primary
 # calendar: T1, an approval card and an undo window. create_event_with_guests invites guests and Google emails them
 # (FR-CAL-04), so it is T3 and always needs a person, listed so removing the line cannot pass unnoticed.
+# org_model_key_change (ADR-0041 BK-07, `/v1/org/model-key`) sets or widens an org's own model key: it sends the
+# org's data to a new third party, so it is T3 and always needs a person. Listed, not left to the unlisted-is-T3
+# default, so that removing the line by mistake cannot pass unnoticed: the BYOK-3a config test pins it at T3.
 # send_push (web_push, FR-CHN-17) shows a short notice on the person's own signed-in device. T1: no new recipient
 # and no attachment; the text is the card title (and a short body), cleaned like a quote (control characters out,
 # the shared secret redactor, addresses, links and phone numbers masked, cut on a word boundary), and the payload
@@ -49,6 +52,7 @@ actions:
   create_meeting_event: T3
   create_event: T1
   create_event_with_guests: T3
+  org_model_key_change: T3
 modifiers:
   - {condition: new_recipients, raises_to: T3}
   - {condition: attachments, raises_to: T3}
