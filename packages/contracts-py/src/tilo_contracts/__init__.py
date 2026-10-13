@@ -119,6 +119,7 @@
 # meeting_host_rpc.schema.json 1.2.0 sha256:a5856b07b3f6501c
 # meeting_join.schema.json 1.0.0 sha256:ea1e8f0945773573
 # meeting_room.schema.json 1.0.0 sha256:13c682235d58ce69
+# meeting_voice_meter.schema.json 1.0.0 sha256:fa317e43b3e785b6
 # mention.schema.json 1.0.0 sha256:ca9c1acbf81616f2
 # meter.schema.json 1.0.0 sha256:ad596dcc70e45e09
 # metering.schema.json 1.0.0 sha256:91358a776e6c033a
@@ -2424,6 +2425,101 @@ class MeetingRoomChangeRequest(BaseModel):
     text: MeetingRoomPersonText
 
 
+type MeetingVoiceMeterClaim = Annotated[str, Field(pattern="^[A-Za-z0-9_-]{32,64}$")]
+"""
+The nonce of one attend: tilo-api makes it with secrets.token_urlsafe(24) when the owner's attend request commits and hands it to the bot in the request header X-Tilo-Meeting-Claim of the attend call (not in MeetingJoin and not in the attend body); the bot echoes it as claim in every meter call (MV-16). 32 to 64 characters of the URL-safe alphabet and nothing else; a trailing newline is refused in every engine. A bearer value for one attend: the bot never logs or writes it.
+"""
+
+
+type MeetingVoiceMeterKey = Annotated[str, Field(pattern="^[A-Za-z0-9_-]{16,64}$")]
+"""
+The bot's own key for one spoken reply, new for each reply (secrets.token_urlsafe(24)); tilo-api scopes it to the claim, so the same key answers the same again and a closed one is never reopened (MV-05). 16 to 64 characters of the URL-safe alphabet and nothing else; a trailing newline is refused in every engine.
+"""
+
+
+type MeetingVoiceMeterTokenCount = Annotated[int, Field(ge=0, le=16384)]
+"""
+One count of a reply's usage: a whole number, 0 to 16384 (see usage).
+"""
+
+
+class MeetingVoiceMeterUsage(BaseModel):
+    """
+    The Live adapter's own whole-number counts for one reply, each optional and each 0 to 16384: 8 times the loader's own maximum for voice.live.max_output_tokens (2048), so the schema is as wide as the widest valid config's ceiling and no wider. A count above 16384 is a 422 before any code runs; tilo-api then books the whole hold when it sweeps (MV-15). A count between the config ceiling and 16384 passes here and books the whole hold. The bot reports counts, never money (MV-09).
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    prompt_token_count: MeetingVoiceMeterTokenCount | None = None
+    response_token_count: MeetingVoiceMeterTokenCount | None = None
+    total_token_count: MeetingVoiceMeterTokenCount | None = None
+
+
+class MeetingVoiceMeterReserveRequest(BaseModel):
+    """
+    POST /internal/meeting-voice/reserve: the bot asks to speak one reply with the Live voice. It names the meeting it was sent to attend (it came in the attend path), the claim of that attend and a key of its own; it names no person, org, run, hold, amount or time, so there is nothing to read them from (MV-03, MV-04).
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    meeting_id: MeetingId
+    claim: MeetingVoiceMeterClaim
+    key: MeetingVoiceMeterKey
+
+
+class MeetingVoiceMeterReserveAnswer(BaseModel):
+    """
+    The 200 answer to reserve. live: a hold is open for this key and the bot may speak the reply with the Live voice. replay: nothing was held and the bot speaks with its local voice; reason is one of capped (the person's lifetime cap, the run cap or the day's hard cap is used up, or under one unit of headroom is left), replay_only (the switch is on in either store), unavailable (the ledger could not be read), hold_open (another reply of this claim is open: one at a time) and meeting_limit (more than max_speech_calls reserves in this claim). reason is present exactly when decision is replay (if/then, so the generated type stays a plain object and no null is needed).
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    decision: Literal["live", "replay"]
+    reason: Literal["capped", "replay_only", "unavailable", "hold_open", "meeting_limit"] | None = (
+        None
+    )
+
+
+class MeetingVoiceMeterCloseRequest(BaseModel):
+    """
+    POST /internal/meeting-voice/close: the bot closes the hold of one reply. settled means the reply reached the model and carries the adapter's usage; released means no model was reached and carries none (usage is present exactly when outcome is settled, if/then/else). A settle books at most the hold, whatever the counts say (MV-15), and a key with no open hold in the claim is 409 no_hold (MV-05).
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    meeting_id: MeetingId
+    claim: MeetingVoiceMeterClaim
+    key: MeetingVoiceMeterKey
+    outcome: Literal["settled", "released"]
+    usage: MeetingVoiceMeterUsage | None = None
+
+
+class MeetingVoiceMeterCloseAnswer(BaseModel):
+    """
+    The 200 answer to close: the outcome that is now recorded for the key. A repeated close answers as the first did and counts nothing twice (MV-05).
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    outcome: Literal["settled", "released"]
+
+
+class MeetingVoiceMeterError(BaseModel):
+    """
+    The body of every refusal on these two routes, a fixed code and nothing else, never a value, a setting, a key, a claim, a usage figure or an exception's text (MV-10): unauthenticated (401, no valid Google ID token, MV-01), forbidden (403, any account but the bot's runtime account), invalid_request (422, a body over 2048 bytes, not JSON or not this contract's request, which includes a usage count above 16384), not_configured (503, TILO_VOICE_METER_* is unset or malformed, the caller pin equals the schedule tick's or the Tasks one, no ledger is wired, or a ceiling-sized reply is priced above the unit, MV-15), not_attending (409, no claim for this meeting in this process, a wrong or expired nonce, a second API instance: one answer for all, MV-14, MV-16), no_hold (409, a close with no open hold under this claim and key) and key_used (409, a reserve of a key whose hold is closed).
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    error: Literal["unauthenticated", "forbidden", "invalid_request", "not_configured", "not_attending", "no_hold", "key_used"]
+
+
 class MentionRemoval(BaseModel):
     """
     Who removed the tag and when: the tagged person or the entry's setter (PE-06).
@@ -4628,6 +4724,15 @@ class MeetingRoomReply(BaseModel):
     units: MeetingRoomCitedUnits
     artifacts: MeetingRoomCitedArtifacts
     proposal: MeetingRoomProposal | None
+
+
+type MeetingVoiceMeter = Annotated[
+    MeetingVoiceMeterReserveRequest | MeetingVoiceMeterReserveAnswer | MeetingVoiceMeterCloseRequest | MeetingVoiceMeterCloseAnswer | MeetingVoiceMeterError,
+    Field(title="MeetingVoiceMeter"),
+]
+"""
+What the meeting bot posts to tilo-api to meter its Gemini Live voice on the SEC-16 spend ledger, and what each route answers (ADR-0042, BQ-M2-4, BQ-M2-5): POST /internal/meeting-voice/reserve takes reserve_request and answers reserve_answer, POST /internal/meeting-voice/close takes close_request and answers close_answer, and any refusal is error, a fixed code and nothing else; this root is any one of them. Every object is closed and no field names a user, an org, a run, a hold, an amount, a cap, a price or a time (MV-03, MV-04): the bot names only the meeting id, the nonce of its own attend (claim) and a key of its own for each spoken reply, and tilo-api derives whose spend it is from the attend claim its own attend route made (MV-02, MV-16). Ids travel in the body, the paths are fixed, and a body over 2048 bytes is refused before it is parsed (MV-06). usage is the adapter's own counts, at most 16384 here and never priced by the bot (MV-09, MV-15). The meter authorises nothing the bot says and writes no event, outbox entry or world change (MV-11). The rules that need tilo-api's state, the attend header and the status codes are in meeting_voice_meter.rules.md.
+"""
 
 
 class Mention(BaseModel):

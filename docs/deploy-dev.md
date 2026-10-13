@@ -436,7 +436,13 @@ only what is already there: `TILO_FIRESTORE_PROJECT` on `tilo-api` (set by the r
 account's existing Firestore access (`roles/datastore.user`, as the schedule store). No composite index (single
 document reads and writes only), no rules change (`firestore.rules` already denies every client path, and the server
 bypasses them), no `TILO_API_STORE` and no always-on CPU (every call is inside a request). With no valid project or no
-credentials the seam answers 503 and every request is replay, never uncapped. Reading it: `GET /access` says
+credentials the seam answers 503 and every request is replay, never uncapped. A `hold:` document carries `expires_at`
+(its reserve time plus one hour, ADR-0042 MV-17); one still `held` after that (a restart or a lost claim) is settled at
+its own amount, so the count is unchanged and only its status closes, by the next reserve of that uid (at most once a
+minute per uid per instance) and by the Scheduler's tick. That is a query on equality filters of `status` and `uid`
+(Firestore's automatic single-field indexes serve it: still no composite index to create). The sweep is NOT behind
+`TILO_VOICE_METER`: on merge every SEC-16 reserve gains that synchronous query (once a minute per uid per instance) and
+every tick scans the whole org's `held` holds, with no uid filter and no limit (caps and totals are unchanged). Reading it: `GET /access` says
 `models: "live"` only while the ledger is readable, the uid is under its cap and the switch is off. To reset the
 durable kill switch after the daily hard cap tripped it, delete the document `orgs/org_tilo/spend_ledger/switch`
 (Firestore console) or set its `on` field to `false`; nothing in the API can.
@@ -460,6 +466,104 @@ T3b (BQ-T3-5): each entry is also folded, in the same transaction, into one roll
 `orgs/{org}/treasury_rollup/{id}`, which the three routes read instead of every entry. Nothing for you to apply: no
 composite index (one equality query on `user`), no rules change (`firestore.rules` denies every client path), no IAM
 change (`roles/datastore.user` covers the transaction). Optional alert text: `treasury_rollup_too_large` at ERROR.
+
+### The meeting bot's Live voice meter (ADR-0042, BQ-M2-4, BQ-M2-5; INERT: nothing here is applied for you)
+
+`tilo_api.meeting_voice_meter` adds two public routes, `POST /internal/meeting-voice/reserve` and `.../close`, on which
+the meeting bot (`meet-bot/bot/voice_meter.py`) reserves and settles one SEC-16 unit per spoken Gemini Live reply. They
+are **off by default**: with `TILO_VOICE_METER` unset (or anything but `1`) both answer a plain 404 and the attend call
+to the bot is unchanged, so nothing in production moves until you answer BQ-M2-5. The bot's side and the exact
+commands: `meet-bot/docs/CLOUD_RUN.md` ("Live voice meter"); who may call what: `infra/ACCESS.md` section 14.
+
+| Where | Setting | Value |
+| --- | --- | --- |
+| `tilo-api` | `TILO_VOICE_METER` | `1` (the switch; exactly `1`) |
+| `tilo-api` | `TILO_VOICE_METER_AUDIENCE` | tilo-api's own service URL, `https://host` with no path, query or fragment |
+| `tilo-api` | `TILO_VOICE_METER_CALLER` | `tilo-meet-bot@<project>.iam.gserviceaccount.com`. Not `tilo-schedule-scheduler` (the tick) and not `tilo-tasks-invoker` (Cloud Tasks): equal to either, unset or malformed answers 503 `not_configured` |
+| `tilo-meet-bot` | `TILO_API_URL` | the same string as the audience |
+
+Unchanged by all of this: no Terraform change and no new IAM role (the bot mints its ID token from its metadata server,
+and tilo-api already carries `allUsers` as `run.invoker`: it checks its own tokens); the bot gets no Firestore or ledger
+access; tilo-api stays one instance (`max_instance_count` 1); the ledger is the one above (`TILO_FIRESTORE_PROJECT`,
+without it both routes answer 503 and the bot speaks the local voice). The reply price comes from `config/prices.yaml`
+for the profile `voice.live.profile` names; with no row a reply books the whole `unit_reserve_minor` (10 INR) and never
+more (K = 1).
+
+**Your steps, in order** (`$P`, `$R`, `$Api` as in `meet-bot/docs/CLOUD_RUN.md`):
+
+1. Answer BQ-M2-5 (default yes). On no, stop: the budget-lease fallback in ADR-0042 redoes decisions 2 to 9.
+2. Merge the stack, in this order: #938, #942, #945, #954, #967, #968, #969, #974, then the PR carrying this section.
+   T2 and T3 are security-flagged, so the merge is yours.
+3. Deploy both images from the same commit (both read the baked `config/`: tilo-api the price and ceiling, the bot the
+   voice flags): `just deploy-dev-cloudbuild api dev`, then the bot image and its revision (modelled on
+   `just build-evals-image`; not run by an agent):
+
+   ```powershell
+   gcloud builds submit --config meet-bot/docker/cloudbuild.yaml --ignore-file meet-bot/docker/cloudbuild.gcloudignore `
+     --substitutions "_BOT_IMAGE=$R-docker.pkg.dev/$P/tilo/meet-bot:meter-1" --project $P --region $R `
+     --gcs-source-staging-dir "gs://$P-cloudbuild-staging/source" .
+   gcloud run services update tilo-meet-bot --project=$P --region=$R --image="$R-docker.pkg.dev/$P/tilo/meet-bot:meter-1"
+   curl.exe -s -X POST -w " -> %{http_code}`n" "$Api/internal/meeting-voice/reserve"
+   ```
+
+   Check A: `404` with `{"detail":"Not Found"}`: the image has the routes and they are off. A `403` from the access
+   gate (`under_construction` or `declaration_required`) means the api image predates T2: deploy it first.
+4. Set the three `tilo-api` settings in one call (the command is in `meet-bot/docs/CLOUD_RUN.md`; one revision, so the
+   pins and the switch arrive together). Repeat the curl. Check B: `401` `{"error":"unauthenticated"}` is healthy (routes
+   on, pins valid, no token). `503` `not_configured`: an unset or malformed pin, or the caller equals the tick's or
+   the Tasks account. `404`: the switch is not exactly `1` on the serving revision.
+5. Set `TILO_API_URL` on `tilo-meet-bot` (same file). Optional and normally unnecessary: a `run.invoker` binding for the
+   bot's account on tilo-api (only if you ever remove `allUsers` from tilo-api). Terraform deliberately has no api entry
+   in `extra_invokers` (guard FR-AGT-14e), so it is a `gcloud` call:
+   `gcloud run services add-iam-policy-binding tilo-api --project=$P --region=$R --member="serviceAccount:tilo-meet-bot@$P.iam.gserviceaccount.com" --role=roles/run.invoker`.
+6. Approve a current regional Live quote (PL-06), add its price row to `config/prices.yaml`, then set
+   `voice.live.price_approved: true` and `voice.live.enabled: true` in `config/voice.yaml`, and redeploy both images
+   (step 3). Until this step nothing calls the meter. Without the row, 15 replies fill a meeting's run cap (150 INR) and 50
+   a person's lifetime cap (500 INR).
+7. Check `LIVE=1` is on `tilo-meet-bot` (already so for attendance): that is the bot's own gate (with `TILO_API_URL`
+   and a valid claim header). The meter routes on `tilo-api` never read `LIVE`, so whether `tilo-api` carries it does
+   not matter to them and nothing changes there for this feature (the deployed API keeps the user's switch for live
+   Home tasks). The env drift check in `docs/routines-rollout.md` lists `LIVE` under `$Never` from before go-live and
+   will print `FORBIDDEN: LIVE is set` for as long as the user keeps it: expected, not a defect of this feature
+   (BQ-M2-13).
+8. The X4 probe and one real meeting with `tilotesting@gmail.com` (`meet-bot/scripts/attend-owner.ps1`). Check C, after a
+   spoken Live reply:
+
+   ```powershell
+   gcloud logging read "resource.type=cloud_run_revision AND resource.labels.service_name=tilo-api AND `"meeting voice meter`"" `
+     --project $P --freshness 1h --limit 20 --format "table(timestamp,jsonPayload.message,textPayload)"
+   ```
+
+   Healthy is `reserve 200 live` then `close 200 settled` per reply. `reserve 200 capped|replay_only|unavailable|hold_open|meeting_limit`
+   is the local voice for that reply; `409 not_attending` is a meeting with no claim here (tilo-api restarted, or not the
+   attend that made it). Read the totals in the ledger documents of the section above: at most one unit per reply. The
+   bot logs `live voice meter <step>: no live answer (<reason>)` (`resource.labels.service_name=tilo-meet-bot`), with no
+   claim, token or key in it.
+
+What each answer means (from `curl` without a token, then from the bot): `404` off; `401` on and no usable token; `403` a
+Google token of another account; `422` a body that is not the closed contract; `409` `not_attending` (no claim, wrong
+nonce, expired claim), `no_hold` or `key_used`; `503` `not_configured` (pins, ledger, or a ceiling-sized reply priced above
+one unit: fix the unit or the price row); `200` is `{"decision":"live"}` (a hold exists), `{"decision":"replay","reason":..}`
+(the local voice speaks) or `{"outcome":..}` on close. The bot treats everything but a 200 `live` as the local voice and
+never speaks Live on its own word.
+
+**Rollback**, fastest first. Neither lowers a counted figure; a hold still open settles at the whole unit when its claim
+ends, or at its ledger `expires_at` (one hour):
+
+```powershell
+gcloud run services update tilo-api --project=$P --region=$R --remove-env-vars=TILO_VOICE_METER   # routes answer 404 again
+gcloud run services update tilo-meet-bot --project=$P --region=$R --remove-env-vars=TILO_API_URL   # no meter: Chirp
+```
+
+The first is enough: every reply is the local voice from the next request. A later `terraform apply` also clears the
+bot's settings, which turns the Live voice off. Set `voice.live.enabled: false` and redeploy to take it out for good.
+Do not change or deploy tilo-api during an attended meeting: its claim lives in that process, so the rest of that meeting
+is the local voice.
+
+**Known coarse edge (BQ-M2-12, not fixed here):** a refused reserve is, to the adapter, `NotConfigured`; the bot's
+`FallbackTTS` then keeps the local voice for the rest of that meeting and remembers it in `out/.tts_state.json` for a
+day, so a warm instance does not retry. Safe (never overspends), coarse (one lost reserve or a capped uid ends Live for
+that meeting). Any new revision, or the instance's idle shutdown, clears it.
 
 ### Against a deployed tilo-api, and the smoke (PROD-WIRE-4)
 

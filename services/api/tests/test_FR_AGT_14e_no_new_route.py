@@ -21,6 +21,9 @@ PUBLIC = frozenset(
         ("POST", "/internal/schedules/tick"),
     }
 )
+# ADR-0042 (BQ-M2-5, the user's decision pending; inert until TILO_VOICE_METER=1): the meeting bot's own two routes.
+# They are not part of the schedule hand-off: this test still pins that the hand-off added nothing of its own.
+METER = frozenset({("POST", "/internal/meeting-voice/reserve"), ("POST", "/internal/meeting-voice/close")})
 SCHEDULE_ROUTES = frozenset(
     {
         ("POST", "/internal/schedules/tick"),
@@ -42,13 +45,13 @@ def _routes() -> set[tuple[str, str]]:
 def test_FR_AGT_14e_the_public_routes_are_exactly_the_five_already_pinned() -> None:
     from tilo_api import access
 
-    assert access.PUBLIC_ROUTES == PUBLIC
-    assert frozenset(PINNED_PUBLIC_ROUTES) == PUBLIC  # the SEC-15 pin is unchanged
+    assert access.PUBLIC_ROUTES == PUBLIC | METER
+    assert frozenset(PINNED_PUBLIC_ROUTES) == PUBLIC | METER  # the five, and the meter's two by name
 
 
 def test_FR_AGT_14e_the_tick_is_the_only_internal_route_and_the_schedule_routes_are_unchanged() -> None:
     routes = _routes()
-    assert {r for r in routes if r[1].startswith("/internal")} == {("POST", TICK)}
+    assert {r for r in routes if r[1].startswith("/internal")} == {("POST", TICK)} | METER
     assert {r for r in routes if "schedule" in r[1]} == SCHEDULE_ROUTES
     assert not [r for r in routes if "tick" in r[1] and r != ("POST", TICK)]
     assert not [r for r in routes if r[1].startswith(("/tasks/run", "/runs", "/internal/tasks", "/internal/runs"))]

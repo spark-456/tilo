@@ -24,6 +24,7 @@ from tilo_api.meeting_bot_rpc import MeetingBotRpc, get_meeting_bot_client
 from tilo_api.meeting_host import HostSeams, get_host_seams, host_meeting
 from tilo_api.meeting_host_rpc import MeetingHostRpc
 from tilo_api.meeting_join import owner_join
+from tilo_api.meeting_voice_claims import AttendClaims, get_attend_claims
 from tilo_api.people_events import WorkEvents, get_work_events
 from tilo_api.people_limits import idempotent, write_limit
 from tilo_api.people_meetings import MeetingEditIn, edit_meeting, get_meeting, list_meetings, read_minutes, set_world
@@ -289,8 +290,11 @@ async def attend_meeting_route(
     host: Annotated[MeetingHostRpc, Depends(deps.get_meeting_host_client)],
     bot: Annotated[MeetingBotRpc, Depends(get_meeting_bot_client)],
     clock: Annotated[Callable[[], str], Depends(deps.get_clock)],
+    claims: Annotated[AttendClaims | None, Depends(get_attend_claims)],
 ) -> dict[str, Any]:
-    work = attend_meeting(_writer(principal, stores, clock), store, artifacts, host, bot, meeting_id, clock)
+    work = attend_meeting(
+        _writer(principal, stores, clock), store, artifacts, host, bot, meeting_id, clock, claims=claims
+    )
     try:
         return await while_connected(request, work)
     except HTTPException:

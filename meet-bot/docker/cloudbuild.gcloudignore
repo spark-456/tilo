@@ -35,6 +35,10 @@
 /prompts/*
 !/prompts/router/
 !/prompts/speech/
+!/contracts/
+/contracts/*
+!/contracts/meeting_voice_meter.schema.json
+!/contracts/common.schema.json
 .env
 .env.*
 *.pem

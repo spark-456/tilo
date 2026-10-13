@@ -42,6 +42,10 @@ PUBLIC_ROUTES: frozenset[tuple[str, str]] = frozenset(
             "POST",
             "/internal/schedules/tick",
         ),  # FR-AGT-14b: Cloud Scheduler has no session; the route checks its OIDC caller
+        # ADR-0042 (BQ-M2-5, pending the user; inert until `TILO_VOICE_METER=1`): the meeting bot has no session; each
+        # route checks its own Google ID token and the attend's nonce.
+        ("POST", "/internal/meeting-voice/reserve"),
+        ("POST", "/internal/meeting-voice/close"),
     }
 )
 

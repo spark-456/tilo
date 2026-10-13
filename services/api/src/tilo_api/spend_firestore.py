@@ -15,11 +15,12 @@ from __future__ import annotations
 
 import logging
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from google.api_core import exceptions as gexc
 from google.cloud import firestore
+from google.cloud.firestore_v1.base_query import FieldFilter
 
 from tilo_api.spend import Refused, Reservation, Settled, SpendCaps, _int
 
@@ -27,6 +28,10 @@ logger = logging.getLogger("tilo_api.spend_firestore")
 COLLECTION = "spend_ledger"
 _ATTEMPTS = 4  # on top of the library's own five per call: contention only ever ends in replay, never in a pass
 _REASONS = ("uid_lifetime", "run", "org_day", "global_hard")
+HOLD_TTL = timedelta(hours=1)  # ADR-0042 MV-17(b): above any meeting claim's 3500 s; then a held hold is stranded.
+# Applies to EVERY unit kind (Director, intake screen, plan, runs, voice), not only meeting voice: a unit still held
+# after an hour is settled at its own amount by the sweep.
+_SWEEP_EVERY = timedelta(seconds=60)  # a uid's reserves sweep its expired holds at most this often per process
 
 
 def _part(value: object, name: str) -> str:
@@ -38,6 +43,7 @@ def _part(value: object, name: str) -> str:
 class FirestoreSpendLedger:
     def __init__(self, client: Any, caps: SpendCaps, *, org_id: str) -> None:
         self._client, self._caps, self._org = client, caps, _part(org_id, "org_id")
+        self._swept: dict[str, datetime] = {}  # uid -> the `at` of its last sweep (this process only)
 
     # -- documents ----------------------------------------------------------------------------------------------
     def _ref(self, doc_id: str) -> Any:
@@ -96,6 +102,7 @@ class FirestoreSpendLedger:
         keys = self._counters(uid, run_id, org_id, day)
         caps = (c.uid_lifetime_minor, c.run_minor, c.org_day_minor, c.global_day_hard_minor)
         terms = {"uid": uid, "run_id": run_id, "org_id": org_id, "day": day, "amount_minor": amount}
+        self._sweep_uid(uid, at)
 
         @firestore.transactional  # type: ignore[misc]
         def txn(tx: Any) -> Reservation | Refused:
@@ -116,10 +123,46 @@ class FirestoreSpendLedger:
                     return Refused(reason)
             for key, (settled, held) in zip(keys, totals, strict=True):
                 tx.set(self._ref(key), {"settled_minor": settled, "held_minor": held + amount})
-            tx.set(self._ref(f"hold:{rid}"), {**terms, "status": "held", "actual_minor": None})
+            expires = (at + HOLD_TTL).isoformat(timespec="milliseconds")
+            tx.set(self._ref(f"hold:{rid}"), {**terms, "status": "held", "actual_minor": None, "expires_at": expires})
             return Reservation(id=rid, uid=uid, run_id=run_id, org_id=org_id, amount_minor=amount)
 
         return self._run(txn)  # type: ignore[no-any-return]
+
+    def _sweep_uid(self, uid: str, at: datetime) -> None:
+        last = self._swept.get(uid)
+        if last is not None and abs(at - last) < _SWEEP_EVERY:
+            return
+        self._swept[uid] = at
+        try:
+            self.settle_expired(at, uid=uid)
+        except Exception as exc:  # a sweep never blocks a reserve and never lifts a cap: the hold still counts
+            logger.warning("expired spend holds not swept (%s)", type(exc).__name__)
+
+    def settle_expired(self, now: datetime, *, uid: str | None = None) -> int:
+        """ADR-0042 MV-17(b): a `held` hold past its `expires_at` (a restart, a claim that was lost) is settled at its
+        own amount: the count is what it already was, only its status closes, so a later close finds it settled and
+        nothing counts twice. Returns how many were settled. A hold with no readable `expires_at` is never expired."""
+        query = self._client.collection(f"orgs/{self._org}/{COLLECTION}").where(
+            filter=FieldFilter("status", "==", "held")
+        )
+        if uid is not None:
+            query = query.where(filter=FieldFilter("uid", "==", uid))
+        done = 0
+        for snapshot in query.stream():
+            held = snapshot.to_dict() or {}
+            try:
+                if datetime.fromisoformat(held["expires_at"]) > now:
+                    continue
+                reservation = Reservation(
+                    id=snapshot.id.removeprefix("hold:"), uid=held["uid"], run_id=held["run_id"],
+                    org_id=held["org_id"], amount_minor=held["amount_minor"],
+                )  # fmt: skip
+                self._close(reservation, held["amount_minor"])
+                done += 1
+            except Exception as exc:  # one bad or contended hold never stops the rest
+                logger.warning("an expired spend hold was not settled (%s)", type(exc).__name__)
+        return done
 
     def _close(self, reservation: Reservation, actual: int | None) -> Settled | None:
         """Settle (`actual` an int) or release (None) one hold, once. The same close again is a no-op that answers as

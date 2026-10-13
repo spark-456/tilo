@@ -129,8 +129,11 @@ class LiveSession:
         context: list[str],
         stt: str | None = None,
         reply: str | None = None,
+        *,
+        voice_meter: Any = None,  # ADR-0042: the SEC-16 hook of the Live voice (`LiveVoiceMeter`); None = local voice
     ) -> None:
         self.cfg, self.mode, self.url = cfg, mode, url
+        self.voice_meter = voice_meter
         self.clock = SystemClock()
         self.run_id = datetime.now().strftime("%Y%m%d-%H%M%S")
         self.out_dir = cfg.out_dir / self.run_id
@@ -483,7 +486,7 @@ class LiveSession:
         """Voice replies need a TTS provider and a virtual microphone; without them the bot stays chat-only."""
         if self.reply_mode == "chat":
             return
-        self.tts = make_tts()
+        self.tts = make_tts() if self.voice_meter is None else make_tts(meter=self.voice_meter)
         if self.tts is None:
             log.warning("no voice provider available: replies will be chat only")
         elif not setup_virtual_mic():
