@@ -1,0 +1,32 @@
+{
+  "v": "1.0",
+  "artifact": {
+    "artifact_id": "art_sample_paper",
+    "version": 1,
+    "label": "Sample paper 2025"
+  },
+  "org_id": "org_example",
+  "world_id": "w_example",
+  "run_id": "r_example_1",
+  "owner": "u_owner",
+  "media_type": "application/pdf",
+  "size_bytes": 812345,
+  "content_sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+  "parents": [],
+  "origin": {
+    "kind": "fetch",
+    "unit": null,
+    "agent": "A_s1"
+  },
+  "sources": [
+    {
+      "id": "src_1",
+      "archive_ref": "r_example_1/12"
+    }
+  ],
+  "screening": "clean",
+  "screened_at": "2026-10-05T09:29:59.500Z",
+  "redacted": false,
+  "idempotency_key": "r_example_1:U2:0:f0",
+  "created_at": "2026-10-05T09:30:00.000Z"
+}

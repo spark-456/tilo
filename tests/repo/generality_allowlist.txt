@@ -4,11 +4,20 @@
 # check of untrusted text (PRD 16.3, 16.5); none chooses what a run does from the subject of a task.
 branch | packages/memory/src/tilo_memory/cache.py | _normalise | collapses whitespace in a cache key so two spellings of one text share an entry; every text gets the same treatment
 branch | packages/planning/src/tilo_planning/compiler.py | _data | neutralises prompt block delimiters in delimited task data (PRD 16.3 item 1)
+branch | packages/planning/src/tilo_planning/brief.py | clean_line | cleans a model's or a person's short text to one plain line (control characters, tags, brackets, spaces) before it is shown or recorded (PRD 16.3); every text gets the same treatment
+branch | packages/planning/src/tilo_planning/questions.py | _chosen_kinds | matches the labels of the kinds in config/deliverable_kinds.yaml against a person's answer to the deliverables question, to read a multi-pick; the labels are configuration, the match names no subject and chooses nothing but which offered kinds the person picked
 branch | packages/providers/src/tilo_providers/dev_director.py | _block | dev-only fake: reads the delimited TASK, BRIEF and CATALOGUE blocks of a prompt
 branch | packages/providers/src/tilo_providers/dev_director.py | _brief_reply | dev-only fake: takes an ISO date out of the task text and echoes the text; every task gets the same shape
 branch | packages/providers/src/tilo_providers/prompts.py | neutralise_marker | neutralises prompt block delimiters in untrusted text
 branch | packages/providers/src/tilo_providers/replay.py | _scrub_authorization_like | redacts credential-shaped strings from recordings (PRD 16.1 rule 4)
-branch | services/api/src/tilo_api/dev_run.py | dev_redact | dev-only stand-in for the shared secret redactor (FR-MEM-05, BQ-109); masks fixed secret shapes in synthetic text; no branch on task content
+branch | services/api/src/tilo_api/quick_rules.py | _stems | COST-FAST-1 Quick classifier (also `classify`, which re.splits the question key into clauses): splits the question into words for the config/quick.yaml word lists; a hit only suggests switching to Thinking (a person who chose Thinking always gets it), it never chooses what a run does and names no scenario
+branch | packages/redact/src/tilo_redact/__init__.py | redact | the shared secret redactor (FR-MEM-05): masks credential shapes, labelled values and Luhn-valid card numbers; never task content
+branch | packages/redact/src/tilo_redact/__init__.py | _labelled | removes the value after a secret key label (password, api_key, ...); matches key shapes, never task content
+branch | packages/redact/src/tilo_redact/__init__.py | _value | decides where a labelled secret's value ends (quotes, JSON escapes, credential shape); matches key and value shapes, never task content
+branch | packages/redact/src/tilo_redact/__init__.py | _quoted_end | finds the quote that ends a quoted secret value at its own JSON-in-JSON level; reads quotes and backslashes only, never task content
+branch | packages/redact/src/tilo_redact/__init__.py | _header_end | finds where an Authorization or Cookie value ends (line start, closing quote); never task content
+branch | packages/redact/src/tilo_redact/__init__.py | _number_quote | picks the quote that keeps JSON valid around a redacted card number; reads punctuation only
+branch | packages/redact/src/tilo_redact/__init__.py | at | the redactor's scanners: whether a URL is an OAuth one (for `code=`) and how deep a position is in JSON strings; never task content
 branch | services/browser/src/tilo_browser/login.py | _asks_in_text | detects a page asking for a password or code, so the worker stops (Tilo never handles passwords)
 branch | services/browser/src/tilo_browser/masking.py | _mask | masks secrets in page text before it is stored or shown
 branch | services/browser/src/tilo_browser/masking.py | _mask_cards | masks Luhn-valid card numbers in page text
@@ -35,6 +44,9 @@ branch | services/harness/src/tilo_harness/run_bundle.py | export_run | compares
 branch | services/connectors/src/tilo_connectors/calendar_sync.py | _diff | PE-13/PE-21: compares a synced title with the stored copy of the same event so an unchanged title keeps its verdict and is not screened again; no word of the title is read
 branch | packages/providers/src/tilo_providers/model_armor_adapter.py | redact | scrubs the bearer token and credentials (ya29./AIza) from provider and error text; never task text
 branch | packages/providers/src/tilo_providers/google_speech_adapter.py | redact | scrubs credentials (ya29./AIza) from provider and error text; never task text
+branch | packages/providers/src/tilo_providers/cloud_tts_adapter.py | redact | scrubs credentials (ya29./AIza) from provider and error text; never task text
 branch | packages/planning/src/tilo_planning/recording.py | _line | FR-MTG-17: cleans one line of untrusted transcript text (whitespace, control and format characters); every text gets the same treatment, no word is read
 branch | services/channels/src/tilo_channels/meeting_followup.py | _title_is_clear | FR-MTG-08c: runs the FR-CHN-10 checker on a meeting title (links, addresses, numbers, commitment words, obfuscation) before it reaches a subject; a safety screen of untrusted text, no choice of what a run does from the subject of a task
 branch | services/channels/src/tilo_channels/reschedule_reply.py | load_config | FR-CAL-07 b: validates the shape of config/reschedule_reply.yaml (a template must hold its slot marker, numbers within bounds); reads configuration only, never task or mail text
+branch | packages/providers/src/tilo_providers/search.py | redact_query | LW-05: masks credential shapes (API keys, tokens, Bearer values, password= pairs) in a search query before it is keyed, recorded or sent (PRD 16.1 rule 4); never chooses what a run does from the subject of a task
+branch | packages/planning/src/tilo_planning/transcript_ingest.py | _prefixed | FR-MTG-02: splits a transcript line into speaker label and utterance by its shape (text before the first colon that is followed by a space); no word of the line is read, and a run's behaviour never depends on it

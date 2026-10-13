@@ -19,10 +19,15 @@ from tilo_memory.artifacts import ArtifactStore
 from tilo_people.stores import PeopleStores
 
 from tilo_api import deps, people_items
+from tilo_api.meeting_bot import attend_meeting
+from tilo_api.meeting_bot_rpc import MeetingBotRpc, get_meeting_bot_client
 from tilo_api.meeting_host import HostSeams, get_host_seams, host_meeting
+from tilo_api.meeting_host_rpc import MeetingHostRpc
+from tilo_api.meeting_join import owner_join
 from tilo_api.people_events import WorkEvents, get_work_events
 from tilo_api.people_limits import idempotent, write_limit
-from tilo_api.people_meetings import MeetingEditIn, edit_meeting, get_meeting, read_minutes, set_world
+from tilo_api.people_meetings import MeetingEditIn, edit_meeting, get_meeting, list_meetings, read_minutes, set_world
+from tilo_api.people_pins import PinIn, create_pin, delete_pin, list_pins
 from tilo_api.people_plate import build_plate
 from tilo_api.people_quotes import Reader, item_quote, meeting_quotes
 from tilo_api.people_writes import (
@@ -46,6 +51,7 @@ from tilo_api.people_writes import (
     remove_team,
     set_role,
 )
+from tilo_api.request_work import while_connected
 
 _MEETING_ID = re.compile(r"mt_[0-9A-Za-z_]{1,48}")
 _ITEM_ID = re.compile(r"wi_[0-9A-Za-z_]{1,48}")
@@ -190,6 +196,15 @@ def confirm_meeting_route(
     return _answer(lambda: confirm_minutes(_writer(principal, stores, clock), meeting_id))
 
 
+@router.get("/v1/meetings")
+def list_meetings_route(
+    principal: Annotated[deps.Principal, Depends(deps.get_current_principal)],
+    stores: Annotated[PeopleStores, Depends(deps.get_people_stores)],
+    clock: Annotated[Callable[[], str], Depends(deps.get_clock)],
+) -> dict[str, Any]:
+    return _answer(lambda: list_meetings(_writer(principal, stores, clock)))
+
+
 @router.get("/v1/meetings/{meeting_id}")
 def get_meeting_route(
     meeting_id: str,
@@ -246,6 +261,41 @@ def meeting_world_route(
     if _MEETING_ID.fullmatch(meeting_id) is None:
         raise _not_found()
     return _answer(lambda: set_world(_writer(principal, stores, clock), worlds, meeting_id))
+
+
+@router.get("/v1/meetings/{meeting_id}/join")
+def join_meeting_route(
+    meeting_id: str,
+    principal: Annotated[deps.Principal, Depends(deps.get_current_principal)],
+    stores: Annotated[PeopleStores, Depends(deps.get_people_stores)],
+    store: Annotated[deps.Store, Depends(deps.get_store)],
+    artifacts: Annotated[ArtifactStore, Depends(deps.get_artifact_store)],
+    client: Annotated[MeetingHostRpc, Depends(deps.get_meeting_host_client)],
+    clock: Annotated[Callable[[], str], Depends(deps.get_clock)],
+) -> dict[str, Any]:
+    return _answer(lambda: owner_join(_writer(principal, stores, clock), store, artifacts, client, meeting_id))
+
+
+@router.post("/v1/meetings/{meeting_id}/attend")
+async def attend_meeting_route(
+    meeting_id: str,
+    request: Request,
+    _: Annotated[Empty, Depends(json_body(Empty))],
+    principal: Annotated[deps.Principal, Depends(deps.get_current_principal)],
+    stores: Annotated[PeopleStores, Depends(deps.get_people_stores)],
+    store: Annotated[deps.Store, Depends(deps.get_store)],
+    artifacts: Annotated[ArtifactStore, Depends(deps.get_artifact_store)],
+    host: Annotated[MeetingHostRpc, Depends(deps.get_meeting_host_client)],
+    bot: Annotated[MeetingBotRpc, Depends(get_meeting_bot_client)],
+    clock: Annotated[Callable[[], str], Depends(deps.get_clock)],
+) -> dict[str, Any]:
+    work = attend_meeting(_writer(principal, stores, clock), store, artifacts, host, bot, meeting_id, clock)
+    try:
+        return await while_connected(request, work)
+    except HTTPException:
+        raise
+    except Exception:
+        raise _unreadable() from None
 
 
 @router.post("/v1/meetings/{meeting_id}/host")
@@ -402,7 +452,8 @@ def create_work_item_route(
     """A person adds their own item; a mail or request source is checked against its owner (PE-08)."""
 
     def owners() -> deps.SourceOwners:  # resolved only when the source is mail or a request
-        return request.app.dependency_overrides.get(deps.get_source_owners, deps.get_source_owners)()  # type: ignore[no-any-return]
+        seam = request.app.dependency_overrides.get(deps.get_source_owners)
+        return seam() if seam is not None else deps.get_source_owners(request)  # an override takes no argument
 
     return _answer(
         lambda: idempotent(
@@ -426,6 +477,52 @@ def _item_writer(
     if _ITEM_ID.fullmatch(item_id) is None:
         raise _not_found()
     return _writer(principal, stores, clock, redact, events)
+
+
+@router.get("/v1/pinboards")
+def list_pinboards_route(
+    principal: Annotated[deps.Principal, Depends(deps.get_current_principal)],
+    stores: Annotated[PeopleStores, Depends(deps.get_people_stores)],
+    clock: Annotated[Callable[[], str], Depends(deps.get_clock)],
+    owners: Annotated[deps.SourceOwners, Depends(deps.get_source_owners)],
+) -> dict[str, Any]:
+    return _answer(lambda: list_pins(_writer(principal, stores, clock), owners))
+
+
+@router.post("/v1/pinboards", status_code=201)
+def create_pin_route(
+    request: Request,
+    body: Annotated[PinIn, Depends(json_body(PinIn))],
+    principal: Annotated[deps.Principal, Depends(deps.get_current_principal)],
+    stores: Annotated[PeopleStores, Depends(deps.get_people_stores)],
+    redact: Annotated[Callable[[str], str], Depends(deps.get_redactor)],
+    clock: Annotated[Callable[[], str], Depends(deps.get_clock)],
+    events: Annotated[WorkEvents, Depends(get_work_events)],
+) -> dict[str, Any]:
+    return _answer(
+        lambda: idempotent(
+            request,
+            principal,
+            stores,
+            body,
+            lambda: create_pin(_writer(principal, stores, clock, redact, events), body),
+        )
+    )
+
+
+@router.post("/v1/pinboards/{pin_id}/delete")
+def delete_pin_route(
+    pin_id: str,
+    body: Annotated[Empty, Depends(json_body(Empty))],
+    principal: Annotated[deps.Principal, Depends(deps.get_current_principal)],
+    stores: Annotated[PeopleStores, Depends(deps.get_people_stores)],
+    clock: Annotated[Callable[[], str], Depends(deps.get_clock)],
+    owners: Annotated[deps.SourceOwners, Depends(deps.get_source_owners)],
+    events: Annotated[WorkEvents, Depends(get_work_events)],
+) -> dict[str, Any]:
+    if re.fullmatch(r"pb_[0-9A-Za-z_]{1,48}", pin_id) is None:
+        raise _not_found()
+    return _answer(lambda: delete_pin(_writer(principal, stores, clock, events=events), pin_id, owners))
 
 
 @router.get("/v1/work-items")

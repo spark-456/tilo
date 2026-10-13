@@ -469,11 +469,17 @@ def test_FR_MTG_09_hostile_the_sync_path_holds_no_write_verb_and_never_names_the
         verbs = {s.upper() for s in string_constants(path)} & {"POST", "PUT", "PATCH", "DELETE"}
         assert not verbs, f"{relative} holds a write verb literal: {sorted(verbs)}"
         source = module_source(path)
+        # ADR-0035 (L1): the sync loader refuses a google_calendar declaration wider than the one sanctioned write
+        # scope, so calendar_sync.py (and only it) names that scope as a refusal pin. It still holds no write verb and
+        # never names the host module.
+        names_scope_ok = relative == "calendar_sync.py"
         for forbidden in ("CALENDAR_EVENTS_OWNED", "meeting_host", "calendar.events"):
+            if names_scope_ok and forbidden != "meeting_host":
+                continue
             assert forbidden not in source, f"{relative} names {forbidden}"
 
 
-def test_FR_MTG_09_hostile_only_the_two_host_modules_contain_calendar_events():
+def test_FR_MTG_09_hostile_only_the_host_modules_and_the_sync_loader_pin_contain_calendar_events():
     holders = {
         str(path.relative_to(SRC)).replace("\\", "/")
         for path in SRC.rglob("*.py")
@@ -481,7 +487,8 @@ def test_FR_MTG_09_hostile_only_the_two_host_modules_contain_calendar_events():
     }
 
     assert "meeting_host.py" in holders, "the scope string is declared where the API doc puts it"
-    assert holders <= {"meeting_host.py", "adapters/meeting_host.py"}, f"also in {sorted(holders)}"
+    # ADR-0035 (L1): calendar_sync.py pins the sanctioned scope to refuse a wider declaration (see the test above)
+    assert holders <= {"meeting_host.py", "adapters/meeting_host.py", "calendar_sync.py"}, f"also in {sorted(holders)}"
 
 
 def test_FR_MTG_09_hostile_a_sync_run_against_the_fake_records_gets_only_with_the_read_scope_asked():

@@ -64,7 +64,8 @@ set on a deployed service, and flags names that are not on the allowlist. It nev
 ```powershell
 $Project = "essential-wares-510320-f0"; $Region = "asia-southeast1"
 $Allow = @("TILO_SCHEDULE_TICK_AUDIENCE","TILO_SCHEDULE_TICK_CALLER","TILO_SCHEDULES_STORE","TILO_FIRESTORE_PROJECT",
-  "TILO_RUNS_QUEUE","TILO_TASKS_CALLER","TILO_TEAM_STORE")        # extend per service as settings are added
+  "TILO_RUNS_QUEUE","TILO_TASKS_CALLER","TILO_TEAM_STORE","TILO_SKILLS_STORE","TILO_API_CORS_ORIGINS","TILO_APPCHECK_ENFORCE","TILO_PEOPLE_BOOTSTRAP_UID")        # extend per service as settings are added
+$Optional = @("TILO_API_STORE","TILO_PEOPLE_STORE")  # PROD-WIRE durable stores (docs/deploy-dev.md), set once ADR-0026 is accepted
 $Never = @("LIVE","TILO_API_DEV","TILO_JUDGE_LIVE","FIRESTORE_EMULATOR_HOST","TILO_MODELS_FILE")
 $Svc = gcloud run services describe tilo-api --project $Project --region $Region --format json | ConvertFrom-Json
 $Vars = @($Svc.spec.template.spec.containers[0].env)
@@ -72,7 +73,9 @@ $Bad = @()
 foreach ($v in $Vars) {
   if ($Never -contains $v.name) { $Bad += "FORBIDDEN: $($v.name) is set" }
   elseif ($v.name -eq "TILO_TEAM_STORE" -and $v.value -and $v.value.Trim().ToLower() -eq "memory") { $Bad += "FORBIDDEN: TILO_TEAM_STORE=memory" }
-  elseif ($Allow -notcontains $v.name) { $Bad += "UNEXPECTED: $($v.name) is not on the allowlist" }
+  elseif ($v.name -eq "TILO_SCHEDULES_STORE" -and $v.value -and $v.value.Trim().ToLower() -eq "memory") { $Bad += "FORBIDDEN: TILO_SCHEDULES_STORE=memory" }
+  elseif ($v.name -eq "TILO_TEAM_STORE" -and -not ($v.value -and $v.value.Trim())) { $Bad += "BLANK: TILO_TEAM_STORE is empty (team controls answer 503)" }
+  elseif ($Allow -notcontains $v.name -and $Optional -notcontains $v.name) { $Bad += "UNEXPECTED: $($v.name) is not on the allowlist" }
 }
 foreach ($n in $Allow) { if (-not ($Vars | Where-Object { $_.name -eq $n })) { $Bad += "MISSING: $n" } }
 if ($Bad.Count) { $Bad | ForEach-Object { Write-Host $_ -ForegroundColor Red } } else { Write-Host "env OK ($($Vars.Count) settings)" }
@@ -92,8 +95,8 @@ if ($Bad.Count) { $Bad | ForEach-Object { Write-Host $_ -ForegroundColor Red } }
 Routines that were due during any 503 stay due, and fire once the cause is fixed. None is disabled by an outage.
 
 ## Known caveats
-- The tilo-api settings in step 2 are set with gcloud. Only tilo-api has `ignore_env = true` in `infra/envs/dev`, so the
-  module ignores `env` drift on that one service (`ignore_changes` on `template[0].containers[0].env`) and a later
+- The tilo-api settings in step 2 are set with gcloud. Only tilo-api and tilo-connectors have `ignore_env = true` in `infra/envs/dev`, so the
+  module ignores `env` drift on those services (`ignore_changes` on `template[0].containers[0].env`) and a later
   Terraform run leaves the settings alone; every other service's env stays fully managed. The service module declares
   no `env` block (a tests/repo guard), because declared env would never be applied.
 - Secrets only via `--update-secrets` (Secret Manager references), never in `--update-env-vars`.

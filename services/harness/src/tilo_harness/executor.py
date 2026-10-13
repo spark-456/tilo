@@ -15,9 +15,15 @@ With `question_wait` as well (FR-HIL-10) the unit instead waits for its answer, 
 then runs once with it in `UnitContext.answer` only if `Ask.runs` says so; Hold, Stop, Skip and a default leave
 it held (`RunResult.held`, retired, nothing made) and its dependents skipped. The other units go on.
 
+With `brief` and `intake_answers` (UNIT-PROMPT) every unit's `UnitContext` carries the brief the run began with and the
+person's answers, and the text outputs of the units it depends on (`upstream`); `unit_prompt` shows them as data.
+
 With `verifier` (FR-AGT-12) the layout must hold that verifier-rank agent and it must not work a unit
-itself. Once a successful unit has handed over, each artifact it handed over gets one `artifact.reviewed`
-(caused by the handoff) before the unit's dependents start; the review result is recorded, not acted on.
+itself. A verifier-role unit of the default runner first runs the deterministic date-window check (`schedule_dates`):
+a schedule date outside today..deadline fails that unit (`UnitOutcome.reason` quotes the dates), so its dependents are
+skipped and the run stops. Once a successful unit has handed over, each artifact it handed over gets one
+`artifact.reviewed` (caused by the handoff) before the unit's dependents start; the review result is recorded, not
+acted on.
 
 With `artifacts` and `scope` (FR-AGT-02, FR-MEM-06; ADR-0018 s5) a successful unit's `outputs` are stored with their
 `created` manifests (`outputs.keep`) after the runner returns and before `agent.handoff`, then announced: one
@@ -43,13 +49,13 @@ import asyncio
 import dataclasses
 import functools
 import math
-from collections.abc import Awaitable, Callable, Mapping
+from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass, field
+from datetime import date
 from typing import Any, Protocol
 
 from tilo_logging.context import bound
-from tilo_providers.interfaces import GenerateRequest, ModelProvider
-from tilo_providers.prompts import load_prompt
+from tilo_providers.clock import Clock, parse_deadline, real_today
 
 from tilo_harness.branch import Checkpoint, hit_summary, reusable_units
 from tilo_harness.config import AgentsConfig
@@ -57,7 +63,10 @@ from tilo_harness.context_handoff import context_pct, next_spare, note_is_valid,
 from tilo_harness.must_ask import Ask, MustAsk
 from tilo_harness.outputs import Kept, UnitOutput, existing, keep
 from tilo_harness.question_wait import Answer, QuestionWait
+from tilo_harness.schedule_dates import WindowFail, date_window_fail
 from tilo_harness.skills import LoadedSkill, Pins, SkillError, SkillRegistry
+from tilo_harness.tool_runner import ToolUnitRunner
+from tilo_harness.unit_prompt import UPSTREAM_ITEM_CAP, UpstreamItem
 from tilo_harness.validator import EventRejected, repo_validator
 from tilo_harness.verifier import Verifier
 
@@ -82,6 +91,9 @@ class UnitOutcome:
     outputs: tuple[UnitOutput, ...] = ()  # what the unit made; the executor stores it (ADR-0018)
     context_share: float | None = None  # share 0..1 of this agent's context window used when run() returned (FR-AGT-09)
     handoff_note: dict[str, Any] | None = None  # a draft handoff note when the agent stops unfinished (FR-AGT-09)
+    reason: str | None = None  # a failed unit's plain, code-written line (at most 140 chars) for the run's stop notice
+    credits: float = 0.0  # what the unit's work cost (model calls through the runner's meter, tool results)
+    read_external: bool = True  # the unit read outside content, or text resting on it (SEC-05); unknown = True
 
 
 @dataclass(frozen=True)
@@ -91,6 +103,11 @@ class UnitContext:
     answer: Answer | None = None  # the answer to the question this unit asked before it started (FR-HIL-10)
     note: dict[str, Any] | None = None  # the validated note a successor starts from (FR-AGT-09)
     note_ref: dict[str, Any] | None = None  # that note's artifact_ref
+    # UNIT-PROMPT: what the unit is told about the task. The brief and the answers are person-supplied text, the
+    # upstream results are model text; the prompt shows all of it as data (`unit_prompt`).
+    brief: Mapping[str, Any] | None = None  # the brief the run was started with
+    intake_answers: tuple[tuple[str, str], ...] = ()  # (the Director's question, the person's answer)
+    upstream: tuple[UpstreamItem, ...] = ()  # the units this one depends on, in plan order
 
 
 class UnitRunner(Protocol):
@@ -115,29 +132,24 @@ class RunResult:
         return [unit_id for unit_id, outcome in self.outcomes.items() if not outcome.success]
 
 
-class DefaultUnitRunner:
-    """Does a unit's work with the model for the unit's role, through the provider layer."""
+class DefaultUnitRunner(ToolUnitRunner):
+    """Shared tool runner with the deterministic date-window verifier guard."""
 
-    def __init__(self, providers: Mapping[str, ModelProvider]) -> None:
-        self._providers = providers
+    def __init__(self, providers: Mapping[str, Any], *, clock: Clock = real_today, **kwargs: Any) -> None:
+        super().__init__(providers, today=clock, **kwargs)
+        self._date_clock = clock
 
     async def run(self, unit: Mapping[str, Any], context: UnitContext) -> UnitOutcome:
-        provider = self._providers[unit["role"]]
-        prompt = load_prompt(
-            unit["role"],
-            "unit.md",
-            {
-                "title": unit["title"],
-                "unit_type": unit["unit_type"],
-                "skills": "\n\n".join(skill.body for skill in context.skills),
-            },
-        )
-        response = await asyncio.to_thread(provider.generate, GenerateRequest(prompt=prompt))
-        if not response.text:
-            return UnitOutcome(success=False, summary=f"No result for {unit['title']}.")
-        # Code picks the media type; a model never names one (ADR-0018 s1).
-        output = UnitOutput(media_type="text/markdown", content=response.text.encode("utf-8"))
-        return UnitOutcome(success=True, summary=f"Finished {unit['title']}.", outputs=(output,))
+        if unit["role"] == "verifier" and (fail := _date_window_fail(context, self._date_clock())) is not None:
+            return UnitOutcome(success=False, summary=" ".join(fail.verdict.split()), reason=fail.reason)
+        return await super().run(unit, context)
+
+
+def _date_window_fail(context: UnitContext, today: date) -> WindowFail | None:
+    """The deterministic date-window failure for the work a verifier unit checks (its upstream outputs), or None."""
+    deadline = parse_deadline((context.brief or {}).get("deadline"))
+    work = "\n\n".join(item.text for item in context.upstream if item.text)
+    return date_window_fail(work, today, deadline)
 
 
 @dataclass(frozen=True)
@@ -207,6 +219,40 @@ def _roster(units: list[dict[str, Any]], layout: dict[str, Any], config: AgentsC
     return _Roster(directors[0], leads, levels, workers, sites, rank)
 
 
+NL2 = chr(10) * 2
+
+
+def _upstream_item(
+    unit: Mapping[str, Any], outcome: UnitOutcome, made: Sequence[Kept], store: Mapping[str, Any] | None
+) -> UpstreamItem:
+    """What a finished unit hands to the units that depend on it: the text of what it STORED (so the redacted version,
+    never the runner's raw bytes), cut to the cap now; a flagged or unreadable item is left out with a note."""
+    texts: list[str] = []
+    verdict = "clean"  # LW-07: clean only if every text item was screened clean; the first other verdict stands
+    for item in made:
+        record = item.version.record
+        if not str(record.get("media_type", "")).startswith("text/"):
+            continue
+        if record.get("screening") != "clean" and verdict == "clean":
+            verdict = str(record.get("screening") or "unscreened")
+        if record.get("screening") == "flagged":
+            texts.append("(an item was left out: the safety screen flagged it)")
+            continue
+        try:
+            raw = store["artifacts"].read(store["scope"], item.version.ref) if store else b""
+        except Exception:  # an unreadable version is left out, never guessed at
+            verdict = verdict if verdict != "clean" else "unscreened"
+            texts.append("(an item was left out: it could not be read)")
+            continue
+        texts.append(raw[: UPSTREAM_ITEM_CAP * 4].decode("utf-8", errors="replace")[:UPSTREAM_ITEM_CAP])
+    refs = tuple(
+        str(ref["artifact_id"]) for ref in outcome.artifact_refs if isinstance(ref, Mapping) and "artifact_id" in ref
+    )
+    return UpstreamItem(
+        unit["id"], unit["title"], NL2.join(texts)[:UPSTREAM_ITEM_CAP] or None, refs, verdict, outcome.read_external
+    )
+
+
 def _envelope(outcome: UnitOutcome, worker: str, lead: str, unit: dict[str, Any]) -> dict[str, Any] | None:
     """The handoff envelope (PRD 8.4) for a successful outcome, or None if it breaks the contract."""
     summary, refs, provenance = outcome.summary, outcome.artifact_refs, outcome.provenance_ids
@@ -260,6 +306,8 @@ class _Run:
         store: dict[str, Any],
         before_handoff: BeforeHandoff | None,
         handoff_at: float = 1.0,
+        brief: Mapping[str, Any] | None = None,
+        intake_answers: Sequence[tuple[str, str]] = (),
     ) -> None:
         self.writer, self.roster, self.skills, self.pins, self.runner = writer, roster, skills, pins, runner
         self.must_ask, self.verifier, self.question_wait = must_ask, verifier, question_wait
@@ -269,6 +317,8 @@ class _Run:
         self.used = {*roster.workers.values(), *([verifier.agent_id] if verifier is not None else [])}  # not spare
         self.held: set[str] = set()
         self.handoffs: dict[str, str] = {}  # unit -> the agent.handoff event that carried its artifacts
+        self.brief, self.intake_answers = brief, tuple((str(q), str(a)) for q, a in intake_answers)
+        self.results: dict[str, UpstreamItem] = {}  # unit -> what it made, for the units that depend on it
 
     def emit(self, type_: str, actor: str, target: str, summary: str, data: dict[str, Any], **kw: Any) -> str:
         district = kw.get("district")
@@ -372,7 +422,10 @@ class _Run:
             cause = self.emit(
                 "agent.working", worker, site, "The agent is working.", {"unit": unit_id}, cause=cause, **at
             )
-            first = UnitContext(worker, loaded, answer)
+            upstream = tuple(self.results[dep] for dep in unit["depends_on"] if dep in self.results)
+            first = UnitContext(
+                worker, loaded, answer, brief=self.brief, intake_answers=self.intake_answers, upstream=upstream
+            )
             outcome, worker, cause = await self.run_agents(unit, first, site, cause, at)  # a successor may finish it
         made: list[Kept] = []
         if outcome.success is True:
@@ -398,6 +451,9 @@ class _Run:
             else:
                 self.handoffs[unit_id] = cause
         self.emit("agent.retired", lead, worker, "The agent finished and left.", {}, cause=cause, **at)
+        if outcome.success is True:
+            # the store read is synchronous: keep it off the event loop
+            self.results[unit_id] = await asyncio.to_thread(_upstream_item, unit, outcome, made, self.store)
         return outcome
 
     async def call(self, work: Awaitable[Any]) -> Any:
@@ -447,7 +503,7 @@ class _Run:
             cause = say("agent.context_handoff_started", worker, worker, "The agent wrote a handoff note.", started)
             cause = say("agent.spawned", lead, successor, "A successor joined the team.", {"role": unit["role"]})
             cause = say("agent.assigned", lead, successor, "The Lead gave it the unit.", {"unit": unit["id"]})
-            context = UnitContext(successor, context.skills, None, note, ref)
+            context = dataclasses.replace(context, agent_id=successor, answer=None, note=note, note_ref=ref)
             check = getattr(self.runner, "verify", None)
             verified = check is not None and await self.call(check(unit, context)) is True
             done = {"predecessor": worker, "note": ref, "verification_passed": verified}
@@ -463,7 +519,9 @@ class _Run:
         data = {"origin_cost": finished.origin_cost, "lookup_cost": 0, "saved": finished.origin_cost}
         summary, district = hit_summary(finished.origin_cost), unit["district"]
         self.emit("memory.hit", worker, worker, summary, data, district=district, cause=finished.handoff_event_id)
-        return UnitOutcome(success=True, artifact_refs=finished.artifact_refs)
+        outcome = UnitOutcome(success=True, artifact_refs=finished.artifact_refs)
+        self.results[unit["id"]] = _upstream_item(unit, outcome, (), None)
+        return outcome
 
     async def keep(
         self, unit: dict[str, Any], worker: str, outcome: UnitOutcome, trail: list[dict[str, Any]]
@@ -542,6 +600,8 @@ async def run_plan(
     redact: Callable[[str], str] | None = None,
     before_handoff: BeforeHandoff | None = None,
     reuse: Checkpoint | None = None,
+    brief: Mapping[str, Any] | None = None,
+    intake_answers: Sequence[tuple[str, str]] = (),
 ) -> RunResult:
     """`artifacts` (a `tilo_memory.artifacts.ArtifactStore`) comes with the run's `scope`, which must be the writer's
     org and world, and the shared secret `redact`or the store also got; `archive` (`tilo_archive.RunArchive`) is the
@@ -589,6 +649,8 @@ async def run_plan(
         store if artifacts is not None else {},
         before_handoff,
         config.context.handoff_at,
+        brief,
+        intake_answers,
     )
     run.spawn_team()
     slots = asyncio.Semaphore(config.limits.max_specialists)

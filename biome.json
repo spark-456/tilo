@@ -10,7 +10,8 @@
       "**/*.md",
       "design/**",
       "design_handoff_tilo_web_app/**",
-      "packages/contracts-ts/src/**"
+      "packages/contracts-ts/src/**",
+      "apps/web/src/park/api/live/meetingRoom.guard.js"
     ]
   },
   "formatter": {

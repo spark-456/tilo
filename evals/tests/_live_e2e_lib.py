@@ -125,6 +125,8 @@ def env(**overrides: str) -> Iterator[None]:
             os.environ.pop(key, None)
         os.environ["CLOUDSDK_CONFIG"] = str(Path(tempfile.gettempdir()) / "tilo-test-no-gcloud-config")
         os.environ.update(overrides)
+        if os.environ.get("LIVE") == "1":  # a live run needs the price sheet's region (ADR-0029 decision 3)
+            os.environ.setdefault("GOOGLE_LOCATION", "asia-southeast1")
         yield
 
 
@@ -359,8 +361,11 @@ def write_prices(
     raw["status"] = status
     raw["credit_usd"] = credit_usd
     raw["source"] = "Test fixture only. Not a real price page."
-    for profile_id in raw["profiles"]:
+    raw.pop("region", None)  # a fixture sheet is quoted for no location (ADR-0029 decision 3)
+    for profile_id, real in raw["profiles"].items():
         raw["profiles"][profile_id] = {"input": per_million, "output": per_million}
+        if "unit_price" in real:  # the search role wants a query unit price (ADR-0029 decision 7): a fake fee
+            raw["profiles"][profile_id]["unit_price"] = {"unit": real["unit_price"]["unit"], "per_1k": per_million}
     path = tmp_path / name
     path.write_text(yaml.safe_dump(raw, sort_keys=False), encoding="utf-8")
     return path

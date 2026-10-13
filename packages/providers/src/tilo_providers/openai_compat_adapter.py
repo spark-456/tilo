@@ -8,6 +8,7 @@ never folded raw into a raised error."""
 
 from __future__ import annotations
 
+import base64
 import json
 import os
 import re
@@ -18,6 +19,7 @@ import httpx
 from tilo_contracts import ProvidersProfile
 
 from tilo_providers.errors import (
+    MissingCapabilityError,
     OutputTruncatedError,
     ProviderError,
     SafetyError,
@@ -33,6 +35,7 @@ from tilo_providers.interfaces import (
     PriceQuote,
     cached_tokens_or_none,
 )
+from tilo_providers.media import check_parts, provider_takes
 
 _CLEAN_TOKEN_RE = re.compile(r"^[\x21-\x7e]+$")  # printable ASCII, no whitespace or control characters
 _MAX_ERROR_MESSAGE_LEN = 500
@@ -82,12 +85,25 @@ class OpenAICompatModelProvider(ModelProvider):
             base_url=base_url, transport=transport, headers={"Authorization": f"Bearer {api_key}"}
         )
 
-    def _messages(self, request: GenerateRequest) -> list[dict[str, str]]:
-        messages: list[dict[str, str]] = []
+    def _messages(self, request: GenerateRequest) -> list[dict[str, Any]]:
+        messages: list[dict[str, Any]] = []
         if request.system is not None:
             messages.append({"role": "system", "content": request.system})
-        messages.append({"role": "user", "content": request.prompt})
+        messages.append({"role": "user", "content": self._user_content(request)})
         return messages
+
+    def _user_content(self, request: GenerateRequest) -> Any:
+        """The prompt, or (LW-06) image_url parts then the prompt. Chat completions take images only: anything
+        else is a missing capability (the router falls back), named by type and never by content."""
+        if not check_parts(request.parts):
+            return request.prompt
+        content: list[dict[str, Any]] = []
+        for part in request.parts or ():
+            if not provider_takes("openai_compat", part):
+                raise MissingCapabilityError(f"LW-06: this endpoint takes images only, not {part.mime_type}")
+            url = f"data:{part.mime_type};base64,{base64.b64encode(part.data or b'').decode('ascii')}"
+            content.append({"type": "image_url", "image_url": {"url": url}})
+        return [*content, {"type": "text", "text": request.prompt}]
 
     def _post(self, path: str, body: dict[str, Any]) -> httpx.Response:
         # A raw httpx/h11 exception's str() can inline a malformed header
@@ -164,7 +180,10 @@ class OpenAICompatModelProvider(ModelProvider):
         if finish_reason == "length":
             # The reply hit its max_tokens cap: cut off or empty, never a reply. No thinking count on this wire.
             output = None if usage_raw is None else (usage_raw.get("completion_tokens") or 0)
-            raise OutputTruncatedError(truncated_message(output, None), output_tokens=output, thinking_tokens=None)
+            prompt = None if usage_raw is None else usage_raw.get("prompt_tokens")
+            raise OutputTruncatedError(
+                truncated_message(output, None), output_tokens=output, thinking_tokens=None, input_tokens=prompt
+            )
         tool_calls: list[dict[str, Any]] | None = None
         raw_tool_calls = message.get("tool_calls")
         if raw_tool_calls:
@@ -272,8 +291,12 @@ class OpenAICompatModelProvider(ModelProvider):
                     if finish_reason == "length":
                         usage_raw = chunk.get("usage")
                         output = None if not isinstance(usage_raw, dict) else (usage_raw.get("completion_tokens") or 0)
+                        prompt = None if not isinstance(usage_raw, dict) else usage_raw.get("prompt_tokens")
                         raise OutputTruncatedError(
-                            truncated_message(output, None), output_tokens=output, thinking_tokens=None
+                            truncated_message(output, None),
+                            output_tokens=output,
+                            thinking_tokens=None,
+                            input_tokens=prompt,
                         )
                     delta = choice.get("delta", {})
                     content = delta.get("content")

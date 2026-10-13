@@ -13,6 +13,11 @@ class ProviderError(Exception):
     """Base for every error a ModelProvider adapter raises."""
 
 
+class NotConfigured(ProviderError):
+    """The provider has no such capability configured (FR-MTG-11): a `SpeechProvider` without a voice, a voice vendor
+    without the live switch. Not retried and not a fallback trigger: the caller (or the config) has to change."""
+
+
 class QuotaError(ProviderError):
     """Rate limit or quota exceeded (HTTP 429). The router may fall back."""
 
@@ -25,6 +30,11 @@ class RequestError(ProviderError):
     """The request itself was rejected (other 4xx). Retrying unchanged will not help."""
 
 
+class MissingCapabilityError(ProviderError):
+    """The provider cannot take this input, for example a media type (LW-06). Not a bad request: the router falls
+    back to the next candidate. The message names the type, never the content."""
+
+
 class SafetyError(ProviderError):
     """The model or platform blocked the response on safety grounds (PRD 10.4)."""
 
@@ -33,12 +43,22 @@ class OutputTruncatedError(ProviderError):
     """The reply stopped because it hit its output-token cap (Gemini MAX_TOKENS, OpenAI-compatible `length`). Thinking
     tokens count against the cap, so a reply can be empty. Not retried or repaired: the same cap burns the same
     tokens. Counts are None when the provider reported no usage (0 when usage is present but the field is missing);
-    the message names the counts and never the reply text (it can carry personal data)."""
+    the message names the counts and never the reply text (it can carry personal data). The call was billed:
+    `input_tokens` is the provider's own prompt-token count (None when it reported none), so the Router and the
+    live meter can charge it from usage (FR-MTR-01)."""
 
-    def __init__(self, message: str, *, output_tokens: int | None = None, thinking_tokens: int | None = None) -> None:
+    def __init__(
+        self,
+        message: str,
+        *,
+        output_tokens: int | None = None,
+        thinking_tokens: int | None = None,
+        input_tokens: int | None = None,
+    ) -> None:
         super().__init__(message)
         self.output_tokens = output_tokens
         self.thinking_tokens = thinking_tokens
+        self.input_tokens = input_tokens
 
 
 def truncated_message(output_tokens: int | None, thinking_tokens: int | None) -> str:

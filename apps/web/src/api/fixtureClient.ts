@@ -235,4 +235,10 @@ export class FixtureClient implements TiloClient {
     await wait(this.delayMs);
     return { ...FIXTURE_DELIVERY, world_id: worldId };
   }
+
+  /** The fixture world has no server, so nothing can confirm feedback: it never resolves (no false "Thanks", HR-1). */
+  async submitFeedback(_words: string): Promise<void> {
+    await wait(this.delayMs);
+    throw new Error("The fixture world has no server to receive feedback.");
+  }
 }

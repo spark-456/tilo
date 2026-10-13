@@ -3,6 +3,15 @@
    fade and turning spinners wait for WEB-3b (motion: restored in WEB-3b, BQ-WEB-3). */
 
 /* ---- Top row: title, count, search ---- */
+[data-park] .park-connectors-live {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  cursor: default;
+}
+[data-park] .park-connectors-live p {
+  margin: 0;
+}
+
 [data-park] .park-connectors-top {
   display: flex;
   align-items: flex-end;
@@ -106,7 +115,7 @@
   border: 0;
   border-radius: 11px;
   background: var(--red);
-  color: #ffffff;
+  color: var(--inv);
   font-family: inherit;
   font-size: 14px;
   font-weight: 800;
@@ -115,6 +124,10 @@
   align-items: center;
   gap: 8px;
   white-space: nowrap;
+}
+/* FR-ACC-04: an expired sign-in is stronger than the 3-day warning (a ring and the words "expired"). */
+[data-park] .park-connectors-banner--expired {
+  box-shadow: inset 0 0 0 2px var(--red);
 }
 
 /* ---- Sections ---- */
@@ -211,7 +224,7 @@
 }
 [data-park] .park-connectors-level--1 {
   background: var(--schSoft);
-  color: var(--sch);
+  color: var(--okInk);
 }
 [data-park] .park-connectors-level--2 {
   background: var(--heroSoft);
@@ -334,7 +347,7 @@
 }
 [data-park] .park-connectors-spin--red {
   border: 2.5px solid rgba(255, 255, 255, 0.4);
-  border-top-color: #ffffff;
+  border-top-color: var(--inv);
 }
 
 /* ---- Not connected yet ---- */
@@ -460,6 +473,28 @@
 }
 [data-park] .park-connectors-band--attn {
   background: var(--redSoft);
+}
+[data-park] .park-connectors-band-action {
+  margin-left: auto;
+  height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--card);
+  color: var(--redInk);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+}
+[data-park] .park-connectors-band-action:disabled,
+[data-park] .park-connectors-sync-now:disabled {
+  cursor: default;
+  opacity: 0.6;
 }
 [data-park] .park-connectors-band-dot,
 [data-park] .park-connectors-radio-dot {
@@ -618,6 +653,7 @@
 [data-park] .park-connectors-usedrow:focus-visible,
 [data-park] .park-connectors-disconnect:focus-visible,
 [data-park] .park-connectors-sync-now:focus-visible,
+[data-park] .park-connectors-band-action:focus-visible,
 [data-park] .park-connectors-search:focus-within {
   outline: 3px solid #5a3fe0;
   outline-offset: 2px;

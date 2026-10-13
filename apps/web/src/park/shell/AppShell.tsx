@@ -4,29 +4,46 @@
 // the store and the Api. The notifications and the user come through the Api on mount, so a fixture Api
 // raises the "Sample data" chip without any page asking for data. The city's cars and walkers run on Home (cityMotion.ts).
 import { type ReactNode, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { LifetimeCapDialog } from "../../components/LifetimeCapDialog";
+import { notifications as sampleNotifications } from "../api/fixtures/notifications";
+import { nameInitials } from "../api/nameInitials";
 import type { Decision, Notification, User } from "../api/types";
 import type { PageId } from "../app/AppCtx";
-import { endSession, useApp, useExpectsSample, useParkApi, useParkStore } from "../app/context";
-import { useParkRoute } from "../app/router";
+import {
+  endSession,
+  useApp,
+  useDemoSession,
+  useExpectsSample,
+  useParkApi,
+  useParkStore,
+} from "../app/context";
+import { useParkRoute, useQuizAppRoute } from "../app/router";
 import { Button, Popover, Toast } from "../components";
+import { FirstRunBanner } from "../sample/FirstRunBanner";
+import { useFirstRun } from "../sample/useFirstRun";
 import "../tokens/fonts";
 import { AccountMenu, type AccountPerson } from "./AccountMenu";
 import { BootSplash } from "./BootSplash";
 import { CityBackdrop } from "./CityBackdrop";
+import { ContextPanel, useContextChoice } from "./ContextPanel";
 import { Enter } from "./Enter";
 import { NotificationsPopover } from "./NotificationsPopover";
+import { RunBar } from "./RunBar";
 import { TopNav } from "./TopNav";
 import { WorldLoader } from "./WorldLoader";
 import { authInitials, useParkAuth } from "./auth";
 import { useAppearance } from "./cityMotion";
 import { loadShellFonts } from "./fonts";
 import { type Bar, useLeavingCard, useMotionOff, usePageSwap } from "./motion";
+import { useParkTour } from "./tour";
 import "./park.shell.css";
 import { backdropScene } from "./scene";
 
 const SIGN_OUT = "This is a prototype, so you stay signed in";
 const SIGNED_OUT = "You are signed out";
 const SIGN_OUT_FAILED = "Could not sign out. Try again.";
+/** Below this width the six tabs and the tools do not fit in the nav: one menu names the current page (B2). */
+const COMPACT_NAV_BELOW = 840;
 const MOBILE_NOTE = "The Tilo mobile app is a concept. It is not available yet.";
 
 /** Sign out (FR-UX-10): ends the real session when there is one; with none (a local host, the fixture world, a build
@@ -45,14 +62,27 @@ export function AppShell({ children }: { children: ReactNode }) {
   const store = useParkStore();
   const api = useParkApi();
   const route = useParkRoute();
+  const quizRoute = useQuizAppRoute();
   const state = useSyncExternalStore(store.subscribe, store.getState);
   const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [notificationStatus, setNotificationStatus] = useState<"loading" | "ready" | "failed">(
+    "loading",
+  );
+  const [liveNotifications, setLiveNotifications] = useState(false);
   const [decisions, setDecisions] = useState<Decision[]>([]);
   const [user, setUser] = useState<User | null>(null);
   const [connectorsOn, setConnectorsOn] = useState<number | null>(null);
   const [ready, setReady] = useState(false);
   const expectsSample = useExpectsSample();
+  const demo = useDemoSession();
   const auth = useParkAuth();
+  const contextPerson = auth ? (auth.user?.email ?? "guest-session") : (user?.email ?? "device");
+  const bannerPerson = auth ? (auth.user?.email ?? null) : (user?.email ?? null);
+  const [contextOpen, toggleContext] = useContextChoice(contextPerson);
+  const tour = useParkTour();
+  const first = useFirstRun();
+  const sampleNotes =
+    first && liveNotifications && notificationStatus === "ready" && notifications.length === 0;
   const [mobileNote, setMobileNote] = useState(false);
   const signingOut = useRef(false);
   const appearance = useAppearance();
@@ -66,10 +96,16 @@ export function AppShell({ children }: { children: ReactNode }) {
   useEffect(() => {
     let live = true;
     const quiet = (): void => undefined; // a read that fails leaves the part empty; the page says why
+    setNotificationStatus("loading");
     api
       .getNotifications()
-      .then((r) => live && setNotifications(r.data))
-      .catch(quiet);
+      .then((r) => {
+        if (!live) return;
+        setNotifications(r.data);
+        setLiveNotifications(r.source === "live");
+        setNotificationStatus("ready");
+      })
+      .catch(() => live && setNotificationStatus("failed"));
     api
       .getDecisions()
       .then((r) => {
@@ -111,7 +147,16 @@ export function AppShell({ children }: { children: ReactNode }) {
   const page = route?.page ?? null;
   // A tab or menu click fades the old page out and the new one in. Everything else (the browser's back button, a
   // link inside a page, a world loader's card that covers the swap, reduced motion) swaps at once.
-  const key = route ? (route.page === "world" ? `world/${route.params.id}` : route.page) : "none";
+  const key = route
+    ? route.page === "world"
+      ? `world/${route.params.id}`
+      : route.page
+    : quizRoute
+      ? `world/${quizRoute.worldId}/app/${quizRoute.artifactId}`
+      : "none";
+  // QA-DEMO-1 m5: the "Mobile app" note belongs to the page it was opened on; going elsewhere closes it.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `key` is the signal (the route changed)
+  useEffect(() => setMobileNote(false), [key]);
   const swap = usePageSwap(
     children,
     key,
@@ -138,7 +183,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const person: AccountPerson | null = auth
     ? auth.status === "signedIn" && auth.user
       ? {
-          initials: authInitials(auth.user),
+          initials: nameInitials(auth.user.displayName?.trim() || authInitials(auth.user)),
           name:
             auth.user.displayName ?? (auth.user.isAnonymous ? "Guest" : (auth.user.email ?? "")),
           email: auth.user.displayName ? (auth.user.email ?? "") : "",
@@ -149,7 +194,9 @@ export function AppShell({ children }: { children: ReactNode }) {
           initials: user.initials,
           name: user.name,
           email: user.email,
-          detail: `${user.org} · ${user.plan} plan`,
+          detail: [user.org.trim(), user.plan.trim() ? `${user.plan.trim()} plan` : ""]
+            .filter(Boolean)
+            .join(" · "),
         }
       : null;
   // Honest: success is said only after the sign-in layer's promise resolves, a failure says it failed.
@@ -184,11 +231,16 @@ export function AppShell({ children }: { children: ReactNode }) {
         needsLeft={app.needsLeft}
         night={appearance.night}
         menu={state.menu}
-        unread={!state.read && app.needsLeft > 0}
+        unread={
+          !state.read &&
+          (liveNotifications
+            ? notifications.some((n) => n.dec === undefined || !app.dec[n.dec])
+            : app.needsLeft > 0)
+        }
         initials={
           auth
             ? auth.status === "signedIn"
-              ? authInitials(auth.user)
+              ? nameInitials(auth.user?.displayName?.trim() || authInitials(auth.user))
               : "?"
             : (user?.initials ?? "")
         }
@@ -202,14 +254,23 @@ export function AppShell({ children }: { children: ReactNode }) {
         onToggleTime={appearance.toggleTime}
         onBell={() => store.toggleMenu("notif")}
         onAvatar={() => store.toggleMenu("acct")}
+        contextOpen={contextOpen}
+        onContext={toggleContext}
+        compact={app.vw > 0 && app.vw < COMPACT_NAV_BELOW}
       />
+      {contextOpen && <ContextPanel key={contextPerson} onClose={toggleContext} />}
       {state.menu === "notif" ? (
         <Enter>
           <NotificationsPopover
-            notifications={notifications}
+            notifications={sampleNotes ? sampleNotifications : notifications}
+            sample={sampleNotes}
+            labelled={demo && !liveNotifications}
+            status={notificationStatus}
             decisions={decisions}
             dec={state.dec}
-            onOpen={open}
+            onOpen={
+              sampleNotes ? () => store.toast("This is sample data. No action is taken.") : open
+            }
             onSettings={() => store.go("profile", { tab: "notifications" })}
             onClose={store.closeMenu}
           />
@@ -221,6 +282,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             user={person}
             canSignOut={!auth || auth.status === "signedIn"}
             onMobile={() => setMobileNote(true)}
+            {...(tour ? { onTour: tour.start } : {})}
             connectorsOn={connectorsOn}
             go={navTo}
             onSignOut={signOutViaSeam}
@@ -244,8 +306,13 @@ export function AppShell({ children }: { children: ReactNode }) {
         className={`park-shell__main ${ready ? "" : "park-shell__booting"}`}
         data-phase={swap.phase === "in" ? undefined : swap.phase}
       >
+        {/* QA-DEMO-1 M1: inside the column on a page (below the fixed nav's padding), pinned under the nav on Home */}
+        {inner ? null : <FirstRunBanner first={first} page={page} person={bannerPerson} floating />}
         <div className={inner ? "park-shell__page" : undefined}>
-          <div className={inner ? "park-shell__column" : undefined}>{swap.node}</div>
+          <div className={inner ? "park-shell__column" : undefined}>
+            {inner ? <FirstRunBanner first={first} page={page} person={bannerPerson} /> : null}
+            {swap.node}
+          </div>
         </div>
       </main>
       {toast ? (
@@ -258,6 +325,17 @@ export function AppShell({ children }: { children: ReactNode }) {
           />
         </Enter>
       ) : null}
+      {state.lifetimeCap ? (
+        <LifetimeCapDialog
+          submit={async (words) => {
+            const answer = await api.submitFeedback(words);
+            // HR-1: only the server's own answer is a confirmation; a fixture answer is not.
+            if (answer.source !== "live") throw new Error("not confirmed by the server");
+          }}
+          onClose={store.dismissLifetimeCap}
+        />
+      ) : null}
+      <RunBar />
       {card ? (
         <WorldLoader
           launch={card}

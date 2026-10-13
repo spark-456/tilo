@@ -43,6 +43,22 @@ def clean(text: Any, *, lines: bool = False) -> str:
     return kept if lines else " ".join(kept.split())
 
 
+_NUMBER_LIST = re.compile(r"\d{1,2}(?:\s*(?:,|;|&|\+|\band\b)\s*\d{1,2}|\s+\d{1,2})+", re.IGNORECASE)
+
+
+def _numbers(said: str) -> list[int] | None:
+    """The numbers of "1 and 2", "1, 2" or "1 2" (two or more), else None (one number or words are not a list)."""
+    return [int(n) for n in re.findall(r"\d+", said)] if said.isascii() and _NUMBER_LIST.fullmatch(said) else None
+
+
+def _clip_at_part(answer: str, limit: int = 300) -> str:
+    """Cut at the answers route's limit, on a part boundary when the answer joins several."""
+    if len(answer) <= limit:
+        return answer
+    cut = answer[:limit]
+    return cut[: cut.rfind("; ")] if "; " in cut else cut
+
+
 def _flush_input() -> None:
     """Discard what is waiting in the console's input buffer. Raises if this is not a real console."""
     if os.name == "nt":
@@ -79,6 +95,7 @@ class TerminalPerson:
                  drain: Callable[[], bool] | None = None) -> None:  # fmt: skip
         self.auto_answer, self.auto_approve_t1t2, self._input, self._write = auto_answer, auto_approve_t1t2, read, write
         self._tty, self.log = tty, list[str]()
+        self.decline_reason = ""  # why the person declined the last approach set, said in their words
         self._wgate: Any = None  # CL-LIVE-2 write gate, bound by the run
         self._drain = drain  # discards the input buffer before a write prompt; None or False: the write is held
 
@@ -143,9 +160,16 @@ class TerminalPerson:
             self._write("answer y or n")
         return False, "no answer (input closed)"
 
-    def _pick(self, prompt: str, options: list[Any]) -> Any:
-        """An option by its number, the person's own words, or "" (the default); a bad number asks again."""
+    def _pick(self, prompt: str, options: list[Any], *, many: bool = False) -> Any:
+        """An option by its number, the person's own words, or "" (the default); a bad number asks again. With
+        `many` (a question that can name several: deliverables) "1 and 2" or "1,2" picks both options, joined."""
         while (said := self._read(prompt)) is not None:
+            numbers = _numbers(said) if many and options and all(isinstance(o, str) for o in options) else None
+            if numbers is not None:
+                if all(1 <= n <= len(options) for n in numbers):
+                    return "; ".join(dict.fromkeys(options[n - 1] for n in numbers))
+                self._write(f"pick numbers from 1 to {len(options)}, or type words")
+                continue
             if not said.isdigit() or not options:  # words, or "" for the default
                 return said
             if said.isascii() and 1 <= int(said) <= len(options):
@@ -161,9 +185,19 @@ class TerminalPerson:
             return default
         self._write(f"Director asks ({field}): {clean(question['text'])}")
         self._write("\n".join(f"  {n}. {option}" for n, option in enumerate(suggested, 1)))
-        pick = self._pick("answer (a number, your own words, or empty for the default): ", suggested) or default
+        pick = (
+            self._pick(
+                "answer (a number, your own words, or empty for the default): ", suggested, many=field == "deliverables"
+            )
+            or default
+        )
         self.log.append(f"question {field}: {pick!r} (answered by the person)")
-        return pick[:300] if pick else None  # the answers route's own limit
+        return _clip_at_part(pick) if pick else None  # the answers route's own limit
+
+    def explain(self, detail: str) -> None:
+        """The answers were refused as a brief: say why in the person's terms; the run asks again, it does not end."""
+        self._write(f"That did not fit the brief ({clean(detail)}). Please answer again.")
+        self.log.append("answers refused as a brief change: asked again")
 
     def approach(self, offered: dict[str, Any]) -> str | None:
         options, recommended = offered["approaches"], offered["recommended"]
@@ -177,6 +211,7 @@ class TerminalPerson:
         ok, why = self._yes(f"approve the approach {clean(chosen['label'])!r}?")
         said = "approved" if ok else "declined"
         self.log.append(f"approach {clean(chosen['id'])}: {said} by the person ({clean(why) or '-'})")
+        self.decline_reason = "" if ok else clean(why)[:200]
         return chosen["id"] if ok else None
 
     def gate(self, card: dict[str, Any]) -> bool:
@@ -236,7 +271,7 @@ def run_topic(
     safety: SafetyProvider | None = None,  # the test seam, only beside an injected (fake) provider
     person: TerminalPerson | None = None, announce: Callable[[e2e.Estimate, float], None] | None = None,
     real_connectors: bool = False, real_connectors_factory: Callable[[], dict[str, Any]] | None = None,
-    allow_writes: bool = False, allow_send: bool = False,
+    allow_writes: bool = False, allow_send: bool = False, progress: Callable[[str], None] | None = None,
 ) -> e2e.LiveE2EReport:  # fmt: skip
     env = os.environ if environ is None else environ
     e2e._gate(mode, env, max_credits)  # the live switch, CI, Cloud Run and the cap: first of all
@@ -273,6 +308,7 @@ def run_topic(
         prices_path=prices_path, recordings_dir=recordings, live_provider_factory=live_provider_factory, safety=screen,
         announce=announce, adhoc=case, person=person, real_connectors=real_connectors,
         real_connectors_factory=real_connectors_factory, allow_writes=allow_writes, allow_send=allow_send,
+        progress=progress,
     )  # fmt: skip
     report.safety = note
     report.faked = e2e.real_faked(TOPIC_FAKED, allow_writes) if report.real_connectors else TOPIC_FAKED
@@ -334,7 +370,7 @@ def main(
             models_path=args.models_file, prices_path=args.prices_file, recordings_dir=args.recordings_dir,
             live_provider_factory=live_provider_factory, safety=safety, person=person, announce=e2e.announce,
             real_connectors=args.real_connectors, real_connectors_factory=real_connectors_factory,
-            allow_writes=args.allow_writes, allow_send=args.allow_send,
+            allow_writes=args.allow_writes, allow_send=args.allow_send, progress=e2e.print_progress,
         )  # fmt: skip
     except e2e.LiveE2ERefused as refusal:
         print(f"REFUSED {refusal.code}: {refusal}", file=sys.stderr)

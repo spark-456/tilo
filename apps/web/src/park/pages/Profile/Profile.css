@@ -25,6 +25,16 @@
 }
 
 /* ---- Header ---- */
+[data-park] .park-profile-unavailable {
+  box-sizing: border-box;
+  min-width: 0;
+  padding: 18px;
+  border: 1px solid var(--line2);
+  border-radius: 16px;
+  background: var(--card);
+  color: var(--ink);
+}
+
 [data-park] .park-profile-head {
   display: flex;
   align-items: center;
@@ -106,6 +116,11 @@
 }
 [data-park] .park-profile-nav.park-profile-nav--wide {
   flex-direction: column;
+}
+/* QA-DEMO-1 M5/m10: a narrow screen wraps the five tabs, so none is clipped and the page never scrolls sideways */
+[data-park] .park-profile-nav:not(.park-profile-nav--wide) {
+  flex-wrap: wrap;
+  overflow-x: visible;
 }
 [data-park] .park-profile-tab {
   display: flex;
@@ -204,6 +219,22 @@
   font-size: 12.5px;
   font-weight: 600;
   color: var(--ink3);
+}
+/* BQ-SET-2: the honest lines of FR-SET-01 and FR-SET-02, in the same small muted style as the field helps. */
+[data-park] .park-profile-note {
+  margin: 0;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ink3);
+}
+[data-park] .park-profile-alert {
+  margin: 0;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--redInk);
+}
+[data-park] .park-profile-quiet + .park-profile-note {
+  margin-top: -8px;
 }
 [data-park] .park-profile-foot {
   display: flex;

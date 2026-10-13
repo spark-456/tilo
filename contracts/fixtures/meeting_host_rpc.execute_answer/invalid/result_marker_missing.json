@@ -1,0 +1,8 @@
+{
+  "outcome": "sent",
+  "result": {
+    "resource_id": "r-1234567890abcdef"
+  },
+  "may_have_sent": null,
+  "parts": []
+}

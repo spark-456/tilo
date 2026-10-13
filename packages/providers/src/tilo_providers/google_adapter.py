@@ -44,9 +44,26 @@ from tilo_providers.interfaces import (
     PriceQuote,
     cached_tokens_or_none,
 )
+from tilo_providers.media import check_parts
 from tilo_providers.schema_subset import to_gemini_schema
 
 _NO_FIELD = object()
+
+
+def _audio_tokens(details: Any, input_tokens: int) -> int | None:
+    """LW-06: the audio part of the input tokens, from the per-modality counts; None (unknown) when the response gave
+    no usable breakdown, so a malformed count can never become a price (ADR-0029 decision 1)."""
+    if not isinstance(details, list):
+        return None
+    total = 0
+    for item in details:
+        count = getattr(item, "token_count", None)
+        if str(getattr(getattr(item, "modality", None), "value", getattr(item, "modality", None))) != "AUDIO":
+            continue
+        if isinstance(count, bool) or not isinstance(count, int) or count < 0:
+            return None
+        total += count
+    return total if total <= input_tokens else None
 
 
 def _genai_module(name: str) -> Any:
@@ -128,6 +145,11 @@ class _ClientSideFailure(Exception):
     """Stands in for a pydantic error from the SDK as the `__cause__` of a mapped error: its class name, no values."""
 
 
+# One request may not wait longer than this: a live run of 8 Oct 2026 hung 300-425 s on verifier and narrator calls
+# that never answered (no usage, an unmapped failure). The SDK takes milliseconds; a timeout maps to a retryable 504.
+REQUEST_TIMEOUT_MS = 120_000
+
+
 class GoogleModelProvider(ModelProvider):
     def __init__(
         self,
@@ -153,7 +175,8 @@ class GoogleModelProvider(ModelProvider):
                 )
             validate_google_settings(project, location)  # before any client exists
             genai = _genai_module("google.genai")
-            client = genai.Client(vertexai=True, project=project, location=location)
+            http_options = _genai_module("google.genai.types").HttpOptions(timeout=REQUEST_TIMEOUT_MS)
+            client = genai.Client(vertexai=True, project=project, location=location, http_options=http_options)
         self._client = client
 
     def _schema_for_send(self, schema: dict[str, Any]) -> dict[str, Any]:
@@ -239,12 +262,13 @@ class GoogleModelProvider(ModelProvider):
             # The reply hit its output cap (thinking tokens count against it): empty or cut off, never a reply.
             # Vertex leaves a visible-output count out when it is 0 (so 0 with usage present, None with no usage); a
             # missing thinking count stays None: the model did not report one.
-            output = thoughts = None
+            output = thoughts = prompt = None
             if usage_metadata is not None:
                 output = getattr(usage_metadata, "candidates_token_count", None) or 0
                 thoughts = getattr(usage_metadata, "thoughts_token_count", None)
+                prompt = getattr(usage_metadata, "prompt_token_count", None)  # billed too (FR-MTR-01)
             raise OutputTruncatedError(
-                truncated_message(output, thoughts), output_tokens=output, thinking_tokens=thoughts
+                truncated_message(output, thoughts), output_tokens=output, thinking_tokens=thoughts, input_tokens=prompt
             )
 
         tool_calls: list[dict[str, Any]] | None = None
@@ -268,13 +292,24 @@ class GoogleModelProvider(ModelProvider):
             cached = cached_tokens_or_none(0 if cached is None else cached, usage["input_tokens"])
             if cached is not None:
                 usage["cached_tokens"] = cached
+            audio = _audio_tokens(getattr(usage_metadata, "prompt_tokens_details", None), usage["input_tokens"])
+            if audio is not None:
+                usage["audio_tokens"] = audio
 
         return GenerateResponse(text=response.text, profile_id=self._profile_id, tool_calls=tool_calls, usage=usage)
+
+    def _contents(self, request: GenerateRequest) -> Any:
+        """The prompt as is, or (LW-06) one user turn of `inline_data` parts then the prompt. The bytes ride only in
+        this request body; URI parts and anything off the media allow-list are refused first (`check_parts`)."""
+        if not check_parts(request.parts):
+            return request.prompt
+        media = [{"inline_data": {"mime_type": p.mime_type, "data": p.data}} for p in request.parts or ()]
+        return [{"role": "user", "parts": [*media, {"text": request.prompt}]}]
 
     def generate(self, request: GenerateRequest) -> GenerateResponse:
         try:
             response = self._client.models.generate_content(
-                model=self._profile.model, contents=request.prompt, config=self._config(request)
+                model=self._profile.model, contents=self._contents(request), config=self._config(request)
             )
         except Exception as error:
             failure = self._failure(error)
@@ -286,7 +321,7 @@ class GoogleModelProvider(ModelProvider):
         failure: Exception | None = None
         try:
             chunks = self._client.models.generate_content_stream(
-                model=self._profile.model, contents=request.prompt, config=self._config(request)
+                model=self._profile.model, contents=self._contents(request), config=self._config(request)
             )
             for chunk in chunks:
                 yield self._map_response(chunk)

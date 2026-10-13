@@ -19,10 +19,40 @@ profiles:
     model: fake-safety
     context: 1000000
     caps: []
+  # LW-05: the dev search; `FakeSearchProvider` answers from the query alone and is refused live or deployed.
+  search-fake:
+    provider: fake
+    model: fake-search
+    context: 1000000
+    caps: [grounding]
+  # FR-MTG-11: the meeting bot's dev profile. A deterministic FakeModelProvider (canned text from the prompt), so every
+  # meet-bot test and `python -m bot.main` without LIVE=1 is offline. Not refused when live (it is not a dev-only
+  # model like fake-director), but the bot only reads this file when LIVE is not 1 and TILO_MODELS_FILE is unset.
+  meeting-fake:
+    provider: fake
+    model: fake-meeting
+    context: 1000000
+    caps: [json]
+
+  # SKILLS-4: the skill-capture role's dev profile (CAPTURE_ROLE = specialist). A deterministic FakeModelProvider, no
+  # model id of any real model, priced 0 in config/prices.yaml. Its canned text is not a valid capture, so dev answers
+  # the fixed 502 draft_failed rather than 503 not_configured; tests script the real reply.
+  specialist-fake:
+    provider: fake
+    model: fake-specialist
+    context: 1000000
+    caps: [json]
 
 roles:
   director: { primary: director-dev, fallback: director-dev }
+  specialist: { primary: specialist-fake, fallback: specialist-fake, max_input_tokens: 16000, max_output_tokens: 2048 }
   safety: { primary: safety-fake, fallback: safety-fake } # screens use the primary only
+  search: { primary: search-fake, fallback: search-fake, max_input_tokens: 8000, max_output_tokens: 4096, reserve_units: 5 }
+  meeting: { primary: meeting-fake, fallback: meeting-fake, max_input_tokens: 16000, max_output_tokens: 2048 }
+  meeting_fast: { primary: meeting-fake, fallback: meeting-fake, max_input_tokens: 8000, max_output_tokens: 256 }
+  # ADR-0028 (MROOM-A1): the meeting room's replies (`meeting` is the meet-bot's role, so these are `meeting_room*`).
+  meeting_room: { primary: meeting-fake, fallback: meeting-fake, max_input_tokens: 12000, max_output_tokens: 800 }
+  meeting_room_thinking: { primary: meeting-fake, fallback: meeting-fake, max_input_tokens: 12000, max_output_tokens: 4000 }
 
 rules:
   deny: ["gemini-2.5-*", "*-preview*"]

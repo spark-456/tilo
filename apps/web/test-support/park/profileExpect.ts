@@ -2,13 +2,15 @@
 // design_handoff_tilo_web_app/design/Tilo App Profile.dc.html, inventory.md "Tilo App Profile.dc.html" and
 // the user fixture (api/fixtures/user.ts). Literals on purpose: a fixture that drifts from the design fails
 // here. "Sample data" is shell-only (WEB-3b): nothing on this page says it.
+// BQ-SET-2 (DECIDED 8 Oct, user approved): the two honest lines of FR-SET-01 and FR-SET-02 are visible text now,
+// pinned below as PROFILE_COPY.saveNote and NOTIF_COPY.quietNote. They are the only strings added to the design's.
 
 export const USER = {
   name: "Alex Morgan",
   initials: "AM",
   email: "alex@northwind.co",
   title: "Operations lead",
-  tz: "Europe/London (GMT+1)",
+  tz: "Europe/London",
   lang: "English (UK)",
   hours: "08:30 – 17:30, Monday to Friday",
 } as const;
@@ -30,7 +32,7 @@ export const CONNECTORS = "Connectors";
 /** `[label, help, initial value]`: the six form fields in design order. */
 export const FIELDS = [
   ["Full name", "Shown to your team", USER.name],
-  ["Work email", "Verified · used for sign-in", USER.email],
+  ["Work email", "Display only · does not change how you sign in", USER.email],
   ["Job title", "Helps Tilo route approvals", USER.title],
   ["Time zone", "Agenda and routines use this", USER.tz],
   ["Language", "For drafts Tilo writes for you", USER.lang],
@@ -41,6 +43,8 @@ export const PROFILE_COPY = {
   sub: "How you appear to your team and how Tilo addresses you.",
   cancel: "Cancel",
   save: "Save changes",
+  /** BQ-SET-2: FR-SET-01, shown above the footer (also the Save button's aria-description and title). */
+  saveNote: "Saved to your Tilo account, so it follows you to your other devices.",
 } as const;
 
 export const CHANNELS = ["Phone", "Email", "Slack"] as const;
@@ -73,9 +77,12 @@ export const NOTIF_COPY = {
   sub: "Choose where Tilo reaches you. Decisions always reach you somewhere.",
   columns: ["WHEN", "PHONE", "EMAIL", "SLACK"],
   quiet: "Quiet hours · 19:00 to 08:00",
-  quietSub: "Phone stays silent, except decisions over £1,000.",
+  quietSub: "Decision threshold: Not available yet",
   quietLabel: "Quiet hours",
   needOne: "Decisions need at least one channel",
+  /** BQ-SET-2: FR-SET-02, shown under the Quiet hours row (also that switch's aria-description). */
+  quietNote:
+    "Quiet hours silence the phone only. A decision that needs you is never hidden by quiet hours: it waits in Needs you.",
 } as const;
 
 export const APPEARANCE_COPY = {
@@ -103,13 +110,8 @@ export const SWATCHES = {
 export const SECURITY_COPY = {
   sub: "Sign-in, devices and how approvals are confirmed.",
   rows: [
+    // QA-DEMO-1: the design's "Confirm approvals with Face ID" row is gone (the mobile app is a concept).
     ["Two-step sign-in", "On · authenticator app", "Manage", "Two-step settings"],
-    [
-      "Confirm approvals with Face ID",
-      "On the Tilo phone app, for spend over £250",
-      "Change",
-      "Approval confirmation settings",
-    ],
   ],
   signedIn: "Signed in on",
   everywhere: "Sign out everywhere else",
@@ -168,6 +170,7 @@ export const STRINGS: Record<TabId, readonly string[]> = {
     ...FIELDS.flatMap((f) => [f[0], f[1]]),
     PROFILE_COPY.cancel,
     PROFILE_COPY.save,
+    PROFILE_COPY.saveNote,
   ],
   notifications: [
     ...header,
@@ -176,6 +179,9 @@ export const STRINGS: Record<TabId, readonly string[]> = {
     ...NOTIF.flatMap((n) => [n[1], n[2]]),
     NOTIF_COPY.quiet,
     NOTIF_COPY.quietSub,
+    NOTIF_COPY.quietNote,
+    PROFILE_COPY.cancel,
+    PROFILE_COPY.save,
   ],
   appearance: [
     ...header,

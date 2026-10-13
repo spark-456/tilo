@@ -13,11 +13,13 @@ import json
 import re
 from collections.abc import Mapping
 from dataclasses import dataclass
+from datetime import date
 from typing import Annotated, Any, Literal
 
 import pydantic
 from tilo_contracts import PlanUnit
 from tilo_policy import RiskTable
+from tilo_providers.clock import real_today, time_facts
 from tilo_providers.interfaces import Capability, GenerateRequest
 from tilo_providers.prompts import load_prompt
 from tilo_providers.router import Router, RouterError, RouterResult
@@ -25,6 +27,7 @@ from tilo_providers.router import Router, RouterError, RouterResult
 from tilo_planning.brief import DIRECTOR_ROLE
 from tilo_planning.plangraph import SCHEMA_RULE, Violation, _floor_tier, validate_plan
 
+PLAN_THINKING = "medium"  # drafting units needs some thought; the model's default (dynamic, high) is billed as output
 MAX_ATTEMPTS = 2  # the first draft and one repair, as for approaches (PL-03, PRD 6.6)
 MAX_UNITS = 30  # BQ-115: the schema allows 200; the Director drafts a plan a person reads
 DELIVER = "deliver"  # BQ-218: the unit type code appends so every run delivers in Tilo (FR-CON-10)
@@ -37,6 +40,9 @@ _SAFE_SEGMENT = re.compile(r"[A-Za-z0-9_]{1,40}")
 
 class PlanCompileError(Exception):
     """No valid plan could be compiled; nothing is returned."""
+
+
+_NO_REVISION = {"revises", "change"}  # plan.schema 1.1.0 (ADR-0028): both or neither, so a null is not "neither"
 
 
 class _Unit(PlanUnit):
@@ -147,7 +153,45 @@ def _with_deliver(units: list[dict[str, Any]], brief: dict[str, Any]) -> list[di
         "district": leaves[-1]["district"] if leaves else units[-1]["district"], "skills": [], "connectors": [],
         "actions": [], "depends_on": [unit["id"] for unit in leaves],
     }  # fmt: skip
-    return [*units, deliver]
+    items = brief.get("deliverables")
+    items = items if isinstance(items, list) and items else [{"title": _deliver_title(brief)}]
+    result = list(units)
+    if any(item.get("format") == "app" for item in items) and not any(u["role"] == "verifier" for u in units):
+        result.append(
+            {
+                **deliver,
+                "id": f"U{number}",
+                "unit_type": "verify",
+                "role": "verifier",
+                "title": "Verify the source material",
+            }
+        )
+        deliver["depends_on"] = [f"U{number}"]
+        number += 1
+    for item in items:
+        title = item.get("title")
+        result.append(
+            {
+                **deliver,
+                "id": f"U{number}",
+                "title": title.strip()[:80] if isinstance(title, str) and title.strip() else DELIVER_TITLE,
+            }
+        )
+        number += 1
+    return result
+
+
+def _director_schema() -> dict[str, Any]:
+    """The reply schema the Director sees. A revision unit (`revises`, `change`: plan.schema 1.1.0) comes only from a
+    confirmed meeting-room change, never from the Director's own plan, so its fields are not offered."""
+    schema = _Reply.model_json_schema()
+    for definition in schema.get("$defs", {}).values():
+        properties = definition.get("properties", {})
+        if _NO_REVISION <= properties.keys():
+            for name in _NO_REVISION:
+                del properties[name]
+            definition.pop("description", None)
+    return schema
 
 
 def _ask(router: Router, prompt: str) -> RouterResult:
@@ -155,7 +199,8 @@ def _ask(router: Router, prompt: str) -> RouterResult:
         system=load_prompt(DIRECTOR_ROLE, "plan_system.md"),
         prompt=prompt,
         json_mode=True,
-        response_schema=_Reply.model_json_schema(),
+        response_schema=_director_schema(),
+        thinking_level=PLAN_THINKING,
     )
     try:
         run = router.generate(DIRECTOR_ROLE, request, required_capability=Capability.JSON)
@@ -174,6 +219,7 @@ def compile_plan(
     *,
     router: Router,
     attempts: int = MAX_ATTEMPTS,
+    today: date | None = None,
 ) -> PlanResult:
     """The PlanGraph for `approach` (one of `inputs.approaches`) under `budget_cap`, valid by `validate_plan`
     for `inputs.owner`, or `PlanCompileError`."""
@@ -186,6 +232,7 @@ def compile_plan(
         "brief": _data(json.dumps(brief, ensure_ascii=False, indent=2)),
         "approach": _data(json.dumps(approach, ensure_ascii=False, indent=2)),
         "catalogue": _data(_catalogue(inputs)),
+        **time_facts(today or real_today(), brief.get("deadline")),  # calendar facts from the clock, not a guess
     }
     prompt, runs, found = load_prompt(DIRECTOR_ROLE, "plan.md", variables), [], ["none"]
     for attempt in range(attempts):
@@ -193,7 +240,10 @@ def compile_plan(
         runs.append(run)
         text = (run.response.text if run.response else None) or ""
         try:
-            units = [u.model_dump(mode="json") for u in _Reply.model_validate_json(text).units]
+            units = [
+                u.model_dump(mode="json", exclude=_NO_REVISION if u.revises is None and u.change is None else None)
+                for u in _Reply.model_validate_json(text).units
+            ]
         except pydantic.ValidationError as error:
             found = [f"schema: {_pointer(e['loc'])} does not match the units schema" for e in error.errors()[:20]]
         else:

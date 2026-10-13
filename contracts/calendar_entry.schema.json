@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://contracts.tilo.example/calendar_entry.schema.json",
-  "x-version": "1.0.0",
+  "x-version": "1.1.0",
   "title": "CalendarEntry",
   "description": "One entry on a person's calendar that Tilo stores (FR-CAL-01, -03): a cached Google Calendar event, an entry the person made, or one Tilo proposed. Work-item due dates, pin deadlines and Tilo's meetings are not stored here: the agenda merges them at read time as `agenda_item` rows that cite their record. Private to `owner` unless `share` names a team (PE-04), which only an accepted entry may do; teammates otherwise get `free_busy` only. A Tilo-made entry (`created_by.by` tilo, source manual or tilo) is accepted only with `confirmed_by` (PE-07). What a Google event keeps is title, times, an all-day flag and a count of other attendees: no description, attendee names or addresses, conference link or location (PE-13). `attendee_count` above 0 makes a write to Google T3 (PE-14).",
   "type": "object",
@@ -237,11 +237,36 @@
       }
     },
     "agenda_item": {
-      "description": "One row of the merged agenda read model (FR-CAL-01): never stored.",
+      "description": "One row of the merged agenda read model (FR-CAL-01): never stored. `joinable` (1.1.0, optional: absent means false, never null) is true only on a meeting row whose meeting the reader owns and Tilo hosts, so the calendar offers Join; the link itself is fetched on click from `GET /v1/meetings/{id}/join` (`meeting_join.schema.json`, MJ-10) and never sits on the row.",
       "type": "object",
       "additionalProperties": false,
       "required": ["start", "end", "all_day", "title", "kind", "source", "state", "shared"],
+      "if": {
+        "properties": {
+          "joinable": {
+            "const": true
+          }
+        },
+        "required": ["joinable"]
+      },
+      "then": {
+        "properties": {
+          "kind": {
+            "const": "meeting"
+          },
+          "source": {
+            "properties": {
+              "kind": {
+                "const": "meeting"
+              }
+            }
+          }
+        }
+      },
       "properties": {
+        "joinable": {
+          "type": "boolean"
+        },
         "start": {
           "$ref": "common.schema.json#/$defs/timestamp"
         },

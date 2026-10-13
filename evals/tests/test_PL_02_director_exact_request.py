@@ -100,6 +100,12 @@ def _wire(body: dict[str, Any]) -> dict[str, Any]:
     return {k: v for k, v in body.items() if not k.startswith("_")}
 
 
+def _thinking_level(body: dict[str, Any]) -> str | None:
+    """The thinking level on the wire (the SDK keeps its enum member in the body), or None when none is sent."""
+    level = (body["generationConfig"].get("thinkingConfig") or {}).get("thinking_level")
+    return None if level is None else str(getattr(level, "value", level))
+
+
 def redacted(body: dict[str, Any]) -> dict[str, Any]:
     """Prompt and task text replaced by a length marker; the schema and config (Tilo's own code) are kept."""
     out = _wire(copy.deepcopy(body))
@@ -234,9 +240,10 @@ SUSPECTS: list[tuple[str, Callable[[dict[str, Any]], bool], str, str]] = [
         "ok",
     ),
     (
-        "no_thinking_config_sent",
-        lambda b: "thinkingConfig" not in b["generationConfig"],
-        "thinking page: dynamic thinking by default; the brief request names no level (the role's 'high' is unused)",
+        "low_thinking_level_sent",
+        lambda b: _thinking_level(b) == "LOW",
+        "thinking page: dynamic (high) thinking by default is billed as output; the brief request names 'low' "
+        "(EFF-02, BQ-LE2E-10); 'minimal' is the level Vertex rejects",
         "ok",
     ),
     (
@@ -273,10 +280,10 @@ SUSPECTS: list[tuple[str, Callable[[dict[str, Any]], bool], str, str]] = [
     (
         "enums_are_short_string_lists",
         lambda b: (
-            max(len(n["enum"]) for _p, n, _d in _nodes(_schema(b)) if "enum" in n) == 11
+            max(len(n["enum"]) for _p, n, _d in _nodes(_schema(b)) if "enum" in n) == 12  # ADR-0029 adds `app`
             and all(n.get("type") == "string" for _p, n, _d in _nodes(_schema(b)) if "enum" in n)
         ),
-        "content.proto: enum for strings and numbers; structured output page: 'enums with many values' (11 is few)",
+        "content.proto: enum for strings and numbers; structured output page: 'enums with many values' (12 is few)",
         "ok",
     ),
     (
@@ -321,7 +328,8 @@ def test_PL_02_director_exact_request_is_the_brief_request_through_the_router_an
     body = _wire(captured)
     assert body["systemInstruction"] == {"parts": [{"text": request.system}], "role": "user"}
     assert body["contents"] == [{"parts": [{"text": request.prompt}], "role": "user"}]
-    assert body["generationConfig"] == {
+    assert _thinking_level(body) == "LOW", "the brief request asks for low thinking (BQ-LE2E-10)"
+    assert {k: v for k, v in body["generationConfig"].items() if k != "thinkingConfig"} == {
         "maxOutputTokens": ROLE_CAP,  # the Router's role cap (config/models.yaml), the request names none
         "responseMimeType": "application/json",
         "responseJsonSchema": json.loads(json.dumps(to_gemini_schema(brief.output_schema()))),

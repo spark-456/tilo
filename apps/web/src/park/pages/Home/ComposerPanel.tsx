@@ -1,13 +1,86 @@
 // The composer column of Home (reference "Tilo App Home.dc.html"): the example chips while idle, the
 // "drafting" line, the plan card, and the glass panel with the task input and the size of job.
-// Presentation only: the phase, the query and the 900 ms draft are HomePage's. The "Start a real task" link
-// under the panel is the one element the design does not have.
+// Presentation only: the phase, the query and the 900 ms draft are HomePage's.
+import type { Effort, QuickCost, SwitchReason } from "../../api/types";
 import { type SegmentOption, SegmentedControl } from "../../components";
-import type { Mode } from "./homeData";
+import { type IntakeClient, IntakeControl } from "./IntakeControl";
+import type { Staging } from "./StagedFiles";
+import { EFFORTS, type Mode, SWITCH_WORDS, quickCostLine } from "./homeData";
 
 export type Phase = "idle" | "drafting" | "plan";
 
+/** What the Quick part of the composer shows (COST-FAST-1). A Quick ask makes no world and no plan. */
+export type QuickView =
+  | { state: "idle" }
+  | { state: "asking" }
+  | { state: "answered"; text: string; cost: QuickCost | null; sample: boolean }
+  | { state: "switch"; reason: SwitchReason }
+  | { state: "error"; message: string };
+
+export const QUICK_IDLE: QuickView = { state: "idle" };
+
+const EFFORT_OPTIONS: SegmentOption[] = EFFORTS.map((e) => ({
+  value: e.key,
+  label: e.label,
+  tone: "heroInk",
+}));
+
+function QuickCard({
+  view,
+  sending,
+  onSwitch,
+}: { view: QuickView; sending: boolean | undefined; onSwitch: () => void }) {
+  if (view.state === "asking") {
+    // No spinner, no progress: a plain line while the one call is out.
+    return (
+      // biome-ignore lint/a11y/useSemanticElements: the design's status line is a div with role="status"
+      <div role="status" className="park-home-drafting">
+        Asking Tilo
+      </div>
+    );
+  }
+  if (view.state === "error") {
+    return (
+      <div role="alert" className="park-home-quick park-home-quick--note">
+        <span>{view.message}</span>
+      </div>
+    );
+  }
+  if (view.state === "switch") {
+    return (
+      // biome-ignore lint/a11y/useSemanticElements: a labelled region around an offer, not a fieldset
+      <div
+        role="region"
+        aria-label="Quick answer"
+        className="park-home-quick park-home-quick--note"
+      >
+        <span>{`This needs Thinking. ${SWITCH_WORDS[view.reason]}`}</span>
+        <button type="button" className="park-home-change" disabled={sending} onClick={onSwitch}>
+          Switch to Thinking
+        </button>
+      </div>
+    );
+  }
+  if (view.state !== "answered") return null;
+  const cost = quickCostLine(view.cost);
+  return (
+    // biome-ignore lint/a11y/useSemanticElements: a labelled region around an answer, not a fieldset
+    <div role="region" aria-label="Quick answer" className="park-home-quick">
+      <div className="park-home-quick__head">
+        <span className="park-home-tier">QUICK</span>
+        {view.sample ? <span className="park-home-quick__sample">Sample answer</span> : null}
+      </div>
+      <p className="park-home-quick__text">{view.text}</p>
+      {cost ? <div className="park-home-quick__cost">{cost}</div> : null}
+    </div>
+  );
+}
+
 export interface ComposerProps {
+  /** I6: absent until an upload route and transport are available. */
+  readonly intakeClient?: IntakeClient;
+  /** WEB-W1: files held for the next Start (the button is shown with a reason when uploads cannot work). */
+  readonly staging?: Staging;
   readonly mode: Mode;
   readonly modes: readonly Mode[];
   readonly query: string;
@@ -16,6 +89,14 @@ export interface ComposerProps {
   readonly phase: Phase;
   /** A start is on its way to the server: the confirm control waits (live only). */
   readonly sending?: boolean;
+  /** QA-DEMO-1: a demo session. The plan is a labelled sample and confirming opens the sample world. */
+  readonly sample?: boolean;
+  /** Quick or Thinking (COST-FAST-1); Thinking when not given. */
+  readonly effort?: Effort;
+  readonly onEffort?: (effort: Effort) => void;
+  readonly quick?: QuickView;
+  /** "Switch to Thinking" on a Quick offer: the same text goes as Thinking. */
+  readonly onSwitch?: () => void;
   readonly onQuery: (value: string) => void;
   readonly onMode: (key: string) => void;
   readonly onChip: (label: string) => void;
@@ -26,6 +107,10 @@ export interface ComposerProps {
 
 export function ComposerPanel(p: ComposerProps) {
   const { mode, phase } = p;
+  const effort = p.effort ?? "thinking";
+  const quick = p.quick ?? QUICK_IDLE;
+  const quickMode = effort === "quick";
+  const effortNote = EFFORTS.find((e) => e.key === effort)?.note ?? "";
   const options: SegmentOption[] = p.modes.map((m) => ({
     value: m.key,
     label: m.label,
@@ -33,7 +118,8 @@ export function ComposerPanel(p: ComposerProps) {
   }));
   return (
     <div className="park-home-composer">
-      {phase === "idle" ? (
+      <QuickCard view={quick} sending={p.sending} onSwitch={p.onSwitch ?? (() => undefined)} />
+      {phase === "idle" && quick.state === "idle" ? (
         <div className="park-home-chips">
           {mode.chips.map((label) => (
             <button
@@ -52,7 +138,9 @@ export function ComposerPanel(p: ComposerProps) {
         <div role="status" className="park-home-drafting">
           {/* a still ring: the draft is a fixed-timer stand-in with no call behind it, so it does not turn (HR-1) */}
           <span className="park-home-spin" aria-hidden="true" />
-          {`Tilo is drafting a ${mode.word} for “${p.shown}”`}
+          {p.sample
+            ? `Showing a sample plan for “${p.shown}”`
+            : `Tilo is drafting a ${mode.word} for “${p.shown}”`}
         </div>
       ) : null}
       {phase === "plan" ? (
@@ -84,6 +172,16 @@ export function ComposerPanel(p: ComposerProps) {
                 </li>
               ))}
             </ol>
+            {p.query.trim() === "" ? (
+              <p className="park-home-plan__sample">
+                Example only: the box is empty. Type your task, then press Start to plan it.
+              </p>
+            ) : null}
+            {p.sample ? (
+              <p className="park-home-plan__sample">
+                Sample plan. Demo sessions replay a recorded run; sign in to start your own.
+              </p>
+            ) : null}
           </div>
           <div className="park-home-plan__actions">
             <button
@@ -93,7 +191,7 @@ export function ComposerPanel(p: ComposerProps) {
               aria-busy={p.sending ? true : undefined}
               onClick={p.onConfirm}
             >
-              {mode.confirm}
+              {p.sample ? "Open the sample world" : mode.confirm}
             </button>
             <button
               type="button"
@@ -107,28 +205,30 @@ export function ComposerPanel(p: ComposerProps) {
         </div>
       ) : null}
       <div className="park-home-panel park-home-glass">
-        <div className="park-home-input-row">
-          <div className="park-home-logo">
-            <div className="park-home-logo__face">
-              <div className="park-home-logo__dot" />
-              <div className="park-home-logo__dot" />
+        <IntakeControl client={p.intakeClient} staging={p.staging}>
+          <div className="park-home-input-row">
+            <div className="park-home-logo">
+              <div className="park-home-logo__face">
+                <div className="park-home-logo__dot" />
+                <div className="park-home-logo__dot" />
+              </div>
             </div>
+            <input
+              className="park-home-input"
+              type="text"
+              aria-label="Describe your task"
+              value={p.query}
+              placeholder={`e.g. ${mode.example}`}
+              onChange={(e) => p.onQuery(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") p.onDraft();
+              }}
+            />
+            <button type="button" className="park-home-start" onClick={p.onDraft}>
+              {quickMode ? "Ask" : mode.start}
+            </button>
           </div>
-          <input
-            className="park-home-input"
-            type="text"
-            aria-label="Describe your task"
-            value={p.query}
-            placeholder={`e.g. ${mode.example}`}
-            onChange={(e) => p.onQuery(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") p.onDraft();
-            }}
-          />
-          <button type="button" className="park-home-start" onClick={p.onDraft}>
-            {mode.start}
-          </button>
-        </div>
+        </IntakeControl>
         <div className="park-home-mode-row">
           <div className="park-home-size">
             <SegmentedControl
@@ -139,14 +239,18 @@ export function ComposerPanel(p: ComposerProps) {
               sliding
             />
           </div>
-          <div className="park-home-hint">{mode.hint}</div>
+          <div className="park-home-effort">
+            <SegmentedControl
+              label="Depth"
+              options={EFFORT_OPTIONS}
+              value={effort}
+              onChange={(value) => p.onEffort?.(value as Effort)}
+              sliding
+            />
+          </div>
+          <div className="park-home-hint">{quickMode ? effortNote : mode.hint}</div>
         </div>
       </div>
-      {/* Not in the design (docs/park-designed-not-in-prd/Home.md): the composer above is fixture-only until
-          FR-UX-13, so this plain link opens the old app's real intake form (a full navigation, not app.go). */}
-      <a className="park-home-real" href="/start">
-        Start a real task
-      </a>
     </div>
   );
 }

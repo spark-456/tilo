@@ -3,13 +3,20 @@
 // instance's own `dec`; started worlds are counted per instance. Writes are acknowledged, nothing more.
 import * as fx from "./fixtures";
 import type { Api } from "./index";
-import type { Ack, ApiResult, Dec, DecisionKey } from "./types";
+import type { Ack, Agenda, ApiResult, Dec, DecisionKey, QuickReply, TierKey } from "./types";
+
+/** The fixture's Quick answer: plainly a sample, with no cost (nothing was spent). */
+export const SAMPLE_QUICK =
+  "This is a sample answer. No model was asked, and your question was not sent anywhere.";
 
 const ok = <T>(data: T): Promise<ApiResult<T>> =>
   Promise.resolve({ data: structuredClone(data), source: "fixture" });
 const ack = (): Promise<ApiResult<Ack>> => ok({ ok: true });
 
-export function createFixtureApi(): Api {
+export function createFixtureApi(): Omit<Api, "getAgenda" | "getProfileSettings"> & {
+  getAgenda(): Promise<ApiResult<Agenda>>;
+  getProfileSettings(): Promise<ApiResult<typeof fx.profileSettings>>;
+} {
   let dec: Dec = {};
   let started = 0;
   const set = (key: DecisionKey, on: boolean) => {
@@ -32,16 +39,27 @@ export function createFixtureApi(): Api {
     getTeamPolicy: () => ok(fx.teamPolicy),
     getConnectorTerms: () => ok(fx.connectorTerms),
     getProfileSettings: () => ok(fx.profileSettings),
+    getBuildHandoff: () => ok(fx.buildHandoffs),
+    getUserSettings: () => ok(fx.userSettings),
+    // Nothing is stored: the answer is the sample document, source "fixture", which the page never reads as saved.
+    saveUserSettings: () => ok(fx.userSettings),
     decide: (key) => set(key, true),
     undo: (key) => set(key, false),
-    startWorld: (mode, query) => {
+    startWorld: ((mode: TierKey, query: string, effort?: string) => {
+      // Quick (COST-FAST-1) makes no world; the fixture answers with a sample, never as if a model had been asked.
+      if (effort === "quick")
+        return ok<QuickReply>({ kind: "answered", text: SAMPLE_QUICK, cost: null });
       started += 1;
       return ok({ ok: true as const, world: fx.makeWorld(mode, query, started) });
-    },
+    }) as Api["startWorld"],
     saveSkill: ack,
+    // The sample card runs on its own fixture steps and never calls these; they hold nothing to show.
+    captureSkill: () => ok({ id: "sample", steps: [] }),
+    proposeVersion: () => ok({ steps: [], question: null, estimates: null }),
     setToolLevel: ack,
     bookSlot: ack,
     addBackup: ack,
     setPref: ack,
+    submitFeedback: ack, // source "fixture": never a server confirmation, so the pop-up never says Thanks
   };
 }
