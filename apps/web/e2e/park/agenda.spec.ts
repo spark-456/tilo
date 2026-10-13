@@ -3,12 +3,17 @@
 // books a slot, "Review and approve" goes to the world through the shell (no reload), and nothing is
 // written to the console.
 // Run on a private port: TILO_WEB_PORT=<own port> pnpm --filter @tilo/web exec playwright test
-// e2e/agenda.spec.ts --project=chromium --no-deps --workers=3
+// e2e/park/agenda.spec.ts --project=chromium --no-deps --workers=1
 import { type Page, expect, test } from "@playwright/test";
 import { collectConsoleProblems } from "../support/console";
 import { DESKTOP, MOBILE } from "../support/viewports";
 
 const SIZES = { desktop: DESKTOP, mobile: MOBILE } as const;
+
+// P0-08b W4: sample slots follow today. Pin the reference day, preserving real timers.
+test.beforeEach(async ({ page }) => {
+  await page.clock.setFixedTime(new Date(2026, 8, 24, 12));
+});
 
 // A cold Vite dev server optimises its dependencies on the first request and reloads the page; warm it
 // once per worker so no test pays for it.

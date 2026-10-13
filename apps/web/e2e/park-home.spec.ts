@@ -12,7 +12,7 @@
 // Night: the shell flips `data-time` on the data-park root; here the attribute is set on the page, which is
 // all the CSS reads (colours are tokens), so this checks the night tokens reach every part of Home.
 // Run on a private port: TILO_WEB_PORT=<own port> pnpm --filter @tilo/web exec playwright test
-// e2e/park-home.spec.ts --project=chromium --no-deps --workers=3
+// e2e/park-home.spec.ts --project=chromium --no-deps --workers=1
 import AxeBuilder from "@axe-core/playwright";
 import { type Locator, type Page, expect, test } from "@playwright/test";
 import { collectConsoleProblems } from "./support/console";
@@ -20,6 +20,12 @@ import { DESKTOP, MOBILE } from "./support/viewports";
 
 const SIZES = { desktop: DESKTOP, mobile: MOBILE } as const;
 type Theme = "day" | "night";
+
+// P0-08b W4: DEMO-TIME-1 follows the browser's calendar. Fix Date while leaving
+// real timers running for drafting, transitions and the toast flow.
+test.beforeEach(async ({ page }) => {
+  await page.clock.setFixedTime(new Date(2026, 8, 24, 12));
+});
 
 // ---- reference values (computed, 1440x900 and 390x844) -----------------------------------------------
 const TOKENS = {
@@ -143,6 +149,13 @@ async function openHome(page: Page, theme: Theme): Promise<string[]> {
 }
 
 const hero = (page: Page) => page.getByRole("heading", { level: 1 });
+
+test("P0_08b_W4_sample_calendar_matches_the_reference_day", async ({ page }) => {
+  await openHome(page, "day");
+  await expect(page.getByText("THURSDAY 24 SEPTEMBER", { exact: true })).toBeVisible({
+    timeout: 5000,
+  });
+});
 const today = (page: Page) => page.locator('aside[aria-label="Today"]');
 const input = (page: Page) => page.getByRole("textbox", { name: "Describe your task" });
 const start = (page: Page) => page.getByRole("button", { name: "Start task", exact: true });
@@ -180,15 +193,11 @@ for (const [sizeName, viewport] of Object.entries(SIZES)) {
         const vh = viewport.height;
 
         // The Home root: the containing block of the three panels, a full-height positioned box.
-        const root = await hero(page).evaluate((el) => {
-          let n: Element = el;
-          while (n.parentElement && getComputedStyle(n).backdropFilter === "none")
-            n = n.parentElement;
-          const cb = (n as HTMLElement).offsetParent as HTMLElement;
-          const s = getComputedStyle(cb);
+        const root = await page.getByTestId("park-page-home").evaluate((el) => {
+          const s = getComputedStyle(el);
           return {
             position: s.position,
-            height: cb.getBoundingClientRect().height,
+            height: el.getBoundingClientRect().height,
             overflow: s.overflow,
           };
         });
