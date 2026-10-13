@@ -16,7 +16,7 @@ import {
 } from "../../../../test-support/park/componentsHarness";
 import { TiloApiError } from "../../../api/http";
 import { createModelKeyFlow } from "../../../api/modelKey";
-import { ModelKeyControl } from "./ModelKey";
+import { CONSENT_VERSION, ModelKeyControl } from "./ModelKey";
 
 // Assembled at runtime (root CLAUDE.md: no secret-looking literal in a fixture).
 const KEY = ["byok", "Zq81XyN0pQ3rT7vW9aB2cD4eF6gH"].join("_");
@@ -165,19 +165,55 @@ describe("ADR-0041 BQ-BYOK-WEB-1 states", () => {
 });
 
 describe("ADR-0041 BQ-BYOK-WEB-1 the key never lingers", () => {
-  it("BYOK_WEB_ADR_0041_the_field_is_a_password_field_with_autocomplete_off_and_save_needs_consent", async () => {
+  it("BYOK_WEB_ADR_0041_B5_the_key_field_is_a_masked_text_field_never_a_password_field", async () => {
+    // SEC-REVIEW-29 B5, PRD 16.1 rule 1 (no password fields anywhere in Tilo): a password-typed field in a form is
+    // what a browser's password manager offers to save, and `autocomplete="off"` is commonly ignored there.
     const { flow } = fake({ get: [NONE] });
     const m = mount(<ModelKeyControl flow={flow} demo={false} />);
     await settle();
-    const field = qa<HTMLInputElement>(m.container, "input").find(
-      (i) => i.type === "password",
+    expect(m.container.querySelector('input[type="password"]')).toBeNull();
+    expect(m.container.querySelector('[autocomplete*="password"]')).toBeNull();
+    const field = qa<HTMLInputElement>(m.container, "input").find((i) =>
+      i.closest("label")?.textContent?.startsWith("API key"),
     ) as HTMLInputElement;
+    expect(field.type).toBe("text");
     expect(field.getAttribute("autocomplete")).toBe("off");
+    expect(field.getAttribute("autocapitalize")).toBe("off");
+    expect(field.getAttribute("spellcheck")).toBe("false");
+    expect(field.hasAttribute("data-1p-ignore")).toBe(true);
+    expect(field.getAttribute("data-lpignore")).toBe("true");
+    expect(field.getAttribute("data-bwignore")).toBe("true");
+    expect(field.getAttribute("data-form-type")).toBe("other");
+    expect(`${field.name} ${field.id}`.toLowerCase()).not.toMatch(/pass|pwd|secret/);
+    expect(field.className).toContain("park-profile-secret"); // the CSS mask (Profile.css), asserted below
     expect(m.container.querySelector("form")?.getAttribute("autocomplete")).toBe("off");
     expect(text(m.container)).toContain("will be sent to the provider you name");
     type(field, KEY);
     expect(button(m.container, "Save key").disabled).toBe(true); // no consent, no bundle, no limit yet
     expect(countPrimary(m.container)).toBe(0);
+  });
+
+  it("BYOK_WEB_ADR_0041_B5_the_mask_is_in_the_stylesheet_and_the_field_is_cleared_after_submit", async () => {
+    const css = readFileSync(path.join(import.meta.dirname, "Profile.css"), "utf8");
+    const rule = /\[data-park\] \.park-profile-secret\s*\{([^}]*)\}/.exec(css)?.[1] ?? "";
+    expect(rule).toMatch(/-webkit-text-security:\s*disc/);
+    const { flow } = fake({
+      get: [NONE, ACTIVE],
+      put: [{ state: "active", secret_version: 3, validated: true }],
+    });
+    const m = mount(<ModelKeyControl flow={flow} demo={false} />);
+    await settle();
+    fillAndAgree(m.container);
+    const field = qa<HTMLInputElement>(m.container, "input").find((i) =>
+      i.closest("label")?.textContent?.startsWith("API key"),
+    ) as HTMLInputElement;
+    expect(field.value).toBe(KEY);
+    click(button(m.container, "Save key"));
+    expect(field.value).toBe(""); // cleared at the click, before any answer
+    await settle();
+    await settle();
+    expect(field.value).toBe("");
+    expect(m.container.innerHTML).not.toContain(KEY);
   });
 
   it("BYOK_WEB_ADR_0041_save_sends_one_put_then_rereads_and_the_key_is_nowhere_afterwards", async () => {
@@ -259,6 +295,66 @@ describe("ADR-0041 BQ-BYOK-WEB-1 the key never lingers", () => {
     await settle();
     expect(text(m.container)).toContain("could not read the change back");
     expect(text(m.container)).not.toContain("Key saved");
+  });
+});
+
+describe("ADR-0041 BK-06 SEC-REVIEW-29 B6: the consent version is the page's, never the server's echo", () => {
+  it("BYOK_WEB_ADR_0041_B6_the_page_sends_the_version_of_the_text_it_rendered", async () => {
+    // The server's number is 0 (older than this page's text): an echo would send 0 and the server could never see a
+    // stale page. The body must carry the page's own CONSENT_VERSION.
+    const { flow, calls } = fake({
+      get: [{ ...NONE, consent_version: 0 }, ACTIVE],
+      put: [{ state: "active", secret_version: 1, validated: true }],
+    });
+    const m = mount(<ModelKeyControl flow={flow} demo={false} />);
+    await settle();
+    fillAndAgree(m.container);
+    click(button(m.container, "Save key"));
+    await settle();
+    await settle();
+    const put = calls.find((c) => c.method === "PUT");
+    expect((put?.body as { consent_version?: number }).consent_version).toBe(CONSENT_VERSION);
+    expect(CONSENT_VERSION).toBe(1);
+  });
+
+  it("BYOK_WEB_ADR_0041_B6_a_server_version_newer_than_the_page_text_says_reload_and_sends_nothing", async () => {
+    const { flow, calls } = fake({ get: [{ ...NONE, consent_version: 2 }] });
+    const m = mount(<ModelKeyControl flow={flow} demo={false} />);
+    await settle();
+    expect(q(m.container, '[role="alert"]').textContent).toContain("Reload this page");
+    expect(button(m.container, "Save key").disabled).toBe(true);
+    fillAndAgree(m.container);
+    expect(button(m.container, "Save key").disabled).toBe(true);
+    click(button(m.container, "Save key"));
+    await settle();
+    expect(calls.map((c) => c.method)).toEqual(["GET"]); // nothing was sent
+  });
+
+  it("BYOK_WEB_ADR_0041_B6_an_older_confirmation_on_a_held_key_does_not_lock_a_rotation", async () => {
+    // A held key shows the version its owner last confirmed (server side): older than the page's text is normal.
+    const { flow, calls } = fake({
+      get: [{ ...ACTIVE, consent_version: 0 }, ACTIVE],
+      put: [{ state: "active", secret_version: 4, validated: true }],
+    });
+    const m = mount(<ModelKeyControl flow={flow} demo={false} />);
+    await settle();
+    expect(m.container.querySelector('[role="alert"]')).toBeNull();
+    fillAndAgree(m.container);
+    click(button(m.container, "Save key"));
+    await settle();
+    await settle();
+    expect(calls.map((c) => c.method)).toEqual(["GET", "PUT", "GET"]);
+  });
+
+  it("BYOK_WEB_ADR_0041_B6_the_version_constant_sits_next_to_the_consent_text", () => {
+    const src = readFileSync(path.join(import.meta.dirname, "ModelKey.tsx"), "utf8");
+    const at = (needle: string) => src.indexOf(needle);
+    expect(at("export const CONSENT_VERSION")).toBeGreaterThan(-1);
+    expect(
+      Math.abs(at("export const CONSENT_VERSION") - at("const CONSENT =")),
+      "adjacent",
+    ).toBeLessThan(400);
+    expect(src).not.toMatch(/consentVersion:\s*view\.consentVersion/);
   });
 });
 

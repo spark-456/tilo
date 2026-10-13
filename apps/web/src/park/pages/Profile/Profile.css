@@ -664,3 +664,7 @@
   font-size: 14px;
   font-weight: 700;
 }
+/* ADR-0041 BYOK-5, SEC-REVIEW-29 B5: the key field is a text field masked here, never a password field (PRD 16.1). */
+[data-park] .park-profile-secret {
+  -webkit-text-security: disc;
+}
