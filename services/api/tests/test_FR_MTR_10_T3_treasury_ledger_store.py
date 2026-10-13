@@ -10,7 +10,7 @@ from datetime import datetime, timedelta
 
 import pytest
 from _adr35_l2_fake import OccFirestore
-from _t3_ledger_lib import AT, OWNER, ROOT, Flaky, entry, make
+from _t3_ledger_lib import AT, ORG, OWNER, ROOT, Flaky, entry, entry_docs, make
 from tilo_metering.prices import Usage
 
 
@@ -20,14 +20,14 @@ def test_FR_MTR_10_BQ_MTR10_4_an_entry_id_counts_once_and_the_same_id_on_other_t
     one = entry(credits=3.0, usage=Usage("lite-31", 1000, 200, 100, 1, 0))
     ledger.append_once("unit_a", one)
     ledger.append_once("unit_a", one)  # a retry: the same entry, nothing added
-    assert len(db.docs) == 1 and ledger.entries_for(OWNER) == [one]
+    assert len(entry_docs(db)) == 1 and ledger.entries_for(OWNER) == [one]
     with pytest.raises(ValueError):
         ledger.append_once("unit_a", entry(credits=9.0))
     with pytest.raises(ValueError):
         ledger.append_once("a/b", one)
     ledger.append(one)
     ledger.append(one)  # no id given: each is its own entry
-    assert len(db.docs) == 3
+    assert len(entry_docs(db)) == 3
 
 
 def test_FR_MTR_10_BQ_MTR10_4_the_store_is_org_scoped_and_refuses_bad_entries_before_any_write():
@@ -44,7 +44,8 @@ def test_FR_MTR_10_BQ_MTR10_4_the_store_is_org_scoped_and_refuses_bad_entries_be
             ledger.append(bad)
     assert db.docs == {} and db.attempted_ops == []
     ledger.append(entry())
-    assert all(p.startswith(ROOT + "/") for p in db.docs)
+    assert len(entry_docs(db)) == 1 and {p.split("/")[2] for p in db.docs} == {"treasury_ledger", "treasury_rollup"}
+    assert all(p.startswith(f"orgs/{ORG}/") for p in db.docs)
     from tilo_api.treasury_firestore import FirestoreTreasuryLedger
 
     assert FirestoreTreasuryLedger(db, org_id="org_other").entries_for(OWNER) == [], "another org's path"

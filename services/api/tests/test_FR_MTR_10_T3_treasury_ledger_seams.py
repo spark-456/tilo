@@ -16,7 +16,7 @@ from typing import Any
 import pytest
 from _adr35_l2_fake import OccFirestore
 from _api_lib import make_world
-from _t3_ledger_lib import ORG, OTHER, OWNER, ROOT, Flaky, entry, make
+from _t3_ledger_lib import ORG, OTHER, OWNER, Flaky, entry, make
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from starlette.requests import Request
@@ -81,7 +81,7 @@ def test_FR_MTR_10_BQ_MTR10_4_deployed_with_a_project_costs_are_200_with_the_rec
     assert [t["run_id"] for t in world.json()["tasks"]] == ["r_x"]
     everything = client.get("/costs")
     assert everything.status_code == 200 and everything.json()["totals"]["credits"] == pytest.approx(10.0)
-    assert {p.split("/")[2] for p in db.docs} == {"treasury_ledger"}, "one org-scoped collection"
+    assert {p.split("/")[2] for p in db.docs} == {"treasury_ledger", "treasury_rollup"}, "org-scoped collections"
 
 
 def test_FR_MTR_10_BQ_MTR10_4_an_empty_but_readable_ledger_is_a_zero_report_not_a_refusal(monkeypatch):
@@ -106,7 +106,10 @@ def test_FR_MTR_10_BQ_MTR10_4_an_unreadable_ledger_is_503_with_no_numbers(monkey
 def test_FR_MTR_10_BQ_MTR10_4_one_unreadable_document_refuses_the_read_never_a_partial_report(monkeypatch):
     db = OccFirestore()
     make(db).append(entry())
-    db.put(f"{ROOT}/hand_written", {"kind": "commit", "run": "r_x", "user": OWNER, "org": ORG, "credits": "a lot"})
+    db.put(  # the costs routes read the rollups (BQ-T3-5): the hand-written document is one of those
+        f"orgs/{ORG}/treasury_rollup/hand_written",
+        {"kind": "commit", "run": "r_x", "user": OWNER, "org": ORG, "credits": "a lot"},
+    )
     _wire(monkeypatch, db)
     response = _app().get("/costs")
     assert response.status_code == 503 and "credits" not in response.text
@@ -168,12 +171,12 @@ def test_FR_MTR_10_BQ_MTR10_4_deployed_the_writer_seam_is_the_same_store_and_a_d
     writer = deps.ledger_writer_for(full)
     assert isinstance(writer, FirestoreTreasuryLedger)
     writer.append(entry(credits=7.0))
-    assert deps.get_ledger(full)[0].credits == 7.0 and len(db.docs) == 1
+    assert deps.get_ledger(full)[0].credits == 7.0 and len(db.docs) == 2  # the entry and its rollup
 
     demo = deps.ledger_writer_for(_request(_app(user="u_demo", demo=True).app))
     assert demo is not None and not isinstance(demo, FirestoreTreasuryLedger)
     demo.append(entry(user="u_demo"))
-    assert len(db.docs) == 1, "an anonymous demo session stores nothing durable (BQ-DEMO-EPH-1)"
+    assert len(db.docs) == 2, "an anonymous demo session stores nothing durable (BQ-DEMO-EPH-1)"
 
 
 def test_FR_MTR_10_BQ_MTR10_4_off_cloud_run_the_seams_stay_503_and_dev_mode_uses_memory(monkeypatch):

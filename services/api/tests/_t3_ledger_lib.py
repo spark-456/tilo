@@ -34,6 +34,11 @@ def entry(run: str = "r_x", user: str = OWNER, credits: float = 4.0, step: str |
     return LedgerEntry("commit", run, user, kw.pop("org", ORG), kw.pop("at", AT), step=step, credits=credits, **kw)
 
 
+def entry_docs(db: Any) -> list[str]:
+    """The paths of the entry documents (the audit record), not the rollups kept beside them (BQ-T3-5)."""
+    return [p for p in db.docs if p.startswith(ROOT + "/")]
+
+
 def make(db: Any) -> Any:
     from tilo_api.treasury_firestore import FirestoreTreasuryLedger
 
