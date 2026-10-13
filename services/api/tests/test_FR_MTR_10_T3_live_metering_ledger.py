@@ -12,11 +12,13 @@ Ledger shows live cost. Pinned:
   the error type only, never its text);
 * on the API: a live intake writes one entry per settled unit for the signed-in uid, a task's units land on the task's
   own run id (so they are on its world's report), and a failing writer changes nothing about the answer;
+* the report: unattributed live spend of the person is one pseudo run on `GET /costs`, never on a world.
 """
 
 from __future__ import annotations
 
 import logging
+from datetime import UTC, datetime
 from typing import Any
 
 import pytest
@@ -246,3 +248,42 @@ def test_FR_MTR_10_BQ_MTR10_4_T3_only_the_owners_task_or_world_names_the_run_an_
     assert run_of("u_someone_else", {"task_id": "t_mine"}, "task_t_mine") == "task_t_mine", "not their task"
     assert run_of(JUDGE_A, {"task_id": "t_unknown"}, "task_t_unknown") == "task_t_unknown"
     assert run_of(JUDGE_A, {}, "req_abc") == "req_abc"
+
+
+# --- the report ------------------------------------------------------------------------------------------------
+
+
+def test_FR_MTR_10_BQ_MTR10_4_T3_unattributed_live_spend_is_one_pseudo_run_on_costs_and_never_a_world():
+    from _api_lib import make_world
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+    from tilo_api import deps
+    from tilo_api.costs import router
+
+    def row(run: str, credits: float, user: str = "u_owner") -> LedgerEntry:
+        return LedgerEntry("commit", run, user, ORG, datetime(2026, 10, 13, tzinfo=UTC), step="model", credits=credits)
+
+    entries = [
+        row("r_x", 1.0),
+        row("req_aaa", 2.0),
+        row("req_bbb", 4.0),
+        row("task_t1", 8.0),
+        row("req_other", 99.0, "u_other"),
+    ]
+    app = FastAPI()
+    app.include_router(router)
+    store = deps.Store()
+    store.worlds["w_x"] = make_world(owner="u_owner", run_id="r_x")
+    principal = deps.Principal(user_id="u_owner", role="owner", world_id="w_x", full_session=True)
+    app.dependency_overrides[deps.get_current_principal] = lambda: principal
+    app.dependency_overrides[deps.get_store] = lambda: store
+    app.dependency_overrides[deps.get_ledger] = lambda: entries
+    client = TestClient(app)
+
+    world = client.get("/worlds/w_x/costs").json()
+    assert world["totals"]["credits"] == pytest.approx(1.0) and [t["run_id"] for t in world["tasks"]] == ["r_x"]
+    everything = client.get("/costs").json()
+    assert everything["totals"]["credits"] == pytest.approx(15.0), "the world's 1 and the person's own 14 unattributed"
+    live = [t for t in everything["tasks"] if t["run_id"].startswith("r_live_")]
+    assert [t["credits"] for t in live] == [pytest.approx(14.0)]
+    assert [r["task_type"] for r in everything["by_task_type"] if r["credits"] == pytest.approx(14.0)] == ["live_call"]

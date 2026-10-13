@@ -11,6 +11,7 @@ unit is also one Treasury ledger entry (`LedgerSink`, T3): after the settle, and
 
 from __future__ import annotations
 
+import hashlib
 import logging
 import math
 from collections.abc import Callable, Iterable
@@ -30,8 +31,15 @@ T = TypeVar("T")
 INR_MINOR_PER_USD = 8000
 _BYTES_PER_TOKEN = 3  # a screened text is priced at one token per three bytes: over-counted on purpose
 _BILLED_ERRORS = frozenset({"OutputTruncatedError"})  # sent and ran to its cap, no usage reported
+LIVE_STEPS = ("model", "safety")  # the `step` of a Treasury entry a metered unit writes (T3)
 _USAGE_ATTEMPT = ("tokens_in", "tokens_out", "tokens_cached", "search_queries", "tokens_audio")  # Usage's int fields
 LIVE_TASK_TYPE = "live_call"  # the `by_task_type` label the report tells that spend by
+UNATTRIBUTED = ("req_", "task_", "world_")  # a meter's own run id when it could not name the task's run (T3)
+
+
+def live_run_id(uid: str) -> str:
+    """The person's pseudo run for live spend no world's run could be named for (T3, BQ-T3-3), as Quick's."""
+    return "r_live_" + hashlib.sha256(b"live/" + uid.encode()).hexdigest()[:24]
 
 
 def _count(attempt: Any, name: str) -> int:
