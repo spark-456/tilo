@@ -662,6 +662,9 @@
 
 /* UI-10 W9: desktop card minima cannot exceed a phone's inner sheet width. */
 @media (max-width: 600px) {
+  [data-park] [data-testid="park-page-connectors"] .park-connectors-titlerow {
+    flex-wrap: wrap;
+  }
   [data-park] [data-testid="park-page-connectors"] .park-connectors-grid,
   [data-park] [data-testid="park-page-connectors"] .park-connectors-availgrid {
     grid-template-columns: minmax(0, 1fr);

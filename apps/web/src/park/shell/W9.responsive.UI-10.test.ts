@@ -41,6 +41,10 @@ it("UI_10_W9 Team coverage can fit a 320px phone without its desktop column mini
   expect(phoneRule("Team", "park-team-matrix")?.get("overflow-x")).toBe("auto");
 });
 
+it("UI_10_W9 Connectors title count wraps within a 320px phone sheet", () => {
+  expect(phoneRule("Connectors", "park-connectors-titlerow")?.get("flex-wrap")).toBe("wrap");
+});
+
 it("UI_10_W9 Agenda sync copy wraps and pin inputs shrink inside the phone board", () => {
   expect(phoneRule("Agenda", "park-agenda-synced")?.get("white-space")).toBe("normal");
   expect(phoneRule("Agenda", "park-agenda-newinput")?.get("min-width")).toBe("0");

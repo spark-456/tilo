@@ -16,13 +16,21 @@ for (const viewport of [
         test.setTimeout(150_000);
         const problems = collectConsoleProblems(page);
         await page.goto(`/${route}`, { timeout: 120_000 });
-        await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+        await expect(page.getByRole("heading", { level: 1 })).toBeVisible({ timeout: 120_000 });
         await page.evaluate(() => document.fonts.ready);
         const size = await page.evaluate(() => ({
           scrollWidth: Math.max(document.documentElement.scrollWidth, document.body.scrollWidth),
           innerWidth: window.innerWidth,
+          overflowing: Array.from(document.querySelectorAll("body *"))
+            .filter((element) => element.getBoundingClientRect().right > window.innerWidth)
+            .map((element) => ({
+              className: element.className,
+              right: element.getBoundingClientRect().right,
+            })),
         }));
-        expect(size.scrollWidth).toBeLessThanOrEqual(size.innerWidth);
+        expect(size.scrollWidth, JSON.stringify(size.overflowing)).toBeLessThanOrEqual(
+          size.innerWidth,
+        );
         expect(problems).toEqual([]);
       });
     }
