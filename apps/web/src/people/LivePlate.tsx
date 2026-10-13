@@ -6,7 +6,7 @@ import { PLATE_GROUPS, type PlateView, plateFromReply } from "./plateFromReply";
 /** FR-PA-02/03: only server reads here. Sample actions are never applied to live rows. */
 export function LivePlate({ client }: { client: HttpClient }) {
   const [attempt, setAttempt] = useState(0);
-  const [state, setState] = useState<PlateView | "loading" | "failed">("loading");
+  const [state, setState] = useState<PlateView | "loading" | "failed" | "empty">("loading");
   // biome-ignore lint/correctness/useExhaustiveDependencies: attempt is the explicit retry trigger.
   useEffect(() => {
     let current = true;
@@ -18,8 +18,10 @@ export function LivePlate({ client }: { client: HttpClient }) {
         if (!plate) throw new TiloApiError("Unreadable plate reply", 200, true);
         if (current) setState(plate);
       })
-      .catch(() => {
-        if (current) setState("failed");
+      .catch((error: unknown) => {
+        // PE-26: no People record means no plate yet; other failures remain retryable UI errors.
+        if (current)
+          setState(error instanceof TiloApiError && error.status === 404 ? "empty" : "failed");
       });
     return () => {
       current = false;
@@ -36,6 +38,8 @@ export function LivePlate({ client }: { client: HttpClient }) {
             Try again
           </button>
         </div>
+      ) : state === "empty" ? (
+        <p>Nothing on your plate yet.</p>
       ) : (
         <>
           <p>As of {state.asOf}</p>
