@@ -163,12 +163,14 @@ def test_SEC_16_when_live_cannot_be_checked_the_label_is_replay_and_replay_work_
     assert os.environ.get(LIVE) is None
 
 
-def test_SEC_16_the_production_ledger_seam_refuses_until_it_is_wired():
-    """Like T4's artifact store and the access store: a deployed process with no ledger denies live, it never
-    runs uncapped."""
+def test_SEC_16_the_production_ledger_seam_refuses_until_it_is_wired(monkeypatch):
+    """Like T4's artifact store and the access store: a deployed process with no ledger (GOLIVE-935: no valid
+    `TILO_FIRESTORE_PROJECT`) denies live, it never runs uncapped."""
     from fastapi import HTTPException
     from tilo_api import deps
 
+    monkeypatch.setenv("K_SERVICE", "tilo-api")
+    monkeypatch.delenv("TILO_FIRESTORE_PROJECT", raising=False)
     with pytest.raises(HTTPException) as caught:
         deps.get_spend_cap_ledger()
     assert caught.value.status_code == 503

@@ -522,10 +522,42 @@ def get_rate_limiter() -> spend.RateLimiter:
     return spend.RateLimiter(limit=caps.rate_limit_requests, window_s=caps.rate_limit_window_s, clock=time.monotonic)
 
 
+_DEV_SPEND_STATE: dict[str, Any] = {}  # the in-memory ledger's whole state, process-wide (dev, CI, a laptop)
+_spend_ledger_retry_at: float | None = None  # after a failed client build, no new attempt until then (FS-18 window)
+
+
 def get_spend_cap_ledger() -> spend.SpendLedger:
-    """SEC-16's ledger (not FR-PA-19's `get_spend_ledger`). Unwired, a deployed judge is replay, never uncapped; wire
-    it only with the per-unit `SpendGuard.begin_unit`/`settle_unit` wiring (BQ-SEC16-1), or live spend is unmetered."""
-    raise HTTPException(status_code=503, detail="not_configured")
+    """SEC-16's ledger (not FR-PA-19's `get_spend_ledger`; GOLIVE-935, BQ-PW-3-1). Deployed (`K_SERVICE` or
+    `CLOUD_RUN_JOB`): the durable `FirestoreSpendLedger` on the process's one client (`prod.firestore_client`, which
+    holds the environment rules) for a valid `TILO_FIRESTORE_PROJECT`; anything else is 503, so a deployed judge is
+    replay and never uncapped. Not deployed: an in-memory ledger shared by the process. It is wired only together
+    with the per-unit metering (`tilo_api.spend_units`): a live path with no meter stays replay."""
+    global _spend_ledger_retry_at
+    from tilo_api import prod, store_door  # noqa: PLC0415  (they import this module's neighbours)
+
+    try:
+        caps = get_spend_caps()
+    except spend.SpendConfigError as exc:
+        raise HTTPException(status_code=503, detail="not_configured") from exc
+    if not enforced():
+        return spend.InMemorySpendLedger(caps, shared=_DEV_SPEND_STATE)
+    project = os.environ.get(store_door.ENV_PROJECT, "")
+    if not store_door.GCP_PROJECT.fullmatch(project):
+        raise HTTPException(status_code=503, detail="not_configured")
+    retry_at = _spend_ledger_retry_at
+    if retry_at is not None and people_stores_clock() < retry_at:
+        raise HTTPException(status_code=503, detail="store_unavailable")
+    try:
+        client = prod.firestore_client(project)
+    except prod.FirestoreNotConfigured as exc:
+        raise HTTPException(status_code=503, detail="not_configured") from exc
+    except Exception as exc:  # no credentials or no network: closed, backed off, never the text
+        _spend_ledger_retry_at = people_stores_clock() + PEOPLE_STORES_BACKOFF_S
+        raise HTTPException(status_code=503, detail="store_unavailable") from exc
+    _spend_ledger_retry_at = None
+    from tilo_api.spend_firestore import FirestoreSpendLedger  # noqa: PLC0415
+
+    return FirestoreSpendLedger(client, caps, org_id=ORG_ID)
 
 
 def _resolve(request: Request, seam: Callable[[], Any]) -> Any:
