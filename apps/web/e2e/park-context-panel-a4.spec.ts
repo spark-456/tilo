@@ -90,8 +90,9 @@ for (const size of SIZES) {
 
       await opener(page).click();
       await expect(dialog(page)).toBeVisible();
-      // the backdrop covers the page: a click on a spot the sheet does not cover closes it
-      await page.mouse.click(8, size.height - 8);
+      // the backdrop covers the page: a click on a spot the sheet does not cover closes it (the phone's sheet
+      // rises from the bottom, so there the spot is the strip between the nav and the sheet's top edge)
+      await page.mouse.click(size.width < 760 ? 8 : 8, size.width < 760 ? 150 : size.height - 8);
       await expect(dialog(page)).toHaveCount(0);
       expect(await onTop()).toBe(true);
     });
