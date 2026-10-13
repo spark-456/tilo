@@ -138,8 +138,9 @@ function Body({ flow }: { flow: ModelKeyFlow }) {
   // asks, so a member sees it too; a member's own answer (`{active, label}`) has no form.
   const view = remote.kind === "view" ? remote.view : null;
   const has = view?.owner === true && view.state !== "none";
-  // The server's text is newer than the words on this page: nothing is sent until the page is reloaded. (A held
-  // key shows the version its owner last confirmed, which is older than the page's, never newer, so it never locks.)
+  // The server's text is newer than the words on this page: nothing is sent until the page is reloaded. The owner's
+  // answer carries the version the next widening act must confirm (the config's current one, org_model_key
+  // owner_view), held key or not, so a bump locks an old page; a number older than the page's never locks.
   const stale = view?.owner === true && (view.consentVersion ?? 0) > CONSENT_VERSION;
   const days = Number(cap);
   const ready =
