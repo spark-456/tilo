@@ -441,6 +441,16 @@ credentials the seam answers 503 and every request is replay, never uncapped. Re
 durable kill switch after the daily hard cap tripped it, delete the document `orgs/org_tilo/spend_ledger/switch`
 (Firestore console) or set its `on` field to `false`; nothing in the API can.
 
+### The Treasury credit ledger (T3, BQ-T3-1, BQ-MTR10-4; nothing for you to apply)
+
+`GET /costs`, `GET /worlds/{id}/costs` (FR-MTR-10), `GET /v1/effort` and the web Ledger read, and Quick, the Meeting
+Hall and the live metering write, one Firestore collection: `tilo_api.treasury_firestore`, documents
+`orgs/{org}/treasury_ledger/{entry id}`, each written once (`create`), never updated or deleted. It needs only what is
+already there, as the SEC-16 ledger above: `TILO_FIRESTORE_PROJECT` on `tilo-api` and the service account's existing
+`roles/datastore.user`. No composite index (one equality query on `user`, served by Firestore's automatic single-field
+index), no rules change (`firestore.rules` denies every client path), no `TILO_API_STORE`. With no valid project or no
+credentials the routes answer 503 (`not_configured`, `store_unavailable`), never an empty report.
+
 ### Against a deployed tilo-api, and the smoke (PROD-WIRE-4)
 
 ```powershell
