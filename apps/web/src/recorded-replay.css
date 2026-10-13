@@ -1,0 +1,35 @@
+.recorded-replay {
+  position: relative;
+  padding: var(--space-24);
+  color: var(--ink);
+  background: var(--paper);
+  border-radius: var(--radius-cards);
+}
+.recorded-replay__player {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 328px);
+  gap: var(--space-16);
+}
+.recorded-replay .stage-frame {
+  min-height: 480px;
+}
+.recorded-replay .stage-controls {
+  bottom: var(--space-16);
+}
+.recorded-replay__rail {
+  min-width: 0;
+  max-height: 640px;
+  overflow: auto;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 767px) {
+  .recorded-replay {
+    padding: var(--space-12);
+  }
+  .recorded-replay__player {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .recorded-replay .stage-frame {
+    min-height: 360px;
+  }
+}

@@ -7,6 +7,13 @@ test("UI_10_B6_the_demo_recorded_run_address_shows_a_replay_not_not_found", asyn
   test.setTimeout(150_000); // a cold dev server optimises the stage's dependencies on the first request
   await page.goto("/world/w_village_basic/stage?fixture=village-basic");
   await expect(page.locator('[data-stage-ready="true"]')).toBeVisible({ timeout: 60_000 });
-  await expect(page.getByText("Fixture replay")).toBeVisible();
+  // UI-10 W20: the recorded stage now shares the Park shell and honest Sample label.
+  await expect(page.getByRole("heading", { name: "Sample recording" })).toBeVisible();
+  await expect(
+    page.getByText("This is a recorded sample, not your task. No work is being sent."),
+  ).toBeVisible();
+  await expect(page.locator("[data-park] nav")).toBeVisible();
+  await expect(page.getByText("Fixture replay")).toHaveCount(0);
+  await expect(page.getByTestId("trace-row").first()).toBeAttached({ timeout: 60_000 });
   await expect(page.getByText("Not found")).toHaveCount(0);
 });
