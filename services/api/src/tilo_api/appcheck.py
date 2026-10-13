@@ -6,7 +6,8 @@ the flag `TILO_APPCHECK_ENFORCE`, read on every request, and ONLY exactly "1" tu
 (infra/ACCESS.md section 7: the owner alone flips it). Off, a missing, empty, refused or unverifiable token is logged
 once as a WARNING on `tilo_api.appcheck` (never the token, never the error text) and the answer is unchanged. On, it
 is a 401 and the route never runs. `/health`, `/healthz` and `POST /internal/schedules/tick` (its own Google OIDC
-check, FR-AGT-14b) are never checked: probes and Cloud Scheduler carry no App Check token.
+check, FR-AGT-14b) are never checked: probes and Cloud Scheduler carry no App Check token; nor is `GET`/`POST
+/l/<token>` (FR-PA-06b), a mail link whose signed single-use token is its own credential.
 
 Deterministic code only: no model decides who is let in. Dev mode (`TILO_API_DEV=1`) and CI open no socket: the
 dev verifier refuses every token without a fetch, and a verifier with no project configured refuses before one.
@@ -32,6 +33,8 @@ from starlette.concurrency import run_in_threadpool
 from starlette.responses import JSONResponse
 from starlette.types import ASGIApp, Receive, Scope, Send
 
+from tilo_api import access
+
 logger = logging.getLogger("tilo_api.appcheck")
 
 HEADER = b"x-firebase-appcheck"  # ASGI header names are lower-case bytes
@@ -43,6 +46,10 @@ EXEMPT_ROUTES: frozenset[tuple[str, str]] = frozenset(
     {("GET", "/health"), ("GET", "/healthz"), ("POST", "/internal/schedules/tick")}
 )
 
+# FR-PA-06b: `GET` and `POST` of `/l/<token>` are the plate digest's emailed Done and Snooze links. A mail client or
+# browser opened from a mail sends no App Check token, and the single-use HMAC-signed token in the path is the
+# credential, checked by the route itself. Only this prefix is exempt (`access.public_link`: one path segment, so the
+# access gate and this one agree on exactly which paths); the exact-route list above is unchanged.
 MAX_TOKEN_CHARS = 4096  # a real token is about 1 KiB; a longer one is refused without being parsed or verified
 
 JWKS_URL = "https://firebaseappcheck.googleapis.com/v1/jwks"
@@ -360,7 +367,12 @@ class AppCheckGate:
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         kind = scope["type"]
-        if kind not in {"http", "websocket"} or (kind == "http" and (scope["method"], scope["path"]) in EXEMPT_ROUTES):
+        if kind not in {"http", "websocket"} or (
+            kind == "http"
+            and (
+                (scope["method"], scope["path"]) in EXEMPT_ROUTES or access.public_link(scope["method"], scope["path"])
+            )
+        ):
             await self.app(scope, receive, send)
             return
         token = _token_of(scope)

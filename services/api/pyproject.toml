@@ -26,6 +26,7 @@ dependencies = [
     "tilo-archive",
     "tilo-memory",
     "tilo-people",
+    "tilo-channels",
     "tilo-logging",
     "tilo-redact",
 ]
