@@ -96,11 +96,16 @@ def _approaches_reply(prompt: str) -> dict[str, Any]:
 
 
 def _first_approval_action(prompt: str) -> tuple[str, str] | None:
-    """(connector id, action id) of the first catalogue action that needs an approval gate, or None."""
+    """(connector id, action id) of the first catalogue action that needs an approval gate and writes, or None.
+    A `read_*` action is skipped: the final unit delivers (a draft, a send), and the owner-setup catalogue cards
+    (FR-UX-18, T3 `read_<service>`, sorted ahead of gmail) must not turn a dev run's gate into a sensitive-step ask."""
     try:
         connectors = json.loads(_block(_CATALOGUE, prompt))["connectors"]
         return next(
-            (c["id"], a["id"]) for c in connectors for a in c["actions"] if a["gate_type"] == "approval"
+            (c["id"], a["id"])
+            for c in connectors
+            for a in c["actions"]
+            if a["gate_type"] == "approval" and not str(a["id"]).startswith("read_")
         )  # fmt: skip
     except (ValueError, KeyError, TypeError, StopIteration):
         return None  # an unreadable catalogue, or one with no gated action, gets a plan with nothing to send

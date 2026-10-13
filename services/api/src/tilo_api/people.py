@@ -283,6 +283,7 @@ async def attend_meeting_route(
     _: Annotated[Empty, Depends(json_body(Empty))],
     principal: Annotated[deps.Principal, Depends(deps.get_current_principal)],
     stores: Annotated[PeopleStores, Depends(deps.get_people_stores)],
+    _new_work: Annotated[deps.Mode, Depends(deps.get_work_mode)],  # a bot is new live work: refused at a cap
     store: Annotated[deps.Store, Depends(deps.get_store)],
     artifacts: Annotated[ArtifactStore, Depends(deps.get_artifact_store)],
     host: Annotated[MeetingHostRpc, Depends(deps.get_meeting_host_client)],
@@ -305,6 +306,7 @@ def host_meeting_route(
     principal: Annotated[deps.Principal, Depends(deps.get_current_principal)],
     stores: Annotated[PeopleStores, Depends(deps.get_people_stores)],
     clock: Annotated[Callable[[], str], Depends(deps.get_clock)],
+    _new_work: Annotated[deps.Mode, Depends(deps.get_work_mode)],  # hosting starts a bot: refused at a cap
     seams: Annotated[HostSeams, Depends(get_host_seams)],
 ) -> dict[str, Any]:
     """The owner hosts a scheduled bot meeting (FR-MTG-09): one gate card, then one invitation (BQ-MTG09-20)."""
