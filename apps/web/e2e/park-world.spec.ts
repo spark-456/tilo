@@ -1219,11 +1219,9 @@ test.describe("park world: behaviour in the browser", () => {
     const problems = await openWorld(page, "k1");
     await btn(page, "Share").click();
     await expect(
-      page
-        .getByRole("status")
-        .filter({
-          hasText: "Link copied. This is a sample world, so there is nothing real to share.",
-        }),
+      page.getByRole("status").filter({
+        hasText: "Link copied. This is a sample world, so there is nothing real to share.",
+      }),
     ).toBeVisible();
     expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(page.url());
     expect(page.url()).toMatch(/\/world\/k1$/);

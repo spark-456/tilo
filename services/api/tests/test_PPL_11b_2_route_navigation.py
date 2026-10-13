@@ -1374,6 +1374,7 @@ def test_FR_PA_17_a_failure_to_read_the_org_gives_a_failed_answer_never_an_unche
         pins=spied.pins,
         mentions=spied.mentions,
         calendar=spied.calendar,
+        world_shares=spied.world_shares,
     )
     body = _ok(rig.ask("What is on my plate?"))
     assert (body["outcome"], body["text"], body["sources"]) == ("failed", DECLINES["failed"], [])

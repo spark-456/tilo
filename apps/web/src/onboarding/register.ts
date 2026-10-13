@@ -4,4 +4,4 @@ import { lazy } from "react";
 import { setParkTour } from "../park/shell/tour";
 import { requestTour } from "./tourEvents";
 
-setParkTour({ Layer: lazy(() => import("./OnboardingLayer")), start: requestTour });
+setParkTour({ Layer: lazy(() => import("./FirstRunTourLayer")), start: requestTour });

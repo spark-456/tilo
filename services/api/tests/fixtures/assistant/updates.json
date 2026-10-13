@@ -3,32 +3,240 @@
   "now": "2026-10-06T10:00:00.000Z",
   "time_zone": "Asia/Kolkata",
   "phrases": [
-    { "n": 1, "text": "done", "select": "wi_rate_sheet", "via": "rules", "kind": "mark_done", "item": "wi_rate_sheet", "date": null },
-    { "n": 2, "text": "Done.", "select": "wi_rate_sheet", "via": "rules", "kind": "mark_done", "item": "wi_rate_sheet", "date": null },
-    { "n": 3, "text": "it is done", "select": "wi_rate_sheet", "via": "rules", "kind": "mark_done", "item": "wi_rate_sheet", "date": null },
-    { "n": 4, "text": "It's done!", "select": "wi_rate_sheet", "via": "rules", "kind": "mark_done", "item": "wi_rate_sheet", "date": null },
-    { "n": 5, "text": "mark it done", "select": "wi_rate_sheet", "via": "rules", "kind": "mark_done", "item": "wi_rate_sheet", "date": null },
-    { "n": 6, "text": "Please mark this as done", "select": "wi_rate_sheet", "via": "rules", "kind": "mark_done", "item": "wi_rate_sheet", "date": null },
-    { "n": 7, "text": "I am done with it", "select": "wi_rate_sheet", "via": "rules", "kind": "mark_done", "item": "wi_rate_sheet", "date": null },
-    { "n": 8, "text": "finished", "select": "wi_rate_sheet", "via": "rules", "kind": "mark_done", "item": "wi_rate_sheet", "date": null },
-    { "n": 9, "text": "all done!", "select": "wi_rate_sheet", "via": "rules", "kind": "mark_done", "item": "wi_rate_sheet", "date": null },
-    { "n": 10, "text": "that is done", "select": "wi_rate_sheet", "via": "rules", "kind": "mark_done", "item": "wi_rate_sheet", "date": null },
-    { "n": 11, "text": "done with the budget notes", "select": "wi_rate_sheet", "via": "rules", "kind": "mark_done", "item": "wi_budget_notes", "date": null },
-    { "n": 12, "text": "mark the travel task as done", "select": "wi_rate_sheet", "via": "rules", "kind": "mark_done", "item": "wi_travel", "date": null },
-    { "n": 13, "text": "finished the printer follow up", "select": "wi_rate_sheet", "via": "rules", "kind": "mark_done", "item": "wi_printer", "date": null },
-    { "n": 14, "text": "snooze", "select": "wi_rate_sheet", "via": "rules", "kind": "snooze", "item": "wi_rate_sheet", "date": "2026-10-07" },
-    { "n": 15, "text": "snooze it", "select": "wi_rate_sheet", "via": "rules", "kind": "snooze", "item": "wi_rate_sheet", "date": "2026-10-07" },
-    { "n": 16, "text": "snooze it to Friday", "select": "wi_rate_sheet", "via": "rules", "kind": "snooze", "item": "wi_rate_sheet", "date": "2026-10-09" },
-    { "n": 17, "text": "Snooze until monday.", "select": "wi_rate_sheet", "via": "rules", "kind": "snooze", "item": "wi_rate_sheet", "date": "2026-10-12" },
-    { "n": 18, "text": "snooze this till tomorrow", "select": "wi_rate_sheet", "via": "rules", "kind": "snooze", "item": "wi_rate_sheet", "date": "2026-10-07" },
-    { "n": 19, "text": "move it to Friday", "select": "wi_rate_sheet", "via": "rules", "kind": "snooze", "item": "wi_rate_sheet", "date": "2026-10-09" },
-    { "n": 20, "text": "Please move this to monday", "select": "wi_rate_sheet", "via": "rules", "kind": "snooze", "item": "wi_rate_sheet", "date": "2026-10-12" },
-    { "n": 21, "text": "postpone it to oct 12", "select": "wi_rate_sheet", "via": "rules", "kind": "snooze", "item": "wi_rate_sheet", "date": "2026-10-12" },
-    { "n": 22, "text": "push it to 12 october", "select": "wi_rate_sheet", "via": "rules", "kind": "snooze", "item": "wi_rate_sheet", "date": "2026-10-12" },
-    { "n": 23, "text": "reschedule it for tomorrow", "select": "wi_rate_sheet", "via": "rules", "kind": "snooze", "item": "wi_rate_sheet", "date": "2026-10-07" },
-    { "n": 24, "text": "defer the travel task to friday", "select": "wi_rate_sheet", "via": "rules", "kind": "snooze", "item": "wi_travel", "date": "2026-10-09" },
-    { "n": 25, "text": "snooze the rate sheet until the end of the week", "select": "wi_budget_notes", "via": "rules", "kind": "snooze", "item": "wi_rate_sheet", "date": "2026-10-09" },
-    { "n": 26, "text": "move it to the 15th", "select": "wi_rate_sheet", "via": "rules", "kind": "snooze", "item": "wi_rate_sheet", "date": "2026-10-15" },
+    {
+      "n": 1,
+      "text": "done",
+      "select": "wi_rate_sheet",
+      "via": "rules",
+      "kind": "mark_done",
+      "item": "wi_rate_sheet",
+      "date": null
+    },
+    {
+      "n": 2,
+      "text": "Done.",
+      "select": "wi_rate_sheet",
+      "via": "rules",
+      "kind": "mark_done",
+      "item": "wi_rate_sheet",
+      "date": null
+    },
+    {
+      "n": 3,
+      "text": "it is done",
+      "select": "wi_rate_sheet",
+      "via": "rules",
+      "kind": "mark_done",
+      "item": "wi_rate_sheet",
+      "date": null
+    },
+    {
+      "n": 4,
+      "text": "It's done!",
+      "select": "wi_rate_sheet",
+      "via": "rules",
+      "kind": "mark_done",
+      "item": "wi_rate_sheet",
+      "date": null
+    },
+    {
+      "n": 5,
+      "text": "mark it done",
+      "select": "wi_rate_sheet",
+      "via": "rules",
+      "kind": "mark_done",
+      "item": "wi_rate_sheet",
+      "date": null
+    },
+    {
+      "n": 6,
+      "text": "Please mark this as done",
+      "select": "wi_rate_sheet",
+      "via": "rules",
+      "kind": "mark_done",
+      "item": "wi_rate_sheet",
+      "date": null
+    },
+    {
+      "n": 7,
+      "text": "I am done with it",
+      "select": "wi_rate_sheet",
+      "via": "rules",
+      "kind": "mark_done",
+      "item": "wi_rate_sheet",
+      "date": null
+    },
+    {
+      "n": 8,
+      "text": "finished",
+      "select": "wi_rate_sheet",
+      "via": "rules",
+      "kind": "mark_done",
+      "item": "wi_rate_sheet",
+      "date": null
+    },
+    {
+      "n": 9,
+      "text": "all done!",
+      "select": "wi_rate_sheet",
+      "via": "rules",
+      "kind": "mark_done",
+      "item": "wi_rate_sheet",
+      "date": null
+    },
+    {
+      "n": 10,
+      "text": "that is done",
+      "select": "wi_rate_sheet",
+      "via": "rules",
+      "kind": "mark_done",
+      "item": "wi_rate_sheet",
+      "date": null
+    },
+    {
+      "n": 11,
+      "text": "done with the budget notes",
+      "select": "wi_rate_sheet",
+      "via": "rules",
+      "kind": "mark_done",
+      "item": "wi_budget_notes",
+      "date": null
+    },
+    {
+      "n": 12,
+      "text": "mark the travel task as done",
+      "select": "wi_rate_sheet",
+      "via": "rules",
+      "kind": "mark_done",
+      "item": "wi_travel",
+      "date": null
+    },
+    {
+      "n": 13,
+      "text": "finished the printer follow up",
+      "select": "wi_rate_sheet",
+      "via": "rules",
+      "kind": "mark_done",
+      "item": "wi_printer",
+      "date": null
+    },
+    {
+      "n": 14,
+      "text": "snooze",
+      "select": "wi_rate_sheet",
+      "via": "rules",
+      "kind": "snooze",
+      "item": "wi_rate_sheet",
+      "date": "2026-10-07"
+    },
+    {
+      "n": 15,
+      "text": "snooze it",
+      "select": "wi_rate_sheet",
+      "via": "rules",
+      "kind": "snooze",
+      "item": "wi_rate_sheet",
+      "date": "2026-10-07"
+    },
+    {
+      "n": 16,
+      "text": "snooze it to Friday",
+      "select": "wi_rate_sheet",
+      "via": "rules",
+      "kind": "snooze",
+      "item": "wi_rate_sheet",
+      "date": "2026-10-09"
+    },
+    {
+      "n": 17,
+      "text": "Snooze until monday.",
+      "select": "wi_rate_sheet",
+      "via": "rules",
+      "kind": "snooze",
+      "item": "wi_rate_sheet",
+      "date": "2026-10-12"
+    },
+    {
+      "n": 18,
+      "text": "snooze this till tomorrow",
+      "select": "wi_rate_sheet",
+      "via": "rules",
+      "kind": "snooze",
+      "item": "wi_rate_sheet",
+      "date": "2026-10-07"
+    },
+    {
+      "n": 19,
+      "text": "move it to Friday",
+      "select": "wi_rate_sheet",
+      "via": "rules",
+      "kind": "snooze",
+      "item": "wi_rate_sheet",
+      "date": "2026-10-09"
+    },
+    {
+      "n": 20,
+      "text": "Please move this to monday",
+      "select": "wi_rate_sheet",
+      "via": "rules",
+      "kind": "snooze",
+      "item": "wi_rate_sheet",
+      "date": "2026-10-12"
+    },
+    {
+      "n": 21,
+      "text": "postpone it to oct 12",
+      "select": "wi_rate_sheet",
+      "via": "rules",
+      "kind": "snooze",
+      "item": "wi_rate_sheet",
+      "date": "2026-10-12"
+    },
+    {
+      "n": 22,
+      "text": "push it to 12 october",
+      "select": "wi_rate_sheet",
+      "via": "rules",
+      "kind": "snooze",
+      "item": "wi_rate_sheet",
+      "date": "2026-10-12"
+    },
+    {
+      "n": 23,
+      "text": "reschedule it for tomorrow",
+      "select": "wi_rate_sheet",
+      "via": "rules",
+      "kind": "snooze",
+      "item": "wi_rate_sheet",
+      "date": "2026-10-07"
+    },
+    {
+      "n": 24,
+      "text": "defer the travel task to friday",
+      "select": "wi_rate_sheet",
+      "via": "rules",
+      "kind": "snooze",
+      "item": "wi_travel",
+      "date": "2026-10-09"
+    },
+    {
+      "n": 25,
+      "text": "snooze the rate sheet until the end of the week",
+      "select": "wi_budget_notes",
+      "via": "rules",
+      "kind": "snooze",
+      "item": "wi_rate_sheet",
+      "date": "2026-10-09"
+    },
+    {
+      "n": 26,
+      "text": "move it to the 15th",
+      "select": "wi_rate_sheet",
+      "via": "rules",
+      "kind": "snooze",
+      "item": "wi_rate_sheet",
+      "date": "2026-10-15"
+    },
     {
       "n": 27,
       "text": "I wrapped up the travel booking",

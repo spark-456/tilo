@@ -3,7 +3,9 @@
 `GET /v1/team` and the writes under it. Identity is the verified `deps.Principal` only; the actor's team role is the
 STORED roles map's, never the session's or the body's; time is the server clock. A person outside the team gets one
 404 body on every route. Only the Owner writes (BQ-TEAMACC-2; PRD 10.1 gives the Approver no policy rights). Writes
-read only `application/json` (415), take closed bodies (422), are refused while replay-only (503), and are applied with
+read only `application/json` (415), take closed bodies (422), are refused while replay-only (503), count against
+`write_limit` as a route dependency (it runs before the body one, so a 413, 415 or 422 takes a slot too: BQ-PPL11C-2,
+-13; it needs `deps.get_people_stores`: 503 `not_configured` where `TILO_PEOPLE_STORE` is unset), and are applied with
 the store's compare-and-set, re-checked on the fresh state after a lost race. Every refusal from `team_rules` maps to
 a 4xx; a broken store or config is a 503 that never echoes the cause. A changed switch or tool level appends one
 `team_rule.changed` event (ADR-0027, `team_events`) after the compare-and-set; if that fails the change is undone and
@@ -20,11 +22,14 @@ from dataclasses import replace
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.responses import JSONResponse
+from fastapi.routing import APIRoute
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 from tilo_metering.flags import FlagStore
 
 from tilo_api import deps
-from tilo_api.people_writes import _capped_body, valid_email
+from tilo_api.people_limits import write_limit
+from tilo_api.people_writes import Refusal, _capped_body, valid_email
 from tilo_api.team_events import TeamEvents, get_team_events
 from tilo_api.team_rules import ROLES, MustAskLocked, RoleChangeRefused, load_capabilities, load_switches, set_switch
 from tilo_api.team_store import (
@@ -37,7 +42,27 @@ from tilo_api.team_store import (
 )
 
 logger = logging.getLogger("tilo_api.team_routes")
-router = APIRouter()
+
+
+class _TeamRoute(APIRoute):
+    def get_route_handler(self) -> Callable[[Request], Any]:
+        handler = super().get_route_handler()
+
+        async def guarded(request: Request) -> Any:
+            try:
+                return await handler(request)
+            except HTTPException as refusal:
+                extra = refusal.extra if isinstance(refusal, Refusal) else {}
+                return JSONResponse(
+                    status_code=refusal.status_code,
+                    content={"detail": refusal.detail, **extra},
+                    headers=refusal.headers,
+                )
+
+        return guarded
+
+
+router = APIRouter(route_class=_TeamRoute)
 
 Principal = Annotated[deps.Principal, Depends(deps.get_current_principal)]
 Store = Annotated[TeamRepository, Depends(get_team_store)]
@@ -245,7 +270,7 @@ def get_team(principal: Principal, store: Store) -> dict[str, Any]:
     return _view(state, principal)
 
 
-@router.put("/v1/team/members/{person_id}/role")
+@router.put("/v1/team/members/{person_id}/role", dependencies=[Depends(write_limit)])
 def put_role(
     person_id: str, principal: Principal, body: Annotated[RoleIn, Depends(_json_body(RoleIn))],
     store: Store, flags: Flags, clock: Clock,
@@ -264,7 +289,7 @@ def put_role(
     return _view(state, principal)
 
 
-@router.put("/v1/team/members/{person_id}/limit")
+@router.put("/v1/team/members/{person_id}/limit", dependencies=[Depends(write_limit)])
 def put_limit(
     person_id: str, principal: Principal, body: Annotated[LimitIn, Depends(_json_body(LimitIn))],
     store: Store, flags: Flags, clock: Clock,
@@ -283,7 +308,7 @@ def put_limit(
     return _view(state, principal)
 
 
-@router.delete("/v1/team/members/{person_id}")
+@router.delete("/v1/team/members/{person_id}", dependencies=[Depends(write_limit)])
 def remove_member(person_id: str, principal: Principal, store: Store, flags: Flags, clock: Clock) -> dict[str, Any]:
     def change(state: TeamState) -> TeamState:
         _owner(state, principal)
@@ -301,7 +326,7 @@ def remove_member(person_id: str, principal: Principal, store: Store, flags: Fla
     return _view(state, principal)
 
 
-@router.post("/v1/team/invites", status_code=201)
+@router.post("/v1/team/invites", status_code=201, dependencies=[Depends(write_limit)])
 def invite(
     principal: Principal, body: Annotated[InviteIn, Depends(_json_body(InviteIn))], store: Store, flags: Flags,
     clock: Clock,
@@ -324,7 +349,7 @@ def invite(
     return {"invite_id": invite_id}
 
 
-@router.put("/v1/team/switches/{key}")
+@router.put("/v1/team/switches/{key}", dependencies=[Depends(write_limit)])
 def put_switch(
     key: str, principal: Principal, body: Annotated[SwitchIn, Depends(_json_body(SwitchIn))],
     store: Store, flags: Flags, clock: Clock, events_: Events,
@@ -350,7 +375,7 @@ def put_switch(
     return _view(state, principal)
 
 
-@router.put("/v1/team/tools/{connector}")
+@router.put("/v1/team/tools/{connector}", dependencies=[Depends(write_limit)])
 def put_tool(
     connector: str, principal: Principal, body: Annotated[ToolIn, Depends(_json_body(ToolIn))],
     store: Store, flags: Flags, events_: Events,

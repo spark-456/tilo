@@ -318,6 +318,7 @@ export function HomePage({ app }: { app: AppCtx }) {
           </div>
           {(vw || 1440) >= 1180 ? (
             <TodayPanel
+              served={served}
               rows={liveRows(worlds, needs, served)}
               sample={served ? worlds.find((w) => w.sample) : undefined}
               events={base.agenda && base.agenda.days !== null ? nextEvents(base.agenda) : []}
@@ -341,6 +342,7 @@ export function HomePage({ app }: { app: AppCtx }) {
         <ComposerPanel
           sending={sending}
           sample={demo}
+          compact={vw > 0 && vw <= 480}
           staging={{
             files,
             onChange: setFiles,

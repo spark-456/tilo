@@ -1,8 +1,8 @@
 {
   "agenda_title": "Roadmap review",
-  "agenda_items": [{"title": "Roadmap", "status": "covered", "minutes": 3}],
+  "agenda_items": [{ "title": "Roadmap", "status": "covered", "minutes": 3 }],
   "decisions": ["Ship the beta on 15 November"],
-  "action_items": [{"text": "Send the draft", "owner": "Tom Reyes", "due": "Friday"}],
+  "action_items": [{ "text": "Send the draft", "owner": "Tom Reyes", "due": "Friday" }],
   "open_questions": [],
   "drift_note": "",
   "context_summary": "Not read by ingest.",

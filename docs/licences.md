@@ -17,6 +17,7 @@ CLAUDE.md's "record every dependency's licence" rule. Updated whenever a depende
 | jsonschema | MIT | https://pypi.org/project/jsonschema/ |
 | referencing | MIT | https://pypi.org/project/referencing/ |
 | datamodel-code-generator (generates `packages/contracts-py`) | MIT | https://pypi.org/project/datamodel-code-generator/ |
+| hatchling (workspace members' `build-system.requires`, used to build their wheels) | MIT | https://github.com/pypa/hatch/blob/master/LICENSE.txt |
 
 ## Python (`services/api`)
 
@@ -163,7 +164,7 @@ Its tests use `jsonschema` and `referencing` from the root dev group (above).
 | vite 6.4.x (#69, replaces 5.4.x; pulls esbuild 0.25, rollup, fdir, tinyglobby, all MIT; no licence change) | MIT | https://www.npmjs.com/package/vite |
 | @playwright/test | Apache-2.0 | https://www.npmjs.com/package/@playwright/test |
 | @axe-core/playwright | MPL-2.0 | https://www.npmjs.com/package/@axe-core/playwright |
-| @fontsource/nunito, @fontsource/nunito-sans, @fontsource/jetbrains-mono | MIT; fonts Nunito, Nunito Sans, JetBrains Mono are OFL-1.1 | https://fonts.google.com/ |
+| @fontsource/nunito, @fontsource/nunito-sans, @fontsource/jetbrains-mono (self-hosted fonts; each installed 5.3.0 package declares OFL-1.1 and includes `LICENSE`) | OFL-1.1 | https://github.com/fontsource/font-files |
 | fast-check (property tests, ticket P0-08b-player, FR-WLD-04) | MIT | https://www.npmjs.com/package/fast-check |
 | happy-dom (DOM for React component unit tests, AGW-01; dev only) | MIT | https://www.npmjs.com/package/happy-dom |
 | ajv (JSON Schema validator for the PPL-40a plate reducer test; dev only) | MIT | https://www.npmjs.com/package/ajv |
@@ -186,6 +187,7 @@ Its tests use `jsonschema` and `referencing` from the root dev group (above).
 | uv | MIT / Apache-2.0 | https://github.com/astral-sh/uv |
 | just | CC0-1.0 | https://github.com/casey/just |
 | pnpm | MIT | https://github.com/pnpm/pnpm |
+| Eclipse Temurin 21 JRE (`eclipse-temurin:21-jre-jammy`, test-only Firestore emulator runtime in Cloud Build) | GPL-2.0 with Classpath Exception | https://adoptium.net/docs/faq |
 | Biome | MIT | https://github.com/biomejs/biome |
 | Terraform | BUSL-1.1 (HashiCorp; run only by the user per CLAUDE.md, never `terraform apply` from an agent) | https://github.com/hashicorp/terraform |
 | pip-audit | Apache-2.0 | https://github.com/pypa/pip-audit |
@@ -230,8 +232,36 @@ Pinned in `cloudbuild.yaml`. They run only inside Google Cloud Build; nothing fr
 
 ## Fonts, icons and design assets
 
-None vendored yet. `design/source/` is read-only reference material, not a dependency; its
+The web app imports self-hosted Nunito, Nunito Sans and JetBrains Mono from the Fontsource packages
+listed above (`apps/web/src/park/tokens/fonts.ts` and `apps/web/src/main.tsx`); their font files ship
+with the web build. `design/source/` is read-only reference material, not a dependency; its
 licence terms are tracked in `design/source/INDEX.md`, not here.
+
+## Meeting bot: Python, browser image and operating-system tools
+
+`meet-bot/pyproject.toml` is standalone, outside the root uv workspace. Its host CLI is stdlib-only;
+the two Dockerfiles install `meet-bot/docker/requirements.txt`, and `CloudRun.Dockerfile` also installs
+`cloud-requirements.txt`. Those files reuse the provider/API dependencies recorded above; their
+direct pins track `uv.lock`, except Playwright, which matches the browser-image tag.
+
+| Component | Licence | Source |
+| --- | --- | --- |
+| playwright Python package (1.52.0; bot dev extra and both images) | Apache-2.0 | https://github.com/microsoft/playwright-python/blob/v1.52.0/LICENSE |
+| mcr.microsoft.com/playwright/python:v1.52.0-noble (both bot base images) | Apache-2.0 (Playwright); bundled browsers and Ubuntu packages retain their own licences | https://github.com/microsoft/playwright-python/tree/v1.52.0/utils/docker |
+| xvfb (both images) | X/MIT and other permissive X.Org component licences; see upstream notices | https://github.com/mirror/xserver/blob/master/COPYING |
+| pulseaudio, pulseaudio-utils (both images) | LGPL-2.1-or-later core; component exceptions apply | https://www.freedesktop.org/wiki/Software/PulseAudio/About/ |
+| fonts-noto-color-emoji (both images) | OFL-1.1 (font files) | https://github.com/googlefonts/noto-emoji/blob/main/LICENSE |
+| x11vnc (local desktop image) | GPL-2.0-or-later with OpenSSL linking exception | https://github.com/LibVNC/x11vnc/blob/master/src/x11vnc.h |
+| novnc (local desktop image) | MPL-2.0 core; BSD-2-Clause HTML/CSS, OFL-1.1 font, CC-BY-SA-3.0 images and other component notices | https://github.com/novnc/noVNC/blob/master/LICENSE.txt |
+| websockify (local desktop image) | LGPL-3.0 | https://github.com/novnc/websockify/blob/master/COPYING |
+| openbox (local desktop image) | GPL-2.0-or-later | https://github.com/danakj/openbox/blob/main/openbox/openbox.c |
+| procps (local desktop image) | GPL-2.0-or-later utilities; LGPL library components | https://github.com/procps-ng/procps |
+| espeak-ng (local desktop image; `bot/tts.py` invokes the executable) | GPL-3.0-or-later | https://github.com/espeak-ng/espeak-ng#license-information |
+
+The Cloud Run image omits the local remote-desktop tools and espeak-ng. Apt package versions and
+Python transitive dependencies are not pinned by these bot requirement files (BQ-MTG11-9); this
+ledger records declared components, not an image-specific SBOM or a redistribution clearance.
+Exact installed package notices belong to the built image (`/usr/share/doc/<package>/copyright`).
 
 ## Python (`packages/memory`)
 
