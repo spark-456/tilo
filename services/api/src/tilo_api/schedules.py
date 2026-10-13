@@ -876,6 +876,7 @@ def tick(
         nudge_sweep.sweep(request, _stamp(clock()))  # FR-PA-15b: off unless TILO_NUDGES=1; the answer never changes
         _sweep_outbox(request, clock, store_factory)
         _sweep_push(request, clock, store_factory)
+        _sweep_spend(request, clock)
         plate_links.sweep(
             request, _stamp(clock())
         )  # FR-PA-06b: off unless TILO_PLATE_DIGEST=1; never changes the answer
@@ -910,6 +911,18 @@ def _sweep_outbox(request: Request, clock: Callable[[], datetime], store_factory
         sweep_due(store, adapters, lambda: _stamp(clock()), paused)
     except Exception as exc:
         logger.error("outbox sweep failed (%s)", type(exc).__name__)
+
+
+def _sweep_spend(request: Request, clock: Callable[[], datetime]) -> None:
+    """ADR-0042 MV-17(b): the Scheduler's tick also settles the SEC-16 ledger's expired `held` holds at their own amount
+    (the count is unchanged, only the status closes). Best effort like the sweeps around it: a ledger with no such
+    method (the in-memory one) or any failure is logged by type and never changes the tick's own answer."""
+    try:
+        ledger = request.app.dependency_overrides.get(deps.get_spend_cap_ledger, deps.get_spend_cap_ledger)()
+        if (settle_expired := getattr(ledger, "settle_expired", None)) is not None:
+            settle_expired(clock())
+    except Exception as exc:
+        logger.warning("spend hold sweep failed (%s)", type(exc).__name__)
 
 
 def _sweep_push(request: Request, clock: Callable[[], datetime], store_factory: Callable[[], deps.Store]) -> None:

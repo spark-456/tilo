@@ -62,6 +62,13 @@ class Claim:
     def open_hold(self) -> Hold | None:
         return next((h for h in self.holds.values() if h.state == "open"), None)
 
+    def settle_stale(self, now: float, ttl_s: float) -> None:
+        """MV-17(a): a hold open longer than `ttl_s` (3 x voice.live.timeout_s) is settled at the whole unit, so a bot
+        that died mid-reply does not hold the meeting's Live voice until the claim ends. Callers hold `lock`."""
+        for hold in self.holds.values():
+            if hold.state == "open" and now - hold.reserved_at > ttl_s:
+                hold.settle_whole()
+
 
 class AttendClaims:
     def __init__(self, *, clock: Callable[[], float] = time.monotonic, ttl_s: float = CLAIM_TTL_S) -> None:

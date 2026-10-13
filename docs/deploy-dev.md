@@ -436,7 +436,11 @@ only what is already there: `TILO_FIRESTORE_PROJECT` on `tilo-api` (set by the r
 account's existing Firestore access (`roles/datastore.user`, as the schedule store). No composite index (single
 document reads and writes only), no rules change (`firestore.rules` already denies every client path, and the server
 bypasses them), no `TILO_API_STORE` and no always-on CPU (every call is inside a request). With no valid project or no
-credentials the seam answers 503 and every request is replay, never uncapped. Reading it: `GET /access` says
+credentials the seam answers 503 and every request is replay, never uncapped. A `hold:` document carries `expires_at`
+(its reserve time plus one hour, ADR-0042 MV-17); one still `held` after that (a restart or a lost claim) is settled at
+its own amount, so the count is unchanged and only its status closes, by the next reserve of that uid (at most once a
+minute per uid per instance) and by the Scheduler's tick. That is a query on equality filters of `status` and `uid`
+(Firestore's automatic single-field indexes serve it: still no composite index to create). Reading it: `GET /access` says
 `models: "live"` only while the ledger is readable, the uid is under its cap and the switch is off. To reset the
 durable kill switch after the daily hard cap tripped it, delete the document `orgs/org_tilo/spend_ledger/switch`
 (Firestore console) or set its `on` field to `false`; nothing in the API can.
