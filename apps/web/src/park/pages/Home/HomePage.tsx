@@ -35,6 +35,7 @@ import {
   spendOf,
   summaryLine,
 } from "./homeData";
+import { useComposerClearance } from "./useComposerClearance";
 
 interface Base {
   user: User;
@@ -287,8 +288,12 @@ export function HomePage({ app }: { app: AppCtx }) {
       )
     : summaryLine(needs, night);
 
+  const root = useRef<HTMLDivElement>(null);
+  const composerShown = !failed || (worldsLive && worlds !== "failed");
+  useComposerClearance(root, composerShown);
+
   return (
-    <div className="park-home-root" data-testid="park-page-home">
+    <div ref={root} className="park-home-root" data-testid="park-page-home">
       {ready ? (
         <>
           <Pins
@@ -340,7 +345,7 @@ export function HomePage({ app }: { app: AppCtx }) {
           </div>
         </div>
       ) : null}
-      {!failed || (worldsLive && worlds !== "failed") ? (
+      {composerShown ? (
         <ComposerPanel
           sending={sending}
           sample={demo}
