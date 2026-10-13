@@ -625,6 +625,8 @@
   background-image: repeating-linear-gradient(to bottom, var(--line2) 0 1px, transparent 1px 52px);
 }
 [data-park] .park-agenda-event {
+  min-width: 24px;
+  min-height: 24px;
   position: absolute;
   right: 3px;
   left: 3px;
@@ -966,4 +968,23 @@
   font-size: 14.5px;
   font-weight: 600;
   color: var(--ink2);
+}
+
+/* UI-10 W9: the honest sync sentence and new-pin field must fit inside the phone sheet. */
+@media (max-width: 600px) {
+  [data-park] [data-testid="park-page-agenda"] .park-agenda-synced {
+    white-space: normal;
+    height: auto;
+    min-height: 40px;
+    max-width: 100%;
+  }
+  [data-park] [data-testid="park-page-agenda"] .park-agenda-newinput {
+    box-sizing: border-box;
+    min-width: 0;
+    width: 100%;
+  }
+  [data-park] [data-testid="park-page-agenda"] .park-agenda-findtext {
+    min-width: 0;
+    max-width: 100%;
+  }
 }

@@ -51,5 +51,19 @@ for (const viewport of [
         expect(box.height).toBeGreaterThanOrEqual(24);
       }
     });
+
+    test("UI_10_W9_ledger_labels_mask_the_dashed_plot_lines", async ({ page }) => {
+      await page.goto("/ledger");
+      const labels = page.locator(".park-ledger-ylabel, .park-ledger-note");
+      await expect(labels.first()).toBeVisible();
+      const backgrounds = await labels.evaluateAll((elements) =>
+        elements.map((element) => getComputedStyle(element).backgroundColor),
+      );
+      expect(backgrounds.length).toBeGreaterThan(2);
+      for (const background of backgrounds) {
+        expect(background).not.toBe("rgba(0, 0, 0, 0)");
+        expect(background).not.toBe("transparent");
+      }
+    });
   });
 }

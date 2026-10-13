@@ -50,6 +50,7 @@
   color: var(--ink2);
 }
 [data-park] .park-connectors-search {
+  max-width: 100%;
   height: 42px;
   width: 260px;
   box-sizing: border-box;
@@ -657,4 +658,19 @@
 [data-park] .park-connectors-search:focus-within {
   outline: 3px solid #5a3fe0;
   outline-offset: 2px;
+}
+
+/* UI-10 W9: desktop card minima cannot exceed a phone's inner sheet width. */
+@media (max-width: 600px) {
+  [data-park] [data-testid="park-page-connectors"] .park-connectors-grid,
+  [data-park] [data-testid="park-page-connectors"] .park-connectors-availgrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  [data-park] [data-testid="park-page-connectors"] .park-connectors-banner-text {
+    min-width: 0;
+    flex-basis: 100%;
+  }
+  [data-park] [data-testid="park-page-connectors"] .park-connectors-avail {
+    flex-wrap: wrap;
+  }
 }
