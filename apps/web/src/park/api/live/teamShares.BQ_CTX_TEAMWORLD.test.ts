@@ -1,7 +1,13 @@
 // BQ-CTX-TEAMWORLD (ADR-0040, FR-TEAM-01..06): the strict readers of the team-sharing routes and the one write.
 import { describe, expect, it, vi } from "vitest";
 import { HttpClient, TiloApiError } from "../../../api/http";
-import { readShares, setShare, sharesFromBody } from "./teamShares";
+import {
+  itemsFromBody,
+  readShares,
+  setShare,
+  sharedWorldFromBody,
+  sharesFromBody,
+} from "./teamShares";
 
 const W = "w_launch";
 const share = (over: Record<string, unknown> = {}) => ({
@@ -9,6 +15,15 @@ const share = (over: Record<string, unknown> = {}) => ({
   in_force: true,
   reason: null,
   granted_at: "2026-10-10T09:00:00.000Z",
+  ...over,
+});
+const item = (over: Record<string, unknown> = {}) => ({
+  id: "wi_1",
+  title: "Book the venue",
+  status: "open",
+  due: null,
+  owner: "u_ben",
+  world_id: W,
   ...over,
 });
 const reply = (body: unknown, status = 200) =>
@@ -51,6 +66,46 @@ describe("BQ_CTX_TEAMWORLD shares reply", () => {
       }),
     );
     expect((await readShares(clientOf(fetch), W)).map((s) => s.team)).toEqual(["tm_ops"]);
+  });
+});
+
+describe("BQ_CTX_TEAMWORLD items and world replies", () => {
+  it("FR_TEAM_05 reads open and done rows and the truncation flag, and nothing else", () => {
+    const got = itemsFromBody(
+      {
+        world_id: W,
+        items: [item(), item({ id: "wi_2", status: "done", due: "2026-10-20" })],
+        truncated: true,
+      },
+      W,
+    );
+    expect(got?.truncated).toBe(true);
+    expect(got?.items.map((i) => [i.id, i.status, i.due])).toEqual([
+      ["wi_1", "open", null],
+      ["wi_2", "done", "2026-10-20"],
+    ]);
+  });
+
+  it("FR_TEAM_05 refuses a row of another world, a proposed row and a row with no owner", () => {
+    expect(itemsFromBody({ world_id: W, items: [item({ world_id: "w_x" })] }, W)).toBeNull();
+    expect(itemsFromBody({ world_id: W, items: [item({ status: "proposed" })] }, W)).toBeNull();
+    expect(itemsFromBody({ world_id: W, items: [item({ owner: "" })] }, W)).toBeNull();
+  });
+
+  it("FR_TEAM_03 reads the districts a Viewer sees and says when some are hidden", () => {
+    const world = sharedWorldFromBody(
+      {
+        world_id: W,
+        districts: [{ id: "D1", name: "Design", summary: "s" }],
+        has_hidden_districts: true,
+      },
+      W,
+    );
+    expect(world).toEqual({
+      districts: [{ id: "D1", name: "Design", summary: "s" }],
+      hasHiddenDistricts: true,
+    });
+    expect(sharedWorldFromBody({ world_id: W, districts: [{ id: "D1" }] }, W)).toBeNull();
   });
 });
 
