@@ -21,7 +21,7 @@ import type { AppCtx } from "../../app/AppCtx";
 import { NotFound } from "../../app/NotFound";
 import { useDemoSession, useParkApi, useWorldClient } from "../../app/context";
 import { PageTitle } from "../../app/pageTitle";
-import { stagePath } from "../../app/router";
+import { RECORDED_RUN_PATH, stagePath } from "../../app/router";
 import {
   SLACK_NOTE_MAX,
   type SlackShareRequest,
@@ -440,7 +440,9 @@ export function WorldPage({ app }: { app: AppCtx }) {
             </StageLink>
           ) : null}
           {w.sample ? (
-            <a className="park-world-live" href={stagePath(w.id)}>
+            // UI-10 B7: a demo session has no API client, so the sample world's own stage is "Not found" there; the
+            // recorded run that exists plays instead (the stage labels it "Fixture replay").
+            <a className="park-world-live" href={demo ? RECORDED_RUN_PATH : stagePath(w.id)}>
               {icon("play", 14)}Watch the replay
             </a>
           ) : null}
@@ -452,7 +454,13 @@ export function WorldPage({ app }: { app: AppCtx }) {
         <TeamItems client={worldClient} worldId={w.id} auto={false} />
       ) : null}
       {slackOpen ? (
-        <div className="park-world-slackbackdrop">
+        // biome-ignore lint/a11y/useKeyWithClickEvents: Escape already closes the dialog (its onKeyDown); the backdrop click is the pointer shortcut
+        <div
+          className="park-world-slackbackdrop"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) closeSlackDialog();
+          }}
+        >
           <div
             ref={dialogRef}
             // biome-ignore lint/a11y/useSemanticElements: custom modal dialog with focus trap and role="dialog"
@@ -465,6 +473,11 @@ export function WorldPage({ app }: { app: AppCtx }) {
             <div className="park-world-slackhead">
               <div className="park-world-slacktitle">Share to Slack</div>
               <div className="park-world-slacksub">{`${w.name} · ${slackState.account}`}</div>
+              {real ? null : (
+                <p className="park-sample-note">
+                  <SampleBadge /> Nothing is sent to Slack: this is recorded sample data.
+                </p>
+              )}
             </div>
             <label className="park-world-slackfield">
               <span className="park-world-slacklabel">Channel</span>
@@ -496,6 +509,9 @@ export function WorldPage({ app }: { app: AppCtx }) {
                 }
               />
             </label>
+            <div className="park-world-slackcount" aria-live="polite">
+              {`${slackNote.length} / ${SLACK_NOTE_MAX}`}
+            </div>
             <div className="park-world-slackactions">
               <Button variant="needs" size="sm" onClick={submitSlackApproval}>
                 Ask for approval

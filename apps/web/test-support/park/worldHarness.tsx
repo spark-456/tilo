@@ -92,6 +92,8 @@ export interface RigOptions {
   dec?: Dec;
   added?: World[];
   app?: Partial<AppCtx>;
+  /** A demo session (QA-DEMO-1): recorded sample data, no real outcomes. */
+  demo?: boolean;
 }
 
 export async function settle(): Promise<void> {
@@ -128,6 +130,7 @@ export async function mountWorld(opts: RigOptions = {}): Promise<WorldRig> {
       navigate={navigate}
       schedule={sch.schedule}
       viewport={{ vw: app.vw, vh: app.vh }}
+      {...(opts.demo ? { demo: true } : {})}
     >
       <WorldPage app={app} />
     </ParkProvider>
