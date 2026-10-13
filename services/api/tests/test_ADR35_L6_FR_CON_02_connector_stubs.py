@@ -89,7 +89,9 @@ class Rig:
         self.entry, self.evidence = entry, evidence
         self.token = "idtok." + secrets.token_hex(12)
         self.transport = t4.Scripted(*replies)
-        self.rpc = MeetingHostRpc(t4.URL, transport=self.transport, token_for=kw.get("fetch") or (lambda a: self.token))
+        self.rpc = MeetingHostRpc(  # a frozen deadline clock: `20 <= timeout_s < 30` then holds exactly, load or not
+            t4.URL, transport=self.transport, token_for=kw.get("fetch") or (lambda a: self.token), clock=lambda: 0.0
+        )
         self.sunk: list[dict[str, Any]] = []
         self.read_calls: list[dict[str, Any]] = []
         self.owner = kw.get("owner", entry["authz"]["ref"])
