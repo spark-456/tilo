@@ -204,7 +204,7 @@ def _decide(request: Request, route: str, body: Any) -> JSONResponse:
             raise NotConfigured("a ceiling-sized reply is priced above the unit")
         claims: AttendClaims | None = _seam(request, meeting_voice_claims.get_attend_claims)
         claim = claims.find(body.meeting_id, body.claim) if claims is not None else None
-        if claim is None:  # absent, wrong nonce, another attend's, expired: one answer (MV-14, MV-16)
+        if claims is None or claim is None:  # absent, wrong nonce, another attend's, expired: one (MV-14, MV-16)
             return _error(409, "not_attending", route)
         with claim.lock:
             if route == RESERVE:
