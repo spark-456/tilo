@@ -1,0 +1,12 @@
+{
+  "meeting_id": "mt_weekly_sync",
+  "claim": "example_claim_nonce-000000000000",
+  "key": "example_key-00000000000000000000",
+  "outcome": "settled",
+  "usage": {
+    "prompt_token_count": 180,
+    "response_token_count": 95,
+    "total_token_count": 275
+  },
+  "user_id": "u_owner"
+}
