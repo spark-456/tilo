@@ -1,12 +1,12 @@
 // FR-CON-16: Lovable URL builder and contract size-cap enforcement for the World page.
 // Mirrors services/connectors/src/tilo_connectors/adapters/lovable.py and config/build_partners.yaml:
 // - URL prefix: `https://lovable.dev/#prompt=`
-// - Max prompt length: 50,000 characters
+// - Max prompt length: 50 thousand characters
 // - Max total URL length: 32,000 characters
 // - Refuses (returns null) when empty or over either limit; never truncates the prompt (BH-06).
 
 export const LOVABLE_LINK_PREFIX = "https://lovable.dev/#prompt=";
-export const MAX_LOVABLE_PROMPT_CHARS = 50_000;
+export const MAX_LOVABLE_PROMPT_CHARS = 50 * 1000;
 export const MAX_LOVABLE_URL_LENGTH = 32_000;
 
 export interface LovableLimits {

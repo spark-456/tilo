@@ -152,9 +152,11 @@ class MeetingHostRpc:
         token_for: Callable[[str], str],
         timeout_s: float = TIMEOUT_S,
         views_timeout_s: float = VIEWS_TIMEOUT_S,
+        clock: Callable[[], float] = time.monotonic,
     ) -> None:
         self._base, self._transport, self._token_for, self._timeout = base_url, transport, token_for, timeout_s
         self._views_timeout = views_timeout_s
+        self._clock = clock  # the deadline's clock: a test freezes it so the request's budget is exactly the limit
 
     def __repr__(self) -> str:
         return "MeetingHostRpc()"
@@ -168,7 +170,7 @@ class MeetingHostRpc:
         box: dict[str, Any] = {}
         done = threading.Event()
         limit = self._timeout if timeout_s is None else timeout_s
-        deadline = time.monotonic() + limit
+        deadline = self._clock() + limit
 
         def work() -> None:
             try:
@@ -198,7 +200,7 @@ class MeetingHostRpc:
         data = json.dumps(payload, separators=(",", ":")).encode()
         stage["posted"] = True
         try:
-            reply = self._transport.post(f"{self._base}{path}", data, headers, max(0.1, deadline - time.monotonic()))
+            reply = self._transport.post(f"{self._base}{path}", data, headers, max(0.1, deadline - self._clock()))
         except Exception:  # noqa: BLE001 - a timeout, a cut connection: it may have arrived
             logger.warning("meeting-host %s: the call failed in transit", route)
             raise HostRpcError("unknown") from None

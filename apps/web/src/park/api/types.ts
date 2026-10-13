@@ -600,7 +600,7 @@ export interface BuildHandoff {
   approveLabel: string;
   /** Status line shown once approved. */
   doneLabel: string;
-  /** Exact prompt text prepared for Lovable (`1..50,000` characters). */
+  /** Exact prompt text prepared for Lovable (`1..MAX_LOVABLE_PROMPT_CHARS` characters). */
   prompt: string;
   /** Granted files/artifacts that would leave Tilo (`1..6` items). */
   files: BuildHandoffFile[];
