@@ -284,7 +284,9 @@ describe("WEB_12_profile_copy: every visible string and aria-label is the design
       const want = new Set(STRINGS[id as TabId]);
       expect({
         missing: [...want].filter((s) => !got.has(s)),
-        extra: [...got].filter((s) => !want.has(s)),
+        // BQ-SETWEB-1 (issue 588): the time zone's display-only "(GMT+1)" label is the one string the design copy
+        // has no entry for; its value depends on the date, so only its shape is allowed.
+        extra: [...got].filter((s) => !want.has(s) && !/^\(GMT([+-]\d{1,2}(:\d{2})?)?\)$/.test(s)),
       }).toEqual({ missing: [], extra: [] });
     },
   );
