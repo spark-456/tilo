@@ -14,7 +14,10 @@ import type {
 import { liveModelKeyFlow } from "../../../api/modelKeyEnv";
 import { StatusChip } from "../../components";
 
-// BK-06 (ADR-0041): shown before the field. Keyed to `consent_version`; the API returns the number, not the words.
+// BK-06 (ADR-0041): shown before the field. `CONSENT_VERSION` is the version of exactly the words below: it is bumped
+// with them, sent in the PUT body, and the server compares it with its own (a stale page is a 422 `confirm_required`).
+// It is never taken from the server's answer: an echo would always match and no stale page could be seen (B6).
+export const CONSENT_VERSION = 1;
 const CONSENT =
   "This organisation's prompts, documents and answers will be sent to the provider you name, under that provider's terms. They may be processed outside asia-southeast1, and that provider's own logs may show them to the administrators of that account. Tilo's spending caps do not apply to this spend, and your organisation carries the provider's bill.";
 const REMOVE_HELP =
@@ -42,6 +45,15 @@ const STATUS: Record<string, string> = {
   invalid: "The provider refused this key. Replace it, or remove it.",
 };
 const OWN = "This organisation's work uses Tilo's own model key.";
+
+/** The mask is CSS (`.park-profile-secret`, never a password field). A browser without it shows the field's text. */
+function canMask(): boolean {
+  return (
+    typeof CSS !== "undefined" &&
+    typeof CSS.supports === "function" &&
+    CSS.supports("-webkit-text-security", "disc")
+  );
+}
 
 function statusLine(v: ModelKeyView): string {
   if (!v.owner) {
@@ -120,10 +132,14 @@ function Body({ flow }: { flow: ModelKeyFlow }) {
   // asks, so a member sees it too; a member's own answer (`{active, label}`) has no form.
   const view = remote.kind === "view" ? remote.view : null;
   const has = view?.owner === true && view.state !== "none";
+  // The server's text is newer than the words on this page: nothing is sent until the page is reloaded. (A held
+  // key shows the version its owner last confirmed, which is older than the page's, never newer, so it never locks.)
+  const stale = view?.owner === true && (view.consentVersion ?? 0) > CONSENT_VERSION;
   const days = Number(cap);
   const ready =
     view?.owner === true &&
     view.consentVersion !== null &&
+    !stale &&
     agreed &&
     bundle.trim() !== "" &&
     (key !== "") !== (project.trim() !== "") &&
@@ -141,7 +157,7 @@ function Body({ flow }: { flow: ModelKeyFlow }) {
     setBusy(false);
   };
   const save = async () => {
-    if (!ready || !view || view.consentVersion === null) return;
+    if (!ready || !view) return;
     const typed = key;
     setKey(""); // gone from the field at the click, whatever the answer
     setBusy(true);
@@ -154,7 +170,7 @@ function Body({ flow }: { flow: ModelKeyFlow }) {
         projectId: project.trim() === "" ? null : project.trim(),
         dayCapCredits: days,
         fallbackToTilo: fallback,
-        consentVersion: view.consentVersion,
+        consentVersion: CONSENT_VERSION,
       }),
       "Key saved and confirmed. It cannot be shown again.",
     );
@@ -183,9 +199,9 @@ function Body({ flow }: { flow: ModelKeyFlow }) {
           </StatusChip>
         ) : null}
       </div>
-      {problem ? (
+      {problem || stale ? (
         <p role="alert" className="park-profile-alert">
-          {PROBLEMS[problem]}
+          {PROBLEMS[problem ?? "confirm"]}
         </p>
       ) : null}
       {done ? <output className="park-profile-note">{done}</output> : null}
@@ -217,16 +233,27 @@ function Body({ flow }: { flow: ModelKeyFlow }) {
               </label>
               <label className="park-profile-field">
                 <span className="park-profile-label">API key</span>
+                {/* PRD 16.1 rule 1: no password field. A text field masked by CSS, with every
+                    password-manager and autofill hint off, so a browser never offers to save the key (B5). */}
                 <input
-                  className="park-profile-input"
-                  type="password"
+                  className="park-profile-input park-profile-secret"
+                  type="text"
+                  name="provider-api-token"
                   value={key}
                   autoComplete="off"
+                  autoCapitalize="off"
                   spellCheck={false}
+                  data-1p-ignore
+                  data-lpignore="true"
+                  data-bwignore="true"
+                  data-form-type="other"
                   onChange={(e) => setKey(e.target.value)}
                 />
                 <span className="park-profile-help">
                   Sent once and kept in Tilo's vault. It is never shown again.
+                  {canMask()
+                    ? ""
+                    : " This browser cannot hide what you type here, so check that no one can see your screen."}
                 </span>
               </label>
               <label className="park-profile-field">
