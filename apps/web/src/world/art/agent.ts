@@ -18,14 +18,14 @@ const HEIGHT: Readonly<Record<string, number>> = {
 
 export const AGENT_SCALE = 1.35;
 
-export function drawAgent(g: Graphics, rank: string, tint: string): void {
+export function drawAgent(g: Graphics, rank: string, tint: string, shadows = true): void {
   const director = rank === "director";
   const col = director ? tokens.color.brand.primary : tint;
   const [cT, cR, limb] = [lt(col, 0.2), dk(col, 0.22), dk(col, 0.3)];
   const w = director ? 15 : 13;
   const hh = HEIGHT[rank] ?? 15;
   const [x0, y0, z] = [-w / 2, -w / 2, 3];
-  g.ellipse(0, 0, w * 0.95, w * 0.5).fill({ color: PALETTE.ink, alpha: 0.13 });
+  if (shadows) g.ellipse(0, 0, w * 0.95, w * 0.5).fill({ color: PALETTE.ink, alpha: 0.13 });
   const leg = { t: limb, l: limb, r: dk(limb, 0.2) };
   box(g, PF, [x0 + 2, y0 + w - 5, 0], [4, 4, 3], leg);
   box(g, PF, [x0 + w - 6, y0 + w - 5, 0], [4, 4, 3], leg);
