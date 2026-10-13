@@ -896,11 +896,14 @@ def _forget_run_stores() -> None:
 
 def get_artifact_store(
     request: Request = None,  # type: ignore[assignment]
-    mode: Annotated[Mode, Depends(get_work_mode)] = "replay",
+    mode: Annotated[Mode, Depends(get_mode)] = "replay",
 ) -> ArtifactStore:
     """Where a run's outputs go (PROD-WIRE 2b): Firestore records and GCS bytes for `TILO_ARTIFACTS_STORE=gcs` (see
     `tilo_api.run_stores`); anything else, or no redactor yet, refuses and no run starts (fail closed, BQ-AGT02-T4-1).
-    Config is read per call; a built store is kept per config. The redactor is checked before any client is built."""
+    Config is read per call; a built store is kept per config. The redactor is checked before any client is built.
+    `get_mode`, not `get_work_mode`: the store serves reads and deletes (an app view, the minutes, a meeting delete),
+    which a capped uid or a tripped switch must still get (API_SEC_16.md "Reads are never refused", NFR-24, FR-MTG-10);
+    it only needs live-or-replay for its source screener. A route that starts new work takes `get_work_mode` itself."""
     if (demo := _demo(request)) is not None:
         return demo.artifacts
     from tilo_api import run_stores  # noqa: PLC0415

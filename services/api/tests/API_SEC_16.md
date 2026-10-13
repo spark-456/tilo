@@ -101,6 +101,9 @@ Never raises; every failure means live denied, not an error.
    request would be live (`provider_mode` is live before the cap) and whose `uid_capped` is true: 4xx (402, 403 or 409; the
    PRD fixes none) `{"detail": <a sentence naming the cap>, "code": "spend_cap_reached"}`, no side effect, no router built.
    Requests that would be replay are never refused for a cap and never write the ledger. Reads are never refused.
+   That includes every read and delete that only needs the artifact store (a quiz app view, the minutes, the quotes,
+   a meeting delete, the join read): `deps.get_artifact_store` takes `get_mode`, not `get_work_mode` (SEC-REVIEW-15 B1).
+   Hosting or attending a meeting starts a bot, so those two routes take `get_work_mode` themselves.
 4. **`GET /access`** reports `models: "replay"` for a judge when capped, when either switch is set, or when live cannot be
    checked (ledger or switch store unreachable, ledger unwired). It reports `"live"` otherwise (SEC-15's rules).
 5. **The switch.** Either store set: new work is refused 503 `{"detail": <says replay>, "replay_only": true}` (NFR-24's
