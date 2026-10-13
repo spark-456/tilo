@@ -26,6 +26,7 @@ import {
   type RowId,
   baseForm,
   channelsOf,
+  gmtLabel,
   isConflict,
   notificationsOf,
   problemOf,
@@ -438,6 +439,9 @@ export function ProfilePage({ app }: { app: AppCtx }) {
                         onChange={(e) => setEdits({ ...edits, [key]: e.target.value })}
                       />
                       <span className="park-profile-help">{help}</span>
+                      {key === "tz" && gmtLabel(form.tz) ? (
+                        <span className="park-profile-help">{`(${gmtLabel(form.tz)})`}</span>
+                      ) : null}
                     </label>
                   ))}
                 </div>
