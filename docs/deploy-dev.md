@@ -492,8 +492,9 @@ more (K = 1).
 **Your steps, in order** (`$P`, `$R`, `$Api` as in `meet-bot/docs/CLOUD_RUN.md`):
 
 1. Answer BQ-M2-5 (default yes). On no, stop: the budget-lease fallback in ADR-0042 redoes decisions 2 to 9.
-2. Merge the stack, in this order: #938, #942, #945, #954, #967, #968, #969, #974, then the PR carrying this section.
-   T2 and T3 are security-flagged, so the merge is yours.
+2. Merge the stack, in this order: #946, #954, #967, #968, #969, #974, then the PR carrying this section (#976) and
+   the transient-refusal fix (#999, BQ-M2-12). #938 is already in; #942 and #945 were closed (their work is in the base
+   these branches carry). T2 and T3 are security-flagged, so the merge is yours.
 3. Deploy both images from the same commit (both read the baked `config/`: tilo-api the price and ceiling, the bot the
    voice flags): `just deploy-dev-cloudbuild api dev`, then the bot image and its revision (modelled on
    `just build-evals-image`; not run by an agent):
@@ -520,7 +521,8 @@ more (K = 1).
    `voice.live.price_approved: true` and `voice.live.enabled: true` in `config/voice.yaml`, and redeploy both images
    (step 3). Until this step nothing calls the meter. Without the row, 15 replies fill a meeting's run cap (150 INR) and 50
    a person's lifetime cap (500 INR).
-7. Check `LIVE=1` is on `tilo-meet-bot` (already so for attendance): that is the bot's own gate (with `TILO_API_URL`
+7. `LIVE=1` is on `tilo-meet-bot` only for the sitting: you set it for the acceptance sitting and remove it afterwards
+   (`meet-bot/docs/CLOUD_RUN.md`, "End the acceptance test"). It is the bot's own gate (with `TILO_API_URL`
    and a valid claim header). The meter routes on `tilo-api` never read `LIVE`, so whether `tilo-api` carries it does
    not matter to them and nothing changes there for this feature (the deployed API keeps the user's switch for live
    Home tasks). The env drift check in `docs/routines-rollout.md` lists `LIVE` under `$Never` from before go-live and

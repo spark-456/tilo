@@ -135,7 +135,7 @@ gcloud run services update tilo-meet-bot --project=$P --region=$R --update-env-v
 
 Unchanged: the bot keeps its two project roles, no Firestore or ledger access and no new secret; tilo-api stays one
 instance (the claim and nonce live in its process); the bot's ingress stays internal only and only tilo-api may invoke
-it; `LIVE=1` stays the user's, on the bot (the meter routes never read it). The ordered steps, the checks and the
+it; `LIVE=1` stays the user's, set on the bot for the sitting and removed after (the meter routes never read it). The ordered steps, the checks and the
 rollback (`--remove-env-vars TILO_VOICE_METER` on tilo-api) are in `docs/deploy-dev.md` ("The meeting bot's Live voice
 meter"). Do not deploy or change tilo-api settings during an attended meeting: its claim ends with the old process,
 so that meeting answers 409 and the rest of it is spoken with the local voice.
