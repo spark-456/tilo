@@ -22,7 +22,12 @@ export function TeachCard({
 }: PaneProps & { cardRef: RefObject<HTMLElement> }) {
   const expr = t.saved ? "delighted" : t.rec || t.stage === 2 ? "focused" : "talking";
   return (
-    <section ref={cardRef} aria-label="Teach a skill" className="park-skills-card">
+    <section
+      ref={cardRef}
+      aria-label="Teach a skill"
+      aria-busy={t.live && t.busy ? true : undefined}
+      className="park-skills-card"
+    >
       <div className="park-skills-card-head">
         <div className="park-skills-teacher">
           {agent({ role: "research", rank: "lead", expr }, 58, night)}
@@ -59,6 +64,9 @@ export function TeachCard({
           })}
         </ol>
       </div>
+      {t.live && t.busy && t.stage === 0 ? (
+        <output className="park-skills-card-sub">Reading your description…</output>
+      ) : null}
       {t.stage === 0 ? <ShowPane t={t} night={night} user={user} /> : null}
       {t.stage === 1 ? <LearnPane t={t} night={night} user={user} /> : null}
       {t.stage === 2 ? <RunPane t={t} night={night} user={user} /> : null}
