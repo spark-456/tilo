@@ -43,6 +43,7 @@ from tilo_api.cards import (
     session_allows,
 )
 from tilo_api.deps import Principal, get_current_principal
+from tilo_api.people_limits import write_limit
 
 logger = logging.getLogger("tilo_api.sharing")
 SHARING_CONFIG = Path(__file__).resolve().parents[4] / "config" / "sharing.yaml"
@@ -195,7 +196,7 @@ def build_router(worlds: CardStore | Callable[..., Callable[[str], WorldView]]) 
             status_code=201, content={"share_id": link.share_id, "token": token, "card_id": new_id, "expires_at": stamp}
         )
 
-    @router.delete("/worlds/{world_id}/shares/{share_id}", status_code=204)
+    @router.delete("/worlds/{world_id}/shares/{share_id}", status_code=204, dependencies=[Depends(write_limit)])
     def revoke_share(
         world_id: str,
         share_id: str,
