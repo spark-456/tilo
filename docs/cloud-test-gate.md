@@ -1,7 +1,9 @@
 # Test-only Cloud Build merge gate
 
 The user approved this gate on 12 Oct with INR500 maximum spend and STOP/QUESTION
-at INR400. It runs the repository suite and the full web Vitest suite in parallel,
+at INR400. On 13 Oct at 21:56 IST, the user lifted that stop to a total INR500
+cap, including reservations; the supervisor sanctioned the guard update at 22:09.
+It runs the repository suite and the full web Vitest suite in parallel,
 plus TypeScript. Per-PR affected tests and touched-file lint/type checks stay local
 (14:10 ruling). Browser acceptance and emulator tests keep the laptop heavy lock.
 The gate never deploys. Deployment waits for a SUCCESS result on the group ref.
@@ -24,9 +26,12 @@ keeps its full reservation; never refund it without checking the actual build.
 
 E2_HIGHCPU_8 is USD0.0156 per minute in the published base table. The ledger uses
 INR3.2/min, conservatively doubling that rate at INR100/USD for regional/overhead
-uncertainty. A 30-minute timeout reserves 32 minutes (INR102.4). No run starts if
-that worst-case reservation would reach INR400; ask the user at that point.
-The user cap remains INR500. Sources: [pricing](https://cloud.google.com/build/pricing)
+uncertainty. A 30-minute timeout reserves 32 minutes (INR102.40). The current guard
+refuses a run when existing spend/reservations are >= INR500 or adding the new
+reservation would reach or exceed INR500. A projected INR500.01 is refused before
+any cloud command; even exactly INR500 is refused by the strict stop boundary.
+The user cap remains INR500 total, including reservations; the earlier INR400
+stop above is historical. Sources: [pricing](https://cloud.google.com/build/pricing)
 and [supported machine configuration](https://docs.cloud.google.com/build/docs/optimize-builds/increase-vcpu-for-builds).
 
 Local gates remain the fallback; they do not authorize deployment after a red
