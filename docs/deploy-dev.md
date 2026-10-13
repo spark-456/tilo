@@ -428,6 +428,19 @@ gcloud run services update tilo-api --project essential-wares-510320-f0 --region
    TILO_API_STORE,TILO_PEOPLE_STORE` (the doors answer 503 `not_configured` again), then set
    `api_durable_stores = false` and apply, so CPU is billed per request again.
 
+### The SEC-16 spend-cap ledger (GOLIVE-935, issue 935; nothing for you to apply)
+
+The live-model spend caps (`config/spend_caps.yaml`) are enforced on a Firestore ledger, `tilo_api.spend_firestore`:
+documents `orgs/{org}/spend_ledger/{counter, hold, switch}`, each reserve, settle and release one transaction. It needs
+only what is already there: `TILO_FIRESTORE_PROJECT` on `tilo-api` (set by the routines rollout) and the service
+account's existing Firestore access (`roles/datastore.user`, as the schedule store). No composite index (single
+document reads and writes only), no rules change (`firestore.rules` already denies every client path, and the server
+bypasses them), no `TILO_API_STORE` and no always-on CPU (every call is inside a request). With no valid project or no
+credentials the seam answers 503 and every request is replay, never uncapped. Reading it: `GET /access` says
+`models: "live"` only while the ledger is readable, the uid is under its cap and the switch is off. To reset the
+durable kill switch after the daily hard cap tripped it, delete the document `orgs/org_tilo/spend_ledger/switch`
+(Firestore console) or set its `on` field to `false`; nothing in the API can.
+
 ### Against a deployed tilo-api, and the smoke (PROD-WIRE-4)
 
 ```powershell

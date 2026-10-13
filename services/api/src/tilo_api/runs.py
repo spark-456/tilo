@@ -29,6 +29,7 @@ from tilo_harness.must_ask import MustAsk
 from tilo_harness.question_wait import AlreadyAnswered, QuestionWait
 from tilo_harness.validator import repo_validator
 from tilo_memory.artifacts import NewVersion, Origin, Scope
+from tilo_metering.flags import FlagStore
 from tilo_planning.compiler import DELIVER, PlanInputs
 
 from tilo_api import deps, events, item_documents, side_effect_fields, team_access, team_store
@@ -104,10 +105,18 @@ _CLOCK_SEAMS = frozenset({"plan_compiler", "unit_runner"})  # the seams whose pr
 _MODE_SEAMS = frozenset({"plan_compiler", "unit_runner", "must_ask_providers"})  # the seams that build a Router
 
 
-def run_seams(request: Request, mode: Annotated[Mode, Depends(deps.get_work_mode)]) -> Seams | None:
+def run_seams(
+    request: Request,
+    mode: Annotated[Mode, Depends(deps.get_work_mode)],
+    switches: Annotated[FlagStore, Depends(deps.get_switches)] = None,  # type: ignore[assignment]
+) -> Seams | None:
     """The seams as the app wires them, overrides included; if any cannot be built, no run starts. The model
-    seams get this request's mode (SEC-15), so a judge's run is live and everyone else's is replay."""
+    seams get this request's mode (SEC-15), so a judge's run is live and everyone else's is replay, and its SEC-16
+    meter (GOLIVE-935): every live call of the plan and the run is a unit on the uid ledger. Deployed, a live
+    request that cannot be metered (the tick has no person's uid) builds replay seams, never unmetered live ones."""
     overrides = request.app.dependency_overrides
+    meter = deps.meter_for(request, mode, switches)
+    mode = deps._live_or_replay(mode, meter)
     names = "plan_compiler layout_builder unit_runner action_resolver skill_registry connector_registry"
     names += " connector_adapters outbox_store event_writer must_ask_providers artifact_store redactor run_archive"
 
@@ -132,8 +141,11 @@ def run_seams(request: Request, mode: Annotated[Mode, Depends(deps.get_work_mode
         if name == "artifact_store":
             return seam(mode=mode)
         if name in _CLOCK_SEAMS:  # one clock for the whole API: the override a test installs reaches the run too
-            return seam(mode, overrides[deps.get_today]() if deps.get_today in overrides else deps.get_today())
-        return seam(mode) if name in _MODE_SEAMS else seam()
+            today = overrides[deps.get_today]() if deps.get_today in overrides else deps.get_today()
+            return seam(mode, today, meter=meter) if meter is not None else seam(mode, today)
+        if name in _MODE_SEAMS:  # a seam written before the meter still gets the call it knows when there is none
+            return seam(mode, meter=meter) if meter is not None else seam(mode)
+        return seam()
 
     try:
         built = dict(
