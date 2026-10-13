@@ -171,6 +171,8 @@ export interface World {
   isNew?: boolean;
   /** STARTER-1: the recorded sample project, served by tilo-api; a replay, not the person's work. */
   sample?: boolean;
+  /** BQ-CTX-TEAMWORLD: `team` for a teammate's world the person reads through a share (read only); absent = theirs. */
+  access?: "team";
   plan?: string | null;
   districts?: WorldDistrict[] | null;
   activity?: ActivityItem[];

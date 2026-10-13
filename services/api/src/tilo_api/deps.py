@@ -379,12 +379,26 @@ def _layout_districts(store: Store, world_id: str) -> list[str]:
         return []
 
 
+def _team_session(principal: Principal) -> bool:
+    """A full web or mobile-web sign-in bound to no world, role owner, not demo (never an email, signed-link, demo or
+    world-bound session): the only session that may be a team reader (ADR-0040 decision 5)."""
+    return (
+        principal.world_id is None
+        and principal.role == "owner"
+        and principal.channel in ("web", "mobile_web")
+        and principal.full_session is True
+        and not principal.demo_session
+    )
+
+
 def team_reader(
     principal: Principal,
     store: Store,
     people: Callable[[], PeopleStores | None],
     clock: Callable[[], str],
     world_id: str,
+    *,
+    directory: Directory | None = None,
 ) -> tuple[WorldRecord, Principal]:
     """ADR-0040 decisions 4 and 5: the world as a team reader, for a read route only. The session must be a full web
     or mobile-web sign-in bound to no world (never an email, signed-link, demo or world-bound one), of a person who
@@ -393,20 +407,14 @@ def team_reader(
     never stored on the request and is handed to read routes only. Every other case, a people store that cannot be
     opened included, is the one unknown-world 404. No cache: each request reads the shares and the directory."""
     world = store.worlds.get(world_id)
-    if (
-        world is None
-        or principal.world_id is not None
-        or principal.role != "owner"
-        or principal.channel not in ("web", "mobile_web")
-        or principal.full_session is not True
-        or principal.demo_session
-    ):
+    if world is None or not _team_session(principal):
         raise HTTPException(status_code=404)
     try:
         stores = people()
         if stores is None:
             raise HTTPException(status_code=404)
-        directory = Directory.of(s.record for s in stores.persons.list(ORG_ID))
+        if directory is None:  # a caller that lists many worlds in one request reads the directory once
+            directory = Directory.of(s.record for s in stores.persons.list(ORG_ID))
         shares = [s.record for s in stores.world_shares.list(ORG_ID, "world_id", world_id)]
         found = reader_share(shares, world_id, world.owner, directory, principal.user_id, clock())
     except HTTPException:
@@ -436,6 +444,43 @@ def readable_world(
         return member_world(principal, store, world_id), principal
     except HTTPException:
         return team_reader(principal, store, people, clock, world_id)
+
+
+def team_readable_worlds(
+    principal: Principal,
+    store: Store,
+    people: Callable[[], PeopleStores | None],
+    clock: Callable[[], str],
+) -> dict[str, tuple[WorldRecord, Principal]]:
+    """BQ-CTX-TEAMWORLD (TSW-4b): the worlds the caller reads as a team reader now, for the worlds list: world id to
+    the record and `team_reader`'s derived Viewer. Candidates are the worlds with a share to a team the caller is
+    in, other people's only; each is then decided by `team_reader` itself (the share-in-force rule is never repeated
+    here). A people store that cannot be opened, or a world that cannot be read, is left out, logged with no detail;
+    never an error (the caller's own list stands). Reads only."""
+    if not _team_session(principal):
+        return {}
+    try:
+        stores = people()
+        if stores is None:
+            return {}
+        directory = Directory.of(s.record for s in stores.persons.list(ORG_ID))
+        me = directory.record(principal.user_id)
+        teams = sorted({m["team"] for m in me["memberships"]}) if me is not None else []
+        candidates = sorted({s.record["world_id"] for t in teams for s in stores.world_shares.list(ORG_ID, "team", t)})
+    except Exception as exc:
+        logger.warning("team worlds not listed (%s)", type(exc).__name__)
+        return {}
+    found: dict[str, tuple[WorldRecord, Principal]] = {}
+    for world_id in candidates:
+        try:
+            world = store.load_world(world_id, settle=False)  # read-only: nothing is settled for a non-owner
+            if world is not None and world.owner != principal.user_id:
+                found[world_id] = team_reader(principal, store, people, clock, world_id, directory=directory)
+        except HTTPException:
+            continue  # no share in force for this person (or the world is unreadable): not theirs to list
+        except Exception as exc:
+            logger.warning("team world not listed (%s)", type(exc).__name__)
+    return found
 
 
 def get_people_provider(request: Request) -> Callable[[], PeopleStores | None]:

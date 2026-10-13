@@ -37,7 +37,7 @@ import { MeetingHall } from "./MeetingHall";
 import { FactsCard, GoLink, LovableCard, SpendCard, WaitingCard } from "./Side";
 import { SkillProposals } from "./SkillProposals";
 import { ShareWithTeam } from "./TeamShare";
-import { TeamItems, TeamWorld } from "./TeamWorld";
+import { MissingWorld, TeamItems, TeamWorld } from "./TeamWorld";
 import "./World.css";
 import { cityArt, rowArt, singleArt } from "./worldArt";
 import {
@@ -225,18 +225,16 @@ export function WorldPage({ app }: { app: AppCtx }) {
   }, [slackOpen]);
 
   if (loaded === null) return <Frame />;
-  // BQ-CTX-TEAMWORLD: a live id that is not one of this person's worlds is read as a teammate's, read only; the
-  // API answers 404 for a world they may not read, which is shown as a missing world.
+  // BQ-CTX-TEAMWORLD (BQ-TEAMWORLD-8): the list says whose a live world is. `access: "team"` is a teammate's, read
+  // only (the API's 404 for one since lapsed is the ordinary missing world); an id the list does not carry is a
+  // missing world too, never a guess.
   const wanted = app.params.id;
-  if (
-    loaded !== "failed" &&
-    loaded.live &&
-    worldClient &&
-    wanted &&
-    !loaded.worlds.some((x) => x.id === wanted) &&
-    !added.some((x) => x.id === wanted)
-  ) {
-    return <TeamWorld client={worldClient} worldId={wanted} app={app} />;
+  if (loaded !== "failed" && loaded.live && worldClient && wanted) {
+    const listed = loaded.worlds.find((x) => x.id === wanted);
+    if (listed?.access === "team")
+      return <TeamWorld client={worldClient} worldId={wanted} app={app} />;
+    if (!listed && !added.some((x) => x.id === wanted))
+      return <MissingWorld worldId={wanted} app={app} />;
   }
   const world =
     loaded === "failed"
