@@ -7,7 +7,9 @@ over `deps.get_spend_cap_ledger()` and passes it as `meter=` to `tilo_providers.
 refuses (returns None) for a capped uid, with the replay-only switch set in either store, with less than one unit of
 headroom, and whenever the ledger or the switch store cannot be read: fail closed, never live. Until PL-06 prices the
 Live profile, a settled reply costs the whole `unit_reserve_minor` (BQ-SEC16-1), the same rule `spend_units` applies
-to an unpriced call; a `price` hook may turn the reply's usage into INR minor units once a quote is approved."""
+to an unpriced call; a `price` hook may turn the reply's usage into INR minor units once a quote is approved. The
+provider settles (never releases) once the text was sent, even when no reply or usage came back (input tokens are
+billable): an empty usage prices to nothing and so charges the whole reserve."""
 
 from __future__ import annotations
 
