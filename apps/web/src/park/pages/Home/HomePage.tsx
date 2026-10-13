@@ -25,6 +25,7 @@ import { Hero, KpiStrip, Pins, TodayPanel } from "./Panels";
 import { readEffort, writeEffort } from "./effortStore";
 import {
   DRAFT_MS,
+  INTAKE_MAX_CHARS,
   MODES,
   QUICK_MAX_CHARS,
   liveRows,
@@ -202,9 +203,26 @@ export function HomePage({ app }: { app: AppCtx }) {
       toIdle();
     });
   };
-  const idleUnlessSending = () => {
-    if (!sendingNow.current) toIdle();
+  const composerInput = useRef<HTMLInputElement>(null);
+  // A3: "Change brief" puts the person back in the task box, ready to edit.
+  const changeBrief = () => {
+    if (sendingNow.current) return;
+    toIdle();
+    composerInput.current?.focus();
   };
+  // A3: Esc closes the plan card (and the drafting line) the same way, unless the start is already on its way.
+  const toIdleNow = useRef(toIdle);
+  toIdleNow.current = toIdle;
+  useEffect(() => {
+    if (phase === "idle") return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape" || e.defaultPrevented || sendingNow.current) return;
+      toIdleNow.current();
+      composerInput.current?.focus();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [phase]);
 
   // Quick / Thinking (COST-FAST-1). The choice is remembered per signed-in email (effortStore), Thinking by
   // default. A Quick ask makes no world and no plan: the answer, or the offer to switch, shows in the composer.
@@ -348,6 +366,8 @@ export function HomePage({ app }: { app: AppCtx }) {
           sending={sending}
           sample={demo}
           compact={vw > 0 && vw <= 480}
+          inputRef={composerInput}
+          maxLength={INTAKE_MAX_CHARS}
           staging={{
             files,
             onChange: setFiles,
@@ -388,7 +408,7 @@ export function HomePage({ app }: { app: AppCtx }) {
           }}
           onDraft={effort === "quick" ? ask : draft}
           onConfirm={confirmStart}
-          onChange={idleUnlessSending}
+          onChange={changeBrief}
         />
       ) : null}
       <nav className="park-home-legal" aria-label="Legal">

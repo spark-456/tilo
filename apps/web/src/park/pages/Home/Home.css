@@ -422,7 +422,15 @@
 }
 
 /* the drafting line: the ring turns in WEB-3 (BQ-WEB-3) */
+[data-park] .park-home-drafting__text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 [data-park] .park-home-drafting {
+  max-width: 100%;
+  box-sizing: border-box;
   display: flex;
   align-items: center;
   gap: 12px;
@@ -488,6 +496,13 @@
   font-size: 17px;
   font-weight: 800;
   min-width: 0;
+  /* A3: a long unbroken task wraps inside the card and stops at three lines (the full text is the title) */
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  overflow: hidden;
 }
 [data-park] .park-home-plan__sample {
   margin: 0;
@@ -1069,7 +1084,7 @@
    drew; where it is taller, the panel ends 12px above the composer instead (under 1390 px the chips row reaches
    the panel, from 1390 only the glass panel does). Under 1120px of height the five spend tiles go compact
    (value beside label and sub: 3 rows of about 48px, so all five show at 1440x900) and the Today panel lists
-   its first three worlds; under 800px the greeting column scrolls as one, never over the composer. ---- */
+   its first three worlds; where the column is shorter than its content it scrolls as one (A3 below). ---- */
 @media (min-width: 481px) {
   [data-park] .park-home-today {
     max-height: min(calc(100% - 330px), calc(100% - var(--park-home-composer-h, 198px) - 132px));
@@ -1116,7 +1131,9 @@
     display: none;
   }
 }
-@media (min-width: 481px) and (max-height: 800px) {
+/* A3: whenever the column is shorter than hero + tiles (a short window, or the plan card open under it) it
+   scrolls as one, so the card never lies over a tile */
+@media (min-width: 481px) {
   [data-park] .park-home-leftcol {
     overflow-y: auto;
     scrollbar-width: thin;
