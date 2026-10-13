@@ -194,7 +194,8 @@ for (const [sizeName, viewport] of Object.entries(SIZES)) {
         });
         expect(root.position).toBe("relative");
         near("root height is 100vh (min 720)", root.height, Math.max(vh, 720));
-        expect(root.overflow).toBe("hidden");
+        // A phone's root scrolls (x hidden, y auto) so the greeting and composer stack without overlap (13 Oct QA).
+        expect(root.overflow).toBe(sizeName === "mobile" ? "hidden auto" : "hidden");
 
         // Hero panel: left 24, top 96, 500 wide (at most the root less 48), glass, r28, p 24 26 22, gap 12.
         const heroP = await facts(
@@ -301,11 +302,10 @@ for (const [sizeName, viewport] of Object.entries(SIZES)) {
           "box-shadow": T.sh,
           gap: "8px",
         });
-        // The column is the nearest absolutely placed ancestor of the panel; the Home root is its containing block.
+        // The column is the composer's own box; the Home root is its containing block.
         const column = await input(page).evaluate((el) => {
-          let col: HTMLElement | null = el.parentElement;
-          while (col && getComputedStyle(col).position !== "absolute") col = col.parentElement;
-          if (!col) throw new Error("no absolutely placed ancestor above the composer");
+          const col = el.closest<HTMLElement>(".park-home-composer");
+          if (!col) throw new Error("no composer column above the input");
           const s = getComputedStyle(col);
           return {
             position: s.position,
@@ -316,12 +316,12 @@ for (const [sizeName, viewport] of Object.entries(SIZES)) {
             rootWidth: (col.offsetParent as HTMLElement).getBoundingClientRect().width,
           };
         });
-        expect(column).toMatchObject({
-          position: "absolute",
-          bottom: "24px",
-          zIndex: "4",
-          gap: "12px",
-        });
+        // On a phone (13 Oct QA) the column sits in the page's scrolling flow, not pinned 24px from the bottom.
+        expect(column).toMatchObject(
+          sizeName === "mobile"
+            ? { position: "static", gap: "12px" }
+            : { position: "absolute", bottom: "24px", zIndex: "4", gap: "12px" },
+        );
         const columnWidth = Math.min(1040, column.rootWidth - 48);
         near("composer column width", column.width, columnWidth);
         near("composer panel fills the column", Number(panel.w), columnWidth);
@@ -429,8 +429,9 @@ for (const [sizeName, viewport] of Object.entries(SIZES)) {
         }) => {
           const problems = await openHome(page, theme);
           // Copy of the three sections and their links.
+          // the fixture rows are sample data, so the section is not titled "Live now" (HR-1)
           for (const t of [
-            "Live now",
+            "Sample worlds",
             "All worlds",
             "Up next today",
             "Agenda",
@@ -439,12 +440,12 @@ for (const [sizeName, viewport] of Object.entries(SIZES)) {
           ]) {
             await expect(today(page).getByText(t, { exact: true })).toBeVisible();
           }
-          const title = await facts(today(page).getByText("Live now", { exact: true }), [
+          const title = await facts(today(page).getByText("Sample worlds", { exact: true }), [
             "font-size",
             "font-weight",
             "color",
           ]);
-          expectFacts("Live now", title, {
+          expectFacts("Sample worlds", title, {
             "font-size": "15px",
             "font-weight": "800",
             color: T.ink,
@@ -686,8 +687,11 @@ for (const [sizeName, viewport] of Object.entries(SIZES)) {
         expectFacts("input", f, { "font-size": "20px", "font-weight": "700", color: T.ink });
         expect(String(f["font-family"])).toMatch(/Nunito Sans/);
         near("input height", Number(f.h), 60);
+        // A phone's input cannot wrap its placeholder, so it shows the example in few words (13 Oct QA).
         expect(await input(page).getAttribute("placeholder")).toBe(
-          "e.g. Summarise this week’s customer feedback",
+          sizeName === "mobile"
+            ? "e.g. Summarise this week’s feedback"
+            : "e.g. Summarise this week’s customer feedback",
         );
         const s = await facts(start(page), [
           "background-color",

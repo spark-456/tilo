@@ -126,10 +126,14 @@ def test_FR_MTG_11_PL_02_guest_listens_speaks_and_leaves_on_every_voice_backend(
         account_name = ""
         page = object()
 
-        def __init__(self, cfg, voice=False):
+        def __init__(self, cfg, voice=False, face=False):
             assert cfg.guest and not cfg.bot_email and voice
+            assert face
             assert not cfg.profile_dir.exists()
             self.cfg = cfg
+
+        async def face_event(self, kind, value=0):
+            pass
 
         async def __aenter__(self):
             actions.append("guest_context")

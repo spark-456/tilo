@@ -318,7 +318,7 @@ class SpyStore:
         return self._inner.delete(org_id, record_id, expected_version=expected_version)
 
 
-KINDS = ("persons", "meetings", "work_items", "pins", "mentions", "calendar")
+KINDS = ("persons", "meetings", "work_items", "pins", "mentions", "calendar", "world_shares")
 
 
 @dataclass

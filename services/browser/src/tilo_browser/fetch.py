@@ -40,6 +40,7 @@ import time
 import urllib.robotparser
 import zipfile
 from collections.abc import Callable, Mapping, Sequence
+from contextlib import AbstractContextManager
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from html.parser import HTMLParser
@@ -574,6 +575,8 @@ class PinnedHttpTransport:
 
 class RawArchiveStore:
     """Stores raw fetched bytes by SHA-256 alongside `RunArchive` hash-chained `tool_call` records."""
+
+    _lock: AbstractContextManager[bool]
 
     def __init__(self, root: Path, *, store: Store | None = None) -> None:
         self._root = Path(root)

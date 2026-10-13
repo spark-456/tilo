@@ -253,6 +253,7 @@ export function useTeach({
 
   const capture = () => {
     if (isLive) return describeIt();
+    if (method === "describe" && !desc.trim()) return; // nothing to read: no steps from an empty box
     if (method === "describe" || method === "upload") {
       setCap(CAPTURE_STEPS);
       return;

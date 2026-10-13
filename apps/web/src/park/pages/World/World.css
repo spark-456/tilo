@@ -1071,3 +1071,34 @@
   flex-wrap: wrap;
   gap: 8px;
 }
+
+/* ---- Team-shared worlds: the share dialog's rows (BQ-CTX-TEAMWORLD) ---- */
+[data-park] .park-world-teamlist {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+[data-park] .park-world-teamrow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line);
+}
+[data-park] .park-world-teamname {
+  font-size: 14px;
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+[data-park] .park-world-teamnote {
+  flex: 1 1 200px;
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink2);
+  overflow-wrap: anywhere;
+}

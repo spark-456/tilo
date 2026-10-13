@@ -415,14 +415,23 @@ export class HttpClient implements TiloClient, SchedulesApi, FieldsApi, ItemApi 
     return this.request<unknown>(path, init, true);
   }
 
+  /** A PUT or DELETE of `path` with no body, decoded as JSON, `write` true (BQ-CTX-TEAMWORLD: team shares). */
+  sendJson(method: "PUT" | "DELETE", path: string): Promise<unknown> {
+    return this.refusedSample(path) ?? this.request<unknown>(path, { method }, true);
+  }
+
+  /** STARTER-1: the sample project is a recorded replay. A write for it is refused here and never sent: no
+   * request leaves for it, whoever asks. Nothing is simulated. */
+  private refusedSample(path: string): Promise<never> | null {
+    if (path !== SAMPLE_PATH && !path.startsWith(`${SAMPLE_PATH}/`)) return null;
+    return Promise.reject(
+      new TiloApiError(SAMPLE_SIMULATED, null, false, false, "sample_is_a_replay"),
+    );
+  }
+
   private post<T>(path: string, body: unknown): Promise<T> {
-    // STARTER-1: the sample project is a recorded replay. A write for it is refused here and never sent: no
-    // request leaves for it, whoever asks. Nothing is simulated.
-    if (path === SAMPLE_PATH || path.startsWith(`${SAMPLE_PATH}/`)) {
-      return Promise.reject(
-        new TiloApiError(SAMPLE_SIMULATED, null, false, false, "sample_is_a_replay"),
-      );
-    }
+    const refused = this.refusedSample(path);
+    if (refused) return refused;
     const init = {
       method: "POST",
       headers: { "content-type": "application/json" },

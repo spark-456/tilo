@@ -258,11 +258,20 @@ def test_SEC_16_FEEDBACK_http_a_judge_at_49999_still_gets_live_work_and_at_50000
     assert h.intake().status_code == 201
     assert set(h.router_modes) == {"live"}
 
-    fill(h, JUDGE_A, 1)
+    # The intake above is now metered (GOLIVE-935): its safety screen settled a unit, so the uid already sits at or
+    # past the lifetime cap and a further `fill(h, JUDGE_A, 1)` would be refused by the ledger itself. The next
+    # request is the one that must be refused.
     response = h.intake()
 
     assert response.status_code == 403, response.text
     assert response.json()["code"] == "spend_cap_reached"
+
+    # And the literal boundary, set up without the metered intake: a uid at exactly 50,000 is refused.
+    fill(h, JUDGE_B, LIFETIME)
+    h.as_user(JUDGE_B)
+    exact = h.intake()
+    assert exact.status_code == 403, exact.text
+    assert exact.json()["code"] == "spend_cap_reached"
 
 
 def test_SEC_16_FEEDBACK_http_another_judge_is_not_refused_by_the_first_ones_cap(sec16_factory):

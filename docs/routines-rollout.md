@@ -103,5 +103,9 @@ Routines that were due during any 503 stay due, and fire once the cause is fixed
 - If a Terraform plan REPLACES the tilo-api service (it shows `must be replaced`), the new service starts without these
   settings: re-run step 2 afterwards. A plan that only updates it in place keeps them. Until `TILO_TEAM_STORE=firestore` is set, the team controls
   (roles, limits, switches, tool levels) are inert and `/v1/team` answers 503.
+- Team writes (role, limit, invite, remove, switch, tool) also count against the people write limiter (60 attempts a
+  minute per person, SEC-10), which lives on the people stores: they need `TILO_PEOPLE_STORE=firestore` as well
+  (`docs/deploy-dev.md`, ADR-0026 rollout; it is outside step 2's allowlist). With `TILO_TEAM_STORE=firestore` but no
+  people store, every team write answers 503 `not_configured`, while `GET /v1/team` still reads.
 - The structured log fields (`event`, `status`, `code`) reach Cloud Logging only once the NFR-26 JSON handler lands.
   Until then, search the log text as step 3 does.

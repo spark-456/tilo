@@ -48,6 +48,19 @@ const arbItem: fc.Arbitrary<WorldListItem> = fc.record({
   last_seq: fc.nat(5000),
 });
 
+describe("BQ_CTX_TEAMWORLD_worldsFromList: the access marker", () => {
+  it("TSW_4b_access_team_is_carried_and_nothing_else_is", () => {
+    const [team, own, odd] = worldsFromList([
+      item({ world_id: "w-t", access: "team" }),
+      item({ world_id: "w-o" }),
+      item({ world_id: "w-x", access: "owner" as unknown as "team" }),
+    ]);
+    expect(team?.access).toBe("team");
+    expect(own && "access" in own).toBe(false);
+    expect(odd && "access" in odd).toBe(false);
+  });
+});
+
 describe("WIRE_2_worldsFromList: served fields map directly", () => {
   it("WIRE_2_mapper_id_name_short_come_from_world_id_and_title", () => {
     const [w] = worldsFromList([item({ world_id: "w-9", title: "Quarterly report" })]);

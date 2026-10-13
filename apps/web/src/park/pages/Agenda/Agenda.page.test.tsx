@@ -41,7 +41,7 @@ describe("WEB_9_agenda_copy: the designed text, verbatim", () => {
     const t = text(container);
     for (const s of [
       "Thursday 24 September. Pins from your team and Tilo, and a week that stays in sync.",
-      "Google Calendar · synced just now",
+      "Sample data · no calendar sync recorded",
       "Anyone on the team can pin. Tilo pins action items from meetings and things that need you.",
       "Pinboard",
       "Grouped",
@@ -290,6 +290,15 @@ describe("WEB_9_agenda_honesty_and_states", () => {
   it("WEB_9_agenda_marks_fixture_data_and_never_hides_it", async () => {
     const { container } = await renderAgenda();
     expect(q(container, "[data-park-agenda]").getAttribute("data-source")).toBe("fixture");
+  });
+
+  it("QA_13OCT_agenda_sample_week_never_claims_a_calendar_sync", async () => {
+    // HR-1: no sync event stands behind the sample week; the chip says sample, and no "synced" claim or tick shows.
+    const { container } = await renderAgenda();
+    const chip = q(container, '[data-testid="agenda-synced"]');
+    expect((chip.textContent ?? "").trim()).toBe("Sample data · no calendar sync recorded");
+    expect(chip.querySelector("svg")).toBeNull();
+    expect(text(container)).not.toMatch(/synced just now/i);
   });
 
   it("WEB_9_agenda_not_built_shows_not_connected_yet_and_no_pins", async () => {

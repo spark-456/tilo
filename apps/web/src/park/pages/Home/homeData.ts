@@ -18,6 +18,8 @@ export interface Mode {
   readonly tier: string;
   readonly word: string;
   readonly example: string;
+  /** The example in few words, for a phone's input, which cannot wrap its placeholder. */
+  readonly short: string;
   readonly start: string;
   readonly hint: string;
   readonly chips: readonly string[];
@@ -35,6 +37,7 @@ export const MODES: readonly [Mode, Mode, Mode] = [
     tier: "Village",
     word: "village",
     example: "Summarise this week’s customer feedback",
+    short: "Summarise this week’s feedback",
     start: "Start task",
     hint: "You see the plan and the cost before any agent starts.",
     chips: ["Compare three suppliers", "Draft a reply to Northline", "Summarise yesterday’s calls"],
@@ -54,6 +57,7 @@ export const MODES: readonly [Mode, Mode, Mode] = [
     tier: "Town",
     word: "town",
     example: "Every Monday, match invoices to purchase orders",
+    short: "Match invoices every Monday",
     start: "Set up routine",
     hint: "You approve the first run. After that it runs on its own.",
     chips: ["Weekly invoice match", "Monday pricing check", "Daily inbox triage"],
@@ -73,6 +77,7 @@ export const MODES: readonly [Mode, Mode, Mode] = [
     tier: "City",
     word: "city",
     example: "Onboard 12 new hires across email, HR and laptops",
+    short: "Onboard 12 new hires",
     start: "Plan project",
     hint: "Tilo drafts districts, teams and gates for your sign-off.",
     chips: ["Product launch", "Supplier onboarding", "Quarterly audit prep"],

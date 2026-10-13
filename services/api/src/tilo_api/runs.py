@@ -30,6 +30,7 @@ from tilo_harness.question_wait import AlreadyAnswered, QuestionWait
 from tilo_harness.validator import repo_validator
 from tilo_memory.artifacts import NewVersion, Origin, Scope
 from tilo_metering.flags import FlagStore
+from tilo_people.stores import PeopleStores
 from tilo_planning.compiler import DELIVER, PlanInputs
 
 from tilo_api import deps, events, item_documents, side_effect_fields, team_access, team_store
@@ -1108,13 +1109,21 @@ def get_delivery(
     world_id: str,
     principal: Annotated[deps.Principal, Depends(deps.get_current_principal)],
     store: Annotated[deps.Store, Depends(deps.get_store)],
+    people: Annotated[Callable[[], PeopleStores | None], Depends(deps.get_people_provider)],
+    clock: Annotated[Callable[[], str], Depends(deps.get_clock)],
 ) -> dict[str, Any]:
-    """Issue #80's DeliveryResult, for the world's owner only, once `world.completed` is written."""
+    """Issue #80's DeliveryResult, for the world's owner and, on purpose (ADR-0040 decision 4), for a team reader of a
+    share in force, who gets it from the events they already see (never a `vis: []` one), once `world.completed`."""
     world = store.worlds.get(world_id)
     owner = world.owner if world is not None else None
-    if principal.world_id != world_id or (principal.role, principal.user_id) != ("owner", owner):
-        raise HTTPException(status_code=404)
     stream = store.events.get(world_id, [])
+    if principal.world_id != world_id or (principal.role, principal.user_id) != ("owner", owner):
+        _, viewer = deps.team_reader(principal, store, people, clock, world_id)  # the one unknown-world 404 otherwise
+        stream = [
+            e
+            for e in stream
+            if e.get("vis") == "all" or (isinstance(e.get("vis"), list) and set(e["vis"]) & set(viewer.districts))
+        ]
     completed = next((e for e in stream if e["type"] == "world.completed"), None)
     if completed is None:
         raise HTTPException(status_code=409, detail="Nothing is delivered until the work is done.")
