@@ -360,8 +360,8 @@ describe("WEB_12_profile_styles: appearance", () => {
   });
 
   it("WEB_12_profile_styles_swatch_colours_are_the_designs_day_and_night", () => {
-    // The colours are inline literals or CSS literals; read both sources, case-insensitively.
-    const src = ["ProfilePage.tsx", "Profile.css"]
+    // UI-10 W8 moved the controls into AppearanceControls; keep the exact swatch assertions.
+    const src = ["ProfilePage.tsx", "AppearanceControls.tsx", "Profile.css"]
       .map((f) => {
         try {
           return readFileSync(path.join(DIR, f), "utf8");

@@ -13,6 +13,7 @@ import {
   isScheduleView,
   nextRunWords,
 } from "../../api/schedules";
+import { AppLink } from "../AppLink";
 import { Loaded } from "../FlowShell";
 import { describeError, isReplayOnly, useRemote } from "../remote";
 
@@ -114,7 +115,8 @@ function RoutineList({ api, first }: { api: SchedulesApi; first: readonly Schedu
       )}
       {rows.length === 0 ? (
         <p className="section-note" data-testid="routines-empty">
-          No routines yet.
+          No routines yet. <AppLink to="/">Create a routine</AppLink> by starting a run and choosing
+          Repeat weekly.
         </p>
       ) : (
         <ul className="blist">
@@ -261,7 +263,11 @@ export function Routines() {
   );
   if (!api) {
     return (
-      <p className="section-note">Routines are listed when Tilo is connected to its server.</p>
+      <p className="section-note">
+        No routines are recorded in this sample. Routines are listed when Tilo is connected to its
+        server. <AppLink to="/">Create a routine</AppLink> by starting a run and choosing Repeat
+        weekly.
+      </p>
     );
   }
   return (
