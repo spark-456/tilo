@@ -1,0 +1,61 @@
+"""W22: the hosted release smoke (`just smoke-hosted`, apps/web/e2e/hosted-smoke.spec.ts).
+
+It must never reach the network by itself: the spec skips when TILO_SMOKE_URL is unset, the main Playwright
+config ignores it, and the recipe accepts only a Firebase Hosting origin. The slip it exists for (a build with no
+Firebase config showing "Sign-in is off") must be asserted by name, and the release doc must describe it.
+"""
+
+from __future__ import annotations
+
+import re
+from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+SPEC = REPO_ROOT / "apps/web/e2e/hosted-smoke.spec.ts"
+HOSTED_CONFIG = REPO_ROOT / "apps/web/playwright.hosted.config.ts"
+MAIN_CONFIG = REPO_ROOT / "apps/web/playwright.config.ts"
+
+
+def _read(p: Path) -> str:
+    return p.read_text(encoding="utf-8")
+
+
+def test_W22_spec_skips_itself_without_a_url():
+    spec = _read(SPEC)
+    assert "TILO_SMOKE_URL" in spec
+    assert re.search(r"test\.skip\(\s*!URL_UNDER_TEST", spec)
+
+
+def test_W22_spec_asserts_the_13_oct_regression_and_the_demo_path():
+    spec = _read(SPEC)
+    for needle in (
+        "Continue with Google",
+        "Explore a demo session",
+        "sign-in is off",
+        "park-page-home",
+        "park-page-worlds",
+        "park-page-world",
+        "/settings",
+        "Fixture replay",
+        "r.status() >= 400",
+    ):
+        assert needle in spec, needle
+
+
+def test_W22_main_playwright_config_ignores_the_hosted_spec_and_hosted_config_has_no_server():
+    assert "hosted-smoke.spec.ts" in _read(MAIN_CONFIG)
+    assert "HOSTED_SPECS" in re.search(r"testIgnore: \[[^\]]*\]", _read(MAIN_CONFIG)).group(0)
+    hosted = _read(HOSTED_CONFIG)
+    assert "webServer" not in re.sub(r"//.*", "", hosted)
+    assert "hosted-smoke.spec.ts" in hosted
+
+
+def test_W22_recipe_accepts_only_a_hosting_origin_and_is_documented():
+    just = _read(REPO_ROOT / "justfile")
+    m = re.search(r"^smoke-hosted url=\"\":\n(.*?)\n\n", just, re.M | re.S)
+    assert m, "smoke-hosted recipe"
+    body = m.group(1)
+    assert "error(" in body.splitlines()[0], "the url check is on the first line"
+    assert "web\.app" in body and "firebaseapp" in body
+    assert "playwright.hosted.config.ts" in body
+    assert "## Hosted smoke" in _read(REPO_ROOT / "docs/deploy-dev.md")
