@@ -53,6 +53,21 @@ describe("WEB_CUTOVER_world_stage: a sample world has no stage to open", () => {
     expect(pageText(el)).toContain(REASON);
   });
 
+  it("UI_10_B4_disabled_lens_links_and_live_view_are_keyboard_focusable_and_the_reason_is_visible", async () => {
+    const { el } = await mountWorld();
+    const all = [control(el, "Open live view"), ...LENSES.map((n) => control(lensNav(el), n))];
+    for (const a of all) {
+      // a link without an href is not in the tab order: tabindex 0 puts it there, aria-disabled keeps it inert
+      expect(a.getAttribute("tabindex"), textOf(a)).toBe("0");
+      expect(a.getAttribute("aria-disabled"), textOf(a)).toBe("true");
+    }
+    // the reason is words on the page (not only a tooltip) and not visually hidden
+    const reason = qa(el, ".park-world-nostage");
+    expect(reason).toHaveLength(1);
+    expect(textOf(reason[0] as HTMLElement)).toBe(REASON);
+    expect(all[0]?.getAttribute("aria-describedby")).toBe(reason[0]?.id);
+  });
+
   it("WEB_CUTOVER_world_stage_sample_no_link_leads_to_a_stage_route", async () => {
     const { el } = await mountWorld();
     expect(qa(el, 'a[href^="/world/"]')).toHaveLength(0);

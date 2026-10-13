@@ -140,17 +140,21 @@ export function SpendCard({
 
 export interface FactsProps {
   w: World;
+  /** UI-10 B2: the world's running state is a recording (sample or demo), so its end time is not a live countdown. */
+  recorded?: boolean;
   skills: readonly Skill[];
   tools: readonly ToolChip[];
   onSkill: (id: string) => void;
   onTools: () => void;
 }
 
-export function FactsCard({ w, skills, tools, onSkill, onTools }: FactsProps) {
+export function FactsCard({ w, recorded, skills, tools, onSkill, onTools }: FactsProps) {
   const facts: readonly (readonly [string, string])[] = [
     ["Owner", w.owner],
     ["Started", w.started],
-    [w.nextL, w.nextV],
+    recorded && w.nextL === "Ends"
+      ? ["Recorded state", `${w.nextL.toLowerCase()} ${w.nextV}`]
+      : [w.nextL, w.nextV],
     ["Agents", String(w.agents)],
   ];
   return (

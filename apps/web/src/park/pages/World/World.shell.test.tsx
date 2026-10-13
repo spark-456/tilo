@@ -96,7 +96,7 @@ describe("WEB_6_shell: /park/world/<id> inside the shell", () => {
     expect(qa(m.container, '[data-testid^="park-page-"]')).toHaveLength(1);
     expect(qa(m.container, "h1")).toHaveLength(1);
     expect(textOf(q(m.container, "h1"))).toBe("K1 electric scooter");
-    expect(document.title).toBe("World · Tilo");
+    expect(document.title).toBe("K1 electric scooter · Tilo"); // UI-10 B3: the world's name, not "World"
     expect(mains[0]?.closest("[data-park]")).not.toBeNull();
     expect(pageText(m.container)).not.toContain("Not built yet");
   });
@@ -125,6 +125,7 @@ describe("WEB_6_shell: /park/world/<id> inside the shell", () => {
     await goTo("/park/world/nope");
     expect(m.container.querySelector('[data-testid="park-page-world"]')).toBeNull();
     expect(m.container.querySelector('[data-testid="park-not-found"]')).not.toBeNull();
+    expect(document.title).toBe("Not found · Tilo"); // UI-10 B3
   });
 
   it("WEB_6_shell_the_breadcrumb_goes_back_to_worlds_and_the_Spend_link_to_the_ledger", async () => {

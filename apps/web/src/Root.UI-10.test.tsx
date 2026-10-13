@@ -46,3 +46,21 @@ it("UI-10 W7 unknown routes name the not-found browser tab", async () => {
   await visit("/unknown-page");
   expect(document.title).toBe("Not found · Tilo");
 });
+it("UI-10 W7-FIX2 shares world names and Settings/More titles through route changes", async () => {
+  const m = await visit("/world/k1");
+  const heading = m.container.querySelector("h1")?.textContent;
+  expect(heading).toBeTruthy();
+  expect(document.title).toBe(`${heading} · Tilo`);
+  for (const [path, title] of [
+    ["/settings", "Settings"],
+    ["/more", "More"],
+    ["/unknown-page", "Not found"],
+  ]) {
+    await act(async () => {
+      window.history.pushState({}, "", path);
+      window.dispatchEvent(new PopStateEvent("popstate"));
+      await vi.dynamicImportSettled();
+    });
+    await vi.waitFor(() => expect(document.title).toBe(`${title} · Tilo`));
+  }
+});

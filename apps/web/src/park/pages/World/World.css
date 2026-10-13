@@ -251,6 +251,7 @@
   align-items: center;
   gap: 2px;
   height: 32px;
+  max-width: calc(100% - 28px); /* UI-10 B4: never past the map's right edge (the nav clipped at 320) */
   padding: 0 4px;
   border-radius: 10px;
   background: var(--pop);
@@ -927,6 +928,23 @@
 
 /* ---- Narrow windows (the design has no rule here; these keep text from overprinting or clipping) ---- */
 @media (max-width: 560px) {
+  /* UI-10 B4: the legend is a tidy 2 x 2 grid instead of three items and one orphan; the lens pill wraps inside
+     the map instead of running off it. The 440px map height is pinned to the design (park-world.spec.ts). */
+  [data-park] .park-world-legend:not([hidden]) {
+    display: grid;
+    grid-template-columns: repeat(2, max-content);
+    gap: 8px 18px;
+  }
+  [data-park] .park-world-lenses {
+    flex-wrap: wrap;
+    height: auto;
+    min-height: 32px;
+    padding: 4px;
+  }
+  [data-park] .park-world-lenses a {
+    min-height: 24px;
+    padding: 0 6px;
+  }
   /* Districts: the name and note, then the counts, then the chip, all across the columns right of the tile
      (the design's column tracks stay; the items span them so nothing runs past the card). */
   [data-park] .park-world-district {

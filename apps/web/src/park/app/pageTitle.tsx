@@ -7,7 +7,7 @@ type SetTitle = (title: string | null) => void;
 
 export const PageTitleContext = createContext<SetTitle | null>(null);
 
-/** While the calling component is mounted the document title is `<title> Â· Tilo`. Outside the shell: nothing. */
+/** While the calling component is mounted the document title is `<title> · Tilo`. Outside the shell: nothing. */
 export function usePageTitle(title: string): void {
   const set = useContext(PageTitleContext);
   useEffect(() => {
