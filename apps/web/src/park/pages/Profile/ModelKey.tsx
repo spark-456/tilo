@@ -61,6 +61,12 @@ function statusLine(v: ModelKeyView): string {
       ? `This organisation's work uses its own model key (${v.label ?? "named by the owner"}).`
       : OWN;
   }
+  if (v.state === "active" && !v.active) {
+    // SEC-REVIEW-29 B7: the stored key is verified but the API says it is not in use: follow `active`, say why.
+    return v.lastError === "not_configured"
+      ? `Not in use. This key's bundle is no longer configured in this build, so work that needs it is refused, or runs on Tilo's own key only if you allowed that. Replace the key or remove it.`
+      : `Not in use right now${v.lastError ? ` (${v.lastError})` : ""}. Work for this organisation does not use this key.`;
+  }
   if (v.state === "active") {
     const added = v.setAt ? `, added ${v.setAt.slice(0, 10)}` : "";
     return `Active. Work for this organisation uses its own key (${v.label ?? "unnamed"}), version ${v.version ?? "?"}${added}.`;
@@ -193,9 +199,19 @@ function Body({ flow }: { flow: ModelKeyFlow }) {
         </div>
         {view?.owner ? (
           <StatusChip
-            tone={view.state === "active" ? "ok" : view.state === "none" ? "neutral" : "amber"}
+            tone={
+              view.state === "active" && view.active
+                ? "ok"
+                : view.state === "none"
+                  ? "neutral"
+                  : "amber"
+            }
           >
-            {view.state === "none" ? "Not set" : view.state}
+            {view.state === "none"
+              ? "Not set"
+              : view.state === "active" && !view.active
+                ? "not in use"
+                : view.state}
           </StatusChip>
         ) : null}
       </div>

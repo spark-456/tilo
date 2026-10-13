@@ -94,6 +94,21 @@ describe("ADR-0041 BQ-BYOK-WEB-1 states", () => {
     expect(text(m.container)).not.toContain("Key saved");
   });
 
+  it("BYOK_WEB_ADR_0041_B7_a_vanished_bundle_is_shown_as_not_in_use_not_as_active", async () => {
+    // SEC-REVIEW-29 B7: the API says state "active" but `active: false, last_error: "not_configured"` (the bundle left
+    // config). The page must follow `active`, not claim "uses its own key" and show a green chip.
+    const gone = { ...ACTIVE, active: false, last_error: "not_configured" };
+    const a = fake({ get: [gone] });
+    const m = mount(<ModelKeyControl flow={a.flow} demo={false} />);
+    await settle();
+    const shown = text(m.container);
+    expect(shown).not.toContain("uses its own key");
+    expect(shown).not.toMatch(/Active\./);
+    expect(shown).toContain("Not in use");
+    expect(shown).toContain("no longer configured");
+    expect(m.container.querySelector(".park-chip--ok")).toBeNull();
+  });
+
   it("BYOK_WEB_ADR_0041_loading_then_failure_with_a_retry", async () => {
     let release: (v: unknown) => void = () => undefined;
     const slow = () =>
