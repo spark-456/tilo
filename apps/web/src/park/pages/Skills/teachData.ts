@@ -118,6 +118,9 @@ export const DEFAULT_DESC =
   "When an invoice email arrives in the Accounts inbox, open the PDF, copy the supplier, amount and due date into the “Invoices 2026” sheet, then label the email “Logged”.";
 export const DESCRIBE_HELP =
   "Write it like you’d explain it to a new colleague. Tilo asks if anything is unclear.";
+/** No API session (a demo): "Read my description" cannot read the text, so the steps are a sample and say so (HR-1). */
+export const DESCRIBE_SAMPLE =
+  "Sample only: the steps below are an example, not read from your description. Real steps need sign-in.";
 export const DROP = {
   title: "Drop an example here",
   sub: "A finished spreadsheet, document or short screen video. Or click to use a sample.",

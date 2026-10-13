@@ -204,7 +204,7 @@ async def _body(request: Request) -> dict[str, Any]:
     if request.headers.get("content-type", "").split(";")[0].strip().lower() != "application/json":
         raise HTTPException(status_code=415, detail="Send application/json.")
     declared = request.headers.get("content-length", "")
-    if declared.isdigit() and int(declared) > MAX_BODY_BYTES:
+    if declared.isascii() and declared.isdigit() and int(declared) > MAX_BODY_BYTES:
         raise HTTPException(status_code=413, detail="body_too_large")
     chunks: list[bytes] = []
     size = 0

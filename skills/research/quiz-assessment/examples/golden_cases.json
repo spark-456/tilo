@@ -9,19 +9,28 @@
             "id": "q1",
             "topic": "lattice_flux",
             "answer": "b",
-            "source": { "artifact": { "artifact_id": "art_northbridge_paper_1", "version": 1 }, "page": 1 }
+            "source": {
+              "artifact": { "artifact_id": "art_northbridge_paper_1", "version": 1 },
+              "page": 1
+            }
           },
           {
             "id": "q2",
             "topic": "clockwork_valves",
             "answer": "b",
-            "source": { "artifact": { "artifact_id": "art_northbridge_paper_1", "version": 1 }, "page": 2 }
+            "source": {
+              "artifact": { "artifact_id": "art_northbridge_paper_1", "version": 1 },
+              "page": 2
+            }
           },
           {
             "id": "q3",
             "topic": "cyclic_routing",
             "answer": "c",
-            "source": { "artifact": { "artifact_id": "art_northbridge_paper_2", "version": 1 }, "page": 3 }
+            "source": {
+              "artifact": { "artifact_id": "art_northbridge_paper_2", "version": 1 },
+              "page": 3
+            }
           }
         ],
         "responses": [
@@ -33,9 +42,27 @@
       "expected_output": {
         "score": { "correct": 1, "total": 3, "accuracy_pct": 33.33 },
         "topic_breakdown": [
-          { "topic": "lattice_flux", "correct": 1, "total": 1, "accuracy_pct": 100.0, "status": "strong" },
-          { "topic": "clockwork_valves", "correct": 0, "total": 1, "accuracy_pct": 0.0, "status": "weak" },
-          { "topic": "cyclic_routing", "correct": 0, "total": 1, "accuracy_pct": 0.0, "status": "weak" }
+          {
+            "topic": "lattice_flux",
+            "correct": 1,
+            "total": 1,
+            "accuracy_pct": 100.0,
+            "status": "strong"
+          },
+          {
+            "topic": "clockwork_valves",
+            "correct": 0,
+            "total": 1,
+            "accuracy_pct": 0.0,
+            "status": "weak"
+          },
+          {
+            "topic": "cyclic_routing",
+            "correct": 0,
+            "total": 1,
+            "accuracy_pct": 0.0,
+            "status": "weak"
+          }
         ],
         "weak_topics": ["clockwork_valves", "cyclic_routing"],
         "next_practice_set": [
@@ -64,13 +91,19 @@
             "id": "q1",
             "topic": "lattice_flux",
             "answer": "b",
-            "source": { "artifact": { "artifact_id": "art_northbridge_paper_1", "version": 1 }, "page": 1 }
+            "source": {
+              "artifact": { "artifact_id": "art_northbridge_paper_1", "version": 1 },
+              "page": 1
+            }
           },
           {
             "id": "q2",
             "topic": "clockwork_valves",
             "answer": "b",
-            "source": { "artifact": { "artifact_id": "art_northbridge_paper_1", "version": 1 }, "page": 2 }
+            "source": {
+              "artifact": { "artifact_id": "art_northbridge_paper_1", "version": 1 },
+              "page": 2
+            }
           }
         ],
         "responses": [
@@ -81,8 +114,20 @@
       "expected_output": {
         "score": { "correct": 2, "total": 2, "accuracy_pct": 100.0 },
         "topic_breakdown": [
-          { "topic": "lattice_flux", "correct": 1, "total": 1, "accuracy_pct": 100.0, "status": "strong" },
-          { "topic": "clockwork_valves", "correct": 1, "total": 1, "accuracy_pct": 100.0, "status": "strong" }
+          {
+            "topic": "lattice_flux",
+            "correct": 1,
+            "total": 1,
+            "accuracy_pct": 100.0,
+            "status": "strong"
+          },
+          {
+            "topic": "clockwork_valves",
+            "correct": 1,
+            "total": 1,
+            "accuracy_pct": 100.0,
+            "status": "strong"
+          }
         ],
         "weak_topics": [],
         "next_practice_set": [
@@ -105,55 +150,82 @@
             "id": "q1",
             "topic": "lattice_flux",
             "answer": "b",
-            "source": { "artifact": { "artifact_id": "art_northbridge_paper_1", "version": 1 }, "page": 1 }
+            "source": {
+              "artifact": { "artifact_id": "art_northbridge_paper_1", "version": 1 },
+              "page": 1
+            }
           },
           {
             "id": "q2",
             "topic": "lattice_flux",
             "answer": "c",
-            "source": { "artifact": { "artifact_id": "art_northbridge_paper_1", "version": 1 }, "page": 1 }
+            "source": {
+              "artifact": { "artifact_id": "art_northbridge_paper_1", "version": 1 },
+              "page": 1
+            }
           },
           {
             "id": "q3",
             "topic": "lattice_flux",
             "answer": "a",
-            "source": { "artifact": { "artifact_id": "art_northbridge_paper_1", "version": 1 }, "page": 4 }
+            "source": {
+              "artifact": { "artifact_id": "art_northbridge_paper_1", "version": 1 },
+              "page": 4
+            }
           },
           {
             "id": "q4",
             "topic": "lattice_flux",
             "answer": "d",
-            "source": { "artifact": { "artifact_id": "art_northbridge_paper_1", "version": 1 }, "page": 4 }
+            "source": {
+              "artifact": { "artifact_id": "art_northbridge_paper_1", "version": 1 },
+              "page": 4
+            }
           },
           {
             "id": "q5",
             "topic": "clockwork_valves",
             "answer": "b",
-            "source": { "artifact": { "artifact_id": "art_northbridge_paper_1", "version": 1 }, "page": 2 }
+            "source": {
+              "artifact": { "artifact_id": "art_northbridge_paper_1", "version": 1 },
+              "page": 2
+            }
           },
           {
             "id": "q6",
             "topic": "clockwork_valves",
             "answer": "a",
-            "source": { "artifact": { "artifact_id": "art_northbridge_paper_1", "version": 1 }, "page": 5 }
+            "source": {
+              "artifact": { "artifact_id": "art_northbridge_paper_1", "version": 1 },
+              "page": 5
+            }
           },
           {
             "id": "q7",
             "topic": "cyclic_routing",
             "answer": "c",
-            "source": { "artifact": { "artifact_id": "art_northbridge_paper_2", "version": 1 }, "page": 3 }
+            "source": {
+              "artifact": { "artifact_id": "art_northbridge_paper_2", "version": 1 },
+              "page": 3
+            }
           },
           {
             "id": "q8",
             "topic": "cyclic_routing",
             "answer": "b",
-            "source": { "artifact": { "artifact_id": "art_northbridge_paper_2", "version": 1 }, "page": 3 }
+            "source": {
+              "artifact": { "artifact_id": "art_northbridge_paper_2", "version": 1 },
+              "page": 3
+            }
           },
           {
             "id": "q9",
             "topic": "cyclic_routing",
             "answer": "e",
-            "source": { "artifact": { "artifact_id": "art_northbridge_paper_2", "version": 1 }, "page": 6 }
+            "source": {
+              "artifact": { "artifact_id": "art_northbridge_paper_2", "version": 1 },
+              "page": 6
+            }
           }
         ],
         "responses": [
@@ -171,9 +243,27 @@
       "expected_output": {
         "score": { "correct": 5, "total": 9, "accuracy_pct": 55.56 },
         "topic_breakdown": [
-          { "topic": "lattice_flux", "correct": 3, "total": 4, "accuracy_pct": 75.0, "status": "strong" },
-          { "topic": "clockwork_valves", "correct": 1, "total": 2, "accuracy_pct": 50.0, "status": "needs_practice" },
-          { "topic": "cyclic_routing", "correct": 1, "total": 3, "accuracy_pct": 33.33, "status": "weak" }
+          {
+            "topic": "lattice_flux",
+            "correct": 3,
+            "total": 4,
+            "accuracy_pct": 75.0,
+            "status": "strong"
+          },
+          {
+            "topic": "clockwork_valves",
+            "correct": 1,
+            "total": 2,
+            "accuracy_pct": 50.0,
+            "status": "needs_practice"
+          },
+          {
+            "topic": "cyclic_routing",
+            "correct": 1,
+            "total": 3,
+            "accuracy_pct": 33.33,
+            "status": "weak"
+          }
         ],
         "weak_topics": ["cyclic_routing"],
         "next_practice_set": [

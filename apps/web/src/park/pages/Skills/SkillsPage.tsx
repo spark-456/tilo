@@ -9,6 +9,8 @@ import type { AppCtx } from "../../app/AppCtx";
 import { useParkApi } from "../../app/context";
 import type { CurrencyCode } from "../../app/ledgerKpis";
 import { PageSheet } from "../../components";
+import { FirstRunPanels } from "../../sample/FirstRunPanels";
+import { useFirstRunPreview } from "../../sample/useFirstRunPreview";
 import { HelpSection } from "./HelpSection";
 import { LibrarySection } from "./LibrarySection";
 import "./Skills.css";
@@ -56,6 +58,10 @@ function Header({ total, children }: { total?: string; children?: ReactNode }) {
 }
 
 export function SkillsPage({ app }: { app: AppCtx }) {
+  const preview = useFirstRunPreview();
+  return preview ? <FirstRunPanels page="skills" app={app} /> : <PersonalSkillsPage app={app} />;
+}
+function PersonalSkillsPage({ app }: { app: AppCtx }) {
   const api = useParkApi();
   const [data, setData] = useState<Loaded>(null);
   useEffect(() => {
