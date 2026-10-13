@@ -14,16 +14,19 @@ import {
   decisionsWaiting,
 } from "./homeData";
 import { icon, needsAgent, worldArt } from "./homeKit";
+import { usePinClearance } from "./usePinClearance";
 
 export function Pins({
   pins,
   onOpen,
 }: { pins: readonly PlacedPin[]; onOpen: (id: string) => void }) {
+  const pinRef = usePinClearance(pins);
   return (
     <>
       {pins.map((p) => (
         <div
           key={p.worldId}
+          ref={(node) => pinRef(p.worldId, node)}
           className="park-home-pin"
           style={{ left: `${p.x}px`, top: `${p.y}px` }}
         >

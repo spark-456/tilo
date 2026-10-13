@@ -53,7 +53,7 @@ for (const width of WIDTHS) {
       await expect(chip).toHaveAccessibleName("Sample data");
     });
 
-    test(`UI_10_WEB_3b_e2e_${width}_the_sample_chip_is_a_24px_target_and_its_focus_ring_hugs_the_dot`, async ({
+    test(`UI_10_WEB_3b_e2e_${width}_the_sample_chip_is_a_24px_target_and_its_focus_ring_hugs_the_button`, async ({
       page,
     }) => {
       test.setTimeout(150_000);
@@ -89,8 +89,10 @@ for (const width of WIDTHS) {
           dot: outline(el.querySelector(".park-shell__sampledot") as Element),
         };
       });
-      // <=430px the dot carries the ring; wider, the chip pill does
-      if (width <= 430) expect(ring).toEqual({ button: "none 3px", dot: "solid 3px" });
+      // W4 supervisor 14 Oct 04:55: W14 #1021 is the compact-control reference.
+      // Its information icon is decorative; focus belongs to the full button target.
+      // design/source/Tilo Home v2.dc.html:18 pins a solid 3px outline on the focused element.
+      if (width <= 430) expect(ring).toEqual({ button: "solid 3px", dot: "none 3px" });
       else expect(ring.button).toBe("solid 3px");
     });
   });
