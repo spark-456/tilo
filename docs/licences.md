@@ -186,6 +186,7 @@ Its tests use `jsonschema` and `referencing` from the root dev group (above).
 | uv | MIT / Apache-2.0 | https://github.com/astral-sh/uv |
 | just | CC0-1.0 | https://github.com/casey/just |
 | pnpm | MIT | https://github.com/pnpm/pnpm |
+| Eclipse Temurin 21 JRE (`eclipse-temurin:21-jre-jammy`, test-only Firestore emulator runtime in Cloud Build) | GPL-2.0 with Classpath Exception | https://adoptium.net/docs/faq |
 | Biome | MIT | https://github.com/biomejs/biome |
 | Terraform | BUSL-1.1 (HashiCorp; run only by the user per CLAUDE.md, never `terraform apply` from an agent) | https://github.com/hashicorp/terraform |
 | pip-audit | Apache-2.0 | https://github.com/pypa/pip-audit |
