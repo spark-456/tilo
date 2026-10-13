@@ -4,6 +4,7 @@ row yet (BQ-M2-8), so a reply books the whole unit. No network, no paid call."""
 
 from __future__ import annotations
 
+import math
 import shutil
 from pathlib import Path
 
@@ -11,6 +12,13 @@ import pytest
 from _mv_lib import UNIT, cost_usd
 
 ROOT = Path(__file__).resolve().parents[3]
+
+
+def _priced(tokens_in: int, tokens_out: int) -> int:
+    """The expected minor units, from the one rate the API prices with (never a literal)."""
+    from tilo_api.spend_units import INR_MINOR_PER_USD
+
+    return max(1, math.ceil(cost_usd(tokens_in, tokens_out) * INR_MINOR_PER_USD))
 
 
 def test_BQ_M2_4_MV_15_the_shipped_config_gives_the_documented_ceiling_ttl_cap_and_unit():
@@ -65,7 +73,9 @@ def test_BQ_M2_4_MV_15_a_priced_live_profile_is_priced_up_and_capped_at_the_unit
         unit_reserve_minor=UNIT, rate_limit_requests=10, rate_limit_window_s=60,
     )  # fmt: skip
     cfg = meter.MeterConfig(caps=caps, ceiling=2048, hold_ttl_s=60.0, max_reserves=400, cost_usd=cost_usd)
-    assert meter.bounded_minor(cfg, {"prompt_token_count": 100, "response_token_count": 100}, UNIT) == 2
-    assert meter.bounded_minor(cfg, {"prompt_token_count": 2048, "response_token_count": 2048}, UNIT) == 25
+    assert meter.bounded_minor(cfg, {"prompt_token_count": 100, "response_token_count": 100}, UNIT) == _priced(100, 100)
+    assert meter.bounded_minor(cfg, {"prompt_token_count": 2048, "response_token_count": 2048}, UNIT) == _priced(
+        2048, 2048
+    )
     assert meter.bounded_minor(cfg, {"prompt_token_count": 2049}, UNIT) is None
     assert meter.bounded_minor(cfg, {}, UNIT) is None
