@@ -38,7 +38,9 @@ from tilo_harness.skills import SkillRegistry
 from tilo_memory.artifacts import ArtifactStore
 from tilo_metering import LedgerEntry
 from tilo_metering.flags import FlagStore, process_flags
+from tilo_people.directory import Directory
 from tilo_people.stores import PeopleStores
+from tilo_people.world_share import reader_share
 from tilo_planning.compiler import PlanInputs, compile_plan
 from tilo_planning.gaps import Gap
 from tilo_planning.memory import InMemoryPreferenceStore, MemoryLookup
@@ -364,6 +366,105 @@ def member_world(principal: Principal, store: Store, world_id: str) -> WorldReco
     if principal.world_id == world_id or unbound_owner:
         return world
     raise HTTPException(status_code=404)
+
+
+def _layout_districts(store: Store, world_id: str) -> list[str]:
+    """The district ids the world's built layout names; none for no layout or one that is not the expected shape."""
+    try:
+        layout = getattr(store.runs.get(world_id), "layout", None)
+        return [
+            d["id"] for level in layout["semantic"]["levels"] for d in level["districts"] if isinstance(d["id"], str)
+        ]
+    except Exception:
+        return []
+
+
+def team_reader(
+    principal: Principal,
+    store: Store,
+    people: Callable[[], PeopleStores | None],
+    clock: Callable[[], str],
+    world_id: str,
+) -> tuple[WorldRecord, Principal]:
+    """ADR-0040 decisions 4 and 5: the world as a team reader, for a read route only. The session must be a full web
+    or mobile-web sign-in bound to no world (never an email, signed-link, demo or world-bound one), of a person who
+    is a member of the team of a share in force for this world now; the team comes from the stored share, never from
+    the request. Returns the world and an internal Viewer of every district the record and layout name, which is
+    never stored on the request and is handed to read routes only. Every other case, a people store that cannot be
+    opened included, is the one unknown-world 404. No cache: each request reads the shares and the directory."""
+    world = store.worlds.get(world_id)
+    if (
+        world is None
+        or principal.world_id is not None
+        or principal.role != "owner"
+        or principal.channel not in ("web", "mobile_web")
+        or principal.full_session is not True
+        or principal.demo_session
+    ):
+        raise HTTPException(status_code=404)
+    try:
+        stores = people()
+        if stores is None:
+            raise HTTPException(status_code=404)
+        directory = Directory.of(s.record for s in stores.persons.list(ORG_ID))
+        shares = [s.record for s in stores.world_shares.list(ORG_ID, "world_id", world_id)]
+        found = reader_share(shares, world_id, world.owner, directory, principal.user_id, clock())
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.warning("team reader check failed (%s)", type(exc).__name__)  # no detail: like an unknown world
+        raise HTTPException(status_code=404) from None
+    if found is None:
+        raise HTTPException(status_code=404)
+    districts = tuple(dict.fromkeys([*world.districts, *_layout_districts(store, world_id)]))
+    viewer = Principal(
+        user_id=principal.user_id, role="viewer", world_id=world_id, channel=principal.channel, districts=districts
+    )
+    return world, viewer
+
+
+def readable_world(
+    principal: Principal,
+    store: Store,
+    people: Callable[[], PeopleStores | None],
+    clock: Callable[[], str],
+    world_id: str,
+) -> tuple[WorldRecord, Principal]:
+    """The world a read route may serve and the principal to serve it as (ADR-0040 decision 5): `member_world` first,
+    unchanged (the principal itself); else `team_reader`'s derived Viewer; else the one unknown-world 404."""
+    try:
+        return member_world(principal, store, world_id), principal
+    except HTTPException:
+        return team_reader(principal, store, people, clock, world_id)
+
+
+def get_people_provider(request: Request) -> Callable[[], PeopleStores | None]:
+    """The people stores as the app is wired (overrides included), resolved only when called and `None` when they are
+    not configured or cannot be opened, so a read route that the owner reaches never depends on them."""
+
+    def provide() -> PeopleStores | None:
+        seam = request.app.dependency_overrides.get(get_people_stores, get_people_stores)
+        try:
+            return seam(request) if inspect.signature(seam).parameters else seam()
+        except Exception:
+            return None
+
+    return provide
+
+
+def get_world_lookup(request: Request) -> Callable[[str], WorldRecord | None]:
+    """A world's record by id from the store as the app is wired, read-only (`Store.load_world`, no settle), or `None`
+    for an unknown world or a store that cannot answer; for a route whose body, not its path, names a world."""
+
+    def lookup(world_id: str) -> WorldRecord | None:
+        seam = request.app.dependency_overrides.get(get_store, get_store)
+        try:
+            store = seam(request) if inspect.signature(seam).parameters else seam()
+            return store.load_world(world_id, settle=False)
+        except Exception:
+            return None
+
+    return lookup
 
 
 def get_store(request: Request = None) -> Store:  # type: ignore[assignment]  # FastAPI injects it; None elsewhere

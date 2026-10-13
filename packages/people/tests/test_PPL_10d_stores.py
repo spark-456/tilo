@@ -117,7 +117,7 @@ def test_PPL_10d_PE_16_indexes_are_pinned():
     assert {k: tuple(v) for k, v in stores.INDEXES.items()} == {
         "person": (),
         "meeting": ("owner",),
-        "work_item": ("owner",),
+        "work_item": ("owner", "world_id"),
         "pinboard_item": ("scope.user", "scope.team", "set_up_by"),
         "mention": ("pin_id", "user"),
         "calendar_entry": ("owner",),

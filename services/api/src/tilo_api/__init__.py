@@ -56,6 +56,7 @@ from tilo_api.skills_capture import router as _skills_capture_router
 from tilo_api.skills_feedback import router as _skills_feedback_router
 from tilo_api.skills_routes import router as _skills_router
 from tilo_api.tasks import router as _tasks_router
+from tilo_api.team_items import router as _team_items_router
 from tilo_api.team_routes import router as _team_router
 from tilo_api.team_shares import router as _team_shares_router
 from tilo_api.user_settings import router as _user_settings_router
@@ -148,6 +149,7 @@ app.include_router(_assistant_router)
 app.include_router(_people.router)
 app.include_router(_plate_links.router)  # FR-PA-06b: /l/<token> (public to the gate; the route checks the link)
 app.include_router(_team_shares_router)  # ADR-0040: owner-only PUT/DELETE of a world's team share
+app.include_router(_team_items_router)  # ADR-0040: the team view of a shared world's work items
 app.include_router(_meeting_host_routes.router)
 app.include_router(_quiz_apps.router)
 app.include_router(_connect_routes.router)
