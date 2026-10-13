@@ -234,3 +234,33 @@ output "cloudbuild_staging_bucket" {
     lifecycle_rules             = module.storage_cloudbuild_staging.lifecycle_rules["cloudbuild-staging"]
   }
 }
+
+# INFRA-SITTING2 (sitting2.tf, tests/sitting2.tftest.hcl)
+output "cloudbuild_tests_grants" {
+  description = "Every binding the test-only Cloud Build identity holds: scope, resource, role."
+  value = concat(
+    [for b in values(module.iam.bindings) : {
+      scope    = "project"
+      resource = var.project_id
+      role     = b.role
+    } if b.member == "serviceAccount:${local.cloudbuild_tests_service_account_email}"],
+    [{
+      scope    = "storage_bucket"
+      resource = google_storage_bucket_iam_member.cloudbuild_tests_staging_viewer.bucket
+      role     = google_storage_bucket_iam_member.cloudbuild_tests_staging_viewer.role
+    }],
+  )
+}
+
+output "cloudbuild_tests_service_account_email" {
+  value = local.cloudbuild_tests_service_account_email
+}
+
+output "firestore_ttl_fields" {
+  description = "collection => field with a TTL policy on the (default) database."
+  value       = { for k, f in google_firestore_field.ttl : k => f.field }
+}
+
+output "artifact_delete_role_permissions" {
+  value = google_project_iam_custom_role.artifact_object_delete.permissions
+}

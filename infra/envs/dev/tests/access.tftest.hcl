@@ -128,8 +128,13 @@ run "PRD_13_2_storage_grants_are_bucket_scoped_create_and_read" {
   }
 
   assert {
-    condition     = !contains(keys(output.service_storage_grants), "archive::harness::roles/storage.objectAdmin") && !anytrue([for k in keys(output.service_storage_grants) : startswith(k, "archive::api")])
-    error_message = "The archive bucket is create-only for harness plus read for chain checks; api gets nothing."
+    condition = (
+      !contains(keys(output.service_storage_grants), "archive::harness::roles/storage.objectAdmin") &&
+      toset([for k in keys(output.service_storage_grants) : k if startswith(k, "archive::api")]) == toset([
+        "archive::api::roles/storage.objectCreator", "archive::api::roles/storage.objectViewer",
+      ])
+    )
+    error_message = "The archive bucket is create-only for harness and api (INFRA-SITTING2, #853: api writes run archives) plus read for chain checks; nobody gets delete or update on it."
   }
 
   assert {

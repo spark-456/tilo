@@ -115,6 +115,7 @@ locals {
       ingress            = "INGRESS_TRAFFIC_ALL"
       public             = true
       invoked_by         = []
+      ignore_env         = true # web push settings via gcloud (docs/runbooks/infra-sitting-2.md); audience is its own URL
     }
     "connectors" = {
       image              = local.placeholder_image
@@ -264,6 +265,13 @@ locals {
       "cloudbuild::roles/logging.logWriter" = {
         role   = "roles/logging.logWriter"
         member = "serviceAccount:${local.cloudbuild_service_account_email}"
+      }
+    },
+    # The test-only gate identity (sitting2.tf): the same one project role, nothing else at project level.
+    {
+      "cloudbuild-tests::roles/logging.logWriter" = {
+        role   = "roles/logging.logWriter"
+        member = "serviceAccount:${local.cloudbuild_tests_service_account_email}"
       }
     },
   )
@@ -721,7 +729,8 @@ locals {
   # bucket => service => roles
   storage_grants = {
     "artifacts" = {
-      api     = ["roles/storage.objectCreator", "roles/storage.objectViewer"] # uploads (FR-INT-02), downloads (PRD 6.2)
+      # uploads (FR-INT-02), downloads (PRD 6.2), and the erasure delete (FR-MEM-09, #853): one-permission custom role
+      api     = ["roles/storage.objectCreator", "roles/storage.objectViewer", local.artifact_delete_role]
       harness = ["roles/storage.objectCreator", "roles/storage.objectViewer"] # intermediate artifacts, masked screenshots
     }
     "snapshots" = {
@@ -729,6 +738,10 @@ locals {
     }
     "archive" = {
       harness = ["roles/storage.objectViewer"] # per-run hash-chain check (FR-MEM-04); create is granted above
+      # run archive (TILO_ARCHIVE_STORE=gcs, #853): create-only objects plus read. No delete and no update, so a
+      # record can never be overwritten or removed by api (overwrite needs storage.objects.delete). Versioning off,
+      # 30-day lifecycle and CMEK untouched.
+      api = ["roles/storage.objectCreator", "roles/storage.objectViewer"]
     }
   }
   storage_bindings = { for combo in flatten([
@@ -746,6 +759,9 @@ resource "google_storage_bucket_iam_member" "service_access" {
   bucket = module.storage.buckets[each.value.bucket].name
   role   = each.value.role
   member = "serviceAccount:${module.service.service_accounts[each.value.svc]}"
+
+  # The custom role (sitting2.tf) must exist before it is bound.
+  depends_on = [google_project_iam_custom_role.artifact_object_delete]
 }
 
 # ---------------------------------------------------------------------------
