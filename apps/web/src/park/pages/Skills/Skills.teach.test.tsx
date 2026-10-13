@@ -146,6 +146,40 @@ describe("WEB_8a_skills_teach: how to show it (step 1)", () => {
     expect(rig.clock.timers).toHaveLength(0); // an upload is read at once, nothing is scheduled
   });
 
+  it("QA_13OCT_skills_teach_Read_my_description_is_off_for_an_empty_or_blank_box_and_on_again_when_typed", async () => {
+    const rig = await mountSkills();
+    clickEl(methodTile(rig.el, "Describe it"));
+    const read = () => control(rig.el, "Read my description");
+    expect(isDisabled(read())).toBe(false); // the sample text is in the box
+    for (const blank of ["", "   ", "\n\t "]) {
+      typeInto(describeField(rig.el), blank);
+      expect(isDisabled(read()), JSON.stringify(blank)).toBe(true);
+      clickEl(read());
+      expect(pickedCount(rig.el), "a blank box yields no steps").toBe(0);
+      expect(card(rig)).not.toContain(CAP.describe[0] as string);
+    }
+    typeInto(describeField(rig.el), "Order office coffee beans");
+    expect(isDisabled(read())).toBe(false);
+  });
+
+  it("QA_13OCT_skills_teach_without_sign_in_the_describe_steps_are_labelled_a_sample_not_read_from_the_text", async () => {
+    // No API session: the four steps are the same canned sample for any text, so the card says so (HR-1).
+    const rig = await mountSkills();
+    clickEl(methodTile(rig.el, "Describe it"));
+    const note = rig.el.querySelector('[data-testid="skills-describe-sample"]');
+    expect(note?.textContent).toBe(
+      "Sample only: the steps below are an example, not read from your description. Real steps need sign-in.",
+    );
+    typeInto(describeField(rig.el), "Order office coffee beans");
+    tap(rig, "Read my description");
+    expect(pickedCount(rig.el)).toBe(4);
+    expect(card(rig)).toContain("Sample run");
+    expect(card(rig)).toContain("Real steps need sign-in.");
+    const rows = qa<HTMLElement>(rig.el, ".park-skills-cap-text").map((r) => r.textContent ?? "");
+    expect(rows).toEqual([...CAP.describe]);
+    expect(rows.join(" ")).not.toContain("coffee"); // the steps are never presented as derived from the text
+  });
+
   it("WEB_8a_skills_teach_Read_my_description_captures_the_four_steps_at_once_with_no_timer", async () => {
     const rig = await mountSkills();
     clickEl(methodTile(rig.el, "Describe it"));

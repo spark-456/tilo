@@ -17,7 +17,9 @@ export const HELD_LABEL = "Waiting for your approval";
 const worldsText = (n: number): string => `${n} worlds`;
 
 /** The bar for these worlds, or null when nothing is running and nothing is held. */
-export function runBarOf(worlds: readonly World[]): RunBarState | null {
+export function runBarOf(all: readonly World[]): RunBarState | null {
+  // BQ-CTX-TEAMWORLD: a teammate's world is theirs; a person's own run bar counts only their own work.
+  const worlds = all.filter((w) => w.access !== "team");
   const running = worlds.filter((w) => w.st === "running");
   if (running.length > 0) {
     const agents = running.reduce((n, w) => n + Math.max(0, w.agents), 0);

@@ -68,7 +68,7 @@ describe("WEB_11_connectors_drawer: a tile opens the detail panel", () => {
     expect(d.getAttribute("aria-label")).toBe("Gmail");
     expect(hasExactText(d, "Gmail")).toBe(true);
     expect(hasExactText(d, "Email · alex@northwind.co")).toBe(true);
-    expect(hasExactText(d, "Healthy · synced 2 min ago")).toBe(true);
+    expect(hasExactText(d, "Example only · no sync or health check recorded")).toBe(true);
     expect(hasExactText(d, "How far agents can go")).toBe(true);
     expect(hasExactText(d, "Used by")).toBe(true);
     expect(
@@ -93,7 +93,12 @@ describe("WEB_11_connectors_drawer: a tile opens the detail panel", () => {
 
   it("FR_ACC_03_WEB_11_connectors_drawer_live_and_attention_status_lines", async () => {
     const { root } = await open();
-    expect(hasExactText(openTile(root, "Google Calendar"), "Healthy · synced live")).toBe(true);
+    expect(
+      hasExactText(
+        openTile(root, "Google Calendar"),
+        "Example only · no sync or health check recorded",
+      ),
+    ).toBe(true);
     click(labelled(root, "Close") as HTMLElement);
     expect(dialogOf(root)).toBeNull();
     const hub = openTile(root, "HubSpot");
@@ -204,7 +209,7 @@ describe("WEB_11_connectors_connect: Add a tool signs in, then lists the tool as
     const t = textOf(tileFor(root, "Notion") as HTMLElement);
     expect(t).toContain("Connected just now");
     expect(t).toContain("Read");
-    expect(t).toContain("Synced just now");
+    expect(t).toContain("Example only: not synced");
     expect(t).toContain("Not used yet");
     expect(connectButtons(root)).toHaveLength(5);
     expect(countExactText(root, "7 connected")).toBe(2);
@@ -217,7 +222,7 @@ describe("WEB_11_connectors_connect: Add a tool signs in, then lists the tool as
     click(connectButtons(root)[0] as HTMLElement);
     await waitFor(() => tileFor(root, "Notion") !== undefined, "Notion in Connected");
     const d = openTile(root, "Notion");
-    expect(hasExactText(d, "Healthy · synced just now")).toBe(true);
+    expect(hasExactText(d, "Example only · no sync or health check recorded")).toBe(true);
     expect(radios(d).map((r) => r.getAttribute("aria-checked"))).toEqual([
       "true",
       "false",
@@ -256,7 +261,7 @@ describe("WEB_11_connectors_reconnect: the HubSpot banner", () => {
     expect(app.toast).toHaveBeenCalledTimes(1);
     toastCopy(app, "HubSpot reconnected for 90 days");
     const hub = textOf(tileFor(root, "HubSpot") as HTMLElement);
-    expect(hub).toContain("Synced just now");
+    expect(hub).toContain("Example only: not synced");
     expect(hub).not.toContain("Sign-in expires");
     expect(countExactText(root, "6 connected")).toBe(2);
     expect(app.go, "S-08 hand-off is not in the design").not.toHaveBeenCalled();

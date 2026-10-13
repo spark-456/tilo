@@ -53,7 +53,20 @@ def test_COST_FAST_1b_an_answer_is_on_costs_for_exactly_the_credits_the_allowanc
     assert report["totals"]["credits"] == pytest.approx(spent)
     assert row["tier"] is None and row["completed"] is False
     assert [r["task_type"] for r in report["by_task_type"]] == ["quick_answer"], "the label the web can tell Quick by"
-    assert set(report) == {"credit_usd", "totals", "tasks", "by_tier", "by_profile", "by_task_type", "by_tier_profile"}
+    assert set(report) == {
+        "credit_usd",
+        "totals",
+        "tasks",
+        "by_tier",
+        "by_profile",
+        "by_task_type",
+        "by_tier_profile",
+        "approval_waits",
+        "activity",
+        "partial",
+        "partial_reason",
+    }
+    assert report["partial"] is False and report["partial_reason"] is None
 
 
 def test_COST_FAST_1b_nothing_is_stored_by_the_ledger_write_no_world_no_event(quick_rig, ledger):

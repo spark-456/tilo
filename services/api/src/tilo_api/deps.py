@@ -39,7 +39,9 @@ from tilo_harness.skills import SkillRegistry
 from tilo_memory.artifacts import ArtifactStore
 from tilo_metering import LedgerEntry
 from tilo_metering.flags import FlagStore, process_flags
+from tilo_people.directory import Directory
 from tilo_people.stores import PeopleStores
+from tilo_people.world_share import reader_share
 from tilo_planning.compiler import PlanInputs, compile_plan
 from tilo_planning.gaps import Gap
 from tilo_planning.memory import InMemoryPreferenceStore, MemoryLookup
@@ -367,6 +369,156 @@ def member_world(principal: Principal, store: Store, world_id: str) -> WorldReco
     raise HTTPException(status_code=404)
 
 
+def _layout_districts(store: Store, world_id: str) -> list[str]:
+    """The district ids the world's built layout names; none for no layout or one that is not the expected shape."""
+    try:
+        layout = getattr(store.runs.get(world_id), "layout", None)
+        return [
+            d["id"] for level in layout["semantic"]["levels"] for d in level["districts"] if isinstance(d["id"], str)
+        ]
+    except Exception:
+        return []
+
+
+def _team_session(principal: Principal) -> bool:
+    """A full web or mobile-web sign-in bound to no world, role owner, not demo (never an email, signed-link, demo or
+    world-bound session): the only session that may be a team reader (ADR-0040 decision 5)."""
+    return (
+        principal.world_id is None
+        and principal.role == "owner"
+        and principal.channel in ("web", "mobile_web")
+        and principal.full_session is True
+        and not principal.demo_session
+    )
+
+
+def team_reader(
+    principal: Principal,
+    store: Store,
+    people: Callable[[], PeopleStores | None],
+    clock: Callable[[], str],
+    world_id: str,
+    *,
+    directory: Directory | None = None,
+) -> tuple[WorldRecord, Principal]:
+    """ADR-0040 decisions 4 and 5: the world as a team reader, for a read route only. The session must be a full web
+    or mobile-web sign-in bound to no world (never an email, signed-link, demo or world-bound one), of a person who
+    is a member of the team of a share in force for this world now; the team comes from the stored share, never from
+    the request. Returns the world and an internal Viewer of every district the record and layout name, which is
+    never stored on the request and is handed to read routes only. Every other case, a people store that cannot be
+    opened included, is the one unknown-world 404. No cache: each request reads the shares and the directory."""
+    world = store.worlds.get(world_id)
+    if world is None or not _team_session(principal):
+        raise HTTPException(status_code=404)
+    try:
+        stores = people()
+        if stores is None:
+            raise HTTPException(status_code=404)
+        if directory is None:  # a caller that lists many worlds in one request reads the directory once
+            directory = Directory.of(s.record for s in stores.persons.list(ORG_ID))
+        shares = [s.record for s in stores.world_shares.list(ORG_ID, "world_id", world_id)]
+        found = reader_share(shares, world_id, world.owner, directory, principal.user_id, clock())
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.warning("team reader check failed (%s)", type(exc).__name__)  # no detail: like an unknown world
+        raise HTTPException(status_code=404) from None
+    if found is None:
+        raise HTTPException(status_code=404)
+    districts = tuple(dict.fromkeys([*world.districts, *_layout_districts(store, world_id)]))
+    viewer = Principal(
+        user_id=principal.user_id, role="viewer", world_id=world_id, channel=principal.channel, districts=districts
+    )
+    return world, viewer
+
+
+def readable_world(
+    principal: Principal,
+    store: Store,
+    people: Callable[[], PeopleStores | None],
+    clock: Callable[[], str],
+    world_id: str,
+) -> tuple[WorldRecord, Principal]:
+    """The world a read route may serve and the principal to serve it as (ADR-0040 decision 5): `member_world` first,
+    unchanged (the principal itself); else `team_reader`'s derived Viewer; else the one unknown-world 404."""
+    try:
+        return member_world(principal, store, world_id), principal
+    except HTTPException:
+        return team_reader(principal, store, people, clock, world_id)
+
+
+TEAM_WORLD_CANDIDATES = 50  # at most this many shared worlds are decided per list request (lowest world ids first)
+
+
+def team_readable_worlds(
+    principal: Principal,
+    store: Store,
+    people: Callable[[], PeopleStores | None],
+    clock: Callable[[], str],
+) -> dict[str, tuple[WorldRecord, Principal]]:
+    """BQ-CTX-TEAMWORLD (TSW-4b): the worlds the caller reads as a team reader now, for the worlds list: world id to
+    the record and `team_reader`'s derived Viewer. Candidates are the worlds with a share to a team the caller is
+    in, other people's only; each is then decided by `team_reader` itself (the share-in-force rule is never repeated
+    here). A people store that cannot be opened, or a world that cannot be read, is left out, logged with no detail;
+    never an error (the caller's own list stands). Reads only."""
+    if not _team_session(principal):
+        return {}
+    try:
+        stores = people()
+        if stores is None:
+            return {}
+        me = stores.persons.get(ORG_ID, principal.user_id)  # their own record first: no team, nothing else is read
+        teams = sorted({m["team"] for m in me.record["memberships"]}) if me is not None else []
+        if not teams:
+            return {}
+        directory = Directory.of(s.record for s in stores.persons.list(ORG_ID))
+        shared = sorted({s.record["world_id"] for t in teams for s in stores.world_shares.list(ORG_ID, "team", t)})
+        candidates = shared[:TEAM_WORLD_CANDIDATES]
+    except Exception as exc:
+        logger.warning("team worlds not listed (%s)", type(exc).__name__)
+        return {}
+    found: dict[str, tuple[WorldRecord, Principal]] = {}
+    for world_id in candidates:
+        try:
+            world = store.load_world(world_id, settle=False)  # read-only: nothing is settled for a non-owner
+            if world is not None and world.owner != principal.user_id:
+                found[world_id] = team_reader(principal, store, people, clock, world_id, directory=directory)
+        except HTTPException:
+            continue  # no share in force for this person (or the world is unreadable): not theirs to list
+        except Exception as exc:
+            logger.warning("team world not listed (%s)", type(exc).__name__)
+    return found
+
+
+def get_people_provider(request: Request) -> Callable[[], PeopleStores | None]:
+    """The people stores as the app is wired (overrides included), resolved only when called and `None` when they are
+    not configured or cannot be opened, so a read route that the owner reaches never depends on them."""
+
+    def provide() -> PeopleStores | None:
+        seam = request.app.dependency_overrides.get(get_people_stores, get_people_stores)
+        try:
+            return seam(request) if inspect.signature(seam).parameters else seam()
+        except Exception:
+            return None
+
+    return provide
+
+
+def get_world_lookup(request: Request) -> Callable[[str], WorldRecord | None]:
+    """A world's record by id from the store as the app is wired, read-only (`Store.load_world`, no settle), or `None`
+    for an unknown world or a store that cannot answer; for a route whose body, not its path, names a world."""
+
+    def lookup(world_id: str) -> WorldRecord | None:
+        seam = request.app.dependency_overrides.get(get_store, get_store)
+        try:
+            store = seam(request) if inspect.signature(seam).parameters else seam()
+            return store.load_world(world_id, settle=False)
+        except Exception:
+            return None
+
+    return lookup
+
+
 def get_store(request: Request = None) -> Store:  # type: ignore[assignment]  # FastAPI injects it; None elsewhere
     """Deployed: the durable store for `TILO_API_STORE`, with the request's path ids loaded (ADR-0026 decisions 1, 3);
     without a valid config 503 `not_configured`, never cached. Dev mode and the tests override this seam."""
@@ -388,20 +540,72 @@ def get_event_writer(request: Request = None) -> EventWriter:  # type: ignore[as
     return deployed()[1]
 
 
-def get_ledger() -> Sequence[LedgerEntry]:
-    """The Treasury's ledger (FR-MTR-10). No ledger store is wired in yet (BQ-MTR10-4): fail closed."""
-    raise HTTPException(status_code=503, detail="not_configured")
+_treasury_retry_at: float | None = None  # after a failed client build, no new attempt until then (FS-18 window)
 
 
-def get_ledger_writer() -> Any:
-    """The Treasury's write seam (COST-FAST-1b, BQ-COSTFAST-7): an object with `append(LedgerEntry)`. Not wired
-    yet, like `get_ledger`: fail closed. Quick treats that as best effort (`ledger_writer_for`)."""
-    raise HTTPException(status_code=503, detail="not_configured")
+def _treasury(request: Request | None) -> Any:
+    """The Treasury's ledger store (FR-MTR-10, BQ-MTR10-4, ticket T3), one object for the read and the write.
+    Deployed (`K_SERVICE` or `CLOUD_RUN_JOB`): an anonymous demo session's own in-memory ledger (it stores nothing
+    durable), else `FirestoreTreasuryLedger` on the process's one client for a valid `TILO_FIRESTORE_PROJECT`, with the
+    FS-18 back-off after a failed build. Anything else is 503, never an empty or invented ledger. Not deployed: 503
+    `not_configured` (dev mode and the tests wire their own ledger on these seams)."""
+    global _treasury_retry_at
+    from tilo_api import ephemeral, prod, store_door  # noqa: PLC0415  (they import this module's neighbours)
+
+    if not enforced():
+        raise HTTPException(status_code=503, detail="not_configured")
+    if request is not None and (demo := ephemeral.for_request(request)) is not None:
+        return demo.treasury
+    project = os.environ.get(store_door.ENV_PROJECT, "")
+    if not store_door.GCP_PROJECT.fullmatch(project):
+        raise HTTPException(status_code=503, detail="not_configured")
+    retry_at = _treasury_retry_at
+    if retry_at is not None and people_stores_clock() < retry_at:
+        raise HTTPException(status_code=503, detail="store_unavailable")
+    try:
+        client = prod.firestore_client(project)
+    except prod.FirestoreNotConfigured as exc:
+        raise HTTPException(status_code=503, detail="not_configured") from exc
+    except Exception as exc:  # no credentials or no network: closed, backed off, never the text
+        _treasury_retry_at = people_stores_clock() + PEOPLE_STORES_BACKOFF_S
+        raise HTTPException(status_code=503, detail="store_unavailable") from exc
+    _treasury_retry_at = None
+    from tilo_api.treasury_firestore import FirestoreTreasuryLedger  # noqa: PLC0415
+
+    return FirestoreTreasuryLedger(client, org_id=ORG_ID)
+
+
+def get_ledger(request: Request = None) -> Sequence[LedgerEntry]:  # type: ignore[assignment]  # FastAPI injects it
+    """The Treasury's ledger (FR-MTR-10) as the signed-in person's own recorded spend: entries (memory), or one
+    `commit` per run, step and profile from their rollups (deployed). A ledger that cannot be built or read is 503,
+    never an empty report (HR-1); nobody signed in is the sign-in 401."""
+    store = _treasury(request)
+    if request is None:  # no request, no person to read for
+        raise HTTPException(status_code=503, detail="not_configured")
+    uid = resolve_principal(request.app, request).user_id
+    read = getattr(store, "summary_for", None) or store.entries_for  # durable: the rollups (BQ-T3-5); memory: entries
+    try:
+        return cast(Sequence[LedgerEntry], read(uid))
+    except Exception as exc:  # a store error, a document that is not an entry, too many rows: the whole read is refused
+        logger.warning("treasury ledger unreadable: %s", type(exc).__name__)
+        raise HTTPException(status_code=503, detail="store_unavailable") from exc
+
+
+def get_ledger_writer(request: Request = None) -> Any:  # type: ignore[assignment]  # FastAPI injects it; None elsewhere
+    """The Treasury's write seam (COST-FAST-1b, BQ-COSTFAST-7): an object with `append(LedgerEntry)` and
+    `append_once(entry_id, LedgerEntry)` (the live metering's idempotent write). Callers treat a refusal or a failure
+    as best effort (`ledger_writer_for`)."""
+    return _treasury(request)
 
 
 def ledger_writer_for(request: Request) -> Any:
-    """The writer as the app is wired (overrides included), or None when it is unwired or fails."""
-    return _resolve(request, get_ledger_writer)
+    """The writer as the app is wired (overrides included, which take no argument), or None when it is unwired or
+    fails: a person's spend is then not recorded here, and nothing else changes."""
+    try:
+        override = request.app.dependency_overrides.get(get_ledger_writer)
+        return override() if override is not None else get_ledger_writer(request)
+    except Exception:
+        return None
 
 
 def get_time_baselines() -> Any:
@@ -688,10 +892,35 @@ def meter_for(request: Request | None, mode: Any, switches: Any, *, run_id: str 
     )
     path = request.path_params
     run = run_id or next((f"{k}_{path[k]}" for k in ("task_id", "world_id") if isinstance(path.get(k), str)), None)
+    run = run or f"req_{uuid.uuid4().hex}"
     return spend_units.SpendMeter(
-        guard, uid=uid, run_id=run or f"req_{uuid.uuid4().hex}", org_id=ORG_ID,
-        unit_minor=caps.unit_reserve_minor, config=providers_config(),
+        guard, uid=uid, run_id=run, org_id=ORG_ID, unit_minor=caps.unit_reserve_minor, config=providers_config(),
+        sink=_ledger_sink(request, uid, run),
     )  # fmt: skip
+
+
+def _ledger_sink(request: Request, uid: str, meter_run: str) -> Any:
+    """T3 (BQ-T3-3): the meter's Treasury sink, or None when no writer is wired (the spend is then not recorded in the
+    ledger, an ERROR marker says so, and the cap ledger is unaffected). The entry's run is the run id of the path's task
+    or world when it is this person's own, so it lands on that world's cost report; else it keeps the meter's id."""
+    from tilo_api import costs, spend_units  # noqa: PLC0415
+
+    writer = ledger_writer_for(request)
+    if writer is None:
+        logger.error("treasury_ledger_write_failed (no writer is wired)")
+        return None
+    path, run = request.path_params, meter_run
+    try:
+        override = request.app.dependency_overrides.get(get_store)
+        store = override() if override is not None else get_store(request)
+        task, world = store.tasks.get(path.get("task_id")), store.worlds.get(path.get("world_id"))
+        if task is not None and task.owner == uid:  # only the person's own task or world names the run
+            run = task.run_id
+        elif world is not None and world.owner == uid:
+            run = world.run_id
+    except Exception as exc:  # no store to look in: the meter's own id, reported as unattributed
+        logger.warning("treasury entry run not resolved: %s", type(exc).__name__)
+    return spend_units.LedgerSink(writer, uid=uid, org_id=ORG_ID, run_id=run, credit_usd=costs.credit_usd)
 
 
 def _live_or_replay(mode: Any, meter: Any) -> Mode:

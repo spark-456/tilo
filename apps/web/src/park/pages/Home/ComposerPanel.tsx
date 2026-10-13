@@ -91,6 +91,8 @@ export interface ComposerProps {
   readonly sending?: boolean;
   /** QA-DEMO-1: a demo session. The plan is a labelled sample and confirming opens the sample world. */
   readonly sample?: boolean;
+  /** A phone: the input cannot wrap its placeholder, so it shows the example in few words. */
+  readonly compact?: boolean;
   /** Quick or Thinking (COST-FAST-1); Thinking when not given. */
   readonly effort?: Effort;
   readonly onEffort?: (effort: Effort) => void;
@@ -218,7 +220,7 @@ export function ComposerPanel(p: ComposerProps) {
               type="text"
               aria-label="Describe your task"
               value={p.query}
-              placeholder={`e.g. ${mode.example}`}
+              placeholder={`e.g. ${p.compact ? mode.short : mode.example}`}
               onChange={(e) => p.onQuery(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === "Enter") p.onDraft();

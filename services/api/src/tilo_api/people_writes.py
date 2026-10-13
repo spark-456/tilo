@@ -25,6 +25,7 @@ from tilo_people.directory import Directory
 from tilo_people.errors import AlreadyExists, EmailTaken, NotFound, OrgAlreadyFounded, VersionConflict
 from tilo_people.stores import PeopleStores, RecordStore, meeting_tombstone
 from tilo_people.text import clean_line
+from tilo_people.world_share import reader_share
 from tilo_people.writes import check_write
 from tilo_policy.schemas import conforms
 
@@ -182,6 +183,7 @@ class ItemIn(_Closed):
     title: Text
     due_text: Text | None = None
     source: SourceIn
+    world_id: Annotated[str, Field(pattern=r"^w_[0-9A-Za-z_]{1,48}$")] | None = None  # ADR-0040: set at creation only
 
 
 MAX_BODY_BYTES = 32768  # BQ-PPL11C-1: a people POST body over this is a 413, whatever the route
@@ -190,9 +192,12 @@ MAX_BODY_BYTES = 32768  # BQ-PPL11C-1: a people POST body over this is a 413, wh
 async def _capped_body(request: Request) -> bytes:
     """The body, refused once it passes the cap: by the declared length before any read, else by counting as it
     streams, so a client that keeps sending is cut after the cap (and one read-ahead chunk)."""
-    declared = request.headers.get("content-length", "")
-    if declared.isdigit() and int(declared) > MAX_BODY_BYTES:
-        raise Refusal(413, "body_too_large")
+    if "content-length" in request.headers:
+        raw_cl = request.headers["content-length"].strip()
+        if len(raw_cl) > 10 or not (raw_cl.isascii() and raw_cl.isdigit()):  # `isdigit` alone admits '\xb2'
+            raise Refusal(400, "invalid_content_length")
+        if int(raw_cl) > MAX_BODY_BYTES:
+            raise Refusal(413, "body_too_large")
     chunks: list[bytes] = []
     size = 0
     async for chunk in request.stream():
@@ -314,11 +319,15 @@ class Writer:
         store: RecordStore,
         d: Directory,
         also: Callable[[], None] | None = None,
+        world: tuple[Mapping[str, Any] | None, str | None] = (None, None),
     ) -> dict[str, Any]:
-        """Schema first (422, so it is no oracle), then authorisation (403: no record is revealed)."""
+        """Schema first (422, so it is no oracle), then authorisation (403: no record is revealed). `world` is the
+        (share, record owner) of the world a work item names (ADR-0040), read from the stores, never the request."""
         if not conforms(f"{kind}.schema.json", record):
             raise Refusal(422, "invalid_record")
-        request = AccessRequest(self.actor, "create", kind, record, self.now)
+        request = AccessRequest(
+            self.actor, "create", kind, record, self.now, world_share=world[0], world_owner=world[1]
+        )
         self.commit(request, record, store, d, Refusal(403, "forbidden"), also=also)
         return record
 
@@ -562,9 +571,16 @@ def set_role(w: Writer, person_id: str, org_role: str) -> dict[str, Any]:
     return change_person(w, person_id, "set_org_role", lambda p: {**p, "org_role": org_role}, same_ok=False)
 
 
-def create_item(w: Writer, body: ItemIn, owners: Callable[[], deps.SourceOwners]) -> dict[str, Any]:
+def create_item(
+    w: Writer,
+    body: ItemIn,
+    owners: Callable[[], deps.SourceOwners],
+    worlds: Callable[[str], deps.WorldRecord | None] = lambda world_id: None,
+) -> dict[str, Any]:
     """A person adds their own item (PE-03, PE-08): owner is the caller, `due` is code's, a mail or request source
-    must be the caller's (someone else's ref and a missing ref are one 422)."""
+    must be the caller's (someone else's ref and a missing ref are one 422). An item that names a `world_id` (PE-33)
+    is allowed only for that world's record owner or a member of a team it is shared with (a share in force); the
+    world's owner and shares come from the stores, and an unknown world is refused like an unshared one (403)."""
     d = w.directory()
     me = d.record(w.actor)
     due_text = None if body.due_text is None else w.text(body.due_text)
@@ -598,4 +614,12 @@ def create_item(w: Writer, body: ItemIn, owners: Callable[[], deps.SourceOwners]
         if body.source.ref is not None and owners().owner_of(body.source.kind, body.source.ref) != w.actor:
             raise Refusal(422, "source_not_found", code="source_not_found")
 
-    return w.create("work_item", record, w.stores.work_items, d, own_source)
+    world: tuple[Mapping[str, Any] | None, str | None] = (None, None)
+    if body.world_id is not None:
+        record["world_id"] = body.world_id
+        d = w.org_directory()  # a share's in-force test reads the world owner's memberships, not only the caller's
+        found = worlds(body.world_id)
+        if found is not None:
+            shares = (s.record for s in w.stores.world_shares.list(w.org, "world_id", body.world_id))
+            world = (reader_share(shares, body.world_id, found.owner, d, w.actor, w.now), found.owner)
+    return w.create("work_item", record, w.stores.work_items, d, own_source, world)

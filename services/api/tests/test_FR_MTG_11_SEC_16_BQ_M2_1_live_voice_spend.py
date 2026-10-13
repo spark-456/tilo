@@ -31,7 +31,7 @@ from tilo_providers.voice import LiveVoiceConfig, VoiceConfig
 
 AUDIO = bytes(range(100))
 UNIT = 100  # DEFAULT_CAPS unit_reserve_minor in `_sec16_lib`: a test number
-LIVE = LiveVoiceConfig(True, "live-voice-test-profile", "live-model-test", "Leda", "global", 5.0, 128, True)
+LIVE = LiveVoiceConfig(True, "fake-live-voice", "fake-live-test", "Leda", "global", 5.0, 128, True)
 CONFIG = VoiceConfig("google-cloud-tts", "chirp3-hd", "chirp-3-hd", "en-US-Chirp3-HD-Test", 24000, 400, 4000, live=LIVE)
 
 
