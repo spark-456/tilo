@@ -146,7 +146,9 @@ export function gmtLabel(zone: string, at: Date = new Date()): string | null {
       timeZone: zone.trim(),
       timeZoneName: "shortOffset",
     }).formatToParts(at);
-    return parts.find((p) => p.type === "timeZoneName")?.value ?? null;
+    const label = parts.find((p) => p.type === "timeZoneName")?.value;
+    // ICU versions differ on zero-offset spelling; keep the display label stable.
+    return label?.replace(/^GMT[+-]0(?::00)?$/, "GMT") ?? null;
   } catch {
     return null;
   }
