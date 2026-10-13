@@ -17,7 +17,8 @@ steps:
 
     git --literal-pathspecs add -f --pathspec-from-file=.cloud-source-files --pathspec-file-nul
 
-    git -c user.name=cloud-gate -c user.email=cloud-gate@example.invalid commit -q -m ''Tracked test source''
+    git -c user.name=cloud-gate -c user.email=cloud-gate@example.invalid commit -q
+    -m ''Tracked test source''
 
     mkdir -p /workspace/.cloud-tools/bin
 
@@ -43,8 +44,8 @@ steps:
 
     cp "$$(command -v uv)" /workspace/.cloud-tools/bin/uv
 
-    curl -fsSL https://github.com/casey/just/releases/download/1.58.0/just-1.58.0-x86_64-unknown-linux-musl.tar.gz | tar -xz
-    -C /workspace/.cloud-tools/bin just
+    curl -fsSL https://github.com/casey/just/releases/download/1.58.0/just-1.58.0-x86_64-unknown-linux-musl.tar.gz
+    | tar -xz -C /workspace/.cloud-tools/bin just
 
     uv sync --locked --all-packages
 
@@ -79,19 +80,24 @@ steps:
   - -ceu
   - 'export PATH=/workspace/.venv/bin:/workspace/.cloud-tools/bin:$$PATH
 
-    /workspace/.venv/bin/python -m pytest services/api/tests/test_CL_INT_5c_dev_run_to_gate.py services/api/tests/test_COST_FAST_1_followups.py
-    services/api/tests/test_COST_FAST_1_metering.py services/api/tests/test_COST_FAST_1_mode_field.py services/api/tests/test_COST_FAST_1_properties.py
-    services/api/tests/test_COST_FAST_1_quick_answer.py services/api/tests/test_COST_FAST_1_safety_and_failures.py services/api/tests/test_COST_FAST_1_spend_and_retries.py
-    services/api/tests/test_COST_FAST_1_switch_offer.py services/api/tests/test_COST_FAST_1b_ledger.py services/api/tests/test_FR_MTG_11_SEC_16_BQ_M2_1_live_voice_spend.py
+    /workspace/.venv/bin/python -m pytest services/api/tests/test_CL_INT_5c_dev_run_to_gate.py
+    services/api/tests/test_COST_FAST_1_followups.py services/api/tests/test_COST_FAST_1_metering.py
+    services/api/tests/test_COST_FAST_1_mode_field.py services/api/tests/test_COST_FAST_1_properties.py
+    services/api/tests/test_COST_FAST_1_quick_answer.py services/api/tests/test_COST_FAST_1_safety_and_failures.py
+    services/api/tests/test_COST_FAST_1_spend_and_retries.py services/api/tests/test_COST_FAST_1_switch_offer.py
+    services/api/tests/test_COST_FAST_1b_ledger.py services/api/tests/test_FR_MTG_11_SEC_16_BQ_M2_1_live_voice_spend.py
     services/api/tests/test_FR_MTR_10_T3_live_metering_ledger.py services/api/tests/test_FR_MTR_10_T3_treasury_ledger_seams.py
     services/api/tests/test_FR_MTR_10_T3_treasury_ledger_store.py services/api/tests/test_FR_MTR_10_T3b_treasury_rollup_partial.py
-    services/api/tests/test_FR_SPD_05_07_cost_history.py services/api/tests/test_MROOM_776b_SEC_16_SEC_07.py services/api/tests/test_PROD_WIRE_1a_deployed_seams_fail_closed.py
-    services/api/tests/test_PROD_WIRE_1a_follow_ups.py services/api/tests/test_PROD_WIRE_1a_intake_events_through_the_writer.py
-    services/api/tests/test_PROD_WIRE_1a_world_writer_adapter.py services/api/tests/test_SEC_16_FEEDBACK_caps_config.py services/api/tests/test_SEC_16_FEEDBACK_hardening.py
-    services/api/tests/test_SEC_16_FEEDBACK_route.py services/api/tests/test_SEC_16_GOLIVE_935_firestore_spend_ledger.py services/api/tests/test_SEC_16_GOLIVE_935_metering.py
-    services/api/tests/test_SEC_16_GOLIVE_935_reads_never_refused.py services/api/tests/test_SEC_16_api_rate_limit.py services/api/tests/test_SEC_16_api_spend_cap.py
-    services/api/tests/test_SEC_16_config.py services/api/tests/test_SEC_16_mode_is_never_client_settable.py services/api/tests/test_SEC_16_rate_limiter.py
-    services/api/tests/test_SEC_16_spend_guard.py services/api/tests/test_SEC_16_spend_ledger.py -q -p no:cacheprovider
+    services/api/tests/test_FR_SPD_05_07_cost_history.py services/api/tests/test_MROOM_776b_SEC_16_SEC_07.py
+    services/api/tests/test_PROD_WIRE_1a_deployed_seams_fail_closed.py services/api/tests/test_PROD_WIRE_1a_follow_ups.py
+    services/api/tests/test_PROD_WIRE_1a_intake_events_through_the_writer.py services/api/tests/test_PROD_WIRE_1a_world_writer_adapter.py
+    services/api/tests/test_SEC_16_FEEDBACK_caps_config.py services/api/tests/test_SEC_16_FEEDBACK_hardening.py
+    services/api/tests/test_SEC_16_FEEDBACK_route.py services/api/tests/test_SEC_16_GOLIVE_935_firestore_spend_ledger.py
+    services/api/tests/test_SEC_16_GOLIVE_935_metering.py services/api/tests/test_SEC_16_GOLIVE_935_reads_never_refused.py
+    services/api/tests/test_SEC_16_api_rate_limit.py services/api/tests/test_SEC_16_api_spend_cap.py
+    services/api/tests/test_SEC_16_config.py services/api/tests/test_SEC_16_mode_is_never_client_settable.py
+    services/api/tests/test_SEC_16_rate_limiter.py services/api/tests/test_SEC_16_spend_guard.py
+    services/api/tests/test_SEC_16_spend_ledger.py -q -p no:cacheprovider
 
     '
 - name: python:3.12-bookworm
@@ -103,13 +109,57 @@ steps:
   - -ceu
   - 'export PATH=/workspace/.venv/bin:/workspace/.cloud-tools/bin:$$PATH
 
-    /workspace/.venv/bin/python -m pytest packages/providers/tests/test_CL_INT_5_dev_director_fake.py packages/providers/tests/test_FR_MTG_11_SEC_16_BQ_M2_1_live_voice_meter.py
-    packages/providers/tests/test_FR_MTG_11_gemini_live_voice.py packages/providers/tests/test_FR_MTG_17_speech_providers.py
-    -q -p no:cacheprovider
+    /workspace/.venv/bin/python -m pytest packages/providers/tests/test_CL_INT_5_dev_director_fake.py
+    packages/providers/tests/test_FR_MTG_11_SEC_16_BQ_M2_1_live_voice_meter.py packages/providers/tests/test_FR_MTG_11_gemini_live_voice.py
+    packages/providers/tests/test_FR_MTG_17_speech_providers.py -q -p no:cacheprovider
 
     /workspace/.venv/bin/python -m pytest packages/metering/tests -q -p no:cacheprovider
 
-    /workspace/.venv/bin/python -m pytest meet-bot/tests/test_FR_MTG_11_SEC_16_BQ_M2_1_bot_live_voice_gate.py meet-bot/tests/test_FR_MTG_11_gemini_live_replay.py
-    -q -p no:cacheprovider
+    /workspace/.venv/bin/python -m pytest meet-bot/tests/test_FR_MTG_11_SEC_16_BQ_M2_1_bot_live_voice_gate.py
+    meet-bot/tests/test_FR_MTG_11_gemini_live_replay.py -q -p no:cacheprovider
+
+    '
+- id: cl8-libraries
+  name: python:3.12-bookworm
+  waitFor:
+  - node-dependencies
+  - python-dependencies
+  entrypoint: bash
+  env:
+  - LIVE=0
+  - TILO_API_STORE=memory
+  - TILO_PEOPLE_STORE=memory
+  - npm_config_store_dir=/workspace/.cloud-tools/pnpm-store
+  args:
+  - -ceu
+  - 'export PATH=/workspace/.venv/bin:/workspace/.cloud-tools/bin:/workspace/.cloud-tools/node_modules/.bin:$$PATH
+
+    /workspace/.venv/bin/python -m pytest packages/people/tests tests/contracts -q
+    -p no:cacheprovider
+
+    '
+- id: cl8-api-affected
+  name: python:3.12-bookworm
+  waitFor:
+  - cl8-libraries
+  entrypoint: bash
+  env:
+  - LIVE=0
+  - TILO_API_STORE=memory
+  - TILO_PEOPLE_STORE=memory
+  args:
+  - -ceu
+  - 'export PATH=/workspace/.venv/bin:/workspace/.cloud-tools/bin:$$PATH
+
+    /workspace/.venv/bin/python -m pytest services/api/tests/test_BQ_CTX_TEAMWORLD*.py
+    services/api/tests/test_PPL_11c_s4_write_limits.py services/api/tests/test_PPL_11c_FS_a_record_contract.py
+    services/api/tests/test_PPL_11c_FS_c_directory.py services/api/tests/test_SEC_16*.py
+    services/api/tests/test_FR_PA_10*.py services/api/tests/test_FR_HIL_09_SEC_07_roles_redaction.py
+    services/api/tests/test_FR_CON_10_in_app_delivery_run.py services/api/tests/test_SEC_15_visitor_refused.py
+    services/api/tests/test_SEC_15_gate_hardening.py services/api/tests/test_SEC_15_declaration.py
+    services/api/tests/test_SEC_10_appcheck*.py -q -p no:cacheprovider
+
+    /workspace/.venv/bin/python -m pytest tests/system/test_SYS_fail_closed_and_services.py
+    -k tilo_api -q -p no:cacheprovider
 
     '

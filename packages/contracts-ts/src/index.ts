@@ -109,6 +109,7 @@
  * events/data/world.planned.schema.json 1.0.0 sha256:eb423b257e5fc838
  * events/data/world.requested.schema.json 1.1.0 sha256:7f1370b796c05ea1
  * events/data/world.resumed.schema.json 1.0.0 sha256:a3fd175fc848bf87
+ * events/data/world.share_changed.schema.json 1.0.0 sha256:7de879d9ec364699
  * events/data/world.started.schema.json 1.0.0 sha256:e0daa70c85838c8f
  * events/registry.schema.json 1.2.0 sha256:5a2b8514c1e7e2b1
  * handoff.schema.json 1.0.0 sha256:7ed882f92b634672
@@ -139,8 +140,9 @@
  * transcript.schema.json 1.0.0 sha256:08f934b8f0c9a40e
  * ui_action.schema.json 1.0.0 sha256:2ceb1e0b46368734
  * user_settings.schema.json 1.0.0 sha256:dfc439371ba69131
- * work_item.schema.json 1.0.0 sha256:7add9f68c1f996fb
- * events/registry.yaml 1.4.0 sha256:94fe429dabf876f7
+ * work_item.schema.json 1.1.0 sha256:9ee739ef8bdb7579
+ * world_share.schema.json 1.0.0 sha256:89d31e9968dc95cc
+ * events/registry.yaml 1.5.0 sha256:ffb369c84ae3eff7
  */
 
 /**
@@ -1138,6 +1140,11 @@ export type UserSettingsWeekday = "mon" | "tue" | "wed" | "thu" | "fri" | "sat" 
  * via the `definition` "UserSettingsClock".
  */
 export type UserSettingsClock = string;
+/**
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "WorldShareId".
+ */
+export type WorldShareId = string;
 
 /**
  * Index of the generated contract types; not a document.
@@ -3459,6 +3466,16 @@ export interface WorldRequestedData {
  */
 export interface WorldResumedData {
   paused_for_s: number;
+}
+/**
+ * data of world.share_changed (registry 1.5.0, ADR-0040). The world's owner turned team sharing on or off for one team. tilo-api writes it in the shared world after the world_share record was written, never an agent or a model: actor is the world's owner (the actor of its first world.requested), target is the world's own id, district is null and vis is [] (owner-only, ADR-0009). state on means a share record now exists for team; off means it was revoked. It authorises nothing outside Tilo and sends nothing, so it is not a side effect and authz is null. A share that lapses because the owner left the team writes no event.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "WorldShareChangedData".
+ */
+export interface WorldShareChangedData {
+  team: TeamId;
+  state: "on" | "off";
 }
 /**
  * data of world.started (PRD 9.5).
@@ -6057,7 +6074,7 @@ export interface UserSettingsUpdate {
   quiet_hours: UserSettingsQuietHours;
 }
 /**
- * One thing a person has to do (FR-PA-01): from confirmed minutes, from mail the person marked, or by hand. Visible to its `owner`; the person who assigned it sees its status only, and only once it is no longer `proposed` (PE-03). An item Tilo made starts `proposed`, is readable by no one until confirmed (PE-03; the meeting Owner sees it in the minutes), carries the meeting Owner as `assigned_by` from the start, and leaves `proposed` only with `confirmed_by`, that Owner (PE-07). A model never sets `due`: code computes it from `due_text` (PE-15).
+ * One thing a person has to do (FR-PA-01): from confirmed minutes, from mail the person marked, or by hand. Visible to its `owner`; the person who assigned it sees its status only, and only once it is no longer `proposed` (PE-03). An item Tilo made starts `proposed`, is readable by no one until confirmed (PE-03; the meeting Owner sees it in the minutes), carries the meeting Owner as `assigned_by` from the start, and leaves `proposed` only with `confirmed_by`, that Owner (PE-07). A model never sets `due`: code computes it from `due_text` (PE-15). An optional `world_id` (1.1.0, ADR-0040, PE-33) binds a person-made item to a world its owner may read; while a team share of that world is in force (PE-31) the members of the team read the item's team view (id, title, status, due, owner, world) when it is open or done and not flagged. Absent means personal, as every item was before 1.1.0; it is set only at creation, never changed, and a Tilo-made item never has one.
  *
  * This interface was referenced by `TiloContracts`'s JSON-Schema
  * via the `definition` "WorkItem".
@@ -6079,6 +6096,7 @@ export interface WorkItem {
    * True when the minutes, mail or calendar text this was made from were flagged by the safety provider; never cleared by a model. Any draft, nudge, send or calendar write built from a flagged record is T3 with safety_flag (PE-21).
    */
   flagged: boolean;
+  world_id?: WorldId;
   /**
    * @minItems 1
    */
@@ -6118,6 +6136,20 @@ export interface WorkItemHistoryEntry {
     | "reassign_requested"
     | "reminded";
   status: "proposed" | "open" | "done" | "dropped";
+}
+/**
+ * A world shared with one team (ADR-0040, PE-31): the members of `team` read that world's Story, Trace, runs and artifacts as Viewers of every district, and read the team view of the work items made in it (PE-33). It is not a role: it carries no scope and no right to answer, approve, start, stop or share, and adds no Approver or Team Lead (ADR-0006). `granted_by` is the world's owner, stamped by tilo-api from the signed-in session and the server clock (PE-19). `revoked` is null while the share stands and the owner's stamp once withdrawn, effective on the next request. One record per world and team (`id` is ws_ and the first 32 hex characters of SHA-256 of `<world_id>/<team>`, checked by the validator); sharing again after a revoke replaces the record and the world's `world.share_changed` events keep the history. Whether the share is in force also depends on the directory (PE-31), which this schema cannot see.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "WorldShare".
+ */
+export interface WorldShare {
+  id: WorldShareId;
+  org_id: OrgId;
+  world_id: WorldId;
+  team: TeamId;
+  granted_by: TeamLeadAssignment;
+  revoked: TeamLeadAssignment | null;
 }
 
 /** Event registry constants from contracts/events/registry.yaml (FR-WLD-03). */
@@ -6217,6 +6249,7 @@ export const EVENT_TYPES = [
   "assistant.asked",
   "assistant.replied",
   "team_rule.changed",
+  "world.share_changed",
 ] as const;
 export type RegisteredEventType = (typeof EVENT_TYPES)[number];
 
@@ -6326,6 +6359,7 @@ export interface EventDataByType {
   "assistant.asked": AssistantAskedData;
   "assistant.replied": AssistantRepliedData;
   "team_rule.changed": TeamRuleChangedData;
+  "world.share_changed": WorldShareChangedData;
 }
 
 /** A registered TiloEvent, discriminated on `type`. */
@@ -6336,7 +6370,7 @@ export type RegisteredEvent = {
 export const EVENT_REGISTRY: EventRegistry & {
   types: { readonly [T in RegisteredEventType]: EventRegistryEntry };
 } = {
-  "version": "1.4.0",
+  "version": "1.5.0",
   "unknown_types": "trace_only",
   "types": {
     "world.requested": {
@@ -7690,6 +7724,20 @@ export const EVENT_REGISTRY: EventRegistry & {
       "trace_row": "rule={data.rule} key={data.key} from={data.from} to={data.to}",
       "data_schema": "events/data/team_rule.changed.schema.json",
       "fixture": "fixtures/events/valid/team_rule.changed.json"
+    },
+    "world.share_changed": {
+      "family": "world",
+      "verb": "share_changed",
+      "priority": "should",
+      "pillar": "P4",
+      "default_severity": "info",
+      "side_effect": false,
+      "world_effect": "A team badge shows on the world's gate while the share stands and comes down when it is withdrawn.",
+      "hud_effect": "The world's sharing line names the team, or says it is not shared.",
+      "story_template": "{actor} turned team sharing {data.state} for this world.",
+      "trace_row": "team={data.team} state={data.state}",
+      "data_schema": "events/data/world.share_changed.schema.json",
+      "fixture": "fixtures/events/valid/world.share_changed.json"
     }
   }
 };
