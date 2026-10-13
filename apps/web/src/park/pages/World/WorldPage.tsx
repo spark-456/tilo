@@ -148,6 +148,14 @@ function Frame({ children, worldId }: { children?: ReactNode; worldId?: string }
   );
 }
 
+// UI-10 B1: no run-now route and no result file exist yet, so a sample says it did nothing and a live world's
+// button says why it is off. Neither claims a run started or a result opened (HR-1).
+const SAMPLE_RUN = "Sample only: nothing was started. This demo world has no runner behind it.";
+const SAMPLE_OPEN =
+  "Sample only: nothing was opened. This demo world has no result file behind it.";
+const RUN_OFF = "Starting a run from this page is not connected yet. No run would start.";
+const OPEN_OFF = "This result has no file linked yet, so there is nothing to open.";
+
 export function WorldPage({ app }: { app: AppCtx }) {
   const api = useParkApi();
   const worldClient = useWorldClient();
@@ -584,14 +592,16 @@ export function WorldPage({ app }: { app: AppCtx }) {
           {isTown ? (
             <RunHistory
               runs={w.runs ?? []}
-              onRunNow={() => app.toast("Run started. You’ll get a notification when it finishes")}
+              onRunNow={() => app.toast(SAMPLE_RUN)}
               onAgenda={() => app.go("agenda")}
+              {...(real ? { runNowOff: RUN_OFF } : {})}
             />
           ) : null}
           {!isCity && !isTown ? (
             <Result
               w={w}
-              onOpen={() => app.toast("Opening the result in Google Drive")}
+              onOpen={() => app.toast(SAMPLE_OPEN)}
+              {...(real ? { openOff: OPEN_OFF } : {})}
               onSlack={openSlackDialog}
               slackConnected={slackState.connected}
               slackReason={slackState.disabledReason}
