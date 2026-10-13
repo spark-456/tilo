@@ -1,6 +1,6 @@
 # BYOK rules beyond the schemas (ADR-0041)
 
-Covers `byok.schema.json` 1.0.0, `org_model_key.schema.json` 1.0.0, `model_call_rpc.schema.json` 1.0.0,
+Covers `byok.schema.json` 1.0.0, `org_model_key.schema.json` 1.1.0, `model_call_rpc.schema.json` 1.0.0,
 `meeting_host_rpc.schema.json` 1.3.0 (the `model_key_*` defs) and `providers.schema.json` 1.4.0 (`credential`).
 
 ADR-0041 is **Proposed**. Until the user accepts it and `config/byok.yaml` `enabled` is true, these files are inert
@@ -45,6 +45,14 @@ document validates against its own schema; only these rules compare them, and ea
 | BK-20 | A member reads `member_view` only; personal-scope units use Tilo's key (BQ-BYOK-3). | schema; api |
 | BK-21 | Variant P is the default; a `lease` route and any credential type in tilo-api need the user's explicit yes (BQ-BYOK-7): none is in these contracts. | schema; tests |
 | BK-22 | A leak test over a failing unit and a failing `put` finds no key character anywhere. | tests |
+
+## `owner_view` of a key whose bundle left the config (BQ-BYOK-RECON-1, BQ-BYOKC-7)
+
+When the reference's `bundle_id` is no longer in `config/byok.yaml`, every unit is refused `not_configured` (SEC-REVIEW-29
+B4, BQ-BYOK-FIX-2), so the owner's `GET` shows the stored `state`, `active: false` and `last_error: not_configured`.
+The schema says what a valid answer is (`owner_last_error`; `active` true exactly when `state` is `active` and
+`last_error` is not `not_configured`); the route decides when a bundle has left, because only it reads the config.
+The stored `reference.last_error` never holds `not_configured`, and `member_view` has no `last_error` at all.
 
 ## Proposed, not applied: `trace.payer` (BK-14, the user's yes needed, BQ-BYOKC-3)
 

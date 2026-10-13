@@ -124,7 +124,7 @@
 # metering.schema.json 1.0.0 sha256:91358a776e6c033a
 # minutes.schema.json 1.0.0 sha256:b8bbe5f69603a5a8
 # model_call_rpc.schema.json 1.0.0 sha256:3f585f8e5d092538
-# org_model_key.schema.json 1.0.0 sha256:d1d48e78635ccede
+# org_model_key.schema.json 1.1.0 sha256:ba443cf35d658c90
 # outbox.schema.json 1.0.0 sha256:0b9b172f230a6347
 # person.schema.json 1.0.0 sha256:2c928319dd7ab9d1
 # pilot.schema.json 1.0.0 sha256:5d091f814844b3b1
@@ -2694,6 +2694,12 @@ The fixed code of the provider's last refusal (BK-17), never the provider's text
 """
 
 
+type OrgModelKeyOwnerLastError = Literal["invalid_key", "quota", "rate_limited", "unreachable", "not_configured"]
+"""
+last_error as the owner is told it (BQ-BYOK-RECON-1): the four codes of a provider refusal, plus not_configured, said while the key's bundle is no longer in config/byok.yaml (SEC-REVIEW-29 B4, BQ-BYOK-FIX-2). not_configured is the route's own word and is never stored: the reference holds the four only.
+"""
+
+
 class OrgModelKeyReference(BaseModel):
     """
     orgs/{org}/model_keys/models (ADR-0041 decision 2, BK-04): the org's choices and stamps and the version of the vault secret, never a key character, length, hash or last four. rotated_at is null until a rotation; rev starts at 1 and is the compare-and-set counter of every write. The record is written by tilo-api's routes only and never by a model, a skill or a tool (BK-18).
@@ -2802,7 +2808,7 @@ class OrgModelKeyMemberView(BaseModel):
 
 class OrgModelKeyOwnerView(BaseModel):
     """
-    GET answer for the org owner, and the 200 answer to patch (BK-20: only the owner reads status, spend and errors). state is none when the org has no key; then active is false, label null and no record field is present. Otherwise every record field is present and active is true exactly when state is active. consent_version here is the version the owner must confirm for the next widening act (config/byok.yaml's), not the stored one. spent_today_credits (committed plus reserved against today's UTC cap) is left out when the spend store cannot be read; never null. No key, secret name, URL, or provider text.
+    GET answer for the org owner, and the 200 answer to patch (BK-20: only the owner reads status, spend and errors). state is none when the org has no key; then active is false, label null and no record field is present. Otherwise every record field is present and active is true exactly when state is active and last_error is not not_configured: a key whose bundle left the config is shown with its stored state, active false and last_error not_configured (BQ-BYOK-RECON-1). consent_version here is the version the owner must confirm for the next widening act (config/byok.yaml's), not the stored one. spent_today_credits (committed plus reserved against today's UTC cap) is left out when the spend store cannot be read; never null. No key, secret name, URL, or provider text.
     """
 
     model_config = ConfigDict(
@@ -2818,7 +2824,7 @@ class OrgModelKeyOwnerView(BaseModel):
     rotated_at: Timestamp | None = None
     day_cap_credits: OrgModelKeyDayCapCredits | None = None
     fallback_to_tilo: bool | None = None
-    last_error: OrgModelKeyLastError | None = None
+    last_error: OrgModelKeyOwnerLastError | None = None
     last_used_at: Timestamp | None = None
     spent_today_credits: Credits | None = None
 
