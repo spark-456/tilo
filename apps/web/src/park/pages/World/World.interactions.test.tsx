@@ -11,7 +11,7 @@
 import { act } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, click, qa } from "../../../../test-support/park/componentsHarness";
-import { DECISIONS, K1, TOASTS } from "../../../../test-support/park/worldCopy";
+import { DECISIONS, K1, OFF, TOASTS } from "../../../../test-support/park/worldCopy";
 import {
   MODIFIED,
   type SpiedApi,
@@ -290,13 +290,28 @@ describe("WEB_6_world_interactions: Share", () => {
 });
 
 describe("WEB_6_world_interactions: Town and Village buttons", () => {
-  it("WEB_6_world_interactions_Run_now_toasts_the_notification_line", async () => {
+  it("UI_10_B1_demo_Run_now_says_nothing_was_started", async () => {
     const rig = await mountWorld({ id: "invoice" });
     click(control(rig.el, "Run now"));
     expect(toastCalls(rig.app)).toEqual([[TOASTS.run]]);
+    expect(TOASTS.run).toContain("nothing was started");
+    expect(TOASTS.run).not.toMatch(/notification/i);
     expect(goCalls(rig.app)).toBe(0);
     const api = rig.api as SpiedApi;
     expect(api.startWorld).not.toHaveBeenCalled();
+  });
+
+  it("UI_10_B1_a_live_world_Run_now_is_off_with_its_reason_in_words_and_toasts_nothing", async () => {
+    const rig = await mountWorld({ id: "invoice", api: liveWorldsApi() });
+    const run = control(rig.el, "Run now");
+    expect(run.getAttribute("aria-disabled")).toBe("true");
+    expect(run.hasAttribute("disabled")).toBe(false); // focusable: the reason is reachable by keyboard
+    const reasonId = run.getAttribute("aria-describedby");
+    expect(reasonId).toBeTruthy();
+    expect(textOf(rig.el.querySelector(`#${reasonId}`) as Element)).toBe(OFF.run);
+    click(run);
+    expect(toastCalls(rig.app)).toEqual([]);
+    expect(goCalls(rig.app)).toBe(0);
   });
 
   it("WEB_6_world_interactions_See_in_Agenda_goes_to_the_agenda_page", async () => {
@@ -306,10 +321,24 @@ describe("WEB_6_world_interactions: Town and Village buttons", () => {
     expect(goCalls(rig.app)).toBe(1);
   });
 
-  it("WEB_6_world_interactions_Open_result_and_Share_to_Slack_toast_their_lines", async () => {
+  it("UI_10_B1_a_live_world_Open_result_is_off_with_its_reason_in_words_and_toasts_nothing", async () => {
+    const rig = await mountWorld({ id: "comp", api: liveWorldsApi() });
+    const open = control(rig.el, "Open result");
+    expect(open.getAttribute("aria-disabled")).toBe("true");
+    expect(open.hasAttribute("disabled")).toBe(false);
+    const reasonId = open.getAttribute("aria-describedby");
+    expect(reasonId).toBeTruthy();
+    expect(textOf(rig.el.querySelector(`#${reasonId}`) as Element)).toBe(OFF.open);
+    click(open);
+    expect(toastCalls(rig.app)).toEqual([]);
+  });
+
+  it("UI_10_B1_demo_Open_result_says_nothing_was_opened_and_Share_to_Slack_opens_its_dialog", async () => {
     const rig = await mountWorld({ id: "comp" });
     click(control(rig.el, "Open result"));
     expect(toastCalls(rig.app)).toEqual([[TOASTS.open]]);
+    expect(TOASTS.open).toContain("nothing was opened");
+    expect(TOASTS.open).not.toMatch(/Google Drive/);
     click(control(rig.el, "Share to Slack"));
     expect(rig.el.querySelector('[role="dialog"]')).not.toBeNull();
     expect(toastCalls(rig.app)).toEqual([[TOASTS.open]]);
