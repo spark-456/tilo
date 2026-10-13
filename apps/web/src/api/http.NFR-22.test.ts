@@ -125,6 +125,32 @@ describe("NFR-22 / NFR-24 the replay-only refusal is labelled the same way", () 
 });
 
 describe("NFR-22 no regressions: other failures keep their copy", () => {
+  it.each([
+    [
+      { detail: "The safety screen is unavailable; nothing was stored." },
+      "The safety screen is unavailable. Try again later.",
+    ],
+    [
+      { detail: "The safety screen is unavailable; nothing was answered." },
+      "The safety screen is unavailable. Try again later.",
+    ],
+    [
+      { detail: "The safety screen is unavailable; nothing changed." },
+      "The safety screen is unavailable. Try again later.",
+    ],
+    [{ detail: "not_configured" }, "This feature is not configured on this server."],
+    [
+      { code: "not_configured", detail: "private server configuration" },
+      "This feature is not configured on this server.",
+    ],
+    [{ detail: "The safety screen is unavailable; private traceback" }, GENERIC_5XX],
+  ])("NFR_22 W1 maps known 503 %j to fixed web copy", async (body, message) => {
+    const error = await failureOf(intake(clientAnswering(503, body)));
+    expect(error.message).toBe(message);
+    expect(error.replayOnly).toBe(false);
+    expect(error.retryable).toBe(true);
+  });
+
   it("NFR_22 other 5xx keep today's generic sentence and no replay label", async () => {
     for (const status of [500, 502, 503, 504]) {
       for (const call of [intake, approaches]) {
