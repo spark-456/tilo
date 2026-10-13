@@ -31,7 +31,7 @@ from pathlib import Path
 from typing import Any
 
 from tilo_providers.config import ProviderConfigError, ProvidersConfig, load_providers_config, profiles_used_by
-from tilo_providers.errors import NotConfigured, QuotaError, RequestError, RetryableError
+from tilo_providers.errors import LiveVoiceRefused, NotConfigured, QuotaError, RequestError, RetryableError
 from tilo_providers.interfaces import GenerateRequest, SpeechProvider
 from tilo_providers.meeting import CallCounter, load_meeting_caps
 from tilo_providers.router import Router, RouterError, TokenCapExceededError
@@ -371,6 +371,15 @@ class ProviderTTS:
                     pcm = await asyncio.to_thread(next, pieces, end)
                 except Exception as error:
                     cause = _cause(error)
+                    if isinstance(cause, LiveVoiceRefused):
+                        # BQ-M2-12: the spend meter refused one reply. A transient word is asked again next reply;
+                        # a permanent one ends the Live voice for THIS meeting only: the state file is keyed by
+                        # voice, not by person or attend, so a cap or a lost claim is never written to it.
+                        raise TTSError(
+                            f"the voice could not speak (the spend meter refused: {cause.reason})",
+                            permanent=not cause.transient,
+                            remember=False,
+                        ) from None
                     raise TTSError(
                         f"the voice could not speak ({type(cause).__name__})",
                         permanent=isinstance(cause, NotConfigured | RequestError),

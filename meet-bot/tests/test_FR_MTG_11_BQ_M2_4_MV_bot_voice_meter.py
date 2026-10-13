@@ -512,13 +512,21 @@ def test_FR_MTG_11_BQ_M2_4_a_live_answer_speaks_live_and_settles_the_replys_coun
 
 
 @pytest.mark.parametrize(
-    "answer", [(200, {"decision": "replay", "reason": "capped"}), (409, {"error": "not_attending"}), (500, {})]
+    ("answer", "permanent"),
+    # BQ-M2-12: a 500 is a blip and the next reply asks again (permanent False); a cap or a lost claim is not
+    [
+        ((200, {"decision": "replay", "reason": "capped"}), True),
+        ((409, {"error": "not_attending"}), True),
+        ((500, {}), False),
+    ],
 )
-def test_FR_MTG_11_BQ_M2_4_MV_07_without_a_200_live_no_session_opens_and_the_local_voice_takes_over(tmp_path, answer):
+def test_FR_MTG_11_BQ_M2_4_MV_07_without_a_200_live_no_session_opens_and_the_local_voice_takes_over(
+    tmp_path, answer, permanent
+):
     api, opened = Api(reserve=answer), []
     with pytest.raises(TTSError) as caught:
         _speak(_live_tts(tmp_path, meter_for(api), opened))
-    assert caught.value.permanent and opened == []  # the bot's FallbackTTS speaks the local voice
+    assert caught.value.permanent is permanent and opened == []  # the bot's FallbackTTS speaks the local voice
     assert api.closes == [] or all(b["outcome"] == "released" for _, b, _ in api.closes)
 
 
