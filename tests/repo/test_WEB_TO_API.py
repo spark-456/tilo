@@ -19,7 +19,7 @@ PROJECT = "essential-wares-510320-f0"
 
 def _recipe(root: pathlib.Path, name: str) -> str:
     text = (root / "justfile").read_text(encoding="utf-8")
-    header = re.search(rf"^{re.escape(name)}:[^\n]*$", text, re.M)
+    header = re.search(rf"^{re.escape(name)}(?:[ \t]+[^:\n]+)?:[^\n]*$", text, re.M)
     assert header, f"justfile must define `{name}`"
     body = [header.group(0)]
     for line in text[header.end() :].splitlines()[1:]:
@@ -52,7 +52,14 @@ def test_WEB_TO_API_live_recipe_is_pinned_to_dev_and_the_fixed_api_origin(repo_r
 
 def test_WEB_TO_API_fixture_recipe_is_untouched(repo_root: pathlib.Path) -> None:
     body = _recipe(repo_root, "deploy-web")
-    assert "--tilo-dev-api" not in body and "web_build_env.py pnpm --filter @tilo/web run build" in body
+    assert body.splitlines()[0].strip() == 'deploy-web api="":'
+    assert "--tilo-dev-api" not in body
+    assert (
+        "python scripts/web_build_env.py {{ if api == '' { '' } else { \"--api '\" + api + \"'\" } }} "
+        "pnpm --filter @tilo/web run build" in body
+    )
+    assert f"pnpm exec firebase deploy --only hosting --project {PROJECT}" in body
+    assert body.index("run build") < body.index("firebase deploy")
 
 
 def test_WEB_TO_API_script_origin_is_a_fixed_constant_and_only_the_flag_selects_it(script) -> None:
@@ -108,6 +115,4 @@ def test_WEB_TO_API_runbook_lists_the_users_steps_in_order(repo_root: pathlib.Pa
     rollout = (repo_root / "docs" / "routines-rollout.md").read_text(encoding="utf-8")
     assert '"TILO_API_CORS_ORIGINS"' in rollout.split("$Allow", 1)[1].split("$Never", 1)[0]
     questions = (repo_root / "docs" / "open-questions.md").read_text(encoding="utf-8").rstrip().splitlines()
-    assert any(
-        ln.startswith("| BQ-WEBAPI-1 ") for ln in questions[-40:]
-    )  # rows go at the end; later merges add more below
+    assert any(ln.startswith("| BQ-WEBAPI-1 ") for ln in questions)  # rows go at the end; later merges add more below

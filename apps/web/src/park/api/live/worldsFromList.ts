@@ -10,6 +10,10 @@ export interface WorldListItem {
   status: WorldListStatus;
   created_at: string | null;
   last_seq: number;
+  /** STARTER-1: true only for the recorded sample project (`w_sample_village_basic`). */
+  sample?: boolean;
+  /** BQ-CTX-TEAMWORLD (TSW-4b): `team` on a world the person reads as a team reader; absent on their own. */
+  access?: "team";
 }
 
 /** `needs` comes only from a recorded open card and `running` only from `world.started`/`resumed` (BQ-WIRE2-2). */
@@ -39,6 +43,8 @@ function worldOf(item: WorldListItem): World {
     nextV: "",
     owner: "",
     started: item.created_at ?? "",
+    ...(item.sample === true ? { sample: true } : {}),
+    ...(item.access === "team" ? { access: "team" as const } : {}),
   };
 }
 

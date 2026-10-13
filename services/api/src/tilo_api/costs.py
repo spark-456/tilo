@@ -6,16 +6,20 @@ written, so `replay_only` (NFR-24) does not close them; the body is the report a
 from __future__ import annotations
 
 from collections.abc import Iterable, Sequence
+from dataclasses import replace
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import JSONResponse
 from tilo_metering import LedgerEntry, MeteringConfigError
 from tilo_metering.costs import cost_report, load_credit_usd
 from tilo_metering.savings import InconsistentMemoryHit
 
 from tilo_api import deps
+from tilo_api.cost_history import cost_history
 from tilo_api.deps import Principal, Store, WorldRecord, get_current_principal, get_ledger, get_store
+from tilo_api.quick_ledger import QUICK_STEP, QUICK_TASK_TYPE, quick_run_id
+from tilo_api.spend_units import INR_MINOR_PER_USD, LIVE_STEPS, LIVE_TASK_TYPE, UNATTRIBUTED, live_run_id
 
 router = APIRouter()
 
@@ -49,8 +53,17 @@ def _credit_usd() -> float:
     return _credit_usd_cache
 
 
-def _report(store: Store, ledger: Sequence[LedgerEntry], worlds: Iterable[tuple[str, WorldRecord]]) -> dict[str, Any]:
-    """The report for these worlds: their runs (the world's own run id plus any on its events) and no others."""
+def credit_usd() -> float:
+    """US$ per credit (config/prices.yaml) for `spend_units.LedgerSink`; the routes' 503 when it cannot be read."""
+    return _credit_usd()
+
+
+def _report(
+    store: Store, ledger: Sequence[LedgerEntry], worlds: Iterable[tuple[str, WorldRecord]], quick_uid: str | None = None
+) -> dict[str, Any]:
+    """The report for these worlds: their runs (the world's own run id plus any on its events) and no others. With
+    `quick_uid`, also that person's Quick pseudo run (COST-FAST-1b), labelled by task type `quick_answer`, and their
+    live spend no world's run could be named for (a meter's own `req_`/`task_`/`world_` id, T3) as one pseudo run."""
     events: list[dict] = []
     unit_types: dict[str, dict[str, str]] = {}
     runs: set[str] = set()
@@ -59,9 +72,17 @@ def _report(store: Store, ledger: Sequence[LedgerEntry], worlds: Iterable[tuple[
         events += world_events
         runs |= {world.run_id} | {e["run_id"] for e in world_events if isinstance(e.get("run_id"), str)}
         unit_types[world.run_id] = _unit_types(store, world_id)
+    if quick_uid is not None:
+        runs.add(quick_run_id(quick_uid))
+        unit_types[quick_run_id(quick_uid)] = {QUICK_STEP: QUICK_TASK_TYPE}
+        live = live_run_id(quick_uid)
+        runs.add(live)
+        unit_types[live] = dict.fromkeys(LIVE_STEPS, LIVE_TASK_TYPE)
+        ledger = [replace(e, run=live) if e.user == quick_uid and e.run.startswith(UNATTRIBUTED) else e for e in ledger]
     credit_usd = _credit_usd()
     try:
-        return cost_report([e for e in ledger if e.run in runs], events, unit_types=unit_types, credit_usd=credit_usd)
+        report = cost_report([e for e in ledger if e.run in runs], events, unit_types=unit_types, credit_usd=credit_usd)
+        return report | cost_history(events)
     except InconsistentMemoryHit as exc:  # a hit that disagrees with its own costs (BQ-MTR10-5): refuse, never a 500
         raise HTTPException(status_code=422, detail="inconsistent_ledger") from exc
 
@@ -82,15 +103,37 @@ def get_world_costs(
     return JSONResponse(content={"world_id": world_id, **_report(store, ledger, [(world_id, world)])})
 
 
+def _completeness(request: Request, principal: Principal, report: dict[str, Any]) -> dict[str, Any]:
+    """T3b (BQ-T3-6): partial when the total shown is below what the SEC-16 uid ledger settled, or that cannot be
+    checked. A demo session is replay only: nothing was spent."""
+    if principal.demo_session:
+        return {"partial": False, "partial_reason": None}
+    try:  # the ledger as the app is wired, overrides included (as `deps.ledger_writer_for`)
+        override = request.app.dependency_overrides.get(deps.get_spend_cap_ledger)
+        settled = (override() if override is not None else deps.get_spend_cap_ledger()).settled_minor(principal.user_id)
+    except Exception:
+        settled = None
+    reason: str | None
+    if not isinstance(settled, int) or isinstance(settled, bool) or settled < 0:
+        reason = "spend_ledger_unreadable"
+    else:
+        shown = report["totals"]["credits"] * report["credit_usd"] * INR_MINOR_PER_USD
+        reason = "below_spend_ledger" if shown + 0.5 < settled else None
+    return {"partial": reason is not None, "partial_reason": reason}
+
+
 @router.get("/costs")
 def get_costs(
+    request: Request,
     principal: Principal = Depends(get_current_principal),
     store: Store = Depends(get_store),
     ledger: Sequence[LedgerEntry] = Depends(get_ledger),
 ) -> JSONResponse:
-    """Every world the signed-in owner owns, whatever world their principal names."""
+    """Every world the signed-in owner owns, whatever world their principal names. `partial`/`partial_reason` are
+    additive: the report is complete only while `partial` is false."""
     if principal.role != "owner":
         raise HTTPException(status_code=403)
     store.load_owner(principal.user_id, settle=True)
     mine = sorted((w, rec) for w, rec in store.worlds.items() if rec.owner == principal.user_id)
-    return JSONResponse(content=_report(store, ledger, mine))
+    report = _report(store, ledger, mine, principal.user_id)
+    return JSONResponse(content=report | _completeness(request, principal, report))

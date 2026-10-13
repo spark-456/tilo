@@ -95,6 +95,7 @@ class TerminalPerson:
                  drain: Callable[[], bool] | None = None) -> None:  # fmt: skip
         self.auto_answer, self.auto_approve_t1t2, self._input, self._write = auto_answer, auto_approve_t1t2, read, write
         self._tty, self.log = tty, list[str]()
+        self.decline_reason = ""  # why the person declined the last approach set, said in their words
         self._wgate: Any = None  # CL-LIVE-2 write gate, bound by the run
         self._drain = drain  # discards the input buffer before a write prompt; None or False: the write is held
 
@@ -205,12 +206,29 @@ class TerminalPerson:
             credits, mark = a["credits"], " (recommended)" if a["id"] == recommended else ""
             what = f"{clean(a['label'])}: {clean(a['summary'])}"
             self._write(f"  {n}. {what} [{credits['min']}-{credits['max']} credits]{mark}")
-        chosen = self._pick("approach number (empty for the recommended): ", options)
-        chosen = chosen if isinstance(chosen, dict) else next(a for a in options if a["id"] == recommended)
-        ok, why = self._yes(f"approve the approach {clean(chosen['label'])!r}?")
+        while True:
+            chosen = self._pick("approach number (empty for the recommended): ", options)
+            chosen = chosen if isinstance(chosen, dict) else next(a for a in options if a["id"] == recommended)
+            confirmation = self._confirm_approach(chosen)
+            if confirmation is not None:
+                ok, why = confirmation
+                break
         said = "approved" if ok else "declined"
         self.log.append(f"approach {clean(chosen['id'])}: {said} by the person ({clean(why) or '-'})")
+        self.decline_reason = "" if ok else clean(why)[:200]
         return chosen["id"] if ok else None
+
+    def _confirm_approach(self, chosen: dict[str, Any]) -> tuple[bool, str] | None:
+        """A misplaced number returns to selection; it never confirms the previous choice."""
+        prompt = f"approve the approach {clean(chosen['label'])!r}? [y/n]: "
+        while (said := self._read(prompt)) is not None:
+            if said.isdigit():
+                self._write("That was a number. Please choose the approach again.")
+                return None
+            if said.lower() in ("y", "yes", "n", "no"):
+                return said.lower().startswith("y"), self._read("reason: ") or ""
+            self._write("answer y or n")
+        return False, "no answer (input closed)"
 
     def gate(self, card: dict[str, Any]) -> bool:
         if (real_write := self._write_gate(card)) is not None:
@@ -269,7 +287,7 @@ def run_topic(
     safety: SafetyProvider | None = None,  # the test seam, only beside an injected (fake) provider
     person: TerminalPerson | None = None, announce: Callable[[e2e.Estimate, float], None] | None = None,
     real_connectors: bool = False, real_connectors_factory: Callable[[], dict[str, Any]] | None = None,
-    allow_writes: bool = False, allow_send: bool = False,
+    allow_writes: bool = False, allow_send: bool = False, progress: Callable[[str], None] | None = None,
 ) -> e2e.LiveE2EReport:  # fmt: skip
     env = os.environ if environ is None else environ
     e2e._gate(mode, env, max_credits)  # the live switch, CI, Cloud Run and the cap: first of all
@@ -306,6 +324,7 @@ def run_topic(
         prices_path=prices_path, recordings_dir=recordings, live_provider_factory=live_provider_factory, safety=screen,
         announce=announce, adhoc=case, person=person, real_connectors=real_connectors,
         real_connectors_factory=real_connectors_factory, allow_writes=allow_writes, allow_send=allow_send,
+        progress=progress,
     )  # fmt: skip
     report.safety = note
     report.faked = e2e.real_faked(TOPIC_FAKED, allow_writes) if report.real_connectors else TOPIC_FAKED
@@ -314,17 +333,24 @@ def run_topic(
 
 
 def _typed(read: Callable[[str], str]) -> str:
-    print("Type your request; finish with an empty line (or end of input):", flush=True)
+    print("Type your request; finish with /end on its own line (or end of input):", flush=True)
     lines: list[str] = []
     while True:
         try:
             line = read("")
         except EOFError:
             break
-        if not line.strip():
+        if line == "/end":
             break
         lines.append(line)
-    return "\n".join(lines)
+    return "\n".join(lines).rstrip()  # blank lines inside stay (#594); trailing ones mean nothing
+
+
+def _exit_code(report: e2e.LiveE2EReport) -> int:
+    if report.outcome_class == "stopped_at_cap":
+        return 3
+    bad = report.outcome_class not in ("completed", "held_at_gate", "declined") or any(f.hard for f in report.findings)
+    return int(bad)
 
 
 def main(
@@ -367,7 +393,7 @@ def main(
             models_path=args.models_file, prices_path=args.prices_file, recordings_dir=args.recordings_dir,
             live_provider_factory=live_provider_factory, safety=safety, person=person, announce=e2e.announce,
             real_connectors=args.real_connectors, real_connectors_factory=real_connectors_factory,
-            allow_writes=args.allow_writes, allow_send=args.allow_send,
+            allow_writes=args.allow_writes, allow_send=args.allow_send, progress=e2e.print_progress,
         )  # fmt: skip
     except e2e.LiveE2ERefused as refusal:
         print(f"REFUSED {refusal.code}: {refusal}", file=sys.stderr)
@@ -380,9 +406,8 @@ def main(
     label = "deliverable" if report.outcome_class == "completed" else "draft (not delivered)"
     for title, work in report.work:
         print(f"{label}: {clean(title)}\n{clean(work, lines=True)}\n")
-    bad = report.outcome_class not in ("completed", "held_at_gate", "declined") or any(f.hard for f in report.findings)
-    code = 3 if report.outcome_class == "stopped_at_cap" else int(bad)
+    code = _exit_code(report)
     if code:
-        why = " ".join((report.reason or "the run did not finish, or a hard check failed").split())
+        why = clean(report.reason or "the run did not finish, or a hard check failed")
         print(f"STOP {report.outcome_class}: {why}", file=sys.stderr)
     return code

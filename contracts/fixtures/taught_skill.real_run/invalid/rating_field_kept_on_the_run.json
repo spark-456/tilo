@@ -1,0 +1,38 @@
+{
+  "org_id": "org_example",
+  "skill": "tsk_01JB6Z0000000000000000INV",
+  "version": 3,
+  "run_id": "r_invoice_0007",
+  "world_id": "w_desk_u_sam",
+  "by": "u_sam",
+  "plan": [
+    {
+      "text": "Check the Accounts inbox for new supplier invoices",
+      "tool": "gmail",
+      "action": "read_email",
+      "verb": "read",
+      "ask_first": false,
+      "must_ask": false
+    },
+    {
+      "text": "Save the row to the Invoices 2026 file in Drive",
+      "tool": "google_drive",
+      "action": "save_file",
+      "verb": "write",
+      "ask_first": true,
+      "must_ask": false
+    },
+    {
+      "text": "Send the supplier a short receipt note",
+      "tool": "gmail",
+      "action": "send_email",
+      "verb": "send",
+      "ask_first": true,
+      "must_ask": true
+    }
+  ],
+  "started_at": "2026-10-09T08:30:00.000Z",
+  "finished_at": "2026-10-09T08:31:12.000Z",
+  "outcome": "completed",
+  "thumb": "up"
+}

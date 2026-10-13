@@ -13,9 +13,9 @@ is read or any world looked up. Not deployed (no `K_SERVICE` or
 
 from __future__ import annotations
 
-import inspect
 import logging
 import os
+import re
 import threading
 from collections.abc import Mapping
 from typing import Literal, Protocol
@@ -44,6 +44,16 @@ PUBLIC_ROUTES: frozenset[tuple[str, str]] = frozenset(
         ),  # FR-AGT-14b: Cloud Scheduler has no session; the route checks its OIDC caller
     }
 )
+
+# FR-PA-06b: the plate digest's emailed Done and Snooze links open in a browser with no session. Only `GET` and `POST`
+# of `/l/<token>` (one path segment of token characters, no query); the route itself verifies the signed single-use
+# token, and a GET consumes nothing. A new public path is an owner decision (the test pins this).
+_LINK_PATH = re.compile(r"/l/[A-Za-z0-9_.-]{1,512}")
+
+
+def public_link(method: str, path: str) -> bool:
+    return method in ("GET", "POST") and _LINK_PATH.fullmatch(path) is not None
+
 
 UNDER_CONSTRUCTION = "Tilo is still under construction and not open to the public."
 DECLARATION_REQUIRED = "Tell Tilo whether you are a visitor or a Google AI Builder Cup judge."
@@ -115,9 +125,8 @@ def _decide(scope: Scope) -> JSONResponse | None:
 
     overrides = scope["app"].dependency_overrides
     try:
-        resolver = overrides.get(deps.get_current_principal, deps.get_current_principal)
         # SEC-15 sign-in reads the request's Authorization header; a test double that takes no argument still works
-        principal = resolver(HTTPConnection(scope)) if inspect.signature(resolver).parameters else resolver()
+        principal = deps.resolve_principal(scope["app"], HTTPConnection(scope))
         store = overrides.get(deps.get_access_store, deps.get_access_store)()
         declaration = store.get(principal.user_id)
     except HTTPException as exc:
@@ -157,7 +166,9 @@ class AccessGate:
         if kind == "lifespan" or not enforced():
             await self.app(scope, receive, send)
             return
-        if kind == "http" and (scope["method"], scope["path"]) in PUBLIC_ROUTES:
+        if kind == "http" and (
+            (scope["method"], scope["path"]) in PUBLIC_ROUTES or public_link(scope["method"], scope["path"])
+        ):
             await self.app(scope, receive, send)
             return
         if kind not in {"http", "websocket"}:

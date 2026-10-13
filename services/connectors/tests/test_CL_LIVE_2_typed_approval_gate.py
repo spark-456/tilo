@@ -272,6 +272,25 @@ def test_CL_LIVE_2_a_widened_scope_or_a_missing_write_token_refuses_to_build(tmp
         assert info.value.code == "no_token" and env.apis.requests == []
 
 
+def test_CL_LIVE_2_a_calendar_scope_wider_than_adr_0035_declares_refuses_to_build(tmp_path):
+    """The shipped registry declares calendar.events.owned under write and send (ADR-0035 decision 6) and builds;
+    this tool never asks for it, and any other calendar scope is still `scope_widened`."""
+    import yaml
+    from _cl_live_lib import CONNECTORS_YAML
+    from tilo_connectors import real
+    from tilo_connectors.registry import load_registry
+
+    g = make_write_env()
+    g.build(registry=load_registry(CONNECTORS_YAML))
+    entries = yaml.safe_load(CONNECTORS_YAML.read_text(encoding="utf-8"))
+    calendar = next(e for e in entries if e["id"] == "google_calendar")
+    calendar["scopes"]["write"] = ["https://www.googleapis.com/auth/calendar.events"]
+    (tmp_path / "c.yaml").write_text(yaml.safe_dump(entries), encoding="utf-8")
+    with pytest.raises(real.RealConnectorsRefused) as info:
+        g.build(registry=load_registry(tmp_path / "c.yaml"))
+    assert info.value.code == "scope_widened"
+
+
 def test_CL_LIVE_2_the_card_shows_the_exact_payload_bounded_and_redacted():
     g = make_write_env()
     g.build()

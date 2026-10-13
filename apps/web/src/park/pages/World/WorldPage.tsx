@@ -6,16 +6,39 @@
 // Undo), navigation inside the Park app is app.go, and the links to the live stage and its lenses are real
 // addresses the browser follows, but only for a world whose data came from the live API: a sample world has no
 // recorded run, so the same elements are disabled with the reason (docs/park-designed-not-in-prd/World.md).
-import { type ReactNode, useEffect, useState } from "react";
-import type { Connector, Decision, Plan, Skill, World } from "../../api/types";
+import { type ChangeEvent, type ReactNode, useEffect, useRef, useState } from "react";
+import { createRoomClient } from "../../api/live/meetingHall";
+import type {
+  ApiResult,
+  BuildHandoff,
+  Connector,
+  Decision,
+  Plan,
+  Skill,
+  World,
+} from "../../api/types";
 import type { AppCtx } from "../../app/AppCtx";
-import { useParkApi } from "../../app/context";
+import { NotFound } from "../../app/NotFound";
+import { useDemoSession, useParkApi, useWorldClient } from "../../app/context";
 import { stagePath } from "../../app/router";
+import {
+  SLACK_NOTE_MAX,
+  type SlackShareRequest,
+  capSlackNote,
+  focusablesIn,
+  handleSlackDialogKeyDown,
+  slackConnectorState,
+} from "../../app/slackShare";
 import { useStaged } from "../../app/useStaged";
 import { Button, PageSheet } from "../../components";
+import { SampleBadge, SampleNote } from "../../sample/SampleBadge";
 import { icon } from "../../shell/kit";
 import { Activity, Districts, Result, RunHistory } from "./Lower";
-import { FactsCard, GoLink, SpendCard, WaitingCard } from "./Side";
+import { MeetingHall } from "./MeetingHall";
+import { FactsCard, GoLink, LovableCard, SpendCard, WaitingCard } from "./Side";
+import { SkillProposals } from "./SkillProposals";
+import { ShareWithTeam } from "./TeamShare";
+import { MissingWorld, TeamItems, TeamWorld } from "./TeamWorld";
 import "./World.css";
 import { cityArt, rowArt, singleArt } from "./worldArt";
 import {
@@ -35,13 +58,26 @@ interface Loaded {
   decisions: Decision[];
   skills: Skill[];
   connectors: Connector[];
+  /** The side reads that failed or are not built: each card says so itself, the page still opens from the worlds. */
+  gaps: { plans: boolean; decisions: boolean; skills: boolean; connectors: boolean };
+  handoffs: BuildHandoff[];
 }
+
+const NOT_YET = "Not available yet";
+
+/** Runs one side read: its failure is a gap in that card, never the whole page. */
+const optional = <T,>(read: Promise<ApiResult<T>>): Promise<ApiResult<T> | null> =>
+  read.then(
+    (r) => r,
+    () => null,
+  );
 
 /** S-05's first building (screens/meta.ts): a Park plan's own building ids are not stage ids. */
 const INSPECT_BUILDING = "B1";
 
 const NO_STAGE = "Sample world: there is no recorded run to open";
 const NO_STAGE_ID = "park-world-nostage";
+const NO_SLACK_ID = "park-world-noslack";
 
 /**
  * A link to the stage or one of its lenses. With a stage it is a plain link the browser follows. Without one
@@ -92,6 +128,18 @@ function MapArt({
   );
 }
 
+/** A side card whose read is not built or failed: its own plain line, nothing sample in its place. */
+function NotYetCard({ title }: { title: string }) {
+  return (
+    <section className="park-world-spend" aria-label={title}>
+      <div className="park-world-spendhead">
+        <span className="park-world-spendtitle">{title}</span>
+      </div>
+      <div className="park-world-spendnote">{NOT_YET}</div>
+    </section>
+  );
+}
+
 function Frame({ children, worldId }: { children?: ReactNode; worldId?: string }) {
   return (
     <div className="park-world-root" data-testid="park-page-world" data-world-id={worldId}>
@@ -102,30 +150,65 @@ function Frame({ children, worldId }: { children?: ReactNode; worldId?: string }
 
 export function WorldPage({ app }: { app: AppCtx }) {
   const api = useParkApi();
+  const worldClient = useWorldClient();
+  const demo = useDemoSession(); // QA-DEMO-1: the sample company: labelled, and approving records nothing
+  const [roomClient] = useState(createRoomClient);
   const [loaded, setLoaded] = useState<Loaded | "failed" | null>(null);
   const [paused, setPaused] = useState<Record<string, boolean>>({});
+  const [slackOpen, setSlackOpen] = useState(false);
+  const [slackChannel, setSlackChannel] = useState("");
+  const [slackNote, setSlackNote] = useState("");
+  const [slackPendingByWorld, setSlackPendingByWorld] = useState<Record<string, SlackShareRequest>>(
+    {},
+  );
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
+  const dialogRef = useRef<HTMLDivElement | null>(null);
   // The map and head first, then the side cards, then the lower part: one task each (WEB-MOTION-2).
   const part = useStaged(3);
   const { dec, added } = app;
 
   useEffect(() => {
     let live = true;
+    const handoffRead =
+      typeof api.getBuildHandoff === "function"
+        ? api.getBuildHandoff().then(
+            (r) => r.data,
+            (err: unknown) => {
+              if (
+                err &&
+                typeof err === "object" &&
+                (err as { code?: unknown }).code === "not_built"
+              ) {
+                return [];
+              }
+              throw err;
+            },
+          )
+        : Promise.resolve([]);
     Promise.all([
       api.getWorlds(dec, added),
-      api.getPlans(dec),
-      api.getDecisions(),
-      api.getSkills(),
-      api.getConnectors(),
+      optional(api.getPlans(dec)),
+      optional(api.getDecisions()),
+      optional(api.getSkills()),
+      optional(api.getConnectors()),
+      handoffRead,
     ]).then(
-      ([worlds, plans, decisions, skills, connectors]) => {
+      ([worlds, plans, decisions, skills, connectors, handoffs]) => {
         if (!live) return;
         setLoaded({
           worlds: worlds.data,
           live: worlds.source === "live",
-          plans: plans.data,
-          decisions: decisions.data,
-          skills: skills.data,
-          connectors: connectors.data,
+          plans: plans?.data ?? {},
+          decisions: decisions?.data ?? [],
+          skills: skills?.data ?? [],
+          connectors: connectors?.data ?? [],
+          gaps: {
+            plans: plans === null,
+            decisions: decisions === null,
+            skills: skills === null,
+            connectors: connectors === null,
+          },
+          handoffs,
         });
       },
       () => {
@@ -137,13 +220,32 @@ export function WorldPage({ app }: { app: AppCtx }) {
     };
   }, [api, dec, added]);
 
+  useEffect(() => {
+    if (!slackOpen) return;
+    const first = focusablesIn(dialogRef.current)[0];
+    first?.focus();
+  }, [slackOpen]);
+
   if (loaded === null) return <Frame />;
+  // BQ-CTX-TEAMWORLD (BQ-TEAMWORLD-8): the list says whose a live world is. `access: "team"` is a teammate's, read
+  // only (the API's 404 for one since lapsed is the ordinary missing world); an id the list does not carry is a
+  // missing world too, never a guess.
+  const wanted = app.params.id;
+  if (loaded !== "failed" && loaded.live && worldClient && wanted) {
+    const listed = loaded.worlds.find((x) => x.id === wanted);
+    if (listed?.access === "team")
+      return <TeamWorld client={worldClient} worldId={wanted} app={app} />;
+    if (!listed && !added.some((x) => x.id === wanted))
+      return <MissingWorld worldId={wanted} app={app} />;
+  }
   const world =
     loaded === "failed"
       ? undefined
-      : (loaded.worlds.find((x) => x.id === app.params.id) ??
-        loaded.worlds.find((x) => !added.some((a) => a.id === x.id)) ??
-        loaded.worlds[0]);
+      : (loaded.worlds.find((x) => x.id === wanted) ??
+        (wanted
+          ? undefined
+          : (loaded.worlds.find((x) => !added.some((a) => a.id === x.id)) ?? loaded.worlds[0])));
+  if (loaded !== "failed" && wanted && !world) return <NotFound go={app.go} />;
   if (loaded === "failed" || !world) {
     return (
       <Frame>
@@ -160,19 +262,33 @@ export function WorldPage({ app }: { app: AppCtx }) {
   const isTown = w.tier === "Town";
   const isPaused = Boolean(paused[w.id]);
   const mine = loaded.decisions.filter((d) => d.world === w.id);
-  const open = mine.filter((d) => !dec[d.k]).length;
+  const slackPending = slackPendingByWorld[w.id] ?? null;
+  const handoff = loaded.handoffs.find((h) => h.world === w.id) ?? null;
+  const open = mine.filter((d) => !dec[d.k]).length + (slackPending ? 1 : 0);
   const look = stateLook(w, isPaused);
-  const chip = w.st === "needs" && !isPaused ? decisionsWord(app.needsLeft) : look[0];
+  const chip =
+    w.st === "needs" && !isPaused && app.needsLeft > 0 ? decisionsWord(app.needsLeft) : look[0];
   const { skills, tools } = skillsAndTools(w, loaded.skills, loaded.connectors);
+  const slackState = slackConnectorState(loaded.connectors);
   const wide = (app.vw || 1440) >= 1060;
   const id = encodeURIComponent(w.id);
   // A world has a stage only when its data came from the live API; a world started on this page is local state.
   const hasStage = loaded.live && !added.some((a) => a.id === w.id);
   const stage = (to: string): string | null => (hasStage ? to : null);
+  const real = hasStage && !demo; // a live world of a real account: its toasts may claim real outcomes
 
   const togglePause = () => {
     setPaused((p) => ({ ...p, [w.id]: !isPaused }));
-    app.toast(isPaused ? "Resumed. Agents are back at work" : "Paused. No spend while paused");
+    // Issue 932: a sample world has no run behind it, so the toast says what happened: this page only.
+    app.toast(
+      real
+        ? isPaused
+          ? "Resumed. Agents are back at work"
+          : "Paused. No spend while paused"
+        : isPaused
+          ? "Sample only: resumed on this page. Nothing real changed."
+          : "Sample only: paused on this page. Nothing real changed.",
+    );
   };
   const share = () => {
     try {
@@ -181,7 +297,41 @@ export function WorldPage({ app }: { app: AppCtx }) {
     } catch {
       // no clipboard here: the toast still says what the button is for
     }
-    app.toast("Link copied. Only your team can open it");
+    app.toast(
+      real
+        ? "Link copied. Only your team can open it"
+        : "Link copied. This is a sample world, so there is nothing real to share.",
+    );
+  };
+
+  const openSlackDialog = (trigger: HTMLButtonElement) => {
+    if (!slackState.connected) return;
+    triggerRef.current = trigger;
+    setSlackChannel((cur) =>
+      cur && slackState.channels.includes(cur) ? cur : (slackState.channels[0] ?? ""),
+    );
+    setSlackNote("");
+    setSlackOpen(true);
+  };
+
+  const closeSlackDialog = () => {
+    setSlackOpen(false);
+    triggerRef.current?.focus();
+  };
+
+  const submitSlackApproval = () => {
+    const channel = slackChannel || slackState.channels[0];
+    if (!channel) return;
+    const req: SlackShareRequest = {
+      worldId: w.id,
+      worldName: w.name,
+      channel,
+      note: capSlackNote(slackNote),
+      sample: !loaded.live,
+    };
+    setSlackPendingByWorld((prev) => ({ ...prev, [w.id]: req }));
+    setSlackOpen(false);
+    triggerRef.current?.focus();
   };
 
   return (
@@ -205,34 +355,126 @@ export function WorldPage({ app }: { app: AppCtx }) {
           </div>
           <h1 className="park-world-h1" tabIndex={-1}>
             {w.name}
+            {w.sample || demo ? <SampleBadge /> : null}
           </h1>
           <p className="park-world-meta">
-            {`Owned by ${w.owner} · started ${w.started} · ${agentsWord(w.agents)}`}
+            {w.sample
+              ? `Recorded ${w.started}`
+              : `Owned by ${w.owner} · started ${w.started} · ${agentsWord(w.agents)}`}
           </p>
+          {w.sample ? <SampleNote /> : null}
+          {demo && !w.sample ? (
+            <span className="park-sample-note">
+              Sample data from a demo session. Approving here records nothing.
+            </span>
+          ) : null}
         </div>
         <div className="park-world-actions">
           <Button
             variant="secondary"
             icon={icon(isPaused ? "play" : "pause", 14)}
             onClick={togglePause}
+            {...(w.sample ? { disabled: true, title: "A recorded replay cannot be paused" } : {})}
           >
             {isPaused ? "Resume" : "Pause"}
           </Button>
           <Button variant="secondary" icon={icon("share", 16)} onClick={share}>
             Share
           </Button>
+          <Button
+            variant="secondary"
+            size="sm"
+            disabled={!slackState.connected}
+            aria-disabled={!slackState.connected ? "true" : undefined}
+            aria-describedby={!slackState.connected ? NO_SLACK_ID : undefined}
+            title={
+              !slackState.connected ? slackState.disabledReason : "Share this world link to Slack"
+            }
+            onClick={(e) => openSlackDialog(e.currentTarget)}
+          >
+            Share to Slack
+          </Button>
+          {loaded.live && worldClient && !w.sample ? (
+            <ShareWithTeam client={worldClient} worldId={w.id} worldName={w.name} />
+          ) : null}
+          {!slackState.connected ? (
+            <span id={NO_SLACK_ID} className="park-world-sr">
+              {slackState.disabledReason}
+            </span>
+          ) : null}
           {isCity ? (
             <StageLink className="park-world-live" href={stage(stagePath(w.id))}>
               {icon("play", 14)}Open live view
             </StageLink>
           ) : null}
-          {isCity && !hasStage ? (
-            <span id={NO_STAGE_ID} className="park-world-sr">
-              {NO_STAGE}
-            </span>
+          {w.sample ? (
+            <a className="park-world-live" href={stagePath(w.id)}>
+              {icon("play", 14)}Watch the replay
+            </a>
           ) : null}
         </div>
       </div>
+
+      {loaded.live && worldClient ? <SkillProposals client={worldClient} worldId={w.id} /> : null}
+      {loaded.live && worldClient && !w.sample ? (
+        <TeamItems client={worldClient} worldId={w.id} auto={false} />
+      ) : null}
+      {slackOpen ? (
+        <div className="park-world-slackbackdrop">
+          <div
+            ref={dialogRef}
+            // biome-ignore lint/a11y/useSemanticElements: custom modal dialog with focus trap and role="dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Share to Slack"
+            className="park-world-slackdialog"
+            onKeyDown={(e) => handleSlackDialogKeyDown(e, dialogRef.current, closeSlackDialog)}
+          >
+            <div className="park-world-slackhead">
+              <div className="park-world-slacktitle">Share to Slack</div>
+              <div className="park-world-slacksub">{`${w.name} · ${slackState.account}`}</div>
+            </div>
+            <label className="park-world-slackfield">
+              <span className="park-world-slacklabel">Channel</span>
+              <select
+                aria-label="Slack channel"
+                className="park-world-slackselect"
+                value={slackChannel}
+                onChange={(e: ChangeEvent<HTMLSelectElement>) => setSlackChannel(e.target.value)}
+              >
+                {slackState.channels.map((ch) => (
+                  <option key={ch} value={ch}>
+                    {ch}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="park-world-slackfield">
+              <span className="park-world-slacklabel">
+                {`Note (optional, up to ${SLACK_NOTE_MAX} characters)`}
+              </span>
+              <textarea
+                aria-label="Optional note"
+                className="park-world-slacknote"
+                rows={3}
+                maxLength={SLACK_NOTE_MAX}
+                value={slackNote}
+                onChange={(e: ChangeEvent<HTMLTextAreaElement>) =>
+                  setSlackNote(capSlackNote(e.target.value))
+                }
+              />
+            </label>
+            <div className="park-world-slackactions">
+              <Button variant="needs" size="sm" onClick={submitSlackApproval}>
+                Ask for approval
+              </Button>
+              <Button variant="secondary" size="sm" onClick={closeSlackDialog}>
+                Cancel
+              </Button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       <div
         className="park-world-top"
@@ -243,6 +485,9 @@ export function WorldPage({ app }: { app: AppCtx }) {
         <div className="park-world-mapcard">
           <div className={isCity ? "park-world-map" : "park-world-map park-world-map--art"}>
             <MapArt w={w} plans={loaded.plans} app={app} />
+            {isCity && loaded.gaps.plans ? (
+              <p className="park-world-meta">City map: {NOT_YET}</p>
+            ) : null}
             <div className="park-world-tag">{heroTagOf(w)}</div>
             {isPaused ? (
               <div className="park-world-overlay">
@@ -262,6 +507,12 @@ export function WorldPage({ app }: { app: AppCtx }) {
               </nav>
             ) : null}
           </div>
+          {isCity && !hasStage ? (
+            // QA-DEMO-1 m3: the reason the lens links and "Open live view" are off is words on the page, not a tooltip
+            <p id={NO_STAGE_ID} className="park-world-nostage">
+              {NO_STAGE}
+            </p>
+          ) : null}
           <div className="park-world-progrow">
             <div className="park-world-progwrap">
               <div className="park-world-track">
@@ -289,13 +540,24 @@ export function WorldPage({ app }: { app: AppCtx }) {
 
         {part(2) ? (
           <div className="park-world-side">
-            {open > 0 ? (
+            {loaded.gaps.decisions ? (
+              <NotYetCard title="Waiting on you" />
+            ) : open > 0 ? (
               <WaitingCard
                 mine={mine}
                 dec={dec}
                 night={app.night}
                 onDecide={(key) => app.decide(key)}
                 onLater={() => app.toast("Tilo will remind you at 16:00")}
+                slackPending={slackPending}
+              />
+            ) : null}
+            {handoff ? (
+              <LovableCard
+                handoff={handoff}
+                dec={dec}
+                sample={Boolean(w.sample)}
+                onDecide={(key) => app.decide(key)}
               />
             ) : null}
             <SpendCard w={w} mine={mine} dec={dec} onLedger={() => app.go("ledger")} />
@@ -306,10 +568,16 @@ export function WorldPage({ app }: { app: AppCtx }) {
               onSkill={(skill) => app.go("skills", { id: skill })}
               onTools={() => app.go("connectors")}
             />
+            {loaded.gaps.skills || loaded.gaps.connectors ? (
+              <NotYetCard title={loaded.gaps.skills ? "Skills" : "Tools"} />
+            ) : null}
           </div>
         ) : null}
       </div>
 
+      {hasStage && roomClient && !w.sample ? (
+        <MeetingHall key={w.id} worldId={w.id} client={roomClient} />
+      ) : null}
       {part(3) ? (
         <div className="park-world-lower">
           {isCity ? <Districts districts={w.districts ?? []} /> : null}
@@ -324,7 +592,10 @@ export function WorldPage({ app }: { app: AppCtx }) {
             <Result
               w={w}
               onOpen={() => app.toast("Opening the result in Google Drive")}
-              onSlack={() => app.toast("Shared to #ops in Slack")}
+              onSlack={openSlackDialog}
+              slackConnected={slackState.connected}
+              slackReason={slackState.disabledReason}
+              noSlackId={NO_SLACK_ID}
             />
           ) : null}
           <Activity

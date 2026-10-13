@@ -35,7 +35,7 @@ from tilo_people.errors import (
     PeopleInputError,
     VersionConflict,
 )
-from tilo_people.stores import INDEXES, PeopleStores, Stored
+from tilo_people.stores import BOUNDED_INDEXES, INDEXES, PeopleStores, Stored
 
 _ORG = re.compile(r"org_[0-9A-Za-z_]{1,48}")
 _IDS = {
@@ -45,6 +45,7 @@ _IDS = {
     "pinboard_item": re.compile(r"pb_[0-9A-Za-z_]{1,48}"),
     "mention": re.compile(r"mn_[0-9A-Za-z_]{1,48}"),
     "calendar_entry": re.compile(r"ce_[0-9A-Za-z_]{1,48}"),
+    "world_share": re.compile(r"ws_[0-9a-f]{32}"),  # ADR-0040: derived from the world and the team, never minted
 }
 _DEMO_PROJECT = re.compile(r"demo-[0-9a-z-]+")
 _PROJECT = re.compile(r"[a-z][a-z0-9-]{4,28}[a-z0-9]")
@@ -223,6 +224,21 @@ class FirestoreRecordStore:
             rows = [self._stored(snap) for snap in query.stream()]
         return tuple(sorted(rows, key=lambda s: s.record["id"]))
 
+    def list_bounded(self, org_id: str, field: str, value: str, *, limit: int) -> tuple[Stored, ...]:
+        if field not in BOUNDED_INDEXES[self.kind] or not isinstance(value, str) or type(limit) is not int or limit < 1:
+            raise PeopleInputError("invalid bounded index query")
+        if not isinstance(org_id, str) or _ORG.fullmatch(org_id) is None:
+            return ()
+        rows = []
+        with _guarded():
+            query = self._collection(org_id).where(filter=FieldFilter(f"record.{field}", "==", value)).limit(limit)
+            for snap in query.stream():
+                try:
+                    rows.append(self._stored(snap))
+                except (KeyError, TypeError, ValueError, OverflowError):
+                    continue  # corrupt document only; stream/storage failures still reach the caller
+        return tuple(rows)
+
 
 class FirestorePersonStore(FirestoreRecordStore):
     """The person store: every write keeps one address reservation per person, in one transaction with the record;
@@ -386,7 +402,7 @@ def _collided(where: str, pid: str) -> PeopleError:
 
 
 def firestore_people_stores(client: Any) -> PeopleStores:
-    """The six stores over one client. Holds the client only: no read, write, query or transaction happens here."""
+    """The seven stores over one client. Holds the client only: no read, write, query or transaction happens here."""
     return PeopleStores(
         persons=FirestorePersonStore(client),
         meetings=FirestoreRecordStore(client, "meeting"),
@@ -394,6 +410,7 @@ def firestore_people_stores(client: Any) -> PeopleStores:
         pins=FirestoreRecordStore(client, "pinboard_item"),
         mentions=FirestoreRecordStore(client, "mention"),
         calendar=FirestoreRecordStore(client, "calendar_entry"),
+        world_shares=FirestoreRecordStore(client, "world_share"),
     )
 
 
@@ -407,6 +424,13 @@ def emulator_people_stores(project_id: str = "demo-tilo") -> PeopleStores:
     return firestore_people_stores(firestore.Client(project=project_id))
 
 
+def _shared_client(project: str) -> Any:
+    """The process's one client (PROD-WIRE 3: `tilo_api.prod`, which also guards it; it imports this module)."""
+    from tilo_api import prod
+
+    return prod.firestore_client(project)
+
+
 def open_people_stores(
     env: Mapping[str, str] | None = None, *, client_factory: Callable[[str], Any] | None = None
 ) -> PeopleStores:
@@ -416,5 +440,4 @@ def open_people_stores(
     project = source.get("TILO_FIRESTORE_PROJECT", "")
     if source.get("TILO_PEOPLE_STORE") != "firestore" or _PROJECT.fullmatch(project) is None:
         raise PeopleStoreNotConfigured("set TILO_PEOPLE_STORE=firestore and a valid TILO_FIRESTORE_PROJECT")
-    make = client_factory or (lambda name: firestore.Client(project=name))
-    return firestore_people_stores(make(project))
+    return firestore_people_stores((client_factory or _shared_client)(project))

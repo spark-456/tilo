@@ -5,6 +5,7 @@
 import { useState } from "react";
 import type { Skill } from "../../api/types";
 import type { AppCtx } from "../../app/AppCtx";
+import { type CurrencyCode, runMoney } from "../../app/ledgerKpis";
 import { cx } from "../../components/cx";
 import { agent, icon } from "./skillsKit";
 
@@ -20,13 +21,15 @@ const STATUS_META: Record<ShownStatus, { label: string; tone: string }> = {
 
 const LEVELS = ["Off", "Read", "Draft", "Act"] as const;
 
-const money = (v: number | undefined): string => (v == null ? "—" : `£${v.toFixed(2)}`);
+const money = (v: number | undefined, currency: CurrencyCode = "GBP"): string =>
+  v == null ? "—" : runMoney(v, currency);
 
 export interface LibraryProps {
   app: AppCtx;
   skills: readonly Skill[];
   selectedId: string;
   paused: Readonly<Record<string, boolean>>;
+  currency?: CurrencyCode;
   onSelect: (id: string) => void;
   onTogglePause: (skill: Skill) => void;
   onTryDraft: () => void;
@@ -37,6 +40,7 @@ export function LibrarySection({
   skills,
   selectedId,
   paused,
+  currency = "GBP",
   onSelect,
   onTogglePause,
   onTryDraft,
@@ -64,7 +68,7 @@ export function LibrarySection({
       : "0%";
 
   const stats = [
-    { k: "Runs", v: String(cur.runs) },
+    { k: "Runs", v: cur.runs == null ? "—" : String(cur.runs) },
     { k: "Success", v: cur.rate != null ? `${cur.rate}%` : "—" },
     { k: "Last run", v: cur.last },
     { k: "Improved", v: cur.improved },
@@ -76,7 +80,8 @@ export function LibrarySection({
       onTryDraft();
       return;
     }
-    app.toast("Test run started on yesterday’s data. Results in about a minute");
+    // Issue 932: nothing starts a run from here yet, so the toast says so instead of promising results.
+    app.toast("Test runs are not connected yet. Nothing was started.");
   };
 
   return (
@@ -138,7 +143,7 @@ export function LibrarySection({
                     {meta.label}
                   </span>
                   <span className="park-skills-lib-row-cost">
-                    {s.now != null ? `${money(s.now)} a run` : "Not run yet"}
+                    {s.now != null ? `${money(s.now, currency)} a run` : "Not run yet"}
                   </span>
                 </span>
               </button>
@@ -210,8 +215,8 @@ export function LibrarySection({
                 <div className="park-skills-lib-cost-fill" style={{ width: barWidth }} />
               </div>
               <div className="park-skills-lib-cost-sub">
-                <span>{`First run ${money(cur.first)}`}</span>
-                <span>{`Now ${money(cur.now)}`}</span>
+                <span>{`First run ${money(cur.first, currency)}`}</span>
+                <span>{`Now ${money(cur.now, currency)}`}</span>
               </div>
             </div>
           ) : null}

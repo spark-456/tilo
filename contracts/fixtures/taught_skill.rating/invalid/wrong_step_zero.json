@@ -1,0 +1,11 @@
+{
+  "id": "01JB6Z00000000000000RAT001",
+  "skill": "tsk_01JB6Z0000000000000000INV",
+  "version": 3,
+  "run_id": "r_invoice_0007",
+  "by": "u_sam",
+  "thumb": "down",
+  "wrong_step": 0,
+  "note": "It should use the due date from the PDF, not the email.",
+  "at": "2026-10-09T09:00:00.000Z"
+}

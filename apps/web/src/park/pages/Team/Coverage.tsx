@@ -55,7 +55,7 @@ export function Coverage({ rows, owner, flash, onBackup, onLedger }: CoveragePro
                       key={w.id}
                       title={w.name}
                       className="park-team-av"
-                      style={{ background: w.c }}
+                      style={w.c === null ? undefined : { background: w.c }}
                     >
                       {initialsOf(w.name)}
                     </span>

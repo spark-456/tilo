@@ -30,7 +30,7 @@ from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import padding, rsa
 
-from tilo_api.appcheck import JwksKeyCache, TokenRefused, _b64, _RefuseAll, fetch_jwks
+from tilo_api.appcheck import JwksKeyCache, RefuseAll, TokenRefused, b64url_decode, fetch_jwks
 
 if TYPE_CHECKING:
     from tilo_api.deps import Principal
@@ -118,7 +118,11 @@ class FirebaseIdTokenVerifier(JwksKeyCache):
         if len(parts) != 3 or len(token) > MAX_TOKEN_CHARS:
             raise TokenRefused("not_a_jwt")
         try:
-            header, claims, signature = json.loads(_b64(parts[0])), json.loads(_b64(parts[1])), _b64(parts[2])
+            header, claims, signature = (
+                json.loads(b64url_decode(parts[0])),
+                json.loads(b64url_decode(parts[1])),
+                b64url_decode(parts[2]),
+            )
         except (ValueError, RecursionError) as exc:  # binascii.Error and UnicodeDecodeError are ValueErrors
             raise TokenRefused("not_a_jwt") from exc
         if not isinstance(header, dict) or not isinstance(claims, dict) or header.get("alg") != "RS256":
@@ -149,10 +153,10 @@ def default_verifier() -> FirebaseVerifier:
     from tilo_api import dev  # noqa: PLC0415  (dev imports deps, which imports this module)
 
     if dev.dev_enabled():
-        return _RefuseAll("dev_mode")
+        return RefuseAll("dev_mode")
     project = (os.environ.get("TILO_FIRESTORE_PROJECT") or os.environ.get("GOOGLE_CLOUD_PROJECT") or "").strip()
     if not project:
-        return _RefuseAll("no_project")
+        return RefuseAll("no_project")
     return _google_verifier(project)
 
 

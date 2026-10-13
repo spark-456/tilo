@@ -1,0 +1,9 @@
+{
+  "parts": [
+    {
+      "type": "connection.revoked",
+      "connector": "meeting_host",
+      "user_id": "u_owner"
+    }
+  ]
+}

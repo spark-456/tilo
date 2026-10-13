@@ -109,6 +109,20 @@ def _detail(response: Any) -> str:
     return said if isinstance(said, str) and said else f"HTTP {response.status_code}"
 
 
+def _revise(call: Any, task: dict[str, Any], person: Any) -> bool:
+    """A person who declined the approaches and said why gets one revised set: the reason joins the brief's
+    constraints (an edit, so the old approaches are dropped and the Director proposes again). No reason, no revision."""
+    reason = getattr(person, "decline_reason", "")
+    if not reason:
+        return False
+    brief = call("POST", f"/tasks/{task['task_id']}/answers", json={"answers": [], "brief_edits": {}}).json()["brief"]
+    wish = f"Must address: {reason}"
+    edits = {"constraints": list(dict.fromkeys([*brief["constraints"], wish]))}
+    return (
+        call("POST", f"/tasks/{task['task_id']}/answers", json={"answers": [], "brief_edits": edits}).status_code < 400
+    )
+
+
 MAX_REASKS = 2  # a person whose answers do not fit the brief is asked again this many times, then the run stops
 
 
@@ -167,7 +181,10 @@ def drive(case: BankCase, obs: Observation, timeout_s: float, app: Any, person: 
             return
         offered = approaches.json()
         wanted = (case.approve or {}).get("approach") or offered["recommended"]
-        if person is not None and (wanted := person.approach(offered)) is None:
+        if person is not None and (wanted := person.approach(offered)) is None and _revise(call, task, person):
+            offered = call("GET", f"/tasks/{task['task_id']}/approaches").json()  # one revised set (BQ-DECLINE-1)
+            wanted = person.approach(offered)
+        if person is not None and wanted is None:
             obs.outcome, obs.reason = "declined", "the person declined the approach; nothing ran"
             return
         obs.cap = float((case.approve or {}).get("cap", DEFAULT_CAP))

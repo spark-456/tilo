@@ -142,10 +142,18 @@ class Schedule:
     # FR-AGT-14b: the owner's approved brief and approach are SNAPSHOTTED here (a task may not survive a redeploy)
     brief: dict[str, Any] | None = None
     approach: dict[str, Any] | None = None
+    # SCHED_PLAN (#656): the FULL offered list (2 to 3, the chosen one among them) the Director's plan names; None on a
+    # record made before the field existed, which the starter skips cleanly rather than plan from a list of one
+    approaches: list[dict[str, Any]] | None = None
     failures: int = 0
     backoff_until: datetime | None = None
     last_error: str | None = None  # a short fixed code (^[a-z][a-z0-9_]{0,63}$), never exception text
     created_at: datetime | None = None
+    # SEC-15 / BQ-SIGNIN-10: the owner was an anonymous demo session when this was created (set by the server from the
+    # verified principal, never by a request body). The tick has no signed-in person, so it reads the flag from here and
+    # builds the run's model seams in replay mode, which tilo-api injects into the providers as `force_replay`: replay
+    # whatever `LIVE` says. A stored record written before the field existed reads as demo (it only replays, safe).
+    demo: bool = False
 
     def __post_init__(self) -> None:
         _aware(self.next_due, "next_due")

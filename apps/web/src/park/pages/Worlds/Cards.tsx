@@ -5,6 +5,7 @@ import type { World } from "../../api/types";
 import { parkPath } from "../../app/router";
 import { useAfterTask } from "../../app/useStaged";
 import { cx } from "../../components/cx";
+import { SampleBadge, SampleNote } from "../../sample/SampleBadge";
 import type { Art } from "./art";
 import type { Status } from "./model";
 
@@ -134,8 +135,13 @@ function VillageCardView({ w, art, status, onOpen }: CardProps) {
         <div className="park-worlds-village__tile">{art.single(w)}</div>
         <Chip status={status} />
       </div>
-      <div className="park-worlds-village__name">{w.name}</div>
-      <div className="park-worlds-village__when">{w.when || `${w.nextL} ${w.nextV}`}</div>
+      <div className="park-worlds-village__name">
+        {w.name}
+        {w.sample ? <SampleBadge /> : null}
+      </div>
+      <div className="park-worlds-village__when">
+        {w.sample ? <SampleNote /> : w.when || `${w.nextL} ${w.nextV}`}
+      </div>
     </a>
   );
 }

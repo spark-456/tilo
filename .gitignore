@@ -20,6 +20,7 @@ application_default_credentials.json
 
 # Build output and caches
 dist/
+dist-e2e/
 build/
 out/
 coverage/
@@ -41,6 +42,8 @@ apps/web/e2e/__artifacts__/
 evals/results.local.md
 evals/nightly.local.md
 evals/metrics.local.md
+# Vertex AI Gen AI evaluation runs (VERTEX-EVAL-1): the local pairs file and report
+evals/vertex-eval/
 # Live generator output (issue #272 b): one folder per run; the user promotes a case into evals/bank/ by PR
 evals/generated/
 # just live-run (PL-LIVE-E2E): recordings of runs on a typed topic are the user's own text, never committed

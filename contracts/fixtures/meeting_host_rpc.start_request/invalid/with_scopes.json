@@ -1,0 +1,6 @@
+{
+  "user_id": "u_priya",
+  "connector": "gmail",
+  "capabilities": ["read"],
+  "scopes": ["https://www.googleapis.com/auth/gmail.readonly"]
+}

@@ -3,12 +3,13 @@
  * contracts/events/registry.yaml. Do not edit. Regenerate with `just contracts-gen`;
  * `just contracts-check` fails CI on drift (FR-WLD-02, FR-WLD-03).
  * agents.schema.json 1.0.0 sha256:f2ba3955260a80eb
- * artifact.schema.json 1.0.0 sha256:358508330e9ee2f2
+ * appspec.schema.json 1.0.0 sha256:e3638e1ae19f9b9b
+ * artifact.schema.json 1.1.0 sha256:ce5a30aeae826180
  * attention.schema.json 1.0.0 sha256:f35cff84728304af
  * brief.schema.json 1.0.0 sha256:be4e747f37e399b2
  * calendar_entry.schema.json 1.1.0 sha256:291531543be88320
  * card.schema.json 1.0.0 sha256:2666292eb19087d0
- * common.schema.json 1.5.0 sha256:b1bd17a36819c785
+ * common.schema.json 1.7.0 sha256:71b116e3caa126a8
  * connector.schema.json 1.0.0 sha256:cc3a7d9b3820e12c
  * decision.schema.json 1.0.0 sha256:06915b6db08dc4b7
  * envelope.schema.json 1.0.0 sha256:8a5c75c61807baa2
@@ -69,10 +70,15 @@
  * events/data/district.created.schema.json 1.0.0 sha256:1b25e3de1fa3e1fb
  * events/data/level.completed.schema.json 1.0.0 sha256:b99d3220a8e24536
  * events/data/level.created.schema.json 1.0.0 sha256:f404c2d35df9da17
+ * events/data/meeting.adjourned.schema.json 1.0.0 sha256:0c3fb38b0ad2732a
+ * events/data/meeting.asked.schema.json 1.0.0 sha256:7d58ef4c8d45d1b0
  * events/data/meeting.called.schema.json 1.0.0 sha256:af1b23d42d145e42
+ * events/data/meeting.change_requested.schema.json 1.0.0 sha256:3df34dc137ada7dd
+ * events/data/meeting.convened.schema.json 1.0.0 sha256:2c0f55f0f651b348
  * events/data/meeting.decision.schema.json 1.0.0 sha256:359fc3bc20f11676
  * events/data/meeting.ended.schema.json 1.1.0 sha256:9219b0e4934a318e
  * events/data/meeting.minuted.schema.json 1.0.0 sha256:f2a9c646721e5b64
+ * events/data/meeting.replied.schema.json 1.0.0 sha256:1591c9f4ab421e93
  * events/data/meeting.started.schema.json 1.1.0 sha256:3ee754f6effc0b32
  * events/data/memory.hit.schema.json 1.0.0 sha256:ae1d0919f97240c5
  * events/data/memory.saved.schema.json 1.0.0 sha256:e8764ecbbdc670a9
@@ -82,11 +88,18 @@
  * events/data/pinboard.item_changed.schema.json 1.0.0 sha256:2db181d1a51c6c84
  * events/data/plan.approaches_proposed.schema.json 1.0.0 sha256:4e67dfd9f1e856b4
  * events/data/plan.questions_asked.schema.json 1.0.0 sha256:5fe5359427d0e04b
+ * events/data/plan.revised.schema.json 1.0.0 sha256:55005a10fa84656a
  * events/data/policy.applied.schema.json 1.0.0 sha256:3ca104f308b12dce
  * events/data/policy.changed.schema.json 1.0.0 sha256:e480c2319e07c2a6
  * events/data/question.answered.schema.json 1.1.0 sha256:27aa69077ee8f813
  * events/data/question.routed.schema.json 1.0.0 sha256:af061a697d8396b2
+ * events/data/skill.captured.schema.json 1.0.0 sha256:6de7eeac396cf5a8
+ * events/data/skill.fixed.schema.json 1.0.0 sha256:a8532b6517841fc5
  * events/data/skill.loaded.schema.json 1.0.0 sha256:acddc05d7bde55d2
+ * events/data/skill.rated.schema.json 1.0.0 sha256:b29d4b724d076f6f
+ * events/data/skill.state_changed.schema.json 1.0.0 sha256:bca4bebcc30d6d6f
+ * events/data/skill.try_run.schema.json 1.0.0 sha256:41d6fdc3a3079a84
+ * events/data/skill.version_proposed.schema.json 1.0.0 sha256:bd3ff89653114f9c
  * events/data/team_rule.changed.schema.json 1.0.0 sha256:c095fa9eb4a68023
  * events/data/work_item.changed.schema.json 1.0.0 sha256:8740c0c65f424dc5
  * events/data/work_item.created.schema.json 1.0.0 sha256:a9fbffc5d3854c81
@@ -96,13 +109,17 @@
  * events/data/world.planned.schema.json 1.0.0 sha256:eb423b257e5fc838
  * events/data/world.requested.schema.json 1.1.0 sha256:7f1370b796c05ea1
  * events/data/world.resumed.schema.json 1.0.0 sha256:a3fd175fc848bf87
+ * events/data/world.share_changed.schema.json 1.0.0 sha256:7de879d9ec364699
  * events/data/world.started.schema.json 1.0.0 sha256:e0daa70c85838c8f
  * events/registry.schema.json 1.2.0 sha256:5a2b8514c1e7e2b1
  * handoff.schema.json 1.0.0 sha256:7ed882f92b634672
  * layout.schema.json 1.0.0 sha256:1db88b1e3b744add
  * manifest.schema.json 1.0.0 sha256:9b885d1826522bb7
+ * mcp_tools.schema.json 1.0.0 sha256:46a498402c9b1e4e
  * meeting.schema.json 1.2.0 sha256:034e93898bb28957
+ * meeting_host_rpc.schema.json 1.2.0 sha256:a5856b07b3f6501c
  * meeting_join.schema.json 1.0.0 sha256:ea1e8f0945773573
+ * meeting_room.schema.json 1.0.0 sha256:13c682235d58ce69
  * mention.schema.json 1.0.0 sha256:ca9c1acbf81616f2
  * meter.schema.json 1.0.0 sha256:ad596dcc70e45e09
  * metering.schema.json 1.0.0 sha256:91358a776e6c033a
@@ -110,26 +127,76 @@
  * outbox.schema.json 1.0.0 sha256:0b9b172f230a6347
  * person.schema.json 1.0.0 sha256:2c928319dd7ab9d1
  * pilot.schema.json 1.0.0 sha256:5d091f814844b3b1
- * pinboard_item.schema.json 1.0.0 sha256:fe6df109871cea93
- * plan.schema.json 1.0.0 sha256:35991402fa6e958d
+ * pinboard_item.schema.json 1.1.0 sha256:edf4c50a588211ee
+ * plan.schema.json 1.1.0 sha256:f0722cc94a84e2d1
  * plate.schema.json 1.0.0 sha256:d2a4e4361a714c8f
  * policy.schema.json 1.0.0 sha256:307bca25f6efc07e
- * providers.schema.json 1.2.0 sha256:4514148b0b6b2f7e
+ * providers.schema.json 1.3.0 sha256:ecc5063d4926f11c
  * scenario.schema.json 1.0.0 sha256:b8e044d7e37b92a3
  * skill.schema.json 1.1.0 sha256:9eeee7768b667afa
- * spend_caps.schema.json 1.1.0 sha256:d337adf13a5337f9
+ * spend_caps.schema.json 1.1.1 sha256:c04bc36ac17dc0ab
+ * taught_skill.schema.json 1.1.0 sha256:b23321ed0cd570d4
  * team_lead.schema.json 1.0.0 sha256:19413726e364ffdd
  * transcript.schema.json 1.0.0 sha256:08f934b8f0c9a40e
  * ui_action.schema.json 1.0.0 sha256:2ceb1e0b46368734
- * work_item.schema.json 1.0.0 sha256:7add9f68c1f996fb
- * events/registry.yaml 1.2.0 sha256:8be0da29431a82c4
+ * user_settings.schema.json 1.0.0 sha256:dfc439371ba69131
+ * work_item.schema.json 1.1.0 sha256:9ee739ef8bdb7579
+ * world_share.schema.json 1.0.0 sha256:89d31e9968dc95cc
+ * events/registry.yaml 1.5.0 sha256:ffb369c84ae3eff7
  */
 
+/**
+ * The quiz's name, shown as plain text.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "AppSpecTitle".
+ */
+export type AppSpecTitle = string;
+/**
+ * Lower-case machine name.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "Slug".
+ */
+export type Slug = string;
+/**
+ * q1 to q999, unique within the spec (AS-01).
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "AppSpecQuestionId".
+ */
+export type AppSpecQuestionId = string;
+/**
+ * The question text, shown as plain text (AS-03).
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "AppSpecStem".
+ */
+export type AppSpecStem = string;
+/**
+ * One choice, shown as plain text (AS-03).
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "AppSpecOptionText".
+ */
+export type AppSpecOptionText = string;
+/**
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "AppSpecOptionId".
+ */
+export type AppSpecOptionId = "a" | "b" | "c" | "d" | "e" | "f";
 /**
  * This interface was referenced by `TiloContracts`'s JSON-Schema
  * via the `definition` "ArtifactId".
  */
 export type ArtifactId = string;
+/**
+ * 1-based page of the cited PDF.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "AppSpecPage".
+ */
+export type AppSpecPage = number;
 /**
  * This interface was referenced by `TiloContracts`'s JSON-Schema
  * via the `definition` "OrgId".
@@ -151,7 +218,7 @@ export type RunId = string;
  */
 export type UserId = string;
 /**
- * Media type of a stored artifact version (ADR-0018). Text: Markdown and CSV; structured: JSON; files (made only by tilo-render or an intake upload, never by a model): PDF, PPTX, DOCX, XLSX, PNG and JPEG. Code picks it from the role and the pinned skill, never a model, a file name or sniffing. Closed: no HTML or SVG.
+ * Media type of a stored artifact version (ADR-0018). Text: Markdown and CSV; structured: JSON; files (made only by tilo-render or an intake upload, never by a model): PDF, PPTX, DOCX, XLSX, PNG and JPEG, and since 1.7.0 (ADR-0034) WebM and MP4 video, which only a taught-skill capture upload stores (a screen recording or an uploaded example; never rendered or fetched). Code picks it, never a model: from the role and the pinned skill for a unit or render output, and from the file's own leading bytes for an upload (whose extension must agree) or a fetch (ADR-0029), never from a file name, a URL or a Content-Type header alone. Closed: no HTML or SVG.
  *
  * This interface was referenced by `TiloContracts`'s JSON-Schema
  * via the `definition` "MediaType".
@@ -165,7 +232,9 @@ export type MediaType =
   | "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
   | "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
   | "image/png"
-  | "image/jpeg";
+  | "image/jpeg"
+  | "video/webm"
+  | "video/mp4";
 /**
  * This interface was referenced by `TiloContracts`'s JSON-Schema
  * via the `definition` "UnitId".
@@ -176,13 +245,6 @@ export type UnitId = string;
  * via the `definition` "AgentId".
  */
 export type AgentId = string;
-/**
- * Lower-case machine name.
- *
- * This interface was referenced by `TiloContracts`'s JSON-Schema
- * via the `definition` "Slug".
- */
-export type Slug = string;
 /**
  * Raw archive record (PRD 13.2): <run id>/<record seq in that run's archive>.
  *
@@ -198,7 +260,7 @@ export type EventArchiveRef = string;
  */
 export type Timestamp = string;
 /**
- * <run_id>:<unit_id>:<attempt>:<index> (AR-05). index is the output's 0-based position, 0 to 9, since a unit has at most 10 outputs (BQ-257).
+ * <run_id>:<unit_id>:<attempt>:<index> (AR-05). index is the output's 0-based position, 0 to 9, since a unit has at most 10 outputs (BQ-257); a fetch's index is f0 to f9, the file's 0-based position among the unit's fetched files, at most 10 (FR-INT-01, ADR-0029 8).
  *
  * This interface was referenced by `TiloContracts`'s JSON-Schema
  * via the `definition` "ArtifactVersionIdempotencyKey".
@@ -236,7 +298,7 @@ export type Semver = string;
  */
 export type ProvidersProfileId = string;
 /**
- * Deliverable format (PRD 12.4), plus email for replies and in_app for answers shown in Tilo.
+ * Deliverable format (PRD 12.4), plus email for replies, in_app for answers shown in Tilo and, since 1.6.0 (ADR-0029), app: an AppSpec (appspec.schema.json) that fixed web code renders (FR-AGT-16).
  *
  * This interface was referenced by `TiloContracts`'s JSON-Schema
  * via the `definition` "DeliverableFormat".
@@ -252,7 +314,8 @@ export type DeliverableFormat =
   | "google_docs"
   | "google_sheets"
   | "email"
-  | "in_app";
+  | "in_app"
+  | "app";
 /**
  * Calendar date YYYY-MM-DD (RFC 3339 full-date).
  *
@@ -587,6 +650,96 @@ export type UiActionTarget =
   | UiActionTargetWorkItem
   | UiActionTargetCalendarEntry;
 /**
+ * person: the convener closed it; idle: no turn for the configured time; capped: the next turn would pass the room's credit or turn cap; paused: Pause all or Stop all; access_lost: the convener's role or scope no longer covers the room; failed: the room could not go on (writer or archive error).
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MeetingRoomAdjournReason".
+ */
+export type MeetingRoomAdjournReason =
+  "person" | "idle" | "capped" | "paused" | "access_lost" | "failed";
+/**
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MeetingRoomTurnNumber".
+ */
+export type MeetingRoomTurnNumber = number;
+/**
+ * The person's Quick or Thinking choice for a turn: quick uses the meeting role, thinking the meeting_thinking role (config/models.yaml).
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MeetingRoomMode".
+ */
+export type MeetingRoomMode = "quick" | "thinking";
+/**
+ * Pinned artifact versions the reply rests on, made by those units.
+ *
+ * @maxItems 10
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MeetingRoomCitedArtifacts".
+ */
+export type MeetingRoomCitedArtifacts = ArtifactRef[];
+/**
+ * Why the convener may hold this room, from the team store and the world record at the time (MR-03): the world's owner, or an Approver or Member of the world's team whose scope covers every attendee's district. A Viewer never convenes.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MeetingRoomAsRole".
+ */
+export type MeetingRoomAsRole = "owner" | "approver" | "member";
+/**
+ * The agents in the room besides the lead, in seating order.
+ *
+ * @maxItems 7
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MeetingRoomAttendees".
+ */
+export type MeetingRoomAttendees = AgentId[];
+/**
+ * answered: a reply grounded in the agent's own units; proposed_change: a reply that also proposes a change for the person to confirm; declined: the agent has no record for it, or the safety screen flagged the message; failed: no reply was produced (no text exists).
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MeetingRoomOutcome".
+ */
+export type MeetingRoomOutcome = "answered" | "proposed_change" | "declined" | "failed";
+/**
+ * Plan units the reply rests on: the replying agent's own units (a lead's: its district's), checked by code against the grounding set (MR-06).
+ *
+ * @maxItems 20
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MeetingRoomCitedUnits".
+ */
+export type MeetingRoomCitedUnits = UnitId[];
+/**
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "TaughtSkillId".
+ */
+export type TaughtSkillId = string;
+/**
+ * How the person showed it (FR-SKL-01): describe (typed words), upload (a finished example file), guided (clicking through in Tilo's browser) or record (a screen recording, video only, no sound).
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "TaughtSkillMethod".
+ */
+export type TaughtSkillMethod = "describe" | "upload" | "guided" | "record";
+/**
+ * 1-based position in plan.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "TaughtSkillStepNumber".
+ */
+export type TaughtSkillStepNumber = number;
+/**
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "TaughtSkillThumb".
+ */
+export type TaughtSkillThumb = "up" | "down";
+/**
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "TaughtSkillCount".
+ */
+export type TaughtSkillCount = number;
+/**
  * switch: one of the five 'When agents stop and ask' switches (FR-TEAM-04). tool_access: the team's level for one connector (FR-ACC-01). Roles, spend limits, invites and removals are not team rules (BQ-ADR27-3).
  *
  * This interface was referenced by `TiloContracts`'s JSON-Schema
@@ -683,12 +836,103 @@ export type LayoutCommonType =
   | "mail_room"
   | "expert_office";
 /**
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "McpToolsToolName".
+ */
+export type McpToolsToolName =
+  | "list_worlds"
+  | "get_world"
+  | "list_artifacts"
+  | "read_artifact"
+  | "list_cards"
+  | "answer_card"
+  | "start_run";
+/**
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "McpToolsWithheldReason".
+ */
+export type McpToolsWithheldReason = "not_text" | "too_large";
+/**
  * Planned minutes for an agenda item.
  *
  * This interface was referenced by `TiloContracts`'s JSON-Schema
  * via the `definition` "MeetingAgendaMinutes".
  */
 export type MeetingAgendaMinutes = number;
+/**
+ * The internal surface of tilo-connectors that tilo-api calls (FR-MTG-09, ADR-0032 decision 2 and addendum 1; FR-CON-02, ADR-0035 decision 2): what tilo-api posts to /internal/meeting-host/send, /internal/meeting-host/status, /internal/meeting-host/disconnect, /internal/connections/views, /internal/connections/start, /internal/connections/callback, /internal/connections/disconnect and /internal/side-effects/execute, and what each answers. Each route validates its own request and answer ($defs send_request and send_answer; user_request and status_answer; user_request and disconnect_answer; user_request and views_answer; start_request and start_answer; callback_request and callback_answer; connection_disconnect_request and connection_disconnect_answer; execute_request and execute_answer; error for any refusal) in both services; this root is any one of them. Every object is closed, and no field holds an access or refresh token, the client secret, a PKCE verifier, key material or a Meet link (ADR-0024 decision 4, ADR-0032 decision 3). Two fields carry a credential on purpose and nothing else does: callback_request.state and .code, the one-time values Google handed the browser (ADR-0035 LC-03; useless without the verifier and the client secret, which stay in tilo-connectors), and start_answer.authorize_url, the public part of the sign-in link. Ids travel in the body, never in a path or query. A route refuses a body over 65536 bytes (64 KiB) before it parses it. Rules that compare values (HB-03 the draft against its hash and the entry, HB-05 the owner, HB-07 the receipt against the entry, HB-09 the views against config/connectors.yaml, LC-05 the flow's person against the caller, LC-07 the items against the entry) are checked by the routes and by tilo-api's client, not by this schema. 1.1.0 adds views_answer, connection_view and scope; 1.2.0 adds the four live-connector routes' defs and the error codes start_again, not_granted and wrong_account (additive).
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MeetingHostRpc".
+ */
+export type MeetingHostRpc =
+  | MeetingHostRpcSendRequest
+  | MeetingHostRpcSendAnswer
+  | MeetingHostRpcUserRequest
+  | MeetingHostRpcStatusAnswer
+  | MeetingHostRpcDisconnectAnswer
+  | MeetingHostRpcViewsAnswer
+  | MeetingHostRpcStartRequest
+  | MeetingHostRpcStartAnswer
+  | MeetingHostRpcCallbackRequest
+  | MeetingHostRpcCallbackAnswer
+  | MeetingHostRpcConnectionDisconnectRequest
+  | MeetingHostRpcConnectionDisconnectAnswer
+  | MeetingHostRpcExecuteRequest
+  | MeetingHostRpcExecuteAnswer
+  | MeetingHostRpcError;
+/**
+ * A PRD 10.4 context condition that raises any action to T3; also listed on the outbox entry it applies to (outbox.schema.json modifiers).
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "PolicyTierCondition".
+ */
+export type PolicyTierCondition =
+  | "new_recipients"
+  | "attachments"
+  | "external_sharing"
+  | "deletion"
+  | "money_or_legal"
+  | "safety_flag";
+/**
+ * What the broker emitted during one call, in order, nothing more (ADR-0032 decision 7): tilo-api hands each connection part to meeting_host.on_connection_event. Every connection part names the call's own user (entry.authz.ref for a send, the request's user_id otherwise); a part naming anyone else is not that call's, and tilo-api's client drops it. At most 16.
+ *
+ * @maxItems 16
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MeetingHostRpcParts".
+ */
+export type MeetingHostRpcParts = (MeetingHostRpcConnectionPart | MeetingHostRpcAlertPart)[];
+/**
+ * An OAuth scope as config/connectors.yaml declares it: a URL or a word from a closed alphabet, at most 300 characters, with no query, fragment, user info, percent sign or space. A backstop only: HB-09 sends only scopes the registry declares for the view's connector.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MeetingHostRpcScope".
+ */
+export type MeetingHostRpcScope = string;
+/**
+ * What the broker emitted during one call of a connect, disconnect or execute route, in order, nothing more (ADR-0032 decision 7, ADR-0035 decision 2): as parts, but a connection part may name any connector and may be connection.established. Every connection part names the call's own user (the request's user_id; evidence.world_owner for an execute); a part naming anyone else is not that call's, and tilo-api's client drops it. At most 16.
+ *
+ * @maxItems 16
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MeetingHostRpcConnectorParts".
+ */
+export type MeetingHostRpcConnectorParts = (
+  MeetingHostRpcConnectorPart | MeetingHostRpcAlertPart
+)[];
+/**
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MeetingRoomPersonText".
+ */
+export type MeetingRoomPersonText = string;
+/**
+ * A reply's text after the secret redactor; a reply's text is null exactly when its outcome is failed.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MeetingRoomReplyText".
+ */
+export type MeetingRoomReplyText = string;
 /**
  * An https URL of host, optional port and path, with no user info, query or fragment. The not-pattern rejects a final line break, which a Python validator's $ lets through.
  *
@@ -727,25 +971,19 @@ export type MeteringBillingService = string;
  */
 export type MinutesEvidence = UtteranceId[];
 /**
- * A PRD 10.4 context condition that raises any action to T3; also listed on the outbox entry it applies to (outbox.schema.json modifiers).
- *
- * This interface was referenced by `TiloContracts`'s JSON-Schema
- * via the `definition` "PolicyTierCondition".
- */
-export type PolicyTierCondition =
-  | "new_recipients"
-  | "attachments"
-  | "external_sharing"
-  | "deletion"
-  | "money_or_legal"
-  | "safety_flag";
-/**
  * Pseudonymous tester id: t_ and 6 to 32 lower-case letters or digits, assigned by Tilo. Never an email address, a name or a Tilo user id (PRD 16.5). The not-pattern rejects a final line break, which a Python validator's $ lets through.
  *
  * This interface was referenced by `TiloContracts`'s JSON-Schema
  * via the `definition` "PilotTesterId".
  */
 export type PilotTesterId = string;
+/**
+ * A board or column id: lower-case letters, digits and underscore, starting with a letter, at most 32 characters.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "PinboardItemPlaceId".
+ */
+export type PinboardItemPlaceId = string;
 /**
  * This interface was referenced by `TiloContracts`'s JSON-Schema
  * via the `definition` "PlanApproachId".
@@ -789,7 +1027,7 @@ export type PlateTitle = string;
  */
 export type PlateAction = "open" | "done" | "snooze" | "not_mine" | "put_back" | "draft_reply";
 /**
- * structured output (json), tool calling, vision, audio input, thinking levels, computer use, search grounding, code execution.
+ * structured output (json), tool calling, vision, audio input, thinking levels, computer use, search grounding, code execution; 1.3.0 (ADR-0029): video input and documents (a PDF read natively, FR-INT-02).
  *
  * This interface was referenced by `TiloContracts`'s JSON-Schema
  * via the `definition` "ProvidersCapability".
@@ -802,7 +1040,9 @@ export type ProvidersCapability =
   | "thinking"
   | "computer_use"
   | "grounding"
-  | "code_execution";
+  | "code_execution"
+  | "video"
+  | "documents";
 /**
  * Scenario id: a letter, then up to 31 letters, digits, hyphens or underscores. Equals the file name without .yaml (SN-01). The not-pattern rejects a final line break, which a Python validator's $ lets through.
  *
@@ -818,12 +1058,93 @@ export type ScenarioId = string;
  */
 export type ScenarioSeedPath = string;
 /**
+ * One line written by a person: data, never an instruction.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "TaughtSkillName".
+ */
+export type TaughtSkillName = string;
+/**
+ * draft until saved; a saved skill starts as learning (FR-SKL-04); only the owner marks it trusted, once good_runs reaches the configured threshold (TS-08), and may set it back to learning at any time.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "TaughtSkillStatus".
+ */
+export type TaughtSkillStatus = "draft" | "learning" | "trusted";
+/**
+ * One step in plain words, one line. Written by a person or by the skill_capture role from what the person showed; data, never an instruction to code.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "TaughtSkillStepText".
+ */
+export type TaughtSkillStepText = string;
+/**
+ * What a step does, in the Skills page's words. send, post, pay, delete, share and book always ask (must_ask).
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "TaughtSkillVerb".
+ */
+export type TaughtSkillVerb =
+  "read" | "draft" | "write" | "send" | "post" | "pay" | "delete" | "share" | "book";
+/**
+ * How a real run ended (ADR-0037): completed after world.completed, failed after world.failed. Pause all and the kill switch end nothing here, so a run they stop stays unfinished and is never rateable (TS-14).
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "TaughtSkillRunOutcome".
+ */
+export type TaughtSkillRunOutcome = "completed" | "failed";
+/**
  * Quote text or speaker: one line of at most 240 characters with no control character (Cc), no line or paragraph separator and no format character (Cf) of the Basic Multilingual Plane, so no bidi override or zero-width character. Astral format characters (tag characters U+E0000 to U+E007F and others) are removed by code (PE-24, validator only).
  *
  * This interface was referenced by `TiloContracts`'s JSON-Schema
  * via the `definition` "TranscriptQuoteLine".
  */
 export type TranscriptQuoteLine = string;
+/**
+ * One line typed by a person, 1 to 80 characters: data, never an instruction.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "UserSettingsLine".
+ */
+export type UserSettingsLine = string;
+/**
+ * A display address, at most 254 characters, with one @ and a dotted host. It is not verified and is never a recipient (USET-06).
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "UserSettingsEmail".
+ */
+export type UserSettingsEmail = string;
+/**
+ * An IANA time zone name (Asia/Kolkata) or UTC, in the same shape as person.time_zone. The schema checks the shape; tilo-api also refuses a name the zone database does not know (USET-03).
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "UserSettingsTimeZone".
+ */
+export type UserSettingsTimeZone = string;
+/**
+ * A BCP 47 language tag of the drafts Tilo writes for the person: language, an optional four-letter script and an optional two-letter region (en, en-GB, zh-Hans-CN). A display name such as English (UK) is the client's label, never stored.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "UserSettingsLanguage".
+ */
+export type UserSettingsLanguage = string;
+/**
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "UserSettingsWeekday".
+ */
+export type UserSettingsWeekday = "mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun";
+/**
+ * A wall-clock time, HH:MM on a 24-hour clock, 00:00 to 23:59, in the zone of the object that holds it.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "UserSettingsClock".
+ */
+export type UserSettingsClock = string;
+/**
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "WorldShareId".
+ */
+export type WorldShareId = string;
 
 /**
  * Index of the generated contract types; not a document.
@@ -902,7 +1223,83 @@ export interface AgentsConfigQuestions {
   hourly_cap_per_person: number;
 }
 /**
- * One immutable, hash-checked, owner-scoped version in the artifact store (ADR-0018, FR-MEM-12; PRD 13.2, 15.1): the metadata record at orgs/{org}/worlds/{world}/artifacts/{artifact_id}/versions/{version:06d}. The bytes live under a key derived from the ids, so the record holds no blob path. Read by the harness, tilo-api, tilo-render and erasure; only the store writes it. Rules the schema cannot express are AR-01 to AR-08 in artifact.rules.md.
+ * A declarative app (FR-AGT-16, ADR-0029 decision 9): JSON that a unit writes and the artifact store keeps as an application/json version with origin unit, and that fixed web code renders at an owner-only route. Nothing in it is ever run as code or markup, and no link or URL comes from it. 1.0.0 has one kind, quiz: single-answer multiple-choice questions under one countdown timer, each citing the stored file it came from. Rules the schema cannot express are AS-01 to AS-04 in appspec.rules.md.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "AppSpec".
+ */
+export interface AppSpec {
+  v: "1.0";
+  kind: "quiz";
+  title: AppSpecTitle;
+  theme: Slug;
+  timer: AppSpecTimer;
+  /**
+   * @minItems 1
+   * @maxItems 200
+   */
+  questions: [AppSpecQuestion, ...AppSpecQuestion[]];
+}
+/**
+ * One countdown for the whole attempt, in seconds (1 minute to 6 hours). The person may pause it; at 0 the attempt is submitted. The clock is the person's own, so it emits no event.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "AppSpecTimer".
+ */
+export interface AppSpecTimer {
+  seconds: number;
+}
+/**
+ * One question. answer is the id of the one correct option and always names an option the question has. topic is an optional tag the person can filter by.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "AppSpecQuestion".
+ */
+export interface AppSpecQuestion {
+  id: AppSpecQuestionId;
+  stem: AppSpecStem;
+  options: AppSpecOptions;
+  answer: AppSpecOptionId;
+  topic?: Slug;
+  source: AppSpecSource;
+}
+/**
+ * Two to six choices keyed a to f and shown in that order: a and b always, each later id only with the one before it.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "AppSpecOptions".
+ */
+export interface AppSpecOptions {
+  a: AppSpecOptionText;
+  b: AppSpecOptionText;
+  c?: AppSpecOptionText;
+  d?: AppSpecOptionText;
+  e?: AppSpecOptionText;
+  f?: AppSpecOptionText;
+}
+/**
+ * Where the question came from: a stored version in the spec's own world, made by a fetch or an upload (AS-02), and for a PDF the page. The web shows the publisher from that version's manifest, never from the spec (AS-03).
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "AppSpecSource".
+ */
+export interface AppSpecSource {
+  artifact: ArtifactRef;
+  page?: AppSpecPage;
+}
+/**
+ * A pinned version of a stored artifact.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "ArtifactRef".
+ */
+export interface ArtifactRef {
+  artifact_id: ArtifactId;
+  version: number;
+  label?: string;
+}
+/**
+ * One immutable, hash-checked, owner-scoped version in the artifact store (ADR-0018, FR-MEM-12; PRD 13.2, 15.1): the metadata record at orgs/{org}/worlds/{world}/artifacts/{artifact_id}/versions/{version:06d}. The bytes live under a key derived from the ids, so the record holds no blob path. Read by the harness, tilo-api, tilo-render and erasure; only the store writes it. Rules the schema cannot express are AR-01 to AR-09 in artifact.rules.md. 1.1.0 (ADR-0029) adds the fetch origin: a file a unit downloaded through tilo-browser.
  *
  * This interface was referenced by `TiloContracts`'s JSON-Schema
  * via the `definition` "ArtifactVersion".
@@ -931,7 +1328,7 @@ export interface ArtifactVersion {
   parents: ArtifactRef[];
   origin: ArtifactVersionOrigin;
   /**
-   * Raw-archive pointers of the version's sources, for the Verifier (FR-CON-10, FR-AGT-12): records of the record's own run for a unit or render output, the copied version's for a restore, none for an upload (AR-03). They never leave Tilo (AR-06).
+   * Raw-archive pointers of the version's sources, for the Verifier (FR-CON-10, FR-AGT-12): records of the record's own run for a unit, render or fetch output (a fetch has exactly one, the fetch's own record, which holds the cleaned URL, BQ-104), the copied version's for a restore, none for an upload (AR-03, AR-09). They never leave Tilo (AR-06).
    */
   sources: ArtifactVersionSource[];
   /**
@@ -947,30 +1344,19 @@ export interface ArtifactVersion {
    */
   redacted: boolean;
   /**
-   * Set for unit and render outputs (AR-05); null for uploads and restores.
+   * Set for unit, render and fetch outputs (AR-05); null for uploads and restores.
    */
   idempotency_key: ArtifactVersionIdempotencyKey | null;
   created_at: Timestamp;
 }
 /**
- * A pinned version of a stored artifact.
- *
- * This interface was referenced by `TiloContracts`'s JSON-Schema
- * via the `definition` "ArtifactRef".
- */
-export interface ArtifactRef {
-  artifact_id: ArtifactId;
-  version: number;
-  label?: string;
-}
-/**
- * What made the version: a unit's runner (unit and the worker agent set), tilo-render (for a unit), an intake upload (neither) or a restore (FR-MEM-06; no unit). Set by the store from the run, never by a runner.
+ * What made the version: a unit's runner (unit and the worker agent set), tilo-render (for a unit), an intake upload (neither), a restore (FR-MEM-06; no unit) or, since 1.1.0 (ADR-0029), a fetch: a file a unit's worker agent downloaded through tilo-browser (unit and agent set). Set by the store from the run, never by a runner.
  *
  * This interface was referenced by `TiloContracts`'s JSON-Schema
  * via the `definition` "ArtifactVersionOrigin".
  */
 export interface ArtifactVersionOrigin {
-  kind: "unit" | "render" | "upload" | "restore";
+  kind: "unit" | "render" | "upload" | "restore" | "fetch";
   unit: UnitId | null;
   agent: AgentId | null;
 }
@@ -2545,6 +2931,31 @@ export interface LevelCreatedData {
   index: number;
 }
 /**
+ * data of meeting.adjourned (ADR-0028). The room closed, once (MR-05). actor is the convener when reason is person, otherwise system (the idle sweeper, the cap check, Pause all or Stop all, the access check); target is the lead. turns is the number of meeting.asked in the room and credits_spent the sum of its meeting.replied credits (MR-08). A room open at Pause all or Stop all is adjourned (paused) before world.paused is written.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MeetingAdjournedData".
+ */
+export interface MeetingAdjournedData {
+  room_id: Ulid;
+  reason: MeetingRoomAdjournReason;
+  turns: number;
+  credits_spent: Credits;
+}
+/**
+ * data of meeting.asked (ADR-0028). The convener said something in the room to one attendee (to; the web sends the lead when nobody is selected). actor is the convener, target the addressed agent. The words are in the redacted raw archive (message_ref), never here (MR-12). Turns count 1, 2, ... per room with one turn in flight (MR-04); mode is the person's Quick or Thinking choice for this turn.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MeetingAskedData".
+ */
+export interface MeetingAskedData {
+  room_id: Ulid;
+  turn: MeetingRoomTurnNumber;
+  to: AgentId;
+  mode: MeetingRoomMode;
+  message_ref: EventArchiveRef;
+}
+/**
  * data of meeting.called (PRD 9.5).
  *
  * This interface was referenced by `TiloContracts`'s JSON-Schema
@@ -2560,6 +2971,40 @@ export interface MeetingCalledData {
     AgentId | UserId | TeamLeadId,
     ...(AgentId | UserId | TeamLeadId)[],
   ];
+}
+/**
+ * data of meeting.change_requested (ADR-0028). The convener confirmed a change an agent proposed in this room. actor is the convener, target the proposing agent (to). units and artifacts equal the proposal's, so the person confirms exactly what was shown (MR-07); message_ref is the confirmed wording in the redacted raw archive (the proposal's words or the person's own). It is not a side effect and authorises nothing: nothing leaves Tilo and nothing is spent until plan.revised and the budget events (MR-09, MR-10); it is never an L2 instruction (OB-01 counts only world.requested) and sets no gate, tier or policy (MR-11).
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MeetingChangeRequestedData".
+ */
+export interface MeetingChangeRequestedData {
+  room_id: Ulid;
+  proposal_id: Ulid;
+  to: AgentId;
+  /**
+   * @minItems 1
+   * @maxItems 10
+   */
+  units: [UnitId, ...UnitId[]];
+  artifacts: MeetingRoomCitedArtifacts;
+  as_role: MeetingRoomAsRole;
+  message_ref: EventArchiveRef;
+}
+/**
+ * data of meeting.convened (ADR-0028, a user-requested addition). A person called a lead agent and the agents it supervises into the Meeting Hall of this world, to talk about the run run_id names. actor is that person (a user id), target the lead; district is the lead's district (null for the Director, whom only the owner calls); vis lists every attendee's district. Written by tilo-api through the world's writer after the access checks (MR-01, MR-03); never by a model, never a side effect (authz null). run_state says whether that run was live or had finished; a paused world opens no room. credit_cap and max_turns are this room's caps, from config/meeting_room.yaml and the convener's remaining spend cap at the time.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MeetingConvenedData".
+ */
+export interface MeetingConvenedData {
+  room_id: Ulid;
+  lead: AgentId;
+  agents: MeetingRoomAttendees;
+  as_role: MeetingRoomAsRole;
+  run_state: "live" | "finished";
+  credit_cap: Credits;
+  max_turns: MeetingRoomTurnNumber;
 }
 /**
  * data of meeting.decision (PRD 9.5).
@@ -2602,6 +3047,40 @@ export interface ArtifactRef1 {
   artifact_id: ArtifactId;
   version: number;
   label?: string;
+}
+/**
+ * data of meeting.replied (ADR-0028). The addressed agent answered one turn. actor is that agent (the turn's to), target the convener. The reply is one model call over that agent's own records only (MR-06): the event's trace names the meeting or meeting_thinking role and profile, and credits what the call cost. The text is in the redacted raw archive (message_ref); a failed reply has none. units and artifacts are what the reply rests on, checked by code against the agent's own grounding set before the event is written; a proposal names what would change and nothing about how (MR-11). The web shows the speaker's cue only while this event's reply is on screen.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MeetingRepliedData".
+ */
+export interface MeetingRepliedData {
+  room_id: Ulid;
+  turn: MeetingRoomTurnNumber;
+  mode: MeetingRoomMode;
+  outcome: MeetingRoomOutcome;
+  message_ref: EventArchiveRef | null;
+  units: MeetingRoomCitedUnits;
+  artifacts: MeetingRoomCitedArtifacts;
+  proposal: MeetingRoomProposal | null;
+}
+/**
+ * A change an agent proposes. It names only WHAT changes (units and artifact versions); its wording is in the reply's archive record. It has no field for an action, a recipient, a connector, a risk tier or a policy: the planner and the policy engine derive those (MR-11).
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MeetingRoomProposal".
+ */
+export interface MeetingRoomProposal {
+  proposal_id: Ulid;
+  /**
+   * @minItems 1
+   * @maxItems 10
+   */
+  units: [UnitId, ...UnitId[]];
+  /**
+   * @maxItems 10
+   */
+  artifacts: ArtifactRef[];
 }
 /**
  * data of meeting.started (PRD 9.5). 1.1.0: the optional meeting_id names the Meeting record of an external meeting a bot or an upload brought in (FR-MTG-01); absent for a meeting the agents called. Optional means absent, never null.
@@ -2700,6 +3179,32 @@ export interface PlanQuestionsAskedData {
   question_count: number;
 }
 /**
+ * data of plan.revised (ADR-0028). The planner compiled a confirmed change (the meeting.change_requested with this proposal_id, which is this event's cause) into revision units, and the plan validator accepted the revised plan (PG-13). actor is the world's Director, target the world. run is same_run when the discussed run was still live (the units join it) and revision_run when it had finished: then this event is the first of a new run of the same world (new run_id), and budget.requested, budget.granted and world.started follow (MR-09, MR-10). credits is the revision's estimate. Not a side effect: the units' own side effects wait at gates or policies like any unit's.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "PlanRevisedData".
+ */
+export interface PlanRevisedData {
+  proposal_id: Ulid;
+  run: "same_run" | "revision_run";
+  /**
+   * @minItems 1
+   * @maxItems 10
+   */
+  units: [PlanRevisedDataRevisionUnit, ...PlanRevisedDataRevisionUnit[]];
+  credits: CreditRange;
+}
+/**
+ * A new plan unit and the unit whose work it changes (plan.schema.json unit revises).
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "PlanRevisedDataRevisionUnit".
+ */
+export interface PlanRevisedDataRevisionUnit {
+  id: UnitId;
+  revises: UnitId;
+}
+/**
  * data of policy.applied (PRD 9.5). The deterministic policy engine opened a gate under a policy (PRD 10.4). Never T3, never below L2. authz is by policy with ref equal to policy_id (EV-06), so the world draws a policy stamp and links it (HR-7); the outbox entry and its outgoing data.transfer carry exactly this authz (OB-01). There is no gate card on this path, so this event records what the engine assessed against the policy's scope: the connector, the destination (an opaque id, never an address), the district of the step, the tier, the undo window, and item pinned to its version (null when there is none). The outbox entry equals it on each (OB-05) and the policy's scope covers it (OB-01), so a redraft, another thread or another connector is a new proposal. L2 is 'instruction is approval' (PRD 10.4, FR-HIL-05): instruction_id is the id of the earlier world.requested (web or mobile_web) or channel.message_in (whatsapp, from the owner's bound number) in this world in which the policy's owner asked for this action on this destination, never an email, and HR-7 links it beside the policy; each instruction is named by at most one policy.applied, so a cancelled send uses it up (OB-01); at L2 the destination is set and the undo window is at least 1 s. At L3 (a standing rule within its limits) instruction_id is null. credits is what this action counts against the policy's daily credit limit (limits.credits, BQ-14): the metered credits of the step whose side effect it is, as known at authz.at (PRD 14.1); the event's own spend stays in the envelope's credits. The engine opens a send only while the policy's actions that UTC day in every world of its owner, this one included, stay within limits.per_day and their credits within limits.credits (OB-01, BQ-52). Recipients stay in the outbox entry, never in an event.
  *
  * This interface was referenced by `TiloContracts`'s JSON-Schema
@@ -2752,6 +3257,40 @@ export interface QuestionRoutedData {
   domain: Slug | null;
 }
 /**
+ * data of skill.captured (registry 1.4.0, ADR-0034, FR-SKL-01): one step was added to a taught skill's captured list. Written once per step, after the record write commits, so the list grows only as steps are recorded (HR-1). The envelope follows TS-11: the actor's Desk world, actor and target that person, district, level and item null, vis [] and authz null. credits and trace name the skill_capture role when a model read the recording, upload or description. No step text, file name or media here: the artifact is a pinned id and version.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "SkillCapturedData".
+ */
+export interface SkillCapturedData {
+  skill: TaughtSkillId;
+  method: TaughtSkillMethod;
+  step: TaughtSkillStepNumber;
+  artifact: TaughtSkillPinned | null;
+}
+/**
+ * A stored artifact version (ADR-0018 store, the owner's Desk world) by id and version only, never a label or a file name.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "TaughtSkillPinned".
+ */
+export interface TaughtSkillPinned {
+  artifact_id: ArtifactId;
+  version: number;
+}
+/**
+ * data of skill.fixed (registry 1.4.0, ADR-0034, FR-SKL-05): the owner fixed one step, and to_version (from_version + 1, TS-09) is what the next run uses. It copies the fix record without its text. Envelope as TS-11.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "SkillFixedData".
+ */
+export interface SkillFixedData {
+  skill: TaughtSkillId;
+  from_version: number;
+  to_version: number;
+  step: TaughtSkillStepNumber;
+}
+/**
  * data of skill.loaded (PRD 9.5). The run pins skill versions and the Trace lists them (FR-AGT-03).
  *
  * This interface was referenced by `TiloContracts`'s JSON-Schema
@@ -2760,6 +3299,68 @@ export interface QuestionRoutedData {
 export interface SkillLoadedData {
   skill: SkillId;
   version: Semver;
+}
+/**
+ * data of skill.rated (registry 1.4.0, ADR-0034, FR-SKL-05): the person whose run it was rated it. It copies the rating record without its note. A thumbs down may name the wrong step. The event goes in the rater's Desk world (TS-11).
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "SkillRatedData".
+ */
+export interface SkillRatedData {
+  skill: TaughtSkillId;
+  version: number;
+  run_id: RunId;
+  thumb: TaughtSkillThumb;
+  wrong_step: TaughtSkillStepNumber | null;
+}
+/**
+ * data of skill.state_changed (registry 1.4.0, ADR-0034, FR-SKL-04, FR-SKL-06): the owner saved a draft (it starts as learning), marked the skill trusted, set it back to learning, paused it or resumed it. A trusted change records the good runs and the threshold in force (good_runs >= threshold, TS-08). The owner is the actor, and the record is written before the event. Envelope as TS-11.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "SkillStateChangedData".
+ */
+export interface SkillStateChangedData {
+  skill: TaughtSkillId;
+  version: number;
+  change: "saved" | "trusted" | "learning" | "paused" | "resumed";
+  good_runs: number;
+  threshold: number | null;
+}
+/**
+ * data of skill.try_run (registry 1.4.0, ADR-0034, FR-SKL-03): a try run finished or stopped. It copies its try_run_result (TS-10), so side_effects is always 0. It is written once per try run, after the result is stored. The page shows the steps only after this event; there is no per-step event. The actor is the person who started it, and credits are the try run's total. Envelope as TS-11.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "SkillTryRunData".
+ */
+export interface SkillTryRunData {
+  skill: TaughtSkillId;
+  version: number;
+  try_run: Ulid;
+  match: number;
+  total: TaughtSkillStepNumber;
+  matched: TaughtSkillCount;
+  asked: TaughtSkillCount;
+  skipped: TaughtSkillCount;
+  side_effects: 0;
+  outcome: "completed" | "stopped";
+}
+/**
+ * data of skill.version_proposed (registry 1.4.0, ADR-0034, FR-SKL-02): Tilo restated a draft as plan steps, with at most one question and the estimates code worked out. The actor is the person who asked for it; credits and trace name the skill_capture role. Envelope as TS-11. Counts and the estimate only, never step text.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "SkillVersionProposedData".
+ */
+export interface SkillVersionProposedData {
+  skill: TaughtSkillId;
+  version: number;
+  steps: TaughtSkillStepNumber;
+  asks: TaughtSkillCount;
+  /**
+   * true when the version asks one clarifying question.
+   */
+  question: boolean;
+  credits_per_run: Credits;
+  source: "ledger" | "prior";
 }
 /**
  * data of team_rule.changed (registry 1.2.0, ADR-0027; FR-TEAM-04 'every change is logged', FR-ACC-01). A person changed one team rule: a stop-and-ask switch (rule switch, key the switch, values on or off) or the team's access level for one connector (rule tool_access, key the connector id, values off, read, draft or act). from is the value in force before the change (an unset tool is act, an unset switch its configured default), to the value after it. A Must-ask switch (spend, share, undo; PRD 8.3) can't be switched off, so its to is always on. tilo-api's team routes write it after the team store's compare-and-set succeeded, never an agent or a model: actor and target are the signed-in person who made the change (only the team's Owner may, BQ-TEAMACC-2), the world is that person's Desk world, district is null and vis is [] (owner-only, ADR-0009). It authorises nothing (a level or switch only narrows what reaches the policy engine), so it is not a side effect and authz is null.
@@ -2865,6 +3466,16 @@ export interface WorldRequestedData {
  */
 export interface WorldResumedData {
   paused_for_s: number;
+}
+/**
+ * data of world.share_changed (registry 1.5.0, ADR-0040). The world's owner turned team sharing on or off for one team. tilo-api writes it in the shared world after the world_share record was written, never an agent or a model: actor is the world's owner (the actor of its first world.requested), target is the world's own id, district is null and vis is [] (owner-only, ADR-0009). state on means a share record now exists for team; off means it was revoked. It authorises nothing outside Tilo and sends nothing, so it is not a side effect and authz is null. A share that lapses because the owner left the team writes no event.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "WorldShareChangedData".
+ */
+export interface WorldShareChangedData {
+  team: TeamId;
+  state: "on" | "off";
 }
 /**
  * data of world.started (PRD 9.5).
@@ -3229,6 +3840,224 @@ export interface LayoutGateGeometry {
   cell: LayoutPoint;
 }
 /**
+ * Tilo's MCP server tools (ADR-0031, Proposed). The root is one `tools/call` request as the server accepts it: a tool `name` and its `arguments`, bound to that tool's input shape; anything else is refused before any store is read. Each tool's result (`structuredContent`) is its `*_out` entry. Read tools need the grant scope `tilo.read`; `answer_card` and `start_run` need `tilo.write`, which the person turns on per client. No tool ever answers a gate, consent or meeting card: only `needs_you` questions can be answered here (`card_row.answerable_here`). Results carry ids, titles, labels and Tilo-written lines only; artifact text only from `read_artifact`, only for a clean text version of the owner's. Rules MC-01 to MC-12 in `mcp_tools.rules.md`.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "McpTools".
+ */
+export interface McpTools {
+  name: McpToolsToolName;
+  arguments: {};
+}
+/**
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "McpToolsListWorldsIn".
+ */
+export interface McpToolsListWorldsIn {
+  limit?: number;
+}
+/**
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "McpToolsWorldIn".
+ */
+export interface McpToolsWorldIn {
+  world_id: WorldId;
+}
+/**
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "McpToolsReadArtifactIn".
+ */
+export interface McpToolsReadArtifactIn {
+  world_id: WorldId;
+  artifact_id: ArtifactId;
+  version: number;
+}
+/**
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "McpToolsListCardsIn".
+ */
+export interface McpToolsListCardsIn {
+  world_id?: WorldId;
+}
+/**
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "McpToolsAnswerCardIn".
+ */
+export interface McpToolsAnswerCardIn {
+  world_id: WorldId;
+  card_id: Ulid;
+  option: CardOptionId;
+}
+/**
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "McpToolsStartRunIn".
+ */
+export interface McpToolsStartRunIn {
+  /**
+   * The person's request in their words, as typed into the client; it goes through intake like a web request (safety screen, brief, questions, approaches, caps). Tab and newline are allowed, other control characters are not.
+   */
+  request: string;
+}
+/**
+ * The S-14 worlds-list row (`GET /worlds`), unchanged.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "McpToolsWorldRow".
+ */
+export interface McpToolsWorldRow {
+  world_id: WorldId;
+  title: string | null;
+  status: "idle" | "started" | "paused" | "completed" | "failed";
+  created_at: Timestamp | null;
+  last_seq: number;
+}
+/**
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "McpToolsListWorldsOut".
+ */
+export interface McpToolsListWorldsOut {
+  /**
+   * @maxItems 50
+   */
+  worlds: McpToolsWorldRow[];
+}
+/**
+ * One Story line of the world, as the Story lens shows it to the owner: a Tilo-written event summary.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "McpToolsStoryLine".
+ */
+export interface McpToolsStoryLine {
+  seq: number;
+  ts: Timestamp;
+  line: string;
+}
+/**
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "McpToolsGetWorldOut".
+ */
+export interface McpToolsGetWorldOut {
+  world: McpToolsWorldRow;
+  open_cards: number;
+  credits_used: Credits;
+  /**
+   * @maxItems 20
+   */
+  story: McpToolsStoryLine[];
+}
+/**
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "McpToolsArtifactRow".
+ */
+export interface McpToolsArtifactRow {
+  artifact_id: ArtifactId;
+  version: number;
+  label: string | null;
+  media_type: MediaType;
+  size_bytes: number;
+  created_at: Timestamp;
+}
+/**
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "McpToolsListArtifactsOut".
+ */
+export interface McpToolsListArtifactsOut {
+  /**
+   * @maxItems 100
+   */
+  artifacts: McpToolsArtifactRow[];
+}
+/**
+ * `text` is the version's bytes as UTF-8 for `text/markdown`, `text/csv` and `application/json` up to 262,144 bytes, else null with `withheld` saying why (MC-07).
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "McpToolsReadArtifactOut".
+ */
+export interface McpToolsReadArtifactOut {
+  artifact: McpToolsArtifactRow;
+  content_sha256: string;
+  text: string | null;
+  withheld: McpToolsWithheldReason | null;
+}
+/**
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "McpToolsCardOption".
+ */
+export interface McpToolsCardOption {
+  id: CardOptionId;
+  label: string;
+}
+/**
+ * An open card of the owner's. `answerable_here` lists the option ids `answer_card` accepts for it: only a `needs_you` card can have any; a gate, consent or meeting card has none, so nothing authorises over MCP (MC-09).
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "McpToolsCardRow".
+ */
+export interface McpToolsCardRow {
+  world_id: WorldId;
+  card_id: Ulid;
+  kind: CardKind;
+  what_happened: string;
+  /**
+   * @minItems 1
+   * @maxItems 4
+   */
+  options: [McpToolsCardOption, ...McpToolsCardOption[]];
+  risk_tier: RiskTier | null;
+  exact: string | null;
+  created_at: Timestamp;
+  /**
+   * @maxItems 4
+   */
+  answerable_here: CardOptionId[];
+}
+/**
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "McpToolsListCardsOut".
+ */
+export interface McpToolsListCardsOut {
+  /**
+   * @maxItems 50
+   */
+  cards: McpToolsCardRow[];
+}
+/**
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "McpToolsAnswerCardOut".
+ */
+export interface McpToolsAnswerCardOut {
+  outcome: "answered";
+}
+/**
+ * Intake ran: the world exists and waits for the person in Tilo, to answer its questions or approve an approach (MC-10). No run spends past intake from here.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "McpToolsStartRunOut".
+ */
+export interface McpToolsStartRunOut {
+  world_id: WorldId;
+  next: "answer_questions_in_tilo" | "approve_in_tilo";
+}
+/**
+ * A refused call (`isError: true`). One closed code, never a server string, a stack or another person's data; an id the caller may not see is `not_found`, byte-equal to a missing one.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "McpToolsToolRefusal".
+ */
+export interface McpToolsToolRefusal {
+  error:
+    | "invalid_arguments"
+    | "not_found"
+    | "insufficient_scope"
+    | "not_answerable_here"
+    | "already_resolved"
+    | "busy"
+    | "rate_limited"
+    | "over_cap"
+    | "rejected_by_intake"
+    | "unavailable";
+}
+/**
  * A meeting Tilo attended or took a transcript of (FR-MTG-01, -10). Owner-only (PE-05). There is no field for a join link or URL: the bot receives it in its start request and nothing stores it. The transcript is deleted at `delete_transcript_after` (30 days by default), the minutes at `delete_minutes_after` (90 days). `world_id` (1.1.0, optional: absent, never null) is the world that holds the transcript and minutes, written by tilo-api when it creates that world and never taken from a request; a meeting without it yields no evidence quote (PE-23, ADR-0020, BQ-273). The free text (`title`, agenda `title`, attendee `name`) holds no link (PE-13; 1.2.0, ADR-0016 decision 14): no `://` or its backslash forms; no meeting host meet.google.com, teams.microsoft.com, teams.live.com, zoom.us, webex.com or whereby.com, alone or as a suffix (acme.zoom.us); no bare `host.tld/segment` (a last label of 2 to 63 letters other than `js`, an optional port, a slash and a path character), which also catches g.co/meet and teams.live.com/meet; no Cc, Zl, Zp, Basic Multilingual Plane Cf, Hangul filler (U+115F, U+1160, U+3164, U+FFA0), braille blank (U+2800) or unassigned default-ignorable code point anywhere; an invisible combining mark (U+034F, U+17B4, U+17B5, U+180B to U+180D, U+180F, variation selectors U+FE00 to U+FE0F) only after a non-ASCII character, or U+FE0E and U+FE0F after a keycap base (# or * or a digit), so emoji keep their variation selector. Astral format and default-ignorable characters (U+E0000 to U+E0FFF, which include the tag characters and variation selectors 17 to 256, and others) cannot be written portably in a pattern: tilo-api removes or refuses them before the schema check (validator, PE-13).
  *
  * This interface was referenced by `TiloContracts`'s JSON-Schema
@@ -3315,6 +4144,478 @@ export interface ArtifactRef3 {
   label?: string;
 }
 /**
+ * POST /internal/meeting-host/send, called only by the host run's outbox stub in tilo-api (HB-02). entry is the outbox entry (outbox.schema.json) tilo-api's outbox enqueued, evidence the case its enqueue checked, and draft the pinned item the owner approved. It names no user: the grant used is (entry.authz.ref, meeting_host). The then branch narrows entry to the one action this surface runs (MH-10), a meeting invitation the owner approved: state queued, create_meeting_event on meeting_host, T3 with the new_recipients modifier, 1 to 50 recipients (MAX_RECIPIENTS), no attachments, the draft pinned as item, the host account's primary calendar as destination, no undo window, authorised by a person. (The narrowing sits in if/then so the generated type stays Outbox.)
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MeetingHostRpcSendRequest".
+ */
+export interface MeetingHostRpcSendRequest {
+  entry: Outbox;
+  evidence: MeetingHostRpcEvidence;
+  draft: MeetingHostRpcDraft;
+}
+/**
+ * One outbox entry: an authorised side effect waiting to run exactly once (PRD 8.5, FR-AGT-11, FR-CHN-13, SEC-03). The harness writes it and tilo-connectors runs it; connector side-effect methods are callable only from the outbox. An entry exists only once the policy engine has authorised it (a person at a gate, or a policy below T3), so authz is always set, equal to the authz of the approval.resolved that answered approve on its gate or of the policy.applied that opened it, never of approval.requested, and the data.transfer it emits carries the same authz (OB-01, HR-7); a proposed side effect waiting at a gate is not in the outbox yet (approval.requested reserves its id). The entry names everything the connector needs: recipients, attachments, the pinned item and the destination. Rules OB-01 to OB-05 are in contracts/outbox.rules.md.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "Outbox".
+ */
+export interface Outbox {
+  id: Ulid;
+  /**
+   * Stable per step: a retry reuses it, and the connector runs a key at most once (OB-03).
+   */
+  idempotency_key: string;
+  world_id: WorldId;
+  run_id: RunId;
+  action_type: ActionType;
+  connector: ConnectorId;
+  /**
+   * Everyone the side effect reaches; equals the recipients the gate card showed (card rule CR-12).
+   *
+   * @maxItems 50
+   */
+  recipients: EmailAddress[];
+  attachments: ArtifactRef[];
+  /**
+   * The draft or file this entry sends, saves or shares, pinned to the version the policy engine assessed and the gate card showed; the connector sends exactly this version (OB-05). null only when the action moves no content, such as a delete.
+   */
+  item: ArtifactRef | null;
+  /**
+   * The thread a reply goes into or the folder a file is saved in, as the gate card showed it (OB-05); null when there is none, such as a new email.
+   */
+  destination: Destination | null;
+  /**
+   * The PRD 10.4 conditions that apply to this side effect; any one makes it T3.
+   */
+  modifiers: PolicyTierCondition[];
+  risk_tier: RiskTier;
+  authz: Authz;
+  /**
+   * Seconds the person can still cancel (PRD 10.4: L2 default 60); 0 when none.
+   */
+  undo_window_s: number;
+  /**
+   * RFC 3339 timestamp in UTC with exactly three fractional digits, e.g. 2026-09-29T09:30:00.000Z.
+   */
+  scheduled_at: string;
+  /**
+   * queued (ready, no undo window), scheduled (waiting out its undo window), sending, sent, cancelled (undone before sending) or failed.
+   */
+  state: "queued" | "scheduled" | "sending" | "sent" | "cancelled" | "failed";
+  created_at: Timestamp;
+}
+/**
+ * The OB-01/OB-05 case tilo-api's own enqueue checked (outbox.rules.md), without the entry: reserved_by is the gate's approval.requested event and authorised_by the approval.resolved event that answered it (event.schema.json, each with its data schema applied in the then branch, so the generated type stays Event), world_owner is the world's owner. A meeting invitation is T3, so no policy, Team Lead, instruction or earlier policy.applied takes part: those are null or empty. tilo-connectors runs the same check on its own outbox (HB-04) and trusts these copies (ADR-0032, residual trust).
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MeetingHostRpcEvidence".
+ */
+export interface MeetingHostRpcEvidence {
+  reserved_by: Event;
+  authorised_by: Event;
+  world_owner: UserId;
+  policy: null;
+  team_lead: null;
+  instruction: null;
+  /**
+   * @maxItems 0
+   */
+  earlier_applied: unknown[];
+}
+/**
+ * The pinned draft the owner approved (kind meeting_event): the bytes tilo-api read from the run's artifact store, hash-checked there (AR-01), because tilo-connectors cannot read that store. HB-03: the SHA-256 of the decoded bytes equals content_sha256, artifact_id and version equal entry.item, and the document parses as kind meeting_event. content_b64 is padded base64 (RFC 4648 section 4) of at most 43692 characters, the base64 of 32 KiB, so a request with 50 recipients stays under the 64 KiB body cap. The same shape is one entry of execute_request.items (LC-07), where the document is the entry's item or attachment and the body cap bounds the sum.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MeetingHostRpcDraft".
+ */
+export interface MeetingHostRpcDraft {
+  artifact_id: ArtifactId;
+  version: number;
+  content_sha256: string;
+  content_b64: string;
+}
+/**
+ * The 200 answer to send. sent: the invitation exists at Google and receipt says what was made; tilo-api checks it (HB-07) before storing it. refused: nothing was sent and nothing will be (SideEffectRefused, HB-03 to HB-06). possibly_sent: Google may hold the invitation and a retry would not help (PossiblySent). retry: try again later; may_have_sent is false when nothing reached Google (not connected, expired, a missing scope, a KMS outage) and true after a Google 5xx or a lost answer. receipt is set only with sent and may_have_sent only with retry; otherwise each is null. parts lists what the broker emitted during the call; tilo-connectors writes no data.transfer and raises no alert of its own outbox here, because tilo-api's outbox does (one writer per world).
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MeetingHostRpcSendAnswer".
+ */
+export interface MeetingHostRpcSendAnswer {
+  outcome: "sent" | "refused" | "possibly_sent" | "retry";
+  receipt: MeetingHostRpcReceipt | null;
+  may_have_sent: boolean | null;
+  parts: MeetingHostRpcParts;
+}
+/**
+ * What the adapter made (HostReceipt): Google's event id, never a link. HB-07: event_ref equals side_effect_marker(entry); world_id, outbox_id and draft equal the entry's; meeting_id and owner equal the draft's. tilo-api stores it through the run's receipt store only when all hold.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MeetingHostRpcReceipt".
+ */
+export interface MeetingHostRpcReceipt {
+  world_id: WorldId;
+  outbox_id: Ulid;
+  meeting_id: MeetingId;
+  owner: UserId;
+  draft: MeetingHostRpcDraftRef;
+  event_ref: string;
+  conference: "pending" | "success" | "failure";
+}
+/**
+ * The draft the receipt was made from, by id and version only (no label).
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MeetingHostRpcDraftRef".
+ */
+export interface MeetingHostRpcDraftRef {
+  artifact_id: ArtifactId;
+  version: number;
+}
+/**
+ * A connection event of the meeting_host grant: expired (Google refused the grant at refresh), rate_limited, or revoked (a disconnect). Type, connector and user only.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MeetingHostRpcConnectionPart".
+ */
+export interface MeetingHostRpcConnectionPart {
+  type: "connection.expired" | "connection.rate_limited" | "connection.revoked";
+  connector: "meeting_host";
+  user_id: UserId;
+}
+/**
+ * An alert.raised the broker emitted (a revoke kept for a retry): its alert id only.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MeetingHostRpcAlertPart".
+ */
+export interface MeetingHostRpcAlertPart {
+  type: "alert.raised";
+  alert_id: Ulid;
+}
+/**
+ * POST /internal/meeting-host/status, POST /internal/meeting-host/disconnect and POST /internal/connections/views. user_id is the signed-in principal's own id in tilo-api, never one taken from a body, path or query there (HB-02, HB-08); the bot account's meeting_host grant is (user_id, meeting_host), and views reads only this user's grants.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MeetingHostRpcUserRequest".
+ */
+export interface MeetingHostRpcUserRequest {
+  user_id: UserId;
+}
+/**
+ * The 200 answer to status: a store read only, with no token use and no Google call, so it emits nothing and has no parts. state is connected, expired (Google refused the grant; connect again) or none (no grant stored); scope_ok is true when the stored grant holds the calendar.events.owned scope, and false when there is none.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MeetingHostRpcStatusAnswer".
+ */
+export interface MeetingHostRpcStatusAnswer {
+  state: "connected" | "expired" | "none";
+  scope_ok: boolean;
+}
+/**
+ * The 200 answer to disconnect. revoked_at_provider is true only when Google confirmed the revoke. The call is idempotent: with nothing stored it answers false with no parts. parts carries connection.revoked, and an alert.raised for each revoke kept for a retry.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MeetingHostRpcDisconnectAnswer".
+ */
+export interface MeetingHostRpcDisconnectAnswer {
+  revoked_at_provider: boolean;
+  parts: MeetingHostRpcParts;
+}
+/**
+ * The 200 answer to POST /internal/connections/views (ADR-0032 addendum 1, HB-08, HB-09): the connection views of the request's user_id, one per stored grant of a connector that config/connectors.yaml declares with auth oauth2, in registry order, each connector at most once. A connector with no stored grant is absent (tilo-api shows it available); a disconnect deletes the grant, so it is absent too. A store read only, with no token use, no KMS call, no provider call and no event, so it has no parts. At most 32 views. tilo-api treats an answer that breaks this contract or HB-09 as unknown as a whole, never as partly read.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MeetingHostRpcViewsAnswer".
+ */
+export interface MeetingHostRpcViewsAnswer {
+  /**
+   * @maxItems 32
+   */
+  views: MeetingHostRpcConnectionView[];
+}
+/**
+ * One stored grant of the request's user, from an allowlist: connector, state, scopes and connected_at, nothing else of the record. state is connected when the stored state is exactly connected, else expired (Google refused the grant at refresh, or a record the broker did not write: connect again). scopes are the stored granted scopes that the registry declares for this connector, sorted and unique, and none when expired. connected_at is when the grant was made (HB-06), null when expired or not recorded; it is display data read without KMS and authorises nothing. Never a token, the record's ciphertext, wrapped key or nonce, the client id or secret, the access token's expiry or an account address.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MeetingHostRpcConnectionView".
+ */
+export interface MeetingHostRpcConnectionView {
+  connector: ConnectorId;
+  state: "connected" | "expired";
+  /**
+   * @maxItems 16
+   */
+  scopes: MeetingHostRpcScope[];
+  connected_at: Timestamp | null;
+}
+/**
+ * POST /internal/connections/start (ADR-0035 decision 2, LC-06): begin the person's Google sign-in for one connector. user_id is the signed-in principal's own id in tilo-api, never one taken from a body, path or query there (HB-02). The route asks Google only for the declared scopes of these capabilities minus those already granted, with include_granted_scopes. A connector that is not an oauth2 connector of the registry, or a capability it does not declare, is invalid_request (the route checks the registry, not this schema). meeting_host uses the same route for the bot account.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MeetingHostRpcStartRequest".
+ */
+export interface MeetingHostRpcStartRequest {
+  user_id: UserId;
+  connector: ConnectorId;
+  /**
+   * @minItems 1
+   * @maxItems 7
+   */
+  capabilities: [ConnectorCapability, ...ConnectorCapability[]];
+}
+/**
+ * The 200 answer to start. authorize_url is the Google sign-in link the web opens: the accounts.google.com authorisation endpoint with a percent-encoded query (client id, redirect URI, the asked scopes, the PKCE challenge, state; no secret) of at most 2048 characters, or null when no scope is missing, in which case no flow was made (LC-06). The PKCE verifier and the client secret stay in tilo-connectors (LC-03); the pattern is a closed shape and a backstop that refuses a query naming a secret.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MeetingHostRpcStartAnswer".
+ */
+export interface MeetingHostRpcStartAnswer {
+  authorize_url: string | null;
+}
+/**
+ * POST /internal/connections/callback (ADR-0035 decision 3, LC-05): the browser came back from Google. user_id is the signed-in principal's own id in tilo-api (HB-02). state and code are the one-time values Google handed the browser and the only place this surface carries them (LC-03): the code is useless without the verifier and the client secret, and tilo-api never logs, stores or echoes either. Exactly one of code (the person agreed) and error (Google's own lower-case error word, for example access_denied, when the person did not; the route never echoes it) is present, absent and never null. The route spends the state on first use and refuses unless the flow's user equals user_id (LC-05).
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MeetingHostRpcCallbackRequest".
+ */
+export interface MeetingHostRpcCallbackRequest {
+  user_id: UserId;
+  state: string;
+  code?: string;
+  error?: string;
+}
+/**
+ * The 200 answer to callback: the connection was stored. connector is the one the flow was for. scope_lines are the plain-language lines of what Google granted, one per text, in the order asked (a partial grant lists only what was granted; none granted is the not_granted error, so there is at least one). parts lists what the broker emitted during the call (connection.established); it carries no token and never a connection.consented, which is the person's Connect on a consent card and tilo-api writes it (CR-13).
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MeetingHostRpcCallbackAnswer".
+ */
+export interface MeetingHostRpcCallbackAnswer {
+  connector: ConnectorId;
+  /**
+   * @minItems 1
+   * @maxItems 16
+   */
+  scope_lines: [string, ...string[]];
+  parts: MeetingHostRpcConnectorParts;
+}
+/**
+ * A connection event of a grant: established (a connect stored it), expired (Google refused the grant at refresh), rate_limited, or revoked (a disconnect). Type, connector and user only. connection.requested and connection.consented are never parts: they belong to the consent card (CR-13) and tilo-api writes them.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MeetingHostRpcConnectorPart".
+ */
+export interface MeetingHostRpcConnectorPart {
+  type:
+    | "connection.established"
+    | "connection.expired"
+    | "connection.rate_limited"
+    | "connection.revoked";
+  connector: ConnectorId;
+  user_id: UserId;
+}
+/**
+ * POST /internal/connections/disconnect (ADR-0035 decision 2): the person disconnects one connector. user_id is the signed-in principal's own id in tilo-api (HB-02). Google keeps one grant per client for a person (CON-D10), so disconnecting any person connector revokes the shared grant and every connector resting on it ends; the web says so before the person confirms.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MeetingHostRpcConnectionDisconnectRequest".
+ */
+export interface MeetingHostRpcConnectionDisconnectRequest {
+  user_id: UserId;
+  connector: ConnectorId;
+}
+/**
+ * The 200 answer to /internal/connections/disconnect: disconnect_answer with the parts of any connector. revoked_at_provider is true only when Google confirmed the revoke; the call is idempotent (with nothing stored it answers false with no parts). parts carries a connection.revoked for each connector that ended, and an alert.raised for each revoke kept for a retry.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MeetingHostRpcConnectionDisconnectAnswer".
+ */
+export interface MeetingHostRpcConnectionDisconnectAnswer {
+  revoked_at_provider: boolean;
+  parts: MeetingHostRpcConnectorParts;
+}
+/**
+ * POST /internal/side-effects/execute (ADR-0035 decision 5, LC-07), called only by a live connector's outbox stub in tilo-api (HB-02). entry is the outbox entry tilo-api's outbox enqueued, evidence the case its enqueue checked and items the pinned content, hash-checked in tilo-api (AR-01) because tilo-connectors cannot read that store: the entry's item first, then each attachment in the entry's order (HB-03: the hashes, ids and versions equal the entry's). The grant used is the world owner's (evidence.world_owner). The route re-runs the same check on its own outbox (HB-04) and refuses an action its connector does not declare with a gate. The then branch narrows entry to the live Google connectors (gmail, google_drive or google_calendar; meeting_host has its own route, lovable no call at all): state queued, or scheduled with its undo window spent (OB-02), a pinned item, at most 10 attachments. The caps do not add up to 64 KiB: the body cap bounds the sum, and a request over it is invalid_request before anything acts. (The narrowing sits in if/then so the generated type stays Outbox.)
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MeetingHostRpcExecuteRequest".
+ */
+export interface MeetingHostRpcExecuteRequest {
+  entry: Outbox;
+  evidence: MeetingHostRpcExecuteEvidence;
+  /**
+   * @minItems 1
+   * @maxItems 11
+   */
+  items: [MeetingHostRpcDraft, ...MeetingHostRpcDraft[]];
+}
+/**
+ * The OB-01/OB-05 case tilo-api's own enqueue checked (outbox.rules.md), without the entry, for a live Google connector's side effect (evidence is the meeting host's, narrowed to its always-T3 case). reserved_by is the gate's approval.requested event, null when a policy opened the entry. authorised_by is the approval.resolved that answered approve or the policy.applied that opened it, never null (an entry exists only once authorised). world_owner is the world's owner. policy is the record policy.applied names, or the one a Team Lead answered under; team_lead that Team Lead's record; instruction the whole event policy.applied.instruction_id names (L2); each null when it does not apply. earlier_applied is the owner's earlier policy.applied events (the day's count and an instruction's single use), at most 50, [] on a gate path. Each event has its data schema applied in the then branch, so the generated type stays Event. tilo-connectors runs the same check on its own outbox (HB-04) and trusts these copies (ADR-0032, residual trust).
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MeetingHostRpcExecuteEvidence".
+ */
+export interface MeetingHostRpcExecuteEvidence {
+  reserved_by: Event | null;
+  authorised_by: Event;
+  world_owner: UserId;
+  policy: Policy | null;
+  team_lead: TeamLead | null;
+  instruction: Event | null;
+  /**
+   * @maxItems 50
+   */
+  earlier_applied: Event[];
+}
+/**
+ * Autonomy policy (PRD 10.4): a user's pre-authorisation of one action type within a scope and limits. Data only: the deterministic policy engine decides, a model never does, and a T3 action never runs above L1. $defs.risk_tier_table is the shape of the risk tiers in config/autonomy.yaml.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "Policy".
+ */
+export interface Policy {
+  id: PolicyId;
+  owner: UserId;
+  action_type: ActionType;
+  scope: PolicyScope;
+  limits: PolicyLimits;
+  conditions: PolicyConditions;
+  level: AutonomyLevel;
+  /**
+   * Seconds an L2 action can still be undone.
+   */
+  undo_window_s: number;
+  /**
+   * When the policy stops applying, or null for no expiry.
+   */
+  expiry: Timestamp | null;
+  notify_channel: Channel;
+  /**
+   * Expert domains (PRD 8.3, for example security or finance; not email domains, which are scope.domains) whose Team Leads may open this action type's gates in the owner's worlds (PRD 10.1: 'in their domain, if the policy allows'). Empty lets no Team Lead open them. The owner, and an Approver the gate names, need no policy. Like scope, read from the current record (outbox OB-01).
+   */
+  team_lead_domains: Slug[];
+  created_by: PolicyStamp;
+  changed_by: PolicyStamp | null;
+  /**
+   * Every change, oldest first, starting with the creation, so never empty: each entry's at is no earlier than the one before, and the record's level equals the last entry's level (validator, outbox OB-01). The level in force at a time is the level of the last entry at or before it; a revocation or Stop all autopilot is an entry at L1 (policy.changed). Only the owner creates and changes a policy (PRD 10.1; a Team Lead only proposes), so every entry's by, like created_by.by and changed_by.by, equals owner; a record that breaks this covers nothing (validator, outbox OB-01).
+   *
+   * @minItems 1
+   */
+  history: [PolicyHistoryEntry, ...PolicyHistoryEntry[]];
+}
+/**
+ * Where the policy applies. An empty recipients, domains or districts list means no restriction on that dimension.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "PolicyScope".
+ */
+export interface PolicyScope {
+  /**
+   * @minItems 1
+   */
+  connectors: [ConnectorId, ...ConnectorId[]];
+  recipients: EmailAddress[];
+  domains: string[];
+  districts: DistrictId[];
+}
+/**
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "PolicyLimits".
+ */
+export interface PolicyLimits {
+  /**
+   * Most actions per day, or null for no daily cap.
+   */
+  per_day: number | null;
+  /**
+   * Most credits per day spent by actions under this policy, or null.
+   */
+  credits: Credits | null;
+}
+/**
+ * Always true: attachments, new recipients and safety-flagged content are T3 (PRD 10.4), and T3 never runs above L1, so no policy can pre-authorise them.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "PolicyConditions".
+ */
+export interface PolicyConditions {
+  no_attachments: true;
+  no_new_recipients: true;
+  no_safety_flags: true;
+}
+/**
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "PolicyStamp".
+ */
+export interface PolicyStamp {
+  by: UserId;
+  at: Timestamp;
+}
+/**
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "PolicyHistoryEntry".
+ */
+export interface PolicyHistoryEntry {
+  by: UserId;
+  at: Timestamp;
+  change: string;
+  /**
+   * Autonomy level (PRD 10.4): L0 observe, L1 ask each time (default), L2 instruction is approval, L3 standing rules.
+   */
+  level: "L0" | "L1" | "L2" | "L3";
+}
+/**
+ * A Team Lead assignment (PRD 8.3, 10.1, 16.2): the person (user) who acts as Team Lead id, and the one expert domain the owner assigned them. The shape of each entry of config/teams.yaml and of a Team Lead set in the Team Lead console. authz.ref of a Team Lead's answer is id. A Team Lead opens a gate only when the gate names this domain and the owner's policy it names lists the domain in team_lead_domains, and only when the world's owner made this assignment before the answer (outbox OB-01). Removing a Team Lead deletes the record, so a removed Team Lead answers nothing.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "TeamLead".
+ */
+export interface TeamLead {
+  id: TeamLeadId;
+  user: UserId;
+  domain: Slug;
+  assigned_by: TeamLeadAssignment;
+}
+/**
+ * The 200 answer to execute, as send_answer with result for receipt. sent: the effect exists at Google and result says which; tilo-api stores it only when result.marker equals side_effect_marker(entry) (LC-08). refused: nothing was done and nothing will be (SideEffectRefused: an item hash, the entry check, a grant missing or newer than the approval, an action the connector does not declare, an event with guests under create_event, LC-09). possibly_sent: Google may hold the effect and a retry would not help. retry: try again later; may_have_sent is false when nothing reached Google (not connected, expired, a missing scope, a KMS outage) and true after a Google 5xx or a lost answer. result is set only with sent and may_have_sent only with retry; otherwise each is null. parts lists what the broker emitted during the call; tilo-connectors writes no data.transfer and raises no alert of its own outbox here, because tilo-api's outbox does (one writer per world).
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MeetingHostRpcExecuteAnswer".
+ */
+export interface MeetingHostRpcExecuteAnswer {
+  outcome: "sent" | "refused" | "possibly_sent" | "retry";
+  result: MeetingHostRpcExecuteResult | null;
+  may_have_sent: boolean | null;
+  parts: MeetingHostRpcConnectorParts;
+}
+/**
+ * What the adapter made, by Google's own id and Tilo's marker only, never a link, a title, a subject or mail text. resource_id is the Gmail message or draft id, the Drive file id or the Calendar event id (letters, digits, underscore and hyphen, at most 256, the adapters' own RESOURCE_ID). marker is side_effect_marker(entry), 32 lower-case hex characters, the same on every retry and instance (OB-03).
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MeetingHostRpcExecuteResult".
+ */
+export interface MeetingHostRpcExecuteResult {
+  resource_id: string;
+  marker: string;
+}
+/**
+ * The body of every refusal on this surface, a fixed code and nothing else: unauthenticated (401, no valid ID token, HB-01), forbidden (403, any account but tilo-api's, HB-01), invalid_request (422, a body over 64 KiB, not JSON or not this contract's request; refused before anything acted) and not_configured (503, a setting is missing or a seam failed to build, or LIVE is not set on tilo-connectors; also 502 when Google's certificates cannot be had to check the token, which is retryable and never a final 401). Only /internal/connections/callback adds three, each 400: start_again (the state is unknown, spent, expired, another person's or lost with an instance, or Google did not accept the code, or the grant could not be saved; one text for all, so the answer says nothing about which, LC-05), not_granted (the person did not agree, or none of the access asked for was granted) and wrong_account (meeting_host only: the sign-in was a person's own account, not the bot's, MH-C1). Never a value, a setting's value or an exception's text.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MeetingHostRpcError".
+ */
+export interface MeetingHostRpcError {
+  error:
+    | "unauthenticated"
+    | "forbidden"
+    | "invalid_request"
+    | "not_configured"
+    | "start_again"
+    | "not_granted"
+    | "wrong_account";
+}
+/**
  * The answer of `GET /v1/meetings/{meeting_id}/join` (ADR-0024 amendment 4): the Google Meet link of a meeting Tilo hosts, for that meeting's owner only, read from the host account's event when the owner clicks and stored nowhere (rules MJ-01 to MJ-10 in `meeting_join.rules.md`). It is a response body, never a record: no store, cache, event, card, notification, archive record or log line holds it, and `meeting.schema.json` and `calendar_entry.schema.json` still have no field that can. `join_url` is exactly `https://meet.google.com/` and a three-four-three lower-case meeting code: no other scheme, host, user info, port, path, query or fragment (36 characters, so a trailing newline is refused in every engine). `expires_at` is the server's clock plus 60 seconds: the client drops the link then, or when the view closes, and asks again on the next click.
  *
  * This interface was referenced by `TiloContracts`'s JSON-Schema
@@ -3323,6 +4624,97 @@ export interface ArtifactRef3 {
 export interface MeetingJoin {
   join_url: string;
   expires_at: Timestamp;
+}
+/**
+ * A meeting room (ADR-0028, user-requested 2026-10-08, Proposed): a person calls a lead agent and the agents it supervises into the Meeting Hall of a live or finished world, asks them what they did and why, and confirms changes they proposed. The root is the room as tilo-api serves it (GET /v1/worlds/{world_id}/rooms/{room_id}); it is rebuilt from the room's meeting.* events plus the redacted archive records they point at, and holds nothing the events do not. $defs hold the three request bodies and the shapes the meeting.* event data share. Text is plain text: the web shows it as text, never as markup or links. Rules MR-01 to MR-12 are in meeting_room.rules.md.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MeetingRoom".
+ */
+export interface MeetingRoom {
+  room_id: Ulid;
+  world_id: WorldId;
+  run_id: RunId;
+  state: "open" | "adjourned";
+  /**
+   * Why the room closed; null exactly while it is open.
+   */
+  reason: MeetingRoomAdjournReason | null;
+  lead: AgentId;
+  agents: MeetingRoomAttendees;
+  as_role: MeetingRoomAsRole;
+  credit_cap: Credits;
+  credits_spent: Credits;
+  max_turns: MeetingRoomTurnNumber;
+  /**
+   * @maxItems 50
+   */
+  turns: MeetingRoomTurn[];
+}
+/**
+ * One turn: what the person asked, the reply (null while it is pending) and the change the person confirmed from it (null if none).
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MeetingRoomTurn".
+ */
+export interface MeetingRoomTurn {
+  turn: MeetingRoomTurnNumber;
+  to: AgentId;
+  mode: MeetingRoomMode;
+  text: MeetingRoomPersonText;
+  reply: MeetingRoomReply | null;
+  change: MeetingRoomConfirmedChange | null;
+}
+/**
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MeetingRoomReply".
+ */
+export interface MeetingRoomReply {
+  from: AgentId;
+  outcome: MeetingRoomOutcome;
+  text: MeetingRoomReplyText | null;
+  units: MeetingRoomCitedUnits;
+  artifacts: MeetingRoomCitedArtifacts;
+  proposal: MeetingRoomProposal | null;
+}
+/**
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MeetingRoomConfirmedChange".
+ */
+export interface MeetingRoomConfirmedChange {
+  proposal_id: Ulid;
+  text: MeetingRoomPersonText;
+}
+/**
+ * POST /v1/worlds/{world_id}/rooms. The server picks the run, the role, the caps and the room id.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MeetingRoomConveneRequest".
+ */
+export interface MeetingRoomConveneRequest {
+  lead: AgentId;
+  agents: MeetingRoomAttendees;
+}
+/**
+ * POST /v1/worlds/{world_id}/rooms/{room_id}/turns. One turn in flight at a time.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MeetingRoomAskRequest".
+ */
+export interface MeetingRoomAskRequest {
+  to: AgentId;
+  text: MeetingRoomPersonText;
+  mode: MeetingRoomMode;
+}
+/**
+ * POST /v1/worlds/{world_id}/rooms/{room_id}/changes: the person confirms a proposal, in the proposal's words or their own. Units and artifacts come from the proposal, never from this body (MR-07).
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MeetingRoomChangeRequest".
+ */
+export interface MeetingRoomChangeRequest {
+  proposal_id: Ulid;
+  text: MeetingRoomPersonText;
 }
 /**
  * An @mention of a team member on a team pinboard entry (FR-PB-04). It names a team because a personal entry cannot be tagged (PE-01, PE-06). The tagged person is a member of the team when tagged; they can always remove themselves, and the entry's `set_up_by` person can remove anyone (PE-06). A removed mention stays as a record; a new tag is a new mention.
@@ -3519,57 +4911,6 @@ export interface MinutesAgendaPoint {
   evidence: MinutesEvidence;
 }
 /**
- * One outbox entry: an authorised side effect waiting to run exactly once (PRD 8.5, FR-AGT-11, FR-CHN-13, SEC-03). The harness writes it and tilo-connectors runs it; connector side-effect methods are callable only from the outbox. An entry exists only once the policy engine has authorised it (a person at a gate, or a policy below T3), so authz is always set, equal to the authz of the approval.resolved that answered approve on its gate or of the policy.applied that opened it, never of approval.requested, and the data.transfer it emits carries the same authz (OB-01, HR-7); a proposed side effect waiting at a gate is not in the outbox yet (approval.requested reserves its id). The entry names everything the connector needs: recipients, attachments, the pinned item and the destination. Rules OB-01 to OB-05 are in contracts/outbox.rules.md.
- *
- * This interface was referenced by `TiloContracts`'s JSON-Schema
- * via the `definition` "Outbox".
- */
-export interface Outbox {
-  id: Ulid;
-  /**
-   * Stable per step: a retry reuses it, and the connector runs a key at most once (OB-03).
-   */
-  idempotency_key: string;
-  world_id: WorldId;
-  run_id: RunId;
-  action_type: ActionType;
-  connector: ConnectorId;
-  /**
-   * Everyone the side effect reaches; equals the recipients the gate card showed (card rule CR-12).
-   *
-   * @maxItems 50
-   */
-  recipients: EmailAddress[];
-  attachments: ArtifactRef[];
-  /**
-   * The draft or file this entry sends, saves or shares, pinned to the version the policy engine assessed and the gate card showed; the connector sends exactly this version (OB-05). null only when the action moves no content, such as a delete.
-   */
-  item: ArtifactRef | null;
-  /**
-   * The thread a reply goes into or the folder a file is saved in, as the gate card showed it (OB-05); null when there is none, such as a new email.
-   */
-  destination: Destination | null;
-  /**
-   * The PRD 10.4 conditions that apply to this side effect; any one makes it T3.
-   */
-  modifiers: PolicyTierCondition[];
-  risk_tier: RiskTier;
-  authz: Authz;
-  /**
-   * Seconds the person can still cancel (PRD 10.4: L2 default 60); 0 when none.
-   */
-  undo_window_s: number;
-  /**
-   * RFC 3339 timestamp in UTC with exactly three fractional digits, e.g. 2026-09-29T09:30:00.000Z.
-   */
-  scheduled_at: string;
-  /**
-   * queued (ready, no undo window), scheduled (waiting out its undo window), sending, sent, cancelled (undone before sending) or failed.
-   */
-  state: "queued" | "scheduled" | "sending" | "sent" | "cancelled" | "failed";
-  created_at: Timestamp;
-}
-/**
  * A person of an org (PRD 15.1 User entity, ADR-0015): who they are, how they are called in a meeting, how Tilo reaches them, and which teams an org owner put them in. `aliases` are names others use for them; a spoken name that matches more than one person is never assigned (PE-15). A membership counts only as people.rules.md defines it (PE-02). Contact details are never shown to teammates; `tilo-api` resolves a recipient from this record (PE-09).
  *
  * This interface was referenced by `TiloContracts`'s JSON-Schema
@@ -3677,7 +5018,7 @@ export interface PilotSurveyResponse {
   quote_consent: boolean;
 }
 /**
- * One entry on a pinboard (FR-PB-01 to -07). A personal entry is private to `scope.user`: no owner, no mention, never proposed (PE-01). A team entry is read by the members of `scope.team` once `active`; until then only `set_up_by` sees it (PE-02). `set_up_by` is the accountable person shown in the table and the target of "get in touch" (PE-09); for an entry Tilo made it is the person who confirmed or owns the meeting. Tilo's entries carry a `source` ("added by Tilo from ..."); a Tilo-made team entry is `active` only with `confirmed_by` (PE-07, PE-08). `url` is https with no user info, query or fragment, and passes the secret redactor before it is stored.
+ * One entry on a pinboard (FR-PB-01 to -07). A personal entry is private to `scope.user`: no owner, no mention, never proposed (PE-01). A team entry is read by the members of `scope.team` once `active`; until then only `set_up_by` sees it (PE-02). `set_up_by` is the accountable person shown in the table and the target of "get in touch" (PE-09); for an entry Tilo made it is the person who confirmed or owns the meeting. Tilo's entries carry a `source` ("added by Tilo from ..."); a Tilo-made team entry is `active` only with `confirmed_by` (PE-07, PE-08). `url` is https with no user info, query or fragment, and passes the secret redactor before it is stored. `placement` (1.1.0, ADR-0038) is optional presentation only: where the entry sits on the board of its own scope. It is no access grant and it never changes the scope or the title (PE-36).
  *
  * This interface was referenced by `TiloContracts`'s JSON-Schema
  * via the `definition` "PinboardItem".
@@ -3707,6 +5048,7 @@ export interface PinboardItem {
   history: [PinboardItemHistoryEntry, ...PinboardItemHistoryEntry[]];
   created_at: Timestamp;
   updated_at: Timestamp;
+  placement?: PinboardItemPlacement;
 }
 /**
  * This interface was referenced by `TiloContracts`'s JSON-Schema
@@ -3747,6 +5089,17 @@ export interface PinboardItemHistoryEntry {
   by: EventActor;
   change: "created" | "edited" | "accepted" | "removed" | "undone" | "owner_changed";
   status: "proposed" | "active" | "removed";
+}
+/**
+ * ADR-0038, FR-PB: where one entry sits on the board of its own scope, left out until it is placed and never null (ADR-0011). board and column are short ids of a presentation place inside that scope, never a user, team or access grant, and the scope itself is not here. order is a sort key inside one board and column across the entries of the scope, lowest first and ties by pin id ascending, so a move writes this one entry and never renumbers another, which may belong to someone else. A move changes this object only: not the title, the content, the scope, the owner, the status, the history or updated_at (PE-36).
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "PinboardItemPlacement".
+ */
+export interface PinboardItemPlacement {
+  board: PinboardItemPlaceId;
+  column: PinboardItemPlaceId;
+  order: number;
 }
 /**
  * PlanGraph (PRD 7.1 FR-INT-06, FR-INT-09): the approaches offered, the chosen one compiled to units, dependencies, roles, skills, connectors and gates, and the confirmed budget cap. Cross-reference rules PG-01.. are in contracts/plan.rules.md.
@@ -3820,6 +5173,8 @@ export interface PlanDimensions {
   output_format: DeliverableFormat;
 }
 /**
+ * One plan unit. 1.1.0 (ADR-0028): a revision unit, planned from a change a person confirmed in a meeting room, also carries revises (the unit whose work it changes) and change (the proposal_id of that meeting.change_requested), both or neither (PG-13).
+ *
  * This interface was referenced by `TiloContracts`'s JSON-Schema
  * via the `definition` "PlanUnit".
  */
@@ -3850,6 +5205,8 @@ export interface PlanUnit {
    * @maxItems 50
    */
   depends_on: UnitId[];
+  revises?: UnitId;
+  change?: Ulid;
 }
 /**
  * Authorisation point before a side effect. A T3 gate has no policy: T3 always needs a person.
@@ -3926,103 +5283,6 @@ export interface PlateRowRef {
   id: string;
 }
 /**
- * Autonomy policy (PRD 10.4): a user's pre-authorisation of one action type within a scope and limits. Data only: the deterministic policy engine decides, a model never does, and a T3 action never runs above L1. $defs.risk_tier_table is the shape of the risk tiers in config/autonomy.yaml.
- *
- * This interface was referenced by `TiloContracts`'s JSON-Schema
- * via the `definition` "Policy".
- */
-export interface Policy {
-  id: PolicyId;
-  owner: UserId;
-  action_type: ActionType;
-  scope: PolicyScope;
-  limits: PolicyLimits;
-  conditions: PolicyConditions;
-  level: AutonomyLevel;
-  /**
-   * Seconds an L2 action can still be undone.
-   */
-  undo_window_s: number;
-  /**
-   * When the policy stops applying, or null for no expiry.
-   */
-  expiry: Timestamp | null;
-  notify_channel: Channel;
-  /**
-   * Expert domains (PRD 8.3, for example security or finance; not email domains, which are scope.domains) whose Team Leads may open this action type's gates in the owner's worlds (PRD 10.1: 'in their domain, if the policy allows'). Empty lets no Team Lead open them. The owner, and an Approver the gate names, need no policy. Like scope, read from the current record (outbox OB-01).
-   */
-  team_lead_domains: Slug[];
-  created_by: PolicyStamp;
-  changed_by: PolicyStamp | null;
-  /**
-   * Every change, oldest first, starting with the creation, so never empty: each entry's at is no earlier than the one before, and the record's level equals the last entry's level (validator, outbox OB-01). The level in force at a time is the level of the last entry at or before it; a revocation or Stop all autopilot is an entry at L1 (policy.changed). Only the owner creates and changes a policy (PRD 10.1; a Team Lead only proposes), so every entry's by, like created_by.by and changed_by.by, equals owner; a record that breaks this covers nothing (validator, outbox OB-01).
-   *
-   * @minItems 1
-   */
-  history: [PolicyHistoryEntry, ...PolicyHistoryEntry[]];
-}
-/**
- * Where the policy applies. An empty recipients, domains or districts list means no restriction on that dimension.
- *
- * This interface was referenced by `TiloContracts`'s JSON-Schema
- * via the `definition` "PolicyScope".
- */
-export interface PolicyScope {
-  /**
-   * @minItems 1
-   */
-  connectors: [ConnectorId, ...ConnectorId[]];
-  recipients: EmailAddress[];
-  domains: string[];
-  districts: DistrictId[];
-}
-/**
- * This interface was referenced by `TiloContracts`'s JSON-Schema
- * via the `definition` "PolicyLimits".
- */
-export interface PolicyLimits {
-  /**
-   * Most actions per day, or null for no daily cap.
-   */
-  per_day: number | null;
-  /**
-   * Most credits per day spent by actions under this policy, or null.
-   */
-  credits: Credits | null;
-}
-/**
- * Always true: attachments, new recipients and safety-flagged content are T3 (PRD 10.4), and T3 never runs above L1, so no policy can pre-authorise them.
- *
- * This interface was referenced by `TiloContracts`'s JSON-Schema
- * via the `definition` "PolicyConditions".
- */
-export interface PolicyConditions {
-  no_attachments: true;
-  no_new_recipients: true;
-  no_safety_flags: true;
-}
-/**
- * This interface was referenced by `TiloContracts`'s JSON-Schema
- * via the `definition` "PolicyStamp".
- */
-export interface PolicyStamp {
-  by: UserId;
-  at: Timestamp;
-}
-/**
- * This interface was referenced by `TiloContracts`'s JSON-Schema
- * via the `definition` "PolicyHistoryEntry".
- */
-export interface PolicyHistoryEntry {
-  by: UserId;
-  at: Timestamp;
-  change: string;
-  /**
-   * Autonomy level (PRD 10.4): L0 observe, L1 ask each time (default), L2 instruction is approval, L3 standing rules.
-   */
-  level: "L0" | "L1" | "L2" | "L3";
-}
-/**
  * Risk tiers (PRD 10.4): each action type's base tier, the context modifiers that raise any action to T3, and the highest level each tier allows. A modifier applies whatever the base tier, so a deletion or an external share is T3 even when its action type is listed lower.
  *
  * This interface was referenced by `TiloContracts`'s JSON-Schema
@@ -4069,7 +5329,7 @@ export interface PolicyMaxLevel {
   T3: "L1";
 }
 /**
- * Provider-layer configuration as the provider layer loads it (PRD 6.4, 6.6, 14.1): models is config/models.yaml ($defs.models) and prices is config/prices.yaml ($defs.prices). The loader also checks that every role names existing profiles and every profile has a price entry, and the speech role's rules below (1.2.0, ADR-0027). Model ids appear only in config/ and packages/providers.
+ * Provider-layer configuration as the provider layer loads it (PRD 6.4, 6.6, 14.1): models is config/models.yaml ($defs.models) and prices is config/prices.yaml ($defs.prices). The loader also checks that every role names existing profiles and every profile has a price entry, the speech role's rules below (1.2.0, ADR-0027), and the search role, unit price, region and valid_until rules below (1.3.0, ADR-0029). Model ids appear only in config/ and packages/providers.
  *
  * This interface was referenced by `TiloContracts`'s JSON-Schema
  * via the `definition` "Providers".
@@ -4091,7 +5351,7 @@ export interface ProvidersModels {
     [k: string]: ProvidersProfile;
   };
   /**
-   * Business code asks for a role, never a model (PL-01). speech (1.2.0, ADR-0027) is the role every SpeechProvider call asks for (FR-MTG-17, FR-MTG-11, FR-INT-14, FR-CHN-16): the loader refuses it unless it states max_output_tokens and its primary, fallback and cascade profiles declare the audio capability and, while prices are set, carry an audio_input price.
+   * Business code asks for a role, never a model (PL-01). speech (1.2.0, ADR-0027) is the role every SpeechProvider call asks for (FR-MTG-17, FR-MTG-11, FR-INT-14, FR-CHN-16): the loader refuses it unless it states max_output_tokens and its primary, fallback and cascade profiles declare the audio capability and, while prices are set, carry an audio_input price. search (1.3.0, ADR-0029) is the role every SearchProvider call asks for (PRD 12.2): the loader refuses it unless it states reserve_units and its primary, fallback and cascade profiles declare the grounding capability and, while prices are set, carry a unit_price with unit query. Any role whose profiles carry a unit_price must state reserve_units.
    */
   roles: {
     [k: string]: ProvidersRole;
@@ -4099,7 +5359,7 @@ export interface ProvidersModels {
   rules: ProvidersRules;
 }
 /**
- * One model profile. Its cost rank (PRD 6.6) is derived from prices, never declared here. base_url and api_key_env are allowed only when provider is openai_compat (ADR-0002, ADR-0003).
+ * One model profile. Its cost rank (PRD 6.6) is derived from prices, never declared here. base_url and api_key_env are allowed only when provider is openai_compat (ADR-0002, ADR-0003). media_tokens (1.3.0, ADR-0029) holds the tokens the provider counts for one image, one PDF page and one second of audio or video, as upper bounds; the router uses them only for the pre-flight estimate and the EFF-03 cap check before it sends a media part, never for billing (the reported usage is billed). A profile without media_tokens gets no media part: the router refuses it before sending.
  *
  * This interface was referenced by `TiloContracts`'s JSON-Schema
  * via the `definition` "ProvidersProfile".
@@ -4115,6 +5375,7 @@ export interface ProvidersProfile {
    */
   context: number;
   caps: ProvidersCapability[];
+  media_tokens?: ProvidersMediaTokens;
   /**
    * openai_compat endpoint. https only, with no user info, query or fragment, so no credential can sit in the URL (PRD 16.1 rule 4). The not-pattern rejects a final line break, which a Python validator's $ lets through.
    */
@@ -4125,6 +5386,20 @@ export interface ProvidersProfile {
   api_key_env?: string;
 }
 /**
+ * Tokens per unit of media input (ADR-0029 decision 6): image is one image, pdf_page one PDF page, audio_per_second and video_per_second one second. Upper bounds, so an estimate never understates.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "ProvidersMediaTokens".
+ */
+export interface ProvidersMediaTokens {
+  image: number;
+  pdf_page: number;
+  audio_per_second: number;
+  video_per_second: number;
+}
+/**
+ * reserve_units (1.3.0, ADR-0029) is how many units of the profile's unit_price the router reserves under the PL-03 budget check before it sends, because the provider cannot cap them (a grounded call runs as many searches as the model decides). A reply that reports no unit count is charged the reserved amount.
+ *
  * This interface was referenced by `TiloContracts`'s JSON-Schema
  * via the `definition` "ProvidersRole".
  */
@@ -4138,6 +5413,7 @@ export interface ProvidersRole {
   thinking?: "low" | "medium" | "high";
   max_input_tokens?: number;
   max_output_tokens?: number;
+  reserve_units?: number;
 }
 /**
  * This interface was referenced by `TiloContracts`'s JSON-Schema
@@ -4150,7 +5426,7 @@ export interface ProvidersRules {
   deny: string[];
 }
 /**
- * Prices per profile (PL-06, FR-MTR-01). Prices, the date and the source may be null only while status is unset, and the loader refuses live metering until status is set.
+ * Prices per profile (PL-06, FR-MTR-01). Prices, the date and the source may be null only while status is unset, and the loader refuses live metering until status is set. region (1.3.0, ADR-0029), optional, is the provider location the rates were quoted for (for example a regional endpoint's rates): the loader refuses live metering of a profile whose adapter sends to another location; an adapter with no location setting (fake, openai_compat) is not checked.
  *
  * This interface was referenced by `TiloContracts`'s JSON-Schema
  * via the `definition` "ProvidersPrices".
@@ -4159,6 +5435,7 @@ export interface ProvidersPrices {
   status: "unset" | "set";
   effective_date: CalendarDate | null;
   source: string | null;
+  region?: string;
   currency: "USD";
   /**
    * PRD 14.1: 1 credit = US$0.005.
@@ -4169,7 +5446,7 @@ export interface ProvidersPrices {
   };
 }
 /**
- * Standard list price in US dollars per million tokens. audio_input (1.2.0, ADR-0027) is the price per million audio input tokens where the provider bills audio input at its own rate (Gemini); left out, the profile has no audio price and cannot serve the speech role. The other input tokens of the same call are priced at input.
+ * The rate charged, in US dollars per million tokens. audio_input (1.2.0, ADR-0027) is the price per million audio input tokens where the provider bills audio input at its own rate (Gemini); left out, the profile has no audio price and cannot serve the speech role. The other input tokens of the same call are priced at input. 1.3.0 (ADR-0029): cached_input is the price per million input tokens served from the provider's prompt cache (the Trace's tokens_cached, ADR-0022); left out, cached tokens are priced at input. unit_price is a fee per 1,000 units charged on top of the token rates (a call costs tokens times their rates plus units times per_1k / 1000). valid_until is the last calendar day (UTC) the price holds, for a promotional rate: after it the loader refuses live metering of the profile until the file is updated. Promotions, credits and free allowances are never subtracted here (the meter overstates, never understates).
  *
  * This interface was referenced by `TiloContracts`'s JSON-Schema
  * via the `definition` "ProvidersPrice".
@@ -4178,6 +5455,19 @@ export interface ProvidersPrice {
   input: number | null;
   output: number | null;
   audio_input?: number | null;
+  cached_input?: number | null;
+  unit_price?: ProvidersUnitPrice;
+  valid_until?: CalendarDate;
+}
+/**
+ * A fee per 1,000 units (ADR-0029 decision 1): query is one search the provider ran (Gemini grounding reports them in grounding_metadata.web_search_queries), minute one minute of audio, character one input character, image one generated image. per_1k is US dollars per 1,000 units, null only while prices are unset.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "ProvidersUnitPrice".
+ */
+export interface ProvidersUnitPrice {
+  unit: "query" | "minute" | "character" | "image";
+  per_1k: number | null;
 }
 /**
  * A scenario config, config/scenarios/<id>.yaml (PRD 4.3, 7.1 FR-INT-11, ADR-0014): the skill set, connectors, seed data, autonomy policy and world theme a scenario preloads, and nothing else. Data only: no code, prompt, model id, brief text or plan, so a scenario that needs any of those becomes a pillar requirement first, and no platform source names a scenario id. The same shape serves any scenario, a demo, a held-out bank case or a generated brief. theme is the world theme, the same slug as layout.schema.json theme (config/themes/, FR-WLD-15; only its shape is checked until that folder exists, BQ-202). Rules that need other files (the id equals the file name, connectors in config/connectors.yaml, seed files exist inside the repo, each autonomy level within its risk tier's max_level, T3 at L1 only) are SN-01 to SN-09 in contracts/scenario.rules.md, checked by the loader.
@@ -4279,7 +5569,7 @@ export interface SkillEmbeddedSchema {
   [k: string]: unknown;
 }
 /**
- * config/spend_caps.yaml: the live-model spend caps, the flat reservation per live unit and the per-uid rate limit (SEC-16, PRD supplement 4; FR-MTR-04, PRD 14.1, 17.3), read by tilo-api's spend loader. Money is an integer in INR minor units (paise, 1 INR = 100): never a float, a bool or a string. Every key is required and no other key is allowed; only org_day_minor may be null (ADR-0002 decision 13). The schema checks each value alone. Two rules it cannot express: a whole float such as 1000.0 is the same JSON number as 1000, so the loader also requires a YAML integer; and the shipped file keeps unit_reserve_minor <= run_minor <= uid_lifetime_minor <= global_day_hard_minor. These caps sit beside config/metering.yaml (credits and US dollars) and replace none of it (ADR-0002 decision 16). 1.1.0 adds unit_reserve_minor (BQ-SEC16-1).
+ * config/spend_caps.yaml: the live-model spend caps, the flat reservation per live unit and the per-uid rate limit (SEC-16, PRD supplement 4; FR-MTR-04, PRD 14.1, 17.3), read by tilo-api's spend loader. Money is an integer in INR minor units (paise, 1 INR = 100): never a float, a bool or a string. Every key is required and no other key is allowed; only org_day_minor may be null (ADR-0002 decision 13). The schema checks each value alone. Two rules it cannot express: a whole float such as 1000.0 is the same JSON number as 1000, so the loader also requires a YAML integer; and the shipped file keeps unit_reserve_minor <= run_minor <= uid_lifetime_minor <= global_day_hard_minor. These caps sit beside config/metering.yaml (credits and US dollars) and replace none of it (ADR-0002 decision 16). 1.1.0 adds unit_reserve_minor (BQ-SEC16-1). 1.1.1 changes description text only (ADR-0002 decision 16, amendment of 8 Oct 2026).
  *
  * This interface was referenced by `TiloContracts`'s JSON-Schema
  * via the `definition` "SpendCapsConfig".
@@ -4290,7 +5580,7 @@ export interface SpendCapsConfig {
    */
   currency: "INR";
   /**
-   * Lifetime live-model spend per signed-in uid, in paise, above zero and never null (SEC-16: 1,000 INR).
+   * Lifetime live-model spend per signed-in uid, in paise, above zero and never null (SEC-16; shipped at 500 INR since the user's decision of 9 Oct 2026, BQ-SEC16-4).
    */
   uid_lifetime_minor: number;
   /**
@@ -4319,16 +5609,286 @@ export interface SpendCapsConfig {
   rate_limit_window_s: number;
 }
 /**
- * A Team Lead assignment (PRD 8.3, 10.1, 16.2): the person (user) who acts as Team Lead id, and the one expert domain the owner assigned them. The shape of each entry of config/teams.yaml and of a Team Lead set in the Team Lead console. authz.ref of a Team Lead's answer is id. A Team Lead opens a gate only when the gate names this domain and the owner's policy it names lists the domain in team_lead_domains, and only when the world's owner made this assignment before the answer (outbox OB-01). Removing a Team Lead deletes the record, so a removed Team Lead answers nothing.
+ * A skill a person taught Tilo on the Skills page (FR-SKL-01 to FR-SKL-07, ADR-0034), stored at orgs/{org}/taught_skills/{id} and read only through tilo-api. A sibling of the expert-signed, version-pinned skill.yaml (skill.schema.json), never a change to it. One person owns it. Each fix makes a new integer version, and a run pins the version it started with. It acts only through its own tool_access, the team's levels and the policy engine. $defs try_run_result, rating, fix, real_run, run_answer and helpers_report are the records and the report around it (real_run and run_answer are 1.1.0, ADR-0037). Rules TS-01 to TS-17 are in taught_skill.rules.md.
  *
  * This interface was referenced by `TiloContracts`'s JSON-Schema
- * via the `definition` "TeamLead".
+ * via the `definition` "TaughtSkill".
  */
-export interface TeamLead {
-  id: TeamLeadId;
+export interface TaughtSkill {
+  id: TaughtSkillId;
+  org_id: OrgId;
+  owner: UserId;
+  name: TaughtSkillName;
+  scope: TaughtSkillScope;
+  status: TaughtSkillStatus;
+  /**
+   * FR-SKL-06: a paused skill never starts (no trigger, no run on request, no try run). Kept apart from status, so Resume returns to learning or trusted as it was. A draft is never paused.
+   */
+  paused: boolean;
+  method: TaughtSkillMethod;
+  /**
+   * FR-SKL-01: the steps captured so far, in order. Text only, plus the pinned capture artifact a step came from; media bytes are never inline.
+   *
+   * @maxItems 20
+   */
+  captured: TaughtSkillCapturedStep[];
+  /**
+   * FR-SKL-02: Tilo's version, in order. Empty until Tilo has proposed one.
+   *
+   * @maxItems 20
+   */
+  plan: TaughtSkillPlanStep[];
+  question: TaughtSkillQuestion | null;
+  trigger: TaughtSkillTrigger;
+  estimates: TaughtSkillEstimates | null;
+  tool_access: TaughtSkillToolAccess;
+  /**
+   * FR-SKL-06: runs of this skill rated up by the person whose run it was (TS-08); try runs never count.
+   */
+  good_runs: number;
+  /**
+   * 1 for a draft and a new skill; each fix adds 1 (TS-09). Name, scope, trigger, status and pause changes keep it.
+   */
+  version: number;
+  created_at: Timestamp;
+  updated_at: Timestamp;
+}
+/**
+ * Who can use it (FR-SKL-04): just_me, or the members of one team the owner belongs to (team is null exactly for just_me).
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "TaughtSkillScope".
+ */
+export interface TaughtSkillScope {
+  kind: "just_me" | "team";
+  team: TeamId | null;
+}
+/**
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "TaughtSkillCapturedStep".
+ */
+export interface TaughtSkillCapturedStep {
+  text: TaughtSkillStepText;
+  artifact: TaughtSkillPinned | null;
+}
+/**
+ * One step of Tilo's version (FR-SKL-02). tool is the connector it uses and action one of that connector's actions (config/connectors.yaml or config/mcp.yaml), the risk-table key of what it does there. must_ask is set by code, never a model: true when the verb is send, post, pay, delete, share or book, or the action's tier is T2 or T3 (an action the config does not list is T3). The runner works it out again from the current config on every run (TS-04). A must_ask step always has ask_first true. ask_first is the person's 'Ask me first' switch for the other steps; while the skill is learning every step but a read asks anyway (TS-05). Neither one authorises anything: every side effect still goes through the policy engine and its gate.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "TaughtSkillPlanStep".
+ */
+export interface TaughtSkillPlanStep {
+  text: TaughtSkillStepText;
+  tool: ConnectorId;
+  action: ActionType;
+  verb: TaughtSkillVerb;
+  ask_first: boolean;
+  must_ask: boolean;
+}
+/**
+ * FR-SKL-02: the one clarifying question of Tilo's version, its options, and the index of the option the person chose (null until answered).
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "TaughtSkillQuestion".
+ */
+export interface TaughtSkillQuestion {
+  text: TaughtSkillStepText;
+  /**
+   * @minItems 2
+   * @maxItems 4
+   */
+  options: [string, string, ...string[]];
+  answer: number | null;
+}
+/**
+ * FR-SKL-04: when it runs. on_demand: when a person asks. schedule: the /schedules record schedule_id (FR-AGT-14) starts it. event: a registered event of a world the owner owns starts it (TS-07). The other two fields are null.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "TaughtSkillTrigger".
+ */
+export interface TaughtSkillTrigger {
+  kind: "on_demand" | "schedule" | "event";
+  schedule_id: string | null;
+  event: TaughtSkillEventTrigger | null;
+}
+/**
+ * An event type from config/skills.yaml's allow-list, and at most three exact matches on its data fields. Keys are data fields holding an id or an enum value, never free text; there are no patterns or substrings (TS-07).
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "TaughtSkillEventTrigger".
+ */
+export interface TaughtSkillEventTrigger {
+  type: EventFamilyVerb;
+  filter: {
+    [k: string]: string;
+  };
+}
+/**
+ * FR-SKL-02, worked out by code, never a model. Taken from the skill's own runs in the credit ledger once it has some (source ledger), else from config/skills.yaml's per-step prior (source prior). Prices come from config/prices.yaml as of prices_as_of. asks_per_run counts the steps that would stop to ask (TS-05).
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "TaughtSkillEstimates".
+ */
+export interface TaughtSkillEstimates {
+  credits_per_run: Credits;
+  seconds_per_run: number;
+  asks_per_run: TaughtSkillCount;
+  source: "ledger" | "prior";
+  prices_as_of: CalendarDate;
+}
+/**
+ * FR-ACC-02, least privilege: the level each connector may be used at, set by code at save to the lowest level that permits that connector's steps. A connector left out is off, unlike skill.yaml, where a missing entry takes the team's level. A level only ever lowers the team's (effective_level). The owner may lower it further; nothing raises it above what the steps need (TS-06).
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "TaughtSkillToolAccess".
+ */
+export interface TaughtSkillToolAccess {
+  [k: string]: ToolAccessLevel;
+}
+/**
+ * FR-SKL-03: one try run, at orgs/{org}/taught_skills/{skill}/try_runs/{id}. Reads are real, writes are recorded as intents in a dry-run outbox and sent nowhere, so side_effects is 0 by construction (TS-10). match = matched / total. Each step ends matched, skipped or not reached; asked counts the steps that paused to ask.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "TaughtSkillTryRunResult".
+ */
+export interface TaughtSkillTryRunResult {
+  id: Ulid;
+  skill: TaughtSkillId;
+  version: number;
+  by: UserId;
+  match: number;
+  total: TaughtSkillStepNumber;
+  matched: TaughtSkillCount;
+  asked: TaughtSkillCount;
+  skipped: TaughtSkillCount;
+  intents: TaughtSkillCount;
+  /**
+   * Always 0: a try run sends and saves nothing outside Tilo.
+   */
+  side_effects: 0;
+  outcome: "completed" | "stopped";
+  stopped_at: TaughtSkillStop | null;
+  duration_ms: number;
+  credits: Credits;
+  finished_at: Timestamp;
+}
+/**
+ * Where and why a try run stopped: a site wanted a sign-in or a CAPTCHA (a needs-you card; Tilo never types a password or solves one), the try run's credit cap, an error, or the person stopped it.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "TaughtSkillStop".
+ */
+export interface TaughtSkillStop {
+  step: TaughtSkillStepNumber;
+  reason: "needs_sign_in" | "captcha" | "budget" | "error" | "cancelled";
+}
+/**
+ * FR-SKL-05: a thumbs up or down on one finished run, by the person whose run it was, at orgs/{org}/taught_skills/{skill}/ratings/{id}. A thumbs down may name the step that went wrong. The note is kept for the owner to read; it never reaches a prompt.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "TaughtSkillRating".
+ */
+export interface TaughtSkillRating {
+  id: Ulid;
+  skill: TaughtSkillId;
+  version: number;
+  run_id: RunId;
+  by: UserId;
+  thumb: TaughtSkillThumb;
+  wrong_step: TaughtSkillStepNumber | null;
+  note: string | null;
+  at: Timestamp;
+}
+/**
+ * FR-SKL-05: a logged change to one step, by the owner only (TS-09), at orgs/{org}/taught_skills/{skill}/fixes/{id}. It sets the step's text and Ask me first and makes version to_version = from_version + 1, which the next run uses. A fix never changes a step's tool, action or verb.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "TaughtSkillFix".
+ */
+export interface TaughtSkillFix {
+  id: Ulid;
+  skill: TaughtSkillId;
+  from_version: number;
+  to_version: number;
+  step: TaughtSkillStepNumber;
+  text: TaughtSkillStepText;
+  ask_first: boolean;
+  by: UserId;
+  /**
+   * The thumbs-down rating that led to it, or null.
+   */
+  rating: Ulid | null;
+  at: Timestamp;
+}
+/**
+ * FR-SKL-05 to 07, ADR-0037: the record that one real run of one saved skill version started and how it ended, at orgs/{org}/taught_skills/{skill}/real_runs/{run_id} (the run id is the key, so a run is recorded once). tilo-api or the harness writes it from its own records, never from a request body (TS-13). by is the verified person whose run it is, set by the server. org_id, skill, version, run_id, world_id, by, plan and started_at are fixed at the start. finished_at and outcome are null together until the run's own world writes its terminal event, then set once together (TS-14). plan is the skill's plan at that version, kept so a later fix cannot rewrite what the run followed. A try run is never one of these (TS-10), and a rating and its note are the rating record's.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "TaughtSkillRealRun".
+ */
+export interface TaughtSkillRealRun {
+  org_id: OrgId;
+  skill: TaughtSkillId;
+  version: number;
+  run_id: RunId;
+  world_id: WorldId;
+  by: UserId;
+  /**
+   * @minItems 1
+   * @maxItems 20
+   */
+  plan: [TaughtSkillPlanStep, ...TaughtSkillPlanStep[]];
+  started_at: Timestamp;
+  finished_at: Timestamp | null;
+  outcome: TaughtSkillRunOutcome | null;
+}
+/**
+ * FR-SKL-07, ADR-0037: one question card that a person answered in a recorded real run, at orgs/{org}/taught_skills/{skill}/real_runs/{run_id}/answers/{card_id} (one for each card). It links records that already exist and holds no text of the question or the answer. by and at are the card's recorded answerer (the person, never a Team Lead id) and answer time, copied once when the answer commits (TS-16). The helpers report counts these and nothing else (TS-12).
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "TaughtSkillRunAnswer".
+ */
+export interface TaughtSkillRunAnswer {
+  org_id: OrgId;
+  skill: TaughtSkillId;
+  version: number;
+  run_id: RunId;
+  world_id: WorldId;
+  card_id: Ulid;
+  by: UserId;
+  at: Timestamp;
+}
+/**
+ * FR-SKL-07 under BQ-DSN-05 and PRD 23.5: counts only, served only while the org has opted in. Per person: question cards answered in runs of the org's taught skills, and fixes made, in the month. Mistakes (thumbs-down ratings) are counted for the whole org, never per person. helpers is ordered by user id, never by a count (TS-12), and has no field for message content, time or speed.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "TaughtSkillHelpersReport".
+ */
+export interface TaughtSkillHelpersReport {
+  org_id: OrgId;
+  month: string;
+  /**
+   * @maxItems 500
+   */
+  helpers: TaughtSkillHelper[];
+  mistakes: TaughtSkillMistakes;
+}
+/**
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "TaughtSkillHelper".
+ */
+export interface TaughtSkillHelper {
   user: UserId;
-  domain: Slug;
-  assigned_by: TeamLeadAssignment;
+  answers: number;
+  fixes: number;
+}
+/**
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "TaughtSkillMistakes".
+ */
+export interface TaughtSkillMistakes {
+  this_month: number;
+  last_month: number;
 }
 /**
  * The content of a transcript artifact version (FR-MTG-02; ADR-0018 store, application/json, inside the 2,000,000-byte text cap; ADR-0020). Ingest writes it; utterance ids strictly increase (PE-22, validator). Owner-only (PE-05): another person gets at most one `evidence_quote`, cut per request by tilo-api (PE-23). Speaker labels and text are untrusted.
@@ -4392,7 +5952,129 @@ export interface TranscriptEvidenceQuotes {
   quotes: TranscriptEvidenceQuote[];
 }
 /**
- * One thing a person has to do (FR-PA-01): from confirmed minutes, from mail the person marked, or by hand. Visible to its `owner`; the person who assigned it sees its status only, and only once it is no longer `proposed` (PE-03). An item Tilo made starts `proposed`, is readable by no one until confirmed (PE-03; the meeting Owner sees it in the minutes), carries the meeting Owner as `assigned_by` from the start, and leaves `proposed` only with `confirmed_by`, that Owner (PE-07). A model never sets `due`: code computes it from `due_text` (PE-15).
+ * One person's saved profile and notification preferences (FR-SET-01, FR-SET-02, ADR-0039), stored and served by tilo-api for the verified principal only, keyed by org and user; no request names another person's. A document with version 0 is the server's unsaved defaults, never a stored record, and its updated_at is null. version counts saved writes: a write carries the version it read and is refused as stale when it is not the stored one (USET-02). Every object is closed, so an unknown field is refused. Profile email and the rest of the profile are display data: they change no sign-in identity, verified destination, directory record or connector grant (USET-06). Preferences authorise nothing and start no work (USET-07). Rules USET-01 to USET-08 are in user_settings.rules.md. $defs update is the request body of a write.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "UserSettings".
+ */
+export interface UserSettings {
+  owner_id: UserId;
+  org_id: OrgId;
+  version: number;
+  profile: UserSettingsProfile;
+  notifications: UserSettingsNotifications;
+  quiet_hours: UserSettingsQuietHours;
+  updated_at: Timestamp | null;
+}
+/**
+ * FR-SET-01. The title is null when the person has none.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "UserSettingsProfile".
+ */
+export interface UserSettingsProfile {
+  name: UserSettingsLine;
+  email: UserSettingsEmail;
+  title: UserSettingsLine | null;
+  time_zone: UserSettingsTimeZone;
+  language: UserSettingsLanguage;
+  working_hours: UserSettingsWorkingHours;
+}
+/**
+ * The days and the window Tilo books inside, in profile.time_zone. start is inclusive, end exclusive, and start is before end: no overnight window (USET-03, as config/personal.yaml working_window).
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "UserSettingsWorkingHours".
+ */
+export interface UserSettingsWorkingHours {
+  /**
+   * @minItems 1
+   * @maxItems 7
+   */
+  days: [UserSettingsWeekday, ...UserSettingsWeekday[]];
+  start: UserSettingsClock;
+  end: UserSettingsClock;
+}
+/**
+ * FR-SET-02: the matrix, one row for each kind of notice. The decisions row keeps at least one channel on (USET-04): the rule is in the schema, so a client that skips its own guard is refused. Any other row may be all off.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "UserSettingsNotifications".
+ */
+export interface UserSettingsNotifications {
+  decisions: UserSettingsDecisionChannels;
+  spend: UserSettingsChannels;
+  finished: UserSettingsChannels;
+  digest: UserSettingsChannels;
+  weekly: UserSettingsChannels;
+}
+/**
+ * Whether one kind of notice reaches the person by phone, email and Slack. Saving a choice verifies no channel and proves no delivery.
+ */
+export interface UserSettingsDecisionChannels {
+  phone: boolean;
+  email: boolean;
+  slack: boolean;
+}
+/**
+ * Whether one kind of notice reaches the person by phone, email and Slack. Saving a choice verifies no channel and proves no delivery.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "UserSettingsChannels".
+ */
+export interface UserSettingsChannels {
+  phone: boolean;
+  email: boolean;
+  slack: boolean;
+}
+/**
+ * FR-SET-02 and FR-HIL-13, in the shape tilo_channels.quiet_hours.parse_quiet_hours already reads. During the window only gate and blocked notices notify; this object has no field that could hide a gate (USET-05). start and end are in timezone, the window may cross midnight, and start is never end (USET-03). threshold is typed money or null; nothing delivers by it in this release (USET-05).
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "UserSettingsQuietHours".
+ */
+export interface UserSettingsQuietHours {
+  enabled: boolean;
+  start: UserSettingsClock;
+  end: UserSettingsClock;
+  timezone: UserSettingsTimeZone;
+  threshold: UserSettingsMoney | null;
+}
+/**
+ * An amount in the minor unit of its currency (paise, pence, cents): an integer from 1 to 1000000000000, never a float, a bool or a string with a symbol. currency is an ISO 4217 code; tilo-api refuses a code it has no minor unit for (USET-03).
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "UserSettingsMoney".
+ */
+export interface UserSettingsMoney {
+  amount_minor: number;
+  currency: string;
+}
+/**
+ * Whether one kind of notice reaches the person by phone, email and Slack. Saving a choice verifies no channel and proves no delivery.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "UserSettingsDecisionChannels".
+ */
+export interface UserSettingsChannels1 {
+  phone: boolean;
+  email: boolean;
+  slack: boolean;
+}
+/**
+ * The body of PUT /v1/me/settings: the whole document except what the server owns. version is the one the client read (0 when nothing was saved yet). It names no owner or org: they come from the verified principal, so a body that carries one, or updated_at, is refused (USET-01).
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "UserSettingsUpdate".
+ */
+export interface UserSettingsUpdate {
+  version: number;
+  profile: UserSettingsProfile;
+  notifications: UserSettingsNotifications;
+  quiet_hours: UserSettingsQuietHours;
+}
+/**
+ * One thing a person has to do (FR-PA-01): from confirmed minutes, from mail the person marked, or by hand. Visible to its `owner`; the person who assigned it sees its status only, and only once it is no longer `proposed` (PE-03). An item Tilo made starts `proposed`, is readable by no one until confirmed (PE-03; the meeting Owner sees it in the minutes), carries the meeting Owner as `assigned_by` from the start, and leaves `proposed` only with `confirmed_by`, that Owner (PE-07). A model never sets `due`: code computes it from `due_text` (PE-15). An optional `world_id` (1.1.0, ADR-0040, PE-33) binds a person-made item to a world its owner may read; while a team share of that world is in force (PE-31) the members of the team read the item's team view (id, title, status, due, owner, world) when it is open or done and not flagged. Absent means personal, as every item was before 1.1.0; it is set only at creation, never changed, and a Tilo-made item never has one.
  *
  * This interface was referenced by `TiloContracts`'s JSON-Schema
  * via the `definition` "WorkItem".
@@ -4414,6 +6096,7 @@ export interface WorkItem {
    * True when the minutes, mail or calendar text this was made from were flagged by the safety provider; never cleared by a model. Any draft, nudge, send or calendar write built from a flagged record is T3 with safety_flag (PE-21).
    */
   flagged: boolean;
+  world_id?: WorldId;
   /**
    * @minItems 1
    */
@@ -4454,6 +6137,20 @@ export interface WorkItemHistoryEntry {
     | "reminded";
   status: "proposed" | "open" | "done" | "dropped";
 }
+/**
+ * A world shared with one team (ADR-0040, PE-31): the members of `team` read that world's Story, Trace, runs and artifacts as Viewers of every district, and read the team view of the work items made in it (PE-33). It is not a role: it carries no scope and no right to answer, approve, start, stop or share, and adds no Approver or Team Lead (ADR-0006). `granted_by` is the world's owner, stamped by tilo-api from the signed-in session and the server clock (PE-19). `revoked` is null while the share stands and the owner's stamp once withdrawn, effective on the next request. One record per world and team (`id` is ws_ and the first 32 hex characters of SHA-256 of `<world_id>/<team>`, checked by the validator); sharing again after a revoke replaces the record and the world's `world.share_changed` events keep the history. Whether the share is in force also depends on the directory (PE-31), which this schema cannot see.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "WorldShare".
+ */
+export interface WorldShare {
+  id: WorldShareId;
+  org_id: OrgId;
+  world_id: WorldId;
+  team: TeamId;
+  granted_by: TeamLeadAssignment;
+  revoked: TeamLeadAssignment | null;
+}
 
 /** Event registry constants from contracts/events/registry.yaml (FR-WLD-03). */
 export const EVENT_TYPES = [
@@ -4466,6 +6163,7 @@ export const EVENT_TYPES = [
   "world.failed",
   "plan.questions_asked",
   "plan.approaches_proposed",
+  "plan.revised",
   "budget.requested",
   "budget.granted",
   "level.created",
@@ -4493,12 +6191,23 @@ export const EVENT_TYPES = [
   "agent.context_handoff_started",
   "agent.context_handoff_completed",
   "skill.loaded",
+  "skill.captured",
+  "skill.version_proposed",
+  "skill.try_run",
+  "skill.state_changed",
+  "skill.rated",
+  "skill.fixed",
   "question.routed",
   "question.answered",
   "meeting.called",
   "meeting.started",
   "meeting.decision",
   "meeting.ended",
+  "meeting.convened",
+  "meeting.asked",
+  "meeting.replied",
+  "meeting.change_requested",
+  "meeting.adjourned",
   "connection.requested",
   "connection.consented",
   "connection.established",
@@ -4540,6 +6249,7 @@ export const EVENT_TYPES = [
   "assistant.asked",
   "assistant.replied",
   "team_rule.changed",
+  "world.share_changed",
 ] as const;
 export type RegisteredEventType = (typeof EVENT_TYPES)[number];
 
@@ -4563,6 +6273,7 @@ export interface EventDataByType {
   "world.failed": WorldFailedData;
   "plan.questions_asked": PlanQuestionsAskedData;
   "plan.approaches_proposed": PlanApproachesProposedData;
+  "plan.revised": PlanRevisedData;
   "budget.requested": BudgetRequestedData;
   "budget.granted": BudgetGrantedData;
   "level.created": LevelCreatedData;
@@ -4590,12 +6301,23 @@ export interface EventDataByType {
   "agent.context_handoff_started": AgentContextHandoffStartedData;
   "agent.context_handoff_completed": AgentContextHandoffCompletedData;
   "skill.loaded": SkillLoadedData;
+  "skill.captured": SkillCapturedData;
+  "skill.version_proposed": SkillVersionProposedData;
+  "skill.try_run": SkillTryRunData;
+  "skill.state_changed": SkillStateChangedData;
+  "skill.rated": SkillRatedData;
+  "skill.fixed": SkillFixedData;
   "question.routed": QuestionRoutedData;
   "question.answered": QuestionAnsweredData;
   "meeting.called": MeetingCalledData;
   "meeting.started": MeetingStartedData;
   "meeting.decision": MeetingDecisionData;
   "meeting.ended": MeetingEndedData;
+  "meeting.convened": MeetingConvenedData;
+  "meeting.asked": MeetingAskedData;
+  "meeting.replied": MeetingRepliedData;
+  "meeting.change_requested": MeetingChangeRequestedData;
+  "meeting.adjourned": MeetingAdjournedData;
   "connection.requested": ConnectionRequestedData;
   "connection.consented": ConnectionConsentedData;
   "connection.established": ConnectionEstablishedData;
@@ -4637,6 +6359,7 @@ export interface EventDataByType {
   "assistant.asked": AssistantAskedData;
   "assistant.replied": AssistantRepliedData;
   "team_rule.changed": TeamRuleChangedData;
+  "world.share_changed": WorldShareChangedData;
 }
 
 /** A registered TiloEvent, discriminated on `type`. */
@@ -4647,7 +6370,7 @@ export type RegisteredEvent = {
 export const EVENT_REGISTRY: EventRegistry & {
   types: { readonly [T in RegisteredEventType]: EventRegistryEntry };
 } = {
-  "version": "1.2.0",
+  "version": "1.5.0",
   "unknown_types": "trace_only",
   "types": {
     "world.requested": {
@@ -4775,6 +6498,20 @@ export const EVENT_REGISTRY: EventRegistry & {
       "trace_row": "approaches={data.approach_count}",
       "data_schema": "events/data/plan.approaches_proposed.schema.json",
       "fixture": "fixtures/events/valid/plan.approaches_proposed.json"
+    },
+    "plan.revised": {
+      "family": "plan",
+      "verb": "revised",
+      "priority": "should",
+      "pillar": "P1",
+      "default_severity": "info",
+      "side_effect": false,
+      "world_effect": "Revision blueprints appear on the buildings whose work changes.",
+      "hud_effect": "The plan gains the revision units and the credit estimate updates.",
+      "story_template": "{actor} planned revision work for a change asked for in the Meeting Hall ({data.run}).",
+      "trace_row": "proposal={data.proposal_id} run={data.run}",
+      "data_schema": "events/data/plan.revised.schema.json",
+      "fixture": "fixtures/events/valid/plan.revised.json"
     },
     "budget.requested": {
       "family": "budget",
@@ -5158,6 +6895,90 @@ export const EVENT_REGISTRY: EventRegistry & {
       "data_schema": "events/data/skill.loaded.schema.json",
       "fixture": "fixtures/events/valid/skill.loaded.json"
     },
+    "skill.captured": {
+      "family": "skill",
+      "verb": "captured",
+      "priority": "should",
+      "pillar": "P7",
+      "default_severity": "info",
+      "side_effect": false,
+      "world_effect": "A new card joins the skill being taught on Your Desk.",
+      "hud_effect": "The Skills page lists the captured step.",
+      "story_template": "{actor} showed Tilo step {data.step} of a new skill ({data.method}).",
+      "trace_row": "skill={data.skill} method={data.method} step={data.step}",
+      "data_schema": "events/data/skill.captured.schema.json",
+      "fixture": "fixtures/events/valid/skill.captured.json"
+    },
+    "skill.version_proposed": {
+      "family": "skill",
+      "verb": "version_proposed",
+      "priority": "should",
+      "pillar": "P7",
+      "default_severity": "info",
+      "side_effect": false,
+      "world_effect": "Tilo lays its own version of the skill beside the captured cards.",
+      "hud_effect": "The Skills page shows Tilo's version with its estimates.",
+      "story_template": "Tilo proposed a version with {data.steps} steps that stops to ask {data.asks} times.",
+      "trace_row": "skill={data.skill} version={data.version} steps={data.steps} asks={data.asks} credits_per_run={data.credits_per_run} source={data.source}",
+      "data_schema": "events/data/skill.version_proposed.schema.json",
+      "fixture": "fixtures/events/valid/skill.version_proposed.json"
+    },
+    "skill.try_run": {
+      "family": "skill",
+      "verb": "try_run",
+      "priority": "should",
+      "pillar": "P2",
+      "default_severity": "info",
+      "side_effect": false,
+      "world_effect": "The practice desk shows the try run's steps; no parcel leaves.",
+      "hud_effect": "The Skills page shows how closely the try run matched.",
+      "story_template": "A try run matched {data.matched} of {data.total} steps and sent nothing ({data.outcome}).",
+      "trace_row": "skill={data.skill} version={data.version} match={data.match} asked={data.asked} skipped={data.skipped} side_effects={data.side_effects}",
+      "data_schema": "events/data/skill.try_run.schema.json",
+      "fixture": "fixtures/events/valid/skill.try_run.json"
+    },
+    "skill.state_changed": {
+      "family": "skill",
+      "verb": "state_changed",
+      "priority": "should",
+      "pillar": "P7",
+      "default_severity": "info",
+      "side_effect": false,
+      "world_effect": "The skill's card on Your Desk changes its badge.",
+      "hud_effect": "The Skills library shows the skill as learning, trusted or paused.",
+      "story_template": "{actor} marked a skill {data.change}.",
+      "trace_row": "skill={data.skill} version={data.version} change={data.change} good_runs={data.good_runs} threshold={data.threshold}",
+      "data_schema": "events/data/skill.state_changed.schema.json",
+      "fixture": "fixtures/events/valid/skill.state_changed.json"
+    },
+    "skill.rated": {
+      "family": "skill",
+      "verb": "rated",
+      "priority": "should",
+      "pillar": "P7",
+      "default_severity": "info",
+      "side_effect": false,
+      "world_effect": "A thumb stamp lands on the run's card on Your Desk.",
+      "hud_effect": "The skill's run history bar fills in.",
+      "story_template": "{actor} rated a run of a skill: thumbs {data.thumb}.",
+      "trace_row": "skill={data.skill} version={data.version} run={data.run_id} thumb={data.thumb} wrong_step={data.wrong_step}",
+      "data_schema": "events/data/skill.rated.schema.json",
+      "fixture": "fixtures/events/valid/skill.rated.json"
+    },
+    "skill.fixed": {
+      "family": "skill",
+      "verb": "fixed",
+      "priority": "should",
+      "pillar": "P7",
+      "default_severity": "info",
+      "side_effect": false,
+      "world_effect": "The fixed step's card on Your Desk is rewritten.",
+      "hud_effect": "The skill shows its new version and the logged fix.",
+      "story_template": "{actor} fixed step {data.step}; version {data.to_version} runs next time.",
+      "trace_row": "skill={data.skill} from={data.from_version} to={data.to_version} step={data.step}",
+      "data_schema": "events/data/skill.fixed.schema.json",
+      "fixture": "fixtures/events/valid/skill.fixed.json"
+    },
     "question.routed": {
       "family": "question",
       "verb": "routed",
@@ -5241,6 +7062,76 @@ export const EVENT_REGISTRY: EventRegistry & {
       "trace_row": "ended",
       "data_schema": "events/data/meeting.ended.schema.json",
       "fixture": "fixtures/events/valid/meeting.ended.json"
+    },
+    "meeting.convened": {
+      "family": "meeting",
+      "verb": "convened",
+      "priority": "should",
+      "pillar": "P4",
+      "default_severity": "info",
+      "side_effect": false,
+      "world_effect": "The lead and its agents gather in the Meeting Hall.",
+      "hud_effect": "The meeting room opens with the agents seated round the table.",
+      "story_template": "{actor} called {target} and its team into the Meeting Hall.",
+      "trace_row": "room={data.room_id} lead={data.lead} as={data.as_role} run={data.run_state} cap={data.credit_cap} turns={data.max_turns}",
+      "data_schema": "events/data/meeting.convened.schema.json",
+      "fixture": "fixtures/events/valid/meeting.convened.json"
+    },
+    "meeting.asked": {
+      "family": "meeting",
+      "verb": "asked",
+      "priority": "should",
+      "pillar": "P4",
+      "default_severity": "info",
+      "side_effect": false,
+      "world_effect": "A speech bubble shows over the Meeting Hall.",
+      "hud_effect": "The chat panel shows the person's message.",
+      "story_template": "{actor} asked {target} something in the Meeting Hall.",
+      "trace_row": "room={data.room_id} turn={data.turn} to={data.to} mode={data.mode}",
+      "data_schema": "events/data/meeting.asked.schema.json",
+      "fixture": "fixtures/events/valid/meeting.asked.json"
+    },
+    "meeting.replied": {
+      "family": "meeting",
+      "verb": "replied",
+      "priority": "should",
+      "pillar": "P2",
+      "default_severity": "info",
+      "side_effect": false,
+      "world_effect": "A reply bubble shows over the Meeting Hall.",
+      "hud_effect": "The chat panel shows the reply and its sources; the speaker's cue shows while the reply is on screen.",
+      "story_template": "{actor} replied in the Meeting Hall ({data.outcome}).",
+      "trace_row": "room={data.room_id} turn={data.turn} outcome={data.outcome} mode={data.mode}",
+      "data_schema": "events/data/meeting.replied.schema.json",
+      "fixture": "fixtures/events/valid/meeting.replied.json"
+    },
+    "meeting.change_requested": {
+      "family": "meeting",
+      "verb": "change_requested",
+      "priority": "should",
+      "pillar": "P4",
+      "default_severity": "info",
+      "side_effect": false,
+      "world_effect": "A change slip goes from the Meeting Hall to the Town Hall.",
+      "hud_effect": "The chat panel marks the change as sent to planning.",
+      "story_template": "{actor} asked {target} for a change; it goes to planning.",
+      "trace_row": "room={data.room_id} proposal={data.proposal_id} as={data.as_role}",
+      "data_schema": "events/data/meeting.change_requested.schema.json",
+      "fixture": "fixtures/events/valid/meeting.change_requested.json"
+    },
+    "meeting.adjourned": {
+      "family": "meeting",
+      "verb": "adjourned",
+      "priority": "should",
+      "pillar": "P4",
+      "default_severity": "info",
+      "side_effect": false,
+      "world_effect": "The agents leave the Meeting Hall.",
+      "hud_effect": "The meeting room closes and the chat panel says why.",
+      "story_template": "The Meeting Hall meeting with {target} ended ({data.reason}).",
+      "trace_row": "room={data.room_id} reason={data.reason} turns={data.turns} credits={data.credits_spent}",
+      "data_schema": "events/data/meeting.adjourned.schema.json",
+      "fixture": "fixtures/events/valid/meeting.adjourned.json"
     },
     "connection.requested": {
       "family": "connection",
@@ -5833,6 +7724,20 @@ export const EVENT_REGISTRY: EventRegistry & {
       "trace_row": "rule={data.rule} key={data.key} from={data.from} to={data.to}",
       "data_schema": "events/data/team_rule.changed.schema.json",
       "fixture": "fixtures/events/valid/team_rule.changed.json"
+    },
+    "world.share_changed": {
+      "family": "world",
+      "verb": "share_changed",
+      "priority": "should",
+      "pillar": "P4",
+      "default_severity": "info",
+      "side_effect": false,
+      "world_effect": "A team badge shows on the world's gate while the share stands and comes down when it is withdrawn.",
+      "hud_effect": "The world's sharing line names the team, or says it is not shared.",
+      "story_template": "{actor} turned team sharing {data.state} for this world.",
+      "trace_row": "team={data.team} state={data.state}",
+      "data_schema": "events/data/world.share_changed.schema.json",
+      "fixture": "fixtures/events/valid/world.share_changed.json"
     }
   }
 };

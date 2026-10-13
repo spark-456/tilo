@@ -1,0 +1,5 @@
+{
+  "user_id": "u_priya",
+  "connector": "google_calendar",
+  "capabilities": ["write", "send"]
+}
