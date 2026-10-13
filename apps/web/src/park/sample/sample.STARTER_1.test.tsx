@@ -224,7 +224,8 @@ describe("STARTER_1 the pages", () => {
     expect((control(rig.el, "Watch the replay") as HTMLAnchorElement).getAttribute("href")).toBe(
       `/world/${SAMPLE_WORLD_ID}/stage`,
     );
-    expect((control(rig.el, "Pause") as HTMLButtonElement).disabled).toBe(true);
+    // UI-10 B2: a recording has nothing running, so no Pause is offered at all (was a disabled one)
+    expect(hasControl(rig.el, "Pause")).toBe(false);
   });
 });
 

@@ -107,8 +107,8 @@ export const NORTHLINE: WorldCopy = {
   progW: 72,
   spend: "£342",
   of: "of £500",
-  // The reference's Town branch comes first: "Each run costs about <spend>. Billed monthly."
-  spendNote: "Each run costs about £342. Billed monthly.",
+  // UI-10 B3: £342 is the project's spend so far, not a per-run cost, so a budgeted Town says so.
+  spendNote: "£342 so far. Billed monthly.",
   spendW: 68.4,
   facts: [
     ["Owner", "Jin Park"],
@@ -170,7 +170,7 @@ export const CALLS: WorldCopy = {
   facts: [
     ["Owner", "Alex Morgan"],
     ["Started", "09:04"],
-    ["Ends", "in 3 min"],
+    ["Recorded state", "ends in 3 min"],
     ["Agents", "1"],
   ],
   skills: ["Summarise call notes"],
@@ -228,7 +228,7 @@ export const VENUES: WorldCopy = {
   facts: [
     ["Owner", "Alex Morgan"],
     ["Started", "09:01"],
-    ["Ends", "in 6 min"],
+    ["Recorded state", "ends in 6 min"],
     ["Agents", "2"],
   ],
   skills: [],
