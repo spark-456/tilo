@@ -8,6 +8,7 @@ import pytest
 from _mtg09b_lib import block_network
 from _ppl11a_lib import OWNER, SAM
 from _ppl11c_lib import artifact_paths, meeting_rig
+from test_FR_MTG_03_minutes_analysis import Script as AnalysisScript
 from tilo_api.deps import WorldRecord
 from tilo_api.meeting_minutes import analyze_and_publish_minutes
 from tilo_api.people_writes import Refusal, Writer
@@ -37,6 +38,7 @@ def integration(people_rig, monkeypatch):
         "minutes": None,
         "minutes_confirmed_by": None,
         "delete_minutes_after": None,
+        "agenda": [],
     }
     rig.real.meetings.replace(ended, expected_version=before.version)
     scope = Scope(rig.org, ended["world_id"], OWNER)
@@ -120,7 +122,7 @@ def test_FR_MTG_03_integration_refuses_before_provider_or_write(integration, cha
     assert not rig.events.calls
 
 
-@pytest.mark.parametrize("change", ["title", "pin", "joining"])
+@pytest.mark.parametrize("change", ["title", "pin", "joining", "agenda"])
 def test_FR_MTG_03_integration_rejects_generation_race_without_new_artifact(integration, change):
     rig, _, _, router = integration
 
@@ -131,6 +133,8 @@ def test_FR_MTG_03_integration_rejects_generation_race_without_new_artifact(inte
             after["title"] = "Changed during analysis"
         elif change == "pin":
             after["transcript"]["version"] += 1
+        elif change == "agenda":
+            after["agenda"] = [{"title": "Changed agenda", "minutes": None}]
         else:
             after["status"] = "joining"
         rig.real.meetings.replace(after, expected_version=stored.version)
@@ -192,3 +196,32 @@ def test_FR_MTG_03_integration_provider_failure_is_fixed_and_has_no_write(integr
         run(integration)
     assert raised.value.detail == "analysis_failed" and raised.value.status_code == 502
     assert rig.snapshot() == before and artifact_paths(rig) == paths and not rig.events.calls
+
+
+def test_FR_MTG_03_integration_stored_agenda_is_required_before_publication(integration):
+    rig, _, _, router = integration
+    stored = rig.real.meetings.get(rig.org, "mt_q4_plan")
+    agenda = [{"title": "Stored topic", "minutes": None}]
+    rig.real.meetings.replace({**stored.record, "agenda": agenda}, expected_version=stored.version)
+    before, paths = rig.snapshot(), artifact_paths(rig)
+    with pytest.raises(Refusal) as raised:
+        run(integration)
+    assert raised.value.detail == "analysis_failed"
+    data = json.loads(router.calls[0][1].prompt.split("\n", 1)[1].rsplit("\n", 1)[0])
+    assert data["agenda"] == agenda
+    assert rig.snapshot() == before and artifact_paths(rig) == paths and not rig.events.calls
+
+
+def test_FR_MTG_03_integration_verified_stored_agenda_publishes_unconfirmed(integration):
+    rig, writer, scope, original = integration
+    stored = rig.real.meetings.get(rig.org, "mt_q4_plan")
+    agenda = [{"title": "Rate sheet", "minutes": 5}]
+    rig.real.meetings.replace({**stored.record, "agenda": agenda}, expected_version=stored.version)
+    evidence = original.doc["decisions"][0]["evidence"]
+    original.doc["agenda"] = [{"title": "Rate sheet", "coverage": "partial", "evidence": evidence}]
+    router = AnalysisScript(original.doc, {"supported": [True]})
+    before = rig.snapshot()
+    result = run((rig, writer, scope, router))
+    minutes = json.loads(rig.artifacts.read(scope, result["minutes"]))
+    assert minutes["agenda"] == original.doc["agenda"] and result["minutes_confirmed_by"] is None
+    assert json.loads(before)["work_items"] == json.loads(rig.snapshot())["work_items"]

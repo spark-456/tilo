@@ -47,6 +47,7 @@ def analyze_minutes(
     now: str,
     budget: float,
     safety: SafetyProvider,
+    agenda: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """Caller supplies an authorised pinned transcript, directory and stored meeting start; never a client body.
 
@@ -72,7 +73,7 @@ def analyze_minutes(
         doc, left = _call(
             router,
             "meeting_analyst",
-            {"transcript": transcript, "metadata": metadata},
+            {"transcript": transcript, "metadata": metadata, "agenda": agenda or []},
             budget,
             Minutes.model_json_schema(),
         )
@@ -86,11 +87,23 @@ def analyze_minutes(
             row["state"] = "unverified"
         if not conforms("minutes.schema.json", doc):
             raise ValueError
+        if [row["title"] for row in doc["agenda"]] != [row["title"] for row in agenda or []]:
+            raise ValueError  # coverage is of the stored agenda, with no omitted or invented topics
         utterances = {u["id"]: u for u in transcript["utterances"]}
         for group in ("summary", "agenda"):
             if any(not set(row["evidence"]) <= utterances.keys() for row in doc[group]):
                 raise ValueError
         pending, checks = [], []
+        for row in doc["agenda"]:
+            if row["coverage"] != "not_discussed" and not row["evidence"]:
+                raise ValueError
+            pending.append(row)
+            checks.append(
+                {
+                    "claim": {"title": row["title"], "coverage": row["coverage"]},
+                    "spans": [utterances[i] for i in row["evidence"]],
+                }
+            )  # absence and extent require full context, never a literal-match shortcut
         for row in doc["summary"]:
             spans = [utterances[i] for i in row["evidence"]]
             if not spans:
@@ -130,7 +143,8 @@ def analyze_minutes(
                 )
         if pending and left > 0:
             try:
-                verdict, _ = _call(router, "verifier", {"checks": checks}, left)
+                context = {"transcript": transcript} if doc["agenda"] else {}
+                verdict, _ = _call(router, "verifier", {"checks": checks, **context}, left)
                 supported = verdict["supported"]
                 if set(verdict) != {"supported"} or not isinstance(supported, list) or len(supported) != len(pending):
                     raise ValueError
@@ -143,6 +157,9 @@ def analyze_minutes(
         for row in doc["summary"]:
             if row in pending and row.pop("state", "unverified") != "verified":
                 raise ValueError  # summary has no unverified representation; refuse unsupported prose
+        for row in doc["agenda"]:
+            if row.pop("state", "unverified") != "verified":
+                raise ValueError  # coverage has no unverified enum; never manufacture not_discussed
         if not conforms("minutes.schema.json", doc):
             raise ValueError
         return doc
