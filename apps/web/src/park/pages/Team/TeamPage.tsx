@@ -159,6 +159,11 @@ export function TeamPage({ app }: { app: AppCtx }) {
             <Button
               variant="primary"
               disabled={!valid}
+              title={
+                valid
+                  ? undefined
+                  : `Enter a work email at ${ready?.domain ?? "your company"} to invite`
+              }
               style={{ opacity: valid ? 1 : 0.6 }}
               onClick={invite}
             >

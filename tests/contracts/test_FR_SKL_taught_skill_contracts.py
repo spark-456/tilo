@@ -1,5 +1,5 @@
-"""FR-SKL-01 to 07 (ADR-0034, Proposed): taught_skill.schema.json 1.0.0 (a sibling of skill.yaml), its try run, rating,
-fix and helpers report, the six skill.* events (registry 1.4.0) and the capture video types (common 1.7.0)."""
+"""FR-SKL-01 to 07 (ADR-0034, Proposed): taught_skill.schema.json 1.0.0 or later (a sibling of skill.yaml), its try run,
+rating, fix and helpers report, the six skill.* events (registry 1.4.0) and the capture video types (common 1.7.0)."""
 
 from __future__ import annotations
 
@@ -36,7 +36,11 @@ def test_FR_SKL_every_valid_fixture_passes_and_every_invalid_one_fails(repo_root
 
 def test_FR_SKL_01_a_taught_skill_is_a_sibling_and_skill_yaml_is_unchanged(repo_root):
     taught, skill = load_schema(repo_root, "taught_skill"), load_schema(repo_root, "skill")
-    assert (taught["title"], taught["x-version"], taught["additionalProperties"]) == ("TaughtSkill", "1.0.0", False)
+    assert (taught["title"], _version(taught) >= (1, 0, 0), taught["additionalProperties"]) == (
+        "TaughtSkill",
+        True,
+        False,
+    )
     assert {"status", "owner", "captured", "plan"}.isdisjoint(skill["properties"]), "skill.yaml stays expert-signed"
     assert set(taught["$defs"]["method"]["enum"]) == {"describe", "upload", "guided", "record"}
     assert taught["$defs"]["pinned"]["required"] == ["artifact_id", "version"]

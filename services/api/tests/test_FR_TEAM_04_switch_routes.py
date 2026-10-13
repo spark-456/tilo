@@ -94,9 +94,13 @@ def test_FR_TEAM_04_a_scheduled_start_on_a_weekend_is_held_not_counted() -> None
     from tilo_api.team_store import InMemoryTeamStore
     from tilo_harness.schedule import StartSkipped
 
+    # SCHED_PLAN: `start` refuses a snapshot whose chosen approach is not one of the 2 to 3 offered ones (`_plannable`)
+    # before it reaches the weekend switch, so the stored record must carry its offered list.
+    offered = [{"id": "approach_a"}, {"id": "approach_b"}]
     record = SimpleNamespace(
-        owner_user_id=OWNER, brief={}, approach={}, enabled=True, cadence=SimpleNamespace(tz="UTC")
-    )
+        owner_user_id=OWNER, brief={}, approach=offered[0], approaches=offered, enabled=True,
+        cadence=SimpleNamespace(tz="UTC"),
+    )  # fmt: skip
     schedules = SimpleNamespace(get=lambda _id: record)
     on = state(switches={"spend": True, "share": True, "undo": True, "tools": True, "weekend": True})
     starter = ScheduleStarter(

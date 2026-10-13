@@ -16,7 +16,9 @@ import type {
   World,
 } from "../../api/types";
 import type { AppCtx } from "../../app/AppCtx";
-import { useParkApi, useParkStore, useSchedule } from "../../app/context";
+import { BUILD_SHA } from "../../app/buildStamp";
+import { useDemoSession, useParkApi, useParkStore, useSchedule } from "../../app/context";
+import { DEMO_START } from "../../app/store";
 import { ComposerPanel, type Phase, QUICK_IDLE, type QuickView } from "./ComposerPanel";
 import "./Home.css";
 import { Hero, KpiStrip, Pins, TodayPanel } from "./Panels";
@@ -57,6 +59,8 @@ export function HomePage({ app }: { app: AppCtx }) {
   const api = useParkApi();
   const schedule = useSchedule();
   const store = useParkStore();
+  // QA-DEMO-1: a demo session (the sample company) replays recorded data and starts no run.
+  const demo = useDemoSession();
   const { go, dec, added, night, vw, vh, pins, needsLeft } = app;
 
   const [base, setBase] = useState<Loaded<Base>>(null);
@@ -161,22 +165,39 @@ export function HomePage({ app }: { app: AppCtx }) {
   // A start in flight (live only): the confirm control waits, nothing is cleared and nothing else is edited.
   const [sending, setSending] = useState(false);
   const sendingNow = useRef(false);
+  // WEB-W1: files picked or pasted for the next Thinking start. They leave with Start on the one POST /intake.
+  const [files, setFiles] = useState<File[]>([]);
   const confirmStart = () => {
     if (sendingNow.current) return;
     const text = query.trim();
+    if (demo) {
+      // HR-1: no world, no progress and no "Director read your brief" without a recorded event. Say so plainly
+      // and open the sample world, whose data is labelled Sample.
+      store.toast(DEMO_START);
+      toIdle();
+      if (waitingIn) go("world", { id: waitingIn.id });
+      else go("worlds");
+      return;
+    }
     if (!store.getState().sources.live) {
       app.addWorld(modeKey, text);
       setQuery("");
       toIdle();
       return;
     }
+    if (text === "") {
+      // Issue 932: the plan on show is the example for an empty box; sending it would post nothing to the server.
+      store.toast("Describe your task first, then press Start.");
+      return;
+    }
     sendingNow.current = true;
     setSending(true);
-    store.startWorld(modeKey, text).then((ok) => {
+    store.startWorld(modeKey, text, files).then((ok) => {
       sendingNow.current = false;
       setSending(false);
       if (!ok) return; // the card stays open and the text stays, so the person can try again
       setQuery("");
+      setFiles([]);
       toIdle();
     });
   };
@@ -319,6 +340,18 @@ export function HomePage({ app }: { app: AppCtx }) {
       {!failed || (worldsLive && worlds !== "failed") ? (
         <ComposerPanel
           sending={sending}
+          sample={demo}
+          staging={{
+            files,
+            onChange: setFiles,
+            disabledReason: demo
+              ? "Uploads are off in the demo; sign in to attach files."
+              : !worldsLive
+                ? "Uploads need setup; the owner has not finished it."
+                : effort === "quick"
+                  ? "Uploads work with Thinking tasks; a Quick ask makes no task."
+                  : null,
+          }}
           mode={mode}
           modes={MODES}
           query={query}
@@ -352,7 +385,10 @@ export function HomePage({ app }: { app: AppCtx }) {
         />
       ) : null}
       <nav className="park-home-legal" aria-label="Legal">
-        <a href="/privacy">Privacy</a> · <a href="/terms">Terms</a>
+        <a href="/privacy">Privacy</a> · <a href="/terms">Terms</a> ·{" "}
+        <span className="park-home-build" title="The commit this page was built from">
+          Build {BUILD_SHA}
+        </span>
       </nav>
     </div>
   );

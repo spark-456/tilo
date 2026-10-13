@@ -274,6 +274,14 @@ class LinkService:
             raise LinkRefused("malformed") from None
         return claims
 
+    def peek(self, token: str) -> tuple[str, str, str | None, str]:
+        """(card id, action, option, user) of a well-signed, unexpired token, for a confirm page. Consumes nothing
+        and checks nothing else: a GET (a scanner, a prefetch) never spends a link; `redeem` is the one that does."""
+        claims = self._verify(token)
+        if self._now() >= datetime.fromtimestamp(claims["e"], tz=UTC):
+            raise LinkRefused("expired")
+        return claims["c"], claims["a"], claims["o"], claims["u"]
+
     def redeem(
         self, token: str, *, card_id: str, action: str, viewer: str | None = None, option: str | None = None
     ) -> Redemption:

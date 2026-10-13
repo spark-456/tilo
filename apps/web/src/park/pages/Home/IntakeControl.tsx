@@ -1,4 +1,5 @@
 import { type ReactNode, useRef, useState } from "react";
+import { StagedFiles, type Staging } from "./StagedFiles";
 
 // I6 local UI seam only. No HTTP transport or KnowledgeItem contract is introduced here.
 export type IntakeInput = { kind: "file"; file: File } | { kind: "text"; text: string };
@@ -22,7 +23,8 @@ type Item = {
 export function IntakeControl({
   client,
   children,
-}: { client?: IntakeClient | undefined; children: ReactNode }) {
+  staging,
+}: { client?: IntakeClient | undefined; staging?: Staging | undefined; children: ReactNode }) {
   const [items, setItems] = useState<Item[]>([]);
   const [text, setText] = useState("");
   const next = useRef(0);
@@ -55,6 +57,7 @@ export function IntakeControl({
       patch(item.key, { removing: false, error: "Could not remove this item. Try again." });
     }
   }
+  if (!client && staging) return <StagedFiles staging={staging}>{children}</StagedFiles>;
   if (!client) {
     return (
       <div

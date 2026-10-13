@@ -19,7 +19,8 @@ def rig(people_rig, monkeypatch):
     block_network(monkeypatch)
     h = HostRig(people_rig())
     h.approve_and_wait_sent()
-    wait_for(lambda: h.events("artifact.created"), what="host receipt")
+    # the draft already made one `artifact.created`: wait for the run's terminal event, not for a mid-run one
+    wait_for(lambda: h.events("world.completed"), what="the hosted run to finish")
     h.rig.as_user(OWNER)
     captured = BotCapture(
         Transcript(

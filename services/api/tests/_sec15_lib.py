@@ -46,6 +46,12 @@ PINNED_PUBLIC_ROUTES = frozenset(
     }
 )
 
+# The second public set, named on purpose (the owner's decision, 13 Oct 2026, BQ-PA06B-1): the plate digest's emailed
+# Done and Snooze links open in a mail client with no session. The signed single-use token in the path is the only
+# credential and the route verifies it itself (forged, expired and replayed cases: test_FR_PA_06b). Nothing else
+# joins this set without the owner.
+PINNED_PUBLIC_LINK_ROUTES = frozenset({("GET", "/l/{token}"), ("POST", "/l/{token}")})
+
 PROBE_PARAMS = {"world_id": "w_probe", "task_id": "t_probe", "policy_id": "pol_probe", "card_id": "c_probe"}
 _PARAM = re.compile(r"\{([a-z_]+)(?::[a-z]+)?\}")
 
@@ -64,7 +70,7 @@ def route_table(app: Any) -> list[tuple[str, str]]:
 
 
 def non_public(app: Any) -> list[tuple[str, str]]:
-    return [r for r in route_table(app) if r not in PINNED_PUBLIC_ROUTES]
+    return [r for r in route_table(app) if r not in PINNED_PUBLIC_ROUTES | PINNED_PUBLIC_LINK_ROUTES]
 
 
 class FakeAccessStore:
