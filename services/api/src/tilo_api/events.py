@@ -79,16 +79,18 @@ def apply_level_change(policy: dict, *, owner: str, change: str, at: str) -> Non
     policy["changed_by"] = {"by": owner, "at": at}
 
 
-def policy_changed_part(*, part_id: str, policy_id: str, change: str, owner: str, at: str, vis: Any) -> dict:
+def policy_changed_part(
+    *, part_id: str, policy_id: str, change: str, owner: str, at: str, vis: Any, level: str = "L1"
+) -> dict:
     return {
         "id": part_id,
         "type": "policy.changed",
         "actor": owner,
         "target": policy_id,
-        "summary": f"{owner} set policy {policy_id} to L1 ({change})"[:140],
+        "summary": f"{owner} set policy {policy_id} to {level} ({change})"[:140],
         "vis": vis,
         "authz": {"by": "person", "ref": owner, "at": at},
-        "data": {"policy_id": policy_id, "change": change, "level": "L1"},
+        "data": {"policy_id": policy_id, "change": change, "level": level},
     }
 
 

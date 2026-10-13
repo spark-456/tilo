@@ -80,7 +80,8 @@ export function LibrarySection({
       onTryDraft();
       return;
     }
-    app.toast("Test run started on yesterday’s data. Results in about a minute");
+    // Issue 932: nothing starts a run from here yet, so the toast says so instead of promising results.
+    app.toast("Test runs are not connected yet. Nothing was started.");
   };
 
   return (

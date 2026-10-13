@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from datetime import timedelta
 from typing import TYPE_CHECKING
 
@@ -17,6 +18,8 @@ from .errors import MeetingHostRefused, ProviderUnavailable
 from .host_auth import CertsUnavailable, caller_status
 from .host_broker import BrokerNotConfigured
 from .tokens import ConnectionExpired, InsufficientScope, NotConnected
+
+_log = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from .host_routes import HostRuntime
@@ -87,7 +90,8 @@ def join_router(runtime: HostRuntime) -> APIRouter:
             return refused(503, "not_configured")
         except ProviderUnavailable:
             return refused(503, "try_again")
-        except Exception:
+        except Exception as exc:
+            _log.error("a join read failed (%s)", type(exc).__name__)
             return refused(503, "try_again")
         return JSONResponse(answer, headers={"Cache-Control": "no-store"})
 

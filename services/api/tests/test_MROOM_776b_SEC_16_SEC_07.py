@@ -84,7 +84,11 @@ def test_MROOM_776b_SEC_16_the_router_model_prices_billed_attempts_not_zero():
     config = load_providers_config(REPO_ROOT / "config" / "models.yaml", REPO_ROOT / "config" / "prices.yaml")
 
     def attempt(error, tin=None, tout=None):
-        return RouterAttempt("lite-31", "google", "error", 1.0, tin, tout, None, error, None)
+        # by keyword: RouterAttempt grew tokens_cached (EFF-04) and search_queries/units_overrun (LW-05) between
+        # tokens_out and error_type, so the old positional call put the error name into search_queries
+        return RouterAttempt(
+            "lite-31", "google", "error", latency_ms=1.0, tokens_in=tin, tokens_out=tout, error_type=error
+        )
 
     class Failing:
         def __init__(self, attempts):

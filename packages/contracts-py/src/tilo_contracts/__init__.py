@@ -125,7 +125,7 @@
 # outbox.schema.json 1.0.0 sha256:0b9b172f230a6347
 # person.schema.json 1.0.0 sha256:2c928319dd7ab9d1
 # pilot.schema.json 1.0.0 sha256:5d091f814844b3b1
-# pinboard_item.schema.json 1.0.0 sha256:fe6df109871cea93
+# pinboard_item.schema.json 1.1.0 sha256:edf4c50a588211ee
 # plan.schema.json 1.1.0 sha256:f0722cc94a84e2d1
 # plate.schema.json 1.0.0 sha256:d2a4e4361a714c8f
 # policy.schema.json 1.0.0 sha256:307bca25f6efc07e
@@ -133,10 +133,11 @@
 # scenario.schema.json 1.0.0 sha256:b8e044d7e37b92a3
 # skill.schema.json 1.1.0 sha256:9eeee7768b667afa
 # spend_caps.schema.json 1.1.1 sha256:c04bc36ac17dc0ab
-# taught_skill.schema.json 1.0.0 sha256:ca1c19c1dadd31c0
+# taught_skill.schema.json 1.1.0 sha256:b23321ed0cd570d4
 # team_lead.schema.json 1.0.0 sha256:19413726e364ffdd
 # transcript.schema.json 1.0.0 sha256:08f934b8f0c9a40e
 # ui_action.schema.json 1.0.0 sha256:2ceb1e0b46368734
+# user_settings.schema.json 1.0.0 sha256:dfc439371ba69131
 # work_item.schema.json 1.0.0 sha256:7add9f68c1f996fb
 # events/registry.yaml 1.4.0 sha256:94fe429dabf876f7
 
@@ -2643,6 +2644,12 @@ type Url = Annotated[
 ]
 
 
+type PinboardItemPlaceId = Annotated[str, Field(pattern="^[a-z][a-z0-9_]{0,31}$")]
+"""
+A board or column id: lower-case letters, digits and underscore, starting with a letter, at most 32 characters.
+"""
+
+
 class PinboardItemScopePersonal(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
@@ -3246,6 +3253,50 @@ class TaughtSkillFix(BaseModel):
     at: Timestamp
 
 
+type TaughtSkillRunOutcome = Literal["completed", "failed"]
+"""
+How a real run ended (ADR-0037): completed after world.completed, failed after world.failed. Pause all and the kill switch end nothing here, so a run they stop stays unfinished and is never rateable (TS-14).
+"""
+
+
+class TaughtSkillRealRun(BaseModel):
+    """
+    FR-SKL-05 to 07, ADR-0037: the record that one real run of one saved skill version started and how it ended, at orgs/{org}/taught_skills/{skill}/real_runs/{run_id} (the run id is the key, so a run is recorded once). tilo-api or the harness writes it from its own records, never from a request body (TS-13). by is the verified person whose run it is, set by the server. org_id, skill, version, run_id, world_id, by, plan and started_at are fixed at the start. finished_at and outcome are null together until the run's own world writes its terminal event, then set once together (TS-14). plan is the skill's plan at that version, kept so a later fix cannot rewrite what the run followed. A try run is never one of these (TS-10), and a rating and its note are the rating record's.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    org_id: OrgId
+    skill: TaughtSkillId
+    version: Annotated[int, Field(ge=1)]
+    run_id: RunId
+    world_id: WorldId
+    by: UserId
+    plan: Annotated[list[TaughtSkillPlanStep], Field(max_length=20, min_length=1)]
+    started_at: Timestamp
+    finished_at: Timestamp | None
+    outcome: TaughtSkillRunOutcome | None
+
+
+class TaughtSkillRunAnswer(BaseModel):
+    """
+    FR-SKL-07, ADR-0037: one question card that a person answered in a recorded real run, at orgs/{org}/taught_skills/{skill}/real_runs/{run_id}/answers/{card_id} (one for each card). It links records that already exist and holds no text of the question or the answer. by and at are the card's recorded answerer (the person, never a Team Lead id) and answer time, copied once when the answer commits (TS-16). The helpers report counts these and nothing else (TS-12).
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    org_id: OrgId
+    skill: TaughtSkillId
+    version: Annotated[int, Field(ge=1)]
+    run_id: RunId
+    world_id: WorldId
+    card_id: Ulid
+    by: UserId
+    at: Timestamp
+
+
 class TaughtSkillHelper(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
@@ -3402,6 +3453,151 @@ class UiActionUntag(BaseModel):
     kind: Literal["untag"]
     pin_id: PinId
     user: UserId
+
+
+type UserSettingsLine = Annotated[
+    str, Field(max_length=80, min_length=1, pattern="^[^\\u0000-\\u001F\\u007F]+$")
+]
+"""
+One line typed by a person, 1 to 80 characters: data, never an instruction.
+"""
+
+
+type UserSettingsEmail = Annotated[
+    str, Field(max_length=254, pattern="^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$")
+]
+"""
+A display address, at most 254 characters, with one @ and a dotted host. It is not verified and is never a recipient (USET-06).
+"""
+
+
+type UserSettingsTimeZone = Annotated[
+    str,
+    Field(max_length=64, pattern="^(UTC|[A-Z][A-Za-z_+-]*(/[A-Za-z0-9_+-]+){1,2})$"),
+]
+"""
+An IANA time zone name (Asia/Kolkata) or UTC, in the same shape as person.time_zone. The schema checks the shape; tilo-api also refuses a name the zone database does not know (USET-03).
+"""
+
+
+type UserSettingsLanguage = Annotated[
+    str, Field(max_length=16, pattern="^[a-z]{2,3}(-[A-Z][a-z]{3})?(-[A-Z]{2})?$")
+]
+"""
+A BCP 47 language tag of the drafts Tilo writes for the person: language, an optional four-letter script and an optional two-letter region (en, en-GB, zh-Hans-CN). A display name such as English (UK) is the client's label, never stored.
+"""
+
+
+type UserSettingsClock = Annotated[
+    str, Field(pattern="^([01][0-9]|2[0-3]):[0-5][0-9]$")
+]
+"""
+A wall-clock time, HH:MM on a 24-hour clock, 00:00 to 23:59, in the zone of the object that holds it.
+"""
+
+
+type UserSettingsWeekday = Literal["mon", "tue", "wed", "thu", "fri", "sat", "sun"]
+
+
+class UserSettingsWorkingHours(BaseModel):
+    """
+    The days and the window Tilo books inside, in profile.time_zone. start is inclusive, end exclusive, and start is before end: no overnight window (USET-03, as config/personal.yaml working_window).
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    days: Annotated[list[UserSettingsWeekday], Field(max_length=7, min_length=1)]
+    start: UserSettingsClock
+    end: UserSettingsClock
+
+
+class UserSettingsProfile(BaseModel):
+    """
+    FR-SET-01. The title is null when the person has none.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    name: UserSettingsLine
+    email: UserSettingsEmail
+    title: UserSettingsLine | None
+    time_zone: UserSettingsTimeZone
+    language: UserSettingsLanguage
+    working_hours: UserSettingsWorkingHours
+
+
+class UserSettingsChannels(BaseModel):
+    """
+    Whether one kind of notice reaches the person by phone, email and Slack. Saving a choice verifies no channel and proves no delivery.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    phone: bool
+    email: bool
+    slack: bool
+
+
+type UserSettingsDecisionChannels = UserSettingsChannels
+
+
+class UserSettingsNotifications(BaseModel):
+    """
+    FR-SET-02: the matrix, one row for each kind of notice. The decisions row keeps at least one channel on (USET-04): the rule is in the schema, so a client that skips its own guard is refused. Any other row may be all off.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    decisions: UserSettingsDecisionChannels
+    spend: UserSettingsChannels
+    finished: UserSettingsChannels
+    digest: UserSettingsChannels
+    weekly: UserSettingsChannels
+
+
+class UserSettingsMoney(BaseModel):
+    """
+    An amount in the minor unit of its currency (paise, pence, cents): an integer from 1 to 1000000000000, never a float, a bool or a string with a symbol. currency is an ISO 4217 code; tilo-api refuses a code it has no minor unit for (USET-03).
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    amount_minor: Annotated[int, Field(ge=1, le=1000000000000)]
+    currency: Annotated[str, Field(pattern="^[A-Z]{3}$")]
+
+
+class UserSettingsQuietHours(BaseModel):
+    """
+    FR-SET-02 and FR-HIL-13, in the shape tilo_channels.quiet_hours.parse_quiet_hours already reads. During the window only gate and blocked notices notify; this object has no field that could hide a gate (USET-05). start and end are in timezone, the window may cross midnight, and start is never end (USET-03). threshold is typed money or null; nothing delivers by it in this release (USET-05).
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    enabled: bool
+    start: UserSettingsClock
+    end: UserSettingsClock
+    timezone: UserSettingsTimeZone
+    threshold: UserSettingsMoney | None
+
+
+class UserSettingsUpdate(BaseModel):
+    """
+    The body of PUT /v1/me/settings: the whole document except what the server owns. version is the one the client read (0 when nothing was saved yet). It names no owner or org: they come from the verified principal, so a body that carries one, or updated_at, is refused (USET-01).
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    version: Annotated[int, Field(ge=0, le=1000000)]
+    profile: UserSettingsProfile
+    notifications: UserSettingsNotifications
+    quiet_hours: UserSettingsQuietHours
 
 
 class WorkItemSource(BaseModel):
@@ -4575,37 +4771,17 @@ class Pilot(BaseModel):
     survey_response: PilotSurveyResponse | None = None
 
 
-class PinboardItem(BaseModel):
+class PinboardItemPlacement(BaseModel):
     """
-    One entry on a pinboard (FR-PB-01 to -07). A personal entry is private to `scope.user`: no owner, no mention, never proposed (PE-01). A team entry is read by the members of `scope.team` once `active`; until then only `set_up_by` sees it (PE-02). `set_up_by` is the accountable person shown in the table and the target of "get in touch" (PE-09); for an entry Tilo made it is the person who confirmed or owns the meeting. Tilo's entries carry a `source` ("added by Tilo from ..."); a Tilo-made team entry is `active` only with `confirmed_by` (PE-07, PE-08). `url` is https with no user info, query or fragment, and passes the secret redactor before it is stored.
+    ADR-0038, FR-PB: where one entry sits on the board of its own scope, left out until it is placed and never null (ADR-0011). board and column are short ids of a presentation place inside that scope, never a user, team or access grant, and the scope itself is not here. order is a sort key inside one board and column across the entries of the scope, lowest first and ties by pin id ascending, so a move writes this one entry and never renumbers another, which may belong to someone else. A move changes this object only: not the title, the content, the scope, the owner, the status, the history or updated_at (PE-36).
     """
 
     model_config = ConfigDict(
         extra="forbid",
     )
-    id: PinId
-    org_id: OrgId
-    scope: PinboardItemScopePersonal | PinboardItemScopeTeam
-    title: Annotated[
-        str, Field(max_length=140, min_length=1, pattern="^[^\\u0000-\\u001F\\u007F]+$")
-    ]
-    body: Body | None
-    kind: Literal["note", "decision", "deadline", "link"]
-    url: Url | None
-    owner: UserId | None
-    due: CalendarDate | None
-    status: Literal["proposed", "active", "removed"]
-    created_by: Maker
-    set_up_by: UserId
-    source: PinboardItemSource | None
-    confirmed_by: TeamLeadAssignment | None
-    flagged: bool
-    """
-    True when the minutes, mail or calendar text this was made from were flagged by the safety provider; never cleared by a model. Any draft, nudge, send or calendar write built from a flagged record is T3 with safety_flag (PE-21).
-    """
-    history: Annotated[list[PinboardItemHistoryEntry], Field(min_length=1)]
-    created_at: Timestamp
-    updated_at: Timestamp
+    board: PinboardItemPlaceId
+    column: PinboardItemPlaceId
+    order: Annotated[int, Field(ge=0, le=9999)]
 
 
 class PlanApproach(BaseModel):
@@ -4943,6 +5119,23 @@ class UiActionNavigate(BaseModel):
     kind: Literal["navigate"]
     route: UiActionRoute
     target: UiActionTarget | None
+
+
+class UserSettings(BaseModel):
+    """
+    One person's saved profile and notification preferences (FR-SET-01, FR-SET-02, ADR-0039), stored and served by tilo-api for the verified principal only, keyed by org and user; no request names another person's. A document with version 0 is the server's unsaved defaults, never a stored record, and its updated_at is null. version counts saved writes: a write carries the version it read and is refused as stale when it is not the stored one (USET-02). Every object is closed, so an unknown field is refused. Profile email and the rest of the profile are display data: they change no sign-in identity, verified destination, directory record or connector grant (USET-06). Preferences authorise nothing and start no work (USET-07). Rules USET-01 to USET-08 are in user_settings.rules.md. $defs update is the request body of a write.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    owner_id: UserId
+    org_id: OrgId
+    version: Annotated[int, Field(ge=0, le=1000000)]
+    profile: UserSettingsProfile
+    notifications: UserSettingsNotifications
+    quiet_hours: UserSettingsQuietHours
+    updated_at: Timestamp | None
 
 
 class WorkItem(BaseModel):
@@ -5611,6 +5804,40 @@ class Person(BaseModel):
     created_by: TeamLeadAssignment
 
 
+class PinboardItem(BaseModel):
+    """
+    One entry on a pinboard (FR-PB-01 to -07). A personal entry is private to `scope.user`: no owner, no mention, never proposed (PE-01). A team entry is read by the members of `scope.team` once `active`; until then only `set_up_by` sees it (PE-02). `set_up_by` is the accountable person shown in the table and the target of "get in touch" (PE-09); for an entry Tilo made it is the person who confirmed or owns the meeting. Tilo's entries carry a `source` ("added by Tilo from ..."); a Tilo-made team entry is `active` only with `confirmed_by` (PE-07, PE-08). `url` is https with no user info, query or fragment, and passes the secret redactor before it is stored. `placement` (1.1.0, ADR-0038) is optional presentation only: where the entry sits on the board of its own scope. It is no access grant and it never changes the scope or the title (PE-36).
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    id: PinId
+    org_id: OrgId
+    scope: PinboardItemScopePersonal | PinboardItemScopeTeam
+    title: Annotated[
+        str, Field(max_length=140, min_length=1, pattern="^[^\\u0000-\\u001F\\u007F]+$")
+    ]
+    body: Body | None
+    kind: Literal["note", "decision", "deadline", "link"]
+    url: Url | None
+    owner: UserId | None
+    due: CalendarDate | None
+    status: Literal["proposed", "active", "removed"]
+    created_by: Maker
+    set_up_by: UserId
+    source: PinboardItemSource | None
+    confirmed_by: TeamLeadAssignment | None
+    flagged: bool
+    """
+    True when the minutes, mail or calendar text this was made from were flagged by the safety provider; never cleared by a model. Any draft, nudge, send or calendar write built from a flagged record is T3 with safety_flag (PE-21).
+    """
+    history: Annotated[list[PinboardItemHistoryEntry], Field(min_length=1)]
+    created_at: Timestamp
+    updated_at: Timestamp
+    placement: PinboardItemPlacement | None = None
+
+
 class Plan(BaseModel):
     """
     PlanGraph (PRD 7.1 FR-INT-06, FR-INT-09): the approaches offered, the chosen one compiled to units, dependencies, roles, skills, connectors and gates, and the confirmed budget cap. Cross-reference rules PG-01.. are in contracts/plan.rules.md.
@@ -5706,7 +5933,7 @@ class ProvidersPrices(BaseModel):
 
 class TaughtSkill(BaseModel):
     """
-    A skill a person taught Tilo on the Skills page (FR-SKL-01 to FR-SKL-07, ADR-0034), stored at orgs/{org}/taught_skills/{id} and read only through tilo-api. A sibling of the expert-signed, version-pinned skill.yaml (skill.schema.json), never a change to it. One person owns it. Each fix makes a new integer version, and a run pins the version it started with. It acts only through its own tool_access, the team's levels and the policy engine. $defs try_run_result, rating, fix and helpers_report are the records and the report around it. Rules TS-01 to TS-12 are in taught_skill.rules.md.
+    A skill a person taught Tilo on the Skills page (FR-SKL-01 to FR-SKL-07, ADR-0034), stored at orgs/{org}/taught_skills/{id} and read only through tilo-api. A sibling of the expert-signed, version-pinned skill.yaml (skill.schema.json), never a change to it. One person owns it. Each fix makes a new integer version, and a run pins the version it started with. It acts only through its own tool_access, the team's levels and the policy engine. $defs try_run_result, rating, fix, real_run, run_answer and helpers_report are the records and the report around it (real_run and run_answer are 1.1.0, ADR-0037). Rules TS-01 to TS-17 are in taught_skill.rules.md.
     """
 
     model_config = ConfigDict(

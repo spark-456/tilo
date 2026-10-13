@@ -74,7 +74,7 @@ from tilo_harness.writer import new_ulid
 from tilo_metering.flags import FlagStore
 from tilo_planning.events import build_event
 
-from tilo_api import deps, dev, ephemeral, events, runs, team_access, team_store
+from tilo_api import deps, dev, ephemeral, events, nudge_sweep, plate_links, runs, team_access, team_store
 from tilo_api.access import Mode, enforced
 from tilo_api.durable_store import DurableStore
 from tilo_api.tasks import _json_body
@@ -873,7 +873,12 @@ def tick(
         answer = _fan_out(
             schedule_store, tasks_client, clock, flags, audience=audience, caller=tasks_caller, queue=queue
         )
+        nudge_sweep.sweep(request, _stamp(clock()))  # FR-PA-15b: off unless TILO_NUDGES=1; the answer never changes
         _sweep_outbox(request, clock, store_factory)
+        _sweep_push(request, clock, store_factory)
+        plate_links.sweep(
+            request, _stamp(clock())
+        )  # FR-PA-06b: off unless TILO_PLATE_DIGEST=1; never changes the answer
         return answer
     return _run_task(request, raw, schedule_store, seams_factory, clock, flags, store_factory)
 
@@ -905,6 +910,48 @@ def _sweep_outbox(request: Request, clock: Callable[[], datetime], store_factory
         sweep_due(store, adapters, lambda: _stamp(clock()), paused)
     except Exception as exc:
         logger.error("outbox sweep failed (%s)", type(exc).__name__)
+
+
+def _sweep_push(request: Request, clock: Callable[[], datetime], store_factory: Callable[[], deps.Store]) -> None:
+    """FR-CHN-17f: the Scheduler's tick also pushes new gate cards to the people who turned push on (`push_feed`),
+    best effort like the outbox sweep: whatever fails is logged by type and the tick's own answer is unchanged.
+    Nothing happens while `TILO_CHANNELS_URL` is unset, or while the outbox store is a process's own in-memory one
+    (the feed's "nothing twice" is the stored idempotency key; a restart or a second instance would send again)."""
+    overrides = request.app.dependency_overrides
+
+    def get(dep: Callable[..., Any]) -> Any:
+        return overrides.get(dep, dep)()
+
+    try:
+        rpc = get(deps.get_push_rpc)
+        if rpc is None:
+            return
+        from tilo_connectors import InMemoryOutboxStore  # noqa: PLC0415
+        from tilo_connectors.errors import SideEffectRefused  # noqa: PLC0415
+
+        from tilo_api import push_feed  # noqa: PLC0415
+        from tilo_api.push_send import PushRpcAdapter  # noqa: PLC0415
+
+        outbox_store = get(deps.get_outbox_store)  # the one the outbox sweep and the service configure
+        if isinstance(outbox_store, InMemoryOutboxStore):
+            return  # fail closed: not durable
+        subs = get(deps.get_push_store)
+        store = store_factory()
+
+        def paused(world_id: str) -> bool:
+            try:
+                world = store.load_world(world_id)
+            except Exception:
+                return True
+            return world is None or world.paused
+
+        push_feed.sweep(
+            subs=subs, store=store, outbox_store=outbox_store,
+            adapter=PushRpcAdapter(subscriptions=subs, rpc=rpc, final_error=SideEffectRefused),
+            people=get(deps.get_people_stores), writer=get(deps.get_event_writer), clock=clock, paused=paused,
+        )  # fmt: skip
+    except Exception as exc:
+        logger.error("push sweep failed (%s)", type(exc).__name__)
 
 
 def _fan_out(
