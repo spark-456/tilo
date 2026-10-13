@@ -19,8 +19,19 @@ generation. Any concurrent meeting edit refuses before writing a minutes artifac
 Existing publication CAS, event rollback, privacy and retention controls still apply.
 Minutes remain unconfirmed; no derived item, recipient, card or outbox entry is made.
 
+`meeting_analysis_mode.analyze_owner_minutes` is an inert internal request adapter.
+It checks meeting/world ownership against the principal and verified request uid,
+uses the stored scheduled start, and refuses unscheduled imports. Capture has no
+persisted actual-start field; this adapter does not claim otherwise. Its credit
+budget remains a trusted server input. Explicit mode reaches both provider factories;
+demo sessions replay. Live safety/analyst/verifier calls each re-read switches and
+team limits, reserve and conservatively settle the configured SEC-16 unit amount,
+including invocation failures. This is not actual provider-cost measurement.
+Team lowered-limit checks are per-call reads, not an atomic cross-store reservation.
+No public endpoint or automatic post-attendance job invokes the adapter yet.
+
 Remaining: recorded provider-quality E-MEET evaluation (the 12-case synthetic offline
-acceptance gate is implemented), proposed derived items with exact evidence pins, public mode/spend wiring, and the
+acceptance gate is implemented), public mode/spend wiring, and the
 confirmed-minutes FR-MTG-08 follow-up API integration. Review belongs to A/B/supervisor.
 
 Offline acceptance: `uv run --package tilo-api pytest
