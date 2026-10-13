@@ -32,9 +32,9 @@ listed only where Google offers no narrower scope.
 
 | Service | Calls | IAM granted | Secrets (accessor) | Status |
 | --- | --- | --- | --- | --- |
-| `tilo-api` | Firestore (default database only); calls connectors' `/internal/meeting-host/*` with an ID token over its VPC egress (ADR-0032); Cloud Tasks enqueue; Vertex AI (Router: approaches, Director); Model Armor (intake screen); `artifacts` bucket (uploads FR-INT-02, downloads PRD 6.2); Firebase ID-token and App Check verification (public keys, no IAM); the schedule tick (FR-AGT-14): receives the Scheduler call (api is public, the route checks its own Google OIDC token), fetches Google's public certs from googleapis.com through Private Google Access (no IAM), and reads and writes `orgs/{org}/schedules` with the `datastore.user` it already holds | project: `datastore.user` limited by an IAM condition to the (default) database, `cloudtasks.enqueuer`, custom role `tiloVertexGenerate` (`aiplatform.endpoints.predict` only) and `modelarmor.user` (added). Bucket `artifacts`: `objectCreator`, `objectViewer` (added). `serviceAccountUser` on `tilo-tasks-invoker` | none | mixed, see cells |
+| `tilo-api` | Firestore (default database only); calls connectors' `/internal/meeting-host/*` with an ID token over its VPC egress (ADR-0032); Cloud Tasks enqueue; Vertex AI (Router: approaches, Director); Model Armor (intake screen); `artifacts` bucket (uploads FR-INT-02, downloads PRD 6.2); Firebase ID-token and App Check verification (public keys, no IAM); the schedule tick (FR-AGT-14): receives the Scheduler call (api is public, the route checks its own Google OIDC token), fetches Google's public certs from googleapis.com through Private Google Access (no IAM), and reads and writes `orgs/{org}/schedules` with the `datastore.user` it already holds | project: `datastore.user` limited by an IAM condition to the (default) database, `cloudtasks.enqueuer`, custom role `tiloVertexGenerate` (`aiplatform.endpoints.predict` only) and `modelarmor.user` (added). Bucket `artifacts`: `objectCreator`, `objectViewer` (added) and the custom role `tiloArtifactObjectDelete` (`storage.objects.delete` only; erasure, FR-MEM-09; INFRA-SITTING2). Bucket `archive`: `objectCreator`, `objectViewer` (INFRA-SITTING2, #853: run archives; never delete or update). `serviceAccountUser` on `tilo-tasks-invoker` | `tilo-link-signing-key` (the plate-link signing key, `TILO_LINK_SIGNING_KEY`; created by hand with automatic replication, so only the accessor binding is Terraform's; INFRA-SITTING2) | mixed, see cells |
 | `tilo-harness` | Firestore; Cloud Tasks; Vertex AI; Model Armor (model output, tool output); Pub/Sub publish on `tilo-events`; buckets `archive`, `artifacts`, `snapshots`; connectors, browser, render | project: `datastore.user` (default database only, conditioned), `cloudtasks.enqueuer`, `aiplatform.user`, `modelarmor.user` (added). Topic `tilo-events`: `pubsub.publisher`. `archive`: `objectCreator` (present), `objectViewer` (added). `artifacts` and `snapshots`: `objectCreator`, `objectViewer` (added). `run.invoker` on connectors, browser, render. Receives the Gmail renew and poll calls from Scheduler | none | mixed |
-| `tilo-channels` | Vertex AI (triage, drafting); Model Armor (inbound mail and WhatsApp text); `tilo-api`; the Gmail push endpoint (forwards to the API) | project: custom role `tiloVertexGenerate`, `modelarmor.user` (added). Holds no Firestore, Pub/Sub or Storage role (writes through the API, SEC-12) | `whatsapp-api-token`, `channels-webhook-signing-key`, `email-action-link-signing-key` (channels only, moved from api in P0-07b: links.py issues and verifies; present); `whatsapp-webhook-verify-token`, `channel-binding-hmac-key`, `channel-number-encryption-key`, `webpush-vapid-private-key` (added) | mixed |
+| `tilo-channels` | Vertex AI (triage, drafting); Model Armor (inbound mail and WhatsApp text); `tilo-api`; the Gmail push endpoint (forwards to the API); web push delivery (FR-CHN-17, INFRA-SITTING2): HTTPS to the four hosts in `config/web_push.yaml` and `www.googleapis.com` (Google's public certificates). It has no VPC egress, so default internet egress applies and no firewall or allow-list entry exists or is needed. Ingress stays `all` with an `allUsers` invoker (Gmail push, WhatsApp webhooks); `POST /internal/push/send` checks its caller itself (Google ID token for `TILO_PUSH_AUDIENCE`, email `TILO_PUSH_CALLER` = tilo-api's account). Its env is gcloud's (`ignore_env`) | project: custom role `tiloVertexGenerate`, `modelarmor.user` (added). Holds no Firestore, Pub/Sub or Storage role (writes through the API, SEC-12) | `whatsapp-api-token`, `channels-webhook-signing-key`, `email-action-link-signing-key` (channels only, moved from api in P0-07b: links.py issues and verifies; present); `whatsapp-webhook-verify-token`, `channel-binding-hmac-key`, `channel-number-encryption-key`, `webpush-vapid-private-key` (added) | mixed |
 | `tilo-connectors` | Firestore (token store, outbox); Cloud KMS; Google Workspace APIs with the user's OAuth token (Gmail, Drive, Calendar, Docs, Sheets, Slides) | project: `datastore.user` (unconditional: both databases, the only account that reaches `tilo-tokens`). Key `oauth-tokens`: `cryptoKeyEncrypterDecrypter` (added: replaces `cryptoKeyDecrypter`, because `tokens.py` wraps a fresh data key per record). `run.invoker` for harness and for `tilo-api` only (ADR-0032 T5: the meeting-host RPC). One instance max (CON-D9) | `workspace-oauth-client-id`, `workspace-oauth-client-secret` | mixed |
 | `tilo-browser` | Allowlist egress proxy only; model calls for computer use are made by the harness | none (SEC-12: no Firestore, Datastore or Storage) | none | present |
 | `tilo-render` | Firestore; `artifacts` bucket; Slides and Docs go through connectors | project: `datastore.user` (default database only, conditioned). Bucket `artifacts`: `objectAdmin` (only service that may overwrite) | none | present |
@@ -53,6 +53,7 @@ Other identities:
 | Cloud Storage service agent | `cryptoKeyEncrypterDecrypter` on key `archive` | present |
 | `tilo-deployer` (WIF, `refs/heads/main` only) | `run.developer` per service; `serviceAccountUser` per runtime SA; Artifact Registry writer on repo `tilo`. No project role, and `deployer_project_roles` stays `[]` for dev | present |
 | `tilo-cloudbuild` (Cloud Build, `cloudbuild.yaml` runs as it; P0-07g) | Five roles, 17 bindings, no key: `roles/artifactregistry.writer` on repo `tilo`; `roles/run.developer` on each of the seven services; `roles/iam.serviceAccountUser` on each of the seven runtime SAs (not tasks-invoker, gmail, deployer or itself); `roles/logging.logWriter` at project level (the only project role); `roles/storage.objectViewer` on bucket `<project>-cloudbuild-staging` | added |
+| `tilo-cloudbuild-tests` (the cloud test gate, #870 follow-up; INFRA-SITTING2) | Two grants, no key: `roles/logging.logWriter` at project level and `roles/storage.objectViewer` on `<project>-cloudbuild-staging`. No Artifact Registry, `run.developer`, `serviceAccountUser`, Secret Manager or KMS. `scripts/gate_cloud.py` and `cloudbuild.tests.yaml` still run as `tilo-cloudbuild` until the user changes the one `serviceAccount:` line | added (INFRA-SITTING2) |
 | `tilo-eval-scheduler` (Cloud Scheduler OAuth identity; EFF-05b) | One grant: `roles/run.invoker` on the Cloud Run job `tilo-eval-nightly` only (it includes `run.jobs.run`). No project role, no `serviceAccountUser`, used for nothing else | added |
 | `tilo-eval-runner` (runtime identity of the job `tilo-eval-nightly`; EFF-05b) | None. The replay reads files in its image and writes to its log; no secret, no live switch | added |
 
@@ -109,8 +110,8 @@ Dependencies (none of these routes exist yet):
 
 | Bucket | Writes | Reads | Note |
 | --- | --- | --- | --- |
-| `artifacts` (versioned, 365 d) | render (`objectAdmin`), api and harness (`objectCreator`) | api, harness (`objectViewer`) | Uploads become new objects, never overwrites |
-| `archive` (CMEK, 30 d) | harness (`objectCreator` only) | harness (`objectViewer`, chain check) | Nobody can overwrite or delete |
+| `artifacts` (versioned, 365 d) | render (`objectAdmin`), api and harness (`objectCreator`) | api, harness (`objectViewer`) | Uploads become new objects, never overwrites. api also holds the custom role `tiloArtifactObjectDelete` (`storage.objects.delete` only) for erasure (FR-MEM-09, INFRA-SITTING2). In Cloud Storage create plus delete is also "overwrite", so create-only here is the application's `if_generation_match=0` and the bucket's versioning, not IAM |
+| `archive` (CMEK, 30 d) | harness and api (`objectCreator` only; api since INFRA-SITTING2, #853: run archives) | harness and api (`objectViewer`, chain check and Trace) | Nobody can overwrite or delete: no principal holds `storage.objects.delete` or `update` on it, versioning is off, the 30-day rule is unchanged |
 | `snapshots` (90 d) | harness (`objectCreator`) | harness (`objectViewer`) | |
 
 ## 5. Secret Manager slots (names only; values added by the user)
@@ -306,7 +307,8 @@ Hard requirements from the security review for the routes the infra points at:
   `pubsub.publisher`, or `iam.serviceAccountUser`.
 - `tilo-browser`: any data, model or secret access.
 - `tilo-channels`: Firestore, Pub/Sub publish, Storage.
-- `tilo-api`: decrypt on `oauth-tokens`, any access to `archive`, publish on `tilo-events`.
+- `tilo-api`: decrypt on `oauth-tokens`, delete or update on `archive` (create and view only, INFRA-SITTING2), the artifact
+  delete role on any bucket but `artifacts`, publish on `tilo-events`.
 - Anyone but `tilo-connectors`: the `oauth-tokens` key.
 - `tilo-api`, `tilo-harness`, `tilo-render`: the `tilo-tokens` database (their `datastore.user` is limited to `(default)`).
 - `modelarmor.user` for connectors and browser (the harness screens tool output
@@ -318,7 +320,7 @@ Hard requirements from the security review for the routes the infra points at:
 1. Harness, not browser, makes computer-use model calls; browser has no `aiplatform.user`.
 2. Vertex Sessions, Memory Bank, code execution and Gen AI evaluation are covered by `aiplatform.user` on harness (to be narrowed to a custom role once those calls exist).
 3. api and harness store uploads and intermediate artifacts (create and read); only render overwrites.
-4. Harness may read `archive` to verify the hash chain; api cannot read it, so the Trace link to a raw record is served by harness (not yet decided in the PRD).
+4. Harness may read `archive` to verify the hash chain. api may now create and read it too (INFRA-SITTING2, #853: `TILO_ARCHIVE_STORE=gcs`; api reads a run's archive for the Trace and `archive_lookup`), and never delete or update.
 5. Masked screenshots reach Storage through harness, because browser holds no Storage role.
 6. Channels binds numbers with an HMAC key and a cipher key held in Secret Manager (the `binding.py` design); the web-push VAPID key is a secret.
 7. The push route lives on `tilo-channels` (`/internal/gmail/push`, where `GmailPushEndpoint` is); renew and poll live on `tilo-harness` (`/internal/gmail/{renew,poll}`).
@@ -398,3 +400,27 @@ Console steps (Terraform cannot do these). APIs and Services, Credentials, then 
 Order: apply infra incl. the index, wait for it to be READY, run the outbox store suite once on the Firestore emulator, set
 the settings, your go, `LIVE=1` on connectors only, acceptance with `tilotesting@gmail.com`. Commands: `docs/deploy-dev.md`
 ("Live connectors").
+
+## 14. Sitting 2: uploads IAM, TTLs, test-only gate identity, web push (INFRA-SITTING2)
+
+Code only; the user applies it from `docs/runbooks/infra-sitting-2.md`, which holds the saved-plan review gate. Everything is
+additive: no destroy, no replacement, no change to a bucket's lifecycle, retention or CMEK.
+
+- Uploads (#853): api gets `objectCreator` and `objectViewer` on `archive`, and the one-permission custom role
+  `tiloArtifactObjectDelete` on `artifacts` only (a predefined role with delete also carries update, ACL or hold control).
+- Firestore TTL (`google_firestore_field`, `(default)` database, no `index_config` so single-field indexes are kept):
+  `limiter_counters`, `limiter_keys`, `link_nonces`, field `expires_at` (collection groups: every org). A TTL deletes within
+  about a day of expiry; the code already ignores an expired document that is still stored.
+- `tilo-cloudbuild-tests`: section 2, other identities. `tilo-cloudbuild` is unchanged.
+- `tilo-channels` is `ignore_env` (state address moved, not replaced): TILO_WEBPUSH_VAPID_SUBJECT, TILO_PUSH_AUDIENCE (its
+  own URL, so Terraform could not reference it without a cycle), TILO_PUSH_CALLER and the mounted
+  `WEBPUSH_VAPID_PRIVATE_KEY` are gcloud's. Terraform declares no env block (tests/repo guard).
+- api reads `tilo-link-signing-key`: a standalone accessor binding, because the secret was made by hand (automatic
+  replication; the placeholders are `user_managed` in `asia-southeast1`), see BQ-INFRA-S2-3.
+- Cloud NAT (`network.tf`: `tilo-nat-router`, `tilo-run-egress-nat`): api and harness send ALL_TRAFFIC into
+  `tilo-vpc/tilo-run-egress`, and Private Google Access does not reach the regional Model Armor endpoint or any non-Google
+  host, so those calls hung (Home `/intake` 503 "safety screen failed" after about 10.9 s). The NAT serves that one subnet
+  with automatic IPs and errors-only logs. There is still no firewall rule and no egress allow-list; the browser worker's
+  allow-list proxy (PRD 6.5) is not in Terraform. `tilo-channels` has no VPC egress and does not use the NAT.
+- `TILO_SKILLS_STORE=firestore` on tilo-api is a gcloud setting (runbook 6.3); no IAM change (its `datastore.user` covers it).
+- `meet_bot_enabled` stays false by default; the runbook plans with it true for the optional bot.

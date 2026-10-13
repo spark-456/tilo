@@ -145,6 +145,20 @@ output "vpc_egress_subnetwork" {
   }
 }
 
+output "nat_egress" {
+  description = "Cloud NAT for the egress subnet (INFRA-SITTING2): the one subnet it serves and how it allocates IPs."
+  value = {
+    router                 = google_compute_router.nat.name
+    router_network         = google_compute_network.vpc.name
+    nat                    = google_compute_router_nat.run_egress.name
+    region                 = google_compute_router_nat.run_egress.region
+    ip_allocation          = google_compute_router_nat.run_egress.nat_ip_allocate_option
+    subnetwork_selection   = google_compute_router_nat.run_egress.source_subnetwork_ip_ranges_to_nat
+    subnetwork_range_modes = [for s in google_compute_router_nat.run_egress.subnetwork : s.source_ip_ranges_to_nat]
+    log_filter             = google_compute_router_nat.run_egress.log_config[0].filter
+  }
+}
+
 output "oauth_token_key_role" {
   description = "The single role bound on the oauth-tokens key (connectors only)."
   value       = module.kms.oauth_token_key_role
@@ -233,4 +247,34 @@ output "cloudbuild_staging_bucket" {
     public_access_prevention    = module.storage_cloudbuild_staging.buckets["cloudbuild-staging"].public_access_prevention
     lifecycle_rules             = module.storage_cloudbuild_staging.lifecycle_rules["cloudbuild-staging"]
   }
+}
+
+# INFRA-SITTING2 (sitting2.tf, tests/sitting2.tftest.hcl)
+output "cloudbuild_tests_grants" {
+  description = "Every binding the test-only Cloud Build identity holds: scope, resource, role."
+  value = concat(
+    [for b in values(module.iam.bindings) : {
+      scope    = "project"
+      resource = var.project_id
+      role     = b.role
+    } if b.member == "serviceAccount:${local.cloudbuild_tests_service_account_email}"],
+    [{
+      scope    = "storage_bucket"
+      resource = google_storage_bucket_iam_member.cloudbuild_tests_staging_viewer.bucket
+      role     = google_storage_bucket_iam_member.cloudbuild_tests_staging_viewer.role
+    }],
+  )
+}
+
+output "cloudbuild_tests_service_account_email" {
+  value = local.cloudbuild_tests_service_account_email
+}
+
+output "firestore_ttl_fields" {
+  description = "collection => field with a TTL policy on the (default) database."
+  value       = { for k, f in google_firestore_field.ttl : k => f.field }
+}
+
+output "artifact_delete_role_permissions" {
+  value = google_project_iam_custom_role.artifact_object_delete.permissions
 }

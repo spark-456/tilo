@@ -151,7 +151,7 @@ resource "google_cloud_run_v2_service" "env_ignored" {
   lifecycle {
     ignore_changes = [
       template[0].containers[0].image,
-      # Runtime settings (TILO_* env vars) of services with ignore_env = true (tilo-api and tilo-connectors) are set with
+      # Runtime settings (TILO_* env vars) of services with ignore_env = true (tilo-api, tilo-connectors, tilo-channels) are set with
       # `gcloud run services update` (docs/routines-rollout.md, FR-AGT-14 and the team store), not by Terraform.
       # Without this, a later run would strip them. Terraform stays authoritative for everything else. This block
       # must therefore declare NO `env` block (tests/repo guard): declared env would be silently never applied.
@@ -175,6 +175,13 @@ moved {
 moved {
   from = google_cloud_run_v2_service.this["connectors"]
   to   = google_cloud_run_v2_service.env_ignored["connectors"]
+}
+
+# INFRA-SITTING2: tilo-channels' web push settings are set by hand too (its audience is its own URL, which the same
+# resource would have to reference; the VAPID subject is the user's private choice).
+moved {
+  from = google_cloud_run_v2_service.this["channels"]
+  to   = google_cloud_run_v2_service.env_ignored["channels"]
 }
 
 locals {
