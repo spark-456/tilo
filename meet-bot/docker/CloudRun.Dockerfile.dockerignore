@@ -16,6 +16,9 @@
 !config/meeting*.yaml
 !prompts/router
 !prompts/speech
+# The Live voice meter checks tilo-api's answers against its contract's JSON Schema (ADR-0042).
+!contracts/meeting_voice_meter.schema.json
+!contracts/common.schema.json
 # Never in the image, at any depth.
 **/__pycache__
 **/*.pyc
