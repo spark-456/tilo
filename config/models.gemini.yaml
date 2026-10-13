@@ -65,6 +65,7 @@ roles:
   # agenda analysis (JSON in, JSON out, about 12000 characters of transcript); `meeting_fast` answers one question in a
   # sentence on the cheapest profile. Caps per EFF-03; the fallback (NFR-25) serves a quota or provider error only.
   meeting: { primary: flash-37, fallback: lite-31, max_input_tokens: 16000, max_output_tokens: 2048 }
+  meeting_analyst: { primary: flash-37, fallback: lite-31, max_input_tokens: 100000, max_output_tokens: 16384 }
   meeting_fast: { primary: lite-31, fallback: flash-37, max_input_tokens: 8000, max_output_tokens: 256 }
   # ADR-0028 (MROOM-A1): the meeting room's replies, one call over what the addressed agent recorded (`meeting` is the
   # meet-bot's role). Quick: no thinking, 800 out; thinking: low, 4000 out. NFR-25 fallbacks; the user picks final models.
