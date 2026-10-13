@@ -8,6 +8,25 @@ from test_FR_MTG_03_meeting_quality import bank
 from tilo_evals.meeting_quality import main
 
 
+@pytest.mark.parametrize("opening,closing", [("[", "]"), ('{"nested":', "}")])
+def test_FR_MTG_03_cli_excessive_nesting_is_pending(tmp_path, monkeypatch, capsys, opening, closing):
+    bundle = tmp_path / "bundle.json"
+    # CPython's JSON decoder can have a separate C recursion limit.
+    depth = 100_000
+    content = opening * depth + '"private meeting sentinel"' + closing * depth
+    assert len(content.encode("utf-8")) < 20_000_000
+    bundle.write_text(content, encoding="utf-8")
+    monkeypatch.setattr(sys, "argv", ["meeting_quality", str(bundle)])
+    assert main() == 2
+    captured = capsys.readouterr()
+    assert not captured.err
+    assert json.loads(captured.out) == {
+        "provider_quality": "pending",
+        "pending": ["bundle unreadable or malformed"],
+    }
+    assert "private meeting sentinel" not in captured.out
+
+
 @pytest.mark.parametrize(
     "original,replacement",
     [
