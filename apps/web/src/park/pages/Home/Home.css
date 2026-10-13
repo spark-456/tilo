@@ -820,6 +820,77 @@
   z-index: 3;
 }
 
+/* ---- A2 (14 Oct QA, 1024x768 / 768x1024 / 390x844): under 1180px the page is one scrolling column ----
+   The spend tiles and the Today panel used to be left out below 1180px (no side to put them on). They now stack
+   under the composer, so a tablet or a phone sees the same numbers as a laptop: greeting, composer, spend tiles,
+   Sample worlds / Up next today / October spend, the legal strip. Nothing is placed by a top or bottom offset,
+   so nothing can lay over anything. The city pins stay out of a tablet column (the worlds are listed in it). ---- */
+@media (max-width: 1179px) {
+  [data-park] .park-home-root {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    box-sizing: border-box;
+    height: 100vh;
+    min-height: 0;
+    padding: 96px 24px 16px;
+    overflow-x: hidden;
+    overflow-y: auto;
+  }
+  [data-park] .park-shell__main:has(.park-first-run-banner--home) .park-home-root {
+    padding-top: 148px;
+  }
+  /* the greeting column gives its two children to the page column, so the composer can sit between them */
+  [data-park] .park-home-leftcol {
+    display: contents;
+  }
+  [data-park] .park-home-root .park-home-hero,
+  [data-park] .park-home-root .park-home-composer,
+  [data-park] .park-home-root .park-home-kpis,
+  [data-park] .park-home-root .park-home-today {
+    position: static;
+    transform: none;
+    box-sizing: border-box;
+    flex: none;
+    width: 100%;
+    max-width: 760px;
+    align-self: center;
+  }
+  [data-park] .park-home-hero {
+    order: 0;
+  }
+  [data-park] .park-home-composer {
+    order: 1;
+  }
+  [data-park] .park-home-kpis {
+    order: 2;
+    overflow: visible;
+    min-height: auto;
+  }
+  [data-park] .park-home-root .park-home-today {
+    order: 3;
+    max-height: none;
+    overflow: visible;
+  }
+  [data-park] .park-home-root .park-home-today .park-home-live:nth-child(n + 5) {
+    display: grid;
+  }
+  [data-park] .park-home-legal {
+    order: 4;
+    position: static;
+    align-self: flex-end;
+    flex: none;
+  }
+}
+@media (min-width: 481px) and (max-width: 1179px) {
+  [data-park] .park-home-kpis {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  [data-park] .park-home-pin {
+    display: none;
+  }
+}
+
 /* ---- focus: the README ring on every control of the page ---- */
 [data-park] .park-home-needs:focus-visible,
 [data-park] .park-home-link:focus-visible,

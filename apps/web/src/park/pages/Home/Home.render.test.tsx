@@ -166,14 +166,19 @@ describe("WEB_4_home_render: Today panel", () => {
     expect(page.indexOf("September spend")).toBeLessThan(page.indexOf(QUICK.start));
   });
 
-  it("WEB_4_home_render_the_side_panel_needs_a_viewport_of_1180_or_more", async () => {
-    const wide = await mountHome({ app: { vw: 1180 } });
-    expect(qa(wide.el, 'aside[aria-label="Today"]')).toHaveLength(1);
-    cleanup();
-    const narrow = await mountHome({ app: { vw: 1179 } });
-    expect(qa(narrow.el, 'aside[aria-label="Today"]')).toHaveLength(0);
-    expect(textOf(q(narrow.el, "h1"))).toBe("Good morning, Alex."); // the rest stays
-    expect(taskInput(narrow.el)).toBeTruthy();
+  // UI-10 / A2 (14 Oct QA): this test used to say the Today panel and the spend tiles are left out under 1180.
+  // A tablet or a phone must see the same numbers, so they render at every width and CSS stacks them.
+  it("UI_10_A2_home_render_the_today_panel_and_the_spend_tiles_render_at_every_width", async () => {
+    for (const vw of [1440, 1180, 1179, 1024, 768, 390]) {
+      const { el } = await mountHome({ app: { vw } });
+      expect(qa(el, 'aside[aria-label="Today"]'), `Today panel at ${vw}`).toHaveLength(1);
+      expect(qa(el, '[aria-label="Spend at a glance"] .park-kpi'), `tiles at ${vw}`).toHaveLength(
+        5,
+      );
+      expect(textOf(q(el, "h1"))).toBe("Good morning, Alex.");
+      expect(taskInput(el)).toBeTruthy();
+      cleanup();
+    }
   });
 
   it("WEB_4_home_render_a_started_world_leads_the_live_list_and_the_list_stays_at_five", async () => {

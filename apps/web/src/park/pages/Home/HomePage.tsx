@@ -329,30 +329,26 @@ export function HomePage({ app }: { app: AppCtx }) {
               worldName={waitingIn?.name ?? null}
               onReview={() => (waitingIn ? open(waitingIn.id) : go("worlds"))}
             />
-            {(vw || 1440) >= 1180 ? (
-              <KpiStrip
-                ledger={base.ledger}
-                dec={dec}
-                decisions={base.decisions}
-                fallbackWorld={waitingIn?.id}
-                onWorld={open}
-              />
-            ) : null}
-          </div>
-          {(vw || 1440) >= 1180 ? (
-            <TodayPanel
-              served={served}
-              rows={liveRows(worlds, needs, served)}
-              sample={served ? worlds.find((w) => w.sample) : undefined}
-              events={base.agenda && base.agenda.days !== null ? nextEvents(base.agenda) : []}
-              spend={spendOf(base.ledger)}
-              night={night}
+            <KpiStrip
+              ledger={base.ledger}
+              dec={dec}
+              decisions={base.decisions}
+              fallbackWorld={waitingIn?.id}
               onWorld={open}
-              onWorlds={() => go("worlds")}
-              onAgenda={() => go("agenda")}
-              onLedger={() => go("ledger")}
             />
-          ) : null}
+          </div>
+          <TodayPanel
+            served={served}
+            rows={liveRows(worlds, needs, served)}
+            sample={served ? worlds.find((w) => w.sample) : undefined}
+            events={base.agenda && base.agenda.days !== null ? nextEvents(base.agenda) : []}
+            spend={spendOf(base.ledger)}
+            night={night}
+            onWorld={open}
+            onWorlds={() => go("worlds")}
+            onAgenda={() => go("agenda")}
+            onLedger={() => go("ledger")}
+          />
         </>
       ) : null}
       {failed ? (
