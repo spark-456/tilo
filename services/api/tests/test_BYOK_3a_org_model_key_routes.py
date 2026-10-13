@@ -237,7 +237,8 @@ def test_BK_02_BK_04_a_set_stores_a_reference_with_no_key_characters_and_answers
     )  # fmt: skip
     assert key not in seen and key[:8] not in seen and key[-8:] not in seen
     audit = rig.store.audit_entries(ORG)
-    assert [e["action"] for e in audit] == ["set"] and audit[0]["authz"]["tier"] == "T3"
+    # BQ-BYOKC-5c: the entry's authz is the common person authz (the T3 tier is the act's, pinned in autonomy.yaml)
+    assert [e["action"] for e in audit] == ["set"] and audit[0]["authz"] == {"by": "person", "ref": OWNER, "at": NOW}
 
 
 def test_BK_04_a_member_reads_active_and_label_only_the_owner_reads_the_rest(rig: Rig) -> None:
