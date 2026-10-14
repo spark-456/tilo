@@ -98,3 +98,28 @@ def test_RERUN_1_a_world_that_did_not_fail_is_a_409(flow, end):
 
     assert response.status_code == 409
     assert len([w for w in flow.store.worlds if w != old["world_id"]]) == 0  # no new world was made
+
+
+@pytest.mark.parametrize(
+    "reason", ["an internal error stopped the work", "the service restarted, so the work stopped", "", None]
+)
+def test_RERUN_UI_only_the_startup_restart_reason_is_eligible(flow, reason):
+    old = _approved(flow)
+    flow.store.events[old["world_id"]][-1]["data"]["reason"] = reason
+    before = set(flow.store.worlds)
+    response = flow.client.post(f"/worlds/{old['world_id']}/rerun")
+    assert response.status_code == 409
+    assert set(flow.store.worlds) == before
+
+
+@pytest.mark.parametrize(
+    "latest", ["world.resumed", "world.started", "world.paused", "world.completed", "world.planned"]
+)
+def test_RERUN_UI_a_later_world_event_supersedes_the_restart_stop(flow, latest):
+    old = _approved(flow)
+    stream = flow.store.events[old["world_id"]]
+    stream.append(_event(old["world_id"], len(stream) + 1, latest, {}))
+    before = set(flow.store.worlds)
+    response = flow.client.post(f"/worlds/{old['world_id']}/rerun")
+    assert response.status_code == 409
+    assert set(flow.store.worlds) == before

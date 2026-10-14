@@ -34,6 +34,26 @@ export function isRestartStop(events: readonly RunEvent[]): boolean {
   return data?.reason === RESTART_REASON;
 }
 
+/** The same last grant the rerun API reuses, and outbound activity actually recorded before the stop. */
+export function restartApproval(events: readonly RunEvent[]): { cap: number | null; sent: number } {
+  const grant = [...events].reverse().find((e) => e.type === "budget.granted");
+  const cap = (grant?.data as { cap?: unknown } | undefined)?.cap;
+  const sent = events.filter((e) => {
+    const data = e.data as { direction?: unknown; outbox_id?: unknown } | undefined;
+    return (
+      (e.type === "data.transfer" && data?.direction === "out") ||
+      (e.type === "artifact.delivered" &&
+        typeof data?.outbox_id === "string" &&
+        !events.some(
+          (transfer) =>
+            transfer.type === "data.transfer" &&
+            (transfer.data as { outbox_id?: unknown } | undefined)?.outbox_id === data.outbox_id,
+        ))
+    );
+  }).length;
+  return { cap: typeof cap === "number" && Number.isFinite(cap) && cap > 0 ? cap : null, sent };
+}
+
 export function runProgress(all: readonly RunEvent[]): RunProgress {
   const events = all;
   let status = "Getting ready";
