@@ -773,6 +773,12 @@ export class HttpClient implements TiloClient, SchedulesApi, FieldsApi, ItemApi 
     return this.post(`/tasks/${encodeURIComponent(taskId)}/approve`, req);
   }
 
+  /** `POST /worlds/{id}/rerun` (RERUN-1): a world a restart stopped is started again as a NEW run of the same task
+   * (same brief, approach and cap). The owner only; the answer names the new world. */
+  startAgain(worldId: string): Promise<{ world_id: string; task_id: string }> {
+    return this.post(`/worlds/${encodeURIComponent(worldId)}/rerun`, {});
+  }
+
   /** `GET /worlds/{id}/layout` (FR-WLD-05): the run's own layout, built from its plan, never made up
    * here. The route is a 404 until the run has built it, and a browser logs every 404 as an error, so
    * the world's recorded events are read first and the layout is asked for only once `world.started`
