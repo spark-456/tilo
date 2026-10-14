@@ -47,7 +47,6 @@ describe("WEB_3a_root: old app or park app by path", () => {
   // Must stay the first test that renders: the lazy import is cached for the rest of the file.
   it("WEB_3a_root_a_visit_to_a_kept_screen_never_loads_the_park_chunk", async () => {
     await visit("/more");
-    await visit("/settings");
     await visit("/world/w/stage");
     await visit("/team/console");
     expect(loaded.park).toBe(0);
@@ -75,6 +74,7 @@ describe("WEB_3a_root: old app or park app by path", () => {
   it("WEB_3a_root_every_park_path_and_root_page_is_the_park_app", async () => {
     for (const path of [
       "/",
+      "/settings",
       "/worlds",
       "/world/k1",
       "/team",

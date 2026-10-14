@@ -12,6 +12,7 @@ import { API_URL, appCheckToken, authToken } from "./api/ClientProvider";
 import { HttpClient } from "./api/http";
 import { SignInGate } from "./auth/SignInGate";
 import { session } from "./auth/session";
+import { useDocumentTitle } from "./documentTitle";
 import { isKeptPath } from "./keptPaths";
 import { legalKind } from "./legal/legalPaths";
 import { takeCallbackParams } from "./oauth/capture";
@@ -50,6 +51,7 @@ function AccessGuard({ children }: { children: ReactNode }) {
 export function Root() {
   const pathname = usePathname();
   const legal = legalKind(pathname);
+  useDocumentTitle(/^\/more\/?$/.test(pathname) ? "More" : null);
   // ADR-0035 LC-02: Google's redirect lands here. The code and state leave the address bar before anything else renders.
   const oauth = isOAuthCallback(pathname) ? takeCallbackParams() : undefined;
   const park = isParkPath(pathname) || !isKeptPath(pathname);

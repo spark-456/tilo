@@ -26,7 +26,6 @@ const KEPT = [
   "/channels",
   "/mail",
   "/connections",
-  "/settings",
   "/estimate",
   "/pilot",
   "/meetings",
@@ -54,7 +53,7 @@ describe("WEB_CUTOVER_kept_paths: the addresses the old app owns", () => {
   it("WEB_CUTOVER_kept_paths_every_screen_path_and_pattern_example_in_meta_is_kept", () => {
     const examples: string[] = [];
     for (const s of SCREENS) {
-      if (s.id === "S-01") continue; // `/` is the Park Home since WEB-CUTOVER
+      if (s.id === "S-01" || s.id === "S-22") continue; // UI-10 W7: Home and Settings use Park.
       if (s.path !== null) examples.push(s.path);
     }
     expect(examples.length).toBeGreaterThan(20);
@@ -63,7 +62,7 @@ describe("WEB_CUTOVER_kept_paths: the addresses the old app owns", () => {
     for (const s of SCREENS) {
       if (!s.pattern || s.path === null) continue;
       expect(s.pattern.test(s.path), `${s.id} pattern matches its path`).toBe(true);
-      expect(isKeptPath(s.path), s.id).toBe(true);
+      expect(isKeptPath(s.path), s.id).toBe(s.id !== "S-22");
     }
   });
 
@@ -102,6 +101,8 @@ describe("WEB_CUTOVER_kept_paths: the addresses the old app owns", () => {
     "/worlds",
     "/team",
     "/connectors",
+    "/settings",
+    "/settings/",
     "",
   ])("WEB_CUTOVER_kept_paths_%j_is_not_kept", (path) => {
     expect(isKeptPath(path)).toBe(false);

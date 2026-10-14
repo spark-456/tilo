@@ -25,6 +25,7 @@ const ROOT_PAGES = new Set<string>([
   "agenda",
   "ledger",
   "profile",
+  "settings",
 ]);
 const ROOT_WORLD = /^\/world\/[^/]+\/?$/;
 const ROOT_WORLD_APP = /^\/(?:park\/)?world\/([^/]+)\/app\/([^/]+)\/?$/;

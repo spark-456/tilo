@@ -51,6 +51,7 @@ describe("WEB_CUTOVER_root: the Park app owns the root paths", () => {
       ["/agenda", "agenda"],
       ["/ledger", "ledger"],
       ["/profile", "profile"],
+      ["/settings", "settings"],
       ["/park/home", "home"],
       ["/park/worlds", "worlds"],
     ] as const;
@@ -73,7 +74,6 @@ describe("WEB_CUTOVER_root: the Park app owns the root paths", () => {
       "/task/t1/approaches",
       "/needs-you",
       "/library",
-      "/settings",
       "/more",
       "/start",
     ]) {
