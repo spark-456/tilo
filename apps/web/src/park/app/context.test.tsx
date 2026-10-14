@@ -126,22 +126,22 @@ describe("WEB_3a_context: useApp builds the AppCtx", () => {
     expect(seen.app.needsLeft).toBe(2);
   });
 
-  it("WEB_3a_context_go_navigates_through_the_injected_navigate", async () => {
+  it("WEB_3a_context_go_navigates_through_the_injected_navigate", () => {
     const { navigate } = setup();
-    await act(async () => seen.app.go("ledger"));
-    await act(async () => seen.app.go("world", { id: "k1" }));
+    act(() => seen.app.go("ledger"));
+    act(() => seen.app.go("world", { id: "k1" }));
     expect(navigate).toHaveBeenNthCalledWith(1, "/ledger");
     expect(navigate).toHaveBeenNthCalledWith(2, "/world/k1");
   });
 
-  it("WEB_3a_context_go_without_an_injected_navigate_pushes_the_path_and_updates_the_page", async () => {
+  it("WEB_3a_context_go_without_an_injected_navigate_pushes_the_path_and_updates_the_page", () => {
     window.history.pushState({}, "", "/park/home");
     mount(
       <ParkProvider api={fakeApi()} viewport={{ vw: 1280, vh: 720 }}>
         <Probe />
       </ParkProvider>,
     );
-    await act(async () => seen.app.go("agenda"));
+    act(() => seen.app.go("agenda"));
     expect(window.location.pathname).toBe("/agenda");
     expect(seen.app.page).toBe("agenda");
   });
@@ -166,19 +166,19 @@ describe("WEB_3a_context: useApp builds the AppCtx", () => {
     expect(seen.app.added.map((x) => x.id)).toEqual(["new1"]);
   });
 
-  it("WEB_3a_context_toast_from_a_page_reaches_the_store", async () => {
+  it("WEB_3a_context_toast_from_a_page_reaches_the_store", () => {
     const { sch } = setup();
-    await act(async () => seen.app.toast("Saved", "Open", () => undefined));
+    act(() => seen.app.toast("Saved", "Open", () => undefined));
     expect(seen.store.getState().toast).toMatchObject({ message: "Saved", actionLabel: "Open" });
     expect(sch.schedule).toHaveBeenCalledWith(expect.any(Function), 4200);
   });
 
-  it("WEB_3a_context_the_app_object_is_stable_while_nothing_changes", async () => {
+  it("WEB_3a_context_the_app_object_is_stable_while_nothing_changes", () => {
     const { m, tree } = setup();
     const first = seen.app;
     m.render(tree({ vw: 1280, vh: 720 }));
     expect(seen.app).toBe(first);
-    await act(async () => seen.store.markRead());
+    act(() => seen.store.markRead());
     expect(seen.app).toBe(first); // `read` is not part of AppCtx
   });
 
@@ -189,7 +189,7 @@ describe("WEB_3a_context: useApp builds the AppCtx", () => {
     expect(seen.app.vh).toBe(844);
   });
 
-  it("WEB_3a_context_without_a_viewport_prop_the_window_size_is_used_and_follows_resize", async () => {
+  it("WEB_3a_context_without_a_viewport_prop_the_window_size_is_used_and_follows_resize", () => {
     window.history.pushState({}, "", "/park/home");
     const hd = (
       window as unknown as { happyDOM: { setViewport(v: { width: number; height: number }): void } }
@@ -202,7 +202,7 @@ describe("WEB_3a_context: useApp builds the AppCtx", () => {
     );
     expect(seen.app.vw).toBe(800);
     expect(seen.app.vh).toBe(600);
-    await act(async () => {
+    act(() => {
       hd.setViewport({ width: 1024, height: 700 });
       window.dispatchEvent(new Event("resize"));
     });
@@ -210,9 +210,9 @@ describe("WEB_3a_context: useApp builds the AppCtx", () => {
     expect(seen.app.vh).toBe(700);
   });
 
-  it("WEB_3a_context_the_page_follows_popstate", async () => {
+  it("WEB_3a_context_the_page_follows_popstate", () => {
     setup("/park/home");
-    await act(async () => {
+    act(() => {
       window.history.pushState({}, "", "/park/team?focus=share");
       window.dispatchEvent(new PopStateEvent("popstate"));
     });

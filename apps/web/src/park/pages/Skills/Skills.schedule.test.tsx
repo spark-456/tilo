@@ -58,13 +58,19 @@ describe("WEB_8a_skills_schedule: useSchedule", () => {
   });
 
   it("WEB_8a_skills_schedule_outside_a_provider_it_throws_like_the_other_hooks", () => {
+    let error: unknown;
     function Probe() {
-      useSchedule();
+      try {
+        useSchedule();
+      } catch (caught) {
+        error = caught;
+      }
       return null;
     }
-    const error = vi.spyOn(console, "error").mockImplementation(() => undefined);
-    expect(() => mount(<Probe />)).toThrow(/ParkProvider is missing/);
-    error.mockRestore();
+    mount(<Probe />);
+    expect(() => {
+      throw error;
+    }).toThrow(/ParkProvider is missing/);
   });
 });
 
