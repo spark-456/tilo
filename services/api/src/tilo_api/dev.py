@@ -37,7 +37,22 @@ ENV_ORIGINS = "TILO_API_DEV_ORIGINS"  # comma-separated allowed browser origins
 ENV_FORCE_REPLAY = "TILO_DEV_FORCE_REPLAY"  # "1" (dev mode only, tests only): start with `replay_only` set (NFR-22/24)
 DEFAULT_ORIGIN = "http://localhost:5173"  # the Vite dev server
 DEV_OWNER = "u_dev_owner"  # the one dev principal (common.schema.json user_id)
-PORT = 8080
+ENV_PORT = "TILO_API_DEV_PORT"  # a second local API beside another one (an unprivileged port); default 8080
+DEFAULT_PORT = 8080
+
+
+def dev_port(env: Mapping[str, str] | None = None) -> int:
+    """The one loopback port the dev server answers on, and the only one its Host check accepts. A value that is not an
+    unprivileged port number is refused, never guessed."""
+    raw = (os.environ if env is None else env).get(ENV_PORT)
+    if raw is None or raw == "":
+        return DEFAULT_PORT
+    if not raw.isdigit() or not 1024 <= int(raw) <= 65535:
+        raise DevModeRefused(f"{ENV_PORT} must be a port number from 1024 to 65535, not {raw!r}")
+    return int(raw)
+
+
+PORT = dev_port()
 ENV_MODELS = "TILO_MODELS_FILE"  # `main` points it at the dev models file unless the user already chose one
 DEV_MODELS = Path(__file__).resolve().parents[4] / "config" / "models.dev.yaml"  # a fake Director, CL-INT-5
 
