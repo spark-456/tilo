@@ -12,6 +12,11 @@
 # adapter's GOOGLE_LOCATION must be asia-southeast1 (its default is global, PRD 6.5 / D-14; BQ-LW-11). Adapters
 # with no location (openai_compat, fake) are not checked, so config/models.gemini.yaml is metered at these rates.
 #
+# LIVE-GLOBAL-1 (14 Oct 2026): Gemini 3.x models are not served on the asia-southeast1 endpoint (404 for every
+# profile below); only the global endpoint serves them, so GOOGLE_LOCATION is global and this sheet's region is global.
+# The rates stay the user-approved regional ones (10% above global): the meter overstates, never understates. Model
+# Armor stays regional (TILO_MODEL_ARMOR_LOCATION asia-southeast1); its one price applies everywhere, so it is not region-checked.
+#
 # Promotions (decision 4): flash-38, flash-37 and tts-flash are promotional through 2026-12-31 (valid_until); after
 # that date the loader refuses live metering for them until this file is updated. From 2027-01-01 the global
 # sheet listed flash at 1.50 / 7.50 (the regional 2027 rate was not supplied). The user decided (BQ-LW-7): meter
@@ -30,8 +35,8 @@
 #   (PRD 12.4 draws charts by code, so there is no image role).
 status: set
 effective_date: "2026-10-08"
-source: "user-supplied 2026-10-08, Google price pages, asia-southeast1 regional endpoint, paid Standard tier"
-region: asia-southeast1
+source: "user-supplied 2026-10-08, Google price pages, asia-southeast1 regional endpoint, paid Standard tier; applied to the global endpoint since 2026-10-14 (LIVE-GLOBAL-1)"
+region: global
 currency: USD
 credit_usd: 0.005
 

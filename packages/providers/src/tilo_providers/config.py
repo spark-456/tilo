@@ -75,6 +75,10 @@ _LOCATION_ENV = {
     "google": ("GOOGLE_LOCATION", "global"),
     "model_armor": ("TILO_MODEL_ARMOR_LOCATION", "asia-southeast1"),
 }
+# LIVE-GLOBAL-1 (14 Oct 2026, user-approved): the adapters whose rates depend on where they send, so the only ones
+# the sheet's `region` must match. Model Armor has one price everywhere and is served only regionally, while Gemini
+# 3.x is served only on the global endpoint, so one region cannot hold both.
+_REGION_PRICED = frozenset({"google"})
 
 
 @dataclass(frozen=True)
@@ -165,15 +169,15 @@ class ProvidersConfig:  # the loaded, validated provider-layer config (PRD 6.4)
 
     def check_live(self, env: Mapping[str, str] | None = None) -> None:
         """Refuses live metering that would use the wrong rates (ADR-0029 decisions 3 and 4): a profile whose adapter
-        sends to a location other than the sheet's `region` (`google` reads GOOGLE_LOCATION, `model_armor` reads
-        TILO_MODEL_ARMOR_LOCATION; an adapter with no location is not checked), or whose promotion has ended. An unset
+        sends to a location other than the sheet's `region` (`google` reads GOOGLE_LOCATION; only adapters whose rates
+        depend on the location are checked, `_REGION_PRICED`), or whose promotion has ended. An unset
         sheet is left alone: it already refuses every live price (`price`), and has no region or date to check."""
         if self.prices.status != "set":
             return
         env = os.environ if env is None else env
         region, today = self.prices.region, datetime.now(UTC).date()
         for profile_id, profile in self.profiles.items():
-            where = _LOCATION_ENV.get(profile.provider)
+            where = _LOCATION_ENV.get(profile.provider) if profile.provider in _REGION_PRICED else None
             if region is not None and where is not None and env.get(where[0], where[1]) != region:
                 raise ProviderConfigError(
                     f"PL-06: refusing live metering: profile {profile_id!r} sends to {env.get(where[0], where[1])!r} "
