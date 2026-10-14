@@ -15,6 +15,11 @@ Every route needs the signed-in `deps.Principal` (`deps.get_current_principal`).
 `questions[]` is `{field, text, suggested_answers}`. `questions` and `brief` are never taken from the
 client. An unauthenticated caller gets the 401 the auth dependency raises, before anything else.
 
+SEC-10: the complete JSON body on task answers and approval is capped at 32,768 bytes (413
+`body_too_large` above the cap). This includes `brief_edits`: the brief schema can describe more
+sources than fit in one edit request. Typical short briefs fit; shorten an oversized edit before
+resubmitting. The schema's source limits do not raise the request-body cap.
+
 ## Injection seams the tests use
 
 - `deps.get_current_principal`, `deps.get_store` (exist). `Store.events[world_id]` receives the events the

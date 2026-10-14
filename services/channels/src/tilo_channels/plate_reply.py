@@ -54,22 +54,10 @@ class PlateReply:
         """The FR-CHN-11 card for a reply to `mail_id`, or None (nothing drafted, stored, emitted or queued) when the
         mail is not on this person's plate. `request_id` is the tap's id and the idempotency key: replays, restarts
         and parallel instances give one card."""
-        if not request_id or "#" in request_id:
-            raise ValueError("a tap needs its own request id")
-        if not self._autopilot.owns(user_id):  # before anything is read or drafted, as `preview` checks it first
+        found = self._answerable(user_id, mail_id, request_id)
+        if found is None:
             return None
-        mailbox = self._mailbox(user_id)
-        if not mailbox or not self._on_plate(user_id, mail_id):
-            return None
-        mail = self._read(self._mail.get_message, user_id, mail_id)
-        thread_id = mail.get("thread_id") if mail else None
-        own_id = message_id_of(mail) if mail else ""
-        if not isinstance(thread_id, str) or not thread_id or not own_id:  # nothing proves the draft answers this mail
-            return None
-        # The message answered is named by its Gmail id (no sender writes it), never by the Message-ID header text,
-        # which a later message can copy or write with look-alike characters.
-        if self._read(self._drafter.reply_target, user_id, thread_id, mailbox) != mail_id:
-            return None  # a later message in the thread would be the one answered
+        mailbox, thread_id, own_id = found[0], found[2], found[3]
         instruction_id = _instruction_id(request_id, mail_id)
         try:  # the drafter reads the thread again; if it changed, it raises before storing or emitting anything
             result = self._drafter.draft(
@@ -87,6 +75,27 @@ class PlateReply:
             return None
         context = DraftContext(instruction_id, thread_id, "", mailbox, MODE)
         return self._autopilot.preview(user_id, context, result)
+
+    def _answerable(self, user_id: str, mail_id: str, request_id: str) -> tuple[str, dict, str, str] | None:
+        """(mailbox, mail, thread id, Message-ID header) when the tap may draft, else None: the person's own world, a
+        plate mail still readable, and a reply that would answer this mail itself (BQ-284)."""
+        if not request_id or "#" in request_id:
+            raise ValueError("a tap needs its own request id")
+        if not self._autopilot.owns(user_id):  # before anything is read or drafted, as `preview` checks it first
+            return None
+        mailbox = self._mailbox(user_id)
+        if not mailbox or not self._on_plate(user_id, mail_id):
+            return None
+        mail = self._read(self._mail.get_message, user_id, mail_id)
+        thread_id = mail.get("thread_id") if mail else None
+        own_id = message_id_of(mail) if mail else ""
+        if not isinstance(thread_id, str) or not thread_id or not own_id:  # nothing proves the draft answers this mail
+            return None
+        # The message answered is named by its Gmail id (no sender writes it), never by the Message-ID header text,
+        # which a later message can copy or write with look-alike characters.
+        if self._read(self._drafter.reply_target, user_id, thread_id, mailbox) != mail_id:
+            return None  # a later message in the thread would be the one answered
+        return mailbox, mail, thread_id, own_id
 
     def _on_plate(self, user_id: str, mail_id: str) -> bool:
         """A result stored for exactly this person and message whose effective category is needs_reply (her label

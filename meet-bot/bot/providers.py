@@ -36,7 +36,7 @@ from tilo_providers.interfaces import GenerateRequest, SpeechProvider
 from tilo_providers.meeting import CallCounter, load_meeting_caps
 from tilo_providers.router import Router, RouterError, TokenCapExceededError
 from tilo_providers.speech import build_speech_provider, load_speech_config
-from tilo_providers.voice import VoiceConfig, build_voice_provider, load_voice_config
+from tilo_providers.voice import LiveVoiceMeter, VoiceConfig, build_voice_provider, load_voice_config
 
 from .brain import Busy, LLMUnavailable
 from .config import ROOT
@@ -347,10 +347,12 @@ class ProviderTTS:
         provider: SpeechProvider | None = None,
         config: VoiceConfig | None = None,
         clock: Callable[[], float] = time.monotonic,
+        meter: LiveVoiceMeter | None = None,
     ) -> None:
         self._clock = clock
         self.config = config or load_voice_config(voice_file(), models_path=repo_root() / "config" / "models.yaml")
-        self.provider = provider or build_voice_provider(self.config, fixtures_dir=fixtures_dir())
+        # SEC-16 (BQ-M2-1): the Live voice speaks only through a spend hook this process was given (see make_tts)
+        self.provider = provider or build_voice_provider(self.config, fixtures_dir=fixtures_dir(), meter=meter)
         self.sample_rate = self.config.sample_rate
 
     async def stream(self, text: str) -> AsyncIterator[bytes]:
@@ -389,16 +391,17 @@ class ProviderTTS:
                 close()
 
 
-def make_tts() -> TTSProvider | None:
+def make_tts(meter: LiveVoiceMeter | None = None) -> TTSProvider | None:
     """The configured voice with the local espeak voice as backup, the local voice alone if the configured one cannot be
     built, else None (the bot then stays chat-only). A bad voice config (an unknown vendor, a denied model) is not
-    swallowed: it fails start-up."""
+    swallowed: it fails start-up. `meter` is the SEC-16 ledger hook of the flagged Gemini Live voice; the bot process
+    has none yet (BQ-M2-4 in docs/open-questions.md), so under the live switch it speaks with Chirp, never Live."""
     local: LocalTTS | None = None
     try:
         local = LocalTTS()
     except TTSError as e:
         log.info("local voice unavailable: %s", e)
-    cloud = ProviderTTS()
+    cloud = ProviderTTS(meter=meter)
     if local is None:
         return cloud
     return FallbackTTS(cloud, local, ROOT / "out" / ".tts_state.json", f"{cloud.config.vendor}/{cloud.config.voice}")

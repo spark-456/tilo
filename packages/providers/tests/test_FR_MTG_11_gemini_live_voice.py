@@ -347,7 +347,14 @@ def test_FR_MTG_11_PL_02_priced_live_path_opens_one_sdk_session_with_the_configu
     monkeypatch.setattr(genai, "Client", Client)
     monkeypatch.setenv("LIVE", "1")
     monkeypatch.setenv("GOOGLE_CLOUD_PROJECT", "tilo-dev-test")
-    assert GeminiLiveVoiceProvider(with_live(price_approved=True), fixtures_dir=None).synthesize(TEXT) == A + B
+    events: list[
+        str
+    ] = []  # SEC-16 (BQ-M2-1): the live factory needs a spend hook; its own tests are in ..._live_voice_meter
+    meter = NS(
+        reserve=lambda: events.append("reserve") or "hold", settle=lambda *a: events.append("settle"), release=None
+    )
+    live = GeminiLiveVoiceProvider(with_live(price_approved=True), fixtures_dir=None, meter=meter)
+    assert live.synthesize(TEXT) == A + B and events == ["reserve", "settle"]
     assert captured["client"]["vertexai"] is True and captured["client"]["project"] == "tilo-dev-test"
     assert captured["client"]["location"] == "global" and captured["model"] == "gemini-3.8-live"
     voice = captured["config"].speech_config.voice_config.prebuilt_voice_config.voice_name

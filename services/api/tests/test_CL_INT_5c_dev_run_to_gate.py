@@ -13,6 +13,7 @@ from fastapi.testclient import TestClient
 from tilo_api import deps, dev, dev_run, runs
 from tilo_api.cards import build_router
 from tilo_api.intake import router as intake_router
+from tilo_api.side_effect_fields import Missing
 from tilo_api.tasks import router as tasks_router
 
 
@@ -119,8 +120,11 @@ def test_CL_INT_5c_the_production_seams_stay_unwired_and_no_request_input_select
     for name in ("LIVE", "K_SERVICE", "CLOUD_RUN_JOB", "TILO_API_DEV"):
         monkeypatch.delenv(name, raising=False)
     app = _app()  # no dev.install: the defaults are the production wiring
-    with pytest.raises(LookupError):
+    # Since ADR-0035 L6c (df7c7aa1) the production resolver is the real deterministic one (`side_effect_fields`), not an
+    # unwired seam: with no answered recipient it still fails closed and never returns the dev's fixed fake recipient.
+    with pytest.raises(Missing) as refused:
         deps.get_action_resolver()(unit={}, action_type="send_email", item={}, brief={})
+    assert refused.value.fields == ("recipient",)
     assert deps.get_connector_adapters() == {}
     assert not any(seam in app.dependency_overrides for seam in (deps.get_action_resolver, deps.get_unit_runner))
     client = TestClient(app, raise_server_exceptions=False)

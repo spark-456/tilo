@@ -192,7 +192,7 @@ class FakeFirestore:
     def commit(self, ops: list[tuple[str, str, dict[str, Any] | None]]) -> None:
         """Applies the writes in order, all or nothing, each with Firestore's precondition."""
         self.attempted_ops.extend((kind, path) for kind, path, _ in ops)
-        staged = copy.deepcopy(self.docs)
+        staged = dict(self.docs)  # shallow: a document is replaced below, never changed in place
         for kind, path, data in ops:
             if kind == "create":
                 if path in staged:

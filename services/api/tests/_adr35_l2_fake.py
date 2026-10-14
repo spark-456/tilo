@@ -42,6 +42,14 @@ class OccQuery(FakeQuery):
     def order_by(self, field: str, **_: Any) -> OccQuery:
         return OccQuery(self._db, self._prefix, self._filters, field, self._limit)
 
+    _after: str | None = None
+
+    def start_after(self, values: dict) -> OccQuery:
+        """A cursor on the document id (`{"__name__": id}`): the rows after it, in id order. Call it last."""
+        query = OccQuery(self._db, self._prefix, self._filters, self._order, self._limit)
+        query._after = self._prefix + next(iter(values.values()))
+        return query
+
     def where(self, *, filter: Any) -> OccQuery:  # noqa: A002 - the library's keyword
         assert filter.op_string == "==", "the fake serves equality filters only"
         return OccQuery(
@@ -55,6 +63,7 @@ class OccQuery(FakeQuery):
             rows = [(p, self._db.read(p)) for p in paths]
         rows = [r for r in rows if all(r[1].to_dict().get(f) == v for f, v in self._filters)]
         rows.sort(key=lambda r: (r[1].to_dict().get(self._order), r[0]) if self._order else (0, r[0]))
+        rows = [r for r in rows if self._after is None or r[0] > self._after]
         yield from (snap for _path, snap in rows[: self._limit])
 
 

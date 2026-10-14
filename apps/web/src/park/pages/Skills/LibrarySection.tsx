@@ -19,6 +19,11 @@ const STATUS_META: Record<ShownStatus, { label: string; tone: string }> = {
   draft: { label: "Draft", tone: "chip" },
 };
 
+/** W10: a signed-in skill has no pause or step-edit call behind this page, so the buttons say so, not pretend. */
+const NOT_FROM_HERE = "Pausing and editing steps are not available from this page yet.";
+/** The demo has no step editor: it says so rather than promising one that opens. */
+const SAMPLE_EDIT = "Sample data: step editing is not available yet, so nothing was changed.";
+
 const LEVELS = ["Off", "Read", "Draft", "Act"] as const;
 
 const money = (v: number | undefined, currency: CurrencyCode = "GBP"): string =>
@@ -33,6 +38,8 @@ export interface LibraryProps {
   onSelect: (id: string) => void;
   onTogglePause: (skill: Skill) => void;
   onTryDraft: () => void;
+  /** A signed-in library: nothing on this page can pause or edit a stored skill yet (W10). */
+  live?: boolean;
 }
 
 export function LibrarySection({
@@ -44,6 +51,7 @@ export function LibrarySection({
   onSelect,
   onTogglePause,
   onTryDraft,
+  live = false,
 }: LibraryProps) {
   const [q, setQ] = useState("");
   const [acc, setAcc] = useState<Record<string, Record<string, number>>>({});
@@ -180,6 +188,8 @@ export function LibrarySection({
               <button
                 type="button"
                 className="park-skills-lib-secondary"
+                disabled={live}
+                title={live ? NOT_FROM_HERE : undefined}
                 onClick={() => onTogglePause(cur)}
               >
                 {isPaused ? "Resume" : "Pause"}
@@ -187,10 +197,17 @@ export function LibrarySection({
               <button
                 type="button"
                 className="park-skills-lib-secondary"
-                onClick={() => app.toast("Step editor opens here. Changes are versioned")}
+                disabled={live}
+                title={live ? NOT_FROM_HERE : undefined}
+                onClick={() => app.toast(SAMPLE_EDIT)}
               >
                 Edit steps
               </button>
+              {live ? (
+                <span className="park-skills-lib-owner" data-testid="skills-lib-not-here">
+                  {NOT_FROM_HERE}
+                </span>
+              ) : null}
             </div>
           </div>
 

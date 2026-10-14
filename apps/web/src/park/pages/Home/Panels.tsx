@@ -107,6 +107,8 @@ function GoLink({ href, onGo, children }: { href: string; onGo: () => void; chil
 }
 
 export interface TodayProps {
+  /** True only when the rows come from the served worlds: "Live now" is a claim, so sample rows are titled as a sample (HR-1). */
+  readonly served: boolean;
   readonly rows: readonly LiveRow[];
   /** STARTER-1: the recorded sample project, when the Api served it and the person has not hidden it. */
   readonly sample?: World | undefined;
@@ -120,6 +122,7 @@ export interface TodayProps {
 }
 
 export function TodayPanel({
+  served,
   rows,
   sample,
   events,
@@ -133,7 +136,7 @@ export function TodayPanel({
   return (
     <aside aria-label="Today" className="park-home-today park-home-glass">
       <div className="park-home-head">
-        <span className="park-home-title">Live now</span>
+        <span className="park-home-title">{served ? "Live now" : "Sample worlds"}</span>
         <GoLink href="#worlds" onGo={onWorlds}>
           All worlds
         </GoLink>

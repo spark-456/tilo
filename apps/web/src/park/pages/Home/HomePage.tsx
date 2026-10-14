@@ -37,6 +37,7 @@ import {
   spendOf,
   summaryLine,
 } from "./homeData";
+import { useComposerClearance } from "./useComposerClearance";
 
 interface Base {
   user: User;
@@ -290,8 +291,13 @@ export function HomePage({ app }: { app: AppCtx }) {
       )
     : summaryLine(needs, night);
 
+  const root = useRef<HTMLDivElement>(null);
+  const composerShown = !failed || (worldsLive && worlds !== "failed");
+  useComposerClearance(root, composerShown);
+
   return (
     <div
+      ref={root}
       className={`park-home-root${preview ? " park-home-root--preview" : ""}`}
       data-testid="park-page-home"
     >
@@ -324,6 +330,7 @@ export function HomePage({ app }: { app: AppCtx }) {
           </div>
           {(vw || 1440) >= 1180 ? (
             <TodayPanel
+              served={served}
               rows={liveRows(worlds, needs, served)}
               sample={served ? worlds.find((w) => w.sample) : undefined}
               events={base.agenda && base.agenda.days !== null ? nextEvents(base.agenda) : []}
@@ -339,15 +346,18 @@ export function HomePage({ app }: { app: AppCtx }) {
       ) : null}
       {preview ? <FirstRunOverview page="home" app={app} /> : null}
       {failed && !preview ? (
-        <div className="park-home-hero park-home-glass">
-          <h1 className="park-home-h1">Home</h1>
-          <p className="park-home-summary">Not connected yet</p>
+        <div className="park-home-leftcol">
+          <div className="park-home-hero park-home-glass">
+            <h1 className="park-home-h1">Home</h1>
+            <p className="park-home-summary">Not connected yet</p>
+          </div>
         </div>
       ) : null}
-      {!failed || (worldsLive && worlds !== "failed") ? (
+      {composerShown ? (
         <ComposerPanel
           sending={sending}
           sample={demo}
+          compact={vw > 0 && vw <= 480}
           staging={{
             files,
             onChange: setFiles,

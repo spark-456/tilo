@@ -32,6 +32,7 @@ COPY config/prices*.yaml /opt/tilo/config/
 COPY config/speech*.yaml /opt/tilo/config/
 COPY config/voice*.yaml /opt/tilo/config/
 COPY config/meeting*.yaml /opt/tilo/config/
+COPY config/meeting-wake.json /opt/tilo/config/
 COPY prompts/router /opt/tilo/prompts/router
 COPY prompts/speech /opt/tilo/prompts/speech
 ENV TILO_REPO_ROOT=/opt/tilo \

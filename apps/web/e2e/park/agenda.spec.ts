@@ -46,7 +46,7 @@ for (const [name, viewport] of Object.entries(SIZES)) {
       );
       await expect(page.getByRole("button", { name: "Find a time" }).first()).toBeVisible();
       await expect(page.locator(".park-btn--primary")).toHaveCount(1);
-      await expect(page.getByText("Google Calendar · synced just now")).toBeVisible();
+      await expect(page.getByText("Sample data · no calendar sync recorded")).toBeVisible();
       expect(problems).toEqual([]);
     });
 

@@ -9,8 +9,17 @@ Three ways to get audio, none of them silent:
 - no live switch: REPLAY of hand-written recordings `<fixtures_dir>/voice-live-recordings/<key>.json`, keyed by profile,
   model, voice and the SHA-256 of the text (a recording stores the digest, never the words). A miss is `NotConfigured`,
   never a fall-through to a live call, so the bot falls back to its local voice;
-- `LIVE=1` (only the user sets it), `voice.live.price_approved` (PL-06: a current Live quote the user approved) and
-  `GOOGLE_CLOUD_PROJECT`: one Live session per reply on the user's ADC, `google.genai` imported lazily.
+- `LIVE=1` (only the user sets it), `voice.live.price_approved` (PL-06: a current Live quote the user approved),
+  `GOOGLE_CLOUD_PROJECT` and a `meter` (SEC-16, BQ-M2-1): one Live session per reply on the user's ADC, `google.genai`
+  imported lazily.
+Spend (SEC-16): a live reply is one unit on the process's ledger, through the `LiveVoiceMeter` the process supplies. No
+meter means no live factory (a code gate: `NotConfigured`, and `voice.build_voice_provider` builds Chirp instead). The
+meter reserves BEFORE any session opens (a refusal or an unreadable ledger raises `NotConfigured`; the provider is never
+reached), settles once with the usage that reply knows, and releases only a hold the text never reached (the session
+did not open or the send failed). The call is reached as soon as `send_client_content` succeeds: input tokens are
+billable even if no reply arrives, so a failure, a timeout or a cancel after the send settles (usage maybe empty: the
+meter then charges its whole reserve, an upper bound of the input estimate), it never releases the hold unpaid. Usage
+lives in the call, never on the instance, so concurrent replies cannot mix.
 Nothing is recorded: audio of a meeting reply is not kept."""
 
 from __future__ import annotations
@@ -25,7 +34,7 @@ import os
 import time
 from collections.abc import AsyncGenerator, Callable, Iterator
 from contextlib import AbstractAsyncContextManager, asynccontextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -35,7 +44,7 @@ from tilo_providers.interfaces import SpeechProvider
 from tilo_providers.prompts import load_prompt
 from tilo_providers.replay import is_live_mode
 from tilo_providers.speech import VoiceTiming, check_synth_request
-from tilo_providers.voice import VoiceConfig
+from tilo_providers.voice import LiveVoiceMeter, VoiceConfig
 
 log = logging.getLogger("tilo_providers.voice")
 RECORDINGS_DIR = "voice-live-recordings"
@@ -54,6 +63,16 @@ class LiveSessionSettings:
 
 
 SessionFactory = Callable[[LiveSessionSettings], AbstractAsyncContextManager[Any]]
+
+
+@dataclass
+class _LiveCall:
+    """What one reply knows about itself: its hold, whether the model was reached (the text was sent) and the usage it
+    reported."""
+
+    hold: object | None = None
+    reached: bool = False
+    usage: dict[str, int] = field(default_factory=dict)
 
 
 def recording_key(profile_id: str, model: str, voice: str, text: str) -> str:
@@ -98,14 +117,14 @@ class GeminiLiveVoiceProvider(SpeechProvider):
         session_factory: SessionFactory | None = None,
         clock: Callable[[], float] = time.monotonic,
         on_timing: Callable[[VoiceTiming], None] | None = None,
+        meter: LiveVoiceMeter | None = None,
     ) -> None:
         if config.live is None or not config.live.enabled:
             raise NotConfigured("FR-MTG-11: the Gemini Live voice is off (voice.live.enabled); Chirp is the voice")
         self._config, self._live = config, config.live
         self._dir = Path(fixtures_dir) / RECORDINGS_DIR if fixtures_dir is not None else None
-        self._factory, self._clock, self._on_timing = session_factory, clock, on_timing
+        self._factory, self._clock, self._on_timing, self._meter = session_factory, clock, on_timing, meter
         self.last_timing: VoiceTiming | None = None
-        self.last_usage: dict[str, int] = {}
 
     def redact(self, payload: str) -> str:
         return _GOOGLE_SECRET_RE.sub("[redacted]", payload)
@@ -122,13 +141,16 @@ class GeminiLiveVoiceProvider(SpeechProvider):
         text, voice = check_synth_request(text, voice, kwargs, self._config.max_chars)
         name, started = voice or self._live.voice, self._clock()
         source: Iterator[bytes]
+        call: _LiveCall | None = None  # a replay costs nothing: no unit, no hold
         if self._factory is not None:
-            source = self._turn(self._factory, text, name)
+            call = _LiveCall() if self._meter is not None else None
+            source = self._turn(self._factory, text, name, call)
         elif is_live_mode():
-            source = self._turn(self._google_factory(), text, name)
+            factory, call = self._google_factory(), _LiveCall()
+            source = self._turn(factory, text, name, call)
         else:
             source = self._replay(text, name)
-        return self._stream(source, len(text), started)
+        return self._stream(source, len(text), started, call)
 
     # -- the three sources ----------------------------------------------------------------------------------------
     def _replay(self, text: str, voice: str) -> Iterator[bytes]:
@@ -168,9 +190,11 @@ class GeminiLiveVoiceProvider(SpeechProvider):
         if not project:
             raise NotConfigured("FR-MTG-11: GOOGLE_CLOUD_PROJECT is not set; cannot speak live")
         validate_google_settings(project, self._live.location)  # before any client exists
+        if self._meter is None:  # SEC-16, BQ-M2-1: a live reply no ledger can count is a silent overspend
+            raise NotConfigured("SEC-16: the Live voice needs a spend meter (a ledger hook); the local voice speaks")
         return functools.partial(_google_session, project)
 
-    def _turn(self, factory: SessionFactory, text: str, voice: str) -> Iterator[bytes]:
+    def _turn(self, factory: SessionFactory, text: str, voice: str, call: _LiveCall | None) -> Iterator[bytes]:
         """One reply on one Live session, driven from sync code on a private event loop (the voice is sync, the SDK
         is async). The deadline is for the whole reply; closing the iterator closes the session."""
         settings = LiveSessionSettings(
@@ -180,7 +204,7 @@ class GeminiLiveVoiceProvider(SpeechProvider):
             self._live.max_output_tokens,
             self._live.location,
         )
-        loop, pieces = asyncio.new_event_loop(), self._receive(factory, settings, text)
+        loop, pieces = asyncio.new_event_loop(), self._receive(factory, settings, text, call or _LiveCall())
         deadline = self._clock() + self._live.timeout_s
         try:
             while True:
@@ -199,16 +223,17 @@ class GeminiLiveVoiceProvider(SpeechProvider):
                 loop.close()
 
     async def _receive(
-        self, factory: SessionFactory, settings: LiveSessionSettings, text: str
+        self, factory: SessionFactory, settings: LiveSessionSettings, text: str, call: _LiveCall
     ) -> AsyncGenerator[bytes, None]:
         mime, complete = f"audio/pcm;rate={self._config.sample_rate}", False
         async with factory(settings) as session:
             await session.send_client_content(turns={"role": "user", "parts": [{"text": text}]}, turn_complete=True)
+            call.reached = True  # the text was accepted: its input tokens are billed even if no reply ever comes
             async for reply in session.receive():
                 usage = getattr(reply, "usage_metadata", None)
                 if usage is not None:  # whole numbers only: the meter reads these, never the content
                     counts = {name: getattr(usage, name, None) for name in _USAGE_FIELDS}
-                    self.last_usage = {k: n for k, n in counts.items() if type(n) is int and n >= 0}
+                    call.usage = {k: n for k, n in counts.items() if type(n) is int and n >= 0}
                 content = getattr(reply, "server_content", None)
                 if content is None:
                     continue
@@ -228,12 +253,16 @@ class GeminiLiveVoiceProvider(SpeechProvider):
             raise ProviderError("PL-02: the Live voice turn did not finish")
 
     # -- caps, timing and errors (the same rules as the Chirp adapter) ----------------------------------------------
-    def _stream(self, source: Iterator[bytes], characters: int, started: float) -> Iterator[bytes]:
+    def _stream(
+        self, source: Iterator[bytes], characters: int, started: float, call: _LiveCall | None = None
+    ) -> Iterator[bytes]:
         chunks = total = 0
         first_ms: float | None = None
         carry = b""
         try:
             try:
+                if call is not None and self._meter is not None:
+                    self._reserve(self._meter, call)  # before the first session is opened, never earlier
                 for data in source:
                     data = carry + data
                     carry = data[-1:] if len(data) % 2 else b""
@@ -264,7 +293,36 @@ class GeminiLiveVoiceProvider(SpeechProvider):
             close = getattr(source, "close", None)
             if callable(close):
                 close()
+            self._close_hold(call)
             self._report(VoiceTiming(characters, chunks, total, first_ms, (self._clock() - started) * 1000))
+
+    # -- spend (SEC-16, BQ-M2-1) --------------------------------------------------------------------------------------
+    def _reserve(self, meter: LiveVoiceMeter, call: _LiveCall) -> None:
+        try:
+            hold = meter.reserve()
+        except Exception as error:  # an unreadable ledger is a refusal; the error text (a ledger's) is never kept
+            log.warning("live voice refused, the spend check failed (%s)", type(error).__name__)
+            hold = None
+        if hold is None:
+            raise NotConfigured(
+                "SEC-16: the spend ledger gave no reservation for the Live voice; the local voice speaks"
+            )
+        call.hold = hold
+
+    def _close_hold(self, call: _LiveCall | None) -> None:
+        """Exactly once per reply: settle what is known (also after a failure, a timeout or a cancel once the text was
+        sent: the input is billable), release a hold nothing reached. A failing ledger is logged by class and never
+        breaks the voice."""
+        if call is None or call.hold is None or self._meter is None:
+            return
+        hold, call.hold = call.hold, None
+        try:
+            if call.reached:
+                self._meter.settle(hold, dict(call.usage))
+            else:
+                self._meter.release(hold)
+        except Exception as error:
+            log.warning("live voice spend hook failed (%s)", type(error).__name__)
 
     def _report(self, timing: VoiceTiming) -> None:
         self.last_timing = timing

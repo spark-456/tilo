@@ -37,6 +37,8 @@ import { Activity, Districts, Result, RunHistory } from "./Lower";
 import { MeetingHall } from "./MeetingHall";
 import { FactsCard, GoLink, LovableCard, SpendCard, WaitingCard } from "./Side";
 import { SkillProposals } from "./SkillProposals";
+import { ShareWithTeam } from "./TeamShare";
+import { MissingWorld, TeamItems, TeamWorld } from "./TeamWorld";
 import "./World.css";
 import { cityArt, rowArt, singleArt } from "./worldArt";
 import {
@@ -146,6 +148,14 @@ function Frame({ children, worldId }: { children?: ReactNode; worldId?: string }
   );
 }
 
+// UI-10 B1: no run-now route and no result file exist yet, so a sample says it did nothing and a live world's
+// button says why it is off. Neither claims a run started or a result opened (HR-1).
+const SAMPLE_RUN = "Sample only: nothing was started. This demo world has no runner behind it.";
+const SAMPLE_OPEN =
+  "Sample only: nothing was opened. This demo world has no result file behind it.";
+const RUN_OFF = "Starting a run from this page is not connected yet. No run would start.";
+const OPEN_OFF = "This result has no file linked yet, so there is nothing to open.";
+
 export function WorldPage({ app }: { app: AppCtx }) {
   const api = useParkApi();
   const worldClient = useWorldClient();
@@ -225,9 +235,17 @@ export function WorldPage({ app }: { app: AppCtx }) {
   }, [slackOpen]);
 
   if (loaded === null) return <Frame />;
+  // BQ-CTX-TEAMWORLD (BQ-TEAMWORLD-8): the list says whose a live world is. `access: "team"` is a teammate's, read
+  // only (the API's 404 for one since lapsed is the ordinary missing world); an id the list does not carry is a
+  // missing world too, never a guess.
   const wanted = app.params.id;
-  // QA-DEMO-1 M2: an id the list does not hold is "Page not found", never another job (with its Approve buttons).
-  // Only an address with no id (the bare /world) falls back to the first world.
+  if (loaded !== "failed" && loaded.live && worldClient && wanted) {
+    const listed = loaded.worlds.find((x) => x.id === wanted);
+    if (listed?.access === "team")
+      return <TeamWorld client={worldClient} worldId={wanted} app={app} />;
+    if (!listed && !added.some((x) => x.id === wanted))
+      return <MissingWorld worldId={wanted} app={app} />;
+  }
   const world =
     loaded === "failed"
       ? undefined
@@ -384,6 +402,9 @@ export function WorldPage({ app }: { app: AppCtx }) {
           >
             Share to Slack
           </Button>
+          {loaded.live && worldClient && !w.sample ? (
+            <ShareWithTeam client={worldClient} worldId={w.id} worldName={w.name} />
+          ) : null}
           {!slackState.connected ? (
             <span id={NO_SLACK_ID} className="park-world-sr">
               {slackState.disabledReason}
@@ -403,6 +424,9 @@ export function WorldPage({ app }: { app: AppCtx }) {
       </div>
 
       {loaded.live && worldClient ? <SkillProposals client={worldClient} worldId={w.id} /> : null}
+      {loaded.live && worldClient && !w.sample ? (
+        <TeamItems client={worldClient} worldId={w.id} auto={false} />
+      ) : null}
       {slackOpen ? (
         <div className="park-world-slackbackdrop">
           <div
@@ -568,14 +592,16 @@ export function WorldPage({ app }: { app: AppCtx }) {
           {isTown ? (
             <RunHistory
               runs={w.runs ?? []}
-              onRunNow={() => app.toast("Run started. You’ll get a notification when it finishes")}
+              onRunNow={() => app.toast(SAMPLE_RUN)}
               onAgenda={() => app.go("agenda")}
+              {...(real ? { runNowOff: RUN_OFF } : {})}
             />
           ) : null}
           {!isCity && !isTown ? (
             <Result
               w={w}
-              onOpen={() => app.toast("Opening the result in Google Drive")}
+              onOpen={() => app.toast(SAMPLE_OPEN)}
+              {...(real ? { openOff: OPEN_OFF } : {})}
               onSlack={openSlackDialog}
               slackConnected={slackState.connected}
               slackReason={slackState.disabledReason}
