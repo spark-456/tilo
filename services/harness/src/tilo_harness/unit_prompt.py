@@ -27,6 +27,7 @@ ANSWERS_CAP = 2000  # all intake answers together: reserved, so a long brief nev
 FIELD_CAP = 1000  # one item of a list (a limit, a deliverable)
 ANSWER_CAP = 600  # one intake question, and one answer
 MAX_ANSWERS = 10
+DECISION_CAP = 800  # the person's decision on the unit's own question: its own room, never squeezed by the answers
 REQUEST_CAP = GOAL_CAP + AUDIENCE_CAP + DELIVERABLES_CAP + CONSTRAINTS_CAP + ANSWERS_CAP  # the whole request block
 UPSTREAM_ITEM_CAP = 4000  # characters of one upstream unit's output
 UPSTREAM_TOTAL_CAP = 12000  # all upstream outputs together
@@ -65,11 +66,17 @@ def _items(items: Sequence[str], cap: int, sep: str) -> str:
 
 
 def request_variables(
-    brief: Mapping[str, Any] | None, answers: Sequence[tuple[str, str]] = (), *, today: date | None = None
+    brief: Mapping[str, Any] | None,
+    answers: Sequence[tuple[str, str]] = (),
+    *,
+    today: date | None = None,
+    decision: str | None = None,
 ) -> dict[str, str]:
     """The template variables `goal`, `audience`, `deliverables`, `constraints` and `answers` for the request block,
     and `today`, `deadline` and `days_to_deadline` (code facts from the clock, never model text; `today` defaults to
-    the real date, a test passes one). The deadline is read only when it is a `YYYY-MM-DD` date."""
+    the real date, a test passes one). The deadline is read only when it is a `YYYY-MM-DD` date.
+    `decision` (FR-HIL-10) is what the person decided when this unit asked first: one more neutralised line at the end
+    of `answers`. Without one, every variable is exactly as before (replay keys do not move)."""
     brief = brief or {}
     deliverables = [
         data_line(f"{d.get('title', '')} ({d['format']})" if d.get("format") else d.get("title", ""), FIELD_CAP)
@@ -88,8 +95,15 @@ def request_variables(
         "audience": data_line(brief.get("audience") or "not stated", AUDIENCE_CAP),
         "deliverables": _items([d for d in deliverables if d], DELIVERABLES_CAP, "; ") or "not stated",
         "constraints": _items([c for c in constraints if c], CONSTRAINTS_CAP, "; ") or "none",
-        "answers": _items(pairs, ANSWERS_CAP, "\n") or "none",
+        "answers": _with_decision(_items(pairs, ANSWERS_CAP, "\n") or "none", decision),
     }
+
+
+def _with_decision(answers: str, decision: str | None) -> str:
+    if not isinstance(decision, str) or not decision.strip():
+        return answers
+    line = f"- {data_line(decision, DECISION_CAP)}"
+    return line if answers == "none" else f"{answers}\n{line}"
 
 
 def inputs_text(upstream: Sequence[UpstreamItem]) -> str:

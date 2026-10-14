@@ -116,6 +116,9 @@ class UnitContext:
     brief: Mapping[str, Any] | None = None  # the brief the run was started with
     intake_answers: tuple[tuple[str, str], ...] = ()  # (the Director's question, the person's answer)
     upstream: tuple[UpstreamItem, ...] = ()  # the units this one depends on, in plan order
+    # FR-HIL-10: what the person decided when this unit asked first (code-written from the card and the answer);
+    # `unit_prompt` shows it, neutralised, inside the request block. None when the unit never asked.
+    decision: str | None = None
 
 
 class UnitRunner(Protocol):
@@ -151,6 +154,31 @@ class DefaultUnitRunner(ToolUnitRunner):
         if unit["role"] == "verifier" and (fail := _date_window_fail(context, self._date_clock())) is not None:
             return UnitOutcome(success=False, summary=" ".join(fail.verdict.split()), reason=fail.reason)
         return await super().run(unit, context)
+
+
+def _decision(card: Any, answer: Any) -> str | None:
+    """FR-HIL-10: the line a unit's prompt shows for the answer to its own question: the person's typed text when an
+    answer carries one (any str), else the chosen option's label; the question it answered follows. A deadline default
+    says so. None when there is nothing to show. Plain data: `unit_prompt` neutralises it."""
+    if answer is None or not isinstance(card, Mapping):
+        return None
+    typed = getattr(answer, "text", None)
+    found = card.get("options")
+    options: list[Any] = found if isinstance(found, list) else []
+    label = next(
+        (o.get("label") for o in options if isinstance(o, Mapping) and o.get("id") == getattr(answer, "option", None)),
+        None,
+    )
+    chosen = typed if isinstance(typed, str) and typed.strip() else label
+    if not isinstance(chosen, str) or not chosen.strip():
+        return None
+    who = (
+        "Nobody answered in time, so the default was taken"
+        if getattr(answer, "answered_by", None) == "default"
+        else "The person decided"
+    )
+    asked = card.get("what_happened")
+    return f"{who}: {chosen}" + (f" (asked: {asked})" if isinstance(asked, str) and asked.strip() else "")
 
 
 def _date_window_fail(context: UnitContext, today: date) -> WindowFail | None:
@@ -370,6 +398,7 @@ class _Run:
             "agent.assigned", lead, worker, "The Lead gave it a unit.", {"unit": unit_id}, cause=cause, **at
         )
         answer: Answer | None = None
+        decision: str | None = None
         if self.must_ask is not None:
             ask = await self.must_ask.assess(unit)  # no failure count yet: retries arrive with FR-AGT-13
             if ask is not None:
@@ -389,6 +418,7 @@ class _Run:
                 answer = await self.question_wait.wait_for(
                     card, lead=lead, director=self.roster.director, district=district
                 )
+                decision = _decision(card, answer)  # the person's own choice on the unit's own card
                 # A stand-in ask that is not MustAsk's (the pinned FR-HIL-10 doubles) runs on any answer.
                 runs, held_by = not isinstance(ask, Ask) or ask.runs(answer), answer
                 if not runs and isinstance(ask, Ask) and (follow := self.must_ask.confirmation(ask, answer)):
@@ -432,7 +462,13 @@ class _Run:
             )
             upstream = tuple(self.results[dep] for dep in unit["depends_on"] if dep in self.results)
             first = UnitContext(
-                worker, loaded, answer, brief=self.brief, intake_answers=self.intake_answers, upstream=upstream
+                worker,
+                loaded,
+                answer,
+                brief=self.brief,
+                intake_answers=self.intake_answers,
+                upstream=upstream,
+                decision=decision,
             )
             outcome, worker, cause = await self.run_agents(unit, first, site, cause, at)  # a successor may finish it
         made: list[Kept] = []

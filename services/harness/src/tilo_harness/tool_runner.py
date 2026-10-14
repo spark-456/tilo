@@ -174,7 +174,12 @@ class ToolUnitRunner:
                 "unit_type": data_line(unit["unit_type"], 80),
                 "skills": "\n\n".join(skill.body for skill in context.skills),
                 "inputs": inputs_text(_upstream_for(context.upstream, holds_effects)),
-                **request_variables(context.brief, context.intake_answers, today=self._today()),
+                **request_variables(
+                    context.brief,
+                    context.intake_answers,
+                    today=self._today(),
+                    decision=getattr(context, "decision", None),  # FR-HIL-10: the unit's own answer, as data
+                ),
             },
         )
         if wants_quiz(unit, context.brief):
