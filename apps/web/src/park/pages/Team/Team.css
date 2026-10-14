@@ -581,3 +581,75 @@
     min-height: 44px;
   }
 }
+
+/* LIVE-P2-A (QA row 26): below 480 px the members table is a card per person (no 820 px sideways scroller): the name
+   and the details button on the first line, then role, spend limit, helped and last active, each with its label. */
+@media (max-width: 480px) {
+  [data-park] .park-team-members::before {
+    content: none;
+  }
+  [data-park] .park-team-table {
+    min-width: 0;
+  }
+  /* the column headings stay in the accessibility tree (they name the cells) but not on the screen */
+  [data-park] .park-team-head {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  [data-park] .park-team-row.park-team-grid {
+    grid-template-columns: minmax(0, 1fr) 44px;
+    column-gap: 8px;
+    row-gap: 8px;
+    min-height: 0;
+    padding: 12px 0;
+  }
+  [data-park] .park-team-row > td:nth-child(1) {
+    grid-column: 1;
+    grid-row: 1;
+  }
+  [data-park] .park-team-row > td:nth-child(6) {
+    grid-column: 2;
+    grid-row: 1;
+  }
+  [data-park] .park-team-row > td:nth-child(n + 2):nth-child(-n + 5) {
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  [data-park] .park-team-row > td:nth-child(2) {
+    grid-row: 2;
+  }
+  [data-park] .park-team-row > td:nth-child(3) {
+    grid-row: 3;
+  }
+  [data-park] .park-team-row > td:nth-child(4) {
+    grid-row: 4;
+  }
+  [data-park] .park-team-row > td:nth-child(5) {
+    grid-row: 5;
+  }
+  [data-park] .park-team-row > td:nth-child(3)::before {
+    content: "Spend limit";
+  }
+  [data-park] .park-team-row > td:nth-child(4)::before {
+    content: "Helped Tilo";
+  }
+  [data-park] .park-team-row > td:nth-child(5)::before {
+    content: "Active";
+  }
+  [data-park] .park-team-row > td:nth-child(n + 3):nth-child(-n + 5)::before {
+    color: var(--ink3);
+    font-size: 12.5px;
+    font-weight: 700;
+  }
+  [data-park] .park-team-sub {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+}

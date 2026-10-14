@@ -390,7 +390,7 @@ export function WorldPage({ app }: { app: AppCtx }) {
     <Frame worldId={w.id}>
       <PageTitle title={w.name} />
       <nav aria-label="Breadcrumb" className="park-world-crumb">
-        <GoLink className="park-world-back" href="#worlds" onGo={() => app.go("worlds")}>
+        <GoLink className="park-world-back" href="/worlds" onGo={() => app.go("worlds")}>
           {icon("arrowL", 15)}Worlds
         </GoLink>
         <span>/</span>
