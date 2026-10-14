@@ -170,7 +170,9 @@ function PersonalTeamPage({ app }: { app: AppCtx }) {
       <Top
         count={
           liveTeam
-            ? `${liveTeam.people.length} people`
+            ? liveTeam.setupRequired
+              ? undefined
+              : `${liveTeam.people.length} people`
             : ready
               ? `${ready.people.length} people`
               : undefined
@@ -208,10 +210,12 @@ function PersonalTeamPage({ app }: { app: AppCtx }) {
       {liveTeam ? (
         <>
           <LiveMembers team={liveTeam} />
-          <details onToggle={(e) => setControlsOpen(e.currentTarget.open)}>
-            <summary>Manage team settings</summary>
-            {controlsOpen ? <LiveControls app={app} /> : null}
-          </details>
+          {!liveTeam.setupRequired ? (
+            <details onToggle={(e) => setControlsOpen(e.currentTarget.open)}>
+              <summary>Manage team settings</summary>
+              {controlsOpen ? <LiveControls app={app} /> : null}
+            </details>
+          ) : null}
         </>
       ) : ready ? (
         <TeamBody app={app} data={ready.data} people={ready.people} setPeople={setPeople} />

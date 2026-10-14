@@ -530,7 +530,7 @@ export class HttpClient implements TiloClient, SchedulesApi, FieldsApi, ItemApi 
 
   /** A plain GET of `path`, decoded as JSON, with the same typed failures as every other call (WIRE-1). */
   getJson(path: string): Promise<unknown> {
-    if (path === "/v1/plate") return this.readPlate();
+    if (path === "/v1/plate" || path === "/v1/people") return this.readPerson(path);
     return this.request<unknown>(path);
   }
 
@@ -539,9 +539,9 @@ export class HttpClient implements TiloClient, SchedulesApi, FieldsApi, ItemApi 
     return this.request(path, { cache: "no-store" }, false, (response) => response.blob());
   }
 
-  private async readPlate(): Promise<unknown> {
+  private async readPerson(path: string): Promise<unknown> {
     try {
-      return await this.request<unknown>("/v1/plate");
+      return await this.request<unknown>(path);
     } catch (error) {
       if (!(error instanceof TiloApiError) || error.status !== 404) throw error;
       const founded = await bootstrapPerson(
@@ -550,7 +550,7 @@ export class HttpClient implements TiloClient, SchedulesApi, FieldsApi, ItemApi 
         (refusal) => refusal instanceof TiloApiError && refusal.status === 403,
       );
       if (!founded) throw error; // existing callers render the honest empty plate
-      return this.request<unknown>("/v1/plate"); // one reread; never a retry loop
+      return this.request<unknown>(path); // one reread; never a retry loop
     }
   }
 

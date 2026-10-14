@@ -6,6 +6,7 @@
 import { type ReactNode, useRef } from "react";
 import type { Api } from "../../api/index";
 import { isCalendarEntry } from "../../api/live/agendaFromPlate";
+import { ORGANISATION_SETUP } from "../../api/organisationSetup";
 import type { Agenda, AgendaPlateRow, Decision, LiveAgenda } from "../../api/types";
 import { useParkApi } from "../../app/context";
 import { useStagedCount } from "../../app/useStaged";
@@ -137,6 +138,13 @@ function PersonalAgendaPage({ app }: AgendaPageProps) {
 }
 
 function Plate({ A }: { A: LiveAgenda }) {
+  if (A.setupRequired)
+    return (
+      <>
+        <h1 className="park-agenda-title">Agenda</h1>
+        <output>{ORGANISATION_SETUP}</output>
+      </>
+    );
   const list = (rows: AgendaPlateRow[], empty: string) =>
     rows.length ? (
       <ul>

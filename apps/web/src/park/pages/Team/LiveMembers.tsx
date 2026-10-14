@@ -1,7 +1,9 @@
+import { ORGANISATION_SETUP } from "../../api/organisationSetup";
 import type { Team } from "../../api/types";
 
 /** A read-only directory: the people endpoint does not provide activity, policy or write actions. */
 export function LiveMembers({ team }: { team: Team }) {
+  if (team.setupRequired) return <output>{ORGANISATION_SETUP}</output>;
   return (
     <section
       className="park-team-card park-team-members"

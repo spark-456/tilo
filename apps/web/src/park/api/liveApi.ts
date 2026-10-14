@@ -319,16 +319,25 @@ export function createLiveApi(options: LiveApiOptions = {}): Api {
     source: "live",
   });
   api.getTeam = async () => {
-    const data = teamFromPeople(await http.getJson("/v1/people"));
-    if (!data) throw new TiloApiError(BAD_REPLY, 200, true);
-    return { data, source: "live" };
+    try {
+      const data = teamFromPeople(await http.getJson("/v1/people"));
+      if (!data) throw new TiloApiError(BAD_REPLY, 200, true);
+      return { data, source: "live" };
+    } catch (error) {
+      if (error instanceof TiloApiError && error.status === 404)
+        return {
+          data: { setupRequired: true, people: [], rules: [], matrix: [], roles: [], coverage: [] },
+          source: "live",
+        };
+      throw error;
+    }
   };
   api.getAgenda = async () => {
     try {
       return { data: agendaFromPlate(await http.getJson("/v1/plate")), source: "live" };
     } catch (error) {
       if (error instanceof TiloApiError && error.status === 404) {
-        return { data: emptyAgenda(), source: "live" };
+        return { data: { ...emptyAgenda(), setupRequired: true }, source: "live" };
       }
       throw error;
     }

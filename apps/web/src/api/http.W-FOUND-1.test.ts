@@ -80,3 +80,13 @@ it("W-FOUND-1 FR-PPL uncertain founding failure is surfaced and never resubmitte
     1,
   );
 });
+
+it("LIVE-PEOPLE FR-TEAM-01 opening Team first founds and rereads the requested directory", async () => {
+  const { client, fetch } = await setup(201);
+  await expect(client().getJson("/v1/people")).resolves.toMatchObject({ rows: [] });
+  expect(fetch.mock.calls.map(([url]) => String(url).split("api.test")[1])).toEqual([
+    "/v1/people",
+    "/v1/people/first",
+    "/v1/people",
+  ]);
+});

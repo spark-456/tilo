@@ -60,7 +60,7 @@ describe("WEB_1a_types: entity shapes follow the README data model", () => {
     >();
     expectTypeOf<keyof Learn>().toEqualTypeOf<"rates" | "reviews" | "helpers" | "tools">();
     expectTypeOf<keyof Team>().toEqualTypeOf<
-      "people" | "rules" | "matrix" | "roles" | "coverage"
+      "people" | "rules" | "matrix" | "roles" | "coverage" | "setupRequired"
     >();
     expectTypeOf<keyof Ledger>().toEqualTypeOf<
       | "budget"

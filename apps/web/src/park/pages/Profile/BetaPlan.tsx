@@ -1,10 +1,11 @@
 // FR-SET-05: beta metadata and a server-filtered directory count, display only.
 import { useEffect, useState } from "react";
+import { ORGANISATION_SETUP } from "../../api/organisationSetup";
 import { useParkApi } from "../../app/context";
 
 export function BetaPlan() {
   const api = useParkApi();
-  const [seats, setSeats] = useState<number | "loading" | "unavailable">("loading");
+  const [seats, setSeats] = useState<number | "loading" | "unavailable" | "setup">("loading");
   useEffect(() => {
     let active = true;
     setSeats("loading");
@@ -13,7 +14,9 @@ export function BetaPlan() {
         if (active)
           setSeats(
             result.source === "live"
-              ? new Set(result.data.people.map((p) => p.id)).size
+              ? result.data.setupRequired
+                ? "setup"
+                : new Set(result.data.people.map((p) => p.id)).size
               : "unavailable",
           );
       },
@@ -34,7 +37,9 @@ export function BetaPlan() {
           ? `${seats} ${seats === 1 ? "seat" : "seats"}`
           : seats === "loading"
             ? "Reading team seats"
-            : "Team seats unavailable"}
+            : seats === "setup"
+              ? ORGANISATION_SETUP
+              : "Team seats unavailable"}
       </output>
       <p className="park-profile-blurb">Based on team members visible to you</p>
       <p className="park-profile-blurb">No renewal date during beta</p>

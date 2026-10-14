@@ -5,6 +5,7 @@
 // provider's `useSchedule`, so a test never waits and a pending draft is cancelled when the page goes.
 import { useEffect, useRef, useState } from "react";
 import type { Cadence, RunPlan } from "../../api/oneStep";
+import { ORGANISATION_SETUP } from "../../api/organisationSetup";
 import type {
   AgendaData,
   ApiResult,
@@ -456,6 +457,13 @@ export function HomePage({ app }: { app: AppCtx }) {
             stacked={vw > 0 && vw < 1180}
           />
         </div>
+      ) : null}
+      {base &&
+      base !== "failed" &&
+      base.agenda &&
+      "setupRequired" in base.agenda &&
+      base.agenda.setupRequired ? (
+        <output>{ORGANISATION_SETUP}</output>
       ) : null}
       {preview ? <FirstRunOverview page="home" app={app} /> : null}
       {failed && !preview ? (
