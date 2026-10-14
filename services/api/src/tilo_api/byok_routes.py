@@ -202,7 +202,7 @@ def _public(ref: KeyReference | None, config: ByokConfig, *, owner_view: bool) -
         return {**base, "state": "none", "consent_version": config.consent_version}
     # org_model_key.owner_view: no auth_mode or project_id (the Google modes wait for BQ-BYOK-2), and consent_version
     # is the config's current one, the line the owner must confirm for the next widening act, not the stored one
-    keep = ("bundle_id", "secret_version", "set_at", "rotated_at", "day_cap_credits")
+    keep: tuple[str, ...] = ("bundle_id", "secret_version", "set_at", "rotated_at", "day_cap_credits")
     keep += ("fallback_to_tilo", "last_error", "last_used_at")
     shown = {k: v for k, v in ref.to_dict().items() if k in keep}
     answer = {**base, "state": ref.status, "consent_version": config.consent_version, **shown}

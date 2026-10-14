@@ -61,6 +61,7 @@ def _draft_deadline(meeting: dict, metadata: dict, now: float) -> float:
         if (
             until.tzinfo is None
             or created.tzinfo is None
+            or days is None
             or type(days) not in (int, float)
             or not math.isfinite(days)
             or days <= 0

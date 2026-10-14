@@ -73,7 +73,7 @@ def _models() -> dict[str, Any]:
 
 def _providers(tmp_path, models: dict[str, Any] | None = None, prices: dict[str, Any] | None = None):
     models = models or _models()
-    priced = {p: (1.0, 2.0) for p in models["profiles"]}
+    priced: dict[str, tuple[float, float] | None] = {p: (1.0, 2.0) for p in models["profiles"]}
     models_path, prices_path = write_providers_config(tmp_path, models, prices or prices_config_for(priced))
     return load_providers_config(models_path, prices_path)
 

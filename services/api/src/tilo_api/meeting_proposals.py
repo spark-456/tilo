@@ -202,16 +202,16 @@ def persist_proposed_items(
         purge = committed is None
         retain_items = False
         if committed is None and made is not None:
-            current = w.stores.meetings.get(w.org, meeting_id)
-            retain_items = current is not None and current.record["minutes"] == made.ref
+            latest = w.stores.meetings.get(w.org, meeting_id)
+            retain_items = latest is not None and latest.record["minutes"] == made.ref
             purge = not retain_items  # replace may have landed before its acknowledgement was lost
         if committed is not None and made is not None:
             try:
                 w.stores.meetings.replace(meeting, expected_version=committed.version)
                 purge = True
             except (NotFound, VersionConflict):
-                current = w.stores.meetings.get(w.org, meeting_id)
-                retain_items = current is not None and current.record["minutes"] == made.ref
+                latest = w.stores.meetings.get(w.org, meeting_id)
+                retain_items = latest is not None and latest.record["minutes"] == made.ref
                 purge = not retain_items  # preserve every link a concurrent meeting write has consumed
         for row in reversed(created) if not retain_items else ():
             try:

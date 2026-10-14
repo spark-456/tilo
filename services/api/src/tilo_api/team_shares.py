@@ -19,7 +19,7 @@ from __future__ import annotations
 
 import logging
 import re
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Response
@@ -68,7 +68,7 @@ def _log(writer: deps.EventWriter, world_id: str, actor: str, team: str, state: 
     """The one event of the change, appended to the shared world; any failure raises. The id comes from the record's
     own stamp, so a retry of the same change is the same part and commits once (EV-10)."""
     stamp = record["granted_by"] if state == "on" else record["revoked"]
-    part = {
+    part: dict[str, Any] = {
         "id": events.stable_part_id("world.share_changed", record["id"], state, stamp["at"]),
         "type": "world.share_changed",
         "actor": actor,
@@ -157,7 +157,7 @@ def _withdraw(shares: Any, world_id: str, team: str, owner: str, now: str) -> di
     raise _unavailable()
 
 
-def _reason(record: dict[str, Any], world_owner: str, now: str) -> str:
+def _reason(record: Mapping[str, Any], world_owner: str, now: str) -> str:
     """The fixed word for a share that is not in force (PE-31), checked in the order the rule states it."""
     if record["revoked"] is not None:
         return "revoked"

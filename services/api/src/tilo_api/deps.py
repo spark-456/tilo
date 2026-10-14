@@ -376,6 +376,8 @@ def _layout_districts(store: Store, world_id: str) -> list[str]:
     """The district ids the world's built layout names; none for no layout or one that is not the expected shape."""
     try:
         layout = getattr(store.runs.get(world_id), "layout", None)
+        if not isinstance(layout, dict):
+            return []
         return [
             d["id"] for level in layout["semantic"]["levels"] for d in level["districts"] if isinstance(d["id"], str)
         ]
@@ -954,7 +956,9 @@ def _ledger_sink(request: Request, uid: str, meter_run: str) -> Any:
     try:
         override = request.app.dependency_overrides.get(get_store)
         store = override() if override is not None else get_store(request)
-        task, world = store.tasks.get(path.get("task_id")), store.worlds.get(path.get("world_id"))
+        task_id, world_id = path.get("task_id"), path.get("world_id")
+        task = store.tasks.get(task_id) if isinstance(task_id, str) else None
+        world = store.worlds.get(world_id) if isinstance(world_id, str) else None
         if task is not None and task.owner == uid:  # only the person's own task or world names the run
             run = task.run_id
         elif world is not None and world.owner == uid:
