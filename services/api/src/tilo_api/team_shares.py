@@ -56,7 +56,7 @@ def _owner_world(principal: deps.Principal, store: deps.Store, world_id: str, te
         or principal.demo_session
         or principal.user_id != world.owner
     ):
-        raise HTTPException(status_code=404)
+        raise HTTPException(status_code=404, detail="Tilo could not find that.")
     return world
 
 
@@ -141,7 +141,7 @@ def _withdraw(shares: Any, world_id: str, team: str, owner: str, now: str) -> di
     for _ in range(_ATTEMPTS):
         held = shares.get(deps.ORG_ID, share_id(world_id, team))
         if held is None:
-            raise HTTPException(status_code=404)
+            raise HTTPException(status_code=404, detail="Tilo could not find that.")
         if held.record["revoked"] is not None:
             return dict(held.record)  # a retry: the first revocation stands
         try:
@@ -153,7 +153,7 @@ def _withdraw(shares: Any, world_id: str, team: str, owner: str, now: str) -> di
         except VersionConflict:
             continue
         except NotFound:
-            raise HTTPException(status_code=404) from None
+            raise HTTPException(status_code=404, detail="Tilo could not find that.") from None
     raise _unavailable()
 
 

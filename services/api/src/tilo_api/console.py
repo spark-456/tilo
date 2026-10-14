@@ -64,7 +64,7 @@ def _lead_record(principal: Principal, team_leads: list[dict], cards: CardStore,
         for record in team_leads:
             if record.get("user") == principal.user_id and _assigned(record, owner, now):
                 return record
-    raise HTTPException(status_code=403)
+    raise HTTPException(status_code=403, detail="You do not have access to this.")
 
 
 def build_router(
@@ -84,7 +84,7 @@ def build_router(
         store: CardStore = Depends(get_cards),
     ) -> dict[str, Any]:
         if principal.world_id != world_id:
-            raise HTTPException(status_code=404)  # same as an unknown world
+            raise HTTPException(status_code=404, detail="Tilo could not find that.")  # same as an unknown world
         lead = _lead_record(principal, team_leads, store, world_id)
         history = store.lead_answers(world_id, principal.user_id)
         times = [h["answer_time_s"] for h in history]
@@ -107,7 +107,7 @@ def build_router(
         store: CardStore = Depends(get_cards),
     ) -> JSONResponse:
         if principal.world_id != world_id:
-            raise HTTPException(status_code=404)
+            raise HTTPException(status_code=404, detail="Tilo could not find that.")
         lead = _lead_record(principal, team_leads, store, world_id)
         if from_channels or not session_allows(principal, principal.channel, False):  # the lead's own signed-in session
             return JSONResponse(status_code=400, content={"outcome": "rejected", "reason": "invalid_channel"})

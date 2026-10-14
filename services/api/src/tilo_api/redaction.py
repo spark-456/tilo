@@ -227,11 +227,11 @@ def get_world_layout(
     run = store.runs.get(world_id)
     layout = getattr(run, "layout", None)
     if not isinstance(layout, dict) or not layout:
-        raise HTTPException(status_code=404)
+        raise HTTPException(status_code=404, detail="Tilo could not find that.")
     if not _is_owner(principal, world.owner):
         layout = visible_layout(layout, _safe_districts(principal.districts))
         if layout is None:
-            raise HTTPException(status_code=404)
+            raise HTTPException(status_code=404, detail="Tilo could not find that.")
     return JSONResponse(content=copy.deepcopy(layout))
 
 

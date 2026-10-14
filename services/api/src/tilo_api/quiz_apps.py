@@ -60,7 +60,7 @@ def get_quiz(
         or principal.channel not in {"web", "mobile_web"}
         or (principal.world_id not in {None, world_id})
     ):
-        raise HTTPException(status_code=404)
+        raise HTTPException(status_code=404, detail="Tilo could not find that.")
     stream = store.events.get(world_id, [])
     specs = [
         e
@@ -68,7 +68,7 @@ def get_quiz(
         if e.get("type") == "app.spec" and e.get("data", {}).get("spec", {}).get("artifact_id") == artifact_id
     ]
     if not specs:
-        raise HTTPException(status_code=404)
+        raise HTTPException(status_code=404, detail="Tilo could not find that.")
     made = specs[-1]
     ref = made["data"]["spec"]
     scope = Scope(deps.ORG_ID, world_id, world.owner)
@@ -117,7 +117,7 @@ def get_quiz(
                 except (ValueError, AttributeError, TypeError):
                     continue
     except Exception:
-        raise HTTPException(status_code=404) from None
+        raise HTTPException(status_code=404, detail="Tilo could not find that.") from None
     part = {
         "id": events.stable_part_id(world_id, artifact_id, str(ref["version"]), "app.deployed"),
         "type": "app.deployed",

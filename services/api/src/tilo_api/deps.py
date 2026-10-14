@@ -364,7 +364,7 @@ def member_world(principal: Principal, store: Store, world_id: str) -> WorldReco
     unknown-world 404 (no membership oracle)."""
     world = store.worlds.get(world_id)
     if world is None:
-        raise HTTPException(status_code=404)
+        raise HTTPException(status_code=404, detail="Tilo could not find that.")
     unbound_owner = (
         principal.world_id is None
         and principal.role == "owner"
@@ -374,7 +374,7 @@ def member_world(principal: Principal, store: Store, world_id: str) -> WorldReco
     )
     if principal.world_id == world_id or unbound_owner:
         return world
-    raise HTTPException(status_code=404)
+    raise HTTPException(status_code=404, detail="Tilo could not find that.")
 
 
 def _layout_districts(store: Store, world_id: str) -> list[str]:
@@ -417,11 +417,11 @@ def team_reader(
     opened included, is the one unknown-world 404. No cache: each request reads the shares and the directory."""
     world = store.worlds.get(world_id)
     if world is None or not _team_session(principal):
-        raise HTTPException(status_code=404)
+        raise HTTPException(status_code=404, detail="Tilo could not find that.")
     try:
         stores = people()
         if stores is None:
-            raise HTTPException(status_code=404)
+            raise HTTPException(status_code=404, detail="Tilo could not find that.")
         if directory is None:  # a caller that lists many worlds in one request reads the directory once
             directory = Directory.of(s.record for s in stores.persons.list(ORG_ID))
         shares = [s.record for s in stores.world_shares.list(ORG_ID, "world_id", world_id)]
@@ -430,9 +430,9 @@ def team_reader(
         raise
     except Exception as exc:
         logger.warning("team reader check failed (%s)", type(exc).__name__)  # no detail: like an unknown world
-        raise HTTPException(status_code=404) from None
+        raise HTTPException(status_code=404, detail="Tilo could not find that.") from None
     if found is None:
-        raise HTTPException(status_code=404)
+        raise HTTPException(status_code=404, detail="Tilo could not find that.")
     districts = tuple(dict.fromkeys([*world.districts, *_layout_districts(store, world_id)]))
     viewer = Principal(
         user_id=principal.user_id, role="viewer", world_id=world_id, channel=principal.channel, districts=districts

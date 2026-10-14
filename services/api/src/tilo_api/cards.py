@@ -844,11 +844,11 @@ def build_router(
     ) -> list[dict]:
         reader = reading_principal(principal, world_id, record_owner=record_owner)
         if reader is None:
-            raise HTTPException(status_code=404)  # same as an unknown world
+            raise HTTPException(status_code=404, detail="Tilo could not find that.")  # same as an unknown world
         try:
             return as_read_by(principal, world_id, store.list_for_world(world_id, principal=reader))
         except PermissionError as exc:
-            raise HTTPException(status_code=403) from exc
+            raise HTTPException(status_code=403, detail="You do not have access to this.") from exc
 
     @router.post("/worlds/{world_id}/cards/{card_id}/answer", dependencies=guards)
     def answer_card(
@@ -864,7 +864,9 @@ def build_router(
             principal, world_id, record_owner=record_owner, cards=store, from_channels=from_channels
         )
         if actor is None:
-            raise HTTPException(status_code=404)  # same as an unknown world, before any other check
+            raise HTTPException(
+                status_code=404, detail="Tilo could not find that."
+            )  # same as an unknown world, before any other check
         if body.pin_verified or (not from_channels and body.channel not in _WEB_CHANNELS):
             return JSONResponse(status_code=403, content={"outcome": "rejected", "reason": "channel_not_permitted"})
         if not session_allows(actor, body.channel, from_channels):

@@ -32,18 +32,18 @@ def get_result(
         or principal.channel not in {"web", "mobile_web"}
         or principal.world_id not in {None, world_id}
     ):
-        raise HTTPException(status_code=404)
+        raise HTTPException(status_code=404, detail="Tilo could not find that.")
     stream = store.events.get(world_id, [])
     delivered = [e for e in stream if e.get("type") == "artifact.delivered"]
     if not delivered or not any(e.get("type") == "world.completed" for e in stream):
-        raise HTTPException(status_code=404)
+        raise HTTPException(status_code=404, detail="Tilo could not find that.")
     ref = delivered[-1].get("data", {}).get("artifact")
     if not any(
         e.get("type") in {"artifact.created", "artifact.versioned", "artifact.rollback"}
         and e.get("data", {}).get("artifact") == ref
         for e in stream
     ):
-        raise HTTPException(status_code=404)
+        raise HTTPException(status_code=404, detail="Tilo could not find that.")
     scope = Scope(deps.ORG_ID, world_id, world.owner)
     artifact_store = artifacts()
     try:
@@ -58,7 +58,7 @@ def get_result(
             raise ValueError("unavailable output")
         content = artifact_store.read(scope, ref)  # AR-01: hash and size checked by the GCS-backed store.
     except Exception:
-        raise HTTPException(status_code=404) from None
+        raise HTTPException(status_code=404, detail="Tilo could not find that.") from None
     media = version.record["media_type"]
     if media not in {"application/pdf", "application/json", "text/plain", "text/markdown"}:
         media = "application/octet-stream"

@@ -48,11 +48,13 @@ def _owned_run(
     )
     run = store.runs.get(world_id)
     if actor is None or run is None or actor.role != "owner" or not cards.is_open(world_id, card_id):
-        raise HTTPException(status_code=404)  # one answer for every caller who may not supply: no oracle
+        raise HTTPException(
+            status_code=404, detail="Tilo could not find that."
+        )  # one answer for every caller who may not supply: no oracle
     if record_owner is not None and actor.user_id != record_owner:  # defence in depth: the role alone is not the owner
-        raise HTTPException(status_code=404)
+        raise HTTPException(status_code=404, detail="Tilo could not find that.")
     if from_channels or not session_allows(actor, actor.channel, False):
-        raise HTTPException(status_code=404)
+        raise HTTPException(status_code=404, detail="Tilo could not find that.")
     return run, actor
 
 
@@ -71,7 +73,7 @@ def asked_fields(
     run, _ = _owned_run(world_id, card_id, principal, from_channels, store, cards, record_owner)
     asked = run.asked_fields(card_id)
     if asked is None:
-        raise HTTPException(status_code=404)
+        raise HTTPException(status_code=404, detail="Tilo could not find that.")
     return JSONResponse(status_code=200, content={"fields": side_effect_fields.describe(asked)})
 
 
@@ -91,7 +93,7 @@ def supply_fields(
         try:
             staged = run.stage_fields(card_id, body.fields)
         except LookupError:
-            raise HTTPException(status_code=404) from None
+            raise HTTPException(status_code=404, detail="Tilo could not find that.") from None
         except ValueError as exc:
             return JSONResponse(status_code=422, content={"outcome": "rejected", "reason": str(exc)})
         try:
@@ -170,7 +172,7 @@ def pinned_item(
     gate: dict[str, Any] = (card or {}).get("gate") or {} if (card or {}).get("kind") == "gate" else {}
     ref = (gate.get("action") or {}).get("item")
     if not isinstance(ref, dict):
-        raise HTTPException(status_code=404)
+        raise HTTPException(status_code=404, detail="Tilo could not find that.")
     try:
         shown = shown_document(run.read_pinned(ref), gate.get("recipients"))
     except (ArtifactError, ValueError):  # absent, corrupt (the hash does not match), busy or a malformed ref

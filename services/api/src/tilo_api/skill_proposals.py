@@ -87,14 +87,14 @@ def build_router(
         """The caller's current Team Lead records; 404 for another world, 403 for anyone who holds none."""
         full = deps.full_world_session(principal)
         if principal.world_id != world_id and not full:
-            raise HTTPException(status_code=404)
+            raise HTTPException(status_code=404, detail="Tilo could not find that.")
         owner, now = owner_of(world_id), _now()
         mine = [r for r in records if (full or principal.role == "team_lead") and r.get("user") == principal.user_id]
         current = [r for r in mine if _assigned(r, owner, now)]
         if not current:
             if principal.world_id != world_id and principal.user_id != owner:
-                raise HTTPException(status_code=404)
-            raise HTTPException(status_code=403)
+                raise HTTPException(status_code=404, detail="Tilo could not find that.")
+            raise HTTPException(status_code=403, detail="You do not have access to this.")
         return current
 
     def reader_domains(principal: deps.Principal, world_id: str, records: list[dict]) -> set[str] | None:
@@ -128,9 +128,11 @@ def build_router(
         mine = leads(principal, world_id, records)
         decision: Any = decisions.get(body.decision_id)
         if not isinstance(decision, dict) or decision.get("source", {}).get("world_id") != world_id:
-            raise HTTPException(status_code=404)  # unknown, or another world's: the same answer
+            raise HTTPException(
+                status_code=404, detail="Tilo could not find that."
+            )  # unknown, or another world's: the same answer
         if decision.get("domain") not in {r["domain"] for r in mine}:
-            raise HTTPException(status_code=403)
+            raise HTTPException(status_code=403, detail="You do not have access to this.")
         try:
             made = store.propose(
                 decision=decision, skill_id=body.skill_id, proposer=principal.user_id, guidance=body.guidance
@@ -159,7 +161,7 @@ def build_router(
     ) -> dict[str, Any]:
         domains = reader_domains(principal, world_id, records)
         if (found := visible(store.get(proposal_id), principal, domains, world_id)) is None:
-            raise HTTPException(status_code=404)
+            raise HTTPException(status_code=404, detail="Tilo could not find that.")
         return {"proposal": found}
 
     def decide(
@@ -174,7 +176,7 @@ def build_router(
         domains = {r["domain"] for r in leads(principal, world_id, records)}
         found = visible(store.get(proposal_id), principal, domains, world_id)
         if found is None:
-            raise HTTPException(status_code=404)
+            raise HTTPException(status_code=404, detail="Tilo could not find that.")
         try:
             done = getattr(store, verb)(
                 proposal_id, reviewer=principal.user_id, experts=experts(world_id, found["domain"], records), **kw

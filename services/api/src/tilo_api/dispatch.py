@@ -249,7 +249,7 @@ def drain(
 
 def _require_owner(principal: Principal, world: WorldRecord) -> None:
     if not (principal.role == "owner" and principal.user_id == world.owner):
-        raise HTTPException(status_code=403)
+        raise HTTPException(status_code=403, detail="You do not have access to this.")
 
 
 def _world_for(store: Store, policy_id: object, fallback: str | None) -> str | None:
@@ -475,7 +475,9 @@ def revoke_policy(
 ) -> dict:
     policy = store.policies.get(policy_id)
     if not isinstance(policy, dict) or principal.user_id != policy.get("owner"):
-        raise HTTPException(status_code=404)  # same 404 for unknown and not-yours -- no oracle
+        raise HTTPException(
+            status_code=404, detail="Tilo could not find that."
+        )  # same 404 for unknown and not-yours -- no oracle
 
     owner = policy["owner"]
     at = events.now()
