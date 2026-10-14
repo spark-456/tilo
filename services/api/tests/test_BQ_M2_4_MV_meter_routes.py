@@ -49,9 +49,49 @@ def test_BQ_M2_5_MV_13_inert_until_the_user_enables_it_a_plain_404_and_nothing_r
     monkeypatch.delenv("TILO_VOICE_METER")
     response = rig.post(path, {"anything": 1})
     assert (response.status_code, response.json()) == (404, {"detail": "Not Found"})
-    assert rig.verifier.calls == [] and rig.ledger.calls == []  # no token read, no ledger touched
+    assert rig.verifier.calls == [] and rig.ledger.calls == []  # no token verification, no ledger touched
     monkeypatch.setenv("TILO_VOICE_METER", "true")  # presence is not enough: exactly "1"
     assert rig.post(path, {"anything": 1}).status_code == 404
+
+
+@pytest.mark.parametrize("path", [RESERVE, CLOSE])
+@pytest.mark.parametrize("enabled", [False, True])
+@pytest.mark.parametrize("authorization", [None, "", "Basic invalid", "Bearer", "Bearer two tokens"])
+def test_SEC_05_MV_missing_or_malformed_bearer_is_401_before_flag_pins_or_body(
+    rig, monkeypatch, path, enabled, authorization
+):
+    from tilo_api import meeting_voice_meter  # noqa: PLC0415
+
+    monkeypatch.setenv("TILO_VOICE_METER", "1" if enabled else "0")
+    monkeypatch.delenv("TILO_VOICE_METER_AUDIENCE")
+
+    async def unread_body(request):
+        pytest.fail("unauthenticated request read its body")
+
+    monkeypatch.setattr(meeting_voice_meter, "_read_body", unread_body)
+    headers = {} if authorization is None else {"Authorization": authorization}
+    response = rig.client.post(path, content=b"not json", headers=headers)
+    assert (response.status_code, response.json()) == (401, {"error": "unauthenticated"})
+    assert rig.verifier.calls == [] and rig.ledger.calls == []
+
+
+@pytest.mark.parametrize("path", [RESERVE, CLOSE])
+def test_SEC_05_MV_valid_bearer_with_flag_off_reads_no_pins_or_body(rig, monkeypatch, path):
+    from tilo_api import meeting_voice_meter  # noqa: PLC0415
+
+    monkeypatch.delenv("TILO_VOICE_METER")
+
+    def unread_pins():
+        pytest.fail("disabled meter read caller configuration")
+
+    async def unread_body(request):
+        pytest.fail("disabled meter read its body")
+
+    monkeypatch.setattr(meeting_voice_meter, "_pins", unread_pins)
+    monkeypatch.setattr(meeting_voice_meter, "_read_body", unread_body)
+    response = rig.post(path, None, raw=b"not json")
+    assert (response.status_code, response.json()) == (404, {"detail": "Not Found"})
+    assert rig.verifier.calls == [] and rig.ledger.calls == []
 
 
 def test_BQ_M2_5_MV_13_the_two_routes_are_exact_public_and_app_check_exempt_entries_and_nothing_wider():
