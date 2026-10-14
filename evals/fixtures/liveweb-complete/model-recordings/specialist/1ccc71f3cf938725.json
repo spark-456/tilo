@@ -6,7 +6,7 @@
     "tool_calls": [
       {
         "args": {
-          "to": "fixture@example.test"
+          "to": "fixture@mail.example"
         },
         "name": "send_email"
       }
