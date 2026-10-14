@@ -261,7 +261,7 @@ describe("WEB_10_team_data: through the park Api only", () => {
   it("WEB_10_team_not_connected_shows_not_connected_yet_and_no_sample_numbers", async () => {
     // Plan 6.1: a page whose endpoint is NotBuilt says so; it never shows sample numbers as if real.
     const { root } = await renderTeam(makeApp(), createLiveApi());
-    expect(root.textContent).toContain("Not connected yet");
+    expect(root.textContent).toContain("Team data is unavailable");
     for (const p of PEOPLE) expect(root.textContent, p.name).not.toContain(p.name);
     for (const s of ["£2,500", "2 h 10 min", "Operations lead"])
       expect(root.textContent).not.toContain(s);

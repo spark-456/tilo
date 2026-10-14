@@ -12,6 +12,7 @@ import type { AppCtx } from "../../app/AppCtx";
 import { useDemoSession, useParkApi } from "../../app/context";
 import { useFollowed } from "../../app/followed";
 import { PageSheet, StatusChip, Switch } from "../../components";
+import { ApiReadState } from "../../components/ApiReadState";
 import { SampleBadge } from "../../sample/SampleBadge";
 import { ModelKeyControl } from "./ModelKey";
 import "./Profile.css";
@@ -141,15 +142,28 @@ function Toggle({
 
 /** FR-SET-01/02: the person's settings are still loading or could not be read. Never a form of guessed values. */
 function SettingsState({ remote, retry }: { remote: Remote; retry: () => void }) {
-  if (remote.kind !== "error") {
-    return <output className="park-profile-note">Loading your settings…</output>;
-  }
+  const failed = remote.kind === "error";
   return (
-    <div className="park-profile-unavailable">
-      <p role="alert" className="park-profile-alert">
-        {remote.text}
-      </p>
-      <button type="button" className="park-profile-small" onClick={retry}>
+    <div
+      data-profile-settings-state=""
+      className="park-profile-unavailable"
+      aria-busy={!failed}
+      style={{ blockSize: 176, overflow: "auto" }}
+    >
+      {failed ? (
+        <p role="alert" className="park-profile-alert">
+          {remote.text}
+        </p>
+      ) : (
+        <output className="park-profile-note">Loading your settings…</output>
+      )}
+      <button
+        type="button"
+        className="park-profile-small"
+        onClick={retry}
+        disabled={!failed}
+        style={{ visibility: failed ? "visible" : "hidden" }}
+      >
         Try again
       </button>
     </div>
@@ -164,8 +178,9 @@ function SaveFoot(props: {
   onCancel: () => void;
   onSave: () => void;
   onReload: () => void;
+  onRetryRead: () => void;
 }) {
-  const { problem, saving, hint, onCancel, onSave, onReload } = props;
+  const { problem, saving, hint, onCancel, onSave, onReload, onRetryRead } = props;
   return (
     <>
       {problem ? (
@@ -175,7 +190,11 @@ function SaveFoot(props: {
             <button type="button" className="park-profile-link" onClick={onReload}>
               Reload settings
             </button>
-          ) : null}
+          ) : (
+            <button type="button" className="park-profile-link" onClick={onRetryRead}>
+              Retry
+            </button>
+          )}
         </p>
       ) : null}
       <div className="park-profile-foot">
@@ -207,6 +226,8 @@ export function ProfilePage({ app }: { app: AppCtx }) {
   const demo = useDemoSession();
   const [loaded, setLoaded] = useState<Loaded | null>(null);
   const [problem, setProblem] = useState<"missing" | "failed" | null>(null);
+  const [loadError, setLoadError] = useState<unknown>(null);
+  const [loadAttempt, setLoadAttempt] = useState(0);
   // FR-SET-01/02: the person's stored document, read and saved through the Api. The drafts below are only what
   // they changed since; Cancel clears them, and a save clears them only after the server answered.
   const [remote, setRemote] = useState<Remote>({ kind: "loading" });
@@ -238,8 +259,11 @@ export function ProfilePage({ app }: { app: AppCtx }) {
     setConfirmOthers(false);
   };
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: loadAttempt is the read-only Retry signal
   useEffect(() => {
     let live = true;
+    setProblem(null);
+    setLoadError(null);
     Promise.all([api.getUser(), api.getProfileSettings(), api.getLedger()]).then(
       ([u, st, led]) => {
         if (!live) return;
@@ -257,13 +281,16 @@ export function ProfilePage({ app }: { app: AppCtx }) {
         setSessions((st.data.sessions ?? []).filter((s) => !(demo && s.icon === "phone")));
       },
       (e: unknown) => {
-        if (live) setProblem(e instanceof Error && e.name === "NotBuilt" ? "missing" : "failed");
+        if (live) {
+          setProblem(e instanceof Error && e.name === "NotBuilt" ? "missing" : "failed");
+          setLoadError(e);
+        }
       },
     );
     return () => {
       live = false;
     };
-  }, [api, demo]);
+  }, [api, demo, loadAttempt]);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: `attempt` is the Try again / Reload signal
   useEffect(() => {
@@ -308,6 +335,10 @@ export function ProfilePage({ app }: { app: AppCtx }) {
   const reload = () => {
     discard();
     setAttempt(attempt + 1);
+  };
+  const retrySettingsRead = () => {
+    setSaveProblem(null);
+    setAttempt((n) => n + 1);
   };
   // One PUT of the whole document (USET-02), never retried by the page. "Saved" is said only for a live answer.
   const save = async (section: "profile" | "notifications") => {
@@ -356,7 +387,7 @@ export function ProfilePage({ app }: { app: AppCtx }) {
         .filter(Boolean)
         .join(" · ")
     : problem === "missing"
-      ? "Not connected yet"
+      ? "Profile data is unavailable"
       : problem === "failed"
         ? "Your profile could not be loaded"
         : "";
@@ -382,6 +413,14 @@ export function ProfilePage({ app }: { app: AppCtx }) {
             Connectors
           </button>
         </div>
+        {!loaded ? (
+          <ApiReadState
+            error={loadError}
+            pending={loadError == null}
+            retryRead={() => setLoadAttempt((n) => n + 1)}
+            title="Your profile could not be loaded"
+          />
+        ) : null}
         {loaded && user ? (
           <div className={cls("park-profile-layout", wide && "park-profile-layout--wide")}>
             <nav
@@ -440,6 +479,7 @@ export function ProfilePage({ app }: { app: AppCtx }) {
                   onCancel={discard}
                   onSave={() => save("profile")}
                   onReload={reload}
+                  onRetryRead={retrySettingsRead}
                 />
               </section>
             ) : null}
@@ -505,6 +545,7 @@ export function ProfilePage({ app }: { app: AppCtx }) {
                   onCancel={discard}
                   onSave={() => save("notifications")}
                   onReload={reload}
+                  onRetryRead={retrySettingsRead}
                 />
               </section>
             ) : null}

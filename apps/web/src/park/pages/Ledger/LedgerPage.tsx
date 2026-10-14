@@ -83,7 +83,7 @@ function PersonalLedgerPage({ app }: LedgerPageProps) {
       <Frame>
         <div className="park-ledger-state">
           <h1 className="park-ledger-title">Ledger</h1>
-          <div className="park-ledger-state-title">Not connected yet</div>
+          <div className="park-ledger-state-title">Ledger data is unavailable</div>
           <div className="park-ledger-state-line">
             Spend and decisions show here once the Ledger is connected.
           </div>

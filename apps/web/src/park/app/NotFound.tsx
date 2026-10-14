@@ -7,10 +7,10 @@ import type { AppCtx } from "./AppCtx";
 export const NOT_FOUND_TITLE = "Page not found";
 
 export function NotFound({ go }: { go: AppCtx["go"] }) {
-  const open = (e: MouseEvent<HTMLAnchorElement>) => {
+  const open = (e: MouseEvent<HTMLAnchorElement>, page: "home" | "worlds") => {
     if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
     e.preventDefault();
-    go("home");
+    go(page);
   };
   return (
     <div data-testid="park-not-found">
@@ -19,8 +19,12 @@ export function NotFound({ go }: { go: AppCtx["go"] }) {
           {NOT_FOUND_TITLE}
         </h1>
         <p className="park-app__note">There is no page at this address.</p>
-        <a className="park-app__link" href="/" onClick={open}>
+        <a className="park-app__link" href="/" onClick={(e) => open(e, "home")}>
           Go to Home
+        </a>
+        <p className="park-app__note">Looking for work you started?</p>
+        <a className="park-app__link" href="/worlds" onClick={(e) => open(e, "worlds")}>
+          Search worlds
         </a>
       </PageSheet>
     </div>

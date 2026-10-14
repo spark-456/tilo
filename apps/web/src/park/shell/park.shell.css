@@ -400,15 +400,14 @@
   outline-offset: 2px;
 }
 
-/* ---- Sample data chip: the label at normal widths, only the dot when the nav is tight ---- */
+/* ---- Sample data chip: a named information icon when the nav is tight ---- */
 [data-park] .park-shell__sample {
   display: flex;
-  /* W-AXE-1: flex compression must not reduce the real button's hit area. */
+  align-items: center;
+  justify-content: center;
+  flex: none;
   min-width: 24px;
   min-height: 24px;
-  flex-shrink: 0;
-  justify-content: center;
-  align-items: center;
   margin: 0 6px 0 0;
   padding: 0;
   border: 0;
@@ -417,10 +416,9 @@
 }
 [data-park] .park-shell__sampledot {
   display: none;
-  width: 8px;
-  height: 8px;
-  border-radius: 99px;
-  background: var(--amber);
+  align-items: center;
+  justify-content: center;
+  color: var(--ink2);
 }
 [data-park] .park-shell__samplebox {
   display: flex;
@@ -440,7 +438,7 @@
     margin: 0;
   }
   [data-park] .park-shell__sampledot {
-    display: block;
+    display: flex;
   }
   /* Visually hidden, still the button's name. */
   [data-park] .park-shell__samplelabel {
@@ -452,20 +450,11 @@
     white-space: nowrap;
   }
 }
-/* W-AXE-1: keep the dot's appearance, but reserve the full target in the flex row.
-   Negative margins let the context button obscure part of the sample target. */
+/* W14 / UI-10: reserve the actual target in flex layout; negative margins overlapped Your context. */
 @media (max-width: 430px) {
   [data-park] .park-shell__sample {
-    padding: 8px;
+    padding: 0;
     margin: 0;
-  }
-  /* The focus ring hugs the dot (as before the 24px box), not the padded box. */
-  [data-park] .park-shell__nav .park-shell__sample:focus-visible {
-    outline: none;
-  }
-  [data-park] .park-shell__sample:focus-visible .park-shell__sampledot {
-    outline: 3px solid #5a3fe0;
-    outline-offset: 2px;
   }
   /* The invisible boot ghost must never take a tap meant for the next button. */
   [data-park] .park-shell__sample.park-shell__booting {
@@ -480,7 +469,8 @@
 
 @media (max-width: 430px) {
   [data-park] .park-shell__nav {
-    gap: 10px;
+    /* P0-08b W4: reserve Home's whole label beside W14's full sample target at 390px. */
+    gap: 8px;
   }
   /* W-AXE-1b: recover the dot target padding from tool gaps, never from hit areas. */
   [data-park] .park-shell__tools {
@@ -779,6 +769,10 @@
 [data-park] .park-shell__boot--out {
   pointer-events: none;
   animation: tiloFade 0.45s ease forwards;
+}
+/* W14 / UI-10: fade the paper only, never loading text through an interactive page. */
+[data-park] .park-shell__boot--out > * {
+  visibility: hidden;
 }
 [data-park] .park-shell__bootlogo {
   display: flex;

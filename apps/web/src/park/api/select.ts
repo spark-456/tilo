@@ -10,6 +10,7 @@ import { type Identity, NotBuilt, createLiveApi, todayOf, userOf } from "./liveA
 // are, from the sign-in session.
 import { carryOneStep } from "./oneStep";
 import { carryQuizReader } from "./quizApps";
+import { carryResultReader } from "./results";
 import { carrySkillFixer } from "./skillFixes";
 import type { ApiResult } from "./types";
 
@@ -60,11 +61,15 @@ export function withSession(live: Api, who: SessionView): Api {
       async () => ({ data: todayOf(who.now()), source: "live" as const }),
       () => fixture.getToday(),
     );
-  return carrySkillFixer(
+  return carryResultReader(
     live,
-    carryOneStep(
+    carrySkillFixer(
       live,
-      carryQuizReader(live, api, () => !who.demo()),
+      carryOneStep(
+        live,
+        carryQuizReader(live, api, () => !who.demo()),
+        () => !who.demo(),
+      ),
       () => !who.demo(),
     ),
     () => !who.demo(),

@@ -46,7 +46,7 @@ describe("FR_TEAM_01 live Team", () => {
   });
   it("LIVE_GAPS_1A shows an honest error instead of a fixture list", async () => {
     const { root } = await renderTeam(makeApp(), apiFor([], 503));
-    expect(root.textContent).toContain("Not connected yet");
+    expect(root.textContent).toContain("Team data is unavailable");
     expect(root.querySelector('[data-testid="live-team"]')).toBeNull();
   });
 });

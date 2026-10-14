@@ -25,4 +25,8 @@ Team people are explicitly fictional. No preview data is substituted into API
 results, personal counters or writes. Loading/failed worlds reads and accounts
 with personal worlds keep the normal page. Real starts remove every preview
 on the next render; the existing demo-session UI stays as it was.
-Home/Worlds previews and tour prompts are separate follow-up slices.
+Home adds labelled Needs you, Live now, Up next and Spend examples alongside
+the real summary and composer. Worlds adds read-only City, Town and Village
+examples without adding them to personal totals, filters or API results.
+The existing recorded sample project and Hide/Show controls remain available.
+Tour prompts are a separate slice.

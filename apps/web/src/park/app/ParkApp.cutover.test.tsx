@@ -185,6 +185,20 @@ describe("WEB_CUTOVER_parkapp: navigation writes root paths", () => {
 });
 
 describe("WEB_CUTOVER_parkapp: the Park NotFound page", () => {
+  it("M1_NOTFOUND_1_unknown_address_can_search_worlds", async () => {
+    const m = await visit("/no-such-page");
+    const link = q<HTMLAnchorElement>(
+      m.container,
+      '[data-testid="park-not-found"] a[href="/worlds"]',
+    );
+    expect(link.textContent).toBe("Search worlds");
+    await act(async () => {
+      link.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, button: 0 }));
+    });
+    await settle();
+    expect(where()).toBe("/worlds");
+    expect(m.container.querySelector('[data-testid="probe-worlds"]')).not.toBeNull();
+  });
   it("WEB_CUTOVER_06_not_found_links_to_the_root_home", async () => {
     const m = await visit("/park/nope");
     const link = q<HTMLAnchorElement>(m.container, '[data-testid="park-not-found"] a');

@@ -292,3 +292,11 @@ dependency (standard library only). `tilo-providers` and `tilo-api` depend on it
 
 MPL-2.0 is file-level copyleft: Tilo ships these packages unmodified and does not copy their files, so no Tilo
 source is affected.
+
+## Park structural accessibility tests (M2-A11Y-1)
+
+| Dependency | Licence | Source |
+| --- | --- | --- |
+| axe-core | MPL-2.0 | https://github.com/dequelabs/axe-core |
+| jsdom | MIT | https://github.com/jsdom/jsdom |
+| @types/jsdom | MIT | https://github.com/DefinitelyTyped/DefinitelyTyped/tree/master/types/jsdom |

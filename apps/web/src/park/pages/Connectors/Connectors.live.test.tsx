@@ -64,6 +64,6 @@ it("FR_ACC_03 live empty list and unreadable or failed reads never become demo d
   const bad = setup({ connectors: [row("unknown")] });
   await expect(bad.api.getConnectors()).rejects.toBeInstanceOf(TiloApiError);
   const failed = await renderPage(makeApp(), setup({ detail: "Unavailable" }, 503).api);
-  expect(textOf(failed.container)).toContain("Not connected yet");
+  expect(textOf(failed.container)).toContain("Connector data is unavailable");
   await expect(createLiveApi().getConnectors()).rejects.toBeInstanceOf(NotBuilt);
 });

@@ -1,6 +1,7 @@
 """Unsigned deployment checks use only fake HTTP and never send credentials."""
 
 import importlib.util
+import json
 from pathlib import Path
 
 import httpx
@@ -17,6 +18,71 @@ def load():
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
+
+
+@pytest.mark.parametrize("payload", ["invalid", "[]", '{"status":{"traffic":[null]}}'])
+def test_FR_MTG_08_release_bad_snapshot_fails_closed(tmp_path, payload):
+    path = tmp_path / "traffic.json"
+    path.write_text(payload)
+    assert load().release_target(API, "tilo-api-new", str(path)) == (False, "")
+
+
+@pytest.mark.parametrize("broken", [None, "traffic", "revision", "new-healthz", "bundle-changed", "foreign"])
+def test_FR_MTG_08_release_checks(tmp_path, capsys, broken):
+    revision = "tilo-api-00042-new"
+    tagged = "https://release---tilo-api-abc-as.a.run.app"
+    snapshot = {
+        "status": {
+            "url": API,
+            "latestReadyRevisionName": revision,
+            "traffic": [
+                {"revisionName": revision, "percent": 99 if broken == "traffic" else 100},
+                {"revisionName": revision, "tag": "release", "url": tagged},
+            ],
+        }
+    }
+    if broken == "revision":
+        snapshot["status"]["latestReadyRevisionName"] = "tilo-api-old"
+    if broken == "foreign":
+        snapshot["status"]["traffic"][1]["url"] = "https://foreign.example"
+    path = tmp_path / "traffic.json"
+    path.write_text(json.dumps(snapshot))
+    module = load()
+    source = f'Continue with Google "{API}"'
+    previous = module.bundle_hash([(WEB + "/assets/main.js", source)]) if broken == "bundle-changed" else "0" * 64
+
+    def server(request):
+        assert request.method in ("GET", "OPTIONS")
+        assert "authorization" not in request.headers and "cookie" not in request.headers
+        assert request.url.host != "foreign.example"
+        if str(request.url) == tagged + "/healthz":
+            return httpx.Response(500 if broken == "new-healthz" else 200)
+        if request.url.path == "/":
+            return httpx.Response(200, text='<script src="/assets/main.js"></script>')
+        if request.url.path == "/assets/main.js":
+            return httpx.Response(200, text=source)
+        if request.url.path == "/intake":
+            return httpx.Response(
+                200,
+                headers={
+                    "access-control-allow-origin": WEB,
+                    "access-control-allow-methods": "POST",
+                    "access-control-allow-headers": "authorization,content-type,x-tilo-channel",
+                },
+            )
+        return httpx.Response(401 if request.url.path == "/v1/plate" else 200)
+
+    assert module.main([API, revision, str(path), previous], transport=httpx.MockTransport(server)) == (
+        0 if broken is None else 1
+    )
+    output = capsys.readouterr().out
+    assert (
+        "PASS api-revision-100" in output
+        if broken not in ("traffic", "revision", "foreign")
+        else "FAIL api-revision-100" in output
+    )
+    assert "FAIL new-healthz" in output if broken in ("new-healthz", "foreign") else "PASS new-healthz" in output
+    assert "FAIL bundle-changed" in output if broken == "bundle-changed" else "PASS bundle-changed" in output
 
 
 @pytest.mark.parametrize("broken", [None, "sign-in", "bundle-api", "healthz", "cors-intake", "plate-auth"])

@@ -1,3 +1,5 @@
+import suggestions from "../../../../config/home_suggestions.json";
+
 // WEB-4 test support: the Home page's copy and numbers, written out from the reference
 // (design_handoff_tilo_web_app/design/Tilo App Home.dc.html and tilo-app.js), so a test names the design's
 // own strings and not whatever the page renders. Nothing here is bundled.
@@ -35,7 +37,7 @@ export const MODES: readonly ModeCopy[] = [
     example: "Summarise this week’s customer feedback",
     start: "Start task",
     hint: "You see the plan and the cost before any agent starts.",
-    chips: ["Compare three suppliers", "Draft a reply to Northline", "Summarise yesterday’s calls"],
+    chips: suggestions.map((suggestion) => suggestion.label),
     agents: "2",
     cost: "about £0.60",
     eta: "about 6 min",

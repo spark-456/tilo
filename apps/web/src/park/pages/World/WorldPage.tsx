@@ -8,6 +8,7 @@
 // recorded run, so the same elements are disabled with the reason (docs/park-designed-not-in-prd/World.md).
 import { type ChangeEvent, type ReactNode, useEffect, useRef, useState } from "react";
 import { createRoomClient } from "../../api/live/meetingHall";
+import { downloadResult, hasResultReader } from "../../api/results";
 import type {
   ApiResult,
   BuildHandoff,
@@ -291,7 +292,7 @@ export function WorldPage({ app }: { app: AppCtx }) {
         <h1 className="park-world-h1" tabIndex={-1}>
           World
         </h1>
-        <p className="park-world-meta">Not connected yet</p>
+        <p className="park-world-meta">World data is unavailable</p>
       </Frame>
     );
   }
@@ -679,8 +680,16 @@ export function WorldPage({ app }: { app: AppCtx }) {
             <Result
               w={w}
               recorded={recorded}
-              onOpen={() => app.toast(SAMPLE_OPEN)}
-              {...(real ? { openOff: OPEN_OFF } : {})}
+              onOpen={() => {
+                if (!real) {
+                  app.toast(SAMPLE_OPEN);
+                  return;
+                }
+                void downloadResult(api, w.id).catch(() =>
+                  app.toast("The result could not be opened. Try again."),
+                );
+              }}
+              {...(real && !hasResultReader(api) ? { openOff: OPEN_OFF } : {})}
               onSlack={openSlackDialog}
               slackConnected={slackState.connected}
               slackReason={slackState.disabledReason}

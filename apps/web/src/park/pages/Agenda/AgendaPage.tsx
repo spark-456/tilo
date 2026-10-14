@@ -105,7 +105,9 @@ function PersonalAgendaPage({ app }: AgendaPageProps) {
         <div className="park-agenda-state">
           <h1 className="park-agenda-title">Agenda</h1>
           <div className="park-agenda-state-title">
-            {state.status === "not-built" ? "Not connected yet" : "The Agenda could not load"}
+            {state.status === "not-built"
+              ? "Agenda data is unavailable"
+              : "The Agenda could not load"}
           </div>
           <div className="park-agenda-state-line">
             {state.status === "not-built"

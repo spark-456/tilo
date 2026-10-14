@@ -1,7 +1,7 @@
 // The Home page (WEB-4): the greeting, the Today panel, the map pins and the composer, as drawn in
 // design_handoff_tilo_web_app/design/Tilo App Home.dc.html. It floats panels over the city the shell draws
 // behind it and has no landmark of its own. Data comes only through the Api (`useParkApi`); a page whose Api
-// is not built shows "Not connected yet", never sample values. The composer's 900 ms goes through the
+// is not built shows "Home data is unavailable", never sample values. The composer's 900 ms goes through the
 // provider's `useSchedule`, so a test never waits and a pending draft is cancelled when the page goes.
 import { useEffect, useRef, useState } from "react";
 import type { Cadence, RunPlan } from "../../api/oneStep";
@@ -20,6 +20,8 @@ import type { AppCtx } from "../../app/AppCtx";
 import { BUILD_SHA } from "../../app/buildStamp";
 import { useDemoSession, useParkApi, useParkStore, useSchedule } from "../../app/context";
 import { DEMO_START } from "../../app/store";
+import { FirstRunOverview } from "../../sample/FirstRunOverview";
+import { useFirstRunPreview } from "../../sample/useFirstRunPreview";
 import { ComposerPanel, type Phase, QUICK_IDLE, type QuickView } from "./ComposerPanel";
 import "./Home.css";
 import { Hero, KpiStrip, Pins, TodayPanel } from "./Panels";
@@ -35,6 +37,7 @@ import {
   nextEvents,
   placedPins,
   spendOf,
+  suggestedTask,
   summaryLine,
 } from "./homeData";
 import { textLimitMessage } from "./uploadRules";
@@ -63,6 +66,7 @@ export function HomePage({ app }: { app: AppCtx }) {
   const api = useParkApi();
   const schedule = useSchedule();
   const store = useParkStore();
+  const preview = useFirstRunPreview();
   // QA-DEMO-1: a demo session (the sample company) replays recorded data and starts no run.
   const demo = useDemoSession();
   const { go, dec, added, night, vw, vh, pins, needsLeft } = app;
@@ -403,9 +407,16 @@ export function HomePage({ app }: { app: AppCtx }) {
   useComposerClearance(root, composerShown);
 
   return (
-    <div ref={root} className="park-home-root" data-testid="park-page-home">
+    <div
+      ref={root}
+      className={`park-home-root${preview ? " park-home-root--preview" : ""}`}
+      data-testid="park-page-home"
+    >
       {ready ? (
-        <>
+        <div
+          className={preview ? "park-home-preview-account" : undefined}
+          style={preview ? undefined : { display: "contents" }}
+        >
           <Pins
             pins={placedPins(pins, worlds, needs, night, vw || 1440, vh || 900, served)}
             onOpen={open}
@@ -421,13 +432,15 @@ export function HomePage({ app }: { app: AppCtx }) {
               worldName={waitingIn?.name ?? null}
               onReview={() => (waitingIn ? open(waitingIn.id) : go("worlds"))}
             />
-            <KpiStrip
-              ledger={base.ledger}
-              dec={dec}
-              decisions={base.decisions}
-              fallbackWorld={waitingIn?.id}
-              onWorld={open}
-            />
+            {!preview ? (
+              <KpiStrip
+                ledger={base.ledger}
+                dec={dec}
+                decisions={base.decisions}
+                fallbackWorld={waitingIn?.id}
+                onWorld={open}
+              />
+            ) : null}
           </div>
           <TodayPanel
             served={served}
@@ -442,13 +455,14 @@ export function HomePage({ app }: { app: AppCtx }) {
             onLedger={() => go("ledger")}
             stacked={vw > 0 && vw < 1180}
           />
-        </>
+        </div>
       ) : null}
-      {failed ? (
+      {preview ? <FirstRunOverview page="home" app={app} /> : null}
+      {failed && !preview ? (
         <div className="park-home-leftcol">
           <div className="park-home-hero park-home-glass">
             <h1 className="park-home-h1">Home</h1>
-            <p className="park-home-summary">Not connected yet</p>
+            <p className="park-home-summary">Home data is unavailable</p>
           </div>
         </div>
       ) : null}
@@ -493,7 +507,7 @@ export function HomePage({ app }: { app: AppCtx }) {
           }}
           onChip={(label) => {
             if (busy()) return;
-            setQuery(label);
+            setQuery(suggestedTask(label));
             setQuick(QUICK_IDLE);
             toIdle();
           }}

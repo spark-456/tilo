@@ -23,6 +23,7 @@ import { HttpClient } from "../../api/http";
 import { API_METHODS, type Api, type ApiMethod } from "../api/index";
 import { carryOneStep } from "../api/oneStep";
 import { carryQuizReader } from "../api/quizApps";
+import { carryResultReader } from "../api/results";
 import { withToday } from "../api/sampleDates";
 import { parkApi, withSession } from "../api/select";
 import { carrySkillFixer } from "../api/skillFixes";
@@ -91,7 +92,10 @@ function noting(api: Api, note: (source: Source) => void): Api {
         }),
     ]),
   );
-  return carrySkillFixer(api, carryOneStep(api, carryQuizReader(api, wrapped as unknown as Api)));
+  return carryResultReader(
+    api,
+    carrySkillFixer(api, carryOneStep(api, carryQuizReader(api, wrapped as unknown as Api))),
+  );
 }
 
 const EMPTY_PINS: AppCtx["pins"] = [];

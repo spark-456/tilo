@@ -440,7 +440,12 @@ export class HttpClient implements TiloClient, SchedulesApi, FieldsApi, ItemApi 
     return { ...init, headers };
   }
 
-  private async request<T>(path: string, init: RequestInit = {}, write = false): Promise<T> {
+  private async request<T>(
+    path: string,
+    init: RequestInit = {},
+    write = false,
+    decode?: (response: Response) => Promise<T>,
+  ): Promise<T> {
     let res: Response;
     // A8: the intake is the one call a person waits on in front of a spinner, so it has an end.
     const stop = path === "/intake" ? new AbortController() : null;
@@ -510,7 +515,7 @@ export class HttpClient implements TiloClient, SchedulesApi, FieldsApi, ItemApi 
     }
     if (res.status === 204) return undefined as T; // no content: nothing to read
     try {
-      return (await res.json()) as T;
+      return decode ? await decode(res) : ((await res.json()) as T);
     } catch {
       throw new TiloApiError(BAD_REPLY, res.status, true, write);
     }
@@ -520,6 +525,11 @@ export class HttpClient implements TiloClient, SchedulesApi, FieldsApi, ItemApi 
   getJson(path: string): Promise<unknown> {
     if (path === "/v1/plate") return this.readPlate();
     return this.request<unknown>(path);
+  }
+
+  /** X-RESULT-1: authenticated binary reads use the same refusal handling as JSON reads. */
+  getBlob(path: string): Promise<Blob> {
+    return this.request(path, { cache: "no-store" }, false, (response) => response.blob());
   }
 
   private async readPlate(): Promise<unknown> {

@@ -12,7 +12,7 @@
 // Night: the shell flips `data-time` on the data-park root; here the attribute is set on the page, which is
 // all the CSS reads (colours are tokens), so this checks the night tokens reach every part of Home.
 // Run on a private port: TILO_WEB_PORT=<own port> pnpm --filter @tilo/web exec playwright test
-// e2e/park-home.spec.ts --project=chromium --no-deps --workers=3
+// e2e/park-home.spec.ts --project=chromium --no-deps --workers=1
 import AxeBuilder from "@axe-core/playwright";
 import { type Locator, type Page, expect, test } from "@playwright/test";
 import { collectConsoleProblems } from "./support/console";
@@ -20,6 +20,12 @@ import { DESKTOP, MOBILE } from "./support/viewports";
 
 const SIZES = { desktop: DESKTOP, mobile: MOBILE } as const;
 type Theme = "day" | "night";
+
+// P0-08b W4: DEMO-TIME-1 follows the browser's calendar. Fix Date while leaving
+// real timers running for drafting, transitions and the toast flow.
+test.beforeEach(async ({ page }) => {
+  await page.clock.setFixedTime(new Date(2026, 8, 24, 12));
+});
 
 // ---- reference values (computed, 1440x900 and 390x844) -----------------------------------------------
 const TOKENS = {
@@ -53,7 +59,8 @@ const TOKENS = {
     ink: "rgb(244, 242, 250)",
     ink2: "rgb(210, 206, 227)",
     ink3: "rgb(210, 206, 227)", // not measured at night: unused by the checks below
-    hero: "rgb(122, 98, 245)",
+    // W4 supervisor ruling: BQ-DS-A11Y-1 gives WCAG AA precedence over the export.
+    hero: "rgb(108, 82, 235)",
     heroInk: "rgb(188, 175, 255)",
     seg: "rgba(255, 255, 255, 0.08)",
     tabOn: "rgba(255, 255, 255, 0.16)",
@@ -143,6 +150,13 @@ async function openHome(page: Page, theme: Theme): Promise<string[]> {
 }
 
 const hero = (page: Page) => page.getByRole("heading", { level: 1 });
+
+test("P0_08b_W4_sample_calendar_matches_the_reference_day", async ({ page }) => {
+  await openHome(page, "day");
+  await expect(page.getByText("THURSDAY 24 SEPTEMBER", { exact: true })).toBeVisible({
+    timeout: 5000,
+  });
+});
 const today = (page: Page) => page.locator('aside[aria-label="Today"]');
 const input = (page: Page) => page.getByRole("textbox", { name: "Describe your task" });
 const start = (page: Page) => page.getByRole("button", { name: "Start task", exact: true });
@@ -180,15 +194,12 @@ for (const [sizeName, viewport] of Object.entries(SIZES)) {
         const vh = viewport.height;
 
         // The Home root: the containing block of the three panels, a full-height positioned box.
-        const root = await hero(page).evaluate((el) => {
-          let n: Element = el;
-          while (n.parentElement && getComputedStyle(n).backdropFilter === "none")
-            n = n.parentElement;
-          const cb = (n as HTMLElement).offsetParent as HTMLElement;
-          const s = getComputedStyle(cb);
+        const root = await page.getByTestId("park-page-home").evaluate((el) => {
+          const s = getComputedStyle(el);
           return {
             position: s.position,
-            height: cb.getBoundingClientRect().height,
+            height: el.getBoundingClientRect().height,
+            width: el.getBoundingClientRect().width,
             overflow: s.overflow,
           };
         });
@@ -219,22 +230,33 @@ for (const [sizeName, viewport] of Object.entries(SIZES)) {
           true,
         );
         expectFacts("hero", heroP, {
-          position: "absolute",
-          left: "24px",
-          top: "96px",
-          padding: "24px 26px 22px",
+          // W4: #995 / f60aa4eb and the 13 Oct QA layout place the hero in a column.
+          position: "static",
+          left: "auto",
+          top: "auto",
+          padding: sizeName === "mobile" ? "20px 22px 18px" : "24px 26px 22px",
           "border-top-left-radius": "28px",
           "border-top-width": "1px",
           "border-top-color": T.gBd,
           "background-color": T.gBg,
           "backdrop-filter": T.fx,
           "box-shadow": T.sh,
-          gap: "12px",
+          gap: sizeName === "mobile" ? "10px" : "12px",
           "z-index": "3",
           display: "flex",
           "flex-direction": "column",
         });
-        near("hero width", Number(heroP.w), Math.min(500, Number(heroP.cbW) - 48));
+        const leftColumn = await facts(page.locator(".park-home-leftcol"), [
+          "position",
+          "left",
+          "top",
+        ]);
+        expectFacts("hero column (#995)", leftColumn, {
+          position: sizeName === "mobile" ? "static" : "absolute",
+          left: "24px",
+          top: "96px",
+        });
+        near("hero width", Number(heroP.w), Math.min(500, root.width - 48));
         if (wide) near("hero height (reference: 292.8 at 500 wide)", Number(heroP.h), 292.8, 3);
 
         // Today panel (only from 1180): right 24, top 96, 352 wide, p 8, r26, gap 6, scrolls, max height root - 330.
@@ -343,10 +365,11 @@ for (const [sizeName, viewport] of Object.entries(SIZES)) {
         ]);
         expect(String(h1["font-family"])).toMatch(/^"?Nunito"?,/);
         expectFacts("h1", h1, {
-          "font-size": "50px",
+          // W4: phone typography follows the 13 Oct responsive rules (#995).
+          "font-size": sizeName === "mobile" ? "40px" : "50px",
           "font-weight": "900",
-          "letter-spacing": "-1.4px",
-          "line-height": "50px",
+          "letter-spacing": sizeName === "mobile" ? "-1.1px" : "-1.4px",
+          "line-height": sizeName === "mobile" ? "40px" : "50px",
           color: T.ink,
           "margin-top": "0px",
         });
@@ -684,7 +707,12 @@ for (const [sizeName, viewport] of Object.entries(SIZES)) {
       }) => {
         const problems = await openHome(page, theme);
         const f = await facts(input(page), ["font-size", "font-weight", "color", "font-family"]);
-        expectFacts("input", f, { "font-size": "20px", "font-weight": "700", color: T.ink });
+        // W4: #995 retains the short phone placeholder and 13 Oct's 16px input type.
+        expectFacts("input", f, {
+          "font-size": sizeName === "mobile" ? "16px" : "20px",
+          "font-weight": "700",
+          color: T.ink,
+        });
         expect(String(f["font-family"])).toMatch(/Nunito Sans/);
         near("input height", Number(f.h), 60);
         // A phone's input cannot wrap its placeholder, so it shows the example in few words (13 Oct QA).
