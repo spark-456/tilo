@@ -109,6 +109,37 @@ A crash or owner edit during failed capture can leave `joining` needing operator
 recovery; this slice does not add a durable lease/reaper. Cloud anti-automation,
 admission selectors, microphone routing and heard audio remain unverified live.
 
+## Live voice meter (ADR-0042, BQ-M2-4; INERT until you set the settings and flip the voice)
+
+The Gemini Live voice speaks a reply only if tilo-api reserves SEC-16 spend for it first. The bot holds no ledger, uid
+or org: per reply it names its meeting id, the claim nonce tilo-api put in the attend call (header
+`X-Tilo-Meeting-Claim`) and a key of its own to `POST /internal/meeting-voice/reserve` and `/close` on tilo-api, with an
+ID token its metadata server mints for audience `TILO_API_URL`. Anything but a 200 `live` is the local voice.
+With `TILO_API_URL` unset, or `voice.live.enabled: false` (the shipped value), the Live voice is never built and the bot
+speaks as it does today. The settings are `gcloud` env, not Terraform: tilo-api has `ignore_env`, and the service module
+declares no env for the bot, so a later apply clears the bot's (which only turns the Live voice off).
+
+| Service | Setting | Value |
+| --- | --- | --- |
+| `tilo-meet-bot` | `TILO_API_URL` | tilo-api's service URL, `https://host`, no path, query or trailing slash |
+| `tilo-api` | `TILO_VOICE_METER` | `1` (exactly; anything else leaves both routes a plain 404) |
+| `tilo-api` | `TILO_VOICE_METER_AUDIENCE` | the same URL string as `TILO_API_URL`, character for character |
+| `tilo-api` | `TILO_VOICE_METER_CALLER` | `tilo-meet-bot@$P.iam.gserviceaccount.com`; never the tick's or the Tasks account |
+
+```powershell
+$Api = gcloud run services describe tilo-api --project=$P --region=$R --format='value(status.url)'
+$BotSa = "tilo-meet-bot@$P.iam.gserviceaccount.com"
+gcloud run services update tilo-api --project=$P --region=$R --update-env-vars="^#^TILO_VOICE_METER=1#TILO_VOICE_METER_AUDIENCE=$Api#TILO_VOICE_METER_CALLER=$BotSa"
+gcloud run services update tilo-meet-bot --project=$P --region=$R --update-env-vars="TILO_API_URL=$Api"
+```
+
+Unchanged: the bot keeps its two project roles, no Firestore or ledger access and no new secret; tilo-api stays one
+instance (the claim and nonce live in its process); the bot's ingress stays internal only and only tilo-api may invoke
+it; `LIVE=1` stays the user's, set on the bot for the sitting and removed after (the meter routes never read it). The ordered steps, the checks and the
+rollback (`--remove-env-vars TILO_VOICE_METER` on tilo-api) are in `docs/deploy-dev.md` ("The meeting bot's Live voice
+meter"). Do not deploy or change tilo-api settings during an attended meeting: its claim ends with the old process,
+so that meeting answers 409 and the rest of it is spoken with the local voice.
+
 ## End the acceptance test — user only
 
 Limit the acceptance sitting to ten minutes. After **Tilo leave**, remove LIVE
