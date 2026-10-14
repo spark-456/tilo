@@ -1,6 +1,7 @@
 """`GET`, `PUT`, `PATCH` and `DELETE /v1/org/model-key` (ADR-0041 decisions 2 and 3, BYOK-3a). SECURITY PATH: this is
 credential handling, and it is INERT: with `config/byok.yaml` `enabled: false` (the shipped value) every route answers
-503 `not_configured` before it looks at the principal, the body or any store.
+503 `not_configured` for a verified principal before it reads the body or any store. Anonymous callers receive 401
+before the feature flag is consulted (SEC-05).
 
 Who: the org is `deps.ORG_ID` (never a body, path or query value, BK-08); the actor is the verified principal on a full
 web session whose directory record (`org_role`, PE-17) is `owner`, never `Principal.role` (every signed-in person is
@@ -102,8 +103,8 @@ def gated(config: Annotated[ByokConfig, Depends(get_byok_config)]) -> ByokConfig
 
 
 def actor(
-    _: Annotated[ByokConfig, Depends(gated)],
     principal: Annotated[deps.Principal, Depends(deps.get_current_principal)],
+    _: Annotated[ByokConfig, Depends(gated)],
     stores: Annotated[PeopleStores, Depends(deps.get_people_stores)],
     clock: Annotated[Any, Depends(deps.get_clock)],
 ) -> Actor:
