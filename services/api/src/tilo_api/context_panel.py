@@ -4,7 +4,7 @@ World loads never settle runs. Demo sessions resolve no durable sources."""
 from collections.abc import Callable, Mapping
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from tilo_people._schema import valid
 from tilo_people.access import AccessRequest, read
 from tilo_people.directory import Directory
@@ -176,7 +176,7 @@ def _context(
             "role": me["org_role"],
             "connectors": [
                 _project(row, ("id", "state", "state_known"))
-                for row in connectors_route(principal, registry, views)["connectors"]
+                for row in connectors_route(Response(), principal, registry, views)["connectors"]
             ],
             "skills": [
                 _project(row, ("id", "name", "status", "paused"))
