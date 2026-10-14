@@ -97,9 +97,9 @@ def get_world_costs(
     """A non-member and an unknown world get the same bare 404; a member who is not the owner gets 403."""
     world = store.worlds.get(world_id)
     if principal.world_id != world_id or world is None:
-        raise HTTPException(status_code=404)
+        raise HTTPException(status_code=404, detail="Tilo could not find that.")
     if principal.role != "owner" or principal.user_id != world.owner:
-        raise HTTPException(status_code=403)
+        raise HTTPException(status_code=403, detail="You do not have access to this.")
     return JSONResponse(content={"world_id": world_id, **_report(store, ledger, [(world_id, world)])})
 
 
@@ -132,7 +132,7 @@ def get_costs(
     """Every world the signed-in owner owns, whatever world their principal names. `partial`/`partial_reason` are
     additive: the report is complete only while `partial` is false."""
     if principal.role != "owner":
-        raise HTTPException(status_code=403)
+        raise HTTPException(status_code=403, detail="You do not have access to this.")
     store.load_owner(principal.user_id, settle=True)
     mine = sorted((w, rec) for w, rec in store.worlds.items() if rec.owner == principal.user_id)
     report = _report(store, ledger, mine, principal.user_id)

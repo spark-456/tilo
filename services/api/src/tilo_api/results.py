@@ -41,12 +41,12 @@ def get_result(
         or principal.world_id not in {None, world_id}
     ):
         logger.warning("result of %s: no such world for this person", world_id)
-        raise HTTPException(status_code=404)
+        raise HTTPException(status_code=404, detail="Tilo could not find that.")
     stream = store.events.get(world_id, [])
     delivered = [e for e in stream if e.get("type") == "artifact.delivered"]
     if not delivered or not any(e.get("type") == "world.completed" for e in stream):
         logger.warning("result of %s: nothing delivered and completed yet", world_id)
-        raise HTTPException(status_code=404)
+        raise HTTPException(status_code=404, detail="Tilo could not find that.")
     ref = delivered[-1].get("data", {}).get("artifact")
     if not any(
         e.get("type") in {"artifact.created", "artifact.versioned", "artifact.rollback"}
@@ -54,7 +54,7 @@ def get_result(
         for e in stream
     ):
         logger.warning("result of %s: the delivered item was never recorded as created", world_id)
-        raise HTTPException(status_code=404)
+        raise HTTPException(status_code=404, detail="Tilo could not find that.")
     scope = Scope(deps.ORG_ID, world_id, world.owner)
     try:
         artifact_store = artifacts()  # a store that cannot open is "unavailable", never a bare 500
@@ -70,7 +70,7 @@ def get_result(
         content = artifact_store.read(scope, ref)  # AR-01: hash and size checked by the GCS-backed store.
     except Exception:
         logger.warning("the output of %s is not available to download", world_id, exc_info=True)
-        raise HTTPException(status_code=404)
+        raise HTTPException(status_code=404, detail="Tilo could not find that.") from None
     media = version.record["media_type"]
     if media not in {"application/pdf", "application/json", "text/plain", "text/markdown"}:
         media = "application/octet-stream"

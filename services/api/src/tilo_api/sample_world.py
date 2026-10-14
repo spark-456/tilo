@@ -83,7 +83,7 @@ def _read(principal: Principal = Depends(get_current_principal)) -> Sample:
     """Any signed-in principal (it holds no user data); absent files are an unknown world."""
     sample = load()
     if sample is None:
-        raise HTTPException(status_code=404)
+        raise HTTPException(status_code=404, detail="Tilo could not find that.")
     return sample
 
 

@@ -42,7 +42,7 @@ def list_team_items(
     if not (
         principal.full_session is True and not principal.demo_session and principal.channel in ("web", "mobile_web")
     ):
-        raise HTTPException(status_code=404)
+        raise HTTPException(status_code=404, detail="Tilo could not find that.")
     world, viewer = deps.readable_world(principal, store, people, clock, world_id)
     stores = people()
     if stores is None:

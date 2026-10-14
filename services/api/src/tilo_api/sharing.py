@@ -132,10 +132,10 @@ def build_router(worlds: CardStore | Callable[..., Callable[[str], WorldView]]) 
 
     def owner_view(world_id: str, principal: Principal, resolve: Callable[[str], WorldView]) -> WorldView:
         if principal.world_id != world_id or principal.role != "owner" or principal.channel not in _WEB_CHANNELS:
-            raise HTTPException(status_code=404)  # same as an unknown world
+            raise HTTPException(status_code=404, detail="Tilo could not find that.")  # same as an unknown world
         view = resolve(world_id)
         if principal.user_id != view.cards.owner_of(world_id):
-            raise HTTPException(status_code=404)
+            raise HTTPException(status_code=404, detail="Tilo could not find that.")
         return view
 
     def named_link(token: str, principal: Principal) -> _Link | None:
@@ -207,7 +207,7 @@ def build_router(worlds: CardStore | Callable[..., Callable[[str], WorldView]]) 
         with lock:
             link = by_id.get(share_id)
             if link is None or link.world_id != world_id:
-                raise HTTPException(status_code=404)
+                raise HTTPException(status_code=404, detail="Tilo could not find that.")
             link.revoked = True
         view.cards.unassign(world_id, link.card_id)  # the assignment ends with the link; the owner keeps the gate
         return Response(status_code=204)
