@@ -3,10 +3,18 @@
 // other kept screen stays on its own address. Bare /team and /worlds belong to Park, not to matchScreen.
 import { describe, expect, it } from "vitest";
 import { FIXTURE_WORLD_ID } from "../api/fixtures/derived";
+import { parseParkPath } from "../park/app/router";
 import { matchFlowRoute } from "../router";
 import { screenMeta } from "./meta";
 import { matchScreen } from "./routes";
 
+const moved = new Set(["S-15", "S-16", "S-22", "S-23", "S-24"]);
+function owner(path: string, id: string) {
+  if (moved.has(id)) {
+    expect(matchScreen(path), path).toBeNull();
+    expect(parseParkPath(path, ""), path).not.toBeNull();
+  } else expect(matchScreen(path)?.id, path).toBe(id);
+}
 const W = `/world/${FIXTURE_WORLD_ID}`;
 
 describe("WEB_CUTOVER_screens: moved screens", () => {
@@ -61,7 +69,7 @@ describe("WEB_CUTOVER_screens: kept screens stay reachable on their own paths", 
       ["/pilot", "S-24"],
       ["/more", "more"],
     ];
-    for (const [path, id] of table) expect(matchScreen(path)?.id, path).toBe(id);
+    for (const [path, id] of table) owner(path, id);
   });
 
   it("OLD_UI_OUT_07_the_task_flow_screens_are_gone", () => {
@@ -90,7 +98,7 @@ describe("WEB_CUTOVER_screens: kept screens stay reachable on their own paths", 
       "S-24",
     ]) {
       const path = screenMeta(s)?.path ?? "";
-      expect(matchScreen(path)?.id, `${s} ${path}`).toBe(s);
+      owner(path, s);
     }
   });
 });

@@ -25,14 +25,9 @@ const S_08 = screen(() => import("./S_08"), "S_08");
 const S_10 = screen(() => import("./S_10"), "S_10");
 const S_11 = screen(() => import("./S_11"), "S_11");
 const S_12 = screen(() => import("./S_12"), "S_12");
-const S_15 = screen(() => import("./S_15"), "S_15");
-const S_16 = screen(() => import("./S_16"), "S_16");
 const S_17 = screen(() => import("./S_17"), "S_17");
 const S_18 = screen(() => import("./S_18"), "S_18");
 const S_19 = screen(() => import("./S_19"), "S_19");
-const S_22 = screen(() => import("./S_22"), "S_22");
-const S_23 = screen(() => import("./S_23"), "S_23");
-const S_24 = screen(() => import("./S_24"), "S_24");
 // The dev build's component gallery (WEB-2): its chunk is never reached from the landing bundle.
 const DevComponents = screen(() => import("../park/dev/Components"), "Components");
 
@@ -41,19 +36,14 @@ const DevComponents = screen(() => import("../park/dev/Components"), "Components
 const NeedsYou = inARun(S_06, { testid: "needs-you", title: "Needs you" });
 const GateSheet = inARun(S_07, { testid: "gate-sheet-page", title: "Approval gate" });
 const Consent = inARun(S_08, { testid: "consent-sheet-page", title: "Connection consent" });
-const Autonomy = inARun(S_15, { testid: "autonomy", title: "Autonomy" });
-const Channels = inARun(S_16, { testid: "channels", title: "Channels" });
 const Mail = inARun(S_17, { testid: "mail", title: "Email Autopilot" });
 const Team = inARun(S_18, { testid: "team", title: "Team Lead console" });
 const Connections = inARun(S_19, { testid: "connections", title: "Connections" });
-const Estimate = inARun(S_23, { testid: "estimate", title: "How we estimate" });
 
 // biome-ignore format: one line per screen keeps group edits to a single line.
 const COMPONENTS: Readonly<Record<string, ElementType<ScreenProps>>> = {
   "S-05": S_05, "S-06": NeedsYou, "S-07": GateSheet, "S-08": Consent, "S-10": S_10,
-  "S-11": S_11, "S-12": S_12, "S-15": Autonomy, "S-16": Channels,
-  "S-17": Mail, "S-18": Team, "S-19": Connections, "S-22": S_22, "S-23": Estimate,
-  "S-24": S_24,
+  "S-11": S_11, "S-12": S_12,
 };
 
 export interface ScreenMatch {

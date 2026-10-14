@@ -231,7 +231,10 @@ describe("WEB_CUTOVER_router: isParkPath splits the two apps", () => {
       "/parkour",
       "/parks/home",
     ]) {
-      expect(isParkPath(path), path).toBe(false);
+      // OLD-UI-OUT.md Wave 4 transfers these exact addresses to Park.
+      expect(isParkPath(path), path).toBe(
+        ["/autonomy", "/channels", "/settings", "/estimate", "/pilot"].includes(path),
+      );
     }
   });
 });

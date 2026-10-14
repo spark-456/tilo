@@ -2,6 +2,7 @@ import { PAGE_LABEL, type PageId } from "../park/app/AppCtx";
 import type { TourStep } from "./steps";
 
 const CONTENT: Record<PageId, [string, string]> = {
+  settings: ["Your preferences and routines", "Appearance, consent and recorded run activity."],
   home: [
     "Describe the work",
     "Use the composer to describe a task. Read the proposed plan before starting.",

@@ -7,6 +7,7 @@ import type { Api } from "../../src/park/api/index";
 import type { AppCtx, PageId } from "../../src/park/app/AppCtx";
 
 export const PAGE_LABEL: Record<PageId, string> = {
+  settings: "Settings",
   home: "Home",
   worlds: "Worlds",
   world: "World",
