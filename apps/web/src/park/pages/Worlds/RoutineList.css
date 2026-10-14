@@ -1,9 +1,9 @@
-[data-park] .park-routine-list {
+[data-park] .park-worlds-routine-list {
   display: grid;
   gap: 16px;
   outline-offset: 4px;
 }
-[data-park] .park-routine {
+[data-park] .park-worlds-routine {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -14,25 +14,25 @@
   background: var(--field);
   color: var(--ink);
 }
-[data-park] .park-routine-main {
+[data-park] .park-worlds-routine-main {
   flex: 1 1 240px;
   min-width: 0;
 }
-[data-park] .park-routine-detail {
+[data-park] .park-worlds-routine-detail {
   display: block;
   color: var(--ink3);
 }
-[data-park] .park-routine-confirm {
+[data-park] .park-worlds-routine-confirm {
   padding: 12px;
   border: 1px solid var(--line);
   border-radius: 10px;
 }
-[data-park] .routine-name {
+[data-park] .park-worlds-routine-name {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
 }
-[data-park] .routine-name input {
+[data-park] .park-worlds-routine-name input {
   max-width: 100%;
   background: var(--field);
   color: var(--ink);

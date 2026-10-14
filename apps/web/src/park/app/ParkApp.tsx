@@ -10,7 +10,7 @@ import "../tokens/park.css";
 import "../tokens/themes.css";
 import { themeFor } from "../tokens/themes";
 import { PAGE_LABEL } from "./AppCtx";
-import { NOT_FOUND_TITLE, NotFound } from "./NotFound";
+import { NotFound } from "./NotFound";
 import "./park-app.css";
 import { ParkProvider, usePageApp, useSessionAuth } from "./context";
 import { PageTitleContext } from "./pageTitle";
@@ -83,7 +83,7 @@ function Shell({ routed }: { routed?: RoutedView | undefined }) {
   const [named, setNamed] = useState<string | null>(null);
   const title =
     named ??
-    (routed ? routed.title : route ? PAGE_LABEL[route.page] : quizRoute ? "Quiz" : NOT_FOUND_TITLE);
+    (routed ? routed.title : route ? PAGE_LABEL[route.page] : quizRoute ? "Quiz" : "Not found");
   // A world is a different page per id; the other pages keep focus where it is when only a query changes.
   const routeKey = routed
     ? routed.routeKey

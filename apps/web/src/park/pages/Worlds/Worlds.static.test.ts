@@ -138,6 +138,7 @@ describe("WEB_5_worlds_static: the registry gets one new line", () => {
         .filter(([k]) => k !== "worlds")
         .every(([, v]) => v === "Placeholder" || form.test(v ?? "")),
     ).toBe(true);
-    expect(src).toContain('const Placeholder = lazy(() => import("./Placeholder"));');
+    // OLD-UI-OUT Final: every registered page has its own component; no placeholder remains.
+    expect(src).not.toContain('import("./Placeholder")');
   });
 });

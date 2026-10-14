@@ -91,7 +91,7 @@ export function RoutineList({
 
   return (
     <section
-      className="park-routine-list"
+      className="park-worlds-routine-list"
       aria-label="Scheduled routines"
       tabIndex={-1}
       ref={scope}
@@ -105,7 +105,7 @@ export function RoutineList({
           const controls = scope.current?.querySelectorAll<HTMLElement>(
             asking
               ? '[role="alertdialog"] button:not(:disabled)'
-              : ".routine-name input:not(:disabled), .routine-name button:not(:disabled)",
+              : ".park-worlds-routine-name input:not(:disabled), .park-worlds-routine-name button:not(:disabled)",
           );
           const last = (controls?.length ?? 0) - 1;
           const target = e.shiftKey ? controls?.[last] : controls?.[0];
@@ -118,7 +118,7 @@ export function RoutineList({
       }}
     >
       {rows.length === 0 ? (
-        <p className="park-routine-empty" data-testid="routines-empty">
+        <p className="park-worlds-routine-empty" data-testid="routines-empty">
           No routines yet. <a href="/">Create a routine</a> by starting a run and choosing Repeat
           weekly.
         </p>
@@ -127,16 +127,16 @@ export function RoutineList({
           {rows.map((row) => (
             <article
               key={row.schedule_id}
-              className="park-routine"
+              className="park-worlds-routine"
               data-testid={`routine-row-${row.schedule_id}`}
             >
-              <div className="park-routine-main">
+              <div className="park-worlds-routine-main">
                 <h3>
                   <b>{row.title}</b>
                 </h3>
                 {editing?.id === row.schedule_id && (
                   <form
-                    className="routine-name"
+                    className="park-worlds-routine-name"
                     aria-label="Rename routine"
                     // Blur neither saves nor cancels: the draft stays until an explicit action.
                     onSubmit={(e) => {
@@ -189,8 +189,8 @@ export function RoutineList({
                     </Button>
                   </form>
                 )}
-                <span className="park-routine-detail">{cadenceWords(row.cadence)}</span>
-                <span className="park-routine-detail">
+                <span className="park-worlds-routine-detail">{cadenceWords(row.cadence)}</span>
+                <span className="park-worlds-routine-detail">
                   {`Next run: ${nextRunWords(row.next_due, row.cadence.tz)}`}
                 </span>
                 {asking === row.schedule_id && (
@@ -198,7 +198,7 @@ export function RoutineList({
                     role="alertdialog"
                     aria-modal="true"
                     aria-label="Delete routine"
-                    className="park-routine-confirm"
+                    className="park-worlds-routine-confirm"
                   >
                     <p>{`Delete "${row.title}"? It will not run again.`}</p>
                     <div style={{ display: "flex", gap: "var(--space-12)", flexWrap: "wrap" }}>
@@ -222,7 +222,7 @@ export function RoutineList({
                   </div>
                 )}
               </div>
-              {!row.enabled && <span className="park-routine-state">Paused</span>}
+              {!row.enabled && <span className="park-worlds-routine-state">Paused</span>}
               <Button
                 variant="secondary"
                 type="button"

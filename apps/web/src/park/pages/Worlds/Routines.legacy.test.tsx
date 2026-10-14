@@ -13,7 +13,7 @@ import {
   row,
   rows,
   view,
-} from "./Routines.legacy.harness";
+} from "../../../../test-support/park/routinesHarness";
 describe("FR-AGT-14 Routines list", () => {
   it("FR-AGT-14 delete confirmation focuses Keep, traps Tab and restores focus on Escape", async () => {
     const { calls } = await open({ "GET /schedules": json({ schedules: [A, B] }) });

@@ -18,9 +18,9 @@
 import { act } from "react";
 import { type Root, createRoot } from "react-dom/client";
 import { afterEach, beforeAll, beforeEach, vi } from "vitest";
-import { ClientProvider } from "../../../api/ClientProvider";
-import { HttpClient } from "../../../api/http";
-import { PRESS_MS } from "../../../screens/remote";
+import { ClientProvider } from "../../src/api/ClientProvider";
+import { HttpClient } from "../../src/api/http";
+import { PRESS_MS } from "../../src/park/shared/remote";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -100,7 +100,7 @@ export const click = async (b: Element | undefined) => {
 };
 
 beforeAll(async () => {
-  ({ Routines } = (await import("./Routines")) as {
+  ({ Routines } = (await import("../../src/park/pages/Worlds/Routines")) as {
     Routines: () => React.JSX.Element;
   });
 });

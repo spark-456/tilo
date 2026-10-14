@@ -12,7 +12,7 @@ import {
   q,
   row,
   view,
-} from "./Routines.legacy.harness";
+} from "../../../../test-support/park/routinesHarness";
 const editName = async (value: string) =>
   act(async () => {
     const input = q<HTMLInputElement>('input[aria-label="Routine name"]');
