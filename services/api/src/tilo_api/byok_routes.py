@@ -330,6 +330,9 @@ def change_settings(
     if body.fallback_to_tilo is not None:
         changes["fallback_to_tilo"] = body.fallback_to_tilo
         widening |= body.fallback_to_tilo and not held.fallback_to_tilo
+    changes = {name: value for name, value in changes.items() if value != getattr(held, name)}
+    if not changes:
+        return _public(held, config, owner_view=True)
     if widening:
         fresh_owner(who)
         _widening(store, who, config, body.confirm, body.consent_version)

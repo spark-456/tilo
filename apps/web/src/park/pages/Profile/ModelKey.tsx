@@ -29,6 +29,8 @@ const PROBLEMS: Record<ModelKeyProblem, string> = {
   reauth:
     "For safety, adding or replacing a key needs a sign-in from the last 10 minutes. Sign out from the account menu, sign in again, then add the key.",
   owner_only: "Only this organisation's owner can see or change its model key.",
+  under_construction: "Access to Tilo is not available for this account yet.",
+  declaration_required: "Complete the sign-up question before using Tilo.",
   key_refused: "That key or project id was refused. Check it and try again. Nothing was saved.",
   confirm:
     "The consent wording has changed. Reload this page, read it again and confirm. Nothing was saved.",
