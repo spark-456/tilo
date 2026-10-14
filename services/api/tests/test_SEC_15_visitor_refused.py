@@ -145,8 +145,17 @@ def test_SEC_15_judge_is_let_through_the_gate_on_every_non_public_route(sec15_fa
         assert response.status_code != 401  # the route's own answer (404, 415, 422, 2xx), never the gate's
 
 
-def test_SEC_15_unwired_access_store_closes_every_non_public_route(sec15_factory):
+def test_SEC_15_unwired_access_store_closes_every_non_public_route(sec15_factory, monkeypatch):
     """A deployed process whose declarations cannot be read gives nobody access (fail closed)."""
+    from tilo_api import rate_limit  # noqa: PLC0415
+
+    # One person calls every non-public route here; the SEC-10 edge limiter (its own tests: test_SEC_10) gets room so
+    # the access gate is what answers, as the people rigs do.
+    rate_limit.reset_default_rate_limiter()
+    wide = rate_limit.RateLimitConfig(
+        ip_capacity=1_000_000, ip_refill_per_s=1_000_000.0, user_capacity=1_000_000, user_refill_per_s=1_000_000.0
+    )
+    monkeypatch.setattr(rate_limit, "get_rate_limit_config", lambda: wide)
     sec = sec15_factory(declarations={JUDGE: "judge"})
     for key in [k for k in app.dependency_overrides if getattr(k, "__name__", "") == "get_access_store"]:
         del app.dependency_overrides[key]

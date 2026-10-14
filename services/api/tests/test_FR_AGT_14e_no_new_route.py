@@ -16,6 +16,8 @@ PUBLIC = frozenset(
     {
         ("GET", "/health"),
         ("GET", "/healthz"),
+        ("GET", "/health/deps"),  # X-HEALTH-1: booleans and fixed kinds only (GATE-LIVE3 security review)
+        ("GET", "/healthz/deps"),
         ("GET", "/access"),
         ("POST", "/access/declaration"),
         ("POST", "/internal/schedules/tick"),

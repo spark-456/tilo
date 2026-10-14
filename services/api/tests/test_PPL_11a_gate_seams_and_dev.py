@@ -97,6 +97,9 @@ def test_PPL_11a_SEC_15_the_people_routes_exist_and_none_of_them_is_public(peopl
             {
                 ("GET", "/health"),
                 ("GET", "/healthz"),
+                # X-HEALTH-1: booleans and fixed kinds only (GATE-LIVE3 security review).
+                ("GET", "/health/deps"),
+                ("GET", "/healthz/deps"),
                 ("GET", "/access"),
                 ("POST", "/access/declaration"),
                 # FR-AGT-14b: the Scheduler tick checks its own OIDC caller; the owner approved this one route (6 Oct).

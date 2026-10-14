@@ -339,7 +339,7 @@ def test_SEC_08_api_has_exactly_one_public_signed_route_and_every_other_route_ne
     from tilo_api import access
     from tilo_api.access import PUBLIC_ROUTES
 
-    health = {("GET", "/health"), ("GET", "/healthz")}
+    health = {("GET", "/health"), ("GET", "/healthz"), ("GET", "/health/deps"), ("GET", "/healthz/deps")}
     signed = {("POST", TICK)}
 
     assert PUBLIC_ROUTES - health - signed == PUBLIC_NEEDING_A_SESSION, (
