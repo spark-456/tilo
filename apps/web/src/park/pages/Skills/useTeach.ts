@@ -245,7 +245,12 @@ export function useTeach({
         app.toast(LIVE_TEACH.saved(nm));
       },
       (e) => {
-        const said = e instanceof TiloApiError ? e.refusal ?? e.message : e instanceof Error ? e.message : "";
+        const said =
+          e instanceof TiloApiError
+            ? (e.refusal ?? e.message)
+            : e instanceof Error
+              ? e.message
+              : "";
         const code = SAVE_CODES.has(said) ? said : null;
         app.toast(LIVE_TEACH.failed(nm, code));
       },
