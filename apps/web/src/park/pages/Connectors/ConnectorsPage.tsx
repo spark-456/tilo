@@ -13,6 +13,7 @@ import type { AppCtx } from "../../app/AppCtx";
 import { useParkApi } from "../../app/context";
 import { PageSheet } from "../../components";
 import "./Connectors.css";
+import { ConnectionsSection } from "../Team/RunAdmin";
 import { AttentionBanner, AvailableRow, ConnectedTile } from "./ConnectorParts";
 import { Drawer } from "./Drawer";
 import { GoogleAccess } from "./GoogleAccess";
@@ -40,7 +41,10 @@ const NO_OVERRIDES: Overrides = { st: {}, lvl: {} };
 function Frame({ children }: { children: ReactNode }) {
   return (
     <div data-testid="park-page-connectors">
-      <PageSheet>{children}</PageSheet>
+      <PageSheet>
+        {children}
+        <ConnectionsSection />
+      </PageSheet>
     </div>
   );
 }

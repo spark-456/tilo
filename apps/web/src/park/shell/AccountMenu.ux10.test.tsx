@@ -151,6 +151,7 @@ describe("FR_UX_10 account menu: Sign out through the auth seam", () => {
     expect(items().map((b) => b.textContent)).toEqual([
       "Profile and settings",
       "Connectors6 on",
+      "More",
       "Team and roles",
       "Mobile appConcept",
     ]);
