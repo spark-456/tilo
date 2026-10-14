@@ -12,6 +12,7 @@ import type {
   QuestionAnswer,
   TiloClient,
 } from "./client";
+import { API_DETAIL_MESSAGES } from "./errorCodes";
 import { type FieldSpec, type FieldsApi, fieldSpecsOf } from "./fields";
 import { type ItemApi, type PinnedItem, pinnedItemOf } from "./item";
 import { type HostStarted, isHostStarted, refusalOf } from "./meetingHost";
@@ -72,6 +73,9 @@ function unavailableMessage(text: string): string {
     if (body?.code === "not_configured" || body?.detail === "not_configured") {
       return NOT_CONFIGURED;
     }
+    if (typeof body?.detail === "string" && Object.hasOwn(API_DETAIL_MESSAGES, body.detail)) {
+      return API_DETAIL_MESSAGES[body.detail] ?? SERVER_TROUBLE;
+    }
     if (typeof body?.detail === "string" && SAFETY_DETAILS.has(body.detail)) {
       return SAFETY_UNAVAILABLE;
     }
@@ -131,6 +135,7 @@ export function displayApiError(error: unknown): string {
     return "We could not confirm it. Reload before trying again.";
   }
   const reasons: Readonly<Record<string, string>> = {
+    ...API_DETAIL_MESSAGES,
     write_unconfirmed: "We could not confirm it. Reload before trying again.",
     not_configured: NOT_CONFIGURED,
     unavailable: "This feature is unavailable right now. Try again in a moment.",
@@ -161,6 +166,7 @@ export function displayApiError(error: unknown): string {
     SLOW_WORLD,
     ...Object.values(GENERIC_4XX),
     ...ANSWER_REASONS.values(),
+    ...Object.values(API_DETAIL_MESSAGES),
   ]);
   if (approved.has(error.message)) return error.message;
   if (error.status === null) return UNREACHABLE;
@@ -203,6 +209,9 @@ export function reasonOf(status: number, text: string): string {
     }
   } catch {
     said = undefined;
+  }
+  if (typeof said === "string" && Object.hasOwn(API_DETAIL_MESSAGES, said)) {
+    return API_DETAIL_MESSAGES[said] ?? SERVER_TROUBLE;
   }
   if (
     typeof said === "string" &&

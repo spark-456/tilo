@@ -337,9 +337,11 @@ def _persist(
                 store.commit_unsaved(touched, policies=policies, worlds=worlds)
         except HTTPException as exc:
             logger.warning("kill switch applied but not saved (%s)", exc.detail)
-            raise HTTPException(status_code=503, detail="not saved") from None
+            raise HTTPException(
+                status_code=503, detail="The change was not saved. Reload before trying again."
+            ) from None
     if not loaded:
-        raise HTTPException(status_code=503, detail="not saved")
+        raise HTTPException(status_code=503, detail="The change was not saved. Reload before trying again.")
 
 
 def _policy_ids(plan) -> list[str]:

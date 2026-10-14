@@ -75,6 +75,12 @@ MAX_LIMIT_MINOR = 10**12  # 10 billion INR: anything above is a typo, never a li
 MAX_INVITES = 100  # pending invites at once
 _SESSIONS = frozenset({"web", "mobile_web"})
 _REFUSED = {"not_allowed": 403, "own_role": 409, "last_owner": 409, "unknown": 404}
+_ROLE_REFUSALS = {
+    "not_allowed": "You do not have permission to change this role.",
+    "own_role": "You cannot change your own role.",
+    "last_owner": "The team must keep at least one Owner.",
+    "unknown": "Tilo could not find that team member.",
+}
 
 
 class _Closed(BaseModel):
@@ -182,7 +188,10 @@ def _write(
         logger.warning("team store refused (%s)", type(exc.__cause__).__name__)
         raise HTTPException(status_code=503, detail="not_configured") from exc
     except RoleChangeRefused as exc:
-        raise HTTPException(status_code=_REFUSED.get(exc.reason, 409), detail=f"refused: {exc.reason}") from exc
+        raise HTTPException(
+            status_code=_REFUSED.get(exc.reason, 409),
+            detail=_ROLE_REFUSALS.get(exc.reason, "This role change is not allowed."),
+        ) from exc
     except MustAskLocked as exc:
         raise HTTPException(status_code=409, detail="A Must-ask rule can't be switched off.") from exc
     except PermissionError as exc:
