@@ -42,6 +42,8 @@ from tilo_providers.router import Router
 from tilo_providers.safety import FakeSafetyProvider
 from tilo_providers.search import FakeSearchProvider
 
+pytestmark = pytest.mark.usefixtures("must_ask_ask_mode")  # these tests pin the card and its answer (BQ-ASSUME-1)
+
 ROOT = Path(__file__).resolve().parents[3]
 WORLD, RUN, OWNER = "w_run_fail_1", "r_run_fail_1", "u_run_fail_1"
 GOAL = (

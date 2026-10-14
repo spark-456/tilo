@@ -8,8 +8,11 @@ layers, in this order, and only the first is authority:
    (or one the table does not list, which is T3) asks (`sensitive_step`) unless the type is T2 and an
    autonomy policy covers it. A T3 type is never waved through by coverage.
 2. The model of the unit's role judges an ambiguous brief, a trade-off, or a sensitive step code cannot
-   see. It can add a question and can never remove one a rule requires. A reply that cannot be read, or
-   a provider that fails, asks (`ambiguous_brief`): when the harness cannot tell, a person decides.
+   see. It can add a question and can never remove one a rule requires. A model-raised sensitive_step always asks.
+   An ambiguous_brief or trade_off the model raises follows `config/must_ask.yaml` (`model_questions`, BQ-ASSUME-1):
+   `assume`, the default, goes on with the model's suggested option and returns an `Assumption` the executor
+   records, so a guess does not stop the run ("too many questions lead to a weak product", SIMPLE-RUN); `ask`
+   raises the card as before. A reply that cannot be read follows the same switch: assume, or ask.
 
 `raise_question` writes the Specialist -> Lead -> Director chain and the Lead's question to a person
 through the one `WorldWriter`, and hands a `needs_you` card to `card_sink` before any of the chain is written.
@@ -25,8 +28,10 @@ import json
 import re
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, cast
 
+import yaml
 from tilo_policy.tiers import RiskTable, load_risk_table
 from tilo_providers.interfaces import GenerateRequest, ModelProvider
 from tilo_providers.prompts import load_prompt
@@ -37,6 +42,9 @@ from tilo_harness.untrusted import neutralise
 from tilo_harness.writer import format_ts, new_ulid
 
 ROLE = "specialist"  # prompts/specialist/must_ask_*.md
+MUST_ASK_CONFIG = Path(__file__).resolve().parents[4] / "config" / "must_ask.yaml"
+_ASSUMED = ("ambiguous_brief", "trade_off")  # the model reasons that `assume` mode does not stop the run for
+SUMMARY_LIMIT = 140  # event.schema.json `summary`
 QUESTION_TIMEOUT_S = 3600  # BQ-212: PRD 10.2 gives a card a timeout but no number
 _MODEL_REASONS = ("ambiguous_brief", "trade_off", "sensitive_step")
 _WHY_IT_MATTERS = {
@@ -66,6 +74,19 @@ _UNREADABLE = (
     0,
     "When Tilo cannot tell, it asks instead of guessing.",
 )
+
+
+def load_model_questions(path: Path | None = None) -> str:
+    """`assume` (the default: no file, or no key) or `ask`, from config/must_ask.yaml. A value that is neither fails
+    closed to `ask`, the behaviour before BQ-ASSUME-1, so a typo can never remove a question."""
+    try:
+        data = yaml.safe_load((path or MUST_ASK_CONFIG).read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        return "assume"
+    except Exception:
+        return "ask"
+    value = data.get("model_questions", "assume") if isinstance(data, dict) else None
+    return value if value in ("assume", "ask") else "ask"
 
 
 def option_index(option: Any, count: int) -> int | None:
@@ -105,6 +126,17 @@ class Ask:
             and (index := option_index(answer.option, len(self.options))) is not None
             and index != self.suggested
         )
+
+
+@dataclass(frozen=True)
+class Assumption:
+    """What `assess` returns instead of an `Ask` in `assume` mode: the unit goes on, the executor records `line` (the
+    "Assumed: ..." form intake uses) as one event and tells the unit the question and its assumed answer."""
+
+    reason: str  # ambiguous_brief | trade_off, or no_question for a reply that could not be read
+    question: str
+    assumed: str
+    line: str
 
 
 def _clip(text: str, limit: int) -> str:
@@ -156,7 +188,9 @@ class MustAsk:
         risk_table: RiskTable | None = None,
         brief: Mapping[str, Any] | None = None,
         intake_answers: Sequence[tuple[str, str]] = (),
+        model_questions: str | None = None,
     ) -> None:
+        self._model_questions = model_questions if model_questions in ("assume", "ask") else load_model_questions()
         self._providers = providers
         self._brief, self._answers = brief, tuple(intake_answers)  # RUN-FAIL-1: the whole task, as data
         self._max_attempts = config.retries.max_attempts
@@ -177,7 +211,7 @@ class MustAsk:
                 out.append(str(action))
         return out
 
-    async def assess(self, unit: Mapping[str, Any], *, failures: int = 0) -> Ask | None:
+    async def assess(self, unit: Mapping[str, Any], *, failures: int = 0) -> Ask | Assumption | None:
         if failures >= self._max_attempts:
             return _canned("repeated_failure", _FAILED, proceed=0, count=failures)
         uncovered = self._uncovered(unit)
@@ -185,9 +219,23 @@ class MustAsk:
             return _canned("sensitive_step", _SENSITIVE, proceed=1, actions=_clip(", ".join(uncovered), 60))
         try:
             reply = await asyncio.to_thread(self._providers[unit["role"]].generate, self._request(unit))
-            return _parse(reply.text)
-        except Exception:  # unreadable reply, provider outage or missing role: ask rather than guess (BQ-199)
-            return _canned("ambiguous_brief", _UNREADABLE, proceed=1)
+            asked = _parse(reply.text)
+        except Exception:  # unreadable reply, provider outage or missing role (BQ-199)
+            if self._model_questions == "ask":
+                return _canned("ambiguous_brief", _UNREADABLE, proceed=1)
+            return Assumption("no_question", "", "no question needed", "Assumed: no question needed")
+        if asked is not None and asked.reason in _ASSUMED and self._model_questions == "assume":
+            return self._assume(asked)
+        return asked  # a model-raised sensitive_step always asks
+
+    @staticmethod
+    def _assume(ask: Ask) -> Assumption:
+        """Go on with the model's suggested option. The question and the option are model text built from the task:
+        neutralised, and the line fits the event's `summary`."""
+        question = neutralise(ask.question, limit=100)
+        assumed = neutralise(ask.options[ask.suggested], limit=40)
+        line = _clip(f"Assumed: {_clip(question, 70).rstrip('?')}: {assumed}", SUMMARY_LIMIT)
+        return Assumption(ask.reason, question, assumed, line)
 
     def confirmation(self, ask: Ask, answer: Any) -> Ask | None:
         """The code-written card that follows a model-raised sensitive_step choice: it quotes the person's choice and
@@ -212,9 +260,21 @@ class MustAsk:
         # title alone. Same caps and neutralising as the unit's own prompt (`unit_prompt`); no clock, so no date drifts.
         task = request_variables(self._brief, self._answers)
         context = {k: task[k] for k in ("goal", "deadline", "constraints", "answers")}
-        variables = {k: neutralise(v, limit=200) for k, v in fields.items()} | context
+        # BQ-ASSUME-1: and what the brief records as settled (audience, earlier assumptions), so it is not asked again.
+        variables = {k: neutralise(v, limit=200) for k, v in fields.items()} | context | self._decided()
         prompt = load_prompt(ROLE, "must_ask_task.md", variables)
         return GenerateRequest(system=self._system, prompt=prompt, json_mode=True, max_output_tokens=400)
+
+    def _decided(self) -> dict[str, str]:
+        """What the brief records as settled beyond the task block (audience and the assumptions already made), so the
+        model does not ask it again (BQ-ASSUME-1). Person-supplied or model text, shown as data."""
+        brief = self._brief or {}
+        audience = brief.get("audience")
+        facts = [f"Audience: {audience}"] if isinstance(audience, str) and audience.strip() else []
+        facts += [
+            str(a["assumed"]) for a in brief.get("assumptions") or [] if isinstance(a, dict) and a.get("assumed")
+        ][:8]
+        return {"decided": neutralise("; ".join(facts), limit=600) if facts else "nothing recorded"}
 
     def raise_question(
         self,

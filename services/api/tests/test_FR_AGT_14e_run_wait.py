@@ -21,6 +21,8 @@ import pytest
 from _agt05_lib import ASK, CLEAR, build_ask_flow, needs_you_cards, start_and_approve, tasks_provider
 from _clint2_lib import wait_for
 
+pytestmark = pytest.mark.usefixtures("must_ask_ask_mode")  # this suite pins the card (BQ-ASSUME-1)
+
 
 class TickingClock:
     """A monotonic clock that jumps `step` seconds every time it is read: the deadline passes with no real waiting."""

@@ -427,3 +427,14 @@ def skills4(people_rig, repo_root):
     rig = people_rig()
     rig.add_people(STANDARD_PERSONS.values())
     yield Skills4(rig, repo_root)
+
+
+@pytest.fixture()
+def must_ask_ask_mode(tmp_path, monkeypatch):
+    """BQ-ASSUME-1: the model-judged must-ask layer assumes by default (config/must_ask.yaml); the suites that pin the
+    FR-AGT-05 / FR-HIL-10 cards run it in `ask` mode, through the config file, as an operator would."""
+    import tilo_harness.must_ask as must_ask
+
+    path = tmp_path / "must_ask.yaml"
+    path.write_text("model_questions: ask", encoding="utf-8")
+    monkeypatch.setattr(must_ask, "MUST_ASK_CONFIG", path)

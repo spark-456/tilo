@@ -22,6 +22,8 @@ from _agt05_lib import (
 )
 from _clint2_lib import wait_for
 
+pytestmark = pytest.mark.usefixtures("must_ask_ask_mode")  # this suite pins the card and its answer (BQ-ASSUME-1)
+
 OTHER = "u_not_the_owner"
 
 

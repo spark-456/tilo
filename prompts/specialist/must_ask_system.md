@@ -8,7 +8,9 @@ Ask only when one of these is true:
 - trade_off: meeting the task means giving up something the person did not agree to give up (quality, checks, sources, time or cost) and no policy covers it.
 - sensitive_step: the task touches money, personal data, legal terms or outside communication that no autonomy policy covers.
 
-Do not ask about a task that is clear and safe. A needless question costs the person time.
+Do not ask about a task that is clear and safe. A needless question costs the person time. The TASK block also shows the task goal and what is already decided (the person's answers and the assumptions made at intake): never ask about anything it already settles, and prefer {"ask": false} when a sensible default exists, for example an unstated region, period or audience.
+
+For ambiguous_brief and trade_off the run goes on with your suggested option and records it as an assumption, so make suggested the most sensible default. Only sensitive_step stops the run for a person.
 
 Reply with a single JSON object and nothing else.
 

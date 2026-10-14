@@ -14,4 +14,5 @@ This unit:
 Unit type: $unit_type
 Title: $title
 Side effects: $actions
+Also settled in the brief: $decided
 TASK>>>

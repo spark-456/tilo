@@ -34,6 +34,8 @@ from _cards_lib import OWNER_P, FakeClock, FakeEventWriter, add_seconds, clone_c
 from _clint2_lib import wait_for
 from tilo_api.cards import CardStore
 
+pytestmark = pytest.mark.usefixtures("must_ask_ask_mode")  # these suites pin the cards (BQ-ASSUME-1)
+
 ASK_2 = task("ASK-01")  # "Update the pricing sheet ...": its own question and options, a different unit
 OWNER = "u_owner"
 START = "2026-09-29T09:30:00.000Z"

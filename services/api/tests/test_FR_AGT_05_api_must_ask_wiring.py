@@ -30,6 +30,8 @@ from _agt05_lib import (
 )
 from _clint2_lib import MOCK_ID, assert_stream_valid, schema_errors, wait_for
 
+pytestmark = pytest.mark.usefixtures("must_ask_ask_mode")  # these suites pin the cards (BQ-ASSUME-1)
+
 REPO_ROOT = pathlib.Path(__file__).resolve().parents[3]
 RUN_TERMINAL = ("world.completed", "world.failed")
 
@@ -153,6 +155,8 @@ def test_FR_AGT_05_api_a_run_with_a_unit_waiting_for_a_person_does_not_complete_
     assert not [t for t in types if t in RUN_TERMINAL], f"a parked run is still waiting: {types}"
     assert rf.delivery().status_code == 409, "nothing is delivered until the work is done"
     if independent:
+        # U3 follows U2, so it may start a moment after U1's question is routed: wait for it, do not race it.
+        wait_for(lambda: {"U2", "U3"} <= set(rf.runner.ran), what="the units that do not depend on the asked one")
         assert {"U2", "U3"} <= set(rf.runner.ran), "the units that do not depend on the asked one go on"
     else:
         assert rf.runner.ran == [], "U2 and U3 depend on the asked unit, so they wait"

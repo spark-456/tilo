@@ -54,7 +54,13 @@ def _run(tmp_path: Any, *, ask: bool, answer: Any = None) -> str:
     config = make_config(tmp_path)
     layout = layout_for_asks()
     writer, _store = make_memory_writer(layout, world_id=layout["world_id"])
-    must_ask = MustAsk(providers, config=config, card_sink=lambda _card: None, owner=OWNER) if ask else None
+    # model_questions="ask": this suite pins the person's own answer reaching the unit; the shipped default
+    # ("assume", BQ-ASSUME-1) would answer a model-raised question itself.
+    must_ask = (
+        MustAsk(providers, config=config, card_sink=lambda _card: None, owner=OWNER, model_questions="ask")
+        if ask
+        else None
+    )
     asyncio.run(
         run_plan(
             build_plan([build_unit("U1", title="Research rarely explored stops")]),
