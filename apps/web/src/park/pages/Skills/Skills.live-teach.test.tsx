@@ -459,8 +459,12 @@ describe("SKILLS_5_live_teach: save (step 4)", () => {
   });
 
   it.each([
-    ["unknown_action", "Couldn’t save “Match invoices”. Check the information and try again."],
-    ["ask_first_required", "Couldn’t save “Match invoices”. Check the information and try again."],
+    // X-APIERR-2 (dcaff4b8): a known refusal code gets its own plain sentence; an unknown word keeps the generic one.
+    ["unknown_action", "Couldn’t save “Match invoices”. This action is not available here."],
+    [
+      "ask_first_required",
+      "Couldn’t save “Match invoices”. Ask for approval before making this change.",
+    ],
     [
       "some words the server made up",
       "Couldn’t save “Match invoices”. Check the information and try again.",

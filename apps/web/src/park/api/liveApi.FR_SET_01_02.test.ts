@@ -43,7 +43,8 @@ describe("FR_SET_01_live_settings_api", () => {
     [500, null],
   ])("test_FR_SET_01_a_%i_answer_is_a_typed_error_never_defaults", async (status, code) => {
     const fetch = vi.fn(async (_url: RequestInfo | URL, _init?: RequestInit) =>
-      reply({ detail: code ?? "x", code }, status),
+      // X-APIERR-2 (dcaff4b8) reads a short lower-case `detail` token as the code, so the no-code cases carry prose.
+      reply({ detail: code ?? "Not allowed here.", code }, status),
     );
     const err = await live(fetch)
       .saveUserSettings(update)

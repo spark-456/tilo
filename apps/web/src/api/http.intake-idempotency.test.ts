@@ -124,6 +124,9 @@ describe("FR-INT-01 intake idempotency follow-up", () => {
     );
   });
 
+  // X-APIERR-2 (dcaff4b8): a refusal's code is now read from a top-level or nested `detail.code` token on every route
+  // and carried on the error for display mapping. What must still hold: an unrelated 409, or another route's
+  // intake-committed body, is not turned into the intake client's own already-submitted error.
   it("does not treat unrelated 409s or another route's nested detail as an intake commit", async () => {
     const s = setup(
       reply({ detail: { code: "other", task_id: "private-task" } }, 409),
@@ -131,11 +134,12 @@ describe("FR-INT-01 intake idempotency follow-up", () => {
     );
     await expect(s.client.submitIntake("Task", [])).rejects.toMatchObject({
       message: "That cannot be done right now.",
-      code: null,
+      code: "other",
+      status: 409,
     });
     await expect(s.client.postJson("/other", {})).rejects.toMatchObject({
       message: "That cannot be done right now.",
-      code: null,
+      status: 409,
     });
   });
 });
