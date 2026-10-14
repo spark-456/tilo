@@ -85,7 +85,7 @@ def test_FR_MTG_08_release_checks(tmp_path, capsys, broken):
     assert "FAIL bundle-changed" in output if broken == "bundle-changed" else "PASS bundle-changed" in output
 
 
-@pytest.mark.parametrize("broken", [None, "sign-in", "bundle-api", "healthz", "cors-intake", "plate-auth"])
+@pytest.mark.parametrize("broken", [None, "sign-in", "bundle-api", "health", "healthz", "cors-intake", "plate-auth"])
 def test_FR_MTG_08_unsigned_checks_fail_each_boundary_and_never_send_tokens(broken, capsys, monkeypatch):
     seen = []
     monkeypatch.setenv("TILO_SMOKE_ID_TOKEN", "must-never-send")
@@ -103,8 +103,8 @@ def test_FR_MTG_08_unsigned_checks_fail_each_boundary_and_never_send_tokens(brok
                 text=("" if broken == "sign-in" else "Continue with Google")
                 + (' "https://wrong.example"' if broken == "bundle-api" else f' "{API}"'),
             )
-        if path == "/healthz":
-            return httpx.Response(500 if broken == "healthz" else 200)
+        if path in ("/health", "/healthz"):
+            return httpx.Response(500 if broken == path[1:] else 200)
         if path == "/intake":
             assert request.method == "OPTIONS" and request.headers["origin"] == WEB
             assert request.headers["access-control-request-method"] == "POST"
@@ -122,9 +122,9 @@ def test_FR_MTG_08_unsigned_checks_fail_each_boundary_and_never_send_tokens(brok
     result = load().main([API], transport=httpx.MockTransport(server))
     assert result == (0 if broken is None else 1)
     output = capsys.readouterr().out
-    assert len(output.splitlines()) == 5
-    assert ("FAIL " + broken in output) if broken else output.count("PASS ") == 5
-    assert "must-never-send" not in output and len(seen) == 5
+    assert len(output.splitlines()) == 6
+    assert ("FAIL " + broken in output) if broken else output.count("PASS ") == 6
+    assert "must-never-send" not in output and len(seen) == 6
 
 
 @pytest.mark.parametrize("asset", ["https://other.example/private.js", "//other.example/private.js"])
@@ -146,12 +146,14 @@ def test_FR_MTG_08_invalid_url_is_refused_before_http(capsys):
     assert load().main(["http://localhost"], transport=httpx.MockTransport(lambda _: pytest.fail("HTTP"))) == 1
 
 
-@pytest.mark.parametrize("variant", ["nested", "suffix", "redirect", "cap", "network"])
+@pytest.mark.parametrize("variant", ["nested", "suffix", "redirect", "cap", "asset-cap", "network"])
 def test_FR_MTG_08_asset_hardening(variant, capsys, monkeypatch):
     module = load()
     seen = []
     if variant == "cap":
         monkeypatch.setattr(module, "MAX_BYTES", 1)
+    if variant == "asset-cap":
+        monkeypatch.setattr(module, "MAX_ASSETS", 0)
 
     def server(request):
         seen.append(str(request.url))
@@ -185,3 +187,50 @@ def test_FR_MTG_08_asset_hardening(variant, capsys, monkeypatch):
     assert result == (0 if variant == "nested" else 1)
     assert "https://other.example" not in seen
     assert "private details" not in capsys.readouterr().out
+
+
+@pytest.mark.parametrize("broken", [None, "api", "sign-in", "asset"])
+def test_vite_preloads_and_large_chunk_graph_are_verified(broken, capsys):
+    seen = []
+
+    def server(request):
+        seen.append(request.url.path)
+        assert request.method in ("GET", "OPTIONS")
+        assert "authorization" not in request.headers and "cookie" not in request.headers
+        assert request.url.host in ("essential-wares-510320-f0.web.app", "tilo-api-123.asia-southeast1.run.app")
+        path = request.url.path
+        if path == "/":
+            return httpx.Response(
+                200, text='<script src="/assets/main.js"></script><link rel="modulepreload" href="/assets/preload.js">'
+            )
+        if path == "/assets/main.js":
+            return httpx.Response(200, text='["assets/chunk0.js"]')
+        if path == "/assets/preload.js":
+            return httpx.Response(200, text='"https://tilo-api-wrong-as.a.run.app"' if broken == "api" else f'"{API}"')
+        if path.startswith("/assets/chunk"):
+            index = int(path.split("chunk")[1].split(".")[0])
+            if broken == "asset" and index == 39:
+                return httpx.Response(404)
+            source = (
+                f'import("./chunk{index + 1}.js")'
+                if index < 39
+                else ('"Continue with Google"' if broken != "sign-in" else '"Sign-in is off"')
+            )
+            return httpx.Response(200, text=source)
+        if path == "/v1/plate":
+            return httpx.Response(401)
+        return httpx.Response(
+            200,
+            headers={
+                "access-control-allow-origin": WEB,
+                "access-control-allow-methods": "POST",
+                "access-control-allow-headers": "authorization,content-type,x-tilo-channel",
+            },
+        )
+
+    assert load().main([API], transport=httpx.MockTransport(server)) == (0 if broken is None else 1)
+    output = capsys.readouterr().out
+    assert "/assets/preload.js" in seen and "/assets/chunk39.js" in seen
+    assert "/assets/assets/chunk0.js" not in seen
+    if broken is None:
+        assert "PASS sign-in" in output and "PASS bundle-api" in output
