@@ -58,6 +58,8 @@ const linkNamed = (root: ParentNode, name: string): HTMLAnchorElement => {
   return a;
 };
 
+/** W10: a role, backup or removal here is this page's only: the team is a sample and nothing is stored. */
+const NOT_SAVED = "This is a sample team, so nothing was saved.";
 const NEW = "new.hire@northwind.co";
 async function invite(root: ParentNode, value: string): Promise<void> {
   await typeInto(inputNamed(root, "Invite by email"), value);
@@ -88,13 +90,15 @@ describe("WEB_10_team_invite: email, validation, pending row", () => {
     const { root } = await renderTeam(app);
     await invite(root, `  ${NEW} `);
     expect(app.toast).toHaveBeenCalledTimes(1);
-    expect(app.toast).toHaveBeenCalledWith(`Invite sent to ${NEW}`);
+    expect(app.toast).toHaveBeenCalledWith(
+      `This is a sample team, so no invite was sent to ${NEW}.`,
+    );
     expect(inputNamed(root, "Invite by email").value).toBe("");
     expect(strings(root).has("6 people")).toBe(true);
     const rows = memberRows(root);
     expect(rows, "appended after the five").toHaveLength(6);
     const [who, role, limit, helped, active] = kids(rows[5] as Element) as HTMLElement[];
-    expect(strings(who as Element)).toEqual(new Set(["?", NEW, "Invite sent · just now"]));
+    expect(strings(who as Element)).toEqual(new Set(["?", NEW, "Sample invite · not sent"]));
     const select = selectOf(role as HTMLElement);
     expect(select.getAttribute("aria-label")).toBe(`Role for ${NEW}`);
     expect(select.value, "invited as Member").toBe("Member");
@@ -111,7 +115,9 @@ describe("WEB_10_team_invite: email, validation, pending row", () => {
     await typeInto(field, NEW);
     await act(async () => press(field, "Enter"));
     await settle();
-    expect(app.toast).toHaveBeenCalledWith(`Invite sent to ${NEW}`);
+    expect(app.toast).toHaveBeenCalledWith(
+      `This is a sample team, so no invite was sent to ${NEW}.`,
+    );
     expect(memberRows(root)).toHaveLength(6);
   });
 
@@ -124,12 +130,16 @@ describe("WEB_10_team_invite: email, validation, pending row", () => {
     expect(fact(root, "SENT")).toBe("Just now · expires in 7 days");
     expect(() => buttonNamed(root, "Remove from team")).toThrow();
     await clickAndSettle(buttonNamed(root, "Resend invite"));
-    expect(app.toast).toHaveBeenLastCalledWith(`Invite sent again to ${NEW}`);
+    expect(app.toast).toHaveBeenLastCalledWith(
+      `This is a sample team, so no invite was sent again to ${NEW}.`,
+    );
     await choose(selectNamed(root, `Role for ${NEW}`), "Approver");
-    expect(app.toast).toHaveBeenLastCalledWith(`${NEW} is now an Approver`);
+    expect(app.toast).toHaveBeenLastCalledWith(
+      `${NEW} is now an Approver on this page. ${NOT_SAVED}`,
+    );
     expect(fact(root, "INVITED AS")).toBe("Approver");
     await clickAndSettle(buttonNamed(root, "Cancel invite"));
-    expect(app.toast).toHaveBeenLastCalledWith("Invite cancelled");
+    expect(app.toast).toHaveBeenLastCalledWith(`Invite cancelled on this page. ${NOT_SAVED}`);
     expect(memberRows(root)).toHaveLength(PEOPLE.length);
     expect(countText(root)).toBe(true);
   });
@@ -148,7 +158,7 @@ describe("WEB_10_team_roles: change a role", () => {
       const { root } = await renderTeam(app);
       await choose(selectNamed(root, `Role for ${name}`), role);
       expect(app.toast).toHaveBeenCalledTimes(1);
-      expect(app.toast).toHaveBeenCalledWith(`${name} is now ${phrase}`);
+      expect(app.toast).toHaveBeenCalledWith(`${name} is now ${phrase} on this page. ${NOT_SAVED}`);
       const i = PEOPLE.findIndex((p) => p.name === name);
       expect(text(kids(memberRows(root)[i] as Element)[2])).toBe(limit);
     },
@@ -184,7 +194,9 @@ describe("WEB_10_team_roles: change a role", () => {
             await choose(select, next);
             role.set(id, next);
             const article = next === "Approver" || next === "Owner" ? "an" : "a";
-            expect(app.toast).toHaveBeenLastCalledWith(`${who} is now ${article} ${next}`);
+            expect(app.toast).toHaveBeenLastCalledWith(
+              `${who} is now ${article} ${next} on this page. ${NOT_SAVED}`,
+            );
             expect(text(kids(memberRows(root)[i] as Element)[2])).toBe(LIMIT_BY_ROLE[next]);
           }
           COVERAGE.forEach((c, i) => {
@@ -267,7 +279,7 @@ describe("WEB_10_team_details: the more button", () => {
     await openMore(root, "Priya Shah");
     await clickAndSettle(buttonNamed(root, "Remove from team"));
     expect(app.toast).toHaveBeenCalledTimes(1);
-    expect(app.toast).toHaveBeenCalledWith("Priya was removed. Their worlds move to you");
+    expect(app.toast).toHaveBeenCalledWith(`Priya was removed on this page. ${NOT_SAVED}`);
     expect(strings(root).has("4 people")).toBe(true);
     expect(memberRows(root)).toHaveLength(4);
     expect(people(root)).not.toContain("Priya Shah");
@@ -285,7 +297,7 @@ describe("WEB_10_team_coverage: add a backup", () => {
     await choose(selectNamed(root, "Add a backup for Sharing outside the company"), "tr");
     expect(app.toast).toHaveBeenCalledTimes(1);
     expect(app.toast).toHaveBeenCalledWith(
-      "Tom Reyes is now a backup for sharing outside the company",
+      `Tom Reyes is now a backup for sharing outside the company on this page. ${NOT_SAVED}`,
     );
     expect(app.setPref).toHaveBeenCalledTimes(1);
     expect(app.setPref).toHaveBeenCalledWith("backup", "tr");
@@ -305,7 +317,9 @@ describe("WEB_10_team_coverage: add a backup", () => {
     const app = makeApp();
     const { root } = await renderTeam(app);
     await choose(selectNamed(root, "Add a backup for Spend up to £2,500"), "jp");
-    expect(app.toast).toHaveBeenCalledWith("Jin Park is now a backup for spend up to £2,500");
+    expect(app.toast).toHaveBeenCalledWith(
+      `Jin Park is now a backup for spend up to £2,500 on this page. ${NOT_SAVED}`,
+    );
     expect(app.setPref).not.toHaveBeenCalled();
     const [, who, wait, action] = kids(coverRows(root)[1] as Element);
     expect(strings(who as HTMLElement).has("Priya, Jin")).toBe(true);

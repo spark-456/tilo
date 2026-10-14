@@ -25,7 +25,7 @@ import os
 import re
 from collections.abc import Callable, Mapping
 from copy import deepcopy
-from typing import Any
+from typing import Any, cast
 
 from fastapi import HTTPException
 from google.cloud import firestore
@@ -410,7 +410,7 @@ def sweep_due(
     A dead instance's due entry goes out within one tick; an ambiguous attempt stays ambiguous (the outbox's retry
     state), never failed. Returns how many entries settled. A world's data.transfer and alerts are left pending: the
     tick has no world writer (BQ-ADR35-L2-3)."""
-    from tilo_connectors import Outbox, RetryPolicy  # noqa: PLC0415
+    from tilo_connectors import InMemoryOutboxStore, Outbox, RetryPolicy  # noqa: PLC0415
 
     adapters = {
         name: a for name, a in adapters.items() if not getattr(a, "needs_run", False)
@@ -422,8 +422,9 @@ def sweep_due(
     settled = 0
     for world in worlds:
         outbox = Outbox(
-            wired, dict(adapters), emit=_no_writer, clock=clock, world_id=world, retry=RetryPolicy(),
-            halted=lambda world=world: world_paused(world),
+            cast(InMemoryOutboxStore, wired), dict(adapters), emit=_no_writer, clock=clock,
+            world_id=world, retry=RetryPolicy(),
+            halted=cast(Callable[..., bool], lambda world=world: world_paused(world)),
         )  # fmt: skip
         settled += len(outbox.dispatch_due())
     return settled

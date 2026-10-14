@@ -38,12 +38,16 @@ function Frame({ source, children }: { source?: string; children?: ReactNode }) 
   );
 }
 
+/** HR-1: no calendar sync event stands behind the sample week, so the chip says so instead of "synced just now". */
+const SAMPLE_SYNC = "Sample data · no calendar sync recorded";
+
 function Ready({
   A,
   decisions,
   app,
   api,
-}: { A: Agenda; decisions: Decision[]; app: AppCtx; api: Api }) {
+  sample,
+}: { A: Agenda; decisions: Decision[]; app: AppCtx; api: Api; sample: boolean }) {
   const ui = useAgendaUi(A, decisions, app, api);
   // The boards draw one after the other, a pin per task, then the week: top to bottom, and a board that has not
   // started holds its cell in the grid, so nothing already drawn moves (WEB-MOTION-2, FR-UX-12: no long task while
@@ -60,13 +64,13 @@ function Ready({
         <div className="park-agenda-titles">
           <h1 className="park-agenda-title">Agenda</h1>
           <p className="park-agenda-lede">
-            {`${A.rules ? `${A.rules.dateLine}. ` : ""}Pins from your team and Tilo, and a week that stays in sync.`}
+            {`${A.rules ? `${A.rules.dateLine}. ` : ""}Pins from your team and Tilo, and your week${sample ? "" : " kept in sync"}.`}
           </p>
         </div>
         <div className="park-agenda-actions">
-          <div className="park-agenda-synced">
-            <span className="park-agenda-synced-tick">{icon("check", 13)}</span>
-            Google Calendar · synced just now
+          <div className="park-agenda-synced" data-testid="agenda-synced">
+            {sample ? null : <span className="park-agenda-synced-tick">{icon("check", 13)}</span>}
+            {sample ? SAMPLE_SYNC : "Google Calendar · synced just now"}
           </div>
           <Button variant="primary" icon={icon("calendar", 16)} onClick={ui.findTime}>
             Find a time
@@ -115,7 +119,13 @@ function PersonalAgendaPage({ app }: AgendaPageProps) {
       {state.data.days === null ? (
         <Plate A={state.data} />
       ) : (
-        <Ready A={state.data} decisions={state.decisions} app={app} api={api} />
+        <Ready
+          A={state.data}
+          decisions={state.decisions}
+          app={app}
+          api={api}
+          sample={state.source !== "live"}
+        />
       )}
     </Frame>
   );

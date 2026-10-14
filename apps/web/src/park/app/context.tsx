@@ -198,6 +198,9 @@ export function ParkProvider({
   );
 }
 
+/** UI-10: legacy Settings can use Park preferences before its shell cutover lands. */
+export const useHasParkProvider = (): boolean => useContext(HeldContext) !== null;
+
 function useHeld(): Held {
   const held = useContext(HeldContext);
   if (!held) throw new Error("ParkProvider is missing");

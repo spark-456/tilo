@@ -27,8 +27,8 @@ MACHINE = "E2_HIGHCPU_8"
 # Published USD0.0156/min; conservative INR100/USD, doubled for region/overhead.
 INR_PER_MINUTE = 3.2
 RESERVATION = 32 * INR_PER_MINUTE
-STOP_INR = 500
-CAP_INR = 500
+STOP_INR = 1000
+CAP_INR = 1000
 ROOTS = set(
     ".claude .github apps config contracts design design_handoff_tilo_web_app docs evals infra "
     "meet-bot packages prompts scripts services skills templates tests".split()
@@ -114,7 +114,7 @@ def write_ledger(path: Path, rows: list[dict]) -> None:
     lines = [
         "# Cloud gate spend",
         "",
-        "Test-only, E2_HIGHCPU_8, asia-southeast1. STOP/QUESTION at INR500; cap INR500.",
+        "Test-only, E2_HIGHCPU_8, asia-southeast1. STOP/QUESTION at INR1000; cap INR1000.",
         "Estimate INR3.2/min: published USD0.0156/min x INR100/USD x 2, rounded up.",
         "Source: https://cloud.google.com/build/pricing. Pending/unknown runs reserve INR102.4.",
         "Deployment .gcloudignore unchanged; only filtered, tracked source is uploaded.",
@@ -156,7 +156,7 @@ def main() -> int:
         rows = json.loads(ledger.read_text()) if ledger.exists() else []
         total = sum(row["inr"] for row in rows)
         if total >= STOP_INR or total + RESERVATION >= STOP_INR or total + RESERVATION > CAP_INR:
-            raise RuntimeError("STOP/QUESTION: INR500 spend threshold; no build submitted")
+            raise RuntimeError("STOP/QUESTION: INR1000 spend threshold; no build submitted")
         row = {
             "time": datetime.now(UTC).isoformat(),
             "ref": ref,

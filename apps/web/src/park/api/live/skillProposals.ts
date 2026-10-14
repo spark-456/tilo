@@ -1,4 +1,5 @@
 import { type HttpClient, TiloApiError } from "../../../api/http";
+import { SAMPLE_WORLD_ID } from "../../sample/sampleChoice";
 import type { SkillProposal } from "../types";
 
 export type ProposalClient = Pick<HttpClient, "getJson" | "postJson">;
@@ -8,6 +9,8 @@ export async function readProposals(
   client: ProposalClient,
   worldId: string,
 ): Promise<SkillProposal[]> {
+  // FR-AGT-15 / STARTER-1: the recorded sample has no live skill proposals.
+  if (worldId === SAMPLE_WORLD_ID) return [];
   const rows = proposalsFromList(await client.getJson(pathOf(worldId)), worldId);
   if (!rows) throw new TiloApiError("Could not read skill proposals.", 200, true);
   return rows;

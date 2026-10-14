@@ -4,11 +4,13 @@ counts and positions only."""
 
 from __future__ import annotations
 
+import asyncio
 import json
 from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
+from starlette.requests import Request
 from tilo_channels import web_push
 from tilo_channels.app import app
 from tilo_channels.push_routes import ENV_AUDIENCE, ENV_CALLER, get_sender, get_verifier
@@ -23,6 +25,31 @@ NOTICE = {
     "path": "/park/home?card=card_1",
 }
 HEADERS = {"authorization": "Bearer id-token"}
+
+
+@pytest.mark.parametrize("declared", [b"\xb2", b"\xb3", b"\xb9"])
+def test_SEC_10_W5_non_ascii_digit_content_length_never_crashes_or_bypasses_the_stream_cap(declared):
+    from fastapi import HTTPException  # noqa: PLC0415
+    from tilo_channels.push_routes import MAX_BODY_BYTES, _body  # noqa: PLC0415
+
+    async def parse(raw):
+        async def receive():
+            return {"type": "http.request", "body": raw, "more_body": False}
+
+        request = Request(
+            {"type": "http", "headers": [(b"content-type", b"application/json"), (b"content-length", declared)]},
+            receive,
+        )
+        return await _body(request)
+
+    assert asyncio.run(parse(json.dumps(_body_payload()).encode())).tag == NOTICE["tag"]
+    with pytest.raises(HTTPException) as caught:
+        asyncio.run(parse(b" " * (MAX_BODY_BYTES + 1)))
+    assert caught.value.status_code == 413
+
+
+def _body_payload():
+    return {"devices": [{"endpoint": FCM, "keys": KEYS}], **NOTICE}
 
 
 class Verifier:

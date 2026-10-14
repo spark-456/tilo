@@ -430,8 +430,8 @@ export interface AgendaPlateRow {
 /** The plate supplies summaries, not a week, event duration, attendees or board ownership. */
 export type LiveAgenda = { [K in keyof Required<Agenda>]: null } & {
   plate: {
-    today: string;
-    asOf: string;
+    today: string | null;
+    asOf: string | null;
     rows: AgendaPlateRow[];
     parked: AgendaPlateRow[];
     truncated: boolean;

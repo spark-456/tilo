@@ -10,7 +10,7 @@ import { HttpClient, type QuickIntakeResult, TiloApiError, reasonOf } from "../.
 import { rememberIntake } from "../../api/intakes";
 import { isSampleHidden, wantsSample } from "../sample/sampleChoice";
 import { API_METHODS, type Api, type ApiMethod } from "./index";
-import { agendaFromPlate } from "./live/agendaFromPlate";
+import { agendaFromPlate, emptyAgenda } from "./live/agendaFromPlate";
 import { connectorsFromList } from "./live/connectorsFromList";
 import {
   type CardFeedItem,
@@ -312,10 +312,16 @@ export function createLiveApi(options: LiveApiOptions = {}): Api {
     if (!data) throw new TiloApiError(BAD_REPLY, 200, true);
     return { data, source: "live" };
   };
-  api.getAgenda = async () => ({
-    data: agendaFromPlate(await http.getJson("/v1/plate")),
-    source: "live",
-  });
+  api.getAgenda = async () => {
+    try {
+      return { data: agendaFromPlate(await http.getJson("/v1/plate")), source: "live" };
+    } catch (error) {
+      if (error instanceof TiloApiError && error.status === 404) {
+        return { data: emptyAgenda(), source: "live" };
+      }
+      throw error;
+    }
+  };
   api.getWorlds = async (_dec, added) => {
     const items: WorldListItem[] = [];
     let cursor: string | null = null;
