@@ -101,7 +101,8 @@ def build_factory(
             if not conforms(f"common.schema.json#/$defs/{definition}", value):
                 raise _refuse()
         hook = getattr(emit, "before_publication", None)
-        if not callable(emit) or not callable(hook):
+        scoped_drafts = getattr(emit, "drafts", None)
+        if not callable(emit) or not callable(hook) or scoped_drafts is None:
             raise _refuse(503, "not_configured")
 
         def authority() -> None:
@@ -152,7 +153,7 @@ def build_factory(
         )
         return _MeetingPreview(
             check=check,
-            drafter=cast(Drafter, _StoredDrafts(drafts, check)),
+            drafter=cast(Drafter, _StoredDrafts(scoped_drafts, check)),
             reader=_NoThreads(),
             contacts=lambda uid: (),
             policy=_Policies(owner, user_id, check),

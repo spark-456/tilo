@@ -33,6 +33,9 @@ def rig():
     hook = Mock(side_effect=lambda: None)
 
     class Emit:
+        def __init__(self):
+            self.drafts = drafts
+
         def __call__(self, part):
             emitted.append(part)
 

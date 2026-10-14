@@ -17,6 +17,7 @@ from tilo_channels.drafting import DraftResult, DraftStore
 from tilo_channels.meeting_followup import MeetingFollowUp
 from tilo_contracts import Minutes
 from tilo_memory.artifacts import ArtifactError, ArtifactStore, Scope
+from tilo_memory.retention import retention_days
 from tilo_metering.flags import FlagStore
 from tilo_people.access import AccessRequest, read
 from tilo_people.errors import NotFound, VersionConflict
@@ -26,6 +27,7 @@ from tilo_providers.interfaces import ModelProvider, SafetyProvider
 from tilo_api import deps
 from tilo_api import events as parts
 from tilo_api.assistant.metering import SpendLedger
+from tilo_api.draft_firestore import FirestoreDraftStore
 from tilo_api.meeting_allowance import allowance_router
 from tilo_api.meeting_analysis_mode import _Calls, _Safety
 from tilo_api.people_limits import limits_of
@@ -44,9 +46,33 @@ class FollowupPublication:
 
     append: Callable[[dict], None]
     before_publication: Callable[[], None]
+    drafts: DraftStore | None = None
 
     def __call__(self, part: dict) -> None:
         self.append(part)
+
+
+def _draft_deadline(meeting: dict, metadata: dict, now: float) -> float:
+    """Use server retention policy and stored timestamps; never infer retention from minutes text."""
+    try:
+        until = datetime.fromisoformat(meeting["delete_minutes_after"].replace("Z", "+00:00"))
+        created = datetime.fromisoformat(metadata["created_at"].replace("Z", "+00:00"))
+        days = retention_days("artifact")
+        if (
+            until.tzinfo is None
+            or created.tzinfo is None
+            or type(days) not in (int, float)
+            or not math.isfinite(days)
+            or days <= 0
+            or created.timestamp() > now
+        ):
+            raise ValueError
+        deadline = min(until.timestamp(), created.timestamp() + days * 86400)
+        if not math.isfinite(deadline) or not math.isfinite(now) or now >= deadline:
+            raise ValueError
+        return deadline
+    except (KeyError, TypeError, AttributeError, ValueError, OverflowError):
+        raise Refusal(409, "minutes_unavailable") from None
 
 
 class _Guarded:
@@ -139,11 +165,11 @@ def draft_owner_followup(
     picks = sorted(set(recipients or []))
     scope = Scope(w.org, world_id, w.actor)
 
-    def snapshot() -> tuple[dict, dict, dict, dict, list]:
-        fresh_time()
+    def snapshot() -> tuple[dict, dict, dict, dict, list, float]:
+        current_time = fresh_time()
         m, v, _ = _mine(w, meeting_id, "read_full", GONE)
         current = store.load_world(world_id, settle=False)
-        stamp, ref, until = m.get("minutes_confirmed_by"), m.get("minutes"), m.get("delete_minutes_after")
+        stamp, ref = m.get("minutes_confirmed_by"), m.get("minutes")
         if (
             v != version
             or m.get("world_id") != world_id
@@ -155,18 +181,24 @@ def draft_owner_followup(
             or stamp["by"] != w.actor
             or stamp["at"] > w.now
             or ref is None
-            or (until is not None and w.now >= until)
         ):
             raise Refusal(409, "followup_unavailable")
         try:
             head = artifacts.head(scope, ref)
             doc = read_doc(artifacts, scope, ref)
-            if head is None or head.doc["screening"] != "clean" or doc is None or doc.get("meeting_id") != meeting_id:
+            if (
+                head is None
+                or head.doc["screening"] != "clean"
+                or head.doc["run_id"] != run_id
+                or doc is None
+                or doc.get("meeting_id") != meeting_id
+            ):
                 raise ValueError
+            deadline = _draft_deadline(m, head.doc, current_time)
             Minutes.model_validate(doc)
             if not conforms("minutes.schema.json", doc):
                 raise ValueError
-        except (ArtifactError, ValueError):
+        except (ArtifactError, KeyError, TypeError, ValueError):
             raise Refusal(409, "minutes_unavailable") from None
         directory, items, addresses = w.org_directory(), {}, {}
         item_versions, people_versions = [], []
@@ -206,8 +238,8 @@ def draft_owner_followup(
         # Fence-only version increments must not change durable retry/card identity. The complete
         # record still pins confirmation, minutes, retention and all other meeting edits.
         identity = [w.org, w.actor, world_id, run_id, meeting_id, m, ref, stamp]
-        identity += [item_versions, people_versions, picks]
-        return m, doc, items, addresses, identity
+        identity += [item_versions, people_versions, picks, [head.doc["created_at"], deadline]]
+        return m, doc, items, addresses, identity, deadline
 
     original = snapshot()
 
@@ -252,7 +284,17 @@ def draft_owner_followup(
         }
         events.append(world_id, event)
 
-    publication = FollowupPublication(emit, fence)
+    if isinstance(drafts, FirestoreDraftStore):
+        drafts = drafts.bind(
+            owner=w.actor,
+            source={
+                "org_id": w.org, "owner": w.actor, "world_id": world_id, "run_id": run_id,
+                "meeting_id": meeting_id, "minutes": original[0]["minutes"],
+                "minutes_confirmed_by": original[0]["minutes_confirmed_by"], "identity": identity,
+            },
+            expires_at=original[5], clock=fresh_time, before_publication=fence,
+        )  # fmt: skip
+    publication = FollowupPublication(emit, fence, drafts)
     ap = autopilot_factory(world_id, run_id, w.actor, publication)
     if not ap.matches_scope(world_id=world_id, run_id=run_id, owner=w.actor):
         raise Refusal(404, "not_found")
@@ -276,7 +318,7 @@ def draft_owner_followup(
         check()
         return result.response if result.outcome == "ok" else None
 
-    m, doc, items, addresses, _ = original
+    m, doc, items, addresses, _, _ = original
     followup = MeetingFollowUp(
         meetings=SimpleNamespace(get=lambda uid, key: m if uid == w.actor and key == meeting_id else None),
         minutes=SimpleNamespace(
