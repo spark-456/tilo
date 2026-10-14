@@ -8,6 +8,7 @@ import { useRemote } from "../screens/remote";
 import { findItem } from "../world/findItem";
 import { useRunLog } from "../world/runLog";
 import { useSelection } from "../world/selection";
+import { ReplayNotices } from "./ReplayNotices";
 import { ViewLink } from "./ViewLink";
 import { type Lens, inspectPath, lensPath, overviewPath } from "./routes";
 
@@ -149,6 +150,8 @@ export function LensFrame({
           )}
         </header>
         {hideTabs ? null : <SelectionBar worldId={worldId} />}
+        {/* HR-4 and HR-6 on every world screen: the stage draws its own (it knows a ?fixture= replay's speed). */}
+        {current === "stage" ? null : <ReplayNotices />}
         {children}
       </section>
     </div>

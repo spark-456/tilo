@@ -191,7 +191,11 @@ export function StageRail({
   const levels = layout && state ? levelRows(layout, state, events) : [];
   return (
     <div className="park-view-rail" data-testid="world-hud">
-      <section className="park-view-card" aria-label="Live meter" data-testid="hud-meter">
+      <section
+        className="park-view-card park-view-meter"
+        aria-label="Live meter"
+        data-testid="hud-meter"
+      >
         {events.length === 0 ? (
           <p className="park-view-note">Nothing yet. This fills in once a run starts.</p>
         ) : (

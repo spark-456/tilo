@@ -28,6 +28,12 @@ export function DeliveryView({ worldId }: { worldId: string }) {
   return (
     <LensFrame worldId={worldId} current="delivery" title="Delivery">
       <div data-testid="delivery" className="park-view-body">
+        {/* First, so the content that arrives below it moves nothing (UX-1) and the way on is above the fold. */}
+        <div className="park-view-actions">
+          <Button variant="primary" onClick={() => navigatePark("/")}>
+            New task
+          </Button>
+        </div>
         {!finished ? (
           <div className="park-view-empty" data-testid="delivery-pending">
             <h2 className="park-view-h2 park-view-empty-title">Nothing to deliver yet</h2>
@@ -59,7 +65,7 @@ export function DeliveryView({ worldId }: { worldId: string }) {
               Finished: {delivery.artifacts.length}{" "}
               {delivery.artifacts.length === 1 ? "deliverable is" : "deliverables are"} ready.
             </p>
-            <ul className="park-view-tiles">
+            <ul className="park-view-tiles park-view-tiles--stats">
               <li>
                 <span className="park-view-tilename">Time saved</span>
                 <b>
@@ -99,11 +105,6 @@ export function DeliveryView({ worldId }: { worldId: string }) {
             </p>
           </>
         ) : null}
-        <div className="park-view-actions">
-          <Button variant="primary" onClick={() => navigatePark("/")}>
-            New task
-          </Button>
-        </div>
       </div>
     </LensFrame>
   );

@@ -21,7 +21,7 @@ export function watchConsole(page: Page): string[] {
  * chips and is covered by worlds-list.spec.ts. */
 export async function expectNoDeadControls(page: Page, scope = "main") {
   const buttons = page.locator(
-    `${scope} button:not(.primary):not([data-lens-control]):not([data-pause-control]):not([data-stop-control]):not([data-assistant-control]):not([data-filter-control])`,
+    `${scope} button:not(.primary):not(.park-btn--primary):not([data-lens-control]):not([data-pause-control]):not([data-stop-control]):not([data-assistant-control]):not([data-filter-control])`,
   );
   for (let i = 0; i < (await buttons.count()); i++) {
     const b = buttons.nth(i);

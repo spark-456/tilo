@@ -50,6 +50,8 @@ async function offScale(page: import("@playwright/test").Page) {
       const own = [...el.childNodes].some((n) => n.nodeType === 3 && n.textContent?.trim());
       const control = ["INPUT", "TEXTAREA", "SELECT"].includes(el.tagName);
       if (!own && !control) continue;
+      // The page title is the Park World page's own 36 px (the handoff artboard), pinned below.
+      if (el.classList.contains("park-view-title")) continue;
       const px = Number.parseFloat(getComputedStyle(el).fontSize);
       if (!scale.includes(px)) bad.push(`${name(el)} ${px}px`);
     }
@@ -92,11 +94,11 @@ for (const [label, viewport, h1, top] of [
           )
           .first()
           .waitFor();
-        // OLD-UI-OUT-2: a Park page title is the Park design's 32 px at both widths, set by its own page header.
+        // OLD-UI-OUT-2: a Park page title is the Park World artboard's 36 px at both widths (Nunito 900, -0.8 px).
         const parkTitles = await page
           .locator(".park-view-root h1")
           .evaluateAll((els) => els.map((el) => Number.parseFloat(getComputedStyle(el).fontSize)));
-        for (const size of parkTitles) expect(size, "Park h1 size").toBe(32);
+        for (const size of parkTitles) expect(size, "Park h1 size").toBe(36);
         const titles = await page.locator("[data-testid='screen-page'] h1").evaluateAll((els) =>
           els.map((el) => ({
             size: Number.parseFloat(getComputedStyle(el).fontSize),

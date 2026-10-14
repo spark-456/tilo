@@ -51,9 +51,10 @@
   margin: 0;
   font-family: "Nunito", sans-serif;
   font-weight: 900;
-  font-size: 32px;
-  line-height: 1.1;
-  letter-spacing: -0.6px;
+  font-size: 36px;
+  line-height: 1.05;
+  letter-spacing: -0.8px;
+  text-wrap: balance;
   color: var(--ink);
 }
 [data-park] .park-view-lede {
@@ -107,7 +108,7 @@
   align-items: center;
   flex-wrap: wrap;
   gap: 8px 12px;
-  min-height: 44px;
+  min-height: 52px; /* the selected state (text and two 32 px chips) is never taller, so choosing shifts nothing */
   padding: 6px 12px;
   border: 1px solid var(--line2);
   border-radius: 14px;
@@ -287,7 +288,9 @@
 }
 [data-park] .park-view-story > li[data-selected="true"],
 [data-park] .park-view-trace > li[data-selected="true"] {
-  border: 2px solid var(--hero);
+  /* A 2 px ring drawn inside the 1 px border: choosing a row changes no row's height (CLS). */
+  border-color: var(--hero);
+  box-shadow: inset 0 0 0 1px var(--hero);
 }
 [data-park] .park-view-story > li[data-severity="blocked"] {
   border-left: 4px solid var(--red);
@@ -492,6 +495,10 @@
   flex-direction: column;
   gap: 12px;
 }
+/* The meter holds the finished run's figures before they arrive, so what fills in moves nothing below it (UX-1). */
+[data-park] .park-view-meter {
+  min-height: 176px;
+}
 [data-park] .park-view-figures {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -518,6 +525,7 @@
   display: flex;
   align-items: center;
   gap: 10px;
+  min-height: 62px; /* with the "Open the queue" chip (32 px) present or not, the card is one height */
 }
 [data-park] .park-view-count .park-view-h2 {
   flex: 1;
@@ -589,6 +597,10 @@
   width: 72px;
   height: 8px;
   accent-color: var(--hero);
+}
+/* The pause card holds its note's line before the note is there, so the note's arrival moves nothing (UX-1). */
+[data-park] .park-view-pause {
+  min-height: 100px;
 }
 [data-park] .park-view-pauserow {
   display: flex;
@@ -718,6 +730,19 @@
 [data-park] .park-needs-section {
   max-width: 760px;
 }
+/* The waiting card of the World artboard: amber-soft with an eyebrow, white decision rows, an amber answer. */
+[data-park] .park-needs-section:has(.park-needs-queue) {
+  padding: 16px;
+  border-color: var(--amberLine);
+  border-radius: 22px;
+  background: var(--amberSoft);
+}
+[data-park] .park-needs-section:has(.park-needs-queue) > .park-view-h2 {
+  font: 800 12px / 1.3 "Nunito Sans", sans-serif;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: var(--amberInk);
+}
 [data-park] .park-needs-queue {
   gap: 8px;
 }
@@ -727,9 +752,14 @@
   flex-wrap: wrap;
   gap: 8px 12px;
   padding: 12px 14px;
-  border: 1px solid var(--line2);
-  border-radius: 16px;
+  border: 0;
+  border-radius: 14px;
   background: var(--card);
+}
+[data-park] .park-needs-item .park-view-chiplink {
+  border-color: transparent;
+  background: var(--amber);
+  color: #1f1d2b;
 }
 [data-park] .park-needs-itemtext {
   display: flex;
@@ -848,6 +878,17 @@
     display: inline-flex;
     align-items: center;
     min-height: 44px;
+  }
+  [data-park] .park-view-back,
+  [data-park] .park-view-actions .park-btn {
+    min-height: 44px;
+  }
+  /* Delivery on a phone: Time saved across the top, Credits used and Deliverables two-up below it. */
+  [data-park] .park-view-tiles--stats {
+    grid-template-columns: 1fr 1fr;
+  }
+  [data-park] .park-view-tiles--stats > li:first-child {
+    grid-column: 1 / -1;
   }
 }
 [data-park] .park-view-tab {

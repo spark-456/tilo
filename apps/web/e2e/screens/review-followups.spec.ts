@@ -1,6 +1,7 @@
 // Frontend follow-ups from the AGW-01/AGW-08 reviews (PRs #129 to #143) and issue #43: the HR-6
 // badge (words, status region, clamped value, no overlap), Not found for unknown addresses, focus,
-// 44 px mobile targets, the S-12 tiles and the right rail on screens that show the run.
+// 44 px mobile targets and the S-12 tiles. OLD-UI-OUT-2: the lenses are Park pages, so the old right rail's
+// "describes the same run" tests are gone with the rail (the Park pages carry their own run notices, HR-4/HR-6).
 import AxeBuilder from "@axe-core/playwright";
 import { type Locator, type Page, expect, test } from "@playwright/test";
 import { watchConsole } from "../support/screens";
@@ -20,6 +21,7 @@ const overlaps = (a: Box, b: Box): boolean =>
   a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
 
 async function axeBestPractice(page: Page) {
+  await expect(page.locator(".park-shell__boot")).toHaveCount(0); // the splash is gone before axe reads the page
   const axe = await new AxeBuilder({ page })
     .withTags(["wcag2a", "wcag2aa", "wcag22aa", "best-practice"])
     .analyze();
@@ -123,7 +125,7 @@ for (const path of [...UNKNOWN_WORLDS, ...EXTRA_SEGMENTS]) {
 
 test("HR_1 Not found offers the way back, and the known world still works", async ({ page }) => {
   await page.goto("/world/nope/story");
-  await page.getByRole("link", { name: "Back to Start" }).click();
+  await page.getByRole("link", { name: "Back to Home" }).click();
   // WEB-CUTOVER: the way back is "/", the Park Home (S-01 is replaced).
   await expect(page).toHaveURL(/\/$/);
   await expect(page.getByRole("heading", { level: 1 })).toHaveText(/^Good \w+, Alex\.$/);
@@ -154,11 +156,13 @@ test("PRD-17.5 Escape closes the mobile HUD sheet and focus returns to its summa
   await page.goto(`${W}/stage${FAST}`);
   const summary = page.getByText("World status");
   await summary.click();
-  const inside = page.locator("details.hud-sheet a").first();
+  const inside = page
+    .locator("details.park-view-sheet-hud button, details.park-view-sheet-hud a")
+    .first();
   await inside.focus();
   await expect(inside).toBeFocused();
   await page.keyboard.press("Escape");
-  await expect(page.locator("details.hud-sheet")).not.toHaveAttribute("open", "");
+  await expect(page.locator("details.park-view-sheet-hud")).not.toHaveAttribute("open", "");
   await expect(summary).toBeFocused();
 });
 
@@ -171,22 +175,21 @@ test("PRD-17.5 the World lens takes focus on its h1 after lens navigation, like 
   await expect(page.getByRole("heading", { level: 1, name: "World" })).toBeFocused();
   await page.getByRole("navigation", { name: "Lens" }).getByRole("link", { name: "Trace" }).click();
   await expect(page.getByRole("heading", { level: 1, name: "Trace" })).toBeFocused();
-  await page
-    .getByRole("navigation", { name: "Primary" })
-    .getByRole("link", { name: "World" })
-    .click();
+  await page.getByRole("navigation", { name: "Lens" }).getByRole("link", { name: "World" }).click();
   await expect(page.getByRole("heading", { level: 1, name: "World" })).toBeFocused();
 });
 
 // ---- 44 px mobile targets, S-12 tiles --------------------------------------------------------
 
-test("PRD-17.5 S-11 Open record is a 44 px target at 390", async ({ page }) => {
+test("PRD-17.5 S-11 every selection control in the Trace is a 44 px target at 390", async ({
+  page,
+}) => {
   await page.setViewportSize(MOBILE);
   await page.goto(`${W}/trace${FAST}`);
   await expect(page.getByTestId("trace-lens-row")).toHaveCount(44, { timeout: 15_000 });
-  const buttons = page.getByRole("button", { name: /Open record/ });
-  expect(await buttons.count()).toBeGreaterThan(0);
-  for (const b of await buttons.all()) {
+  const controls = page.locator("[data-testid=trace-lens] [data-lens-control]");
+  expect(await controls.count()).toBeGreaterThan(0);
+  for (const b of await controls.all()) {
     const { width, height } = await box(b);
     expect(height).toBeGreaterThanOrEqual(44);
     expect(width).toBeGreaterThanOrEqual(44);
@@ -201,8 +204,8 @@ test("PRD-17.5 S-05 Back to the world is a 44 px target at 390 and 24 px on desk
     [DESKTOP, 24],
   ] as const) {
     await page.setViewportSize(viewport);
-    await page.goto(`${W}/inspect/B1`);
-    const link = page.getByRole("link", { name: "Back to the world" });
+    await page.goto(`${W}/inspect/B1${FAST}`);
+    const link = page.locator(".park-view-back");
     await expect(link).toBeVisible();
     const { width, height } = await box(link);
     expect(height).toBeGreaterThanOrEqual(min);
@@ -219,76 +222,23 @@ for (const viewport of [MOBILE, NARROW]) {
     await page.goto(`${W}/delivery${FAST}`);
     const delivery = page.getByTestId("delivery");
     await expect(delivery).toContainText("Finished", { timeout: 15_000 });
-    const actions = delivery.locator(".action-row button");
-    expect(await actions.count()).toBe(5);
-    for (const a of await actions.all()) {
-      const { width, height } = await box(a);
-      expect(height).toBeGreaterThanOrEqual(44);
-      expect(width).toBeGreaterThanOrEqual(44);
+    // The way on is a 44 px target; the three tiles all fit the width.
+    const primary = await box(page.locator(".park-view-root .park-btn--primary"));
+    expect(primary.height).toBeGreaterThanOrEqual(44);
+    expect(primary.width).toBeGreaterThanOrEqual(44);
+    for (const name of ["Time saved", "Credits used", "Deliverables"]) {
+      const tile = await box(delivery.locator("li", { hasText: name }).first());
+      expect(tile.x, name).toBeGreaterThanOrEqual(0);
+      expect(tile.x + tile.width, name).toBeLessThanOrEqual(viewport.width);
     }
-    // Time saved across the top, Credits used and Deliverables two-up below it.
-    const time = await box(delivery.locator("li", { hasText: "Time saved" }));
-    const credits = await box(delivery.locator("li", { hasText: "Credits used" }));
-    const count = await box(delivery.locator("li", { hasText: "Deliverables" }).first());
-    expect(credits.y).toBeGreaterThanOrEqual(time.y + time.height - 1);
-    expect(Math.abs(credits.y - count.y)).toBeLessThanOrEqual(1);
-    expect(time.width).toBeGreaterThanOrEqual(viewport.width - 64);
-    expect(credits.width).toBeGreaterThanOrEqual(viewport.width / 2 - 40);
     // The estimate link is a 44 px target and fits on one line.
     const link = await box(delivery.getByRole("link", { name: "How we estimate" }));
     expect(link.height).toBeGreaterThanOrEqual(44);
     expect(link.width).toBeGreaterThanOrEqual(44);
-    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
-      viewport.width,
+    // The page's own column fits the width (the shell's city backdrop is decoration and is clipped).
+    const column = await page.evaluate(
+      () => document.querySelector(".park-view-root")?.scrollWidth ?? 0,
     );
+    expect(column).toBeLessThanOrEqual(viewport.width);
   });
 }
-
-// ---- Right rail on screens that show the run --------------------------------------------------
-
-const RUN_PAGES = [
-  "/library",
-  "/worlds/replays",
-  "/autonomy",
-  "/channels",
-  "/mail",
-  "/team/console",
-  "/connections",
-  "/library/artifacts",
-  "/estimate",
-];
-for (const path of RUN_PAGES) {
-  test(`UX_1 ${path} right rail describes the same run as the page, never "Nothing yet" while it shows one`, async ({
-    page,
-  }) => {
-    await page.setViewportSize(DESKTOP);
-    await page.addInitScript(() => {
-      const w = window as unknown as { __shifts: number[] };
-      w.__shifts = [];
-      new PerformanceObserver((list) => {
-        for (const entry of list.getEntries())
-          w.__shifts.push((entry as unknown as { value: number }).value);
-      }).observe({ type: "layout-shift", buffered: true });
-    });
-    await page.goto(`${path}${FAST}`);
-    const rail = page.getByTestId("right-rail");
-    await expect(rail).toContainText("credits of 40 approved", { timeout: 20_000 });
-    await expect(rail).toContainText("Done");
-    await expect(rail).not.toContainText("Nothing yet");
-    await expect(rail).not.toContainText("No agents assigned");
-    await page.waitForTimeout(300);
-    const shifts = await page.evaluate(
-      () => (window as unknown as { __shifts: number[] }).__shifts,
-    );
-    expect(shifts).toEqual([]);
-  });
-}
-
-test("UX_1 screens that show no run keep the honest empty rail", async ({ page }) => {
-  await page.setViewportSize(DESKTOP);
-  // WEB-CUTOVER: "/" is the Park Home; S-02 is the old shell's start of the flow, with no run on screen.
-  for (const path of ["/task/task_fixture_1/understanding", "/more", "/needs-you"]) {
-    await page.goto(path);
-    await expect(page.getByTestId("right-rail")).toContainText("Nothing yet");
-  }
-});

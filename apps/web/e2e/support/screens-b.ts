@@ -36,7 +36,10 @@ export async function expectTypeScale(page: Page) {
     const used = new Set<number>();
     for (const el of root.querySelectorAll<HTMLElement>("*")) {
       const own = [...el.childNodes].some((n) => n.nodeType === 3 && n.textContent?.trim());
-      if (own) used.add(Number.parseFloat(getComputedStyle(el).fontSize));
+      // The Park page title is the World artboard's own 36 px, ranked against the sections below (h1 > h2).
+      if (own && !el.classList.contains("park-view-title")) {
+        used.add(Number.parseFloat(getComputedStyle(el).fontSize));
+      }
     }
     const px = (sel: string) => {
       const el = root.querySelector(sel);

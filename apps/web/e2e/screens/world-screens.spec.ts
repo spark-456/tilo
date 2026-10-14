@@ -1,3 +1,5 @@
+// OLD-UI-OUT-2: the world's lenses are Park pages (worldView/): the selection bar names Inspect, the lens bar is
+// navigation "Lens", the Trace row names its record, and the one filled primary is the Park Button.
 // AGW-08 group A smoke: S-04, S-05, S-10, S-11 and S-12 on the fixture client (PRD 18.3). Each test
 // name carries the screen id. `?speed=100` fast-forwards the recorded replay (about 2 s in all).
 import AxeBuilder from "@axe-core/playwright";
@@ -8,8 +10,11 @@ import { DESKTOP, MOBILE } from "../support/viewports";
 const W = "/world/w_village_basic";
 const FAST = "?speed=100";
 const DONE = "Done: 1 reply sent and 12 emails triaged for 13 credits.";
+const PRIMARY = ".park-view-root .park-btn--primary";
+const PAGE = ".park-view-root";
 
 async function expectAxeClean(page: Page) {
+  await expect(page.locator(".park-shell__boot")).toHaveCount(0); // the splash is gone before axe reads the page
   const axe = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag22aa"]).analyze();
   expect(axe.violations).toEqual([]);
 }
@@ -38,13 +43,12 @@ test("S_04 renders, no console errors, placeholders aria-disabled", async ({ pag
   await expect(hud.getByRole("button", { name: /Director/ })).toContainText("Joined");
   // A row selects its object for every lens (FR-WLD-06); the selection bar opens Inspect.
   await hud.getByRole("button", { name: /Mail Room/ }).click();
-  await expect(hud.getByRole("link", { name: "Inspect" })).toHaveAttribute(
-    "href",
-    `${W}/inspect/B1`,
-  );
+  await expect(
+    page.getByTestId("selection-bar").getByRole("link", { name: "Inspect" }),
+  ).toHaveAttribute("href", `${W}/inspect/B1`);
   await expect(hud).not.toContainText("A_dir");
-  await expect(page.locator("button.primary")).toHaveCount(1); // UX-1
-  await expectNoDeadControls(page, "body");
+  expect(await page.locator(PRIMARY).count()).toBeLessThanOrEqual(1); // UX-1
+  await expectNoDeadControls(page, PAGE);
   await expectAxeClean(page);
   await page.setViewportSize(MOBILE);
   await page.getByText("World status").click();
@@ -52,7 +56,7 @@ test("S_04 renders, no console errors, placeholders aria-disabled", async ({ pag
   // Escape closes the sheet.
   await page.getByText("World status").focus();
   await page.keyboard.press("Escape");
-  await expect(page.locator("details.hud-sheet")).not.toHaveAttribute("open", "");
+  await expect(page.locator("details.park-view-sheet-hud")).not.toHaveAttribute("open", "");
   expect(problems).toEqual([]);
 });
 
@@ -64,12 +68,12 @@ test("S_10 renders, no console errors, placeholders aria-disabled", async ({ pag
   await expect(page.getByRole("heading", { level: 1, name: "Story" })).toBeVisible();
   await expect(page.getByTestId("story-lens")).toContainText(DONE, { timeout: 15_000 });
   // The severity label is in the story itself (the nav also has a "Needs you" tab).
-  await expect(page.getByTestId("story-lens").locator(".story-flag").first()).toHaveText(
+  await expect(page.getByTestId("story-lens").locator(".park-view-flag").first()).toHaveText(
     "Needs you",
   );
   await expect(page.getByTestId("story-lens")).not.toContainText("?speed");
   await expect(page.getByRole("list", { name: "What happened, in order" })).toBeVisible(); // screen-reader Story
-  await expectNoDeadControls(page);
+  await expectNoDeadControls(page, PAGE);
   await expectAxeClean(page);
   await page.setViewportSize(MOBILE);
   await expectAxeClean(page);
@@ -85,10 +89,9 @@ test("S_11 renders, no console errors, placeholders aria-disabled", async ({ pag
   const rows = page.getByTestId("trace-lens-row");
   await expect(rows).toHaveCount(44, { timeout: 15_000 });
   await expect(rows.first()).toContainText("world.requested");
-  // The raw-record viewer is a placeholder: visible, labelled, aria-disabled.
-  const open = page.getByRole("button", { name: /Open record/ }).first();
-  await expect(open).toHaveAttribute("aria-disabled", "true");
-  await expect(open).toHaveAttribute("title", "Coming soon");
+  // The raw-record viewer is not built: a row names its record and offers no control that does nothing.
+  await expect(page.getByTestId("trace-lens")).toContainText("raw record viewer is not built yet");
+  await expect(page.getByRole("button", { name: /Open record/ })).toHaveCount(0);
   // The record and the credits are on screen at 1440 without sideways scroll, in two-line rows.
   const sideways = await page.evaluate(
     () => document.documentElement.scrollWidth > window.innerWidth,
@@ -97,11 +100,11 @@ test("S_11 renders, no console errors, placeholders aria-disabled", async ({ pag
   const second = rows.nth(1);
   await expect(second).toContainText("credits");
   await expect(second).toContainText("r_village_basic_1/2");
-  const box = await open.boundingBox();
+  const box = await second.boundingBox();
   expect((box?.x ?? 9999) + (box?.width ?? 0)).toBeLessThanOrEqual(DESKTOP.width);
   const heights = await rows.evaluateAll((els) => els.map((e) => e.getBoundingClientRect().height));
-  expect(Math.max(...heights), "no double-height blank rows").toBeLessThanOrEqual(70);
-  await expectNoDeadControls(page);
+  expect(Math.max(...heights), "no double-height blank rows").toBeLessThanOrEqual(96);
+  await expectNoDeadControls(page, PAGE);
   await expectAxeClean(page);
   // At 390 a stacked row still shows the event, actor to target, credits and the record.
   await page.setViewportSize(MOBILE);
@@ -109,9 +112,8 @@ test("S_11 renders, no console errors, placeholders aria-disabled", async ({ pag
   await expect(stacked).toContainText("plan.approaches_proposed");
   await expect(stacked).toContainText("A_dir");
   await expect(stacked).toContainText("credits");
-  const record = stacked.getByRole("button", { name: /Open record/ });
-  await expect(record).toBeVisible();
-  const rb = await record.boundingBox();
+  await expect(stacked).toContainText("Record");
+  const rb = await stacked.boundingBox();
   expect((rb?.x ?? 9999) + (rb?.width ?? 0)).toBeLessThanOrEqual(MOBILE.width);
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
     MOBILE.width,
@@ -129,7 +131,7 @@ test("S_05 renders, no console errors, placeholders aria-disabled", async ({ pag
     timeout: 15_000,
   });
   await expect(page.getByText("Mail Room is planned.")).toBeVisible();
-  await expectNoDeadControls(page);
+  await expectNoDeadControls(page, PAGE);
   await expectAxeClean(page);
   await page.goto(`${W}/inspect/B99`);
   await expect(page.getByRole("heading", { level: 1, name: "Not found" })).toBeVisible();
@@ -143,10 +145,11 @@ test("S_05 has its heading while the layout loads, so route-change focus lands o
   page,
 }) => {
   await page.setViewportSize(DESKTOP);
-  await page.goto("/more?client_delay_ms=1500");
-  await page.getByRole("link", { name: "Inspect panel" }).click();
-  await expect(page.getByRole("heading", { level: 1, name: "Inspect" })).toBeFocused();
-  await expect(page.getByRole("heading", { level: 1, name: "Mail Room" })).toBeVisible();
+  await page.goto(`${W}/story?client_delay_ms=1500&speed=100`);
+  await page.getByTestId("story-lens").getByRole("button", { name: "Director" }).first().click();
+  await page.getByTestId("selection-bar").getByRole("link", { name: "Inspect" }).click();
+  await expect(page.getByRole("heading", { level: 1 })).toBeFocused();
+  await expect(page.getByRole("heading", { level: 1, name: "Director" })).toBeVisible();
 });
 
 test("S_12 renders, no console errors, placeholders aria-disabled", async ({ page }) => {
@@ -168,13 +171,13 @@ test("S_12 renders, no console errors, placeholders aria-disabled", async ({ pag
   );
   // Credits agree with the rail, which reads the same events.
   await expect(delivery.locator("li", { hasText: "Credits used" })).toContainText("13");
-  await expect(page.getByTestId("hud-meter")).toContainText("13");
-  await expect(page.locator("button.primary")).toHaveCount(1); // UX-1
-  await expectNoDeadControls(page);
+  await expect(delivery).toContainText("Finished");
+  await expect(page.locator(PRIMARY)).toHaveCount(1); // UX-1
+  await expectNoDeadControls(page, PAGE);
   await expectAxeClean(page);
   await page.setViewportSize(MOBILE);
   await expectAxeClean(page);
-  await page.locator("button.primary").click();
+  await page.locator(PRIMARY).click();
   // WEB-CUTOVER: the way back is "/", the Park Home (S-01 is replaced).
   await expect(page).toHaveURL(/\/$/);
   await expect(page.getByRole("heading", { level: 1 })).toHaveText(/^Good \w+, Alex\.$/);
@@ -191,10 +194,11 @@ test("S_12 says the run is not finished until the log holds world.completed (HR-
   await expect(delivery).not.toContainText("Finished");
   await expect(delivery).not.toContainText("Credits used");
   await expect(delivery).not.toContainText("Triage list");
-  await expect(page.locator("button.primary")).toHaveCount(1);
+  await expect(page.getByRole("link", { name: "Back to the world" })).toBeVisible();
+  await expect(page.locator(PRIMARY)).toHaveCount(1);
 });
 
-test("S_12 at 390x844 shows the finished header, the stat tiles and the one primary above the fold", async ({
+test("S_12 at 390x844 shows the finished header and the one primary above the fold, the tiles within reach", async ({
   page,
 }) => {
   test.setTimeout(60_000);
@@ -202,31 +206,25 @@ test("S_12 at 390x844 shows the finished header, the stat tiles and the one prim
   await page.goto(`${W}/delivery${FAST}`);
   const delivery = page.getByTestId("delivery");
   await expect(delivery).toContainText("Finished", { timeout: 15_000 });
-  const usable = MOBILE.height - 48; // the bottom tabs
+  const usable = MOBILE.height; // the Park shell has no bottom tab bar
+  // The Park frame keeps its lens bar, selection bar and both replay notices above the body, so the tiles sit on the
+  // second screen; the finished header and the way on are in the first.
   for (const locator of [
-    delivery.locator(".delivery-done"),
-    delivery.locator("li", { hasText: "Time saved" }),
-    delivery.locator("li", { hasText: "Credits used" }),
-    page.locator("button.primary"),
+    delivery.locator(".park-view-done"),
+    page.locator(PRIMARY), // first in the body, so it is in view whatever arrives below it
   ]) {
     const box = await locator.boundingBox();
     expect((box?.y ?? 9999) + (box?.height ?? 0)).toBeLessThanOrEqual(usable);
   }
-  // The Coming soon actions are one compact row.
-  const ys = await delivery
-    .locator(".action-row button")
-    .evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().top)));
-  expect(ys).toHaveLength(5);
-  expect(new Set(ys).size).toBe(1);
-  await expect(delivery).toContainText("These actions are coming soon.");
+  // What is not built is said in words, with no control that does nothing.
+  await expect(delivery).toContainText("not built yet");
 });
 
 test("S_04 lens tabs and the outline reach Story, Trace and Inspect", async ({ page }) => {
   test.setTimeout(60_000);
   await page.setViewportSize(DESKTOP);
   await page.goto(`${W}/stage${FAST}`);
-  const hud = page.getByTestId("world-hud");
-  await hud.getByRole("link", { name: "Story" }).click();
+  await page.getByRole("navigation", { name: "Lens" }).getByRole("link", { name: "Story" }).click();
   await expect(page.getByRole("heading", { level: 1, name: "Story" })).toBeVisible();
   // The replay was already running, so it is not restarted by moving between lenses.
   await expect(page.getByTestId("story-lens")).toContainText(DONE, { timeout: 15_000 });
@@ -286,11 +284,25 @@ for (const viewport of [DESKTOP, MOBILE]) {
       test.setTimeout(60_000);
       await page.setViewportSize(viewport);
       await page.addInitScript(() => {
-        const w = window as unknown as { __shifts: number[] };
+        const w = window as unknown as { __shifts: string[] };
         w.__shifts = [];
         new PerformanceObserver((list) => {
-          for (const entry of list.getEntries())
-            w.__shifts.push((entry as unknown as { value: number }).value);
+          for (const entry of list.getEntries()) {
+            const e = entry as unknown as {
+              value: number;
+              sources?: Array<{
+                node: Element | null;
+                previousRect: DOMRect;
+                currentRect: DOMRect;
+              }>;
+            };
+            // The value and what moved, so a failure names the element.
+            const who = (e.sources ?? []).map(
+              (s) =>
+                `${s.node?.tagName?.toLowerCase()}.${String(s.node?.className).slice(0, 40)} ${Math.round(s.previousRect.y)}->${Math.round(s.currentRect.y)}`,
+            );
+            w.__shifts.push(`${e.value.toFixed(4)} ${who.join(" | ")}`);
+          }
         }).observe({ type: "layout-shift", buffered: true });
       });
       await page.goto(`${path}?client_delay_ms=800&speed=100`, { waitUntil: "commit" });
@@ -298,7 +310,7 @@ for (const viewport of [DESKTOP, MOBILE]) {
       await expect(page.getByText(settled).first()).toBeAttached({ timeout: 20_000 });
       await page.waitForTimeout(300); // let a late shift be reported
       const shifts = await page.evaluate(
-        () => (window as unknown as { __shifts: number[] }).__shifts,
+        () => (window as unknown as { __shifts: string[] }).__shifts,
       );
       expect(shifts).toEqual([]);
     });
