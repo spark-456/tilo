@@ -36,6 +36,7 @@ export function MorePage({ app }: { app: AppCtx }) {
           ))}
           {links.map(([label, page, focus]) => (
             <Button
+              variant="secondary"
               key={label}
               onClick={() =>
                 app.go(page, {
