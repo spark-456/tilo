@@ -3,7 +3,8 @@ vault and the T3 pin. Variant P: tilo-api never stores or returns a key.
 
 No network, no model, no cloud, no real key: a fake key is assembled at runtime (CLAUDE.md), the vault is the
 in-memory one, the stores are in memory and the clock is fixed. With the flag off (`config/byok.yaml` `enabled:
-false`, the shipped value) every route answers 503 `not_configured` and nothing is read or written."""
+false`, the shipped value) signed-in callers receive 503 `not_configured` and nothing is read or written.
+Anonymous callers always receive 401 before the flag or request body is consulted (SEC-05)."""
 
 from __future__ import annotations
 
@@ -16,6 +17,7 @@ from typing import Any
 
 import pytest
 import yaml
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from tilo_api import app, byok_routes, deps
 from tilo_api.byok_store import MemoryModelKeyVault, OrgKeyStore
@@ -112,12 +114,37 @@ def test_BK_12_shipped_flag_is_off_and_every_route_answers_not_configured(monkey
     assert rig.store.get(ORG) is None and rig.store.audit_entries(ORG) == [] and rig.vault.versions(ORG) == {}
 
 
-def test_BK_12_flag_off_does_not_consult_the_principal_the_directory_or_the_body(
+def test_BK_12_flag_off_does_not_consult_the_directory_or_the_body(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     rig = Rig(monkeypatch, config=ByokConfig())
     rig.user, rig.full = STRANGER, False
     assert rig.client.put(PATH, content=b"{not json", headers={"content-type": "text/plain"}).status_code == 503
+
+
+@pytest.mark.parametrize("method", ["GET", "PUT", "PATCH", "DELETE"])
+@pytest.mark.parametrize("enabled", [False, True])
+def test_W_SEC05_anonymous_byok_is_401_before_flag_directory_or_body(
+    monkeypatch: pytest.MonkeyPatch,
+    method: str,
+    enabled: bool,
+) -> None:
+    rig = Rig(monkeypatch, config=CFG if enabled else ByokConfig())
+    app.dependency_overrides.pop(deps.get_current_principal)
+
+    def forbidden_read() -> Any:
+        pytest.fail("anonymous BYOK must not read config, directory or body")
+
+    app.dependency_overrides[byok_routes.get_byok_config] = forbidden_read
+    app.dependency_overrides[deps.get_people_stores] = forbidden_read
+    monkeypatch.setattr(byok_routes, "_capped_body", forbidden_read)
+    # Isolate route dependencies: middleware must not mask their authentication ordering.
+    isolated = FastAPI()
+    isolated.include_router(byok_routes.router)
+    isolated.dependency_overrides.update(app.dependency_overrides)
+    got = TestClient(isolated).request(method, PATH, content=b"{not json", headers={"content-type": "application/json"})
+    assert got.status_code == 401
+    assert rig.store.get(ORG) is None and rig.store.audit_entries(ORG) == [] and rig.vault.versions(ORG) == {}
 
 
 def test_BK_12_the_flag_default_is_off_when_the_config_cannot_be_read(monkeypatch: pytest.MonkeyPatch) -> None:

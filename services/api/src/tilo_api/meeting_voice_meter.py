@@ -7,7 +7,8 @@ reply and nothing else (closed schema, 2 KiB): the uid and org come from the att
 the amount is `unit_reserve_minor`, and what a reply is booked at is priced here from config and never above that one
 unit (K = 1, MV-15). Anything but 200 `live` is the local voice. Deterministic code; no event, no outbox, no model.
 
-INERT until the user answers BQ-M2-5: `TILO_VOICE_METER` unset (or not "1") is a plain 404, nothing read."""
+INERT until the user answers BQ-M2-5: after bearer syntax is checked, `TILO_VOICE_METER` unset (or not "1") is a
+plain 404, no body read."""
 
 from __future__ import annotations
 
@@ -158,13 +159,13 @@ def _seam(request: Request, fn: Callable[[], Any]) -> Any:
 
 
 async def _serve(request: Request, route: str) -> JSONResponse:
+    if (token := _bearer(request)) is None:
+        return _error(401, "unauthenticated", route)
     if not meeting_voice_claims.enabled():  # the default: as if the route did not exist
         return JSONResponse({"detail": "Not Found"}, status_code=404)
     if (pins := _pins()) is None:
         return _error(503, "not_configured", route)
     audience, caller = pins
-    if (token := _bearer(request)) is None:
-        return _error(401, "unauthenticated", route)
     try:
         claims = await run_in_threadpool(_seam(request, schedules.get_oidc_verifier).verify, token, audience)
     except Exception as exc:  # bad signature, expiry, audience or a verifier outage: the type only, never the text
