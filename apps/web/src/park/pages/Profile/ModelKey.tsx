@@ -2,9 +2,9 @@
 // the org's spend is. The org owner adds, replaces or removes the one key; every member reads only where work goes
 // (BK-20). Honest states: off in this build (503 `not_configured`, while `config/byok.yaml` has `enabled: false`: the
 // form is shown disabled), loading, failed with retry, signed out, not the owner, a demo needing a real sign-in.
-// "Saved" shows only after the live answer and a re-read (`api/modelKey.ts`). The key lives in one controlled field,
+// "Saved" shows only after the live answer and a re-read (`api/modelKey.ts`). The key lives in one uncontrolled field,
 // is cleared at the click, is never stored, put in a URL, logged or shown, and the server's own text is never shown.
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type {
   ModelKeyFlow,
   ModelKeyProblem,
@@ -83,7 +83,8 @@ function Body({ flow }: { flow: ModelKeyFlow }) {
   const [remote, setRemote] = useState<Remote>({ kind: "loading" });
   const [attempt, setAttempt] = useState(0);
   const [bundle, setBundle] = useState("");
-  const [key, setKey] = useState("");
+  const keyField = useRef<HTMLInputElement>(null);
+  const [hasKey, setHasKey] = useState(false);
   const [project, setProject] = useState("");
   const [cap, setCap] = useState("");
   const [fallback, setFallback] = useState(false);
@@ -149,7 +150,7 @@ function Body({ flow }: { flow: ModelKeyFlow }) {
     !stale &&
     agreed &&
     bundle.trim() !== "" &&
-    (key !== "") !== (project.trim() !== "") &&
+    hasKey !== (project.trim() !== "") &&
     Number.isInteger(days) &&
     days >= 1 &&
     !busy;
@@ -165,8 +166,9 @@ function Body({ flow }: { flow: ModelKeyFlow }) {
   };
   const save = async () => {
     if (!ready || !view) return;
-    const typed = key;
-    setKey(""); // gone from the field at the click, whatever the answer
+    const typed = keyField.current?.value ?? "";
+    if (keyField.current) keyField.current.value = "";
+    setHasKey(false); // gone from the field at the click, whatever the answer
     setBusy(true);
     setProblem(null);
     setDone(null);
@@ -256,15 +258,20 @@ function Body({ flow }: { flow: ModelKeyFlow }) {
                   className="park-profile-input park-profile-secret"
                   type="text"
                   name="provider-api-token"
-                  value={key}
+                  ref={keyField}
                   autoComplete="off"
+                  autoCorrect="off"
                   autoCapitalize="off"
                   spellCheck={false}
                   data-1p-ignore
                   data-lpignore="true"
                   data-bwignore="true"
                   data-form-type="other"
-                  onChange={(e) => setKey(e.target.value)}
+                  data-gramm="false"
+                  data-gramm_editor="false"
+                  data-enable-grammarly="false"
+                  data-lt-active="false"
+                  onChange={(e) => setHasKey(e.target.value !== "")}
                 />
                 <span className="park-profile-help">
                   Sent once and kept in Tilo's vault. It is never shown again.

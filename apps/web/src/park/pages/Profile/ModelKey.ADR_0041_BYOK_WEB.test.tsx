@@ -180,6 +180,43 @@ describe("ADR-0041 BQ-BYOK-WEB-1 states", () => {
 });
 
 describe("ADR-0041 BQ-BYOK-WEB-1 the key never lingers", () => {
+  it("ADR_0041_R34_1_typed_key_never_enters_serialized_DOM_even_after_form_updates", async () => {
+    const { flow, calls } = fake({ get: [NONE] });
+    const m = mount(<ModelKeyControl flow={flow} demo={false} />);
+    await settle();
+    const field = q<HTMLInputElement>(m.container, '[name="provider-api-token"]');
+    type(field, KEY);
+    expect(field.value).toBe(KEY);
+    expect(m.container.innerHTML).not.toContain(KEY);
+    expect(field.hasAttribute("value")).toBe(false);
+    fillAndAgree(m.container);
+    expect(button(m.container, "Save key").disabled).toBe(false);
+    expect(m.container.innerHTML).not.toContain(KEY);
+    expect(field.hasAttribute("value")).toBe(false);
+    type(field, "");
+    expect(button(m.container, "Save key").disabled).toBe(true);
+    expect(calls).toEqual([{ method: "GET", path: "/v1/org/model-key" }]);
+  });
+
+  it("ADR_0041_R34_1_key_field_opts_out_of_correction_and_grammar_extensions", async () => {
+    const { flow } = fake({ get: [NONE] });
+    const m = mount(<ModelKeyControl flow={flow} demo={false} />);
+    await settle();
+    const field = q<HTMLInputElement>(m.container, '[name="provider-api-token"]');
+    for (const name of ["autocorrect", "autocapitalize"]) {
+      expect(field.getAttribute(name)).toBe("off");
+    }
+    for (const name of [
+      "spellcheck",
+      "data-gramm",
+      "data-gramm_editor",
+      "data-enable-grammarly",
+      "data-lt-active",
+    ]) {
+      expect(field.getAttribute(name)).toBe("false");
+    }
+  });
+
   it("BYOK_WEB_ADR_0041_B5_the_key_field_is_a_masked_text_field_never_a_password_field", async () => {
     // SEC-REVIEW-29 B5, PRD 16.1 rule 1 (no password fields anywhere in Tilo): a password-typed field in a form is
     // what a browser's password manager offers to save, and `autocomplete="off"` is commonly ignored there.
