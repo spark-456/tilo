@@ -60,7 +60,7 @@ from tilo_providers.clock import Clock, parse_deadline, real_today
 from tilo_harness.branch import Checkpoint, hit_summary, reusable_units
 from tilo_harness.config import AgentsConfig
 from tilo_harness.context_handoff import context_pct, next_spare, note_is_valid, store_note
-from tilo_harness.must_ask import Ask, MustAsk
+from tilo_harness.must_ask import Ask, Assumption, MustAsk
 from tilo_harness.outputs import Kept, UnitOutput, existing, keep
 from tilo_harness.question_wait import Answer, QuestionWait
 from tilo_harness.schedule_dates import WindowFail, date_window_fail
@@ -362,8 +362,17 @@ class _Run:
             "agent.assigned", lead, worker, "The Lead gave it a unit.", {"unit": unit_id}, cause=cause, **at
         )
         answer: Answer | None = None
+        intake_answers = self.intake_answers
         if self.must_ask is not None:
             ask = await self.must_ask.assess(unit)  # no failure count yet: retries arrive with FR-AGT-13
+            if isinstance(ask, Assumption):
+                # BQ-ASSUME-1: a model-raised ambiguity or trade-off does not stop the run. The assumption is one
+                # visible event, and the unit is told the question with the answer assumed, like an intake answer.
+                site = self.roster.sites.get(unit_id, district)
+                cause = self.emit("agent.working", worker, site, ask.line, {"unit": unit_id}, cause=cause, **at)
+                if ask.question:
+                    intake_answers = (*intake_answers, (ask.question, ask.assumed))
+                ask = None
             if ask is not None:
                 card = self.must_ask.raise_question(
                     ask,
@@ -424,7 +433,7 @@ class _Run:
             )
             upstream = tuple(self.results[dep] for dep in unit["depends_on"] if dep in self.results)
             first = UnitContext(
-                worker, loaded, answer, brief=self.brief, intake_answers=self.intake_answers, upstream=upstream
+                worker, loaded, answer, brief=self.brief, intake_answers=intake_answers, upstream=upstream
             )
             outcome, worker, cause = await self.run_agents(unit, first, site, cause, at)  # a successor may finish it
         made: list[Kept] = []

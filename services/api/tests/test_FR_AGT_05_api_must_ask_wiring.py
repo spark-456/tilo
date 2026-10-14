@@ -30,6 +30,8 @@ from _agt05_lib import (
 )
 from _clint2_lib import MOCK_ID, assert_stream_valid, schema_errors, wait_for
 
+pytestmark = pytest.mark.usefixtures("must_ask_ask_mode")  # these suites pin the cards (BQ-ASSUME-1)
+
 REPO_ROOT = pathlib.Path(__file__).resolve().parents[3]
 RUN_TERMINAL = ("world.completed", "world.failed")
 

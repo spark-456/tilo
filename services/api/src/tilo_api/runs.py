@@ -557,6 +557,7 @@ class Run:
         return MustAsk(
             self.seams.must_ask_providers, config=config, card_sink=self._store_card, owner=self.owner,
             covered_actions={p["action_type"] for p in self.store.policies.values() if p.get("owner") == self.owner},
+            brief=self.brief,
         )  # fmt: skip
 
     def _prepare(self) -> Any:

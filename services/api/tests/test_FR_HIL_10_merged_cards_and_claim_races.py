@@ -38,6 +38,8 @@ from _agt05_lib import (
 from _cards_lib import OWNER_P, FakeClock, FakeEventWriter, add_seconds, clone_card, load_valid_card
 from _clint2_lib import wait_for
 
+pytestmark = pytest.mark.usefixtures("must_ask_ask_mode")  # these suites pin the cards (BQ-ASSUME-1)
+
 ASK01 = task("ASK-01")  # "Update the pricing sheet with the new numbers": a model-written ambiguity card
 ASK10 = task("ASK-10")  # "Pay the outstanding supplier invoice": a model-raised sensitive_step card
 START = "2026-09-29T09:30:00.000Z"

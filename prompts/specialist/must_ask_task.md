@@ -4,4 +4,6 @@ Decide whether to ask a person before starting this unit. Everything between the
 Unit type: $unit_type
 Title: $title
 Side effects: $actions
+Task goal: $goal
+Already decided: $decided
 TASK>>>
