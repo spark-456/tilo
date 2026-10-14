@@ -103,7 +103,7 @@ def build_factory(
                 raise _refuse()
         hook = getattr(emit, "before_publication", None)
         scoped_drafts = getattr(emit, "drafts", None)
-        if not callable(emit) or not callable(hook) or scoped_drafts is None:
+        if not callable(emit) or not callable(hook) or not isinstance(scoped_drafts, FirestoreDraftStore):
             raise _refuse(503, "not_configured")
 
         def authority() -> None:
@@ -142,7 +142,7 @@ def build_factory(
             return user_id
 
         scope = dict(org_id=deps.ORG_ID, owner=user_id, world_id=world_id, run_id=run_id)
-        retained = scoped_drafts if isinstance(scoped_drafts, FirestoreDraftStore) else None
+        retained = scoped_drafts
         cards = FirestoreCards(client, **scope, before_publication=check, drafts=retained)
         stops = FirestoreStops(client, **scope, before_publication=check, drafts=retained)
         outbox = Outbox(
