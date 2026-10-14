@@ -224,7 +224,16 @@ describe("STARTER_1 the pages", () => {
     expect((control(rig.el, "Watch the replay") as HTMLAnchorElement).getAttribute("href")).toBe(
       `/world/${SAMPLE_WORLD_ID}/stage`,
     );
-    expect((control(rig.el, "Pause") as HTMLButtonElement).disabled).toBe(true);
+    // UI-10 B2: a recording has nothing running, so no Pause is offered at all (was a disabled one)
+    expect(hasControl(rig.el, "Pause")).toBe(false);
+  });
+
+  it("UI_10_B7_in_a_demo_session_Watch_the_replay_opens_the_recorded_run_never_not_found", async () => {
+    const base = liveWorldsApi();
+    const api = { ...base, getWorlds: vi.fn(async () => sampleWorlds([sampleItem])) };
+    const rig = await mountWorld({ id: SAMPLE_WORLD_ID, api, demo: true });
+    const link = control(rig.el, "Watch the replay") as HTMLAnchorElement;
+    expect(link.getAttribute("href")).toBe("/world/w_village_basic/stage?fixture=village-basic");
   });
 });
 

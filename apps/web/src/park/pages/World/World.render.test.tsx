@@ -415,13 +415,15 @@ describe("WEB_6_world_render: Result (Village)", () => {
     const { el } = await mountWorld({ id: "calls" });
     const section = region(el, "Result");
     expect(textOf(q(section, "h2"))).toBe("Result");
-    expect(textOf(section)).toContain(CALLS.mainSub); // the header's right side: w.when
+    // UI-10 B2: a sample is a recording: the header says Sample and the running line says whose state it is
+    const recorded = `Recorded sample state: ${CALLS.mainSub}`;
+    expect(textOf(section)).toContain(recorded);
     expect(elWithText(section, OUT.calls)).toBeTruthy();
-    const line = elWithText(section, CALLS.mainSub);
+    const line = elWithText(section, recorded);
     expect(line, "the running line").toBeTruthy();
     // spinner (an empty element) then the text, as in the reference
     const running = qa(section, "*").filter(
-      (e) => textOf(e) === CALLS.mainSub && e.children.length >= 1,
+      (e) => textOf(e) === recorded && e.children.length >= 1,
     );
     expect(running.length, "a spinner element sits in the running line").toBeGreaterThanOrEqual(1);
     expect(hasControl(section, "Open result")).toBe(false);
@@ -494,12 +496,36 @@ describe("WEB_6_world_render: Activity", () => {
   });
 
   it("WEB_6_world_render_a_world_without_activity_shows_one_Director_line_from_its_start", async () => {
-    // Reference: [{ t: w.started, rank: 'director', who: 'Director', text: 'Started ' + w.name.toLowerCase() + '.' }]
+    // UI-10 B3: the world's name keeps its own capitals (a lowercased "northline" was wrong), quoted
     const { el } = await mountWorld({ id: "calls" });
     const section = region(el, "Activity");
-    const row = rowOf(section, "Started summarise yesterday’s calls.", "09:04");
-    expect(flat(textOf(row))).toBe(flat("Director Started summarise yesterday’s calls. 09:04"));
+    const row = rowOf(section, "Started “Summarise yesterday’s calls”.", "09:04");
+    expect(flat(textOf(row))).toBe(flat("Director Started “Summarise yesterday’s calls”. 09:04"));
     expect(row.querySelector(ART)).not.toBeNull();
+  });
+
+  it("UI_10_B3_the_default_activity_line_keeps_the_names_capitals", async () => {
+    const { el } = await mountWorld({ id: "reply" });
+    const text = textOf(region(el, "Activity"));
+    expect(text).toContain("Started “Reply to Northline”.");
+    expect(text).not.toContain("northline");
+  });
+
+  it("UI_10_B3_the_Activity_header_says_Today_only_when_every_row_is_from_today", async () => {
+    const today = await mountWorld(); // K1: rows stamped with the time of day
+    expect(textOf(q(region(today.el, "Activity"), ".park-world-sub"))).toBe("Today");
+    cleanup();
+    const older = await mountWorld({ id: "hires" }); // a row stamped "Yesterday"
+    expect(textOf(q(region(older.el, "Activity"), ".park-world-sub"))).toBe("Recent");
+  });
+
+  it("UI_10_B3_a_project_with_a_budget_shows_spend_so_far_not_a_per_run_cost", async () => {
+    const project = await mountWorld({ id: "northline" });
+    expect(pageText(project.el)).toContain("£342 so far. Billed monthly.");
+    expect(pageText(project.el)).not.toContain("Each run costs about £342");
+    cleanup();
+    const routine = await mountWorld({ id: "invoice" });
+    expect(pageText(routine.el)).toContain("Each run costs about £0.60. Billed monthly.");
   });
 
   it("WEB_6_world_render_the_second_city_activity_has_its_three_rows", async () => {

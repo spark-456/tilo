@@ -108,6 +108,40 @@ describe("FR_UX_17 World page: Share to Slack through the approval card", () => 
     expect(pageText(liveRig.el)).not.toMatch(/\bshared\b/i);
   });
 
+  it("UI_10_B7_the_dialog_of_a_sample_world_says_sample_and_that_nothing_is_sent", async () => {
+    const rig = await mountWorld({ id: "hires" });
+    click(control(rig.el, "Share to Slack"));
+    const dialog = q(rig.el, '[role="dialog"]');
+    expect(textOf(dialog)).toContain("Sample");
+    expect(textOf(dialog)).toContain("Nothing is sent to Slack");
+    cleanup();
+    const live = await mountWorld({ id: "hires", api: liveWorldsApi() });
+    click(control(live.el, "Share to Slack"));
+    expect(textOf(q(live.el, '[role="dialog"]'))).not.toContain("Nothing is sent to Slack");
+  });
+
+  it("UI_10_B7_the_note_has_a_live_character_counter_to_the_240_limit", async () => {
+    const rig = await mountWorld({ id: "hires" });
+    click(control(rig.el, "Share to Slack"));
+    const dialog = q(rig.el, '[role="dialog"]');
+    expect(textOf(dialog)).toContain("0 / 240");
+    setFieldValue(q<HTMLTextAreaElement>(dialog, "textarea"), "hello");
+    expect(textOf(q(rig.el, '[role="dialog"]'))).toContain("5 / 240");
+    setFieldValue(q<HTMLTextAreaElement>(dialog, "textarea"), "x".repeat(300));
+    expect(textOf(q(rig.el, '[role="dialog"]'))).toContain("240 / 240");
+  });
+
+  it("UI_10_B7_a_click_on_the_backdrop_closes_the_dialog_and_a_click_inside_does_not", async () => {
+    const rig = await mountWorld({ id: "hires" });
+    click(control(rig.el, "Share to Slack"));
+    click(q(rig.el, '[role="dialog"] .park-world-slacktitle'));
+    expect(rig.el.querySelector('[role="dialog"]')).not.toBeNull();
+    click(q(rig.el, ".park-world-slackbackdrop"));
+    expect(rig.el.querySelector('[role="dialog"]')).toBeNull();
+    // nothing was asked for: no pending approval card
+    expect(pageText(rig.el)).not.toContain("Waiting for approval");
+  });
+
   it("test_FR_UX_17_without_connected_slack_connector_action_is_disabled_and_explains_why", async () => {
     const api = spiedApi();
     const baseGetConnectors = api.getConnectors;

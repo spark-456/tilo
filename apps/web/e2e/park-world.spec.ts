@@ -147,7 +147,7 @@ for (const [sizeName, viewport] of Object.entries(SIZES)) {
         page,
       }) => {
         const problems = await openWorld(page, "k1", theme);
-        await expect(page).toHaveTitle("World · Tilo");
+        await expect(page).toHaveTitle("K1 electric scooter · Tilo");
         await expect(page.getByRole("main")).toHaveCount(1);
         await expect(page.getByRole("main").getByTestId("park-page-world")).toHaveCount(1);
         await expect(page.getByRole("heading", { level: 1 })).toHaveCount(1);
@@ -1027,8 +1027,10 @@ test.describe("park world: the other tiers at 1440", () => {
       "font-weight": "700",
     });
     near("result line height", Number.parseFloat(String(out["line-height"])), 22.5, 0.2);
-    // running: the 16px ring (a --track ring with a --hero top) beside "About 3 min left"; no buttons
-    const running = result.getByText("About 3 min left", { exact: true }).last();
+    // running: the 16px ring (a --track ring with a --hero top) beside the recorded line; no buttons
+    const running = result
+      .getByText("Recorded sample state: About 3 min left", { exact: true })
+      .last();
     const ring = running.locator("xpath=preceding-sibling::*[1]");
     const rf = await facts(ring, [
       "border-top-width",
@@ -1182,7 +1184,7 @@ test.describe("park world: behaviour in the browser", () => {
     const overlay = text(page, "Paused · agents are waiting");
     await expect(overlay).toBeVisible();
     await expect(btn(page, "Resume")).toBeVisible();
-    await expect(text(page, "Paused")).toBeVisible();
+    await expect(text(page, "Paused · 2 decisions")).toBeVisible(); // UI-10 B2: the count stays beside Paused
     const map = await mapOf(page, K1_TAG).boundingBox();
     const scrim = await facts(overlay.locator("xpath=.."), ["position", "background-color"]);
     expect(scrim.position).toBe("absolute");
