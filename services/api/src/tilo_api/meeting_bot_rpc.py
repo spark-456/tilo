@@ -22,7 +22,7 @@ class MeetingBotRpc:
     def __repr__(self) -> str:
         return "MeetingBotRpc()"
 
-    async def attend(self, meeting_id: str, join: MeetingJoin) -> BotCapture:
+    async def attend(self, meeting_id: str, join: MeetingJoin, claim: str | None = None) -> BotCapture:
         if os.environ.get("LIVE") != "1":
             raise HTTPException(503, "bot_not_enabled")
         try:
@@ -33,7 +33,8 @@ class MeetingBotRpc:
                     "POST",
                     f"{self._base}/internal/meetings/{meeting_id}/attend",
                     json=join.model_dump(mode="json"),
-                    headers={"Authorization": f"Bearer {token}"},
+                    headers={"Authorization": f"Bearer {token}"}
+                    | ({"X-Tilo-Meeting-Claim": claim} if claim else {}),  # ADR-0042 MV-16: the bot never logs it
                 ) as response:
                     if response.status_code != 200:
                         raise ValueError("Bot refused")

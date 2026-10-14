@@ -16,6 +16,7 @@ from tilo_people.errors import VersionConflict
 from tilo_api import deps
 from tilo_api.meeting_host_rpc import MeetingHostRpc
 from tilo_api.meeting_join import owned_receipt
+from tilo_api.meeting_voice_claims import AttendClaims
 from tilo_api.people_meetings import _mine
 from tilo_api.people_writes import Refusal, Writer, _purge
 
@@ -27,7 +28,7 @@ class BotCapture:
 
 
 class BotClient(Protocol):
-    async def attend(self, meeting_id: str, join: MeetingJoin) -> BotCapture: ...
+    async def attend(self, meeting_id: str, join: MeetingJoin, claim: str | None = None) -> BotCapture: ...
 
 
 async def attend_meeting(
@@ -38,6 +39,7 @@ async def attend_meeting(
     bot: BotClient,
     meeting_id: str,
     clock: Callable[[], str],
+    claims: AttendClaims | None = None,
 ) -> dict[str, Any]:
     receipt = owned_receipt(w, store, artifacts, meeting_id)
     meeting, version, _ = _mine(w, meeting_id, "read_full", ("deleted",))
@@ -52,8 +54,10 @@ async def attend_meeting(
         raise Refusal(409, "already_attending") from None
     scope = Scope(w.org, receipt["world_id"], w.actor)
     made = None
+    # ADR-0042: the voice meter's claim, from the verified principal and only here; off (None) the call is unchanged.
+    nonce = claims.open(meeting_id, uid=w.actor, org_id=w.org) if claims is not None else None
     try:
-        capture = await bot.attend(meeting_id, join)
+        capture = await (bot.attend(meeting_id, join) if nonce is None else bot.attend(meeting_id, join, nonce))
         if capture.transcript.meeting_id != meeting_id or capture.reason not in (
             "completed",
             "left_on_request",
@@ -113,3 +117,6 @@ async def attend_meeting(
             except VersionConflict:
                 pass
         raise
+    finally:
+        if claims is not None and nonce is not None:
+            claims.end(meeting_id, nonce)
