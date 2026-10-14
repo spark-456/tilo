@@ -204,6 +204,7 @@ export interface Skill {
   tools: [string, number][];
   used: string[];
   steps: string[];
+  fix?: { version: number; asks: boolean[]; locked: boolean[] };
   ask?: { q: string; a: string[] };
   /** SKILLS-3: what the teach card chose, so `saveSkill` can post it (scope, trigger and each step's tool); never served. */
   draft?: SkillDraft;

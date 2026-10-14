@@ -11,6 +11,7 @@ import type { CurrencyCode } from "../../app/ledgerKpis";
 import { PageSheet } from "../../components";
 import { FirstRunPanels } from "../../sample/FirstRunPanels";
 import { useFirstRunPreview } from "../../sample/useFirstRunPreview";
+import { FixSkill } from "./FixSkill";
 import { HelpSection } from "./HelpSection";
 import { LibrarySection } from "./LibrarySection";
 import "./Skills.css";
@@ -134,10 +135,11 @@ function Ready({ app, data }: { app: AppCtx; data: Data }) {
   const [fixed, setFixed] = useState<Record<string, SkillFixEntry>>({});
   const [rev, setRev] = useState<Record<string, "trusted" | "learning">>({});
   const [paused, setPaused] = useState<Record<string, boolean>>({});
+  const [persisted, setPersisted] = useState<Record<string, Skill>>({});
 
   const baseSkills = withTaught(data.skills, t.taught);
   const skills = baseSkills.map((s) => {
-    let next = { ...s };
+    let next = { ...(persisted[s.id] ?? s) };
     if (rev[s.id] === "trusted") next.st = "trusted";
     if (s.st === "review" && ans[s.id]) next.st = "learning";
     for (const entry of Object.values(fixed)) {
@@ -243,6 +245,17 @@ function Ready({ app, data }: { app: AppCtx; data: Data }) {
         }}
       />
       <ToolAccess skills={skills} tools={learn.tools} />
+      {source === "live" && skills.find((s) => s.id === selectedId)?.fix ? (
+        <FixSkill
+          key={`${selectedId}:${persisted[selectedId]?.fix?.version ?? 0}`}
+          api={api}
+          skill={skills.find((s) => s.id === selectedId) as Skill}
+          saved={(s) => {
+            setPersisted((prev) => ({ ...prev, [s.id]: s }));
+            app.toast("Step fix saved.");
+          }}
+        />
+      ) : null}
     </>
   );
 }
