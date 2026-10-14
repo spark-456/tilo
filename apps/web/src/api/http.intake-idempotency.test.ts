@@ -35,6 +35,23 @@ function setup(...responses: Array<Response | Error>) {
 }
 
 describe("FR-INT-01 intake idempotency follow-up", () => {
+  it("QA-11 shares an in-flight intake and releases it after success", async () => {
+    let resolve!: (value: Response) => void;
+    const pending = new Promise<Response>((done) => {
+      resolve = done;
+    });
+    const fetch = vi.fn(() => pending);
+    const client = new HttpClient({ baseUrl: "https://api.test", fetch });
+    const first = client.submitIntake("Task", []);
+    const duplicate = client.submitIntake("Task", []);
+    await vi.waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+    resolve(accepted());
+    expect(await duplicate).toEqual(await first);
+    fetch.mockImplementationOnce(async () => accepted());
+    await client.submitIntake("Task", []);
+    expect(fetch).toHaveBeenCalledTimes(2);
+  });
+
   it("keeps the opaque key after network, server and unreadable reply failures with unchanged File references", async () => {
     const s = setup(new Error("offline"), reply({}, 503), new Response("broken"), accepted());
     const file = new File(["source"], "source.txt");

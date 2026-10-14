@@ -44,7 +44,7 @@ const BRIEF = {
   ],
 };
 
-function server(over: Record<string, () => Response> = {}) {
+function server(over: Record<string, () => Response | Promise<Response>> = {}) {
   const calls: { method: string; path: string; body: unknown }[] = [];
   const fetchSpy = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
     const path = String(url).replace(BASE, "");
@@ -87,6 +87,35 @@ function server(over: Record<string, () => Response> = {}) {
 }
 
 describe("SIMPLE-RUN-1 one-step start over the live Api", () => {
+  it("QA-11 requests approaches immediately after saved answers, before the confirm plan resolves", async () => {
+    let save!: (value: Response) => void;
+    let price!: (value: Response) => void;
+    const answers = new Promise<Response>((done) => {
+      save = done;
+    });
+    const approaches = new Promise<Response>((done) => {
+      price = done;
+    });
+    const { one, calls } = server({
+      "POST /tasks/t_1/answers": () => answers,
+      "GET /tasks/t_1/approaches": () => approaches,
+    });
+    let ready = false;
+    const plan = one.prepare("Plan the offsite", []).then((value) => {
+      ready = true;
+      return value;
+    });
+    await vi.waitFor(() => expect(calls.at(-1)?.path).toBe("/tasks/t_1/answers"));
+    expect(calls.some((call) => call.path.endsWith("/approaches"))).toBe(false);
+    save(json({ brief: BRIEF }));
+    await vi.waitFor(() => expect(calls.at(-1)?.path).toBe("/tasks/t_1/approaches"));
+    expect(ready).toBe(false);
+    price(
+      json({ task_id: "t_1", approaches: [APPROACH], recommended: "a_balanced", credit_usd: 0.05 }),
+    );
+    expect((await plan).taskId).toBe("t_1");
+  });
+
   it("SIMPLE-RUN-1 prepare: one intake, one answers call skipping each distinct question, one approaches read, a priced plan", async () => {
     const { one, calls } = server();
     const plan = await one.prepare("Plan the offsite", []);
