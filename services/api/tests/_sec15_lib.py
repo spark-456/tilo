@@ -40,6 +40,9 @@ PINNED_PUBLIC_ROUTES = frozenset(
     {
         ("GET", "/health"),
         ("GET", "/healthz"),
+        # X-HEALTH-1 + SEC15-HEALTH: configuration booleans and fixed kinds only, rate-limit exempt like /health.
+        ("GET", "/health/deps"),
+        ("GET", "/healthz/deps"),
         ("GET", "/access"),
         ("POST", "/access/declaration"),
         ("POST", "/internal/schedules/tick"),  # owner decision (FR-AGT-14b): the Scheduler's own OIDC-checked route
