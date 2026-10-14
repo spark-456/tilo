@@ -151,7 +151,10 @@
 }
 [data-park] .park-ledger-chart {
   position: relative;
-  width: 100%;
+  width: calc(100% - 48px);
+  margin-left: 48px;
+  margin-bottom: 24px;
+  min-height: 160px;
   aspect-ratio: 720 / 270;
   cursor: crosshair;
 }
@@ -226,7 +229,9 @@
 }
 [data-park] .park-ledger-ylabel {
   position: absolute;
-  left: 0;
+  left: -48px;
+  width: 44px;
+  text-align: right;
   transform: translateY(-50%);
   font-size: 12px;
   font-weight: 700;
@@ -234,7 +239,7 @@
 }
 [data-park] .park-ledger-xlabel {
   position: absolute;
-  bottom: -2px;
+  bottom: -24px;
   transform: translateX(-50%);
   font-size: 12px;
   font-weight: 700;
@@ -242,23 +247,22 @@
   white-space: nowrap;
 }
 [data-park] .park-ledger-note {
-  position: absolute;
   font-size: 12px;
   font-weight: 800;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
+}
+[data-park] .park-ledger-notes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
 }
 [data-park] .park-ledger-note--cap {
-  right: 0;
-  transform: translateY(-130%);
   color: var(--redInk);
 }
 [data-park] .park-ledger-note--spike {
-  transform: translate(-100%, -100%);
-  padding-right: 6px;
   color: var(--ink2);
 }
 [data-park] .park-ledger-note--fc {
-  transform: translate(-50%, -120%);
   color: var(--amberInk);
 }
 [data-park] .park-ledger-tip {

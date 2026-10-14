@@ -160,7 +160,10 @@ export function chartGeometry(L: Ledger, dec: Dec, hover: number | null) {
     fcLeft: pct(X((27.4 * per.days) / 30), 720),
     // The note sits a fixed distance (350 on the budget scale) below the end of the forecast.
     fcTop: pct(Y(L.forecast) + (350 / L.budget) * 206, 270),
-    fcLabel: taken ? `Forecast ${money(L, L.forecast)}` : `If you approve ${money(L, waiting)}`,
+    fcLabel:
+      taken || waiting === 0
+        ? `Forecast ${money(L, L.forecast)}`
+        : `If you approve ${money(L, waiting)}`,
     hOp: hd != null ? "1" : "0",
     hx: hd != null ? hx.toFixed(1) : "0",
     hy: hd != null ? Y(hv).toFixed(1) : "0",
