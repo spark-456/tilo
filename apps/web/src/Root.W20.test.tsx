@@ -43,6 +43,10 @@ it.each(["village-basic", "another-recording"])(
       await vi.dynamicImportSettled();
     });
     await vi.waitFor(() => expect(qa(m.container, "[data-park] nav").length).toBeGreaterThan(0));
+    // W20/B6: the replay has two distinct navigation landmarks; shell checks target Main.
+    expect(qa(m.container, '[data-park] nav[aria-label="Main"]')).toHaveLength(1);
+    expect(qa(m.container, '[data-park] nav[aria-label="Lens"]')).toHaveLength(1);
+    expect(qa(m.container, '[data-park] nav[aria-label="Lens"] a')).toHaveLength(3);
     expect(qa(m.container, "main")).toHaveLength(1);
     expect(qa(m.container, 'main [data-testid="recorded-stage"]')).toHaveLength(1);
     expect(m.container.textContent).toContain("Sample recording");
