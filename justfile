@@ -215,3 +215,7 @@ deploy-web-live:
 # The url check is in the command line itself: error() fires before the script runs.
 smoke-dev url="":
     uv run python scripts/smoke_dev.py --unsigned {{ if url =~ '^https://tilo-api-[a-z0-9]+-as\.a\.run\.app$|^https://tilo-api-[0-9]+\.asia-southeast1\.run\.app$' { url } else { error('smoke-dev: url must be the tilo-api Cloud Run url (https://tilo-api-<hash>-as.a.run.app or https://tilo-api-<project-number>.asia-southeast1.run.app, lower case, no path, port or query), got ' + url) } }}
+
+# Release companion: same unsigned smoke plus exact-revision and bundle-change evidence.
+smoke-dev-release url revision traffic previous:
+    uv run python scripts/smoke_dev.py --unsigned {{ if url =~ '^https://tilo-api-[a-z0-9]+-as\.a\.run\.app$|^https://tilo-api-[0-9]+\.asia-southeast1\.run\.app$' { url } else { error('invalid API URL') } }} {{ if revision =~ '^tilo-api-[a-z0-9-]+$' { revision } else { error('invalid revision') } }} {{ if traffic =~ '^[A-Za-z0-9_./-]+\.json$' { traffic } else { error('invalid traffic JSON path') } }} {{ if previous =~ '^[a-f0-9]{64}$' { previous } else { error('invalid previous SHA256') } }}
