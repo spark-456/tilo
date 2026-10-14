@@ -7,6 +7,7 @@ from typing import Any
 
 from fastapi import HTTPException
 from google.cloud.firestore_v1.base_query import FieldFilter
+from tilo_connectors.outbox import _alert_part
 
 from tilo_api.followup_autopilot_state import FirestoreCards
 from tilo_api.followup_draft_retention import DraftRetention, followup_retention
@@ -66,7 +67,16 @@ def cancel_source_entries(
     query = policy._query().where(filter=FieldFilter("owner", "==", owner))
     if meeting is not None:
         query = query.where(filter=FieldFilter("source.meeting_id", "==", meeting))
-    for found in query.stream():
+    # Match retention's three 200-row cleanup passes, plus one overflow probe.
+    # Refuse before mutating if completeness cannot be established within this bound.
+    # Keep retained metadata on refusal; retry after reducing the retained set.
+    try:
+        rows = list(query.limit(601).stream())
+    except Exception:
+        raise HTTPException(503, "store_unavailable") from None
+    if len(rows) > 600:
+        raise HTTPException(503, "store_unavailable")
+    for found in rows:
         row = found.to_dict()
         if row.get("org_id") != org or row.get("owner") != owner:
             raise HTTPException(503, "store_unavailable")
@@ -78,5 +88,5 @@ def cancel_source_entries(
             continue
         entry = store.get_by_idempotency_key(payload["world_id"], f"autopilot:{payload['card_id']}")
         if entry is not None and entry["state"] in {"queued", "scheduled", "sending"}:
-            if store._abandon(entry["id"], clock()) is None:
+            if store._cancel_source(entry["id"], clock(), _alert_part(entry)) is None:
                 raise HTTPException(503, "store_unavailable")  # live lease: retry erasure, keep source metadata
