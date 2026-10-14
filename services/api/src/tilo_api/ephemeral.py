@@ -116,6 +116,8 @@ class _Outbox(_Counted, InMemoryOutboxStore):
 class _ArchiveLines:
     """The raw archive's line store (`tilo_archive.Store`): in memory, charged, gone with the session."""
 
+    _lines: dict[tuple[str, str], list[str]]
+
     def __init__(self, session: DemoSession) -> None:
         self._session, self._lines, self._lock = session, {}, threading.Lock()
 
@@ -220,6 +222,13 @@ class DemoSession:
             _Meta(self), _Blobs(self), clock=lambda: datetime.now(UTC), redactor=_redact,
             archive_lookup=lambda scope, archive_ref: None, alert_sink=lambda alert: logger.info("demo artifact alert"),
         ))  # fmt: skip
+
+    @property
+    def treasury(self) -> Any:
+        """The Treasury seams' ledger for this session (T3): memory only, bounded, gone with the session."""
+        from tilo_api.quick_ledger import MemoryLedger  # noqa: PLC0415
+
+        return self._once("treasury", lambda: MemoryLedger(limit=200))
 
     @property
     def redactor(self) -> Callable[[str], str]:

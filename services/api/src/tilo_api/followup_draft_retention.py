@@ -4,8 +4,8 @@ The scoped caller supplies trusted source metadata, its retention deadline and a
 source validator. Bodies and emit markers share that policy. The existing draft adapter
 must atomically create this envelope with its payload, then apply read() to every read.
 Cleanup uses the same store-door client and collection; no client/store/env is created here.
-Meeting deletion calls erase_meeting_complete after its tombstone. Owner erasure and the
-expiry sweep still need explicit production wiring before activation.
+Meeting deletion and owner erasure close sources before draining these rows. The
+authenticated Scheduler tick makes bounded expiry passes; reads deny expired state immediately.
 """
 
 from __future__ import annotations
@@ -40,11 +40,40 @@ def _finite(value: Any) -> TypeGuard[int | float]:
 
 class DraftRetention:
     def __init__(
-        self, client: Any, *, org_id: str, clock: Callable[[], float], source_valid: Callable[[str, dict], bool]
+        self,
+        client: Any,
+        *,
+        org_id: str,
+        clock: Callable[[], float],
+        source_valid: Callable[[str, dict], bool],
+        state_group: str | None = None,
     ) -> None:
         self.client, self.org = client, _id(org_id, "org")
         self.clock, self.source_valid = clock, source_valid
         self.collection = f"orgs/{self.org}/followup_drafts"
+        if state_group not in (None, "cards", "stops"):
+            raise ValueError("invalid state collection")
+        self.state_group = state_group
+
+    def _query(self) -> Any:
+        if self.state_group is None:
+            return self.client.collection(self.collection)
+        return (
+            self.client.collection_group(self.state_group)
+            .where(filter=FieldFilter("org_id", "==", self.org))
+            .where(filter=FieldFilter("retention_namespace", "==", "meeting_followup"))
+        )
+
+    def _document(self, found: Any) -> Any:
+        if self.state_group is None:
+            return self.client.document(f"{self.collection}/{found.id}")
+        path = found.reference.path
+        if (
+            re.fullmatch(rf"orgs/{self.org}/followup_autopilot/[0-9a-f]{{64}}/{self.state_group}/[0-9a-f]{{64}}", path)
+            is None
+        ):
+            raise _closed()
+        return self.client.document(path)
 
     def path(self, owner: str, instruction_id: str) -> str:
         _id(owner, "u")
@@ -101,9 +130,7 @@ class DraftRetention:
             raise ValueError("invalid cleanup limit")
         removed = 0
         try:
-            query = (
-                self.client.collection(self.collection).where(filter=FieldFilter(field, operator, value)).limit(limit)
-            )
+            query = self._query().where(filter=FieldFilter(field, operator, value)).limit(limit)
             for found in query.stream():
                 row = found.to_dict()
                 if (
@@ -115,9 +142,7 @@ class DraftRetention:
                 ):
                     raise ValueError("invalid retention row")
                 try:
-                    self.client.document(f"{self.collection}/{found.id}").delete(
-                        option=self.client.write_option(last_update_time=found.update_time)
-                    )
+                    self._document(found).delete(option=self.client.write_option(last_update_time=found.update_time))
                     removed += 1
                 except (FailedPrecondition, NotFound):
                     continue  # changed rows require a fresh indexed pass; never delete the replacement
@@ -127,6 +152,18 @@ class DraftRetention:
 
     def erase_owner(self, owner: str, *, limit: int = 200) -> int:
         return self._cleanup("owner", "==", _id(owner, "u"), limit)
+
+    def erase_owner_complete(self, owner: str) -> None:
+        _id(owner, "u")
+        for _ in range(3):
+            self.erase_owner(owner)
+            try:
+                query = self._query().where(filter=FieldFilter("owner", "==", owner)).limit(1)
+                if next(iter(query.stream()), None) is None:
+                    return
+            except Exception:
+                raise _closed() from None
+        raise _closed()
 
     def purge_expired(self, *, limit: int = 200) -> int:
         now = self.clock()
@@ -140,7 +177,7 @@ class DraftRetention:
         if type(limit) is not int or not 1 <= limit <= 200:
             raise ValueError("invalid cleanup limit")
         return (
-            self.client.collection(self.collection)
+            self._query()
             .where(filter=FieldFilter("owner", "==", owner))
             .where(filter=FieldFilter("source.meeting_id", "==", meeting_id))
             .limit(limit)
@@ -164,9 +201,7 @@ class DraftRetention:
                 ):
                     raise _closed()
                 try:
-                    self.client.document(f"{self.collection}/{found.id}").delete(
-                        option=self.client.write_option(last_update_time=found.update_time)
-                    )
+                    self._document(found).delete(option=self.client.write_option(last_update_time=found.update_time))
                     removed += 1
                 except (FailedPrecondition, NotFound):
                     continue
@@ -186,3 +221,11 @@ class DraftRetention:
             except Exception:
                 raise _closed() from None
         raise _closed()  # retry the already-deleted source; never claim partial cleanup complete
+
+
+def followup_retention(client: Any, org_id: str, clock: Callable[[], float]) -> tuple[DraftRetention, ...]:
+    """Cleanup-only policies for drafts, card/index rows and stops on the SAME shared client."""
+    return tuple(
+        DraftRetention(client, org_id=org_id, clock=clock, source_valid=lambda *args: False, state_group=group)
+        for group in (None, "cards", "stops")
+    )

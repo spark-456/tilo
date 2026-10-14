@@ -284,6 +284,7 @@ async def attend_meeting_route(
     _: Annotated[Empty, Depends(json_body(Empty))],
     principal: Annotated[deps.Principal, Depends(deps.get_current_principal)],
     stores: Annotated[PeopleStores, Depends(deps.get_people_stores)],
+    _new_work: Annotated[deps.Mode, Depends(deps.get_work_mode)],  # a bot is new live work: refused at a cap
     store: Annotated[deps.Store, Depends(deps.get_store)],
     artifacts: Annotated[ArtifactStore, Depends(deps.get_artifact_store)],
     host: Annotated[MeetingHostRpc, Depends(deps.get_meeting_host_client)],
@@ -306,6 +307,7 @@ def host_meeting_route(
     principal: Annotated[deps.Principal, Depends(deps.get_current_principal)],
     stores: Annotated[PeopleStores, Depends(deps.get_people_stores)],
     clock: Annotated[Callable[[], str], Depends(deps.get_clock)],
+    _new_work: Annotated[deps.Mode, Depends(deps.get_work_mode)],  # hosting starts a bot: refused at a cap
     seams: Annotated[HostSeams, Depends(get_host_seams)],
 ) -> dict[str, Any]:
     """The owner hosts a scheduled bot meeting (FR-MTG-09): one gate card, then one invitation (BQ-MTG09-20)."""
@@ -450,12 +452,19 @@ def create_work_item_route(
     redact: Annotated[Callable[[str], str], Depends(deps.get_redactor)],
     clock: Annotated[Callable[[], str], Depends(deps.get_clock)],
     events: Annotated[WorkEvents, Depends(get_work_events)],
+    lookup: Annotated[Callable[[str], deps.WorldRecord | None], Depends(deps.get_world_lookup)],
 ) -> dict[str, Any]:
-    """A person adds their own item; a mail or request source is checked against its owner (PE-08)."""
+    """A person adds their own item; a mail or request source is checked against its owner (PE-08). A `world_id`
+    binds it to a world its creator owns or reads as a team reader (ADR-0040, PE-33): only a full web or mobile-web
+    sign-in session bound to no world may name one, and the world and its shares come from the stores."""
 
     def owners() -> deps.SourceOwners:  # resolved only when the source is mail or a request
         seam = request.app.dependency_overrides.get(deps.get_source_owners)
         return seam() if seam is not None else deps.get_source_owners(request)  # an override takes no argument
+
+    def worlds(world_id: str) -> deps.WorldRecord | None:  # a session of another shape reads no world (PE-32)
+        full = principal.full_session is True and not principal.demo_session and principal.world_id is None
+        return lookup(world_id) if full and principal.channel in ("web", "mobile_web") else None
 
     return _answer(
         lambda: idempotent(
@@ -463,7 +472,7 @@ def create_work_item_route(
             principal,
             stores,
             body,
-            lambda: create_item(_writer(principal, stores, clock, redact, events), body, owners),
+            lambda: create_item(_writer(principal, stores, clock, redact, events), body, owners, worlds),
         )
     )
 

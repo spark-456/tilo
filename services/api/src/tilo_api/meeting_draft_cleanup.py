@@ -8,7 +8,7 @@ from fastapi import Depends, HTTPException, Request
 from tilo_people.stores import PeopleStores
 
 from tilo_api import deps, store_door
-from tilo_api.followup_draft_retention import DraftRetention
+from tilo_api.followup_draft_retention import followup_retention
 
 
 def get_meeting_draft_cleanup(
@@ -39,10 +39,8 @@ def get_meeting_draft_cleanup(
             opened = store_door.open_api_store()
         except store_door.ApiStoreNotConfigured:
             raise HTTPException(503, "not_configured", headers={"Cache-Control": "no-store"}) from None
-        retention = DraftRetention(
-            opened.client, org_id=deps.ORG_ID, clock=lambda: 0.0, source_valid=lambda *args: False
-        )  # cleanup-only; grants no draft read/write authority
-        retention.erase_meeting_complete(owner, meeting_id)
+        for retention in followup_retention(opened.client, deps.ORG_ID, lambda: 0.0):
+            retention.erase_meeting_complete(owner, meeting_id)
         check(owner, meeting_id)
 
     return cleanup

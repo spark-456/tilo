@@ -12,28 +12,39 @@ BODY = {"draft": {"body": "Private confirmed minutes"}, "status": "ready"}
 
 
 class Query:
-    def __init__(self, db, path, filters=(), count=200):
+    def __init__(self, db, path, filters=(), count=200, group=False):
         self.db, self.path, self.filters, self.count = db, path, filters, count
+        self.group = group
 
     def where(self, *, filter):  # noqa: A002
-        return Query(self.db, self.path, (*self.filters, filter), self.count)
+        return Query(self.db, self.path, (*self.filters, filter), self.count, self.group)
 
     def limit(self, count):
-        return Query(self.db, self.path, self.filters, count)
+        return Query(self.db, self.path, self.filters, count, self.group)
 
     def stream(self):
         self.db.queries.append((self.path, [(f.field_path, f.op_string, f.value) for f in self.filters], self.count))
         rows = []
         for path, doc in sorted(self.db.docs.items()):
-            if not path.startswith(self.path + "/"):
+            selected = path.split("/")[-2] == self.path if self.group else path.startswith(self.path + "/")
+            if not selected:
                 continue
+
+            def field(name, default=None):
+                value = doc
+                for part in name.split("."):
+                    if not isinstance(value, dict) or part not in value:
+                        return default
+                    value = value[part]
+                return value
+
             if all(
-                doc.get(f.field_path) == f.value
-                if f.op_string == "=="
-                else doc.get(f.field_path, float("inf")) <= f.value
+                field(f.field_path) == f.value if f.op_string == "==" else field(f.field_path, float("inf")) <= f.value
                 for f in self.filters
             ):
-                rows.append(self.db.read(path))
+                snapshot = self.db.read(path)
+                snapshot.reference = SimpleNamespace(path=path)
+                rows.append(snapshot)
         yield from rows[: self.count]
 
 
@@ -44,6 +55,9 @@ class DB(FakeFirestore):
 
     def collection(self, path):
         return Query(self, path)
+
+    def collection_group(self, name):
+        return Query(self, name, group=True)
 
 
 @pytest.fixture

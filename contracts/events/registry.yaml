@@ -19,7 +19,7 @@
 # (PRD 10.4 Audit, HR-7). Such an event carries authz (EV-03) from one of authz_by (EV-04), and
 # event.schema.json lists the same types (contracts-check fails if the lists drift).
 
-version: 1.4.0
+version: 1.5.0
 unknown_types: trace_only
 types:
   world.requested:
@@ -1265,3 +1265,16 @@ types:
     trace_row: "rule={data.rule} key={data.key} from={data.from} to={data.to}"
     data_schema: events/data/team_rule.changed.schema.json
     fixture: fixtures/events/valid/team_rule.changed.json
+  world.share_changed:
+    family: world
+    verb: share_changed
+    priority: should
+    pillar: P4
+    default_severity: info
+    side_effect: false
+    world_effect: "A team badge shows on the world's gate while the share stands and comes down when it is withdrawn."
+    hud_effect: "The world's sharing line names the team, or says it is not shared."
+    story_template: "{actor} turned team sharing {data.state} for this world."
+    trace_row: "team={data.team} state={data.state}"
+    data_schema: events/data/world.share_changed.schema.json
+    fixture: fixtures/events/valid/world.share_changed.json

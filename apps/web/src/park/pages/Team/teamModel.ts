@@ -112,7 +112,7 @@ export function memberViews(
     if (p.pending) {
       return {
         ...base,
-        sub: "Invite sent · just now",
+        sub: "Sample invite · not sent",
         limit: "—",
         active: "Pending",
         facts: [

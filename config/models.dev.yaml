@@ -19,6 +19,12 @@ profiles:
     model: fake-safety
     context: 1000000
     caps: []
+  # VERTEX-EVAL-1 (ADR-0033): the dev stand-in judge for the Gen AI evaluation service; deterministic, no paid call.
+  eval-fake:
+    provider: fake
+    model: fake-eval-judge
+    context: 1000000
+    caps: []
   # LW-05: the dev search; `FakeSearchProvider` answers from the query alone and is refused live or deployed.
   search-fake:
     provider: fake
@@ -47,6 +53,7 @@ roles:
   director: { primary: director-dev, fallback: director-dev }
   specialist: { primary: specialist-fake, fallback: specialist-fake, max_input_tokens: 16000, max_output_tokens: 2048 }
   safety: { primary: safety-fake, fallback: safety-fake } # screens use the primary only
+  eval_judge: { primary: eval-fake, fallback: eval-fake } # judged with the primary only: one judge per run
   search: { primary: search-fake, fallback: search-fake, max_input_tokens: 8000, max_output_tokens: 4096, reserve_units: 5 }
   meeting: { primary: meeting-fake, fallback: meeting-fake, max_input_tokens: 16000, max_output_tokens: 2048 }
   meeting_analyst: { primary: meeting-fake, fallback: meeting-fake, max_input_tokens: 100000, max_output_tokens: 16384 }

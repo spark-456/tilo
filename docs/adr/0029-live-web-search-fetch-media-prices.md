@@ -233,3 +233,14 @@ supervisor assigns lanes to sessions.
   declarative spec rendered by fixed code needs neither.
 - **Storing fetched HTML pages as artifacts.** Rejected: it would reopen the closed media types
   for little gain, since the cleaned text already sits in the raw archive and is cited.
+
+## Amendment LIVE-GLOBAL-1 (14 Oct 2026, user-approved)
+
+Decision 3 assumed one location for every priced adapter. In production the Gemini 3.x profiles (flash-38, flash-37,
+lite-31, search-google) answer 404 on the asia-southeast1 endpoint and 200 on the global endpoint, while Model Armor is
+served only regionally (template `tilo-default` in asia-southeast1). The user approved: `config/prices.yaml` `region`
+is `global` and `GOOGLE_LOCATION` is `global`; the rates stay the user-approved asia-southeast1 rates (about 10% above
+global), so the meter overstates and never understates; the loader's region check applies only to adapters whose rates
+depend on the location (`_REGION_PRICED = {"google"}` in `tilo_providers/config.py`). Model Armor keeps its single
+price and its regional location (`TILO_MODEL_ARMOR_LOCATION`, default asia-southeast1). Deployment and data stay in
+asia-southeast1; only the model inference endpoint is global.

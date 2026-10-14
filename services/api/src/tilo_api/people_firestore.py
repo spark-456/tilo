@@ -45,6 +45,7 @@ _IDS = {
     "pinboard_item": re.compile(r"pb_[0-9A-Za-z_]{1,48}"),
     "mention": re.compile(r"mn_[0-9A-Za-z_]{1,48}"),
     "calendar_entry": re.compile(r"ce_[0-9A-Za-z_]{1,48}"),
+    "world_share": re.compile(r"ws_[0-9a-f]{32}"),  # ADR-0040: derived from the world and the team, never minted
 }
 _DEMO_PROJECT = re.compile(r"demo-[0-9a-z-]+")
 _PROJECT = re.compile(r"[a-z][a-z0-9-]{4,28}[a-z0-9]")
@@ -401,7 +402,14 @@ def _collided(where: str, pid: str) -> PeopleError:
 
 
 def firestore_people_stores(client: Any) -> PeopleStores:
-    """The six stores over one client. Holds the client only: no read, write, query or transaction happens here."""
+    """The seven stores over one client. Holds the client only: no read, write, query or transaction happens here."""
+
+    def erase_followup(org_id: str, user: str) -> None:
+        from tilo_api.followup_draft_retention import followup_retention  # noqa: PLC0415
+
+        for policy in followup_retention(client, org_id, lambda: 0.0):
+            policy.erase_owner_complete(user)
+
     return PeopleStores(
         persons=FirestorePersonStore(client),
         meetings=FirestoreRecordStore(client, "meeting"),
@@ -409,6 +417,8 @@ def firestore_people_stores(client: Any) -> PeopleStores:
         pins=FirestoreRecordStore(client, "pinboard_item"),
         mentions=FirestoreRecordStore(client, "mention"),
         calendar=FirestoreRecordStore(client, "calendar_entry"),
+        world_shares=FirestoreRecordStore(client, "world_share"),
+        erase_followup=erase_followup,
     )
 
 

@@ -454,7 +454,7 @@ def test_PPL_11c_FS_11_once_founded_the_org_can_be_emptied_person_by_person(back
     assert erase_person(stores, org, "u_a")["person"] == 1  # not the last
     assert erase_person(stores, org, "u_b")["person"] == 1  # the last, and the org is founded
     assert erase_person(stores, org, "u_a") == dict.fromkeys(
-        ("meeting", "work_item", "pinboard_item", "mention", "calendar_entry", "person"), 0
+        ("meeting", "work_item", "pinboard_item", "mention", "calendar_entry", "world_share", "person"), 0
     ), "a second erase of someone already gone is all zeros"
 
 
@@ -462,7 +462,9 @@ def test_PPL_11c_FS_11_erasing_someone_who_is_not_the_sole_person_is_not_a_last_
     org, stores = unique_org(), backend.stores()
     sole = stores.persons.create(person("u_a", org, role="owner"))
     counts = erase_person(stores, org, "u_nobody")
-    assert counts == dict.fromkeys(("meeting", "work_item", "pinboard_item", "mention", "calendar_entry", "person"), 0)
+    assert counts == dict.fromkeys(
+        ("meeting", "work_item", "pinboard_item", "mention", "calendar_entry", "world_share", "person"), 0
+    )
     assert stores.persons.get(org, "u_a") == sole
 
 

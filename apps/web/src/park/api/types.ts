@@ -171,6 +171,8 @@ export interface World {
   isNew?: boolean;
   /** STARTER-1: the recorded sample project, served by tilo-api; a replay, not the person's work. */
   sample?: boolean;
+  /** BQ-CTX-TEAMWORLD: `team` for a teammate's world the person reads through a share (read only); absent = theirs. */
+  access?: "team";
   plan?: string | null;
   districts?: WorldDistrict[] | null;
   activity?: ActivityItem[];
@@ -428,8 +430,8 @@ export interface AgendaPlateRow {
 /** The plate supplies summaries, not a week, event duration, attendees or board ownership. */
 export type LiveAgenda = { [K in keyof Required<Agenda>]: null } & {
   plate: {
-    today: string;
-    asOf: string;
+    today: string | null;
+    asOf: string | null;
     rows: AgendaPlateRow[];
     parked: AgendaPlateRow[];
     truncated: boolean;
