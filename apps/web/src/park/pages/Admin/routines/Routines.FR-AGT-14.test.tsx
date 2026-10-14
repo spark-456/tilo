@@ -18,9 +18,9 @@
 import { act } from "react";
 import { type Root, createRoot } from "react-dom/client";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { ClientProvider } from "../../api/ClientProvider";
-import { HttpClient } from "../../api/http";
-import { PRESS_MS } from "../remote";
+import { ClientProvider } from "../../../../api/ClientProvider";
+import { HttpClient } from "../../../../api/http";
+import { PRESS_MS } from "../../../../screens/remote";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -100,7 +100,9 @@ const click = async (b: Element | undefined) => {
 };
 
 beforeAll(async () => {
-  ({ Routines } = (await import("./Routines")) as { Routines: () => React.JSX.Element });
+  ({ Routines } = (await import("./Routines")) as {
+    Routines: () => React.JSX.Element;
+  });
 });
 beforeEach(() => {
   container = document.createElement("div");

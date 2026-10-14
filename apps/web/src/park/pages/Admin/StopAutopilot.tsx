@@ -4,10 +4,10 @@
 // it. The page then says what the API answered and nothing before it (HR-1); a client that cannot
 // send it shows the control disabled with the reason, never a live-looking no-op.
 import { useEffect, useRef } from "react";
-import { useClient, useIsFixtureClient, useWorldKnown } from "../api/ClientProvider";
-import { canStopAutopilot, describeStop, useStopAutopilot } from "../world/autopilot";
-import { Placeholder } from "./Placeholder";
-import { nameOf } from "./kit";
+import { useClient, useIsFixtureClient, useWorldKnown } from "../../../api/ClientProvider";
+import { canStopAutopilot, describeStop, useStopAutopilot } from "../../../world/autopilot";
+
+import { nameOf } from "./shared";
 
 export function StopAutopilot({ worldId }: { worldId: string }) {
   const client = useClient();
@@ -37,7 +37,9 @@ export function StopAutopilot({ worldId }: { worldId: string }) {
   if (!canStopAutopilot(client) || !known) {
     return (
       <div className="stop-autopilot" data-testid="stop-autopilot" data-stop="unavailable">
-        <Placeholder label="Stop all autopilot" danger />
+        <button type="button" disabled aria-disabled="true" title="Coming soon">
+          Stop all autopilot Coming soon
+        </button>
         {!known && <p className="stop-note">There is no world to stop autopilot in yet.</p>}
       </div>
     );
