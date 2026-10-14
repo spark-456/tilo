@@ -16,8 +16,8 @@ WEB = "https://essential-wares-510320-f0.web.app"
 API_PATTERN = re.compile(r"https://tilo-api-(?:[a-z0-9]+-as\.a\.run\.app|[0-9]+\.asia-southeast1\.run\.app)")
 API_REFERENCE = re.compile(API_PATTERN.pattern + r"(?![A-Za-z0-9./:?#+_%=-])")
 MAX_BYTES = 20 * 1024 * 1024
-MAX_ASSETS = 32
-JS_REFERENCE = re.compile(r"""["']((?:\./|/assets/)[^"'\s?#]+\.js)["']""")
+MAX_ASSETS = 128  # bounded Vite graph: the deployed Park build exceeds 32 chunks
+JS_REFERENCE = re.compile(r"""["']((?:\./|/?assets/)[^"'\s?#]+\.js)["']""")
 
 
 def bundle_hash(assets: list[tuple[str, str]]) -> str:
@@ -69,8 +69,11 @@ def main(argv: Sequence[str], *, transport: httpx.BaseTransport | None = None) -
         print("FAIL url: expected the tilo-api Cloud Run URL")
         return 1
     api = argv[0]
-    results: dict[str, bool] = dict.fromkeys(("sign-in", "bundle-api", "healthz", "cors-intake", "plate-auth"), False)
+    results: dict[str, bool] = dict.fromkeys(
+        ("sign-in", "bundle-api", "health", "healthz", "cors-intake", "plate-auth"), False
+    )
     target = ""
+    healthz_absent = False
     if len(argv) == 4:
         if not re.fullmatch(r"tilo-api-[a-z0-9-]+", argv[1]) or not re.fullmatch(r"[a-f0-9]{64}", argv[3]):
             print("FAIL release: expected revision, traffic JSON file and previous SHA256")
@@ -117,7 +120,10 @@ def main(argv: Sequence[str], *, transport: httpx.BaseTransport | None = None) -
                     raise ValueError("asset status")
                 bundles.append(source)
                 assets.append((url, source))
-                pending.extend(urljoin(url, path) for path in JS_REFERENCE.findall(source))
+                pending.extend(
+                    urljoin(WEB + "/" if path.startswith("assets/") else url, path)
+                    for path in JS_REFERENCE.findall(source)
+                )
             bundle = "\n".join(bundles)
             results["sign-in"] = "Continue with Google" in page or "Continue with Google" in bundle
             found = set(API_REFERENCE.findall(bundle))
@@ -127,9 +133,11 @@ def main(argv: Sequence[str], *, transport: httpx.BaseTransport | None = None) -
                 if len(argv) == 4:
                     print(f"BUNDLE-SHA256 {fingerprint}")
                     results["bundle-changed"] = fingerprint != argv[3]
-        except (httpx.HTTPError, ValueError):
-            pass
+        except (httpx.HTTPError, ValueError) as exc:
+            reason = str(exc) if isinstance(exc, ValueError) else type(exc).__name__
+            print(f"FAIL asset-graph: {reason}")
         for label, method, path in (
+            ("health", "GET", "/health"),
             ("healthz", "GET", "/healthz"),
             ("cors-intake", "OPTIONS", "/intake"),
             ("plate-auth", "GET", "/v1/plate"),
@@ -145,6 +153,8 @@ def main(argv: Sequence[str], *, transport: httpx.BaseTransport | None = None) -
                         }
                     )
                 status, response_headers, _ = fetch(method, api + path, headers=headers)
+                if label == "healthz":
+                    healthz_absent = status == 404
                 ok = status == (401 if label == "plate-auth" else 200)
                 if label == "cors-intake":
                     allowed = {
@@ -168,5 +178,13 @@ def main(argv: Sequence[str], *, transport: httpx.BaseTransport | None = None) -
             except (httpx.HTTPError, ValueError):
                 pass
     for label, passed in results.items():
-        print(f"{'PASS' if passed else 'FAIL'} {label}")
-    return 0 if all(results.values()) else 1
+        if label == "healthz" and healthz_absent:
+            print("NOT DEPLOYED healthz: HTTP 404; /healthz is not deployed yet")
+        else:
+            print(f"{'PASS' if passed else 'FAIL'} {label}")
+    if all(results.values()):
+        return 0
+    # Distinguish a missing deployment endpoint from broken Hosting/security checks.
+    if len(argv) == 1 and healthz_absent and all(value for key, value in results.items() if key != "healthz"):
+        return 2
+    return 1
