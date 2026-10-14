@@ -4,7 +4,8 @@ The scoped caller supplies trusted source metadata, its retention deadline and a
 source validator. Bodies and emit markers share that policy. The existing draft adapter
 must atomically create this envelope with its payload, then apply read() to every read.
 Cleanup uses the same store-door client and collection; no client/store/env is created here.
-erase_owner/purge_expired need explicit owner-deletion/meeting-retention wiring before activation.
+Meeting deletion calls erase_meeting_complete after its tombstone. Owner erasure and the
+expiry sweep still need explicit production wiring before activation.
 """
 
 from __future__ import annotations
@@ -132,3 +133,56 @@ class DraftRetention:
         if not _finite(now):
             raise _closed()
         return self._cleanup("expires_at", "<=", now, limit)
+
+    def _meeting_query(self, owner: str, meeting_id: str, limit: int) -> Any:
+        _id(owner, "u")
+        _id(meeting_id, "mt")
+        if type(limit) is not int or not 1 <= limit <= 200:
+            raise ValueError("invalid cleanup limit")
+        return (
+            self.client.collection(self.collection)
+            .where(filter=FieldFilter("owner", "==", owner))
+            .where(filter=FieldFilter("source.meeting_id", "==", meeting_id))
+            .limit(limit)
+        )
+
+    def erase_meeting(self, owner: str, meeting_id: str, *, limit: int = 200) -> int:
+        """One indexed pass, with snapshot preconditions; replacements survive for a fresh pass."""
+        _id(owner, "u")
+        _id(meeting_id, "mt")
+        removed = 0
+        try:
+            for found in self._meeting_query(owner, meeting_id, limit).stream():
+                row = found.to_dict()
+                if (
+                    not isinstance(row, dict)
+                    or row.get("org_id") != self.org
+                    or row.get("owner") != owner
+                    or not isinstance(row.get("source"), dict)
+                    or row["source"].get("meeting_id") != meeting_id
+                    or re.fullmatch(r"[0-9a-f]{64}", found.id) is None
+                ):
+                    raise _closed()
+                try:
+                    self.client.document(f"{self.collection}/{found.id}").delete(
+                        option=self.client.write_option(last_update_time=found.update_time)
+                    )
+                    removed += 1
+                except (FailedPrecondition, NotFound):
+                    continue
+        except Exception:
+            raise _closed() from None
+        return removed
+
+    def erase_meeting_complete(self, owner: str, meeting_id: str, *, passes: int = 3, limit: int = 200) -> None:
+        """Bounded drain after source tombstoning; completion requires a separate fresh indexed read."""
+        if type(passes) is not int or not 1 <= passes <= 3:
+            raise ValueError("invalid cleanup passes")
+        for _ in range(passes):
+            self.erase_meeting(owner, meeting_id, limit=limit)
+            try:
+                if next(iter(self._meeting_query(owner, meeting_id, 1).stream()), None) is None:
+                    return
+            except Exception:
+                raise _closed() from None
+        raise _closed()  # retry the already-deleted source; never claim partial cleanup complete

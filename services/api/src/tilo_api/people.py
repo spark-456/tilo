@@ -21,6 +21,7 @@ from tilo_people.stores import PeopleStores
 from tilo_api import deps, people_items
 from tilo_api.meeting_bot import attend_meeting
 from tilo_api.meeting_bot_rpc import MeetingBotRpc, get_meeting_bot_client
+from tilo_api.meeting_draft_cleanup import get_meeting_draft_cleanup
 from tilo_api.meeting_host import HostSeams, get_host_seams, host_meeting
 from tilo_api.meeting_host_rpc import MeetingHostRpc
 from tilo_api.meeting_join import owner_join
@@ -321,11 +322,12 @@ def delete_meeting_route(
     stores: Annotated[PeopleStores, Depends(deps.get_people_stores)],
     artifacts: Annotated[ArtifactStore, Depends(deps.get_artifact_store)],
     clock: Annotated[Callable[[], str], Depends(deps.get_clock)],
+    cleanup: Annotated[Callable[[str, str], None] | None, Depends(get_meeting_draft_cleanup)],
 ) -> dict[str, Any]:
     """The meeting owner deletes it and everything made from it (FR-MTG-10); needs the artifact store (503 without)."""
     if _MEETING_ID.fullmatch(meeting_id) is None:
         raise _not_found()
-    return _answer(lambda: remove_meeting(_writer(principal, stores, clock), artifacts, meeting_id))
+    return _answer(lambda: remove_meeting(_writer(principal, stores, clock), artifacts, meeting_id, cleanup=cleanup))
 
 
 @router.post("/v1/work-items/{work_item_id}/confirm")
