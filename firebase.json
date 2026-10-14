@@ -12,6 +12,10 @@
     ],
     "headers": [
       {
+        "source": "**/*.jsonl",
+        "headers": [{ "key": "Content-Type", "value": "application/x-ndjson" }]
+      },
+      {
         "source": "**",
         "headers": [
           {
