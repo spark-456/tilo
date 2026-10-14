@@ -30,6 +30,7 @@ export interface Today {
 }
 
 export interface Decision {
+  questionOptions?: { id: string; label: string }[];
   k: DecisionKey;
   world: string;
   title: string;

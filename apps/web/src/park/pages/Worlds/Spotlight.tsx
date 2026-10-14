@@ -1,5 +1,6 @@
 // "Waiting for you" (the amber box with one card per decision) and the "all caught up" banner.
 import type { Dec, Decision, DecisionKey } from "../../api/types";
+import { QuestionAnswer } from "../../app/QuestionAnswer";
 import { DecisionFields } from "../../app/DecisionFields";
 import {
   type SlackShareRequest,
@@ -18,7 +19,7 @@ interface SpotlightProps {
   worldName: string;
   dec: Dec;
   needsLeft: number;
-  onDecide: (key: DecisionKey) => void;
+  onDecide: (key: DecisionKey, text?: string, option?: string) => void;
   onOpen: (worldId: string) => void;
   slackPending?: SlackShareRequest | null;
 }
@@ -49,7 +50,8 @@ function DecisionCard({
       ) : (
         <div className="park-worlds-dec__actions">
           {d.provide && <DecisionFields d={d} />}
-          {d.yes !== "" && (
+          {d.questionOptions && <QuestionAnswer d={d} onDecide={onDecide} />}
+          {!d.questionOptions && d.yes !== "" && (
             <button type="button" className="park-worlds-dec__yes" onClick={() => onDecide(d.k)}>
               {d.yes}
             </button>

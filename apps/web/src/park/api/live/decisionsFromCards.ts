@@ -45,6 +45,9 @@ function decisionOf({ world_id, card_id, card }: CardFeedItem): Decision {
   const id = answerOption(card);
   return {
     k: decisionKey(world_id, card_id),
+    ...(card.kind === "needs_you" && !needsFields(card)
+      ? { questionOptions: card.options.map(({ id, label }) => ({ id, label })) }
+      : {}),
     world: world_id,
     title: card.what_happened,
     body: bodyOf(card),

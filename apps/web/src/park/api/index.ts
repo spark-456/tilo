@@ -93,7 +93,7 @@ export interface Api {
   getUserSettings(): R<UserSettings>;
   /** The whole document, answered by the stored one. Saved only when the answer's `source` is "live". */
   saveUserSettings(update: UserSettingsUpdate): R<UserSettings>;
-  decide(key: DecisionKey): R<DecideAck>;
+  decide(key: DecisionKey, text?: string, option?: string): R<DecideAck>;
   undo(key: DecisionKey): R<DecideAck>;
   startWorld(mode: TierKey, query: string): R<StartAck>;
   saveSkill(skill: Skill): R<Ack>;

@@ -42,7 +42,7 @@ export interface AppCtx {
   params: Params;
   go: (page: PageId, params?: Params) => void;
   dec: Dec;
-  decide: (key: DecisionKey) => void;
+  decide: (key: DecisionKey, text?: string, option?: string) => void;
   needsLeft: number;
   added: World[];
   addWorld: (mode: TierKey, query: string) => World;

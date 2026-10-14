@@ -30,13 +30,15 @@ from typing import Any, Protocol
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import jsonschema
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 from referencing import Registry, Resource
 from referencing.jsonschema import DRAFT202012
 from tilo_harness.question_wait import AlreadyCommitted  # raised by an event writer; one class for both sides
+from tilo_redact import redact
 
+from tilo_api import deps
 from tilo_api.deps import Principal, get_current_principal
 from tilo_api.redaction import _DISTRICT_RE, _safe_districts
 
@@ -276,7 +278,10 @@ class CardStore:
         merge_window_s: int = 60,
         preferences: Any | None = None,
         notifier: Callable[[dict], None] | None = None,
+        safety: Any | None = None,
+        redactor: Callable[[str], str] = redact,
     ) -> None:
+        self._safety, self._redactor = safety, redactor
         self._clock = clock
         self._writer = writer
         self._world_owners = dict(world_owners or {})
@@ -599,7 +604,9 @@ class CardStore:
         world_id: str,
         card_id: str,
         *,
-        option: str,
+        option: str | None = None,
+        text: str | None = None,
+        safety: Any | None = None,
         channel: str,
         principal: Principal,
         console_domain: str | None = None,
@@ -629,7 +636,24 @@ class CardStore:
                 return AnswerResult("rejected", "busy", ())
 
             card = record.card
-            if option not in {o["id"] for o in card["options"]}:
+            answer_key_text = text
+            if (option is None) == (text is None):
+                return AnswerResult("rejected", "Choose an option or type an answer.", ())
+            if text is not None:
+                if record.kind != "needs_you":
+                    return AnswerResult("rejected", "You can only type an answer to a question.", ())
+                if not isinstance(text, str) or not 1 <= len(text) <= 300 or not text.strip():
+                    return AnswerResult("rejected", "Use 1 to 300 characters with at least one word.", ())
+                try:
+                    text = self._redactor(text)
+                    if not 1 <= len(text) <= 300 or not text.strip():
+                        return AnswerResult("rejected", "Please shorten your answer and try again.", ())
+                    verdict = (safety or self._safety).check(text)
+                    if verdict["flagged"] is not False:
+                        return AnswerResult("rejected", "Please reword your answer and try again.", ())
+                except Exception:
+                    return AnswerResult("rejected", "Your answer could not be checked. Please try again.", ())
+            if option is not None and option not in {o["id"] for o in card["options"]}:
                 return AnswerResult("rejected", "invalid_option", ())
             if channel not in card["answer_channels"] or channel not in _ANSWER_CHANNELS:
                 # SEC-06: a gate opens only in a signed-in session; any other channel is refused, whatever a card lists
@@ -637,7 +661,7 @@ class CardStore:
             if channel == "email" and record.kind != "needs_you":
                 return AnswerResult("rejected", "invalid_channel", ())  # email answers a plain question only (CH-RM)
 
-            who = (option, channel, principal.user_id, principal.role)
+            who = (option, answer_key_text, channel, principal.user_id, principal.role)
             authz = {"by": "person", "ref": principal.user_id, "at": self._clock.now()}
             if record.attempt is not None and record.attempt[0] == who:
                 part: dict | None = record.attempt[1]  # this answer again after a write that raised: resend it as is
@@ -654,20 +678,25 @@ class CardStore:
                 part = self._part(record, "connection.consented", data, authz=authz) if option == "connect" else None
             else:
                 by = "team_lead" if principal.role == "team_lead" else "person"
-                part = self._part(record, "question.answered", {"answered_by": by}) | {"option": option}
-                # `option` is scope for the waiting agent (BQ-207), not event data: the event stays {answered_by}
+                data = {"answered_by": by}
+                if text is not None:
+                    data["text"] = text
+                part = self._part(record, "question.answered", data) | {"option": option}
+                # The chosen option is scope; typed text belongs to the question event data.
             if part is None:
                 return AnswerResult("answered", None, ())
             record.group.resolving = True  # exactly one resolution per card: later answers and tick see this
         if not self._write_then_close(record, who, part):
             return AnswerResult("rejected", "already_resolved", ())  # an earlier answer committed: it won
         if principal.role == "team_lead" and part["type"] == "question.answered":
-            self._note_answer(record, principal.user_id, option, authz["at"])
+            self._note_answer(record, principal.user_id, option, authz["at"], text)
         return AnswerResult("answered", None, (part,))
 
-    def _note_answer(self, record: _Record, user_id: str, option: str, at: str) -> None:
+    def _note_answer(self, record: _Record, user_id: str, option: str | None, at: str, text: str | None = None) -> None:
         seconds = (_parse_ts(at) - _parse_ts(record.card["created_at"])).total_seconds()
         entry = {"world_id": record.world_id, "user_id": user_id, "card_id": record.card["id"], "option": option}
+        if text is not None:
+            entry["answer"] = text
         with self._lock:
             self._answers_by_lead.append({**entry, "answered_at": at, "answer_time_s": seconds})
 
@@ -750,9 +779,28 @@ class _AnswerBody(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    option: str
+    option: str | None = None
+    text: str | None = Field(default=None, min_length=1, max_length=300, pattern=r"\S")
     channel: str = "web"
     pin_verified: bool = False
+
+    @model_validator(mode="after")
+    def exactly_one_answer(self) -> _AnswerBody:
+        if (self.option is None) == (self.text is None):
+            raise HTTPException(status_code=400, detail="Choose an option or type an answer.")
+        return self
+
+
+def answer_safety(
+    body: _AnswerBody,
+    request: Request,
+    mode: Any = Depends(deps.get_mode),
+    switches: Any = Depends(deps.get_switches),
+) -> Any:
+    if body.text is None:
+        return None
+    override = request.app.dependency_overrides.get(deps.get_safety)
+    return override() if override else deps.get_safety(mode, request, switches)
 
 
 def session_allows(principal: Principal, claimed: str, from_channels: bool) -> bool:
@@ -855,6 +903,7 @@ def build_router(
         world_id: str,
         card_id: str,
         body: _AnswerBody,
+        safety: Any = Depends(answer_safety),
         principal: Principal = Depends(get_current_principal),
         from_channels: bool = Depends(get_channels_caller),
         store: CardStore = Depends(get_cards),
@@ -876,6 +925,8 @@ def build_router(
                 world_id,
                 card_id,
                 option=body.option,
+                text=body.text,
+                safety=safety,
                 channel=body.channel,
                 principal=actor,
             )
@@ -890,7 +941,12 @@ def build_router(
                 )  # fmt: skip
             return JSONResponse(status_code=200, content={"outcome": "answered"})
         return JSONResponse(
-            status_code=_STATUS.get(result.reason or "", 400), content={"outcome": "rejected", "reason": result.reason}
+            status_code=_STATUS.get(result.reason or "", 400),
+            content={
+                "outcome": "rejected",
+                "reason": result.reason,
+                **({"detail": result.reason} if " " in (result.reason or "") else {}),
+            },
         )
 
     return router
