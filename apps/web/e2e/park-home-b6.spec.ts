@@ -12,7 +12,13 @@ test("UI_10_B6_the_demo_recorded_run_address_shows_a_replay_not_not_found", asyn
   await expect(
     page.getByText("This is a recorded sample, not your task. No work is being sent."),
   ).toBeVisible();
-  await expect(page.locator("[data-park] nav")).toBeVisible();
+  // W20: Main is the Park shell; the recorded stage also retains its Lens navigation.
+  await expect(
+    page.locator("[data-park]").getByRole("navigation", { name: "Main", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.locator("[data-park]").getByRole("navigation", { name: "Lens", exact: true }),
+  ).toBeVisible();
   await expect(page.getByText("Fixture replay")).toHaveCount(0);
   await expect(page.getByTestId("trace-row").first()).toBeAttached({ timeout: 60_000 });
   await expect(page.getByText("Not found")).toHaveCount(0);
