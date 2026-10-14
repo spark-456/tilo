@@ -14,6 +14,7 @@ const KEPT: readonly RegExp[] = [
   /^\/(?:plate|pinboards|calendar|more)\/?$/,
   /^\/library(?:\/artifacts)?\/?$/,
   /^\/meetings(?:\/[^/]+)?\/?$/,
+  /^\/share\/[^/]+\/?$/, // FR-HIL-12: an Approver's shared link (share/SharePage.tsx)
   /^\/worlds\/replays\/?$/,
   /^\/team\/console\/?$/,
   // dev only, as in screens/routes.tsx: the screens index, the cards gallery and the component sheet
