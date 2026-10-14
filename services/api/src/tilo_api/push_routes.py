@@ -42,7 +42,7 @@ def small_json_body[Body: BaseModel](model: type[Body]):  # noqa: ANN201
         if request.headers.get("content-type", "").split(";")[0].strip().lower() != "application/json":
             raise Refusal(415, "Send application/json.")
         declared = request.headers.get("content-length", "")
-        if declared.isdigit() and int(declared) > MAX_BODY_BYTES:
+        if declared.isascii() and declared.isdigit() and int(declared) > MAX_BODY_BYTES:
             raise Refusal(413, "body_too_large")
         chunks: list[bytes] = []
         size = 0

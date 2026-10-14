@@ -31,6 +31,18 @@ DESK = "w_desk_priya"
 IN_WINDOW = "2026-10-06T05:00:00.000Z"  # 10:30 IST, inside 09:00 to 18:00
 
 
+def test_FR_CHN_18b_OLD_4_failed_policy_emit_abandons_the_queued_plate(people_rig, monkeypatch):
+    env = _env(people_rig, monkeypatch)
+
+    def fail_emit(self, part):
+        raise RuntimeError("offline event writer unavailable")
+
+    monkeypatch.setattr(plate_mailer.DeskEvents, "applied", fail_emit)
+    assert env.tick() == 0
+    assert env.gmail.sent == []
+    assert [entry["state"] for entry in env.outbox.all_entries()] == ["failed"]
+
+
 class FakeGmail:
     """`ConnectorRpcStub`'s outbox face: `bound(...)` is the run's copy, `hand_evidence` its case, `execute_side_effect`
     the one send (grant first). `mode` makes it fail the way connectors can."""

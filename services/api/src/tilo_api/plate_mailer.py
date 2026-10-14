@@ -186,6 +186,9 @@ class _EvidenceOutbox:
     def cancel(self, outbox_id: str) -> dict:
         return self._inner.cancel(outbox_id)
 
+    def abandon(self, outbox_id: str) -> dict:
+        return self._inner.abandon(outbox_id)
+
     def get(self, outbox_id: str) -> dict | None:
         return self._inner.get(outbox_id)
 

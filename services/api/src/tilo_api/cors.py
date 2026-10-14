@@ -13,6 +13,7 @@ from __future__ import annotations
 import os
 import re
 from collections.abc import Mapping
+from typing import TypedDict
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -24,7 +25,16 @@ PRODUCTION_ORIGINS = (
     "https://essential-wares-510320-f0.web.app",
     "https://essential-wares-510320-f0.firebaseapp.com",
 )
-_OPTIONS = {
+
+
+class _CorsOptions(TypedDict):
+    allow_methods: list[str]
+    allow_headers: list[str]
+    expose_headers: list[str]
+    allow_credentials: bool
+
+
+_OPTIONS: _CorsOptions = {
     "allow_methods": ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     "allow_headers": ["Content-Type", "Idempotency-Key", "X-Firebase-AppCheck", "Authorization", "X-Tilo-Channel"],
     "expose_headers": ["Retry-After"],

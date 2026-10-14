@@ -100,14 +100,9 @@ function PersonalLedgerPage({ app }: LedgerPageProps) {
         </div>
         {month ? (
           <div className="park-ledger-actions">
+            {/* UI-10 / W12: /costs has no per-month query; the fixture also holds one period. */}
             <span className="park-ledger-month">
-              <Button
-                variant="secondary"
-                onClick={() => app.toast("August and earlier months live here")}
-              >
-                {periodOf(L).month} {periodOf(L).year}
-                {icon("chevD", 13)}
-              </Button>
+              {periodOf(L).month} {periodOf(L).year}
             </span>
             <Button
               variant="secondary"

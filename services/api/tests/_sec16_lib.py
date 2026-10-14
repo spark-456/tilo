@@ -215,7 +215,7 @@ def build(
 ) -> Sec16:
     """`judge_live` sets TILO_JUDGE_LIVE=1, the deployment's permission for judges' live models (SEC-15). `ledger`
     is a ready ledger (a spy over the real one by default); pass `None` to leave the production seam unwired."""
-    from tilo_api import app, deps  # noqa: PLC0415
+    from tilo_api import app, deps, rate_limit  # noqa: PLC0415
     from tilo_api.spend import RateLimiter  # noqa: PLC0415
 
     sec = _sec15_lib.build(
@@ -228,6 +228,11 @@ def build(
         ledger = SpyLedger(make_ledger(caps))
     clock = FakeClock()
     limiter = SpyLimiter(RateLimiter(limit=caps.rate_limit_requests, window_s=caps.rate_limit_window_s, clock=clock))
+    # OLD-4: both installed limiter layers follow the same test clock. Keep the
+    # SEC-10 edge limiter and its configured quotas; advancing a SEC-16 window
+    # must also refill the edge buckets rather than exhaust a real-time singleton.
+    edge_limiter = rate_limit.InMemoryRateLimiter(clock=clock)
+    app.dependency_overrides[rate_limit.get_rate_limiter] = lambda: edge_limiter
     if flags is not None:
         app.dependency_overrides[deps.get_flag_store] = lambda: flags
     app.dependency_overrides[seam(deps, "get_spend_caps")] = lambda: caps
