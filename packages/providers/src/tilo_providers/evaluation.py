@@ -32,7 +32,8 @@ class FakeEvalProvider(EvalProvider):
 def build_eval_provider(config: ProvidersConfig, *, live_permitted: bool = False) -> EvalProvider:
     """`fake` -> `FakeEvalProvider` (refused when live or deployed); `vertex_eval` -> the live adapter (needs the live
     switch or `live_permitted`, SEC-15; project from `GOOGLE_CLOUD_PROJECT`, location from `TILO_VERTEX_EVAL_LOCATION`,
-    default asia-southeast1). Anything else, or a missing role, is a `ProviderConfigError`."""
+    falling back to `GOOGLE_LOCATION` (default global, W-EVAL-LOC)). Anything else, or a missing role,
+    is a `ProviderConfigError`."""
     if EVAL_ROLE not in config.roles:
         raise ProviderConfigError(f"VERTEX-EVAL-1: config has no {EVAL_ROLE!r} role")
     profile_id = config.roles[EVAL_ROLE].primary
@@ -55,7 +56,7 @@ def build_eval_provider(config: ProvidersConfig, *, live_permitted: bool = False
         raise ProviderConfigError(
             f"VERTEX-EVAL-1: GOOGLE_CLOUD_PROJECT is not set; cannot judge live for {profile_id!r}"
         )
-    location = os.environ.get("TILO_VERTEX_EVAL_LOCATION", "asia-southeast1")
+    location = os.environ.get("TILO_VERTEX_EVAL_LOCATION", os.environ.get("GOOGLE_LOCATION", "global"))
     from tilo_providers import vertex_eval_adapter  # noqa: PLC0415  (lazy: the fake never loads it)
 
     return vertex_eval_adapter.VertexEvalProvider(

@@ -13,7 +13,7 @@ Ambiguities resolved (listed in the report):
 - The explanation sits inside the metric result (`pairwiseMetricResult.explanation`,
   `pointwiseMetricResult.explanation`), as in the v1 REST reference the design cites; `autoraterConfig` is a
   top-level body field next to `pairwiseMetricInput` / `pointwiseMetricInput`.
-- Location accepts regions only (`asia-southeast1` shape), like Model Armor's pattern; `global` is not tested.
+- Location accepts regions and `global` (W-EVAL-LOC); the global host has no location prefix.
 - A 3xx or a non-200 2xx is not a verdict: any `ProviderError`.
 - The "explanation is redacted, then capped at 500" test pins the order with an API key that straddles the cut.
 - `build_eval_provider(..., live_permitted=True)` builds the live adapter without the live switch and without any
@@ -60,6 +60,7 @@ def _clean_env(monkeypatch, tmp_path):
         "CLOUD_RUN_JOB",
         "GOOGLE_CLOUD_PROJECT",
         "TILO_VERTEX_EVAL_LOCATION",
+        "GOOGLE_LOCATION",
         "GOOGLE_APPLICATION_CREDENTIALS",
         "GOOGLE_API_KEY",
     ):
@@ -218,6 +219,37 @@ def _vertex_config():
     return build_providers_config(models, prices_config_for({"vertex-eval": (0.5, 2.0)}))
 
 
+@pytest.mark.parametrize(
+    ("google_location", "eval_location", "expected"),
+    [
+        (None, None, "global"),
+        ("global", None, "global"),
+        ("us-central1", None, "us-central1"),
+        ("global", "europe-west4", "europe-west4"),
+    ],
+)
+def test_W_EVAL_LOC_VERTEX_EVAL_1_factory_uses_google_location_unless_overridden(
+    monkeypatch, google_location, eval_location, expected
+):
+    from tilo_providers.evaluation import build_eval_provider  # noqa: PLC0415
+
+    monkeypatch.setenv("GOOGLE_CLOUD_PROJECT", PROJECT)
+    monkeypatch.delenv("GOOGLE_LOCATION", raising=False)
+    if google_location is not None:
+        monkeypatch.setenv("GOOGLE_LOCATION", google_location)
+    if eval_location is not None:
+        monkeypatch.setenv("TILO_VERTEX_EVAL_LOCATION", eval_location)
+    provider = build_eval_provider(_vertex_config(), live_permitted=True)
+    assert provider._location == expected
+
+
+def test_W_EVAL_LOC_VERTEX_EVAL_1_global_uses_unprefixed_host_with_global_path():
+    provider, calls = _provider(location="global")
+    provider.evaluate(_request())
+    assert calls.requests[0].url.host == "aiplatform.googleapis.com"
+    assert calls.requests[0].url.path == f"/v1/projects/{PROJECT}/locations/global:evaluateInstances"
+
+
 def test_VERTEX_EVAL_1_build_live_adapter_reads_project_and_location_from_the_environment(monkeypatch):
     from tilo_providers import vertex_eval_adapter  # noqa: PLC0415
     from tilo_providers.evaluation import build_eval_provider  # noqa: PLC0415
@@ -238,7 +270,8 @@ def test_VERTEX_EVAL_1_build_live_adapter_reads_project_and_location_from_the_en
 
     monkeypatch.setenv("GOOGLE_CLOUD_PROJECT", PROJECT)
     build_eval_provider(config)
-    assert (seen[-1]["project"], seen[-1]["location"], seen[-1]["model"]) == (PROJECT, "asia-southeast1", MODEL)
+    # W-EVAL-LOC changes the default; keep the exact project/location/model assertion.
+    assert (seen[-1]["project"], seen[-1]["location"], seen[-1]["model"]) == (PROJECT, "global", MODEL)
 
     monkeypatch.setenv("TILO_VERTEX_EVAL_LOCATION", "us-central1")
     build_eval_provider(config)
