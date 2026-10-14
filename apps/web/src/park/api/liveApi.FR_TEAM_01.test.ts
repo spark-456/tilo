@@ -67,9 +67,15 @@ describe("FR_TEAM_01 LIVE_GAPS_1A directory", () => {
     });
     expect(data.people[1]).toMatchObject({ role: "Member", email: null, memberships: ["t_ops"] });
   });
-  it.each([404, 503])("LIVE_GAPS_1A preserves the HTTP error %i", async (status) => {
-    const { api } = make({ detail: "unavailable" }, status);
-    await expect(api.getTeam()).rejects.toMatchObject({ status });
+  it("LIVE_GAPS_1A preserves the HTTP error 503", async () => {
+    const { api } = make({ detail: "unavailable" }, 503);
+    await expect(api.getTeam()).rejects.toMatchObject({ status: 503 });
+  });
+  // LIVE-PEOPLE (b80c2b50): a 404 is the founding state (no person record yet), read as "set up" with nothing listed.
+  it("LIVE_PEOPLE_a_404_is_the_set_up_state_with_no_people", async () => {
+    const { api } = make({ detail: "Not Found" }, 404);
+    const { data } = await api.getTeam();
+    expect(data).toMatchObject({ setupRequired: true, people: [], coverage: [] });
   });
   it.each([
     {},

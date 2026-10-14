@@ -4,9 +4,11 @@ import { cleanup, renderAgenda } from "../../../../test-support/park/agendaHarne
 import { createLiveApi } from "../../api/liveApi";
 
 afterEach(cleanup);
-it("PE_26 W2 no person record shows empty Agenda work without a load error", async () => {
+// LIVE-PEOPLE (b80c2b50): no person record is the founding state, so the page says to set the organisation up
+// (not "Nothing on your plate", which would claim an empty plate) and still shows no load error or sample rows.
+it("PE_26 W2 no person record shows the set-up state without a load error", async () => {
   const { container } = await mount({ detail: "Not Found" }, 404);
-  expect(container.textContent).toContain("Nothing on your plate");
+  expect(container.textContent).toContain("Set up your organisation to see your team and agenda.");
   expect(container.textContent).not.toMatch(/The Agenda could not load|Prepare notes|2026-10-09/);
 });
 const body = {

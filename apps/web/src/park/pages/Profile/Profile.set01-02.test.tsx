@@ -25,6 +25,8 @@ import {
 afterEach(cleanup);
 
 const boom = new TiloApiError("Tilo had a problem on its side.", 500, true, true);
+// A read (GET) that failed is not a write: it names the server's trouble, not an unconfirmed save (M2-CODES-1).
+const readBoom = new TiloApiError("Tilo had a problem on its side.", 500, true, false);
 const stale = new TiloApiError(
   "That cannot be done right now.",
   409,
@@ -135,7 +137,7 @@ describe("FR_SET_01_profile_saved_per_person", () => {
       ...api,
       getUserSettings: async () => {
         calls += 1;
-        if (calls === 1) throw boom;
+        if (calls === 1) throw readBoom;
         if (calls === 2) throw signedOut;
         return api.getUserSettings();
       },
