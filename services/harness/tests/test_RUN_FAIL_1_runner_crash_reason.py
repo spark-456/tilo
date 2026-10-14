@@ -72,9 +72,10 @@ def test_RUN_FAIL_1_a_runner_crash_fails_its_unit_with_a_plain_reason_and_an_err
     assert result.failed == ["U1"] and result.outcomes["U2"].success is True
     assert result.outcomes["U1"].reason == "the model service refused a step's request"
     (line,) = [r.getMessage() for r in caplog.records if r.levelno >= logging.ERROR]
+    # SILENT-FAILS (147820ff) appends the run and world ids to the error line.
     assert line == (
         "unit U1 failed: the model service refused a step's request "
-        "[RouterRequestError <- RequestError; attempts: lite-31 RequestError]"
+        "[RouterRequestError <- RequestError; attempts: lite-31 RequestError] run=r_test_1 world=w_crash"
     )
     assert SECRET not in caplog.text
 
