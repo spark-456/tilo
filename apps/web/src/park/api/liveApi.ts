@@ -247,6 +247,7 @@ function isCardPage(v: unknown): v is { cards: CardFeedItem[]; next_cursor: stri
 interface Answerable {
   path: string;
   option: string;
+  question: boolean;
 }
 
 export function createLiveApi(options: LiveApiOptions = {}): Api {
@@ -415,18 +416,27 @@ export function createLiveApi(options: LiveApiOptions = {}): Api {
     for (const { world_id, card_id, card } of items) {
       if (needsFields(card)) continue; // typed in the fields form: a tap on it would answer `provide` with nothing
       const path = `/worlds/${encodeURIComponent(world_id)}/cards/${encodeURIComponent(card_id)}/answer`;
-      served.set(decisionKey(world_id, card_id), { path, option: answerOption(card) as string });
+      served.set(decisionKey(world_id, card_id), {
+        path,
+        option: answerOption(card) as string,
+        question: card.kind === "needs_you",
+      });
     }
     return { data: decisionsFromCards(items), source: "live" };
   };
   // One POST per call: no retry, no refresh (a person answers once, HR-1..HR-7). A 404 means the session's world is
   // not the card's world, so the page offers "Open in world" (code open_in_world; `Decision.world` is that world).
-  api.decide = async (key: DecisionKey) => {
+  api.decide = async (key: DecisionKey, text?: string, option?: string) => {
     const target = served.get(key);
     if (!target) throw new TiloApiError("That decision is not on this page any more.", null, false);
     let body: unknown;
     try {
-      body = await http.postJson(target.path, { option: target.option });
+      if ((text !== undefined || option !== undefined) && !target.question)
+        throw new TiloApiError("You can only type an answer to a question.", null, false);
+      body = await http.postJson(
+        target.path,
+        text !== undefined ? { text } : { option: option ?? target.option },
+      );
     } catch (e) {
       if (e instanceof TiloApiError && e.status === 404) {
         throw new TiloApiError(e.message, 404, false, true, "open_in_world");

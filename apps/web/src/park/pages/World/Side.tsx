@@ -1,6 +1,7 @@
 // The side column of the World page: the Waiting for you card, Spend, the Lovable handoff card, and the facts with skills and tools.
 import type { MouseEvent, ReactNode } from "react";
 import type { BuildHandoff, Dec, Decision, DecisionKey, Skill, World } from "../../api/types";
+import { QuestionAnswer } from "../../app/QuestionAnswer";
 import { DecisionFields } from "../../app/DecisionFields";
 import {
   type SlackShareRequest,
@@ -43,7 +44,7 @@ export interface WaitingProps {
   mine: readonly Decision[];
   dec: Dec;
   night: boolean;
-  onDecide: (key: DecisionKey) => void;
+  onDecide: (key: DecisionKey, text?: string, option?: string) => void;
   onLater: () => void;
   slackPending?: SlackShareRequest | null;
 }
@@ -78,7 +79,8 @@ export function WaitingCard({ mine, dec, night, onDecide, onLater, slackPending 
           ) : (
             <div className="park-world-dactions">
               {d.provide && <DecisionFields d={d} />}
-              {d.yes !== "" && (
+              {d.questionOptions && <QuestionAnswer d={d} onDecide={onDecide} />}
+              {!d.questionOptions && d.yes !== "" && (
                 <Button variant="needs" size="sm" onClick={() => onDecide(d.k)}>
                   {d.yes}
                 </Button>
@@ -209,7 +211,7 @@ export function FactsCard({ w, recorded, skills, tools, onSkill, onTools }: Fact
 export interface LovableCardProps {
   handoff: BuildHandoff;
   dec: Dec;
-  onDecide: (key: DecisionKey) => void;
+  onDecide: (key: DecisionKey, text?: string, option?: string) => void;
   sample?: boolean;
 }
 

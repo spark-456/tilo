@@ -648,7 +648,7 @@ export function WorldPage({ app }: { app: AppCtx }) {
                 mine={mine}
                 dec={dec}
                 night={app.night}
-                onDecide={(key) => app.decide(key)}
+                onDecide={(key, text, option) => app.decide(key, text, option)}
                 onLater={() => app.toast("Tilo will remind you at 16:00")}
                 slackPending={slackPending}
               />
@@ -658,7 +658,7 @@ export function WorldPage({ app }: { app: AppCtx }) {
                 handoff={handoff}
                 dec={dec}
                 sample={Boolean(w.sample)}
-                onDecide={(key) => app.decide(key)}
+                onDecide={(key, text, option) => app.decide(key, text, option)}
               />
             ) : null}
             <SpendCard w={w} mine={mine} dec={dec} onLedger={() => app.go("ledger")} />

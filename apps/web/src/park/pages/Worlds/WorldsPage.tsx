@@ -274,7 +274,7 @@ export function WorldsPage({ app }: { app: AppCtx }) {
               worldName={all.find((w) => w.id === data.decisions[0]?.world)?.name ?? ""}
               dec={dec}
               needsLeft={needsLeft}
-              onDecide={(key) => app.decide(key)}
+              onDecide={(key, text, option) => app.decide(key, text, option)}
               onOpen={open}
               slackPending={slackPending}
             />

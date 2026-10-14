@@ -20,10 +20,18 @@ from typing import Any
 import yaml
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, ConfigDict
+from pydantic import ConfigDict
 from tilo_policy.schemas import conforms
 
-from tilo_api.cards import _STATUS, CardStore, _parse_ts, get_channels_caller, session_allows
+from tilo_api.cards import (
+    _STATUS,
+    CardStore,
+    _AnswerBody,
+    _parse_ts,
+    answer_safety,
+    get_channels_caller,
+    session_allows,
+)
 from tilo_api.deps import Principal, get_current_principal
 
 logger = logging.getLogger("tilo_api.console")
@@ -39,10 +47,8 @@ def get_team_leads() -> list[dict]:
     return records
 
 
-class _ConsoleAnswer(BaseModel):
+class _ConsoleAnswer(_AnswerBody):
     model_config = ConfigDict(extra="forbid")  # no identity field: who answers is the verified principal
-
-    option: str
 
 
 def _assigned(record: dict, owner: str | None, now: str) -> bool:
@@ -101,6 +107,7 @@ def build_router(
         world_id: str,
         card_id: str,
         body: _ConsoleAnswer,
+        safety: Any = Depends(answer_safety),
         principal: Principal = Depends(get_current_principal),
         from_channels: bool = Depends(get_channels_caller),
         team_leads: list[dict] = Depends(get_team_leads),
@@ -116,6 +123,8 @@ def build_router(
                 world_id,
                 card_id,
                 option=body.option,
+                text=body.text,
+                safety=safety,
                 channel=principal.channel,
                 principal=principal,
                 console_domain=lead["domain"],
@@ -126,7 +135,12 @@ def build_router(
         if result.outcome == "answered":
             return JSONResponse(status_code=200, content={"outcome": "answered"})
         return JSONResponse(
-            status_code=_STATUS.get(result.reason or "", 400), content={"outcome": "rejected", "reason": result.reason}
+            status_code=_STATUS.get(result.reason or "", 400),
+            content={
+                "outcome": "rejected",
+                "reason": result.reason,
+                **({"detail": result.reason} if " " in (result.reason or "") else {}),
+            },
         )
 
     return router

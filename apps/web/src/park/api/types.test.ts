@@ -99,6 +99,7 @@ describe("WEB_1a_types: entity shapes follow the README data model", () => {
 
   it("WEB_1a_types_decision_shape", () => {
     expectTypeOf<Decision>().toEqualTypeOf<{
+      questionOptions?: { id: string; label: string }[];
       k: DecisionKey;
       world: string;
       title: string;
@@ -206,7 +207,9 @@ describe("WEB_1a_types: the Api interface returns typed envelopes", () => {
   });
 
   it("WEB_1a_types_api_writes", () => {
-    expectTypeOf<Parameters<Api["decide"]>>().toEqualTypeOf<[key: DecisionKey]>();
+    expectTypeOf<Parameters<Api["decide"]>>().toEqualTypeOf<
+      [key: DecisionKey, text?: string, option?: string]
+    >();
     expectTypeOf<ReturnType<Api["decide"]>>().toEqualTypeOf<R<DecideAck>>();
     expectTypeOf<Parameters<Api["undo"]>>().toEqualTypeOf<[key: DecisionKey]>();
     expectTypeOf<ReturnType<Api["undo"]>>().toEqualTypeOf<R<DecideAck>>();

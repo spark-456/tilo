@@ -109,7 +109,7 @@ export interface ParkState {
 export interface ParkStore {
   getState(): ParkState;
   subscribe(listener: () => void): () => void;
-  decide(key: DecisionKey): void;
+  decide(key: DecisionKey, text?: string, option?: string): void;
   undo(key: DecisionKey): void;
   /** The fixture path: adds the world at once and returns it. */
   addWorld(mode: TierKey, query: string): World;
@@ -315,7 +315,7 @@ export function createParkStore({ api, navigate, schedule, demo }: ParkStoreDeps
         listeners.delete(listener);
       };
     },
-    decide(key) {
+    decide(key, text, option) {
       if (demo === true) {
         toast(DEMO_DECIDE);
         return;
@@ -325,7 +325,7 @@ export function createParkStore({ api, navigate, schedule, demo }: ParkStoreDeps
         // Live (WIRE-3): a decision is taken only when tilo-api recorded the answer (HR-1). No Undo: no route
         // reopens a card. A failure leaves the card open and says why; another world's card offers to open it.
         pending.add(key);
-        api.decide(key).then(
+        api.decide(key, text, option).then(
           () => {
             pending.delete(key);
             update({
@@ -347,7 +347,7 @@ export function createParkStore({ api, navigate, schedule, demo }: ParkStoreDeps
         );
         return;
       }
-      quiet(api.decide(key));
+      quiet(api.decide(key, text, option));
       update({
         dec: { ...state.dec, [key]: true },
         toast: arm(

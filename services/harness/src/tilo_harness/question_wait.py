@@ -34,8 +34,9 @@ class AlreadyCommitted(Exception):
 @dataclass(frozen=True)
 class Answer:
     card_id: str
-    option: str  # the chosen option id; at the deadline the card's safe_default
+    option: str | None  # the chosen option id; at the deadline the card's safe_default
     answered_by: str  # person | team_lead | default
+    text: str | None = None
 
 
 class Clock(Protocol):
@@ -86,7 +87,7 @@ class QuestionWait:
         self._lock = threading.Lock()
         self._waiting: dict[str, _Waiter] = {}
         self._claimed: dict[str, str] = {}  # card id -> event id of the resolution that won
-        self._early: dict[str, tuple[str | None, str]] = {}  # resolved before anyone waited: (option, answered_by)
+        self._early: dict[str, tuple[str | None, str, str | None]] = {}  # early option, answerer, typed text
         # Answers whose write raised: each may still have committed (commit-then-raise). card id -> by -> (event id,
         # options tried). An event id carries no option, so a committed event is matched to its attempt only when one
         # option was tried under it: the unit resumes with what was chosen, else with the card's safe default.
@@ -102,7 +103,8 @@ class QuestionWait:
             if early is None:
                 self._waiting[card_id] = waiter
         if early is not None:
-            return Answer(card_id, early[0] or card["safe_default"], early[1])
+            option = early[0] if early[2] is not None else early[0] or card["safe_default"]
+            return Answer(card_id, option, early[1], early[2])
         deadline = asyncio.ensure_future(self._at_deadline(waiter))
         try:
             return await waiter.future
@@ -136,7 +138,7 @@ class QuestionWait:
         try:
             self._writer.emit(
                 type="question.answered", actor=director if by == "default" else "system", target=lead,
-                summary=f"The question was answered ({by}).", data={"answered_by": by}, district=part["district"],
+                summary=f"The question was answered ({by}).", data=part["data"], district=part["district"],
                 severity=part.get("severity"), vis=part["vis"], event_id=event_id,
             )  # fmt: skip
         except AlreadyCommitted as exc:  # an earlier answer of this card committed though its caller saw a failure
@@ -154,13 +156,16 @@ class QuestionWait:
             self._tried.pop(card_id, None)
             waiter = self._waiting.get(card_id)
             if waiter is None:
-                self._early[card_id] = (part.get("option"), by)
+                self._early[card_id] = (part.get("option"), by, part["data"].get("text"))
         if waiter is not None:
-            _resolve(waiter, Answer(card_id, part.get("option") or waiter.card["safe_default"], by))
+            text = part["data"].get("text")
+            option = part.get("option") if text is not None else part.get("option") or waiter.card["safe_default"]
+            _resolve(waiter, Answer(card_id, option, by, text))
 
     def _settle_committed(self, card_id: str, exc: AlreadyCommitted, fallback_by: str) -> None:
         """The card's one event is already committed: the unit resumes with the answer that wrote it, never a second."""
         committed = exc.args[0] if exc.args and isinstance(exc.args[0], dict) else {}
+        text = (committed.get("data") or {}).get("text")
         by = (committed.get("data") or {}).get("answered_by") or fallback_by
         with self._lock:
             tried = self._tried.pop(card_id, {})
@@ -169,9 +174,10 @@ class QuestionWait:
             option = next(iter(options)) if len(options) == 1 else None  # unknown or several: the safe default
             waiter = self._waiting.get(card_id)
             if waiter is None:
-                self._early[card_id] = (option, by)
+                self._early[card_id] = (option, by, text)
         if waiter is not None:
-            _resolve(waiter, Answer(card_id, option or waiter.card["safe_default"], by))
+            chosen = option if text is not None else option or waiter.card["safe_default"]
+            _resolve(waiter, Answer(card_id, chosen, by, text))
 
     def _committed(self, event_id: str) -> dict[str, Any] | None:
         lookup = getattr(self._writer, "committed", None)  # the writer's own record of a committed event id

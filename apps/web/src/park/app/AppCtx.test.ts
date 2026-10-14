@@ -58,7 +58,9 @@ describe("WEB_3a_appctx: the contract is typed exactly as the README says", () =
 
   it("WEB_3a_appctx_decision_members", () => {
     expectTypeOf<AppCtx["dec"]>().toEqualTypeOf<Dec>();
-    expectTypeOf<AppCtx["decide"]>().toEqualTypeOf<(key: DecisionKey) => void>();
+    expectTypeOf<AppCtx["decide"]>().toEqualTypeOf<
+      (key: DecisionKey, text?: string, option?: string) => void
+    >();
     expectTypeOf<AppCtx["needsLeft"]>().toEqualTypeOf<number>();
   });
 
