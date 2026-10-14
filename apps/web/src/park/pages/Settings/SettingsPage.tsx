@@ -37,15 +37,23 @@ const CONSENTS: ReadonlyArray<readonly [string, string, string | null]> = [
   [
     "Gmail access",
     "So Tilo can sort mail and send replies. You sign in with Google; Tilo never sees your password.",
-    "/connections",
+    "/connectors",
   ],
   [
     "Style profile",
     "Greetings and sign-offs learned from your sent mail. Stored as settings.",
     null,
   ],
-  ["Email", "Notifications and question cards, with the preferences you set.", "/channels"],
-  ["Pilot diary", "A daily note and an exit survey. Results are aggregated only.", "/pilot"],
+  [
+    "Email",
+    "Notifications and question cards, with the preferences you set.",
+    "/settings?section=channels",
+  ],
+  [
+    "Pilot diary",
+    "A daily note and an exit survey. Results are aggregated only.",
+    "/settings?section=pilot",
+  ],
 ];
 
 const MODES: ReadonlyArray<readonly [Density, string, string]> = [
@@ -97,7 +105,7 @@ export function SettingsPage({ app }: { app: AppCtx }) {
             <>
               <p>No routines yet.</p>
               <p>Routines are listed when Tilo is connected to its server.</p>
-              <a href="/start">Create a routine</a>
+              <a href="/">Create a routine</a>
             </>
           )}
         </SettingsSection>

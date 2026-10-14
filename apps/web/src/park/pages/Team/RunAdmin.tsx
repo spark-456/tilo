@@ -215,7 +215,7 @@ function Recorded({ section, worldId }: { section: Section; worldId: string }) {
             empty="The digest appears when the run finishes."
           />
           <p>
-            {estimate} <a href="/estimate">How we estimate</a>
+            {estimate} <a href="/settings?section=estimate">How we estimate</a>
           </p>
         </Block>
       </>
