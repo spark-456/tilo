@@ -87,6 +87,14 @@
 [data-park] .park-first-run-banner--home > span {
   flex: 0 1 auto;
 }
+/* A6 (14 Oct QA, night): on Home the strip floats over the lit city, and a translucent --field let the lamp glow
+   through the text. It sits on the opaque popover surface (day and night come from the tokens), so its text is
+   ink2 on pop at every hour: 4.5:1 or better, never a function of what is behind it. */
+[data-park] .park-first-run-banner--home {
+  background: var(--pop);
+  border-color: var(--line2);
+  box-shadow: var(--sh);
+}
 [data-park] .park-shell__main:has(.park-first-run-banner--home) .park-home-leftcol {
   top: 148px;
 }
