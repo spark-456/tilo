@@ -192,10 +192,12 @@ def principal_from_claims(claims: Mapping[str, Any], *, channel: Channel) -> Pri
     if not isinstance(sub, str) or not 0 < len(sub) <= _MAX_SUB_CHARS or not isinstance(firebase, dict):
         raise TokenRefused("bad_claims")
     full = firebase.get("sign_in_provider") == "google.com"
+    auth_time = claims.get("auth_time")  # a number: `_check_claims` already refused anything else (BK-06)
     return Principal(
         user_id=user_id_for(sub),
         role="owner",
         channel=channel,
         full_session=full,
+        auth_time=float(auth_time) if isinstance(auth_time, int | float) and not isinstance(auth_time, bool) else None,
         demo_session=not full,  # an anonymous demo session gets replay models only (BQ-SIGNIN-10)
     )

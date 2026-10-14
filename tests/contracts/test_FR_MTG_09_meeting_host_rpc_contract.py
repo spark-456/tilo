@@ -36,7 +36,25 @@ LIVE_MESSAGES = (
     "execute_request",
     "execute_answer",
 )
-LIVE_CREDENTIAL_FIELDS = {"callback_request": {"code"}, "start_answer": {"authorize_url"}}
+# ADR-0041 (meeting_host_rpc 1.3.0) adds six model-key messages, tested in test_BYOK_contract.py; the one more
+# credential is model_key_put_request.key (BK-02).
+MODEL_KEY_MESSAGES = (
+    "model_key_put_request",
+    "model_key_put_answer",
+    "model_key_remove_request",
+    "model_key_remove_answer",
+    "model_key_status_request",
+    "model_key_status_answer",
+)
+LIVE_CREDENTIAL_FIELDS = {
+    "callback_request": {"code"},
+    "start_answer": {"authorize_url"},
+    "model_key_put_request": {"key"},
+    # secret_version is a number naming a vault version, never key material (ADR-0041 decision 2)
+    "model_key_put_answer": {"secret_version"},
+    "model_key_remove_request": {"secret_version"},
+    "model_key_status_answer": {"secret_version"},
+}
 CASES = [
     pytest.param(name, kind, path, id=f"{name}/{kind}/{path.stem}")
     for name in MESSAGES
@@ -58,7 +76,9 @@ def test_FR_MTG_09_meeting_host_rpc_is_a_versioned_2020_12_contract_with_fixture
     schema = load_json(contracts_root / "meeting_host_rpc.schema.json")
     assert schema["$schema"] == "https://json-schema.org/draft/2020-12/schema" and schema["$id"] == BASE
     assert schema["title"] == "MeetingHostRpc" and re.fullmatch(r"1\.\d+\.\d+", schema["x-version"])
-    assert {r["$ref"] for r in schema["anyOf"]} == {f"#/$defs/{m}" for m in (*MESSAGES, *LIVE_MESSAGES)}
+    assert {r["$ref"] for r in schema["anyOf"]} == {
+        f"#/$defs/{m}" for m in (*MESSAGES, *LIVE_MESSAGES, *MODEL_KEY_MESSAGES)
+    }
     assert all(_fixtures(m) and _fixtures(m, "invalid") for m in MESSAGES), "each message needs both kinds"
 
 

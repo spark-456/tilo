@@ -46,6 +46,7 @@ from tilo_planning.compiler import PlanInputs, compile_plan
 from tilo_planning.gaps import Gap
 from tilo_planning.memory import InMemoryPreferenceStore, MemoryLookup
 from tilo_planning.questions import Question
+from tilo_providers.byok import OrgBinding
 from tilo_providers.clock import Clock, real_today
 from tilo_providers.config import ProviderConfigError, ProvidersConfig, load_providers_config, resolve_models_path
 from tilo_providers.interfaces import SafetyProvider
@@ -92,6 +93,8 @@ class Principal:
     demo_session: bool = False  # an anonymous demo session (SEC-15, BQ-SIGNIN-10): models are replay only, always
     full_session: bool = False  # a full web sign-in session (BQ-XWORLD-10): set only by the server that resolves the
     # session, never from anything in a request; needed to answer, or read in full, another owned world's cards
+    auth_time: float | None = None  # ADR-0041 BK-06: the verified token's `auth_time` (epoch s), server-set only; a key
+    # act older than 10 minutes needs a fresh sign-in. None (a dev, email or test session) is never fresh.
 
 
 @dataclass
@@ -851,16 +854,20 @@ def get_work_mode(request: Request, switches: Annotated[FlagStore, Depends(get_s
     return mode
 
 
-def router_for_mode(mode: Mode) -> Router:
+def router_for_mode(mode: Mode, *, org: OrgBinding | None = None) -> Router:
     """The one place a request's Router is built (PL-01). It replays recordings unless `mode` is "live", which only
     `access.provider_mode` returns: the user's own global switch, or a deployed judge where the user set
     `TILO_JUDGE_LIVE=1` (SEC-15). The permission is injected into the Router, never read-and-written from the
     environment, so no request can turn live mode on for the process (EFF-01). Any other mode is a replay decision
     (a demo session, NFR-24's switch, SEC-16's cap, no live declaration), injected as `force_replay`: it holds at the
-    provider layer even where `LIVE=1` is set, and never records (BQ-SIGNIN-10)."""
+    provider layer even where `LIVE=1` is set, and never records (BQ-SIGNIN-10). `org` (ADR-0041,
+    `byok_unit.plan_unit`) is the one org's bundle of a unit that runs on the org's own key: None, the default, is
+    every caller today."""
     try:
         live = mode == "live"
-        return Router(providers_config(), fixtures_dir=FIXTURES_DIR, live_permitted=live, force_replay=not live)
+        return Router(
+            providers_config(), fixtures_dir=FIXTURES_DIR, live_permitted=live, force_replay=not live, org=org
+        )
     except ProviderConfigError as exc:
         logger.warning("model router unavailable: %s", exc)
         raise HTTPException(status_code=503, detail="The model router is not configured.") from exc

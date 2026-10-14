@@ -1,0 +1,26 @@
+# Bring your own model key (ADR-0041, issue 934; BYOK-1 to BYOK-3). Read by `tilo_providers.byok.load_byok_config`.
+#
+# THE FLAG IS `enabled`. It is false here and BYOK is inert while it is: every `/v1/org/model-key` route answers 503
+# `not_configured`, no Router takes a bundle, nothing is Tilo-keyed by accident. Only the user turns it on, and only
+# after the credential-handling review of ADR-0041, the user's answers to BQ-BYOK-1 to BQ-BYOK-3 and BQ-BYOK-7, and a
+# deployed connectors with the `generate` route (BYOK-4, not built yet). `example: true`: the user chooses final models.
+#
+# No key, secret name or customer value is ever in this file. A bundle is an allow-list of role -> org profiles; the
+# profiles are ordinary entries of config/models*.yaml that NO Tilo role names, with a fixed https `base_url` and no
+# `api_key_env` (until providers.schema.json 1.4.0 adds `credential: org`, BQ-BYOK-8), priced in config/prices.yaml
+# (PL-06). `kind` is one of openai_compat, google_api_key (the org's Gemini API key) or google_vertex_iam (the org's
+# own Vertex project by an IAM grant: no secret, BQ-BYOK-2). A service-account JSON key is refused always.
+#
+# bundles:
+#   openai-compat-example:
+#     label: "OpenAI-compatible endpoint (example)"
+#     kind: openai_compat
+#     roles:                    # never safety, search or speech (BK-13); a fallback of the bundle's own is required
+#       director: { primary: <org profile id>, fallback: <org profile id> }
+version: 1
+example: true
+enabled: false
+day_cap_credits_max: 10000 # the most an org may set for its own key's day (1 credit = US$0.005; BQ-BYOK-4)
+calls_per_org_per_minute: 120 # connectors' per-org rate cap on `generate` (BK-09)
+consent_version: 1 # the version of the consent line the owner sees and confirms (BK-06)
+bundles: {}
