@@ -290,6 +290,9 @@ def test_FR_CHN_18_704_failed_emit_and_failed_abandon_logs_the_outbox_id_and_rai
         def abandon(self, outbox_id: str) -> dict[str, Any]:
             raise OSError("store down secret digest body leak")
 
+        def abandon_before_dispatch(self, outbox_id: str) -> dict[str, Any]:
+            raise OSError("store down secret digest body leak")
+
     pol = _digest_policy(level="L3", undo_window_s=60)
     svc = _svc(_StuckOutbox(), _RealEnginePort([pol], emitted), DigestArtifacts(), _raise_emit)  # type: ignore[arg-type]
     with caplog.at_level(logging.ERROR), pytest.raises(DigestSettleFailed):
@@ -371,3 +374,29 @@ def test_FR_CHN_18_713_atomic_enqueue_emit_base_exception_replay_id_and_retry_ke
 
     with pytest.raises(KeyError):
         _deliver(_svc(outbox_be, _KeyErrorPolicy(), DigestArtifacts(), emitted_be.append))
+
+
+def test_FR_CHN_18_OLD_4b_terminal_send_failure_never_gets_new_digest_key() -> None:
+    from tilo_connectors.errors import PossiblySent, SideEffectRefused
+
+    for error in (PossiblySent, SideEffectRefused):
+        calls: list[str] = []
+
+        class RefusingGmail:
+            def send_reply(self, destination: Any, item: Any, recipients: Any, key: str, grant: Any) -> None:
+                calls.append(key)
+                raise error("offline terminal refusal")
+
+        store, emitted = InMemoryOutboxStore(), list[dict[str, Any]]()
+        outbox = Outbox(
+            store, connectors={"gmail": RefusingGmail()}, emit=lambda _: None, clock=lambda: NOW_TS, world_id=WORLD
+        )
+        policy = _RealEnginePort([_digest_policy(undo_window_s=0, per_day=5)], emitted)
+        svc = _svc(outbox, policy, DigestArtifacts(), emitted.append)
+        assert _deliver(svc) is not None
+        outbox.dispatch_due()
+        assert [entry["state"] for entry in store.all_entries()] == ["failed"]
+        assert _deliver(svc) is None
+        outbox.dispatch_due()
+        assert calls == [f"digest:{USER}:2026-10-06"]
+        assert len(store.all_entries()) == len(emitted) == 1

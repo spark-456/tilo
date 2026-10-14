@@ -299,7 +299,11 @@ def enqueue_digest(
     except BaseException as exc:
         _release_hold(store, entry["id"], holder)
         try:  # abandon settles queued and scheduled entries alike (cancel refuses a queued one, undo window 0)
-            outbox.abandon(entry["id"])
+            compensate = getattr(outbox, "abandon_before_dispatch", None)
+            if callable(compensate):
+                compensate(entry["id"])
+            else:
+                outbox.abandon(entry["id"])  # legacy ports settle, but provide no safe-retry proof
         except Exception as err:
             _LOG.error(
                 "digest %s: emit failed (%s) and abandon failed (%s); the entry may still be sent",

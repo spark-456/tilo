@@ -67,10 +67,11 @@ def _resolve_digest_key(outbox: Outbox, world_id: str, base_key: str) -> str | N
         existing = outbox.get_by_idempotency_key(world_id, key)
         if existing is None:
             return key
-        if existing.get("state") != "failed":
+        proof = getattr(outbox, "was_abandoned_before_dispatch", None)
+        if existing.get("state") != "failed" or not callable(proof) or proof(existing["id"]) is not True:
             return None
-        next_key = f"{base_key}:retry:{attempt + 1}"
-        _LOG.warning("digest key %s held failed entry %s; retrying as %s", key, existing.get("id"), next_key)
+        if attempt + 1 < _MAX_DIGEST_RETRIES:
+            _LOG.warning("digest entry %s compensated before dispatch; retrying", existing.get("id"))
     return None
 
 
