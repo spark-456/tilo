@@ -3,6 +3,7 @@
 import asyncio
 import os
 import threading
+from typing import Literal, cast
 
 from starlette.concurrency import run_in_threadpool
 from tilo_harness.deliverable import MAX_PDF, DeliverableRefused, parse_spec
@@ -10,14 +11,14 @@ from tilo_harness.outputs import RenderedOffice, RenderedPdf
 from tilo_render.pdf import render_pdf
 from tilo_render.spec import RequestDeliverableSpec
 
-from tilo_api.render_rpc import RenderRpc
+from tilo_api.render_rpc import MIME, RenderRpc
 
 _SLOTS = threading.BoundedSemaphore(2)
 RENDER_TIMEOUT_S = 30.0
 
 
 async def render_report(reply: str, *, fmt: str = "pdf") -> RenderedPdf | RenderedOffice:
-    if fmt not in ("pdf", "pptx"):
+    if fmt not in ("pdf", "pptx", "docx"):
         raise DeliverableRefused("render_failed")
     try:
         spec = RequestDeliverableSpec.model_validate(parse_spec(reply).model_dump())
@@ -35,8 +36,8 @@ async def render_report(reply: str, *, fmt: str = "pdf") -> RenderedPdf | Render
                 return b""
             claimed = True
         try:
-            if fmt == "pptx":
-                return RenderRpc(os.environ.get("TILO_RENDER_URL", "")).render(spec, "pptx")
+            if fmt in ("pptx", "docx"):
+                return RenderRpc(os.environ.get("TILO_RENDER_URL", "")).render(spec, cast(Literal["pptx", "docx"], fmt))
             return render_pdf(spec)
         finally:
             _SLOTS.release()
@@ -50,9 +51,9 @@ async def render_report(reply: str, *, fmt: str = "pdf") -> RenderedPdf | Render
             abandoned = True
             if not claimed:
                 _SLOTS.release()
-    if fmt == "pptx":
+    if fmt in ("pptx", "docx"):
         return RenderedOffice(
-            media_type="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+            media_type=MIME[fmt],
             content=content,
             spec_text=spec.model_dump_json(),
         )

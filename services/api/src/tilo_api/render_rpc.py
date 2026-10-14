@@ -16,10 +16,11 @@ from tilo_api.meeting_host_rpc import metadata_id_token
 MAX_OUTPUT_BYTES = 20 * 1024 * 1024
 MAX_REQUEST_BYTES = 1024 * 1024
 MIME = {
+    "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     "pdf": "application/pdf",
     "pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
 }
-MAGIC = {"pdf": b"%PDF-", "pptx": b"PK\x03\x04"}
+MAGIC = {"pdf": b"%PDF-", "pptx": b"PK\x03\x04", "docx": b"PK\x03\x04"}
 
 
 class RenderRpcError(Exception):
@@ -76,7 +77,7 @@ class RenderRpc:
         self._transport = transport if transport is not None else RequestsTransport()
         self._token_for = token_for
 
-    def render(self, spec: RequestDeliverableSpec, fmt: Literal["pdf", "pptx"]) -> bytes:
+    def render(self, spec: RequestDeliverableSpec, fmt: Literal["pdf", "pptx", "docx"]) -> bytes:
         try:
             # Revalidate even an object constructed without Pydantic validation, before credentials or I/O.
             checked = RequestDeliverableSpec.model_validate(spec.model_dump())

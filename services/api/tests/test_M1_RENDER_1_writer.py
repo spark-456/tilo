@@ -29,7 +29,10 @@ def test_M1_RENDER_1_writer_selection_comes_from_deliverable(fmt):
     assert render_format({"role": "writer", "unit_type": "research"}, brief) is None
 
 
-def test_M1_RENDER_1_pptx_writer_uses_configured_authenticated_rpc(monkeypatch):
+@pytest.mark.parametrize(
+    "fmt,mime", [("pptx", PPTX), ("docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document")]
+)
+def test_M1_RENDER_1_pptx_writer_uses_configured_authenticated_rpc(monkeypatch, fmt, mime):
     seen = []
 
     class FakeRpc:
@@ -42,12 +45,12 @@ def test_M1_RENDER_1_pptx_writer_uses_configured_authenticated_rpc(monkeypatch):
 
     monkeypatch.setenv("TILO_RENDER_URL", "https://render.example")
     monkeypatch.setattr(report_render, "RenderRpc", FakeRpc)
-    output = asyncio.run(report_render.render_report(SPEC, fmt="pptx"))
+    output = asyncio.run(report_render.render_report(SPEC, fmt=fmt))
     assert type(output) is RenderedOffice
-    assert output.media_type == PPTX
+    assert output.media_type == mime
     assert output.content == b"PK\x03\x04offline"
     assert json.loads(output.spec_text)["title"] == "Deck"
-    assert seen == [("Deck", "pptx")]
+    assert seen == [("Deck", fmt)]
 
 
 def test_M1_RENDER_1_unconfigured_office_never_falls_back_to_pdf(monkeypatch):

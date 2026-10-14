@@ -25,6 +25,7 @@ from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, ValidationError
 
+from tilo_render.docx import render_docx
 from tilo_render.pdf import render_pdf
 from tilo_render.pptx import render_pptx
 from tilo_render.spec import DeliverableSpec, RequestDeliverableSpec
@@ -43,6 +44,11 @@ DEFAULT_RENDER_TIMEOUT = 15.0
 DEFAULT_MAX_CONCURRENCY = 2
 _CONTENT_LENGTH_RE = re.compile(r"^[0-9]+$")
 _MIME_BY_FORMAT: dict[str, tuple[str, str, bytes]] = {
+    "docx": (
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        'attachment; filename="deliverable.docx"',
+        b"PK\x03\x04",
+    ),
     "pdf": ("application/pdf", 'attachment; filename="deliverable.pdf"', b"%PDF-"),
     "pptx": (
         "application/vnd.openxmlformats-officedocument.presentationml.presentation",
@@ -56,7 +62,7 @@ class RenderRequestPayload(BaseModel):
     """Strict request contract for `POST /render` (`manifest` is omitted: provenance is attached by `tilo-harness`)."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
-    format: Literal["pdf", "pptx"]
+    format: Literal["pdf", "pptx", "docx"]
     spec: RequestDeliverableSpec
 
 
@@ -95,13 +101,15 @@ def _no_nan_inf(_name: str) -> Any:
     raise ValueError("NaN and Infinity are not JSON")
 
 
-def _default_renderer(spec: DeliverableSpec, fmt: Literal["pdf", "pptx"]) -> bytes:
+def _default_renderer(spec: DeliverableSpec, fmt: Literal["pdf", "pptx", "docx"]) -> bytes:
+    if fmt == "docx":
+        return render_docx(spec)
     return render_pdf(spec) if fmt == "pdf" else render_pptx(spec)
 
 
 def create_app(
     *,
-    renderer: Callable[[DeliverableSpec, Literal["pdf", "pptx"]], bytes] | None = None,
+    renderer: Callable[[DeliverableSpec, Literal["pdf", "pptx", "docx"]], bytes] | None = None,
     oidc_verifier: Callable[[str, str], Mapping[str, Any]] | None = None,
     audience: str | None = None,
     allowed_callers: Sequence[str] = (),
