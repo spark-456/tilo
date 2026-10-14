@@ -1,0 +1,16 @@
+[data-park] .park-partner-tiles {
+  color: var(--ink);
+}
+[data-park] .park-partner-tiles h2,
+[data-park] .park-partner-tiles h3 {
+  margin: 0 0 12px;
+}
+[data-park] .park-partner-tiles p {
+  color: var(--ink2);
+  overflow-wrap: anywhere;
+}
+[data-park] .park-partner-tiles-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
+  gap: 16px;
+}
