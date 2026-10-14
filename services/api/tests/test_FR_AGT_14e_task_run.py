@@ -599,6 +599,28 @@ def test_FR_AGT_14e_one_identity_for_both_modes_fails_closed(rig: SchedApi, monk
 # --- the wait inside the request -------------------------------------------------------------------
 
 
+def test_X_SCHED_1_FR_AGT_14e_delivery_wait_leaves_a_minute_under_the_service_timeout(
+    rig: SchedApi, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from tilo_api import runs
+
+    scheduled(rig)
+    assert rig.tick().json() == {"fired": 1}
+    (task,) = rig.tasks.calls
+    deadline = int(task["dispatchDeadline"].removesuffix("s"))
+    waits: list[float] = []
+
+    def wait(_run: Any, timeout_s: float) -> str:
+        waits.append(timeout_s)
+        return "timeout"
+
+    monkeypatch.setattr(runs.Run, "wait_until_parked_or_done", wait)
+    response = rig.task_call(task_payload(task))
+    assert response.status_code == 200 and response.json() == {"ran": 1, "state": "timeout"}
+    assert 0 < deadline <= 1500
+    assert len(waits) == 1 and 20 * 60 <= waits[0] <= deadline - 60
+
+
 def test_FR_AGT_14e_a_run_that_completes_without_a_person_answers_done(rig: SchedApi) -> None:
     source = scheduled(rig)
     gateless(rig)

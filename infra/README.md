@@ -154,10 +154,15 @@ Two more variables on tilo-api are yours to set (the tick answers 503 until both
 
 They must differ from `TILO_SCHEDULE_TICK_CALLER`: the Scheduler never gets the task mode
 and Cloud Tasks never gets the fan-out (one account for both is refused). One setting is
-not in Terraform yet: the request timeout of `tilo-api` is Cloud Run's 300 s default, and
-a delivery waits up to 1500 s for its run, so set it to 1800 s,
-`gcloud run services update tilo-api --timeout=1800 --region asia-southeast1`, until an
-infra ticket adds `timeout` to the service module (open in BQ-AGT14-5).
+not in Terraform yet: `tilo-api` needs a 1500 s request timeout (X-SCHED-1).
+A task's dispatch deadline is 1500 s and its run wait is 1440 s, leaving 60 s to answer.
+The user sets `gcloud run services update tilo-api --timeout=1500 --region asia-southeast1`
+until an infra ticket adds `timeout` to the service module (open in BQ-AGT14-5).
+The user also bounds retries:
+
+```powershell
+gcloud tasks queues update runs --location asia-southeast1 --project essential-wares-510320-f0 --max-attempts 3 --min-backoff 30s
+```
 
 ## Destroy
 

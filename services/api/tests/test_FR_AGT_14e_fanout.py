@@ -2,7 +2,7 @@
 
 `POST /internal/schedules/tick` from the Scheduler identity with NO body no longer starts anything. It claims each due
 slot, hands it to Cloud Tasks (one task per slot, name = `task_name(slot_key)`, OIDC for `TILO_TASKS_CALLER`, audience =
-the tick audience, a body of `schedule_id` / `slot` / `due` only, dispatch deadline 1800 s) and completes the slot as
+the tick audience, a body of `schedule_id` / `slot` / `due` only, dispatch deadline 1500 s) and completes the slot as
 before, so the run executes inside the task's own request (CPU allocated) and not in the tick's. API_FR_AGT_14e.md.
 
 Fakes: `_fr_agt_14_lib.py` (`FakeTasksClient` records what it is handed; no network, enforced below).
@@ -68,9 +68,10 @@ def test_FR_AGT_14e_the_interface_names_exist() -> None:
 
     assert schedules.ENV_QUEUE == "TILO_RUNS_QUEUE" == ENV_QUEUE
     assert schedules.ENV_TASKS_CALLER == "TILO_TASKS_CALLER" == ENV_TASKS_CALLER
-    assert schedules.DISPATCH_DEADLINE_S == 1800
+    # X-SCHED-1: deployed tilo-api has a 1500 s request timeout.
+    assert schedules.DISPATCH_DEADLINE_S == 1500
     assert 0 < schedules.IN_REQUEST_DEADLINE_S < schedules.DISPATCH_DEADLINE_S  # answers before Cloud Tasks gives up
-    assert schedules.IN_REQUEST_DEADLINE_S == 25 * 60
+    assert schedules.IN_REQUEST_DEADLINE_S == 24 * 60
     for name in ("TasksClient", "AlreadyExists", "TaskEnqueuer", "get_tasks_client_factory"):
         assert hasattr(schedules, name), name
     assert callable(getattr(runs.Run, "wait_until_parked_or_done", None))
@@ -89,7 +90,7 @@ def test_FR_AGT_14e_fan_out_creates_exactly_one_task_per_due_slot(sched: SchedAp
         schedule_id = "sched_a" if task["name"] == name_of("sched_a") else "sched_b"
         assert task["name"].startswith(QUEUE + "/tasks/sched-")  # the queue, and the harness's stable task id
         assert set(task) <= {"name", "httpRequest", "dispatchDeadline"}  # retry policy stays with the queue
-        assert task["dispatchDeadline"] == "1800s"
+        assert task["dispatchDeadline"] == "1500s"
         request = task["httpRequest"]
         assert set(request) <= {"httpMethod", "url", "headers", "body", "oidcToken"}
         assert request["httpMethod"] == "POST"

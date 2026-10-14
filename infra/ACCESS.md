@@ -280,7 +280,8 @@ Hard requirements from the security review for the routes the infra points at:
   `cloudtasks.enqueuer` and `serviceAccountUser` on `tilo-tasks-invoker`, so either can mint a
   task token for this route (an accepted trust set, BQ-AGT14-5 h), and api needs no
   `run.invoker` for a task to reach it. The api service's request timeout must cover the
-  in-request wait (1500 s): see `infra/README.md`.
+  in-request wait (1440 s) plus the 60 s response margin; the task dispatch deadline is
+  1500 s (X-SCHED-1): see `infra/README.md`.
 - `tilo-channels` is `allUsers`, so the `tilo-gmail-push` `run.invoker` binding
   gives no protection: `/internal/gmail/push` is reachable from the internet and
   no channels route under `/internal/` may rely on ingress or IAM.
