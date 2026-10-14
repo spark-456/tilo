@@ -1166,3 +1166,24 @@
   outline: 2px solid var(--heroInk);
   outline-offset: 2px;
 }
+
+/* M2-PHONE-1: keep the priced plan readable and its editing controls tappable. */
+@media (max-width: 480px) {
+  [data-park] .park-home-plan {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  [data-park] .park-home-plan__query,
+  [data-park] .park-home-step > span {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+  [data-park] .park-home-run__link,
+  [data-park] .park-home-run__edit input,
+  [data-park] .park-home-change {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  [data-park] .park-home-run__link {
+    flex: none;
+  }
+}

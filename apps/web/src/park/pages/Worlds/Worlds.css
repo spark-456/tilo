@@ -306,6 +306,23 @@
   gap: 6px;
 }
 
+/* M2-PHONE-1: Needs-you actions stay tappable even with long server labels. */
+@media (max-width: 480px) {
+  [data-park] .park-worlds-dec__yes,
+  [data-park] .park-worlds-dec__open {
+    min-height: 44px;
+    height: auto;
+    min-width: 44px;
+    max-width: 100%;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    padding-block: 10px;
+  }
+  [data-park] .park-worlds-dec__text {
+    overflow-wrap: anywhere;
+  }
+}
+
 /* ---- All caught up ---- */
 [data-park] .park-worlds-clear {
   display: flex;
