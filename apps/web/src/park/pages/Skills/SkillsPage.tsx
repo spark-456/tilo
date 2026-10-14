@@ -9,6 +9,7 @@ import type { AppCtx } from "../../app/AppCtx";
 import { useParkApi } from "../../app/context";
 import type { CurrencyCode } from "../../app/ledgerKpis";
 import { PageSheet } from "../../components";
+import { ApiReadState } from "../../components/ApiReadState";
 import { FirstRunPanels } from "../../sample/FirstRunPanels";
 import { useFirstRunPreview } from "../../sample/useFirstRunPreview";
 import { HelpSection } from "./HelpSection";
@@ -64,8 +65,13 @@ export function SkillsPage({ app }: { app: AppCtx }) {
 function PersonalSkillsPage({ app }: { app: AppCtx }) {
   const api = useParkApi();
   const [data, setData] = useState<Loaded>(null);
+  const [error, setError] = useState<unknown>(null);
+  const [attempt, setAttempt] = useState(0);
   useEffect(() => {
+    void attempt;
     let live = true;
+    setData(null);
+    setError(null);
     const ledgerCurrency = (): Promise<CurrencyCode> =>
       together(() => api.getLedger()).then(
         (r) => r.data.currency ?? "GBP",
@@ -84,21 +90,28 @@ function PersonalSkillsPage({ app }: { app: AppCtx }) {
             currency,
           });
       },
-      () => {
-        if (live) setData("failed");
+      (error: unknown) => {
+        if (live) {
+          setError(error);
+          setData("failed");
+        }
       },
     );
     return () => {
       live = false;
     };
-  }, [api]);
+  }, [api, attempt]);
 
   return (
     <div className="park-skills-root" data-testid="park-page-skills">
       <PageSheet gap={30}>
         {data !== null && data !== "failed" ? (
           <Ready app={app} data={data} />
-        ) : data === "failed" ? (
+        ) : data === "failed" &&
+          error instanceof Error &&
+          error.name === "NotBuilt" &&
+          "code" in error &&
+          error.code === "not_built" ? (
           <div className="park-skills-head">
             <div className="park-skills-intro-col">
               <Title />
@@ -106,7 +119,15 @@ function PersonalSkillsPage({ app }: { app: AppCtx }) {
             </div>
           </div>
         ) : (
-          <Header />
+          <>
+            <Header />
+            <ApiReadState
+              title="Skills could not load"
+              error={error}
+              pending={data === null}
+              retryRead={() => setAttempt((n) => n + 1)}
+            />
+          </>
         )}
       </PageSheet>
     </div>
