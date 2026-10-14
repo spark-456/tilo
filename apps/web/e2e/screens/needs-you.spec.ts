@@ -51,7 +51,7 @@ for (const viewport of [DESKTOP, MOBILE]) {
     await expect(rows.first()).toContainText("Specialist 2 · Mail");
     await expect(rows.first()).toContainText("Send email · Cannot be undone");
     // The text carries no machine ids (people read names), and sizes sit on the PRD 18.2 scale.
-    const text = await page.getByTestId("screen-page").innerText();
+    const text = await page.locator("main").innerText();
     expect(text).not.toMatch(/\b[A-Z]_[a-z0-9]+\b|\bG\d\b/);
     await expectTypeScale(page);
     expect(await page.locator("main button.primary").count()).toBeLessThanOrEqual(1); // UX-1

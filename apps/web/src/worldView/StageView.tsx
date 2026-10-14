@@ -12,6 +12,7 @@ import { useClientWorld } from "../world/useClientWorld";
 import type { WorldFixtureState } from "../world/useWorldFixture";
 import { LensFrame } from "./LensFrame";
 import { LoggedDock, ReplayDock } from "./ReplayDock";
+import { ReplayNotices } from "./ReplayNotices";
 import { StagePresenter } from "./StagePresenter";
 import { HudGlance, StageRail } from "./StageRail";
 
@@ -74,19 +75,7 @@ export function StageView({
         data-stage-layout={stageLayout ? "1920x1080" : "off"}
       >
         <div className="park-view-stagecol">
-          {fixture.active || fixtureClient ? (
-            // HR-4: a recorded replay says so, always, in words; never dismissable.
-            // biome-ignore lint/a11y/useSemanticElements: a persistent mode banner, not a form result.
-            <div className="park-view-banner" data-testid="fixture-replay-banner" role="status">
-              Recorded replay: sample data, not a live run
-            </div>
-          ) : null}
-          {speedBadge ? (
-            // biome-ignore lint/a11y/useSemanticElements: the same persistent status region as the banner.
-            <div className="park-view-banner" data-testid="speed-badge" role="status">
-              {speedBadge}
-            </div>
-          ) : null}
+          <ReplayNotices active={fixture.active} speedLabel={speedBadge} />
           <div className="park-view-stagebox">
             <Stage
               key={fixture.active ? "fixture" : worldId}

@@ -17,6 +17,7 @@ import { type Remote, useRemote } from "../screens/remote";
 import { elapsed, useRunLog } from "../world/runLog";
 import { alsoWorld, useRunWorld, withWorld } from "../world/worldContext";
 import { NotFoundView } from "./NotFoundView";
+import { ReplayNotices } from "./ReplayNotices";
 import { ViewLink } from "./ViewLink";
 import { nameOf, words } from "./text";
 
@@ -481,6 +482,7 @@ export function NeedsYouSheet({
 }: { sheet: "queue" | "gate" | "consent"; worldId: string }) {
   return (
     <Frame {...COPY[sheet]}>
+      <ReplayNotices />
       {sheet === "queue" ? (
         <Queue worldId={worldId} />
       ) : sheet === "gate" ? (

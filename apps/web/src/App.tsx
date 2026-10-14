@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { useIsFixtureClient, useReplaySpeed } from "./api/ClientProvider";
 import { AssistantPanel } from "./assistant/AssistantPanel";
 import { useMediaQuery } from "./hooks/useMediaQuery";
 import { usePathname } from "./router";
@@ -8,7 +9,22 @@ import { PrimaryNav } from "./screens/PrimaryNav";
 import { ScreenPage } from "./screens/ScreenPage";
 import { TopBar } from "./screens/TopBar";
 import { type ScreenMatch, matchScreen } from "./screens/routes";
+import { speedBadgeText } from "./world/speed";
 
+/** Screens that read the replayed run from a bare address (AGW-08 group B): HR-6 applies, so a replay that is not at
+ * its recorded pace says so. */
+const RUN_SCREENS: ReadonlySet<string> = new Set([
+  "S-09",
+  "S-13",
+  "S-14",
+  "S-15",
+  "S-16",
+  "S-17",
+  "S-18",
+  "S-19",
+  "S-21",
+  "S-23",
+]);
 const NOT_FOUND: ScreenMatch = { id: "not-found", params: [], Component: NotFound };
 
 /** The addresses the old app still owns until its last screens move into the Park pages (OLD-UI-OUT): the intake
@@ -16,6 +32,8 @@ const NOT_FOUND: ScreenMatch = { id: "not-found", params: [], Component: NotFoun
  * (worldView/), so this frame draws no stage and no right rail. */
 export function App() {
   const mobile = useMediaQuery("(max-width: 767px)");
+  const fixtureClient = useIsFixtureClient();
+  const replaySpeed = useReplaySpeed();
   const path = usePathname();
   const matched = matchScreen(path); // null: the flow shell
   const previousPath = useRef(path);
@@ -49,8 +67,19 @@ export function App() {
   }, [path]);
   // A path under /world/ that no screen owns is "Not found" (the Park pages answer for the ones they own).
   const screen = matched ?? (/^\/world\//.test(path) ? NOT_FOUND : null);
+  // HR-6: a replay that is not at its recorded pace always says so, in words, in a status region.
+  const speedBadge =
+    fixtureClient && screen !== null && RUN_SCREENS.has(screen.id)
+      ? speedBadgeText(replaySpeed)
+      : null;
   return (
-    <div className="app-shell" data-stage-mode="off" data-stage-layout="off" data-strip="off">
+    <div
+      className="app-shell"
+      data-stage-mode="off"
+      data-stage-layout="off"
+      data-strip={fixtureClient ? "on" : "off"}
+      data-replay-badge={speedBadge ? "on" : "off"}
+    >
       <TopBar fixture={false} />
       {!mobile && <PrimaryNav id="left-rail" mobile={false} />}
       {screen ? (
@@ -62,6 +91,23 @@ export function App() {
         </ScreenPage>
       ) : (
         <FlowShell />
+      )}
+      {fixtureClient && (
+        // HR-4/BQ-07: permanent (whenever the fixture client is active), never dismissable, exposed to assistive
+        // tech. It sits in a reserved strip along the top edge: the shell starts below the strip, so it never
+        // covers a control.
+        <div className="status-strip">
+          {/* biome-ignore lint/a11y/useSemanticElements: <output> is for a form/calculation result; this is a persistent mode banner, so an explicit role="status" region fits better. */}
+          <div className="fixture-replay-banner" data-testid="fixture-replay-banner" role="status">
+            Fixture replay — dev data, not a real run
+          </div>
+          {speedBadge && (
+            // biome-ignore lint/a11y/useSemanticElements: same persistent status region as the banner above, not a form result.
+            <div className="speed-badge" data-testid="speed-badge" role="status">
+              {speedBadge}
+            </div>
+          )}
+        </div>
       )}
       {mobile && <PrimaryNav id="bottom-tabs" mobile />}
       <AssistantPanel />

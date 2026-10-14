@@ -302,7 +302,7 @@
 }
 [data-park] .park-view-text {
   margin: 0;
-  font-size: 15.5px;
+  font-size: 16px;
   font-weight: 700;
   color: var(--ink);
 }
@@ -311,6 +311,7 @@
   flex-wrap: wrap;
   gap: 8px;
   margin: 6px 0 0;
+  font-size: 14px;
 }
 
 /* ---- Trace: two-line rows, no sideways scroll ---- */
@@ -320,6 +321,9 @@
   border-radius: 14px;
   background: var(--card);
   overflow-wrap: anywhere;
+}
+[data-park] .park-view-tracetop {
+  font-size: 14px;
 }
 [data-park] .park-view-tracetop,
 [data-park] .park-view-tracemeta {
@@ -502,6 +506,13 @@
   font-size: 12.5px;
   font-weight: 700;
   color: var(--ink3);
+}
+[data-park] .park-view-count,
+[data-park] .park-view-slot {
+  padding: 14px 16px;
+  border: 1px solid var(--line2);
+  border-radius: 22px;
+  background: var(--card);
 }
 [data-park] .park-view-count {
   display: flex;
@@ -814,4 +825,24 @@
     grid-template-columns: 1fr;
     gap: 0;
   }
+}
+
+[data-park] .park-needs-head {
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+/* Phone targets: lens tabs and level links are at least 44 px high (UX-1). */
+@media (max-width: 767px) {
+  [data-park] .park-view-tab {
+    min-height: 44px;
+  }
+  [data-park] .park-view-h2 a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+  }
+}
+[data-park] .park-view-tab {
+  min-height: 44px;
 }

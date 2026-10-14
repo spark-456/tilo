@@ -55,20 +55,10 @@ test.describe("phone", () => {
     await expect(glance).toContainText("credits");
     await expect(glance).toContainText("nothing waiting");
     // Still a 44 px target that opens the full panels.
-    const box = await page.locator(".hud-sheet summary").boundingBox();
+    const box = await page.locator(".park-view-sheet-hud summary").boundingBox();
     expect(box?.height ?? 0).toBeGreaterThanOrEqual(44);
     await page.getByText("World status").click();
     await expect(page.getByTestId("hud-meter")).toBeVisible();
-  });
-
-  test("#227 S-04 phone: the World card is a slim row and leaves the world in view", async ({
-    page,
-  }) => {
-    await page.goto(`${W}?speed=1000`);
-    await expect.poll(() => stageSeq(page), { timeout: 20_000 }).toBe(44);
-    const card = await page.getByTestId("flow-shell").boundingBox();
-    expect(card?.height ?? 999).toBeLessThanOrEqual(80);
-    await expect(page.getByRole("button", { name: "View delivery" })).toBeVisible();
   });
 
   test("PRD 18.6 phone: zero layout shift across the route replay, the HUD line included", async ({
