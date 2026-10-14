@@ -15,6 +15,7 @@ import type {
 import { type FieldSpec, type FieldsApi, fieldSpecsOf } from "./fields";
 import { type ItemApi, type PinnedItem, pinnedItemOf } from "./item";
 import { type HostStarted, isHostStarted, refusalOf } from "./meetingHost";
+import { bootstrapPerson } from "./peopleBootstrap";
 import {
   type ScheduleRequest,
   type ScheduleView,
@@ -516,7 +517,23 @@ export class HttpClient implements TiloClient, SchedulesApi, FieldsApi, ItemApi 
 
   /** A plain GET of `path`, decoded as JSON, with the same typed failures as every other call (WIRE-1). */
   getJson(path: string): Promise<unknown> {
+    if (path === "/v1/plate") return this.readPlate();
     return this.request<unknown>(path);
+  }
+
+  private async readPlate(): Promise<unknown> {
+    try {
+      return await this.request<unknown>("/v1/plate");
+    } catch (error) {
+      if (!(error instanceof TiloApiError) || error.status !== 404) throw error;
+      const founded = await bootstrapPerson(
+        this.base,
+        (body) => this.postJson("/v1/people/first", body),
+        (refusal) => refusal instanceof TiloApiError && refusal.status === 403,
+      );
+      if (!founded) throw error; // existing callers render the honest empty plate
+      return this.request<unknown>("/v1/plate"); // one reread; never a retry loop
+    }
   }
 
   /** A plain POST of `body` as JSON, decoded as JSON, with the same typed failures and `write` true (WIRE-3). No credentials.
