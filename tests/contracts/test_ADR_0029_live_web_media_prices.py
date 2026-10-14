@@ -77,7 +77,10 @@ def test_PL_06_a_price_gains_unit_price_cached_input_and_valid_until_and_stays_t
 
 def test_PL_06_the_price_draft_meters_regional_rates_with_dated_promotions(repo_root):
     prices = _config(repo_root, "prices.yaml")
-    assert (prices["status"], prices["effective_date"], prices["region"]) == ("set", "2026-10-08", "asia-southeast1")
+    # LIVE-GLOBAL-1 (ADR-0029 amendment, user-approved 14 Oct 2026): Gemini 3.x is served only on the global endpoint,
+    # so the sheet's region is global; the rates are still the regional ones (the meter overstates, never understates).
+    assert (prices["status"], prices["effective_date"], prices["region"]) == ("set", "2026-10-08", "global")
+    assert "asia-southeast1 regional endpoint" in prices["source"] and "LIVE-GLOBAL-1" in prices["source"]
     profiles = prices["profiles"]
     for flash in ("flash-38", "flash-37", "search-google"):
         assert (profiles[flash]["input"], profiles[flash]["output"]) == (0.825, 4.125)
