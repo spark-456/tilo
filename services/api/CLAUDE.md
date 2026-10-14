@@ -1,5 +1,4 @@
 # services/api â€” `tilo-api`
-
 ## Purpose
 Cloud Run service (PRD 6.2): sessions, tasks, cards, approvals, policies, downloads, sharing, RBAC. The only service the web client and channels write through; the client reads live state from Firestore under rules.
 
