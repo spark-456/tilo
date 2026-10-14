@@ -400,6 +400,22 @@
 }
 
 /* ---- Cards (shared) ---- */
+[data-park] .park-worlds-skeleton {
+  gap: var(--space-3);
+  padding: var(--space-4);
+}
+[data-park] .park-worlds-skeleton__line {
+  height: var(--space-4);
+  width: 65%;
+  flex-shrink: 0;
+  border-radius: var(--space-1);
+  background: var(--track);
+}
+[data-park] .park-worlds-skeleton__art {
+  flex: 1;
+  border-radius: var(--space-2);
+  background: var(--track);
+}
 [data-park] .park-worlds-card {
   display: flex;
   flex-direction: column;
