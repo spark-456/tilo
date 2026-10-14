@@ -1,7 +1,7 @@
 """Internal explicit owner-request caller; no route registration or automatic trigger.
 
-Future HTTP wiring must use the existing access/App Check middleware and this dependency,
-with a separately reviewed server budget. The default budget seam refuses all work.
+HTTP wiring uses the existing access/App Check middleware and this dependency,
+with the existing per-user allowance as its server-owned maximum budget.
 """
 
 from __future__ import annotations
@@ -10,6 +10,7 @@ import math
 import re
 from collections.abc import Callable
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from typing import Annotated, Any
 
 from fastapi import Depends, HTTPException, Request
@@ -25,9 +26,14 @@ from tilo_api.meeting_minutes import MinutesWriter
 from tilo_api.people_writes import Refusal
 
 
-def get_owner_minutes_budget() -> float:
-    """Server-owned activation/budget authority, unwired until owner adoption; never a body/env switch."""
-    raise HTTPException(503, "not_configured", headers={"Cache-Control": "no-store"})
+def get_owner_minutes_budget(
+    config: Annotated[AssistantConfig, Depends(deps.get_assistant_config)],
+) -> float:
+    """Existing intake allowance caps the operation; no independent budget, price or body switch."""
+    cap = config.user_day_credits
+    if type(cap) not in (int, float) or not math.isfinite(cap) or cap <= 0:
+        raise Refusal(429, "allowance_capped", headers={"Cache-Control": "no-store"})
+    return float(cap)
 
 
 @dataclass(frozen=True)
@@ -88,6 +94,27 @@ def get_owner_minutes_caller(
     uid = getattr(request.state, "uid", None)
     if uid is not None and uid != principal.user_id:
         raise Refusal(404, "not_found")
+    try:
+        stamp = datetime.fromisoformat(clock().replace("Z", "+00:00"))
+        if stamp.tzinfo is None:
+            raise ValueError
+        cap = config.user_day_credits
+        spent = allowance.spent(principal.user_id, stamp.astimezone(UTC).date().isoformat())
+        if (
+            type(cap) not in (int, float)
+            or not math.isfinite(cap)
+            or cap <= 0
+            or type(spent) not in (int, float)
+            or not math.isfinite(spent)
+            or spent < 0
+            or spent >= cap
+        ):
+            raise ValueError
+        # A read bounds the operation, never grants authority: the later atomic reservation
+        # still checks competing holds and commits before any provider invocation.
+        budget = min(budget, cap - spent)
+    except Exception:
+        raise Refusal(429, "allowance_capped", headers={"Cache-Control": "no-store"}) from None
     # Where SEC-15's deployed gate is absent, the verified sign-in dependency supplies the same identity.
     request.state.uid = principal.user_id
     return OwnerMinutesCaller(

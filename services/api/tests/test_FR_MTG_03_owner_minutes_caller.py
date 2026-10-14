@@ -64,8 +64,13 @@ def call(c, meeting_id="mt_q4_plan", headers=None):
     return c.client.post(f"/__test_minutes/{meeting_id}", headers=c.headers if headers is None else headers)
 
 
-def test_FR_MTG_03_caller_default_disabled_before_store_or_provider(caller_app):
+def test_FR_MTG_03_caller_missing_config_refuses_before_store_or_provider(caller_app):
     c = caller_app
+
+    def unavailable_config():
+        raise HTTPException(503, "not_configured", headers={"Cache-Control": "no-store"})
+
+    c.app.dependency_overrides[deps.get_assistant_config] = unavailable_config
     c.app.dependency_overrides[deps.get_people_stores] = lambda: pytest.fail("disabled factory read store")
     response = call(c)
     assert response.status_code == 503 and response.json()["detail"] == "not_configured"

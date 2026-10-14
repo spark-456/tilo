@@ -2,6 +2,7 @@
 
 import pytest
 from _ppl11a_lib import OWNER, PRIYA, SAM
+from fastapi import HTTPException
 from test_FR_MTG_03_analysis_publication import integration  # noqa: F401
 from test_FR_MTG_03_owner_analysis_mode import owner_call  # noqa: F401
 from test_FR_MTG_03_owner_minutes_caller import caller_app  # noqa: F401
@@ -68,9 +69,14 @@ def test_FR_MTG_03_enabled_owner_analyzes_through_adopted_caller(caller_app):  #
     assert len(c.rig.event_store.events[c.scope.world_id]) == 1
 
 
-def test_FR_MTG_03_enabled_flag_does_not_open_server_budget(caller_app):  # noqa: F811
+def test_FR_MTG_03_enabled_flag_does_not_bypass_unavailable_config(caller_app):  # noqa: F811
     c = caller_app
     install(c)
+
+    def unavailable_config():
+        raise HTTPException(503, "not_configured", headers={"Cache-Control": "no-store"})
+
+    c.app.dependency_overrides[deps.get_assistant_config] = unavailable_config
     response = call_route(c, ANALYZE)
     assert response.status_code == 503 and response.headers["cache-control"] == "no-store"
     assert not c.router.calls

@@ -1,7 +1,7 @@
 """Explicit owner follow-up caller, using the adopted minutes dependency design.
 
-No route or automatic attendance trigger. Drafts use the existing guarded durable store;
-the scoped autopilot dependency still refuses. This does not activate the minutes chain.
+No automatic attendance trigger. Drafts use the existing guarded durable store and
+scoped autopilot dependency. Default-off routes do not activate the minutes chain.
 """
 
 from __future__ import annotations
@@ -11,7 +11,7 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from typing import Annotated
 
-from fastapi import Depends, HTTPException
+from fastapi import Depends
 from tilo_channels.autopilot import Autopilot, Preview
 from tilo_channels.drafting import DraftStore
 
@@ -28,9 +28,11 @@ def get_owner_followup_drafts() -> DraftStore:
     return deps.get_followup_draft_store()
 
 
-def get_owner_followup_autopilot_factory() -> AutopilotFactory:
-    """Scoped production card/outbox factory required; never an unscoped bench."""
-    raise HTTPException(503, "not_configured", headers={"Cache-Control": "no-store"})
+def get_owner_followup_autopilot_factory(
+    owner: Annotated[OwnerMinutesCaller, Depends(get_owner_minutes_caller)],
+) -> AutopilotFactory:
+    """Reuse the verified owner dependency and existing durable outbox/store-door resolver."""
+    return deps.get_followup_autopilot_factory(owner)
 
 
 @dataclass(frozen=True)
