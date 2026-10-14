@@ -44,7 +44,7 @@ function clientWith(events: RunEvent[], startAgain?: HttpClient["startAgain"]): 
 }
 
 const STOPPED = [
-  ev(1, "world.requested"),
+  ev(1, "budget.granted", { cap: 80, granted: 80 }),
   ev(2, "world.started"),
   ev(3, "world.failed", { reason: RESTART, unit: null }),
 ];
@@ -58,6 +58,9 @@ describe("RERUN_1 Start it again", () => {
       client: clientWith(STOPPED, start),
     });
     expect(pageText(rig.el)).toContain("Tilo restarted while this was running");
+    expect(pageText(rig.el)).toContain("spending cap of 80 credits");
+    expect(pageText(rig.el)).toContain("in addition to any credits already used");
+    expect(pageText(rig.el)).toContain("No outbound sends are recorded");
 
     click(control(rig.el, "Start it again"));
     await settle();
@@ -84,6 +87,52 @@ describe("RERUN_1 Start it again", () => {
     expect(hasControl(rig.el, "Start it again")).toBe(true);
     expect(rig.app.go).not.toHaveBeenCalled();
   });
+
+  it("discloses recorded sends and the latest approved cap before starting", async () => {
+    const start = vi.fn(async () => ({ world_id: "w_new", task_id: "t_new" }));
+    const events = [
+      ev(1, "budget.granted", { cap: 80 }),
+      ev(2, "budget.granted", { cap: 125.5 }),
+      ev(3, "data.transfer", { direction: "in", outbox_id: null }),
+      ev(4, "data.transfer", { direction: "out", outbox_id: "o_first" }),
+      ev(5, "artifact.delivered", { outbox_id: "o_first" }),
+      ev(6, "artifact.delivered", { outbox_id: "o_other" }),
+      ev(7, "artifact.delivered", { outbox_id: null }),
+      ev(8, "world.failed", { reason: RESTART }),
+    ];
+    const rig = await mountWorld({
+      id: "hires",
+      api: liveWorldsApi(),
+      client: clientWith(events, start),
+    });
+    expect(pageText(rig.el)).toContain("spending cap of 125.5 credits");
+    expect(pageText(rig.el)).toContain(
+      "already sent things outside Tilo (2 recorded outbound actions)",
+    );
+    expect(pageText(rig.el)).toContain("Starting again may send them again");
+    expect(start).not.toHaveBeenCalled();
+    click(control(rig.el, "Start it again"));
+    await settle();
+    expect(start).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([undefined, {}, { cap: -1 }, { cap: "80" }])(
+    "cannot approve an unavailable cap: %s",
+    async (grant) => {
+      const start = vi.fn(async () => ({ world_id: "w_new", task_id: "t_new" }));
+      const events = [ev(1, "budget.granted", grant), ...STOPPED.slice(1)];
+      const rig = await mountWorld({
+        id: "hires",
+        api: liveWorldsApi(),
+        client: clientWith(events, start),
+      });
+      expect(pageText(rig.el)).toContain("spending cap is not available");
+      expect((control(rig.el, "Start it again") as HTMLButtonElement).disabled).toBe(true);
+      click(control(rig.el, "Start it again"));
+      await settle();
+      expect(start).not.toHaveBeenCalled();
+    },
+  );
 
   it("RERUN_1_other_stops_and_running_worlds_offer_nothing", async () => {
     const other = [

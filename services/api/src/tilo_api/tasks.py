@@ -550,18 +550,22 @@ def rerun(
     seams: Annotated[runs.Seams | None, Depends(runs.run_seams)],
     flags: FlagsDep,
 ) -> dict[str, Any]:
-    """RERUN-1: a world that ended `world.failed` (a restart closed it, X-ORPHAN-1) is started again as a NEW run of the
+    """RERUN-1: a world whose latest world event is the X-ORPHAN-1 restart failure is started again as a NEW run of the
     same task: the same brief, the approach the person approved and the cap they granted, through the approve path
     (so the policy engine, the ceiling and the owner's grants decide again). Only the owner; anyone else gets the
-    unknown-world 404. A world that did not fail is a 409. Pressing twice is one new world."""
+    unknown-world 404. Any other latest world event or failure reason is a 409. Pressing twice is one new world."""
+    from .durable_store import STARTUP_RESTARTED
+
     world = store.load_world(world_id)
     if world is None or world.owner != principal.user_id:
         raise HTTPException(status_code=404, detail="No such world.")
     deps.refuse_if_replay_only(flags)  # NFR-24: after sign-in and the owner check, before anything is stored
     store.settle(world_id)
     stream = store.events.get(world_id, [])
-    if not any(e["type"] == "world.failed" for e in stream) or any(e["type"] == "world.completed" for e in stream):
-        raise HTTPException(status_code=409, detail="Only a world that stopped can be started again.")
+
+    last = next((e for e in reversed(stream) if e["type"].startswith("world.")), None)
+    if last is None or last["type"] != "world.failed" or last.get("data", {}).get("reason") != STARTUP_RESTARTED:
+        raise HTTPException(status_code=409, detail="Only a run stopped by a Tilo restart can be started again.")
     old = store.load_world_task(world_id)
     planned = next((e for e in reversed(stream) if e["type"] == "world.planned"), None)
     if old is None or old.approaches is None or planned is None:
