@@ -5,11 +5,11 @@
 // are not served by the fixture client, so none is listed. Rows after design/source "Tilo Team.dc.html".
 import type { Event } from "@tilo/contracts";
 import { useClient } from "../api/ClientProvider";
+import { StopAutopilot } from "../park/pages/Admin/StopAutopilot";
 import { waitingForYou } from "../world/runLog";
 import { AppLink } from "./AppLink";
 import { Loaded } from "./FlowShell";
 import { Placeholder } from "./Placeholder";
-import { StopAutopilot } from "./StopAutopilot";
 import { findItem } from "./findItem";
 import {
   Chip,

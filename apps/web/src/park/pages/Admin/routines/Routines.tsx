@@ -3,8 +3,8 @@
 // confirmation. Each change is shown only after the API answered (HR-1). A client without the
 // schedule routes (the fixture client) says so in words.
 import { useLayoutEffect, useRef, useState } from "react";
-import { useClient } from "../../api/ClientProvider";
-import { TiloApiError } from "../../api/http";
+import { useClient } from "../../../../api/ClientProvider";
+import { TiloApiError } from "../../../../api/http";
 import {
   type ScheduleView,
   type SchedulesApi,
@@ -12,10 +12,10 @@ import {
   canSchedule,
   isScheduleView,
   nextRunWords,
-} from "../../api/schedules";
-import { AppLink } from "../AppLink";
-import { Loaded } from "../FlowShell";
-import { describeError, isReplayOnly, useRemote } from "../remote";
+} from "../../../../api/schedules";
+import { AppLink } from "../../../../screens/AppLink";
+import { describeError, isReplayOnly, useRemote } from "../../../../screens/remote";
+import { Loaded } from "../Loaded";
 
 interface Problem {
   readonly message: string;
