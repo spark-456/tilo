@@ -1,3 +1,4 @@
+import { type ChangeEvent, type ReactNode, useEffect, useRef, useState } from "react";
 // The Park "World" page (WEB-6; design "Tilo App World.dc.html"): one world's overview. The title block and
 // its buttons, the map with its progress, the decisions it waits on, spend, facts, skills and tools, and then
 // Districts (a City), Run history (a Town) or Result (a Village) beside Activity. The worlds, plans,
@@ -7,7 +8,6 @@
 // addresses the browser follows, but only for a world whose data came from the live API: a sample world has no
 // recorded run, so the same elements are disabled with the reason (docs/park-designed-not-in-prd/World.md).
 import { HOST_NOT_CONNECTED_TEXT } from "../../../api/connect";
-import { type ChangeEvent, type ReactNode, useEffect, useRef, useState } from "react";
 import { createRoomClient } from "../../api/live/meetingHall";
 import { downloadResult, hasResultReader } from "../../api/results";
 import type {
