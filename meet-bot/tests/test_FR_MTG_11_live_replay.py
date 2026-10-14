@@ -35,8 +35,8 @@ def test_FR_MTG_11_guest_listens_speaks_and_leaves_with_offline_chirp(monkeypatc
         account_name = ""
         page = object()
 
-        def __init__(self, cfg, voice=False):
-            assert cfg.guest and not cfg.bot_email and voice
+        def __init__(self, cfg, voice=False, face=False):
+            assert cfg.guest and not cfg.bot_email and voice and face
             assert not cfg.profile_dir.exists()
             self.cfg = cfg
 
