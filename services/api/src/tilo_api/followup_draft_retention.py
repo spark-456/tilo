@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import math
 import re
 from collections.abc import Callable
@@ -20,6 +21,8 @@ from typing import Any, TypeGuard
 from fastapi import HTTPException
 from google.api_core.exceptions import FailedPrecondition, NotFound
 from google.cloud.firestore_v1.base_query import FieldFilter
+
+logger = logging.getLogger(__name__)
 
 
 def _closed(status: int = 503) -> HTTPException:
@@ -132,15 +135,19 @@ class DraftRetention:
         try:
             query = self._query().where(filter=FieldFilter(field, operator, value)).limit(limit)
             for found in query.stream():
-                row = found.to_dict()
-                if (
-                    not isinstance(row, dict)
-                    or row.get("org_id") != self.org
-                    or re.fullmatch(r"[0-9a-f]{64}", found.id) is None
-                    or (field == "owner" and row.get("owner") != value)
-                    or (field == "expires_at" and (not _finite(row.get(field)) or row[field] > value))
-                ):
-                    raise ValueError("invalid retention row")
+                try:
+                    row = found.to_dict()
+                    if (
+                        not isinstance(row, dict)
+                        or row.get("org_id") != self.org
+                        or re.fullmatch(r"[0-9a-f]{64}", found.id) is None
+                        or (field == "owner" and row.get("owner") != value)
+                        or (field == "expires_at" and (not _finite(row.get(field)) or row[field] > value))
+                    ):
+                        raise ValueError("invalid retention row")
+                except (ValueError, TypeError, KeyError, AttributeError) as exc:
+                    logger.warning("follow-up retention row skipped (%s)", type(exc).__name__)
+                    continue
                 try:
                     self._document(found).delete(option=self.client.write_option(last_update_time=found.update_time))
                     removed += 1

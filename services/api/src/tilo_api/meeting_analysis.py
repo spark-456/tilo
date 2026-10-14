@@ -16,6 +16,13 @@ from tilo_providers.interfaces import GenerateRequest, SafetyProvider
 from tilo_providers.prompts import load_prompt, neutralise_marker
 from tilo_providers.router import Router
 
+from tilo_api import spend
+from tilo_api.people_writes import Refusal
+
+
+class _ScreenCap(Refusal):
+    """Preserve only safety-screen budget refusals across the analysis error boundary."""
+
 
 def _call(router: Router, role: str, data: dict, budget: float, schema: dict | None = None) -> tuple[Any, float]:
     result = router.generate(
@@ -63,7 +70,14 @@ def analyze_minutes(
             raise ValueError  # generated types do not enforce the PE-22 ordering rule
         if directory.get(viewer) is None:
             raise ValueError
-        screen = safety.check(json.dumps(transcript))
+        try:
+            screen = safety.check(json.dumps(transcript))
+        except Refusal as exc:
+            if exc.status_code == 429 and exc.detail == "allowance_capped":
+                raise _ScreenCap(429, "allowance_capped", headers={"Cache-Control": "no-store"}) from None
+            raise
+        except spend.SpendCapReached:
+            raise _ScreenCap(429, "allowance_capped", headers={"Cache-Control": "no-store"}) from None
         if not isinstance(screen, dict) or screen.get("flagged") is not False:
             raise ValueError
         metadata = dict(meeting_id=transcript["meeting_id"], transcript=transcript_ref, generated_at=now, flagged=False)
@@ -163,5 +177,7 @@ def analyze_minutes(
         if not conforms("minutes.schema.json", doc):
             raise ValueError
         return doc
+    except _ScreenCap:
+        raise
     except Exception:
         raise ValueError("analysis_failed") from None
