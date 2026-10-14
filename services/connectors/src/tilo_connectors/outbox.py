@@ -210,6 +210,17 @@ class Outbox:
             raise OutboxRefused(f"cannot abandon {outbox_id!r}: being sent or already settled")
         return updated
 
+    def abandon_before_dispatch(self, outbox_id: str) -> dict:
+        """Compensate a refused decision record atomically; mark only entries never claimed for sending."""
+        self._own(outbox_id, "abandon")
+        if (updated := self._store._abandon_before_dispatch(outbox_id)) is None:
+            raise OutboxRefused("cannot compensate an entry that may have reached an adapter")
+        return updated
+
+    def was_abandoned_before_dispatch(self, outbox_id: str) -> bool:
+        self._own(outbox_id, "read compensation")
+        return self._store.was_abandoned_before_dispatch(outbox_id)
+
     def dispatch_due(self) -> list[dict]:
         now = self._clock()
         ours = [e for e in self._store.all_entries() if self._world_id in (None, e["world_id"])]

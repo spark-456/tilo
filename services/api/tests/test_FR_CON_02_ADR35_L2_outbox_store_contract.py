@@ -517,3 +517,28 @@ def test_FR_CON_02_ADR35_L2_the_schema_patterns_the_store_matches_are_the_contra
     defs = common["$defs"]
     assert mod.ID_PATTERN.pattern == defs["ulid"]["pattern"].strip("^$")
     assert mod.WORLD_PATTERN.pattern == defs["world_id"]["pattern"].strip("^$")
+
+
+def test_FR_CHN_18_OLD_4b_compensation_proof_survives_restart_and_refuses_attempted_entry(rig: Rig) -> None:
+    from tilo_connectors import Outbox
+    from tilo_connectors.errors import OutboxRefused
+
+    store = rig.make()
+    rig.put(store, entry(1), entry(2), entry(3), entry(4))
+    outbox = Outbox(store, {}, emit=lambda _: None, clock=rig.clock, world_id=WORLD_A)
+    assert not outbox.was_abandoned_before_dispatch(outbox_id(1))
+    assert outbox.abandon_before_dispatch(outbox_id(1))["state"] == "failed"
+    restarted = Outbox(rig.make(), {}, emit=lambda _: None, clock=rig.clock, world_id=WORLD_A)
+    assert restarted.was_abandoned_before_dispatch(outbox_id(1))
+    rig.claim(store, 2, "sending")
+    rig.clock.advance(31)
+    with pytest.raises(OutboxRefused):
+        restarted.abandon_before_dispatch(outbox_id(2))
+    rig.claim(store, 3, "terminal")
+    store._finalize_claim(outbox_id(3), "terminal", "failed")
+    assert not restarted.was_abandoned_before_dispatch(outbox_id(3))
+    store._abandon(outbox_id(4), rig.clock())
+    assert not restarted.was_abandoned_before_dispatch(outbox_id(4))
+    foreign = Outbox(rig.make(), {}, emit=lambda _: None, clock=rig.clock, world_id=WORLD_B)
+    with pytest.raises(OutboxRefused):
+        foreign.was_abandoned_before_dispatch(outbox_id(1))

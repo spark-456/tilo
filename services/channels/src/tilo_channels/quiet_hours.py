@@ -43,7 +43,7 @@ def _load_tz(tz_name: object) -> ZoneInfo:
         raise ValueError(f"invalid timezone: {tz_name!r}")
     try:
         return ZoneInfo(tz_name.strip())
-    except (ZoneInfoNotFoundError, KeyError, ValueError) as exc:
+    except (ZoneInfoNotFoundError, KeyError, ValueError, OSError) as exc:
         raise ValueError(f"unknown timezone: {tz_name!r}") from exc
 
 
@@ -78,8 +78,8 @@ class QuietHours:
             return False
         try:
             local_dt = _to_utc_datetime(now).astimezone(_load_tz(self.timezone))
-        except (ZoneInfoNotFoundError, ValueError, TypeError) as exc:
-            cause = exc.__cause__ if isinstance(exc.__cause__, ZoneInfoNotFoundError) else exc
+        except (ZoneInfoNotFoundError, ValueError, TypeError, OSError) as exc:
+            cause = exc.__cause__ if isinstance(exc.__cause__, (ZoneInfoNotFoundError, OSError)) else exc
             _LOG.warning("quiet_hours held: reason=timezone_unresolved error=%s", type(cause).__name__)
             return True
         cur_min = local_dt.hour * 60 + local_dt.minute
@@ -112,19 +112,33 @@ def parse_quiet_hours(prefs: Mapping[str, Any] | QuietHours | None) -> QuietHour
 def is_quiet_hours(
     prefs: Mapping[str, Any] | QuietHours | None, *, now: float | int | str | dt.datetime | None = None
 ) -> bool:
+    if prefs is None:
+        return False
     if isinstance(prefs, QuietHours):
         return prefs.is_active(now)
-    if not isinstance(prefs, Mapping) or (block := _extract_quiet_block(prefs)) is None:
+    if not isinstance(prefs, Mapping):
+        _LOG.warning("quiet_hours held: reason=invalid_window error=ValueError")
+        return True
+    raw = prefs.get("quiet_hours")
+    if raw is not None and not isinstance(raw, Mapping):
+        _LOG.warning("quiet_hours held: reason=invalid_window error=ValueError")
+        return True
+    if (block := _extract_quiet_block(prefs)) is None:
         return False
     start, end = block.get("start"), block.get("end")
     tz = block.get("timezone") or block.get("time_zone") or prefs.get("timezone") or prefs.get("time_zone") or "UTC"
-    if not isinstance(start, str) or not isinstance(end, str):
+    try:
+        if not isinstance(start, str) or not isinstance(end, str):
+            raise ValueError("missing start/end")
+        _parse_hhmm(start)
+        _parse_hhmm(end)
+    except ValueError:
         _LOG.warning("quiet_hours held: reason=invalid_window error=ValueError")
         return True
     try:
         window = QuietHours(start=start, end=end, timezone=str(tz))
-    except (ZoneInfoNotFoundError, ValueError) as exc:
-        cause = exc.__cause__ if isinstance(exc.__cause__, ZoneInfoNotFoundError) else exc
+    except (ZoneInfoNotFoundError, ValueError, OSError) as exc:
+        cause = exc.__cause__ if isinstance(exc.__cause__, (ZoneInfoNotFoundError, OSError)) else exc
         _LOG.warning("quiet_hours held: reason=timezone_unresolved error=%s", type(cause).__name__)
         return True
     return window.is_active(now)
@@ -147,7 +161,11 @@ def should_notify(
     now: float | int | str | dt.datetime | None = None,
 ) -> bool:
     kind = _notification_kind(item)
-    return (kind in ALWAYS_NOTIFY_TYPES) if is_quiet_hours(prefs, now=now) else (kind not in ("info", "fyi"))
+    if kind in ALWAYS_NOTIFY_TYPES:
+        return True
+    if kind in ("info", "fyi"):
+        return False
+    return not is_quiet_hours(prefs, now=now)
 
 
 @dataclass(frozen=True)
@@ -171,17 +189,23 @@ class NotificationGate:
     def should_notify(
         self, user_id: str, item: Mapping[str, Any] | str, *, now: float | int | str | dt.datetime | None = None
     ) -> bool:
+        kind = _notification_kind(item)
+        if kind in ALWAYS_NOTIFY_TYPES:
+            return True
+        if kind in ("info", "fyi"):
+            return False
         try:
             prefs = self._prefs.get(user_id) if self._prefs is not None else None
             return should_notify(item, prefs=prefs, now=self._clock() if now is None else now)
-        except (ZoneInfoNotFoundError, ValueError, TypeError, LookupError, RuntimeError, OSError) as exc:
+        except Exception as exc:
             _LOG.warning("quiet_hours held: reason=preference_error error=%s", type(exc).__name__)
-            return _notification_kind(item) in ALWAYS_NOTIFY_TYPES
+            return False
 
     def deliver(self, user_id: str, item: dict) -> DeliveryDecision:
-        stored, notify = copy.deepcopy(item), self.should_notify(user_id, item)
+        stored = copy.deepcopy(item)
         with self._lock:
             self._in_app.setdefault(user_id, []).append(stored)
+        notify = self.should_notify(user_id, item)
         if notify and self._sender is not None:
             self._sender(copy.deepcopy(stored))
         return DeliveryDecision(notified=notify, in_app=True)

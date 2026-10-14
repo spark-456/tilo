@@ -66,24 +66,35 @@ def _parse_hhmm(value: object) -> int | None:
 
 def _quiet_hours_active(prefs: Mapping[str, Any] | None, now: datetime.datetime) -> bool:
     """FR-HIL-13: whether `now` falls in the user's `[start, end)` quiet-hours window in their IANA timezone."""
-    if not isinstance(prefs, Mapping):
+    if prefs is None:
         return False
+    if not isinstance(prefs, Mapping):
+        logger.warning("quiet_hours held: reason=invalid_window error=ValueError")
+        return True
     raw = prefs.get("quiet_hours")
-    block = raw if isinstance(raw, Mapping) else (prefs if "start" in prefs and "end" in prefs else None)
+    if raw is not None and not isinstance(raw, Mapping):
+        logger.warning("quiet_hours held: reason=invalid_window error=ValueError")
+        return True
+    block = raw if isinstance(raw, Mapping) else (prefs if ("start" in prefs or "end" in prefs) else None)
     if not isinstance(block, Mapping) or block.get("enabled") is False:
         return False
     start_min, end_min = _parse_hhmm(block.get("start")), _parse_hhmm(block.get("end"))
-    if start_min is None or end_min is None or start_min == end_min:
+    if start_min is None or end_min is None:
+        logger.warning("quiet_hours held: reason=invalid_window error=ValueError")
+        return True
+    if start_min == end_min:
         return False
     tz_name = (
         block.get("timezone") or block.get("time_zone") or prefs.get("timezone") or prefs.get("time_zone") or "UTC"
     )
     if not isinstance(tz_name, str) or not tz_name.strip():
-        return False
+        logger.warning("quiet_hours held: reason=timezone_unresolved error=ValueError")
+        return True
     try:
         tz = ZoneInfo(tz_name.strip())
-    except (ZoneInfoNotFoundError, KeyError, ValueError):
-        return False
+    except (ZoneInfoNotFoundError, KeyError, ValueError, OSError) as exc:
+        logger.warning("quiet_hours held: reason=timezone_unresolved error=%s", type(exc).__name__)
+        return True
     local_dt = now.astimezone(tz)
     cur_min = local_dt.hour * 60 + local_dt.minute
     return (start_min <= cur_min < end_min) if start_min < end_min else (cur_min >= start_min or cur_min < end_min)
@@ -290,12 +301,17 @@ class CardStore:
 
     def should_notify(self, card: dict, *, user_id: str | None = None, now: str | None = None) -> bool:
         """FR-HIL-13: during quiet hours only `gate` and `blocked` cards notify."""
+        rung = str(card.get("rung") or card.get("kind") or "").lower()
+        if rung in _ALWAYS_NOTIFY or card.get("kind") == "gate":
+            return True
         target = user_id or self._world_owners.get(card.get("world_id", ""))
         instant = _parse_ts(now or self._clock.now())
-        rung = str(card.get("rung") or card.get("kind") or "").lower()
-        if _quiet_hours_active(self._user_prefs(target), instant):
-            return rung in _ALWAYS_NOTIFY or card.get("kind") == "gate"
-        return True
+        try:
+            prefs = self._user_prefs(target)
+        except Exception as exc:
+            logger.warning("quiet_hours held: reason=preference_error error=%s", type(exc).__name__)
+            return False
+        return not _quiet_hours_active(prefs, instant)
 
     # -- submit ---------------------------------------------------------
 

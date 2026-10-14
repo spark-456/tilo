@@ -303,11 +303,19 @@ def _rate_limit_response(limit_scope: LimitScope, retry_after_s: int) -> JSONRes
     )
 
 
-_CAPABILITY_MISSING = (NotImplementedError, AttributeError, TypeError)  # a store without peek/consume_all: fail closed
+_CAPABILITY_MISSING = (
+    NotImplementedError,
+    AttributeError,
+    TypeError,
+    ValueError,
+)  # missing or malformed peek/consume_all contract: fail closed
 
 
 def _store_unusable(limiter: object) -> JSONResponse:
-    logger.error("rate limiter store lacks peek/consume_all, failing closed: %s", type(limiter).__name__)
+    logger.error(
+        "rate limiter store lacks or violated peek/consume_all contract, failing closed: %s",
+        type(limiter).__name__,
+    )
     return JSONResponse(
         status_code=503,
         content={"detail": "Rate limiter store is unusable.", "code": "rate_limiter_unavailable"},

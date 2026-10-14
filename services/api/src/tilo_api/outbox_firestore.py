@@ -245,6 +245,30 @@ class FirestoreOutboxStore:
 
         return self._mutate(outbox_id, change)
 
+    def _abandon_before_dispatch(self, outbox_id: str) -> dict | None:
+        def change(doc: dict) -> tuple[bool, dict | None]:
+            if (
+                doc["entry"]["state"] not in ("queued", "scheduled")
+                or doc["send_lease"] is not None
+                or doc["retry"] is not None
+            ):
+                return False, None
+            doc["entry"]["state"] = "failed"
+            doc["abandoned_before_dispatch"] = True
+            return True, deepcopy(doc["entry"])
+
+        return self._mutate(outbox_id, change)
+
+    def was_abandoned_before_dispatch(self, outbox_id: str) -> bool:
+        if not _id_ok(outbox_id):
+            return False
+
+        def work() -> bool:
+            snap = self._ref(outbox_id).get()
+            return snap.exists and snap.to_dict().get("abandoned_before_dispatch") is True
+
+        return self._read(work)
+
     def _claim_for_sending(
         self, outbox_id: str, holder: str, now: str, lease_seconds: float, skew_s: float = 0
     ) -> dict | None:  # never before scheduled_at + skew_s (PI-12) or the entry's not-before

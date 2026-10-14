@@ -31,6 +31,7 @@ class InMemoryOutboxStore:
         self._by_id: dict[str, dict] = {}
         self._by_key: dict[tuple[str, str], str] = {}
         self._send_leases: dict[str, _Lease] = {}
+        self._abandoned_before_dispatch: set[str] = set()
         self._transfer_leases: dict[str, _Lease] = {}
         self._pending_transfers: dict[str, tuple[str, dict]] = {}  # outbox_id -> (world_id, transfer)
         self._pending_alerts: dict[str, tuple[str, dict]] = {}  # outbox_id -> (world_id, alert part)
@@ -101,6 +102,25 @@ class InMemoryOutboxStore:
             entry["state"] = "failed"
             self._retries.pop(outbox_id, None)
             return deepcopy(entry)
+
+    def _abandon_before_dispatch(self, outbox_id: str) -> dict | None:
+        # A terminal failure or any prior dispatch lease is never proof that nothing was sent.
+        with self._lock:
+            entry = self._by_id.get(outbox_id)
+            if (
+                entry is None
+                or entry["state"] not in ("queued", "scheduled")
+                or outbox_id in self._send_leases
+                or outbox_id in self._retries
+            ):
+                return None
+            entry["state"] = "failed"
+            self._abandoned_before_dispatch.add(outbox_id)
+            return deepcopy(entry)
+
+    def was_abandoned_before_dispatch(self, outbox_id: str) -> bool:
+        with self._lock:
+            return outbox_id in self._abandoned_before_dispatch
 
     def _claim_for_sending(
         self, outbox_id: str, holder: str, now: str, lease_seconds: float, skew_s: float = 0
