@@ -7,8 +7,8 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   type ConnectFlow,
-  type HostState,
   HOST_NOT_CONNECTED_TEXT,
+  type HostState,
   MEETING_HOST,
   MEETING_HOST_CAPABILITIES,
 } from "../../../api/connect";
