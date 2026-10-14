@@ -48,6 +48,7 @@ from __future__ import annotations
 import asyncio
 import dataclasses
 import functools
+import logging
 import math
 from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass, field
@@ -60,6 +61,7 @@ from tilo_providers.clock import Clock, parse_deadline, real_today
 from tilo_harness.branch import Checkpoint, hit_summary, reusable_units
 from tilo_harness.config import AgentsConfig
 from tilo_harness.context_handoff import context_pct, next_spare, note_is_valid, store_note
+from tilo_harness.failure import crash_reason, error_trail
 from tilo_harness.must_ask import Ask, MustAsk
 from tilo_harness.outputs import Kept, UnitOutput, existing, keep
 from tilo_harness.question_wait import Answer, QuestionWait
@@ -70,6 +72,7 @@ from tilo_harness.unit_prompt import UPSTREAM_ITEM_CAP, UpstreamItem
 from tilo_harness.validator import EventRejected, repo_validator
 from tilo_harness.verifier import Verifier
 
+log = logging.getLogger(__name__)
 _WORKER_RANKS = ("specialist", "verifier", "writer")  # ranks that execute units (PRD 8.1)
 _LEVELS = 3  # Director -> Lead -> worker
 
@@ -97,6 +100,11 @@ class UnitOutcome:
 
 
 @dataclass(frozen=True)
+class _Crashed:
+    reason: str  # a runner that raised: the plain line for UnitOutcome.reason (RUN-FAIL-1)
+
+
+@dataclass(frozen=True)
 class UnitContext:
     agent_id: str
     skills: tuple[LoadedSkill, ...]
@@ -108,6 +116,9 @@ class UnitContext:
     brief: Mapping[str, Any] | None = None  # the brief the run was started with
     intake_answers: tuple[tuple[str, str], ...] = ()  # (the Director's question, the person's answer)
     upstream: tuple[UpstreamItem, ...] = ()  # the units this one depends on, in plan order
+    # FR-HIL-10: what the person decided when this unit asked first (code-written from the card and the answer);
+    # `unit_prompt` shows it, neutralised, inside the request block. None when the unit never asked.
+    decision: str | None = None
 
 
 class UnitRunner(Protocol):
@@ -143,6 +154,31 @@ class DefaultUnitRunner(ToolUnitRunner):
         if unit["role"] == "verifier" and (fail := _date_window_fail(context, self._date_clock())) is not None:
             return UnitOutcome(success=False, summary=" ".join(fail.verdict.split()), reason=fail.reason)
         return await super().run(unit, context)
+
+
+def _decision(card: Any, answer: Any) -> str | None:
+    """FR-HIL-10: the line a unit's prompt shows for the answer to its own question: the person's typed text when an
+    answer carries one (any str), else the chosen option's label; the question it answered follows. A deadline default
+    says so. None when there is nothing to show. Plain data: `unit_prompt` neutralises it."""
+    if answer is None or not isinstance(card, Mapping):
+        return None
+    typed = getattr(answer, "text", None)
+    found = card.get("options")
+    options: list[Any] = found if isinstance(found, list) else []
+    label = next(
+        (o.get("label") for o in options if isinstance(o, Mapping) and o.get("id") == getattr(answer, "option", None)),
+        None,
+    )
+    chosen = typed if isinstance(typed, str) and typed.strip() else label
+    if not isinstance(chosen, str) or not chosen.strip():
+        return None
+    who = (
+        "Nobody answered in time, so the default was taken"
+        if getattr(answer, "answered_by", None) == "default"
+        else "The person decided"
+    )
+    asked = card.get("what_happened")
+    return f"{who}: {chosen}" + (f" (asked: {asked})" if isinstance(asked, str) and asked.strip() else "")
 
 
 def _date_window_fail(context: UnitContext, today: date) -> WindowFail | None:
@@ -362,6 +398,7 @@ class _Run:
             "agent.assigned", lead, worker, "The Lead gave it a unit.", {"unit": unit_id}, cause=cause, **at
         )
         answer: Answer | None = None
+        decision: str | None = None
         if self.must_ask is not None:
             ask = await self.must_ask.assess(unit)  # no failure count yet: retries arrive with FR-AGT-13
             if ask is not None:
@@ -381,6 +418,7 @@ class _Run:
                 answer = await self.question_wait.wait_for(
                     card, lead=lead, director=self.roster.director, district=district
                 )
+                decision = _decision(card, answer)  # the person's own choice on the unit's own card
                 # A stand-in ask that is not MustAsk's (the pinned FR-HIL-10 doubles) runs on any answer.
                 runs, held_by = not isinstance(ask, Ask) or ask.runs(answer), answer
                 if not runs and isinstance(ask, Ask) and (follow := self.must_ask.confirmation(ask, answer)):
@@ -424,7 +462,13 @@ class _Run:
             )
             upstream = tuple(self.results[dep] for dep in unit["depends_on"] if dep in self.results)
             first = UnitContext(
-                worker, loaded, answer, brief=self.brief, intake_answers=self.intake_answers, upstream=upstream
+                worker,
+                loaded,
+                answer,
+                brief=self.brief,
+                intake_answers=self.intake_answers,
+                upstream=upstream,
+                decision=decision,
             )
             outcome, worker, cause = await self.run_agents(unit, first, site, cause, at)  # a successor may finish it
         made: list[Kept] = []
@@ -456,17 +500,20 @@ class _Run:
             self.results[unit_id] = await asyncio.to_thread(_upstream_item, unit, outcome, made, self.store)
         return outcome
 
-    async def call(self, work: Awaitable[Any]) -> Any:
-        """The runner's result, or None if it crashed or cancelled its own work (a cancel of the run itself goes on)."""
+    async def call(self, work: Awaitable[Any], unit_id: str = "") -> Any:
+        """The runner's result, or a `_Crashed` if it crashed or cancelled its own work (a cancel of the run itself
+        goes on). A crash is one ERROR line: class names and profile ids only (RUN-FAIL-1)."""
         try:
             return await asyncio.ensure_future(work)  # its own task: a runner cancelling "the current task" is itself
         except asyncio.CancelledError:
             task = asyncio.current_task()
             if task is not None and task.cancelling():  # the run itself was cancelled
                 raise
-        except Exception:  # a runner crash fails this unit closed; the run goes on
-            pass
-        return None
+            return _Crashed("a step's work was cancelled")
+        except Exception as error:  # a runner crash fails this unit closed; the run goes on
+            reason = crash_reason(error)
+            log.error("unit %s failed: %s [%s]", unit_id, reason, error_trail(error))
+            return _Crashed(reason)
 
     async def run_agents(
         self, unit: dict[str, Any], context: UnitContext, site: str, cause: str, at: dict[str, Any]
@@ -477,9 +524,10 @@ class _Run:
         worker, lead, handoffs = context.agent_id, self.roster.leads[unit["district"]], 0
         closed = UnitOutcome(success=False, summary="The handoff could not be completed, so the unit stopped.")
         while True:
-            ran = await self.call(self.runner.run(unit, context))
+            ran = await self.call(self.runner.run(unit, context), unit["id"])
             if not isinstance(ran, UnitOutcome):
-                return UnitOutcome(success=False, summary="The unit's work failed."), worker, cause
+                reason = ran.reason if isinstance(ran, _Crashed) else "a step's work returned no result"
+                return UnitOutcome(success=False, summary="The unit's work failed.", reason=reason), worker, cause
             if ran.handoff_note is None or ran.success is not True:
                 return ran, worker, cause
             note, pct = ran.handoff_note, context_pct(ran.context_share, self.handoff_at)
@@ -505,7 +553,7 @@ class _Run:
             cause = say("agent.assigned", lead, successor, "The Lead gave it the unit.", {"unit": unit["id"]})
             context = dataclasses.replace(context, agent_id=successor, answer=None, note=note, note_ref=ref)
             check = getattr(self.runner, "verify", None)
-            verified = check is not None and await self.call(check(unit, context)) is True
+            verified = check is not None and await self.call(check(unit, context), unit["id"]) is True
             done = {"predecessor": worker, "note": ref, "verification_passed": verified}
             cause = say("agent.context_handoff_completed", successor, site, "The successor took over.", done)
             say("agent.retired", lead, worker, "The agent handed over and left.", {})
