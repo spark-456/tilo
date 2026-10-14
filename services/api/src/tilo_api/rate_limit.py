@@ -30,7 +30,7 @@ from tilo_api.deps import Principal, get_current_principal
 logger = logging.getLogger("tilo_api.rate_limit")
 
 LimitScope = Literal["ip", "user"]
-_EXEMPT_PATHS = frozenset({"/health", "/healthz"})
+_EXEMPT_PATHS = frozenset({"/health", "/healthz", "/health/deps", "/healthz/deps"})
 _DEFAULT_MAX_BUCKETS = 10_000
 _CONFIG_PATH = Path(__file__).resolve().parents[4] / "config" / "rate_limits.yaml"
 
