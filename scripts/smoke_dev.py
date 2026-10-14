@@ -336,9 +336,56 @@ def main(
         return 0 if _report("delivery", lambda: smoke.delivery(world, timeout_s))[0] else 1
 
 
+def hosted_main(argv: Sequence[str], *, transport: httpx.BaseTransport | None = None) -> int:
+    """Signed-out Hosting, API and dependency configuration checks over HTTP.
+
+    Demo Home/world verification belongs to the existing hosted Playwright smoke
+    in playwright.hosted.config.ts; this command reports only its HTTP scope.
+    """
+    from smoke_unsigned import main as unsigned_main  # noqa: PLC0415
+
+    if unsigned_main(argv, transport=transport):
+        print("FAIL hosted: signed-out Hosting, bundle, health or security check failed")
+        return 1
+    with httpx.Client(transport=transport, timeout=CALL_TIMEOUT_S, follow_redirects=False, trust_env=False) as client:
+
+        def configured() -> None:
+            try:
+                with client.stream("GET", argv[0] + "/healthz/deps", headers={"X-Tilo-Channel": "web"}) as response:
+                    if response.status_code != 200:
+                        raise Failed(f"HTTP {response.status_code}, wanted 200")
+                    body = bytearray()
+                    for chunk in response.iter_bytes():
+                        body.extend(chunk)
+                        if len(body) > 65536:
+                            raise Failed("dependency response exceeds 64 KiB")
+                    data = httpx.Response(200, content=bytes(body)).json()
+            except (httpx.HTTPError, ValueError) as exc:
+                raise Failed(f"dependency response could not be read ({type(exc).__name__})") from None
+            if not isinstance(data, dict):
+                raise Failed("dependency configuration is not an object")
+            required = {
+                "api_store": "firestore",
+                "artifacts_store": "gcs",
+                "archive_store": "gcs",
+                "skills_store": "firestore",
+                "firestore_project_configured": True,
+                "artifacts_bucket_configured": True,
+                "archive_bucket_configured": True,
+                "live_mode": True,
+            }
+            for key, wanted in required.items():
+                if type(data.get(key)) is not type(wanted) or data.get(key) != wanted:
+                    raise Failed(f"{key} does not report the required deployed configuration")
+
+        if not _report("dependency-configuration (configuration only, not readiness)", configured)[0]:
+            return 1
+    print("SKIP demo: Home and recorded world require the existing playwright.hosted.config.ts hosted smoke")
+    print("PASS hosted-http (signed-out HTTP checks only; demo unverified)")
+    return 0
+
+
 if __name__ == "__main__":
     if sys.argv[1:2] == ["--unsigned"]:
-        from smoke_unsigned import main as unsigned_main
-
-        sys.exit(unsigned_main(sys.argv[2:]))
+        sys.exit(hosted_main(sys.argv[2:]))
     sys.exit(main(sys.argv[1:]))
