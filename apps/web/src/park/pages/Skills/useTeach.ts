@@ -1,8 +1,9 @@
+import { useCallback, useEffect, useRef, useState } from "react";
 // The "Teach Tilo something new" flow as one state machine (the reference's `startCapture`, `startRun`,
 // `advance` and `save`): Show it, Tilo's version, Try run, Save, then saved. Every wait goes through the
 // provider's `schedule` (never a timer of its own), one pending step at a time, cancelled when the state
 // that wanted it changes or the page goes: a captured step and a run step each take 900 ms.
-import { useCallback, useEffect, useRef, useState } from "react";
+import { displayApiError } from "../../api/errorMessage";
 import type { Api } from "../../api/index";
 import type { Skill, SkillCapture, SkillVersion, Source, User } from "../../api/types";
 import type { AppCtx } from "../../app/AppCtx";
@@ -16,7 +17,6 @@ import {
   LIVE_TEACH,
   type MethodKey,
   PLAN,
-  SAVE_CODES,
   type Scope,
   TRY_RUN_FIXTURE_EVENTS,
   type Trigger,
@@ -69,7 +69,7 @@ export interface Teach {
   /** SKILLS-5: a live page teaches by describing; these hold what the server answered. */
   live: boolean;
   busy: boolean;
-  failure: string | null;
+  failure: unknown;
   steps: readonly string[];
   version: SkillVersion | null;
   setName: (v: string) => void;
@@ -88,16 +88,6 @@ export interface Teach {
   reset: () => void;
   view: () => void;
 }
-
-/** What the person is told when a capture or a version fails: unavailable, refused, or try again. */
-const failureOf = (e: unknown): string => {
-  const status = (e as { status?: unknown } | null)?.status;
-  return status === 503
-    ? LIVE_TEACH.unavailable
-    : status === 422
-      ? LIVE_TEACH.refused
-      : LIVE_TEACH.retry;
-};
 
 /** Runs the call inside one promise, so a call that throws at once is a rejection like any other. */
 const together = <T>(call: () => Promise<T>): Promise<T> =>
@@ -130,7 +120,7 @@ export function useTeach({
   const [trig, setTrig] = useState<Trigger>(isLive ? "ask" : "arrive");
   const [captured, setCaptured] = useState<SkillCapture | null>(null);
   const [version, setVersion] = useState<SkillVersion | null>(null);
-  const [failure, setFailure] = useState<string | null>(null);
+  const [failure, setFailure] = useState<unknown>(null);
   const [busy, setBusy] = useState(false);
   const inflight = useRef(false);
   const [saved, setSaved] = useState(false);
@@ -198,7 +188,7 @@ export function useTeach({
         if (live.current) setBusy(false);
       });
   };
-  const failed = (e: unknown) => setFailure(failureOf(e));
+  const failed = (e: unknown) => setFailure(e);
   const describeIt = () => {
     const text = desc.trim();
     if (!text) return;
@@ -244,9 +234,8 @@ export function useTeach({
         app.toast(LIVE_TEACH.saved(nm));
       },
       (e) => {
-        const said = e instanceof Error ? e.message : "";
-        const code = SAVE_CODES.has(said) ? said : null;
-        app.toast(LIVE_TEACH.failed(nm, code));
+        setFailure(e);
+        app.toast(`Couldn’t save “${nm}”. ${displayApiError(e)}`);
       },
     );
   };

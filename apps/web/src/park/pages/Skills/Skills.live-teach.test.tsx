@@ -80,9 +80,9 @@ const SAVED = {
 
 // the strings this ticket adds (flagged in the PR body)
 const SAVED_TOAST = "Saved “Match invoices”. It starts as Learning";
-const ERR_TRY = "Tilo couldn’t read that just now. Try again.";
-const ERR_UNDERSTOOD = "Tilo couldn’t make a skill from that. Try describing it differently.";
-const NOT_CONNECTED = "Not connected yet";
+const ERR_TRY = "Tilo had a problem on its side.";
+const ERR_UNDERSTOOD = "Check the information and try again.";
+const NOT_CONNECTED = "Tilo had a problem on its side.";
 
 type Handler = (init: RequestInit) => Response | Promise<Response>;
 interface Server {
@@ -246,7 +246,7 @@ describe("SKILLS_5_live_teach: a capture the server cannot make", () => {
       "POST /v1/skills/captures": () => json({ detail: "x" }, status),
     }).mount();
     await describe_(r);
-    expect(pageText(r.el.querySelector('[data-testid="skills-teach-error"]') as Element)).toBe(
+    expect(pageText(r.el.querySelector('[data-testid="skills-teach-error"] p') as Element)).toBe(
       line,
     );
     expect(text(r)).toContain("0 of 0");
@@ -347,7 +347,7 @@ describe("SKILLS_5_live_teach: Tilo's version (step 2)", () => {
       "POST /v1/skills/captures/tsk_C1/version": () => json({ detail: "x" }, status),
     }).mount();
     await toVersion(r);
-    expect(pageText(r.el.querySelector('[data-testid="skills-teach-error"]') as Element)).toBe(
+    expect(pageText(r.el.querySelector('[data-testid="skills-teach-error"] p') as Element)).toBe(
       line,
     );
     expect(text(r)).toContain("Note the total");
@@ -454,9 +454,12 @@ describe("SKILLS_5_live_teach: save (step 4)", () => {
   });
 
   it.each([
-    ["unknown_action", "Couldn’t save “Match invoices” (unknown_action). Try again"],
-    ["ask_first_required", "Couldn’t save “Match invoices” (ask_first_required). Try again"],
-    ["some words the server made up", "Couldn’t save “Match invoices”. Try again"],
+    ["unknown_action", "Couldn’t save “Match invoices”. Check the information and try again."],
+    ["ask_first_required", "Couldn’t save “Match invoices”. Check the information and try again."],
+    [
+      "some words the server made up",
+      "Couldn’t save “Match invoices”. Check the information and try again.",
+    ],
   ])(
     "SKILLS_5_live_teach_a_422_%s_says_Couldnt_save_and_nothing_is_saved",
     async (detail, toast) => {
@@ -481,7 +484,9 @@ describe("SKILLS_5_live_teach: save (step 4)", () => {
     name(r, "Match invoices");
     clickEl(control(r.el, "Save skill"));
     await settle();
-    expect(toasts(r.app)).toEqual([["Couldn’t save “Match invoices”. Try again"]]);
+    expect(toasts(r.app)).toEqual([
+      ["Couldn’t save “Match invoices”. Tilo had a problem on its side."],
+    ]);
     clickEl(control(r.el, "Save skill"));
     await settle();
     expect(server.posts("/v1/skills")).toHaveLength(2);
@@ -498,3 +503,42 @@ describe("SKILLS_5_live_teach: save (step 4)", () => {
     expect(text(r)).not.toContain("is now a skill");
   });
 });
+
+it.each(["capture", "version", "save"])(
+  "NFR22 Skills %s failure reserves space and Retry only refreshes reads",
+  async (action) => {
+    const path =
+      action === "capture"
+        ? "/v1/skills/captures"
+        : action === "version"
+          ? "/v1/skills/captures/tsk_C1/version"
+          : "/v1/skills";
+    const { server, mount } = rig({
+      [`POST ${path}`]: () => json({ detail: "rate_limited" }, 429),
+    });
+    const r = await mount();
+    const before = r.el.querySelector<HTMLElement>("[data-skills-action-state]");
+    expect(before?.style.blockSize).toBe("176px");
+    if (action === "capture") await describe_(r);
+    if (action === "version") await toVersion(r);
+    if (action === "save") {
+      await toSave(r);
+      name(r, "Match invoices");
+      clickEl(control(r.el, "Save skill"));
+      await settle();
+    }
+    const box = r.el.querySelector<HTMLElement>("[data-skills-action-state]");
+    expect(box?.style.blockSize).toBe("176px");
+    expect(box?.textContent).toContain("Too many requests. Wait a moment and try again.");
+    const posts = server.posts(path).length;
+    const reads = server.fetch.mock.calls.filter((c) => c[1]?.method !== "POST").length;
+    clickEl(control(box as HTMLElement, "Retry"));
+    await settle();
+    expect(server.posts(path)).toHaveLength(posts);
+    expect(server.fetch.mock.calls.filter((c) => c[1]?.method !== "POST").length).toBeGreaterThan(
+      reads,
+    );
+    expect(text(r)).not.toContain("is now a skill");
+    expect(r.el.querySelector("[role=alert]")).toBeNull();
+  },
+);

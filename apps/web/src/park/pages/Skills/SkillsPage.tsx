@@ -106,7 +106,7 @@ function PersonalSkillsPage({ app }: { app: AppCtx }) {
     <div className="park-skills-root" data-testid="park-page-skills">
       <PageSheet gap={30}>
         {data !== null && data !== "failed" ? (
-          <Ready app={app} data={data} />
+          <Ready app={app} data={data} retryRead={() => setAttempt((n) => n + 1)} />
         ) : data === "failed" &&
           error instanceof Error &&
           error.name === "NotBuilt" &&
@@ -142,7 +142,7 @@ function withTaught(skills: Skill[], taught: Skill | null): Skill[] {
     : [...skills, taught];
 }
 
-function Ready({ app, data }: { app: AppCtx; data: Data }) {
+function Ready({ app, data, retryRead }: { app: AppCtx; data: Data; retryRead: () => void }) {
   const api = useParkApi();
   const { user, learn, source, currency } = data;
   const teachRef = useRef<HTMLElement>(null);
@@ -214,7 +214,7 @@ function Ready({ app, data }: { app: AppCtx; data: Data }) {
           </button>
         </div>
       </Header>
-      <TeachCard t={t} night={app.night} user={user} cardRef={teachRef} />
+      <TeachCard t={t} night={app.night} user={user} cardRef={teachRef} retryRead={retryRead} />
       <HelpSection
         app={app}
         skills={skills}

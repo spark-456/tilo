@@ -1,6 +1,7 @@
 // "Teach Tilo something new": the card head with the teacher and the step bar, then the pane of the step the
 // person is on (design: Tilo App Skills.dc.html, README Skills 2). The flow itself lives in useTeach.
 import type { RefObject } from "react";
+import { ApiReadState } from "../../components/ApiReadState";
 import { cx } from "../../components/cx";
 import { LearnPane } from "./LearnPane";
 import { RunPane } from "./RunPane";
@@ -19,7 +20,8 @@ export function TeachCard({
   night,
   user,
   cardRef,
-}: PaneProps & { cardRef: RefObject<HTMLElement> }) {
+  retryRead,
+}: PaneProps & { cardRef: RefObject<HTMLElement>; retryRead: () => void }) {
   const expr = t.saved ? "delighted" : t.rec || t.stage === 2 ? "focused" : "talking";
   return (
     <section ref={cardRef} aria-label="Teach a skill" className="park-skills-card">
@@ -61,6 +63,18 @@ export function TeachCard({
       </div>
       {t.live && t.busy && t.stage === 0 ? (
         <output className="park-skills-card-sub">Reading your description…</output>
+      ) : null}
+      {t.live ? (
+        <div data-skills-action-state="" style={{ blockSize: 176 }}>
+          <div data-testid={t.failure != null ? "skills-teach-error" : undefined}>
+            <ApiReadState
+              error={t.failure}
+              pending={false}
+              retryRead={retryRead}
+              title="The skill could not be updated"
+            />
+          </div>
+        </div>
       ) : null}
       {t.stage === 0 ? <ShowPane t={t} night={night} user={user} /> : null}
       {t.stage === 1 ? <LearnPane t={t} night={night} user={user} /> : null}
