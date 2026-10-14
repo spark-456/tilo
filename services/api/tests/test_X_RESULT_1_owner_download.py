@@ -93,3 +93,38 @@ def test_X_RESULT_1_download_recorded_bytes_no_store_owner_only(flaw):
         assert response.headers["cache-control"] == "no-store"
         assert response.headers["x-content-type-options"] == "nosniff"
         assert response.headers["content-disposition"].startswith("attachment;")
+
+
+def test_X_RESULT_1_the_apps_own_store_seam_opens_a_local_runs_output():
+    """E2E-ONESTEP: the dev run wires its in-memory store as `deps.get_artifact_store`; the download used to bypass that
+    seam and the browser saw a bare 500."""
+    app, state, item = make_case()
+    state.events[WORLD].extend(
+        [
+            {"type": "artifact.delivered", "data": {"artifact": item.ref, "format": "json"}},
+            {"type": "world.completed", "data": {"credits_used": 0}},
+        ]
+    )
+    del app.dependency_overrides[result_store]  # only the store seam, as the dev app has it
+
+    response = TestClient(app).get(f"/worlds/{WORLD}/result")
+
+    assert response.status_code == 200
+    assert response.content == b'{"result":"Replay report"}'
+
+
+def test_X_RESULT_1_a_store_that_cannot_open_is_a_404_not_a_500():
+    app, state, item = make_case()
+    state.events[WORLD].extend(
+        [
+            {"type": "artifact.delivered", "data": {"artifact": item.ref, "format": "json"}},
+            {"type": "world.completed", "data": {"credits_used": 0}},
+        ]
+    )
+
+    def broken():
+        raise RuntimeError("no artifact store configured")
+
+    app.dependency_overrides[result_store] = lambda: broken
+
+    assert TestClient(app).get(f"/worlds/{WORLD}/result").status_code == 404

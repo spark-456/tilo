@@ -60,7 +60,10 @@ export function RunProgressCard({
   const facts: readonly (readonly [string, string])[] = [
     ["Status", p.status],
     ["Agents", String(p.agents)],
-    ["Buildings", `${p.buildings.done} of ${p.buildings.planned} finished`],
+    // A run that recorded no building event has no count to show: "0 of 0 finished" would claim a total of nothing.
+    ...(p.buildings.planned > 0
+      ? ([["Buildings", `${p.buildings.done} of ${p.buildings.planned} finished`]] as const)
+      : []),
     ["Credits used", String(p.credits)],
     ["Waiting for you", String(p.waiting)],
   ];
