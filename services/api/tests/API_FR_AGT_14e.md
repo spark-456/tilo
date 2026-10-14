@@ -36,8 +36,8 @@ enqueued, created or started). If `TILO_TASKS_CALLER` equals `TILO_SCHEDULE_TICK
 # tilo_api.schedules
 ENV_QUEUE = "TILO_RUNS_QUEUE"  # projects/<p>/locations/<region>/queues/runs
 ENV_TASKS_CALLER = "TILO_TASKS_CALLER"  # the Cloud Tasks OIDC identity (tilo-tasks-invoker@...); exact email
-DISPATCH_DEADLINE_S = 1800  # the task's dispatchDeadline, as "1800s"
-IN_REQUEST_DEADLINE_S = 25 * 60  # the run wait; 20 min <= it <= DISPATCH_DEADLINE_S - 60. The tests monkeypatch it
+DISPATCH_DEADLINE_S = 1500  # X-SCHED-1: no longer than tilo-api's request timeout, as "1500s"
+IN_REQUEST_DEADLINE_S = DISPATCH_DEADLINE_S - 60  # 1440 s; leave a minute to answer. The tests monkeypatch it
 ```
 
 `TILO_RUNS_QUEUE` or `TILO_TASKS_CALLER` unset or empty: the Scheduler caller gets 503 AFTER its token and BEFORE anything
@@ -73,7 +73,7 @@ class TaskEnqueuer:                                             # the tick's Run
 ```python
 {
     "name": f"{TILO_RUNS_QUEUE}/tasks/{task_name(slot_key(schedule_id, slot))}",  # tilo_harness.schedule.task_name
-    "dispatchDeadline": "1800s",
+    "dispatchDeadline": "1500s",
     "httpRequest": {
         "httpMethod": "POST",
         "url": TILO_SCHEDULE_TICK_AUDIENCE + "/internal/schedules/tick",

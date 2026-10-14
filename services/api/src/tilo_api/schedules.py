@@ -87,8 +87,9 @@ MAX_SCHEDULES_PER_OWNER = 10
 ENV_AUDIENCE, ENV_CALLER = "TILO_SCHEDULE_TICK_AUDIENCE", "TILO_SCHEDULE_TICK_CALLER"
 ENV_QUEUE = "TILO_RUNS_QUEUE"  # projects/<p>/locations/<region>/queues/runs
 ENV_TASKS_CALLER = "TILO_TASKS_CALLER"  # the Cloud Tasks OIDC identity (tilo-tasks-invoker@...), an exact email
-DISPATCH_DEADLINE_S = 1800  # a task's dispatchDeadline: Cloud Tasks gives up on a delivery after this
-IN_REQUEST_DEADLINE_S = 25 * 60  # a delivery answers by now at the latest, with room under the dispatch deadline
+# X-SCHED-1: match tilo-api's 1500 s Cloud Run timeout and leave time to answer.
+DISPATCH_DEADLINE_S = 1500
+IN_REQUEST_DEADLINE_S = DISPATCH_DEADLINE_S - 60
 _GRANT_CONNECTOR, _GRANT_DISTRICT = "internal", "world"  # a grant uses no connector and sits in no district
 _MAX_TOKEN = 8192
 
