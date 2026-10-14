@@ -40,6 +40,30 @@ const SCENES: readonly Scene[] = [
   { name: "connectors", path: "/connectors" },
   { name: "profile", path: "/profile" },
   { name: "ledger", path: "/ledger" },
+  { name: "stage", path: "/world/w_village_basic/stage?fixture=village-basic" },
+  {
+    name: "popover-notifications",
+    path: "/",
+    prep: async (page) => {
+      await page.getByRole("button", { name: "Notifications" }).click();
+    },
+  },
+  {
+    name: "popover-account",
+    path: "/",
+    prep: async (page) => {
+      await page.getByRole("button", { name: "Account menu" }).click();
+    },
+  },
+  {
+    name: "toast-world",
+    path: "/world/k1",
+    prep: async (page) => {
+      const approve = page.getByRole("button", { name: /^Approve/ }).first();
+      if ((await approve.count()) > 0) await approve.click();
+      await page.locator(".park-toast").first().waitFor({ timeout: 5_000 });
+    },
+  },
 ];
 
 const VIEWS = [
@@ -63,7 +87,7 @@ function scan(): { sel: string; text: string; why: string }[] {
     el === document.documentElement ||
     el.hasAttribute("data-park") ||
     el.tagName === "MAIN" ||
-    /(^|\s)park-shell__(main|page|root|content)|park-home-root|park-page/.test(
+    /(^|\s)(park-shell__(main|page|root|content)|park-home-root|park-page)(\s|$)/.test(
       el.className?.toString() ?? "",
     );
   const out: { sel: string; text: string; why: string }[] = [];
@@ -96,12 +120,22 @@ function scan(): { sel: string; text: string; why: string }[] {
       if (PAGE_LEVEL(a)) break;
     }
     if (solid) {
-      // tints and blurs between the text and a solid card are harmless; a solid card that is itself faded is not
+      // tints and blurs between the text and a solid card are harmless. A faded solid fill (a disabled button, a
+      // done pin) is a defect only when no other solid card sits behind it: one above it hides the city again.
       why = "";
+      let fadedAt: Element | null = null;
       for (let a: Element | null = solid; a; a = a.parentElement) {
         const o = Number(getComputedStyle(a).opacity);
         if (o < 0.999 && o > 0) {
+          fadedAt = a;
           why = `solid card faded (opacity ${o.toFixed(2)})`;
+          break;
+        }
+      }
+      for (let a = fadedAt?.parentElement ?? null; a && !PAGE_LEVEL(a); a = a.parentElement) {
+        const [, , , alpha] = rgba(getComputedStyle(a).backgroundColor);
+        if (alpha >= 0.999) {
+          why = "";
           break;
         }
       }
