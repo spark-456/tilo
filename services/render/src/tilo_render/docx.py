@@ -83,6 +83,13 @@ def render_docx(spec: DeliverableSpec) -> bytes:
             elif isinstance(block, TableBlock):
                 table = next(t for t in spec.tables if t.id == block.table_id)
                 node = _node(body, W, "tbl")
+                properties = _node(node, W, "tblPr")
+                width = _node(properties, W, "tblW")
+                width.set(f"{{{W}}}w", "0")
+                width.set(f"{{{W}}}type", "auto")
+                grid = _node(node, W, "tblGrid")
+                for _ in table.columns:
+                    _node(grid, W, "gridCol").set(f"{{{W}}}w", str(8640 // len(table.columns)))
                 for index, row in enumerate([[*table.columns], *[[str(v) for v in row] for row in table.rows]]):
                     tr = _node(node, W, "tr")
                     for value in row:

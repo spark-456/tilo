@@ -54,6 +54,8 @@ def test_FR_MTG_03_docx_door_preserves_text_tables_and_native_chart_data():
         for expected in ("Report <safe>", "Quarterly", "First", "Second", "One", "Two", "APAC", "12"):
             assert expected in texts
         assert len(document.findall(".//{*}chart")) == 2
+        table = document.find(".//{*}tbl")
+        assert table is not None and len(table.findall("./{*}tblGrid/{*}gridCol")) == 2
         relationships = ET.fromstring(package.read("word/_rels/document.xml.rels"))
         for rel in relationships:
             target = posixpath.normpath(posixpath.join("word", rel.attrib["Target"]))
