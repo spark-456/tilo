@@ -5,6 +5,7 @@ from types import SimpleNamespace
 import pytest
 from _adr35_l2_lib import Clock, Rig, entry, outbox_id
 from test_ACT_1_state_retention import retained  # noqa: F401
+from test_FR_CON_02_ADR35_L2_gate_and_tick import sweep  # noqa: F401
 from tilo_connectors import Outbox
 from tilo_connectors.fakes import FakeGmail
 
@@ -48,6 +49,13 @@ def test_X_SEC37_FU4_sweep_passes_fresh_source_check():
     rig.put(store, entry(1))
     sweep_due(store, {"gmail": gmail}, rig.clock, lambda world: False, source_valid=lambda row: False)
     assert store.get(outbox_id(1))["state"] == "failed" and not gmail.sent
+
+
+def test_X_SEC37_FU4_tick_abandons_removed_world_instead_of_pausing_forever(sweep):  # noqa: F811
+    sweep.outbox._insert_if_absent(entry(1))
+    sweep.store.worlds.clear()
+    assert sweep.tick().status_code == 200
+    assert sweep.outbox.get(outbox_id(1))["state"] == "failed" and not sweep.gmail.sent
 
 
 @pytest.mark.parametrize("meeting", [None, "mt_a"])

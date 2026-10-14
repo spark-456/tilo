@@ -916,7 +916,7 @@ def _sweep_outbox(request: Request, clock: Callable[[], datetime], store_factory
             world = opened[0].load_world(world_id)
         except Exception:
             return True
-        return world is None or world.paused
+        return world is not None and world.paused  # removed worlds reach the source guard and are abandoned
 
     def source_valid(entry: dict) -> bool:
         from tilo_api.followup_outbox_sources import source_valid as valid  # noqa: PLC0415
