@@ -144,9 +144,9 @@ export function ConnectorsPage({
         {live ? <MeetingHostAccess flow={live} /> : null}
         <div className="park-connectors-empty">
           <span className="park-connectors-empty-glyph">{icon("plug", 22)}</span>
-          <div className="park-connectors-empty-title">Not connected yet</div>
+          <div className="park-connectors-empty-title">Connector data is unavailable</div>
           <div className="park-connectors-empty-line">
-            Your tools will show here once this workspace is connected.
+            The connector list is unavailable. No connection status can be shown.
           </div>
         </div>
       </Frame>

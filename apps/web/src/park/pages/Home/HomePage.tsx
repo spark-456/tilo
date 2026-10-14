@@ -1,7 +1,7 @@
 // The Home page (WEB-4): the greeting, the Today panel, the map pins and the composer, as drawn in
 // design_handoff_tilo_web_app/design/Tilo App Home.dc.html. It floats panels over the city the shell draws
 // behind it and has no landmark of its own. Data comes only through the Api (`useParkApi`); a page whose Api
-// is not built shows "Not connected yet", never sample values. The composer's 900 ms goes through the
+// is not built shows "Home data is unavailable", never sample values. The composer's 900 ms goes through the
 // provider's `useSchedule`, so a test never waits and a pending draft is cancelled when the page goes.
 import { useEffect, useRef, useState } from "react";
 import type { Cadence, RunPlan } from "../../api/oneStep";
@@ -449,7 +449,7 @@ export function HomePage({ app }: { app: AppCtx }) {
         <div className="park-home-leftcol">
           <div className="park-home-hero park-home-glass">
             <h1 className="park-home-h1">Home</h1>
-            <p className="park-home-summary">Not connected yet</p>
+            <p className="park-home-summary">Home data is unavailable</p>
           </div>
         </div>
       ) : null}

@@ -308,7 +308,7 @@ describe("WEB_9_agenda_honesty_and_states", () => {
       getAgenda: () => Promise.reject(new NotBuilt("getAgenda")),
     };
     const { container } = await renderAgenda({ api });
-    expect(text(container)).toContain("Not connected yet");
+    expect(text(container)).toContain("Agenda data is unavailable");
     expect(text(container)).not.toContain("Book the K1 Level 3 gate review");
     expect(container.querySelector("[data-event]")).toBeNull();
   });

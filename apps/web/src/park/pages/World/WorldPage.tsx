@@ -291,7 +291,7 @@ export function WorldPage({ app }: { app: AppCtx }) {
         <h1 className="park-world-h1" tabIndex={-1}>
           World
         </h1>
-        <p className="park-world-meta">Not connected yet</p>
+        <p className="park-world-meta">World data is unavailable</p>
       </Frame>
     );
   }

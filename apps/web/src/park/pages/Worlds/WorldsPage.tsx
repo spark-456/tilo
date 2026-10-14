@@ -240,7 +240,7 @@ export function WorldsPage({ app }: { app: AppCtx }) {
           </div>
         ) : null}
         {failed ? (
-          <EmptyBox title="Not connected yet" />
+          <EmptyBox title="Worlds data is unavailable" />
         ) : data ? (
           <>
             {data.live ? (

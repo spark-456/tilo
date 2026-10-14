@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 // WEB-6 acceptance: where the World page gets its data and what it shows when there is none (plan sections 6
-// and 10: "Read data only through the Api via useParkApi(); render an EmptyState 'Not connected yet' on
+// and 10: "Read data only through the Api via useParkApi(); render an EmptyState 'World data is unavailable' on
 // NotBuilt"; "Fixtures never pass as live"; "No scenario-specific code"). The page reads the worlds, the plans
 // (its art), the decisions, the skills and the connectors, and nothing else; it never calls fetch itself.
 // The scenario's words (which world a decision belongs to, the K1 hero tag, the spend note) are DATA: the
@@ -303,7 +303,7 @@ describe("WEB_6_world_states: loading and not built", () => {
     expect(qa(el, '[data-testid="park-page-world"]')).toHaveLength(1);
     const text = pageText(el);
     for (const sample of SAMPLE_ONLY) expect(text, sample).not.toContain(sample);
-    expect(text).not.toContain("Not connected yet");
+    expect(text).not.toContain("World data is unavailable");
     expect(qa(el, "h1").length).toBeLessThanOrEqual(1);
     expect(qa(el, "main")).toHaveLength(0);
   });
@@ -311,7 +311,7 @@ describe("WEB_6_world_states: loading and not built", () => {
   it("WEB_6_world_states_a_live_Api_that_is_not_built_shows_Not_connected_yet", async () => {
     const { el } = await mountWorld({ api: createLiveApi() });
     const text = pageText(el);
-    expect(text).toContain("Not connected yet");
+    expect(text).toContain("World data is unavailable");
     for (const sample of SAMPLE_ONLY) expect(text, sample).not.toContain(sample);
     expect(qa(el, '[data-testid="park-page-world"]')).toHaveLength(1);
     expect(qa(el, "h1").length).toBeLessThanOrEqual(1);
@@ -321,7 +321,7 @@ describe("WEB_6_world_states: loading and not built", () => {
     const base = createFixtureApi();
     const { el } = await mountWorld({ api: { ...base, getWorlds: createLiveApi().getWorlds } });
     const text = pageText(el);
-    expect(text).toContain("Not connected yet");
+    expect(text).toContain("World data is unavailable");
     for (const sample of SAMPLE_ONLY) expect(text, sample).not.toContain(sample);
   });
 
@@ -339,7 +339,7 @@ describe("WEB_6_world_states: loading and not built", () => {
       const live = createLiveApi();
       const { el } = await mountWorld({ api: { ...base, [method]: live[method] } as Api });
       const text = pageText(el);
-      expect(text).not.toContain("Not connected yet");
+      expect(text).not.toContain("World data is unavailable");
       expect(text).toContain("Not available yet");
       expect(text).toContain(title);
       expect(text).not.toMatch(/NotBuilt|not_built|getPlans|getDecisions|getSkills|getConnectors/);
@@ -362,7 +362,7 @@ describe("WEB_6_world_states: loading and not built", () => {
     const { el } = await mountWorld({ api: { ...base, getWorlds: boom, getSkills: boom } });
     expect(el.isConnected).toBe(true);
     expect(pageText(el)).not.toContain("offline-7f3");
-    expect(pageText(el)).toContain("Not connected yet");
+    expect(pageText(el)).toContain("World data is unavailable");
   });
 
   it("WEB_6_world_states_no_console_error_or_warning_for_any_world_loading_or_not_built", async () => {

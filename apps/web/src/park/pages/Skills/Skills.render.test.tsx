@@ -330,7 +330,7 @@ describe("WEB_8a_skills_render: data comes through the Api, and shows only what 
   it("WEB_8a_skills_render_a_live_Api_that_is_not_built_says_Not_connected_yet_and_shows_no_count", async () => {
     const { el } = await mountSkills({ api: createLiveApi() });
     const text = pageText(el);
-    expect(text).toContain("Not connected yet");
+    expect(text).toContain("Skills data is unavailable");
     expect(text).not.toMatch(COUNT);
     expect(text).not.toMatch(/NotBuilt|not_built|getSkills|getLearn|undefined/);
     expect(qa(el, "h1")).toHaveLength(1);

@@ -363,7 +363,7 @@ describe("WEB_7_ledger_honesty_and_states", () => {
     const { container } = await renderLedger({
       getLedger: () => Promise.reject(new NotBuilt("getLedger")),
     });
-    expect(text(container)).toContain("Not connected yet");
+    expect(text(container)).toContain("Ledger data is unavailable");
     expect(text(container), "no £ figure of any kind").not.toMatch(/£\s*\d/);
     expect(container.querySelector("svg")).toBeNull();
   });

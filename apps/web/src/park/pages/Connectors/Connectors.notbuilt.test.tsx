@@ -20,13 +20,18 @@ import { createLiveApi } from "../../api/liveApi";
 afterEach(cleanup);
 
 describe("WEB_11_connectors_honesty: a NotBuilt endpoint is not sample data", () => {
-  it("WEB_11_connectors_honesty_not_built_shows_Not_connected_yet_and_no_fixture_connectors", async () => {
+  it("W_COPY_1_FR_ACC_03_unavailable_data_never_promises_a_connection", async () => {
     const err = vi.spyOn(console, "error").mockImplementation(() => undefined);
     const app = makeApp();
     const m = await renderPage(app, createLiveApi());
-    await waitFor(() => hasExactText(m.container, "Not connected yet"), "the EmptyState");
+    await waitFor(
+      () => hasExactText(m.container, "Connector data is unavailable"),
+      "the EmptyState",
+    );
     await flush();
     const text = textOf(m.container);
+    expect(text).toContain("The connector list is unavailable. No connection status can be shown.");
+    expect(text).not.toContain("once this workspace is connected");
     for (const c of connectors)
       expect(text, `${c.name} must not appear as live`).not.toContain(c.name);
     expect(connectedTiles(m.container)).toHaveLength(0);
