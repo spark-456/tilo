@@ -70,16 +70,15 @@ def main(argv: Sequence[str], *, transport: httpx.BaseTransport | None = None) -
         return 1
     api = argv[0]
     results: dict[str, bool] = dict.fromkeys(
-        ("sign-in", "bundle-api", "health", "healthz", "cors-intake", "plate-auth"), False
+        ("sign-in", "bundle-api", "health", "cors-intake", "plate-auth"), False
     )
     target = ""
-    healthz_absent = False
     if len(argv) == 4:
         if not re.fullmatch(r"tilo-api-[a-z0-9-]+", argv[1]) or not re.fullmatch(r"[a-f0-9]{64}", argv[3]):
             print("FAIL release: expected revision, traffic JSON file and previous SHA256")
             return 1
         results["api-revision-100"], target = release_target(api, argv[1], argv[2])
-        results.update({"new-healthz": False, "bundle-changed": False})
+        results.update({"new-health": False, "bundle-changed": False})
     with httpx.Client(transport=transport, timeout=15, follow_redirects=False, trust_env=False) as client:
         remaining = MAX_BYTES
 
@@ -138,7 +137,6 @@ def main(argv: Sequence[str], *, transport: httpx.BaseTransport | None = None) -
             print(f"FAIL asset-graph: {reason}")
         for label, method, path in (
             ("health", "GET", "/health"),
-            ("healthz", "GET", "/healthz"),
             ("cors-intake", "OPTIONS", "/intake"),
             ("plate-auth", "GET", "/v1/plate"),
         ):
@@ -153,8 +151,6 @@ def main(argv: Sequence[str], *, transport: httpx.BaseTransport | None = None) -
                         }
                     )
                 status, response_headers, _ = fetch(method, api + path, headers=headers)
-                if label == "healthz":
-                    healthz_absent = status == 404
                 ok = status == (401 if label == "plate-auth" else 200)
                 if label == "cors-intake":
                     allowed = {
@@ -174,17 +170,9 @@ def main(argv: Sequence[str], *, transport: httpx.BaseTransport | None = None) -
                 pass
         if target:
             try:
-                results["new-healthz"] = fetch("GET", target + "/healthz")[0] == 200
+                results["new-health"] = fetch("GET", target + "/health")[0] == 200
             except (httpx.HTTPError, ValueError):
                 pass
     for label, passed in results.items():
-        if label == "healthz" and healthz_absent:
-            print("NOT DEPLOYED healthz: HTTP 404; /healthz is not deployed yet")
-        else:
-            print(f"{'PASS' if passed else 'FAIL'} {label}")
-    if all(results.values()):
-        return 0
-    # Distinguish a missing deployment endpoint from broken Hosting/security checks.
-    if len(argv) == 1 and healthz_absent and all(value for key, value in results.items() if key != "healthz"):
-        return 2
-    return 1
+        print(f"{'PASS' if passed else 'FAIL'} {label}")
+    return 0 if all(results.values()) else 1
