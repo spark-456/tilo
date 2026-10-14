@@ -440,7 +440,10 @@ def test_SEC_15_SIGNIN_the_gate_has_the_same_public_routes_as_before():
         ("GET", "/access"),
         ("POST", "/access/declaration"),
         ("POST", "/internal/schedules/tick"),
-    }, "signing in adds no public route: a new one is an owner decision"
+        # ADR-0042: default-off meter routes check their own OIDC token, audience, caller and nonce.
+        ("POST", "/internal/meeting-voice/reserve"),
+        ("POST", "/internal/meeting-voice/close"),
+    }, "signing in adds no unreviewed public route: a new one is an owner decision"
 
 
 def test_SEC_15_SIGNIN_the_real_app_makes_no_key_fetch_when_nobody_sends_a_token(signer, monkeypatch):
