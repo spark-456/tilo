@@ -399,11 +399,14 @@ def _made_from(meeting_id: str, source: Mapping[str, Any] | None) -> bool:
     return meeting_made and isinstance(ref, str) and ref.partition("#")[0] == meeting_id
 
 
-def remove_meeting(w: Writer, artifacts: ArtifactStore, meeting_id: str) -> dict[str, Any]:
+def remove_meeting(
+    w: Writer, artifacts: ArtifactStore, meeting_id: str, *, cleanup: Callable[[str, str], None] | None = None
+) -> dict[str, Any]:
     """The owner deletes a meeting and what was made from it (FR-MTG-10, PE-16, PE-19): the transcript and minutes
     artifacts, then the *proposed* items, pins and calendar entries made from it (what the owner released stays the
     assignee's), then the tombstone by compare-and-set, last, so a failure leaves the meeting live and a retry
-    finishes. Every step is idempotent; a deleted meeting answers the same again."""
+    finishes. Durable follow-up cleanup runs after the tombstone, including on deleted retries,
+    so a cleanup failure refuses completion without restoring publication authority."""
     stored, me = w.stores.meetings.get(w.org, meeting_id), w.stores.persons.get(w.org, w.actor)
     if stored is None or me is None:
         raise _not_found()
@@ -427,6 +430,8 @@ def remove_meeting(w: Writer, artifacts: ArtifactStore, meeting_id: str) -> dict
             raise Refusal(409, "version_conflict", code="version_conflict") from None
         except NotFound:
             raise _not_found() from None
+    if cleanup is not None and m.get("world_id") is not None:
+        cleanup(w.actor, meeting_id)  # source invalidated first; deleted retries still drain late SDK writes
     return {"id": meeting_id, "status": "deleted"}
 
 

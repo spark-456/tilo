@@ -6,16 +6,14 @@ import { type Page, expect, test } from "@playwright/test";
 import { DESKTOP, MOBILE } from "./support/viewports";
 
 // WEB-CUTOVER: "/", "/worlds" and "/team" are Park pages now (they have no assistant panel); the old
-// Start row is removed with the replaced S-01 screen, S-14 and S-18 moved to /worlds/replays and /team/console.
+// Start row is removed with the replaced S-01 screen, S-18 moved to /team/console, and OLD-UI-OUT 3 moved the Library and Worlds replays to Park.
 const SCREENS = [
   ["/task/task_fixture_1/understanding", "Understanding"],
   ["/task/task_fixture_1/approaches", "Approaches"],
   ["/world/w_village_basic/stage", "World"],
   ["/needs-you", "Needs-you queue"],
-  ["/library", "Library"],
   ["/channels", "Channels"],
   ["/settings", "Settings"],
-  ["/worlds/replays", "Worlds"],
 ] as const;
 
 async function watchShifts(page: Page) {
@@ -126,7 +124,7 @@ for (const viewport of [DESKTOP, MOBILE]) {
   }) => {
     test.setTimeout(90_000);
     await page.setViewportSize(viewport);
-    await page.goto("/library");
+    await page.goto("/autonomy");
     await page.getByTestId("assistant-open").click();
     const dialog = page.getByRole("dialog", { name: "Assistant" });
     await dialog.getByLabel("Ask Tilo").fill("What is on my plate?");

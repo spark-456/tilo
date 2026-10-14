@@ -11,7 +11,6 @@ import { ClientProvider } from "../api/ClientProvider";
 import type { TiloClient } from "../api/client";
 import { FixtureClient } from "../api/fixtureClient";
 import { EVENTS_VILLAGE_BASIC } from "../api/fixtures/events";
-import { S_13 } from "./S_13";
 import { S_17 } from "./S_17";
 import { S_18 } from "./S_18";
 import { S_19 } from "./S_19";
@@ -111,16 +110,6 @@ describe("AGW-08 S-19 consent requests come only from connection.requested event
   it("keeps a request that another connector's revocation did not answer", async () => {
     const other = conn(2, "connection.revoked", { connector: "gmail" });
     expect(await withEvents([requested, other])).toContain("Google Drive");
-  });
-});
-
-describe("AGW-08 S-13 the library follows artifact.delivered", () => {
-  it("is empty before seq 41 and lists the deliverable from seq 41", async () => {
-    expect((await text(S_13, 40)).textContent).toContain("Nothing delivered yet");
-    const after = await text(S_13, 41);
-    expect(after.querySelector('[data-testid="library-rows"]')?.textContent).toContain(
-      "Triage list",
-    );
   });
 });
 

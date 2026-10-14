@@ -74,7 +74,19 @@ from tilo_harness.writer import new_ulid
 from tilo_metering.flags import FlagStore
 from tilo_planning.events import build_event
 
-from tilo_api import deps, dev, ephemeral, events, nudge_sweep, plate_links, runs, team_access, team_store
+from tilo_api import (
+    deps,
+    dev,
+    ephemeral,
+    events,
+    followup_cleanup,
+    nudge_sweep,
+    plate_links,
+    runs,
+    store_door,
+    team_access,
+    team_store,
+)
 from tilo_api.access import Mode, enforced
 from tilo_api.durable_store import DurableStore
 from tilo_api.people_limits import write_limit
@@ -876,6 +888,7 @@ def tick(
             schedule_store, tasks_client, clock, flags, audience=audience, caller=tasks_caller, queue=queue
         )
         nudge_sweep.sweep(request, _stamp(clock()))  # FR-PA-15b: off unless TILO_NUDGES=1; the answer never changes
+        followup_cleanup.sweep(clock)
         _sweep_outbox(request, clock, store_factory)
         _sweep_push(request, clock, store_factory)
         _sweep_spend(request, clock)
@@ -905,12 +918,24 @@ def _sweep_outbox(request: Request, clock: Callable[[], datetime], store_factory
             world = opened[0].load_world(world_id)
         except Exception:
             return True
-        return world is None or world.paused
+        return world is not None and world.paused  # removed worlds reach the source guard and are abandoned
+
+    def source_valid(entry: dict) -> bool:
+        from tilo_api.followup_outbox_sources import source_valid as valid  # noqa: PLC0415
+
+        if not opened:
+            opened.append(store_factory())
+        world = opened[0].load_world(entry["world_id"], settle=False)
+        if not entry["idempotency_key"].startswith("autopilot:"):
+            return world is not None
+        people = overrides.get(deps.get_people_stores, deps.get_people_stores)()
+        client = store_door.open_api_store().client
+        return valid(entry, world, people, client, deps.ORG_ID, clock().timestamp())
 
     try:
         store = overrides.get(deps.get_outbox_store, deps.get_outbox_store)()
         adapters = overrides.get(deps.get_connector_adapters, deps.get_connector_adapters)()
-        sweep_due(store, adapters, lambda: _stamp(clock()), paused)
+        sweep_due(store, adapters, lambda: _stamp(clock()), paused, source_valid=source_valid)
     except Exception as exc:
         logger.error("outbox sweep failed (%s)", type(exc).__name__)
 

@@ -19,8 +19,10 @@ from tilo_api import deps as _deps
 from tilo_api import dev as _dev
 from tilo_api import durable_store as _durable_store
 from tilo_api import meeting_host_routes as _meeting_host_routes
+from tilo_api import meeting_minutes_flag as _meeting_minutes_flag
 from tilo_api import meeting_voice_meter as _meeting_voice_meter
 from tilo_api import nudge_sweep as _nudge_sweep
+from tilo_api import owner_minutes_routes as _owner_minutes_routes
 from tilo_api import people as _people
 from tilo_api import plate_links as _plate_links
 from tilo_api import quiz_apps as _quiz_apps
@@ -157,6 +159,8 @@ app.include_router(_team_shares_router)  # ADR-0040: owner-only PUT/DELETE of a 
 app.include_router(_team_items_router)  # ADR-0040: the team view of a shared world's work items
 app.include_router(_meeting_host_routes.router)
 app.include_router(_byok_routes.router)  # ADR-0041: /v1/org/model-key; 503 not_configured while config/byok.yaml is off
+_meeting_minutes_flag.configure_minutes_flag(_deps.get_flag_store())
+_owner_minutes_routes.install_owner_minutes_routes(app, _deps.get_flag_store())
 app.include_router(_quiz_apps.router)
 app.include_router(_connect_routes.router)
 app.include_router(_people_list_router)

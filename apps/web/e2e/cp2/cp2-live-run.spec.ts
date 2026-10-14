@@ -177,15 +177,6 @@ test.describe("@cp2 CP2 live run on the real dev API", () => {
     expect(problems).toEqual([]);
   });
 
-  // The Library says the same; its shell still fills the right rail from the fixture world (App.tsx),
-  // which is #253's to change, so only its words are checked here.
-  test("CP2 #258: a bare /library before any run says 'No run yet'", async ({ page }) => {
-    await page.setViewportSize(DESKTOP);
-    await page.goto("/library");
-    await expect(page.getByRole("heading", { level: 1, name: "Library" })).toBeVisible();
-    await expect(page.getByTestId("no-run")).toContainText("No run yet");
-  });
-
   test("CP2 #258: an unknown world says Not found and its events are asked for once, not on every poll", async ({
     page,
   }) => {

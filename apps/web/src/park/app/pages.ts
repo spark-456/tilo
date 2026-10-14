@@ -26,4 +26,7 @@ export const PAGES: Record<PageId, LazyExoticComponent<ComponentType<{ app: AppC
   connectors: lazy(() =>
     import("../pages/Connectors/ConnectorsPage").then((m) => ({ default: m.ConnectorsPage })),
   ),
+  library: lazy(() =>
+    import("../pages/Library/LibraryPage").then((m) => ({ default: m.LibraryPage })),
+  ),
 };

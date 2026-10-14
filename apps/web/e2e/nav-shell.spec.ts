@@ -22,9 +22,7 @@ const ACTIVE: ReadonlyArray<readonly [string, string]> = [
   [`${W}/story`, "Story"],
   [`${W}/trace`, "Story"],
   [`${W}/delivery`, "World"],
-  ["/worlds/replays", "World"],
   ["/needs-you", "Needs you"],
-  ["/library", "Library"],
   ["/settings", "More"],
   ["/autonomy", "More"],
 ];
@@ -88,7 +86,7 @@ for (const viewport of VIEWPORTS) {
       page,
     }) => {
       await page.setViewportSize(viewport);
-      for (const path of [FLOW, "/worlds/replays", "/needs-you", `${W}/story`]) {
+      for (const path of [FLOW, "/needs-you", `${W}/story`]) {
         await page.goto(`${path}${path.includes("?") ? "&" : "?"}speed=20${display}`);
         const pill = page.getByTestId("fixture-replay-banner");
         const badge = page.getByTestId("speed-badge");
@@ -151,7 +149,7 @@ for (const viewport of VIEWPORTS) {
       test.setTimeout(60_000);
       await page.setViewportSize(viewport);
       await watchShifts(page);
-      for (const path of [FLOW, "/worlds/replays", "/library?speed=50"]) {
+      for (const path of [FLOW, "/autonomy?speed=50"]) {
         await page.goto(`${path}${path.includes("?") ? "&" : "?"}x=1${display}`);
         await expect(page.getByRole("navigation", { name: /primary/i })).toBeVisible();
         expect(await readShifts(page), path).toEqual([]);
@@ -181,14 +179,7 @@ test("UX-227-C3 every route has the same right rail: card, Needs you, Team; link
   page,
 }) => {
   await page.setViewportSize(DESKTOP);
-  for (const path of [
-    FLOW,
-    "/worlds/replays",
-    "/needs-you",
-    "/settings",
-    `${W}/story`,
-    `${W}/delivery`,
-  ]) {
+  for (const path of [FLOW, "/needs-you", "/settings", `${W}/story`, `${W}/delivery`]) {
     await page.goto(`${path}?speed=1000`);
     const rail = page.getByTestId("right-rail");
     await expect(rail.getByRole("region", { name: "Live meter" }), path).toBeVisible();

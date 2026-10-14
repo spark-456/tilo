@@ -40,14 +40,11 @@ const WORLD_SCREENS: ReadonlySet<string> = new Set(["S-05", "S-10", "S-11", "S-1
 const RUN_SCREENS: ReadonlySet<string> = new Set([
   "S-06",
   "S-07",
-  "S-13",
-  "S-14",
   "S-15",
   "S-16",
   "S-17",
   "S-18",
   "S-19",
-  "S-21",
   "S-23",
 ]);
 /** The Needs-you screens keep their own rail (the cards queue); the badge still applies to them. */

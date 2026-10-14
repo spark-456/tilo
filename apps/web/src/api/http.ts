@@ -480,6 +480,17 @@ export class HttpClient implements TiloClient, SchedulesApi, FieldsApi, ItemApi 
     return this.request<unknown>(path);
   }
 
+  /** Non-mutating route discovery where production OpenAPI is disabled. FastAPI returns 405 for
+   * OPTIONS on a registered POST route, 404 when the default-off router was never installed. */
+  async hasPostRoute(path: string): Promise<boolean> {
+    try {
+      await this.request<unknown>(path, { method: "OPTIONS" });
+      return false;
+    } catch (error) {
+      return error instanceof TiloApiError && error.status === 405;
+    }
+  }
+
   /** A plain POST of `body` as JSON, decoded as JSON, with the same typed failures and `write` true (WIRE-3). No credentials.
    * `headers` adds request headers (BQ-CTX-TEAMWORLD: an `Idempotency-Key` so a retried create is made once). */
   postJson(path: string, body: unknown, headers?: Record<string, string>): Promise<unknown> {

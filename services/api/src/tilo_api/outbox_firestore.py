@@ -259,6 +259,24 @@ class FirestoreOutboxStore:
 
         return self._mutate(outbox_id, change)
 
+    def _cancel_source(self, outbox_id: str, now: str, alert: dict) -> dict | None:
+        """X-SEC37-FU4b: stop dispatch atomically, retaining uncertain-send evidence and an alert."""
+
+        def change(doc: dict) -> tuple[bool, dict | None]:
+            lease = doc["send_lease"]
+            if doc["entry"]["state"] not in _UNSENT or (lease is not None and self._now(now) < lease["until"]):
+                return False, None
+            ambiguous = bool((doc["retry"] or {}).get("ambiguous") or lease is not None)
+            doc["entry"]["state"], doc["send_lease"] = "failed", None
+            if ambiguous:
+                doc["retry"] = {**(doc["retry"] or {}), "ambiguous": True}
+                self._record_alert(doc, alert)
+            else:
+                doc["retry"] = None
+            return True, deepcopy(doc["entry"])
+
+        return self._mutate(outbox_id, change)
+
     def was_abandoned_before_dispatch(self, outbox_id: str) -> bool:
         if not _id_ok(outbox_id):
             return False
@@ -428,7 +446,12 @@ def _no_writer(part: dict) -> None:
 
 
 def sweep_due(
-    store: Any, adapters: Mapping[str, Any], clock: Callable[[], str], world_paused: Callable[[str], bool]
+    store: Any,
+    adapters: Mapping[str, Any],
+    clock: Callable[[], str],
+    world_paused: Callable[[str], bool],
+    *,
+    source_valid: Callable[[dict], bool] | None = None,
 ) -> int:
     """`dispatch_due()` over the unsent entries, one world at a time so a paused world is not claimed (FR-WLD-07).
     A dead instance's due entry goes out within one tick; an ambiguous attempt stays ambiguous (the outbox's retry
@@ -449,6 +472,7 @@ def sweep_due(
             cast(InMemoryOutboxStore, wired), dict(adapters), emit=_no_writer, clock=clock,
             world_id=world, retry=RetryPolicy(),
             halted=cast(Callable[..., bool], lambda world=world: world_paused(world)),
+            source_valid=source_valid,
         )  # fmt: skip
         settled += len(outbox.dispatch_due())
     return settled

@@ -54,6 +54,7 @@ export function AccountMenu({
       onSelect: () => go("connectors"),
     },
     { id: "team", label: "Team and roles", icon: icon("people", 17), onSelect: () => go("team") },
+    { id: "library", label: "Library", icon: icon("grid", 17), onSelect: () => go("library") },
     {
       id: "mobile",
       label: "Mobile app",

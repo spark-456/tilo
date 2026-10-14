@@ -128,6 +128,7 @@ describe("WEB_5_worlds_static: the registry gets one new line", () => {
       "team",
       "profile",
       "connectors",
+      "library",
     ]);
     // another lane's page is its own one line in the same named-export form; the rest stay Placeholder
     const form = /^lazy\(\(\) =>/; // a long line may wrap, so only the opening is checked

@@ -265,6 +265,7 @@ class PeopleStores:
     mentions: RecordStore
     calendar: RecordStore
     world_shares: RecordStore  # required, no in-memory default: a door that forgets it fails at build (ADR-0040)
+    erase_followup: Callable[[str, str], None] | None = None
 
     @classmethod
     def in_memory(cls) -> PeopleStores:
@@ -399,6 +400,8 @@ def erase_person(stores: PeopleStores, org_id: str, user: str) -> dict[str, int]
     _refuse_last_person(stores, org_id, user)
     for stored in stores.meetings.list(org_id, "owner", user):
         counts["meeting"] += _tombstone(stores.meetings, org_id, stored.record["id"])
+    if stores.erase_followup is not None:
+        stores.erase_followup(org_id, user)  # sources closed first; failure prevents a completed erasure claim
     plan = (
         ("work_item", stores.work_items, "owner"),
         ("pinboard_item", stores.pins, "scope.user"),
