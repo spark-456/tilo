@@ -126,9 +126,15 @@ const STOCK = new Set(["Not Found", "Forbidden", "Unauthorized", "Conflict", "Ba
  * never arbitrary exceptions/server text, URLs, status numbers or credentials. */
 export function displayApiError(error: unknown): string {
   if (!(error instanceof TiloApiError)) return SERVER_TROUBLE;
+  if (error.replayOnly) return REPLAY_ONLY;
+  if (error.write && error.retryable && (error.status === null || error.status >= 500)) {
+    return "We could not confirm it. Reload before trying again.";
+  }
   const reasons: Readonly<Record<string, string>> = {
     write_unconfirmed: "We could not confirm it. Reload before trying again.",
     not_configured: NOT_CONFIGURED,
+    unavailable: "This feature is unavailable right now. Try again in a moment.",
+    body_too_large: "This is too large to send. Reduce its size and try again.",
     store_unavailable: "Stored information is unavailable. Try again in a moment.",
     allowance_capped: "Your allowance is used up. Try again when it resets.",
     spend_cap_reached: "Your spending limit has been reached.",
@@ -137,9 +143,10 @@ export function displayApiError(error: unknown): string {
     demo_read_only: "This is a sample. It cannot change your information.",
     invalid_recipients: "Choose people from this meeting before trying again.",
   };
-  const mapped =
-    reasons[error.code ?? ""] ?? reasons[error.refusal ?? ""] ?? reasons[error.message];
-  if (mapped) return mapped;
+  const mapped = [error.code, error.refusal, error.message]
+    .filter((code): code is string => code !== null)
+    .find((code) => Object.hasOwn(reasons, code));
+  if (mapped) return reasons[mapped] ?? SERVER_TROUBLE;
   const approved = new Set([
     UNREACHABLE,
     SERVER_TROUBLE,
