@@ -103,6 +103,19 @@ def test_LW_05_the_reserve_is_checked_against_the_budget_before_anything_is_sent
     assert stub.calls[0] == (QUERY, {"max_output_tokens": 4096}), "the role's cap, not the router default of 1024"
 
 
+def test_LW_05_SEARCH_LIVE_the_reserve_uses_the_expected_output_not_the_full_cap(tmp_path):
+    """BQ-EXPECTED-OUT-1 applied to search: a 4096-token cap priced a search at the full cap (14 + 1.7 credits here), so
+    a run with 15 credits left refused one that costs ~14.4 reserved. The cap still bounds the call (2x headroom)."""
+    config, stub = make_config(tmp_path), StubSearch(reply_usage(search_queries=1))
+    result = router(config, stub, tmp_path).search("search", QUERY, budget=15.0)
+    assert len(stub.calls) == 1 and result.search_result is not None
+    assert stub.calls[0][1] == {"max_output_tokens": 4096}, "the cap sent is unchanged"
+    quiet = StubSearch(reply_usage())
+    with pytest.raises(BudgetExceededError):  # the reserve itself (14 credits of queries) is over what is left
+        router(config, quiet, tmp_path).search("search", QUERY, budget=7.0)
+    assert quiet.calls == []
+
+
 def test_LW_05_a_reply_that_reports_its_queries_is_charged_that_count(tmp_path):
     config, stub = make_config(tmp_path), StubSearch(reply_usage(search_queries=2))
     result = router(config, stub, tmp_path).search("search", QUERY, budget=100)

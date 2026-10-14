@@ -16,3 +16,4 @@ roles:
   verifier: 1500 # a verdict, thinking high (the live runner also caps its own verifier calls at 1024)
   writer: 3000 # a document: thinking low plus ~1500 visible tokens, with room (cap 16384 for the long case)
   narrator: 1000 # a few Story beats, no thinking
+  search: 1024 # a grounded answer with its citations in metadata (SEARCH-LIVE): ~800 tokens; cap stays 4096
