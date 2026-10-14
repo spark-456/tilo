@@ -177,7 +177,7 @@ deploy-dev env="dev":
 # shell runs, so nothing in them can reach a shell or gcloud. Needs `gcloud auth login` (docs/deploy-dev.md).
 deploy-dev-cloudbuild service="all" env="dev":
     python -c "print('deploy-dev-cloudbuild: env and service accepted')" {{ if env != 'dev' { error('deploy-dev-cloudbuild: only env=dev is allowed, got ' + env) } else { '' } }} {{ if service =~ '^(all|api|harness|channels|connectors|browser|render|sandbox-web)$' { '' } else { error('deploy-dev-cloudbuild: service must be all or one of api, harness, channels, connectors, browser, render, sandbox-web, got ' + service) } }}
-    gcloud builds submit --config cloudbuild.yaml --project essential-wares-510320-f0 --substitutions "_SERVICE={{service}}" --region asia-southeast1 --gcs-source-staging-dir gs://essential-wares-510320-f0-cloudbuild-staging/source .
+    gcloud builds submit --config cloudbuild.yaml --ignore-file .gcloudignore --project essential-wares-510320-f0 --substitutions "_SERVICE={{service}}" --region asia-southeast1 --gcs-source-staging-dir gs://essential-wares-510320-f0-cloudbuild-staging/source .
 
 # Build and push the nightly eval job image on Cloud Build (EFF-05b, evals/cloudbuild.yaml): run it before the apply
 # that creates the Cloud Run job tilo-eval-nightly. Pinned to the dev project; takes no parameter. Needs `gcloud auth login`.

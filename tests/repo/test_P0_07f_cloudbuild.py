@@ -64,7 +64,7 @@ CLOUD_SDK = "gcr.io/google.com/cloudsdktool/cloud-sdk"
 CLOUD_SDK_TAG = "587.0.0"  # 530.0.0 does not exist in the registry (cost review, PR #373)
 TAGGED = re.compile(r"^[\w./-]+(:[\w][\w.-]*|@sha256:[0-9a-f]{64})$")
 UPLOAD_ROOT_FILES = {"pyproject.toml", "uv.lock", ".dockerignore"}
-UPLOAD_ROOT_DIRS = {"evals", "packages", "services", "config", "contracts", "prompts", "templates", "design"}
+UPLOAD_ROOT_DIRS = {"evals", "packages", "services", "config", "contracts", "prompts", "templates", "skills", "design"}
 REINCLUDES = [
     "!/pyproject.toml",
     "!/uv.lock",
@@ -77,6 +77,7 @@ REINCLUDES = [
     "!/contracts/",
     "!/prompts/",
     "!/templates/",
+    "!/skills/",
     "!/design/",
     "!/design/tokens.json",
 ]
@@ -225,6 +226,22 @@ def _uploaded(rules, path: str) -> bool:
         if ignored:
             return False
     return True
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        "skills/core/example/skill.yaml",
+        "config/sub/example.yaml",
+        "contracts/sub/example.json",
+        "prompts/sub/example.md",
+        "templates/sub/example.html",
+        "design/tokens.json",
+    ],
+)
+def test_RELEASE_SKILLS_api_upload_keeps_runtime_inputs(repo_root: pathlib.Path, path: str) -> None:
+    rules = _ignore_rules((repo_root / ".gcloudignore").read_text(encoding="utf-8").splitlines())
+    assert _uploaded(rules, path), f"API release upload must retain {path}"
 
 
 def _fake_gcloud(tmp_path: pathlib.Path) -> tuple[dict[str, str], pathlib.Path]:
@@ -569,6 +586,7 @@ def test_P0_07f_just_recipe_refuses_anything_but_dev_and_calls_only_gcloud(repo_
     assert submit > refusal.start() >= 0, "the refusal comes before `gcloud builds submit`"
     assert re.search(r"cloudbuild\.yaml", body), "submits the repo's cloudbuild.yaml"
     assert re.search(r"--config[= ]\S*cloudbuild\.yaml", body)
+    assert re.search(r"--ignore-file[= ]\.gcloudignore(?:\s|$)", body), "release pins the tracked upload filter"
     gcloud_lines = [ln for ln in lines if ln.startswith("gcloud ")]
     assert len(gcloud_lines) == 1, "exactly one gcloud line"
     gcloud = gcloud_lines[0]
@@ -653,6 +671,7 @@ def test_P0_07f_just_recipe_pins_the_dev_project_and_passes_service_as_one_argum
         assert argv.count("--project") == 1 and argv[argv.index("--project") + 1] == DEV_PROJECT, argv
         assert f"_SERVICE={service}" in argv, argv
         assert "--config" in argv and "cloudbuild.yaml" in argv, argv
+        assert argv.count("--ignore-file") == 1 and argv[argv.index("--ignore-file") + 1] == ".gcloudignore", argv
         assert "--region" in argv and argv[argv.index("--region") + 1] == "asia-southeast1", argv
         assert not [a for a in argv if "some-other-project" in a], argv
 
