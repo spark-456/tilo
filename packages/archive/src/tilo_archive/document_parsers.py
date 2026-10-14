@@ -165,6 +165,17 @@ def expand_zip(data: bytes, *, limits: Limits = Limits()) -> tuple[tuple[str, by
     raise Refused("invalid_zip")
 
 
+def _network_target(value: str) -> bool:
+    """True for a relationship target that names a scheme, a UNC share or a rooted backslash path.
+
+    Separators are normalised before the test so mixed slash and backslash prefixes cannot slip past a plain
+    double-backslash check, and a leading BOM or zero-width character does not hide the share. A forward-slash
+    path such as /word/media/a.png is a package-absolute part name, not a share, and stays allowed.
+    """
+    value = value.strip().lstrip("﻿​⁠").strip()
+    return value.startswith("\\") or bool(re.match(r"(?:[a-zA-Z][\w+.-]*:|//)", value.replace("\\", "/")))
+
+
 class _BoundedTree(ET.TreeBuilder):
     def __init__(self, limits: Limits, budget: _XmlBudget) -> None:
         super().__init__()
@@ -190,7 +201,7 @@ class _BoundedTree(ET.TreeBuilder):
             if (
                 (local == "targetmode" and value.lower() == "external")
                 or local == "base"
-                or (local == "target" and (value.startswith("\\\\") or re.match(r"(?:[a-zA-Z][\w+.-]*:|//)", value)))
+                or (local == "target" and _network_target(value))
             ):
                 raise Refused("external_reference")
         return super().start(tag, attrs)
