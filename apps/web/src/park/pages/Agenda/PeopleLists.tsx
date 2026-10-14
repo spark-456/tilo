@@ -5,7 +5,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { API_URL, appCheckToken, authToken, sessionView } from "../../../api/ClientProvider";
 import { HttpClient } from "../../../api/http";
+import { type MeetingMinutesApi, meetingMinutesApi } from "../../api/live/meetingMinutes";
 import { type PeopleList, peopleListsApi } from "../../api/live/peopleLists";
+import { MeetingMinutes } from "./MeetingMinutes";
 
 type Kind = "meetings" | "pinboards";
 type State = PeopleList | "loading" | "failed";
@@ -18,7 +20,11 @@ const EMPTY: Record<Kind, string> = {
 const READ = { meetings: "getMeetings", pinboards: "getPinboards" } as const;
 const cap = (s: string): string => (s[0] ?? "").toUpperCase() + s.slice(1);
 
-function List({ kind, api }: { kind: Kind; api: ReturnType<typeof peopleListsApi> }) {
+function List({
+  kind,
+  api,
+  minutes,
+}: { kind: Kind; api: ReturnType<typeof peopleListsApi>; minutes: MeetingMinutesApi | null }) {
   const [attempt, setAttempt] = useState(0);
   const [state, setState] = useState<State>("loading");
   // biome-ignore lint/correctness/useExhaustiveDependencies: attempt is the explicit retry trigger.
@@ -58,6 +64,9 @@ function List({ kind, api }: { kind: Kind; api: ReturnType<typeof peopleListsApi
                   {cap(row.status)} · {row.at}
                 </p>
                 {row.body ? <p>{row.body}</p> : null}
+                {minutes ? (
+                  <MeetingMinutes key={row.id} id={row.id} status={row.status} api={minutes} />
+                ) : null}
               </li>
             ))}
           </ul>
@@ -70,18 +79,34 @@ function List({ kind, api }: { kind: Kind; api: ReturnType<typeof peopleListsApi
 
 export function PeopleLists() {
   const demo = sessionView.demo();
-  const api = useMemo(
+  const http = useMemo(
     () =>
       API_URL?.trim() && !demo
-        ? peopleListsApi(new HttpClient({ baseUrl: API_URL, appCheckToken, authToken }))
+        ? new HttpClient({ baseUrl: API_URL, appCheckToken, authToken })
         : null,
     [demo],
   );
+  const api = useMemo(() => (http ? peopleListsApi(http) : null), [http]);
+  const minutes = useMemo(() => (http ? meetingMinutesApi(http) : null), [http]);
+  const [available, setAvailable] = useState(false);
+  useEffect(() => {
+    let live = true;
+    setAvailable(false);
+    minutes?.available().then(
+      (value) => {
+        if (live) setAvailable(value);
+      },
+      () => {},
+    );
+    return () => {
+      live = false;
+    };
+  }, [minutes]);
   if (!api) return null;
   return (
     <>
-      <List kind="meetings" api={api} />
-      <List kind="pinboards" api={api} />
+      <List kind="meetings" api={api} minutes={available ? minutes : null} />
+      <List kind="pinboards" api={api} minutes={null} />
     </>
   );
 }
