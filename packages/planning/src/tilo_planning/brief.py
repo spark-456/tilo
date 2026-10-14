@@ -14,6 +14,7 @@ import unicodedata
 from collections.abc import Iterator
 from dataclasses import dataclass, field
 from datetime import date
+from pathlib import Path
 from typing import Any
 
 import pydantic
@@ -24,6 +25,7 @@ from tilo_providers.media import MediaPart
 from tilo_providers.prompts import load_prompt, neutralise_marker
 from tilo_providers.router import Router, RouterError, RouterResult
 
+from tilo_planning.due_dates import DEADLINE_HELP, parse_deadline
 from tilo_planning.gaps import (
     MAX_GAPS,
     Gap,
@@ -58,6 +60,8 @@ RESERVED_LABELS = frozenset(
     | {"sensitivity"}
 )
 _RAW_LIMIT = 10  # items read from a model list before any is vetted
+_CALENDAR_DATE = re.compile(r"\d{4}-\d{2}-\d{2}")
+_URL = re.compile(r"https?://\S+", re.IGNORECASE)
 _NEUTRAL_CHANGE = 0.5  # expected_change of a question whose number is unusable
 _TAG = re.compile(r"<[^<>]{0,200}>")
 _CONTROL = re.compile(r"[\x00-\x1f\x7f-\x9f​-‏ -‮⁠﻿]")
@@ -332,10 +336,41 @@ def extract_brief(
         raise NothingPossible(gaps, gap_config.nothing_possible)
     try:
         ambiguous = list(output["ambiguous_fields"])
-        brief = complete_brief(output)
+        brief = complete_brief({**output, "sources": vet_sources(output.get("sources"))})
     except (pydantic.ValidationError, KeyError, TypeError, BriefValidationError) as error:
         raise BriefExtractionError(f"FR-INT-03: the Director's reply is not a valid brief: {error}") from error
     return ExtractionResult(brief, ambiguous, run, gaps, questions=topic_questions(output.get("questions")))
+
+
+@functools.cache
+def _connector_ids() -> frozenset[str]:
+    try:
+        import yaml  # noqa: PLC0415
+
+        path = Path(__file__).resolve().parents[4] / "config" / "connectors.yaml"
+        return frozenset(str(c["id"]) for c in yaml.safe_load(path.read_text(encoding="utf-8")) or ())
+    except Exception:  # noqa: BLE001 - no registry means no model-named connector is believed
+        return frozenset()
+
+
+def vet_sources(value: Any) -> list[Any]:
+    """The Director's `sources` as code can stand behind them (SIMPLE-RUN-2). A file or memory source is something code
+    applies (an upload it screened, a preference it looked up), so a model naming one is inventing it and it is
+    dropped; a url must be http(s); a connector must be one the registry ships. A web source (a search query) is
+    kept. Anything else the schema validates as before."""
+    if not isinstance(value, list):
+        return [] if value is None else value
+    kept: list[Any] = []
+    for item in value:
+        kind, ref = (item.get("kind"), item.get("ref")) if isinstance(item, dict) else (None, None)
+        if kind in ("file", "memory"):
+            continue
+        if kind == "url" and not (isinstance(ref, str) and _URL.fullmatch(ref.strip())):
+            continue
+        if kind == "connector" and ref not in _connector_ids():
+            continue
+        kept.append(item)
+    return kept
 
 
 def _refusal_category(value: Any, policy: RefusalPolicy) -> RefusalCategory | None:
@@ -348,8 +383,14 @@ def _refusal_category(value: Any, policy: RefusalPolicy) -> RefusalCategory | No
     return category
 
 
-def edit_brief_field(brief: dict[str, Any], field: str, value: Any) -> dict[str, Any]:
-    """A person edits one chip. Returns a new, validated brief; the original is left unchanged."""
+def edit_brief_field(brief: dict[str, Any], field: str, value: Any, *, today: date | None = None) -> dict[str, Any]:
+    """A person edits one chip. Returns a new, validated brief; the original is left unchanged. A deadline typed in
+    words ("by today", "Friday") is read against `today` (SIMPLE-RUN-2); unreadable words are refused plainly."""
     if field not in CHIP_FIELDS:
         raise BriefValidationError("That is not an editable brief field")
+    if field == "deadline" and isinstance(value, str) and not _CALENDAR_DATE.fullmatch(value):
+        known, parsed = parse_deadline(value, today or real_today())
+        if not known:
+            raise BriefValidationError(DEADLINE_HELP)
+        value = parsed.isoformat() if parsed is not None else None
     return validate_brief({**copy.deepcopy(brief), field: value})
