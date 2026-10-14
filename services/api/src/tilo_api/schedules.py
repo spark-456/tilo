@@ -77,6 +77,7 @@ from tilo_planning.events import build_event
 from tilo_api import deps, dev, ephemeral, events, nudge_sweep, plate_links, runs, team_access, team_store
 from tilo_api.access import Mode, enforced
 from tilo_api.durable_store import DurableStore
+from tilo_api.people_limits import write_limit
 from tilo_api.tasks import _json_body
 
 logger = logging.getLogger("tilo_api.schedules")
@@ -434,7 +435,7 @@ def get_schedule(schedule_id: str, principal: Principal, schedules: Schedules) -
     return _view(_mine(schedules, schedule_id, principal))
 
 
-@router.patch("/schedules/{schedule_id}")
+@router.patch("/schedules/{schedule_id}", dependencies=[Depends(write_limit)])
 def update_schedule(
     schedule_id: str,
     principal: Principal,
@@ -458,7 +459,7 @@ def update_schedule(
     return _view(updated)
 
 
-@router.delete("/schedules/{schedule_id}", status_code=204)
+@router.delete("/schedules/{schedule_id}", status_code=204, dependencies=[Depends(write_limit)])
 def delete_schedule(schedule_id: str, principal: Principal, schedules: Schedules, flags: Flags) -> Response:
     _mine(schedules, schedule_id, principal)
     deps.refuse_if_replay_only(flags)

@@ -24,16 +24,13 @@ export function FirstRunBanner({
 }) {
   const key = `tilo:first-run-banner:${JSON.stringify([person, page])}`;
   const [dismissed, setDismissed] = useState<ReadonlySet<string>>(() => new Set());
-  if (!first || page === null || dismissed.has(key) || (person !== null && wasDismissed(key)))
-    return null;
+  if (!first || page === null || dismissed.has(key) || wasDismissed(key)) return null;
   const dismiss = () => {
     setDismissed((before) => new Set([...before, key]));
-    if (person !== null) {
-      try {
-        localStorage.setItem(key, "hidden");
-      } catch {
-        /* device storage unavailable */
-      }
+    try {
+      localStorage.setItem(key, "hidden");
+    } catch {
+      /* device storage unavailable: hidden for this visit only */
     }
   };
   return (
@@ -44,8 +41,8 @@ export function FirstRunBanner({
       <span>
         <SampleBadge /> You are looking at sample data. It goes away after your first run.
       </span>
-      <button type="button" onClick={dismiss} aria-label="Dismiss sample banner">
-        Dismiss
+      <button type="button" onClick={dismiss} aria-label="Dismiss sample banner" title="Dismiss">
+        <span aria-hidden="true">{"×"}</span>
       </button>
     </aside>
   );

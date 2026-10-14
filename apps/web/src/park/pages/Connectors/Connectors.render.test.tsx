@@ -68,7 +68,7 @@ describe("WEB_11_connectors_render: every designed element", () => {
     on.forEach((c, i) => {
       const t = textOf(tiles[i] as HTMLElement);
       const level = LV[c.level ?? 1] as string;
-      const sync = c.st === "attention" ? c.sync : `Synced ${c.sync === "Live" ? "live" : c.sync}`;
+      const sync = c.st === "attention" ? c.sync : "Example only: not synced";
       expect(t.startsWith(c.mono), `${c.name} monogram (BQ-WEB-1: monograms stay)`).toBe(true);
       expect(t, `${c.name} name`).toContain(c.name);
       expect(t, `${c.name} account`).toContain(c.acct ?? "");
@@ -81,11 +81,12 @@ describe("WEB_11_connectors_render: every designed element", () => {
   it("WEB_11_connectors_render_literal_spot_checks_of_the_first_and_the_attention_tile", async () => {
     const { root } = await open();
     const gmail = textOf(tileFor(root, "Gmail") as HTMLElement);
-    for (const s of ["alex@northwind.co", "Act", "Synced 2 min ago", "Used by 3"]) {
+    for (const s of ["alex@northwind.co", "Act", "Example only: not synced", "Used by 3"]) {
       expect(gmail).toContain(s);
     }
     const cal = textOf(tileFor(root, "Google Calendar") as HTMLElement);
-    expect(cal).toContain("Synced live");
+    expect(cal).toContain("Example only: not synced");
+    expect(cal).not.toMatch(/synced (live|\d)/i); // no sync event stands behind a sample tool
     const hub = textOf(tileFor(root, "HubSpot") as HTMLElement);
     expect(hub).toContain("Northwind sales");
     expect(hub).toContain("Read");
@@ -216,7 +217,7 @@ describe("WEB_11_connectors_honesty: fixture data is labelled, statuses come fro
 
   it("WEB_11_connectors_honesty_connected_status_appears_only_for_fixture_connected_tools", async () => {
     const { root } = await open();
-    const synced = connectedTiles(root).filter((t) => /Synced /.test(textOf(t)));
+    const synced = connectedTiles(root).filter((t) => /Example only: not synced/.test(textOf(t)));
     expect(synced).toHaveLength(connectors.filter((c) => c.st === "connected").length);
     const addRegion = textOf(labelled(root, "Available") as HTMLElement);
     expect(addRegion).not.toMatch(/Synced|Connected just now|Healthy/);

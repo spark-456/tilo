@@ -50,7 +50,9 @@ export function quickErrorMessage(e: unknown): string {
     return "The spending limit for this account has been reached, so nothing new can run.";
   }
   if (e.status === 503) {
-    return "Live models are unavailable right now, so Tilo could not answer. Try again later.";
+    return e.replayOnly
+      ? "Live models are unavailable right now, so Tilo could not answer. Try again later."
+      : e.message;
   }
   if (e.status !== null && e.status >= 500) return "Tilo had a problem on its side. Try again.";
   return e.message;

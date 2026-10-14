@@ -7,6 +7,13 @@ import { HttpClient } from "../api/http";
 import { S_27 } from "../screens/S_27";
 
 afterEach(cleanup);
+it("PE_26 W2 missing person plate is empty without an error or invented timestamp", async () => {
+  const root = await screen(async () => new Response('{"detail":"Not Found"}', { status: 404 }));
+  expect(root.textContent).toContain("Nothing on your plate yet");
+  expect(root.textContent).not.toMatch(/Could not load|As of|sample|venue shortlist/i);
+  expect(root.querySelector('[role="alert"]')).toBeNull();
+  expect(root.querySelectorAll("button")).toHaveLength(0);
+});
 const body = {
   as_of: "2026-10-09T12:00:00Z",
   truncated: true,

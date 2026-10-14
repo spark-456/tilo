@@ -176,15 +176,16 @@ describe("WEB_7_ledger_copy: the designed text, verbatim", () => {
 });
 
 describe("WEB_7_ledger_interactions", () => {
-  it("WEB_7_ledger_waiting_kpi_opens_k1_and_header_buttons_toast", async () => {
+  it("UI_10_W12_ledger_waiting_kpi_opens_k1_and_period_is_not_a_picker", async () => {
     const { container, navigate, store } = await renderLedger();
     click(byText(container, "button", "Waiting on you£3,420Laptop Depot sign-off"));
     expect(navigate).toHaveBeenCalledWith("/world/k1");
-    click(byText(container, "button", "September 2026"));
-    expect(store.getState().toast).toMatchObject({
-      message: "August and earlier months live here",
-      actionLabel: undefined,
-    });
+    // W12 supersedes the prototype toast: neither API exposes earlier months.
+    const period = q(container, ".park-ledger-month");
+    expect(period.textContent).toBe("September 2026");
+    expect(period.querySelector("button, select, [role=button]")).toBeNull();
+    click(period);
+    expect(store.getState().toast).toBeNull();
     click(byText(container, "button", "Export CSV"));
     expect(store.getState().toast).toMatchObject({
       // Updated for FR-SPD-08 (user approved 8 Oct): a real download with an honest sample name, no accounting-sync claim.
