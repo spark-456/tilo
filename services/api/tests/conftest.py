@@ -64,6 +64,14 @@ def _no_dev_unit_delay(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("TILO_DEV_UNIT_DELAY_S", "0")
 
 
+@pytest.fixture(autouse=True)
+def _reset_rate_limiter() -> None:
+    """SEC-10: each test starts with empty in-process rate-limit buckets."""
+    from tilo_api.rate_limit import reset_default_rate_limiter
+
+    reset_default_rate_limiter()
+
+
 @pytest.fixture(scope="session")
 def repo_root() -> pathlib.Path:
     return REPO_ROOT
@@ -226,6 +234,15 @@ def people_rig(monkeypatch: pytest.MonkeyPatch):
     made: list[_ppl11a_lib.Rig] = []
 
     def make(**kwargs):
+        from tilo_api import rate_limit
+
+        # SEC-10: these tests drive the people write cap (60 a minute on the injected clock, hundreds of attempts in no
+        # real time), so the edge gate (real clock) gets a fresh install and room; its own limits are in test_SEC_10
+        rate_limit.reset_default_rate_limiter()
+        wide = rate_limit.RateLimitConfig(
+            ip_capacity=1_000_000, ip_refill_per_s=1_000_000.0, user_capacity=1_000_000, user_refill_per_s=1_000_000.0
+        )
+        monkeypatch.setattr(rate_limit, "get_rate_limit_config", lambda: wide)
         rig = _ppl11a_lib.Rig(monkeypatch, **kwargs)
         made.append(rig)
         return rig

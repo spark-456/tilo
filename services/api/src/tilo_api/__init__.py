@@ -50,6 +50,7 @@ from tilo_api.notifications import router as _notifications_router
 from tilo_api.people_limits import NoStore as _NoStore
 from tilo_api.people_list import router as _people_list_router
 from tilo_api.push_routes import router as _push_router
+from tilo_api.rate_limit import RateLimitGate as _RateLimitGate
 from tilo_api.redaction import router as _redaction_router
 from tilo_api.sample_world import router as _sample_router
 from tilo_api.sharing import WorldView
@@ -88,6 +89,7 @@ app.add_middleware(_LogRunId)  # NFR-26: innermost, so the world is looked up on
 app.add_middleware(_AccessGate)  # SEC-15: deployed, every non-public route needs a stored judge declaration
 app.add_middleware(_AppCheckGate)  # SEC-10: App Check token, logged only until the owner sets TILO_APPCHECK_ENFORCE=1
 app.add_middleware(_NoStore)  # added after the gate, so it is outside it: the gate's 403 on `/v1/` is no-store too
+app.add_middleware(_RateLimitGate, fastapi_app=app)  # SEC-10: before AccessGate
 app.add_middleware(_LogContext)  # NFR-26: outermost, no I/O: binds the world id and trace id of the request
 _cors.install_cors(app)  # WEB-TO-API: only with TILO_API_CORS_ORIGINS; outermost, so a preflight needs no token
 _configure_logging()  # NFR-26: a deployed service logs JSON with no further setup

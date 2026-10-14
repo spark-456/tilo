@@ -217,6 +217,9 @@ def test_SEC_16_no_request_field_header_or_query_can_reset_or_raise_a_judges_cap
     fill(h, JUDGE_A, cap)
 
     for method, path in non_public(h.client.app):
+        # OLD-4: probe lifetime-cap tampering across fresh request windows;
+        # the independent SEC-10 edge quota must not mask the cap refusal.
+        h.clock.advance(61)
         h.call(
             method,
             path,

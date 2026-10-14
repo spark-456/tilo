@@ -4,10 +4,12 @@ from __future__ import annotations
 
 import copy
 import datetime as dt
+import logging
 import re
 from collections.abc import Callable, Collection, Iterable, Mapping
 from dataclasses import dataclass, field
 from typing import Any, Literal, Protocol, TypeGuard
+from zoneinfo import ZoneInfoNotFoundError
 
 import tilo_policy
 from tilo_policy.schemas import conforms, event_ok
@@ -35,6 +37,17 @@ __all__ = [
 WINDOW_S = 86_400
 AUTOMATED_LEVELS: frozenset[str] = frozenset({"L2", "L3"})
 _MSG_ID_RE = re.compile(r"^[A-Za-z0-9_-]{1,64}\Z")
+_LOG = logging.getLogger("tilo_channels.digest")
+_EXPECTED_ERROR_NAMES: frozenset[str] = frozenset(
+    {"OutboxRefused", "AdapterError", "ProviderUnavailable", "RateLimited", "SideEffectRefused"}
+)
+
+
+def _is_expected_port_error(exc: Exception) -> bool:
+    return (
+        isinstance(exc, (ZoneInfoNotFoundError, ValueError, LookupError, PermissionError, RuntimeError, OSError))
+        or type(exc).__name__ in _EXPECTED_ERROR_NAMES
+    )
 
 
 def _to_epoch_s(value: float | int | str | dt.datetime | None) -> float | None:
@@ -400,8 +413,12 @@ class DigestService:
         try:
             if not should_notify("digest", prefs=_user_prefs(self._preferences, user_id), now=check_now):
                 return None
-        except Exception:
-            return None
+        except Exception as exc:
+            if _is_expected_port_error(exc) or isinstance(exc, TypeError):
+                _LOG.warning("digest held: quiet hours check failed (%s)", type(exc).__name__)
+                return None
+            _LOG.error("digest unexpected failure in quiet hours (%s)", type(exc).__name__)
+            raise
         return owner_addr, check_now
 
     def enqueue_text(
@@ -447,8 +464,12 @@ class DigestService:
         try:
             decision = self._policy.decide(user_id, proposal)
             pol_doc = self._policy.policy_for(user_id, decision.policy_id) if type(decision.policy_id) is str else None
-        except Exception:
-            return None
+        except Exception as exc:
+            if _is_expected_port_error(exc):
+                _LOG.warning("digest policy check failed (%s)", type(exc).__name__)
+                return None
+            _LOG.error("digest unexpected failure in policy check (%s)", type(exc).__name__)
+            raise
         if not isinstance(pol_doc, Mapping):
             return None
         pol_undo = pol_doc.get("undo_window_s")
@@ -480,5 +501,9 @@ class DigestService:
                 world_owner=self._world_owner,
                 emit=self._emit,
             )
-        except Exception:
-            return None
+        except Exception as exc:
+            if _is_expected_port_error(exc):
+                _LOG.warning("digest enqueue failed (%s)", type(exc).__name__)
+                return None
+            _LOG.error("digest unexpected failure in enqueue (%s)", type(exc).__name__)
+            raise
