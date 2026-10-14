@@ -316,6 +316,20 @@ class CaseFakeModel(ModelProvider):
             text = json.dumps(reply, sort_keys=True)
         elif kind == "schema":
             text = json.dumps(instance_for(request.response_schema or {}), sort_keys=True)
+        elif self._role == "writer" and "The object has exactly these keys and no others:" in request.prompt:
+            # The shared runner requests a DeliverableSpec in the prompt rather than response_schema.
+            text = json.dumps(
+                {
+                    "title": "Synthetic report",
+                    "date": "2026-10-09",
+                    "tables": [],
+                    "charts": [],
+                    "sections": [
+                        {"heading": "Result", "blocks": [{"type": "paragraph", "text": "Synthetic report text."}]}
+                    ],
+                },
+                sort_keys=True,
+            )
         else:
             text = f"Synthetic {self._role} reply for the test. {world.leak}".strip()
         tin, tout = world.usage
