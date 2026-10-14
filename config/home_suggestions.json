@@ -1,0 +1,18 @@
+[
+  {
+    "label": "Research a topic",
+    "prompt": "Write a one-page research brief on solar energy, using at most three public sources. Do not access connected tools."
+  },
+  {
+    "label": "Make a one-page plan",
+    "prompt": "Write a one-page plan for a small community workshop, with five steps and a simple checklist. Do not access connected tools."
+  },
+  {
+    "label": "Draft a meeting agenda",
+    "prompt": "Draft a 30-minute project kickoff meeting agenda with goals, timeboxes and discussion questions. Do not schedule or send anything."
+  },
+  {
+    "label": "Summarise a public URL",
+    "prompt": "Summarise https://en.wikipedia.org/wiki/Solar_energy in five bullet points using only this public page. Do not access connected tools."
+  }
+]

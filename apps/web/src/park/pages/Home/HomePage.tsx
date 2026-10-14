@@ -33,6 +33,7 @@ import {
   nextEvents,
   placedPins,
   spendOf,
+  suggestedTask,
   summaryLine,
 } from "./homeData";
 import { useComposerClearance } from "./useComposerClearance";
@@ -384,7 +385,7 @@ export function HomePage({ app }: { app: AppCtx }) {
           }}
           onChip={(label) => {
             if (busy()) return;
-            setQuery(label);
+            setQuery(suggestedTask(label));
             setQuick(QUICK_IDLE);
             toIdle();
           }}
