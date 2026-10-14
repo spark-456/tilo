@@ -76,13 +76,79 @@ def test_X_SEC37_FU4_cleanup_abandons_only_matching_source(monkeypatch, meeting,
             }
         )
     ]
-    query = SimpleNamespace(where=lambda **kw: query, stream=lambda: iter(rows))
+    query = SimpleNamespace(where=lambda **kw: query, limit=lambda n: query, stream=lambda: iter(rows))
     monkeypatch.setattr(sources, "followup_retention", lambda *args: [None, SimpleNamespace(_query=lambda: query)])
     sources.cancel_source_entries(
         None, "org_tilo", "u_owner", meeting, store=store, clock=None if default_clock else rig.clock
     )
     assert store.get(outbox_id(1))["state"] == "failed"
     assert store.get(outbox_id(2))["state"] == "queued"
+
+
+@pytest.mark.parametrize("kind", ["memory", "firestore"])
+@pytest.mark.parametrize("uncertain", ["expired_lease", "ambiguous_retry", "live_lease"])
+def test_X_SEC37_FU4b_cancellation_preserves_uncertain_send_and_never_resends(kind, uncertain):
+    from tilo_connectors.outbox import _alert_part
+
+    rig, gmail = Rig(kind), FakeGmail()
+    store = rig.make()
+    rig.put(store, entry(1))
+    assert rig.claim(store, 1)
+    if uncertain == "ambiguous_retry":
+        store._defer(outbox_id(1), "holder-1", 1, rig.clock(), 0, ambiguous=True)
+    elif uncertain == "expired_lease":
+        rig.clock.advance(31)
+    result = store._cancel_source(outbox_id(1), rig.clock(), _alert_part(entry(1)))
+    if uncertain == "live_lease":
+        assert result is None
+        assert store.get(outbox_id(1))["state"] == "sending"
+        return
+    assert result["state"] == "failed"
+    assert store.retry_state(outbox_id(1))["ambiguous"] is True
+    assert len(store._pending_alerts_of(None)) == 1
+    outbox = Outbox(store, {"gmail": gmail}, emit=lambda part: None, clock=rig.clock)
+    outbox.dispatch_due()
+    assert not gmail.sent
+    assert store.retry_state(outbox_id(1))["ambiguous"] is True
+
+
+@pytest.mark.parametrize("count", [250, 601])
+def test_X_SEC37_FU4b_cancellation_scan_bounded_and_overflow_refuses_cleanup(monkeypatch, count):
+    from fastapi import HTTPException
+    from tilo_api import followup_outbox_sources as sources
+
+    limits, cancelled = [], []
+    rows = [
+        SimpleNamespace(
+            to_dict=lambda: {
+                "org_id": "org_tilo",
+                "owner": "u_owner",
+                "source": {"meeting_id": "mt_a"},
+                "payload": '{"world_id":"w_adr35_a","card_id":"c1"}',
+            }
+        )
+        for _ in range(count)
+    ]
+    query = SimpleNamespace(
+        where=lambda **kw: query,
+        limit=lambda n: limits.append(n) or query,
+        stream=lambda: iter(rows[: limits[-1]] if limits else rows),
+    )
+    monkeypatch.setattr(sources, "followup_retention", lambda *args: [None, SimpleNamespace(_query=lambda: query)])
+    store = SimpleNamespace(
+        get_by_idempotency_key=lambda *args: entry(1),
+        _cancel_source=lambda *args: cancelled.append(args) or entry(1, state="failed"),
+    )
+    if count > 600:
+        with pytest.raises(HTTPException) as refused:
+            sources.cancel_source_entries(None, "org_tilo", "u_owner", store=store)
+        assert refused.value.status_code == 503
+        assert cancelled == []
+        # A retry after the source's retained set is reduced can finish honestly.
+        rows[:] = rows[:250]
+    sources.cancel_source_entries(None, "org_tilo", "u_owner", store=store)
+    assert limits and all(n == 601 for n in limits)
+    assert len(cancelled) == 250
 
 
 @pytest.mark.parametrize("gone", [None, "meeting", "person", "world", "card", "expired", "run"])

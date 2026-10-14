@@ -245,6 +245,24 @@ class FirestoreOutboxStore:
 
         return self._mutate(outbox_id, change)
 
+    def _cancel_source(self, outbox_id: str, now: str, alert: dict) -> dict | None:
+        """X-SEC37-FU4b: stop dispatch atomically, retaining uncertain-send evidence and an alert."""
+
+        def change(doc: dict) -> tuple[bool, dict | None]:
+            lease = doc["send_lease"]
+            if doc["entry"]["state"] not in _UNSENT or (lease is not None and self._now(now) < lease["until"]):
+                return False, None
+            ambiguous = bool((doc["retry"] or {}).get("ambiguous") or lease is not None)
+            doc["entry"]["state"], doc["send_lease"] = "failed", None
+            if ambiguous:
+                doc["retry"] = {**(doc["retry"] or {}), "ambiguous": True}
+                self._record_alert(doc, alert)
+            else:
+                doc["retry"] = None
+            return True, deepcopy(doc["entry"])
+
+        return self._mutate(outbox_id, change)
+
     def _abandon_before_dispatch(self, outbox_id: str) -> dict | None:
         def change(doc: dict) -> tuple[bool, dict | None]:
             if (
