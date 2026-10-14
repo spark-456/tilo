@@ -59,7 +59,7 @@
 [data-park] .park-view-lede {
   margin: 6px 0 0;
   max-width: 62ch;
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 600;
   color: var(--ink2);
 }
@@ -77,7 +77,7 @@
   padding: 0 14px;
   border-radius: 10px;
   color: var(--ink2);
-  font-size: 14.5px;
+  font-size: 14px;
   font-weight: 800;
   text-decoration: none;
 }
@@ -132,7 +132,7 @@
   border-radius: 10px;
   background: var(--btn2);
   color: var(--ink);
-  font: 800 13.5px "Nunito Sans", sans-serif;
+  font: 800 14px "Nunito Sans", sans-serif;
   text-decoration: none;
   cursor: pointer;
 }
@@ -146,7 +146,7 @@
 }
 [data-park] .park-view-note {
   margin: 0;
-  font-size: 14.5px;
+  font-size: 14px;
   font-weight: 600;
   color: var(--ink2);
 }
@@ -154,7 +154,7 @@
   margin: 0;
   font-family: "Nunito", sans-serif;
   font-weight: 900;
-  font-size: 18px;
+  font-size: 20px;
   color: var(--ink);
 }
 [data-park] .park-view-h2 a {
@@ -181,7 +181,7 @@
   border-radius: 14px;
   background: var(--amberSoft);
   color: var(--amberInk);
-  font-size: 14.5px;
+  font-size: 14px;
   font-weight: 700;
 }
 [data-park] .park-view-alert p {
@@ -254,7 +254,7 @@
   border-radius: 9px;
   background: var(--btn2);
   color: var(--ink);
-  font: 700 13px "Nunito Sans", sans-serif;
+  font: 700 14px "Nunito Sans", sans-serif;
 }
 [data-park] .park-view-pickbox {
   border-style: dashed;
@@ -297,7 +297,7 @@
   border-left: 4px solid var(--amber);
 }
 [data-park] .park-view-time {
-  font: 700 13px "JetBrains Mono", monospace;
+  font: 700 14px "JetBrains Mono", monospace;
   color: var(--ink3);
 }
 [data-park] .park-view-text {
@@ -334,18 +334,18 @@
 }
 [data-park] .park-view-tracemeta {
   margin-top: 6px;
-  font-size: 13.5px;
+  font-size: 14px;
   color: var(--ink2);
 }
 [data-park] .park-view-seq {
-  font: 800 13px "JetBrains Mono", monospace;
+  font: 800 14px "JetBrains Mono", monospace;
   color: var(--heroInk);
 }
 
 /* ---- Inspect ---- */
 [data-park] .park-view-state {
   margin: 0;
-  font-size: 15px;
+  font-size: 16px;
 }
 [data-park] .park-view-facts {
   display: grid;
@@ -404,11 +404,11 @@
   font-size: 14px;
 }
 [data-park] .park-view-tiles b {
-  font-size: 18px;
+  font-size: 20px;
   color: var(--ink);
 }
 [data-park] .park-view-tilename {
-  font-size: 12.5px;
+  font-size: 12px;
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.4px;
@@ -451,7 +451,7 @@
   border-radius: 10px;
   background: var(--heroSoft);
   color: var(--heroInk);
-  font-size: 13.5px;
+  font-size: 14px;
   font-weight: 800;
 }
 @media (max-width: 1023px) {
@@ -481,7 +481,7 @@
   cursor: pointer;
 }
 [data-park] .park-view-glance {
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 700;
   color: var(--ink2);
 }
@@ -503,7 +503,7 @@
   color: var(--ink);
 }
 [data-park] .park-view-figures span {
-  font-size: 12.5px;
+  font-size: 12px;
   font-weight: 700;
   color: var(--ink3);
 }
@@ -567,13 +567,13 @@
 }
 [data-park] .park-view-rowstate {
   flex: none;
-  font-size: 12.5px;
+  font-size: 12px;
   font-weight: 700;
   color: var(--ink2);
 }
 [data-park] .park-view-counts {
   margin: 0;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 700;
   color: var(--ink3);
 }
@@ -581,7 +581,7 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 800;
   color: var(--ink2);
 }
@@ -596,7 +596,7 @@
 }
 [data-park] .park-view-pausenote {
   margin: 0;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 700;
   color: var(--ink3);
 }
@@ -606,7 +606,7 @@
   padding: 0;
   overflow: auto;
   list-style: none;
-  font: 600 12.5px "JetBrains Mono", monospace;
+  font: 600 12px "JetBrains Mono", monospace;
   color: var(--ink2);
 }
 
@@ -623,7 +623,7 @@
 }
 [data-park] .park-view-dockbanner {
   margin: 0;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 700;
   color: var(--ink2);
 }
@@ -667,7 +667,7 @@
   border-radius: 12px;
   background: var(--btn2);
   color: var(--ink);
-  font-size: 22px;
+  font-size: 24px;
   font-weight: 800;
 }
 [data-park] .park-view-step:disabled {
@@ -675,7 +675,7 @@
 }
 [data-park] .park-view-pos {
   margin: 0;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 700;
   color: var(--ink2);
 }
@@ -756,7 +756,7 @@
   margin: 0;
   font-family: "Nunito", sans-serif;
   font-weight: 900;
-  font-size: 18px;
+  font-size: 20px;
   color: var(--ink);
 }
 [data-park] .park-needs-root .need-why,
@@ -783,7 +783,7 @@
   min-height: 42px;
   padding: 0 16px;
   border-radius: 12px;
-  font: 800 14.5px "Nunito Sans", sans-serif;
+  font: 800 14px "Nunito Sans", sans-serif;
   cursor: pointer;
 }
 [data-park] .park-needs-root .primary {
@@ -845,4 +845,15 @@
 }
 [data-park] .park-view-tab {
   min-height: 44px;
+}
+
+/* The selection bar reserves its second line on a phone, so choosing an object moves nothing (CLS). */
+@media (max-width: 520px) {
+  [data-park] .park-view-selection {
+    min-height: 88px;
+    align-content: flex-start;
+  }
+  [data-park] .park-view-selection-text {
+    flex: 1 1 100%;
+  }
 }
