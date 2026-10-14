@@ -76,6 +76,10 @@ class ReplayExecutor:
         self._base = base
 
     def run(self, case: Any) -> Outcome:
+        if case.inputs.get("fake_suite") == "ebuild":
+            from .ebuild_fake import execute
+
+            return execute(case)
         if not case.recording:
             raise ExecutorError(f"case {case.id}: no recording to replay")
         path = self._base / case.recording

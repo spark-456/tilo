@@ -1,0 +1,32 @@
+id: E-BUILD-02
+group: E-BUILD
+title: second deliverable with a granted excerpt
+measures:
+- FR-CON-16
+- FR-CON-17
+- FR-CON-20
+- EFF-01
+status: ready
+deploy_gate: false
+inputs:
+  fake_suite: ebuild
+  scenario: second_deliverable_with_a_granted_excerpt
+scripted_answers: []
+ground_truth:
+  scenario: second_deliverable_with_a_granted_excerpt
+  mechanics_passed: true
+  basis: scripted_fakes
+recording: null
+checks:
+- check: equals_ground_truth
+  args:
+    field: scenario
+- check: equals_ground_truth
+  args:
+    field: mechanics_passed
+- check: equals_ground_truth
+  args:
+    field: basis
+notes: Executes existing fake acceptance flow. Four handoffs also verify card artifact,
+  T3 person approval refusal, and data.transfer evidence. Backend mechanics only;
+  no browser rendering or FR-CON-18/19/21/22 activation claim.
