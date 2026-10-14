@@ -20,7 +20,7 @@ const BROWSER = { ...devices["Desktop Chrome"], channel: process.env.CI ? undefi
 const CP2 = process.env.TILO_CP2 === "1";
 const CP2_PORT = Number(process.env.TILO_CP2_PORT ?? 5391);
 const CP2_ORIGIN = `http://127.0.0.1:${CP2_PORT}`;
-const CP2_API = "http://127.0.0.1:8080";
+const CP2_API = `http://127.0.0.1:${process.env.TILO_CP2_API_PORT ?? 8080}`;
 const CP2_SPECS = "**/cp2/**";
 // NFR-01 (`TILO_NFR01=1`, local only): the landing-page budget is measured on the production build
 // served by `vite preview`, with the network and CPU throttled for the phone case. CI never sets it.
@@ -179,7 +179,10 @@ export default defineConfig({
           {
             command: "uv run --package tilo-api python -m tilo_api",
             cwd: "../..",
-            env: { TILO_API_DEV_ORIGINS: CP2_ORIGIN },
+            env: {
+              TILO_API_DEV_ORIGINS: CP2_ORIGIN,
+              TILO_API_DEV_PORT: String(process.env.TILO_CP2_API_PORT ?? 8080),
+            },
             url: `${CP2_API}/healthz`,
             reuseExistingServer: !process.env.CI,
             timeout: 120_000,
