@@ -191,17 +191,17 @@ describe("WEB_3b_nav: day and night", () => {
     const { m } = await mountApp();
     expect(toggle(m.container).getAttribute("aria-label")).toBe("Switch to night");
     expect(toggle(m.container).getAttribute("title")).toBe("Switch to night");
-    click(toggle(m.container));
+    await act(async () => click(toggle(m.container)));
     expect(toggle(m.container).getAttribute("aria-label")).toBe("Switch to day");
     expect(toggle(m.container).getAttribute("title")).toBe("Switch to day");
   });
 
   it("WEB_3b_nav_the_toggle_sets_the_time_pref_both_ways", async () => {
     const { m, api } = await mountApp();
-    click(toggle(m.container));
+    await act(async () => click(toggle(m.container)));
     expect(seen.app.time).toBe("night");
     expect(api.setPref).toHaveBeenCalledWith("time", "night");
-    click(toggle(m.container));
+    await act(async () => click(toggle(m.container)));
     expect(seen.app.time).toBe("day");
     expect(api.setPref).toHaveBeenLastCalledWith("time", "day");
   });
@@ -209,7 +209,7 @@ describe("WEB_3b_nav: day and night", () => {
   it("WEB_3b_nav_the_toggle_icon_changes_with_the_theme", async () => {
     const { m } = await mountApp();
     const day = q(toggle(m.container), "svg").outerHTML;
-    click(toggle(m.container));
+    await act(async () => click(toggle(m.container)));
     expect(q(toggle(m.container), "svg").outerHTML).not.toBe(day);
   });
 });
@@ -218,10 +218,10 @@ describe("WEB_3b_nav: bell and avatar", () => {
   it("WEB_3b_nav_the_bell_opens_and_closes_the_notifications_and_says_so_in_aria_expanded", async () => {
     const { m } = await mountApp();
     expect(bell(m.container).getAttribute("aria-expanded")).toBe("false");
-    click(bell(m.container));
+    await act(async () => click(bell(m.container)));
     expect(seen.store.getState().menu).toBe("notif");
     expect(bell(m.container).getAttribute("aria-expanded")).toBe("true");
-    click(bell(m.container));
+    await act(async () => click(bell(m.container)));
     expect(seen.store.getState().menu).toBeNull();
     expect(bell(m.container).getAttribute("aria-expanded")).toBe("false");
   });
@@ -229,9 +229,9 @@ describe("WEB_3b_nav: bell and avatar", () => {
   it("WEB_3b_nav_the_amber_dot_shows_until_the_bell_is_opened_and_stays_gone", async () => {
     const { m } = await mountApp();
     expect(unreadDots(m.container)).toHaveLength(1);
-    click(bell(m.container));
+    await act(async () => click(bell(m.container)));
     expect(unreadDots(m.container)).toHaveLength(0);
-    click(bell(m.container));
+    await act(async () => click(bell(m.container)));
     expect(unreadDots(m.container)).toHaveLength(0);
   });
 
@@ -247,18 +247,18 @@ describe("WEB_3b_nav: bell and avatar", () => {
   it("WEB_3b_nav_the_avatar_opens_the_account_menu_and_says_so_in_aria_expanded", async () => {
     const { m } = await mountApp();
     expect(avatar(m.container).getAttribute("aria-expanded")).toBe("false");
-    click(avatar(m.container));
+    await act(async () => click(avatar(m.container)));
     expect(seen.store.getState().menu).toBe("acct");
     expect(avatar(m.container).getAttribute("aria-expanded")).toBe("true");
   });
 
   it("WEB_3b_nav_only_one_of_the_two_menus_is_open_at_a_time", async () => {
     const { m } = await mountApp();
-    click(bell(m.container));
-    click(avatar(m.container));
+    await act(async () => click(bell(m.container)));
+    await act(async () => click(avatar(m.container)));
     expect(seen.store.getState().menu).toBe("acct");
     expect(bell(m.container).getAttribute("aria-expanded")).toBe("false");
-    click(bell(m.container));
+    await act(async () => click(bell(m.container)));
     expect(seen.store.getState().menu).toBe("notif");
     expect(avatar(m.container).getAttribute("aria-expanded")).toBe("false");
   });
@@ -294,7 +294,7 @@ describe("WEB_3b_chip: Sample data (plan section 6.1)", () => {
     const { m } = await mountApp();
     const chip = sampleChip(m.container) as HTMLButtonElement;
     focus(chip);
-    click(chip);
+    await act(async () => click(chip));
     const text = q(document.body, '[role="dialog"]').textContent;
     expect(text).toContain(SAMPLE);
     expect(chip.getAttribute("aria-expanded")).toBe("true");
@@ -305,7 +305,7 @@ describe("WEB_3b_chip: Sample data (plan section 6.1)", () => {
 
   it("WEB_3b_chip_it_is_not_one_of_the_two_menus_of_the_store", async () => {
     const { m } = await mountApp();
-    click(sampleChip(m.container) as HTMLButtonElement);
+    await act(async () => click(sampleChip(m.container) as HTMLButtonElement));
     expect(seen.store.getState().menu).toBeNull();
   });
 });

@@ -128,12 +128,12 @@ describe("WEB-MOTION-1 prefers-reduced-motion: a static frame, live while the pa
     expect(still()).toBe("false");
     const live = build();
 
-    setReduced(true);
+    await act(async () => setReduced(true));
     expect(still(), "the frame under reduced motion").toBe("true");
     expect(build()).not.toBe(live);
 
     const before = builds();
-    setReduced(false);
+    await act(async () => setReduced(false));
     expect(still()).toBe("false");
     expect(build(), "the same live scene, from the cache").toBe(live);
     expect(builds()).toBe(before);
@@ -151,7 +151,7 @@ describe("WEB-MOTION-1 prefers-reduced-motion: a static frame, live while the pa
     expect(still(), "night under reduced motion").toBe("true");
     // The control: lifting the setting gives the live city back, so the frames above were the setting's doing.
     await act(async () => seen.app.setPref("motion", "lively"));
-    setReduced(false);
+    await act(async () => setReduced(false));
     expect(still()).toBe("false");
   });
 });
@@ -162,26 +162,26 @@ describe("WEB-MOTION-1 cache: the city is drawn once per time|motion", () => {
     const start = builds();
     const drawn = build();
     expect(still(), "the city drawn is the live one").toBe("false");
-    const go = (to: string) =>
-      act(() => {
+    const go = async (to: string) =>
+      act(async () => {
         window.history.pushState({}, "", to);
         window.dispatchEvent(new PopStateEvent("popstate"));
       });
-    const setHidden = (hidden: boolean) => {
+    const setHidden = async (hidden: boolean) => {
       Object.defineProperty(document, "hidden", { configurable: true, get: () => hidden });
       Object.defineProperty(document, "visibilityState", {
         configurable: true,
         get: () => (hidden ? "hidden" : "visible"),
       });
-      act(() => {
+      await act(async () => {
         document.dispatchEvent(new Event("visibilitychange"));
       });
     };
-    go("/park/ledger");
-    go("/park/agenda");
-    go("/park/home");
-    setHidden(true);
-    setHidden(false);
+    await go("/park/ledger");
+    await go("/park/agenda");
+    await go("/park/home");
+    await setHidden(true);
+    await setHidden(false);
     expect(builds()).toBe(start);
     expect(build()).toBe(drawn);
   });
