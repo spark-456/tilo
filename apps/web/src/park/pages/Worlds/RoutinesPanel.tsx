@@ -5,25 +5,30 @@ import {
   cadenceText,
   setRoutineEnabled,
 } from "../../api/live/routines";
+import { ApiReadState } from "../../components/ApiReadState";
 
 export function RoutinesPanel({ client }: { client: RoutinesClient }) {
   const [rows, setRows] = useState<Routine[] | null>(null);
-  const [error, setError] = useState("");
+  const [error, setError] = useState<unknown>(null);
+  const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [attempt, setAttempt] = useState(0);
   const writing = useRef(false);
   useEffect(() => {
     void attempt;
     let active = true;
-    setRows(null);
-    setError("");
+    setLoading(true);
+    setError(null);
     client
       .listSchedules()
       .then((list) => {
         if (active) setRows(list);
       })
-      .catch(() => {
-        if (active) setError("Could not load routines. Try again.");
+      .catch((error: unknown) => {
+        if (active) setError(error);
+      })
+      .finally(() => {
+        if (active) setLoading(false);
       });
     return () => {
       active = false;
@@ -33,14 +38,14 @@ export function RoutinesPanel({ client }: { client: RoutinesClient }) {
     if (writing.current) return;
     writing.current = true;
     setBusy(true);
-    setError("");
+    setError(null);
     try {
       const updated = await setRoutineEnabled(client, row.schedule_id, !row.enabled);
       setRows(
         (old) => old?.map((r) => (r.schedule_id === updated.schedule_id ? updated : r)) ?? null,
       );
-    } catch {
-      setError("Could not change this routine. Its status is unchanged on this page.");
+    } catch (error: unknown) {
+      setError(error);
     } finally {
       writing.current = false;
       setBusy(false);
@@ -53,17 +58,6 @@ export function RoutinesPanel({ client }: { client: RoutinesClient }) {
         To create a routine, start a world and choose Repeat weekly when approving its approach.
       </p>
       <a href="/start">Create a routine</a>
-      {error ? (
-        <>
-          <p role="alert">{error}</p>
-          {rows === null ? (
-            <button type="button" onClick={() => setAttempt((n) => n + 1)}>
-              Retry
-            </button>
-          ) : null}
-        </>
-      ) : null}
-      {!error && rows === null ? <p>Loading routines…</p> : null}
       {rows?.length === 0 ? <p>No routines yet.</p> : null}
       {rows?.map((row) => (
         <article key={row.schedule_id}>
@@ -75,6 +69,12 @@ export function RoutinesPanel({ client }: { client: RoutinesClient }) {
           </button>
         </article>
       ))}
+      <ApiReadState
+        title={rows === null ? "Could not load routines" : "Could not change this routine"}
+        error={error}
+        pending={loading || busy}
+        retryRead={() => setAttempt((n) => n + 1)}
+      />
     </section>
   );
 }

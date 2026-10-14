@@ -2,12 +2,13 @@
 // design_handoff_tilo_web_app/design/Tilo App Ledger.dc.html (user's prototype, ADR-0003a).
 // Data comes only from the Park Api (fixture or live, with its `source`); every approval goes through
 // `app.decide(key)`; navigation only through `app.go`. No motion until WEB-3 (BQ-WEB-3).
-import type { ReactNode } from "react";
+import { type ReactNode, useState } from "react";
 import type { Decision, Ledger, Source } from "../../api/types";
 import type { AppCtx } from "../../app/AppCtx";
 import { useParkApi } from "../../app/context";
 import { useStaged } from "../../app/useStaged";
 import { Button, KpiTile, PageSheet } from "../../components";
+import { ApiReadState } from "../../components/ApiReadState";
 import { FirstRunPanels } from "../../sample/FirstRunPanels";
 import { useFirstRunPreview } from "../../sample/useFirstRunPreview";
 import "../../components/park.components.css";
@@ -60,27 +61,36 @@ export function LedgerPage({ app }: LedgerPageProps) {
   return preview ? <FirstRunPanels page="ledger" app={app} /> : <PersonalLedgerPage app={app} />;
 }
 function PersonalLedgerPage({ app }: LedgerPageProps) {
-  const state = useLedger(useParkApi());
+  const [attempt, setAttempt] = useState(0);
+  const state = useLedger(useParkApi(), attempt);
   const part = useStaged(5); // drawn top to bottom, one task each, so the page never holds the thread
 
-  if (state.status === "not-built" || state.status === "error") {
+  if (state.status === "error" || state.status === "loading") {
+    return (
+      <Frame>
+        <h1 className="park-ledger-title">Ledger</h1>
+        <ApiReadState
+          title="The Ledger could not load"
+          error={state.status === "error" ? state.error : undefined}
+          pending={state.status === "loading"}
+          retryRead={() => setAttempt((n) => n + 1)}
+        />
+      </Frame>
+    );
+  }
+  if (state.status === "not-built") {
     return (
       <Frame>
         <div className="park-ledger-state">
           <h1 className="park-ledger-title">Ledger</h1>
-          <div className="park-ledger-state-title">
-            {state.status === "not-built" ? "Not connected yet" : "The Ledger could not load"}
-          </div>
+          <div className="park-ledger-state-title">Not connected yet</div>
           <div className="park-ledger-state-line">
-            {state.status === "not-built"
-              ? "Spend and decisions show here once the Ledger is connected."
-              : "Try again in a moment."}
+            Spend and decisions show here once the Ledger is connected.
           </div>
         </div>
       </Frame>
     );
   }
-  if (state.status === "loading") return <Frame />;
 
   const L = state.data;
   const wide = app.vw >= 1100;

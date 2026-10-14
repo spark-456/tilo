@@ -10,12 +10,14 @@ export type LedgerState =
   | { status: "loading" }
   | { status: "ready"; data: Ledger; decisions: Decision[]; source: Source }
   | { status: "not-built" }
-  | { status: "error" };
+  | { status: "error"; error: unknown };
 
-export function useLedger(api: Api): LedgerState {
+export function useLedger(api: Api, attempt = 0): LedgerState {
   const [state, setState] = useState<LedgerState>({ status: "loading" });
   useEffect(() => {
+    void attempt;
     let live = true;
+    setState({ status: "loading" });
     // The decisions carry the world to open and the words of a taken one; without them (a live Api that
     // does not serve them yet) the page still shows the Ledger, with no world link.
     const decisions = api.getDecisions().then(
@@ -25,11 +27,13 @@ export function useLedger(api: Api): LedgerState {
     Promise.all([api.getLedger(), decisions]).then(
       ([r, d]) =>
         live && setState({ status: "ready", data: r.data, decisions: d, source: r.source }),
-      (e: unknown) => live && setState({ status: e instanceof NotBuilt ? "not-built" : "error" }),
+      (e: unknown) =>
+        live &&
+        setState(e instanceof NotBuilt ? { status: "not-built" } : { status: "error", error: e }),
     );
     return () => {
       live = false;
     };
-  }, [api]);
+  }, [api, attempt]);
   return state;
 }
