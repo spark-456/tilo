@@ -5,7 +5,7 @@ for (const [path, destination, title] of [
   ["/team/console", "/team?focus=console", "Team Lead console"],
   ["/connections", "/connectors", "Connectors"],
   ["/more", "/more", "More"],
-]) {
+] as const) {
   test(`OLD-UI-OUT-4b ${path} opens in Park and preserves the run`, async ({ page }) => {
     await page.goto(`${path}?world=w_sample_village_basic`);
     const separator = destination.includes("?") ? "&" : "?";
