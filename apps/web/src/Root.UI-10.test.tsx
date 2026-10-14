@@ -14,6 +14,8 @@ const visit = async (path: string) => {
   await act(async () => undefined);
   return m;
 };
+const createRoutine = (root: ParentNode) =>
+  qa<HTMLAnchorElement>(root, "a").find((a) => a.textContent === "Create a routine");
 afterEach(() => {
   cleanup();
   setDensity("friendly");
@@ -26,11 +28,11 @@ it("UI-10 W7 Settings uses the Park navigation and one main without the flow rep
     await act(async () => {
       await vi.dynamicImportSettled();
     });
-    expect(m.container.querySelector('main [data-testid="settings"]')).not.toBeNull();
+    expect(m.container.querySelector('main [data-testid="park-page-settings"]')).not.toBeNull();
   });
   expect(qa(m.container, "[data-park]")).toHaveLength(1);
   expect(qa(m.container, "main")).toHaveLength(1);
-  expect(m.container.querySelector('main [data-testid="settings"]')).not.toBeNull();
+  expect(m.container.querySelector('main [data-testid="park-page-settings"]')).not.toBeNull();
   expect(m.container.querySelector("nav")).not.toBeNull();
   expect(m.container.textContent).not.toContain("Fixture replay");
   expect(document.title).toBe("Settings · Tilo");
@@ -41,9 +43,9 @@ it("UI-10 W7 More names its browser tab", async () => {
 });
 it("UI-10 W7-FIX Settings provides a Park routine empty state and creation link", async () => {
   const m = await visit("/settings");
-  expect(m.container.textContent).toContain("No routines yet.");
-  expect(m.container.querySelector('a[href="/start"]')?.textContent).toBe("Create a routine");
-  expect(m.container.querySelector('[data-testid="density"]')).not.toBeNull();
+  expect(m.container.textContent).toContain("No routines are recorded in this sample.");
+  expect(createRoutine(m.container)?.getAttribute("href")).toBe("/");
+  expect(m.container.querySelector('input[name="density"]')).not.toBeNull();
 });
 it("UI-10 W7 unknown routes name the not-found browser tab", async () => {
   await visit("/unknown-page");
@@ -83,8 +85,8 @@ it("UI-10 W8b Settings Appearance changes the shell and persists to Profile", as
   const professional = q<HTMLInputElement>(m.container, 'input[value="professional"]');
   click(professional);
   expect(professional.checked).toBe(true);
-  expect(m.container.textContent).toContain("No routines yet.");
-  expect(q(m.container, 'a[href="/start"]').textContent).toBe("Create a routine");
+  expect(m.container.textContent).toContain("No routines are recorded in this sample.");
+  expect(createRoutine(m.container)?.getAttribute("href")).toBe("/");
   await act(async () => {
     window.history.pushState({}, "", "/profile?tab=appearance");
     window.dispatchEvent(new PopStateEvent("popstate"));

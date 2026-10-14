@@ -15,7 +15,7 @@ import { isNotBuilt, useLiveTeam } from "../../app/useLiveTeam";
 import { PageSheet } from "../../components";
 import { ToolAccess } from "./ToolAccess";
 import "./Connectors.css";
-import { ConnectionsSection } from "../Team/RunAdmin";
+import { ConnectionsSection } from "../../shared/RunAdmin";
 import { AttentionBanner, AvailableRow, ConnectedTile } from "./ConnectorParts";
 import { Drawer } from "./Drawer";
 import { GoogleAccess } from "./GoogleAccess";

@@ -1,8 +1,8 @@
 // "Teach Tilo something new": the card head with the teacher and the step bar, then the pane of the step the
 // person is on (design: Tilo App Skills.dc.html, README Skills 2). The flow itself lives in useTeach.
 import type { RefObject } from "react";
-import { ApiReadState } from "../../components/ApiReadState";
 import { cx } from "../../components/cx";
+import { ApiReadState } from "../../shared/ApiReadState";
 import { LearnPane } from "./LearnPane";
 import { RunPane } from "./RunPane";
 import { SavePane } from "./SavePane";

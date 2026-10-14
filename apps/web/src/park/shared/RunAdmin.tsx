@@ -1,8 +1,8 @@
 import type { Event } from "@tilo/contracts";
 import type { ReactNode } from "react";
-import { useClient, useIsFixtureClient } from "../../../api/ClientProvider";
-import { useAdminRead, useRunLog, useRunWorld, worldStatus } from "../../../api/runAdmin";
-import { Card } from "../../components";
+import { useClient, useIsFixtureClient } from "../../api/ClientProvider";
+import { useAdminRead, useRunLog, useRunWorld, worldStatus } from "../../api/runAdmin";
+import { Card } from "../components";
 
 type Section = "mail" | "console" | "connections";
 const authors: Record<string, string> = { policy: "Your rule", team_lead: "A Team Lead" };

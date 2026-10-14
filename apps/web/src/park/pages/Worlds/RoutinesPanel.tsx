@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import type { Routine, RoutinesClient } from "../../api/live/routines";
-import { ApiReadState } from "../../components/ApiReadState";
+import { ApiReadState } from "../../shared/ApiReadState";
 import { RoutineList } from "./RoutineList";
 
 export function RoutinesPanel({ client }: { client: RoutinesClient }) {
