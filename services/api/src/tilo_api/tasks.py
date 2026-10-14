@@ -456,14 +456,24 @@ def get_approaches(
     approaches = task.approaches
     # Default (PRD silent, BQ-83): the cheapest approach is recommended; ties keep the Director's order.
     recommended = min(approaches, key=lambda a: a["credits"]["max"])["id"]
+    floor = deps.min_run_grant()
+    shown = [_floored(a, floor) for a in approaches]  # BQ-BUDGET-FLOOR-1: stored as the Director made them
     return {
         "task_id": task_id,
-        "approaches": approaches,
+        "approaches": shown,
         "recommended": recommended,
         "credit_usd": credit_usd,
         # SIMPLE-RUN-2: the most one approval may grant, so a one-step Start sends min(estimate, ceiling), never a 422.
         "budget_ceiling": deps.budget_cap_ceiling(),
+        "min_grant": floor,  # BQ-BUDGET-FLOOR-1: and the least; approve raises a smaller cap to this
     }
+
+
+def _floored(approach: dict[str, Any], floor: float) -> dict[str, Any]:
+    """The approach as the confirm card shows it: its estimate raised to the floor a Start grants (BQ-BUDGET-FLOOR-1),
+    so the card never promises less than the grant. `min` follows `max` down, never above it."""
+    top = max(approach["credits"]["max"], floor)
+    return {**approach, "credits": {**approach["credits"], "min": min(approach["credits"]["min"], top), "max": top}}
 
 
 def _load_scenario(task: deps.TaskRecord) -> Any:
@@ -583,7 +593,8 @@ def approve(
         if body.approach_id not in {a["id"] for a in task.approaches}:
             raise HTTPException(status_code=422, detail="Pick one of the proposed approaches.")
         preload = _load_scenario(task)  # before anything changes: a scenario that no longer loads stops the approval
-        now, base, cap = now_ts(), _base(task, task.owner), body.budget_cap
+        now, base = now_ts(), _base(task, task.owner)
+        cap = max(body.budget_cap, deps.min_run_grant())  # BQ-BUDGET-FLOOR-1: never below the floor, above it kept
         # the earlier grants and the policies are read across all of the owner's worlds
         store.load_owner(task.owner, settle=True)
         owned = {w for w, record in store.worlds.items() if record.owner == task.owner}

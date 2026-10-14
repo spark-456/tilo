@@ -16,6 +16,10 @@ import type { Api } from "./index";
 /** `caps.run_credits` in config/metering.yaml (services/api answers 422 above it): the most one approval may grant. */
 export const MAX_RUN_CREDITS = 300;
 
+/** `min_run_grant_credits` in config/run_grant.yaml (BQ-BUDGET-FLOOR-1): a Start always grants at least this many. The
+ *  approaches reply's own `min_grant` wins when it is there, so a changed config never needs a web deploy. */
+export const MIN_RUN_GRANT_CREDITS = 30;
+
 export interface RunLine {
   /** The brief field the person's answer to the skipped question goes to, or null when it cannot be edited. */
   readonly field: string | null;
@@ -96,7 +100,12 @@ function planOf(
   taskId: string,
   brief: { goal?: unknown; assumptions?: unknown },
   asked: readonly { field: string; text: string }[],
-  priced: { approaches: PlanApproach[]; recommended: string; credit_usd: number },
+  priced: {
+    approaches: PlanApproach[];
+    recommended: string;
+    credit_usd: number;
+    min_grant?: number;
+  },
 ): RunPlan {
   const chosen =
     priced.approaches.find((a) => a.id === priced.recommended) ?? priced.approaches[0] ?? null;
@@ -112,8 +121,20 @@ function planOf(
       text: item.assumed.trim(),
     });
   }
-  const max = Math.max(1, Math.ceil(chosen.credits.max));
-  const usd = Number.isFinite(priced.credit_usd) ? max * priced.credit_usd : null;
+  // BQ-BUDGET-FLOOR-1: the card shows what Start grants, never less than the floor (the API raises a smaller cap to it).
+  const floor = Math.min(
+    typeof priced.min_grant === "number" &&
+      Number.isFinite(priced.min_grant) &&
+      priced.min_grant >= 0
+      ? priced.min_grant
+      : MIN_RUN_GRANT_CREDITS,
+    MAX_RUN_CREDITS,
+  );
+  const top = Math.max(chosen.credits.max, floor);
+  const max = Math.max(1, Math.ceil(top));
+  const usd = Number.isFinite(priced.credit_usd)
+    ? Math.min(max, MAX_RUN_CREDITS) * priced.credit_usd
+    : null;
   const t = chosen.time;
   return {
     taskId,
@@ -121,7 +142,7 @@ function planOf(
     lines,
     approachId: chosen.id,
     approachLabel: chosen.label,
-    credits: { min: chosen.credits.min, max: chosen.credits.max },
+    credits: { min: Math.min(chosen.credits.min, top), max: top },
     cap: Math.min(max, MAX_RUN_CREDITS),
     usd,
     time:

@@ -656,6 +656,27 @@ def budget_cap_ceiling() -> float:
     return float(value)
 
 
+DEFAULT_MIN_RUN_GRANT_CREDITS = 30.0  # BQ-BUDGET-FLOOR-1: the owner's floor (US$0.15), used when the file gives none
+
+
+def min_run_grant() -> float:
+    """The least one run's budget grant may be: `min_run_grant_credits` in config/run_grant.yaml (BQ-BUDGET-FLOOR-1),
+    or 30 when the file or the value is missing or unusable. Never above the run ceiling, so the floor and the
+    300-credit cap can never contradict each other."""
+    try:
+        import yaml
+
+        value = yaml.safe_load((_REPO_ROOT / "config" / "run_grant.yaml").read_text(encoding="utf-8"))[
+            "min_run_grant_credits"
+        ]
+    except Exception as exc:
+        logger.warning("run grant config unreadable (%s); using the default floor", type(exc).__name__)
+        value = DEFAULT_MIN_RUN_GRANT_CREDITS
+    if isinstance(value, bool) or not isinstance(value, int | float) or not (math.isfinite(value) and value >= 0):
+        value = DEFAULT_MIN_RUN_GRANT_CREDITS
+    return min(float(value), budget_cap_ceiling())
+
+
 def get_access_store() -> AccessStore:
     """SEC-15: where each person's visitor-or-judge declaration is kept. Deployed: a `FirestoreAccessStore` on the
     process's shared client when `TILO_API_STORE=firestore` and the api store door opens (the same rules as
