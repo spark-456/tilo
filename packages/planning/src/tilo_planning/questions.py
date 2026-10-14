@@ -119,12 +119,7 @@ def generate_questions(
 
     stated = [c.casefold() for c in brief["constraints"]]  # what the task (or a saved preference) already says
     topic = [q for q in topic_questions if not any(c.startswith(f"{q.label.casefold()}:") for c in stated)]
-    topic = _dedupe_topic(topic)[
-        :MAX_QUESTIONS
-    ]  # a label that is already a stated "Label: ..." constraint is not asked
-    if "deadline" in candidates and any(_date_like(q.label, q.text) for q in topic):
-        candidates.remove("deadline")  # the Director already asks when: one date question, not two (SIMPLE-RUN-2)
-        brief["assumptions"].append({"question": None, "assumed": _assumed(brief, "deadline")})
+    topic = topic[:MAX_QUESTIONS]  # a label that is already a stated "Label: ..." constraint is not asked
     if topic:  # their answers cover what the generic format and rules questions would have asked
         for field in (f for f in candidates if f in TOPIC_REPLACES):
             brief["assumptions"].append({"question": None, "assumed": _assumed(brief, field)})
@@ -133,6 +128,8 @@ def generate_questions(
     room = MAX_QUESTIONS - len(topic)
     questions = [_topic_question(q, n) for n, q in enumerate(topic, 1)]
     questions += [_question(brief, f, kinds) for f in ranked[:room]]
+    # one question per field, the first kept: nothing reaches the answers route twice (SIMPLE-RUN-2)
+    questions = list({q.field: q for q in reversed(questions)}.values())[::-1]
     for field in ranked[room:]:
         brief["assumptions"].append({"question": None, "assumed": _assumed(brief, field)})
     brief = validate_brief(brief)
@@ -146,22 +143,6 @@ def generate_questions(
             summary=f"The Director has {count} question{'s' if count > 1 else ''} that change the plan.",
         )  # fmt: skip
     return QuestionsResult(brief, questions, event, hit_events)
-
-
-def _dedupe_topic(topic: Sequence[TopicQuestion]) -> list[TopicQuestion]:
-    """One question per wording, and one about the date: the first of each stays (most useful first)."""
-    seen: set[str] = set()
-    kept: list[TopicQuestion] = []
-    asks_date = False
-    for q in topic:
-        words = " ".join(re.findall(r"\w+", q.text.casefold()))
-        dated = _date_like(q.label, q.text)
-        if words in seen or (dated and asks_date):
-            continue
-        seen.add(words)
-        asks_date = asks_date or dated
-        kept.append(q)
-    return kept
 
 
 def record_assumption(
@@ -205,7 +186,7 @@ def apply_answer(
     config. One that names a kind the config marks unavailable is refused (alone or in a mix), saying what it needs.
     Any other deliverables answer is read as before (formats, or free text, BQ-FREETEXT-1)."""
     if question.label is not None:
-        return _apply_topic(brief, question, answer, today=today)
+        return _apply_topic(brief, question, answer)
     if answer == question.suggested_answers[0]:
         return validate_brief(copy.deepcopy(brief))
     field = question.field
@@ -320,19 +301,11 @@ def _topic_value(answer: str) -> str:
     return value
 
 
-def _apply_topic(
-    brief: dict[str, Any], question: Question, answer: str, *, today: date | None = None
-) -> dict[str, Any]:
+def _apply_topic(brief: dict[str, Any], question: Question, answer: str) -> dict[str, Any]:
     """The constraint `Label: value` is appended; a stated constraint is never removed or edited (a Director label that
-    matches one is dropped in `generate_questions`, so no stated constraint carries this label). A question about the
-    date also sets the brief's deadline when it has none and the answer reads as a date (SIMPLE-RUN-2)."""
+    matches one is dropped in `generate_questions`, so no stated constraint carries this label)."""
     line = f"{question.label}: {_topic_value(answer)}"
-    updated = {**copy.deepcopy(brief), "constraints": list(dict.fromkeys([*brief["constraints"], line]))}
-    if today is not None and updated.get("deadline") is None and _date_like(question.label, question.text):
-        known, parsed = parse_deadline(answer, today)
-        if known and parsed is not None:
-            updated["deadline"] = parsed.isoformat()
-    return validate_brief(updated)
+    return validate_brief({**copy.deepcopy(brief), "constraints": list(dict.fromkeys([*brief["constraints"], line]))})
 
 
 def _topic_question(topic: TopicQuestion, number: int) -> Question:
@@ -342,13 +315,6 @@ def _topic_question(topic: TopicQuestion, number: int) -> Question:
 
 ANSWER_MAX_CHARS = 300  # the answers route's own limit: a longer answer is cut, never scanned
 _ISO_DATE = re.compile(r"\d{4}-\d{2}-\d{2}")
-_DATE_WORDS = re.compile(r"\b(deadline|due date|due|dates?|when|by when)\b", re.IGNORECASE)
-
-
-def _date_like(label: str | None, text: str) -> bool:
-    """A Director question that is about when: the generic deadline question would only ask it a second time."""
-    return _DATE_WORDS.search(f"{label or ''} {text}") is not None
-
 
 _FORMATS = (
     "pdf",
