@@ -45,6 +45,7 @@ import { FactsCard, GoLink, LovableCard, SpendCard, WaitingCard } from "./Side";
 import { SkillProposals } from "./SkillProposals";
 import { ShareWithTeam } from "./TeamShare";
 import { MissingWorld, TeamItems, TeamWorld } from "./TeamWorld";
+import { runProgress } from "./runProgress";
 import { useRunEvents } from "./useRunEvents";
 import "./World.css";
 import { cityArt, rowArt, singleArt } from "./worldArt";
@@ -55,6 +56,7 @@ import {
   decisionsWord,
   heroTagOf,
   isRecordedRunning,
+  metaLine,
   skillsAndTools,
   stateLook,
 } from "./worldModel";
@@ -403,7 +405,9 @@ export function WorldPage({ app }: { app: AppCtx }) {
       <div className="park-world-head">
         <div className="park-world-titles">
           <div className="park-world-eyebrowrow">
-            <span className="park-world-eyebrow">{`${w.tier} · ${w.tool}`.toUpperCase()}</span>
+            <span className="park-world-eyebrow">
+              {[w.tier, w.tool].filter(Boolean).join(" · ").toUpperCase()}
+            </span>
             <span className="park-world-chip" style={{ background: look[1], color: look[2] }}>
               <span className="park-world-dot" style={{ background: look[3] }} />
               {chip}
@@ -419,7 +423,11 @@ export function WorldPage({ app }: { app: AppCtx }) {
           <p className="park-world-meta">
             {w.sample
               ? `Recorded ${w.started}`
-              : `Owned by ${w.owner} · started ${w.started} · ${agentsWord(w.agents)}`}
+              : metaLine(
+                  w.owner,
+                  w.started,
+                  trackRun && runEvents.length > 0 ? runProgress(runEvents).agents : w.agents,
+                )}
           </p>
           {w.sample ? <SampleNote /> : null}
           {demo && !w.sample ? (

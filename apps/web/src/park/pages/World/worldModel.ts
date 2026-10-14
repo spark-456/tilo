@@ -97,6 +97,27 @@ const plural = (n: number, one: string, many: string): string => `${n} ${n === 1
 export const decisionsWord = (n: number): string => plural(n, "decision", "decisions");
 export const agentsWord = (n: number): string => plural(n, "agent", "agents");
 
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+/** A recorded timestamp as the day it names ("14 Oct"); a value that is not a timestamp (a sample's own words) is kept. */
+export function startedWord(value: string): string {
+  const m = /^\d{4}-(\d\d)-(\d\d)T/.exec(value);
+  const month = m ? MONTHS[Number(m[1]) - 1] : undefined;
+  return m && month ? `${Number(m[2])} ${month}` : value;
+}
+
+/** The meta line of a real world: only the facts that are known. The list serves no owner name or agent count, and
+ * an empty one is left out rather than printed as "Owned by ·" or "0 agents" beside a run that has agents (HR-1). */
+export function metaLine(owner: string, started: string, agents: number): string {
+  return [
+    owner ? `Owned by ${owner}` : "",
+    started ? `started ${startedWord(started)}` : "",
+    agents > 0 ? agentsWord(agents) : "",
+  ]
+    .filter(Boolean)
+    .join(" · ");
+}
+
 /** Share of the budget spent, 0..100 (a world over budget fills the bar and stops). */
 export const spendShare = (w: World): number =>
   w.budget ? Math.min(100, (w.spendV / w.budget) * 100) : 0;
