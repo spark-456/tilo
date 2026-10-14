@@ -228,6 +228,8 @@
   stroke-width: 2.5;
 }
 [data-park] .park-ledger-ylabel {
+  /* UI-10 W9: a solid label surface keeps grid/pace dashes out of the glyphs. */
+  background: var(--card);
   position: absolute;
   left: -48px;
   width: 44px;
@@ -247,6 +249,8 @@
   white-space: nowrap;
 }
 [data-park] .park-ledger-note {
+  /* UI-10 W25/W9: retain the opaque surface in the wrapping annotation row. */
+  background: var(--card);
   font-size: 12px;
   font-weight: 800;
   overflow-wrap: anywhere;

@@ -16,7 +16,7 @@ export function normSelector(sel: string): string {
   return sel.replace(/\s+/g, "").replace(/'/g, '"');
 }
 
-export function parseBlocks(css: string): CssBlock[] {
+export function parseBlocks(css: string, normalizeSelectors = true): CssBlock[] {
   const src = stripComments(css);
   const out: CssBlock[] = [];
   let i = 0;
@@ -32,7 +32,7 @@ export function parseBlocks(css: string): CssBlock[] {
       j++;
     }
     out.push({
-      selector: normSelector(head),
+      selector: normalizeSelectors ? normSelector(head) : head,
       atRule: head.startsWith("@"),
       body: src.slice(open + 1, j - 1),
     });
