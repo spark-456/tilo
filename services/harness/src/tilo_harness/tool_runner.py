@@ -43,7 +43,7 @@ from tilo_providers.interfaces import GenerateRequest, GenerateResponse, ModelPr
 from tilo_providers.media import MediaPart, check_parts
 from tilo_providers.prompts import load_prompt
 
-from tilo_harness.deliverable import DeliverableRefused, render_output, wants_pdf
+from tilo_harness.deliverable import DeliverableRefused, render_format, render_output, wants_rendered
 from tilo_harness.outputs import UnitOutput
 from tilo_harness.quiz import SourceLoader, quiz_output, wants_quiz
 from tilo_harness.tools import (
@@ -166,7 +166,9 @@ class ToolUnitRunner:
         holds_effects = not loop.tainted and any(self._tools.is_side_effect(tool) for tool in allowed.values())
         base = load_prompt(
             role,
-            "unit_pdf.md" if wants_pdf(unit, context.brief) else "unit.md",  # LW-10: a PDF deliver unit writes a spec
+            "unit_pdf.md"
+            if wants_rendered(unit, context.brief)
+            else "unit.md",  # LW-10: a PDF deliver unit writes a spec
             {
                 "title": data_line(unit["title"], 120),
                 "unit_type": data_line(unit["unit_type"], 80),
@@ -196,13 +198,19 @@ class ToolUnitRunner:
                 if not response.text:
                     return self._finish(UnitOutcome(False, f"No result for {unit['title']}."), loop, "no_text")
                 try:  # LW-10: a PDF deliver unit's reply is a DeliverableSpec, rendered here; any flaw fails the unit
+                    if (
+                        wants_rendered(unit, context.brief)
+                        and render_format(unit, context.brief) != "pdf"
+                        and self._report_renderer is None
+                    ):
+                        raise DeliverableRefused("render_failed")
                     output = (
                         (
                             await self._report_renderer(response.text)
                             if self._report_renderer is not None
                             else await asyncio.to_thread(render_output, response.text)
                         )
-                        if wants_pdf(unit, context.brief)
+                        if wants_rendered(unit, context.brief)
                         else await asyncio.to_thread(quiz_output, response.text, self._quiz_sources)
                         if wants_quiz(unit, context.brief)
                         else UnitOutput(media_type="text/markdown", content=response.text.encode("utf-8"))

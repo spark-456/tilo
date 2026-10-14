@@ -51,6 +51,22 @@ def wants_pdf(unit: Mapping[str, Any], brief: Mapping[str, Any] | None) -> bool:
     )
 
 
+def render_format(unit: Mapping[str, Any], brief: Mapping[str, Any] | None) -> str | None:
+    """The final writer's requested file format, chosen only from the approved brief."""
+    items = brief.get("deliverables") if isinstance(brief, Mapping) else None
+    first = items[0] if isinstance(items, list) and items else None
+    fmt = first.get("format") if isinstance(first, Mapping) else None
+    return (
+        fmt
+        if unit.get("role") == "writer" and unit.get("unit_type") == "deliver" and fmt in ("pdf", "pptx", "docx")
+        else None
+    )
+
+
+def wants_rendered(unit: Mapping[str, Any], brief: Mapping[str, Any] | None) -> bool:
+    return render_format(unit, brief) is not None
+
+
 def _object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
     keys = [key for key, _ in pairs]
     if len(set(keys)) != len(keys):
