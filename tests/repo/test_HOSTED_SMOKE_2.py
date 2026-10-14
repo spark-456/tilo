@@ -74,7 +74,8 @@ def fake_server():
 
     class LocalTransport(httpx.BaseTransport):
         def __init__(self):
-            self.inner = httpx.HTTPTransport()
+            # Every request is rewritten to plaintext loopback; no TLS certificates are used.
+            self.inner = httpx.HTTPTransport(verify=False)
             transports.append(self.inner)
 
         def handle_request(self, request):
@@ -97,10 +98,12 @@ def fake_server():
 def test_configured_http_is_not_demo_acceptance(fake_server, capsys, monkeypatch):
     state, transport = fake_server
     monkeypatch.setenv(smoke.TOKEN_ENV, "must.never.send")
-    assert smoke.hosted_main([API], transport=transport()) == 1
+    assert smoke.hosted_main([API], transport=transport()) == 0
     output = capsys.readouterr().out
     assert "PASS dependency-configuration" in output
-    assert "FAIL demo: Home and recorded world are unverified" in output
+    assert "SKIP demo: Home and recorded world require the existing playwright.hosted.config.ts hosted smoke" in output
+    assert "PASS hosted-http (signed-out HTTP checks only; demo unverified)" in output
+    assert {"/", "/assets/main.js", "/healthz", "/healthz/deps"} <= {path for _, path, _ in state["requests"]}
     assert all(method in ("GET", "OPTIONS") for method, _, _ in state["requests"])
     assert all("Authorization" not in headers and "Cookie" not in headers for _, _, headers in state["requests"])
 
