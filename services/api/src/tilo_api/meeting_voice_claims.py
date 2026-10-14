@@ -41,10 +41,17 @@ class Hold:
     unit: int
     reserved_at: float
     state: str = "open"  # open | settled | released
+    failure_logged: bool = False
 
     def settle_whole(self) -> None:
         """A reply nobody closed may have reached the model, so the count can only be too high, never too low."""
-        self.guard.settle_unit(self.plan, self.unit)
+        try:
+            self.guard.settle_unit(self.plan, self.unit)
+        except Exception as exc:
+            if not self.failure_logged:  # once per hold: the sweep and the claim's end both retry it
+                self.failure_logged = True
+                logger.warning("meeting voice hold settle failed (%s)", type(exc).__name__)
+            raise
         self.state = "settled"
 
 
@@ -61,6 +68,13 @@ class Claim:
 
     def open_hold(self) -> Hold | None:
         return next((h for h in self.holds.values() if h.state == "open"), None)
+
+    def settle_stale(self, now: float, ttl_s: float) -> None:
+        """MV-17(a): a hold open longer than `ttl_s` (3 x voice.live.timeout_s) is settled at the whole unit, so a bot
+        that died mid-reply does not hold the meeting's Live voice until the claim ends. Callers hold `lock`."""
+        for hold in self.holds.values():
+            if hold.state == "open" and now - hold.reserved_at > ttl_s:
+                hold.settle_whole()
 
 
 class AttendClaims:
