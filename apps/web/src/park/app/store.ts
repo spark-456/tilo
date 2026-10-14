@@ -7,6 +7,7 @@ import { buildHandoffDecisions } from "../api/fixtures/buildHandoff";
 import { needsLeft as countNeedsLeft, makeWorld, worlds } from "../api/fixtures/worlds";
 import { type Api, askQuick, startWithFiles } from "../api/index";
 import { NotBuilt } from "../api/liveApi";
+import { type OneStepApi, type RunPlan, oneStepOf } from "../api/oneStep";
 import type {
   Dec,
   Decision,
@@ -21,6 +22,11 @@ import { TOAST_MS } from "../components/Toast";
 import type { Motion, PageId, Params } from "./AppCtx";
 import { parkPath } from "./router";
 import { openServedCount } from "./servedDecisions";
+
+/** One step of the one-step start: its value, or the plain reason it stopped (`capped`: the lifetime-cap pop-up says it). */
+export type RunStep<T> =
+  | { readonly ok: true; readonly value: T }
+  | { readonly ok: false; readonly message: string; readonly capped: boolean };
 
 /** A live answer that failed in a way the Api did not describe. */
 const NOT_RECORDED = "Tilo could not record that answer. Nothing was sent.";
@@ -109,6 +115,14 @@ export interface ParkStore {
    * the page shows the outcome. `mode` is only the size on screen. A second call while one is in flight shares it.
    */
   askQuick(mode: TierKey, query: string): Promise<QuickOutcome>;
+  /**
+   * SIMPLE-RUN-1: the one-step start (live only; false on a fixture Api). `prepareRun` makes the intake, skips every
+   * question and prices the recommended approach; `startRun` is the person's Start, the approval of that plan's cap.
+   */
+  readonly oneStep: boolean;
+  prepareRun(text: string, files?: readonly File[]): Promise<RunStep<RunPlan>>;
+  reviseRun(plan: RunPlan, field: string, answer: string): Promise<RunStep<RunPlan>>;
+  startRun(plan: RunPlan): Promise<RunStep<string>>;
   toast(message: string, actionLabel?: string, action?: () => void): void;
   dismissToast(): void;
   dismissLifetimeCap(): void;
@@ -220,6 +234,30 @@ export function createParkStore({ api, navigate, schedule, demo }: ParkStoreDeps
     state = next;
     for (const l of [...listeners]) l();
   };
+  // One call of the one-step start; a refusal becomes its plain reason, and one in flight is never doubled.
+  let stepping = false;
+  const runStep = async <T>(call: (one: OneStepApi) => Promise<T>): Promise<RunStep<T>> => {
+    const one = oneStepOf(api);
+    if (one === null) return { ok: false, message: NOT_CONNECTED, capped: false };
+    if (stepping)
+      return { ok: false, message: "Tilo is still working on the last step.", capped: false };
+    stepping = true;
+    try {
+      return { ok: true, value: await call(one) };
+    } catch (e) {
+      if (isLifetimeCap(e)) {
+        set({ ...state, lifetimeCap: true });
+        return { ok: false, message: "", capped: true };
+      }
+      return {
+        ok: false,
+        message: e instanceof TiloApiError ? e.message : NOT_STARTED,
+        capped: false,
+      };
+    } finally {
+      stepping = false;
+    }
+  };
   // A call to the api is best effort here: the screen state is the source of truth until the live
   // endpoints exist, and a rejection must never reach the page.
   const quiet = (call: Promise<unknown>): void => {
@@ -329,14 +367,9 @@ export function createParkStore({ api, navigate, schedule, demo }: ParkStoreDeps
           const { world } = data;
           update({
             added: [world, ...state.added],
-            toast: arm(
-              `“${world.short}” was sent to Tilo. Open it to review the brief.`,
-              "Open",
-              () => {
-                dismissToast();
-                navigate(`/task/${encodeURIComponent(world.id)}/understanding`);
-              },
-            ),
+            // The old Understanding screen is retired (SIMPLE-RUN-1): nothing offers it. Home's one-step flow is the
+            // live start; this path only answers an Api that has no `oneStep`.
+            toast: arm(`“${world.short}” was sent to Tilo.`),
           });
           return true;
         },
@@ -358,6 +391,10 @@ export function createParkStore({ api, navigate, schedule, demo }: ParkStoreDeps
       );
       return starting;
     },
+    oneStep: oneStepOf(api) !== null,
+    prepareRun: (text, files) => runStep((one) => one.prepare(text, files ?? [])),
+    reviseRun: (plan, field, answer) => runStep((one) => one.revise(plan.taskId, field, answer)),
+    startRun: (plan) => runStep((one) => one.start(plan)),
     askQuick(mode, query) {
       if (asking) return asking;
       asking = askQuick(api, mode, query).then(

@@ -22,3 +22,11 @@ const KEPT: readonly RegExp[] = [
 
 /** True when the old app owns this address (`window.location.pathname`). */
 export const isKeptPath = (pathname: string): boolean => KEPT.some((re) => re.test(pathname));
+
+/**
+ * SIMPLE-RUN-1: the old Understanding and Approaches screens are retired from the user's path (Park Home starts a run
+ * in one step). On a deployment (Root checks that an API is configured) a stale link or bookmark to one goes to Home
+ * instead of the old screens; a fixture or dev build keeps them for its own tests.
+ */
+export const isRetiredFlowPath = (pathname: string): boolean =>
+  /^\/task\/[^/]+\/(?:understanding|approaches)\/?$/.test(pathname);

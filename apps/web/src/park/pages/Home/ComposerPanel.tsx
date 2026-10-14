@@ -4,10 +4,11 @@
 import type { Effort, QuickCost, SwitchReason } from "../../api/types";
 import { type SegmentOption, SegmentedControl } from "../../components";
 import { type IntakeClient, IntakeControl } from "./IntakeControl";
+import { RunCard, type RunCardProps } from "./RunCard";
 import type { Staging } from "./StagedFiles";
 import { EFFORTS, type Mode, SWITCH_WORDS, quickCostLine } from "./homeData";
 
-export type Phase = "idle" | "drafting" | "plan";
+export type Phase = "idle" | "drafting" | "plan" | "ready";
 
 /** What the Quick part of the composer shows (COST-FAST-1). A Quick ask makes no world and no plan. */
 export type QuickView =
@@ -15,7 +16,7 @@ export type QuickView =
   | { state: "asking" }
   | { state: "answered"; text: string; cost: QuickCost | null; sample: boolean }
   | { state: "switch"; reason: SwitchReason }
-  | { state: "error"; message: string };
+  | { state: "error"; message: string; retry?: () => void };
 
 export const QUICK_IDLE: QuickView = { state: "idle" };
 
@@ -43,6 +44,16 @@ function QuickCard({
     return (
       <div role="alert" className="park-home-quick park-home-quick--note">
         <span>{view.message}</span>
+        {view.retry ? (
+          <button
+            type="button"
+            className="park-home-change"
+            disabled={sending}
+            onClick={view.retry}
+          >
+            Try again
+          </button>
+        ) : null}
       </div>
     );
   }
@@ -105,6 +116,8 @@ export interface ComposerProps {
   readonly onDraft: () => void;
   readonly onConfirm: () => void;
   readonly onChange: () => void;
+  /** SIMPLE-RUN-1: the one confirm card, shown in the "ready" phase in place of the example plan. */
+  readonly run?: RunCardProps | undefined;
 }
 
 export function ComposerPanel(p: ComposerProps) {
@@ -145,6 +158,7 @@ export function ComposerPanel(p: ComposerProps) {
             : `Tilo is drafting a ${mode.word} for “${p.shown}”`}
         </div>
       ) : null}
+      {phase === "ready" && p.run ? <RunCard {...p.run} /> : null}
       {phase === "plan" ? (
         <div className="park-home-plan">
           <div className="park-home-plan__main">

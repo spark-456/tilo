@@ -12,7 +12,7 @@ import { API_URL, appCheckToken, authToken } from "./api/ClientProvider";
 import { HttpClient } from "./api/http";
 import { SignInGate } from "./auth/SignInGate";
 import { session } from "./auth/session";
-import { isKeptPath } from "./keptPaths";
+import { isKeptPath, isRetiredFlowPath } from "./keptPaths";
 import { legalKind } from "./legal/legalPaths";
 import { takeCallbackParams } from "./oauth/capture";
 import { isOAuthCallback } from "./oauth/paths";
@@ -58,6 +58,15 @@ export function Root() {
   useEffect(() => {
     if (park && !legal && oauth === undefined) void import("./onboarding/register");
   }, [park, legal, oauth]);
+  // SIMPLE-RUN-1: a retired flow address is replaced by Home before either app renders.
+  // Only where an API is configured (a deployment): a fixture or dev build keeps the old screens for its own tests.
+  const retired = Boolean(API_URL?.trim()) && isRetiredFlowPath(pathname);
+  useEffect(() => {
+    if (!retired) return;
+    window.history.replaceState({}, "", "/");
+    window.dispatchEvent(new PopStateEvent("popstate"));
+  }, [retired]);
+  if (retired) return null;
   if (oauth !== undefined) {
     return (
       <Suspense fallback={null}>

@@ -4,6 +4,7 @@
 // is not built shows "Not connected yet", never sample values. The composer's 900 ms goes through the
 // provider's `useSchedule`, so a test never waits and a pending draft is cancelled when the page goes.
 import { useEffect, useRef, useState } from "react";
+import type { RunPlan } from "../../api/oneStep";
 import type {
   AgendaData,
   ApiResult,
@@ -148,9 +149,15 @@ export function HomePage({ app }: { app: AppCtx }) {
     },
     [],
   );
+  // SIMPLE-RUN-1: the one confirm card (live only): the priced plan, a call in flight on it, and why the last step stopped.
+  const [run, setRun] = useState<RunPlan | null>(null);
+  const [runBusy, setRunBusy] = useState(false);
+  const [runError, setRunError] = useState<string | null>(null);
   const toIdle = () => {
     cancelDraft();
     settle("idle");
+    setRun(null);
+    setRunError(null);
   };
   const draft = () => {
     if (phaseNow.current !== "idle") return;
@@ -200,6 +207,63 @@ export function HomePage({ app }: { app: AppCtx }) {
       setQuery("");
       setFiles([]);
       toIdle();
+    });
+  };
+  // SIMPLE-RUN-1: Start on a live Thinking task goes straight to the real calls (intake, every question skipped,
+  // pricing) and lands on the one confirm card; there is no example plan and no other screen in between.
+  const oneStepLive = () => !demo && store.getState().sources.live && store.oneStep;
+  const prepare = () => {
+    if (sendingNow.current || asking.current || phaseNow.current === "ready") return;
+    const text = query.trim();
+    if (text === "") {
+      store.toast("Describe your task first, then press Start.");
+      return;
+    }
+    cancelDraft();
+    sendingNow.current = true;
+    setSending(true);
+    setQuick(QUICK_IDLE);
+    settle("drafting");
+    store.prepareRun(text, files).then((r) => {
+      sendingNow.current = false;
+      if (!alive.current) return;
+      setSending(false);
+      if (r.ok) {
+        setFiles([]); // the intake took them: a second Start must not upload them again
+        setRun(r.value);
+        settle("ready");
+        return;
+      }
+      settle("idle");
+      if (!r.capped) setQuick({ state: "error", message: r.message, retry: prepare });
+    });
+  };
+  const startRun = () => {
+    if (run === null || runBusy) return;
+    setRunBusy(true);
+    setRunError(null);
+    store.startRun(run).then((r) => {
+      if (!alive.current) return;
+      setRunBusy(false);
+      if (!r.ok) {
+        if (!r.capped) setRunError(r.message);
+        return;
+      }
+      setQuery("");
+      setFiles([]);
+      toIdle();
+      go("world", { id: r.value });
+    });
+  };
+  const reviseRun = (field: string, answer: string) => {
+    if (run === null || runBusy) return;
+    setRunBusy(true);
+    setRunError(null);
+    store.reviseRun(run, field, answer).then((r) => {
+      if (!alive.current) return;
+      setRunBusy(false);
+      if (r.ok) setRun(r.value);
+      else if (!r.capped) setRunError(r.message);
     });
   };
   const idleUnlessSending = () => {
@@ -269,7 +333,8 @@ export function HomePage({ app }: { app: AppCtx }) {
     setEffort("thinking");
     writeEffort(email, "thinking");
     setQuick(QUICK_IDLE);
-    confirmStart();
+    if (oneStepLive()) prepare();
+    else confirmStart();
   };
 
   const open = (id: string) => go("world", { id });
@@ -388,7 +453,19 @@ export function HomePage({ app }: { app: AppCtx }) {
             setQuick(QUICK_IDLE);
             toIdle();
           }}
-          onDraft={effort === "quick" ? ask : draft}
+          onDraft={effort === "quick" ? ask : oneStepLive() ? prepare : draft}
+          run={
+            run === null
+              ? undefined
+              : {
+                  plan: run,
+                  busy: runBusy,
+                  error: runError,
+                  onStart: startRun,
+                  onCancel: toIdle,
+                  onEdit: reviseRun,
+                }
+          }
           onConfirm={confirmStart}
           onChange={idleUnlessSending}
         />

@@ -5,12 +5,20 @@
 import { act } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, q } from "../../../../test-support/park/componentsHarness";
-import { clickEl, mountHome, settle } from "../../../../test-support/park/homeHarness";
+import { MODES } from "../../../../test-support/park/homeCopy";
 import {
-  confirm,
+  clickEl,
+  control,
+  hasControl,
+  mountHome,
+  settle,
+  taskInput,
+  typeInto,
+} from "../../../../test-support/park/homeHarness";
+import {
+  type LiveRig,
   mountLiveHome,
   pickSize,
-  toPlan,
 } from "../../../../test-support/park/liveHomeHarness";
 import { BRIEF_SUPPLIER_COMPARISON } from "../../../api/fixtures/brief";
 import type { Api } from "../../api/index";
@@ -30,18 +38,54 @@ const INTAKE = {
   questions: [],
   files: [{ filename: "quote.pdf", status: "ok", safety_flagged: false }],
 };
+/** SIMPLE-RUN-1: Start on a live Thinking task goes straight to the one POST /intake. */
+async function startTask(rig: LiveRig, text: string): Promise<void> {
+  typeInto(taskInput(rig.el), text);
+  clickEl(control(rig.el, MODES.map((m) => m.start).find((l) => hasControl(rig.el, l)) ?? ""));
+  await settle();
+}
 const NOT_SET_UP = "Uploads need setup; the owner has not finished it.";
 
 function live() {
   const fetchSpy = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
     const path = String(url).replace(BASE, "");
     if (init?.method === "POST" && path === "/intake") return json(INTAKE);
+    if (init?.method === "POST" && path === "/tasks/t_up1/answers")
+      return json({ brief: BRIEF_SUPPLIER_COMPARISON });
+    if (path === "/tasks/t_up1/approaches")
+      return json({
+        task_id: "t_up1",
+        approaches: [
+          {
+            id: "a1",
+            label: "Balanced",
+            summary: "s",
+            dimensions: {
+              depth: "standard",
+              sources: "web",
+              parallelism: "single",
+              verification: "light",
+              output_format: "document",
+            },
+            time: { min_s: 60, max_s: 120 },
+            credits: { min: 4, max: 9 },
+            risks: [],
+            skips: [],
+          },
+        ],
+        recommended: "a1",
+        credit_usd: 0.05,
+      });
     if (path.startsWith("/worlds")) return json({ worlds: [], next_cursor: null });
     if (path.startsWith("/cards")) return json({ cards: [], next_cursor: null });
     return json({ detail: "Not Found" }, 404);
   });
   const api: Api = createLiveApi({ baseUrl: BASE, fetch: fetchSpy as unknown as typeof fetch });
-  const posts = () => fetchSpy.mock.calls.filter(([, init]) => init?.method === "POST");
+  // the one POST /intake; the one-step start's later calls (answers, approve) are not the upload's
+  const posts = () =>
+    fetchSpy.mock.calls.filter(
+      ([url, init]) => init?.method === "POST" && String(url).endsWith("/intake"),
+    );
   return { api, posts };
 }
 
@@ -83,8 +127,7 @@ describe("WEB-W1 composer uploads", () => {
     expect(fileButton(rig.el).getAttribute("aria-disabled")).not.toBe("true");
     attach(rig.el, [pdf()]);
     expect(rig.el.textContent).toContain("quote.pdf");
-    await toPlan(rig, "Compare these quotes");
-    await confirm(rig);
+    await startTask(rig, "Compare these quotes");
     expect(posts()).toHaveLength(1);
     const form = posts()[0]?.[1]?.body as FormData;
     expect(form.get("text")).toBe("Compare these quotes");
@@ -111,8 +154,7 @@ describe("WEB-W1 composer uploads", () => {
       "run.exe is not accepted; attach PDF, DOCX, PPTX, XLSX, CSV, PNG or JPG files.",
     );
     expect(rig.el.querySelector('[aria-label="Remove run.exe"]')).toBeNull();
-    await toPlan(rig, "Compare these quotes");
-    await confirm(rig);
+    await startTask(rig, "Compare these quotes");
     const form = posts()[0]?.[1]?.body as FormData;
     expect(form.getAll("files")).toHaveLength(0);
   });

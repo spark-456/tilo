@@ -52,7 +52,7 @@ export function RoutinesPanel({ client }: { client: RoutinesClient }) {
       <p>
         To create a routine, start a world and choose Repeat weekly when approving its approach.
       </p>
-      <a href="/start">Create a routine</a>
+      <a href="/">Create a routine</a>
       {error ? (
         <>
           <p role="alert">{error}</p>

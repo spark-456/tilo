@@ -5,6 +5,7 @@ import type { Api } from "./index";
 // pieces that are positional (the Agenda's week, the Ledger's month). Pure: the caller hands in today as a calendar
 // date (the app reads its clock in app/context.tsx; this layer reads none), so a test passes any day it likes and a
 // fixture Api with no clock stays exactly as written. Only results whose `source` is "fixture" are changed.
+import { carryOneStep } from "./oneStep";
 import { carryQuizReader } from "./quizApps";
 import type { Agenda, ApiResult, Ledger, Source } from "./types";
 
@@ -285,5 +286,5 @@ export function withToday(api: Api, today: () => CivilDate): Api {
         ),
     ]),
   );
-  return carryQuizReader(api, wrapped as unknown as Api);
+  return carryOneStep(api, carryQuizReader(api, wrapped as unknown as Api));
 }

@@ -3,7 +3,7 @@
 // concrete `path` and `pattern` example in screens/meta.ts and the flow routes is kept; S-01's `/` is the Park
 // Home now, so it is not.
 import { describe, expect, it } from "vitest";
-import { isKeptPath } from "./keptPaths";
+import { isKeptPath, isRetiredFlowPath } from "./keptPaths";
 import { matchFlowRoute } from "./router";
 import { SCREENS } from "./screens/meta";
 
@@ -106,4 +106,20 @@ describe("WEB_CUTOVER_kept_paths: the addresses the old app owns", () => {
   ])("WEB_CUTOVER_kept_paths_%j_is_not_kept", (path) => {
     expect(isKeptPath(path)).toBe(false);
   });
+});
+
+describe("SIMPLE_RUN_1_retired_flow_paths: the old Understanding and Approaches addresses", () => {
+  it.each(["/task/t1/understanding", "/task/t1/approaches", "/task/t1/approaches/"])(
+    "SIMPLE_RUN_1_%s_is_retired",
+    (path) => {
+      expect(isRetiredFlowPath(path)).toBe(true);
+    },
+  );
+
+  it.each(["/start", "/world/w/stage", "/task/t1", "/task/t1/other", "/worlds"])(
+    "SIMPLE_RUN_1_%s_is_not_retired",
+    (path) => {
+      expect(isRetiredFlowPath(path)).toBe(false);
+    },
+  );
 });
