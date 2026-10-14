@@ -134,16 +134,22 @@ describe("RERUN_1 Start it again", () => {
     },
   );
 
-  it("RERUN_1_other_stops_and_running_worlds_offer_nothing", async () => {
+  it("RERUN_1_another_stop_shows_its_own_recorded_reason_and_a_running_or_finished_world_offers_nothing", async () => {
+    // WORLD-USEFUL: any stop shows the reason the run recorded; "Tilo restarted" is said only of a restart stop.
     const other = [
       ev(1, "world.started"),
       ev(2, "world.failed", { reason: "an internal error stopped the work", unit: null }),
     ];
-    for (const events of [
-      other,
-      [ev(1, "world.started")],
-      [...STOPPED, ev(4, "world.completed", {})],
-    ]) {
+    const stopped = await mountWorld({
+      id: "hires",
+      api: liveWorldsApi(),
+      client: clientWith(other),
+    });
+    expect(pageText(stopped.el)).toContain("Why: an internal error stopped the work");
+    expect(pageText(stopped.el)).not.toContain("Tilo restarted while this was running");
+    expect(hasControl(stopped.el, "Start it again")).toBe(true);
+    cleanup();
+    for (const events of [[ev(1, "world.started")], [...STOPPED, ev(4, "world.completed", {})]]) {
       const rig = await mountWorld({
         id: "hires",
         api: liveWorldsApi(),

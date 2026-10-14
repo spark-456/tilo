@@ -144,18 +144,23 @@ test.describe("@cp2 E2E-ONESTEP the whole journey", () => {
       },
     );
 
-    await step(page, "result: Open result downloads the run's output", async () => {
+    await step(page, "result: the output is readable on the page, Open and Download work", async () => {
+      // WORLD-USEFUL: the page reads the delivered output itself as soon as the run is recorded as done
+      const read = page.waitForResponse((r) => r.url().includes(`/worlds/${worldId}/result`), {
+        timeout: 30_000,
+      });
       await page.goto(`/world/${worldId}`);
+      expect((await read).status(), "GET /worlds/{id}/result").toBe(200);
+      await expect(page.getByTestId("run-status")).toContainText("Done");
+      await expect(page.getByTestId("result-text")).toBeVisible({ timeout: 30_000 });
       const open = page.getByRole("button", { name: "Open result" });
-      await expect(open).toBeVisible({ timeout: 30_000 });
+      await expect(open).toBeVisible();
       await expect(open).not.toHaveAttribute("aria-disabled", "true");
-      const [answer] = await Promise.all([
-        page.waitForResponse((r) => r.url().includes(`/worlds/${worldId}/result`), {
-          timeout: 20_000,
-        }),
-        open.click(),
+      const [download] = await Promise.all([
+        page.waitForEvent("download", { timeout: 20_000 }),
+        page.getByRole("button", { name: "Download", exact: true }).click(),
       ]);
-      expect(answer.status(), "GET /worlds/{id}/result").toBe(200);
+      expect(download.suggestedFilename()).toMatch(/^tilo-result-/);
     });
 
     for (const [name, path, heading] of [

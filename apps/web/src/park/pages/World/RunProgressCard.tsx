@@ -1,63 +1,9 @@
 // UI-10 B8: the live run of a real world, read from its recorded events (GET /worlds/{id}/events, polled by the
 // client). With no event yet it says so; it never fills in a status, an agent or a step that no event recorded.
-import { useState } from "react";
-import { Button } from "../../components";
-import { isRestartStop, restartApproval, runProgress } from "./runProgress";
+import { runProgress } from "./runProgress";
 import type { RunEvent } from "./useRunEvents";
 
-/** What the card needs to start a stopped run again: the one call, and where the new world is opened. */
-export interface StartAgain {
-  readonly start: () => Promise<{ readonly worldId: string }>;
-  readonly open: (worldId: string) => void;
-}
-
-/** RERUN-1: the one honest action for a world a restart stopped. A failure says so and leaves the button for another try. */
-function StartItAgain({ again, events }: { again: StartAgain; events: readonly RunEvent[] }) {
-  const { cap, sent } = restartApproval(events);
-  const [state, setState] = useState<"idle" | "busy" | "error">("idle");
-  const press = (): void => {
-    if (state === "busy" || cap === null) return;
-    setState("busy");
-    again.start().then(
-      (r) => again.open(r.worldId),
-      () => setState("error"),
-    );
-  };
-  return (
-    <div className="park-world-restart" data-testid="start-it-again">
-      <p className="park-world-noruns">Tilo restarted while this was running, so it stopped.</p>
-      <p className="park-world-noruns">
-        {sent > 0
-          ? `The stopped run already sent things outside Tilo (${sent} recorded outbound ${sent === 1 ? "action" : "actions"}). Starting again may send them again.`
-          : "No outbound sends are recorded for the stopped run. This does not confirm that nothing was sent."}
-      </p>
-      <p className="park-world-noruns">
-        {cap === null
-          ? "The spending cap is not available in the recorded events. Starting again is unavailable."
-          : `Starting again approves a new run with a spending cap of ${cap} credits, in addition to any credits already used by the stopped run.`}
-      </p>
-      <Button
-        variant="primary"
-        onClick={press}
-        disabled={cap === null || state === "busy"}
-        aria-busy={state === "busy"}
-      >
-        {state === "busy" ? "Starting…" : "Start it again"}
-      </Button>
-      {state === "error" ? (
-        <p className="park-world-noruns" role="alert">
-          It could not be started just now. Nothing was started and nothing was charged. Try again
-          in a minute.
-        </p>
-      ) : null}
-    </div>
-  );
-}
-
-export function RunProgressCard({
-  events,
-  again,
-}: { events: readonly RunEvent[]; again?: StartAgain | undefined }) {
+export function RunProgressCard({ events }: { events: readonly RunEvent[] }) {
   if (events.length === 0) {
     return (
       <section aria-label="Live run" className="park-world-section">
@@ -95,7 +41,6 @@ export function RunProgressCard({
           </div>
         ))}
       </div>
-      {again && isRestartStop(events) ? <StartItAgain again={again} events={events} /> : null}
       <ol className="park-world-teamlist" aria-label="Latest steps">
         {p.steps.map((s) => (
           <li key={s.seq}>

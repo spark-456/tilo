@@ -1126,3 +1126,143 @@
   color: var(--ink2);
   overflow-wrap: anywhere;
 }
+
+/* ---- WORLD-USEFUL: the run status banner, assumption chips, failure and readable result ---- */
+[data-park] .park-world-runstatus {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+  margin: 0 0 18px;
+  padding: 16px 20px;
+  border: 1px solid var(--line2);
+  border-radius: 22px;
+  background: var(--card);
+}
+[data-park] .park-world-runstatus[data-phase="failed"] {
+  border-color: var(--amber);
+}
+[data-park] .park-world-runline {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 800;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+[data-park] .park-world-runline {
+  display: block;
+}
+[data-park] .park-world-progress {
+  appearance: none;
+  -webkit-appearance: none;
+  display: block;
+  width: 100%;
+  height: 6px;
+  border: 0;
+  border-radius: 99px;
+  background: var(--track);
+  overflow: hidden;
+}
+[data-park] .park-world-progress::-webkit-progress-bar {
+  background: var(--track);
+}
+[data-park] .park-world-progress::-webkit-progress-value {
+  background: var(--run);
+  border-radius: 99px;
+}
+[data-park] .park-world-progress::-moz-progress-bar {
+  background: var(--run);
+  border-radius: 99px;
+}
+[data-park] .park-world-runstatus[data-phase="done"] .park-world-progress::-webkit-progress-value {
+  background: var(--ok);
+}
+[data-park] .park-world-runstatus[data-phase="done"] .park-world-progress::-moz-progress-bar {
+  background: var(--ok);
+}
+[data-park] .park-world-assumed {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+[data-park] .park-world-assumedchip {
+  min-height: 28px;
+  padding: 4px 12px;
+  border-radius: 99px;
+  background: var(--chip);
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+[data-park] .park-world-failed {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+[data-park] .park-world-failreason {
+  margin: 0;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: var(--amberTile);
+  color: var(--amberInk);
+  font-size: 15px;
+  font-weight: 800;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+[data-park] .park-world-resulttext {
+  max-height: 560px;
+  overflow: auto;
+  margin: 8px 4px 12px;
+  padding: 16px 18px;
+  border-radius: 14px;
+  background: var(--sunk);
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+[data-park] .park-world-resulttext h3,
+[data-park] .park-world-resulttext h4,
+[data-park] .park-world-resulttext h5,
+[data-park] .park-world-resulttext h6 {
+  margin: 14px 0 6px;
+  font-size: 16px;
+  font-weight: 800;
+}
+[data-park] .park-world-resulttext p,
+[data-park] .park-world-resulttext ul,
+[data-park] .park-world-resulttext ol {
+  margin: 0 0 10px;
+}
+[data-park] .park-world-resulttext ul,
+[data-park] .park-world-resulttext ol {
+  padding-left: 22px;
+}
+[data-park] .park-world-resulttext table {
+  border-collapse: collapse;
+  margin: 0 0 10px;
+  font-size: 14px;
+}
+[data-park] .park-world-resulttext th,
+[data-park] .park-world-resulttext td {
+  padding: 6px 10px;
+  border: 1px solid var(--line2);
+  text-align: left;
+  vertical-align: top;
+}
+[data-park] .park-world-resulttext pre,
+[data-park] .park-world-resultpre {
+  margin: 0 0 10px;
+  white-space: pre-wrap;
+  font-family: inherit;
+}
+[data-park] .park-world-resulttext a {
+  color: var(--heroInk);
+  text-decoration: underline;
+}

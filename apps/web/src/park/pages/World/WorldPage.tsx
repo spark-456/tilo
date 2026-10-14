@@ -40,17 +40,20 @@ import { Activity, Districts, Result, RunHistory } from "./Lower";
 import { MeetingHall } from "./MeetingHall";
 import { RecordedWorldArt } from "./RecordedWorldArt";
 import { RunProgressCard } from "./RunProgressCard";
+import { RunStatus } from "./RunStatus";
 import { ShareLine } from "./ShareLine";
 import { FactsCard, GoLink, LovableCard, SpendCard, WaitingCard } from "./Side";
 import { SkillProposals } from "./SkillProposals";
 import { ShareWithTeam } from "./TeamShare";
 import { MissingWorld, TeamItems, TeamWorld } from "./TeamWorld";
 import { runProgress } from "./runProgress";
+import { runView } from "./runView";
 import { useRunEvents } from "./useRunEvents";
 import "./World.css";
 import { cityArt, rowArt, singleArt } from "./worldArt";
 import {
   LEGEND,
+  STOPPED,
   agentsWord,
   canPause,
   decisionsWord,
@@ -59,6 +62,7 @@ import {
   metaLine,
   skillsAndTools,
   stateLook,
+  withRunState,
 } from "./worldModel";
 
 interface Loaded {
@@ -301,7 +305,10 @@ export function WorldPage({ app }: { app: AppCtx }) {
     );
   }
 
-  const w = world;
+  // WORLD-USEFUL: for a real run the recorded events say what state it is in, not the list read at page open.
+  const trackRun = runId !== null && runId === world.id;
+  const view = trackRun && runEvents.length > 0 ? runView(runEvents) : null;
+  const w = view ? withRunState(world, view, runProgress(runEvents).agents) : world;
   const isCity = w.tier === "City";
   const isTown = w.tier === "Town";
   // Live run navigation follows the recorded run, regardless of the world's size.
@@ -311,7 +318,7 @@ export function WorldPage({ app }: { app: AppCtx }) {
   const slackPending = slackPendingByWorld[w.id] ?? null;
   const handoff = loaded.handoffs.find((h) => h.world === w.id) ?? null;
   const open = mine.filter((d) => !dec[d.k]).length + (slackPending ? 1 : 0);
-  const look = stateLook(w, isPaused);
+  const look = view?.phase === "failed" ? STOPPED : stateLook(w, isPaused);
   const { skills, tools } = skillsAndTools(w, loaded.skills, loaded.connectors);
   const slackState = slackConnectorState(loaded.connectors);
   const wide = (app.vw || 1440) >= 1060;
@@ -319,7 +326,6 @@ export function WorldPage({ app }: { app: AppCtx }) {
   // A world has a stage only when its data came from the live API; a world started on this page is local state.
   const startedHere = added.some((a) => a.id === w.id);
   // UI-10 B8: for a real run the stage and its lenses open only once the run has recorded an event.
-  const trackRun = runId !== null && runId === w.id;
   const hasStage = loaded.live && !startedHere && (!trackRun || runEvents.length > 0);
   const noStage = trackRun ? NO_RUN_YET : NO_STAGE;
   const stage = (to: string): string | null => (hasStage ? to : null);
@@ -489,6 +495,23 @@ export function WorldPage({ app }: { app: AppCtx }) {
         </div>
       </div>
 
+      {trackRun && worldClient ? (
+        <RunStatus
+          view={view ?? runView([])}
+          events={runEvents}
+          api={api}
+          worldId={w.id}
+          {...(loaded.live && !w.sample
+            ? {
+                again: {
+                  start: () => worldClient.startAgain(w.id).then((r) => ({ worldId: r.world_id })),
+                  open: (id: string) => app.go("world", { id }),
+                  newTask: () => app.go("home"),
+                },
+              }
+            : {})}
+        />
+      ) : null}
       {loaded.live && worldClient ? <SkillProposals client={worldClient} worldId={w.id} /> : null}
       {loaded.live && worldClient && !w.sample ? (
         <TeamItems client={worldClient} worldId={w.id} auto={false} />
@@ -685,20 +708,7 @@ export function WorldPage({ app }: { app: AppCtx }) {
       ) : null}
       {part(3) ? (
         <div className="park-world-lower">
-          {trackRun ? (
-            <RunProgressCard
-              events={runEvents}
-              {...(worldClient && loaded.live && !w.sample
-                ? {
-                    again: {
-                      start: () =>
-                        worldClient.startAgain(w.id).then((r) => ({ worldId: r.world_id })),
-                      open: (id: string) => app.go("world", { id }),
-                    },
-                  }
-                : {})}
-            />
-          ) : null}
+          {trackRun ? <RunProgressCard events={runEvents} /> : null}
           {isCity ? <Districts districts={w.districts ?? []} /> : null}
           {isTown ? (
             <RunHistory
@@ -708,7 +718,7 @@ export function WorldPage({ app }: { app: AppCtx }) {
               {...(real ? { runNowOff: RUN_OFF } : {})}
             />
           ) : null}
-          {!isCity && !isTown ? (
+          {!isCity && !isTown && !trackRun ? (
             <Result
               w={w}
               recorded={recorded}
