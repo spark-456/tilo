@@ -14,12 +14,13 @@ Three ways to get audio, none of them silent:
   imported lazily.
 Spend (SEC-16): a live reply is one unit on the process's ledger, through the `LiveVoiceMeter` the process supplies. No
 meter means no live factory (a code gate: `NotConfigured`, and `voice.build_voice_provider` builds Chirp instead). The
-meter reserves BEFORE any session opens (a refusal or an unreadable ledger raises `NotConfigured`; the provider is never
-reached), settles once with the usage that reply knows, and releases only a hold the text never reached (the session
-did not open or the send failed). The call is reached as soon as `send_client_content` succeeds: input tokens are
-billable even if no reply arrives, so a failure, a timeout or a cancel after the send settles (usage maybe empty: the
-meter then charges its whole reserve, an upper bound of the input estimate), it never releases the hold unpaid. Usage
-lives in the call, never on the instance, so concurrent replies cannot mix.
+meter reserves BEFORE any session opens (a refusal or an unreadable ledger raises `NotConfigured`, as `LiveVoiceRefused`
+with `transient` set for a blip the next reply may retry, bounded by `voice.live.max_consecutive_refusals`, BQ-M2-12;
+the provider is never reached), settles once with the usage that reply knows, and releases only a hold the text never
+reached (the session did not open or the send failed). The call is reached as soon as `send_client_content` succeeds:
+input tokens are billable even if no reply arrives, so a failure, a timeout or a cancel after the send settles (usage
+maybe empty: the meter then charges its whole reserve, an upper bound of the input estimate), it never releases the
+hold unpaid. Usage lives in the call, never on the instance, so concurrent replies cannot mix.
 Nothing is recorded: audio of a meeting reply is not kept."""
 
 from __future__ import annotations
@@ -31,6 +32,7 @@ import hashlib
 import json
 import logging
 import os
+import threading
 import time
 from collections.abc import AsyncGenerator, Callable, Iterator
 from contextlib import AbstractAsyncContextManager, asynccontextmanager
@@ -38,16 +40,26 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from tilo_providers.errors import NotConfigured, ProviderError, RequestError, map_http_status, map_transport_error
+from tilo_providers.errors import (
+    LiveVoiceRefused,
+    NotConfigured,
+    ProviderError,
+    RequestError,
+    map_http_status,
+    map_transport_error,
+)
 from tilo_providers.google_adapter import _GOOGLE_SECRET_RE, validate_google_settings
 from tilo_providers.interfaces import SpeechProvider
 from tilo_providers.prompts import load_prompt
 from tilo_providers.replay import is_live_mode
 from tilo_providers.speech import VoiceTiming, check_synth_request
-from tilo_providers.voice import LiveVoiceMeter, VoiceConfig
+from tilo_providers.voice import REFUSAL_REASONS, TRANSIENT_REFUSALS, LiveVoiceMeter, VoiceConfig
 
 log = logging.getLogger("tilo_providers.voice")
 RECORDINGS_DIR = "voice-live-recordings"
+_STOPPED = (
+    "SEC-16: the Live voice is off for the rest of this meeting after its spend meter refused; the local voice speaks"
+)
 _USAGE_FIELDS = ("prompt_token_count", "response_token_count", "total_token_count")
 
 
@@ -124,6 +136,8 @@ class GeminiLiveVoiceProvider(SpeechProvider):
         self._config, self._live = config, config.live
         self._dir = Path(fixtures_dir) / RECORDINGS_DIR if fixtures_dir is not None else None
         self._factory, self._clock, self._on_timing, self._meter = session_factory, clock, on_timing, meter
+        self._lock = threading.Lock()  # BQ-M2-12: a run of refusals in a row, and the word that stopped the voice
+        self._run, self._stopped = 0, ""
         self.last_timing: VoiceTiming | None = None
 
     def redact(self, payload: str) -> str:
@@ -298,16 +312,41 @@ class GeminiLiveVoiceProvider(SpeechProvider):
 
     # -- spend (SEC-16, BQ-M2-1) --------------------------------------------------------------------------------------
     def _reserve(self, meter: LiveVoiceMeter, call: _LiveCall) -> None:
+        with self._lock:
+            if self._stopped:  # BQ-M2-12: a run of transients (or a permanent word) ended it: the meter is not asked
+                raise LiveVoiceRefused(_STOPPED, reason=self._stopped, transient=False)
+        word: str | None = None
         try:
             hold = meter.reserve()
+            word = getattr(meter, "last_refusal", None) if hold is None else None
         except Exception as error:  # an unreadable ledger is a refusal; the error text (a ledger's) is never kept
             log.warning("live voice refused, the spend check failed (%s)", type(error).__name__)
             hold = None
         if hold is None:
-            raise NotConfigured(
-                "SEC-16: the spend ledger gave no reservation for the Live voice; the local voice speaks"
-            )
+            raise self._refusal(word if isinstance(word, str) and word in REFUSAL_REASONS else "unknown")
+        with self._lock:
+            self._run = 0  # a good reserve ends a run of transient refusals
         call.hold = hold
+
+    def _refusal(self, reason: str) -> LiveVoiceRefused:
+        """BQ-M2-12: the refusal of one reply. A transient word is retried by the next reply, `max_consecutive_refusals`
+        times in a row at most: the last of the run, and any permanent or unknown word, stops the Live voice for this
+        provider's lifetime (the meeting). The text names only the fixed word."""
+        transient = reason in TRANSIENT_REFUSALS
+        with self._lock:
+            self._run += 1
+            if transient and self._run >= self._live.max_consecutive_refusals:
+                transient = False
+            if not transient:
+                self._stopped = reason
+        tail = "this reply" if transient else "the rest of this meeting"
+        log.warning("live voice refused for %s (%s)", tail, reason)
+        return LiveVoiceRefused(
+            f"SEC-16: the spend ledger gave no reservation for the Live voice ({reason}); the local voice speaks "
+            f"for {tail}",
+            reason=reason,
+            transient=transient,
+        )
 
     def _close_hold(self, call: _LiveCall | None) -> None:
         """Exactly once per reply: settle what is known (also after a failure, a timeout or a cancel once the text was

@@ -36,3 +36,8 @@ voice:
     timeout_s: 20 # the deadline of one spoken reply (seconds)
     max_output_tokens: 256 # the model's own output cap for one reply
     price_approved: false
+    # BQ-M2-12 (ADR-0042 decision 8): the spend meter refusing ONE reply for a transient reason (the previous reply's hold
+    # still open, a ledger blip, a slow or unreachable meter, 429, a 5xx) speaks that reply with the local voice and the
+    # next reply asks again. This many such refusals in a row and the Live voice is off for the rest of that meeting.
+    # A cap, the kill switch, a lost claim or an answer the bot does not know is off for the meeting at the first one.
+    max_consecutive_refusals: 3 # whole number, 1 to 10

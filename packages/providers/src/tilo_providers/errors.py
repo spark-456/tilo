@@ -18,6 +18,20 @@ class NotConfigured(ProviderError):
     without the live switch. Not retried and not a fallback trigger: the caller (or the config) has to change."""
 
 
+class LiveVoiceRefused(NotConfigured):
+    """The spend meter refused ONE Live voice reply (SEC-16, BQ-M2-12). It is a `NotConfigured`, so every caller that
+    reads a refusal as permanent still does; a caller that knows this class reads `transient`: True means the next
+    reply may ask again (a hold still open, an unreadable ledger, an unreachable meter), False that the Live voice is
+    off for the rest of this meeting (a cap, the kill switch, a lost claim, a run of transients, or a word it does not
+    know: the fail-closed default). `reason` is one word of a closed vocabulary (`voice.REFUSAL_REASONS`), never the
+    meter's own text. Raised before any session opens: a refusal never reaches the model."""
+
+    def __init__(self, message: str, *, reason: str, transient: bool) -> None:
+        super().__init__(message)
+        self.reason = reason
+        self.transient = transient
+
+
 class QuotaError(ProviderError):
     """Rate limit or quota exceeded (HTTP 429). The router may fall back."""
 

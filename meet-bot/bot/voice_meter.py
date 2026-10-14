@@ -49,11 +49,39 @@ _CONTRACTS = "https://contracts.tilo.example/"
 _SCHEMAS = ("meeting_voice_meter", "common")  # the contract and the file its meeting id points at
 _IDENTITY_URL = "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/identity"
 _REFRESH_MARGIN_S = 120
-_NO_HOLD = frozenset({"refused", "no_token"})  # reasons after which tilo-api cannot have opened a hold
+# The contract's `error` codes (`$defs.error`; a test pins this set to the schema file).
+_ERROR_CODES = frozenset(
+    {"unauthenticated", "forbidden", "invalid_request", "not_configured", "not_attending", "no_hold", "key_used"}
+)
+# Reasons after which tilo-api cannot have opened a hold: no token, or an answer that was a refusal by status. A 5xx
+# is not one: the API may have opened the hold and failed after it, so a `server_error` is followed by a release.
+_NO_HOLD = frozenset({"refused", "no_token", "rate_limited"}) | _ERROR_CODES
 
 
 class _Failed(Exception):
     """One call did not give a usable 200 answer. Carries a fixed reason word, never a value."""
+
+
+def _status_word(status: int, body: bytes) -> str:
+    """The fixed word for an answer that was not a 200 (BQ-M2-12): the contract's own `error` code when the body is one,
+    else the status class. Never the body's text."""
+    try:
+        code = json.loads(body).get("error") if body else None
+    except (ValueError, AttributeError):
+        code = None
+    if isinstance(code, str) and code in _ERROR_CODES:
+        return code
+    return "rate_limited" if status == 429 else "server_error" if status >= 500 else "refused"
+
+
+def _refusal_word(error: BaseException) -> str:
+    """The fixed word for a reserve that failed (BQ-M2-12). `error` is one word the meter raised itself, or a
+    transport failure of httpx; anything else is `error`, which the provider layer treats as permanent."""
+    if isinstance(error, _Failed):
+        return str(error.args[0])
+    if isinstance(error, httpx.TimeoutException):
+        return "timeout"
+    return "unreachable" if isinstance(error, httpx.TransportError) else "error"
 
 
 @functools.lru_cache(maxsize=1)
@@ -155,25 +183,39 @@ class RemoteLiveVoiceMeter:
         self._token_for = token_for or IdentityToken()
         self._transport = transport
         self.last_free: threading.Thread | None = None  # the best-effort release of a lost reserve (tests join it)
+        self._why = threading.local()  # per thread: the word of the last refused reserve of THAT reply's thread
         _check("reserve_request", self._body(secrets.token_urlsafe(24)))  # a bad meeting id (or no schema) is no meter
 
     def __repr__(self) -> str:
         return "RemoteLiveVoiceMeter()"
 
+    @property
+    def last_refusal(self) -> str | None:
+        """BQ-M2-12: why the last `reserve` of this thread returned None, as one fixed word (the contract's `reason` or
+        `error` code, or `hold_open`-style words of this module: timeout, unreachable, rate_limited, server_error,
+        no_token, refused, off_contract, malformed, oversize, error); None after a live answer. The provider layer
+        reads it to tell a blip from a cap; it is never text from the API."""
+        return getattr(self._why, "word", None)
+
     # -- the LiveVoiceMeter hook ------------------------------------------------------------------------------------
     def reserve(self) -> object | None:
         key = secrets.token_urlsafe(24)  # fresh for every reply: a key is never reused (MV-05)
+        self._why.word = None
         try:
             request = _check("reserve_request", self._body(key))
             answer = _check("reserve_answer", self._post(RESERVE, request))
         except Exception as error:  # a refusal, an outage, a bad answer: all the local voice (MV-07)
             self._note("reserve", error)
+            self._why.word = _refusal_word(error)
             if not (isinstance(error, _Failed) and error.args[0] in _NO_HOLD):
                 # the API may have opened a hold whose answer was lost: one best-effort release, off the voice's path
                 self.last_free = threading.Thread(target=self._free, args=(key,), daemon=True)
                 self.last_free.start()
             return None
-        return _Hold(key) if answer["decision"] == "live" else None  # `replay` and its reason: the local voice
+        if answer["decision"] != "live":  # `replay` and its reason (the contract's word): the local voice
+            self._why.word = answer["reason"]
+            return None
+        return _Hold(key)
 
     def settle(self, hold: object, usage: Mapping[str, int]) -> None:
         if isinstance(hold, _Hold) and not hold.done:
@@ -218,7 +260,10 @@ class RemoteLiveVoiceMeter:
 
     def _post(self, path: str, body: dict[str, Any]) -> Any:
         """One bounded POST, no redirect, answer under 1 KiB; the parsed JSON of a 200, else `_Failed`."""
-        token = self._token_for(self._base)
+        try:
+            token = self._token_for(self._base)
+        except Exception:  # the metadata server, the signer: no call is made without a token
+            raise _Failed("no_token") from None
         with (
             httpx.Client(
                 transport=self._transport, timeout=TIMEOUT_S, follow_redirects=False, trust_env=False
@@ -230,15 +275,17 @@ class RemoteLiveVoiceMeter:
                 headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
             ) as response,
         ):
-            if response.status_code != 200:
-                raise _Failed("refused")
+            ok = response.status_code == 200
             data, deadline = bytearray(), time.monotonic() + 2 * TIMEOUT_S
             for chunk in response.iter_bytes():
                 data.extend(chunk)
-                if len(data) > MAX_ANSWER:
-                    raise _Failed("oversize")
-                if time.monotonic() > deadline:  # a slow drip is bounded too
-                    raise _Failed("timeout")
+                if len(data) > MAX_ANSWER or time.monotonic() > deadline:  # a slow or long answer is bounded too
+                    if ok:
+                        raise _Failed("oversize" if len(data) > MAX_ANSWER else "timeout")
+                    data.clear()  # a refusal's body is only read for the contract's error code: the status decides
+                    break
+            if not ok:
+                raise _Failed(_status_word(response.status_code, bytes(data)))
         try:
             return json.loads(bytes(data))
         except ValueError:

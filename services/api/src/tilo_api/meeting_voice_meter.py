@@ -219,9 +219,14 @@ def _replay(reason: str) -> JSONResponse:
     return _out(200, {"decision": "replay", "reason": reason}, RESERVE, reason)
 
 
+class _Capped(Exception):
+    """The uid's team-lowered lifetime cap is 0 or less: the reserve answers `capped`."""
+
+
 def _guard(request: Request, uid: str, cfg: MeterConfig) -> spend.SpendGuard | None:
     """The uid's guard as `deps.meter_for` builds it: the team's role and limits only ever lower the lifetime cap, and
-    limits that cannot be read are no live voice. None: no Live voice. NotConfigured: no ledger is wired."""
+    limits that cannot be read are no live voice. None: no Live voice. `_Capped`: the team's cap is zero or less.
+    NotConfigured: no ledger is wired."""
     from tilo_api import team_access, team_store  # noqa: PLC0415  (team_store's dev seam imports `deps`)
 
     try:
@@ -235,8 +240,8 @@ def _guard(request: Request, uid: str, cfg: MeterConfig) -> spend.SpendGuard | N
         ledger, flags = _seam(request, deps.get_spend_cap_ledger), _seam(request, deps.get_flag_store)
     except Exception as exc:
         raise NotConfigured(type(exc).__name__) from exc
-    if cap <= 0:
-        return None
+    if cap <= 0:  # a team that lowered this person's cap to nothing: capped, not "unavailable"
+        raise _Capped
     caps = dataclasses.replace(cfg.caps, uid_lifetime_minor=min(cap, cfg.caps.uid_lifetime_minor))
     return spend.SpendGuard(ledger, flags, caps)
 
@@ -252,7 +257,10 @@ def _reserve(request: Request, claims: AttendClaims, claim: Claim, cfg: MeterCon
     if claim.reserves >= cfg.max_reserves:
         return _replay("meeting_limit")
     claim.reserves += 1
-    guard = _guard(request, claim.uid, cfg)
+    try:
+        guard = _guard(request, claim.uid, cfg)
+    except _Capped:
+        return _replay("capped")
     if guard is None:
         return _replay("unavailable")
     unit = cfg.caps.unit_reserve_minor

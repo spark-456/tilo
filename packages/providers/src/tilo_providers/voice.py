@@ -39,8 +39,47 @@ SAMPLE_RATES = frozenset({16000, 22050, 24000, 44100, 48000})
 
 LIVE_SAMPLE_RATE = 24000  # Gemini Live's native output rate: the flagged voice cannot be resampled here
 _LIVE_KEYS = frozenset(
-    {"enabled", "profile", "model", "voice", "location", "timeout_s", "max_output_tokens", "price_approved"}
+    {
+        "enabled",
+        "profile",
+        "model",
+        "voice",
+        "location",
+        "timeout_s",
+        "max_output_tokens",
+        "price_approved",
+        "max_consecutive_refusals",
+    }
 )
+MAX_CONSECUTIVE_REFUSALS = 10  # the largest `voice.live.max_consecutive_refusals` the loader accepts
+# BQ-M2-12: why a meter refused ONE reply, as a closed vocabulary of fixed words (the bot's meter publishes one in
+# `last_refusal`; its text, its exception and its body never travel). TRANSIENT words may clear by the next reply: the
+# one-at-a-time hold still open, a ledger that could not be read, an unreachable or slow meter, 429, a 5xx that is not
+# the contract's own `not_configured`, no identity token this time. Everything else is PERMANENT for the meeting (a
+# cap, the kill switch, a lost claim, a refused identity, a setting missing on the API, an answer off the contract),
+# and so is a word this module does not know: fail closed.
+TRANSIENT_REFUSALS = frozenset(
+    {"hold_open", "unavailable", "timeout", "unreachable", "rate_limited", "server_error", "no_token"}
+)
+PERMANENT_REFUSALS = frozenset(
+    {
+        "capped",
+        "replay_only",
+        "meeting_limit",
+        "not_attending",
+        "not_configured",
+        "unauthenticated",
+        "forbidden",
+        "invalid_request",
+        "key_used",
+        "no_hold",
+        "refused",
+        "off_contract",
+        "malformed",
+        "oversize",
+    }
+)
+REFUSAL_REASONS = TRANSIENT_REFUSALS | PERMANENT_REFUSALS
 
 
 @dataclass(frozen=True)
@@ -57,6 +96,8 @@ class LiveVoiceConfig:
     timeout_s: float  # the deadline of one spoken reply
     max_output_tokens: int  # the model's own output cap for one reply
     price_approved: bool
+    # BQ-M2-12: this many refusals in a row, each of a transient kind, and the Live voice stops for the meeting
+    max_consecutive_refusals: int = 3
 
 
 class LiveVoiceMeter(Protocol):
@@ -65,7 +106,9 @@ class LiveVoiceMeter(Protocol):
     will not take the unit (capped uid, replay-only switch, no headroom); raising counts as a refusal (fail closed).
     `settle` gets that reply's own whole-number token counts (maybe empty: the text was sent but no usage came back,
     and the input is billable, so an empty usage is charged at the hold's whole reserve, never zero); `release` frees a
-    hold the text never reached (no session, or the send failed)."""
+    hold the text never reached (no session, or the send failed). A meter MAY also expose `last_refusal`: after a
+    `reserve` that returned None, one fixed word of `REFUSAL_REASONS` saying why (BQ-M2-12); a meter with none, one that
+    raises, or a word outside the vocabulary gives a permanent refusal for the meeting."""
 
     def reserve(self) -> object | None: ...
     def settle(self, hold: object, usage: Mapping[str, int]) -> None: ...
@@ -173,7 +216,12 @@ def _live_section(raw: Any, vendor: str, rate: int) -> LiveVoiceConfig | None:
         raise ProviderConfigError(f"{where}max_output_tokens` must be a whole number from 1 to 2048")
     if enabled and (vendor == "fake" or rate != LIVE_SAMPLE_RATE):
         raise ProviderConfigError(f"{where}enabled` needs a Google vendor and sample_rate {LIVE_SAMPLE_RATE}")
-    return LiveVoiceConfig(enabled, profile, model, voice, location, float(timeout), tokens, approved)
+    bound = raw.get("max_consecutive_refusals", 3)
+    if type(bound) is not int or not 1 <= bound <= MAX_CONSECUTIVE_REFUSALS:
+        raise ProviderConfigError(
+            f"{where}max_consecutive_refusals` must be a whole number from 1 to {MAX_CONSECUTIVE_REFUSALS}"
+        )
+    return LiveVoiceConfig(enabled, profile, model, voice, location, float(timeout), tokens, approved, bound)
 
 
 def character_metering_ready() -> bool:
