@@ -54,7 +54,7 @@ BYOK-4/BYOK-6.
 
 ## Not built (left, in order)
 
-1. Contract changes below (architect), then `tilo_contracts` codegen.
+1. The open contract items below (architect), then `tilo_contracts` codegen.
 2. BYOK-4: tilo-connectors `model-keys/put|remove|status|generate` routes, the Secret Manager adapter, the HTTP
    `ModelKeyVault` and `ModelCallTransport` in tilo-api, the IAM test, connectors scaled past one instance
    (CON-D9). New client library goes in `docs/licences.md`.
@@ -66,56 +66,28 @@ BYOK-4/BYOK-6.
 5. `LedgerEntry.payer` in `packages/metering`, MT-02 summing `payer: tilo` only, `trace.payer` on the event.
 6. BYOK-3c members' banner and BYOK-5 owner form in `apps/web`; BYOK-7 the user's live acceptance with their own key.
 
-## Needs a contract change (contracts/ is architect-only; nothing here edits it)
+## Contract state (BYOK-6: the code follows #977, nothing is activated)
 
-The code uses plain Python types where a schema should be; each is a seam, so the architect ticket replaces them.
+The contracts landed as an inert proposal (`contracts/byok.schema.json`, `org_model_key.schema.json`,
+`model_call_rpc.schema.json`, `meeting_host_rpc.schema.json` 1.3.0, `providers.schema.json` 1.4.0 `credential: org`;
+rules in `contracts/byok.rules.md`, BQ-BYOKC-1 to BQ-BYOKC-6). The code follows them:
 
-1. `providers.schema.json` 1.4.0, `$defs.profile` (BK-12). Until then an org profile is "named by a bundle and by no
-   role, with a fixed `base_url` and no `api_key_env`" (BQ-BYOK-8). Exact diff of lines 88 to 93 (`credential` is
-   allowed on `openai_compat` and, for BQ-BYOK-2's Google modes, on `google`; never with `api_key_env`):
+- An openai_compat org profile has `credential: "org"`, a fixed `base_url` and no `api_key_env`; `config.py` refuses
+  the three wrong shapes and a Tilo role that names it (BK-12), and a bundle names only such profiles. The interim
+  "named by a bundle and by no role" marker (BQ-BYOK-8) remains only for the two Google kinds, which have no contract
+  case (BQ-BYOK-RECON-2).
+- Answers and audit entries are the schema's: `authz` is `{by: person, ref, at}`, `owner_view.consent_version` is the
+  config's current one, no `auth_mode` or `project_id`, 403 is always `owner_only`, a PATCH carries `confirm` and
+  `consent_version` together or neither. `ProxyModelProvider` sends no media part and relays only a
+  `generate_answer`-shaped reply. Tests judge every body with the JSON Schema itself
+  (`test_BYOK_6_reconcile_977.py`, `test_BYOK_6_reconcile_credential_org.py`).
 
-   ```diff
-            "pattern": "^[A-Z][A-Z0-9_]{2,63}$",
-            "not": { "pattern": "\n" }
-   -        }
-   +        },
-   +        "credential": {
-   +          "description": "ADR-0041 BK-12: \"org\" marks a profile that only an org's own key serves and that no Tilo role may name. Replaces api_key_env.",
-   +          "const": "org"
-   +        }
-          },
-   +      "allOf": [
-   +        { "not": { "required": ["api_key_env", "credential"] } },
-   +        { "if": { "required": ["credential"] },
-   +          "then": { "properties": { "provider": { "enum": ["openai_compat", "google"] } } } }
-   +      ],
-          "if": { "properties": { "provider": { "const": "openai_compat" } } },
-   ```
-   plus, in `config.py`, the loader rules BK-12 (a Tilo role naming a `credential: org` profile, a bundle naming one
-   without it, an unpriced one) replacing the interim "named by no role" check in `tilo_providers.byok`.
+Still needs a decision or a contract change (BQ-BYOK-RECON-1, BQ-BYOKC-3):
 
-2. `event.schema.json`, `trace` event `data` (user's yes needed, as ADR-0022 did): optional `payer`, enum `tilo` |
-   `org_key`, absent reads `tilo`. `RouterAttempt.payer` already carries it.
-3. `byok.schema.json` (new): the shape of `config/byok.yaml` exactly as `load_byok_config` checks it: `version`,
-   `example`, `enabled` (boolean, required), `day_cap_credits_max`, `calls_per_org_per_minute`, `consent_version`
-   (positive integers), `bundles` of `{label, kind in [openai_compat, google_api_key, google_vertex_iam], roles:
-   {role: {primary, fallback}}}`; closed, no key or secret name field.
-4. `org_model_key.schema.json` (new): the reference (`KeyReference` fields: `bundle_id`, `auth_mode`, `project_id`,
-   `status` in [unverified, active, paused, invalid], `secret_version`, `set_by`, `set_at`, `rotated_at`,
-   `day_cap_credits`, `fallback_to_tilo`, `consent_version`, `refusals`, `last_error`, `last_used_at`, `rev`; no key
-   character, length, hash or last four), the audit entry (`id`, `at`, `actor`, `action`, `bundle`, `version`,
-   `outcome`, `authz`), and the route bodies `PutIn`/`PatchIn` and answers (closed; codes `owner_only`,
-   `reauth_required`, `confirm_required`, `key_refused`, `invalid_body`, `rate_limited`, `not_configured`,
-   `unavailable`). `auth_mode`, `project_id` and the PATCH route extend the ADR's field list (BQ-BYOK-8, BQ-BYOK-9).
-5. `model_call_rpc.schema.json` (new, variant P): `generate` request `{org_id, slot, run_id, profile_id, request}` where
-   `request` is a closed subset of `GenerateRequest` (prompt, system, max_output_tokens, tools, json_mode,
-   response_schema, thinking_level; no media parts in v1), reply `{text, tool_calls, usage}`, its own body cap from
-   the roles' `max_input_tokens`, and no key field in either direction (`ProxyModelProvider` already refuses a
-   reply with any other field).
-6. `meeting_host_rpc.schema.json` additive minor: `put {org_id, slot, mode, key?, project_id?}` ->
-   `{secret_version, validated}`, `remove {org_id, slot, secret_version?}` -> `{removed}`, `status {org_id, slot}` ->
-   `{state, secret_version}`; the `key` field of `put` is the one place a key crosses, marked `no-store`.
-
+1. `org_model_key.schema.json` `owner_view.last_error` lacks `not_configured` (SEC-REVIEW-29 B4); a strict xfail pins it.
+2. `event.schema.json` `trace.payer` (the user's yes, as ADR-0022 did): `RouterAttempt.payer` already carries it.
+3. The Google modes (BQ-BYOK-2): an additive minor of `byok`, `org_model_key`, `meeting_host_rpc` and `providers`, or
+   removal from the code.
 ## Where the key can be
 
 At rest only in Secret Manager `byok-<digest>-models`, held by connectors (BK-01). In transit only in the owner's
