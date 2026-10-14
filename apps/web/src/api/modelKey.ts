@@ -1,6 +1,7 @@
-// ADR-0041 (BYOK-5, INERT): the web half of `/v1/org/model-key`, framework-free. Exactly the shapes of
-// services/api `byok_routes.py` (GET, PUT, DELETE); nothing here is a contract type, because `org_model_key.schema.json`
-// does not exist yet (docs/byok.md, "Needs a contract change" 4). The key is a function argument: it goes into the one
+// ADR-0041 (BYOK-5, INERT): the web half of `/v1/org/model-key`, framework-free. The shapes are those of
+// contracts/org_model_key.schema.json (GET `owner_view` or `member_view`, PUT `put_request` and `put_answer`, DELETE
+// `remove_answer`, `error`); the contract's fixtures are this client's test oracle (BYOK-6). A 403 is `owner_only`
+// by status, whatever word the server sends. The key is a function argument: it goes into the one
 // PUT body and is dropped, never kept, logged or put in a message. Every refusal becomes a fixed word (`problem`); the
 // server's text is never shown, so no answer can carry the key back. `saved` is true only after the live answer AND a
 // re-read that shows the key (BK-02, BK-06). While `config/byok.yaml` has `enabled: false` the API answers 503

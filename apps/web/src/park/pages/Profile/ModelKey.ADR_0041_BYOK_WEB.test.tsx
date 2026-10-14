@@ -346,7 +346,7 @@ describe("ADR-0041 BK-06 SEC-REVIEW-29 B6: the consent version is the page's, ne
   });
 
   it("BYOK_WEB_ADR_0041_B6_an_older_confirmation_on_a_held_key_does_not_lock_a_rotation", async () => {
-    // A held key shows the version its owner last confirmed (server side): older than the page's text is normal.
+    // A number older than the page's text (an API that has not caught up) never locks the page.
     const { flow, calls } = fake({
       get: [{ ...ACTIVE, consent_version: 0 }, ACTIVE],
       put: [{ state: "active", secret_version: 4, validated: true }],
@@ -359,6 +359,20 @@ describe("ADR-0041 BK-06 SEC-REVIEW-29 B6: the consent version is the page's, ne
     await settle();
     await settle();
     expect(calls.map((c) => c.method)).toEqual(["GET", "PUT", "GET"]);
+  });
+
+  it("BYOK_6_a_held_key_whose_config_moved_to_a_newer_consent_version_says_reload_and_sends_nothing", async () => {
+    // org_model_key.owner_view: `consent_version` is the config's current one, not the stored one, so a held key
+    // shows the bump (the API used to echo the stored number, which went stale).
+    const { flow, calls } = fake({ get: [{ ...ACTIVE, consent_version: CONSENT_VERSION + 1 }] });
+    const m = mount(<ModelKeyControl flow={flow} demo={false} />);
+    await settle();
+    expect(q(m.container, '[role="alert"]').textContent).toContain("Reload this page");
+    fillAndAgree(m.container);
+    expect(button(m.container, "Save key").disabled).toBe(true);
+    click(button(m.container, "Save key"));
+    await settle();
+    expect(calls.map((c) => c.method)).toEqual(["GET"]);
   });
 
   it("BYOK_WEB_ADR_0041_B6_the_version_constant_sits_next_to_the_consent_text", () => {
