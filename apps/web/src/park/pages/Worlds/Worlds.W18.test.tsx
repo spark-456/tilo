@@ -58,7 +58,7 @@ it("UI-10 W18 loading skeleton clears on failure", async () => {
   api.getWorlds = vi.fn(() => Promise.reject(new Error("offline")));
   const { c } = await renderWorlds({ api });
   expect(c.querySelector('[aria-label="Loading worlds"]')).toBeNull();
-  expect(c.textContent).toContain("Not connected yet");
+  expect(c.textContent).toContain("Worlds data is unavailable");
 });
 
 it("UI-10 W18 staged cards reserve all grid slots before expensive art renders", async () => {

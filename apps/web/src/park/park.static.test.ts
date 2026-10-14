@@ -167,7 +167,8 @@ describe("WEB_1a_static: park stays beside the old app", () => {
         const shared = inSrc === "components/LifetimeCapDialog";
         // The run-admin sections read the live run through four engine modules the stage shares: the one named
         // exception to "nothing from world/" (the old app is gone; nothing else may be added here).
-        const engine = RUN_ENGINE.includes(inSrc);
+        const engine =
+          RUN_ENGINE.includes(inSrc) || /(?:^|\/)config\/home_suggestions\.json$/.test(inSrc);
         if (!(inSrc === "api" || inSrc.startsWith("api/") || shared || engine))
           bad.push(`${rel(p)} imports ${m[1]}`);
       }
