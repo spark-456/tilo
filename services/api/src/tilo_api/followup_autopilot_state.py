@@ -16,6 +16,7 @@ from fastapi import HTTPException
 from google.api_core.exceptions import AlreadyExists
 
 from tilo_api.draft_firestore import FirestoreDraftStore
+from tilo_api.followup_write_guard import guarded_write
 
 
 def _unavailable() -> HTTPException:
@@ -123,9 +124,11 @@ class FirestoreCards(_Scope):
         row = self._envelope(path, self._validate(user_id, value))
         document = self._publication_document(path)
         try:
-            document.create(row)
+            guarded_write(self._client, document, row, document.create, self._check_read)
         except AlreadyExists:
             return False
+        except HTTPException:
+            raise
         except Exception:
             raise _unavailable() from None
         return True
@@ -135,7 +138,9 @@ class FirestoreCards(_Scope):
         row = self._envelope(path, self._validate(user_id, value))
         document = self._publication_document(path)
         try:
-            document.update(row)
+            guarded_write(self._client, document, row, document.update, self._check_read)
+        except HTTPException:
+            raise
         except Exception:
             raise _unavailable() from None
 
@@ -148,9 +153,17 @@ class FirestoreStops(_Scope):
         row = self._envelope(path, {"owner": user_id, "card_id": card_id})
         document = self._publication_document(path)
         try:
-            document.create(row if self._drafts is not None else {"owner": user_id, "card_id": card_id})
+            guarded_write(
+                self._client,
+                document,
+                row if self._drafts is not None else {"owner": user_id, "card_id": card_id},
+                document.create,
+                self._check_read,
+            )
         except AlreadyExists:
             pass
+        except HTTPException:
+            raise
         except Exception:
             raise _unavailable() from None
 

@@ -254,7 +254,13 @@ def publish_minutes(
                 if attempt == 2:
                     raise Refusal(503, "unavailable") from None
     except BaseException as exc:
-        purge = committed is None
+        purge = False
+        if committed is None:
+            try:
+                current = w.stores.meetings.get(w.org, meeting_id)
+                purge = current is None or current.record.get("minutes") != made.ref
+            except Exception:
+                pass  # uncertain authority: retain rather than destroy possibly committed minutes
         if committed is not None:
             try:
                 w.stores.meetings.replace(meeting, expected_version=committed.version)

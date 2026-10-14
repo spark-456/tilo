@@ -37,10 +37,11 @@ def test_FR_MTG_08_publication_check_immediately_precedes_each_delegation(port_t
     port = port_type(inner, lambda: events.append("check"))
     assert events == []
     assert getattr(port, method)(*args) is result
-    assert events == ["check", "delegate"]
+    expected = ["check", "delegate", "check"] if method == "enqueue" else ["check", "delegate"]
+    assert events == expected
     # The second operation must revalidate instead of caching the first check.
     assert getattr(port, method)(*args) is result
-    assert events == ["check", "delegate", "check", "delegate"]
+    assert events == expected * 2
     assert getattr(inner, method).call_count == 2
 
 

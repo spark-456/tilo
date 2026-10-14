@@ -132,8 +132,8 @@ def build_factory(
 
         def halted() -> bool:
             try:
-                authority()
-            except HTTPException:
+                check()
+            except Exception:
                 return True
             return False
 

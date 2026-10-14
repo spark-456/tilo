@@ -6,7 +6,8 @@ must also pass the hook into durable adapters; delegation is not a transaction.
 
 from collections.abc import Callable
 
-from tilo_channels.autopilot_state import CardStore, Outbox, StopQueue
+from tilo_channels.autopilot_state import CardStore, StopQueue
+from tilo_connectors import Outbox
 
 
 class PublicationCards:
@@ -49,7 +50,17 @@ class PublicationOutbox:
 
     def enqueue(self, entry: dict, evidence: dict) -> dict:
         self._check()
-        return self._inner.enqueue(entry, evidence)
+        try:
+            return self._inner.enqueue(entry, evidence)
+        finally:
+            try:
+                self._check()
+            except Exception:
+                # Bypass the closed read wrapper only for compensation of this exact key.
+                stored = self._inner.get_by_idempotency_key(entry["world_id"], entry["idempotency_key"])
+                if stored is not None and stored["state"] in ("queued", "scheduled"):
+                    self._inner.abandon(stored["id"], keep_ambiguous=True)
+                raise
 
     def cancel(self, outbox_id: str) -> dict:
         self._check()

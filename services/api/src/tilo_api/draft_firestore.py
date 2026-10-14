@@ -18,6 +18,7 @@ from fastapi import HTTPException
 from google.api_core.exceptions import AlreadyExists
 
 from tilo_api.followup_draft_retention import DraftRetention
+from tilo_api.followup_write_guard import guarded_write
 
 
 def _unavailable() -> HTTPException:
@@ -123,9 +124,11 @@ class FirestoreDraftStore:
             raise _unavailable() from None
         self._authority(user_id)  # after document lookup, immediately before SDK mutation
         try:
-            ref.create(row)
+            guarded_write(self._client, ref, row, ref.create, lambda: self._authority(user_id))
         except AlreadyExists:
             return False
+        except HTTPException:
+            raise
         except Exception:
             raise _unavailable() from None
         self._authority(user_id)
