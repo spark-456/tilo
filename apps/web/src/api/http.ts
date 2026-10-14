@@ -121,6 +121,45 @@ const CODE_WORD = /^[a-z][a-z0-9]*(?:[_-][a-z0-9]+)+$/;
 /** FastAPI's stock texts: not written for people, so the status sentence is used instead. */
 const STOCK = new Set(["Not Found", "Forbidden", "Unauthorized", "Conflict", "Bad Request"]);
 
+/** NFR-22: one display boundary for Park. Only approved copy or mapped wire codes;
+ * never arbitrary exceptions/server text, URLs, status numbers or credentials. */
+export function displayApiError(error: unknown): string {
+  if (!(error instanceof TiloApiError)) return SERVER_TROUBLE;
+  const reasons: Readonly<Record<string, string>> = {
+    not_configured: NOT_CONFIGURED,
+    store_unavailable: "Stored information is unavailable. Try again in a moment.",
+    allowance_capped: "Your allowance is used up. Try again when it resets.",
+    spend_cap_reached: "Your spending limit has been reached.",
+    rate_limited: "Too many requests. Wait a moment and try again.",
+    version_conflict: "This changed while you were working. Reload and try again.",
+    demo_read_only: "This is a sample. It cannot change your information.",
+    invalid_recipients: "Choose people from this meeting before trying again.",
+  };
+  const mapped =
+    reasons[error.code ?? ""] ?? reasons[error.refusal ?? ""] ?? reasons[error.message];
+  if (mapped) return mapped;
+  const approved = new Set([
+    UNREACHABLE,
+    SERVER_TROUBLE,
+    REPLAY_ONLY,
+    SAFETY_UNAVAILABLE,
+    NOT_CONFIGURED,
+    BAD_REPLY,
+    INTAKE_COMMITTED,
+    OUT_OF_DATE,
+    NOT_BUILT,
+    NO_WORLD_BUILT,
+    SLOW_WORLD,
+    ...Object.values(GENERIC_4XX),
+    ...ANSWER_REASONS.values(),
+  ]);
+  if (approved.has(error.message)) return error.message;
+  if (error.status === null) return UNREACHABLE;
+  if (error.status === 429) return reasons.rate_limited ?? SERVER_TROUBLE;
+  if (error.status === 422) return "Check the information and try again.";
+  return GENERIC_4XX[error.status] ?? SERVER_TROUBLE;
+}
+
 /** A card answer's `{outcome: "rejected", reason}` code, in words. The code is not for people. */
 const ANSWER_REASONS = new Map([
   ["already_resolved", "This card was already answered."],
