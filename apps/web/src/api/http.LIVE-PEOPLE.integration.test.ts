@@ -1,4 +1,6 @@
 import { spawn, spawnSync } from "node:child_process";
+import { existsSync } from "node:fs";
+import { join } from "node:path";
 import { createInterface } from "node:readline";
 import { fileURLToPath } from "node:url";
 import { expect, it, vi } from "vitest";
@@ -13,13 +15,21 @@ vi.mock("../auth/session", () => ({
 }));
 // This test starts the real FastAPI app through `uv run --no-sync python`. It needs the Python stack to be
 // importable. Where it is not (the Cloud Build web step is a Node image whose .venv points at a missing
-// interpreter, so uv makes an empty one), it is skipped with the reason printed, and runs wherever the venv exists.
+// interpreter), it is skipped with the reason printed, and runs wherever the venv exists.
+// The probe NEVER runs uv: `uv run` on a venv whose interpreter link is dangling removes and recreates that venv
+// empty, and the gate's later Python steps share the same /workspace/.venv. It only spawns the venv's own
+// interpreter, and only if that file exists (existsSync follows links, so a dangling one counts as missing).
 const ROOT = fileURLToPath(new URL("../../../../", import.meta.url));
 const probe = (() => {
+  const venv = process.env.UV_PROJECT_ENVIRONMENT || join(ROOT, ".venv");
+  const python = [join(venv, "bin", "python"), join(venv, "Scripts", "python.exe")].find((p) =>
+    existsSync(p),
+  );
+  if (!python) return "the project venv has no working interpreter";
   try {
-    const out = spawnSync("uv", ["run", "--no-sync", "python", "-c", "import pytest, fastapi"], {
+    const out = spawnSync(python, ["-c", "import pytest, fastapi"], {
       cwd: ROOT,
-      timeout: 60_000,
+      timeout: 30_000,
       encoding: "utf8",
     });
     if (out.status === 0) return null;
