@@ -197,13 +197,29 @@ export function HomePage({ app }: { app: AppCtx }) {
     store.startWorld(modeKey, text, files).then((ok) => {
       sendingNow.current = false;
       setSending(false);
-      if (!ok) return; // the card stays open and the text stays, so the person can try again
+      // A8: the confirm button was disabled while the call ran, so focus fell to the page; it goes back to the
+      // button to try again, or to the task box once the start is done.
+      if (!ok) {
+        setRefocus("confirm"); // the card stays open and the text stays, so the person can try again
+        return;
+      }
       setQuery("");
       setFiles([]);
       toIdle();
+      setRefocus("input");
     });
   };
   const composerInput = useRef<HTMLInputElement>(null);
+  const [refocus, setRefocus] = useState<"confirm" | "input" | null>(null);
+  useEffect(() => {
+    if (refocus === null) return;
+    const el =
+      refocus === "input"
+        ? composerInput.current
+        : root.current?.querySelector<HTMLElement>(".park-home-confirm");
+    el?.focus();
+    setRefocus(null);
+  }, [refocus]);
   // A3: "Change brief" puts the person back in the task box, ready to edit.
   const changeBrief = () => {
     if (sendingNow.current) return;

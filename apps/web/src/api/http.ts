@@ -50,6 +50,31 @@ const SERVER_TROUBLE = "Tilo had a problem on its side.";
 const REPLAY_ONLY =
   "Live models are unavailable right now, so nothing new was started. Finished runs can still be replayed.";
 const BAD_REPLY = "Tilo sent a reply this page could not read.";
+/** A8: how long a start waits for the intake's reply before the person is told, instead of a spinner for ever.
+ * The Director's brief takes up to about a minute; the intake's own provider timeouts sit inside this. */
+export const INTAKE_TIMEOUT_MS = 120_000;
+const TOOK_TOO_LONG =
+  "Tilo is taking too long to answer. Nothing is shown as started; check your worlds before you try again.";
+
+/** Sentences of ours for the intake's 503s (nothing was stored). The server's wording only selects one. */
+function intakeUnavailable(text: string): string | null {
+  let said = "";
+  try {
+    const d = (JSON.parse(text) as { detail?: unknown } | null)?.detail;
+    said = typeof d === "string" ? d : "";
+  } catch {
+    return null;
+  }
+  if (/safety screen/i.test(said))
+    return "Tilo could not run its safety check just now, so nothing was started. Try again in a moment.";
+  if (/screening is unavailable/i.test(said))
+    return "Tilo could not screen this task just now, so nothing was started. Try again in a moment.";
+  if (/upload storage|could not be screened/i.test(said))
+    return "Tilo could not take the attached files just now, so nothing was started. Try again in a moment.";
+  if (said === "not_configured")
+    return "Starting tasks is not set up on this deployment yet, so nothing was started.";
+  return null;
+}
 const INTAKE_COMMITTED =
   "This task was already submitted. Check your worlds before starting another task.";
 
@@ -71,13 +96,17 @@ const SAMPLE_SIMULATED =
 const GENERIC_4XX: Readonly<Record<number, string>> = {
   401: "You need to sign in to do this.",
   403: "You do not have access to this.",
+  402: "A usage limit has been reached, so nothing was started.",
   404: "Tilo could not find that.",
   409: "That cannot be done right now.",
+  429: "Tilo is busy right now. Wait a moment and try again.",
 };
 const OUT_OF_DATE = "This server is out of date for live runs.";
 const NOT_BUILT = "Tilo has not built this world yet.";
 const NO_WORLD_BUILT = "This run ended before its world was built.";
 const SLOW_WORLD = "Tilo is taking longer than expected to build this world.";
+/** A bare lower-case token such as `demo_runs_busy` or `cap_reached`: a code, never shown as it is. */
+const CODE_WORD = /^[a-z][a-z0-9]*(?:[_-][a-z0-9]+)+$/;
 /** FastAPI's stock texts: not written for people, so the status sentence is used instead. */
 const STOCK = new Set(["Not Found", "Forbidden", "Unauthorized", "Conflict", "Bad Request"]);
 
@@ -114,7 +143,8 @@ export function reasonOf(status: number, text: string): string {
     said.length > 0 &&
     said.length <= 200 &&
     !/[<>{}]/.test(said) &&
-    !STOCK.has(said)
+    !STOCK.has(said) &&
+    !CODE_WORD.test(said) // a stable code (`demo_runs_busy`) is for the page, not for people
   ) {
     return said;
   }
@@ -353,13 +383,26 @@ export class HttpClient implements TiloClient, SchedulesApi, FieldsApi, ItemApi 
 
   private async request<T>(path: string, init: RequestInit = {}, write = false): Promise<T> {
     let res: Response;
+    // A8: the intake is the one call a person waits on in front of a spinner, so it has an end.
+    const stop = path === "/intake" ? new AbortController() : null;
+    let late = false;
+    const timer = stop
+      ? setTimeout(() => {
+          late = true;
+          stop.abort();
+        }, INTAKE_TIMEOUT_MS)
+      : null;
     try {
+      const sent = await this.withAuth(await this.withAppCheck(init));
       res = await this.fetchFn(
         `${this.base}${path}`,
-        await this.withAuth(await this.withAppCheck(init)),
+        stop ? { ...sent, signal: stop.signal } : sent,
       );
     } catch {
+      if (late) throw new TiloApiError(TOOK_TOO_LONG, null, true, write);
       throw new TiloApiError(UNREACHABLE, null, true, write); // the cause (host, port) is not for people
+    } finally {
+      if (timer !== null) clearTimeout(timer);
     }
     if (!res.ok) {
       // Only a 503 (the replay-only label) or a 4xx has a body worth reading; other 5xx are not awaited.
@@ -372,6 +415,10 @@ export class HttpClient implements TiloClient, SchedulesApi, FieldsApi, ItemApi 
       }
       if (isReplayOnly(res.status, body)) {
         throw new TiloApiError(REPLAY_ONLY, 503, false, write, codeOf(body), true);
+      }
+      if (path === "/intake" && res.status === 503) {
+        const words = intakeUnavailable(body);
+        if (words) throw new TiloApiError(words, 503, true, write, codeOf(body));
       }
       const refusal = refusalOf(body);
       if (res.status >= 500) {
