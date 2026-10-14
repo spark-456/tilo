@@ -4,6 +4,9 @@ const TARGETS: Record<string, string> = {
   channels: "/settings?section=channels",
   estimate: "/settings?section=estimate",
   pilot: "/settings?section=pilot",
+  mail: "/team?focus=mail",
+  "team/console": "/team?focus=console",
+  connections: "/connectors",
 };
 export function adminRedirect(path: string, search = ""): string | null {
   const target = TARGETS[path.replace(/^\//, "").replace(/\/$/, "")];

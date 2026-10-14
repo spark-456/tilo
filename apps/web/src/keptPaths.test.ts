@@ -9,7 +9,7 @@ import { matchFlowRoute } from "./router";
 import { SCREENS } from "./screens/meta";
 
 // Reference: agy-bridge/tasks/OLD-UI-OUT.md Wave 4.
-const MOVED = new Set(["/autonomy", "/channels", "/settings", "/estimate", "/pilot"]);
+const MOVED = new Set(["/autonomy", "/channels", "/settings", "/estimate", "/pilot", "/mail", "/connections", "/more", "/team/console"]);
 const ownership = (path: string) => {
   const moved = MOVED.has(path.replace(/\/$/, ""));
   expect(isKeptPath(path), path).toBe(!moved);

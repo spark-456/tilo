@@ -3,6 +3,7 @@ import type { TourStep } from "./steps";
 
 const CONTENT: Record<PageId, [string, string]> = {
   settings: ["Your preferences and routines", "Appearance, consent and recorded run activity."],
+  more: ["Find another page", "Open the tools and recorded activity for this project."],
   home: [
     "Describe the work",
     "Use the composer to describe a task. Read the proposed plan before starting.",

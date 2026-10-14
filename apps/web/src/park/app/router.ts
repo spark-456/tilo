@@ -34,6 +34,7 @@ const ROOT_PAGES = new Set<string>([
   "profile",
   "settings",
   "library",
+  "more",
 ]);
 const ROOT_WORLD = /^\/world\/[^/]+\/?$/;
 const ROOT_WORLD_APP = /^\/(?:park\/)?world\/([^/]+)\/app\/([^/]+)\/?$/;
@@ -117,6 +118,10 @@ export function parseParkPath(pathname: string, search: string): ParkRoute | nul
     if (world && (first === "settings" || first === "team" || first === "connectors"))
       params.world = world;
   }
+  if (["team", "connectors", "more"].includes(first)) {
+    const world = new URLSearchParams(search).get("world");
+    if (world) params.world = world;
+  }
   return { page: first, params };
 }
 
@@ -131,7 +136,7 @@ export function parkPath(page: PageId, params: Params = {}): string {
   const value = name === undefined ? undefined : params[name];
   const query = new URLSearchParams();
   if (name !== undefined && value) query.set(name, value);
-  if (params.world && ["settings", "team", "connectors"].includes(page))
+  if (params.world && ["settings", "team", "connectors", "more"].includes(page))
     query.set("world", params.world);
   return query.size ? `${base}?${query}` : base;
 }

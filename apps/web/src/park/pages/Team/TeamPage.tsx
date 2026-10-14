@@ -24,6 +24,7 @@ import { LiveMembers } from "./LiveMembers";
 import { LiveBody, LiveInvite, StatusLine } from "./LiveTeam";
 import { Members } from "./Members";
 import { MatrixCard, RulesCard } from "./Rules";
+import { ConsoleSection, MailSection } from "./RunAdmin";
 import "./Team.css";
 import { agentArt, icon } from "./teamKit";
 import {
@@ -69,6 +70,22 @@ function Frame({ children }: { children: ReactNode }) {
 
 export function TeamPage({ app }: { app: AppCtx }) {
   const preview = useFirstRunPreview();
+  if (app.params.focus === "mail")
+    return (
+      <Frame>
+        <Top />
+        <h2>Email Autopilot</h2>
+        <MailSection />
+      </Frame>
+    );
+  if (app.params.focus === "console")
+    return (
+      <Frame>
+        <Top />
+        <h2>Team Lead console</h2>
+        <ConsoleSection />
+      </Frame>
+    );
   return preview ? <FirstRunPanels page="team" app={app} /> : <PersonalTeamPage app={app} />;
 }
 function PersonalTeamPage({ app }: { app: AppCtx }) {

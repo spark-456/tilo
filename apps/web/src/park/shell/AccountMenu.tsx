@@ -53,6 +53,7 @@ export function AccountMenu({
       ...(connectorsOn === null ? {} : { hint: `${connectorsOn} on` }),
       onSelect: () => go("connectors"),
     },
+    { id: "more", label: "More", icon: icon("search", 17), onSelect: () => go("more") },
     { id: "team", label: "Team and roles", icon: icon("people", 17), onSelect: () => go("team") },
     { id: "library", label: "Library", icon: icon("grid", 17), onSelect: () => go("library") },
     {

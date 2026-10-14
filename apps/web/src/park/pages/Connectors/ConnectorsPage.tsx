@@ -15,6 +15,7 @@ import { isNotBuilt, useLiveTeam } from "../../app/useLiveTeam";
 import { PageSheet } from "../../components";
 import { ToolAccess } from "./ToolAccess";
 import "./Connectors.css";
+import { ConnectionsSection } from "../Team/RunAdmin";
 import { AttentionBanner, AvailableRow, ConnectedTile } from "./ConnectorParts";
 import { Drawer } from "./Drawer";
 import { GoogleAccess } from "./GoogleAccess";
@@ -43,7 +44,10 @@ const NO_OVERRIDES: Overrides = { st: {}, lvl: {} };
 function Frame({ children }: { children: ReactNode }) {
   return (
     <div data-testid="park-page-connectors">
-      <PageSheet>{children}</PageSheet>
+      <PageSheet>
+        {children}
+        <ConnectionsSection />
+      </PageSheet>
     </div>
   );
 }

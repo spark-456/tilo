@@ -3,6 +3,7 @@ import type { AppCtx, PageId } from "./AppCtx";
 
 export const PAGES: Record<PageId, LazyExoticComponent<ComponentType<{ app: AppCtx }>>> = {
   settings: lazy(() => import("../pages/Admin/AdminPage").then((m) => ({ default: m.AdminPage }))),
+  more: lazy(() => import("../pages/Team/MorePage").then((m) => ({ default: m.MorePage }))),
   home: lazy(() => import("../pages/Home/HomePage").then((m) => ({ default: m.HomePage }))),
   // biome-ignore format: the registry keeps one line per page
   worlds: lazy(() => import("../pages/Worlds/WorldsPage").then((m) => ({ default: m.WorldsPage }))),
