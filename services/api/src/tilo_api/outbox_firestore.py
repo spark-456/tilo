@@ -404,7 +404,12 @@ def _no_writer(part: dict) -> None:
 
 
 def sweep_due(
-    store: Any, adapters: Mapping[str, Any], clock: Callable[[], str], world_paused: Callable[[str], bool]
+    store: Any,
+    adapters: Mapping[str, Any],
+    clock: Callable[[], str],
+    world_paused: Callable[[str], bool],
+    *,
+    source_valid: Callable[[dict], bool] | None = None,
 ) -> int:
     """`dispatch_due()` over the unsent entries, one world at a time so a paused world is not claimed (FR-WLD-07).
     A dead instance's due entry goes out within one tick; an ambiguous attempt stays ambiguous (the outbox's retry
@@ -425,6 +430,7 @@ def sweep_due(
             cast(InMemoryOutboxStore, wired), dict(adapters), emit=_no_writer, clock=clock,
             world_id=world, retry=RetryPolicy(),
             halted=cast(Callable[..., bool], lambda world=world: world_paused(world)),
+            source_valid=source_valid,
         )  # fmt: skip
         settled += len(outbox.dispatch_due())
     return settled
