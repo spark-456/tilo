@@ -1,6 +1,6 @@
 """tilo_providers.vertex_eval_adapter — the Gen AI evaluation service `EvalProvider` (VERTEX-EVAL-1, ADR-0033).
 
-REST `:evaluateInstances` on the regional endpoint, user ADC bearer token, custom rubrics only (the template is sent
+REST `:evaluateInstances` on the configured endpoint, user ADC bearer token, custom rubrics only (the template is sent
 as `metricPromptTemplate`, as is). One instance a call, `samplingCount` 1, `flipEnabled` false: no hidden repeat.
 `model` is the judge the service is told to use (`autoraterConfig.autoraterModel`). Fails closed: a missing or
 unknown choice, a non-finite score, duplicate keys or non-JSON raise `ProviderError`. Messages never carry the
@@ -24,7 +24,7 @@ from tilo_providers.interfaces import EvalProvider, EvalRequest, EvalScore
 from tilo_providers.model_armor_adapter import _AdcTokens, _duplicate_key_free
 
 # URL components: fullmatch only, so a trailing newline, a dot, a slash or a colon never reaches the URL.
-_LOCATION_RE = re.compile(r"[a-z]+-[a-z]+[0-9]+")
+_LOCATION_RE = re.compile(r"global|[a-z]+-[a-z]+[0-9]+")
 _PROJECT_RE = re.compile(r"[a-z][a-z0-9-]{4,28}[a-z0-9]")
 _MODEL_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,98}")
 _TOKEN_RE = re.compile(r"[\x21-\x7e]+")  # visible ASCII only: no space, CR/LF or control character in a header
@@ -63,9 +63,8 @@ class VertexEvalProvider(EvalProvider):
         self._location = location
         self._project = project
         self._model = model
-        self._url = (
-            f"https://{location}-aiplatform.googleapis.com/v1/projects/{project}/locations/{location}:evaluateInstances"
-        )
+        host = "aiplatform.googleapis.com" if location == "global" else f"{location}-aiplatform.googleapis.com"
+        self._url = f"https://{host}/v1/projects/{project}/locations/{location}:evaluateInstances"
         # Redirects are never followed and the environment's proxy settings are ignored.
         self._client = httpx.Client(transport=transport, timeout=timeout_s, trust_env=False)
         self._token = token or _AdcTokens()
