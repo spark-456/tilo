@@ -38,6 +38,26 @@ const KEPT = [
   "/dev/components",
 ];
 
+// OLD-UI-OUT-2: a world's stage and lenses and the Needs-you pages are Park pages (worldView/routes.ts).
+const MOVED = [
+  "/world/w1/stage",
+  "/world/w1/story",
+  "/world/w1/trace",
+  "/world/w1/delivery",
+  "/world/w1/inspect/B1",
+  "/needs-you",
+  "/needs-you/gate",
+  "/needs-you/consent",
+];
+const MOVED_SCREENS = new Set(["S-04", "S-05", "S-06", "S-07", "S-08", "S-10", "S-11", "S-12"]);
+
+describe("OLD-UI-OUT-2_kept_paths: the moved addresses are Park pages", () => {
+  it.each(MOVED)("OLD_UI_OUT_2_kept_paths_%s_is_not_kept", (path) => {
+    expect(isKeptPath(path)).toBe(false);
+    expect(isKeptPath(`${path}/`)).toBe(false);
+  });
+});
+
 describe("WEB_CUTOVER_kept_paths: the addresses the old app owns", () => {
   it.each(KEPT)("WEB_CUTOVER_kept_paths_%s_is_kept", (path) => {
     ownership(path);

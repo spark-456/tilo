@@ -11,7 +11,7 @@ import { ClientProvider } from "../api/ClientProvider";
 import { FixtureClient } from "../api/fixtureClient";
 import { HttpClient } from "../api/http";
 import { PAUSE_CONFIRM_MS, canPause } from "../world/pause";
-import { ReplayPauseSlot, WorldPauseSlot } from "./PauseSlot";
+import { ReplayPauseSlot, WorldPauseSlot } from "./StageRail";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 

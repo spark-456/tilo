@@ -15,7 +15,10 @@ import { createRoot } from "react-dom/client";
 import { describe, expect, it } from "vitest";
 import { ClientProvider } from "../api/ClientProvider";
 import { FixtureClient } from "../api/fixtureClient";
-import { S_08 } from "./S_08";
+import { NeedsYouView } from "./NeedsYouView";
+
+// OLD-UI-OUT-2: the consent sheet is a Park page now (worldView/NeedsYouView); same behaviour.
+const S_08 = () => <NeedsYouView sheet="consent" />;
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 

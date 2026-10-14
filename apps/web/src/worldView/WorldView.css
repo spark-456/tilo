@@ -1,0 +1,870 @@
+/* A world's lenses and the Needs-you page inside the Park shell (OLD-UI-OUT-2). Built from the Park role tokens
+   (day and night come from them) and the Park component idiom (cards r22 on --card with a 1px --line2, chips,
+   pills); no artboard exists for these pages. Every selector sits under [data-park] with a park-view- or
+   park-needs- class. Nothing here animates: a frame is drawn only on a recorded event (HR-2). */
+
+[data-park] .park-view-root,
+[data-park] .park-view-root * {
+  box-sizing: border-box;
+}
+[data-park] .park-view-sheet {
+  padding: 24px 32px 36px;
+  gap: 16px;
+}
+@media (max-width: 767px) {
+  [data-park] .park-view-sheet {
+    padding: 16px;
+  }
+}
+
+/* ---- Head: crumb, title, tabs ---- */
+[data-park] .park-view-crumb {
+  display: flex;
+  align-items: center;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--ink3);
+}
+[data-park] .park-view-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 0 10px 0 6px;
+  border-radius: 10px;
+  color: var(--ink2);
+  font-weight: 800;
+  text-decoration: none;
+}
+[data-park] .park-view-back:hover {
+  background: var(--chip);
+  color: var(--ink);
+}
+[data-park] .park-view-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 14px 20px;
+}
+[data-park] .park-view-title {
+  margin: 0;
+  font-family: "Nunito", sans-serif;
+  font-weight: 900;
+  font-size: 32px;
+  line-height: 1.1;
+  letter-spacing: -0.6px;
+  color: var(--ink);
+}
+[data-park] .park-view-lede {
+  margin: 6px 0 0;
+  max-width: 62ch;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--ink2);
+}
+[data-park] .park-view-tabs {
+  display: inline-flex;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 14px;
+  background: var(--seg);
+}
+[data-park] .park-view-tab {
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  padding: 0 14px;
+  border-radius: 10px;
+  color: var(--ink2);
+  font-size: 14px;
+  font-weight: 800;
+  text-decoration: none;
+}
+[data-park] .park-view-tab:hover {
+  color: var(--ink);
+}
+[data-park] .park-view-tab[aria-current="page"] {
+  background: var(--tabOn);
+  color: var(--ink);
+  box-shadow: 0 1px 2px rgba(31, 29, 43, 0.12);
+}
+[data-park] .park-view-back:focus-visible,
+[data-park] .park-view-tab:focus-visible,
+[data-park] .park-view-chiplink:focus-visible,
+[data-park] .park-view-pick:focus-visible,
+[data-park] .park-view-row:focus-visible,
+[data-park] .park-view-step:focus-visible,
+[data-park] .park-view-selection:focus-visible,
+[data-park] .park-view-sheet-hud summary:focus-visible {
+  outline: 3px solid #5a3fe0;
+  outline-offset: 2px;
+}
+
+/* ---- Selection bar: one fixed height ---- */
+[data-park] .park-view-selection {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  min-height: 44px;
+  padding: 6px 12px;
+  border: 1px solid var(--line2);
+  border-radius: 14px;
+  background: var(--sunk);
+  font-size: 14px;
+  color: var(--ink2);
+}
+[data-park] .park-view-selection-text b {
+  color: var(--ink);
+}
+[data-park] .park-view-selection-text small {
+  color: var(--ink3);
+}
+
+/* ---- Shared small parts ---- */
+[data-park] .park-view-chiplink {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--btn2);
+  color: var(--ink);
+  font: 800 14px "Nunito Sans", sans-serif;
+  text-decoration: none;
+  cursor: pointer;
+}
+[data-park] .park-view-chiplink[aria-disabled="true"] {
+  color: var(--ink3);
+  cursor: default;
+}
+[data-park] .park-view-chiplink.park-view-danger {
+  border-color: var(--red);
+  color: var(--redInk);
+}
+[data-park] .park-view-note {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink2);
+}
+[data-park] .park-view-h2 {
+  margin: 0;
+  font-family: "Nunito", sans-serif;
+  font-weight: 900;
+  font-size: 20px;
+  color: var(--ink);
+}
+[data-park] .park-view-h2 a {
+  color: inherit;
+  text-decoration: none;
+}
+[data-park] .park-view-body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+[data-park] .park-view-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px 18px;
+  border: 1px solid var(--line2);
+  border-radius: 22px;
+  background: var(--card);
+}
+[data-park] .park-view-alert {
+  padding: 12px 16px;
+  border: 1px solid var(--amberLine);
+  border-radius: 14px;
+  background: var(--amberSoft);
+  color: var(--amberInk);
+  font-size: 14px;
+  font-weight: 700;
+}
+[data-park] .park-view-alert p {
+  margin: 0 0 8px;
+}
+[data-park] .park-view-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 18px;
+  border: 1px dashed var(--line);
+  border-radius: 18px;
+}
+[data-park] .park-view-flag {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 0 8px;
+  border-radius: 7px;
+  background: var(--chip);
+  color: var(--ink2);
+  font-size: 12px;
+  font-weight: 800;
+}
+[data-park] .park-view-flag--info,
+[data-park] .park-view-flag--fyi {
+  background: var(--heroSoft);
+  color: var(--heroInk);
+}
+[data-park] .park-view-flag--needs {
+  background: var(--amberTile);
+  color: var(--amberInk);
+}
+[data-park] .park-view-flag--blocked {
+  background: var(--redSoft);
+  color: var(--redInk);
+}
+[data-park] .park-view-flag--done {
+  background: var(--okSoft);
+  color: var(--okInk);
+}
+[data-park] .park-view-flag--soon {
+  border: 1px dashed var(--line);
+  background: transparent;
+}
+[data-park] .park-view-flag--gate {
+  background: var(--chip);
+  color: var(--ink2);
+}
+/* The level chip of an event: "L1" in the colour of its level, named for a screen reader. */
+[data-park] .level-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 0 8px;
+  border: 2px solid var(--level-tint);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--level-tint) 22%, var(--card));
+  color: var(--ink);
+  font: 800 12px / 1 "Nunito Sans", sans-serif;
+}
+[data-park] .park-view-pick,
+[data-park] .park-view-pickbox {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--btn2);
+  color: var(--ink);
+  font: 700 14px "Nunito Sans", sans-serif;
+}
+[data-park] .park-view-pickbox {
+  border-style: dashed;
+  color: var(--ink2);
+}
+[data-park] .park-view-pick[aria-pressed="true"] {
+  border: 2px solid var(--hero);
+  background: var(--heroSoft);
+  color: var(--heroInk);
+}
+
+/* ---- Story ---- */
+[data-park] .park-view-story,
+[data-park] .park-view-trace {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+[data-park] .park-view-story > li {
+  display: grid;
+  grid-template-columns: 64px 1fr;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--line2);
+  border-radius: 16px;
+  background: var(--card);
+}
+[data-park] .park-view-story > li[data-selected="true"],
+[data-park] .park-view-trace > li[data-selected="true"] {
+  border: 2px solid var(--hero);
+}
+[data-park] .park-view-story > li[data-severity="blocked"] {
+  border-left: 4px solid var(--red);
+}
+[data-park] .park-view-story > li[data-severity="needs_you"],
+[data-park] .park-view-story > li[data-severity="gate"] {
+  border-left: 4px solid var(--amber);
+}
+[data-park] .park-view-time {
+  font: 700 14px "JetBrains Mono", monospace;
+  color: var(--ink3);
+}
+[data-park] .park-view-text {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--ink);
+}
+[data-park] .park-view-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 6px 0 0;
+  font-size: 14px;
+}
+
+/* ---- Trace: two-line rows, no sideways scroll ---- */
+[data-park] .park-view-trace > li {
+  padding: 10px 14px;
+  border: 1px solid var(--line2);
+  border-radius: 14px;
+  background: var(--card);
+  overflow-wrap: anywhere;
+}
+[data-park] .park-view-tracetop {
+  font-size: 14px;
+}
+[data-park] .park-view-tracetop,
+[data-park] .park-view-tracemeta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+}
+[data-park] .park-view-tracemeta {
+  margin-top: 6px;
+  font-size: 14px;
+  color: var(--ink2);
+}
+[data-park] .park-view-seq {
+  font: 800 14px "JetBrains Mono", monospace;
+  color: var(--heroInk);
+}
+
+/* ---- Inspect ---- */
+[data-park] .park-view-state {
+  margin: 0;
+  font-size: 16px;
+}
+[data-park] .park-view-facts {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 14px 16px;
+  border: 1px solid var(--line2);
+  border-radius: 18px;
+  background: var(--card);
+}
+[data-park] .park-view-facts > div {
+  display: grid;
+  grid-template-columns: 160px 1fr;
+  gap: 12px;
+}
+[data-park] .park-view-facts dt {
+  font-weight: 800;
+  color: var(--ink2);
+}
+[data-park] .park-view-facts dd {
+  margin: 0;
+  font-weight: 700;
+  color: var(--ink);
+}
+@media (max-width: 520px) {
+  [data-park] .park-view-facts > div {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+}
+
+/* ---- Delivery ---- */
+[data-park] .park-view-done {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--okInk);
+}
+[data-park] .park-view-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+[data-park] .park-view-tiles > li {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 14px 16px;
+  border: 1px solid var(--line2);
+  border-radius: 18px;
+  background: var(--card);
+  color: var(--ink2);
+  font-size: 14px;
+}
+[data-park] .park-view-tiles b {
+  font-size: 20px;
+  color: var(--ink);
+}
+[data-park] .park-view-tilename {
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--ink3);
+}
+[data-park] .park-view-actions {
+  display: flex;
+  gap: 10px;
+}
+
+/* ---- Stage: the stage beside its panels ---- */
+[data-park] .park-view-stagegrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  gap: 16px;
+  align-items: start;
+}
+[data-park] .park-view-stagecol {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+[data-park] .park-view-stagebox {
+  display: flex;
+  height: clamp(420px, 66vh, 760px);
+  border: 1px solid var(--line2);
+  border-radius: 22px;
+  background: var(--sunk);
+  overflow: hidden;
+}
+[data-park] .park-view-side {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+[data-park] .park-view-banner {
+  padding: 6px 12px;
+  border-radius: 10px;
+  background: var(--heroSoft);
+  color: var(--heroInk);
+  font-size: 14px;
+  font-weight: 800;
+}
+@media (max-width: 1023px) {
+  [data-park] .park-view-stagegrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+@media (max-width: 767px) {
+  [data-park] .park-view-stagebox {
+    height: 56vh;
+    min-height: 320px;
+  }
+}
+[data-park] .park-view-sheet-hud {
+  border: 1px solid var(--line2);
+  border-radius: 18px;
+  background: var(--card);
+  padding: 4px 12px 12px;
+}
+[data-park] .park-view-sheet-hud summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 46px;
+  font-weight: 800;
+  cursor: pointer;
+}
+[data-park] .park-view-glance {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--ink2);
+}
+
+/* ---- Rail panels ---- */
+[data-park] .park-view-rail {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+[data-park] .park-view-figures {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px 14px;
+}
+[data-park] .park-view-figures b {
+  display: block;
+  font-size: 20px;
+  color: var(--ink);
+}
+[data-park] .park-view-figures span {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ink3);
+}
+[data-park] .park-view-count,
+[data-park] .park-view-slot {
+  padding: 14px 16px;
+  border: 1px solid var(--line2);
+  border-radius: 22px;
+  background: var(--card);
+}
+[data-park] .park-view-count {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+[data-park] .park-view-count .park-view-h2 {
+  flex: 1;
+}
+[data-park] .park-view-slot {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+[data-park] .park-view-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+[data-park] .park-view-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  min-height: 44px;
+  padding: 6px 12px;
+  border: 1px solid var(--line2);
+  border-radius: 12px;
+  background: var(--card);
+  color: var(--ink);
+  font: 700 14px "Nunito Sans", sans-serif;
+  text-align: left;
+  cursor: pointer;
+}
+[data-park] .park-view-row[aria-pressed="true"] {
+  border: 2px solid var(--hero);
+  background: var(--rowOn);
+}
+[data-park] .park-view-rowname {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  font-weight: 800;
+}
+[data-park] .park-view-rowname small {
+  font-weight: 600;
+  color: var(--ink3);
+}
+[data-park] .park-view-rowstate {
+  flex: none;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ink2);
+}
+[data-park] .park-view-counts {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--ink3);
+}
+[data-park] .park-view-pct {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--ink2);
+}
+[data-park] .park-view-pct progress {
+  width: 72px;
+  height: 8px;
+  accent-color: var(--hero);
+}
+[data-park] .park-view-pauserow {
+  display: flex;
+  gap: 8px;
+}
+[data-park] .park-view-pausenote {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--ink3);
+}
+[data-park] .park-view-tracelist {
+  max-height: 220px;
+  margin: 0;
+  padding: 0;
+  overflow: auto;
+  list-style: none;
+  font: 600 12px "JetBrains Mono", monospace;
+  color: var(--ink2);
+}
+
+/* ---- Replay dock ---- */
+[data-park] .park-view-dock {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 112px;
+  padding: 12px 14px;
+  border: 1px solid var(--line2);
+  border-radius: 18px;
+  background: var(--card);
+}
+[data-park] .park-view-dockbanner {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--ink2);
+}
+[data-park] .park-view-dockrow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+[data-park] .park-view-track {
+  position: relative;
+  flex: 1;
+}
+[data-park] .park-view-track input[type="range"] {
+  width: 100%;
+  accent-color: var(--hero);
+}
+[data-park] .park-view-marks {
+  position: absolute;
+  inset: auto 8px 0 8px;
+  height: 6px;
+  pointer-events: none;
+}
+[data-park] .park-view-marks i {
+  position: absolute;
+  left: calc(var(--at) * 100%);
+  width: 3px;
+  height: 6px;
+  border-radius: 2px;
+  background: var(--ink3);
+}
+[data-park] .park-view-marks i[data-kind="needs"] {
+  background: var(--amber);
+}
+[data-park] .park-view-marks i[data-kind="problem"] {
+  background: var(--red);
+}
+[data-park] .park-view-step {
+  width: 44px;
+  height: 44px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--btn2);
+  color: var(--ink);
+  font-size: 24px;
+  font-weight: 800;
+}
+[data-park] .park-view-step:disabled {
+  color: var(--ink3);
+}
+[data-park] .park-view-pos {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--ink2);
+}
+
+/* ---- Stage mode controls and the reset dialog ---- */
+[data-park] .park-view-presenter {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--pop);
+  box-shadow: var(--shPop);
+}
+[data-park] .park-view-dialog {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  margin: auto;
+  max-width: 420px;
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--pop);
+  color: var(--ink);
+  box-shadow: var(--shPop);
+}
+[data-park] .park-view-dialogactions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* ---- Needs you ---- */
+[data-park] .park-needs-section {
+  max-width: 760px;
+}
+[data-park] .park-needs-queue {
+  gap: 8px;
+}
+[data-park] .park-needs-item {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--line2);
+  border-radius: 16px;
+  background: var(--card);
+}
+[data-park] .park-needs-itemtext {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 200px;
+}
+[data-park] .park-needs-itemtext small {
+  font-weight: 600;
+  color: var(--ink3);
+}
+/* The decision card and the gate sheet keep their own markup (needs-you/CardView, GateSheet); here they take the
+   Park card look and role tokens. */
+[data-park] .park-needs-root .need-card,
+[data-park] .park-needs-root .gate-sheet {
+  max-width: none;
+  padding: 18px 20px;
+  border: 1px solid var(--line2);
+  border-radius: 22px;
+  background: var(--card);
+  color: var(--ink);
+}
+[data-park] .park-needs-root .need-what {
+  margin: 0;
+  font-family: "Nunito", sans-serif;
+  font-weight: 900;
+  font-size: 20px;
+  color: var(--ink);
+}
+[data-park] .park-needs-root .need-why,
+[data-park] .park-needs-root .need-where,
+[data-park] .park-needs-root .section-note,
+[data-park] .park-needs-root .need-status,
+[data-park] .park-needs-root .gate-status {
+  color: var(--ink2);
+  font-size: 14px;
+  font-weight: 600;
+}
+[data-park] .park-needs-root .need-error {
+  color: var(--redInk);
+  font-weight: 700;
+}
+[data-park] .park-needs-root .need-option {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--btn2);
+  color: var(--ink);
+}
+[data-park] .park-needs-root .primary,
+[data-park] .park-needs-root .secondary {
+  min-height: 42px;
+  padding: 0 16px;
+  border-radius: 12px;
+  font: 800 14px "Nunito Sans", sans-serif;
+  cursor: pointer;
+}
+[data-park] .park-needs-root .primary {
+  border: 0;
+  background: var(--heroFill);
+  color: #fff;
+}
+[data-park] .park-needs-root .secondary {
+  border: 1px solid var(--line);
+  background: var(--btn2);
+  color: var(--ink);
+}
+[data-park] .park-needs-root .gate-facts {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+}
+[data-park] .park-needs-root .gate-facts > div {
+  display: grid;
+  grid-template-columns: 160px 1fr;
+  gap: 12px;
+}
+[data-park] .park-needs-root .gate-facts dt {
+  font-weight: 800;
+  color: var(--ink2);
+}
+[data-park] .park-needs-root .gate-facts dd {
+  margin: 0;
+  font-weight: 700;
+}
+[data-park] .park-needs-root .need-actions,
+[data-park] .park-needs-root .need-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+}
+@media (max-width: 520px) {
+  [data-park] .park-needs-root .gate-facts > div {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+}
+
+[data-park] .park-needs-head {
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+/* Phone targets: lens tabs and level links are at least 44 px high (UX-1). */
+@media (max-width: 767px) {
+  [data-park] .park-view-tab {
+    min-height: 44px;
+  }
+  [data-park] .park-view-h2 a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+  }
+}
+[data-park] .park-view-tab {
+  min-height: 44px;
+}
+
+/* The selection bar reserves its second line on a phone, so choosing an object moves nothing (CLS). */
+@media (max-width: 520px) {
+  [data-park] .park-view-selection {
+    min-height: 88px;
+    align-content: flex-start;
+  }
+  [data-park] .park-view-selection-text {
+    flex: 1 1 100%;
+  }
+}
+
+/* A bare button, input or summary in these pages takes the ramp's 14 px, never the browser's 13.33 px. */
+:where([data-park] .park-view-root) :where(button, input, select, textarea, summary, output) {
+  font-size: 14px;
+  font-family: "Nunito Sans", sans-serif;
+}
+
+/* <small> is 83% of its parent by default (13.33 px): on these pages it is the ramp's 14 px. */
+[data-park] .park-view-root small {
+  font-size: 14px;
+}

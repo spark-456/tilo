@@ -65,11 +65,8 @@ describe("WEB_CUTOVER_root: the Park app owns the root paths", () => {
 
   it("WEB_CUTOVER_05_the_stage_and_every_kept_screen_is_the_old_app", async () => {
     for (const path of [
-      "/world/w/stage",
-      "/world/w/story",
-      "/world/w/inspect/B1",
+      "/library",
       "/team/console",
-      "/needs-you",
       "/more",
     ]) {
       const m = await visit(path);
@@ -88,7 +85,7 @@ describe("WEB_CUTOVER_root: the Park app owns the root paths", () => {
   it("WEB_CUTOVER_05_moving_between_the_apps_follows_the_address", async () => {
     const m = await visit("/");
     expect(m.container.querySelector('[data-testid="park-page-home"]')).not.toBeNull();
-    await act(async () => navigateFlow("/world/w/stage"));
+    await act(async () => navigateFlow("/library"));
     await settle();
     expect(m.container.querySelector('[data-testid="old-app"]')).not.toBeNull();
     expect(m.container.querySelector("[data-park]")).toBeNull();

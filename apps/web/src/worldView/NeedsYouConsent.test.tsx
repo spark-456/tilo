@@ -5,7 +5,10 @@ import { createRoot } from "react-dom/client";
 import { describe, expect, it } from "vitest";
 import { ClientProvider } from "../api/ClientProvider";
 import { FixtureClient } from "../api/fixtureClient";
-import { S_08 } from "./S_08";
+import { NeedsYouView } from "./NeedsYouView";
+
+// OLD-UI-OUT-2: the consent sheet is a Park page now (worldView/NeedsYouView); same behaviour.
+const S_08 = () => <NeedsYouView sheet="consent" />;
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -88,7 +91,7 @@ describe("AGW-06 S-08 Connection consent sheet", () => {
     expect(container.textContent).toContain("Create and edit files in the Tilo folder only");
     expect(container.textContent).not.toContain("No specific scopes");
     expect(container.querySelector("h1")?.textContent).toBe("Connection consent");
-    expect(container.querySelector("dl.gate-facts")).toBeTruthy();
+    expect(container.querySelector("dl.park-needs-facts")).toBeTruthy();
   });
 
   it("offers exactly the contract options, Connect and Hold (CR-13)", async () => {

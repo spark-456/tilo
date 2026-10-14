@@ -19,7 +19,12 @@ vi.mock("./App", async () => {
 vi.mock("./park/app/ParkApp", async () => {
   const { createElement } = await import("react");
   loaded.park += 1;
-  const ParkApp = () => createElement("div", { "data-testid": "park-app" }, "park app");
+  const ParkApp = (props: { routed?: { title: string } }) =>
+    createElement(
+      "div",
+      { "data-testid": "park-app", "data-routed": props.routed?.title ?? "" },
+      "park app",
+    );
   return { default: ParkApp, ParkApp };
 });
 
@@ -47,7 +52,7 @@ describe("WEB_3a_root: old app or park app by path", () => {
   // Must stay the first test that renders: the lazy import is cached for the rest of the file.
   it("WEB_3a_root_a_visit_to_a_kept_screen_never_loads_the_park_chunk", async () => {
     await visit("/more");
-    await visit("/world/w/stage");
+    await visit("/screens");
     await visit("/team/console");
     expect(loaded.park).toBe(0);
   });
@@ -57,8 +62,6 @@ describe("WEB_3a_root: old app or park app by path", () => {
   it("WEB_3a_root_every_non_park_path_is_the_old_app", async () => {
     for (const path of [
       "/more",
-      "/world/w/stage",
-      "/world/w/story",
       "/team/console",
     ]) {
       const m = await visit(path);
@@ -88,6 +91,31 @@ describe("WEB_3a_root: old app or park app by path", () => {
     }
   });
 
+  it("OLD_UI_OUT_2_root_a_lens_or_needs_you_address_is_the_park_app_with_a_routed_view", async () => {
+    const titles: Array<[string, string]> = [
+      ["/world/w/stage", "World"],
+      ["/world/w/story", "Story"],
+      ["/world/w/trace", "Trace"],
+      ["/world/w/delivery", "Delivery"],
+      ["/world/w/inspect/B1", "Inspect"],
+      ["/needs-you", "Needs you"],
+      ["/needs-you/gate", "Approval gate"],
+      ["/needs-you/consent", "Connection consent"],
+    ];
+    for (const [path, title] of titles) {
+      const m = await visit(path);
+      const park = qa(m.container, '[data-testid="park-app"]');
+      expect(park, path).toHaveLength(1);
+      expect(park[0]?.getAttribute("data-routed"), path).toBe(title);
+      expect(qa(m.container, '[data-testid="old-app"]'), path).toHaveLength(0);
+      m.unmount();
+    }
+    // A plain Park page carries no routed view.
+    const home = await visit("/worlds");
+    expect(q(home.container, '[data-testid="park-app"]')?.getAttribute("data-routed")).toBe("");
+    home.unmount();
+  });
+
   it("WEB_3a_root_moving_between_the_apps_follows_the_address", async () => {
     const m = await visit("/more");
     expect(q(m.container, '[data-testid="old-app"]')).toBeTruthy();
@@ -95,7 +123,7 @@ describe("WEB_3a_root: old app or park app by path", () => {
     await settle();
     expect(m.container.querySelector('[data-testid="park-app"]')).not.toBeNull();
     expect(m.container.querySelector('[data-testid="old-app"]')).toBeNull();
-    await act(async () => navigateFlow("/world/w/stage"));
+    await act(async () => navigateFlow("/library"));
     await settle();
     expect(m.container.querySelector('[data-testid="old-app"]')).not.toBeNull();
   });

@@ -5,9 +5,6 @@
 // the entry chunk, and importing meta.ts or routes.tsx here would put the old app back into the landing bundle.
 // `keptPaths.test.ts` checks this list against screens/meta.ts and the flow routes.
 const KEPT: readonly RegExp[] = [
-  /^\/world\/[^/]+\/(?:stage|story|trace|delivery)\/?$/,
-  /^\/world\/[^/]+\/inspect\/[^/]+\/?$/,
-  /^\/needs-you(?:\/(?:gate|consent))?\/?$/,
   // dev only, as in screens/routes.tsx: the screens index, the cards gallery and the component sheet
   ...(import.meta.env.DEV ? [/^\/screens(?:\/cards)?\/?$/, /^\/dev\/components\/?$/] : []),
 ];

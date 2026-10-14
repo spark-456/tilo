@@ -8,13 +8,11 @@ import { describe, expect, it } from "vitest";
 
 const SRC = resolve(__dirname, "..");
 
-// Link to the stage: LensTabs World tab, PrimaryNav world item, S-03 after approval, S-05 back link,
-// S-12 "Back to the world", the Park World page's "Open live stage" link.
+// Link to the stage: PrimaryNav world item, S-03 after approval, the replays list's "World" pill, the Park World
+// page's "Open live stage" link. (The lens tabs, the inspect page and the delivery moved to worldView/ and build
+// their addresses through worldView/routes.ts.)
 const FILES = [
-  "screens/LensTabs.tsx",
   "screens/PrimaryNav.tsx",
-  "screens/S_05.tsx",
-  "screens/S_12.tsx",
   "park/pages/World/WorldPage.tsx",
 ] as const;
 

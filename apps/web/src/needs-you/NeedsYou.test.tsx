@@ -20,11 +20,14 @@ import {
 import { ClientProvider } from "../api/ClientProvider";
 import { CARDS_VALID } from "../api/fixtures/cards";
 import { LAYOUT_VILLAGE_BASIC } from "../api/fixtures/layout";
-import { S_06 } from "../screens/S_06";
-import { S_07 } from "../screens/S_07";
+import { NeedsYouView } from "../worldView/NeedsYouView";
 import { CONFIRM_MS, CardView } from "./CardView";
 import { GateSheet } from "./GateSheet";
 import { gatesOf } from "./gates";
+
+// OLD-UI-OUT-2: the queue and the gate sheet are pages of worldView/ now; same behaviour, same test ids.
+const S_06 = () => <NeedsYouView sheet="queue" />;
+const S_07 = () => <NeedsYouView sheet="gate" />;
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 

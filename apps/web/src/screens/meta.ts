@@ -50,37 +50,14 @@ const later = (id: string, name: string, pillar: string): ScreenMeta => ({
 
 export const SCREENS: readonly ScreenMeta[] = [
   built(must("S-04", "World with HUD", "P3", `${W}/stage`)),
-  built(
-    must(
-      "S-05",
-      "Inspect panel",
-      "P3",
-      `${W}/inspect/B1`,
-      /^\/world\/([^/]+)\/inspect\/([^/]+)\/?$/,
-    ),
-  ),
-  built(must("S-06", "Needs-you queue and card", "P4", "/needs-you", /^\/needs-you\/?$/)),
-  built(must("S-07", "Gate sheet", "P4", "/needs-you/gate", /^\/needs-you\/gate\/?$/)),
-  built(
-    must(
-      "S-08",
-      "Connection consent sheet",
-      "P6",
-      "/needs-you/consent",
-      /^\/needs-you\/consent\/?$/,
-    ),
-  ),
-  built(must("S-10", "Story lens", "P3", `${W}/story`, /^\/world\/([^/]+)\/story\/?$/)),
-  built(must("S-11", "Trace lens", "P3, P7", `${W}/trace`, /^\/world\/([^/]+)\/trace\/?$/)),
-  built(
-    must(
-      "S-12",
-      "Delivery and celebration",
-      "P6, P8",
-      `${W}/delivery`,
-      /^\/world\/([^/]+)\/delivery\/?$/,
-    ),
-  ),
+  // OLD-UI-OUT-2: S-04 to S-08 and S-10 to S-12 are Park pages now (worldView/routes.ts): no pattern here.
+  built(must("S-05", "Inspect panel", "P3", `${W}/inspect/B1`)),
+  built(must("S-06", "Needs-you queue and card", "P4", "/needs-you")),
+  built(must("S-07", "Gate sheet", "P4", "/needs-you/gate")),
+  built(must("S-08", "Connection consent sheet", "P6", "/needs-you/consent")),
+  built(must("S-10", "Story lens", "P3", `${W}/story`)),
+  built(must("S-11", "Trace lens", "P3, P7", `${W}/trace`)),
+  built(must("S-12", "Delivery and celebration", "P6, P8", `${W}/delivery`)),
   built(must("S-15", "Autonomy", "P4", "/autonomy", /^\/autonomy\/?$/)),
   built(must("S-16", "Channels", "P5", "/channels", /^\/channels\/?$/)),
   built(must("S-17", "Email Autopilot home", "P5", "/mail", /^\/mail\/?$/)),

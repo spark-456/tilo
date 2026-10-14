@@ -1,6 +1,6 @@
-// FR-WLD-12 (PRD 9.6, 18.3): Stage mode presenter controls and reset confirmation dialog.
-// Renders fixed over the corner so it never shifts the layout (CLS 0). Reset asks for confirmation
-// first with nothing pre-chosen, and only clears demo display state on confirm (HR-1).
+// FR-WLD-12 (PRD 9.6, 18.3): Stage mode presenter controls and the reset confirmation dialog. Fixed over the corner
+// so it never shifts the layout (CLS 0). Reset asks for confirmation first with nothing pre-chosen, and only clears
+// demo display state on confirm (HR-1).
 import type { Event } from "@tilo/contracts";
 import { useEffect, useRef } from "react";
 import { useClient } from "../api/ClientProvider";
@@ -55,19 +55,19 @@ export function StagePresenter({
 
   return (
     <>
-      {stageMode && (
+      {stageMode ? (
         <aside
-          className="stage-presenter"
+          className="park-view-presenter"
           data-testid="stage-presenter"
           aria-label="Stage mode controls"
         >
-          <span className="stage-presenter-badge" data-testid="stage-mode-badge">
+          <span className="park-view-flag park-view-flag--info" data-testid="stage-mode-badge">
             Stage mode
           </span>
           <button
             ref={openBtnRef}
             type="button"
-            className="secondary"
+            className="park-view-chiplink"
             data-testid="stage-reset-open"
             data-stage-control
             onClick={askResetStageDemo}
@@ -76,7 +76,7 @@ export function StagePresenter({
           </button>
           <button
             type="button"
-            className="secondary"
+            className="park-view-chiplink"
             data-testid="stage-mode-exit"
             data-stage-control
             onClick={() => setStageMode(false)}
@@ -84,11 +84,11 @@ export function StagePresenter({
             Exit stage
           </button>
         </aside>
-      )}
-      {confirmOpen && (
+      ) : null}
+      {confirmOpen ? (
         <dialog
           open
-          className="stage-reset-dialog"
+          className="park-view-dialog"
           data-testid="stage-reset-dialog"
           aria-modal="true"
           aria-labelledby="stage-reset-title"
@@ -100,10 +100,10 @@ export function StagePresenter({
             Clears the current selection, replay scrub position and display settings for this demo.
             Recorded run events are not changed.
           </p>
-          <div className="stage-reset-actions">
+          <div className="park-view-dialogactions">
             <button
               type="button"
-              className="secondary danger"
+              className="park-view-chiplink park-view-danger"
               data-testid="stage-reset-confirm"
               data-stage-control
               onClick={() => confirmResetStageDemo(worldId)}
@@ -112,7 +112,7 @@ export function StagePresenter({
             </button>
             <button
               type="button"
-              className="secondary"
+              className="park-view-chiplink"
               data-testid="stage-reset-cancel"
               data-stage-control
               onClick={cancelResetStageDemo}
@@ -121,7 +121,7 @@ export function StagePresenter({
             </button>
           </div>
         </dialog>
-      )}
+      ) : null}
     </>
   );
 }

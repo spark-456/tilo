@@ -2,11 +2,13 @@ import { describe, expect, it } from "vitest";
 import { ALL_ROUTES } from "../../e2e/support/routes";
 import { isParkPath } from "../park/app/router";
 import { matchFlowRoute } from "../router";
+import { parseViewPath } from "../worldView/routes";
 import { sectionOf } from "./PrimaryNav";
 import { SCREENS } from "./meta";
 import { matchScreen } from "./routes";
 
 const FLOW_SCREENS = ["S-04"];
+const PARK_VIEWS = ["S-05", "S-06", "S-07", "S-08", "S-10", "S-11", "S-12"];
 
 describe("PRD-18.3 AGW-08 route table: every Must screen has a route", () => {
   it("the rows are S-01..S-29 minus the screens OLD-UI-OUT 3 moved to Park, and only the Should screens have no address", () => {
@@ -28,6 +30,9 @@ describe("PRD-18.3 AGW-08 route table: every Must screen has a route", () => {
       } else if (FLOW_SCREENS.includes(s.id)) {
         expect(matchScreen(path)).toBeNull();
         expect(matchFlowRoute(path).screen).not.toBe("Start");
+      } else if (PARK_VIEWS.includes(s.id)) {
+        expect(parseViewPath(path), path).not.toBeNull();
+        expect(matchScreen(path)?.id).not.toBe(s.id);
       } else {
         expect(matchScreen(path)?.id).toBe(s.id);
       }
@@ -42,8 +47,8 @@ describe("PRD-18.3 AGW-08 route table: every Must screen has a route", () => {
   });
 
   it("passes URL-decoded captures to the screen, and unknown paths belong to the flow shell", () => {
-    expect(matchScreen("/world/w%201/inspect/B1")?.params).toEqual(["w 1", "B1"]);
-    expect(matchScreen("/world/w%E0/inspect/B1")?.params).toEqual(["w%E0", "B1"]);
+    expect(matchScreen("/meetings/m%201")?.params).toEqual(["m 1"]);
+    expect(matchScreen("/meetings/m%E0")?.params).toEqual(["m%E0"]);
     expect(matchScreen("/nowhere")).toBeNull();
   });
 
@@ -60,8 +65,12 @@ describe("PRD-18.3 AGW-08 route table: every Must screen has a route", () => {
       expect(matchScreen(path)?.id, path).toBe("not-found");
     }
     // Real addresses are untouched: the flow shell and every screen keep theirs.
-    expect(matchScreen("/world/w/inspect/B1")?.id).toBe("S-05");
-    expect(matchScreen("/world/w/delivery")?.id).toBe("S-12");
+    expect(parseViewPath("/world/w/inspect/B1")?.kind).toBe("inspect");
+    expect(parseViewPath("/world/w/delivery")).toEqual({
+      kind: "lens",
+      worldId: "w",
+      lens: "delivery",
+    });
     expect(matchScreen("/world/w/stage")).toBeNull(); // the stage is a flow route (S-04)
     expect(matchScreen("/task/t/approaches")?.id).toBe("not-found"); // retired: Root sends it Home first
     expect(matchScreen("/nowhere")).toBeNull();

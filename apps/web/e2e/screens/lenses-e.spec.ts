@@ -16,7 +16,7 @@ test("UX-1 E1 Story rows carry a level chip and mark Needs-you rows by bar and l
   await page.setViewportSize(DESKTOP);
   await page.goto(`${W}/story?speed=100`);
   const story = page.getByTestId("story-lens");
-  await expect(story.locator(".story-list li").first()).toBeVisible({ timeout: 20_000 });
+  await expect(story.locator(".park-view-story li").first()).toBeVisible({ timeout: 20_000 });
   await expect(story).toContainText("Done: 1 reply sent", { timeout: 20_000 });
 
   const chip = story.locator(".level-chip").first();
@@ -24,26 +24,26 @@ test("UX-1 E1 Story rows carry a level chip and mark Needs-you rows by bar and l
   await expect(chip).toHaveAttribute("aria-label", /^Level /);
 
   const needs = story.locator("li[data-severity='needs_you']").first();
-  await expect(needs.locator(".story-flag")).toHaveText("Needs you");
+  await expect(needs.locator(".park-view-flag")).toHaveText("Needs you");
   const bar = await needs.evaluate((el) => getComputedStyle(el).borderLeftWidth);
-  expect(bar).toBe("6px");
+  expect(bar).toBe("4px");
 
   const sizes = await story
-    .locator(".story-list li:has(.story-meta)")
+    .locator(".park-view-story li:has(.park-view-meta)")
     .first()
     .evaluate((li) => ({
       text: Number.parseFloat(
-        getComputedStyle(li.querySelector(".story-text") as Element).fontSize,
+        getComputedStyle(li.querySelector(".park-view-text") as Element).fontSize,
       ),
       meta: Number.parseFloat(
-        getComputedStyle(li.querySelector(".story-meta") as Element).fontSize,
+        getComputedStyle(li.querySelector(".park-view-meta") as Element).fontSize,
       ),
     }));
   expect(sizes).toEqual({ text: 16, meta: 14 });
   expect(problems).toEqual([]);
 });
 
-test("UX-1 E2 Trace rows are 14 px and Open record is 28 px high, disabled until a record route exists", async ({
+test("UX-1 E2 Trace rows are 14 px and name the record without a control that does nothing", async ({
   page,
 }) => {
   test.setTimeout(90_000);
@@ -51,26 +51,24 @@ test("UX-1 E2 Trace rows are 14 px and Open record is 28 px high, disabled until
   await page.goto(`${W}/trace?speed=100`);
   const rows = page.getByTestId("trace-lens-row");
   await expect(rows).toHaveCount(44, { timeout: 20_000 });
-  expect(await rows.first().locator(".trace-top").evaluate(fontPx)).toBe(14);
-  const open = page.getByRole("button", { name: /Open record/ }).first();
-  await expect(open).toHaveAttribute("aria-disabled", "true"); // no archive route: not invented
-  expect((await open.boundingBox())?.height).toBe(28);
-  await page.setViewportSize(MOBILE);
-  expect((await open.boundingBox())?.height).toBeGreaterThanOrEqual(44);
+  expect(await rows.first().locator(".park-view-tracetop").evaluate(fontPx)).toBe(14);
+  // No archive route exists: the record is named, never offered as a control that does nothing.
+  await expect(page.getByRole("button", { name: /Open record/ })).toHaveCount(0);
+  await expect(page.getByTestId("trace-lens")).toContainText("record viewer is not built yet");
 });
 
 test("UX-1 phone targets: lens tabs and the level link are 44 px high at 390", async ({ page }) => {
   test.setTimeout(90_000);
   await page.setViewportSize(MOBILE);
   await page.goto(`${W}/stage?speed=100`);
-  await page.getByText("World status").click(); // the panels sit in this sheet on a phone
-  const tabs = page.locator(".world-panels .lens-tab");
+  const tabs = page.locator('nav[aria-label="Lens"] a');
   await expect(tabs.first()).toBeVisible({ timeout: 20_000 });
   for (const tab of await tabs.all()) {
     const box = await tab.boundingBox();
     expect(box?.height).toBeGreaterThanOrEqual(44);
   }
-  for (const link of await page.locator(".world-panels h2 a").all()) {
+  await page.getByText("World status").click(); // the panels sit in this sheet on a phone
+  for (const link of await page.locator('[data-testid="world-hud"] h2 a').all()) {
     if (!(await link.isVisible())) continue;
     expect((await link.boundingBox())?.height).toBeGreaterThanOrEqual(44);
   }
@@ -90,7 +88,7 @@ test("UX-1 E3 Inspect shows a building's and an agent's state as a chip, facts a
     await page.goto(`${W}/inspect/B1?speed=100`);
     const panel = page.getByTestId("inspect-panel");
     await expect(panel).toContainText("State: Finished", { timeout: 20_000 });
-    await expect(panel.locator(".inspect-state .btag")).toHaveText("Finished");
+    await expect(panel.locator(".park-view-state .park-view-flag")).toHaveText("Finished");
     await expect(panel.getByTestId("inspect-facts")).toContainText("People here");
     await expect(panel.getByRole("list", { name: /Events that name this/ })).toBeVisible();
   }

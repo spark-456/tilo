@@ -18,25 +18,13 @@ export interface ScreenProps {
 // Suspense boundary, so the frame stays put while a chunk arrives.
 const screen = (load: () => Promise<Record<string, unknown>>, name: string) =>
   lazy(() => load().then((m) => ({ default: m[name] as ComponentType<ScreenProps> })));
-const S_05 = screen(() => import("./S_05"), "S_05");
-const S_06 = screen(() => import("./S_06"), "S_06");
-const S_07 = screen(() => import("./S_07"), "S_07");
-const S_08 = screen(() => import("./S_08"), "S_08");
-const S_10 = screen(() => import("./S_10"), "S_10");
-const S_11 = screen(() => import("./S_11"), "S_11");
-const S_12 = screen(() => import("./S_12"), "S_12");
 // The dev build's component gallery (WEB-2): its chunk is never reached from the landing bundle.
 const DevComponents = screen(() => import("../park/dev/Components"), "Components");
 
 // Screens that read one run from a bare address: no run yet, or an unknown world, is said, not fetched
 // (a live API is never asked about the fixture world).
-const NeedsYou = inARun(S_06, { testid: "needs-you", title: "Needs you" });
-const GateSheet = inARun(S_07, { testid: "gate-sheet-page", title: "Approval gate" });
-const Consent = inARun(S_08, { testid: "consent-sheet-page", title: "Connection consent" });
-// biome-ignore format: one line per screen keeps group edits to a single line.
+// OLD-UI-OUT: all production screens are ported to Park.
 const COMPONENTS: Readonly<Record<string, ElementType<ScreenProps>>> = {
-  "S-05": S_05, "S-06": NeedsYou, "S-07": GateSheet, "S-08": Consent, "S-10": S_10,
-  "S-11": S_11, "S-12": S_12,
 };
 
 export interface ScreenMatch {

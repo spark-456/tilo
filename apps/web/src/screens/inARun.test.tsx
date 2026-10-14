@@ -10,6 +10,8 @@ import type { TiloClient } from "../api/client";
 import { FixtureClient } from "../api/fixtureClient";
 import { HttpClient } from "../api/http";
 import { forgetWorld, rememberWorld } from "../world/lastWorld";
+import { NeedsYouView } from "../worldView/NeedsYouView";
+import { parseViewPath } from "../worldView/routes";
 import { useRemote } from "./remote";
 import { matchScreen } from "./routes";
 
@@ -34,7 +36,15 @@ function liveApi(known: string[]) {
 
 async function visit(address: string, client: TiloClient) {
   window.history.pushState({}, "", address);
-  const match = matchScreen(window.location.pathname);
+  // OLD-UI-OUT-2: the Needs-you pages are Park pages (worldView/), the rest are still screens.
+  const view = parseViewPath(window.location.pathname);
+  const match =
+    view?.kind === "needs"
+      ? {
+          params: [] as readonly string[],
+          Component: () => <NeedsYouView sheet={view.sheet} />,
+        }
+      : matchScreen(window.location.pathname);
   if (!match) throw new Error(`no screen at ${address}`);
   const container = document.createElement("div");
   document.body.append(container);

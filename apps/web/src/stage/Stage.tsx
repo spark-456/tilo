@@ -3,9 +3,9 @@ import type { Container, Graphics } from "pixi.js";
 import { type KeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
 import tokens from "../design/tokens";
 import { useMediaQuery } from "../hooks/useMediaQuery";
-import { AppLink } from "../screens/AppLink";
 import { agentNames, rankName } from "../world/runSummary";
 import { useSelection } from "../world/selection";
+import { ViewLink } from "../worldView/ViewLink";
 import * as cam from "./camera";
 
 const { tileWidth: TW, tileHeight: TH } = tokens.stage;
@@ -64,6 +64,7 @@ export function Stage({
   paused = false,
   layout,
   worldId,
+  landmark = true,
 }: {
   onWorld?: WorldSeam;
   seq?: number;
@@ -71,6 +72,9 @@ export function Stage({
   paused?: boolean;
   layout?: Layout | null;
   worldId?: string;
+  /** The stage is the page's main landmark (the old app). Inside the Park shell, whose <main> holds the page, it is
+   * a labelled region instead: one main per page. */
+  landmark?: boolean;
 }) {
   const [, set, toggle] = useSelection(worldId ?? "");
   const outlineItems = useMemo(() => {
@@ -321,15 +325,15 @@ export function Stage({
     };
   }, [supported, pixi]);
 
+  const Frame = landmark ? "main" : "section";
   return (
-    <main
+    <Frame
       className="stage-frame"
       data-testid="stage-frame"
       {...(seq !== undefined ? { "data-seq": seq } : {})}
       {...(selected ? { "data-selected": selected } : {})}
       {...(paused ? { "data-paused": "true" } : {})}
       aria-label="World stage"
-      // biome-ignore lint/a11y/noNoninteractiveTabindex: keyboard pan and zoom (PRD 9.7).
       tabIndex={0}
       ref={frameRef}
     >
@@ -396,16 +400,16 @@ export function Stage({
                 {item.name}
               </button>
               {selected === item.id && item.inspect && worldId && (
-                <AppLink
+                <ViewLink
                   to={`/world/${encodeURIComponent(worldId)}/inspect/${encodeURIComponent(item.id)}`}
                 >
                   Inspect
-                </AppLink>
+                </ViewLink>
               )}
             </li>
           ))}
         </ul>
       )}
-    </main>
+    </Frame>
   );
 }
