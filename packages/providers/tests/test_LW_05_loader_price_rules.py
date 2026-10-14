@@ -139,9 +139,18 @@ def test_LW_05_live_metering_is_refused_when_the_adapter_location_is_not_the_pri
     with pytest.raises(ProviderConfigError, match="GOOGLE_LOCATION"):
         load(tmp_path, env={**LIVE_ENV, "GOOGLE_LOCATION": "europe-west4"})
     ok = {**LIVE_ENV, "GOOGLE_LOCATION": "asia-southeast1"}
-    assert load(tmp_path, env=ok)  # model_armor defaults to asia-southeast1 too
-    with pytest.raises(ProviderConfigError, match="TILO_MODEL_ARMOR_LOCATION"):
-        load(tmp_path, env={**ok, "TILO_MODEL_ARMOR_LOCATION": "us"})
+    assert load(tmp_path, env=ok)
+
+
+def test_PL_06_LIVE_GLOBAL_1_only_location_priced_adapters_are_region_checked(tmp_path):
+    # LIVE-GLOBAL-1 (user-approved 14 Oct): Model Armor has one price everywhere and is served regionally; Gemini 3.x
+    # is served only on the global endpoint. Gemini's location must still match the sheet; Model Armor's need not.
+    ok = {**LIVE_ENV, "GOOGLE_LOCATION": "asia-southeast1"}
+    assert load(tmp_path, env={**ok, "TILO_MODEL_ARMOR_LOCATION": "us"})
+    with pytest.raises(ProviderConfigError, match="GOOGLE_LOCATION"):
+        load(tmp_path, env={**ok, "GOOGLE_LOCATION": "global", "TILO_MODEL_ARMOR_LOCATION": "asia-southeast1"})
+    global_sheet = edit(PRICES, "region", value="global")
+    assert load(tmp_path, prices=global_sheet, env={**LIVE_ENV, "GOOGLE_LOCATION": "global"})
 
 
 def test_LW_05_the_region_is_not_checked_off_live_without_a_region_or_for_adapters_with_no_location(tmp_path):
