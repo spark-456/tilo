@@ -316,6 +316,9 @@ export function createParkStore({ api, navigate, schedule, demo }: ParkStoreDeps
       };
     },
     decide(key, text, option) {
+      // The extras (OWN-ANSWER: a typed answer, a chosen option) go on the call only when there are some, so a plain
+      // approval still reaches the Api as `decide(key)`.
+      const extras = text === undefined && option === undefined ? [] : [text, option];
       if (demo === true) {
         toast(DEMO_DECIDE);
         return;
@@ -325,7 +328,7 @@ export function createParkStore({ api, navigate, schedule, demo }: ParkStoreDeps
         // Live (WIRE-3): a decision is taken only when tilo-api recorded the answer (HR-1). No Undo: no route
         // reopens a card. A failure leaves the card open and says why; another world's card offers to open it.
         pending.add(key);
-        api.decide(key, text, option).then(
+        api.decide(key, ...extras).then(
           () => {
             pending.delete(key);
             update({
@@ -347,7 +350,7 @@ export function createParkStore({ api, navigate, schedule, demo }: ParkStoreDeps
         );
         return;
       }
-      quiet(api.decide(key, text, option));
+      quiet(api.decide(key, ...extras));
       update({
         dec: { ...state.dec, [key]: true },
         toast: arm(
