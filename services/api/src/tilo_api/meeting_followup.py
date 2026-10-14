@@ -6,6 +6,7 @@ import hashlib
 import json
 import math
 from collections.abc import Callable, Sequence
+from dataclasses import dataclass
 from datetime import datetime
 from types import SimpleNamespace
 from typing import Any, cast
@@ -18,8 +19,9 @@ from tilo_contracts import Minutes
 from tilo_memory.artifacts import ArtifactError, ArtifactStore, Scope
 from tilo_metering.flags import FlagStore
 from tilo_people.access import AccessRequest, read
+from tilo_people.errors import NotFound, VersionConflict
 from tilo_policy.schemas import conforms
-from tilo_providers.interfaces import SafetyProvider
+from tilo_providers.interfaces import ModelProvider, SafetyProvider
 
 from tilo_api import deps
 from tilo_api import events as parts
@@ -30,31 +32,51 @@ from tilo_api.people_quotes import GONE, read_doc
 from tilo_api.people_writes import Refusal, Writer
 
 
+@dataclass(frozen=True)
+class FollowupPublication:
+    """Callable event sink with a fresh meeting CAS hook for the scoped factory's final writes.
+
+    Durable card/stop/outbox adapters must invoke before_publication immediately before writing.
+    This guards the meeting source; it does not make independent stores one transaction.
+    """
+
+    append: Callable[[dict], None]
+    before_publication: Callable[[], None]
+
+    def __call__(self, part: dict) -> None:
+        self.append(part)
+
+
 class _Guarded:
     def __init__(self, port: Any, check: Callable[[], None]) -> None:
-        self.port, self.check = port, check
+        self.port, self._check = port, check
 
     def __getattr__(self, name: str) -> Any:
         def invoke(*args: Any, **kwargs: Any) -> Any:
-            self.check()
-            return getattr(self.port, name)(*args, **kwargs)
+            self._check()
+            result = getattr(self.port, name)(*args, **kwargs)
+            self._check()
+            return result
 
         return invoke
 
 
 class _PublishedPreview(_Guarded):
-    def __init__(self, port: Autopilot, check: Callable[[], None], emit: Callable[[dict], None]) -> None:
+    def __init__(
+        self, port: Autopilot, check: Callable[[], None], emit: Callable[[dict], None], commit: Callable[[], None]
+    ) -> None:
         super().__init__(port, check)
-        self.emit = emit
+        self.emit, self.commit = emit, commit
 
     def preview(self, user_id: str, context: DraftContext, result: DraftResult) -> Preview:
-        self.check()
+        self._check()
+        self.commit()
         if result.draft is not None:
             # A failed channel announcement retains its lease. Repair before any card even within that lease;
             # the registered writer deduplicates this snapshot's stable event id after a successful announcement.
             artifact = {"artifact_id": result.draft.artifact_id, "version": result.draft.version}
             self.emit({"type": "artifact.created", "data": {"artifact": artifact}})
-        self.check()
+        self._check()
         return cast(Preview, self.port.preview(user_id, context, result))
 
 
@@ -72,12 +94,21 @@ def draft_owner_followup(
     drafts: DraftStore,
     autopilot_factory: Callable[[str, str, str, Callable[[dict], None]], Autopilot],
     recipients: Sequence[str] | None = None,
+    clock: Callable[[], str] | None = None,
 ) -> Preview | None | list[Preview]:
     """Server-only wiring: None picks means nudges; person-id picks mean one minutes email.
     Factory supplies scoped cards/outbox; scope check rejects another world/run or bench evidence.
-    Source rechecks guard each call, not a transaction across stores. Confirmation has no pin field:
-    the current minutes pointer and meeting version are authoritative. No route/job invokes this seam.
+    Source rechecks and meeting CAS fences guard publication, not a transaction across stores.
+    Confirmation has no pin field: the current minutes pointer and meeting version are authoritative.
+    No route/job invokes this seam.
     """
+    server_clock = clock or (lambda: w.now)
+
+    def fresh_time() -> float:
+        w.now = server_clock()
+        return datetime.fromisoformat(w.now.replace("Z", "+00:00")).timestamp()
+
+    now = fresh_time()
     meeting, version, _ = _mine(w, meeting_id, "read_full", GONE)
     world_id = meeting.get("world_id")
     world = store.load_world(world_id, settle=False) if world_id else None
@@ -91,7 +122,7 @@ def draft_owner_followup(
     ):
         raise Refusal(404, "not_found")
     world_id = cast(str, world_id)
-    now = datetime.fromisoformat(w.now.replace("Z", "+00:00")).timestamp()
+    run_id = world.run_id
     limits_of(w.stores).attempt(w.actor, now)
     if type(budget) not in (int, float) or not math.isfinite(budget) or budget <= 0:
         raise Refusal(409, "followup_unavailable")
@@ -105,6 +136,7 @@ def draft_owner_followup(
     scope = Scope(w.org, world_id, w.actor)
 
     def snapshot() -> tuple[dict, dict, dict, dict, list]:
+        fresh_time()
         m, v, _ = _mine(w, meeting_id, "read_full", GONE)
         current = store.load_world(world_id, settle=False)
         stamp, ref, until = m.get("minutes_confirmed_by"), m.get("minutes"), m.get("delete_minutes_after")
@@ -113,7 +145,7 @@ def draft_owner_followup(
             or m.get("world_id") != world_id
             or current is None
             or current.owner != w.actor
-            or current.run_id != world.run_id
+            or current.run_id != run_id
             or m["status"] != "minuted"
             or not stamp
             or stamp["by"] != w.actor
@@ -167,7 +199,9 @@ def draft_owner_followup(
                 raise Refusal(404, "not_found")
             addresses[person_id] = person.record["email"]
             people_versions.append([person_id, person.version, person.record["email"]])
-        identity = [w.org, w.actor, world_id, world.run_id, meeting_id, v, ref, stamp]
+        # Fence-only version increments must not change durable retry/card identity. The complete
+        # record still pins confirmation, minutes, retention and all other meeting edits.
+        identity = [w.org, w.actor, world_id, run_id, meeting_id, m, ref, stamp]
         identity += [item_versions, people_versions, picks]
         return m, doc, items, addresses, identity
 
@@ -177,12 +211,31 @@ def draft_owner_followup(
         if snapshot() != original:
             raise Refusal(409, "version_conflict")
 
+    def fence() -> None:
+        nonlocal version
+        check()
+        try:
+            committed = w.stores.meetings.replace(original[0], expected_version=version)
+        except (NotFound, VersionConflict):
+            raise Refusal(409, "version_conflict") from None
+        version = committed.version
+        check()
+
+    reserved = False
+
+    def reserve() -> None:
+        nonlocal reserved
+        if not reserved:
+            fence()
+            reserved = True
+
     identity = hashlib.sha256(json.dumps(original[4], sort_keys=True).encode()).hexdigest()
 
     def emit(part: dict) -> None:
         check()
         if part["type"] not in ("artifact.created", "approval.requested"):
             raise Refusal(409, "unexpected_followup_event")
+        reserve()
         event = {
             **part,
             "id": parts.stable_part_id(identity, part["type"], json.dumps(part["data"], sort_keys=True)),
@@ -195,15 +248,16 @@ def draft_owner_followup(
         }
         events.append(world_id, event)
 
-    ap = autopilot_factory(world_id, world.run_id, w.actor, emit)
-    if not ap.matches_scope(world_id=world_id, run_id=world.run_id, owner=w.actor):
+    publication = FollowupPublication(emit, fence)
+    ap = autopilot_factory(world_id, run_id, w.actor, publication)
+    if not ap.matches_scope(world_id=world_id, run_id=run_id, owner=w.actor):
         raise Refusal(404, "not_found")
     check()
     mode = deps.get_work_mode(request, switches)
     if principal.demo_session or getattr(request.state, "demo_session", False) is True:
         mode = "replay"
     router, safety = deps.router_for_mode(mode), deps.get_safety(mode)
-    calls = _Calls(request, w, switches, mode, world.run_id)
+    calls = _Calls(request, w, switches, mode, run_id)
     left = budget
 
     def generate(prompt: Any) -> Any:
@@ -228,12 +282,12 @@ def draft_owner_followup(
         ),
         work_items=SimpleNamespace(get=lambda uid, key: items.get(key) if uid == w.actor else None),
         directory=SimpleNamespace(address=addresses.get),
-        model=SimpleNamespace(generate=generate),
-        safety=cast(SafetyProvider, _Safety(safety, calls)),
+        model=cast(ModelProvider, SimpleNamespace(generate=generate)),
+        safety=cast(SafetyProvider, _Guarded(_Safety(safety, calls), check)),
         drafts=cast(DraftStore, _Guarded(drafts, check)),
-        autopilot=cast(Autopilot, _PublishedPreview(ap, check, emit)),
+        autopilot=cast(Autopilot, _PublishedPreview(ap, check, emit, fence)),
         mailbox=lambda uid: addresses.get(uid),
-        clock=lambda: now,
+        clock=fresh_time,
         emit=emit,
     )
     result = (
