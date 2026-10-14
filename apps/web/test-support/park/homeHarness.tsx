@@ -158,9 +158,10 @@ export function controlWith(root: ParentNode, part: string): HTMLElement {
   return hit;
 }
 
-/** The map pins of a world: controls outside the Today panel whose text starts with the world's name. */
+/** The map pins of a world: controls outside the Today panel (or, under 1180, the stacked worlds block) whose text
+ * starts with the world's name. */
 export function pinsFor(root: ParentNode, name: string): HTMLElement[] {
-  const today = root.querySelector('aside[aria-label="Today"]');
+  const today = root.querySelector(".park-home-today");
   return qa(root, ACTIONS).filter((e) => !today?.contains(e) && textOf(e).startsWith(name));
 }
 export function pinFor(root: ParentNode, name: string): HTMLElement {

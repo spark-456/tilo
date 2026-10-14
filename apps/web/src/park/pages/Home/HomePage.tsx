@@ -348,6 +348,7 @@ export function HomePage({ app }: { app: AppCtx }) {
             onWorlds={() => go("worlds")}
             onAgenda={() => go("agenda")}
             onLedger={() => go("ledger")}
+            stacked={vw > 0 && vw < 1180}
           />
         </>
       ) : null}
