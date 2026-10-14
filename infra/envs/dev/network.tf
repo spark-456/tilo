@@ -33,6 +33,19 @@ resource "google_compute_subnetwork" "run_egress" {
 # NIM adapter and every vendor or connector host that api or harness calls directly. Only this subnet is NATed, with
 # automatically allocated IPs: no VM, no connector, no reserved address (PRD 6.6). Cost: a small per-hour charge while
 # the gateway exists plus a per-GiB charge on the traffic through it (about nothing at this scale).
+# The router and the NAT were created by hand on 14 Oct (about 09:00) with exactly these names, so the first apply
+# imports them instead of creating them (the arguments below are the live ones: the plan shows "import", no change).
+# The ids are the provider's documented formats; once imported, these two blocks are inert and may be removed.
+import {
+  to = google_compute_router.nat
+  id = "projects/essential-wares-510320-f0/regions/asia-southeast1/routers/tilo-nat-router"
+}
+
+import {
+  to = google_compute_router_nat.run_egress
+  id = "essential-wares-510320-f0/asia-southeast1/tilo-nat-router/tilo-run-egress-nat"
+}
+
 resource "google_compute_router" "nat" {
   project = var.project_id
   name    = "tilo-nat-router"
@@ -51,7 +64,7 @@ resource "google_compute_router_nat" "run_egress" {
 
   subnetwork {
     name                    = google_compute_subnetwork.run_egress.id
-    source_ip_ranges_to_nat = ["ALL_IP_RANGES"]
+    source_ip_ranges_to_nat = ["PRIMARY_IP_RANGE"] # as created by hand: the subnet has no secondary ranges in use
   }
 
   log_config {

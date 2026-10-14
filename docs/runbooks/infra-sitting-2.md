@@ -16,20 +16,20 @@ Sources: `agy-bridge/tasks/USER-INFRA-SITTING-2.md`, `USER-INFRA-SITTING-2-DETAI
 | Test-only gate identity (#870) | `tilo-cloudbuild-tests`: staging-source read and build logs only. The gate keeps `tilo-cloudbuild` until you change `serviceAccount` | `sitting2.tf` |
 | Link signing key | api may read `tilo-link-signing-key` (the secret was made by hand; only the accessor binding is Terraform's) | `sitting2.tf` |
 | Channels env | `tilo-channels` gets `ignore_env`, so the gcloud-set push settings survive a later apply (a `moved` block: no destroy) | `modules/service`, `main.tf` |
-| **Egress NAT (apply first, blocking)** | Cloud Router `tilo-nat-router` plus a Cloud NAT on `tilo-run-egress` only (automatic IPs, errors-only logs). Fixes the live Home 503 ("safety screen failed" after about 10.9 s): api and harness send ALL_TRAFFIC into `tilo-vpc`, which had no NAT, and the regional Model Armor endpoint (and NIM, Canva, Lovable, vendor hosts) is not reached by Private Google Access | `network.tf` |
+| **Egress NAT (already created by hand; imported)** | Cloud Router `tilo-nat-router` plus a Cloud NAT on `tilo-run-egress` only (automatic IPs, errors-only logs), made by hand on 14 Oct about 09:00 with exactly these names and **imported** by two `import` blocks in `network.tf` (no create, no change). Fixes the live Home 503 ("safety screen failed" after about 10.9 s): api and harness send ALL_TRAFFIC into `tilo-vpc`, which had no NAT, and the regional Model Armor endpoint (and NIM, Canva, Lovable, vendor hosts) is not reached by Private Google Access | `network.tf` |
 | Optional Meet bot | plan made with `meet_bot_enabled=true` (variable default stays false) | existing flag |
 | Skills store | `TILO_SKILLS_STORE=firestore` on tilo-api (`GET /v1/skills` was 503 `SkillStoreNotConfigured`); a gcloud setting, section 6.3 | none |
 | Left OFF | `TILO_PLATE_DIGEST` (section 6.4 says why); the live switch; Gemini Live (`voice.live.enabled` and `price_approved` stay false) | none |
 
 Expected plan with the bot, from the code (not from a refreshed plan; the script in section 3 enforces it):
-**23 to add, 3 to change, 0 to destroy**, plus one "has moved" (channels). Without the bot it is 13 to add, 0 to change.
+**21 to add, 3 to change, 0 to destroy**, plus 2 to import (the router and the NAT) and one "has moved" (channels). Without the bot it is 11 to add, 0 to change, 2 to import.
 Anything else: stop and send it for review.
 
-**Order of the sitting:** sections 1 to 3 (plan and review), then 4 (apply). The saved plan already contains the NAT, so the
-apply creates it with everything else. Then do the section 4 verification (NAT, then a Home task) before any env step in
+**Order of the sitting:** sections 1 to 3 (plan and review), then 4 (apply). The saved plan imports the NAT you created by hand, so the
+apply only adopts it into state. Then do the section 4 verification (NAT, then a Home task) before any env step in
 sections 5 and 6: if Home still answers 503 after the NAT shows READY, stop there and send the log lines.
 
-**Cost of the NAT:** Cloud NAT bills a small per-hour charge for the gateway while it exists plus a per-GiB charge on the
+**Cost of the NAT:** (it is already running; importing changes nothing) Cloud NAT bills a small per-hour charge for the gateway while it exists plus a per-GiB charge on the
 traffic through it, and automatically allocated external IPs may carry a small address charge while in use. At this
 project's traffic that is cents a month, not a budget item; check the regional price before you apply if it matters. Only
 `tilo-run-egress` is NATed, nothing else in the project gains internet egress.
@@ -92,7 +92,8 @@ $add = @($real | Where-Object { ($_.change.actions -join ',') -eq 'create' })
 $chg = @($real | Where-Object { ($_.change.actions -join ',') -eq 'update' })
 $gone = @($real | Where-Object { $_.change.actions -contains 'delete' })   # destroy, or replace (delete + create)
 $moved = @($rc | Where-Object { $_.previous_address })
-"add=$($add.Count) change=$($chg.Count) destroy_or_replace=$($gone.Count) moved=$($moved.Count)"
+$imported = @($rc | Where-Object { $_.change.importing })   # the two hand-made NAT resources: adopted, never created
+"add=$($add.Count) change=$($chg.Count) destroy_or_replace=$($gone.Count) moved=$($moved.Count) import=$($imported.Count)"
 if ($gone.Count) { $gone | ForEach-Object { "  $($_.change.actions -join '+')  $($_.address)" }; throw 'STOP: a destroy or replace appears. Do not apply. Send this output for review.' }
 
 $expectAdd = @(
@@ -104,8 +105,6 @@ $expectAdd = @(
   'google_storage_bucket_iam_member.service_access["archive::api::roles/storage.objectCreator"]',
   'google_storage_bucket_iam_member.service_access["archive::api::roles/storage.objectViewer"]',
   'google_storage_bucket_iam_member.service_access["artifacts::api::projects/essential-wares-510320-f0/roles/tiloArtifactObjectDelete"]',
-  # egress NAT (network.tf): the fix for the Home 503
-  'google_compute_router.nat', 'google_compute_router_nat.run_egress',
   # the optional bot (MEETING-OPTIONAL-BOT-PLAN-14OCT.md items 1 to 10)
   'google_project_service.apis["texttospeech.googleapis.com"]',
   'module.service.google_service_account.this["meet-bot"]',
@@ -123,7 +122,12 @@ $expectChange = @(
   'module.monitoring.google_monitoring_alert_policy.run_5xx_ratio',              # the filter regex gains tilo-meet-bot
   'module.monitoring.google_monitoring_alert_policy.run_latency_p95'             # same
 )
+$expectImport = @('google_compute_router.nat', 'google_compute_router_nat.run_egress')
 $problems = @()
+$problems += @($imported.address | Where-Object { $_ -notin $expectImport }) | ForEach-Object { "UNEXPECTED import: $_" }
+$problems += @($expectImport | Where-Object { $_ -notin $imported.address }) | ForEach-Object { "MISSING import: $_" }
+# An import must adopt as-is: a router or NAT shown as update, create or replace means the code and the hand-made one differ.
+$problems += @($imported | Where-Object { ($_.change.actions -join ',') -ne 'no-op' }) | ForEach-Object { "IMPORT WITH A CHANGE: $($_.address) ($($_.change.actions -join '+'))" }
 $problems += @($add.address | Where-Object { $_ -notin $expectAdd }) | ForEach-Object { "UNEXPECTED add: $_" }
 $problems += @($expectAdd | Where-Object { $_ -notin $add.address }) | ForEach-Object { "MISSING add: $_" }
 $problems += @($chg.address | Where-Object { $_ -notin $expectChange }) | ForEach-Object { "UNEXPECTED change: $_" }
@@ -173,10 +177,11 @@ gcloud secrets get-iam-policy tilo-link-signing-key --project $P --format='value
 If a TTL field shows an empty `indexConfig` (all indexes disabled) where it had indexes before, say so before going on:
 the policy was written without an index configuration on purpose.
 
-### 4.1 Verify the NAT with a Home task, before any env step
+### 4.1 The NAT already exists (imported): verify only, before any env step
 
-The NAT needs no new Cloud Run revision: running instances use it on their next outbound connection. Order: NAT exists and
-serves the subnet, then one Home task, then (only if it passes) sections 5 and 6.
+You created the router and the NAT by hand (about 09:00 on 14 Oct); the apply above only imported them into state, so there
+is nothing to create here. The NAT needs no new Cloud Run revision: running instances use it on their next outbound
+connection. Order: NAT exists and serves the subnet, then one Home task, then (only if it passes) sections 5 and 6.
 
 ```powershell
 $P = 'essential-wares-510320-f0'; $R = 'asia-southeast1'
@@ -264,8 +269,9 @@ if ($LASTEXITCODE -ne 0 -or $Pub -notmatch '^[A-Za-z0-9_-]{87}$') { throw 'could
 
 ### 6.3 tilo-api: push, uploads, link signing, skills store
 
-* `TILO_SKILLS_STORE=firestore` (with `TILO_FIRESTORE_PROJECT`, already set): `GET /v1/skills` answers 503 `not_configured`
-  (`SkillStoreNotConfigured`, `deps.get_skill_store`) until it is set. Documents live at `orgs/{org}/taught_skills/{id}` in
+* `TILO_SKILLS_STORE=firestore` (with `TILO_FIRESTORE_PROJECT`, already set): **done** (set on tilo-api, revision
+  `tilo-api-00048-hzq`; `--update-env-vars` keeps it, so the command below may repeat it or leave it out). Before it,
+  `GET /v1/skills` answered 503 `not_configured` (`SkillStoreNotConfigured`, `deps.get_skill_store`). Documents live at `orgs/{org}/taught_skills/{id}` in
   the `(default)` database with single-field queries only, so no index is needed and tilo-api's existing
   `datastore.user` (conditioned to `(default)`) covers it. Roll back with `--remove-env-vars TILO_SKILLS_STORE`.
 * `TILO_ARTIFACTS_STORE` / `TILO_ARCHIVE_STORE` = `gcs` with the two real buckets. The code refuses the same bucket for both,
