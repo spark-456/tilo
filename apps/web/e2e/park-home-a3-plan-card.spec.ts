@@ -94,9 +94,11 @@ test.describe("UI-10 A3 home plan card at 1440x900", () => {
     if (!(m.card && m.left && m.today)) return;
     expect(m.left.b, "greeting column ends above the card").toBeLessThanOrEqual(m.card.t);
     expect(m.today.b, "Today panel ends above the card").toBeLessThanOrEqual(m.card.t);
-    // the tiles are not lost: they are all there, behind the column's own scroll
+    // LIVE-P2-A (QA row 20): the tiles step aside while the card is open (still in the page, not drawn), so the
+    // column has nothing to scroll; Esc brings them back (park-live-p2-a.spec.ts).
     expect(m.tiles).toBe(5);
-    expect(m.scrolls).toBe(true);
+    expect(m.shown).toBe(0);
+    expect(m.scrolls).toBe(false);
   });
 
   test("UI_10_A3_Esc_closes_the_plan_card_and_focus_is_in_the_task_box", async ({ page }) => {

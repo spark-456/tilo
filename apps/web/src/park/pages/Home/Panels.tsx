@@ -150,7 +150,7 @@ export function TodayPanel({
     >
       <div className="park-home-head">
         <span className="park-home-title">{served ? "Live now" : "Sample worlds"}</span>
-        <GoLink href="#worlds" onGo={onWorlds}>
+        <GoLink href="/worlds" onGo={onWorlds}>
           All worlds
         </GoLink>
       </div>
@@ -194,7 +194,7 @@ export function TodayPanel({
           <div className="park-home-rule" />
           <div className="park-home-head park-home-head--next">
             <span className="park-home-title">Up next today</span>
-            <GoLink href="#agenda" onGo={onAgenda}>
+            <GoLink href="/agenda" onGo={onAgenda}>
               Agenda
             </GoLink>
           </div>

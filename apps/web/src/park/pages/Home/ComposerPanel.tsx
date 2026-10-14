@@ -205,8 +205,9 @@ export function ComposerPanel(p: ComposerProps) {
             ) : null}
             {p.sample ? (
               <p className="park-home-plan__sample">
-                Sample plan. Demo sessions replay a recorded run; sign in to start your own.
-                Whatever you type, the replay is the same recorded run: a mail reply, not your task.
+                <strong>Sample run: inbox triage.</strong> Sample plan. Demo sessions replay a
+                recorded run; sign in to start your own. Whatever you type, the replay is the same
+                recorded run: a mail reply, not your task.
               </p>
             ) : null}
           </div>

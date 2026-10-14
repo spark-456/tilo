@@ -120,7 +120,7 @@ export function SpendCard({
     <div className="park-world-spend">
       <div className="park-world-spendhead">
         <span className="park-world-spendtitle">Spend</span>
-        <GoLink className="park-world-spendlink" href="#ledger" onGo={onLedger}>
+        <GoLink className="park-world-spendlink" href="/ledger" onGo={onLedger}>
           Ledger
         </GoLink>
       </div>

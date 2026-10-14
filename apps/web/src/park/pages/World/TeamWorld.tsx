@@ -164,7 +164,7 @@ function WorldShell({
     <div className="park-world-root" data-testid="park-page-world" data-world-id={worldId}>
       <PageSheet>
         <nav aria-label="Breadcrumb" className="park-world-crumb">
-          <GoLink className="park-world-back" href="#worlds" onGo={() => app.go("worlds")}>
+          <GoLink className="park-world-back" href="/worlds" onGo={() => app.go("worlds")}>
             Worlds
           </GoLink>
         </nav>

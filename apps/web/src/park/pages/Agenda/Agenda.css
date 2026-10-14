@@ -1045,3 +1045,15 @@
   font-weight: 600;
   color: var(--ink2);
 }
+
+/* LIVE-P2-A (QA row 26): on a phone an event's title wraps inside its block (the block clips what does not fit) */
+@media (max-width: 480px) {
+  [data-park] .park-agenda-eventline {
+    align-items: flex-start;
+  }
+  [data-park] .park-agenda-eventtitle {
+    white-space: normal;
+    overflow-wrap: anywhere;
+    text-overflow: clip;
+  }
+}
