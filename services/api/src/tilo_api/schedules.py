@@ -83,6 +83,7 @@ from tilo_api import (
     nudge_sweep,
     plate_links,
     runs,
+    store_door,
     team_access,
     team_store,
 )
@@ -919,10 +920,22 @@ def _sweep_outbox(request: Request, clock: Callable[[], datetime], store_factory
             return True
         return world is None or world.paused
 
+    def source_valid(entry: dict) -> bool:
+        from tilo_api.followup_outbox_sources import source_valid as valid  # noqa: PLC0415
+
+        if not opened:
+            opened.append(store_factory())
+        world = opened[0].load_world(entry["world_id"], settle=False)
+        if not entry["idempotency_key"].startswith("autopilot:"):
+            return world is not None
+        people = overrides.get(deps.get_people_stores, deps.get_people_stores)()
+        client = store_door.open_api_store().client
+        return valid(entry, world, people, client, deps.ORG_ID, clock().timestamp())
+
     try:
         store = overrides.get(deps.get_outbox_store, deps.get_outbox_store)()
         adapters = overrides.get(deps.get_connector_adapters, deps.get_connector_adapters)()
-        sweep_due(store, adapters, lambda: _stamp(clock()), paused)
+        sweep_due(store, adapters, lambda: _stamp(clock()), paused, source_valid=source_valid)
     except Exception as exc:
         logger.error("outbox sweep failed (%s)", type(exc).__name__)
 
