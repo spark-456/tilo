@@ -3,7 +3,6 @@
 // invents or emits events (HR-1..HR-7).
 import type { Event } from "@tilo/contracts";
 import { useSyncExternalStore } from "react";
-import { setAssistantOpen } from "../assistant/openState";
 import { forgetWorld } from "../world/lastWorld";
 import {
   clearReplayPoints,
@@ -120,7 +119,6 @@ export function confirmResetStageDemo(worldId?: string | null): void {
   if (worldId) setReplayPoint(worldId, null);
   forgetWorld();
   setDensity("friendly");
-  setAssistantOpen(false);
   notify();
 }
 

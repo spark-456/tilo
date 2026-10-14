@@ -8,10 +8,9 @@ import { describe, expect, it } from "vitest";
 
 const SRC = resolve(__dirname, "..");
 
-// Link to the stage: PrimaryNav world item, S-03 after approval, the replays list's "World" pill, the Park World
-// page's "Open live stage" link. (The lens tabs, the inspect page and the delivery moved to worldView/ and build
-// their addresses through worldView/routes.ts.)
-const FILES = ["screens/PrimaryNav.tsx", "park/pages/World/WorldPage.tsx"] as const;
+// Link to the stage: the Park World page's "Open live stage" link. (The lens tabs, the inspect page and the delivery
+// are in worldView/ and build their addresses through worldView/routes.ts.)
+const FILES = ["park/pages/World/WorldPage.tsx"] as const;
 
 const read = (rel: string): string => readFileSync(resolve(SRC, rel), "utf8");
 

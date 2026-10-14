@@ -19,7 +19,7 @@ old screens until the cutover PR. WEB-1a holds the tokens, fonts, typed fixtures
   marker `motion: restored in WEB-3 (BQ-WEB-3)` sits where the design moves (thumb, knob). A control
   that is a button is a real `<button type="button">`; `Toast` has no timer (`TOAST_MS` only);
   `Popover`/`Menu` share `Panel.tsx` (Escape on the document, backdrop, focus back to the opener).
-- `dev/Components.tsx`: `/dev/components` (dev build, lazy route in `screens/routes.tsx`), a day and a
+- `dev/Components.tsx`: `/dev/components` (dev build only; a lazy route in `Root.tsx`), a day and a
   night `data-park` panel with every component; one filled primary button per panel (UX-1).
 ## App (WEB-3a, `app/`)
 - `src/Root.tsx` shows the old app, or the lazy `app/ParkApp.tsx` under `/park` (`isParkPath`).

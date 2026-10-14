@@ -241,7 +241,7 @@ for (const [name, viewport] of Object.entries(SIZES)) {
   });
 }
 
-test.describe("the old app and the landing bundle", () => {
+test.describe("the landing bundle", () => {
   test.use({ viewport: DESKTOP });
 
   const PARK_CHUNK = /\/src\/park\/app\/(ParkApp|context|pages|store)/;
@@ -254,32 +254,7 @@ test.describe("the old app and the landing bundle", () => {
     await expect(page.getByTestId("stage-frame")).toHaveCount(0);
     await page.goto("/worlds");
     await expect(page.getByTestId("park-page-worlds")).toBeVisible();
-    await expect(page.getByTestId("screen-page")).toHaveCount(0);
     expect(problems).toEqual([]);
-  });
-
-  test("WEB_3a_e2e_the_old_app_is_untouched_at_more_and_the_stage_path", async ({ page }) => {
-    const problems = collectConsoleProblems(page);
-    await page.goto("/more");
-    await expect(page.getByTestId("screen-page")).toBeVisible();
-    await expect(page.getByTestId("top-bar")).toBeVisible();
-    await expect(page.locator("[data-park]")).toHaveCount(0);
-    await page.goto("/world/w_village_basic/stage");
-    await expect(page.getByTestId("stage-frame")).toBeVisible();
-    await expect(page.locator("[data-park]")).toHaveCount(0);
-    expect(problems).toEqual([]);
-  });
-
-  test("WEB_3a_e2e_a_kept_old_app_path_does_not_fetch_the_park_app_chunk", async ({ page }) => {
-    const parkModules: string[] = [];
-    page.on("request", (r) => {
-      if (PARK_CHUNK.test(r.url())) parkModules.push(r.url());
-    });
-    await page.goto("/more");
-    await expect(page.getByTestId("screen-page")).toBeVisible();
-    expect(parkModules, "NFR-01: the park chunk loads only on a Park path").toEqual([]);
-    await page.goto("/");
-    await expect(page.getByTestId("park-page-home")).toBeVisible();
   });
 
   test("WEB_3a_e2e_the_landing_loads_the_park_shell_and_not_the_stage_engine", async ({ page }) => {

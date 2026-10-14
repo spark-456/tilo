@@ -1,25 +1,16 @@
 // OLD-UI-OUT waves 1-4: only development galleries remain in the old shell.
 // @vitest-environment happy-dom
-// WEB-3a: the mount point. Pinned: apps/web/src/Root.tsx exports `Root()`; main.tsx renders <Root/>.
-// Root shows the existing <App/> (unchanged) unless the pathname is a Park path (`isParkPath` from
-// park/app/router: the root pages and the /park alias, WEB-CUTOVER), then the lazily imported
-// park/app/ParkApp (default export) inside <Suspense>.
-// NFR-01: the park chunk is a dynamic import, so a visit to a kept (old-app) screen never loads it. The
-// landing page `/` is the Park Home since WEB-CUTOVER, so it is no longer the case to pin here.
+// OLD-UI-OUT Final: the mount point. Pinned: apps/web/src/Root.tsx exports `Root()`; main.tsx renders <Root/>.
+// The old app is deleted, so every address is the lazily imported park/app/ParkApp (default export) inside
+// <Suspense>: a Park page, its own "Page not found", or a routed world view (worldView/). A retired bookmark is
+// replaced by its Park home before anything renders.
 import { act } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, mount, q, qa } from "../test-support/park/componentsHarness";
 import { navigateFlow } from "./router";
 
-const loaded = vi.hoisted(() => ({ park: 0 }));
-
-vi.mock("./App", async () => {
-  const { createElement } = await import("react");
-  return { App: () => createElement("div", { "data-testid": "old-app" }, "old app") };
-});
 vi.mock("./park/app/ParkApp", async () => {
   const { createElement } = await import("react");
-  loaded.park += 1;
   const ParkApp = (props: { routed?: { title: string } }) =>
     createElement(
       "div",
@@ -49,47 +40,29 @@ afterEach(() => {
   window.history.pushState({}, "", "/");
 });
 
-describe("WEB_3a_root: old app or park app by path", () => {
-  // Must stay the first test that renders: the lazy import is cached for the rest of the file.
-  it("WEB_3a_root_a_visit_to_a_kept_screen_never_loads_the_park_chunk", async () => {
-    await visit("/screens");
-    await visit("/screens");
-    await visit("/dev/components");
-    expect(loaded.park).toBe(0);
-  });
-
-  // `/world`, `/parkour` and `/parks/home` own no screen: they are the Park "Page not found" now
-  // (Root.kept.test.tsx), so the old app's list is the addresses it keeps.
-  it("WEB_3a_root_every_non_park_path_is_the_old_app", async () => {
-    for (const path of ["/screens", "/screens/cards", "/dev/components"]) {
-      const m = await visit(path);
-      expect(qa(m.container, '[data-testid="old-app"]'), path).toHaveLength(1);
-      expect(qa(m.container, '[data-testid="park-app"]'), path).toHaveLength(0);
-      m.unmount();
-    }
-  });
-
-  it("WEB_3a_root_every_park_path_and_root_page_is_the_park_app", async () => {
+describe("WEB_3a_root: the Park app serves every address", () => {
+  it("OLD_UI_OUT_final_root_every_address_is_the_park_app", async () => {
     for (const path of [
       "/",
       "/settings",
       "/worlds",
       "/world/k1",
       "/team",
+      "/library",
+      "/settings",
+      "/more",
       "/park",
-      "/park/",
       "/park/home",
-      "/park/world/k1",
       "/park/nope",
+      "/xyz",
     ]) {
       const m = await visit(path);
       expect(qa(m.container, '[data-testid="park-app"]'), path).toHaveLength(1);
-      expect(qa(m.container, '[data-testid="old-app"]'), path).toHaveLength(0);
       m.unmount();
     }
   });
 
-  it("OLD_UI_OUT_2_root_a_lens_or_needs_you_address_is_the_park_app_with_a_routed_view", async () => {
+  it("OLD_UI_OUT_final_root_a_lens_or_needs_you_address_is_the_park_app_with_a_routed_view", async () => {
     const titles: Array<[string, string]> = [
       ["/world/w/stage", "World"],
       ["/world/w/story", "Story"],
@@ -105,7 +78,6 @@ describe("WEB_3a_root: old app or park app by path", () => {
       const park = qa(m.container, '[data-testid="park-app"]');
       expect(park, path).toHaveLength(1);
       expect(park[0]?.getAttribute("data-routed"), path).toBe(title);
-      expect(qa(m.container, '[data-testid="old-app"]'), path).toHaveLength(0);
       m.unmount();
     }
     // A plain Park page carries no routed view.
@@ -114,15 +86,19 @@ describe("WEB_3a_root: old app or park app by path", () => {
     home.unmount();
   });
 
-  it("WEB_3a_root_moving_between_the_apps_follows_the_address", async () => {
-    const m = await visit("/screens");
-    expect(q(m.container, '[data-testid="old-app"]')).toBeTruthy();
-    await act(async () => navigateFlow("/park/home"));
+  it("OLD_UI_OUT_final_root_a_retired_intake_address_is_replaced_by_home", async () => {
+    for (const path of ["/start", "/task/t1/understanding", "/task/t1/approaches"]) {
+      const m = await visit(path);
+      expect(window.location.pathname, path).toBe("/");
+      expect(qa(m.container, '[data-testid="park-app"]'), path).toHaveLength(1);
+      m.unmount();
+    }
+  });
+
+  it("OLD_UI_OUT_final_root_navigation_stays_in_the_park_app", async () => {
+    const m = await visit("/worlds");
+    await act(async () => navigateFlow("/library"));
     await settle();
-    expect(m.container.querySelector('[data-testid="park-app"]')).not.toBeNull();
-    expect(m.container.querySelector('[data-testid="old-app"]')).toBeNull();
-    await act(async () => navigateFlow("/screens"));
-    await settle();
-    expect(m.container.querySelector('[data-testid="old-app"]')).not.toBeNull();
+    expect(qa(m.container, '[data-testid="park-app"]')).toHaveLength(1);
   });
 });

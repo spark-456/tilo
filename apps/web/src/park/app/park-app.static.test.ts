@@ -215,16 +215,16 @@ describe("WEB_3a_static: the mount point keeps the landing bundle free of the pa
   it("WEB_3a_static_no_static_import_of_ParkApp_or_anything_in_park_but_the_pure_router", () => {
     for (const src of [rootSrc(), mainSrc()]) {
       const parkImports = staticImports(src).filter((s) => /(^|\/)park(\/|$)/.test(s));
-      for (const spec of parkImports) expect(spec).toBe("./park/app/router");
+      // the pure router, and the pure redirect table for retired bookmarks (adminRedirect)
+      for (const spec of parkImports)
+        expect(["./park/app/router", "./park/app/adminRedirect"]).toContain(spec);
     }
   });
 
-  it("WEB_3a_static_Root_uses_the_pure_isParkPath_and_the_shared_usePathname", () => {
-    expect(rootSrc()).toMatch(/\bisParkPath\b/);
-    expect(rootSrc()).toMatch(/\bisKeptPath\b/); // the old app owns only the addresses keptPaths.ts lists
+  it("WEB_3a_static_Root_uses_the_shared_usePathname_and_has_no_old_app", () => {
     expect(rootSrc()).toMatch(/\busePathname\b/);
-    // the old app is a chunk too since 7073de5d (the landing never ships its shell, NFR-01): a dynamic import
-    expect(rootSrc()).toMatch(/import\(\s*["']\.\/App["']\s*\)/);
+    // OLD-UI-OUT Final: the old app and its kept-address predicate are deleted; Root loads only Park
+    expect(rootSrc()).not.toMatch(/\bisKeptPath\b|keptPaths|import\(\s*["']\.\/App["']\s*\)/);
   });
 
   it("WEB_3a_static_main_still_renders_through_Root_with_the_old_boot_steps", () => {

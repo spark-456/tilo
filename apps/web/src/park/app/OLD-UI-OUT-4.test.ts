@@ -1,13 +1,11 @@
 import { expect, it } from "vitest";
-import { isKeptPath } from "../../keptPaths";
 import { adminRedirect } from "./adminRedirect";
 import { isParkPath, parseParkPath } from "./router";
 
 it.each(["/autonomy", "/channels", "/settings", "/estimate", "/pilot"])(
-  "OLD-UI-OUT-4a %s belongs to Park, never the old shell",
+  "OLD-UI-OUT-4a %s belongs to Park",
   (path) => {
     expect(isParkPath(path)).toBe(true);
-    expect(isKeptPath(path)).toBe(false);
   },
 );
 it.each([

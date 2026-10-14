@@ -16,7 +16,6 @@ import {
   q,
   qa,
 } from "../../../test-support/park/componentsHarness";
-import { matchScreen } from "../../screens/routes";
 import { Components } from "../dev/Components";
 
 afterEach(cleanup);
@@ -302,26 +301,5 @@ describe("WEB_2_dev_page: the live menu opens, closes on Escape and gives focus 
     click(trigger);
     click(q(d, ".park-popover__backdrop"));
     expect(d.querySelector('[role="menu"]')).toBeNull();
-  });
-});
-
-describe("WEB_2_dev_route: /dev/components is a screen route in the dev build", () => {
-  it("WEB_2_dev_route_matchScreen_finds_dev_components_in_the_dev_build", () => {
-    const m = matchScreen("/dev/components");
-    expect(m?.id).toBe("dev-components");
-    expect(m?.params).toEqual([]);
-    expect(matchScreen("/dev/components/")?.id).toBe("dev-components");
-  });
-
-  it("WEB_2_dev_route_neighbouring_paths_do_not_match", () => {
-    expect(matchScreen("/dev/components/extra")).toBeNull();
-    expect(matchScreen("/dev")).toBeNull();
-    expect(matchScreen("/dev/components-x")).toBeNull();
-  });
-
-  it("WEB_2_dev_route_the_existing_extra_routes_still_match", () => {
-    expect(matchScreen("/more")?.id).toBe("more");
-    expect(matchScreen("/screens")?.id).toBe("screens");
-    expect(matchScreen("/screens/cards")?.id).toBe("screens-cards");
   });
 });

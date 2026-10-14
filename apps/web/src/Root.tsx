@@ -1,10 +1,7 @@
-// The mount point: the Park app serves the root paths (/, /worlds, /world/:id, /team, ...), the /park alias
-// and every address no screen owns (its own "Page not found"); the old app serves exactly the addresses it
-// keeps (`isKeptPath`: /start, the stage at /world/:id/stage and the other kept screens). Both apps are
-// dynamic imports, so a visit to a kept screen never loads the Park app (NFR-01). `isParkPath` and
-// `isKeptPath` are the shared predicates for the split (WEB-CUTOVER). /privacy and /terms (WEB-LEGAL) are
-// static public pages: their own chunk, loading neither app (no sign-in, no API). /oauth/google/callback (ADR-0035 L4) is its own chunk
-// behind the sign-in gate; it loads neither app. SEC-15: both apps sit behind the
+// The mount point: the Park app serves every address (/, /worlds, /world/:id, /team, ...), the /park alias and every
+// address no page owns (its own "Page not found"). The old app is gone (OLD-UI-OUT Final). /privacy and /terms
+// (WEB-LEGAL) are static public pages: their own chunk, loading no app (no sign-in, no API). /oauth/google/callback
+// (ADR-0035 L4) is its own chunk behind the sign-in gate; it loads no app. SEC-15: the Park app sits behind the
 // sign-in gate; with no Firebase here (a local host, a build with no config) the gate shows the app at once.
 import { type ReactNode, Suspense, lazy, useEffect, useMemo, useSyncExternalStore } from "react";
 import { AccessLayer, needsAccess } from "./access/AccessLayer";
@@ -12,25 +9,25 @@ import { API_URL, appCheckToken, authToken } from "./api/ClientProvider";
 import { HttpClient } from "./api/http";
 import { SignInGate } from "./auth/SignInGate";
 import { session } from "./auth/session";
-import { useDocumentTitle } from "./documentTitle";
-import { isKeptPath, isRetiredFlowPath } from "./keptPaths";
 import { legalKind } from "./legal/legalPaths";
 import { takeCallbackParams } from "./oauth/capture";
 import { isOAuthCallback } from "./oauth/paths";
 import { adminRedirect } from "./park/app/adminRedirect";
-import { isParkPath } from "./park/app/router";
 import { usePathname } from "./router";
 import { type ViewRoute, parseViewPath, viewTitle } from "./worldView/routes";
 
-// Both apps are chunks: the landing (Park Home) never ships the old app's shell, and a kept screen never
-// loads the Park app (NFR-01).
-const App = lazy(() => import("./App").then((m) => ({ default: m.App })));
+// The Park app is a chunk of its own, so the legal pages and the OAuth callback load without it (NFR-01).
 const ParkApp = lazy(() => import("./park/app/ParkApp"));
 const LegalPage = lazy(() => import("./legal/LegalPage"));
 const OAuthCallback = lazy(() => import("./oauth/CallbackRoute"));
 // OLD-UI-OUT-2: a world's lenses and the Needs-you page are Park pages (the Park shell frames them); their code is a
 // chunk of its own that only these addresses load.
 const WorldViewApp = lazy(() => import("./worldView/WorldViewApp"));
+// The Park component gallery (WEB-2): a dev-build address only; its chunk is never reached from the landing bundle.
+const DevComponents = import.meta.env.DEV
+  ? lazy(() => import("./park/dev/Components").then((m) => ({ default: m.Components })))
+  : null;
+const DEV_COMPONENTS = /^\/dev\/components\/?$/;
 
 /** The shell's routed view for a lens, inspect or Needs-you address. */
 function routedOf(view: ViewRoute) {
@@ -74,6 +71,7 @@ function AccessGuard({ children }: { children: ReactNode }) {
 
 export function Root() {
   const pathname = usePathname();
+  // A bookmark of a retired screen (the old intake flow, mail, the team console) is replaced by its Park home before it renders.
   const redirect = adminRedirect(pathname, window.location.search);
   useEffect(() => {
     if (redirect) {
@@ -82,24 +80,15 @@ export function Root() {
     }
   }, [redirect]);
   const legal = legalKind(pathname);
-  useDocumentTitle(/^\/more\/?$/.test(pathname) ? "More" : null);
   // ADR-0035 LC-02: Google's redirect lands here. The code and state leave the address bar before anything else renders.
   const oauth = isOAuthCallback(pathname) ? takeCallbackParams() : undefined;
   const view = parseViewPath(pathname);
-  const park = view !== null || isParkPath(pathname) || !isKeptPath(pathname);
   // ONBOARD-1: the first-run welcome and tour register themselves with the Park shell (park/shell/tour.ts): a chunk of
-  // its own, started beside the Park app's and never awaited by it. The kept screens and legal pages never load it.
+  // its own, started beside the Park app's and never awaited by it. The legal pages and the OAuth callback never load it.
   useEffect(() => {
-    if (park && !legal && oauth === undefined) void import("./onboarding/register");
-  }, [park, legal, oauth]);
-  // SIMPLE-RUN-1: a retired flow address is replaced by Home before either app renders.
-  const retired = isRetiredFlowPath(pathname);
-  useEffect(() => {
-    if (!retired) return;
-    window.history.replaceState({}, "", "/");
-    window.dispatchEvent(new PopStateEvent("popstate"));
-  }, [retired]);
-  if (retired) return null;
+    if (!legal && oauth === undefined) void import("./onboarding/register");
+  }, [legal, oauth]);
+  if (redirect) return null;
   if (oauth !== undefined) {
     return (
       <Suspense fallback={null}>
@@ -118,7 +107,11 @@ export function Root() {
     <SignInGate auth={session}>
       <AccessGuard>
         <Suspense fallback={null}>
-          {park ? <ParkApp {...(view ? { routed: routedOf(view) } : {})} /> : <App />}
+          {DevComponents && DEV_COMPONENTS.test(pathname) ? (
+            <DevComponents />
+          ) : (
+            <ParkApp {...(view ? { routed: routedOf(view) } : {})} />
+          )}
         </Suspense>
       </AccessGuard>
     </SignInGate>

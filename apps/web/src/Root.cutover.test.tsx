@@ -1,19 +1,13 @@
 // OLD-UI-OUT waves 1-4: only development galleries remain in the old shell.
 // @vitest-environment happy-dom
-// WEB-CUTOVER: the mount point after the cutover. Root shows the Park app for `isParkPath(pathname)`
-// (every root Park path and the /park alias), else <App/>. The old App is mocked; the Park app is the real
-// one with the real page registry, so "/" really renders the Park Home (data-testid="park-page-home").
+// WEB-CUTOVER, after OLD-UI-OUT Final: the mount point renders the real Park app with the real page registry, so
+// "/" really is the Park Home (data-testid="park-page-home"), an address no page owns is the Park "Page not
+// found" with a link Home, and a retired intake address goes to Home. No old app exists to fall back to.
 import { act } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, mount, qa } from "../test-support/park/componentsHarness";
-import { navigateFlow } from "./router";
-
-vi.mock("./App", async () => {
-  const { createElement } = await import("react");
-  return { App: () => createElement("div", { "data-testid": "old-app" }, "old app") };
-});
-
 import { Root } from "./Root";
+import { navigateFlow } from "./router";
 
 const settle = async () => {
   await act(async () => {
@@ -33,12 +27,11 @@ afterEach(() => {
   window.history.pushState({}, "", "/");
 });
 
-describe("WEB_CUTOVER_root: the Park app owns the root paths", () => {
+describe("WEB_CUTOVER_root: the Park app owns every address", () => {
   it("WEB_CUTOVER_05_root_renders_the_park_home", async () => {
     const m = await visit("/");
     expect(qa(m.container, '[data-testid="park-page-home"]')).toHaveLength(1);
     expect(qa(m.container, "[data-park]")).toHaveLength(1);
-    expect(qa(m.container, '[data-testid="old-app"]')).toHaveLength(0);
   });
 
   it("WEB_CUTOVER_05_every_root_park_path_is_the_park_app_with_its_page", async () => {
@@ -59,39 +52,34 @@ describe("WEB_CUTOVER_root: the Park app owns the root paths", () => {
     for (const [path, id] of table) {
       const m = await visit(path);
       expect(qa(m.container, `[data-testid="park-page-${id}"]`), path).toHaveLength(1);
-      expect(qa(m.container, '[data-testid="old-app"]'), path).toHaveLength(0);
       m.unmount();
     }
   });
 
-  it("WEB_CUTOVER_05_the_stage_and_every_kept_screen_is_the_old_app", async () => {
-    for (const path of ["/screens", "/screens/cards", "/dev/components"]) {
+  it.each(["/xyz", "/world/x/unknown", "/world", "/start/x", "/team/x", "/parkour", "/park/nope"])(
+    "WEB_CUTOVER_root_%s_is_the_park_not_found_with_a_link_home",
+    async (path) => {
       const m = await visit(path);
-      expect(qa(m.container, '[data-testid="old-app"]'), path).toHaveLength(1);
-      expect(qa(m.container, "[data-park]"), path).toHaveLength(0);
+      expect(qa(m.container, '[data-testid="park-not-found"]'), path).toHaveLength(1);
+      const home = qa<HTMLAnchorElement>(m.container, '[data-testid="park-not-found"] a').find(
+        (a) => a.textContent?.trim() === "Go to Home",
+      );
+      expect(home?.getAttribute("href"), path).toBe("/");
       m.unmount();
-    }
+    },
+  );
+
+  it("OLD_UI_OUT_final_root_start_goes_to_the_park_home", async () => {
+    const m = await visit("/start");
+    expect(qa(m.container, '[data-testid="park-page-home"]')).toHaveLength(1);
+    expect(window.location.pathname).toBe("/");
   });
 
-  it("WEB_CUTOVER_05_an_unknown_park_alias_path_shows_the_park_not_found_page", async () => {
-    const m = await visit("/park/nope");
-    expect(qa(m.container, '[data-testid="park-not-found"]')).toHaveLength(1);
-    expect(qa(m.container, '[data-testid="old-app"]')).toHaveLength(0);
-  });
-
-  it("WEB_CUTOVER_05_moving_between_the_apps_follows_the_address", async () => {
+  it("WEB_CUTOVER_05_navigation_moves_between_park_pages", async () => {
     const m = await visit("/");
     expect(m.container.querySelector('[data-testid="park-page-home"]')).not.toBeNull();
-    await act(async () => navigateFlow("/screens"));
-    await settle();
-    expect(m.container.querySelector('[data-testid="old-app"]')).not.toBeNull();
-    expect(m.container.querySelector("[data-park]")).toBeNull();
     await act(async () => navigateFlow("/worlds"));
     await settle();
     expect(m.container.querySelector('[data-testid="park-page-worlds"]')).not.toBeNull();
-    expect(m.container.querySelector('[data-testid="old-app"]')).toBeNull();
-    await act(async () => navigateFlow("/dev/components"));
-    await settle();
-    expect(m.container.querySelector('[data-testid="old-app"]')).not.toBeNull();
   });
 });
