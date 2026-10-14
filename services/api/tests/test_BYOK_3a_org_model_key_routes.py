@@ -385,26 +385,30 @@ def _force_status(rig: Rig, status: str) -> None:
 
 
 @pytest.mark.parametrize("status", ["invalid", "unverified"])
-def test_BK_17_B2_an_invalid_or_unverified_key_cannot_be_paused_and_resumed_to_active(rig: Rig, status: str) -> None:
+def test_ADR_0041_R34_6_BK_17_B2_invalid_or_unverified_resume_is_200_unchanged(rig: Rig, status: str) -> None:
     rig.put()
     _force_status(rig, status)
     refused = rig.client.patch(PATH, json={"paused": True})
     assert refused.status_code == 422 and refused.json()["code"] == "invalid_body"
     assert rig.store.get(ORG).status == status  # type: ignore[union-attr]
+    before = rig.store.get(ORG)
     resumed = rig.client.patch(PATH, json={"paused": False, "confirm": True, "consent_version": 3})
     assert rig.store.get(ORG).status == status, "a resume never makes it active"  # type: ignore[union-attr]
-    assert resumed.status_code in (200, 422)
+    assert resumed.status_code == 200
+    assert rig.store.get(ORG) == before
     assert rig.client.get(PATH).json()["state"] == status
     rig.user = MEMBER
     assert rig.client.get(PATH).json()["active"] is False
 
 
-def test_BK_17_B2_a_key_that_went_invalid_while_paused_stays_invalid_on_resume(rig: Rig) -> None:
+def test_ADR_0041_R34_6_BK_17_B2_invalid_while_paused_resume_is_200_unchanged(rig: Rig) -> None:
     rig.put()
     assert rig.client.patch(PATH, json={"paused": True}).json()["state"] == "paused"
     _force_status(rig, "invalid")
+    before = rig.store.get(ORG)
     got = rig.client.patch(PATH, json={"paused": False, "confirm": True, "consent_version": 3})
-    assert got.status_code in (200, 422)
+    assert got.status_code == 200
+    assert rig.store.get(ORG) == before
     assert rig.store.get(ORG).status == "invalid"  # type: ignore[union-attr]
 
 
