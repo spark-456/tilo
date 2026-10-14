@@ -24,7 +24,6 @@ const isPageId = (s: string | undefined): s is PageId => PAGE_IDS.some((p) => p 
 
 // Root pages other than home ("/" is home, the world page takes exactly one id segment).
 const ROOT_PAGES = new Set<string>([
-  "settings",
   "worlds",
   "team",
   "connectors",
@@ -172,7 +171,9 @@ const snapshot = (): string => `${window.location.pathname}${window.location.sea
 /** The current route, re-read on every History API navigation; null when the path is not a Park page. */
 export function useParkRoute(): ParkRoute | null {
   const url = useSyncExternalStore(subscribe, snapshot);
-  const legacy = ROUTINES_ADDRESS.test(url.split("?")[0] ?? "") ? "/worlds" : legacyTarget(url.split("?")[0] ?? url);
+  const legacy = ROUTINES_ADDRESS.test(url.split("?")[0] ?? "")
+    ? "/worlds"
+    : legacyTarget(url.split("?")[0] ?? url);
   useEffect(() => {
     if (legacy === null) return;
     window.history.replaceState({}, "", legacy);

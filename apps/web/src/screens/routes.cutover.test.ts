@@ -3,13 +3,13 @@
 // other kept screen stays on its own address. Bare /team and /worlds belong to Park, not to matchScreen.
 import { describe, expect, it } from "vitest";
 import { FIXTURE_WORLD_ID } from "../api/fixtures/derived";
-import { parseParkPath, isParkPath } from "../park/app/router";
+import { isParkPath, parseParkPath } from "../park/app/router";
 import { matchFlowRoute } from "../router";
 import { parseViewPath } from "../worldView/routes";
 import { screenMeta } from "./meta";
 import { matchScreen } from "./routes";
 
-const moved = new Set(["S-15", "S-16", "S-22", "S-23", "S-24"]);
+const moved = new Set(["S-15", "S-16", "S-22", "S-23", "S-24", "S-17", "S-18", "S-19", "more"]);
 function owner(path: string, id: string) {
   if (moved.has(id)) {
     expect(matchScreen(path), path).toBeNull();
@@ -92,13 +92,7 @@ describe("WEB_CUTOVER_screens: kept screens stay reachable on their own paths", 
   });
 
   it("WEB_CUTOVER_07_every_screen_row_with_a_pattern_resolves_from_its_own_path", () => {
-    for (const s of [
-      "S-15",
-      "S-16",
-      "S-22",
-      "S-23",
-      "S-24",
-    ]) {
+    for (const s of ["S-15", "S-16", "S-22", "S-23", "S-24"]) {
       const path = screenMeta(s)?.path ?? "";
       owner(path, s);
     }

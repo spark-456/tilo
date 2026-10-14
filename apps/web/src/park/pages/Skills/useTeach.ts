@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { displayApiError } from "../../api/errorMessage";
 // The "Teach Tilo something new" flow as one state machine (the reference's `startCapture`, `startRun`,
 // `advance` and `save`): Show it, Tilo's version, Try run, Save, then saved. Every wait goes through the
 // provider's `schedule` (never a timer of its own), one pending step at a time, cancelled when the state
 // that wanted it changes or the page goes: a captured step and a run step each take 900 ms.
-import { displayApiError } from "../../api/errorMessage";
 import type { Api } from "../../api/index";
 import type { Skill, SkillCapture, SkillVersion, Source, User } from "../../api/types";
 import type { AppCtx } from "../../app/AppCtx";
@@ -235,14 +235,7 @@ export function useTeach({
       },
       (e) => {
         setFailure(e);
-        const said =
-          e instanceof Error
-            ? "refusal" in e && typeof e.refusal === "string"
-              ? e.refusal
-              : e.message
-            : "";
-        const code = SAVE_CODES.has(said) ? said : null;
-        app.toast(LIVE_TEACH.failed(nm, code));
+        app.toast(`Couldn’t save “${nm}”. ${displayApiError(e)}`);
       },
     );
   };

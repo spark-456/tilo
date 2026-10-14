@@ -24,8 +24,7 @@ const DevComponents = screen(() => import("../park/dev/Components"), "Components
 // Screens that read one run from a bare address: no run yet, or an unknown world, is said, not fetched
 // (a live API is never asked about the fixture world).
 // OLD-UI-OUT: all production screens are ported to Park.
-const COMPONENTS: Readonly<Record<string, ElementType<ScreenProps>>> = {
-};
+const COMPONENTS: Readonly<Record<string, ElementType<ScreenProps>>> = {};
 
 export interface ScreenMatch {
   readonly id: string;

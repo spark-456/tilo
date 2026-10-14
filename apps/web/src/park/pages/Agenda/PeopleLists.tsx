@@ -34,7 +34,11 @@ function List({ kind, api }: { kind: Kind; api: ReturnType<typeof peopleListsApi
     };
   }, [api, kind, attempt]);
   return (
-    <section aria-label={TITLE[kind]} className="park-agenda-state park-agenda-peoplelist" data-testid={`agenda-${kind}`}>
+    <section
+      aria-label={TITLE[kind]}
+      className="park-agenda-state park-agenda-peoplelist"
+      data-testid={`agenda-${kind}`}
+    >
       <h2>{TITLE[kind]}</h2>
       {state === "loading" ? (
         <output>Loading…</output>

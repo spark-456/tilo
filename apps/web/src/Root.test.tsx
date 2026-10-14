@@ -1,3 +1,4 @@
+// OLD-UI-OUT waves 1-4: only development galleries remain in the old shell.
 // @vitest-environment happy-dom
 // WEB-3a: the mount point. Pinned: apps/web/src/Root.tsx exports `Root()`; main.tsx renders <Root/>.
 // Root shows the existing <App/> (unchanged) unless the pathname is a Park path (`isParkPath` from
@@ -51,19 +52,16 @@ afterEach(() => {
 describe("WEB_3a_root: old app or park app by path", () => {
   // Must stay the first test that renders: the lazy import is cached for the rest of the file.
   it("WEB_3a_root_a_visit_to_a_kept_screen_never_loads_the_park_chunk", async () => {
-    await visit("/more");
     await visit("/screens");
-    await visit("/team/console");
+    await visit("/screens");
+    await visit("/dev/components");
     expect(loaded.park).toBe(0);
   });
 
   // `/world`, `/parkour` and `/parks/home` own no screen: they are the Park "Page not found" now
   // (Root.kept.test.tsx), so the old app's list is the addresses it keeps.
   it("WEB_3a_root_every_non_park_path_is_the_old_app", async () => {
-    for (const path of [
-      "/more",
-      "/team/console",
-    ]) {
+    for (const path of ["/screens", "/screens/cards", "/dev/components"]) {
       const m = await visit(path);
       expect(qa(m.container, '[data-testid="old-app"]'), path).toHaveLength(1);
       expect(qa(m.container, '[data-testid="park-app"]'), path).toHaveLength(0);
@@ -117,13 +115,13 @@ describe("WEB_3a_root: old app or park app by path", () => {
   });
 
   it("WEB_3a_root_moving_between_the_apps_follows_the_address", async () => {
-    const m = await visit("/more");
+    const m = await visit("/screens");
     expect(q(m.container, '[data-testid="old-app"]')).toBeTruthy();
     await act(async () => navigateFlow("/park/home"));
     await settle();
     expect(m.container.querySelector('[data-testid="park-app"]')).not.toBeNull();
     expect(m.container.querySelector('[data-testid="old-app"]')).toBeNull();
-    await act(async () => navigateFlow("/library"));
+    await act(async () => navigateFlow("/screens"));
     await settle();
     expect(m.container.querySelector('[data-testid="old-app"]')).not.toBeNull();
   });

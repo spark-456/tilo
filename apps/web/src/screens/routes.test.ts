@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { ALL_ROUTES } from "../../e2e/support/routes";
-import { isParkPath } from "../park/app/router";
+import { isParkPath, legacyTarget } from "../park/app/router";
 import { matchFlowRoute } from "../router";
 import { parseViewPath } from "../worldView/routes";
 import { sectionOf } from "./PrimaryNav";
@@ -12,7 +12,19 @@ const PARK_VIEWS = ["S-05", "S-06", "S-07", "S-08", "S-10", "S-11", "S-12"];
 
 describe("PRD-18.3 AGW-08 route table: every Must screen has a route", () => {
   it("the rows are S-01..S-29 minus the screens OLD-UI-OUT 3 moved to Park, and only the Should screens have no address", () => {
-    const moved = new Set(["S-01", "S-02", "S-03", "S-09", "S-13", "S-14", "S-21", "S-26", "S-27", "S-28", "S-29"]);
+    const moved = new Set([
+      "S-01",
+      "S-02",
+      "S-03",
+      "S-09",
+      "S-13",
+      "S-14",
+      "S-21",
+      "S-26",
+      "S-27",
+      "S-28",
+      "S-29",
+    ]);
     expect(SCREENS.map((s) => s.id)).toEqual(
       Array.from({ length: 29 }, (_, i) => `S-${String(i + 1).padStart(2, "0")}`).filter(
         (id) => !moved.has(id),
@@ -24,7 +36,7 @@ describe("PRD-18.3 AGW-08 route table: every Must screen has a route", () => {
   for (const s of SCREENS.filter((s) => s.path !== null)) {
     it(`${s.id} ${s.name} resolves from its own address`, () => {
       const path = s.path ?? "";
-      if (["S-17", "S-18", "S-19"].includes(s.id)) {
+      if (["S-15", "S-16", "S-17", "S-18", "S-19", "S-22", "S-23", "S-24"].includes(s.id)) {
         expect(isParkPath(path)).toBe(true);
         expect(matchScreen(path)).toBeNull();
       } else if (FLOW_SCREENS.includes(s.id)) {
@@ -47,8 +59,10 @@ describe("PRD-18.3 AGW-08 route table: every Must screen has a route", () => {
   });
 
   it("passes URL-decoded captures to the screen, and unknown paths belong to the flow shell", () => {
-    expect(matchScreen("/meetings/m%201")?.params).toEqual(["m 1"]);
-    expect(matchScreen("/meetings/m%E0")?.params).toEqual(["m%E0"]);
+    expect(matchScreen("/meetings/m%201")).toBeNull();
+    expect(legacyTarget("/meetings/m%201")).toBe("/agenda");
+    expect(matchScreen("/meetings/m%E0")).toBeNull();
+    expect(legacyTarget("/meetings/m%E0")).toBe("/agenda");
     expect(matchScreen("/nowhere")).toBeNull();
   });
 

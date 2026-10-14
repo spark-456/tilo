@@ -13,14 +13,7 @@ import { speedBadgeText } from "./world/speed";
 
 /** Screens that read the replayed run from a bare address (AGW-08 group B): HR-6 applies, so a replay that is not at
  * its recorded pace says so. */
-const RUN_SCREENS: ReadonlySet<string> = new Set([
-  "S-15",
-  "S-16",
-  "S-17",
-  "S-18",
-  "S-19",
-  "S-23",
-]);
+const RUN_SCREENS: ReadonlySet<string> = new Set(["S-15", "S-16", "S-17", "S-18", "S-19", "S-23"]);
 const NOT_FOUND: ScreenMatch = { id: "not-found", params: [], Component: NotFound };
 
 /** The addresses the old app still owns until its last screens move into the Park pages (OLD-UI-OUT): the intake

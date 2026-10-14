@@ -1,3 +1,4 @@
+// OLD-UI-OUT waves 1-4: only development galleries remain in the old shell.
 // @vitest-environment happy-dom
 // WEB-CUTOVER: the mount point after the cutover. Root shows the Park app for `isParkPath(pathname)`
 // (every root Park path and the /park alias), else <App/>. The old App is mocked; the Park app is the real
@@ -64,11 +65,7 @@ describe("WEB_CUTOVER_root: the Park app owns the root paths", () => {
   });
 
   it("WEB_CUTOVER_05_the_stage_and_every_kept_screen_is_the_old_app", async () => {
-    for (const path of [
-      "/library",
-      "/team/console",
-      "/more",
-    ]) {
+    for (const path of ["/screens", "/screens/cards", "/dev/components"]) {
       const m = await visit(path);
       expect(qa(m.container, '[data-testid="old-app"]'), path).toHaveLength(1);
       expect(qa(m.container, "[data-park]"), path).toHaveLength(0);
@@ -85,7 +82,7 @@ describe("WEB_CUTOVER_root: the Park app owns the root paths", () => {
   it("WEB_CUTOVER_05_moving_between_the_apps_follows_the_address", async () => {
     const m = await visit("/");
     expect(m.container.querySelector('[data-testid="park-page-home"]')).not.toBeNull();
-    await act(async () => navigateFlow("/library"));
+    await act(async () => navigateFlow("/screens"));
     await settle();
     expect(m.container.querySelector('[data-testid="old-app"]')).not.toBeNull();
     expect(m.container.querySelector("[data-park]")).toBeNull();
@@ -93,7 +90,7 @@ describe("WEB_CUTOVER_root: the Park app owns the root paths", () => {
     await settle();
     expect(m.container.querySelector('[data-testid="park-page-worlds"]')).not.toBeNull();
     expect(m.container.querySelector('[data-testid="old-app"]')).toBeNull();
-    await act(async () => navigateFlow("/team/console"));
+    await act(async () => navigateFlow("/dev/components"));
     await settle();
     expect(m.container.querySelector('[data-testid="old-app"]')).not.toBeNull();
   });

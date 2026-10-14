@@ -3,17 +3,29 @@
 // concrete `path` and `pattern` example in screens/meta.ts and the flow routes is kept; S-01's `/` is the Park
 // Home now, so it is not.
 import { describe, expect, it } from "vitest";
+import { FIXTURE_WORLD_ID } from "./api/fixtures/derived";
 import { isKeptPath, isRetiredFlowPath } from "./keptPaths";
 import { isParkPath } from "./park/app/router";
 import { matchFlowRoute } from "./router";
 import { SCREENS } from "./screens/meta";
+import { parseViewPath } from "./worldView/routes";
 
 // Reference: agy-bridge/tasks/OLD-UI-OUT.md Wave 4.
-const MOVED = new Set(["/autonomy", "/channels", "/settings", "/estimate", "/pilot", "/mail", "/connections", "/more", "/team/console"]);
+const MOVED = new Set([
+  "/autonomy",
+  "/channels",
+  "/settings",
+  "/estimate",
+  "/pilot",
+  "/mail",
+  "/connections",
+  "/more",
+  "/team/console",
+]);
 const ownership = (path: string) => {
-  const moved = MOVED.has(path.replace(/\/$/, ""));
+  const moved = MOVED.has(path.replace(/\/$/, "")) || parseViewPath(path) !== null;
   expect(isKeptPath(path), path).toBe(!moved);
-  if (moved) expect(isParkPath(path), path).toBe(true);
+  if (moved) expect(isParkPath(path) || parseViewPath(path) !== null, path).toBe(true);
 };
 const KEPT = [
   "/world/w1/stage",
@@ -39,7 +51,7 @@ const KEPT = [
 ];
 
 // OLD-UI-OUT-2: a world's stage and lenses and the Needs-you pages are Park pages (worldView/routes.ts).
-const MOVED = [
+const MOVED_VIEWS = [
   "/world/w1/stage",
   "/world/w1/story",
   "/world/w1/trace",
@@ -52,7 +64,7 @@ const MOVED = [
 const MOVED_SCREENS = new Set(["S-04", "S-05", "S-06", "S-07", "S-08", "S-10", "S-11", "S-12"]);
 
 describe("OLD-UI-OUT-2_kept_paths: the moved addresses are Park pages", () => {
-  it.each(MOVED)("OLD_UI_OUT_2_kept_paths_%s_is_not_kept", (path) => {
+  it.each(MOVED_VIEWS)("OLD_UI_OUT_2_kept_paths_%s_is_not_kept", (path) => {
     expect(isKeptPath(path)).toBe(false);
     expect(isKeptPath(`${path}/`)).toBe(false);
   });
@@ -73,7 +85,24 @@ describe("WEB_CUTOVER_kept_paths: the addresses the old app owns", () => {
       if (s.id === "S-01" || s.id === "S-22") continue; // UI-10 W7: Home and Settings use Park.
       if (s.path !== null) examples.push(s.path);
     }
-    expect(examples.length).toBeGreaterThan(12);
+    // All four waves keep metadata for these exact ported screens.
+    expect(examples).toEqual([
+      `/world/${FIXTURE_WORLD_ID}/stage`,
+      `/world/${FIXTURE_WORLD_ID}/inspect/B1`,
+      "/needs-you",
+      "/needs-you/gate",
+      "/needs-you/consent",
+      `/world/${FIXTURE_WORLD_ID}/story`,
+      `/world/${FIXTURE_WORLD_ID}/trace`,
+      `/world/${FIXTURE_WORLD_ID}/delivery`,
+      "/autonomy",
+      "/channels",
+      "/mail",
+      "/team/console",
+      "/connections",
+      "/estimate",
+      "/pilot",
+    ]);
     for (const path of examples) ownership(path);
     // every pattern accepts its own example, and the example is kept (patterns are what the router matches)
     for (const s of SCREENS) {
