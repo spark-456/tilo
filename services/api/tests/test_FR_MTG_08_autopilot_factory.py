@@ -1,5 +1,6 @@
 """FR-MTG-08 inert scoped production factory acceptance, fake Firestore only."""
 
+import json
 from dataclasses import replace
 from types import SimpleNamespace
 from unittest.mock import Mock
@@ -8,6 +9,7 @@ import pytest
 from _ppl11c_fs_fake import FakeFirestore
 from fastapi import HTTPException
 from tilo_api import deps
+from tilo_api.draft_firestore import FirestoreDraftStore
 from tilo_api.followup_autopilot_factory import build_factory
 from tilo_api.outbox_firestore import FirestoreOutboxStore
 from tilo_channels.autopilot import DraftContext
@@ -28,8 +30,10 @@ def rig():
         store=store,
         clock=lambda: NOW,
     )
-    db, outbox, drafts, emitted = FakeFirestore(), InMemoryOutboxStore(), Mock(), []
+    db, outbox, drafts, emitted = FakeFirestore(), InMemoryOutboxStore(), Mock(spec=FirestoreDraftStore), []
     drafts.get.return_value = None
+    drafts.state_envelope.side_effect = lambda user, key, value: {"payload": json.dumps(value)}
+    drafts.state_read.side_effect = lambda user, key, row: json.loads(row["payload"])
     hook = Mock(side_effect=lambda: None)
 
     class Emit:
@@ -176,3 +180,15 @@ def test_FR_MTG_08_factory_resolver_requires_durable_shared_door(rig, monkeypatc
         assert caught.value.headers["Cache-Control"] == "no-store"
         assert "private-client-error" not in str(caught.value)
         built.assert_not_called()
+
+
+@pytest.mark.parametrize("drafts", [None, Mock(), object()])
+def test_FR_MTG_08_factory_non_firestore_drafts_fail_closed(rig, drafts):
+    emit = rig.Emit()
+    emit.drafts = drafts
+    with pytest.raises(HTTPException) as refused:
+        make(rig, emit=emit)
+    assert refused.value.status_code == 503
+    assert refused.value.detail == "not_configured"
+    assert rig.emitted == [] and rig.outbox.all_entries() == []
+    rig.hook.assert_not_called()
