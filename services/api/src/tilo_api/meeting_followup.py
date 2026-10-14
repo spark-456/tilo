@@ -23,6 +23,8 @@ from tilo_providers.interfaces import SafetyProvider
 
 from tilo_api import deps
 from tilo_api import events as parts
+from tilo_api.assistant.metering import SpendLedger
+from tilo_api.meeting_allowance import allowance_router
 from tilo_api.meeting_analysis_mode import _Calls, _Safety
 from tilo_api.people_limits import limits_of
 from tilo_api.people_meetings import _mine
@@ -72,6 +74,9 @@ def draft_owner_followup(
     drafts: DraftStore,
     autopilot_factory: Callable[[str, str, str, Callable[[dict], None]], Autopilot],
     recipients: Sequence[str] | None = None,
+    allowance: SpendLedger | None = None,
+    allowance_cap: float = 0,
+    clock: Callable[[], str] | None = None,
 ) -> Preview | None | list[Preview]:
     """Server-only wiring: None picks means nudges; person-id picks mean one minutes email.
     Factory supplies scoped cards/outbox; scope check rejects another world/run or bench evidence.
@@ -236,10 +241,18 @@ def draft_owner_followup(
         clock=lambda: now,
         emit=emit,
     )
-    result = (
-        followup.draft_minutes_email(w.actor, meeting_id, recipients=picks, request_id=identity)
-        if recipients is not None else followup.draft_nudges(w.actor, meeting_id, request_id=identity)
-    )  # fmt: skip
+    with allowance_router(
+        router,
+        ledger=allowance,
+        user=w.actor,
+        clock=clock or (lambda: w.now),
+        cap=allowance_cap,
+        budget=budget,
+    ) as router:
+        result = (
+            followup.draft_minutes_email(w.actor, meeting_id, recipients=picks, request_id=identity)
+            if recipients is not None else followup.draft_nudges(w.actor, meeting_id, request_id=identity)
+        )  # fmt: skip
     check()
     cards = result if isinstance(result, list) else [result] if result is not None else []
     for card in cards:

@@ -18,6 +18,8 @@ from tilo_metering.flags import FlagStore
 from tilo_people.stores import PeopleStores
 
 from tilo_api import deps
+from tilo_api.assistant.config import AssistantConfig
+from tilo_api.assistant.metering import SpendLedger
 from tilo_api.meeting_analysis_mode import analyze_owner_minutes
 from tilo_api.people_writes import Refusal, Writer
 
@@ -39,6 +41,8 @@ class OwnerMinutesCaller:
     switches: FlagStore
     events: deps.EventWriter
     budget: float
+    allowance: SpendLedger | None = None
+    allowance_cap: float = 0
 
     def analyze(self, meeting_id: str) -> dict[str, Any]:
         """Invoke only for an explicit owner instruction; reads/attendance/confirm never call this."""
@@ -55,6 +59,9 @@ class OwnerMinutesCaller:
             switches=self.switches,
             budget=self.budget,
             events=self.events,
+            allowance=self.allowance,
+            allowance_cap=self.allowance_cap,
+            clock=self.clock,
         )
 
 
@@ -69,6 +76,8 @@ def get_owner_minutes_caller(
     redact: Annotated[Callable[[str], str], Depends(deps.get_redactor)],
     switches: Annotated[FlagStore, Depends(deps.get_switches)],
     events: Annotated[deps.EventWriter, Depends(deps.get_event_writer)],
+    allowance: Annotated[SpendLedger, Depends(deps.get_spend_ledger)],
+    config: Annotated[AssistantConfig, Depends(deps.get_assistant_config)],
 ) -> OwnerMinutesCaller:
     """Resolve through existing request-scoped seams; no body, payload, caller identity or model mode accepted."""
     if type(budget) not in (int, float) or not math.isfinite(budget) or budget <= 0:
@@ -78,4 +87,17 @@ def get_owner_minutes_caller(
         raise Refusal(404, "not_found")
     # Where SEC-15's deployed gate is absent, the verified sign-in dependency supplies the same identity.
     request.state.uid = principal.user_id
-    return OwnerMinutesCaller(request, principal, stores, store, artifacts, clock, redact, switches, events, budget)
+    return OwnerMinutesCaller(
+        request,
+        principal,
+        stores,
+        store,
+        artifacts,
+        clock,
+        redact,
+        switches,
+        events,
+        budget,
+        allowance,
+        config.user_day_credits,
+    )

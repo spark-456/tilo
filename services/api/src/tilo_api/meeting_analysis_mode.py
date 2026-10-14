@@ -15,6 +15,8 @@ from tilo_providers.interfaces import SafetyProvider
 from tilo_providers.router import Router
 
 from tilo_api import deps, spend, team_access, team_store
+from tilo_api.assistant.metering import SpendLedger
+from tilo_api.meeting_allowance import allowance_router
 from tilo_api.meeting_minutes import analyze_and_publish_minutes
 from tilo_api.people_meetings import _mine
 from tilo_api.people_quotes import GONE
@@ -99,6 +101,9 @@ def analyze_owner_minutes(
     switches: FlagStore,
     budget: float,
     events: deps.EventWriter,
+    allowance: SpendLedger | None = None,
+    allowance_cap: float = 0,
+    clock: Callable[[], str] | None = None,
 ) -> dict[str, Any]:
     """Server-only caller supplies writer/principal/switches and bounded credit budget, never a request body.
 
@@ -140,14 +145,22 @@ def analyze_owner_minutes(
     if _mine(w, meeting_id, "read_full", GONE)[1] != version:
         raise Refusal(409, "version_conflict")
     calls = _Calls(request, w, switches, mode, world.run_id)
-    return analyze_and_publish_minutes(
-        w,
-        store,
-        artifacts,
-        meeting_id,
-        router=cast(Router, _Router(router, calls)),
-        meeting_at=start,
+    with allowance_router(
+        _Router(router, calls),
+        ledger=allowance,
+        user=w.actor,
+        clock=clock or (lambda: w.now),
+        cap=allowance_cap,
         budget=budget,
-        safety=cast(SafetyProvider, _Safety(safety, calls)),
-        events=events,
-    )
+    ) as metered:
+        return analyze_and_publish_minutes(
+            w,
+            store,
+            artifacts,
+            meeting_id,
+            router=cast(Router, metered),
+            meeting_at=start,
+            budget=budget,
+            safety=cast(SafetyProvider, _Safety(safety, calls)),
+            events=events,
+        )

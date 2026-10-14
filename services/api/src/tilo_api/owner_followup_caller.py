@@ -58,6 +58,9 @@ class OwnerFollowupCaller:
             drafts=self.drafts,
             autopilot_factory=self.autopilot_factory,
             recipients=recipients,
+            allowance=c.allowance,
+            allowance_cap=c.allowance_cap,
+            clock=c.clock,
         )
 
 
