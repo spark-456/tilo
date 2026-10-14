@@ -586,7 +586,9 @@ checks it before any shell runs, on the first line of each recipe, which must st
 `firebase.json` is not widened yet (waits on CL-REACH's host list), so a deployed page cannot reach the API until
 it is.
 
-`just smoke-dev <api-url>` drives the deployed API the way a browser does and prints one line per step, stopping
+`just smoke-dev <api-url>` runs the unsigned read-only checks in [the smoke runbook](runbook/smoke-dev.md), ignoring
+any sign-in token in the environment. The optional signed-in replay flow below requires the explicit command
+`uv run python scripts/smoke_dev.py <api-url>`, which drives the deployed API and prints one line per step, stopping
 at the first failure (exit 1):
 
 | Step | What it proves |

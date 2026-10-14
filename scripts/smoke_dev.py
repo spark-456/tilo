@@ -306,4 +306,8 @@ def main(
 
 
 if __name__ == "__main__":
+    if sys.argv[1:2] == ["--unsigned"]:
+        from smoke_unsigned import main as unsigned_main
+
+        sys.exit(unsigned_main(sys.argv[2:]))
     sys.exit(main(sys.argv[1:]))

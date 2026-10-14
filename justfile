@@ -217,12 +217,9 @@ smoke-hosted url="":
     {{ if url =~ '^https://[a-z0-9.-]+\.(web\.app|firebaseapp\.com)$' { 'node -e "process.exit(0)"' } else { error('smoke-hosted: url must be the Firebase Hosting origin (https://<project>.web.app or .firebaseapp.com, no path), got ' + url) } }}
     node -e "process.env.TILO_SMOKE_URL='{{ url }}';require('node:child_process').execSync('pnpm exec playwright test --config playwright.hosted.config.ts',{cwd:'apps/web',stdio:'inherit'})"
 
-# Deployed smoke of tilo-dev (PROD-WIRE-4, scripts/smoke_dev.py): `just smoke-dev <api-url>` (positional, tilo-api's own
-# Cloud Run url, checked by just on the first command line like `deploy-web`, so a person's token only ever goes to
-# tilo-api). The token must be a JWT, and the smoke answers no card that could send anything out. Health, the CORS preflight from the hosting
-# origin and from a stranger, and the closed gate need no token. Set TILO_SMOKE_ID_TOKEN in your own shell (a Firebase
-# ID token you paste; it is never printed, logged or written) to also run the signed-in flow in replay mode. It needs a
-# real deployment and a person: CI never runs it and it is no part of `check` or `test`. Docs: docs/deploy-dev.md.
+# Unsigned deployed smoke (M1-SMOKE-1): hosted sign-in text, bundle API base, /healthz, intake CORS and plate 401.
+# Always read-only and token-free, including when TILO_SMOKE_ID_TOKEN exists. See docs/runbook/smoke-dev.md.
+# The optional signed-in replay flow remains an explicit `uv run python scripts/smoke_dev.py <api-url>` command.
 # The url check is in the command line itself: error() fires before the script runs.
 smoke-dev url="":
-    uv run python scripts/smoke_dev.py {{ if url =~ '^https://tilo-api-[a-z0-9]+-as\.a\.run\.app$|^https://tilo-api-[0-9]+\.asia-southeast1\.run\.app$' { url } else { error('smoke-dev: url must be the tilo-api Cloud Run url (https://tilo-api-<hash>-as.a.run.app or https://tilo-api-<project-number>.asia-southeast1.run.app, lower case, no path, port or query), got ' + url) } }}
+    uv run python scripts/smoke_dev.py --unsigned {{ if url =~ '^https://tilo-api-[a-z0-9]+-as\.a\.run\.app$|^https://tilo-api-[0-9]+\.asia-southeast1\.run\.app$' { url } else { error('smoke-dev: url must be the tilo-api Cloud Run url (https://tilo-api-<hash>-as.a.run.app or https://tilo-api-<project-number>.asia-southeast1.run.app, lower case, no path, port or query), got ' + url) } }}
