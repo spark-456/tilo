@@ -47,14 +47,14 @@ def _fresh_process_state():
     app.openapi()
     overrides = app.dependency_overrides.copy()
     app.dependency_overrides.clear()
-    for cached in (deps.get_spend_ledger, deps.get_decision_cache):
+    for cached in (deps.get_spend_ledger, deps.get_decision_cache, deps.get_outbox_store):
         cached.cache_clear()
     try:
         yield
     finally:
         app.dependency_overrides.clear()
         app.dependency_overrides.update(overrides)
-        for cached in (deps.get_spend_ledger, deps.get_decision_cache):
+        for cached in (deps.get_spend_ledger, deps.get_decision_cache, deps.get_outbox_store):
             cached.cache_clear()
 
 

@@ -56,6 +56,9 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
+from tilo_api import deps
+from tilo_api.owner_minutes_routes import MINUTES_FLAG, install_owner_minutes_routes
+from tilo_metering.flags import InMemoryFlagStore
 
 KEY = {"Idempotency-Key": "retry-key-0001"}
 BODY_ROUTES = {
@@ -63,6 +66,8 @@ BODY_ROUTES = {
     "create person": "/v1/people",
     "create work item": "/v1/work-items",
     "first person": "/v1/people/first",
+    "analyze minutes": "/v1/meetings/mt_q4_plan/analyze-minutes",
+    "draft followup": "/v1/meetings/mt_q4_plan/draft-followup",
     "confirm meeting": "/v1/meetings/mt_q4_plan/confirm",
     "confirm item": "/v1/work-items/wi_launch_note/confirm",
     "edit item": "/v1/work-items/wi_rate_sheet/edit",
@@ -103,6 +108,15 @@ BODY_ROUTES = {
 }
 
 
+def minutes_body_rig(rig):
+    flags = InMemoryFlagStore()
+    flags.set(MINUTES_FLAG, True, reason="offline body cap coverage")
+    rig.app.dependency_overrides[deps.get_flag_store] = lambda: flags
+    install_owner_minutes_routes(rig.app, flags)
+    rig.app.openapi_schema = None
+    return rig
+
+
 # --- the body cap ---------------------------------------------------------------------------------------------------
 
 
@@ -110,7 +124,7 @@ BODY_ROUTES = {
 def test_PPL_11c_s4_BQ_PPL11C_1_an_oversize_body_is_a_413_and_the_rest_of_it_is_never_read(people_rig, path):
     """A client that keeps sending is stopped after the cap: the app asked for at most the cap plus one read-ahead
     chunk of a 5 MB stream, and a declared `Content-Length` over the cap is refused before any body is read."""
-    rig = meeting_rig(people_rig)
+    rig = minutes_body_rig(meeting_rig(people_rig))
     before = rig.snapshot()
     status, consumed, headers, text = stream_post(rig.app, path, total_bytes=5_000_000)
     assert status == 413 and json.loads(text) == {"detail": "body_too_large"}, (status, text[:120])
@@ -123,7 +137,7 @@ def test_PPL_11c_s4_BQ_PPL11C_1_an_oversize_body_is_a_413_and_the_rest_of_it_is_
 def test_PPL_11c_s4_BQ_PPL11C_1_every_people_post_route_is_in_the_body_cap_list(people_rig):
     """A guard (passes once S1 to S3 and S6 have landed, and must keep passing): a people POST route added later
     without a line in `BODY_ROUTES` would silently have no cap. `/v1/assistant/ask` is PPL-11b's, not a people write."""
-    rig = people_rig()
+    rig = minutes_body_rig(people_rig())
     # /v1/feedback has its own 65536-byte cap (SEC-16, test_SEC_16_FEEDBACK_hardening)
     not_people_writes = {"/v1/assistant/ask", "/v1/feedback"}
     templates = [
