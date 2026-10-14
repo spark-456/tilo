@@ -591,6 +591,17 @@ export class HttpClient implements TiloClient, SchedulesApi, FieldsApi, ItemApi 
     return this.request<unknown>(path);
   }
 
+  /** Non-mutating route discovery where production OpenAPI is disabled. FastAPI returns 405 for
+   * OPTIONS on a registered POST route, 404 when the default-off router was never installed. */
+  async hasPostRoute(path: string): Promise<boolean> {
+    try {
+      await this.request<unknown>(path, { method: "OPTIONS" });
+      return false;
+    } catch (error) {
+      return error instanceof TiloApiError && error.status === 405;
+    }
+  }
+
   /** X-RESULT-1: authenticated binary reads use the same refusal handling as JSON reads. */
   getBlob(path: string): Promise<Blob> {
     return this.request(path, { cache: "no-store" }, false, (response) => response.blob());
