@@ -121,7 +121,7 @@ class DriveAdapter(GoogleAdapter):
 
     def execute_side_effect(self, entry: Mapping[str, Any], grant: Grant) -> dict[str, Any]:
         self._check_grant(entry, grant)
-        return self._final_on_rejection(lambda: self._save(entry))
+        return self._done(self._final_on_rejection(lambda: self._save(entry)))
 
     def _save(self, entry: Mapping[str, Any]) -> dict[str, Any]:
         action = entry.get("action_type")

@@ -46,12 +46,14 @@ CONTINUE_WITHOUT_MEDIA = _s(
 MIC_TURN_ON = _s("mic_turn_on", ("role", "button", r"turn on microphone"), ("aria", "Turn on microphone"))
 MIC_TURN_OFF = _s("mic_turn_off", ("role", "button", r"turn off microphone"), ("aria", "Turn off microphone"))
 CAM_TURN_OFF = _s("cam_turn_off", ("role", "button", r"turn off camera"), ("aria", "Turn off camera"))
+CAM_TURN_ON = _s("cam_turn_on", ("role", "button", r"turn on camera"), ("aria", "Turn on camera"))
 JOIN_NOW = _s("join_now", ("role", "button", r"^(join now|switch here)$"), ("text", r"^join now$"))
 ASK_TO_JOIN = _s("ask_to_join", ("role", "button", r"ask to join"), ("text", r"^ask to join$"))
 CLOSE_DIALOG = _s("close_dialog", ("role", "button", r"^close$"))
 GOT_IT = _s("got_it", ("role", "button", r"^(got it|dismiss|ok)$"))
 ACCOUNT_BUTTON = _s("account_button", ("aria", "Google Account"))
 SIGN_IN = _s("sign_in", ("role", "link", r"^sign in$"), ("role", "button", r"^sign in$"))
+GUEST_NAME = _s("guest_name", ("role", "textbox", r"your name"), ("placeholder", "Your name"))
 
 # --- waiting / ended states ------------------------------------------------------------------------------------
 WAITING_TEXT = _s(

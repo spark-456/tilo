@@ -293,7 +293,15 @@ describe("QUICK_THINKING on the live path", () => {
     async (status, code, sentence) => {
       const rig = await mountLiveHome(
         quickApi(async () => {
-          throw new TiloApiError("raw server text", status, status >= 500, true, code);
+          // The model-outage case carries the API's explicit replay-only marker.
+          throw new TiloApiError(
+            "raw server text",
+            status,
+            status >= 500,
+            true,
+            code,
+            status === 503,
+          );
         }),
       );
       await choose(rig.el, "Quick");

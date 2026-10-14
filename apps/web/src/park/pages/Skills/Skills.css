@@ -476,6 +476,17 @@
   color: var(--ink2);
   font-weight: 600;
 }
+/* a demo's "Sample only" line: a plain line in the column, never a growing flex child */
+[data-park] .park-skills-describe-note {
+  flex: none;
+  font-size: 13px;
+  color: var(--ink2);
+  font-weight: 700;
+}
+[data-park] .park-skills-read:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
 [data-park] .park-skills-read {
   height: 40px;
   padding: 0 16px;
@@ -1640,6 +1651,12 @@
   grid-template-columns: minmax(320px, 0.9fr) minmax(0, 1.5fr);
   gap: 18px;
   align-items: start;
+}
+/* Keep the learned list and its selected detail readable on a phone. */
+@media (max-width: 640px) {
+  [data-park] .park-skills-lib-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 [data-park] .park-skills-lib-list {
   background: var(--card);

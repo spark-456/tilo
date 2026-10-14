@@ -6,7 +6,7 @@
 // Scenario content lives in api/fixtures only.
 import type { ProfileSettings } from "../types";
 
-export const profileSettings: ProfileSettings = {
+export const profileSettings: { [K in keyof ProfileSettings]: NonNullable<ProfileSettings[K]> } = {
   sessions: [
     {
       id: "mac",

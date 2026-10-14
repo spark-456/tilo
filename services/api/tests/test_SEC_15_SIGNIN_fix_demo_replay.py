@@ -44,6 +44,10 @@ SRC = pathlib.Path(__file__).resolve().parents[1] / "src" / "tilo_api"
 def _clean_env(monkeypatch: pytest.MonkeyPatch) -> None:
     for name in ENV_CLEAR:
         monkeypatch.delenv(name, raising=False)
+    # LW-05 / PL-06 (BQ-LW-11, BQ-LW5-1): a live router refuses to build unless GOOGLE_LOCATION is the price sheet's
+    # region, so every test that sets LIVE=1 needs the deploy's setting. Without it the router is "not configured"
+    # before the demo flag is ever consulted, and these tests never reach what they assert.
+    monkeypatch.setenv("GOOGLE_LOCATION", "asia-southeast1")
 
 
 # --- (2) a process that is not deployed: the demo flag comes from the resolved principal --------------------------
@@ -285,15 +289,25 @@ def test_SEC_15_SIGNIN_fix_a_schedule_record_has_a_demo_flag_that_defaults_to_fa
             schedule_from_doc({**schedule_to_doc(plain), "demo": bad})
 
 
-@pytest.mark.parametrize(("demo", "flag"), [(True, True), (False, False)])
-def test_SEC_15_SIGNIN_fix_creating_a_schedule_records_the_principals_demo_flag(rig: SchedApi, demo, flag):
+def test_SEC_15_SIGNIN_fix_creating_a_schedule_records_the_principals_demo_flag(rig: SchedApi):
     source = rig.source_run_task()
     rig.flow.app.dependency_overrides[deps.get_current_principal] = lambda: dataclasses.replace(
-        rig.flow.principal, demo_session=demo
+        rig.flow.principal, demo_session=False
     )
     made = rig.created(source)
-    assert rig.schedules.get(made["schedule_id"]).demo is flag
+    assert rig.schedules.get(made["schedule_id"]).demo is False
     assert "demo" not in made, "the flag is the server's note, not part of the owner's view"
+
+
+def test_DEMO_EPHEMERAL_1_a_demo_session_cannot_create_a_schedule(rig: SchedApi):
+    """A demo stores nothing durable and a schedule outlives the session: refused, nothing stored (BQ-DEMO-EPH-1)."""
+    source = rig.source_run_task()
+    rig.flow.app.dependency_overrides[deps.get_current_principal] = lambda: dataclasses.replace(
+        rig.flow.principal, demo_session=True
+    )
+    refused = rig.create(source)
+    assert refused.status_code == 403 and refused.json()["detail"] == "demo_schedules_unavailable"
+    assert rig.schedules.list_for_owner(rig.flow.principal.user_id) == []
 
 
 def test_SEC_15_SIGNIN_fix_a_body_cannot_set_the_demo_flag(rig: SchedApi):

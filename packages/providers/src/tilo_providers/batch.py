@@ -17,7 +17,7 @@ from collections.abc import Callable, Sequence
 from pathlib import Path
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from tilo_providers.config import ProviderConfigError, ProvidersConfig
 from tilo_providers.errors import ProviderError, RequestError
@@ -42,9 +42,16 @@ TERMINAL_STATES = frozenset({BatchState.SUCCEEDED, BatchState.PARTIAL, BatchStat
 
 
 class BatchRequest(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", hide_input_in_errors=True, validate_assignment=True)
     custom_id: str = Field(min_length=1)
     request: GenerateRequest
+
+    @field_validator("request")
+    @classmethod
+    def _no_media(cls, request: GenerateRequest) -> GenerateRequest:
+        if request.parts:  # the batch wire carries the prompt only: refuse rather than drop a file silently
+            raise RequestError("LW-06: a batch request carries no media parts")
+        return request
 
 
 class BatchJob(BaseModel):
@@ -80,6 +87,12 @@ class BatchProvider(ABC):
         """Submission order; raises `BatchNotReadyError` until the job is terminal."""
 
 
+def refuse_media(requests: Sequence[BatchRequest]) -> None:
+    """LW-06: a batch item may have gained parts after construction (an assignment, or `request.parts = ...`)."""
+    if any(item.request.parts for item in requests):
+        raise RequestError("LW-06: a batch request carries no media parts")
+
+
 def _fingerprint(requests: Sequence[BatchRequest]) -> str:
     payload = [item.model_dump(exclude_none=True) for item in requests]
     return hashlib.sha256(json.dumps(payload, sort_keys=True).encode("utf-8")).hexdigest()
@@ -110,6 +123,7 @@ class InMemoryBatchProvider(BatchProvider):
     def _run_item(self, item: BatchRequest) -> GenerateResponse: ...
 
     def submit(self, requests: Sequence[BatchRequest], *, idempotency_key: str) -> BatchJob:
+        refuse_media(requests)
         if not idempotency_key.strip():
             raise RequestError("EFF-05: a batch needs a non-blank idempotency key")
         if not requests:
@@ -225,6 +239,7 @@ class RecordReplayBatchProvider(InMemoryBatchProvider):
         return GenerateResponse.model_validate(json.loads(path.read_text(encoding="utf-8"))["response"])
 
     def submit(self, requests: Sequence[BatchRequest], *, idempotency_key: str) -> BatchJob:
+        refuse_media(requests)
         if not (self._live_permitted or is_live_mode()):
             return super().submit(requests, idempotency_key=idempotency_key)
         job = self._live().submit(requests, idempotency_key=idempotency_key)

@@ -54,6 +54,9 @@ function openTile(root: HTMLElement, name: string): HTMLElement {
   return d as HTMLElement;
 }
 const radios = (d: HTMLElement) => [...d.querySelectorAll<HTMLElement>('[role="radio"]')];
+/** The demo's honest toast: the action ran no OAuth and changed nothing (W6). */
+const SAMPLE = (tool: string, what: string) =>
+  `Sample data: ${tool} was not ${what}. Sign in to use your own tools.`;
 const lastToast = (app: TestApp) => app.toast.mock.calls.at(-1);
 const toastCopy = (app: TestApp, msg: string) => {
   const call = lastToast(app);
@@ -68,7 +71,7 @@ describe("WEB_11_connectors_drawer: a tile opens the detail panel", () => {
     expect(d.getAttribute("aria-label")).toBe("Gmail");
     expect(hasExactText(d, "Gmail")).toBe(true);
     expect(hasExactText(d, "Email · alex@northwind.co")).toBe(true);
-    expect(hasExactText(d, "Healthy · synced 2 min ago")).toBe(true);
+    expect(hasExactText(d, "Example only · no sync or health check recorded")).toBe(true);
     expect(hasExactText(d, "How far agents can go")).toBe(true);
     expect(hasExactText(d, "Used by")).toBe(true);
     expect(
@@ -93,7 +96,12 @@ describe("WEB_11_connectors_drawer: a tile opens the detail panel", () => {
 
   it("FR_ACC_03_WEB_11_connectors_drawer_live_and_attention_status_lines", async () => {
     const { root } = await open();
-    expect(hasExactText(openTile(root, "Google Calendar"), "Healthy · synced live")).toBe(true);
+    expect(
+      hasExactText(
+        openTile(root, "Google Calendar"),
+        "Example only · no sync or health check recorded",
+      ),
+    ).toBe(true);
     click(labelled(root, "Close") as HTMLElement);
     expect(dialogOf(root)).toBeNull();
     const hub = openTile(root, "HubSpot");
@@ -110,48 +118,43 @@ describe("WEB_11_connectors_drawer: a tile opens the detail panel", () => {
     expect(dialogOf(root)).toBeNull();
   });
 
-  it("WEB_11_connectors_drawer_picking_a_level_selects_it_toasts_and_updates_the_tile", async () => {
+  it("W6_connectors_demo_drawer_picking_a_level_changes_nothing_and_says_so", async () => {
     const { app, root } = await open();
     const d = openTile(root, "Gmail");
+    const before = radios(d).map((r) => r.getAttribute("aria-checked"));
+    const tile = textOf(tileFor(root, "Gmail") as HTMLElement);
     click(radios(d)[1] as HTMLElement);
-    toastCopy(app, "Gmail: agents can now write drafts");
-    expect(radios(d).map((r) => r.getAttribute("aria-checked"))).toEqual([
-      "false",
-      "true",
-      "false",
-    ]);
-    expect(textOf(tileFor(root, "Gmail") as HTMLElement)).toContain("Draft");
-    click(radios(d)[0] as HTMLElement);
-    toastCopy(app, "Gmail: agents can now read mail");
-    expect(textOf(tileFor(root, "Gmail") as HTMLElement)).toContain("Read");
+    toastCopy(app, SAMPLE("Gmail", "changed"));
+    expect(radios(d).map((r) => r.getAttribute("aria-checked"))).toEqual(before);
+    expect(textOf(tileFor(root, "Gmail") as HTMLElement)).toBe(tile);
   });
 
-  it("WEB_11_connectors_drawer_sync_now_toasts_and_keeps_the_drawer_open", async () => {
+  it("W6_connectors_demo_drawer_sync_now_says_nothing_was_synced_and_keeps_the_drawer_open", async () => {
     const { app, root } = await open();
     const d = openTile(root, "Google Drive");
     click(buttonText(d, "Sync now") as HTMLElement);
-    toastCopy(app, "Syncing Google Drive…");
+    toastCopy(app, SAMPLE("Google Drive", "synced"));
+    expect(textOf(d)).not.toContain("Syncing");
     expect(dialogOf(root)).not.toBeNull();
   });
 
-  it("WEB_11_connectors_drawer_disconnect_closes_toasts_and_moves_the_tool_to_add_a_tool", async () => {
+  it("W6_connectors_demo_drawer_disconnect_says_nothing_was_disconnected_and_keeps_the_tool", async () => {
     const { app, root } = await open();
     const d = openTile(root, "Gmail");
     click(buttonText(d, "Disconnect") as HTMLElement);
     expect(dialogOf(root)).toBeNull();
-    toastCopy(app, "Gmail disconnected. Skills that use it will pause");
-    expect(tileFor(root, "Gmail")).toBeUndefined();
-    expect(connectedTiles(root)).toHaveLength(5);
-    expect(connectButtons(root)).toHaveLength(7);
-    expect(textOf(labelled(root, "Available") as HTMLElement)).toContain("Gmail");
-    expect(countExactText(root, "5 connected")).toBe(2);
+    toastCopy(app, SAMPLE("Gmail", "disconnected"));
+    expect(tileFor(root, "Gmail")).toBeDefined();
+    expect(connectedTiles(root)).toHaveLength(6);
+    expect(connectButtons(root)).toHaveLength(6);
+    expect(countExactText(root, "6 connected")).toBe(2);
   });
 
-  it("WEB_11_connectors_drawer_disconnecting_hubspot_clears_the_attention_banner", async () => {
+  it("W6_connectors_demo_disconnecting_hubspot_keeps_the_attention_banner", async () => {
     const { root } = await open();
     click(buttonText(openTile(root, "HubSpot"), "Disconnect") as HTMLElement);
-    expect(hasExactText(root, "HubSpot sign-in expires in 3 days")).toBe(false);
-    expect(tileFor(root, "HubSpot")).toBeUndefined();
+    expect(hasExactText(root, "HubSpot sign-in expires in 3 days")).toBe(true);
+    expect(tileFor(root, "HubSpot")).toBeDefined();
   });
 });
 
@@ -192,83 +195,47 @@ describe("WEB_11_connectors_go: Used by sends people to skills or the Agenda", (
   });
 });
 
-describe("WEB_11_connectors_connect: Add a tool signs in, then lists the tool as connected", () => {
-  it("WEB_11_connectors_connect_waits_as_Signing_in_then_connects_with_Read_access", async () => {
+describe("W6_connectors_demo_connect: no OAuth runs, so nothing is shown or announced as connected", () => {
+  it("W6_connectors_demo_connect_says_nothing_was_connected_and_the_lists_stay_as_loaded", async () => {
     const { app, root } = await open();
     click(connectButtons(root)[0] as HTMLElement);
-    const busy = connectButtons(root)[0] as HTMLButtonElement;
-    expect(textOf(busy)).toBe("Signing in");
-    expect(busy.disabled).toBe(true);
-    await waitFor(() => tileFor(root, "Notion") !== undefined, "Notion in Connected");
-    toastCopy(app, "Notion connected with Read access");
-    const t = textOf(tileFor(root, "Notion") as HTMLElement);
-    expect(t).toContain("Connected just now");
-    expect(t).toContain("Read");
-    expect(t).toContain("Synced just now");
-    expect(t).toContain("Not used yet");
-    expect(connectButtons(root)).toHaveLength(5);
-    expect(countExactText(root, "7 connected")).toBe(2);
+    await flush();
+    toastCopy(app, SAMPLE("Notion", "connected"));
+    expect(tileFor(root, "Notion")).toBeUndefined();
+    expect(textOf(connectButtons(root)[0] as HTMLElement)).not.toBe("Signing in");
+    expect(connectedTiles(root)).toHaveLength(6);
+    expect(connectButtons(root)).toHaveLength(6);
+    expect(countExactText(root, "6 connected")).toBe(2);
+    expect(textOf(root)).not.toContain("Connected just now");
     expect(app.go, "an in-page sign-in, not a navigation").not.toHaveBeenCalled();
     expect(app.decide).not.toHaveBeenCalled();
   });
 
-  it("WEB_11_connectors_connect_a_newly_connected_tool_opens_a_drawer_with_read_selected", async () => {
-    const { root } = await open();
-    click(connectButtons(root)[0] as HTMLElement);
-    await waitFor(() => tileFor(root, "Notion") !== undefined, "Notion in Connected");
-    const d = openTile(root, "Notion");
-    expect(hasExactText(d, "Healthy · synced just now")).toBe(true);
-    expect(radios(d).map((r) => r.getAttribute("aria-checked"))).toEqual([
-      "true",
-      "false",
-      "false",
-    ]);
-  });
-
-  it("WEB_11_connectors_connect_completes_without_any_timer", async () => {
+  it("W6_connectors_demo_connect_toasts_at_once_without_any_timer", async () => {
     const { app, root } = await open();
     vi.useFakeTimers({ toFake: ["setTimeout", "setInterval", "requestAnimationFrame"] });
     click(connectButtons(root)[0] as HTMLElement);
-    await flush(100);
-    expect(
-      tileFor(root, "Notion"),
-      "no setTimeout may stand between click and result",
-    ).toBeDefined();
-    toastCopy(app, "Notion connected with Read access");
+    toastCopy(app, SAMPLE("Notion", "connected"));
   });
 });
 
-describe("WEB_11_connectors_reconnect: the HubSpot banner", () => {
+describe("W6_connectors_demo_reconnect: the HubSpot banner stays until a real sign-in", () => {
   const reconnect = (root: HTMLElement) =>
-    [...root.querySelectorAll("button")].find((b) =>
-      /^(Reconnect|Waiting for HubSpot)$/.test(textOf(b)),
-    ) as HTMLButtonElement | undefined;
+    [...root.querySelectorAll("button")].find((b) => /^Reconnect$/.test(textOf(b))) as
+      | HTMLButtonElement
+      | undefined;
 
-  it("FR_ACC_04_WEB_11_connectors_reconnect_waits_ignores_a_second_click_then_clears_the_attention", async () => {
+  it("W6_connectors_demo_reconnect_says_nothing_was_reconnected_and_keeps_the_banner", async () => {
     const { app, root } = await open();
     click(reconnect(root) as HTMLElement);
-    expect(textOf(reconnect(root) as HTMLElement)).toBe("Waiting for HubSpot");
-    click(reconnect(root) as HTMLElement);
-    await waitFor(
-      () => !hasExactText(root, "HubSpot sign-in expires in 3 days"),
-      "the banner clears",
-    );
+    await flush();
+    expect(textOf(reconnect(root) as HTMLElement)).toBe("Reconnect");
     expect(app.toast).toHaveBeenCalledTimes(1);
-    toastCopy(app, "HubSpot reconnected for 90 days");
-    const hub = textOf(tileFor(root, "HubSpot") as HTMLElement);
-    expect(hub).toContain("Synced just now");
-    expect(hub).not.toContain("Sign-in expires");
+    toastCopy(app, SAMPLE("HubSpot", "reconnected"));
+    expect(hasExactText(root, "HubSpot sign-in expires in 3 days")).toBe(true);
+    expect(textOf(tileFor(root, "HubSpot") as HTMLElement)).toContain("Sign-in expires");
     expect(countExactText(root, "6 connected")).toBe(2);
     expect(app.go, "S-08 hand-off is not in the design").not.toHaveBeenCalled();
-  });
-
-  it("FR_ACC_04_WEB_11_connectors_reconnect_completes_without_any_timer", async () => {
-    const { app, root } = await open();
-    vi.useFakeTimers({ toFake: ["setTimeout", "setInterval", "requestAnimationFrame"] });
-    click(reconnect(root) as HTMLElement);
-    await flush(100);
-    expect(hasExactText(root, "HubSpot sign-in expires in 3 days")).toBe(false);
-    toastCopy(app, "HubSpot reconnected for 90 days");
   });
 });
 
@@ -282,9 +249,7 @@ describe("WEB_11_connectors_console: a whole visit logs no console error or warn
     click(buttonText(d, "Sync now") as HTMLElement);
     click(labelled(root, "Close") as HTMLElement);
     click(connectButtons(root)[1] as HTMLElement);
-    await waitFor(() => tileFor(root, "Microsoft 365") !== undefined, "Microsoft 365 connected");
     click(buttonText(root, "Reconnect") as HTMLElement);
-    await waitFor(() => !hasExactText(root, "HubSpot sign-in expires in 3 days"), "banner clears");
     click(buttonText(openTile(root, "Xero"), "Disconnect") as HTMLElement);
     await act(async () => undefined);
     expect(err.mock.calls).toEqual([]);

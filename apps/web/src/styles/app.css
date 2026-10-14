@@ -488,6 +488,12 @@ textarea {
   outline: 2px solid var(--color-brand-primary);
   outline-offset: 2px;
 }
+.repeat-weekly input:focus-visible,
+.repeat-weekly select:focus-visible,
+.flow-notice input:focus-visible {
+  outline: 2px solid var(--color-brand-primary);
+  outline-offset: 2px;
+}
 .flow-shell {
   position: fixed;
   top: calc(var(--chrome-h) + var(--space-16));
@@ -2906,6 +2912,75 @@ html[data-density="professional"] .app-shell {
     border-radius: var(--radius-cards) var(--radius-cards) 0 0;
   }
 }
+/* FR-WLD-12 (PRD 9.6, 18.3): Stage mode 1920x1080 presenter layout, presenter bar and reset
+   confirmation dialog. Fixed layers so opening or closing shifts nothing (CLS 0); no transitions. */
+.app-shell[data-stage-layout="1920x1080"] {
+  --bar-h: 0px;
+}
+.stage-presenter {
+  position: fixed;
+  left: calc(72px * var(--ui-scale, 1) + var(--space-16));
+  bottom: var(--space-16);
+  z-index: 600;
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+  padding: var(--space-8) var(--space-12);
+  border: 2px solid var(--color-surface-2);
+  border-radius: var(--radius-cards);
+  background: var(--color-surface-1);
+  color: var(--color-ink-1);
+  font-size: var(--text-14);
+}
+.app-shell[data-stage-layout="1920x1080"] .stage-presenter {
+  left: var(--space-16);
+}
+.stage-presenter-badge {
+  padding: var(--space-4) var(--space-8);
+  border-radius: var(--radius-pill);
+  background: var(--color-brand-primary);
+  color: var(--color-surface-1);
+  font: 700 var(--text-12) / 1.2 var(--font-ui);
+}
+@media (max-width: 767px) {
+  .stage-presenter {
+    display: none;
+  }
+}
+.stage-reset-dialog {
+  position: fixed;
+  top: calc(var(--chrome-h) + var(--space-24));
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1100;
+  box-sizing: border-box;
+  width: min(420px, calc(100vw - 32px));
+  margin: 0;
+  padding: var(--space-16);
+  border: 2px solid var(--color-surface-2);
+  border-radius: var(--radius-cards);
+  background: var(--color-surface-1);
+  color: var(--color-ink-1);
+  font-size: var(--text-14);
+}
+.stage-reset-dialog h2 {
+  margin: 0 0 var(--space-8);
+  font: 800 var(--text-20) / 1.2 var(--font-display);
+}
+.stage-reset-dialog h2:focus-visible {
+  outline: 2px solid var(--color-brand-primary);
+  outline-offset: 2px;
+}
+.stage-reset-dialog p {
+  margin: 0 0 var(--space-12);
+  color: var(--color-ink-2);
+  font: 400 var(--text-14) / 1.4 var(--font-ui);
+}
+.stage-reset-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-8);
+}
 /* FR-AGT-14 S-03 "Repeat weekly": a checkbox row, and its day, time and zone when switched on. */
 .repeat-weekly {
   margin: 0 0 var(--space-8);
@@ -2982,4 +3057,56 @@ html[data-density="professional"] .app-shell {
   .routines-scope .bitem-main {
     flex-basis: 100%;
   }
+}
+/* ADR-0035 L6c: the form of a needs-you card that asks for fields (Park tokens only). */
+.need-fields {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-12);
+}
+.need-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.need-field label {
+  font-weight: 700;
+  font-size: var(--text-14);
+}
+.need-field input {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 480px;
+  min-height: 44px;
+  padding: var(--space-8) var(--space-12);
+  border: 2px solid var(--color-ink-2);
+  border-radius: var(--radius-controls);
+  background: var(--color-surface-0);
+  color: var(--color-ink-1);
+  font: 400 var(--text-14) / 1.4 var(--font-ui);
+}
+.need-field input[aria-invalid="true"] {
+  border-color: var(--color-signal-blocked);
+}
+.need-field input:disabled {
+  cursor: not-allowed;
+}
+.need-field input:focus-visible {
+  outline: 2px solid var(--color-brand-primary);
+  outline-offset: 2px;
+}
+.item-text {
+  box-sizing: border-box;
+  max-width: 100%;
+  max-height: 320px;
+  margin: var(--space-8) 0;
+  padding: var(--space-8) var(--space-12);
+  overflow: auto;
+  border: 2px solid var(--color-surface-2);
+  border-radius: var(--radius-controls);
+  background: var(--color-surface-0);
+  color: var(--color-ink-1);
+  font: 400 var(--text-14) / 1.4 var(--font-ui);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }

@@ -1,12 +1,13 @@
 // Park Connectors page (WEB-11; design `Tilo App Connectors.dc.html`, inventory.md). Data comes through
 // useParkApi(); navigation only through app.go; toasts through app.toast with the design's exact copy.
 //
-// The Api has no connector write yet (README lists connector reconnect/sync as a call to add), so Connect,
-// Reconnect, Disconnect and the access level are page-local state, as in the design. The design waits 1.4 s
-// and 1.5 s on timers; page code holds no timer before WEB-3b, so the wait is one awaited step: the busy
-// label shows at once and the result lands on the promise continuation. The S-08 consent hand-off belongs to
-// live mode, when the Api has a connect endpoint. The "Sample data" chip belongs to the shell.
-import { type ReactNode, useCallback, useEffect, useState } from "react";
+// Live data uses a read-only list with unavailable facts labelled (CX-W1-1). In the demo, Connect, Reconnect,
+// Disconnect, the access level and Sync now change nothing and say so (W6 honesty: no OAuth ran, so no tool
+// may be shown or announced as connected). The S-08 consent hand-off belongs to live mode, when the Api has
+// a connect endpoint. The "Sample data" chip belongs to the shell.
+import { type ReactNode, useCallback, useEffect, useMemo, useState } from "react";
+import type { ConnectFlow } from "../../../api/connect";
+import { liveConnectFlow } from "../../../api/connectEnv";
 import type { Connector, ConnectorTerms, Skill, World } from "../../api/types";
 import type { AppCtx } from "../../app/AppCtx";
 import { useParkApi } from "../../app/context";
@@ -14,11 +15,15 @@ import { PageSheet } from "../../components";
 import "./Connectors.css";
 import { AttentionBanner, AvailableRow, ConnectedTile } from "./ConnectorParts";
 import { Drawer } from "./Drawer";
+import { GoogleAccess } from "./GoogleAccess";
+import { LiveConnectors } from "./LiveConnectors";
+import { MeetingHostAccess } from "./MeetingHostAccess";
 import { icon } from "./icons";
 import { type Overrides, type UsedRow, isOn, matches, merge, usedBy } from "./view";
 
 type Load =
   | { kind: "loading" }
+  | { kind: "live"; connectors: Connector[] }
   | {
       kind: "ready";
       connectors: Connector[];
@@ -27,6 +32,9 @@ type Load =
       terms: ConnectorTerms;
     }
   | { kind: "unavailable" };
+
+/** The demo changes no connector, so nothing overrides the loaded list. */
+const NO_OVERRIDES: Overrides = { st: {}, lvl: {} };
 
 /** The shell's page contract: one `park-page-<id>` root holding the sheet (as the Placeholder does). */
 function Frame({ children }: { children: ReactNode }) {
@@ -58,29 +66,38 @@ function Heading({ count, children }: { count?: string; children?: ReactNode }) 
  * `now` is the clock the sign-in warning reads (FR-ACC-04); a test fixes it. The warning needs a connector's
  * `expires`, so a tool with none is never flagged here.
  */
-export function ConnectorsPage({ app, now = Date.now }: { app: AppCtx; now?: () => number }) {
+export function ConnectorsPage({
+  app,
+  now = Date.now,
+  flow,
+}: { app: AppCtx; now?: () => number; flow?: ConnectFlow | null }) {
   const api = useParkApi();
+  // ADR-0035 L4: the live Google connect flow, or null (fixture world, demo session): then the page is exactly as before.
+  const live = useMemo(() => (flow === undefined ? liveConnectFlow() : flow), [flow]);
   const [load, setLoad] = useState<Load>({ kind: "loading" });
   const [q, setQ] = useState("");
   const [open, setOpen] = useState<string | null>(null);
-  const [over, setOver] = useState<Overrides>({ st: {}, lvl: {} });
-  const [busy, setBusy] = useState<Record<string, boolean>>({});
-  const [reconnecting, setReconnecting] = useState<Record<string, boolean>>({});
-  const [syncing, setSyncing] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     let live = true;
     // Worlds only feed the "Used by" list: a failed read leaves the skills and drops the worlds.
-    const worlds = api.getWorlds(app.dec, app.added).then(
-      (w) => w.data,
-      () => [] as World[],
-    );
-    Promise.all([api.getConnectors(), api.getSkills(), api.getConnectorTerms(), worlds]).then(
-      ([c, s, t, w]) =>
-        live &&
-        setLoad({ kind: "ready", connectors: c.data, skills: s.data, worlds: w, terms: t.data }),
-      () => live && setLoad({ kind: "unavailable" }),
-    );
+    void api
+      .getConnectors()
+      .then(async (c) => {
+        if (!live) return;
+        if (c.source === "live") {
+          setLoad({ kind: "live", connectors: c.data });
+          return;
+        }
+        const worlds = api.getWorlds(app.dec, app.added).then(
+          (w) => w.data,
+          () => [] as World[],
+        );
+        const [s, t, w] = await Promise.all([api.getSkills(), api.getConnectorTerms(), worlds]);
+        if (live)
+          setLoad({ kind: "ready", connectors: c.data, skills: s.data, worlds: w, terms: t.data });
+      })
+      .catch(() => live && setLoad({ kind: "unavailable" }));
     return () => {
       live = false;
     };
@@ -88,10 +105,23 @@ export function ConnectorsPage({ app, now = Date.now }: { app: AppCtx; now?: () 
 
   const close = useCallback(() => setOpen(null), []);
 
+  if (load.kind === "live") {
+    return (
+      <Frame>
+        <Heading />
+        {live ? <GoogleAccess flow={live} /> : null}
+        <MeetingHostAccess flow={live} />
+        <LiveConnectors connectors={load.connectors} />
+      </Frame>
+    );
+  }
+
   if (load.kind === "unavailable") {
     return (
       <Frame>
         <Heading />
+        {live ? <GoogleAccess flow={live} /> : null}
+        {live ? <MeetingHostAccess flow={live} /> : null}
         <div className="park-connectors-empty">
           <span className="park-connectors-empty-glyph">{icon("plug", 22)}</span>
           <div className="park-connectors-empty-title">Not connected yet</div>
@@ -110,43 +140,16 @@ export function ConnectorsPage({ app, now = Date.now }: { app: AppCtx; now?: () 
     );
   }
 
-  const all = merge(load.connectors, over, now());
+  const all = merge(load.connectors, NO_OVERRIDES, now());
   const on = all.filter((c) => isOn(c) && matches(c, q));
   const avail = all.filter((c) => !isOn(c) && matches(c, q));
   const attn = all.filter((c) => c.st === "attention");
   const cur = all.find((c) => c.id === open);
   const nOn = `${on.length} connected`;
 
-  const settle = (id: string, level: number) =>
-    setOver((o) => ({ st: { ...o.st, [id]: "connected" }, lvl: { ...o.lvl, [id]: level } }));
-  const connect = (c: Connector) => {
-    setBusy((b) => ({ ...b, [c.id]: true }));
-    void Promise.resolve().then(() => {
-      setBusy((b) => ({ ...b, [c.id]: false }));
-      settle(c.id, 1);
-      app.toast(`${c.name} connected with Read access`);
-    });
-  };
-  const reconnect = (c: Connector) => {
-    if (reconnecting[c.id]) return;
-    setReconnecting((r) => ({ ...r, [c.id]: true }));
-    void Promise.resolve().then(() => {
-      setReconnecting((r) => ({ ...r, [c.id]: false }));
-      setOver((o) => ({ ...o, st: { ...o.st, [c.id]: "connected" } }));
-      app.toast(`${c.name} reconnected for ${load.terms.reconnectDays} days`);
-    });
-  };
-
-  // The spinner shows only between this click and the end of the sync (the awaited step, no timer).
-  const sync = (c: Connector) => {
-    if (syncing[c.id]) return;
-    setSyncing((x) => ({ ...x, [c.id]: true }));
-    app.toast(`Syncing ${c.name}…`);
-    void Promise.resolve().then(() => {
-      setSyncing((x) => ({ ...x, [c.id]: false }));
-      setOver((o) => ({ ...o, synced: { ...o.synced, [c.id]: true } }));
-    });
-  };
+  // Demo: nothing is stored or sent, so each action is a plain toast and the lists stay as loaded.
+  const sample = (c: Connector, what: string) =>
+    app.toast(`Sample data: ${c.name} was not ${what}. Sign in to use your own tools.`);
   const openUsed = (row: UsedRow) => {
     setOpen(null);
     if (row.kind === "skill" && row.id) app.go("skills", { id: row.id });
@@ -169,12 +172,15 @@ export function ConnectorsPage({ app, now = Date.now }: { app: AppCtx; now?: () 
         </div>
       </Heading>
 
+      {live ? <GoogleAccess flow={live} /> : null}
+      {live ? <MeetingHostAccess flow={live} /> : null}
+
       {attn.map((c) => (
         <AttentionBanner
           key={c.id}
           c={c}
-          waiting={!!reconnecting[c.id]}
-          onReconnect={() => reconnect(c)}
+          waiting={false}
+          onReconnect={() => sample(c, "reconnected")}
         />
       ))}
 
@@ -199,7 +205,7 @@ export function ConnectorsPage({ app, now = Date.now }: { app: AppCtx; now?: () 
         </div>
         <div className="park-connectors-availgrid">
           {avail.map((c) => (
-            <AvailableRow key={c.id} c={c} busy={!!busy[c.id]} onConnect={() => connect(c)} />
+            <AvailableRow key={c.id} c={c} busy={false} onConnect={() => sample(c, "connected")} />
           ))}
         </div>
       </section>
@@ -208,21 +214,17 @@ export function ConnectorsPage({ app, now = Date.now }: { app: AppCtx; now?: () 
         <Drawer
           c={cur}
           used={usedBy(cur, load.skills, load.worlds)}
-          syncing={!!syncing[cur.id]}
-          reconnecting={!!reconnecting[cur.id]}
-          onReconnect={() => reconnect(cur)}
+          syncing={false}
+          reconnecting={false}
+          onReconnect={() => sample(cur, "reconnected")}
           onClose={close}
-          onLevel={(level, sub) => {
-            setOver((o) => ({ ...o, lvl: { ...o.lvl, [cur.id]: level } }));
-            app.toast(`${cur.name}: agents can now ${sub.toLowerCase()}`);
-          }}
+          onLevel={() => sample(cur, "changed")}
           onUsed={openUsed}
           onDisconnect={() => {
             setOpen(null);
-            setOver((o) => ({ ...o, st: { ...o.st, [cur.id]: "available" } }));
-            app.toast(`${cur.name} disconnected. Skills that use it will pause`);
+            sample(cur, "disconnected");
           }}
-          onSync={() => sync(cur)}
+          onSync={() => sample(cur, "synced")}
         />
       ) : null}
     </Frame>

@@ -13,6 +13,7 @@ import {
   isScheduleView,
   nextRunWords,
 } from "../../api/schedules";
+import { AppLink } from "../AppLink";
 import { Loaded } from "../FlowShell";
 import { describeError, isReplayOnly, useRemote } from "../remote";
 
@@ -43,7 +44,10 @@ function RoutineList({ api, first }: { api: SchedulesApi; first: readonly Schedu
       returnFocus.current = null;
       (target.isConnected
         ? target
-        : (scope.current?.querySelector<HTMLElement>(".bitem button:not(:disabled)") ??
+        : (scope.current?.querySelector<HTMLElement>(
+            '.bitem button[aria-label^="Resume "]:not(:disabled), .bitem button[aria-label^="Pause "]:not(:disabled)',
+          ) ??
+          scope.current?.querySelector<HTMLElement>(".bitem button:not(:disabled)") ??
           scope.current)
       )?.focus();
     }
@@ -88,12 +92,15 @@ function RoutineList({ api, first }: { api: SchedulesApi; first: readonly Schedu
           e.preventDefault();
           setAsking(null);
           setEditing(null);
-        } else if (e.key === "Tab" && asking) {
-          const buttons = scope.current?.querySelectorAll<HTMLButtonElement>(
-            '[role="alertdialog"] button',
+        } else if (e.key === "Tab" && (asking || editing)) {
+          const controls = scope.current?.querySelectorAll<HTMLElement>(
+            asking
+              ? '[role="alertdialog"] button:not(:disabled)'
+              : ".routine-name input:not(:disabled), .routine-name button:not(:disabled)",
           );
-          const target = e.shiftKey ? buttons?.[1] : buttons?.[0];
-          const edge = e.shiftKey ? buttons?.[0] : buttons?.[1];
+          const last = (controls?.length ?? 0) - 1;
+          const target = e.shiftKey ? controls?.[last] : controls?.[0];
+          const edge = e.shiftKey ? controls?.[0] : controls?.[last];
           if (document.activeElement === edge) {
             e.preventDefault();
             target?.focus();
@@ -108,7 +115,8 @@ function RoutineList({ api, first }: { api: SchedulesApi; first: readonly Schedu
       )}
       {rows.length === 0 ? (
         <p className="section-note" data-testid="routines-empty">
-          No routines yet.
+          No routines yet. <AppLink to="/">Create a routine</AppLink> by starting a run and choosing
+          Repeat weekly.
         </p>
       ) : (
         <ul className="blist">
@@ -123,6 +131,7 @@ function RoutineList({ api, first }: { api: SchedulesApi; first: readonly Schedu
                 {editing?.id === row.schedule_id && (
                   <form
                     className="routine-name"
+                    aria-label="Rename routine"
                     // Blur neither saves nor cancels: the draft stays until an explicit action.
                     onSubmit={(e) => {
                       e.preventDefault();
@@ -169,7 +178,12 @@ function RoutineList({ api, first }: { api: SchedulesApi; first: readonly Schedu
                   {`Next run: ${nextRunWords(row.next_due, row.cadence.tz)}`}
                 </span>
                 {asking === row.schedule_id && (
-                  <div role="alertdialog" aria-label="Delete routine" className="flow-notice">
+                  <div
+                    role="alertdialog"
+                    aria-modal="true"
+                    aria-label="Delete routine"
+                    className="flow-notice"
+                  >
                     <p>{`Delete "${row.title}"? It will not run again.`}</p>
                     <div style={{ display: "flex", gap: "var(--space-12)", flexWrap: "wrap" }}>
                       <button
@@ -249,7 +263,11 @@ export function Routines() {
   );
   if (!api) {
     return (
-      <p className="section-note">Routines are listed when Tilo is connected to its server.</p>
+      <p className="section-note">
+        No routines are recorded in this sample. Routines are listed when Tilo is connected to its
+        server. <AppLink to="/">Create a routine</AppLink> by starting a run and choosing Repeat
+        weekly.
+      </p>
     );
   }
   return (

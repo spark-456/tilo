@@ -1,0 +1,106 @@
+/* STARTER-1: the sample project's badge, note and Worlds controls. Every selector sits under [data-park];
+   colours are var(--token); no motion. */
+[data-park] .park-sample-badge {
+  display: inline-block;
+  box-sizing: border-box;
+  margin-left: 8px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--field);
+  color: var(--ink2);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.3px;
+  line-height: 16px;
+  vertical-align: middle;
+}
+[data-park] .park-sample-note {
+  display: block;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ink3);
+}
+[data-park] .park-sample-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 12px 0;
+}
+[data-park] .park-sample-controls__hint {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink3);
+}
+[data-park] .park-first-run-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: nowrap;
+  gap: 8px;
+  margin: 0 0 12px;
+  padding: 6px 8px 6px 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  color: var(--ink2);
+  background: var(--field);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+/* WEB-QA-14OCT-1: the dismiss is a fixed icon control (28px, 44px on a phone) that never shrinks or wraps, so the
+   strip's own text gives way (it wraps) and nothing runs into the control or the status beside it. */
+[data-park] .park-first-run-banner > span {
+  flex: 1 1 0;
+  min-width: 0;
+}
+[data-park] .park-first-run-banner button {
+  flex: none;
+  box-sizing: border-box;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ink2);
+  background: var(--field);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+}
+/* QA-DEMO-1 M1: Home is a full-height scene, so its banner is pinned under the fixed nav (14 + 62 + 8) instead of
+   sitting behind it, and the greeting column starts below it. */
+[data-park] .park-first-run-banner--home {
+  position: fixed;
+  top: 84px;
+  left: 24px;
+  z-index: 4;
+  box-sizing: border-box;
+  width: fit-content;
+  max-width: min(640px, calc(100vw - 48px));
+  margin: 0;
+  font-size: 12.5px;
+}
+[data-park] .park-first-run-banner--home > span {
+  flex: 0 1 auto;
+}
+[data-park] .park-shell__main:has(.park-first-run-banner--home) .park-home-leftcol {
+  top: 148px;
+}
+@media (max-width: 480px) {
+  [data-park] .park-first-run-banner--home {
+    left: 16px;
+    width: calc(100vw - 32px);
+    max-width: none;
+  }
+  [data-park] .park-first-run-banner button {
+    width: 44px;
+    height: 44px;
+  }
+  [data-park] .park-first-run-banner--home > span {
+    flex: 1 1 0;
+  }
+}

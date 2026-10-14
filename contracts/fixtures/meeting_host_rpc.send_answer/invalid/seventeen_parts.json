@@ -1,0 +1,92 @@
+{
+  "outcome": "retry",
+  "receipt": null,
+  "may_have_sent": false,
+  "parts": [
+    {
+      "type": "connection.expired",
+      "connector": "meeting_host",
+      "user_id": "u_owner"
+    },
+    {
+      "type": "connection.expired",
+      "connector": "meeting_host",
+      "user_id": "u_owner"
+    },
+    {
+      "type": "connection.expired",
+      "connector": "meeting_host",
+      "user_id": "u_owner"
+    },
+    {
+      "type": "connection.expired",
+      "connector": "meeting_host",
+      "user_id": "u_owner"
+    },
+    {
+      "type": "connection.expired",
+      "connector": "meeting_host",
+      "user_id": "u_owner"
+    },
+    {
+      "type": "connection.expired",
+      "connector": "meeting_host",
+      "user_id": "u_owner"
+    },
+    {
+      "type": "connection.expired",
+      "connector": "meeting_host",
+      "user_id": "u_owner"
+    },
+    {
+      "type": "connection.expired",
+      "connector": "meeting_host",
+      "user_id": "u_owner"
+    },
+    {
+      "type": "connection.expired",
+      "connector": "meeting_host",
+      "user_id": "u_owner"
+    },
+    {
+      "type": "connection.expired",
+      "connector": "meeting_host",
+      "user_id": "u_owner"
+    },
+    {
+      "type": "connection.expired",
+      "connector": "meeting_host",
+      "user_id": "u_owner"
+    },
+    {
+      "type": "connection.expired",
+      "connector": "meeting_host",
+      "user_id": "u_owner"
+    },
+    {
+      "type": "connection.expired",
+      "connector": "meeting_host",
+      "user_id": "u_owner"
+    },
+    {
+      "type": "connection.expired",
+      "connector": "meeting_host",
+      "user_id": "u_owner"
+    },
+    {
+      "type": "connection.expired",
+      "connector": "meeting_host",
+      "user_id": "u_owner"
+    },
+    {
+      "type": "connection.expired",
+      "connector": "meeting_host",
+      "user_id": "u_owner"
+    },
+    {
+      "type": "connection.expired",
+      "connector": "meeting_host",
+      "user_id": "u_owner"
+    }
+  ]
+}

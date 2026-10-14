@@ -60,6 +60,26 @@ afterEach(async () => { await act(async () => root.unmount()); container.remove(
 
 // biome-ignore format: compact suite
 describe("AGW-03 S-02 Understanding", () => {
+  it("FR_INT_04 FR_INT_06 deliverable multi-select sends option labels and supports deselection", async () => {
+    const choices = ["Director's suggested output", "Study plan", "Notes", "Question bank", "Report", "Quiz"];
+    const { answerQuestions } = await openUnderstanding({ questions: [{ field: "deliverables", text: "What should Tilo produce?", suggested_answers: choices }] });
+    const buttons = qa(".suggestion-btn") as HTMLButtonElement[];
+    expect(buttons.map(b => b.textContent)).toEqual(choices);
+    const study = buttons[1];
+    const notes = buttons[2];
+    const quiz = buttons[5];
+    if (!study || !notes || !quiz) throw new Error("Deliverable choices missing");
+    await act(async () => study.click());
+    await act(async () => notes.click());
+    expect(study.getAttribute("aria-pressed")).toBe("true");
+    expect(notes.getAttribute("aria-pressed")).toBe("true");
+    await act(async () => quiz.click());
+    await act(async () => quiz.click());
+    expect(quiz.getAttribute("aria-pressed")).toBe("false");
+    await act(async () => q("button.primary")?.click());
+    await settle();
+    expect(answerQuestions).toHaveBeenCalledWith("t1", [{ field: "deliverables", answer: "Study plan; Notes" }], {});
+  });
   it("HR-honesty S-02: direct URL for an unremembered task shows the empty notice and never invents a brief or quote_a.pdf", async () => {
     window.history.pushState({}, "", "/task/task_unknown_99/understanding");
     await act(async () => {

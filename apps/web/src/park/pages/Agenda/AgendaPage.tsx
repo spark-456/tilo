@@ -5,10 +5,13 @@
 // No motion until WEB-3 (BQ-WEB-3).
 import { type ReactNode, useRef } from "react";
 import type { Api } from "../../api/index";
-import type { Agenda, Decision } from "../../api/types";
+import { isCalendarEntry } from "../../api/live/agendaFromPlate";
+import type { Agenda, AgendaPlateRow, Decision, LiveAgenda } from "../../api/types";
 import { useParkApi } from "../../app/context";
 import { useStagedCount } from "../../app/useStaged";
 import { Button, PageSheet } from "../../components";
+import { FirstRunPanels } from "../../sample/FirstRunPanels";
+import { useFirstRunPreview } from "../../sample/useFirstRunPreview";
 import "../../components/park.components.css";
 import type { AppCtx } from "../../app/AppCtx";
 import { Boards } from "./Boards";
@@ -35,12 +38,16 @@ function Frame({ source, children }: { source?: string; children?: ReactNode }) 
   );
 }
 
+/** HR-1: no calendar sync event stands behind the sample week, so the chip says so instead of "synced just now". */
+const SAMPLE_SYNC = "Sample data · no calendar sync recorded";
+
 function Ready({
   A,
   decisions,
   app,
   api,
-}: { A: Agenda; decisions: Decision[]; app: AppCtx; api: Api }) {
+  sample,
+}: { A: Agenda; decisions: Decision[]; app: AppCtx; api: Api; sample: boolean }) {
   const ui = useAgendaUi(A, decisions, app, api);
   // The boards draw one after the other, a pin per task, then the week: top to bottom, and a board that has not
   // started holds its cell in the grid, so nothing already drawn moves (WEB-MOTION-2, FR-UX-12: no long task while
@@ -57,13 +64,13 @@ function Ready({
         <div className="park-agenda-titles">
           <h1 className="park-agenda-title">Agenda</h1>
           <p className="park-agenda-lede">
-            {`${A.rules ? `${A.rules.dateLine}. ` : ""}Pins from your team and Tilo, and a week that stays in sync.`}
+            {`${A.rules ? `${A.rules.dateLine}. ` : ""}Pins from your team and Tilo, and your week${sample ? "" : " kept in sync"}.`}
           </p>
         </div>
         <div className="park-agenda-actions">
-          <div className="park-agenda-synced">
-            <span className="park-agenda-synced-tick">{icon("check", 13)}</span>
-            Google Calendar · synced just now
+          <div className="park-agenda-synced" data-testid="agenda-synced">
+            {sample ? null : <span className="park-agenda-synced-tick">{icon("check", 13)}</span>}
+            {sample ? SAMPLE_SYNC : "Google Calendar · synced just now"}
           </div>
           <Button variant="primary" icon={icon("calendar", 16)} onClick={ui.findTime}>
             Find a time
@@ -82,6 +89,10 @@ function Ready({
 }
 
 export function AgendaPage({ app }: AgendaPageProps) {
+  const preview = useFirstRunPreview();
+  return preview ? <FirstRunPanels page="agenda" app={app} /> : <PersonalAgendaPage app={app} />;
+}
+function PersonalAgendaPage({ app }: AgendaPageProps) {
   const api = useParkApi();
   const state = useAgenda(api);
 
@@ -105,7 +116,72 @@ export function AgendaPage({ app }: AgendaPageProps) {
   if (state.status === "loading") return <Frame />;
   return (
     <Frame source={state.source}>
-      <Ready A={state.data} decisions={state.decisions} app={app} api={api} />
+      {state.data.days === null ? (
+        <Plate A={state.data} />
+      ) : (
+        <Ready
+          A={state.data}
+          decisions={state.decisions}
+          app={app}
+          api={api}
+          sample={state.source !== "live"}
+        />
+      )}
     </Frame>
+  );
+}
+
+function Plate({ A }: { A: LiveAgenda }) {
+  const list = (rows: AgendaPlateRow[], empty: string) =>
+    rows.length ? (
+      <ul>
+        {rows.map((r) => (
+          <li key={`${r.ref.kind}:${r.ref.id}`}>
+            <strong>{r.title ?? "Untitled item"}</strong>
+            {r.due ? (
+              <p>
+                Due <time dateTime={r.due}>{r.due}</time>
+              </p>
+            ) : null}
+            {isCalendarEntry(r) && r.at ? (
+              <p>
+                <time dateTime={r.at}>{r.at}</time>
+              </p>
+            ) : null}
+          </li>
+        ))}
+      </ul>
+    ) : (
+      <p>{empty}</p>
+    );
+  return (
+    <>
+      <div className="park-agenda-titles">
+        <h1 className="park-agenda-title">Agenda</h1>
+        <p className="park-agenda-lede">{A.plate.today}</p>
+      </div>
+      <section aria-label="Your plate" className="park-agenda-state">
+        <h2>Your plate</h2>
+        {list(
+          A.plate.rows.filter((r) => !isCalendarEntry(r)),
+          "Nothing on your plate",
+        )}
+        {A.plate.truncated ? <p>Showing a limited list.</p> : null}
+      </section>
+      <section aria-label="Today's calendar" className="park-agenda-state">
+        <h2>Today's calendar</h2>
+        {list(A.plate.rows.filter(isCalendarEntry), "No calendar entries for today.")}
+      </section>
+      <section aria-label="Parked work" className="park-agenda-state">
+        <h2>Parked work</h2>
+        {list(A.plate.parked, "No parked work.")}
+      </section>
+      {["Boards", "Week view", "Event details", "Available times"].map((name) => (
+        <section key={name} aria-label={name} className="park-agenda-state">
+          <h2>{name}</h2>
+          <p>Not available yet</p>
+        </section>
+      ))}
+    </>
   );
 }

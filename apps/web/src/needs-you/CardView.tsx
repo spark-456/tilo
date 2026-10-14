@@ -7,11 +7,13 @@
 import type { Card, Layout } from "@tilo/contracts";
 import { type ReactNode, useCallback, useEffect, useId, useRef, useState } from "react";
 import type { TiloClient } from "../api/client";
+import type { FieldsApi } from "../api/fields";
 import { Placeholder } from "../screens/Placeholder";
 import { findItem } from "../screens/findItem";
 import { Chip, Soon } from "../screens/kit";
 import { describeError } from "../screens/remote";
 import { agentNames } from "../world/runSummary";
+import { FieldsForm } from "./FieldsForm";
 import { RUNG } from "./queue";
 
 /** The state of one answer: the option sent and not yet confirmed by its closing event (HR-1). */
@@ -207,18 +209,39 @@ export function CardView({
   answer,
   footer,
   children,
+  fields = null,
 }: {
   card: Card;
   layout: Layout | null;
   answer: Answer | null;
   footer?: ReactNode;
   children?: ReactNode;
+  /** ADR-0035 L6c: a card that asks for fields (`provide`) is answered by this form, never by a tap on "Add it". */
+  fields?: FieldsApi | null;
 }) {
+  const asks =
+    fields !== null && card.kind === "needs_you" && card.options.some((o) => o.id === "provide");
+  const hold = asks && answer && card.options.some((o) => o.id === "hold") ? answer : null;
   return (
     <article className="need-card" data-testid="need-card" data-rung={card.rung}>
       <CardHead card={card} layout={layout} />
       {children}
-      <CardOptions card={card} answer={answer} footer={footer} />
+      {asks ? (
+        <>
+          <FieldsForm
+            api={fields}
+            cardId={card.id}
+            onHold={hold ? () => hold.send("hold", "") : undefined}
+          />
+          {answer?.error && (
+            <p className="need-error" role="alert">
+              {answer.error}
+            </p>
+          )}
+        </>
+      ) : (
+        <CardOptions card={card} answer={answer} footer={footer} />
+      )}
     </article>
   );
 }

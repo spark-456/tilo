@@ -5,6 +5,9 @@ import { icon } from "../../shell/kit";
 import { agentArt } from "./worldArt";
 import { ACTIVITY_DOT, DISTRICT_LOOK, keyed } from "./worldModel";
 
+const RUN_OFF_ID = "park-world-runoff";
+const OPEN_OFF_ID = "park-world-openoff";
+
 function SectionHead({ title, sub }: { title: string; sub: string }) {
   return (
     <div className="park-world-sechead">
@@ -77,10 +80,13 @@ export function RunHistory({
   runs,
   onRunNow,
   onAgenda,
+  runNowOff,
 }: {
   runs: readonly WorldRun[];
   onRunNow: () => void;
   onAgenda: () => void;
+  /** UI-10 B1: why "Run now" is off (no run route is connected): focusable and described, never a false toast. */
+  runNowOff?: string;
 }) {
   return (
     <section aria-label="Run history" className="park-world-section">
@@ -92,9 +98,20 @@ export function RunHistory({
         <div className="park-world-noruns">No runs yet. The first run waits for your approval.</div>
       ) : null}
       <div className="park-world-runactions">
-        <Button variant="primary" size="sm" icon={icon("play", 14)} onClick={onRunNow}>
+        <Button
+          variant="primary"
+          size="sm"
+          icon={icon("play", 14)}
+          onClick={runNowOff ? undefined : onRunNow}
+          {...(runNowOff ? { "aria-disabled": "true", "aria-describedby": RUN_OFF_ID } : {})}
+        >
           Run now
         </Button>
+        {runNowOff ? (
+          <span id={RUN_OFF_ID} className="park-world-sub">
+            {runNowOff}
+          </span>
+        ) : null}
         <Button variant="secondary" size="sm" onClick={onAgenda}>
           See in Agenda
         </Button>
@@ -107,10 +124,19 @@ export function Result({
   w,
   onOpen,
   onSlack,
+  slackConnected = true,
+  slackReason = "",
+  noSlackId,
+  openOff,
 }: {
   w: World;
   onOpen: () => void;
-  onSlack: () => void;
+  /** UI-10 B1: why "Open result" is off (no file is linked): focusable and described, never a false toast. */
+  openOff?: string;
+  onSlack: (trigger: HTMLButtonElement) => void;
+  slackConnected?: boolean;
+  slackReason?: string;
+  noSlackId?: string;
 }) {
   return (
     <section aria-label="Result" className="park-world-section">
@@ -119,12 +145,30 @@ export function Result({
         <div className="park-world-out">{w.out ?? ""}</div>
         {w.st === "finished" ? (
           <div className="park-world-resultactions">
-            <Button variant="primary" size="sm" onClick={onOpen}>
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={openOff ? undefined : onOpen}
+              {...(openOff ? { "aria-disabled": "true", "aria-describedby": OPEN_OFF_ID } : {})}
+            >
               Open result
             </Button>
-            <Button variant="secondary" size="sm" onClick={onSlack}>
+            <Button
+              variant="secondary"
+              size="sm"
+              disabled={!slackConnected}
+              aria-disabled={!slackConnected ? "true" : undefined}
+              aria-describedby={!slackConnected ? noSlackId : undefined}
+              title={!slackConnected ? slackReason : "Share this world link to Slack"}
+              onClick={(e) => onSlack(e.currentTarget)}
+            >
               Share to Slack
             </Button>
+            {openOff ? (
+              <span id={OPEN_OFF_ID} className="park-world-sub">
+                {openOff}
+              </span>
+            ) : null}
           </div>
         ) : (
           <div className="park-world-running">

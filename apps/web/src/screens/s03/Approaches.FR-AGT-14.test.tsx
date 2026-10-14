@@ -132,6 +132,21 @@ afterEach(async () => {
 });
 
 describe("FR-AGT-14 S-03 Repeat weekly", () => {
+  it("FR-AGT-14 groups the cadence and connects an invalid time to its hint", async () => {
+    await open();
+    await turnOn();
+    const time = q<HTMLInputElement>('[data-testid="repeat-time"]');
+    expect(time?.closest('[role="group"], fieldset')?.getAttribute("aria-label")).toBe(
+      "Repeat weekly",
+    );
+    await act(async () => {
+      if (time) setValue(time, "");
+    });
+    const hintId = time?.getAttribute("aria-describedby");
+    expect(hintId).toBeTruthy();
+    expect(document.getElementById(hintId ?? "")?.textContent).toContain("Enter a time");
+  });
+
   it("FR-AGT-14 S-03: a 'Repeat weekly' checkbox is present and off by default", async () => {
     await open();
     expect(repeat()).not.toBeNull();

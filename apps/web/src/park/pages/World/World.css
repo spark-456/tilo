@@ -124,16 +124,32 @@
   filter: brightness(1.08);
 }
 
-/* a sample world's disabled stage links keep their look; they only stop looking pressable */
-[data-park] .park-world-live[aria-disabled="true"],
+/* QA-DEMO-1 m3: a disabled stage link looks disabled (muted, not the pressable purple, no hover) and the reason is
+   written beside the lenses (.park-world-nostage) */
+[data-park] .park-world-live[aria-disabled="true"] {
+  background: var(--chip);
+  color: var(--ink3);
+  opacity: 0.55; /* issue 932: dimmed like the other disabled controls */
+  cursor: not-allowed;
+}
 [data-park] .park-world-lenses a[aria-disabled="true"] {
+  color: var(--ink3);
+  opacity: 0.55;
   cursor: not-allowed;
 }
 [data-park] .park-world-live[aria-disabled="true"]:hover {
+  color: var(--ink3);
   filter: none;
 }
 [data-park] .park-world-lenses a[aria-disabled="true"]:hover {
   background: transparent;
+}
+[data-park] .park-world-nostage {
+  margin: 0;
+  padding: 0 6px;
+  color: var(--ink2);
+  font-size: 12.5px;
+  font-weight: 700;
 }
 /* the reason a stage link is disabled, for assistive technology; out of the flow, so nothing moves */
 [data-park] .park-world-sr {
@@ -816,13 +832,95 @@
   white-space: nowrap;
 }
 
+/* ---- Build this in Lovable card (FR-CON-16) ---- */
+[data-park] .park-world-lovable {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 18px 18px 16px;
+  border: 1px solid var(--line2);
+  border-radius: 22px;
+  background: var(--card);
+}
+[data-park] .park-world-lovablehead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+[data-park] .park-world-lovabletitle {
+  font-size: 15px;
+  font-weight: 800;
+}
+[data-park] .park-world-lovablesub {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--ink3);
+}
+[data-park] .park-world-lovableprompt {
+  margin: 0;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: var(--sunk);
+  color: var(--ink);
+  font-family: "Nunito Sans", sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+[data-park] .park-world-lovablefiles {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+[data-park] .park-world-lovablefile {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: var(--sunk);
+}
+[data-park] .park-world-lovablepath {
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--ink);
+}
+[data-park] .park-world-lovablesummary {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ink2);
+}
+[data-park] .park-world-lovablelink {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 14px;
+  border-radius: 10px;
+  background: var(--hero);
+  color: #ffffff;
+  font-size: 13.5px;
+  font-weight: 800;
+  text-decoration: none;
+  white-space: nowrap;
+}
+[data-park] .park-world-lovablelink:hover {
+  color: #ffffff;
+  filter: brightness(1.08);
+}
+
 /* ---- Focus ring (README "Interactions and motion"): 3px #5A3FE0, offset 2px ---- */
 [data-park] .park-world-back:focus-visible,
 [data-park] .park-world-live:focus-visible,
 [data-park] .park-world-lenses a:focus-visible,
 [data-park] .park-world-spendlink:focus-visible,
 [data-park] .park-world-skillchip:focus-visible,
-[data-park] .park-world-toolchip:focus-visible {
+[data-park] .park-world-toolchip:focus-visible,
+[data-park] .park-world-lovablelink:focus-visible {
   outline: 3px solid #5a3fe0;
   outline-offset: 2px;
 }
@@ -877,4 +975,130 @@
     text-overflow: clip;
     white-space: normal;
   }
+}
+[data-park] .park-world-proposals {
+  padding: var(--space-4);
+  color: var(--ink);
+}
+[data-park] .park-world-proposals pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* ---- Share to Slack dialog & pending approval badge (FR-UX-17) ---- */
+[data-park] .park-world-dpending {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+[data-park] .park-world-dpendingbadge {
+  display: inline-flex;
+  align-items: center;
+  height: 26px;
+  padding: 0 10px;
+  border-radius: 8px;
+  background: var(--amberTile);
+  color: var(--amberInk);
+  font-size: 12.5px;
+  font-weight: 800;
+}
+[data-park] .park-world-slackbackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: var(--scrim);
+}
+[data-park] .park-world-slackdialog {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: 100%;
+  max-width: 420px;
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: var(--card);
+  box-shadow: var(--sh);
+  color: var(--ink);
+}
+[data-park] .park-world-slackhead {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+[data-park] .park-world-slacktitle {
+  font-size: 18px;
+  font-weight: 800;
+}
+[data-park] .park-world-slacksub {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink2);
+}
+[data-park] .park-world-slackfield {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+[data-park] .park-world-slacklabel {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink2);
+}
+[data-park] .park-world-slackselect,
+[data-park] .park-world-slacknote {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--field);
+  color: var(--ink);
+  font-family: "Nunito Sans", sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+}
+[data-park] .park-world-slackselect:focus-visible,
+[data-park] .park-world-slacknote:focus-visible {
+  outline: 3px solid #5a3fe0;
+  outline-offset: 2px;
+}
+[data-park] .park-world-slackactions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* ---- Team-shared worlds: the share dialog's rows (BQ-CTX-TEAMWORLD) ---- */
+[data-park] .park-world-teamlist {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+[data-park] .park-world-teamrow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line);
+}
+[data-park] .park-world-teamname {
+  font-size: 14px;
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+[data-park] .park-world-teamnote {
+  flex: 1 1 200px;
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink2);
+  overflow-wrap: anywhere;
 }

@@ -74,9 +74,10 @@ from tilo_harness.writer import new_ulid
 from tilo_metering.flags import FlagStore
 from tilo_planning.events import build_event
 
-from tilo_api import deps, dev, events, runs, team_access, team_store
-from tilo_api.access import Mode
+from tilo_api import deps, dev, ephemeral, events, nudge_sweep, plate_links, runs, team_access, team_store
+from tilo_api.access import Mode, enforced
 from tilo_api.durable_store import DurableStore
+from tilo_api.people_limits import write_limit
 from tilo_api.tasks import _json_body
 
 logger = logging.getLogger("tilo_api.schedules")
@@ -110,6 +111,8 @@ def get_schedule_store() -> ScheduleRepository:
             kind = "memory"
         except dev.DevModeRefused:
             pass
+    if kind == "memory" and enforced():  # deployed: a restart would lose every routine, so never in memory
+        raise HTTPException(status_code=503, detail="not_configured")
     try:
         return _open(kind, os.environ.get("TILO_FIRESTORE_PROJECT") or "")
     except ScheduleStoreNotConfigured as exc:
@@ -137,7 +140,14 @@ def get_seams_factory(
 ) -> Callable[..., runs.Seams | None]:
     """Builds nothing (about 80 ms when called): `runs.run_seams`, overrides included, for the tick to call after it.
     `demo=True` builds them for a demo session's schedule: replay, whatever the request's own mode is (BQ-SIGNIN-10)."""
-    return lambda demo=False: runs.run_seams(request, "replay" if demo else mode)
+
+    def build(demo: bool = False) -> runs.Seams | None:
+        ephemeral.mark_no_person(request)  # only the tick calls this, after its OIDC check: no Firebase token to verify
+        seams = runs.run_seams(request, "replay" if demo else mode)
+        # a demo's schedule sends nothing (ADR-0035 L6): the tick has no person, so the seam would hand it live stubs
+        return dataclasses.replace(seams, adapters={}) if demo and seams is not None else seams
+
+    return build
 
 
 def _unverified(token: str) -> tuple[dict[str, Any], dict[str, Any]]:
@@ -279,6 +289,7 @@ def get_store_factory(request: Request) -> Callable[[], deps.Store]:
     its token check, so an anonymous call opens no Firestore client and reads nothing."""
 
     def build() -> deps.Store:
+        ephemeral.mark_no_person(request)  # called only after the tick's token check; see `ephemeral.mark_no_person`
         seam = request.app.dependency_overrides.get(deps.get_store, deps.get_store)
         return seam(request) if inspect.signature(seam).parameters else seam()
 
@@ -342,6 +353,29 @@ def _view(s: Schedule) -> dict[str, Any]:
     }  # fmt: skip
 
 
+MIN_APPROACHES, MAX_APPROACHES, MAX_APPROACH_BYTES = 2, 3, 16_384  # plan.schema.json `approaches`; one item's JSON size
+
+
+def _plannable(offered: object, chosen: dict[str, Any] | None) -> bool:
+    """The list a plan is compiled against: 2 to 3 bounded dicts with unique str ids, and the entry for the chosen
+    approach EQUAL to it (the planner plans from the list entry). Anything odd, even a nesting too deep, is False."""
+    if not isinstance(offered, list) or not MIN_APPROACHES <= len(offered) <= MAX_APPROACHES or not chosen:
+        return False
+    try:
+        if not all(isinstance(a, dict) and isinstance(a.get("id"), str) for a in offered):
+            return False
+        ids = [a["id"] for a in offered]
+        if len(set(ids)) != len(ids) or chosen.get("id") not in ids:
+            return False
+        if offered[ids.index(chosen["id"])] != chosen:
+            return False
+        return all(
+            len(json.dumps(a, default=str, ensure_ascii=False).encode("utf-8")) <= MAX_APPROACH_BYTES for a in offered
+        )
+    except (RecursionError, TypeError, ValueError):
+        return False
+
+
 def _mine(schedules: ScheduleRepository, schedule_id: str, principal: deps.Principal) -> Schedule:
     found = schedules.get(schedule_id)
     if found is None or found.owner_user_id != principal.user_id:  # no oracle for another user's schedule
@@ -358,24 +392,31 @@ def create_schedule(
     clock: Clock,
     flags: Flags,
 ) -> dict[str, Any]:
+    if principal.demo_session:  # DEMO-EPHEMERAL-1: a demo stores nothing durable, and a schedule outlives the session
+        raise HTTPException(status_code=403, detail="demo_schedules_unavailable")
     task = store.load_task(body.task_id, settle=False)  # not yet known to be this owner's
     if task is None or task.owner != principal.user_id:  # unknown and another user's task answer alike
         raise HTTPException(status_code=404, detail="No such task.")
     deps.refuse_if_replay_only(flags)  # NFR-24: after sign-in and the owner check
     with task.lock:
-        approach = next((a for a in task.approaches or [] if a["id"] == body.approach_id), None)
+        approach = next(
+            (a for a in task.approaches or [] if isinstance(a, dict) and a.get("id") == body.approach_id), None
+        )
         grants = [e for e in store.events.get(task.world_id, []) if e["type"] == "budget.granted"]
         if not task.granted or not grants:
             raise HTTPException(status_code=409, detail="Approve this task's budget first.")
         if approach is None:
             raise HTTPException(status_code=422, detail="Pick one of the approaches this task was offered.")
+        if not _plannable(task.approaches, approach):  # before any copy: a hostile nesting must not reach deepcopy
+            raise HTTPException(status_code=409, detail="This task's approaches cannot be scheduled.")
+        offered = copy.deepcopy(task.approaches)
         brief, approach, cap = copy.deepcopy(task.brief), copy.deepcopy(approach), grants[0]["data"]["cap"]
     cadence, now = body.cadence.build(), clock()
     try:
         record = Schedule(
             schedule_id="sched_" + secrets.token_hex(12), owner_user_id=principal.user_id, title=body.title,
             cadence=cadence, approved_brief_ref=task.world_id, budget_cap=float(cap), next_due=next_slot(cadence, now),
-            brief=brief, approach=approach, created_at=now, demo=principal.demo_session,
+            brief=brief, approach=approach, approaches=offered, created_at=now, demo=principal.demo_session,
         )  # fmt: skip
     except ValueError as exc:
         raise HTTPException(status_code=409, detail="This task's budget cannot be scheduled.") from exc
@@ -394,7 +435,7 @@ def get_schedule(schedule_id: str, principal: Principal, schedules: Schedules) -
     return _view(_mine(schedules, schedule_id, principal))
 
 
-@router.patch("/schedules/{schedule_id}")
+@router.patch("/schedules/{schedule_id}", dependencies=[Depends(write_limit)])
 def update_schedule(
     schedule_id: str,
     principal: Principal,
@@ -403,6 +444,8 @@ def update_schedule(
     clock: Clock,
     flags: Flags,
 ) -> dict[str, Any]:
+    if principal.demo_session:  # DEMO-EPHEMERAL-1: a demo's schedule is never edited or re-enabled
+        raise HTTPException(status_code=403, detail="demo_schedules_unavailable")
     current = _mine(schedules, schedule_id, principal)
     deps.refuse_if_replay_only(flags)
     cadence = body.cadence.build() if body.cadence is not None else None
@@ -416,7 +459,7 @@ def update_schedule(
     return _view(updated)
 
 
-@router.delete("/schedules/{schedule_id}", status_code=204)
+@router.delete("/schedules/{schedule_id}", status_code=204, dependencies=[Depends(write_limit)])
 def delete_schedule(schedule_id: str, principal: Principal, schedules: Schedules, flags: Flags) -> Response:
     _mine(schedules, schedule_id, principal)
     deps.refuse_if_replay_only(flags)
@@ -462,6 +505,8 @@ class ScheduleStarter:
             raise StartSkipped("owner_mismatch")
         if record.brief is None or record.approach is None:
             raise StartSkipped("snapshot_missing")
+        if not _plannable(record.approaches, record.approach):  # before any world or grant: nothing to orphan
+            raise StartSkipped("snapshot_incomplete")
         if not record.enabled:  # claimed just before `disable_for_owner` or a pause: read again here, after the claim
             raise StartSkipped("schedule_disabled", count=False)
         team = self._team.read() if self._team is not None else None  # unreadable raises: no start (fail closed)
@@ -483,7 +528,7 @@ class ScheduleStarter:
                 store.drain(world_id, self._seams.writer)
         task = deps.TaskRecord(
             owner, world_id, run_id, copy.deepcopy(record.brief), copy.deepcopy(record.brief), [], 3,
-            approaches=[copy.deepcopy(record.approach)], granted=True,
+            approaches=copy.deepcopy(record.approaches), granted=True,
         )  # fmt: skip
         # start_run keeps one run per world, so a repeat (or a retry after a failed start) starts nothing twice
         runs.start_run(store, task, approach=record.approach, budget_cap=record.budget_cap, seams=self._seams)
@@ -715,9 +760,18 @@ class TaskRunIn(BaseModel):
 
 # the starter's own codes that no retry can change: a 2xx, so Cloud Tasks does not retry (run_seams_unwired is a 5xx)
 _REFUSALS = frozenset(
-    {"schedule_missing", "schedule_disabled", "owner_mismatch", "budget_not_granted", "snapshot_missing"}
+    {
+        "schedule_missing",
+        "schedule_disabled",
+        "owner_mismatch",
+        "budget_not_granted",
+        "snapshot_missing",
+        "snapshot_incomplete",
+    }
 )
-_RECORDED = frozenset({"owner_mismatch", "budget_not_granted", "snapshot_missing"})  # not a missing or disabled one
+_RECORDED = frozenset(
+    {"owner_mismatch", "budget_not_granted", "snapshot_missing", "snapshot_incomplete"}
+)  # not a missing or disabled one
 _CLOCK_SLACK = timedelta(seconds=60)  # a slot this far ahead is the clocks of two instances, not a forged future
 _ALERTS = threading.Lock()  # one instance's duplicate deliveries raise the missed-slots alert once
 
@@ -817,8 +871,88 @@ def tick(
     if as_scheduler:
         if raw:  # the Scheduler sends no body: a task's body from it is the other mode's, refused with no side effect
             return _closed(422, "This caller sends no body.")
-        return _fan_out(schedule_store, tasks_client, clock, flags, audience=audience, caller=tasks_caller, queue=queue)
+        answer = _fan_out(
+            schedule_store, tasks_client, clock, flags, audience=audience, caller=tasks_caller, queue=queue
+        )
+        nudge_sweep.sweep(request, _stamp(clock()))  # FR-PA-15b: off unless TILO_NUDGES=1; the answer never changes
+        _sweep_outbox(request, clock, store_factory)
+        _sweep_push(request, clock, store_factory)
+        plate_links.sweep(
+            request, _stamp(clock())
+        )  # FR-PA-06b: off unless TILO_PLATE_DIGEST=1; never changes the answer
+        return answer
     return _run_task(request, raw, schedule_store, seams_factory, clock, flags, store_factory)
+
+
+def _sweep_outbox(request: Request, clock: Callable[[], datetime], store_factory: Callable[[], deps.Store]) -> None:
+    """ADR-0035 LC-12: the Scheduler's tick also dispatches the durable outbox's due entries, so a dead instance's entry
+    goes out within one tick. Only for `TILO_OUTBOX_STORE=firestore`; best effort: whatever fails is logged by type and
+    the tick's own answer is unchanged. A world that cannot be read is treated as paused."""
+    if os.environ.get("TILO_OUTBOX_STORE") != "firestore":
+        return
+    from tilo_api.outbox_firestore import sweep_due  # noqa: PLC0415
+
+    overrides = request.app.dependency_overrides
+
+    opened: list[deps.Store] = []
+
+    def paused(world_id: str) -> bool:
+        try:
+            if not opened:
+                opened.append(store_factory())
+            world = opened[0].load_world(world_id)
+        except Exception:
+            return True
+        return world is None or world.paused
+
+    try:
+        store = overrides.get(deps.get_outbox_store, deps.get_outbox_store)()
+        adapters = overrides.get(deps.get_connector_adapters, deps.get_connector_adapters)()
+        sweep_due(store, adapters, lambda: _stamp(clock()), paused)
+    except Exception as exc:
+        logger.error("outbox sweep failed (%s)", type(exc).__name__)
+
+
+def _sweep_push(request: Request, clock: Callable[[], datetime], store_factory: Callable[[], deps.Store]) -> None:
+    """FR-CHN-17f: the Scheduler's tick also pushes new gate cards to the people who turned push on (`push_feed`),
+    best effort like the outbox sweep: whatever fails is logged by type and the tick's own answer is unchanged.
+    Nothing happens while `TILO_CHANNELS_URL` is unset, or while the outbox store is a process's own in-memory one
+    (the feed's "nothing twice" is the stored idempotency key; a restart or a second instance would send again)."""
+    overrides = request.app.dependency_overrides
+
+    def get(dep: Callable[..., Any]) -> Any:
+        return overrides.get(dep, dep)()
+
+    try:
+        rpc = get(deps.get_push_rpc)
+        if rpc is None:
+            return
+        from tilo_connectors import InMemoryOutboxStore  # noqa: PLC0415
+        from tilo_connectors.errors import SideEffectRefused  # noqa: PLC0415
+
+        from tilo_api import push_feed  # noqa: PLC0415
+        from tilo_api.push_send import PushRpcAdapter  # noqa: PLC0415
+
+        outbox_store = get(deps.get_outbox_store)  # the one the outbox sweep and the service configure
+        if isinstance(outbox_store, InMemoryOutboxStore):
+            return  # fail closed: not durable
+        subs = get(deps.get_push_store)
+        store = store_factory()
+
+        def paused(world_id: str) -> bool:
+            try:
+                world = store.load_world(world_id)
+            except Exception:
+                return True
+            return world is None or world.paused
+
+        push_feed.sweep(
+            subs=subs, store=store, outbox_store=outbox_store,
+            adapter=PushRpcAdapter(subscriptions=subs, rpc=rpc, final_error=SideEffectRefused),
+            people=get(deps.get_people_stores), writer=get(deps.get_event_writer), clock=clock, paused=paused,
+        )  # fmt: skip
+    except Exception as exc:
+        logger.error("push sweep failed (%s)", type(exc).__name__)
 
 
 def _fan_out(
