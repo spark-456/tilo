@@ -192,3 +192,25 @@ def test_PL_LIVE_E2E_09_no_credit_rate_is_hard_coded_in_the_module() -> None:
     source = Path(spec.origin).read_text(encoding="utf-8")
     assert "0.005" not in source  # the credit's dollar value is read from config/prices.yaml (PL-06)
     assert not re.search(r"\b(?:0\.75|3\.75|1\.50|7\.50)\b", source)  # nor any of the file's token prices
+
+
+def test_PL_LIVE_E2E_global_prices_accept_global_and_refuse_a_regional_mismatch() -> None:
+    from datetime import UTC, datetime
+
+    from _live_e2e_lib import REPO_ROOT
+    from tilo_metering import PriceBook
+    from tilo_metering.prices import Usage
+    from tilo_providers.config import ProviderConfigError, load_providers_config
+
+    with env(LIVE="1", GOOGLE_LOCATION="global"):
+        config = load_providers_config(REPO_ROOT / "config/models.yaml", REPO_ROOT / "config/prices.yaml")
+    assert config.prices.region == "global"
+    profile = config.roles["director"].primary
+    at = datetime(2026, 10, 14, tzinfo=UTC)
+    book = PriceBook.load(REPO_ROOT / "config" / "prices.yaml")
+    assert book.credits(Usage(profile, 1000, 500), at) == pytest.approx(
+        config.credits(config.cost_usd(profile, 1000, 500, at=at.date()))
+    )
+    with env(LIVE="1", GOOGLE_LOCATION="asia-southeast1"):
+        with pytest.raises(ProviderConfigError, match="GOOGLE_LOCATION"):
+            load_providers_config(REPO_ROOT / "config/models.yaml", REPO_ROOT / "config/prices.yaml")

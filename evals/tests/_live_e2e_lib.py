@@ -125,8 +125,8 @@ def env(**overrides: str) -> Iterator[None]:
             os.environ.pop(key, None)
         os.environ["CLOUDSDK_CONFIG"] = str(Path(tempfile.gettempdir()) / "tilo-test-no-gcloud-config")
         os.environ.update(overrides)
-        if os.environ.get("LIVE") == "1":  # a live run needs the price sheet's region (ADR-0029 decision 3)
-            os.environ.setdefault("GOOGLE_LOCATION", "asia-southeast1")
+        if os.environ.get("LIVE") == "1":  # match the checked-in global price sheet (LIVE-GLOBAL-1)
+            os.environ.setdefault("GOOGLE_LOCATION", "global")
         yield
 
 
