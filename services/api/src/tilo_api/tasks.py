@@ -15,8 +15,9 @@ import dataclasses
 import hashlib
 import json
 import logging
+import threading
 from collections.abc import Awaitable, Callable, Iterator, Sequence
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import Future, ThreadPoolExecutor
 from datetime import UTC, date, datetime
 from typing import Annotated, Any
 
@@ -281,9 +282,11 @@ def answer_questions(
         if brief != task.brief:
             changes["approaches"] = None  # proposed for the old brief
         saved = _saved(store, None, task_id, task, [], changes)
+        if brief != task.brief:
+            saved.approaches_work["version"] = saved.approaches_work.get("version", 0) + 1
         prefetch = saved.approaches is None and all(q.field in answers for q in saved.questions)
-    if prefetch:
-        _PREFETCH.submit(_prefetch_approaches, store, writer, task_id, model_router, clock)
+        if prefetch:
+            _queue_approaches(store, writer, task_id, saved, model_router, clock)
     return {"brief": brief}
 
 
@@ -295,10 +298,25 @@ def _proposed(
     model_router: Router,
     clock: Clock,
 ) -> deps.TaskRecord:
-    """The task with the approaches proposed for its current brief; one model call per brief version. The caller
-    holds `task.lock` and passes the record saved last, so a second caller waits, then finds the stored result."""
-    if task.approaches is not None:
-        return task
+    """Wait outside the task lock; concurrent GETs and answers share one bounded worker."""
+    while True:
+        with task.lock:
+            task = store.tasks[task_id]
+            if any(q.field not in task.answers for q in task.questions):
+                raise HTTPException(status_code=409, detail="Answer or skip every question first.")
+            if task.approaches is not None:
+                return task
+            work = task.approaches_work
+            if work.get("computed") == work.get("version", 0):
+                result = work["result"]
+                return _saved(store, writer, task_id, task, [result.event], {"approaches": result.approaches})
+            future = _queue_approaches(store, writer, task_id, task, model_router, clock)
+            if future is None:
+                raise HTTPException(status_code=503, detail="The Director is busy; try again shortly.")
+        future.result()
+
+
+def _compute_approaches(task: deps.TaskRecord, model_router: Router, clock: Clock) -> Any:
     try:
         result = propose_approaches(
             task.brief,
@@ -311,30 +329,94 @@ def _proposed(
     except ApproachProposalError as exc:
         deps.raise_if_model_unavailable(exc)
         raise HTTPException(status_code=502, detail="The Director could not propose approaches.") from exc
-    return _saved(store, writer, task_id, task, [result.event], {"approaches": result.approaches})
+    return result
 
 
 _PREFETCH = ThreadPoolExecutor(max_workers=4, thread_name_prefix="approaches")
+_PREFETCH_SLOTS = threading.BoundedSemaphore(32)  # running + queued tasks; edits never enqueue another job
+
+
+def _queue_approaches(
+    store: deps.Store,
+    writer: deps.EventWriter | None,
+    task_id: str,
+    task: deps.TaskRecord,
+    model_router: Router,
+    clock: Clock,
+) -> Future | None:
+    """Called under task.lock. One future per task, including failures for the same version."""
+    work = task.approaches_work
+    future = work.get("future")
+    version = work.get("version", 0)
+    if future is not None and (not future.done() or work.get("finished") == version):
+        return future
+    slots = _PREFETCH_SLOTS
+    if not slots.acquire(blocking=False):
+        return None
+    future = Future()
+    work["future"] = future
+    try:
+        _PREFETCH.submit(_prefetch_approaches, store, writer, task_id, model_router, clock, future, slots)
+    except Exception:
+        work.pop("future", None)
+        slots.release()
+        raise
+    return future
 
 
 def _prefetch_approaches(
-    store: deps.Store, writer: deps.EventWriter, task_id: str, model_router: Router, clock: Clock
+    store: deps.Store,
+    writer: deps.EventWriter | None,
+    task_id: str,
+    model_router: Router,
+    clock: Clock,
+    future: Future,
+    slots: threading.BoundedSemaphore,
 ) -> None:
-    """APPROACH-SPEED: propose the approaches as soon as the brief is final, off the request, so the person's next
-    GET finds them (or waits on this call, which holds the task's lock). Same single call as the GET would make, so
-    nothing extra is spent. Best effort: a failure is logged and the GET asks again and reports it."""
-    task = store.tasks.get(task_id)
-    if task is None:
-        return
+    """Coalesce edits to the latest version. Compute unlocked, publish only if still current.
+
+    Keep a computed result even if publication fails, so replay never pays to compute it twice.
+    """
+    task = store.tasks[task_id]
+    work = task.approaches_work
     try:
-        deps.providers_config()  # the GET's own check, before any model call is spent
-        with task.lock:
-            task = store.tasks[task_id]
-            if task.granted or any(q.field not in task.answers for q in task.questions):
+        while True:
+            with task.lock:
+                task = store.tasks[task_id]
+                version = work.get("version", 0)
+                snapshot = dataclasses.replace(task, brief=copy.deepcopy(task.brief))
+                if task.approaches is not None or task.granted:
+                    work["finished"] = version
+                    future.set_result(None)
+                    return
+            result, error = None, None
+            try:
+                deps.providers_config()
+                if work.get("computed") == version:
+                    result = work["result"]
+                else:
+                    result = _compute_approaches(snapshot, model_router, clock)
+            except Exception as exc:
+                error = exc
+            with task.lock:
+                task = store.tasks[task_id]
+                if work.get("version", 0) != version:
+                    continue  # stale result/error: no event, no cache, only the newest pending brief runs
+                if error is None:
+                    work.update(computed=version, result=result)
+                    try:
+                        _saved(store, writer, task_id, task, [result.event], {"approaches": result.approaches})
+                    except Exception as exc:
+                        error = exc
+                work["finished"] = version
+                if error is None:
+                    future.set_result(None)
+                else:
+                    future.set_exception(error)
+                    logger.warning("approaches prefetch for a task did not complete: %s", type(error).__name__)
                 return
-            _proposed(store, writer, task_id, task, model_router, clock)
-    except Exception as exc:
-        logger.warning("approaches prefetch for a task did not complete: %s", type(exc).__name__)
+    finally:
+        slots.release()
 
 
 @router.get("/tasks/{task_id}/approaches")
@@ -355,13 +437,9 @@ def get_approaches(
     except ProviderConfigError as exc:
         logger.warning("provider config unavailable: %s", exc)
         raise HTTPException(status_code=503, detail="The model configuration is not available.") from exc
-    with task.lock:
-        task = store.tasks[task_id]  # the record saved last: the prefetch may have stored the approaches meanwhile
-        if any(q.field not in task.answers for q in task.questions):
-            raise HTTPException(status_code=409, detail="Answer or skip every question first.")
-        task = _proposed(store, writer, task_id, task, model_router, clock)
-        assert task.approaches is not None
-        approaches = task.approaches
+    task = _proposed(store, writer, task_id, task, model_router, clock)
+    assert task.approaches is not None
+    approaches = task.approaches
     # Default (PRD silent, BQ-83): the cheapest approach is recommended; ties keep the Director's order.
     recommended = min(approaches, key=lambda a: a["credits"]["max"])["id"]
     return {

@@ -93,7 +93,9 @@ def _world_from(d: Mapping[str, Any]) -> deps.WorldRecord:
 
 
 def _task_doc(t: deps.TaskRecord) -> dict[str, Any]:
-    return _plain({f.name: getattr(t, f.name) for f in dataclasses.fields(t) if f.name != "lock"})
+    return _plain(
+        {f.name: getattr(t, f.name) for f in dataclasses.fields(t) if f.name not in {"lock", "approaches_work"}}
+    )
 
 
 def _task_from(d: Mapping[str, Any]) -> deps.TaskRecord:
