@@ -9,6 +9,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+from collections.abc import Callable
 from typing import Any
 
 from fastapi import HTTPException
@@ -30,12 +31,31 @@ def _reject_constant(value: str) -> None:
 class _Scope:
     kind: str
 
-    def __init__(self, client: Any, *, org_id: str, owner: str, world_id: str, run_id: str) -> None:
+    def __init__(
+        self,
+        client: Any,
+        *,
+        org_id: str,
+        owner: str,
+        world_id: str,
+        run_id: str,
+        before_publication: Callable[[], None] = lambda: None,
+    ) -> None:
         for value, prefix in ((org_id, "org"), (owner, "u"), (world_id, "w"), (run_id, "r")):
             if not isinstance(value, str) or re.fullmatch(rf"{prefix}_[0-9A-Za-z_]{{1,48}}", value) is None:
                 raise ValueError("invalid scope")
         self._client, self._owner = client, owner
+        self._before_publication = before_publication
         self._root = f"orgs/{org_id}/followup_autopilot/{_hash([owner, world_id, run_id])}/{self.kind}"
+
+    def _publication_document(self, path: str) -> Any:
+        try:
+            document = self._client.document(path)
+        except Exception:
+            raise _unavailable() from None
+        # Outside the SDK catch: source/CAS refusals retain their original status.
+        self._before_publication()
+        return document
 
     def _path(self, user_id: str, key: str) -> str:
         if user_id != self._owner and not (self.kind == "cards" and user_id == "#artifacts"):
@@ -69,8 +89,9 @@ class FirestoreCards(_Scope):
     def create(self, user_id: str, key: str, value: dict) -> bool:
         path = self._path(user_id, key)
         payload = json.dumps(self._validate(user_id, value), ensure_ascii=True, allow_nan=False)
+        document = self._publication_document(path)
         try:
-            self._client.document(path).create({"payload": payload})
+            document.create({"payload": payload})
         except AlreadyExists:
             return False
         except Exception:
@@ -80,8 +101,9 @@ class FirestoreCards(_Scope):
     def put(self, user_id: str, key: str, value: dict) -> None:
         path = self._path(user_id, key)
         payload = json.dumps(self._validate(user_id, value), ensure_ascii=True, allow_nan=False)
+        document = self._publication_document(path)
         try:
-            self._client.document(path).update({"payload": payload})
+            document.update({"payload": payload})
         except Exception:
             raise _unavailable() from None
 
@@ -91,8 +113,9 @@ class FirestoreStops(_Scope):
 
     def add(self, user_id: str, card_id: str) -> None:
         path = self._path(user_id, card_id)
+        document = self._publication_document(path)
         try:
-            self._client.document(path).create({"owner": user_id, "card_id": card_id})
+            document.create({"owner": user_id, "card_id": card_id})
         except AlreadyExists:
             pass
         except Exception:
@@ -113,7 +136,8 @@ class FirestoreStops(_Scope):
 
     def remove(self, user_id: str, card_id: str) -> None:
         path = self._path(user_id, card_id)
+        document = self._publication_document(path)
         try:
-            self._client.document(path).delete()
+            document.delete()
         except Exception:
             raise _unavailable() from None
