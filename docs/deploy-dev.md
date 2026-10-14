@@ -510,6 +510,27 @@ ID-token verifier (`deps.get_current_principal`, CL-REACH) is wired; before that
 smoke stops at `intake`. The smoke needs a real deployment and a person, so no workflow runs it and it is not part
 of `just check` or `just test`.
 
+## Hosted smoke (W22, after every Hosting release)
+
+The 13 Oct hosting regression (a build with no Firebase web config showed "Sign-in is off") passed a smoke that said
+`signedin SKIP`. `just smoke-hosted <hosting origin>` looks at what a person sees on the deployed site, with
+Playwright (`apps/web/e2e/hosted-smoke.spec.ts`, its own config `apps/web/playwright.hosted.config.ts`, no dev server):
+
+```
+just smoke-hosted https://essential-wares-510320-f0.web.app
+```
+
+| Case | What it proves |
+| --- | --- |
+| signed out | "Continue with Google" and "Explore a demo session" are on the page, no "Sign-in is off" text or console line, no console error or warning, no request answered >= 400 |
+| demo session | Home shows its composer and content, the Worlds list loads, one world opens, `/settings` is in the Park shell (main navigation present, no "Fixture replay" pill), and the same console and request checks hold |
+
+Only `https://<project>.web.app` or `.firebaseapp.com` is accepted. `TILO_SMOKE_ALLOW=<regex,regex>` adds URL
+patterns whose >= 400 answers are expected. The demo session replays recorded runs: nothing is sent, started or
+paid. The spec skips itself when `TILO_SMOKE_URL` is unset and the main Playwright config ignores it, so dev and CI
+never reach the network. CX-MERGE-A runs it as the last step of a Hosting release; a red case blocks calling the
+release done. It is no part of `just check` or `just test`.
+
 ## Web push certificate egress (FR-CHN-17f)
 
 Before activating web push, include HTTPS egress from `tilo-channels` to `www.googleapis.com` for

@@ -50,6 +50,8 @@ const LIVE_SPECS = "**/live/**";
 // (IPv6 on Windows), so Playwright did not see it and silently started the dev server on the same port. Never reused.
 // Run: TILO_WEB_PROD=1 TILO_WEB_PORT=5393 pnpm exec playwright test <spec> -g "CPU slowed 4x" --project=chromium --no-deps --workers=1
 const PROD = process.env.TILO_WEB_PROD === "1";
+// W22: the hosted release smoke has its own config (playwright.hosted.config.ts) and never joins this suite.
+const HOSTED_SPECS = "**/hosted-smoke.spec.ts";
 const TIMING_SPECS = [
   "**/world-perf.spec.ts",
   "**/world-reduced-motion-toggle.spec.ts",
@@ -72,7 +74,7 @@ export default defineConfig({
   projects: [
     {
       name: "chromium",
-      testIgnore: [...TIMING_SPECS, CP2_SPECS, NFR01_SPECS, PARITY_SPECS, LIVE_SPECS],
+      testIgnore: [...TIMING_SPECS, CP2_SPECS, NFR01_SPECS, PARITY_SPECS, LIVE_SPECS, HOSTED_SPECS],
       // Runs the timing project after this one finishes, pass or fail. A `dependencies` link would
       // skip the C8 freeze and perf specs whenever any chromium test failed.
       teardown: "timing",

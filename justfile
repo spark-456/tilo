@@ -209,6 +209,14 @@ deploy-web-live:
     python scripts/web_build_env.py --tilo-dev-api pnpm --filter @tilo/web run build
     pnpm exec firebase deploy --only hosting --project essential-wares-510320-f0
 
+# Hosted release smoke (W22, apps/web/e2e/hosted-smoke.spec.ts): what a person sees on the deployed site. The signed-out
+# gate offers Google and the demo with no "Sign-in is off", then a demo session loads Home, Worlds, a world and Settings,
+# with no console error and no request >= 400 outside an allowlist. `just smoke-hosted <hosting origin>`; it needs the
+# deployment, so CI never runs it and it is no part of `check` or `test`. Docs: docs/deploy-dev.md "Hosted smoke".
+smoke-hosted url="":
+    {{ if url =~ '^https://[a-z0-9.-]+\.(web\.app|firebaseapp\.com)$' { 'node -e "process.exit(0)"' } else { error('smoke-hosted: url must be the Firebase Hosting origin (https://<project>.web.app or .firebaseapp.com, no path), got ' + url) } }}
+    node -e "process.env.TILO_SMOKE_URL='{{ url }}';require('node:child_process').execSync('pnpm exec playwright test --config playwright.hosted.config.ts',{cwd:'apps/web',stdio:'inherit'})"
+
 # Deployed smoke of tilo-dev (PROD-WIRE-4, scripts/smoke_dev.py): `just smoke-dev <api-url>` (positional, tilo-api's own
 # Cloud Run url, checked by just on the first command line like `deploy-web`, so a person's token only ever goes to
 # tilo-api). The token must be a JWT, and the smoke answers no card that could send anything out. Health, the CORS preflight from the hosting
