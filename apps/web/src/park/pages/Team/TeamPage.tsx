@@ -86,7 +86,14 @@ export function TeamPage({ app }: { app: AppCtx }) {
         <ConsoleSection />
       </Frame>
     );
-  return preview ? <FirstRunPanels page="team" app={app} /> : <PersonalTeamPage app={app} />;
+  // JUDGE-FIRST-RUN F1: a judge is a member of the org, so the real team shows; a first visit adds the labelled
+  // fictional examples below it instead of hiding it.
+  return (
+    <>
+      <PersonalTeamPage app={app} />
+      {preview ? <FirstRunPanels page="team" app={app} embedded /> : null}
+    </>
+  );
 }
 function PersonalTeamPage({ app }: { app: AppCtx }) {
   const api = useParkApi();

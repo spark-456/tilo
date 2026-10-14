@@ -49,8 +49,12 @@ it("FIRST_RUN_HR_1_home_worlds_previews_are_labelled_read_only_and_keep_real_con
     expect(panel.textContent).toContain("Sample");
   expect(node.m.container.querySelector('[aria-label="Describe your task"]')).not.toBeNull();
   expect(node.m.container.textContent).toContain("Show sample project");
-  for (const button of node.m.container.querySelectorAll("[data-first-run-overview] button"))
-    click(button);
+  // JUDGE-FIRST-RUN F2/F3: the first-task buttons only fill the task box and the two "recorded project" buttons only
+  // open the read-only sample (both covered in FirstTask.JUDGE_FIRST_RUN.test.tsx); every other button explains.
+  for (const button of node.m.container.querySelectorAll(
+    "[data-first-run-overview] button.park-first-run-explain",
+  ))
+    if (button.textContent !== "Open the recorded sample project") click(button);
   expect(seen.store.getState().toast?.message).toContain("sample data");
   for (const name of ["startWorld", "decide", "undo", "setPref", "saveSkill"] as const)
     expect(api[name]).not.toHaveBeenCalled();

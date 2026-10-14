@@ -81,7 +81,9 @@ export function Spotlight({
         <div className="park-worlds-clear__text">
           <div className="park-worlds-clear__title">You’re all caught up</div>
           <div className="park-worlds-clear__body">
-            {worldName} is moving again. Tilo will ask if anything else needs you.
+            {worldName === ""
+              ? "Nothing needs you right now. Tilo will ask if anything does."
+              : `${worldName} is moving again. Tilo will ask if anything else needs you.`}
           </div>
         </div>
       </div>

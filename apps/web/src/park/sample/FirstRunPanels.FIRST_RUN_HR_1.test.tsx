@@ -46,7 +46,14 @@ it("FIRST_RUN_HR_1_four_live_pages_show_labelled_fixture_panels_and_clicks_never
   for (const panel of node.m.container.querySelectorAll(".park-first-run-card"))
     expect(panel.textContent).toContain("Sample");
   expect(node.m.container.textContent).toContain("Fictional");
-  expect(node.m.container.textContent).not.toContain("Not connected yet");
+  // JUDGE-FIRST-RUN F1/F4: Agenda, Skills and Team keep their real page and add the labelled examples below it.
+  for (const page of ["agenda", "skills", "team"])
+    expect(
+      node.m.container.querySelector(`[data-first-run-panels="${page}"] h2`)?.textContent,
+    ).toBe("Recorded examples");
+  expect(node.m.container.querySelector('[data-first-run-panels="ledger"] h1')?.textContent).toBe(
+    "Ledger",
+  );
   click(q(node.m.container, "[data-first-run-panels] button"));
   expect(seen.store.getState().toast?.message).toContain("sample data");
   for (const name of ["startWorld", "decide", "undo", "setPref", "saveSkill"] as const)

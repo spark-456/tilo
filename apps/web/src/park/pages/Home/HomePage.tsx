@@ -25,6 +25,7 @@ import { FirstRunOverview } from "../../sample/FirstRunOverview";
 import { useFirstRunPreview } from "../../sample/useFirstRunPreview";
 import { ComposerPanel, type Phase, QUICK_IDLE, type QuickView } from "./ComposerPanel";
 import "./Home.css";
+import { HomeSkeleton } from "./HomeSkeleton";
 import { Hero, KpiStrip, Pins, TodayPanel } from "./Panels";
 import { readEffort, writeEffort } from "./effortStore";
 import {
@@ -459,6 +460,7 @@ export function HomePage({ app }: { app: AppCtx }) {
           />
         </div>
       ) : null}
+      {!ready && !failed ? <HomeSkeleton /> : null}
       {base &&
       base !== "failed" &&
       base.agenda &&
@@ -466,7 +468,19 @@ export function HomePage({ app }: { app: AppCtx }) {
       base.agenda.setupRequired ? (
         <output>{ORGANISATION_SETUP}</output>
       ) : null}
-      {preview ? <FirstRunOverview page="home" app={app} /> : null}
+      {preview ? (
+        <FirstRunOverview
+          page="home"
+          app={app}
+          onPickTask={(prompt) => {
+            if (busy()) return;
+            setQuery(prompt);
+            setQuick(QUICK_IDLE);
+            toIdle();
+            composerInput.current?.focus();
+          }}
+        />
+      ) : null}
       {failed && !preview ? (
         <div className="park-home-leftcol">
           <div className="park-home-hero park-home-glass">
