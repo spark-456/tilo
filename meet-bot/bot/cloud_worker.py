@@ -16,6 +16,7 @@ from .config import Config
 from .events import remove_meet_links
 from .providers import reset_call_counter
 from .session import LiveSession
+from .voice_meter import meter_from_env
 
 
 class CapturedTranscript(dict):
@@ -86,8 +87,11 @@ def quiet_capture():
             logger.disabled = disabled
 
 
-async def attend_meeting(meeting_id: str, join_url: str) -> dict:
+async def attend_meeting(meeting_id: str, join_url: str, claim: str | None = None) -> dict:
     reset_call_counter()
+    # ADR-0042 (BQ-M2-4): the Live voice's SEC-16 hook, or None (the Live voice then stays unbuilt and the local voice
+    # speaks). Only with LIVE=1, TILO_API_URL and the attend's claim; the claim goes nowhere else.
+    meter = meter_from_env(meeting_id, claim, os.environ)
     with quiet_capture(), TemporaryDirectory(prefix="tilo-meet-") as directory:
         root = Path(directory)
         agenda = root / "agenda.md"
@@ -114,7 +118,10 @@ async def attend_meeting(meeting_id: str, join_url: str) -> dict:
             reply_mode="both",
             context_urls=[],
         )
-        session = LiveSession(cfg, "join", join_url, agenda, 45, False, [], False, False, [], "captions", "both")
+        extra = {"voice_meter": meter} if meter is not None else {}  # off: the session is built exactly as before
+        session = LiveSession(
+            cfg, "join", join_url, agenda, 45, False, [], False, False, [], "captions", "both", **extra
+        )
         session.events.echo = False
         await session.run()
         return CapturedTranscript(
