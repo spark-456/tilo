@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { TiloApiError } from "../../../api/http";
 import { type ProposalClient, readProposals, reviewProposal } from "../../api/live/skillProposals";
 import type { SkillProposal } from "../../api/types";
 
@@ -6,6 +7,7 @@ import type { SkillProposal } from "../../api/types";
 export function SkillProposals({ client, worldId }: { client: ProposalClient; worldId: string }) {
   const [rows, setRows] = useState<SkillProposal[] | null>(null);
   const [error, setError] = useState("");
+  const [notYet, setNotYet] = useState(false);
   const [busy, setBusy] = useState(false);
   const [attempt, setAttempt] = useState(0);
   const generation = useRef(0);
@@ -19,11 +21,16 @@ export function SkillProposals({ client, worldId }: { client: ProposalClient; wo
     let active = true;
     setRows(null);
     setError("");
+    setNotYet(false);
     readProposals(client, worldId)
       .then((list) => {
         if (active) setRows(list);
       })
-      .catch(() => {
+      .catch((failure: unknown) => {
+        if (active && failure instanceof TiloApiError && failure.status === 404) {
+          setNotYet(true);
+          return;
+        }
         if (active)
           setError("Skill proposals not available. You may need an expert Team Lead assignment.");
       });
@@ -65,7 +72,8 @@ export function SkillProposals({ client, worldId }: { client: ProposalClient; wo
           ) : null}
         </>
       ) : null}
-      {!error && rows === null ? <p>Loading skill proposals…</p> : null}
+      {notYet ? <p>Skill proposals are not available for this world yet.</p> : null}
+      {!error && !notYet && rows === null ? <p>Loading skill proposals…</p> : null}
       {rows?.length === 0 ? <p>No skill proposals yet.</p> : null}
       {rows?.map((p) => (
         <article key={p.id}>

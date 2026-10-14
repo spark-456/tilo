@@ -9,6 +9,10 @@ export interface RunEvent {
   readonly ts: string;
   readonly credits: number;
   readonly summary: string;
+  readonly target?: string;
+  readonly actor?: string;
+  readonly district?: string | null;
+  readonly data?: unknown;
 }
 
 /** What the page needs of the world client: the event subscription. */

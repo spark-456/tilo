@@ -25,10 +25,17 @@ export function roomOf(v: unknown, worldId: string): Room {
 /** MR-02: the same layout + recorded district association the server uses; nothing inferred from names. */
 export async function attendees(client: RoomClient, worldId: string): Promise<Attendee[]> {
   const path = `/worlds/${encodeURIComponent(worldId)}`;
+  const missing = Symbol("layout not yet available");
   const [layout, feed] = await Promise.all([
-    client.getJson(`${path}/layout`),
+    client.getJson(`${path}/layout`).catch((error: unknown) => {
+      if (error instanceof TiloApiError && error.status === 404) return missing;
+      throw error;
+    }),
     client.getJson(`${path}/events`),
   ]);
+  // LIVE-LAYOUT / FR-WLD-05: only a successful events read establishes a readable world.
+  // Missing layout cannot supply attendees; never invent agents or suppress an access error.
+  if (layout === missing && record(feed) && Array.isArray(feed.events)) return [];
   if (
     !record(layout) ||
     !record(layout.semantic) ||

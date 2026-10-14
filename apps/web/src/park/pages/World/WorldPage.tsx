@@ -37,6 +37,7 @@ import { SampleBadge, SampleNote } from "../../sample/SampleBadge";
 import { icon } from "../../shell/kit";
 import { Activity, Districts, Result, RunHistory } from "./Lower";
 import { MeetingHall } from "./MeetingHall";
+import { RecordedWorldArt } from "./RecordedWorldArt";
 import { RunProgressCard } from "./RunProgressCard";
 import { ShareLine } from "./ShareLine";
 import { FactsCard, GoLink, LovableCard, SpendCard, WaitingCard } from "./Side";
@@ -560,7 +561,11 @@ export function WorldPage({ app }: { app: AppCtx }) {
       >
         <div className="park-world-mapcard">
           <div className={isCity ? "park-world-map" : "park-world-map park-world-map--art"}>
-            <MapArt w={w} plans={loaded.plans} app={app} />
+            {trackRun ? (
+              <RecordedWorldArt events={runEvents} />
+            ) : (
+              <MapArt w={w} plans={loaded.plans} app={app} />
+            )}
             {isCity && loaded.gaps.plans ? (
               <p className="park-world-meta">City map: {NOT_YET}</p>
             ) : null}
