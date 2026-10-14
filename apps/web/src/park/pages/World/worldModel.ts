@@ -29,6 +29,41 @@ const STARTING: StateLook = [
   "var(--hero)",
 ];
 
+/** WORLD-USEFUL: a run whose last recorded word is world.failed. It is never "Ready": nothing was finished. */
+export const STOPPED: StateLook = [
+  "Stopped",
+  "var(--amberTile)",
+  "var(--amberInk)",
+  "var(--amber)",
+  "var(--amber)",
+];
+
+/**
+ * WORLD-USEFUL: the world as its own recorded events say it is. The list is read once, when the page opens, so a
+ * run that finished (or stopped) afterwards would still read "Running" (or, for a failed run, "Ready"); the events
+ * are the truth. `phase` and `percent` come from runView; the agent count from the spawn events.
+ */
+export function withRunState(
+  w: World,
+  run: { phase: string; percent: number | null },
+  agents: number,
+): World {
+  const st: WorldState | null =
+    run.phase === "working"
+      ? "running"
+      : run.phase === "waiting"
+        ? "needs"
+        : run.phase === "done" || run.phase === "failed"
+          ? "finished"
+          : null;
+  return {
+    ...w,
+    ...(st ? { st } : {}),
+    ...(agents > 0 ? { agents } : {}),
+    ...(run.percent !== null ? { prog: run.percent } : {}),
+  };
+}
+
 /** The look of the world's status chip and progress bar: paused wins, then a new world, then its state. */
 export const stateLook = (w: World, paused: boolean): StateLook =>
   paused ? PAUSED : w.isNew ? STARTING : STATES[w.st];
