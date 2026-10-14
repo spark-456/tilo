@@ -92,7 +92,7 @@
  * events/data/plan.revised.schema.json 1.0.0 sha256:55005a10fa84656a
  * events/data/policy.applied.schema.json 1.0.0 sha256:3ca104f308b12dce
  * events/data/policy.changed.schema.json 1.0.0 sha256:e480c2319e07c2a6
- * events/data/question.answered.schema.json 1.1.0 sha256:27aa69077ee8f813
+ * events/data/question.answered.schema.json 1.2.0 sha256:425bf7e87e9c5ced
  * events/data/question.routed.schema.json 1.0.0 sha256:af061a697d8396b2
  * events/data/skill.captured.schema.json 1.0.0 sha256:6de7eeac396cf5a8
  * events/data/skill.fixed.schema.json 1.0.0 sha256:a8532b6517841fc5
@@ -3430,7 +3430,7 @@ export interface PolicyChangedData {
   level: AutonomyLevel;
 }
 /**
- * data of question.answered (PRD 9.5). answered_by default means the card timed out and the Director applied its safe default; that event has severity nudge (BQ-04, EV-08). Gates never time out to go. answered_by decision means a repeat question was answered from an earlier decision (FR-AGT-07), and decision_id cites it (decision.schema.json id, rule DC-04); decision_id is set exactly then and is null or absent otherwise (added in 1.1.0).
+ * data of question.answered (PRD 9.5). answered_by default means the card timed out and the Director applied its safe default; that event has severity nudge (BQ-04, EV-08). Gates never time out to go. answered_by decision means a repeat question was answered from an earlier decision (FR-AGT-07), and decision_id cites it (decision.schema.json id, rule DC-04); decision_id is set exactly then and is null or absent otherwise (added in 1.1.0). text (added in 1.2.0, ADR-0043) is the answer a person or Team Lead typed in their own words instead of choosing one of the question card's options: present only when answered_by is person or team_lead and they typed, absent otherwise (never null). A chosen option is not event data and travels in the part's scope (BQ-207); a default answer is always the card's safe_default option; a decision's answer stays in the Decision it cites. Only a question card (kind needs_you) takes a typed answer: gate, consent and meeting cards keep their fixed options, and a typed answer never opens a gate, grants a connection or counts as an owner's instruction (OB-01 reads world.requested only). text comes from a person's answer on tilo-api's card answer route, never from a channel message (an email reply's body stays in the raw archive, event.rules.md), and payloads never carry credentials, so the writer passes it through the secret redactor before the event is written (BQ-OWNANS-3).
  *
  * This interface was referenced by `TiloContracts`'s JSON-Schema
  * via the `definition` "QuestionAnsweredData".
@@ -3438,6 +3438,10 @@ export interface PolicyChangedData {
 export interface QuestionAnsweredData {
   answered_by: EventAnswerSource;
   decision_id?: Ulid | null;
+  /**
+   * The typed answer, 1 to 300 characters with at least one that is not white space.
+   */
+  text?: string;
 }
 /**
  * data of question.routed (PRD 9.5). target is the person or Team Lead the question went to; domain is the Team Lead domain it matched, null for the owner fallback (FR-AGT-06).

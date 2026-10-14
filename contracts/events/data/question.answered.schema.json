@@ -1,9 +1,9 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://contracts.tilo.example/events/data/question.answered.schema.json",
-  "x-version": "1.1.0",
+  "x-version": "1.2.0",
   "title": "QuestionAnsweredData",
-  "description": "data of question.answered (PRD 9.5). answered_by default means the card timed out and the Director applied its safe default; that event has severity nudge (BQ-04, EV-08). Gates never time out to go. answered_by decision means a repeat question was answered from an earlier decision (FR-AGT-07), and decision_id cites it (decision.schema.json id, rule DC-04); decision_id is set exactly then and is null or absent otherwise (added in 1.1.0).",
+  "description": "data of question.answered (PRD 9.5). answered_by default means the card timed out and the Director applied its safe default; that event has severity nudge (BQ-04, EV-08). Gates never time out to go. answered_by decision means a repeat question was answered from an earlier decision (FR-AGT-07), and decision_id cites it (decision.schema.json id, rule DC-04); decision_id is set exactly then and is null or absent otherwise (added in 1.1.0). text (added in 1.2.0, ADR-0043) is the answer a person or Team Lead typed in their own words instead of choosing one of the question card's options: present only when answered_by is person or team_lead and they typed, absent otherwise (never null). A chosen option is not event data and travels in the part's scope (BQ-207); a default answer is always the card's safe_default option; a decision's answer stays in the Decision it cites. Only a question card (kind needs_you) takes a typed answer: gate, consent and meeting cards keep their fixed options, and a typed answer never opens a gate, grants a connection or counts as an owner's instruction (OB-01 reads world.requested only). text comes from a person's answer on tilo-api's card answer route, never from a channel message (an email reply's body stays in the raw archive, event.rules.md), and payloads never carry credentials, so the writer passes it through the secret redactor before the event is written (BQ-OWNANS-3).",
   "type": "object",
   "additionalProperties": false,
   "required": ["answered_by"],
@@ -11,12 +11,24 @@
     "answered_by": { "$ref": "../../event.schema.json#/$defs/answer_source" },
     "decision_id": {
       "anyOf": [{ "$ref": "../../common.schema.json#/$defs/ulid" }, { "type": "null" }]
+    },
+    "text": {
+      "description": "The typed answer, 1 to 300 characters with at least one that is not white space.",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 300,
+      "pattern": "\\S"
     }
   },
   "if": { "properties": { "answered_by": { "const": "decision" } }, "required": ["answered_by"] },
   "then": {
     "required": ["decision_id"],
-    "properties": { "decision_id": { "$ref": "../../common.schema.json#/$defs/ulid" } }
+    "properties": { "decision_id": { "$ref": "../../common.schema.json#/$defs/ulid" } },
+    "not": { "required": ["text"] }
   },
-  "else": { "properties": { "decision_id": { "type": "null" } } }
+  "else": {
+    "properties": { "decision_id": { "type": "null" } },
+    "if": { "properties": { "answered_by": { "const": "default" } }, "required": ["answered_by"] },
+    "then": { "not": { "required": ["text"] } }
+  }
 }
