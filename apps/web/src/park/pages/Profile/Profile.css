@@ -636,3 +636,14 @@
   color: var(--ink2);
   cursor: pointer;
 }
+
+/* UI-10 W9: fit the form and wrap contact text inside the phone card. */
+@media (max-width: 600px) {
+  [data-park] [data-testid="park-page-profile"] .park-profile-form {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  [data-park] [data-testid="park-page-profile"] .park-profile-sub,
+  [data-park] [data-testid="park-page-profile"] .park-profile-name {
+    overflow-wrap: anywhere;
+  }
+}

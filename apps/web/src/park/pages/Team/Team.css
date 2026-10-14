@@ -69,6 +69,7 @@
   outline-offset: 2px;
 }
 [data-park] .park-team-input {
+  min-height: 24px;
   flex: 1;
   min-width: 0;
   border: 0;
@@ -151,6 +152,10 @@
   color: var(--ink2);
 }
 [data-park] .park-team-link {
+  display: inline-flex;
+  align-items: center;
+  min-width: 24px;
+  min-height: 24px;
   font-size: 13.5px;
   font-weight: 800;
   color: var(--heroInk);
@@ -543,4 +548,36 @@
 [data-park] .park-team-check--on {
   background: var(--okSoft);
   color: var(--ok);
+}
+
+/* UI-10 W9: keep the dense tables scrollable inside their card, and stack coverage on phones. */
+@media (max-width: 600px) {
+  [data-park] [data-testid="park-page-team"] .park-team-cover {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+  }
+  [data-park] [data-testid="park-page-team"] .park-team-act {
+    justify-content: flex-start;
+  }
+  [data-park] [data-testid="park-page-team"] .park-team-matrix {
+    overflow-x: auto;
+  }
+  [data-park] [data-testid="park-page-team"] .park-team-mrow {
+    min-width: 360px;
+  }
+  [data-park] [data-testid="park-page-team"] .park-team-invite {
+    min-width: 0;
+    max-width: 100%;
+  }
+  [data-park] [data-testid="park-page-team"] .park-team-titlerow {
+    flex-wrap: wrap;
+  }
+}
+
+/* UI-10 W19: the invite is the page's primary phone action. */
+@media (max-width: 600px) {
+  [data-park] .park-team-invite button {
+    min-width: 44px;
+    min-height: 44px;
+  }
 }

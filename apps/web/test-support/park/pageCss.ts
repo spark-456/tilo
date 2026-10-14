@@ -6,13 +6,29 @@
 // Later rules win; specificity is ignored. Real computed values are checked in the Playwright specs.
 import fs from "node:fs";
 import { COMPONENTS_CSS, type CssRule, norm, parseRules } from "./componentsCss";
+import { parseBlocks } from "./css";
 
 export type Decls = Map<string, string>;
 
 /** The rules of one stylesheet file on disk (empty list when the file does not exist yet). */
-export function rulesOf(file: string): CssRule[] {
+export function rulesOf(file: string, viewportWidth = 1440): CssRule[] {
   if (!fs.existsSync(file)) return [];
-  return parseRules(fs.readFileSync(file, "utf8")).rules;
+  return rulesAtWidth(fs.readFileSync(file, "utf8"), viewportWidth);
+}
+
+/** W9: media declarations apply only at their viewport; desktop artboard pins default to 1440. */
+export function rulesAtWidth(css: string, viewportWidth: number): CssRule[] {
+  return parseBlocks(css, false).flatMap((block) => {
+    if (!block.atRule) return parseRules(`${block.selector}{${block.body}}`).rules;
+    if (block.selector.startsWith("@media")) {
+      const min = /min-width:\s*(\d+(?:\.\d+)?)px/.exec(block.selector)?.[1];
+      const max = /max-width:\s*(\d+(?:\.\d+)?)px/.exec(block.selector)?.[1];
+      if (min && viewportWidth < Number(min)) return [];
+      if (max && viewportWidth > Number(max)) return [];
+      return rulesAtWidth(block.body, viewportWidth);
+    }
+    return parseRules(`${block.selector}{${block.body}}`).rules;
+  });
 }
 
 interface Part {
