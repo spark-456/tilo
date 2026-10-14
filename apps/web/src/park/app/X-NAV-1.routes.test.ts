@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
+import { parseViewPath, viewTitle } from "../../worldView/routes";
 import { PAGE_IDS } from "./AppCtx";
 import { PAGES } from "./pages";
 import { parkPath, parseParkPath } from "./router";
 
 // Supervisor X-NAV-1: the sidebar's existing destinations must resolve in Park.
-// These are the addresses in screens/meta.ts and screens/PrimaryNav.tsx.
+// OLD-UI-OUT-2: Root routes lens/Needs-you views into ParkApp's shell separately
+// from PAGES. Keep the original destinations covered through their actual table.
 const SIDEBAR_PATHS = [
   ["Home", "/"],
   ["World", "/world/northline/stage"],
@@ -17,6 +19,16 @@ const SIDEBAR_PATHS = [
 describe("X_NAV_1 Park route coverage", () => {
   for (const [label, path] of SIDEBAR_PATHS) {
     it(`X_NAV_1 ${label} resolves to a registered Park page`, () => {
+      const view = parseViewPath(path);
+      if (label === "World" || label === "Story" || label === "Needs you") {
+        expect(view).toEqual(
+          label === "Needs you"
+            ? { kind: "needs", sheet: "queue" }
+            : { kind: "lens", worldId: "northline", lens: label === "World" ? "stage" : "story" },
+        );
+        expect(view && viewTitle(view)).toBe(label);
+        return;
+      }
       const route = parseParkPath(path, "");
       expect(route, `${label} at ${path} needs its OLD-UI Park page`).not.toBeNull();
       if (route) expect(PAGES).toHaveProperty(route.page);
