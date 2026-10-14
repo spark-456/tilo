@@ -117,6 +117,12 @@ export function ConnectorsPage({
     return (
       <Frame>
         <Heading />
+        <div className="park-connectors-empty">
+          <div className="park-connectors-empty-title">Connector data is unavailable</div>
+          <div className="park-connectors-empty-line">
+            The connector list is unavailable. No connection status can be shown.
+          </div>
+        </div>
         <TeamTools app={app} />
       </Frame>
     );

@@ -352,6 +352,9 @@ function LiveControlsPage({ app }: { app: AppCtx }) {
   return (
     <Frame>
       <Top />
+      <section className="park-team-card park-team-empty">
+        <h2 className="park-team-h2">Team data is unavailable</h2>
+      </section>
       <LiveControls app={app} />
     </Frame>
   );
