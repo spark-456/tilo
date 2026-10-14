@@ -97,6 +97,42 @@ def rig(monkeypatch: pytest.MonkeyPatch) -> Rig:
 # --- the flag: off is inert ---------------------------------------------------------------------------------------
 
 
+@pytest.mark.parametrize(
+    "status, patch",
+    [
+        ("active", {"paused": False}),
+        ("paused", {"paused": True}),
+        ("unverified", {"paused": False}),
+        ("invalid", {"paused": False}),
+        ("active", {"day_cap_credits": 500}),
+        ("active", {"fallback_to_tilo": False}),
+        ("active", {"paused": False, "day_cap_credits": 500, "fallback_to_tilo": False}),
+    ],
+)
+def test_ADR_0041_R34_8_noop_patch_preserves_reference_and_audit(
+    rig: Rig,
+    status: str,
+    patch: dict[str, Any],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    assert rig.put().status_code == 200
+    held = rig.store.get(ORG)
+    assert held is not None
+    if status != held.status:
+        assert rig.store.cas(ORG, held.bumped(status=status), expected_rev=held.rev)
+    before = rig.store.get(ORG)
+    audit = rig.store.audit_entries(ORG)
+    writes: list[str] = []
+    monkeypatch.setattr(rig.store, "cas", lambda *args, **kwargs: writes.append("cas") or False)
+    rig.age = 601.0  # a no-op does not widen access or require fresh sign-in
+    got = rig.client.patch(PATH, json=patch)
+    assert got.status_code == 200, got.text
+    assert got.json()["state"] == status
+    assert rig.store.get(ORG) == before
+    assert rig.store.audit_entries(ORG) == audit
+    assert writes == []
+
+
 def test_BK_12_shipped_flag_is_off_and_every_route_answers_not_configured(monkeypatch: pytest.MonkeyPatch) -> None:
     shipped = yaml.safe_load((REPO / "config" / "byok.yaml").read_text(encoding="utf-8"))
     assert shipped["enabled"] is False and shipped["bundles"] == {}

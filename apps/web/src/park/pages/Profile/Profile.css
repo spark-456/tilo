@@ -636,3 +636,35 @@
   color: var(--ink2);
   cursor: pointer;
 }
+/* ADR-0041 BYOK-5: the organisation model key card (BQ-BYOK-WEB-1). Neutral role tokens, no design artboard yet. */
+[data-park] .park-profile-modelkey {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  margin: 0;
+  padding: 18px 22px;
+  background: var(--card);
+  border: 1px solid var(--line2);
+  border-radius: 22px;
+  font-family: "Nunito Sans", sans-serif;
+}
+[data-park] .park-profile-mkset {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+[data-park] .park-profile-check {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 28px;
+  font-size: 14px;
+  font-weight: 700;
+}
+/* ADR-0041 BYOK-5, SEC-REVIEW-29 B5: the key field is a text field masked here, never a password field (PRD 16.1). */
+[data-park] .park-profile-secret {
+  -webkit-text-security: disc;
+}
