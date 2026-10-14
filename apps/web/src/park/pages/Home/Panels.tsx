@@ -119,6 +119,8 @@ export interface TodayProps {
   readonly onWorlds: () => void;
   readonly onAgenda: () => void;
   readonly onLedger: () => void;
+  /** Under 1180px: a block in the column (no Today `aside`, no agenda). */
+  readonly stacked?: boolean;
 }
 
 export function TodayPanel({
@@ -132,9 +134,17 @@ export function TodayPanel({
   onWorlds,
   onAgenda,
   onLedger,
+  stacked = false,
 }: TodayProps) {
+  // The phone and tablet artboards have no Today panel (UI-10 A2 ruling, 14 Oct): under 1180px the worlds and the
+  // month's spend are drawn in the one column as their own block, without the "Up next today" agenda and not as
+  // the Today `aside`.
+  const Shell = stacked ? "section" : "aside";
   return (
-    <aside aria-label="Today" className="park-home-today park-home-glass">
+    <Shell
+      aria-label={stacked ? "Sample worlds and spend" : "Today"}
+      className="park-home-today park-home-glass"
+    >
       <div className="park-home-head">
         <span className="park-home-title">{served ? "Live now" : "Sample worlds"}</span>
         <GoLink href="#worlds" onGo={onWorlds}>
@@ -176,22 +186,26 @@ export function TodayPanel({
           </span>
         </button>
       ) : null}
-      <div className="park-home-rule" />
-      <div className="park-home-head park-home-head--next">
-        <span className="park-home-title">Up next today</span>
-        <GoLink href="#agenda" onGo={onAgenda}>
-          Agenda
-        </GoLink>
-      </div>
-      {events.map((e) => (
-        <button key={e.id} type="button" className="park-home-event" onClick={onAgenda}>
-          <span className="park-home-event__time">{e.time}</span>
-          <span className={`park-home-event__body park-home-event__body--${e.tone}`}>
-            <span className="park-home-event__title">{e.title}</span>
-            <span className="park-home-event__sub">{e.sub}</span>
-          </span>
-        </button>
-      ))}
+      {stacked ? null : (
+        <>
+          <div className="park-home-rule" />
+          <div className="park-home-head park-home-head--next">
+            <span className="park-home-title">Up next today</span>
+            <GoLink href="#agenda" onGo={onAgenda}>
+              Agenda
+            </GoLink>
+          </div>
+          {events.map((e) => (
+            <button key={e.id} type="button" className="park-home-event" onClick={onAgenda}>
+              <span className="park-home-event__time">{e.time}</span>
+              <span className={`park-home-event__body park-home-event__body--${e.tone}`}>
+                <span className="park-home-event__title">{e.title}</span>
+                <span className="park-home-event__sub">{e.sub}</span>
+              </span>
+            </button>
+          ))}
+        </>
+      )}
       <div className="park-home-rule" />
       <button type="button" className="park-home-spend" onClick={onLedger}>
         <span className="park-home-spend__head">
@@ -210,7 +224,7 @@ export function TodayPanel({
         </span>
         <span className="park-home-spend__note">{spend.forecast}</span>
       </button>
-    </aside>
+    </Shell>
   );
 }
 
