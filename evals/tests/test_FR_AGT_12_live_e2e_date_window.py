@@ -8,10 +8,13 @@ from __future__ import annotations
 import asyncio
 from datetime import date
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 from tilo_evals import live_e2e
+from tilo_harness.executor import UnitContext
 from tilo_providers.clock import real_today
+from tilo_providers.interfaces import GenerateResponse
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 TODAY = date(2026, 10, 9)
@@ -31,12 +34,14 @@ PLAN = {
 }
 
 
-class _Context:
-    skills: tuple = ()
-
-
 def _runner(replies: dict[str, str], asked: list[str]) -> live_e2e._UnitRunner:
-    runner = live_e2e._UnitRunner(None, None, TODAY)  # type: ignore[arg-type]
+    def generate(role, request):
+        asked.append(request.prompt)
+        return SimpleNamespace(response=GenerateResponse(text=replies[role], profile_id="date-window-fake"))
+
+    router = SimpleNamespace(generate=generate)
+    meter = SimpleNamespace(tokens=lambda response, request: (0, 0), cost=lambda *args: 0.0)
+    runner = live_e2e._UnitRunner(router, meter, TODAY)  # type: ignore[arg-type]
     runner.capture(BRIEF, PLAN)
 
     def ask(role: str, prompt: str) -> tuple[str, float]:
@@ -49,7 +54,7 @@ def _runner(replies: dict[str, str], asked: list[str]) -> live_e2e._UnitRunner:
 
 def _run(runner: live_e2e._UnitRunner, unit_id: str):
     unit = next(u for u in PLAN["units"] if u["id"] == unit_id)
-    return asyncio.run(runner.run(unit, _Context()))
+    return asyncio.run(runner.run(unit, UnitContext(agent_id="date-window-test", skills=())))
 
 
 def test_FR_AGT_12_a_verifier_unit_fails_on_a_date_before_today_without_a_model_call() -> None:
