@@ -8,9 +8,21 @@ summary.ready, meeting.ended.
 from __future__ import annotations
 
 import json
+import re
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
+
+
+def remove_meet_links(value: Any) -> Any:
+    """A meeting capability never enters local output, including pasted participant text."""
+    if isinstance(value, str):
+        return re.sub(r"(?:https?://)?meet\.google\.com/[^\s<>\"']+", "[Meet link removed]", value, flags=re.I)
+    if isinstance(value, dict):
+        return {k: remove_meet_links(v) for k, v in value.items() if k != "url"}
+    if isinstance(value, (tuple, list)):
+        return [remove_meet_links(v) for v in value]
+    return value
 
 
 class EventSink:
@@ -27,7 +39,7 @@ class EventSink:
             "type": type_,
             "ts": datetime.now(UTC).isoformat(timespec="seconds"),
             "meeting_id": self.meeting_id,
-            **data,
+            **remove_meet_links(data),
         }
         line = json.dumps(event, ensure_ascii=False)
         if self.path:

@@ -43,7 +43,28 @@ describe("WEB_1a_select: an API url means the live Api and no sample values", ()
     const api = parkApi(LIVE_ENV);
     const args = callTable();
     for (const m of API_METHODS.filter(
-      (x) => !["getLedger", "getWorlds", "getDecisions", "decide", "startWorld"].includes(x),
+      (x) =>
+        ![
+          "getLedger",
+          "getWorlds",
+          "getDecisions",
+          "decide",
+          "startWorld",
+          "getConnectors",
+          "getNotifications",
+          "getTeam",
+          "getAgenda",
+          "submitFeedback",
+          "getProfileSettings",
+          "getSkills",
+          "getLearn",
+          "saveSkill",
+          "captureSkill",
+          "proposeVersion",
+          "setPref",
+          "getUserSettings",
+          "saveUserSettings",
+        ].includes(x),
     )) {
       const p = invoke(api, m, args);
       expect(p, `${m} returns a Promise`).toBeInstanceOf(Promise);

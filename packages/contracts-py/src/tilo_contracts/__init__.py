@@ -2,12 +2,13 @@
 # contracts/events/registry.yaml. Do not edit. Regenerate with `just contracts-gen`;
 # `just contracts-check` fails CI on drift (FR-WLD-02, FR-WLD-03).
 # agents.schema.json 1.0.0 sha256:f2ba3955260a80eb
-# artifact.schema.json 1.0.0 sha256:358508330e9ee2f2
+# appspec.schema.json 1.0.0 sha256:e3638e1ae19f9b9b
+# artifact.schema.json 1.1.0 sha256:ce5a30aeae826180
 # attention.schema.json 1.0.0 sha256:f35cff84728304af
 # brief.schema.json 1.0.0 sha256:be4e747f37e399b2
 # calendar_entry.schema.json 1.1.0 sha256:291531543be88320
 # card.schema.json 1.0.0 sha256:2666292eb19087d0
-# common.schema.json 1.5.0 sha256:b1bd17a36819c785
+# common.schema.json 1.7.0 sha256:71b116e3caa126a8
 # connector.schema.json 1.0.0 sha256:cc3a7d9b3820e12c
 # decision.schema.json 1.0.0 sha256:06915b6db08dc4b7
 # envelope.schema.json 1.0.0 sha256:8a5c75c61807baa2
@@ -68,10 +69,15 @@
 # events/data/district.created.schema.json 1.0.0 sha256:1b25e3de1fa3e1fb
 # events/data/level.completed.schema.json 1.0.0 sha256:b99d3220a8e24536
 # events/data/level.created.schema.json 1.0.0 sha256:f404c2d35df9da17
+# events/data/meeting.adjourned.schema.json 1.0.0 sha256:0c3fb38b0ad2732a
+# events/data/meeting.asked.schema.json 1.0.0 sha256:7d58ef4c8d45d1b0
 # events/data/meeting.called.schema.json 1.0.0 sha256:af1b23d42d145e42
+# events/data/meeting.change_requested.schema.json 1.0.0 sha256:3df34dc137ada7dd
+# events/data/meeting.convened.schema.json 1.0.0 sha256:2c0f55f0f651b348
 # events/data/meeting.decision.schema.json 1.0.0 sha256:359fc3bc20f11676
 # events/data/meeting.ended.schema.json 1.1.0 sha256:9219b0e4934a318e
 # events/data/meeting.minuted.schema.json 1.0.0 sha256:f2a9c646721e5b64
+# events/data/meeting.replied.schema.json 1.0.0 sha256:1591c9f4ab421e93
 # events/data/meeting.started.schema.json 1.1.0 sha256:3ee754f6effc0b32
 # events/data/memory.hit.schema.json 1.0.0 sha256:ae1d0919f97240c5
 # events/data/memory.saved.schema.json 1.0.0 sha256:e8764ecbbdc670a9
@@ -81,11 +87,18 @@
 # events/data/pinboard.item_changed.schema.json 1.0.0 sha256:2db181d1a51c6c84
 # events/data/plan.approaches_proposed.schema.json 1.0.0 sha256:4e67dfd9f1e856b4
 # events/data/plan.questions_asked.schema.json 1.0.0 sha256:5fe5359427d0e04b
+# events/data/plan.revised.schema.json 1.0.0 sha256:55005a10fa84656a
 # events/data/policy.applied.schema.json 1.0.0 sha256:3ca104f308b12dce
 # events/data/policy.changed.schema.json 1.0.0 sha256:e480c2319e07c2a6
 # events/data/question.answered.schema.json 1.1.0 sha256:27aa69077ee8f813
 # events/data/question.routed.schema.json 1.0.0 sha256:af061a697d8396b2
+# events/data/skill.captured.schema.json 1.0.0 sha256:6de7eeac396cf5a8
+# events/data/skill.fixed.schema.json 1.0.0 sha256:a8532b6517841fc5
 # events/data/skill.loaded.schema.json 1.0.0 sha256:acddc05d7bde55d2
+# events/data/skill.rated.schema.json 1.0.0 sha256:b29d4b724d076f6f
+# events/data/skill.state_changed.schema.json 1.0.0 sha256:bca4bebcc30d6d6f
+# events/data/skill.try_run.schema.json 1.0.0 sha256:41d6fdc3a3079a84
+# events/data/skill.version_proposed.schema.json 1.0.0 sha256:bd3ff89653114f9c
 # events/data/team_rule.changed.schema.json 1.0.0 sha256:c095fa9eb4a68023
 # events/data/work_item.changed.schema.json 1.0.0 sha256:8740c0c65f424dc5
 # events/data/work_item.created.schema.json 1.0.0 sha256:a9fbffc5d3854c81
@@ -95,13 +108,17 @@
 # events/data/world.planned.schema.json 1.0.0 sha256:eb423b257e5fc838
 # events/data/world.requested.schema.json 1.1.0 sha256:7f1370b796c05ea1
 # events/data/world.resumed.schema.json 1.0.0 sha256:a3fd175fc848bf87
+# events/data/world.share_changed.schema.json 1.0.0 sha256:7de879d9ec364699
 # events/data/world.started.schema.json 1.0.0 sha256:e0daa70c85838c8f
 # events/registry.schema.json 1.2.0 sha256:5a2b8514c1e7e2b1
 # handoff.schema.json 1.0.0 sha256:7ed882f92b634672
 # layout.schema.json 1.0.0 sha256:1db88b1e3b744add
 # manifest.schema.json 1.0.0 sha256:9b885d1826522bb7
+# mcp_tools.schema.json 1.0.0 sha256:46a498402c9b1e4e
 # meeting.schema.json 1.2.0 sha256:034e93898bb28957
+# meeting_host_rpc.schema.json 1.2.0 sha256:a5856b07b3f6501c
 # meeting_join.schema.json 1.0.0 sha256:ea1e8f0945773573
+# meeting_room.schema.json 1.0.0 sha256:13c682235d58ce69
 # mention.schema.json 1.0.0 sha256:ca9c1acbf81616f2
 # meter.schema.json 1.0.0 sha256:ad596dcc70e45e09
 # metering.schema.json 1.0.0 sha256:91358a776e6c033a
@@ -109,25 +126,29 @@
 # outbox.schema.json 1.0.0 sha256:0b9b172f230a6347
 # person.schema.json 1.0.0 sha256:2c928319dd7ab9d1
 # pilot.schema.json 1.0.0 sha256:5d091f814844b3b1
-# pinboard_item.schema.json 1.0.0 sha256:fe6df109871cea93
-# plan.schema.json 1.0.0 sha256:35991402fa6e958d
+# pinboard_item.schema.json 1.1.0 sha256:edf4c50a588211ee
+# plan.schema.json 1.1.0 sha256:f0722cc94a84e2d1
 # plate.schema.json 1.0.0 sha256:d2a4e4361a714c8f
 # policy.schema.json 1.0.0 sha256:307bca25f6efc07e
-# providers.schema.json 1.2.0 sha256:4514148b0b6b2f7e
+# providers.schema.json 1.3.0 sha256:ecc5063d4926f11c
 # scenario.schema.json 1.0.0 sha256:b8e044d7e37b92a3
 # skill.schema.json 1.1.0 sha256:9eeee7768b667afa
-# spend_caps.schema.json 1.1.0 sha256:d337adf13a5337f9
+# spend_caps.schema.json 1.1.1 sha256:c04bc36ac17dc0ab
+# taught_skill.schema.json 1.1.0 sha256:b23321ed0cd570d4
 # team_lead.schema.json 1.0.0 sha256:19413726e364ffdd
 # transcript.schema.json 1.0.0 sha256:08f934b8f0c9a40e
 # ui_action.schema.json 1.0.0 sha256:2ceb1e0b46368734
-# work_item.schema.json 1.0.0 sha256:7add9f68c1f996fb
-# events/registry.yaml 1.2.0 sha256:8be0da29431a82c4
+# user_settings.schema.json 1.0.0 sha256:dfc439371ba69131
+# work_item.schema.json 1.1.0 sha256:9ee739ef8bdb7579
+# world_share.schema.json 1.0.0 sha256:89d31e9968dc95cc
+# events/registry.yaml 1.5.0 sha256:ffb369c84ae3eff7
 
 from __future__ import annotations
 
 from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
+from typing_extensions import TypeAliasType
 
 
 class AgentsConfigLimits(BaseModel):
@@ -199,11 +220,71 @@ class AgentsConfigQuestions(BaseModel):
     hourly_cap_per_person: Annotated[int, Field(ge=1)]
 
 
+type AppSpecTitle = Annotated[str, Field(max_length=120, min_length=1)]
+"""
+The quiz's name, shown as plain text.
+"""
+
+
+class AppSpecTimer(BaseModel):
+    """
+    One countdown for the whole attempt, in seconds (1 minute to 6 hours). The person may pause it; at 0 the attempt is submitted. The clock is the person's own, so it emits no event.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    seconds: Annotated[int, Field(ge=60, le=21600)]
+
+
+type AppSpecQuestionId = Annotated[str, Field(pattern="^q[1-9][0-9]{0,2}$")]
+"""
+q1 to q999, unique within the spec (AS-01).
+"""
+
+
+type AppSpecStem = Annotated[str, Field(max_length=2000, min_length=1)]
+"""
+The question text, shown as plain text (AS-03).
+"""
+
+
+type AppSpecOptionId = Literal["a", "b", "c", "d", "e", "f"]
+
+
+type AppSpecOptionText = Annotated[str, Field(max_length=500, min_length=1)]
+"""
+One choice, shown as plain text (AS-03).
+"""
+
+
+class AppSpecOptions(BaseModel):
+    """
+    Two to six choices keyed a to f and shown in that order: a and b always, each later id only with the one before it.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    a: AppSpecOptionText
+    b: AppSpecOptionText
+    c: AppSpecOptionText | None = None
+    d: AppSpecOptionText | None = None
+    e: AppSpecOptionText | None = None
+    f: AppSpecOptionText | None = None
+
+
+type AppSpecPage = Annotated[int, Field(ge=1, le=100000)]
+"""
+1-based page of the cited PDF.
+"""
+
+
 type ArtifactVersionIdempotencyKey = Annotated[
-    str, Field(pattern="^r_[0-9A-Za-z_]{1,48}:U[0-9]{1,4}:(0|[1-9][0-9]{0,3}):[0-9]$")
+    str, Field(pattern="^r_[0-9A-Za-z_]{1,48}:U[0-9]{1,4}:(0|[1-9][0-9]{0,3}):f?[0-9]$")
 ]
 """
-<run_id>:<unit_id>:<attempt>:<index> (AR-05). index is the output's 0-based position, 0 to 9, since a unit has at most 10 outputs (BQ-257).
+<run_id>:<unit_id>:<attempt>:<index> (AR-05). index is the output's 0-based position, 0 to 9, since a unit has at most 10 outputs (BQ-257); a fetch's index is f0 to f9, the file's 0-based position among the unit's fetched files, at most 10 (FR-INT-01, ADR-0029 8).
 """
 
 
@@ -484,15 +565,15 @@ Data class (PRD 12.1): personal, business or public.
 """
 
 
-type DeliverableFormat = Literal["pdf", "pptx", "docx", "xlsx", "csv", "markdown", "google_slides", "google_docs", "google_sheets", "email", "in_app"]
+type DeliverableFormat = Literal["pdf", "pptx", "docx", "xlsx", "csv", "markdown", "google_slides", "google_docs", "google_sheets", "email", "in_app", "app"]
 """
-Deliverable format (PRD 12.4), plus email for replies and in_app for answers shown in Tilo.
+Deliverable format (PRD 12.4), plus email for replies, in_app for answers shown in Tilo and, since 1.6.0 (ADR-0029), app: an AppSpec (appspec.schema.json) that fixed web code renders (FR-AGT-16).
 """
 
 
-type MediaType = Literal["text/markdown", "text/csv", "application/json", "application/pdf", "application/vnd.openxmlformats-officedocument.presentationml.presentation", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "image/png", "image/jpeg"]
+type MediaType = Literal["text/markdown", "text/csv", "application/json", "application/pdf", "application/vnd.openxmlformats-officedocument.presentationml.presentation", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "image/png", "image/jpeg", "video/webm", "video/mp4"]
 """
-Media type of a stored artifact version (ADR-0018). Text: Markdown and CSV; structured: JSON; files (made only by tilo-render or an intake upload, never by a model): PDF, PPTX, DOCX, XLSX, PNG and JPEG. Code picks it from the role and the pinned skill, never a model, a file name or sniffing. Closed: no HTML or SVG.
+Media type of a stored artifact version (ADR-0018). Text: Markdown and CSV; structured: JSON; files (made only by tilo-render or an intake upload, never by a model): PDF, PPTX, DOCX, XLSX, PNG and JPEG, and since 1.7.0 (ADR-0034) WebM and MP4 video, which only a taught-skill capture upload stores (a screen recording or an uploaded example; never rendered or fetched). Code picks it, never a model: from the role and the pinned skill for a unit or render output, and from the file's own leading bytes for an upload (whose extension must agree) or a fetch (ADR-0029), never from a file name, a URL or a Content-Type header alone. Closed: no HTML or SVG.
 """
 
 
@@ -1368,6 +1449,18 @@ class PlanQuestionsAskedData(BaseModel):
     question_count: Annotated[int, Field(ge=1, le=3)]
 
 
+class PlanRevisedDataRevisionUnit(BaseModel):
+    """
+    A new plan unit and the unit whose work it changes (plan.schema.json unit revises).
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    id: UnitId
+    revises: UnitId
+
+
 class PolicyChangedData(BaseModel):
     """
     data of policy.changed (PRD 9.5). The owner created, edited or revoked a policy, or used Stop all autopilot, which sets every policy to L1 (one event per policy). Revoking also sets the policy to L1, as if it did not exist: it authorises nothing and its next send waits at a gate (FR-HIL-03). level is the level after the change and is appended to the policy's history, so a send after a revocation or Stop all is never covered, even if the owner raises the level again later (outbox OB-01, BQ-31). Only the policy's owner creates and changes it (PRD 10.1; a Team Lead only proposes), so authz is by person and authz.ref is the owner of the policy policy_id names (event rule EV-04, validator); the history entry the change appends has that owner as by (outbox OB-01).
@@ -1540,6 +1633,18 @@ class WorldResumedData(BaseModel):
         extra="forbid",
     )
     paused_for_s: Annotated[int, Field(ge=0)]
+
+
+class WorldShareChangedData(BaseModel):
+    """
+    data of world.share_changed (registry 1.5.0, ADR-0040). The world's owner turned team sharing on or off for one team. tilo-api writes it in the shared world after the world_share record was written, never an agent or a model: actor is the world's owner (the actor of its first world.requested), target is the world's own id, district is null and vis is [] (owner-only, ADR-0009). state on means a share record now exists for team; off means it was revoked. It authorises nothing outside Tilo and sends nothing, so it is not a side effect and authz is null. A share that lapses because the owner left the team writes no event.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    team: TeamId
+    state: Literal["on", "off"]
 
 
 class WorldStartedData(BaseModel):
@@ -1779,6 +1884,196 @@ class ManifestClaim(BaseModel):
     verified: bool
 
 
+type McpToolsToolName = Literal["list_worlds", "get_world", "list_artifacts", "read_artifact", "list_cards", "answer_card", "start_run"]
+
+
+class McpToolsListWorldsIn(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    limit: Annotated[int | None, Field(ge=1, le=50)] = None
+
+
+class McpToolsWorldIn(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    world_id: WorldId
+
+
+class McpToolsReadArtifactIn(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    world_id: WorldId
+    artifact_id: ArtifactId
+    version: Annotated[int, Field(ge=1)]
+
+
+class McpToolsListCardsIn(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    world_id: WorldId | None = None
+
+
+class McpToolsAnswerCardIn(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    world_id: WorldId
+    card_id: Ulid
+    option: CardOptionId
+
+
+class McpToolsStartRunIn(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    request: Annotated[
+        str,
+        Field(
+            max_length=2000,
+            min_length=1,
+            pattern="^[^\\u0000-\\u0008\\u000B\\u000C\\u000E-\\u001F\\u007F]+$",
+        ),
+    ]
+    """
+    The person's request in their words, as typed into the client; it goes through intake like a web request (safety screen, brief, questions, approaches, caps). Tab and newline are allowed, other control characters are not.
+    """
+
+
+class McpToolsWorldRow(BaseModel):
+    """
+    The S-14 worlds-list row (`GET /worlds`), unchanged.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    world_id: WorldId
+    title: Annotated[str | None, Field(max_length=140)]
+    status: Literal["idle", "started", "paused", "completed", "failed"]
+    created_at: Timestamp | None
+    last_seq: Annotated[int, Field(ge=0)]
+
+
+class McpToolsListWorldsOut(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    worlds: Annotated[list[McpToolsWorldRow], Field(max_length=50)]
+
+
+class McpToolsStoryLine(BaseModel):
+    """
+    One Story line of the world, as the Story lens shows it to the owner: a Tilo-written event summary.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    seq: Annotated[int, Field(ge=1)]
+    ts: Timestamp
+    line: Annotated[str, Field(max_length=140, min_length=1)]
+
+
+class McpToolsGetWorldOut(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    world: McpToolsWorldRow
+    open_cards: Annotated[int, Field(ge=0)]
+    credits_used: Credits
+    story: Annotated[list[McpToolsStoryLine], Field(max_length=20)]
+
+
+class McpToolsArtifactRow(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    artifact_id: ArtifactId
+    version: Annotated[int, Field(ge=1)]
+    label: Annotated[str | None, Field(max_length=120)]
+    media_type: MediaType
+    size_bytes: Annotated[int, Field(ge=1)]
+    created_at: Timestamp
+
+
+class McpToolsListArtifactsOut(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    artifacts: Annotated[list[McpToolsArtifactRow], Field(max_length=100)]
+
+
+type McpToolsWithheldReason = Literal["not_text", "too_large"]
+
+
+class McpToolsCardOption(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    id: CardOptionId
+    label: Annotated[str, Field(max_length=20, min_length=1)]
+
+
+class McpToolsCardRow(BaseModel):
+    """
+    An open card of the owner's. `answerable_here` lists the option ids `answer_card` accepts for it: only a `needs_you` card can have any; a gate, consent or meeting card has none, so nothing authorises over MCP (MC-09).
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    world_id: WorldId
+    card_id: Ulid
+    kind: CardKind
+    what_happened: Annotated[str, Field(max_length=140, min_length=1)]
+    options: Annotated[list[McpToolsCardOption], Field(max_length=4, min_length=1)]
+    risk_tier: RiskTier | None
+    exact: Annotated[str | None, Field(max_length=500)]
+    created_at: Timestamp
+    answerable_here: Annotated[list[CardOptionId], Field(max_length=4)]
+
+
+class McpToolsListCardsOut(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    cards: Annotated[list[McpToolsCardRow], Field(max_length=50)]
+
+
+class McpToolsAnswerCardOut(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    outcome: Literal["answered"]
+
+
+class McpToolsStartRunOut(BaseModel):
+    """
+    Intake ran: the world exists and waits for the person in Tilo, to answer its questions or approve an approach (MC-10). No run spends past intake from here.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    world_id: WorldId
+    next: Literal["answer_questions_in_tilo", "approve_in_tilo"]
+
+
+class McpToolsToolRefusal(BaseModel):
+    """
+    A refused call (`isError: true`). One closed code, never a server string, a stack or another person's data; an id the caller may not see is `not_found`, byte-equal to a missing one.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    error: Literal["invalid_arguments", "not_found", "insufficient_scope", "not_answerable_here", "already_resolved", "busy", "rate_limited", "over_cap", "rejected_by_intake", "unavailable"]
+
+
 type Series = Annotated[str, Field(pattern="^[a-z0-9_-]{1,64}$")]
 
 
@@ -1828,6 +2123,195 @@ class MeetingAttestation(BaseModel):
     notice_version: Semver
 
 
+class MeetingHostRpcDraft(BaseModel):
+    """
+    The pinned draft the owner approved (kind meeting_event): the bytes tilo-api read from the run's artifact store, hash-checked there (AR-01), because tilo-connectors cannot read that store. HB-03: the SHA-256 of the decoded bytes equals content_sha256, artifact_id and version equal entry.item, and the document parses as kind meeting_event. content_b64 is padded base64 (RFC 4648 section 4) of at most 43692 characters, the base64 of 32 KiB, so a request with 50 recipients stays under the 64 KiB body cap. The same shape is one entry of execute_request.items (LC-07), where the document is the entry's item or attachment and the body cap bounds the sum.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    artifact_id: ArtifactId
+    version: Annotated[int, Field(ge=1)]
+    content_sha256: Annotated[str, Field(pattern="^[0-9a-f]{64}$")]
+    content_b64: Annotated[
+        str,
+        Field(
+            max_length=43692,
+            min_length=4,
+            pattern="^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$",
+        ),
+    ]
+
+
+class MeetingHostRpcDraftRef(BaseModel):
+    """
+    The draft the receipt was made from, by id and version only (no label).
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    artifact_id: ArtifactId
+    version: Annotated[int, Field(ge=1)]
+
+
+class MeetingHostRpcUserRequest(BaseModel):
+    """
+    POST /internal/meeting-host/status, POST /internal/meeting-host/disconnect and POST /internal/connections/views. user_id is the signed-in principal's own id in tilo-api, never one taken from a body, path or query there (HB-02, HB-08); the bot account's meeting_host grant is (user_id, meeting_host), and views reads only this user's grants.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    user_id: UserId
+
+
+class MeetingHostRpcStatusAnswer(BaseModel):
+    """
+    The 200 answer to status: a store read only, with no token use and no Google call, so it emits nothing and has no parts. state is connected, expired (Google refused the grant; connect again) or none (no grant stored); scope_ok is true when the stored grant holds the calendar.events.owned scope, and false when there is none.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    state: Literal["connected", "expired", "none"]
+    scope_ok: bool
+
+
+type MeetingHostRpcScope = Annotated[
+    str, Field(pattern="^[A-Za-z0-9][A-Za-z0-9:/._-]{0,299}$")
+]
+"""
+An OAuth scope as config/connectors.yaml declares it: a URL or a word from a closed alphabet, at most 300 characters, with no query, fragment, user info, percent sign or space. A backstop only: HB-09 sends only scopes the registry declares for the view's connector.
+"""
+
+
+class MeetingHostRpcConnectionPart(BaseModel):
+    """
+    A connection event of the meeting_host grant: expired (Google refused the grant at refresh), rate_limited, or revoked (a disconnect). Type, connector and user only.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    type: Literal["connection.expired", "connection.rate_limited", "connection.revoked"]
+    connector: Literal["meeting_host"]
+    user_id: UserId
+
+
+class MeetingHostRpcAlertPart(BaseModel):
+    """
+    An alert.raised the broker emitted (a revoke kept for a retry): its alert id only.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    type: Literal["alert.raised"]
+    alert_id: Ulid
+
+
+class MeetingHostRpcStartRequest(BaseModel):
+    """
+    POST /internal/connections/start (ADR-0035 decision 2, LC-06): begin the person's Google sign-in for one connector. user_id is the signed-in principal's own id in tilo-api, never one taken from a body, path or query there (HB-02). The route asks Google only for the declared scopes of these capabilities minus those already granted, with include_granted_scopes. A connector that is not an oauth2 connector of the registry, or a capability it does not declare, is invalid_request (the route checks the registry, not this schema). meeting_host uses the same route for the bot account.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    user_id: UserId
+    connector: ConnectorId
+    capabilities: Annotated[
+        list[ConnectorCapability], Field(max_length=7, min_length=1)
+    ]
+
+
+type AuthorizeUrl = Annotated[
+    str,
+    Field(
+        max_length=2048,
+        pattern="^https://accounts\\.google\\.com/o/oauth2/v2/auth\\?[A-Za-z0-9%._~&=+-]+$",
+    ),
+]
+
+
+class MeetingHostRpcStartAnswer(BaseModel):
+    """
+    The 200 answer to start. authorize_url is the Google sign-in link the web opens: the accounts.google.com authorisation endpoint with a percent-encoded query (client id, redirect URI, the asked scopes, the PKCE challenge, state; no secret) of at most 2048 characters, or null when no scope is missing, in which case no flow was made (LC-06). The PKCE verifier and the client secret stay in tilo-connectors (LC-03); the pattern is a closed shape and a backstop that refuses a query naming a secret.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    authorize_url: AuthorizeUrl | None
+
+
+class MeetingHostRpcCallbackRequest(BaseModel):
+    """
+    POST /internal/connections/callback (ADR-0035 decision 3, LC-05): the browser came back from Google. user_id is the signed-in principal's own id in tilo-api (HB-02). state and code are the one-time values Google handed the browser and the only place this surface carries them (LC-03): the code is useless without the verifier and the client secret, and tilo-api never logs, stores or echoes either. Exactly one of code (the person agreed) and error (Google's own lower-case error word, for example access_denied, when the person did not; the route never echoes it) is present, absent and never null. The route spends the state on first use and refuses unless the flow's user equals user_id (LC-05).
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    user_id: UserId
+    state: Annotated[str, Field(pattern="^[A-Za-z0-9_-]{16,128}$")]
+    code: Annotated[str | None, Field(pattern="^[A-Za-z0-9/_.~-]{1,512}$")] = None
+    error: Annotated[str | None, Field(pattern="^[a-z][a-z_]{0,63}$")] = None
+
+
+type ScopeLine = Annotated[str, Field(max_length=300, min_length=1)]
+
+
+class MeetingHostRpcConnectionDisconnectRequest(BaseModel):
+    """
+    POST /internal/connections/disconnect (ADR-0035 decision 2): the person disconnects one connector. user_id is the signed-in principal's own id in tilo-api (HB-02). Google keeps one grant per client for a person (CON-D10), so disconnecting any person connector revokes the shared grant and every connector resting on it ends; the web says so before the person confirms.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    user_id: UserId
+    connector: ConnectorId
+
+
+class MeetingHostRpcExecuteResult(BaseModel):
+    """
+    What the adapter made, by Google's own id and Tilo's marker only, never a link, a title, a subject or mail text. resource_id is the Gmail message or draft id, the Drive file id or the Calendar event id (letters, digits, underscore and hyphen, at most 256, the adapters' own RESOURCE_ID). marker is side_effect_marker(entry), 32 lower-case hex characters, the same on every retry and instance (OB-03).
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    resource_id: Annotated[str, Field(pattern="^[A-Za-z0-9_-]{1,256}$")]
+    marker: Annotated[str, Field(pattern="^[0-9a-f]{32}$")]
+
+
+class MeetingHostRpcConnectorPart(BaseModel):
+    """
+    A connection event of a grant: established (a connect stored it), expired (Google refused the grant at refresh), rate_limited, or revoked (a disconnect). Type, connector and user only. connection.requested and connection.consented are never parts: they belong to the consent card (CR-13) and tilo-api writes them.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    type: Literal["connection.established", "connection.expired", "connection.rate_limited", "connection.revoked"]
+    connector: ConnectorId
+    user_id: UserId
+
+
+class MeetingHostRpcError(BaseModel):
+    """
+    The body of every refusal on this surface, a fixed code and nothing else: unauthenticated (401, no valid ID token, HB-01), forbidden (403, any account but tilo-api's, HB-01), invalid_request (422, a body over 64 KiB, not JSON or not this contract's request; refused before anything acted) and not_configured (503, a setting is missing or a seam failed to build, or LIVE is not set on tilo-connectors; also 502 when Google's certificates cannot be had to check the token, which is retryable and never a final 401). Only /internal/connections/callback adds three, each 400: start_again (the state is unknown, spent, expired, another person's or lost with an instance, or Google did not accept the code, or the grant could not be saved; one text for all, so the answer says nothing about which, LC-05), not_granted (the person did not agree, or none of the access asked for was granted) and wrong_account (meeting_host only: the sign-in was a person's own account, not the bot's, MH-C1). Never a value, a setting's value or an exception's text.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    error: Literal["unauthenticated", "forbidden", "invalid_request", "not_configured", "start_again", "not_granted", "wrong_account"]
+
+
 class MeetingJoin(BaseModel):
     """
     The answer of `GET /v1/meetings/{meeting_id}/join` (ADR-0024 amendment 4): the Google Meet link of a meeting Tilo hosts, for that meeting's owner only, read from the host account's event when the owner clicks and stored nowhere (rules MJ-01 to MJ-10 in `meeting_join.rules.md`). It is a response body, never a record: no store, cache, event, card, notification, archive record or log line holds it, and `meeting.schema.json` and `calendar_entry.schema.json` still have no field that can. `join_url` is exactly `https://meet.google.com/` and a three-four-three lower-case meeting code: no other scheme, host, user info, port, path, query or fragment (36 characters, so a trailing newline is refused in every engine). `expires_at` is the server's clock plus 60 seconds: the client drops the link then, or when the view closes, and asks again on the next click.
@@ -1845,6 +2329,99 @@ class MeetingJoin(BaseModel):
         ),
     ]
     expires_at: Timestamp
+
+
+type MeetingRoomMode = Literal["quick", "thinking"]
+"""
+The person's Quick or Thinking choice for a turn: quick uses the meeting role, thinking the meeting_thinking role (config/models.yaml).
+"""
+
+
+type MeetingRoomAsRole = Literal["owner", "approver", "member"]
+"""
+Why the convener may hold this room, from the team store and the world record at the time (MR-03): the world's owner, or an Approver or Member of the world's team whose scope covers every attendee's district. A Viewer never convenes.
+"""
+
+
+type MeetingRoomAdjournReason = Literal["person", "idle", "capped", "paused", "access_lost", "failed"]
+"""
+person: the convener closed it; idle: no turn for the configured time; capped: the next turn would pass the room's credit or turn cap; paused: Pause all or Stop all; access_lost: the convener's role or scope no longer covers the room; failed: the room could not go on (writer or archive error).
+"""
+
+
+type MeetingRoomOutcome = Literal["answered", "proposed_change", "declined", "failed"]
+"""
+answered: a reply grounded in the agent's own units; proposed_change: a reply that also proposes a change for the person to confirm; declined: the agent has no record for it, or the safety screen flagged the message; failed: no reply was produced (no text exists).
+"""
+
+
+type MeetingRoomTurnNumber = Annotated[int, Field(ge=1, le=50)]
+
+
+type MeetingRoomAttendees = Annotated[list[AgentId], Field(max_length=7)]
+"""
+The agents in the room besides the lead, in seating order.
+"""
+
+
+type MeetingRoomCitedUnits = Annotated[list[UnitId], Field(max_length=20)]
+"""
+Plan units the reply rests on: the replying agent's own units (a lead's: its district's), checked by code against the grounding set (MR-06).
+"""
+
+
+type MeetingRoomPersonText = Annotated[str, Field(max_length=2000, min_length=1)]
+
+
+type MeetingRoomReplyText = Annotated[str, Field(max_length=4000, min_length=1)]
+"""
+A reply's text after the secret redactor; a reply's text is null exactly when its outcome is failed.
+"""
+
+
+class MeetingRoomConfirmedChange(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    proposal_id: Ulid
+    text: MeetingRoomPersonText
+
+
+class MeetingRoomConveneRequest(BaseModel):
+    """
+    POST /v1/worlds/{world_id}/rooms. The server picks the run, the role, the caps and the room id.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    lead: AgentId
+    agents: MeetingRoomAttendees
+
+
+class MeetingRoomAskRequest(BaseModel):
+    """
+    POST /v1/worlds/{world_id}/rooms/{room_id}/turns. One turn in flight at a time.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    to: AgentId
+    text: MeetingRoomPersonText
+    mode: MeetingRoomMode
+
+
+class MeetingRoomChangeRequest(BaseModel):
+    """
+    POST /v1/worlds/{world_id}/rooms/{room_id}/changes: the person confirms a proposal, in the proposal's words or their own. Units and artifacts come from the proposal, never from this body (MR-07).
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    proposal_id: Ulid
+    text: MeetingRoomPersonText
 
 
 class MentionRemoval(BaseModel):
@@ -2081,6 +2658,12 @@ type Url = Annotated[
 ]
 
 
+type PinboardItemPlaceId = Annotated[str, Field(pattern="^[a-z][a-z0-9_]{0,31}$")]
+"""
+A board or column id: lower-case letters, digits and underscore, starting with a letter, at most 32 characters.
+"""
+
+
 class PinboardItemScopePersonal(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
@@ -2151,6 +2734,10 @@ class PlanDimensions(BaseModel):
 
 
 class PlanUnit(BaseModel):
+    """
+    One plan unit. 1.1.0 (ADR-0028): a revision unit, planned from a change a person confirmed in a meeting room, also carries revises (the unit whose work it changes) and change (the proposal_id of that meeting.change_requested), both or neither (PG-13).
+    """
+
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -2169,6 +2756,8 @@ class PlanUnit(BaseModel):
     Side-effect action types this unit performs; each must be guarded by a gate (PG-04).
     """
     depends_on: Annotated[list[UnitId], Field(max_length=50)]
+    revises: UnitId | None = None
+    change: Ulid | None = None
 
 
 class PlanGate(BaseModel):
@@ -2321,47 +2910,31 @@ class PolicyMaxLevel(BaseModel):
 type ProvidersProfileId = Annotated[str, Field(pattern="^[a-z][a-z0-9-]{0,31}$")]
 
 
-type ProvidersCapability = Literal["json", "tools", "vision", "audio", "thinking", "computer_use", "grounding", "code_execution"]
+type ProvidersCapability = Literal["json", "tools", "vision", "audio", "thinking", "computer_use", "grounding", "code_execution", "video", "documents"]
 """
-structured output (json), tool calling, vision, audio input, thinking levels, computer use, search grounding, code execution.
+structured output (json), tool calling, vision, audio input, thinking levels, computer use, search grounding, code execution; 1.3.0 (ADR-0029): video input and documents (a PDF read natively, FR-INT-02).
 """
 
 
-class ProvidersProfile(BaseModel):
+class ProvidersMediaTokens(BaseModel):
     """
-    One model profile. Its cost rank (PRD 6.6) is derived from prices, never declared here. base_url and api_key_env are allowed only when provider is openai_compat (ADR-0002, ADR-0003).
+    Tokens per unit of media input (ADR-0029 decision 6): image is one image, pdf_page one PDF page, audio_per_second and video_per_second one second. Upper bounds, so an estimate never understates.
     """
 
     model_config = ConfigDict(
         extra="forbid",
     )
-    provider: Slug
-    """
-    Adapter name in packages/providers, e.g. google.
-    """
-    model: Annotated[str, Field(max_length=128, min_length=1)]
-    context: Annotated[int, Field(ge=1)]
-    """
-    Context window in tokens.
-    """
-    caps: list[ProvidersCapability]
-    base_url: Annotated[
-        str | None,
-        Field(
-            max_length=512,
-            pattern="^https://[A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?(?::[0-9]{1,5})?(?:/[A-Za-z0-9._~%/-]*)?$",
-        ),
-    ] = None
-    """
-    openai_compat endpoint. https only, with no user info, query or fragment, so no credential can sit in the URL (PRD 16.1 rule 4). The not-pattern rejects a final line break, which a Python validator's $ lets through.
-    """
-    api_key_env: Annotated[str | None, Field(pattern="^[A-Z][A-Z0-9_]{2,63}$")] = None
-    """
-    Name of the environment variable that holds the key, never the key itself. The not-pattern rejects a final line break, which a Python validator's $ lets through.
-    """
+    image: Annotated[int, Field(ge=1)]
+    pdf_page: Annotated[int, Field(ge=1)]
+    audio_per_second: Annotated[int, Field(ge=1)]
+    video_per_second: Annotated[int, Field(ge=1)]
 
 
 class ProvidersRole(BaseModel):
+    """
+    reserve_units (1.3.0, ADR-0029) is how many units of the profile's unit_price the router reserves under the PL-03 budget check before it sends, because the provider cannot cap them (a grounded call runs as many searches as the model decides). A reply that reports no unit count is charged the reserved amount.
+    """
+
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -2374,6 +2947,7 @@ class ProvidersRole(BaseModel):
     thinking: Literal["low", "medium", "high"] | None = None
     max_input_tokens: Annotated[int | None, Field(ge=1)] = None
     max_output_tokens: Annotated[int | None, Field(ge=1)] = None
+    reserve_units: Annotated[int | None, Field(ge=1)] = None
 
 
 type DenyItem = Annotated[str, Field(max_length=128, min_length=1)]
@@ -2389,17 +2963,16 @@ class ProvidersRules(BaseModel):
     """
 
 
-class ProvidersPrice(BaseModel):
+class ProvidersUnitPrice(BaseModel):
     """
-    Standard list price in US dollars per million tokens. audio_input (1.2.0, ADR-0027) is the price per million audio input tokens where the provider bills audio input at its own rate (Gemini); left out, the profile has no audio price and cannot serve the speech role. The other input tokens of the same call are priced at input.
+    A fee per 1,000 units (ADR-0029 decision 1): query is one search the provider ran (Gemini grounding reports them in grounding_metadata.web_search_queries), minute one minute of audio, character one input character, image one generated image. per_1k is US dollars per 1,000 units, null only while prices are unset.
     """
 
     model_config = ConfigDict(
         extra="forbid",
     )
-    input: Annotated[float | None, Field(ge=0.0)]
-    output: Annotated[float | None, Field(ge=0.0)]
-    audio_input: Annotated[float | None, Field(ge=0.0)] = None
+    unit: Literal["query", "minute", "character", "image"]
+    per_1k: Annotated[float | None, Field(ge=0.0)]
 
 
 type ScenarioId = Annotated[str, Field(pattern="^[A-Za-z][A-Za-z0-9_-]{0,31}$")]
@@ -2463,7 +3036,7 @@ class SkillEmbeddedSchema(BaseModel):
 
 class SpendCapsConfig(BaseModel):
     """
-    config/spend_caps.yaml: the live-model spend caps, the flat reservation per live unit and the per-uid rate limit (SEC-16, PRD supplement 4; FR-MTR-04, PRD 14.1, 17.3), read by tilo-api's spend loader. Money is an integer in INR minor units (paise, 1 INR = 100): never a float, a bool or a string. Every key is required and no other key is allowed; only org_day_minor may be null (ADR-0002 decision 13). The schema checks each value alone. Two rules it cannot express: a whole float such as 1000.0 is the same JSON number as 1000, so the loader also requires a YAML integer; and the shipped file keeps unit_reserve_minor <= run_minor <= uid_lifetime_minor <= global_day_hard_minor. These caps sit beside config/metering.yaml (credits and US dollars) and replace none of it (ADR-0002 decision 16). 1.1.0 adds unit_reserve_minor (BQ-SEC16-1).
+    config/spend_caps.yaml: the live-model spend caps, the flat reservation per live unit and the per-uid rate limit (SEC-16, PRD supplement 4; FR-MTR-04, PRD 14.1, 17.3), read by tilo-api's spend loader. Money is an integer in INR minor units (paise, 1 INR = 100): never a float, a bool or a string. Every key is required and no other key is allowed; only org_day_minor may be null (ADR-0002 decision 13). The schema checks each value alone. Two rules it cannot express: a whole float such as 1000.0 is the same JSON number as 1000, so the loader also requires a YAML integer; and the shipped file keeps unit_reserve_minor <= run_minor <= uid_lifetime_minor <= global_day_hard_minor. These caps sit beside config/metering.yaml (credits and US dollars) and replace none of it (ADR-0002 decision 16). 1.1.0 adds unit_reserve_minor (BQ-SEC16-1). 1.1.1 changes description text only (ADR-0002 decision 16, amendment of 8 Oct 2026).
     """
 
     model_config = ConfigDict(
@@ -2475,7 +3048,7 @@ class SpendCapsConfig(BaseModel):
     """
     uid_lifetime_minor: Annotated[int, Field(ge=1)]
     """
-    Lifetime live-model spend per signed-in uid, in paise, above zero and never null (SEC-16: 1,000 INR).
+    Lifetime live-model spend per signed-in uid, in paise, above zero and never null (SEC-16; shipped at 500 INR since the user's decision of 9 Oct 2026, BQ-SEC16-4).
     """
     run_minor: Annotated[int, Field(ge=1)]
     """
@@ -2501,6 +3074,258 @@ class SpendCapsConfig(BaseModel):
     """
     The length of the per-uid rate-limit window in seconds, above zero.
     """
+
+
+type TaughtSkillId = Annotated[str, Field(pattern="^tsk_[0-9A-Za-z_]{1,48}$")]
+
+
+type TaughtSkillName = Annotated[
+    str, Field(max_length=80, min_length=1, pattern="^[^\\r\\n]+$")
+]
+"""
+One line written by a person: data, never an instruction.
+"""
+
+
+type TaughtSkillStepText = Annotated[
+    str, Field(max_length=200, min_length=1, pattern="^[^\\r\\n]+$")
+]
+"""
+One step in plain words, one line. Written by a person or by the skill_capture role from what the person showed; data, never an instruction to code.
+"""
+
+
+type TaughtSkillStepNumber = Annotated[int, Field(ge=1, le=20)]
+"""
+1-based position in plan.
+"""
+
+
+type TaughtSkillCount = Annotated[int, Field(ge=0, le=20)]
+
+
+type TaughtSkillStatus = Literal["draft", "learning", "trusted"]
+"""
+draft until saved; a saved skill starts as learning (FR-SKL-04); only the owner marks it trusted, once good_runs reaches the configured threshold (TS-08), and may set it back to learning at any time.
+"""
+
+
+type TaughtSkillMethod = Literal["describe", "upload", "guided", "record"]
+"""
+How the person showed it (FR-SKL-01): describe (typed words), upload (a finished example file), guided (clicking through in Tilo's browser) or record (a screen recording, video only, no sound).
+"""
+
+
+class TaughtSkillScope(BaseModel):
+    """
+    Who can use it (FR-SKL-04): just_me, or the members of one team the owner belongs to (team is null exactly for just_me).
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    kind: Literal["just_me", "team"]
+    team: TeamId | None
+
+
+class TaughtSkillPinned(BaseModel):
+    """
+    A stored artifact version (ADR-0018 store, the owner's Desk world) by id and version only, never a label or a file name.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    artifact_id: ArtifactId
+    version: Annotated[int, Field(ge=1)]
+
+
+class TaughtSkillCapturedStep(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    text: TaughtSkillStepText
+    artifact: TaughtSkillPinned | None
+
+
+type TaughtSkillVerb = Literal["read", "draft", "write", "send", "post", "pay", "delete", "share", "book"]
+"""
+What a step does, in the Skills page's words. send, post, pay, delete, share and book always ask (must_ask).
+"""
+
+
+class TaughtSkillPlanStep(BaseModel):
+    """
+    One step of Tilo's version (FR-SKL-02). tool is the connector it uses and action one of that connector's actions (config/connectors.yaml or config/mcp.yaml), the risk-table key of what it does there. must_ask is set by code, never a model: true when the verb is send, post, pay, delete, share or book, or the action's tier is T2 or T3 (an action the config does not list is T3). The runner works it out again from the current config on every run (TS-04). A must_ask step always has ask_first true. ask_first is the person's 'Ask me first' switch for the other steps; while the skill is learning every step but a read asks anyway (TS-05). Neither one authorises anything: every side effect still goes through the policy engine and its gate.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    text: TaughtSkillStepText
+    tool: ConnectorId
+    action: ActionType
+    verb: TaughtSkillVerb
+    ask_first: bool
+    must_ask: bool
+
+
+type Option = Annotated[str, Field(max_length=60, min_length=1, pattern="^[^\\r\\n]+$")]
+
+
+class TaughtSkillQuestion(BaseModel):
+    """
+    FR-SKL-02: the one clarifying question of Tilo's version, its options, and the index of the option the person chose (null until answered).
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    text: TaughtSkillStepText
+    options: Annotated[list[Option], Field(max_length=4, min_length=2)]
+    answer: Annotated[int | None, Field(ge=0, le=3)]
+
+
+type ScheduleId = Annotated[str, Field(pattern="^sched_[0-9a-f]{24}$")]
+
+
+FilterAdditionalProperty = TypeAliasType(
+    "FilterAdditionalProperty", Annotated[str, Field(pattern="^[A-Za-z0-9_.:-]{1,64}$")]
+)
+
+
+class TaughtSkillEventTrigger(BaseModel):
+    """
+    An event type from config/skills.yaml's allow-list, and at most three exact matches on its data fields. Keys are data fields holding an id or an enum value, never free text; there are no patterns or substrings (TS-07).
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    type: EventFamilyVerb
+    filter: Annotated[dict[Slug, FilterAdditionalProperty], Field(max_length=3)]
+
+
+class TaughtSkillEstimates(BaseModel):
+    """
+    FR-SKL-02, worked out by code, never a model. Taken from the skill's own runs in the credit ledger once it has some (source ledger), else from config/skills.yaml's per-step prior (source prior). Prices come from config/prices.yaml as of prices_as_of. asks_per_run counts the steps that would stop to ask (TS-05).
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    credits_per_run: Credits
+    seconds_per_run: Annotated[int, Field(ge=0)]
+    asks_per_run: TaughtSkillCount
+    source: Literal["ledger", "prior"]
+    prices_as_of: CalendarDate
+
+
+type TaughtSkillToolAccess = Annotated[
+    dict[ConnectorId, ToolAccessLevel], Field(max_length=20)
+]
+"""
+FR-ACC-02, least privilege: the level each connector may be used at, set by code at save to the lowest level that permits that connector's steps. A connector left out is off, unlike skill.yaml, where a missing entry takes the team's level. A level only ever lowers the team's (effective_level). The owner may lower it further; nothing raises it above what the steps need (TS-06).
+"""
+
+
+class TaughtSkillStop(BaseModel):
+    """
+    Where and why a try run stopped: a site wanted a sign-in or a CAPTCHA (a needs-you card; Tilo never types a password or solves one), the try run's credit cap, an error, or the person stopped it.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    step: TaughtSkillStepNumber
+    reason: Literal["needs_sign_in", "captcha", "budget", "error", "cancelled"]
+
+
+type TaughtSkillThumb = Literal["up", "down"]
+
+
+class TaughtSkillFix(BaseModel):
+    """
+    FR-SKL-05: a logged change to one step, by the owner only (TS-09), at orgs/{org}/taught_skills/{skill}/fixes/{id}. It sets the step's text and Ask me first and makes version to_version = from_version + 1, which the next run uses. A fix never changes a step's tool, action or verb.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    id: Ulid
+    skill: TaughtSkillId
+    from_version: Annotated[int, Field(ge=1)]
+    to_version: Annotated[int, Field(ge=2)]
+    step: TaughtSkillStepNumber
+    text: TaughtSkillStepText
+    ask_first: bool
+    by: UserId
+    rating: Ulid | None
+    """
+    The thumbs-down rating that led to it, or null.
+    """
+    at: Timestamp
+
+
+type TaughtSkillRunOutcome = Literal["completed", "failed"]
+"""
+How a real run ended (ADR-0037): completed after world.completed, failed after world.failed. Pause all and the kill switch end nothing here, so a run they stop stays unfinished and is never rateable (TS-14).
+"""
+
+
+class TaughtSkillRealRun(BaseModel):
+    """
+    FR-SKL-05 to 07, ADR-0037: the record that one real run of one saved skill version started and how it ended, at orgs/{org}/taught_skills/{skill}/real_runs/{run_id} (the run id is the key, so a run is recorded once). tilo-api or the harness writes it from its own records, never from a request body (TS-13). by is the verified person whose run it is, set by the server. org_id, skill, version, run_id, world_id, by, plan and started_at are fixed at the start. finished_at and outcome are null together until the run's own world writes its terminal event, then set once together (TS-14). plan is the skill's plan at that version, kept so a later fix cannot rewrite what the run followed. A try run is never one of these (TS-10), and a rating and its note are the rating record's.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    org_id: OrgId
+    skill: TaughtSkillId
+    version: Annotated[int, Field(ge=1)]
+    run_id: RunId
+    world_id: WorldId
+    by: UserId
+    plan: Annotated[list[TaughtSkillPlanStep], Field(max_length=20, min_length=1)]
+    started_at: Timestamp
+    finished_at: Timestamp | None
+    outcome: TaughtSkillRunOutcome | None
+
+
+class TaughtSkillRunAnswer(BaseModel):
+    """
+    FR-SKL-07, ADR-0037: one question card that a person answered in a recorded real run, at orgs/{org}/taught_skills/{skill}/real_runs/{run_id}/answers/{card_id} (one for each card). It links records that already exist and holds no text of the question or the answer. by and at are the card's recorded answerer (the person, never a Team Lead id) and answer time, copied once when the answer commits (TS-16). The helpers report counts these and nothing else (TS-12).
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    org_id: OrgId
+    skill: TaughtSkillId
+    version: Annotated[int, Field(ge=1)]
+    run_id: RunId
+    world_id: WorldId
+    card_id: Ulid
+    by: UserId
+    at: Timestamp
+
+
+class TaughtSkillHelper(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    user: UserId
+    answers: Annotated[int, Field(ge=0)]
+    fixes: Annotated[int, Field(ge=0)]
+
+
+class TaughtSkillMistakes(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    this_month: Annotated[int, Field(ge=0)]
+    last_month: Annotated[int, Field(ge=0)]
 
 
 class TeamLeadAssignment(BaseModel):
@@ -2644,6 +3469,151 @@ class UiActionUntag(BaseModel):
     user: UserId
 
 
+type UserSettingsLine = Annotated[
+    str, Field(max_length=80, min_length=1, pattern="^[^\\u0000-\\u001F\\u007F]+$")
+]
+"""
+One line typed by a person, 1 to 80 characters: data, never an instruction.
+"""
+
+
+type UserSettingsEmail = Annotated[
+    str, Field(max_length=254, pattern="^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$")
+]
+"""
+A display address, at most 254 characters, with one @ and a dotted host. It is not verified and is never a recipient (USET-06).
+"""
+
+
+type UserSettingsTimeZone = Annotated[
+    str,
+    Field(max_length=64, pattern="^(UTC|[A-Z][A-Za-z_+-]*(/[A-Za-z0-9_+-]+){1,2})$"),
+]
+"""
+An IANA time zone name (Asia/Kolkata) or UTC, in the same shape as person.time_zone. The schema checks the shape; tilo-api also refuses a name the zone database does not know (USET-03).
+"""
+
+
+type UserSettingsLanguage = Annotated[
+    str, Field(max_length=16, pattern="^[a-z]{2,3}(-[A-Z][a-z]{3})?(-[A-Z]{2})?$")
+]
+"""
+A BCP 47 language tag of the drafts Tilo writes for the person: language, an optional four-letter script and an optional two-letter region (en, en-GB, zh-Hans-CN). A display name such as English (UK) is the client's label, never stored.
+"""
+
+
+type UserSettingsClock = Annotated[
+    str, Field(pattern="^([01][0-9]|2[0-3]):[0-5][0-9]$")
+]
+"""
+A wall-clock time, HH:MM on a 24-hour clock, 00:00 to 23:59, in the zone of the object that holds it.
+"""
+
+
+type UserSettingsWeekday = Literal["mon", "tue", "wed", "thu", "fri", "sat", "sun"]
+
+
+class UserSettingsWorkingHours(BaseModel):
+    """
+    The days and the window Tilo books inside, in profile.time_zone. start is inclusive, end exclusive, and start is before end: no overnight window (USET-03, as config/personal.yaml working_window).
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    days: Annotated[list[UserSettingsWeekday], Field(max_length=7, min_length=1)]
+    start: UserSettingsClock
+    end: UserSettingsClock
+
+
+class UserSettingsProfile(BaseModel):
+    """
+    FR-SET-01. The title is null when the person has none.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    name: UserSettingsLine
+    email: UserSettingsEmail
+    title: UserSettingsLine | None
+    time_zone: UserSettingsTimeZone
+    language: UserSettingsLanguage
+    working_hours: UserSettingsWorkingHours
+
+
+class UserSettingsChannels(BaseModel):
+    """
+    Whether one kind of notice reaches the person by phone, email and Slack. Saving a choice verifies no channel and proves no delivery.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    phone: bool
+    email: bool
+    slack: bool
+
+
+type UserSettingsDecisionChannels = UserSettingsChannels
+
+
+class UserSettingsNotifications(BaseModel):
+    """
+    FR-SET-02: the matrix, one row for each kind of notice. The decisions row keeps at least one channel on (USET-04): the rule is in the schema, so a client that skips its own guard is refused. Any other row may be all off.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    decisions: UserSettingsDecisionChannels
+    spend: UserSettingsChannels
+    finished: UserSettingsChannels
+    digest: UserSettingsChannels
+    weekly: UserSettingsChannels
+
+
+class UserSettingsMoney(BaseModel):
+    """
+    An amount in the minor unit of its currency (paise, pence, cents): an integer from 1 to 1000000000000, never a float, a bool or a string with a symbol. currency is an ISO 4217 code; tilo-api refuses a code it has no minor unit for (USET-03).
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    amount_minor: Annotated[int, Field(ge=1, le=1000000000000)]
+    currency: Annotated[str, Field(pattern="^[A-Z]{3}$")]
+
+
+class UserSettingsQuietHours(BaseModel):
+    """
+    FR-SET-02 and FR-HIL-13, in the shape tilo_channels.quiet_hours.parse_quiet_hours already reads. During the window only gate and blocked notices notify; this object has no field that could hide a gate (USET-05). start and end are in timezone, the window may cross midnight, and start is never end (USET-03). threshold is typed money or null; nothing delivers by it in this release (USET-05).
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    enabled: bool
+    start: UserSettingsClock
+    end: UserSettingsClock
+    timezone: UserSettingsTimeZone
+    threshold: UserSettingsMoney | None
+
+
+class UserSettingsUpdate(BaseModel):
+    """
+    The body of PUT /v1/me/settings: the whole document except what the server owns. version is the one the client read (0 when nothing was saved yet). It names no owner or org: they come from the verified principal, so a body that carries one, or updated_at, is refused (USET-01).
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    version: Annotated[int, Field(ge=0, le=1000000)]
+    profile: UserSettingsProfile
+    notifications: UserSettingsNotifications
+    quiet_hours: UserSettingsQuietHours
+
+
 class WorkItemSource(BaseModel):
     """
     Where the item came from; evidence lists the utterances of a meeting transcript.
@@ -2667,6 +3637,9 @@ class WorkItemHistoryEntry(BaseModel):
     status: Literal["proposed", "open", "done", "dropped"]
 
 
+type WorldShareId = Annotated[str, Field(pattern="^ws_[0-9a-f]{32}$")]
+
+
 class AgentsConfig(BaseModel):
     """
     config/agents.yaml: the harness's role limits (PRD 8.1, FR-AGT-01), context thresholds and liveness timings (8.5, FR-AGT-09, FR-AGT-10), retries (FR-AGT-13) and question load control (8.3). Values the PRD fixes are const; the rest are bounded so config cannot loosen a stated limit.
@@ -2684,13 +3657,13 @@ class AgentsConfig(BaseModel):
 
 class ArtifactVersionOrigin(BaseModel):
     """
-    What made the version: a unit's runner (unit and the worker agent set), tilo-render (for a unit), an intake upload (neither) or a restore (FR-MEM-06; no unit). Set by the store from the run, never by a runner.
+    What made the version: a unit's runner (unit and the worker agent set), tilo-render (for a unit), an intake upload (neither), a restore (FR-MEM-06; no unit) or, since 1.1.0 (ADR-0029), a fetch: a file a unit's worker agent downloaded through tilo-browser (unit and agent set). Set by the store from the run, never by a runner.
     """
 
     model_config = ConfigDict(
         extra="forbid",
     )
-    kind: Literal["unit", "render", "upload", "restore"]
+    kind: Literal["unit", "render", "upload", "restore", "fetch"]
     unit: UnitId | None
     agent: AgentId | None
 
@@ -3214,6 +4187,52 @@ class DataTransferData(BaseModel):
     risk_tier: RiskTier
 
 
+class MeetingAdjournedData(BaseModel):
+    """
+    data of meeting.adjourned (ADR-0028). The room closed, once (MR-05). actor is the convener when reason is person, otherwise system (the idle sweeper, the cap check, Pause all or Stop all, the access check); target is the lead. turns is the number of meeting.asked in the room and credits_spent the sum of its meeting.replied credits (MR-08). A room open at Pause all or Stop all is adjourned (paused) before world.paused is written.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    room_id: Ulid
+    reason: MeetingRoomAdjournReason
+    turns: Annotated[int, Field(ge=0, le=50)]
+    credits_spent: Credits
+
+
+class MeetingAskedData(BaseModel):
+    """
+    data of meeting.asked (ADR-0028). The convener said something in the room to one attendee (to; the web sends the lead when nobody is selected). actor is the convener, target the addressed agent. The words are in the redacted raw archive (message_ref), never here (MR-12). Turns count 1, 2, ... per room with one turn in flight (MR-04); mode is the person's Quick or Thinking choice for this turn.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    room_id: Ulid
+    turn: MeetingRoomTurnNumber
+    to: AgentId
+    mode: MeetingRoomMode
+    message_ref: EventArchiveRef
+
+
+class MeetingConvenedData(BaseModel):
+    """
+    data of meeting.convened (ADR-0028, a user-requested addition). A person called a lead agent and the agents it supervises into the Meeting Hall of this world, to talk about the run run_id names. actor is that person (a user id), target the lead; district is the lead's district (null for the Director, whom only the owner calls); vis lists every attendee's district. Written by tilo-api through the world's writer after the access checks (MR-01, MR-03); never by a model, never a side effect (authz null). run_state says whether that run was live or had finished; a paused world opens no room. credit_cap and max_turns are this room's caps, from config/meeting_room.yaml and the convener's remaining spend cap at the time.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    room_id: Ulid
+    lead: AgentId
+    agents: MeetingRoomAttendees
+    as_role: MeetingRoomAsRole
+    run_state: Literal["live", "finished"]
+    credit_cap: Credits
+    max_turns: MeetingRoomTurnNumber
+
+
 class MeetingMinutedData(BaseModel):
     """
     data of meeting.minuted (CC-PEOPLE, FR-MTG-03). The minutes artifact is ready for the Owner to review; the counts let the HUD say what is waiting without carrying any text. unverified counts items whose evidence check failed (FR-MTG-04). flagged is the safety provider's verdict on the transcript.
@@ -3228,6 +4247,22 @@ class MeetingMinutedData(BaseModel):
     action_items: Annotated[int, Field(ge=0)]
     unverified: Annotated[int, Field(ge=0)]
     flagged: bool
+
+
+class PlanRevisedData(BaseModel):
+    """
+    data of plan.revised (ADR-0028). The planner compiled a confirmed change (the meeting.change_requested with this proposal_id, which is this event's cause) into revision units, and the plan validator accepted the revised plan (PG-13). actor is the world's Director, target the world. run is same_run when the discussed run was still live (the units join it) and revision_run when it had finished: then this event is the first of a new run of the same world (new run_id), and budget.requested, budget.granted and world.started follow (MR-09, MR-10). credits is the revision's estimate. Not a side effect: the units' own side effects wait at gates or policies like any unit's.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    proposal_id: Ulid
+    run: Literal["same_run", "revision_run"]
+    units: Annotated[
+        list[PlanRevisedDataRevisionUnit], Field(max_length=10, min_length=1)
+    ]
+    credits: CreditRange
 
 
 class PolicyAppliedData(BaseModel):
@@ -3251,6 +4286,104 @@ class PolicyAppliedData(BaseModel):
     undo_window_s: Annotated[int, Field(ge=0)]
     item: ArtifactRef | None
     credits: Credits
+
+
+class SkillCapturedData(BaseModel):
+    """
+    data of skill.captured (registry 1.4.0, ADR-0034, FR-SKL-01): one step was added to a taught skill's captured list. Written once per step, after the record write commits, so the list grows only as steps are recorded (HR-1). The envelope follows TS-11: the actor's Desk world, actor and target that person, district, level and item null, vis [] and authz null. credits and trace name the skill_capture role when a model read the recording, upload or description. No step text, file name or media here: the artifact is a pinned id and version.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    skill: TaughtSkillId
+    method: TaughtSkillMethod
+    step: TaughtSkillStepNumber
+    artifact: TaughtSkillPinned | None
+
+
+class SkillFixedData(BaseModel):
+    """
+    data of skill.fixed (registry 1.4.0, ADR-0034, FR-SKL-05): the owner fixed one step, and to_version (from_version + 1, TS-09) is what the next run uses. It copies the fix record without its text. Envelope as TS-11.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    skill: TaughtSkillId
+    from_version: Annotated[int, Field(ge=1)]
+    to_version: Annotated[int, Field(ge=2)]
+    step: TaughtSkillStepNumber
+
+
+class SkillRatedData(BaseModel):
+    """
+    data of skill.rated (registry 1.4.0, ADR-0034, FR-SKL-05): the person whose run it was rated it. It copies the rating record without its note. A thumbs down may name the wrong step. The event goes in the rater's Desk world (TS-11).
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    skill: TaughtSkillId
+    version: Annotated[int, Field(ge=1)]
+    run_id: RunId
+    thumb: TaughtSkillThumb
+    wrong_step: TaughtSkillStepNumber | None
+
+
+class SkillStateChangedData(BaseModel):
+    """
+    data of skill.state_changed (registry 1.4.0, ADR-0034, FR-SKL-04, FR-SKL-06): the owner saved a draft (it starts as learning), marked the skill trusted, set it back to learning, paused it or resumed it. A trusted change records the good runs and the threshold in force (good_runs >= threshold, TS-08). The owner is the actor, and the record is written before the event. Envelope as TS-11.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    skill: TaughtSkillId
+    version: Annotated[int, Field(ge=1)]
+    change: Literal["saved", "trusted", "learning", "paused", "resumed"]
+    good_runs: Annotated[int, Field(ge=0)]
+    threshold: Annotated[int | None, Field(ge=1)]
+
+
+class SkillTryRunData(BaseModel):
+    """
+    data of skill.try_run (registry 1.4.0, ADR-0034, FR-SKL-03): a try run finished or stopped. It copies its try_run_result (TS-10), so side_effects is always 0. It is written once per try run, after the result is stored. The page shows the steps only after this event; there is no per-step event. The actor is the person who started it, and credits are the try run's total. Envelope as TS-11.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    skill: TaughtSkillId
+    version: Annotated[int, Field(ge=1)]
+    try_run: Ulid
+    match: Annotated[float, Field(ge=0.0, le=1.0)]
+    total: TaughtSkillStepNumber
+    matched: TaughtSkillCount
+    asked: TaughtSkillCount
+    skipped: TaughtSkillCount
+    side_effects: Literal[0]
+    outcome: Literal["completed", "stopped"]
+
+
+class SkillVersionProposedData(BaseModel):
+    """
+    data of skill.version_proposed (registry 1.4.0, ADR-0034, FR-SKL-02): Tilo restated a draft as plan steps, with at most one question and the estimates code worked out. The actor is the person who asked for it; credits and trace name the skill_capture role. Envelope as TS-11. Counts and the estimate only, never step text.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    skill: TaughtSkillId
+    version: Annotated[int, Field(ge=1)]
+    steps: TaughtSkillStepNumber
+    asks: TaughtSkillCount
+    question: bool
+    """
+    true when the version asks one clarifying question.
+    """
+    credits_per_run: Credits
+    source: Literal["ledger", "prior"]
 
 
 class TeamRuleChangedData(BaseModel):
@@ -3378,6 +4511,32 @@ class ManifestProducer(BaseModel):
     profile: ProvidersProfileId | None
 
 
+class McpTools(BaseModel):
+    """
+    Tilo's MCP server tools (ADR-0031, Proposed). The root is one `tools/call` request as the server accepts it: a tool `name` and its `arguments`, bound to that tool's input shape; anything else is refused before any store is read. Each tool's result (`structuredContent`) is its `*_out` entry. Read tools need the grant scope `tilo.read`; `answer_card` and `start_run` need `tilo.write`, which the person turns on per client. No tool ever answers a gate, consent or meeting card: only `needs_you` questions can be answered here (`card_row.answerable_here`). Results carry ids, titles, labels and Tilo-written lines only; artifact text only from `read_artifact`, only for a clean text version of the owner's. Rules MC-01 to MC-12 in `mcp_tools.rules.md`.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    name: McpToolsToolName
+    arguments: dict[str, Any]
+
+
+class McpToolsReadArtifactOut(BaseModel):
+    """
+    `text` is the version's bytes as UTF-8 for `text/markdown`, `text/csv` and `application/json` up to 262,144 bytes, else null with `withheld` saying why (MC-07).
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    artifact: McpToolsArtifactRow
+    content_sha256: Annotated[str, Field(pattern="^[0-9a-f]{64}$")]
+    text: Annotated[str | None, Field(max_length=262144)]
+    withheld: McpToolsWithheldReason | None
+
+
 class MeetingAgendaItem(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
@@ -3391,6 +4550,84 @@ class MeetingAgendaItem(BaseModel):
         ),
     ]
     minutes: MeetingAgendaMinutes | None
+
+
+class MeetingHostRpcReceipt(BaseModel):
+    """
+    What the adapter made (HostReceipt): Google's event id, never a link. HB-07: event_ref equals side_effect_marker(entry); world_id, outbox_id and draft equal the entry's; meeting_id and owner equal the draft's. tilo-api stores it through the run's receipt store only when all hold.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    world_id: WorldId
+    outbox_id: Ulid
+    meeting_id: MeetingId
+    owner: UserId
+    draft: MeetingHostRpcDraftRef
+    event_ref: Annotated[str, Field(pattern="^[0-9a-f]{32}$")]
+    conference: Literal["pending", "success", "failure"]
+
+
+class MeetingHostRpcConnectionView(BaseModel):
+    """
+    One stored grant of the request's user, from an allowlist: connector, state, scopes and connected_at, nothing else of the record. state is connected when the stored state is exactly connected, else expired (Google refused the grant at refresh, or a record the broker did not write: connect again). scopes are the stored granted scopes that the registry declares for this connector, sorted and unique, and none when expired. connected_at is when the grant was made (HB-06), null when expired or not recorded; it is display data read without KMS and authorises nothing. Never a token, the record's ciphertext, wrapped key or nonce, the client id or secret, the access token's expiry or an account address.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    connector: ConnectorId
+    state: Literal["connected", "expired"]
+    scopes: Annotated[list[MeetingHostRpcScope], Field(max_length=16)]
+    connected_at: Timestamp | None
+
+
+type MeetingHostRpcParts = Annotated[
+    list[MeetingHostRpcConnectionPart | MeetingHostRpcAlertPart], Field(max_length=16)
+]
+"""
+What the broker emitted during one call, in order, nothing more (ADR-0032 decision 7): tilo-api hands each connection part to meeting_host.on_connection_event. Every connection part names the call's own user (entry.authz.ref for a send, the request's user_id otherwise); a part naming anyone else is not that call's, and tilo-api's client drops it. At most 16.
+"""
+
+
+type MeetingHostRpcConnectorParts = Annotated[
+    list[MeetingHostRpcConnectorPart | MeetingHostRpcAlertPart], Field(max_length=16)
+]
+"""
+What the broker emitted during one call of a connect, disconnect or execute route, in order, nothing more (ADR-0032 decision 7, ADR-0035 decision 2): as parts, but a connection part may name any connector and may be connection.established. Every connection part names the call's own user (the request's user_id; evidence.world_owner for an execute); a part naming anyone else is not that call's, and tilo-api's client drops it. At most 16.
+"""
+
+
+type MeetingRoomCitedArtifacts = Annotated[list[ArtifactRef], Field(max_length=10)]
+"""
+Pinned artifact versions the reply rests on, made by those units.
+"""
+
+
+class MeetingRoomProposal(BaseModel):
+    """
+    A change an agent proposes. It names only WHAT changes (units and artifact versions); its wording is in the reply's archive record. It has no field for an action, a recipient, a connector, a risk tier or a policy: the planner and the policy engine derive those (MR-11).
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    proposal_id: Ulid
+    units: Annotated[list[UnitId], Field(max_length=10, min_length=1)]
+    artifacts: Annotated[list[ArtifactRef], Field(max_length=10)]
+
+
+class MeetingRoomReply(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    from_: Annotated[AgentId, Field(alias="from")]
+    outcome: MeetingRoomOutcome
+    text: MeetingRoomReplyText | None
+    units: MeetingRoomCitedUnits
+    artifacts: MeetingRoomCitedArtifacts
+    proposal: MeetingRoomProposal | None
 
 
 class Mention(BaseModel):
@@ -3551,37 +4788,17 @@ class Pilot(BaseModel):
     survey_response: PilotSurveyResponse | None = None
 
 
-class PinboardItem(BaseModel):
+class PinboardItemPlacement(BaseModel):
     """
-    One entry on a pinboard (FR-PB-01 to -07). A personal entry is private to `scope.user`: no owner, no mention, never proposed (PE-01). A team entry is read by the members of `scope.team` once `active`; until then only `set_up_by` sees it (PE-02). `set_up_by` is the accountable person shown in the table and the target of "get in touch" (PE-09); for an entry Tilo made it is the person who confirmed or owns the meeting. Tilo's entries carry a `source` ("added by Tilo from ..."); a Tilo-made team entry is `active` only with `confirmed_by` (PE-07, PE-08). `url` is https with no user info, query or fragment, and passes the secret redactor before it is stored.
+    ADR-0038, FR-PB: where one entry sits on the board of its own scope, left out until it is placed and never null (ADR-0011). board and column are short ids of a presentation place inside that scope, never a user, team or access grant, and the scope itself is not here. order is a sort key inside one board and column across the entries of the scope, lowest first and ties by pin id ascending, so a move writes this one entry and never renumbers another, which may belong to someone else. A move changes this object only: not the title, the content, the scope, the owner, the status, the history or updated_at (PE-36).
     """
 
     model_config = ConfigDict(
         extra="forbid",
     )
-    id: PinId
-    org_id: OrgId
-    scope: PinboardItemScopePersonal | PinboardItemScopeTeam
-    title: Annotated[
-        str, Field(max_length=140, min_length=1, pattern="^[^\\u0000-\\u001F\\u007F]+$")
-    ]
-    body: Body | None
-    kind: Literal["note", "decision", "deadline", "link"]
-    url: Url | None
-    owner: UserId | None
-    due: CalendarDate | None
-    status: Literal["proposed", "active", "removed"]
-    created_by: Maker
-    set_up_by: UserId
-    source: PinboardItemSource | None
-    confirmed_by: TeamLeadAssignment | None
-    flagged: bool
-    """
-    True when the minutes, mail or calendar text this was made from were flagged by the safety provider; never cleared by a model. Any draft, nudge, send or calendar write built from a flagged record is T3 with safety_flag (PE-21).
-    """
-    history: Annotated[list[PinboardItemHistoryEntry], Field(min_length=1)]
-    created_at: Timestamp
-    updated_at: Timestamp
+    board: PinboardItemPlaceId
+    column: PinboardItemPlaceId
+    order: Annotated[int, Field(ge=0, le=9999)]
 
 
 class PlanApproach(BaseModel):
@@ -3665,39 +4882,55 @@ class PolicyTierModifier(BaseModel):
     raises_to: Literal["T3"]
 
 
-class ProvidersModels(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    example: bool
+class ProvidersProfile(BaseModel):
     """
-    true while the profiles are the PRD's examples; the user chooses final models.
-    """
-    profiles: Annotated[dict[ProvidersProfileId, ProvidersProfile], Field(min_length=1)]
-    roles: Annotated[dict[Slug, ProvidersRole], Field(min_length=1)]
-    """
-    Business code asks for a role, never a model (PL-01). speech (1.2.0, ADR-0027) is the role every SpeechProvider call asks for (FR-MTG-17, FR-MTG-11, FR-INT-14, FR-CHN-16): the loader refuses it unless it states max_output_tokens and its primary, fallback and cascade profiles declare the audio capability and, while prices are set, carry an audio_input price.
-    """
-    rules: ProvidersRules
-
-
-class ProvidersPrices(BaseModel):
-    """
-    Prices per profile (PL-06, FR-MTR-01). Prices, the date and the source may be null only while status is unset, and the loader refuses live metering until status is set.
+    One model profile. Its cost rank (PRD 6.6) is derived from prices, never declared here. base_url and api_key_env are allowed only when provider is openai_compat (ADR-0002, ADR-0003). media_tokens (1.3.0, ADR-0029) holds the tokens the provider counts for one image, one PDF page and one second of audio or video, as upper bounds; the router uses them only for the pre-flight estimate and the EFF-03 cap check before it sends a media part, never for billing (the reported usage is billed). A profile without media_tokens gets no media part: the router refuses it before sending.
     """
 
     model_config = ConfigDict(
         extra="forbid",
     )
-    status: Literal["unset", "set"]
-    effective_date: CalendarDate | None
-    source: Annotated[str | None, Field(max_length=500, min_length=1)]
-    currency: Literal["USD"]
-    credit_usd: float
+    provider: Slug
     """
-    PRD 14.1: 1 credit = US$0.005.
+    Adapter name in packages/providers, e.g. google.
     """
-    profiles: Annotated[dict[ProvidersProfileId, ProvidersPrice], Field(min_length=1)]
+    model: Annotated[str, Field(max_length=128, min_length=1)]
+    context: Annotated[int, Field(ge=1)]
+    """
+    Context window in tokens.
+    """
+    caps: list[ProvidersCapability]
+    media_tokens: ProvidersMediaTokens | None = None
+    base_url: Annotated[
+        str | None,
+        Field(
+            max_length=512,
+            pattern="^https://[A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?(?::[0-9]{1,5})?(?:/[A-Za-z0-9._~%/-]*)?$",
+        ),
+    ] = None
+    """
+    openai_compat endpoint. https only, with no user info, query or fragment, so no credential can sit in the URL (PRD 16.1 rule 4). The not-pattern rejects a final line break, which a Python validator's $ lets through.
+    """
+    api_key_env: Annotated[str | None, Field(pattern="^[A-Z][A-Z0-9_]{2,63}$")] = None
+    """
+    Name of the environment variable that holds the key, never the key itself. The not-pattern rejects a final line break, which a Python validator's $ lets through.
+    """
+
+
+class ProvidersPrice(BaseModel):
+    """
+    The rate charged, in US dollars per million tokens. audio_input (1.2.0, ADR-0027) is the price per million audio input tokens where the provider bills audio input at its own rate (Gemini); left out, the profile has no audio price and cannot serve the speech role. The other input tokens of the same call are priced at input. 1.3.0 (ADR-0029): cached_input is the price per million input tokens served from the provider's prompt cache (the Trace's tokens_cached, ADR-0022); left out, cached tokens are priced at input. unit_price is a fee per 1,000 units charged on top of the token rates (a call costs tokens times their rates plus units times per_1k / 1000). valid_until is the last calendar day (UTC) the price holds, for a promotional rate: after it the loader refuses live metering of the profile until the file is updated. Promotions, credits and free allowances are never subtracted here (the meter overstates, never understates).
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    input: Annotated[float | None, Field(ge=0.0)]
+    output: Annotated[float | None, Field(ge=0.0)]
+    audio_input: Annotated[float | None, Field(ge=0.0)] = None
+    cached_input: Annotated[float | None, Field(ge=0.0)] = None
+    unit_price: ProvidersUnitPrice | None = None
+    valid_until: CalendarDate | None = None
 
 
 class Scenario(BaseModel):
@@ -3758,6 +4991,81 @@ class Skill(BaseModel):
     """
     One line, shown to the planner.
     """
+
+
+class TaughtSkillTrigger(BaseModel):
+    """
+    FR-SKL-04: when it runs. on_demand: when a person asks. schedule: the /schedules record schedule_id (FR-AGT-14) starts it. event: a registered event of a world the owner owns starts it (TS-07). The other two fields are null.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    kind: Literal["on_demand", "schedule", "event"]
+    schedule_id: ScheduleId | None
+    event: TaughtSkillEventTrigger | None
+
+
+class TaughtSkillTryRunResult(BaseModel):
+    """
+    FR-SKL-03: one try run, at orgs/{org}/taught_skills/{skill}/try_runs/{id}. Reads are real, writes are recorded as intents in a dry-run outbox and sent nowhere, so side_effects is 0 by construction (TS-10). match = matched / total. Each step ends matched, skipped or not reached; asked counts the steps that paused to ask.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    id: Ulid
+    skill: TaughtSkillId
+    version: Annotated[int, Field(ge=1)]
+    by: UserId
+    match: Annotated[float, Field(ge=0.0, le=1.0)]
+    total: TaughtSkillStepNumber
+    matched: TaughtSkillCount
+    asked: TaughtSkillCount
+    skipped: TaughtSkillCount
+    intents: TaughtSkillCount
+    side_effects: Literal[0]
+    """
+    Always 0: a try run sends and saves nothing outside Tilo.
+    """
+    outcome: Literal["completed", "stopped"]
+    stopped_at: TaughtSkillStop | None
+    duration_ms: Annotated[int, Field(ge=0)]
+    credits: Credits
+    finished_at: Timestamp
+
+
+class TaughtSkillRating(BaseModel):
+    """
+    FR-SKL-05: a thumbs up or down on one finished run, by the person whose run it was, at orgs/{org}/taught_skills/{skill}/ratings/{id}. A thumbs down may name the step that went wrong. The note is kept for the owner to read; it never reaches a prompt.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    id: Ulid
+    skill: TaughtSkillId
+    version: Annotated[int, Field(ge=1)]
+    run_id: RunId
+    by: UserId
+    thumb: TaughtSkillThumb
+    wrong_step: TaughtSkillStepNumber | None
+    note: Annotated[str | None, Field(max_length=280, min_length=1)]
+    at: Timestamp
+
+
+class TaughtSkillHelpersReport(BaseModel):
+    """
+    FR-SKL-07 under BQ-DSN-05 and PRD 23.5: counts only, served only while the org has opted in. Per person: question cards answered in runs of the org's taught skills, and fixes made, in the month. Mistakes (thumbs-down ratings) are counted for the whole org, never per person. helpers is ordered by user id, never by a count (TS-12), and has no field for message content, time or speed.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    org_id: OrgId
+    month: Annotated[str, Field(pattern="^[0-9]{4}-(0[1-9]|1[0-2])$")]
+    helpers: Annotated[list[TaughtSkillHelper], Field(max_length=500)]
+    mistakes: TaughtSkillMistakes
 
 
 class TeamLead(BaseModel):
@@ -3830,9 +5138,26 @@ class UiActionNavigate(BaseModel):
     target: UiActionTarget | None
 
 
+class UserSettings(BaseModel):
+    """
+    One person's saved profile and notification preferences (FR-SET-01, FR-SET-02, ADR-0039), stored and served by tilo-api for the verified principal only, keyed by org and user; no request names another person's. A document with version 0 is the server's unsaved defaults, never a stored record, and its updated_at is null. version counts saved writes: a write carries the version it read and is refused as stale when it is not the stored one (USET-02). Every object is closed, so an unknown field is refused. Profile email and the rest of the profile are display data: they change no sign-in identity, verified destination, directory record or connector grant (USET-06). Preferences authorise nothing and start no work (USET-07). Rules USET-01 to USET-08 are in user_settings.rules.md. $defs update is the request body of a write.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    owner_id: UserId
+    org_id: OrgId
+    version: Annotated[int, Field(ge=0, le=1000000)]
+    profile: UserSettingsProfile
+    notifications: UserSettingsNotifications
+    quiet_hours: UserSettingsQuietHours
+    updated_at: Timestamp | None
+
+
 class WorkItem(BaseModel):
     """
-    One thing a person has to do (FR-PA-01): from confirmed minutes, from mail the person marked, or by hand. Visible to its `owner`; the person who assigned it sees its status only, and only once it is no longer `proposed` (PE-03). An item Tilo made starts `proposed`, is readable by no one until confirmed (PE-03; the meeting Owner sees it in the minutes), carries the meeting Owner as `assigned_by` from the start, and leaves `proposed` only with `confirmed_by`, that Owner (PE-07). A model never sets `due`: code computes it from `due_text` (PE-15).
+    One thing a person has to do (FR-PA-01): from confirmed minutes, from mail the person marked, or by hand. Visible to its `owner`; the person who assigned it sees its status only, and only once it is no longer `proposed` (PE-03). An item Tilo made starts `proposed`, is readable by no one until confirmed (PE-03; the meeting Owner sees it in the minutes), carries the meeting Owner as `assigned_by` from the start, and leaves `proposed` only with `confirmed_by`, that Owner (PE-07). A model never sets `due`: code computes it from `due_text` (PE-15). An optional `world_id` (1.1.0, ADR-0040, PE-33) binds a person-made item to a world its owner may read; while a team share of that world is in force (PE-31) the members of the team read the item's team view (id, title, status, due, owner, world) when it is open or done and not flagged. Absent means personal, as every item was before 1.1.0; it is set only at creation, never changed, and a Tilo-made item never has one.
     """
 
     model_config = ConfigDict(
@@ -3856,14 +5181,43 @@ class WorkItem(BaseModel):
     """
     True when the minutes, mail or calendar text this was made from were flagged by the safety provider; never cleared by a model. Any draft, nudge, send or calendar write built from a flagged record is T3 with safety_flag (PE-21).
     """
+    world_id: WorldId | None = None
     history: Annotated[list[WorkItemHistoryEntry], Field(min_length=1)]
     created_at: Timestamp
     updated_at: Timestamp
 
 
+class WorldShare(BaseModel):
+    """
+    A world shared with one team (ADR-0040, PE-31): the members of `team` read that world's Story, Trace, runs and artifacts as Viewers of every district, and read the team view of the work items made in it (PE-33). It is not a role: it carries no scope and no right to answer, approve, start, stop or share, and adds no Approver or Team Lead (ADR-0006). `granted_by` is the world's owner, stamped by tilo-api from the signed-in session and the server clock (PE-19). `revoked` is null while the share stands and the owner's stamp once withdrawn, effective on the next request. One record per world and team (`id` is ws_ and the first 32 hex characters of SHA-256 of `<world_id>/<team>`, checked by the validator); sharing again after a revoke replaces the record and the world's `world.share_changed` events keep the history. Whether the share is in force also depends on the directory (PE-31), which this schema cannot see.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    id: WorldShareId
+    org_id: OrgId
+    world_id: WorldId
+    team: TeamId
+    granted_by: TeamLeadAssignment
+    revoked: TeamLeadAssignment | None
+
+
+class AppSpecSource(BaseModel):
+    """
+    Where the question came from: a stored version in the spec's own world, made by a fetch or an upload (AS-02), and for a PDF the page. The web shows the publisher from that version's manifest, never from the spec (AS-03).
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    artifact: ArtifactRef
+    page: AppSpecPage | None = None
+
+
 class ArtifactVersion(BaseModel):
     """
-    One immutable, hash-checked, owner-scoped version in the artifact store (ADR-0018, FR-MEM-12; PRD 13.2, 15.1): the metadata record at orgs/{org}/worlds/{world}/artifacts/{artifact_id}/versions/{version:06d}. The bytes live under a key derived from the ids, so the record holds no blob path. Read by the harness, tilo-api, tilo-render and erasure; only the store writes it. Rules the schema cannot express are AR-01 to AR-08 in artifact.rules.md.
+    One immutable, hash-checked, owner-scoped version in the artifact store (ADR-0018, FR-MEM-12; PRD 13.2, 15.1): the metadata record at orgs/{org}/worlds/{world}/artifacts/{artifact_id}/versions/{version:06d}. The bytes live under a key derived from the ids, so the record holds no blob path. Read by the harness, tilo-api, tilo-render and erasure; only the store writes it. Rules the schema cannot express are AR-01 to AR-09 in artifact.rules.md. 1.1.0 (ADR-0029) adds the fetch origin: a file a unit downloaded through tilo-browser.
     """
 
     model_config = ConfigDict(
@@ -3893,7 +5247,7 @@ class ArtifactVersion(BaseModel):
     origin: ArtifactVersionOrigin
     sources: list[ArtifactVersionSource]
     """
-    Raw-archive pointers of the version's sources, for the Verifier (FR-CON-10, FR-AGT-12): records of the record's own run for a unit or render output, the copied version's for a restore, none for an upload (AR-03). They never leave Tilo (AR-06).
+    Raw-archive pointers of the version's sources, for the Verifier (FR-CON-10, FR-AGT-12): records of the record's own run for a unit, render or fetch output (a fetch has exactly one, the fetch's own record, which holds the cleaned URL, BQ-104), the copied version's for a restore, none for an upload (AR-03, AR-09). They never leave Tilo (AR-06).
     """
     screening: Literal["clean", "flagged", "unscreened"]
     """
@@ -3909,7 +5263,7 @@ class ArtifactVersion(BaseModel):
     """
     idempotency_key: ArtifactVersionIdempotencyKey | None
     """
-    Set for unit and render outputs (AR-05); null for uploads and restores.
+    Set for unit, render and fetch outputs (AR-05); null for uploads and restores.
     """
     created_at: Timestamp
 
@@ -4131,6 +5485,41 @@ class ApprovalRequestedData(BaseModel):
     team_lead: ApprovalRequestedDataTeamLeadAllowance | None
 
 
+class MeetingChangeRequestedData(BaseModel):
+    """
+    data of meeting.change_requested (ADR-0028). The convener confirmed a change an agent proposed in this room. actor is the convener, target the proposing agent (to). units and artifacts equal the proposal's, so the person confirms exactly what was shown (MR-07); message_ref is the confirmed wording in the redacted raw archive (the proposal's words or the person's own). It is not a side effect and authorises nothing: nothing leaves Tilo and nothing is spent until plan.revised and the budget events (MR-09, MR-10); it is never an L2 instruction (OB-01 counts only world.requested) and sets no gate, tier or policy (MR-11).
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    room_id: Ulid
+    proposal_id: Ulid
+    to: AgentId
+    units: Annotated[list[UnitId], Field(max_length=10, min_length=1)]
+    artifacts: MeetingRoomCitedArtifacts
+    as_role: MeetingRoomAsRole
+    message_ref: EventArchiveRef
+
+
+class MeetingRepliedData(BaseModel):
+    """
+    data of meeting.replied (ADR-0028). The addressed agent answered one turn. actor is that agent (the turn's to), target the convener. The reply is one model call over that agent's own records only (MR-06): the event's trace names the meeting or meeting_thinking role and profile, and credits what the call cost. The text is in the redacted raw archive (message_ref); a failed reply has none. units and artifacts are what the reply rests on, checked by code against the agent's own grounding set before the event is written; a proposal names what would change and nothing about how (MR-11). The web shows the speaker's cue only while this event's reply is on screen.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    room_id: Ulid
+    turn: MeetingRoomTurnNumber
+    mode: MeetingRoomMode
+    outcome: MeetingRoomOutcome
+    message_ref: EventArchiveRef | None
+    units: MeetingRoomCitedUnits
+    artifacts: MeetingRoomCitedArtifacts
+    proposal: MeetingRoomProposal | None
+
+
 class EventRegistry(BaseModel):
     """
     Shape of contracts/events/registry.yaml (PRD 9.5): every registered event type with exactly one world effect, one HUD effect, one Story line template and one Trace row, its data schema, its fixture and the pillar that emits it. unknown_types is fixed to trace_only (HR-5). contracts-check also checks the paths, the placeholders and the side-effect list (contracts/event.rules.md).
@@ -4257,6 +5646,132 @@ class Meeting(BaseModel):
     created_at: Timestamp
 
 
+class MeetingHostRpcEvidence(BaseModel):
+    """
+    The OB-01/OB-05 case tilo-api's own enqueue checked (outbox.rules.md), without the entry: reserved_by is the gate's approval.requested event and authorised_by the approval.resolved event that answered it (event.schema.json, each with its data schema applied in the then branch, so the generated type stays Event), world_owner is the world's owner. A meeting invitation is T3, so no policy, Team Lead, instruction or earlier policy.applied takes part: those are null or empty. tilo-connectors runs the same check on its own outbox (HB-04) and trusts these copies (ADR-0032, residual trust).
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    reserved_by: Event
+    authorised_by: Event
+    world_owner: UserId
+    policy: None
+    team_lead: None
+    instruction: None
+    earlier_applied: Annotated[list[Any], Field(max_length=0)]
+
+
+class MeetingHostRpcSendAnswer(BaseModel):
+    """
+    The 200 answer to send. sent: the invitation exists at Google and receipt says what was made; tilo-api checks it (HB-07) before storing it. refused: nothing was sent and nothing will be (SideEffectRefused, HB-03 to HB-06). possibly_sent: Google may hold the invitation and a retry would not help (PossiblySent). retry: try again later; may_have_sent is false when nothing reached Google (not connected, expired, a missing scope, a KMS outage) and true after a Google 5xx or a lost answer. receipt is set only with sent and may_have_sent only with retry; otherwise each is null. parts lists what the broker emitted during the call; tilo-connectors writes no data.transfer and raises no alert of its own outbox here, because tilo-api's outbox does (one writer per world).
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    outcome: Literal["sent", "refused", "possibly_sent", "retry"]
+    receipt: MeetingHostRpcReceipt | None
+    may_have_sent: bool | None
+    parts: MeetingHostRpcParts
+
+
+class MeetingHostRpcDisconnectAnswer(BaseModel):
+    """
+    The 200 answer to disconnect. revoked_at_provider is true only when Google confirmed the revoke. The call is idempotent: with nothing stored it answers false with no parts. parts carries connection.revoked, and an alert.raised for each revoke kept for a retry.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    revoked_at_provider: bool
+    parts: MeetingHostRpcParts
+
+
+class MeetingHostRpcViewsAnswer(BaseModel):
+    """
+    The 200 answer to POST /internal/connections/views (ADR-0032 addendum 1, HB-08, HB-09): the connection views of the request's user_id, one per stored grant of a connector that config/connectors.yaml declares with auth oauth2, in registry order, each connector at most once. A connector with no stored grant is absent (tilo-api shows it available); a disconnect deletes the grant, so it is absent too. A store read only, with no token use, no KMS call, no provider call and no event, so it has no parts. At most 32 views. tilo-api treats an answer that breaks this contract or HB-09 as unknown as a whole, never as partly read.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    views: Annotated[list[MeetingHostRpcConnectionView], Field(max_length=32)]
+
+
+class MeetingHostRpcCallbackAnswer(BaseModel):
+    """
+    The 200 answer to callback: the connection was stored. connector is the one the flow was for. scope_lines are the plain-language lines of what Google granted, one per text, in the order asked (a partial grant lists only what was granted; none granted is the not_granted error, so there is at least one). parts lists what the broker emitted during the call (connection.established); it carries no token and never a connection.consented, which is the person's Connect on a consent card and tilo-api writes it (CR-13).
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    connector: ConnectorId
+    scope_lines: Annotated[list[ScopeLine], Field(max_length=16, min_length=1)]
+    parts: MeetingHostRpcConnectorParts
+
+
+class MeetingHostRpcConnectionDisconnectAnswer(BaseModel):
+    """
+    The 200 answer to /internal/connections/disconnect: disconnect_answer with the parts of any connector. revoked_at_provider is true only when Google confirmed the revoke; the call is idempotent (with nothing stored it answers false with no parts). parts carries a connection.revoked for each connector that ended, and an alert.raised for each revoke kept for a retry.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    revoked_at_provider: bool
+    parts: MeetingHostRpcConnectorParts
+
+
+class MeetingHostRpcExecuteEvidence(BaseModel):
+    """
+    The OB-01/OB-05 case tilo-api's own enqueue checked (outbox.rules.md), without the entry, for a live Google connector's side effect (evidence is the meeting host's, narrowed to its always-T3 case). reserved_by is the gate's approval.requested event, null when a policy opened the entry. authorised_by is the approval.resolved that answered approve or the policy.applied that opened it, never null (an entry exists only once authorised). world_owner is the world's owner. policy is the record policy.applied names, or the one a Team Lead answered under; team_lead that Team Lead's record; instruction the whole event policy.applied.instruction_id names (L2); each null when it does not apply. earlier_applied is the owner's earlier policy.applied events (the day's count and an instruction's single use), at most 50, [] on a gate path. Each event has its data schema applied in the then branch, so the generated type stays Event. tilo-connectors runs the same check on its own outbox (HB-04) and trusts these copies (ADR-0032, residual trust).
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    reserved_by: Event | None
+    authorised_by: Event
+    world_owner: UserId
+    policy: Policy | None
+    team_lead: TeamLead | None
+    instruction: Event | None
+    earlier_applied: Annotated[list[Event], Field(max_length=50)]
+
+
+class MeetingHostRpcExecuteAnswer(BaseModel):
+    """
+    The 200 answer to execute, as send_answer with result for receipt. sent: the effect exists at Google and result says which; tilo-api stores it only when result.marker equals side_effect_marker(entry) (LC-08). refused: nothing was done and nothing will be (SideEffectRefused: an item hash, the entry check, a grant missing or newer than the approval, an action the connector does not declare, an event with guests under create_event, LC-09). possibly_sent: Google may hold the effect and a retry would not help. retry: try again later; may_have_sent is false when nothing reached Google (not connected, expired, a missing scope, a KMS outage) and true after a Google 5xx or a lost answer. result is set only with sent and may_have_sent only with retry; otherwise each is null. parts lists what the broker emitted during the call; tilo-connectors writes no data.transfer and raises no alert of its own outbox here, because tilo-api's outbox does (one writer per world).
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    outcome: Literal["sent", "refused", "possibly_sent", "retry"]
+    result: MeetingHostRpcExecuteResult | None
+    may_have_sent: bool | None
+    parts: MeetingHostRpcConnectorParts
+
+
+class MeetingRoomTurn(BaseModel):
+    """
+    One turn: what the person asked, the reply (null while it is pending) and the change the person confirmed from it (null if none).
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    turn: MeetingRoomTurnNumber
+    to: AgentId
+    mode: MeetingRoomMode
+    text: MeetingRoomPersonText
+    reply: MeetingRoomReply | None
+    change: MeetingRoomConfirmedChange | None
+
+
 class Meter(BaseModel):
     """
     The HUD meter's state for one run (PRD 14.4, FR-MTR-07): credits used (the sum of the run's event credits), credits saved (origin cost minus lookup cost over accepted reuses, PRD 14.3), time saved (estimate) and the run's budget. packages/metering computes it from the run's events up to last_seq, and apps/web renders it. Rules MT-05 and MT-06 in contracts/metering.rules.md.
@@ -4323,6 +5838,40 @@ class Person(BaseModel):
     created_by: TeamLeadAssignment
 
 
+class PinboardItem(BaseModel):
+    """
+    One entry on a pinboard (FR-PB-01 to -07). A personal entry is private to `scope.user`: no owner, no mention, never proposed (PE-01). A team entry is read by the members of `scope.team` once `active`; until then only `set_up_by` sees it (PE-02). `set_up_by` is the accountable person shown in the table and the target of "get in touch" (PE-09); for an entry Tilo made it is the person who confirmed or owns the meeting. Tilo's entries carry a `source` ("added by Tilo from ..."); a Tilo-made team entry is `active` only with `confirmed_by` (PE-07, PE-08). `url` is https with no user info, query or fragment, and passes the secret redactor before it is stored. `placement` (1.1.0, ADR-0038) is optional presentation only: where the entry sits on the board of its own scope. It is no access grant and it never changes the scope or the title (PE-36).
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    id: PinId
+    org_id: OrgId
+    scope: PinboardItemScopePersonal | PinboardItemScopeTeam
+    title: Annotated[
+        str, Field(max_length=140, min_length=1, pattern="^[^\\u0000-\\u001F\\u007F]+$")
+    ]
+    body: Body | None
+    kind: Literal["note", "decision", "deadline", "link"]
+    url: Url | None
+    owner: UserId | None
+    due: CalendarDate | None
+    status: Literal["proposed", "active", "removed"]
+    created_by: Maker
+    set_up_by: UserId
+    source: PinboardItemSource | None
+    confirmed_by: TeamLeadAssignment | None
+    flagged: bool
+    """
+    True when the minutes, mail or calendar text this was made from were flagged by the safety provider; never cleared by a model. Any draft, nudge, send or calendar write built from a flagged record is T3 with safety_flag (PE-21).
+    """
+    history: Annotated[list[PinboardItemHistoryEntry], Field(min_length=1)]
+    created_at: Timestamp
+    updated_at: Timestamp
+    placement: PinboardItemPlacement | None = None
+
+
 class Plan(BaseModel):
     """
     PlanGraph (PRD 7.1 FR-INT-06, FR-INT-09): the approaches offered, the chosen one compiled to units, dependencies, roles, skills, connectors and gates, and the confirmed budget cap. Cross-reference rules PG-01.. are in contracts/plan.rules.md.
@@ -4378,16 +5927,85 @@ class PolicyRiskTierTable(BaseModel):
     max_level: PolicyMaxLevel
 
 
-class Providers(BaseModel):
+class ProvidersModels(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    example: bool
     """
-    Provider-layer configuration as the provider layer loads it (PRD 6.4, 6.6, 14.1): models is config/models.yaml ($defs.models) and prices is config/prices.yaml ($defs.prices). The loader also checks that every role names existing profiles and every profile has a price entry, and the speech role's rules below (1.2.0, ADR-0027). Model ids appear only in config/ and packages/providers.
+    true while the profiles are the PRD's examples; the user chooses final models.
+    """
+    profiles: Annotated[dict[ProvidersProfileId, ProvidersProfile], Field(min_length=1)]
+    roles: Annotated[dict[Slug, ProvidersRole], Field(min_length=1)]
+    """
+    Business code asks for a role, never a model (PL-01). speech (1.2.0, ADR-0027) is the role every SpeechProvider call asks for (FR-MTG-17, FR-MTG-11, FR-INT-14, FR-CHN-16): the loader refuses it unless it states max_output_tokens and its primary, fallback and cascade profiles declare the audio capability and, while prices are set, carry an audio_input price. search (1.3.0, ADR-0029) is the role every SearchProvider call asks for (PRD 12.2): the loader refuses it unless it states reserve_units and its primary, fallback and cascade profiles declare the grounding capability and, while prices are set, carry a unit_price with unit query. Any role whose profiles carry a unit_price must state reserve_units.
+    """
+    rules: ProvidersRules
+
+
+class ProvidersPrices(BaseModel):
+    """
+    Prices per profile (PL-06, FR-MTR-01). Prices, the date and the source may be null only while status is unset, and the loader refuses live metering until status is set. region (1.3.0, ADR-0029), optional, is the provider location the rates were quoted for (for example a regional endpoint's rates): the loader refuses live metering of a profile whose adapter sends to another location; an adapter with no location setting (fake, openai_compat) is not checked.
     """
 
     model_config = ConfigDict(
         extra="forbid",
     )
-    models: ProvidersModels
-    prices: ProvidersPrices
+    status: Literal["unset", "set"]
+    effective_date: CalendarDate | None
+    source: Annotated[str | None, Field(max_length=500, min_length=1)]
+    region: Annotated[
+        str | None, Field(max_length=32, pattern="^(global|us|eu|[a-z]+-[a-z]+[0-9]+)$")
+    ] = None
+    currency: Literal["USD"]
+    credit_usd: float
+    """
+    PRD 14.1: 1 credit = US$0.005.
+    """
+    profiles: Annotated[dict[ProvidersProfileId, ProvidersPrice], Field(min_length=1)]
+
+
+class TaughtSkill(BaseModel):
+    """
+    A skill a person taught Tilo on the Skills page (FR-SKL-01 to FR-SKL-07, ADR-0034), stored at orgs/{org}/taught_skills/{id} and read only through tilo-api. A sibling of the expert-signed, version-pinned skill.yaml (skill.schema.json), never a change to it. One person owns it. Each fix makes a new integer version, and a run pins the version it started with. It acts only through its own tool_access, the team's levels and the policy engine. $defs try_run_result, rating, fix, real_run, run_answer and helpers_report are the records and the report around it (real_run and run_answer are 1.1.0, ADR-0037). Rules TS-01 to TS-17 are in taught_skill.rules.md.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    id: TaughtSkillId
+    org_id: OrgId
+    owner: UserId
+    name: TaughtSkillName
+    scope: TaughtSkillScope
+    status: TaughtSkillStatus
+    paused: bool
+    """
+    FR-SKL-06: a paused skill never starts (no trigger, no run on request, no try run). Kept apart from status, so Resume returns to learning or trusted as it was. A draft is never paused.
+    """
+    method: TaughtSkillMethod
+    captured: Annotated[list[TaughtSkillCapturedStep], Field(max_length=20)]
+    """
+    FR-SKL-01: the steps captured so far, in order. Text only, plus the pinned capture artifact a step came from; media bytes are never inline.
+    """
+    plan: Annotated[list[TaughtSkillPlanStep], Field(max_length=20)]
+    """
+    FR-SKL-02: Tilo's version, in order. Empty until Tilo has proposed one.
+    """
+    question: TaughtSkillQuestion | None
+    trigger: TaughtSkillTrigger
+    estimates: TaughtSkillEstimates | None
+    tool_access: TaughtSkillToolAccess
+    good_runs: Annotated[int, Field(ge=0)]
+    """
+    FR-SKL-06: runs of this skill rated up by the person whose run it was (TS-08); try runs never count.
+    """
+    version: Annotated[int, Field(ge=1)]
+    """
+    1 for a draft and a new skill; each fix adds 1 (TS-09). Name, scope, trigger, status and pause changes keep it.
+    """
+    created_at: Timestamp
+    updated_at: Timestamp
 
 
 type UiAction = Annotated[
@@ -4397,6 +6015,22 @@ type UiAction = Annotated[
 """
 The allow-list of what the assistant panel may do on the page (FR-PA-14, PE-10): a closed union on `kind`. The web app has one executor that maps each kind to a handler; a document that does not validate is dropped, so a model can never click, type, read the page or go anywhere outside these routes and targets. State-changing kinds act on the signed-in person's own records through the same API routes as the buttons; `draft_reply` makes a draft (T1) and sends nothing; no kind sends to another person.
 """
+
+
+class AppSpecQuestion(BaseModel):
+    """
+    One question. answer is the id of the one correct option and always names an option the question has. topic is an optional tag the person can filter by.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    id: AppSpecQuestionId
+    stem: AppSpecStem
+    options: AppSpecOptions
+    answer: AppSpecOptionId
+    topic: Slug | None = None
+    source: AppSpecSource
 
 
 class ArtifactVersionManifestRevision(BaseModel):
@@ -4489,6 +6123,85 @@ class LayoutLevel(BaseModel):
     districts: Annotated[list[LayoutDistrict], Field(max_length=6, min_length=1)]
 
 
+class MeetingHostRpcSendRequest(BaseModel):
+    """
+    POST /internal/meeting-host/send, called only by the host run's outbox stub in tilo-api (HB-02). entry is the outbox entry (outbox.schema.json) tilo-api's outbox enqueued, evidence the case its enqueue checked, and draft the pinned item the owner approved. It names no user: the grant used is (entry.authz.ref, meeting_host). The then branch narrows entry to the one action this surface runs (MH-10), a meeting invitation the owner approved: state queued, create_meeting_event on meeting_host, T3 with the new_recipients modifier, 1 to 50 recipients (MAX_RECIPIENTS), no attachments, the draft pinned as item, the host account's primary calendar as destination, no undo window, authorised by a person. (The narrowing sits in if/then so the generated type stays Outbox.)
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    entry: Outbox
+    evidence: MeetingHostRpcEvidence
+    draft: MeetingHostRpcDraft
+
+
+class MeetingHostRpcExecuteRequest(BaseModel):
+    """
+    POST /internal/side-effects/execute (ADR-0035 decision 5, LC-07), called only by a live connector's outbox stub in tilo-api (HB-02). entry is the outbox entry tilo-api's outbox enqueued, evidence the case its enqueue checked and items the pinned content, hash-checked in tilo-api (AR-01) because tilo-connectors cannot read that store: the entry's item first, then each attachment in the entry's order (HB-03: the hashes, ids and versions equal the entry's). The grant used is the world owner's (evidence.world_owner). The route re-runs the same check on its own outbox (HB-04) and refuses an action its connector does not declare with a gate. The then branch narrows entry to the live Google connectors (gmail, google_drive or google_calendar; meeting_host has its own route, lovable no call at all): state queued, or scheduled with its undo window spent (OB-02), a pinned item, at most 10 attachments. The caps do not add up to 64 KiB: the body cap bounds the sum, and a request over it is invalid_request before anything acts. (The narrowing sits in if/then so the generated type stays Outbox.)
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    entry: Outbox
+    evidence: MeetingHostRpcExecuteEvidence
+    items: Annotated[list[MeetingHostRpcDraft], Field(max_length=11, min_length=1)]
+
+
+class MeetingRoom(BaseModel):
+    """
+    A meeting room (ADR-0028, user-requested 2026-10-08, Proposed): a person calls a lead agent and the agents it supervises into the Meeting Hall of a live or finished world, asks them what they did and why, and confirms changes they proposed. The root is the room as tilo-api serves it (GET /v1/worlds/{world_id}/rooms/{room_id}); it is rebuilt from the room's meeting.* events plus the redacted archive records they point at, and holds nothing the events do not. $defs hold the three request bodies and the shapes the meeting.* event data share. Text is plain text: the web shows it as text, never as markup or links. Rules MR-01 to MR-12 are in meeting_room.rules.md.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    room_id: Ulid
+    world_id: WorldId
+    run_id: RunId
+    state: Literal["open", "adjourned"]
+    reason: MeetingRoomAdjournReason | None
+    """
+    Why the room closed; null exactly while it is open.
+    """
+    lead: AgentId
+    agents: MeetingRoomAttendees
+    as_role: MeetingRoomAsRole
+    credit_cap: Credits
+    credits_spent: Credits
+    max_turns: MeetingRoomTurnNumber
+    turns: Annotated[list[MeetingRoomTurn], Field(max_length=50)]
+
+
+class Providers(BaseModel):
+    """
+    Provider-layer configuration as the provider layer loads it (PRD 6.4, 6.6, 14.1): models is config/models.yaml ($defs.models) and prices is config/prices.yaml ($defs.prices). The loader also checks that every role names existing profiles and every profile has a price entry, the speech role's rules below (1.2.0, ADR-0027), and the search role, unit price, region and valid_until rules below (1.3.0, ADR-0029). Model ids appear only in config/ and packages/providers.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    models: ProvidersModels
+    prices: ProvidersPrices
+
+
+class AppSpec(BaseModel):
+    """
+    A declarative app (FR-AGT-16, ADR-0029 decision 9): JSON that a unit writes and the artifact store keeps as an application/json version with origin unit, and that fixed web code renders at an owner-only route. Nothing in it is ever run as code or markup, and no link or URL comes from it. 1.0.0 has one kind, quiz: single-answer multiple-choice questions under one countdown timer, each citing the stored file it came from. Rules the schema cannot express are AS-01 to AS-04 in appspec.rules.md.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    v: Literal["1.0"]
+    kind: Literal["quiz"]
+    title: AppSpecTitle
+    theme: Slug
+    timer: AppSpecTimer
+    questions: Annotated[list[AppSpecQuestion], Field(max_length=200, min_length=1)]
+
+
 class Card(BaseModel):
     """
     One card, every channel (PRD 10.2, 10.3): needs-you, gate, consent and meeting cards. Channel rules are data: answer_channels is limited per kind (email answers questions only; gates need sign-in on the web or a verified WhatsApp number; consent needs the web). safe_default is the option id applied at timeout; it names one of the options and that option is reversible (contracts/card.rules.md CR-01 to CR-03). A gate's or consent card's is always hold, so a gate never times out to go and a consent card never times out to a grant; every hold option is reversible, only a gate may offer an irreversible option, and neither a gate nor a consent card is delegated to the Director. A gate's option ids are the closed set approve, edit, hold, each with a fixed label (Approve, Edit first, Hold); only approve opens the gate, and its irreversible flag equals the gate's (CR-07, CR-08). A consent card's option ids are the closed set connect, hold with fixed labels Connect, Hold; only connect grants (CR-13). The deterministic card builder writes a gate card's gate details and options, never a model, and the card validator checks them against the plan gate, the connector action and the outbox entry the gate releases (CR-09 to CR-12).
@@ -4541,6 +6254,15 @@ class LayoutSemantic(BaseModel):
     agents: Annotated[list[LayoutAgent], Field(min_length=1)]
 
 
+type MeetingHostRpc = Annotated[
+    MeetingHostRpcSendRequest | MeetingHostRpcSendAnswer | MeetingHostRpcUserRequest | MeetingHostRpcStatusAnswer | MeetingHostRpcDisconnectAnswer | MeetingHostRpcViewsAnswer | MeetingHostRpcStartRequest | MeetingHostRpcStartAnswer | MeetingHostRpcCallbackRequest | MeetingHostRpcCallbackAnswer | MeetingHostRpcConnectionDisconnectRequest | MeetingHostRpcConnectionDisconnectAnswer | MeetingHostRpcExecuteRequest | MeetingHostRpcExecuteAnswer | MeetingHostRpcError,
+    Field(title="MeetingHostRpc"),
+]
+"""
+The internal surface of tilo-connectors that tilo-api calls (FR-MTG-09, ADR-0032 decision 2 and addendum 1; FR-CON-02, ADR-0035 decision 2): what tilo-api posts to /internal/meeting-host/send, /internal/meeting-host/status, /internal/meeting-host/disconnect, /internal/connections/views, /internal/connections/start, /internal/connections/callback, /internal/connections/disconnect and /internal/side-effects/execute, and what each answers. Each route validates its own request and answer ($defs send_request and send_answer; user_request and status_answer; user_request and disconnect_answer; user_request and views_answer; start_request and start_answer; callback_request and callback_answer; connection_disconnect_request and connection_disconnect_answer; execute_request and execute_answer; error for any refusal) in both services; this root is any one of them. Every object is closed, and no field holds an access or refresh token, the client secret, a PKCE verifier, key material or a Meet link (ADR-0024 decision 4, ADR-0032 decision 3). Two fields carry a credential on purpose and nothing else does: callback_request.state and .code, the one-time values Google handed the browser (ADR-0035 LC-03; useless without the verifier and the client secret, which stay in tilo-connectors), and start_answer.authorize_url, the public part of the sign-in link. Ids travel in the body, never in a path or query. A route refuses a body over 65536 bytes (64 KiB) before it parses it. Rules that compare values (HB-03 the draft against its hash and the entry, HB-05 the owner, HB-07 the receipt against the entry, HB-09 the views against config/connectors.yaml, LC-05 the flow's person against the caller, LC-07 the items against the entry) are checked by the routes and by tilo-api's client, not by this schema. 1.1.0 adds views_answer, connection_view and scope; 1.2.0 adds the four live-connector routes' defs and the error codes start_again, not_granted and wrong_account (additive).
+"""
+
+
 class Layout(BaseModel):
     """
     WorldLayout v1 (PRD 9.2). A model writes semantic; only the deterministic solver writes geometry (null until solved). Rules WE-01.. that a schema cannot express are in contracts/layout.rules.md.
@@ -4573,6 +6295,7 @@ type RegisteredEventType = Literal[
     "world.failed",
     "plan.questions_asked",
     "plan.approaches_proposed",
+    "plan.revised",
     "budget.requested",
     "budget.granted",
     "level.created",
@@ -4600,12 +6323,23 @@ type RegisteredEventType = Literal[
     "agent.context_handoff_started",
     "agent.context_handoff_completed",
     "skill.loaded",
+    "skill.captured",
+    "skill.version_proposed",
+    "skill.try_run",
+    "skill.state_changed",
+    "skill.rated",
+    "skill.fixed",
     "question.routed",
     "question.answered",
     "meeting.called",
     "meeting.started",
     "meeting.decision",
     "meeting.ended",
+    "meeting.convened",
+    "meeting.asked",
+    "meeting.replied",
+    "meeting.change_requested",
+    "meeting.adjourned",
     "connection.requested",
     "connection.consented",
     "connection.established",
@@ -4647,6 +6381,7 @@ type RegisteredEventType = Literal[
     "assistant.asked",
     "assistant.replied",
     "team_rule.changed",
+    "world.share_changed",
 ]
 
 EVENT_TYPES: Final[tuple[RegisteredEventType, ...]] = (
@@ -4659,6 +6394,7 @@ EVENT_TYPES: Final[tuple[RegisteredEventType, ...]] = (
     "world.failed",
     "plan.questions_asked",
     "plan.approaches_proposed",
+    "plan.revised",
     "budget.requested",
     "budget.granted",
     "level.created",
@@ -4686,12 +6422,23 @@ EVENT_TYPES: Final[tuple[RegisteredEventType, ...]] = (
     "agent.context_handoff_started",
     "agent.context_handoff_completed",
     "skill.loaded",
+    "skill.captured",
+    "skill.version_proposed",
+    "skill.try_run",
+    "skill.state_changed",
+    "skill.rated",
+    "skill.fixed",
     "question.routed",
     "question.answered",
     "meeting.called",
     "meeting.started",
     "meeting.decision",
     "meeting.ended",
+    "meeting.convened",
+    "meeting.asked",
+    "meeting.replied",
+    "meeting.change_requested",
+    "meeting.adjourned",
     "connection.requested",
     "connection.consented",
     "connection.established",
@@ -4733,6 +6480,7 @@ EVENT_TYPES: Final[tuple[RegisteredEventType, ...]] = (
     "assistant.asked",
     "assistant.replied",
     "team_rule.changed",
+    "world.share_changed",
 )
 
 SIDE_EFFECT_EVENT_TYPES: Final[frozenset[RegisteredEventType]] = frozenset(
@@ -4756,6 +6504,7 @@ EVENT_DATA_MODELS: Final[dict[RegisteredEventType, type[BaseModel]]] = {
     "world.failed": WorldFailedData,
     "plan.questions_asked": PlanQuestionsAskedData,
     "plan.approaches_proposed": PlanApproachesProposedData,
+    "plan.revised": PlanRevisedData,
     "budget.requested": BudgetRequestedData,
     "budget.granted": BudgetGrantedData,
     "level.created": LevelCreatedData,
@@ -4783,12 +6532,23 @@ EVENT_DATA_MODELS: Final[dict[RegisteredEventType, type[BaseModel]]] = {
     "agent.context_handoff_started": AgentContextHandoffStartedData,
     "agent.context_handoff_completed": AgentContextHandoffCompletedData,
     "skill.loaded": SkillLoadedData,
+    "skill.captured": SkillCapturedData,
+    "skill.version_proposed": SkillVersionProposedData,
+    "skill.try_run": SkillTryRunData,
+    "skill.state_changed": SkillStateChangedData,
+    "skill.rated": SkillRatedData,
+    "skill.fixed": SkillFixedData,
     "question.routed": QuestionRoutedData,
     "question.answered": QuestionAnsweredData,
     "meeting.called": MeetingCalledData,
     "meeting.started": MeetingStartedData,
     "meeting.decision": MeetingDecisionData,
     "meeting.ended": MeetingEndedData,
+    "meeting.convened": MeetingConvenedData,
+    "meeting.asked": MeetingAskedData,
+    "meeting.replied": MeetingRepliedData,
+    "meeting.change_requested": MeetingChangeRequestedData,
+    "meeting.adjourned": MeetingAdjournedData,
     "connection.requested": ConnectionRequestedData,
     "connection.consented": ConnectionConsentedData,
     "connection.established": ConnectionEstablishedData,
@@ -4830,10 +6590,11 @@ EVENT_DATA_MODELS: Final[dict[RegisteredEventType, type[BaseModel]]] = {
     "assistant.asked": AssistantAskedData,
     "assistant.replied": AssistantRepliedData,
     "team_rule.changed": TeamRuleChangedData,
+    "world.share_changed": WorldShareChangedData,
 }
 
 EVENT_REGISTRY: Final[EventRegistry] = EventRegistry.model_validate(
-    {'version': '1.2.0',
+    {'version': '1.5.0',
      'unknown_types': 'trace_only',
      'types': {'world.requested': {'family': 'world',
                                    'verb': 'requested',
@@ -4955,6 +6716,21 @@ EVENT_REGISTRY: Final[EventRegistry] = EventRegistry.model_validate(
                                             'trace_row': 'approaches={data.approach_count}',
                                             'data_schema': 'events/data/plan.approaches_proposed.schema.json',
                                             'fixture': 'fixtures/events/valid/plan.approaches_proposed.json'},
+               'plan.revised': {'family': 'plan',
+                                'verb': 'revised',
+                                'priority': 'should',
+                                'pillar': 'P1',
+                                'default_severity': 'info',
+                                'side_effect': False,
+                                'world_effect': 'Revision blueprints appear on the buildings whose '
+                                                'work changes.',
+                                'hud_effect': 'The plan gains the revision units and the credit '
+                                              'estimate updates.',
+                                'story_template': '{actor} planned revision work for a change asked '
+                                                  'for in the Meeting Hall ({data.run}).',
+                                'trace_row': 'proposal={data.proposal_id} run={data.run}',
+                                'data_schema': 'events/data/plan.revised.schema.json',
+                                'fixture': 'fixtures/events/valid/plan.revised.json'},
                'budget.requested': {'family': 'budget',
                                     'verb': 'requested',
                                     'priority': 'must',
@@ -5296,6 +7072,100 @@ EVENT_REGISTRY: Final[EventRegistry] = EventRegistry.model_validate(
                                 'trace_row': 'skill={data.skill} version={data.version}',
                                 'data_schema': 'events/data/skill.loaded.schema.json',
                                 'fixture': 'fixtures/events/valid/skill.loaded.json'},
+               'skill.captured': {'family': 'skill',
+                                  'verb': 'captured',
+                                  'priority': 'should',
+                                  'pillar': 'P7',
+                                  'default_severity': 'info',
+                                  'side_effect': False,
+                                  'world_effect': 'A new card joins the skill being taught on Your '
+                                                  'Desk.',
+                                  'hud_effect': 'The Skills page lists the captured step.',
+                                  'story_template': '{actor} showed Tilo step {data.step} of a new '
+                                                    'skill ({data.method}).',
+                                  'trace_row': 'skill={data.skill} method={data.method} '
+                                               'step={data.step}',
+                                  'data_schema': 'events/data/skill.captured.schema.json',
+                                  'fixture': 'fixtures/events/valid/skill.captured.json'},
+               'skill.version_proposed': {'family': 'skill',
+                                          'verb': 'version_proposed',
+                                          'priority': 'should',
+                                          'pillar': 'P7',
+                                          'default_severity': 'info',
+                                          'side_effect': False,
+                                          'world_effect': 'Tilo lays its own version of the skill '
+                                                          'beside the captured cards.',
+                                          'hud_effect': "The Skills page shows Tilo's version with its "
+                                                        'estimates.',
+                                          'story_template': 'Tilo proposed a version with {data.steps} '
+                                                            'steps that stops to ask {data.asks} '
+                                                            'times.',
+                                          'trace_row': 'skill={data.skill} version={data.version} '
+                                                       'steps={data.steps} asks={data.asks} '
+                                                       'credits_per_run={data.credits_per_run} '
+                                                       'source={data.source}',
+                                          'data_schema': 'events/data/skill.version_proposed.schema.json',
+                                          'fixture': 'fixtures/events/valid/skill.version_proposed.json'},
+               'skill.try_run': {'family': 'skill',
+                                 'verb': 'try_run',
+                                 'priority': 'should',
+                                 'pillar': 'P2',
+                                 'default_severity': 'info',
+                                 'side_effect': False,
+                                 'world_effect': "The practice desk shows the try run's steps; no "
+                                                 'parcel leaves.',
+                                 'hud_effect': 'The Skills page shows how closely the try run matched.',
+                                 'story_template': 'A try run matched {data.matched} of {data.total} '
+                                                   'steps and sent nothing ({data.outcome}).',
+                                 'trace_row': 'skill={data.skill} version={data.version} '
+                                              'match={data.match} asked={data.asked} '
+                                              'skipped={data.skipped} side_effects={data.side_effects}',
+                                 'data_schema': 'events/data/skill.try_run.schema.json',
+                                 'fixture': 'fixtures/events/valid/skill.try_run.json'},
+               'skill.state_changed': {'family': 'skill',
+                                       'verb': 'state_changed',
+                                       'priority': 'should',
+                                       'pillar': 'P7',
+                                       'default_severity': 'info',
+                                       'side_effect': False,
+                                       'world_effect': "The skill's card on Your Desk changes its "
+                                                       'badge.',
+                                       'hud_effect': 'The Skills library shows the skill as learning, '
+                                                     'trusted or paused.',
+                                       'story_template': '{actor} marked a skill {data.change}.',
+                                       'trace_row': 'skill={data.skill} version={data.version} '
+                                                    'change={data.change} good_runs={data.good_runs} '
+                                                    'threshold={data.threshold}',
+                                       'data_schema': 'events/data/skill.state_changed.schema.json',
+                                       'fixture': 'fixtures/events/valid/skill.state_changed.json'},
+               'skill.rated': {'family': 'skill',
+                               'verb': 'rated',
+                               'priority': 'should',
+                               'pillar': 'P7',
+                               'default_severity': 'info',
+                               'side_effect': False,
+                               'world_effect': "A thumb stamp lands on the run's card on Your Desk.",
+                               'hud_effect': "The skill's run history bar fills in.",
+                               'story_template': '{actor} rated a run of a skill: thumbs {data.thumb}.',
+                               'trace_row': 'skill={data.skill} version={data.version} '
+                                            'run={data.run_id} thumb={data.thumb} '
+                                            'wrong_step={data.wrong_step}',
+                               'data_schema': 'events/data/skill.rated.schema.json',
+                               'fixture': 'fixtures/events/valid/skill.rated.json'},
+               'skill.fixed': {'family': 'skill',
+                               'verb': 'fixed',
+                               'priority': 'should',
+                               'pillar': 'P7',
+                               'default_severity': 'info',
+                               'side_effect': False,
+                               'world_effect': "The fixed step's card on Your Desk is rewritten.",
+                               'hud_effect': 'The skill shows its new version and the logged fix.',
+                               'story_template': '{actor} fixed step {data.step}; version '
+                                                 '{data.to_version} runs next time.',
+                               'trace_row': 'skill={data.skill} from={data.from_version} '
+                                            'to={data.to_version} step={data.step}',
+                               'data_schema': 'events/data/skill.fixed.schema.json',
+                               'fixture': 'fixtures/events/valid/skill.fixed.json'},
                'question.routed': {'family': 'question',
                                    'verb': 'routed',
                                    'priority': 'must',
@@ -5369,6 +7239,84 @@ EVENT_REGISTRY: Final[EventRegistry] = EventRegistry.model_validate(
                                  'trace_row': 'ended',
                                  'data_schema': 'events/data/meeting.ended.schema.json',
                                  'fixture': 'fixtures/events/valid/meeting.ended.json'},
+               'meeting.convened': {'family': 'meeting',
+                                    'verb': 'convened',
+                                    'priority': 'should',
+                                    'pillar': 'P4',
+                                    'default_severity': 'info',
+                                    'side_effect': False,
+                                    'world_effect': 'The lead and its agents gather in the Meeting '
+                                                    'Hall.',
+                                    'hud_effect': 'The meeting room opens with the agents seated round '
+                                                  'the table.',
+                                    'story_template': '{actor} called {target} and its team into the '
+                                                      'Meeting Hall.',
+                                    'trace_row': 'room={data.room_id} lead={data.lead} '
+                                                 'as={data.as_role} run={data.run_state} '
+                                                 'cap={data.credit_cap} turns={data.max_turns}',
+                                    'data_schema': 'events/data/meeting.convened.schema.json',
+                                    'fixture': 'fixtures/events/valid/meeting.convened.json'},
+               'meeting.asked': {'family': 'meeting',
+                                 'verb': 'asked',
+                                 'priority': 'should',
+                                 'pillar': 'P4',
+                                 'default_severity': 'info',
+                                 'side_effect': False,
+                                 'world_effect': 'A speech bubble shows over the Meeting Hall.',
+                                 'hud_effect': "The chat panel shows the person's message.",
+                                 'story_template': '{actor} asked {target} something in the Meeting '
+                                                   'Hall.',
+                                 'trace_row': 'room={data.room_id} turn={data.turn} to={data.to} '
+                                              'mode={data.mode}',
+                                 'data_schema': 'events/data/meeting.asked.schema.json',
+                                 'fixture': 'fixtures/events/valid/meeting.asked.json'},
+               'meeting.replied': {'family': 'meeting',
+                                   'verb': 'replied',
+                                   'priority': 'should',
+                                   'pillar': 'P2',
+                                   'default_severity': 'info',
+                                   'side_effect': False,
+                                   'world_effect': 'A reply bubble shows over the Meeting Hall.',
+                                   'hud_effect': 'The chat panel shows the reply and its sources; the '
+                                                 "speaker's cue shows while the reply is on screen.",
+                                   'story_template': '{actor} replied in the Meeting Hall '
+                                                     '({data.outcome}).',
+                                   'trace_row': 'room={data.room_id} turn={data.turn} '
+                                                'outcome={data.outcome} mode={data.mode}',
+                                   'data_schema': 'events/data/meeting.replied.schema.json',
+                                   'fixture': 'fixtures/events/valid/meeting.replied.json'},
+               'meeting.change_requested': {'family': 'meeting',
+                                            'verb': 'change_requested',
+                                            'priority': 'should',
+                                            'pillar': 'P4',
+                                            'default_severity': 'info',
+                                            'side_effect': False,
+                                            'world_effect': 'A change slip goes from the Meeting Hall '
+                                                            'to the Town Hall.',
+                                            'hud_effect': 'The chat panel marks the change as sent to '
+                                                          'planning.',
+                                            'story_template': '{actor} asked {target} for a change; it '
+                                                              'goes to planning.',
+                                            'trace_row': 'room={data.room_id} '
+                                                         'proposal={data.proposal_id} '
+                                                         'as={data.as_role}',
+                                            'data_schema': 'events/data/meeting.change_requested.schema.json',
+                                            'fixture': 'fixtures/events/valid/meeting.change_requested.json'},
+               'meeting.adjourned': {'family': 'meeting',
+                                     'verb': 'adjourned',
+                                     'priority': 'should',
+                                     'pillar': 'P4',
+                                     'default_severity': 'info',
+                                     'side_effect': False,
+                                     'world_effect': 'The agents leave the Meeting Hall.',
+                                     'hud_effect': 'The meeting room closes and the chat panel says '
+                                                   'why.',
+                                     'story_template': 'The Meeting Hall meeting with {target} ended '
+                                                       '({data.reason}).',
+                                     'trace_row': 'room={data.room_id} reason={data.reason} '
+                                                  'turns={data.turns} credits={data.credits_spent}',
+                                     'data_schema': 'events/data/meeting.adjourned.schema.json',
+                                     'fixture': 'fixtures/events/valid/meeting.adjourned.json'},
                'connection.requested': {'family': 'connection',
                                         'verb': 'requested',
                                         'priority': 'must',
@@ -5913,5 +7861,21 @@ EVENT_REGISTRY: Final[EventRegistry] = EventRegistry.model_validate(
                                      'trace_row': 'rule={data.rule} key={data.key} from={data.from} '
                                                   'to={data.to}',
                                      'data_schema': 'events/data/team_rule.changed.schema.json',
-                                     'fixture': 'fixtures/events/valid/team_rule.changed.json'}}}
+                                     'fixture': 'fixtures/events/valid/team_rule.changed.json'},
+               'world.share_changed': {'family': 'world',
+                                       'verb': 'share_changed',
+                                       'priority': 'should',
+                                       'pillar': 'P4',
+                                       'default_severity': 'info',
+                                       'side_effect': False,
+                                       'world_effect': "A team badge shows on the world's gate while "
+                                                       'the share stands and comes down when it is '
+                                                       'withdrawn.',
+                                       'hud_effect': "The world's sharing line names the team, or says "
+                                                     'it is not shared.',
+                                       'story_template': '{actor} turned team sharing {data.state} for '
+                                                         'this world.',
+                                       'trace_row': 'team={data.team} state={data.state}',
+                                       'data_schema': 'events/data/world.share_changed.schema.json',
+                                       'fixture': 'fixtures/events/valid/world.share_changed.json'}}}
 )

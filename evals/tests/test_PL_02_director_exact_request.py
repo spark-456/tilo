@@ -280,10 +280,10 @@ SUSPECTS: list[tuple[str, Callable[[dict[str, Any]], bool], str, str]] = [
     (
         "enums_are_short_string_lists",
         lambda b: (
-            max(len(n["enum"]) for _p, n, _d in _nodes(_schema(b)) if "enum" in n) == 11
+            max(len(n["enum"]) for _p, n, _d in _nodes(_schema(b)) if "enum" in n) == 12  # ADR-0029 adds `app`
             and all(n.get("type") == "string" for _p, n, _d in _nodes(_schema(b)) if "enum" in n)
         ),
-        "content.proto: enum for strings and numbers; structured output page: 'enums with many values' (11 is few)",
+        "content.proto: enum for strings and numbers; structured output page: 'enums with many values' (12 is few)",
         "ok",
     ),
     (

@@ -250,3 +250,39 @@ describe("WEB_4_home_styles: every value of the reference's inline styles", () =
     expect(has(hover, "filter", "brightness(1.08)")).toBe(true);
   });
 });
+
+describe("QA_13OCT_home_phone_layout: one scrolling column, nothing pinned by an offset", () => {
+  // The rules of the `@media (max-width: 480px)` blocks that name the composer column.
+  const phone = (): CssRule[] => {
+    const blocks = css().match(/@media \(max-width: 480px\) \{[\s\S]*?\n\}/g) ?? [];
+    return blocks
+      .filter((b) => b.includes(".park-home-composer"))
+      .flatMap((b) => parseRules(b).rules);
+  };
+  const decl = (selector: string, prop: string): string | undefined =>
+    phone()
+      .filter((r) => r.selector === selector)
+      .map((r) => norm(r.decls.get(prop)))
+      .filter((v) => v !== "")
+      .pop();
+
+  it("QA_13OCT_home_phone_root_is_a_scrolling_flex_column", () => {
+    const root = "[data-park] .park-home-root";
+    expect(decl(root, "display")).toBe("flex");
+    expect(decl(root, "flex-direction")).toBe("column");
+    expect(decl(root, "overflow-y")).toBe("auto");
+  });
+
+  it("QA_13OCT_home_phone_greeting_and_composer_columns_are_in_the_flow_not_pinned", () => {
+    for (const sel of ["[data-park] .park-home-leftcol", "[data-park] .park-home-composer"]) {
+      expect(decl(sel, "position"), sel).toBe("static");
+      expect(decl(sel, "transform"), sel).toBe("none");
+    }
+    expect(decl("[data-park] .park-home-legal", "position")).toBe("static");
+  });
+
+  it("QA_13OCT_home_phone_input_takes_its_own_row_so_the_placeholder_is_not_cut", () => {
+    expect(decl("[data-park] .park-home-input-row", "flex-wrap")).toBe("wrap");
+    expect(decl("[data-park] .park-home-input", "flex")).toBe("1 1 100%");
+  });
+});

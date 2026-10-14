@@ -11,12 +11,15 @@ import {
   useRef,
   useState,
 } from "react";
-import type { World } from "../../api/types";
+import type { Team, World } from "../../api/types";
 import type { AppCtx } from "../../app/AppCtx";
 import { useParkApi } from "../../app/context";
 import { useStaged } from "../../app/useStaged";
 import { Button, PageSheet } from "../../components";
+import { FirstRunPanels } from "../../sample/FirstRunPanels";
+import { useFirstRunPreview } from "../../sample/useFirstRunPreview";
 import { Coverage } from "./Coverage";
+import { LiveMembers } from "./LiveMembers";
 import { Members } from "./Members";
 import { MatrixCard, RulesCard } from "./Rules";
 import "./Team.css";
@@ -63,22 +66,35 @@ function Frame({ children }: { children: ReactNode }) {
 }
 
 export function TeamPage({ app }: { app: AppCtx }) {
+  const preview = useFirstRunPreview();
+  return preview ? <FirstRunPanels page="team" app={app} /> : <PersonalTeamPage app={app} />;
+}
+function PersonalTeamPage({ app }: { app: AppCtx }) {
   const api = useParkApi();
   const { dec, added, toast } = app;
   const [loaded, setLoaded] = useState<Loaded | "failed" | null>(null);
+  const [liveTeam, setLiveTeam] = useState<Team | null>(null);
   const [people, setPeople] = useState<Member[] | null>(null);
   const [email, setEmail] = useState("");
   const sent = useRef(0);
   useEffect(() => {
     let live = true;
-    Promise.all([
-      api.getTeam(),
-      api.getTeamPolicy(),
-      api.getLearn(),
-      api.getSkills(),
-      api.getWorlds(dec, added),
-    ])
-      .then(([t, pol, l, s, w]) => {
+    setLiveTeam(null);
+    setLoaded(null);
+    api
+      .getTeam()
+      .then(async (t) => {
+        if (!live) return;
+        if (t.source === "live") {
+          setLiveTeam(t.data);
+          return;
+        }
+        const [pol, l, s, w] = await Promise.all([
+          api.getTeamPolicy(),
+          api.getLearn(),
+          api.getSkills(),
+          api.getWorlds(dec, added),
+        ]);
         if (!live) return;
         setPeople((ps) => ps ?? t.data.people);
         setLoaded({
@@ -106,25 +122,33 @@ export function TeamPage({ app }: { app: AppCtx }) {
       { ...pending, active: "Pending", c: "transparent", pending: true },
     ]);
     setEmail("");
-    toast(`Invite sent to ${to}`);
+    toast(`This is a sample team, so no invite was sent to ${to}.`);
   };
 
   // One stable root: the frame and the heading are the same elements while loading, loaded or failed, so
   // the h1 the shell focuses on arrival is not remounted when the data lands.
   const ready =
-    loaded && loaded !== "failed" && people
+    !liveTeam && loaded && loaded !== "failed" && people
       ? {
           data: loaded,
           people,
           // The invite placeholder takes the owner's mail domain from the team data.
           domain:
-            loaded.team.people.find((p) => p.role === "Owner")?.email.split("@")[1] ??
+            loaded.team.people.find((p) => p.role === "Owner")?.email?.split("@")[1] ??
             "company.com",
         }
       : null;
   return (
     <Frame>
-      <Top count={ready ? `${ready.people.length} people` : undefined}>
+      <Top
+        count={
+          liveTeam
+            ? `${liveTeam.people.length} people`
+            : ready
+              ? `${ready.people.length} people`
+              : undefined
+        }
+      >
         {ready ? (
           <div className="park-team-invite">
             <div className="park-team-field">
@@ -141,6 +165,11 @@ export function TeamPage({ app }: { app: AppCtx }) {
             <Button
               variant="primary"
               disabled={!valid}
+              title={
+                valid
+                  ? undefined
+                  : `Enter a work email at ${ready?.domain ?? "your company"} to invite`
+              }
               style={{ opacity: valid ? 1 : 0.6 }}
               onClick={invite}
             >
@@ -149,7 +178,9 @@ export function TeamPage({ app }: { app: AppCtx }) {
           </div>
         ) : null}
       </Top>
-      {ready ? (
+      {liveTeam ? (
+        <LiveMembers team={liveTeam} />
+      ) : ready ? (
         <TeamBody app={app} data={ready.data} people={ready.people} setPeople={setPeople} />
       ) : loaded === "failed" ? (
         <section className="park-team-card park-team-empty">
@@ -166,6 +197,9 @@ interface BodyProps {
   people: Member[];
   setPeople: Dispatch<SetStateAction<Member[] | null>>;
 }
+
+/** W10: the team page shows a sample, so a role, backup or removal is this page's only and nothing is stored. */
+const NOT_SAVED = "This is a sample team, so nothing was saved.";
 
 function TeamBody({ app, data, people, setPeople }: BodyProps) {
   const { team } = data;
@@ -193,7 +227,9 @@ function TeamBody({ app, data, people, setPeople }: BodyProps) {
     setPeople((ps) =>
       (ps ?? []).map((q) => (q.id === p.id ? { ...q, role, limit: undefined } : q)),
     );
-    toast(`${p.name} is now ${role === "Approver" || role === "Owner" ? "an" : "a"} ${role}`);
+    toast(
+      `${p.name} is now ${role === "Approver" || role === "Owner" ? "an" : "a"} ${role} on this page. ${NOT_SAVED}`,
+    );
   };
   const remove = (p: Member) => {
     setPeople((ps) => (ps ?? []).filter((q) => q.id !== p.id));
@@ -202,8 +238,8 @@ function TeamBody({ app, data, people, setPeople }: BodyProps) {
     setOpen(null);
     toast(
       p.pending
-        ? "Invite cancelled"
-        : `${p.name.split(" ")[0]} was removed. Their worlds move to you`,
+        ? `Invite cancelled on this page. ${NOT_SAVED}`
+        : `${p.name.split(" ")[0]} was removed on this page. ${NOT_SAVED}`,
     );
   };
   const addBackup = (row: CoverRow, id: string) => {
@@ -211,7 +247,7 @@ function TeamBody({ app, data, people, setPeople }: BodyProps) {
     if (!who) return;
     setBackups((b) => ({ ...b, [row.id]: id }));
     if (row.flagged) app.setPref("backup", id);
-    toast(`${who.name} is now a backup for ${row.what.toLowerCase()}`);
+    toast(`${who.name} is now a backup for ${row.what.toLowerCase()} on this page. ${NOT_SAVED}`);
   };
 
   return (
@@ -222,9 +258,14 @@ function TeamBody({ app, data, people, setPeople }: BodyProps) {
         open={open}
         onOpen={(id) => setOpen((o) => (o === id ? null : id))}
         onRole={setRole}
-        canChange={(p) => !!you && canChangeRole(you, p)}
+        canChange={(p) =>
+          !!you &&
+          you.role !== null &&
+          p.role !== null &&
+          canChangeRole({ id: you.id, role: you.role }, { id: p.id, role: p.role })
+        }
         onRemove={remove}
-        onResend={(p) => toast(`Invite sent again to ${p.email}`)}
+        onResend={(p) => toast(`This is a sample team, so no invite was sent again to ${p.email}.`)}
       />
       {part(2) ? (
         <Coverage

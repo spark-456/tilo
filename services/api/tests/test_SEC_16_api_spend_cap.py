@@ -34,8 +34,9 @@ def declared():
 
 
 def fill(h, uid, minor):
-    """Puts `minor` on a uid's lifetime total, then forgets the setup calls the spy recorded."""
-    spend(h.ledger, uid, minor)
+    """Brings a uid's lifetime total to `minor` (a live request before it now spends: every live call is a unit,
+    GOLIVE-935), then forgets the setup calls the spy recorded."""
+    spend(h.ledger, uid, minor - h.ledger.spent_minor(uid))
     h.ledger.calls.clear()
 
 
@@ -163,12 +164,14 @@ def test_SEC_16_when_live_cannot_be_checked_the_label_is_replay_and_replay_work_
     assert os.environ.get(LIVE) is None
 
 
-def test_SEC_16_the_production_ledger_seam_refuses_until_it_is_wired():
-    """Like T4's artifact store and the access store: a deployed process with no ledger denies live, it never
-    runs uncapped."""
+def test_SEC_16_the_production_ledger_seam_refuses_until_it_is_wired(monkeypatch):
+    """Like T4's artifact store and the access store: a deployed process with no ledger (GOLIVE-935: no valid
+    `TILO_FIRESTORE_PROJECT`) denies live, it never runs uncapped."""
     from fastapi import HTTPException
     from tilo_api import deps
 
+    monkeypatch.setenv("K_SERVICE", "tilo-api")
+    monkeypatch.delenv("TILO_FIRESTORE_PROJECT", raising=False)
     with pytest.raises(HTTPException) as caught:
         deps.get_spend_cap_ledger()
     assert caught.value.status_code == 503
@@ -214,6 +217,9 @@ def test_SEC_16_no_request_field_header_or_query_can_reset_or_raise_a_judges_cap
     fill(h, JUDGE_A, cap)
 
     for method, path in non_public(h.client.app):
+        # OLD-4: probe lifetime-cap tampering across fresh request windows;
+        # the independent SEC-10 edge quota must not mask the cap refusal.
+        h.clock.advance(61)
         h.call(
             method,
             path,

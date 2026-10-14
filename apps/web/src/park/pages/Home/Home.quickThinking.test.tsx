@@ -129,7 +129,9 @@ describe("QUICK_THINKING the choice is remembered", () => {
     await choose(first.el, "Quick");
     const keys = Object.keys(window.localStorage).filter((k) => k.includes("effort"));
     expect(keys).toHaveLength(1);
-    expect(keys[0]).toContain("@");
+    // LIVE-HOME (BQ-SIGNIN-4): the key is per person but never holds the address itself.
+    expect(keys[0]).not.toContain("@");
+    expect(keys[0]).not.toMatch(/alex|northwind/i);
   });
 
   it("QUICK_THINKING_survives_storage_throwing_and_keeps_the_choice_in_memory", async () => {
@@ -291,7 +293,15 @@ describe("QUICK_THINKING on the live path", () => {
     async (status, code, sentence) => {
       const rig = await mountLiveHome(
         quickApi(async () => {
-          throw new TiloApiError("raw server text", status, status >= 500, true, code);
+          // The model-outage case carries the API's explicit replay-only marker.
+          throw new TiloApiError(
+            "raw server text",
+            status,
+            status >= 500,
+            true,
+            code,
+            status === 503,
+          );
         }),
       );
       await choose(rig.el, "Quick");

@@ -1,0 +1,23 @@
+{
+  "key": "40837e30041bcf04",
+  "profile": "fixture",
+  "result": {
+    "answer": "Fictional past paper and answer key.",
+    "profile_id": "fixture",
+    "queries": ["Northbridge fictional past paper and answer key"],
+    "query": "Northbridge fictional past paper and answer key",
+    "sources": [
+      {
+        "domain": "sandbox-web.example",
+        "redirect_url": "https://sandbox-web.example/papers/paper-1.pdf",
+        "resolved_url": null,
+        "title": "Paper"
+      }
+    ],
+    "suggestions_html": null,
+    "usage": {
+      "search_queries": 1
+    }
+  },
+  "role": "search"
+}

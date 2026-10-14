@@ -1,5 +1,6 @@
 """tilo-api: sessions, tasks, cards, approvals, policies, downloads, sharing, RBAC (PRD 6.2)."""
 
+import threading
 from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
 from typing import Annotated, Any
@@ -10,11 +11,17 @@ from starlette.concurrency import run_in_threadpool
 from tilo_harness.writer import WriterBusy as _WriterBusy
 from tilo_logging import configure_logging as _configure_logging
 
+from tilo_api import appcheck as _appcheck
+from tilo_api import connect_routes as _connect_routes
 from tilo_api import cors as _cors
 from tilo_api import deps as _deps
 from tilo_api import dev as _dev
 from tilo_api import durable_store as _durable_store
+from tilo_api import meeting_host_routes as _meeting_host_routes
+from tilo_api import nudge_sweep as _nudge_sweep
 from tilo_api import people as _people
+from tilo_api import plate_links as _plate_links
+from tilo_api import quiz_apps as _quiz_apps
 from tilo_api import runs as _runs
 from tilo_api import schedules as _schedules
 from tilo_api import skill_proposals as _skill_proposals
@@ -25,19 +32,35 @@ from tilo_api.appcheck import AppCheckGate as _AppCheckGate
 from tilo_api.assistant.route import router as _assistant_router
 from tilo_api.cards import build_router as _build_cards_router
 from tilo_api.cards_feed import router as _cards_feed_router
+from tilo_api.connectors_list import router as _connectors_list_router
 from tilo_api.console import build_router as _build_console_router
+from tilo_api.context_panel import router as _context_panel_router
 from tilo_api.costs import router as _costs_router
 from tilo_api.dispatch import router as _dispatch_router
 from tilo_api.effort import router as _effort_router
+from tilo_api.feedback import router as _feedback_router
 from tilo_api.intake import router as intake_router
+from tilo_api.item_fields import router as _item_fields_router
 from tilo_api.log_context import LogContext as _LogContext
 from tilo_api.log_context import LogRunId as _LogRunId
+from tilo_api.meeting_room import router as _meeting_room_router
+from tilo_api.notifications import router as _notifications_router
 from tilo_api.people_limits import NoStore as _NoStore
+from tilo_api.people_list import router as _people_list_router
+from tilo_api.push_routes import router as _push_router
 from tilo_api.rate_limit import RateLimitGate as _RateLimitGate
 from tilo_api.redaction import router as _redaction_router
+from tilo_api.sample_world import router as _sample_router
 from tilo_api.sharing import WorldView
 from tilo_api.sharing import build_router as _build_sharing_router
+from tilo_api.skills_capture import router as _skills_capture_router
+from tilo_api.skills_feedback import router as _skills_feedback_router
+from tilo_api.skills_routes import router as _skills_router
 from tilo_api.tasks import router as _tasks_router
+from tilo_api.team_items import router as _team_items_router
+from tilo_api.team_routes import router as _team_router
+from tilo_api.team_shares import router as _team_shares_router
+from tilo_api.user_settings import router as _user_settings_router
 from tilo_api.worlds_list import router as _worlds_list_router
 
 # Generated docs only in local dev mode: deployed, the service is public and the route list is not for
@@ -47,8 +70,16 @@ _DOCS: dict[str, Any] = {} if _dev.dev_enabled() else {"docs_url": None, "redoc_
 
 @asynccontextmanager
 async def _lifespan(_: FastAPI) -> AsyncIterator[None]:
+    # min-instances 0: every idle period ends in a cold start, and the first sign-in must not meet an empty key cache.
+    # A daemon thread, best effort: the start never waits on the keys endpoint and never fails for it.
+    threading.Thread(target=_appcheck.warm_up, name="jwks-warm-up", daemon=True).start()
     yield
     await run_in_threadpool(_durable_store.close_deployed)  # SIGTERM: the writers release their leases (ADR-0026 4)
+
+
+# The two Firebase Hosting origins of the tilo-dev web app (BQ-SIGNIN-7, CL-REACH): exact strings, never a wildcard,
+# a suffix match or `allow_origin_regex`. Not credentialed: the API reads a bearer token, no cookie.
+PRODUCTION_ORIGINS = _cors.PRODUCTION_ORIGINS
 
 
 app = FastAPI(title="tilo-api", lifespan=_lifespan, **_DOCS)
@@ -98,12 +129,15 @@ def _world_views(store: Annotated[_deps.Store, Depends(_deps.get_store)]) -> Cal
 
 
 app.include_router(_access_router)
+app.include_router(_sample_router)  # STARTER-1: ahead of the owner-scoped /worlds/{id} routes
 app.include_router(intake_router)
 app.include_router(_dispatch_router)
 app.include_router(_redaction_router)
 app.include_router(_costs_router)
+app.include_router(_context_panel_router)
 app.include_router(_worlds_list_router)
 app.include_router(_cards_feed_router)
+app.include_router(_notifications_router)
 app.include_router(_tasks_router)
 app.include_router(
     _build_cards_router(_runs.get_card_store, answer_guard=_runs.answer_guard, world_owner=_runs.world_owner)
@@ -111,10 +145,28 @@ app.include_router(
 app.include_router(_build_console_router(_runs.get_card_store, answer_guard=_runs.answer_guard))
 app.include_router(_build_sharing_router(_world_views))
 app.include_router(_runs.router)
+app.include_router(_item_fields_router)
+app.include_router(_meeting_room_router)
 app.include_router(_assistant_router)
 app.include_router(_people.router)
+app.include_router(_plate_links.router)  # FR-PA-06b: /l/<token> (public to the gate; the route checks the link)
+app.include_router(_team_shares_router)  # ADR-0040: owner-only PUT/DELETE of a world's team share
+app.include_router(_team_items_router)  # ADR-0040: the team view of a shared world's work items
+app.include_router(_meeting_host_routes.router)
+app.include_router(_quiz_apps.router)
+app.include_router(_connect_routes.router)
+app.include_router(_people_list_router)
+app.include_router(_skills_router)
+app.include_router(_skills_capture_router)
+app.include_router(_skills_feedback_router)
 app.include_router(_effort_router)
+app.include_router(_feedback_router)
+app.include_router(_push_router)
+app.include_router(_connectors_list_router)
 app.include_router(_schedules.router)
+app.include_router(_nudge_sweep.router)  # FR-PA-15b: GET /v1/nudges, POST /v1/nudges/{id}/snooze
+app.include_router(_team_router)
+app.include_router(_user_settings_router)  # FR-SET-01/02: GET and PUT /v1/me/settings
 
 
 def _world_owner(world_id: str) -> str | None:

@@ -202,11 +202,11 @@ class Outbox:
             raise OutboxRefused(f"cannot cancel {outbox_id!r}: not 'scheduled'")
         return updated
 
-    def abandon(self, outbox_id: str) -> dict:
+    def abandon(self, outbox_id: str, *, keep_ambiguous: bool = False) -> dict:
         """A run gave up on this unsent entry: "failed", so no later dispatch_due() ever sends it. Refused while a
         live lease may be sending it, or once it is sent, failed or cancelled."""
         self._own(outbox_id, "abandon")
-        if (updated := self._store._abandon(outbox_id, self._clock())) is None:
+        if (updated := self._store._abandon(outbox_id, self._clock(), keep_ambiguous)) is None:
             raise OutboxRefused(f"cannot abandon {outbox_id!r}: being sent or already settled")
         return updated
 

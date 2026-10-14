@@ -1,0 +1,6 @@
+# FR-CHN-17 web push: API for the tilo-api wiring
+
+- `SubscriptionStore.add(user_id, body)`: `body` is the browser's `PushSubscription.toJSON()` (`endpoint`, `keys.p256dh`, `keys.auth`). Raises `SubscriptionRefused` (`SubscriptionLimit` at the per-person cap); never echo the endpoint. `user_id` comes from the verified session, never the body. One owner per endpoint: a re-subscribe moves it.
+- `PushNotifier.notify(user_id, {id, kind, title, body, flagged})` -> `PushResult(status, in_app, outbox_id)`; it never raises, and the card must already be stored. `kind` is one of `gate`, `blocked`, `spend`, `finished`, `digest`, `weekly`. `flagged` is the card's injection flag: anything but `False` (true, None, missing) is a person's decision, so no push. Statuses: queued, duplicate, quiet, off, no_subscription, no_policy, refused. The card is shown in the app whatever the status.
+- Wire `WebPushAdapter` into the world's `Outbox(connectors={"web_push": adapter})`, passing the outbox's `SideEffectRefused` as `final_error`; the real `PushSender` reads the secret named by `load_config().vapid` (`webpush-vapid-private-key`) and maps HTTP 404/410 to `SubscriptionGone`.
+- Needs the owner's standing L3 `send_push` policy (undo 0) on connector `web_push`, made by the owner's own confirm (BQ-CHN17-1).

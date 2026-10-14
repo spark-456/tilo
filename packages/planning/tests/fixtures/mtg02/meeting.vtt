@@ -1,0 +1,28 @@
+WEBVTT - Roadmap review (fixture)
+
+NOTE
+Cue settings, voice tags, class tags and a mid-cue timestamp tag are all part of this fixture.
+
+STYLE
+::cue(.yellow) { color: yellow }
+
+cue-1
+00:00:01.000 --> 00:00:04.000 align:start position:10% line:90%
+<v Priya Shah>Let's start with the roadmap review.</v>
+
+cue-2
+00:00:05.500 --> 00:00:08.000
+<v.loud Tom Reyes><c.yellow>I will send</c> the <00:00:06.500><i>draft</i> by Friday.</v>
+
+00:00:09.000 --> 00:00:13.000
+<v Priya Shah>Decision: we ship the beta</v>
+<v Priya Shah>on 15 November.</v>
+
+00:00:14.250 --> 00:00:17.000
+Dana Cole: Can we move the budget review to Tuesday?
+
+00:00:18.000 --> 00:00:19.500
+<v Tom Reyes>Yes, Tuesday works for me.</v>
+
+00:21.000 --> 00:23.000
+Priya Shah: Great, that is everything. Thanks all.

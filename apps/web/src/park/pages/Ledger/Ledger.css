@@ -44,10 +44,12 @@
   gap: 8px;
   flex-wrap: wrap;
 }
-/* Month picker: the chevron trails the label (padding 0 12px 0 16px). */
-[data-park] .park-ledger-month .park-btn {
-  padding-right: 12px;
-  padding-left: 16px;
+/* The recorded period is a label until the API supports month selection (UI-10 / W12). */
+[data-park] .park-ledger-month {
+  align-self: center;
+  font-size: var(--text-14);
+  font-weight: 700;
+  color: var(--ink2);
 }
 [data-park] .park-ledger-kpis {
   display: grid;
@@ -470,6 +472,12 @@
 }
 [data-park] .park-ledger-type span + span {
   white-space: nowrap;
+}
+[data-park] .park-ledger-recorded {
+  flex-wrap: wrap;
+}
+[data-park] .park-ledger-recorded span + span {
+  white-space: normal;
 }
 [data-park] .park-ledger-callout {
   display: flex;

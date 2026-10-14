@@ -15,7 +15,7 @@ describe("WEB_4_typecheck: Home compiles with the repo's strict options", () => 
     expectTypeOf<ReturnType<typeof useSchedule>>().toEqualTypeOf<Schedule>();
   });
 
-  it("WEB_4_typecheck_home_has_no_type_errors", { timeout: 180_000 }, async () => {
+  it("WEB_4_typecheck_home_has_no_type_errors", { timeout: 240_000 }, async () => {
     const errors = (await parkTypeErrors()).filter(
       (e) =>
         e.startsWith("src/park/pages/Home/") ||

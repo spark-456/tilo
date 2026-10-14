@@ -2,7 +2,11 @@
 // design_handoff_tilo_web_app/design/Tilo App Skills.dc.html (the markup and `renderVals`). The Api serves none
 // of it (a teaching session has no endpoint yet), so it is page-local, as the Home composer's copy is. Nothing
 // here names the person, the company or a skill of the sample data: those come from the Api.
-import type { Skill } from "../../api/types";
+import type { Ledger, Skill } from "../../api/types";
+import { type CurrencyCode, STEP_LEDGER_PRICES, runMoney } from "../../app/ledgerKpis";
+import { SKILL_TRUST_CONFIG } from "./skillConfig";
+
+export { STEP_LEDGER_PRICES };
 
 export const INTRO =
   "Teach your agents new work, help them get better, and choose which tools they may touch. Every repeat of a skill gets faster and cheaper.";
@@ -93,49 +97,33 @@ export interface CaptureFixtureEvent {
   readonly source: "fixture";
 }
 
-export const CAPTURE_FIXTURE_EVENTS: Record<MethodKey, readonly CaptureFixtureEvent[]> = {
-  record: CAP.record.map((text, stepIndex) => ({
-    seq: stepIndex + 1,
-    type: "skill.capture.step",
-    method: "record",
-    stepIndex,
-    text,
-    delayMs: STEP_MS,
-    source: "fixture",
-  })),
-  guided: CAP.guided.map((text, stepIndex) => ({
-    seq: stepIndex + 1,
-    type: "skill.capture.step",
-    method: "guided",
-    stepIndex,
-    text,
-    delayMs: STEP_MS,
-    source: "fixture",
-  })),
-  describe: CAP.describe.map((text, stepIndex) => ({
-    seq: stepIndex + 1,
-    type: "skill.capture.step",
-    method: "describe",
-    stepIndex,
-    text,
-    delayMs: STEP_MS,
-    source: "fixture",
-  })),
-  upload: CAP.upload.map((text, stepIndex) => ({
-    seq: stepIndex + 1,
-    type: "skill.capture.step",
-    method: "upload",
-    stepIndex,
-    text,
-    delayMs: STEP_MS,
-    source: "fixture",
-  })),
-};
+export const CAPTURE_FIXTURE_EVENTS = Object.fromEntries(
+  METHODS.map(({ key }) => [
+    key,
+    CAP[key].map(
+      (text, stepIndex): CaptureFixtureEvent => ({
+        seq: stepIndex + 1,
+        type: "skill.capture.step",
+        method: key,
+        stepIndex,
+        text,
+        delayMs: STEP_MS,
+        source: "fixture",
+      }),
+    ),
+  ]),
+) as unknown as Record<MethodKey, readonly CaptureFixtureEvent[]>;
 
 export const DEFAULT_DESC =
   "When an invoice email arrives in the Accounts inbox, open the PDF, copy the supplier, amount and due date into the “Invoices 2026” sheet, then label the email “Logged”.";
+/** W10: with nothing written the read button is off, and the line beside it says what is missing. */
+export const DESCRIBE_EMPTY =
+  "Write a sentence about the work first, then press Read my description.";
 export const DESCRIBE_HELP =
   "Write it like you’d explain it to a new colleague. Tilo asks if anything is unclear.";
+/** No API session (a demo): "Read my description" cannot read the text, so the steps are a sample and say so (HR-1). */
+export const DESCRIBE_SAMPLE =
+  "Sample only: the steps below are an example, not read from your description. Real steps need sign-in.";
 export const DROP = {
   title: "Drop an example here",
   sub: "A finished spreadsheet, document or short screen video. Or click to use a sample.",
@@ -243,6 +231,7 @@ export const TRY_RUN_FIXTURE_EVENTS: readonly TryRunFixtureEvent[] = [
 export function formatTryRunResult(
   events: readonly Pick<TryRunFixtureEvent, "matched" | "durationSec" | "cost">[],
   totalSteps: number = PLAN.length,
+  currency: CurrencyCode | Pick<Ledger, "currency"> = "GBP",
 ): { title: string; sub: string } {
   const matched = events.filter((e) => e.matched).length;
   const totalSec = events.reduce((sum, e) => sum + e.durationSec, 0);
@@ -256,11 +245,9 @@ export function formatTryRunResult(
       : `Matched ${matched} of ${totalSteps} steps of your way`;
   return {
     title,
-    sub: `${matched} of ${totalSteps} steps · ${dur} · £${totalCost.toFixed(2)}`,
+    sub: `${matched} of ${totalSteps} steps · ${dur} · ${runMoney(totalCost, currency)}`,
   };
 }
-
-import { SKILL_TRUST_CONFIG } from "./skillConfig";
 
 export const SAVE = {
   nameLabel: "Skill name",
@@ -283,12 +270,6 @@ export const savedLine = (who: string, t: Trigger): string =>
 export const sharedWith = (scope: Scope, org: string): string =>
   scope === "team" ? `Shared with ${org}` : "Just for you";
 
-/** Ledger step-cost table by tool access level (Read = 0.05, Draft = 0.10, Act = 0.15) and ~15s per step. */
-export const STEP_LEDGER_PRICES = {
-  Read: 0.05,
-  Draft: 0.1,
-  Act: 0.15,
-} as const;
 export const STEP_SECONDS = 15;
 
 export const stopsToAsk = (asks: readonly boolean[]): string => {
@@ -299,9 +280,8 @@ export const stopsToAsk = (asks: readonly boolean[]): string => {
 export function estimateSkillPlan(
   steps: readonly { readonly tool: string }[],
   asks: readonly boolean[],
-  currency: "GBP" | "USD" = "GBP",
+  currency: CurrencyCode | Pick<Ledger, "currency"> = "GBP",
 ): { run: string; time: string; stops: string } {
-  const sym = currency === "USD" ? "$" : "£";
   const cost = steps.reduce((sum, s) => {
     if (s.tool.endsWith("Act")) return sum + STEP_LEDGER_PRICES.Act;
     if (s.tool.endsWith("Draft")) return sum + STEP_LEDGER_PRICES.Draft;
@@ -309,14 +289,11 @@ export function estimateSkillPlan(
   }, 0);
   const mins = Math.max(1, Math.round((steps.length * STEP_SECONDS) / 60));
   return {
-    run: `~${sym}${cost.toFixed(2)}`,
+    run: `~${runMoney(cost, currency)}`,
     time: `~${mins} min`,
     stops: stopsToAsk(asks),
   };
 }
-
-/** The estimates of Tilo's version; computed from the default plan and ledger prices. */
-export const EST = estimateSkillPlan(PLAN, DEFAULT_ASK, "GBP");
 
 /** What "Save skill" sets on the draft skill (the design's `S.live` override). */
 export const savedOverride = (owner: string): Partial<Skill> => ({
@@ -330,6 +307,36 @@ export const savedOverride = (owner: string): Partial<Skill> => ({
   from: "taught by you",
   owner,
 });
+
+/** SKILLS-3: what a saved skill shows on a live page: it has not run, so no count, rate or time is made up. */
+export const liveSavedOverride = (owner: string): Partial<Skill> => ({
+  st: "learning",
+  status: "live",
+  runs: null,
+  rate: null,
+  last: "",
+  improved: "",
+  from: "",
+  owner,
+});
+
+/** SKILLS-5: the words of the live teach flow (new strings are flagged in the PR). */
+export const LIVE_TEACH = {
+  unavailable: "Not connected yet",
+  retry: "Tilo couldn’t read that just now. Try again.",
+  refused: "Tilo couldn’t make a skill from that. Try describing it differently.",
+  saved: (name: string) => `Saved “${name}”. It starts as Learning`,
+  failed: (name: string, code: string | null) =>
+    `Couldn’t save “${name}”${code ? ` (${code})` : ""}. Try again`,
+} as const;
+/** The server's fixed refusal words for a save; any other text is never shown. */
+export const SAVE_CODES: ReadonlySet<string> = new Set([
+  "unknown_action",
+  "ask_first_required",
+  "forbidden",
+  "event_not_allowed",
+  "not_understood",
+]);
 
 /** A new skill for a person whose data holds no draft to start from. */
 export const blankSkill = (owner: string): Skill => ({

@@ -191,6 +191,19 @@ def test_DEV_HARNESS_d_an_emulator_demo_project_is_not_refused(dev_client, monke
     assert dev_client.post(PATH, json={}).status_code == 200
 
 
+def test_DEV_HARNESS_d_BQ_DEVH_2_a_non_memory_store_is_refused_before_it_is_read(dev_client):
+    class NonMemoryStore:
+        def due(self, *_args):
+            pytest.fail("the dev tick must refuse the store before reading due schedules")
+
+    dev_client.app.dependency_overrides[schedules.get_schedule_store] = NonMemoryStore
+
+    response = dev_client.post(PATH, json={})
+
+    assert response.status_code == 503
+    assert response.json() == {"detail": "dev_tick_needs_memory_store"}
+
+
 def test_DEV_HARNESS_d_only_json_is_accepted_so_a_cross_site_page_needs_a_preflight(dev_client):
     repo, record = _foreign_schedule(dev_client)
     for headers in (
@@ -229,3 +242,25 @@ def test_DEV_HARNESS_d_one_failing_task_does_not_lose_the_slots_after_it(dev_cli
 def test_DEV_HARNESS_f_a_host_with_a_trailing_newline_is_refused():
     assert dev._HOST_RE.fullmatch("localhost:8080")
     assert dev._HOST_RE.fullmatch("localhost:8080\n") is None
+
+
+def test_DEV_HARNESS_d_the_delivered_task_request_carries_the_app_so_dependency_overrides_resolve(
+    dev_client, monkeypatch
+):
+    """The tick hands `_run_task` a hand-made Request; `_run_task` reads `request.app.dependency_overrides` (wiring that
+    arrives with the team store), so the request must carry the app it runs in, never a bare scope."""
+    schedule = _schedule(dev_client)
+    _grant_policy(dev_client)
+    seen: list[object] = []
+
+    def fake_run_task(request, *args, **kwargs):
+        seen.append(request.app)  # KeyError when the scope has no app
+        return {"ran": 1}
+
+    monkeypatch.setattr(schedules, "_run_task", fake_run_task)
+
+    response = dev_client.post(PATH, json={"as_of": _as_of(schedule)})
+
+    assert response.status_code == 200, response.text
+    assert [t["ran"] for t in response.json()["tasks"]] == [1]
+    assert seen == [dev_client.app]

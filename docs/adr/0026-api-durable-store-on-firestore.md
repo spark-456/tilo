@@ -1,7 +1,13 @@
 # ADR-0026: tilo-api keeps worlds, tasks, policies and events in Firestore (addendum to ADR-0003)
 
-- Status: Proposed (awaiting the supervisor's / user's OK), 2026-10-07, on the supervisor's defaults
-  for PROD-WIRE (#522). It sets no switch, changes no contract and no `infra/`; that rollout is the user's.
+- Status: **Accepted**, 2026-10-09, by the supervisor under the user's blanket delegation (the user, 9 Oct 2026:
+  "Handle it yourself, i have given u full authority and merge ability"). The user did not read this ADR; the
+  decisions below are the supervisor's, recorded as OVERRIDABLE (BQ-PW-1-ACCEPT, BQ-PW-2B-1, BQ-PW-3-1). It sets no
+  switch and changes no contract; the rollout (`api_durable_stores = true`, then `TILO_API_STORE=firestore`,
+  `TILO_PEOPLE_STORE=firestore`) happens after PR3's composition root is merged.
+  Accepted decisions: tilo-api is pinned to ONE instance (one writer, `max_instance_count = 1`, as PR3 sets it in all
+  three places); min instances 0 by default and 1 only for judging windows (as NFR-23); the kill-switch exception is
+  accepted as proposed; then `api_durable_stores = true`.
 - Deciders: supervisor (defaults), architect (proposal), user (approval, rollout)
 - Requirement: PROD-WIRE; PRD 6.1, 6.2, 6.6, 15.1, 15.3; FR-HIL-07, FR-WLD-07, HR-1; ADR-0018 T4; BQ-PW-1
 - Amends in part: ADR-0003 decision 1 and follows ADR-0023 (an ADR-0003 addendum line once accepted)

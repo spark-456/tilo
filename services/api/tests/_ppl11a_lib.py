@@ -155,6 +155,10 @@ class SpyRedactor:
         return _TOKEN.sub("[REDACTED]", text)
 
 
+def _no_redactor() -> Any:
+    raise NotImplementedError("no redactor is wired")
+
+
 class IdentityRedactor:
     def __call__(self, text: str) -> str:
         return text
@@ -279,6 +283,10 @@ class SpyStore:
         self._note("list", org_id)
         return self._inner.list(org_id, field, value)
 
+    def list_bounded(self, org_id: str, field: str, value: str, *, limit: int) -> Any:
+        self._note("list_bounded", org_id)
+        return self._inner.list_bounded(org_id, field, value, limit=limit)
+
     # PPL-11c-FS: the person store's directory calls (API_PPL_11c_FS.md section 2); only a person store has them.
     def create_founder(self, record: Any) -> Any:
         self._note("create_founder", record["org_id"])
@@ -364,7 +372,7 @@ class Rig:
 
         wrapped = {
             f: SpyStore(getattr(real, f), self.store_calls, flags.get(f, False))
-            for f in ("persons", "meetings", "work_items", "pins", "mentions", "calendar")
+            for f in ("persons", "meetings", "work_items", "pins", "mentions", "calendar", "world_shares")
         }
         return PeopleStores(**wrapped)
 
@@ -420,10 +428,13 @@ class Rig:
 
     def unwire(self, *names: str) -> None:
         """Back to the production default of a seam (`people_stores`, `artifact_store`, `redactor`, `clock`,
-        `plate_sources`, `source_owners`)."""
+        `plate_sources`, `source_owners`). The production redactor exists since FR-MEM-05, so `redactor` is unwired to a
+        seam that refuses, the way every other production seam still does: the routes' 503 on a missing seam is kept."""
         for name in names:
             key = seam(self.deps, f"get_{name}")
             self.app.dependency_overrides.pop(key, None)
+            if name == "redactor":
+                self.app.dependency_overrides[key] = _no_redactor
 
     def close(self) -> None:
         self.app.dependency_overrides.clear()

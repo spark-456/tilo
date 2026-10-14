@@ -1,0 +1,10 @@
+{
+  "revoked_at_provider": true,
+  "parts": [
+    {
+      "type": "connection.revoked",
+      "connector": "Gmail",
+      "user_id": "u_priya"
+    }
+  ]
+}

@@ -5,6 +5,7 @@
 import { useState } from "react";
 import type { Skill } from "../../api/types";
 import type { AppCtx } from "../../app/AppCtx";
+import { type CurrencyCode, runMoney } from "../../app/ledgerKpis";
 import { cx } from "../../components/cx";
 import { agent, icon } from "./skillsKit";
 
@@ -18,18 +19,27 @@ const STATUS_META: Record<ShownStatus, { label: string; tone: string }> = {
   draft: { label: "Draft", tone: "chip" },
 };
 
+/** W10: a signed-in skill has no pause or step-edit call behind this page, so the buttons say so, not pretend. */
+const NOT_FROM_HERE = "Pausing and editing steps are not available from this page yet.";
+/** The demo has no step editor: it says so rather than promising one that opens. */
+const SAMPLE_EDIT = "Sample data: step editing is not available yet, so nothing was changed.";
+
 const LEVELS = ["Off", "Read", "Draft", "Act"] as const;
 
-const money = (v: number | undefined): string => (v == null ? "—" : `£${v.toFixed(2)}`);
+const money = (v: number | undefined, currency: CurrencyCode = "GBP"): string =>
+  v == null ? "—" : runMoney(v, currency);
 
 export interface LibraryProps {
   app: AppCtx;
   skills: readonly Skill[];
   selectedId: string;
   paused: Readonly<Record<string, boolean>>;
+  currency?: CurrencyCode;
   onSelect: (id: string) => void;
   onTogglePause: (skill: Skill) => void;
   onTryDraft: () => void;
+  /** A signed-in library: nothing on this page can pause or edit a stored skill yet (W10). */
+  live?: boolean;
 }
 
 export function LibrarySection({
@@ -37,9 +47,11 @@ export function LibrarySection({
   skills,
   selectedId,
   paused,
+  currency = "GBP",
   onSelect,
   onTogglePause,
   onTryDraft,
+  live = false,
 }: LibraryProps) {
   const [q, setQ] = useState("");
   const [acc, setAcc] = useState<Record<string, Record<string, number>>>({});
@@ -64,7 +76,7 @@ export function LibrarySection({
       : "0%";
 
   const stats = [
-    { k: "Runs", v: String(cur.runs) },
+    { k: "Runs", v: cur.runs == null ? "—" : String(cur.runs) },
     { k: "Success", v: cur.rate != null ? `${cur.rate}%` : "—" },
     { k: "Last run", v: cur.last },
     { k: "Improved", v: cur.improved },
@@ -76,7 +88,8 @@ export function LibrarySection({
       onTryDraft();
       return;
     }
-    app.toast("Test run started on yesterday’s data. Results in about a minute");
+    // Issue 932: nothing starts a run from here yet, so the toast says so instead of promising results.
+    app.toast("Test runs are not connected yet. Nothing was started.");
   };
 
   return (
@@ -138,7 +151,7 @@ export function LibrarySection({
                     {meta.label}
                   </span>
                   <span className="park-skills-lib-row-cost">
-                    {s.now != null ? `${money(s.now)} a run` : "Not run yet"}
+                    {s.now != null ? `${money(s.now, currency)} a run` : "Not run yet"}
                   </span>
                 </span>
               </button>
@@ -175,6 +188,8 @@ export function LibrarySection({
               <button
                 type="button"
                 className="park-skills-lib-secondary"
+                disabled={live}
+                title={live ? NOT_FROM_HERE : undefined}
                 onClick={() => onTogglePause(cur)}
               >
                 {isPaused ? "Resume" : "Pause"}
@@ -182,10 +197,17 @@ export function LibrarySection({
               <button
                 type="button"
                 className="park-skills-lib-secondary"
-                onClick={() => app.toast("Step editor opens here. Changes are versioned")}
+                disabled={live}
+                title={live ? NOT_FROM_HERE : undefined}
+                onClick={() => app.toast(SAMPLE_EDIT)}
               >
                 Edit steps
               </button>
+              {live ? (
+                <span className="park-skills-lib-owner" data-testid="skills-lib-not-here">
+                  {NOT_FROM_HERE}
+                </span>
+              ) : null}
             </div>
           </div>
 
@@ -210,8 +232,8 @@ export function LibrarySection({
                 <div className="park-skills-lib-cost-fill" style={{ width: barWidth }} />
               </div>
               <div className="park-skills-lib-cost-sub">
-                <span>{`First run ${money(cur.first)}`}</span>
-                <span>{`Now ${money(cur.now)}`}</span>
+                <span>{`First run ${money(cur.first, currency)}`}</span>
+                <span>{`Now ${money(cur.now, currency)}`}</span>
               </div>
             </div>
           ) : null}

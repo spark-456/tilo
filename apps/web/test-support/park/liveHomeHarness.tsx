@@ -150,7 +150,9 @@ export function notices(rig: LiveRig): string[] {
 
 /** True when the page or the toast says a request is on its way, not just that a control exists. */
 export function showsPending(rig: LiveRig): boolean {
-  const buttons = [...rig.el.querySelectorAll<HTMLElement>("button")];
+  const buttons = [...rig.el.querySelectorAll<HTMLElement>("button")].filter(
+    (b) => !b.closest(".park-home-intake") || b.classList.contains("park-home-start"),
+  );
   const busy = buttons.some(
     (b) =>
       (b as HTMLButtonElement).disabled ||

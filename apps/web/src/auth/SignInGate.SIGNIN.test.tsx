@@ -12,7 +12,7 @@
 //                      "signed_out": the sign-in panel and NOT the children;
 //                      "google" or "anonymous": the children and no panel.
 //   The panel is rendered by the gate (a separate SignInPanel component is the builder's choice). It offers
-//   "Sign in with Google" and a demo session (a control whose accessible name contains "demo"), both real buttons.
+//   "Continue with Google" and a demo session (a control whose accessible name contains "demo"), both real buttons.
 //   It has no password or email field and no form: Tilo never handles passwords.
 //   `session.ts` exports `session: AuthController`, the one controller for this page (createAuth on the page's host).
 import { act } from "react";
@@ -65,7 +65,7 @@ const app = () => document.querySelector('[data-testid="app"]');
 const buttons = () => qa<HTMLButtonElement>(document.body, "button");
 const named = (re: RegExp) =>
   buttons().find((b) => re.test(`${b.textContent ?? ""} ${b.getAttribute("aria-label") ?? ""}`));
-const googleButton = () => named(/sign in with google/i);
+const googleButton = () => named(/(sign in|continue) with google/i);
 const demoButton = () => named(/demo/i);
 const alertText = () => document.querySelector('[role="alert"]')?.textContent ?? null;
 const settle = async () => {

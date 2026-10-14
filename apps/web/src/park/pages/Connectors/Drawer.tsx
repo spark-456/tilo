@@ -1,7 +1,7 @@
 // The connector detail panel (design: a right-hand drawer, role="dialog" named by the tool). The scrim and
 // Escape close it; focus goes to Close on open and back to the opener on close.
 import { useEffect, useRef } from "react";
-import { Spin } from "./ConnectorParts";
+import { Spin, monoColor } from "./ConnectorParts";
 import { icon } from "./icons";
 import {
   DEFAULT_SCOPES,
@@ -72,7 +72,7 @@ export function Drawer({
       {/* biome-ignore lint/a11y/useSemanticElements: the design's side panel is an aside with role="dialog" */}
       <aside className="park-connectors-drawer" role="dialog" aria-label={c.name}>
         <div className="park-connectors-drawer-head">
-          <span className="park-connectors-drawer-mono" style={{ color: c.col }}>
+          <span className="park-connectors-drawer-mono" style={{ color: monoColor(c.col) }}>
             {c.mono}
           </span>
           <div className="park-connectors-drawer-title">

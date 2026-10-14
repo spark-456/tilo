@@ -40,6 +40,25 @@ def pytest_configure(config: pytest.Config) -> None:
 
 
 @pytest.fixture(autouse=True)
+def _fresh_process_state():
+    # FastAPI lazily binds included routes. Bind the original dependency keys before
+    # _wire_models patches deps.get_router, or later intake requests retain its
+    # assistant-only router even after monkeypatch restores the module attribute (#672).
+    app.openapi()
+    overrides = app.dependency_overrides.copy()
+    app.dependency_overrides.clear()
+    for cached in (deps.get_spend_ledger, deps.get_decision_cache):
+        cached.cache_clear()
+    try:
+        yield
+    finally:
+        app.dependency_overrides.clear()
+        app.dependency_overrides.update(overrides)
+        for cached in (deps.get_spend_ledger, deps.get_decision_cache):
+            cached.cache_clear()
+
+
+@pytest.fixture(autouse=True)
 def _no_dev_unit_delay(monkeypatch: pytest.MonkeyPatch) -> None:
     """CL-INT-5d: the dev unit runner paces a dev run by default; the suite runs it unpaced unless a test sets it."""
     monkeypatch.setenv("TILO_DEV_UNIT_DELAY_S", "0")
@@ -285,6 +304,49 @@ def pw1b_rig(request):
     return _pw1b_lib.make_rig(request.param)
 
 
+def pytest_addoption(parser):
+    """ADR35-L2: switch on the `firestore-emulator` rig of the outbox store suite (`just test-outbox-emulator`)."""
+    parser.addoption("--outbox-emulator", action="store_true", default=False, help="run the outbox store emulator rig")
+
+
+# --- PROD-WIRE 3 (one Firestore client per process, the Firestore access store): see _pw3_lib.py ---------------
+
+
+@pytest.fixture(autouse=True)
+def _pw3_cold_client_cache():
+    """`tilo_api.prod` caches one client per project for the process: every test starts and ends with it empty (a
+    no-op until the module exists)."""
+    import _pw3_lib
+
+    _pw3_lib.reset_prod()
+    yield
+    _pw3_lib.reset_prod()
+
+
+@pytest.fixture()
+def pw3(monkeypatch: pytest.MonkeyPatch):
+    """A `_pw3_lib.Pw3`: no ambient config, a cold process, the real Firestore client replaced by a spy."""
+    import _pw3_lib
+
+    return _pw3_lib.make_pw3(monkeypatch)
+
+
+@pytest.fixture()
+def pw3_emulator(pw1b_emulator_host: str, monkeypatch: pytest.MonkeyPatch):
+    """The emulator (a `demo-` project, no credentials) with a cold process; `FIRESTORE_EMULATOR_HOST` stays set, the
+    real `firestore.Client` is NOT replaced, and no `K_SERVICE` is present (a laptop)."""
+    import _pw3_lib
+    from tilo_api import deps, durable_store
+
+    for name in _pw3_lib.AMBIENT:
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setenv("FIRESTORE_EMULATOR_HOST", pw1b_emulator_host)
+    monkeypatch.setattr(durable_store, "_opened", {})
+    deps.get_people_stores.cache_clear()
+    _pw3_lib.reset_prod()
+    return monkeypatch
+
+
 def pytest_collection_modifyitems(items):
     """PPL-11a: tests that need a slice B or C route are strict xfails until that slice lands (`SLICE_BC_PENDING`).
     PPL-11c: the same for each slice of the rest of the people API (`SLICE_PENDING`, API_PPL_11c.md section 0)."""
@@ -308,6 +370,14 @@ def pytest_collection_modifyitems(items):
         for item in items:
             if "test_PPL_11c_FS_" in item.nodeid and is_pending(item.nodeid):
                 item.add_marker(pytest.mark.xfail(strict=True, reason="PPL-11c-FS-1 pending (API_PPL_11c_FS.md)"))
+    if any("test_PPL_11c_FS_2_" in item.nodeid for item in items):
+        # PPL-11c-FS-2 (limits, idempotency records and event writes on durable stores, API_PPL_11c_FS_2.md section 0):
+        # a group is a strict xfail until its builder deletes its entry from `FS2_PENDING`.
+        from _ppl11c_fs2_lib import is_pending as fs2_is_pending
+
+        for item in items:
+            if "test_PPL_11c_FS_2_" in item.nodeid and fs2_is_pending(item.nodeid):
+                item.add_marker(pytest.mark.xfail(strict=True, reason="PPL-11c-FS-2 pending (API_PPL_11c_FS_2.md)"))
     if any("test_FR_PA_08_" in item.nodeid for item in items):
         # FR-PA-08 (people assistant STATUS and weekly summary, API_FR_PA_08.md section 0): a slice is a strict xfail
         # until its builder deletes its entry from `SLICE_PENDING`; the guards file is never pending.
@@ -330,3 +400,23 @@ def pytest_collection_modifyitems(items):
                 continue
             if any(entry in item.nodeid for entry in FR_CAL_07A_PENDING):
                 item.add_marker(pytest.mark.xfail(strict=True, reason="FR-CAL-07a slice pending"))
+
+
+@pytest.fixture(autouse=True)
+def _fresh_missing_token_log():
+    """The missing-token warning is sampled per process (once a minute): each test starts with a first one."""
+    from tilo_api import appcheck
+
+    appcheck._missing_log.update(at=float("-inf"), skipped=0)
+    yield
+
+
+@pytest.fixture()
+def skills4(people_rig, repo_root):
+    """SKILLS-4: the people rig plus a scripted Router, a fake safety screen and the in-memory skill store."""
+    from _ppl11a_lib import STANDARD_PERSONS
+    from _skills4_lib import Skills4
+
+    rig = people_rig()
+    rig.add_people(STANDARD_PERSONS.values())
+    yield Skills4(rig, repo_root)

@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.tilo.example/world_share.schema.json",
+  "x-version": "1.0.0",
+  "title": "WorldShare",
+  "description": "A world shared with one team (ADR-0040, PE-31): the members of `team` read that world's Story, Trace, runs and artifacts as Viewers of every district, and read the team view of the work items made in it (PE-33). It is not a role: it carries no scope and no right to answer, approve, start, stop or share, and adds no Approver or Team Lead (ADR-0006). `granted_by` is the world's owner, stamped by tilo-api from the signed-in session and the server clock (PE-19). `revoked` is null while the share stands and the owner's stamp once withdrawn, effective on the next request. One record per world and team (`id` is ws_ and the first 32 hex characters of SHA-256 of `<world_id>/<team>`, checked by the validator); sharing again after a revoke replaces the record and the world's `world.share_changed` events keep the history. Whether the share is in force also depends on the directory (PE-31), which this schema cannot see.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "org_id", "world_id", "team", "granted_by", "revoked"],
+  "properties": {
+    "id": {
+      "$ref": "#/$defs/id"
+    },
+    "org_id": {
+      "$ref": "common.schema.json#/$defs/org_id"
+    },
+    "world_id": {
+      "$ref": "common.schema.json#/$defs/world_id"
+    },
+    "team": {
+      "$ref": "common.schema.json#/$defs/team_id"
+    },
+    "granted_by": {
+      "$ref": "team_lead.schema.json#/$defs/assignment"
+    },
+    "revoked": {
+      "anyOf": [
+        {
+          "$ref": "team_lead.schema.json#/$defs/assignment"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  },
+  "$defs": {
+    "id": {
+      "type": "string",
+      "pattern": "^ws_[0-9a-f]{32}$"
+    }
+  }
+}

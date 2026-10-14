@@ -236,6 +236,9 @@ class _Record:
     def kind(self) -> str:
         return self.card["kind"]
 
+    def assignee_until_live(self, now: datetime.datetime) -> bool:
+        return self.assignee_until is None or now < self.assignee_until
+
 
 def _can_see(p: Principal, world_id: str, owner: str | None, r: _Record, now: datetime.datetime) -> bool:
     """PRD 10.1 scope: the owner sees every card, a Team Lead their districts' cards, an Approver
@@ -489,6 +492,32 @@ class CardStore:
                 if record.status == "open" and id(record.group) not in shown and _routed_to(record, world_id, domain):
                     shown[id(record.group)] = record
             return sorted((copy.deepcopy(r.card) for r in shown.values()), key=lambda c: c["created_at"])
+
+    def plate_facts(self, user_id: str, *, limit: int = 500) -> list[dict]:
+        """PEOPLE-SEAMS-1 (ADR-0021, PE-27): the plate's card facts for `user_id` alone, oldest first, one per group:
+        every open card of a world the person owns, and an open gate whose live Approver assignment names them (a share
+        link's expiry ends it). `{data, world_owner, approver, answered: False}`; nothing of any other person's."""
+        now = _parse_ts(self._clock.now())
+        with self._lock:
+            shown: dict[int, tuple[_Record, str | None]] = {}
+            for world_id, records in self._records.items():
+                owner = self._world_owners.get(world_id)
+                for record in records.values():
+                    if record.status != "open" or id(record.group) in shown:
+                        continue
+                    approves = record.kind == "gate" and record.assignee == user_id and record.assignee_until_live(now)
+                    if (owner is not None and owner == user_id) or approves:
+                        shown[id(record.group)] = (record, owner)
+            found = sorted(shown.values(), key=lambda pair: (pair[0].card["created_at"], pair[0].card["id"]))
+            return [
+                {
+                    "data": copy.deepcopy(r.card),
+                    "world_owner": owner,
+                    "approver": r.assignee if r.kind == "gate" and r.assignee_until_live(now) else None,
+                    "answered": False,
+                }
+                for r, owner in found[: max(limit, 0)]
+            ]
 
     def lead_answers(self, world_id: str, user_id: str) -> list[dict]:
         """FR-HIL-10: this Team Lead's own answers (never a timeout default), each `{card_id, option, answered_at,

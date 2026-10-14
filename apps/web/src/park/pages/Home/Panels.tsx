@@ -2,9 +2,10 @@
 // Tilo App Home.dc.html): map pins, the greeting panel, the Today panel and the composer's panels.
 // Presentation only: HomePage.tsx owns the data, the composer state and every navigation call.
 import type { MouseEvent, ReactNode } from "react";
-import type { Dec, Decision, Ledger } from "../../api/types";
+import type { Dec, Decision, Ledger, World } from "../../api/types";
 import { kpis } from "../../app/ledgerKpis";
 import { KpiTile } from "../../components";
+import { SampleBadge, SampleNote } from "../../sample/SampleBadge";
 import {
   type LiveRow,
   type NextEvent,
@@ -106,7 +107,11 @@ function GoLink({ href, onGo, children }: { href: string; onGo: () => void; chil
 }
 
 export interface TodayProps {
+  /** True only when the rows come from the served worlds: "Live now" is a claim, so sample rows are titled as a sample (HR-1). */
+  readonly served: boolean;
   readonly rows: readonly LiveRow[];
+  /** STARTER-1: the recorded sample project, when the Api served it and the person has not hidden it. */
+  readonly sample?: World | undefined;
   readonly events: readonly NextEvent[];
   readonly spend: Spend;
   readonly night: boolean;
@@ -117,7 +122,9 @@ export interface TodayProps {
 }
 
 export function TodayPanel({
+  served,
   rows,
+  sample,
   events,
   spend,
   night,
@@ -129,7 +136,7 @@ export function TodayPanel({
   return (
     <aside aria-label="Today" className="park-home-today park-home-glass">
       <div className="park-home-head">
-        <span className="park-home-title">Live now</span>
+        <span className="park-home-title">{served ? "Live now" : "Sample worlds"}</span>
         <GoLink href="#worlds" onGo={onWorlds}>
           All worlds
         </GoLink>
@@ -158,6 +165,17 @@ export function TodayPanel({
           </span>
         </button>
       ))}
+      {sample ? (
+        <button type="button" className="park-home-live" onClick={() => onWorld(sample.id)}>
+          <span className="park-home-live__text">
+            <span className="park-home-live__name">
+              {sample.short}
+              <SampleBadge />
+            </span>
+            <SampleNote className="park-home-live__sub" />
+          </span>
+        </button>
+      ) : null}
       <div className="park-home-rule" />
       <div className="park-home-head park-home-head--next">
         <span className="park-home-title">Up next today</span>
@@ -177,7 +195,9 @@ export function TodayPanel({
       <div className="park-home-rule" />
       <button type="button" className="park-home-spend" onClick={onLedger}>
         <span className="park-home-spend__head">
-          <span className="park-home-title">September spend</span>
+          <span className="park-home-title">
+            {spend.month ? `${spend.month} spend` : "Spend so far"}
+          </span>
           <span className="park-home-spend__link">Ledger</span>
         </span>
         <span className="park-home-spend__figures">

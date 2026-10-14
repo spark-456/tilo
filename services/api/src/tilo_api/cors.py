@@ -13,12 +13,56 @@ from __future__ import annotations
 import os
 import re
 from collections.abc import Mapping
+from typing import TypedDict
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.datastructures import MutableHeaders
+from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 ENV = "TILO_API_CORS_ORIGINS"
+PRODUCTION_ORIGINS = (
+    "https://essential-wares-510320-f0.web.app",
+    "https://essential-wares-510320-f0.firebaseapp.com",
+)
+
+
+class _CorsOptions(TypedDict):
+    allow_methods: list[str]
+    allow_headers: list[str]
+    expose_headers: list[str]
+    allow_credentials: bool
+
+
+_OPTIONS: _CorsOptions = {
+    "allow_methods": ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    "allow_headers": ["Content-Type", "Idempotency-Key", "X-Firebase-AppCheck", "Authorization", "X-Tilo-Channel"],
+    "expose_headers": ["Retry-After"],
+    "allow_credentials": False,
+}
 _ORIGIN_RE = re.compile(r"^https://[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?(?::[0-9]{1,5})?$")
+
+
+class ProductionCors:
+    """One outer layer: fixed Hosting origins when deployed, configured origins otherwise."""
+
+    def __init__(self, app: ASGIApp) -> None:
+        self.app = app
+        self.production = CORSMiddleware(app, allow_origins=list(PRODUCTION_ORIGINS), **_OPTIONS)
+        origins = cors_origins()
+        self.configured = CORSMiddleware(app, allow_origins=origins, **_OPTIONS) if origins else app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        from tilo_api.access import enforced
+
+        async def with_exposure(message: Message) -> None:
+            if message["type"] == "http.response.start":
+                headers = MutableHeaders(scope=message)
+                if "access-control-allow-origin" in headers:
+                    headers["access-control-expose-headers"] = "Retry-After"
+            await send(message)
+
+        await (self.production if enforced() else self.configured)(scope, receive, with_exposure)
 
 
 def cors_origins(env: Mapping[str, str] | None = None) -> list[str]:
@@ -37,15 +81,15 @@ def install_cors(app: FastAPI, env: Mapping[str, str] | None = None) -> bool:
     source = os.environ if env is None else env
     if source.get("TILO_API_DEV") == "1":  # dev mode has its own CORS (tilo_api.dev): never both
         return False
+    if env is None:
+        app.add_middleware(ProductionCors)
+        return True
     origins = cors_origins(env)
     if not origins:
         return False
     app.add_middleware(
         CORSMiddleware,
         allow_origins=origins,
-        allow_methods=["GET", "POST", "OPTIONS"],
-        allow_headers=["Content-Type", "Idempotency-Key", "X-Firebase-AppCheck", "Authorization", "X-Tilo-Channel"],
-        expose_headers=["Retry-After"],
-        allow_credentials=False,
+        **_OPTIONS,
     )
     return True

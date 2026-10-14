@@ -175,6 +175,7 @@ describe("FR-SKL-06: Trust and pause", () => {
   });
 
   it("test_FR_SKL_06_trusted_requires_configured_number_of_good_runs_from_config", async () => {
+    expect(Object.keys(skillConfig.SKILL_TRUST_CONFIG)).toEqual(["minGoodRunsForTrust"]);
     expect(skillConfig.SKILL_TRUST_CONFIG.minGoodRunsForTrust).toBe(5);
     expect(skillConfig.canTrustSkill([1, 1, 1, 1, 1])).toBe(true);
     expect(skillConfig.canTrustSkill([1, 1, 0, 1])).toBe(false);
@@ -196,6 +197,15 @@ describe("FR-SKL-06: Trust and pause", () => {
     expect(pageText(help)).not.toContain("Trusted. Tilo stops asking before routine steps.");
   });
 
+  it("W10_FR_SKL_05_demo_edit_steps_says_nothing_opened_or_changed", async () => {
+    const rig = await mountSkills();
+    clickEl(control(librarySection(rig.el), "Edit steps"));
+    expect(toasts(rig.app)).toContainEqual([
+      "Sample data: step editing is not available yet, so nothing was changed.",
+    ]);
+    expect(pageText(rig.el)).not.toContain("Step editor opens here");
+  });
+
   it("test_FR_SKL_06_pause_and_resume_and_paused_skill_never_starts", async () => {
     const rig = await mountSkills();
     const lib = librarySection(rig.el);
@@ -204,7 +214,7 @@ describe("FR-SKL-06: Trust and pause", () => {
     clickEl(control(lib, "Pause"));
     expect(pageText(lib)).toContain("FINANCE · PAUSED");
     expect(toasts(rig.app)).toContainEqual([
-      "“Match invoices to purchase orders” is paused. Worlds using it will ask you instead",
+      "Sample data: “Match invoices to purchase orders” is paused on this page only. Nothing changed for your worlds",
     ]);
 
     // While paused, "Test run" is disabled and clicking it never starts a run
@@ -218,18 +228,27 @@ describe("FR-SKL-06: Trust and pause", () => {
     clickEl(control(lib, "Resume"));
     expect(pageText(lib)).toContain("FINANCE · TRUSTED");
     expect(toasts(rig.app)).toContainEqual([
-      "“Match invoices to purchase orders” is running again",
+      "Sample data: “Match invoices to purchase orders” is shown as running again on this page only",
     ]);
     expect(isDisabled(control(lib, "Test run"))).toBe(false);
     clickEl(control(lib, "Test run"));
     expect(toasts(rig.app)).toContainEqual([
-      "Test run started on yesterday’s data. Results in about a minute",
+      "Test runs are not connected yet. Nothing was started.",
     ]);
   });
 });
 
 describe("FR-SKL-07: Who helped this month", () => {
   it("test_FR_SKL_07_who_helped_this_month_shows_counts_and_mistake_change_only_never_message_content", async () => {
+    const fixtures = (await import("../../api/fixtures")) as Record<string, unknown>;
+    const teachData = (await import("./teachData")) as Record<string, unknown>;
+    expect(fixtures.HELPER_SUMMARY_FIXTURE).toEqual({
+      baseMonthlyAnswersAndFixes: 41,
+      mistakesDeltaSinceJuly: "−38%",
+      helperMonthLabel: "September",
+    });
+    expect(teachData.HELPER_SUMMARY_FIXTURE).toBeUndefined();
+
     const rig = await mountSkills();
     const help = helpSection(rig.el);
     const whoCard = elWithText(help, "Who helped this month")?.closest(

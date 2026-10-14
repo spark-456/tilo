@@ -194,7 +194,8 @@ describe("WEB_3a_static: imports", () => {
     const src = code(join(APP, "ParkApp.tsx"));
     expect(src).toMatch(/import\s+["']\.\.\/tokens\/park\.css["']/);
     expect(src).toMatch(
-      /from\s+["']\.\.\/components(?:\/index)?["']|\.\.\/components\/park\.components\.css/,
+      // QA-DEMO-1 M2: NotFound moved to ./NotFound, which is what imports the components barrel
+      /from\s+["']\.\.\/components(?:\/index)?["']|\.\.\/components\/park\.components\.css|from\s+["']\.\/NotFound["']/,
     );
   });
 });

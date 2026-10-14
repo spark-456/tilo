@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.tilo.example/events/data/skill.fixed.schema.json",
+  "x-version": "1.0.0",
+  "title": "SkillFixedData",
+  "description": "data of skill.fixed (registry 1.4.0, ADR-0034, FR-SKL-05): the owner fixed one step, and to_version (from_version + 1, TS-09) is what the next run uses. It copies the fix record without its text. Envelope as TS-11.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["skill", "from_version", "to_version", "step"],
+  "properties": {
+    "skill": { "$ref": "../../taught_skill.schema.json#/$defs/id" },
+    "from_version": { "type": "integer", "minimum": 1 },
+    "to_version": { "type": "integer", "minimum": 2 },
+    "step": { "$ref": "../../taught_skill.schema.json#/$defs/step_number" }
+  }
+}
