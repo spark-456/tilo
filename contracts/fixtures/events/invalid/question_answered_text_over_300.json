@@ -1,0 +1,37 @@
+{
+  "v": "1.0",
+  "id": "01JB5VQ0000000000000000119",
+  "seq": 119,
+  "ts": "2026-09-29T09:41:59.000Z",
+  "world_id": "w_village_basic",
+  "run_id": "r_village_basic_1",
+  "type": "question.answered",
+  "actor": "u_owner",
+  "target": "A_l1",
+  "level": "L1",
+  "district": "D1",
+  "item": {
+    "kind": "note",
+    "artifact_id": null,
+    "label": "Your answer"
+  },
+  "severity": "info",
+  "credits": 0,
+  "summary": "You answered: reply to the supplier only.",
+  "cause": null,
+  "vis": "all",
+  "authz": null,
+  "data": {
+    "answered_by": "person",
+    "text": "Gokarna, not Europe. Gokarna, not Europe. Gokarna, not Europe. Gokarna, not Europe. Gokarna, not Europe. Gokarna, not Europe. Gokarna, not Europe. Gokarna, not Europe. Gokarna, not Europe. Gokarna, not Europe. Gokarna, not Europe. Gokarna, not Europe. Gokarna, not Europe. Gokarna, not Europe. Gokarn!"
+  },
+  "trace": {
+    "model_role": null,
+    "profile": null,
+    "tokens_in": null,
+    "tokens_out": null,
+    "tool": null,
+    "latency_ms": null,
+    "archive_ref": null
+  }
+}
