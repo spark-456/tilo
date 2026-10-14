@@ -857,3 +857,14 @@
     flex: 1 1 100%;
   }
 }
+
+/* A bare button, input or summary in these pages takes the ramp's 14 px, never the browser's 13.33 px. */
+:where([data-park] .park-view-root) :where(button, input, select, textarea, summary, output) {
+  font-size: 14px;
+  font-family: "Nunito Sans", sans-serif;
+}
+
+/* <small> is 83% of its parent by default (13.33 px): on these pages it is the ramp's 14 px. */
+[data-park] .park-view-root small {
+  font-size: 14px;
+}

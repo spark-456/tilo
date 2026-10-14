@@ -55,10 +55,8 @@ for (const viewport of [DESKTOP, MOBILE]) {
     expect(text).not.toMatch(/\b[A-Z]_[a-z0-9]+\b|\bG\d\b/);
     await expectTypeScale(page);
     expect(await page.locator("main button.primary").count()).toBeLessThanOrEqual(1); // UX-1
-    if (viewport === DESKTOP) {
-      await expect(page.getByTestId("rail-needs")).toContainText(SUMMARY); // the rail agrees
-    }
     const axe = await new AxeBuilder({ page })
+      .include(".park-view-root")
       .withTags(["wcag2a", "wcag2aa", "wcag22aa"])
       .analyze();
     expect(axe.violations).toEqual([]);

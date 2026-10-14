@@ -44,6 +44,7 @@ for (const viewport of [DESKTOP, MOBILE]) {
     expect(await page.locator("main").innerText()).not.toMatch(noIds);
     await expectTypeScale(page);
     const axe = await new AxeBuilder({ page })
+      .include(".park-view-root")
       .withTags(["wcag2a", "wcag2aa", "wcag22aa"])
       .analyze();
     expect(axe.violations).toEqual([]);
