@@ -300,6 +300,8 @@ export function WorldPage({ app }: { app: AppCtx }) {
   const w = world;
   const isCity = w.tier === "City";
   const isTown = w.tier === "Town";
+  // Live run navigation follows the recorded run, regardless of the world's size.
+  const showRunViews = loaded.live || isCity;
   const isPaused = Boolean(paused[w.id]);
   const mine = loaded.decisions.filter((d) => d.world === w.id);
   const slackPending = slackPendingByWorld[w.id] ?? null;
@@ -462,7 +464,7 @@ export function WorldPage({ app }: { app: AppCtx }) {
               {slackState.disabledReason}
             </span>
           ) : null}
-          {isCity ? (
+          {showRunViews ? (
             <StageLink className="park-world-live" href={stage(stagePath(w.id))} reason={noStage}>
               {icon("play", 14)}Open live view
             </StageLink>
@@ -572,7 +574,7 @@ export function WorldPage({ app }: { app: AppCtx }) {
                 </div>
               </div>
             ) : null}
-            {isCity ? (
+            {showRunViews ? (
               <nav aria-label="Run views" className="park-world-lenses">
                 <StageLink href={stage(`/world/${id}/story`)} reason={noStage}>
                   Story
@@ -592,7 +594,7 @@ export function WorldPage({ app }: { app: AppCtx }) {
               </nav>
             ) : null}
           </div>
-          {isCity && !hasStage ? (
+          {showRunViews && !hasStage ? (
             // QA-DEMO-1 m3: the reason the lens links and "Open live view" are off is words on the page, not a tooltip
             <p id={NO_STAGE_ID} className="park-world-nostage">
               {noStage}
