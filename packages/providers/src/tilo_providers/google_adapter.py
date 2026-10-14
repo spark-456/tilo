@@ -183,6 +183,26 @@ class GoogleModelProvider(ModelProvider):
         """A sanitized copy: Gemini accepts a subset of JSON Schema and answers 400 to the rest (`schema_subset`)."""
         return to_gemini_schema(schema)
 
+    def _tools_for_send(self, tools: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        """RUN-FAIL-1: `GenerateRequest.tools` holds OpenAI-style `{"type": "function", "function": {...}}` specs
+        (the harness tool loop writes them; the OpenAI-compatible adapter sends them as they are). The Gen AI SDK
+        refuses that shape before sending, so every tool-using unit failed on Vertex. Function specs become ONE
+        Gemini tool of function declarations (parameters sanitized like a response schema); others pass as they are."""
+        declarations: list[dict[str, Any]] = []
+        others: list[dict[str, Any]] = []
+        for tool in tools:
+            function = tool.get("function") if tool.get("type") == "function" else None
+            if not isinstance(function, Mapping):
+                others.append(tool)
+                continue
+            declaration: dict[str, Any] = {"name": function.get("name")}
+            if function.get("description"):
+                declaration["description"] = function["description"]
+            if isinstance(function.get("parameters"), Mapping):
+                declaration["parameters_json_schema"] = to_gemini_schema(dict(function["parameters"]))
+            declarations.append(declaration)
+        return [{"function_declarations": declarations}, *others] if declarations else others
+
     def _thinking_for_send(self, level: str) -> str:
         """Vertex answers HTTP 400 to thinking level "minimal" (live, 5 Oct 2026; packages/providers/CLAUDE.md, "the
         smoke sends no `thinking_level`"), so it goes out as "low". This adapter is Vertex-only, so no other
@@ -202,7 +222,7 @@ class GoogleModelProvider(ModelProvider):
         if request.system is not None:
             kwargs["system_instruction"] = request.system
         if request.tools is not None:
-            kwargs["tools"] = request.tools
+            kwargs["tools"] = self._tools_for_send(request.tools)
         if request.max_output_tokens is not None:
             kwargs["max_output_tokens"] = request.max_output_tokens
         if request.response_schema is not None:

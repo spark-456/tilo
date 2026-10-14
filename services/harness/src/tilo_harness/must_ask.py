@@ -23,7 +23,7 @@ from __future__ import annotations
 import asyncio
 import json
 import re
-from collections.abc import Callable, Iterable, Mapping
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any, cast
 
@@ -32,6 +32,7 @@ from tilo_providers.interfaces import GenerateRequest, ModelProvider
 from tilo_providers.prompts import load_prompt
 
 from tilo_harness.config import AgentsConfig
+from tilo_harness.unit_prompt import request_variables
 from tilo_harness.untrusted import neutralise
 from tilo_harness.writer import format_ts, new_ulid
 
@@ -153,8 +154,11 @@ class MustAsk:
         owner: str = "u_owner",
         covered_actions: Iterable[str] = (),
         risk_table: RiskTable | None = None,
+        brief: Mapping[str, Any] | None = None,
+        intake_answers: Sequence[tuple[str, str]] = (),
     ) -> None:
         self._providers = providers
+        self._brief, self._answers = brief, tuple(intake_answers)  # RUN-FAIL-1: the whole task, as data
         self._max_attempts = config.retries.max_attempts
         self._card_sink = card_sink
         self._owner = owner
@@ -204,7 +208,12 @@ class MustAsk:
             "title": unit["title"],
             "actions": ", ".join(unit["actions"]) or "none",
         }
-        prompt = load_prompt(ROLE, "must_ask_task.md", {k: neutralise(v, limit=200) for k, v in fields.items()})
+        # RUN-FAIL-1: the unit is judged against the whole task (goal, places, dates, the person's answers), never its
+        # title alone. Same caps and neutralising as the unit's own prompt (`unit_prompt`); no clock, so no date drifts.
+        task = request_variables(self._brief, self._answers)
+        context = {k: task[k] for k in ("goal", "deadline", "constraints", "answers")}
+        variables = {k: neutralise(v, limit=200) for k, v in fields.items()} | context
+        prompt = load_prompt(ROLE, "must_ask_task.md", variables)
         return GenerateRequest(system=self._system, prompt=prompt, json_mode=True, max_output_tokens=400)
 
     def raise_question(

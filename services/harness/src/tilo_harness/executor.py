@@ -48,6 +48,7 @@ from __future__ import annotations
 import asyncio
 import dataclasses
 import functools
+import logging
 import math
 from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass, field
@@ -60,6 +61,7 @@ from tilo_providers.clock import Clock, parse_deadline, real_today
 from tilo_harness.branch import Checkpoint, hit_summary, reusable_units
 from tilo_harness.config import AgentsConfig
 from tilo_harness.context_handoff import context_pct, next_spare, note_is_valid, store_note
+from tilo_harness.failure import crash_reason, error_trail
 from tilo_harness.must_ask import Ask, MustAsk
 from tilo_harness.outputs import Kept, UnitOutput, existing, keep
 from tilo_harness.question_wait import Answer, QuestionWait
@@ -70,6 +72,7 @@ from tilo_harness.unit_prompt import UPSTREAM_ITEM_CAP, UpstreamItem
 from tilo_harness.validator import EventRejected, repo_validator
 from tilo_harness.verifier import Verifier
 
+log = logging.getLogger(__name__)
 _WORKER_RANKS = ("specialist", "verifier", "writer")  # ranks that execute units (PRD 8.1)
 _LEVELS = 3  # Director -> Lead -> worker
 
@@ -94,6 +97,11 @@ class UnitOutcome:
     reason: str | None = None  # a failed unit's plain, code-written line (at most 140 chars) for the run's stop notice
     credits: float = 0.0  # what the unit's work cost (model calls through the runner's meter, tool results)
     read_external: bool = True  # the unit read outside content, or text resting on it (SEC-05); unknown = True
+
+
+@dataclass(frozen=True)
+class _Crashed:
+    reason: str  # a runner that raised: the plain line for UnitOutcome.reason (RUN-FAIL-1)
 
 
 @dataclass(frozen=True)
@@ -456,17 +464,20 @@ class _Run:
             self.results[unit_id] = await asyncio.to_thread(_upstream_item, unit, outcome, made, self.store)
         return outcome
 
-    async def call(self, work: Awaitable[Any]) -> Any:
-        """The runner's result, or None if it crashed or cancelled its own work (a cancel of the run itself goes on)."""
+    async def call(self, work: Awaitable[Any], unit_id: str = "") -> Any:
+        """The runner's result, or a `_Crashed` if it crashed or cancelled its own work (a cancel of the run itself
+        goes on). A crash is one ERROR line: class names and profile ids only (RUN-FAIL-1)."""
         try:
             return await asyncio.ensure_future(work)  # its own task: a runner cancelling "the current task" is itself
         except asyncio.CancelledError:
             task = asyncio.current_task()
             if task is not None and task.cancelling():  # the run itself was cancelled
                 raise
-        except Exception:  # a runner crash fails this unit closed; the run goes on
-            pass
-        return None
+            return _Crashed("a step's work was cancelled")
+        except Exception as error:  # a runner crash fails this unit closed; the run goes on
+            reason = crash_reason(error)
+            log.error("unit %s failed: %s [%s]", unit_id, reason, error_trail(error))
+            return _Crashed(reason)
 
     async def run_agents(
         self, unit: dict[str, Any], context: UnitContext, site: str, cause: str, at: dict[str, Any]
@@ -477,9 +488,10 @@ class _Run:
         worker, lead, handoffs = context.agent_id, self.roster.leads[unit["district"]], 0
         closed = UnitOutcome(success=False, summary="The handoff could not be completed, so the unit stopped.")
         while True:
-            ran = await self.call(self.runner.run(unit, context))
+            ran = await self.call(self.runner.run(unit, context), unit["id"])
             if not isinstance(ran, UnitOutcome):
-                return UnitOutcome(success=False, summary="The unit's work failed."), worker, cause
+                reason = ran.reason if isinstance(ran, _Crashed) else "a step's work returned no result"
+                return UnitOutcome(success=False, summary="The unit's work failed.", reason=reason), worker, cause
             if ran.handoff_note is None or ran.success is not True:
                 return ran, worker, cause
             note, pct = ran.handoff_note, context_pct(ran.context_share, self.handoff_at)
@@ -505,7 +517,7 @@ class _Run:
             cause = say("agent.assigned", lead, successor, "The Lead gave it the unit.", {"unit": unit["id"]})
             context = dataclasses.replace(context, agent_id=successor, answer=None, note=note, note_ref=ref)
             check = getattr(self.runner, "verify", None)
-            verified = check is not None and await self.call(check(unit, context)) is True
+            verified = check is not None and await self.call(check(unit, context), unit["id"]) is True
             done = {"predecessor": worker, "note": ref, "verification_passed": verified}
             cause = say("agent.context_handoff_completed", successor, site, "The successor took over.", done)
             say("agent.retired", lead, worker, "The agent handed over and left.", {})

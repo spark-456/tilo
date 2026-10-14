@@ -182,6 +182,17 @@ def start_run(store: deps.Store, task: deps.TaskRecord, *, approach: dict, budge
     threading.Thread(target=run.main, name=f"run-{task.world_id}", daemon=True).start()
 
 
+def _clip_reason(reason: str) -> str:
+    """world.failed data.reason: one line, at most 140 characters."""
+    line = " ".join(str(reason).split()) or "the work stopped"
+    return line if len(line) <= 140 else line[:139] + "…"
+
+
+def _unit_reason(outcome: Any) -> str | None:
+    """RUN-FAIL-1: a failed unit's plain stop line: its own `reason`, else its code-written summary."""
+    return getattr(outcome, "reason", None) or getattr(outcome, "summary", None) or None
+
+
 def _plain(card: dict) -> dict:
     """The card without control, format and surrogate characters in the text a model may have written."""
 
@@ -453,9 +464,12 @@ class Run:
             self.resolved[card_id] = committed
 
     def _fail(self, reason: str, unit: str | None) -> None:
+        reason = _clip_reason(reason)
         try:
             if not (self._failed or self.paused()):
                 self._failed = True
+                # RUN-FAIL-1: every failure is one ERROR line with its plain, code-written reason (never silent)
+                logger.error("run %s failed (unit %s): %s", self.run_id, unit or "none", reason)
                 self.put(
                     "world.failed", "system", self.world_id, f"Stopped: {reason}", {"reason": reason, "unit": unit}
                 )
@@ -557,6 +571,7 @@ class Run:
         return MustAsk(
             self.seams.must_ask_providers, config=config, card_sink=self._store_card, owner=self.owner,
             covered_actions={p["action_type"] for p in self.store.policies.values() if p.get("owner") == self.owner},
+            brief=copy.deepcopy(self.brief), intake_answers=self.intake_answers,  # RUN-FAIL-1: the whole task
         )  # fmt: skip
 
     def _prepare(self) -> Any:
@@ -654,7 +669,8 @@ class Run:
         if stopped := result.failed + result.held + result.skipped:
             reason = "a step was held, so the work stopped" if result.held and not result.failed else None
             failed = result.outcomes.get(stopped[0])  # a unit's own plain stop line, if code wrote one (FR-AGT-12)
-            own = getattr(failed, "reason", None) if failed is not None and not failed.success else None
+            ran = failed is not None and not failed.success and stopped[0] not in result.held
+            own = _unit_reason(failed) if ran else None
             self._fail(self.failure or own or reason or "a unit failed, so the work stopped", stopped[0])
             return
         credits = math.fsum(e["credits"] for e in self.store.events.get(self.world_id, []))  # the meter (HR-1)
