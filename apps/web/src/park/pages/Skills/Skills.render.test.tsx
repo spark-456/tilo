@@ -338,13 +338,16 @@ describe("WEB_8a_skills_render: data comes through the Api, and shows only what 
 
   it("WEB_8a_skills_render_when_either_read_fails_there_are_no_made_up_numbers", async () => {
     const skillsDown = await mountSkills({ api: skillsApi({ getSkills: rejects }) });
-    expect(pageText(skillsDown.el)).toContain("Not connected yet");
+    // M2-ERRCOPY-1: an actual failed read is distinct from the NotBuilt control above.
+    expect(pageText(skillsDown.el)).toContain("Skills could not load");
+    expect(qa(skillsDown.el, "[data-api-read-state] button")).toHaveLength(1);
     expect(pageText(skillsDown.el)).not.toMatch(COUNT);
     expect(pageText(skillsDown.el)).not.toContain("offline-7f3");
     cleanup();
     // Without the learn data the "need your help" count cannot be known, so no count of it is shown.
     const learnDown = await mountSkills({ api: skillsApi({ getLearn: rejects }) });
-    expect(pageText(learnDown.el)).toContain("Not connected yet");
+    expect(pageText(learnDown.el)).toContain("Skills could not load");
+    expect(qa(learnDown.el, "[data-api-read-state] button")).toHaveLength(1);
     expect(pageText(learnDown.el)).not.toMatch(/need your help|Nothing waiting/);
     expect(pageText(learnDown.el)).not.toContain("offline-7f3");
   });

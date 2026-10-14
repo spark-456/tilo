@@ -1,4 +1,5 @@
 import { displayApiError } from "../../api/http";
+import { Button } from "./Button";
 
 /** Retry is explicitly a READ refresh: uncertain writes must never be resubmitted here.
  * The same reserved box stays mounted during loading/error/retry; long copy scrolls inside. */
@@ -28,14 +29,15 @@ export function ApiReadState({
         {visible ? <strong>{pending ? "Loading" : title}</strong> : null}
         {visible ? <p>{pending ? "Loading…" : displayApiError(error)}</p> : null}
       </div>
-      <button
+      <Button
+        variant="secondary"
         type="button"
         disabled={pending || error == null}
         style={{ visibility: !pending && error != null ? "visible" : "hidden", minHeight: 44 }}
         onClick={retryRead}
       >
         Retry
-      </button>
+      </Button>
     </div>
   );
 }
