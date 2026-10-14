@@ -43,7 +43,14 @@ REFUSED = "A valid App Check token is required."
 
 # Never checked, in either mode (a test pins this list).
 EXEMPT_ROUTES: frozenset[tuple[str, str]] = frozenset(
-    {("GET", "/health"), ("GET", "/healthz"), ("POST", "/internal/schedules/tick")}
+    {
+        ("GET", "/health"),
+        ("GET", "/healthz"),
+        ("POST", "/internal/schedules/tick"),
+        # ADR-0042: the meeting bot's two meter routes; a service has no App Check token, each checks its own token.
+        ("POST", "/internal/meeting-voice/reserve"),
+        ("POST", "/internal/meeting-voice/close"),
+    }
 )
 
 # FR-PA-06b: `GET` and `POST` of `/l/<token>` are the plate digest's emailed Done and Snooze links. A mail client or

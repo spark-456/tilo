@@ -33,15 +33,23 @@ class LiveVoiceSpend:
     ) -> None:
         self._guard, self._uid, self._run_id, self._org_id = guard, uid, run_id, org_id
         self._unit, self._price = unit_minor, price
+        self.refusal: str | None = None  # after a None `reserve`: capped, replay_only or unavailable (ADR-0042)
 
     def reserve(self) -> spend.UnitPlan | None:
-        if self._guard.uid_capped(self._uid) or not self._guard.live_allowed(self._uid):
+        if self._guard.uid_capped(self._uid):
+            self.refusal = "capped"
+            return None
+        if not self._guard.live_allowed(self._uid):
+            self.refusal = "replay_only" if self._guard.replay_only() else "unavailable"
             return None
         plan = self._guard.begin_unit(
             "live", uid=self._uid, run_id=self._run_id, org_id=self._org_id, estimate_minor=self._unit,
             at=datetime.now(UTC),
         )  # fmt: skip
-        return plan if plan.mode == "live" and plan.reservation is not None else None
+        if plan.mode == "live" and plan.reservation is not None:
+            return plan
+        self.refusal = plan.reason if plan.reason in ("replay_only", "unavailable") else "capped"
+        return None
 
     def settle(self, hold: object, usage: Mapping[str, int]) -> None:
         minor = self._price(usage) if self._price is not None else None

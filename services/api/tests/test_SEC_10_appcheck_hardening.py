@@ -59,8 +59,14 @@ def _verifier(fetch, clock: Clock | None = None) -> appcheck.GoogleAppCheckVerif
 # --- the exempt list and enforcement on the public and write routes ---------------------------------
 
 
-def test_SEC_10_exempt_routes_are_exactly_the_three_pairs():
-    assert appcheck.EXEMPT_ROUTES == {("GET", "/health"), ("GET", "/healthz"), ("POST", "/internal/schedules/tick")}
+def test_SEC_10_exempt_routes_are_exactly_the_three_pairs_and_the_meeting_meters_two():
+    assert appcheck.EXEMPT_ROUTES == {
+        ("GET", "/health"),
+        ("GET", "/healthz"),
+        ("POST", "/internal/schedules/tick"),
+        ("POST", "/internal/meeting-voice/reserve"),  # ADR-0042 (BQ-M2-5): the bot's own token check, inert until on
+        ("POST", "/internal/meeting-voice/close"),
+    }
 
 
 def test_SEC_10_on_the_public_access_route_and_a_post_route_are_401_without_a_token(client, monkeypatch):
