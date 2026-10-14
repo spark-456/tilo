@@ -1,13 +1,18 @@
-// FR-UX-13 (docs/prd-supplement-design-2026-10-06.md section 1.6; HR-1..HR-7): the Park Home composer against the
-// LIVE Api in a real browser. Starting work makes the real intake call (POST /intake, the legacy S-01's call);
-// the world is added and the toast offers Open only after the server's reply. The page is /park/home, served by a
-// Vite with VITE_TILO_API_URL set (the fake tilo-api of e2e/support/fakeCardsApi.mjs answers the reads); the
-// intake route is stubbed here with `page.route`, held until the test releases it, so no real backend is used.
+// SIMPLE-RUN-1 (supersedes the FR-UX-13 plan-card flow; HR-1..HR-7): the Park Home composer against the LIVE Api in a
+// real browser. Start makes the real intake call, skips every question, prices the recommended approach and shows ONE
+// confirm card; the card's Start is the approval and opens the run's world. The page is /park/home, served by a Vite
+// with VITE_TILO_API_URL set (the fake tilo-api of e2e/support/fakeCardsApi.mjs answers the reads); the task routes are
+// stubbed here with `page.route`, so no real backend is used. Nothing sends the person to the old Understanding screen.
 // Local only (TILO_LIVE=1): `TILO_LIVE=1 pnpm exec playwright test e2e/live/composer --project=live --workers=1`.
 import { type Page, expect, test } from "@playwright/test";
 
 const API = `http://127.0.0.1:${process.env.TILO_LIVE_API_PORT ?? 5398}`;
-const CORS = { "access-control-allow-origin": "*", "content-type": "application/json" };
+const CORS = {
+  "access-control-allow-origin": "*",
+  "access-control-allow-headers": "*",
+  "access-control-allow-methods": "GET, POST, OPTIONS",
+  "content-type": "application/json",
+};
 const BRIEF = {
   goal: "Compare three suppliers' quotes and recommend one.",
   deliverables: [{ title: "Supplier comparison", format: "pdf" }],
@@ -19,82 +24,126 @@ const BRIEF = {
   assumptions: [],
   applied_preferences: [],
 };
-const INTAKE = { task_id: "t_e2e_1", brief: BRIEF, questions: [], files: [] };
+const QUESTIONS = [{ field: "audience", text: "Who is it for?", suggested_answers: ["The team"] }];
+const INTAKE = { task_id: "t_e2e_1", brief: BRIEF, questions: QUESTIONS, files: [] };
+const APPROACH = {
+  id: "a_balanced",
+  label: "Balanced",
+  summary: "Read the quotes, then compare.",
+  dimensions: {
+    depth: "standard",
+    sources: "files",
+    parallelism: "single",
+    verification: "light",
+    output_format: "document",
+  },
+  time: { min_s: 120, max_s: 300 },
+  credits: { min: 8, max: 20 },
+  risks: [],
+  skips: [],
+};
 
 interface Stub {
-  posts: () => number;
-  texts: () => string[];
+  posts: () => string[];
   release: (status?: number, body?: unknown) => void;
 }
 
-/** Holds the first POST /intake until `release`, and records how many arrived and what text they carried. */
-async function stubIntake(page: Page): Promise<Stub> {
-  let count = 0;
-  const texts: string[] = [];
+/** Holds the first POST /intake until `release`; every later task route answers at once. Records each POST path. */
+async function stubTask(page: Page): Promise<Stub> {
+  const posts: string[] = [];
   let release: (r: { status: number; body: unknown }) => void = () => undefined;
   const held = new Promise<{ status: number; body: unknown }>((r) => {
     release = r;
   });
+  const reply = (body: unknown, status = 200) => ({
+    status,
+    headers: CORS,
+    body: JSON.stringify(body),
+  });
   await page.route(`${API}/intake`, async (route) => {
-    const req = route.request();
-    if (req.method() !== "POST") return route.fulfill({ status: 204, headers: CORS });
-    count += 1;
-    texts.push(req.postData() ?? "");
+    if (route.request().method() !== "POST") return route.fulfill({ status: 204, headers: CORS });
+    posts.push("/intake");
     const r = await held;
-    await route.fulfill({ status: r.status, headers: CORS, body: JSON.stringify(r.body) });
+    await route.fulfill(reply(r.body, r.status));
+  });
+  await page.route(`${API}/tasks/t_e2e_1/answers`, async (route) => {
+    if (route.request().method() !== "POST") return route.fulfill({ status: 204, headers: CORS });
+    posts.push("/answers");
+    await route.fulfill(
+      reply({
+        brief: { ...BRIEF, assumptions: [{ question: "Who is it for?", assumed: "The team" }] },
+      }),
+    );
+  });
+  await page.route(`${API}/tasks/t_e2e_1/approaches`, (route) =>
+    route.request().method() !== "GET"
+      ? route.fulfill({ status: 204, headers: CORS })
+      : route.fulfill(
+          reply({
+            task_id: "t_e2e_1",
+            approaches: [APPROACH],
+            recommended: "a_balanced",
+            credit_usd: 0.05,
+          }),
+        ),
+  );
+  await page.route(`${API}/tasks/t_e2e_1/approve`, async (route) => {
+    if (route.request().method() !== "POST") return route.fulfill({ status: 204, headers: CORS });
+    posts.push("/approve");
+    await route.fulfill(reply({ world_id: "w_e2e_1" }));
   });
   return {
-    posts: () => count,
-    texts: () => texts,
+    posts: () => posts,
     release: (status = 200, body: unknown = INTAKE) => release({ status, body }),
   };
 }
 
-async function planFor(page: Page, text: string) {
+async function typeTask(page: Page, text: string) {
   await page.goto("/park/home");
   const box = page.getByLabel("Describe your task");
   await expect(box).toBeVisible({ timeout: 30_000 });
   await box.fill(text);
-  await page.getByRole("button", { name: "Start task" }).click();
-  await expect(page.getByRole("button", { name: "Start now" })).toBeVisible();
 }
 
-test("FR_UX_13_e2e_live_start_adds_the_world_and_toasts_with_Open_only_after_the_server_replies", async ({
+test("SIMPLE_RUN_1_e2e_live_start_reaches_one_confirm_card_then_its_Start_opens_the_world", async ({
   page,
 }) => {
-  const intake = await stubIntake(page);
-  await planFor(page, "Compare three suppliers");
-  const start = page.getByRole("button", { name: "Start now" });
-  await start.click();
+  const stub = await stubTask(page);
+  await typeTask(page, "Compare three suppliers");
+  await page.getByRole("button", { name: "Start task" }).click();
 
-  // The POST is out and the reply is held: nothing is shown as started (HR-1), and a second tap sends nothing.
-  await expect.poll(intake.posts).toBe(1);
-  await start.click({ force: true, timeout: 1000 }).catch(() => undefined);
-  await page.waitForTimeout(400);
-  expect(await page.getByRole("button", { name: "Open", exact: true }).count()).toBe(0);
-  expect(intake.posts(), "one POST for one start").toBe(1);
-  expect(intake.texts()[0] ?? "").toContain("Compare three suppliers");
+  // The intake is out and held: no card, nothing approved (HR-1).
+  await expect.poll(() => stub.posts().length).toBe(1);
+  await expect(page.getByTestId("run-card")).toHaveCount(0);
 
-  intake.release();
-  const open = page.getByRole("status").getByRole("button", { name: "Open", exact: true });
-  await expect(open).toBeVisible();
-  expect(intake.posts()).toBe(1);
+  stub.release();
+  const card = page.getByTestId("run-card");
+  await expect(card).toBeVisible();
+  await expect(card).toContainText("Compare three suppliers' quotes and recommend one.");
+  await expect(card).toContainText("Assumed: The team");
+  await expect(card).toContainText("20 credits");
+  expect(stub.posts(), "intake and the one answers call; nothing approved yet").toEqual([
+    "/intake",
+    "/answers",
+  ]);
 
-  await open.click();
-  await expect(page).toHaveURL(/\/(park\/world\/t_e2e_1|task\/t_e2e_1\/understanding)$/);
+  await card.getByRole("button", { name: "Start", exact: true }).click();
+  await expect.poll(() => stub.posts().at(-1)).toBe("/approve");
+  await expect(page).toHaveURL(/\/world\/w_e2e_1/);
+  await expect(page).not.toHaveURL(/understanding|approaches/);
 });
 
-test("FR_UX_13_e2e_live_not_signed_in_asks_to_sign_in_adds_no_world_and_keeps_the_text", async ({
+test("SIMPLE_RUN_1_e2e_live_not_signed_in_asks_to_sign_in_shows_no_card_and_keeps_the_text", async ({
   page,
 }) => {
-  const intake = await stubIntake(page);
-  await planFor(page, "Compare three suppliers");
-  await page.getByRole("button", { name: "Start now" }).click();
-  await expect.poll(intake.posts).toBe(1);
-  intake.release(401, { detail: "Unauthorized" });
+  const stub = await stubTask(page);
+  await typeTask(page, "Compare three suppliers");
+  await page.getByRole("button", { name: "Start task" }).click();
+  await expect.poll(() => stub.posts().length).toBe(1);
+  stub.release(401, { detail: "Unauthorized" });
 
   await expect(page.getByText(/sign in/i).first()).toBeVisible();
-  expect(await page.getByRole("button", { name: "Open", exact: true }).count()).toBe(0);
+  await expect(page.getByTestId("run-card")).toHaveCount(0);
   await expect(page.getByLabel("Describe your task")).toHaveValue("Compare three suppliers");
-  expect(intake.posts(), "no retry").toBe(1);
+  expect(stub.posts(), "no retry").toEqual(["/intake"]);
 });

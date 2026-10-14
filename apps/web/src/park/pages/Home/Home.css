@@ -1214,3 +1214,43 @@
     overflow: visible;
   }
 }
+
+/* SIMPLE-RUN-1: the one confirm card's changeable assumption lines */
+[data-park] .park-home-run__edit {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex: 1;
+  min-width: 0;
+}
+[data-park] .park-home-run__edit input {
+  flex: 1;
+  min-width: 0;
+  height: 36px;
+  box-sizing: border-box;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--btn2);
+  color: var(--ink);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+}
+[data-park] .park-home-run__link {
+  min-height: 24px;
+  padding: 0 4px;
+  border: 0;
+  background: none;
+  color: var(--heroInk);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 800;
+  text-decoration: underline;
+  cursor: pointer;
+}
+[data-park] .park-home-run__link:focus-visible,
+[data-park] .park-home-run__edit input:focus-visible {
+  outline: 2px solid var(--heroInk);
+  outline-offset: 2px;
+}

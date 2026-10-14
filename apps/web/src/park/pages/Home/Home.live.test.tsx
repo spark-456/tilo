@@ -79,7 +79,8 @@ describe("FR_UX_13 live composer: a world is added only after the server's reply
 
       const state = rig.store.getState();
       expect(state.added.map((w) => w.id)).toEqual(["t_abc123"]);
-      expect(state.toast?.actionLabel).toBe("Open");
+      // SIMPLE-RUN-1: the old Understanding screen is retired, so the toast offers no Open to it.
+      expect(state.toast?.actionLabel).toBeUndefined();
       expect(state.toast?.message ?? "").toContain(world.short);
       expect(
         worldsSeen(rig).map((w) => w.id),
@@ -88,9 +89,6 @@ describe("FR_UX_13 live composer: a world is added only after the server's reply
       expect(taskInput(rig.el).value, "the brief is cleared once started").toBe("");
       expect(hasConfirm(rig), "the plan card closes").toBe(false);
 
-      state.toast?.action?.();
-      await settle();
-      expect(opened(rig, "t_abc123"), "Open opens that world").toBe(true);
       expect(startWorld).toHaveBeenCalledTimes(1);
     },
   );

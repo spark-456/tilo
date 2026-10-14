@@ -41,7 +41,7 @@ it("FR_AGT_14 Park lists real schedules and pauses only after the PATCH succeeds
   expect(JSON.parse(String(fetch.mock.calls[1]?.[1]?.body))).toEqual({ enabled: false });
   expect(root.container.textContent).toContain("Paused");
   expect(root.container.textContent).toContain("Resume");
-  expect(root.container.querySelector("a")?.getAttribute("href")).toBe("/start");
+  expect(root.container.querySelector("a")?.getAttribute("href")).toBe("/"); // SIMPLE-RUN-1: Home starts a run in one step; the old /start screen is not offered
 });
 it("FR_AGT_14 Park distinguishes an empty schedule list from a failure", async () => {
   for (const status of [200, 503]) {
