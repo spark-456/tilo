@@ -16,17 +16,19 @@ Sources: `agy-bridge/tasks/USER-INFRA-SITTING-2.md`, `USER-INFRA-SITTING-2-DETAI
 | Test-only gate identity (#870) | `tilo-cloudbuild-tests`: staging-source read and build logs only. The gate keeps `tilo-cloudbuild` until you change `serviceAccount` | `sitting2.tf` |
 | Link signing key | api may read `tilo-link-signing-key` (the secret was made by hand; only the accessor binding is Terraform's) | `sitting2.tf` |
 | Channels env | `tilo-channels` gets `ignore_env`, so the gcloud-set push settings survive a later apply (a `moved` block: no destroy) | `modules/service`, `main.tf` |
-| **Egress NAT (already created by hand; imported)** | Cloud Router `tilo-nat-router` plus a Cloud NAT on `tilo-run-egress` only (automatic IPs, errors-only logs), made by hand on 14 Oct about 09:00 with exactly these names and **imported** by two `import` blocks in `network.tf` (no create, no change). Fixes the live Home 503 ("safety screen failed" after about 10.9 s): api and harness send ALL_TRAFFIC into `tilo-vpc`, which had no NAT, and the regional Model Armor endpoint (and NIM, Canva, Lovable, vendor hosts) is not reached by Private Google Access | `network.tf` |
+| **Egress NAT (already created by hand; adopted in section 2)** | Cloud Router `tilo-nat-router` plus a Cloud NAT on `tilo-run-egress` only (automatic IPs, errors-only logs), made by hand on 14 Oct about 09:00 with exactly these names. Section 2 adopts both into Terraform state with two `terraform import` commands, before the plan; the code matches the live arguments, so the plan has no entry for them (no create, no change). Fixes the live Home 503 ("safety screen failed" after about 10.9 s): api and harness send ALL_TRAFFIC into `tilo-vpc`, which had no NAT, and the regional Model Armor endpoint (and NIM, Canva, Lovable, vendor hosts) is not reached by Private Google Access | `network.tf` |
 | Optional Meet bot | plan made with `meet_bot_enabled=true` (variable default stays false) | existing flag |
 | Skills store | `TILO_SKILLS_STORE=firestore` on tilo-api (`GET /v1/skills` was 503 `SkillStoreNotConfigured`); a gcloud setting, section 6.3 | none |
 | Left OFF | `TILO_PLATE_DIGEST` (section 6.4 says why); the live switch; Gemini Live (`voice.live.enabled` and `price_approved` stay false) | none |
 
 Expected plan with the bot, from the code (not from a refreshed plan; the script in section 3 enforces it):
-**21 to add, 3 to change, 0 to destroy**, plus 2 to import (the router and the NAT) and one "has moved" (channels). Without the bot it is 11 to add, 0 to change, 2 to import.
+**21 to add, 3 to change, 0 to destroy**, plus one "has moved" (channels). Without the bot it is 11 to add, 0 to change.
+The NAT router and NAT are in none of these numbers: after the section 2 import they are unchanged, and the review gate
+fails if either appears as an add, a change or an import (it means the import step was skipped or the code drifted).
 Anything else: stop and send it for review.
 
-**Order of the sitting:** sections 1 to 3 (plan and review), then 4 (apply). The saved plan imports the NAT you created by hand, so the
-apply only adopts it into state. Then do the section 4 verification (NAT, then a Home task) before any env step in
+**Order of the sitting:** sections 1 to 3 (plan and review), then 4 (apply). The NAT you created by hand is adopted into state in
+section 2, before the plan, so the apply leaves it alone. Then do the section 4 verification (NAT, then a Home task) before any env step in
 sections 5 and 6: if Home still answers 503 after the NAT shows READY, stop there and send the log lines.
 
 **Cost of the NAT:** (it is already running; importing changes nothing) Cloud NAT bills a small per-hour charge for the gateway while it exists plus a per-GiB charge on the
@@ -60,14 +62,43 @@ foreach ($s in 'webpush-vapid-private-key', 'tilo-link-signing-key', 'workspace-
 }
 ```
 
-## 2. Saved plan (writes a local file; changes nothing in the cloud)
+## 2. Adopt the hand-made NAT into state, then the saved plan
+
+### 2.0 Import the router and the NAT (writes Terraform state only; changes nothing in the cloud)
+
+You created `tilo-nat-router` and `tilo-run-egress-nat` by hand, with the names `network.tf` uses. Without this step the
+plan would try to create them and fail with "already exists". Each command reads the live object and records it in the
+state; neither creates, changes or deletes anything in the cloud. Run it once; a second run answers "already managed".
+
+```powershell
+$billingId = Read-Host 'Billing account ID (first column of the list above)'
+$alertEmail = Read-Host 'Monitoring alert email (same as the first sitting)'
+$varArgs = @(
+  "-var=project_id=$P", "-var=region=$R", "-var=billing_account_id=$billingId",
+  '-var=github_repository=spark-456/tilo', '-var=github_repository_id=1386743901',
+  '-var=github_repository_owner_id=81423861', "-var=alert_email=$alertEmail",
+  '-var=budget_amount_usd=15000', '-var=budget_currency_code=INR',
+  '-var=api_durable_stores=true', '-var=meet_bot_enabled=true'
+)
+terraform -chdir=infra/envs/dev import -input=false @varArgs google_compute_router.nat "projects/$P/regions/$R/routers/tilo-nat-router"
+if ($LASTEXITCODE -ne 0) { throw 'router import failed; stop' }
+terraform -chdir=infra/envs/dev import -input=false @varArgs google_compute_router_nat.run_egress "$P/$R/tilo-nat-router/tilo-run-egress-nat"
+if ($LASTEXITCODE -ne 0) { throw 'NAT import failed; stop' }
+terraform -chdir=infra/envs/dev state list | Select-String 'google_compute_router'   # both addresses
+```
+
+The live NAT is: automatic IPs, `LIST_OF_SUBNETWORKS` with `tilo-run-egress` on `PRIMARY_IP_RANGE`, errors-only logs. The code
+says the same, so the plan below has no line for either. If section 3 reports `NAT PAIR IN THE PLAN`, stop and send it.
+
+### 2.1 Saved plan (writes a local file; changes nothing in the cloud)
 
 `-refresh=true` reads the live state. The repository ids and the budget are the values of the first sitting. Add any
 other override you used then. The file `sitting2.tfplan` is git-ignored and can hold sensitive state: keep it local.
 
 ```powershell
-$billingId = Read-Host 'Billing account ID (first column of the list above)'
-$alertEmail = Read-Host 'Monitoring alert email (same as the first sitting)'
+# $billingId and $alertEmail come from section 2.0 (same window); ask again only if they are empty.
+if (-not $billingId) { $billingId = Read-Host 'Billing account ID (first column of the list above)' }
+if (-not $alertEmail) { $alertEmail = Read-Host 'Monitoring alert email (same as the first sitting)' }
 $planArgs = @(
   '-chdir=infra/envs/dev', 'plan', '-refresh=true', '-input=false',
   "-var=project_id=$P", "-var=region=$R", "-var=billing_account_id=$billingId",
@@ -92,7 +123,7 @@ $add = @($real | Where-Object { ($_.change.actions -join ',') -eq 'create' })
 $chg = @($real | Where-Object { ($_.change.actions -join ',') -eq 'update' })
 $gone = @($real | Where-Object { $_.change.actions -contains 'delete' })   # destroy, or replace (delete + create)
 $moved = @($rc | Where-Object { $_.previous_address })
-$imported = @($rc | Where-Object { $_.change.importing })   # the two hand-made NAT resources: adopted, never created
+$imported = @($rc | Where-Object { $_.change.importing })   # none expected: the NAT was adopted in section 2.0
 "add=$($add.Count) change=$($chg.Count) destroy_or_replace=$($gone.Count) moved=$($moved.Count) import=$($imported.Count)"
 if ($gone.Count) { $gone | ForEach-Object { "  $($_.change.actions -join '+')  $($_.address)" }; throw 'STOP: a destroy or replace appears. Do not apply. Send this output for review.' }
 
@@ -122,12 +153,13 @@ $expectChange = @(
   'module.monitoring.google_monitoring_alert_policy.run_5xx_ratio',              # the filter regex gains tilo-meet-bot
   'module.monitoring.google_monitoring_alert_policy.run_latency_p95'             # same
 )
-$expectImport = @('google_compute_router.nat', 'google_compute_router_nat.run_egress')
 $problems = @()
-$problems += @($imported.address | Where-Object { $_ -notin $expectImport }) | ForEach-Object { "UNEXPECTED import: $_" }
-$problems += @($expectImport | Where-Object { $_ -notin $imported.address }) | ForEach-Object { "MISSING import: $_" }
-# An import must adopt as-is: a router or NAT shown as update, create or replace means the code and the hand-made one differ.
-$problems += @($imported | Where-Object { ($_.change.actions -join ',') -ne 'no-op' }) | ForEach-Object { "IMPORT WITH A CHANGE: $($_.address) ($($_.change.actions -join '+'))" }
+# The hand-made NAT pair was adopted in section 2 and must not appear: not as an add (import skipped), not as a change
+# (the code differs from the live NAT), not as an import (import blocks are not used).
+$natPair = @('google_compute_router.nat', 'google_compute_router_nat.run_egress')
+$problems += @($rc | Where-Object { $_.address -in $natPair -and (($_.change.actions -join ',') -ne 'no-op' -or $_.change.importing) }) |
+  ForEach-Object { "NAT PAIR IN THE PLAN: $($_.address) ($($_.change.actions -join '+')): run the section 2.0 import, or the code differs from the live NAT" }
+$problems += @($imported | Where-Object { $_.address -notin $natPair }) | ForEach-Object { "UNEXPECTED import: $($_.address)" }
 $problems += @($add.address | Where-Object { $_ -notin $expectAdd }) | ForEach-Object { "UNEXPECTED add: $_" }
 $problems += @($expectAdd | Where-Object { $_ -notin $add.address }) | ForEach-Object { "MISSING add: $_" }
 $problems += @($chg.address | Where-Object { $_ -notin $expectChange }) | ForEach-Object { "UNEXPECTED change: $_" }
@@ -177,9 +209,9 @@ gcloud secrets get-iam-policy tilo-link-signing-key --project $P --format='value
 If a TTL field shows an empty `indexConfig` (all indexes disabled) where it had indexes before, say so before going on:
 the policy was written without an index configuration on purpose.
 
-### 4.1 The NAT already exists (imported): verify only, before any env step
+### 4.1 The NAT already exists (adopted in section 2.0): verify only, before any env step
 
-You created the router and the NAT by hand (about 09:00 on 14 Oct); the apply above only imported them into state, so there
+You created the router and the NAT by hand (about 09:00 on 14 Oct) and adopted them into state in section 2.0, so there
 is nothing to create here. The NAT needs no new Cloud Run revision: running instances use it on their next outbound
 connection. Order: NAT exists and serves the subnet, then one Home task, then (only if it passes) sections 5 and 6.
 
