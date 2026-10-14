@@ -3,7 +3,6 @@
 // provider's `schedule` (never a timer of its own), one pending step at a time, cancelled when the state
 // that wanted it changes or the page goes: a captured step and a run step each take 900 ms.
 import { useCallback, useEffect, useRef, useState } from "react";
-import { TiloApiError } from "../../../api/http";
 import type { Api } from "../../api/index";
 import type { Skill, SkillCapture, SkillVersion, Source, User } from "../../api/types";
 import type { AppCtx } from "../../app/AppCtx";
@@ -246,11 +245,11 @@ export function useTeach({
       },
       (e) => {
         const said =
-          e instanceof TiloApiError
-            ? (e.refusal ?? e.message)
-            : e instanceof Error
-              ? e.message
-              : "";
+          e instanceof Error
+            ? "refusal" in e && typeof e.refusal === "string"
+              ? e.refusal
+              : e.message
+            : "";
         const code = SAVE_CODES.has(said) ? said : null;
         app.toast(LIVE_TEACH.failed(nm, code));
       },
