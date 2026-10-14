@@ -1,11 +1,7 @@
-import { useEffect, useRef, useState } from "react";
-import {
-  type Routine,
-  type RoutinesClient,
-  cadenceText,
-  setRoutineEnabled,
-} from "../../api/live/routines";
+import { useEffect, useState } from "react";
+import type { Routine, RoutinesClient } from "../../api/live/routines";
 import { ApiReadState } from "../../components/ApiReadState";
+import { RoutineList } from "./RoutineList";
 
 export function RoutinesPanel({ client }: { client: RoutinesClient }) {
   const [rows, setRows] = useState<Routine[] | null>(null);
@@ -13,7 +9,6 @@ export function RoutinesPanel({ client }: { client: RoutinesClient }) {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [attempt, setAttempt] = useState(0);
-  const writing = useRef(false);
   useEffect(() => {
     void attempt;
     let active = true;
@@ -34,41 +29,16 @@ export function RoutinesPanel({ client }: { client: RoutinesClient }) {
       active = false;
     };
   }, [client, attempt]);
-  const toggle = async (row: Routine) => {
-    if (writing.current) return;
-    writing.current = true;
-    setBusy(true);
-    setError(null);
-    try {
-      const updated = await setRoutineEnabled(client, row.schedule_id, !row.enabled);
-      setRows(
-        (old) => old?.map((r) => (r.schedule_id === updated.schedule_id ? updated : r)) ?? null,
-      );
-    } catch (error: unknown) {
-      setError(error);
-    } finally {
-      writing.current = false;
-      setBusy(false);
-    }
-  };
   return (
-    <section className="park-worlds-routines" aria-label="Routines">
+    <section className="park-worlds-routines" aria-label="Routines" tabIndex={-1}>
       <h2>Routines</h2>
       <p>
         To create a routine, start a world and choose Repeat weekly when approving its approach.
       </p>
       <a href="/start">Create a routine</a>
-      {rows?.length === 0 ? <p>No routines yet.</p> : null}
-      {rows?.map((row) => (
-        <article key={row.schedule_id}>
-          <h3>{row.title}</h3>
-          <p>{cadenceText(row.cadence)}</p>
-          <p>{row.enabled ? `Next run: ${row.next_due ?? "Not available yet"}` : "Paused"}</p>
-          <button type="button" disabled={busy} onClick={() => void toggle(row)}>
-            {row.enabled ? "Pause" : "Resume"}
-          </button>
-        </article>
-      ))}
+      {rows ? (
+        <RoutineList api={client} first={rows} onError={setError} onPending={setBusy} />
+      ) : null}
       <ApiReadState
         title={rows === null ? "Could not load routines" : "Could not change this routine"}
         error={error}

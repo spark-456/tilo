@@ -1,7 +1,7 @@
 // The Park router (README "Routes"; plan sections 1 and 3): the pages live at the ROOT paths (/, /worlds,
 // /world/:id, /team, ...) and /park/<page> stays as an alias. Pure path functions plus one hook. This is
 // the only file under park/ that reads the address bar; pages get `app.page` and `app.params`.
-import { useMemo, useSyncExternalStore } from "react";
+import { useEffect, useMemo, useSyncExternalStore } from "react";
 import { PAGE_IDS, type PageId, type Params } from "./AppCtx";
 import { noteFollowed } from "./followed";
 
@@ -26,6 +26,7 @@ const ROOT_PAGES = new Set<string>([
   "ledger",
   "profile",
 ]);
+const ROUTINES_ADDRESS = /^\/(?:park\/)?routines\/?$/;
 const ROOT_WORLD = /^\/world\/[^/]+\/?$/;
 const ROOT_WORLD_APP = /^\/(?:park\/)?world\/([^/]+)\/app\/([^/]+)\/?$/;
 
@@ -41,6 +42,7 @@ export const stagePath = (worldId: string): string => `/world/${encodeURICompone
  */
 export function isParkPath(pathname: string): boolean {
   if (pathname === "/park" || pathname.startsWith("/park/") || pathname === "/") return true;
+  if (ROUTINES_ADDRESS.test(pathname)) return true;
   if (ROOT_WORLD.test(pathname) || ROOT_WORLD_APP.test(pathname)) return true;
   const m = /^\/([^/]+)\/?$/.exec(pathname);
   return m?.[1] !== undefined && ROOT_PAGES.has(m[1]);
@@ -55,6 +57,7 @@ function decodeSegment(raw: string): string | null {
 }
 
 export function parseParkPath(pathname: string, search: string): ParkRoute | null {
+  if (ROUTINES_ADDRESS.test(pathname)) return { page: "worlds", params: {} };
   if (!isParkPath(pathname)) return null;
   let rest =
     pathname === "/park" || pathname.startsWith("/park/")
@@ -115,6 +118,12 @@ const snapshot = (): string => `${window.location.pathname}${window.location.sea
 /** The current route, re-read on every History API navigation; null when the path is not a Park page. */
 export function useParkRoute(): ParkRoute | null {
   const url = useSyncExternalStore(subscribe, snapshot);
+  useEffect(() => {
+    if (ROUTINES_ADDRESS.test(url.split("?")[0] ?? "")) {
+      window.history.replaceState({}, "", "/worlds");
+      window.dispatchEvent(new PopStateEvent("popstate"));
+    }
+  }, [url]);
   return useMemo(() => {
     const q = url.indexOf("?");
     return q < 0 ? parseParkPath(url, "") : parseParkPath(url.slice(0, q), url.slice(q));

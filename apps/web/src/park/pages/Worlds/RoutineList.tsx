@@ -1,32 +1,31 @@
-// FR-AGT-14 (PRD 8, "Scheduled runs"): the person's routines, the weekly runs they set up on S-03.
-// Lists GET /schedules, pauses and resumes (PATCH enabled) and deletes after an in-page
-// confirmation. Each change is shown only after the API answered (HR-1). A client without the
-// schedule routes (the fixture client) says so in words.
-import { useLayoutEffect, useRef, useState } from "react";
-import { useClient } from "../../api/ClientProvider";
-import { TiloApiError } from "../../api/http";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { TiloApiError } from "../../../api/http";
 import {
   type ScheduleView,
   type SchedulesApi,
   cadenceWords,
-  canSchedule,
   isScheduleView,
   nextRunWords,
-} from "../../api/schedules";
-import { AppLink } from "../AppLink";
-import { Loaded } from "../FlowShell";
-import { describeError, isReplayOnly, useRemote } from "../remote";
+} from "../../../api/schedules";
+import { Button } from "../../components/Button";
+import "./RoutineList.css";
 
-interface Problem {
-  readonly message: string;
-  readonly replayOnly: boolean;
-}
-
-function RoutineList({ api, first }: { api: SchedulesApi; first: readonly ScheduleView[] }) {
+export function RoutineList({
+  api,
+  first,
+  onError,
+  onPending,
+}: {
+  api: Pick<SchedulesApi, "updateSchedule" | "deleteSchedule">;
+  first: readonly ScheduleView[];
+  onError: (error: unknown) => void;
+  onPending: (pending: boolean) => void;
+}) {
   const [rows, setRows] = useState<readonly ScheduleView[]>(first);
   const [busy, setBusy] = useState<string | null>(null);
   const [asking, setAsking] = useState<string | null>(null);
-  const [problem, setProblem] = useState<Problem | null>(null);
+  const writing = useRef(false);
+  useEffect(() => setRows(first), [first]);
   const [editing, setEditing] = useState<{ id: string; title: string } | null>(null);
   const scope = useRef<HTMLElement>(null);
   const returnFocus = useRef<HTMLButtonElement | null>(null);
@@ -45,24 +44,28 @@ function RoutineList({ api, first }: { api: SchedulesApi; first: readonly Schedu
       (target.isConnected
         ? target
         : (scope.current?.querySelector<HTMLElement>(
-            '.bitem button[aria-label^="Resume "]:not(:disabled), .bitem button[aria-label^="Pause "]:not(:disabled)',
+            'article button[aria-label^="Resume "]:not(:disabled), article button[aria-label^="Pause "]:not(:disabled)',
           ) ??
-          scope.current?.querySelector<HTMLElement>(".bitem button:not(:disabled)") ??
+          scope.current?.querySelector<HTMLElement>("article button:not(:disabled)") ??
+          scope.current?.closest<HTMLElement>('[aria-label="Routines"]') ??
           scope.current)
       )?.focus();
     }
   }, [asking, busy, editingId]);
 
-  const run = async (id: string, doing: string, change: () => Promise<void>) => {
+  const run = async (id: string, _doing: string, change: () => Promise<void>) => {
+    if (writing.current) return;
+    writing.current = true;
     setBusy(id);
-    setProblem(null);
+    onPending(true);
+    onError(null);
     try {
       await change();
     } catch (e) {
-      const replayOnly = isReplayOnly(e);
-      const said = e instanceof Error ? e.message : "";
-      setProblem({ message: replayOnly ? said : describeError(doing, e), replayOnly });
+      onError(e);
     } finally {
+      writing.current = false;
+      onPending(false);
       setBusy(null);
       setAsking(null);
       setEditing(null);
@@ -71,7 +74,13 @@ function RoutineList({ api, first }: { api: SchedulesApi; first: readonly Schedu
   const setEnabled = (row: ScheduleView, enabled: boolean) =>
     run(row.schedule_id, enabled ? "resume the routine" : "pause the routine", async () => {
       const updated = await api.updateSchedule(row.schedule_id, { enabled });
-      const next = isScheduleView(updated) ? updated : { ...row, enabled };
+      if (
+        !isScheduleView(updated) ||
+        updated.schedule_id !== row.schedule_id ||
+        updated.enabled !== enabled
+      )
+        throw new TiloApiError("Unreadable routine reply", 200, true, true, "write_unconfirmed");
+      const next = updated;
       setRows((all) => all.map((r) => (r.schedule_id === row.schedule_id ? next : r)));
     });
   const remove = (row: ScheduleView) =>
@@ -82,8 +91,8 @@ function RoutineList({ api, first }: { api: SchedulesApi; first: readonly Schedu
 
   return (
     <section
-      className="routines-scope"
-      aria-label="Routines"
+      className="park-routine-list"
+      aria-label="Scheduled routines"
       tabIndex={-1}
       ref={scope}
       onKeyDown={(e) => {
@@ -108,26 +117,23 @@ function RoutineList({ api, first }: { api: SchedulesApi; first: readonly Schedu
         }
       }}
     >
-      {problem && (
-        <div className="flow-notice" role="alert" data-testid="routines-problem">
-          <p>{problem.message}</p>
-        </div>
-      )}
       {rows.length === 0 ? (
-        <p className="section-note" data-testid="routines-empty">
-          No routines yet. <AppLink to="/">Create a routine</AppLink> by starting a run and choosing
-          Repeat weekly.
+        <p className="park-routine-empty" data-testid="routines-empty">
+          No routines yet. <a href="/">Create a routine</a> by starting a run and choosing Repeat
+          weekly.
         </p>
       ) : (
-        <ul className="blist">
+        <div>
           {rows.map((row) => (
-            <li
+            <article
               key={row.schedule_id}
-              className="bitem"
+              className="park-routine"
               data-testid={`routine-row-${row.schedule_id}`}
             >
-              <div className="bitem-main">
-                <b>{row.title}</b>
+              <div className="park-routine-main">
+                <h3>
+                  <b>{row.title}</b>
+                </h3>
                 {editing?.id === row.schedule_id && (
                   <form
                     className="routine-name"
@@ -139,8 +145,18 @@ function RoutineList({ api, first }: { api: SchedulesApi; first: readonly Schedu
                       if (!title || busy !== null) return;
                       void run(row.schedule_id, "rename the routine", async () => {
                         const updated = await api.updateSchedule(row.schedule_id, { title });
-                        if (!isScheduleView(updated)) {
-                          throw new TiloApiError("Unreadable routine reply", 200, true, true);
+                        if (
+                          !isScheduleView(updated) ||
+                          updated.schedule_id !== row.schedule_id ||
+                          updated.title !== title
+                        ) {
+                          throw new TiloApiError(
+                            "Unreadable routine reply",
+                            200,
+                            true,
+                            true,
+                            "write_unconfirmed",
+                          );
                         }
                         setRows((all) =>
                           all.map((r) => (r.schedule_id === row.schedule_id ? updated : r)),
@@ -156,25 +172,25 @@ function RoutineList({ api, first }: { api: SchedulesApi; first: readonly Schedu
                       disabled={busy !== null}
                       onChange={(e) => setEditing({ id: row.schedule_id, title: e.target.value })}
                     />
-                    <button
+                    <Button
+                      variant="secondary"
                       type="submit"
-                      className="secondary"
                       disabled={busy !== null || !editing.title.trim()}
                     >
                       Save name
-                    </button>
-                    <button
+                    </Button>
+                    <Button
+                      variant="secondary"
                       type="button"
-                      className="secondary"
                       disabled={busy !== null}
                       onClick={() => setEditing(null)}
                     >
                       Cancel
-                    </button>
+                    </Button>
                   </form>
                 )}
-                <span className="bitem-sub">{cadenceWords(row.cadence)}</span>
-                <span className="bitem-sub">
+                <span className="park-routine-detail">{cadenceWords(row.cadence)}</span>
+                <span className="park-routine-detail">
                   {`Next run: ${nextRunWords(row.next_due, row.cadence.tz)}`}
                 </span>
                 {asking === row.schedule_id && (
@@ -182,34 +198,34 @@ function RoutineList({ api, first }: { api: SchedulesApi; first: readonly Schedu
                     role="alertdialog"
                     aria-modal="true"
                     aria-label="Delete routine"
-                    className="flow-notice"
+                    className="park-routine-confirm"
                   >
                     <p>{`Delete "${row.title}"? It will not run again.`}</p>
                     <div style={{ display: "flex", gap: "var(--space-12)", flexWrap: "wrap" }}>
-                      <button
+                      <Button
+                        variant="secondary"
                         type="button"
-                        className="secondary"
                         disabled={busy !== null}
                         onClick={() => remove(row)}
                       >
                         Delete routine
-                      </button>
-                      <button
+                      </Button>
+                      <Button
+                        variant="secondary"
                         type="button"
-                        className="secondary"
                         disabled={busy !== null}
                         onClick={() => setAsking(null)}
                       >
                         Keep routine
-                      </button>
+                      </Button>
                     </div>
                   </div>
                 )}
               </div>
-              {!row.enabled && <span className="btag">Paused</span>}
-              <button
+              {!row.enabled && <span className="park-routine-state">Paused</span>}
+              <Button
+                variant="secondary"
                 type="button"
-                className="secondary"
                 disabled={busy !== null}
                 aria-label={`Rename ${row.title}`}
                 onClick={(e) => {
@@ -219,10 +235,10 @@ function RoutineList({ api, first }: { api: SchedulesApi; first: readonly Schedu
                 }}
               >
                 Rename
-              </button>
-              <button
+              </Button>
+              <Button
+                variant="secondary"
                 type="button"
-                className="secondary"
                 disabled={busy !== null}
                 aria-label={`${row.enabled ? "Pause" : "Resume"} ${row.title}`}
                 onClick={(e) => {
@@ -231,10 +247,10 @@ function RoutineList({ api, first }: { api: SchedulesApi; first: readonly Schedu
                 }}
               >
                 {row.enabled ? "Pause" : "Resume"}
-              </button>
-              <button
+              </Button>
+              <Button
+                variant="secondary"
                 type="button"
-                className="secondary"
                 disabled={busy !== null}
                 aria-label={`Delete ${row.title}`}
                 onClick={(e) => {
@@ -244,35 +260,11 @@ function RoutineList({ api, first }: { api: SchedulesApi; first: readonly Schedu
                 }}
               >
                 Delete
-              </button>
-            </li>
+              </Button>
+            </article>
           ))}
-        </ul>
+        </div>
       )}
     </section>
-  );
-}
-
-export function Routines() {
-  const client = useClient();
-  const api = canSchedule(client) ? client : null;
-  const [remote, retry] = useRemote(
-    "load the routines",
-    () => (api ? api.listSchedules() : Promise.resolve([])),
-    api !== null,
-  );
-  if (!api) {
-    return (
-      <p className="section-note">
-        No routines are recorded in this sample. Routines are listed when Tilo is connected to its
-        server. <AppLink to="/">Create a routine</AppLink> by starting a run and choosing Repeat
-        weekly.
-      </p>
-    );
-  }
-  return (
-    <Loaded what="the routines" remote={remote} retry={retry} isEmpty={() => false}>
-      {(rows) => <RoutineList api={api} first={rows} />}
-    </Loaded>
   );
 }

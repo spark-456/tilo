@@ -14,6 +14,7 @@ it("NFR22 Routines Retry refreshes after an uncertain write without resubmitting
     next_due: null,
   };
   const client = {
+    deleteSchedule: vi.fn(),
     listSchedules: vi.fn().mockResolvedValue([row]),
     updateSchedule: vi.fn().mockRejectedValue(new TiloApiError("rate_limited", 429, true, true)),
   };
@@ -25,7 +26,7 @@ it("NFR22 Routines Retry refreshes after an uncertain write without resubmitting
   const view = root;
   await act(async () => {
     view.container
-      .querySelector("article button")
+      .querySelector('article button[aria-label^="Pause "]')
       ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
   });
   expect(view.container.textContent).toContain("Too many requests. Wait a moment and try again.");

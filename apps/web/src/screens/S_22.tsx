@@ -3,10 +3,10 @@
 // privacy lines are PRD 16.5's. No design export covers a unified Settings screen: cards and rows
 // after "Tilo Team.dc.html", neutral role tokens (design/source/INDEX.md, S-22).
 import { type Density, useDensity } from "../display/density";
+import { Routines } from "../park/pages/Worlds/Routines";
 import { SettingsAppearance } from "../park/shell/SettingsAppearance";
 import { AppLink } from "./AppLink";
 import { Page, Row, Section } from "./kit";
-import { Routines } from "./routines/Routines";
 
 // PRD 16.5 consent: each opt-in is explicit and revocable.
 // `to` is where the access is shown and managed today; an opt-in with no screen of its own yet has

@@ -8,7 +8,10 @@ import {
 
 export { cadenceText };
 export type Routine = ScheduleView;
-export type RoutinesClient = Pick<HttpClient, "listSchedules" | "updateSchedule">;
+export type RoutinesClient = Pick<
+  HttpClient,
+  "listSchedules" | "updateSchedule" | "deleteSchedule"
+>;
 /** No scheduled-run requests from the demo company. Creation uses the existing approved approach flow. */
 export function createRoutinesClient(): RoutinesClient | null {
   return API_URL?.trim() && !sessionView.demo()
