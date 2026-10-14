@@ -69,9 +69,7 @@ describe("WEB_CUTOVER_root: the Park app owns the root paths", () => {
       "/world/w/story",
       "/world/w/inspect/B1",
       "/team/console",
-      "/worlds/replays",
       "/needs-you",
-      "/library",
       "/more",
     ]) {
       const m = await visit(path);

@@ -53,7 +53,7 @@ describe("WEB_CUTOVER_root_kept: unknown addresses are the Park not-found", () =
     expect(window.location.pathname).toBe("/");
   });
 
-  it.each(["/more", "/world/w/stage", "/team/console", "/worlds/replays"])(
+  it.each(["/more", "/world/w/stage", "/team/console"])(
     "WEB_CUTOVER_root_kept_%s_stays_the_old_app",
     async (path) => {
       const m = await visit(path);

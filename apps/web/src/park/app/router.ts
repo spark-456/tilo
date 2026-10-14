@@ -1,7 +1,7 @@
 // The Park router (README "Routes"; plan sections 1 and 3): the pages live at the ROOT paths (/, /worlds,
 // /world/:id, /team, ...) and /park/<page> stays as an alias. Pure path functions plus one hook. This is
 // the only file under park/ that reads the address bar; pages get `app.page` and `app.params`.
-import { useMemo, useSyncExternalStore } from "react";
+import { useEffect, useMemo, useSyncExternalStore } from "react";
 import { PAGE_IDS, type PageId, type Params } from "./AppCtx";
 import { noteFollowed } from "./followed";
 
@@ -26,6 +26,7 @@ const ROOT_PAGES = new Set<string>([
   "ledger",
   "profile",
   "settings",
+  "library",
 ]);
 const ROOT_WORLD = /^\/world\/[^/]+\/?$/;
 const ROOT_WORLD_APP = /^\/(?:park\/)?world\/([^/]+)\/app\/([^/]+)\/?$/;
@@ -45,6 +46,25 @@ export function isParkPath(pathname: string): boolean {
   if (ROOT_WORLD.test(pathname) || ROOT_WORLD_APP.test(pathname)) return true;
   const m = /^\/([^/]+)\/?$/.exec(pathname);
   return m?.[1] !== undefined && ROOT_PAGES.has(m[1]);
+}
+
+/**
+ * OLD-UI-OUT wave 3: the addresses of the removed old screens (Meeting, Meetings, My plate, Pinboards, Calendar, the
+ * Library's version history, Worlds replays), each answered by the Park page that took its function, so an old link
+ * never lands on "Page not found". The address is replaced in the history, never pushed.
+ */
+const LEGACY: ReadonlyArray<readonly [RegExp, string]> = [
+  [/^\/library\/artifacts\/?$/, "/library"],
+  [/^\/meetings?(?:\/[^/]+)?\/?$/, "/agenda"],
+  [/^\/(?:pinboards|calendar)\/?$/, "/agenda"],
+  [/^\/plate\/?$/, "/"],
+  [/^\/worlds\/replays\/?$/, "/worlds"],
+];
+
+/** The Park address that now holds what `pathname` used to, or null when it is not a removed old address. */
+export function legacyTarget(pathname: string): string | null {
+  for (const [re, to] of LEGACY) if (re.test(pathname)) return to;
+  return null;
 }
 
 function decodeSegment(raw: string): string | null {
@@ -122,10 +142,17 @@ const snapshot = (): string => `${window.location.pathname}${window.location.sea
 /** The current route, re-read on every History API navigation; null when the path is not a Park page. */
 export function useParkRoute(): ParkRoute | null {
   const url = useSyncExternalStore(subscribe, snapshot);
+  const legacy = legacyTarget(url.split("?")[0] ?? url);
+  useEffect(() => {
+    if (legacy === null) return;
+    window.history.replaceState({}, "", legacy);
+    window.dispatchEvent(new PopStateEvent("popstate"));
+  }, [legacy]);
   return useMemo(() => {
-    const q = url.indexOf("?");
-    return q < 0 ? parseParkPath(url, "") : parseParkPath(url.slice(0, q), url.slice(q));
-  }, [url]);
+    const at = legacy ?? url;
+    const q = at.indexOf("?");
+    return q < 0 ? parseParkPath(at, "") : parseParkPath(at.slice(0, q), at.slice(q));
+  }, [url, legacy]);
 }
 
 export interface QuizAppRoute {

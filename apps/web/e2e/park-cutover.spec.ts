@@ -123,11 +123,31 @@ test("WEB_CUTOVER_e2e_the_team_lead_console_is_at_team_console", async ({ page }
   expect(problems).toEqual([]);
 });
 
-test("WEB_CUTOVER_e2e_the_worlds_replays_list_is_at_worlds_replays", async ({ page }) => {
+test("OLD_UI_OUT_3_e2e_the_old_replays_address_lands_on_the_park_worlds_page", async ({ page }) => {
   const problems = watchConsole(page);
   await page.goto("/worlds/replays");
-  await expect(page.locator("[data-park]")).toHaveCount(0);
+  await expect(page.locator("[data-park]")).toHaveCount(1);
+  await expect(page).toHaveURL(/\/worlds$/);
   await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+  expect(problems).toEqual([]);
+});
+
+test("OLD_UI_OUT_3_e2e_the_old_meetings_plate_and_library_addresses_land_on_park_pages", async ({
+  page,
+}) => {
+  const problems = watchConsole(page);
+  for (const [from, to] of [
+    ["/meetings", /\/agenda$/],
+    ["/pinboards", /\/agenda$/],
+    ["/calendar", /\/agenda$/],
+    ["/plate", /\/$/],
+    ["/library/artifacts", /\/library$/],
+  ] as const) {
+    await page.goto(from);
+    await expect(page.locator("[data-park]"), from).toHaveCount(1);
+    await expect(page, from).toHaveURL(to);
+  }
+  await expect(page.getByTestId("park-page-library")).toBeVisible();
   expect(problems).toEqual([]);
 });
 

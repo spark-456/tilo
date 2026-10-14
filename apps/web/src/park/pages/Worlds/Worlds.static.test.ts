@@ -116,9 +116,10 @@ describe("WEB_5_worlds_static: the registry gets one new line", () => {
     expect(src).toContain(
       '  worlds: lazy(() => import("../pages/Worlds/WorldsPage").then((m) => ({ default: m.WorldsPage }))),\n',
     );
-    // UI-10 W7-FIX: Settings is intentionally a tenth Park page; pin every key explicitly.
+    // UI-10 W7-FIX: Settings is intentionally a Park page; pin every key explicitly.
     expect(entries.map(([key]) => key)).toEqual([
       "settings",
+      "library",
       "home",
       "worlds",
       "world",

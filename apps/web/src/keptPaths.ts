@@ -8,11 +8,8 @@ const KEPT: readonly RegExp[] = [
   /^\/world\/[^/]+\/(?:stage|story|trace|delivery)\/?$/,
   /^\/world\/[^/]+\/inspect\/[^/]+\/?$/,
   /^\/needs-you(?:\/(?:gate|consent))?\/?$/,
-  /^\/(?:meeting|autonomy|channels|mail|connections|estimate|pilot)\/?$/,
-  /^\/(?:plate|pinboards|calendar|more)\/?$/,
-  /^\/library(?:\/artifacts)?\/?$/,
-  /^\/meetings(?:\/[^/]+)?\/?$/,
-  /^\/worlds\/replays\/?$/,
+  /^\/(?:autonomy|channels|mail|connections|estimate|pilot)\/?$/,
+  /^\/more\/?$/,
   /^\/team\/console\/?$/,
   // dev only, as in screens/routes.tsx: the screens index, the cards gallery and the component sheet
   ...(import.meta.env.DEV ? [/^\/screens(?:\/cards)?\/?$/, /^\/dev\/components\/?$/] : []),

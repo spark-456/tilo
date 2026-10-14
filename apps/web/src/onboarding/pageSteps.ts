@@ -38,6 +38,10 @@ const CONTENT: Record<PageId, [string, string]> = {
     "Review display and data preferences",
     "Display controls apply at once. Review routines and consent here; unavailable actions say so.",
   ],
+  library: [
+    "See what Tilo made",
+    "Finished work from your projects is listed here as it is delivered. A tour changes nothing.",
+  ],
   profile: [
     "Review your settings",
     "Your profile shows your real account and preferences. A tour changes nothing.",

@@ -60,7 +60,6 @@ describe("WEB_3a_root: old app or park app by path", () => {
       "/world/w/stage",
       "/world/w/story",
       "/team/console",
-      "/worlds/replays",
     ]) {
       const m = await visit(path);
       expect(qa(m.container, '[data-testid="old-app"]'), path).toHaveLength(1);

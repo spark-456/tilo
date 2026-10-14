@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-// CP2 #258: a bare /needs-you, /needs-you/gate or /library with a live API shows the run this
+// CP2 #258: a bare /needs-you or /needs-you/gate with a live API shows the run this
 // session started last, or "No run yet"; an unknown world is "Not found" in fixture and live mode.
 // Nothing is asked of the API about a world the page cannot name (no 404 or 403 on every poll).
 import { Suspense, act } from "react";
@@ -76,9 +76,6 @@ describe("CP2 #258 a bare address with a live API and no started run says so", (
     "/needs-you",
     "/needs-you/gate",
     "/needs-you/consent",
-    "/meeting",
-    "/library",
-    "/library/artifacts",
     "/autonomy",
     "/channels",
     "/mail",
@@ -105,27 +102,6 @@ describe("CP2 #258 a bare address with a live API and no started run says so", (
     const action = page.container.querySelector('[data-testid="needs-empty"] a');
     expect(action?.getAttribute("href")).toBe("/worlds?world=w_real");
     await page.stop();
-  });
-
-  it("/worlds/replays (S-14) is its own empty state with no run, and the API is not asked about any world", async () => {
-    const { client, urls } = liveApi(["w_real"]);
-    const page = await visit("/worlds/replays", client);
-    expect(page.container.querySelector('[data-testid="worlds-empty"]')).not.toBeNull();
-    expect(page.container.querySelector('[data-testid="world-card"]')).toBeNull();
-    expect(page.container.querySelector('[data-testid="count-all"]')?.textContent).toBe("0");
-    expect(urls).toEqual([]);
-    await page.stop();
-  });
-
-  it("/worlds/replays?world=bogus is Not found, and /worlds/replays?world=w_real lists that world's card area", async () => {
-    const live = liveApi(["w_real"]);
-    const missing = await visit("/worlds/replays?world=bogus", live.client);
-    expect(missing.container.querySelector('[data-testid="not-found"]')).not.toBeNull();
-    await missing.stop();
-    const known = await visit("/worlds/replays?world=w_real", liveApi(["w_real"]).client);
-    expect(known.container.querySelector('[data-testid="not-found"]')).toBeNull();
-    expect(known.container.querySelector('[data-testid="worlds-empty"]')).toBeNull();
-    await known.stop();
   });
 
   it("the world this session started last is shown instead, and only that world is polled", async () => {

@@ -1004,3 +1004,44 @@
     min-height: 54px;
   }
 }
+
+/* OLD-UI-OUT 3: the live Meetings and Pinboards lists read left to right, one row per item, like the plate rows */
+[data-park] .park-agenda-peoplelist {
+  align-items: stretch;
+  text-align: left;
+}
+[data-park] .park-agenda-peoplelist h2 {
+  margin: 0 0 6px;
+  font-size: 18px;
+  font-weight: 800;
+}
+[data-park] .park-agenda-peoplelist ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+[data-park] .park-agenda-peoplelist li {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 12px 0;
+  border-top: 1px solid var(--line2);
+}
+[data-park] .park-agenda-peoplelist li:first-child {
+  border-top: 0;
+}
+[data-park] .park-agenda-peoplelist li p {
+  margin: 0;
+  font-size: 14.5px;
+  font-weight: 600;
+  color: var(--ink2);
+  overflow-wrap: anywhere;
+}
+[data-park] .park-agenda-peoplelist p {
+  margin: 0;
+  font-size: 14.5px;
+  font-weight: 600;
+  color: var(--ink2);
+}

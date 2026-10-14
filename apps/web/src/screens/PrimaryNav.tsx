@@ -20,7 +20,7 @@ const WORLD_ID = /^\/world\/([^/]+)/;
 export function sectionOf(path: string): Section {
   if (path === "/" || path.startsWith("/task/")) return "home";
   if (/^\/world\/[^/]+\/(story|trace)\/?$/.test(path)) return "story";
-  // /world/:id/stage (S-04), and S-14's replays list at /worlds/replays
+  // /world/:id/stage (S-04); /worlds and anything under it is the Park Worlds page
   if (WORLD_ID.test(path) || path === "/worlds" || path.startsWith("/worlds/")) return "world";
   if (path.startsWith("/needs-you")) return "needs";
   if (path.startsWith("/library")) return "library";

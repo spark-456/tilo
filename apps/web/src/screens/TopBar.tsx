@@ -19,8 +19,6 @@ const SHORT: Readonly<Record<string, string>> = {
   "S-06": "Needs you",
   "S-07": "Gate",
   "S-08": "Connection consent",
-  "S-14": "Worlds",
-  "S-13": "Library",
   "S-23": "How we estimate",
 };
 /** Screens that belong to one world: the place is that world's title, then the lens. */

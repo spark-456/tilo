@@ -8,9 +8,12 @@ import { matchScreen } from "./routes";
 const FLOW_SCREENS = ["S-04"];
 
 describe("PRD-18.3 AGW-08 route table: every Must screen has a route", () => {
-  it("S-04..S-29 are all listed (S-01 to S-03 are gone: OLD-UI-OUT wave 1) (S-26 to S-29 are the people screens, PPL-40a and PPL-40b), and only the Should screens have no address", () => {
+  it("the rows are S-01..S-29 minus the screens OLD-UI-OUT 3 moved to Park, and only the Should screens have no address", () => {
+    const moved = new Set(["S-01", "S-02", "S-03", "S-09", "S-13", "S-14", "S-21", "S-26", "S-27", "S-28", "S-29"]);
     expect(SCREENS.map((s) => s.id)).toEqual(
-      Array.from({ length: 26 }, (_, i) => `S-${String(i + 4).padStart(2, "0")}`),
+      Array.from({ length: 29 }, (_, i) => `S-${String(i + 1).padStart(2, "0")}`).filter(
+        (id) => !moved.has(id),
+      ),
     );
     for (const s of SCREENS) expect(s.path === null).toBe(s.priority === "Should");
   });
@@ -71,9 +74,7 @@ describe("PRD-18.3 AGW-08 route table: every Must screen has a route", () => {
     expect(sectionOf("/world/w1/delivery")).toBe("world");
     expect(sectionOf("/world/w1/trace")).toBe("story");
     expect(sectionOf("/needs-you/gate")).toBe("needs");
-    expect(sectionOf("/library/artifacts")).toBe("library");
     expect(sectionOf("/autonomy")).toBe("more");
     expect(sectionOf("/world/w1/stage")).toBe("world"); // S-04 (WEB-CUTOVER: /world/:id is the Park overview)
-    expect(sectionOf("/worlds/replays")).toBe("world"); // S-14 lists worlds (#227 C4), at /worlds/replays since WEB-CUTOVER
   });
 });

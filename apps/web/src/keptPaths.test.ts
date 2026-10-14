@@ -16,22 +16,13 @@ const KEPT = [
   "/needs-you",
   "/needs-you/gate",
   "/needs-you/consent",
-  "/meeting",
-  "/library",
-  "/library/artifacts",
   "/autonomy",
   "/channels",
   "/mail",
   "/connections",
   "/estimate",
   "/pilot",
-  "/meetings",
-  "/meetings/m1",
-  "/plate",
-  "/pinboards",
-  "/calendar",
   "/more",
-  "/worlds/replays",
   "/team/console",
   "/screens",
   "/screens/cards",
@@ -53,7 +44,7 @@ describe("WEB_CUTOVER_kept_paths: the addresses the old app owns", () => {
       if (s.id === "S-01" || s.id === "S-22") continue; // UI-10 W7: Home and Settings use Park.
       if (s.path !== null) examples.push(s.path);
     }
-    expect(examples.length).toBeGreaterThan(20);
+    expect(examples.length).toBeGreaterThan(12);
     for (const path of examples) expect(isKeptPath(path), path).toBe(true);
     // every pattern accepts its own example, and the example is kept (patterns are what the router matches)
     for (const s of SCREENS) {
@@ -120,4 +111,20 @@ describe("OLD_UI_OUT_retired_flow_paths: the old Start, Understanding and Approa
       expect(isRetiredFlowPath(path)).toBe(false);
     },
   );
+});
+
+describe("OLD_UI_OUT_3_removed_addresses: Library, Meetings, plate, pinboards, calendar and replays are Park's", () => {
+  it.each([
+    "/library",
+    "/library/artifacts",
+    "/meeting",
+    "/meetings",
+    "/meetings/m1",
+    "/plate",
+    "/pinboards",
+    "/calendar",
+    "/worlds/replays",
+  ])("OLD_UI_OUT_3_%s_is_not_kept", (path) => {
+    expect(isKeptPath(path)).toBe(false);
+  });
 });
