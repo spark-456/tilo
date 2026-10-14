@@ -34,6 +34,7 @@ from tilo_planning.deliverable_kinds import (
     load_deliverable_kinds,
     load_kinds,
 )
+from tilo_planning.due_dates import DEADLINE_HELP, parse_deadline
 from tilo_planning.events import build_event, clip
 from tilo_planning.memory import MemoryHit, MemoryLookup
 
@@ -123,10 +124,12 @@ def generate_questions(
         for field in (f for f in candidates if f in TOPIC_REPLACES):
             brief["assumptions"].append({"question": None, "assumed": _assumed(brief, field)})
         candidates = [f for f in candidates if f not in TOPIC_REPLACES]
-    ranked = sorted(candidates, key=lambda f: (-EXPECTED_CHANGE[f], CHIP_FIELDS.index(f)))
+    ranked = sorted(dict.fromkeys(candidates), key=lambda f: (-EXPECTED_CHANGE[f], CHIP_FIELDS.index(f)))
     room = MAX_QUESTIONS - len(topic)
     questions = [_topic_question(q, n) for n, q in enumerate(topic, 1)]
     questions += [_question(brief, f, kinds) for f in ranked[:room]]
+    # one question per field, the first kept: nothing reaches the answers route twice (SIMPLE-RUN-2)
+    questions = list({q.field: q for q in reversed(questions)}.values())[::-1]
     for field in ranked[room:]:
         brief["assumptions"].append({"question": None, "assumed": _assumed(brief, field)})
     brief = validate_brief(brief)
@@ -223,6 +226,11 @@ def apply_answer(
         value = kept if value is None else [*kept, dict(WEB_SOURCE)]
     elif field == "deadline" and value == "end_of_week":
         value = (today + timedelta(days=(4 - today.weekday()) % 7)).isoformat()  # the coming Friday
+    elif field == "deadline" and isinstance(value, str) and not _ISO_DATE.fullmatch(value):
+        known, parsed = parse_deadline(value, today)  # SIMPLE-RUN-2: "by today", "Friday", "Today, 2026-10-14"
+        if not known:
+            raise BriefValidationError(DEADLINE_HELP)
+        value = parsed.isoformat() if parsed is not None else None
     return validate_brief({**copy.deepcopy(brief), field: value})
 
 
@@ -306,6 +314,8 @@ def _topic_question(topic: TopicQuestion, number: int) -> Question:
 
 
 ANSWER_MAX_CHARS = 300  # the answers route's own limit: a longer answer is cut, never scanned
+_ISO_DATE = re.compile(r"\d{4}-\d{2}-\d{2}")
+
 _FORMATS = (
     "pdf",
     "pptx",
