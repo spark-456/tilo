@@ -47,6 +47,7 @@ function Replay() {
           {world.loadError && <p role="alert">{world.loadError}</p>}
           <div className="recorded-replay__player">
             <Stage
+              embedded
               onWorld={world.onWorld}
               seq={world.seq}
               selected={world.selected}

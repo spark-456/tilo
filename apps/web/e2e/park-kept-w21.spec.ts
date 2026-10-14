@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-for (const width of [390, 1440]) {
+for (const width of [320, 390, 1440]) {
   test(`UI_10_W21_reachable_kept_screens_have_Park_chrome_at_${width}`, async ({ page }) => {
     await page.setViewportSize({ width, height: 844 });
     for (const path of [
@@ -12,6 +12,8 @@ for (const width of [390, 1440]) {
     ]) {
       await page.goto(path);
       await expect(page.locator("[data-park] nav")).toBeVisible();
+      await expect(page.getByRole("button", { name: "Your context", exact: true })).toBeVisible();
+      await expect(page.getByRole("button", { name: "Account menu", exact: true })).toBeVisible();
       await expect(page.locator("main")).toHaveCount(1);
       await expect(page.locator("main h1").first()).toBeVisible();
       await expect(page.getByText("Fixture replay")).toHaveCount(0);

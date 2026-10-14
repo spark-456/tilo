@@ -64,6 +64,7 @@ export function Stage({
   paused = false,
   layout,
   worldId,
+  embedded = false,
 }: {
   onWorld?: WorldSeam;
   seq?: number;
@@ -71,7 +72,10 @@ export function Stage({
   paused?: boolean;
   layout?: Layout | null;
   worldId?: string;
+  /** The host already owns the main landmark (Park chrome). */
+  embedded?: boolean;
 }) {
+  const Tag = embedded ? "section" : "main";
   const [, set, toggle] = useSelection(worldId ?? "");
   const outlineItems = useMemo(() => {
     if (!layout) return [];
@@ -322,14 +326,14 @@ export function Stage({
   }, [supported, pixi]);
 
   return (
-    <main
+    <Tag
       className="stage-frame"
       data-testid="stage-frame"
       {...(seq !== undefined ? { "data-seq": seq } : {})}
       {...(selected ? { "data-selected": selected } : {})}
       {...(paused ? { "data-paused": "true" } : {})}
       aria-label="World stage"
-      // biome-ignore lint/a11y/noNoninteractiveTabindex: keyboard pan and zoom (PRD 9.7).
+      // Keyboard pan and zoom remain available in either host (PRD 9.7).
       tabIndex={0}
       ref={frameRef}
     >
@@ -406,6 +410,6 @@ export function Stage({
           ))}
         </ul>
       )}
-    </main>
+    </Tag>
   );
 }

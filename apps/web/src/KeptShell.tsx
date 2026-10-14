@@ -13,6 +13,7 @@ function Shell({ children }: { children: ReactNode }) {
   return (
     <div
       data-park
+      data-kept-shell
       data-time={app.time}
       data-motion={app.motion}
       data-theme={themeFor(app.prefs.theme)}

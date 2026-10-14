@@ -4,7 +4,11 @@ import { afterEach, expect, it, vi } from "vitest";
 import { cleanup, mount, qa } from "../test-support/park/componentsHarness";
 import { FIXTURE_WORLD_ID } from "./api/fixtures/derived";
 
-vi.mock("./stage/Stage", () => ({ Stage: () => <div data-testid="kept-stage" /> }));
+vi.mock("./stage/Stage", () => ({
+  // The real Stage owns a main unless its host explicitly embeds it.
+  Stage: ({ embedded }: { embedded?: boolean }) =>
+    embedded ? <section data-testid="kept-stage" /> : <main data-testid="kept-stage" />,
+}));
 vi.mock("./screens/FlowShell", () => ({
   FlowShell: () => (
     <section>

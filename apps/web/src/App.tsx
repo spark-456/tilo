@@ -189,6 +189,7 @@ export function App({ parkChrome = false }: { parkChrome?: boolean } = {}) {
       ) : (
         // Keyed by world: Stage hands its content seam over once, when Pixi is ready.
         <Stage
+          embedded={parkChrome}
           key={world.active ? "fixture" : (hudWorld ?? "none")}
           {...(stageWorld.active
             ? {

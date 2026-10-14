@@ -56,6 +56,7 @@ it.each(["village-basic", "another-recording"])(
     expect(qa(m.container, '[data-testid="replay-scrubber"]')).toHaveLength(1);
     expect(stage).toHaveBeenCalledWith(
       expect.objectContaining({
+        embedded: true,
         seq: 7,
         worldId: "w_recorded",
         selected: "agent",

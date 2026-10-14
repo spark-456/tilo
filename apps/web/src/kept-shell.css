@@ -41,3 +41,26 @@
   height: 100vh;
   border-radius: 0;
 }
+
+/* W21: Context, Sample and the account tools exhaust the phone header's single row.
+   Keep the Pages control in a row with the logo, and give the tools their own row.
+   The outlet and menu clear the complete header; no control loses its tap area. */
+@media (max-width: 560px) {
+  [data-park][data-kept-shell] .park-shell__nav {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    height: 110px;
+    gap: 8px 12px;
+    padding: 8px 12px;
+  }
+  [data-park][data-kept-shell] .park-shell__tools {
+    grid-column: 1 / -1;
+    justify-content: flex-end;
+  }
+  [data-park][data-kept-shell] .park-shell__page {
+    padding-top: 140px;
+  }
+  [data-park][data-kept-shell] .park-shell__pagemenu {
+    top: 132px;
+  }
+}
