@@ -271,11 +271,12 @@ for (const [sizeName, viewport] of Object.entries(SIZES)) {
           "padding-left": "10px",
         });
         // a fixture world is a recorded sample (WEB-CUTOVER): its meta line says so instead of claiming an owner and agents
-        const meta = await facts(text(page, "Recorded 2 Sep"), [
-          "font-size",
-          "font-weight",
-          "color",
-        ]);
+        // a recorded sample says "Recorded <date>", a fixture world "Owned by ... · started <date> · N agents"; the date follows today (DEMO-TIME-1), so the line is matched by its shape
+        const metaLine = page.locator(".park-world-meta").filter({
+          hasText: /^(?:Recorded \d{1,2} [A-Z][a-z]{2}|Owned by .+ · started .+ · \d+ agents?)$/,
+        });
+        await expect(metaLine).toHaveCount(1);
+        const meta = await facts(metaLine, ["font-size", "font-weight", "color"]);
         expectFacts("meta", meta, {
           "font-size": "15.5px",
           "font-weight": "600",
@@ -328,12 +329,14 @@ for (const [sizeName, viewport] of Object.entries(SIZES)) {
         // Slack, the disabled live view, then the recorded replay link
         const slack = btn(page, "Share to Slack");
         const replay = root(page).getByRole("link", { name: "Watch the replay" });
+        // a recorded sample carries the replay link; a fixture world's row ends at the live view
+        const hasReplay = (await replay.count()) > 0;
         const [pa, sa, ka, la, ra] = await Promise.all([
           btn(page, "Pause").boundingBox(),
           btn(page, "Share").boundingBox(),
           slack.boundingBox(),
           live(page).boundingBox(),
-          replay.boundingBox(),
+          (hasReplay ? replay : live(page)).boundingBox(),
         ]);
         if (!(pa && sa && ka && la && ra)) throw new Error("buttons have no box");
         if (wide) {
@@ -341,7 +344,7 @@ for (const [sizeName, viewport] of Object.entries(SIZES)) {
           near("gap Pause to Share", sa.x - (pa.x + pa.width), 8, 0.6);
           near("gap Share to Share to Slack", ka.x - (sa.x + sa.width), 8, 0.6);
           near("gap Share to Slack to live view", la.x - (ka.x + ka.width), 8, 0.6);
-          near("gap live view to replay", ra.x - (la.x + la.width), 8, 0.6);
+          if (hasReplay) near("gap live view to replay", ra.x - (la.x + la.width), 8, 0.6);
           near(
             "the actions end at the content edge",
             ra.x + ra.width,
