@@ -16,6 +16,7 @@
 !/contracts/
 !/prompts/
 !/templates/
+!/skills/
 !/design/
 /design/*
 
