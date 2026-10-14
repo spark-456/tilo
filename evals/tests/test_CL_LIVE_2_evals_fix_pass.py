@@ -18,7 +18,7 @@ from _live_e2e_lib import network_guard  # noqa: F401  (autouse fixture)
 from tilo_providers.safety import FakeSafetyProvider
 
 FLAGS = ["--real-connectors", "--allow-writes"]
-PASTE = ["Write a short note.", "", *["yes"] * 12]  # the topic, its blank line, then whatever followed in the buffer
+PASTE = ["Write a short note.", "/end", *["yes"] * 12]  # the topic, its /end line (#594), then the rest of the buffer
 
 
 class Terminal:
@@ -72,7 +72,7 @@ def test_CL_LIVE_2_pasted_lines_queued_before_the_card_never_approve_a_write(tmp
 
 def test_CL_LIVE_2_a_yes_typed_after_the_buffer_is_discarded_still_approves_once(tmp_path):
     world = lib.world_for("B-007")
-    buffered = ["Write a short note.", "", "", "y", "ok", "yes", "yes"]  # the paste, plus the early typing
+    buffered = ["Write a short note.", "/end", "", "y", "ok", "yes", "yes"]  # the paste, plus the early typing
     factory, terminal = WriteFactory(world=world), Terminal(buffered, ["yes"])
 
     code, out, err = main(tmp_path, terminal, factory, world)
@@ -85,7 +85,7 @@ def test_CL_LIVE_2_a_drain_that_cannot_run_holds_the_write(tmp_path):
     world = lib.world_for("B-007")
     for drain in ("terminal", lambda: (_ for _ in ()).throw(OSError("no console"))):
         factory = WriteFactory(world=world)
-        terminal = Terminal(["Write a short note.", "", "", "y", "ok", "yes"], can_drain=False)
+        terminal = Terminal(["Write a short note.", "/end", "", "y", "ok", "yes"], can_drain=False)
 
         code, out, err = main(tmp_path, terminal, factory, world, drain=drain)
 

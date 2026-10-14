@@ -9,6 +9,8 @@ import type { AppCtx } from "../../app/AppCtx";
 import { useParkApi } from "../../app/context";
 import type { CurrencyCode } from "../../app/ledgerKpis";
 import { PageSheet } from "../../components";
+import { FirstRunPanels } from "../../sample/FirstRunPanels";
+import { useFirstRunPreview } from "../../sample/useFirstRunPreview";
 import { HelpSection } from "./HelpSection";
 import { LibrarySection } from "./LibrarySection";
 import "./Skills.css";
@@ -56,6 +58,10 @@ function Header({ total, children }: { total?: string; children?: ReactNode }) {
 }
 
 export function SkillsPage({ app }: { app: AppCtx }) {
+  const preview = useFirstRunPreview();
+  return preview ? <FirstRunPanels page="skills" app={app} /> : <PersonalSkillsPage app={app} />;
+}
+function PersonalSkillsPage({ app }: { app: AppCtx }) {
   const api = useParkApi();
   const [data, setData] = useState<Loaded>(null);
   useEffect(() => {
@@ -217,14 +223,16 @@ function Ready({ app, data }: { app: AppCtx; data: Data }) {
         selectedId={selectedId}
         paused={paused}
         currency={currency}
+        live={source !== "fixture"}
         onSelect={(id) => setSel(id)}
         onTogglePause={(skill) => {
           const nextPaused = !paused[skill.id];
           setPaused((prev) => ({ ...prev, [skill.id]: nextPaused }));
+          // The demo's pause is this page's only: no world, run or stored skill changes (W10).
           app.toast(
             nextPaused
-              ? `“${skill.name}” is paused. Worlds using it will ask you instead`
-              : `“${skill.name}” is running again`,
+              ? `Sample data: “${skill.name}” is paused on this page only. Nothing changed for your worlds`
+              : `Sample data: “${skill.name}” is shown as running again on this page only`,
           );
         }}
         onTryDraft={() => {

@@ -5,6 +5,10 @@ the caller's own `GET /worlds/{id}/events` view shows them (nothing stored witho
 `title` and `created_at` from the first `world.requested`, `status` from the latest registered `world.*` event,
 `last_seq` from the last event the caller can see. Scope: an owner sees every world whose record owner is their
 user id (as `GET /costs`); anyone else only the world their principal names. Nothing is written.
+TSW-4b (BQ-CTX-TEAMWORLD, ADR-0040, BQ-TEAMWORLD-8): a full web or mobile-web sign-in also lists the worlds it reads as
+a team reader (`deps.team_readable_worlds`, each decided by `deps.team_reader`, re-read every request), as the derived
+Viewer sees them (the same five keys) plus `"access": "team"`; the person's own items carry no `access` key. A people
+store that cannot be opened leaves the person's own list.
 
 The cursor is an opaque keyset position (`created_at`, `world_id`) of the last item served, with a keyed MAC over the
 caller's user id, so one person's cursor is refused for another and a forged one is refused. The scope is applied on
@@ -24,13 +28,23 @@ import hmac
 import json
 import os
 import secrets
-from collections.abc import Iterable, Iterator
+from collections.abc import Callable, Iterable, Iterator
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import JSONResponse
+from tilo_people.stores import PeopleStores
 
-from tilo_api.deps import Principal, Store, WorldRecord, get_current_principal, get_store
+from tilo_api.deps import (
+    Principal,
+    Store,
+    WorldRecord,
+    get_clock,
+    get_current_principal,
+    get_people_provider,
+    get_store,
+    team_readable_worlds,
+)
 from tilo_api.redaction import _event_hides_district, _is_malformed_event, _is_owner, _safe_districts, _visible
 from tilo_api.sample_world import SAMPLE_TITLE_PREFIX, SAMPLE_WORLD_ID
 from tilo_api.sample_world import load as _load_sample
@@ -150,28 +164,45 @@ def list_worlds(
     include_sample: str | None = Query(None),
     principal: Principal = Depends(get_current_principal),
     store: Store = Depends(get_store),
+    people: Callable[[], PeopleStores | None] = Depends(get_people_provider),
+    clock: Callable[[], str] = Depends(get_clock),
 ) -> JSONResponse:
     after = _decode_cursor(principal.user_id, cursor) if cursor is not None else None
+    viewers: dict[str, Principal] = {}  # TSW-4b: team world id -> the derived Viewer it is served as
     if principal.role == "owner":
         store.load_owner(principal.user_id, settle=True)
         scope = {
             w: rec for w, rec in store.worlds.items() if rec.owner == principal.user_id and w != SAMPLE_WORLD_ID
         }  # STARTER-1: the sample is never a stored world, whatever a store holds under its id
+        own = bool(scope)
+        # TSW-4b: the worlds shared with a team of theirs, decided afresh by `team_reader` on every request (a cursor
+        # never carries scope); a person's own world is never listed twice.
+        for w, (record, viewer) in team_readable_worlds(principal, store, people, clock).items():
+            if w not in scope and w != SAMPLE_WORLD_ID:
+                scope[w], viewers[w] = record, viewer
     else:
+        own = False
         named = store.load_world(principal.world_id, settle=True) if principal.world_id is not None else None
         scope = (
             {principal.world_id: named}
             if principal.world_id is not None and named is not None and principal.world_id != SAMPLE_WORLD_ID
             else {}
         )
-    positions = [_position(principal, store, w, rec) for w, rec in scope.items()]
-    sample = _sample_item() if principal.role == "owner" and (not scope or include_sample == "1") else None
+    positions = [_position(viewers.get(w, principal), store, w, rec) for w, rec in scope.items()]
+    sample = _sample_item() if principal.role == "owner" and (not own or include_sample == "1") else None
     if sample is not None:  # STARTER-1: ordered among the caller's worlds like any other, so pages walk it once
         positions.append((True, sample["created_at"], SAMPLE_WORLD_ID))
     ordered = sorted(positions, reverse=True)
     rest = [p for p in ordered if after is None or p < after]
     page = rest[:limit]
-    worlds = [sample if p[2] == SAMPLE_WORLD_ID else _item(principal, store, p[2], scope[p[2]]) for p in page]
+    worlds: list[dict[str, Any]] = []
+    for _, _, world_id in page:
+        if world_id == SAMPLE_WORLD_ID and sample is not None:
+            worlds.append(sample)
+        elif world_id in viewers:  # a team item: what the reader's own view shows, marked (absent = the person's own)
+            worlds.append({**_item(viewers[world_id], store, world_id, scope[world_id]), "access": "team"})
+        else:
+            worlds.append(_item(principal, store, world_id, scope[world_id]))
     more = len(rest) > limit
     return JSONResponse(
         content={"worlds": worlds, "next_cursor": _encode_cursor(principal.user_id, page[-1]) if more else None}

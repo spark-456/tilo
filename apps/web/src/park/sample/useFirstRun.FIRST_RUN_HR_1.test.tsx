@@ -49,6 +49,11 @@ describe("FIRST_RUN_HR_1 shared session guard", () => {
     await flush();
     expect(rig.value()).toBe("true");
   });
+  it("FIRST_RUN_HR_1_BQ_CTX_TEAMWORLD_a_teammates_world_is_not_a_personal_run", async () => {
+    const rig = setup([{ ...real, id: "w_team", access: "team" }]);
+    await flush();
+    expect(rig.value()).toBe("true");
+  });
   it("FIRST_RUN_HR_1_any_real_world_hides_samples_even_beside_a_sample", async () => {
     const rig = setup([sample, real]);
     await flush();

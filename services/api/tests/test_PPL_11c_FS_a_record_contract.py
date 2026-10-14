@@ -270,7 +270,12 @@ INDEX_EXPECTATIONS = {
         ("owner", "u_none", []),
         ("owner", "u_", []),
     ],
-    "work_item": [("owner", "u_a", ["wi_w1", "wi_w2"]), ("owner", "u_b", ["wi_w3"]), ("owner", "U_A", [])],
+    "work_item": [
+        ("owner", "u_a", ["wi_w1", "wi_w2"]),
+        ("owner", "u_b", ["wi_w3"]),
+        ("owner", "U_A", []),
+        ("world_id", "w_shared", []),  # ADR-0040: no item of these tests names a world
+    ],
     "calendar_entry": [("owner", "u_a", ["ce_c1", "ce_c2"]), ("owner", "u_b", ["ce_c3"])],
     "pinboard_item": [
         ("scope.user", "u_x", ["pb_p3"]),

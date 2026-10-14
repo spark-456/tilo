@@ -1,10 +1,10 @@
-// S-22 Settings (PRD 18.3, 16.5): data, export, delete and the density mode. Nothing here is
-// stored or sent yet, so every control is a placeholder and no setting claims a value. The
+// S-22 Settings (PRD 18.3, 16.5): display preferences, routines and consent.
+// Appearance shares Profile controls; unavailable export/delete actions stay hidden. The
 // privacy lines are PRD 16.5's. No design export covers a unified Settings screen: cards and rows
 // after "Tilo Team.dc.html", neutral role tokens (design/source/INDEX.md, S-22).
 import { type Density, useDensity } from "../display/density";
+import { SettingsAppearance } from "../park/shell/SettingsAppearance";
 import { AppLink } from "./AppLink";
-import { Placeholder } from "./Placeholder";
 import { Page, Row, Section } from "./kit";
 import { Routines } from "./routines/Routines";
 
@@ -40,9 +40,10 @@ export function S_22() {
       sub="Your data, what Tilo may use, and how the app looks."
     >
       <Section
-        title="Display"
+        title="Appearance"
         note="Friendly is the default. Professional tightens the spacing and keeps decoration out. It changes how the app looks, never what happened, and it applies at once."
       >
+        <SettingsAppearance />
         <fieldset className="segmented" data-testid="density">
           <legend className="visually-hidden">Display mode</legend>
           {MODES.map(([id, name, what]) => (
@@ -85,22 +86,7 @@ export function S_22() {
       <Section
         title="Your data"
         note="Email bodies are never cached. The style profile keeps settings, not emails. Data stays in asia-southeast1."
-      >
-        <ul className="blist">
-          <Row
-            name="Export my data"
-            sub="Events, files and a provenance manifest. Not available in the app yet."
-          >
-            <Placeholder label="Export" compact />
-          </Row>
-          <Row
-            name="Delete my account and data"
-            sub="Not available in the app yet. When it is, your data is removed from every store within 30 days, and this cannot be undone."
-          >
-            <Placeholder label="Delete" compact />
-          </Row>
-        </ul>
-      </Section>
+      />
     </Page>
   );
 }

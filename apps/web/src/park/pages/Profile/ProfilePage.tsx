@@ -14,6 +14,8 @@ import { useFollowed } from "../../app/followed";
 import { PageSheet, StatusChip, Switch } from "../../components";
 import { SampleBadge } from "../../sample/SampleBadge";
 import "./Profile.css";
+import { AppearanceControls } from "./AppearanceControls";
+import { BetaPlan } from "./BetaPlan";
 import { PushControl } from "./PushControl";
 import { ICONS } from "./icons";
 import { canSwitchOff } from "./notifyRules";
@@ -25,6 +27,7 @@ import {
   type RowId,
   baseForm,
   channelsOf,
+  gmtLabel,
   isConflict,
   notificationsOf,
   problemOf,
@@ -51,20 +54,6 @@ const FIELDS = [
 ] as const;
 
 const CHANNELS = ["Phone", "Email", "Slack"] as const;
-const SWATCH = {
-  day: ["#B6DCA0", "#F4B23E", "#3E9BE6", "#EC6AA6"],
-  night: ["#2C3556", "#FFD98A", "#5A6BD0", "#7A62F5"],
-} as const;
-const TIMES = [
-  ["day", "Day", "Bright lawns"],
-  ["night", "Night", "Lamps and glow"],
-] as const;
-const MOTIONS = [
-  ["lively", "Lively", "Full speed on Home. The city pauses when you leave Home."],
-  ["calm", "Calm", "Agents and cars move slowly. The city pauses when you leave Home."],
-  ["still", "Still", "Nothing moves. Best for older laptops and long sessions."],
-] as const;
-
 // QA-DEMO-1: the Face ID row is gone everywhere (the mobile app is a concept), and a row is shown only where it is
 // labelled Sample (a demo session) or read from the fixture company: a real account never gets an invented claim.
 const SECURITY_ROWS = [
@@ -106,10 +95,10 @@ function Tile({ tone, children }: { tone: "ok" | "sunk" | "hero"; children: Reac
   return <div className={`park-profile-tile park-profile-tile--${tone}`}>{children}</div>;
 }
 
-function Unavailable({ title }: { title: string }) {
+function Unavailable({ title, sub = "Not available yet" }: { title: string; sub?: string }) {
   return (
     <div className="park-profile-unavailable">
-      <Head title={title} sub="Not available yet" />
+      <Head title={title} sub={sub} />
     </div>
   );
 }
@@ -371,7 +360,6 @@ export function ProfilePage({ app }: { app: AppCtx }) {
         ? "Your profile could not be loaded"
         : "";
   // An unknown value reads as the default, calm (the store and the handoff default), not as the first option.
-  const motion = MOTIONS.find((m) => m[0] === app.motion) ?? MOTIONS[1];
 
   return (
     <div data-testid="park-page-profile">
@@ -437,6 +425,9 @@ export function ProfilePage({ app }: { app: AppCtx }) {
                         onChange={(e) => setEdits({ ...edits, [key]: e.target.value })}
                       />
                       <span className="park-profile-help">{help}</span>
+                      {key === "tz" && gmtLabel(form.tz) ? (
+                        <span className="park-profile-help">{`(${gmtLabel(form.tz)})`}</span>
+                      ) : null}
                     </label>
                   ))}
                 </div>
@@ -523,61 +514,7 @@ export function ProfilePage({ app }: { app: AppCtx }) {
                 className="park-profile-card park-profile-card--appearance"
               >
                 <Head title="Appearance" sub="Your city, your way. Changes apply straight away." />
-                <h3 className="park-profile-group">Time of day</h3>
-                <div className="park-profile-times">
-                  {TIMES.map(([id, name, sub]) => {
-                    const [ground, a, b, c] = SWATCH[id];
-                    return (
-                      <button
-                        key={id}
-                        type="button"
-                        aria-pressed={app.time === id}
-                        className={cls(
-                          "park-profile-time",
-                          app.time === id && "park-profile-time--on",
-                        )}
-                        onClick={() => app.setPref("time", id)}
-                      >
-                        <div className="park-profile-swatch" style={{ background: ground }}>
-                          <div
-                            className="park-profile-block park-profile-block--a"
-                            style={{ background: a }}
-                          />
-                          <div
-                            className="park-profile-block park-profile-block--b"
-                            style={{ background: b }}
-                          />
-                          <div
-                            className="park-profile-block park-profile-block--c"
-                            style={{ background: c }}
-                          />
-                        </div>
-                        <div>
-                          <div className="park-profile-tname">{name}</div>
-                          <div className="park-profile-tsub">{sub}</div>
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-                <h3 className="park-profile-group">Motion in the city</h3>
-                <div className="park-profile-motion">
-                  {MOTIONS.map(([id, name]) => (
-                    <button
-                      key={id}
-                      type="button"
-                      aria-pressed={motion[0] === id}
-                      className={cls(
-                        "park-profile-mopt",
-                        motion[0] === id && "park-profile-mopt--on",
-                      )}
-                      onClick={() => app.setPref("motion", id)}
-                    >
-                      {name}
-                    </button>
-                  ))}
-                </div>
-                <p className="park-profile-motion-help">{motion[2]}</p>
+                <AppearanceControls app={app} />
               </section>
             ) : null}
 
@@ -696,7 +633,7 @@ export function ProfilePage({ app }: { app: AppCtx }) {
                 ) : null}
                 <div className="park-profile-cards">
                   {loaded.settings.plan === null ? (
-                    <Unavailable title="Plan" />
+                    <BetaPlan />
                   ) : (
                     <div className="park-profile-plan">
                       <span className="park-profile-eyebrow">PLAN</span>
@@ -764,7 +701,7 @@ export function ProfilePage({ app }: { app: AppCtx }) {
                 <div className="park-profile-invoices">
                   <h2 className="park-profile-invoices-title">Invoices</h2>
                   {loaded.settings.invoices === null ? (
-                    <Unavailable title="Invoice history" />
+                    <Unavailable title="Invoice history" sub="No invoices during beta" />
                   ) : (
                     loaded.settings.invoices.map((inv) => (
                       <div key={inv.id} className="park-profile-invoice">

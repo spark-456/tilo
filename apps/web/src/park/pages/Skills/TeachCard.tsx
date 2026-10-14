@@ -59,6 +59,9 @@ export function TeachCard({
           })}
         </ol>
       </div>
+      {t.live && t.busy && t.stage === 0 ? (
+        <output className="park-skills-card-sub">Reading your description…</output>
+      ) : null}
       {t.stage === 0 ? <ShowPane t={t} night={night} user={user} /> : null}
       {t.stage === 1 ? <LearnPane t={t} night={night} user={user} /> : null}
       {t.stage === 2 ? <RunPane t={t} night={night} user={user} /> : null}

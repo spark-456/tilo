@@ -9,6 +9,23 @@ const object = (v: unknown): v is Record<string, unknown> =>
   typeof v === "object" && v !== null && !Array.isArray(v);
 const text = (v: unknown): v is string => typeof v === "string";
 const nullable = (v: unknown): v is string | null => v === null || text(v);
+/** PE-26: a 404 means no person record. There are no server dates or rows to display. */
+export function emptyAgenda(): LiveAgenda {
+  return {
+    days: null,
+    wkend: null,
+    today: null,
+    start: null,
+    end: null,
+    now: null,
+    events: null,
+    slots: null,
+    details: null,
+    pins: null,
+    rules: null,
+    plate: { today: null, asOf: null, rows: [], parked: [], truncated: false },
+  };
+}
 const row = (v: unknown): v is AgendaPlateRow =>
   object(v) &&
   object(v.ref) &&
@@ -43,17 +60,7 @@ export function agendaFromPlate(v: unknown): LiveAgenda {
       group: r.group,
     }));
   return {
-    days: null,
-    wkend: null,
-    today: null,
-    start: null,
-    end: null,
-    now: null,
-    events: null,
-    slots: null,
-    details: null,
-    pins: null,
-    rules: null,
+    ...emptyAgenda(),
     plate: {
       today: v.today,
       asOf: v.as_of,

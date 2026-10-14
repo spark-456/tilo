@@ -36,6 +36,17 @@ const apiFor = (body: unknown, status = 200) => {
   return { api: createLiveApi({ baseUrl: "https://api.example.test", fetch }), fetch };
 };
 describe("FR_UX_14 FR_PB live Agenda", () => {
+  it("PE_26 W2 a missing person plate is empty live work with no invented date", async () => {
+    const { api, fetch } = apiFor({ detail: "Not Found" }, 404);
+    expect(await api.getAgenda()).toMatchObject({
+      source: "live",
+      data: {
+        events: null,
+        plate: { today: null, asOf: null, rows: [], parked: [], truncated: false },
+      },
+    });
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
   it("FR_UX_14 reads the plate without inventing events, end times or people", async () => {
     const { api, fetch } = apiFor(plate);
     const result = await api.getAgenda();

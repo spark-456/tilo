@@ -85,10 +85,15 @@ export function merge(list: Connector[], o: Overrides, nowMs?: number): Merged[]
 export const matches = (c: Connector, q: string): boolean =>
   !q || `${c.name} ${c.cat}`.toLowerCase().includes(q.toLowerCase());
 
+/**
+ * HR-1: this list is the sample company's, so no sync event stands behind a tool's "synced 2 min ago" or "synced
+ * live". A connected tool says so plainly; only the sign-in warning (worked out from `expires`) keeps its text.
+ */
+export const SAMPLE_SYNC_LINE = "Example only: not synced";
+export const SAMPLE_DRAWER_LINE = "Example only · no sync or health check recorded";
+
 export const syncLine = (c: Connector): string =>
-  c.st === "attention"
-    ? (c.sync ?? "")
-    : `Synced ${c.sync === "Live" ? "live" : c.sync || "just now"}`;
+  c.st === "attention" ? (c.sync ?? "") : SAMPLE_SYNC_LINE;
 
 export const usedLine = (c: Connector): string =>
   c.used?.length ? `Used by ${c.used.length}` : "Not used yet";
@@ -107,9 +112,7 @@ export function bannerText(c: Merged): { title: string; sub: string } {
 }
 
 export const drawerSync = (c: Connector): string =>
-  c.st === "attention"
-    ? `${c.sync ?? ""}. Reconnect to keep agents working.`
-    : `Healthy · synced ${c.sync === "Live" ? "live" : c.sync || "just now"}`;
+  c.st === "attention" ? `${c.sync ?? ""}. Reconnect to keep agents working.` : SAMPLE_DRAWER_LINE;
 
 /** A "Used by" row: a skill or world that touches the tool (linked by id), or another place the record names. */
 export interface UsedRow {

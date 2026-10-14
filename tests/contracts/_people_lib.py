@@ -36,6 +36,7 @@ Ambiguities this file resolves (each is also in the ticket report; PRD/rules ref
 from __future__ import annotations
 
 import copy
+import hashlib
 import json
 import pathlib
 from collections.abc import Callable
@@ -1395,3 +1396,123 @@ REQUIRED_REFUSALS: dict[str, Callable[[dict], bool]] = {
 
 def load_cases(repo_root: pathlib.Path, kind: str) -> list[tuple[pathlib.Path, dict]]:
     return [(p, load_json(p)) for p in fixture_files(repo_root, f"person/crossref/{kind}")]
+
+
+# ---------------------------------------------------------------------------------------------
+# World shares (ADR-0040, PE-31 to PE-35): `fixtures/world_share/crossref/{valid,invalid}/`.
+# A case is the person crossref shape plus `world_owner` (the world's record owner) and `world_share`
+# (the share of the item's world, or null). It has its own folder so the suites that run
+# `person/crossref` (tilo_people PPL-10a, tilo-api) keep their counts until TSW-1 teaches `decide`
+# the `read_team` action. `skip` switches single checks off: the mutant tests use it to show that
+# each named case dies when its check is dropped.
+# ---------------------------------------------------------------------------------------------
+SHARE_CASE_KEYS = CASE_KEYS | {"world_owner", "world_share"}
+SHARE_REQUEST_KINDS = (*REQUEST_KINDS, "read_team")  # the 14 actions plus the team view (PE-33)
+SHARE_RULES = ("PE-03", "PE-31", "PE-33")
+TEAM_VIEW_FIELDS = ("id", "title", "status", "due", "owner", "world_id")  # PE-33: the `read_team` view of a work item
+SHARE_CHECKS = (
+    "revoked",
+    "granter_is_world_owner",
+    "granted_not_in_future",
+    "owner_in_team",
+    "membership_predates_grant",
+    "id_derived",
+    "same_org",
+    "item_in_the_share_world",
+    "person_made",
+    "open_or_done",
+    "not_flagged",
+    "actor_same_org",
+    "actor_in_team",
+    "item_owner_in_team",
+    "creator_reads_world",
+)
+
+
+def share_id(world_id: str, team: str) -> str:
+    """PE-31: `ws_` and the first 32 hex characters of the SHA-256 of `<world_id>/<team>`."""
+    return "ws_" + hashlib.sha256(f"{world_id}/{team}".encode()).hexdigest()[:32]
+
+
+def share_in_force(case: dict, skip: frozenset = frozenset()) -> bool:
+    """PE-31: the share stands at `now` and still means what it said."""
+    share, owner, persons, now = case["world_share"], case["world_owner"], case["persons"], case["now"]
+    if share is None or owner not in persons:
+        return False
+    person = persons[owner]
+    held = {
+        "revoked": share["revoked"] is None,
+        "granter_is_world_owner": share["granted_by"]["by"] == owner,
+        "granted_not_in_future": share["granted_by"]["at"] <= now,
+        "owner_in_team": is_member(persons, owner, share["team"], now),
+        "membership_predates_grant": any(
+            m["team"] == share["team"] and m["assigned_by"]["at"] <= share["granted_by"]["at"]
+            for m in person["memberships"]
+        ),
+        "id_derived": share["id"] == share_id(share["world_id"], share["team"]),
+        "same_org": share["org_id"] == person["org_id"],
+    }
+    return all(ok for name, ok in held.items() if name not in skip)
+
+
+def world_share_permits(case: dict, skip: frozenset = frozenset()) -> bool:
+    """PE-03 as amended, PE-31 and PE-33: the plain people oracle for every action but two. `read_team`
+    answers only for a work item bound to the share's world; `create` of an item that names a world needs
+    a creator who owns that world or belongs to a team it is shared with."""
+    request, record, persons, now = case["request"], case["record"], case["persons"], case["now"]
+    action, actor, data, share = request["action"], request["actor"], record["data"], case["world_share"]
+    if action not in ("read_team", "create"):
+        return permits({key: case[key] for key in CASE_KEYS})
+    me = persons.get(actor)
+    if action == "read_team":
+        if record["kind"] != "work_item":  # the team view is for work items only (PE-33)
+            return False
+        created, owner = data["created_by"], data["owner"]
+        held = {
+            "item_in_the_share_world": share is not None
+            and data.get("world_id") is not None
+            and data["world_id"] == share["world_id"],
+            "person_made": created["by"] == "person" and owner == created["ref"],
+            "open_or_done": data["status"] in ("open", "done"),
+            "not_flagged": data["flagged"] is False,
+            "actor_same_org": me is not None and me["org_id"] == data["org_id"],
+            "actor_in_team": share is not None and is_member(persons, actor, share["team"], now),
+            "item_owner_in_team": share is not None and is_member(persons, owner, share["team"], now),
+        }
+        return all(ok for name, ok in held.items() if name not in skip) and share_in_force(case, skip)
+    if not permits({key: case[key] for key in CASE_KEYS}):
+        return False
+    if record["kind"] != "work_item" or data.get("world_id") is None:
+        return True
+    owns = actor == case["world_owner"]
+    reads = (
+        share is not None
+        and data["world_id"] == share["world_id"]
+        and share_in_force(case, skip)
+        and is_member(persons, actor, share["team"], now)
+    )
+    return owns or reads or "creator_reads_world" in skip
+
+
+def share_case_shape_problems(repo_root: pathlib.Path, registry: Any, case: dict) -> list[str]:
+    """Every part of a world-share crossref case is shape-valid against its schema."""
+    if set(case) != SHARE_CASE_KEYS:
+        return [f"keys must be {sorted(SHARE_CASE_KEYS)}, got {sorted(case)}"]
+    if case["rule"] is not None and case["rule"] not in SHARE_RULES:
+        return [f"rule must be null or one of {SHARE_RULES}"]
+    plain = {key: case[key] for key in CASE_KEYS}
+    plain["rule"] = None  # the person-case check knows the PE-01 to PE-20 rules only
+    request = case["request"]
+    if request.get("action") == "read_team":  # the person check, and tilo_people's 14 actions, stay as they are
+        plain["request"] = {**request, "action": "read", "view": "full"}
+        if request.get("view") != "team":
+            return [f"a read_team request has view team, got {request.get('view')!r}"]
+    found = case_shape_problems(repo_root, registry, plain)
+    if case["world_share"] is not None:
+        found += [f"world_share: {m}" for m in problems(repo_root, registry, "world_share", case["world_share"])]
+    found += [f"world_owner: {m}" for m in problems(repo_root, registry, "common", case["world_owner"], "user_id")]
+    return found
+
+
+def load_share_cases(repo_root: pathlib.Path, kind: str) -> list[tuple[pathlib.Path, dict]]:
+    return [(p, load_json(p)) for p in fixture_files(repo_root, f"world_share/crossref/{kind}")]

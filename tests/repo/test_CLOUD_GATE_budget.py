@@ -47,8 +47,9 @@ def test_CLOUD_GATE_tracked_test_inputs_are_allowed(name):
     assert gate.allowed(name)
 
 
-def test_CLOUD_GATE_budget_refuses_before_any_cloud_command(tmp_path, monkeypatch):
-    (tmp_path / "CLOUD-GATE-SPEND.json").write_text(json.dumps([{"inr": 399}]))
+@pytest.mark.parametrize("spent", [899, 897.61])
+def test_CLOUD_GATE_budget_refuses_before_any_cloud_command(tmp_path, monkeypatch, spent):
+    (tmp_path / "CLOUD-GATE-SPEND.json").write_text(json.dumps([{"inr": spent}]))
     monkeypatch.setattr(sys, "argv", ["gate-cloud", "HEAD"])
     monkeypatch.setattr(gate, "ledger_directory", lambda: tmp_path)
     real_run = gate.subprocess.run
@@ -61,7 +62,7 @@ def test_CLOUD_GATE_budget_refuses_before_any_cloud_command(tmp_path, monkeypatc
     with pytest.raises(RuntimeError, match="STOP/QUESTION"):
         gate.main()
     assert not (tmp_path / "CLOUD-GATE-SPEND.lock").exists()
-    assert json.loads((tmp_path / "CLOUD-GATE-SPEND.json").read_text()) == [{"inr": 399}]
+    assert json.loads((tmp_path / "CLOUD-GATE-SPEND.json").read_text()) == [{"inr": spent}]
 
 
 def test_CLOUD_GATE_caller_cannot_override_shared_ledger(tmp_path, monkeypatch):

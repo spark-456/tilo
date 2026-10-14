@@ -59,21 +59,24 @@ class BoundModel:
 
 
 class ApiUnitRunner(DefaultUnitRunner):
-    def __init__(self, providers: Mapping[str, Any], *, mode: Mode, clock: Callable[[], date]) -> None:
+    def __init__(
+        self, providers: Mapping[str, Any], *, mode: Mode, clock: Callable[[], date], meter: Any = None
+    ) -> None:
         super().__init__(providers, clock=clock)
-        self.mode = mode
+        self.mode, self.meter = mode, meter  # SEC-16: the run's meter; deployed, live with none is replay
 
     def bind_run(self, run: Any, archive: RunArchive) -> BoundRunRunner:
         from tilo_api import deps
 
+        safety = deps.get_safety(self.mode, meter=self.meter) if self.meter is not None else deps.get_safety(self.mode)
         return BoundRunRunner(
             run,
             self._providers,
             self.mode,
             self._date_clock,
             archive,
-            deps.get_safety(self.mode),
-            deps._seam_router(self.mode),
+            safety,
+            deps._seam_router(self.mode, self.meter),
             deps.FIXTURES_DIR,
         )
 

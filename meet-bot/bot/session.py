@@ -24,7 +24,7 @@ from .browser import MeetBrowser
 from .captions import CaptionMerger, CaptionReader, TranscriptStore, Utterance
 from .chat import ChatPoster, intro_text
 from .clock import SystemClock
-from .config import ROOT, Config
+from .config import ROOT, Config, load_wake_settings
 from .control import stop_requested
 from .events import EventSink, remove_meet_links
 from .guards import BotRefused
@@ -46,6 +46,7 @@ from .speaker import NullSpeaker, VoiceSpeaker
 from .timing import Timeline
 from .trace import Turn, TurnTrace
 from .tts import STT_END_AT
+from .wake import Attention, wake_gate
 
 log = logging.getLogger("bot.session")
 STATUS_EVERY_S = 3.0  # how often to check who is here before the meeting has started for the bot
@@ -68,7 +69,7 @@ def build_brain(cfg: Config, agenda_path: Path | None, duration: float | None, k
         log.warning("no agenda at %s: transcript only, no brain (copy agenda.example.md to agenda.md)", path)
         return None
     agenda = Agenda.load(path)
-    return Brain(
+    brain = Brain(
         agenda,
         ProviderLLM(),
         agenda.resolve_duration(duration or cfg.meeting_minutes),
@@ -77,7 +78,11 @@ def build_brain(cfg: Config, agenda_path: Path | None, duration: float | None, k
         max_direct=cfg.max_direct_replies,
         direct_gap_s=cfg.direct_reply_gap_s,
         knowledge=kb,
+        wake_settings=load_wake_settings(),
+        meeting_scope=True,
     )
+    brain.policy.proactive = cfg.voice_nudges  # existing operator opt-in; off by default for chat AND voice
+    return brain
 
 
 async def run_live(
@@ -240,6 +245,7 @@ class LiveSession:
         u.speaker = remove_meet_links(u.speaker)
         u.t = round(u.t, 1)
         self.store.append(u)
+        self.emit_face("heard")
         self.events.emit("transcript.utterance", speaker=u.speaker, text=u.text, t=u.t)
         self.timeline.record(
             "utterance",
@@ -282,7 +288,12 @@ class LiveSession:
             self.record_audio,
         )
         self._setup_voice()
-        async with MeetBrowser(self.cfg, voice=self.voice) as br:
+        async with MeetBrowser(self.cfg, voice=self.voice, face=True) as br:
+            self._face_loop = asyncio.get_running_loop()
+            if isinstance(self.speaker, VoiceSpeaker):
+                self.speaker.player.on_level = lambda level: self.emit_face("audio_level", level)
+            if self.brain:
+                self.brain.model_event = self.emit_face
             self.br = br
             try:
                 if self.mode == "start":
@@ -434,16 +445,39 @@ class LiveSession:
             log.info("chat from %s: %s", sender, text[:120])
             if not asked and len(text) >= 20:
                 self.kb.add_chat(sender, text)  # pasted notes/links become answerable context
-            self.record(chat_utterance(sender, text, self.elapsed()), heard_at=self.clock.now())
+            directed = (
+                self.brain is None
+                or self.brain.wake_settings is None
+                or wake_gate(text, sender, self.brain_elapsed(), Attention(), self.brain.wake_settings).allowed
+            )
+            line = chat_utterance(sender, text, self.elapsed()) if directed else Utterance(sender, text, self.elapsed())
+            self.record(line, heard_at=self.clock.now())
 
     # -- answering ---------------------------------------------------------------------------------------------------
     async def _post(self, text: str, kind: str) -> bool:
         self.own_texts.add(text)
         ok = await self.chat.send(text)
+        if not self.voice:
+            self.emit_face("success" if ok else "failure")
         if ok:
             self.events.emit("chat.posted", kind=kind, text=text)
             await self.br.shot(f"chat_{kind}")
         return ok
+
+    def emit_face(self, kind: str, value: float = 0) -> None:
+        loop = getattr(self, "_face_loop", None)
+        if loop is not None and not loop.is_closed():
+
+            def send() -> None:
+                async def apply() -> None:
+                    try:
+                        await self.br.face_event(kind, value)
+                    except Exception:
+                        log.debug("face event unavailable")
+
+                loop.create_task(apply())
+
+            loop.call_soon_threadsafe(send)
 
     def _setup_voice(self) -> None:
         """Voice replies need a TTS provider and a virtual microphone; without them the bot stays chat-only."""
@@ -473,6 +507,7 @@ class LiveSession:
 
         def heard_first() -> None:
             first_sound.set()
+            self.emit_face("audio_start")
             mark("first_sample")
 
         if want_voice:
@@ -497,7 +532,11 @@ class LiveSession:
             chat_s, first_out = self.clock.now() - t1, self.clock.now() - t0
             if chat_ok:
                 mark("chat_posted")
-        res = await speak if speak else None
+        try:
+            res = await speak if speak else None
+        finally:
+            if speak:
+                self.emit_face("audio_end")
         if res is not None:
             mark("playback_end")
             if res.first_audio_s is not None:

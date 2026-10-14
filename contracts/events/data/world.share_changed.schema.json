@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.tilo.example/events/data/world.share_changed.schema.json",
+  "x-version": "1.0.0",
+  "title": "WorldShareChangedData",
+  "description": "data of world.share_changed (registry 1.5.0, ADR-0040). The world's owner turned team sharing on or off for one team. tilo-api writes it in the shared world after the world_share record was written, never an agent or a model: actor is the world's owner (the actor of its first world.requested), target is the world's own id, district is null and vis is [] (owner-only, ADR-0009). state on means a share record now exists for team; off means it was revoked. It authorises nothing outside Tilo and sends nothing, so it is not a side effect and authz is null. A share that lapses because the owner left the team writes no event.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["team", "state"],
+  "properties": {
+    "team": {
+      "$ref": "../../common.schema.json#/$defs/team_id"
+    },
+    "state": {
+      "type": "string",
+      "enum": ["on", "off"]
+    }
+  }
+}
