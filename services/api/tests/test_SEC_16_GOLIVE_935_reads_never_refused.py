@@ -86,6 +86,12 @@ def meeting_world(people_rig, monkeypatch):
         rig.add("work_items", proposed_launch_note())
         rig.as_user(OWNER)
         wire_state(rig, monkeypatch, state)
+        # ACT-1b: a deployed delete drains follow-up drafts through the API store door (its own tests cover it and its
+        # 503); this rig has no Firestore, so the drain is recorded and the cap/switch question stays the test's.
+        from tilo_api.meeting_draft_cleanup import get_meeting_draft_cleanup  # noqa: PLC0415
+
+        rig.drained = []
+        rig.app.dependency_overrides[get_meeting_draft_cleanup] = lambda: lambda owner, mid: rig.drained.append(mid)
         return rig
 
     yield make
