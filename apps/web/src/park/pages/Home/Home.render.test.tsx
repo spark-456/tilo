@@ -166,14 +166,29 @@ describe("WEB_4_home_render: Today panel", () => {
     expect(page.indexOf("September spend")).toBeLessThan(page.indexOf(QUICK.start));
   });
 
-  it("WEB_4_home_render_the_side_panel_needs_a_viewport_of_1180_or_more", async () => {
-    const wide = await mountHome({ app: { vw: 1180 } });
-    expect(qa(wide.el, 'aside[aria-label="Today"]')).toHaveLength(1);
-    cleanup();
-    const narrow = await mountHome({ app: { vw: 1179 } });
-    expect(qa(narrow.el, 'aside[aria-label="Today"]')).toHaveLength(0);
-    expect(textOf(q(narrow.el, "h1"))).toBe("Good morning, Alex."); // the rest stays
-    expect(taskInput(narrow.el)).toBeTruthy();
+  // UI-10 / A2 (14 Oct QA, ruled 05:52): this used to say the Today panel and the spend tiles are left out under
+  // 1180. The artboards have no Today panel there, so the `aside` stays absent, but the spend tiles and the
+  // worlds / October spend block (no agenda) are drawn in the one column.
+  it("UI_10_A2_home_render_under_1180_the_tiles_and_the_worlds_and_spend_block_replace_the_Today_aside", async () => {
+    for (const vw of [1440, 1180, 1179, 1024, 768, 390]) {
+      const { el } = await mountHome({ app: { vw } });
+      const wide = vw >= 1180;
+      expect(qa(el, 'aside[aria-label="Today"]'), `Today aside at ${vw}`).toHaveLength(
+        wide ? 1 : 0,
+      );
+      expect(
+        qa(el, 'section[aria-label="Sample worlds and spend"]'),
+        `stacked block at ${vw}`,
+      ).toHaveLength(wide ? 0 : 1);
+      expect(qa(el, '[aria-label="Spend at a glance"] .park-kpi'), `tiles at ${vw}`).toHaveLength(
+        5,
+      );
+      expect(pageText(el).includes("Up next today"), `agenda at ${vw}`).toBe(wide);
+      expect(pageText(el)).toContain("Sample worlds");
+      expect(textOf(q(el, "h1"))).toBe("Good morning, Alex.");
+      expect(taskInput(el)).toBeTruthy();
+      cleanup();
+    }
   });
 
   it("WEB_4_home_render_a_started_world_leads_the_live_list_and_the_list_stays_at_five", async () => {

@@ -25,6 +25,7 @@ import { Hero, KpiStrip, Pins, TodayPanel } from "./Panels";
 import { readEffort, writeEffort } from "./effortStore";
 import {
   DRAFT_MS,
+  INTAKE_MAX_CHARS,
   MODES,
   QUICK_MAX_CHARS,
   liveRows,
@@ -196,15 +197,48 @@ export function HomePage({ app }: { app: AppCtx }) {
     store.startWorld(modeKey, text, files).then((ok) => {
       sendingNow.current = false;
       setSending(false);
-      if (!ok) return; // the card stays open and the text stays, so the person can try again
+      // A8: the confirm button was disabled while the call ran, so focus fell to the page; it goes back to the
+      // button to try again, or to the task box once the start is done.
+      if (!ok) {
+        setRefocus("confirm"); // the card stays open and the text stays, so the person can try again
+        return;
+      }
       setQuery("");
       setFiles([]);
       toIdle();
+      setRefocus("input");
     });
   };
-  const idleUnlessSending = () => {
-    if (!sendingNow.current) toIdle();
+  const composerInput = useRef<HTMLInputElement>(null);
+  const [refocus, setRefocus] = useState<"confirm" | "input" | null>(null);
+  useEffect(() => {
+    if (refocus === null) return;
+    const el =
+      refocus === "input"
+        ? composerInput.current
+        : root.current?.querySelector<HTMLElement>(".park-home-confirm");
+    el?.focus();
+    setRefocus(null);
+  }, [refocus]);
+  // A3: "Change brief" puts the person back in the task box, ready to edit.
+  const changeBrief = () => {
+    if (sendingNow.current) return;
+    toIdle();
+    composerInput.current?.focus();
   };
+  // A3: Esc closes the plan card (and the drafting line) the same way, unless the start is already on its way.
+  const toIdleNow = useRef(toIdle);
+  toIdleNow.current = toIdle;
+  useEffect(() => {
+    if (phase === "idle") return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape" || e.defaultPrevented || sendingNow.current) return;
+      toIdleNow.current();
+      composerInput.current?.focus();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [phase]);
 
   // Quick / Thinking (COST-FAST-1). The choice is remembered per signed-in email (effortStore), Thinking by
   // default. A Quick ask makes no world and no plan: the answer, or the offer to switch, shows in the composer.
@@ -311,30 +345,27 @@ export function HomePage({ app }: { app: AppCtx }) {
               worldName={waitingIn?.name ?? null}
               onReview={() => (waitingIn ? open(waitingIn.id) : go("worlds"))}
             />
-            {(vw || 1440) >= 1180 ? (
-              <KpiStrip
-                ledger={base.ledger}
-                dec={dec}
-                decisions={base.decisions}
-                fallbackWorld={waitingIn?.id}
-                onWorld={open}
-              />
-            ) : null}
-          </div>
-          {(vw || 1440) >= 1180 ? (
-            <TodayPanel
-              served={served}
-              rows={liveRows(worlds, needs, served)}
-              sample={served ? worlds.find((w) => w.sample) : undefined}
-              events={base.agenda && base.agenda.days !== null ? nextEvents(base.agenda) : []}
-              spend={spendOf(base.ledger)}
-              night={night}
+            <KpiStrip
+              ledger={base.ledger}
+              dec={dec}
+              decisions={base.decisions}
+              fallbackWorld={waitingIn?.id}
               onWorld={open}
-              onWorlds={() => go("worlds")}
-              onAgenda={() => go("agenda")}
-              onLedger={() => go("ledger")}
             />
-          ) : null}
+          </div>
+          <TodayPanel
+            served={served}
+            rows={liveRows(worlds, needs, served)}
+            sample={served ? worlds.find((w) => w.sample) : undefined}
+            events={base.agenda && base.agenda.days !== null ? nextEvents(base.agenda) : []}
+            spend={spendOf(base.ledger)}
+            night={night}
+            onWorld={open}
+            onWorlds={() => go("worlds")}
+            onAgenda={() => go("agenda")}
+            onLedger={() => go("ledger")}
+            stacked={vw > 0 && vw < 1180}
+          />
         </>
       ) : null}
       {failed ? (
@@ -350,6 +381,8 @@ export function HomePage({ app }: { app: AppCtx }) {
           sending={sending}
           sample={demo}
           compact={vw > 0 && vw <= 480}
+          inputRef={composerInput}
+          maxLength={INTAKE_MAX_CHARS}
           staging={{
             files,
             onChange: setFiles,
@@ -390,7 +423,7 @@ export function HomePage({ app }: { app: AppCtx }) {
           }}
           onDraft={effort === "quick" ? ask : draft}
           onConfirm={confirmStart}
-          onChange={idleUnlessSending}
+          onChange={changeBrief}
         />
       ) : null}
       <nav className="park-home-legal" aria-label="Legal">

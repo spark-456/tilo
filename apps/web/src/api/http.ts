@@ -74,6 +74,12 @@ function unavailableMessage(text: string): string {
   return SERVER_TROUBLE;
 }
 const BAD_REPLY = "Tilo sent a reply this page could not read.";
+/** A8: how long a start waits for the intake's reply before the person is told, instead of a spinner for ever.
+ * The Director's brief takes up to about a minute; the intake's own provider timeouts sit inside this. */
+export const INTAKE_TIMEOUT_MS = 120_000;
+const TOOK_TOO_LONG =
+  "Tilo is taking too long to answer. Nothing is shown as started; check your worlds before you try again.";
+
 const INTAKE_COMMITTED =
   "This task was already submitted. Check your worlds before starting another task.";
 
@@ -95,13 +101,17 @@ const SAMPLE_SIMULATED =
 const GENERIC_4XX: Readonly<Record<number, string>> = {
   401: "You need to sign in to do this.",
   403: "You do not have access to this.",
+  402: "A usage limit has been reached, so nothing was started.",
   404: "Tilo could not find that.",
   409: "That cannot be done right now.",
+  429: "Tilo is busy right now. Wait a moment and try again.",
 };
 const OUT_OF_DATE = "This server is out of date for live runs.";
 const NOT_BUILT = "Tilo has not built this world yet.";
 const NO_WORLD_BUILT = "This run ended before its world was built.";
 const SLOW_WORLD = "Tilo is taking longer than expected to build this world.";
+/** A bare lower-case token such as `demo_runs_busy` or `cap_reached`: a code, never shown as it is. */
+const CODE_WORD = /^[a-z][a-z0-9]*(?:[_-][a-z0-9]+)+$/;
 /** FastAPI's stock texts: not written for people, so the status sentence is used instead. */
 const STOCK = new Set(["Not Found", "Forbidden", "Unauthorized", "Conflict", "Bad Request"]);
 
@@ -138,7 +148,8 @@ export function reasonOf(status: number, text: string): string {
     said.length > 0 &&
     said.length <= 200 &&
     !/[<>{}]/.test(said) &&
-    !STOCK.has(said)
+    !STOCK.has(said) &&
+    !CODE_WORD.test(said) // a stable code (`demo_runs_busy`) is for the page, not for people
   ) {
     return said;
   }
@@ -377,13 +388,26 @@ export class HttpClient implements TiloClient, SchedulesApi, FieldsApi, ItemApi 
 
   private async request<T>(path: string, init: RequestInit = {}, write = false): Promise<T> {
     let res: Response;
+    // A8: the intake is the one call a person waits on in front of a spinner, so it has an end.
+    const stop = path === "/intake" ? new AbortController() : null;
+    let late = false;
+    const timer = stop
+      ? setTimeout(() => {
+          late = true;
+          stop.abort();
+        }, INTAKE_TIMEOUT_MS)
+      : null;
     try {
+      const sent = await this.withAuth(await this.withAppCheck(init));
       res = await this.fetchFn(
         `${this.base}${path}`,
-        await this.withAuth(await this.withAppCheck(init)),
+        stop ? { ...sent, signal: stop.signal } : sent,
       );
     } catch {
+      if (late) throw new TiloApiError(TOOK_TOO_LONG, null, true, write);
       throw new TiloApiError(UNREACHABLE, null, true, write); // the cause (host, port) is not for people
+    } finally {
+      if (timer !== null) clearTimeout(timer);
     }
     if (!res.ok) {
       // Read 503's known refusal values or a 4xx; other 5xx are not awaited.

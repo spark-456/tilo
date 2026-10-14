@@ -98,6 +98,9 @@ export const DRAFT_MS = 900;
 // Quick / Thinking (COST-FAST-1). Words only: no number here is an estimate, a price or a time. The one number is
 // the server's own input cap for a Quick question (config/assistant.yaml question.max_chars).
 export const QUICK_MAX_CHARS = 500;
+// A3 (14 Oct QA): the task box stops at the server's cap for a Thinking task (packages/planning intake.py
+// MAX_TEXT_CHARS), so a paste of 4,500 characters cannot go further than the server would take.
+export const INTAKE_MAX_CHARS = 4000;
 
 export const EFFORTS = [
   {
