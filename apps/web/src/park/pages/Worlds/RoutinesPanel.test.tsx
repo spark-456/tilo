@@ -29,7 +29,7 @@ it("FR_AGT_14 Park lists real schedules and pauses only after the PATCH succeeds
   });
   if (!root) throw new Error("Panel missing");
   expect(root.container.textContent).toContain("Recorded routine");
-  const pause = root.container.querySelector("button");
+  const pause = root.container.querySelector<HTMLButtonElement>('button[aria-label^="Pause "]');
   if (!pause) throw new Error("Pause missing");
   await act(async () => {
     pause.click();

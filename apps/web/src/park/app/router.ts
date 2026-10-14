@@ -36,6 +36,7 @@ const ROOT_PAGES = new Set<string>([
   "library",
   "more",
 ]);
+const ROUTINES_ADDRESS = /^\/(?:park\/)?routines\/?$/;
 const ROOT_WORLD = /^\/world\/[^/]+\/?$/;
 const ROOT_WORLD_APP = /^\/(?:park\/)?world\/([^/]+)\/app\/([^/]+)\/?$/;
 
@@ -52,6 +53,7 @@ export const stagePath = (worldId: string): string => `/world/${encodeURICompone
 export function isParkPath(pathname: string): boolean {
   if (adminRedirect(pathname)) return true;
   if (pathname === "/park" || pathname.startsWith("/park/") || pathname === "/") return true;
+  if (ROUTINES_ADDRESS.test(pathname)) return true;
   if (ROOT_WORLD.test(pathname) || ROOT_WORLD_APP.test(pathname)) return true;
   const m = /^\/([^/]+)\/?$/.exec(pathname);
   return m?.[1] !== undefined && ROOT_PAGES.has(m[1]);
@@ -93,6 +95,7 @@ export function parseParkPath(pathname: string, search: string): ParkRoute | nul
       at < 0 ? "" : redirect.slice(at),
     );
   }
+  if (ROUTINES_ADDRESS.test(pathname)) return { page: "worlds", params: {} };
   if (!isParkPath(pathname)) return null;
   let rest =
     pathname === "/park" || pathname.startsWith("/park/")
@@ -169,7 +172,7 @@ const snapshot = (): string => `${window.location.pathname}${window.location.sea
 /** The current route, re-read on every History API navigation; null when the path is not a Park page. */
 export function useParkRoute(): ParkRoute | null {
   const url = useSyncExternalStore(subscribe, snapshot);
-  const legacy = legacyTarget(url.split("?")[0] ?? url);
+  const legacy = ROUTINES_ADDRESS.test(url.split("?")[0] ?? "") ? "/worlds" : legacyTarget(url.split("?")[0] ?? url);
   useEffect(() => {
     if (legacy === null) return;
     window.history.replaceState({}, "", legacy);

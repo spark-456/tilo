@@ -127,6 +127,7 @@ const STOCK = new Set(["Not Found", "Forbidden", "Unauthorized", "Conflict", "Ba
 export function displayApiError(error: unknown): string {
   if (!(error instanceof TiloApiError)) return SERVER_TROUBLE;
   const reasons: Readonly<Record<string, string>> = {
+    write_unconfirmed: "We could not confirm it. Reload before trying again.",
     not_configured: NOT_CONFIGURED,
     store_unavailable: "Stored information is unavailable. Try again in a moment.",
     allowance_capped: "Your allowance is used up. Try again when it resets.",
