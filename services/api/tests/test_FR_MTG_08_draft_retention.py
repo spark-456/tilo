@@ -11,6 +11,20 @@ ORG, OWNER, OTHER = "org_tilo", "u_owner", "u_other"
 BODY = {"draft": {"body": "Private confirmed minutes"}, "status": "ready"}
 
 
+@pytest.mark.parametrize("operation", ["erase", "expiry"])
+def test_X_SEC37_FU_malformed_row_does_not_halt_cleanup(rig, caplog, operation):
+    c = rig
+    good = put(c)
+    bad = good.rsplit("/", 1)[0] + "/000-malformed-private-id"
+    c.db.docs[bad] = {"org_id": ORG, "owner": OWNER, "expires_at": 150.0, "payload": "private content"}
+    c.now = 250.0
+    removed = c.policy.erase_owner(OWNER) if operation == "erase" else c.policy.purge_expired()
+    assert removed == 1
+    assert good not in c.db.docs and bad in c.db.docs
+    assert "ValueError" in caplog.text
+    assert all(private not in caplog.text for private in ("private content", "private-id", OWNER, ORG))
+
+
 class Query:
     def __init__(self, db, path, filters=(), count=200, group=False):
         self.db, self.path, self.filters, self.count = db, path, filters, count
