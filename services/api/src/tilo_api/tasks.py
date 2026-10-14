@@ -16,6 +16,7 @@ import hashlib
 import json
 import logging
 from collections.abc import Awaitable, Callable, Iterator, Sequence
+from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, date, datetime
 from typing import Annotated, Any
 
@@ -239,12 +240,16 @@ def answer_questions(
     principal: Principal,
     body: Annotated[AnswersIn, Depends(_json_body(AnswersIn))],
     store: StoreDep,
+    writer: WriterDep,
+    model_router: Annotated[Router, Depends(deps.get_router)],
     safety: Annotated[SafetyProvider, Depends(deps.get_safety)],
     flags: FlagsDep,
     clock: Annotated[Clock, Depends(deps.get_today)],
 ) -> dict[str, Any]:
     """FR-INT-03/04: answers, skips (`answer: null`, recorded as "Assumed: ...") and chip edits, every typed
-    string screened first (FR-INT-02). No model call; a refused request changes nothing."""
+    string screened first (FR-INT-02). No model call in the request; a refused request changes nothing. Once every
+    question has an answer and the brief is saved, the approaches are proposed in the background (APPROACH-SPEED),
+    so GET /approaches returns the stored result or waits on that one call."""
     task = _owned(store, task_id, principal)
     deps.refuse_if_replay_only(flags)  # NFR-24: after sign-in and the owner check
     fields = [a.field for a in body.answers]
@@ -255,6 +260,7 @@ def answer_questions(
     typed = [a.answer for a in body.answers if a.answer is not None]
     _screen(safety, typed + _director_strings(task, body.answers) + list(_strings(body.brief_edits)))
     with task.lock:
+        task = store.tasks[task_id]  # the record saved last: a prefetch may have stored the approaches meanwhile
         if task.granted:
             raise HTTPException(status_code=409, detail="The budget is approved; the brief is final.")
         answers = {**task.answers, **{a.field: a.answer for a in body.answers}}
@@ -274,8 +280,61 @@ def answer_questions(
         changes: dict[str, Any] = {"answers": answers, "edits": edits, "brief": brief}
         if brief != task.brief:
             changes["approaches"] = None  # proposed for the old brief
-        _saved(store, None, task_id, task, [], changes)
+        saved = _saved(store, None, task_id, task, [], changes)
+        prefetch = saved.approaches is None and all(q.field in answers for q in saved.questions)
+    if prefetch:
+        _PREFETCH.submit(_prefetch_approaches, store, writer, task_id, model_router, clock)
     return {"brief": brief}
+
+
+def _proposed(
+    store: deps.Store,
+    writer: deps.EventWriter | None,
+    task_id: str,
+    task: deps.TaskRecord,
+    model_router: Router,
+    clock: Clock,
+) -> deps.TaskRecord:
+    """The task with the approaches proposed for its current brief; one model call per brief version. The caller
+    holds `task.lock` and passes the record saved last, so a second caller waits, then finds the stored result."""
+    if task.approaches is not None:
+        return task
+    try:
+        result = propose_approaches(
+            task.brief,
+            router=model_router,
+            base=_base(task, DIRECTOR),
+            seq=task.next_seq,
+            gaps=task.gaps,
+            today=clock(),
+        )
+    except ApproachProposalError as exc:
+        deps.raise_if_model_unavailable(exc)
+        raise HTTPException(status_code=502, detail="The Director could not propose approaches.") from exc
+    return _saved(store, writer, task_id, task, [result.event], {"approaches": result.approaches})
+
+
+_PREFETCH = ThreadPoolExecutor(max_workers=4, thread_name_prefix="approaches")
+
+
+def _prefetch_approaches(
+    store: deps.Store, writer: deps.EventWriter, task_id: str, model_router: Router, clock: Clock
+) -> None:
+    """APPROACH-SPEED: propose the approaches as soon as the brief is final, off the request, so the person's next
+    GET finds them (or waits on this call, which holds the task's lock). Same single call as the GET would make, so
+    nothing extra is spent. Best effort: a failure is logged and the GET asks again and reports it."""
+    task = store.tasks.get(task_id)
+    if task is None:
+        return
+    try:
+        deps.providers_config()  # the GET's own check, before any model call is spent
+        with task.lock:
+            task = store.tasks[task_id]
+            if task.granted or any(q.field not in task.answers for q in task.questions):
+                return
+            _proposed(store, writer, task_id, task, model_router, clock)
+    except Exception as exc:
+        logger.warning("approaches prefetch for a task did not complete: %s", type(exc).__name__)
 
 
 @router.get("/tasks/{task_id}/approaches")
@@ -297,18 +356,10 @@ def get_approaches(
         logger.warning("provider config unavailable: %s", exc)
         raise HTTPException(status_code=503, detail="The model configuration is not available.") from exc
     with task.lock:
+        task = store.tasks[task_id]  # the record saved last: the prefetch may have stored the approaches meanwhile
         if any(q.field not in task.answers for q in task.questions):
             raise HTTPException(status_code=409, detail="Answer or skip every question first.")
-        if task.approaches is None:
-            try:
-                base = _base(task, DIRECTOR)
-                result = propose_approaches(
-                    task.brief, router=model_router, base=base, seq=task.next_seq, gaps=task.gaps, today=clock()
-                )
-            except ApproachProposalError as exc:
-                deps.raise_if_model_unavailable(exc)
-                raise HTTPException(status_code=502, detail="The Director could not propose approaches.") from exc
-            task = _saved(store, writer, task_id, task, [result.event], {"approaches": result.approaches})
+        task = _proposed(store, writer, task_id, task, model_router, clock)
         assert task.approaches is not None
         approaches = task.approaches
     # Default (PRD silent, BQ-83): the cheapest approach is recommended; ties keep the Director's order.
@@ -432,6 +483,7 @@ def approve(
     if body.budget_cap > (ceiling := deps.budget_cap_ceiling()):  # finite already: the body refuses NaN and Infinity
         raise HTTPException(status_code=422, detail=f"One run may use at most {ceiling:g} credits.")
     with store.grant_lock(task.owner), task.lock:  # always in this order: the owner's grants, then the task
+        task = store.tasks[task_id]  # the record saved last (a prefetch may have stored the approaches)
         if task.granted:
             raise HTTPException(status_code=409, detail="This task's budget is already approved.")
         if task.approaches is None:
