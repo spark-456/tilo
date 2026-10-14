@@ -270,7 +270,8 @@ for (const [sizeName, viewport] of Object.entries(SIZES)) {
           gap: "7px",
           "padding-left": "10px",
         });
-        const meta = await facts(text(page, "Owned by Alex Morgan · started 2 Sep · 38 agents"), [
+        // a fixture world is a recorded sample (WEB-CUTOVER): its meta line says so instead of claiming an owner and agents
+        const meta = await facts(text(page, "Recorded 2 Sep"), [
           "font-size",
           "font-weight",
           "color",
@@ -281,7 +282,7 @@ for (const [sizeName, viewport] of Object.entries(SIZES)) {
           color: await token(page, "--ink2"),
         });
 
-        // header buttons: h42 r12, `0 16px 0 14px`, 14.5/800, --btn2 on a 1px --line border; the live view --hero on white
+        // header buttons: h42 r12, `0 16px 0 14px`, 14.5/800, --btn2 on a 1px --line border
         for (const name of ["Pause", "Share"]) {
           const b = await facts(btn(page, name), [
             "padding",
@@ -304,6 +305,8 @@ for (const [sizeName, viewport] of Object.entries(SIZES)) {
             color: await token(page, "--ink"),
           });
         }
+        // a sample world has no stage (WEB-CUTOVER, QA-DEMO-1 m3): the live view is a disabled link, muted not pressable
+        await expect(live(page)).toHaveAttribute("aria-disabled", "true");
         const lv = await facts(live(page), [
           "padding",
           "border-top-left-radius",
@@ -318,28 +321,35 @@ for (const [sizeName, viewport] of Object.entries(SIZES)) {
           "border-top-left-radius": "12px",
           "font-size": "14.5px",
           "font-weight": "800",
-          "background-color": await token(page, "--hero"),
-          color: WHITE,
+          "background-color": await token(page, "--chip"),
+          color: await token(page, "--ink3"),
         });
-        // the three sit in a row of the right side, 8 apart (wrapping under the title on a narrow window)
-        const [pa, sa, la] = await Promise.all([
+        // the row of the right side, 8 apart (wrapping under the title on a narrow window): Pause, Share, Share to
+        // Slack, the disabled live view, then the recorded replay link
+        const slack = btn(page, "Share to Slack");
+        const replay = root(page).getByRole("link", { name: "Watch the replay" });
+        const [pa, sa, ka, la, ra] = await Promise.all([
           btn(page, "Pause").boundingBox(),
           btn(page, "Share").boundingBox(),
+          slack.boundingBox(),
           live(page).boundingBox(),
+          replay.boundingBox(),
         ]);
-        if (!(pa && sa && la)) throw new Error("buttons have no box");
+        if (!(pa && sa && ka && la && ra)) throw new Error("buttons have no box");
         if (wide) {
           near("Pause and Share share a row", pa.y, sa.y, 0.6);
           near("gap Pause to Share", sa.x - (pa.x + pa.width), 8, 0.6);
-          near("gap Share to live view", la.x - (sa.x + sa.width), 8, 0.6);
+          near("gap Share to Share to Slack", ka.x - (sa.x + sa.width), 8, 0.6);
+          near("gap Share to Slack to live view", la.x - (ka.x + ka.width), 8, 0.6);
+          near("gap live view to replay", ra.x - (la.x + la.width), 8, 0.6);
           near(
             "the actions end at the content edge",
-            la.x + la.width,
+            ra.x + ra.width,
             sheetBox.x + 1 + 32 + inner,
             1,
           );
         }
-        for (const b of [pa, sa, la]) {
+        for (const b of [pa, sa, ka, la, ra]) {
           expect(b.x + b.width, "a button leaves the sheet").toBeLessThanOrEqual(
             sheetBox.x + sheetBox.w,
           );
@@ -1102,7 +1112,10 @@ test.describe("park world: the other tiers at 1440", () => {
     await expect(region(page, "Districts").getByText("4 districts", { exact: true })).toBeVisible();
     await expect(btn(page, "Set up a new starter")).toBeVisible();
     for (const tool of ["Google Workspace", "BambooHR", "Slack"]) {
-      await expect(root(page).getByRole("button", { name: new RegExp(`${tool}$`) })).toBeVisible();
+      // the tool chips only: the header also has a "Share to Slack" button
+      await expect(
+        root(page).locator("button.park-world-toolchip", { hasText: tool }).first(),
+      ).toBeVisible();
     }
     await expect(text(page, "38% of budget used. Forecast within budget.")).toBeVisible();
     expect(problems).toEqual([]);
@@ -1374,14 +1387,16 @@ test.describe("park world: the top grid breaks at a window of 1060", () => {
       const problems = await openWorld(page, "k1");
       const card = await cardOf(page, K1_TAG).boundingBox();
       const spend = await text(page, "Spend").locator("xpath=ancestor::div[2]").boundingBox();
-      if (!(card && spend)) throw new Error("no boxes");
+      const side = await root(page).locator(".park-world-side").boundingBox();
+      if (!(card && spend && side)) throw new Error("no boxes");
       if (columns === 2) {
         expect(
-          spend.y,
-          "the side column starts beside the map card (the Waiting card may sit above Spend)",
+          side.y,
+          "the side column starts beside the map card (the Waiting card makes it taller than the map)",
         ).toBeLessThan(card.y + card.height);
-        expect(spend.x, "the side column is to the right").toBeGreaterThan(card.x + card.width);
-        expect(spend.width, "the side column keeps its 300px minimum").toBeGreaterThanOrEqual(299);
+        expect(side.x, "the side column is to the right").toBeGreaterThan(card.x + card.width);
+        expect(side.width, "the side column keeps its 300px minimum").toBeGreaterThanOrEqual(299);
+        expect(spend.x, "the Spend card is in the side column").toBeGreaterThanOrEqual(side.x);
       } else {
         near("stacked: same left edge", spend.x, card.x, 1);
         expect(spend.y, "under the map card").toBeGreaterThan(card.y + card.height);
