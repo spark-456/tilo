@@ -74,7 +74,18 @@ from tilo_harness.writer import new_ulid
 from tilo_metering.flags import FlagStore
 from tilo_planning.events import build_event
 
-from tilo_api import deps, dev, ephemeral, events, nudge_sweep, plate_links, runs, team_access, team_store
+from tilo_api import (
+    deps,
+    dev,
+    ephemeral,
+    events,
+    followup_cleanup,
+    nudge_sweep,
+    plate_links,
+    runs,
+    team_access,
+    team_store,
+)
 from tilo_api.access import Mode, enforced
 from tilo_api.durable_store import DurableStore
 from tilo_api.people_limits import write_limit
@@ -876,6 +887,7 @@ def tick(
             schedule_store, tasks_client, clock, flags, audience=audience, caller=tasks_caller, queue=queue
         )
         nudge_sweep.sweep(request, _stamp(clock()))  # FR-PA-15b: off unless TILO_NUDGES=1; the answer never changes
+        followup_cleanup.sweep(clock)
         _sweep_outbox(request, clock, store_factory)
         _sweep_push(request, clock, store_factory)
         _sweep_spend(request, clock)

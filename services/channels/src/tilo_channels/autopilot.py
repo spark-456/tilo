@@ -144,6 +144,7 @@ class Autopilot:
         self._drafter, self._reader, self._contacts, self._emit = drafter, reader, contacts, emit
         self._policy, self._cards, self._clock, self._stops = policy, cards, clock, stops
         self._world_id = world_id
+        self._run_id = run_id
         self._ledger = Ledger(
             cards=cards, outbox=outbox, clock=clock, world_id=world_id, run_id=run_id, connector=connector, stops=stops
         )
@@ -178,6 +179,10 @@ class Autopilot:
         """Whether `user_id` is this world's owner: the check `preview` makes first, for callers that must not draft
         for anyone else (FR-PA-07). No behaviour of the card path changes."""
         return self._owns(user_id)
+
+    def matches_scope(self, *, world_id: str, run_id: str, owner: str) -> bool:
+        """Server adapters bind previews to the stored world/run and real owner (never bench evidence)."""
+        return not self._fake and (self._world_id, self._run_id, self._world_owner()) == (world_id, run_id, owner)
 
     def _get(self, user_id: str, card_id: str) -> dict[str, Any] | None:
         """The stored card as it stands: an L2 card's newest decision, or L1 once its decision was dropped."""
