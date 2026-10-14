@@ -8,6 +8,7 @@ import type {
   UserSettingsWeekday,
   UserSettingsWorkingHours,
 } from "@tilo/contracts";
+import { displayApiError } from "../../api/errorMessage";
 
 export const FORM_KEYS = ["name", "email", "title", "tz", "lang", "hours"] as const;
 export type Form = Record<(typeof FORM_KEYS)[number], string>;
@@ -131,8 +132,9 @@ export function problemOf(e: unknown, saving: boolean): string {
     return "These settings changed on another device. Nothing was saved. Reload to see the latest.";
   if (f.code === "invalid_settings")
     return "Tilo could not accept one of the values. Nothing was saved. Check the fields and try again.";
-  const said =
-    f.message && f.name === "TiloApiError" ? f.message : "Tilo could not read the reply.";
+  const said = displayApiError(e);
+  if (saving && (f.code === "write_unconfirmed" || f.status === null))
+    return `${said} Your changes are still here.`;
   return saving ? `${said} Nothing was saved. Your changes are still here.` : said;
 }
 
