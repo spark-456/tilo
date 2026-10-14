@@ -169,7 +169,8 @@ def test_FR_INT_08_flow_property_a_grant_is_exactly_a_finite_positive_cap_or_not
     if math.isfinite(cap) and 0 < cap <= deps.budget_cap_ceiling():  # above the run cap is 422 (#139, BQ-99)
         assert response.status_code == 200, response.text
         (event,) = events
-        assert event["data"]["cap"] == event["data"]["granted"] == cap
+        # a cap under the run floor is granted at the floor (BQ-BUDGET-FLOOR-1); a higher one is exactly the person's
+        assert event["data"]["cap"] == event["data"]["granted"] == max(cap, deps.min_run_grant())
     else:
         assert response.status_code in (400, 422), response.text
         assert events == []

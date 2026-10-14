@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from "vitest";
 import { BRIEF_SUPPLIER_COMPARISON } from "../../api/fixtures/brief";
 import { TiloApiError } from "../../api/http";
 import { createLiveApi } from "./liveApi";
-import { MAX_RUN_CREDITS, oneStepOf } from "./oneStep";
+import { MAX_RUN_CREDITS, MIN_RUN_GRANT_CREDITS, oneStepOf } from "./oneStep";
 
 const BASE = "https://api.example.test";
 const json = (body: unknown, status = 200) =>
@@ -135,9 +135,10 @@ describe("SIMPLE-RUN-1 one-step start over the live Api", () => {
     expect(plan.taskId).toBe("t_1");
     expect(plan.goal).toBe(BRIEF_SUPPLIER_COMPARISON.goal);
     expect(plan.approachId).toBe("a_balanced");
-    expect(plan.cap, "the approach's own maximum, whole credits").toBe(21);
+    expect(plan.cap, "the estimate is under the 30-credit floor, so the floor").toBe(30);
+    expect(plan.credits).toEqual({ min: 8, max: 30 });
     expect(plan.time).toBe("2–5 min");
-    expect(plan.usd).toBeCloseTo(21 * 0.05);
+    expect(plan.usd).toBeCloseTo(30 * 0.05);
     expect(plan.lines).toEqual([
       { field: "audience", text: "The team" },
       { field: "deadline", text: "Today" },
@@ -151,7 +152,7 @@ describe("SIMPLE-RUN-1 one-step start over the live Api", () => {
     expect(await one.start(plan)).toEqual({ worldId: "w_1", repeatRefused: null });
     const approve = calls.at(-1);
     expect(`${approve?.method} ${approve?.path}`).toBe("POST /tasks/t_1/approve");
-    expect(approve?.body).toEqual({ approach_id: "a_balanced", budget_cap: 21 });
+    expect(approve?.body).toEqual({ approach_id: "a_balanced", budget_cap: 30 });
   });
 
   it("SIMPLE-RUN-1 cap: a price above the API's ceiling is asked at the ceiling", async () => {
@@ -161,6 +162,30 @@ describe("SIMPLE-RUN-1 one-step start over the live Api", () => {
         json({ task_id: "t_1", approaches: [big], recommended: "a_balanced", credit_usd: 0.05 }),
     });
     expect((await one.prepare("Big task", [])).cap).toBe(MAX_RUN_CREDITS);
+  });
+
+  it("BQ-BUDGET-FLOOR-1 floor: a small estimate is floored, a bigger one is kept, the cap is never above the ceiling", async () => {
+    const priced = (credits: { min: number; max: number }, extra: object = {}) =>
+      server({
+        "GET /tasks/t_1/approaches": () =>
+          json({
+            task_id: "t_1",
+            approaches: [{ ...APPROACH, credits }],
+            recommended: "a_balanced",
+            credit_usd: 0.005,
+            ...extra,
+          }),
+      }).one;
+    const small = await priced({ min: 1, max: 4.2 }).prepare("Tiny", []);
+    expect(small.cap).toBe(MIN_RUN_GRANT_CREDITS);
+    expect(small.credits).toEqual({ min: 1, max: MIN_RUN_GRANT_CREDITS });
+    expect(small.usd).toBeCloseTo(0.15);
+    const big = await priced({ min: 40, max: 80.2 }).prepare("Bigger", []);
+    expect(big.cap).toBe(81); // above the floor: the estimate stands
+    const served = await priced({ min: 1, max: 4 }, { min_grant: 45 }).prepare("Served floor", []);
+    expect(served.cap, "the server's own floor wins over the built-in one").toBe(45);
+    const over = await priced({ min: 1, max: 4 }, { min_grant: 9000 }).prepare("Silly floor", []);
+    expect(over.cap).toBe(MAX_RUN_CREDITS);
   });
 
   it("SIMPLE-RUN-1 revise: a changed line is answered, then the new brief is priced again", async () => {

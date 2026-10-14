@@ -12,7 +12,7 @@ export interface IntakeResult { task_id: string; brief: Brief; files: IntakeFile
 // biome-ignore format: verbatim from issue #80
 export interface QuestionAnswer { field: string; answer: string | null } // null = skipped; the brief records the assumption
 // biome-ignore format: verbatim from issue #80
-export interface ApproachesResult { task_id: string; approaches: PlanApproach[]; recommended: string; credit_usd: number }
+export interface ApproachesResult { task_id: string; approaches: PlanApproach[]; recommended: string; credit_usd: number; min_grant?: number }
 // biome-ignore format: verbatim from issue #80
 export interface ApprovalRequest { approach_id: string; budget_cap: number }
 // biome-ignore format: verbatim from issue #80
