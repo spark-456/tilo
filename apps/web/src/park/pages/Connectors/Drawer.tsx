@@ -78,7 +78,7 @@ export function Drawer({
           <div className="park-connectors-drawer-title">
             <div className="park-connectors-drawer-name">{c.name}</div>
             <div className="park-connectors-drawer-meta">
-              {c.cat} · {c.acct || "Connected just now"}
+              {c.cat} · {c.acct || "Account not available"}
             </div>
           </div>
           <button

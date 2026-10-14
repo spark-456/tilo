@@ -121,13 +121,13 @@ describe("WEB_10_team_invite: email, validation, pending row", () => {
     expect(memberRows(root)).toHaveLength(6);
   });
 
-  it("WEB_10_team_pending_member_details_resend_cancel_and_role", async () => {
+  it("HR_W23_team_pending_member_details_never_claim_an_invite_was_sent", async () => {
     const app = makeApp();
     const { root } = await renderTeam(app);
     await invite(root, NEW);
     await openMore(root, NEW);
     expect(fact(root, "INVITED AS")).toBe("Member");
-    expect(fact(root, "SENT")).toBe("Just now · expires in 7 days");
+    expect(fact(root, "SENT")).toBe("Not sent · sample invitation");
     expect(() => buttonNamed(root, "Remove from team")).toThrow();
     await clickAndSettle(buttonNamed(root, "Resend invite"));
     expect(app.toast).toHaveBeenLastCalledWith(

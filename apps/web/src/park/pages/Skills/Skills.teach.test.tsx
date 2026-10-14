@@ -701,13 +701,13 @@ describe("WEB_8a_skills_teach: save (step 4)", () => {
     expect(toasts(rig.app)[0]?.[0]).toBe(savedToast("Pay Northline early", "Northwind Ops"));
   });
 
-  it("WEB_8a_skills_teach_saving_toasts_once_with_no_action_and_shows_the_saved_banner", async () => {
+  it("HR_W23_sample_skill_save_toasts_once_without_claiming_a_live_skill", async () => {
     const rig = await mountSkills();
     toSave(rig);
     tap(rig, "Save skill");
     expect(toasts(rig.app)).toHaveLength(1);
     expect(toasts(rig.app)[0]?.[0]).toBe(
-      "Saved “Log new supplier invoices”. It’s live for the team",
+      "Sample skill “Log new supplier invoices” saved on this page only. Nothing is live or scheduled.",
     );
     expect(toasts(rig.app)[0]?.[1]).toBeUndefined();
     showsAll(rig, [

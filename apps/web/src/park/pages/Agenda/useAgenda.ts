@@ -110,13 +110,15 @@ export function useAgendaUi(A: Agenda, decisions: Decision[], app: AppCtx, api: 
     },
     book: (s: AgendaSlot) =>
       api.bookSlot(s).then(
-        () => {
+        (answer) => {
           setPins((ps) => bookedPins(ps, s, A));
           setFinding(false);
           setBooked(s);
           setSel(findRuleOf(A)?.find?.event.id ?? defaultEventId(A));
           app.toast(
-            `Booked ${s.l} on your Agenda. Invites go out from Google Calendar once it's connected and you approve`,
+            answer.source === "live"
+              ? `Booked ${s.l} on your Agenda. Invitations have not been sent.`
+              : `Sample booking for ${s.l} shown on this page only. No meeting was booked or invitations sent.`,
           );
         },
         () => app.toast("Not connected yet"),

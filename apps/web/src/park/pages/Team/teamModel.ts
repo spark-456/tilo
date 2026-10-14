@@ -117,7 +117,7 @@ export function memberViews(
         active: "Pending",
         facts: [
           ["INVITED AS", p.role ?? "Not available"],
-          ["SENT", "Just now · expires in 7 days"],
+          ["SENT", "Not sent · sample invitation"],
         ],
       };
     }

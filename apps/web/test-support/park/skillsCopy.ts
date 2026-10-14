@@ -139,8 +139,9 @@ export const SAVED_TRIGGER: Record<Trigger, string> = {
 };
 export const savedLine = (scope: Scope, trig: Trigger): string =>
   `${SAVED_SUB[scope]} · ${SAVED_TRIGGER[trig]} · starts as Learning`;
-export const savedToast = (name: string, scope: Scope): string =>
-  `Saved “${name}”. It’s live for ${scope === "Just me" ? "you" : "the team"}`;
+// HR W23 (PRD 9.4): the fixture save cannot make a skill live for a person or team.
+export const savedToast = (name: string, _scope: Scope): string =>
+  `Sample skill “${name}” saved on this page only. Nothing is live or scheduled.`;
 export const savedTitle = (name: string): string => `“${name}” is now a skill`;
 
 /** What "Save skill" hands to `saveSkill` on top of the draft skill `log` (design: the `S.live` override). */
