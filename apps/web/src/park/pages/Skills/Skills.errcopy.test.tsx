@@ -30,6 +30,6 @@ it("NFR22 Skills reads show mapped refusal, then Retry loads once without writin
 });
 it("NFR22 Skills keeps honest NotBuilt separate from retryable API failure", async () => {
   const root = await mountSkills({ api: createLiveApi() });
-  expect(root.el.textContent).toContain("Not connected yet");
+  expect(root.el.textContent).toContain("Skills data is unavailable");
   expect(root.el.querySelector("[data-api-read-state]")).toBeNull();
 });

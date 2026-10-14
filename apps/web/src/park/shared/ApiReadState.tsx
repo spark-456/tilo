@@ -1,5 +1,5 @@
 import { displayApiError } from "../../api/http";
-import { Button } from "./Button";
+import { Button } from "../components/Button";
 
 /** Retry is explicitly a READ refresh: uncertain writes must never be resubmitted here.
  * The same reserved box stays mounted during loading/error/retry; long copy scrolls inside. */

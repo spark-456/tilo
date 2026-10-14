@@ -19,12 +19,12 @@ import { useStaged } from "../../app/useStaged";
 import { Button, PageSheet } from "../../components";
 import { FirstRunPanels } from "../../sample/FirstRunPanels";
 import { useFirstRunPreview } from "../../sample/useFirstRunPreview";
+import { ConsoleSection, MailSection } from "../../shared/RunAdmin";
 import { Coverage } from "./Coverage";
 import { LiveMembers } from "./LiveMembers";
 import { LiveBody, LiveInvite, StatusLine } from "./LiveTeam";
 import { Members } from "./Members";
 import { MatrixCard, RulesCard } from "./Rules";
-import { ConsoleSection, MailSection } from "./RunAdmin";
 import "./Team.css";
 import { agentArt, icon } from "./teamKit";
 import {

@@ -216,22 +216,20 @@ describe("WEB_2_static: honesty (FR-WLD-09) and motion (BQ-WEB-3)", () => {
 });
 
 describe("WEB_2_static: /dev/components is a dev-build route", () => {
-  const routes = readFileSync(join(WEB, "src", "screens", "routes.tsx"), "utf8");
+  // OLD-UI-OUT Final: the route table is gone; Root.tsx holds the one dev-only lazy route.
+  const root = readFileSync(join(WEB, "src", "Root.tsx"), "utf8");
 
-  it("WEB_2_static_route_row_sits_inside_the_import_meta_env_DEV_branch_of_EXTRA", () => {
-    const m = /import\.meta\.env\.DEV\s*\?\s*\[([\s\S]*?)\]\s*:\s*\[\]/.exec(routes);
-    expect(m, "the EXTRA table keeps its `import.meta.env.DEV ? [...] : []` branch").not.toBeNull();
-    const dev = m?.[1] ?? "";
-    expect(dev).toMatch(/id:\s*"dev-components"/);
-    expect(dev).toMatch(/\\\/dev\\\/components/);
-    expect(dev, "the existing dev rows stay").toContain('id: "screens"');
-    expect(dev).not.toContain('id: "more"');
-    expect(routes).toMatch(/id:\s*"more"/);
+  it("WEB_2_static_route_is_inside_the_import_meta_env_DEV_branch_of_Root", () => {
+    const m = /import\.meta\.env\.DEV\s*\?\s*lazy\(([\s\S]*?)\)\s*:\s*null/.exec(root);
+    expect(m, "Root keeps its `import.meta.env.DEV ? lazy(...) : null` branch").not.toBeNull();
+    expect(m?.[1] ?? "").toMatch(/import\(\s*["']\.\/park\/dev\/Components["']\s*\)/);
+    expect(root).toContain("const DEV_COMPONENTS = /^\\/dev\\/components\\/?$/;");
+    expect(root).toMatch(/DevComponents\s*&&\s*DEV_COMPONENTS\.test\(pathname\)/);
   });
 
   it("WEB_2_static_the_page_is_lazy_loaded_so_park_code_stays_off_the_landing_bundle", () => {
-    expect(routes).not.toMatch(/^import\s[^;]*from\s*["']\.\.\/park\//m);
-    expect(routes).toMatch(/import\(\s*["']\.\.\/park\/dev\/Components["']\s*\)/);
+    expect(root).not.toMatch(/^import\s[^;]*from\s*["']\.\/park\/dev\//m);
+    expect(root).not.toMatch(/^import\s[^;]*from\s*["']\.\/park\/app\/ParkApp["']/m);
   });
 
   it("WEB_2_static_the_dev_page_is_a_named_export_Components", () => {

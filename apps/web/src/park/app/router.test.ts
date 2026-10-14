@@ -12,6 +12,7 @@ import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import { stagePath as appStagePath } from "../../router";
 import { PAGE_IDS, type PageId, type Params } from "./AppCtx";
+import { adminRedirect } from "./adminRedirect";
 import { isParkPath, parkPath, parseParkPath, stagePath } from "./router";
 
 describe("WEB_CUTOVER_router: the Park stagePath is the old app's stagePath", () => {
@@ -105,7 +106,6 @@ describe("WEB_3a_router: parseParkPath maps each design route", () => {
 describe("WEB_3a_router: what is not a Park route", () => {
   it("WEB_3a_router_null_for_anything_that_is_not_a_page", () => {
     const paths = [
-      "",
       "/world/k1/extra",
       "/home",
       "/parkour",
@@ -196,12 +196,16 @@ describe("WEB_3a_router: isParkPath", () => {
     }
   });
 
+  it("WEB_3a_router_a_trailing_slash_is_replaced_by_the_canonical_address", () => {
+    expect(adminRedirect("/world/")).toBe("/world");
+    expect(adminRedirect("/worlds/", "?x=1")).toBe("/worlds?x=1");
+    expect(adminRedirect("/index.html", "?x=1")).toBe("/?x=1");
+  });
+
   it("WEB_3a_router_isParkPath_false_elsewhere", () => {
     for (const p of [
-      "",
       "/home",
       "/world",
-      "/world/",
       "/world/k1/stage",
       "/parkour",
       "/parks",

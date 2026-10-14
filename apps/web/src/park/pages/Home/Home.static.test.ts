@@ -199,6 +199,8 @@ describe("WEB_4_static: imports", () => {
           bad.push(`${rel(p)} imports another page: ${spec}`);
           continue;
         }
+        // The four connector-free task suggestions are config, not code (config/home_suggestions.json).
+        if (target.replaceAll("\\", "/").endsWith("/config/home_suggestions.json")) continue;
         if (!target.startsWith(PARK)) bad.push(`${rel(p)} imports outside park/: ${spec}`);
       }
     }

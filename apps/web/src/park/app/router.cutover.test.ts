@@ -77,10 +77,18 @@ describe("WEB_CUTOVER_router: root paths resolve to Park pages", () => {
       "/world/w/stage",
       "/worlds/replays",
       "/needs-you",
-      "/task/t/understanding",
       "/skills/extra",
     ]) {
       expect(parseParkPath(path, ""), path).toBeNull();
+    }
+  });
+});
+
+describe("WEB_CUTOVER_router: retired flow bookmarks", () => {
+  it("WEB_CUTOVER_05_retired_start_and_task_flow_addresses_open_Home", () => {
+    for (const path of ["/start", "/task/t/understanding", "/task/t/approaches"]) {
+      expect(isParkPath(path), path).toBe(true);
+      expect(parseParkPath(path, ""), path).toEqual({ page: "home", params: {} });
     }
   });
 });
@@ -207,8 +215,6 @@ describe("WEB_CUTOVER_router: isParkPath splits the two apps", () => {
       "/world/w/delivery",
       "/world/w/inspect/B1",
       "/worlds/replays",
-      "/task/t/understanding",
-      "/task/t/approaches",
       "/needs-you",
       "/needs-you/gate",
       "/needs-you/consent",
