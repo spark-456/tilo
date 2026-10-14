@@ -148,6 +148,34 @@ def test_I4_docx_refuses_hostile_xml_in_any_part(xml, code):
         parse_docx(docx(b"<x/>", [("customXml/item.xml", xml)]))
 
 
+@pytest.mark.parametrize(
+    "target",
+    [
+        r"\\host\share\a.png",
+        r"/\host\share\a.png",
+        r"\/host/share/a.png",
+        r"\host\share\a.png",
+        "\ufeff" + r"\host\share\a.png",
+        "\ufeff//host/share/a.png",
+        " \u200b" + r"\\host\share",
+        "//host/share/a.png",
+        "file:///etc/passwd",
+        r"C:\Users\a.png",
+    ],
+)
+def test_I4_docx_refuses_network_share_targets_in_any_slash_form(target):
+    xml = f'<Relationship Target="{target}"/>'.encode()
+    with pytest.raises(Refused, match="^external_reference$"):
+        parse_docx(docx(b"<x/>", [("customXml/item.xml", xml)]))
+
+
+def test_I4_docx_keeps_package_relative_and_absolute_part_targets():
+    body = f'<w:document xmlns:w="{WORD}"><w:p><w:r><w:t>Hi</w:t></w:r></w:p></w:document>'.encode()
+    for target in ("media/a.png", "../media/a.png", "/word/media/a.png"):
+        xml = f'<Relationship Target="{target}"/>'.encode()
+        assert parse_docx(docx(body, [("customXml/item.xml", xml)])) == (("word/document.xml#p1", "Hi"),)
+
+
 def test_I4_docx_refuses_macros_unknown_types_and_output_overflow():
     with pytest.raises(Refused, match="^active_content$"):
         parse_docx(docx(b"<x/>", [("word/vbaProject.bin", b"macro")]))

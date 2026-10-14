@@ -13,6 +13,9 @@ ambiguous paths and duplicate output labels are refused.
 
 `parse_docx` reads UTF-8 Word paragraph text with part/paragraph provenance. All XML
 parts are screened: DTD/entities, external references and active content are refused.
+Relationship targets are separator-normalised before the test, so a URL scheme, drive letter,
+`//host`, `\\host`, `/\host`, `\/host` and a rooted `\host\share` (optionally behind a BOM or
+zero-width character) are all refused as `external_reference`; `/word/media/a.png` stays allowed.
 Limits additionally cap each XML part at 1 MiB before decoding or XML parsing,
 20,000 nodes and 20,000 attributes across the entire package, depth 64 during
 incremental parsing, and returned text at 1 Mi characters. Each tree is screened,
