@@ -8,6 +8,7 @@
 import { type ReactNode, useCallback, useEffect, useMemo, useState } from "react";
 import type { ConnectFlow } from "../../../api/connect";
 import { liveConnectFlow } from "../../../api/connectEnv";
+import { showPartnerTiles } from "../../api/partnerTilesEnv";
 import type { Connector, ConnectorTerms, Skill, World } from "../../api/types";
 import type { AppCtx } from "../../app/AppCtx";
 import { useParkApi } from "../../app/context";
@@ -21,6 +22,7 @@ import { Drawer } from "./Drawer";
 import { GoogleAccess } from "./GoogleAccess";
 import { LiveConnectors } from "./LiveConnectors";
 import { MeetingHostAccess } from "./MeetingHostAccess";
+import { PartnerTiles } from "./PartnerTiles";
 import { icon } from "./icons";
 import { type Overrides, type UsedRow, isOn, matches, merge, usedBy } from "./view";
 
@@ -46,6 +48,7 @@ function Frame({ children }: { children: ReactNode }) {
     <div data-testid="park-page-connectors">
       <PageSheet>
         {children}
+        {showPartnerTiles() ? <PartnerTiles /> : null}
         <ConnectionsSection />
       </PageSheet>
     </div>
