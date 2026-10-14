@@ -76,7 +76,7 @@ async def _run(web: FixtureWeb, seed: bool) -> dict[str, Any]:
         [
             [("web_search", {"query": QUERY})],
             [("fetch_url", {"url": url}) for url in urls],
-            [("send_email", {"to": "fixture@example.test"})],
+            [("send_email", {"to": "fixture@mail.example"})],
             "Sources read.",
         ],
         seed,
