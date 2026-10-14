@@ -45,10 +45,20 @@ class LockedFirestore(FakeFirestore):
             return super().read(path)
 
 
-def store(db, org=ORG):
+def bind(raw, owner=USER):
+    return raw.bind(
+        owner=owner,
+        source={"meeting_id": "mt_static"},
+        expires_at=200.0,
+        clock=lambda: 100.0,
+        before_publication=lambda: None,
+    )
+
+
+def store(db, org=ORG, owner=USER):
     from tilo_api.draft_firestore import FirestoreDraftStore
 
-    return FirestoreDraftStore(db, org_id=org)
+    return bind(FirestoreDraftStore(db, org_id=org), owner)
 
 
 def assert_closed(call, detail="store_unavailable"):
@@ -93,13 +103,13 @@ def test_FR_MTG_08_atomic_contention_across_service_instances():
 
 def test_FR_MTG_08_owner_and_organization_isolation():
     db = LockedFirestore()
-    a, b = store(db), store(db, "org_other")
+    a, b, a_other = store(db), store(db, "org_other"), store(db, owner=OTHER)
     assert a.create(USER, "same", {"owner": "a"})
-    assert a.get(OTHER, "same") is None and b.get(USER, "same") is None
-    assert a.create(OTHER, "same", {"owner": "b"})
+    assert a_other.get(OTHER, "same") is None and b.get(USER, "same") is None
+    assert a_other.create(OTHER, "same", {"owner": "b"})
     assert b.create(USER, "same", {"owner": "c"})
     assert a.get(USER, "same") == {"owner": "a"}
-    assert a.get(OTHER, "same") == {"owner": "b"}
+    assert a_other.get(OTHER, "same") == {"owner": "b"}
     assert b.get(USER, "same") == {"owner": "c"}
     assert len(db.docs) == 3
     assert all(p.startswith(("orgs/org_tilo/", "orgs/org_other/")) for p in db.docs)
@@ -150,9 +160,9 @@ def test_FR_MTG_08_existing_door_and_owner_caller_forwarding(monkeypatch):
         return store_door.FirestoreApiStore("demo-drafts", db)
 
     monkeypatch.setattr(store_door, "open_api_store", opened)
-    first = deps.get_followup_draft_store()
+    first = bind(deps.get_followup_draft_store())
     assert first.create(USER, "persist", VALUE)
-    assert deps.get_followup_draft_store().get(USER, "persist") == VALUE
+    assert bind(deps.get_followup_draft_store()).get(USER, "persist") == VALUE
     assert len(calls) == 2
     sentinel = object()
     monkeypatch.setattr(deps, "get_followup_draft_store", lambda: sentinel)

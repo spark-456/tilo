@@ -1,0 +1,9 @@
+# Bound meeting draft storage (FR-MTG-08 / FR-MEM-09)
+
+`FirestoreDraftStore` uses the existing API store-door client and collection. An unbound adapter refuses reads and writes with 503. `bind(owner=..., source=..., expires_at=..., clock=..., before_publication=...)` returns a new request-local adapter; it never installs a source callback on the shared raw adapter.
+
+The caller must derive source identity and the finite deadline from current server-owned meeting/minutes records, provide a fresh source/CAS hook, and pass the same bound adapter to follow-up generation and the scoped preview factory. Bodies and emit markers use the same atomic retention envelope. Reads reject legacy rows, another source, another owner, expiry, and changed deadlines. Writes recheck authority after obtaining the SDK document reference, immediately before `create`; a post-write refusal leaves a retained row for cleanup. This is not a transaction across meeting, artifact and draft stores.
+
+This helper is not activated production wiring. Trusted meeting binding at the caller, propagation into the factory, called owner-erasure/meeting-retention cleanup, public dependency/budget wiring, exact integrated acceptance and whole-chain security review remain required. No new environment variable, store, client, provider call, dispatch or route activation is introduced. `meeting.minutes.enabled` remains false by default and public caller prerequisites remain closed.
+
+Validation: independent test-writer observed missing-bind RED before implementation; the focused adapter/retention/factory/CAS suite passes 69 tests with fake Firestore and no paid calls. Existing durable tests now explicitly supply trusted bindings while retaining atomic first-writer, tenant isolation, restart and unavailable-store assertions.
