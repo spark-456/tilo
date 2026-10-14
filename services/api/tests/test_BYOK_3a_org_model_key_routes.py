@@ -99,6 +99,42 @@ def rig(monkeypatch: pytest.MonkeyPatch) -> Rig:
 # --- the flag: off is inert ---------------------------------------------------------------------------------------
 
 
+@pytest.mark.parametrize(
+    "status, patch",
+    [
+        ("active", {"paused": False}),
+        ("paused", {"paused": True}),
+        ("unverified", {"paused": False}),
+        ("invalid", {"paused": False}),
+        ("active", {"day_cap_credits": 500}),
+        ("active", {"fallback_to_tilo": False}),
+        ("active", {"paused": False, "day_cap_credits": 500, "fallback_to_tilo": False}),
+    ],
+)
+def test_ADR_0041_R34_8_noop_patch_preserves_reference_and_audit(
+    rig: Rig,
+    status: str,
+    patch: dict[str, Any],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    assert rig.put().status_code == 200
+    held = rig.store.get(ORG)
+    assert held is not None
+    if status != held.status:
+        assert rig.store.cas(ORG, held.bumped(status=status), expected_rev=held.rev)
+    before = rig.store.get(ORG)
+    audit = rig.store.audit_entries(ORG)
+    writes: list[str] = []
+    monkeypatch.setattr(rig.store, "cas", lambda *args, **kwargs: writes.append("cas") or False)
+    rig.age = 601.0  # a no-op does not widen access or require fresh sign-in
+    got = rig.client.patch(PATH, json=patch)
+    assert got.status_code == 200, got.text
+    assert got.json()["state"] == status
+    assert rig.store.get(ORG) == before
+    assert rig.store.audit_entries(ORG) == audit
+    assert writes == []
+
+
 def test_BK_12_shipped_flag_is_off_and_every_route_answers_not_configured(monkeypatch: pytest.MonkeyPatch) -> None:
     shipped = yaml.safe_load((REPO / "config" / "byok.yaml").read_text(encoding="utf-8"))
     assert shipped["enabled"] is False and shipped["bundles"] == {}
@@ -349,26 +385,30 @@ def _force_status(rig: Rig, status: str) -> None:
 
 
 @pytest.mark.parametrize("status", ["invalid", "unverified"])
-def test_BK_17_B2_an_invalid_or_unverified_key_cannot_be_paused_and_resumed_to_active(rig: Rig, status: str) -> None:
+def test_ADR_0041_R34_6_BK_17_B2_invalid_or_unverified_resume_is_200_unchanged(rig: Rig, status: str) -> None:
     rig.put()
     _force_status(rig, status)
     refused = rig.client.patch(PATH, json={"paused": True})
     assert refused.status_code == 422 and refused.json()["code"] == "invalid_body"
     assert rig.store.get(ORG).status == status  # type: ignore[union-attr]
+    before = rig.store.get(ORG)
     resumed = rig.client.patch(PATH, json={"paused": False, "confirm": True, "consent_version": 3})
     assert rig.store.get(ORG).status == status, "a resume never makes it active"  # type: ignore[union-attr]
-    assert resumed.status_code in (200, 422)
+    assert resumed.status_code == 200
+    assert rig.store.get(ORG) == before
     assert rig.client.get(PATH).json()["state"] == status
     rig.user = MEMBER
     assert rig.client.get(PATH).json()["active"] is False
 
 
-def test_BK_17_B2_a_key_that_went_invalid_while_paused_stays_invalid_on_resume(rig: Rig) -> None:
+def test_ADR_0041_R34_6_BK_17_B2_invalid_while_paused_resume_is_200_unchanged(rig: Rig) -> None:
     rig.put()
     assert rig.client.patch(PATH, json={"paused": True}).json()["state"] == "paused"
     _force_status(rig, "invalid")
+    before = rig.store.get(ORG)
     got = rig.client.patch(PATH, json={"paused": False, "confirm": True, "consent_version": 3})
-    assert got.status_code in (200, 422)
+    assert got.status_code == 200
+    assert rig.store.get(ORG) == before
     assert rig.store.get(ORG).status == "invalid"  # type: ignore[union-attr]
 
 

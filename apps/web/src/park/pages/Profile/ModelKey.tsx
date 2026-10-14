@@ -2,9 +2,9 @@
 // the org's spend is. The org owner adds, replaces or removes the one key; every member reads only where work goes
 // (BK-20). Honest states: off in this build (503 `not_configured`, while `config/byok.yaml` has `enabled: false`: the
 // form is shown disabled), loading, failed with retry, signed out, not the owner, a demo needing a real sign-in.
-// "Saved" shows only after the live answer and a re-read (`api/modelKey.ts`). The key lives in one controlled field,
+// "Saved" shows only after the live answer and a re-read (`api/modelKey.ts`). The key lives in one uncontrolled field,
 // is cleared at the click, is never stored, put in a URL, logged or shown, and the server's own text is never shown.
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type {
   ModelKeyFlow,
   ModelKeyProblem,
@@ -29,7 +29,9 @@ const PROBLEMS: Record<ModelKeyProblem, string> = {
   reauth:
     "For safety, adding or replacing a key needs a sign-in from the last 10 minutes. Sign out from the account menu, sign in again, then add the key.",
   owner_only: "Only this organisation's owner can see or change its model key.",
-  key_refused: "That key or project id was refused. Check it and try again. Nothing was saved.",
+  under_construction: "Access to Tilo is not available for this account yet.",
+  declaration_required: "Complete the sign-up question before using Tilo.",
+  key_refused: "That key was refused. Check it and try again. Nothing was saved.",
   confirm:
     "The consent wording has changed. Reload this page, read it again and confirm. Nothing was saved.",
   invalid: "A value was not accepted: check the bundle id and the daily limit. Nothing was saved.",
@@ -83,8 +85,8 @@ function Body({ flow }: { flow: ModelKeyFlow }) {
   const [remote, setRemote] = useState<Remote>({ kind: "loading" });
   const [attempt, setAttempt] = useState(0);
   const [bundle, setBundle] = useState("");
-  const [key, setKey] = useState("");
-  const [project, setProject] = useState("");
+  const keyField = useRef<HTMLInputElement>(null);
+  const [hasKey, setHasKey] = useState(false);
   const [cap, setCap] = useState("");
   const [fallback, setFallback] = useState(false);
   const [agreed, setAgreed] = useState(false);
@@ -149,7 +151,7 @@ function Body({ flow }: { flow: ModelKeyFlow }) {
     !stale &&
     agreed &&
     bundle.trim() !== "" &&
-    (key !== "") !== (project.trim() !== "") &&
+    hasKey &&
     Number.isInteger(days) &&
     days >= 1 &&
     !busy;
@@ -165,16 +167,17 @@ function Body({ flow }: { flow: ModelKeyFlow }) {
   };
   const save = async () => {
     if (!ready || !view) return;
-    const typed = key;
-    setKey(""); // gone from the field at the click, whatever the answer
+    const typed = keyField.current?.value ?? "";
+    if (keyField.current) keyField.current.value = "";
+    setHasKey(false); // gone from the field at the click, whatever the answer
     setBusy(true);
     setProblem(null);
     setDone(null);
     after(
       await flow.save({
         bundleId: bundle.trim(),
-        key: typed === "" ? null : typed,
-        projectId: project.trim() === "" ? null : project.trim(),
+        key: typed,
+        projectId: null,
         dayCapCredits: days,
         fallbackToTilo: fallback,
         consentVersion: CONSENT_VERSION,
@@ -245,7 +248,7 @@ function Body({ flow }: { flow: ModelKeyFlow }) {
                   onChange={(e) => setBundle(e.target.value)}
                 />
                 <span className="park-profile-help">
-                  The id of the provider bundle your Tilo operator set up.
+                  The id of the API-key provider bundle your Tilo operator set up.
                 </span>
               </label>
               <label className="park-profile-field">
@@ -256,36 +259,26 @@ function Body({ flow }: { flow: ModelKeyFlow }) {
                   className="park-profile-input park-profile-secret"
                   type="text"
                   name="provider-api-token"
-                  value={key}
+                  ref={keyField}
                   autoComplete="off"
+                  autoCorrect="off"
                   autoCapitalize="off"
                   spellCheck={false}
                   data-1p-ignore
                   data-lpignore="true"
                   data-bwignore="true"
                   data-form-type="other"
-                  onChange={(e) => setKey(e.target.value)}
+                  data-gramm="false"
+                  data-gramm_editor="false"
+                  data-enable-grammarly="false"
+                  data-lt-active="false"
+                  onChange={(e) => setHasKey(e.target.value !== "")}
                 />
                 <span className="park-profile-help">
                   Sent once and kept in Tilo's vault. It is never shown again.
                   {canMask()
                     ? ""
                     : " This browser cannot hide what you type here, so check that no one can see your screen."}
-                </span>
-              </label>
-              <label className="park-profile-field">
-                <span className="park-profile-label">Vertex project id (instead of a key)</span>
-                <input
-                  className="park-profile-input"
-                  type="text"
-                  value={project}
-                  maxLength={64}
-                  autoComplete="off"
-                  onChange={(e) => setProject(e.target.value)}
-                />
-                <span className="park-profile-help">
-                  Only for a Vertex bundle that uses your own project. Give a key or a project id,
-                  not both.
                 </span>
               </label>
               <label className="park-profile-field">

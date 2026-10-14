@@ -25,7 +25,7 @@ from __future__ import annotations
 import math
 import threading
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Literal
 
@@ -76,6 +76,14 @@ class ByokSpend:
             return self._committed.get((org_id, day), 0.0) + self._held.get((org_id, day), 0.0)
 
 
+class _Completion:
+    """One terminal act per plan, shared by retries and protected across threads."""
+
+    def __init__(self) -> None:
+        self.lock = threading.Lock()
+        self.done = False
+
+
 @dataclass(frozen=True)
 class ByokUnitPlan:
     payer: Literal["tilo", "org_key"]
@@ -86,6 +94,7 @@ class ByokUnitPlan:
     reserved_credits: float = 0.0
     day: str | None = None
     org_id: str | None = None
+    _completion: _Completion = field(default_factory=_Completion, compare=False, repr=False)
 
     @property
     def blocked(self) -> bool:
@@ -158,9 +167,15 @@ def _refusal(ref: KeyReference, vault: ModelKeyVault, org_id: str) -> str | None
 def settle_unit(plan: ByokUnitPlan, spend: ByokSpend, actual_credits: float) -> None:
     """An org-key unit's actual credits against the org's day; a Tilo-metered plan is settled by SEC-16 as before."""
     if plan.payer == "org_key" and plan.org_id is not None and plan.day is not None:
-        spend.commit(plan.org_id, plan.day, plan.reserved_credits, actual_credits)
+        with plan._completion.lock:
+            if not plan._completion.done:
+                spend.commit(plan.org_id, plan.day, plan.reserved_credits, actual_credits)
+                plan._completion.done = True
 
 
 def abort_unit(plan: ByokUnitPlan, spend: ByokSpend) -> None:
     if plan.payer == "org_key" and plan.org_id is not None and plan.day is not None:
-        spend.release(plan.org_id, plan.day, plan.reserved_credits)
+        with plan._completion.lock:
+            if not plan._completion.done:
+                spend.release(plan.org_id, plan.day, plan.reserved_credits)
+                plan._completion.done = True
