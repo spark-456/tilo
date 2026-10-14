@@ -6,13 +6,16 @@ grep of `hmac`, `compare_digest` and OIDC users under services/api/src, 2026-10-
 
 1. `POST /internal/schedules/tick`: Cloud Scheduler's Google-signed OIDC token, checked by
    `tilo_api.schedules.GoogleOidcVerifier` (google-auth, RS256, certificates fetched through an injected transport).
-   This is the ONLY route the access gate lets through without a session.
-2. Not webhooks, listed so the enumeration is complete: `GET /access` and `POST /access/declaration` are public to the
-   access gate but need a signed-in principal (asserted below); every other route needs the principal; `GET|POST
-   /share/{token}` is a bearer link looked up by hash that still needs the named person signed in (SEC-06,
+   This route uses the Scheduler/Tasks caller pins.
+2. `POST /internal/meeting-voice/reserve` and `.../close`: ADR-0042 bot Google OIDC tokens, with their own
+   audience/caller pins and attend nonce. Real-verifier adversarial and idempotent replay cases are below.
+3. Not webhooks, listed so the enumeration is complete: `GET /access` and `POST /access/declaration` are public to the
+   access gate but need a signed-in principal (asserted below). Every other non-health, non-signed route needs
+   the principal.
+   `GET|POST /share/{token}` is a bearer link looked up by hash that still needs the named person signed in (SEC-06,
    test_FR_HIL_* share tests), and the worlds-list pagination cursor is an HMAC-signed query value
    (`worlds_list.py`, covered by its own tests). Neither is a signed webhook or a signed email link.
-3. The signed email links (FR-CHN-07) are verified in tilo-channels, not here; see
+4. The signed email links (FR-CHN-07) are verified in tilo-channels, not here; see
    services/channels/tests/test_SEC_08_forged_or_replayed_requests_rejected.py.
 
 Acceptance claim: a forged signature, a tampered payload, a missing signature, an expired token and a replayed
@@ -46,10 +49,12 @@ from _fr_agt_14_lib import (
     SchedApi,
     l3_budget_policy,
 )
+from _mv_lib import BOT_SA, CLOSE, MEETING, RESERVE, Rig, new_key
 from _sec15_lib import PINNED_PUBLIC_LINK_ROUTES, route_table
 from google.auth import crypt, jwt
 
 KID = "kid-sec08-one"
+VOICE_SIGNED_ROUTES = {("POST", RESERVE), ("POST", CLOSE)}
 PUBLIC_NEEDING_A_SESSION = {("GET", "/access"), ("POST", "/access/declaration")}
 
 
@@ -330,17 +335,88 @@ def test_SEC_08_tick_replayed_request_starts_each_slot_once_and_a_late_replay_is
     assert set(run_sched.store.worlds) == worlds_after
 
 
+# --- ADR-0042 voice meter: real signatures, no network ---------------------------------------------------------------
+
+
+@pytest.fixture
+def voice_rig(monkeypatch: pytest.MonkeyPatch, keys: Keys) -> Rig:
+    from tilo_api import schedules
+
+    rig = Rig(monkeypatch)
+    transport = _CertTransport({KID: keys.cert})
+    verifier = schedules.GoogleOidcVerifier(transport=transport)
+    rig.app.dependency_overrides[schedules.get_oidc_verifier] = lambda: verifier
+    rig.token = keys.token(email=BOT_SA)
+    monkeypatch.setenv("K_SERVICE", "tilo-api")
+    monkeypatch.setenv("TILO_APPCHECK_ENFORCE", "1")
+    return rig
+
+
+@pytest.mark.parametrize("route", [RESERVE, CLOSE])
+@pytest.mark.parametrize("attack", ["forged", "tampered", "missing", "unsigned", "expired", "late-replay"])
+def test_SEC_08_voice_bad_signature_or_expiry_reads_no_body_and_changes_nothing(
+    voice_rig: Rig, keys: Keys, monkeypatch: pytest.MonkeyPatch, route: str, attack: str
+) -> None:
+    from tilo_api import meeting_voice_meter
+
+    nonce, key = voice_rig.attend(), new_key()
+    if attack == "late-replay":
+        assert voice_rig.reserve(nonce, key).status_code == 200
+    before = list(voice_rig.ledger.calls)
+    claim = voice_rig.claims.find(MEETING, nonce)
+    assert claim is not None
+    state = (claim.reserves, {k: h.state for k, h in claim.holds.items()})
+    token: str | None = voice_rig.token
+    if attack == "forged":
+        token = keys.token(email=BOT_SA, private=keys.attacker_private)
+    elif attack == "tampered":
+        head, _, signature = keys.token(email=GMAIL_SA).split(".")
+        payload = _b64e(json.dumps(jwt.decode(voice_rig.token, verify=False)).encode())
+        token = f"{head}.{payload}.{signature}"
+    elif attack == "missing":
+        token = None
+    elif attack == "unsigned":
+        token = voice_rig.token.rsplit(".", 1)[0] + "."
+    else:
+        now = int(time.time())
+        token = keys.token(email=BOT_SA, iat=now - 7200, exp=now - 3600)
+
+    async def unread_body(request: Any) -> bytes:
+        pytest.fail("unverified voice request read its body")
+
+    monkeypatch.setattr(meeting_voice_meter, "_read_body", unread_body)
+    response = voice_rig.post(route, None, token=token, raw=b"not-json")
+    assert (response.status_code, response.json()) == (401, {"error": "unauthenticated"})
+    assert token is None or token not in response.text
+    assert voice_rig.ledger.calls == before
+    assert (claim.reserves, {k: h.state for k, h in claim.holds.items()}) == state
+
+
+def test_SEC_08_voice_real_signed_positive_control_and_replay_books_only_one_unit(voice_rig: Rig) -> None:
+    nonce, key = voice_rig.attend(), new_key()
+    for _ in range(3):
+        response = voice_rig.reserve(nonce, key)
+        assert (response.status_code, response.json()) == (200, {"decision": "live"})
+    for _ in range(3):
+        response = voice_rig.close(nonce, key)
+        assert (response.status_code, response.json()) == (200, {"outcome": "settled"})
+    response = voice_rig.reserve(nonce, key)
+    assert (response.status_code, response.json()) == (409, {"error": "key_used"})
+    writes = [name for name, _, _ in voice_rig.ledger.calls if name in {"reserve", "settle", "release"}]
+    assert writes == ["reserve", "settle"]
+
+
 # --- route guard ----------------------------------------------------------------------------------------------------
 
 
-def test_SEC_08_api_has_exactly_one_public_signed_route_and_every_other_route_needs_a_session(
+def test_SEC_08_api_has_only_covered_public_signed_routes_and_every_other_route_needs_a_session(
     sched: SchedApi, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     from tilo_api import access
     from tilo_api.access import PUBLIC_ROUTES
 
     health = {("GET", "/health"), ("GET", "/healthz"), ("GET", "/health/deps"), ("GET", "/healthz/deps")}
-    signed = {("POST", TICK)}
+    signed = {("POST", TICK)} | VOICE_SIGNED_ROUTES
 
     assert PUBLIC_ROUTES - health - signed == PUBLIC_NEEDING_A_SESSION, (
         "a new public route needs forged / tampered / missing / expired / replayed cases in this file, or a session"
