@@ -194,8 +194,11 @@ class GoogleModelProvider(ModelProvider):
         return _genai_module("google.genai.types").GenerateContentConfig(**kwargs) if kwargs else None
 
     def _config_kwargs(self, request: GenerateRequest) -> dict[str, Any]:
-        """The `GenerateContentConfig` fields for `request` ({} = no config); `schema_probe` edits a copy of these."""
+        """The `GenerateContentConfig` fields for `request`; `schema_probe` edits a copy of these."""
         kwargs: dict[str, Any] = {}
+        if not request.tools:
+            # X-LOGS-1: no functions to execute; explicitly opt out of SDK AFC and its warning.
+            kwargs["automatic_function_calling"] = {"disable": True}
         if request.system is not None:
             kwargs["system_instruction"] = request.system
         if request.tools is not None:

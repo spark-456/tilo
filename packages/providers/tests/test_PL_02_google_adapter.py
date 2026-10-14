@@ -82,6 +82,25 @@ def test_PL_02_google_adapter_conforms_to_model_provider(fake_genai_sdk):
     assert isinstance(provider, ModelProvider)
 
 
+@pytest.mark.parametrize("tools", [None, []])
+@pytest.mark.parametrize("method", ["generate", "stream"])
+def test_X_LOGS_1_tool_free_requests_explicitly_disable_afc(fake_genai_sdk, tools, method):
+    api = FakeModelsAPI(
+        generate_content_result=FakeGenerateContentResponse(text="ok"),
+        generate_content_stream_result=[FakeGenerateContentResponse(text="ok")],
+    )
+    provider = _provider(api)
+    request = GenerateRequest(prompt="hello", tools=tools)
+    result = getattr(provider, method)(request)
+    if method == "stream":
+        list(result)
+    config = api.calls[0]["config"]
+    assert config is not None
+    assert config.automatic_function_calling == {"disable": True}
+    sdk_config = real_genai_types.GenerateContentConfig(**provider._config_kwargs(request))
+    assert sdk_config.automatic_function_calling.disable is True
+
+
 def test_PL_02_google_adapter_generate_returns_structured_json_output(fake_genai_sdk):
     """PL-02 "structured output": `GenerateRequest.response_schema` must
     reach the SDK as `GenerateContentConfig(response_mime_type=
