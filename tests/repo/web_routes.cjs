@@ -117,6 +117,19 @@ function value(n, env = new Map(), seen = new Set()) {
       return v.map((o) => o[d.propertyName?.getText() ?? d.name.getText()] ?? unknown);
     }
     if (d && ts.isParameter(d)) {
+      // `["a", "b"].map((x) => ...)`: x is each string of the array literal.
+      const fn0 = d.parent;
+      const call0 = fn0?.parent;
+      if (
+        call0 &&
+        ts.isCallExpression(call0) &&
+        ts.isPropertyAccessExpression(call0.expression) &&
+        call0.expression.name.text === "map" &&
+        ts.isArrayLiteralExpression(call0.expression.expression) &&
+        fn0.parameters.indexOf(d) === 0 &&
+        call0.expression.expression.elements.every(ts.isStringLiteralLike)
+      )
+        return call0.expression.expression.elements.map((e) => e.text);
       if (d.type && ts.isUnionTypeNode(d.type) && d.type.types.every(ts.isLiteralTypeNode))
         return d.type.types.flatMap((t) => read(t.literal));
       // String identifiers represent route parameters, but a path is resolved from callers.
@@ -153,6 +166,8 @@ const helpers = {
   post: "POST",
   putJson: "PUT",
   deleteJson: "DELETE",
+  // A capability probe for a POST route (OPTIONS answers 405 when it is registered): audited as the POST it probes.
+  hasPostRoute: "POST",
 };
 const routes = [];
 const errors = [];
@@ -194,6 +209,7 @@ for (const c of calls) {
       "deleteJson",
       "sendJson",
       "post",
+      "hasPostRoute",
     ].includes(owner.name.getText())
   )
     continue;

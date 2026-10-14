@@ -16,9 +16,11 @@ OTHER_SERVICES: dict[tuple[str, str], str] = {}
 
 
 def matches(web_path: str, api_path: str) -> bool:
-    """Parameter names differ between TS expressions and FastAPI declarations."""
-    pattern = re.sub(r"\{[^}]+\}", "{param}", api_path)
-    return re.sub(r"\{[^}]+\}", "{param}", web_path) == pattern
+    """Parameter names differ between TS expressions and FastAPI declarations. A literal web segment may fill an API
+    parameter (a fixed probe id such as mt_capability_probe); a web parameter never matches a literal API segment."""
+    web = re.sub(r"\{[^}]+\}", "{param}", web_path).split("/")
+    api = re.sub(r"\{[^}]+\}", "{param}", api_path).split("/")
+    return len(web) == len(api) and all(a == "{param}" or w == a for w, a in zip(web, api, strict=True))
 
 
 def test_ROUTE_AUDIT_1_every_web_call_is_registered(repo_root: Path) -> None:
@@ -39,6 +41,11 @@ def test_ROUTE_AUDIT_1_every_web_call_is_registered(repo_root: Path) -> None:
         elif hasattr(route, "effective_route_contexts"):
             # FastAPI's lazy included routers expose fully prefixed contexts.
             routes.extend(route.effective_route_contexts())
+    # Default-off routers are installed only when their flag is on, so the flags-off app above lacks them; the web
+    # probes them (hasPostRoute) before showing the feature. Each is listed here with its flag.
+    from tilo_api import owner_minutes_routes  # noqa: PLC0415  (flag meeting.minutes.enabled)
+
+    routes.extend(r for r in owner_minutes_routes.router.routes if isinstance(r, APIRoute))
     assert routes, "No registered FastAPI routes were collected"
     assert collected["routes"], "The web route collector must not silently collect nothing"
     assert all(OTHER_SERVICES.values()), "Every external route must name its service"
@@ -57,6 +64,7 @@ def test_ROUTE_AUDIT_1_matching_keeps_literal_segments_and_methods() -> None:
     assert matches("/worlds/{param}/cards/{param}/fields", "/worlds/{world_id}/cards/{card_id}/fields")
     assert not matches("/worlds/{param}/missing", "/worlds/{world_id}/layout")
     assert not matches("/v1/{param}", "/v1/people")
+    assert matches("/v1/meetings/mt_capability_probe/minutes", "/v1/meetings/{meeting_id}/minutes")
 
 
 def test_ROUTE_AUDIT_1_collector_catches_new_calls_and_preserves_pairs(repo_root: Path, tmp_path: Path) -> None:
