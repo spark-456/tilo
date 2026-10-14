@@ -355,7 +355,7 @@ export function ProfilePage({ app }: { app: AppCtx }) {
         .filter(Boolean)
         .join(" · ")
     : problem === "missing"
-      ? "Not connected yet"
+      ? "Profile data is unavailable"
       : problem === "failed"
         ? "Your profile could not be loaded"
         : "";

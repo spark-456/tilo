@@ -353,7 +353,7 @@ describe("WEB_12_profile_data: through the park Api only", () => {
   it("WEB_12_profile_not_connected_shows_not_connected_yet_and_no_sample_user", async () => {
     // Plan 6.1: a page whose endpoint is NotBuilt says so; it never shows sample numbers as if real.
     const { root } = await renderProfile(makeApp(), createLiveApi());
-    expect(root.textContent).toContain("Not connected yet");
+    expect(root.textContent).toContain("Profile data is unavailable");
     for (const s of [USER.name, USER.email, USER.title, "Northwind Ops"]) {
       expect(root.textContent, s).not.toContain(s);
     }

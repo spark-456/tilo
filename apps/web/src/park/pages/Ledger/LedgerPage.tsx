@@ -69,7 +69,9 @@ function PersonalLedgerPage({ app }: LedgerPageProps) {
         <div className="park-ledger-state">
           <h1 className="park-ledger-title">Ledger</h1>
           <div className="park-ledger-state-title">
-            {state.status === "not-built" ? "Not connected yet" : "The Ledger could not load"}
+            {state.status === "not-built"
+              ? "Ledger data is unavailable"
+              : "The Ledger could not load"}
           </div>
           <div className="park-ledger-state-line">
             {state.status === "not-built"

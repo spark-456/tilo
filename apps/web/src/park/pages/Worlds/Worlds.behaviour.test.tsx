@@ -76,7 +76,7 @@ describe("WEB_5_worlds: header, search and New world", () => {
     const api = worldsApi();
     api.getWorlds = vi.fn(() => Promise.reject(new NotBuilt("getWorlds")));
     const { c } = await renderWorlds({ api });
-    expect(text(c)).toContain("Not connected yet");
+    expect(text(c)).toContain("Worlds data is unavailable");
     expect(qa(c, "a[href]")).toHaveLength(0);
     expect(text(q(c, "h1"))).toBe("Worlds");
   });
@@ -86,7 +86,7 @@ describe("WEB_5_worlds: header, search and New world", () => {
     const api = worldsApi();
     api.getPlans = vi.fn(() => Promise.reject(new NotBuilt("getPlans")));
     const { c } = await renderWorlds({ api });
-    expect(text(c)).not.toContain("Not connected yet");
+    expect(text(c)).not.toContain("Worlds data is unavailable");
     expect(cardIds(c, "Villages").length).toBeGreaterThan(0);
     expect(spotlight(c)).not.toBeNull();
   });

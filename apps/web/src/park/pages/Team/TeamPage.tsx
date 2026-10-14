@@ -184,7 +184,7 @@ function PersonalTeamPage({ app }: { app: AppCtx }) {
         <TeamBody app={app} data={ready.data} people={ready.people} setPeople={setPeople} />
       ) : loaded === "failed" ? (
         <section className="park-team-card park-team-empty">
-          <h2 className="park-team-h2">Not connected yet</h2>
+          <h2 className="park-team-h2">Team data is unavailable</h2>
         </section>
       ) : null}
     </Frame>

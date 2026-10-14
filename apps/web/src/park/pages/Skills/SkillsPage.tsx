@@ -1,7 +1,7 @@
 // The Skills page (WEB-8a): the header with its summary pills and "Teach a skill", and the "Teach Tilo
 // something new" card, as drawn in design_handoff_tilo_web_app/design/Tilo App Skills.dc.html. The sections
 // below the card (help your agents get better, the library, the tools) are later tickets (8b, 8c). Data comes
-// only through the Api (`useParkApi`); a page whose Api is not built says "Not connected yet", never numbers.
+// only through the Api (`useParkApi`); a page whose Api is not built says "Skills data is unavailable", never numbers.
 // The card's 900 ms steps go through the provider's `useSchedule`; a draft skill's save goes through `saveSkill`.
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import type { Learn, Skill, Source, User } from "../../api/types";
@@ -102,7 +102,7 @@ function PersonalSkillsPage({ app }: { app: AppCtx }) {
           <div className="park-skills-head">
             <div className="park-skills-intro-col">
               <Title />
-              <p className="park-skills-intro">Not connected yet</p>
+              <p className="park-skills-intro">Skills data is unavailable</p>
             </div>
           </div>
         ) : (

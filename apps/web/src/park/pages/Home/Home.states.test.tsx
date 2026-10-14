@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 // WEB-4 acceptance: where Home gets its data and what it shows when there is none (plan sections 6 and 10:
-// "Read data only through the Api via useParkApi(); render an EmptyState 'Not connected yet' on NotBuilt";
+// "Read data only through the Api via useParkApi(); render an EmptyState 'Home data is unavailable' on NotBuilt";
 // "Fixtures never pass as live"). Home reads the user, today, the worlds (for the app's `dec` and `added`),
 // the agenda and the ledger, and nothing else, and it never calls fetch itself.
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -105,7 +105,7 @@ describe("WEB_4_home_states: loading and not built", () => {
   it("WEB_4_home_states_a_live_Api_that_is_not_built_shows_Not_connected_yet", async () => {
     const { el } = await mountHome({ api: createLiveApi() });
     const text = pageText(el);
-    expect(text).toContain("Not connected yet");
+    expect(text).toContain("Home data is unavailable");
     for (const sample of SAMPLE_ONLY) expect(text, sample).not.toContain(sample);
   });
 

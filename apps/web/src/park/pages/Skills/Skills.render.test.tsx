@@ -330,7 +330,7 @@ describe("WEB_8a_skills_render: data comes through the Api, and shows only what 
   it("WEB_8a_skills_render_a_live_Api_that_is_not_built_says_Not_connected_yet_and_shows_no_count", async () => {
     const { el } = await mountSkills({ api: createLiveApi() });
     const text = pageText(el);
-    expect(text).toContain("Not connected yet");
+    expect(text).toContain("Skills data is unavailable");
     expect(text).not.toMatch(COUNT);
     expect(text).not.toMatch(/NotBuilt|not_built|getSkills|getLearn|undefined/);
     expect(qa(el, "h1")).toHaveLength(1);
@@ -338,13 +338,13 @@ describe("WEB_8a_skills_render: data comes through the Api, and shows only what 
 
   it("WEB_8a_skills_render_when_either_read_fails_there_are_no_made_up_numbers", async () => {
     const skillsDown = await mountSkills({ api: skillsApi({ getSkills: rejects }) });
-    expect(pageText(skillsDown.el)).toContain("Not connected yet");
+    expect(pageText(skillsDown.el)).toContain("Skills data is unavailable");
     expect(pageText(skillsDown.el)).not.toMatch(COUNT);
     expect(pageText(skillsDown.el)).not.toContain("offline-7f3");
     cleanup();
     // Without the learn data the "need your help" count cannot be known, so no count of it is shown.
     const learnDown = await mountSkills({ api: skillsApi({ getLearn: rejects }) });
-    expect(pageText(learnDown.el)).toContain("Not connected yet");
+    expect(pageText(learnDown.el)).toContain("Skills data is unavailable");
     expect(pageText(learnDown.el)).not.toMatch(/need your help|Nothing waiting/);
     expect(pageText(learnDown.el)).not.toContain("offline-7f3");
   });
