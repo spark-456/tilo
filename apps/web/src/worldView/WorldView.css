@@ -832,8 +832,15 @@
   align-items: flex-start;
 }
 
-/* Phone targets: lens tabs and level links are at least 44 px high (UX-1). */
+/* Phone targets: lens tabs, level links and every control that selects or clears an object are at least 44 px
+ * (UX-1, FR-WLD-06). */
 @media (max-width: 767px) {
+  [data-park] .park-view-chiplink,
+  [data-park] .park-view-pick {
+    min-width: 44px;
+    min-height: 44px;
+    justify-content: center;
+  }
   [data-park] .park-view-tab {
     min-height: 44px;
   }

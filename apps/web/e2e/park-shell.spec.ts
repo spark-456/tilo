@@ -3,7 +3,7 @@
 // page registry's placeholder for each of the nine pages inside one [data-park] root (WEB-CUTOVER: /park/<page>
 // stays an alias); an
 // unknown /park path shows the Park not-found page; history back and forward switch pages without a reload;
-// the old app is untouched at its kept paths (/more, /world/<id>/stage); a kept path never fetches the park
+// the old app is untouched at its kept paths (/more; the world lenses are Park since OLD-UI-OUT-2); a kept path never fetches the park
 // chunk and the landing / loads the Park shell without the old app's stage engine (NFR-01).
 // Run on a private port: TILO_WEB_PORT=<own port> pnpm --filter @tilo/web exec playwright test
 // e2e/park-shell.spec.ts --project=chromium --no-deps --workers=3
@@ -258,15 +258,19 @@ test.describe("the old app and the landing bundle", () => {
     expect(problems).toEqual([]);
   });
 
-  test("WEB_3a_e2e_the_old_app_is_untouched_at_more_and_the_stage_path", async ({ page }) => {
+  test("WEB_3a_e2e_the_old_app_is_untouched_at_more_and_the_stage_path_is_Park", async ({
+    page,
+  }) => {
     const problems = collectConsoleProblems(page);
     await page.goto("/more");
     await expect(page.getByTestId("screen-page")).toBeVisible();
     await expect(page.getByTestId("top-bar")).toBeVisible();
     await expect(page.locator("[data-park]")).toHaveCount(0);
+    // OLD-UI-OUT-2: the world's lenses and Needs you are Park pages now.
     await page.goto("/world/w_village_basic/stage");
     await expect(page.getByTestId("stage-frame")).toBeVisible();
-    await expect(page.locator("[data-park]")).toHaveCount(0);
+    await expect(page.locator("[data-park]")).toHaveCount(1);
+    await expect(page.getByTestId("screen-page")).toHaveCount(0);
     expect(problems).toEqual([]);
   });
 

@@ -72,11 +72,14 @@ test("FR_WLD_06 a selection made in the World lens follows to Story and Trace", 
   await expect(page.getByTestId("story-lens")).toContainText("Specialist 1");
   await expect(page.locator('[data-testid="story-lens"] li[data-seq]')).toHaveCount(44);
   expect(await highlightedSeqs(page, "[data-testid=story-lens] li")).toEqual(A_S1_SEQS);
-  await expect(hudRow(page, /Specialist 1/)).toHaveAttribute("aria-pressed", "true");
+  // OLD-UI-OUT-2: the roster belongs to the World lens; Story and Trace carry the shared selection bar.
+  await expect(page.getByTestId("selection-bar")).toHaveAttribute("data-selected-id", "A_s1");
 
   await lens(page, "Trace").click();
   await expect(page.getByTestId("trace-lens-row")).toHaveCount(44);
   expect(await highlightedSeqs(page, "[data-testid=trace-lens-row]")).toEqual(A_S1_SEQS);
+  await lens(page, "World").click();
+  await expect(hudRow(page, /Specialist 1/)).toHaveAttribute("aria-pressed", "true");
   // The lenses are routes of one page: the selection survived with no reload.
   expect(await page.evaluate(() => (window as unknown as { __kept?: boolean }).__kept)).toBe(true);
   expect(problems).toEqual([]);
@@ -98,7 +101,6 @@ test("FR_WLD_06 selecting an agent highlights it in all three lenses in <= 200 m
       page.getByTestId("story-lens").getByRole("button", { name: "Specialist 1" }).first().click(),
     [
       '[data-testid=story-lens] li[data-selected="true"]',
-      '[data-testid=world-hud] button[aria-pressed="true"]',
       '[data-testid=selection-bar][data-selected-id="A_s1"]',
     ],
   );
@@ -120,7 +122,7 @@ test("FR_WLD_06 selecting an agent highlights it in all three lenses in <= 200 m
     () => page.getByTestId("trace-lens").getByRole("button", { name: "A_s1" }).first().click(),
     [
       '[data-testid=trace-lens-row][data-selected="true"]',
-      '[data-testid=world-hud] button[aria-pressed="true"]',
+      '[data-testid=selection-bar][data-selected-id="A_s1"]',
     ],
   );
   expect(fromTrace, "Trace to Trace and World roster").toBeLessThanOrEqual(200);
@@ -217,18 +219,26 @@ test("FR_WLD_06 selecting shifts nothing on the page and passes axe", async ({ p
   await page.setViewportSize(DESKTOP);
   for (const path of [`${W}/story${FAST}`, `${W}/trace${FAST}`, `${W}/stage${FAST}`]) {
     await page.goto(path);
-    await finished(page);
+    // OLD-UI-OUT-2: the roster and the meter are the World lens's; Story and Trace pick from their own rows.
+    const onStage = path.includes("/stage");
+    if (onStage) await finished(page);
+    else await expect(page.locator("[data-seq]")).toHaveCount(44, { timeout: 15_000 });
+    const target = onStage
+      ? hudRow(page, /Specialist 1/)
+      : path.includes("/story")
+        ? page.getByTestId("story-lens").getByRole("button", { name: "Specialist 1" }).first()
+        : page.getByTestId("trace-lens").getByRole("button", { name: "A_s1" }).first();
     const tops = () =>
       page
         .locator(
-          "[data-testid=selection-bar], [data-testid=world-hud] .row, .story-list li, .trace-rows li",
+          "[data-testid=selection-bar], [data-testid=world-hud] .row, .park-view-story li, .park-view-trace li",
         )
         .evaluateAll((els) => els.slice(0, 40).map((el) => el.getBoundingClientRect().top));
     // The rail scrolls: a row below the fold is brought into view first, so the click itself
     // scrolls nothing and only a selection's own shift would show.
-    await hudRow(page, /Specialist 1/).scrollIntoViewIfNeeded();
+    await target.scrollIntoViewIfNeeded();
     const before = await tops();
-    await hudRow(page, /Specialist 1/).click();
+    await target.click();
     await expect(page.getByTestId("selection-bar")).toHaveAttribute("data-selected-id", "A_s1");
     expect(await tops(), path).toEqual(before);
     const axe = await new AxeBuilder({ page })

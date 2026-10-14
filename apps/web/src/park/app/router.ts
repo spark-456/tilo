@@ -1,7 +1,7 @@
 // The Park router (README "Routes"; plan sections 1 and 3): the pages live at the ROOT paths (/, /worlds,
 // /world/:id, /team, ...) and /park/<page> stays as an alias. Pure path functions plus one hook. This is
 // the only file under park/ that reads the address bar; pages get `app.page` and `app.params`.
-import { useMemo, useSyncExternalStore } from "react";
+import { createContext, useContext, useMemo, useSyncExternalStore } from "react";
 import { PAGE_IDS, type PageId, type Params } from "./AppCtx";
 import { noteFollowed } from "./followed";
 
@@ -120,6 +120,11 @@ export function useParkRoute(): ParkRoute | null {
     return q < 0 ? parseParkPath(url, "") : parseParkPath(url.slice(0, q), url.slice(q));
   }, [url]);
 }
+
+/** The page a routed view (a world lens, Needs you) belongs to, for the nav's current tab: such a view has no Park
+ * route of its own, so its host names the page. Null for every Park page. */
+export const ActivePageContext = createContext<PageId | null>(null);
+export const useActivePage = (): PageId | null => useContext(ActivePageContext);
 
 export interface QuizAppRoute {
   readonly worldId: string;

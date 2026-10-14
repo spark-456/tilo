@@ -14,10 +14,13 @@ const FIXTURE = "/world/w_village_basic/stage?fixture=village-basic&seq=44";
 const ROUTES = [
   // WEB-CUTOVER: S-01 at "/" is the Park Home now, which follows its own design's type ramp (the pixel-parity
   // harness pins it), not PRD 18.2's seven steps; its test is removed with the replaced screen.
-  ...SCREENS.filter((s) => s.path !== null && s.id !== "S-01").map((s) => ({
-    name: s.id,
-    path: s.path as string,
-  })),
+  // OLD-UI-OUT: S-12 and S-22 are Park pages (park-btn, park-profile-*) of the Park design's own ramp now, like S-01.
+  ...SCREENS.filter((s) => s.path !== null && !["S-01", "S-12", "S-22"].includes(s.id)).map(
+    (s) => ({
+      name: s.id,
+      path: s.path as string,
+    }),
+  ),
   { name: "fixture-world", path: FIXTURE },
   { name: "more", path: "/more" },
   { name: "screens-index", path: "/screens" },
@@ -39,7 +42,10 @@ async function offScale(page: import("@playwright/test").Page) {
           : "";
       return `${el.tagName.toLowerCase()}${id}${cls}`;
     };
-    for (const el of document.body.querySelectorAll("*")) {
+    // OLD-UI-OUT-2: a Park page (worldView/) is judged inside its own view; the Park shell chrome follows the
+    // Park design's ramp (the pixel-parity harness pins it), like the Park Home.
+    const scope = document.querySelector(".park-view-root") ?? document.body;
+    for (const el of scope.querySelectorAll("*")) {
       if (["SCRIPT", "STYLE", "NOSCRIPT"].includes(el.tagName)) continue;
       const own = [...el.childNodes].some((n) => n.nodeType === 3 && n.textContent?.trim());
       const control = ["INPUT", "TEXTAREA", "SELECT"].includes(el.tagName);
@@ -65,7 +71,9 @@ for (const [label, viewport, h1, top] of [
       }) => {
         await page.goto(route.path);
         await page
-          .locator("main, [data-testid='stage-frame'], [data-testid='screen-page']")
+          .locator(
+            "main, [data-testid='stage-frame'], [data-testid='screen-page'], .park-view-root",
+          )
           .first()
           .waitFor();
         await page.waitForTimeout(500);
@@ -79,9 +87,16 @@ for (const [label, viewport, h1, top] of [
       }) => {
         await page.goto(route.path);
         await page
-          .locator("main, [data-testid='stage-frame'], [data-testid='screen-page']")
+          .locator(
+            "main, [data-testid='stage-frame'], [data-testid='screen-page'], .park-view-root",
+          )
           .first()
           .waitFor();
+        // OLD-UI-OUT-2: a Park page title is the Park design's 32 px at both widths, set by its own page header.
+        const parkTitles = await page
+          .locator(".park-view-root h1")
+          .evaluateAll((els) => els.map((el) => Number.parseFloat(getComputedStyle(el).fontSize)));
+        for (const size of parkTitles) expect(size, "Park h1 size").toBe(32);
         const titles = await page.locator("[data-testid='screen-page'] h1").evaluateAll((els) =>
           els.map((el) => ({
             size: Number.parseFloat(getComputedStyle(el).fontSize),

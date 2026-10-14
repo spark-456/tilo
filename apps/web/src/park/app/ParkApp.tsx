@@ -9,12 +9,12 @@ import "../tokens/fonts";
 import "../tokens/park.css";
 import "../tokens/themes.css";
 import { themeFor } from "../tokens/themes";
-import { PAGE_LABEL } from "./AppCtx";
+import { PAGE_LABEL, type PageId } from "./AppCtx";
 import { NOT_FOUND_TITLE, NotFound } from "./NotFound";
 import "./park-app.css";
 import { ParkProvider, usePageApp, useSessionAuth } from "./context";
 import { PAGES } from "./pages";
-import { isHomeAddress, useParkRoute, useQuizAppRoute } from "./router";
+import { ActivePageContext, isHomeAddress, useParkRoute, useQuizAppRoute } from "./router";
 
 const QuizPlayerPage = lazy(() =>
   import("../pages/QuizPlayer/QuizPlayerPage").then((m) => ({ default: m.QuizPlayerPage })),
@@ -73,6 +73,8 @@ export interface RoutedView {
   readonly content: ReactNode;
   readonly title: string;
   readonly routeKey: string;
+  /** The tab the nav marks current while this view shows (a lens or Needs you belongs to Worlds). */
+  readonly page?: PageId;
 }
 
 function Shell({ routed }: { routed?: RoutedView | undefined }) {
@@ -112,24 +114,26 @@ function Shell({ routed }: { routed?: RoutedView | undefined }) {
       data-motion={app.motion}
       data-theme={themeFor(app.prefs.theme)}
     >
-      <AppShell>
-        <Suspense fallback={null}>
-          {routed ? (
-            routed.content
-          ) : Page ? (
-            <Page app={app} />
-          ) : quizRoute ? (
-            <QuizPlayerPage
-              app={app}
-              worldId={quizRoute.worldId}
-              artifactId={quizRoute.artifactId}
-            />
-          ) : (
-            <NotFound go={app.go} />
-          )}
-          <FocusHeading routeKey={routeKey} />
-        </Suspense>
-      </AppShell>
+      <ActivePageContext.Provider value={routed?.page ?? null}>
+        <AppShell>
+          <Suspense fallback={null}>
+            {routed ? (
+              routed.content
+            ) : Page ? (
+              <Page app={app} />
+            ) : quizRoute ? (
+              <QuizPlayerPage
+                app={app}
+                worldId={quizRoute.worldId}
+                artifactId={quizRoute.artifactId}
+              />
+            ) : (
+              <NotFound go={app.go} />
+            )}
+            <FocusHeading routeKey={routeKey} />
+          </Suspense>
+        </AppShell>
+      </ActivePageContext.Provider>
       {Tour ? (
         <Suspense fallback={null}>
           <Tour />

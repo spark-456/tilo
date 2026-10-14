@@ -17,7 +17,7 @@ import {
   useParkApi,
   useParkStore,
 } from "../app/context";
-import { useParkRoute, useQuizAppRoute } from "../app/router";
+import { useActivePage, useParkRoute, useQuizAppRoute } from "../app/router";
 import { Button, Popover, Toast } from "../components";
 import { FirstRunBanner } from "../sample/FirstRunBanner";
 import { useFirstRun } from "../sample/useFirstRun";
@@ -62,6 +62,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const store = useParkStore();
   const api = useParkApi();
   const route = useParkRoute();
+  const activePage = useActivePage();
   const quizRoute = useQuizAppRoute();
   const state = useSyncExternalStore(store.subscribe, store.getState);
   const [notifications, setNotifications] = useState<Notification[]>([]);
@@ -144,7 +145,8 @@ export function AppShell({ children }: { children: ReactNode }) {
     [ready, appearance.time, appearance.motion],
   );
 
-  const page = route?.page ?? null;
+  // A routed view (a lens, Needs you) has no Park route of its own: its host names the page it belongs to.
+  const page = route?.page ?? activePage ?? null;
   // A tab or menu click fades the old page out and the new one in. Everything else (the browser's back button, a
   // link inside a page, a world loader's card that covers the swap, reduced motion) swaps at once.
   const key = route

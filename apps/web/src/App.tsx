@@ -90,7 +90,10 @@ export function App() {
           />
         </ScreenPage>
       ) : (
-        <FlowShell />
+        // The stage used to supply the page's one <main> here; the flow shell is the page now.
+        <main className="flow-main">
+          <FlowShell />
+        </main>
       )}
       {fixtureClient && (
         // HR-4/BQ-07: permanent (whenever the fixture client is active), never dismissable, exposed to assistive

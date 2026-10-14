@@ -41,6 +41,7 @@ function routedOf(view: ViewRoute) {
   return {
     title: viewTitle(view),
     routeKey: `view:${key}`,
+    page: "worlds" as const,
     content: (
       <Suspense fallback={null}>
         <WorldViewApp route={view} />

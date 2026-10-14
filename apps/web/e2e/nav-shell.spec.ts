@@ -1,5 +1,5 @@
 // Issue #227 Bundle C (shell and global hierarchy): the primary nav (C1, C4), the reserved strip for
-// the dev "Fixture replay" pill (C2), one right-rail contract (C3), the button hierarchy (C5) and
+// the dev "Fixture replay" pill (C2), the button hierarchy (C5) and
 // the Inspect hint (C6), at 1440x900, 390x844 and 320x640, in normal and stage mode (?display=stage).
 import { type Page, expect, test } from "@playwright/test";
 import { readShifts, watchShifts } from "./support/shifts";
@@ -18,12 +18,7 @@ const overlaps = (a: Rect, b: Rect) =>
 // C4: the active item matches the route. "none" is the phone's Home (no tab for it).
 const ACTIVE: ReadonlyArray<readonly [string, string]> = [
   [FLOW, "Home"],
-  [`${W}/stage`, "World"],
-  [`${W}/story`, "Story"],
-  [`${W}/trace`, "Story"],
-  [`${W}/delivery`, "World"],
   ["/worlds/replays", "World"],
-  ["/needs-you", "Needs you"],
   ["/library", "Library"],
   ["/settings", "More"],
   ["/autonomy", "More"],
@@ -53,11 +48,11 @@ for (const viewport of VIEWPORTS) {
       page,
     }) => {
       await page.setViewportSize(viewport);
-      await page.goto(`/needs-you?speed=20${display}`);
+      await page.goto(`/library?speed=20${display}`); // OLD-UI-OUT-2: /needs-you is a Park page now
       const nav = page.getByRole("navigation", { name: /primary/i });
       const links = nav.getByRole("link");
-      const count = await links.count();
-      expect(count).toBe(phone ? 5 : 6);
+      const count = phone ? 5 : 6;
+      await expect(links).toHaveCount(count); // the lazy screen paints the bar after load
       for (let i = 0; i < count; i++) {
         const link = links.nth(i);
         const info = await link.evaluate((el) => {
@@ -74,7 +69,9 @@ for (const viewport of VIEWPORTS) {
             hasIcon: !!el.querySelector("svg.nav-icon"),
           };
         });
-        const scale = display && !phone ? 1.25 : 1; // the tabs share the phone's width: no scaling
+        // OLD-UI-OUT-2: stage mode now scales the Park stage and presenter (stage.spec); the nav of the screens that
+        // remain on this frame keeps its size.
+        const scale = 1;
         expect(info.hasIcon, `${info.text} has an icon`).toBe(true);
         expect(info.fits, `${info.text} fits its link`).toBe(true);
         expect(info.lines, `${info.text} is one line`).toBe(1);
@@ -88,14 +85,15 @@ for (const viewport of VIEWPORTS) {
       page,
     }) => {
       await page.setViewportSize(viewport);
-      for (const path of [FLOW, "/worlds/replays", "/needs-you", `${W}/story`]) {
+      // OLD-UI-OUT-2: /needs-you and the lenses are Park pages (the strip is theirs: needs-you.spec, stage.spec).
+      for (const path of [FLOW, "/worlds/replays"]) {
         await page.goto(`${path}${path.includes("?") ? "&" : "?"}speed=20${display}`);
         const pill = page.getByTestId("fixture-replay-banner");
         const badge = page.getByTestId("speed-badge");
         await expect(pill).toBeVisible();
         const strip = (await page.locator(".status-strip").boundingBox()) as Rect;
         const shell = (await page
-          .locator(phone ? ".screen-page, .stage-frame" : ".left-rail")
+          .locator(phone ? ".screen-page, .stage-frame, [data-testid=flow-shell]" : ".left-rail")
           .first()
           .boundingBox()) as Rect;
         const p = (await pill.boundingBox()) as Rect;
@@ -160,50 +158,18 @@ for (const viewport of VIEWPORTS) {
   }
 }
 
-test("UX-227-C1 the Needs-you badge counts the queue S-06 lists, and is absent at zero", async ({
-  page,
-}) => {
-  test.setTimeout(90_000);
-  await page.setViewportSize(DESKTOP);
-  await page.goto("/needs-you?speed=5", { waitUntil: "commit" }); // the replay starts at mount
-  const link = page.getByRole("navigation", { name: /primary/i }).getByRole("link", {
-    name: /^Needs you/,
-  });
-  await expect(page.getByTestId("nav-needs-badge")).toHaveCount(0); // nothing waits yet (HR-1)
-  const rows = page.getByTestId("needs-queue").locator("li");
-  await expect(rows).toHaveCount(1, { timeout: 30_000 });
-  await expect(page.getByTestId("nav-needs-badge")).toHaveText("1 waiting");
-  await expect(link).toHaveAccessibleName("Needs you 1 waiting");
-  await expect(page.getByTestId("nav-needs-badge")).toHaveCount(0, { timeout: 30_000 }); // answered
-});
-
-test("UX-227-C3 every route has the same right rail: card, Needs you, Team; links are 24 px", async ({
+test("UX-227-C4 the world lenses and Needs you mark Worlds current in the Park nav and nothing else", async ({
   page,
 }) => {
   await page.setViewportSize(DESKTOP);
-  for (const path of [
-    FLOW,
-    "/worlds/replays",
-    "/needs-you",
-    "/settings",
-    `${W}/story`,
-    `${W}/delivery`,
-  ]) {
-    await page.goto(`${path}?speed=1000`);
-    const rail = page.getByTestId("right-rail");
-    await expect(rail.getByRole("region", { name: "Live meter" }), path).toBeVisible();
-    await expect(rail.getByRole("heading", { level: 2, name: "Needs you" }), path).toBeVisible();
-    await expect(rail.getByRole("heading", { level: 2, name: "Team" }), path).toBeVisible();
-    const small = await rail.evaluate((el) =>
-      [...el.querySelectorAll("a, button")]
-        .map((a) => a.getBoundingClientRect())
-        .filter((r) => r.width > 0 && (r.width < 24 || r.height < 24))
-        .map((r) => `${Math.round(r.width)}x${Math.round(r.height)}`),
+  for (const lens of ["stage", "story", "trace", "delivery", "needs-you"]) {
+    await page.goto(lens === "needs-you" ? "/needs-you" : `${W}/${lens}`);
+    const nav = page.getByRole("navigation", { name: "Main" });
+    await expect(nav.locator('[aria-current="page"]'), lens).toHaveCount(1);
+    await expect(nav.getByRole("link", { name: /^Worlds/ }), lens).toHaveAttribute(
+      "aria-current",
+      "page",
     );
-    expect(small, `rail targets under 24x24 on ${path}`).toEqual([]);
-    // The card never claims "0 credits" for a run that has not started (and a finished run says Done).
-    const text = await rail.getByRole("region", { name: "Live meter" }).innerText();
-    expect(text, path).not.toMatch(/Getting ready[\s\S]*\b0\b[\s\S]*credits/);
   }
 });
 

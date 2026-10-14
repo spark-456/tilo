@@ -183,13 +183,13 @@ for (const viewport of [DESKTOP, MOBILE]) {
       .getByRole("link", { name: "Story" })
       .click();
     const seqs = await page
-      .locator(".story-list li")
+      .locator(".park-view-story li")
       .evaluateAll((els) => els.map((el) => Number(el.getAttribute("data-seq"))));
     expect(seqs.length).toBeGreaterThan(0);
     expect(Math.max(...seqs)).toBeLessThanOrEqual(12);
     await expect(slider(page)).toHaveAttribute("aria-valuetext", /Event 12 of 44/);
     await slider(page).fill("44");
-    await expect(page.locator(".story-list li")).toHaveCount(44);
+    await expect(page.locator(".park-view-story li")).toHaveCount(44);
     const shifts = await page.evaluate(
       () => (window as unknown as { __shifts: number[] }).__shifts,
     );

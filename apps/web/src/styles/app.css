@@ -494,6 +494,10 @@ textarea {
   outline: 2px solid var(--color-brand-primary);
   outline-offset: 2px;
 }
+/* The flow shell sits in the page's one <main>; the wrapper adds a landmark and no box of its own. */
+.flow-main {
+  display: contents;
+}
 .flow-shell {
   position: fixed;
   top: calc(var(--chrome-h) + var(--space-16));
