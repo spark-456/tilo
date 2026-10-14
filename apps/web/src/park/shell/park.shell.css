@@ -482,6 +482,10 @@
   [data-park] .park-shell__nav {
     gap: 10px;
   }
+  /* W-AXE-1b: recover the dot target padding from tool gaps, never from hit areas. */
+  [data-park] .park-shell__tools {
+    gap: 0;
+  }
 }
 /* QA-DEMO-1 B2: at 320 the page button needs room: the nav's gaps and the tool buttons give back a little. */
 @media (max-width: 360px) {
