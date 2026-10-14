@@ -102,6 +102,25 @@ class InMemoryOutboxStore:
             self._retries.pop(outbox_id, None)
             return deepcopy(entry)
 
+    def _cancel_source(self, outbox_id: str, now: str, alert: dict) -> dict | None:
+        """X-SEC37-FU4b: refuse live leases; preserve uncertainty and alert while stopping resend."""
+        with self._lock:
+            entry = self._by_id.get(outbox_id)
+            if entry is None or entry["state"] not in ("queued", "scheduled", "sending"):
+                return None
+            expiry = self._send_leases.get(outbox_id, (None, None))[1]
+            if expiry is not None and now < expiry:
+                return None
+            ambiguous = bool(self._retries.get(outbox_id, {}).get("ambiguous") or expiry is not None)
+            entry["state"] = "failed"
+            self._send_leases.pop(outbox_id, None)
+            if ambiguous:
+                self._retries[outbox_id] = {**self._retries.get(outbox_id, {}), "ambiguous": True}
+                self._record_alert(outbox_id, entry["world_id"], alert)
+            else:
+                self._retries.pop(outbox_id, None)
+            return deepcopy(entry)
+
     def _claim_for_sending(
         self, outbox_id: str, holder: str, now: str, lease_seconds: float, skew_s: float = 0
     ) -> dict | None:  # never before scheduled_at + skew_s (PI-12) or the entry's not-before
