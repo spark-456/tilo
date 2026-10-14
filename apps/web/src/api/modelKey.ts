@@ -1,7 +1,7 @@
 // ADR-0041 (BYOK-5, INERT): the web half of `/v1/org/model-key`, framework-free. The shapes are those of
 // contracts/org_model_key.schema.json (GET `owner_view` or `member_view`, PUT `put_request` and `put_answer`, DELETE
-// `remove_answer`, `error`); the contract's fixtures are this client's test oracle (BYOK-6). A 403 is `owner_only`
-// by status, whatever word the server sends. The key is a function argument: it goes into the one
+// `remove_answer`, `error`); the contract's fixtures are this client's test oracle (BYOK-6). SEC-15 gate codes
+// have their own copy; other 403s retain the owner refusal. The key is a function argument: it goes into the one
 // PUT body and is dropped, never kept, logged or put in a message. Every refusal becomes a fixed word (`problem`); the
 // server's text is never shown, so no answer can carry the key back. `saved` is true only after the live answer AND a
 // re-read that shows the key (BK-02, BK-06). While `config/byok.yaml` has `enabled: false` the API answers 503
@@ -14,6 +14,8 @@ export type ModelKeyProblem =
   | "sign_in" // 401: no sign-in
   | "reauth" // 401 `reauth_required`: the sign-in is older than 10 minutes (BK-06)
   | "owner_only" // 403: not the org owner, or a session with no directory record (BK-05)
+  | "under_construction" // SEC-15: account access has not been granted
+  | "declaration_required" // SEC-15: sign-up declaration is missing
   | "key_refused" // 422 `key_refused`
   | "confirm" // 422 `confirm_required`: the consent version moved
   | "invalid" // 422 `invalid_body`
@@ -94,7 +96,9 @@ export function problemOf(error: unknown): ModelKeyProblem {
   const word = error.code ?? error.refusal;
   if (error.status === 503) return word === "not_configured" ? "not_configured" : "unavailable";
   if (error.status === 401) return word === "reauth_required" ? "reauth" : "sign_in";
-  if (error.status === 403) return "owner_only";
+  if (error.status === 403) {
+    return word === "under_construction" || word === "declaration_required" ? word : "owner_only";
+  }
   if (error.status === 429) return "rate_limited";
   if (error.status === 422) {
     return word === "key_refused"
