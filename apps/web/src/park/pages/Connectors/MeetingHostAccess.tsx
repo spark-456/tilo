@@ -8,11 +8,13 @@ import { useCallback, useEffect, useState } from "react";
 import {
   type ConnectFlow,
   type HostState,
+  HOST_NOT_CONNECTED_TEXT,
   MEETING_HOST,
   MEETING_HOST_CAPABILITIES,
 } from "../../../api/connect";
 
 const STATE_TEXT: Record<HostState, string> = {
+  not_configured: HOST_NOT_CONNECTED_TEXT,
   connected: "Connected",
   attention: "Needs attention: the sign-in has expired or is about to",
   available: "Not connected",
@@ -62,6 +64,14 @@ export function MeetingHostAccess({ flow }: { flow: ConnectFlow | null }) {
           Signing in the meeting host needs a real Tilo sign-in. This demo or replay session cannot
           connect a Google account.
         </output>
+      </section>
+    );
+  }
+
+  if (state === "not_configured") {
+    return (
+      <section className="park-connectors-section" aria-label="Meeting host account">
+        <p>{HOST_NOT_CONNECTED_TEXT}</p>
       </section>
     );
   }

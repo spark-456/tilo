@@ -6,6 +6,7 @@
 // Undo), navigation inside the Park app is app.go, and the links to the live stage and its lenses are real
 // addresses the browser follows, but only for a world whose data came from the live API: a sample world has no
 // recorded run, so the same elements are disabled with the reason (docs/park-designed-not-in-prd/World.md).
+import { HOST_NOT_CONNECTED_TEXT } from "../../../api/connect";
 import { type ChangeEvent, type ReactNode, useEffect, useRef, useState } from "react";
 import { createRoomClient } from "../../api/live/meetingHall";
 import { downloadResult, hasResultReader } from "../../api/results";
@@ -654,6 +655,9 @@ export function WorldPage({ app }: { app: AppCtx }) {
               onSkill={(skill) => app.go("skills", { id: skill })}
               onTools={() => app.go("connectors")}
             />
+            {loaded.connectors.some((c) => c.id === "meeting_host" && c.live?.notConfigured) ? (
+              <p>{HOST_NOT_CONNECTED_TEXT}</p>
+            ) : null}
             {loaded.gaps.skills || loaded.gaps.connectors ? (
               <NotYetCard title={loaded.gaps.skills ? "Skills" : "Tools"} />
             ) : null}

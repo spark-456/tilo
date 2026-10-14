@@ -72,3 +72,29 @@ def test_ADR32A_T4B_FR_MTG_09_unconfigured_is_503_for_the_seam_and_unknown_rows_
     rows = _rows(client)
 
     assert all(r["state_known"] is False for r in rows.values())
+
+
+def test_live_meethost_not_configured_marker_is_specific_and_one_call(client, monkeypatch):
+    calls = []
+
+    def read(user_id):
+        calls.append(user_id)
+        raise deps.ConnectionViewsNotConfigured
+
+    monkeypatch.setattr(deps, "get_connection_views_rpc", lambda: read)
+    as_principal(as_full_session(make_principal(user_id=USER, role="owner", world_id=None)))
+    response = client.get("/v1/connectors")
+    assert response.status_code == 200
+    assert response.headers["X-Tilo-Meeting-Host"] == "not_configured"
+    assert "X-Tilo-Meeting-Host" in response.headers["Access-Control-Expose-Headers"]
+    rows = {row["id"]: row for row in response.json()["connectors"]}
+    assert calls == [USER]
+    assert all(not row["state_known"] for row in rows.values())
+    assert all("unavailable_reason" not in row for row in rows.values())
+
+
+def test_live_meethost_unknown_failure_has_no_not_configured_marker(client, monkeypatch):
+    _install(None, monkeypatch)
+    response = client.get("/v1/connectors")
+    assert "X-Tilo-Meeting-Host" not in response.headers
+    assert all("unavailable_reason" not in row for row in response.json()["connectors"])

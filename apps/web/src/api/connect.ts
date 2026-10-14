@@ -33,7 +33,7 @@ export type StartResult =
   | { kind: "failed" };
 
 /** What `GET /v1/connectors` says of the meeting host; `unknown` unless the server says it read the state. */
-export type HostState = ConnectionState | "unknown";
+export type HostState = ConnectionState | "unknown" | "not_configured";
 
 export type FinishResult =
   /** `connector` is carried only for the meeting host (the one id this page words differently). */
@@ -136,6 +136,8 @@ export function createConnectFlow(
       const body = await http.getJson("/v1/connectors");
       const rows = isObject(body) && Array.isArray(body.connectors) ? body.connectors : [];
       const row = rows.find((r) => isObject(r) && r.id === MEETING_HOST);
+      if (isObject(row) && row.state_known === false && row.unavailable_reason === "not_configured")
+        return "not_configured";
       if (!isObject(row) || row.state_known !== true) return "unknown";
       const { state } = row;
       return state === "connected" || state === "attention" || state === "available"
@@ -220,3 +222,5 @@ export const RESULT_TEXT: Record<FinishResult["kind"], string> = {
   start_again: "That sign-in could not be completed. Please start again from Connectors.",
   unavailable: "Tilo could not finish connecting right now. Please start again from Connectors.",
 };
+
+export const HOST_NOT_CONNECTED_TEXT = "Meeting host is not connected yet";

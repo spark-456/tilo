@@ -15,7 +15,7 @@ from __future__ import annotations
 from datetime import UTC, datetime, timedelta
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from tilo_connectors._time import format_ts, parse_ts
 
 from tilo_api import deps
@@ -38,8 +38,16 @@ def _optional_views(request: Request) -> Any | None:
     provider = request.app.dependency_overrides.get(deps.get_connection_views, deps.get_connection_views)
     try:
         return provider()
+    except HTTPException as exc:
+        if exc.status_code == 503 and exc.detail == "not_configured":
+            return deps._RpcConnectionViews(_not_configured)
+        return None
     except Exception:  # noqa: BLE001 - the default is HTTP 503 `not_configured`; any failure means unknown, silently
         return None
+
+
+def _not_configured(_: str) -> None:
+    raise deps.ConnectionViewsNotConfigured
 
 
 def _row(
@@ -91,6 +99,7 @@ router = APIRouter(route_class=_PeopleRoute)
 
 @router.get("/v1/connectors")
 def connectors_route(
+    response: Response,
     principal: Annotated[deps.Principal, Depends(deps.get_current_principal)],
     registry: Annotated[Any, Depends(deps.get_connector_registry)],
     views: Annotated[Any, Depends(_optional_views)],
@@ -102,6 +111,11 @@ def connectors_route(
         if views is not None:
             try:
                 row = _one(views, principal.user_id, declared)
+            except deps.ConnectionViewsNotConfigured:
+                row = _row(declared, "available", [], None, known=False)
+                if declared["id"] == "meeting_host":
+                    response.headers["X-Tilo-Meeting-Host"] = "not_configured"
+                    response.headers["Access-Control-Expose-Headers"] = "X-Tilo-Meeting-Host"
             except Exception:  # noqa: BLE001 - one failing connector is `available`; its error text goes nowhere
                 row = None
         if row is None:  # built outside any handler: nothing can chain the failure's text

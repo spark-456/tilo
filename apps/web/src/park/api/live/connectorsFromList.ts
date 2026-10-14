@@ -33,7 +33,15 @@ export function connectorsFromList(body: unknown): Connector[] | null {
       cat: "",
       mono: nameInitials(c.name),
       col: "var(--ink2)",
-      live: { stateKnown: c.state_known, scopes: [...c.scopes] },
+      live: {
+        stateKnown: c.state_known,
+        scopes: [...c.scopes],
+        ...(c.id === "meeting_host" &&
+        c.state_known === false &&
+        c.unavailable_reason === "not_configured"
+          ? { notConfigured: true }
+          : {}),
+      },
       ...(c.expires_at === null ? {} : { expires: c.expires_at }),
     });
   }

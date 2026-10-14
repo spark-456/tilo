@@ -239,3 +239,17 @@ def test_ADR32A_T4B_FR_MTG_09_the_provider_order_is_the_registrys_oauth2_ids(
     deps.get_connection_views_rpc()(USER)
     registry = deps.get_connector_registry()
     assert seen == [[c for c in registry.ids() if registry.get(c)["auth"] == "oauth2"]]
+
+
+def test_live_meethost_only_exact_503_not_configured_marks_views():
+    for status, error, expected in [
+        (503, "not_configured", True),
+        (503, "unknown", False),
+        (403, "not_configured", False),
+        (500, "not_configured", False),
+    ]:
+        rig = Rig(reply({"error": error}, status), reply(GOOD))
+        assert rig.rpc.connection_views(USER, order=ORDER) is None
+        assert rig.rpc.views_not_configured is expected
+        assert rig.rpc.connection_views(USER, order=ORDER) is not None
+        assert rig.rpc.views_not_configured is False
