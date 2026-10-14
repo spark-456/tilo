@@ -14,7 +14,7 @@ screen goes **In production** (user, 7 Oct; BQ-SIGNIN-1). Choices the PRD does n
 | Web sign-in gate and panel | `apps/web/src/auth/SignInGate.SIGNIN.test.tsx` |
 | Bearer header on every API call | `apps/web/src/api/http.authToken.SIGNIN.test.ts` |
 | Sign out in the account menu | `apps/web/src/park/shell/AccountMenu.signOut.SIGNIN.test.tsx` |
-| Gmail consent: unverified-app sentence | `apps/web/src/screens/S_08.unverified.SIGNIN.test.tsx` |
+| Gmail consent: unverified-app sentence | `apps/web/src/worldView/NeedsYouConsent.unverified.SIGNIN.test.tsx` |
 | Setup sheet in `infra/ACCESS.md`, Hosting CSP, static web rules | `tests/repo/test_SEC_15_SIGNIN_docs_and_csp.py` |
 
 ## New code the tests name
