@@ -577,11 +577,20 @@ class Router:
             raise TokenCapExceededError(f"EFF-03: role {run.role_id!r} query is over its max_input_tokens cap of {cap}")
         if run.budget is None:
             return 0.0
-        estimate = self._cost(profile_id, tokens, out)
-        total = estimate + self._cost(profile_id, 0, 0, units=reserve)
+        # Reserved at the role's EXPECTED output like every other call (BQ-EXPECTED-OUT-1), not at the full cap: a
+        # grounded answer is short, and reserving all of `out` (4096) priced a search at ~17.4 credits, so a 30-credit
+        # run could afford two. The cap still bounds the call (the ceiling check) and the reply settles from usage.
+        expected = min(self._config.expected_output.get(run.role_id, _DEFAULT_EXPECTED_OUTPUT), out)
+        estimate = self._cost(profile_id, tokens, expected)
+        queries = self._cost(profile_id, 0, 0, units=reserve)
+        total = estimate + queries
         if total > run.budget:
             message = f"PL-03: a search on {profile_id!r} costs ~{total:.4f} credits ({reserve} queries reserved)"
             raise BudgetExceededError(f"{message}, over {run.budget} left", run.attempts)
+        ceiling = self._cost(profile_id, tokens, out) + queries
+        if ceiling > _CAP_HEADROOM * run.budget:
+            message = f"PL-03: a search on {profile_id!r} may cost up to ~{ceiling:.4f} credits at its cap"
+            raise BudgetExceededError(f"{message}, over {_CAP_HEADROOM}x the {run.budget} left", run.attempts)
         return estimate
 
     def search(
