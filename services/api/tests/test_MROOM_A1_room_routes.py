@@ -250,12 +250,33 @@ def test_MROOM_A1_unwired_seams_answer_503_and_write_nothing(tmp_path):
     env = make_env(tmp_path)
     room = env.convene().json()
     kept = dict(app.dependency_overrides)
-    for seam in (deps.get_run_archive, deps.get_redactor):  # production defaults: no archive, no redactor
+    for seam in (deps.get_run_archive,):  # production default: no archive
         del app.dependency_overrides[seam]
         assert env.ask(room["room_id"]).status_code == 503
         app.dependency_overrides.update(kept)
     assert len(env.room_events()) == 1  # not even a meeting.asked
     assert env.ask(room["room_id"]).status_code == 202
+
+
+def test_MROOM_A1_default_redactor_is_wired_and_redacts_request_and_reply(tmp_path):
+    # FR-MEM-05: deps.get_redactor returns the shared tilo_redact.redact in production.
+    secret = "mroom-test-credential-123"
+    question = f"What did you do? api_key={secret}"
+    answer = f"I did U1 [seq: 18]. api_key={secret}"
+    env = make_env(tmp_path, model=Scripted(lambda g: reply_json(text=answer)))
+    room = env.convene().json()
+    del app.dependency_overrides[deps.get_redactor]
+
+    response = env.ask(room["room_id"], question)
+    assert response.status_code == 202
+    assert response.json()["reply"]["outcome"] == "answered"
+    assert response.json()["reply"]["text"] == "I did U1 [seq: 18]. api_key=[REDACTED]"
+    shown = env.get(room["room_id"]).json()
+    assert shown["turns"][0]["text"] == "What did you do? api_key=[REDACTED]"
+    assert secret not in json.dumps(response.json()) and secret not in json.dumps(shown)
+    assert [e["type"] for e in env.room_events()] == ["meeting.convened", "meeting.asked", "meeting.replied"]
+    archived = [json.loads(line)["payload"]["text"] for line in env.lines.lines[("org_tilo", "r_village_basic_1")]]
+    assert archived == ["What did you do? api_key=[REDACTED]", "I did U1 [seq: 18]. api_key=[REDACTED]"]
 
 
 def test_MROOM_A1_defaults_are_the_shipped_config():
