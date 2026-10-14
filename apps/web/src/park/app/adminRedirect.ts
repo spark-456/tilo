@@ -12,6 +12,10 @@ const TARGETS: Record<string, string> = {
   connections: "/connectors",
 };
 export function adminRedirect(path: string, search = ""): string | null {
+  // Canonical bookmarks keep their query; retired screens below keep only their allowed run context.
+  const canonical = path.replace(/\/+$/, "") || "/";
+  if (canonical === "/index.html") return `/${search}`;
+  if (canonical !== path) return adminRedirect(canonical, search) ?? `${canonical}${search}`;
   if (RETIRED_FLOW.test(path)) return "/";
   const target = TARGETS[path.replace(/^\//, "").replace(/\/$/, "")];
   if (!target) return null;

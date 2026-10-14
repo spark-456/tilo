@@ -1,7 +1,7 @@
 # Tilo
 
-Tilo is an agentic work platform. You describe work in plain language; a Director plans it and offers priced
-approaches; teams of agents run it. You watch the work as a living isometric world, a plain-language Story, or a
+Tilo is an agentic work platform. You describe work in plain language; a Director plans it and offers one priced
+confirmation card; teams of agents run it. You watch the work as a living isometric world, a plain-language Story, or a
 technical Trace, and agents come to you (web, phone or email) when they need a decision. Every animation traces to a
 recorded event, and nothing that leaves Tilo is sent without the policy engine and, for the highest tier, a person.
 
@@ -18,7 +18,25 @@ Built for the Google Cloud AI Builder Cup 2026. The full specification is `docs/
   users can sign in.
 - Deploying it yourself: `docs/deploy-dev.md`.
 
+### Judges: try a task from Home
+
+1. Sign in with **Continue with Google**, then open **Home** (`/`).
+2. Type a task, such as “Draft a one-page plan for a community garden”, into the Home composer and submit it.
+3. Review the single confirmation card, including its scope and estimated cost.
+4. Choose **Start** on that card. The World opens for the run; follow its progress and answer any Needs-you cards.
+5. Open **Story** for the plain-language account or **Trace** for the recorded technical events.
+
+A live run requires the signed-in API and its configured runner. Local fake-provider runs and demo replays are
+labelled as samples or recordings; they do not prove a live model call or an external action. If the run cannot
+start, use the displayed error rather than treating the sample world as a completed task.
+
+For a historical view of the world renderer, see the existing
+[World screenshot](docs/screenshots/s04/world-finished-1440x900-after.png). This is a recorded reference, not
+evidence that the current hosted run completed.
+
 ## How to run
+
+For meeting notes and messages, see [Meeting minutes and follow-ups](docs/minutes.md).
 
 You need `just`, `uv` (Python 3.12), Node 22 or newer and `pnpm`.
 
@@ -90,7 +108,7 @@ only in `config/` and `packages/providers`.
 
 | Role | Primary, fallback | Used for |
 | --- | --- | --- |
-| `director` | `gemini-3.8-flash`, `gemini-3.7-flash` (thinking high) | intake, planning, approaches |
+| `director` | `gemini-3.8-flash`, `gemini-3.7-flash` (thinking high) | intake, planning, confirmation card |
 | `lead`, `verifier`, `writer` | `gemini-3.8-flash`, `gemini-3.7-flash` | district leadership, verification, documents |
 | `specialist`, `narrator`, `lead_review` | `gemini-3.1-flash-lite`, `gemini-3.7-flash` | cheapest-first step work, Story narration, short verdicts |
 | `autopilot`, `autorater` | `gemini-3.7-flash`, `gemini-3.1-flash-lite` | Email Autopilot triage and drafts, eval grading |
