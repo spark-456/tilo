@@ -132,7 +132,7 @@ describe("WEB_3b_loader: the card", () => {
 
   it("WEB_3b_loader_a_world_the_user_started_shows_its_own_name_and_tier", async () => {
     await mountApp();
-    act(() => {
+    await act(async () => {
       seen.app.addWorld("routine", "Every Monday, match invoices");
     });
     open("new1");
@@ -224,7 +224,7 @@ describe("WEB_3b_boot: the splash", () => {
     expect(m.container.textContent).not.toContain("Loading your city");
   });
 
-  it("WEB_3b_boot_it_is_removed_the_moment_ready_turns_true", () => {
+  it("WEB_3b_boot_it_is_removed_the_moment_ready_turns_true", async () => {
     let setReady: (v: boolean) => void = () => undefined;
     function Host() {
       const [ready, set] = useState(false);
@@ -233,7 +233,7 @@ describe("WEB_3b_boot: the splash", () => {
     }
     const { m } = mountShell(<Host />);
     expect(m.container.querySelector('[aria-label="Loading Tilo"]')).not.toBeNull();
-    act(() => setReady(true));
+    await act(async () => setReady(true));
     // Updated for WEB-MOTION-2: the splash fades over .45 s once ready, and goes at animationend.
     expect(m.container.querySelector('[aria-label="Loading Tilo"]')).not.toBeNull();
     animationEnd(m.container.querySelector('[aria-label="Loading Tilo"]'));

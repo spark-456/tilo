@@ -40,14 +40,14 @@ describe("FR_UX_11 notifications popover", () => {
   it("test_FR_UX_11_bell_shows_unread_dot_only_when_something_is_unread", async () => {
     await mountApp();
     expect(unreadDots()).toHaveLength(1);
-    act(() => seen.app.decide("depot"));
+    await act(async () => seen.app.decide("depot"));
     expect(unreadDots()).toHaveLength(1);
-    act(() => seen.app.decide("mail"));
+    await act(async () => seen.app.decide("mail"));
     expect(seen.store.getState().read).toBe(false);
     expect(unreadDots()).toHaveLength(0);
 
     // Undoing brings back the waiting decision and the unread dot if never opened
-    act(() => seen.store.getState().toast?.action?.());
+    await act(async () => seen.store.getState().toast?.action?.());
     expect(unreadDots()).toHaveLength(1);
 
     // Opening the bell marks notifications read and removes the dot permanently
@@ -133,13 +133,13 @@ describe("FR_UX_11 notifications popover", () => {
 
     await mountApp({ api });
     click(bell());
-    act(() => seen.app.decide("depot"));
+    await act(async () => seen.app.decide("depot"));
     await act(async () => undefined);
     // Even when approvedTitle is blank on a live/custom decision, an approved card renders "You approved"
     expect(rows()[0]?.textContent).toContain("You approved");
     expect(rows()[0]?.getAttribute("data-kind")).toBe("done");
 
-    act(() => seen.app.decide("mail"));
+    await act(async () => seen.app.decide("mail"));
     await act(async () => undefined);
     expect(rows()[1]?.textContent).toContain("You sent the supplier brief");
     expect(rows()[1]?.getAttribute("data-kind")).toBe("done");
@@ -157,7 +157,7 @@ describe("FR_UX_11 notifications popover", () => {
       click(rowWith(text));
       expect(dialog()).toBeNull();
       expect(seen.store.getState().wl).toMatchObject({ id: worldId, step: 0 });
-      for (let i = 0; i < 3; i++) act(() => sch.fire(sch.live()[0]));
+      for (let i = 0; i < 3; i++) await act(async () => sch.fire(sch.live()[0]));
       expect(navigate).toHaveBeenCalledWith(`/world/${worldId}`);
       m.unmount();
     }

@@ -80,7 +80,7 @@ describe("WEB-MOTION-1 motion preference: lively, calm, still", () => {
 
   it("WEB-MOTION-1 lively shows the full, live city at full speed: not still, k = 1", async () => {
     await mountApp();
-    act(() => seen.app.setPref("motion", "lively"));
+    await act(async () => seen.app.setPref("motion", "lively"));
     expect(still()).toBe("false");
     expect(k()).toBe(1);
   });
@@ -88,14 +88,14 @@ describe("WEB-MOTION-1 motion preference: lively, calm, still", () => {
   it("WEB-MOTION-1 still shows a frozen city: still = true", async () => {
     await mountApp();
     expect(still(), "the live city it starts from is not frozen").toBe("false");
-    act(() => seen.app.setPref("motion", "still"));
+    await act(async () => seen.app.setPref("motion", "still"));
     expect(still()).toBe("true");
   });
 
   it("WEB-MOTION-1 every scene is the 1600 by 1000 picture whatever the motion", async () => {
     await mountApp();
-    act(() => seen.app.setPref("motion", "calm"));
-    act(() => seen.app.setPref("motion", "still"));
+    await act(async () => seen.app.setPref("motion", "calm"));
+    await act(async () => seen.app.setPref("motion", "still"));
     expect(builds()).toBeGreaterThan(0);
     for (const c of sceneSpy.mock.calls) {
       expect(c[0]).toMatchObject({ w: 1600, h: 1000 });
@@ -104,8 +104,8 @@ describe("WEB-MOTION-1 motion preference: lively, calm, still", () => {
 
   it("WEB-MOTION-1 night keeps the motion: a night city under calm is still live and slow", async () => {
     await mountApp();
-    act(() => seen.app.setPref("time", "night"));
-    act(() => seen.app.setPref("motion", "calm"));
+    await act(async () => seen.app.setPref("time", "night"));
+    await act(async () => seen.app.setPref("motion", "calm"));
     expect(scene().getAttribute("data-night")).toBe("true");
     expect(still()).toBe("false");
     expect(k()).toBeCloseTo(1.9, 5);
@@ -117,7 +117,7 @@ describe("WEB-MOTION-1 the city holds still while the world loader is open (as t
     await mountApp();
     const backdrop = () => q(document.body, ".park-shell__backdrop");
     expect(backdrop().hasAttribute("data-paused"), "Home, no loader: the city moves").toBe(false);
-    act(() => seen.store.openWorld("k1"));
+    await act(async () => seen.store.openWorld("k1"));
     expect(backdrop().hasAttribute("data-paused"), "the loader is open: the city holds").toBe(true);
   });
 });
@@ -144,13 +144,13 @@ describe("WEB-MOTION-1 prefers-reduced-motion: a static frame, live while the pa
     await mountApp();
     expect(still()).toBe("true");
     for (const motion of ["calm", "lively", "still"]) {
-      act(() => seen.app.setPref("motion", motion));
+      await act(async () => seen.app.setPref("motion", motion));
       expect(still(), `motion ${motion} under reduced motion`).toBe("true");
     }
-    act(() => seen.app.setPref("time", "night"));
+    await act(async () => seen.app.setPref("time", "night"));
     expect(still(), "night under reduced motion").toBe("true");
     // The control: lifting the setting gives the live city back, so the frames above were the setting's doing.
-    act(() => seen.app.setPref("motion", "lively"));
+    await act(async () => seen.app.setPref("motion", "lively"));
     setReduced(false);
     expect(still()).toBe("false");
   });
@@ -188,17 +188,17 @@ describe("WEB-MOTION-1 cache: the city is drawn once per time|motion", () => {
 
   it("WEB-MOTION-1 each motion has its own key: going calm, still and back reuses what was drawn", async () => {
     await mountApp();
-    act(() => seen.app.setPref("time", "night"));
-    act(() => seen.app.setPref("motion", "calm"));
+    await act(async () => seen.app.setPref("time", "night"));
+    await act(async () => seen.app.setPref("motion", "calm"));
     const calm = build();
     expect(still(), "calm is live").toBe("false");
-    act(() => seen.app.setPref("motion", "still"));
+    await act(async () => seen.app.setPref("motion", "still"));
     const frozen = build();
     expect(new Set([calm, frozen]).size).toBe(2);
     const before = builds();
-    act(() => seen.app.setPref("motion", "calm"));
+    await act(async () => seen.app.setPref("motion", "calm"));
     expect(build()).toBe(calm);
-    act(() => seen.app.setPref("motion", "still"));
+    await act(async () => seen.app.setPref("motion", "still"));
     expect(build()).toBe(frozen);
     expect(builds()).toBe(before);
   });

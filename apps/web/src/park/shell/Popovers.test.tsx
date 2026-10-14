@@ -82,13 +82,13 @@ describe("WEB_3b_notif: the notifications popover", () => {
   it("WEB_3b_notif_approving_flips_the_row_to_You_approved_with_a_done_tile", async () => {
     await mountApp();
     openBell();
-    act(() => seen.app.decide("depot"));
+    await act(async () => seen.app.decide("depot"));
     expect(rows()[0]?.textContent).toBe(
       "You approved Laptop DepotK1 electric scooter · £3,42011:52",
     );
     expect(rows()[0]?.getAttribute("data-kind")).toBe("done");
     expect(rows()[1]?.getAttribute("data-kind")).toBe("needs");
-    act(() => seen.app.decide("mail"));
+    await act(async () => seen.app.decide("mail"));
     expect(rows()[1]?.textContent).toBe(
       "You sent the supplier briefK1 electric scooter · 3 suppliers11:40",
     );
@@ -98,8 +98,8 @@ describe("WEB_3b_notif: the notifications popover", () => {
   it("WEB_3b_notif_undo_brings_the_waiting_row_back", async () => {
     await mountApp();
     openBell();
-    act(() => seen.app.decide("depot"));
-    act(() => seen.store.getState().toast?.action?.());
+    await act(async () => seen.app.decide("depot"));
+    await act(async () => seen.store.getState().toast?.action?.());
     expect(rows()[0]?.textContent).toContain("Laptop Depot needs budget sign-off");
     expect(rows()[0]?.getAttribute("data-kind")).toBe("needs");
   });
@@ -276,7 +276,7 @@ describe("WEB_3b_acct: the account menu", () => {
     await mountApp();
     openMenu();
     expect(document.activeElement).toBe(items()[0]);
-    act(() => {
+    await act(async () => {
       items()[0]?.dispatchEvent(
         new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true, cancelable: true }),
       );

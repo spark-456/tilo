@@ -16,6 +16,7 @@ export default defineConfig({
   resolve: { alias: [{ find: /%20/g, replacement: " " }] },
   test: {
     environment: "node",
+    setupFiles: ["./test-support/park/consoleGuard.ts"],
     // SEC-10: the Firebase web config the build supplies in production (`just deploy-web`). Fake test values, so
     // the App Check tests reach the SDK (which they replace by a fake); no key literal is committed.
     env: { VITE_FIREBASE_API_KEY: "test-web-api-key", VITE_FIREBASE_PROJECT_ID: "demo-tilo-web" },

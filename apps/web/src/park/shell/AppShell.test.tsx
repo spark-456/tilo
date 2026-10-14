@@ -98,7 +98,7 @@ describe("WEB_3b_shell: the toast", () => {
   it("WEB_3b_shell_no_toast_until_something_toasts_then_one_with_Undo", async () => {
     await mountApp();
     expect(status()).toHaveLength(0);
-    act(() => seen.app.decide("depot"));
+    await act(async () => seen.app.decide("depot"));
     expect(status()).toHaveLength(1);
     expect(status()[0]?.textContent).toContain("Approved £3,420 for Laptop Depot");
     expect(status()[0]?.getAttribute("aria-live")).toBe("polite");
@@ -110,9 +110,9 @@ describe("WEB_3b_shell: the toast", () => {
 
   it("WEB_3b_shell_the_toast_hides_when_its_4200_ms_timer_fires", async () => {
     const { sch } = await mountApp();
-    act(() => seen.app.toast("Saved"));
+    await act(async () => seen.app.toast("Saved"));
     expect(sch.live().map((t) => t.ms)).toEqual([4200]);
-    act(() => sch.fire(sch.live()[0]));
+    await act(async () => sch.fire(sch.live()[0]));
     expect(status()).toHaveLength(0);
   });
 });
@@ -129,10 +129,10 @@ describe("WEB_3b_shell: the popovers and the loader work together", () => {
     expect(card()?.textContent).toContain("Competitor pricing");
     expect(document.querySelector('[role="dialog"]')).toBeNull();
     expect(navigate).not.toHaveBeenCalled();
-    for (let i = 0; i < 3; i++) act(() => sch.fire(sch.live()[0]));
+    for (let i = 0; i < 3; i++) await act(async () => sch.fire(sch.live()[0]));
     expect(navigate).toHaveBeenCalledWith("/world/comp");
     expect(card()).toBeDefined();
-    act(() => sch.fire(sch.live()[0]));
+    await act(async () => sch.fire(sch.live()[0]));
     // Updated for WEB-MOTION-2: the card fades out over 280 ms after the last step, and goes at animationend.
     expect(card()).toBeDefined();
     animationEnd(card());
