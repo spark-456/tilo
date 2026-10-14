@@ -1,0 +1,49 @@
+{
+  "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
+  "type": "AdaptiveCard",
+  "version": "1.0",
+  "body": [
+    {
+      "type": "TextBlock",
+      "text": "The quote summary is ready to save to your Drive.",
+      "wrap": true
+    },
+    {
+      "type": "TextBlock",
+      "text": "Your policy asks each time before Tilo saves files.",
+      "wrap": true
+    },
+    {
+      "type": "TextBlock",
+      "text": "Risk: T3; irreversible: False",
+      "wrap": true
+    },
+    {
+      "type": "TextBlock",
+      "text": "Approve; suggested",
+      "wrap": true
+    },
+    {
+      "type": "TextBlock",
+      "text": "Hold",
+      "wrap": true
+    },
+    {
+      "type": "TextBlock",
+      "text": "Timeout default: hold",
+      "wrap": true
+    },
+    {
+      "type": "TextBlock",
+      "text": "Review and answer securely in Tilo.",
+      "wrap": true
+    }
+  ],
+  "actions": [
+    {
+      "type": "Action.OpenUrl",
+      "title": "Open card securely",
+      "url": "EXISTING_SIGNED_LINK"
+    }
+  ]
+}
