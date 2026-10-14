@@ -403,6 +403,13 @@ def _collided(where: str, pid: str) -> PeopleError:
 
 def firestore_people_stores(client: Any) -> PeopleStores:
     """The seven stores over one client. Holds the client only: no read, write, query or transaction happens here."""
+
+    def erase_followup(org_id: str, user: str) -> None:
+        from tilo_api.followup_draft_retention import followup_retention  # noqa: PLC0415
+
+        for policy in followup_retention(client, org_id, lambda: 0.0):
+            policy.erase_owner_complete(user)
+
     return PeopleStores(
         persons=FirestorePersonStore(client),
         meetings=FirestoreRecordStore(client, "meeting"),
@@ -411,6 +418,7 @@ def firestore_people_stores(client: Any) -> PeopleStores:
         mentions=FirestoreRecordStore(client, "mention"),
         calendar=FirestoreRecordStore(client, "calendar_entry"),
         world_shares=FirestoreRecordStore(client, "world_share"),
+        erase_followup=erase_followup,
     )
 
 

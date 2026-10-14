@@ -86,7 +86,9 @@ class FirestoreDraftStore:
     def state_envelope(self, owner: str, key: str, value: dict) -> dict:
         """Cards and stop rows share this request's trusted source and exact deadline."""
         retention = self._authority(owner)
-        return retention.envelope(owner, key, value, source=self._source, expires_at=self._expiry)
+        return retention.envelope(owner, key, value, source=self._source, expires_at=self._expiry) | {
+            "retention_namespace": "meeting_followup"
+        }
 
     def state_read(self, owner: str, key: str, row: dict) -> dict | None:
         retention = self._authority(owner)
