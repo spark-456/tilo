@@ -162,6 +162,7 @@ class TaskRecord:
     scenario: str | None = None  # FR-INT-11: the scenario id named at intake; its policies are created at approve
     gaps: tuple[Gap, ...] = ()  # FR-INT-15: the parts Tilo cannot do, set once at intake; answers and edits keep them
     lock: threading.Lock = field(default_factory=threading.Lock, repr=False, compare=False)
+    approaches_work: dict[str, Any] = field(default_factory=dict, repr=False, compare=False)
 
 
 @dataclass
