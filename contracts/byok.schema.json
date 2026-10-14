@@ -1,0 +1,94 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.tilo.example/byok.schema.json",
+  "x-version": "1.0.0",
+  "title": "ByokConfig",
+  "description": "config/byok.yaml (ADR-0041 decisions 5 and 12, BK-12, BK-13, BK-16, BK-20; Proposed and inert: enabled is false in the shipped file, and while it is every route and Router ignores the file). The master flag, the most an org may set for its own key's daily spend, connectors' per-org rate cap on generate, the version of the consent line the owner confirms, and the bundles: an allow-list the owner picks from by id and never types a model id, a role or a URL into. A bundle names only roles that generate or verify work (never safety, search or speech), each with its own primary and fallback profile, and holds no key, secret name, URL or provider field: its profiles are ordinary entries of config/models*.yaml with credential org (providers.schema.json 1.4.0). The schema checks this file alone; the rules that compare it with config/models*.yaml and config/prices.yaml (BK-12, BK-13) are in byok.rules.md and the loader. Example values only: the user chooses the final models and the ceiling.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "example",
+    "enabled",
+    "day_cap_credits_max",
+    "calls_per_org_per_minute",
+    "consent_version",
+    "bundles"
+  ],
+  "properties": {
+    "version": {
+      "description": "The file's own format version (optional, as config/web_push.yaml).",
+      "const": 1
+    },
+    "example": {
+      "description": "true while the bundles are examples; the user chooses final models.",
+      "type": "boolean"
+    },
+    "enabled": {
+      "description": "The master switch, false until the user turns it on after the credential-handling review and BQ-BYOK-1, BQ-BYOK-2, BQ-BYOK-3 and BQ-BYOK-7. While false nothing is Tilo-keyed by accident and every route answers not_configured. An enabled file needs at least one bundle (if/then below).",
+      "type": "boolean"
+    },
+    "day_cap_credits_max": {
+      "description": "The most credits (1 credit = US$0.005) an org may set as its own key's daily cap (BK-16, BQ-BYOK-4). Never null: the owner's cap is required.",
+      "type": "integer",
+      "minimum": 1
+    },
+    "calls_per_org_per_minute": {
+      "description": "Connectors' per-org rate cap on generate (ADR-0041 decision 2), so a compromised tilo-api cannot call at will.",
+      "type": "integer",
+      "minimum": 1
+    },
+    "consent_version": {
+      "description": "The version of the consent line the owner sees and confirms (BK-06). Raising it makes every earlier confirmation stale for the next widening act.",
+      "type": "integer",
+      "minimum": 1
+    },
+    "bundles": {
+      "type": "object",
+      "propertyNames": { "$ref": "#/$defs/bundle_id" },
+      "additionalProperties": { "$ref": "#/$defs/bundle" }
+    }
+  },
+  "if": { "properties": { "enabled": { "const": true } }, "required": ["enabled"] },
+  "then": { "properties": { "bundles": { "minProperties": 1 } } },
+  "$defs": {
+    "bundle_id": {
+      "description": "The id the owner picks a bundle by: lower-case words joined by hyphens, at most 64 characters.",
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]{0,63}$",
+      "not": { "pattern": "\n" }
+    },
+    "bundle": {
+      "description": "One allow-listed way to use an org's key. label is what every member sees (BK-20): a plain name from a closed alphabet, no markup, link or address. kind is openai_compat only in the first slice (BK-13; the Google modes wait for BQ-BYOK-2 and are an additive minor). roles maps a role of config/models.yaml to profiles of its own: never a Tilo profile in a BYOK cascade, and no safety, search or speech role (BK-13). An embedding call is never a bundle's: it stays on Tilo's profile.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["label", "kind", "roles"],
+      "properties": {
+        "label": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9 ().,'/_+-]{0,79}$",
+          "not": { "pattern": "\n" }
+        },
+        "kind": { "type": "string", "enum": ["openai_compat"] },
+        "roles": {
+          "type": "object",
+          "minProperties": 1,
+          "propertyNames": {
+            "$ref": "common.schema.json#/$defs/slug",
+            "not": { "enum": ["safety", "search", "speech"] }
+          },
+          "additionalProperties": { "$ref": "#/$defs/role_profiles" }
+        }
+      }
+    },
+    "role_profiles": {
+      "description": "The org profiles one role runs on: a primary and a fallback of the bundle's own (NFR-25 holds inside the bundle; both may name the same profile). Each must be a profile with credential org that no Tilo role names and that has a price (BK-12, PL-06); the loader checks that against config/models*.yaml.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["primary", "fallback"],
+      "properties": {
+        "primary": { "$ref": "providers.schema.json#/$defs/profile_id" },
+        "fallback": { "$ref": "providers.schema.json#/$defs/profile_id" }
+      }
+    }
+  }
+}
