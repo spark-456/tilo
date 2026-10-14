@@ -1184,7 +1184,7 @@ test.describe("park world: behaviour in the browser", () => {
     const overlay = text(page, "Paused · agents are waiting");
     await expect(overlay).toBeVisible();
     await expect(btn(page, "Resume")).toBeVisible();
-    await expect(text(page, "Paused")).toBeVisible();
+    await expect(text(page, "Paused · 2 decisions")).toBeVisible(); // UI-10 B2: the count stays beside Paused
     const map = await mapOf(page, K1_TAG).boundingBox();
     const scrim = await facts(overlay.locator("xpath=.."), ["position", "background-color"]);
     expect(scrim.position).toBe("absolute");
