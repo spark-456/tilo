@@ -110,15 +110,6 @@ export function ShowPane({ t, night, user }: PaneProps) {
                 value={t.desc}
                 onChange={(e) => t.setDesc(e.target.value)}
               />
-              {live && t.failure ? (
-                <div
-                  className="park-skills-describe-help"
-                  role="alert"
-                  data-testid="skills-teach-error"
-                >
-                  {t.failure}
-                </div>
-              ) : null}
               {live ? null : (
                 <div className="park-skills-describe-note" data-testid="skills-describe-sample">
                   {DESCRIBE_SAMPLE}
