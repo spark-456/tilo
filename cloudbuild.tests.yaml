@@ -231,3 +231,24 @@ steps:
     -q -p no:cacheprovider
 
     '
+
+- id: combined-voice-byok-old-affected
+  name: python:3.12-bookworm
+  waitFor:
+  - node-dependencies
+  - python-dependencies
+  entrypoint: bash
+  env:
+  - LIVE=0
+  - GOOGLE_LOCATION=asia-southeast1
+  - TILO_API_STORE=memory
+  - TILO_PEOPLE_STORE=memory
+  args:
+  - -ceu
+  - |
+    export PATH=/workspace/.venv/bin:/workspace/.cloud-tools/bin:/workspace/.cloud-tools/node_modules/.bin:$$PATH
+    /workspace/.venv/bin/python -m pytest services/api/tests/test_BQ_M2_4_MV*.py services/api/tests/test_BYOK*.py services/api/tests/test_FR_CHN_18b_plate_mailer.py services/api/tests/test_FR_CON_02_ADR35_L2_outbox_store_contract.py -q -p no:cacheprovider
+    /workspace/.venv/bin/python -m pytest packages/providers/tests/test_BYOK*.py packages/providers/tests/test_FR_MTG_11_BQ_M2_12_transient_refusal.py -q -p no:cacheprovider
+    /workspace/.venv/bin/python -m pytest meet-bot/tests/test_FR_MTG_11_BQ_M2_4_MV_bot_voice_meter.py meet-bot/tests/test_FR_MTG_11_BQ_M2_12_transient_voice_refusal.py -q -p no:cacheprovider
+    /workspace/.venv/bin/python -m pytest services/channels/tests/test_FR_CHN_18_digest_service.py -q -p no:cacheprovider
+    /workspace/.venv/bin/python -m pytest packages/archive/tests -q -p no:cacheprovider
