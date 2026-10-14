@@ -69,7 +69,7 @@ export function DeliveryView({ worldId }: { worldId: string }) {
                 </b>
                 <span>
                   estimate ·{" "}
-                  <ViewLink className="park-view-chiplink" to="/estimate">
+                  <ViewLink className="park-view-chiplink" to="/settings?section=estimate">
                     How we estimate
                   </ViewLink>
                 </span>

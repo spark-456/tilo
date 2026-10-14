@@ -20,16 +20,16 @@ export function MorePage({ app }: { app: AppCtx }) {
           {(
             [
               ["Library", "/library"],
-              ["Autonomy", "/autonomy"],
-              ["Channels", "/channels"],
+              ["Autonomy", "/settings?section=autonomy"],
+              ["Channels", "/settings?section=channels"],
               ["Settings", "/settings"],
-              ["How we estimate", "/estimate"],
-              ["Pilot", "/pilot"],
+              ["How we estimate", "/settings?section=estimate"],
+              ["Pilot", "/settings?section=pilot"],
             ] as const
           ).map(([label, path]) => (
             <a
               key={path}
-              href={`${path}${app.params.world ? `?world=${encodeURIComponent(app.params.world)}` : ""}`}
+              href={`${path}${app.params.world ? `${path.includes("?") ? "&" : "?"}world=${encodeURIComponent(app.params.world)}` : ""}`}
             >
               {label}
             </a>

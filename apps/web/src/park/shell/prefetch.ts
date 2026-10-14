@@ -1,17 +1,15 @@
-// README "Boot": the page bundles are fetched after the splash has gone, so the first tab click finds its page
-// already loaded. Importing a module here and in app/pages.ts is the same module (one chunk, fetched once);
-// a failed fetch is left for the page's own import to report.
-const LOADERS: readonly (() => Promise<unknown>)[] = [
-  () => import("../pages/Worlds/WorldsPage"),
-  () => import("../pages/World/WorldPage"),
-  () => import("../pages/Skills/SkillsPage"),
-  () => import("../pages/Ledger/LedgerPage"),
-  () => import("../pages/Agenda/AgendaPage"),
-  () => import("../pages/Team/TeamPage"),
-  () => import("../pages/Profile/ProfilePage"),
-  () => import("../pages/Connectors/ConnectorsPage"),
-];
+import type { PageId } from "../app/AppCtx";
 
-export function prefetchPages(): void {
-  for (const load of LOADERS) load().catch(() => undefined);
+// X-PERF-1: prefetch only the tab the person points to or focuses. The route uses
+// the same import; a failed speculative request is left for its boundary to report.
+const LOADERS: Partial<Record<PageId, () => Promise<unknown>>> = {
+  worlds: () => import("../pages/Worlds/WorldsPage"),
+  skills: () => import("../pages/Skills/SkillsPage"),
+  ledger: () => import("../pages/Ledger/LedgerPage"),
+  agenda: () => import("../pages/Agenda/AgendaPage"),
+  team: () => import("../pages/Team/TeamPage"),
+};
+
+export function prefetchPage(page: PageId): void {
+  void LOADERS[page]?.().catch(() => undefined);
 }

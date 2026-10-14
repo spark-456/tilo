@@ -191,6 +191,46 @@ test("WEB_CUTOVER_e2e_the_not_found_home_link_goes_home", async ({ page }) => {
   expect(new URL(page.url()).pathname).toBe("/");
 });
 
+for (const [name, viewport] of [
+  ["desktop", DESKTOP],
+  ["phone", MOBILE],
+] as const) {
+  test(`W-HOME-RED_WEB_CUTOVER_e2e_home_${name}_starts_in_the_park_composer_without_a_layout_shift`, async ({
+    page,
+  }) => {
+    await page.setViewportSize(viewport);
+    await watchShifts(page);
+    const problems = collectConsoleProblems(page);
+    await page.goto("/");
+    // SIMPLE-RUN-1 (#1077) and RETIRE-OLD-APP: task start lives on Park Home.
+    // Home.start.test.tsx pins the removal of the legacy intake link.
+    const input = page.getByLabel("Describe your task");
+    const start = page.getByRole("button", { name: "Start task", exact: true });
+    await expect(input).toBeVisible();
+    await expect(start).toBeVisible();
+    await expect(page.getByRole("link", { name: "Start a real task", exact: true })).toHaveCount(0);
+    // Inside the viewport and the composer panel, big enough to hit.
+    const box = await start.boundingBox();
+    const panel = await page.locator(".park-home-panel").boundingBox();
+    if (!box || !panel) throw new Error("no boxes");
+    expect(box.x).toBeGreaterThanOrEqual(0);
+    expect(box.x + box.width).toBeLessThanOrEqual(viewport.width);
+    expect(box.y + box.height).toBeLessThanOrEqual(viewport.height);
+    expect(box.y).toBeGreaterThanOrEqual(panel.y);
+    expect(box.y + box.height).toBeLessThanOrEqual(panel.y + panel.height);
+    expect(box.height).toBeGreaterThanOrEqual(24);
+    // the composer stays where the design puts it: its panel's bottom edge is the column's bottom edge
+    expect(await readShifts(page)).toEqual([]);
+    await input.fill("Plan a launch");
+    await start.click();
+    await expect(page.getByRole("button", { name: "Start now", exact: true })).toBeVisible();
+    await expect(input).toHaveValue("Plan a launch");
+    expect(new URL(page.url()).pathname).toBe("/");
+    await expect(page.getByTestId("park-page-home")).toBeVisible();
+    expect(problems).toEqual([]);
+  });
+}
+
 test("WEB_CUTOVER_e2e_a_sample_world_has_a_disabled_live_view_and_nothing_to_open", async ({
   page,
 }) => {

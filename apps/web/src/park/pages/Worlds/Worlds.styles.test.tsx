@@ -37,7 +37,10 @@ const pageCss = fs
   .filter((f) => f.endsWith(".css"))
   .map((f) => fs.readFileSync(path.join(__dirname, f), "utf8"))
   .join("\n");
-const { rules } = parseRules(`${readComponentsCss()}\n${pageCss}`);
+// This reference is desktop. parseRules flattens media blocks, so exclude the
+// phone overrides here; Home.phone.test.ts retains the exact M2-PHONE-1 checks.
+const desktopPageCss = pageCss.replace(/@media \(max-width: 480px\) \{[\s\S]*?\n\}/g, "");
+const { rules } = parseRules(`${readComponentsCss()}\n${desktopPageCss}`);
 
 type Decls = Map<string, string>;
 function declared(el: Element): Decls {

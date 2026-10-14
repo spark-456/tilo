@@ -55,13 +55,13 @@ def join_router(runtime: HostRuntime) -> APIRouter:
 
     @router.post("/meeting-host/join")
     async def join(request: Request):
+        scheme, _, token = request.headers.get("authorization", "").partition(" ")
+        if scheme.lower() != "bearer" or not token or any(char.isspace() for char in token):
+            return refused(401, "unauthenticated")
         settings = runtime.settings()
         if settings is None:
             return refused(503, "not_configured")
         audience, caller = settings
-        scheme, _, token = request.headers.get("authorization", "").partition(" ")
-        if scheme.lower() != "bearer" or not token or " " in token:
-            return refused(401, "unauthenticated")
         try:
             claims = await run_in_threadpool(runtime.verifier.verify, token, audience)
             status = caller_status(claims, audience=audience, caller=caller)

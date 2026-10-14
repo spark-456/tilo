@@ -3,7 +3,8 @@ vault and the T3 pin. Variant P: tilo-api never stores or returns a key.
 
 No network, no model, no cloud, no real key: a fake key is assembled at runtime (CLAUDE.md), the vault is the
 in-memory one, the stores are in memory and the clock is fixed. With the flag off (`config/byok.yaml` `enabled:
-false`, the shipped value) every route answers 503 `not_configured` and nothing is read or written."""
+false`, the shipped value) signed-in callers receive 503 `not_configured` and nothing is read or written.
+Anonymous callers always receive 401 before the flag or request body is consulted (SEC-05)."""
 
 from __future__ import annotations
 
@@ -16,6 +17,7 @@ from typing import Any
 
 import pytest
 import yaml
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from tilo_api import app, byok_routes, deps
 from tilo_api.byok_store import MemoryModelKeyVault, OrgKeyStore
@@ -97,6 +99,42 @@ def rig(monkeypatch: pytest.MonkeyPatch) -> Rig:
 # --- the flag: off is inert ---------------------------------------------------------------------------------------
 
 
+@pytest.mark.parametrize(
+    "status, patch",
+    [
+        ("active", {"paused": False}),
+        ("paused", {"paused": True}),
+        ("unverified", {"paused": False}),
+        ("invalid", {"paused": False}),
+        ("active", {"day_cap_credits": 500}),
+        ("active", {"fallback_to_tilo": False}),
+        ("active", {"paused": False, "day_cap_credits": 500, "fallback_to_tilo": False}),
+    ],
+)
+def test_ADR_0041_R34_8_noop_patch_preserves_reference_and_audit(
+    rig: Rig,
+    status: str,
+    patch: dict[str, Any],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    assert rig.put().status_code == 200
+    held = rig.store.get(ORG)
+    assert held is not None
+    if status != held.status:
+        assert rig.store.cas(ORG, held.bumped(status=status), expected_rev=held.rev)
+    before = rig.store.get(ORG)
+    audit = rig.store.audit_entries(ORG)
+    writes: list[str] = []
+    monkeypatch.setattr(rig.store, "cas", lambda *args, **kwargs: writes.append("cas") or False)
+    rig.age = 601.0  # a no-op does not widen access or require fresh sign-in
+    got = rig.client.patch(PATH, json=patch)
+    assert got.status_code == 200, got.text
+    assert got.json()["state"] == status
+    assert rig.store.get(ORG) == before
+    assert rig.store.audit_entries(ORG) == audit
+    assert writes == []
+
+
 def test_BK_12_shipped_flag_is_off_and_every_route_answers_not_configured(monkeypatch: pytest.MonkeyPatch) -> None:
     shipped = yaml.safe_load((REPO / "config" / "byok.yaml").read_text(encoding="utf-8"))
     assert shipped["enabled"] is False and shipped["bundles"] == {}
@@ -112,12 +150,37 @@ def test_BK_12_shipped_flag_is_off_and_every_route_answers_not_configured(monkey
     assert rig.store.get(ORG) is None and rig.store.audit_entries(ORG) == [] and rig.vault.versions(ORG) == {}
 
 
-def test_BK_12_flag_off_does_not_consult_the_principal_the_directory_or_the_body(
+def test_BK_12_flag_off_does_not_consult_the_directory_or_the_body(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     rig = Rig(monkeypatch, config=ByokConfig())
     rig.user, rig.full = STRANGER, False
     assert rig.client.put(PATH, content=b"{not json", headers={"content-type": "text/plain"}).status_code == 503
+
+
+@pytest.mark.parametrize("method", ["GET", "PUT", "PATCH", "DELETE"])
+@pytest.mark.parametrize("enabled", [False, True])
+def test_W_SEC05_anonymous_byok_is_401_before_flag_directory_or_body(
+    monkeypatch: pytest.MonkeyPatch,
+    method: str,
+    enabled: bool,
+) -> None:
+    rig = Rig(monkeypatch, config=CFG if enabled else ByokConfig())
+    app.dependency_overrides.pop(deps.get_current_principal)
+
+    def forbidden_read() -> Any:
+        pytest.fail("anonymous BYOK must not read config, directory or body")
+
+    app.dependency_overrides[byok_routes.get_byok_config] = forbidden_read
+    app.dependency_overrides[deps.get_people_stores] = forbidden_read
+    monkeypatch.setattr(byok_routes, "_capped_body", forbidden_read)
+    # Isolate route dependencies: middleware must not mask their authentication ordering.
+    isolated = FastAPI()
+    isolated.include_router(byok_routes.router)
+    isolated.dependency_overrides.update(app.dependency_overrides)
+    got = TestClient(isolated).request(method, PATH, content=b"{not json", headers={"content-type": "application/json"})
+    assert got.status_code == 401
+    assert rig.store.get(ORG) is None and rig.store.audit_entries(ORG) == [] and rig.vault.versions(ORG) == {}
 
 
 def test_BK_12_the_flag_default_is_off_when_the_config_cannot_be_read(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -322,26 +385,30 @@ def _force_status(rig: Rig, status: str) -> None:
 
 
 @pytest.mark.parametrize("status", ["invalid", "unverified"])
-def test_BK_17_B2_an_invalid_or_unverified_key_cannot_be_paused_and_resumed_to_active(rig: Rig, status: str) -> None:
+def test_ADR_0041_R34_6_BK_17_B2_invalid_or_unverified_resume_is_200_unchanged(rig: Rig, status: str) -> None:
     rig.put()
     _force_status(rig, status)
     refused = rig.client.patch(PATH, json={"paused": True})
     assert refused.status_code == 422 and refused.json()["code"] == "invalid_body"
     assert rig.store.get(ORG).status == status  # type: ignore[union-attr]
+    before = rig.store.get(ORG)
     resumed = rig.client.patch(PATH, json={"paused": False, "confirm": True, "consent_version": 3})
     assert rig.store.get(ORG).status == status, "a resume never makes it active"  # type: ignore[union-attr]
-    assert resumed.status_code in (200, 422)
+    assert resumed.status_code == 200
+    assert rig.store.get(ORG) == before
     assert rig.client.get(PATH).json()["state"] == status
     rig.user = MEMBER
     assert rig.client.get(PATH).json()["active"] is False
 
 
-def test_BK_17_B2_a_key_that_went_invalid_while_paused_stays_invalid_on_resume(rig: Rig) -> None:
+def test_ADR_0041_R34_6_BK_17_B2_invalid_while_paused_resume_is_200_unchanged(rig: Rig) -> None:
     rig.put()
     assert rig.client.patch(PATH, json={"paused": True}).json()["state"] == "paused"
     _force_status(rig, "invalid")
+    before = rig.store.get(ORG)
     got = rig.client.patch(PATH, json={"paused": False, "confirm": True, "consent_version": 3})
-    assert got.status_code in (200, 422)
+    assert got.status_code == 200
+    assert rig.store.get(ORG) == before
     assert rig.store.get(ORG).status == "invalid"  # type: ignore[union-attr]
 
 
