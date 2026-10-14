@@ -234,7 +234,8 @@ describe("WEB_9_agenda_week: the calendar", () => {
     await settle();
     toasted(
       h,
-      "Booked Thu 16:00 on your Agenda. Invites go out from Google Calendar once it's connected and you approve",
+      // HR W23 / PRD 9.4 outranks prototype success copy: the fixture books no real meeting.
+      "Sample booking for Thu 16:00 shown on this page only. No meeting was booked or invitations sent.",
     );
     expect(qa(week, "[data-slot]")).toHaveLength(0);
     expect(container.querySelector('[data-pin="t0"]')).toBeNull();

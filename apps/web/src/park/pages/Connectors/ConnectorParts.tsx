@@ -64,7 +64,7 @@ export function ConnectedTile({ c, onOpen }: { c: Merged; onOpen: () => void }) 
         </span>
         <span className="park-connectors-tile-names">
           <span className="park-connectors-tile-name">{c.name}</span>
-          <span className="park-connectors-tile-acct">{c.acct || "Connected just now"}</span>
+          <span className="park-connectors-tile-acct">{c.acct || "Account not available"}</span>
         </span>
         <span className={`park-connectors-level park-connectors-level--${c.level}`}>
           {LEVEL_LABEL[c.level]}

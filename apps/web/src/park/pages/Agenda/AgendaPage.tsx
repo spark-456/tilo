@@ -64,13 +64,15 @@ function Ready({
         <div className="park-agenda-titles">
           <h1 className="park-agenda-title">Agenda</h1>
           <p className="park-agenda-lede">
-            {`${A.rules ? `${A.rules.dateLine}. ` : ""}Pins from your team and Tilo, and your week${sample ? "" : " kept in sync"}.`}
+            {`${A.rules ? `${A.rules.dateLine}. ` : ""}Pins from your team and Tilo, and your week.`}
           </p>
+          {sample ? (
+            <p>Sample week: no meetings are booked, invitations sent or reminders scheduled.</p>
+          ) : null}
         </div>
         <div className="park-agenda-actions">
           <div className="park-agenda-synced" data-testid="agenda-synced">
-            {sample ? null : <span className="park-agenda-synced-tick">{icon("check", 13)}</span>}
-            {sample ? SAMPLE_SYNC : "Google Calendar · synced just now"}
+            {sample ? SAMPLE_SYNC : "No calendar sync recorded"}
           </div>
           <Button variant="primary" icon={icon("calendar", 16)} onClick={ui.findTime}>
             Find a time

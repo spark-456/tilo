@@ -302,7 +302,7 @@ export function useTeach({
     const before = taught;
     setSaved(true);
     setTaught(skill);
-    app.toast(`Saved “${nm}”. It’s live for ${scope === "me" ? "you" : "the team"}`);
+    app.toast(`Sample skill “${nm}” saved on this page only. Nothing is live or scheduled.`);
     together(() => api.saveSkill(skill)).catch(() => {
       if (!live.current) return;
       setSaved(false);
