@@ -1,0 +1,14 @@
+{
+  "id": "0123456789abcdef0123456789abcdef",
+  "at": "2026-10-13T09:30:00.000Z",
+  "actor": "u_owner",
+  "action": "set",
+  "bundle": "openai-compat-example",
+  "version": 1,
+  "outcome": "Incorrect API key provided",
+  "authz": {
+    "by": "person",
+    "ref": "u_owner",
+    "at": "2026-10-13T09:30:00.000Z"
+  }
+}
