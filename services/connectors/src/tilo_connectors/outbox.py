@@ -125,6 +125,7 @@ class Outbox:
         retry: RetryPolicy | None = None,  # production passes RetryPolicy()
         alert: Callable[[dict], None] | None = None,  # gets alert.raised parts {type, authz, data, world_id}
         halted: Callable[[], bool] | None = None,
+        source_valid: Callable[[dict], bool] | None = None,
     ) -> None:
         if any(name.strip() == RESERVED_CONNECTOR_ID for name in connectors):
             raise ValueError(f"connector id {RESERVED_CONNECTOR_ID!r} is reserved and cannot be bound")
@@ -136,6 +137,7 @@ class Outbox:
         self._retry = retry if retry is not None else _IMMEDIATE
         self._alert = alert
         self._halted = halted  # set: asked at each claim; True means nothing more is claimed (a paused world)
+        self._source_valid = source_valid
 
     def enqueue(self, entry: dict, evidence: dict) -> dict:
         if errors := sorted(outbox_validator().iter_errors(entry), key=lambda e: list(e.path)):
@@ -260,6 +262,14 @@ class Outbox:
         adapter = None if name.strip() == RESERVED_CONNECTOR_ID else self._connectors.get(name)
         if adapter is None:  # never a reserved id, even if the map was edited after construction
             return self._store._finalize_claim(outbox_id, holder, "failed")
+        if self._source_valid is not None:
+            try:
+                valid = self._source_valid(deepcopy(claimed)) is True
+            except Exception:
+                valid = False  # no source authority without a fresh readable record
+            if not valid:
+                alert = _alert_part(claimed) if self._store.retry_state(outbox_id)["ambiguous"] else None
+                return self._store._finalize_claim(outbox_id, holder, "failed", alert=alert)
         grant = Grant(world_id=claimed["world_id"], idempotency_key=claimed["idempotency_key"])
         _LIVE_GRANTS.add(id(grant))
         execute = getattr(adapter, "execute_side_effect", None)  # FR-CON-04/05 adapters; else send_reply
