@@ -7,7 +7,7 @@
 // e2e/park-shell-chip-narrow.spec.ts --project=chromium --no-deps --workers=1
 import { expect, test } from "@playwright/test";
 
-const WIDTHS = [360, 375, 390, 414, 560] as const;
+const WIDTHS = [320, 360, 375, 390, 414, 560] as const;
 const HOME_WHOLE_FROM = 390; // the narrowest width at which the reference nav leaves the Home tab room
 
 for (const width of WIDTHS) {
@@ -53,7 +53,7 @@ for (const width of WIDTHS) {
       await expect(chip).toHaveAccessibleName("Sample data");
     });
 
-    test(`UI_10_WEB_3b_e2e_${width}_the_sample_chip_is_a_24px_target_and_its_focus_ring_hugs_the_dot`, async ({
+    test(`UI_10_WEB_3b_e2e_${width}_the_sample_chip_is_a_24px_target_and_its_focus_ring_hugs_the_button`, async ({
       page,
     }) => {
       test.setTimeout(150_000);
@@ -65,6 +65,16 @@ for (const width of WIDTHS) {
       const box = await chip.boundingBox();
       expect(box?.width, "WCAG 2.5.8 target width").toBeGreaterThanOrEqual(24);
       expect(box?.height, "WCAG 2.5.8 target height").toBeGreaterThanOrEqual(24);
+      // P0-08b W4: a 24px box is insufficient if another control covers its hit area.
+      const unobscured = await chip.evaluate((el) => {
+        const r = el.getBoundingClientRect();
+        return [1, r.width / 2, r.width - 1].every((x) =>
+          [1, r.height / 2, r.height - 1].every((y) =>
+            el.contains(document.elementFromPoint(r.left + x, r.top + y)),
+          ),
+        );
+      });
+      expect(unobscured, "P0_08b_W4 sample target is fully clickable").toBe(true);
       await chip.focus();
       await page.keyboard.press("Shift+Tab");
       await page.keyboard.press("Tab");
@@ -79,8 +89,10 @@ for (const width of WIDTHS) {
           dot: outline(el.querySelector(".park-shell__sampledot") as Element),
         };
       });
-      // <=430px the dot carries the ring; wider, the chip pill does
-      if (width <= 430) expect(ring).toEqual({ button: "none 3px", dot: "solid 3px" });
+      // W4 supervisor 14 Oct 04:55: W14 #1021 is the compact-control reference.
+      // Its information icon is decorative; focus belongs to the full button target.
+      // design/source/Tilo Home v2.dc.html:18 pins a solid 3px outline on the focused element.
+      if (width <= 430) expect(ring).toEqual({ button: "solid 3px", dot: "none 3px" });
       else expect(ring.button).toBe("solid 3px");
     });
   });
