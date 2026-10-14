@@ -6,6 +6,7 @@
 import { type ReactNode, Suspense, lazy, useEffect, useMemo, useSyncExternalStore } from "react";
 import { AccessLayer, needsAccess } from "./access/AccessLayer";
 import { API_URL, appCheckToken, authToken } from "./api/ClientProvider";
+import { PersonStartup } from "./api/PersonStartup";
 import { HttpClient } from "./api/http";
 import { SignInGate } from "./auth/SignInGate";
 import { session } from "./auth/session";
@@ -64,7 +65,7 @@ function AccessGuard({ children }: { children: ReactNode }) {
       key={state.status === "google" ? (state.email ?? state.displayName ?? "google") : "google"}
       http={http}
     >
-      {children}
+      <PersonStartup http={http}>{children}</PersonStartup>
     </AccessLayer>
   );
 }
