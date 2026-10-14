@@ -10,7 +10,7 @@ const KEPT: readonly RegExp[] = [
   /^\/world\/[^/]+\/(?:stage|story|trace|delivery)\/?$/,
   /^\/world\/[^/]+\/inspect\/[^/]+\/?$/,
   /^\/needs-you(?:\/(?:gate|consent))?\/?$/,
-  /^\/(?:meeting|autonomy|channels|mail|connections|settings|estimate|pilot)\/?$/,
+  /^\/(?:meeting|mail|connections)\/?$/,
   /^\/(?:plate|pinboards|calendar|more)\/?$/,
   /^\/library(?:\/artifacts)?\/?$/,
   /^\/meetings(?:\/[^/]+)?\/?$/,

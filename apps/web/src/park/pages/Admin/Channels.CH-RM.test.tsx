@@ -5,11 +5,11 @@
 import type { Event } from "@tilo/contracts";
 import { act } from "react";
 import { createRoot } from "react-dom/client";
-import { describe, expect, it } from "vitest";
-import { ClientProvider } from "../api/ClientProvider";
-import { FixtureClient } from "../api/fixtureClient";
-import { EVENTS_VILLAGE_BASIC } from "../api/fixtures/events";
-import { S_16 } from "./S_16";
+import { describe, expect, it, vi } from "vitest";
+import { ClientProvider } from "../../../api/ClientProvider";
+import { FixtureClient } from "../../../api/fixtureClient";
+import { EVENTS_VILLAGE_BASIC } from "../../../api/fixtures/events";
+import { ChannelsSection as S_16 } from "./RunSections";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -40,8 +40,9 @@ async function render() {
     );
   });
   // The layout arrives after the first render (the fixture client imports it).
-  await act(async () => {
-    await new Promise((r) => setTimeout(r, 50));
+  await vi.waitFor(async () => {
+    await act(async () => undefined);
+    expect(container.querySelector('[data-testid="connected-accounts"]')).not.toBeNull();
   });
   return container;
 }

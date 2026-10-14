@@ -1,0 +1,62 @@
+[data-park] .park-admin {
+  color: var(--ink);
+  font-size: var(--text-14);
+}
+[data-park] .park-admin-sections {
+  display: grid;
+  gap: var(--space-16);
+  min-width: 0;
+}
+[data-park] .park-admin h1 {
+  font-size: var(--text-32);
+}
+[data-park] .park-admin h2 {
+  font-size: var(--text-20);
+  margin: 0 0 var(--space-12);
+}
+[data-park] .park-admin nav,
+[data-park] .park-admin .stop-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-12);
+}
+[data-park] .park-admin button {
+  min-height: 32px;
+  padding: var(--space-8) var(--space-12);
+  border: 1px solid var(--line2);
+  border-radius: var(--space-12);
+  background: var(--card);
+  color: var(--ink);
+  cursor: pointer;
+}
+[data-park] .park-admin button[aria-current="page"] {
+  border-color: var(--heroFill);
+}
+[data-park] .park-admin button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+[data-park] .park-admin input {
+  max-width: 100%;
+}
+[data-park] .park-admin li {
+  overflow-wrap: anywhere;
+  margin-block: var(--space-12);
+}
+[data-park] .park-admin .bitem {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-12);
+}
+[data-park] .park-admin .bitem-main {
+  flex: 1 1 180px;
+  min-width: 0;
+}
+[data-park] .park-admin .bitem-name,
+[data-park] .park-admin .bitem-sub {
+  display: block;
+}
+[data-park] .park-admin .routine-list {
+  padding: 0;
+  list-style: none;
+}

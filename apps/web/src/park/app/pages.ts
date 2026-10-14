@@ -1,12 +1,8 @@
-// The page registry (plan section 10). Each page is one line: a lane replaces its line with
-//   home: lazy(() => import("../pages/Home/HomePage").then((m) => ({ default: m.HomePage }))),
-// (a NAMED export `HomePage` taking `{ app: AppCtx }`, no default export) and touches nothing else in this file.
 import { type ComponentType, type LazyExoticComponent, lazy } from "react";
 import type { AppCtx, PageId } from "./AppCtx";
 
-const Placeholder = lazy(() => import("./Placeholder"));
-
 export const PAGES: Record<PageId, LazyExoticComponent<ComponentType<{ app: AppCtx }>>> = {
+  settings: lazy(() => import("../pages/Admin/AdminPage").then((m) => ({ default: m.AdminPage }))),
   home: lazy(() => import("../pages/Home/HomePage").then((m) => ({ default: m.HomePage }))),
   // biome-ignore format: the registry keeps one line per page
   worlds: lazy(() => import("../pages/Worlds/WorldsPage").then((m) => ({ default: m.WorldsPage }))),

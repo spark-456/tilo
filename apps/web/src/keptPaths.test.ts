@@ -4,9 +4,17 @@
 // Home now, so it is not.
 import { describe, expect, it } from "vitest";
 import { isKeptPath } from "./keptPaths";
+import { isParkPath } from "./park/app/router";
 import { matchFlowRoute } from "./router";
 import { SCREENS } from "./screens/meta";
 
+// Reference: agy-bridge/tasks/OLD-UI-OUT.md Wave 4.
+const MOVED = new Set(["/autonomy", "/channels", "/settings", "/estimate", "/pilot"]);
+const ownership = (path: string) => {
+  const moved = MOVED.has(path.replace(/\/$/, ""));
+  expect(isKeptPath(path), path).toBe(!moved);
+  if (moved) expect(isParkPath(path), path).toBe(true);
+};
 const KEPT = [
   "/start",
   "/task/t1/understanding",
@@ -24,8 +32,6 @@ const KEPT = [
   "/library/artifacts",
   "/autonomy",
   "/channels",
-  "/mail",
-  "/connections",
   "/settings",
   "/estimate",
   "/pilot",
@@ -34,9 +40,7 @@ const KEPT = [
   "/plate",
   "/pinboards",
   "/calendar",
-  "/more",
   "/worlds/replays",
-  "/team/console",
   "/screens",
   "/screens/cards",
   "/dev/components",
@@ -44,11 +48,11 @@ const KEPT = [
 
 describe("WEB_CUTOVER_kept_paths: the addresses the old app owns", () => {
   it.each(KEPT)("WEB_CUTOVER_kept_paths_%s_is_kept", (path) => {
-    expect(isKeptPath(path)).toBe(true);
+    ownership(path);
   });
 
   it.each(KEPT)("WEB_CUTOVER_kept_paths_%s_with_a_trailing_slash_is_kept", (path) => {
-    expect(isKeptPath(`${path}/`)).toBe(true);
+    ownership(`${path}/`);
   });
 
   it("WEB_CUTOVER_kept_paths_every_screen_path_and_pattern_example_in_meta_is_kept", () => {
@@ -58,12 +62,12 @@ describe("WEB_CUTOVER_kept_paths: the addresses the old app owns", () => {
       if (s.path !== null) examples.push(s.path);
     }
     expect(examples.length).toBeGreaterThan(20);
-    for (const path of examples) expect(isKeptPath(path), path).toBe(true);
+    for (const path of examples) ownership(path);
     // every pattern accepts its own example, and the example is kept (patterns are what the router matches)
     for (const s of SCREENS) {
       if (!s.pattern || s.path === null) continue;
       expect(s.pattern.test(s.path), `${s.id} pattern matches its path`).toBe(true);
-      expect(isKeptPath(s.path), s.id).toBe(true);
+      ownership(s.path);
     }
   });
 
@@ -76,7 +80,7 @@ describe("WEB_CUTOVER_kept_paths: the addresses the old app owns", () => {
       "/world/q%201%2F2/stage",
     ]) {
       expect(matchFlowRoute(path).screen, path).not.toBe("Start");
-      expect(isKeptPath(path), path).toBe(true);
+      ownership(path);
     }
   });
 

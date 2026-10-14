@@ -1,11 +1,11 @@
 // @vitest-environment happy-dom
 import { act } from "react";
 import { afterEach, expect, it, vi } from "vitest";
-import { cleanup, click, mount } from "../../test-support/park/componentsHarness";
-import { setDensity } from "../display/density";
-import { createFixtureApi } from "../park/api/fixtureApi";
-import { ParkProvider, useApp } from "../park/app/context";
-import { S_22 } from "./S_22";
+import { cleanup, click, mount } from "../../../../test-support/park/componentsHarness";
+import { setDensity } from "../../../display/density";
+import { createFixtureApi } from "../../api/fixtureApi";
+import { ParkProvider, useApp } from "../../app/context";
+import { SettingsSection as S_22 } from "./AdminPage";
 
 function Probe() {
   const app = useApp();
