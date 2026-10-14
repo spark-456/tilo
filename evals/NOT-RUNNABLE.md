@@ -9,7 +9,7 @@ is separate evidence; its checkout and eval implementation remain untouched.
 ## Runner reasons
 
 `runner._is_runnable` requires both a non-skeleton status and a recording path.
-All 160 cases have `recording: null`: 74 are skeletons and 86 are ready.
+All 160 cases have `recording: null`: 76 are skeletons and 84 are ready.
 The full pass reports the former as `status skeleton` and the latter as
 `no recording`. There are no populated recording paths to repair.
 
@@ -33,7 +33,7 @@ do not supply outcomes for the repository cases.
 | E-HAND | 20 | skeleton | Harness context-handoff outcomes and rework evidence. Synthetic intranet references do not supply the multi-step execution. |
 | E-RED | 14 | ready | Safety refusal/flag events and recorded absence of side effects. Injection text, mail and web fixtures are adversarial inputs, not safety-screen outcomes. |
 | E-ROUTE | 20 | ready | Matching `question.routed` and `question.answered` events, including decision references where required. `fixtures/route/routing_scenarios.yaml` supplies context exercised by acceptance tests, not a replay event stream. |
-| **Total** | **160** | **86 ready, 74 skeleton** | **All missing outcome recordings.** |
+| **Total** | **160** | **84 ready, 76 skeleton** | **All missing outcome recordings.** |
 
 ## Fixture-wiring result
 
