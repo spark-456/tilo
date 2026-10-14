@@ -75,6 +75,7 @@ async def _lifespan(_: FastAPI) -> AsyncIterator[None]:
     # min-instances 0: every idle period ends in a cold start, and the first sign-in must not meet an empty key cache.
     # A daemon thread, best effort: the start never waits on the keys endpoint and never fails for it.
     threading.Thread(target=_appcheck.warm_up, name="jwks-warm-up", daemon=True).start()
+    await run_in_threadpool(_durable_store.recover_deployed)  # X-ORPHAN-1: fail orphan runs before accepting requests
     yield
     await run_in_threadpool(_durable_store.close_deployed)  # SIGTERM: the writers release their leases (ADR-0026 4)
 

@@ -13,6 +13,8 @@ as JSON strings, because Firestore refuses arrays of arrays.
 terminal event, no run of this process and a free lease gets one `world.failed` (decision 5), so it does not look busy
 forever. It writes, so a route calls it only after its own ownership check; `load_world`, `load_task` and
 `load_owner` settle by default for callers that have checked, and `settle=False` is for those that have not.
+At API startup, `recover_deployed` also visits the durable worlds before requests are served (X-ORPHAN-1 / HR-1).
+It preserves paused runs and active leases; an unavailable store retains the normal route-level 503 behavior.
 
 Kill switches (FR-HIL-07) change the cache in place first. `unsaved` keeps every such policy and world until a commit
 lands, and `commit_unsaved` writes them all, so a retry that finds nothing new to lower still saves what is pending.
@@ -49,6 +51,7 @@ _ID = {
 }
 _JSON_FIELDS = {"worlds": ("layout",), "tasks": ("draft", "brief", "edits", "approaches")}  # free-form: may nest arrays
 RESTARTED = "the service restarted, so the work stopped"
+STARTUP_RESTARTED = "Tilo restarted during this run; start it again"  # X-ORPHAN-1 / HR-1
 _CLOSE_BUDGET_S = 5.0  # shutdown, well under Cloud Run's 10 s SIGTERM grace
 
 
@@ -130,6 +133,9 @@ class MemoryBackend:
         _check(collection, doc_id)
         return copy.deepcopy(self.docs.get((collection, doc_id)))
 
+    def world_ids(self) -> Iterator[str]:
+        yield from (i for c, i in list(self.docs) if c == "worlds")
+
     def queue(self, world_id: str) -> list[dict[str, Any]]:
         _check("worlds", world_id)
         return copy.deepcopy(self.queues.get(world_id, []))
@@ -190,6 +196,11 @@ class FirestoreBackend:
     def read(self, collection: str, doc_id: str) -> dict[str, Any] | None:
         doc = self._ref(collection, doc_id).get().to_dict()
         return None if doc is None else self._dec(collection, doc)
+
+    def world_ids(self) -> Iterator[str]:
+        # Startup is service-owned (max one instance, ADR-0026), never selected by a request's owner/body.
+        for doc in self.client.collection(f"orgs/{self.org_id}/worlds").select([]).stream():
+            yield doc.id
 
     def queue(self, world_id: str) -> list[dict[str, Any]]:
         doc = self._queue(world_id).get().to_dict() or {}
@@ -307,7 +318,7 @@ class DurableStore(deps.Store):
         if world_id:
             self.load_world(world_id, settle=settle)
 
-    def settle(self, world_id: str, writer: deps.EventWriter | None = None) -> None:
+    def settle(self, world_id: str, writer: deps.EventWriter | None = None, *, restart_reason: str = RESTARTED) -> None:
         """What a previous process left, once per world: its queue is sent, and a started world with no end, no run
         and no pause is closed with one `world.failed` (a stable id, so two loaders never write two). Writes: call it
         only after the route's own ownership or membership check."""
@@ -323,10 +334,25 @@ class DurableStore(deps.Store):
                 and not types & {"world.completed", "world.failed"}
                 and not (record.paused or world_id in self.runs)
             ):
-                writer.append(world_id, events.world_failed_part(world_id, RESTARTED, record.run_id))
+                writer.append(world_id, events.world_failed_part(world_id, restart_reason, record.run_id))
             self._settled.add(world_id)
         except Exception as exc:  # a busy lease belongs to whoever holds it; the next look tries again
             logger.warning("settling world %s failed (%s)", world_id, type(exc).__name__)
+
+    def recover_started_worlds(self) -> None:
+        """X-ORPHAN-1: settle durable worlds before serving requests, using the existing lease and stable event id.
+
+        An active lease is never stolen. A failed recovery stays eligible for the existing owner-load retry.
+        Paused worlds and in-process runs retain settle's exclusion; no mail, model or outbox is called here.
+        """
+        for world_id in self.backend.world_ids():
+            if not _valid("worlds", world_id):
+                continue
+            try:
+                self.load_world(world_id)
+                self.settle(world_id, restart_reason=STARTUP_RESTARTED)
+            except Exception as exc:
+                logger.warning("startup world recovery failed (%s)", type(exc).__name__)
 
     def load_world(self, world_id: str, settle: bool = False) -> deps.WorldRecord | None:
         if world_id not in self.worlds and (d := self._doc("worlds", world_id)) is not None:
@@ -573,6 +599,16 @@ def deployed() -> tuple[DurableStore, deps.EventWriter]:
             store.writer = WorldWriterAdapter(store, opened.events)
             _opened[key] = (store, store.writer)
         return _opened[key]
+
+
+def recover_deployed() -> None:
+    """Only a configured durable API opens a store at startup. An outage keeps the normal route-level 503s."""
+    if os.environ.get(store_door.ENV_STORE) != "firestore":
+        return
+    try:
+        deployed()[0].recover_started_worlds()
+    except Exception as exc:
+        logger.warning("startup recovery unavailable (%s)", type(exc).__name__)
 
 
 def close_deployed() -> None:
