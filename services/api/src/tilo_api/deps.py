@@ -476,6 +476,20 @@ def get_feedback_store() -> Any:
         raise HTTPException(status_code=503, detail="not_configured") from None
 
 
+def get_followup_draft_store() -> Any:
+    """FR-MTG-08: existing guarded API client; no memory fallback or new environment."""
+    from tilo_api import store_door  # noqa: PLC0415
+    from tilo_api.draft_firestore import FirestoreDraftStore  # noqa: PLC0415
+
+    try:
+        opened = store_door.open_api_store()
+    except store_door.ApiStoreNotConfigured:
+        raise HTTPException(503, "not_configured", headers={"Cache-Control": "no-store"}) from None
+    except store_door.ApiStoreUnavailable:
+        raise HTTPException(503, "store_unavailable", headers={"Cache-Control": "no-store"}) from None
+    return FirestoreDraftStore(opened.client, org_id=ORG_ID)
+
+
 def get_push_rpc() -> Any:
     """FR-CHN-17f: the client of tilo-channels' `POST /internal/push/send`, or None while `TILO_CHANNELS_URL` is
     unset or not an https Cloud Run address (then no push is sent: dev, CI and a demo send nothing)."""

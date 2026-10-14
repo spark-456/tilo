@@ -1,7 +1,7 @@
 """Explicit owner follow-up caller, using the adopted minutes dependency design.
 
-No route or automatic attendance trigger. Durable draft/autopilot dependencies refuse until
-their production wiring is reviewed; this piece does not activate the minutes chain.
+No route or automatic attendance trigger. Drafts use the existing guarded durable store;
+the scoped autopilot dependency still refuses. This does not activate the minutes chain.
 """
 
 from __future__ import annotations
@@ -25,7 +25,7 @@ AutopilotFactory = Callable[[str, str, str, Callable[[dict], None]], Autopilot]
 
 def get_owner_followup_drafts() -> DraftStore:
     """Durable set-if-absent store required; never silently replace it with memory."""
-    raise HTTPException(503, "not_configured", headers={"Cache-Control": "no-store"})
+    return deps.get_followup_draft_store()
 
 
 def get_owner_followup_autopilot_factory() -> AutopilotFactory:
