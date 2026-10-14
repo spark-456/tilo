@@ -953,6 +953,18 @@
 [data-park]:has(.park-first-run-banner) .park-shell__enter[data-enter="pre"] > .park-toast {
   transform: translateX(-50%) translateY(8px);
 }
+/* LIVE-P2-A (QA row 24): on a World page the bottom edge is the map legend, so the toast sits under the sample banner
+   there instead of over the legend. */
+[data-park]:has(.park-first-run-banner):has(.park-world-legend:not([hidden]))
+  .park-toast:not(.park-toast--inline) {
+  top: 152px;
+  bottom: auto;
+}
+[data-park]:has(.park-first-run-banner):has(.park-world-legend:not([hidden]))
+  .park-shell__enter[data-enter="pre"]
+  > .park-toast {
+  transform: translateX(-50%) translateY(-8px);
+}
 [data-park] .park-shell__enter[data-enter="pre"] > .park-toast {
   opacity: 0;
   transform: translateX(-50%) translateY(-8px);

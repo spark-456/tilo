@@ -22,6 +22,8 @@ const edge = (w: World): string | false =>
 function linkProps(w: World, onOpen: CardProps["onOpen"]) {
   return {
     href: parkPath("world", { id: w.id }),
+    // The card is one link: the world's name is its name, not the sum of its stats.
+    "aria-label": w.name,
     onClick: (e: MouseEvent<HTMLAnchorElement>) => {
       if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
       e.preventDefault();

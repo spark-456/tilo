@@ -2101,3 +2101,17 @@
   border: 1px solid var(--line);
   border-radius: 8px;
 }
+
+/* LIVE-P2-A (QA row 26): on a phone a skill's name and its line wrap instead of ending in an ellipsis */
+@media (max-width: 480px) {
+  [data-park] .park-skills-lib-row-name,
+  [data-park] .park-skills-lib-row-sub {
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+    overflow-wrap: anywhere;
+  }
+  [data-park] .park-skills-lib-row {
+    align-items: start;
+  }
+}

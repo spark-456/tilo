@@ -1215,6 +1215,26 @@
   }
 }
 
+/* LIVE-P2-A (QA row 20): while the plan card is open on the wide layout the stat tiles and the longer Today list
+   step aside, so nothing inside a glass card scrolls and no row is half hidden. They come back when the card closes. */
+@media (min-width: 1180px) {
+  [data-park] .park-home-root:has(.park-home-plan) .park-home-kpis {
+    display: none;
+  }
+  [data-park] .park-home-root:has(.park-home-plan) .park-home-leftcol {
+    overflow-y: visible;
+  }
+  [data-park] .park-home-root:has(.park-home-plan) .park-home-today {
+    overflow-y: visible;
+  }
+  [data-park] .park-home-root:has(.park-home-plan) .park-home-live:nth-child(n + 4) {
+    display: none;
+  }
+  [data-park] .park-home-root:has(.park-home-plan) .park-home-spend {
+    display: none;
+  }
+}
+
 /* SIMPLE-RUN-1: the one confirm card's changeable assumption lines */
 [data-park] .park-home-run__edit {
   display: flex;

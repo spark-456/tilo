@@ -59,6 +59,8 @@ describe("QA_DEMO_1_B1 the composer in a demo session", () => {
     expect(text(confirm)).toBe("Watch the recorded run");
     expect(confirm.getAttribute("href")).toBe("/world/w_village_basic/stage?fixture=village-basic");
     expect(text(plan)).toContain("Whatever you type, the replay is the same recorded run");
+    // LIVE-P2-A row 29: the recording is named before anyone has to work out why the result is not their task
+    expect(text(plan)).toContain("Sample run: inbox triage");
     expect(text(plan)).not.toContain("Start now");
     expect(api.startWorld).not.toHaveBeenCalled();
     expect(seen.store.getState().added).toHaveLength(0);
