@@ -1,10 +1,19 @@
 # Three-minute judges' walkthrough
 
-This script describes the GATE-OLDUI+LIVE2 candidate
-`182beac2a481d28982e145092e471939f59adc91`. It records no deployment or hosted
+This script describes the published LIVE3 source candidate
+`aa708ec8b1380cc869a377bd6ac23b7a5b17670b`. It records no deployment or hosted
 acceptance result. Before presenting, match the hosted Home build stamp to the
 published gate head and check which steps are available. Present only what that
-build exposes; retain any index, provider, activation and security holds.
+build exposes; retain any index, provider, activation and security holds. LIVE3's
+reported API gate is 250 passed and 1 failed (SEC15 health-route allowlist),
+pending supervisor disposition; this is no gate or release approval.
+
+Before timing, inspect the API's `/healthz` and `/healthz/deps` JSON health pages
+(`/health/deps` is an alias). The dependency page reports store kinds,
+configuration-presence booleans and the live-mode flag. Configured does not prove
+readiness, working credentials or a successful provider call. LIVE3 has no Park
+health screen. Its confirmation flow carries no verified APPROACH-SPEED change;
+make no faster-confirmation claim.
 
 Use an authorised test account and an existing run for the timed demonstration.
 A new run can take longer than three minutes. Starting work or resolving an
@@ -18,7 +27,7 @@ does not grant it.
 | 0:40–1:25 | **World** (`/world/<id>`): show the live recorded map for a Village, Town or City run. Open the available **Story** and **Trace** lenses for the same world. | `district.created`, `building.planned` and `agent.spawned` establish the corresponding visible entities; `building.completed` establishes completed building work. All sizes use the live event view. With no entity events, show “Waiting for recorded districts and agents”; never substitute a sample map as live progress. Preserve sequence numbers and timestamps. |
 | 1:25–2:05 | **Needs you** (`/needs-you?world=<id>`): inspect an actual waiting card's action, recipient and consequences; resolve it only if authorised. Otherwise show the empty state. | `approval.requested` establishes the waiting request; the matching `approval.resolved` establishes its resolution. A click or toast does not prove resumption, delivery or sending. No pending approval means there is nothing to demonstrate. |
 | 2:05–2:35 | **World result** (`/world/<id>`): inspect completion and open the result only if a file is available. | `world.completed` establishes completion; `artifact.created` identifies an artifact when recorded. The actual returned/downloaded file establishes its contents. A pending run, missing file or failed download remains a stated limitation. |
-| 2:35–3:00 | **Start it again — Home** (`/`): return to Home, enter the task again, review the new confirmation card and start only if authorised. | This candidate has no control labelled **Start it again**. Demonstrate a fresh Home start, not an automatic restart or reuse of the old run. A new world ID with its own `world.started` proves the second run; the old completion event proves nothing about it. If a published successor adds the control, verify its behavior before presenting it. |
+| 2:35–3:00 | **Start it again — World** (`/world/<id>`): on a real run whose latest world event is `world.failed` with reason “Tilo restarted during this run; start it again”, choose **Start it again** only if authorised. If no such run exists, return to Home and demonstrate a fresh confirmation instead. | The control is conditional on a recorded restart stop and a live, non-sample world. The API creates a new run of the same task and opens the returned world; repeated requests are deduplicated. A new world ID with its own `world.started` proves the second run. Completed runs and demo recordings do not offer this restart control. |
 
 Read the source/lifecycle label aloud: live run, recorded replay, paused,
 completed, failed, or no run yet. Lenses and Stage mode are presentation only;

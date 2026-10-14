@@ -12,8 +12,10 @@ Follow the [three-minute walkthrough](docs/demo.md); see the [architecture](docs
 **Verified 14 October 2026:** the public site returned HTTP 200 with HTML build stamp
 `7e1b0d7bd7accbe01d2560b4b5daa2a4735294d1`. This verifies site availability only;
 it does not establish sign-in, a completed live task, provider access or external delivery.
-The walkthrough describes candidate `182beac2a481d28982e145092e471939f59adc91`,
+The walkthrough describes published LIVE3 source candidate `aa708ec8b1380cc869a377bd6ac23b7a5b17670b`,
 so check the hosted build stamp before demonstrating that candidate's flow.
+Its reported API gate has 250 passes and one SEC15 health-route allowlist failure pending supervisor disposition;
+publication establishes neither deployment nor release approval.
 
 Slack, Teams and Outlook decision cards are prepared offline and remain off pending integration and activation.
 Canva needs the owner's app and verified provider details; Lovable's manual handoff is distinct from its inert MCP preparation.
@@ -34,7 +36,7 @@ Built for the Google Cloud AI Builder Cup 2026. The full specification is `docs/
 
 ### Judges: try a task from Home
 
-See the [three-minute judges' walkthrough](docs/demo.md) for the post-GATE-OLDUI
+See the [three-minute judges' walkthrough](docs/demo.md) for the LIVE3 candidate
 flow, the recorded evidence at each step, and the conditional publication status.
 
 1. Sign in with **Continue with Google**, then open **Home** (`/`).
@@ -42,6 +44,11 @@ flow, the recorded evidence at each step, and the conditional publication status
 3. Review the single confirmation card, including its scope and estimated cost.
 4. Choose **Start** on that card. The World opens for the run; follow its progress and answer any Needs-you cards.
 5. Open **Story** for the plain-language account or **Trace** for the recorded technical events.
+6. A real World stopped by a recorded service restart offers **Start it again**, which opens a new run of the same task.
+   Otherwise start a fresh task from Home; completed runs and recordings do not offer that control.
+
+The API's `/healthz/deps` JSON page (`/health/deps` alias) reports store configuration and live-mode status;
+it does not establish dependency readiness. There is no Park health screen or verified faster-confirmation change in this candidate.
 
 A live run requires the signed-in API and its configured runner. Local fake-provider runs and demo replays are
 labelled as samples or recordings; they do not prove a live model call or an external action. If the run cannot
