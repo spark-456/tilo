@@ -347,9 +347,12 @@ def get_ctx(
         raise HTTPException(status_code=404, detail=NOT_FOUND)  # one message for unknown and not yours: no oracle
     if principal.world_id != world_id:
         team = team_store.team_reader(request.app.dependency_overrides)
+        districts = set(world.districts) & set(principal.districts)
+        owner = principal.role == "owner" and principal.user_id == world.owner
         if (
             not deps.full_world_session(principal)
-            or _as_role(principal, world, cfg, team, set(principal.districts)) is None
+            or (not owner and not districts)
+            or _as_role(principal, world, cfg, team, districts) is None
         ):
             raise HTTPException(status_code=404, detail=NOT_FOUND)
         principal = dataclasses.replace(principal, world_id=world_id)
