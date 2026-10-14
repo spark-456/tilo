@@ -1,6 +1,7 @@
 import { ParkProvider, useApp, useHasParkProvider } from "../app/context";
 import { AppearanceControls } from "../pages/Profile/AppearanceControls";
 import "../tokens/park.css";
+import "../tokens/park.opaque.css";
 import "../tokens/themes.css";
 
 function Controls({ standalone = false }: { standalone?: boolean }) {

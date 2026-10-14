@@ -1,0 +1,20 @@
+/* GLASS-1 (14 Oct 2026, the owner after testing the live site: "text behind a card shows through, it looks like a
+   mistake"). Loaded right after park.css, which stays the handoff's tokens.css exactly. Every surface that carries
+   text is OPAQUE: the glass fill, the page sheet and, by night, the card, field and active-tab fills are solid colours
+   (the night ones are what the design's translucent values composite to over --sheet), and the glass blur is off.
+   --veil and --scrim stay translucent: they dim the city or sit behind a modal and carry no text. */
+/* biome-ignore format: values stay one declaration per line, as in park.css */
+[data-park] {
+  --gBg:#FFFFFF;
+  --gFx:none;
+  --sheet:#FAF9F6;
+}
+/* biome-ignore format: values stay one declaration per line, as in park.css */
+[data-park][data-time="night"] {
+  --gBg:#171A3D;
+  --gFx:none;
+  --sheet:#161836;
+  --card:#232541;
+  --field:#262844;
+  --tabOn:#3B3D56;
+}

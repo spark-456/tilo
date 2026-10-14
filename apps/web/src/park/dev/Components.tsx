@@ -22,6 +22,7 @@ import {
 import { createKit } from "../engines/kit";
 import type { H } from "../engines/types";
 import "../tokens/park.css";
+import "../tokens/park.opaque.css";
 import "../tokens/fonts";
 
 const h: H = (tag, props, ...children) => createElement(tag, props, ...(children as ReactNode[]));

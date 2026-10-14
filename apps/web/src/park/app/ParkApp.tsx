@@ -7,6 +7,7 @@ import { ParkAuthProvider } from "../shell/auth";
 import { useParkTour } from "../shell/tour";
 import "../tokens/fonts";
 import "../tokens/park.css";
+import "../tokens/park.opaque.css";
 import "../tokens/themes.css";
 import { themeFor } from "../tokens/themes";
 import { PAGE_LABEL } from "./AppCtx";

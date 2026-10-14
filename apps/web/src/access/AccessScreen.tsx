@@ -1,5 +1,6 @@
 import { Component, type ReactNode, Suspense, lazy, useState } from "react";
 import "../park/tokens/park.css";
+import "../park/tokens/park.opaque.css";
 import "./AccessScreen.css";
 
 const City = lazy(() => import("../auth/SignInBackdrop"));

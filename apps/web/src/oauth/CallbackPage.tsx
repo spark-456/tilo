@@ -5,6 +5,7 @@
 import { useEffect, useRef, useState } from "react";
 import "../park/tokens/fonts";
 import "../park/tokens/park.css";
+import "../park/tokens/park.opaque.css";
 import {
   type CallbackParams,
   type ConnectFlow,

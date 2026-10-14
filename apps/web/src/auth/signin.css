@@ -1,9 +1,9 @@
-/* The sign-in screen (SEC-15 / SIGNIN): a glass card over the Park city. Own role tokens, day and night, so the card
+/* The sign-in screen (SEC-15 / SIGNIN): an opaque card over the Park city (GLASS-1: no text shows through). Own role tokens, day and night, so the card
    draws before the city's chunk arrives. Neutral role tokens only; the logo colours are the Park design's. */
 .signin {
   --si-ink: #1f1d2b;
   --si-ink2: #4a4655;
-  --si-card: rgba(255, 255, 255, 0.72);
+  --si-card: #ffffff;
   --si-edge: rgba(255, 255, 255, 0.85);
   --si-line: rgba(31, 29, 43, 0.12);
   --si-btn: #ffffff;
@@ -26,7 +26,7 @@
 .signin[data-time="night"] {
   --si-ink: #f4f2fa;
   --si-ink2: #d2cee3;
-  --si-card: rgba(28, 26, 42, 0.74);
+  --si-card: #1c1a2a;
   --si-edge: rgba(255, 255, 255, 0.14);
   --si-line: rgba(255, 255, 255, 0.14);
   --si-btn: rgba(255, 255, 255, 0.07);
@@ -54,7 +54,6 @@
   background: var(--si-card);
   color: var(--si-ink);
   cursor: pointer;
-  backdrop-filter: blur(14px);
 }
 .signin__card {
   position: relative;
@@ -65,7 +64,6 @@
   border: 1px solid var(--si-edge);
   border-radius: 28px;
   background: var(--si-card);
-  backdrop-filter: blur(22px) saturate(1.2);
   box-shadow: 0 24px 60px rgba(31, 29, 43, 0.18);
 }
 .signin__logo {

@@ -6,6 +6,7 @@ import { sceneScale } from "../park/app/pins";
 import { backdropScene } from "../park/shell/scene";
 import "../park/shell/park.shell.css";
 import "../park/tokens/park.css";
+import "../park/tokens/park.opaque.css";
 
 const size = () => ({ vw: window.innerWidth, vh: window.innerHeight });
 

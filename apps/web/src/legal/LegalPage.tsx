@@ -3,6 +3,7 @@
 import { Fragment, useEffect, useState } from "react";
 import "../park/tokens/fonts";
 import "../park/tokens/park.css";
+import "../park/tokens/park.opaque.css";
 import { type Block, type Inline, PRIVACY, TERMS } from "./content";
 import "./legal.css";
 import type { LegalKind } from "./legalPaths";
