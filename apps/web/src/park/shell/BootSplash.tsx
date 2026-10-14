@@ -2,12 +2,11 @@
 // screen with the 56px logo, the 48px wordmark, a 200px bar sliding with tiloSlide and "Loading your city".
 // It stays until the art engines have drawn the city; then it fades over .45s (a CSS animation, so the browser's
 // own animationend says when it is over) and goes. Reduced motion and the 'still' preference skip the fade.
-// A splash that was never shown (ready from the first render) is never drawn. Once it has gone, the other pages'
-// bundles are fetched (README Boot: "Prefetch the page bundles afterwards").
-import { useEffect, useRef, useState } from "react";
+// A splash that was never shown (ready from the first render) is never drawn. X-PERF-1:
+// other pages load on navigation intent, so finishing Home boot does not fetch unused pages.
+import { useEffect, useState } from "react";
 import { useSchedule } from "../app/context";
 import { FADE_MARGIN_MS, SPLASH_FADE_MS, browserRunsAnimations, useMotionOff } from "./motion";
-import { prefetchPages } from "./prefetch";
 
 type Phase = "up" | "out" | "gone";
 
@@ -15,11 +14,7 @@ export function BootSplash({ ready }: { ready: boolean }) {
   const off = useMotionOff();
   const schedule = useSchedule();
   const [phase, setPhase] = useState<Phase>(ready ? "gone" : "up");
-  const wasShown = useRef(!ready);
   if (ready && phase === "up") setPhase(off ? "gone" : "out");
-  useEffect(() => {
-    if (phase === "gone" && wasShown.current) prefetchPages();
-  }, [phase]);
   // The browser's animationend ends the fade; if it never runs, the scheduler does, a little later.
   useEffect(() => {
     if (phase !== "out" || !browserRunsAnimations()) return undefined;
