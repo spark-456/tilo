@@ -85,25 +85,36 @@ def build_router(
 
     def leads(principal: deps.Principal, world_id: str, records: list[dict]) -> list[dict]:
         """The caller's current Team Lead records; 404 for another world, 403 for anyone who holds none."""
-        if principal.world_id != world_id:
+        full = deps.full_world_session(principal)
+        if principal.world_id != world_id and not full:
             raise HTTPException(status_code=404)
         owner, now = owner_of(world_id), _now()
-        mine = [r for r in records if principal.role == "team_lead" and r.get("user") == principal.user_id]
+        mine = [r for r in records if (full or principal.role == "team_lead") and r.get("user") == principal.user_id]
         current = [r for r in mine if _assigned(r, owner, now)]
         if not current:
+            if principal.world_id != world_id and principal.user_id != owner:
+                raise HTTPException(status_code=404)
             raise HTTPException(status_code=403)
         return current
+
+    def reader_domains(principal: deps.Principal, world_id: str, records: list[dict]) -> set[str] | None:
+        # Ownership grants visibility, never the domain expert's write authority.
+        if deps.full_world_session(principal) and principal.role == "owner" and owner_of(world_id) == principal.user_id:
+            return None
+        return {r["domain"] for r in leads(principal, world_id, records)}
 
     def experts(world_id: str, domain: str, records: list[dict]) -> set[str]:
         owner, now = owner_of(world_id), _now()
         return {r["user"] for r in records if r.get("domain") == domain and _assigned(r, owner, now)}
 
-    def visible(proposal: dict | None, principal: deps.Principal, domains: set[str], world_id: str) -> dict | None:
+    def visible(
+        proposal: dict | None, principal: deps.Principal, domains: set[str] | None, world_id: str
+    ) -> dict | None:
         """The proposal if it belongs to this world and the caller holds its domain or proposed it; else None."""
         if proposal is None or proposal["provenance"]["world_id"] != world_id:
             return None  # another world's proposal is never listed, shown or decided, whatever the domain slug
         mine = proposal["provenance"]["proposed_by"] == principal.user_id
-        return proposal if proposal["domain"] in domains or mine else None
+        return proposal if domains is None or proposal["domain"] in domains or mine else None
 
     @router.post("/worlds/{world_id}/skill-proposals")
     def promote(
@@ -135,7 +146,7 @@ def build_router(
         records: Annotated[list[dict], Depends(get_team_leads)],
         store: SkillProposals = Depends(get_proposals),  # a closure name: not resolvable inside Annotated
     ) -> dict[str, Any]:
-        domains = {r["domain"] for r in leads(principal, world_id, records)}
+        domains = reader_domains(principal, world_id, records)
         return {"proposals": [p for p in store.list() if visible(p, principal, domains, world_id)]}
 
     @router.get("/worlds/{world_id}/skill-proposals/{proposal_id}")
@@ -146,7 +157,7 @@ def build_router(
         records: Annotated[list[dict], Depends(get_team_leads)],
         store: SkillProposals = Depends(get_proposals),  # a closure name: not resolvable inside Annotated
     ) -> dict[str, Any]:
-        domains = {r["domain"] for r in leads(principal, world_id, records)}
+        domains = reader_domains(principal, world_id, records)
         if (found := visible(store.get(proposal_id), principal, domains, world_id)) is None:
             raise HTTPException(status_code=404)
         return {"proposal": found}
