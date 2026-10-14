@@ -457,14 +457,15 @@ describe("WEB_6_world_interactions: the live stage and its lenses (plan question
     expect(hrefs.some((h) => h?.startsWith("/world/k1"))).toBe(false);
   });
 
-  it("WEB_6_world_interactions_a_Town_and_a_Village_have_no_live_view", async () => {
+  it("WEB_6_world_interactions_QA_1_live_Town_and_Village_have_all_run_views", async () => {
     for (const id of ["northline", "invoice", "calls", "comp"]) {
       const { el } = await mountWorld({ id, api: liveWorldsApi() });
-      expect(pageText(el), id).not.toContain("Open live view");
-      expect(
-        stageLinks(el).map((a) => a.getAttribute("href")),
-        id,
-      ).not.toContain(`/world/${id}/stage`);
+      // QA-1 supersedes the City-only navigation rule for worlds from the live API.
+      expect(control(el, "Open live view").getAttribute("href"), id).toBe(`/world/${id}/stage`);
+      const hrefs = stageLinks(el).map((a) => a.getAttribute("href"));
+      for (const lens of ["story", "trace", "delivery", "inspect/B1"]) {
+        expect(hrefs, `${id} ${lens}`).toContain(`/world/${id}/${lens}`);
+      }
       cleanup();
     }
   });
