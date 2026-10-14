@@ -27,7 +27,7 @@ def test_FR_MTG_08_release_bad_snapshot_fails_closed(tmp_path, payload):
     assert load().release_target(API, "tilo-api-new", str(path)) == (False, "")
 
 
-@pytest.mark.parametrize("broken", [None, "traffic", "revision", "new-healthz", "bundle-changed", "foreign"])
+@pytest.mark.parametrize("broken", [None, "traffic", "revision", "new-health", "bundle-changed", "foreign"])
 def test_FR_MTG_08_release_checks(tmp_path, capsys, broken):
     revision = "tilo-api-00042-new"
     tagged = "https://release---tilo-api-abc-as.a.run.app"
@@ -55,8 +55,8 @@ def test_FR_MTG_08_release_checks(tmp_path, capsys, broken):
         assert request.method in ("GET", "OPTIONS")
         assert "authorization" not in request.headers and "cookie" not in request.headers
         assert request.url.host != "foreign.example"
-        if str(request.url) == tagged + "/healthz":
-            return httpx.Response(500 if broken == "new-healthz" else 200)
+        if str(request.url) == tagged + "/health":
+            return httpx.Response(500 if broken == "new-health" else 200)
         if request.url.path == "/":
             return httpx.Response(200, text='<script src="/assets/main.js"></script>')
         if request.url.path == "/assets/main.js":
@@ -81,11 +81,11 @@ def test_FR_MTG_08_release_checks(tmp_path, capsys, broken):
         if broken not in ("traffic", "revision", "foreign")
         else "FAIL api-revision-100" in output
     )
-    assert "FAIL new-healthz" in output if broken in ("new-healthz", "foreign") else "PASS new-healthz" in output
+    assert "FAIL new-health" in output if broken in ("new-health", "foreign") else "PASS new-health" in output
     assert "FAIL bundle-changed" in output if broken == "bundle-changed" else "PASS bundle-changed" in output
 
 
-@pytest.mark.parametrize("broken", [None, "sign-in", "bundle-api", "health", "healthz", "cors-intake", "plate-auth"])
+@pytest.mark.parametrize("broken", [None, "sign-in", "bundle-api", "health", "cors-intake", "plate-auth"])
 def test_FR_MTG_08_unsigned_checks_fail_each_boundary_and_never_send_tokens(broken, capsys, monkeypatch):
     seen = []
     monkeypatch.setenv("TILO_SMOKE_ID_TOKEN", "must-never-send")
@@ -122,9 +122,9 @@ def test_FR_MTG_08_unsigned_checks_fail_each_boundary_and_never_send_tokens(brok
     result = load().main([API], transport=httpx.MockTransport(server))
     assert result == (0 if broken is None else 1)
     output = capsys.readouterr().out
-    assert len(output.splitlines()) == 6
-    assert ("FAIL " + broken in output) if broken else output.count("PASS ") == 6
-    assert "must-never-send" not in output and len(seen) == 6
+    assert len(output.splitlines()) == 5
+    assert ("FAIL " + broken in output) if broken else output.count("PASS ") == 5
+    assert "must-never-send" not in output and len(seen) == 5
 
 
 @pytest.mark.parametrize("asset", ["https://other.example/private.js", "//other.example/private.js"])
