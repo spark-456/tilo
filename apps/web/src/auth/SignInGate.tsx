@@ -3,10 +3,9 @@
 // (EFF-01); "unknown" (the SDK has not answered) shows nothing, so nothing flashes; "signed_out" shows the panel
 // and not the app (the Park sign-in screen, SignInScreen); "google" or "anonymous" shows the app. Tilo never handles passwords: Google signs the person
 // in, in its own window, and the panel has no field and no form (PRD 16.1). Neutral role tokens only.
-import { type ReactNode, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
+import { type ReactNode, useRef, useState, useSyncExternalStore } from "react";
 import { SignInScreen } from "./SignInScreen";
 import type { AuthController, SignInResult } from "./auth";
-import { restoreShareToken, stashShareToken } from "./pendingShare";
 
 const FAILED = "Signing in did not work. Please try again.";
 const SIGN_OUT_FAILED =
@@ -20,11 +19,6 @@ export function SignInGate({
   readonly children: ReactNode;
 }) {
   const state = useSyncExternalStore(auth.subscribe, auth.getState);
-  const signedIn = state.status === "google" || state.status === "anonymous";
-  // FR-HIL-12: a shared link's token left the address for sign-in (see pendingShare.ts); put it back once signed in.
-  useLayoutEffect(() => {
-    if (signedIn) restoreShareToken();
-  }, [signedIn]);
   if (state.status === "unavailable" || state.status === "google" || state.status === "anonymous") {
     return <>{children}</>;
   }
@@ -44,7 +38,6 @@ function SignInPanel({
   const run = (start: () => Promise<SignInResult>): void => {
     if (running.current) return;
     running.current = true;
-    stashShareToken(); // before Google or Firebase can read the address
     setBusy(true);
     setFailed(false);
     start().then(

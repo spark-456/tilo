@@ -41,8 +41,6 @@ const S_26 = screen(() => import("./S_26"), "S_26");
 const S_27 = screen(() => import("./S_27"), "S_27");
 const S_28 = screen(() => import("./S_28"), "S_28");
 const S_29 = screen(() => import("./S_29"), "S_29");
-// FR-HIL-12: an Approver's shared link. It is not one of the PRD 18.3 screens, so it sits in EXTRA, not in meta.ts.
-const SharePage = screen(() => import("../share/SharePage"), "SharePage");
 // The dev build's component gallery (WEB-2): its chunk is never reached from the landing bundle.
 const DevComponents = screen(() => import("../park/dev/Components"), "Components");
 
@@ -86,7 +84,6 @@ const decode = (s: string | undefined): string => {
 /** /more is the production menu; /screens is the dev-only index (PRD 18.3, AGW-08). */
 const EXTRA: ReadonlyArray<{ id: string; re: RegExp; Component: ElementType<ScreenProps> }> = [
   { id: "more", re: /^\/more\/?$/, Component: More },
-  { id: "share", re: /^\/share\/[^/]+\/?$/, Component: SharePage },
   ...(import.meta.env.DEV
     ? [
         { id: "screens", re: /^\/screens\/?$/, Component: ScreensIndex },

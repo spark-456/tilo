@@ -13,12 +13,9 @@ export function contextOf(pathname: string, record: string | null): AssistantCon
   const label = screen
     ? screen.id === "not-found"
       ? "Not found"
-      : screen.id === "share"
-        ? "Shared request"
-        : short(SCREENS.find((s) => s.id === screen.id)?.name ?? screen.id)
+      : short(SCREENS.find((s) => s.id === screen.id)?.name ?? screen.id)
     : matchFlowRoute(pathname).screen;
-  // A shared link carries its token in the address: the assistant never gets it (FR-HIL-12).
-  return { label, route: screen?.id === "share" ? "/share" : pathname, record };
+  return { label, route: pathname, record };
 }
 
 /** The world a path belongs to, for reading its selection (null off a world). */

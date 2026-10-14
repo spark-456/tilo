@@ -34,7 +34,6 @@ const KEPT = [
   "/pinboards",
   "/calendar",
   "/more",
-  "/share/abc",
   "/worlds/replays",
   "/team/console",
   "/screens",
