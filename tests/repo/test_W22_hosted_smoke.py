@@ -7,7 +7,10 @@ Firebase config showing "Sign-in is off") must be asserted by name, and the rele
 
 from __future__ import annotations
 
+import json
+import os
 import re
+import subprocess
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -59,3 +62,35 @@ def test_W22_recipe_accepts_only_a_hosting_origin_and_is_documented():
     assert "web\.app" in body and "firebaseapp" in body
     assert "playwright.hosted.config.ts" in body
     assert "## Hosted smoke" in _read(REPO_ROOT / "docs/deploy-dev.md")
+
+
+def test_W22_WIN_recipe_passes_url_and_failure_without_network(tmp_path):
+    """Run the real recipe with a fake pnpm; never start a browser or contact Hosting."""
+    capture = tmp_path / "capture.json"
+    stub = tmp_path / "stub.cjs"
+    stub.write_text(
+        "require('node:fs').writeFileSync(process.env.W22_CAPTURE, JSON.stringify({"
+        "url:process.env.TILO_SMOKE_URL,cwd:process.cwd(),args:process.argv.slice(2)}));"
+        "process.exit(7);",
+        encoding="utf-8",
+    )
+    launcher = tmp_path / ("pnpm.cmd" if os.name == "nt" else "pnpm")
+    launcher.write_text(
+        f'@node "{stub}" %*\n' if os.name == "nt" else f'#!/bin/sh\nnode "{stub}" "$@"\n',
+        encoding="utf-8",
+    )
+    launcher.chmod(0o755)
+    env = {**os.environ, "PATH": f"{tmp_path}{os.pathsep}{os.environ['PATH']}", "W22_CAPTURE": str(capture)}
+    result = subprocess.run(
+        ["just", "--justfile", str(REPO_ROOT / "justfile"), "smoke-hosted", "https://w22-test.web.app"],
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    assert capture.exists(), result.stdout + result.stderr
+    recorded = json.loads(capture.read_text(encoding="utf-8"))
+    assert recorded["url"] == "https://w22-test.web.app"
+    assert Path(recorded["cwd"]) == REPO_ROOT / "apps/web"
+    assert recorded["args"] == ["exec", "playwright", "test", "--config", "playwright.hosted.config.ts"]
+    assert result.returncode != 0, "a failed smoke must fail the recipe"
