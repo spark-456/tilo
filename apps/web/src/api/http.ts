@@ -409,7 +409,7 @@ export class HttpClient implements TiloClient, SchedulesApi, FieldsApi, ItemApi 
         files: File[];
         mode: "quick" | undefined;
         key: string;
-        pending?: Promise<IntakeResult | QuickIntakeResult>;
+        pending?: Promise<IntakeResult | QuickIntakeResult> | undefined;
       }
     | undefined;
 
