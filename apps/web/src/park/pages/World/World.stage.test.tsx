@@ -120,10 +120,19 @@ describe("WEB_CUTOVER_world_stage: a live-source world links its stage", () => {
     expect(goCalls(rig.app)).toBe(0);
   });
 
-  it("WEB_CUTOVER_world_stage_live_a_town_and_a_village_still_have_no_live_view", async () => {
+  // LIVE-QA-1 (9b382ba2, the user's order): every live world, whatever its size, has the live view and the lenses.
+  it("LIVE_QA_1_world_stage_live_a_town_and_a_village_also_have_the_live_view_and_lenses", async () => {
     for (const id of ["northline", "calls"]) {
       const { el } = await mountWorld({ id, api: liveWorldsApi() });
-      expect(pageText(el), id).not.toContain("Open live view");
+      const live = control(el, "Open live view");
+      expect(live.tagName, id).toBe("A");
+      expect(live.getAttribute("href"), id).toBe(`/world/${id}/stage`);
+      const hrefs = qa<HTMLAnchorElement>(lensNav(el), "a").map((a) => a.getAttribute("href"));
+      expect(hrefs.slice(0, 3), id).toEqual([
+        `/world/${id}/story`,
+        `/world/${id}/trace`,
+        `/world/${id}/delivery`,
+      ]);
       cleanup();
     }
   });

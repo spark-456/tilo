@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { TiloApiError } from "../../../api/http";
+import { TiloApiError } from "../../api/hostCopy";
 import { type ProposalClient, readProposals, reviewProposal } from "../../api/live/skillProposals";
 import type { SkillProposal } from "../../api/types";
 

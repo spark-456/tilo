@@ -2,11 +2,15 @@
 import { afterEach, expect, it } from "vitest";
 import { cleanup, renderAgenda } from "../../../../test-support/park/agendaHarness";
 import { createLiveApi } from "../../api/liveApi";
+import { ORGANISATION_SETUP } from "../../api/organisationSetup";
 
 afterEach(cleanup);
-it("PE_26 W2 no person record shows empty Agenda work without a load error", async () => {
+// LIVE-PEOPLE (b80c2b50): no person record means the organisation is not founded yet, and the Agenda says so
+// ("Set up your organisation") instead of claiming an empty plate; it is still not a load error.
+it("PE_26 W2 no person record shows the organisation setup state without a load error", async () => {
   const { container } = await mount({ detail: "Not Found" }, 404);
-  expect(container.textContent).toContain("Nothing on your plate");
+  expect(container.textContent).toContain(ORGANISATION_SETUP);
+  expect(container.textContent).not.toContain("Nothing on your plate");
   expect(container.textContent).not.toMatch(/The Agenda could not load|Prepare notes|2026-10-09/);
 });
 const body = {

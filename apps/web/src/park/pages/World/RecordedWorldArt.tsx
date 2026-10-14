@@ -86,7 +86,7 @@ export function RecordedWorldArt({ events }: { events: readonly RunEvent[] }) {
               width="332"
               height={height - 8}
               rx="16"
-              fill="var(--surface, #fff)"
+              fill="var(--card)"
               stroke="currentColor"
             />
             <text x="20" y="34" fill="currentColor">

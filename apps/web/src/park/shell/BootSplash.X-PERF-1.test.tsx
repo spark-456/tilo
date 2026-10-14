@@ -4,6 +4,9 @@ import { createRoot } from "react-dom/client";
 import { expect, it, vi } from "vitest";
 import { BootSplash } from "./BootSplash";
 
+// The Park console guard (d141e731) fails on React's act() warning, so the test declares its act environment.
+(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+
 const eager = vi.hoisted(() => vi.fn());
 vi.mock("./prefetch", () => ({ prefetchPages: eager }));
 vi.mock("../app/context", () => ({ useSchedule: () => vi.fn() }));

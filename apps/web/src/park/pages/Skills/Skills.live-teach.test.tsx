@@ -80,9 +80,10 @@ const SAVED = {
 
 // the strings this ticket adds (flagged in the PR body)
 const SAVED_TOAST = "Saved “Match invoices”. It starts as Learning";
-const ERR_TRY = "Tilo had a problem on its side.";
+// M2-CODES-1 (5b57e7ef): a retryable 5xx on a POST may still have happened, so the page says it is unconfirmed.
+const ERR_TRY = "We could not confirm it. Reload before trying again.";
 const ERR_UNDERSTOOD = "Check the information and try again.";
-const NOT_CONNECTED = "Tilo had a problem on its side.";
+const NOT_CONNECTED = ERR_TRY;
 
 type Handler = (init: RequestInit) => Response | Promise<Response>;
 interface Server {
@@ -103,7 +104,11 @@ function rig(routes: Record<string, Handler> = {}): {
     ...routes,
   };
   const fetchSpy = vi.fn(async (url: unknown, init?: RequestInit) => {
-    const key = `${init?.method ?? "GET"} ${String(url).replace(BASE, "")}`;
+    // LIVE-SKILLS (FR-SKL-04, 4480648d): the library and Learn reads ask for the built-in catalogue, so the
+    // route key ignores that one query flag; the flag itself is pinned in liveApi.LIVE-SKILLS.test.ts.
+    const key = `${init?.method ?? "GET"} ${String(url)
+      .replace(BASE, "")
+      .replace(/\?include_builtin=true$/, "")}`;
     const hit = table[key];
     if (!hit) throw new Error(`unrouted ${key}`);
     return hit(init ?? {});
@@ -485,7 +490,7 @@ describe("SKILLS_5_live_teach: save (step 4)", () => {
     clickEl(control(r.el, "Save skill"));
     await settle();
     expect(toasts(r.app)).toEqual([
-      ["Couldn’t save “Match invoices”. Tilo had a problem on its side."],
+      ["Couldn’t save “Match invoices”. We could not confirm it. Reload before trying again."],
     ]);
     clickEl(control(r.el, "Save skill"));
     await settle();

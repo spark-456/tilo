@@ -7,7 +7,7 @@ import { type ChangeEvent, type ReactNode, useEffect, useRef, useState } from "r
 // Undo), navigation inside the Park app is app.go, and the links to the live stage and its lenses are real
 // addresses the browser follows, but only for a world whose data came from the live API: a sample world has no
 // recorded run, so the same elements are disabled with the reason (docs/park-designed-not-in-prd/World.md).
-import { HOST_NOT_CONNECTED_TEXT } from "../../../api/connect";
+import { HOST_NOT_CONNECTED_TEXT } from "../../api/hostCopy";
 import { createRoomClient } from "../../api/live/meetingHall";
 import { downloadResult, hasResultReader } from "../../api/results";
 import type {
