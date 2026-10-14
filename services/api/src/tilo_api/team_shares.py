@@ -94,20 +94,41 @@ def _log(writer: deps.EventWriter, world_id: str, actor: str, team: str, state: 
                 raise
 
 
-def _grant(shares: Any, wanted: dict[str, Any], owner: str) -> Stored:
+def _grant(shares: Any, wanted: dict[str, Any], owner: str, directory: Directory, now: str) -> tuple[Stored, bool]:
     """Creates the record, keeps the owner's own standing grant (a retry never restamps it), or replaces a revoked
-    one or one a previous owner granted."""
+    one, one a previous owner granted, or one that has lapsed (the owner left the team and came back, F1). The flag
+    is True when this request wrote the record: only then may a failed event take it back (F2)."""
     for _ in range(_ATTEMPTS):
         held = shares.get(deps.ORG_ID, wanted["id"])
         try:
             if held is None:
-                return shares.create(wanted)
-            if held.record["revoked"] is None and held.record["granted_by"]["by"] == owner:
-                return held
-            return shares.replace(wanted, expected_version=held.version)
+                return shares.create(wanted), True
+            if in_force(held.record, owner, directory, now):
+                return held, False
+            return shares.replace(wanted, expected_version=held.version), True
         except (AlreadyExists, VersionConflict, NotFound):
             continue  # a racing writer: read again
     raise _unavailable()
+
+
+def _take_back(shares: Any, stored: Stored, owner: str, now: str) -> None:
+    """Nothing is shared without its event (F3): delete the record this request wrote, retried; if the delete keeps
+    failing, stamp the revocation by compare-and-set (fail closed, the share is withdrawn, no event); if that too
+    fails the share stays and the case is the residual listed in BQ-TEAMWORLD-3."""
+    share_key = stored.record["id"]
+    version = stored.version
+    for _ in range(_ATTEMPTS):
+        try:
+            shares.delete(deps.ORG_ID, share_key, expected_version=version)
+            return
+        except (NotFound, VersionConflict):
+            return  # gone, or someone else already replaced it: not this request's to remove
+        except Exception:
+            continue
+    try:
+        shares.replace({**stored.record, "revoked": {"by": owner, "at": now}}, expected_version=version)
+    except Exception:
+        logger.error("world share not removed or revoked after a failed event share=%s", share_key)
 
 
 def _answer(response: Response, world_id: str, team: str, state: str, now_in_force: bool) -> dict[str, Any]:
@@ -208,7 +229,7 @@ def put_team_share(
         directory = _directory(people)
         if not directory.is_member(owner, team, now):
             raise HTTPException(status_code=403, detail="forbidden")
-        stored = _grant(people.world_shares, wanted, owner)
+        stored, created = _grant(people.world_shares, wanted, owner, directory, now)
     except HTTPException:
         raise
     except Exception:
@@ -217,10 +238,8 @@ def put_team_share(
         _log(writer, world_id, owner, team, "on", dict(stored.record))
     except Exception as exc:
         logger.warning("world share event not written (%s) world=%s team=%s", type(exc).__name__, world_id, team)
-        try:  # nothing is shared without its event
-            people.world_shares.delete(deps.ORG_ID, wanted["id"], expected_version=stored.version)
-        except Exception:
-            logger.error("world share not removed after a failed event world=%s team=%s", world_id, team)
+        if created:  # a standing share keeps standing: the retry writes the event only (F2)
+            _take_back(people.world_shares, stored, owner, now)
         raise _unavailable() from None
     logger.info("world_share state=on world=%s team=%s by=%s", world_id, team, owner)
     return _answer(response, world_id, team, "on", in_force(stored.record, world.owner, directory, now))

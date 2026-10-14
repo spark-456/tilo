@@ -45,4 +45,5 @@ export { team } from "./team";
 export { teamPolicy } from "./teamPolicy";
 export { LEVELS, TIERS } from "./tiers";
 export { today, user } from "./user";
+export { userSettings } from "./userSettings";
 export { makeWorld, needsLeft, plans, worlds } from "./worlds";

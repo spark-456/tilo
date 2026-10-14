@@ -41,6 +41,9 @@ export interface ParkProviderProps {
   /** ADR-0035 L6d: the fields calls of a world's cards. Default: the signed-in person's own API on a configured
    * deployment (never a demo session), none otherwise; a test hands one in. */
   fields?: FieldsFor | null;
+  /** QA-DEMO-1: a demo session on a configured deployment (anonymous sign-in): its data is recorded sample data, so a
+   * start and an approval are explained, never simulated. Default: no injected Api, a url and an anonymous session. */
+  demo?: boolean;
   children: ReactNode;
 }
 
@@ -51,6 +54,8 @@ interface Held {
   schedule: Schedule;
   /** The default Api is the fixture one, so every page will read sample data (no injected Api, no url). */
   expectsSample: boolean;
+  /** QA-DEMO-1: a demo session on a configured deployment (see `ParkProviderProps.demo`). */
+  demo: boolean;
   firstRun: FirstRun;
 }
 
@@ -106,6 +111,7 @@ export function ParkProvider({
   schedule,
   viewport,
   fields,
+  demo: demoProp,
   children,
 }: ParkProviderProps) {
   const [fieldsFor] = useState<FieldsFor | null>(() =>
@@ -120,10 +126,12 @@ export function ParkProvider({
     let store: ParkStore | null = null;
     const wrapped = noting(raw, (source) => store?.noteSource(source));
     const timer = schedule ?? realSchedule;
+    const demo = demoProp ?? (api === undefined && Boolean(API_URL?.trim()) && sessionView.demo());
     store = createParkStore({
       api: wrapped,
       navigate: navigate ?? navigatePark,
       schedule: timer,
+      demo,
     });
     const expectsSample = api === undefined && (!API_URL || sessionView.demo());
     const firstRun = createFirstRun(wrapped, store, expectsSample);
@@ -152,6 +160,7 @@ export function ParkProvider({
             ? new HttpClient({ baseUrl: API_URL, appCheckToken, authToken })
             : null,
       expectsSample,
+      demo,
       firstRun,
     };
   });
@@ -189,6 +198,9 @@ export function ParkProvider({
   );
 }
 
+/** UI-10: legacy Settings can use Park preferences before its shell cutover lands. */
+export const useHasParkProvider = (): boolean => useContext(HeldContext) !== null;
+
 function useHeld(): Held {
   const held = useContext(HeldContext);
   if (!held) throw new Error("ParkProvider is missing");
@@ -202,6 +214,9 @@ export const useFirstRunController = (): FirstRun => useHeld().firstRun;
 export const useWorldClient = (): HttpClient | null => useHeld().worldClient;
 /** The provider's timer: a page that waits (the Home composer's 900 ms) goes through it, never setTimeout. */
 export const useSchedule = (): Schedule => useHeld().schedule;
+
+/** QA-DEMO-1: this is a demo session (recorded sample data): starts and approvals are explained, never simulated. */
+export const useDemoSession = (): boolean => useHeld().demo;
 
 /** True when the Sample data chip is going to show (the fixture Api is the default), so its place can be kept. */
 export const useExpectsSample = (): boolean => useHeld().expectsSample;

@@ -94,7 +94,13 @@ async function liveApi(own: string | null = W): Promise<Api> {
   const first = (await api.getWorlds({}, [])).data[0];
   if (!first) throw new Error("fixture world missing");
   api.getWorlds = async () => ({
-    data: own ? [{ ...first, id: own, name: "Launch plan", sample: false }] : [],
+    // TSW-4b: with no world of their own the list carries `W` as a teammate's (`access: "team"`); a live id the list
+    // does not carry is a missing world with no request.
+    data: [
+      own
+        ? { ...first, id: own, name: "Launch plan", sample: false }
+        : { ...first, id: W, name: "Launch plan", sample: false, access: "team" as const },
+    ],
     source: "live",
   });
   api.getTeam = async () => people;

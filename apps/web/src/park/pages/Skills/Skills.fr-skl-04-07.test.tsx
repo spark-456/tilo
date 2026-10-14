@@ -197,6 +197,15 @@ describe("FR-SKL-06: Trust and pause", () => {
     expect(pageText(help)).not.toContain("Trusted. Tilo stops asking before routine steps.");
   });
 
+  it("W10_FR_SKL_05_demo_edit_steps_says_nothing_opened_or_changed", async () => {
+    const rig = await mountSkills();
+    clickEl(control(librarySection(rig.el), "Edit steps"));
+    expect(toasts(rig.app)).toContainEqual([
+      "Sample data: step editing is not available yet, so nothing was changed.",
+    ]);
+    expect(pageText(rig.el)).not.toContain("Step editor opens here");
+  });
+
   it("test_FR_SKL_06_pause_and_resume_and_paused_skill_never_starts", async () => {
     const rig = await mountSkills();
     const lib = librarySection(rig.el);
@@ -205,7 +214,7 @@ describe("FR-SKL-06: Trust and pause", () => {
     clickEl(control(lib, "Pause"));
     expect(pageText(lib)).toContain("FINANCE · PAUSED");
     expect(toasts(rig.app)).toContainEqual([
-      "“Match invoices to purchase orders” is paused. Worlds using it will ask you instead",
+      "Sample data: “Match invoices to purchase orders” is paused on this page only. Nothing changed for your worlds",
     ]);
 
     // While paused, "Test run" is disabled and clicking it never starts a run
@@ -219,12 +228,12 @@ describe("FR-SKL-06: Trust and pause", () => {
     clickEl(control(lib, "Resume"));
     expect(pageText(lib)).toContain("FINANCE · TRUSTED");
     expect(toasts(rig.app)).toContainEqual([
-      "“Match invoices to purchase orders” is running again",
+      "Sample data: “Match invoices to purchase orders” is shown as running again on this page only",
     ]);
     expect(isDisabled(control(lib, "Test run"))).toBe(false);
     clickEl(control(lib, "Test run"));
     expect(toasts(rig.app)).toContainEqual([
-      "Test run started on yesterday’s data. Results in about a minute",
+      "Test runs are not connected yet. Nothing was started.",
     ]);
   });
 });

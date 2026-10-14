@@ -155,6 +155,23 @@ const gate = () => {
 };
 
 describe("SKILLS_5_live_teach: describe it (step 1)", () => {
+  it("FR_SKL_01_W11_describing_announces_loading_until_the_capture_finishes", async () => {
+    const g = gate();
+    const { mount } = rig({ "POST /v1/skills/captures": () => g.waiting });
+    const r = await mount();
+    typeInto(describeField(r.el), "Check the mail");
+    clickEl(control(r.el, "Read my description"));
+    await settle();
+    const pending = r.el.querySelector("output");
+    expect(pending).not.toBeNull();
+    expect(pending?.textContent).toBe("Reading your description…");
+    expect(isDisabled(control(r.el, "Read my description"))).toBe(true);
+    g.release(json(CAPTURED, 201));
+    await settle();
+    expect(r.el.querySelector("output")).toBeNull();
+    expect(text(r)).toContain("Note the total");
+  });
+
   it("SKILLS_5_live_teach_the_first_step_is_an_empty_describe_box_and_no_sample_content", async () => {
     const r = await rig().mount();
     expect(describeField(r.el).value).toBe("");
@@ -170,9 +187,26 @@ describe("SKILLS_5_live_teach: describe it (step 1)", () => {
     const { server, mount } = rig();
     const r = await mount();
     expect(isDisabled(control(r.el, "Read my description"))).toBe(true);
+    // W10: an empty box says what is missing instead of a silent, unexplained off button.
+    expect(text(r)).toContain("Write a sentence about the work first");
+    typeInto(describeField(r.el), "Check the invoice mail");
+    expect(text(r)).not.toContain("Write a sentence about the work first");
+    typeInto(describeField(r.el), "");
     clickEl(control(r.el, "Read my description"));
     await settle();
     expect(server.posts("/v1/skills/captures")).toEqual([]);
+  });
+
+  it("W10_FR_SKL_05_signed_in_library_disables_pause_and_edit_steps_and_says_why", async () => {
+    const { mount } = rig({ "GET /v1/skills": () => json({ skills: [SAVED] }) });
+    const r = await mount();
+    const why = "Pausing and editing steps are not available from this page yet.";
+    expect(isDisabled(control(r.el, "Pause"))).toBe(true);
+    expect(isDisabled(control(r.el, "Edit steps"))).toBe(true);
+    expect(pageText(r.el)).toContain(why);
+    clickEl(control(r.el, "Pause"));
+    clickEl(control(r.el, "Edit steps"));
+    expect(toasts(r.app)).toEqual([]);
   });
 
   it("SKILLS_5_live_teach_reading_posts_the_text_and_shows_the_servers_captured_steps", async () => {

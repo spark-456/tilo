@@ -7,16 +7,20 @@ the artifact contract's existing limits and authoritative stored screening.
 Flagged or unscreened versions are excluded from brief sources. Archive entries
 contain redacted upload metadata and hashes; artifact.created traces cite them.
 Upload artifact versions have no archive sources (AR-03).
-If archival cannot preserve an originally flagged/unscreened verdict, intake
-refuses rather than publishing an upgraded artifact record.
+The archive metadata and intake result carry the same stored verdict by construction;
+neither can upgrade a flagged or unscreened version to clean.
 
 Invalid UTF-8 CSV, empty files, bad magic and extraction failures receive per-file
 refusals before any put. Office versions record the converted-text safety verdict;
 native media and CSV use the store's existing screening path, once per file.
+When every file lacks a stored safety verdict, intake returns 503 before the Director
+and attempts cleanup of its prepared versions; mixed batches retain per-file failures.
 
 Completed versions are cleaned up on pre-commit refusals. After a task persistence
-failure, cleanup first reads the task/world: landed commits and failed reads retain
-owned versions, as does cancellation during a commit. Abort invalidates prepared
+failure, 503/WriterBusy/unknown errors and cancellation retain owned versions:
+a timed-out commit can land after an empty read. Only definite 429/409 refusals
+attempt cleanup, after a task/world read; landed commits and failed reads retain
+the versions. Abort invalidates prepared
 references so a same-key retry rebinds and screens fresh versions.
 Archive attempt metadata is append-only. Partial backend puts and failed cleanup
 retain the store's existing repair/retention semantics; this is not a cross-store

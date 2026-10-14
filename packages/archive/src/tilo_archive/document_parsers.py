@@ -21,10 +21,21 @@ class Refused(ValueError):
 
 
 @dataclass(frozen=True)
+class DocumentRead:
+    """Inert cited text and parser capabilities; no safety or understanding verdict."""
+
+    fragments: tuple[tuple[str, str], ...]
+    read: tuple[str, ...]
+    skipped: tuple[str, ...]
+
+
+@dataclass(frozen=True)
 class Limits:
     input_bytes: int = 4 * 1024 * 1024
     expanded_bytes: int = 16 * 1024 * 1024
     entries: int = 256
+    cells: int = 4096
+    paragraphs: int = 2048
     nesting: int = 2
     path_depth: int = 16
     ratio: int = 100
@@ -41,6 +52,8 @@ class Limits:
                 self.input_bytes,
                 self.expanded_bytes,
                 self.entries,
+                self.cells,
+                self.paragraphs,
                 self.path_depth,
                 self.ratio,
                 self.xml_nodes,
@@ -54,10 +67,8 @@ class Limits:
         if type(self.nesting) is not int or self.nesting < 0:
             raise ValueError("invalid_limits")
         maxima = Limits()
-        if any(
-            value > (32 * 1024 * 1024 if name == "expanded_bytes" else getattr(maxima, name))
-            for name, value in vars(self).items()
-        ):
+        ceilings = {"expanded_bytes": 32 * 1024 * 1024, "cells": 8192, "paragraphs": 4096}
+        if any(value > ceilings.get(name, getattr(maxima, name)) for name, value in vars(self).items()):
             raise ValueError("invalid_limits")
 
 
@@ -249,11 +260,14 @@ def parse_docx(data: bytes, *, limits: Limits = Limits()) -> tuple[tuple[str, st
         word + "document",
     )
     output: list[tuple[str, str]] = []
-    size = 0
+    size = paragraphs = 0
     for name, root in roots:
         if not name.startswith("word/"):
             continue
         for index, paragraph in enumerate(root.iter(word + "p"), 1):
+            paragraphs += 1
+            if paragraphs > limits.paragraphs:
+                raise Refused("paragraph_count")
             text = "".join(node.text or "" for node in paragraph.iter(word + "t"))
             size += len(text)
             if size > limits.output_chars:
@@ -301,8 +315,8 @@ def parse_xlsx(data: bytes, *, limits: Limits = Limits()) -> tuple[tuple[str, st
         seen: set[str] = set()
         for cell in root.iter(sheet + "c"):
             cells += 1
-            if cells > limits.entries:
-                raise Refused("entry_count")
+            if cells > limits.cells:
+                raise Refused("cell_count")
             ref = cell.get("r", "")
             if not re.fullmatch(r"[A-Z]{1,3}[1-9][0-9]{0,6}", ref) or ref in seen:
                 raise Refused("invalid_spreadsheet")
@@ -349,8 +363,8 @@ def parse_pptx(data: bytes, *, limits: Limits = Limits()) -> tuple[tuple[str, st
             raise Refused("invalid_presentation")
         for index, paragraph in enumerate(root.iter(drawing + "p"), 1):
             paragraphs += 1
-            if paragraphs > limits.entries:
-                raise Refused("entry_count")
+            if paragraphs > limits.paragraphs:
+                raise Refused("paragraph_count")
             text = "".join(
                 "\n" if node.tag == drawing + "br" else node.text or ""
                 for node in paragraph.iter()
@@ -364,34 +378,108 @@ def parse_pptx(data: bytes, *, limits: Limits = Limits()) -> tuple[tuple[str, st
     return tuple(output)
 
 
+def _csv_cell_preflight(text: str, limit: int) -> None:
+    """Count cells before csv.reader can allocate a large row, without a row list.
+
+    Match its fixed comma/double-quote dialect; syntax validation stays with the
+    reader. Quoted newlines/commas and doubled quotes remain inert cell text.
+    """
+    cells = index = 0
+    quoted = active = False
+    field_start = True
+    while index < len(text):
+        char = text[index]
+        if quoted:
+            if char == '"':
+                if index + 1 < len(text) and text[index + 1] == '"':
+                    index += 2
+                    continue
+                quoted = False
+        else:
+            if not active:
+                cells += 1  # includes a blank logical row
+                active = True
+            if char == ",":
+                cells += 1
+                field_start = True
+            elif char in "\r\n":
+                active = False
+                field_start = True
+                if char == "\r" and index + 1 < len(text) and text[index + 1] == "\n":
+                    index += 1
+            else:
+                quoted = char == '"' and field_start
+                field_start = False
+            if cells > limit:
+                raise Refused("cell_count")
+        index += 1
+
+
 def parse_csv(data: bytes, *, limits: Limits = Limits()) -> tuple[tuple[str, str], ...]:
     """Read comma-separated UTF-8 cells as inert text, with logical row/cell labels.
 
     No dialect/encoding guesses, formula evaluation or global CSV limit changes.
-    The entry budget counts every cell, including empty cells; blank rows count too.
+    The cell budget counts every cell, including empty cells; blank rows count too.
     Python's CSV field-size limit also applies and yields a stable refusal.
     """
     limits.validate()
     if len(data) > limits.input_bytes:
         raise Refused("input_size")
+    text = None
     try:
         text = data.decode("utf-8-sig")
     except UnicodeError:
-        raise Refused("invalid_encoding") from None
+        pass
+    if text is None:
+        raise Refused("invalid_encoding")
     if "\x00" in text:
         raise Refused("invalid_csv")
+    _csv_cell_preflight(text, limits.cells)
     output: list[tuple[str, str]] = []
     entries = size = 0
     try:
         for row_index, row in enumerate(csv.reader(io.StringIO(text, newline=""), strict=True), 1):
             entries += max(1, len(row))
-            if entries > limits.entries:
-                raise Refused("entry_count")
+            if entries > limits.cells:
+                raise Refused("cell_count")
             for column, cell in enumerate(row, 1):
                 size += len(cell)
                 if size > limits.output_chars:
                     raise Refused("output_size")
                 output.append((f"csv#r{row_index}c{column}", cell))
     except csv.Error:
-        raise Refused("invalid_csv") from None
-    return tuple(output)
+        pass
+    else:
+        return tuple(output)
+    raise Refused("invalid_csv")
+
+
+def read_document(data: bytes, *, kind: str, limits: Limits = Limits()) -> DocumentRead:
+    """Return explicit coverage only after parsing succeeds, with original citations.
+
+    Kind is chosen by the caller's type gate, never inferred from an uploaded name.
+    Coverage describes capabilities, not a claim that each feature was present.
+    Returned text still requires safety screening and a quarantined reader.
+    """
+    read: tuple[str, ...]
+    skipped: tuple[str, ...]
+    match kind:
+        case "docx":
+            fragments = parse_docx(data, limits=limits)
+            read = ("Word paragraph text", "hidden text and comments")
+            skipped = ("page layout", "images", "altChunk payloads", "field evaluation")
+        case "xlsx":
+            fragments = parse_xlsx(data, limits=limits)
+            read = ("stored worksheet values", "hidden sheets", "cached formula values")
+            skipped = ("formula evaluation", "images", "charts", "styles and date interpretation", "layout")
+        case "pptx":
+            fragments = parse_pptx(data, limits=limits)
+            read = ("slide and table paragraphs", "hidden slides", "explicit line breaks")
+            skipped = ("speaker notes", "images", "layouts", "animation", "field evaluation")
+        case "csv":
+            fragments = parse_csv(data, limits=limits)
+            read = ("UTF-8 comma-separated cells", "quoted multiline and empty cells")
+            skipped = ("formula evaluation", "dialect and encoding inference")
+        case _:
+            raise Refused("unknown_type")
+    return DocumentRead(fragments, read, skipped)

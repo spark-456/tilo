@@ -2,6 +2,7 @@
 import { afterEach, expect, it, vi } from "vitest";
 import { makeApp } from "../../../../test-support/park/profileApp";
 import { createFixtureApi } from "../../api/fixtureApi";
+import { userSettings } from "../../api/fixtures";
 import { createLiveApi } from "../../api/liveApi";
 import { withSession } from "../../api/select";
 import {
@@ -44,10 +45,25 @@ it("LIVE_WIRING_1 null billing and sessions show unavailable panels without acti
   expect(last.getAttribute("aria-checked")).toBe("true");
 });
 
-it("LIVE_WIRING_1 signed-in profile uses identity and local toggles with only the costs read", async () => {
+it("LIVE_WIRING_1 signed-in profile uses identity and draft toggles with the costs, settings and on-demand team reads", async () => {
+  // FR-SET-01: nothing saved yet (version 0), so the form starts from the sign-in identity.
+  const unsaved = { ...userSettings, version: 0, updated_at: null };
+  const costs = { totals: { usd: 18 }, by_profile: [], by_task_type: [] };
+  const team = {
+    you: "u_ana",
+    people: [{ id: "u_ana", display_name: "Ana Silva", org_role: "owner" }],
+  };
   const fetch = vi.fn(
-    async (_url: RequestInfo | URL) =>
-      new Response(JSON.stringify({ totals: { usd: 18 }, by_profile: [], by_task_type: [] })),
+    async (url: RequestInfo | URL, _init?: RequestInit) =>
+      new Response(
+        JSON.stringify(
+          String(url).endsWith("/v1/me/settings")
+            ? unsaved
+            : String(url).endsWith("/v1/people")
+              ? team
+              : costs,
+        ),
+      ),
   );
   const api = withSession(createLiveApi({ baseUrl: "https://api.example", fetch }), {
     demo: () => false,
@@ -64,9 +80,15 @@ it("LIVE_WIRING_1 signed-in profile uses identity and local toggles with only th
   await clickAndSettle(switchNamed(root, "Quiet hours"));
   await openTab(root, "Plan and billing");
   expect(text(root)).toContain("$18");
+  expect(text(root)).toContain("1 seat");
   expect(text(root)).not.toContain("£18");
   await openTab(root, "Notifications");
   expect(switchNamed(root, "Quiet hours").getAttribute("aria-checked")).toBe("false");
-  expect(fetch).toHaveBeenCalledTimes(1);
-  expect(String(fetch.mock.calls[0]?.[0])).toBe("https://api.example/costs");
+  expect(fetch.mock.calls.map((c) => String(c[0])).sort()).toEqual([
+    "https://api.example/costs",
+    "https://api.example/v1/me/settings",
+    "https://api.example/v1/people",
+  ]);
+  const verbs = fetch.mock.calls.map((c) => (c[1] as RequestInit | undefined)?.method ?? "GET");
+  expect(verbs, "reads only: no PUT").toEqual(["GET", "GET", "GET"]);
 });

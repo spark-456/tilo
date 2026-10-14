@@ -33,12 +33,15 @@ enabling attendance. Infrastructure apply and live switches stay with the user.
 After the bot PRs are reviewed and merged, add `-var=meet_bot_enabled=true` to
 CX-MERGE's complete saved-plan command for the optional bot follow-up. Keep every
 existing variable/backend setting; do not plan with only the bot flag. The flag
-does not exist on phase0-stack until this change is merged. If the plan contains
-any destroy, stop and ask before applying. Only the user applies the saved plan.
+is already defined in `infra/envs/dev/variables.tf` and defaults to false. If the
+plan contains any destroy or replacement, stop and ask before applying. Only the
+user applies the reviewed saved plan.
 
-The agent has already built and verified the final spoken image below. Reuse its
-digest; there is no additional build for the user to run. After the optional bot
-infrastructure has been applied, deployment can use these exact dev-only commands:
+The image below has recorded offline verification for the source version noted
+after the command block. Reuse it only if that version is the cleared deployment
+target; newer runtime changes need their own image verification by CX-MERGE-A.
+After the optional bot infrastructure has been applied, A can deploy this verified
+version with these dev-only commands:
 
 ```powershell
 $P = 'essential-wares-510320-f0'
@@ -50,8 +53,9 @@ $Api = gcloud run services describe tilo-api --project=$P --region=$R --format='
 ```
 
 Cloud Build `a2b73e0f-c1a1-4945-8e7b-ae9a2ba29769` verified this digest from
-runtime source `be6cbc43`. Subsequent branch commits change operator documentation
-only. Do not deploy it before review or enable LIVE before the user's price review.
+runtime source `be6cbc43`. That verification applies to this exact digest, not to
+later runtime changes on phase0-stack. CX-MERGE-A must check the cleared source and
+image evidence before deployment. Do not enable LIVE before the user's price review.
 
 The optional service has internal ingress, only the API's invoker grant, zero idle
 instances, one active request/instance, 2 CPUs/4 GiB and a 3600-second deadline. It
@@ -104,6 +108,24 @@ the transcript is the saved notes. The existing join limiter is per API process.
 A crash or owner edit during failed capture can leave `joining` needing operator
 recovery; this slice does not add a durable lease/reaper. Cloud anti-automation,
 admission selectors, microphone routing and heard audio remain unverified live.
+
+## End the acceptance test — user only
+
+Limit the acceptance sitting to ten minutes. After **Tilo leave**, remove LIVE
+even if attendance failed; use a second terminal if the attendance command is
+still open. Restore `$P` and `$R` from the deployment block above, then run:
+
+```powershell
+foreach ($serviceName in @('tilo-meet-bot', 'tilo-api', 'tilo-connectors')) {
+  gcloud run services update $serviceName --project=$P --region=$R --remove-env-vars=LIVE
+  if ($LASTEXITCODE -ne 0) { throw "Could not disable $serviceName; stop and report" }
+}
+```
+
+API LIVE is process-wide; include connectors if it was activated for hosting.
+Confirm each service is Ready and has no LIVE variable, then check the bot has no
+active attendance and scales to zero. Keep the transcript reference and human-heard
+result. A failed launch needs state inspection before another attendance request.
 
 ## Local account fallback
 

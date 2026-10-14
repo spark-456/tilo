@@ -64,6 +64,6 @@ Changing a frozen contract (ADR first); applying infrastructure or spending mone
 - `just check-fast` — format + lint + tests, used by `.claude/hooks/stop_check.py`, under 2 minutes
 - `just test` — all Python and JS test suites
 - `just fmt` / `just lint` / `just typecheck` — individual gate steps
-- `just eval` — run the eval harness (not built yet; prints a message and exits 0 until P3)
+- `just eval` — run the full replay eval set without paid calls; write `evals/results.local.md` (git-ignored). Exit 0 when all cases pass, 1 on a failed case, 2 on an error, or 3 at the credit cap (EFF-07).
 - `just skills-test` — run `skills/` tests (FR-AGT-04); passes with none present
 - `just deploy dev` — refuses anything but `dev`, and infra isn't applied yet either way (ticket P0-07)

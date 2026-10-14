@@ -106,7 +106,8 @@ const teamOf = (memberships: string[]) => ({
   source: "live" as const,
 });
 
-/** The fixture Api with a live world list: `own` ids are this person's worlds; the rest are not. */
+/** The fixture Api with a live world list as `GET /worlds` serves it: `own` is this person's world, or, with
+ * `null`, the list carries `W` as a teammate's (`access: "team"`, TSW-4b) and nothing of their own. */
 async function liveApi(
   memberships: string[] = ["tm_launch", "tm_ops"],
   own: string | null = W,
@@ -116,7 +117,9 @@ async function liveApi(
   const first = listed.data[0];
   if (!first) throw new Error("fixture world missing");
   api.getWorlds = async () => ({
-    data: own ? [{ ...first, id: own, name: "Launch plan", sample: false }] : [],
+    data: own
+      ? [{ ...first, id: own, name: "Launch plan", sample: false }]
+      : [{ ...first, id: W, name: "Launch plan", sample: false, access: "team" as const }],
     source: "live",
   });
   api.getTeam = async () => teamOf(memberships);
@@ -213,15 +216,25 @@ describe("BQ_CTX_TEAMWORLD a teammate's read-only world", () => {
     expect(el.textContent).toContain("Items added before it was shared stay personal");
   });
 
-  it("FR_TEAM_03 a world the person may not read is an ordinary missing world", async () => {
-    const { el } = await page(
-      newServer({ world: 404 }),
-      await liveApi(["tm_launch"], null),
-      "w_nobody",
-    );
+  it("FR_TEAM_03 a world the list does not carry is an ordinary missing world, with no request", async () => {
+    const { el, calls } = await page(newServer(), await liveApi(["tm_launch"], null), "w_nobody");
     expect(el.textContent).toContain("World not found");
     expect(el.textContent).toContain("Tilo could not find that world.");
     expect(buttons(el)).toHaveLength(0);
+    expect(calls()).toEqual([]);
+  });
+
+  it("FR_TEAM_03 a team world whose share lapsed since the list is the same missing world", async () => {
+    const { el } = await page(newServer({ world: 404 }), await liveApi(["tm_launch"], null));
+    expect(el.textContent).toContain("World not found");
+    expect(el.textContent).not.toContain("Shared world");
+    expect(buttons(el)).toHaveLength(0);
+  });
+
+  it("FR_TEAM_03 a world listed as the person's own is not opened as a teammate's", async () => {
+    const own = await page(newServer(), await liveApi(["tm_launch"], W));
+    expect(own.el.textContent).not.toContain("Shared world");
+    expect(own.calls().some((c) => c === `GET /worlds/${W}`)).toBe(false);
   });
 
   it("FR_TEAM_03 a read that fails shows the failure and retries; nothing is invented", async () => {

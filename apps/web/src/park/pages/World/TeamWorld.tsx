@@ -3,7 +3,7 @@
 // Trace, Delivery) and the team's work items. It has no pause, answer, approve or share control and nothing on it
 // moves (HR-1: nothing is recorded in this world for a teammate's item). A world this person may not read, and one
 // that does not exist, are the same ordinary missing world. `TeamItems` is a read model: list rows, never a link.
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 import { type ShareClient, readSharedWorld, readTeamItems } from "../../api/live/teamShares";
 import type { WorkItemClient } from "../../api/live/workItems";
 import type { AppCtx } from "../../app/AppCtx";
@@ -106,11 +106,6 @@ export function TeamWorld({
 }: { client: ShareClient & WorkItemClient; worldId: string; app: AppCtx }) {
   const [view, reload] = useRead(() => readSharedWorld(client, worldId), [client, worldId]);
   const id = encodeURIComponent(worldId);
-  const crumb = (
-    <GoLink className="park-world-back" href="#worlds" onGo={() => app.go("worlds")}>
-      Worlds
-    </GoLink>
-  );
   let body = <output>Loading this world…</output>;
   let title = "World";
   if (view.status === "failed" && view.missing) {
@@ -151,16 +146,40 @@ export function TeamWorld({
     );
   }
   return (
+    <WorldShell app={app} worldId={worldId} title={title}>
+      {body}
+    </WorldShell>
+  );
+}
+
+function WorldShell({
+  app,
+  worldId,
+  title,
+  children,
+}: { app: AppCtx; worldId: string; title: string; children: ReactNode }) {
+  return (
     <div className="park-world-root" data-testid="park-page-world" data-world-id={worldId}>
       <PageSheet>
         <nav aria-label="Breadcrumb" className="park-world-crumb">
-          {crumb}
+          <GoLink className="park-world-back" href="#worlds" onGo={() => app.go("worlds")}>
+            Worlds
+          </GoLink>
         </nav>
         <h1 className="park-world-h1" tabIndex={-1}>
           {title}
         </h1>
-        {body}
+        {children}
       </PageSheet>
     </div>
+  );
+}
+
+/** A live id the person's own list does not carry (BQ-TEAMWORLD-8): the ordinary missing world, no request made. */
+export function MissingWorld({ worldId, app }: { worldId: string; app: AppCtx }) {
+  return (
+    <WorldShell app={app} worldId={worldId} title="World not found">
+      <p className="park-world-meta">Tilo could not find that world.</p>
+    </WorldShell>
   );
 }

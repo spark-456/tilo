@@ -195,11 +195,20 @@ async function settled(
 /** A script click on the nav tab `label`, starting the probe in the same task so t = 0 is the click. */
 const clickTab = (page: Page, label: string, restart = true) =>
   page.evaluate(
-    ({ label: name, restart: reset, sel }) => {
+    async ({ label: name, restart: reset, sel }) => {
       if (reset) (window as unknown as { __probe: { start(): void } }).__probe.start();
-      const tab = [...document.querySelectorAll(sel)].find(
+      let tab = [...document.querySelectorAll(sel)].find(
         (a) => (a.textContent ?? "").replace(/\d+$/, "").trim() === name,
       ) as HTMLElement | undefined;
+      if (!tab) {
+        // a phone has one page button that opens the menu of the six (QA-DEMO-1 B2). The click only sets React state,
+        // so the rows exist after the next task, not in this one.
+        (document.querySelector("button.park-shell__pagebtn") as HTMLElement | null)?.click();
+        await new Promise<void>((done) => setTimeout(done, 0));
+        tab = [...document.querySelectorAll('[role="menuitem"]')].find(
+          (a) => (a.textContent ?? "").replace(/Current page|\d+ decisions?/g, "").trim() === name,
+        ) as HTMLElement | undefined;
+      }
       if (!tab) throw new Error(`no tab named ${name}`);
       tab.click();
     },
@@ -237,11 +246,23 @@ const chrome = (recs: readonly AnimRec[]): AnimRec[] => recs.filter((r) => r.zon
 function expectCompositorOnly(recs: readonly AnimRec[]): void {
   for (const r of chrome(recs)) {
     for (const p of r.props) {
-      expect(["transform", "opacity"], `${r.zone} ${r.name} ${r.tag} animates ${p}`).toContain(p);
+      // background-color and color: the colour fades the user approved on 8 Oct (BQ-WEB-MOTION-3a), on the exact list
+      // that src/park/shell/motion3.micro.css.test.ts pins. Layout and paint properties (width, box-shadow, ...) stay out.
+      expect(
+        ["transform", "opacity", "backgroundColor", "color"],
+        `${r.zone} ${r.name} ${r.tag} animates ${p}`,
+      ).toContain(p);
     }
-    expect(r.blurred, `${r.zone} ${r.name} ${r.tag} is, or sits under, a backdrop-filter`).toBe(
-      false,
-    );
+    // A colour fade (BQ-WEB-MOTION-3a) may sit in the glass nav, which carries the backdrop-filter itself; the fading
+    // control must not carry one. Every other animation neither carries nor sits under one.
+    const colourOnly = r.props.every((p) => p === "backgroundColor" || p === "color");
+    if (colourOnly) {
+      expect(r.selfBlurred, `${r.zone} ${r.name} ${r.tag} carries a backdrop-filter`).toBe(false);
+    } else {
+      expect(r.blurred, `${r.zone} ${r.name} ${r.tag} is, or sits under, a backdrop-filter`).toBe(
+        false,
+      );
+    }
   }
 }
 
@@ -385,6 +406,21 @@ test("WEB-MOTION-2 e2e: after the splash has gone the page bundles of the other 
   test.setTimeout(90_000);
   const page = await newPage(browser, baseURL);
   const problems = collectConsoleProblems(page);
+  await page.addInitScript(() => {
+    // Vite's module graph can exceed the browser's default 250 resource entries.
+    performance.setResourceTimingBufferSize(2000);
+    // Observe removal in the mutation microtask, before module evaluation can delay
+    // the polling probe's next sample. Both timestamps use the resource timing clock.
+    let shown = false;
+    const observer = new MutationObserver(() => {
+      if (document.querySelector('[aria-label="Loading Tilo"]')) shown = true;
+      else if (shown) {
+        Reflect.set(window, "__prefetchSplashGoneAt", performance.now());
+        observer.disconnect();
+      }
+    });
+    observer.observe(document, { childList: true, subtree: true });
+  });
   await page.goto("/park/home");
   await booted(page);
   const names = (): Promise<{ name: string; start: number }[]> =>
@@ -400,9 +436,8 @@ test("WEB-MOTION-2 e2e: after the splash has gone the page bundles of the other 
       { timeout: 10_000, message: "the page bundles are never prefetched" },
     )
     .toBe(BUNDLES.length);
-  const { samples } = await readProbe(page);
-  const lastUp = samples.map((s) => s.splash !== null).lastIndexOf(true);
-  const goneAt = samples[lastUp + 1]?.t ?? Number.NaN;
+  const goneAt = await page.evaluate(() => Reflect.get(window, "__prefetchSplashGoneAt") as number);
+  expect(Number.isFinite(goneAt), "the splash removal must be observed").toBe(true);
   const early = (await names()).filter(
     (e) => BUNDLES.some((b) => e.name.includes(`/pages/${b}`)) && e.start < goneAt - 10,
   );
@@ -721,8 +756,9 @@ test("FR_UX_12 WEB-MOTION-2 e2e: with the 'still' motion preference (Profile > A
 // ignored). Every page mount and page change is in the tour. The budget is 200 ms (it was 150 ms at first, on the
 // supervisor's later ruling) because a city picture (kit.world) is one indivisible draw per city; to be tightened to
 // 100 ms with cached art in the phone pass (f).
-// Run: vite build --outDir <dir> then vite preview --outDir <dir> --port 5393, and
-//   TILO_WEB_PORT=5393 pnpm --filter @tilo/web exec playwright test e2e/park-motion-transitions.spec.ts -g "long task" ...
+// Run (Playwright builds and serves the production build itself on 127.0.0.1; a hand-started `vite preview` binds
+// `localhost` (IPv6 on Windows), which Playwright cannot see, and the run silently lands on the dev server):
+//   TILO_WEB_PROD=1 TILO_WEB_PORT=5393 pnpm --filter @tilo/web exec playwright test e2e/park-motion-transitions.spec.ts -g "CPU slowed 4x" --project=chromium --no-deps --workers=1
 const LONG_TASK_BUDGET_MS = 200;
 const EXTENSION_SCHEMES = ["chrome-extension://", "edge-extension://"] as const;
 

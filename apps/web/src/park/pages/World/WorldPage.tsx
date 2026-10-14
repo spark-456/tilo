@@ -18,7 +18,8 @@ import type {
   World,
 } from "../../api/types";
 import type { AppCtx } from "../../app/AppCtx";
-import { useParkApi, useWorldClient } from "../../app/context";
+import { NotFound } from "../../app/NotFound";
+import { useDemoSession, useParkApi, useWorldClient } from "../../app/context";
 import { stagePath } from "../../app/router";
 import {
   SLACK_NOTE_MAX,
@@ -37,7 +38,7 @@ import { MeetingHall } from "./MeetingHall";
 import { FactsCard, GoLink, LovableCard, SpendCard, WaitingCard } from "./Side";
 import { SkillProposals } from "./SkillProposals";
 import { ShareWithTeam } from "./TeamShare";
-import { TeamItems, TeamWorld } from "./TeamWorld";
+import { MissingWorld, TeamItems, TeamWorld } from "./TeamWorld";
 import "./World.css";
 import { cityArt, rowArt, singleArt } from "./worldArt";
 import {
@@ -147,9 +148,18 @@ function Frame({ children, worldId }: { children?: ReactNode; worldId?: string }
   );
 }
 
+// UI-10 B1: no run-now route and no result file exist yet, so a sample says it did nothing and a live world's
+// button says why it is off. Neither claims a run started or a result opened (HR-1).
+const SAMPLE_RUN = "Sample only: nothing was started. This demo world has no runner behind it.";
+const SAMPLE_OPEN =
+  "Sample only: nothing was opened. This demo world has no result file behind it.";
+const RUN_OFF = "Starting a run from this page is not connected yet. No run would start.";
+const OPEN_OFF = "This result has no file linked yet, so there is nothing to open.";
+
 export function WorldPage({ app }: { app: AppCtx }) {
   const api = useParkApi();
   const worldClient = useWorldClient();
+  const demo = useDemoSession(); // QA-DEMO-1: the sample company: labelled, and approving records nothing
   const [roomClient] = useState(createRoomClient);
   const [loaded, setLoaded] = useState<Loaded | "failed" | null>(null);
   const [paused, setPaused] = useState<Record<string, boolean>>({});
@@ -225,25 +235,25 @@ export function WorldPage({ app }: { app: AppCtx }) {
   }, [slackOpen]);
 
   if (loaded === null) return <Frame />;
-  // BQ-CTX-TEAMWORLD: a live id that is not one of this person's worlds is read as a teammate's, read only; the
-  // API answers 404 for a world they may not read, which is shown as a missing world.
+  // BQ-CTX-TEAMWORLD (BQ-TEAMWORLD-8): the list says whose a live world is. `access: "team"` is a teammate's, read
+  // only (the API's 404 for one since lapsed is the ordinary missing world); an id the list does not carry is a
+  // missing world too, never a guess.
   const wanted = app.params.id;
-  if (
-    loaded !== "failed" &&
-    loaded.live &&
-    worldClient &&
-    wanted &&
-    !loaded.worlds.some((x) => x.id === wanted) &&
-    !added.some((x) => x.id === wanted)
-  ) {
-    return <TeamWorld client={worldClient} worldId={wanted} app={app} />;
+  if (loaded !== "failed" && loaded.live && worldClient && wanted) {
+    const listed = loaded.worlds.find((x) => x.id === wanted);
+    if (listed?.access === "team")
+      return <TeamWorld client={worldClient} worldId={wanted} app={app} />;
+    if (!listed && !added.some((x) => x.id === wanted))
+      return <MissingWorld worldId={wanted} app={app} />;
   }
   const world =
     loaded === "failed"
       ? undefined
-      : (loaded.worlds.find((x) => x.id === app.params.id) ??
-        loaded.worlds.find((x) => !added.some((a) => a.id === x.id)) ??
-        loaded.worlds[0]);
+      : (loaded.worlds.find((x) => x.id === wanted) ??
+        (wanted
+          ? undefined
+          : (loaded.worlds.find((x) => !added.some((a) => a.id === x.id)) ?? loaded.worlds[0])));
+  if (loaded !== "failed" && wanted && !world) return <NotFound go={app.go} />;
   if (loaded === "failed" || !world) {
     return (
       <Frame>
@@ -273,10 +283,20 @@ export function WorldPage({ app }: { app: AppCtx }) {
   // A world has a stage only when its data came from the live API; a world started on this page is local state.
   const hasStage = loaded.live && !added.some((a) => a.id === w.id);
   const stage = (to: string): string | null => (hasStage ? to : null);
+  const real = hasStage && !demo; // a live world of a real account: its toasts may claim real outcomes
 
   const togglePause = () => {
     setPaused((p) => ({ ...p, [w.id]: !isPaused }));
-    app.toast(isPaused ? "Resumed. Agents are back at work" : "Paused. No spend while paused");
+    // Issue 932: a sample world has no run behind it, so the toast says what happened: this page only.
+    app.toast(
+      real
+        ? isPaused
+          ? "Resumed. Agents are back at work"
+          : "Paused. No spend while paused"
+        : isPaused
+          ? "Sample only: resumed on this page. Nothing real changed."
+          : "Sample only: paused on this page. Nothing real changed.",
+    );
   };
   const share = () => {
     try {
@@ -285,7 +305,11 @@ export function WorldPage({ app }: { app: AppCtx }) {
     } catch {
       // no clipboard here: the toast still says what the button is for
     }
-    app.toast("Link copied. Only your team can open it");
+    app.toast(
+      real
+        ? "Link copied. Only your team can open it"
+        : "Link copied. This is a sample world, so there is nothing real to share.",
+    );
   };
 
   const openSlackDialog = (trigger: HTMLButtonElement) => {
@@ -339,7 +363,7 @@ export function WorldPage({ app }: { app: AppCtx }) {
           </div>
           <h1 className="park-world-h1" tabIndex={-1}>
             {w.name}
-            {w.sample ? <SampleBadge /> : null}
+            {w.sample || demo ? <SampleBadge /> : null}
           </h1>
           <p className="park-world-meta">
             {w.sample
@@ -347,6 +371,11 @@ export function WorldPage({ app }: { app: AppCtx }) {
               : `Owned by ${w.owner} · started ${w.started} · ${agentsWord(w.agents)}`}
           </p>
           {w.sample ? <SampleNote /> : null}
+          {demo && !w.sample ? (
+            <span className="park-sample-note">
+              Sample data from a demo session. Approving here records nothing.
+            </span>
+          ) : null}
         </div>
         <div className="park-world-actions">
           <Button
@@ -390,11 +419,6 @@ export function WorldPage({ app }: { app: AppCtx }) {
             <a className="park-world-live" href={stagePath(w.id)}>
               {icon("play", 14)}Watch the replay
             </a>
-          ) : null}
-          {isCity && !hasStage ? (
-            <span id={NO_STAGE_ID} className="park-world-sr">
-              {NO_STAGE}
-            </span>
           ) : null}
         </div>
       </div>
@@ -491,6 +515,12 @@ export function WorldPage({ app }: { app: AppCtx }) {
               </nav>
             ) : null}
           </div>
+          {isCity && !hasStage ? (
+            // QA-DEMO-1 m3: the reason the lens links and "Open live view" are off is words on the page, not a tooltip
+            <p id={NO_STAGE_ID} className="park-world-nostage">
+              {NO_STAGE}
+            </p>
+          ) : null}
           <div className="park-world-progrow">
             <div className="park-world-progwrap">
               <div className="park-world-track">
@@ -562,14 +592,16 @@ export function WorldPage({ app }: { app: AppCtx }) {
           {isTown ? (
             <RunHistory
               runs={w.runs ?? []}
-              onRunNow={() => app.toast("Run started. You’ll get a notification when it finishes")}
+              onRunNow={() => app.toast(SAMPLE_RUN)}
               onAgenda={() => app.go("agenda")}
+              {...(real ? { runNowOff: RUN_OFF } : {})}
             />
           ) : null}
           {!isCity && !isTown ? (
             <Result
               w={w}
-              onOpen={() => app.toast("Opening the result in Google Drive")}
+              onOpen={() => app.toast(SAMPLE_OPEN)}
+              {...(real ? { openOff: OPEN_OFF } : {})}
               onSlack={openSlackDialog}
               slackConnected={slackState.connected}
               slackReason={slackState.disabledReason}

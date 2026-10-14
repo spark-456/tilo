@@ -991,9 +991,7 @@ test.describe("park world: the other tiers at 1440", () => {
     // Run now toasts
     await runs.getByRole("button", { name: "Run now" }).click();
     await expect(
-      page
-        .getByRole("status")
-        .filter({ hasText: "Run started. You’ll get a notification when it finishes" }),
+      page.getByRole("status").filter({ hasText: "Sample only: nothing was started." }),
     ).toBeVisible();
     // See in Agenda goes to the agenda page
     await runs.getByRole("button", { name: "See in Agenda" }).click();
@@ -1085,7 +1083,7 @@ test.describe("park world: the other tiers at 1440", () => {
     });
     await region(page, "Result").getByRole("button", { name: "Open result" }).click();
     await expect(
-      page.getByRole("status").filter({ hasText: "Opening the result in Google Drive" }),
+      page.getByRole("status").filter({ hasText: "Sample only: nothing was opened." }),
     ).toBeVisible();
     expect(problems).toEqual([]);
   });
@@ -1177,7 +1175,9 @@ test.describe("park world: behaviour in the browser", () => {
     const problems = await openWorld(page, "k1");
     await btn(page, "Pause").click();
     await expect(
-      page.getByRole("status").filter({ hasText: "Paused. No spend while paused" }),
+      page
+        .getByRole("status")
+        .filter({ hasText: "Sample only: paused on this page. Nothing real changed." }),
     ).toBeVisible();
     const overlay = text(page, "Paused · agents are waiting");
     await expect(overlay).toBeVisible();
@@ -1204,7 +1204,9 @@ test.describe("park world: behaviour in the browser", () => {
     });
     await btn(page, "Resume").click();
     await expect(
-      page.getByRole("status").filter({ hasText: "Resumed. Agents are back at work" }),
+      page
+        .getByRole("status")
+        .filter({ hasText: "Sample only: resumed on this page. Nothing real changed." }),
     ).toBeVisible();
     await expect(overlay).toHaveCount(0);
     expect(problems).toEqual([]);
@@ -1215,7 +1217,9 @@ test.describe("park world: behaviour in the browser", () => {
     const problems = await openWorld(page, "k1");
     await btn(page, "Share").click();
     await expect(
-      page.getByRole("status").filter({ hasText: "Link copied. Only your team can open it" }),
+      page.getByRole("status").filter({
+        hasText: "Link copied. This is a sample world, so there is nothing real to share.",
+      }),
     ).toBeVisible();
     expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(page.url());
     expect(page.url()).toMatch(/\/world\/k1$/);

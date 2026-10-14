@@ -40,6 +40,7 @@ export function LiveConnectors({ connectors }: { connectors: Connector[] }) {
                       ? "Connected"
                       : "Available"}
               </p>
+              {!c.live?.stateKnown ? <p>Needs setup by the workspace owner</p> : null}
               <p>Access level not available yet</p>
               <p>Usage not available yet</p>
               <p>Sync history not available yet</p>
