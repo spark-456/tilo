@@ -403,6 +403,9 @@
 /* ---- Sample data chip: the label at normal widths, only the dot when the nav is tight ---- */
 [data-park] .park-shell__sample {
   display: flex;
+  min-width: 24px;
+  min-height: 24px;
+  justify-content: center;
   align-items: center;
   margin: 0 6px 0 0;
   padding: 0;

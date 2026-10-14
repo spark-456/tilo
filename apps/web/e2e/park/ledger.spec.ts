@@ -27,6 +27,14 @@ test.beforeAll(async ({ browser, baseURL }) => {
   await page.close();
 });
 
+// These reference-layout fixtures are recorded for 24 September 2026 (DEMO-TIME-1).
+// Keep their recorded date deterministic while normal timers and every assertion still run.
+test.beforeEach(async ({ page }, info) => {
+  if (info.title.startsWith("WEB_7_e2e_") || info.title.startsWith("WEB_6_e2e_")) {
+    await page.clock.setFixedTime(new Date("2026-09-24T12:00:00Z"));
+  }
+});
+
 for (const [name, viewport] of Object.entries(SIZES)) {
   test.describe(`ledger at ${name}`, () => {
     test.use({ viewport });
