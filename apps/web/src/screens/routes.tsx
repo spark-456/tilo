@@ -18,14 +18,7 @@ export interface ScreenProps {
 // Suspense boundary, so the frame stays put while a chunk arrives.
 const screen = (load: () => Promise<Record<string, unknown>>, name: string) =>
   lazy(() => load().then((m) => ({ default: m[name] as ComponentType<ScreenProps> })));
-const S_05 = screen(() => import("./S_05"), "S_05");
-const S_06 = screen(() => import("./S_06"), "S_06");
-const S_07 = screen(() => import("./S_07"), "S_07");
-const S_08 = screen(() => import("./S_08"), "S_08");
 const S_09 = screen(() => import("./S_09"), "S_09");
-const S_10 = screen(() => import("./S_10"), "S_10");
-const S_11 = screen(() => import("./S_11"), "S_11");
-const S_12 = screen(() => import("./S_12"), "S_12");
 const S_13 = screen(() => import("./S_13"), "S_13");
 const S_14 = screen(() => import("./S_14"), "S_14");
 const S_15 = screen(() => import("./S_15"), "S_15");
@@ -46,9 +39,6 @@ const DevComponents = screen(() => import("../park/dev/Components"), "Components
 
 // Screens that read one run from a bare address: no run yet, or an unknown world, is said, not fetched
 // (a live API is never asked about the fixture world).
-const NeedsYou = inARun(S_06, { testid: "needs-you", title: "Needs you" });
-const GateSheet = inARun(S_07, { testid: "gate-sheet-page", title: "Approval gate" });
-const Consent = inARun(S_08, { testid: "consent-sheet-page", title: "Connection consent" });
 const Meeting = inARun(S_09, { testid: "meeting", title: "Meeting" });
 const Library = inARun(S_13, { testid: "library", title: "Library" });
 const Autonomy = inARun(S_15, { testid: "autonomy", title: "Autonomy" });
@@ -61,8 +51,7 @@ const Estimate = inARun(S_23, { testid: "estimate", title: "How we estimate" });
 
 // biome-ignore format: one line per screen keeps group edits to a single line.
 const COMPONENTS: Readonly<Record<string, ElementType<ScreenProps>>> = {
-  "S-05": S_05, "S-06": NeedsYou, "S-07": GateSheet, "S-08": Consent, "S-09": Meeting, "S-10": S_10,
-  "S-11": S_11, "S-12": S_12, "S-13": Library, "S-14": S_14, "S-15": Autonomy, "S-16": Channels,
+  "S-09": Meeting, "S-13": Library, "S-14": S_14, "S-15": Autonomy, "S-16": Channels,
   "S-17": Mail, "S-18": Team, "S-19": Connections, "S-21": Artifacts, "S-22": S_22, "S-23": Estimate,
   "S-24": S_24, "S-26": S_26, "S-27": S_27, "S-28": S_28, "S-29": S_29,
 };

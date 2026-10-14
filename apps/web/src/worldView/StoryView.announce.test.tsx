@@ -8,8 +8,11 @@ import { FixtureClient } from "../api/fixtureClient";
 import { FIXTURE_WORLD_ID } from "../api/fixtures/derived";
 import { EVENTS_VILLAGE_BASIC } from "../api/fixtures/events";
 import { setReplayPoint } from "../world/replay";
-import { S_10 } from "./S_10";
+import { StoryView } from "./StoryView";
 import { ANNOUNCE_DEBOUNCE_MS } from "./storyAnnounce";
+
+// OLD-UI-OUT-2: the Story lens is a Park page now (worldView/StoryView); same behaviour.
+const S_10 = ({ params }: { params: readonly string[] }) => <StoryView worldId={params[0] ?? ""} />;
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -67,7 +70,7 @@ describe("FR-WLD-11 Story announces only what arrives live", () => {
         vi.advanceTimersByTime(ms);
       });
     const said = () => container.querySelector("output.sr-only")?.textContent ?? "";
-    const rows = () => container.querySelectorAll(".story-list li").length;
+    const rows = () => container.querySelectorAll(".park-view-story li").length;
     return { send: (e: readonly Event[]) => act(async () => send(e)), wait, said, rows };
   }
 

@@ -8,7 +8,6 @@ import path from "node:path";
 import { act } from "react";
 import { type Root, createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { App } from "../App";
 import { ClientProvider } from "../api/ClientProvider";
 import { FixtureClient } from "../api/fixtureClient";
 import { FIXTURE_WORLD_ID } from "../api/fixtures/derived";
@@ -17,6 +16,8 @@ import { forgetWorld, rememberWorld, useLastStartedWorld } from "../world/lastWo
 import { getReplayPoint, setReplayPoint } from "../world/replayPoint";
 import { useRunLog } from "../world/runLog";
 import { getSelection, select } from "../world/selection";
+import WorldViewApp from "../worldView/WorldViewApp";
+import { type ViewRoute, parseViewPath } from "../worldView/routes";
 import { getDensity, setDensity } from "./density";
 import {
   PRESENTER_HOTKEYS,
@@ -64,7 +65,7 @@ async function mountApp(url: string, client?: FixtureClient): Promise<HTMLElemen
   await act(async () => {
     root?.render(
       <ClientProvider client={activeClient}>
-        <App />
+        <WorldViewApp route={parseViewPath(window.location.pathname) as ViewRoute} />
       </ClientProvider>,
     );
   });
@@ -102,23 +103,22 @@ afterEach(() => {
 describe("FR_WLD_12 stage mode (1920x1080 layout, presenter hotkeys, reset with confirm)", () => {
   it("FR_WLD_12_stage_layout_at_1920x1080_hides_non_stage_chrome_and_keeps_stage_and_hud", async () => {
     const normal = await mountApp(`/world/${FIXTURE_WORLD_ID}/stage`);
-    const shellNormal = normal.querySelector(".app-shell");
+    const shellNormal = normal.querySelector('[data-testid="world-stage-view"]');
     expect(shellNormal?.getAttribute("data-stage-mode")).toBe("off");
-    expect(normal.querySelector('[data-testid="top-bar"]')).not.toBeNull();
-    expect(normal.querySelector('[data-testid="left-rail"]')).not.toBeNull();
-    expect(normal.querySelector('[data-testid="levels-panel"]')).not.toBeNull();
+    // The lens chrome (tabs and the selection bar) is there in normal mode:
+    expect(normal.querySelector('nav[aria-label="Lens"]')).not.toBeNull();
+    expect(normal.querySelector('[data-testid="selection-bar"]')).not.toBeNull();
 
     await act(async () => {
       setStageMode(true);
     });
 
-    const shellStage = normal.querySelector(".app-shell");
+    const shellStage = normal.querySelector('[data-testid="world-stage-view"]');
     expect(shellStage?.getAttribute("data-stage-mode")).toBe("on");
     expect(shellStage?.getAttribute("data-stage-layout")).toBe("1920x1080");
     // Non-stage chrome is hidden on stage at 1920x1080:
-    expect(normal.querySelector('[data-testid="top-bar"]')).toBeNull();
-    expect(normal.querySelector('[data-testid="left-rail"]')).toBeNull();
-    expect(normal.querySelector('[data-testid="levels-panel"]')).toBeNull();
+    expect(normal.querySelector('nav[aria-label="Lens"]')).toBeNull();
+    expect(normal.querySelector('[data-testid="selection-bar"]')).toBeNull();
     expect(normal.querySelector('[data-testid="assistant-open"]')).toBeNull();
     expect(normal.querySelector('[data-testid="flow-shell"]')).toBeNull();
     // Stage, HUD right rail, HR-4 banner, and presenter bar remain:
@@ -146,7 +146,9 @@ describe("FR_WLD_12 stage mode (1920x1080 layout, presenter hotkeys, reset with 
       pressKey("s");
     });
     expect(getStageMode()).toBe(true);
-    expect(container.querySelector(".app-shell")?.getAttribute("data-stage-mode")).toBe("on");
+    expect(
+      container.querySelector('[data-testid="world-stage-view"]')?.getAttribute("data-stage-mode"),
+    ).toBe("on");
 
     expect(getDensity()).toBe("friendly");
     await act(async () => {

@@ -4,6 +4,7 @@
 import { describe, expect, it } from "vitest";
 import { FIXTURE_WORLD_ID } from "../api/fixtures/derived";
 import { matchFlowRoute } from "../router";
+import { parseViewPath } from "../worldView/routes";
 import { screenMeta } from "./meta";
 import { matchScreen } from "./routes";
 
@@ -50,14 +51,7 @@ describe("WEB_CUTOVER_screens: moved screens", () => {
 describe("WEB_CUTOVER_screens: kept screens stay reachable on their own paths", () => {
   it("WEB_CUTOVER_07_every_kept_screen_resolves_from_its_address", () => {
     const table: ReadonlyArray<readonly [string, string]> = [
-      ["/world/w/inspect/B1", "S-05"],
-      ["/needs-you", "S-06"],
-      ["/needs-you/gate", "S-07"],
-      ["/needs-you/consent", "S-08"],
       ["/meeting", "S-09"],
-      ["/world/w/story", "S-10"],
-      ["/world/w/trace", "S-11"],
-      ["/world/w/delivery", "S-12"],
       ["/library", "S-13"],
       ["/worlds/replays", "S-14"],
       ["/autonomy", "S-15"],
@@ -78,6 +72,21 @@ describe("WEB_CUTOVER_screens: kept screens stay reachable on their own paths", 
     for (const [path, id] of table) expect(matchScreen(path)?.id, path).toBe(id);
   });
 
+  it("OLD_UI_OUT_2_the_lens_and_needs_you_screens_are_park_views_not_old_screens", () => {
+    for (const path of [
+      "/world/w/inspect/B1",
+      "/needs-you",
+      "/needs-you/gate",
+      "/needs-you/consent",
+      "/world/w/story",
+      "/world/w/trace",
+      "/world/w/delivery",
+    ]) {
+      expect(parseViewPath(path), path).not.toBeNull();
+      expect(matchScreen(path)?.id ?? "none", path).not.toMatch(/^S-/);
+    }
+  });
+
   it("WEB_CUTOVER_07_the_task_flow_screens_stay_in_the_flow_shell", () => {
     expect(matchScreen("/task/t/understanding")).toBeNull();
     expect(matchScreen("/task/t/approaches")).toBeNull();
@@ -87,14 +96,7 @@ describe("WEB_CUTOVER_screens: kept screens stay reachable on their own paths", 
 
   it("WEB_CUTOVER_07_every_screen_row_with_a_pattern_resolves_from_its_own_path", () => {
     for (const s of [
-      "S-05",
-      "S-06",
-      "S-07",
-      "S-08",
       "S-09",
-      "S-10",
-      "S-11",
-      "S-12",
       "S-13",
       "S-14",
       "S-15",

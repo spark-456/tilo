@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { TiloClient } from "../api/client";
 import { EVENTS_VILLAGE_BASIC } from "../api/fixtures/events";
 import { LAYOUT_VILLAGE_BASIC } from "../api/fixtures/layout";
-import { findItem } from "../screens/S_05";
+import { findItem } from "./findItem";
 import { reduce } from "./reducer";
 import { creditsUsed, elapsed, waitingForYou, watchRun } from "./runLog";
 

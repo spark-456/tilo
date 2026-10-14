@@ -2,8 +2,8 @@
 // name, place and state text, found in the layout (agents, levels, districts, buildings, islands)
 // or in the events that carry it (artifacts). State comes from the reducer, never a guess (HR-1).
 import type { Event, Layout } from "@tilo/contracts";
-import type { WorldState } from "../world/reducer";
-import { BUILDING_STATE, ISLAND_STATE, agentNames } from "../world/runSummary";
+import type { WorldState } from "./reducer";
+import { BUILDING_STATE, ISLAND_STATE, agentNames } from "./runSummary";
 
 export interface Found {
   readonly kind: string;

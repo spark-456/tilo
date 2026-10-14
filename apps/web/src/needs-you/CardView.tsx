@@ -9,9 +9,9 @@ import { type ReactNode, useCallback, useEffect, useId, useRef, useState } from 
 import type { TiloClient } from "../api/client";
 import type { FieldsApi } from "../api/fields";
 import { Placeholder } from "../screens/Placeholder";
-import { findItem } from "../screens/findItem";
 import { Chip, Soon } from "../screens/kit";
 import { describeError } from "../screens/remote";
+import { findItem } from "../world/findItem";
 import { agentNames } from "../world/runSummary";
 import { FieldsForm } from "./FieldsForm";
 import { RUNG } from "./queue";

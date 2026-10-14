@@ -18,6 +18,7 @@ import { takeCallbackParams } from "./oauth/capture";
 import { isOAuthCallback } from "./oauth/paths";
 import { isParkPath } from "./park/app/router";
 import { usePathname } from "./router";
+import { type ViewRoute, parseViewPath, viewTitle } from "./worldView/routes";
 
 // Both apps are chunks: the landing (Park Home) never ships the old app's shell, and a kept screen never
 // loads the Park app (NFR-01).
@@ -25,6 +26,28 @@ const App = lazy(() => import("./App").then((m) => ({ default: m.App })));
 const ParkApp = lazy(() => import("./park/app/ParkApp"));
 const LegalPage = lazy(() => import("./legal/LegalPage"));
 const OAuthCallback = lazy(() => import("./oauth/CallbackRoute"));
+// OLD-UI-OUT-2: a world's lenses and the Needs-you page are Park pages (the Park shell frames them); their code is a
+// chunk of its own that only these addresses load.
+const WorldViewApp = lazy(() => import("./worldView/WorldViewApp"));
+
+/** The shell's routed view for a lens, inspect or Needs-you address. */
+function routedOf(view: ViewRoute) {
+  const key =
+    view.kind === "lens"
+      ? `${view.worldId}/${view.lens}`
+      : view.kind === "inspect"
+        ? `${view.worldId}/inspect/${view.itemId}`
+        : `needs-you/${view.sheet}`;
+  return {
+    title: viewTitle(view),
+    routeKey: `view:${key}`,
+    content: (
+      <Suspense fallback={null}>
+        <WorldViewApp route={view} />
+      </Suspense>
+    ),
+  };
+}
 
 /** SEC-15 W0b: on a deployment with an API, a Google sign-in is asked who it is before the app (the server enforces it).
  * A demo session reads the sample company and is not asked; a local host or a build with no API has no gate. */
@@ -52,7 +75,8 @@ export function Root() {
   const legal = legalKind(pathname);
   // ADR-0035 LC-02: Google's redirect lands here. The code and state leave the address bar before anything else renders.
   const oauth = isOAuthCallback(pathname) ? takeCallbackParams() : undefined;
-  const park = isParkPath(pathname) || !isKeptPath(pathname);
+  const view = parseViewPath(pathname);
+  const park = view !== null || isParkPath(pathname) || !isKeptPath(pathname);
   // ONBOARD-1: the first-run welcome and tour register themselves with the Park shell (park/shell/tour.ts): a chunk of
   // its own, started beside the Park app's and never awaited by it. The kept screens and legal pages never load it.
   useEffect(() => {
@@ -75,7 +99,9 @@ export function Root() {
   return (
     <SignInGate auth={session}>
       <AccessGuard>
-        <Suspense fallback={null}>{park ? <ParkApp /> : <App />}</Suspense>
+        <Suspense fallback={null}>
+          {park ? <ParkApp {...(view ? { routed: routedOf(view) } : {})} /> : <App />}
+        </Suspense>
       </AccessGuard>
     </SignInGate>
   );

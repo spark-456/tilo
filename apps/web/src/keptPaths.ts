@@ -7,9 +7,6 @@
 const KEPT: readonly RegExp[] = [
   /^\/start\/?$/,
   /^\/task\/[^/]+\/(?:understanding|approaches)\/?$/,
-  /^\/world\/[^/]+\/(?:stage|story|trace|delivery)\/?$/,
-  /^\/world\/[^/]+\/inspect\/[^/]+\/?$/,
-  /^\/needs-you(?:\/(?:gate|consent))?\/?$/,
   /^\/(?:meeting|autonomy|channels|mail|connections|settings|estimate|pilot)\/?$/,
   /^\/(?:plate|pinboards|calendar|more)\/?$/,
   /^\/library(?:\/artifacts)?\/?$/,

@@ -2,10 +2,10 @@
 // the tone of its state chip. Every fact is read from the layout or the reducer over the recorded
 // events (HR-1); nothing is guessed, and a fact the run has not recorded says so.
 import type { Layout } from "@tilo/contracts";
+import { findItem } from "../world/findItem";
 import type { WorldState } from "../world/reducer";
 import { agentNames, rankName } from "../world/runSummary";
-import { findItem } from "./findItem";
-import { words } from "./kit";
+import { words } from "./text";
 
 export type Fact = readonly [label: string, value: string];
 

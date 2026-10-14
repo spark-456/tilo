@@ -8,14 +8,20 @@ import { afterEach, describe, expect, it } from "vitest";
 import { ClientProvider } from "../api/ClientProvider";
 import type { TiloClient } from "../api/client";
 import { FixtureClient } from "../api/fixtureClient";
-import { S_06 } from "./S_06";
-import { S_07 } from "./S_07";
-import { S_12 } from "./S_12";
+import { DeliveryView } from "../worldView/DeliveryView";
+import { NeedsYouView } from "../worldView/NeedsYouView";
 import { S_13 } from "./S_13";
 import { S_14 } from "./S_14";
 import { S_21 } from "./S_21";
 import { EmptyState } from "./kit";
 import type { ScreenProps } from "./routes";
+
+// OLD-UI-OUT-2: these screens are pages of worldView/ now; same behaviour, same test ids.
+const S_06 = () => <NeedsYouView sheet="queue" />;
+const S_07 = () => <NeedsYouView sheet="gate" />;
+const S_12 = ({ params }: { params: readonly string[] }) => (
+  <DeliveryView worldId={params[0] ?? ""} />
+);
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -84,7 +90,7 @@ describe("#227 H1 EmptyState: each screen with nothing recorded", () => {
       const c = await screen(Component, params);
       const box = c.querySelector(`[data-testid="${testid}"]`);
       expect(box, `${id} ${testid}`).not.toBeNull();
-      expect(box?.querySelector(".empty-title")?.textContent).toBe(title);
+      expect(box?.querySelector(".empty-title, .park-view-empty-title")?.textContent).toBe(title);
       expect(box?.querySelectorAll("a, button")).toHaveLength(1);
       expect(c.querySelector(".empty-note")?.textContent ?? "").not.toContain("Nothing");
     });

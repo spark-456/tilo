@@ -9,7 +9,10 @@ import { ClientProvider } from "../api/ClientProvider";
 import type { TiloClient } from "../api/client";
 import { FixtureClient } from "../api/fixtureClient";
 import { EVENTS_VILLAGE_BASIC } from "../api/fixtures/events";
-import { S_06 } from "./S_06";
+import { NeedsYouView } from "./NeedsYouView";
+
+// OLD-UI-OUT-2: the queue is a Park page now (worldView/NeedsYouView); same behaviour.
+const S_06 = () => <NeedsYouView sheet="queue" />;
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 

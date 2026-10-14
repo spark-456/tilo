@@ -11,14 +11,6 @@ const KEPT = [
   "/start",
   "/task/t1/understanding",
   "/task/t1/approaches",
-  "/world/w1/stage",
-  "/world/w1/story",
-  "/world/w1/trace",
-  "/world/w1/delivery",
-  "/world/w1/inspect/B1",
-  "/needs-you",
-  "/needs-you/gate",
-  "/needs-you/consent",
   "/meeting",
   "/library",
   "/library/artifacts",
@@ -42,6 +34,26 @@ const KEPT = [
   "/dev/components",
 ];
 
+// OLD-UI-OUT-2: a world's stage and lenses and the Needs-you pages are Park pages (worldView/routes.ts).
+const MOVED = [
+  "/world/w1/stage",
+  "/world/w1/story",
+  "/world/w1/trace",
+  "/world/w1/delivery",
+  "/world/w1/inspect/B1",
+  "/needs-you",
+  "/needs-you/gate",
+  "/needs-you/consent",
+];
+const MOVED_SCREENS = new Set(["S-04", "S-05", "S-06", "S-07", "S-08", "S-10", "S-11", "S-12"]);
+
+describe("OLD-UI-OUT-2_kept_paths: the moved addresses are Park pages", () => {
+  it.each(MOVED)("OLD_UI_OUT_2_kept_paths_%s_is_not_kept", (path) => {
+    expect(isKeptPath(path)).toBe(false);
+    expect(isKeptPath(`${path}/`)).toBe(false);
+  });
+});
+
 describe("WEB_CUTOVER_kept_paths: the addresses the old app owns", () => {
   it.each(KEPT)("WEB_CUTOVER_kept_paths_%s_is_kept", (path) => {
     expect(isKeptPath(path)).toBe(true);
@@ -55,9 +67,10 @@ describe("WEB_CUTOVER_kept_paths: the addresses the old app owns", () => {
     const examples: string[] = [];
     for (const s of SCREENS) {
       if (s.id === "S-01") continue; // `/` is the Park Home since WEB-CUTOVER
+      if (MOVED_SCREENS.has(s.id)) continue; // OLD-UI-OUT-2: Park pages
       if (s.path !== null) examples.push(s.path);
     }
-    expect(examples.length).toBeGreaterThan(20);
+    expect(examples.length).toBeGreaterThan(10);
     for (const path of examples) expect(isKeptPath(path), path).toBe(true);
     // every pattern accepts its own example, and the example is kept (patterns are what the router matches)
     for (const s of SCREENS) {
@@ -71,9 +84,7 @@ describe("WEB_CUTOVER_kept_paths: the addresses the old app owns", () => {
     for (const path of [
       "/task/abc/understanding",
       "/task/abc/approaches",
-      "/world/abc/stage",
       "/task/a%20b/understanding",
-      "/world/q%201%2F2/stage",
     ]) {
       expect(matchFlowRoute(path).screen, path).not.toBe("Start");
       expect(isKeptPath(path), path).toBe(true);

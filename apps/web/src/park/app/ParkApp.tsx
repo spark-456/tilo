@@ -1,7 +1,7 @@
 // The Park app (README "Routes", "The `app` prop", "Focus"): the data-park root around the shell (shell/AppShell:
 // nav, backdrop, the one <main>, toast, world loader), the page for the route, the document title and the
 // focus move after a route change. Lazy-imported by src/Root.tsx, so a landing visit never loads it (NFR-01).
-import { Suspense, lazy, useEffect, useRef } from "react";
+import { type ReactNode, Suspense, lazy, useEffect, useRef } from "react";
 import { AppShell } from "../shell/AppShell";
 import { ParkAuthProvider } from "../shell/auth";
 import { useParkTour } from "../shell/tour";
@@ -67,19 +67,35 @@ function FocusHeading({ routeKey }: { routeKey: string }) {
   return <span ref={mark} hidden />;
 }
 
-function Shell() {
+/** A view the Root frames in this shell that is no Park page of its own (OLD-UI-OUT-2: a world's lenses, the
+ * Needs-you page): its content, its tab title and a key that moves focus to its heading when it changes. */
+export interface RoutedView {
+  readonly content: ReactNode;
+  readonly title: string;
+  readonly routeKey: string;
+}
+
+function Shell({ routed }: { routed?: RoutedView | undefined }) {
   const app = usePageApp();
   const route = useParkRoute();
   const quizRoute = useQuizAppRoute();
-  const title = route ? PAGE_LABEL[route.page] : quizRoute ? "Quiz" : NOT_FOUND_TITLE;
+  const title = routed
+    ? routed.title
+    : route
+      ? PAGE_LABEL[route.page]
+      : quizRoute
+        ? "Quiz"
+        : NOT_FOUND_TITLE;
   // A world is a different page per id; the other pages keep focus where it is when only a query changes.
-  const routeKey = route
-    ? route.page === "world"
-      ? `world/${route.params.id}`
-      : route.page
-    : quizRoute
-      ? `world/${quizRoute.worldId}/app/${quizRoute.artifactId}`
-      : "none";
+  const routeKey = routed
+    ? routed.routeKey
+    : route
+      ? route.page === "world"
+        ? `world/${route.params.id}`
+        : route.page
+      : quizRoute
+        ? `world/${quizRoute.worldId}/app/${quizRoute.artifactId}`
+        : "none";
   useEffect(() => {
     const before = document.title;
     document.title = `${title} · Tilo`;
@@ -87,7 +103,7 @@ function Shell() {
       document.title = before;
     };
   }, [title]);
-  const Page = route ? PAGES[route.page] : null;
+  const Page = routed ? null : route ? PAGES[route.page] : null;
   const Tour = useParkTour()?.Layer; // ONBOARD-1: the first-run welcome and tour, when the Root provides them
   return (
     <div
@@ -98,7 +114,9 @@ function Shell() {
     >
       <AppShell>
         <Suspense fallback={null}>
-          {Page ? (
+          {routed ? (
+            routed.content
+          ) : Page ? (
             <Page app={app} />
           ) : quizRoute ? (
             <QuizPlayerPage
@@ -121,13 +139,13 @@ function Shell() {
   );
 }
 
-export function ParkApp() {
+export function ParkApp({ routed }: { routed?: RoutedView | undefined } = {}) {
   // FR-UX-10: the account menu reads the page's real sign-in; null (no sign-in here) keeps the prototype's behaviour.
   const auth = useSessionAuth();
   return (
     <ParkProvider>
       <ParkAuthProvider auth={auth}>
-        <Shell />
+        <Shell routed={routed} />
       </ParkAuthProvider>
     </ParkProvider>
   );

@@ -9,12 +9,19 @@ import { ClientProvider } from "../api/ClientProvider";
 import type { TiloClient } from "../api/client";
 import { FixtureClient } from "../api/fixtureClient";
 import { EVENTS_VILLAGE_BASIC } from "../api/fixtures/events";
-import { S_06 } from "../screens/S_06";
-import { S_07 } from "../screens/S_07";
-import { S_12 } from "../screens/S_12";
-import { WorldPanels } from "../screens/WorldPanels";
+import { DeliveryView } from "../worldView/DeliveryView";
+import { NeedsYouSheet } from "../worldView/NeedsYouView";
+import { StageRail } from "../worldView/StageRail";
 import { watchRun } from "./runLog";
-import { alsoWorld, withWorld, worldOf } from "./worldContext";
+import { alsoWorld, useWorldContext, withWorld, worldOf } from "./worldContext";
+
+// OLD-UI-OUT-2: these screens are pages of worldView/ now; same behaviour, same test ids.
+const S_06 = () => <NeedsYouSheet sheet="queue" worldId={useWorldContext()} />;
+const S_07 = () => <NeedsYouSheet sheet="gate" worldId={useWorldContext()} />;
+const S_12 = ({ params }: { params: readonly string[] }) => (
+  <DeliveryView worldId={params[0] ?? ""} />
+);
+const WorldPanels = StageRail;
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
