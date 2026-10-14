@@ -48,9 +48,9 @@ export const FIXTURE_QUERY = {
 /** The live stage (S-04) of the fixture world: `/world/:id` is the Park World overview since WEB-CUTOVER. */
 export const STAGE_PATH = "/world/w_village_basic/stage";
 
-/** A page whose stage has no world to draw: the decorative bare iso grid behind the task flow (S-02). The old
- * S-01 landing at "/" was the other such page; "/" is the Park Home now (WEB-CUTOVER). */
-export const BARE_STAGE_PATH = "/task/task_fixture_1/understanding";
+/** A page whose stage has no world to draw: the decorative bare iso grid. The old S-01 landing and S-02 were such
+ * pages; both are gone (WEB-CUTOVER, OLD-UI-OUT wave 1), so it is the stage address of a world that has no run. */
+export const BARE_STAGE_PATH = "/world/w_no_run/stage";
 
 export function fixtureUrl(
   name: string,

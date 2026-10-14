@@ -59,8 +59,7 @@ export function Root() {
     if (park && !legal && oauth === undefined) void import("./onboarding/register");
   }, [park, legal, oauth]);
   // SIMPLE-RUN-1: a retired flow address is replaced by Home before either app renders.
-  // Only where an API is configured (a deployment): a fixture or dev build keeps the old screens for its own tests.
-  const retired = Boolean(API_URL?.trim()) && isRetiredFlowPath(pathname);
+  const retired = isRetiredFlowPath(pathname);
   useEffect(() => {
     if (!retired) return;
     window.history.replaceState({}, "", "/");

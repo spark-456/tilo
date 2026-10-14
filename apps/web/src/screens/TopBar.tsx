@@ -54,12 +54,9 @@ export function placeOf(path: string, fixture = false): Place {
   }
   const flow = matchFlowRoute(path);
   if (flow.screen === "World") return { name: "World", sub: null, world: flow.worldId };
-  if (flow.screen === "Start") {
-    return fixture
-      ? { name: "World", sub: null, world: null }
-      : { name: "Home", sub: null, world: null };
-  }
-  return { name: "New task", sub: flow.screen, world: null };
+  return fixture
+    ? { name: "World", sub: null, world: null }
+    : { name: "Home", sub: null, world: null };
 }
 
 /** The world's recorded title (its first event carries it), else null. */

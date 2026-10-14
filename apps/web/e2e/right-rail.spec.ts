@@ -6,8 +6,8 @@ test.use({ viewport: DESKTOP });
 test("PRD-18.3 right rail: honest empty state shows no fake numbers before any events exist", async ({
   page,
 }) => {
-  // WEB-CUTOVER: "/" is the Park Home; S-02 is the old shell's first screen, with no run on record.
-  await page.goto("/task/task_fixture_1/understanding");
+  // WEB-CUTOVER: "/" is the Park Home; /more is an old-shell screen with no run on record (S-02 is gone).
+  await page.goto("/more");
 
   const meter = page.getByTestId("right-rail-meter");
   await expect(meter).toBeVisible();

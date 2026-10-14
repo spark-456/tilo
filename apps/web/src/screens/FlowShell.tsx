@@ -1,27 +1,19 @@
-// PRD 18.3 flow screens S-01, S-02, S-03 and S-04 as placeholders (heading, one primary button to
-// the next step) that AGW-02 to AGW-05 fill in. S-12 (Delivery) is S_12.tsx, routed by routes.tsx.
+// PRD 18.3 flow screen S-04 (the live stage's summary and one primary button); S-01 to S-03 are the Park Home's
+// one-step start now (OLD-UI-OUT wave 1). This file also holds Loaded/Primary/Summary for the screens still kept. S-12 (Delivery) is S_12.tsx, routed by routes.tsx.
 // Every client call has loading, empty and error states with a retry (PRD 18.4); one filled
 // primary button per screen (UX-1).
-import { type ReactNode, Suspense, lazy, useEffect, useRef, useState } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import { useClient } from "../api/ClientProvider";
 import { LifetimeCapDialog } from "../components/LifetimeCapDialog";
 import { ReplayBanner } from "../components/ReplayBanner";
 import { useFlowRoute } from "../router";
-import { ChunkBoundary } from "./ChunkBoundary";
-import { StartScreen } from "./flow/StartScreen";
 import "./flow/flow.css";
 import { type Action, type Remote, useAction } from "./remote";
 
 const enc = encodeURIComponent;
 
-// S-02 and S-03 load when a task reaches them (NFR-01): the Start screen does not carry their code.
-const Understanding = lazy(() =>
-  import("./s02/Understanding").then((m) => ({ default: m.Understanding })),
-);
-const Approaches = lazy(() => import("./s03/Approaches").then((m) => ({ default: m.Approaches })));
-
-/** What each flow screen calls itself. Start is the Home hero (artboard Tilo Home v2). */
-const HEADINGS: Readonly<Record<string, string>> = { Start: "What should Tilo do?" };
+/** What each flow screen calls itself. Only the live stage is left (OLD-UI-OUT wave 1 retired S-01 to S-03). */
+const HEADINGS: Readonly<Record<string, string>> = {};
 
 function Notice({ message, onRetry }: { message: string; onRetry?: (() => void) | undefined }) {
   return (
@@ -131,27 +123,10 @@ function World({ worldId }: { worldId: string }) {
   return <Primary label="View delivery" action={action} />;
 }
 
-/** A screen whose chunk loads on demand: the card is already drawn, so the words sit in its slot. */
-function Later({ children }: { children: ReactNode }) {
-  return (
-    <ChunkBoundary>
-      <Suspense
-        fallback={
-          <div className="flow-slot">
-            <output className="flow-loading">Loading…</output>
-          </div>
-        }
-      >
-        {children}
-      </Suspense>
-    </ChunkBoundary>
-  );
-}
-
 export function FlowShell() {
   const { route } = useFlowRoute();
   const heading = useRef<HTMLHeadingElement>(null);
-  const id = "taskId" in route ? route.taskId : "worldId" in route ? route.worldId : "";
+  const id = "worldId" in route ? route.worldId : "";
   const key = `${route.screen}:${id}`;
   const shownKey = useRef(key);
   // After a route change, focus moves to the new screen's heading, so keyboard and
@@ -165,19 +140,7 @@ export function FlowShell() {
   const screen = (() => {
     switch (route.screen) {
       case "Start":
-        return <StartScreen />;
-      case "Understanding":
-        return (
-          <Later>
-            <Understanding taskId={route.taskId} />
-          </Later>
-        );
-      case "Approaches":
-        return (
-          <Later>
-            <Approaches taskId={route.taskId} />
-          </Later>
-        );
+        return null; // not an address of the old app: Root sends the retired intake addresses to Park Home
       case "World":
         return (
           <>
@@ -189,7 +152,7 @@ export function FlowShell() {
   })();
   return (
     <section
-      className={route.screen === "Start" ? "flow-shell flow-wide" : "flow-shell"}
+      className="flow-shell"
       data-testid="flow-shell"
       data-screen={route.screen}
       aria-label="Task flow"

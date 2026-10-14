@@ -6,18 +6,9 @@ describe("PRD-18.3 flow: the router maps each flow path to its screen and unknow
     expect(matchFlowRoute("/")).toEqual({ screen: "Start" });
   });
 
-  it("maps /task/:taskId/understanding to Understanding", () => {
-    expect(matchFlowRoute("/task/123/understanding")).toEqual({
-      screen: "Understanding",
-      taskId: "123",
-    });
-  });
-
-  it("maps /task/:taskId/approaches to Approaches", () => {
-    expect(matchFlowRoute("/task/123/approaches")).toEqual({
-      screen: "Approaches",
-      taskId: "123",
-    });
+  it("no longer maps /task/:taskId/understanding or /approaches (OLD-UI-OUT wave 1): they are Start", () => {
+    expect(matchFlowRoute("/task/123/understanding")).toEqual({ screen: "Start" });
+    expect(matchFlowRoute("/task/123/approaches")).toEqual({ screen: "Start" });
   });
 
   it("maps /world/:worldId/stage to World", () => {

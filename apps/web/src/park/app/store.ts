@@ -7,7 +7,13 @@ import { buildHandoffDecisions } from "../api/fixtures/buildHandoff";
 import { needsLeft as countNeedsLeft, makeWorld, worlds } from "../api/fixtures/worlds";
 import { type Api, askQuick, startWithFiles } from "../api/index";
 import { NotBuilt } from "../api/liveApi";
-import { type OneStepApi, type RunPlan, oneStepOf } from "../api/oneStep";
+import {
+  type Cadence,
+  type OneStepApi,
+  type RunPlan,
+  type RunStart,
+  oneStepOf,
+} from "../api/oneStep";
 import type {
   Dec,
   Decision,
@@ -122,7 +128,7 @@ export interface ParkStore {
   readonly oneStep: boolean;
   prepareRun(text: string, files?: readonly File[]): Promise<RunStep<RunPlan>>;
   reviseRun(plan: RunPlan, field: string, answer: string): Promise<RunStep<RunPlan>>;
-  startRun(plan: RunPlan): Promise<RunStep<string>>;
+  startRun(plan: RunPlan, repeat?: Cadence | null): Promise<RunStep<RunStart>>;
   toast(message: string, actionLabel?: string, action?: () => void): void;
   dismissToast(): void;
   dismissLifetimeCap(): void;
@@ -394,7 +400,7 @@ export function createParkStore({ api, navigate, schedule, demo }: ParkStoreDeps
     oneStep: oneStepOf(api) !== null,
     prepareRun: (text, files) => runStep((one) => one.prepare(text, files ?? [])),
     reviseRun: (plan, field, answer) => runStep((one) => one.revise(plan.taskId, field, answer)),
-    startRun: (plan) => runStep((one) => one.start(plan)),
+    startRun: (plan, repeat) => runStep((one) => one.start(plan, repeat)),
     askQuick(mode, query) {
       if (asking) return asking;
       asking = askQuick(api, mode, query).then(

@@ -78,11 +78,11 @@ describe("WEB_CUTOVER_screens: kept screens stay reachable on their own paths", 
     for (const [path, id] of table) expect(matchScreen(path)?.id, path).toBe(id);
   });
 
-  it("WEB_CUTOVER_07_the_task_flow_screens_stay_in_the_flow_shell", () => {
-    expect(matchScreen("/task/t/understanding")).toBeNull();
-    expect(matchScreen("/task/t/approaches")).toBeNull();
-    expect(matchFlowRoute("/task/t/understanding").screen).toBe("Understanding");
-    expect(matchFlowRoute("/task/t/approaches").screen).toBe("Approaches");
+  it("OLD_UI_OUT_07_the_task_flow_screens_are_gone", () => {
+    expect(matchScreen("/task/t/understanding")?.id).toBe("not-found");
+    expect(matchScreen("/task/t/approaches")?.id).toBe("not-found");
+    expect(matchFlowRoute("/task/t/understanding").screen).toBe("Start");
+    expect(matchFlowRoute("/task/t/approaches").screen).toBe("Start");
   });
 
   it("WEB_CUTOVER_07_every_screen_row_with_a_pattern_resolves_from_its_own_path", () => {

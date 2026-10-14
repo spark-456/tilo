@@ -2,7 +2,9 @@
 // words in it: the goal, what Tilo assumed in place of asking (each line can be changed), the price and one Start
 // button. The person's click is the budget approval. Presentation only: the calls are HomePage's.
 import { useState } from "react";
-import type { RunPlan } from "../../api/oneStep";
+import type { Cadence, RunPlan } from "../../api/oneStep";
+import { BudgetBar } from "./BudgetBar";
+import { useRepeatWeekly } from "./RepeatWeekly";
 
 export interface RunCardProps {
   readonly plan: RunPlan;
@@ -10,7 +12,8 @@ export interface RunCardProps {
   readonly busy: boolean;
   /** The plain reason the last step stopped, with Start as the retry. */
   readonly error: string | null;
-  readonly onStart: () => void;
+  /** Start, with the weekly cadence when the person switched "Repeat weekly" on (FR-AGT-14). */
+  readonly onStart: (repeat: Cadence | null) => void;
   readonly onCancel: () => void;
   readonly onEdit: (field: string, answer: string) => void;
 }
@@ -20,6 +23,7 @@ const credits = (n: number): string => `${Number.isInteger(n) ? n : n.toFixed(1)
 export function RunCard({ plan, busy, error, onStart, onCancel, onEdit }: RunCardProps) {
   const [editing, setEditing] = useState<number | null>(null);
   const [draft, setDraft] = useState("");
+  const repeat = useRepeatWeekly(busy);
   const price =
     plan.credits.min === plan.credits.max
       ? `${credits(plan.credits.max)} credits`
@@ -42,6 +46,10 @@ export function RunCard({ plan, busy, error, onStart, onCancel, onEdit }: RunCar
             <span className="park-home-meta__v">{plan.time}</span>
           </span>
         </div>
+        <BudgetBar min={plan.credits.min} max={plan.credits.max} cap={plan.cap} />
+        <p className="park-home-plan__sample" data-testid="budget-line">
+          {`Start approves up to ${plan.cap} credits${plan.usd === null ? "" : ` (about US$${plan.usd.toFixed(2)})`}. You can pause it any time.`}
+        </p>
         {plan.lines.length > 0 ? (
           <ol className="park-home-steps" aria-label="What Tilo assumed">
             {plan.lines.map((line, i) => (
@@ -91,6 +99,7 @@ export function RunCard({ plan, busy, error, onStart, onCancel, onEdit }: RunCar
             ))}
           </ol>
         ) : null}
+        {repeat.control}
         {busy ? (
           // biome-ignore lint/a11y/useSemanticElements: a status line, not a form result
           <p role="status" className="park-home-plan__sample">
@@ -107,9 +116,9 @@ export function RunCard({ plan, busy, error, onStart, onCancel, onEdit }: RunCar
         <button
           type="button"
           className="park-home-confirm"
-          disabled={busy}
+          disabled={busy || repeat.invalid}
           aria-busy={busy ? true : undefined}
-          onClick={onStart}
+          onClick={() => onStart(repeat.cadence)}
         >
           {error ? "Try again" : "Start"}
         </button>

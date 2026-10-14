@@ -5,11 +5,6 @@ import { SCREENS } from "./meta";
 describe("UX-227-C the top bar's current place", () => {
   it("names Home, a new task step and a lens of a world from the address alone", () => {
     expect(placeOf("/")).toEqual({ name: "Home", sub: null, world: null });
-    expect(placeOf("/task/t1/approaches")).toEqual({
-      name: "New task",
-      sub: "Approaches",
-      world: null,
-    });
     expect(placeOf("/world/w_a/stage")).toEqual({ name: "World", sub: null, world: "w_a" });
     expect(placeOf("/world/w_a/story")).toEqual({ name: "World", sub: "Story", world: "w_a" });
     expect(placeOf("/world/w_a/delivery").sub).toBe("Delivery");
