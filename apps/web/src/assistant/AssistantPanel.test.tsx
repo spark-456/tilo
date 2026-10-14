@@ -76,9 +76,9 @@ describe("FR-PA-12 assistant panel shell", () => {
   it("follows the screen: the chip names the screen the person is on", async () => {
     await mount();
     await act(async () => launcher()?.click());
-    await go("/library");
+    await go("/autonomy");
     expect(document.querySelector('[data-testid="assistant-context"]')?.textContent).toBe(
-      "You are on: Library",
+      "You are on: Autonomy",
     );
     await go("/world/w_village_basic/delivery");
     expect(document.querySelector('[data-testid="assistant-context"]')?.textContent).toContain(

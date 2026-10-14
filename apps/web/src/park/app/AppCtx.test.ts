@@ -19,6 +19,7 @@ describe("WEB_3a_appctx: the page list", () => {
       "profile",
       "connectors",
       "settings",
+      "library",
     ]);
   });
 
@@ -40,6 +41,7 @@ describe("WEB_3a_appctx: the contract is typed exactly as the README says", () =
       | "profile"
       | "connectors"
       | "settings"
+      | "library"
     >();
     expectTypeOf<(typeof PAGE_IDS)[number]>().toEqualTypeOf<PageId>();
     expectTypeOf<Params>().toEqualTypeOf<Record<string, string>>();

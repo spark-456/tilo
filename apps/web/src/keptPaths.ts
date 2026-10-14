@@ -11,10 +11,7 @@ const KEPT: readonly RegExp[] = [
   /^\/world\/[^/]+\/inspect\/[^/]+\/?$/,
   /^\/needs-you(?:\/(?:gate|consent))?\/?$/,
   /^\/(?:meeting|autonomy|channels|mail|connections|estimate|pilot)\/?$/,
-  /^\/(?:plate|pinboards|calendar|more)\/?$/,
-  /^\/library(?:\/artifacts)?\/?$/,
-  /^\/meetings(?:\/[^/]+)?\/?$/,
-  /^\/worlds\/replays\/?$/,
+  /^\/more\/?$/,
   /^\/team\/console\/?$/,
   // dev only, as in screens/routes.tsx: the screens index, the cards gallery and the component sheet
   ...(import.meta.env.DEV ? [/^\/screens(?:\/cards)?\/?$/, /^\/dev\/components\/?$/] : []),

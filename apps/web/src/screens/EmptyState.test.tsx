@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
-// #227 Bundle H1: one EmptyState (glyph, title, one line, at most one action) on S-06, S-07, S-12,
-// S-13, S-14 and S-21. Each screen says what is true: nothing is recorded, so nothing is listed.
+// #227 Bundle H1: one EmptyState (glyph, title, one line, at most one action) on S-06, S-07 and S-12.
+// Each screen says what is true: nothing is recorded, so nothing is listed.
 import { act } from "react";
 import type { ComponentType, ReactNode } from "react";
 import { createRoot } from "react-dom/client";
@@ -11,9 +11,6 @@ import { FixtureClient } from "../api/fixtureClient";
 import { S_06 } from "./S_06";
 import { S_07 } from "./S_07";
 import { S_12 } from "./S_12";
-import { S_13 } from "./S_13";
-import { S_14 } from "./S_14";
-import { S_21 } from "./S_21";
 import { EmptyState } from "./kit";
 import type { ScreenProps } from "./routes";
 
@@ -76,8 +73,6 @@ describe("#227 H1 EmptyState: each screen with nothing recorded", () => {
     ["S-06", S_06, [], "needs-empty", "Nothing needs you"],
     ["S-07", S_07, [], "gate-empty", "No gate yet"],
     ["S-12", S_12, ["w_village_basic"], "delivery-pending", "Nothing to deliver yet"],
-    ["S-13", S_13, [], "library-empty", "Nothing delivered yet"],
-    ["S-21", S_21, [], "history-empty", "No artifact yet"],
   ];
   for (const [id, Component, params, testid, title] of cases) {
     it(`${id} shows its EmptyState "${title}" with one action`, async () => {
@@ -89,23 +84,4 @@ describe("#227 H1 EmptyState: each screen with nothing recorded", () => {
       expect(c.querySelector(".empty-note")?.textContent ?? "").not.toContain("Nothing");
     });
   }
-
-  it("S-13's memory note is the compact EmptyState, with no action", async () => {
-    const c = await screen(S_13);
-    const box = c.querySelector('[data-testid="memory-empty"]');
-    expect(box?.getAttribute("data-compact")).toBe("true");
-    expect(box?.querySelectorAll("a, button")).toHaveLength(0);
-  });
-
-  it("S-14 lists no world when the client knows none, and says so", async () => {
-    const c = await show(() => <S_14 />, quietClient(false));
-    const box = c.querySelector('[data-testid="worlds-empty"]');
-    expect(box?.querySelector(".empty-title")?.textContent).toBe("No worlds yet");
-    expect(c.querySelector('[data-testid="world-card"]')).toBeNull();
-  });
-
-  it("S-14 still shows the world's card when the client knows it", async () => {
-    const c = await screen(S_14);
-    expect(c.querySelector('[data-testid="worlds-empty"]')).toBeNull();
-  });
 });

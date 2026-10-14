@@ -13,6 +13,7 @@ export const PAGE_IDS = [
   "profile",
   "connectors",
   "settings",
+  "library",
 ] as const;
 
 export type PageId = (typeof PAGE_IDS)[number];
@@ -31,6 +32,7 @@ export const PAGE_LABEL: Record<PageId, string> = {
   profile: "Profile",
   connectors: "Connectors",
   settings: "Settings",
+  library: "Library",
 };
 
 export interface AppCtx {
