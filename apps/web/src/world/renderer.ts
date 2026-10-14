@@ -87,6 +87,7 @@ export interface WorldLayer {
   readonly density: () => Density;
   readonly size: () => { width: number; height: number };
   /** How much the name tags are enlarged so they read on a small screen (1 on a full-size stage). */
+  shadows?: boolean;
   tagScale: number;
   staticKey: string;
   groundKey: string;
@@ -433,12 +434,16 @@ export function renderAgents(
   for (const agent of frame.agents) {
     const p = positions.get(agent.id);
     if (!p) continue;
-    const key = `${agent.rank}:${agent.tint}`;
+    const shadows = layer.shadows !== false;
+    const key = `${agent.rank}:${agent.tint}:${shadows}`;
     let fig = layer.figures.get(agent.id);
     if (!fig || fig.key !== key) {
       fig?.g.destroy();
       const g = new Graphics();
-      drawAgent(g, agent.rank, agent.tint);
+      drawAgent(g, agent.rank, agent.tint, shadows);
+      // FR-WLD-13: the rig never changes during a walk; rasterize its many faces once.
+      // Position/depth still follow the caller's recorded choreography on every frame.
+      g.cacheAsTexture({ resolution: 2, antialias: true });
       layer.objects.addChild(g);
       fig = { g, key };
       layer.figures.set(agent.id, fig);

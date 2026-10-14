@@ -11,6 +11,7 @@ import type { Container } from "pixi.js";
 import { subscribeDensity } from "../display/density";
 import { MAX_DURATION_MS, createChoreographer } from "./choreographer";
 import { type Frame, frameOf } from "./frame";
+import { createMobileQuality } from "./mobileQuality";
 import { type WorldState, applyEvent, createInitialState } from "./reducer";
 import {
   type WorldLayer,
@@ -111,6 +112,7 @@ function createLive(
   const { world, requestRender, layout, reducedMotion, onSeq, onTrace } = o;
   const onStatus = o.onStatus ?? (() => undefined);
   const layer = createLayer(world, o.size);
+  const mobileQuality = createMobileQuality();
   // FR-WLD-06: the ring follows the run's one selection; choosing redraws one frame, nothing more.
   const selected = () => getSelection(layout.world_id);
   const agentIds = layout.semantic.agents.map((a) => a.id);
@@ -175,8 +177,15 @@ function createLive(
 
   function tickAnim() {
     raf = 0;
-    if (stopped || paused || scrubbed) return;
-    if (drawAgents(performance.now())) raf = requestAnimationFrame(tickAnim);
+    if (stopped || paused || scrubbed) {
+      mobileQuality.idle();
+      return;
+    }
+    const now = performance.now();
+    mobileQuality.sample(now, o.size().width);
+    layer.shadows = mobileQuality.shadows;
+    if (drawAgents(now)) raf = requestAnimationFrame(tickAnim);
+    else mobileQuality.idle();
   }
 
   const unselect = subscribeSelection(() => {
