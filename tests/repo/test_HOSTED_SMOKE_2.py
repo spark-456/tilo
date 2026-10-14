@@ -31,7 +31,14 @@ CONFIG = {
 
 @pytest.fixture
 def fake_server():
-    state = {"config": dict(CONFIG), "deps_status": 200, "requests": [], "bundle_api": API, "google": True}
+    state = {
+        "config": dict(CONFIG),
+        "deps_status": 200,
+        "requests": [],
+        "bundle_api": API,
+        "google": True,
+        "healthz_status": 200,
+    }
 
     class Handler(BaseHTTPRequestHandler):
         def log_message(self, *args):
@@ -46,8 +53,10 @@ def fake_server():
                 body = '<script src="/assets/main.js"></script>'
             elif self.path == "/assets/main.js":
                 body = json.dumps(state["bundle_api"]) + ('; "Continue with Google"' if state["google"] else "")
-            elif self.path == "/healthz/deps":
+            elif self.path == "/health/deps":
                 status, body = state["deps_status"], json.dumps(state["config"])
+            elif self.path == "/healthz":
+                status = state["healthz_status"]
             elif self.path == "/v1/plate":
                 status = 401
             elif self.path == "/intake" and self.command == "OPTIONS":
@@ -56,7 +65,7 @@ def fake_server():
                     "Access-Control-Allow-Methods": "POST",
                     "Access-Control-Allow-Headers": "authorization,content-type,x-tilo-channel",
                 }
-            elif self.path != "/healthz":
+            elif self.path not in ("/health", "/healthz"):
                 status = 404
             self.send_response(status)
             for key, value in headers.items():
@@ -103,7 +112,7 @@ def test_configured_http_is_not_demo_acceptance(fake_server, capsys, monkeypatch
     assert "PASS dependency-configuration" in output
     assert "SKIP demo: Home and recorded world require the existing playwright.hosted.config.ts hosted smoke" in output
     assert "PASS hosted-http (signed-out HTTP checks only; demo unverified)" in output
-    assert {"/", "/assets/main.js", "/healthz", "/healthz/deps"} <= {path for _, path, _ in state["requests"]}
+    assert {"/", "/assets/main.js", "/health", "/healthz", "/health/deps"} <= {path for _, path, _ in state["requests"]}
     assert all(method in ("GET", "OPTIONS") for method, _, _ in state["requests"])
     assert all("Authorization" not in headers and "Cookie" not in headers for _, _, headers in state["requests"])
 
@@ -124,7 +133,7 @@ def test_live_flag_requires_boolean_true(fake_server, capsys, value):
     assert "live_mode does not report" in capsys.readouterr().out
 
 
-@pytest.mark.parametrize("status", [302, 404, 503])
+@pytest.mark.parametrize("status", [302, 429, 503])
 def test_dependency_http_failure(fake_server, capsys, status):
     state, transport = fake_server
     state["deps_status"] = status
@@ -138,4 +147,24 @@ def test_hosting_failure_stops_before_dependency_checks(fake_server, capsys, fie
     state[field] = value
     assert smoke.hosted_main([API], transport=transport()) == 1
     assert "FAIL hosted:" in capsys.readouterr().out
-    assert not any(path == "/healthz/deps" for _, path, _ in state["requests"])
+    assert not any(path == "/health/deps" for _, path, _ in state["requests"])
+
+
+@pytest.mark.parametrize("missing", ["healthz", "dependencies", "both"])
+def test_missing_deployment_is_explicit_and_never_hosted_pass(fake_server, capsys, missing):
+    state, transport = fake_server
+    if missing in ("healthz", "both"):
+        state["healthz_status"] = 404
+    if missing in ("dependencies", "both"):
+        state["deps_status"] = 404
+    assert smoke.hosted_main([API], transport=transport()) == 1
+    output = capsys.readouterr().out
+    assert "PASS health\n" in output
+    assert "PASS sign-in" in output and "PASS bundle-api" in output
+    assert "NOT DEPLOYED hosted-http:" in output
+    assert "PASS hosted-http" not in output
+    if missing in ("healthz", "both"):
+        assert "NOT DEPLOYED healthz: HTTP 404; /healthz is not deployed yet" in output
+    if missing in ("dependencies", "both"):
+        assert "NOT DEPLOYED dependency-configuration: HTTP 404; /health/deps is not deployed yet" in output
+    assert any(path == "/health/deps" for _, path, _ in state["requests"])
