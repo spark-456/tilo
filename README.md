@@ -1,9 +1,23 @@
 # Tilo
 
-Tilo is an agentic work platform. You describe work in plain language; a Director plans it and offers one priced
-confirmation card; teams of agents run it. You watch the work as a living isometric world, a plain-language Story, or a
-technical Trace, and agents come to you (web, phone or email) when they need a decision. Every animation traces to a
-recorded event, and nothing that leaves Tilo is sent without the policy engine and, for the highest tier, a person.
+Tilo turns a plain-language task into a plan and one confirmation card showing scope and estimated cost.
+Teams of agents carry out approved work, with progress shown through recorded events in an isometric World, a plain-language Story and a technical Trace.
+External actions pass through the policy engine and outbox, and the highest risk tier requires a person's approval.
+
+**Judges — submission 17 October 2026:** open [Tilo](https://essential-wares-510320-f0.web.app),
+choose **Continue with Google** with an authorised test account, or **Explore a demo session** for a labelled recording.
+Follow the [three-minute walkthrough](docs/demo.md); see the [architecture](docs/architecture.md),
+[design decisions](docs/adr/) and [connector status and owner activation requirements](docs/connectors/README.md).
+
+**Verified 14 October 2026:** the public site returned HTTP 200 with HTML build stamp
+`7e1b0d7bd7accbe01d2560b4b5daa2a4735294d1`. This verifies site availability only;
+it does not establish sign-in, a completed live task, provider access or external delivery.
+The walkthrough describes candidate `182beac2a481d28982e145092e471939f59adc91`,
+so check the hosted build stamp before demonstrating that candidate's flow.
+
+Slack, Teams and Outlook decision cards are prepared offline and remain off pending integration and activation.
+Canva needs the owner's app and verified provider details; Lovable's manual handoff is distinct from its inert MCP preparation.
+These preparations are not evidence of live connectors or sending; [activation requirements](docs/connectors/README.md) remain held.
 
 Built for the Google Cloud AI Builder Cup 2026. The full specification is `docs/prd/tilo-prd-v2.md` (read-only);
 `contracts/` (JSON Schemas, event registry, fixtures) wins over prose where they differ.
@@ -128,6 +142,10 @@ BigQuery, Secret Manager and Cloud KMS, Model Armor. The service map is PRD 6.3.
 No committed pass record exists yet (`evals/results.md` is not in the repository); the numbers above are file counts,
 not results.
 
+The latest preserved local replay result (14 October, `c3e8f64e` documentation handoff) was
+**0/0 PASS, 160 not runnable, 0 failures, 0 credits**. It provides no runnable coverage
+or live quality claim; this docs change does not repeat that evaluation.
+
 ## Security notes
 
 - Every side effect goes through the outbox and a deterministic policy engine; a model never decides authorisation,
@@ -144,8 +162,8 @@ not results.
 - WhatsApp is out of scope; the channels are web, phone web push and email.
 - Email Autopilot and Google sign-in run in testing mode for listed test users until Google's app verification is
   complete (PRD 1.4).
-- Roadmap, not built (PRD 3.4): desktop control, Build mode, workforce orchestration, native mobile apps,
-  Microsoft 365 connectors.
+- Roadmap (PRD 3.4): desktop control, Build mode, workforce orchestration and native mobile apps.
+  Microsoft 365 card preparation is offline; no live Teams or Outlook delivery is established here.
 - Open questions and the defaults taken are logged in `docs/open-questions.md`.
 
 ## License
