@@ -1,9 +1,9 @@
 // WEB-9 acceptance in a real browser: the Park Agenda at /agenda, 1440x900 and 390x844. The page
 // renders the designed copy on the fixture Api, the pinboard and calendar controls work, "Find a time"
-// books a slot, "Review and approve" goes to the world through the shell (no reload), and nothing is
+// shows a page-local sample booking, "Review and approve" goes to the world through the shell (no reload), and nothing is
 // written to the console.
 // Run on a private port: TILO_WEB_PORT=<own port> pnpm --filter @tilo/web exec playwright test
-// e2e/agenda.spec.ts --project=chromium --no-deps --workers=3
+// e2e/agenda.spec.ts --project=chromium --no-deps --workers=1
 import { type Page, expect, test } from "@playwright/test";
 import { collectConsoleProblems } from "../support/console";
 import { DESKTOP, MOBILE } from "../support/viewports";
@@ -74,19 +74,42 @@ for (const [name, viewport] of Object.entries(SIZES)) {
       expect(problems).toEqual([]);
     });
 
-    test(`WEB_9_e2e_${name}_find_a_time_books_a_slot_and_pins_it`, async ({ page }) => {
+    test(`WEB_9_HR_W23_e2e_${name}_find_a_time_shows_a_page_only_sample_booking_and_pins_it`, async ({
+      page,
+    }) => {
       const problems = collectConsoleProblems(page);
       await open(page);
+      const writes: string[] = [];
+      page.on("request", (request) => {
+        if (!["GET", "HEAD", "OPTIONS"].includes(request.method()))
+          writes.push(`${request.method()} ${request.url()}`);
+      });
+      await expect(page.getByTestId("park-page-agenda")).toHaveAttribute("data-source", "fixture");
+      await expect(
+        page.getByText(
+          "Sample week: no meetings are booked, invitations sent or reminders scheduled.",
+        ),
+      ).toBeVisible();
+      await expect(page.locator('[data-pin="tg"]')).toHaveCount(0);
       await page.getByRole("button", { name: "Find a time" }).first().click();
       await expect(
         page.getByText("Tilo checked all four calendars. Pick a dashed slot to book it."),
       ).toBeVisible();
       await page.locator("[data-slot]").first().click();
-      await expect(page.getByRole("status")).toContainText(
-        "Booked Thu 16:00 on your Agenda. Invites go out from Google Calendar once it's connected and you approve",
+      // A22 14 Oct regression: W23 HR copy describes the sample; no external booking is claimed.
+      await expect(page.getByRole("status")).toHaveText(
+        "Sample booking for Thu 16:00 shown on this page only. No meeting was booked or invitations sent.",
       );
       await expect(page.locator('[data-pin="tg"]')).toContainText("K1 gate review booked");
       await expect(page.locator("[data-slot]")).toHaveCount(0);
+      expect(writes).toEqual([]);
+      // The pin is page state only: a reload restores the sample and records no meeting or invitation.
+      await page.reload();
+      await expect(page.getByRole("heading", { level: 1, name: "Agenda" })).toBeVisible();
+      await expect(page.locator('[data-pin="tg"]')).toHaveCount(0);
+      await expect(page.locator('[data-pin="t0"]')).toBeVisible();
+      await expect(page.locator('[data-event="gate"]')).toHaveCount(0);
+      expect(writes).toEqual([]);
       expect(problems).toEqual([]);
     });
 
