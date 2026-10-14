@@ -404,7 +404,13 @@ export class HttpClient implements TiloClient, SchedulesApi, FieldsApi, ItemApi 
   private readonly missingListeners = new Set<() => void>();
   // Keep only the current uncertain intent. File identity matters: same metadata can hide different bytes.
   private intakeIntent:
-    | { text: string; files: File[]; mode: "quick" | undefined; key: string }
+    | {
+        text: string;
+        files: File[];
+        mode: "quick" | undefined;
+        key: string;
+        pending?: Promise<IntakeResult | QuickIntakeResult>;
+      }
     | undefined;
 
   constructor(options: HttpClientOptions) {
@@ -680,8 +686,12 @@ export class HttpClient implements TiloClient, SchedulesApi, FieldsApi, ItemApi 
       intent = { text, files: [...files], mode, key: crypto.randomUUID() };
       this.intakeIntent = intent;
     }
+    // QA-11: sharing the key alone still sends two POSTs while the first is pending.
+    if (intent.pending) return intent.pending;
+    const pending = this.sendIntake(text, intent.files, mode, intent.key);
+    intent.pending = pending;
     try {
-      const result = await this.sendIntake(text, intent.files, mode, intent.key);
+      const result = await pending;
       if (this.intakeIntent === intent) this.intakeIntent = undefined;
       return result;
     } catch (error) {
@@ -690,6 +700,8 @@ export class HttpClient implements TiloClient, SchedulesApi, FieldsApi, ItemApi 
         this.intakeIntent = undefined;
       }
       throw error;
+    } finally {
+      intent.pending = undefined;
     }
   }
 
