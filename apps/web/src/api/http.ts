@@ -471,9 +471,16 @@ export class HttpClient implements TiloClient, SchedulesApi, FieldsApi, ItemApi 
     return this.request<unknown>(path, init, true);
   }
 
-  /** A PUT or DELETE of `path` with no body, decoded as JSON, `write` true (BQ-CTX-TEAMWORLD: team shares). */
-  sendJson(method: "PUT" | "DELETE", path: string): Promise<unknown> {
-    return this.refusedSample(path) ?? this.request<unknown>(path, { method }, true);
+  /** A JSON write with any method (PUT, DELETE, POST), decoded as JSON, `write` true (TEAM-WEB). No credentials. */
+  sendJson(method: string, path: string, body?: unknown): Promise<unknown> {
+    const refused = this.refusedSample(path);
+    if (refused) return refused;
+    const init: RequestInit = { method };
+    if (body !== undefined) {
+      init.headers = { "content-type": "application/json" };
+      init.body = JSON.stringify(body);
+    }
+    return this.request<unknown>(path, init, true);
   }
 
   /** STARTER-1: the sample project is a recorded replay. A write for it is refused here and never sent: no

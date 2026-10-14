@@ -34,6 +34,7 @@ export function createFixtureApi(): Omit<Api, "getAgenda" | "getProfileSettings"
     getLedger: () => ok(fx.ledger),
     getAgenda: () => ok(fx.agenda),
     getTeam: () => ok(fx.team),
+    getTeamLive: () => ok(null),
     getConnectors: () => ok(fx.connectors),
     getNotifications: () => ok(fx.notifications),
     getTeamPolicy: () => ok(fx.teamPolicy),
@@ -60,6 +61,7 @@ export function createFixtureApi(): Omit<Api, "getAgenda" | "getProfileSettings"
     bookSlot: ack,
     addBackup: ack,
     setPref: ack,
+    writeTeam: () => ok(null),
     submitFeedback: ack, // source "fixture": never a server confirmation, so the pop-up never says Thanks
   };
 }

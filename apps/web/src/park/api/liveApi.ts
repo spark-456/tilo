@@ -31,6 +31,7 @@ import {
   versionOfBody,
 } from "./live/skillsFromApi";
 import { teamFromPeople } from "./live/teamFromPeople";
+import { type TeamView, isTeamView, requestOf } from "./live/teamLive";
 import { isUserSettings } from "./live/userSettings";
 import { worldFromIntake } from "./live/worldFromIntake";
 import { STATE_OF, type WorldListItem, worldsFromList } from "./live/worldsFromList";
@@ -419,6 +420,24 @@ export function createLiveApi(options: LiveApiOptions = {}): Api {
     answered[key] = true;
     return { data: { ok: true, dec: { ...answered } }, source: "live" };
   };
+  // TEAM-WEB: the team view and its Owner-only writes (services/api team_routes.py). A write answers the new view;
+  // an invite answers its id only, so it is followed by a read. No retry: the server already retries a lost race.
+  const readTeam = async (): Promise<TeamView> => {
+    const body = await http.getJson("/v1/team");
+    if (!isTeamView(body)) throw new TiloApiError(BAD_REPLY, 200, true);
+    return body;
+  };
+  api.getTeamLive = async () => ({ data: await readTeam(), source: "live" });
+  api.writeTeam = async (op) => {
+    const { method, path, body } = requestOf(op);
+    const reply = await http.sendJson(method, path, body);
+    // The invite is saved once the POST answers; if the read after it fails, say "no view" (the page keeps its
+    // optimistic copy and says so) rather than fail a write that happened, which a retry would refuse (409).
+    if (op.kind === "invite") return { data: await readTeam().catch(() => null), source: "live" };
+    if (!isTeamView(reply)) throw new TiloApiError(BAD_REPLY, 200, true, true);
+    return { data: reply, source: "live" };
+  };
+
   // The real intake call, the legacy S-01's (FR-UX-13): one POST of the text alone (the intake has no size, routine
   // or workspace field; the size only picks the tier shown, BQ-UX13-2). A reply the page cannot read, including
   // one without its `files`, is a TiloApiError, never a TypeError or a world. The brief goes to S-02.

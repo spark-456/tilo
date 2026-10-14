@@ -1,6 +1,7 @@
 // WEB-10 Team page: the members card (header row, one row per person, the open details block).
 // Plan 8c: the Card padding 14/18/6 and the 36px "more" button are page-local variants.
 // A real <table>; Team.css makes each <tr> a grid (the design's column template) and the table parts blocks.
+import type { ReactNode } from "react";
 import { icon } from "./teamKit";
 import { type Member, type MemberView, initialsOf } from "./teamModel";
 
@@ -14,7 +15,12 @@ interface MembersProps {
   onRole: (p: Member, role: string) => void;
   canChange: (p: Member) => boolean;
   onRemove: (p: Member) => void;
-  onResend: (p: Member) => void;
+  /** Without it no "Resend invite" is offered (live mode: no route resends). */
+  onResend?: ((p: Member) => void) | undefined;
+  /** Whether the remove / cancel button is offered for this person (default: yes, except for you). */
+  canRemove?: ((p: Member) => boolean) | undefined;
+  /** More controls at the end of the open details block (live mode: the spend limit). */
+  extra?: ((p: Member) => ReactNode) | undefined;
 }
 
 export function Members({
@@ -26,6 +32,8 @@ export function Members({
   canChange,
   onRemove,
   onResend,
+  canRemove,
+  extra,
 }: MembersProps) {
   return (
     <section className="park-team-card park-team-members" aria-label="Members">
@@ -47,7 +55,7 @@ export function Members({
               v={v}
               roles={roles}
               isOpen={open === v.p.id}
-              {...{ onOpen, onRole, canChange, onRemove, onResend }}
+              {...{ onOpen, onRole, canChange, onRemove, onResend, canRemove, extra }}
             />
           ))}
         </table>
@@ -58,13 +66,24 @@ export function Members({
 
 type PersonProps = Pick<
   MembersProps,
-  "roles" | "onOpen" | "onRole" | "canChange" | "onRemove" | "onResend"
+  "roles" | "onOpen" | "onRole" | "canChange" | "onRemove" | "onResend" | "canRemove" | "extra"
 > & {
   v: MemberView;
   isOpen: boolean;
 };
 
-function Person({ v, roles, isOpen, onOpen, onRole, canChange, onRemove, onResend }: PersonProps) {
+function Person({
+  v,
+  roles,
+  isOpen,
+  onOpen,
+  onRole,
+  canChange,
+  onRemove,
+  onResend,
+  canRemove,
+  extra,
+}: PersonProps) {
   const { p } = v;
   return (
     <tbody className="park-team-blk park-team-person">
@@ -140,12 +159,12 @@ function Person({ v, roles, isOpen, onOpen, onRole, canChange, onRemove, onResen
               </div>
             ))}
             <div className="park-team-actions">
-              {p.pending ? (
+              {p.pending && onResend ? (
                 <button type="button" className="park-team-btn" onClick={() => onResend(p)}>
                   Resend invite
                 </button>
               ) : null}
-              {p.you ? null : (
+              {p.you || canRemove?.(p) === false ? null : (
                 <button
                   type="button"
                   className="park-team-btn park-team-btn--red"
@@ -154,6 +173,7 @@ function Person({ v, roles, isOpen, onOpen, onRole, canChange, onRemove, onResen
                   {p.pending ? "Cancel invite" : "Remove from team"}
                 </button>
               )}
+              {extra?.(p)}
             </div>
           </td>
         </tr>

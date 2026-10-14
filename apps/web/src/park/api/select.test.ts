@@ -49,6 +49,8 @@ describe("WEB_1a_select: an API url means the live Api and no sample values", ()
           "getWorlds",
           "getDecisions",
           "decide",
+          "getTeamLive",
+          "writeTeam",
           "startWorld",
           "getConnectors",
           "getNotifications",

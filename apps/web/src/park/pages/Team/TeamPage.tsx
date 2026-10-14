@@ -14,12 +14,14 @@ import {
 import type { Team, World } from "../../api/types";
 import type { AppCtx } from "../../app/AppCtx";
 import { useParkApi } from "../../app/context";
+import { isNotBuilt, useLiveTeam } from "../../app/useLiveTeam";
 import { useStaged } from "../../app/useStaged";
 import { Button, PageSheet } from "../../components";
 import { FirstRunPanels } from "../../sample/FirstRunPanels";
 import { useFirstRunPreview } from "../../sample/useFirstRunPreview";
 import { Coverage } from "./Coverage";
 import { LiveMembers } from "./LiveMembers";
+import { LiveBody, LiveInvite, StatusLine } from "./LiveTeam";
 import { Members } from "./Members";
 import { MatrixCard, RulesCard } from "./Rules";
 import "./Team.css";
@@ -73,6 +75,8 @@ function PersonalTeamPage({ app }: { app: AppCtx }) {
   const api = useParkApi();
   const { dec, added, toast } = app;
   const [loaded, setLoaded] = useState<Loaded | "failed" | null>(null);
+  const [controlsOnly, setControlsOnly] = useState(false);
+  const [controlsOpen, setControlsOpen] = useState(false);
   const [liveTeam, setLiveTeam] = useState<Team | null>(null);
   const [people, setPeople] = useState<Member[] | null>(null);
   const [email, setEmail] = useState("");
@@ -105,7 +109,11 @@ function PersonalTeamPage({ app }: { app: AppCtx }) {
           worlds: w.data,
         });
       })
-      .catch(() => live && setLoaded("failed"));
+      .catch((e: unknown) => {
+        if (!live) return;
+        if (isNotBuilt(e)) setControlsOnly(true);
+        else setLoaded("failed");
+      });
     return () => {
       live = false;
     };
@@ -127,6 +135,8 @@ function PersonalTeamPage({ app }: { app: AppCtx }) {
 
   // One stable root: the frame and the heading are the same elements while loading, loaded or failed, so
   // the h1 the shell focuses on arrival is not remounted when the data lands.
+  if (controlsOnly) return <LiveControlsPage app={app} />;
+
   const ready =
     !liveTeam && loaded && loaded !== "failed" && people
       ? {
@@ -179,7 +189,13 @@ function PersonalTeamPage({ app }: { app: AppCtx }) {
         ) : null}
       </Top>
       {liveTeam ? (
-        <LiveMembers team={liveTeam} />
+        <>
+          <LiveMembers team={liveTeam} />
+          <details onToggle={(e) => setControlsOpen(e.currentTarget.open)}>
+            <summary>Manage team settings</summary>
+            {controlsOpen ? <LiveControls app={app} /> : null}
+          </details>
+        </>
       ) : ready ? (
         <TeamBody app={app} data={ready.data} people={ready.people} setPeople={setPeople} />
       ) : loaded === "failed" ? (
@@ -295,5 +311,31 @@ function TeamBody({ app, data, people, setPeople }: BodyProps) {
         </div>
       ) : null}
     </>
+  );
+}
+
+/** The owner settings view supplements the people directory; failures do not hide the directory. */
+function LiveControls({ app }: { app: AppCtx }) {
+  const lt = useLiveTeam(useParkApi());
+  return (
+    <>
+      {lt.state.phase === "ready" ? <LiveInvite live={lt} toast={app.toast} /> : null}
+      <StatusLine text={lt.note} />
+      {lt.state.phase === "ready" ? (
+        <LiveBody live={lt} view={lt.state.view} toast={app.toast} />
+      ) : lt.state.phase === "error" ? (
+        <p className="park-team-intro">{lt.state.text}</p>
+      ) : lt.state.phase === "fixture" ? (
+        <p>Not connected yet</p>
+      ) : null}
+    </>
+  );
+}
+function LiveControlsPage({ app }: { app: AppCtx }) {
+  return (
+    <Frame>
+      <Top />
+      <LiveControls app={app} />
+    </Frame>
   );
 }

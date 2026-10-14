@@ -150,6 +150,8 @@ describe("WIRE_1_live_api: every other method is still NotBuilt", () => {
           "getWorlds",
           "getDecisions",
           "decide",
+          "getTeamLive",
+          "writeTeam",
           "startWorld",
           "getConnectors",
           "getNotifications",

@@ -1,6 +1,7 @@
 // The Park api (WEB-1a; plan section 6.1): every method returns a Promise of `{ data, source }`, so a
 // page can always say whether it shows sample data. One list of method names, one interface.
 import type { UserSettings, UserSettingsUpdate } from "@tilo/contracts";
+import type { TeamOp, TeamView } from "./live/teamLive";
 import type {
   Ack,
   AgendaData,
@@ -45,6 +46,7 @@ export const API_METHODS = [
   "getLedger",
   "getAgenda",
   "getTeam",
+  "getTeamLive",
   "getConnectors",
   "getNotifications",
   "getTeamPolicy",
@@ -62,6 +64,7 @@ export const API_METHODS = [
   "bookSlot",
   "addBackup",
   "setPref",
+  "writeTeam",
   "saveUserSettings",
   "submitFeedback",
 ] as const;
@@ -78,6 +81,8 @@ export interface Api {
   getLedger(): R<Ledger>;
   getAgenda(): R<AgendaData>;
   getTeam(): R<Team>;
+  /** TEAM-WEB: `GET /v1/team`. Live: the server's view. Fixture: `data: null` (the page keeps its sample copy). Unbuilt: NotBuilt. */
+  getTeamLive(): R<TeamView | null>;
   getConnectors(): R<Connector[]>;
   getNotifications(): R<Notification[]>;
   getTeamPolicy(): R<TeamPolicy>;
@@ -98,6 +103,8 @@ export interface Api {
   bookSlot(slot: AgendaSlot): R<Ack>;
   addBackup(personId: string): R<Ack>;
   setPref(key: string, value: unknown): R<Ack>;
+  /** TEAM-WEB: one Owner-only team write; resolves with the view the server answers. Fixture: `data: null`, nothing written. */
+  writeTeam(op: TeamOp): R<TeamView | null>;
   /** SEC-16: the lifetime-cap pop-up's feedback; confirmed only by a `source: "live"` answer. */
   submitFeedback(words: string): R<Ack>;
 }

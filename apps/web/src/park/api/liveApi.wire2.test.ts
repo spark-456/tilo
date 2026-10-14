@@ -390,6 +390,8 @@ describe("WIRE_2_live_api: nothing else is connected", () => {
           "getWorlds",
           "getDecisions",
           "decide",
+          "getTeamLive",
+          "writeTeam",
           "startWorld",
           "getConnectors",
           "getNotifications",
