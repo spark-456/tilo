@@ -1,0 +1,14 @@
+# PREP-SLACK-1: declaration only; deliberately outside the active catalogue.
+- id: slack
+  name: Slack
+  icon: message
+  auth: oauth2
+  scopes:
+    read: ["channels:read"]
+    send: ["chat:write"]
+  capabilities: [read, send]
+  actions:
+    - {id: post_message, capability: send, description: "Post approved text into the public channel you picked and invited the bot to.", risk_tier: T3, gate_type: approval, irreversible: true}
+    - {id: list_channels, capability: read, description: "List public channels so you can pick a destination.", risk_tier: T1, gate_type: none, irreversible: false}
+  limits: {per_minute: 20, batch_size: 1}
+  data_class: {returns: [business], redact: []}
