@@ -44,6 +44,7 @@ from tilo_api.costs import router as _costs_router
 from tilo_api.dispatch import router as _dispatch_router
 from tilo_api.effort import router as _effort_router
 from tilo_api.feedback import router as _feedback_router
+from tilo_api.health_deps import router as _health_deps_router
 from tilo_api.intake import router as intake_router
 from tilo_api.item_fields import router as _item_fields_router
 from tilo_api.log_context import LogContext as _LogContext
@@ -187,6 +188,7 @@ def _world_owner(world_id: str) -> str | None:
 
 
 app.include_router(_skill_proposals.build_router(_skill_proposals.get_skill_proposals, owner_of=_world_owner))
+app.include_router(_health_deps_router)
 _dev.install_if_enabled(app)  # only with TILO_API_DEV=1; refuses when deployed or live (CL-INT-4)
 
 
