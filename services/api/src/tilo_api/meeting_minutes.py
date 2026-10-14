@@ -57,7 +57,7 @@ def _source_guard(
         raise Refusal(409, "transcript_unavailable")
     world_id, ref = current.get("world_id"), current["transcript"]
     world = store.load_world(world_id, settle=False) if world_id else None
-    if world is None or world.owner != w.actor:
+    if world_id is None or world is None or world.owner != w.actor:
         raise Refusal(404, "not_found")
     if world.run_id != source[0] or ref is None:
         raise Refusal(409, "transcript_unavailable")
