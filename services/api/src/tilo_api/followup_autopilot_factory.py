@@ -16,6 +16,7 @@ from tilo_connectors import Outbox
 from tilo_policy.schemas import conforms
 
 from tilo_api import deps
+from tilo_api.draft_firestore import FirestoreDraftStore
 from tilo_api.followup_autopilot_state import FirestoreCards, FirestoreStops
 from tilo_api.followup_publication_ports import PublicationCards, PublicationOutbox, PublicationStops
 from tilo_api.owner_minutes_caller import OwnerMinutesCaller
@@ -141,8 +142,9 @@ def build_factory(
             return user_id
 
         scope = dict(org_id=deps.ORG_ID, owner=user_id, world_id=world_id, run_id=run_id)
-        cards = FirestoreCards(client, **scope, before_publication=check)
-        stops = FirestoreStops(client, **scope, before_publication=check)
+        retained = scoped_drafts if isinstance(scoped_drafts, FirestoreDraftStore) else None
+        cards = FirestoreCards(client, **scope, before_publication=check, drafts=retained)
+        stops = FirestoreStops(client, **scope, before_publication=check, drafts=retained)
         outbox = Outbox(
             outbox_store,
             {},

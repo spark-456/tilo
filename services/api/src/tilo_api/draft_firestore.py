@@ -83,6 +83,17 @@ class FirestoreDraftStore:
         key = hashlib.sha256(json.dumps([user_id, instruction_id], ensure_ascii=True).encode()).hexdigest()
         return f"orgs/{self._org}/followup_drafts/{key}"
 
+    def state_envelope(self, owner: str, key: str, value: dict) -> dict:
+        """Cards and stop rows share this request's trusted source and exact deadline."""
+        retention = self._authority(owner)
+        return retention.envelope(owner, key, value, source=self._source, expires_at=self._expiry)
+
+    def state_read(self, owner: str, key: str, row: dict) -> dict | None:
+        retention = self._authority(owner)
+        if not isinstance(row, dict) or row.get("expires_at") != self._expiry:
+            return None
+        return retention.read(owner, key, row)
+
     def get(self, user_id: str, instruction_id: str) -> dict | None:
         path = self._path(user_id, instruction_id)
         retention = self._authority(user_id)
