@@ -17,6 +17,39 @@ from tilo_api.people_writes import Refusal
 DAY, NOW = "2026-10-14", "2026-10-14T23:59:59.000Z"
 
 
+@pytest.mark.parametrize("kind", ["allowance", "spend"])
+def test_X_SEC37_FU_screen_cap_returns_429_without_publication(request, monkeypatch, kind):
+    from tilo_api import spend
+
+    c = request.getfixturevalue("minutes_app")
+
+    class CappedSafety:
+        def check(self, text):
+            if kind == "spend":
+                raise spend.SpendCapReached
+            raise Refusal(429, "allowance_capped")
+
+    monkeypatch.setattr(deps, "get_safety", lambda mode: CappedSafety())
+    before = c.rig.snapshot()
+    response = minutes_call(c)
+    assert response.status_code == 429
+    assert response.json()["detail"] == "allowance_capped"
+    assert c.rig.snapshot() == before
+    assert not c.router.calls
+
+
+@pytest.mark.parametrize("profile", ["models.gemini.yaml", "models.nim.yaml"])
+def test_X_SEC37_FU_verifier_input_cap_matches_default(profile):
+    from pathlib import Path
+
+    import yaml
+
+    config = Path(__file__).resolve().parents[3] / "config"
+    default = yaml.safe_load((config / "models.yaml").read_text(encoding="utf-8"))
+    alternate = yaml.safe_load((config / profile).read_text(encoding="utf-8"))
+    assert alternate["roles"]["verifier"]["max_input_tokens"] == default["roles"]["verifier"]["max_input_tokens"]
+
+
 class Script:
     def __init__(self, left=0, during=None):
         self.left, self.during, self.calls = left, during, []
