@@ -14,11 +14,10 @@ is not installed -- this fakes the SDK's public surface at the
 a legitimate "mocked transport" per the ticket, and the standard technique
 for testing code against an SDK that lives behind a stable import path.
 
-`install()` only ever replaces `google.genai`, `google.genai.types` and
-`google.genai.errors` -- never `sys.modules["google"]` itself, which this
-machine's real (unrelated) `google` namespace package already occupies.
+`install()` replaces `google.genai`, `google.genai.types`, `google.genai.errors`
+and the namespace's `genai` attribute -- never `sys.modules["google"]` itself.
 Call it through the `fake_genai_sdk` fixture (autouse=False) so
-`monkeypatch` restores `sys.modules` after each test.
+`monkeypatch` restores both import surfaces after each test.
 
 Ambiguity resolved (see report): the real SDK's response objects are not
 importable here to verify field names against, so this fakes the minimal,
@@ -151,7 +150,9 @@ class FakeClient:
         self.models = models
 
 
-def install() -> None:
+def install(monkeypatch: pytest.MonkeyPatch) -> None:
+    import google  # noqa: PLC0415 -- only the namespace, never a real SDK client
+
     genai_pkg = pytypes.ModuleType("google.genai")
     types_mod = pytypes.ModuleType("google.genai.types")
     errors_mod = pytypes.ModuleType("google.genai.errors")
@@ -166,18 +167,15 @@ def install() -> None:
 
     genai_pkg.Client = _unexpected_construction  # type: ignore[attr-defined]
 
-    sys.modules["google.genai"] = genai_pkg
-    sys.modules["google.genai.types"] = types_mod
-    sys.modules["google.genai.errors"] = errors_mod
+    monkeypatch.setitem(sys.modules, "google.genai", genai_pkg)
+    monkeypatch.setitem(sys.modules, "google.genai.types", types_mod)
+    monkeypatch.setitem(sys.modules, "google.genai.errors", errors_mod)
+    monkeypatch.setattr(google, "genai", genai_pkg, raising=False)
 
 
 @pytest.fixture
 def fake_genai_sdk(monkeypatch: pytest.MonkeyPatch) -> Iterator[pytypes.ModuleType]:
     """Installs the fake `google.genai` SDK for the duration of one test and
     returns the fake `google.genai` module (for `errors.APIError` etc.)."""
-    for name in ("google.genai", "google.genai.types", "google.genai.errors"):
-        monkeypatch.delitem(sys.modules, name, raising=False)
-    install()
+    install(monkeypatch)
     yield sys.modules["google.genai"]
-    for name in ("google.genai", "google.genai.types", "google.genai.errors"):
-        monkeypatch.delitem(sys.modules, name, raising=False)

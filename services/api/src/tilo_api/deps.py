@@ -684,6 +684,40 @@ def get_feedback_store() -> Any:
         raise HTTPException(status_code=503, detail="not_configured") from None
 
 
+def get_followup_draft_store() -> Any:
+    """FR-MTG-08: existing guarded API client; no memory fallback or new environment."""
+    from tilo_api import store_door  # noqa: PLC0415
+    from tilo_api.draft_firestore import FirestoreDraftStore  # noqa: PLC0415
+
+    try:
+        opened = store_door.open_api_store()
+    except store_door.ApiStoreNotConfigured:
+        raise HTTPException(503, "not_configured", headers={"Cache-Control": "no-store"}) from None
+    except store_door.ApiStoreUnavailable:
+        raise HTTPException(503, "store_unavailable", headers={"Cache-Control": "no-store"}) from None
+    return FirestoreDraftStore(opened.client, org_id=ORG_ID)
+
+
+def get_followup_autopilot_factory(owner: Any) -> Any:
+    """FR-MTG-08: require the existing durable outbox; owner caller still remains closed."""
+    from tilo_api import store_door  # noqa: PLC0415
+    from tilo_api.followup_autopilot_factory import build_factory  # noqa: PLC0415
+    from tilo_api.outbox_firestore import FirestoreOutboxStore  # noqa: PLC0415
+
+    if os.environ.get("TILO_OUTBOX_STORE") != "firestore":
+        raise HTTPException(503, "not_configured", headers={"Cache-Control": "no-store"})
+    try:
+        opened = store_door.open_api_store()
+        outbox = get_outbox_store()
+        if not isinstance(outbox, FirestoreOutboxStore):
+            raise store_door.ApiStoreNotConfigured()
+        return build_factory(owner, client=opened.client, outbox_store=outbox, drafts=get_followup_draft_store())
+    except store_door.ApiStoreNotConfigured:
+        raise HTTPException(503, "not_configured", headers={"Cache-Control": "no-store"}) from None
+    except store_door.ApiStoreUnavailable:
+        raise HTTPException(503, "store_unavailable", headers={"Cache-Control": "no-store"}) from None
+
+
 def get_push_rpc() -> Any:
     """FR-CHN-17f: the client of tilo-channels' `POST /internal/push/send`, or None while `TILO_CHANNELS_URL` is
     unset or not an https Cloud Run address (then no push is sent: dev, CI and a demo send nothing)."""
