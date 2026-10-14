@@ -1,6 +1,7 @@
 // Home page data rules, written out from the reference (design_handoff_tilo_web_app/design/
 // Tilo App Home.dc.html, its renderVals, and tilo-app.js). Pure functions over what the Api returned:
 // nothing here reads a fixture, the clock or the address bar.
+import suggestions from "../../../../../../config/home_suggestions.json";
 import type {
   Agenda,
   AgendaEvent,
@@ -40,7 +41,7 @@ export const MODES: readonly [Mode, Mode, Mode] = [
     short: "Summarise this week’s feedback",
     start: "Start task",
     hint: "You see the plan and the cost before any agent starts.",
-    chips: ["Compare three suppliers", "Draft a reply to Northline", "Summarise yesterday’s calls"],
+    chips: suggestions.map((suggestion) => suggestion.label),
     agents: "2",
     cost: "about £0.60",
     eta: "about 6 min",
@@ -367,4 +368,9 @@ export function placedPins(
       out.push({ ...def, x: Math.round(p.x), y: Math.round(p.y), world });
   });
   return out;
+}
+
+/** W-SAMPLES-1: config suggestions fill text; they never dispatch a task. */
+export function suggestedTask(label: string): string {
+  return suggestions.find((suggestion) => suggestion.label === label)?.prompt ?? label;
 }

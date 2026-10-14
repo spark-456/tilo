@@ -1,3 +1,4 @@
+import { afterEach, describe, expect, it, vi } from "vitest";
 // @vitest-environment happy-dom
 // WEB-4 acceptance: the composer (README "Home": "Composer flow: idle -> drafting (900ms) -> plan with cost
 // and steps -> start. Starting calls addWorld() and toasts with an 'Open' action"; the reference's
@@ -6,7 +7,7 @@
 // Reference behaviours pinned on purpose: an empty or blank query is allowed and stands in with the mode's
 // example task; the start control does nothing while drafting or planning; typing, a chip or a size change
 // returns to idle and keeps the text; confirming clears the text and keeps the size.
-import { afterEach, describe, expect, it, vi } from "vitest";
+import suggestions from "../../../../../../config/home_suggestions.json";
 import { cleanup, press, qa } from "../../../../test-support/park/componentsHarness";
 import { MODES, QUICK, ROUTINE, WORKSPACE } from "../../../../test-support/park/homeCopy";
 import {
@@ -142,7 +143,7 @@ describe("WEB_4_home_composer: idle", () => {
     const rig = await mountHome();
     clickEl(control(rig.el, QUICK.chips[1] ?? ""));
     await settle();
-    expect(taskInput(rig.el).value).toBe(QUICK.chips[1]);
+    expect(taskInput(rig.el).value).toBe(suggestions[1]?.prompt);
     expect(drafting(rig)).toBeUndefined();
     expect(draftTimers(rig)).toHaveLength(0);
   });
