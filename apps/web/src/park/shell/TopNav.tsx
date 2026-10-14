@@ -10,6 +10,7 @@ import { Menu } from "../components";
 import { SampleChip } from "./SampleChip";
 import { icon } from "./kit";
 import type { Bar } from "./motion";
+import { prefetchPage } from "./prefetch";
 
 const TABS: readonly (readonly [PageId, string])[] = [
   ["home", "Home"],
@@ -122,6 +123,8 @@ export function TopNav(p: TopNavProps) {
                   aria-current={on ? "page" : undefined}
                   className={`park-shell__tab ${on ? "park-shell__tab--on" : ""}`}
                   onClick={link(id)}
+                  onPointerEnter={() => prefetchPage(id)}
+                  onFocus={() => prefetchPage(id)}
                 >
                   {label}
                   {id === "worlds" && p.needsLeft > 0 ? (
