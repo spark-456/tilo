@@ -18,6 +18,7 @@ from typing import Any
 import httpx
 from tilo_contracts import ProvidersProfile
 
+from tilo_providers.diagnostics import log_caught
 from tilo_providers.errors import (
     MissingCapabilityError,
     OutputTruncatedError,
@@ -111,6 +112,7 @@ class OpenAICompatModelProvider(ModelProvider):
         try:
             return self._client.post(path, json=body)
         except httpx.HTTPError as error:
+            log_caught(error, __name__, locals())
             mapped = map_transport_error(error)
             assert mapped is not None  # httpx.HTTPError always maps
             raise mapped from None
@@ -128,7 +130,8 @@ class OpenAICompatModelProvider(ModelProvider):
         message = f"PL-02: provider returned HTTP {response.status_code}"
         try:
             data = response.json()
-        except (json.JSONDecodeError, ValueError):
+        except (json.JSONDecodeError, ValueError) as caught_error:
+            log_caught(caught_error, __name__, locals())
             data = None
         if isinstance(data, dict):
             error = data.get("error")
@@ -168,6 +171,7 @@ class OpenAICompatModelProvider(ModelProvider):
         try:
             return response.json()
         except (json.JSONDecodeError, ValueError) as error:
+            log_caught(error, __name__, locals())
             raise ProviderError(self._scrub(f"PL-02: provider returned a malformed response body: {error}")) from None
 
     def _map_message(
@@ -251,6 +255,7 @@ class OpenAICompatModelProvider(ModelProvider):
             choice = data["choices"][0]
             return self._map_message(choice["message"], data.get("usage"), choice.get("finish_reason"))
         except (KeyError, IndexError, TypeError) as error:
+            log_caught(error, __name__, locals())
             raise ProviderError(self._scrub(f"PL-02: provider response missing {error}")) from None
 
     def stream(self, request: GenerateRequest) -> Iterator[GenerateResponse]:
@@ -276,6 +281,7 @@ class OpenAICompatModelProvider(ModelProvider):
                     try:
                         chunk = json.loads(payload)
                     except (json.JSONDecodeError, ValueError) as error:
+                        log_caught(error, __name__, locals())
                         raise ProviderError(
                             self._scrub(f"PL-02: provider returned a malformed stream chunk: {error}")
                         ) from None
@@ -284,6 +290,7 @@ class OpenAICompatModelProvider(ModelProvider):
                     try:
                         choice = chunk["choices"][0]
                     except (KeyError, IndexError, TypeError) as error:
+                        log_caught(error, __name__, locals())
                         raise ProviderError(self._scrub(f"PL-02: provider stream chunk missing {error}")) from None
                     finish_reason = choice.get("finish_reason")
                     if finish_reason == "content_filter":
@@ -308,6 +315,7 @@ class OpenAICompatModelProvider(ModelProvider):
                         buffer["name"] = function.get("name") or buffer["name"]
                         buffer["args"] += function.get("arguments") or ""
         except httpx.HTTPError as error:
+            log_caught(error, __name__, locals())
             mapped = map_transport_error(error)
             assert mapped is not None  # httpx.HTTPError always maps
             raise mapped from None
@@ -331,6 +339,7 @@ class OpenAICompatModelProvider(ModelProvider):
         try:
             vectors = [item["embedding"] for item in data["data"]]
         except (KeyError, TypeError) as error:
+            log_caught(error, __name__, locals())
             raise ProviderError(self._scrub(f"PL-02: provider response missing {error}")) from None
         return {"vectors": vectors, "usage": data.get("usage", {})}
 

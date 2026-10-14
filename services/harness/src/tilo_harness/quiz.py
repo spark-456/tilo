@@ -6,6 +6,7 @@ import json
 from collections.abc import Callable, Mapping
 from typing import Any
 
+from tilo_providers.diagnostics import log_caught
 from tilo_providers.interfaces import GenerateRequest, ModelProvider
 from tilo_providers.media import MAX_PARTS, MediaPart, check_parts
 
@@ -44,7 +45,8 @@ def quiz_output(reply: str, load: SourceLoader | None) -> UnitOutput:
         validate_sources(spec, load)
     except DeliverableRefused:
         raise
-    except Exception:
+    except Exception as caught_error:
+        log_caught(caught_error, __name__, locals())
         raise DeliverableRefused("invalid_spec") from None
     return UnitOutput(
         "application/json",
@@ -101,6 +103,7 @@ def verify_answers(spec: Mapping[str, Any], model: ModelProvider, load: SourceLo
             verdict = json.loads(reply.text, object_pairs_hook=_object, parse_constant=_constant)
             if verdict != {"confirmed": True} or type(verdict["confirmed"]) is not bool:
                 return False
-        except Exception:
+        except Exception as caught_error:
+            log_caught(caught_error, __name__, locals())
             return False
     return True

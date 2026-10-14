@@ -27,6 +27,7 @@ from typing import Any
 import pydantic
 from tilo_contracts import ProvidersProfile
 
+from tilo_providers.diagnostics import log_caught
 from tilo_providers.errors import (
     OutputTruncatedError,
     ProviderError,
@@ -118,7 +119,8 @@ def refuse_service_account_key(environ: Mapping[str, str] | None = None) -> None
     try:
         with open(path, encoding="utf-8") as handle:  # only the `type` field is read; ADC reports anything else
             content = json.load(handle)
-    except (OSError, ValueError):
+    except (OSError, ValueError) as caught_error:
+        log_caught(caught_error, __name__, locals())
         content = None
     if isinstance(content, dict) and content.get("type") == "service_account":
         where = _CREDENTIALS_VAR if explicit else "the gcloud well-known ADC file"
@@ -335,6 +337,7 @@ class GoogleModelProvider(ModelProvider):
                 model=self._profile.model, contents=self._contents(request), config=self._config(request)
             )
         except Exception as error:
+            log_caught(error, __name__, locals())
             failure = self._failure(error)
         else:
             return self._map_response(response)
@@ -349,6 +352,7 @@ class GoogleModelProvider(ModelProvider):
             for chunk in chunks:
                 yield self._map_response(chunk)
         except Exception as error:
+            log_caught(error, __name__, locals())
             failure = self._failure(error)
         if failure is not None:
             raise failure
@@ -358,6 +362,7 @@ class GoogleModelProvider(ModelProvider):
         try:
             response = self._client.models.embed_content(model=self._profile.model, contents=contents)
         except Exception as error:
+            log_caught(error, __name__, locals())
             failure = self._failure(error)
         else:
             # `.values` is the float vector; `list(item)` would iterate the
@@ -369,6 +374,7 @@ class GoogleModelProvider(ModelProvider):
         try:
             response = self._client.models.count_tokens(model=self._profile.model, contents=text)
         except Exception as error:
+            log_caught(error, __name__, locals())
             failure = self._failure(error)
         else:
             return response.total_tokens  # type: ignore[no-any-return]

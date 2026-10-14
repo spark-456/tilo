@@ -8,6 +8,7 @@ from pathlib import Path
 
 import yaml
 from tilo_contracts import AgentsConfig
+from tilo_providers.diagnostics import log_caught
 
 from tilo_harness.validator import repo_validator
 
@@ -26,6 +27,7 @@ def load_agents_config(path: Path | None = None) -> AgentsConfig:
     try:
         data = yaml.safe_load(path.read_text(encoding="utf-8"))
     except Exception as error:  # any read or parse failure, even ValueError from a huge YAML int
+        log_caught(error, __name__, locals())
         raise AgentsConfigError(f"{path}: cannot read agents config ({type(error).__name__})") from error
     problems = repo_validator().contract_problems("agents", data)
     if problems:

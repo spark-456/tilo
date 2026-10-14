@@ -37,6 +37,7 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from tilo_providers._pdf_pages_child import MAX_PDF_PAGES
+from tilo_providers.diagnostics import log_caught
 from tilo_providers.errors import RequestError
 
 MAX_PARTS = 10  # FR-INT-01: at most 10 files a unit
@@ -141,7 +142,8 @@ def _measure(data: bytes) -> tuple[str, int]:
             )
         except subprocess.TimeoutExpired:
             return "slow", 0
-        except Exception:  # noqa: BLE001 -- no child could be run: refuse, never guess
+        except Exception as caught_error:  # noqa: BLE001 -- no child could be run: refuse, never guess
+            log_caught(caught_error, __name__, locals())
             return "error", 0
     fields = done.stdout.split()
     if done.returncode == 0 and len(fields) == 2 and fields[0] in (b"ok", b"many", b"bad") and fields[1].isdigit():

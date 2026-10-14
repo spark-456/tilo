@@ -28,6 +28,8 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Any, Protocol, TypeGuard
 
+from tilo_providers.diagnostics import log_caught
+
 from tilo_harness.ids import ORG_ID, check_id
 from tilo_harness.schedule import CLAIM_LEASE, Cadence, Schedule, ScheduleStore, next_slot, slot_key
 
@@ -172,6 +174,7 @@ def schedule_from_doc(doc: Mapping[str, Any]) -> Schedule:
     except ValueError:
         raise
     except Exception as exc:  # KeyError, TypeError, OverflowError ...: one failure type for the callers
+        log_caught(exc, __name__, locals())
         raise ValueError("schedule document cannot be built") from exc
 
 
@@ -265,7 +268,8 @@ def _stale_cadence(doc: Mapping[str, Any]) -> Cadence | None:
     try:
         raw = doc["cadence"]
         return Cadence(weekday=raw["weekday"], hour=raw["hour"], minute=raw["minute"], tz=raw["tz"])
-    except Exception:  # a record that cannot be built is left as it is (quarantine handles it)
+    except Exception as caught_error:  # a record that cannot be built is left as it is (quarantine handles it)
+        log_caught(caught_error, __name__, locals())
         return None
 
 

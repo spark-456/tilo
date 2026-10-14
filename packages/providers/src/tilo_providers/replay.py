@@ -24,6 +24,7 @@ from collections.abc import Callable, Iterator
 from pathlib import Path
 from typing import Any, Protocol
 
+from tilo_providers.diagnostics import log_caught
 from tilo_providers.interfaces import Capability, GenerateRequest, GenerateResponse, ModelProvider, PriceQuote
 
 # Backstop scrub for anything written to a recording, whatever provider
@@ -210,7 +211,8 @@ class RecordReplayProvider(ModelProvider):
         if self._is_live():
             try:
                 return int(self._live().count_tokens(text))
-            except Exception:  # noqa: BLE001 - metering must never fail a run: the word count is the floor
+            except Exception as caught_error:
+                log_caught(caught_error, __name__, locals())
                 pass
         return len(text.split())
 

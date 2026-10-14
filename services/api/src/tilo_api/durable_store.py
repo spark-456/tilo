@@ -39,6 +39,7 @@ from typing import Any
 from fastapi import HTTPException
 from tilo_planning.gaps import Gap
 from tilo_planning.questions import Question
+from tilo_providers.diagnostics import log_caught
 
 from tilo_api import deps, events, store_door
 
@@ -546,7 +547,8 @@ class DurableStore(deps.Store):
                 continue
             try:
                 self.pending_events[w] = self.backend.queue(w)
-            except Exception:  # unreadable: forget the whole world, so its next access reads everything again
+            except Exception as caught_error:
+                log_caught(caught_error, __name__, locals())
                 self.worlds.pop(w, None)
                 self.events.pop(w, None)
                 self.pending_events.pop(w, None)
@@ -569,6 +571,7 @@ class DurableStore(deps.Store):
                 assert writer is not None
                 writer.append(world_id, part)
             except Exception as exc:
+                log_caught(exc, __name__, locals())
                 raise deps.event_failure(world_id, exc) from None
             self.ack(world_id, part["id"])
 

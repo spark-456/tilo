@@ -23,6 +23,7 @@ import time
 from collections.abc import Callable, Iterator
 from typing import Any
 
+from tilo_providers.diagnostics import log_caught
 from tilo_providers.errors import NotConfigured, ProviderError, RequestError, map_http_status, map_transport_error
 from tilo_providers.google_adapter import _GOOGLE_SECRET_RE, validate_google_settings
 from tilo_providers.interfaces import SpeechProvider
@@ -154,6 +155,7 @@ class GoogleCloudTTSProvider(SpeechProvider):
             except ProviderError:
                 raise
             except Exception as error:
+                log_caught(error, __name__, locals())
                 failure: ProviderError | None = self._failure(error)
             else:
                 failure = None

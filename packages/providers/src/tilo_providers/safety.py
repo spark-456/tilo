@@ -25,6 +25,7 @@ from typing import Any
 from tilo_contracts import ProvidersProfile
 
 from tilo_providers.config import ProviderConfigError, ProvidersConfig
+from tilo_providers.diagnostics import log_caught
 from tilo_providers.errors import ProviderError, RequestError
 from tilo_providers.interfaces import NATIVE_MIME_TYPES, SafetyProvider, SafetyResult, native_mime_type
 from tilo_providers.replay import ReplayMissError, is_live_mode, redact_strings
@@ -170,6 +171,7 @@ class SafetyRecordReplayProvider(SafetyProvider):
         try:
             data = json.loads(path.read_text(encoding="utf-8"))
         except (OSError, ValueError) as exc:  # JSONDecodeError and UnicodeDecodeError are ValueErrors
+            log_caught(exc, __name__, locals())
             raise ProviderError(
                 f"FR-INT-02: safety recording {path.name} is unreadable ({type(exc).__name__})"
             ) from None
@@ -195,7 +197,8 @@ class SafetyRecordReplayProvider(SafetyProvider):
                 handle.flush()
                 os.fsync(handle.fileno())
             os.replace(tmp_name, path)
-        except BaseException:
+        except BaseException as caught_error:
+            log_caught(caught_error, __name__, locals())
             Path(tmp_name).unlink(missing_ok=True)
             raise
 

@@ -36,6 +36,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 from referencing import Registry, Resource
 from referencing.jsonschema import DRAFT202012
 from tilo_harness.question_wait import AlreadyCommitted  # raised by an event writer; one class for both sides
+from tilo_providers.diagnostics import log_caught
 from tilo_redact import redact
 
 from tilo_api import deps
@@ -159,7 +160,8 @@ def _card_errors(card: Any) -> list[str]:
         errors.append("CR-01: safe_default must name one of options[].id")
     try:
         _deadline(card)
-    except (ValueError, OverflowError):
+    except (ValueError, OverflowError) as caught_error:
+        log_caught(caught_error, __name__, locals())
         errors.append("created_at must be a real calendar instant and created_at + timeout must be representable")
     return errors
 
@@ -708,7 +710,8 @@ class CardStore:
             with self._lock:
                 self._resolve_group(record.group)
             return False
-        except BaseException:
+        except BaseException as caught_error:
+            log_caught(caught_error, __name__, locals())
             with self._lock:
                 record.group.resolving = False
                 record.attempt = (who, part)  # it may have committed: the same answer resends this exact part
@@ -758,6 +761,7 @@ class CardStore:
             except BaseException as exc:
                 # This claim, and (if the failure is not an ordinary error) every later one, goes back to the
                 # work set for the next tick; an ordinary failure never blocks the cards after it.
+                log_caught(exc, __name__, locals())
                 rest = [claimed[i]] if isinstance(exc, Exception) else claimed[i:]
                 with self._lock:
                     for k, r, h in rest:

@@ -24,6 +24,7 @@ from urllib.parse import urlsplit, urlunsplit
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from tilo_providers.config import ProviderConfigError, ProvidersConfig, refuse_dev_only
+from tilo_providers.diagnostics import log_caught
 from tilo_providers.errors import ProviderError, RequestError
 from tilo_providers.google_adapter import _GOOGLE_SECRET_RE
 from tilo_providers.interfaces import Capability, SearchProvider
@@ -186,7 +187,8 @@ class SearchRecordReplayProvider(SearchProvider):
     def _read(path: Path) -> SearchResult:
         try:
             return SearchResult.model_validate(json.loads(path.read_text(encoding="utf-8"))["result"])
-        except (OSError, ValueError, KeyError, TypeError):  # a corrupt or hand-edited recording fails closed
+        except (OSError, ValueError, KeyError, TypeError) as caught_error:
+            log_caught(caught_error, __name__, locals())
             raise ProviderError(f"LW-05: search recording {path.name} is unreadable or malformed") from None
 
     def _write(self, path: Path, key: str, result: SearchResult, live: SearchProvider) -> None:
@@ -199,7 +201,8 @@ class SearchRecordReplayProvider(SearchProvider):
             with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as handle:
                 handle.write(json.dumps(redacted, indent=2, sort_keys=True) + "\n")
             os.replace(tmp_name, path)
-        except BaseException:
+        except BaseException as caught_error:
+            log_caught(caught_error, __name__, locals())
             Path(tmp_name).unlink(missing_ok=True)
             raise
 

@@ -16,6 +16,7 @@ from tilo_redact import redact
 
 from tilo_providers.byok import CredentialRefused, OrgBinding
 from tilo_providers.config import ProvidersConfig
+from tilo_providers.diagnostics import log_caught
 from tilo_providers.errors import (
     MissingCapabilityError,
     OutputTruncatedError,
@@ -133,10 +134,12 @@ def schema_error(response: GenerateResponse, schema: dict[str, Any]) -> str | No
     try:
         instance = json.loads(response.text or "")
     except (ValueError, RecursionError) as error:  # RecursionError: nested too deeply to parse
+        log_caught(error, __name__, locals())
         return short(f"not valid JSON ({error})")
     try:
         return first_error(instance, schema)
-    except (ValueError, RecursionError):  # too deep to walk, or a number too long to print
+    except (ValueError, RecursionError) as caught_error:  # too deep to walk, or a number too long to print
+        log_caught(caught_error, __name__, locals())
         return "/: the output could not be validated"
 
 
@@ -297,6 +300,7 @@ class Router:
         try:
             yield attempt
         except Exception as error:
+            log_caught(error, __name__, locals())
             run.attempts.append(attempt)
             if isinstance(error, OutputTruncatedError):
                 self._charge_truncated(run, attempt, error)
@@ -547,6 +551,7 @@ class Router:
                     yield chunk
                     chunk = next(chunks, None)
             except Exception as error:
+                log_caught(error, __name__, locals())
                 _fail(run, attempt, error, output_started=True)
             finally:
                 attempt.latency_ms = (time.perf_counter() - start) * 1000

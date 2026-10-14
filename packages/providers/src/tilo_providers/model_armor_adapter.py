@@ -20,6 +20,7 @@ from typing import Any
 import httpx
 
 from tilo_providers.config import ProviderConfigError
+from tilo_providers.diagnostics import log_caught
 from tilo_providers.errors import ProviderError, map_http_status, map_transport_error
 from tilo_providers.google_adapter import _GOOGLE_SECRET_RE, refuse_service_account_key
 from tilo_providers.interfaces import SafetyProvider, SafetyResult
@@ -166,6 +167,7 @@ class ModelArmorSafetyProvider(SafetyProvider):
         except ProviderConfigError:
             raise
         except Exception as exc:
+            log_caught(exc, __name__, locals())
             failure = ProviderError(f"FR-INT-02: no Google credentials for Model Armor ({type(exc).__name__})")
         if failure is None and not (isinstance(token, str) and _TOKEN_RE.fullmatch(token)):
             failure = ProviderError("FR-INT-02: Model Armor credentials produced no usable token")
@@ -186,6 +188,7 @@ class ModelArmorSafetyProvider(SafetyProvider):
         try:
             response = self._client.post(self._url, headers=headers, json={"userPromptData": user_prompt_data})
         except httpx.HTTPError as exc:
+            log_caught(exc, __name__, locals())
             failure = map_transport_error(exc) or ProviderError("FR-INT-02: Model Armor request failed")
         if failure is not None:
             raise failure  # raised outside the except block, so the request and its bearer header are not __context__
@@ -193,7 +196,8 @@ class ModelArmorSafetyProvider(SafetyProvider):
             raise map_http_status(response.status_code, f"FR-INT-02: Model Armor returned HTTP {response.status_code}")
         try:
             body = json.loads(response.content, object_pairs_hook=_duplicate_key_free)
-        except (ValueError, RecursionError):  # ValueError includes UnicodeDecodeError
+        except (ValueError, RecursionError) as caught_error:  # ValueError includes UnicodeDecodeError
+            log_caught(caught_error, __name__, locals())
             body = None
         return _verdict(body)
 

@@ -17,6 +17,8 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Any, Protocol
 
+from tilo_providers.diagnostics import log_caught
+
 from tilo_harness.writer import new_ulid
 
 _DEADLINE = "deadline"  # who claimed a card's resolution when nobody answered
@@ -144,7 +146,8 @@ class QuestionWait:
         except AlreadyCommitted as exc:  # an earlier answer of this card committed though its caller saw a failure
             self._settle_committed(card_id, exc, by)
             raise AlreadyAnswered(card_id) from None
-        except BaseException:
+        except BaseException as caught_error:
+            log_caught(caught_error, __name__, locals())
             with self._lock:
                 del self._claimed[card_id]  # the same answer may be sent again; it may still have committed
                 self._tried.setdefault(card_id, {}).setdefault(by, (event_id, set()))[1].add(part.get("option"))
@@ -211,6 +214,7 @@ class QuestionWait:
             self._settle_committed(card["id"], exc, "default")
             return
         except Exception as error:
+            log_caught(error, __name__, locals())
             found = self._committed(default_id)
             if not found or (found.get("data") or {}).get("answered_by") != "default":
                 with self._lock:
