@@ -406,7 +406,9 @@ def firestore_people_stores(client: Any) -> PeopleStores:
 
     def erase_followup(org_id: str, user: str) -> None:
         from tilo_api.followup_draft_retention import followup_retention  # noqa: PLC0415
+        from tilo_api.followup_outbox_sources import cancel_source_entries  # noqa: PLC0415
 
+        cancel_source_entries(client, org_id, user)
         for policy in followup_retention(client, org_id, lambda: 0.0):
             policy.erase_owner_complete(user)
 
