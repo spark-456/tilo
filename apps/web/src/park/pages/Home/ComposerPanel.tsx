@@ -3,6 +3,7 @@
 // Presentation only: the phase, the query and the 900 ms draft are HomePage's.
 import type { Ref } from "react";
 import type { Effort, QuickCost, SwitchReason } from "../../api/types";
+import { RECORDED_RUN_PATH } from "../../app/router";
 import { type SegmentOption, SegmentedControl } from "../../components";
 import { type IntakeClient, IntakeControl } from "./IntakeControl";
 import type { Staging } from "./StagedFiles";
@@ -191,19 +192,27 @@ export function ComposerPanel(p: ComposerProps) {
             {p.sample ? (
               <p className="park-home-plan__sample">
                 Sample plan. Demo sessions replay a recorded run; sign in to start your own.
+                Whatever you type, the replay is the same recorded run: a mail reply, not your task.
               </p>
             ) : null}
           </div>
           <div className="park-home-plan__actions">
-            <button
-              type="button"
-              className="park-home-confirm"
-              disabled={p.sending}
-              aria-busy={p.sending ? true : undefined}
-              onClick={p.onConfirm}
-            >
-              {p.sample ? "Open the sample world" : mode.confirm}
-            </button>
+            {p.sample ? (
+              // UI-10 B6: the demo opens a recording that exists and plays, not a world with nothing to open.
+              <a className="park-home-confirm" href={RECORDED_RUN_PATH}>
+                Watch the recorded run
+              </a>
+            ) : (
+              <button
+                type="button"
+                className="park-home-confirm"
+                disabled={p.sending}
+                aria-busy={p.sending ? true : undefined}
+                onClick={p.onConfirm}
+              >
+                {mode.confirm}
+              </button>
+            )}
             <button
               type="button"
               className="park-home-change"

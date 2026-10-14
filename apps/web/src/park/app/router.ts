@@ -100,6 +100,12 @@ export function isHomeAddress(): boolean {
   return parseParkPath(window.location.pathname, window.location.search)?.page === "home";
 }
 
+/**
+ * UI-10 B6: the one recorded run the demo can replay: the bundled `village-basic` stream (a mail-room reply run,
+ * plan to delivery) on the stage, which labels it "Fixture replay". It is a recording, never the person's own task.
+ */
+export const RECORDED_RUN_PATH = `${stagePath("w_village_basic")}?fixture=village-basic`;
+
 /** Pushes the path and tells every listener (this app's hook and the Root's) that the address changed. */
 export function navigatePark(to: string): void {
   window.history.pushState({}, "", to);

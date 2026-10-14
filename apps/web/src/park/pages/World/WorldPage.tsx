@@ -21,7 +21,7 @@ import type { AppCtx } from "../../app/AppCtx";
 import { NotFound } from "../../app/NotFound";
 import { useDemoSession, useParkApi, useWorldClient } from "../../app/context";
 import { PageTitle } from "../../app/pageTitle";
-import { stagePath } from "../../app/router";
+import { RECORDED_RUN_PATH, stagePath } from "../../app/router";
 import {
   SLACK_NOTE_MAX,
   type SlackShareRequest,
@@ -36,10 +36,12 @@ import { SampleBadge, SampleNote } from "../../sample/SampleBadge";
 import { icon } from "../../shell/kit";
 import { Activity, Districts, Result, RunHistory } from "./Lower";
 import { MeetingHall } from "./MeetingHall";
+import { RunProgressCard } from "./RunProgressCard";
 import { FactsCard, GoLink, LovableCard, SpendCard, WaitingCard } from "./Side";
 import { SkillProposals } from "./SkillProposals";
 import { ShareWithTeam } from "./TeamShare";
 import { MissingWorld, TeamItems, TeamWorld } from "./TeamWorld";
+import { useRunEvents } from "./useRunEvents";
 import "./World.css";
 import { cityArt, rowArt, singleArt } from "./worldArt";
 import {
@@ -79,6 +81,7 @@ const optional = <T,>(read: Promise<ApiResult<T>>): Promise<ApiResult<T> | null>
 const INSPECT_BUILDING = "B1";
 
 const NO_STAGE = "Sample world: there is no recorded run to open";
+const NO_RUN_YET = "This run has recorded no events yet, so there is nothing to open";
 const NO_STAGE_ID = "park-world-nostage";
 const NO_SLACK_ID = "park-world-noslack";
 
@@ -91,7 +94,8 @@ function StageLink({
   href,
   className,
   children,
-}: { href: string | null; className?: string; children: ReactNode }) {
+  reason = NO_STAGE,
+}: { href: string | null; className?: string; children: ReactNode; reason?: string }) {
   if (href !== null) {
     return (
       <a className={className} href={href}>
@@ -108,7 +112,7 @@ function StageLink({
       tabIndex={0} // UI-10 B4: still reachable by keyboard, so the reason it is off can be read
       aria-disabled="true"
       aria-describedby={NO_STAGE_ID}
-      title={NO_STAGE}
+      title={reason}
     >
       {children}
     </a>
@@ -178,6 +182,21 @@ export function WorldPage({ app }: { app: AppCtx }) {
   // The map and head first, then the side cards, then the lower part: one task each (WEB-MOTION-2).
   const part = useStaged(3);
   const { dec, added } = app;
+  // UI-10 B8: a real run (the HTTP API, not a demo) is read from its recorded events; any other client leaves it be.
+  // Only a world the list carries as the person's own, and not one started on this page: nothing is asked for an
+  // id the list does not know (the missing-world rule) and a teammate's world is read through its share.
+  const listed =
+    loaded !== null && loaded !== "failed" && loaded.live
+      ? loaded.worlds.find((x) => x.id === app.params.id)
+      : undefined;
+  const runId =
+    worldClient !== null &&
+    listed !== undefined &&
+    listed.access !== "team" &&
+    !added.some((a) => a.id === listed.id)
+      ? listed.id
+      : null;
+  const runEvents = useRunEvents(worldClient, runId);
 
   useEffect(() => {
     let live = true;
@@ -290,7 +309,11 @@ export function WorldPage({ app }: { app: AppCtx }) {
   const wide = (app.vw || 1440) >= 1060;
   const id = encodeURIComponent(w.id);
   // A world has a stage only when its data came from the live API; a world started on this page is local state.
-  const hasStage = loaded.live && !added.some((a) => a.id === w.id);
+  const startedHere = added.some((a) => a.id === w.id);
+  // UI-10 B8: for a real run the stage and its lenses open only once the run has recorded an event.
+  const trackRun = runId !== null && runId === w.id;
+  const hasStage = loaded.live && !startedHere && (!trackRun || runEvents.length > 0);
+  const noStage = trackRun ? NO_RUN_YET : NO_STAGE;
   const stage = (to: string): string | null => (hasStage ? to : null);
   const real = hasStage && !demo; // a live world of a real account: its toasts may claim real outcomes
   const recorded = isRecordedRunning(w, real);
@@ -435,12 +458,14 @@ export function WorldPage({ app }: { app: AppCtx }) {
             </span>
           ) : null}
           {isCity ? (
-            <StageLink className="park-world-live" href={stage(stagePath(w.id))}>
+            <StageLink className="park-world-live" href={stage(stagePath(w.id))} reason={noStage}>
               {icon("play", 14)}Open live view
             </StageLink>
           ) : null}
           {w.sample ? (
-            <a className="park-world-live" href={stagePath(w.id)}>
+            // UI-10 B7: a demo session has no API client, so the sample world's own stage is "Not found" there; the
+            // recorded run that exists plays instead (the stage labels it "Fixture replay").
+            <a className="park-world-live" href={demo ? RECORDED_RUN_PATH : stagePath(w.id)}>
               {icon("play", 14)}Watch the replay
             </a>
           ) : null}
@@ -452,7 +477,13 @@ export function WorldPage({ app }: { app: AppCtx }) {
         <TeamItems client={worldClient} worldId={w.id} auto={false} />
       ) : null}
       {slackOpen ? (
-        <div className="park-world-slackbackdrop">
+        // biome-ignore lint/a11y/useKeyWithClickEvents: Escape already closes the dialog (its onKeyDown); the backdrop click is the pointer shortcut
+        <div
+          className="park-world-slackbackdrop"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) closeSlackDialog();
+          }}
+        >
           <div
             ref={dialogRef}
             // biome-ignore lint/a11y/useSemanticElements: custom modal dialog with focus trap and role="dialog"
@@ -465,6 +496,11 @@ export function WorldPage({ app }: { app: AppCtx }) {
             <div className="park-world-slackhead">
               <div className="park-world-slacktitle">Share to Slack</div>
               <div className="park-world-slacksub">{`${w.name} · ${slackState.account}`}</div>
+              {real ? null : (
+                <p className="park-sample-note">
+                  <SampleBadge /> Nothing is sent to Slack: this is recorded sample data.
+                </p>
+              )}
             </div>
             <label className="park-world-slackfield">
               <span className="park-world-slacklabel">Channel</span>
@@ -496,6 +532,9 @@ export function WorldPage({ app }: { app: AppCtx }) {
                 }
               />
             </label>
+            <div className="park-world-slackcount" aria-live="polite">
+              {`${slackNote.length} / ${SLACK_NOTE_MAX}`}
+            </div>
             <div className="park-world-slackactions">
               <Button variant="needs" size="sm" onClick={submitSlackApproval}>
                 Ask for approval
@@ -530,10 +569,19 @@ export function WorldPage({ app }: { app: AppCtx }) {
             ) : null}
             {isCity ? (
               <nav aria-label="Run views" className="park-world-lenses">
-                <StageLink href={stage(`/world/${id}/story`)}>Story</StageLink>
-                <StageLink href={stage(`/world/${id}/trace`)}>Trace</StageLink>
-                <StageLink href={stage(`/world/${id}/delivery`)}>Delivery</StageLink>
-                <StageLink href={stage(`/world/${id}/inspect/${INSPECT_BUILDING}`)}>
+                <StageLink href={stage(`/world/${id}/story`)} reason={noStage}>
+                  Story
+                </StageLink>
+                <StageLink href={stage(`/world/${id}/trace`)} reason={noStage}>
+                  Trace
+                </StageLink>
+                <StageLink href={stage(`/world/${id}/delivery`)} reason={noStage}>
+                  Delivery
+                </StageLink>
+                <StageLink
+                  href={stage(`/world/${id}/inspect/${INSPECT_BUILDING}`)}
+                  reason={noStage}
+                >
                   Inspect
                 </StageLink>
               </nav>
@@ -542,7 +590,7 @@ export function WorldPage({ app }: { app: AppCtx }) {
           {isCity && !hasStage ? (
             // QA-DEMO-1 m3: the reason the lens links and "Open live view" are off is words on the page, not a tooltip
             <p id={NO_STAGE_ID} className="park-world-nostage">
-              {NO_STAGE}
+              {noStage}
             </p>
           ) : null}
           <div className="park-world-progrow">
@@ -613,6 +661,7 @@ export function WorldPage({ app }: { app: AppCtx }) {
       ) : null}
       {part(3) ? (
         <div className="park-world-lower">
+          {trackRun ? <RunProgressCard events={runEvents} /> : null}
           {isCity ? <Districts districts={w.districts ?? []} /> : null}
           {isTown ? (
             <RunHistory

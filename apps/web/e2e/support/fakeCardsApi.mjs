@@ -9,11 +9,22 @@
 //           leaves the feed; "other_world" answers w_here's card as "answer" but refuses any other world's card with
 //           404 {"outcome":"rejected","reason":"card_not_found"} (what tilo-api does today, API-CARDS-XWORLD);
 //           "already" 400 (the real route maps already_resolved to 400) {"outcome":"rejected","reason":"already_resolved"}
-//   POST /__control {hold?:boolean, mode?:string, reset?:true} ; POST /__release ; GET /__log -> [{method,path,body}]
+//   GET  /worlds/:w/events                -> {"events":[...]} the first `events` rows of the recorded village-basic stream
+//        (contracts/fixtures/streams), re-keyed to the asked world; none until /__control {events: n} (UI-10 B8)
+//   POST /__control {hold?:boolean, mode?:string, events?:number, reset?:true} ; POST /__release ; GET /__log -> [{method,path,body}]
 // CORS: any origin may read (it holds nothing private); the page is a different origin from this server.
+import { readFileSync } from "node:fs";
 import http from "node:http";
 
 const PORT = Number(process.argv[2] ?? 5398);
+const RECORDED = readFileSync(
+  new URL("../../../../contracts/fixtures/streams/village-basic.jsonl", import.meta.url),
+  "utf8",
+)
+  .split(String.fromCharCode(10))
+  .filter((l) => l.trim() !== "")
+  .map((l) => JSON.parse(l));
+let served = 0; // how many recorded events GET /worlds/:w/events returns
 const ulid = (n) => `01${"0".repeat(21)}${String(n).padStart(3, "0")}`;
 
 const baseCard = (n, world, kind, over) => ({
@@ -129,6 +140,13 @@ http
       log.push({ method: "GET", path: `${url.pathname}${url.search}` });
       return send(res, 200, { cards, next_cursor: null });
     }
+    const feed = url.pathname.match(/^\/worlds\/([^/]+)\/events$/);
+    if (feed && req.method === "GET") {
+      const world = decodeURIComponent(feed[1] ?? "");
+      log.push({ method: "GET", path: url.pathname });
+      const events = RECORDED.slice(0, served).map((e) => ({ ...e, world_id: world }));
+      return send(res, 200, { events });
+    }
     const answer = url.pathname.match(/^\/worlds\/([^/]+)\/cards\/([^/]+)\/answer$/);
     if (answer && req.method === "POST") {
       const world = decodeURIComponent(answer[1] ?? "");
@@ -150,7 +168,9 @@ http
         held = [];
         hold = false;
         mode = "answer";
+        served = 0;
       }
+      if (typeof b.events === "number") served = Math.max(0, Math.floor(b.events));
       if (typeof b.hold === "boolean") hold = b.hold;
       if (typeof b.mode === "string") mode = b.mode;
       return send(res, 200, { hold, mode });
