@@ -163,6 +163,16 @@ def _owned(store: deps.Store, task_id: str, principal: deps.Principal) -> deps.T
     return task
 
 
+def _latest(store: deps.Store, task_id: str) -> deps.TaskRecord:
+    """The record saved last, read again after the task's lock is taken (a prefetch or a second request may have stored
+    a newer one). A commit that failed evicts its entries, so this reloads from the store; gone is the unknown-task 404,
+    never a KeyError."""
+    task = store.load_task(task_id)
+    if task is None:
+        raise HTTPException(status_code=404, detail="No such task.")
+    return task
+
+
 def _brief(task: deps.TaskRecord, answers: dict[str, str | None], edits: dict[str, Any], today: date) -> dict[str, Any]:
     brief = task.draft
     for question in task.questions:
@@ -260,7 +270,7 @@ def answer_questions(
     typed = [a.answer for a in body.answers if a.answer is not None]
     _screen(safety, typed + _director_strings(task, body.answers) + list(_strings(body.brief_edits)))
     with task.lock:
-        task = store.tasks[task_id]  # the record saved last: a prefetch may have stored the approaches meanwhile
+        task = _latest(store, task_id)  # the record saved last: a prefetch may have stored the approaches meanwhile
         if task.granted:
             raise HTTPException(status_code=409, detail="The budget is approved; the brief is final.")
         answers = {**task.answers, **{a.field: a.answer for a in body.answers}}
@@ -329,7 +339,7 @@ def _prefetch_approaches(
     try:
         deps.providers_config()  # the GET's own check, before any model call is spent
         with task.lock:
-            task = store.tasks[task_id]
+            task = _latest(store, task_id)
             if task.granted or any(q.field not in task.answers for q in task.questions):
                 return
             _proposed(store, writer, task_id, task, model_router, clock)
@@ -356,7 +366,7 @@ def get_approaches(
         logger.warning("provider config unavailable: %s", exc)
         raise HTTPException(status_code=503, detail="The model configuration is not available.") from exc
     with task.lock:
-        task = store.tasks[task_id]  # the record saved last: the prefetch may have stored the approaches meanwhile
+        task = _latest(store, task_id)  # the record saved last: the prefetch may have stored the approaches meanwhile
         if any(q.field not in task.answers for q in task.questions):
             raise HTTPException(status_code=409, detail="Answer or skip every question first.")
         task = _proposed(store, writer, task_id, task, model_router, clock)
@@ -483,7 +493,7 @@ def approve(
     if body.budget_cap > (ceiling := deps.budget_cap_ceiling()):  # finite already: the body refuses NaN and Infinity
         raise HTTPException(status_code=422, detail=f"One run may use at most {ceiling:g} credits.")
     with store.grant_lock(task.owner), task.lock:  # always in this order: the owner's grants, then the task
-        task = store.tasks[task_id]  # the record saved last (a prefetch may have stored the approaches)
+        task = _latest(store, task_id)  # the record saved last (a prefetch may have stored the approaches)
         if task.granted:
             raise HTTPException(status_code=409, detail="This task's budget is already approved.")
         if task.approaches is None:
@@ -544,9 +554,10 @@ def rerun(
     same task: the same brief, the approach the person approved and the cap they granted, through the approve path
     (so the policy engine, the ceiling and the owner's grants decide again). Only the owner; anyone else gets the
     unknown-world 404. A world that did not fail is a 409. Pressing twice is one new world."""
-    world = store.worlds.get(world_id)
+    world = store.load_world(world_id)
     if world is None or world.owner != principal.user_id:
         raise HTTPException(status_code=404, detail="No such world.")
+    deps.refuse_if_replay_only(flags)  # NFR-24: after sign-in and the owner check, before anything is stored
     store.settle(world_id)
     stream = store.events.get(world_id, [])
     if not any(e["type"] == "world.failed" for e in stream) or any(e["type"] == "world.completed" for e in stream):
@@ -561,9 +572,23 @@ def rerun(
             detail="This task used attached files, which stay with the first run. Describe it again from Home.",
         )
     task_id, new_world, new_run = _again_ids(world_id)
-    if (again := store.tasks.get(task_id)) is not None and again.granted:
-        return {"world_id": new_world, "task_id": task_id}  # pressed twice: the one new world
-    if task_id not in store.tasks:
+    # The durable store, not this process's cache: a second press on another instance (after scale to zero) finds the
+    # first one's task and dedupes. Pressed twice is one new world once its run started; a first press whose start
+    # failed falls through to `approve`, which starts it again with the grant it recorded (SIMPLE-RUN-2).
+    again = store.load_task(task_id)
+    if again is not None and again.granted and (not _loud() or _run_started(store, again)):
+        return {"world_id": again.world_id, "task_id": task_id}
+    cap = _granted_cap(store, old, 0.0)
+    if cap <= 0:
+        raise HTTPException(status_code=409, detail="This world has no approved budget to start again.")
+    # What `approve` refuses before it grants is refused here first: a refusal leaves no orphan world or task.
+    if seams is None and _loud():
+        logger.error("rerun refused: the run seams are not wired (world %s)", world_id)
+        raise HTTPException(status_code=503, detail=_NOT_STARTED)
+    getattr(store, "admit_run", lambda: None)()
+    if cap > (ceiling := deps.budget_cap_ceiling()):
+        raise HTTPException(status_code=422, detail=f"One run may use at most {ceiling:g} credits.")
+    if again is None:
         fresh = deps.TaskRecord(
             old.owner, new_world, new_run, copy.deepcopy(old.draft), copy.deepcopy(old.brief), list(old.questions), 1,
             answers=dict(old.answers), edits=copy.deepcopy(old.edits), approaches=copy.deepcopy(old.approaches),
@@ -575,9 +600,6 @@ def rerun(
             tasks={task_id: fresh},
             create=[("worlds", new_world), ("tasks", task_id)],
         )
-    cap = _granted_cap(store, old, 0.0)
-    if cap <= 0:
-        raise HTTPException(status_code=409, detail="This world has no approved budget to start again.")
     body = ApproveIn(approach_id=str(planned["data"]["approach"]), budget_cap=cap)
     approve(task_id, principal, body, store, writer, seams, flags)
     return {"world_id": new_world, "task_id": task_id}
