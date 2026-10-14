@@ -17,8 +17,10 @@ import {
 } from "../../app/slackShare";
 import { useStaged } from "../../app/useStaged";
 import { PageSheet } from "../../components";
+import { FirstRunOverview } from "../../sample/FirstRunOverview";
 import { SampleControls } from "../../sample/SampleControls";
 import { hideSample, showSample } from "../../sample/sampleChoice";
+import { useFirstRunPreview } from "../../sample/useFirstRunPreview";
 import { CityCard, TownCard, VillageCard } from "./Cards";
 import { Filters } from "./Filters";
 import { Header } from "./Header";
@@ -39,6 +41,7 @@ interface Loaded {
 
 export function WorldsPage({ app }: { app: AppCtx }) {
   const api = useParkApi();
+  const preview = useFirstRunPreview();
   const [routines] = useState(createRoutinesClient);
   const { dec, added, needsLeft, night } = app;
   const plans = useRef<Record<string, Plan>>({});
@@ -163,6 +166,7 @@ export function WorldsPage({ app }: { app: AppCtx }) {
           slack={slackState}
           onShareSlack={openSlackDialog}
         />
+        {preview ? <FirstRunOverview page="worlds" app={app} /> : null}
         {routines ? <RoutinesPanel client={routines} /> : null}
         {slackOpen && slackState ? (
           <div className="park-worlds-slackbackdrop">

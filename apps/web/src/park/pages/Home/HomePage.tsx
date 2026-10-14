@@ -20,6 +20,8 @@ import type { AppCtx } from "../../app/AppCtx";
 import { BUILD_SHA } from "../../app/buildStamp";
 import { useDemoSession, useParkApi, useParkStore, useSchedule } from "../../app/context";
 import { DEMO_START } from "../../app/store";
+import { FirstRunOverview } from "../../sample/FirstRunOverview";
+import { useFirstRunPreview } from "../../sample/useFirstRunPreview";
 import { ComposerPanel, type Phase, QUICK_IDLE, type QuickView } from "./ComposerPanel";
 import "./Home.css";
 import { Hero, KpiStrip, Pins, TodayPanel } from "./Panels";
@@ -64,6 +66,7 @@ export function HomePage({ app }: { app: AppCtx }) {
   const api = useParkApi();
   const schedule = useSchedule();
   const store = useParkStore();
+  const preview = useFirstRunPreview();
   // QA-DEMO-1: a demo session (the sample company) replays recorded data and starts no run.
   const demo = useDemoSession();
   const { go, dec, added, night, vw, vh, pins, needsLeft } = app;
@@ -404,9 +407,13 @@ export function HomePage({ app }: { app: AppCtx }) {
   useComposerClearance(root, composerShown);
 
   return (
-    <div ref={root} className="park-home-root" data-testid="park-page-home">
+    <div
+      ref={root}
+      className={`park-home-root${preview ? " park-home-root--preview" : ""}`}
+      data-testid="park-page-home"
+    >
       {ready ? (
-        <>
+        <div className={preview ? "park-home-preview-account" : undefined}>
           <Pins
             pins={placedPins(pins, worlds, needs, night, vw || 1440, vh || 900, served)}
             onOpen={open}
@@ -443,9 +450,10 @@ export function HomePage({ app }: { app: AppCtx }) {
             onLedger={() => go("ledger")}
             stacked={vw > 0 && vw < 1180}
           />
-        </>
+        </div>
       ) : null}
-      {failed ? (
+      {preview ? <FirstRunOverview page="home" app={app} /> : null}
+      {failed && !preview ? (
         <div className="park-home-leftcol">
           <div className="park-home-hero park-home-glass">
             <h1 className="park-home-h1">Home</h1>
