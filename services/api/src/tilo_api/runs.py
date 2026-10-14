@@ -32,6 +32,7 @@ from tilo_memory.artifacts import NewVersion, Origin, Scope
 from tilo_metering.flags import FlagStore
 from tilo_people.stores import PeopleStores
 from tilo_planning.compiler import DELIVER, PlanInputs
+from tilo_providers.diagnostics import failure_context, log_caught
 
 from tilo_api import deps, events, item_documents, side_effect_fields, team_access, team_store
 from tilo_api.access import Mode
@@ -167,6 +168,7 @@ def _tool_access(seams: Any, connector: str, action: str, tier: str, skill_ids: 
             seams.team(), connector, action, tier, registry=seams.connectors, skill_level=lowest
         )
     except Exception as exc:
+        log_caught(exc, __name__, locals())
         raise _GateFailed("tool access could not be checked") from exc
     if access == "block":
         raise _GateFailed("tool access does not allow this step")
@@ -322,9 +324,10 @@ class Run:
             self._built[event["id"]] = copy.deepcopy(event)
         try:
             return self.seams.writer.append(self.world_id, event)
-        except Exception:
+        except Exception as caught_error:
             # An id already committed under other content means an earlier answer won although its caller saw a
             # failure (any other error, an identical committed event included, is the caller's to retry).
+            log_caught(caught_error, __name__, locals())
             stream = list(self.store.events.get(self.world_id, []))
             committed = next((e for e in stream if e["id"] == event["id"]), None)
             if committed is None or all(committed[k] == event[k] for k in same):
@@ -418,8 +421,8 @@ class Run:
     def _close_defaulted(self) -> None:
         try:
             self.cards.tick()
-        except Exception:  # the resolution is committed; a card that failed to close stays in tick's work set
-            logger.warning("a card could not be closed after its deadline default", exc_info=True)
+        except Exception as caught_error:
+            log_caught(caught_error, __name__, locals())
 
     def committed(self, event_id: str) -> dict | None:
         """The event of this run already committed under `event_id`, if any (QuestionWait asks, #338)."""
@@ -473,17 +476,18 @@ class Run:
                 self.put(
                     "world.failed", "system", self.world_id, f"Stopped: {reason}", {"reason": reason, "unit": unit}
                 )
-        except Exception:
-            logger.exception("run %s could not record its failure", self.run_id)
+        except Exception as caught_error:
+            log_caught(caught_error, __name__, locals())
 
     def main(self) -> None:
         """Every way out ends in a terminal event (or the pause) and leaves no entry of the run waiting to send."""
         try:
-            asyncio.run(self._execute())
+            with failure_context(run_id=self.run_id, world_id=self.world_id):
+                asyncio.run(self._execute())
         except RunStopped:
             pass
         except BaseException as exc:  # the outbox re-raises a BaseException from a send; the run still ends
-            logger.exception("run %s stopped on an error", self.run_id)
+            log_caught(exc, __name__, locals())
             self._abandon_unsent()
             self._fail("an internal error stopped the work", None)
             if isinstance(exc, KeyboardInterrupt):
@@ -610,10 +614,12 @@ class Run:
                 record.layout = self.layout  # before `world.started`: the event writer validates against it (ADR-0026)
                 try:
                     self.store.commit(worlds={self.world_id: record}, evict=False)  # durable: the layout is stored too
-                except Exception:
+                except Exception as caught_error:
+                    log_caught(caught_error, __name__, locals())
                     record.layout = None  # the record stays cached, as it was, for the run's `world.failed`
                     raise
-        except Exception:
+        except Exception as caught_error:
+            log_caught(caught_error, __name__, locals())
             self._fail("the world could not be laid out", None)
             return None
         self.plan, semantic = plan, self.layout["semantic"]
@@ -734,6 +740,7 @@ class Run:
                     raise _GateFailed("the send has no recipients") from exc
                 supplied |= await self._ask_fields(unit, worker, action, exc.fields, exc.reason)
             except Exception as exc:
+                log_caught(exc, __name__, locals())
                 raise _GateFailed("the send has no recipients") from exc
         else:
             raise _GateFailed("the send has no recipients")
@@ -754,6 +761,7 @@ class Run:
                 self.seams.artifacts.head(self.scope, body_ref).record["screening"] != "clean"
             )
         except Exception as exc:
+            log_caught(exc, __name__, locals())
             raise _GateFailed("the item to send is not in the run's store") from exc
         self._draft_first(connector, action, item)  # LC-10: before any card a send that could not go would raise
         facts = tilo_policy.SideEffectFacts(
@@ -893,7 +901,8 @@ class Run:
                 and e["item"] == item for e in self.seams.outbox_store.all_entries()
             )  # fmt: skip
             ok = drafted and pinned is not None and head is not None and head.record["content_sha256"] == pinned
-        except Exception:
+        except Exception as caught_error:
+            log_caught(caught_error, __name__, locals())
             ok = False
         if not ok:
             raise _GateFailed(NO_DRAFT)
@@ -963,6 +972,7 @@ class Run:
                 stored = self.seams.artifacts.head(self.scope, body).record  # type: ignore[union-attr]
                 content, fields = self._read_pinned(body), dict(declared)
             except Exception as exc:
+                log_caught(exc, __name__, locals())
                 raise _GateFailed("the item to send is not in the run's store") from exc
             origin = {"kind": stored["origin"]["kind"]}
             try:
@@ -996,10 +1006,12 @@ class Run:
             except RunStopped:
                 raise
             except Exception as exc:
+                log_caught(exc, __name__, locals())
                 raise _GateFailed("the document to send could not be stored") from exc
             try:  # the card's line is read back from the stored (redacted) bytes, not from what was built
                 line = item_documents.summary(self._read_pinned(version.ref))
             except Exception as exc:
+                log_caught(exc, __name__, locals())
                 raise _GateFailed("the document to send could not be read back") from exc
             self._documents[key] = (version.ref, line, destination)
         ref, line, _ = self._documents[key]

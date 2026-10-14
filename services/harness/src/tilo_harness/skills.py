@@ -17,6 +17,7 @@ from typing import Any
 
 import jsonschema
 import yaml
+from tilo_providers.diagnostics import log_caught
 
 from tilo_harness.validator import repo_validator
 
@@ -53,6 +54,7 @@ def _read_skill(folder: Path) -> tuple[dict[str, Any], LoadedSkill]:
     except SkillError:
         raise
     except Exception as error:
+        log_caught(error, __name__, locals())
         raise SkillError(f"{folder.name}: cannot read skill ({type(error).__name__})") from error
 
 

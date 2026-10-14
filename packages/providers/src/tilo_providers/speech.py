@@ -23,6 +23,7 @@ from typing import Any, cast
 import yaml
 
 from tilo_providers.config import ProviderConfigError, refuse_dev_only
+from tilo_providers.diagnostics import log_caught
 from tilo_providers.errors import ProviderError, RequestError
 from tilo_providers.interfaces import SpeechProvider
 from tilo_providers.replay import Redactor, ReplayMissError, is_live_mode, redact_strings
@@ -55,6 +56,7 @@ def load_speech_config(path: Path | str, *, models_path: Path | str | None = Non
     try:
         raw = yaml.safe_load(path.read_text(encoding="utf-8"))
     except (OSError, yaml.YAMLError) as error:
+        log_caught(error, __name__, locals())
         raise ProviderConfigError(f"could not read {path}: {type(error).__name__}") from None
     section = raw.get("speech") if isinstance(raw, dict) else None
     if not isinstance(section, dict):
@@ -211,7 +213,8 @@ class SpeechRecordReplayProvider(SpeechProvider):
         try:
             data = json.loads(path.read_text(encoding="utf-8"))
             return as_speech_result(data["result"])
-        except (OSError, ValueError, KeyError, TypeError):  # a corrupt or hand-edited recording fails closed
+        except (OSError, ValueError, KeyError, TypeError) as caught_error:
+            log_caught(caught_error, __name__, locals())
             raise ProviderError(f"FR-MTG-17: speech recording {path.name} is unreadable or malformed") from None
 
     def _write(self, path: Path, key: str, result: dict[str, Any], live: SpeechProvider) -> None:
@@ -225,7 +228,8 @@ class SpeechRecordReplayProvider(SpeechProvider):
             with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as handle:
                 handle.write(json.dumps(redacted, indent=2, sort_keys=True) + "\n")
             os.replace(tmp_name, path)
-        except BaseException:
+        except BaseException as caught_error:
+            log_caught(caught_error, __name__, locals())
             Path(tmp_name).unlink(missing_ok=True)
             raise
 

@@ -31,6 +31,7 @@ from typing import Any, Protocol
 import yaml
 
 from tilo_providers.config import ProviderConfigError, ProvidersConfig
+from tilo_providers.diagnostics import log_caught
 from tilo_providers.errors import MissingCapabilityError, NotConfigured, ProviderError, QuotaError, RetryableError
 from tilo_providers.interfaces import Capability, GenerateRequest, GenerateResponse, ModelProvider, PriceQuote
 
@@ -118,7 +119,8 @@ def load_byok_config(path: Path | str | None = None, *, providers: ProvidersConf
         return ByokConfig()
     try:
         doc = yaml.safe_load(target.read_text(encoding="utf-8"))
-    except (OSError, yaml.YAMLError):
+    except (OSError, yaml.YAMLError) as caught_error:
+        log_caught(caught_error, __name__, locals())
         raise ByokConfigError("byok.yaml is not readable plain YAML") from None
     if not isinstance(doc, dict) or not set(doc) <= _FILE_KEYS or type(doc.get("enabled")) is not bool:
         raise ByokConfigError(f"byok.yaml must be a mapping of {sorted(_FILE_KEYS)} with a boolean `enabled`")
@@ -279,7 +281,8 @@ class ProxyModelProvider(ModelProvider):
                 refused = "unreachable"
         except ProxyRefusal as refusal:
             refused = refusal.code
-        except Exception:  # noqa: BLE001 - any text it carries may hold a key fragment: only a fixed outcome leaves
+        except Exception as caught_error:
+            log_caught(caught_error, __name__, locals())
             refused = "unreachable"
         if reply is None:
             raise _error_for(refused or "unreachable")

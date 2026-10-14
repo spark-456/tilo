@@ -7,6 +7,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import Response
 from tilo_memory.artifacts import ArtifactStore, Scope
+from tilo_providers.diagnostics import log_caught
 
 from tilo_api import deps
 
@@ -68,8 +69,8 @@ def get_result(
         ):
             raise ValueError("unavailable output")
         content = artifact_store.read(scope, ref)  # AR-01: hash and size checked by the GCS-backed store.
-    except Exception:
-        logger.warning("the output of %s is not available to download", world_id, exc_info=True)
+    except Exception as caught_error:
+        log_caught(caught_error, __name__, locals())
         raise HTTPException(status_code=404, detail="Tilo could not find that.") from None
     media = version.record["media_type"]
     if media not in {"application/pdf", "application/json", "text/plain", "text/markdown"}:

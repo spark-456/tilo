@@ -33,6 +33,7 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from typing import Any
 
+from tilo_providers.diagnostics import log_caught
 from tilo_providers.interfaces import GenerateRequest, GenerateResponse, ModelProvider
 from tilo_providers.prompts import load_prompt
 
@@ -126,7 +127,8 @@ def _verdict(text: Any) -> str:
             if isinstance(text, str) and len(text) <= MAX_REPLY_CHARS
             else None
         )
-    except Exception:  # not JSON, a duplicate key, or too deeply nested
+    except Exception as caught_error:  # not JSON, a duplicate key, or too deeply nested
+        log_caught(caught_error, __name__, locals())
         return "unverified"
     if isinstance(reply, dict) and set(reply) == {"verdict"} and reply["verdict"] in ("supported", "contradicted"):
         return str(reply["verdict"])
@@ -224,7 +226,8 @@ class Verifier:
         )
         try:
             response = await asyncio.to_thread(self._model.generate, request)
-        except Exception:  # a provider outage marks the claim unverified, never supported
+        except Exception as caught_error:  # a provider outage marks the claim unverified, never supported
+            log_caught(caught_error, __name__, locals())
             return "unverified"
         responses.append(response)
         return _verdict(response.text)
@@ -247,7 +250,8 @@ class Verifier:
                 review = Review("unverified", {}, _cleared(deliverable.manifest))
             else:
                 review = await self.review(deliverable)
-        except Exception:  # unloadable, malformed or not independent: fail closed
+        except Exception as caught_error:  # unloadable, malformed or not independent: fail closed
+            log_caught(caught_error, __name__, locals())
             review = Review("unverified", {}, {})
         levels = [
             lv["id"] for lv in writer.layout["semantic"]["levels"] for d in lv["districts"] if d["id"] == district

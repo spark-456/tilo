@@ -40,6 +40,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from tilo_providers.diagnostics import log_caught
 from tilo_providers.errors import (
     LiveVoiceRefused,
     NotConfigured,
@@ -177,7 +178,8 @@ class GeminiLiveVoiceProvider(SpeechProvider):
             raise NotConfigured(
                 f"FR-MTG-11: no recording {key} for this reply; replay serves recordings only"
             ) from None
-        except (OSError, ValueError):
+        except (OSError, ValueError) as caught_error:
+            log_caught(caught_error, __name__, locals())
             raise ProviderError("FR-MTG-11: the Live voice recording could not be read") from None
         chunks = data.get("chunks_b64") if isinstance(data, dict) else None
         expected = (key, self._live.profile_id, self._live.model, voice, self._config.sample_rate)
@@ -294,6 +296,7 @@ class GeminiLiveVoiceProvider(SpeechProvider):
             except ProviderError:
                 raise
             except Exception as error:
+                log_caught(error, __name__, locals())
                 failure: ProviderError | None = self._failure(error)
             else:
                 failure = None

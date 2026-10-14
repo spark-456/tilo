@@ -39,6 +39,7 @@ from typing import TYPE_CHECKING, Any, Literal
 
 import jsonschema
 from tilo_providers.clock import Clock, real_today
+from tilo_providers.diagnostics import log_caught
 from tilo_providers.interfaces import GenerateRequest, GenerateResponse, ModelProvider, SafetyProvider
 from tilo_providers.media import MediaPart, check_parts
 from tilo_providers.prompts import load_prompt
@@ -221,7 +222,16 @@ class ToolUnitRunner:
                         else UnitOutput(media_type="text/markdown", content=response.text.encode("utf-8"))
                     )
                 except DeliverableRefused as refused:
-                    return self._finish(UnitOutcome(False, f"No report was made: {refused}."), loop, "done")
+                    log_caught(refused, __name__, locals())
+                    return self._finish(
+                        UnitOutcome(
+                            False,
+                            f"No report was made: {refused}.",
+                            reason="a step's report could not be validated or rendered",
+                        ),
+                        loop,
+                        "done",
+                    )
                 outcome = UnitOutcome(True, f"Finished {unit['title']}.", outputs=(output,), provenance_ids=_refs(loop))
                 return self._finish(outcome, loop, "done")
             await self._calls(response.tool_calls, live, loop)
@@ -283,7 +293,8 @@ class ToolUnitRunner:
                 args = raw.get("args") if isinstance(raw, Mapping) else None
                 label = data_line(name, 48) if isinstance(name, str) and name else "unknown"
                 await self._one(name, args, label, live, loop)
-            except Exception:  # whatever one call does wrong is one error row, never a crash that loses the step
+            except Exception as caught_error:
+                log_caught(caught_error, __name__, locals())
                 self._note(
                     loop, label, FAILED, ToolCallRecord(loop.unit_id, loop.step, label, "0" * 64, "error", 0.0, 0, None)
                 )
@@ -324,7 +335,8 @@ class ToolUnitRunner:
             assert self._gate is not None
             try:
                 raw = self._gate(loop.unit_id, tool.name, args)
-            except Exception:  # it may have queued before it failed: keep the row, show nothing
+            except Exception as caught_error:  # it may have queued before it failed: keep the row, show nothing
+                log_caught(caught_error, __name__, locals())
                 self._note(
                     loop, tool.name, FAILED, dataclasses.replace(record, outcome="error", latency_ms=self._ms(started))
                 )
@@ -342,7 +354,8 @@ class ToolUnitRunner:
             return
         try:
             result = await asyncio.to_thread(tool.run, args)
-        except Exception:  # the error text may echo a secret: only the fact is kept
+        except Exception as caught_error:  # the error text may echo a secret: only the fact is kept
+            log_caught(caught_error, __name__, locals())
             self._note(
                 loop, tool.name, FAILED, dataclasses.replace(record, outcome="error", latency_ms=self._ms(started))
             )
@@ -378,7 +391,8 @@ class ToolUnitRunner:
                     )
                     if verdict.get("flagged") is not False:
                         flagged = True
-            except Exception:
+            except Exception as caught_error:
+                log_caught(caught_error, __name__, locals())
                 flagged = True
         # Native bytes require a recorded source before reaching a model.
         if parts and self._archive is None:
@@ -396,7 +410,8 @@ class ToolUnitRunner:
                         **({"parts": [p.model_dump() for p in parts]} if parts else {}),
                     }
                 )
-        except Exception:
+        except Exception as caught_error:
+            log_caught(caught_error, __name__, locals())
             loop.credits += credits
             error = dataclasses.replace(record, outcome="error", credits=credits, latency_ms=self._ms(started))
             self._note(loop, tool.name, NO_ARCHIVE, error)
@@ -427,7 +442,8 @@ class ToolUnitRunner:
         try:
             verdict = await asyncio.to_thread(self._safety.check, text)
             return verdict.get("flagged") is not False
-        except Exception:
+        except Exception as caught_error:
+            log_caught(caught_error, __name__, locals())
             return True
 
     def _ms(self, started: float) -> int:
@@ -460,7 +476,8 @@ def _spec(tool: Tool) -> dict[str, Any]:
 def _credits(value: Any) -> float:
     try:
         number = float(value)
-    except (TypeError, ValueError):
+    except (TypeError, ValueError) as caught_error:
+        log_caught(caught_error, __name__, locals())
         return 0.0
     return number if math.isfinite(number) and number > 0 else 0.0
 

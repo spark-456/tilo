@@ -35,6 +35,7 @@ from tilo_planning.questions import apply_answer, generate_questions, record_ass
 from tilo_planning.scenarios import ScenarioError, load_scenario
 from tilo_providers.clock import Clock
 from tilo_providers.config import ProviderConfigError
+from tilo_providers.diagnostics import log_caught
 from tilo_providers.errors import ProviderError
 from tilo_providers.interfaces import SafetyProvider
 from tilo_providers.replay import ReplayMissError
@@ -211,6 +212,7 @@ def _screen(safety: SafetyProvider, strings: list[str]) -> None:
     try:
         flagged = safety.check("\n".join(strings))["flagged"]
     except (ProviderError, ProviderConfigError, ReplayMissError) as exc:
+        log_caught(exc, __name__, locals())
         raise HTTPException(status_code=503, detail="The safety screen is unavailable; nothing changed.") from exc
     if flagged:
         raise HTTPException(status_code=422, detail="The safety screen flagged this change; rephrase it.")
@@ -367,7 +369,8 @@ def _queue_approaches(
     work["future"] = future
     try:
         _PREFETCH.submit(_prefetch_approaches, store, writer, task_id, model_router, clock, future, slots)
-    except Exception:
+    except Exception as caught_error:
+        log_caught(caught_error, __name__, locals())
         work.pop("future", None)
         slots.release()
         raise
@@ -411,6 +414,7 @@ def _prefetch_approaches(
                 else:
                     result = _compute_approaches(snapshot, model_router, clock)
             except Exception as exc:
+                log_caught(exc, __name__, locals())
                 error = exc
             with task.lock:
                 task = _latest(store, task_id)
@@ -421,6 +425,7 @@ def _prefetch_approaches(
                     try:
                         _saved(store, writer, task_id, task, [result.event], {"approaches": result.approaches})
                     except Exception as exc:
+                        log_caught(exc, __name__, locals())
                         error = exc
                 work["finished"] = version
                 if error is None:
@@ -521,7 +526,8 @@ def _granted_cap(store: deps.Store, task: deps.TaskRecord, asked: float) -> floa
         if event.get("type") == "budget.granted":
             try:
                 return float(event["data"]["cap"])
-            except (KeyError, TypeError, ValueError):
+            except (KeyError, TypeError, ValueError) as caught_error:
+                log_caught(caught_error, __name__, locals())
                 break
     return asked
 
@@ -536,7 +542,7 @@ def _start(
     try:
         runs.start_run(store, task, approach=approach, budget_cap=budget_cap, seams=seams)
     except Exception as exc:
-        logger.exception("the run for task %s did not start", task.world_id)
+        log_caught(exc, __name__, locals())
         if _loud():
             raise HTTPException(status_code=503, detail=_NOT_STARTED) from exc
 

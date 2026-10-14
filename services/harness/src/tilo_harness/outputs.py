@@ -35,6 +35,7 @@ from tilo_memory.artifacts import (
     Origin,
     StoredVersion,
 )
+from tilo_providers.diagnostics import log_caught
 
 MAX_OUTPUTS = 10  # a unit's cap (BQ-257)
 MAX_PDF = 20 * 1024 * 1024  # a rendered PDF's cap (LW-10); the store's own file cap is 50 MB
@@ -182,6 +183,7 @@ def keep(
         for item, out in zip(kept, outputs, strict=True):
             _manifest(artifacts, scope, item.version, out, manifest_of)
     except Exception as error:  # a refused put or manifest, a backend error: the unit fails, nothing announced
+        log_caught(error, __name__, locals())
         raise OutputRefused(type(error).__name__) from None
     return kept
 

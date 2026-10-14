@@ -29,6 +29,7 @@ import jsonschema
 import yaml
 from referencing import Registry, Resource
 from referencing.jsonschema import DRAFT202012
+from tilo_providers.diagnostics import log_caught
 
 LAYOUT_ID = re.compile(r"^(A_[0-9A-Za-z_]+|[LDBGI][0-9]{1,4})$")
 
@@ -358,6 +359,7 @@ class EventValidator:
         try:
             return [_capped(problem) for problem in self._problems(event, state)]
         except Exception as error:  # fail closed: a validator crash rejects the event, it never escapes
+            log_caught(error, __name__, locals())
             return [f"schema: (root): the event could not be validated ({type(error).__name__})"]
 
     def contract_problems(self, name: str, instance: object) -> list[str]:
@@ -366,6 +368,7 @@ class EventValidator:
         try:
             return [_capped(problem) for problem in self._schema_errors(name, instance)]
         except Exception as error:  # fail closed, same as problems()
+            log_caught(error, __name__, locals())
             return [f"(root): could not be validated against {name} ({type(error).__name__})"]
 
     def _problems(self, event: dict[str, Any], state: WorldState | None) -> list[str]:

@@ -13,6 +13,7 @@ from typing import Any
 from tilo_contracts import ProvidersProfile
 
 from tilo_providers.config import ProviderConfigError
+from tilo_providers.diagnostics import log_caught
 from tilo_providers.google_adapter import GoogleModelProvider
 from tilo_providers.interfaces import Capability, SearchProvider
 from tilo_providers.prompts import load_prompt
@@ -69,6 +70,7 @@ class GoogleSearchProvider(SearchProvider):
                 model=self._model_id, contents=request.query, config=config
             )
         except Exception as error:
+            log_caught(error, __name__, locals())
             failure = self._google._failure(error)
         else:
             return self._result(request.query, response)

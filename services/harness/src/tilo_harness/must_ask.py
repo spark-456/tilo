@@ -28,6 +28,7 @@ from dataclasses import dataclass
 from typing import Any, cast
 
 from tilo_policy.tiers import RiskTable, load_risk_table
+from tilo_providers.diagnostics import log_caught
 from tilo_providers.interfaces import GenerateRequest, ModelProvider
 from tilo_providers.prompts import load_prompt
 
@@ -186,7 +187,8 @@ class MustAsk:
         try:
             reply = await asyncio.to_thread(self._providers[unit["role"]].generate, self._request(unit))
             return _parse(reply.text)
-        except Exception:  # unreadable reply, provider outage or missing role: ask rather than guess (BQ-199)
+        except Exception as caught_error:
+            log_caught(caught_error, __name__, locals())
             return _canned("ambiguous_brief", _UNREADABLE, proceed=1)
 
     def confirmation(self, ask: Ask, answer: Any) -> Ask | None:

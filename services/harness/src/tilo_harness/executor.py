@@ -57,6 +57,7 @@ from typing import Any, Protocol
 
 from tilo_logging.context import bound
 from tilo_providers.clock import Clock, parse_deadline, real_today
+from tilo_providers.diagnostics import failure_context, log_caught
 
 from tilo_harness.branch import Checkpoint, hit_summary, reusable_units
 from tilo_harness.config import AgentsConfig
@@ -276,7 +277,8 @@ def _upstream_item(
             continue
         try:
             raw = store["artifacts"].read(store["scope"], item.version.ref) if store else b""
-        except Exception:  # an unreadable version is left out, never guessed at
+        except Exception as caught_error:  # an unreadable version is left out, never guessed at
+            log_caught(caught_error, __name__, locals())
             verdict = verdict if verdict != "clean" else "unscreened"
             texts.append("(an item was left out: it could not be read)")
             continue
@@ -450,8 +452,13 @@ class _Run:
                     return UnitOutcome(success=False, summary="The step was held, so it did not run.")
         try:
             loaded = tuple(self.skills.load_pinned(skill_id, self.pins) for skill_id in unit["skills"])
-        except SkillError:
-            outcome = UnitOutcome(success=False, summary="A pinned skill changed on disk, so the unit stopped.")
+        except SkillError as error:
+            log_caught(error, __name__, locals())
+            outcome = UnitOutcome(
+                success=False,
+                summary="A pinned skill changed on disk, so the unit stopped.",
+                reason="a pinned skill changed on disk",
+            )
         else:
             for skill in loaded:
                 data = {"skill": skill.id, "version": skill.version}
@@ -476,7 +483,11 @@ class _Run:
             outcome, made = await self.keep(unit, worker, outcome, trail)
         envelope = _envelope(outcome, worker, lead, unit) if outcome.success is True else None
         if envelope is None and outcome.success is not False:
-            outcome = UnitOutcome(success=False, summary="The unit's result was not a valid handoff.")
+            outcome = UnitOutcome(
+                success=False,
+                summary="The unit's result was not a valid handoff.",
+                reason="a step's result was not a valid handoff",
+            )
         if envelope is not None:
             credits = getattr(outcome, "credits", 0)  # the unit's credits ride on its first item (HR-1: the meter)
             announced = [
@@ -490,8 +501,13 @@ class _Run:
             summary = "The agent handed its result to the Lead."
             try:
                 cause = self.emit("agent.handoff", worker, lead, summary, {"envelope": envelope}, cause=cause, **at)
-            except EventRejected:  # the writer refused the handoff and wrote nothing: this unit fails
-                outcome = UnitOutcome(success=False, summary="The unit's result was not a valid handoff.")
+            except EventRejected as error:  # the writer refused the handoff and wrote nothing: this unit fails
+                log_caught(error, __name__, locals())
+                outcome = UnitOutcome(
+                    success=False,
+                    summary="The unit's result was not a valid handoff.",
+                    reason="a step's result could not be handed to the Lead",
+                )
             else:
                 self.handoffs[unit_id] = cause
         self.emit("agent.retired", lead, worker, "The agent finished and left.", {}, cause=cause, **at)
@@ -505,14 +521,22 @@ class _Run:
         goes on). A crash is one ERROR line: class names and profile ids only (RUN-FAIL-1)."""
         try:
             return await asyncio.ensure_future(work)  # its own task: a runner cancelling "the current task" is itself
-        except asyncio.CancelledError:
+        except asyncio.CancelledError as error:
             task = asyncio.current_task()
             if task is not None and task.cancelling():  # the run itself was cancelled
                 raise
+            log_caught(error, __name__, locals())
             return _Crashed("a step's work was cancelled")
         except Exception as error:  # a runner crash fails this unit closed; the run goes on
             reason = crash_reason(error)
-            log.error("unit %s failed: %s [%s]", unit_id, reason, error_trail(error))
+            log.error(
+                "unit %s failed: %s [%s] run=%s world=%s",
+                unit_id,
+                reason,
+                error_trail(error),
+                self.writer.run_id,
+                self.writer.world_id,
+            )
             return _Crashed(reason)
 
     async def run_agents(
@@ -522,7 +546,11 @@ class _Run:
         checked and stored before anything is announced, then the successor verifies it before it continues.
         Returns the outcome, the agent that ended the unit and the last event."""
         worker, lead, handoffs = context.agent_id, self.roster.leads[unit["district"]], 0
-        closed = UnitOutcome(success=False, summary="The handoff could not be completed, so the unit stopped.")
+        closed = UnitOutcome(
+            success=False,
+            summary="The handoff could not be completed, so the unit stopped.",
+            reason="a step's context handoff could not be stored or completed",
+        )
         while True:
             ran = await self.call(self.runner.run(unit, context), unit["id"])
             if not isinstance(ran, UnitOutcome):
@@ -539,7 +567,8 @@ class _Run:
                 ref = await asyncio.to_thread(
                     store_note, self.store, self.writer.run_id, unit["id"], worker, note, handoffs
                 )
-            except Exception:  # a refused or failed put: fail closed, and the unused spare goes back
+            except Exception as caught_error:  # a refused or failed put: fail closed, and the unused spare goes back
+                log_caught(caught_error, __name__, locals())
                 self.used.discard(successor)
                 return closed, worker, cause
             handoffs += 1
@@ -589,8 +618,15 @@ class _Run:
             )
             stored = [item.version.ref for item in made]
             return dataclasses.replace(outcome, artifact_refs=(*stored, *selected)), made
-        except Exception:  # a refused put, manifest or ref, or a backend error: no artifact event for this unit
-            return UnitOutcome(success=False, summary="The unit's result could not be stored."), []
+        except (
+            Exception
+        ) as caught_error:  # a refused put, manifest or ref, or a backend error: no artifact event for this unit
+            log_caught(caught_error, __name__, locals())
+            return UnitOutcome(
+                success=False,
+                summary="The unit's result could not be stored.",
+                reason="a step's result could not be stored",
+            ), []
 
     def announce(self, item: Kept, worker: str, cause: str, district: str, credits: float) -> str:
         """One event per stored version, its data from the store's record (ADR-0018 s6): no runner-named id or hash."""
@@ -624,7 +660,10 @@ def _logged_with_run_ids[**P, R](work: Callable[P, Awaitable[R]]) -> Callable[P,
     @functools.wraps(work)
     async def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
         writer = kwargs.get("writer")
-        with bound(run_id=getattr(writer, "run_id", None), world_id=getattr(writer, "world_id", None)):
+        with (
+            bound(run_id=getattr(writer, "run_id", None), world_id=getattr(writer, "world_id", None)),
+            failure_context(run_id=getattr(writer, "run_id", None), world_id=getattr(writer, "world_id", None)),
+        ):
             return await work(*args, **kwargs)
 
     return wrapper
@@ -712,31 +751,33 @@ async def run_plan(
             finished[unit["id"]].set_result(True)
 
     async def unit_task(unit: dict[str, Any]) -> None:
-        if unit["id"] in result.reused:
-            return
-        dependencies_ok = [await finished[dep] for dep in unit["depends_on"]]
-        if not all(dependencies_ok):
-            result.skipped.append(unit["id"])
-            finished[unit["id"]].set_result(False)
-            return
-        async with _Slot(slots) as slot:
-            outcome = await run.work(unit, slot)
-        if outcome is None:  # parked: a person must answer first, so its dependents wait (skipped)
-            result.parked.append(unit["id"])
-            finished[unit["id"]].set_result(False)
-            return
-        await run.review(unit, outcome)  # after the slot is free; dependents wait for it
-        if unit["id"] in run.held:  # a person's Hold (or the default) kept it from running: dependents are skipped
-            result.held.append(unit["id"])
-            finished[unit["id"]].set_result(False)
-            return
-        result.outcomes[unit["id"]] = outcome
-        finished[unit["id"]].set_result(outcome.success)
+        with failure_context(unit_id=unit["id"]):
+            if unit["id"] in result.reused:
+                return
+            dependencies_ok = [await finished[dep] for dep in unit["depends_on"]]
+            if not all(dependencies_ok):
+                result.skipped.append(unit["id"])
+                finished[unit["id"]].set_result(False)
+                return
+            async with _Slot(slots) as slot:
+                outcome = await run.work(unit, slot)
+            if outcome is None:  # parked: a person must answer first, so its dependents wait (skipped)
+                result.parked.append(unit["id"])
+                finished[unit["id"]].set_result(False)
+                return
+            await run.review(unit, outcome)  # after the slot is free; dependents wait for it
+            if unit["id"] in run.held:  # a person's Hold (or the default) kept it from running: dependents are skipped
+                result.held.append(unit["id"])
+                finished[unit["id"]].set_result(False)
+                return
+            result.outcomes[unit["id"]] = outcome
+            finished[unit["id"]].set_result(outcome.success)
 
     try:
         async with asyncio.TaskGroup() as group:
             for unit in order:
                 group.create_task(unit_task(unit))
     except ExceptionGroup as errors:  # e.g. WriterBusy or EventRejected: stop the run, raise it plainly
+        log_caught(errors, __name__, locals())
         raise errors.exceptions[0] from None
     return result

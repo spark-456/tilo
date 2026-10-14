@@ -15,6 +15,7 @@ import json
 from collections.abc import Mapping
 from typing import Any
 
+from tilo_providers.diagnostics import log_caught
 from tilo_render.pdf import render_pdf
 from tilo_render.spec import DeliverableSpec
 
@@ -87,11 +88,13 @@ def parse_spec(reply: Any) -> DeliverableSpec:
         raise DeliverableRefused("not_json")
     try:
         data = json.loads(text, object_pairs_hook=_object, parse_constant=_constant)
-    except (ValueError, RecursionError):  # includes JSONDecodeError and the int-digits limit
+    except (ValueError, RecursionError) as caught_error:  # includes JSONDecodeError and the int-digits limit
+        log_caught(caught_error, __name__, locals())
         raise DeliverableRefused("not_json") from None
     try:
         return DeliverableSpec.model_validate(data)
-    except Exception:  # noqa: BLE001 - pydantic's message echoes the input
+    except Exception as caught_error:  # noqa: BLE001 - pydantic's message echoes the input
+        log_caught(caught_error, __name__, locals())
         raise DeliverableRefused("invalid_spec") from None
 
 
@@ -100,7 +103,8 @@ def render_output(reply: Any) -> RenderedPdf:
     spec = parse_spec(reply)
     try:
         pdf = render_pdf(spec)
-    except Exception:  # noqa: BLE001 - the error text may echo the spec
+    except Exception as caught_error:  # noqa: BLE001 - the error text may echo the spec
+        log_caught(caught_error, __name__, locals())
         raise DeliverableRefused("render_failed") from None
     if len(pdf) > MAX_PDF:
         raise DeliverableRefused("too_large")

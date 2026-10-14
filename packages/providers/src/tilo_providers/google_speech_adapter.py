@@ -11,6 +11,7 @@ import json
 import os
 from typing import Any
 
+from tilo_providers.diagnostics import log_caught
 from tilo_providers.errors import NotConfigured, ProviderError, map_http_status, map_transport_error
 from tilo_providers.google_adapter import _GOOGLE_SECRET_RE, validate_google_settings
 from tilo_providers.interfaces import SpeechProvider
@@ -70,6 +71,7 @@ class GoogleSpeechProvider(SpeechProvider):
         try:
             response = self._client.models.generate_content(model=self._model, contents=contents, config=config)
         except Exception as error:
+            log_caught(error, __name__, locals())
             failure = self._failure(error)
         else:
             return self._parse(getattr(response, "text", None))
@@ -90,6 +92,7 @@ class GoogleSpeechProvider(SpeechProvider):
         try:
             response = self._client.models.generate_content(model=self._tts_model, contents=text, config=config)
         except Exception as error:
+            log_caught(error, __name__, locals())
             failure = self._failure(error)
         else:
             return self._parse_audio(response)

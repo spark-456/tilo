@@ -20,6 +20,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from tilo_providers.config import ProviderConfigError, ProvidersConfig
+from tilo_providers.diagnostics import log_caught
 from tilo_providers.errors import ProviderError, RequestError
 from tilo_providers.fake import _canned_text
 from tilo_providers.interfaces import GenerateRequest, GenerateResponse
@@ -162,6 +163,7 @@ class InMemoryBatchProvider(BatchProvider):
             try:
                 response = self._run_item(item)
             except Exception as error:  # noqa: BLE001 - an item failure is data, never an exception
+                log_caught(error, __name__, locals())
                 job.results.append(BatchResult(custom_id=item.custom_id, status="error", error=_item_error(error)))
             else:
                 job.results.append(BatchResult(custom_id=item.custom_id, status="ok", response=response))

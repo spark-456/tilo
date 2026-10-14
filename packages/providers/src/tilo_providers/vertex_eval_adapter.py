@@ -18,6 +18,7 @@ from typing import Any, Literal
 import httpx
 
 from tilo_providers.config import ProviderConfigError
+from tilo_providers.diagnostics import log_caught
 from tilo_providers.errors import ProviderError, map_http_status, map_transport_error
 from tilo_providers.google_adapter import _GOOGLE_SECRET_RE, GoogleSettingsError
 from tilo_providers.interfaces import EvalProvider, EvalRequest, EvalScore
@@ -75,9 +76,11 @@ class VertexEvalProvider(EvalProvider):
         token: Any = None
         try:
             token = self._token()
-        except (ProviderConfigError, GoogleSettingsError):  # a refusal (key file) is not a missing credential
+        except (ProviderConfigError, GoogleSettingsError) as caught_error:
+            log_caught(caught_error, __name__, locals())
             raise
         except Exception as exc:
+            log_caught(exc, __name__, locals())
             failure = ProviderError(f"VERTEX-EVAL-1: no Google credentials for the eval service ({type(exc).__name__})")
         if failure is None and not (isinstance(token, str) and _TOKEN_RE.fullmatch(token)):
             failure = ProviderError("VERTEX-EVAL-1: eval credentials produced no usable token")
@@ -112,6 +115,7 @@ class VertexEvalProvider(EvalProvider):
         try:
             response = self._client.post(self._url, headers=headers, json=self._body(request))
         except httpx.HTTPError as exc:
+            log_caught(exc, __name__, locals())
             failure = map_transport_error(exc) or ProviderError("VERTEX-EVAL-1: eval request failed")
         if failure is not None:
             raise failure  # raised outside the except block, so the request and its bearer header are not __context__
@@ -121,7 +125,8 @@ class VertexEvalProvider(EvalProvider):
             )
         try:
             body = json.loads(response.content, object_pairs_hook=_duplicate_key_free)
-        except (ValueError, RecursionError, ProviderError):  # ValueError includes UnicodeDecodeError
+        except (ValueError, RecursionError, ProviderError) as caught_error:  # ValueError includes UnicodeDecodeError
+            log_caught(caught_error, __name__, locals())
             body = None
         return self._score(request.kind, body)
 
