@@ -8,7 +8,8 @@ the user setup sheet, the Hosting CSP for Google sign-in, and the static rules o
   the 100-new-user cap on Gmail consent, until Google verifies the restricted scopes: a later owner step) and Testing as
   the fallback. docs/deploy-dev.md must not keep telling the user the key is "App Check API only", or sign-in breaks.
 - The Gmail consent sheet (S-08) tells the person about Google's unverified-app warning before the redirect; the exact
-  sentence is in services/api/tests/API_SIGNIN.md and in apps/web/src/screens/S_08.unverified.SIGNIN.test.tsx.
+  sentence is in services/api/tests/API_SIGNIN.md and in
+  apps/web/src/worldView/NeedsYouConsent.unverified.SIGNIN.test.tsx.
 - The Hosting CSP (firebase.json) gets exactly what the Firebase Auth SDK needs for a popup / redirect Google sign-in,
   nothing wider. Found by reading @firebase/auth 12.x `dist/esm/index-*.js` (version in pnpm-lock): the gapi loader is
   `https://apis.google.com/js/api.js` (script-src), the sign-in iframe and handler live on the project's auth domain at
@@ -202,7 +203,7 @@ def test_SEC_15_SIGNIN_the_gmail_consent_sentence_in_the_spec_doc_is_the_one_the
     repo_root: pathlib.Path,
 ) -> None:
     spec = (repo_root / "services" / "api" / "tests" / "API_SIGNIN.md").read_text(encoding="utf-8")
-    web = (repo_root / "apps" / "web" / "src" / "screens" / "S_08.unverified.SIGNIN.test.tsx").read_text(
+    web = (repo_root / "apps" / "web" / "src" / "worldView" / "NeedsYouConsent.unverified.SIGNIN.test.tsx").read_text(
         encoding="utf-8"
     )
     match = re.search(r'const UNVERIFIED_NOTE =\s*"([^"]+)"', web)
