@@ -18,6 +18,7 @@ from tilo_api import deps as _deps
 from tilo_api import dev as _dev
 from tilo_api import durable_store as _durable_store
 from tilo_api import meeting_host_routes as _meeting_host_routes
+from tilo_api import meeting_minutes_flag as _meeting_minutes_flag
 from tilo_api import nudge_sweep as _nudge_sweep
 from tilo_api import owner_minutes_routes as _owner_minutes_routes
 from tilo_api import people as _people
@@ -148,6 +149,7 @@ app.include_router(_assistant_router)
 app.include_router(_people.router)
 app.include_router(_plate_links.router)  # FR-PA-06b: /l/<token> (public to the gate; the route checks the link)
 app.include_router(_meeting_host_routes.router)
+_meeting_minutes_flag.configure_minutes_flag(_deps.get_flag_store())
 _owner_minutes_routes.install_owner_minutes_routes(app, _deps.get_flag_store())
 app.include_router(_quiz_apps.router)
 app.include_router(_connect_routes.router)
