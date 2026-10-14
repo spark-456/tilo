@@ -9,6 +9,7 @@ from __future__ import annotations
 import ast
 import pathlib
 import secrets
+from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime
 from typing import Any
 
@@ -93,6 +94,38 @@ def plan(ref: KeyReference | None = None, vault: Any = None, spend: ByokSpend | 
 
 
 _NO_CONFIG: Any = None  # plan_unit never calls the source, so the fake needs no providers config here
+
+
+@pytest.mark.parametrize("first_action", ["abort", "settle"])
+@pytest.mark.parametrize("retry_action", ["abort", "settle"])
+def test_ADR_0041_R34_6_completed_plan_never_releases_another_units_hold(first_action, retry_action) -> None:
+    spend = ByokSpend()
+    first = plan(_ref(day_cap_credits=2), spend=spend, estimate_credits=0)
+    second = plan(_ref(day_cap_credits=2), spend=spend, estimate_credits=0)
+    assert first.payer == second.payer == "org_key"
+    if first_action == "abort":
+        abort_unit(first, spend)
+    else:
+        settle_unit(first, spend, actual_credits=1)
+    before = spend.spent(ORG, DAY.date().isoformat())
+    if retry_action == "abort":
+        abort_unit(first, spend)
+    else:
+        settle_unit(first, spend, actual_credits=1)
+    assert spend.spent(ORG, DAY.date().isoformat()) == before
+    abort_unit(second, spend)
+    assert spend.spent(ORG, DAY.date().isoformat()) == (0 if first_action == "abort" else 1)
+
+
+def test_ADR_0041_R34_6_concurrent_abort_consumes_a_plan_once() -> None:
+    spend = ByokSpend()
+    first = plan(_ref(day_cap_credits=2), spend=spend, estimate_credits=0)
+    second = plan(_ref(day_cap_credits=2), spend=spend, estimate_credits=0)
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        list(pool.map(lambda _: abort_unit(first, spend), range(24)))
+    assert spend.spent(ORG, DAY.date().isoformat()) == 1
+    abort_unit(second, spend)
+    assert spend.spent(ORG, DAY.date().isoformat()) == 0
 
 
 # --- BK-17: the table of decision 7, row by row ---------------------------------------------------------------------
