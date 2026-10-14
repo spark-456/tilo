@@ -37,6 +37,7 @@ import { icon } from "../../shell/kit";
 import { Activity, Districts, Result, RunHistory } from "./Lower";
 import { MeetingHall } from "./MeetingHall";
 import { RunProgressCard } from "./RunProgressCard";
+import { ShareLine } from "./ShareLine";
 import { FactsCard, GoLink, LovableCard, SpendCard, WaitingCard } from "./Side";
 import { SkillProposals } from "./SkillProposals";
 import { ShareWithTeam } from "./TeamShare";
@@ -420,6 +421,9 @@ export function WorldPage({ app }: { app: AppCtx }) {
             <span className="park-sample-note">
               Sample data from a demo session. Approving here records nothing.
             </span>
+          ) : null}
+          {loaded.live && worldClient && !w.sample ? (
+            <ShareLine client={worldClient} worldId={w.id} />
           ) : null}
         </div>
         <div className="park-world-actions">

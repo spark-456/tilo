@@ -66,11 +66,16 @@ it("FR_AGT_15 the live World page reaches proposals and the demo World never req
         </ParkProvider>,
       );
     });
-    // UI-10 B8: a live world also polls its recorded events; a demo World requests nothing
-    const world_ = `https://api.test/worlds/${encodeURIComponent(world.id)}`;
-    expect(fetch.mock.calls.map((c) => String(c[0])).sort()).toEqual(
-      source === "live" ? [`${world_}/events`, `${world_}/skill-proposals`] : [],
+    // A live page also reads the world's events (its sharing line, BQ-CTX-TEAMWORLD TSW-5b, and the run progress
+    // poll, UI-10 B8); proposals are the one request this test is about. A demo World requests nothing.
+    const urls = fetch.mock.calls.map((c) => String(c[0]));
+    const base = `https://api.test/worlds/${encodeURIComponent(world.id)}`;
+    expect(urls.filter((u) => u.endsWith("/skill-proposals"))).toEqual(
+      source === "live" ? [`${base}/skill-proposals`] : [],
     );
+    const others = urls.filter((u) => !u.endsWith("/skill-proposals"));
+    expect(others.every((u) => u === `${base}/events`)).toBe(true);
+    expect(others.length > 0).toBe(source === "live");
     cleanup();
   }
 });

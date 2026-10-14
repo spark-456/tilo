@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
-// BQ-CTX-TEAMWORLD (ADR-0040 decisions 6 and 10; FR-TEAM-04/05): the add-a-work-item form on a world page. The client
-// is a fake fetch; the Api is the fixture one with its world list replaced by what the live Api would answer.
+// BQ-CTX-TEAMWORLD (ADR-0040 decisions 6, 9 and 10; FR-TEAM-02/04/05): the add-a-work-item form on a world page and
+// the world's sharing line. The client is a fake fetch; the Api is the fixture one with its world list replaced by
+// what the live Api would answer. The line comes only from recorded `world.share_changed` events (HR-1).
 import { act } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { fakeScheduler } from "../../../../test-support/park/appHarness";
@@ -19,6 +20,7 @@ const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
 
 interface Server {
+  events: Record<string, unknown>[] | number;
   items: Record<string, unknown>[];
   /** The status the create answers with; 201 stores the item and answers with it. */
   postStatus: number;
@@ -28,6 +30,7 @@ interface Server {
   world: Record<string, unknown>;
 }
 const newServer = (over: Partial<Server> = {}): Server => ({
+  events: [],
   items: [],
   postStatus: 201,
   hold: null,
@@ -39,6 +42,16 @@ const newServer = (over: Partial<Server> = {}): Server => ({
   },
   ...over,
 });
+const shareEvent = (seq: number, team: string, state: "on" | "off") => ({
+  id: `01JB5VQ00000000000000${String(seq).padStart(5, "0")}`,
+  seq,
+  world_id: W,
+  type: "world.share_changed",
+  actor: "u_asha",
+  vis: [],
+  data: { team, state },
+});
+
 function fakeFetch(s: Server) {
   return vi.fn(async (url: RequestInfo | URL, init?: RequestInit) => {
     const path = new URL(String(url)).pathname;
@@ -59,6 +72,8 @@ function fakeFetch(s: Server) {
       if (body.world_id) s.items.push(row);
       return json({ ...row, source: { kind: "manual", ref: null } }, 201);
     }
+    if (path === `/worlds/${W}/events`)
+      return typeof s.events === "number" ? json({}, s.events) : json({ events: s.events });
     if (path === `/worlds/${W}/work-items`)
       return json({ world_id: W, items: s.items, truncated: false });
     if (path === `/worlds/${W}`) return json(s.world);
@@ -150,6 +165,8 @@ const choose = async (el: HTMLElement, label: string) =>
 const add = (el: HTMLElement) => press(named(form(el) ?? el, "Add item"));
 const status = (el: HTMLElement) => form(el)?.querySelector("output")?.textContent ?? "";
 const alertOf = (el: HTMLElement) => form(el)?.querySelector('[role="alert"]')?.textContent ?? "";
+const line = (el: HTMLElement) =>
+  el.querySelector('[data-testid="park-world-share-line"]')?.textContent ?? null;
 
 describe("BQ_CTX_TEAMWORLD the add-a-work-item form", () => {
   it("FR_TEAM_04 is offered on the owner's own world and on a teammate's world, defaulting to a personal item", async () => {
@@ -277,5 +294,58 @@ describe("BQ_CTX_TEAMWORLD the add-a-work-item form", () => {
     server.world = {};
     const missing = await page(server, await liveApi(null), "w_nobody");
     expect(form(missing.el)).toBeNull();
+  });
+});
+
+describe("BQ_CTX_TEAMWORLD the world's sharing line", () => {
+  it("FR_TEAM_02 names the teams whose latest recorded event is on", async () => {
+    const server = newServer({
+      events: [
+        shareEvent(2, "tm_launch", "on"),
+        shareEvent(3, "tm_ops", "on"),
+        shareEvent(4, "tm_ops", "off"),
+      ],
+    });
+    const { el } = await page(server, await liveApi());
+    expect(line(el)).toContain("Shared with team tm_launch");
+    expect(line(el)).toContain("Turned off for tm_ops");
+  });
+
+  it("FR_TEAM_02 says sharing is off when every recorded team state is off", async () => {
+    const { el } = await page(
+      newServer({ events: [shareEvent(2, "tm_launch", "off")] }),
+      await liveApi(),
+    );
+    expect(line(el)).toContain("Team sharing is off");
+  });
+
+  it("FR_TEAM_02 shows nothing without a recorded event, and nothing when the events cannot be read", async () => {
+    const none = await page(newServer({ events: [] }), await liveApi());
+    expect(line(none.el)).toBeNull();
+    cleanup();
+    const failed = await page(newServer({ events: 500 }), await liveApi());
+    expect(line(failed.el)).toBeNull();
+    expect(failed.el.textContent).not.toContain("Team sharing");
+    const alerts = [...failed.el.querySelectorAll('[role="alert"]')].map((a) => a.textContent);
+    expect(alerts.join(" ")).not.toMatch(/shar|events/i); // no error is made of an unreadable feed
+  });
+
+  it("FR_TEAM_02 a teammate's page shows the line when its feed carries the event, nothing when it does not", async () => {
+    const shown = await page(
+      newServer({ events: [shareEvent(2, "tm_launch", "on")] }),
+      await liveApi(null),
+    );
+    expect(line(shown.el)).toContain("Shared with team tm_launch");
+    cleanup();
+    const hidden = await page(newServer({ events: [] }), await liveApi(null));
+    expect(line(hidden.el)).toBeNull();
+  });
+
+  it("FR_TEAM_02 the line is plain text with no motion and no control", async () => {
+    const server = newServer({ events: [shareEvent(2, "tm_launch", "on")] });
+    const { el } = await page(server, await liveApi());
+    const node = el.querySelector('[data-testid="park-world-share-line"]');
+    expect(node?.querySelector("button, a, input")).toBeNull();
+    expect(node?.getAttribute("style") ?? "").not.toMatch(/animation|transition/);
   });
 });
