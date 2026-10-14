@@ -25,3 +25,24 @@ The hosted origin is https://essential-wares-510320-f0.web.app. Foreign script o
 
 The optional signed-in replay flow documented in deploy-dev.md remains available explicitly with
 `uv run python scripts/smoke_dev.py <api-url>`; `just smoke-dev` always selects the unsigned checks above.
+
+## Merge lane: after every release
+
+Keep the `BUNDLE-SHA256` line from the previous successful release. After the authorized deployment,
+save a fresh service description (PowerShell example; read only):
+
+```powershell
+gcloud run services describe tilo-api --project essential-wares-510320-f0 --region asia-southeast1 --format=json | Set-Content -Encoding utf8 traffic.json
+just smoke-dev-release <api-url> <new-revision-name> traffic.json <previous-bundle-sha256>
+```
+
+Use the actual URL and exact expected new revision. The snapshot must name that revision as latest ready,
+assign it all 100 percent of traffic, and contain exactly one tagged URL for it. The smoke GETs `/healthz`
+at that tagged URL, separately from the service URL, and compares a stable SHA256 of all downloaded JS
+URLs and contents with the previous release. All eight PASS lines are required; any FAIL exits 1.
+The snapshot is evidence captured by the merge lane, not a live control-plane query by this script.
+If there is no revision tag, report the missing prerequisite to the release owner; this smoke creates none.
+If only the API changed and the frontend bundle did not, the bundle check correctly fails: record that
+release disposition explicitly instead of inventing a different baseline. The first baseline can be captured
+with 64 zeroes as the previous hash, but that bootstrap run does not prove a change from a prior release.
+Save the new hash only after the release checks pass. No token, deployment, traffic edit or model call is made.
