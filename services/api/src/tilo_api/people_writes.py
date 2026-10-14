@@ -533,6 +533,25 @@ def create_first_person(w: Writer, body: PersonIn) -> dict[str, Any]:
     return project("person", "membership", record) or {}
 
 
+def create_judge_member(w: Writer, body: PersonIn) -> dict[str, Any]:
+    """A signed-in judge joins the org as a plain member (JUDGE-FIRST-RUN F1): the record is the principal's own and
+    its role is always `member`, never `owner`. The route has checked the judge declaration and the web session; a
+    person who already has a record, or an org its owner has not founded yet (a member must never close the door on the
+    founder), is the same 403 as `/first`."""
+    record = _person_record(w, body, w.actor, "member")
+    if not conforms("person.schema.json", record):
+        raise Refusal(422, "invalid_record")
+    if not w.stores.persons.founded(w.org):  # type: ignore[attr-defined]  # only the person store has it
+        raise Refusal(403, "forbidden")  # a judge never takes the place of the owner who founds the org
+    try:
+        w.stores.persons.create(record)
+    except AlreadyExists:
+        raise Refusal(403, "forbidden") from None
+    except EmailTaken:
+        raise Refusal(409, "email_taken", code="email_taken") from None
+    return project("person", "membership", record) or {}
+
+
 def _view(person: Mapping[str, Any]) -> dict[str, Any]:
     return project("person", "membership", person) or {}
 
