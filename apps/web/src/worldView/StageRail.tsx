@@ -159,11 +159,14 @@ export function StageRail({
   worldId,
   replayed = null,
   pauseStatus = null,
+  compact = false,
 }: {
   worldId: string;
   replayed?: readonly Event[] | null;
   /** A replay's recorded status: it has no client to pause. */
   pauseStatus?: RunStatus | null;
+  /** Presentation keeps the meter, pause and Needs-you controls without the object lists. */
+  compact?: boolean;
 }) {
   const client = useClient();
   const log = useReplayedLog(client, worldId);
@@ -244,96 +247,98 @@ export function StageRail({
           {waiting}
         </span>
       </div>
-      <div className="park-view-slot">
-        {layout === null || names === null ? (
-          <>
-            <h2 className="park-view-h2">Team</h2>
-            <p className="park-view-note">
-              {layoutRemote.status === "error" ? layoutRemote.message : "The team is loading…"}
-            </p>
-          </>
-        ) : (
-          <>
-            <h2 className="park-view-h2">Team</h2>
-            <ul className="park-view-rows">
-              {layout.semantic.agents.map((a) => (
-                <li key={a.id}>
-                  <Pick id={a.id} selected={selected} toggle={toggle}>
-                    <span className="park-view-rowname">{names.get(a.id)}</span>
-                    <span className="park-view-rowstate">
-                      {state?.agents[a.id]?.spawned || acted.has(a.id)
-                        ? "Joined"
-                        : "Not joined yet"}
-                    </span>
-                  </Pick>
-                </li>
-              ))}
-            </ul>
-            <p className="park-view-counts">
-              {words(layout.tier)} · {plural(layout.semantic.agents.length, "agent")} ·{" "}
-              {plural(buildingCount(layout), "building")} ·{" "}
-              {plural(layout.semantic.gates.length, "gate")}
-            </p>
-            {layout.semantic.levels.map((level) => {
-              const row = levels.find((r) => r.id === level.id);
-              return (
-                <section key={level.id}>
-                  <h2 className="park-view-h2">
-                    <ViewLink to={inspectPath(worldId, level.id)}>Level {level.name}</ViewLink>
-                    {row ? (
-                      <span className="park-view-pct">
-                        {" "}
-                        {row.percent}%
-                        <progress
-                          max={100}
-                          value={row.percent}
-                          aria-label={`${row.name}: buildings finished`}
-                        />
+      {compact ? null : (
+        <div className="park-view-slot" data-testid="stage-rail-details">
+          {layout === null || names === null ? (
+            <>
+              <h2 className="park-view-h2">Team</h2>
+              <p className="park-view-note">
+                {layoutRemote.status === "error" ? layoutRemote.message : "The team is loading…"}
+              </p>
+            </>
+          ) : (
+            <>
+              <h2 className="park-view-h2">Team</h2>
+              <ul className="park-view-rows">
+                {layout.semantic.agents.map((a) => (
+                  <li key={a.id}>
+                    <Pick id={a.id} selected={selected} toggle={toggle}>
+                      <span className="park-view-rowname">{names.get(a.id)}</span>
+                      <span className="park-view-rowstate">
+                        {state?.agents[a.id]?.spawned || acted.has(a.id)
+                          ? "Joined"
+                          : "Not joined yet"}
                       </span>
-                    ) : null}
-                  </h2>
-                  {row?.line ? <p className="park-view-note">{row.line}</p> : null}
+                    </Pick>
+                  </li>
+                ))}
+              </ul>
+              <p className="park-view-counts">
+                {words(layout.tier)} · {plural(layout.semantic.agents.length, "agent")} ·{" "}
+                {plural(buildingCount(layout), "building")} ·{" "}
+                {plural(layout.semantic.gates.length, "gate")}
+              </p>
+              {layout.semantic.levels.map((level) => {
+                const row = levels.find((r) => r.id === level.id);
+                return (
+                  <section key={level.id}>
+                    <h2 className="park-view-h2">
+                      <ViewLink to={inspectPath(worldId, level.id)}>Level {level.name}</ViewLink>
+                      {row ? (
+                        <span className="park-view-pct">
+                          {" "}
+                          {row.percent}%
+                          <progress
+                            max={100}
+                            value={row.percent}
+                            aria-label={`${row.name}: buildings finished`}
+                          />
+                        </span>
+                      ) : null}
+                    </h2>
+                    {row?.line ? <p className="park-view-note">{row.line}</p> : null}
+                    <ul className="park-view-rows">
+                      {level.districts.flatMap((d) =>
+                        d.buildings.map((b) => (
+                          <li key={b.id}>
+                            <Pick id={b.id} selected={selected} toggle={toggle}>
+                              <span className="park-view-rowname">
+                                {b.name}
+                                <small>{d.name}</small>
+                              </span>
+                              <span className="park-view-rowstate">
+                                {BUILDING_STATE[state?.buildings[b.id]?.status ?? "hidden"]}
+                              </span>
+                            </Pick>
+                          </li>
+                        )),
+                      )}
+                    </ul>
+                  </section>
+                );
+              })}
+              {layout.semantic.gates.length > 0 ? (
+                <section>
+                  <h2 className="park-view-h2">Gates</h2>
                   <ul className="park-view-rows">
-                    {level.districts.flatMap((d) =>
-                      d.buildings.map((b) => (
-                        <li key={b.id}>
-                          <Pick id={b.id} selected={selected} toggle={toggle}>
-                            <span className="park-view-rowname">
-                              {b.name}
-                              <small>{d.name}</small>
-                            </span>
-                            <span className="park-view-rowstate">
-                              {BUILDING_STATE[state?.buildings[b.id]?.status ?? "hidden"]}
-                            </span>
-                          </Pick>
-                        </li>
-                      )),
-                    )}
+                    {layout.semantic.gates.map((g) => (
+                      <li key={g.id}>
+                        <Pick id={g.id} selected={selected} toggle={toggle}>
+                          <span className="park-view-rowname">
+                            Gate {g.id}
+                            <small>{rankName(g.guards)}</small>
+                          </span>
+                          <span className="park-view-rowstate">Approval gate</span>
+                        </Pick>
+                      </li>
+                    ))}
                   </ul>
                 </section>
-              );
-            })}
-            {layout.semantic.gates.length > 0 ? (
-              <section>
-                <h2 className="park-view-h2">Gates</h2>
-                <ul className="park-view-rows">
-                  {layout.semantic.gates.map((g) => (
-                    <li key={g.id}>
-                      <Pick id={g.id} selected={selected} toggle={toggle}>
-                        <span className="park-view-rowname">
-                          Gate {g.id}
-                          <small>{rankName(g.guards)}</small>
-                        </span>
-                        <span className="park-view-rowstate">Approval gate</span>
-                      </Pick>
-                    </li>
-                  ))}
-                </ul>
-              </section>
-            ) : null}
-          </>
-        )}
-      </div>
+              ) : null}
+            </>
+          )}
+        </div>
+      )}
     </div>
   );
 }

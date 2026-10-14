@@ -7,6 +7,7 @@ import { useStageMode } from "../display/stageMode";
 import { useMediaQuery } from "../hooks/useMediaQuery";
 import { Stage } from "../stage/Stage";
 import { useRunStatus } from "../world/runLog";
+import type { RunStatus } from "../world/runSummary";
 import { speedBadgeText } from "../world/speed";
 import { useClientWorld } from "../world/useClientWorld";
 import type { WorldFixtureState } from "../world/useWorldFixture";
@@ -15,6 +16,24 @@ import { LoggedDock, ReplayDock } from "./ReplayDock";
 import { ReplayNotices } from "./ReplayNotices";
 import { StagePresenter } from "./StagePresenter";
 import { HudGlance, StageRail } from "./StageRail";
+import "./StageView.css";
+
+/** Source and lifecycle are separate: arriving sample events never make a replay live. */
+export function stageRunLabel(recorded: boolean, status: RunStatus): string {
+  if (recorded) return "Recorded replay";
+  switch (status) {
+    case "started":
+      return "Live run";
+    case "paused":
+      return "Live run · paused";
+    case "completed":
+      return "Completed run";
+    case "failed":
+      return "Failed run";
+    default:
+      return "No run yet";
+  }
+}
 
 /** Memoised rows: each applied event adds one row instead of re-rendering the whole list. The trace list is the
  * ?fixture= replay's own (App's right rail used to hold it). */
@@ -75,6 +94,15 @@ export function StageView({
         data-stage-layout={stageLayout ? "1920x1080" : "off"}
       >
         <div className="park-view-stagecol">
+          {stageMode ? (
+            // biome-ignore lint/a11y/useSemanticElements: persistent run-source status, not a form result.
+            <div className="park-stage-source" data-testid="stage-source-label" role="status">
+              {stageRunLabel(
+                fixture.active || fixtureClient,
+                fixture.active ? fixture.status : clientStatus,
+              )}
+            </div>
+          ) : null}
           <ReplayNotices active={fixture.active} speedLabel={speedBadge} />
           <div className="park-view-stagebox">
             <Stage
@@ -138,12 +166,13 @@ export function StageView({
           <aside className="park-view-side" data-testid="right-rail">
             {dock}
             <StageRail
+              compact={stageMode}
               key={railWorld}
               worldId={railWorld}
               replayed={replayed}
               pauseStatus={fixture.active ? fixture.status : null}
             />
-            {fixture.active ? (
+            {fixture.active && !stageMode ? (
               <section className="park-view-card" aria-label="Trace">
                 <h2 className="park-view-h2">Trace</h2>
                 <ul
