@@ -149,10 +149,20 @@ describe("FR_UX_10 account menu: Sign out through the auth seam", () => {
     expect(text).not.toContain("alex@");
     expect(avatar().textContent).not.toBe("AM");
     expect(items().map((b) => b.textContent)).toEqual([
+      // OLD-UI-OUT.md Wave 4 adds the Park More menu; existing rows stay exact.
+      "More",
       "Profile and settings",
       "Connectors6 on",
       "Team and roles",
       "Mobile appConcept",
     ]);
+  });
+  it("OLD-UI-OUT-4 More opens its Park home through the shell", async () => {
+    const { navigate } = await mountWith(fakeAuth("signedOut"));
+    click(avatar());
+    const more = item("More");
+    expect(more).toBeDefined();
+    click(more as HTMLButtonElement);
+    expect(navigate).toHaveBeenCalledWith("/more");
   });
 });

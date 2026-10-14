@@ -50,7 +50,10 @@ describe("WEB_CUTOVER_router: root paths resolve to Park pages", () => {
       "/world/%E0",
       "/world/%E0%A4%A",
     ]) {
-      expect(parseParkPath(path, ""), path).toBeNull();
+      // OLD-UI-OUT.md Wave 4: console now resolves to Park Team.
+      expect(parseParkPath(path, ""), path).toEqual(
+        path === "/team/console" ? { page: "team", params: { focus: "console" } } : null,
+      );
     }
   });
 
@@ -81,7 +84,10 @@ describe("WEB_CUTOVER_router: root paths resolve to Park pages", () => {
       "/task/t/understanding",
       "/skills/extra",
     ]) {
-      expect(parseParkPath(path, ""), path).toBeNull();
+      // OLD-UI-OUT.md Wave 4: console now resolves to Park Team.
+      expect(parseParkPath(path, ""), path).toEqual(
+        path === "/team/console" ? { page: "team", params: { focus: "console" } } : null,
+      );
     }
   });
 });
@@ -115,7 +121,10 @@ describe("WEB_CUTOVER_router: /park/<page> keeps working as an alias", () => {
       "/park/world",
       "/park/world/%E0",
     ]) {
-      expect(parseParkPath(path, ""), path).toBeNull();
+      // OLD-UI-OUT.md Wave 4: console now resolves to Park Team.
+      expect(parseParkPath(path, ""), path).toEqual(
+        path === "/team/console" ? { page: "team", params: { focus: "console" } } : null,
+      );
       expect(isParkPath(path), path).toBe(true); // the Park NotFound page shows, not the old app
     }
   });
@@ -232,7 +241,20 @@ describe("WEB_CUTOVER_router: isParkPath splits the two apps", () => {
       "/parkour",
       "/parks/home",
     ]) {
-      expect(isParkPath(path), path).toBe(false);
+      // OLD-UI-OUT.md Wave 4 transfers these exact addresses to Park.
+      expect(isParkPath(path), path).toBe(
+        [
+          "/autonomy",
+          "/channels",
+          "/mail",
+          "/connections",
+          "/settings",
+          "/estimate",
+          "/pilot",
+          "/team/console",
+          "/more",
+        ].includes(path),
+      );
     }
   });
 });

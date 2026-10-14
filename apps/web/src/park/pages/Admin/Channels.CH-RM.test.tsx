@@ -6,10 +6,10 @@ import type { Event } from "@tilo/contracts";
 import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { describe, expect, it } from "vitest";
-import { ClientProvider } from "../api/ClientProvider";
-import { FixtureClient } from "../api/fixtureClient";
-import { EVENTS_VILLAGE_BASIC } from "../api/fixtures/events";
-import { S_16 } from "./S_16";
+import { ClientProvider } from "../../../api/ClientProvider";
+import { FixtureClient } from "../../../api/fixtureClient";
+import { EVENTS_VILLAGE_BASIC } from "../../../api/fixtures/events";
+import { ChannelsSection as S_16 } from "./RunSections";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 

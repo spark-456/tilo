@@ -12,6 +12,7 @@ import type { Connector, ConnectorTerms, Skill, World } from "../../api/types";
 import type { AppCtx } from "../../app/AppCtx";
 import { useParkApi } from "../../app/context";
 import { PageSheet } from "../../components";
+import { ConnectionsSection } from "../Admin/RunSections";
 import "./Connectors.css";
 import { AttentionBanner, AvailableRow, ConnectedTile } from "./ConnectorParts";
 import { Drawer } from "./Drawer";
@@ -40,7 +41,13 @@ const NO_OVERRIDES: Overrides = { st: {}, lvl: {} };
 function Frame({ children }: { children: ReactNode }) {
   return (
     <div data-testid="park-page-connectors">
-      <PageSheet>{children}</PageSheet>
+      <PageSheet>
+        {children}
+        <details className="park-admin">
+          <summary>Run access history</summary>
+          <ConnectionsSection />
+        </details>
+      </PageSheet>
     </div>
   );
 }

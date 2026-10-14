@@ -40,6 +40,7 @@ export function AccountMenu({
   onClose,
 }: AccountMenuProps) {
   const items: MenuItem[] = [
+    { id: "more", label: "More", icon: icon("person", 17), onSelect: () => go("more") },
     {
       id: "profile",
       label: "Profile and settings",

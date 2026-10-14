@@ -4,11 +4,11 @@
 import { act } from "react";
 import { type Root, createRoot } from "react-dom/client";
 import { afterEach, describe, expect, it } from "vitest";
-import { ClientProvider } from "../api/ClientProvider";
-import type { TiloClient } from "../api/client";
-import { FixtureClient } from "../api/fixtureClient";
-import { FIXTURE_WORLD_ID } from "../api/fixtures/derived";
-import type { StopResult } from "../api/stop";
+import { ClientProvider } from "../../../api/ClientProvider";
+import type { TiloClient } from "../../../api/client";
+import { FixtureClient } from "../../../api/fixtureClient";
+import { FIXTURE_WORLD_ID } from "../../../api/fixtures/derived";
+import type { StopResult } from "../../../api/stop";
 import { StopAutopilot } from "./StopAutopilot";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;

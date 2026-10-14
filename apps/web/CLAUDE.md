@@ -38,3 +38,6 @@ Trace lenses, cards and settings.
 - Nothing animates without a recorded event (HR-1–HR-7, PRD 9.4); `src/honesty/` (FR-WLD-09) fails on animation APIs outside `choreographer.ts` (allowlist: `test-support/honestyScan.ts`).
 - One primary filled button per screen (UX-1, iris + 4px lip; `.secondary` is quiet); no streaks, hearts or fake urgency (UX-7).
   Type and spacing are tokens (PRD 18.2): `var(--text-N)` 12/14/16/20/24/32/40, `--space-N` 4..32, no `em` sizing; `e2e/type-ramp.spec.ts` pins it.
+
+## OLD-UI-OUT-4 (settings/admin)
+`park/pages/Admin/` ports routine management, confirmed autopilot stop and event-derived mail/consent/channel/decision history into Park components. Settings shares Profile appearance controls. Old autonomy/channels/mail/estimate/pilot addresses replace to Settings sections, connections to Connectors and team/console to Team; selected `world` is retained. More is a Park page linked from the account menu. Unavailable diary/survey forms and placeholder actions are replaced with honest explanations. Wave 4 screen files are deleted; other waves own remaining legacy routes and the final shell deletion.

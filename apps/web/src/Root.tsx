@@ -16,6 +16,7 @@ import { isKeptPath } from "./keptPaths";
 import { legalKind } from "./legal/legalPaths";
 import { takeCallbackParams } from "./oauth/capture";
 import { isOAuthCallback } from "./oauth/paths";
+import { adminRedirect } from "./park/app/adminRedirect";
 import { isParkPath } from "./park/app/router";
 import { usePathname } from "./router";
 
@@ -49,6 +50,13 @@ function AccessGuard({ children }: { children: ReactNode }) {
 
 export function Root() {
   const pathname = usePathname();
+  const redirect = adminRedirect(pathname, window.location.search);
+  useEffect(() => {
+    if (redirect) {
+      window.history.replaceState({}, "", redirect);
+      window.dispatchEvent(new PopStateEvent("popstate"));
+    }
+  }, [redirect]);
   const legal = legalKind(pathname);
   // ADR-0035 LC-02: Google's redirect lands here. The code and state leave the address bar before anything else renders.
   const oauth = isOAuthCallback(pathname) ? takeCallbackParams() : undefined;

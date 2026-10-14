@@ -3,6 +3,7 @@
 // the only file under park/ that reads the address bar; pages get `app.page` and `app.params`.
 import { useMemo, useSyncExternalStore } from "react";
 import { PAGE_IDS, type PageId, type Params } from "./AppCtx";
+import { adminRedirect } from "./adminRedirect";
 import { noteFollowed } from "./followed";
 
 export interface ParkRoute {
@@ -12,12 +13,19 @@ export interface ParkRoute {
 
 // The query names each page keeps (README "Routes"); anything else is dropped. The world id is a path
 // segment, not a query value.
-const QUERY: Partial<Record<PageId, string>> = { skills: "id", team: "focus", profile: "tab" };
+const QUERY: Partial<Record<PageId, string>> = {
+  skills: "id",
+  team: "focus",
+  profile: "tab",
+  settings: "section",
+};
 
 const isPageId = (s: string | undefined): s is PageId => PAGE_IDS.some((p) => p === s);
 
 // Root pages other than home ("/" is home, the world page takes exactly one id segment).
 const ROOT_PAGES = new Set<string>([
+  "settings",
+  "more",
   "worlds",
   "team",
   "connectors",
@@ -40,6 +48,7 @@ export const stagePath = (worldId: string): string => `/world/${encodeURICompone
  * Paths the old app keeps (/world/:id/stage, /team/console, /worlds/replays, ...) are not Park paths.
  */
 export function isParkPath(pathname: string): boolean {
+  if (adminRedirect(pathname)) return true;
   if (pathname === "/park" || pathname.startsWith("/park/") || pathname === "/") return true;
   if (ROOT_WORLD.test(pathname) || ROOT_WORLD_APP.test(pathname)) return true;
   const m = /^\/([^/]+)\/?$/.exec(pathname);
@@ -55,6 +64,14 @@ function decodeSegment(raw: string): string | null {
 }
 
 export function parseParkPath(pathname: string, search: string): ParkRoute | null {
+  const redirect = adminRedirect(pathname, search);
+  if (redirect) {
+    const at = redirect.indexOf("?");
+    return parseParkPath(
+      at < 0 ? redirect : redirect.slice(0, at),
+      at < 0 ? "" : redirect.slice(at),
+    );
+  }
   if (!isParkPath(pathname)) return null;
   let rest =
     pathname === "/park" || pathname.startsWith("/park/")
@@ -76,6 +93,9 @@ export function parseParkPath(pathname: string, search: string): ParkRoute | nul
     const name = QUERY[first];
     const value = name === undefined ? null : new URLSearchParams(search).get(name);
     if (name !== undefined && value) params[name] = value;
+    const world = new URLSearchParams(search).get("world");
+    if (world && (first === "settings" || first === "team" || first === "connectors"))
+      params.world = world;
   }
   return { page: first, params };
 }
@@ -89,8 +109,11 @@ export function parkPath(page: PageId, params: Params = {}): string {
   const base = page === "home" ? "/" : `/${page}`;
   const name = QUERY[page];
   const value = name === undefined ? undefined : params[name];
-  if (name === undefined || !value) return base;
-  return `${base}?${new URLSearchParams({ [name]: value }).toString()}`;
+  const query = new URLSearchParams();
+  if (name !== undefined && value) query.set(name, value);
+  if (params.world && ["settings", "team", "connectors"].includes(page))
+    query.set("world", params.world);
+  return query.size ? `${base}?${query}` : base;
 }
 
 /** True when the address bar is on the Park Home page: the landing visit, whose page chunk starts with the shell's. */

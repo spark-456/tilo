@@ -14,6 +14,8 @@ export const REAL_PAGES: readonly PageId[] = [
   "team",
   "worlds",
   "profile",
+  "settings",
+  "more",
 ];
 
 export const PLACEHOLDER_PAGES: readonly PageId[] = PAGE_IDS.filter(
