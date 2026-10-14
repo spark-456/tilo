@@ -96,7 +96,10 @@ locals {
       invoked_by = []
       vpc_egress = local.caller_vpc_egress # calls harness directly
       ignore_env = true                    # TILO_* runtime settings via gcloud (docs/routines-rollout.md)
-      timeout    = var.meet_bot_enabled ? "3600s" : null
+      # Set by hand on 14 Oct (LIVE-PATH-AUDIT-A) and declared so a plan never reverts them: 1Gi, 1500 s. The user's ruling
+      # (14 Oct): 1500 s with or without the bot (it was 3600 s with the bot before).
+      memory  = "1Gi"
+      timeout = "1500s"
     }
     "harness" = {
       image              = local.placeholder_image

@@ -22,9 +22,10 @@ Sources: `agy-bridge/tasks/USER-INFRA-SITTING-2.md`, `USER-INFRA-SITTING-2-DETAI
 | Left OFF | `TILO_PLATE_DIGEST` (section 6.4 says why); the live switch; Gemini Live (`voice.live.enabled` and `price_approved` stay false) | none |
 
 Expected plan with the bot, from the code (not from a refreshed plan; the script in section 3 enforces it):
-**21 to add, 3 to change, 0 to destroy**, plus one "has moved" (channels). Without the bot it is 11 to add, 0 to change.
-The NAT router and NAT are in none of these numbers: after the section 2 import they are unchanged, and the review gate
-fails if either appears as an add, a change or an import (it means the import step was skipped or the code drifted).
+**21 to add, 2 to change, 0 to destroy**, plus one "has moved" (channels). Without the bot it is 11 to add, 0 to change.
+The NAT router and NAT, and the nine Firestore indexes, are in none of these numbers: after the section 2.0 and 2.0b
+imports they are unchanged, and the review gate fails if any appears as an add, a change or an import (the import was
+skipped or the code drifted). `tilo-api` has no change either: what was set by hand is carried (section 3).
 Anything else: stop and send it for review.
 
 **Order of the sitting:** sections 1 to 3 (plan and review), then 4 (apply). The NAT you created by hand is adopted into state in
@@ -90,6 +91,37 @@ terraform -chdir=infra/envs/dev state list | Select-String 'google_compute_route
 The live NAT is: automatic IPs, `LIST_OF_SUBNETWORKS` with `tilo-run-egress` on `PRIMARY_IP_RANGE`, errors-only logs. The code
 says the same, so the plan below has no line for either. If section 3 reports `NAT PAIR IN THE PLAN`, stop and send it.
 
+### 2.0b Import the nine Firestore indexes you created by hand (state only)
+
+The seven follow-up retention indexes (ACT-1c, #1063, `followup_retention.tf`; SEC-REVIEW-37 wants them READY before the
+minutes deploy) and the two older ones (`schedules_due`, `outbox_transfer_pending`) exist in the `(default)` database. Each is
+imported only if it is not in state yet, so a rerun does nothing. Ids were read from
+`gcloud firestore indexes composite list` on 14 Oct; if any differs, take the live id from that command.
+
+```powershell
+$DB = "projects/$P/databases/(default)/collectionGroups"
+$indexes = [ordered]@{
+  'google_firestore_index.followup_retention["cards-owner"]'   = "$DB/cards/indexes/CICAgJim14AK"
+  'google_firestore_index.followup_retention["stops-owner"]'   = "$DB/stops/indexes/CICAgJjF9oIK"
+  'google_firestore_index.followup_retention["cards-meeting"]' = "$DB/cards/indexes/CICAgJj7z4EK"
+  'google_firestore_index.followup_retention["stops-meeting"]' = "$DB/stops/indexes/CICAgNi47oMK"
+  'google_firestore_index.followup_retention["cards-expiry"]'  = "$DB/cards/indexes/CICAgJjF9oIJ"
+  'google_firestore_index.followup_retention["stops-expiry"]'  = "$DB/stops/indexes/CICAgJiUsZIK"
+  'google_firestore_index.followup_retention["drafts-meeting"]' = "$DB/followup_drafts/indexes/CICAgNiav4AK"
+  'google_firestore_index.schedules_due'                        = "$DB/schedules/indexes/CICAgOjXh4EK"
+  'google_firestore_index.outbox_transfer_pending'             = "$DB/outbox/indexes/CICAgJiUpoMK"
+}
+$inState = @(terraform -chdir=infra/envs/dev state list)
+foreach ($addr in $indexes.Keys) {
+  if ($inState -contains $addr) { "already in state: $addr"; continue }
+  terraform -chdir=infra/envs/dev import -input=false @varArgs $addr $indexes[$addr]
+  if ($LASTEXITCODE -ne 0) { throw "import failed for $addr; stop" }
+}
+```
+
+The code declares exactly the fields these indexes have (Firestore adds `__name__` itself), so the plan shows no index line:
+the gate in section 3 fails on any `google_firestore_index` add or change.
+
 ### 2.1 Saved plan (writes a local file; changes nothing in the cloud)
 
 `-refresh=true` reads the live state. The repository ids and the budget are the values of the first sitting. Add any
@@ -149,7 +181,7 @@ $expectAdd = @(
   'google_service_account_iam_member.cloudbuild_act_as["meet-bot"]'
 )
 $expectChange = @(
-  'module.service.google_cloud_run_v2_service.env_ignored["api"]',                # item 11: timeout 3600s only
+  # tilo-api is NOT here: its 1Gi memory and 1500 s timeout were set by hand and are declared the same, so no change
   'module.monitoring.google_monitoring_alert_policy.run_5xx_ratio',              # the filter regex gains tilo-meet-bot
   'module.monitoring.google_monitoring_alert_policy.run_latency_p95'             # same
 )
@@ -160,6 +192,12 @@ $natPair = @('google_compute_router.nat', 'google_compute_router_nat.run_egress'
 $problems += @($rc | Where-Object { $_.address -in $natPair -and (($_.change.actions -join ',') -ne 'no-op' -or $_.change.importing) }) |
   ForEach-Object { "NAT PAIR IN THE PLAN: $($_.address) ($($_.change.actions -join '+')): run the section 2.0 import, or the code differs from the live NAT" }
 $problems += @($imported | Where-Object { $_.address -notin $natPair }) | ForEach-Object { "UNEXPECTED import: $($_.address)" }
+# The nine Firestore indexes were created by hand and imported in section 2.0b: no create, no change, no replace.
+$problems += @($rc | Where-Object { $_.type -eq 'google_firestore_index' -and (($_.change.actions -join ',') -notin @('no-op', 'read')) }) |
+  ForEach-Object { "INDEX IN THE PLAN: $($_.address) ($($_.change.actions -join '+')): run the section 2.0b import, or the code differs from the live index" }
+# tilo-api keeps what was set by hand (env is ignored by the module; memory and timeout are declared): no api change at all.
+$problems += @($rc | Where-Object { $_.address -eq 'module.service.google_cloud_run_v2_service.env_ignored["api"]' -and (($_.change.actions -join ',') -ne 'no-op') }) |
+  ForEach-Object { "TILO-API CHANGES: the plan would alter the service (names are listed below); the hand-set values must be carried" }
 $problems += @($add.address | Where-Object { $_ -notin $expectAdd }) | ForEach-Object { "UNEXPECTED add: $_" }
 $problems += @($expectAdd | Where-Object { $_ -notin $add.address }) | ForEach-Object { "MISSING add: $_" }
 $problems += @($chg.address | Where-Object { $_ -notin $expectChange }) | ForEach-Object { "UNEXPECTED change: $_" }
@@ -174,8 +212,12 @@ if ($problems.Count) { $problems | ForEach-Object { Write-Host $_ -ForegroundCol
 Write-Host 'Plan matches the reviewed list: nothing is destroyed or replaced.' -ForegroundColor Green
 ```
 
-Read the changed attribute names above. `env_ignored["api"]` must show only `template` (timeout), and the two alert policies
-only `conditions`. A changed Cloud Run image, ingress, scaling or env on any other service is not part of this plan: stop.
+Read the changed attribute names above. There are exactly two changes, the two alert policies, and only `conditions`.
+`tilo-api` has none: every env var set by hand (the artifacts and archive stores and buckets, `TILO_SKILLS_STORE`,
+`TILO_PEOPLE_BOOTSTRAP_UID`, `GOOGLE_LOCATION`, `LIVE`, ...) is ignored by the module, memory is declared `1Gi` and the
+timeout `1500s`. The Cloud Scheduler jobs `tilo-gmail-poll` and `tilo-gmail-renew` stay PAUSED (the code leaves `paused`
+unset, so a plan never resumes them). The api's archive-bucket creator and viewer bindings are in the add list: the same
+member and role you added by hand, which the apply accepts as already present. A changed Cloud Run image, ingress, scaling or env on any other service is not part of this plan: stop.
 
 ## 4. Apply (you, the saved plan only)
 

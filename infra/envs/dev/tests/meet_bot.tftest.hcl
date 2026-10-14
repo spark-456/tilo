@@ -33,7 +33,8 @@ run "FR_MTG_09_guest_service_is_api_only_bounded_and_keyless" {
       output.cloud_run_services["meet-bot"].max_instance_count == 1 &&
       output.cloud_run_services["meet-bot"].request_concurrency == 1 &&
       output.cloud_run_services["meet-bot"].timeout == "3600s" &&
-      output.cloud_run_services["api"].timeout == "3600s" &&
+      output.cloud_run_services["api"].timeout == "1500s" &&
+      output.cloud_run_services["api"].memory == "1Gi" &&
       output.cloud_run_services["meet-bot"].cpu == "2" &&
       output.cloud_run_services["meet-bot"].memory == "4Gi" &&
       output.cloud_run_services["meet-bot"].cpu_idle
