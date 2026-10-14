@@ -89,6 +89,10 @@ PRODUCTION_ORIGINS = _cors.PRODUCTION_ORIGINS
 
 
 app = FastAPI(title="tilo-api", lifespan=_lifespan, **_DOCS)
+
+from tilo_api.validation_copy import ValidationRefusal, validation_response  # noqa: E402
+
+app.add_exception_handler(ValidationRefusal, validation_response)
 app.add_middleware(_LogRunId)  # NFR-26: innermost, so the world is looked up only for a request the gate admitted
 app.add_middleware(_AccessGate)  # SEC-15: deployed, every non-public route needs a stored judge declaration
 app.add_middleware(_AppCheckGate)  # SEC-10: App Check token, logged only until the owner sets TILO_APPCHECK_ENFORCE=1

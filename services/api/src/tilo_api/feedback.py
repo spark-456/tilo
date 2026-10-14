@@ -21,6 +21,7 @@ from pydantic import BaseModel, ConfigDict, Field, StrictStr, ValidationError, f
 from starlette.concurrency import run_in_threadpool
 
 from tilo_api import deps
+from tilo_api.validation_copy import ValidationRefusal
 
 CONTEXT = "lifetime_cap"
 MAX_CHARS = 2000  # after cleaning
@@ -79,7 +80,7 @@ class FeedbackBusy(Exception):
 
 async def _body(request: Request) -> FeedbackIn:
     """Strict JSON only (415), refused over MAX_BODY_BYTES before it is read (413), parsed by pydantic from the bytes,
-    and a 422 that carries only field locations: never the input (it is the person's text, and never logged)."""
+    and a 422 sentence with separate field locations: never the input (it is the person's text, and never logged)."""
     if request.headers.get("content-type", "").split(";")[0].strip().lower() != "application/json":
         raise HTTPException(status_code=415, detail="Send application/json.")
     declared = request.headers.get("content-length", "")
@@ -96,7 +97,9 @@ async def _body(request: Request) -> FeedbackIn:
         return FeedbackIn.model_validate_json(b"".join(chunks))
     except ValidationError as exc:
         locs = [[*e["loc"][:-1], "?"] if e["type"] == "extra_forbidden" else list(e["loc"]) for e in exc.errors()]
-        raise HTTPException(status_code=422, detail=[{"loc": loc} for loc in locs]) from None
+        raise ValidationRefusal(
+            "Check your feedback and send between 1 and 2000 visible characters.", [{"loc": loc} for loc in locs]
+        ) from None
 
 
 def seconds_until_free(oldest_created_at: str, now: str) -> int:

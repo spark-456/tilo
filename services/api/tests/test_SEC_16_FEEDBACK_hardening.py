@@ -60,12 +60,13 @@ def test_SEC_16_FEEDBACK_a_surrogate_or_NaN_body_is_422_and_the_text_is_logged_n
         assert CANARY not in place
 
 
-def test_SEC_16_FEEDBACK_a_422_carries_only_field_locations(rig):
+def test_SEC_16_FEEDBACK_a_422_has_a_sentence_and_only_field_locations(rig):
     response = post(rig, {"text": "x", "context": CONTEXT, "uid": "u_other"})
 
     assert response.status_code == 422
-    assert response.json() == {"detail": [{"loc": ["body", "?"]}]} or all(
-        set(item) == {"loc"} for item in response.json()["detail"]
+    assert response.json()["detail"] == "Check your feedback and send between 1 and 2000 visible characters."
+    assert response.json()["errors"] == [{"loc": ["body", "?"]}] or all(
+        set(item) == {"loc"} for item in response.json()["errors"]
     )
     assert "u_other" not in response.text
 

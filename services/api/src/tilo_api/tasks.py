@@ -38,6 +38,7 @@ from tilo_providers.router import Router
 
 from tilo_api import deps, runs
 from tilo_api.people_writes import _capped_body
+from tilo_api.validation_copy import ValidationRefusal
 
 logger = logging.getLogger("tilo_api.tasks")
 router = APIRouter()
@@ -77,7 +78,7 @@ def _json_body[Body: BaseModel](model: type[Body]) -> Callable[[Request], Awaita
             return model.model_validate_json(raw)
         except ValidationError as exc:
             detail = [{"loc": list(e["loc"]), "msg": e["msg"]} for e in exc.errors()]
-            raise HTTPException(status_code=422, detail=detail) from exc
+            raise ValidationRefusal("Check the task information and try again.", detail) from exc
 
     return parse
 
