@@ -466,7 +466,7 @@ export interface Team {
 }
 export interface Connector {
   /** Live list metadata: OAuth scopes are not the demo's agent access levels. */
-  live?: { stateKnown: boolean; scopes: string[] };
+  live?: { stateKnown: boolean; scopes: string[]; notConfigured?: boolean };
   id: string;
   name: string;
   cat: string;

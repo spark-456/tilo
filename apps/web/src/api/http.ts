@@ -384,8 +384,13 @@ function quickOf(body: unknown): QuickIntakeResult | null {
   return { kind: "answered", text: b.text, cost: Object.keys(cost).length > 0 ? cost : null };
 }
 
+// Shared by the session's clients so Connectors and World coalesce the first read.
+// Only an explicit not-configured result is retained; other failures are evicted.
+const connectorSessions = new WeakMap<object, Map<string, Promise<unknown>>>();
+
 export class HttpClient implements TiloClient, SchedulesApi, FieldsApi, ItemApi {
   private readonly base: string;
+  private readonly connectorScope: object;
   private readonly fetchFn: typeof fetch;
   private readonly pollMs: number;
   private readonly appCheckToken: (() => Promise<string | null>) | undefined;
@@ -404,6 +409,7 @@ export class HttpClient implements TiloClient, SchedulesApi, FieldsApi, ItemApi 
 
   constructor(options: HttpClientOptions) {
     this.base = options.baseUrl.trim().replace(/\/+$/, "");
+    this.connectorScope = options.authToken ?? options.fetch ?? fetch;
     // redirect: "error": the API never redirects a call, so one that does (a stray proxy, a hijacked path) is an error, not a
     // detour that would carry the sign-in and App Check tokens to another address (SEC-10)
     this.fetchFn = options.fetch ?? ((url, init) => fetch(url, { ...init, redirect: "error" }));
@@ -531,6 +537,51 @@ export class HttpClient implements TiloClient, SchedulesApi, FieldsApi, ItemApi 
   /** A plain GET of `path`, decoded as JSON, with the same typed failures as every other call (WIRE-1). */
   getJson(path: string): Promise<unknown> {
     if (path === "/v1/plate" || path === "/v1/people") return this.readPerson(path);
+    if (path === "/v1/connectors") {
+      let session = connectorSessions.get(this.connectorScope);
+      if (!session) {
+        session = new Map();
+        connectorSessions.set(this.connectorScope, session);
+      }
+      const cached = session.get(this.base);
+      if (cached) return cached;
+      const cache = session;
+      const read = this.request<unknown>(path, {}, false, async (response) => {
+        const body = await response.json();
+        // The wire body remains the existing connector contract; the header carries
+        // only the exact configuration refusal, never arbitrary error text.
+        if (
+          response.headers.get("X-Tilo-Meeting-Host") === "not_configured" &&
+          Array.isArray(body?.connectors)
+        ) {
+          for (const row of body.connectors) {
+            if (row?.id === "meeting_host" && row.state_known === false)
+              row.unavailable_reason = "not_configured";
+          }
+        }
+        return body;
+      }).then(
+        (body) => {
+          const rows = (body as { connectors?: unknown } | null)?.connectors;
+          const unavailable =
+            Array.isArray(rows) &&
+            rows.some(
+              (row) =>
+                row?.id === "meeting_host" &&
+                row.state_known === false &&
+                row.unavailable_reason === "not_configured",
+            );
+          if (!unavailable) cache.delete(this.base);
+          return body;
+        },
+        (error: unknown) => {
+          cache.delete(this.base);
+          throw error;
+        },
+      );
+      cache.set(this.base, read);
+      return read;
+    }
     return this.request<unknown>(path);
   }
 

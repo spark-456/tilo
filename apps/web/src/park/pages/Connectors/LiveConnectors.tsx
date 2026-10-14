@@ -4,7 +4,11 @@ import type { Connector } from "../../api/types";
 /** FR-ACC-01/03/04: a read-only live list; unsupported facts and writes never use demo defaults. */
 export function LiveConnectors({ connectors }: { connectors: Connector[] }) {
   const [query, setQuery] = useState("");
-  const rows = connectors.filter((c) => c.name.toLowerCase().includes(query.toLowerCase()));
+  const rows = connectors.filter(
+    (c) =>
+      !(c.id === "meeting_host" && c.live?.notConfigured) &&
+      c.name.toLowerCase().includes(query.toLowerCase()),
+  );
   return (
     <>
       <div className="park-connectors-search">

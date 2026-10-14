@@ -156,7 +156,12 @@ class MeetingHostRpc:
     ) -> None:
         self._base, self._transport, self._token_for, self._timeout = base_url, transport, token_for, timeout_s
         self._views_timeout = views_timeout_s
+        self._views_local = threading.local()
         self._clock = clock  # the deadline's clock: a test freezes it so the request's budget is exactly the limit
+
+    @property
+    def views_not_configured(self) -> bool:
+        return getattr(self._views_local, "not_configured", False)
 
     def __repr__(self) -> str:
         return "MeetingHostRpc()"
@@ -220,7 +225,10 @@ class MeetingHostRpc:
                 raise HostRpcError("rejected", said)
         refused = reply.status in (401, 403, 422) or (reply.status == 503 and _is_error(reply.body, "not_configured"))
         logger.warning("meeting-host %s: answered %s", route, reply.status)
-        raise HostRpcError("refused" if refused else "unknown")
+        raise HostRpcError(
+            "refused" if refused else "unknown",
+            "not_configured" if reply.status == 503 and _is_error(reply.body, "not_configured") else None,
+        )
 
     def join_link(self, receipt: Mapping[str, Any]) -> MeetingJoin:
         """The API supplies its scoped receipt; connectors alone reads the host grant."""
@@ -252,6 +260,7 @@ class MeetingHostRpc:
         """The principal's own display views (HB-08), or None for "unknown": any failure at all, an answer that breaks
         the contract, or one that breaks HB-09 against `order` (the registry's oauth2 connector ids): ids unique and in
         that order. Never raises, never retries, and never logs more than a status code."""
+        self._views_local.not_configured = False
         try:
             raw = self._post("views", {"user_id": user_id}, path=VIEWS_PATH, timeout_s=self._views_timeout)
             if len(raw) > MAX_VIEWS_REPLY_BYTES:
@@ -267,6 +276,9 @@ class MeetingHostRpc:
                 if view.state == "expired" and (view.scopes or view.connected_at is not None):  # the schema's if/then
                     return None
             return list(views)
+        except HostRpcError as exc:
+            self._views_local.not_configured = exc.code == "not_configured"
+            return None
         except Exception:  # noqa: BLE001 - a broken answer is "unknown" whatever broke it; no text is kept
             return None
 

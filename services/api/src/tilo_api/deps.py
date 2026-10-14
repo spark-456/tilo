@@ -1480,7 +1480,14 @@ def get_connection_views_rpc() -> Callable[[str], list[MeetingHostRpcConnectionV
     client = get_meeting_host_client()
     registry = get_connector_registry()
     order = [c for c in registry.ids() if registry.get(c)["auth"] == "oauth2"]
-    return lambda user_id: client.connection_views(user_id, order=order)
+
+    def read(user_id: str) -> list[MeetingHostRpcConnectionView] | None:
+        rows = client.connection_views(user_id, order=order)
+        if rows is None and client.views_not_configured:
+            raise ConnectionViewsNotConfigured
+        return rows
+
+    return read
 
 
 def _forget_host_client() -> None:
@@ -1500,6 +1507,10 @@ class ConnectionViews(Protocol):
         ...
 
 
+class ConnectionViewsNotConfigured(LookupError):
+    """The connector service explicitly answered 503 not_configured."""
+
+
 class _RpcConnectionViews:
     """The `ConnectionViews` seam over tilo-connectors (ADR-0032a). One `views(user_id)` call serves the whole
     `GET /v1/connectors` (the route asks per connector); a failed call (`None`) is remembered, so the other connectors
@@ -1509,13 +1520,20 @@ class _RpcConnectionViews:
     def __init__(self, views: Callable[[str], list[MeetingHostRpcConnectionView] | None]) -> None:
         self._views = views
         self._asked: tuple[str, dict[str, MeetingHostRpcConnectionView] | None] | None = None
+        self.not_configured = False
 
     def view(self, user_id: str, connector: str) -> tuple[str | None, list[str], str | None]:
         if self._asked is None or self._asked[0] != user_id:
-            got = self._views(user_id)
+            try:
+                got = self._views(user_id)
+            except ConnectionViewsNotConfigured:
+                got = None
+                self.not_configured = True
             self._asked = (user_id, None if got is None else {v.connector: v for v in got})
         rows = self._asked[1]
         if rows is None:
+            if self.not_configured:
+                raise ConnectionViewsNotConfigured
             raise LookupError("connection views unknown")
         found = rows.get(connector)
         return (None, [], None) if found is None else (str(found.state), list(found.scopes), None)

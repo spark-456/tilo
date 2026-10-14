@@ -59,7 +59,9 @@ class ProductionCors:
             if message["type"] == "http.response.start":
                 headers = MutableHeaders(scope=message)
                 if "access-control-allow-origin" in headers:
-                    headers["access-control-expose-headers"] = "Retry-After"
+                    headers["access-control-expose-headers"] = (
+                        "Retry-After, X-Tilo-Meeting-Host" if "x-tilo-meeting-host" in headers else "Retry-After"
+                    )
             await send(message)
 
         await (self.production if enforced() else self.configured)(scope, receive, with_exposure)

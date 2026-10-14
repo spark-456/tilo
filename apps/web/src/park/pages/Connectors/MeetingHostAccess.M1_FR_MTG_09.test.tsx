@@ -216,3 +216,14 @@ describe("M1_FR_MTG_09_meeting_host_access", () => {
     expect(byText(m.container, "Sign in the meeting host")).toBeTruthy();
   });
 });
+
+it("LIVE-MEETHOST unconfigured renders one honest line and offers no repeated check", async () => {
+  const flow = flowOf("not_configured");
+  const m = mount(<MeetingHostAccess flow={flow} />);
+  await flush();
+  expect(textOf(m.container)).toBe("Meeting host is not connected yet");
+  expect(buttons(m.container)).toHaveLength(0);
+  m.render(<MeetingHostAccess flow={flow} />);
+  await flush();
+  expect(flow.meetingHost).toHaveBeenCalledTimes(1);
+});
