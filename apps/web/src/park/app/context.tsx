@@ -21,6 +21,7 @@ export { endSession } from "../../api/signOut"; // FR-UX-10: the shell's Sign ou
 export { useSessionAuth } from "../../api/sessionAuth"; // FR-UX-10: who is signed in, for the account menu
 import { HttpClient } from "../../api/http";
 import { API_METHODS, type Api, type ApiMethod } from "../api/index";
+import { carryOneStep } from "../api/oneStep";
 import { carryQuizReader } from "../api/quizApps";
 import { withToday } from "../api/sampleDates";
 import { parkApi, withSession } from "../api/select";
@@ -90,7 +91,7 @@ function noting(api: Api, note: (source: Source) => void): Api {
         }),
     ]),
   );
-  return carrySkillFixer(api, carryQuizReader(api, wrapped as unknown as Api));
+  return carrySkillFixer(api, carryOneStep(api, carryQuizReader(api, wrapped as unknown as Api)));
 }
 
 const EMPTY_PINS: AppCtx["pins"] = [];

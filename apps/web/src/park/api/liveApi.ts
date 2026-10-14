@@ -37,6 +37,7 @@ import { isUserSettings } from "./live/userSettings";
 import { worldFromIntake } from "./live/worldFromIntake";
 import { STATE_OF, type WorldListItem, worldsFromList } from "./live/worldsFromList";
 import { nameInitials } from "./nameInitials";
+import { installOneStep, oneStepOver } from "./oneStep";
 import { installQuizReader } from "./quizApps";
 import { installSkillFixer } from "./skillFixes";
 import type { Dec, DecisionKey, Effort, QuickReply, TierKey, Today, User } from "./types";
@@ -470,6 +471,10 @@ export function createLiveApi(options: LiveApiOptions = {}): Api {
     rememberIntake(intake);
     return { data: { ok: true, world: worldFromIntake(mode, intake, query) }, source: "live" };
   }) as Api["startWorld"];
+  // SIMPLE-RUN-1: Home's one-step start (intake, skip every question, price, approve). Not a method of the pinned
+  // `Api` type: Home reads it with `oneStepOf(api)`, and a fixture Api has none.
+  const oneStep = oneStepOver(http);
+  installOneStep(api, () => oneStep);
   // The lifetime-cap pop-up's feedback (SEC-16): resolves only on the server's `{received: true}`.
   api.submitFeedback = async (words: string) => {
     await http.submitFeedback(words);

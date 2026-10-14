@@ -8,6 +8,7 @@ import { type Identity, NotBuilt, createLiveApi, todayOf, userOf } from "./liveA
 // LIVE-HOME: a demo (anonymous) session on a configured deployment reads the fixture company instead, labelled as sample
 // and with no request (the server only replays for a demo session); a signed-in person gets the live Api plus who they
 // are, from the sign-in session.
+import { carryOneStep } from "./oneStep";
 import { carryQuizReader } from "./quizApps";
 import { carrySkillFixer } from "./skillFixes";
 import type { ApiResult } from "./types";
@@ -61,7 +62,11 @@ export function withSession(live: Api, who: SessionView): Api {
     );
   return carrySkillFixer(
     live,
-    carryQuizReader(live, api, () => !who.demo()),
+    carryOneStep(
+      live,
+      carryQuizReader(live, api, () => !who.demo()),
+      () => !who.demo(),
+    ),
     () => !who.demo(),
   );
 }

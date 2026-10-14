@@ -59,6 +59,12 @@ const SAFETY_DETAILS = new Set([
   "The safety screen is unavailable; nothing changed.",
 ]);
 
+/** The two 502 sentences tilo-api writes for the Director (services/api intake.py, tasks.py). */
+const DIRECTOR_DETAILS = new Set([
+  "The Director could not draft a brief.",
+  "The Director could not propose approaches.",
+]);
+
 function unavailableMessage(text: string): string {
   try {
     const body = JSON.parse(text) as { code?: unknown; detail?: unknown } | null;
@@ -138,6 +144,13 @@ export function reasonOf(status: number, text: string): string {
       const coded = typeof reason === "string" ? ANSWER_REASONS.get(reason) : undefined;
       if (coded) return coded;
       said = typeof detail === "string" ? detail : error;
+      if (said === undefined && Array.isArray(detail)) {
+        // SIMPLE-RUN-1: a 422 whose detail is a list of {loc, msg}: only a sentence the API's own validator wrote
+        // ("Value error, <sentence>"); pydantic's stock texts ("Field required") are never shown.
+        const first = (detail[0] as { msg?: unknown } | undefined)?.msg;
+        if (typeof first === "string" && first.startsWith("Value error, "))
+          said = first.slice("Value error, ".length);
+      }
       if (status === 422 && outcome === "rejected") said = reason; // the fields route's plain reason (L6c)
     }
   } catch {
@@ -412,6 +425,17 @@ export class HttpClient implements TiloClient, SchedulesApi, FieldsApi, ItemApi 
     if (!res.ok) {
       // Read 503's known refusal values or a 4xx; other 5xx are not awaited.
       if (res.status >= 500 && res.status !== 503) {
+        if (res.status === 502) {
+          // SIMPLE-RUN-1: the Director's two known failures are said as the API words them (an exact allow-list: no
+          // other server text is ever shown), so the person is told which step stopped.
+          const said = await res
+            .text()
+            .then((t) => (JSON.parse(t) as { detail?: unknown } | null)?.detail)
+            .catch(() => undefined);
+          if (typeof said === "string" && DIRECTOR_DETAILS.has(said)) {
+            throw new TiloApiError(said, 502, true, write);
+          }
+        }
         throw new TiloApiError(SERVER_TROUBLE, res.status, true, write);
       }
       const body = await res.text().catch(() => "");
