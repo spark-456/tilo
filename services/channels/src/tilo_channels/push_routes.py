@@ -4,7 +4,8 @@ the outbox lives in tilo-api and its adapter hands the already authorised notice
 
 The caller is proven first (a Google-signed token for `TILO_PUSH_AUDIENCE`, a verified email equal to
 `TILO_PUSH_CALLER`; `push_verifier`: junk is refused before any certificate fetch, which is cached and bounded, and
-runs off the event loop); an unset audience or caller is 503 and nothing is read. The body is JSON only, <= 8 KiB;
+runs off the event loop); a missing/malformed bearer is 401 before configuration is inspected;
+an unset audience or caller is 503 and no body is read. The body is JSON only, <= 8 KiB;
 every device is checked again as an allowed push service address; the notice is the fixed shape (title, body, tag, a
 relative path of the one allowlisted page). Devices go out in parallel so five slow ones cost one timeout. The answer
 holds counts and positions, never an endpoint, key, payload or the vendor's text. The real sender exists only on Cloud
@@ -80,14 +81,14 @@ def get_sender() -> PushSender | None:
 
 def _caller_ok(header: str, verifier: Verifier) -> None:
     """Blocking (a certificate fetch may run): the route calls it in the threadpool, never on the event loop."""
+    scheme, _, token = header.partition(" ")
+    if scheme.lower() != "bearer" or not token or any(char.isspace() for char in token):
+        raise HTTPException(status_code=401, detail="unauthorized")
     audience, caller = os.environ.get(ENV_AUDIENCE, ""), os.environ.get(ENV_CALLER, "")
     if not audience or not caller:
         raise HTTPException(status_code=503, detail="not_configured")
-    scheme, _, token = header.partition(" ")
-    if scheme.lower() != "bearer" or not token:
-        raise HTTPException(status_code=401, detail="unauthorized")
     try:
-        claims = verifier.verify(token.strip(), audience)
+        claims = verifier.verify(token, audience)
     except Exception:  # noqa: BLE001 - any failure to prove the caller is the same answer
         raise HTTPException(status_code=401, detail="unauthorized") from None
     if claims.get("email_verified") is not True or claims.get("email") != caller or claims.get("aud") != audience:
