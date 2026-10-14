@@ -13,8 +13,8 @@ import {
   isScheduleView,
   nextRunWords,
 } from "../../../../api/schedules";
-import { AppLink } from "../../../../screens/AppLink";
-import { describeError, isReplayOnly, useRemote } from "../../../../screens/remote";
+import { AppLink } from "../../../shared/AppLink";
+import { describeError, isReplayOnly, useRemote } from "../../../shared/remote";
 import { Loaded } from "../Loaded";
 
 interface Problem {

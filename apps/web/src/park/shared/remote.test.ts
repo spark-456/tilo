@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { TiloApiError } from "../api/http";
+import { TiloApiError } from "../../api/http";
 import { describeError } from "./remote";
 
 describe("CL-INT-3 PRD 18.4: an error says only what is known", () => {

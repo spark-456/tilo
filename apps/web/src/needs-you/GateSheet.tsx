@@ -7,7 +7,7 @@
 // design export shows the policy variant.
 import type { Card, Event, Layout } from "@tilo/contracts";
 import type { ItemApi } from "../api/item";
-import { AppLink } from "../screens/AppLink";
+import { AppLink } from "../park/shared/AppLink";
 import { Chip, Soon, authzText, nameOf, stamp, words } from "../screens/kit";
 import { type Answer, CardHead, CardOptions } from "./CardView";
 import { ShowItem } from "./ShowItem";

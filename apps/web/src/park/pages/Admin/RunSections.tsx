@@ -3,7 +3,7 @@ import type { Event } from "@tilo/contracts";
 import type { ReactNode } from "react";
 import { useClient, useIsFixtureClient } from "../../../api/ClientProvider";
 import { FIXTURE_APPROACHES } from "../../../api/fixtures/derived";
-import { useRemote } from "../../../screens/remote";
+import { useRemote } from "../../shared/remote";
 import { useRunLog } from "../../../world/runLog";
 import { worldStatus } from "../../../world/runSummary";
 import { useRunWorld } from "../../../world/worldContext";

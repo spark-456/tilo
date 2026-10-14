@@ -12,7 +12,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { ChunkLoadError } from "../api/chunkError";
 import type { TiloClient } from "../api/client";
 import { useMediaQuery } from "../hooks/useMediaQuery";
-import { describeError } from "../screens/remote";
+import { describeError } from "../park/shared/remote";
 import type { WorldSeam } from "../stage/Stage";
 import { watchRun } from "./runLog";
 import { useSelection } from "./selection";

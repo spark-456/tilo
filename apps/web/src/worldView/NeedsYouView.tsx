@@ -13,7 +13,7 @@ import { GateSheet } from "../needs-you/GateSheet";
 import { type GateRecord, gatesOf } from "../needs-you/gates";
 import { type QueueItem, askedBy, cardFor, deriveQueue, rungOf } from "../needs-you/queue";
 import { gateKey } from "../needs-you/reduce";
-import { type Remote, useRemote } from "../screens/remote";
+import { type Remote, useRemote } from "../park/shared/remote";
 import { elapsed, useRunLog } from "../world/runLog";
 import { alsoWorld, useRunWorld, withWorld } from "../world/worldContext";
 import { NotFoundView } from "./NotFoundView";

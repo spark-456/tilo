@@ -3,7 +3,7 @@
 // recorded events, never from a guess (HR-1, HR-5).
 import { type CSSProperties, useEffect } from "react";
 import { useClient } from "../api/ClientProvider";
-import { useRemote } from "../screens/remote";
+import { useRemote } from "../park/shared/remote";
 import { findItem } from "../world/findItem";
 import { reduce } from "../world/reducer";
 import { useReplayedLog } from "../world/replay";

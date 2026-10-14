@@ -2,7 +2,7 @@
 // below it actor to target, the model call, credits and the archive record, so the record is always in view (no
 // sideways scroll). Unregistered types are listed too and marked: HR-5 puts them here and nowhere else.
 import { useClient } from "../api/ClientProvider";
-import { useRemote } from "../screens/remote";
+import { useRemote } from "../park/shared/remote";
 import { isKnownType } from "../world/registry";
 import { useReplayedLog } from "../world/replay";
 import { elapsed } from "../world/runLog";

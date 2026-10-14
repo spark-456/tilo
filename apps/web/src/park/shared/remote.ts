@@ -2,9 +2,9 @@
 // error rule: what happened, what Tilo did, what is next). Nothing here ever rejects unhandled
 // or logs to the console.
 import { useCallback, useEffect, useRef, useState } from "react";
-import { describeError } from "../api/describeError";
-import { TiloApiError, isLifetimeCap } from "../api/http";
-import { useNavigate } from "../router";
+import { describeError } from "../../api/describeError";
+import { TiloApiError, isLifetimeCap } from "../../api/http";
+import { useNavigate } from "../../router";
 
 export type Remote<T> =
   | { readonly status: "loading" }

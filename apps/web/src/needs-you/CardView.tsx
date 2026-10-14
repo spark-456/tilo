@@ -10,7 +10,7 @@ import type { TiloClient } from "../api/client";
 import type { FieldsApi } from "../api/fields";
 import { Placeholder } from "../screens/Placeholder";
 import { Chip, Soon } from "../screens/kit";
-import { describeError } from "../screens/remote";
+import { describeError } from "../park/shared/remote";
 import { findItem } from "../world/findItem";
 import { agentNames } from "../world/runSummary";
 import { FieldsForm } from "./FieldsForm";

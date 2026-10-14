@@ -2,7 +2,7 @@
 // Registered types only (HR-5: unknown types appear in the Trace).
 import type { Severity } from "@tilo/contracts";
 import { useClient, useIsFixtureClient } from "../api/ClientProvider";
-import { useRemote } from "../screens/remote";
+import { useRemote } from "../park/shared/remote";
 import { isKnownType } from "../world/registry";
 import { useReplayPoint, useReplayedLog } from "../world/replay";
 import { elapsed, useRunLog } from "../world/runLog";

@@ -20,7 +20,7 @@ import { type Root, createRoot } from "react-dom/client";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { ClientProvider } from "../../../../api/ClientProvider";
 import { HttpClient } from "../../../../api/http";
-import { PRESS_MS } from "../../../../screens/remote";
+import { PRESS_MS } from "../../../shared/remote";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 

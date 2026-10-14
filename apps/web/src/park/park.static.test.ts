@@ -22,6 +22,16 @@ function walk(dir: string): string[] {
   });
 }
 
+const RUN_ENGINE = [
+  "world/runLog",
+  "world/runSummary",
+  "world/worldContext",
+  "world/autopilot",
+  // Shared seams that are not part of any old screen: the router and the display-density store.
+  "router",
+  "display/density",
+];
+
 const files = walk(PARK);
 const rel = (p: string) => relative(PARK, p).replaceAll("\\", "/");
 const text = (p: string) => readFileSync(p, "utf8");
@@ -155,7 +165,10 @@ describe("WEB_1a_static: park stays beside the old app", () => {
         // Only the shared API client seam (src/api) may be reused from outside park.
         // SEC-16: and the one shared lifetime-cap dialog (src/components, like ReplayBanner: neither tree imports the other).
         const shared = inSrc === "components/LifetimeCapDialog";
-        if (!(inSrc === "api" || inSrc.startsWith("api/") || shared))
+        // The run-admin sections read the live run through four engine modules the stage shares: the one named
+        // exception to "nothing from world/" (the old app is gone; nothing else may be added here).
+        const engine = RUN_ENGINE.includes(inSrc);
+        if (!(inSrc === "api" || inSrc.startsWith("api/") || shared || engine))
           bad.push(`${rel(p)} imports ${m[1]}`);
       }
     }

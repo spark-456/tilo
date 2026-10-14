@@ -1,6 +1,6 @@
 // A real link (open in a new tab, copy address) that routes on the History API without a reload.
 import type { AnchorHTMLAttributes } from "react";
-import { useNavigate } from "../router";
+import { useNavigate } from "../../router";
 
 export function AppLink({
   to,

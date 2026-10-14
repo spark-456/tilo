@@ -4,7 +4,7 @@
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { useClient } from "../api/ClientProvider";
 import { useApp, useHasParkProvider, useParkApi } from "../park/app/context";
-import { useRemote } from "../screens/remote";
+import { useRemote } from "../park/shared/remote";
 import { findItem } from "../world/findItem";
 import { useRunLog } from "../world/runLog";
 import { useSelection } from "../world/selection";

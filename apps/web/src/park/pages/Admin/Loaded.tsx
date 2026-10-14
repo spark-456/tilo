@@ -1,7 +1,7 @@
 import { type ReactNode, useState } from "react";
 import { useClient } from "../../../api/ClientProvider";
 import { LifetimeCapDialog } from "../../../components/LifetimeCapDialog";
-import type { Remote } from "../../../screens/remote";
+import type { Remote } from "../../shared/remote";
 function Cap() {
   const client = useClient();
   const [closed, setClosed] = useState(false);

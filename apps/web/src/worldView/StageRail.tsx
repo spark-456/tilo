@@ -4,7 +4,7 @@
 import type { Event, Layout } from "@tilo/contracts";
 import { type ReactNode, useMemo } from "react";
 import { useClient } from "../api/ClientProvider";
-import { useRemote } from "../screens/remote";
+import { useRemote } from "../park/shared/remote";
 import { buildingCount, levelRows } from "../world/levels";
 import { type PauseView, usePause } from "../world/pause";
 import { reduce } from "../world/reducer";

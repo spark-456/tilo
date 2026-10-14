@@ -16,7 +16,7 @@ import {
 import { useClient } from "../api/ClientProvider";
 import { elapsed, useRunLog } from "../world/runLog";
 import { useWorldContext } from "../world/worldContext";
-import { AppLink } from "./AppLink";
+import { AppLink } from "../park/shared/AppLink";
 import { Placeholder } from "./Placeholder";
 
 /** The recorded events of the screen's world as they arrive: the world its address names

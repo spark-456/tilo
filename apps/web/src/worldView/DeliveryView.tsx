@@ -6,7 +6,7 @@
 import { useClient } from "../api/ClientProvider";
 import { navigatePark } from "../park/app/router";
 import { Button } from "../park/components";
-import { useRemote } from "../screens/remote";
+import { useRemote } from "../park/shared/remote";
 import { creditsUsed, useRunLog } from "../world/runLog";
 import { worldStatus } from "../world/runSummary";
 import { LensFrame } from "./LensFrame";
