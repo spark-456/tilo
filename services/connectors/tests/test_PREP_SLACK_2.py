@@ -8,8 +8,8 @@ import pytest
 from _connectors_lib import ManualClock, evidence_from_case
 from tilo_channels.links import CardState, KeyRing, LinkService
 from tilo_channels.quiet_hours import NotificationGate
-from tilo_channels.slack_approval import SlackApprovalAdapter, render_approval
 from tilo_connectors import InMemoryOutboxStore, Outbox
+from tilo_connectors.adapters.slack_approval import SlackApprovalAdapter, render_approval
 from tilo_connectors.errors import MissingGrant
 
 
@@ -153,7 +153,7 @@ def test_ambiguous_delivery_reservation_survives(gate_case_factory):
 
 @pytest.mark.parametrize("flag", ["0", "1"])
 def test_app_routes_never_import_adapter(flag):
-    code = "import sys; import tilo_channels.app; assert 'tilo_channels.slack_approval' not in sys.modules"
+    code = "import sys; import tilo_channels.app; assert 'tilo_connectors.adapters.slack_approval' not in sys.modules"
     result = subprocess.run(
         [sys.executable, "-c", code], env={**os.environ, "TILO_SLACK_CHANNEL": flag}, capture_output=True, text=True
     )

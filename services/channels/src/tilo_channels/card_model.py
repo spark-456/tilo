@@ -7,7 +7,6 @@ Any future delivery must use the existing outbox + policy engine at T3.
 
 from __future__ import annotations
 
-import re
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import Any
@@ -27,9 +26,8 @@ class NeutralCard:
 def safe_text(value: str, limit: int = 2000) -> str:
     """Bound, redact, then escape channel markup and disable mention syntax."""
     text = redact(value[:8000])
-    text = re.sub(r"[\x00-\x1f\x7f]", " ", text)
-    text = text.replace("@", "＠").replace("<", "＜").replace(">", "＞")
-    text = re.sub(r"([\\`*_{}\[\]()!#|~])", r"\\\1", text)
+    text = text.translate({**dict.fromkeys(range(32), " "), 127: " ", 64: "＠", 60: "＜", 62: "＞"})
+    text = text.translate({ord(char): "\\" + char for char in "\\`*_{}[]()!#|~"})
     return text if len(text) <= limit else text[: limit - 1] + "…"
 
 

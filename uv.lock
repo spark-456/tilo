@@ -1769,8 +1769,10 @@ dependencies = [
     { name = "pyyaml" },
     { name = "referencing" },
     { name = "tilo-archive" },
+    { name = "tilo-channels" },
     { name = "tilo-contracts" },
     { name = "tilo-policy" },
+    { name = "tilo-redact" },
     { name = "tzdata" },
     { name = "uvicorn" },
 ]
@@ -1786,8 +1788,10 @@ requires-dist = [
     { name = "pyyaml", specifier = ">=6.0" },
     { name = "referencing", specifier = ">=0.30" },
     { name = "tilo-archive", editable = "packages/archive" },
+    { name = "tilo-channels", editable = "services/channels" },
     { name = "tilo-contracts", editable = "packages/contracts-py" },
     { name = "tilo-policy", editable = "packages/policy" },
+    { name = "tilo-redact", editable = "packages/redact" },
     { name = "tzdata", specifier = ">=2024.1" },
     { name = "uvicorn", specifier = ">=0.32" },
 ]

@@ -5,13 +5,20 @@ import { makeApp, renderPage, spyApi } from "../../../../test-support/park/conne
 import { NotBuilt } from "../../api/liveApi";
 import { partnerTilesEnabled } from "../../api/partnerTilesEnv";
 
+function setPartnerTiles(value: string): void {
+  const meta = document.createElement("meta");
+  meta.name = "tilo-partner-tiles";
+  meta.content = value;
+  document.head.append(meta);
+}
+
 beforeEach(() => {
   vi.spyOn(Date, "now").mockReturnValue(Date.parse("2026-10-14T13:00:00Z"));
 });
 
 afterEach(() => {
   cleanup();
-  vi.unstubAllEnvs();
+  for (const meta of document.querySelectorAll('meta[name="tilo-partner-tiles"]')) meta.remove();
   vi.restoreAllMocks();
 });
 
@@ -24,7 +31,7 @@ it("PREP-CONNECTORS-TILES defaults off unless explicitly enabled", () => {
 
 for (const state of ["fixture", "live", "unavailable", "team"] as const) {
   it(`PREP-CONNECTORS-TILES flag off pins existing ${state} page exactly`, async () => {
-    vi.stubEnv("VITE_TILO_PARTNER_TILES", "false");
+    setPartnerTiles("false");
     const api = spyApi();
     if (state === "live") api.getConnectors.mockResolvedValue({ source: "live", data: [] });
     if (state === "unavailable") api.getConnectors.mockRejectedValue(new Error("unavailable"));
@@ -35,7 +42,7 @@ for (const state of ["fixture", "live", "unavailable", "team"] as const) {
 }
 
 it("PREP-CONNECTORS-TILES explicit flag shows exact owner requirements without actions or extra reads", async () => {
-  vi.stubEnv("VITE_TILO_PARTNER_TILES", "true");
+  setPartnerTiles("true");
   const api = spyApi();
   api.getConnectors.mockResolvedValue({ source: "live", data: [] });
   const app = makeApp();

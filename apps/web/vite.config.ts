@@ -24,6 +24,14 @@ function buildStamp(): Plugin {
     name: "tilo-build-stamp",
     transformIndexHtml: () => [
       { tag: "meta", attrs: { name: "tilo-build", content: BUILD_SHA }, injectTo: "head" as const },
+      {
+        tag: "meta",
+        attrs: {
+          name: "tilo-partner-tiles",
+          content: process.env.VITE_TILO_PARTNER_TILES === "true" ? "true" : "false",
+        },
+        injectTo: "head" as const,
+      },
     ],
   };
 }

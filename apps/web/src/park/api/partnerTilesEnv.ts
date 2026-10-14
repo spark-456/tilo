@@ -4,5 +4,9 @@ export function partnerTilesEnabled(value: unknown): boolean {
 }
 
 export function showPartnerTiles(): boolean {
-  return partnerTilesEnabled(import.meta.env.VITE_TILO_PARTNER_TILES);
+  return partnerTilesEnabled(
+    typeof document === "undefined"
+      ? undefined
+      : document.querySelector('meta[name="tilo-partner-tiles"]')?.getAttribute("content"),
+  );
 }

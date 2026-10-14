@@ -68,7 +68,7 @@ def test_FR_UX_17_untrusted_redacted_bounded_and_immutable():
     text = " ".join(model.lines)
     assert all(s not in text for s in ("@channel", "@here", "<at>", "<!channel>", "fixture-password", "[click]("))
     assert all(len(line) <= 2000 for line in model.lines)
-    assert "â€¦" in text
+    assert "\u2026" in text
     assert model.open_url == link.url
 
 

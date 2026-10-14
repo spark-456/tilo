@@ -12,14 +12,14 @@ import re
 from collections.abc import Callable, Mapping
 from typing import Any
 
-from tilo_connectors.adapters.slack import Artifacts
-from tilo_connectors.errors import MissingGrant, PossiblySent, SideEffectRefused
-from tilo_connectors.outbox import Grant
-
 from tilo_channels.card_model import card_to_neutral
 from tilo_channels.dedupe import DedupeStore
 from tilo_channels.links import IssuedLink, LinkService
 from tilo_channels.quiet_hours import NotificationGate
+
+from tilo_connectors.adapters.slack import Artifacts
+from tilo_connectors.errors import MissingGrant, PossiblySent, SideEffectRefused
+from tilo_connectors.outbox import Grant
 
 FLAG = "TILO_SLACK_CHANNEL"
 
