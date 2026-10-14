@@ -166,15 +166,25 @@ describe("WEB_4_home_render: Today panel", () => {
     expect(page.indexOf("September spend")).toBeLessThan(page.indexOf(QUICK.start));
   });
 
-  // UI-10 / A2 (14 Oct QA): this test used to say the Today panel and the spend tiles are left out under 1180.
-  // A tablet or a phone must see the same numbers, so they render at every width and CSS stacks them.
-  it("UI_10_A2_home_render_the_today_panel_and_the_spend_tiles_render_at_every_width", async () => {
+  // UI-10 / A2 (14 Oct QA, ruled 05:52): this used to say the Today panel and the spend tiles are left out under
+  // 1180. The artboards have no Today panel there, so the `aside` stays absent, but the spend tiles and the
+  // worlds / October spend block (no agenda) are drawn in the one column.
+  it("UI_10_A2_home_render_under_1180_the_tiles_and_the_worlds_and_spend_block_replace_the_Today_aside", async () => {
     for (const vw of [1440, 1180, 1179, 1024, 768, 390]) {
       const { el } = await mountHome({ app: { vw } });
-      expect(qa(el, 'aside[aria-label="Today"]'), `Today panel at ${vw}`).toHaveLength(1);
+      const wide = vw >= 1180;
+      expect(qa(el, 'aside[aria-label="Today"]'), `Today aside at ${vw}`).toHaveLength(
+        wide ? 1 : 0,
+      );
+      expect(
+        qa(el, 'section[aria-label="Sample worlds and spend"]'),
+        `stacked block at ${vw}`,
+      ).toHaveLength(wide ? 0 : 1);
       expect(qa(el, '[aria-label="Spend at a glance"] .park-kpi'), `tiles at ${vw}`).toHaveLength(
         5,
       );
+      expect(pageText(el).includes("Up next today"), `agenda at ${vw}`).toBe(wide);
+      expect(pageText(el)).toContain("Sample worlds");
       expect(textOf(q(el, "h1"))).toBe("Good morning, Alex.");
       expect(taskInput(el)).toBeTruthy();
       cleanup();

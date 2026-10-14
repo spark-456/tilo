@@ -51,13 +51,14 @@ for (const size of SIZES) {
             h: r.height,
           };
         };
-        const today = document.querySelector('aside[aria-label="Today"]');
+        const today = document.querySelector(".park-home-today");
         const titles = [...(today?.querySelectorAll(".park-home-title") ?? [])].map(
           (e) => e.textContent ?? "",
         );
         return {
           titles,
           tiles: document.querySelectorAll(".park-home-kpis .park-kpi").length,
+          asides: document.querySelectorAll('aside[aria-label="Today"]').length,
           boxes: [
             box("greeting", document.querySelector(".park-home-hero")),
             box("composer", document.querySelector(".park-home-composer")),
@@ -69,7 +70,9 @@ for (const size of SIZES) {
         };
       });
       expect(found.tiles).toBe(5);
-      expect(found.titles.join("|")).toMatch(/Sample worlds.*Up next today.*spend/);
+      expect(found.titles.join("|")).toMatch(/Sample worlds.*spend/);
+      expect(found.titles.join("|")).not.toContain("Up next today");
+      expect(found.asides, "no Today aside under 1180").toBe(0);
       const boxes = found.boxes.filter((b): b is Box => b !== null);
       expect(boxes.map((b) => b.name)).toEqual(["greeting", "composer", "tiles", "today", "spend"]);
       // sideways: inside the window, and the page does not scroll sideways
