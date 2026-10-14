@@ -5,8 +5,11 @@ virtual-microphone tone checks have passed with LIVE off. This is not a demonstr
 live Meet. The user completed the production infrastructure sitting and Workspace
 OAuth secret versions on 12 October. The optional bot infrastructure still needs
 its reviewed opt-in apply. No paid model calls have run in this implementation.
-Review #826 (deployment), #827 (Chirp integration) and #828 (Live probe) before
-enabling attendance. Infrastructure apply and live switches stay with the user.
+The current acceptance checklist is
+`agy-bridge/tasks/MEETING-GO-LIVE-13OCT.md` in the coordination checkout. It tracks
+the exact reviewed heads, image certification, minutes/index and human acceptance
+holds. Infrastructure apply and live switches stay with the user; CX-MERGE-A alone
+deploys cleared images. Source instructions are not deployment evidence.
 
 ## Prerequisites
 
@@ -37,25 +40,27 @@ is already defined in `infra/envs/dev/variables.tf` and defaults to false. If th
 plan contains any destroy or replacement, stop and ask before applying. Only the
 user applies the reviewed saved plan.
 
-The image below has recorded offline verification for the source version noted
-after the command block. Reuse it only if that version is the cleared deployment
-target; newer runtime changes need their own image verification by CX-MERGE-A.
-After the optional bot infrastructure has been applied, A can deploy this verified
-version with these dev-only commands:
+After the optional bot infrastructure has been applied, A must supply the exact
+cleared source head, certified digest and passed offline image-gate report. The
+historical image below lacks the Gemini Live adapter and cannot certify the current
+replay/Live chain. Once the current image is certified, A uses these dev-only commands:
 
 ```powershell
 $P = 'essential-wares-510320-f0'
 $R = 'asia-southeast1'
-$Image = "$R-docker.pkg.dev/$P/tilo/meet-bot@sha256:2f8ab6057a801462219d0fa219fcf81fb70b8cba288a4e4330ddac7969736d2f"
+$Digest = Read-Host 'A-certified current bot image digest (sha256:...)'
+if ($Digest -notmatch '^sha256:[0-9a-f]{64}$') { throw 'Invalid certified digest; stop' }
+$Image = "$R-docker.pkg.dev/$P/tilo/meet-bot@$Digest"
 gcloud run services update tilo-meet-bot --project=$P --region=$R --image=$Image
+if ($LASTEXITCODE -ne 0) { throw 'Deployment failed; stop' }
 $Bot = gcloud run services describe tilo-meet-bot --project=$P --region=$R --format='value(status.url)'
 $Api = gcloud run services describe tilo-api --project=$P --region=$R --format='value(status.url)'
 ```
 
-Cloud Build `a2b73e0f-c1a1-4945-8e7b-ae9a2ba29769` verified this digest from
-runtime source `be6cbc43`. That verification applies to this exact digest, not to
-later runtime changes on phase0-stack. CX-MERGE-A must check the cleared source and
-image evidence before deployment. Do not enable LIVE before the user's price review.
+Historical Cloud Build `a2b73e0f-c1a1-4945-8e7b-ae9a2ba29769` verified digest
+`sha256:2f8ab6057a801462219d0fa219fcf81fb70b8cba288a4e4330ddac7969736d2f`
+from runtime source `be6cbc43`. That evidence applies only to that older image.
+Do not enable LIVE before the user's price review.
 
 The optional service has internal ingress, only the API's invoker grant, zero idle
 instances, one active request/instance, 2 CPUs/4 GiB and a 3600-second deadline. It
@@ -66,8 +71,17 @@ The **user** enables the live switch after reviewing the configured prices:
 
 ```powershell
 gcloud run services update tilo-meet-bot --project=$P --region=$R --update-env-vars="^#^LIVE=1#GOOGLE_CLOUD_PROJECT=$P#GOOGLE_LOCATION=$R#BOT_JOIN_MODE=guest#TILO_MEET_BOT_AUDIENCE=$Bot#TILO_MEET_BOT_CALLER=tilo-api@$P.iam.gserviceaccount.com"
-gcloud run services update tilo-api --project=$P --region=$R --update-env-vars="^#^LIVE=1#GOOGLE_CLOUD_PROJECT=$P#GOOGLE_LOCATION=$R#TILO_MEET_BOT_URL=$Bot"
+if ($LASTEXITCODE -ne 0) { throw 'Bot activation failed; stop' }
+gcloud run services update tilo-api --project=$P --region=$R --update-env-vars="^#^LIVE=1#TILO_MEET_BOT_URL=$Bot"
+if ($LASTEXITCODE -ne 0) { throw 'API activation failed; stop' }
 ```
+
+Preserve the API's existing model location, including its user-approved global
+Gemini setting, Model Armor region and durable-store environment. The API command
+changes only LIVE and the bot URL. Keep `voice.live.enabled: false` and
+`voice.live.price_approved: false` for Chirp acceptance. The optional Live adapter
+passes offline fake/recorded lifecycle tests; this does not prove heard voice or
+approve its live price.
 
 The bot has no persistent browser profile. Terraform manages its environment in
 full; a later apply can reset these runtime variables, which safely disables it.
@@ -103,8 +117,13 @@ concurrent conflicting attachment prevents the transcript from being attached.
 An already-running synchronous provider SDK call can finish after cancellation;
 cloud content-log filters and per-capture counters isolate its late completion.
 
-Known limits: minutes summarization and a web attendance button are not included;
-the transcript is the saved notes. The existing join limiter is per API process.
+Minutes/follow-up routes are a separate default-off integration. Activation needs
+same-head independent acceptance and final delta security review, all seven
+retention indexes provisioned/READY, and the exact API rollout. The coordination
+checklist supplies the analyze, inspect, confirm and draft sequence. A durable
+T3 preview needs owner approval; worker acceptance performs no real send. The
+transcript alone does not prove minutes/follow-up publication. A web attendance
+button is not included. The existing join limiter is per API process.
 A crash or owner edit during failed capture can leave `joining` needing operator
 recovery; this slice does not add a durable lease/reaper. Cloud anti-automation,
 admission selectors, microphone routing and heard audio remain unverified live.
