@@ -147,7 +147,7 @@ function Ready({ app, data, retryRead }: { app: AppCtx; data: Data; retryRead: (
   const api = useParkApi();
   const { user, learn, source, currency } = data;
   const teachRef = useRef<HTMLElement>(null);
-  const draft = data.skills.find((s) => s.st === "draft");
+  const draft = data.skills.find((s) => s.st === "draft" && !s.builtin);
   const t = useTeach({ app, api, user, draft, source, currency });
 
   const [sel, setSel] = useState<string | null>(null);

@@ -20,6 +20,7 @@ from typing import Annotated, Any, Literal
 import yaml
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import Field, StrictBool, model_validator
+from tilo_harness.skills import SkillRegistry
 from tilo_people.directory import Directory
 from tilo_people.stores import PeopleStores
 from tilo_planning.artifacts import new_ulid
@@ -275,9 +276,21 @@ def create_skill_route(
     return _guarded(save)
 
 
-def _readable(store: SkillStore, stores: PeopleStores, principal: deps.Principal, clock: Callable[[], str]) -> list:
+def _readable(
+    store: SkillStore,
+    stores: PeopleStores,
+    principal: deps.Principal,
+    clock: Callable[[], str],
+    *,
+    allow_unfounded: bool = False,
+) -> list:
     now = _now(clock)
-    teams = _teams(stores, principal.user_id, now)
+    try:
+        teams = _teams(stores, principal.user_id, now)
+    except HTTPException as exc:
+        if allow_unfounded and exc.status_code == 404:
+            return []  # Catalogue reads do not grant access to any taught records before founding.
+        raise
     # A capture draft is the owner's working copy for the version flow, not a skill yet: never listed.
     return _sorted([r for r in store.list_visible(deps.ORG_ID, principal.user_id, teams) if r["status"] != "draft"])
 
@@ -288,9 +301,21 @@ def list_skills_route(
     store: Annotated[SkillStore, Depends(deps.get_skill_store)],
     stores: Annotated[PeopleStores, Depends(deps.get_people_stores)],
     clock: Annotated[Callable[[], str], Depends(deps.get_clock)],
+    registry: Annotated[SkillRegistry, Depends(deps.get_skill_registry)],
+    include_builtin: bool = False,
 ) -> dict[str, Any]:
     """The caller's own skills and those of their current teams, by name then id."""
-    return {"skills": _guarded(lambda: _readable(store, stores, principal, clock))}
+
+    def read() -> dict[str, Any]:
+        result = {"skills": _readable(store, stores, principal, clock, allow_unfounded=include_builtin)}
+        if include_builtin:
+            result["builtins"] = [
+                {"id": skill_id, "description": description, "version": registry.load(skill_id).version}
+                for skill_id, description in registry.catalog()
+            ]
+        return result
+
+    return _guarded(read)
 
 
 @router.get("/v1/skills/{skill_id}")
@@ -322,13 +347,14 @@ def learn_route(
     store: Annotated[SkillStore, Depends(deps.get_skill_store)],
     stores: Annotated[PeopleStores, Depends(deps.get_people_stores)],
     clock: Annotated[Callable[[], str], Depends(deps.get_clock)],
+    include_builtin: bool = False,
 ) -> dict[str, Any]:
     """Skills still learning that the caller may read, and the caller's own recorded runs that finished and wait for
     a rating (FR-SKL-05, TS-15). Both come from stored records only: no recorded run is an empty list, never a made-up
     bar (HR-1). The helpers report (FR-SKL-07) is a later slice."""
 
     def build() -> dict[str, Any]:
-        readable, user = _readable(store, stores, principal, clock), principal.user_id
+        readable, user = _readable(store, stores, principal, clock, allow_unfounded=include_builtin), principal.user_id
         waiting = []
         for skill in readable:
             rated = {r["run_id"] for r in store.list_ratings(deps.ORG_ID, skill["id"])}

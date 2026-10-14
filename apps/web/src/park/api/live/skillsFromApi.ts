@@ -102,7 +102,33 @@ export function skillFromRow(r: SkillRow): Skill {
 /** `skills` rows of the answer that match the shape; null when the body is not a skill list at all. */
 export function skillsOfBody(v: unknown): Skill[] | null {
   if (!isObject(v) || !Array.isArray(v.skills)) return null;
-  return v.skills.filter(isSkillRow).map(skillFromRow);
+  const builtins: Skill[] = [];
+  for (const r of Array.isArray(v.builtins) ? v.builtins : []) {
+    if (!isObject(r) || !isText(r.id) || !isText(r.description) || !isText(r.version)) continue;
+    builtins.push({
+      id: r.id,
+      name: r.id
+        .split("-")
+        .map((s) => s.charAt(0).toUpperCase() + s.slice(1))
+        .join(" "),
+      builtin: true,
+      description: r.description,
+      owner: "Tilo",
+      team: "",
+      role: "",
+      runs: null,
+      rate: null,
+      last: "",
+      improved: "",
+      status: "live",
+      st: "draft",
+      from: r.version,
+      tools: [],
+      used: [],
+      steps: [],
+    });
+  }
+  return [...builtins, ...v.skills.filter(isSkillRow).map(skillFromRow)];
 }
 
 /** A body that is a Learn answer (`learning` rows, `needs_rating`) the page can read. */

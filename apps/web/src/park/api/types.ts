@@ -186,6 +186,9 @@ export interface World {
 
 // Skills and learning
 export interface Skill {
+  /** Shipped catalogue entry, not an owned or learned skill. */
+  builtin?: boolean;
+  description?: string;
   id: string;
   name: string;
   team: string;

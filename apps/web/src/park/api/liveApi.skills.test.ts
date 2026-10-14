@@ -61,7 +61,7 @@ describe("SKILLS_3_getSkills: GET /v1/skills as the Skills library", () => {
   it("SKILLS_3_getSkills_maps_a_record_to_a_Skill_and_says_live", async () => {
     const spy = vi.fn(async (_u: unknown) => json({ skills: [row()] }));
     const r = await live(spy).getSkills();
-    expect(String(spy.mock.calls[0]?.[0])).toBe(`${BASE}/v1/skills`);
+    expect(String(spy.mock.calls[0]?.[0])).toBe(`${BASE}/v1/skills?include_builtin=true`);
     expect(r.source).toBe("live");
     const s = r.data[0] as Skill;
     expect(s).toMatchObject({
@@ -142,7 +142,7 @@ describe("SKILLS_3_getLearn: GET /v1/learn as the Learn data", () => {
       json({ learning: [row()], needs_rating: [], helpers: null }),
     );
     const r = await live(spy).getLearn();
-    expect(String(spy.mock.calls[0]?.[0])).toBe(`${BASE}/v1/learn`);
+    expect(String(spy.mock.calls[0]?.[0])).toBe(`${BASE}/v1/learn?include_builtin=true`);
     expect(r).toEqual({
       data: { rates: [], reviews: [], helpers: [], tools: [] },
       source: "live",
