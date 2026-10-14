@@ -5,7 +5,7 @@ import { type ComponentType, type ElementType, lazy } from "react";
 import { CardsGallery } from "../needs-you/CardsGallery";
 import { matchFlowRoute } from "../router";
 import { NotFound } from "./NotFound";
-import { More, ScreensIndex } from "./ScreensIndex";
+import { ScreensIndex } from "./ScreensIndex";
 import { inARun } from "./inARun";
 import { SCREENS } from "./meta";
 
@@ -30,9 +30,6 @@ const S_13 = screen(() => import("./S_13"), "S_13");
 const S_14 = screen(() => import("./S_14"), "S_14");
 const S_15 = screen(() => import("./S_15"), "S_15");
 const S_16 = screen(() => import("./S_16"), "S_16");
-const S_17 = screen(() => import("./S_17"), "S_17");
-const S_18 = screen(() => import("./S_18"), "S_18");
-const S_19 = screen(() => import("./S_19"), "S_19");
 const S_21 = screen(() => import("./S_21"), "S_21");
 const S_22 = screen(() => import("./S_22"), "S_22");
 const S_23 = screen(() => import("./S_23"), "S_23");
@@ -53,9 +50,6 @@ const Meeting = inARun(S_09, { testid: "meeting", title: "Meeting" });
 const Library = inARun(S_13, { testid: "library", title: "Library" });
 const Autonomy = inARun(S_15, { testid: "autonomy", title: "Autonomy" });
 const Channels = inARun(S_16, { testid: "channels", title: "Channels" });
-const Mail = inARun(S_17, { testid: "mail", title: "Email Autopilot" });
-const Team = inARun(S_18, { testid: "team", title: "Team Lead console" });
-const Connections = inARun(S_19, { testid: "connections", title: "Connections" });
 const Artifacts = inARun(S_21, { testid: "artifacts", title: "Artifact history" });
 const Estimate = inARun(S_23, { testid: "estimate", title: "How we estimate" });
 
@@ -63,7 +57,7 @@ const Estimate = inARun(S_23, { testid: "estimate", title: "How we estimate" });
 const COMPONENTS: Readonly<Record<string, ElementType<ScreenProps>>> = {
   "S-05": S_05, "S-06": NeedsYou, "S-07": GateSheet, "S-08": Consent, "S-09": Meeting, "S-10": S_10,
   "S-11": S_11, "S-12": S_12, "S-13": Library, "S-14": S_14, "S-15": Autonomy, "S-16": Channels,
-  "S-17": Mail, "S-18": Team, "S-19": Connections, "S-21": Artifacts, "S-22": S_22, "S-23": Estimate,
+  "S-21": Artifacts, "S-22": S_22, "S-23": Estimate,
   "S-24": S_24, "S-26": S_26, "S-27": S_27, "S-28": S_28, "S-29": S_29,
 };
 
@@ -83,7 +77,6 @@ const decode = (s: string | undefined): string => {
 
 /** /more is the production menu; /screens is the dev-only index (PRD 18.3, AGW-08). */
 const EXTRA: ReadonlyArray<{ id: string; re: RegExp; Component: ElementType<ScreenProps> }> = [
-  { id: "more", re: /^\/more\/?$/, Component: More },
   ...(import.meta.env.DEV
     ? [
         { id: "screens", re: /^\/screens\/?$/, Component: ScreensIndex },

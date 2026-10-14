@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { ALL_ROUTES } from "../../e2e/support/routes";
+import { isParkPath } from "../park/app/router";
 import { matchFlowRoute } from "../router";
 import { sectionOf } from "./PrimaryNav";
 import { SCREENS } from "./meta";
@@ -18,7 +19,10 @@ describe("PRD-18.3 AGW-08 route table: every Must screen has a route", () => {
   for (const s of SCREENS.filter((s) => s.path !== null)) {
     it(`${s.id} ${s.name} resolves from its own address`, () => {
       const path = s.path ?? "";
-      if (FLOW_SCREENS.includes(s.id)) {
+      if (["S-17", "S-18", "S-19"].includes(s.id)) {
+        expect(isParkPath(path)).toBe(true);
+        expect(matchScreen(path)).toBeNull();
+      } else if (FLOW_SCREENS.includes(s.id)) {
         expect(matchScreen(path)).toBeNull();
         if (s.id !== "S-01") expect(matchFlowRoute(path).screen).not.toBe("Start");
       } else {
@@ -61,7 +65,8 @@ describe("PRD-18.3 AGW-08 route table: every Must screen has a route", () => {
   });
 
   it("serves /more and, in dev, /screens", () => {
-    expect(matchScreen("/more")?.id).toBe("more");
+    expect(isParkPath("/more")).toBe(true);
+    expect(matchScreen("/more")).toBeNull();
     expect(matchScreen("/screens")?.id).toBe("screens");
   });
 

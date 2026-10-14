@@ -11,10 +11,10 @@ import { ClientProvider } from "../api/ClientProvider";
 import type { TiloClient } from "../api/client";
 import { FixtureClient } from "../api/fixtureClient";
 import { EVENTS_VILLAGE_BASIC } from "../api/fixtures/events";
+import { MailSection as S_17 } from "../park/pages/Team/RunAdmin";
+import { ConsoleSection as S_18 } from "../park/pages/Team/RunAdmin";
+import { ConnectionsSection as S_19 } from "../park/pages/Team/RunAdmin";
 import { S_13 } from "./S_13";
-import { S_17 } from "./S_17";
-import { S_18 } from "./S_18";
-import { S_19 } from "./S_19";
 import { S_23 } from "./S_23";
 import type { ScreenProps } from "./routes";
 

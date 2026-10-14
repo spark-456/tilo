@@ -3,6 +3,7 @@
 // other kept screen stays on its own address. Bare /team and /worlds belong to Park, not to matchScreen.
 import { describe, expect, it } from "vitest";
 import { FIXTURE_WORLD_ID } from "../api/fixtures/derived";
+import { isParkPath } from "../park/app/router";
 import { matchFlowRoute } from "../router";
 import { screenMeta } from "./meta";
 import { matchScreen } from "./routes";
@@ -28,8 +29,10 @@ describe("WEB_CUTOVER_screens: moved screens", () => {
   });
 
   it("WEB_CUTOVER_04_matchScreen_finds_S_18_and_S_14_at_their_new_addresses", () => {
-    expect(matchScreen("/team/console")?.id).toBe("S-18");
-    expect(matchScreen("/team/console/")?.id).toBe("S-18");
+    expect(isParkPath("/team/console")).toBe(true);
+    expect(matchScreen("/team/console")).toBeNull();
+    expect(isParkPath("/team/console/")).toBe(true);
+    expect(matchScreen("/team/console/")).toBeNull();
     expect(matchScreen("/worlds/replays")?.id).toBe("S-14");
     expect(matchScreen("/worlds/replays/")?.id).toBe("S-14");
   });
@@ -62,9 +65,6 @@ describe("WEB_CUTOVER_screens: kept screens stay reachable on their own paths", 
       ["/worlds/replays", "S-14"],
       ["/autonomy", "S-15"],
       ["/channels", "S-16"],
-      ["/mail", "S-17"],
-      ["/team/console", "S-18"],
-      ["/connections", "S-19"],
       ["/library/artifacts", "S-21"],
       ["/settings", "S-22"],
       ["/estimate", "S-23"],
@@ -73,7 +73,6 @@ describe("WEB_CUTOVER_screens: kept screens stay reachable on their own paths", 
       ["/plate", "S-27"],
       ["/pinboards", "S-28"],
       ["/calendar", "S-29"],
-      ["/more", "more"],
     ];
     for (const [path, id] of table) expect(matchScreen(path)?.id, path).toBe(id);
   });
@@ -99,9 +98,6 @@ describe("WEB_CUTOVER_screens: kept screens stay reachable on their own paths", 
       "S-14",
       "S-15",
       "S-16",
-      "S-17",
-      "S-18",
-      "S-19",
       "S-21",
       "S-22",
       "S-23",
