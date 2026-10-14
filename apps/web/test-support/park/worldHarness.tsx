@@ -3,6 +3,7 @@
 // found by its public surface only: roles, labels and visible text. Nothing here is bundled.
 import { act } from "react";
 import { type Mock, vi } from "vitest";
+import type { HttpClient } from "../../src/api/http";
 import { API_METHODS, type Api } from "../../src/park/api/index";
 import type { Dec, World } from "../../src/park/api/types";
 import type { AppCtx } from "../../src/park/app/AppCtx";
@@ -94,6 +95,8 @@ export interface RigOptions {
   app?: Partial<AppCtx>;
   /** A demo session (QA-DEMO-1): recorded sample data, no real outcomes. */
   demo?: boolean;
+  /** The run client the page reads recorded events from (UI-10 B8); the default client when absent. */
+  client?: HttpClient;
 }
 
 export async function settle(): Promise<void> {
@@ -124,17 +127,21 @@ export async function mountWorld(opts: RigOptions = {}): Promise<WorldRig> {
     setDec: async (dec) => rig.update({ dec, needsLeft: needsOf(dec) }),
     open: async (id) => rig.update({ params: { id } }),
   };
-  const tree = (app: AppCtx) => (
-    <ParkProvider
-      api={api}
-      navigate={navigate}
-      schedule={sch.schedule}
-      viewport={{ vw: app.vw, vh: app.vh }}
-      {...(opts.demo ? { demo: true } : {})}
-    >
-      <WorldPage app={app} />
-    </ParkProvider>
-  );
+  const tree = (app: AppCtx) => {
+    const page = (
+      <ParkProvider
+        api={api}
+        navigate={navigate}
+        schedule={sch.schedule}
+        viewport={{ vw: app.vw, vh: app.vh }}
+        {...(opts.demo ? { demo: true } : {})}
+        {...(opts.client ? { worldClient: opts.client } : {})}
+      >
+        <WorldPage app={app} />
+      </ParkProvider>
+    );
+    return page;
+  };
   const m = mount(tree(rig.app));
   Object.assign(rig, { m, el: m.container });
   await settle();

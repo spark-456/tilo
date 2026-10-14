@@ -33,11 +33,11 @@ it("FR_AGT_15 the live World page reaches proposals and the demo World never req
         </ParkProvider>,
       );
     });
-    expect(fetch).toHaveBeenCalledTimes(source === "live" ? 1 : 0);
-    if (source === "live")
-      expect(fetch.mock.calls[0]?.[0]).toBe(
-        `https://api.test/worlds/${encodeURIComponent(world.id)}/skill-proposals`,
-      );
+    // UI-10 B8: a live world also polls its recorded events; a demo World requests nothing
+    const world_ = `https://api.test/worlds/${encodeURIComponent(world.id)}`;
+    expect(fetch.mock.calls.map((c) => String(c[0])).sort()).toEqual(
+      source === "live" ? [`${world_}/events`, `${world_}/skill-proposals`] : [],
+    );
     cleanup();
   }
 });
