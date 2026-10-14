@@ -36,7 +36,7 @@ from typing import Any, Literal
 
 from fastapi import FastAPI, Request
 from tilo_harness.lead_review import REVIEW_ROLE, review_milestones
-from tilo_harness.outputs import UnitOutput
+from tilo_harness.outputs import RenderedOffice, RenderedPdf, UnitOutput
 from tilo_harness.schedule_dates import date_window_fail
 from tilo_harness.tool_runner import ToolUnitRunner
 from tilo_harness.unit_prompt import UpstreamItem, request_variables
@@ -817,6 +817,7 @@ class _UnitRunner:
             tools=self._web.registry(),
             safety=FakeSafetyProvider(),  # every tool result is screened; the marker-list fake, named in `FAKED`
             role_tools={"specialist": ("fetch_url",)},
+            report_renderer=self._render_report,
             meter=lambda role, request, response: meter.cost(response.profile_id, *meter.tokens(response, request)),
             request_options={
                 role: {"max_output_tokens": cap, "thinking_level": "minimal"} for role, cap in _OUT.items()
@@ -826,6 +827,34 @@ class _UnitRunner:
         self._units: list[dict[str, Any]] = []
         self._milestones: frozenset[str] = frozenset()
         self._work: dict[str, str] = {}
+
+    async def _render_report(self, reply: str) -> UnitOutput:
+        """Render the approved format locally, including Office files, without an RPC."""
+        from tilo_harness.deliverable import DeliverableRefused, parse_spec, render_output  # noqa: PLC0415
+        from tilo_harness.outputs import RenderedOffice  # noqa: PLC0415
+        from tilo_render.docx import render_docx  # noqa: PLC0415
+        from tilo_render.pptx import render_pptx  # noqa: PLC0415
+        from tilo_render.spec import RequestDeliverableSpec  # noqa: PLC0415
+
+        fmt = self._brief["deliverables"][0]["format"]
+        if fmt == "pdf":
+            return await asyncio.to_thread(render_output, reply)
+        try:
+            spec = RequestDeliverableSpec.model_validate(parse_spec(reply).model_dump())
+        except Exception:
+            raise DeliverableRefused("invalid_spec") from None
+        renderers = {
+            "docx": (render_docx, "application/vnd.openxmlformats-officedocument.wordprocessingml.document"),
+            "pptx": (render_pptx, "application/vnd.openxmlformats-officedocument.presentationml.presentation"),
+        }
+        if fmt not in renderers:
+            raise DeliverableRefused("render_failed")
+        renderer, media_type = renderers[fmt]
+        try:
+            content = await asyncio.to_thread(renderer, spec)
+            return RenderedOffice(media_type=media_type, content=content, spec_text=spec.model_dump_json())
+        except Exception:
+            raise DeliverableRefused("render_failed") from None
 
     @property
     def today(self) -> date:
@@ -881,7 +910,10 @@ class _UnitRunner:
         done = await self._shared.run_unit(unit, shown)  # the shared ToolUnitRunner (LW-07); no tools offered here
         if not done.outcome.success:
             raise ProviderError("the model returned no text")
-        text = done.outcome.outputs[0].content.decode("utf-8").strip()
+        output = done.outcome.outputs[0]
+        text = (
+            output.spec_text if isinstance(output, RenderedPdf | RenderedOffice) else output.content.decode("utf-8")
+        ).strip()
         credits = done.credits
         self._work[unit["id"]] = text
         summary = f"Finished {unit['title']}."
@@ -897,7 +929,11 @@ class _UnitRunner:
             prompt = load_prompt("lead", "review.md", {"district": district, "work": _safe(work), **self._request()})
             review, spent = await asyncio.to_thread(self._ask, REVIEW_ROLE, prompt)
             summary, credits = f"{summary} Lead review: {review[:200]}", credits + spent
-        item = UnitOutput(media_type="text/markdown", content=text.encode("utf-8"))  # the executor stores it (ADR-0018)
+        item = (
+            output
+            if isinstance(output, RenderedPdf | RenderedOffice)
+            else UnitOutput(media_type="text/markdown", content=text.encode("utf-8"))
+        )  # the executor stores the rendered bytes or text (ADR-0018)
         return MeteredOutcome(success=True, summary=summary, outputs=(item,), credits=credits)
 
 
