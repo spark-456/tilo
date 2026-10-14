@@ -19,7 +19,7 @@
     "recording"
   ],
   "properties": {
-    "id": { "type": "string", "pattern": "^E-(PLAN|RES|DOC|MAIL|CHN|ROUTE|HAND|RED)-\\d{2}$" },
+    "id": { "type": "string", "pattern": "^E-(PLAN|RES|DOC|MAIL|CHN|ROUTE|HAND|RED|BUILD)-\\d{2}$" },
     "group": { "type": "string", "description": "Must match the directory and the id prefix." },
     "title": { "type": "string", "minLength": 1 },
     "measures": {

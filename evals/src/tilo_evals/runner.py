@@ -85,7 +85,7 @@ class PassResult:
 
 
 def _is_runnable(case: Case) -> bool:
-    return case.status != "skeleton" and bool(case.recording)
+    return case.status != "skeleton" and (bool(case.recording) or case.inputs.get("fake_suite") == "ebuild")
 
 
 def _select(
@@ -164,7 +164,10 @@ def run_pass(
     whose cap is already reached starts no further case. The cap is never exceeded."""
     if pass_kind not in PASS_KINDS:
         raise SelectionError(f"pass kind must be one of {PASS_KINDS}, got {pass_kind!r}")
-    selected = _select(load_cases(root=cases_root), pass_kind, group, case_ids or [], config)
+    cases = load_cases(root=cases_root)
+    if cases_root == "evals/cases":
+        cases += load_cases(root=str(base / "evals/build-cases"))
+    selected = _select(cases, pass_kind, group, case_ids or [], config)
     cap = float(config.credit_cap[pass_kind])
     result = PassResult(pass_kind, cap=cap, case_groups={c.id: c.group for c in selected})
     executor = executor or ReplayExecutor(base)
