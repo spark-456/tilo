@@ -1,0 +1,79 @@
+{
+  "text": "The quote summary is ready to save to your Drive. Your policy asks each time before Tilo saves files. Risk: T2; irreversible: False Approve; suggested Hold Timeout default: hold Review and answer securely in Tilo.",
+  "mrkdwn": false,
+  "parse": "none",
+  "unfurl_links": false,
+  "unfurl_media": false,
+  "blocks": [
+    {
+      "type": "section",
+      "text": {
+        "type": "plain_text",
+        "text": "The quote summary is ready to save to your Drive.",
+        "emoji": false
+      }
+    },
+    {
+      "type": "section",
+      "text": {
+        "type": "plain_text",
+        "text": "Your policy asks each time before Tilo saves files.",
+        "emoji": false
+      }
+    },
+    {
+      "type": "section",
+      "text": {
+        "type": "plain_text",
+        "text": "Risk: T2; irreversible: False",
+        "emoji": false
+      }
+    },
+    {
+      "type": "section",
+      "text": {
+        "type": "plain_text",
+        "text": "Approve; suggested",
+        "emoji": false
+      }
+    },
+    {
+      "type": "section",
+      "text": {
+        "type": "plain_text",
+        "text": "Hold",
+        "emoji": false
+      }
+    },
+    {
+      "type": "section",
+      "text": {
+        "type": "plain_text",
+        "text": "Timeout default: hold",
+        "emoji": false
+      }
+    },
+    {
+      "type": "section",
+      "text": {
+        "type": "plain_text",
+        "text": "Review and answer securely in Tilo.",
+        "emoji": false
+      }
+    },
+    {
+      "type": "actions",
+      "elements": [
+        {
+          "type": "button",
+          "text": {
+            "type": "plain_text",
+            "text": "Open card securely",
+            "emoji": false
+          },
+          "url": "EXISTING_SIGNED_LINK"
+        }
+      ]
+    }
+  ]
+}
