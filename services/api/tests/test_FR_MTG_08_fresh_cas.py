@@ -18,6 +18,7 @@ def fresh_run(c):
         principal=deps.Principal(OWNER, "owner"), switches=c.switches, budget=2,
         events=c.rig.events, drafts=c.drafts, autopilot_factory=c.factory,
         recipients=[PRIYA], clock=lambda: c.time,
+        allowance=c.allowance, allowance_cap=c.allowance_cap,
     )  # fmt: skip
 
 
@@ -132,7 +133,7 @@ def test_FR_MTG_08_owner_caller_passes_fresh_server_clock(followup):  # noqa: F8
     c.time = c.writer.now
     owner = OwnerMinutesCaller(
         c.request, deps.Principal(OWNER, "owner"), c.rig.stores, c.rig.event_store,
-        c.rig.artifacts, lambda: c.time, c.writer.redact, c.switches, c.rig.events, 2,
+        c.rig.artifacts, lambda: c.time, c.writer.redact, c.switches, c.rig.events, 2, c.allowance, c.allowance_cap,
     )  # fmt: skip
     caller = OwnerFollowupCaller(owner, c.drafts, c.factory)
 

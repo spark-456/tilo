@@ -65,7 +65,7 @@ roles:
   # Router sends 1024 (BQ-63) and the model's own thinking uses all of it, so a role that writes a document or a research
   # note states a cap that fits thinking plus the text, and thinks little.
   specialist: { primary: lite-31, fallback: flash-37, thinking: low, max_output_tokens: 8192 } # EFF-02: cheapest first
-  verifier: { primary: flash-38, fallback: flash-37, thinking: high, max_output_tokens: 16384 }
+  verifier: { primary: flash-38, fallback: flash-37, thinking: high, max_input_tokens: 100000, max_output_tokens: 16384 }
   writer: { primary: flash-38, fallback: flash-37, thinking: low, max_output_tokens: 16384 }
   narrator: { primary: lite-31, fallback: flash-37, max_output_tokens: 4096 } # fallback added for NFR-25 (BQ-18)
   autopilot: { primary: flash-37, fallback: lite-31, max_input_tokens: 16000 }

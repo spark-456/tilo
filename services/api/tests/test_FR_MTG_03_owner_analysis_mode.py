@@ -8,6 +8,7 @@ from _sec16_lib import make_caps, make_ledger
 from starlette.requests import Request
 from test_FR_MTG_03_analysis_publication import integration  # noqa: F401
 from tilo_api import deps, spend, team_access
+from tilo_api.assistant.metering import InMemorySpendLedger
 from tilo_api.people_writes import Refusal
 from tilo_metering.flags import InMemoryFlagStore
 from tilo_providers.safety import FakeSafetyProvider
@@ -21,6 +22,7 @@ def owner_call(integration, monkeypatch):  # noqa: F811
         {**stored.record, "scheduled": {"start": "2026-10-05T23:30:00.000Z", "end": "2026-10-06T00:30:00.000Z"}},
         expected_version=stored.version,
     )
+    allowance = InMemorySpendLedger()
     caps = make_caps()
     ledger = make_ledger(caps)
     flags = InMemoryFlagStore()
@@ -51,6 +53,8 @@ def run(case):
         switches=case.switches,
         budget=2,
         events=case.rig.events,
+        allowance=case.allowance,
+        allowance_cap=100,
     )
 
 
@@ -103,6 +107,8 @@ def test_FR_MTG_03_owner_mode_refuses_before_mode_or_provider(owner_call, monkey
                 switches=c.switches,
                 budget=float("nan"),
                 events=c.rig.events,
+                allowance=c.allowance,
+                allowance_cap=100,
             )
         else:
             run(c)
@@ -124,6 +130,8 @@ def test_FR_MTG_03_owner_demo_forces_replay_even_when_mode_seam_says_live(owner_
         switches=c.switches,
         budget=2,
         events=c.rig.events,
+        allowance=c.allowance,
+        allowance_cap=100,
     )
     assert c.modes == [("router", "replay"), ("safety", "replay")]
     assert c.ledger.spent_minor(OWNER) == 0
