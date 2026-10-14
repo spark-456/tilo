@@ -97,7 +97,7 @@ function Host({ onReady }: { onReady: (set: (v: boolean) => void) => void }) {
 }
 
 describe("WEB-MOTION-2 unit: the boot splash fades, then goes (README Boot: fades over .45s)", () => {
-  it("WEB-MOTION-2 unit: the splash is still on screen when the shell turns ready (it is fading) and is gone once its fade has run", () => {
+  it("WEB-MOTION-2 unit: the splash is still on screen when the shell turns ready (it is fading) and is gone once its fade has run", async () => {
     vi.useFakeTimers();
     let setReady: (v: boolean) => void = () => undefined;
     const { sch } = mountShell(
@@ -110,9 +110,9 @@ describe("WEB-MOTION-2 unit: the boot splash fades, then goes (README Boot: fade
     expect(splash(), "the splash is up while the shell is not ready").not.toBeNull();
     expect(q(document.body, '[role="status"]').textContent).toContain("Loading your city");
 
-    act(() => setReady(true));
+    await act(async () => setReady(true));
     expect(splash(), "cut at once: there is no fade").not.toBeNull();
-    act(() => {
+    await act(async () => {
       vi.advanceTimersByTime(400);
     });
     expect(splash(), "gone before the .45 s fade could have finished").not.toBeNull();
@@ -122,7 +122,7 @@ describe("WEB-MOTION-2 unit: the boot splash fades, then goes (README Boot: fade
     expect(document.body.textContent).not.toContain("Loading your city");
   });
 
-  it("FR_UX_12 WEB-MOTION-2 unit: with reduced motion the splash goes the moment the shell is ready (no fade to wait for)", () => {
+  it("FR_UX_12 WEB-MOTION-2 unit: with reduced motion the splash goes the moment the shell is ready (no fade to wait for)", async () => {
     reduceMotion();
     let setReady: (v: boolean) => void = () => undefined;
     mountShell(
@@ -133,7 +133,7 @@ describe("WEB-MOTION-2 unit: the boot splash fades, then goes (README Boot: fade
       />,
     );
     expect(splash()).not.toBeNull();
-    act(() => setReady(true));
+    await act(async () => setReady(true));
     expect(splash(), "reduced motion keeps the splash up for a fade that is turned off").toBeNull();
   });
 });
@@ -182,7 +182,7 @@ describe("WEB-MOTION-2 unit: the world loader's card fades after the last step (
 
   it("FR_UX_12 WEB-MOTION-2 unit: with the 'still' motion preference the card goes at the last step too (README: motion 'still' freezes motion)", async () => {
     const { sch } = await mountApp();
-    act(() => seen.app.setPref("motion", "still"));
+    await act(async () => seen.app.setPref("motion", "still"));
     expect(seen.app.motion).toBe("still");
     open("comp");
     tick(sch, 3);

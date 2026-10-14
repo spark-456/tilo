@@ -67,7 +67,7 @@ describe("WEB_3b_nav: structure", () => {
     expect(logo.getAttribute("href")).toBe("/");
     expect(logo.textContent).toBe("tilo");
     const ev = new MouseEvent("click", { bubbles: true, cancelable: true, button: 0 });
-    act(() => {
+    await act(async () => {
       logo.dispatchEvent(ev);
     });
     expect(ev.defaultPrevented).toBe(true);
@@ -142,7 +142,7 @@ describe("WEB_3b_nav: tabs navigate through app.go", () => {
       const { m, navigate } = await mountApp();
       const a = tabs(m.container).find((x) => label(x) === name) as HTMLAnchorElement;
       const ev = new MouseEvent("click", { bubbles: true, cancelable: true, button: 0 });
-      act(() => {
+      await act(async () => {
         a.dispatchEvent(ev);
       });
       expect(ev.defaultPrevented, name).toBe(true);
@@ -157,7 +157,7 @@ describe("WEB_3b_nav: tabs navigate through app.go", () => {
     const a = tabs(m.container)[3] as HTMLAnchorElement;
     for (const init of [{ ctrlKey: true }, { metaKey: true }, { shiftKey: true }, { button: 1 }]) {
       const ev = new MouseEvent("click", { bubbles: true, cancelable: true, ...init });
-      act(() => {
+      await act(async () => {
         a.dispatchEvent(ev);
       });
       expect(ev.defaultPrevented, JSON.stringify(init)).toBe(false);
@@ -177,11 +177,11 @@ describe("WEB_3b_nav: the Worlds badge shows what still needs you", () => {
 
   it("WEB_3b_nav_each_approval_lowers_it_and_at_zero_it_is_gone_not_0", async () => {
     const { m } = await mountApp();
-    act(() => seen.app.decide("depot"));
+    await act(async () => seen.app.decide("depot"));
     expect(worlds(m.container).textContent).toBe("Worlds1");
-    act(() => seen.app.decide("mail"));
+    await act(async () => seen.app.decide("mail"));
     expect(worlds(m.container).textContent).toBe("Worlds");
-    act(() => seen.store.getState().toast?.action?.()); // Undo the supplier brief
+    await act(async () => seen.store.getState().toast?.action?.()); // Undo the supplier brief
     expect(worlds(m.container).textContent).toBe("Worlds1");
   });
 });
@@ -237,9 +237,9 @@ describe("WEB_3b_nav: bell and avatar", () => {
 
   it("WEB_3b_nav_nothing_waiting_means_no_dot_even_if_never_opened", async () => {
     const { m } = await mountApp();
-    act(() => seen.app.decide("depot"));
+    await act(async () => seen.app.decide("depot"));
     expect(unreadDots(m.container)).toHaveLength(1);
-    act(() => seen.app.decide("mail"));
+    await act(async () => seen.app.decide("mail"));
     expect(seen.store.getState().read).toBe(false);
     expect(unreadDots(m.container)).toHaveLength(0);
   });
@@ -286,7 +286,7 @@ describe("WEB_3b_chip: Sample data (plan section 6.1)", () => {
 
   it("WEB_3b_chip_a_live_result_after_a_fixture_one_does_not_hide_it", async () => {
     const { m } = await mountApp();
-    act(() => seen.store.noteSource("live"));
+    await act(async () => seen.store.noteSource("live"));
     expect(sampleChip(m.container)).toBeDefined();
   });
 

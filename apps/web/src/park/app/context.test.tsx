@@ -36,6 +36,14 @@ function Probe() {
 
 const flush = () => act(async () => undefined);
 
+async function withinAct<T>(read: () => Promise<T>): Promise<T> {
+  let result!: T;
+  await act(async () => {
+    result = await read();
+  });
+  return result;
+}
+
 function setup(path = "/park/home", extra: Partial<Parameters<typeof ParkProvider>[0]> = {}) {
   window.history.pushState({}, "", path);
   const api = fakeApi();
@@ -99,10 +107,10 @@ describe("WEB_3a_context: useApp builds the AppCtx", () => {
     }
   });
 
-  it("WEB_3a_context_decide_updates_dec_needsLeft_and_shows_the_toast", () => {
+  it("WEB_3a_context_decide_updates_dec_needsLeft_and_shows_the_toast", async () => {
     const { api } = setup();
-    seen.store.setDecisions(decisions); // the shell does this once the Api has returned them (WEB-3b)
-    act(() => seen.app.decide("depot"));
+    act(() => seen.store.setDecisions(decisions)); // the shell does this once the Api has returned them (WEB-3b)
+    await act(async () => seen.app.decide("depot"));
     expect(seen.app.dec.depot).toBe(true);
     expect(seen.app.needsLeft).toBe(1);
     expect(api.decide).toHaveBeenCalledWith("depot");
@@ -110,67 +118,67 @@ describe("WEB_3a_context: useApp builds the AppCtx", () => {
     expect(document.querySelector('[data-testid="probe"]')?.textContent).toBe("home|1");
   });
 
-  it("WEB_3a_context_undo_through_the_toast_action_restores_needsLeft", () => {
+  it("WEB_3a_context_undo_through_the_toast_action_restores_needsLeft", async () => {
     setup();
-    act(() => seen.app.decide("depot"));
-    act(() => seen.store.getState().toast?.action?.());
+    await act(async () => seen.app.decide("depot"));
+    await act(async () => seen.store.getState().toast?.action?.());
     expect(seen.app.dec.depot).toBe(false);
     expect(seen.app.needsLeft).toBe(2);
   });
 
-  it("WEB_3a_context_go_navigates_through_the_injected_navigate", () => {
+  it("WEB_3a_context_go_navigates_through_the_injected_navigate", async () => {
     const { navigate } = setup();
-    act(() => seen.app.go("ledger"));
-    act(() => seen.app.go("world", { id: "k1" }));
+    await act(async () => seen.app.go("ledger"));
+    await act(async () => seen.app.go("world", { id: "k1" }));
     expect(navigate).toHaveBeenNthCalledWith(1, "/ledger");
     expect(navigate).toHaveBeenNthCalledWith(2, "/world/k1");
   });
 
-  it("WEB_3a_context_go_without_an_injected_navigate_pushes_the_path_and_updates_the_page", () => {
+  it("WEB_3a_context_go_without_an_injected_navigate_pushes_the_path_and_updates_the_page", async () => {
     window.history.pushState({}, "", "/park/home");
     mount(
       <ParkProvider api={fakeApi()} viewport={{ vw: 1280, vh: 720 }}>
         <Probe />
       </ParkProvider>,
     );
-    act(() => seen.app.go("agenda"));
+    await act(async () => seen.app.go("agenda"));
     expect(window.location.pathname).toBe("/agenda");
     expect(seen.app.page).toBe("agenda");
   });
 
-  it("WEB_3a_context_setPref_night_gives_time_night_and_night_true", () => {
+  it("WEB_3a_context_setPref_night_gives_time_night_and_night_true", async () => {
     setup();
-    act(() => seen.app.setPref("time", "night"));
+    await act(async () => seen.app.setPref("time", "night"));
     expect(seen.app.time).toBe("night");
     expect(seen.app.night).toBe(true);
-    act(() => seen.app.setPref("motion", "still"));
+    await act(async () => seen.app.setPref("motion", "still"));
     expect(seen.app.motion).toBe("still");
     expect(seen.app.prefs).toEqual({ time: "night", motion: "still" });
   });
 
-  it("WEB_3a_context_addWorld_returns_the_world_and_adds_it_to_added", () => {
+  it("WEB_3a_context_addWorld_returns_the_world_and_adds_it_to_added", async () => {
     setup();
     let w: ReturnType<AppCtx["addWorld"]> | undefined;
-    act(() => {
+    await act(async () => {
       w = seen.app.addWorld("quick", "Order lunch");
     });
     expect(w?.id).toBe("new1");
     expect(seen.app.added.map((x) => x.id)).toEqual(["new1"]);
   });
 
-  it("WEB_3a_context_toast_from_a_page_reaches_the_store", () => {
+  it("WEB_3a_context_toast_from_a_page_reaches_the_store", async () => {
     const { sch } = setup();
-    act(() => seen.app.toast("Saved", "Open", () => undefined));
+    await act(async () => seen.app.toast("Saved", "Open", () => undefined));
     expect(seen.store.getState().toast).toMatchObject({ message: "Saved", actionLabel: "Open" });
     expect(sch.schedule).toHaveBeenCalledWith(expect.any(Function), 4200);
   });
 
-  it("WEB_3a_context_the_app_object_is_stable_while_nothing_changes", () => {
+  it("WEB_3a_context_the_app_object_is_stable_while_nothing_changes", async () => {
     const { m, tree } = setup();
     const first = seen.app;
     m.render(tree({ vw: 1280, vh: 720 }));
     expect(seen.app).toBe(first);
-    act(() => seen.store.markRead());
+    await act(async () => seen.store.markRead());
     expect(seen.app).toBe(first); // `read` is not part of AppCtx
   });
 
@@ -181,7 +189,7 @@ describe("WEB_3a_context: useApp builds the AppCtx", () => {
     expect(seen.app.vh).toBe(844);
   });
 
-  it("WEB_3a_context_without_a_viewport_prop_the_window_size_is_used_and_follows_resize", () => {
+  it("WEB_3a_context_without_a_viewport_prop_the_window_size_is_used_and_follows_resize", async () => {
     window.history.pushState({}, "", "/park/home");
     const hd = (
       window as unknown as { happyDOM: { setViewport(v: { width: number; height: number }): void } }
@@ -194,7 +202,7 @@ describe("WEB_3a_context: useApp builds the AppCtx", () => {
     );
     expect(seen.app.vw).toBe(800);
     expect(seen.app.vh).toBe(600);
-    act(() => {
+    await act(async () => {
       hd.setViewport({ width: 1024, height: 700 });
       window.dispatchEvent(new Event("resize"));
     });
@@ -202,9 +210,9 @@ describe("WEB_3a_context: useApp builds the AppCtx", () => {
     expect(seen.app.vh).toBe(700);
   });
 
-  it("WEB_3a_context_the_page_follows_popstate", () => {
+  it("WEB_3a_context_the_page_follows_popstate", async () => {
     setup("/park/home");
-    act(() => {
+    await act(async () => {
       window.history.pushState({}, "", "/park/team?focus=share");
       window.dispatchEvent(new PopStateEvent("popstate"));
     });
@@ -221,7 +229,7 @@ describe("WEB_3a_context: useParkApi notes where every result came from", () => 
         <Probe />
       </ParkProvider>,
     );
-    const r = await seen.api.getUser();
+    const r = await withinAct(() => seen.api.getUser());
     await flush();
     expect(r.source).toBe("fixture");
     expect(seen.store.getState().sources).toEqual({ fixture: true, live: false });
@@ -244,7 +252,7 @@ describe("WEB_3a_context: useParkApi notes where every result came from", () => 
         <Probe />
       </ParkProvider>,
     );
-    await seen.api.getToday();
+    await withinAct(() => seen.api.getToday());
     await flush();
     expect(seen.store.getState().sources).toEqual({ fixture: false, live: true });
   });
@@ -253,16 +261,16 @@ describe("WEB_3a_context: useParkApi notes where every result came from", () => 
     const { api } = setup();
     for (const m of API_METHODS) expect(typeof seen.api[m]).toBe("function");
     const direct = await api.getDecisions();
-    const wrapped = await seen.api.getDecisions();
+    const wrapped = await withinAct(() => seen.api.getDecisions());
     expect(wrapped.source).toBe("fixture");
     expect(wrapped.data).toEqual(direct.data);
   });
 
   it("WEB_3a_context_arguments_reach_the_underlying_api", async () => {
     const { api } = setup();
-    await seen.api.decide("mail");
+    await withinAct(() => seen.api.decide("mail"));
     expect(api.decide).toHaveBeenCalledWith("mail");
-    await seen.api.setPref("backup", "p2");
+    await withinAct(() => seen.api.setPref("backup", "p2"));
     expect(api.setPref).toHaveBeenCalledWith("backup", "p2");
   });
 

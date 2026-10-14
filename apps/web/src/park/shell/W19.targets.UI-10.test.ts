@@ -29,8 +29,8 @@ it.each([
 ])("UI_10_W19 phone target %s in %s is at least %i px tall", (classes, ancestor, minimum) => {
   const declarations = declsFor(rules, classes.split(" "), "", ancestor ? [ancestor] : []);
   const height = Math.max(
-    Number.parseFloat(declarations.get("height") ?? "0"),
-    Number.parseFloat(declarations.get("min-height") ?? "0"),
+    Number.parseFloat(declarations.get("height") ?? "0") || 0,
+    Number.parseFloat(declarations.get("min-height") ?? "0") || 0,
   );
   expect(height).toBeGreaterThanOrEqual(minimum);
 });

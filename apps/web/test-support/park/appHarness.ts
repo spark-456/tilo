@@ -1,6 +1,7 @@
 // WEB-3a test support: fakes for the Park app skeleton (AppCtx, store, router, registry). Nothing here
 // is bundled. The Api is the fixture Api with the four calls the store makes wrapped in spies; the
 // scheduler is the injected `schedule(fn, ms)` that returns a cancel function (the pinned signature).
+import { act } from "react";
 import { vi } from "vitest";
 import { createFixtureApi } from "../../src/park/api/fixtureApi";
 import type { Api } from "../../src/park/api/index";
@@ -66,7 +67,7 @@ export function fakeScheduler() {
     fire(t: FakeTimer | undefined): void {
       if (!t || t.cancelled || t.fired) return;
       t.fired = true;
-      t.fn();
+      act(() => t.fn());
     },
   };
 }

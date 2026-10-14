@@ -33,7 +33,7 @@ it("W-LINKS-1 navigation sources no longer link to retired flow and admin addres
   // These literals are navigation destinations, not API endpoints or bookmark redirect tables.
   for (const path of [
     "../pages/Settings/SettingsPage.tsx",
-    "../pages/Team/RunAdmin.tsx",
+    "../shared/RunAdmin.tsx",
     "../../worldView/DeliveryView.tsx",
     "../../worldView/StageRail.tsx",
   ]) {
