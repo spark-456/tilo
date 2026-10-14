@@ -152,6 +152,7 @@ describe("FR_UX_10 account menu: Sign out through the auth seam", () => {
       "Profile and settings",
       "Connectors6 on",
       "Team and roles",
+      "Library",
       "Mobile appConcept",
     ]);
   });

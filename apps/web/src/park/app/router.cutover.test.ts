@@ -6,7 +6,7 @@
 // Paths that stay with the old app (/world/:id/stage, /team/console, /worlds/replays, ...) are not Park paths.
 import { describe, expect, it } from "vitest";
 import { PAGE_IDS, type PageId, type Params } from "./AppCtx";
-import { isParkPath, parkPath, parseParkPath } from "./router";
+import { isParkPath, legacyTarget, parkPath, parseParkPath } from "./router";
 
 describe("WEB_CUTOVER_router: root paths resolve to Park pages", () => {
   it("WEB_CUTOVER_01_root_paths_resolve_to_park_pages", () => {
@@ -214,7 +214,6 @@ describe("WEB_CUTOVER_router: isParkPath splits the two apps", () => {
       "/needs-you/gate",
       "/needs-you/consent",
       "/meeting",
-      "/library",
       "/library/artifacts",
       "/autonomy",
       "/channels",
@@ -233,6 +232,28 @@ describe("WEB_CUTOVER_router: isParkPath splits the two apps", () => {
       "/parks/home",
     ]) {
       expect(isParkPath(path), path).toBe(false);
+    }
+  });
+});
+
+describe("OLD_UI_OUT_3_legacy: removed old addresses are answered by the Park page that took their function", () => {
+  it.each([
+    ["/library/artifacts", "/library"],
+    ["/meeting", "/agenda"],
+    ["/meetings", "/agenda"],
+    ["/meetings/mt_q4_plan", "/agenda"],
+    ["/pinboards", "/agenda"],
+    ["/calendar", "/agenda"],
+    ["/plate", "/"],
+    ["/worlds/replays", "/worlds"],
+  ])("OLD_UI_OUT_3_legacy_%s_goes_to_%s", (from, to) => {
+    expect(legacyTarget(from)).toBe(to);
+    expect(legacyTarget(`${from}/`)).toBe(to);
+  });
+
+  it("OLD_UI_OUT_3_legacy_leaves_every_current_address_alone", () => {
+    for (const path of ["/", "/library", "/agenda", "/worlds", "/world/w1", "/more", "/autonomy"]) {
+      expect(legacyTarget(path), path).toBeNull();
     }
   });
 });

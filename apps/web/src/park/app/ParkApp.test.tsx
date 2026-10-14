@@ -106,7 +106,7 @@ describe("WEB_3a_parkapp: each route renders its page", () => {
     }
   });
 
-  it("WEB_3a_parkapp_all_nine_pages_are_reachable", async () => {
+  it("WEB_3a_parkapp_all_ten_pages_are_reachable", async () => {
     const reached: string[] = [];
     for (const id of PAGE_IDS) {
       const m = await visit(id === "world" ? "/park/world/k1" : `/park/${id}`);

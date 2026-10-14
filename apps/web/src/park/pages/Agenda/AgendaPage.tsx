@@ -15,6 +15,7 @@ import { useFirstRunPreview } from "../../sample/useFirstRunPreview";
 import "../../components/park.components.css";
 import type { AppCtx } from "../../app/AppCtx";
 import { Boards } from "./Boards";
+import { PeopleLists } from "./PeopleLists";
 import { Week } from "./Week";
 import { icon } from "./icons";
 import { BOARDS, boardLimits } from "./model";
@@ -176,6 +177,7 @@ function Plate({ A }: { A: LiveAgenda }) {
         <h2>Parked work</h2>
         {list(A.plate.parked, "No parked work.")}
       </section>
+      <PeopleLists />
       {["Boards", "Week view", "Event details", "Available times"].map((name) => (
         <section key={name} aria-label={name} className="park-agenda-state">
           <h2>{name}</h2>

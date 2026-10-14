@@ -116,7 +116,7 @@ describe("WEB_5_worlds_static: the registry gets one new line", () => {
     expect(src).toContain(
       '  worlds: lazy(() => import("../pages/Worlds/WorldsPage").then((m) => ({ default: m.WorldsPage }))),\n',
     );
-    expect(entries).toHaveLength(9);
+    expect(entries).toHaveLength(10);
     // another lane's page is its own one line in the same named-export form; the rest stay Placeholder
     const form = /^lazy\(\(\) =>/; // a long line may wrap, so only the opening is checked
     expect(

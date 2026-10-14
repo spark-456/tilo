@@ -16,6 +16,7 @@ export const PAGE_LABEL: Record<PageId, string> = {
   team: "Team",
   profile: "Profile",
   connectors: "Connectors",
+  library: "Library",
 };
 
 export type SpyApi = Api & {

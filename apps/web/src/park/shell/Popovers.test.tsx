@@ -207,13 +207,14 @@ describe("WEB_3b_acct: the account menu", () => {
     expect(text.indexOf("Alex Morgan")).toBeLessThan(text.indexOf("Profile and settings"));
   });
 
-  it("WEB_3b_acct_the_five_items_in_order_with_their_hints_and_icons", async () => {
+  it("WEB_3b_acct_the_six_items_in_order_with_their_hints_and_icons", async () => {
     await mountApp();
     openMenu();
     expect(items().map((b) => b.textContent)).toEqual([
       "Profile and settings",
       "Connectors6 on",
       "Team and roles",
+      "Library",
       "Mobile appConcept",
       "Sign out",
     ]);

@@ -34,6 +34,10 @@ const CONTENT: Record<PageId, [string, string]> = {
     "Check real connections",
     "Connections show their real state. A tour never connects a tool or grants access.",
   ],
+  library: [
+    "See what Tilo made",
+    "Finished work from your projects is listed here as it is delivered. A tour changes nothing.",
+  ],
   profile: [
     "Review your settings",
     "Your profile shows your real account and preferences. A tour changes nothing.",

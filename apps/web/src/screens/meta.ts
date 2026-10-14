@@ -73,7 +73,6 @@ export const SCREENS: readonly ScreenMeta[] = [
       /^\/needs-you\/consent\/?$/,
     ),
   ),
-  built(must("S-09", "Meeting", "P2", "/meeting", /^\/meeting\/?$/)),
   built(must("S-10", "Story lens", "P3", `${W}/story`, /^\/world\/([^/]+)\/story\/?$/)),
   built(must("S-11", "Trace lens", "P3, P7", `${W}/trace`, /^\/world\/([^/]+)\/trace\/?$/)),
   built(
@@ -85,32 +84,16 @@ export const SCREENS: readonly ScreenMeta[] = [
       /^\/world\/([^/]+)\/delivery\/?$/,
     ),
   ),
-  built(must("S-13", "Library and Memory Vault", "P7", "/library", /^\/library\/?$/)),
-  built(must("S-14", "Worlds list and replays", "P3", "/worlds/replays", /^\/worlds\/replays\/?$/)),
   built(must("S-15", "Autonomy", "P4", "/autonomy", /^\/autonomy\/?$/)),
   built(must("S-16", "Channels", "P5", "/channels", /^\/channels\/?$/)),
   built(must("S-17", "Email Autopilot home", "P5", "/mail", /^\/mail\/?$/)),
   built(must("S-18", "Team Lead console", "P4", "/team/console", /^\/team\/console\/?$/)),
   built(must("S-19", "Connections", "P6", "/connections", /^\/connections\/?$/)),
   later("S-20", "Skills library", "P2"),
-  built(
-    must(
-      "S-21",
-      "Artifact history and restore",
-      "P7",
-      "/library/artifacts",
-      /^\/library\/artifacts\/?$/,
-    ),
-  ),
   built(must("S-22", "Settings", "P7", "/settings", /^\/settings\/?$/)),
   built(must("S-23", "How we estimate; status page", "P8", "/estimate", /^\/estimate\/?$/)),
   built(must("S-24", "Pilot diary and survey", "P8", "/pilot", /^\/pilot\/?$/)),
   later("S-25", "Stage mode overlay", "P3"),
-  // The people screens (docs/prd-addendum-people-agents.md, FR-PA-03): reached from More, on fixtures.
-  built(must("S-26", "Meetings", "P3", "/meetings", /^\/meetings(?:\/([^/]+))?\/?$/)),
-  built(must("S-27", "My plate", "P3", "/plate", /^\/plate\/?$/)),
-  built(must("S-28", "Pinboards", "P3", "/pinboards", /^\/pinboards\/?$/)),
-  built(must("S-29", "Calendar", "P3", "/calendar", /^\/calendar\/?$/)),
 ];
 
 export const screenMeta = (id: string): ScreenMeta | undefined => SCREENS.find((s) => s.id === id);

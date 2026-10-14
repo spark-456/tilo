@@ -16,7 +16,6 @@ const FILES = [
   "screens/s03/Approaches.tsx",
   "screens/S_05.tsx",
   "screens/S_12.tsx",
-  "screens/S_14.tsx", // the replays list: its "World" pill
   "park/pages/World/WorldPage.tsx",
 ] as const;
 

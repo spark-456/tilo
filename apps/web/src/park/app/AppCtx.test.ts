@@ -7,7 +7,7 @@ import { type AppCtx, type Motion, PAGE_IDS, type PageId, type Params } from "./
 import type { ParkState } from "./store";
 
 describe("WEB_3a_appctx: the page list", () => {
-  it("WEB_3a_appctx_PAGE_IDS_are_the_nine_pages_in_the_design_order", () => {
+  it("WEB_3a_appctx_PAGE_IDS_are_the_ten_pages_in_the_design_order", () => {
     expect([...PAGE_IDS]).toEqual([
       "home",
       "worlds",
@@ -18,6 +18,7 @@ describe("WEB_3a_appctx: the page list", () => {
       "team",
       "profile",
       "connectors",
+      "library",
     ]);
   });
 
@@ -38,6 +39,7 @@ describe("WEB_3a_appctx: the contract is typed exactly as the README says", () =
       | "team"
       | "profile"
       | "connectors"
+      | "library"
     >();
     expectTypeOf<(typeof PAGE_IDS)[number]>().toEqualTypeOf<PageId>();
     expectTypeOf<Params>().toEqualTypeOf<Record<string, string>>();
