@@ -5,7 +5,7 @@ import { type ComponentType, type ElementType, lazy } from "react";
 import { CardsGallery } from "../needs-you/CardsGallery";
 import { matchFlowRoute } from "../router";
 import { NotFound } from "./NotFound";
-import { More, ScreensIndex } from "./ScreensIndex";
+import { ScreensIndex } from "./ScreensIndex";
 import { inARun } from "./inARun";
 import { SCREENS } from "./meta";
 
@@ -25,9 +25,6 @@ const S_08 = screen(() => import("./S_08"), "S_08");
 const S_10 = screen(() => import("./S_10"), "S_10");
 const S_11 = screen(() => import("./S_11"), "S_11");
 const S_12 = screen(() => import("./S_12"), "S_12");
-const S_17 = screen(() => import("./S_17"), "S_17");
-const S_18 = screen(() => import("./S_18"), "S_18");
-const S_19 = screen(() => import("./S_19"), "S_19");
 // The dev build's component gallery (WEB-2): its chunk is never reached from the landing bundle.
 const DevComponents = screen(() => import("../park/dev/Components"), "Components");
 
@@ -36,10 +33,6 @@ const DevComponents = screen(() => import("../park/dev/Components"), "Components
 const NeedsYou = inARun(S_06, { testid: "needs-you", title: "Needs you" });
 const GateSheet = inARun(S_07, { testid: "gate-sheet-page", title: "Approval gate" });
 const Consent = inARun(S_08, { testid: "consent-sheet-page", title: "Connection consent" });
-const Mail = inARun(S_17, { testid: "mail", title: "Email Autopilot" });
-const Team = inARun(S_18, { testid: "team", title: "Team Lead console" });
-const Connections = inARun(S_19, { testid: "connections", title: "Connections" });
-
 // biome-ignore format: one line per screen keeps group edits to a single line.
 const COMPONENTS: Readonly<Record<string, ElementType<ScreenProps>>> = {
   "S-05": S_05, "S-06": NeedsYou, "S-07": GateSheet, "S-08": Consent, "S-10": S_10,
@@ -62,7 +55,6 @@ const decode = (s: string | undefined): string => {
 
 /** /more is the production menu; /screens is the dev-only index (PRD 18.3, AGW-08). */
 const EXTRA: ReadonlyArray<{ id: string; re: RegExp; Component: ElementType<ScreenProps> }> = [
-  { id: "more", re: /^\/more\/?$/, Component: More },
   ...(import.meta.env.DEV
     ? [
         { id: "screens", re: /^\/screens\/?$/, Component: ScreensIndex },

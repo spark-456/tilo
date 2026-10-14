@@ -11,9 +11,9 @@ import { ClientProvider } from "../api/ClientProvider";
 import type { TiloClient } from "../api/client";
 import { FixtureClient } from "../api/fixtureClient";
 import { EVENTS_VILLAGE_BASIC } from "../api/fixtures/events";
-import { S_17 } from "./S_17";
-import { S_18 } from "./S_18";
-import { S_19 } from "./S_19";
+import { MailSection as S_17 } from "../park/pages/Team/RunAdmin";
+import { ConsoleSection as S_18 } from "../park/pages/Team/RunAdmin";
+import { ConnectionsSection as S_19 } from "../park/pages/Team/RunAdmin";
 import type { ScreenProps } from "./routes";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;

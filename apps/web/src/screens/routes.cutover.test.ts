@@ -3,7 +3,7 @@
 // other kept screen stays on its own address. Bare /team and /worlds belong to Park, not to matchScreen.
 import { describe, expect, it } from "vitest";
 import { FIXTURE_WORLD_ID } from "../api/fixtures/derived";
-import { parseParkPath } from "../park/app/router";
+import { parseParkPath, isParkPath } from "../park/app/router";
 import { matchFlowRoute } from "../router";
 import { screenMeta } from "./meta";
 import { matchScreen } from "./routes";
@@ -30,10 +30,13 @@ describe("WEB_CUTOVER_screens: moved screens", () => {
     expect(s18?.test("/team")).toBe(false);
   });
 
-  it("WEB_CUTOVER_04_matchScreen_finds_S_18_at_its_new_address_and_replays_is_Park_s", () => {
-    expect(matchScreen("/team/console")?.id).toBe("S-18");
-    expect(matchScreen("/team/console/")?.id).toBe("S-18");
-    expect(matchScreen("/worlds/replays")).toBeNull(); // OLD-UI-OUT 3: a redirect to the Park Worlds page
+  it("WEB_CUTOVER_04_matchScreen_finds_S_18_and_S_14_at_their_new_addresses", () => {
+    expect(isParkPath("/team/console")).toBe(true);
+    expect(matchScreen("/team/console")).toBeNull();
+    expect(isParkPath("/team/console/")).toBe(true);
+    expect(matchScreen("/team/console/")).toBeNull();
+    expect(matchScreen("/worlds/replays")).toBeNull();
+    expect(matchScreen("/worlds/replays/")).toBeNull();
   });
 
   it("WEB_CUTOVER_04_bare_team_and_worlds_are_not_matched_by_matchScreen", () => {
@@ -90,9 +93,6 @@ describe("WEB_CUTOVER_screens: kept screens stay reachable on their own paths", 
       "S-12",
       "S-15",
       "S-16",
-      "S-17",
-      "S-18",
-      "S-19",
       "S-22",
       "S-23",
       "S-24",
