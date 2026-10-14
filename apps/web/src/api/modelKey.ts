@@ -31,6 +31,8 @@ export interface ModelKeyView {
   rotatedAt: string | null;
   dayCapCredits: number | null;
   consentVersion: number | null;
+  /** The API's fixed word for why a stored key is not in use (`not_configured`: its bundle left config). */
+  lastError: string | null;
 }
 export type ModelKeyResult =
   | { ok: true; view: ModelKeyView }
@@ -81,6 +83,7 @@ function viewOf(body: unknown): ModelKeyView | null {
     rotatedAt: str(b.rotated_at),
     dayCapCredits: int(b.day_cap_credits),
     consentVersion: int(b.consent_version),
+    lastError: str(b.last_error),
   };
 }
 
