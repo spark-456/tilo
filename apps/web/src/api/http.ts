@@ -80,25 +80,6 @@ export const INTAKE_TIMEOUT_MS = 120_000;
 const TOOK_TOO_LONG =
   "Tilo is taking too long to answer. Nothing is shown as started; check your worlds before you try again.";
 
-/** Sentences of ours for the intake's 503s (nothing was stored). The server's wording only selects one. */
-function intakeUnavailable(text: string): string | null {
-  let said = "";
-  try {
-    const d = (JSON.parse(text) as { detail?: unknown } | null)?.detail;
-    said = typeof d === "string" ? d : "";
-  } catch {
-    return null;
-  }
-  if (/safety screen/i.test(said))
-    return "Tilo could not run its safety check just now, so nothing was started. Try again in a moment.";
-  if (/screening is unavailable/i.test(said))
-    return "Tilo could not screen this task just now, so nothing was started. Try again in a moment.";
-  if (/upload storage|could not be screened/i.test(said))
-    return "Tilo could not take the attached files just now, so nothing was started. Try again in a moment.";
-  if (said === "not_configured")
-    return "Starting tasks is not set up on this deployment yet, so nothing was started.";
-  return null;
-}
 const INTAKE_COMMITTED =
   "This task was already submitted. Check your worlds before starting another task.";
 
@@ -439,10 +420,6 @@ export class HttpClient implements TiloClient, SchedulesApi, FieldsApi, ItemApi 
       }
       if (isReplayOnly(res.status, body)) {
         throw new TiloApiError(REPLAY_ONLY, 503, false, write, codeOf(body), true);
-      }
-      if (path === "/intake" && res.status === 503) {
-        const words = intakeUnavailable(body);
-        if (words) throw new TiloApiError(words, 503, true, write, codeOf(body));
       }
       const refusal = refusalOf(body);
       if (res.status >= 500) {

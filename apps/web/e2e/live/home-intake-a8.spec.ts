@@ -103,13 +103,13 @@ const REFUSALS: Array<{ name: string; reply: Reply; says: RegExp; not?: RegExp }
       status: 503,
       body: { detail: "The safety screen is unavailable; nothing was stored." },
     },
-    says: /safety check/i,
+    says: /safety screen is unavailable/i,
   },
   {
     name: "503_not_configured",
     reply: { status: 503, body: { detail: "not_configured" } },
-    says: /not set up|not connected/i,
-    not: /not_configured/,
+    says: /not configured on this server/i,
+    not: /not_configured\s*$/,
   },
   {
     name: "429_demo_runs_busy",

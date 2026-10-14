@@ -1,6 +1,6 @@
 // A8 / NFR-22 (14 Oct): what a person reads when POST /intake is refused or does not answer. The server's wire
-// shapes are services/api/src/tilo_api/intake.py (503 {detail} per cause, 429 demo_runs_busy, 409 committed).
-// Codes are never shown as they are; a 503 that stored nothing gets a sentence of ours; a reply that never comes
+// shapes are services/api/src/tilo_api/intake.py (429 demo_runs_busy, 409 committed). The 503 causes have their
+// fixed copy in http.NFR-22.test.ts (W1). Codes are never shown as they are; a reply that never comes
 // ends after INTAKE_TIMEOUT_MS with a plain message that keeps the idempotency key (a retry is the same intent).
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { HttpClient, INTAKE_TIMEOUT_MS, type TiloApiError } from "./http";
@@ -30,32 +30,6 @@ async function failure(call: Promise<unknown>): Promise<TiloApiError> {
 const send = (c: HttpClient) => c.submitIntake("Compare three suppliers", []);
 
 describe("A8_intake_errors: sentences, not codes", () => {
-  it.each([
-    [
-      "the safety screen",
-      { detail: "The safety screen is unavailable; nothing was stored." },
-      /safety check/i,
-    ],
-    [
-      "task screening",
-      { detail: "Task screening is unavailable; nothing was stored." },
-      /screen this task/i,
-    ],
-    ["upload storage", { detail: "Upload storage is unavailable; retry." }, /attached files/i],
-    ["not_configured", { detail: "not_configured" }, /not set up/i],
-  ])("A8_intake_503_%s becomes one retryable sentence of ours", async (_n, body, says) => {
-    const e = await failure(send(answering(503, body)));
-    expect(e.status).toBe(503);
-    expect(e.retryable).toBe(true);
-    expect(e.message).toMatch(says);
-    expect(e.message).not.toContain("nothing was stored");
-  });
-
-  it("A8_intake_503_with_an_unknown_detail_keeps_the_generic_server_trouble_sentence", async () => {
-    const e = await failure(send(answering(503, { detail: "store_unavailable" })));
-    expect(e.message).toBe("Tilo had a problem on its side.");
-  });
-
   it.each([
     [429, { detail: "demo_runs_busy" }, /busy/i],
     [402, { detail: "cap_reached" }, /limit/i],
