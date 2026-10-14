@@ -71,7 +71,12 @@ def test_RERUN_2_a_second_instance_dedupes_through_the_durable_store():
         ),
         part(2, type="world.started", target=W1, data={"budget_cap": 40}),
         granted_part(3, W1, 40),
-        part(4, type="world.failed", target=W1, data={"reason": "the service restarted", "unit": None}),
+        part(
+            4,
+            type="world.failed",
+            target=W1,
+            data={"reason": "Tilo restarted during this run; start it again", "unit": None},
+        ),
     ]
     first_store, _ = rig.process()
     seed(first_store, worlds={W1: world()}, tasks={T1: task(granted=True)}, parts={W1: stream})
