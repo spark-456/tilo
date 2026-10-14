@@ -19,7 +19,8 @@ from tilo_people.stores import PeopleStores
 
 from tilo_api import deps
 from tilo_api.meeting_analysis_mode import analyze_owner_minutes
-from tilo_api.people_writes import Refusal, Writer
+from tilo_api.meeting_minutes import MinutesWriter
+from tilo_api.people_writes import Refusal
 
 
 def get_owner_minutes_budget() -> float:
@@ -44,7 +45,9 @@ class OwnerMinutesCaller:
         """Invoke only for an explicit owner instruction; reads/attendance/confirm never call this."""
         if re.fullmatch(r"mt_[0-9A-Za-z_]{1,48}", meeting_id) is None:
             raise Refusal(404, "not_found")
-        writer = Writer(self.stores, deps.ORG_ID, self.principal.user_id, self.clock(), self.redact)
+        writer = MinutesWriter(
+            self.stores, deps.ORG_ID, self.principal.user_id, self.clock(), self.redact, clock=self.clock
+        )
         return analyze_owner_minutes(
             self.request,
             writer,
