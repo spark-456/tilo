@@ -19,8 +19,8 @@ from tilo_api import deps as _deps
 from tilo_api import dev as _dev
 from tilo_api import durable_store as _durable_store
 from tilo_api import meeting_host_routes as _meeting_host_routes
-from tilo_api import meeting_voice_meter as _meeting_voice_meter
 from tilo_api import meeting_minutes_flag as _meeting_minutes_flag
+from tilo_api import meeting_voice_meter as _meeting_voice_meter
 from tilo_api import nudge_sweep as _nudge_sweep
 from tilo_api import owner_minutes_routes as _owner_minutes_routes
 from tilo_api import people as _people
