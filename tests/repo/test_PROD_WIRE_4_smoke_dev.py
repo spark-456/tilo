@@ -61,7 +61,7 @@ ALLOWED = (WEB_APP, FIREBASE_APP)
 PUBLIC_PATHS = {"/health", "/healthz", "/access", "/access/declaration", "/internal/schedules/tick"}
 TOKEN_ENV = "TILO_SMOKE_ID_TOKEN"
 
-UNSIGNED = ["health", "cors-allowed", "cors-denied", "gate-closed"]
+UNSIGNED = ["health", "dependencies", "cors-allowed", "cors-denied", "gate-closed"]
 SIGNED = ["intake", "answers", "approaches", "approve", "gate-card", "answer-card", "delivery"]
 ORDER = UNSIGNED + SIGNED
 SKIP_LINE = "SKIP signed-in steps: set TILO_SMOKE_ID_TOKEN"
@@ -89,6 +89,8 @@ def label(request: httpx.Request) -> str:
     method, path = request.method, request.url.path
     if method == "GET" and path == "/health":
         return "health"
+    if method == "GET" and path == "/health/deps":
+        return "dependencies"
     if method == "OPTIONS":
         return "cors-allowed" if request.headers.get("origin") in ALLOWED else "cors-denied"
     if "authorization" not in request.headers:
@@ -136,6 +138,21 @@ class Edge:
         method, path, origin = request.method, request.url.path, request.headers.get("origin")
         if method == "GET" and path == "/health":
             return json_response(200, {"status": "ok"})
+        if method == "GET" and path == "/health/deps":
+            return json_response(
+                200,
+                {
+                    "api_store": "firestore",
+                    "artifacts_store": "gcs",
+                    "archive_store": "gcs",
+                    "skills_store": "firestore",
+                    "firestore_project_configured": True,
+                    "artifacts_bucket_configured": True,
+                    "archive_bucket_configured": True,
+                    "connectors_url_configured": False,
+                    "live_mode": False,
+                },
+            )
         if method == "OPTIONS":
             if origin in ALLOWED:
                 return httpx.Response(
@@ -251,14 +268,14 @@ def test_PROD_WIRE_4_smoke_probes_cors_with_real_origins_against_a_gated_route(c
 
     run(capsys, edge)
 
-    allowed, denied = edge.requests[1], edge.requests[2]
+    allowed, denied = edge.requests[2], edge.requests[3]
     assert allowed.method == denied.method == "OPTIONS"
     assert allowed.headers["origin"] == WEB_APP
     assert denied.headers["origin"] not in ALLOWED and denied.headers["origin"].startswith("https://")
     for preflight in (allowed, denied):
         assert preflight.headers.get("access-control-request-method"), "a preflight names the method it asks for"
         assert preflight.url.path not in PUBLIC_PATHS, "the preflight goes to a gated route, not a public one"
-    closed = edge.requests[3]
+    closed = edge.requests[4]
     assert closed.url.path not in PUBLIC_PATHS and closed.method != "OPTIONS", "the fail-closed probe is a gated route"
 
 
@@ -981,3 +998,22 @@ def test_PROD_WIRE_4_no_workflow_or_cloud_build_config_runs_smoke_dev_and_the_ga
     for recipe in ("check-fast", "test", "check"):
         body = text[re.search(rf"^{recipe}:", text, re.M).start() :].split("\n\n")[0]
         assert "smoke-dev" not in body and "smoke_dev" not in body
+
+
+@pytest.mark.parametrize("body", [{}, [], {"api_store": "private-project"}, {"detail": "secret-canary"}])
+def test_X_HEALTH_1_smoke_refuses_malformed_inventory_without_printing_it(capsys, body):
+    edge = Edge(override=only("dependencies", lambda r: json_response(200, body)))
+    code, out, err = run(capsys, edge)
+    assert code == 1
+    assert fail_reason(out, "dependencies") == "invalid dependency configuration"
+    assert "secret-canary" not in out + err
+    only_requests_up_to(edge, "dependencies")
+
+
+def test_X_HEALTH_1_smoke_dependency_failure_stops_before_signed_requests(capsys):
+    edge = Edge(override=only("dependencies", lambda r: json_response(503, {"detail": "secret-canary"})))
+    code, out, err = run(capsys, edge)
+    assert code == 1
+    assert fail_reason(out, "dependencies") == "dependency configuration unavailable"
+    assert "secret-canary" not in out + err
+    only_requests_up_to(edge, "dependencies")

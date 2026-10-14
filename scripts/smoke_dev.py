@@ -147,6 +147,36 @@ class Smoke:
     def health(self) -> None:
         self.expect(self.call("GET", "/health"), 200)
 
+    def dependencies(self) -> None:
+        # Cloud Run reserves /healthz; the alias exposes the same inventory.
+        response = self.call("GET", "/health/deps")
+        if response.status_code != 200:
+            raise Failed("dependency configuration unavailable")
+        try:
+            data = response.json()
+        except ValueError:
+            raise Failed("invalid dependency configuration") from None
+        kinds = {
+            "api_store": {"firestore", "memory", "unconfigured", "invalid"},
+            "artifacts_store": {"gcs", "unconfigured", "invalid"},
+            "archive_store": {"gcs", "unconfigured", "invalid"},
+            "skills_store": {"firestore", "memory", "unconfigured", "invalid"},
+        }
+        flags = {
+            "firestore_project_configured",
+            "artifacts_bucket_configured",
+            "archive_bucket_configured",
+            "connectors_url_configured",
+            "live_mode",
+        }
+        if (
+            not isinstance(data, dict)
+            or set(data) != set(kinds) | flags
+            or any(not isinstance(data[key], str) or data[key] not in values for key, values in kinds.items())
+            or any(type(data[key]) is not bool for key in flags)
+        ):
+            raise Failed("invalid dependency configuration")
+
     def preflight(self, origin: str) -> httpx.Response:
         asked = {
             "Origin": origin,
@@ -278,6 +308,7 @@ def main(
         smoke = Smoke(url, client, token, sleep)
         for step, action in (
             ("health", smoke.health),
+            ("dependencies", smoke.dependencies),
             ("cors-allowed", smoke.cors_allowed),
             ("cors-denied", smoke.cors_denied),
             ("gate-closed", smoke.gate_closed),
