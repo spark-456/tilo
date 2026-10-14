@@ -169,7 +169,8 @@ describe("FR_MTG_03_08 Park minutes owner flow", () => {
       appCheckToken: async () => "app-check",
     });
     expect(await http.hasPostRoute("/v1/meetings/mt_probe/analyze-minutes")).toBe(true);
-    const init = fetcher.mock.calls[0][1];
+    const init = fetcher.mock.calls[0]?.[1];
+    if (!init) throw new Error("Missing discovery request");
     expect(init.method).toBe("OPTIONS");
     expect(new Headers(init.headers).get("authorization")).toBe("Bearer owner-token");
     expect(new Headers(init.headers).get("X-Firebase-AppCheck")).toBe("app-check");
