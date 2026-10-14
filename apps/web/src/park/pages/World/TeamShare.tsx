@@ -13,6 +13,7 @@ import {
   readShares,
   setShare,
 } from "../../api/live/teamShares";
+import { ORGANISATION_SETUP } from "../../api/organisationSetup";
 import { useParkApi } from "../../app/context";
 import { focusablesIn, handleSlackDialogKeyDown } from "../../app/slackShare";
 import { Button } from "../../components";
@@ -109,8 +110,13 @@ function ShareDialog({
   const [busy, setBusy] = useState<string | null>(null);
   const [failure, setFailure] = useState("");
   const [view, reload] = useRead(async () => {
-    const [shares, team] = await Promise.all([readShares(client, worldId), api.getTeam()]);
-    return { shares, teams: team.data.people.find((p) => p.you)?.memberships ?? null };
+    const team = await api.getTeam();
+    const shares = team.data.setupRequired ? [] : await readShares(client, worldId);
+    return {
+      shares,
+      setupRequired: team.data.setupRequired,
+      teams: team.data.people.find((p) => p.you)?.memberships ?? null,
+    };
   }, [client, worldId, api]);
   useEffect(() => {
     focusablesIn(ref.current)[0]?.focus();
@@ -166,7 +172,10 @@ function ShareDialog({
             )}
           </>
         ) : null}
-        {view.status === "ready" ? (
+        {view.status === "ready" && view.value.setupRequired ? (
+          <output>{ORGANISATION_SETUP}</output>
+        ) : null}
+        {view.status === "ready" && !view.value.setupRequired ? (
           <>
             {view.value.teams === null ? (
               <p role="alert">Tilo could not read which teams you belong to.</p>

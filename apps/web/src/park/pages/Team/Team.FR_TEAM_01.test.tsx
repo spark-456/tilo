@@ -50,3 +50,11 @@ describe("FR_TEAM_01 live Team", () => {
     expect(root.querySelector('[data-testid="live-team"]')).toBeNull();
   });
 });
+
+it("LIVE-PEOPLE FR-TEAM-01 absent person shows organisation setup without member controls", async () => {
+  const { root } = await renderTeam(makeApp(), apiFor([], 404));
+  expect(root.textContent).toContain("Set up your organisation");
+  expect(root.textContent).not.toContain("Team data is unavailable");
+  expect(root.textContent).not.toContain("0 people");
+  expect(root.querySelector('input[aria-label="Invite by email"]')).toBeNull();
+});

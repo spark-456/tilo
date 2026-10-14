@@ -1,5 +1,6 @@
 import { type ReactNode, useCallback, useEffect, useState } from "react";
 import type { Api } from "../api";
+import { ORGANISATION_SETUP } from "../api/organisationSetup";
 import type { AgendaData, ApiResult, WorldState } from "../api/types";
 import { useApp, useParkApi } from "../app/context";
 import { useParkRoute } from "../app/router";
@@ -73,6 +74,7 @@ function Rows<T>({
 }
 export function agendaRows(a: AgendaData, future: boolean): string[] {
   if ("plate" in a) {
+    if (a.setupRequired) return [ORGANISATION_SETUP];
     const today = a.plate.today;
     if (today === null) return [];
     return [...a.plate.rows, ...(future ? a.plate.parked : [])]
@@ -188,7 +190,11 @@ export function ContextPanel({ onClose }: { onClose: () => void }) {
         <Rows
           label="Team"
           result={data.getTeam}
-          rows={(t) => t.people.map((p) => [p.name, p.role].filter(Boolean).join(" · "))}
+          rows={(t) =>
+            t.setupRequired
+              ? [ORGANISATION_SETUP]
+              : t.people.map((p) => [p.name, p.role].filter(Boolean).join(" · "))
+          }
         />
         <Rows
           label="Connected tools"

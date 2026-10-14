@@ -430,6 +430,7 @@ export interface AgendaPlateRow {
 }
 /** The plate supplies summaries, not a week, event duration, attendees or board ownership. */
 export type LiveAgenda = { [K in keyof Required<Agenda>]: null } & {
+  setupRequired?: boolean;
   plate: {
     today: string | null;
     asOf: string | null;
@@ -442,6 +443,7 @@ export type AgendaData = Agenda | LiveAgenda;
 
 // Team, connectors, notifications
 export interface Team {
+  setupRequired?: boolean;
   people: {
     id: string;
     name: string;
