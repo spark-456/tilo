@@ -78,6 +78,16 @@ def test_M1_RENDER_1_pdf_content_type_and_magic_are_checked():
     assert client(server, []).render(SPEC, "pdf") == b"%PDF-offline"
 
 
+def test_FR_MTG_03_docx_rpc_uses_its_mime_and_authenticated_payload():
+    server, audiences = FakeServer(), []
+    server.reply = RenderReply(
+        200, "application/vnd.openxmlformats-officedocument.wordprocessingml.document", b"PK\x03\x04offline"
+    )
+    assert client(server, audiences).render(SPEC, "docx") == server.reply.content
+    assert audiences == ["https://render.example"]
+    assert server.seen[0][1]["format"] == "docx"
+
+
 @pytest.mark.parametrize(
     "url",
     [
