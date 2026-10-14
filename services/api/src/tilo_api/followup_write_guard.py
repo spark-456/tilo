@@ -8,9 +8,7 @@ from fastapi import HTTPException
 from google.api_core.exceptions import AlreadyExists, FailedPrecondition, NotFound
 
 
-def guarded_write(
-    client: Any, document: Any, row: dict, write: Callable[[dict], Any], check: Callable[[], None]
-) -> Any:
+def guarded_write(client: Any, document: Any, row: dict, write: Callable[[dict], Any], check: Callable[[], Any]) -> Any:
     row = {**row, "publication_nonce": uuid4().hex}
     error = None
     try:

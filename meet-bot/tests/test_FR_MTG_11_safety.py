@@ -244,6 +244,7 @@ def test_FR_MTG_11_a_fake_profile_in_a_file_with_an_innocent_name_is_still_refus
 
 def test_FR_MTG_11_a_fake_speech_vendor_is_refused_even_when_the_models_are_real(tmp_path, monkeypatch):
     monkeypatch.setenv("LIVE", "1")
+    monkeypatch.setenv("GOOGLE_LOCATION", "global")  # match the shipped Gemini price quote; no provider call
     speech = tmp_path / "speech-x.yaml"
     speech.write_text((P.repo_root() / "config" / "speech.dev.yaml").read_text(encoding="utf-8"), encoding="utf-8")
     monkeypatch.setenv("TILO_SPEECH_FILE", str(speech))
@@ -253,7 +254,15 @@ def test_FR_MTG_11_a_fake_speech_vendor_is_refused_even_when_the_models_are_real
 
 def test_FR_MTG_11_the_shipped_live_config_resolves_to_no_fakes(monkeypatch):
     monkeypatch.setenv("LIVE", "1")
+    monkeypatch.setenv("GOOGLE_LOCATION", "global")
     assert P.resolved_fakes_refusal() is None
+
+
+def test_FR_MTG_11_live_model_region_mismatch_stays_fail_closed(monkeypatch):
+    monkeypatch.setenv("LIVE", "1")
+    monkeypatch.setenv("GOOGLE_LOCATION", "asia-southeast1")
+    refusal = P.resolved_fakes_refusal()
+    assert refusal and "PL-06" in refusal and "GOOGLE_LOCATION=global" in refusal
 
 
 def test_FR_MTG_11_the_dev_file_name_check_ignores_case(monkeypatch):
