@@ -20,6 +20,9 @@ Built for the Google Cloud AI Builder Cup 2026. The full specification is `docs/
 
 ### Judges: try a task from Home
 
+See the [three-minute judges' walkthrough](docs/demo.md) for the post-GATE-OLDUI
+flow, the recorded evidence at each step, and the conditional publication status.
+
 1. Sign in with **Continue with Google**, then open **Home** (`/`).
 2. Type a task, such as “Draft a one-page plan for a community garden”, into the Home composer and submit it.
 3. Review the single confirmation card, including its scope and estimated cost.
