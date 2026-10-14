@@ -126,6 +126,11 @@ describe("FR_WLD_12 stage mode (1920x1080 layout, presenter hotkeys, reset with 
     expect(normal.querySelector('[data-testid="right-rail"]')).not.toBeNull();
     expect(normal.querySelector('[data-testid="fixture-replay-banner"]')).not.toBeNull();
     expect(normal.querySelector('[data-testid="stage-presenter"]')).not.toBeNull();
+    expect(normal.querySelector('[data-testid="stage-source-label"]')?.textContent).toBe(
+      "Recorded replay",
+    );
+    expect(normal.querySelector('[data-testid="trace-list"]')).toBeNull();
+    expect(normal.querySelector('[data-testid="stage-rail-details"]')).toBeNull();
   });
 
   it("FR_WLD_12_presenter_hotkeys_are_documented_in_claude_md_and_control_stage_mode_density_and_replay", async () => {
