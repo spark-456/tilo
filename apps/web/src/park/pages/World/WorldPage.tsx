@@ -677,7 +677,20 @@ export function WorldPage({ app }: { app: AppCtx }) {
       ) : null}
       {part(3) ? (
         <div className="park-world-lower">
-          {trackRun ? <RunProgressCard events={runEvents} /> : null}
+          {trackRun ? (
+            <RunProgressCard
+              events={runEvents}
+              {...(worldClient && loaded.live && !w.sample
+                ? {
+                    again: {
+                      start: () =>
+                        worldClient.startAgain(w.id).then((r) => ({ worldId: r.world_id })),
+                      open: (id: string) => app.go("world", { id }),
+                    },
+                  }
+                : {})}
+            />
+          ) : null}
           {isCity ? <Districts districts={w.districts ?? []} /> : null}
           {isTown ? (
             <RunHistory

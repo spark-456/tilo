@@ -25,6 +25,15 @@ const STEPS_SHOWN = 6;
 // The recorded time of day (UTC) straight from the ISO timestamp: no clock is read.
 const clock = (ts: string): string => /^\d{4}-\d\d-\d\dT(\d\d:\d\d)/.exec(ts)?.[1] ?? "";
 
+/** X-ORPHAN-1: the world's last word is the `world.failed` a restart wrote ("start it again"); no other stop is. */
+export const RESTART_REASON = "Tilo restarted during this run; start it again";
+export function isRestartStop(events: readonly RunEvent[]): boolean {
+  const last = [...events].reverse().find((e) => e.type.startsWith("world."));
+  if (last?.type !== "world.failed") return false;
+  const data = last.data as { reason?: unknown } | null | undefined;
+  return data?.reason === RESTART_REASON;
+}
+
 export function runProgress(all: readonly RunEvent[]): RunProgress {
   const events = all;
   let status = "Getting ready";

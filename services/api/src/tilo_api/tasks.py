@@ -12,6 +12,8 @@ from __future__ import annotations
 
 import copy
 import dataclasses
+import hashlib
+import json
 import logging
 from collections.abc import Awaitable, Callable, Iterator, Sequence
 from datetime import UTC, date, datetime
@@ -462,3 +464,68 @@ def approve(
         )  # fmt: skip
     _start(store, task, approach=approach, budget_cap=cap, seams=seams)
     return {"world_id": task.world_id}
+
+
+_CROCKFORD = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
+
+
+def _again_ids(world_id: str) -> tuple[str, str, str]:
+    """The ids of a world's "Start it again" run: derived from the old world, so pressing twice is one new world."""
+    found = []
+    for prefix in ("t", "w", "r"):
+        raw = json.dumps(["/worlds/rerun", world_id, prefix], separators=(",", ":")).encode()
+        number = int.from_bytes(hashlib.sha256(raw).digest()[:16], "big")
+        found.append(prefix + "_" + "".join(_CROCKFORD[(number >> (5 * i)) & 31] for i in range(25, -1, -1)))
+    return found[0], found[1], found[2]
+
+
+@router.post("/worlds/{world_id}/rerun")
+def rerun(
+    world_id: str,
+    principal: Principal,
+    store: StoreDep,
+    writer: WriterDep,
+    seams: Annotated[runs.Seams | None, Depends(runs.run_seams)],
+    flags: FlagsDep,
+) -> dict[str, Any]:
+    """RERUN-1: a world that ended `world.failed` (a restart closed it, X-ORPHAN-1) is started again as a NEW run of the
+    same task: the same brief, the approach the person approved and the cap they granted, through the approve path
+    (so the policy engine, the ceiling and the owner's grants decide again). Only the owner; anyone else gets the
+    unknown-world 404. A world that did not fail is a 409. Pressing twice is one new world."""
+    world = store.worlds.get(world_id)
+    if world is None or world.owner != principal.user_id:
+        raise HTTPException(status_code=404, detail="No such world.")
+    store.settle(world_id)
+    stream = store.events.get(world_id, [])
+    if not any(e["type"] == "world.failed" for e in stream) or any(e["type"] == "world.completed" for e in stream):
+        raise HTTPException(status_code=409, detail="Only a world that stopped can be started again.")
+    old = store.load_world_task(world_id)
+    planned = next((e for e in reversed(stream) if e["type"] == "world.planned"), None)
+    if old is None or old.approaches is None or planned is None:
+        raise HTTPException(status_code=409, detail="This world has no approved task to start again.")
+    if any(src.get("kind") == "file" for src in old.brief.get("sources", [])):
+        raise HTTPException(
+            status_code=409,
+            detail="This task used attached files, which stay with the first run. Describe it again from Home.",
+        )
+    task_id, new_world, new_run = _again_ids(world_id)
+    if (again := store.tasks.get(task_id)) is not None and again.granted:
+        return {"world_id": new_world, "task_id": task_id}  # pressed twice: the one new world
+    if task_id not in store.tasks:
+        fresh = deps.TaskRecord(
+            old.owner, new_world, new_run, copy.deepcopy(old.draft), copy.deepcopy(old.brief), list(old.questions), 1,
+            answers=dict(old.answers), edits=copy.deepcopy(old.edits), approaches=copy.deepcopy(old.approaches),
+            granted=False, scenario=old.scenario, gaps=old.gaps,
+        )  # fmt: skip
+        store.save(
+            writer,
+            worlds={new_world: deps.WorldRecord(owner=old.owner, districts={}, run_id=new_run)},
+            tasks={task_id: fresh},
+            create=[("worlds", new_world), ("tasks", task_id)],
+        )
+    cap = _granted_cap(store, old, 0.0)
+    if cap <= 0:
+        raise HTTPException(status_code=409, detail="This world has no approved budget to start again.")
+    body = ApproveIn(approach_id=str(planned["data"]["approach"]), budget_cap=cap)
+    approve(task_id, principal, body, store, writer, seams, flags)
+    return {"world_id": new_world, "task_id": task_id}
