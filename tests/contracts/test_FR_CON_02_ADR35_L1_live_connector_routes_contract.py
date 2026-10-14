@@ -201,6 +201,7 @@ def test_FR_CON_02_ADR35_L1_error_codes_gain_three_and_keep_the_four(contracts_r
         "start_again",
         "not_granted",
         "wrong_account",
+        "key_refused",  # 1.3.0, ADR-0041: /internal/model-keys/put only
     }
 
 

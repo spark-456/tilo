@@ -1,0 +1,14 @@
+{
+  "active": false,
+  "label": null,
+  "state": "paused",
+  "consent_version": 1,
+  "bundle_id": "openai-compat-retired",
+  "secret_version": 2,
+  "set_at": "2026-10-13T09:30:00.000Z",
+  "rotated_at": "2026-10-14T08:00:00.000Z",
+  "day_cap_credits": 500,
+  "fallback_to_tilo": true,
+  "last_error": "not_configured",
+  "last_used_at": "2026-10-14T08:00:00.000Z"
+}

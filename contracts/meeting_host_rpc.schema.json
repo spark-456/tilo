@@ -1,9 +1,9 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://contracts.tilo.example/meeting_host_rpc.schema.json",
-  "x-version": "1.2.0",
+  "x-version": "1.3.0",
   "title": "MeetingHostRpc",
-  "description": "The internal surface of tilo-connectors that tilo-api calls (FR-MTG-09, ADR-0032 decision 2 and addendum 1; FR-CON-02, ADR-0035 decision 2): what tilo-api posts to /internal/meeting-host/send, /internal/meeting-host/status, /internal/meeting-host/disconnect, /internal/connections/views, /internal/connections/start, /internal/connections/callback, /internal/connections/disconnect and /internal/side-effects/execute, and what each answers. Each route validates its own request and answer ($defs send_request and send_answer; user_request and status_answer; user_request and disconnect_answer; user_request and views_answer; start_request and start_answer; callback_request and callback_answer; connection_disconnect_request and connection_disconnect_answer; execute_request and execute_answer; error for any refusal) in both services; this root is any one of them. Every object is closed, and no field holds an access or refresh token, the client secret, a PKCE verifier, key material or a Meet link (ADR-0024 decision 4, ADR-0032 decision 3). Two fields carry a credential on purpose and nothing else does: callback_request.state and .code, the one-time values Google handed the browser (ADR-0035 LC-03; useless without the verifier and the client secret, which stay in tilo-connectors), and start_answer.authorize_url, the public part of the sign-in link. Ids travel in the body, never in a path or query. A route refuses a body over 65536 bytes (64 KiB) before it parses it. Rules that compare values (HB-03 the draft against its hash and the entry, HB-05 the owner, HB-07 the receipt against the entry, HB-09 the views against config/connectors.yaml, LC-05 the flow's person against the caller, LC-07 the items against the entry) are checked by the routes and by tilo-api's client, not by this schema. 1.1.0 adds views_answer, connection_view and scope; 1.2.0 adds the four live-connector routes' defs and the error codes start_again, not_granted and wrong_account (additive).",
+  "description": "The internal surface of tilo-connectors that tilo-api calls (FR-MTG-09, ADR-0032 decision 2 and addendum 1; FR-CON-02, ADR-0035 decision 2): what tilo-api posts to /internal/meeting-host/send, /internal/meeting-host/status, /internal/meeting-host/disconnect, /internal/connections/views, /internal/connections/start, /internal/connections/callback, /internal/connections/disconnect and /internal/side-effects/execute, and what each answers. Each route validates its own request and answer ($defs send_request and send_answer; user_request and status_answer; user_request and disconnect_answer; user_request and views_answer; start_request and start_answer; callback_request and callback_answer; connection_disconnect_request and connection_disconnect_answer; execute_request and execute_answer; error for any refusal) in both services; this root is any one of them. Every object is closed, and no field holds an access or refresh token, the client secret, a PKCE verifier, key material or a Meet link (ADR-0024 decision 4, ADR-0032 decision 3). Two fields carry a credential on purpose and nothing else does: callback_request.state and .code, the one-time values Google handed the browser (ADR-0035 LC-03; useless without the verifier and the client secret, which stay in tilo-connectors), and start_answer.authorize_url, the public part of the sign-in link. Ids travel in the body, never in a path or query. A route refuses a body over 65536 bytes (64 KiB) before it parses it. Rules that compare values (HB-03 the draft against its hash and the entry, HB-05 the owner, HB-07 the receipt against the entry, HB-09 the views against config/connectors.yaml, LC-05 the flow's person against the caller, LC-07 the items against the entry) are checked by the routes and by tilo-api's client, not by this schema. 1.1.0 adds views_answer, connection_view and scope; 1.2.0 adds the four live-connector routes' defs and the error codes start_again, not_granted and wrong_account (additive). 1.3.0 adds the three model-key routes of ADR-0041 decision 2 (Proposed and inert until config/byok.yaml enabled is true): /internal/model-keys/put, /internal/model-keys/remove and /internal/model-keys/status with the defs model_key_put_request and model_key_put_answer, model_key_remove_request and model_key_remove_answer, model_key_status_request and model_key_status_answer, and the error code key_refused (additive). model_key_put_request.key is the one more credential on this surface (BK-02): it is no-store and, like state and code above, nothing logs, stores or echoes it. /internal/model-keys/generate is model_call_rpc.schema.json's.",
   "anyOf": [
     { "$ref": "#/$defs/send_request" },
     { "$ref": "#/$defs/send_answer" },
@@ -19,6 +19,12 @@
     { "$ref": "#/$defs/connection_disconnect_answer" },
     { "$ref": "#/$defs/execute_request" },
     { "$ref": "#/$defs/execute_answer" },
+    { "$ref": "#/$defs/model_key_put_request" },
+    { "$ref": "#/$defs/model_key_put_answer" },
+    { "$ref": "#/$defs/model_key_remove_request" },
+    { "$ref": "#/$defs/model_key_remove_answer" },
+    { "$ref": "#/$defs/model_key_status_request" },
+    { "$ref": "#/$defs/model_key_status_answer" },
     { "$ref": "#/$defs/error" }
   ],
   "$defs": {
@@ -534,8 +540,71 @@
         "user_id": { "$ref": "common.schema.json#/$defs/user_id" }
       }
     },
+    "model_key_put_request": {
+      "description": "POST /internal/model-keys/put (ADR-0041 decision 2, BK-01 to BK-03): store the org's key as a new version of its Secret Manager secret, then validate it with the provider's free list-models call from tilo-connectors, to the profile's pinned host, with no redirect and a 3 second limit (BK-19). org_id is the verified principal's org in tilo-api, never a browser value (BK-08); the secret's name comes from org_id and slot, never from the body. key has the shape of the owner's PUT body and is the one credential on this request; the body is no-store.",
+      "x-no-store": true,
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["org_id", "slot", "key"],
+      "properties": {
+        "org_id": { "$ref": "common.schema.json#/$defs/org_id" },
+        "slot": { "$ref": "org_model_key.schema.json#/$defs/slot" },
+        "key": { "$ref": "org_model_key.schema.json#/$defs/key" }
+      }
+    },
+    "model_key_put_answer": {
+      "description": "The 200 answer to put: the new secret version and whether the provider accepted the key. validated false means the version was created disabled because the process may not go live (EFF-01): the status is unverified and no run can use it. A key the provider refuses is the error key_refused and no version is kept. A rotation disables every earlier version only once the new one validated (decision 2).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["secret_version", "validated"],
+      "properties": {
+        "secret_version": { "type": "integer", "minimum": 1 },
+        "validated": { "type": "boolean" }
+      }
+    },
+    "model_key_remove_request": {
+      "description": "POST /internal/model-keys/remove: with secret_version, destroy that one version and re-enable the one it displaced (the compensating act when tilo-api's reference write failed after put, so the old key stays active); without it, destroy every version and delete the secret (the owner's removal). Idempotent. Nothing is ever left enabled after a rotation or a removal (BK-01).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["org_id", "slot"],
+      "properties": {
+        "org_id": { "$ref": "common.schema.json#/$defs/org_id" },
+        "slot": { "$ref": "org_model_key.schema.json#/$defs/slot" },
+        "secret_version": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "model_key_remove_answer": {
+      "description": "The 200 answer to remove: true when a version or the secret existed and is gone, false when there was nothing to remove (still a 200).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["removed"],
+      "properties": { "removed": { "type": "boolean" } }
+    },
+    "model_key_status_request": {
+      "description": "POST /internal/model-keys/status: a store read only, with no secret access, no provider call and no event.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["org_id", "slot"],
+      "properties": {
+        "org_id": { "$ref": "common.schema.json#/$defs/org_id" },
+        "slot": { "$ref": "org_model_key.schema.json#/$defs/slot" }
+      }
+    },
+    "model_key_status_answer": {
+      "description": "The 200 answer to status, about the org's latest version: none (no version), active (enabled and validated), unverified (created disabled, never validated) or disabled (a rotation, three refusals or a failed re-validation disabled it, BK-17). secret_version is null exactly when state is none. No key character, length or hash.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["state", "secret_version"],
+      "properties": {
+        "state": { "type": "string", "enum": ["none", "active", "unverified", "disabled"] },
+        "secret_version": { "anyOf": [{ "type": "integer", "minimum": 1 }, { "type": "null" }] }
+      },
+      "if": { "properties": { "state": { "const": "none" } }, "required": ["state"] },
+      "then": { "properties": { "secret_version": { "type": "null" } } },
+      "else": { "properties": { "secret_version": { "type": "integer" } } }
+    },
     "error": {
-      "description": "The body of every refusal on this surface, a fixed code and nothing else: unauthenticated (401, no valid ID token, HB-01), forbidden (403, any account but tilo-api's, HB-01), invalid_request (422, a body over 64 KiB, not JSON or not this contract's request; refused before anything acted) and not_configured (503, a setting is missing or a seam failed to build, or LIVE is not set on tilo-connectors; also 502 when Google's certificates cannot be had to check the token, which is retryable and never a final 401). Only /internal/connections/callback adds three, each 400: start_again (the state is unknown, spent, expired, another person's or lost with an instance, or Google did not accept the code, or the grant could not be saved; one text for all, so the answer says nothing about which, LC-05), not_granted (the person did not agree, or none of the access asked for was granted) and wrong_account (meeting_host only: the sign-in was a person's own account, not the bot's, MH-C1). Never a value, a setting's value or an exception's text.",
+      "description": "The body of every refusal on this surface, a fixed code and nothing else: unauthenticated (401, no valid ID token, HB-01), forbidden (403, any account but tilo-api's, HB-01), invalid_request (422, a body over 64 KiB, not JSON or not this contract's request; refused before anything acted) and not_configured (503, a setting is missing or a seam failed to build, or LIVE is not set on tilo-connectors; also 502 when Google's certificates cannot be had to check the token, which is retryable and never a final 401). Only /internal/connections/callback adds three, each 400: start_again (the state is unknown, spent, expired, another person's or lost with an instance, or Google did not accept the code, or the grant could not be saved; one text for all, so the answer says nothing about which, LC-05), not_granted (the person did not agree, or none of the access asked for was granted) and wrong_account (meeting_host only: the sign-in was a person's own account, not the bot's, MH-C1). Only /internal/model-keys/put adds one, 422: key_refused (the provider refused the key; no version was kept, ADR-0041 decision 2). Never a value, a setting's value or an exception's text.",
       "type": "object",
       "additionalProperties": false,
       "required": ["error"],
@@ -549,7 +618,8 @@
             "not_configured",
             "start_again",
             "not_granted",
-            "wrong_account"
+            "wrong_account",
+            "key_refused"
           ]
         }
       }
