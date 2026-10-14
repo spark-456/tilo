@@ -80,6 +80,18 @@ afterEach(() => {
 });
 
 describe("ADR-0041 BQ-BYOK-WEB-1 states", () => {
+  it("R34_4_ADR_0041_refused_Vertex_IAM_is_not_offered_by_the_form", async () => {
+    for (const answer of [NONE, refuse(503, "not_configured", true)]) {
+      const { flow, calls } = fake({ get: [answer] });
+      const m = mount(<ModelKeyControl flow={flow} demo={false} />);
+      await settle();
+      expect(text(m.container)).not.toMatch(/Vertex|project id/i);
+      expect(qa<HTMLInputElement>(m.container, 'input[type="text"]')).toHaveLength(2);
+      expect(calls).toEqual([{ method: "GET", path: "/v1/org/model-key" }]);
+      cleanup();
+    }
+  });
+
   it("BYOK_WEB_ADR_0041_off_in_this_build_is_a_calm_line_with_a_disabled_form_and_no_write", async () => {
     const { flow, calls } = fake({ get: [refuse(503, "not_configured", true)] });
     const m = mount(<ModelKeyControl flow={flow} demo={false} />);

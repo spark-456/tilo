@@ -29,7 +29,7 @@ const PROBLEMS: Record<ModelKeyProblem, string> = {
   reauth:
     "For safety, adding or replacing a key needs a sign-in from the last 10 minutes. Sign out from the account menu, sign in again, then add the key.",
   owner_only: "Only this organisation's owner can see or change its model key.",
-  key_refused: "That key or project id was refused. Check it and try again. Nothing was saved.",
+  key_refused: "That key was refused. Check it and try again. Nothing was saved.",
   confirm:
     "The consent wording has changed. Reload this page, read it again and confirm. Nothing was saved.",
   invalid: "A value was not accepted: check the bundle id and the daily limit. Nothing was saved.",
@@ -85,7 +85,6 @@ function Body({ flow }: { flow: ModelKeyFlow }) {
   const [bundle, setBundle] = useState("");
   const keyField = useRef<HTMLInputElement>(null);
   const [hasKey, setHasKey] = useState(false);
-  const [project, setProject] = useState("");
   const [cap, setCap] = useState("");
   const [fallback, setFallback] = useState(false);
   const [agreed, setAgreed] = useState(false);
@@ -150,7 +149,7 @@ function Body({ flow }: { flow: ModelKeyFlow }) {
     !stale &&
     agreed &&
     bundle.trim() !== "" &&
-    hasKey !== (project.trim() !== "") &&
+    hasKey &&
     Number.isInteger(days) &&
     days >= 1 &&
     !busy;
@@ -175,8 +174,8 @@ function Body({ flow }: { flow: ModelKeyFlow }) {
     after(
       await flow.save({
         bundleId: bundle.trim(),
-        key: typed === "" ? null : typed,
-        projectId: project.trim() === "" ? null : project.trim(),
+        key: typed,
+        projectId: null,
         dayCapCredits: days,
         fallbackToTilo: fallback,
         consentVersion: CONSENT_VERSION,
@@ -247,7 +246,7 @@ function Body({ flow }: { flow: ModelKeyFlow }) {
                   onChange={(e) => setBundle(e.target.value)}
                 />
                 <span className="park-profile-help">
-                  The id of the provider bundle your Tilo operator set up.
+                  The id of the API-key provider bundle your Tilo operator set up.
                 </span>
               </label>
               <label className="park-profile-field">
@@ -278,21 +277,6 @@ function Body({ flow }: { flow: ModelKeyFlow }) {
                   {canMask()
                     ? ""
                     : " This browser cannot hide what you type here, so check that no one can see your screen."}
-                </span>
-              </label>
-              <label className="park-profile-field">
-                <span className="park-profile-label">Vertex project id (instead of a key)</span>
-                <input
-                  className="park-profile-input"
-                  type="text"
-                  value={project}
-                  maxLength={64}
-                  autoComplete="off"
-                  onChange={(e) => setProject(e.target.value)}
-                />
-                <span className="park-profile-help">
-                  Only for a Vertex bundle that uses your own project. Give a key or a project id,
-                  not both.
                 </span>
               </label>
               <label className="park-profile-field">
