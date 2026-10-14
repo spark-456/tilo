@@ -83,7 +83,7 @@ export function LibrarySection({
   ];
 
   const handleTestRun = () => {
-    if (isPaused) return;
+    if (isPaused || cur.builtin) return;
     if (cur.st === "draft") {
       onTryDraft();
       return;
@@ -95,7 +95,9 @@ export function LibrarySection({
   return (
     <section aria-label="Learned skills" className="park-skills-section">
       <div>
-        <h2 className="park-skills-h2">Learned skills</h2>
+        <h2 className="park-skills-h2">
+          {skills.some((s) => s.builtin) ? "Built-in and learned skills" : "Learned skills"}
+        </h2>
         <div className="park-skills-section-sub">
           Pick one to see its steps, cost per run and tool access.
         </div>
@@ -117,7 +119,7 @@ export function LibrarySection({
           {filtered.map((s) => {
             const on = s.id === cur.id;
             const stShown = shownOf(s);
-            const meta = STATUS_META[stShown];
+            const meta = s.builtin ? { label: "Built-in", tone: "chip" } : STATUS_META[stShown];
             const sub = `${s.team} · ${
               s.used.length
                 ? `used in ${s.used.length} ${s.used.length === 1 ? "world" : "worlds"}`
@@ -167,18 +169,25 @@ export function LibrarySection({
               </div>
               <div className="park-skills-lib-title-col">
                 <div className="park-skills-lib-eyebrow">
-                  {`${cur.team} · ${STATUS_META[curShown].label}`.toUpperCase()}
+                  {cur.builtin
+                    ? "BUILT-IN"
+                    : `${cur.team} · ${STATUS_META[curShown].label}`.toUpperCase()}
                 </div>
                 <h3 className="park-skills-lib-h3">{cur.name}</h3>
                 <div className="park-skills-lib-owner">
-                  {`Owned by ${cur.owner} · learned from ${cur.from || "—"}`}
+                  {cur.builtin
+                    ? `Shipped with Tilo · version ${cur.from}`
+                    : `Owned by ${cur.owner} · learned from ${cur.from || "—"}`}
                 </div>
               </div>
             </div>
             <div className="park-skills-lib-actions">
               <button
                 type="button"
-                disabled={isPaused}
+                disabled={isPaused || cur.builtin}
+                title={
+                  cur.builtin ? "Built-in skills are selected by agents during a run." : undefined
+                }
                 className="park-skills-lib-test"
                 onClick={handleTestRun}
               >
@@ -188,7 +197,7 @@ export function LibrarySection({
               <button
                 type="button"
                 className="park-skills-lib-secondary"
-                disabled={live}
+                disabled={live || cur.builtin}
                 title={live ? NOT_FROM_HERE : undefined}
                 onClick={() => onTogglePause(cur)}
               >
@@ -197,7 +206,7 @@ export function LibrarySection({
               <button
                 type="button"
                 className="park-skills-lib-secondary"
-                disabled={live}
+                disabled={live || cur.builtin}
                 title={live ? NOT_FROM_HERE : undefined}
                 onClick={() => app.toast(SAMPLE_EDIT)}
               >
@@ -239,7 +248,8 @@ export function LibrarySection({
           ) : null}
 
           <div className="park-skills-lib-steps-sec">
-            <h4 className="park-skills-h4">Steps</h4>
+            <h4 className="park-skills-h4">{cur.builtin ? "Description" : "Steps"}</h4>
+            {cur.builtin ? <p>{cur.description}</p> : null}
             <ol className="park-skills-lib-steps">
               {cur.steps.map((step, i) => (
                 <li key={`${i + 1}-${step}`} className="park-skills-lib-step">

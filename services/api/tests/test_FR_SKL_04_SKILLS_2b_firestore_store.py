@@ -305,6 +305,14 @@ def test_FR_SKL_04_SKILLS_2b_routes_save_list_read_and_learn_over_firestore(fs_c
     assert fs_ctx.post(PRIYA, valid_body()).status_code == 201
 
 
+def test_FR_SKL_04_LIVE_SKILLS_empty_firestore_catalogue_before_founding(fs_ctx):
+    response = fs_ctx.get("u_unfounded", "/v1/skills?include_builtin=true")
+    assert response.status_code == 200, response.text
+    assert response.json()["skills"] == []
+    assert "web-research" in {r["id"] for r in response.json()["builtins"]}
+    assert fs_ctx.client.docs == {}  # A catalogue read never seeds an organisation or taught-skill store.
+
+
 @pytest.mark.parametrize("route", ["learn", "list", "one"])
 def test_FR_SKL_04_SKILLS_2b_a_malformed_stored_row_is_503_never_500(fs_ctx, route):
     bad = record("tsk_BAD", PRIYA)

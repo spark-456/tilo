@@ -67,6 +67,32 @@ from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 
 SCHEMA = "taught_skill.schema.json"
+
+
+def test_FR_SKL_04_LIVE_SKILLS_builtin_catalogue_before_founding(ctx):
+    response = ctx.get("u_stranger", "/v1/skills?include_builtin=true")
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["skills"] == []
+    assert "web-research" in {r["id"] for r in body["builtins"]}
+    assert all(r["description"] and r["version"] for r in body["builtins"])
+    assert ctx.store.calls == []  # no private taught records read or written before founding
+    assert response.headers["cache-control"] == "no-store"
+    learn_response = ctx.get("u_stranger", "/v1/learn?include_builtin=true")
+    assert learn_response.status_code == 200
+    assert learn_response.json() == {"learning": [], "needs_rating": [], "helpers": None}
+    assert ctx.store.calls == []
+
+
+def test_FR_SKL_04_LIVE_SKILLS_builtin_catalogue_keeps_taught_visibility(ctx):
+    own = ctx.post(DEV).json()
+    ctx.post(SAM)
+    response = ctx.get(DEV, "/v1/skills?include_builtin=true")
+    assert response.status_code == 200, response.text
+    assert [r["id"] for r in response.json()["skills"]] == [own["id"]]
+    assert "web-research" in {r["id"] for r in response.json()["builtins"]}
+
+
 PATH = "/v1/skills"
 LEARN = "/v1/learn"
 R_CREATE = ("POST", PATH)

@@ -360,12 +360,13 @@ export function createLiveApi(options: LiveApiOptions = {}): Api {
   };
   // Taught skills (SKILLS-3, FR-SKL-04): the library is `GET /v1/skills`; Learn has nothing served but the list.
   api.getSkills = async () => {
-    const skills = skillsOfBody(await http.getJson("/v1/skills"));
+    const skills = skillsOfBody(await http.getJson("/v1/skills?include_builtin=true"));
     if (!skills) throw new TiloApiError(BAD_REPLY, 200, true);
     return { data: skills, source: "live" };
   };
   api.getLearn = async () => {
-    if (!isLearnBody(await http.getJson("/v1/learn"))) throw new TiloApiError(BAD_REPLY, 200, true);
+    if (!isLearnBody(await http.getJson("/v1/learn?include_builtin=true")))
+      throw new TiloApiError(BAD_REPLY, 200, true);
     return { data: { rates: [], reviews: [], helpers: [], tools: [] }, source: "live" };
   };
   // One POST, no retry. A draft the server cannot take (a team scope, a timed trigger) is refused here, never sent as

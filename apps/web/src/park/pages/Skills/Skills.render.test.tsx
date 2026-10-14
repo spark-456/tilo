@@ -50,8 +50,31 @@ import {
   toasts,
 } from "../../../../test-support/park/skillsHarness";
 import { learn, skills } from "../../api/fixtures";
+import { skillsOfBody } from "../../api/live/skillsFromApi";
 import { createLiveApi } from "../../api/liveApi";
 import type { Skill } from "../../api/types";
+
+it("LIVE-SKILLS renders builtins as shipped descriptions with run and edit controls disabled", async () => {
+  const list = skillsOfBody({
+    skills: [],
+    builtins: [{ id: "web-research", version: "1.0.0", description: "Research public sources." }],
+  });
+  const { el } = await mountSkills({
+    api: skillsApi({ getSkills: () => fixtureResult(list ?? []) }),
+  });
+  expect(el.textContent).toContain("Web Research");
+  expect(el.textContent).toContain("Shipped with Tilo · version 1.0.0");
+  expect(el.textContent).toContain("Research public sources.");
+  expect(el.textContent).toContain("Built-in and learned skills");
+  expect(teachCard(el).textContent).not.toContain("Web Research");
+  for (const text of ["Try run", "Pause", "Edit steps"]) {
+    const button = Array.from(el.querySelectorAll("button")).find(
+      (b) => b.textContent?.trim() === text,
+    );
+    expect(button, text).toBeDefined();
+    expect(button?.disabled, text).toBe(true);
+  }
+});
 
 afterEach(() => {
   cleanup();
