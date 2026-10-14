@@ -105,3 +105,33 @@
   flex-direction: column;
   gap: 10px;
 }
+
+/* the search field takes the same focus ring as every park control and a 44 px target */
+[data-park] .park-library-search {
+  min-height: 44px;
+}
+[data-park] .park-library-search:focus-visible {
+  outline: 3px solid #5a3fe0;
+  outline-offset: 2px;
+}
+[data-park] .park-library-rowmain {
+  flex: 1 1 auto;
+}
+/* a phone: the card fits the 16 px gutters, the search takes the width, a row stacks its action under its words */
+@media (max-width: 520px) {
+  [data-park] .park-library-title {
+    font-size: 30px;
+  }
+  [data-park] .park-library-card {
+    padding: 16px;
+    border-radius: 18px;
+  }
+  [data-park] .park-library-search {
+    min-width: 0;
+    width: 100%;
+  }
+  [data-park] .park-library-row {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}

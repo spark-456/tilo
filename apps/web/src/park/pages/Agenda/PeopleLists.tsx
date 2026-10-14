@@ -40,7 +40,7 @@ function List({
     };
   }, [api, kind, attempt]);
   return (
-    <section aria-label={TITLE[kind]} className="park-agenda-state" data-testid={`agenda-${kind}`}>
+    <section aria-label={TITLE[kind]} className="park-agenda-state park-agenda-peoplelist" data-testid={`agenda-${kind}`}>
       <h2>{TITLE[kind]}</h2>
       {state === "loading" ? (
         <output>Loading…</output>
