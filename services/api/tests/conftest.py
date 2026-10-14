@@ -18,6 +18,7 @@ packages/policy/tests/conftest.py and packages/providers/tests/conftest.py use.
 from __future__ import annotations
 
 import pathlib
+import sys
 
 import pytest
 from _api_contracts_lib import build_registry, make_safety_provider
@@ -27,6 +28,12 @@ from tilo_api import app, deps
 from tilo_api.intake import get_safety
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parents[3]
+
+# Minutes API tests share channel test doubles, including _chn_wire1_lib and
+# _mtg08_lib. Make them available even when no channel tests are collected.
+CHANNEL_TEST_SUPPORT = str(REPO_ROOT / "services" / "channels" / "tests")
+if CHANNEL_TEST_SUPPORT not in sys.path:
+    sys.path.append(CHANNEL_TEST_SUPPORT)
 
 
 def pytest_configure(config: pytest.Config) -> None:
