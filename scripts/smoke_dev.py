@@ -344,14 +344,18 @@ def hosted_main(argv: Sequence[str], *, transport: httpx.BaseTransport | None = 
     """
     from smoke_unsigned import main as unsigned_main  # noqa: PLC0415
 
-    if unsigned_main(argv, transport=transport):
+    unsigned_status = unsigned_main(argv, transport=transport)
+    if unsigned_status == 1:
         print("FAIL hosted: signed-out Hosting, bundle, health or security check failed")
         return 1
     with httpx.Client(transport=transport, timeout=CALL_TIMEOUT_S, follow_redirects=False, trust_env=False) as client:
 
-        def configured() -> None:
+        def configured() -> bool:
             try:
-                with client.stream("GET", argv[0] + "/healthz/deps", headers={"X-Tilo-Channel": "web"}) as response:
+                with client.stream("GET", argv[0] + "/health/deps", headers={"X-Tilo-Channel": "web"}) as response:
+                    if response.status_code == 404:
+                        print("NOT DEPLOYED dependency-configuration: HTTP 404; /health/deps is not deployed yet")
+                        return False
                     if response.status_code != 200:
                         raise Failed(f"HTTP {response.status_code}, wanted 200")
                     body = bytearray()
@@ -378,9 +382,19 @@ def hosted_main(argv: Sequence[str], *, transport: httpx.BaseTransport | None = 
                 if type(data.get(key)) is not type(wanted) or data.get(key) != wanted:
                     raise Failed(f"{key} does not report the required deployed configuration")
 
-        if not _report("dependency-configuration (configuration only, not readiness)", configured)[0]:
+            return True
+
+        try:
+            dependencies_present = configured()
+        except Failed as failure:
+            print(f"FAIL dependency-configuration: {failure}")
             return 1
+        if dependencies_present:
+            print("PASS dependency-configuration (configuration only, not readiness)")
     print("SKIP demo: Home and recorded world require the existing playwright.hosted.config.ts hosted smoke")
+    if unsigned_status == 2 or not dependencies_present:
+        print("NOT DEPLOYED hosted-http: required deployment endpoints are missing; demo unverified")
+        return 1
     print("PASS hosted-http (signed-out HTTP checks only; demo unverified)")
     return 0
 
