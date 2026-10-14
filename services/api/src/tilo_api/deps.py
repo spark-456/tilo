@@ -97,6 +97,11 @@ class Principal:
     # act older than 10 minutes needs a fresh sign-in. None (a dev, email or test session) is never fresh.
 
 
+def full_world_session(principal: Principal) -> bool:
+    """Only a verified full web sign-in may resolve authority beyond its session world."""
+    return principal.full_session and not principal.demo_session and principal.channel in ("web", "mobile_web")
+
+
 @dataclass
 class DistrictRecord:
     name: str

@@ -343,8 +343,16 @@ def get_ctx(
     now: Annotated[Callable[[], str], Depends(deps.get_clock)],
 ) -> Ctx:
     world = store.worlds.get(world_id)
-    if principal.world_id != world_id or world is None:
+    if world is None:
         raise HTTPException(status_code=404, detail=NOT_FOUND)  # one message for unknown and not yours: no oracle
+    if principal.world_id != world_id:
+        team = team_store.team_reader(request.app.dependency_overrides)
+        if (
+            not deps.full_world_session(principal)
+            or _as_role(principal, world, cfg, team, set(principal.districts)) is None
+        ):
+            raise HTTPException(status_code=404, detail=NOT_FOUND)
+        principal = dataclasses.replace(principal, world_id=world_id)
     return Ctx(request, principal, world, world_id, cfg, store, writer, now)
 
 
