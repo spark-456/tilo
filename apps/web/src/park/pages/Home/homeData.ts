@@ -189,6 +189,13 @@ export interface LiveRow {
 }
 
 /** "Live now": the worlds that need you or run, five at most, in the Api's order. */
+/** The greeting for the person's own local hour (OLD-UI-OUT QA row 21): never the theme's, never a made-up clock. */
+export function greetingWord(hour: number): string {
+  if (hour >= 5 && hour < 12) return "Good morning";
+  if (hour >= 12 && hour < 18) return "Good afternoon";
+  return "Good evening";
+}
+
 export function liveRows(worlds: readonly World[], needs: number, served = false): LiveRow[] {
   return worlds
     .filter((w) => w.st === "needs" || w.st === "running")
