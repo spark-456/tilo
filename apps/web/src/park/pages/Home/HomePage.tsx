@@ -32,6 +32,7 @@ import {
   INTAKE_MAX_CHARS,
   MODES,
   QUICK_MAX_CHARS,
+  greetingWord,
   liveRows,
   liveSummaryLine,
   needsWorld,
@@ -424,8 +425,8 @@ export function HomePage({ app }: { app: AppCtx }) {
           />
           <div className="park-home-leftcol">
             <Hero
-              dateLine={`${base.today.long}${night ? " · 21:10" : ""}`.toUpperCase()}
-              greeting={`${night ? "Good evening" : "Good morning"}, ${base.user.first}.`}
+              dateLine={base.today.long.toUpperCase()}
+              greeting={`${greetingWord(new Date().getHours())}, ${base.user.first}.`}
               summary={summary}
               needs={needs}
               needsKnown={!served || openServed !== null}

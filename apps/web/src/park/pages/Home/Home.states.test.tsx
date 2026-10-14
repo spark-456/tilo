@@ -3,7 +3,7 @@
 // "Read data only through the Api via useParkApi(); render an EmptyState 'Home data is unavailable' on NotBuilt";
 // "Fixtures never pass as live"). Home reads the user, today, the worlds (for the app's `dec` and `added`),
 // the agenda and the ledger, and nothing else, and it never calls fetch itself.
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, q, qa } from "../../../../test-support/park/componentsHarness";
 import { SAMPLE_ONLY } from "../../../../test-support/park/homeCopy";
 import {
@@ -20,6 +20,8 @@ import type { Api } from "../../api/index";
 import { createLiveApi } from "../../api/liveApi";
 import type { Agenda, ApiResult, Ledger, Today, User } from "../../api/types";
 
+// QA row 21: the greeting follows the local hour; pin 09:00.
+beforeEach(() => vi.setSystemTime(new Date(2026, 8, 24, 9, 0)));
 afterEach(() => {
   cleanup();
   vi.restoreAllMocks();

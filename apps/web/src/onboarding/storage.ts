@@ -21,6 +21,26 @@ function store(): Storage | null {
   }
 }
 
+const SILENCED = `${PREFIX}silenced.`;
+
+/** QA row 22: "Not now" on one page's invitation silences every page's invitation for this browser session
+ * (sessionStorage: a reload is the same session; the next visit asks again). Never sent anywhere. */
+export function silenceInvitations(userKey: string): void {
+  try {
+    window.sessionStorage.setItem(SILENCED + userKey, "1");
+  } catch {
+    // blocked: the next page may ask once more, nothing else
+  }
+}
+
+export function invitationsSilenced(userKey: string): boolean {
+  try {
+    return window.sessionStorage.getItem(SILENCED + userKey) != null;
+  } catch {
+    return false;
+  }
+}
+
 export function hasSeen(key: string): boolean {
   try {
     return store()?.getItem(PREFIX + key) != null;
