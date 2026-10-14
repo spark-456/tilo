@@ -27,6 +27,7 @@ import {
   isLearnBody,
   isSkillRow,
   saveBody,
+  skillFromRow,
   skillsOfBody,
   versionOfBody,
 } from "./live/skillsFromApi";
@@ -37,6 +38,7 @@ import { worldFromIntake } from "./live/worldFromIntake";
 import { STATE_OF, type WorldListItem, worldsFromList } from "./live/worldsFromList";
 import { nameInitials } from "./nameInitials";
 import { installQuizReader } from "./quizApps";
+import { installSkillFixer } from "./skillFixes";
 import type { Dec, DecisionKey, Effort, QuickReply, TierKey, Today, User } from "./types";
 
 export class NotBuilt extends Error {
@@ -267,6 +269,12 @@ export function createLiveApi(options: LiveApiOptions = {}): Api {
     ...(options.fetch ? { fetch: options.fetch } : {}),
     ...(options.appCheckToken ? { appCheckToken: options.appCheckToken } : {}),
     ...(options.authToken ? { authToken: options.authToken } : {}),
+  });
+  installSkillFixer(api, async (id, body) => {
+    const row = await http.postJson(`/v1/skills/${encodeURIComponent(id)}/fixes`, body);
+    if (!isSkillRow(row) || row.id !== id || row.version !== body.from_version + 1)
+      throw new TiloApiError(BAD_REPLY, 200, true, true);
+    return skillFromRow(row);
   });
   installQuizReader(api, async (world, artifact) => {
     const raw = await http.getJson(
