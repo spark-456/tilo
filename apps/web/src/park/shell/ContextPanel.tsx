@@ -72,13 +72,16 @@ function Rows<T>({
   );
 }
 export function agendaRows(a: AgendaData, future: boolean): string[] {
-  if ("plate" in a)
+  if ("plate" in a) {
+    const today = a.plate.today;
+    if (today === null) return [];
     return [...a.plate.rows, ...(future ? a.plate.parked : [])]
       .filter((r) => {
         const day = (r.ref.kind === "calendar_entry" ? r.at : r.due)?.slice(0, 10) ?? "";
-        return future ? day > a.plate.today : day <= a.plate.today;
+        return future ? day > today : day <= today;
       })
       .map((r) => [r.title ?? r.ref.kind, r.at ?? r.due].filter(Boolean).join(" · "));
+  }
   return a.events
     .filter((e) => !e.past && (future ? e.d > a.today : e.d === a.today))
     .map((e) => e.t);

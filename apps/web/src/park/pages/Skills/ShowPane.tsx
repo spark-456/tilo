@@ -6,6 +6,7 @@ import {
   CAP,
   CAPTURED_HINT,
   CAPTURE_STEPS,
+  DESCRIBE_EMPTY,
   DESCRIBE_HELP,
   DESCRIBE_SAMPLE,
   DROP,
@@ -124,7 +125,9 @@ export function ShowPane({ t, night, user }: PaneProps) {
                 </div>
               )}
               <div className="park-skills-describe-foot">
-                <div className="park-skills-describe-help">{DESCRIBE_HELP}</div>
+                <div className="park-skills-describe-help" data-testid="skills-describe-help">
+                  {t.desc.trim() ? DESCRIBE_HELP : DESCRIBE_EMPTY}
+                </div>
                 <button
                   type="button"
                   className="park-skills-read"

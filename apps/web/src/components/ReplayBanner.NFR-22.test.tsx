@@ -16,6 +16,8 @@ import { fileURLToPath } from "node:url";
 import { act } from "react";
 import { type Root, createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { HttpClient, TiloApiError } from "../api/http";
+import { quickErrorMessage } from "../park/app/store";
 import { ReplayBanner } from "./ReplayBanner";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -46,6 +48,29 @@ const nameOf = (el: HTMLElement): string => {
 };
 
 describe("NFR-22 ReplayBanner: a clear, labelled banner", () => {
+  it.each([
+    [
+      { detail: "The safety screen is unavailable; nothing was stored." },
+      /safety screen is unavailable/i,
+    ],
+    [{ detail: "not_configured" }, /not configured on this server/i],
+    [{ detail: "private traceback" }, /problem on its side/i],
+    [{ replay_only: true }, /live models are unavailable/i],
+  ])("NFR_22 W1 only offers the replay banner for a replay-only 503 %j", async (body, sentence) => {
+    const client = new HttpClient({
+      baseUrl: "http://api.test",
+      fetch: (async () => new Response(JSON.stringify(body), { status: 503 })) as typeof fetch,
+    });
+    const error = await client.submitIntake("Prepare the weekly summary.", []).catch((e) => e);
+    expect(error).toBeInstanceOf(TiloApiError);
+    expect(quickErrorMessage(error)).toMatch(sentence);
+    expect(quickErrorMessage(error)).not.toContain("private traceback");
+    act(() =>
+      root.render(error.replayOnly ? <ReplayBanner /> : <p role="alert">{error.message}</p>),
+    );
+    expect(banner() !== null).toBe("replay_only" in body);
+  });
+
   it("NFR_22 it renders with no props, and says live models are unavailable and that replays are offered", () => {
     act(() => root.render(<ReplayBanner />));
     const el = banner();

@@ -127,14 +127,15 @@ describe("FR_ACC_03 sync status shows a spinner only while a sync is in flight",
     expect(hasExactText(d, "Example only · no sync or health check recorded")).toBe(true);
   });
 
-  it("FR_ACC_03_sync_now_shows_a_spinner_and_Syncing_until_the_sync_ends", async () => {
-    const { root } = await open(fx.connectors);
+  it("W6_FR_ACC_03_demo_sync_now_shows_no_spinner_and_says_nothing_was_synced", async () => {
+    const { app, root } = await open(fx.connectors);
     const d = openTile(root, "Google Drive");
     click(buttonText(d, "Sync now") as HTMLElement);
-    expect(spinners(d).length, "in flight").toBe(1);
-    expect(textOf(d)).toContain("Syncing");
-    await flush();
-    expect(spinners(d).length, "settled").toBe(0);
+    expect(spinners(d).length).toBe(0);
+    expect(textOf(d)).not.toContain("Syncing");
+    expect(app.toast.mock.calls.at(-1)?.[0]).toBe(
+      "Sample data: Google Drive was not synced. Sign in to use your own tools.",
+    );
     expect(hasExactText(d, "Example only · no sync or health check recorded")).toBe(true);
   });
 });
@@ -199,22 +200,24 @@ describe("FR_ACC_04 the sign-in expiry warning shows 3 days ahead", () => {
 });
 
 describe("FR_ACC_04 reconnect is one click and never shows Tilo a password", () => {
-  it("FR_ACC_04_one_click_on_the_banner_reconnects_and_clears_the_warning", async () => {
+  it("W6_FR_ACC_04_demo_one_click_on_the_banner_says_nothing_was_reconnected", async () => {
     const { app, root } = await open(withHubspotExpiry(NOW + 2 * DAY));
     click(buttonText(banner(root) as HTMLElement, "Reconnect") as HTMLElement);
-    await waitFor(() => banner(root) === null, "the banner clears");
-    expect(app.toast.mock.calls.at(-1)?.[0]).toBe("HubSpot reconnected for 90 days");
-    expect(textOf(tileFor(root, "HubSpot") as HTMLElement)).toContain("Example only: not synced");
+    await flush();
+    expect(app.toast.mock.calls.at(-1)?.[0]).toBe(
+      "Sample data: HubSpot was not reconnected. Sign in to use your own tools.",
+    );
+    expect(banner(root), "no OAuth ran, so the warning stays").not.toBeNull();
   });
 
-  it("FR_ACC_04_the_detail_panel_of_an_expiring_tool_has_its_own_one_click_reconnect", async () => {
+  it("W6_FR_ACC_04_demo_the_detail_panel_of_an_expiring_tool_has_its_own_one_click_reconnect", async () => {
     const { root } = await open(withHubspotExpiry(NOW + 1 * DAY));
     const d = openTile(root, "HubSpot");
     expect(textOf(d)).toContain("Sign-in expires in 1 day");
     click(buttonText(d, "Reconnect") as HTMLElement);
-    await waitFor(() => banner(root) === null, "the banner clears");
-    expect(hasExactText(d, "Example only · no sync or health check recorded")).toBe(true);
-    expect(buttonText(d, "Reconnect")).toBeUndefined();
+    await flush();
+    expect(banner(root), "no OAuth ran, so the warning stays").not.toBeNull();
+    expect(buttonText(d, "Reconnect")).toBeDefined();
   });
 
   it("FR_ACC_04_no_password_field_anywhere_in_the_reconnect_flow", async () => {

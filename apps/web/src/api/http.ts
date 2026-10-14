@@ -49,6 +49,30 @@ const SERVER_TROUBLE = "Tilo had a problem on its side.";
 /** NFR-22: the web's own sentence for a replay-only 503; the server's free text is never shown. */
 const REPLAY_ONLY =
   "Live models are unavailable right now, so nothing new was started. Finished runs can still be replayed.";
+const SAFETY_UNAVAILABLE = "The safety screen is unavailable. Try again later.";
+const NOT_CONFIGURED = "This feature is not configured on this server.";
+/** Legacy routes use these exact details instead of a code. Match only known wire values;
+ * no server text, including extensions of these sentences, is ever displayed. */
+const SAFETY_DETAILS = new Set([
+  "The safety screen is unavailable; nothing was stored.",
+  "The safety screen is unavailable; nothing was answered.",
+  "The safety screen is unavailable; nothing changed.",
+]);
+
+function unavailableMessage(text: string): string {
+  try {
+    const body = JSON.parse(text) as { code?: unknown; detail?: unknown } | null;
+    if (body?.code === "not_configured" || body?.detail === "not_configured") {
+      return NOT_CONFIGURED;
+    }
+    if (typeof body?.detail === "string" && SAFETY_DETAILS.has(body.detail)) {
+      return SAFETY_UNAVAILABLE;
+    }
+  } catch {
+    // An unreadable refusal still gets fixed web copy.
+  }
+  return SERVER_TROUBLE;
+}
 const BAD_REPLY = "Tilo sent a reply this page could not read.";
 /** A8: how long a start waits for the intake's reply before the person is told, instead of a spinner for ever.
  * The Director's brief takes up to about a minute; the intake's own provider timeouts sit inside this. */
@@ -405,7 +429,7 @@ export class HttpClient implements TiloClient, SchedulesApi, FieldsApi, ItemApi 
       if (timer !== null) clearTimeout(timer);
     }
     if (!res.ok) {
-      // Only a 503 (the replay-only label) or a 4xx has a body worth reading; other 5xx are not awaited.
+      // Read 503's known refusal values or a 4xx; other 5xx are not awaited.
       if (res.status >= 500 && res.status !== 503) {
         throw new TiloApiError(SERVER_TROUBLE, res.status, true, write);
       }
@@ -422,7 +446,15 @@ export class HttpClient implements TiloClient, SchedulesApi, FieldsApi, ItemApi 
       }
       const refusal = refusalOf(body);
       if (res.status >= 500) {
-        throw new TiloApiError(SERVER_TROUBLE, res.status, true, write, null, false, refusal);
+        throw new TiloApiError(
+          unavailableMessage(body),
+          res.status,
+          true,
+          write,
+          codeOf(body),
+          false,
+          refusal,
+        );
       }
       throw new TiloApiError(
         reasonOf(res.status, body),

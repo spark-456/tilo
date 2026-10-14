@@ -4,6 +4,7 @@ import { AssistantPanel } from "./assistant/AssistantPanel";
 import { useStageMode } from "./display/stageMode";
 import { useMediaQuery } from "./hooks/useMediaQuery";
 import { NeedsYouRail } from "./needs-you/NeedsYouRail";
+import { isParkOnlyWorld } from "./parkWorlds";
 import { matchFlowRoute, usePathname } from "./router";
 import { FlowShell } from "./screens/FlowShell";
 import { LevelsPanel } from "./screens/LevelsPanel";
@@ -109,6 +110,14 @@ export function App() {
       : null;
   // A world id the client does not know is "Not found", never another world's run in its place.
   const unknownWorld = !useWorldKnown(pathWorld) && !world.active;
+  // WEB-QA-14OCT-1: a sample-company world only the Park pages know has no run to draw here; its stage and lens
+  // addresses go to its Park page (lens links shown disabled with their reason), never a 404 in this shell.
+  const parkOnlyWorld = unknownWorld && pathWorld !== null && isParkOnlyWorld(pathWorld);
+  useEffect(() => {
+    if (!parkOnlyWorld || pathWorld === null) return;
+    window.history.replaceState({}, "", `/world/${encodeURIComponent(pathWorld)}`);
+    window.dispatchEvent(new PopStateEvent("popstate"));
+  }, [parkOnlyWorld, pathWorld]);
   const screen = unknownWorld ? NOT_FOUND : matched;
   const worldId = unknownWorld ? null : pathWorld;
   const hudWorld = screen ? null : worldId;
@@ -149,6 +158,7 @@ export function App() {
   ) : worldId !== null ? (
     <LoggedScrubber worldId={worldId} fixture={fixtureClient} />
   ) : null;
+  if (parkOnlyWorld) return null; // the effect above is moving to the Park page
   return (
     <div
       className="app-shell"

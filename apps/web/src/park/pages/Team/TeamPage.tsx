@@ -122,7 +122,7 @@ function PersonalTeamPage({ app }: { app: AppCtx }) {
       { ...pending, active: "Pending", c: "transparent", pending: true },
     ]);
     setEmail("");
-    toast(`Invite sent to ${to}`);
+    toast(`This is a sample team, so no invite was sent to ${to}.`);
   };
 
   // One stable root: the frame and the heading are the same elements while loading, loaded or failed, so
@@ -198,6 +198,9 @@ interface BodyProps {
   setPeople: Dispatch<SetStateAction<Member[] | null>>;
 }
 
+/** W10: the team page shows a sample, so a role, backup or removal is this page's only and nothing is stored. */
+const NOT_SAVED = "This is a sample team, so nothing was saved.";
+
 function TeamBody({ app, data, people, setPeople }: BodyProps) {
   const { team } = data;
   const { toast } = app;
@@ -224,7 +227,9 @@ function TeamBody({ app, data, people, setPeople }: BodyProps) {
     setPeople((ps) =>
       (ps ?? []).map((q) => (q.id === p.id ? { ...q, role, limit: undefined } : q)),
     );
-    toast(`${p.name} is now ${role === "Approver" || role === "Owner" ? "an" : "a"} ${role}`);
+    toast(
+      `${p.name} is now ${role === "Approver" || role === "Owner" ? "an" : "a"} ${role} on this page. ${NOT_SAVED}`,
+    );
   };
   const remove = (p: Member) => {
     setPeople((ps) => (ps ?? []).filter((q) => q.id !== p.id));
@@ -233,8 +238,8 @@ function TeamBody({ app, data, people, setPeople }: BodyProps) {
     setOpen(null);
     toast(
       p.pending
-        ? "Invite cancelled"
-        : `${p.name.split(" ")[0]} was removed. Their worlds move to you`,
+        ? `Invite cancelled on this page. ${NOT_SAVED}`
+        : `${p.name.split(" ")[0]} was removed on this page. ${NOT_SAVED}`,
     );
   };
   const addBackup = (row: CoverRow, id: string) => {
@@ -242,7 +247,7 @@ function TeamBody({ app, data, people, setPeople }: BodyProps) {
     if (!who) return;
     setBackups((b) => ({ ...b, [row.id]: id }));
     if (row.flagged) app.setPref("backup", id);
-    toast(`${who.name} is now a backup for ${row.what.toLowerCase()}`);
+    toast(`${who.name} is now a backup for ${row.what.toLowerCase()} on this page. ${NOT_SAVED}`);
   };
 
   return (
@@ -260,7 +265,7 @@ function TeamBody({ app, data, people, setPeople }: BodyProps) {
           canChangeRole({ id: you.id, role: you.role }, { id: p.id, role: p.role })
         }
         onRemove={remove}
-        onResend={(p) => toast(`Invite sent again to ${p.email}`)}
+        onResend={(p) => toast(`This is a sample team, so no invite was sent again to ${p.email}.`)}
       />
       {part(2) ? (
         <Coverage

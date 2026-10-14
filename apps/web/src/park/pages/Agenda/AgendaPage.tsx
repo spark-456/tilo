@@ -64,7 +64,7 @@ function Ready({
         <div className="park-agenda-titles">
           <h1 className="park-agenda-title">Agenda</h1>
           <p className="park-agenda-lede">
-            {`${A.rules ? `${A.rules.dateLine}. ` : ""}Pins from your team and Tilo, and a week that stays in sync.`}
+            {`${A.rules ? `${A.rules.dateLine}. ` : ""}Pins from your team and Tilo, and your week${sample ? "" : " kept in sync"}.`}
           </p>
         </div>
         <div className="park-agenda-actions">
