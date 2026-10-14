@@ -10,7 +10,7 @@ const KEPT: readonly RegExp[] = [
   /^\/world\/[^/]+\/(?:stage|story|trace|delivery)\/?$/,
   /^\/world\/[^/]+\/inspect\/[^/]+\/?$/,
   /^\/needs-you(?:\/(?:gate|consent))?\/?$/,
-  /^\/(?:meeting|autonomy|channels|mail|connections|estimate|pilot)\/?$/,
+  /^\/(?:autonomy|channels|mail|connections|estimate|pilot)\/?$/,
   /^\/more\/?$/,
   /^\/team\/console\/?$/,
   // dev only, as in screens/routes.tsx: the screens index, the cards gallery and the component sheet
