@@ -18,6 +18,8 @@ from __future__ import annotations
 
 import json
 import re
+from dataclasses import replace
+from datetime import datetime
 
 import pytest
 from _ppl11a_lib import OWNER, PRIYA, SAM, fixture_case, run_threads
@@ -175,6 +177,49 @@ def test_PPL_11c_s4_BQ_PPL11C_1_team_put_routes_oversize_body_is_a_413(people_ri
 SETTINGS_PUT_ROUTES = {"settings": "/v1/me/settings"}
 SETTINGS_MAX_BODY_BYTES = 16384
 
+ORG_MODEL_KEY_WRITE_ROUTES = {"org model key": "/v1/org/model-key"}
+
+
+@pytest.mark.parametrize("path", list(ORG_MODEL_KEY_WRITE_ROUTES.values()), ids=list(ORG_MODEL_KEY_WRITE_ROUTES))
+@pytest.mark.parametrize("method", ["PUT", "PATCH"])
+def test_PPL_11c_s4_BQ_PPL11C_1_org_model_key_write_body_is_bounded_before_parsing(people_rig, path, method):
+    """Exercise active BYOK in this in-memory app only; every original body-cap assertion stays strict."""
+    from tilo_api import deps
+    from tilo_api.byok_routes import get_byok_config
+
+    rig = meeting_rig(people_rig)
+    config = replace(get_byok_config(), enabled=True)
+    rig.app.dependency_overrides[get_byok_config] = lambda: config
+    principal = rig.app.dependency_overrides[deps.get_current_principal]()
+    clock = rig.app.dependency_overrides[deps.get_clock]()
+    fresh_principal = replace(
+        principal, full_session=True, auth_time=datetime.fromisoformat(clock().replace("Z", "+00:00")).timestamp()
+    )
+    rig.app.dependency_overrides[deps.get_current_principal] = lambda: fresh_principal
+    before = rig.snapshot()
+    status, consumed, headers, text = stream_post(rig.app, path, method=method, total_bytes=5_000_000)
+    assert status == 413 and json.loads(text) == {"detail": "body_too_large"}, (status, text[:120])
+    assert consumed <= MAX_BODY_BYTES + 64 * 1024
+    assert rig.snapshot() == before
+    status, consumed, headers, text = stream_post(
+        rig.app, path, method=method, total_bytes=10, declared_length=50_000_000
+    )
+    assert status == 413 and consumed <= 4096
+    assert rig.snapshot() == before
+
+
+@pytest.mark.parametrize("method", ["PUT", "PATCH"])
+def test_PPL_11c_s4_BQ_PPL11C_1_disabled_org_model_key_never_reads_an_oversize_body(people_rig, method):
+    """Shipped flags stay OFF: 503 before reading any credential bytes is the inert contract."""
+    rig = meeting_rig(people_rig)
+    before = rig.snapshot()
+    status, consumed, headers, text = stream_post(
+        rig.app, ORG_MODEL_KEY_WRITE_ROUTES["org model key"], method=method, total_bytes=5_000_000
+    )
+    assert status == 503 and json.loads(text) == {"detail": "not_configured"}
+    assert consumed == 0
+    assert rig.snapshot() == before
+
 
 @pytest.mark.parametrize("path", list(SETTINGS_PUT_ROUTES.values()), ids=list(SETTINGS_PUT_ROUTES))
 def test_PPL_11c_s4_BQ_PPL11C_1_settings_put_oversize_body_is_a_413(people_rig, path):
@@ -198,7 +243,7 @@ def test_PPL_11c_s4_BQ_PPL11C_1_every_put_and_patch_write_route_is_covered(peopl
         if any(m in methods for m in ("put", "patch")) and t.startswith("/v1/")
     ]
     patterns = {t: re.compile("^" + re.sub(r"\{[^/}]+\}", "[^/]+", t) + "$") for t in templates}
-    all_covered = [*TEAM_PUT_ROUTES.values(), *SETTINGS_PUT_ROUTES.values()]
+    all_covered = [*TEAM_PUT_ROUTES.values(), *SETTINGS_PUT_ROUTES.values(), *ORG_MODEL_KEY_WRITE_ROUTES.values()]
     uncovered = [t for t, p in patterns.items() if not any(p.match(path) for path in all_covered)]
     assert not uncovered, f"PUT/PATCH write routes with no body-cap case: {uncovered}"
 
