@@ -1,0 +1,8 @@
+# FR-CON-18 / FR-CON-12: synthetic offline declaration, NOT vendor metadata.
+# Never copy this endpoint or illustrative tool into the production allowlist.
+servers:
+  - id: lovable_mcp
+    name: Lovable MCP offline candidate
+    endpoint: https://lovable.example/mcp
+    tools:
+      - {name: build_handoff, action_type: build_handoff, risk_tier: T3, side_effect: true}
