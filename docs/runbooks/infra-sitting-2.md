@@ -198,10 +198,10 @@ $problems += @($rc | Where-Object { $_.type -eq 'google_firestore_index' -and ((
 # tilo-api keeps what was set by hand (env is ignored by the module; memory and timeout are declared): no api change at all.
 $problems += @($rc | Where-Object { $_.address -eq 'module.service.google_cloud_run_v2_service.env_ignored["api"]' -and (($_.change.actions -join ',') -ne 'no-op') }) |
   ForEach-Object { "TILO-API CHANGES: the plan would alter the service (names are listed below); the hand-set values must be carried" }
-$problems += @($add.address | Where-Object { $_ -notin $expectAdd }) | ForEach-Object { "UNEXPECTED add: $_" }
-$problems += @($expectAdd | Where-Object { $_ -notin $add.address }) | ForEach-Object { "MISSING add: $_" }
-$problems += @($chg.address | Where-Object { $_ -notin $expectChange }) | ForEach-Object { "UNEXPECTED change: $_" }
-$problems += @($expectChange | Where-Object { $_ -notin $chg.address }) | ForEach-Object { "MISSING change: $_" }
+$problems += @(($add | ForEach-Object address) | Where-Object { $_ -notin $expectAdd }) | ForEach-Object { "UNEXPECTED add: $_" }
+$problems += @($expectAdd | Where-Object { $_ -notin ($add | ForEach-Object address) }) | ForEach-Object { "MISSING add: $_" }
+$problems += @(($chg | ForEach-Object address) | Where-Object { $_ -notin $expectChange }) | ForEach-Object { "UNEXPECTED change: $_" }
+$problems += @($expectChange | Where-Object { $_ -notin ($chg | ForEach-Object address) }) | ForEach-Object { "MISSING change: $_" }
 if ($moved.Count -ne 1 -or $moved[0].address -ne 'module.service.google_cloud_run_v2_service.env_ignored["channels"]') { $problems += 'MOVED: expected exactly the tilo-channels state move' }
 # Which attributes change in place (names only, never values):
 foreach ($c in $chg) {

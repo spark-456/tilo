@@ -1,0 +1,217 @@
+{
+  "resource_changes": [
+    {
+      "address": "google_project_iam_custom_role.artifact_object_delete",
+      "change": {
+        "actions": [
+          "create"
+        ]
+      }
+    },
+    {
+      "address": "google_firestore_field.ttl[\"limiter_counters\"]",
+      "change": {
+        "actions": [
+          "create"
+        ]
+      }
+    },
+    {
+      "address": "google_firestore_field.ttl[\"limiter_keys\"]",
+      "change": {
+        "actions": [
+          "create"
+        ]
+      }
+    },
+    {
+      "address": "google_firestore_field.ttl[\"link_nonces\"]",
+      "change": {
+        "actions": [
+          "create"
+        ]
+      }
+    },
+    {
+      "address": "google_secret_manager_secret_iam_member.api_link_signing_key",
+      "change": {
+        "actions": [
+          "create"
+        ]
+      }
+    },
+    {
+      "address": "google_service_account.cloudbuild_tests",
+      "change": {
+        "actions": [
+          "create"
+        ]
+      }
+    },
+    {
+      "address": "google_storage_bucket_iam_member.cloudbuild_tests_staging_viewer",
+      "change": {
+        "actions": [
+          "create"
+        ]
+      }
+    },
+    {
+      "address": "module.iam.google_project_iam_member.this[\"cloudbuild-tests::roles/logging.logWriter\"]",
+      "change": {
+        "actions": [
+          "create"
+        ]
+      }
+    },
+    {
+      "address": "google_storage_bucket_iam_member.service_access[\"archive::api::roles/storage.objectCreator\"]",
+      "change": {
+        "actions": [
+          "create"
+        ]
+      }
+    },
+    {
+      "address": "google_storage_bucket_iam_member.service_access[\"archive::api::roles/storage.objectViewer\"]",
+      "change": {
+        "actions": [
+          "create"
+        ]
+      }
+    },
+    {
+      "address": "google_storage_bucket_iam_member.service_access[\"artifacts::api::projects/essential-wares-510320-f0/roles/tiloArtifactObjectDelete\"]",
+      "change": {
+        "actions": [
+          "create"
+        ]
+      }
+    },
+    {
+      "address": "google_project_service.apis[\"texttospeech.googleapis.com\"]",
+      "change": {
+        "actions": [
+          "create"
+        ]
+      }
+    },
+    {
+      "address": "module.service.google_service_account.this[\"meet-bot\"]",
+      "change": {
+        "actions": [
+          "create"
+        ]
+      }
+    },
+    {
+      "address": "module.service.google_cloud_run_v2_service.this[\"meet-bot\"]",
+      "change": {
+        "actions": [
+          "create"
+        ]
+      }
+    },
+    {
+      "address": "module.service.google_cloud_run_v2_service_iam_member.invoker[\"meet-bot::api\"]",
+      "change": {
+        "actions": [
+          "create"
+        ]
+      }
+    },
+    {
+      "address": "module.iam.google_project_iam_member.this[\"meet-bot::projects/essential-wares-510320-f0/roles/tiloVertexGenerate\"]",
+      "change": {
+        "actions": [
+          "create"
+        ]
+      }
+    },
+    {
+      "address": "module.iam.google_project_iam_member.this[\"meet-bot::roles/serviceusage.serviceUsageConsumer\"]",
+      "change": {
+        "actions": [
+          "create"
+        ]
+      }
+    },
+    {
+      "address": "module.service.google_cloud_run_v2_service_iam_member.developer[\"meet-bot::deployer\"]",
+      "change": {
+        "actions": [
+          "create"
+        ]
+      }
+    },
+    {
+      "address": "module.service.google_cloud_run_v2_service_iam_member.developer[\"meet-bot::cloudbuild\"]",
+      "change": {
+        "actions": [
+          "create"
+        ]
+      }
+    },
+    {
+      "address": "google_service_account_iam_member.deployer_act_as[\"meet-bot\"]",
+      "change": {
+        "actions": [
+          "create"
+        ]
+      }
+    },
+    {
+      "address": "google_service_account_iam_member.cloudbuild_act_as[\"meet-bot\"]",
+      "change": {
+        "actions": [
+          "create"
+        ]
+      }
+    },
+    {
+      "address": "module.monitoring.google_monitoring_alert_policy.run_5xx_ratio",
+      "change": {
+        "actions": [
+          "update"
+        ],
+        "before": {
+          "conditions": [
+            "old"
+          ]
+        },
+        "after": {
+          "conditions": [
+            "new"
+          ]
+        }
+      }
+    },
+    {
+      "address": "module.monitoring.google_monitoring_alert_policy.run_latency_p95",
+      "change": {
+        "actions": [
+          "update"
+        ],
+        "before": {
+          "conditions": [
+            "old"
+          ]
+        },
+        "after": {
+          "conditions": [
+            "new"
+          ]
+        }
+      }
+    },
+    {
+      "address": "module.service.google_cloud_run_v2_service.env_ignored[\"channels\"]",
+      "previous_address": "module.service.google_cloud_run_v2_service.this[\"channels\"]",
+      "change": {
+        "actions": [
+          "no-op"
+        ]
+      }
+    }
+  ]
+}
