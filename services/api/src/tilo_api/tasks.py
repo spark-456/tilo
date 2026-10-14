@@ -166,12 +166,20 @@ def _brief(task: deps.TaskRecord, answers: dict[str, str | None], edits: dict[st
         if question.field in answers and question.field not in edits:  # an edit stands over the answer (BQ-99)
             answer = answers[question.field]
             if answer is None:
-                brief = record_assumption(brief, question)
+                try:
+                    brief = record_assumption(brief, question, today=today)
+                except BriefValidationError:  # a skip is never refused (SIMPLE-RUN-2): the guess stands as asked
+                    brief = {**brief, "assumptions": [*brief["assumptions"], _assumption_line(question)]}
             else:
                 brief = apply_answer(brief, question, answer, today=today)
     for field, value in edits.items():
-        brief = edit_brief_field(brief, field, value)
+        brief = edit_brief_field(brief, field, value, today=today)
     return brief
+
+
+def _assumption_line(question: Any) -> dict[str, Any]:
+    guess = question.suggested_answers[0] if question.suggested_answers else ""
+    return {"question": question.text[:300], "assumed": f"{question.label or question.field}: {guess}"[:300]}
 
 
 def _strings(value: Any) -> Iterator[str]:
@@ -303,7 +311,14 @@ def get_approaches(
         approaches = task.approaches
     # Default (PRD silent, BQ-83): the cheapest approach is recommended; ties keep the Director's order.
     recommended = min(approaches, key=lambda a: a["credits"]["max"])["id"]
-    return {"task_id": task_id, "approaches": approaches, "recommended": recommended, "credit_usd": credit_usd}
+    return {
+        "task_id": task_id,
+        "approaches": approaches,
+        "recommended": recommended,
+        "credit_usd": credit_usd,
+        # SIMPLE-RUN-2: the most one approval may grant, so a one-step Start sends min(estimate, ceiling), never a 422.
+        "budget_ceiling": deps.budget_cap_ceiling(),
+    }
 
 
 def _load_scenario(task: deps.TaskRecord) -> Any:
@@ -338,6 +353,49 @@ def _scenario_policies(
     return policies, events
 
 
+_NOT_STARTED = (
+    "Tilo could not start this run just now. Nothing was started and nothing was charged. "
+    "Press Start again in a minute; if it keeps happening, the problem is on our side."
+)
+
+
+def _loud() -> bool:
+    """Deployed, a run that cannot start is a plain 503 (SIMPLE-RUN-2). Locally and in tests the stores are often
+    deliberately absent, so the long-standing answer stays: the grant is recorded and a world answers 200."""
+    return deps.enforced()
+
+
+def _run_started(store: deps.Store, task: deps.TaskRecord) -> bool:
+    store.settle(task.world_id)
+    return task.world_id in store.runs or any(e["type"] == "world.started" for e in store.events.get(task.world_id, []))
+
+
+def _granted_cap(store: deps.Store, task: deps.TaskRecord, asked: float) -> float:
+    """The cap this task's grant recorded, which a second Start keeps (the request's number never raises it)."""
+    for event in reversed(store.events.get(task.world_id, [])):
+        if event.get("type") == "budget.granted":
+            try:
+                return float(event["data"]["cap"])
+            except (KeyError, TypeError, ValueError):
+                break
+    return asked
+
+
+def _start(
+    store: deps.Store, task: deps.TaskRecord, *, approach: dict, budget_cap: float, seams: runs.Seams | None
+) -> None:
+    """Start the task's one run. A start that fails is a 503 in plain words, never a 200 onto a world that never
+    moves (SIMPLE-RUN-2, LIVE-PATH-AUDIT-A finding 6). The grant stays recorded, so Start again retries only this."""
+    if seams is None:
+        return  # local and tests only (`_loud` refuses before this when deployed): nothing to start with
+    try:
+        runs.start_run(store, task, approach=approach, budget_cap=budget_cap, seams=seams)
+    except Exception as exc:
+        logger.exception("the run for task %s did not start", task.world_id)
+        if _loud():
+            raise HTTPException(status_code=503, detail=_NOT_STARTED) from exc
+
+
 @router.post("/tasks/{task_id}/approve")
 def approve(
     task_id: str,
@@ -353,6 +411,21 @@ def approve(
     the task's one run (CL-INT-2); a run that cannot start never changes this answer."""
     task = _owned(store, task_id, principal)
     deps.refuse_if_replay_only(flags)  # NFR-24: after sign-in and the owner check, before any grant
+    if _loud() and task.granted and not _run_started(store, task):
+        # SIMPLE-RUN-2: the budget was approved but the run never started (it could not be wired, or the start failed):
+        # Start again starts it with the grant already recorded, so the person is never stuck on "already approved".
+        approach = next((a for a in task.approaches or [] if a["id"] == body.approach_id), None)
+        if approach is None:
+            raise HTTPException(status_code=422, detail="Pick one of the proposed approaches.")
+        if seams is None:
+            raise HTTPException(status_code=503, detail=_NOT_STARTED)
+        _start(store, task, approach=approach, budget_cap=_granted_cap(store, task, body.budget_cap), seams=seams)
+        return {"world_id": task.world_id}
+    if (
+        seams is None and _loud()
+    ):  # SIMPLE-RUN-2: loud and before the grant, so nothing is approved or charged for a run that cannot go
+        logger.error("approve refused: the run seams are not wired (task %s)", task_id)
+        raise HTTPException(status_code=503, detail=_NOT_STARTED)
     getattr(store, "admit_run", lambda: None)()  # a demo may have only a few runs at once (DEMO-EPHEMERAL-1)
     if body.budget_cap > (ceiling := deps.budget_cap_ceiling()):  # finite already: the body refuses NaN and Infinity
         raise HTTPException(status_code=422, detail=f"One run may use at most {ceiling:g} credits.")
@@ -387,9 +460,5 @@ def approve(
             store, writer, task_id, task, [event, *policy_events], {"granted": True},
             policies={p["id"]: p for p in policies}, policy_worlds={p["id"]: task.world_id for p in policies},
         )  # fmt: skip
-    if seams is not None:
-        try:
-            runs.start_run(store, task, approach=approach, budget_cap=cap, seams=seams)
-        except Exception:
-            logger.exception("the run for task %s did not start", task_id)
+    _start(store, task, approach=approach, budget_cap=cap, seams=seams)
     return {"world_id": task.world_id}
