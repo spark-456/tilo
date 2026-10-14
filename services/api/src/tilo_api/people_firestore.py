@@ -35,7 +35,7 @@ from tilo_people.errors import (
     PeopleInputError,
     VersionConflict,
 )
-from tilo_people.stores import INDEXES, PeopleStores, Stored
+from tilo_people.stores import BOUNDED_INDEXES, INDEXES, PeopleStores, Stored
 
 _ORG = re.compile(r"org_[0-9A-Za-z_]{1,48}")
 _IDS = {
@@ -223,6 +223,21 @@ class FirestoreRecordStore:
                 query = query.where(filter=FieldFilter(f"record.{field}", "==", value))
             rows = [self._stored(snap) for snap in query.stream()]
         return tuple(sorted(rows, key=lambda s: s.record["id"]))
+
+    def list_bounded(self, org_id: str, field: str, value: str, *, limit: int) -> tuple[Stored, ...]:
+        if field not in BOUNDED_INDEXES[self.kind] or not isinstance(value, str) or type(limit) is not int or limit < 1:
+            raise PeopleInputError("invalid bounded index query")
+        if not isinstance(org_id, str) or _ORG.fullmatch(org_id) is None:
+            return ()
+        rows = []
+        with _guarded():
+            query = self._collection(org_id).where(filter=FieldFilter(f"record.{field}", "==", value)).limit(limit)
+            for snap in query.stream():
+                try:
+                    rows.append(self._stored(snap))
+                except (KeyError, TypeError, ValueError, OverflowError):
+                    continue  # corrupt document only; stream/storage failures still reach the caller
+        return tuple(rows)
 
 
 class FirestorePersonStore(FirestoreRecordStore):

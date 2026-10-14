@@ -2,7 +2,7 @@
 
 from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Any, Literal
+from typing import Any, Literal, cast
 
 from tilo_people.access import AccessRequest, decide, read
 from tilo_people.directory import Directory
@@ -26,7 +26,7 @@ def _directory(w: Writer, owner: str | None = None) -> Directory:
     # Membership stamps need their assigning org owner. Read only those ids, never the org directory.
     rows = {}
     for user in {w.actor, owner} - {None}:
-        stored = w.stores.persons.get(w.org, user)
+        stored = w.stores.persons.get(w.org, cast(str, user))  # None was removed from the candidate set.
         if stored is not None:
             rows[user] = stored.record
     assigners = {m["assigned_by"]["by"] for row in rows.values() for m in row["memberships"]}

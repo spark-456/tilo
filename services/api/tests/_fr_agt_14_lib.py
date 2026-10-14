@@ -185,6 +185,7 @@ class SchedApi:
 
     def __init__(self, flow: Flow, monkeypatch: Any, *, rf: Any = None, configured: bool = True) -> None:
         from tilo_api import deps, schedules  # noqa: PLC0415
+        from tilo_people.stores import PeopleStores  # noqa: PLC0415
 
         self.flow, self.rf, self.app, self.store = flow, rf, flow.app, flow.store
         self.clock = Clock()
@@ -192,6 +193,10 @@ class SchedApi:
         self.verifier = FakeOidcVerifier()
         self.flags = InMemoryFlagStore()
         overrides = flow.app.dependency_overrides
+        # SEC-10 W5: the route limiter uses the install's people stores and its clock.
+        people = PeopleStores.in_memory()
+        overrides.setdefault(deps.get_people_stores, lambda: people)
+        overrides.setdefault(deps.get_clock, lambda: lambda: self.clock().isoformat())
         overrides[seam(schedules, "get_schedule_store")] = lambda: self.schedules
         overrides[seam(schedules, "get_clock")] = lambda: self.clock
         overrides[seam(schedules, "get_oidc_verifier")] = lambda: self.verifier

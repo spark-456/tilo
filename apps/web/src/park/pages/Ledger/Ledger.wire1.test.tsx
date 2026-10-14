@@ -94,6 +94,28 @@ async function renderLive(ledger: Ledger, vw = 1440) {
 const BAD = /NaN|Infinity|undefined|\[object/;
 
 describe("WIRE_1_ledger_page: a live Ledger with zero budget and empty arrays", () => {
+  it("UI_10_W12_live_ledger_without_month_query_has_no_month_picker", async () => {
+    const { container } = await renderLive(
+      live({
+        daily: [1.21],
+        period: {
+          month: "October",
+          short: "Oct",
+          year: 2026,
+          days: 31,
+          firstWeekday: 4,
+          today: "Thu 1 Oct",
+          day: 1,
+        },
+      }),
+    );
+    expect(q(container, ".park-ledger-month").textContent).toBe("October 2026");
+    expect(
+      container.querySelector(".park-ledger-month button, .park-ledger-month select"),
+    ).toBeNull();
+    expect(container.textContent).not.toContain("August and earlier months live here");
+  });
+
   it("WIRE_1_ledger_live_zero_budget_renders_no_NaN_or_Infinity_anywhere", async () => {
     const err = vi.spyOn(console, "error").mockImplementation(() => undefined);
     const { container } = await renderLive(live());

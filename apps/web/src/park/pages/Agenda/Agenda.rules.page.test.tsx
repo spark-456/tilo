@@ -177,9 +177,7 @@ describe("WEB_9c_agenda_generic: behaviour follows the data", () => {
         getDecisions: () => Promise.reject(new Error("not served")),
       },
     });
-    expect(text(container)).toContain(
-      "Pins from your team and Tilo, and a week that stays in sync.",
-    );
+    expect(text(container)).toContain("Pins from your team and Tilo, and your week.");
     expect(text(container)).toContain("Everyone on the team and Tilo");
     expect(text(pin(container, "t0"))).toContain("Accept");
     expect(text(pin(container, "t1"))).not.toContain("Review and approve");

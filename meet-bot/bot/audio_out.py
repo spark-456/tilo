@@ -53,6 +53,8 @@ def setup_virtual_mic() -> bool:
 class Player:
     """Plays PCM chunks into the virtual microphone; `should_stop` is polled so a human can interrupt."""
 
+    on_level: Callable[[float], None] | None = None
+
     async def play(self, chunks: AsyncIterator[bytes], rate: int, should_stop: Callable[[], bool]) -> bool:
         """True if everything was played, False if cut off."""
         proc = await asyncio.create_subprocess_exec(
@@ -76,6 +78,9 @@ class Player:
                     break
                 proc.stdin.write(chunk)
                 await proc.stdin.drain()
+                if self.on_level and len(chunk) >= 2:
+                    samples = memoryview(chunk[: len(chunk) // 2 * 2]).cast("h")[::32]
+                    self.on_level((sum(float(x) ** 2 for x in samples) / len(samples)) ** 0.5 / 32768)
             proc.stdin.close()
             while not cut and proc.returncode is None:  # the tail is still playing: keep watching for interruptions
                 if should_stop():

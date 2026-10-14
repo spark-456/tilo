@@ -49,7 +49,45 @@ const SERVER_TROUBLE = "Tilo had a problem on its side.";
 /** NFR-22: the web's own sentence for a replay-only 503; the server's free text is never shown. */
 const REPLAY_ONLY =
   "Live models are unavailable right now, so nothing new was started. Finished runs can still be replayed.";
+const SAFETY_UNAVAILABLE = "The safety screen is unavailable. Try again later.";
+const NOT_CONFIGURED = "This feature is not configured on this server.";
+/** Legacy routes use these exact details instead of a code. Match only known wire values;
+ * no server text, including extensions of these sentences, is ever displayed. */
+const SAFETY_DETAILS = new Set([
+  "The safety screen is unavailable; nothing was stored.",
+  "The safety screen is unavailable; nothing was answered.",
+  "The safety screen is unavailable; nothing changed.",
+]);
+
+function unavailableMessage(text: string): string {
+  try {
+    const body = JSON.parse(text) as { code?: unknown; detail?: unknown } | null;
+    if (body?.code === "not_configured" || body?.detail === "not_configured") {
+      return NOT_CONFIGURED;
+    }
+    if (typeof body?.detail === "string" && SAFETY_DETAILS.has(body.detail)) {
+      return SAFETY_UNAVAILABLE;
+    }
+  } catch {
+    // An unreadable refusal still gets fixed web copy.
+  }
+  return SERVER_TROUBLE;
+}
 const BAD_REPLY = "Tilo sent a reply this page could not read.";
+const INTAKE_COMMITTED =
+  "This task was already submitted. Check your worlds before starting another task.";
+
+function isIntakeCommitted(status: number, text: string): boolean {
+  if (status !== 409) return false;
+  try {
+    return (
+      (JSON.parse(text) as { detail?: { code?: unknown } } | null)?.detail?.code ===
+      "intake_already_committed"
+    );
+  } catch {
+    return false;
+  }
+}
 /** STARTER-1: the recorded sample project (`tilo_api.sample_world`); its path is read-only. */
 const SAMPLE_PATH = "/worlds/w_sample_village_basic";
 const SAMPLE_SIMULATED =
@@ -287,6 +325,10 @@ export class HttpClient implements TiloClient, SchedulesApi, FieldsApi, ItemApi 
   private readonly feeds = new Map<string, Feed>();
   private readonly missing = new Set<string>(); // worlds whose events answered 404
   private readonly missingListeners = new Set<() => void>();
+  // Keep only the current uncertain intent. File identity matters: same metadata can hide different bytes.
+  private intakeIntent:
+    | { text: string; files: File[]; mode: "quick" | undefined; key: string }
+    | undefined;
 
   constructor(options: HttpClientOptions) {
     this.base = options.baseUrl.trim().replace(/\/+$/, "");
@@ -344,17 +386,28 @@ export class HttpClient implements TiloClient, SchedulesApi, FieldsApi, ItemApi 
       throw new TiloApiError(UNREACHABLE, null, true, write); // the cause (host, port) is not for people
     }
     if (!res.ok) {
-      // Only a 503 (the replay-only label) or a 4xx has a body worth reading; other 5xx are not awaited.
+      // Read 503's known refusal values or a 4xx; other 5xx are not awaited.
       if (res.status >= 500 && res.status !== 503) {
         throw new TiloApiError(SERVER_TROUBLE, res.status, true, write);
       }
       const body = await res.text().catch(() => "");
+      if (path === "/intake" && isIntakeCommitted(res.status, body)) {
+        throw new TiloApiError(INTAKE_COMMITTED, 409, false, write, "intake_already_committed");
+      }
       if (isReplayOnly(res.status, body)) {
         throw new TiloApiError(REPLAY_ONLY, 503, false, write, codeOf(body), true);
       }
       const refusal = refusalOf(body);
       if (res.status >= 500) {
-        throw new TiloApiError(SERVER_TROUBLE, res.status, true, write, null, false, refusal);
+        throw new TiloApiError(
+          unavailableMessage(body),
+          res.status,
+          true,
+          write,
+          codeOf(body),
+          false,
+          refusal,
+        );
       }
       throw new TiloApiError(
         reasonOf(res.status, body),
@@ -383,6 +436,16 @@ export class HttpClient implements TiloClient, SchedulesApi, FieldsApi, ItemApi 
    * `headers` adds request headers (BQ-CTX-TEAMWORLD: an `Idempotency-Key` so a retried create is made once). */
   postJson(path: string, body: unknown, headers?: Record<string, string>): Promise<unknown> {
     return this.post<unknown>(path, body, headers);
+  }
+
+  /** A plain PUT of `body` as JSON, decoded as JSON, with the same typed failures and `write` true (FR-SET-01). */
+  putJson(path: string, body: unknown): Promise<unknown> {
+    const init = {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body),
+    };
+    return this.request<unknown>(path, init, true);
   }
 
   /** A PUT or DELETE of `path` with no body, decoded as JSON, `write` true (BQ-CTX-TEAMWORLD: team shares). */
@@ -421,12 +484,43 @@ export class HttpClient implements TiloClient, SchedulesApi, FieldsApi, ItemApi 
     files: File[],
     mode?: "quick",
   ): Promise<IntakeResult | QuickIntakeResult> {
+    let intent = this.intakeIntent;
+    if (
+      !intent ||
+      intent.text !== text ||
+      intent.mode !== mode ||
+      intent.files.length !== files.length ||
+      !intent.files.every((file, i) => file === files[i])
+    ) {
+      intent = { text, files: [...files], mode, key: crypto.randomUUID() };
+      this.intakeIntent = intent;
+    }
+    try {
+      const result = await this.sendIntake(text, intent.files, mode, intent.key);
+      if (this.intakeIntent === intent) this.intakeIntent = undefined;
+      return result;
+    } catch (error) {
+      // A network/5xx/unreadable reply can follow a committed write: a manual retry keeps the key.
+      if (error instanceof TiloApiError && !error.retryable && this.intakeIntent === intent) {
+        this.intakeIntent = undefined;
+      }
+      throw error;
+    }
+  }
+
+  private async sendIntake(
+    text: string,
+    files: File[],
+    mode: "quick" | undefined,
+    key: string,
+  ): Promise<IntakeResult | QuickIntakeResult> {
     const form = new FormData();
     form.append("text", text);
     for (const file of files) form.append("files", file);
+    const init = { method: "POST", body: form, headers: { "Idempotency-Key": key } };
     if (mode === "quick") {
       form.append("mode", mode);
-      const body = await this.request<unknown>("/intake", { method: "POST", body: form }, true);
+      const body = await this.request<unknown>("/intake", init, true);
       const quick = quickOf(body);
       if (!quick) throw new TiloApiError(BAD_REPLY, 200, true, true);
       return quick;
@@ -435,7 +529,7 @@ export class HttpClient implements TiloClient, SchedulesApi, FieldsApi, ItemApi 
       Omit<IntakeResult, "files"> & {
         files: Array<{ filename: string; status: "ok" | "failed"; safety_flagged: boolean }>;
       }
-    >("/intake", { method: "POST", body: form }, true);
+    >("/intake", init, true);
     return {
       task_id: r.task_id,
       brief: r.brief,

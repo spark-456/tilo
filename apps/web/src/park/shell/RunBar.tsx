@@ -17,7 +17,7 @@ import { useMotionOff } from "./motion";
 import { runBarOf } from "./runStatus";
 
 /** How often a live, running or held bar reads the worlds again. */
-export const POLL_MS = 15_000;
+export const POLL_MS = 15 * 1000;
 
 interface Read {
   worlds: World[];

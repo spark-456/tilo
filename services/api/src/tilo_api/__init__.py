@@ -18,7 +18,9 @@ from tilo_api import deps as _deps
 from tilo_api import dev as _dev
 from tilo_api import durable_store as _durable_store
 from tilo_api import meeting_host_routes as _meeting_host_routes
+from tilo_api import nudge_sweep as _nudge_sweep
 from tilo_api import people as _people
+from tilo_api import plate_links as _plate_links
 from tilo_api import quiz_apps as _quiz_apps
 from tilo_api import runs as _runs
 from tilo_api import schedules as _schedules
@@ -32,6 +34,7 @@ from tilo_api.cards import build_router as _build_cards_router
 from tilo_api.cards_feed import router as _cards_feed_router
 from tilo_api.connectors_list import router as _connectors_list_router
 from tilo_api.console import build_router as _build_console_router
+from tilo_api.context_panel import router as _context_panel_router
 from tilo_api.costs import router as _costs_router
 from tilo_api.dispatch import router as _dispatch_router
 from tilo_api.effort import router as _effort_router
@@ -44,16 +47,19 @@ from tilo_api.meeting_room import router as _meeting_room_router
 from tilo_api.notifications import router as _notifications_router
 from tilo_api.people_limits import NoStore as _NoStore
 from tilo_api.people_list import router as _people_list_router
+from tilo_api.push_routes import router as _push_router
 from tilo_api.redaction import router as _redaction_router
 from tilo_api.sample_world import router as _sample_router
 from tilo_api.sharing import WorldView
 from tilo_api.sharing import build_router as _build_sharing_router
 from tilo_api.skills_capture import router as _skills_capture_router
+from tilo_api.skills_feedback import router as _skills_feedback_router
 from tilo_api.skills_routes import router as _skills_router
 from tilo_api.tasks import router as _tasks_router
 from tilo_api.team_items import router as _team_items_router
 from tilo_api.team_routes import router as _team_router
 from tilo_api.team_shares import router as _team_shares_router
+from tilo_api.user_settings import router as _user_settings_router
 from tilo_api.worlds_list import router as _worlds_list_router
 
 # Generated docs only in local dev mode: deployed, the service is public and the route list is not for
@@ -126,6 +132,7 @@ app.include_router(intake_router)
 app.include_router(_dispatch_router)
 app.include_router(_redaction_router)
 app.include_router(_costs_router)
+app.include_router(_context_panel_router)
 app.include_router(_worlds_list_router)
 app.include_router(_cards_feed_router)
 app.include_router(_notifications_router)
@@ -140,6 +147,7 @@ app.include_router(_item_fields_router)
 app.include_router(_meeting_room_router)
 app.include_router(_assistant_router)
 app.include_router(_people.router)
+app.include_router(_plate_links.router)  # FR-PA-06b: /l/<token> (public to the gate; the route checks the link)
 app.include_router(_team_shares_router)  # ADR-0040: owner-only PUT/DELETE of a world's team share
 app.include_router(_team_items_router)  # ADR-0040: the team view of a shared world's work items
 app.include_router(_meeting_host_routes.router)
@@ -148,11 +156,15 @@ app.include_router(_connect_routes.router)
 app.include_router(_people_list_router)
 app.include_router(_skills_router)
 app.include_router(_skills_capture_router)
+app.include_router(_skills_feedback_router)
 app.include_router(_effort_router)
 app.include_router(_feedback_router)
+app.include_router(_push_router)
 app.include_router(_connectors_list_router)
 app.include_router(_schedules.router)
+app.include_router(_nudge_sweep.router)  # FR-PA-15b: GET /v1/nudges, POST /v1/nudges/{id}/snooze
 app.include_router(_team_router)
+app.include_router(_user_settings_router)  # FR-SET-01/02: GET and PUT /v1/me/settings
 
 
 def _world_owner(world_id: str) -> str | None:

@@ -33,7 +33,9 @@ def test_I2_FR_INT_02_files_preserve_model_or_spend_failure(uploads, monkeypatch
 
 
 @pytest.mark.parametrize("status,detail", [(429, "demo_capacity"), (503, "store_unavailable"), (409, "stale")])
-def test_I2_FR_INT_02_commit_preserves_http_failure_and_cleans_only_uncommitted(uploads, monkeypatch, status, detail):
+def test_I2_FR_INT_02_commit_preserves_http_failure_and_cleans_only_definite_refusals(
+    uploads, monkeypatch, status, detail
+):
     from fastapi import HTTPException
 
     client, _, artifacts, _ = uploads
@@ -45,7 +47,7 @@ def test_I2_FR_INT_02_commit_preserves_http_failure_and_cleans_only_uncommitted(
     response = post(client)
     assert response.status_code == status
     assert response.json() == {"detail": detail}
-    assert artifacts.retention().records() == []
+    assert len(artifacts.retention().records()) == int(status == 503)
 
 
 def test_I2_FR_INT_02_an_unknown_commit_that_landed_keeps_its_uploads(uploads, store, monkeypatch):
@@ -142,7 +144,7 @@ def test_I2_FR_INT_02_director_failure_cleans_prepared_uploads(uploads, monkeypa
     assert archives and all("content" not in r["payload"] for a in archives.values() for r in a.records())
 
 
-def test_I2_FR_INT_02_task_failure_cleans_completed_upload_versions(uploads, monkeypatch):
+def test_I2_FR_INT_02_ambiguous_task_failure_retains_completed_upload_versions(uploads, monkeypatch):
     client, _, artifacts, archives = uploads
 
     def fail(*_args, **_kwargs):
@@ -150,7 +152,7 @@ def test_I2_FR_INT_02_task_failure_cleans_completed_upload_versions(uploads, mon
 
     monkeypatch.setattr(intake, "create_task", fail)
     assert post(client).status_code == 503
-    assert artifacts.retention().records() == []
+    assert len(artifacts.retention().records()) == 1
     # The raw archive is append-only: metadata of a failed attempt is retained, with no file bytes.
     assert all("content" not in r["payload"] for a in archives.values() for r in a.records())
 
@@ -193,6 +195,10 @@ def test_I2_FR_INT_02_stored_verdict_cannot_be_upgraded_to_clean(uploads, store,
 
     artifacts._screener = Flagged() if verdict == "flagged" else None
     response = post(client)
+    if verdict == "unscreened":
+        assert response.status_code == 503 and not store.tasks
+        assert artifacts.retention().records() == []
+        return
     assert response.status_code == 201
     body = response.json()
     file = body["files"][0]
@@ -298,8 +304,8 @@ def test_I2_FR_INT_02_stored_unsafe_file_never_reaches_director(uploads, monkeyp
         return extract(*args, **kwargs)
 
     monkeypatch.setattr(intake, "extract_brief", director)
-    assert post(client).status_code == 201
-    assert inputs == [("", [])]
+    assert post(client).status_code == (503 if verdict == "unscreened" else 201)
+    assert inputs == ([] if verdict == "unscreened" else [("", [])])
 
 
 @pytest.mark.parametrize("backend", ["artifacts", "archive"])
@@ -351,14 +357,16 @@ def test_I2_FR_INT_02_retry_is_single_world_and_body_scoped(uploads, store):
 
 
 def test_I2_FR_INT_02_failed_retry_rebinds_deleted_prepared_versions(uploads, monkeypatch):
+    from fastapi import HTTPException
+
     client, bridge, artifacts, _ = uploads
     create = intake.create_task
 
     def fail(*_args, **_kwargs):
-        raise RuntimeError("unavailable")
+        raise HTTPException(status_code=409, detail="stale")  # definite refusal before the write
 
     monkeypatch.setattr(intake, "create_task", fail)
-    assert post(client, key="retry-1").status_code == 503
+    assert post(client, key="retry-1").status_code == 409
     assert not bridge.prepared and bridge.scope is None
     monkeypatch.setattr(intake, "create_task", create)
     response = post(client, key="retry-1")
@@ -384,14 +392,19 @@ def test_I2_FR_INT_02_unknown_landed_retry_makes_no_second_world(uploads, store,
 
 
 def test_I2_FR_INT_02_failed_commit_read_retains_owned_versions(uploads, store, monkeypatch):
+    from fastapi import HTTPException
+
     client, _, artifacts, _ = uploads
 
     def fail(*_args, **_kwargs):
         raise RuntimeError("unavailable")
 
-    monkeypatch.setattr(intake, "create_task", fail)
+    def refused(*_args, **_kwargs):
+        raise HTTPException(status_code=409, detail="stale")
+
+    monkeypatch.setattr(intake, "create_task", refused)
     monkeypatch.setattr(store, "load_path", fail)
-    assert post(client).status_code == 503
+    assert post(client).status_code == 409
     assert len(artifacts.retention().records()) == 1
 
 
@@ -431,3 +444,98 @@ def test_I2_FR_INT_02_cancelled_commit_retains_owned_versions(uploads, monkeypat
     with pytest.raises(CancelledError):
         post(client)
     assert len(artifacts.retention().records()) == 1
+
+
+@pytest.mark.parametrize("with_files", [False, True])
+def test_I2_FR_INT_02_writer_busy_keeps_app_response_and_owned_versions(uploads, monkeypatch, with_files):
+    from tilo_harness.writer import WriterBusy
+
+    client, _, artifacts, _ = uploads
+
+    def busy(*_args, **_kwargs):
+        raise WriterBusy("unavailable")
+
+    monkeypatch.setattr(intake, "create_task", busy)
+    response = post(client) if with_files else client.post("/intake", data={"text": "Describe the work."})
+    assert response.status_code == 503 and response.json() == {"detail": "store_unavailable"}
+    assert len(artifacts.retention().records()) == int(with_files)
+
+
+def test_I2_FR_INT_02_delayed_commit_after_empty_read_retains_sources(uploads, store, monkeypatch):
+    from fastapi import HTTPException
+
+    client, _, artifacts, _ = uploads
+    create = intake.create_task
+    pending = []
+
+    def delayed(*args, **kwargs):
+        pending.append((args, kwargs))
+        raise HTTPException(status_code=503, detail="store_unavailable")
+
+    monkeypatch.setattr(intake, "create_task", delayed)
+    assert post(client).status_code == 503
+    assert not store.tasks  # even an empty read cannot prove that the timed-out write will never land
+    args, kwargs = pending[0]
+    task_id, task = create(*args, **kwargs)
+    ref = next(s["ref"] for s in store.tasks[task_id].brief["sources"] if s["kind"] == "file")
+    assert artifacts.read(Scope("org_tilo", task.world_id, task.owner), {"artifact_id": ref, "version": 1})
+
+
+def test_I2_FR_INT_02_artifact_refusal_is_honest_without_backend_details(uploads, monkeypatch):
+    from tilo_memory.artifacts import ArtifactRefused
+
+    client, _, artifacts, _ = uploads
+
+    def refuse(*_args, **_kwargs):
+        raise ArtifactRefused("AR-07: redaction unavailable")
+
+    monkeypatch.setattr(artifacts, "put", refuse)
+    response = post(client)
+    assert response.status_code == 201
+    assert response.json()["files"][0]["error"] == "the file could not be stored"
+    assert artifacts.retention().records() == []
+
+
+@pytest.mark.parametrize("mixed", [False, True])
+def test_I2_FR_INT_02_screen_outage_is_503_only_when_all_files_lack_verdict(uploads, store, monkeypatch, mixed):
+    client, _, artifacts, _ = uploads
+    calls = []
+
+    class Intermittent:
+        def check(self, text, **_kwargs):
+            if "outage" in text:
+                raise RuntimeError("unavailable")
+            return {"flagged": False}
+
+    artifacts._screener = Intermittent()
+    extract = intake.extract_brief
+
+    def director(*args, **kwargs):
+        calls.append(kwargs["source_text"])
+        return extract(*args, **kwargs)
+
+    monkeypatch.setattr(intake, "extract_brief", director)
+    files = [("files", ("outage.csv", b"outage", "text/csv"))]
+    if mixed:
+        files.append(("files", ("clean.csv", b"clean data", "text/csv")))
+    response = post(client, files)
+    assert response.status_code == (201 if mixed else 503)
+    if mixed:
+        assert len(calls) == 1 and "clean data" in calls[0] and "outage" not in calls[0]
+        assert response.json()["files"][0]["status"] == "failed"
+    else:
+        assert calls == [] and not store.tasks and artifacts.retention().records() == []
+        assert response.json() == {"detail": "The attached files could not be screened; retry."}
+
+
+def test_I2_FR_INT_02_submit_storage_logs_cause_class_without_error_text(uploads, monkeypatch, caplog):
+    client, _, artifacts, _ = uploads
+
+    def fail(*_args, **_kwargs):
+        raise RuntimeError("untrusted content from storage")
+
+    monkeypatch.setattr(intake, "submit_intake", fail)
+    assert post(client).status_code == 503
+    assert "upload persistence failed: RuntimeError" in caplog.text
+    assert "untrusted content from storage" not in caplog.text
+    assert artifacts.retention().records() == []

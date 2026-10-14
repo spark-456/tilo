@@ -45,7 +45,8 @@ HEALTH_ROUTES = frozenset({("GET", "/health"), ("GET", "/healthz")})
 # Add a route here only with its own forged/replayed cases. The internal routes are not OAuth redirects: each takes a
 # Google-signed ID token for the one caller account (HB-01) and keeps no replayable secret; their forged, missing,
 # wrong-audience, wrong-account and oversize cases are in test_ADR32_T3_host_routes.py and
-# test_ADR32A_T4B_FR_MTG_09_connection_views.py. /internal/connections/callback carries the browser's one-time state
+# test_ADR32A_T4B_FR_MTG_09_connection_views.py. Join's HB-01, bounded-body, hostile-link and replayed-read cases
+# are in test_SEC_08_join_route_cases.py. /internal/connections/callback carries the browser's one-time state
 # and code (tilo-api relays them); its forged, replayed, expired, other-user and lost-instance cases are in
 # test_ADR35_L3_FR_CON_02_connect_routes.py, and the state rules themselves are tested below on ConsentService.
 # /internal/side-effects/execute (ADR-0035 L5) takes no OAuth state or code at all: HB-01 caller, hashed items and the
@@ -56,6 +57,7 @@ SIGNED_ROUTES: frozenset[tuple[str, str]] = frozenset(
         ("POST", "/internal/meeting-host/send"),
         ("POST", "/internal/meeting-host/status"),
         ("POST", "/internal/meeting-host/disconnect"),
+        ("POST", "/internal/meeting-host/join"),
         ("POST", "/internal/connections/views"),
         ("POST", "/internal/connections/start"),
         ("POST", "/internal/connections/callback"),
@@ -330,9 +332,9 @@ def test_SEC_08_connectors_app_mounts_no_inbound_route_outside_the_signed_surfac
         "replayed cases for it to this file, then list it in SIGNED_ROUTES"
     )
 
-    def plain(route) -> bool:  # an include_router() entry (newer FastAPI wraps it) is fine when it holds only APIRoutes
+    def plain(route) -> bool:  # nested include_router() wrappers are fine only when every leaf is an APIRoute
         inner = getattr(route, "original_router", None)
-        return isinstance(route, APIRoute) or (inner is not None and all(isinstance(r, APIRoute) for r in inner.routes))
+        return isinstance(route, APIRoute) or (inner is not None and all(plain(r) for r in inner.routes))
 
     assert all(plain(r) for r in app.routes), "a mounted sub-app or non-API route: list its routes here"
     assert app.openapi_url is None

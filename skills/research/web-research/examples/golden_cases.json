@@ -66,9 +66,7 @@
         ]
       },
       "expected_output": {
-        "planned_queries": [
-          "Northbridge Fictional Academy supplemental reading"
-        ],
+        "planned_queries": ["Northbridge Fictional Academy supplemental reading"],
         "findings": [
           {
             "claim": "The Northbridge toy thermal model in Section B assumes uniform heat capacity.",

@@ -11,6 +11,39 @@ import { SkillProposals } from "./SkillProposals";
 import { WorldPage } from "./WorldPage";
 
 afterEach(cleanup);
+it("FR_AGT_15 W3 sample world has no proposals, errors or live requests", async () => {
+  const fetch = vi.fn(async () => new Response('{"detail":"Not Found"}', { status: 404 }));
+  let panel: ReturnType<typeof mount> | undefined;
+  await act(async () => {
+    panel = mount(
+      <SkillProposals
+        client={new HttpClient({ baseUrl: "https://api.test", fetch })}
+        worldId="w_sample_village_basic"
+      />,
+    );
+  });
+  if (!panel) throw new Error("Panel did not mount");
+  expect(fetch).not.toHaveBeenCalled();
+  expect(panel.container.textContent).toContain("No skill proposals yet.");
+  expect(panel.container.querySelector('[role="alert"]')).toBeNull();
+  expect(panel.container.querySelectorAll("button")).toHaveLength(0);
+});
+
+it("FR_AGT_15 W3 a world sharing the sample prefix still requests its live proposals", async () => {
+  const fetch = vi.fn(async (_url: RequestInfo | URL) => new Response('{"proposals":[]}'));
+  await act(async () => {
+    mount(
+      <SkillProposals
+        client={new HttpClient({ baseUrl: "https://api.test", fetch })}
+        worldId="w_sample_village_basic_real"
+      />,
+    );
+  });
+  expect(fetch).toHaveBeenCalledTimes(1);
+  expect(fetch.mock.calls[0]?.[0]).toBe(
+    "https://api.test/worlds/w_sample_village_basic_real/skill-proposals",
+  );
+});
 it("FR_AGT_15 the live World page reaches proposals and the demo World never requests them", async () => {
   for (const source of ["live", "fixture"] as const) {
     const api = createFixtureApi();

@@ -164,6 +164,24 @@
 [data-park] .park-team-scroll {
   overflow-x: auto;
   overflow-y: hidden;
+  /* QA-DEMO-1 M5: edge shadows that show there is more to the side (they follow the scroll position) */
+  background:
+    linear-gradient(to right, var(--card) 30%, transparent) left center / 32px 100% no-repeat local,
+    linear-gradient(to left, var(--card) 30%, transparent) right center / 32px 100% no-repeat local,
+    radial-gradient(farthest-side at 0 50%, rgba(31, 29, 43, 0.22), transparent) left center / 10px 100% no-repeat scroll,
+    radial-gradient(farthest-side at 100% 50%, rgba(31, 29, 43, 0.22), transparent) right center / 10px 100% no-repeat scroll;
+}
+/* The same cue as words, for anyone the shadow does not reach: only where the table is wider than its card.
+   Generated content, so the page's own text (pinned by the copy test) is unchanged. */
+@media (max-width: 900px) {
+  [data-park] .park-team-members::before {
+    content: "Swipe sideways to see roles and spend limits.";
+    display: block;
+    margin: 0 0 8px;
+    color: var(--ink3);
+    font-size: 12.5px;
+    font-weight: 700;
+  }
 }
 [data-park] .park-team-table {
   min-width: 820px;

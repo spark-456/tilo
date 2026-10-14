@@ -99,7 +99,8 @@ describe("ADR35_L4_FR_CON_02_callback_route", () => {
       const m = page({ state: STATE, error: "access_denied" }, flow);
       await settle();
       expect(m.container.textContent).toContain(RESULT_TEXT[kind]);
-      expect(m.container.querySelector("button")?.textContent).toBe("Back to Connectors");
+      // M1: a failed sign-in offers "Try again" (the Connectors page holds the sign-in buttons); success keeps "Back".
+      expect(m.container.querySelector("button")?.textContent).toBe("Try again from Connectors");
     },
   );
 

@@ -71,7 +71,7 @@ def test_I4_xlsx_screens_all_parts(name, value, code):
 def test_I4_xlsx_output_and_cell_caps_and_unknown_type():
     for limits, code in [
         (replace(Limits(), output_chars=1), "output_size"),
-        (replace(Limits(), entries=3), "entry_count"),
+        (replace(Limits(), cells=3), "cell_count"),
     ]:
         with pytest.raises(Refused, match=f"^{code}$"):
             parse_xlsx(xlsx('<c r="A1"><v>123</v></c><c r="B1"/><c r="C1"/><c r="D1"/>'), limits=limits)

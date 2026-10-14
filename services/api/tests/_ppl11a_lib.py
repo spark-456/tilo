@@ -283,6 +283,10 @@ class SpyStore:
         self._note("list", org_id)
         return self._inner.list(org_id, field, value)
 
+    def list_bounded(self, org_id: str, field: str, value: str, *, limit: int) -> Any:
+        self._note("list_bounded", org_id)
+        return self._inner.list_bounded(org_id, field, value, limit=limit)
+
     # PPL-11c-FS: the person store's directory calls (API_PPL_11c_FS.md section 2); only a person store has them.
     def create_founder(self, record: Any) -> Any:
         self._note("create_founder", record["org_id"])

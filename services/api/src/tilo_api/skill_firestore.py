@@ -1,6 +1,7 @@
 """The taught-skill store on Firestore, and its one door (SKILLS-2b, FR-SKL-04, BQ-SKILLS-1; ADR-0026, ADR-0034).
 
-Layout: `orgs/{org}/taught_skills/{id}` holds the validated TaughtSkill record verbatim, no extra field. A new id is
+Layout: `orgs/{org}/taught_skills/{id}` holds the validated TaughtSkill record verbatim, no extra field, with the
+subcollections `real_runs`, `ratings` and `fixes` of `skill_ledger.py` (FR-SKL-05, ADR-0037). A new id is
 written with `create` (an id collision is a `SkillStoreError`, never an overwrite); a second `put` of an id replaces the
 document only when the stored owner is the same. Reads are single-field queries (`owner ==`, `scope.team in` chunks of
 at most 30, Firestore's limit), merged, de-duplicated and sorted by (name, id). Whatever the client raises leaves as a
@@ -20,8 +21,10 @@ from collections.abc import Callable, Iterable, Mapping
 from typing import Any
 
 from google.api_core import exceptions as gexc
+from google.cloud import firestore
 from tilo_harness.schedule_store import _PROJECT as GCP_PROJECT
 
+from tilo_api.skill_ledger import SkillLedger, SkillRefused, Tx
 from tilo_api.skill_store import MemorySkillStore, SkillStore, SkillStoreError
 
 ENV_STORE, ENV_PROJECT = "TILO_SKILLS_STORE", "TILO_FIRESTORE_PROJECT"
@@ -42,7 +45,7 @@ def _sort_key(row: dict[str, Any]) -> tuple[str, str]:
     return (str(row.get("name", "")), str(row.get("id", "")))
 
 
-class FirestoreSkillStore:
+class FirestoreSkillStore(SkillLedger):
     def __init__(self, client: Any) -> None:
         self._client = client
 
@@ -91,6 +94,47 @@ class FirestoreSkillStore:
     def list_for_owner(self, org: str, owner: str) -> list[dict[str, Any]]:
         try:
             return sorted(self._where(org, "owner", "==", owner), key=_sort_key)
+        except Exception:
+            raise _failed() from None
+
+    # -- FR-SKL-05/06: the ledger's two seams (skill_ledger.py); runs, ratings and fixes are subcollections -----------
+
+    def _doc(self, path: str) -> dict[str, Any] | None:
+        try:
+            snap = self._client.document(path).get()
+            return snap.to_dict() if snap.exists else None  # type: ignore[no-any-return]
+        except Exception:
+            raise _failed() from None
+
+    def _children(self, path: str) -> list[dict[str, Any]]:
+        try:
+            return [s.to_dict() for s in self._client.collection(path).stream()]
+        except Exception:
+            raise _failed() from None
+
+    def _atomic(self, work: Callable[[Tx], Any]) -> Any:
+        """One Firestore transaction: the reads of `work`, then its writes; a concurrent write retries all of it."""
+        from google.cloud.firestore_v1.base_query import FieldFilter  # noqa: PLC0415 - lazy: no client at import
+
+        def run(transaction: Any) -> Any:
+            def read(path: str) -> dict[str, Any] | None:
+                snap = self._client.document(path).get(transaction=transaction)
+                return snap.to_dict() if snap.exists else None  # type: ignore[no-any-return]
+
+            def find(coll: str, field: str, value: Any) -> list[dict[str, Any]]:
+                query = self._client.collection(coll).where(filter=FieldFilter(field, "==", value))
+                return [s.to_dict() for s in query.stream(transaction=transaction)]
+
+            tx = Tx(read, find)
+            out = work(tx)
+            for kind, path, doc in tx.writes:
+                getattr(transaction, kind)(self._client.document(path), doc)
+            return out
+
+        try:
+            return firestore.transactional(run)(self._client.transaction())
+        except (SkillRefused, SkillStoreError):
+            raise
         except Exception:
             raise _failed() from None
 

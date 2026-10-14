@@ -21,6 +21,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.responses import PlainTextResponse
 from starlette.types import ASGIApp, Receive, Scope, Send
+from tilo_channels.web_push import SubscriptionStore
 from tilo_harness.schedule_store import InMemoryScheduleStore
 from tilo_harness.validator import repo_validator
 from tilo_metering import InMemoryFlagStore, LedgerEntry
@@ -100,6 +101,7 @@ class DevLedger:
 
     def __init__(self) -> None:
         self._entries: list[LedgerEntry] = []
+        self._ids: set[str] = set()
         self._lock = threading.Lock()
 
     def record(self, event: Mapping[str, Any], owner: str) -> None:
@@ -113,6 +115,19 @@ class DevLedger:
         )  # fmt: skip
         with self._lock:
             self._entries.append(entry)
+
+    def append(self, entry: LedgerEntry) -> None:
+        """The writer seam (`deps.get_ledger_writer`, ticket T3): Quick, a room turn or a metered unit in dev mode."""
+        self.append_once(None, entry)
+
+    def append_once(self, entry_id: str | None, entry: LedgerEntry) -> None:
+        refuse_if_unsafe()
+        with self._lock:
+            if entry_id is not None and entry_id in self._ids:
+                return
+            self._entries.append(entry)
+            if entry_id is not None:
+                self._ids.add(entry_id)
 
     def entries(self) -> tuple[LedgerEntry, ...]:
         refuse_if_unsafe()
@@ -269,6 +284,7 @@ def install(app: FastAPI, env: Mapping[str, str] | None = None) -> None:
 
     app.dependency_overrides[deps.get_event_writer] = get_writer
     app.dependency_overrides[deps.get_ledger] = ledger.entries  # the cost routes' seam (FR-MTR-10, BQ-MTR10-4)
+    app.dependency_overrides[deps.get_ledger_writer] = lambda: ledger  # and the write seam (T3): one dev memory
     from tilo_api import dev_tick, schedules  # noqa: PLC0415 (they import this module)
 
     schedule_store = InMemoryScheduleStore()  # per install: dev never reads TILO_SCHEDULES_STORE or a real project
@@ -294,6 +310,13 @@ def install(app: FastAPI, env: Mapping[str, str] | None = None) -> None:
         return feedback
 
     app.dependency_overrides[deps.get_feedback_store] = get_feedback
+    push = SubscriptionStore()  # FR-CHN-17b: in memory, never sent (the fake push is the default in dev)
+
+    def get_push() -> SubscriptionStore:
+        refuse_if_unsafe()
+        return push
+
+    app.dependency_overrides[deps.get_push_store] = get_push
     app.dependency_overrides.update(_dev_people())  # in-memory people stores, the dev owner an org owner
     from tilo_api import meeting_room  # noqa: PLC0415
 

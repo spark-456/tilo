@@ -93,6 +93,111 @@
   limits: {per_minute: 30, batch_size: 50}
   data_class: {returns: [business], redact: []}
 
+# FR-UX-18 setup catalogue. No scopes or adapters are granted here.
+# MCP OAuth/transport and a reviewed allowlist entry are required before these tools execute.
+# Explicit catalogue -> reserved MCP server mapping lives beside each entry below.
+# These comments reserve names for the later OAuth ticket; they do not allowlist or bind servers.
+# The frozen connector schema has no transport field. Registry IDs cannot be MCP server IDs.
+- id: slack
+  # MCP mapping: slack -> mcp_slack (owner OAuth app/setup required).
+  name: Slack
+  icon: link
+  auth: oauth2
+  scopes: {read: []}
+  capabilities: [read]
+  actions:
+    - {id: read_slack, capability: read, description: "Read approved Slack data after workspace OAuth and MCP setup.", risk_tier: T3, gate_type: approval, irreversible: false}
+  limits: {per_minute: null, batch_size: null}
+  data_class: {returns: [business], redact: []}
+- id: notion
+  # MCP mapping: notion -> mcp_notion (owner OAuth app/setup required).
+  name: Notion
+  icon: link
+  auth: oauth2
+  scopes: {read: []}
+  capabilities: [read]
+  actions:
+    - {id: read_notion, capability: read, description: "Read approved Notion data after workspace OAuth and MCP setup.", risk_tier: T3, gate_type: approval, irreversible: false}
+  limits: {per_minute: null, batch_size: null}
+  data_class: {returns: [business], redact: []}
+- id: github
+  # MCP mapping: github -> mcp_github (owner OAuth app/setup required).
+  name: GitHub
+  icon: link
+  auth: oauth2
+  scopes: {read: []}
+  capabilities: [read]
+  actions:
+    - {id: read_github, capability: read, description: "Read approved GitHub data after workspace OAuth and MCP setup.", risk_tier: T3, gate_type: approval, irreversible: false}
+  limits: {per_minute: null, batch_size: null}
+  data_class: {returns: [business], redact: []}
+- id: xero
+  # MCP mapping: xero -> mcp_xero (owner OAuth app/setup required).
+  name: Xero
+  icon: link
+  auth: oauth2
+  scopes: {read: []}
+  capabilities: [read]
+  actions:
+    - {id: read_xero, capability: read, description: "Read approved Xero data after workspace OAuth and MCP setup.", risk_tier: T3, gate_type: approval, irreversible: false}
+  limits: {per_minute: null, batch_size: null}
+  data_class: {returns: [business], redact: []}
+- id: hubspot
+  # MCP mapping: hubspot -> mcp_hubspot (owner OAuth app/setup required).
+  name: HubSpot
+  icon: link
+  auth: oauth2
+  scopes: {read: []}
+  capabilities: [read]
+  actions:
+    - {id: read_hubspot, capability: read, description: "Read approved HubSpot data after workspace OAuth and MCP setup.", risk_tier: T3, gate_type: approval, irreversible: false}
+  limits: {per_minute: null, batch_size: null}
+  data_class: {returns: [business], redact: []}
+- id: stripe
+  # MCP mapping: stripe -> mcp_stripe (owner OAuth app/setup required).
+  name: Stripe
+  icon: link
+  auth: oauth2
+  scopes: {read: []}
+  capabilities: [read]
+  actions:
+    - {id: read_stripe, capability: read, description: "Read approved Stripe data after workspace OAuth and MCP setup.", risk_tier: T3, gate_type: approval, irreversible: false}
+  limits: {per_minute: null, batch_size: null}
+  data_class: {returns: [business], redact: []}
+- id: microsoft365
+  # MCP mapping: microsoft365 -> mcp_microsoft365 (owner OAuth app/setup required).
+  name: Microsoft 365
+  icon: link
+  auth: oauth2
+  scopes: {read: []}
+  capabilities: [read]
+  actions:
+    - {id: read_microsoft365, capability: read, description: "Read approved Microsoft 365 data after workspace OAuth and MCP setup.", risk_tier: T3, gate_type: approval, irreversible: false}
+  limits: {per_minute: null, batch_size: null}
+  data_class: {returns: [business], redact: []}
+- id: jira
+  # MCP mapping: jira -> mcp_jira (owner OAuth app/setup required).
+  name: Jira
+  icon: link
+  auth: oauth2
+  scopes: {read: []}
+  capabilities: [read]
+  actions:
+    - {id: read_jira, capability: read, description: "Read approved Jira data after workspace OAuth and MCP setup.", risk_tier: T3, gate_type: approval, irreversible: false}
+  limits: {per_minute: null, batch_size: null}
+  data_class: {returns: [business], redact: []}
+- id: bamboohr
+  # MCP mapping: bamboohr -> mcp_bamboohr (owner OAuth app/setup required).
+  name: BambooHR
+  icon: link
+  auth: oauth2
+  scopes: {read: []}
+  capabilities: [read]
+  actions:
+    - {id: read_bamboohr, capability: read, description: "Read approved BambooHR data after workspace OAuth and MCP setup.", risk_tier: T3, gate_type: approval, irreversible: false}
+  limits: {per_minute: null, batch_size: null}
+  data_class: {returns: [business], redact: []}
+
 # web (PRD 12.2 web search, Must; ADR-0029 decision 7): public web reads for a unit. web_search runs through the
 # SearchProvider (the `search` role in config/models.yaml, Google Search grounding by default); fetch_url downloads
 # one public page or file through tilo-browser (egress allowlist plus the task's allowlist, BQ-LW-1; robots.txt,

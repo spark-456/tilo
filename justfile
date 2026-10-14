@@ -35,9 +35,10 @@ parity pages="":
 system-test:
     uv run pytest tests/system -q -p no:cacheprovider
 
-# Regenerate apps/web design tokens from design/tokens.json (drift-tested).
+# Regenerate apps/web design tokens from design/tokens.json and the Park themes from config/themes/ (drift-tested).
 tokens:
     node apps/web/scripts/generate-tokens.mjs
+    node apps/web/scripts/generate-themes.mjs
 
 # Format check + lint + typecheck + all tests (the full gate; matches PRD 20.4 "make check").
 # contracts-check runs first so CI fails on contract drift (FR-WLD-02).
@@ -125,6 +126,10 @@ vertex-smoke *args:
 # PL-02 schema probe: the exact Director brief request (small cap) and one variant per suspect field removed, then seven tiny Director-profile calls (no schema, json mode, sanitized/raw schema, thinking) to find what Vertex refuses. Refuses unless the user sets the live switch; `just vertex-probe-schema --dry-run` is free.
 vertex-probe-schema *args:
     uv run python packages/providers/scripts/live_vertex_probe_schema.py {{args}}
+
+# VERTEX-EVAL-1 (ADR-0033): `just vertex-eval export --candidate DIR [--baseline DIR]` pairs recorded Director output (free); `run --pairs P --fake|--dry-run` is free; a live run needs the user's own live switch and stays under 20 credits.
+vertex-eval *args:
+    uv run python -m tilo_evals vertex-eval {{args}}
 
 # PL-LIVE-E2E (#340): one bank case through the real pipeline. Live only when the user sets LIVE=1; `--dry-run` and `--replay` are free.
 live-e2e *args:

@@ -10,7 +10,7 @@ import { HttpClient, type QuickIntakeResult, TiloApiError, reasonOf } from "../.
 import { rememberIntake } from "../../api/intakes";
 import { isSampleHidden, wantsSample } from "../sample/sampleChoice";
 import { API_METHODS, type Api, type ApiMethod } from "./index";
-import { agendaFromPlate } from "./live/agendaFromPlate";
+import { agendaFromPlate, emptyAgenda } from "./live/agendaFromPlate";
 import { connectorsFromList } from "./live/connectorsFromList";
 import {
   type CardFeedItem,
@@ -31,6 +31,7 @@ import {
   versionOfBody,
 } from "./live/skillsFromApi";
 import { teamFromPeople } from "./live/teamFromPeople";
+import { isUserSettings } from "./live/userSettings";
 import { worldFromIntake } from "./live/worldFromIntake";
 import { STATE_OF, type WorldListItem, worldsFromList } from "./live/worldsFromList";
 import { nameInitials } from "./nameInitials";
@@ -280,6 +281,18 @@ export function createLiveApi(options: LiveApiOptions = {}): Api {
     }
     return { spec: raw.spec, publishers: raw.publishers as Record<string, string> };
   });
+  // FR-SET-01/02: the signed-in person's own document (the server derives owner and org from the token). A save is
+  // one PUT, never retried; only the stored document the server answers with is `live`.
+  api.getUserSettings = async () => {
+    const body = await http.getJson("/v1/me/settings");
+    if (!isUserSettings(body)) throw new TiloApiError(BAD_REPLY, 200, true);
+    return { data: body, source: "live" };
+  };
+  api.saveUserSettings = async (update) => {
+    const body = await http.putJson("/v1/me/settings", update);
+    if (!isUserSettings(body)) throw new TiloApiError(BAD_REPLY, 200, true, true);
+    return { data: body, source: "live" };
+  };
   api.getLedger = async () => {
     const report = await http.getJson("/costs");
     if (!isCostReport(report)) throw new TiloApiError(BAD_REPLY, 200, true);
@@ -299,10 +312,16 @@ export function createLiveApi(options: LiveApiOptions = {}): Api {
     if (!data) throw new TiloApiError(BAD_REPLY, 200, true);
     return { data, source: "live" };
   };
-  api.getAgenda = async () => ({
-    data: agendaFromPlate(await http.getJson("/v1/plate")),
-    source: "live",
-  });
+  api.getAgenda = async () => {
+    try {
+      return { data: agendaFromPlate(await http.getJson("/v1/plate")), source: "live" };
+    } catch (error) {
+      if (error instanceof TiloApiError && error.status === 404) {
+        return { data: emptyAgenda(), source: "live" };
+      }
+      throw error;
+    }
+  };
   api.getWorlds = async (_dec, added) => {
     const items: WorldListItem[] = [];
     let cursor: string | null = null;
@@ -403,12 +422,17 @@ export function createLiveApi(options: LiveApiOptions = {}): Api {
   // The real intake call, the legacy S-01's (FR-UX-13): one POST of the text alone (the intake has no size, routine
   // or workspace field; the size only picks the tier shown, BQ-UX13-2). A reply the page cannot read, including
   // one without its `files`, is a TiloApiError, never a TypeError or a world. The brief goes to S-02.
-  api.startWorld = (async (mode: TierKey, query: string, effort?: Effort) => {
+  api.startWorld = (async (
+    mode: TierKey,
+    query: string,
+    effort?: Effort,
+    files: readonly File[] = [],
+  ) => {
     // Quick (COST-FAST-1): a direct answer or an offer to switch. No world, no event, and nothing is remembered.
     if (effort === "quick") return quickAsk(http, query);
     let intake: IntakeResult;
     try {
-      intake = await http.submitIntake(query, []);
+      intake = await http.submitIntake(query, [...files]);
     } catch (e) {
       if (e instanceof TiloApiError) throw e;
       throw new TiloApiError(BAD_REPLY, 200, true, true);

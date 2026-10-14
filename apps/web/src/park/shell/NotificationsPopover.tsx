@@ -23,6 +23,8 @@ export interface NotificationsPopoverProps {
   onClose: () => void;
   status?: "loading" | "ready" | "failed";
   sample?: boolean;
+  /** QA-DEMO-1: these rows are the demo company's sample data: each carries the Sample label, nothing else changes. */
+  labelled?: boolean;
 }
 
 export function NotificationsPopover({
@@ -34,6 +36,7 @@ export function NotificationsPopover({
   onClose,
   status = "ready",
   sample = false,
+  labelled = false,
 }: NotificationsPopoverProps): ReactNode {
   return (
     <Popover label="Notifications" width={392} className="park-shell__notif" onClose={onClose}>
@@ -67,7 +70,7 @@ export function NotificationsPopover({
             <span className="park-shell__ntext">
               <span className="park-shell__ntitle">
                 {approved ? approvedTitle(decisions.find((d) => d.k === n.dec)) : n.title}
-                {sample && <SampleBadge />}
+                {sample || labelled ? <SampleBadge /> : null}
               </span>
               <span className="park-shell__nsub">{n.sub}</span>
             </span>

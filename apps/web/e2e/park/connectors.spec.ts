@@ -79,3 +79,21 @@ test.describe("WEB_11_connectors_e2e drawer", () => {
     expect(problems, problems.join("\n")).toEqual([]);
   });
 });
+
+test.describe("W6_connectors_demo_honesty", () => {
+  test.use({ viewport: DESKTOP });
+
+  test("W6_connectors_demo_connect_says_nothing_was_connected_and_the_count_does_not_rise", async ({
+    page,
+  }) => {
+    const problems = collectConsoleProblems(page);
+    await openConnectors(page, "day");
+    await expect(page.locator('[aria-label="Connected"] button')).toHaveCount(6);
+    await page.locator('[aria-label="Available"] button', { hasText: "Connect" }).first().click();
+    await expect(page.getByText(/^Sample data: .+ was not connected\./)).toBeVisible();
+    await expect(page.getByText(/connected with Read access/)).toHaveCount(0);
+    await expect(page.locator('[aria-label="Connected"] button')).toHaveCount(6);
+    await expect(page.getByText("6 connected", { exact: true })).toHaveCount(2);
+    expect(problems, problems.join("\n")).toEqual([]);
+  });
+});
