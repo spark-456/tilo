@@ -28,10 +28,9 @@ it.each([
   ["park-agenda-pinit", "", 44],
 ])("UI_10_W19 phone target %s in %s is at least %i px tall", (classes, ancestor, minimum) => {
   const declarations = declsFor(rules, classes.split(" "), "", ancestor ? [ancestor] : []);
-  const height = Math.max(
-    Number.parseFloat(declarations.get("height") ?? "0"),
-    Number.parseFloat(declarations.get("min-height") ?? "0"),
-  );
+  // `height: auto` (a phone rule that lets long labels wrap) is not a number: only min-height holds the target then.
+  const px = (name: string) => Number.parseFloat(declarations.get(name) ?? "0") || 0;
+  const height = Math.max(px("height"), px("min-height"));
   expect(height).toBeGreaterThanOrEqual(minimum);
 });
 
