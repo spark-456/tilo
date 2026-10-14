@@ -5,6 +5,8 @@
 // park code (which may import nothing from outside park). No timers: the scheduler is the injected fake.
 import { type ReactElement, act } from "react";
 import { type Mock, vi } from "vitest";
+import { ClientProvider } from "../../src/api/ClientProvider";
+import type { TiloClient } from "../../src/api/client";
 import { createFixtureApi } from "../../src/park/api/fixtureApi";
 import { API_METHODS, type Api, type ApiMethod } from "../../src/park/api/index";
 import type { AppCtx } from "../../src/park/app/AppCtx";
@@ -46,15 +48,19 @@ export async function renderPage(
   app: AppCtx,
   api: Api = createFixtureApi(),
   time: "day" | "night" = "day",
+  /** The app-level run client the page's run section reads. Default: the fixture client (sample run). A
+   * deployed-mode test passes a non-fixture client so the section never shows the sample run. */
+  client?: TiloClient,
 ): Promise<Rendered> {
   const sch = fakeScheduler();
-  const tree: ReactElement = (
+  const page: ReactElement = (
     <ParkProvider api={api} schedule={sch.schedule} viewport={{ vw: app.vw, vh: app.vh }}>
       <div data-park="" data-time={time}>
         <ConnectorsPage app={app} />
       </div>
     </ParkProvider>
   );
+  const tree = client ? <ClientProvider client={client}>{page}</ClientProvider> : page;
   const m = mount(tree);
   // The page loads its data on mount; let that settle inside act so no update lands outside it.
   await flush();
