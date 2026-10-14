@@ -158,6 +158,8 @@ def test_FR_MTG_08_caller_clock_is_sampled_at_invocation(caller_app):
         c.switches,
         c.rig.events,
         2,
+        c.allowance,
+        c.allowance_cap,
     )
     caller = OwnerFollowupCaller(owner, c.drafts, c.factory)
     c.writer.now = c.meeting["delete_minutes_after"]

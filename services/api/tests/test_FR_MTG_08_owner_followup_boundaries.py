@@ -36,6 +36,8 @@ def test_FR_MTG_08_owner_explicit_mode_and_both_demo_sources(followup, monkeypat
         drafts=c.drafts,
         autopilot_factory=c.factory,
         recipients=["u_priya"],
+        allowance=c.allowance,
+        allowance_cap=c.allowance_cap,
     )
     assert card.tier == "T3" and card.level == "L1"
     assert modes == [("router", "replay"), ("safety", "replay")]
@@ -105,7 +107,9 @@ def test_FR_MTG_08_owner_multiple_nudges_share_nonincreasing_budget(followup, mo
             return SimpleNamespace(
                 response=SimpleNamespace(text=answer(body), tool_calls=()),
                 outcome="ok",
-                budget=remaining[len(budgets) - 1],
+                # Real Router returns credits left after its estimate, never more than sent.
+                # Invalid/inflated raw usage is pinned separately by the allowance tests.
+                budget=min(budget, remaining[len(budgets) - 1]),
             )
 
     monkeypatch.setattr(deps, "router_for_mode", lambda mode: Router())

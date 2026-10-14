@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import math
 from collections.abc import Callable
-from contextlib import AbstractContextManager, nullcontext
 from datetime import UTC, datetime
 from typing import Any
 
@@ -74,11 +73,8 @@ class AllowanceRouter:
 
 
 def allowance_router(
-    router: Any, *, ledger: SpendLedger | None, user: str, clock: Callable[[], str], cap: float, budget: float
-) -> AbstractContextManager[Any]:
-    # Existing internal offline adapters remain compatible; the owner dependency always supplies the ledger.
-    return (
-        nullcontext(router)
-        if ledger is None
-        else AllowanceRouter(router, ledger=ledger, user=user, clock=clock, cap=cap, budget=budget)
-    )
+    router: Any, *, ledger: SpendLedger, user: str, clock: Callable[[], str], cap: float, budget: float
+) -> AllowanceRouter:
+    if ledger is None:
+        raise Refusal(429, "allowance_capped")
+    return AllowanceRouter(router, ledger=ledger, user=user, clock=clock, cap=cap, budget=budget)

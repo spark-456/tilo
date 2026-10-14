@@ -24,7 +24,7 @@ from tilo_people.errors import NotFound, VersionConflict
 from tilo_policy.schemas import conforms
 from tilo_providers.interfaces import ModelProvider, SafetyProvider
 
-from tilo_api import deps
+from tilo_api import deps, spend
 from tilo_api import events as parts
 from tilo_api.assistant.metering import SpendLedger
 from tilo_api.draft_firestore import FirestoreDraftStore
@@ -108,6 +108,30 @@ class _PublishedPreview(_Guarded):
         return cast(Preview, self.port.preview(user_id, context, result))
 
 
+class _FollowupCalls(_Calls):
+    """Keep cap/rate refusals authoritative when the per-item channel loop catches errors."""
+
+    blocked: Refusal | None = None
+
+    def invoke(self, call: Callable[[], Any]) -> Any:
+        self.check_budget()
+        try:
+            return super().invoke(call)
+        except Refusal as error:
+            self.blocked = error
+            raise
+        except spend.SpendCapReached:
+            self.blocked = Refusal(429, "allowance_capped")
+            raise self.blocked from None
+        except deps.ReplayOnly:
+            self.blocked = Refusal(503, "replay_only")
+            raise self.blocked from None
+
+    def check_budget(self) -> None:
+        if self.blocked is not None:
+            raise self.blocked
+
+
 def draft_owner_followup(
     request: Request,
     w: Writer,
@@ -122,8 +146,8 @@ def draft_owner_followup(
     drafts: DraftStore,
     autopilot_factory: Callable[[str, str, str, Callable[[dict], None]], Autopilot],
     recipients: Sequence[str] | None = None,
-    allowance: SpendLedger | None = None,
-    allowance_cap: float = 0,
+    allowance: SpendLedger,
+    allowance_cap: float,
     clock: Callable[[], str] | None = None,
 ) -> Preview | None | list[Preview]:
     """Server-only wiring: None picks means nudges; person-id picks mean one minutes email.
@@ -302,15 +326,17 @@ def draft_owner_followup(
     mode = deps.get_work_mode(request, switches)
     if principal.demo_session or getattr(request.state, "demo_session", False) is True:
         mode = "replay"
-    router, safety = deps.router_for_mode(mode), deps.get_safety(mode)
-    calls = _Calls(request, w, switches, mode, run_id)
+    router: Any = deps.router_for_mode(mode)
+    safety = deps.get_safety(mode)
+    calls = _FollowupCalls(request, w, switches, mode, run_id)
     left = budget
 
     def generate(prompt: Any) -> Any:
         nonlocal left
         check()
         if left <= 0:
-            raise Refusal(409, "followup_budget_exhausted")
+            calls.blocked = Refusal(429, "allowance_capped")
+            raise calls.blocked
         result = calls.invoke(lambda: router.generate("autopilot", prompt, budget=left))
         if type(result.budget) not in (int, float) or not math.isfinite(result.budget):
             raise Refusal(502, "followup_failed")
@@ -348,6 +374,8 @@ def draft_owner_followup(
             followup.draft_minutes_email(w.actor, meeting_id, recipients=picks, request_id=identity)
             if recipients is not None else followup.draft_nudges(w.actor, meeting_id, request_id=identity)
         )  # fmt: skip
+        if not result:
+            calls.check_budget()
     check()
     cards = result if isinstance(result, list) else [result] if result is not None else []
     for card in cards:

@@ -10,6 +10,7 @@ from fastapi import Depends, FastAPI
 from fastapi.testclient import TestClient
 from tilo_api import deps
 from tilo_api.assistant.config import load_assistant_config
+from tilo_api.assistant.metering import InMemorySpendLedger
 from tilo_api.owner_followup_caller import (
     OwnerFollowupCaller,
     get_owner_followup_autopilot_factory,
@@ -33,6 +34,8 @@ def owner():
         switches=object(),
         events=object(),
         budget=3.5,
+        allowance=InMemorySpendLedger(),
+        allowance_cap=100,
     )
 
 

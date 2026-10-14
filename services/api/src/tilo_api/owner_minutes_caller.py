@@ -48,8 +48,8 @@ class OwnerMinutesCaller:
     switches: FlagStore
     events: deps.EventWriter
     budget: float
-    allowance: SpendLedger | None = None
-    allowance_cap: float = 0
+    allowance: SpendLedger
+    allowance_cap: float
 
     def analyze(self, meeting_id: str) -> dict[str, Any]:
         """Invoke only for an explicit owner instruction; reads/attendance/confirm never call this."""

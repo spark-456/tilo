@@ -10,6 +10,7 @@ from _ppl11c_lib import meeting_rig
 from _sec16_lib import make_caps, make_ledger
 from starlette.requests import Request
 from tilo_api import deps, spend
+from tilo_api.assistant.metering import InMemorySpendLedger
 from tilo_api.people_writes import Refusal, Writer
 from tilo_channels.autopilot import Autopilot
 from tilo_metering.flags import InMemoryFlagStore
@@ -25,6 +26,7 @@ def followup(people_rig, monkeypatch):
     rig.event_store.worlds[meeting["world_id"]] = deps.WorldRecord(OWNER, {}, run_id="r_meeting_q4_plan_1")
     request = Request({"type": "http", "app": SimpleNamespace(dependency_overrides={})})
     request.state.uid = OWNER
+    allowance, allowance_cap = InMemorySpendLedger(), 100
     line, drafts = make_wire_line(), MemoryDraftStore()
     calls, during = [], []
 
@@ -64,6 +66,7 @@ def run(c, recipients=(PRIYA,), budget=2):
         principal=deps.Principal(OWNER, "owner"), switches=c.switches, budget=budget,
         events=c.rig.events, drafts=c.drafts, autopilot_factory=c.factory,
         recipients=None if recipients is None else list(recipients),
+        allowance=c.allowance, allowance_cap=c.allowance_cap,
     )  # fmt: skip
 
 

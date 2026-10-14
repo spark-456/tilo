@@ -101,8 +101,8 @@ def analyze_owner_minutes(
     switches: FlagStore,
     budget: float,
     events: deps.EventWriter,
-    allowance: SpendLedger | None = None,
-    allowance_cap: float = 0,
+    allowance: SpendLedger,
+    allowance_cap: float,
     clock: Callable[[], str] | None = None,
 ) -> dict[str, Any]:
     """Server-only caller supplies writer/principal/switches and bounded credit budget, never a request body.
