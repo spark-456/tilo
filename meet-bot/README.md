@@ -1,5 +1,10 @@
 # Tilo Meet bot (prototype)
 
+For the Cloud Run guest path, use [the operator rehearsal](docs/CLOUD_RUN.md) and
+`agy-bridge/tasks/MEETING-GO-LIVE-13OCT.md` in the coordination checkout. They track
+current image certification, deployment and human acceptance prerequisites. The
+local prototype commands below do not establish cloud readiness.
+
 A bot that joins a Google Meet like a person, reads the live captions, tracks your agenda with a model (through Tilo's provider layer), and occasionally asks a short question in the Meet chat.
 
 Cloud transcript ingestion assigns utterance ids in speech-start timestamp order,
@@ -30,11 +35,11 @@ or the Meet capability. Meet links are removed from local transcript text, event
 Think of a spare laptop in a cupboard that only this bot uses:
 
 - **Docker container = the laptop.** Inside it: a virtual screen (Xvfb), virtual sound (PulseAudio) and a real, visible Chromium browser driven by Playwright.
-- **The bot's Google account** (`tiloagent@gmail.com`) is signed in once, by you, by hand. The browser remembers it in a Docker volume. The code never sees or stores a password.
+- **The dedicated bot Google account** (currently `tilotesting@gmail.com`; confirm before login) is signed in once, by you, by hand for the local fallback. Never reuse the owner's profile. The browser remembers it in a Docker volume. Cloud guest mode has no signed-in profile. The code never sees or stores a password.
 - **The script does what a person would**: opens Meet, joins with camera and mic off, turns on captions, reads them, and every 45 seconds sends the last few minutes to the model. The model fills in a small JSON form (agenda status, decisions, action items, open questions). The code, not the model, decides whether the bot may speak.
 - **noVNC** lets you watch and click inside that browser from a normal tab at http://localhost:6080. Used for the one-time login and for debugging.
 
-The bot speaks in chat only: at most 4 messages per meeting, at least 5 minutes apart, and only when (a) an agenda item is untouched after its fair share of time, (b) an action item lacks an owner or due date, or (c) once, with about 10 minutes left. Default is silence. Right after joining it posts one intro line ("Hi, I'm an AI assistant taking notes for this meeting.").
+Proactive chat nudges are limited to at most 4 messages per meeting, at least 5 minutes apart. Direct replies can also use configured voice with a chat mirror. Disclosure must succeed before capture starts.
 
 ## Setup
 
@@ -56,7 +61,7 @@ Run from the `meet-bot/` folder. On Windows use `python`, on Mac/Linux `python3`
 | `python -m bot.main join URL` | Joins an existing meeting |
 | `python -m bot.main run-mock` | Replays a recorded 30-minute transcript through the brain, offline, no key needed |
 
-Outputs per meeting, in `out/<timestamp>/`: `transcript.jsonl`, `events.jsonl`, `state.json`, `summary.md`. Screenshots go to `debug/`.
+Local outputs per meeting, in `out/<timestamp>/`: `transcript.jsonl`, `events.jsonl`, `state.json`, `summary.md`. Browser screenshots and DOM dumps are disabled.
 
 `start` and `join` need `LIVE=1` (set by you only): without it the providers are dev fakes, and a fake transcript never
 reaches a real meeting, so both commands refuse and tell you so. `run-mock` works offline without it. The bot never
@@ -76,7 +81,7 @@ Start with `--record-audio` (or `RECORD_AUDIO=1`). The bot then says in chat tha
 - `connections.jsonl`: model attempts (outcome, code, first-token time), and prewarms, so a slow answer can be explained.
 - `bot.wav` (voice replies on): what the bot actually sent into the meeting, recorded next to `audio.wav` (`audio_clock.json` holds both start times). `python -m bot.main audit [out/<time>]` measures end of question to first bot sound from the recordings, to about 10 ms, and compares it with the log.
 
-Talking to Tilo: say its name at the start or end of what you say ("Tilo, tell me a joke", "what do you think, Tilo"), or type in the chat; no question mark and no special words are needed, and it answers any topic in a sentence or two. For about 15 s after it answers you can follow up without the name. People talking among themselves are never answered, except a question the meeting notes or project files can answer.
+Talking to Tilo: address it by name or type in the chat. Replies are limited to the recorded meeting agenda, minutes so far and your own recorded meeting items; unrelated requests receive a scope refusal. For example, ask "Tilo, meeting agenda" or "Tilo, minutes so far". Wake/follow-up behavior is controlled by meeting configuration.
 
 Tuning: `DIRECT_REPLY_GAP_SECONDS` (default 6), `MAX_DIRECT_REPLIES` (40), `BRAIN_INTERVAL_SECONDS` (20), `ANSWER_MODE` (`questions` or `addressed`). A throttled project hits quota errors if these are pushed too hard.
 
@@ -84,9 +89,14 @@ Tuning: `DIRECT_REPLY_GAP_SECONDS` (default 6), `MAX_DIRECT_REPLIES` (40), `BRAI
 
 `--stt captions` (default) uses Meet's captions. `--stt gemini` (or `--hybrid`) sends each detected speech segment to the speech provider as batch audio; captions only supply speaker names. Streaming speech-to-text is a later ticket (FR-MTG-16). Audio modes are announced in the intro chat line.
 
-Google's native-audio voice (Gemini Live) is not wired into meetings yet: it is FR-MTG-16, see `docs/VOICE_ARCHITECTURE.md`.
+The optional Gemini Live voice adapter is wired through `packages/providers` behind
+`voice.live.enabled: false`; Chirp remains the default. Fake and recorded Live
+responses pass the offline meeting lifecycle. Real Live additionally requires
+price approval and the SEC-16 meter; without that meter the bot retains Chirp.
+This is not human-heard Live acceptance. The standalone probe in
+[LIVE_TRIAL.md](docs/LIVE_TRIAL.md) is separate from meeting capture.
 
-The bot answers project questions from `context/` (.md/.txt/.csv/.json), any `--context FILE|FOLDER|https://URL` (repeatable, or `CONTEXT_URLS`), and text people paste into the Meet chat. Typed chat questions work without any speech recognition.
+The local prototype can load `context/` and explicit `--context` inputs, but these do not widen the meeting reply scope. Cloud guest capture disables context URLs. Typed chat requests still obey the same recorded-meeting scope.
 
 ## Providers (FR-MTG-11): models, speech and voice are Tilo's config
 
@@ -100,7 +110,7 @@ The bot names no model, vendor or key. `bot/providers.py` is the one module that
 | Audio to text (`--stt gemini`, `retranscribe`) | `config/speech.yaml` (`SpeechProvider.transcribe`) | `ProviderSpeech` |
 | The bot's voice | `config/voice.yaml` (`SpeechProvider.synthesize`, PCM) with the local espeak voice as backup | `ProviderTTS` / `make_tts` |
 
-- **Vendor, model, voice and caps are config.** Speech and voice accept the vendor `google` (or the dev vendor `fake`);
+- **Vendor, model, voice and caps are config.** Speech accepts `google` or `fake`; voice also accepts `google-cloud-tts` (the Chirp default);
   anything else, or a denylisted model id, fails start-up. The voice name and sample rate are in `config/voice.yaml`.
 - **Offline by default.** Without the live switch the bot reads `config/models.dev.yaml`, `config/speech.dev.yaml` and
   `config/voice.dev.yaml`, whose providers are deterministic fakes: canned answers, a tone for a voice, no network, no paid
@@ -110,11 +120,7 @@ The bot names no model, vendor or key. `bot/providers.py` is the one module that
   the prototype's model key (Gemini or AI Studio) and its third-party voice key. Nothing reads them now, but
   `env_file: .env` in `docker-compose.yml` loads the whole file into the container. Remove every `*_API_KEY` line from
   `.env`, then revoke each key in the console of the service that issued it.
-- **Credentials for a live meeting (BQ-MTG11-4).** The only default is a dedicated identity that has no project role
-  (ADR-0024 amendment 3(a)); until you create one, make no live run. Running on the host is not an alternative: the bot starts
-  Chromium with `--no-sandbox` everywhere (`bot/browser.py`), so a host run would put an unsandboxed browser on pages other
-  people control next to your own gcloud credentials, until MTG09-c drops that flag outside the container. Never put your own gcloud credentials in the container: they are
-  the project Owner's, and the container runs Chromium with `--no-sandbox` behind a VNC session with no password.
+- **Credentials for a live meeting (BQ-MTG11-4).** The local signed-in fallback uses a dedicated bot identity and sandboxed Chromium. Guest mode disables Chromium's sandbox and uses an ephemeral context; Cloud Run refuses signed-in mode. Never mount the owner's profile or gcloud credentials into either image. The cloud service uses its reviewed service identity; local noVNC/profile use still needs separate hardening review.
 - **A cap per meeting.** `config/meeting.yaml` bounds the provider calls of one meeting (200 model calls, 400 speech
   calls; one model call is one router call, so a call that tries the primary and then the fallback counts once). At the
   cap the bot logs one warning and carries on without them: no more answers, the local voice (for the rest of that
@@ -140,7 +146,7 @@ The bot names no model, vendor or key. `bot/providers.py` is the one module that
 
 ## Debugging with noVNC
 
-Start any command, then open http://localhost:6080/vnc.html?autoconnect=true&resize=scale. You see the bot's browser and can click in it (for example to dismiss a surprise dialog). When a Meet control cannot be found, the log names the selector (from `bot/selectors.py`) and a screenshot is saved to `debug/`. Fix the selector there; it is the only file that knows Meet's UI.
+For the local fallback, open http://localhost:6080/vnc.html?autoconnect=true&resize=scale. You can inspect the browser manually. Selector definitions live in `bot/selectors.py`; browser screenshots and DOM dumps are disabled even if an inherited log mentions `debug/`. Cloud Run has no noVNC endpoint.
 
 To capture real caption HTML for parser tests, set `SAVE_CAPTION_SNAPSHOTS=1` in `.env`; snapshots land in `debug/caption_snapshots/`.
 
