@@ -36,6 +36,8 @@ evidence that the current hosted run completed.
 
 ## How to run
 
+For meeting notes and messages, see [Meeting minutes and follow-ups](docs/minutes.md).
+
 You need `just`, `uv` (Python 3.12), Node 22 or newer and `pnpm`.
 
 ### Windows (native, no WSL; see `docs/adr/0001-native-windows-just-task-runner.md`)
