@@ -5,7 +5,7 @@
 //     "no timers in page code"; the 900 ms of the composer goes through this).
 //  2. park/app/pages.ts: `home` is the Home page, not the Placeholder (one line, as plan section 10 allows).
 import { Suspense, act } from "react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { fakeApi, fakeScheduler, stubApp } from "../../../../test-support/park/appHarness";
 import { cleanup, mount, q, qa } from "../../../../test-support/park/componentsHarness";
 import { settle } from "../../../../test-support/park/homeHarness";
@@ -14,6 +14,8 @@ import { PAGES } from "../../app/pages";
 import type { Schedule } from "../../app/store";
 
 afterEach(cleanup);
+// QA row 21: the greeting follows the local hour; pin 09:00.
+beforeEach(() => vi.setSystemTime(new Date(2026, 8, 24, 9, 0)));
 
 describe("WEB_4_home_schedule: useSchedule", () => {
   it("WEB_4_home_schedule_useSchedule_returns_the_schedule_the_provider_was_given", () => {

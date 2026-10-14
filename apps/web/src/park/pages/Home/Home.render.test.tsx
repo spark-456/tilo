@@ -10,7 +10,7 @@
 // takes the first two events after 09:18 in fixture order; the side panel needs a viewport of 1180 or more.
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, q, qa } from "../../../../test-support/park/componentsHarness";
 import { LIVE_OPEN, QUICK, UP_NEXT } from "../../../../test-support/park/homeCopy";
 import {
@@ -34,6 +34,8 @@ import { HANDOFF_DIR } from "../../../../test-support/park/prototype";
 import { makeWorld } from "../../api/fixtures";
 
 afterEach(cleanup);
+// QA row 21: the greeting follows the local hour, so every test pins one (09:00 unless it says otherwise).
+beforeEach(() => vi.setSystemTime(new Date(2026, 8, 24, 9, 0)));
 
 const SUMMARY_DAY_2 = "38 agents are at work across 4 worlds. Two things need you.";
 const SUMMARY_NIGHT_2 = "Your city keeps working overnight. Two things need you before morning.";
@@ -78,12 +80,27 @@ describe("WEB_4_home_render: the greeting panel", () => {
     expect(elWithText(el, SUMMARY_DAY_2), "the summary line").toBeTruthy();
   });
 
-  it("WEB_4_home_render_night_copy_is_the_evening_one_with_the_21_10_clock", async () => {
+  it("WEB_4_home_render_night_copy_names_the_evening_by_the_clock_and_makes_up_no_time", async () => {
+    vi.setSystemTime(new Date(2026, 8, 24, 21, 10)); // the person's own local time, not the theme
     const { el } = await mountHome({ app: NIGHT });
     expect(textOf(q(el, "h1"))).toBe("Good evening, Alex.");
-    expect(elWithText(el, "Thursday 24 September · 21:10", true)).toBeTruthy();
+    expect(elWithText(el, "Thursday 24 September", true)).toBeTruthy();
+    expect(pageText(el)).not.toContain("21:10");
     expect(elWithText(el, SUMMARY_NIGHT_2)).toBeTruthy();
     expect(pageText(el)).not.toContain("Good morning");
+  });
+
+  it("QA_21_home_render_the_greeting_follows_the_local_hour_not_the_theme", async () => {
+    for (const [hour, word] of [
+      [8, "Good morning"],
+      [14, "Good afternoon"],
+      [19, "Good evening"],
+    ] as const) {
+      vi.setSystemTime(new Date(2026, 8, 24, hour, 0));
+      const { el } = await mountHome({ app: NIGHT }); // night theme at every hour
+      expect(textOf(q(el, "h1"))).toBe(`${word}, Alex.`);
+      cleanup();
+    }
   });
 
   it("WEB_4_home_render_two_open_decisions_show_the_amber_needs_pill_with_Review", async () => {

@@ -21,12 +21,14 @@ vi.mock("../auth/session", () => ({
 beforeEach(() => {
   window.history.replaceState(null, "", "/?onboarding=1");
   window.localStorage.clear();
+  window.sessionStorage.clear();
   seam.firstRun = false;
 });
 afterEach(() => {
   window.history.replaceState(null, "", "/");
   cleanup();
   window.localStorage.clear();
+  window.sessionStorage.clear();
 });
 const button = (name: string) => {
   const found = [...document.querySelectorAll<HTMLButtonElement>("button")].find(
@@ -101,10 +103,28 @@ it.each(PAGE_IDS)("FIRST_RUN asks once for %s, scoped per person and page", (pag
   expect(dialog()?.textContent).toContain(`Take a tour of ${PAGE_LABEL[page]}?`);
 });
 
-it("FIRST_RUN a page dismissal does not dismiss a different page", () => {
+it("QA_22_Not_now_on_one_page_silences_every_page_invitation_for_the_session", () => {
   const root = mount(view());
   click(button("Not now"));
+  for (const page of ["worlds", "agenda", "team", "connectors", "profile"] as const) {
+    root.render(view(page));
+    expect(dialog(), page).toBeNull(); // no scrim, no prompt
+  }
+  act(() => requestTour()); // the person asking for the tour on purpose still gets it
+  expect(dialog()).not.toBeNull();
+});
+
+it("QA_22_Escape_on_the_invitation_is_a_Not_now", () => {
+  const root = mount(view());
+  act(() => document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true })));
   root.render(view("worlds"));
+  expect(dialog()).toBeNull();
+});
+
+it("QA_22_another_person_in_the_same_browser_is_still_asked", () => {
+  const root = mount(view());
+  click(button("Not now"));
+  root.render(view("worlds", true, "person-two"));
   expect(dialog()?.textContent).toContain("Take a tour of Worlds?");
 });
 

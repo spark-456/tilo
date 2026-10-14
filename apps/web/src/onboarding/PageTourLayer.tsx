@@ -5,7 +5,7 @@ import { CoachMark } from "./CoachMark";
 import { trapTab } from "./focus";
 import "./onboarding.css";
 import { pageTourSteps } from "./pageSteps";
-import { hasSeen, markSeen } from "./storage";
+import { hasSeen, invitationsSilenced, markSeen, silenceInvitations } from "./storage";
 import { onTourRequest } from "./tourEvents";
 
 export interface PageTourLayerProps {
@@ -75,6 +75,11 @@ export function PageTourLayer({ page, firstRun, autoInvite = true, userKey }: Pa
     [key],
   );
   const close = useCallback(() => setPhase(null), []);
+  // "Not now" (or Escape) on the invitation: no page asks again this session (QA row 22).
+  const dismiss = useCallback(() => {
+    if (phase?.step === null) silenceInvitations(userKey);
+    setPhase(null);
+  }, [phase, userKey]);
   useEffect(
     () => () => {
       if (opener.current?.isConnected) opener.current.focus();
@@ -86,10 +91,10 @@ export function PageTourLayer({ page, firstRun, autoInvite = true, userKey }: Pa
       setPhase(null);
       return;
     }
-    if (!autoInvite || hasSeen(key)) return; // effect replay preserves this mount's already-open invitation
+    if (!autoInvite || hasSeen(key) || invitationsSilenced(userKey)) return; // replay keeps an open invitation
     markSeen(key);
     open(null);
-  }, [firstRun, autoInvite, key, open]);
+  }, [firstRun, autoInvite, key, userKey, open]);
   useEffect(
     () =>
       onTourRequest(() => {
@@ -115,14 +120,14 @@ export function PageTourLayer({ page, firstRun, autoInvite = true, userKey }: Pa
   useEffect(() => {
     if (!visible) return;
     const onEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") close();
+      if (event.key === "Escape") dismiss();
     };
     document.addEventListener("keydown", onEscape);
     return () => document.removeEventListener("keydown", onEscape);
-  }, [visible, close]);
+  }, [visible, dismiss]);
   if (!visible || !phase) return null;
   if (phase.step === null)
-    return <Invitation page={page} begin={() => setPhase({ key, step: 0 })} close={close} />;
+    return <Invitation page={page} begin={() => setPhase({ key, step: 0 })} close={dismiss} />;
   const index = phase.step;
   const step = steps[index];
   if (!step) return null;
