@@ -11,6 +11,7 @@ COPY evals/pyproject.toml ./evals/pyproject.toml
 COPY config ./config
 COPY contracts ./contracts
 COPY prompts ./prompts
+COPY skills ./skills
 COPY templates ./templates
 COPY design/tokens.json ./design/tokens.json
 RUN uv sync --locked --no-dev --package tilo-api
