@@ -8,10 +8,12 @@ import json
 import threading
 from collections.abc import Callable, Mapping
 from datetime import date
+from functools import partial
 from pathlib import Path
 from typing import Any, cast
 
 from tilo_archive import RunArchive
+from tilo_harness.deliverable import render_format
 from tilo_harness.executor import DefaultUnitRunner, UnitContext, UnitOutcome
 from tilo_harness.quiz import validate_spec, verify_answers, wants_quiz
 from tilo_harness.tools import ToolRegistry
@@ -168,7 +170,7 @@ class BoundRunRunner:
             quiz_sources=source_loader(owner.seams.artifacts, owner.scope, owner.store.events[owner.world_id]),
             meter=lambda role, _request, _reply: models[role].take_charge(),
             credit_cap=self.budget.left,
-            report_renderer=render_report,
+            report_renderer=partial(render_report, fmt=render_format(unit, context.brief) or "pdf"),
         )
         return await runner.run(unit, context)
 

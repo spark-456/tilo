@@ -23,7 +23,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, cast
 
 from tilo_connectors.provenance import build_manifest
 from tilo_memory.artifacts import (
@@ -80,6 +80,28 @@ class Kept:
     label: str | None
 
 
+OFFICE_TYPES = {
+    "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+}
+
+
+@dataclass(frozen=True)
+class RenderedOffice(UnitOutput):
+    """Office bytes from the authenticated renderer; spec text is checked before storage."""
+
+    spec_text: str = ""
+
+    def __post_init__(self) -> None:
+        if (
+            self.media_type not in OFFICE_TYPES
+            or type(self.content) is not bytes
+            or not 4 < len(self.content) <= MAX_PDF
+            or not self.content.startswith(b"PK\x03\x04")
+        ):
+            raise ValueError("a rendered Office file must be bounded OOXML bytes")
+
+
 def existing(artifacts: Any, scope: Any, refs: Any, recorded: Callable[[str], int]) -> list[dict[str, Any]]:
     """Each ref as the store's own {artifact_id, version}; OutputRefused unless the store holds it in `scope` and the
     world announced it (`recorded(artifact_id)` is the highest version the world's stream recorded, EV-15)."""
@@ -121,7 +143,11 @@ def keep(
         plain = type(label) is str and 0 < len(label) <= _LABEL_MAX and label.isprintable()
         if label is not None and not (plain and redact(label) == label):
             raise OutputRefused("an output label is not 1 to 80 characters free of secrets")
-        if type(out) is RenderedPdf and redact(out.spec_text) != out.spec_text:  # a PDF cannot be redacted
+        if (
+            type(out) in (RenderedPdf, RenderedOffice)
+            and redact(cast(RenderedPdf | RenderedOffice, out).spec_text)
+            != cast(RenderedPdf | RenderedOffice, out).spec_text
+        ):  # a PDF cannot be redacted
             raise OutputRefused("a rendered report holds a secret")
 
     def manifest_of(out: UnitOutput, ref: Any, content: bytes, parents: Any, sources: Any) -> dict[str, Any]:
@@ -169,6 +195,11 @@ def _preflight(
     if type(out) is RenderedPdf:  # frozen, but re-checked: the file kind is only ever the render path's
         if out.media_type != "application/pdf" or not 5 < len(out.content) <= MAX_PDF or out.content[:5] != b"%PDF-":
             raise OutputRefused("a rendered PDF is not %PDF- bytes of at most 20 MiB")
+    elif type(out) is RenderedOffice:
+        try:
+            RenderedOffice.__post_init__(out)
+        except ValueError:
+            raise OutputRefused("a rendered Office file is not bounded OOXML bytes") from None
     elif out.media_type not in TEXT_TYPES or not 0 < memoryview(out.content).nbytes <= MAX_TEXT:
         raise OutputRefused("an output is not 1 byte to 2 MB of text or JSON")
     elif not bytes(memoryview(out.content)).decode("utf-8").strip():  # UnicodeDecodeError on bad UTF-8
@@ -194,7 +225,7 @@ def _put(
         content=bytes(memoryview(out.content)),  # the buffer's bytes: never a subclass's len() or __bytes__
         run_id=run_id,
         origin=Origin(kind="render", unit=unit["id"], agent=None)
-        if type(out) is RenderedPdf
+        if type(out) in (RenderedPdf, RenderedOffice)
         else Origin(kind="unit", unit=unit["id"], agent=worker),
         sources=tuple(dict(source) for source in out.sources),
         idempotency_key=f"{run_id}:{unit['id']}:{at}",
