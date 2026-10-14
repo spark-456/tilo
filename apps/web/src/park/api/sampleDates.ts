@@ -7,6 +7,7 @@ import type { Api } from "./index";
 // fixture Api with no clock stays exactly as written. Only results whose `source` is "fixture" are changed.
 import { carryOneStep } from "./oneStep";
 import { carryQuizReader } from "./quizApps";
+import { carryResultReader } from "./results";
 import { carrySkillFixer } from "./skillFixes";
 import type { Agenda, ApiResult, Ledger, Source } from "./types";
 
@@ -287,5 +288,8 @@ export function withToday(api: Api, today: () => CivilDate): Api {
         ),
     ]),
   );
-  return carrySkillFixer(api, carryOneStep(api, carryQuizReader(api, wrapped as unknown as Api)));
+  return carryResultReader(
+    api,
+    carrySkillFixer(api, carryOneStep(api, carryQuizReader(api, wrapped as unknown as Api))),
+  );
 }

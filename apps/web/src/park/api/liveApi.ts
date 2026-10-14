@@ -38,6 +38,7 @@ import { STATE_OF, type WorldListItem, worldsFromList } from "./live/worldsFromL
 import { nameInitials } from "./nameInitials";
 import { installOneStep, oneStepOver } from "./oneStep";
 import { installQuizReader } from "./quizApps";
+import { installResultReader } from "./results";
 import { installSkillFixer } from "./skillFixes";
 import type { Dec, DecisionKey, Effort, QuickReply, TierKey, Today, User } from "./types";
 
@@ -276,6 +277,7 @@ export function createLiveApi(options: LiveApiOptions = {}): Api {
       throw new TiloApiError(BAD_REPLY, 200, true, true);
     return skillFromRow(row);
   });
+  installResultReader(api, (world) => http.getBlob(`/worlds/${encodeURIComponent(world)}/result`));
   installQuizReader(api, async (world, artifact) => {
     const raw = await http.getJson(
       `/worlds/${encodeURIComponent(world)}/apps/${encodeURIComponent(artifact)}`,
