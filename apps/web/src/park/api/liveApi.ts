@@ -36,6 +36,7 @@ import { worldFromIntake } from "./live/worldFromIntake";
 import { STATE_OF, type WorldListItem, worldsFromList } from "./live/worldsFromList";
 import { nameInitials } from "./nameInitials";
 import { installQuizReader } from "./quizApps";
+import { installResultReader } from "./results";
 import type { Dec, DecisionKey, Effort, QuickReply, TierKey, Today, User } from "./types";
 
 export class NotBuilt extends Error {
@@ -267,6 +268,7 @@ export function createLiveApi(options: LiveApiOptions = {}): Api {
     ...(options.appCheckToken ? { appCheckToken: options.appCheckToken } : {}),
     ...(options.authToken ? { authToken: options.authToken } : {}),
   });
+  installResultReader(api, (world) => http.getBlob(`/worlds/${encodeURIComponent(world)}/result`));
   installQuizReader(api, async (world, artifact) => {
     const raw = await http.getJson(
       `/worlds/${encodeURIComponent(world)}/apps/${encodeURIComponent(artifact)}`,

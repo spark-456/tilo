@@ -9,6 +9,7 @@ import { type Identity, NotBuilt, createLiveApi, todayOf, userOf } from "./liveA
 // and with no request (the server only replays for a demo session); a signed-in person gets the live Api plus who they
 // are, from the sign-in session.
 import { carryQuizReader } from "./quizApps";
+import { carryResultReader } from "./results";
 import type { ApiResult } from "./types";
 
 export interface SessionView {
@@ -58,5 +59,9 @@ export function withSession(live: Api, who: SessionView): Api {
       async () => ({ data: todayOf(who.now()), source: "live" as const }),
       () => fixture.getToday(),
     );
-  return carryQuizReader(live, api, () => !who.demo());
+  return carryResultReader(
+    live,
+    carryQuizReader(live, api, () => !who.demo()),
+    () => !who.demo(),
+  );
 }

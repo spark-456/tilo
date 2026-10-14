@@ -22,6 +22,7 @@ from tilo_api import nudge_sweep as _nudge_sweep
 from tilo_api import people as _people
 from tilo_api import plate_links as _plate_links
 from tilo_api import quiz_apps as _quiz_apps
+from tilo_api import results as _results
 from tilo_api import runs as _runs
 from tilo_api import schedules as _schedules
 from tilo_api import skill_proposals as _skill_proposals
@@ -152,6 +153,7 @@ app.include_router(_team_shares_router)  # ADR-0040: owner-only PUT/DELETE of a 
 app.include_router(_team_items_router)  # ADR-0040: the team view of a shared world's work items
 app.include_router(_meeting_host_routes.router)
 app.include_router(_quiz_apps.router)
+app.include_router(_results.router)
 app.include_router(_connect_routes.router)
 app.include_router(_people_list_router)
 app.include_router(_skills_router)

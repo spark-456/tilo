@@ -6,6 +6,7 @@ import type { Api } from "./index";
 // date (the app reads its clock in app/context.tsx; this layer reads none), so a test passes any day it likes and a
 // fixture Api with no clock stays exactly as written. Only results whose `source` is "fixture" are changed.
 import { carryQuizReader } from "./quizApps";
+import { carryResultReader } from "./results";
 import type { Agenda, ApiResult, Ledger, Source } from "./types";
 
 export interface CivilDate {
@@ -285,5 +286,5 @@ export function withToday(api: Api, today: () => CivilDate): Api {
         ),
     ]),
   );
-  return carryQuizReader(api, wrapped as unknown as Api);
+  return carryResultReader(api, carryQuizReader(api, wrapped as unknown as Api));
 }
