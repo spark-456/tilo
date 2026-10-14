@@ -131,11 +131,16 @@ test("WEB_CUTOVER_e2e_the_worlds_replays_list_is_at_worlds_replays", async ({ pa
   expect(problems).toEqual([]);
 });
 
-test("WEB_CUTOVER_e2e_a_kept_task_screen_still_loads", async ({ page }) => {
+test("OLD_UI_OUT_e2e_the_retired_task_and_start_addresses_go_to_the_park_home", async ({
+  page,
+}) => {
   const problems = watchConsole(page);
-  await page.goto(`/task/${TASK}/understanding`);
-  await expect(page.getByRole("heading", { level: 1, name: "Understanding" })).toBeVisible();
-  await expect(page.locator("[data-park]")).toHaveCount(0);
+  for (const path of [`/task/${TASK}/understanding`, `/task/${TASK}/approaches`, "/start"]) {
+    await page.goto(path);
+    await expect(page.getByTestId("park-page-home")).toBeVisible();
+    expect(new URL(page.url()).pathname, path).toBe("/");
+    await expect(page.locator("main h1, h1").filter({ hasText: "Understanding" })).toHaveCount(0);
+  }
   expect(problems).toEqual([]);
 });
 
@@ -165,46 +170,6 @@ test("WEB_CUTOVER_e2e_the_not_found_home_link_goes_home", async ({ page }) => {
   await expect(page.getByTestId("park-page-home")).toBeVisible();
   expect(new URL(page.url()).pathname).toBe("/");
 });
-
-test("WEB_CUTOVER_e2e_start_is_the_intake_form", async ({ page }) => {
-  const problems = watchConsole(page);
-  await page.goto("/start");
-  await expect(page.getByLabel("Describe your task")).toBeVisible();
-  await expect(page.getByRole("button", { name: "Start task", exact: true })).toBeVisible();
-  await expect(page.locator("[data-park]")).toHaveCount(0);
-  expect(problems).toEqual([]);
-});
-
-for (const [name, viewport] of [
-  ["desktop", DESKTOP],
-  ["phone", MOBILE],
-] as const) {
-  test(`WEB_CUTOVER_e2e_home_${name}_start_a_real_task_links_to_the_intake_without_a_layout_shift`, async ({
-    page,
-  }) => {
-    await page.setViewportSize(viewport);
-    await watchShifts(page);
-    const problems = collectConsoleProblems(page);
-    await page.goto("/");
-    const link = page.getByRole("link", { name: "Start a real task", exact: true });
-    await expect(link).toBeVisible();
-    await expect(link).toHaveAttribute("href", "/start");
-    // inside the viewport, clear of the composer panel above it, big enough to hit
-    const box = await link.boundingBox();
-    const panel = await page.locator(".park-home-panel").boundingBox();
-    if (!box || !panel) throw new Error("no boxes");
-    expect(box.x).toBeGreaterThanOrEqual(0);
-    expect(box.x + box.width).toBeLessThanOrEqual(viewport.width);
-    expect(box.y + box.height).toBeLessThanOrEqual(viewport.height);
-    expect(box.y).toBeGreaterThanOrEqual(panel.y + panel.height - 0.5);
-    expect(box.height).toBeGreaterThanOrEqual(24);
-    // the composer stays where the design puts it: its panel's bottom edge is the column's bottom edge
-    expect(await readShifts(page)).toEqual([]);
-    await Promise.all([page.waitForURL(/\/start$/), link.click()]);
-    await expect(page.getByLabel("Describe your task")).toBeVisible();
-    expect(problems).toEqual([]);
-  });
-}
 
 test("WEB_CUTOVER_e2e_a_sample_world_has_a_disabled_live_view_and_nothing_to_open", async ({
   page,

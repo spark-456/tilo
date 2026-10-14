@@ -4,7 +4,7 @@
 // is not built shows "Not connected yet", never sample values. The composer's 900 ms goes through the
 // provider's `useSchedule`, so a test never waits and a pending draft is cancelled when the page goes.
 import { useEffect, useRef, useState } from "react";
-import type { RunPlan } from "../../api/oneStep";
+import type { Cadence, RunPlan } from "../../api/oneStep";
 import type {
   AgendaData,
   ApiResult,
@@ -37,6 +37,7 @@ import {
   spendOf,
   summaryLine,
 } from "./homeData";
+import { textLimitMessage } from "./uploadRules";
 import { useComposerClearance } from "./useComposerClearance";
 
 interface Base {
@@ -243,6 +244,11 @@ export function HomePage({ app }: { app: AppCtx }) {
       store.toast("Describe your task first, then press Start.");
       return;
     }
+    const tooLong = textLimitMessage(text); // FR-INT-01: the server's own limit, said before any call
+    if (tooLong !== null) {
+      setQuick({ state: "error", message: tooLong });
+      return;
+    }
     cancelDraft();
     sendingNow.current = true;
     setSending(true);
@@ -262,11 +268,11 @@ export function HomePage({ app }: { app: AppCtx }) {
       if (!r.capped) setQuick({ state: "error", message: r.message, retry: prepare });
     });
   };
-  const startRun = () => {
+  const startRun = (repeat: Cadence | null) => {
     if (run === null || runBusy) return;
     setRunBusy(true);
     setRunError(null);
-    store.startRun(run).then((r) => {
+    store.startRun(run, repeat).then((r) => {
       if (!alive.current) return;
       setRunBusy(false);
       if (!r.ok) {
@@ -276,7 +282,11 @@ export function HomePage({ app }: { app: AppCtx }) {
       setQuery("");
       setFiles([]);
       toIdle();
-      go("world", { id: r.value });
+      if (r.value.repeatRefused !== null)
+        store.toast(
+          `The run has started, but it was not set to repeat weekly. ${r.value.repeatRefused}`,
+        );
+      go("world", { id: r.value.worldId });
     });
   };
   const reviseRun = (field: string, answer: string) => {

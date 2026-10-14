@@ -286,8 +286,8 @@ for (const path of RUN_PAGES) {
 
 test("UX_1 screens that show no run keep the honest empty rail", async ({ page }) => {
   await page.setViewportSize(DESKTOP);
-  // WEB-CUTOVER: "/" is the Park Home; S-02 is the old shell's start of the flow, with no run on screen.
-  for (const path of ["/task/task_fixture_1/understanding", "/more", "/needs-you"]) {
+  // WEB-CUTOVER: "/" is the Park Home; these old-shell screens have no run on screen.
+  for (const path of ["/more", "/needs-you"]) {
     await page.goto(path);
     await expect(page.getByTestId("right-rail")).toContainText("Nothing yet");
   }

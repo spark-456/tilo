@@ -8,9 +8,6 @@ import { matchFlowRoute } from "./router";
 import { SCREENS } from "./screens/meta";
 
 const KEPT = [
-  "/start",
-  "/task/t1/understanding",
-  "/task/t1/approaches",
   "/world/w1/stage",
   "/world/w1/story",
   "/world/w1/trace",
@@ -67,13 +64,7 @@ describe("WEB_CUTOVER_kept_paths: the addresses the old app owns", () => {
   });
 
   it("WEB_CUTOVER_kept_paths_every_flow_route_address_is_kept", () => {
-    for (const path of [
-      "/task/abc/understanding",
-      "/task/abc/approaches",
-      "/world/abc/stage",
-      "/task/a%20b/understanding",
-      "/world/q%201%2F2/stage",
-    ]) {
+    for (const path of ["/world/abc/stage", "/world/q%201%2F2/stage"]) {
       expect(matchFlowRoute(path).screen, path).not.toBe("Start");
       expect(isKeptPath(path), path).toBe(true);
     }
@@ -85,9 +76,12 @@ describe("WEB_CUTOVER_kept_paths: the addresses the old app owns", () => {
     "/world/x/unknown",
     "/world/",
     "/world",
+    "/start",
     "/start/x",
     "/team/x",
     "/task/t1",
+    "/task/t1/understanding",
+    "/task/t1/approaches",
     "/task/t1/other",
     "/worlds/other",
     "/needs-you/other",
@@ -109,15 +103,18 @@ describe("WEB_CUTOVER_kept_paths: the addresses the old app owns", () => {
   });
 });
 
-describe("SIMPLE_RUN_1_retired_flow_paths: the old Understanding and Approaches addresses", () => {
-  it.each(["/task/t1/understanding", "/task/t1/approaches", "/task/t1/approaches/"])(
-    "SIMPLE_RUN_1_%s_is_retired",
-    (path) => {
-      expect(isRetiredFlowPath(path)).toBe(true);
-    },
-  );
+describe("OLD_UI_OUT_retired_flow_paths: the old Start, Understanding and Approaches addresses", () => {
+  it.each([
+    "/start",
+    "/start/",
+    "/task/t1/understanding",
+    "/task/t1/approaches",
+    "/task/t1/approaches/",
+  ])("SIMPLE_RUN_1_%s_is_retired", (path) => {
+    expect(isRetiredFlowPath(path)).toBe(true);
+  });
 
-  it.each(["/start", "/world/w/stage", "/task/t1", "/task/t1/other", "/worlds"])(
+  it.each(["/start/x", "/world/w/stage", "/task/t1", "/task/t1/other", "/worlds"])(
     "SIMPLE_RUN_1_%s_is_not_retired",
     (path) => {
       expect(isRetiredFlowPath(path)).toBe(false);

@@ -1254,3 +1254,63 @@
   outline: 2px solid var(--heroInk);
   outline-offset: 2px;
 }
+
+/* OLD-UI-OUT wave 1: the budget meter and the "Repeat weekly" option of the confirm card (ported from S-03) */
+[data-park] .park-home-meter {
+  position: relative;
+  height: 10px;
+  border-radius: 99px;
+  background: var(--track);
+  overflow: hidden;
+}
+[data-park] .park-home-meter__band {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-radius: 99px;
+  background: var(--heroSoft);
+}
+[data-park] .park-home-meter__cap {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: var(--heroFill);
+}
+[data-park] .park-home-repeat {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--ink2);
+}
+[data-park] .park-home-repeat__toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 24px;
+  cursor: pointer;
+}
+[data-park] .park-home-repeat__fields {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+[data-park] .park-home-repeat__fields select,
+[data-park] .park-home-repeat__fields input[type="time"] {
+  height: 32px;
+  padding: 0 8px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--btn2);
+  color: var(--ink);
+  font: inherit;
+}
+[data-park] .park-home-repeat__hint {
+  color: var(--ink3);
+}

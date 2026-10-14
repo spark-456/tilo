@@ -119,7 +119,7 @@ describe("SIMPLE-RUN-1 one-step start over the live Api", () => {
   it("SIMPLE-RUN-1 start: Start is the one approve call, with the plan's approach and cap, and answers the world", async () => {
     const { one, calls } = server();
     const plan = await one.prepare("Plan the offsite", []);
-    expect(await one.start(plan)).toBe("w_1");
+    expect(await one.start(plan)).toEqual({ worldId: "w_1", repeatRefused: null });
     const approve = calls.at(-1);
     expect(`${approve?.method} ${approve?.path}`).toBe("POST /tasks/t_1/approve");
     expect(approve?.body).toEqual({ approach_id: "a_balanced", budget_cap: 21 });

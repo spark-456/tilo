@@ -4,7 +4,6 @@
 // intake; the fixture answers with a labelled sample.
 import { describe, expect, it } from "vitest";
 import { TiloApiError } from "../../api/http";
-import { intakes } from "../../api/intakes";
 import { SAMPLE_QUICK, createFixtureApi } from "./fixtureApi";
 import { askQuick } from "./index";
 import { createLiveApi } from "./liveApi";
@@ -52,7 +51,6 @@ describe("QUICK_THINKING_http: the mode field", () => {
       text: "Paris.",
       cost: { model_calls: 1, credits: 0.04, saved_credits: 0.3 },
     });
-    const known = intakes.size;
     const res = await askQuick(r.api, "quick", "Capital of France?");
     expect(r.seen[0]?.form.get("mode")).toBe("quick");
     expect(res.source).toBe("live");
@@ -61,8 +59,6 @@ describe("QUICK_THINKING_http: the mode field", () => {
       text: "Paris.",
       cost: { credits: 0.04, savedCredits: 0.3 },
     });
-    // a Quick answer makes no task: nothing is remembered as an intake
-    expect(intakes.size).toBe(known);
   });
 
   it("QUICK_THINKING_http_an_answer_without_cost_has_cost_null_never_a_made_up_figure", async () => {

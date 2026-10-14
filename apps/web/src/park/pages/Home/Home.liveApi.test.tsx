@@ -2,7 +2,7 @@
 // FR-UX-13 acceptance, end to end inside the browser-less page: Home mounted over the REAL live Api
 // (`createLiveApi` with a fake fetch standing in for tilo-api). Starting work makes the real intake call
 // (POST /intake, the legacy S-01's call), and on the server's reply the world is added, the toast offers Open
-// and the legacy `/task/:id/understanding` screen has the brief to show (`rememberIntake`).
+// and the person lands on the one confirm card (SIMPLE-RUN-1); the old Understanding screen is gone.
 //
 // The live Api serves the worlds, cards and costs reads today; the user, today and agenda reads are still
 // NotBuilt. The composer has to be usable all the same: starting work needs none of them (BQ rows at the end
@@ -28,10 +28,7 @@ import {
   said,
   showsPending,
 } from "../../../../test-support/park/liveHomeHarness";
-import { ClientProvider } from "../../../api/ClientProvider";
-import { FixtureClient } from "../../../api/fixtureClient";
 import { BRIEF_SUPPLIER_COMPARISON } from "../../../api/fixtures/brief";
-import { Understanding } from "../../../screens/s02/Understanding";
 import type { Api } from "../../api/index";
 import { createLiveApi } from "../../api/liveApi";
 import { carryOneStep } from "../../api/oneStep";

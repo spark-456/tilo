@@ -29,12 +29,9 @@ describe("WEB_CUTOVER_router: the flow routes", () => {
     expect(matchFlowRoute("/world/w/story")).toEqual({ screen: "Start" });
   });
 
-  it("WEB_CUTOVER_04_the_task_flow_routes_are_unchanged", () => {
-    expect(matchFlowRoute("/task/t1/understanding")).toEqual({
-      screen: "Understanding",
-      taskId: "t1",
-    });
-    expect(matchFlowRoute("/task/t1/approaches")).toEqual({ screen: "Approaches", taskId: "t1" });
+  it("OLD_UI_OUT_04_the_task_flow_routes_are_gone", () => {
+    expect(matchFlowRoute("/task/t1/understanding")).toEqual({ screen: "Start" });
+    expect(matchFlowRoute("/task/t1/approaches")).toEqual({ screen: "Start" });
     expect(matchFlowRoute("/")).toEqual({ screen: "Start" });
   });
 });

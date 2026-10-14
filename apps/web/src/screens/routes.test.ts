@@ -5,12 +5,12 @@ import { sectionOf } from "./PrimaryNav";
 import { SCREENS } from "./meta";
 import { matchScreen } from "./routes";
 
-const FLOW_SCREENS = ["S-01", "S-02", "S-03", "S-04"];
+const FLOW_SCREENS = ["S-04"];
 
 describe("PRD-18.3 AGW-08 route table: every Must screen has a route", () => {
-  it("S-01..S-29 are all listed (S-26 to S-29 are the people screens, PPL-40a and PPL-40b), and only the Should screens have no address", () => {
+  it("S-04..S-29 are all listed (S-01 to S-03 are gone: OLD-UI-OUT wave 1) (S-26 to S-29 are the people screens, PPL-40a and PPL-40b), and only the Should screens have no address", () => {
     expect(SCREENS.map((s) => s.id)).toEqual(
-      Array.from({ length: 29 }, (_, i) => `S-${String(i + 1).padStart(2, "0")}`),
+      Array.from({ length: 26 }, (_, i) => `S-${String(i + 4).padStart(2, "0")}`),
     );
     for (const s of SCREENS) expect(s.path === null).toBe(s.priority === "Should");
   });
@@ -20,7 +20,7 @@ describe("PRD-18.3 AGW-08 route table: every Must screen has a route", () => {
       const path = s.path ?? "";
       if (FLOW_SCREENS.includes(s.id)) {
         expect(matchScreen(path)).toBeNull();
-        if (s.id !== "S-01") expect(matchFlowRoute(path).screen).not.toBe("Start");
+        expect(matchFlowRoute(path).screen).not.toBe("Start");
       } else {
         expect(matchScreen(path)?.id).toBe(s.id);
       }
@@ -56,7 +56,7 @@ describe("PRD-18.3 AGW-08 route table: every Must screen has a route", () => {
     expect(matchScreen("/world/w/inspect/B1")?.id).toBe("S-05");
     expect(matchScreen("/world/w/delivery")?.id).toBe("S-12");
     expect(matchScreen("/world/w/stage")).toBeNull(); // the stage is a flow route (S-04)
-    expect(matchScreen("/task/t/approaches")).toBeNull();
+    expect(matchScreen("/task/t/approaches")?.id).toBe("not-found"); // retired: Root sends it Home first
     expect(matchScreen("/nowhere")).toBeNull();
   });
 

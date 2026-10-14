@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 // WEB-CUTOVER: an address that is neither a Park page nor a screen the old app owns is the Park "Page not
-// found" (with a link Home), never the old StartScreen. `/start` is the old app's explicit intake address.
+// found" (with a link Home), never the old StartScreen. `/start` is retired: it goes to the Park Home (OLD-UI-OUT wave 1).
 // The old App is mocked; the Park app is the real one.
 import { act } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -46,11 +46,11 @@ describe("WEB_CUTOVER_root_kept: unknown addresses are the Park not-found", () =
     },
   );
 
-  it("WEB_CUTOVER_root_kept_start_is_the_old_app", async () => {
+  it("OLD_UI_OUT_root_kept_start_goes_to_the_park_home", async () => {
     const m = await visit("/start");
-    expect(q(m.container, '[data-testid="old-app"]')).toBeTruthy();
-    expect(qa(m.container, '[data-testid="park-not-found"]')).toHaveLength(0);
-    expect(qa(m.container, "[data-park]")).toHaveLength(0);
+    expect(qa(m.container, '[data-testid="old-app"]')).toHaveLength(0);
+    expect(qa(m.container, '[data-testid="park-page-home"]')).toHaveLength(1);
+    expect(window.location.pathname).toBe("/");
   });
 
   it.each(["/more", "/world/w/stage", "/team/console", "/worlds/replays"])(

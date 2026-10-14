@@ -7,7 +7,6 @@
 import type { IntakeResult } from "../../api/client";
 export { peopleListsApi } from "./live/peopleLists";
 import { HttpClient, type QuickIntakeResult, TiloApiError, reasonOf } from "../../api/http";
-import { rememberIntake } from "../../api/intakes";
 import { isSampleHidden, wantsSample } from "../sample/sampleChoice";
 import { API_METHODS, type Api, type ApiMethod } from "./index";
 import { agendaFromPlate, emptyAgenda } from "./live/agendaFromPlate";
@@ -468,7 +467,6 @@ export function createLiveApi(options: LiveApiOptions = {}): Api {
     if (!isText(intake?.task_id) || intake.task_id === "" || !isObject(intake.brief)) {
       throw new TiloApiError(BAD_REPLY, 200, true, true);
     }
-    rememberIntake(intake);
     return { data: { ok: true, world: worldFromIntake(mode, intake, query) }, source: "live" };
   }) as Api["startWorld"];
   // SIMPLE-RUN-1: Home's one-step start (intake, skip every question, price, approve). Not a method of the pinned

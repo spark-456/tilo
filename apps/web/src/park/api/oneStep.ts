@@ -6,6 +6,11 @@ import type { PlanApproach } from "@tilo/contracts";
 import type { IntakeResult } from "../../api/client";
 import type { HttpClient } from "../../api/http";
 import { TiloApiError } from "../../api/http";
+import type { Cadence } from "../../api/schedules";
+
+// The weekly repeat's types and weekday names travel with the one-step start, so a page imports them from park/api.
+export { WEEKDAYS } from "../../api/schedules";
+export type { Cadence };
 import type { Api } from "./index";
 
 /** `caps.run_credits` in config/metering.yaml (services/api answers 422 above it): the most one approval may grant. */
@@ -36,9 +41,25 @@ export interface OneStepApi {
   prepare(text: string, files: readonly File[]): Promise<RunPlan>;
   /** The person changed one assumption: answer that question, then price the new brief again. */
   revise(taskId: string, field: string, answer: string): Promise<RunPlan>;
-  /** Approve the plan's cap; answers the id of the run's world. */
-  start(plan: RunPlan): Promise<string>;
+  /**
+   * Approve the plan's cap and, when `repeat` is given, post one weekly schedule after the grant (FR-AGT-14). The run
+   * has started whatever the schedule's answer: a refused repeat is `repeatRefused`, never an undone run.
+   */
+  start(plan: RunPlan, repeat?: Cadence | null): Promise<RunStart>;
 }
+
+export interface RunStart {
+  readonly worldId: string;
+  /** The plain reason the repeat was not set, or null (none asked, or it was set). */
+  readonly repeatRefused: string | null;
+}
+
+/** The API takes a schedule title without control characters. */
+const plainTitle = (text: string): string =>
+  [...text]
+    .map((ch) => ((ch.codePointAt(0) ?? 0) < 32 || /^[\u007f-\u009f]$/.test(ch) ? " " : ch))
+    .join("")
+    .slice(0, 140);
 
 // Travels with the Api through its session wrappers like the quiz reader (quizApps.ts); the pinned `Api` keys stay.
 const starters = new WeakMap<Api, () => OneStepApi | null>();
@@ -164,7 +185,8 @@ export function oneStepOver(http: HttpClient): OneStepApi {
       }
       return price(taskId, brief);
     },
-    async start(plan) {
+    async start(plan, repeat) {
+      let worldId: string;
       try {
         const { world_id } = await http.approve(plan.taskId, {
           approach_id: plan.approachId,
@@ -172,9 +194,24 @@ export function oneStepOver(http: HttpClient): OneStepApi {
         });
         if (!isText(world_id) || world_id === "")
           throw new TiloApiError(BAD_REPLY, 200, true, true);
-        return world_id;
+        worldId = world_id;
       } catch (e) {
         throw said("start the run", e);
+      }
+      if (!repeat) return { worldId, repeatRefused: null };
+      // The schedule copies what was just approved, so it is posted only after the grant.
+      try {
+        await http.createSchedule({
+          task_id: plan.taskId,
+          approach_id: plan.approachId,
+          title: plainTitle(`Weekly run: ${plan.approachLabel}`),
+          cadence: repeat,
+        });
+        return { worldId, repeatRefused: null };
+      } catch (e) {
+        const reason =
+          e instanceof TiloApiError && e.message ? e.message : "Tilo could not set it up.";
+        return { worldId, repeatRefused: reason };
       }
     },
   };
