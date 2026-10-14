@@ -1,6 +1,7 @@
-"""SEC-16 / FR-MTG-11 (M2b, BQ-M2-1): the Gemini Live voice's spend hook over the uid ledger. `LiveVoiceSpend` is a
+"""SEC-16 / FR-MTG-11 (M2b, BQ-M2-1): the configured Live voice's spend hook over the uid ledger. `LiveVoiceSpend` is a
 `tilo_providers.voice.LiveVoiceMeter`: one spoken reply is one unit, asked of the same `SpendGuard` every other live
-call goes through. Deterministic code; the provider is never reached when it answers no.
+call goes through. Model selection stays in config/voice.yaml (PL-01).
+Deterministic code; the provider is never reached when it answers no.
 
 A process that speaks with the Live voice builds one per meeting (the owner's uid, org and a run id for the meeting)
 over `deps.get_spend_cap_ledger()` and passes it as `meter=` to `tilo_providers.voice.build_voice_provider`. It
