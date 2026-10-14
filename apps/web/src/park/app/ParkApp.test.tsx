@@ -68,10 +68,11 @@ describe("WEB_3a_parkapp: the shell around a page", () => {
     expect(m.container.textContent).toContain("Not built yet");
   });
 
-  it("WEB_3a_parkapp_the_shell_is_there_while_the_page_chunk_loads", () => {
+  it("WEB_3a_parkapp_the_shell_is_there_while_the_page_chunk_loads", async () => {
     window.history.pushState({}, "", "/park/ledger");
     const m = mount(<ParkApp />);
     expect(qa(m.container, "[data-park]")).toHaveLength(1); // Suspense fallback, not a blank root
+    await settle();
   });
 });
 

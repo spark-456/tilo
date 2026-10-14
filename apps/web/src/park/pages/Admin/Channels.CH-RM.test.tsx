@@ -4,14 +4,15 @@
 // the contracts, but the screen never offers, names or lists it, even when a recorded run holds it.
 import type { Event } from "@tilo/contracts";
 import { act } from "react";
-import { createRoot } from "react-dom/client";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { cleanup, mount } from "../../../../test-support/park/componentsHarness";
 import { ClientProvider } from "../../../api/ClientProvider";
 import { FixtureClient } from "../../../api/fixtureClient";
 import { EVENTS_VILLAGE_BASIC } from "../../../api/fixtures/events";
 import { ChannelsSection as S_16 } from "./RunSections";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+afterEach(cleanup);
 
 // The village run now carries no WhatsApp message (its seq 35 and 36 went by email), so one is
 // built here from seq 35: a recorded run may still hold the value, and the screen must not list it.
@@ -30,14 +31,13 @@ async function render() {
     for (const e of [...EVENTS_VILLAGE_BASIC, RETIRED_CHANNEL_MESSAGE]) onEvent(e);
     return () => undefined;
   };
-  const container = document.createElement("div");
-  document.body.append(container);
+  const { container } = mount(
+    <ClientProvider client={client}>
+      <S_16 />
+    </ClientProvider>,
+  );
   await act(async () => {
-    createRoot(container).render(
-      <ClientProvider client={client}>
-        <S_16 />
-      </ClientProvider>,
-    );
+    await vi.dynamicImportSettled();
   });
   // The layout arrives after the first render (the fixture client imports it).
   await vi.waitFor(async () => {

@@ -103,7 +103,7 @@ describe("WEB_3b_shell: the toast", () => {
     expect(status()[0]?.textContent).toContain("Approved £3,420 for Laptop Depot");
     expect(status()[0]?.getAttribute("aria-live")).toBe("polite");
     expect(status()[0]?.closest("[data-park]")).not.toBeNull();
-    click(q(status()[0] as HTMLElement, "button"));
+    await act(async () => click(q(status()[0] as HTMLElement, "button")));
     expect(seen.app.dec.depot).toBe(false);
     expect(status()).toHaveLength(0);
   });
@@ -120,11 +120,11 @@ describe("WEB_3b_shell: the toast", () => {
 describe("WEB_3b_shell: the popovers and the loader work together", () => {
   it("WEB_3b_shell_a_notification_row_opens_the_world_through_the_loader_then_the_page", async () => {
     const { navigate, sch } = await mountApp();
-    click(q(document.body, 'button[aria-label="Notifications"]'));
+    await act(async () => click(q(document.body, 'button[aria-label="Notifications"]')));
     const row = qa<HTMLButtonElement>(document.body, '[role="dialog"] button').find((r) =>
       (r.textContent ?? "").includes("Competitor pricing is ready"),
     ) as HTMLButtonElement;
-    click(row);
+    await act(async () => click(row));
     const card = () => status().find((e) => (e.textContent ?? "").includes("OPENING"));
     expect(card()?.textContent).toContain("Competitor pricing");
     expect(document.querySelector('[role="dialog"]')).toBeNull();
@@ -193,9 +193,9 @@ describe("WEB_3b_parkapp: the real ParkApp wears the shell", () => {
 
   it("WEB_3b_parkapp_the_day_night_button_flips_data_time_on_the_one_root", async () => {
     const m = await visit("/park/home");
-    click(q(m.container, 'button[aria-label="Switch to night"]'));
+    await act(async () => click(q(m.container, 'button[aria-label="Switch to night"]')));
     expect(q(m.container, "[data-park]").getAttribute("data-time")).toBe("night");
-    click(q(m.container, 'button[aria-label="Switch to day"]'));
+    await act(async () => click(q(m.container, 'button[aria-label="Switch to day"]')));
     expect(q(m.container, "[data-park]").getAttribute("data-time")).toBe("day");
   });
 
@@ -210,11 +210,11 @@ describe("WEB_3b_parkapp: the real ParkApp wears the shell", () => {
   it("WEB_3b_parkapp_a_world_from_the_bell_loads_for_3x250_ms_then_the_page_swaps_and_the_card_goes", async () => {
     const m = await visit("/park/home");
     vi.useFakeTimers();
-    click(q(m.container, 'button[aria-label="Notifications"]'));
+    await act(async () => click(q(m.container, 'button[aria-label="Notifications"]')));
     const row = qa<HTMLButtonElement>(m.container, '[role="dialog"] button').find((r) =>
       (r.textContent ?? "").includes("Competitor pricing is ready"),
     ) as HTMLButtonElement;
-    click(row);
+    await act(async () => click(row));
     const card = () =>
       qa(m.container, '[role="status"]').find((e) => (e.textContent ?? "").includes("OPENING"));
     expect(card()).toBeDefined();

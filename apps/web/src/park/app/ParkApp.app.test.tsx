@@ -157,7 +157,7 @@ describe("WEB_3a_shell: the toast", () => {
     const m = await visit("/park/home");
     await act(async () => app().decide("mail"));
     expect(toastEl(m.container)?.textContent).toContain("Supplier brief sent to 3 suppliers");
-    click(q(toastEl(m.container) as HTMLElement, "button"));
+    await act(async () => click(q(toastEl(m.container) as HTMLElement, "button")));
     expect(app().dec.mail).toBe(false);
     expect(app().needsLeft).toBe(2);
     expect(toastEl(m.container)).toBeNull();
@@ -194,7 +194,7 @@ describe("WEB_3a_shell: the toast", () => {
     expect(toastEl(m.container)?.textContent).toContain("Started “Order lunch”");
     const open = qa<HTMLButtonElement>(m.container, '[role="status"] button');
     expect(open.map((b) => b.textContent)).toEqual(["Open"]);
-    click(open[0] as HTMLButtonElement);
+    await act(async () => click(open[0] as HTMLButtonElement));
     await settle();
     expect(window.location.pathname).toBe("/world/new1");
     expect(app().params).toEqual({ id: "new1" });

@@ -32,11 +32,15 @@ beforeEach(() => {
   const original = globalThis.console;
   globalThis.console = guardConsoleErrors(original, (args) => errors.push(args));
   const rejected = (reason: unknown) => rejections.push(reason);
+  const browserRejected = (event: PromiseRejectionEvent) => rejections.push(event.reason);
   process.on("unhandledRejection", rejected);
+  if (typeof window !== "undefined") window.addEventListener("unhandledrejection", browserRejected);
   // This runs after page cleanup, so errors from unmount are covered too.
   onTestFinished(() => {
     globalThis.console = original;
     process.off("unhandledRejection", rejected);
+    if (typeof window !== "undefined")
+      window.removeEventListener("unhandledrejection", browserRejected);
     expect(
       errors,
       `Park console.error: ${errors.map((args) => format(...args)).join("\n")}`,
