@@ -46,6 +46,7 @@ from tilo_api.people_writes import (
     confirm_minutes,
     create_first_person,
     create_item,
+    create_judge_member,
     create_meeting,
     create_person,
     json_body,
@@ -394,11 +395,19 @@ def create_first_person_route(
     gate: Annotated[Callable[[str], bool], Depends(deps.get_founder_gate)],
     redact: Annotated[Callable[[str], str], Depends(deps.get_redactor)],
     clock: Annotated[Callable[[], str], Depends(deps.get_clock)],
+    judge: Annotated[Callable[[str], bool], Depends(deps.get_judge_gate)],
 ) -> dict[str, Any]:
-    """The configured bootstrap uid founds an empty org as its owner (PE-17, BQ-PPL11C-15); every other principal, and
-    any org that has a person or was founded, is the same 403. The uid and the session (a full web or mobile_web
-    sign-in, FS-19, an allow-list) are checked before any store is read; the marker is never the request's."""
-    if not (principal.full_session and principal.channel in _FOUNDING_CHANNELS and gate(principal.user_id)):
+    """The configured bootstrap uid founds an empty org as its owner (PE-17, BQ-PPL11C-15). A person who declared
+    `judge` (and only then) joins as a plain member of it instead, never as owner (JUDGE-FIRST-RUN F1). Every other
+    principal, and any org that has a person or was founded, is the same 403. The session (a full web or mobile_web
+    sign-in, FS-19, an allow-list) is checked before any store is read; the marker is never the request's."""
+    if not (principal.full_session and principal.channel in _FOUNDING_CHANNELS):
+        raise Refusal(403, "forbidden")
+    if gate(principal.user_id):
+        make = create_first_person
+    elif not principal.demo_session and judge(principal.user_id):
+        make = create_judge_member
+    else:
         raise Refusal(403, "forbidden")
     return _answer(
         lambda: idempotent(
@@ -406,7 +415,7 @@ def create_first_person_route(
             principal,
             stores,
             body,
-            lambda: create_first_person(_writer(principal, stores, clock, redact), body),
+            lambda: make(_writer(principal, stores, clock, redact), body),
         )
     )
 

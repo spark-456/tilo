@@ -94,7 +94,14 @@ function Ready({
 
 export function AgendaPage({ app }: AgendaPageProps) {
   const preview = useFirstRunPreview();
-  return preview ? <FirstRunPanels page="agenda" app={app} /> : <PersonalAgendaPage app={app} />;
+  // JUDGE-FIRST-RUN F1: a judge is a member of the org, so the real Agenda shows; a first visit adds the labelled
+  // recorded examples below it instead of hiding it.
+  return (
+    <>
+      <PersonalAgendaPage app={app} />
+      {preview ? <FirstRunPanels page="agenda" app={app} embedded /> : null}
+    </>
+  );
 }
 function PersonalAgendaPage({ app }: AgendaPageProps) {
   const api = useParkApi();

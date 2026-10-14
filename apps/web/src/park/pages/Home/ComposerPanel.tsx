@@ -132,6 +132,8 @@ export function ComposerPanel(p: ComposerProps) {
   const quick = p.quick ?? QUICK_IDLE;
   const quickMode = effort === "quick";
   const effortNote = EFFORTS.find((e) => e.key === effort)?.note ?? "";
+  const effortLabel = EFFORTS.find((e) => e.key === effort)?.label ?? "";
+  const isDefault = mode.key === "quick" && effort === "thinking";
   const options: SegmentOption[] = p.modes.map((m) => ({
     value: m.key,
     label: m.label,
@@ -267,24 +269,42 @@ export function ComposerPanel(p: ComposerProps) {
           </div>
         </IntakeControl>
         <div className="park-home-mode-row">
-          <div className="park-home-size">
-            <SegmentedControl
-              label="Size of job"
-              options={options}
-              value={mode.key}
-              onChange={p.onMode}
-              sliding
-            />
-          </div>
-          <div className="park-home-effort">
-            <SegmentedControl
-              label="Depth"
-              options={EFFORT_OPTIONS}
-              value={effort}
-              onChange={(value) => p.onEffort?.(value as Effort)}
-              sliding
-            />
-          </div>
+          {/* JUDGE-FIRST-RUN F7: the two choices are folded away with their defaults (Quick task, Thinking) and say
+              what they mean when opened. A person who has changed one sees it open. */}
+          <details className="park-home-options" open={!isDefault || undefined}>
+            <summary className="park-home-options__summary">
+              Options
+              <span className="park-home-options__now">{`${mode.label} · ${effortLabel}`}</span>
+            </summary>
+            <div className="park-home-options__body">
+              <p className="park-home-options__help">
+                Size of job: how big the work is. A quick task is one short job, a routine repeats
+                on a schedule, and a workspace is a larger project with several teams.
+              </p>
+              <div className="park-home-size">
+                <SegmentedControl
+                  label="Size of job"
+                  options={options}
+                  value={mode.key}
+                  onChange={p.onMode}
+                  sliding
+                />
+              </div>
+              <p className="park-home-options__help">
+                Depth: Quick answers straight away and starts no agents. Thinking makes a plan first
+                and waits for your approval.
+              </p>
+              <div className="park-home-effort">
+                <SegmentedControl
+                  label="Depth"
+                  options={EFFORT_OPTIONS}
+                  value={effort}
+                  onChange={(value) => p.onEffort?.(value as Effort)}
+                  sliding
+                />
+              </div>
+            </div>
+          </details>
           <div className="park-home-hint">{quickMode ? effortNote : mode.hint}</div>
         </div>
       </div>

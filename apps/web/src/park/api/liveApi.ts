@@ -8,6 +8,7 @@ import type { IntakeResult } from "../../api/client";
 export { peopleListsApi } from "./live/peopleLists";
 import { HttpClient, type QuickIntakeResult, TiloApiError, reasonOf } from "../../api/http";
 import { isSampleHidden, wantsSample } from "../sample/sampleChoice";
+import { coalesce } from "./coalesce";
 import { API_METHODS, type Api, type ApiMethod } from "./index";
 import { agendaFromPlate, emptyAgenda } from "./live/agendaFromPlate";
 import { connectorsFromList } from "./live/connectorsFromList";
@@ -343,17 +344,23 @@ export function createLiveApi(options: LiveApiOptions = {}): Api {
       throw error;
     }
   };
-  api.getWorlds = async (_dec, added) => {
+  // JUDGE-FIRST-RUN F6: the pages, the shell and the first-run check all ask for the list when a page loads; the
+  // server is asked once while a read is out (see coalesce.ts).
+  const readWorldItems = coalesce(async (sample: string) => {
     const items: WorldListItem[] = [];
     let cursor: string | null = null;
     for (let n = 0; n < MAX_PAGES && (n === 0 || cursor !== null); n++) {
       const query = cursor === null ? "" : `&cursor=${encodeURIComponent(cursor)}`;
-      const sample = wantsSample() ? "&include_sample=1" : ""; // STARTER-1: "Show sample project"
       const body = await http.getJson(`/worlds?limit=100${sample}${query}`);
       if (!isWorldPage(body)) throw new TiloApiError(BAD_REPLY, 200, true);
       items.push(...body.worlds);
       cursor = body.next_cursor;
     }
+    return items;
+  });
+  api.getWorlds = async (_dec, added) => {
+    // STARTER-1: "Show sample project"
+    const items = await readWorldItems(wantsSample() ? "&include_sample=1" : "");
     // STARTER-1: a person's "Hide" is this browser's; the server stores nothing about it.
     const live = worldsFromList(isSampleHidden() ? items.filter((i) => i.sample !== true) : items);
     const liveIds = new Set(live.map((w) => w.id));
@@ -402,7 +409,7 @@ export function createLiveApi(options: LiveApiOptions = {}): Api {
   };
   const served = new Map<string, Answerable>();
   const answered: Dec = {};
-  api.getDecisions = async () => {
+  const readCardItems = coalesce(async (_all: string) => {
     const items: CardFeedItem[] = [];
     let cursor: string | null = null;
     for (let n = 0; n < MAX_PAGES && (n === 0 || cursor !== null); n++) {
@@ -412,6 +419,10 @@ export function createLiveApi(options: LiveApiOptions = {}): Api {
       items.push(...body.cards);
       cursor = body.next_cursor;
     }
+    return items;
+  });
+  api.getDecisions = async () => {
+    const items = await readCardItems("cards");
     served.clear(); // a card that left the feed can no longer be answered from a stale key (BQ-WIRE3-1)
     for (const { world_id, card_id, card } of items) {
       if (needsFields(card)) continue; // typed in the fields form: a tap on it would answer `provide` with nothing

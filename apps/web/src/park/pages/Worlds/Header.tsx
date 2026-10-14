@@ -22,7 +22,9 @@ export function Header({ art, total, query, onQuery, onNew, slack, onShareSlack 
       <div className="park-worlds-header__titles">
         <div className="park-worlds-header__line">
           <h1 className="park-worlds-h1">Worlds</h1>
-          {total === null ? null : <span className="park-worlds-total">{`${total} worlds`}</span>}
+          {total === null ? null : (
+            <span className="park-worlds-total">{`${total} ${total === 1 ? "world" : "worlds"}`}</span>
+          )}
         </div>
         <p className="park-worlds-subtitle">
           Every job Tilo is running, sized by scale: cities, towns and villages.

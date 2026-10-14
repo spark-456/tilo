@@ -1337,6 +1337,21 @@ def get_founder_gate() -> Callable[[str], bool]:
     return lambda user_id: user_id == configured
 
 
+def get_judge_gate(request: Request = None) -> Callable[[str], bool]:  # type: ignore[assignment]
+    """Who may join the org as a plain member (JUDGE-FIRST-RUN F1): a person whose stored declaration is `judge`. The
+    store is opened only when asked, and any failure (not configured, unavailable, an unstorable id) is "no": the gate
+    only ever widens `/v1/people/first` to a member record, never to ownership, and fails closed."""
+
+    def is_judge(user_id: str) -> bool:
+        try:
+            seam = request.app.dependency_overrides.get(get_access_store, get_access_store)
+            return seam().get(user_id) == "judge"
+        except Exception:
+            return False
+
+    return is_judge
+
+
 def get_clock() -> Callable[[], str]:
     return events.now  # a `common#timestamp`; a route reads it once per request
 

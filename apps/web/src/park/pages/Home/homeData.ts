@@ -11,6 +11,7 @@ import type {
   TierKey,
   World,
 } from "../../api/types";
+import { type CurrencyCode, currencySymbol } from "../../app/ledgerKpis";
 
 /** The composer's copy per size of job (the reference reads it from `D.TIERS`; the Api has no tier call). */
 export interface Mode {
@@ -193,7 +194,8 @@ export interface LiveRow {
 export function greetingWord(hour: number): string {
   if (hour >= 5 && hour < 12) return "Good morning";
   if (hour >= 12 && hour < 18) return "Good afternoon";
-  return "Good evening";
+  if (hour >= 18) return "Good evening";
+  return "Hello"; // JUDGE-FIRST-RUN F5: midnight to 05:00 is not an evening
 }
 
 export function liveRows(worlds: readonly World[], needs: number, served = false): LiveRow[] {
@@ -251,9 +253,9 @@ export function nextEvents(agenda: Agenda): NextEvent[] {
     }));
 }
 
-/** 2412 -> "£2,412". */
-export const money = (n: number): string =>
-  `£${Math.round(n)
+/** 2412 -> "£2,412" (or "$2,412" for an amount served in dollars). */
+export const money = (n: number, currency: CurrencyCode = "GBP"): string =>
+  `${currencySymbol(currency)}${Math.round(n)
     .toString()
     .replace(/\B(?=(\d{3})+(?!\d))/g, ",")}`;
 
@@ -273,11 +275,12 @@ export function spendOf(ledger: Ledger): Spend {
   const waiting = ledger.tx.filter((t) => t.st === "waiting").reduce((sum, t) => sum + t.amt, 0);
   const pct = (n: number): number =>
     ledger.budget > 0 ? Math.round((n / ledger.budget) * 100) : 0;
+  const unit = ledger.currency ?? "GBP"; // JUDGE-FIRST-RUN F5: the live report is served in dollars, never shown as pounds
   return {
     month: ledger.period?.month ?? (ledger.daily.length > 0 ? "September" : null),
-    spent: money(ledger.spent),
-    of: `of ${money(ledger.budget)}`,
-    forecast: `Forecast ${money(ledger.forecast)} · ${money(waiting)} waiting on you`,
+    spent: money(ledger.spent, unit),
+    of: `of ${money(ledger.budget, unit)}`,
+    forecast: `Forecast ${money(ledger.forecast, unit)} · ${money(waiting, unit)} waiting on you`,
     spentPct: Math.min(pct(ledger.spent), 100),
     waitingPct: Math.min(pct(waiting), 100 - Math.min(pct(ledger.spent), 100)),
   };

@@ -61,7 +61,14 @@ function Header({ total, children }: { total?: string; children?: ReactNode }) {
 
 export function SkillsPage({ app }: { app: AppCtx }) {
   const preview = useFirstRunPreview();
-  return preview ? <FirstRunPanels page="skills" app={app} /> : <PersonalSkillsPage app={app} />;
+  // JUDGE-FIRST-RUN F4: the real page (the built-in skills, Teach a skill) always shows; a first visit adds the labelled
+  // recorded examples below it instead of hiding it.
+  return (
+    <>
+      <PersonalSkillsPage app={app} />
+      {preview ? <FirstRunPanels page="skills" app={app} embedded /> : null}
+    </>
+  );
 }
 function PersonalSkillsPage({ app }: { app: AppCtx }) {
   const api = useParkApi();

@@ -17,14 +17,24 @@ function Panel({ title, children }: { title: string; children: ReactNode }) {
     </section>
   );
 }
-export function FirstRunPanels({ page, app }: { page: PreviewPage; app: AppCtx }) {
+/** `embedded` (JUDGE-FIRST-RUN F4): the page's real content is already on screen, so the recorded examples sit below it
+ * under their own smaller heading and add no page title or landmark of their own. */
+export function FirstRunPanels({
+  page,
+  app,
+  embedded = false,
+}: { page: PreviewPage; app: AppCtx; embedded?: boolean }) {
   const explain = () => app.toast("This is sample data. Nothing is saved, sent or charged.");
   return (
-    <div data-first-run-panels={page} data-testid={`park-page-${page}`}>
+    <div data-first-run-panels={page} {...(embedded ? {} : { "data-testid": `park-page-${page}` })}>
       <PageSheet gap={22}>
         <header>
-          <h1 tabIndex={-1}>{PAGE_LABEL[page]}</h1>
-          <p>Recorded examples to explore before your first run. These are not your work.</p>
+          {embedded ? <h2>Recorded examples</h2> : <h1 tabIndex={-1}>{PAGE_LABEL[page]}</h1>}
+          <p>
+            {embedded
+              ? "Sample data to explore while you have no work yet. These are not your work."
+              : "Recorded examples to explore before your first run. These are not your work."}
+          </p>
         </header>
         <div className="park-first-run-grid">
           {page === "agenda" && (

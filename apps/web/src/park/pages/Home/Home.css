@@ -1355,3 +1355,57 @@
     flex: none;
   }
 }
+
+/* ---- JUDGE-FIRST-RUN F6: still loading shapes (no motion) ---- */
+[data-park] .park-home-skeleton {
+  display: block;
+  height: 16px;
+  border-radius: 8px;
+  background: var(--track);
+}
+[data-park] .park-home-skeleton--short {
+  width: 30%;
+}
+[data-park] .park-home-skeleton--mid {
+  width: 60%;
+}
+[data-park] .park-home-skeleton--wide {
+  width: 85%;
+  height: 28px;
+}
+
+/* ---- JUDGE-FIRST-RUN F7: the size and depth choices live behind "Options" ---- */
+[data-park] .park-home-options {
+  flex: none;
+  max-width: 100%;
+}
+[data-park] .park-home-options__summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 36px;
+  padding: 0 4px;
+  color: var(--ink2);
+  font-size: 14px;
+  font-weight: 800;
+  cursor: pointer;
+}
+[data-park] .park-home-options__now {
+  color: var(--ink3);
+  font-weight: 700;
+}
+[data-park] .park-home-options__body {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 4px 4px;
+}
+[data-park] .park-home-options__help {
+  margin: 0;
+  max-width: 390px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink3);
+  line-height: 1.35;
+}
