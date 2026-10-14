@@ -1,0 +1,10 @@
+{
+  "meeting_id": "mt_weekly_sync",
+  "key": "example_key-00000000000000000000",
+  "outcome": "settled",
+  "usage": {
+    "prompt_token_count": 180,
+    "response_token_count": 95,
+    "total_token_count": 275
+  }
+}
