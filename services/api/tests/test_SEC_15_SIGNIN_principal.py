@@ -437,6 +437,8 @@ def test_SEC_15_SIGNIN_the_gate_has_the_same_public_routes_as_before():
     assert access.PUBLIC_ROUTES == {
         ("GET", "/health"),
         ("GET", "/healthz"),
+        ("GET", "/health/deps"),  # Supervisor SEC15-HEALTH: public configuration booleans/fixed kinds only.
+        ("GET", "/healthz/deps"),  # Supervisor SEC15-HEALTH: leak-free alias of the public configuration inventory.
         ("GET", "/access"),
         ("POST", "/access/declaration"),
         ("POST", "/internal/schedules/tick"),
