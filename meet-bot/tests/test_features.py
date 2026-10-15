@@ -85,7 +85,7 @@ def test_prompt_carries_present_people_and_bot_name():
     llm = ScriptedLLM([reply()])
     b = Brain(AGENDA, llm, 30, bot_name="tilo")
     b.present = ["John Regi"]
-    b.step([], 10)
+    b.step([Utterance("John", "hi", 1)], 10)
     assert '"participants_present": ["John Regi"]' in llm.calls[0][1] and '"bot_name": "tilo"' in llm.calls[0][1]
 
 

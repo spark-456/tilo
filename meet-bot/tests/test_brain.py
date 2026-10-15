@@ -22,6 +22,11 @@ ROOT = Path(__file__).parent.parent
 AGENDA = Agenda.load(ROOT / "agenda.example.md")
 
 
+def spoke(n):
+    """A new settled utterance: a step with a silent window makes no model call (FR-MTG-09)."""
+    return [Utterance("Sam", f"point {n}", float(n))]
+
+
 def reply(items=None, **kw):
     base = {
         "agenda_items": items or [],
@@ -83,7 +88,7 @@ def test_malformed_json_is_retried_then_recovers():
         ["not json at all", '{"agenda_items": 3}', reply([{"title": "Kickoff and goals", "status": "in_progress"}])]
     )
     b = Brain(AGENDA, llm, 30)
-    r = b.step([], 60)
+    r = b.step(spoke(1), 60)
     assert r.ok and len(llm.calls) == 3
     assert "invalid" in llm.calls[1][1]
     assert b.state.items[0].status == "in_progress"
@@ -91,7 +96,7 @@ def test_malformed_json_is_retried_then_recovers():
 
 def test_persistently_bad_json_fails_softly():
     b = Brain(AGENDA, ScriptedLLM(["garbage"]), 30)
-    r = b.step([], 60)
+    r = b.step(spoke(1), 60)
     assert not r.ok and r.chat is None
 
 
@@ -103,8 +108,8 @@ def test_status_never_moves_backwards_and_unknown_titles_ignored():
         ]
     )
     b = Brain(AGENDA, llm, 30)
-    b.step([], 30)
-    b.step([], 60)
+    b.step(spoke(1), 30)
+    b.step(spoke(2), 60)
     assert b.state.items[0].status == "covered"
     assert all(i.status == "not_started" for i in b.state.items[1:])
 
@@ -117,8 +122,8 @@ def test_action_owner_is_not_lost_when_model_forgets_it():
         ]
     )
     b = Brain(AGENDA, llm, 30)
-    b.step([], 30)
-    b.step([], 60)
+    b.step(spoke(1), 30)
+    b.step(spoke(2), 60)
     assert len(b.state.action_items) == 1 and b.state.action_items[0].owner == "Priya"
 
 
@@ -244,5 +249,5 @@ def test_model_outage_still_allows_time_warning():
             raise LLMUnavailable("quota")
 
     b = Brain(AGENDA, Down(), 30)
-    r = b.step([], 1300)
+    r = b.step(spoke(1), 1300)
     assert not r.ok and r.chat and r.chat.kind == "time_warning"

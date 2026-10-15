@@ -581,6 +581,7 @@ class Brain:
         self.max_chars, self.max_attempts = max_transcript_chars, max_attempts
         self.state = MeetingState(agenda.title, [ItemState(i.title, i.minutes) for i in agenda.items])
         self.last_error: str | None = None
+        self._analysed: tuple[float, str, str] | None = None  # newest utterance the model last analysed
 
     # -- one cycle -----------------------------------------------------------------------------------------------
     def step(self, utterances: list[Any], elapsed_s: float) -> StepResult:
@@ -588,17 +589,20 @@ class Brain:
         model_msg: str | None = None
         reply: str | None = None
         error: str | None = None
-        try:
-            raw = self._ask(self._payload(utterances, elapsed_s))
-            self._merge(raw)
-            self.policy.observe(self.state)
-            model_msg = raw["chat_message"]
-            reply = raw["reply_to_assistant"]
-            self.last_error = None
-        except (LLMUnavailable, SchemaError, json.JSONDecodeError) as e:
-            error = str(e)
-            self.last_error = error
-            log.warning("brain step failed: %s", error)
+        seen = self._signature(utterances)
+        if self._needs_model(utterances, seen):
+            try:
+                raw = self._ask(self._payload(utterances, elapsed_s))
+                self._merge(raw)
+                self.policy.observe(self.state)
+                model_msg = raw["chat_message"]
+                reply = raw["reply_to_assistant"]
+                self.last_error = None
+                self._analysed = seen
+            except (LLMUnavailable, SchemaError, json.JSONDecodeError) as e:
+                error = str(e)
+                self.last_error = error
+                log.warning("brain step failed: %s", error)
         question = self._pending_question(utterances) if self.wake_settings or self.meeting_scope else None
         if self.meeting_scope:
             reply = scoped_answer(question.text, self.bot_name, question.speaker, self.state) if question else None
@@ -611,6 +615,16 @@ class Brain:
             self._attention = Attention(question.speaker.removesuffix(CHAT_SUFFIX), question.t)
         chat = direct or self.policy.decide(self.state, elapsed_s, self.duration_s, model_msg)
         return StepResult(ok=error is None, chat=chat, error=error)
+
+    @staticmethod
+    def _signature(utterances: list[Any]) -> tuple[float, str, str] | None:
+        """The newest utterance: a window that slides without a new one keeps the same signature."""
+        return (utterances[-1].t, utterances[-1].speaker, utterances[-1].text) if utterances else None
+
+    def _needs_model(self, utterances: list[Any], seen: tuple[float, str, str] | None) -> bool:
+        """No model call in silence: only a new utterance, or a question still waiting for its answer, needs one.
+        A failed step leaves `_analysed` alone, so the same transcript is tried again on the next cycle."""
+        return seen is not None and (seen != self._analysed or self._pending_question(utterances) is not None)
 
     def question_in(self, u: Any) -> Question | None:
         if self.wake_settings is not None:

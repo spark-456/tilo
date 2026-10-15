@@ -52,8 +52,8 @@ RUN = "r_meeting_host1_1"
 TITLE = "Q4 planning"
 IST = "Asia/Kolkata"
 T_START = "2030-01-15T09:00:00.000Z"  # far enough ahead that no wall clock a builder might use is past it
-T_END = "2030-01-15T10:00:00.000Z"
-WHEN_IST = "Tue 15 Jan 2030, 14:30 to 15:30"  # 09:00 to 10:00 UTC shown in Asia/Kolkata
+T_END = "2030-01-15T09:45:00.000Z"  # the shipped cap: meeting_host.max_duration_min is 45
+WHEN_IST = "Tue 15 Jan 2030, 14:30 to 15:15"  # 09:00 to 09:45 UTC shown in Asia/Kolkata
 
 ASHA, PRIYA_MAIL, SAM_MAIL, DEV_MAIL = "asha@example.com", "priya@example.com", "sam@example.com", "dev@example.com"
 ATTACKER = "eve@example.org"

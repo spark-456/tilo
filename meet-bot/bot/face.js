@@ -9,10 +9,27 @@
   let feeling = "idle";
   let level = 0;
   let last = Number.NEGATIVE_INFINITY;
-  const state = () => (audio ? "speaking" : models > 0 ? "thinking" : feeling);
+  // Decay: "listening", "happy" and "sad" last FEELING_MS after the event that set them; "thinking" ends with
+  // model_end, and THINKING_MS only guards against a lost model_end. Decay only ever returns to idle.
+  const FEELING_MS = 4000;
+  const THINKING_MS = 30000;
+  const clock = () => (globalThis.performance ? performance.now() : Date.now());
+  let feelingAt = 0;
+  let modelAt = 0;
+  const state = () => {
+    const now = clock();
+    if (feeling !== "idle" && now - feelingAt > FEELING_MS) feeling = "idle";
+    if (models > 0 && now - modelAt > THINKING_MS) models = 0;
+    return audio ? "speaking" : models > 0 ? "thinking" : feeling;
+  };
+  function feel(value) {
+    feeling = value;
+    feelingAt = clock();
+  }
   function event(kind, value = 0) {
     if (kind === "model_start") {
       models++;
+      modelAt = clock();
       feeling = "idle";
     }
     if (kind === "model_end") {
@@ -29,9 +46,9 @@
       feeling = "idle";
     }
     if (kind === "audio_level" && audio) level = Math.max(0, Math.min(1, Number(value) || 0));
-    if (kind === "heard") feeling = "listening";
-    if (kind === "success") feeling = "happy";
-    if (kind === "failure") feeling = "sad";
+    if (kind === "heard") feel("listening");
+    if (kind === "success") feel("happy");
+    if (kind === "failure") feel("sad");
     if (kind === "idle") feeling = "idle";
   }
   function tick(now) {

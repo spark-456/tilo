@@ -95,6 +95,11 @@ The attendance request stays open until capture ends (maximum 45 minutes); closi
 it cancels the browser and does not attach partial notes. There is no automatic
 launch retry. Do not launch attendance from a demo session or with fake providers.
 
+The bot leaves earlier when: 60 s after the last other person leaves; 900 s after joining when nobody arrives; or
+300 s (`UNREADABLE_LEAVE_SECONDS`) after the People panel and head count both became unreadable with no caption in
+that time. It makes no model call while nobody speaks (FR-MTG-09), so the 200-call meeting budget goes to answers.
+The host form and `meeting_host.max_duration_min` are capped at 45 minutes to match (BQ-MEETBOT-1).
+
 Run `meet-bot/scripts/attend-owner.ps1 -ApiUrl $Api -MeetingId <owner-meeting-id>`.
 It prompts locally for the owner's Firebase ID token and App Check token, without
 echoing them or recording them in command history. Obtain those tokens from your

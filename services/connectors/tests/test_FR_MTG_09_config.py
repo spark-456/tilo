@@ -189,9 +189,9 @@ def test_FR_MTG_09_autonomy_yaml_still_loads_through_the_risk_table_schema():
 # config/personal.yaml
 
 
-def test_FR_MTG_09_personal_yaml_has_meeting_host_max_duration_60_and_keeps_the_other_keys():
+def test_FR_MTG_09_personal_yaml_has_meeting_host_max_duration_45_and_keeps_the_other_keys():
     raw = yaml.safe_load(PERSONAL_YAML.read_text(encoding="utf-8"))
-    assert raw["meeting_host"] == {"max_duration_min": 60}
+    assert raw["meeting_host"] == {"max_duration_min": 45}
     assert raw["working_window"] == {"start": "09:00", "end": "18:00"}
     assert set(raw["calendar_sync"]) == {
         "poll_interval_s",
@@ -213,7 +213,7 @@ def test_FR_MTG_09_the_three_config_files_still_validate_and_load_with_meeting_h
     load_risk_table()  # autonomy.yaml against policy.schema.json
     config = load_calendar_sync_config(DEFAULT_PERSONAL_CONFIG, registry=registry)  # ignores `meeting_host`
     assert config.poll_interval_s == 900
-    assert mh().load_meeting_host_config(DEFAULT_PERSONAL_CONFIG, registry=registry).max_duration_min == 60
+    assert mh().load_meeting_host_config(DEFAULT_PERSONAL_CONFIG, registry=registry).max_duration_min == 45
 
 
 WIDER_CALENDAR_SCOPES = {
@@ -288,7 +288,7 @@ def test_FR_MTG_09_the_loader_reads_the_shipped_files_and_defaults_to_the_shippe
 
     registry = load_registry(CONNECTORS_YAML)
     config = mh().load_meeting_host_config(registry=registry)  # the default path
-    assert config == mh().MeetingHostConfig(max_duration_min=60)
+    assert config == mh().MeetingHostConfig(max_duration_min=45)
     assert config == mh().load_meeting_host_config(DEFAULT_PERSONAL_CONFIG, registry=registry)
 
 
