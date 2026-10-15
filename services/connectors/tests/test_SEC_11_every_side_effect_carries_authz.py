@@ -62,7 +62,10 @@ READ_ONLY_CAPABILITIES = {"read", "search", "list"}
 # send_push: a risk-table action whose adapter lives in tilo-channels (`WebPushAdapter`, FR-CHN-17), not in
 # config/connectors.yaml: nothing for a person to connect. Its per-action case below runs the real push path.
 PUSH_ACTION, PUSH_CONNECTOR = "send_push", "web_push"
-NOT_AN_OUTBOX_ACTION = {"read_events", "web_search", "fetch_url", "grant_budget"}
+# ADR-0048: the agents' Gmail and Drive read tools joined the risk table as T1 reads (like read_events)
+NOT_AN_OUTBOX_ACTION = {
+    "read_events", "search_email", "read_email", "list_files", "read_file", "web_search", "fetch_url", "grant_budget"
+}  # fmt: skip
 MUTATION_VERBS = ("send", "create", "save", "share", "delete", "insert", "patch", "update", "upload", "post", "write")
 
 

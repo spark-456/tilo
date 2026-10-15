@@ -2,6 +2,9 @@
 # loaded by tilo_connectors.registry.load_registry. Scopes are least privilege per capability (PRD 16.1):
 # Gmail never asks for mail.google.com or gmail.modify; Drive uses drive.file only (the files the user
 # picks and the files Tilo creates, PRD 12.2). Each action's risk_tier equals config/autonomy.yaml.
+# ADR-0048: the ungated reads (search_email, read_email, read_events, list_files, read_file) are also the agents'
+# read tools, run by tilo-connectors' /internal/workspace/read with exactly the scope declared here; Drive stays on
+# drive.file, so a tool sees only the files the person picked in Google's Picker and the files Tilo saved.
 - id: gmail
   name: Gmail
   icon: mail
@@ -13,7 +16,7 @@
     send: ["https://www.googleapis.com/auth/gmail.send"]
   capabilities: [read, search, write, send]
   actions:
-    - {id: read_email, capability: read, description: "Read a thread the task needs.", risk_tier: T1, gate_type: none, irreversible: false}
+    - {id: read_email, capability: read, description: "Read a message the task needs.", risk_tier: T1, gate_type: none, irreversible: false}
     - {id: search_email, capability: search, description: "Search the mailbox.", risk_tier: T1, gate_type: none, irreversible: false}
     - {id: create_draft, capability: write, description: "Save a reply as a draft.", risk_tier: T1, gate_type: approval, irreversible: false}
     - {id: send_email, capability: send, description: "Send a reply in an existing thread.", risk_tier: T2, gate_type: approval, irreversible: true}
@@ -31,7 +34,7 @@
   capabilities: [read, list, write]
   actions:
     - {id: read_file, capability: read, description: "Read the files you pick in Drive.", risk_tier: T1, gate_type: none, irreversible: false}
-    - {id: list_files, capability: list, description: "See the files in the folder you pick.", risk_tier: T1, gate_type: none, irreversible: false}
+    - {id: list_files, capability: list, description: "List or search the Drive files you picked for Tilo and the files Tilo saved.", risk_tier: T1, gate_type: none, irreversible: false}
     - {id: save_file, capability: write, description: "Save finished work in a Tilo folder in your Drive.", risk_tier: T1, gate_type: approval, irreversible: false}
     - {id: save_as_google_file, capability: write, description: "Save a deck, doc or sheet as a Slides, Docs or Sheets file in a Tilo folder in your Drive.", risk_tier: T1, gate_type: approval, irreversible: false}
   limits: {per_minute: 60, batch_size: 50}

@@ -1,0 +1,19 @@
+{
+  "tool": "read_events",
+  "outcome": "ok",
+  "connected_at": "2026-10-01T08:00:00.000Z",
+  "result": {
+    "events": [
+      {
+        "id": "q8r7s6t5u4v3",
+        "title": "Diwali",
+        "start": "2026-10-20T00:00:00.000Z",
+        "end": "2026-10-21",
+        "all_day": true,
+        "attendee_count": 0
+      }
+    ],
+    "truncated": false
+  },
+  "parts": []
+}

@@ -1,0 +1,7 @@
+{
+  "user_id": "u_owner",
+  "tool": "read_file",
+  "args": {
+    "file_id": "https://example.com/file/d/1AbCdEf"
+  }
+}

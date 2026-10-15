@@ -35,8 +35,16 @@
 # clean, is T3 (the safety_flag modifier): a person decides, so no push. Its adapter lives in tilo-channels, not in
 # config/connectors.yaml (nothing for a person to connect); the SEC-11 file names it on purpose. A standing L3
 # policy of the owner's own opens it through the outbox; with none it gates like any action (BQ-CHN17-1).
+# search_email, read_email (gmail), list_files and read_file (google_drive) are the agents' read tools of ADR-0048
+# (with read_events): reads of the person's own account in their own world, no side effect, never gated, never an
+# outbox entry (ADR-0035 decision 6 already gave them T1). Listed because an unlisted action is T3 (BQ-44), which
+# would put a person in front of every read; the SEC-11 test keeps each of them an ungated read.
 actions:
   read_events: T1
+  search_email: T1
+  read_email: T1
+  list_files: T1
+  read_file: T1
   send_push: T1
   web_search: T1
   fetch_url: T1
