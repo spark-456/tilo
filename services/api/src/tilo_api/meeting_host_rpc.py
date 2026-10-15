@@ -35,9 +35,11 @@ from tilo_contracts import (
     MeetingHostRpcConnectionDisconnectAnswer,
     MeetingHostRpcConnectionPart,
     MeetingHostRpcConnectionView,
+    MeetingHostRpcConnectorPart,
     MeetingHostRpcDisconnectAnswer,
     MeetingHostRpcError,
     MeetingHostRpcExecuteAnswer,
+    MeetingHostRpcReadAnswer,
     MeetingHostRpcReceipt,
     MeetingHostRpcSendAnswer,
     MeetingHostRpcStartAnswer,
@@ -46,6 +48,7 @@ from tilo_contracts import (
     MeetingJoin,
 )
 from tilo_memory.artifacts import ArtifactCorrupt  # noqa: E402
+from tilo_policy.schemas import conforms
 
 logger = logging.getLogger("tilo_api.meeting_host_rpc")
 URL_VAR = "TILO_CONNECTORS_URL"
@@ -56,6 +59,10 @@ EXECUTE_PATH = "/internal/side-effects/execute"
 VIEWS_TIMEOUT_S = 10.0  # a cold connectors instance costs one wait this long at most; the page's next load asks again
 MAX_VIEWS_REPLY_BYTES = 262_144  # 32 views of 16 scopes stay under 160 KiB
 VIEWS_PATH = "/internal/connections/views"
+READ_PATH = "/internal/workspace/read"  # ADR-0048: an agent's read of the person's own Gmail, Calendar or Drive
+READ_TIMEOUT_S = 25.0  # Google may be slow; one deadline for the token fetch and the request together
+MAX_READ_REPLY_BYTES = 6 * 1024 * 1024  # a 4 MiB PDF in base64 plus the answer around it
+_SCHEMA = "meeting_host_rpc.schema.json"
 CONNECT_PATH = "/internal/connections/"  # start, callback, disconnect (ADR-0035 decision 2)
 _SECRET_PARAM = re.compile(r"[?&](?:client_secret|code_verifier|code|access_token|refresh_token)=")
 CALLBACK_REFUSALS = frozenset({"start_again", "not_granted", "wrong_account"})  # the callback route's own 400s
@@ -121,7 +128,8 @@ class RequestsTransport:
                 url, data=body, headers=dict(headers), timeout=(min(5.0, timeout_s), timeout_s), allow_redirects=False,
                 stream=True,
             ) as response:  # fmt: skip
-                cap = MAX_VIEWS_REPLY_BYTES if url.endswith(VIEWS_PATH) else MAX_REPLY_BYTES
+                cap = MAX_READ_REPLY_BYTES if url.endswith(READ_PATH) else MAX_REPLY_BYTES
+                cap = MAX_VIEWS_REPLY_BYTES if url.endswith(VIEWS_PATH) else cap
                 data = response.raw.read(cap + 1, decode_content=True)
                 if len(data) > cap:
                     raise TransportError
@@ -337,6 +345,25 @@ class MeetingHostRpc:
             )
         except ValidationError:
             raise HostRpcError("unknown") from None
+
+    def read(self, user_id: str, tool: str, args: Mapping[str, Any]) -> MeetingHostRpcReadAnswer:
+        """ADR-0048: one read for an agent's tool call, for `user_id` (the caller has proved it is the world's owner).
+        Both bodies are checked against the contract: a request that breaks it is `refused` before any call; an answer
+        that breaks it (or answers another tool) is `unknown`. Parts naming another user are dropped. Never retried
+        here: it is a read, the tool loop decides whether to ask again."""
+        request = {"user_id": user_id, "tool": tool, "args": dict(args)}
+        if not conforms(f"{_SCHEMA}#/$defs/read_request", request):
+            raise HostRpcError("refused")
+        raw = self._post("read", request, path=READ_PATH, timeout_s=READ_TIMEOUT_S)
+        try:
+            decoded: Any = json.loads(raw) if len(raw) <= MAX_READ_REPLY_BYTES else None
+            if not (conforms(f"{_SCHEMA}#/$defs/read_answer", decoded) and decoded["tool"] == tool):
+                raise HostRpcError("unknown")
+            answer = MeetingHostRpcReadAnswer.model_validate(decoded)
+        except (ValueError, ValidationError):
+            raise HostRpcError("unknown") from None
+        own = [p for p in answer.parts if not isinstance(p, MeetingHostRpcConnectorPart) or p.user_id == user_id]
+        return answer.model_copy(update={"parts": own})
 
     def send_invitation(self, entry: Mapping[str, Any], evidence: Mapping[str, Any], draft: Mapping[str, Any]) -> Any:
         """Not a registered SEC-03 name (that list is the connector adapters' methods); a local AST test pins that only

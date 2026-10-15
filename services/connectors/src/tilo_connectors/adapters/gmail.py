@@ -8,12 +8,17 @@ import base64
 import email
 import email.policy
 import email.utils
+import html
 import re
 import unicodedata
 from collections.abc import Iterable, Iterator, Mapping
+from datetime import UTC
+from email.header import decode_header, make_header
 from email.message import EmailMessage
+from html.parser import HTMLParser
 from typing import Any
 
+from .._time import format_ts
 from ..outbox import Grant
 from ._google import RESOURCE_ID, GoogleAdapter, checked_id, side_effect_marker
 from ._transport import AdapterError, SideEffectRefused
@@ -32,6 +37,12 @@ _MIME = re.compile(r"[A-Za-z0-9][\w.+-]*/[\w.+-]+")
 _RE_PREFIX = re.compile(r"^(\s*re\s*:\s*)+", re.I)
 _KEPT_HEADERS = ("message-id", "in-reply-to", "references", "authentication-results")  # what channels reads
 _CHARSET = re.compile(r"charset=\"?([\w.:-]+)", re.I)
+BODY_CAP = 20_000  # characters of a message's text an agent reads (meeting_host_rpc read_email_result)
+SUMMARY_FIELDS = "id,threadId,snippet,labelIds,payload/headers"
+_GMAIL_ID = re.compile(r"[A-Za-z0-9_-]{1,64}")
+_HTML_SCAN = 400_000  # characters of an HTML part looked at
+_HIDDEN_TAGS = frozenset({"script", "style", "head", "title"})
+_BREAK_TAGS = frozenset({"br", "p", "div", "li", "tr", "h1", "h2", "h3", "h4", "h5", "h6", "table", "blockquote"})
 _TOPIC = re.compile(r"projects/[a-z][a-z0-9.:-]{4,62}/topics/[A-Za-z][\w.~+%-]{2,254}")  # Pub/Sub resource names
 
 
@@ -64,6 +75,31 @@ class GmailAdapter(GoogleAdapter):
         if headers is not None:
             params = {"format": "metadata", "metadataHeaders": [str(h) for h in headers]}
         return _message(self._get(user_id, self._scopes("read"), f"/messages/{checked_id(message_id)}", params))
+
+    # ADR-0048 agent tools: reads at gmail.readonly, closed results (the contract's `search_email_result` and the like).
+    def search_messages(self, user_id: str, query: str, *, max_results: int = 10) -> dict[str, Any]:
+        """At most `max_results` summaries, newest first: the ids by Gmail's own search, then each message as metadata
+        (From, Subject, Date and the snippet; no body leaves Google). A message that vanished meanwhile is skipped."""
+        scopes = self._scopes("search")
+        listed = self._get(user_id, scopes, "/messages", {"q": str(query), "maxResults": self._batch(max_results)})
+        found: list[dict[str, Any]] = []
+        for ref in (listed.get("messages") or [])[:max_results]:
+            params = {"format": "metadata", "metadataHeaders": ["From", "Subject", "Date"], "fields": SUMMARY_FIELDS}
+            try:
+                found.append(_summary(self._get(user_id, scopes, f"/messages/{checked_id(ref.get('id'))}", params)))
+            except AdapterError as exc:
+                if exc.status != 404:
+                    raise
+        return {"messages": found}
+
+    def read_message(self, user_id: str, message_id: str) -> dict[str, Any]:
+        """One message: headers, its text (the text/plain part, else its HTML with the tags taken out), attachment
+        names only. Attachment bytes are never requested."""
+        resource = self._get(user_id, self._scopes("read"), f"/messages/{checked_id(message_id)}", {"format": "full"})
+        try:
+            return _readable(resource)
+        except (ValueError, KeyError, TypeError):
+            raise AdapterError("Google answered an unexpected message") from None
 
     def list_labels(self, user_id: str) -> list[dict[str, Any]]:
         labels = self._get(user_id, self._scopes("read"), "/labels").get("labels") or []
@@ -221,6 +257,104 @@ class GmailAdapter(GoogleAdapter):
         if last_id := _MSG_ID.findall(headers.get("message-id", ""))[:1]:
             msg["In-Reply-To"] = last_id[0]
             msg["References"] = " ".join(_MSG_ID.findall(headers.get("references", ""))[-20:] + last_id)  # bounded
+
+
+class _Strip(HTMLParser):
+    """HTML to text with the standard library only: scripts and styles dropped, block ends become line breaks."""
+
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=True)
+        self.out: list[str] = []
+        self._skip = 0
+
+    def handle_starttag(self, tag: str, attrs: Any) -> None:
+        self._skip += tag in _HIDDEN_TAGS
+        self.out.append("\n" if tag in _BREAK_TAGS else "")
+
+    def handle_endtag(self, tag: str) -> None:
+        self._skip = max(0, self._skip - (tag in _HIDDEN_TAGS))
+        self.out.append("\n" if tag in _BREAK_TAGS else "")
+
+    def handle_data(self, data: str) -> None:
+        if not self._skip:
+            self.out.append(data)
+
+
+def _text_of_html(markup: str) -> str:
+    parser = _Strip()
+    parser.feed(markup[:_HTML_SCAN])
+    parser.close()
+    return re.sub(r"\n\s*\n+", "\n\n", "".join(parser.out)).strip()
+
+
+def _line(value: str, cap: int) -> str:
+    """A header value as one line of at most `cap` characters: RFC 2047 words decoded, controls folded to spaces."""
+    try:
+        value = str(make_header(decode_header(value)))
+    except (UnicodeError, ValueError, LookupError):
+        pass
+    return " ".join(_no_control(value).split())[:cap]
+
+
+def _clean_body(text: str) -> str:
+    text = text.replace("\r\n", "\n").replace("\r", "\n")
+    return "".join(c for c in text if c in "\n\t" or unicodedata.category(c) not in ("Cc", "Cs"))
+
+
+def _shaped(value: Any) -> str:
+    if not isinstance(value, str) or not _GMAIL_ID.fullmatch(value):
+        raise AdapterError("Google answered an id that is not an id")
+    return value
+
+
+def _utc(value: str) -> str | None:
+    try:
+        moment = email.utils.parsedate_to_datetime(value)
+        return format_ts(moment if moment.tzinfo else moment.replace(tzinfo=UTC))
+    except (TypeError, ValueError, IndexError, OverflowError):
+        return None
+
+
+def _summary(resource: Mapping[str, Any]) -> dict[str, Any]:
+    headers = _headers(resource.get("payload") or {})
+    return {
+        "id": _shaped(resource.get("id")),
+        "thread_id": _shaped(resource.get("threadId")),
+        "sender": _line(headers.get("from", ""), 320),
+        "subject": _line(headers.get("subject", ""), 300),
+        "date": _utc(headers.get("date", "")),
+        "snippet": _line(html.unescape(str(resource.get("snippet", ""))), 300),
+        "unread": "UNREAD" in (resource.get("labelIds") or []),
+    }
+
+
+def _readable(resource: Mapping[str, Any]) -> dict[str, Any]:
+    message = _message(resource)
+    kind, text = "none", ""
+    if message["has_text_part"]:
+        kind, text = "text", _clean_body(message["body_text"])
+    else:
+        pages = (p for p in _parts(resource.get("payload") or {}) if p.get("mimeType") == "text/html")
+        page = next((p for p in pages if not p.get("filename") and "data" in (p.get("body") or {})), None)
+        if page is not None:
+            kind, text = "html_stripped", _clean_body(_text_of_html(_decoded(page)))
+    cut = len(text) > BODY_CAP
+    return {
+        "id": _shaped(message["id"]),
+        "thread_id": _shaped(message["thread_id"]),
+        "sender": _line(message["from"], 320),
+        "to": [a[:320] for a in message["to"][:50]],
+        "cc": [a[:320] for a in message["cc"][:50]],
+        "subject": _line(message["subject"], 300),
+        "date": _utc(message["date"]),
+        "body_text": text[:BODY_CAP],
+        "body_kind": kind,
+        "truncated": cut,
+        "attachments": [
+            {"filename": _line(a["filename"], 255), "mime_type": a["mime_type"][:255], "size": max(0, a["size"])}
+            for a in message["attachments"][:20]
+        ],
+    }
 
 
 def _history_id(value: Any) -> str:

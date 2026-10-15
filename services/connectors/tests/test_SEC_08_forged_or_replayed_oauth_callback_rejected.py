@@ -51,7 +51,9 @@ HEALTH_ROUTES = frozenset({("GET", "/health"), ("GET", "/healthz")})
 # test_ADR35_L3_FR_CON_02_connect_routes.py, and the state rules themselves are tested below on ConsentService.
 # /internal/side-effects/execute (ADR-0035 L5) takes no OAuth state or code at all: HB-01 caller, hashed items and the
 # approval-bound grant; its forged, missing, wrong-account and oversize cases are in
-# test_ADR35_L5_FR_CON_02_execute_route.py.
+# test_ADR35_L5_FR_CON_02_execute_route.py. /internal/workspace/read (ADR-0048) is the same kind of route (no OAuth
+# state or code, no replayable secret): its missing, forged, wrong-account, wrong-audience and oversize cases are in
+# test_WORKSPACE_TOOLS_A_read_route.py.
 SIGNED_ROUTES: frozenset[tuple[str, str]] = frozenset(
     {
         ("POST", "/internal/meeting-host/send"),
@@ -63,6 +65,7 @@ SIGNED_ROUTES: frozenset[tuple[str, str]] = frozenset(
         ("POST", "/internal/connections/callback"),
         ("POST", "/internal/connections/disconnect"),
         ("POST", "/internal/side-effects/execute"),
+        ("POST", "/internal/workspace/read"),
     }
 )
 

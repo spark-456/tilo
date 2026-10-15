@@ -28,6 +28,7 @@ from hypothesis import strategies as st
 
 GMAIL_READS = {"list_threads", "search_threads", "get_thread", "get_message", "list_labels"}
 GMAIL_READS |= {"watch", "stop_watch", "list_history", "recent_inbox"}  # FR-CHN-08 watch seam, read scope only
+GMAIL_READS |= {"search_messages", "read_message"}  # ADR-0048: the agents' two reads, gmail.readonly, closed results
 
 
 def _thread(g):
