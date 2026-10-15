@@ -19,11 +19,46 @@ import { Buddy } from "../studio/Buddy";
 import "./TiloBubble.css";
 
 const SIZE = 64;
+/** The docked (phone) bubble is smaller (TiloBubble.css). */
+const DOCK_SIZE = 52;
 const EDGE = 8;
 const STEP = 16;
 const DRAG_FROM = 4;
 /** The panel keeps 24px from the side edges: 8px plus room for a page scrollbar. */
 const PANEL_EDGE = 24;
+
+/** A phone (POLISH-2): the bubble is docked, not draggable, and keeps clear of page content. */
+export const isDocked = (vw: number): boolean => vw > 0 && vw <= 560;
+/** Elements a page marks as floating controls (map zoom, the latest-event card): the docked bubble never covers them. */
+export const FLOATING = "[data-park-floating]";
+
+interface Box {
+  top: number;
+  bottom: number;
+  left: number;
+  right: number;
+}
+/**
+ * How far (px) a docked bubble at `box` must rise to stand clear of every floating control it overlaps, with `gap`
+ * between them. Pure: rects in, one number out.
+ */
+export function dockLift(box: Box, floats: readonly Box[], gap = 8): number {
+  let lift = 0;
+  for (let n = 0; n <= floats.length; n++) {
+    const hit = floats
+      .filter(
+        (f) =>
+          f.right > box.left &&
+          f.left < box.right &&
+          f.bottom > box.top - lift &&
+          f.top < box.bottom - lift,
+      )
+      .sort((a, b) => a.top - b.top)[0];
+    if (!hit) break;
+    lift = Math.max(lift, box.bottom - hit.top + gap);
+  }
+  return lift;
+}
 
 /** The default place: 40px from the corner on a desktop, clear of the run bar on a phone. */
 export const homePos = (vw: number): BubblePos =>
@@ -80,7 +115,32 @@ export function TiloBubble({
   const input = useRef<HTMLInputElement>(null);
   const panelId = useId();
   const inputId = useId();
-  const pos = clampPos(saved ?? homePos(vw), vw || 1440, vh || 900);
+  const docked = isDocked(vw);
+  const base = clampPos(docked ? homePos(vw) : (saved ?? homePos(vw)), vw || 1440, vh || 900);
+  const [lift, setLift] = useState(0);
+  const pos = docked ? { right: base.right, bottom: base.bottom + lift } : base;
+  // POLISH-2: docked, it rises above any element a page marks as a floating control (measured on scroll, resize and
+  // page change). Reading the layout is not an animation: nothing here moves by itself.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `page` only asks for a new measure when another page's controls arrive
+  useEffect(() => {
+    if (!docked) {
+      setLift(0);
+      return;
+    }
+    const measure = () => {
+      const box = {
+        top: vh - base.bottom - DOCK_SIZE,
+        bottom: vh - base.bottom,
+        left: vw - base.right - DOCK_SIZE,
+        right: vw - base.right,
+      };
+      const rects = [...document.querySelectorAll(FLOATING)].map((e) => e.getBoundingClientRect());
+      setLift(dockLift(box, rects));
+    };
+    measure();
+    window.addEventListener("scroll", measure, { passive: true, capture: true });
+    return () => window.removeEventListener("scroll", measure, { capture: true });
+  }, [docked, page, vw, vh, base.right, base.bottom]);
 
   const place = (next: BubblePos | null, keep: boolean) => {
     const p = next === null ? null : clampPos(next, vw || 1440, vh || 900);
@@ -106,7 +166,7 @@ export function TiloBubble({
   }, [open]);
 
   const down = (e: PointerEvent<HTMLButtonElement>) => {
-    if (e.button !== 0) return;
+    if (e.button !== 0 || docked) return;
     dragged.current = false;
     drag.current = { x: e.clientX, y: e.clientY, from: pos, moved: false };
     e.currentTarget.setPointerCapture?.(e.pointerId);
@@ -139,7 +199,7 @@ export function TiloBubble({
       ArrowDown: [0, -STEP],
     };
     const d = by[e.key];
-    if (!d) return;
+    if (!d || docked) return;
     e.preventDefault();
     place({ right: pos.right + d[0], bottom: pos.bottom + d[1] }, true);
   };
@@ -230,9 +290,11 @@ export function TiloBubble({
                 <button type="button" onClick={() => goTo("agenda")}>
                   Agenda
                 </button>
-                <button type="button" onClick={() => place(null, true)}>
-                  Back to the corner
-                </button>
+                {docked ? null : (
+                  <button type="button" onClick={() => place(null, true)}>
+                    Back to the corner
+                  </button>
+                )}
               </div>
             )}
             {chat.note ? (
@@ -270,7 +332,12 @@ export function TiloBubble({
         ref={button}
         type="button"
         className="park-bubble"
-        aria-label="Your Tilo: quick answers. Drag, or use the arrow keys, to move it"
+        aria-label={
+          docked
+            ? "Your Tilo: quick answers"
+            : "Your Tilo: quick answers. Drag, or use the arrow keys, to move it"
+        }
+        data-docked={docked ? "true" : undefined}
         aria-expanded={open}
         aria-controls={open ? panelId : undefined}
         style={{ right: pos.right, bottom: pos.bottom }}

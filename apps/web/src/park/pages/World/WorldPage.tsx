@@ -103,7 +103,8 @@ const optional = <T,>(read: Promise<ApiResult<T>>): Promise<ApiResult<T> | null>
 /** S-05's first building (screens/meta.ts): a Park plan's own building ids are not stage ids. */
 const INSPECT_BUILDING = "B1";
 
-const NO_STAGE = "Sample world: there is no recorded run to open";
+/** A sample (fixture) world has no run behind it: the live view and lenses are not offered, this one line says why. */
+const NO_STAGE = "Live view is for real runs";
 const NO_RUN_YET = "This run has recorded no events yet, so there is nothing to open";
 const NO_STAGE_ID = "park-world-nostage";
 const NO_SLACK_ID = "park-world-noslack";
@@ -345,6 +346,9 @@ export function WorldPage({ app }: { app: AppCtx }) {
   const hasStage = loaded.live && !startedHere && (!trackRun || runEvents.length > 0);
   const noStage = trackRun ? NO_RUN_YET : NO_STAGE;
   const stage = (to: string): string | null => (hasStage ? to : null);
+  // POLISH-2: a sample world offers no live view or lens links at all (greyed out they read as broken); one chip says why.
+  // A real run with no events yet keeps its disabled links: they switch on with its first event.
+  const sampleOnly = showRunViews && !hasStage && !trackRun;
   const real = hasStage && !demo; // a live world of a real account: its toasts may claim real outcomes
   const recorded = isRecordedRunning(w, real);
   // UI-10 B2: pausing keeps the decision count (the cards still say "before agents continue"); a recording says so.
@@ -550,7 +554,7 @@ export function WorldPage({ app }: { app: AppCtx }) {
               {isPaused ? "Resume" : "Pause"}
             </Button>
           ) : null}
-          {showRunViews ? (
+          {showRunViews && !sampleOnly ? (
             <StageLink className="park-world-live" href={stage(stagePath(w.id))} reason={noStage}>
               {icon("play", 14)}Open live view
             </StageLink>
@@ -692,7 +696,7 @@ export function WorldPage({ app }: { app: AppCtx }) {
                 </div>
               </div>
             ) : null}
-            {showRunViews ? (
+            {showRunViews && !sampleOnly ? (
               <nav aria-label="Run views" className="park-world-lenses">
                 <StageLink href={stage(`/world/${id}/story`)} reason={noStage}>
                   Story
@@ -712,7 +716,7 @@ export function WorldPage({ app }: { app: AppCtx }) {
               </nav>
             ) : null}
             {isCity ? (
-              <div className="park-world-legend">
+              <div className="park-world-legend" data-park-floating="">
                 {LEGEND.map(([colour, label]) => (
                   <span key={label} className="park-world-legenditem">
                     <span className="park-world-swatch" style={{ background: colour }} />

@@ -116,9 +116,19 @@
   --park-page-max: 1296px;
   --park-page-pad: 8px;
 }
+/* POLISH-2: a phone docks the Tilo bubble bottom right (52px, 72px up) and every page keeps this much room under its
+   last line, so the bubble never covers content; shell/TiloBubble also lifts it over elements marked
+   data-park-floating. Wider windows reserve nothing (the bubble is draggable there). */
+[data-park] {
+  --park-dock-space: 0px;
+}
 @media (max-width: 560px) {
+  [data-park] {
+    --park-dock-space: 80px;
+  }
   [data-park] .park-shell__page {
     padding-right: 16px;
+    padding-bottom: calc(56px + var(--park-dock-space, 0px));
     padding-left: 16px;
   }
 }

@@ -253,3 +253,13 @@
     min-height: 44px;
   }
 }
+
+/* POLISH-2: docked on a phone (shell/TiloBubble isDocked): a smaller button, fixed in the corner, never dragged. The
+   pages reserve --park-dock-space under their content (park.shell.css). */
+@media (max-width: 560px) {
+  [data-park] .park-bubble[data-docked] {
+    width: 52px;
+    height: 52px;
+    cursor: pointer;
+  }
+}

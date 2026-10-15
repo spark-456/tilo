@@ -175,11 +175,16 @@
 [data-park] .park-world-lenses a[aria-disabled="true"]:hover {
   background: transparent;
 }
+/* POLISH-2: on a sample world it is the one chip that replaces the live view and the lenses (a quiet pill, never
+   a greyed-out control) */
 [data-park] .park-world-nostage {
+  align-self: flex-start;
   margin: 0;
-  padding: 0 6px;
+  padding: 7px 14px;
+  border-radius: 99px;
+  background: var(--chip);
   color: var(--ink2);
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 700;
 }
 /* the reason a stage link is disabled, for assistive technology; out of the flow, so nothing moves */

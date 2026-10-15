@@ -518,6 +518,17 @@
   font-size: 14px;
   font-weight: 600;
 }
+/* POLISH-2: the empty Routines section is a card with its one honest line (artboard: a bordered list card). */
+[data-park] .park-worlds-routine-empty {
+  margin: 0;
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: var(--card);
+  color: var(--ink2);
+  font-size: 15px;
+  font-weight: 600;
+}
 /* UI-10 W19: keep text controls tappable independently of their surrounding panel. */
 [data-park] .park-worlds-routines a,
 [data-park] .park-worlds-routines button {

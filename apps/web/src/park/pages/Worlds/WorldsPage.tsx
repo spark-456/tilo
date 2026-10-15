@@ -333,7 +333,7 @@ export function WorldsPage({ app }: { app: AppCtx }) {
           ) : (
             <LoadingWorlds />
           )}
-          {routines ? <RoutinesPanel client={routines} /> : null}
+          <RoutinesPanel client={routines} />
         </div>
       </PageSheet>
     </div>

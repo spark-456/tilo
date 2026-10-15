@@ -314,45 +314,25 @@ for (const [sizeName, viewport] of Object.entries(SIZES)) {
             color: await token(page, "--ink"),
           });
         }
-        // a sample world has no stage (WEB-CUTOVER, QA-DEMO-1 m3): the live view is a disabled link, muted not pressable
-        await expect(live(page)).toHaveAttribute("aria-disabled", "true");
-        const lv = await facts(live(page), [
-          "padding",
-          "border-top-left-radius",
-          "font-size",
-          "font-weight",
-          "background-color",
-          "color",
-        ]);
-        near("live view height", Number(lv.h), 42, 0.6);
-        expectFacts("live view", lv, {
-          padding: "0px 18px",
-          "border-top-left-radius": "12px",
-          "font-size": "14.5px",
-          "font-weight": "800",
-          "background-color": await token(page, "--chip"),
-          color: await token(page, "--ink3"),
-        });
+        // a sample world has no stage (WEB-CUTOVER, QA-DEMO-1 m3, POLISH-2): no live view is offered at all
+        await expect(live(page)).toHaveCount(0);
         // the row of the right side, 8 apart (wrapping under the title on a narrow window): Pause, Share, Share to
-        // Slack, the disabled live view, then the recorded replay link
+        // Slack, then the recorded replay link when the sample carries one
         const slack = btn(page, "Share to Slack");
         const replay = root(page).getByRole("link", { name: "Watch the replay" });
-        // a recorded sample carries the replay link; a fixture world's row ends at the live view
         const hasReplay = (await replay.count()) > 0;
-        const [pa, sa, ka, la, ra] = await Promise.all([
+        const [pa, sa, ka, ra] = await Promise.all([
           btn(page, "Pause").boundingBox(),
           btn(page, "Share").boundingBox(),
           slack.boundingBox(),
-          live(page).boundingBox(),
-          (hasReplay ? replay : live(page)).boundingBox(),
+          (hasReplay ? replay : slack).boundingBox(),
         ]);
-        if (!(pa && sa && ka && la && ra)) throw new Error("buttons have no box");
+        if (!(pa && sa && ka && ra)) throw new Error("buttons have no box");
         if (wide) {
           near("Pause and Share share a row", pa.y, sa.y, 0.6);
           near("gap Pause to Share", sa.x - (pa.x + pa.width), 8, 0.6);
           near("gap Share to Share to Slack", ka.x - (sa.x + sa.width), 8, 0.6);
-          near("gap Share to Slack to live view", la.x - (ka.x + ka.width), 8, 0.6);
-          if (hasReplay) near("gap live view to replay", ra.x - (la.x + la.width), 8, 0.6);
+          if (hasReplay) near("gap Share to Slack to replay", ra.x - (ka.x + ka.width), 8, 0.6);
           near(
             "the actions end at the content edge",
             ra.x + ra.width,
@@ -360,7 +340,7 @@ for (const [sizeName, viewport] of Object.entries(SIZES)) {
             1,
           );
         }
-        for (const b of [pa, sa, ka, la, ra]) {
+        for (const b of [pa, sa, ka, ra]) {
           expect(b.x + b.width, "a button leaves the sheet").toBeLessThanOrEqual(
             sheetBox.x + sheetBox.w,
           );
@@ -1117,9 +1097,8 @@ test.describe("park world: the other tiers at 1440", () => {
     const problems = await openWorld(page, "hires");
     await expect(h1(page)).toHaveText("Onboard 12 new hires");
     await expect(root(page).getByText("WAITING FOR YOU")).toHaveCount(0);
-    // a sample world has no stage (WEB-CUTOVER): the live view is disabled; the live-source href is a vitest case
-    await expect(live(page)).toHaveAttribute("aria-disabled", "true");
-    await expect(live(page)).not.toHaveAttribute("href", /.*/);
+    // a sample world has no stage (WEB-CUTOVER, POLISH-2): no live view is offered; the live-source href is a vitest case
+    await expect(live(page)).toHaveCount(0);
     await expect(region(page, "Districts").getByText("4 districts", { exact: true })).toBeVisible();
     await expect(btn(page, "Set up a new starter")).toBeVisible();
     for (const tool of ["Google Workspace", "BambooHR", "Slack"]) {
@@ -1276,25 +1255,14 @@ test.describe("park world: behaviour in the browser", () => {
     page,
   }) => {
     // WEB-CUTOVER: a stage exists only for a live-source world (World.stage.test.tsx pins the live hrefs:
-    // /world/k1/stage, story, trace, delivery, inspect/B1). A sample world renders the same elements, disabled.
+    // /world/k1/stage, story, trace, delivery, inspect/B1). POLISH-2: a sample world offers none of them (greyed out
+    // they read as broken) and one chip says why.
     await openWorld(page, "k1");
-    const reason = "Sample world: there is no recorded run to open";
-    await expect(live(page)).toHaveAttribute("aria-disabled", "true");
-    await expect(live(page)).toHaveAttribute("title", reason);
-    await expect(live(page)).not.toHaveAttribute("href", /.*/);
-    for (const name of ["Story", "Trace", "Delivery", "Inspect"]) {
-      const lens = root(page)
-        .getByRole("navigation", { name: "Run views" })
-        .getByRole("link", { name });
-      await expect(lens, name).toHaveAttribute("aria-disabled", "true");
-      await expect(lens, name).not.toHaveAttribute("href", /.*/);
-    }
+    const reason = "Live view is for real runs";
+    await expect(live(page)).toHaveCount(0);
+    await expect(root(page).getByRole("navigation", { name: "Run views" })).toHaveCount(0);
     await expect(root(page).locator('a[href^="/world/k1/"]')).toHaveCount(0);
-    await expect(root(page).getByText(reason).first()).toBeAttached();
-    // a click, plain or modified, goes nowhere (force: Playwright treats aria-disabled as not clickable)
-    await live(page).click({ modifiers: ["ControlOrMeta"], force: true });
-    await live(page).click({ force: true });
-    expect(new URL(page.url()).pathname).toBe("/world/k1");
+    await expect(root(page).getByText(reason).first()).toBeVisible();
   });
 
   test("WEB_6_e2e_a_keyboard_reaches_every_control_in_reading_order_with_the_README_focus_ring", async ({
@@ -1306,7 +1274,7 @@ test.describe("park world: behaviour in the browser", () => {
     await page.keyboard.press("Tab"); // keyboard modality: the ring is :focus-visible from here on
     await page.keyboard.press("Shift+Tab");
     await expect(back).toBeFocused();
-    // the live view of a sample world is disabled (no href), so the keyboard skips it
+    // a sample world has no live view, so there is nothing for the keyboard to skip
     const order = [btn(page, "Pause"), btn(page, "Share")];
     const ring = async (loc: Locator) => {
       const f = await facts(loc, [
