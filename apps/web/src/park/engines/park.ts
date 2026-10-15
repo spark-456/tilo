@@ -84,7 +84,10 @@ export function createPark(
   env: ParkEnv = {},
 ): {
   scene: (o?: SceneOpts) => { el: El; spots: Spot[]; lanes?: LaneRow[] };
-  world: (plan: Plan, o?: Opt<{ night: boolean; seed: number }>) => El;
+  world: (
+    plan: Plan,
+    o?: Opt<{ night: boolean; seed: number; labels: boolean; tags: boolean }>,
+  ) => El;
   building: (spec: string | Spec, state: string, d?: string, ht?: number, night?: boolean) => El;
   agent: (a: AgentSpec, size?: number, night?: boolean) => El;
 } {
@@ -925,14 +928,18 @@ export function createPark(
       style: Object.assign({ display: "block", pointerEvents: "none" }, style || {}),
     });
   };
-  function world(plan: Plan, o0?: Opt<{ night: boolean; seed: number }>): El {
+  // `labels` and `tags` (WORLD-DESIGN, design/studio-v2 "Tilo S World": R.city labels/tags) stay off unless asked for.
+  function world(
+    plan: Plan,
+    o0?: Opt<{ night: boolean; seed: number; labels: boolean; tags: boolean }>,
+  ): El {
     const o = o0 || {};
     const s = (
       using(o.night ? toward(NAVY, 0.6, true) : null, () =>
         W.world(plan, {
           seed: o.seed || 3,
-          labels: false,
-          tags: false,
+          labels: o.labels === true,
+          tags: o.tags === true,
           anim: false,
           width: 1000,
           height: 640,
