@@ -9,6 +9,7 @@ import {
   teamsClient,
 } from "../../api/selfServeTeams";
 import { Button } from "../../components";
+import { InviteLinks } from "./InviteLinks";
 import { type MyTeamName, isValidEmail } from "./teamModel";
 
 export const INVITE_SENT =
@@ -67,6 +68,8 @@ export function SelfServeTeams(props: {
   client?: TeamsClient | null;
   /** The person's own teams after every read, for the people table beside this panel. */
   onLoaded?: (you: string | null, teams: MyTeamName[]) => void;
+  orgOwner?: boolean;
+  ownerTeams?: string[];
 }) {
   const { onLoaded } = props;
   const [client] = useState(() => (props.client === undefined ? teamsClient() : props.client));
@@ -173,9 +176,17 @@ export function SelfServeTeams(props: {
                 onInvite={(email) => act(() => client.invite(t.team, email), INVITE_SENT)}
               />
             ) : null}
+            {t.lead || props.orgOwner ? (
+              <InviteLinks client={client} team={t.team} allowed />
+            ) : null}
           </div>
         ),
       )}
+      {props.orgOwner
+        ? (props.ownerTeams ?? [])
+            .filter((team) => !data.teams.some((t) => t.team === team && t.state === "member"))
+            .map((team) => <InviteLinks key={team} client={client} team={team} allowed />)
+        : null}
       <Button
         variant="secondary"
         disabled={busy}

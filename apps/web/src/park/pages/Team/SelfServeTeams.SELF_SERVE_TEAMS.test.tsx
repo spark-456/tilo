@@ -37,6 +37,15 @@ function fakeClient(teams: MyTeam[], rosters: Record<string, RosterMember[]> = {
       );
     }),
     leave: vi.fn(async () => undefined),
+    makeLink: vi.fn(async () => ({
+      invite_id: "til_test",
+      token: "test",
+      expires_at: "2026-10-23T00:00:00Z",
+    })),
+    listLinks: vi.fn(async () => []),
+    revokeLink: vi.fn(async () => undefined),
+    acceptLink: vi.fn(async () => ({ team: "tm_a", state: "member" as const })),
+    ensurePerson: vi.fn(async () => undefined),
   } satisfies TeamsClient;
   return client;
 }
@@ -158,4 +167,24 @@ it("FR_TEAM_01 SELF_SERVE_TEAMS reports the person's teams after the first read 
   await act(async () => button(host as HTMLElement, "Create a team").click());
   await settle();
   expect(seen.at(-1)).toEqual(["u_me", [{ name: "Me's team", lead: true }]]);
+});
+
+it("SELF_SERVE_TEAMS_INVITE_LINK_panel_shows_for_a_lead_or_owner_only", async () => {
+  const member = { team: "tm_a", lead: false, state: "member" as const, invitedBy: null };
+  const client = fakeClient([member]);
+  const page = await mount(client);
+  expect(page.textContent).not.toContain("Invite by link");
+  act(() => root?.unmount());
+  root = createRoot(page);
+  act(() =>
+    root?.render(createElement(SelfServeTeams, { client, orgOwner: true, ownerTeams: ["tm_a"] })),
+  );
+  await settle();
+  expect(page.textContent).toContain("Invite by link");
+  act(() => root?.unmount());
+  root = createRoot(page);
+  client.mine.mockResolvedValue({ teams: [{ ...member, lead: true }], you: "u_me" });
+  act(() => root?.render(createElement(SelfServeTeams, { client })));
+  await settle();
+  expect(page.textContent).toContain("Invite by link");
 });

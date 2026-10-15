@@ -237,7 +237,13 @@ function PersonalTeamPage({ app }: { app: AppCtx }) {
               right, the helpers under them; the owner's settings open below, full width. */}
           <div className="park-team-studio">
             <div className="park-team-main">
-              <SelfServeTeams onLoaded={onMine} />
+              <SelfServeTeams
+                onLoaded={onMine}
+                orgOwner={liveTeam.people.some((person) => person.you && person.role === "Owner")}
+                ownerTeams={[
+                  ...new Set(liveTeam.people.flatMap((person) => person.memberships ?? [])),
+                ]}
+              />
               <LiveMembers team={withMyTeams(liveTeam, mine.you, mine.teams)} />
             </div>
             <WhoCanSayYes />
