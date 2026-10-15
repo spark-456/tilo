@@ -306,6 +306,9 @@
   padding: 0;
   list-style: none;
 }
+.landing-apps .landing-app:last-child {
+  grid-column: span 2; /* eight tiles: the last fills the row (undone below 1100 px, where two columns fit evenly) */
+}
 .landing-app {
   display: flex;
   gap: 14px;
@@ -369,7 +372,8 @@
     grid-template-columns: minmax(0, 1fr);
   }
   .landing-why__item,
-  .landing-why__item:nth-child(n + 4) {
+  .landing-why__item:nth-child(n + 4),
+  .landing-apps .landing-app:last-child {
     grid-column: auto;
   }
   .landing-steps.landing-steps--four,
