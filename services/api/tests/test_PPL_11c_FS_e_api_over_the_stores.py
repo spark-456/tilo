@@ -221,10 +221,13 @@ def test_PPL_11c_FS_14_the_bootstrap_uid_gate_holds_over_firestore(people_rig, f
     rig.unwire("founder_gate")
     rig.require_route(R_PERSON_FIRST)
     rig.as_user("u_other")
-    assert rig.client.post("/v1/people/first", json=_body()).status_code == 403, "unconfigured is closed"
+    joined = rig.client.post("/v1/people/first", json=_body(email="other@example.com"))
+    assert joined.status_code == 201 and joined.json()["org_role"] == "member", "unconfigured founds nothing"
     monkeypatch.setenv("TILO_PEOPLE_BOOTSTRAP_UID", FOUNDER)
-    assert rig.client.post("/v1/people/first", json=_body()).status_code == 403, "another uid"
-    assert stores.persons.founded(org) is False and stores.persons.list(org) == ()
+    rig.as_user("u_another")
+    joined = rig.client.post("/v1/people/first", json=_body(email="another@example.com"))
+    assert joined.status_code == 201 and joined.json()["org_role"] == "member", "another uid joins as a member"
+    assert stores.persons.founded(org) is False
     rig.as_user(FOUNDER)
     assert rig.client.post("/v1/people/first", json=_body()).status_code == 201
     assert stores.persons.founded(org) is True

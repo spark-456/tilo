@@ -317,8 +317,7 @@ class FirestorePersonStore(FirestoreRecordStore):
         data, ref, founder = _doc(1, record), self._ref(org, pid), self._directory(org, "founder")
 
         def work(txn: Any) -> None:
-            anyone = any(True for _ in self._collection(org).limit(1).stream(transaction=txn))
-            if founder.get(transaction=txn).exists or anyone:
+            if founder.get(transaction=txn).exists:  # members who joined first do not block it (ADR-0044)
                 raise OrgAlreadyFounded("OrgAlreadyFounded")
             exists, slot = ref.get(transaction=txn).exists, self._slot(txn, org, record["email"])
             if exists:

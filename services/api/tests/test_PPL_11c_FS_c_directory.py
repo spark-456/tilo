@@ -92,15 +92,17 @@ def test_PPL_11c_FS_07_a_founder_is_a_schema_valid_owner_or_nothing_is_written(b
     assert stores.persons.founded(org) is True
 
 
-def test_PPL_11c_FS_07_an_org_that_already_has_a_person_cannot_be_founded(backend):
-    """`/first` on an org seeded by hand (or by an earlier build) is refused: "no person now" and "never founded" are
-    both required, and the marker is not invented for the people already there."""
+def test_PPL_11c_FS_07_an_org_whose_members_joined_first_can_still_be_founded(backend):
+    """SELF-SERVE-TEAMS (ADR-0044, PE-17): members may join before the owner founds the org, so only the founder
+    marker refuses `create_founder`; the people already there are kept and the marker is written once."""
     org, stores = unique_org(), backend.stores()
-    stores.persons.create(person("u_seed", org, role="owner"))
+    stores.persons.create(person("u_seed", org))
+    assert stores.persons.founded(org) is False
+    stores.persons.create_founder(_owner("u_new", org, email="new@example.com"))
+    assert stores.persons.founded(org) is True
+    assert sorted(s.record["id"] for s in stores.persons.list(org)) == ["u_new", "u_seed"]
     with pytest.raises(errors.OrgAlreadyFounded):
-        stores.persons.create_founder(_owner("u_new", org, email="new@example.com"))
-    assert stores.persons.founded(org) is False, "a seeded org is not founded, so its last person cannot be erased"
-    assert [s.record["id"] for s in stores.persons.list(org)] == ["u_seed"]
+        stores.persons.create_founder(_owner("u_third", org, email="third@example.com"))
 
 
 def test_PPL_11c_FS_07_the_marker_outlives_every_person_so_an_erased_org_cannot_be_refounded(backend):
