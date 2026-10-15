@@ -67,19 +67,19 @@ it("TEAM_WEB_integration_catalogue_remains_when_owner_opens_team_controls", asyn
     "https://api.test/v1/team",
   ]);
   expect(container.textContent).toContain("Actual Mail");
-  expect(container.querySelector('select[aria-label="Access level for mail"]')).not.toBeNull();
+  expect(container.querySelector('fieldset[aria-label="Access level for mail"]')).not.toBeNull();
 });
 
 it("TEAM_WEB_integration_people_directory_survives_failed_team_controls_read", async () => {
   const { api, fetch } = setup(true);
-  // SELF-SERVE-TEAMS (fix/LIVE7b) adds the Team page's own-teams read (/v1/teams); this test is about the
-  // directory and the team controls, so that read is left out of the call list.
-  const calls = () =>
-    fetch.mock.calls.map(([url]) => String(url)).filter((u) => !u.endsWith("/v1/teams"));
   const { root } = await renderTeam(makeApp(), api);
-  expect(calls()).toEqual(["https://api.test/v1/people"]);
+  // SELF-SERVE-TEAMS: the "Your teams" panel reads the person's own teams (/v1/teams) beside the directory; the
+  // owner's team controls (/v1/team) are still read only when opened.
+  const urls = () =>
+    fetch.mock.calls.map(([url]) => String(url)).filter((u) => !u.endsWith("/v1/teams"));
+  expect(urls()).toEqual(["https://api.test/v1/people"]);
   await expand(root);
-  expect(calls()).toEqual(["https://api.test/v1/people", "https://api.test/v1/team"]);
+  expect(urls()).toEqual(["https://api.test/v1/people", "https://api.test/v1/team"]);
   expect(root.textContent).toContain("Actual owner");
   expect(root.textContent).toContain("Team controls are not set up on this install yet.");
   expect(root.querySelector('[data-testid="live-team"]')).not.toBeNull();

@@ -138,7 +138,7 @@ describe("WEB_11_connectors_copy: verbatim from inventory.md", () => {
     const { root } = await open();
     for (const s of [
       "Connectors",
-      "The tools your agents can use, and how far each one can go.",
+      "The apps Tilo can use for you. You decide what it may do in each one.", // UI-STUDIO-5 lede
       "HubSpot sign-in expires in 3 days",
       "Scan competitor prices reads contacts from it. Reconnect to keep it running.",
       "Connected",

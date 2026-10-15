@@ -55,4 +55,7 @@ export const ICONS = {
     </>,
   ),
   download: glyph(<path d="M12 4v11 M7.5 11l4.5 4.5 4.5-4.5 M5 20h14" />),
+  // UI-STUDIO-5: a gauge (limits) and a raised hand (ask before).
+  limits: glyph(<path d="M4 16a8 8 0 1 1 16 0 M12 16l4-5 M4 20h16" />),
+  ask: glyph(<path d="M12 18h.01 M9.5 9a2.5 2.5 0 1 1 3.5 2.3c-.7.3-1 1-1 1.7v1" />),
 } as const;

@@ -20,8 +20,16 @@ export const SUBTITLE = `${USER.title} · Northwind Ops · Owner on the Team pla
 /** The nav tabs in order; `h2` is the card heading the design shows on that tab (billing has none). */
 export const TABS = [
   { id: "profile", label: "Profile", section: "Profile", h2: ["Profile"] },
-  { id: "notifications", label: "Notifications", section: "Notifications", h2: ["Notifications"] },
   { id: "appearance", label: "Appearance", section: "Appearance", h2: ["Appearance"] },
+  // UI-STUDIO-5: the Studio settings order adds Spending and limits and Ask before.
+  {
+    id: "limits",
+    label: "Spending and limits",
+    section: "Spending and limits",
+    h2: ["Spending and limits"],
+  },
+  { id: "ask", label: "Ask before", section: "Ask before", h2: ["Ask me before Tilo…"] },
+  { id: "notifications", label: "Notifications", section: "Notifications", h2: ["Notifications"] },
   { id: "security", label: "Security", section: "Security", h2: ["Security"] },
   { id: "billing", label: "Plan and billing", section: "Plan and billing", h2: ["Invoices"] },
 ] as const;
@@ -101,12 +109,36 @@ export const APPEARANCE_COPY = {
     calm: "Agents and cars move slowly. The city pauses when you leave Home.",
     still: "Nothing moves. Best for older laptops and long sessions.",
   },
+  // UI-STUDIO-5: the scene behind the helper in Chat (display state on this device).
+  sceneTitle: "Your Tilo hangs out in",
+  sceneSub: "The scene behind your helper in Chat. Kept on this device only.",
+  scenes: ["Office", "Balcony", "Beach", "Cosy room"],
+} as const;
+
+/** UI-STUDIO-5: Spending and limits, and Ask before, on the fixture Api (no team rules: says so). */
+export const LIMITS_COPY = {
+  sub: "Spending money always waits for a yes. These are the numbers Tilo checks against.",
+  strings: [
+    "Spent so far",
+    "£2,412",
+    "of £8,000 budget",
+    "You can say yes to",
+    "Not available yet",
+    "An Owner sets this on the Team page",
+    "Each day and each world",
+    "Daily and per-world caps are not kept yet",
+    "Open the Team page",
+  ],
+  askTitle: "Ask me before Tilo…",
+  askSub: "These show up in Needs you. Turn one off and Tilo goes ahead without asking.",
+  notConnected: "Not connected yet. Sign in to see your team’s rules.",
 } as const;
 
 /** Swatch colours of the two time-of-day cards: `[ground, block1, block2, block3]`. */
+// UI-STUDIO-5: each look previews the Studio theme (ground, heading line, card, primary button).
 export const SWATCHES = {
-  day: ["#B6DCA0", "#F4B23E", "#3E9BE6", "#EC6AA6"],
-  night: ["#2C3556", "#FFD98A", "#5A6BD0", "#7A62F5"],
+  day: ["#F6F6F4", "#0B0B0C", "#FFFFFF", "#0B0B0C"],
+  night: ["#0A0A0B", "#F4F4F2", "#141416", "#C8F23A"],
 } as const;
 
 export const SECURITY_COPY = {
@@ -193,7 +225,12 @@ export const STRINGS: Record<TabId, readonly string[]> = {
     APPEARANCE_COPY.motionTitle,
     ...APPEARANCE_COPY.motions,
     APPEARANCE_COPY.help.lively,
+    APPEARANCE_COPY.sceneTitle,
+    APPEARANCE_COPY.sceneSub,
+    ...APPEARANCE_COPY.scenes,
   ],
+  limits: [...header, LIMITS_COPY.sub, ...LIMITS_COPY.strings, LIMITS_COPY.notConnected],
+  ask: [...header, LIMITS_COPY.askTitle, LIMITS_COPY.askSub, LIMITS_COPY.notConnected],
   security: [
     ...header,
     SECURITY_COPY.sub,
@@ -234,6 +271,8 @@ export const ARIA_LABELS: Record<TabId, readonly string[]> = {
     NOTIF_COPY.quietLabel,
   ],
   appearance: ["Settings", "Appearance"],
+  limits: ["Settings", "Spending and limits"],
+  ask: ["Settings", "Ask before"],
   security: ["Settings", "Security"],
   billing: [
     "Settings",

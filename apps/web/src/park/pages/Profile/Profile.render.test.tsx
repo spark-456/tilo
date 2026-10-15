@@ -82,13 +82,10 @@ describe("WEB_12_profile_render: the frame (header and tabs)", () => {
     const tabs = [...nav.querySelectorAll("button")];
     expect(tabs.map(text)).toEqual(TABS.map((t) => t.label));
     for (const t of tabs) expect(t.querySelector("svg"), `${text(t)}: icon`).not.toBeNull();
-    expect(tabs.map((t) => t.getAttribute("aria-current"))).toEqual([
-      "page",
-      null,
-      null,
-      null,
-      null,
-    ]);
+    // UI-STUDIO-5: seven tabs in the Studio settings order; only the first is current.
+    expect(tabs.map((t) => t.getAttribute("aria-current"))).toEqual(
+      TABS.map((_, i) => (i === 0 ? "page" : null)),
+    );
   });
 
   it.each(TABS.map((t) => [t.id, t.label] as const))(
