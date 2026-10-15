@@ -151,6 +151,25 @@
   font-weight: 700;
   color: var(--ink3);
 }
+[data-park] .park-connectors-category {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+[data-park] .park-connectors-category h2 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--ink2);
+}
+[data-park] .park-connectors-brand {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+[data-park] .park-connectors-livehead .park-connectors-tile-name {
+  margin: 0;
+}
 
 /* ---- Connected tiles ---- */
 [data-park] .park-connectors-grid {

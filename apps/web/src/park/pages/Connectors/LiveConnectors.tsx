@@ -1,8 +1,10 @@
 import { useState } from "react";
 import type { Connector } from "../../api/types";
+import { BrandIcon } from "./BrandIcon";
 import { levelLabel } from "./ToolAccess";
+import { groupConnectors } from "./connectorGroups";
 
-/** UI-STUDIO-5: two letters for the app's tile, from its own name (never a brand mark). */
+/** UI-STUDIO-5: two letters from the app name when no brand mark is available. */
 export function monogram(name: string): string {
   const words = name.trim().split(/\s+/);
   const two =
@@ -79,45 +81,52 @@ export function LiveConnectors({
         <p>{connectors.length ? "No matching connectors" : "No connectors available yet"}</p>
       ) : null}
       <section className="park-connectors-section" aria-label="Tools">
-        <div className="park-connectors-grid">
-          {rows.map((c) => (
-            <article
-              className={
-                selected === c.id
-                  ? "park-connectors-tile park-connectors-live park-connectors-live--sel"
-                  : "park-connectors-tile park-connectors-live"
-              }
-              key={c.id}
-              aria-label={c.name}
-            >
-              <div className="park-connectors-livehead">
-                <span className="park-connectors-avail-mono" aria-hidden="true">
-                  {monogram(c.name)}
-                </span>
-                <h2 className="park-connectors-tile-name">{c.name}</h2>
-              </div>
-              <p className={`park-connectors-livestate park-connectors-livestate--${toneOf(c)}`}>
-                {stateText(c)}
-              </p>
-              {!c.live?.stateKnown ? <p>Needs setup by the workspace owner</p> : null}
-              <p>{accessLine(levels, c.id)}</p>
-              <p>Granted scopes: {scopesText(c)}</p>
-              <p>Grant expiry: {expiryText(c)}</p>
-              {onManage ? (
-                <button
-                  type="button"
-                  id={`manage-${c.id}`}
-                  className="park-connectors-manage-btn"
-                  aria-label={`Manage ${c.name}`}
-                  aria-pressed={selected === c.id}
-                  onClick={() => onManage(c.id)}
+        {groupConnectors(rows).map(({ heading, connectors: members }) => (
+          <div className="park-connectors-category" key={heading}>
+            <h2>{heading}</h2>
+            <div className="park-connectors-grid">
+              {members.map((c) => (
+                <article
+                  className={
+                    selected === c.id
+                      ? "park-connectors-tile park-connectors-live park-connectors-live--sel"
+                      : "park-connectors-tile park-connectors-live"
+                  }
+                  key={c.id}
+                  aria-label={c.name}
                 >
-                  Manage
-                </button>
-              ) : null}
-            </article>
-          ))}
-        </div>
+                  <div className="park-connectors-livehead">
+                    <span className="park-connectors-avail-mono" aria-hidden="true">
+                      <BrandIcon id={c.id} mono={monogram(c.name)} />
+                    </span>
+                    <h3 className="park-connectors-tile-name">{c.name}</h3>
+                  </div>
+                  <p
+                    className={`park-connectors-livestate park-connectors-livestate--${toneOf(c)}`}
+                  >
+                    {stateText(c)}
+                  </p>
+                  {!c.live?.stateKnown ? <p>Needs setup by the workspace owner</p> : null}
+                  <p>{accessLine(levels, c.id)}</p>
+                  <p>Granted scopes: {scopesText(c)}</p>
+                  <p>Grant expiry: {expiryText(c)}</p>
+                  {onManage ? (
+                    <button
+                      type="button"
+                      id={`manage-${c.id}`}
+                      className="park-connectors-manage-btn"
+                      aria-label={`Manage ${c.name}`}
+                      aria-pressed={selected === c.id}
+                      onClick={() => onManage(c.id)}
+                    >
+                      Manage
+                    </button>
+                  ) : null}
+                </article>
+              ))}
+            </div>
+          </div>
+        ))}
       </section>
     </>
   );

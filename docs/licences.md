@@ -174,6 +174,9 @@ Its tests use `jsonschema` and `referencing` from the root dev group (above).
 | pngjs (WEB-PARITY PNG decode/encode; dev/test only) | MIT | https://www.npmjs.com/package/pngjs |
 | @types/pngjs (types for pngjs; dev only) | MIT | https://www.npmjs.com/package/@types/pngjs |
 | @tilo/contracts (`packages/contracts-ts`, internal workspace package, not third-party) | n/a | `packages/contracts-ts` |
+| simple-icons (Connectors page brand SVG paths) | CC0-1.0 package; individual brand marks may carry separate rights | https://github.com/simple-icons/simple-icons/blob/develop/LICENSE.md |
+
+Connector marks identify the corresponding services only (nominative use); their owners retain their trademarks.
 
 ## JavaScript / TypeScript (`packages/contracts-ts` devDependencies)
 
