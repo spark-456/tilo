@@ -60,24 +60,26 @@ def test_JUDGE_FIRST_RUN_F1_a_judge_joins_as_a_member_never_the_owner(people_rig
 def test_JUDGE_FIRST_RUN_F1_a_judge_cannot_close_the_door_on_the_owner_before_the_org_is_founded(
     people_rig, monkeypatch
 ):
+    """SELF-SERVE-TEAMS (ADR-0044): a judge may join before founding now, as a member, and that never blocks the
+    owner, who still founds the org afterwards."""
     rig = _rig(people_rig, monkeypatch, {JUDGE: "judge"})
     rig.as_user(JUDGE)
-    before = rig.snapshot()
-    refused = _first(rig)
-    assert refused.status_code == 403 and refused.json() == FORBIDDEN
-    assert rig.snapshot() == before and rig.real.persons.founded(rig.org) is False
+    joined = _first(rig)
+    assert joined.status_code == 201 and joined.json()["org_role"] == "member"
+    assert rig.real.persons.founded(rig.org) is False
     _found(rig)  # the owner can still found it
     assert rig.stored("persons", FOUNDER)["org_role"] == "owner"
 
 
-def test_JUDGE_FIRST_RUN_F1_a_visitor_or_undeclared_person_is_refused(people_rig, monkeypatch):
+def test_JUDGE_FIRST_RUN_F1_a_visitor_or_undeclared_person_joins_as_a_member_never_the_owner(people_rig, monkeypatch):
+    """SELF-SERVE-TEAMS (ADR-0044, BQ-SST-6): the judge declaration no longer gates joining; every full, non-demo web
+    sign-in joins as a plain member, and none of them becomes owner."""
     rig = _rig(people_rig, monkeypatch, {"u_visitor1": "visitor"})
-    before = rig.snapshot()
-    for uid in ("u_visitor1", "u_nobody1"):
+    for i, uid in enumerate(("u_visitor1", "u_nobody1")):
         rig.as_user(uid)
-        refused = _first(rig)
-        assert refused.status_code == 403 and refused.json() == FORBIDDEN, (uid, refused.text[:200])
-    assert rig.snapshot() == before
+        joined = _first(rig, email=f"v{i}@example.com")
+        assert joined.status_code == 201 and joined.json()["org_role"] == "member", (uid, joined.text[:200])
+    assert rig.real.persons.founded(rig.org) is False
 
 
 def test_JUDGE_FIRST_RUN_F1_a_judge_needs_a_full_web_session_and_not_a_demo_one(people_rig, monkeypatch):
@@ -99,7 +101,7 @@ def test_JUDGE_FIRST_RUN_F1_a_judge_with_a_record_is_not_written_twice(people_ri
     assert _first(rig).status_code == 201
     version = rig.version_of("persons", JUDGE)
     again = _first(rig, display_name="Someone Else", email="else@example.com")
-    assert again.status_code == 403, again.text
+    assert again.status_code == 200 and again.json()["org_role"] == "member", again.text  # SELF-SERVE-TEAMS
     assert rig.version_of("persons", JUDGE) == version
     assert rig.stored("persons", JUDGE)["org_role"] == "member"
 

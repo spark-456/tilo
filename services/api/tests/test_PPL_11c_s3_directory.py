@@ -118,18 +118,23 @@ def test_PPL_11c_s3_PE_17_the_org_and_the_role_never_come_from_the_request(peopl
     assert rig.stored("persons", "u_founder") is None
 
 
-def test_PPL_11c_s3_PE_17_once_an_org_has_a_person_nobody_else_becomes_its_first_and_its_owner(people_rig):
+def test_PPL_11c_s3_PE_17_once_an_org_is_founded_nobody_else_becomes_its_first_and_its_owner(people_rig):
+    """SELF-SERVE-TEAMS (ADR-0044): the founder marker, not the people already there, closes founding; a person with a
+    record gets it back unchanged (200) and is never promoted."""
     rig = people_rig()
     rig.add_people()
+    rig.as_user("u_first")
+    assert _first(rig, _person(email="first@example.com")).status_code == 201
     rig.as_user("u_late")
     before = rig.snapshot()
     refused = _first(rig)
     assert refused.status_code == 403, refused.text[:200]
     assert rig.snapshot() == before, "no record, no promotion, nothing"
     rig.as_user(PRIYA)  # a member with a record is not a newcomer either
-    assert _first(rig, _person(email="priya.two@example.com")).status_code == 403
+    again = _first(rig, _person(email="priya.two@example.com"))
+    assert again.status_code == 200 and again.json()["org_role"] == "member"
     rig.as_user(OWNER)
-    assert _first(rig, _person(email="owner.two@example.com")).status_code == 403
+    assert _first(rig, _person(email="owner.two@example.com")).status_code == 200
     assert rig.snapshot() == before
 
 
@@ -138,7 +143,8 @@ def test_PPL_11c_s3_PE_17_a_principal_is_bound_to_exactly_one_person_record(peop
     rig.as_user("u_founder")
     assert _first(rig).status_code == 201
     again = _first(rig, _person(email="other@example.com"))
-    assert again.status_code == 403, "a second record for the same principal"
+    assert again.status_code == 200, "no second record for the same principal (SELF-SERVE-TEAMS: idempotent)"
+    assert again.json()["org_role"] == "owner" and rig.stored("persons", "u_founder")["email"] != "other@example.com"
     assert [s.record["id"] for s in rig.real.persons.list(rig.org)] == ["u_founder"]
 
 

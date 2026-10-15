@@ -32,7 +32,7 @@ class EmailTaken(PeopleError):
 
 
 class OrgAlreadyFounded(PeopleError):
-    """create_founder: the org has a founder marker or already has a person."""
+    """create_founder: the org has a founder marker (ADR-0044: members who joined first do not count)."""
 
 
 class LastPerson(PeopleError):
