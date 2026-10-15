@@ -279,7 +279,11 @@ export function createLiveApi(options: LiveApiOptions = {}): Api {
       throw new TiloApiError(BAD_REPLY, 200, true, true);
     return skillFromRow(row);
   });
-  installResultReader(api, (world) => http.getBlob(`/worlds/${encodeURIComponent(world)}/result`));
+  installResultReader(api, (world, artifact) =>
+    http.getBlob(
+      `/worlds/${encodeURIComponent(world)}/result${artifact ? `?artifact=${encodeURIComponent(artifact)}` : ""}`,
+    ),
+  );
   installQuizReader(api, async (world, artifact) => {
     const raw = await http.getJson(
       `/worlds/${encodeURIComponent(world)}/apps/${encodeURIComponent(artifact)}`,

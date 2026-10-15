@@ -370,6 +370,14 @@ class ArtifactStore:
         view._upload_text = convert
         return view
 
+    def with_screener(self, screener: Any) -> ArtifactStore:
+        """A run-local view whose verdicts come from `screener` (RESULT-LIVE: a live run's own metered safety
+        provider, SEC-16). Still only a verdict on the exact stored bytes says clean (AR-07); backends, caps,
+        redaction, scope checks and locks are shared; other users of the store are unchanged."""
+        view = copy.copy(self)
+        view._screener = screener
+        return view
+
     def __init__(
         self,
         meta: MetaBackend,
