@@ -1,14 +1,14 @@
 {
-  "key": "35c8bb83d5c68f5d",
+  "key": "36b01d39ae210c65",
   "profile": "lite-31",
   "response": {
     "profile_id": "lite-31",
-    "text": "Synthetic lead_review reply for the test.",
+    "text": "Synthetic narrator reply for the test.",
     "usage": {
       "input_tokens": 1000,
       "output_tokens": 500,
       "total_tokens": 1500
     }
   },
-  "role": "lead_review"
+  "role": "narrator"
 }
