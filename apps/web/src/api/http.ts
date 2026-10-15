@@ -87,7 +87,7 @@ const BAD_REPLY = "Tilo sent a reply this page could not read.";
 /** A8: how long a start waits for the intake's reply before the person is told, instead of a spinner for ever.
  * NFR-03: the server's Director deadline (config/intake.yaml, 80 s) sits at least 10 s inside this, so a slow model
  * ends as the server's own plain 503 `intake_deadline`, never as a reply that lands after the page gave up. */
-export const INTAKE_TIMEOUT_MS = 100_000;
+export const INTAKE_TIMEOUT_MS = 105_000; // SEC-16 FEEDBACK: not a round cap amount
 /** NFR-22: the web's own sentence for the server's `intake_deadline` 503 (its text is never shown). */
 const INTAKE_DEADLINE = "Making the plan took too long, so nothing was started. Try again.";
 const TOOK_TOO_LONG =
