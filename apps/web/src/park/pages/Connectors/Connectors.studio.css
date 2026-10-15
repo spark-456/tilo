@@ -117,31 +117,31 @@
   font-size: 14.5px;
   font-weight: 500;
 }
-[data-park][data-theme="studio"] .park-connectors-usedrow.park-connectors-levelrow {
+[data-park][data-theme="studio"] .park-connectors-usedrow.park-connectors-choicerow {
   border-top: 1px solid var(--line);
   border-radius: 0;
   background: transparent;
   padding: 14px 0 6px;
 }
-[data-park][data-theme="studio"] .park-connectors-levelrow .park-connectors-usedname {
+[data-park][data-theme="studio"] .park-connectors-choicerow .park-connectors-usedname {
   font-size: 15px;
   font-weight: 600;
   text-transform: capitalize;
 }
-[data-park][data-theme="studio"] .park-connectors-levels {
+[data-park][data-theme="studio"] .park-connectors-choices {
   border-radius: 12px;
   background: var(--sunk);
 }
-[data-park][data-theme="studio"] .park-connectors-level {
+[data-park][data-theme="studio"] .park-connectors-choice {
   color: var(--ink3);
   font-weight: 600;
 }
-[data-park][data-theme="studio"] .park-connectors-level.park-connectors-level--on {
+[data-park][data-theme="studio"] .park-connectors-choice.park-connectors-choice--on {
   background: var(--card);
   color: var(--ink);
 }
 [data-park][data-theme="studio"]
-  .park-connectors-level:has(.park-connectors-levelinput:focus-visible),
+  .park-connectors-choice:has(.park-connectors-choiceinput:focus-visible),
 [data-park][data-theme="studio"] .park-connectors-summary:focus-visible,
 [data-park][data-theme="studio"] .park-connectors-connect:focus-visible {
   outline: 3px solid var(--focus);

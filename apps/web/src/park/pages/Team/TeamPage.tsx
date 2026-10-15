@@ -26,7 +26,9 @@ import { LiveBody, LiveInvite, StatusLine } from "./LiveTeam";
 import { Members } from "./Members";
 import { MatrixCard, RulesCard } from "./Rules";
 import { SelfServeTeams } from "./SelfServeTeams";
+import { Helpers, WhoCanSayYes } from "./Studio";
 import "./Team.css";
+import "./Team.studio.css";
 import { agentArt, icon } from "./teamKit";
 import {
   type Backups,
@@ -52,7 +54,7 @@ function Top({ count, children }: { count?: string | undefined; children?: React
           {count ? <span className="park-team-count">{count}</span> : null}
         </div>
         <p className="park-team-intro">
-          Who can start work, who signs off, and the rules every agent follows.
+          The people who share this space, and the helpers who work for all of you.
         </p>
       </div>
       {children}
@@ -215,16 +217,27 @@ function PersonalTeamPage({ app }: { app: AppCtx }) {
           </div>
         ) : null}
       </Top>
-      {liveTeam ? (
+      {liveTeam?.setupRequired ? (
+        <LiveMembers team={liveTeam} />
+      ) : liveTeam ? (
         <>
-          <LiveMembers team={liveTeam} />
-          {!liveTeam.setupRequired ? <SelfServeTeams /> : null}
-          {!liveTeam.setupRequired ? (
-            <details onToggle={(e) => setControlsOpen(e.currentTarget.open)}>
-              <summary>Manage team settings</summary>
-              {controlsOpen ? <LiveControls app={app} /> : null}
-            </details>
-          ) : null}
+          {/* UI-STUDIO-5 (design "Tilo S Team"): your teams and the people on the left, who can say yes on the
+              right, the helpers under them; the owner's settings open below, full width. */}
+          <div className="park-team-studio">
+            <div className="park-team-main">
+              <SelfServeTeams />
+              <LiveMembers team={liveTeam} />
+            </div>
+            <WhoCanSayYes />
+          </div>
+          <details
+            className="park-team-disclosure"
+            onToggle={(e) => setControlsOpen(e.currentTarget.open)}
+          >
+            <summary className="park-team-summary">Manage team settings</summary>
+            {controlsOpen ? <LiveControls app={app} /> : null}
+          </details>
+          <Helpers night={app.night} />
         </>
       ) : ready ? (
         <TeamBody app={app} data={ready.data} people={ready.people} setPeople={setPeople} />

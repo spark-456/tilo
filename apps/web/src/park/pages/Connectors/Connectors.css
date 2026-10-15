@@ -746,15 +746,15 @@
   background: var(--amberSoft);
   color: var(--amberInk);
 }
-[data-park] .park-connectors-usedrow.park-connectors-levelrow {
+[data-park] .park-connectors-usedrow.park-connectors-choicerow {
   height: auto;
   flex-wrap: wrap;
   padding: 12px;
 }
-[data-park] .park-connectors-levelrow .park-connectors-usedname {
+[data-park] .park-connectors-choicerow .park-connectors-usedname {
   flex: 1 1 100%;
 }
-[data-park] .park-connectors-levels {
+[data-park] .park-connectors-choices {
   flex: 1 1 100%;
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -766,7 +766,7 @@
   border-radius: 12px;
   background: var(--seg);
 }
-[data-park] .park-connectors-level {
+[data-park] .park-connectors-choice {
   position: relative;
   min-height: 44px;
   padding: 0 4px;
@@ -780,22 +780,22 @@
   color: var(--ink2);
   cursor: pointer;
 }
-[data-park] .park-connectors-level.park-connectors-level--on {
+[data-park] .park-connectors-choice.park-connectors-choice--on {
   background: var(--card);
   color: var(--ink);
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
 }
-[data-park] .park-connectors-levels:disabled .park-connectors-level {
+[data-park] .park-connectors-choices:disabled .park-connectors-choice {
   cursor: default;
 }
-[data-park] .park-connectors-levelinput {
+[data-park] .park-connectors-choiceinput {
   position: absolute;
   inset: 0;
   margin: 0;
   opacity: 0;
   cursor: inherit;
 }
-[data-park] .park-connectors-level:has(.park-connectors-levelinput:focus-visible) {
+[data-park] .park-connectors-choice:has(.park-connectors-choiceinput:focus-visible) {
   outline: 3px solid var(--focus, var(--ink));
   outline-offset: 1px;
 }

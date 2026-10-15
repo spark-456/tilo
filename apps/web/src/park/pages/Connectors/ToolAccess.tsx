@@ -35,7 +35,7 @@ function LevelPicker({
 }) {
   return (
     <fieldset
-      className="park-connectors-levels"
+      className="park-connectors-choices"
       aria-label={`Access level for ${connector}`}
       disabled={disabled}
     >
@@ -44,13 +44,13 @@ function LevelPicker({
           key={value}
           className={
             level === value
-              ? "park-connectors-level park-connectors-level--on"
-              : "park-connectors-level"
+              ? "park-connectors-choice park-connectors-choice--on"
+              : "park-connectors-choice"
           }
         >
           <input
             type="radio"
-            className="park-connectors-levelinput"
+            className="park-connectors-choiceinput"
             name={`level-${connector}`}
             value={value}
             checked={level === value}
@@ -87,7 +87,7 @@ export function ToolAccess({
           <span className="park-connectors-count">{view.tools.length} tools</span>
         </div>
         {view.tools.map((t) => (
-          <div key={t.connector} className="park-connectors-usedrow park-connectors-levelrow">
+          <div key={t.connector} className="park-connectors-usedrow park-connectors-choicerow">
             <span className="park-connectors-usedname">{t.connector}</span>
             <LevelPicker
               connector={t.connector}

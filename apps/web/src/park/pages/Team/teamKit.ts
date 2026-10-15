@@ -8,5 +8,10 @@ const h: H = (tag, props, ...children) => createElement(tag, props, ...(children
 const kit = createKit(h, { plans: () => ({}) });
 
 export const icon = (name: string, size = 16): ReactNode => kit.icon(name, size) as ReactNode;
+/** UI-STUDIO-5: a helper's picture for the "Your helpers" cards (a role, or the director's rank). */
+export const helperArt = (
+  a: { role?: string; rank?: string; expr: string },
+  night: boolean,
+): ReactNode => kit.agent(a, 58, night) as ReactNode;
 export const agentArt = (night: boolean): ReactNode =>
   kit.agent({ role: "builder", expr: "needs" }, 38, night) as ReactNode;
