@@ -113,8 +113,8 @@ describe("SIMPLE-RUN-1 Home starts a run in one step", () => {
     expect(text).toContain("Assumed: The team");
     expect(
       text,
-      "the 20-credit estimate is shown at the 30-credit floor (BQ-BUDGET-FLOOR-1)",
-    ).toMatch(/30 credits/);
+      "the 20-credit estimate is shown at the 60-credit floor (BQ-BUDGET-FLOOR-1)",
+    ).toMatch(/60 credits/);
     expect(pageText(rig.el)).not.toMatch(/Example only|drafting/i);
     expect(cardStart(rig).textContent).toBe("Start");
 
