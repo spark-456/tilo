@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { Connector } from "../../api/types";
+import { levelLabel } from "./ToolAccess";
 
 /** UI-STUDIO-5: two letters for the app's tile, from its own name (never a brand mark). */
 function monogram(name: string): string {
@@ -11,8 +12,27 @@ function monogram(name: string): string {
 const toneOf = (c: Connector): "on" | "warn" | "off" =>
   !c.live?.stateKnown ? "off" : c.st === "attention" ? "warn" : c.st === "connected" ? "on" : "off";
 
+/** Each app's access level (GET /v1/team tools[].level, the Owner's route): loading, known, or why it is not shown. */
+export type ToolLevels =
+  | { kind: "loading" }
+  | { kind: "known"; byId: Record<string, string> }
+  | { kind: "not_owner" }
+  | { kind: "unknown" };
+
+function accessLine(levels: ToolLevels, id: string): string {
+  if (levels.kind === "loading") return "Access level: Loading…";
+  if (levels.kind === "not_owner") return "Access level: Set by the workspace owner";
+  const level = levels.kind === "known" ? levels.byId[id] : undefined;
+  return level === undefined
+    ? "Access level not available yet"
+    : `Access level: ${levelLabel(level)}`;
+}
+
 /** FR-ACC-01/03/04: a read-only live list; unsupported facts and writes never use demo defaults. */
-export function LiveConnectors({ connectors }: { connectors: Connector[] }) {
+export function LiveConnectors({
+  connectors,
+  levels = { kind: "unknown" },
+}: { connectors: Connector[]; levels?: ToolLevels }) {
   const [query, setQuery] = useState("");
   const rows = connectors.filter(
     (c) =>
@@ -30,10 +50,7 @@ export function LiveConnectors({ connectors }: { connectors: Connector[] }) {
           onChange={(e) => setQuery(e.target.value)}
         />
       </div>
-      <p className="park-connectors-note">
-        Connecting and reconnecting these apps is not available here yet. What Tilo may do in each
-        app is set beside this list.
-      </p>
+      <p className="park-connectors-note">What Tilo may do in each app is set beside this list.</p>
       {rows.length === 0 ? (
         <p>{connectors.length ? "No matching connectors" : "No connectors available yet"}</p>
       ) : null}
@@ -61,17 +78,20 @@ export function LiveConnectors({ connectors }: { connectors: Connector[] }) {
                       : "Available"}
               </p>
               {!c.live?.stateKnown ? <p>Needs setup by the workspace owner</p> : null}
-              <p>Access level not available yet</p>
+              <p>{accessLine(levels, c.id)}</p>
               <p>Usage not available yet</p>
               <p>Sync history not available yet</p>
               <p>
                 Granted scopes:{" "}
-                {c.live?.stateKnown && c.live.scopes.length
-                  ? c.live.scopes.join(", ")
-                  : "Not available yet"}
+                {!c.live?.stateKnown
+                  ? "Not available yet"
+                  : c.live.scopes.length
+                    ? c.live.scopes.join(", ")
+                    : "None recorded"}
               </p>
               <p>
-                Grant expiry: {c.live?.stateKnown && c.expires ? c.expires : "Not available yet"}
+                Grant expiry:{" "}
+                {!c.live?.stateKnown ? "Not available yet" : (c.expires ?? "No expiry recorded")}
               </p>
             </article>
           ))}

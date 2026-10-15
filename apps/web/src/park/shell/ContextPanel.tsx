@@ -1,5 +1,11 @@
-import { type ReactNode, useCallback, useEffect, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useMemo, useState } from "react";
 import type { Api } from "../api";
+import {
+  type Routine,
+  type RoutinesClient,
+  createRoutinesClient,
+  nextRunWords,
+} from "../api/live/routines";
 import { ORGANISATION_SETUP } from "../api/organisationSetup";
 import type { AgendaData, ApiResult, WorldState } from "../api/types";
 import { useApp, useParkApi } from "../app/context";
@@ -96,11 +102,38 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
     </section>
   );
 }
-export function ContextPanel({ onClose }: { onClose: () => void }) {
+/** One line per routine from GET /schedules (FR-AGT-14): its title and next due time in its own zone. */
+const routineLine = (r: Routine): string =>
+  `${r.title} · Next run: ${nextRunWords(r.next_due, r.cadence.tz)}`;
+
+export function ContextPanel({
+  onClose,
+  routines,
+}: { onClose: () => void; routines?: RoutinesClient | null }) {
   const api = useParkApi();
   const app = useApp();
   const route = useParkRoute();
   const [data, setData] = useState<Data>({});
+  const client = useMemo(
+    () => (routines === undefined ? createRoutinesClient() : routines),
+    [routines],
+  );
+  // undefined = still reading, null = no client or a failed read (the honest "not available" copy stays).
+  const [routineRows, setRoutineRows] = useState<string[] | null | undefined>(undefined);
+  useEffect(() => {
+    let current = true;
+    if (!client) {
+      setRoutineRows(null);
+      return;
+    }
+    client.listSchedules().then(
+      (rows) => current && setRoutineRows(rows.map(routineLine)),
+      () => current && setRoutineRows(null),
+    );
+    return () => {
+      current = false;
+    };
+  }, [client]);
   const worldId = route?.page === "world" ? route.params.id : null;
   const worlds = (label: string, state: WorldState) => (
     <Rows
@@ -227,7 +260,23 @@ export function ContextPanel({ onClose }: { onClose: () => void }) {
           result={data.getAgenda}
           rows={(a) => agendaRows(a, true)}
         />
-        <p>Routine next-run times and forecasts are not available here yet.</p>
+        {routineRows === null || routineRows === undefined ? (
+          <p>
+            {routineRows === undefined
+              ? "Routines: Loading…"
+              : "Routine next-run times and forecasts are not available here yet."}
+          </p>
+        ) : (
+          <div>
+            <h3>Routines</h3>
+            <ul>
+              {(routineRows.length ? routineRows : ["No routines yet."]).map((v) => (
+                <li key={v}>{v}</li>
+              ))}
+            </ul>
+            <p>Forecasts are not available yet.</p>
+          </div>
+        )}
       </Section>
       <Section title="What Tilo knows">
         <p>Knowledge items are not available yet.</p>

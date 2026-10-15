@@ -20,7 +20,7 @@ import { ConnectionsSection } from "../../shared/RunAdmin";
 import { AttentionBanner, AvailableRow, ConnectedTile } from "./ConnectorParts";
 import { Drawer } from "./Drawer";
 import { GoogleAccess } from "./GoogleAccess";
-import { LiveConnectors } from "./LiveConnectors";
+import { LiveConnectorsWithLevels } from "./LiveConnectorsWithLevels";
 import { MeetingHostAccess } from "./MeetingHostAccess";
 import { icon } from "./icons";
 import { type Overrides, type UsedRow, isOn, matches, merge, usedBy } from "./view";
@@ -158,7 +158,7 @@ export function ConnectorsPage({
             <>
               {live ? <GoogleAccess flow={live} /> : null}
               <MeetingHostAccess flow={live} />
-              <LiveConnectors connectors={load.connectors} />
+              <LiveConnectorsWithLevels api={api} connectors={load.connectors} />
             </>
           }
           side={

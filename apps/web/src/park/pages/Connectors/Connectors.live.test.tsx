@@ -32,7 +32,10 @@ it("FR_ACC_01_03_04 live page loads the existing route without needing skills or
   });
   const app = makeApp();
   const { container: root } = await renderPage(app, api);
-  expect(fetch).toHaveBeenCalledTimes(1);
+  expect((fetch.mock.calls as unknown[][]).map(([u]) => new URL(String(u)).pathname)).toEqual([
+    "/v1/connectors",
+    "/v1/people",
+  ]);
   expect(fetch.mock.calls[0]?.[0]).toBe("https://api.test/v1/connectors");
   const text = textOf(root);
   for (const word of [
