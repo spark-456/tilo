@@ -1,5 +1,5 @@
 // The signed-out page (SEC-15 / SIGNIN), in Studio (STUDIO-6, design/studio-v2 "Tilo S Landing"): a header, the hero
-// with Google and a demo session, then the landing (a recorded replay of a sample run, how it works, safety, skills)
+// with Google and a demo session, then the landing (a recorded replay of a sample run, how it works, safety, skills, meetings, teams, connectors)
 // in a chunk of its own. The hero is drawn at once; the landing arrives below it into a reserved box, so nothing
 // above it moves (CLS) and the art engines stay off the entry bundle (NFR-01). Tilo never handles passwords: no
 // field, no form (PRD 16.1). The buttons are real; what they do is the gate's (`SignInGate`).
@@ -79,8 +79,11 @@ export function SignInScreen({
         <Logo />
         <nav className="landing-head__nav" aria-label="On this page">
           <a href="#how">How it works</a>
-          <a href="#safety">Safety</a>
           <a href="#skills">Skills</a>
+          <a href="#meetings">Meetings</a>
+          <a href="#teams">Teams</a>
+          <a href="#connectors">Connectors</a>
+          <a href="#why">Why Tilo</a>
         </nav>
         <ThemeToggle night={night} onToggle={toggle} />
       </header>
@@ -89,8 +92,8 @@ export function SignInScreen({
           Describe the work. <span className="landing-mark">Watch your team do it.</span>
         </h1>
         <p className="landing-hero__lead">
-          Plain words in. A small city of AI helpers plans it, does it, and checks with you before
-          anything important.
+          Plain words in. A Director plans the work, teams of AI helpers run it, and you watch it
+          happen in a small living city and approve what matters.
         </p>
         <div className="landing-hero__actions">
           <button
