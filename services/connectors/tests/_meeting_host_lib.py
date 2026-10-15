@@ -354,6 +354,7 @@ def oracle_exact(title: str, start: str, end: str, zone: str, n: int, k: int) ->
         f'Creates "{title}" on the Tilo meeting host\'s Google Calendar, {local_when(start, end, zone)} ({zone}), '
         f"with a new Google Meet link. Google emails an invitation from the meeting host account to the {n} "
         f"people listed, you included. {skipped}Guests cannot add people or see each other's addresses. "
+        "Tilo notetaker joins at the start time and posts a recording notice. "
         "An invitation cannot be unsent."
     )
 

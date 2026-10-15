@@ -136,8 +136,20 @@ def test_FR_MTG_09_the_exact_sentence_counts_the_listed_people_and_the_ones_with
     assert "3 attendees without a Tilo account are not invited. " in many.exact
     assert "without a Tilo account" not in none.exact
     assert none.exact == oracle_exact("Q4 planning", T_START, T_END, IST, 3, 0)
-    assert one.exact.endswith("Guests cannot add people or see each other's addresses. An invitation cannot be unsent.")
+    assert one.exact.endswith(
+        "Guests cannot add people or see each other's addresses. "
+        "Tilo notetaker joins at the start time and posts a recording notice. An invitation cannot be unsent."
+    )
     assert "the 3 people listed, you included" in one.exact
+
+
+def test_FR_MTG_09_ADR_0024_A5_the_card_says_the_notetaker_joins_and_posts_a_recording_notice():
+    """MB-T3 / ADR-0024 amendment 5: the sentence is pinned word for word, once, just before the unsent line."""
+    exact = draft_of(meeting()).exact
+    sentence = "Tilo notetaker joins at the start time and posts a recording notice."
+    assert exact.count(sentence) == 1
+    assert exact.endswith(f"addresses. {sentence} An invitation cannot be unsent.")
+    assert len(exact) <= EXACT_MAX
 
 
 def default_attendees_with(unresolved: int) -> list[dict]:
