@@ -4,9 +4,10 @@ import {
   type ScheduleView,
   cadenceWords as cadenceText,
   isScheduleView,
+  nextRunWords,
 } from "../../../api/schedules";
 
-export { cadenceText };
+export { cadenceText, nextRunWords };
 export type Routine = ScheduleView;
 export type RoutinesClient = Pick<
   HttpClient,

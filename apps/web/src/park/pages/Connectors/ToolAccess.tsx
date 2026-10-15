@@ -14,6 +14,9 @@ const CHOICES: readonly (readonly [ToolLevelName, string])[] = [
   ["read", "Read only"],
   ["off", "Never"],
 ];
+/** A level in the design's words (what the person sees beside each app). */
+export const levelLabel = (level: string): string =>
+  CHOICES.find(([value]) => value === level)?.[1] ?? level;
 const WORDS: Record<string, string> = {
   off: "Agent runs cannot use this tool. Email Autopilot and calendar sync do not check this yet.",
   read: "Agents can read from this tool.",

@@ -45,5 +45,8 @@ it("FR_UX_18_registered_catalogue_cards_show_owner_setup_without_fake_connection
   }
   expect(container.querySelector('input[type="password"]')).toBeNull();
   expect(container.querySelectorAll("button")).toHaveLength(0);
-  expect(fetch).toHaveBeenCalledTimes(1);
+  expect((fetch.mock.calls as unknown[][]).map(([u]) => new URL(String(u)).pathname)).toEqual([
+    "/v1/connectors",
+    "/v1/people",
+  ]);
 });

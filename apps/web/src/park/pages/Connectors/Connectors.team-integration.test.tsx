@@ -60,10 +60,14 @@ async function expand(root: ParentNode) {
 it("TEAM_WEB_integration_catalogue_remains_when_owner_opens_team_controls", async () => {
   const { api, fetch } = setup();
   const { container } = await renderPage(makeApp(), api);
-  expect(fetch.mock.calls.map(([url]) => String(url))).toEqual(["https://api.test/v1/connectors"]);
+  expect(fetch.mock.calls.map(([url]) => String(url))).toEqual([
+    "https://api.test/v1/connectors",
+    "https://api.test/v1/people",
+  ]);
   await expand(container);
   expect(fetch.mock.calls.map(([url]) => String(url))).toEqual([
     "https://api.test/v1/connectors",
+    "https://api.test/v1/people",
     "https://api.test/v1/team",
   ]);
   expect(container.textContent).toContain("Actual Mail");

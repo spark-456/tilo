@@ -105,6 +105,9 @@ describe("STUDIO_5 Connectors: What Tilo may do", () => {
     expect(tile?.querySelector(".park-connectors-livestate--on")?.textContent).toBe("Connected");
     expect(tile?.textContent).toContain("Access level not available yet");
     expect(m.container.querySelector(".park-connectors-aside details")).not.toBeNull();
-    expect(fetch).toHaveBeenCalledTimes(1);
+    expect((fetch.mock.calls as unknown[][]).map(([u]) => new URL(String(u)).pathname)).toEqual([
+      "/v1/connectors",
+      "/v1/people",
+    ]);
   });
 });
