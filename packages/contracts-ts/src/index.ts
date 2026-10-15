@@ -118,7 +118,7 @@
  * manifest.schema.json 1.0.0 sha256:9b885d1826522bb7
  * mcp_tools.schema.json 1.0.0 sha256:46a498402c9b1e4e
  * meeting.schema.json 1.2.0 sha256:034e93898bb28957
- * meeting_host_rpc.schema.json 1.3.0 sha256:76c124635c8ad9c2
+ * meeting_host_rpc.schema.json 1.4.0 sha256:38bb31a808bfe7f0
  * meeting_join.schema.json 1.0.0 sha256:ea1e8f0945773573
  * meeting_room.schema.json 1.0.0 sha256:13c682235d58ce69
  * meeting_voice_meter.schema.json 1.0.0 sha256:fa317e43b3e785b6
@@ -871,7 +871,7 @@ export type McpToolsWithheldReason = "not_text" | "too_large";
  */
 export type MeetingAgendaMinutes = number;
 /**
- * The internal surface of tilo-connectors that tilo-api calls (FR-MTG-09, ADR-0032 decision 2 and addendum 1; FR-CON-02, ADR-0035 decision 2): what tilo-api posts to /internal/meeting-host/send, /internal/meeting-host/status, /internal/meeting-host/disconnect, /internal/connections/views, /internal/connections/start, /internal/connections/callback, /internal/connections/disconnect and /internal/side-effects/execute, and what each answers. Each route validates its own request and answer ($defs send_request and send_answer; user_request and status_answer; user_request and disconnect_answer; user_request and views_answer; start_request and start_answer; callback_request and callback_answer; connection_disconnect_request and connection_disconnect_answer; execute_request and execute_answer; error for any refusal) in both services; this root is any one of them. Every object is closed, and no field holds an access or refresh token, the client secret, a PKCE verifier, key material or a Meet link (ADR-0024 decision 4, ADR-0032 decision 3). Two fields carry a credential on purpose and nothing else does: callback_request.state and .code, the one-time values Google handed the browser (ADR-0035 LC-03; useless without the verifier and the client secret, which stay in tilo-connectors), and start_answer.authorize_url, the public part of the sign-in link. Ids travel in the body, never in a path or query. A route refuses a body over 65536 bytes (64 KiB) before it parses it. Rules that compare values (HB-03 the draft against its hash and the entry, HB-05 the owner, HB-07 the receipt against the entry, HB-09 the views against config/connectors.yaml, LC-05 the flow's person against the caller, LC-07 the items against the entry) are checked by the routes and by tilo-api's client, not by this schema. 1.1.0 adds views_answer, connection_view and scope; 1.2.0 adds the four live-connector routes' defs and the error codes start_again, not_granted and wrong_account (additive). 1.3.0 adds the three model-key routes of ADR-0041 decision 2 (Proposed and inert until config/byok.yaml enabled is true): /internal/model-keys/put, /internal/model-keys/remove and /internal/model-keys/status with the defs model_key_put_request and model_key_put_answer, model_key_remove_request and model_key_remove_answer, model_key_status_request and model_key_status_answer, and the error code key_refused (additive). model_key_put_request.key is the one more credential on this surface (BK-02): it is no-store and, like state and code above, nothing logs, stores or echoes it. /internal/model-keys/generate is model_call_rpc.schema.json's.
+ * The internal surface of tilo-connectors that tilo-api calls (FR-MTG-09, ADR-0032 decision 2 and addendum 1; FR-CON-02, ADR-0035 decision 2): what tilo-api posts to /internal/meeting-host/send, /internal/meeting-host/status, /internal/meeting-host/disconnect, /internal/connections/views, /internal/connections/start, /internal/connections/callback, /internal/connections/disconnect and /internal/side-effects/execute, and what each answers. Each route validates its own request and answer ($defs send_request and send_answer; user_request and status_answer; user_request and disconnect_answer; user_request and views_answer; start_request and start_answer; callback_request and callback_answer; connection_disconnect_request and connection_disconnect_answer; execute_request and execute_answer; error for any refusal) in both services; this root is any one of them. Every object is closed, and no field holds an access or refresh token, the client secret, a PKCE verifier, key material or a Meet link (ADR-0024 decision 4, ADR-0032 decision 3). Two fields carry a credential on purpose and nothing else does: callback_request.state and .code, the one-time values Google handed the browser (ADR-0035 LC-03; useless without the verifier and the client secret, which stay in tilo-connectors), and start_answer.authorize_url, the public part of the sign-in link. Ids travel in the body, never in a path or query. A route refuses a body over 65536 bytes (64 KiB) before it parses it. Rules that compare values (HB-03 the draft against its hash and the entry, HB-05 the owner, HB-07 the receipt against the entry, HB-09 the views against config/connectors.yaml, LC-05 the flow's person against the caller, LC-07 the items against the entry) are checked by the routes and by tilo-api's client, not by this schema. 1.1.0 adds views_answer, connection_view and scope; 1.2.0 adds the four live-connector routes' defs and the error codes start_again, not_granted and wrong_account (additive). 1.3.0 adds the three model-key routes of ADR-0041 decision 2 (Proposed and inert until config/byok.yaml enabled is true): /internal/model-keys/put, /internal/model-keys/remove and /internal/model-keys/status with the defs model_key_put_request and model_key_put_answer, model_key_remove_request and model_key_remove_answer, model_key_status_request and model_key_status_answer, and the error code key_refused (additive). model_key_put_request.key is the one more credential on this surface (BK-02): it is no-store and, like state and code above, nothing logs, stores or echoes it. /internal/model-keys/generate is model_call_rpc.schema.json's. 1.4.0 adds the read route of ADR-0048 (workspace tools): /internal/workspace/read with the defs read_request and read_answer, the tool names (read_tool), each tool's arguments (search_email_args, read_email_args, read_events_args, list_files_args, read_file_args, each self-contained so it is also the tool's input schema) and each tool's result (search_email_result, read_email_result, read_events_result, list_files_result, read_file_result, with mail_summary, mail_address, mail_attachment, calendar_item, drive_item, file_text and pdf_bytes); no new error code (additive). A read result is the person's own mail, calendar or Drive text: untrusted data, never instructions (WT-03).
  *
  * This interface was referenced by `TiloContracts`'s JSON-Schema
  * via the `definition` "MeetingHostRpc".
@@ -897,6 +897,8 @@ export type MeetingHostRpc =
   | MeetingHostRpcModelKeyRemoveAnswer
   | MeetingHostRpcModelKeyStatusRequest
   | MeetingHostRpcModelKeyStatusAnswer
+  | MeetingHostRpcReadRequest
+  | MeetingHostRpcReadAnswer
   | MeetingHostRpcError;
 /**
  * A PRD 10.4 context condition that raises any action to T3; also listed on the outbox entry it applies to (outbox.schema.json modifiers).
@@ -928,7 +930,7 @@ export type MeetingHostRpcParts = (MeetingHostRpcConnectionPart | MeetingHostRpc
  */
 export type MeetingHostRpcScope = string;
 /**
- * What the broker emitted during one call of a connect, disconnect or execute route, in order, nothing more (ADR-0032 decision 7, ADR-0035 decision 2): as parts, but a connection part may name any connector and may be connection.established. Every connection part names the call's own user (the request's user_id; evidence.world_owner for an execute); a part naming anyone else is not that call's, and tilo-api's client drops it. At most 16.
+ * What the broker emitted during one call of a connect, disconnect, execute or read route, in order, nothing more (ADR-0032 decision 7, ADR-0035 decision 2, ADR-0048): as parts, but a connection part may name any connector and may be connection.established. Every connection part names the call's own user (the request's user_id; evidence.world_owner for an execute); a part naming anyone else is not that call's, and tilo-api's client drops it. At most 16.
  *
  * @maxItems 16
  *
@@ -952,6 +954,35 @@ export type OrgModelKeySlot = "models";
  * via the `definition` "OrgModelKeyKey".
  */
 export type OrgModelKeyKey = string;
+/**
+ * The five read tools (ADR-0048 decision 1), each named after the connector action it runs: search_email and read_email (gmail, gmail.readonly), read_events (google_calendar, calendar.readonly, the primary calendar only), list_files and read_file (google_drive, drive.file: only files the person picked or Tilo saved).
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MeetingHostRpcReadTool".
+ */
+export type MeetingHostRpcReadTool =
+  "search_email" | "read_email" | "read_events" | "list_files" | "read_file";
+/**
+ * An address from a To or Cc header as Gmail gave it, cut to fit: data, never a recipient Tilo sends to.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MeetingHostRpcMailAddress".
+ */
+export type MeetingHostRpcMailAddress = string;
+/**
+ * A Drive file's text, cut at 32000 characters.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MeetingHostRpcFileText".
+ */
+export type MeetingHostRpcFileText = string;
+/**
+ * A PDF's bytes in standard base64 (at most 4 MiB decoded), one line.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MeetingHostRpcPdfBytes".
+ */
+export type MeetingHostRpcPdfBytes = string;
 /**
  * This interface was referenced by `TiloContracts`'s JSON-Schema
  * via the `definition` "MeetingRoomPersonText".
@@ -4856,6 +4887,256 @@ export interface MeetingHostRpcModelKeyStatusRequest {
 export interface MeetingHostRpcModelKeyStatusAnswer {
   state: "none" | "active" | "unverified" | "disabled";
   secret_version: number | null;
+}
+/**
+ * POST /internal/workspace/read (ADR-0048 decision 3): one read of the person's own Gmail, primary Google Calendar or Google Drive. user_id is the person whose own account is read (WT-01): for an agent's tool call in a run, the world's record owner, sent only for a world with no team share in force (ADR-0040); for another tilo-api feature of that person's own, the signed-in person, and only when the feature records each ok read as WT-05 does in a world that person owns; never from a demo session, and never one a model, a body, a path or a query names. tool is the connector action the tool is named after (config/connectors.yaml, T1 and gate none in config/autonomy.yaml) and args its arguments, already checked by tilo-api against that tool's args def. The route uses only the scope the tool's capability declares and answers read_answer. A body that breaks this contract, or a read_events window that does not end after it starts or spans more than 31 days (WT-02), is invalid_request.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MeetingHostRpcReadRequest".
+ */
+export interface MeetingHostRpcReadRequest {
+  user_id: UserId;
+  tool: MeetingHostRpcReadTool;
+  args:
+    | MeetingHostRpcSearchEmailArgs
+    | MeetingHostRpcReadEmailArgs
+    | MeetingHostRpcReadEventsArgs
+    | MeetingHostRpcListFilesArgs
+    | MeetingHostRpcReadFileArgs;
+}
+/**
+ * Search the person's Gmail. Newest first.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MeetingHostRpcSearchEmailArgs".
+ */
+export interface MeetingHostRpcSearchEmailArgs {
+  /**
+   * Gmail search words, for example: from:ana@example.org newer_than:7d is:unread
+   */
+  query: string;
+  /**
+   * At most this many messages; 10 when left out.
+   */
+  max_results?: number;
+}
+/**
+ * Read one Gmail message: its headers and its plain text.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MeetingHostRpcReadEmailArgs".
+ */
+export interface MeetingHostRpcReadEmailArgs {
+  /**
+   * The id search_email gave for the message.
+   */
+  message_id: string;
+}
+/**
+ * List the events on the person's own primary Google Calendar between start and end (at most 31 days).
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MeetingHostRpcReadEventsArgs".
+ */
+export interface MeetingHostRpcReadEventsArgs {
+  /**
+   * RFC 3339 date and time with an offset, for example 2026-10-17T00:00:00+05:30
+   */
+  start: string;
+  /**
+   * RFC 3339 date and time with an offset, after start.
+   */
+  end: string;
+  /**
+   * At most this many events; 50 when left out.
+   */
+  max_results?: number;
+}
+/**
+ * List the Google Drive files Tilo may read (files the person picked for Tilo, and files Tilo saved), newest first; with query, only those whose name or text contains it.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MeetingHostRpcListFilesArgs".
+ */
+export interface MeetingHostRpcListFilesArgs {
+  /**
+   * Words to look for in the file name or text.
+   */
+  query?: string;
+  /**
+   * At most this many files; 10 when left out.
+   */
+  max_results?: number;
+}
+/**
+ * Read one Google Drive file as text (a Google Doc, Sheet or Slides file, or a text file) or as a PDF.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MeetingHostRpcReadFileArgs".
+ */
+export interface MeetingHostRpcReadFileArgs {
+  /**
+   * The id list_files gave for the file.
+   */
+  file_id: string;
+}
+/**
+ * The 200 answer to POST /internal/workspace/read (ADR-0048 decision 3). tool repeats the request's. ok: result is that tool's result and connected_at the time the person's grant was made (HB-06), which tilo-api stamps as the person's consent in the read's data.transfer (WT-05); otherwise both are null. not_connected: no grant for the connector; missing_scope: the grant lacks the scope of the tool's capability (the person connects that capability, LC-06); expired: Google refused the grant at refresh (a connection.expired part says so); not_found: no such message, event or file, or one this grant cannot see (for Drive, a file the person did not pick, so the answer never says which); too_large: a PDF over 4 MiB; unsupported_type: a Drive file that is not a Google Doc, Sheet or Slides file, a text file or a PDF; unavailable: Google was slow, busy or failing, try later. parts lists what the broker emitted during the call. No answer carries a token, a link, an attachment's bytes, an event's description, location or guest addresses, or any field the result defs do not name.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MeetingHostRpcReadAnswer".
+ */
+export interface MeetingHostRpcReadAnswer {
+  tool: MeetingHostRpcReadTool;
+  outcome:
+    | "ok"
+    | "not_connected"
+    | "missing_scope"
+    | "expired"
+    | "not_found"
+    | "too_large"
+    | "unsupported_type"
+    | "unavailable";
+  connected_at: Timestamp | null;
+  result:
+    | MeetingHostRpcSearchEmailResult
+    | MeetingHostRpcReadEmailResult
+    | MeetingHostRpcReadEventsResult
+    | MeetingHostRpcListFilesResult
+    | MeetingHostRpcReadFileResult
+    | null;
+  parts: MeetingHostRpcConnectorParts;
+}
+/**
+ * search_email's result: at most 10 messages, newest first, each a summary (no body).
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MeetingHostRpcSearchEmailResult".
+ */
+export interface MeetingHostRpcSearchEmailResult {
+  /**
+   * @maxItems 10
+   */
+  messages: MeetingHostRpcMailSummary[];
+}
+/**
+ * One message as search_email lists it. sender, subject and snippet are the message's own words, cut to fit: untrusted data (WT-03). date is the Date header in UTC, null when it cannot be read.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MeetingHostRpcMailSummary".
+ */
+export interface MeetingHostRpcMailSummary {
+  id: string;
+  thread_id: string;
+  sender: string;
+  subject: string;
+  date: Timestamp | null;
+  snippet: string;
+  unread: boolean;
+}
+/**
+ * read_email's result: one message's headers and text. body_kind says where body_text came from: text (the message's text/plain part), html_stripped (no text part: its HTML with the tags taken out), none (neither; body_text is empty). body_text is cut at 20000 characters (truncated says so). attachments are names, types and sizes only: their bytes are never fetched. Every string is the message's own words: untrusted data (WT-03).
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MeetingHostRpcReadEmailResult".
+ */
+export interface MeetingHostRpcReadEmailResult {
+  id: string;
+  thread_id: string;
+  sender: string;
+  /**
+   * @maxItems 50
+   */
+  to: MeetingHostRpcMailAddress[];
+  /**
+   * @maxItems 50
+   */
+  cc: MeetingHostRpcMailAddress[];
+  subject: string;
+  date: Timestamp | null;
+  body_text: string;
+  body_kind: "text" | "html_stripped" | "none";
+  truncated: boolean;
+  /**
+   * @maxItems 20
+   */
+  attachments: MeetingHostRpcMailAttachment[];
+}
+/**
+ * An attachment as read_email names it: the sender's file name, its type and its size in bytes. Never its content.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MeetingHostRpcMailAttachment".
+ */
+export interface MeetingHostRpcMailAttachment {
+  filename: string;
+  mime_type: string;
+  size: number;
+}
+/**
+ * read_events' result: the events of the person's own primary calendar in the window, in time order, at most 50; truncated when more were there. Cancelled events, events the person declined and working locations are left out.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MeetingHostRpcReadEventsResult".
+ */
+export interface MeetingHostRpcReadEventsResult {
+  /**
+   * @maxItems 50
+   */
+  events: MeetingHostRpcCalendarItem[];
+  truncated: boolean;
+}
+/**
+ * One event as read_events lists it, the PE-13 fields only (the calendar adapter's field mask, FR-CAL-08): no description, location, conference link, organizer or guest address. title is cleaned like a calendar entry's title (clean_title, at most 140 characters) and stays untrusted data. An all-day event has dates (end exclusive, as Google gives it); any other has UTC times.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MeetingHostRpcCalendarItem".
+ */
+export interface MeetingHostRpcCalendarItem {
+  id: string;
+  title: string;
+  start: string;
+  end: string;
+  all_day: boolean;
+  attendee_count: number;
+}
+/**
+ * list_files' result: at most 10 Drive files Tilo may read, newest first.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MeetingHostRpcListFilesResult".
+ */
+export interface MeetingHostRpcListFilesResult {
+  /**
+   * @maxItems 10
+   */
+  files: MeetingHostRpcDriveItem[];
+}
+/**
+ * One Drive file as list_files lists it: id, the person's own file name (untrusted data), its type and when it last changed (UTC, null when Google gave none). Never a link, an owner, a sharing setting or a parent folder.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MeetingHostRpcDriveItem".
+ */
+export interface MeetingHostRpcDriveItem {
+  id: string;
+  name: string;
+  mime_type: string;
+  modified_at: Timestamp | null;
+}
+/**
+ * read_file's result. A Google Doc or Slides file comes as plain text, a Sheet as CSV (its first sheet, Drive's export), a text file (text/plain, text/csv, text/markdown, application/json) as its UTF-8 text: text is cut at 32000 characters (truncated says so) and pdf_b64 is null. A PDF (mime_type application/pdf, at most 4 MiB) comes as its bytes in base64 for the model to read natively, with text null and truncated false. Every string is the file's own words: untrusted data (WT-03).
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MeetingHostRpcReadFileResult".
+ */
+export interface MeetingHostRpcReadFileResult {
+  id: string;
+  name: string;
+  mime_type: string;
+  text: MeetingHostRpcFileText | null;
+  pdf_b64: MeetingHostRpcPdfBytes | null;
+  truncated: boolean;
 }
 /**
  * The body of every refusal on this surface, a fixed code and nothing else: unauthenticated (401, no valid ID token, HB-01), forbidden (403, any account but tilo-api's, HB-01), invalid_request (422, a body over 64 KiB, not JSON or not this contract's request; refused before anything acted) and not_configured (503, a setting is missing or a seam failed to build, or LIVE is not set on tilo-connectors; also 502 when Google's certificates cannot be had to check the token, which is retryable and never a final 401). Only /internal/connections/callback adds three, each 400: start_again (the state is unknown, spent, expired, another person's or lost with an instance, or Google did not accept the code, or the grant could not be saved; one text for all, so the answer says nothing about which, LC-05), not_granted (the person did not agree, or none of the access asked for was granted) and wrong_account (meeting_host only: the sign-in was a person's own account, not the bot's, MH-C1). Only /internal/model-keys/put adds one, 422: key_refused (the provider refused the key; no version was kept, ADR-0041 decision 2). Never a value, a setting's value or an exception's text.

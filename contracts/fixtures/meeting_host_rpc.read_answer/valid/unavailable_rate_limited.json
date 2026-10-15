@@ -1,0 +1,13 @@
+{
+  "tool": "search_email",
+  "outcome": "unavailable",
+  "connected_at": null,
+  "result": null,
+  "parts": [
+    {
+      "type": "connection.rate_limited",
+      "connector": "gmail",
+      "user_id": "u_owner"
+    }
+  ]
+}
