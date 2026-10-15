@@ -6,7 +6,6 @@
 // (NFR-01). No invented numbers, quotes or logos: the examples are lines of the recorded run, the skills are the ones
 // in the repository's skills/ folder, and the safety lines are what the policy engine and budgets do (PRD 9.4, 16).
 import type { ReactNode } from "react";
-import LandingStage, { RecordedStory } from "./LandingStage";
 import {
   AudiencesSection,
   ConnectorsSection,
@@ -17,6 +16,7 @@ import {
   TeamsSection,
   WhySection,
 } from "./LandingSections";
+import LandingStage, { RecordedStory } from "./LandingStage";
 import { Reveal } from "./Reveal";
 import { cityArt, helperArt } from "./landingKit";
 import "./landing.sections.css";
@@ -50,6 +50,50 @@ export default function LandingBody({
   const finalCity = frames[frames.length - 1]?.plan ?? null;
   return (
     <>
+      <div className="landing-prompt-wrap">
+        <form
+          className="landing-prompt"
+          onSubmit={(event) => {
+            event.preventDefault();
+            if (!busy) onGoogle();
+          }}
+        >
+          <span className="landing-prompt__helper" aria-hidden="true">
+            {helperArt({ role: "research", expr: "delighted" }, 46, night)}
+          </span>
+          <input
+            type="text"
+            aria-label="What do you want done?"
+            aria-describedby="landing-prompt-note"
+            placeholder="Describe one job…"
+            autoComplete="off"
+            disabled={busy}
+            onInput={() => {
+              if (!busy) onGoogle();
+            }}
+          />
+          <button type="submit" className="landing-btn landing-btn--secondary" disabled={busy}>
+            Try it <span aria-hidden="true">→</span>
+          </button>
+        </form>
+        <p id="landing-prompt-note">Sign in to turn your idea into a plan.</p>
+      </div>
+      <aside
+        className="landing-ticker"
+        // biome-ignore lint/a11y/noNoninteractiveTabindex: keyboard users need to scroll the highlights.
+        tabIndex={0}
+        aria-label="Highlights from the recorded example"
+      >
+        <span className="landing-ticker__label landing-mono">Recorded example</span>
+        <ul>
+          {[facts.planned, facts.budget, facts.done].filter(Boolean).map((fact) => (
+            <li key={fact}>
+              <span aria-hidden="true">✓</span>
+              {fact}
+            </li>
+          ))}
+        </ul>
+      </aside>
       <div className="landing-hero__stage">
         <LandingStage night={night} />
       </div>

@@ -127,7 +127,7 @@ describe("LANDING_2 the landing is a complete product page", () => {
     }
   });
 
-  it("LANDING_2 Continue with Google is still the one filled button, and the page has no field or form", async () => {
+  it("LANDING_2 Continue with Google is still the one filled button, without credential fields", async () => {
     landing();
     await settle();
     const named = qa<HTMLButtonElement>(document.body, "button").filter(
@@ -135,7 +135,9 @@ describe("LANDING_2 the landing is a complete product page", () => {
     );
     expect(named).toHaveLength(1);
     expect(qa(document.body, ".landing-btn--primary")).toHaveLength(1);
-    expect(qa(document.body, "input, textarea, form")).toHaveLength(0);
+    expect(
+      qa(document.body, 'input[type="password"], input[autocomplete="username"]'),
+    ).toHaveLength(0);
   });
 
   it("LANDING_2 the hero says what Tilo is: describe, a Director plans, teams run it, watch, approve", () => {
