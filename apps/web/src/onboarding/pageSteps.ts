@@ -23,6 +23,10 @@ const CONTENT: Record<PageId, [string, string]> = {
     "Explore skills",
     "Browse the skills available to agent teams and the history recorded for them.",
   ],
+  needs: [
+    "Answer what is waiting",
+    "Read what each answer does before you give it. Nothing is sent until you answer.",
+  ],
   ledger: [
     "Review recorded costs",
     "See recorded spend and decisions. Sample costs are not charges to your account.",

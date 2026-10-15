@@ -155,6 +155,7 @@ describe("WEB_CUTOVER_parkapp: navigation writes root paths", () => {
       "/",
       "/worlds",
       "/skills",
+      "/needs", // STUDIO-4
       "/ledger",
       "/agenda",
       "/team",

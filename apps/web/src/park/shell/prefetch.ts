@@ -5,6 +5,7 @@ import type { PageId } from "../app/AppCtx";
 const LOADERS: Partial<Record<PageId, () => Promise<unknown>>> = {
   worlds: () => import("../pages/Worlds/WorldsPage"),
   skills: () => import("../pages/Skills/SkillsPage"),
+  needs: () => import("../pages/Needs/NeedsPage"),
   ledger: () => import("../pages/Ledger/LedgerPage"),
   agenda: () => import("../pages/Agenda/AgendaPage"),
   team: () => import("../pages/Team/TeamPage"),

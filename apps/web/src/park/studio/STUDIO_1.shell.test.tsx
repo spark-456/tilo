@@ -176,6 +176,7 @@ describe("UI-STUDIO-1 nav: every destination is still reached", () => {
       ["Home", "/"],
       ["Worlds", "/worlds"],
       ["Skills", "/skills"],
+      ["Needs you", "/needs"], // STUDIO-4
       ["Ledger", "/ledger"],
       ["Agenda", "/agenda"],
       ["Team", "/team"],

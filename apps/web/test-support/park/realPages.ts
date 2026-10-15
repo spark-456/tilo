@@ -17,6 +17,7 @@ export const REAL_PAGES: readonly PageId[] = [
   "settings",
   "library",
   "more",
+  "needs",
 ];
 
 export const PLACEHOLDER_PAGES: readonly PageId[] = PAGE_IDS.filter(

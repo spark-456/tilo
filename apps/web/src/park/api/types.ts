@@ -46,6 +46,40 @@ export interface Decision {
   provide?: { cardId: string };
   /** Additive (not in the prototype): what the decision is about. Merged in `fixtures/index.ts`. */
   facts?: DecisionFacts;
+  /** STUDIO-4: what a live card serves beyond its title (Needs you shows it); absent on the fixture path. */
+  card?: DecisionCard;
+}
+
+/**
+ * STUDIO-4: the served fields of one live card (`GET /cards`), copied as they are. Needs you derives "if you say
+ * yes", "if you say no" and "exactly what will be sent" from these alone; nothing here is written by the web.
+ */
+export interface DecisionCard {
+  id: string;
+  kind: "needs_you" | "gate" | "consent" | "meeting";
+  why: string;
+  options: {
+    id: string;
+    label: string;
+    suggested: boolean;
+    reason?: string;
+    irreversible: boolean;
+  }[];
+  safeDefault: string;
+  createdAt: string;
+  /** Seconds after `createdAt` when the safe default applies. */
+  timeout: number;
+  /** The card offers "Show me" (the item it pins can be read). */
+  showMe: boolean;
+  gate: {
+    exact: string;
+    recipients: string[];
+    /** The pinned draft or file's label, if any. */
+    item: string | null;
+    irreversible: boolean;
+    riskTier: string;
+  } | null;
+  consent: { connector: string; scopes: string[] } | null;
 }
 
 /**

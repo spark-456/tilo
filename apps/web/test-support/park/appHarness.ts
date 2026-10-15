@@ -20,6 +20,7 @@ export const PAGE_LABEL: Record<PageId, string> = {
   connectors: "Connectors",
   settings: "Settings",
   library: "Library",
+  needs: "Needs you",
 };
 
 export type SpyApi = Api & {

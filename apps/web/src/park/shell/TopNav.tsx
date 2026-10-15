@@ -1,5 +1,5 @@
 // The top nav (README "Shell > Nav"; reference `Tilo App.dc.html` header): a fixed glass bar with the logo,
-// six tabs (an amber badge on Worlds while decisions wait), the day and night toggle, the bell (an amber dot
+// seven tabs (an amber badge on Needs you while decisions wait, STUDIO-4), the day and night toggle, the bell (an amber dot
 // until the notifications are read) and the AM avatar (ringed in the hero colour on Profile and
 // Connectors). The 3px progress bar on its bottom edge follows the world loader and the page swap: it fades
 // with its opacity and fills with a scaleX (the stylesheet times both).
@@ -16,6 +16,7 @@ const TABS: readonly (readonly [PageId, string])[] = [
   ["home", "Home"],
   ["worlds", "Worlds"],
   ["skills", "Skills"],
+  ["needs", "Needs you"],
   ["ledger", "Ledger"],
   ["agenda", "Agenda"],
   ["team", "Team"],
@@ -127,7 +128,7 @@ export function TopNav(p: TopNavProps) {
                   onFocus={() => prefetchPage(id)}
                 >
                   {label}
-                  {id === "worlds" && p.needsLeft > 0 ? (
+                  {id === "needs" && p.needsLeft > 0 ? (
                     <span className="park-shell__badge">{p.needsLeft}</span>
                   ) : null}
                 </a>
@@ -192,7 +193,7 @@ export function TopNav(p: TopNavProps) {
           items={TABS.map(([id, label]) => {
             const on = current?.[0] === id;
             const waiting =
-              id === "worlds" && p.needsLeft > 0
+              id === "needs" && p.needsLeft > 0
                 ? `${p.needsLeft} decision${p.needsLeft === 1 ? "" : "s"}`
                 : "";
             const hint = [on ? "Current page" : "", waiting].filter(Boolean).join(" · ");
