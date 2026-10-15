@@ -40,6 +40,11 @@ class RetryableError(ProviderError):
     """Transient server-side failure (5xx, timeout, connection error). Safe to retry."""
 
 
+class AttemptTimeoutError(RetryableError):
+    """One attempt did not answer within its share of the caller's deadline (`Router.generate(deadline=...)`). The
+    router records it like any retryable failure and falls back on the cascade."""
+
+
 class RequestError(ProviderError):
     """The request itself was rejected (other 4xx). Retrying unchanged will not help."""
 

@@ -98,7 +98,11 @@ describe("FR_UX_13 live Api: startWorld is the real intake call", () => {
       expect(err).toBeInstanceOf(TiloApiError);
       expect(err).toMatchObject({ ...want, write: true });
       expect((err as Error).message).not.toContain("10.0.0.7");
-      expect(fetchSpy, "a write is never retried by itself").toHaveBeenCalledTimes(1);
+      // NFR-03: only a lost reply (no status) is asked once more, by the intake's own Idempotency-Key; a reply the
+      // server did send is never retried by itself.
+      expect(fetchSpy, "a sent refusal is never retried by itself").toHaveBeenCalledTimes(
+        want.status === null ? 2 : 1,
+      );
     },
   );
 

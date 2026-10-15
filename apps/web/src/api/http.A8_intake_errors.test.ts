@@ -1,7 +1,7 @@
 // A8 / NFR-22 (14 Oct): what a person reads when POST /intake is refused or does not answer. The server's wire
 // shapes are services/api/src/tilo_api/intake.py (429 demo_runs_busy, 409 committed). The 503 causes have their
 // fixed copy in http.NFR-22.test.ts (W1). Codes are never shown as they are; a reply that never comes
-// ends after INTAKE_TIMEOUT_MS with a plain message that keeps the idempotency key (a retry is the same intent).
+// ends after INTAKE_TIMEOUT_MS (asked once more with the same key, NFR-03) with a plain message that keeps the idempotency key (a retry is the same intent).
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { HttpClient, INTAKE_TIMEOUT_MS, type TiloApiError } from "./http";
 
@@ -66,6 +66,7 @@ describe("A8_intake_timeout: a reply that never comes ends", () => {
     const client = new HttpClient({ baseUrl: "http://api.test", fetch: fetchFn });
     const pending = failure(send(client));
     await vi.advanceTimersByTimeAsync(INTAKE_TIMEOUT_MS + 1);
+    await vi.advanceTimersByTimeAsync(INTAKE_TIMEOUT_MS + 1); // NFR-03: one more ask with the same key before giving up
     const e = await pending;
     expect(e.message).toMatch(/taking too long/i);
     expect(e.retryable).toBe(true);
@@ -73,8 +74,9 @@ describe("A8_intake_timeout: a reply that never comes ends", () => {
     // a manual retry of the same text is the same intent: the same Idempotency-Key goes out again
     const again = failure(send(client));
     await vi.advanceTimersByTimeAsync(INTAKE_TIMEOUT_MS + 1);
+    await vi.advanceTimersByTimeAsync(INTAKE_TIMEOUT_MS + 1);
     await again;
-    expect(keys).toHaveLength(2);
-    expect(keys[1]).toBe(keys[0]);
+    expect(keys).toHaveLength(4);
+    expect(new Set(keys).size).toBe(1);
   });
 });

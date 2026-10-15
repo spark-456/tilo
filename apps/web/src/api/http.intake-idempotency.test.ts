@@ -53,7 +53,14 @@ describe("FR-INT-01 intake idempotency follow-up", () => {
   });
 
   it("keeps the opaque key after network, server and unreadable reply failures with unchanged File references", async () => {
-    const s = setup(new Error("offline"), reply({}, 503), new Response("broken"), accepted());
+    // NFR-03: a lost reply (offline) is asked once more with the same key, so it uses two fetches here.
+    const s = setup(
+      new Error("offline"),
+      new Error("offline"),
+      reply({}, 503),
+      new Response("broken"),
+      accepted(),
+    );
     const file = new File(["source"], "source.txt");
     for (let i = 0; i < 3; i++) {
       await expect(s.client.submitIntake("Task", [file])).rejects.toMatchObject({
@@ -62,16 +69,21 @@ describe("FR-INT-01 intake idempotency follow-up", () => {
     }
     await s.client.submitIntake("Task", [file]);
     expect(s.key(0)).toMatch(/^[a-f0-9-]{36}$/);
-    expect([s.key(1), s.key(2), s.key(3)]).toEqual([s.key(0), s.key(0), s.key(0)]);
-    expect(s.headers(3).get("Authorization")).toBe("Bearer test.token");
-    expect(s.headers(3).get("X-Firebase-AppCheck")).toBe("test.appcheck");
-    expect(s.headers(3).has("content-type")).toBe(false);
-    expect(s.fetch.mock.calls[3]?.[1]?.body).toBeInstanceOf(FormData);
-    expect(s.fetch).toHaveBeenCalledTimes(4);
+    expect([s.key(1), s.key(2), s.key(3), s.key(4)]).toEqual([
+      s.key(0),
+      s.key(0),
+      s.key(0),
+      s.key(0),
+    ]);
+    expect(s.headers(4).get("Authorization")).toBe("Bearer test.token");
+    expect(s.headers(4).get("X-Firebase-AppCheck")).toBe("test.appcheck");
+    expect(s.headers(4).has("content-type")).toBe(false);
+    expect(s.fetch.mock.calls[4]?.[1]?.body).toBeInstanceOf(FormData);
+    expect(s.fetch).toHaveBeenCalledTimes(5);
   });
 
   it("starts a new key for changed text, file identity, file order or Quick/Thinking mode", async () => {
-    const s = setup(...Array.from({ length: 6 }, () => new Error("offline")));
+    const s = setup(...Array.from({ length: 12 }, () => new Error("offline"))); // Thinking asks twice, Quick once
     const a = new File(["a"], "same.txt");
     const b = new File(["b"], "same.txt");
     await s.client.submitIntake("One", [a, b]).catch(() => undefined);
@@ -80,7 +92,9 @@ describe("FR-INT-01 intake idempotency follow-up", () => {
     await s.client.submitIntake("Two", [b, new File(["a"], "same.txt")]).catch(() => undefined);
     await s.client.submitIntake("Two", [b, a], "quick").catch(() => undefined);
     await s.client.submitIntake("Two", [b, a]).catch(() => undefined);
-    expect(new Set(Array.from({ length: 6 }, (_, i) => s.key(i))).size).toBe(6);
+    const keys = s.fetch.mock.calls.map((_, i) => s.key(i));
+    expect(keys).toHaveLength(11);
+    expect(new Set(keys).size).toBe(6);
   });
 
   it("starts a fresh key after success or a definite refusal", async () => {

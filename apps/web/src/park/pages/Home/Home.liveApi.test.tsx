@@ -189,7 +189,8 @@ describe("FR_UX_13 live composer over the real live Api", () => {
       expect(rig.store.getState().added).toHaveLength(0);
       expect(rig.store.getState().toast?.actionLabel).not.toBe("Open");
       expect(taskInput(rig.el).value).toBe("Compare three suppliers");
-      expect(intakes()).toHaveLength(1);
+      // NFR-03: a lost reply (no status) is asked once more by the intake's own Idempotency-Key; a sent refusal is not.
+      expect(intakes()).toHaveLength(_name === "a network failure" ? 2 : 1);
     },
   );
 });
