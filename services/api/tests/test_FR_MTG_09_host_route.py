@@ -34,7 +34,7 @@ from _mtg09b_lib import (
     meeting,
     person,
 )
-from _ppl11a_lib import DEV, MEERA, OTHER_ORG, run_threads
+from _ppl11a_lib import DEV, MEERA, OTHER_ORG, STANDARD_PERSONS, run_threads
 from _ppl11c_lib import assert_gated, assert_unwired_is_503, gone_meeting, refusals
 
 
@@ -145,7 +145,10 @@ def _window(end: str | None, start: str = T_START) -> dict:
 
 
 def _persons_p(count: int) -> list[dict]:
-    return [person(f"u_p{n:02d}", f"p{n:02d}@example.com") for n in range(count)]
+    return [
+        {**person(f"u_p{n:02d}", f"p{n:02d}@example.com"), "memberships": STANDARD_PERSONS[PRIYA]["memberships"]}
+        for n in range(count)
+    ]
 
 
 def _many(count: int) -> dict:
@@ -165,17 +168,7 @@ def _refusal_cases() -> list:
         pytest.param("MH-02", {"meeting": _window(None)}, id="MH-02-no-end"),
         pytest.param("MH-02", {"now": T_START}, id="MH-02-start-not-after-now"),
         pytest.param("MH-02", {"now": "2030-01-15T09:30:00.000Z"}, id="MH-02-already-started"),
-        pytest.param(
-            "MH-03", {"meeting": meeting(attendees=attendees_of(OWNER, "u_ghost"))}, id="MH-03-no-person-record"
-        ),
-        pytest.param(
-            "MH-03",
-            {
-                "people": [person("u_far", "far@example.net", org=OTHER_ORG)],
-                "meeting": meeting(attendees=attendees_of(OWNER, "u_far")),
-            },
-            id="MH-03-other-org",
-        ),  # fmt: skip
+        # FR-MTG PE-15 now drops missing and other-org attendee links before the MH-03 adapter check.
         # MH-03 "two users share an address" has no API case any more: the people store reserves an address per person
         # (phase0-stack) and the route lists a repeated person once, so the state cannot be built here. The rule stays
         # covered in services/connectors (test_FR_MTG_09_MH_03_two_users_with_one_address_NFKC_casefold_refuse).

@@ -3,6 +3,7 @@
 import copy
 
 import pytest
+from _mtg09b_lib import HostRig
 from _ppl11a_lib import ATTEST, EARLY, NOW, OTHER_ORG, OWNER, PRIYA, SAM, conforms
 from _ppl11c_lib import meeting_rig
 
@@ -103,3 +104,57 @@ def test_FR_MTG_08_PE_15_email_matches_before_redaction_and_only_sanitized_name_
     response = _write(rig, "create", [{"name": "priya@example.com"}])
     assert response.status_code == 201
     assert response.json()["attendees"] == [{"name": "[removed]", "user": PRIYA}]
+
+
+def test_FR_MTG_PE_15_create_refuses_unknown_actor_before_directory_list(people_rig):
+    rig = meeting_rig(people_rig)
+    rig.as_user("u_absent")
+    rig.store_calls.clear()
+    response = _write(rig, "create", [{"name": "priya@example.com"}])
+    assert response.status_code == 403
+    assert ("person", "list", rig.org) not in rig.store_calls
+
+
+def test_FR_MTG_PE_15_cleaned_email_name_is_resolved(people_rig):
+    rig = meeting_rig(people_rig)
+    response = _write(rig, "create", [{"name": "pri\u200bya@example.com"}])
+    assert response.status_code == 201
+    assert response.json()["attendees"] == [{"name": "priya@example.com", "user": PRIYA}]
+
+
+def test_FR_MTG_PE_15_edit_drops_link_after_teammate_leaves(people_rig):
+    rig = meeting_rig(people_rig)
+    target = rig.stored("persons", PRIYA)
+    target["memberships"] = []
+    _replace(rig, target)
+    response = _write(rig, "edit", [{"name": "Priya"}])
+    assert response.status_code == 200
+    assert response.json()["attendees"] == [{"name": "Priya", "user": None}]
+
+
+@pytest.mark.parametrize("state", ["left_team", "missing", "other_org"])
+def test_FR_MTG_PE_15_host_drops_stale_attendee_link(people_rig, monkeypatch, state):
+    from tilo_api import meeting_host
+
+    hr = HostRig(people_rig())
+    target = hr.rig.stored("persons", PRIYA)
+    if state == "left_team":
+        target["memberships"] = []
+        _replace(hr.rig, target)
+    else:
+        hr.rig.real.persons.delete(hr.rig.org, PRIYA, expected_version=hr.rig.version_of("persons", PRIYA))
+        if state == "other_org":
+            target["org_id"] = OTHER_ORG
+            hr.rig.real.persons.create(target)
+    seen = []
+    original = meeting_host.draft_meeting_event
+
+    def capture(*, meeting, **kwargs):
+        seen.extend(meeting["attendees"])
+        return original(meeting=meeting, **kwargs)
+
+    monkeypatch.setattr(meeting_host, "draft_meeting_event", capture)
+    response = hr.host()
+    assert response.status_code == 200, response.text
+    hr.wait_gate()
+    assert next(a for a in seen if a["name"] == "Priya")["user"] is None

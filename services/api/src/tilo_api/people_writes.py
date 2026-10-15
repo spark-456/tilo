@@ -261,11 +261,15 @@ class Writer:
         character cannot hide a link from the redactor or the schema), then the secret redactor, then the schema.
         ASCII controls are never stripped or joined: the schema refuses them (a line break is a 422), and the
         redactor's output is checked again, since one that removes a multi-line block could otherwise hide them."""
-        cleaned = _unhide("".join(c for c in value if c.isascii() or clean_line(c)))
+        cleaned = self.cleaned(value)
         redacted = self.redact(cleaned)
         if _ASCII_CONTROL.search(redacted):
             raise Refusal(422, "invalid_record")
         return redacted
+
+    @staticmethod
+    def cleaned(value: str) -> str:
+        return _unhide("".join(c for c in value if c.isascii() or clean_line(c)))
 
     def stamp(self) -> dict[str, str]:
         return {"by": self.actor, "at": self.now}
@@ -476,15 +480,21 @@ def meeting_attendees(
     w: Writer, attendees: list[AttendeeIn], known: Mapping[str, Any] | None = None
 ) -> list[dict[str, Any]]:
     """PE-15/PE-20: exact email lookup in the owner's current team directory, never model identity.
-    Legacy captions keep their stored link; an email input is always resolved afresh. ADR-0044 membership
-    checks need the whole org, read once only when an address is present. Only sanitized captions are stored.
+    Legacy captions keep their link while the person remains a teammate; email inputs resolve afresh. ADR-0044
+    membership checks use the org directory, read once when a link or address needs checking. Only sanitized captions
+    are stored.
     """
     directory: Directory | None = None
     result = []
     for attendee in attendees:
         name = w.text(attendee.name)
-        address = attendee.email if attendee.email is not None else attendee.name
+        address = attendee.email if attendee.email is not None else w.cleaned(attendee.name)
         user = (known or {}).get(name) if attendee.email is None else None
+        if user is not None and user != w.actor:
+            if directory is None:
+                directory = w.org_directory()
+            if not directory.teammates(w.actor, user, w.now):
+                user = None
         if valid_email(address):
             if directory is None:
                 directory = w.org_directory()
@@ -492,7 +502,7 @@ def meeting_attendees(
                 person["id"]
                 for person in directory.persons.values()
                 if person["org_id"] == w.org
-                and person["email"].casefold() == address.casefold()
+                and person["email"].lower() == address.lower()
                 and (person["id"] == w.actor or directory.teammates(w.actor, person["id"], w.now))
             ]
             user = matches[0] if len(matches) == 1 else None
@@ -511,7 +521,7 @@ def create_meeting(w: Writer, body: MeetingIn) -> dict[str, Any]:
         "series": None if body.series is None else r(body.series),
         "scheduled": body.scheduled and body.scheduled.model_dump(),
         "agenda": [{"title": r(a.title), "minutes": a.minutes} for a in body.agenda],
-        "attendees": meeting_attendees(w, body.attendees),
+        "attendees": [{"name": r(a.name), "user": None} for a in body.attendees],
         "attestation": {**w.stamp(), "notice_version": deps.NOTICE_VERSION},
         "source": body.source,
         "status": "scheduled",
@@ -523,7 +533,13 @@ def create_meeting(w: Writer, body: MeetingIn) -> dict[str, Any]:
         "delete_minutes_after": None,
         "created_at": w.now,
     }
-    return w.create("meeting", record, w.stores.meetings, w.directory())
+
+    def resolve_attendees() -> None:
+        record["attendees"] = meeting_attendees(w, body.attendees)
+        if not conforms("meeting.schema.json", record):
+            raise Refusal(422, "invalid_record")
+
+    return w.create("meeting", record, w.stores.meetings, w.directory(), also=resolve_attendees)
 
 
 def _person_record(w: Writer, body: PersonIn, record_id: str, role: str) -> dict[str, Any]:

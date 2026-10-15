@@ -31,7 +31,7 @@ from typing import Any
 
 from _clint1_lib import registered_event_types, seam
 from _clint2_lib import SKILLS_ROOT, ArtifactRig, ClearModel, StreamWriter, layout_for, wait_for
-from _ppl11a_lib import DEV, MEERA, ORG, OWNER, PRIYA, SAM, Rig
+from _ppl11a_lib import DEV, MEERA, ORG, OWNER, PRIYA, SAM, STANDARD_PERSONS, Rig
 from tilo_connectors import InMemoryOutboxStore
 from tilo_connectors.registry import load_registry
 
@@ -397,6 +397,10 @@ class HostRig:
         self.store = rig.event_store
         self.store.worlds[WORLD] = deps.WorldRecord(owner=OWNER, districts={}, run_id=RUN)
         rig.add_people()
+        # The host fixture expects Sam to be invited: make that stored link a current teammate (ADR-0044).
+        sam = rig.stored("persons", SAM)
+        sam["memberships"] = copy.deepcopy(STANDARD_PERSONS[PRIYA]["memberships"])
+        rig.real.persons.replace(sam, expected_version=rig.version_of("persons", SAM))
         if with_meeting:
             rig.add("meetings", meeting())
         rig.as_user(OWNER)

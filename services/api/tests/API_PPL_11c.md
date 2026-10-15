@@ -214,9 +214,11 @@ world id, owner only) with its own tests there; these tests pin only the HTTP be
   write the person may write again; another principal is unaffected. Time is `deps.get_clock`, and the counter belongs to
   the install's people stores (a fresh `PeopleStores` starts at zero), never to module state, so tests do not leak into one
   another.
-* **No whole-org directory per write:** create meeting, create work item, both confirms and every S1/S2/S6 write read the
-  actor's person record by id (at most two person records) and never call `persons.list`. Directory writes (create person,
-  first person, memberships, roles) may list because uniqueness and membership need it.
+* **Directory reads after authorization:** create meeting reads the actor's person by id first. If an attendee supplies
+  an email-shaped name or an explicit email, it lists the directory only after `check_write` permits the create, then
+  resolves a link only to the owner or a current accepted teammate. An edit checks a retained link against the same
+  directory and drops it when that person is no longer a teammate. Create work item, both confirms and other S1/S2/S6
+  writes read the actor by id and never call `persons.list`. Directory writes may list for uniqueness and membership.
 * **no-store on every answer**, including 401, the SEC-15 gate's 403, a path or query validation 422, 413, 415 and 429.
 * **Dev CORS:** `dev.install` allows the `Idempotency-Key` request header and exposes `Retry-After`.
 

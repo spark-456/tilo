@@ -309,6 +309,13 @@ def host_meeting(w: Writer, meeting_id: str, seams: HostSeams) -> dict[str, Any]
         raise Refusal(409, "not_hostable")
     if world.paused or world_id in seams.store.runs:
         raise Refusal(409, "already_hosted")
+    directory = w.org_directory()
+    meeting["attendees"] = [
+        {**attendee, "user": user if user == w.actor or directory.teammates(w.actor, user, w.now) else None}
+        if (user := attendee["user"]) is not None
+        else attendee
+        for attendee in meeting["attendees"]
+    ]
     users = dict.fromkeys([meeting["owner"], *(a["user"] for a in meeting["attendees"] if a["user"] is not None)])
     persons = {u: dict(p.record) for u in users if (p := w.stores.persons.get(w.org, u)) is not None}
     try:
@@ -331,11 +338,12 @@ def host_meeting(w: Writer, meeting_id: str, seams: HostSeams) -> dict[str, Any]
         bool
     ):  # at approval: the meeting is still the owner's, scheduled, and every invitee is a person
         now = w.stores.meetings.get(w.org, meeting_id)
-        return (
-            now is not None
-            and (now.record.get("owner"), now.record.get("status")) == (w.actor, "scheduled")
-            and all(w.stores.persons.get(w.org, u) is not None for u in draft.invited)
-        )
+        if now is None or (now.record.get("owner"), now.record.get("status")) != (w.actor, "scheduled"):
+            return False
+        directory = w.org_directory()
+        if directory.record(w.actor) is None:
+            return False
+        return all(u == w.actor or directory.teammates(w.actor, u, w.now) for u in draft.invited)
 
     run = HostRun(seams, task, draft, still_hosted)
     with seams.store.runs_guard:  # two requests at once make one run
