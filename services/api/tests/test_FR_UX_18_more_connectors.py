@@ -1,6 +1,7 @@
 """FR-UX-18 setup catalogue: no invented OAuth connection or token exposure."""
 
 import pytest
+from fastapi import Response
 from tilo_api import deps
 from tilo_api.connectors_list import connectors_route
 from tilo_connectors.mcp import McpClient, McpServerNotAllowed, load_allowlist
@@ -16,7 +17,7 @@ def test_FR_UX_18_declared_oauth_card_is_unconnected_until_workspace_setup(conne
     assert declared["actions"][0]["risk_tier"] == "T3"
     assert declared["actions"][0]["gate_type"] == "approval"
     response = connectors_route(
-        deps.Principal(user_id="u_owner", role="owner", world_id=None, channel="web"), registry, None
+        Response(), deps.Principal(user_id="u_owner", role="owner", world_id=None, channel="web"), registry, None
     )
     row = next(r for r in response["connectors"] if r["id"] == connector)
     assert row["state"] == "available" and row["state_known"] is False
