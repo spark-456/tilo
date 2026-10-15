@@ -14,6 +14,7 @@ import { prefetchPage } from "./prefetch";
 
 const TABS: readonly (readonly [PageId, string])[] = [
   ["home", "Home"],
+  ["chat", "Chat"],
   ["worlds", "Worlds"],
   ["skills", "Skills"],
   ["ledger", "Ledger"],

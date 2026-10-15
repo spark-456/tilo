@@ -174,6 +174,7 @@ describe("UI-STUDIO-1 nav: every destination is still reached", () => {
       ]),
     ).toEqual([
       ["Home", "/"],
+      ["Chat", "/chat"],
       ["Worlds", "/worlds"],
       ["Skills", "/skills"],
       ["Ledger", "/ledger"],

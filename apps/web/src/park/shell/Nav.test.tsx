@@ -28,6 +28,7 @@ afterEach(() => {
 
 const TABS = [
   ["Home", "/"],
+  ["Chat", "/chat"],
   ["Worlds", "/worlds"],
   ["Skills", "/skills"],
   ["Ledger", "/ledger"],

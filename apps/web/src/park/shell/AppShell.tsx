@@ -38,6 +38,7 @@ import { loadShellFonts } from "./fonts";
 import { type Bar, useLeavingCard, useMotionOff, usePageSwap } from "./motion";
 import { useParkTour } from "./tour";
 import "./park.shell.css";
+import { TiloBubble } from "./TiloBubble";
 import { backdropScene } from "./scene";
 
 const SIGN_OUT = "This is a prototype, so you stay signed in";
@@ -339,6 +340,10 @@ export function AppShell({ children }: { children: ReactNode }) {
         />
       ) : null}
       <RunBar />
+      {/* UI-STUDIO-2: the Tilo bubble on every page but Chat, which is the same conversation full size */}
+      {ready && page !== null && page !== "chat" ? (
+        <TiloBubble page={page} vw={app.vw} vh={app.vh} go={navTo} />
+      ) : null}
       {card ? (
         <WorldLoader
           launch={card}
