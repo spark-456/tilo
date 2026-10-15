@@ -17,6 +17,22 @@ export function cityArt(plan: Plan, _planId: string, _dec: Dec, night: boolean):
   return cachedCity(plan, night, (p, n) => parkKit().TP.world(p, { night: n }) as ReactNode);
 }
 
+const labelled = new Map<string, ReactNode>();
+/**
+ * The World page's own, larger map (WORLD-DESIGN, design/studio-v2 "Tilo S World": `R.city(.., { labels, tags })`): the
+ * same plan with its building names (`labels`, wide maps only) and district tags drawn by the engine from the plan's
+ * own names. Kept apart from `cityArt`, whose picture the Worlds cards share without words.
+ */
+export function labelledCityArt(plan: Plan, night: boolean, labels: boolean): ReactNode {
+  const key = `${night ? "n" : "d"}${labels ? "l" : "s"}|${JSON.stringify(plan)}`;
+  const known = labelled.get(key);
+  if (known) return known;
+  const picture = parkKit().TP.world(plan, { night, labels, tags: true }) as ReactNode;
+  labelled.set(key, picture);
+  if (labelled.size > 8) labelled.delete(labelled.keys().next().value as string);
+  return picture;
+}
+
 /** A Town's row of buildings, drawn side by side, each tucked 40px under the one before. */
 export function rowArt(row: NonNullable<World["row"]>, night: boolean): ReactNode {
   const kit = parkKit();

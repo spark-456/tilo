@@ -1,7 +1,7 @@
 // STUDIO-3 (design/studio-v2 "Tilo S World.dc.html"): the three tabs beside the city. Story is what the team did, in
 // plain words from the recorded events; Steps is the plan in order; Result is the delivered output. A tab with
 // nothing recorded says so; nothing here moves or is filled in.
-import { type KeyboardEvent, type ReactNode, useRef } from "react";
+import { type KeyboardEvent, type ReactNode, useLayoutEffect, useRef, useState } from "react";
 import { cx } from "../../components/cx";
 import { type RunStep, clockOf, runSteps, storyOf } from "./runSteps";
 import type { RunEvent } from "./useRunEvents";
@@ -69,6 +69,39 @@ export function WorldTabs({
   );
 }
 
+/**
+ * The scrolling body of a panel (WORLD-DESIGN). When its content is taller than the panel it can be reached by keyboard
+ * (a labelled region in the tab order) and a soft fade at the bottom edge says there is more, so a long item is never
+ * cut off mid-line without a hint; at the very end the fade goes. Measured from the DOM on each render and scroll.
+ */
+function PanelBody({ label, children }: { label: string; children: ReactNode }) {
+  const body = useRef<HTMLDivElement>(null);
+  const [edge, setEdge] = useState({ scrolls: false, end: true });
+  const measure = () => {
+    const el = body.current;
+    if (!el) return;
+    const scrolls = el.scrollHeight > el.clientHeight + 1;
+    const end = !scrolls || el.scrollHeight - el.scrollTop - el.clientHeight < 4;
+    setEdge((p) => (p.scrolls === scrolls && p.end === end ? p : { scrolls, end }));
+  };
+  useLayoutEffect(measure);
+  return (
+    <>
+      <div
+        ref={body}
+        className="park-world-panelbody"
+        onScroll={measure}
+        {...(edge.scrolls
+          ? { role: "region", "aria-label": `${label}, scroll for more`, tabIndex: 0 }
+          : {})}
+      >
+        {children}
+      </div>
+      {edge.scrolls && !edge.end ? <div className="park-world-fade" aria-hidden="true" /> : null}
+    </>
+  );
+}
+
 /** One tab panel: every panel stays in the page (hidden when not chosen), so switching moves nothing else. */
 export function TabPanel({
   tab,
@@ -99,7 +132,7 @@ export function TabPanel({
         <span className="park-world-panelsub">{sub}</span>
         {aside ? <span className="park-world-panelaside">{aside}</span> : null}
       </div>
-      <div className="park-world-panelbody">{children}</div>
+      <PanelBody label={title}>{children}</PanelBody>
     </div>
   );
 }

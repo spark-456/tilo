@@ -832,8 +832,22 @@
   align-items: flex-start;
 }
 
-/* Phone targets: lens tabs and level links are at least 44 px high (UX-1). */
+/* Phone targets: lens tabs and level links are at least 44 px high (UX-1). WORLD-DESIGN: World / Story / Trace /
+   Delivery stay one row that scrolls sideways (never wrapped onto two lines); its links are focusable, so the row is
+   reachable by keyboard. */
 @media (max-width: 767px) {
+  [data-park] .park-view-tabs {
+    display: flex;
+    flex-wrap: nowrap;
+    width: 100%;
+    max-width: 100%;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+  }
+  [data-park] .park-view-tab {
+    flex: none;
+    white-space: nowrap;
+  }
   [data-park] .park-view-tab {
     min-height: 44px;
   }

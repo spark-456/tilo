@@ -39,6 +39,7 @@ import { Button, PageSheet } from "../../components";
 import { SampleBadge, SampleNote } from "../../sample/SampleBadge";
 import { icon } from "../../shell/kit";
 import { Activity, Districts, Result, RunHistory } from "./Lower";
+import { MapToast, ZoomableMap, latestLine } from "./MapChrome";
 import { MeetingHall } from "./MeetingHall";
 import {
   EmptyPanel,
@@ -61,7 +62,8 @@ import { runProgress } from "./runProgress";
 import { runView } from "./runView";
 import { useRunEvents } from "./useRunEvents";
 import "./World.css";
-import { cityArt, rowArt, singleArt } from "./worldArt";
+import "./World.studio.css";
+import { labelledCityArt, rowArt, singleArt } from "./worldArt";
 import {
   LEGEND,
   STOPPED,
@@ -148,7 +150,8 @@ function MapArt({
 }: { w: World; plans: Record<string, Plan>; app: AppCtx }): ReactNode {
   if (w.tier === "City") {
     const plan = w.plan ? plans[w.plan] : undefined;
-    return w.plan && plan ? cityArt(plan, w.plan, app.dec, app.night) : null;
+    // Building names on a map wide enough to read them (the artboard's labelled city); district tags always.
+    return w.plan && plan ? labelledCityArt(plan, app.night, (app.vw || 1440) >= 760) : null;
   }
   return (
     <div className="park-world-bigart">
@@ -434,6 +437,8 @@ export function WorldPage({ app }: { app: AppCtx }) {
       ? `${w.spend} spent so far${w.of ? ` · ${w.of}` : ""}`
       : "";
   const steps = trackRun ? stepsCount(runEvents) : null;
+  // WORLD-DESIGN: the artboard's card on the map says the newest recorded line, or nothing.
+  const toastLine = latestLine(trackRun ? runEvents : null, w.activity);
   const shown: WorldTab = tab ?? (view?.deliverable ? "result" : "story");
   const delivered = trackRun && view !== null && view.deliverable;
 
@@ -669,6 +674,10 @@ export function WorldPage({ app }: { app: AppCtx }) {
           <div className={isCity ? "park-world-map" : "park-world-map park-world-map--art"}>
             {trackRun ? (
               <RecordedWorldArt events={runEvents} />
+            ) : isCity ? (
+              <ZoomableMap key={w.id} controls={Boolean(w.plan && loaded.plans[w.plan])}>
+                <MapArt w={w} plans={loaded.plans} app={app} />
+              </ZoomableMap>
             ) : (
               <MapArt w={w} plans={loaded.plans} app={app} />
             )}
@@ -713,6 +722,7 @@ export function WorldPage({ app }: { app: AppCtx }) {
               </div>
             ) : null}
           </div>
+          {toastLine ? <MapToast line={toastLine} /> : null}
           {showRunViews && !hasStage ? (
             // QA-DEMO-1 m3: the reason the lens links and "Open live view" are off is words on the page, not a tooltip
             <p id={NO_STAGE_ID} className="park-world-nostage">
