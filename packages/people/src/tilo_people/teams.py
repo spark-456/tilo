@@ -8,7 +8,7 @@ mobile-web sign-in, never demo) and the bootstrap uid are the caller's. Determin
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Any, TypeGuard
@@ -146,7 +146,7 @@ class LinkRequest:
         return f"LinkRequest(action={action!r})"
 
 
-def decide_link(r: LinkRequest, d: Directory, links: list[Mapping[str, Any]] | tuple[Mapping[str, Any], ...]) -> bool:
+def decide_link(r: LinkRequest, d: Directory, links: Sequence[Mapping[str, Any]]) -> bool:
     """PE-38/39 on the whole org directory and stored links; malformed input fails closed."""
     try:
         return _link_decision(r, d, links) is True
@@ -154,9 +154,7 @@ def decide_link(r: LinkRequest, d: Directory, links: list[Mapping[str, Any]] | t
         return False
 
 
-def _link_decision(
-    r: LinkRequest, d: Directory, links: list[Mapping[str, Any]] | tuple[Mapping[str, Any], ...]
-) -> bool:
+def _link_decision(r: LinkRequest, d: Directory, links: Sequence[Mapping[str, Any]]) -> bool:
     if not (is_user_id(r.actor) and is_timestamp(r.now) and isinstance(r.org_id, str)):
         return False
     me = d.record(r.actor)

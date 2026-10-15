@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import base64
+import binascii
 import hashlib
 import hmac
 import os
@@ -57,7 +58,7 @@ def _unb64(value: str) -> bytes | None:
     try:
         raw = base64.urlsafe_b64decode(value + "=")
         return raw if _b64(raw) == value and len(raw) == 32 else None
-    except (ValueError, base64.binascii.Error):
+    except (ValueError, binascii.Error):
         return None
 
 
@@ -137,7 +138,7 @@ def _event(
 @router.post("/v1/teams/{team}/invite-links", status_code=201)
 def make_link(
     team: str,
-    _: Annotated[Empty, Depends(json_body(Empty))],
+    empty: Annotated[Empty, Depends(json_body(Empty))],
     principal: Principal,
     stores: Stores,
     clock: Clock,
@@ -225,7 +226,7 @@ def list_links(team: str, principal: Principal, stores: Stores, clock: Clock) ->
 def revoke_link(
     team: str,
     invite_id: str,
-    _: Annotated[Empty, Depends(json_body(Empty))],
+    empty: Annotated[Empty, Depends(json_body(Empty))],
     principal: Principal,
     stores: Stores,
     clock: Clock,
@@ -249,8 +250,9 @@ def revoke_link(
             if decide_link(asked, d, [row.record]):
                 changed = {**row.record, "status": "revoked", "revoked": {"by": principal.user_id, "at": now}}
                 store.replace(changed, row.version)
-        if row.record["status"] in ("pending", "revoked"):
-            _event(writer, desks, principal.user_id, "invite_link.revoked", invite_id, team)
+                row = store.get(deps.ORG_ID, invite_id)
+        if row is not None and row.record["status"] == "revoked":
+            _event(writer, desks, row.record["revoked"]["by"], "invite_link.revoked", invite_id, team)
     except VersionConflict:
         pass
     except Exception:
@@ -336,14 +338,19 @@ def accept_link(
         _event(writer, desks, principal.user_id, "invite_link.accepted", invite_id, row.record["team"])
     except Exception:
         if written_version is not None:
-            try:
-                current = stores.persons.get(deps.ORG_ID, principal.user_id)
-                if current is not None:
+            for _ in range(3):
+                try:
+                    current = stores.persons.get(deps.ORG_ID, principal.user_id)
+                    if current is None or entry not in current.record["memberships"]:
+                        break
                     remaining = [m for m in current.record["memberships"] if m != entry]
                     stores.persons.replace(
                         {**current.record, "memberships": remaining}, expected_version=current.version
                     )
-            except Exception:
-                pass
+                    break
+                except VersionConflict:
+                    continue
+                except Exception:
+                    break
         raise Refusal(503, "unavailable") from None
     return {"team": row.record["team"], "state": "member"}

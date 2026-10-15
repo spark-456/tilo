@@ -1,8 +1,11 @@
 """ADR-0046: signed invite links are single-use and disclose no bearer material."""
 
 import hashlib
+from concurrent.futures import ThreadPoolExecutor
+from threading import Barrier
 
 from _ppl11a_lib import ORG, OWNER, SAM
+from tilo_policy.schemas import conforms
 
 TEAM = "tm_launch"
 
@@ -171,3 +174,82 @@ def test_SELF_SERVE_TEAMS_INVITE_LINK_no_get_route_takes_a_token(people_rig, mon
     token = _make(rig).json()["token"]
     rig.as_user(SAM)
     assert rig.client.get("/v1/team-invite-links/accept", params={"token": token}).status_code in (404, 405)
+
+
+def test_SELF_SERVE_TEAMS_INVITE_LINK_concurrent_redeemers_have_exactly_one_winner(people_rig, monkeypatch):
+    rig = _rig(people_rig, monkeypatch)
+    made = _make(rig).json()
+    rig.as_user(SAM)
+    rig.email = "sam@example.com"
+    store = rig.stores.persons._invite_links
+    original = store.replace
+    barrier = Barrier(2)
+
+    def racing(record, version):
+        if record["status"] == "redeemed":
+            barrier.wait(timeout=5)
+        return original(record, version)
+
+    monkeypatch.setattr(store, "replace", racing)
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        responses = list(
+            pool.map(lambda _: rig.post("/v1/team-invite-links/accept", {"token": made["token"]}), range(2))
+        )
+    assert sorted(r.status_code for r in responses) == [200, 404]
+    assert sum(m["team"] == TEAM for m in rig.stored("persons", SAM)["memberships"]) == 1
+
+
+def test_SELF_SERVE_TEAMS_INVITE_LINK_events_are_registered_ids_only_in_the_actors_desk_world(people_rig, monkeypatch):
+    rig = _rig(people_rig, monkeypatch)
+    made = _make(rig).json()
+    rig.as_user(SAM)
+    rig.email = "sam@example.com"
+    assert rig.post("/v1/team-invite-links/accept", {"token": made["token"]}).status_code == 200
+    for call in rig.events.calls:
+        part = call.part
+        assert part["actor"] == part["target"]
+        assert call.world_id == "w_desk_" + part["actor"][2:]
+        assert part["vis"] == [] and part["authz"] is None
+        assert conforms(f"events/data/{part['type']}.schema.json", part["data"])
+        assert made["token"] not in str(part)
+
+
+def test_SELF_SERVE_TEAMS_INVITE_LINK_event_failures_fail_closed_and_revoke_retry_writes_once(people_rig, monkeypatch):
+    rig = _rig(people_rig, monkeypatch)
+    original = rig.events.append
+
+    def fail_create(world, part):
+        if part["type"] == "invite_link.created":
+            raise RuntimeError("offline")
+        return original(world, part)
+
+    monkeypatch.setattr(rig.events, "append", fail_create)
+    assert _make(rig).status_code == 503
+    assert rig.stores.persons._invite_links.list(ORG) == ()
+    monkeypatch.setattr(rig.events, "append", original)
+    made = _make(rig).json()
+    attempts = 0
+
+    def fail_once(world, part):
+        nonlocal attempts
+        if part["type"] == "invite_link.revoked" and attempts == 0:
+            attempts += 1
+            raise RuntimeError("offline")
+        return original(world, part)
+
+    monkeypatch.setattr(rig.events, "append", fail_once)
+    path = f"/v1/teams/{TEAM}/invite-links/{made['invite_id']}/revoke"
+    assert rig.post(path, {}).status_code == 503
+    assert rig.stores.persons._invite_links.get(ORG, made["invite_id"]).record["status"] == "revoked"
+    assert rig.post(path, {}).json() == {"status": "done"}
+    assert [call.part["type"] for call in rig.events.calls].count("invite_link.revoked") == 1
+
+
+def test_SELF_SERVE_TEAMS_INVITE_LINK_an_entry_accepted_through_an_owners_link_may_be_left(people_rig, monkeypatch):
+    rig = _rig(people_rig, monkeypatch)
+    token = _make(rig).json()["token"]
+    rig.as_user(SAM)
+    rig.email = "sam@example.com"
+    assert rig.post("/v1/team-invite-links/accept", {"token": token}).status_code == 200
+    assert rig.post(f"/v1/teams/{TEAM}/members/{SAM}/remove", {}).status_code == 200
+    assert all(m["team"] != TEAM for m in rig.stored("persons", SAM)["memberships"])
