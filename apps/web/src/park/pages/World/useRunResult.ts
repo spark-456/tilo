@@ -5,7 +5,7 @@ import type { Api } from "../../api";
 import { hasResultReader, readResult } from "../../api/results";
 
 /** The most text drawn on the page; the file itself always has all of it. */
-export const SHOWN_CHARS = 200_000;
+export const SHOWN_CHARS = 250_000;
 
 export type ResultView =
   | { readonly status: "off" }
