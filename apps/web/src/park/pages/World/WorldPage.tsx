@@ -747,7 +747,7 @@ export function WorldPage({ app }: { app: AppCtx }) {
                     }
                   />
                 ) : null}
-                {trackRun ? <RunProgressCard events={runEvents} /> : null}
+                {trackRun ? <RunProgressCard events={runEvents} steps={false} /> : null}
                 {trackRun ? (
                   <RunStory events={runEvents} />
                 ) : (
