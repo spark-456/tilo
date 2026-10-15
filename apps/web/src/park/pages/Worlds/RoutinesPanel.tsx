@@ -31,11 +31,14 @@ export function RoutinesPanel({ client }: { client: RoutinesClient }) {
   }, [client, attempt]);
   return (
     <section className="park-worlds-routines" aria-label="Routines" tabIndex={-1}>
-      <h2>Routines</h2>
-      <p>
-        To create a routine, start a world and choose Repeat weekly when approving its approach.
+      <div className="park-worlds-routines__head">
+        <h2 className="park-worlds-h2">Routines</h2>
+        <span className="park-worlds-routines__sub">Worlds that run on a schedule</span>
+      </div>
+      <p className="park-worlds-routines__how">
+        To create a routine, start a world and choose Repeat weekly when approving its approach.{" "}
+        <a href="/">Create a routine</a>
       </p>
-      <a href="/">Create a routine</a>
       {rows ? (
         <RoutineList api={client} first={rows} onError={setError} onPending={setBusy} />
       ) : null}
