@@ -15,8 +15,8 @@ export interface DraftCard {
   body: string;
   recipients: string[];
 }
-/** Reuse the authenticated, App Check protected client. Discovery never invokes a provider. */
-export function meetingMinutesApi(http: Pick<HttpClient, "getJson" | "postJson" | "hasPostRoute">) {
+/** Reuse the authenticated, App Check protected client. No capability probe: a route the server never installed answers 404 to the real call and the control hides itself. */
+export function meetingMinutesApi(http: Pick<HttpClient, "getJson" | "postJson">) {
   const path = (id: string, action: string) => {
     if (!/^mt_[A-Za-z0-9_]{1,48}$/.test(id)) throw bad();
     return `/v1/meetings/${id}/${action}`;
@@ -26,14 +26,6 @@ export function meetingMinutesApi(http: Pick<HttpClient, "getJson" | "postJson" 
     return v.map((r) => `${r.text}${typeof r.state === "string" ? ` (${r.state})` : ""}`);
   };
   return {
-    async available() {
-      const routes = await Promise.all(
-        ["analyze-minutes", "draft-followup"].map((action) =>
-          http.hasPostRoute(path("mt_capability_probe", action)),
-        ),
-      );
-      return routes.every(Boolean);
-    },
     async read(id: string): Promise<{ minutes: MinutesView; confirmed: boolean }> {
       const meeting = await http.getJson(`/v1/meetings/${encodeURIComponent(id)}`);
       const doc = await http.getJson(path(id, "minutes"));

@@ -92,24 +92,10 @@ export function PeopleLists() {
   );
   const api = useMemo(() => (http ? peopleListsApi(http) : null), [http]);
   const minutes = useMemo(() => (http ? meetingMinutesApi(http) : null), [http]);
-  const [available, setAvailable] = useState(false);
-  useEffect(() => {
-    let live = true;
-    setAvailable(false);
-    minutes?.available().then(
-      (value) => {
-        if (live) setAvailable(value);
-      },
-      () => {},
-    );
-    return () => {
-      live = false;
-    };
-  }, [minutes]);
   if (!api) return null;
   return (
     <>
-      <List kind="meetings" api={api} minutes={available ? minutes : null} />
+      <List kind="meetings" api={api} minutes={minutes} />
       <List kind="pinboards" api={api} minutes={null} />
     </>
   );

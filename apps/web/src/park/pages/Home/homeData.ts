@@ -11,7 +11,7 @@ import type {
   TierKey,
   World,
 } from "../../api/types";
-import { type CurrencyCode, currencySymbol } from "../../app/ledgerKpis";
+import { type CurrencyCode, currencySymbol, money as ledgerMoney } from "../../app/ledgerKpis";
 
 /** The composer's copy per size of job (the reference reads it from `D.TIERS`; the Api has no tier call). */
 export interface Mode {
@@ -278,9 +278,10 @@ export function spendOf(ledger: Ledger): Spend {
   const unit = ledger.currency ?? "GBP"; // JUDGE-FIRST-RUN F5: the live report is served in dollars, never shown as pounds
   return {
     month: ledger.period?.month ?? (ledger.daily.length > 0 ? "September" : null),
-    spent: money(ledger.spent, unit),
-    of: `of ${money(ledger.budget, unit)}`,
-    forecast: `Forecast ${money(ledger.forecast, unit)} · ${money(waiting, unit)} waiting on you`,
+    // FR-SPD-01: the figure the KPI tile and the Ledger show (cents kept under 100); no budget is said, not "of $0"
+    spent: ledgerMoney(ledger, ledger.spent),
+    of: ledger.budget > 0 ? `of ${money(ledger.budget, unit)}` : "No budget set",
+    forecast: `${ledger.forecast > 0 ? `Forecast ${money(ledger.forecast, unit)} · ` : ""}${ledgerMoney(ledger, waiting)} waiting on you`,
     spentPct: Math.min(pct(ledger.spent), 100),
     waitingPct: Math.min(pct(waiting), 100 - Math.min(pct(ledger.spent), 100)),
   };

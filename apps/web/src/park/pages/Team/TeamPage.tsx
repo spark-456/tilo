@@ -7,6 +7,7 @@ import {
   type Dispatch,
   type ReactNode,
   type SetStateAction,
+  useCallback,
   useEffect,
   useRef,
   useState,
@@ -36,11 +37,14 @@ import {
   type Loaded,
   MUST_ASK_RULES,
   type Member,
+  type MyTeamName,
   canChangeRole,
   coverRows,
   isValidEmail,
   memberViews,
+  peopleCount,
   reassignWorlds,
+  withMyTeams,
 } from "./teamModel";
 
 function Top({ count, children }: { count?: string | undefined; children?: ReactNode }) {
@@ -107,6 +111,14 @@ function PersonalTeamPage({ app }: { app: AppCtx }) {
   const [liveTeam, setLiveTeam] = useState<Team | null>(null);
   const [people, setPeople] = useState<Member[] | null>(null);
   const [email, setEmail] = useState("");
+  const [mine, setMine] = useState<{ you: string | null; teams: MyTeamName[] }>({
+    you: null,
+    teams: [],
+  });
+  const onMine = useCallback(
+    (you: string | null, teams: MyTeamName[]) => setMine({ you, teams }),
+    [],
+  );
   const sent = useRef(0);
   useEffect(() => {
     let live = true;
@@ -182,9 +194,9 @@ function PersonalTeamPage({ app }: { app: AppCtx }) {
           liveTeam
             ? liveTeam.setupRequired
               ? undefined
-              : `${liveTeam.people.length} people`
+              : peopleCount(liveTeam.people.length)
             : ready
-              ? `${ready.people.length} people`
+              ? peopleCount(ready.people.length)
               : undefined
         }
       >
@@ -225,8 +237,8 @@ function PersonalTeamPage({ app }: { app: AppCtx }) {
               right, the helpers under them; the owner's settings open below, full width. */}
           <div className="park-team-studio">
             <div className="park-team-main">
-              <SelfServeTeams />
-              <LiveMembers team={liveTeam} />
+              <SelfServeTeams onLoaded={onMine} />
+              <LiveMembers team={withMyTeams(liveTeam, mine.you, mine.teams)} />
             </div>
             <WhoCanSayYes />
           </div>
