@@ -30,6 +30,8 @@ from tilo_providers.errors import (
 )
 from tilo_providers.interfaces import (
     Capability,
+    EmbedRequest,
+    EmbedResponse,
     GenerateRequest,
     GenerateResponse,
     ModelProvider,
@@ -331,9 +333,13 @@ class OpenAICompatModelProvider(ModelProvider):
                 ) from None
             yield GenerateResponse(text=None, profile_id=self._profile_id, tool_calls=tool_calls)
 
-    def embed(self, request: Any) -> Any:
-        texts = request["input"] if isinstance(request, dict) else request
-        response = self._post("/embeddings", {"model": self._profile.model, "input": texts})
+    def embed(self, request: EmbedRequest) -> EmbedResponse:
+        typed = isinstance(request, EmbedRequest)
+        texts = request.texts if typed else request["input"] if isinstance(request, dict) else request
+        body: dict[str, Any] = {"model": self._profile.model, "input": texts}
+        if typed:
+            body.update(dimensions=request.dimensions, input_type=request.task)
+        response = self._post("/embeddings", body)
         self._raise_for_status(response)
         data = self._parse(response)
         try:
@@ -341,6 +347,11 @@ class OpenAICompatModelProvider(ModelProvider):
         except (KeyError, TypeError) as error:
             log_caught(error, __name__, locals())
             raise ProviderError(self._scrub(f"PL-02: provider response missing {error}")) from None
+        if typed:
+            if len(vectors) != len(request.texts) or any(len(vector) != request.dimensions for vector in vectors):
+                raise ProviderError("RT-05: embedding response has the wrong shape")
+            usage = {key: value for key, value in data.get("usage", {}).items() if isinstance(value, int)}
+            return EmbedResponse(vectors=vectors, profile_id=self._profile_id, usage=usage or None)
         return {"vectors": vectors, "usage": data.get("usage", {})}
 
     def count_tokens(self, text: str) -> int:

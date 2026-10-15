@@ -39,6 +39,8 @@ from tilo_providers.errors import (
 )
 from tilo_providers.interfaces import (
     Capability,
+    EmbedRequest,
+    EmbedResponse,
     GenerateRequest,
     GenerateResponse,
     ModelProvider,
@@ -414,17 +416,31 @@ class GoogleModelProvider(ModelProvider):
         if failure is not None:
             raise failure
 
-    def embed(self, request: Any) -> Any:
-        contents = request["input"] if isinstance(request, dict) else request
+    def embed(self, request: EmbedRequest) -> EmbedResponse:
+        typed = isinstance(request, EmbedRequest)
+        contents = request.texts if typed else request["input"] if isinstance(request, dict) else request
+        kwargs: dict[str, Any] = {"model": self._profile.model, "contents": contents}
+        if typed:
+            kwargs["config"] = _genai_module("google.genai.types").EmbedContentConfig(
+                task_type="RETRIEVAL_DOCUMENT" if request.task == "document" else "RETRIEVAL_QUERY",
+                output_dimensionality=request.dimensions,
+            )
         try:
-            response = self._client.models.embed_content(model=self._profile.model, contents=contents)
+            response = self._client.models.embed_content(**kwargs)
         except Exception as error:
             log_caught(error, __name__, locals())
             failure = self._failure(error)
         else:
             # `.values` is the float vector; `list(item)` would iterate the
             # pydantic model's *fields* instead.
-            return {"vectors": [item.values for item in response.embeddings], "profile_id": self._profile_id}
+            vectors = [item.values for item in response.embeddings]
+            if typed:
+                if len(vectors) != len(request.texts) or any(
+                    len(vector or []) != request.dimensions for vector in vectors
+                ):
+                    raise ProviderError("RT-05: embedding response has the wrong shape")
+                return EmbedResponse(vectors=vectors, profile_id=self._profile_id)
+            return {"vectors": vectors, "profile_id": self._profile_id}
         raise failure
 
     def count_tokens(self, text: str) -> int:

@@ -31,6 +31,13 @@ def build_provider(
     profile_id = profile_id or config.roles[role_id].primary  # the router passes any cascade profile
     profile = config.profiles[profile_id]
 
+    # RT-05: the owner has not selected/priced a live embedding model. Never let
+    # the offline placeholder produce synthetic vectors for a live lookup.
+    if profile.model == "fake-embed" and (
+        live_permitted or os.environ.get("LIVE") == "1" or os.environ.get("K_SERVICE")
+    ):
+        raise ProviderConfigError("RT-05: live embedding model is not configured")
+
     if profile.provider == "fake" and profile.model == DEV_DIRECTOR_MODEL:  # CL-INT-5: refused when deployed or live
         from tilo_providers.dev_director import DevDirectorProvider  # noqa: PLC0415
 
