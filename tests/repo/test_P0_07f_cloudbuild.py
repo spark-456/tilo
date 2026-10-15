@@ -64,7 +64,7 @@ CLOUD_SDK = "gcr.io/google.com/cloudsdktool/cloud-sdk"
 CLOUD_SDK_TAG = "587.0.0"  # 530.0.0 does not exist in the registry (cost review, PR #373)
 TAGGED = re.compile(r"^[\w./-]+(:[\w][\w.-]*|@sha256:[0-9a-f]{64})$")
 UPLOAD_ROOT_FILES = {"pyproject.toml", "uv.lock", ".dockerignore"}
-UPLOAD_ROOT_DIRS = {"evals", "packages", "services", "config", "contracts", "prompts", "templates", "design"}
+UPLOAD_ROOT_DIRS = {"evals", "packages", "services", "config", "contracts", "prompts", "templates", "skills", "design"}
 REINCLUDES = [
     "!/pyproject.toml",
     "!/uv.lock",
@@ -77,6 +77,7 @@ REINCLUDES = [
     "!/contracts/",
     "!/prompts/",
     "!/templates/",
+    "!/skills/",  # services/api/Dockerfile COPY skills (built-in skill catalogue)
     "!/design/",
     "!/design/tokens.json",
 ]
