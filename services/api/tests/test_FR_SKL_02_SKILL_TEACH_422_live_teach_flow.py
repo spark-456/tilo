@@ -76,9 +76,11 @@ def test_FR_SKL_02_SKILL_TEACH_422_the_teach_flow_runs_from_description_to_a_lis
 
 def test_FR_SKL_02_SKILL_TEACH_422_the_pair_list_names_tool_and_action_as_separate_fields(skills4):
     assert skills4.version(_teach(skills4)).status_code == 200
-    system = skills4.model.calls[-1].system
-    assert 'tool "gmail", action "read_email"' in system and "gmail.read_email" not in system
-    assert "never join" in system.lower()
+    call = skills4.model.calls[-1]
+    assert 'tool "gmail", action "read_email"' in call.prompt and "gmail.read_email" not in call.prompt
+    assert (
+        "gmail.read_email" not in call.system and "never join" in call.system.lower()
+    )  # the person's tools: task (EFF-04)
 
 
 def test_FR_SKL_02_SKILL_TEACH_422_a_pair_joined_or_cased_as_a_model_writes_it_is_read_as_the_listed_pair(skills4):

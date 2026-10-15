@@ -60,7 +60,7 @@ def test_FR_SKL_02_TEACH_2_nothing_connected_the_writer_is_shown_only_the_google
     capture_id = _teach(skills4)
     _replies(skills4, {"steps": plan(DRIVE_READ, DRIVE_SAVE), "question": None})
     assert skills4.version(capture_id).status_code == 200
-    system = skills4.model.calls[-1].system
+    system = skills4.model.calls[-1].prompt  # the person's tools ride in the task, not the cached system (EFF-04)
     assert "gmail, google_drive, google_calendar" in system
     assert 'tool "google_drive"' in system and 'tool "hubspot"' not in system and 'tool "slack"' not in system
 
@@ -97,7 +97,7 @@ def test_FR_SKL_02_TEACH_2_a_connected_hubspot_is_offered_and_kept(skills4):
     assert response.status_code == 200, response.text
     assert _pairs(response) == [("hubspot", "read_hubspot"), ("google_drive", "save_as_google_file")]
     assert len(skills4.model.calls) == calls + 1  # nothing was dropped, so no second ask
-    system = skills4.model.calls[-1].system
+    system = skills4.model.calls[-1].prompt  # the person's tools ride in the task, not the cached system (EFF-04)
     assert (
         "gmail, google_drive, google_calendar, hubspot" in system and 'tool "hubspot", action "read_hubspot"' in system
     )
@@ -113,4 +113,4 @@ def test_FR_SKL_02_TEACH_2_a_views_seam_that_fails_counts_as_nothing_connected(s
     skills4.rig.app.dependency_overrides[skills4.rig.deps.get_connection_views] = lambda: Down()
     _replies(skills4, {"steps": plan(DRIVE_READ, DRIVE_SAVE), "question": None})
     assert skills4.version(capture_id).status_code == 200
-    assert 'tool "hubspot"' not in skills4.model.calls[-1].system
+    assert 'tool "hubspot"' not in skills4.model.calls[-1].prompt

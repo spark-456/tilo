@@ -402,13 +402,12 @@ def version_route(
         for a in registry.get(tool)["actions"]
     )
     preferred = ", ".join(t for t in usable if registry.get(t)["auth"] == "oauth2")
-    system = load_prompt("skill_describe", "version_system.md", {"actions": actions, "preferred": preferred})
-    doc, used = _ask(
-        model_router, system, load_prompt("skill_describe", "version_task.md", {"steps": steps_block}), _VERSION_SCHEMA
-    )
+    system = load_prompt("skill_describe", "version_system.md")  # static: the person's tools ride in the task (EFF-04)
+    variables = {"steps": steps_block, "actions": actions, "preferred": preferred}
+    doc, used = _ask(model_router, system, load_prompt("skill_describe", "version_task.md", variables), _VERSION_SCHEMA)
     kept, steered = _listed(registry, doc, usable)
     if not kept or steered:  # SKILL-TEACH-422 / TEACH-PAIRS: nothing usable, or a step lost to an unconnected tool
-        retry = load_prompt("skill_describe", "version_retry.md", {"steps": steps_block, "preferred": preferred})
+        retry = load_prompt("skill_describe", "version_retry.md", variables)
         again_doc, again = _ask(model_router, system, retry, _VERSION_SCHEMA)
         again_kept, _skipped = _listed(registry, again_doc, usable)
         if len(again_kept) >= len(kept):  # the first reply stays when the second keeps fewer steps
