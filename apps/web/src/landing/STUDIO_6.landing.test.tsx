@@ -68,7 +68,9 @@ describe("STUDIO_6 the signed-out landing", () => {
     expect(stage()).not.toBeNull(); // the landing below the hero arrived
     expect(named("Continue with Google")).toHaveLength(1);
     expect(qa(document.body, ".landing-btn--primary")).toHaveLength(1);
-    expect(qa(document.body, "input, textarea, form")).toHaveLength(0);
+    expect(
+      qa(document.body, 'input[type="password"], input[autocomplete="username"]'),
+    ).toHaveLength(0);
   });
 
   it("STUDIO_6 the stage carries the recorded-example label and says nothing is live", async () => {

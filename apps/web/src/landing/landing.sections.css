@@ -2,11 +2,110 @@
    same [data-park][data-theme="studio"] root as landing.css; no new colours. Loaded with the landing chunk, after
    landing.css. Static: the scroll reveal and hover motion live in landing.motion.css (see Reveal.tsx). */
 
+/* LANDING-3: a sign-in prompt and a still strip of recorded highlights. */
+.landing-prompt-wrap {
+  width: 100%;
+  max-width: 720px;
+}
+.landing-prompt {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 10px 10px 18px;
+  border: 1px solid var(--lineStrong);
+  border-radius: 24px;
+  background: var(--card);
+  box-shadow: var(--l-sh2);
+}
+.landing-prompt__helper {
+  display: flex;
+  flex: none;
+}
+.landing-prompt input {
+  flex: 1;
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: 20px;
+}
+.landing-prompt input::placeholder {
+  color: var(--ink2);
+  opacity: 1;
+}
+.landing-prompt-wrap > p {
+  margin: 8px 0 0;
+  color: var(--ink3);
+  font-size: 14px;
+}
+.landing-ticker {
+  width: 100%;
+  max-width: 1360px;
+  overflow-x: auto;
+  padding: 8px 4px;
+  text-align: left;
+}
+.landing-prompt input:focus-visible,
+.landing-ticker:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+.landing-ticker__label {
+  display: block;
+  margin-bottom: 8px;
+}
+.landing-ticker ul {
+  display: flex;
+  gap: 10px;
+  width: max-content;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.landing-ticker li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 400px;
+  padding: 8px 14px;
+  border: 1px solid var(--line);
+  border-radius: 24px;
+  background: var(--card);
+  color: var(--ink2);
+  font-size: 14px;
+}
+.landing-ticker li > span {
+  color: var(--okInk);
+}
+@media (max-width: 720px) {
+  .landing-prompt {
+    gap: 8px;
+    padding-left: 12px;
+  }
+  .landing-prompt__helper {
+    display: none;
+  }
+  .landing-prompt input {
+    font-size: 16px;
+  }
+  .landing-prompt button {
+    min-height: 44px;
+    padding: 0 16px;
+    font-size: 16px;
+  }
+  .landing-ticker li {
+    max-width: 280px;
+  }
+}
+
 /* ---- shared pieces ---- */
 .landing-split {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 32px;
+  gap: 24px;
   align-items: start;
 }
 .landing-stack {
@@ -20,7 +119,7 @@
   flex-direction: column;
   gap: 12px;
   min-width: 0;
-  padding: 28px;
+  padding: 20px;
   border: 1px solid var(--line);
   border-radius: 24px;
   background: var(--card);
