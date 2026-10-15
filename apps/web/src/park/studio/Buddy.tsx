@@ -57,16 +57,17 @@ const ARMS: Readonly<Record<BuddyMood, readonly [number, number]>> = {
 
 export function Buddy({
   mood = "idle",
-  role = "director",
+  kind = "director",
   size = 236,
 }: {
   mood?: BuddyMood;
-  role?: BuddyRole;
+  /** Which helper (its colour; the director wears the crown). */
+  kind?: BuddyRole;
   /** Height in px; the width follows (200:236). */
   size?: number;
 }) {
   const k = size / 236;
-  const col = ROLE[role];
+  const col = ROLE[kind];
   const lt = (f: number) => mix(col, 255, f);
   const dk = (f: number) => mix(col, 0, f);
   const limb = dk(0.3);
@@ -131,7 +132,7 @@ export function Buddy({
           <div style={box(68, 188, 24, 26, { borderRadius: 5, background: limb })} />
           <div style={box(112, 188, 24, 26, { borderRadius: 5, background: limb })} />
           {arm(26, armL)}
-          {role === "director" ? (
+          {kind === "director" ? (
             <>
               <div style={box(70, 44, 20, 26, { borderRadius: 4, background: dk(0.22) })} />
               <div style={box(94, 30, 22, 40, { borderRadius: 4, background: col })} />

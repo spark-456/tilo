@@ -94,10 +94,12 @@ describe("QA_DEMO_1_M5 the Team table says it scrolls", () => {
     );
   });
 
-  it("QA_DEMO_1_m8_the_composer_input_gets_the_logos_room_on_a_phone", () => {
+  // UI-STUDIO-2: the helper tile stays (it shows the request state) but shrinks to 44px on a phone, and the
+  // input's text drops to 19px, so the placeholder still reads beside it.
+  it("QA_DEMO_1_m8_the_composer_input_keeps_its_room_on_a_phone", () => {
     const css = readFileSync(path.join(__dirname, "../pages/Home/Home.css"), "utf8");
-    expect(css).toMatch(
-      /@media \(max-width: 480px\)\s*\{[^@]*\.park-home-logo\s*\{\s*display:\s*none;/,
-    );
+    const phone = css.slice(css.indexOf("@media (max-width: 840px)"));
+    expect(phone).toMatch(/\.park-home-logo\s*\{\s*width:\s*44px;/);
+    expect(phone).toMatch(/\.park-home-panel \.park-home-input\s*\{[^}]*font-size:\s*19px;/);
   });
 });

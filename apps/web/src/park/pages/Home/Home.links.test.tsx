@@ -18,6 +18,9 @@ import {
 
 afterEach(cleanup);
 
+// UI-STUDIO-2: the world cards and All worlds sit in the Sample worlds section, not in the Today column.
+const worldsOf = (el: HTMLElement): HTMLElement =>
+  el.querySelector('section[aria-label="Sample worlds"]') as HTMLElement;
 const noParams = (p: unknown) =>
   p === undefined || (typeof p === "object" && p !== null && Object.keys(p).length === 0);
 
@@ -31,16 +34,16 @@ describe("WEB_4_home_links: each control goes where the reference sends it", () 
 
   it("WEB_4_home_links_a_live_row_opens_its_world", async () => {
     const rig = await mountHome();
-    for (const w of LIVE_OPEN) {
-      clickEl(controlWith(todayRegion(rig.el), w.name));
+    for (const w of LIVE_OPEN.slice(0, 3)) {
+      clickEl(controlWith(worldsOf(rig.el), w.name));
       expect(lastGo(rig.app), w.name).toEqual(["world", { id: w.id }]);
     }
-    expect(goCalls(rig.app)).toBe(LIVE_OPEN.length);
+    expect(goCalls(rig.app)).toBe(3);
   });
 
   it("WEB_4_home_links_All_worlds_goes_to_the_worlds_page", async () => {
     const rig = await mountHome();
-    const link = control(todayRegion(rig.el), "All worlds");
+    const link = control(worldsOf(rig.el), "All worlds");
     const proceeded = clickEl(link);
     const last = lastGo(rig.app);
     expect(last?.[0]).toBe("worlds");
@@ -92,7 +95,8 @@ describe("WEB_4_home_links: nothing else moves the app", () => {
   it("WEB_4_home_links_a_click_leaves_the_address_bar_alone", async () => {
     const before = `${window.location.pathname}${window.location.search}${window.location.hash}`;
     const rig = await mountHome();
-    for (const label of ["All worlds", "Agenda"]) clickEl(control(todayRegion(rig.el), label));
+    clickEl(control(worldsOf(rig.el), "All worlds"));
+    clickEl(control(todayRegion(rig.el), "Agenda"));
     clickEl(controlWith(todayRegion(rig.el), "September spend"));
     expect(`${window.location.pathname}${window.location.search}${window.location.hash}`).toBe(
       before,
@@ -118,7 +122,7 @@ describe("WEB_4_home_links: nothing else moves the app", () => {
     const rig = await mountHome();
     press(controlWith(rig.el, "in K1 electric scooter"), "Enter");
     expect(lastGo(rig.app)).toEqual(["world", { id: "k1" }]);
-    press(controlWith(todayRegion(rig.el), "Onboard 12 new hires"), "Enter");
+    press(controlWith(worldsOf(rig.el), "Onboard 12 new hires"), "Enter");
     expect(lastGo(rig.app)).toEqual(["world", { id: "hires" }]);
   });
 });

@@ -398,18 +398,7 @@
   color: var(--ink);
 }
 
-/* ---- Home composer (S Components "Composer · files and the two speeds"): a white card, hairline, files as tiles ---- */
-[data-park][data-theme="studio"] .park-home-glass {
-  border: 1px solid var(--line);
-  background: var(--card);
-  box-shadow: var(--sh);
-  -webkit-backdrop-filter: none;
-  backdrop-filter: none;
-}
-[data-park][data-theme="studio"] .park-home-panel {
-  border-radius: 24px;
-  padding: 12px;
-}
+/* ---- Home composer (S Components "Composer · files and the two speeds"; the layout is Home.css, UI-STUDIO-2) ---- */
 [data-park][data-theme="studio"] .park-home-chip {
   height: 44px;
   border: 1px solid var(--line);
@@ -432,7 +421,6 @@
   color: var(--onPri);
 }
 [data-park][data-theme="studio"] .park-home-change {
-  height: 40px;
   border: 1px solid var(--line);
   border-radius: 12px;
   background: var(--card);

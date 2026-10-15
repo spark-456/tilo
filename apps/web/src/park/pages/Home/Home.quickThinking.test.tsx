@@ -44,7 +44,8 @@ afterEach(() => {
   window.localStorage.clear();
 });
 
-const depth = (root: HTMLElement) => q(root, '[aria-label="Depth"]');
+// UI-STUDIO-2: the depth control is the ask box's "Quick answer" / "Make a world" switch.
+const depth = (root: HTMLElement) => q(root, '[aria-label="Quick answer or world"]');
 const depthOptions = (root: HTMLElement) => qa(depth(root), '[role="radio"]');
 const chosen = (root: HTMLElement): string =>
   textOf(depthOptions(root).find((o) => o.getAttribute("aria-checked") === "true") as Element);
@@ -80,8 +81,8 @@ describe("QUICK_THINKING the control", () => {
   it("QUICK_THINKING_default_is_Thinking_in_a_labelled_radiogroup_with_the_two_words", async () => {
     const { el } = await mountHome();
     expect(depth(el).getAttribute("role")).toBe("radiogroup");
-    expect(depthOptions(el).map(textOf)).toEqual(["Quick", "Thinking"]);
-    expect(chosen(el)).toBe("Thinking");
+    expect(depthOptions(el).map(textOf)).toEqual(["Quick answer", "Make a world"]);
+    expect(chosen(el)).toBe("Make a world");
     // Thinking is today's flow: the start control and the hint are the size's own.
     expect(hasControl(el, "Start task")).toBe(true);
     expect(pageText(el)).toContain("You see the plan and the cost before any agent starts.");
@@ -94,15 +95,15 @@ describe("QUICK_THINKING the control", () => {
     expect(quick.tabIndex).toBe(-1);
     press(thinking, "ArrowLeft");
     await settle();
-    expect(chosen(el)).toBe("Quick");
+    expect(chosen(el)).toBe("Quick answer");
     press(depthOptions(el)[0] as Element, "ArrowRight");
     await settle();
-    expect(chosen(el)).toBe("Thinking");
+    expect(chosen(el)).toBe("Make a world");
   });
 
   it("QUICK_THINKING_words_only_no_number_before_any_answer_and_one_primary_button", async () => {
     const { el } = await mountHome();
-    await choose(el, "Quick");
+    await choose(el, "Quick answer");
     expect(hasControl(el, "Ask")).toBe(true);
     const composer = q(el, ".park-home-composer");
     expect(textOf(q(composer, ".park-home-hint"))).toBe(
@@ -117,16 +118,16 @@ describe("QUICK_THINKING the control", () => {
 describe("QUICK_THINKING the choice is remembered", () => {
   it("QUICK_THINKING_persists_across_remounts", async () => {
     const first = await mountHome();
-    await choose(first.el, "Quick");
+    await choose(first.el, "Quick answer");
     cleanup();
     const second = await mountHome();
-    expect(chosen(second.el)).toBe("Quick");
+    expect(chosen(second.el)).toBe("Quick answer");
     expect(hasControl(second.el, "Ask")).toBe(true);
   });
 
   it("QUICK_THINKING_is_kept_per_signed_in_email_not_shared", async () => {
     const first = await mountHome();
-    await choose(first.el, "Quick");
+    await choose(first.el, "Quick answer");
     const keys = Object.keys(window.localStorage).filter((k) => k.includes("effort"));
     expect(keys).toHaveLength(1);
     // LIVE-HOME (BQ-SIGNIN-4): the key is per person but never holds the address itself.
@@ -142,12 +143,12 @@ describe("QUICK_THINKING the choice is remembered", () => {
       throw new Error("blocked");
     });
     const first = await mountHome();
-    expect(chosen(first.el)).toBe("Thinking");
-    await choose(first.el, "Quick");
-    expect(chosen(first.el)).toBe("Quick");
+    expect(chosen(first.el)).toBe("Make a world");
+    await choose(first.el, "Quick answer");
+    expect(chosen(first.el)).toBe("Quick answer");
     cleanup();
     const second = await mountHome();
-    expect(chosen(second.el)).toBe("Quick");
+    expect(chosen(second.el)).toBe("Quick answer");
   });
 });
 
@@ -155,7 +156,7 @@ describe("QUICK_THINKING on the fixture path", () => {
   it("QUICK_THINKING_quick_asks_with_the_effort_makes_no_world_and_shows_a_labelled_sample", async () => {
     const api = spiedApi();
     const rig = await mountHome({ api });
-    await choose(rig.el, "Quick");
+    await choose(rig.el, "Quick answer");
     await ask(rig.el, "What is the capital of France?");
     const sent = (api.startWorld as unknown as { mock: { calls: unknown[][] } }).mock.calls;
     expect(sent).toEqual([["quick", "What is the capital of France?", "quick"]]);
@@ -187,7 +188,7 @@ describe("QUICK_THINKING on the fixture path", () => {
   it("QUICK_THINKING_an_empty_question_is_not_sent_and_says_so", async () => {
     const api = spiedApi();
     const rig = await mountHome({ api });
-    await choose(rig.el, "Quick");
+    await choose(rig.el, "Quick answer");
     clickEl(control(rig.el, "Ask"));
     await settle();
     expect(alertText(rig.el)).toBe("Type your question first.");
@@ -197,7 +198,7 @@ describe("QUICK_THINKING on the fixture path", () => {
   it("QUICK_THINKING_a_question_over_500_characters_is_refused_in_plain_words_and_never_cut", async () => {
     const api = spiedApi();
     const rig = await mountHome({ api });
-    await choose(rig.el, "Quick");
+    await choose(rig.el, "Quick answer");
     const long = "a".repeat(QUICK_MAX_CHARS + 1);
     await ask(rig.el, long);
     expect(alertText(rig.el)).toContain("500 characters");
@@ -218,7 +219,7 @@ describe("QUICK_THINKING on the live path", () => {
   it("QUICK_THINKING_live_answer_shows_the_served_cost_makes_no_world_and_no_toast", async () => {
     const api = quickApi(answered({ credits: 0.04, savedCredits: 0.3 }));
     const rig = await mountLiveHome(api);
-    await choose(rig.el, "Quick");
+    await choose(rig.el, "Quick answer");
     await ask(rig.el, "What is the capital of France?");
     expect(calls(api)).toEqual([["quick", "What is the capital of France?", "quick"]]);
     const card = textOf(answerCard(rig.el) as Element);
@@ -233,7 +234,7 @@ describe("QUICK_THINKING on the live path", () => {
 
   it("QUICK_THINKING_live_answer_without_a_cost_shows_no_cost_and_no_number", async () => {
     const rig = await mountLiveHome(quickApi(answered(null)));
-    await choose(rig.el, "Quick");
+    await choose(rig.el, "Quick answer");
     await ask(rig.el, "Capital of France?");
     const card = textOf(answerCard(rig.el) as Element);
     expect(card).not.toMatch(/credit|Cost|Saved|\d/);
@@ -242,7 +243,7 @@ describe("QUICK_THINKING on the live path", () => {
   it("QUICK_THINKING_asking_shows_a_plain_status_and_locks_the_text_until_the_reply", async () => {
     const reply = gate<unknown>();
     const rig = await mountLiveHome(quickApi(() => reply.promise));
-    await choose(rig.el, "Quick");
+    await choose(rig.el, "Quick answer");
     await ask(rig.el, "Capital of France?");
     expect(qa(rig.el, '[role="status"]').map(textOf)).toContain("Asking Tilo");
     expect(qa(rig.el, ".park-home-spin")).toHaveLength(0); // nothing animates
@@ -263,15 +264,15 @@ describe("QUICK_THINKING on the live path", () => {
       async () => liveAck(world),
     );
     const rig = await mountLiveHome(api);
-    await choose(rig.el, "Quick");
+    await choose(rig.el, "Quick answer");
     await ask(rig.el, "Make a 12 slide deck");
     const offer = textOf(answerCard(rig.el) as Element);
-    expect(offer).toContain("This needs Thinking.");
+    expect(offer).toContain("This needs a world.");
     expect(offer).toContain("It asks for a document, deck or sheet to be made.");
     expect(offer).not.toContain("deliverable"); // the code is not for people
     expect(rig.store.getState().added).toHaveLength(0);
 
-    clickEl(control(rig.el, "Switch to Thinking"));
+    clickEl(control(rig.el, "Make it a world"));
     await settle();
     // the same text, as Thinking: the two-argument call of today, no effort
     expect(calls(api)).toEqual([
@@ -279,7 +280,7 @@ describe("QUICK_THINKING on the live path", () => {
       ["quick", "Make a 12 slide deck"],
     ]);
     expect(rig.store.getState().added.map((w) => w.id)).toEqual(["t_sw1"]);
-    expect(chosen(rig.el)).toBe("Thinking");
+    expect(chosen(rig.el)).toBe("Make a world");
     expect(answerCard(rig.el)).toBeNull();
   });
 
@@ -304,7 +305,7 @@ describe("QUICK_THINKING on the live path", () => {
           );
         }),
       );
-      await choose(rig.el, "Quick");
+      await choose(rig.el, "Quick answer");
       await ask(rig.el, "Capital of France?");
       expect(alertText(rig.el)).toMatch(sentence);
       expect(alertText(rig.el)).not.toContain("raw server text");
@@ -320,7 +321,7 @@ describe("QUICK_THINKING on the live path", () => {
         throw new TiloApiError("That question was flagged by the safety check.", 422, false, true);
       }),
     );
-    await choose(rig.el, "Quick");
+    await choose(rig.el, "Quick answer");
     await ask(rig.el, "x");
     expect(alertText(rig.el)).toBe("That question was flagged by the safety check.");
   });

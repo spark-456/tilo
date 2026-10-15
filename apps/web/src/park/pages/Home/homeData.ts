@@ -107,13 +107,13 @@ export const INTAKE_MAX_CHARS = 4000;
 export const EFFORTS = [
   {
     key: "quick",
-    label: "Quick",
+    label: "Quick answer",
     note: "A direct answer. No plan is made and no agents start.",
     start: "Ask",
   },
   {
     key: "thinking",
-    label: "Thinking",
+    label: "Make a world",
     note: "The Director plans the work first, and nothing starts until you approve it.",
     start: null,
   },
@@ -286,98 +286,9 @@ export function spendOf(ledger: Ledger): Spend {
   };
 }
 
-export type PinTone = "needs" | "run" | "sch";
-export interface PinDef {
-  readonly worldId: string;
-  readonly icon: string;
-  readonly tone: PinTone;
-  readonly sub: string;
-}
-
 /** The world a decision waits in: the first world (not one just started) whose state is "needs". */
 export function needsWorld(worlds: readonly World[]): World | undefined {
   return worlds.find((w) => w.st === "needs" && !w.isNew);
-}
-
-/**
- * The three pins of the reference, by index of `app.pins`, chosen from the worlds the Api returned (not
- * ones just started): pin 0 is the first world that needs you or runs, pin 1 the next running one, pin 2
- * the first scheduled one. A slot with no such world has no pin.
- */
-export function pinDefs(
-  worlds: readonly World[],
-  needs: number,
-  night: boolean,
-  served = false,
-): readonly (PinDef | undefined)[] {
-  const old = worlds.filter((w) => !w.isNew);
-  const [first, second] = old.filter((w) => w.st === "needs" || w.st === "running");
-  const sched = old.find((w) => w.st === "scheduled");
-  const nd = first?.st === "needs";
-  return [
-    first && {
-      worldId: first.id,
-      icon: nd ? "flag" : "bolt",
-      tone: nd ? "needs" : "run",
-      sub: nd
-        ? needs > 0
-          ? `${needs} ${plural(needs, "decision needs you", "decisions need you")}`
-          : "Needs you" // no served count: no number (BQ-UX11-1)
-        : served && first.prog === undefined
-          ? "Running"
-          : `Running · ${first.prog ?? 0}%`,
-    },
-    second && {
-      worldId: second.id,
-      icon: "people",
-      tone: "run",
-      sub: `${night ? "Running overnight" : "Running"}${
-        served && second.prog === undefined ? "" : ` · ${second.prog ?? 0}%`
-      }`,
-    },
-    sched && {
-      worldId: sched.id,
-      icon: "clock",
-      tone: "sch",
-      sub: `${sched.nextL} ${sched.nextV}`,
-    },
-  ];
-}
-
-export interface PlacedPin extends PinDef {
-  readonly x: number;
-  readonly y: number;
-  readonly world: World;
-}
-
-/** A pin is dropped where it would sit under one of the page's own panels (the reference's `blocks`). */
-export function placedPins(
-  pins: readonly { x: number; y: number }[],
-  worlds: readonly World[],
-  needs: number,
-  night: boolean,
-  vw: number,
-  vh: number,
-  served = false,
-): PlacedPin[] {
-  const side = vw >= 1180;
-  const blocks: readonly [number, number, number, number][] = [
-    [0, 0, vw, 96],
-    [0, 80, 548, 430],
-    side ? [vw - 400, 80, vw, vh - 300] : [0, 0, 0, 0],
-    [0, vh - 250, vw, vh],
-  ];
-  const clear = (p: { x: number; y: number }): boolean =>
-    !blocks.some((b) => p.x + 140 > b[0] && p.x - 140 < b[2] && p.y > b[1] && p.y - 84 < b[3]);
-  const defs = pinDefs(worlds, needs, night, served);
-  const out: PlacedPin[] = [];
-  pins.forEach((p, i) => {
-    const def = defs[i];
-    const world = def ? worlds.find((w) => w.id === def.worldId) : undefined;
-    if (def && world && clear(p))
-      out.push({ ...def, x: Math.round(p.x), y: Math.round(p.y), world });
-  });
-  return out;
 }
 
 /** W-SAMPLES-1: config suggestions fill text; they never dispatch a task. */

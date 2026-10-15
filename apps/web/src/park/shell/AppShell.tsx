@@ -38,6 +38,7 @@ import { loadShellFonts } from "./fonts";
 import { type Bar, useLeavingCard, useMotionOff, usePageSwap } from "./motion";
 import { useParkTour } from "./tour";
 import "./park.shell.css";
+import { themeFor } from "../tokens/themes";
 import { TiloBubble } from "./TiloBubble";
 import { backdropScene } from "./scene";
 
@@ -223,7 +224,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         scene={scene}
         vw={app.vw}
         vh={app.vh}
-        veiled={inner}
+        veiled={inner || themeFor(app.prefs.theme) === "studio"}
         lite={appearance.lite}
         hidden={appearance.hidden}
         loading={state.wl != null}

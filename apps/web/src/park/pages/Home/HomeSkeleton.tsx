@@ -3,8 +3,8 @@
 export function HomeSkeleton() {
   return (
     // biome-ignore lint/a11y/useSemanticElements: a loading status around still shapes, not a form output
-    <div role="status" aria-label="Loading Home" className="park-home-leftcol">
-      <div className="park-home-hero park-home-glass">
+    <div role="status" aria-label="Loading Home" className="park-home-top">
+      <div className="park-home-hero park-home-hero--loading">
         <span className="park-home-skeleton park-home-skeleton--short" aria-hidden="true" />
         <span className="park-home-skeleton park-home-skeleton--wide" aria-hidden="true" />
         <span className="park-home-skeleton park-home-skeleton--mid" aria-hidden="true" />

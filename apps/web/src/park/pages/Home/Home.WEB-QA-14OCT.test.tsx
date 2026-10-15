@@ -14,11 +14,11 @@ afterEach(() => {
 });
 
 describe("WEB-QA-14OCT Home failed state", () => {
-  it("UI-10 WEB-QA-14OCT the Not connected panel sits in the left column, below the sample strip", async () => {
+  it("UI-10 WEB-QA-14OCT the Not connected panel sits in the greeting row, below the sample strip", async () => {
     const api: Api = { ...createFixtureApi(), getUser: () => Promise.reject(new Error("down")) };
     const { el } = await mountHome({ api });
     expect(pageText(el)).toContain("Home data is unavailable");
     const hero = el.querySelector(".park-home-hero");
-    expect(hero?.closest(".park-home-leftcol")).not.toBeNull();
+    expect(hero?.closest(".park-home-top")).not.toBeNull();
   });
 });

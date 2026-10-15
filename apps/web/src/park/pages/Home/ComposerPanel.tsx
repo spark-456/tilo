@@ -1,10 +1,12 @@
-// The composer column of Home (reference "Tilo App Home.dc.html"): the example chips while idle, the
-// "drafting" line, the plan card, and the glass panel with the task input and the size of job.
-// Presentation only: the phase, the query and the 900 ms draft are HomePage's.
+// The composer of Home (UI-STUDIO-2, design/studio-v2 "Tilo S Home"): one ask box with the helper, the task input,
+// files, the Quick answer / Make a world switch and Go; under it the answer, the "drafting" line, the plan or
+// confirm card, and the example chips while idle. Presentation only: the phase, the query and the 900 ms draft
+// are HomePage's. The helper's pose is the request state HomePage passes (still, never a loop).
 import type { Ref } from "react";
 import type { Effort, QuickCost, SwitchReason } from "../../api/types";
 import { RECORDED_RUN_PATH } from "../../app/router";
 import { type SegmentOption, SegmentedControl } from "../../components";
+import { Buddy, type BuddyMood } from "../../studio/Buddy";
 import { type IntakeClient, IntakeControl } from "./IntakeControl";
 import { RunCard, type RunCardProps } from "./RunCard";
 import type { Staging } from "./StagedFiles";
@@ -67,9 +69,9 @@ function QuickCard({
         aria-label="Quick answer"
         className="park-home-quick park-home-quick--note"
       >
-        <span>{`This needs Thinking. ${SWITCH_WORDS[view.reason]}`}</span>
+        <span>{`This needs a world. ${SWITCH_WORDS[view.reason]}`}</span>
         <button type="button" className="park-home-change" disabled={sending} onClick={onSwitch}>
-          Switch to Thinking
+          Make it a world
         </button>
       </div>
     );
@@ -80,7 +82,7 @@ function QuickCard({
     // biome-ignore lint/a11y/useSemanticElements: a labelled region around an answer, not a fieldset
     <div role="region" aria-label="Quick answer" className="park-home-quick">
       <div className="park-home-quick__head">
-        <span className="park-home-tier">QUICK</span>
+        <span className="park-home-tier">QUICK ANSWER</span>
         {view.sample ? <span className="park-home-quick__sample">Sample answer</span> : null}
       </div>
       <p className="park-home-quick__text">{view.text}</p>
@@ -114,7 +116,7 @@ export interface ComposerProps {
   readonly effort?: Effort;
   readonly onEffort?: (effort: Effort) => void;
   readonly quick?: QuickView;
-  /** "Switch to Thinking" on a Quick offer: the same text goes as Thinking. */
+  /** "Make it a world" on a Quick offer: the same text goes as a world (Thinking). */
   readonly onSwitch?: () => void;
   readonly onQuery: (value: string) => void;
   readonly onMode: (key: string) => void;
@@ -124,6 +126,8 @@ export interface ComposerProps {
   readonly onChange: () => void;
   /** SIMPLE-RUN-1: the one confirm card, shown in the "ready" phase in place of the example plan. */
   readonly run?: RunCardProps | undefined;
+  /** The helper's pose: the request state only (reading while a call is out, done once answered). */
+  readonly mood?: BuddyMood;
 }
 
 export function ComposerPanel(p: ComposerProps) {
@@ -132,8 +136,7 @@ export function ComposerPanel(p: ComposerProps) {
   const quick = p.quick ?? QUICK_IDLE;
   const quickMode = effort === "quick";
   const effortNote = EFFORTS.find((e) => e.key === effort)?.note ?? "";
-  const effortLabel = EFFORTS.find((e) => e.key === effort)?.label ?? "";
-  const isDefault = mode.key === "quick" && effort === "thinking";
+  const isDefault = mode.key === "quick";
   const options: SegmentOption[] = p.modes.map((m) => ({
     value: m.key,
     label: m.label,
@@ -141,21 +144,71 @@ export function ComposerPanel(p: ComposerProps) {
   }));
   return (
     <div className="park-home-composer">
-      <QuickCard view={quick} sending={p.sending} onSwitch={p.onSwitch ?? (() => undefined)} />
-      {phase === "idle" && quick.state === "idle" ? (
-        <div className="park-home-chips">
-          {mode.chips.map((label) => (
-            <button
-              key={label}
-              type="button"
-              className="park-home-chip"
-              onClick={() => p.onChip(label)}
-            >
-              {label}
-            </button>
-          ))}
+      <div className="park-home-panel">
+        <IntakeControl client={p.intakeClient} staging={p.staging}>
+          <div className="park-home-input-row">
+            <div className="park-home-logo">
+              <Buddy mood={p.mood ?? "idle"} size={50} />
+            </div>
+            <input
+              ref={p.inputRef}
+              className="park-home-input"
+              type="text"
+              maxLength={p.maxLength}
+              aria-label="Describe your task"
+              value={p.query}
+              placeholder={
+                quickMode ? "Ask a quick question" : `e.g. ${p.compact ? mode.short : mode.example}`
+              }
+              onChange={(e) => p.onQuery(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") p.onDraft();
+              }}
+            />
+          </div>
+        </IntakeControl>
+        <div className="park-home-mode-row">
+          <div className="park-home-effort">
+            <SegmentedControl
+              label="Quick answer or world"
+              options={EFFORT_OPTIONS}
+              value={effort}
+              onChange={(value) => p.onEffort?.(value as Effort)}
+              sliding
+            />
+          </div>
+          {quickMode ? null : (
+            // JUDGE-FIRST-RUN F7: the size of job is folded away on its default (Quick task) and says what it means
+            // when opened. A person who has changed it sees it open.
+            <details className="park-home-options" open={!isDefault || undefined}>
+              <summary className="park-home-options__summary">
+                Options
+                <span className="park-home-options__now">{mode.label}</span>
+              </summary>
+              <div className="park-home-options__body">
+                <p className="park-home-options__help">
+                  Size of job: how big the work is. A quick task is one short job, a routine repeats
+                  on a schedule, and a workspace is a larger project with several teams.
+                </p>
+                <div className="park-home-size">
+                  <SegmentedControl
+                    label="Size of job"
+                    options={options}
+                    value={mode.key}
+                    onChange={p.onMode}
+                    sliding
+                  />
+                </div>
+              </div>
+            </details>
+          )}
+          <div className="park-home-hint">{quickMode ? effortNote : mode.hint}</div>
+          <button type="button" className="park-home-start" onClick={p.onDraft}>
+            {quickMode ? "Ask" : mode.start}
+          </button>
         </div>
-      ) : null}
+      </div>
+      <QuickCard view={quick} sending={p.sending} onSwitch={p.onSwitch ?? (() => undefined)} />
       {phase === "drafting" ? (
         // biome-ignore lint/a11y/useSemanticElements: the design's status line is a div with role="status"
         <div role="status" className="park-home-drafting">
@@ -241,73 +294,20 @@ export function ComposerPanel(p: ComposerProps) {
           </div>
         </div>
       ) : null}
-      <div className="park-home-panel park-home-glass">
-        <IntakeControl client={p.intakeClient} staging={p.staging}>
-          <div className="park-home-input-row">
-            <div className="park-home-logo">
-              <div className="park-home-logo__face">
-                <div className="park-home-logo__dot" />
-                <div className="park-home-logo__dot" />
-              </div>
-            </div>
-            <input
-              ref={p.inputRef}
-              className="park-home-input"
-              type="text"
-              maxLength={p.maxLength}
-              aria-label="Describe your task"
-              value={p.query}
-              placeholder={`e.g. ${p.compact ? mode.short : mode.example}`}
-              onChange={(e) => p.onQuery(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") p.onDraft();
-              }}
-            />
-            <button type="button" className="park-home-start" onClick={p.onDraft}>
-              {quickMode ? "Ask" : mode.start}
+      {phase === "idle" && quick.state === "idle" ? (
+        <div className="park-home-chips">
+          {mode.chips.map((label) => (
+            <button
+              key={label}
+              type="button"
+              className="park-home-chip"
+              onClick={() => p.onChip(label)}
+            >
+              {label}
             </button>
-          </div>
-        </IntakeControl>
-        <div className="park-home-mode-row">
-          {/* JUDGE-FIRST-RUN F7: the two choices are folded away with their defaults (Quick task, Thinking) and say
-              what they mean when opened. A person who has changed one sees it open. */}
-          <details className="park-home-options" open={!isDefault || undefined}>
-            <summary className="park-home-options__summary">
-              Options
-              <span className="park-home-options__now">{`${mode.label} · ${effortLabel}`}</span>
-            </summary>
-            <div className="park-home-options__body">
-              <p className="park-home-options__help">
-                Size of job: how big the work is. A quick task is one short job, a routine repeats
-                on a schedule, and a workspace is a larger project with several teams.
-              </p>
-              <div className="park-home-size">
-                <SegmentedControl
-                  label="Size of job"
-                  options={options}
-                  value={mode.key}
-                  onChange={p.onMode}
-                  sliding
-                />
-              </div>
-              <p className="park-home-options__help">
-                Depth: Quick answers straight away and starts no agents. Thinking makes a plan first
-                and waits for your approval.
-              </p>
-              <div className="park-home-effort">
-                <SegmentedControl
-                  label="Depth"
-                  options={EFFORT_OPTIONS}
-                  value={effort}
-                  onChange={(value) => p.onEffort?.(value as Effort)}
-                  sliding
-                />
-              </div>
-            </div>
-          </details>
-          <div className="park-home-hint">{quickMode ? effortNote : mode.hint}</div>
+          ))}
         </div>
-      </div>
+      ) : null}
     </div>
   );
 }

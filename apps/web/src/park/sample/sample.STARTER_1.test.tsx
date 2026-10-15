@@ -7,7 +7,6 @@ import type { Event } from "@tilo/contracts";
 import { act } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, q } from "../../../test-support/park/componentsHarness";
-import { todayRegion } from "../../../test-support/park/homeHarness";
 import { liveSourced, mountLiveHome } from "../../../test-support/park/liveHomeHarness";
 import {
   control,
@@ -195,7 +194,8 @@ describe("STARTER_1 the pages", () => {
   it("STARTER_1_home_card_marks_the_sample", async () => {
     const api = liveSourced({ getWorlds: async () => sampleWorlds([sampleItem]) });
     const rig = await mountLiveHome(api);
-    const today = todayRegion(rig.el);
+    // UI-STUDIO-2: the sample card sits in the Your worlds section
+    const today = q(rig.el, 'section[aria-label="Your worlds"]');
     expect(q(today, ".park-sample-badge").textContent).toBe("Sample");
     expect(today.textContent).toContain(SAMPLE_NOTE);
     await act(async () => {
@@ -211,7 +211,7 @@ describe("STARTER_1 the pages", () => {
   it("STARTER_1_home_shows_no_sample_row_for_other_worlds", async () => {
     const api = liveSourced({ getWorlds: async () => sampleWorlds([own]) });
     const rig = await mountLiveHome(api);
-    expect(todayRegion(rig.el).querySelector(".park-sample-badge")).toBeNull();
+    expect(rig.el.querySelector(".park-sample-badge")).toBeNull();
   });
 
   it("STARTER_1_world_page_marks_the_sample_links_the_replay_and_cannot_be_paused", async () => {
