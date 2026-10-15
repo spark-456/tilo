@@ -135,10 +135,10 @@ describe("SIMPLE-RUN-1 one-step start over the live Api", () => {
     expect(plan.taskId).toBe("t_1");
     expect(plan.goal).toBe(BRIEF_SUPPLIER_COMPARISON.goal);
     expect(plan.approachId).toBe("a_balanced");
-    expect(plan.cap, "the estimate is under the 30-credit floor, so the floor").toBe(30);
-    expect(plan.credits).toEqual({ min: 8, max: 30 });
+    expect(plan.cap, "the estimate is under the 60-credit floor, so the floor").toBe(60);
+    expect(plan.credits).toEqual({ min: 8, max: 60 });
     expect(plan.time).toBe("2–5 min");
-    expect(plan.usd).toBeCloseTo(30 * 0.05);
+    expect(plan.usd).toBeCloseTo(60 * 0.05);
     expect(plan.lines).toEqual([
       { field: "audience", text: "The team" },
       { field: "deadline", text: "Today" },
@@ -152,7 +152,7 @@ describe("SIMPLE-RUN-1 one-step start over the live Api", () => {
     expect(await one.start(plan)).toEqual({ worldId: "w_1", repeatRefused: null });
     const approve = calls.at(-1);
     expect(`${approve?.method} ${approve?.path}`).toBe("POST /tasks/t_1/approve");
-    expect(approve?.body).toEqual({ approach_id: "a_balanced", budget_cap: 30 });
+    expect(approve?.body).toEqual({ approach_id: "a_balanced", budget_cap: 60 });
   });
 
   it("SIMPLE-RUN-1 cap: a price above the API's ceiling is asked at the ceiling", async () => {
@@ -179,7 +179,7 @@ describe("SIMPLE-RUN-1 one-step start over the live Api", () => {
     const small = await priced({ min: 1, max: 4.2 }).prepare("Tiny", []);
     expect(small.cap).toBe(MIN_RUN_GRANT_CREDITS);
     expect(small.credits).toEqual({ min: 1, max: MIN_RUN_GRANT_CREDITS });
-    expect(small.usd).toBeCloseTo(0.15);
+    expect(small.usd).toBeCloseTo(0.3);
     const big = await priced({ min: 40, max: 80.2 }).prepare("Bigger", []);
     expect(big.cap).toBe(81); // above the floor: the estimate stands
     const served = await priced({ min: 1, max: 4 }, { min_grant: 45 }).prepare("Served floor", []);

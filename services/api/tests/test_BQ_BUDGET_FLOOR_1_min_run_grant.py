@@ -1,6 +1,7 @@
-"""BQ-BUDGET-FLOOR-1 (owner decision, 15 Oct 2026): every run's budget grant is at least 30 credits (US$0.15), whatever
-the Director's estimate says, and never more than the run cap. The approaches the confirm card reads are floored, so it
-shows what a Start grants; `approve` raises a smaller cap to the floor; a cap the person set higher is kept.
+"""BQ-BUDGET-FLOOR-1 (owner decision, 15 Oct 2026; floor raised 30 to 60 by BQ-BUDGET-FLOOR-2): every run's budget
+grant is at least 60 credits (US$0.30), whatever the Director's estimate says, and never more than the run cap. The
+approaches the confirm card reads are floored, so it shows what a Start grants; `approve` raises a smaller cap to the
+floor; a cap the person set higher is kept.
 """
 
 from __future__ import annotations
@@ -12,7 +13,7 @@ import pytest
 from _clint1_lib import Flow, brief_reply, make_spy_safety
 from tilo_api import deps
 
-FLOOR = 30.0
+FLOOR = 60.0
 
 
 @pytest.fixture()
@@ -76,9 +77,9 @@ def test_BQ_BUDGET_FLOOR_1_the_run_cap_still_holds(flow) -> None:
         ("min_run_grant_credits: 45.5\n", 45.5),
         ("min_run_grant_credits: 0\n", 0.0),  # the floor can be switched off
         ("min_run_grant_credits: 5000\n", 300.0),  # never above the run cap
-        ("min_run_grant_credits: lots\n", 30.0),  # unusable: the owner's default
-        ("{ not yaml", 30.0),
-        (None, 30.0),  # no file
+        ("min_run_grant_credits: lots\n", 60.0),  # unusable: the owner's default
+        ("{ not yaml", 60.0),
+        (None, 60.0),  # no file
     ],
 )
 def test_BQ_BUDGET_FLOOR_1_the_floor_is_configuration(tmp_path, monkeypatch, yaml_text, expected) -> None:
@@ -92,5 +93,5 @@ def test_BQ_BUDGET_FLOOR_1_the_floor_is_configuration(tmp_path, monkeypatch, yam
     assert deps.min_run_grant() == expected
 
 
-def test_BQ_BUDGET_FLOOR_1_the_shipped_floor_is_thirty_credits() -> None:
+def test_BQ_BUDGET_FLOOR_1_the_shipped_floor_is_sixty_credits() -> None:
     assert deps.min_run_grant() == FLOOR

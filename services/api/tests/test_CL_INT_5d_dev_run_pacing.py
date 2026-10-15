@@ -159,7 +159,7 @@ def test_CL_INT_5d_credits_move_with_each_unit_and_stay_under_the_cap(dev_client
 
 
 def test_CL_INT_5d_a_cap_smaller_than_the_cost_is_never_exceeded(dev_client, monkeypatch):
-    monkeypatch.setattr(deps, "min_run_grant", lambda: 0.0)  # the 30-credit floor (BQ-BUDGET-FLOOR-1) would lift cap 1
+    monkeypatch.setattr(deps, "min_run_grant", lambda: 0.0)  # the 60-credit floor (BQ-BUDGET-FLOOR-1) would lift cap 1
     world_id, _ = _approve(dev_client, cap=1)
     card = _gate(dev_client, world_id)  # every unit before the gate is done
     dev_client.post(f"/worlds/{world_id}/cards/{card['id']}/answer", json={"option": "hold"})

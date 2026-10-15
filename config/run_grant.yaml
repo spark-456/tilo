@@ -1,5 +1,7 @@
-# The least a run's budget grant may be (BQ-BUDGET-FLOOR-1, owner decision 15 Oct 2026).
-# A Start always grants at least this many credits (30 credits = US$0.15 at config/prices.yaml's rate), whatever the
+# The least a run's budget grant may be (BQ-BUDGET-FLOOR-1, owner decision 15 Oct 2026; raised to 60 by BQ-BUDGET-FLOOR-2).
+# A Start always grants at least this many credits (60 credits = US$0.30 at config/prices.yaml's rate), whatever the
 # Director's estimate says, and never more than caps.run_credits in config/metering.yaml. A cap the person set
 # higher is kept. The confirm card shows the floored number. 0 turns the floor off.
-min_run_grant_credits: 30
+# The owner's 30 was raised to 60 by the supervisor on 15 Oct after the live verifier unit ran out at 24.5 of 30
+# (every stored output is screened by the metered safety provider). One value to revert.
+min_run_grant_credits: 60
