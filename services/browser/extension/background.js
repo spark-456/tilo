@@ -5,30 +5,41 @@ const read = async () => (await chrome.storage.local.get(KEY))[KEY] || { active:
 const write = (state) => chrome.storage.local.set({ [KEY]: state });
 let writes = Promise.resolve();
 
+function enqueue(operation) {
+  const result = writes.then(operation);
+  writes = result.catch(() => {});
+  return result;
+}
+
 function record(input) {
-  writes = writes.then(async () => {
+  return enqueue(async () => {
     const state = await read();
     if (!state.active) return;
     const events = appendEvent(state.events, input);
     if (events !== state.events) await write({ ...state, events });
   });
-  return writes;
 }
 
 chrome.runtime.onMessage.addListener((message, _sender, respond) => {
   (async () => {
     if (message?.kind === "start") {
-      const state = { active: true, id: crypto.randomUUID(), events: [] };
-      await write(state);
+      const state = await enqueue(async () => {
+        const started = { active: true, id: crypto.randomUUID(), events: [] };
+        await write(started);
+        return started;
+      });
       const tabs = await chrome.tabs.query({ url: ["http://*/*", "https://*/*"] });
       for (const tab of tabs) chrome.tabs.sendMessage(tab.id, { recording: true }).catch(() => {});
       respond(state);
     } else if (message?.kind === "stop") {
-      const state = await read();
-      const stopped = { ...state, active: false };
-      await write(stopped);
+      const stopped = await enqueue(async () => {
+        const state = await read();
+        const next = { ...state, active: false };
+        await write(next);
+        return next;
+      });
       respond(stopped);
-    } else if (message?.kind === "state") respond(await read());
+    } else if (message?.kind === "state") respond(await enqueue(read));
     else if (message?.kind === "event") {
       await record(message.event);
       respond({ ok: true });
