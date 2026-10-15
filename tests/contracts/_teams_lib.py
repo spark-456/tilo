@@ -96,8 +96,9 @@ def team_permits(case: dict) -> bool:
             return True
         if lead:  # any entry of their own team but another person's lead entry
             return actor == target["id"] or not any(m.get("lead") is True for m in entries)
-        assigners = [persons.get(m["assigned_by"]["by"]) for m in entries]
-        return actor == target["id"] and all(a is None or a["org_role"] != "owner" for a in assigners)
+        # their own entry, unless an org owner assigned it and they never accepted it (ADR-0046: an owner's link)
+        owners = [m for m in entries if (persons.get(m["assigned_by"]["by"]) or {}).get("org_role") == "owner"]
+        return actor == target["id"] and all(m.get("accepted_at") is not None for m in owners)
     return False
 
 

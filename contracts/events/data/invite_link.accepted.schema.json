@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.tilo.example/events/data/invite_link.accepted.schema.json",
+  "x-version": "1.0.0",
+  "title": "InviteLinkAcceptedData",
+  "description": "data of invite_link.accepted (registry 1.6.0, ADR-0046, PE-39). A signed-in person redeemed a team invite link and joined its team. tilo-api writes it after the link was claimed and the membership written, never an agent or a model: actor and target are the person who joined, the world is that person's Desk world (PE-12), district is null and vis is [] (owner-only, ADR-0009). Ids only: never the token, nonce, an address or a name. A membership is not a send, so it is not a side effect and authz is null.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["invite_id", "team"],
+  "properties": {
+    "invite_id": {
+      "$ref": "../../team_invite_link.schema.json#/$defs/id"
+    },
+    "team": {
+      "$ref": "../../common.schema.json#/$defs/team_id"
+    }
+  }
+}

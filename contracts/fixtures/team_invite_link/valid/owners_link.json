@@ -1,0 +1,15 @@
+{
+  "id": "til_9f8e7d6c5b4a39281706f5e4",
+  "org_id": "org_example",
+  "team": "tm_ops",
+  "created_by": {
+    "by": "u_owner",
+    "at": "2026-10-15T08:45:00.000Z"
+  },
+  "expires_at": "2026-10-22T08:45:00.000Z",
+  "key_id": "key_a",
+  "nonce_sha256": "19220af2c550dd7614cbaa2bd129c3e0dcb00a5f2a87d8e208d8355d2da07955",
+  "status": "pending",
+  "redeemed": null,
+  "revoked": null
+}

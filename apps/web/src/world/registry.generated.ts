@@ -96,4 +96,7 @@ export const KNOWN_EVENT_TYPES: readonly string[] = [
   "assistant.replied",
   "team_rule.changed",
   "world.share_changed",
+  "invite_link.created",
+  "invite_link.accepted",
+  "invite_link.revoked"
 ];

@@ -1,0 +1,33 @@
+{
+  "v": "1.0",
+  "id": "01JB5VQ0000000000000000992",
+  "seq": 4,
+  "ts": "2026-10-15T09:00:00.000Z",
+  "world_id": "w_desk_lena",
+  "run_id": "r_desk_lena_1",
+  "type": "invite_link.revoked",
+  "actor": "u_lena",
+  "target": "u_lena",
+  "level": null,
+  "district": null,
+  "item": null,
+  "severity": "info",
+  "credits": 0,
+  "summary": "Lena withdrew a team invite link.",
+  "cause": null,
+  "vis": [],
+  "authz": null,
+  "data": {
+    "invite_id": "til_0a1b2c3d4e5f60718293a4b5",
+    "team": "tm_5f3a9c2e7b1d4e6f8a0b2c4d"
+  },
+  "trace": {
+    "model_role": null,
+    "profile": null,
+    "tokens_in": null,
+    "tokens_out": null,
+    "tool": null,
+    "latency_ms": null,
+    "archive_ref": null
+  }
+}
