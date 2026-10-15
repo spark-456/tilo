@@ -680,3 +680,65 @@
 [data-park] .park-profile-secret {
   -webkit-text-security: disc;
 }
+
+/* UI-STUDIO-5: the scene choice, the spending tiles and the Ask before rows (Studio look in Profile.studio.css). */
+[data-park] .park-profile-scenes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+[data-park] .park-profile-scene {
+  box-sizing: border-box;
+  min-height: 44px;
+  padding: 0 16px;
+  border: 1px solid var(--line);
+  border-radius: 99px;
+  background: var(--card);
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+[data-park] .park-profile-scene.park-profile-scene--on {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--card);
+}
+[data-park] .park-profile-caps {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 14px;
+}
+[data-park] .park-profile-cap {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+  padding: 16px;
+  border-radius: 18px;
+  background: var(--sunk);
+}
+[data-park] .park-profile-captitle {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--ink2);
+}
+[data-park] .park-profile-capvalue {
+  font-size: 26px;
+  font-weight: 800;
+  line-height: 1.1;
+  overflow-wrap: anywhere;
+}
+[data-park] .park-profile-askrow {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-height: 60px;
+  padding: 8px 0;
+  border-top: 1px solid var(--line);
+}
+[data-park] .park-profile-status {
+  display: block;
+  min-height: 20px;
+  margin: 0;
+}

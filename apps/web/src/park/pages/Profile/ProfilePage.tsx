@@ -18,6 +18,8 @@ import { ModelKeyControl } from "./ModelKey";
 import "./Profile.css";
 import { AppearanceControls } from "./AppearanceControls";
 import { BetaPlan } from "./BetaPlan";
+import { AskBefore, SpendingLimits } from "./Limits";
+import "./Profile.studio.css";
 import { PushControl } from "./PushControl";
 import { ICONS } from "./icons";
 import { canSwitchOff } from "./notifyRules";
@@ -36,10 +38,13 @@ import {
   profileOf,
 } from "./settingsForm";
 
+// UI-STUDIO-5: the Studio settings order (design/studio-v2 "Tilo S Settings"), with Spending and limits and Ask before.
 const TABS = [
   { id: "profile", label: "Profile", icon: ICONS.profile },
-  { id: "notifications", label: "Notifications", icon: ICONS.notifications },
   { id: "appearance", label: "Appearance", icon: ICONS.appearance },
+  { id: "limits", label: "Spending and limits", icon: ICONS.limits },
+  { id: "ask", label: "Ask before", icon: ICONS.ask },
+  { id: "notifications", label: "Notifications", icon: ICONS.notifications },
   { id: "security", label: "Security", icon: ICONS.security },
   { id: "billing", label: "Plan and billing", icon: ICONS.billing },
 ] as const;
@@ -559,6 +564,12 @@ export function ProfilePage({ app }: { app: AppCtx }) {
                 <AppearanceControls app={app} />
               </section>
             ) : null}
+
+            {tab === "limits" ? (
+              <SpendingLimits spend={loaded.spend} onTeam={() => app.go("team")} />
+            ) : null}
+
+            {tab === "ask" ? <AskBefore /> : null}
 
             {tab === "security" ? (
               <section aria-label="Security" className="park-profile-card park-profile-card--list">
