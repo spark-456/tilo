@@ -15,7 +15,17 @@ from _sys_lib import Server, free_port
 pytestmark = pytest.mark.system
 
 # Not behind a sign-in by design: liveness, the generated API description and the docs.
-OPEN = {"/health", "/healthz", "/openapi.json", "/docs", "/docs/oauth2-redirect", "/redoc"}
+# /health/deps and /healthz/deps: X-HEALTH-1, public by the owner's decision (14 Oct), booleans and fixed kinds only.
+OPEN = {
+    "/health",
+    "/healthz",
+    "/health/deps",
+    "/healthz/deps",
+    "/openapi.json",
+    "/docs",
+    "/docs/oauth2-redirect",
+    "/redoc",
+}
 
 # service name -> (ASGI app, the routes besides OPEN it serves, with who may call them)
 SERVICES = {
