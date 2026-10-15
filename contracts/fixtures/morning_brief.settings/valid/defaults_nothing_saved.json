@@ -1,0 +1,10 @@
+{
+  "owner_id": "u_alex",
+  "org_id": "org_example",
+  "enabled": false,
+  "time": "07:30",
+  "time_zone": "UTC",
+  "email_copy": false,
+  "email_rule_ready": false,
+  "updated_at": null
+}

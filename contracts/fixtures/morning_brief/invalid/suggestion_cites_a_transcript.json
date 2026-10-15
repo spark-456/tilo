@@ -1,0 +1,108 @@
+{
+  "v": "1.0",
+  "owner": "u_alex",
+  "local_date": "2026-10-16",
+  "time_zone": "Asia/Kolkata",
+  "generated_at": "2026-10-16T02:00:05.000Z",
+  "trigger": "schedule",
+  "model": "used",
+  "meetings": {
+    "status": "ok",
+    "items": [
+      {
+        "title": "Team offsite",
+        "start": "2026-10-16",
+        "end": "2026-10-17",
+        "all_day": true,
+        "attendee_count": 0,
+        "source": {
+          "kind": "calendar_event",
+          "id": "offsite20261016"
+        }
+      },
+      {
+        "title": "Design review",
+        "start": "2026-10-16T04:30:00.000Z",
+        "end": "2026-10-16T05:00:00.000Z",
+        "all_day": false,
+        "attendee_count": 3,
+        "source": {
+          "kind": "calendar_event",
+          "id": "a1b2c3d4e5f6g7h8i9j0k1l2m3"
+        }
+      }
+    ]
+  },
+  "mail_needing_reply": {
+    "status": "ok",
+    "items": [
+      {
+        "from_name": "Priya Raman",
+        "subject": "Can you review the Q4 budget before Friday?",
+        "received_at": "2026-10-15T16:20:00.000Z",
+        "source": {
+          "kind": "mail",
+          "id": "18c9f0a1b2c3d4e5"
+        }
+      }
+    ]
+  },
+  "deadlines": {
+    "status": "ok",
+    "items": [
+      {
+        "title": "Expense report",
+        "due": "2026-10-14",
+        "overdue": true,
+        "source": {
+          "kind": "pinboard_item",
+          "id": "pb_expenses"
+        }
+      },
+      {
+        "title": "Send the supplier rate sheet",
+        "due": "2026-10-16",
+        "overdue": false,
+        "source": {
+          "kind": "work_item",
+          "id": "wi_rate_sheet"
+        }
+      }
+    ]
+  },
+  "suggestions": [
+    {
+      "text": "Reply to Priya about the Q4 budget before the 10:00 design review.",
+      "cites": [
+        {
+          "kind": "utterance",
+          "id": "u0001"
+        }
+      ]
+    },
+    {
+      "text": "The expense report is two days late.",
+      "cites": [
+        {
+          "kind": "pinboard_item",
+          "id": "pb_expenses"
+        }
+      ]
+    }
+  ],
+  "todo_suggestions": [
+    {
+      "title": "Pay the October power bill",
+      "due_text": "by 25 October",
+      "mail": {
+        "from_name": "City Power",
+        "subject": "Your October bill is ready",
+        "received_at": "2026-10-15T12:00:00.000Z",
+        "source": {
+          "kind": "mail",
+          "id": "18c9f0a1b2c3d4f0"
+        }
+      }
+    }
+  ]
+}
