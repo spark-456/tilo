@@ -791,7 +791,7 @@ class _AnswerBody(BaseModel):
     @model_validator(mode="after")
     def exactly_one_answer(self) -> _AnswerBody:
         if (self.option is None) == (self.text is None):
-            raise HTTPException(status_code=400, detail="Choose an option or type an answer.")
+            raise ValueError("Choose exactly one: option or text.")
         return self
 
 
