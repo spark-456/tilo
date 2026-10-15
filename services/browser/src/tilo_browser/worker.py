@@ -124,6 +124,14 @@ class BrowserWorker(HandsProvider):
         self._alive()
         return self._land(self._driver.click(ref))
 
+    def scroll(self, ref: Any) -> None:
+        """Scroll a currently identified target into view when the browser driver supports it."""
+        self._alive()
+        scroll = getattr(self._driver, "scroll", None)
+        if not callable(scroll):
+            raise NotImplementedError("this browser driver does not support scroll")
+        scroll(ref)
+
     def type(self, ref: Any, text: str) -> None:
         """Types only into an editable, non-secure input that is in the freshly read tree, on a page
         that is not (any longer) a login wall. Anything else is refused: the check fails closed."""
