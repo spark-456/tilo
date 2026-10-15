@@ -96,7 +96,7 @@ describe("WORLD_USEFUL runView: the progress line comes from recorded events onl
     const planned = PLAN.map((f) => f());
     expect(runView([...planned]).line).toBe("The plan is ready: 3 steps. Waiting to start.");
     const working = [...planned, START()];
-    expect(runView(working).line).toBe("Working.");
+    expect(runView(working).line).toBe("Starting: the team is getting ready.");
     const one = [...working, WORKING("U1", "The Specialist is mapping the route")()];
     expect(runView(one)).toMatchObject({
       phase: "working",
