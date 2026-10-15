@@ -138,11 +138,12 @@ def test_FR_WLD_04_WORLD_LIVE_no_walk_when_the_building_is_the_leads_own_post(tm
     assert not [e for e in events if e["type"] == "agent.moved" and e["actor"] == "A_s1"]  # B1 is the Lead's post
 
 
-def test_FR_WLD_04_WORLD_LIVE_the_handoff_summary_is_the_real_short_note(tmp_path, repo_root):
+def test_FR_WLD_04_WORLD_LIVE_the_handoff_carries_the_real_note_only_in_its_envelope(tmp_path, repo_root):
+    # FR-AGT-08: the stage's speech bubble reads data.envelope.summary; the event's own line stays code-written.
     events = _run(tmp_path, repo_root)
     handoffs = [e for e in events if e["type"] == "agent.handoff"]
-    assert [e["summary"] for e in handoffs] == [NOTE, NOTE]
-    assert all(len(e["summary"]) <= 140 and e["data"]["envelope"]["summary"] == NOTE for e in handoffs)
+    assert len(handoffs) == 2 and all(e["data"]["envelope"]["summary"] == NOTE for e in handoffs)
+    assert all(NOTE not in e["summary"] for e in handoffs)
 
 
 def test_FR_WLD_04_WORLD_LIVE_assigned_says_which_unit_by_its_title(tmp_path, repo_root):

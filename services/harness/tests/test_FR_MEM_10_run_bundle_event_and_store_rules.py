@@ -54,7 +54,7 @@ def test_FR_MEM_10_the_imported_stream_passes_the_validator_from_scratch(src, tm
     for event in imported.stream():
         assert validator.problems(event, state) == [], f"seq {event['seq']}"
         state.observe(event)
-    assert state.last_seq == 18
+    assert state.last_seq == 24  # WORLD-LIVE: the run also records its buildings and posts (6 events)
     assert state.versions[src.art_ids["brief"]] == 3
 
 
@@ -97,7 +97,7 @@ def test_FR_MEM_10_the_writer_knows_what_the_world_recorded_and_continues_it(src
         summary="The market brief has a new version.",
         data={"artifact": fourth.ref, "previous_version": 3},
     )
-    assert event["seq"] == 19, "the stream continues where the run ended"
+    assert event["seq"] == 25, "the stream continues where the run ended"
     imported.writer.emit(**agent_idle_kwargs("A_s0", "A_s0", level="L1", district="D1"))
     assert imported.writer.recorded_version(brief) == 4
 

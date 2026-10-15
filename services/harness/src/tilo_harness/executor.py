@@ -424,12 +424,11 @@ class _Run:
                 cause=cause,
             )
 
-    def plan_world(self, units: Sequence[dict[str, Any]]) -> None:
+    def plan_world(self) -> None:
         """WORLD-LIVE (PRD 9.4/9.5): the buildings the plan needs are planned (a wireframe, named in the layout from the
         plan's titles), then each Lead takes a post at its district's first building and the Director at the first of
         all, so every agent that talks in the world is on the stage. A building the plan has no unit for is not."""
         roster = self.roster
-        self.unit_types = {unit["id"]: unit["unit_type"] for unit in units}
         for site in roster.buildings.values():
             data = {"plan_units": list(site.units)}
             planned = self.emit("building.planned", roster.director, site.id, _line(f"{site.name} is planned."), data,
@@ -615,7 +614,9 @@ class _Run:
                 outcome = UnitOutcome(success=False, summary="The unit's step before its handoff did not finish.")
                 envelope = None
         if envelope is not None:
-            summary = _line(outcome.summary) or "The agent handed its result to the Lead."  # the real short note
+            summary = (
+                "The agent handed its result to the Lead."  # FR-AGT-08: the agent's own words ride only in the envelope
+            )
             try:
                 cause = self.walk_back(unit, worker, cause)
                 cause = self.emit("agent.handoff", worker, lead, summary, {"envelope": envelope}, cause=cause, **at)
@@ -859,7 +860,9 @@ async def run_plan(
         intake_answers,
     )
     run.spawn_team()
-    run.plan_world(order)
+    if reuse is None:  # a branch continues the parent run's world: its buildings and posts are already recorded
+        run.plan_world()
+    run.unit_types = {unit["id"]: unit["unit_type"] for unit in order}
     slots = asyncio.Semaphore(config.limits.max_specialists)
     loop = asyncio.get_running_loop()
     finished: dict[str, asyncio.Future[bool]] = {unit["id"]: loop.create_future() for unit in order}
