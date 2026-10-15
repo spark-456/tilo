@@ -426,6 +426,11 @@
   color: var(--onPri);
   font-weight: 700;
 }
+/* The World page's handoff link has white text on --hero, which is lime by night: it takes the primary pair instead. */
+[data-park][data-theme="studio"] .park-world-lovablelink {
+  background: var(--priFill);
+  color: var(--onPri);
+}
 [data-park][data-theme="studio"] .park-home-change {
   height: 40px;
   border: 1px solid var(--line);
