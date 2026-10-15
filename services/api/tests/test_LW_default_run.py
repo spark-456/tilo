@@ -199,7 +199,7 @@ def execute_case(root, monkeypatch, seed, confirmed=True):
         search=lambda _role, query, budget: SimpleNamespace(search_result=search_replay.search(query), budget=budget)
     )
     monkeypatch.setattr(deps, "_worker_models", lambda mode: models)
-    monkeypatch.setattr(deps, "_seam_router", lambda mode: search)
+    monkeypatch.setattr(deps, "_seam_router", lambda mode, meter=None: search)
     monkeypatch.setattr(deps, "get_safety", lambda mode: FakeSafetyProvider())
     monkeypatch.setattr(deps, "FIXTURES_DIR", root)
     clear = SimpleNamespace(generate=lambda _: SimpleNamespace(text='{"ask":false}'))
