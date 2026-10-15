@@ -60,9 +60,9 @@ def format_context(
         lines.append(
             {"prior_question": _short(turn.get("question"), 60), "prior_answer": _short(turn.get("answer"), 60)}
         )
-    worlds = _rows(facts.get("worlds"), "worlds")[:4]
+    worlds = _rows(facts.get("worlds"), "worlds")
     worlds.sort(key=lambda row: str(row.get("created_at") or ""), reverse=True)
-    for row in worlds:
+    for row in worlds[:4]:
         wid = str(row.get("world_id"))
         lines.append(
             {
