@@ -124,6 +124,20 @@ class BrowserWorker(HandsProvider):
         self._alive()
         return self._land(self._driver.click(ref))
 
+    def classify_recorded_input(self, ref: str) -> str:
+        """Trusted recording check: return nonsecure, secure, or invalid from the fresh page tree."""
+        self._alive()
+        tree = self._driver.read_accessibility_tree()
+        if detect_login(chain=[self._url] if self._url else [], tree=tree, text=self._driver.page_text()):
+            return "secure"
+        matches = [node for node in iter_nodes(tree) if node_ref(node) == ref]
+        if len(matches) != 1:
+            return "invalid"
+        node = matches[0]
+        if is_secure_node(node):
+            return "secure"
+        return "nonsecure" if is_input_node(node) else "invalid"
+
     def type(self, ref: Any, text: str) -> None:
         """Types only into an editable, non-secure input that is in the freshly read tree, on a page
         that is not (any longer) a login wall. Anything else is refused: the check fails closed."""
