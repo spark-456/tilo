@@ -8,7 +8,9 @@ from typing import Literal, cast
 from starlette.concurrency import run_in_threadpool
 from tilo_harness.deliverable import MAX_PDF, DeliverableRefused, parse_spec
 from tilo_harness.outputs import RenderedOffice, RenderedPdf
+from tilo_render.docx import render_docx
 from tilo_render.pdf import render_pdf
+from tilo_render.pptx import render_pptx
 from tilo_render.spec import RequestDeliverableSpec
 
 from tilo_api.render_rpc import MIME, RenderRpc
@@ -36,9 +38,11 @@ async def render_report(reply: str, *, fmt: str = "pdf") -> RenderedPdf | Render
                 return b""
             claimed = True
         try:
-            if fmt in ("pptx", "docx"):
-                return RenderRpc(os.environ.get("TILO_RENDER_URL", "")).render(spec, cast(Literal["pptx", "docx"], fmt))
-            return render_pdf(spec)
+            url = os.environ.get("TILO_RENDER_URL", "")
+            if fmt in ("pptx", "docx") and url:
+                return RenderRpc(url).render(spec, cast(Literal["pptx", "docx"], fmt))
+            # DOCS-OUT: with no render door configured, the same library the door runs renders in process.
+            return {"pdf": render_pdf, "docx": render_docx, "pptx": render_pptx}[fmt](spec)
         finally:
             _SLOTS.release()
 

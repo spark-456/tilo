@@ -53,10 +53,12 @@ def test_M1_RENDER_1_pptx_writer_uses_configured_authenticated_rpc(monkeypatch, 
     assert seen == [("Deck", fmt)]
 
 
-def test_M1_RENDER_1_unconfigured_office_never_falls_back_to_pdf(monkeypatch):
+def test_M1_RENDER_1_unconfigured_office_renders_in_process_never_as_pdf(monkeypatch):
     monkeypatch.delenv("TILO_RENDER_URL", raising=False)
+    output = asyncio.run(report_render.render_report(SPEC, fmt="pptx"))  # DOCS-OUT: same library, no door needed
+    assert type(output) is RenderedOffice and output.media_type == PPTX and output.content.startswith(b"PK")
     with pytest.raises(DeliverableRefused):
-        asyncio.run(report_render.render_report(SPEC, fmt="pptx"))
+        asyncio.run(report_render.render_report(SPEC, fmt="odt"))
 
 
 @pytest.mark.parametrize(
