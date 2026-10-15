@@ -89,6 +89,7 @@ _REFUSALS = {
     "no_gate": "(refused: this tool acts in the world and needs approval, which is not available here)",
     "credits": "(refused: this unit has used its credits)",
     "tainted": "(refused: this unit has read outside content, so it cannot act in the world)",
+    "private": "(refused: this unit has read the person's private data, so it cannot fetch web pages)",
     "many": "(refused: too many tool calls in one step)",
 }
 
@@ -106,6 +107,7 @@ class _Loop:
     unit_id: str
     credits: float = 0.0
     tainted: bool = False  # SEC-05: outside content was read
+    private: bool = False  # WT-04: the person's own private data was read (here or upstream)
     step: int = 0
     shown: int = 0  # characters of results shown so far
     capped: bool = False  # RESULTS_TOTAL_CAP is spent: no more blocks
@@ -165,7 +167,10 @@ class ToolUnitRunner:
         provider = self._providers[role]
         allowed = self._allowed(role, context)
         # SEC-05 follows the data: a unit shown text that rests on outside content starts as a reader.
-        loop = _Loop(unit["id"], tainted=any(item.tainted for item in context.upstream))
+        loop = _Loop(
+            unit["id"], tainted=any(item.tainted for item in context.upstream),
+            private=any(item.private for item in context.upstream),
+        )  # fmt: skip
         holds_effects = not loop.tainted and any(self._tools.is_side_effect(tool) for tool in allowed.values())
         base = load_prompt(
             role,
@@ -245,7 +250,9 @@ class ToolUnitRunner:
         return self._finish(UnitOutcome(False, summary, provenance_ids=_refs(loop)), loop, stop)
 
     def _finish(self, outcome: UnitOutcome, loop: _Loop, stop: Stop) -> UnitRun:
-        outcome = dataclasses.replace(outcome, credits=loop.credits, read_external=loop.tainted)
+        outcome = dataclasses.replace(
+            outcome, credits=loop.credits, read_external=loop.tainted, read_private=loop.private
+        )
         return UnitRun(outcome, loop.credits, tuple(loop.calls), stop)
 
     def _allowed(self, role: str, context: UnitContext) -> dict[str, Tool]:
@@ -260,8 +267,13 @@ class ToolUnitRunner:
         return {name: tool for name, tool in found if tool is not None}
 
     def _live(self, allowed: Mapping[str, Tool], loop: _Loop) -> dict[str, Tool]:
-        """What the model may ask for now: once the unit is a reader (SEC-05), no side-effect tool."""
-        return {n: t for n, t in allowed.items() if not (loop.tainted and self._tools.is_side_effect(t))}
+        """What the model may ask for now: once the unit is a reader (SEC-05), no side-effect tool; once it has read
+        private data (WT-04), no tool that carries text to a web server."""
+        return {
+            n: t
+            for n, t in allowed.items()
+            if not (loop.tainted and self._tools.is_side_effect(t)) and not (loop.private and self._tools.is_egress(t))
+        }
 
     def _request(
         self, role: str, base: str, allowed: Mapping[str, Tool], live: Mapping[str, Tool], loop: _Loop
@@ -317,6 +329,10 @@ class ToolUnitRunner:
             args
         ):
             self._refuse(loop, label, args, "arguments")
+        elif loop.private and self._tools.is_egress(
+            live[name]
+        ):  # per call: an earlier call of this reply may have read
+            self._refuse(loop, label, args, "private")
         else:
             await self._call(live[name], args, loop)
 
@@ -335,6 +351,9 @@ class ToolUnitRunner:
             return
         if external:
             loop.tainted = True  # before anything else: even a dropped or cached result was read
+        private = self._tools.is_private(tool)
+        if private:
+            loop.private = True  # likewise
         started = self._clock()
         if effect:
             assert self._gate is not None
@@ -349,7 +368,9 @@ class ToolUnitRunner:
             await self._shown(loop, tool, args, key, record, raw, 0.0, started, cache=False, ok="queued")
             return
         cache_key = args_hash(self._scope, {"key": key})
-        hit = self._cache.get(cache_key)
+        hit = (
+            None if private else self._cache.get(cache_key)
+        )  # WT-01/05: a private read is made, checked and recorded each time
         if hit is not None:
             self._add_parts(loop, hit.parts)
             shown = hit.text or DROPPED
@@ -374,7 +395,7 @@ class ToolUnitRunner:
             result.content,
             _credits(result.credits),
             started,
-            cache=True,
+            cache=not private,
             parts=result.parts,
         )
 

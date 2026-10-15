@@ -36,12 +36,12 @@ class _NoArtifacts:  # a read saves nothing
         raise AdapterError("a read has no artifacts")
 
 
-def invalid_window(body: Mapping[str, Any]) -> bool:
+def invalid_window(request: Mapping[str, Any]) -> bool:
     """WT-02: a `read_events` window that does not end after it starts, or spans over 31 days (or has no offset)."""
-    if body["tool"] != "read_events":
+    if request["tool"] != "read_events":
         return False
     try:
-        window(body["args"]["start"], body["args"]["end"])
+        window(request["args"]["start"], request["args"]["end"])
     except ValueError:
         return True
     return False

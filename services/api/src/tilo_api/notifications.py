@@ -1,10 +1,11 @@
 """`GET /v1/notifications`: the owner's bell (NOTIF-1; services/api/tests/test_NOTIF_1_notifications.py, BQ-NOTIF-1).
 
 Read-only and derived, nothing stored (HR-1): an open card of the owner's is a "needs" item, and an `artifact.created`
-or `data.transfer` event in one of the owner's worlds is a "done" item (a hosted meeting's success writes exactly
-these). Cards are read as `GET /cards` reads them. Titles are fixed text per source, and an item carries ids only, so
-no address, link, card text or event summary can reach the bell. Newest first; `count` is the whole bell, `limit`
-(1 to 100, default 20) cuts the list. Only a world's owner gets items; anyone else gets an empty bell, never an error.
+or `data.transfer` event with direction `out` in one of the owner's worlds is a "done" item (a hosted meeting's
+success writes exactly these; a read, direction `in`, is not "sent"). Cards are read as `GET /cards` reads them.
+Titles are fixed text per source, and an item carries ids only, so no address, link, card text or event summary
+can reach the bell. Newest first; `count` is the whole bell, `limit` (1 to 100, default 20) cuts the list.
+Only a world's owner gets items; anyone else gets an empty bell, never an error.
 """
 
 from __future__ import annotations
@@ -63,6 +64,8 @@ def list_notifications(
                 ref = (
                     {"artifact_id": artifact} if isinstance(artifact, str) and _ARTIFACT_ID.fullmatch(artifact) else {}
                 )
+                if event["type"] == "data.transfer" and data.get("direction") != "out":
+                    continue  # a read (ADR-0048) is not "an item was sent"
                 title = _DONE_TITLES[event["type"]]
                 items.append(_item("done", f"e:{event['id']}", str(event["ts"]), world_id, title, **ref))
     items.sort(key=lambda n: (n["created_at"], n["id"]), reverse=True)

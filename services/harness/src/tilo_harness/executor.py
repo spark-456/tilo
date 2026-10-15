@@ -98,6 +98,7 @@ class UnitOutcome:
     reason: str | None = None  # a failed unit's plain, code-written line (at most 140 chars) for the run's stop notice
     credits: float = 0.0  # what the unit's work cost (model calls through the runner's meter, tool results)
     read_external: bool = True  # the unit read outside content, or text resting on it (SEC-05); unknown = True
+    read_private: bool = False  # the unit read the person's own private data, or text resting on it (WT-04)
 
 
 @dataclass(frozen=True)
@@ -287,7 +288,13 @@ def _upstream_item(
         str(ref["artifact_id"]) for ref in outcome.artifact_refs if isinstance(ref, Mapping) and "artifact_id" in ref
     )
     return UpstreamItem(
-        unit["id"], unit["title"], NL2.join(texts)[:UPSTREAM_ITEM_CAP] or None, refs, verdict, outcome.read_external
+        unit["id"],
+        unit["title"],
+        NL2.join(texts)[:UPSTREAM_ITEM_CAP] or None,
+        refs,
+        verdict,
+        outcome.read_external,
+        outcome.read_private,
     )
 
 

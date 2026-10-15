@@ -12,7 +12,7 @@ Reply with a single JSON object and nothing else, with one key, units: a list of
 - role: specialist (gathers and analyses), writer (drafts deliverables) or verifier (checks another unit's output).
 - district: D1, D2 and so on, a team of related units.
 - skills: ids from the catalogue's skills that the unit uses; an empty list when none fits. Never invent an id.
-- connectors: ids from the catalogue's connectors that the unit needs; an empty list when none.
+- connectors: ids from the catalogue's connectors that the unit needs; an empty list when none. A unit that must read the person's own mail, calendar or Drive names the connector (gmail, google_calendar, google_drive) and the skill that lists its read tools (search_email, read_email, read_events, list_files, read_file); reading is not an action and needs no gate.
 - actions: the side effects the unit performs, each one an action id that one of the unit's connectors lists in the catalogue with gate_type approval. A unit that only reads has an empty list. Never invent an action.
 - depends_on: ids of the units that must finish first. A unit never depends on itself and the dependencies never loop.
 
