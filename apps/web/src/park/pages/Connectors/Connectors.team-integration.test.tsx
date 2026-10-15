@@ -72,13 +72,14 @@ it("TEAM_WEB_integration_catalogue_remains_when_owner_opens_team_controls", asyn
 
 it("TEAM_WEB_integration_people_directory_survives_failed_team_controls_read", async () => {
   const { api, fetch } = setup(true);
+  // SELF-SERVE-TEAMS (fix/LIVE7b) adds the Team page's own-teams read (/v1/teams); this test is about the
+  // directory and the team controls, so that read is left out of the call list.
+  const calls = () =>
+    fetch.mock.calls.map(([url]) => String(url)).filter((u) => !u.endsWith("/v1/teams"));
   const { root } = await renderTeam(makeApp(), api);
-  expect(fetch.mock.calls.map(([url]) => String(url))).toEqual(["https://api.test/v1/people"]);
+  expect(calls()).toEqual(["https://api.test/v1/people"]);
   await expand(root);
-  expect(fetch.mock.calls.map(([url]) => String(url))).toEqual([
-    "https://api.test/v1/people",
-    "https://api.test/v1/team",
-  ]);
+  expect(calls()).toEqual(["https://api.test/v1/people", "https://api.test/v1/team"]);
   expect(root.textContent).toContain("Actual owner");
   expect(root.textContent).toContain("Team controls are not set up on this install yet.");
   expect(root.querySelector('[data-testid="live-team"]')).not.toBeNull();
