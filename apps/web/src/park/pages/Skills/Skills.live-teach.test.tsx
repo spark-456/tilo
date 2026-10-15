@@ -1,23 +1,28 @@
 // @vitest-environment happy-dom
-// SKILLS-5 (FR-SKL-01/02/04, web half): on a live page the Teach card works against the real API: describe the
+// SKILLS-5 (FR-SKL-01/02/04, web half; STUDIO-4: through the 3-step Teach wizard): on a live page teaching works against the real API: describe the
 // skill -> the captured steps (POST /v1/skills/captures) -> Tilo's version (POST .../{id}/version) -> save
 // (POST /v1/skills). Driven through the live Api over a stubbed fetch, so the wire and the page are checked together.
 // Pinned: the server sets "Ask me first" (a forced step is locked on), the offer is "Just me" and "When I ask"
 // only, the "Saved" toast comes after a 201 and not before, a failed capture or version shows an error and never
 // sample steps, one click is one request, and nothing in the live card is a made-up number.
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, qa } from "../../../../test-support/park/componentsHarness";
+import { cleanup, q, qa } from "../../../../test-support/park/componentsHarness";
 import { CAP, PLAN } from "../../../../test-support/park/skillsCopy";
 import {
+  NEXT_EXAMPLE,
+  NEXT_REVIEW,
   type SkillsRig,
   askStates,
   askSwitches,
   clickEl,
   control,
+  currentStep,
   describeField,
   hasControl,
   isDisabled,
   mountSkills,
+  openSkill,
+  openTeach,
   pageText,
   settle,
   skillsApi,
@@ -26,6 +31,7 @@ import {
   typeInto,
 } from "../../../../test-support/park/skillsHarness";
 import { createLiveApi } from "../../api/liveApi";
+import { TRY_OFF } from "./TeachWizard";
 
 afterEach(() => {
   cleanup();
@@ -128,25 +134,29 @@ function rig(routes: Record<string, Handler> = {}): {
     proposeVersion: live.proposeVersion,
     saveSkill: live.saveSkill,
   });
-  return { server, mount: () => mountSkills({ api }) };
+  return {
+    server,
+    mount: async () => {
+      const r = await mountSkills({ api });
+      openTeach(r); // STUDIO-4: the wizard opens from the page's one primary button
+      return r;
+    },
+  };
 }
 
 const text = (r: SkillsRig) => pageText(teachCard(r.el));
 const describe_ = async (r: SkillsRig, words = "Check the invoice mail and log the total") => {
   typeInto(describeField(r.el), words);
-  clickEl(control(r.el, "Read my description"));
+  clickEl(control(r.el, NEXT_EXAMPLE));
   await settle();
 };
 const toVersion = async (r: SkillsRig) => {
   await describe_(r);
-  clickEl(control(r.el, "Show me Tilo’s version"));
+  clickEl(control(r.el, NEXT_REVIEW));
   await settle();
 };
-const toSave = async (r: SkillsRig) => {
-  await toVersion(r);
-  clickEl(control(r.el, "Looks right"));
-  await settle();
-};
+// STUDIO-4: Save sits on step 3 (Review the steps), with Tilo's version.
+const toSave = toVersion;
 const name = (r: SkillsRig, v: string) => {
   const field = qa<HTMLInputElement>(teachCard(r.el), "input").find((i) => i.value !== undefined);
   typeInto(field as HTMLInputElement, v);
@@ -165,12 +175,12 @@ describe("SKILLS_5_live_teach: describe it (step 1)", () => {
     const { mount } = rig({ "POST /v1/skills/captures": () => g.waiting });
     const r = await mount();
     typeInto(describeField(r.el), "Check the mail");
-    clickEl(control(r.el, "Read my description"));
+    clickEl(control(r.el, NEXT_EXAMPLE));
     await settle();
     const pending = r.el.querySelector("output");
     expect(pending).not.toBeNull();
     expect(pending?.textContent).toBe("Reading your description…");
-    expect(isDisabled(control(r.el, "Read my description"))).toBe(true);
+    expect(isDisabled(control(r.el, NEXT_EXAMPLE))).toBe(true);
     g.release(json(CAPTURED, 201));
     await settle();
     expect(r.el.querySelector("output")).toBeNull();
@@ -180,7 +190,7 @@ describe("SKILLS_5_live_teach: describe it (step 1)", () => {
   it("SKILLS_5_live_teach_the_first_step_is_an_empty_describe_box_and_no_sample_content", async () => {
     const r = await rig().mount();
     expect(describeField(r.el).value).toBe("");
-    expect(hasControl(r.el, "Read my description")).toBe(true);
+    expect(hasControl(r.el, NEXT_EXAMPLE)).toBe(true);
     for (const m of ["Record my screen", "Guided walkthrough", "Upload an example"])
       expect(text(r), m).not.toContain(m);
     expect(text(r)).not.toContain("Connect to start teaching");
@@ -191,26 +201,30 @@ describe("SKILLS_5_live_teach: describe it (step 1)", () => {
   it("SKILLS_5_live_teach_nothing_is_sent_for_an_empty_description", async () => {
     const { server, mount } = rig();
     const r = await mount();
-    expect(isDisabled(control(r.el, "Read my description"))).toBe(true);
+    expect(isDisabled(control(r.el, NEXT_EXAMPLE))).toBe(true);
     // W10: an empty box says what is missing instead of a silent, unexplained off button.
     expect(text(r)).toContain("Write a sentence about the work first");
     typeInto(describeField(r.el), "Check the invoice mail");
     expect(text(r)).not.toContain("Write a sentence about the work first");
     typeInto(describeField(r.el), "");
-    clickEl(control(r.el, "Read my description"));
+    clickEl(control(r.el, NEXT_EXAMPLE));
     await settle();
     expect(server.posts("/v1/skills/captures")).toEqual([]);
   });
 
-  it("W10_FR_SKL_05_signed_in_library_disables_pause_and_edit_steps_and_says_why", async () => {
+  // STUDIO-4: a live page pauses through POST /v1/skills/{id}/state; a session with no signed-in client cannot, and
+  // the sheet says so (no step editor button: a live owned skill's steps are fixed in FixSkill).
+  it("W10_FR_SKL_05_signed_in_library_without_a_client_disables_pause_and_says_why", async () => {
     const { mount } = rig({ "GET /v1/skills": () => json({ skills: [SAVED] }) });
     const r = await mount();
-    const why = "Pausing and editing steps are not available from this page yet.";
-    expect(isDisabled(control(r.el, "Pause"))).toBe(true);
-    expect(isDisabled(control(r.el, "Edit steps"))).toBe(true);
-    expect(pageText(r.el)).toContain(why);
-    clickEl(control(r.el, "Pause"));
-    clickEl(control(r.el, "Edit steps"));
+    clickEl(control(r.el, "← Back to skills"));
+    const sheet = openSkill(r.el, "Match invoices");
+    const why = "Pausing is not available in this session.";
+    expect(isDisabled(control(sheet, "Pause"))).toBe(true);
+    expect(isDisabled(control(sheet, "Test run"))).toBe(true);
+    expect(pageText(sheet)).toContain(why);
+    clickEl(control(sheet, "Pause"));
+    expect(hasControl(sheet, "Edit steps")).toBe(false);
     expect(toasts(r.app)).toEqual([]);
   });
 
@@ -223,7 +237,7 @@ describe("SKILLS_5_live_teach: describe it (step 1)", () => {
     ]);
     expect(text(r)).toContain("Open the invoice mail");
     expect(text(r)).toContain("Note the total");
-    expect(text(r)).toContain("2 of 2");
+    expect(currentStep(r.el)).toBe("Show an example"); // STUDIO-4: the read steps are step 2
   });
 
   it("SKILLS_5_live_teach_two_clicks_before_the_answer_make_one_request", async () => {
@@ -231,8 +245,8 @@ describe("SKILLS_5_live_teach: describe it (step 1)", () => {
     const { server, mount } = rig({ "POST /v1/skills/captures": () => g.waiting });
     const r = await mount();
     typeInto(describeField(r.el), "Check the mail");
-    clickEl(control(r.el, "Read my description"));
-    clickEl(control(r.el, "Read my description"));
+    clickEl(control(r.el, NEXT_EXAMPLE));
+    clickEl(control(r.el, NEXT_EXAMPLE));
     await settle();
     expect(server.posts("/v1/skills/captures")).toHaveLength(1);
     g.release(json(CAPTURED, 201));
@@ -254,9 +268,9 @@ describe("SKILLS_5_live_teach: a capture the server cannot make", () => {
     expect(pageText(r.el.querySelector('[data-testid="skills-teach-error"] p') as Element)).toBe(
       line,
     );
-    expect(text(r)).toContain("0 of 0");
     for (const l of CAP.describe) expect(text(r)).not.toContain(l);
-    expect(isDisabled(control(r.el, "Show me Tilo’s version"))).toBe(true);
+    expect(currentStep(r.el)).toBe("Describe it"); // STUDIO-4: no steps read, so no way on to step 2
+    expect(hasControl(r.el, NEXT_REVIEW)).toBe(false);
   });
 
   it.each([{ oops: 1 }, { capture_id: "tsk_C1", captured_steps: [] }])(
@@ -265,7 +279,7 @@ describe("SKILLS_5_live_teach: a capture the server cannot make", () => {
       const r = await rig({ "POST /v1/skills/captures": () => json(body, 201) }).mount();
       await describe_(r);
       expect(r.el.querySelector('[data-testid="skills-teach-error"]')).not.toBeNull();
-      expect(isDisabled(control(r.el, "Show me Tilo’s version"))).toBe(true);
+      expect(hasControl(r.el, NEXT_REVIEW)).toBe(false);
     },
   );
 
@@ -277,7 +291,7 @@ describe("SKILLS_5_live_teach: a capture the server cannot make", () => {
     }).mount();
     await describe_(r);
     expect(r.el.querySelector('[data-testid="skills-teach-error"]')).not.toBeNull();
-    clickEl(control(r.el, "Read my description"));
+    clickEl(control(r.el, NEXT_EXAMPLE));
     await settle();
     expect(r.el.querySelector('[data-testid="skills-teach-error"]')).toBeNull();
     expect(text(r)).toContain("Note the total");
@@ -316,8 +330,8 @@ describe("SKILLS_5_live_teach: Tilo's version (step 2)", () => {
     const { server, mount } = rig({ "POST /v1/skills/captures/tsk_C1/version": () => g.waiting });
     const r = await mount();
     await describe_(r);
-    clickEl(control(r.el, "Show me Tilo’s version"));
-    clickEl(control(r.el, "Show me Tilo’s version"));
+    clickEl(control(r.el, NEXT_REVIEW));
+    clickEl(control(r.el, NEXT_REVIEW));
     await settle();
     expect(server.posts("/v1/skills/captures/tsk_C1/version")).toHaveLength(1);
     g.release(json(VERSION));
@@ -372,18 +386,21 @@ describe("SKILLS_5_live_teach: Tilo's version (step 2)", () => {
   it("SKILLS_5_live_teach_there_is_no_practice_run_to_start_live", async () => {
     const r = await rig().mount();
     await toVersion(r);
-    expect(hasControl(r.el, "Let Tilo try it")).toBe(false);
-    expect(hasControl(r.el, "Looks right")).toBe(true);
+    // STUDIO-4: Try it once has no route yet, so it is off and says so; nothing pretends to run.
+    expect(isDisabled(control(r.el, "Try it once"))).toBe(true);
+    expect(text(r)).toContain(TRY_OFF);
+    expect(hasControl(r.el, "Save skill")).toBe(true);
   });
 });
 
 describe("SKILLS_5_live_teach: save (step 4)", () => {
   it("SKILLS_5_live_teach_save_offers_just_me_and_when_I_ask_only", async () => {
     const r = await rig().mount();
+    const chips = () => qa(teachCard(r.el), "fieldset button").map((e) => pageText(e));
+    expect(chips()).toEqual(["When I ask"]); // STUDIO-4: when it runs is asked on step 1
     await toSave(r);
     expect(hasControl(r.el, "Save skill")).toBe(true);
-    const picks = qa(teachCard(r.el), ".park-skills-pick").map((e) => pageText(e));
-    expect(picks).toEqual(["Just me", "When I ask"]);
+    expect(chips()).toEqual(["Just me"]); // and who can use it on step 3
   });
 
   it("SKILLS_5_live_teach_save_posts_the_servers_steps_and_shows_Saved_only_after_a_201", async () => {
@@ -421,8 +438,6 @@ describe("SKILLS_5_live_teach: save (step 4)", () => {
     const r = await mount();
     await toVersion(r);
     clickEl(askSwitches(r.el)[0] as HTMLElement);
-    clickEl(control(r.el, "Looks right"));
-    await settle();
     name(r, "Match invoices");
     clickEl(control(r.el, "Save skill"));
     await settle();
@@ -451,10 +466,13 @@ describe("SKILLS_5_live_teach: save (step 4)", () => {
     name(r, "Match invoices");
     clickEl(control(r.el, "Save skill"));
     await settle();
-    const lib = pageText(r.el);
+    expect(text(r)).toContain("“Match invoices” is now a skill");
+    clickEl(control(r.el, "View in skills")); // STUDIO-4: back to the gallery, its sheet open
+    const sheet = q(r.el, '[role="dialog"]');
+    const lib = pageText(sheet);
     expect(lib).toContain("Match invoices");
     expect(lib).toMatch(/Learning/);
-    const runs = qa(r.el, "*").find((e) => pageText(e) === "Runs");
+    const runs = qa(sheet, "*").find((e) => pageText(e) === "Runs");
     expect(pageText(runs?.nextElementSibling as Element)).toBe("—");
   });
 

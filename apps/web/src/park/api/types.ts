@@ -244,6 +244,8 @@ export interface Skill {
   steps: string[];
   fix?: { version: number; asks: boolean[]; locked: boolean[] };
   ask?: { q: string; a: string[] };
+  /** STUDIO-4: the served record says the skill is paused (live only; absent otherwise). */
+  paused?: boolean;
   /** SKILLS-3: what the teach card chose, so `saveSkill` can post it (scope, trigger and each step's tool); never served. */
   draft?: SkillDraft;
 }

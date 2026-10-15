@@ -16,7 +16,7 @@ import type { AgentSpec, H } from "../../src/park/engines/types";
 import { SkillsPage } from "../../src/park/pages/Skills/SkillsPage";
 import { stubApp } from "./appHarness";
 import { type Mounted, mount, press, q, qa } from "./componentsHarness";
-import { DROP, PLAN, STEP_LABELS, TRY } from "./skillsCopy";
+import { STEP_LABELS } from "./skillsCopy";
 
 // ---- fake clock ------------------------------------------------------------------------------------
 
@@ -213,84 +213,24 @@ export const toasts = (app: AppCtx): unknown[][] => (app.toast as unknown as Moc
 export const goCalls = (app: AppCtx): [unknown, unknown][] =>
   (app.go as unknown as Mock).mock.calls.map((c) => [c[0], c[1]]);
 
-// ---- the Teach card --------------------------------------------------------------------------------
+// ---- the Teach wizard (STUDIO-4: three steps, Describe it, Show an example, Review the steps) ------------------
 
-export const teachCard = (root: ParentNode): HTMLElement =>
-  q(root, 'section[aria-label="Teach a skill"]');
+/** The wizard: the page swaps the gallery for it once "+ Teach Tilo a skill" is pressed. */
+export const teachCard = (root: ParentNode): HTMLElement => q(root, '[data-testid="skills-teach"]');
 export const stepBar = (root: ParentNode): HTMLElement =>
   q(teachCard(root), 'ol[aria-label="Steps"]');
-export const stepButtons = (root: ParentNode): HTMLElement[] => qa(stepBar(root), "li button");
-export function stepButton(root: ParentNode, label: string): HTMLElement {
-  const hit = stepButtons(root).find((b) => flat(textOf(b)).endsWith(flat(label)));
-  if (!hit) throw new Error(`no step "${label}"`);
-  return hit;
-}
 /** The label of the step marked aria-current="step". */
 export const currentStep = (root: ParentNode): string | undefined => {
-  const marked = stepButtons(root).filter((b) => b.getAttribute("aria-current") === "step");
+  const marked = qa(stepBar(root), "li").filter((b) => b.getAttribute("aria-current") === "step");
   if (marked.length !== 1) return undefined;
-  return STEP_LABELS.find((l) => flat(textOf(marked[0] as HTMLElement)).endsWith(flat(l)));
+  return STEP_LABELS.find((l) => flat(textOf(marked[0] as HTMLElement)).includes(flat(l)));
 };
-/** Which of the four steps can be pressed right now. */
-export const reachable = (root: ParentNode): boolean[] =>
-  stepButtons(root).map((b) => !isDisabled(b));
 
-/** The method tile whose text starts with `name` (the tile also holds its one-line description). */
-export function methodTile(root: ParentNode, name: string): HTMLElement {
-  const hit = qa(teachCard(root), "button").find((b) => textOf(b).startsWith(name));
-  if (!hit) throw new Error(`no method "${name}"`);
-  return hit;
-}
-
-/** The N of "N of 4" in "What Tilo has picked up". */
-export function pickedCount(root: ParentNode): number | null {
-  const el = elWithText(teachCard(root), /^\d of 4$/);
-  return el ? Number.parseInt(textOf(el), 10) : null;
-}
-
+/** The skill name field: the first text input of the wizard step (steps 1 and 3 hold one). */
 export const skillNameField = (root: ParentNode): HTMLInputElement =>
-  q<HTMLInputElement>(teachCard(root), 'input[aria-label="Skill name"], label input');
+  q<HTMLInputElement>(teachCard(root), "input");
 export const describeField = (root: ParentNode): HTMLTextAreaElement =>
-  q<HTMLTextAreaElement>(root, 'textarea[aria-label="Describe the task"]');
-
-const STATUS = /(Working…|Waiting|Done|Asking you)/;
-/** The status word of each of the four run steps ("Working…", "Waiting", "Done", "Asking you"). */
-export function runStatuses(root: ParentNode): string[] {
-  return PLAN.map((p) => {
-    const el = elWithText(root, p.text);
-    if (!el) return "(missing)";
-    let row: Element = el;
-    for (let n = el.parentElement; n && root.contains(n); n = n.parentElement) {
-      const t = textOf(n);
-      if (PLAN.some((o) => o.text !== p.text && t.includes(o.text))) break;
-      row = n;
-    }
-    return textOf(row).match(STATUS)?.[1] ?? "(none)";
-  });
-}
-/** The pill over the practice run: "Step N of 4", "Waiting for you" or "Finished". */
-export const runPill = (root: ParentNode): string | undefined => {
-  const el = elWithText(root, /^(Step \d of 4|Waiting for you|Finished)$/);
-  return el ? textOf(el) : undefined;
-};
-
-/** The dropzone of "Upload an example": the one button whose text starts with its title. */
-export function dropzone(root: ParentNode): HTMLElement {
-  const hit = qa(teachCard(root), "button").find((b) =>
-    flat(textOf(b)).startsWith(flat(DROP.title)),
-  );
-  if (!hit) throw new Error("no dropzone");
-  return hit;
-}
-
-/** The row of plan step `index` (0-based) in Tilo's version: the nearest ancestor of its text that holds a switch. */
-export function planRow(root: ParentNode, index: number): HTMLElement {
-  const text = PLAN[index]?.text ?? "";
-  let n: HTMLElement | null = elWithText(teachCard(root), text) ?? null;
-  while (n && !n.querySelector('[role="switch"]')) n = n.parentElement;
-  if (!n) throw new Error(`no plan row for "${text}"`);
-  return n;
-}
+  q<HTMLTextAreaElement>(teachCard(root), "textarea");
 
 /** The "Ask me first" switches of Tilo's version, in plan order. */
 export const askSwitches = (root: ParentNode): HTMLElement[] =>
@@ -303,32 +243,37 @@ export function estimate(root: ParentNode, label: string): string | undefined {
   return k?.nextElementSibling ? textOf(k.nextElementSibling) : undefined;
 }
 
+// ---- the gallery and the detail sheet ------------------------------------------------------------------
+
+/** Opens one skill's detail sheet from its card in "All skills" and returns the sheet. */
+export function openSkill(root: ParentNode, name: string): HTMLElement {
+  const gallery = q(root, 'section[aria-label="All skills"]');
+  const card = qa(gallery, "button").find((b) => textOf(b).includes(name));
+  if (!card) throw new Error(`no skill card "${name}"`);
+  clickEl(card);
+  return q(root, '[role="dialog"]');
+}
+
 // ---- drivers: move the flow along ------------------------------------------------------------------
 
-/** Describe it, then Read my description: four steps captured at once, no timer. */
-export function captureByDescribing(rig: SkillsRig): void {
-  clickEl(methodTile(rig.el, "Describe it"));
-  clickEl(control(rig.el, "Read my description"));
+export const START = "+ Teach Tilo a skill";
+export const NEXT_EXAMPLE = "Next: show an example →";
+export const NEXT_REVIEW = "Next: review the steps →";
+
+export function openTeach(rig: SkillsRig): void {
+  clickEl(control(rig.el, START));
 }
-export function toTilosVersion(rig: SkillsRig): void {
-  captureByDescribing(rig);
-  clickEl(control(rig.el, "Show me Tilo’s version"));
+/** Step 1 to step 2: on the sample data the description is read at once (no timer). */
+export function toExample(rig: SkillsRig): void {
+  openTeach(rig);
+  clickEl(control(rig.el, NEXT_EXAMPLE));
 }
-export function toTryRun(rig: SkillsRig): void {
-  toTilosVersion(rig);
-  clickEl(control(rig.el, "Let Tilo try it"));
+export function toReview(rig: SkillsRig): void {
+  toExample(rig);
+  clickEl(control(rig.el, NEXT_REVIEW));
 }
-/** With the default asks: runs to the pause at step 3, answers it, runs to the end. */
-export function finishRun(rig: SkillsRig): void {
-  rig.clock.advance(3 * 900);
-  clickEl(control(rig.el, TRY.yes));
-  rig.clock.advance(900);
-}
-export function toSave(rig: SkillsRig): void {
-  toTryRun(rig);
-  finishRun(rig);
-  clickEl(control(rig.el, "Looks right"));
-}
+/** Save sits on step 3, Review the steps. */
+export const toSave = toReview;
 
 export { press };
 
@@ -367,6 +312,3 @@ async function artOf(node: ReactNode): Promise<string> {
 /** One agent as the design's kit draws it (`K.agent(spec, size, night)`), to look for in `artIn(...)`. */
 export const agentArt = (spec: AgentSpec, size: number, night = false): Promise<string> =>
   artOf(kit().agent(spec, size, night) as ReactNode);
-/** The desk building of the practice run (`K.building('desk', state, 'analysis', 150, night)`). */
-export const deskArt = (state: string, night = false): Promise<string> =>
-  artOf(kit().building("desk", state, "analysis", 150, night) as ReactNode);

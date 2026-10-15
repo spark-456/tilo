@@ -11,6 +11,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, q, qa } from "../../../../test-support/park/componentsHarness";
 import {
+  NEXT_EXAMPLE,
+  NEXT_REVIEW,
   choice,
   clickEl,
   control,
@@ -20,11 +22,12 @@ import {
   isDisabled,
   isOn,
   mountSkills,
+  openSkill,
+  openTeach,
   pageText,
   skillNameField,
   skillsApi,
   textOf,
-  toSave,
   toasts,
   typeInto,
 } from "../../../../test-support/park/skillsHarness";
@@ -38,8 +41,9 @@ afterEach(() => {
 
 const helpSection = (root: ParentNode): HTMLElement =>
   q(root, 'section[aria-label="Help your agents get better"]');
+// STUDIO-4: the library is the gallery ("All skills"); one skill's detail opens in a side sheet (openSkill).
 const librarySection = (root: ParentNode): HTMLElement =>
-  q(root, 'section[aria-label="Learned skills"]');
+  q(root, 'section[aria-label="All skills"]');
 
 describe("FR-SKL-04: Save a skill and Learned skills library", () => {
   it("test_FR_SKL_04_save_skill_with_name_scope_and_trigger_starts_as_learning_and_appears_in_library", async () => {
@@ -51,11 +55,13 @@ describe("FR-SKL-04: Save a skill and Learned skills library", () => {
     expect(pageText(libBefore)).toContain("Log new supplier invoices");
     expect(pageText(libBefore)).toContain("Draft");
 
-    // Complete teach flow to Save step, configure name, scope, and trigger
-    toSave(rig);
+    // Complete the teach wizard: when it runs on step 1, then name and scope on step 3, then Save
+    openTeach(rig);
+    clickEl(choice(rig.el, "Weekdays 09:00"));
+    clickEl(control(rig.el, NEXT_EXAMPLE));
+    clickEl(control(rig.el, NEXT_REVIEW));
     typeInto(skillNameField(rig.el), "Auto-log supplier invoices");
     clickEl(choice(rig.el, "Just me"));
-    clickEl(choice(rig.el, "Weekdays 09:00"));
     clickEl(control(rig.el, "Save skill"));
 
     expect(api.saveSkill).toHaveBeenCalledTimes(1);
@@ -68,12 +74,14 @@ describe("FR-SKL-04: Save a skill and Learned skills library", () => {
       rate: 100,
     });
 
-    // Saved skill appears in the library as Learning and is selected
-    const libAfter = librarySection(rig.el);
-    expect(pageText(libAfter)).toContain("Auto-log supplier invoices");
-    expect(pageText(libAfter)).toContain("FINANCE · LEARNING");
-    expect(pageText(libAfter)).toContain("Owned by Alex Morgan · learned from taught by you");
-    expect(pageText(libAfter)).toContain("£0.38 a run");
+    // Saved skill appears in the library as Learning, its sheet open
+    clickEl(control(rig.el, "View in skills"));
+    expect(pageText(librarySection(rig.el))).toContain("Auto-log supplier invoices");
+    const sheet = q(rig.el, '[role="dialog"]');
+    expect(pageText(sheet)).toContain("Auto-log supplier invoices");
+    expect(pageText(sheet)).toContain("Learning");
+    expect(pageText(sheet)).toContain("Owned by Alex Morgan · Finance");
+    expect(pageText(sheet)).toContain("£0.38");
   });
 
   it("test_FR_SKL_04_learned_skills_library_search_and_selection_shows_steps_and_cost", async () => {
@@ -86,13 +94,12 @@ describe("FR-SKL-04: Save a skill and Learned skills library", () => {
     expect(pageText(lib)).toContain("Scan competitor prices");
     expect(pageText(lib)).not.toContain("Summarise call notes");
 
-    // Select "Scan competitor prices" and inspect detail view
-    const rowBtn = qa(lib, "button").find((b) => textOf(b).startsWith("Scan competitor prices"));
-    expect(rowBtn).toBeDefined();
-    clickEl(rowBtn as HTMLElement);
-    expect(pageText(lib)).toContain("SALES · TRUSTED");
-    expect(pageText(lib)).toContain("Open the 14 competitor product pages");
-    expect(pageText(lib)).toContain("49% cheaper than the first run");
+    // Open "Scan competitor prices" and inspect its sheet
+    const sheet = openSkill(rig.el, "Scan competitor prices");
+    expect(pageText(sheet)).toContain("Trusted");
+    expect(pageText(sheet)).toContain("Sales");
+    expect(pageText(sheet)).toContain("Open the 14 competitor product pages");
+    expect(pageText(sheet)).toContain("49% cheaper than the first run");
   });
 });
 
@@ -133,13 +140,10 @@ describe("FR-SKL-05: Rate and fix runs", () => {
     expect(pageText(help)).toContain("Fix saved");
     expect(toasts(rig.app)).toContainEqual(["Fix saved. The next run uses it"]);
 
-    // Select "Triage the Accounts inbox" in the library: the logged fix is applied to its step and next run
-    const lib = librarySection(rig.el);
-    const triageRow = qa(lib, "button").find((b) =>
-      textOf(b).startsWith("Triage the Accounts inbox"),
+    // Open "Triage the Accounts inbox": the logged fix is applied to its step and next run
+    expect(pageText(openSkill(rig.el, "Triage the Accounts inbox"))).toContain(
+      "Check PO status before drafting reply",
     );
-    clickEl(triageRow as HTMLElement);
-    expect(pageText(lib)).toContain("Check PO status before drafting reply");
   });
 });
 
@@ -147,7 +151,6 @@ describe("FR-SKL-06: Trust and pause", () => {
   it("test_FR_SKL_06_ready_for_review_run_history_bars_mark_as_trusted_and_keep_learning", async () => {
     const rig = await mountSkills();
     const help = helpSection(rig.el);
-    const lib = librarySection(rig.el);
 
     // Run-history bars are rendered for both review items (12 bars + 6 bars)
     const barCharts = qa(help, '[role="img"]');
@@ -164,10 +167,10 @@ describe("FR-SKL-06: Trust and pause", () => {
     expect(toasts(rig.app)).toContainEqual(["“Draft a supplier brief” is trusted"]);
     expect(elWithText(rig.el, "5 trusted")).toBeDefined();
 
-    // Select "Draft a supplier brief" in library -> now Trusted
-    const briefRow = qa(lib, "button").find((b) => textOf(b).startsWith("Draft a supplier brief"));
-    clickEl(briefRow as HTMLElement);
-    expect(pageText(lib)).toContain("SUPPLY CHAIN · TRUSTED");
+    // Open "Draft a supplier brief" -> now Trusted
+    const sheet = openSkill(rig.el, "Draft a supplier brief");
+    expect(pageText(sheet)).toContain("Trusted");
+    clickEl(q(sheet, 'button[aria-label="Close"]'));
 
     // Click "Keep learning" on the second review item ("Check firmware test results")
     clickEl(control(help, "Keep learning"));
@@ -197,22 +200,24 @@ describe("FR-SKL-06: Trust and pause", () => {
     expect(pageText(help)).not.toContain("Trusted. Tilo stops asking before routine steps.");
   });
 
-  it("W10_FR_SKL_05_demo_edit_steps_says_nothing_opened_or_changed", async () => {
+  // STUDIO-4: the sheet offers no step editor that pretends to open; a new version is taught in the wizard.
+  it("W10_FR_SKL_05_demo_offers_no_step_editor_and_teaching_a_new_version_opens_the_wizard", async () => {
     const rig = await mountSkills();
-    clickEl(control(librarySection(rig.el), "Edit steps"));
-    expect(toasts(rig.app)).toContainEqual([
-      "Sample data: step editing is not available yet, so nothing was changed.",
-    ]);
+    const sheet = openSkill(rig.el, "Match invoices to purchase orders");
+    expect(hasControl(sheet, "Edit steps")).toBe(false);
+    clickEl(control(sheet, "Teach a new version"));
+    expect(q(rig.el, '[data-testid="skills-teach"]')).toBeTruthy();
+    expect(skillNameField(rig.el).value).toBe("Match invoices to purchase orders");
     expect(pageText(rig.el)).not.toContain("Step editor opens here");
   });
 
   it("test_FR_SKL_06_pause_and_resume_and_paused_skill_never_starts", async () => {
     const rig = await mountSkills();
-    const lib = librarySection(rig.el);
+    const lib = openSkill(rig.el, "Match invoices to purchase orders");
 
-    // Pause the currently selected skill ("Match invoices to purchase orders")
+    // Pause it (sample data: this page only, and it says so)
     clickEl(control(lib, "Pause"));
-    expect(pageText(lib)).toContain("FINANCE · PAUSED");
+    expect(pageText(lib)).toContain("Paused");
     expect(toasts(rig.app)).toContainEqual([
       "Sample data: “Match invoices to purchase orders” is paused on this page only. Nothing changed for your worlds",
     ]);
@@ -224,17 +229,14 @@ describe("FR-SKL-06: Trust and pause", () => {
     clickEl(testRunBtn);
     expect(toasts(rig.app)).toHaveLength(toastCountAfterPause);
 
-    // Resume the skill -> can run again
+    // Resume the skill -> trusted again; a test run still has no route, so it stays off and says so (STUDIO-4)
     clickEl(control(lib, "Resume"));
-    expect(pageText(lib)).toContain("FINANCE · TRUSTED");
+    expect(pageText(lib)).toContain("Trusted");
     expect(toasts(rig.app)).toContainEqual([
       "Sample data: “Match invoices to purchase orders” is shown as running again on this page only",
     ]);
-    expect(isDisabled(control(lib, "Test run"))).toBe(false);
-    clickEl(control(lib, "Test run"));
-    expect(toasts(rig.app)).toContainEqual([
-      "Test runs are not connected yet. Nothing was started.",
-    ]);
+    expect(isDisabled(control(lib, "Test run"))).toBe(true);
+    expect(pageText(lib)).toContain("Test runs are not available yet.");
   });
 });
 

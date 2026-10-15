@@ -17,6 +17,10 @@ export const icon = (name: string, size: number): ReactNode => kit().icon(name, 
 export const agent = (spec: AgentSpec, size: number, night: boolean): ReactNode =>
   kit().agent(spec, size, night) as ReactNode;
 
-/** The desk of the practice run, in the state the run is in. */
-export const desk = (state: string, night: boolean): ReactNode =>
-  kit().building("desk", state, "analysis", 150, night) as ReactNode;
+/** STUDIO-4: one teach step's building, still, in the state the step is in (planned, construction, complete). */
+export const stepBuilding = (
+  kind: string,
+  state: string,
+  district: string,
+  night: boolean,
+): ReactNode => kit().building(kind, state, district, 130, night) as ReactNode;

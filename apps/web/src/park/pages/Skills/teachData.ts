@@ -1,136 +1,34 @@
-// The copy and the flow data of the Skills page's header and its "Teach Tilo something new" card, taken from
-// design_handoff_tilo_web_app/design/Tilo App Skills.dc.html (the markup and `renderVals`). The Api serves none
-// of it (a teaching session has no endpoint yet), so it is page-local, as the Home composer's copy is. Nothing
-// here names the person, the company or a skill of the sample data: those come from the Api.
+// The copy and the sample flow data of the Skills page and its Teach wizard (STUDIO-4, design/studio-v2 "Tilo S
+// Skills"; the sample plan and question come from the earlier design_handoff_tilo_web_app "Tilo App Skills"). The Api
+// serves none of the sample: a live page shows only what the server answered. Nothing here names the person, the
+// company or a skill of the sample data: those come from the Api.
 import type { Ledger, Skill } from "../../api/types";
 import { type CurrencyCode, STEP_LEDGER_PRICES, runMoney } from "../../app/ledgerKpis";
 import { SKILL_TRUST_CONFIG } from "./skillConfig";
 
 export { STEP_LEDGER_PRICES };
 
+/** STUDIO-4 (design/studio-v2 "Tilo S Skills"), without the design's "Use one in a task" (no such action yet). */
 export const INTRO =
-  "Teach your agents new work, help them get better, and choose which tools they may touch. Every repeat of a skill gets faster and cheaper.";
+  "Things your helpers already know how to do. Open one to see its steps, or teach Tilo something new.";
 
 /** One captured step / one run step every 900 ms (README Skills 2). */
-export const STEP_MS = 900;
+/** Sample data: the four steps read from the sample description. */
 export const CAPTURE_STEPS = 4;
-
-export const STEP_LABELS = ["Show it", "Tilo’s version", "Try run", "Save"] as const;
-
-export type MethodKey = "record" | "guided" | "describe" | "upload";
-export interface Method {
-  key: MethodKey;
-  name: string;
-  desc: string;
-  icon: string;
-}
-export const METHODS: readonly Method[] = [
-  {
-    key: "record",
-    name: "Record my screen",
-    desc: "Do it once while Tilo watches",
-    icon: "screen",
-  },
-  {
-    key: "guided",
-    name: "Guided walkthrough",
-    desc: "Click through it in Tilo’s browser",
-    icon: "eye",
-  },
-  { key: "describe", name: "Describe it", desc: "Explain in words, Tilo tries it", icon: "pen" },
-  {
-    key: "upload",
-    name: "Upload an example",
-    desc: "A finished doc, video or sheet",
-    icon: "upload",
-  },
-];
-
-/** What the mock browser says for the two screen methods (the record address is built from the person's mail domain). */
-export const GUIDED = {
-  url: "Tilo browser · Accounts inbox",
-  hint: "Tilo highlights what it sees and asks as you go.",
-  start: "Start walkthrough",
-} as const;
-export const RECORD = {
-  hint: "Do the task as normal. Tilo notes each step.",
-  start: "Start recording",
-} as const;
-export const CAPTURED_HINT = "Got it. 4 steps captured.";
-/** Widths of the four mock rows, in percent. */
-export const MOCK_ROWS = [62, 48, 70, 40] as const;
-
-export const CAP: Record<MethodKey, readonly string[]> = {
-  record: [
-    "Opened the new email from Northline in the Accounts inbox",
-    "Downloaded the attached PDF invoice",
-    "Copied supplier, amount and due date into “Invoices 2026”",
-    "Labelled the email “Logged”",
-  ],
-  guided: [
-    "Opened the newest invoice in the Accounts inbox",
-    "Opened the PDF in the preview",
-    "Pasted supplier, amount and due date into “Invoices 2026”",
-    "Moved the email to the Logged folder",
-  ],
+export const CAP = {
   describe: [
     "Watch the Accounts inbox for invoice emails",
     "Open the attached PDF",
     "Copy supplier, amount and due date into “Invoices 2026”",
     "Label the email “Logged”",
   ],
-  upload: [
-    "Found 3 sheets in invoice-log-example.xlsx",
-    "Columns: supplier, invoice number, amount, due date",
-    "Each row matches one email in the Accounts inbox",
-    "Emails with a row are labelled “Logged”",
-  ],
-};
-
-export interface CaptureFixtureEvent {
-  readonly seq: number;
-  readonly type: "skill.capture.step";
-  readonly method: MethodKey;
-  readonly stepIndex: number;
-  readonly text: string;
-  readonly delayMs: number;
-  readonly source: "fixture";
-}
-
-export const CAPTURE_FIXTURE_EVENTS = Object.fromEntries(
-  METHODS.map(({ key }) => [
-    key,
-    CAP[key].map(
-      (text, stepIndex): CaptureFixtureEvent => ({
-        seq: stepIndex + 1,
-        type: "skill.capture.step",
-        method: key,
-        stepIndex,
-        text,
-        delayMs: STEP_MS,
-        source: "fixture",
-      }),
-    ),
-  ]),
-) as unknown as Record<MethodKey, readonly CaptureFixtureEvent[]>;
+} as const;
 
 export const DEFAULT_DESC =
   "When an invoice email arrives in the Accounts inbox, open the PDF, copy the supplier, amount and due date into the “Invoices 2026” sheet, then label the email “Logged”.";
-/** W10: with nothing written the read button is off, and the line beside it says what is missing. */
-export const DESCRIBE_EMPTY =
-  "Write a sentence about the work first, then press Read my description.";
-export const DESCRIBE_HELP =
-  "Write it like you’d explain it to a new colleague. Tilo asks if anything is unclear.";
-/** No API session (a demo): "Read my description" cannot read the text, so the steps are a sample and say so (HR-1). */
+/** No API session (a demo): Tilo cannot read the description, so the steps are a sample and say so (HR-1). */
 export const DESCRIBE_SAMPLE =
   "Sample only: the steps below are an example, not read from your description. Real steps need sign-in.";
-export const DROP = {
-  title: "Drop an example here",
-  sub: "A finished spreadsheet, document or short screen video. Or click to use a sample.",
-  doneTitle: "invoice-log-example.xlsx",
-  doneSub: "3 sheets · 128 rows · Tilo read the pattern",
-} as const;
-export const NO_STEPS_YET = "Steps appear here as Tilo watches.";
 
 export const PLAN = [
   {
@@ -154,101 +52,6 @@ export const QUESTION = {
   text: "Some invoices arrive as a link, not a PDF. What should I do?",
   answers: ["Open the link", "Ask me each time", "Skip and flag it"],
 } as const;
-export const LEARN_NOTE =
-  "Tilo tries this once on a real invoice from today. Nothing is posted without your OK while the skill is learning.";
-export const BUBBLE_TAIL =
-  ". Change anything that looks wrong, and tell me where to stop and ask you.";
-
-export const TRY = {
-  practice: "Practice run · Northline invoice #2291",
-  prompt: "Northline Components · £1,240.00 · due 9 Oct",
-  promptTail: " to Invoices 2026?",
-  yes: "Yes, add it",
-  resultTitle: "Matched your way of doing it",
-  resultSub: "4 of 4 steps · 1 min 08s · £0.38",
-} as const;
-
-export interface TryRunFixtureEvent {
-  readonly seq: number;
-  readonly type: "skill.try_run.step";
-  readonly stepIndex: number;
-  readonly text: string;
-  readonly matched: boolean;
-  readonly durationSec: number;
-  readonly cost: number;
-  readonly delayMs: number;
-  readonly source: "fixture";
-}
-
-/** Fixture events driving the practice try-run (sum: 4 matched steps, 68s = 1 min 08s, £0.38). */
-export const TRY_RUN_FIXTURE_EVENTS: readonly TryRunFixtureEvent[] = [
-  {
-    seq: 1,
-    type: "skill.try_run.step",
-    stepIndex: 0,
-    text: PLAN[0].text,
-    matched: true,
-    durationSec: 14,
-    cost: 0.05,
-    delayMs: STEP_MS,
-    source: "fixture",
-  },
-  {
-    seq: 2,
-    type: "skill.try_run.step",
-    stepIndex: 1,
-    text: PLAN[1].text,
-    matched: true,
-    durationSec: 18,
-    cost: 0.09,
-    delayMs: STEP_MS,
-    source: "fixture",
-  },
-  {
-    seq: 3,
-    type: "skill.try_run.step",
-    stepIndex: 2,
-    text: PLAN[2].text,
-    matched: true,
-    durationSec: 21,
-    cost: 0.14,
-    delayMs: STEP_MS,
-    source: "fixture",
-  },
-  {
-    seq: 4,
-    type: "skill.try_run.step",
-    stepIndex: 3,
-    text: PLAN[3].text,
-    matched: true,
-    durationSec: 15,
-    cost: 0.1,
-    delayMs: STEP_MS,
-    source: "fixture",
-  },
-];
-
-export function formatTryRunResult(
-  events: readonly Pick<TryRunFixtureEvent, "matched" | "durationSec" | "cost">[],
-  totalSteps: number = PLAN.length,
-  currency: CurrencyCode | Pick<Ledger, "currency"> = "GBP",
-): { title: string; sub: string } {
-  const matched = events.filter((e) => e.matched).length;
-  const totalSec = events.reduce((sum, e) => sum + e.durationSec, 0);
-  const totalCost = events.reduce((sum, e) => sum + e.cost, 0);
-  const mins = Math.floor(totalSec / 60);
-  const secs = String(totalSec % 60).padStart(2, "0");
-  const dur = mins > 0 ? `${mins} min ${secs}s` : `${totalSec}s`;
-  const title =
-    matched === totalSteps
-      ? TRY.resultTitle
-      : `Matched ${matched} of ${totalSteps} steps of your way`;
-  return {
-    title,
-    sub: `${matched} of ${totalSteps} steps · ${dur} · ${runMoney(totalCost, currency)}`,
-  };
-}
-
 export const SAVE = {
   nameLabel: "Skill name",
   who: "Who can use it",

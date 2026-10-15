@@ -89,7 +89,7 @@ describe("WEB_8a_skills_schedule: the page registry", () => {
     });
     await settle();
     expect(q(m.container, "h1").textContent).toBe("Skills");
-    expect(q(m.container, 'section[aria-label="Teach a skill"]')).toBeTruthy();
+    expect(q(m.container, 'section[aria-label="Teach Tilo a skill"]')).toBeTruthy(); // STUDIO-4 banner
     expect(m.container.textContent).not.toContain("Not built yet");
     expect(qa(m.container, '[data-testid="park-page-skills"]')).toHaveLength(1);
   });
