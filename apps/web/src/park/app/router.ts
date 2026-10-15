@@ -26,6 +26,7 @@ const isPageId = (s: string | undefined): s is PageId => PAGE_IDS.some((p) => p 
 const ROOT_PAGES = new Set<string>([
   "worlds",
   "team",
+  "join",
   "connectors",
   "skills",
   "agenda",

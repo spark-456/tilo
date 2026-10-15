@@ -14,6 +14,7 @@ import { legalKind } from "./legal/legalPaths";
 import { takeCallbackParams } from "./oauth/capture";
 import { isOAuthCallback } from "./oauth/paths";
 import { adminRedirect } from "./park/app/adminRedirect";
+import { captureJoinToken } from "./park/pages/Join/joinToken";
 import { usePathname } from "./router";
 import { type ViewRoute, parseViewPath, viewTitle } from "./worldView/routes";
 
@@ -71,6 +72,7 @@ function AccessGuard({ children }: { children: ReactNode }) {
 }
 
 export function Root() {
+  captureJoinToken();
   const pathname = usePathname();
   // A bookmark of a retired screen (the old intake flow, mail, the team console) is replaced by its Park home before it renders.
   const redirect = adminRedirect(pathname, window.location.search);

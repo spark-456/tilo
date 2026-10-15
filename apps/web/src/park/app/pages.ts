@@ -15,6 +15,7 @@ export const PAGES: Record<PageId, LazyExoticComponent<ComponentType<{ app: AppC
   agenda: lazy(() => import("../pages/Agenda/AgendaPage").then((m) => ({ default: m.AgendaPage }))),
   needs: lazy(() => import("../pages/Needs/NeedsPage").then((m) => ({ default: m.NeedsPage }))),
   team: lazy(() => import("../pages/Team/TeamPage").then((m) => ({ default: m.TeamPage }))),
+  join: lazy(() => import("../pages/Join/JoinPage").then((m) => ({ default: m.JoinPage }))),
   profile: lazy(() =>
     import("../pages/Profile/ProfilePage").then((m) => ({ default: m.ProfilePage })),
   ),

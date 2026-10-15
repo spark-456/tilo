@@ -7,7 +7,7 @@ import { type AppCtx, type Motion, PAGE_IDS, type PageId, type Params } from "./
 import type { ParkState } from "./store";
 
 describe("WEB_3a_appctx: the page list", () => {
-  it("UI_10_W7_appctx_keeps_the_design_pages_then_Settings", () => {
+  it("UI_10_W7_SELF_SERVE_TEAMS_INVITE_LINK_appctx_keeps_the_design_pages_and_join", () => {
     expect([...PAGE_IDS]).toEqual([
       "home",
       "worlds",
@@ -16,6 +16,7 @@ describe("WEB_3a_appctx: the page list", () => {
       "ledger",
       "agenda",
       "team",
+      "join",
       "profile",
       "connectors",
       "settings",
@@ -41,6 +42,7 @@ describe("WEB_3a_appctx: the contract is typed exactly as the README says", () =
       | "ledger"
       | "agenda"
       | "team"
+      | "join"
       | "profile"
       | "connectors"
       | "settings"

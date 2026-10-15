@@ -39,6 +39,7 @@ const CONTENT: Record<PageId, [string, string]> = {
     "See your team",
     "Review people and roles. Any sample people are fictional and clearly labelled.",
   ],
+  join: ["Join a team", "Review the invitation before choosing Join."],
   connectors: [
     "Check real connections",
     "Connections show their real state. A tour never connects a tool or grants access.",

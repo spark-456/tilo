@@ -23,13 +23,20 @@ export function SignInGate({
     return <>{children}</>;
   }
   if (state.status === "unknown") return null;
-  return <SignInPanel auth={auth} signOutFailed={state.signOutFailed === true} />;
+  return (
+    <SignInPanel
+      auth={auth}
+      signOutFailed={state.signOutFailed === true}
+      join={window.location.pathname === "/join"}
+    />
+  );
 }
 
 function SignInPanel({
   auth,
   signOutFailed,
-}: { readonly auth: AuthController; readonly signOutFailed: boolean }) {
+  join,
+}: { readonly auth: AuthController; readonly signOutFailed: boolean; readonly join: boolean }) {
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(false);
   // A ref, not the state: two clicks in one batch both see the same render, and only one sign-in may start.
@@ -54,6 +61,32 @@ function SignInPanel({
     );
   };
 
+  if (join)
+    return (
+      <main
+        data-park
+        data-testid="join-sign-in"
+        style={{
+          width: "100%",
+          maxWidth: "390px",
+          boxSizing: "border-box",
+          padding: "20px",
+          overflowWrap: "anywhere",
+        }}
+      >
+        <h1>Join a team</h1>
+        <p>You've been invited to join a team on Tilo.</p>
+        <button
+          type="button"
+          className="primary"
+          disabled={busy}
+          onClick={() => run(() => auth.signInWithGoogle())}
+        >
+          Continue with Google
+        </button>
+        {failed ? <p role="alert">{FAILED}</p> : null}
+      </main>
+    );
   return (
     <SignInScreen
       busy={busy}

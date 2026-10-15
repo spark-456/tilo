@@ -53,6 +53,7 @@ function fakeAuth(initial: AuthState) {
 
 afterEach(() => {
   cleanup();
+  history.replaceState({}, "", "/");
 });
 
 const App = () => <div data-testid="app">the app</div>;
@@ -74,6 +75,17 @@ const settle = async () => {
 };
 
 describe("SEC-15 SIGNIN the gate in front of the app", () => {
+  it("SELF_SERVE_TEAMS_INVITE_LINK_join_sign_in_uses_google_and_shows_no_team", async () => {
+    history.replaceState({}, "", "/join");
+    const { auth } = fakeAuth({ status: "signed_out" });
+    mount(gate(auth));
+    expect(document.body.textContent).toContain("You've been invited to join a team on Tilo.");
+    expect(demoButton()).toBeUndefined();
+    const google = googleButton();
+    expect(google).toBeDefined();
+    if (google) await act(async () => click(google));
+    expect(auth.signInWithGoogle).toHaveBeenCalledTimes(1);
+  });
   it("SEC-15 SIGNIN 'unavailable' (local host, fixture world, no config): the app shows and there is no sign-in UI", () => {
     const { auth } = fakeAuth({ status: "unavailable" });
     mount(gate(auth));

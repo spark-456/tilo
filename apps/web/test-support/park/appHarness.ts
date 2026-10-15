@@ -15,6 +15,7 @@ export const PAGE_LABEL: Record<PageId, string> = {
   ledger: "Ledger",
   agenda: "Agenda",
   team: "Team",
+  join: "Join a team",
   profile: "Profile",
   more: "More",
   connectors: "Connectors",
