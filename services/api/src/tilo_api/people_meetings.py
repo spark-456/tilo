@@ -20,7 +20,7 @@ from tilo_policy.schemas import conforms
 
 from tilo_api import deps
 from tilo_api.people_quotes import GONE, read_doc
-from tilo_api.people_writes import AgendaIn, AttendeeIn, Refusal, Text, WindowIn, Writer
+from tilo_api.people_writes import AgendaIn, AttendeeIn, Refusal, Text, WindowIn, Writer, meeting_attendees
 
 _WORLD = re.compile(r"w_[0-9A-Za-z_]{1,48}")
 
@@ -81,8 +81,8 @@ def list_meetings(w: Writer) -> dict[str, Any]:
 
 
 def edit_meeting(w: Writer, meeting_id: str, body: MeetingEditIn) -> dict[str, Any]:
-    """Title, series, schedule, agenda and attendees (PE-07); a name that stays keeps its resolved `user`, a new name
-    gets null: a request never sets identity (PE-15). Text goes through `Writer.text`; the schema refuses a link."""
+    """Title, series, schedule, agenda and attendees (PE-07); legacy captions keep their resolved `user`, emails
+    resolve in the current team directory (PE-15). Text goes through `Writer.text`; the schema refuses a link."""
     m, version, d = _mine(w, meeting_id, "edit", GONE)
     sent, after = body.model_fields_set, dict(m)
     if "title" in sent:
@@ -95,8 +95,7 @@ def edit_meeting(w: Writer, meeting_id: str, body: MeetingEditIn) -> dict[str, A
         after["agenda"] = [{"title": w.text(a.title), "minutes": a.minutes} for a in body.agenda]
     if "attendees" in sent:
         known = {a["name"]: a["user"] for a in reversed(m["attendees"])}
-        names = [w.text(a.name) for a in body.attendees]
-        after["attendees"] = [{"name": n, "user": known.get(n)} for n in names]
+        after["attendees"] = meeting_attendees(w, body.attendees, known)
     if not conforms("meeting.schema.json", after):
         raise Refusal(422, "invalid_record")
     request = AccessRequest(w.actor, "edit", "meeting", m, w.now)

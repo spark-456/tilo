@@ -101,6 +101,14 @@ class AgendaIn(_Closed):
 
 class AttendeeIn(_Closed):
     name: Text  # `user` is never taken from a request: attendees[].user is not identity (PE-15, PPL-20)
+    email: Text | None = None  # transient lookup input; never stored on the meeting
+
+    @field_validator("email")
+    @classmethod
+    def _address(cls, value: str | None) -> str | None:
+        if value is not None and not valid_email(value):
+            raise ValueError("email")
+        return value
 
 
 class WindowIn(_Closed):
@@ -464,6 +472,34 @@ def _purge(artifacts: ArtifactStore, scope: Scope, artifact_id: str) -> None:
         artifacts.retention().delete(f"{prefix}/{version.version:06d}")
 
 
+def meeting_attendees(
+    w: Writer, attendees: list[AttendeeIn], known: Mapping[str, Any] | None = None
+) -> list[dict[str, Any]]:
+    """PE-15/PE-20: exact email lookup in the owner's current team directory, never model identity.
+    Legacy captions keep their stored link; an email input is always resolved afresh. ADR-0044 membership
+    checks need the whole org, read once only when an address is present. Only sanitized captions are stored.
+    """
+    directory: Directory | None = None
+    result = []
+    for attendee in attendees:
+        name = w.text(attendee.name)
+        address = attendee.email if attendee.email is not None else attendee.name
+        user = (known or {}).get(name) if attendee.email is None else None
+        if valid_email(address):
+            if directory is None:
+                directory = w.org_directory()
+            matches = [
+                person["id"]
+                for person in directory.persons.values()
+                if person["org_id"] == w.org
+                and person["email"].casefold() == address.casefold()
+                and (person["id"] == w.actor or directory.teammates(w.actor, person["id"], w.now))
+            ]
+            user = matches[0] if len(matches) == 1 else None
+        result.append({"name": name, "user": user})
+    return result
+
+
 def create_meeting(w: Writer, body: MeetingIn) -> dict[str, Any]:
     """A person of the org adds a meeting they own and attest; the server stamps the attestation (PE-18, G2)."""
     r = w.text
@@ -475,7 +511,7 @@ def create_meeting(w: Writer, body: MeetingIn) -> dict[str, Any]:
         "series": None if body.series is None else r(body.series),
         "scheduled": body.scheduled and body.scheduled.model_dump(),
         "agenda": [{"title": r(a.title), "minutes": a.minutes} for a in body.agenda],
-        "attendees": [{"name": r(a.name), "user": None} for a in body.attendees],
+        "attendees": meeting_attendees(w, body.attendees),
         "attestation": {**w.stamp(), "notice_version": deps.NOTICE_VERSION},
         "source": body.source,
         "status": "scheduled",
