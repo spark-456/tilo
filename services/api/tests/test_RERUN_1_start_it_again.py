@@ -1,5 +1,6 @@
 """RERUN-1 / HR-1: a world a restart closed with `world.failed` is started again as a NEW run of the same task, through
-the approve path (same brief, same approved approach, same cap). Only the owner; a world that did not fail is a 409."""
+the approve path (same brief, same approved approach, same cap). Only the owner; a world that did not fail is a 409.
+RERUN-ANY widened this from restart stops to every `world.failed`: see test_RERUN_ANY_any_failed_world.py."""
 
 from __future__ import annotations
 
@@ -98,18 +99,6 @@ def test_RERUN_1_a_world_that_did_not_fail_is_a_409(flow, end):
 
     assert response.status_code == 409
     assert len([w for w in flow.store.worlds if w != old["world_id"]]) == 0  # no new world was made
-
-
-@pytest.mark.parametrize(
-    "reason", ["an internal error stopped the work", "the service restarted, so the work stopped", "", None]
-)
-def test_RERUN_UI_only_the_startup_restart_reason_is_eligible(flow, reason):
-    old = _approved(flow)
-    flow.store.events[old["world_id"]][-1]["data"]["reason"] = reason
-    before = set(flow.store.worlds)
-    response = flow.client.post(f"/worlds/{old['world_id']}/rerun")
-    assert response.status_code == 409
-    assert set(flow.store.worlds) == before
 
 
 @pytest.mark.parametrize(

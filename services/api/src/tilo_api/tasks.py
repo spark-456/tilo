@@ -640,6 +640,9 @@ def _again_ids(world_id: str) -> tuple[str, str, str]:
     return found[0], found[1], found[2]
 
 
+_SHARED = "world.share_changed"
+
+
 @router.post("/worlds/{world_id}/rerun")
 def rerun(
     world_id: str,
@@ -649,12 +652,11 @@ def rerun(
     seams: Annotated[runs.Seams | None, Depends(runs.run_seams)],
     flags: FlagsDep,
 ) -> dict[str, Any]:
-    """RERUN-1: a world whose latest world event is the X-ORPHAN-1 restart failure is started again as a NEW run of the
-    same task: the same brief, the approach the person approved and the cap they granted, through the approve path
-    (so the policy engine, the ceiling and the owner's grants decide again). Only the owner; anyone else gets the
-    unknown-world 404. Any other latest world event or failure reason is a 409. Pressing twice is one new world."""
-    from .durable_store import STARTUP_RESTARTED
-
+    """RERUN-1, RERUN-ANY: a world whose latest world state is `world.failed` (a restart, a unit that failed, any
+    recorded reason) is started again as a NEW run of the same task: the same brief, the approach the person approved
+    and the cap they granted, through the approve path (so the policy engine, the ceiling and the owner's grants decide
+    again). Only the owner; anyone else gets the unknown-world 404. A world still running, waiting or finished is a 409.
+    Pressing twice is one new world."""
     world = store.load_world(world_id)
     if world is None or world.owner != principal.user_id:
         raise HTTPException(status_code=404, detail="No such world.")
@@ -662,9 +664,10 @@ def rerun(
     store.settle(world_id)
     stream = store.events.get(world_id, [])
 
-    last = next((e for e in reversed(stream) if e["type"].startswith("world.")), None)
-    if last is None or last["type"] != "world.failed" or last.get("data", {}).get("reason") != STARTUP_RESTARTED:
-        raise HTTPException(status_code=409, detail="Only a run stopped by a Tilo restart can be started again.")
+    # The latest world state; a share change is not one, so sharing a stopped world does not hide its stop.
+    last = next((e for e in reversed(stream) if e["type"].startswith("world.") and e["type"] != _SHARED), None)
+    if last is None or last["type"] != "world.failed":
+        raise HTTPException(status_code=409, detail="Only a run that stopped can be started again.")
     old = store.load_world_task(world_id)
     planned = next((e for e in reversed(stream) if e["type"] == "world.planned"), None)
     if old is None or old.approaches is None or planned is None:

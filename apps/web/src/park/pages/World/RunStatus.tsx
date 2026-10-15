@@ -24,7 +24,8 @@ const refused = (error: unknown): boolean => {
   return typeof status === "number" && status >= 400 && status < 500;
 };
 
-/** The one honest action for a stopped run (RERUN-1): a failure says so and leaves the button for another try. */
+/** The one honest action for any stopped run (RERUN-1, RERUN-ANY): it always asks `/rerun` first; only a server
+ * refusal points to a new task, and any other failure says so and leaves the button for another try. */
 function StartItAgain({ again, events }: { again: StartAgain; events: readonly RunEvent[] }) {
   const { cap, sent } = restartApproval(events);
   const restart = isRestartStop(events);
