@@ -260,6 +260,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         contextOpen={contextOpen}
         onContext={toggleContext}
         compact={app.vw > 0 && app.vw < COMPACT_NAV_BELOW}
+        vw={app.vw}
       />
       {contextOpen && <ContextPanel key={contextPerson} onClose={toggleContext} />}
       {state.menu === "notif" ? (

@@ -6,6 +6,7 @@
 import { act } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, click, mount, q, qa } from "../../../test-support/park/componentsHarness";
+import { wideWindow } from "../../../test-support/park/wideWindow";
 import type { AppCtx } from "./AppCtx";
 import { ParkApp } from "./ParkApp";
 
@@ -149,6 +150,7 @@ describe("WEB_CUTOVER_parkapp: navigation writes root paths", () => {
   });
 
   it("WEB_CUTOVER_06_the_nav_tabs_and_the_logo_link_to_root_paths", async () => {
+    wideWindow();
     const m = await visit("/ledger");
     const tabs = qa<HTMLAnchorElement>(q(m.container, "header nav"), "a");
     expect(tabs.map((a) => a.getAttribute("href"))).toEqual([
@@ -168,6 +170,7 @@ describe("WEB_CUTOVER_parkapp: navigation writes root paths", () => {
   });
 
   it("WEB_CUTOVER_06_clicking_a_nav_tab_changes_the_address_to_its_root_path", async () => {
+    wideWindow();
     const m = await visit("/");
     const tab = (name: string) =>
       qa<HTMLAnchorElement>(q(m.container, "header nav"), "a").find((a) =>

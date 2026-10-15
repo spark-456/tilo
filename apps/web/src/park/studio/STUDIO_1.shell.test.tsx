@@ -5,6 +5,7 @@
 import { act } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, click, mount, q, qa } from "../../../test-support/park/componentsHarness";
+import { wideWindow } from "../../../test-support/park/wideWindow";
 import { Button } from "../components";
 import { EmptyState, ErrorState, Skeleton } from "./States";
 import { ThemeSwitch, appearanceOf } from "./ThemeSwitch";
@@ -165,6 +166,7 @@ describe("UI-STUDIO-1 theme: Studio light, dark and system", () => {
 
 describe("UI-STUDIO-1 nav: every destination is still reached", () => {
   it("STUDIO_1 the nav renders all six tabs and the account menu's pages", async () => {
+    wideWindow();
     await visit("/park/worlds");
     const nav = q(document.body, 'header nav[aria-label="Main"]');
     expect(

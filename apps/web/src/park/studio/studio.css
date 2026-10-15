@@ -166,6 +166,17 @@
 [data-park][data-theme="studio"] .park-shell__avatar--ring {
   box-shadow: 0 0 0 2px var(--card), 0 0 0 4px var(--ink);
 }
+/* STUDIO-INT: below a roomy bar the sides, gaps and tab padding give back room before a tab moves into More
+   (shell/navFit.ts holds the same numbers). */
+@media (max-width: 1199px) {
+  [data-park][data-theme="studio"] .park-shell__nav {
+    gap: 16px;
+    padding: 0 20px;
+  }
+  [data-park][data-theme="studio"] .park-shell__tab {
+    padding: 0 10px;
+  }
+}
 /* The page column starts under the 72px bar. */
 [data-park][data-theme="studio"] .park-shell__page {
   padding-top: 104px;

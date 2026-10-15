@@ -18,6 +18,7 @@ import {
   seen,
   settle,
 } from "../../../test-support/park/shellHarness";
+import { wideWindow } from "../../../test-support/park/wideWindow";
 import { ParkApp } from "../app/ParkApp";
 import { AppShell } from "./AppShell";
 
@@ -162,6 +163,7 @@ describe("WEB_3b_parkapp: the real ParkApp wears the shell", () => {
   });
 
   it("WEB_3b_parkapp_a_tab_click_changes_the_page_and_the_current_tab_without_a_load", async () => {
+    wideWindow();
     const m = await visit("/park/home");
     const ledger = qa<HTMLAnchorElement>(m.container, "header nav a").find((a) =>
       (a.textContent ?? "").startsWith("Ledger"),

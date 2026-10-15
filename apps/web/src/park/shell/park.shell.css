@@ -294,6 +294,24 @@
   background: var(--heroSoft);
   color: var(--heroInk);
 }
+/* STUDIO-INT: between the page menu (below 840px) and a roomy bar, the tabs that do not fit sit in a More menu
+   (shell/navFit.ts holds the same numbers). The More button is a tab that opens a menu under itself. */
+[data-park] .park-shell__more {
+  border: 0;
+  font-family: inherit;
+  cursor: pointer;
+}
+[data-park] .park-shell__more svg {
+  flex: none;
+}
+[data-park] .park-popover.park-shell__moremenu {
+  left: var(--park-more-left, 16px);
+}
+@media (max-width: 1199px) {
+  [data-park] .park-shell__tab {
+    padding: 0 10px;
+  }
+}
 /* The amber badge: #F0A500 with #1F1D2B in both themes (README "Hard-coded on purpose"). */
 [data-park] .park-shell__badge {
   display: flex;
