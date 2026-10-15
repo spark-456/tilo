@@ -7,6 +7,7 @@ import { Button } from "../../components";
 import { cx } from "../../components/cx";
 import { statusOf } from "./SkillDrawer";
 import { WIZARD_STEPS } from "./TeachWizard";
+import { SkillIcon } from "./skillIcon";
 import { agent, icon } from "./skillsKit";
 
 type Filter = "all" | "builtin" | "yours" | "learning" | "trusted";
@@ -62,7 +63,6 @@ function sub(s: Skill): string {
 export function SkillGrid({
   skills,
   paused,
-  night,
   onOpen,
 }: {
   skills: readonly Skill[];
@@ -124,11 +124,7 @@ export function SkillGrid({
                 <button type="button" className="park-skills-card2" onClick={() => onOpen(s.id)}>
                   <span className="park-skills-card2__top">
                     <span className="park-skills-card2__art" aria-hidden="true">
-                      {agent(
-                        { role: s.role, expr: st.tone === "ok" ? "delighted" : "neutral" },
-                        44,
-                        night,
-                      )}
+                      <SkillIcon skill={s} />
                     </span>
                     <span className={`park-skill-chip park-skill-chip--${st.tone}`}>
                       {st.label}
@@ -160,7 +156,6 @@ export function SkillGrid({
 
 export function LearningNow({
   skills,
-  night,
   onOpen,
   onPause,
   pauseOff,
@@ -190,7 +185,7 @@ export function LearningNow({
             <li key={s.id} className="park-skills-learning__card">
               <div className="park-skills-learning__top">
                 <span className="park-skills-card2__art" aria-hidden="true">
-                  {agent({ role: s.role, expr: "focused" }, 44, night)}
+                  <SkillIcon skill={s} />
                 </span>
                 <span className="park-skills-learning__titles">
                   <span className="park-skills-card2__name">{s.name}</span>

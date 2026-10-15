@@ -9,7 +9,8 @@ import type { Learn, Skill } from "../../api/types";
 import type { AppCtx } from "../../app/AppCtx";
 import { cx } from "../../components/cx";
 import { SKILL_TRUST_CONFIG, type SkillFixEntry, canTrustSkill } from "./skillConfig";
-import { agent, icon } from "./skillsKit";
+import { SkillIcon } from "./skillIcon";
+import { icon } from "./skillsKit";
 
 export interface HelpProps {
   app: AppCtx;
@@ -122,7 +123,7 @@ export function HelpSection({
                 >
                   <div className="park-skills-ask-top">
                     <div className="park-skills-ask-avatar">
-                      {agent({ role: s.role, expr: a ? "delighted" : "puzzled" }, 44, app.night)}
+                      <SkillIcon skill={s} />
                     </div>
                     <div className="park-skills-ask-body">
                       <div className="park-skills-ask-skill">{s.name}</div>
@@ -287,14 +288,7 @@ export function HelpSection({
                 >
                   <div className="park-skills-review-head">
                     <div className="park-skills-review-avatar">
-                      {agent(
-                        {
-                          role: s?.role ?? "builder",
-                          expr: decision === "trusted" ? "delighted" : "neutral",
-                        },
-                        44,
-                        app.night,
-                      )}
+                      <SkillIcon skill={s ?? { name: skillName, role: "", tools: [] }} />
                     </div>
                     <div className="park-skills-review-info">
                       <div className="park-skills-review-name">{skillName}</div>

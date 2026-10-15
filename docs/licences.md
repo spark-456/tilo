@@ -158,6 +158,7 @@ Its tests use `jsonschema` and `referencing` from the root dev group (above).
 | --- | --- | --- |
 | @biomejs/biome | MIT | https://www.npmjs.com/package/@biomejs/biome |
 | firebase (Firebase JS SDK, `apps/web` runtime dependency: `firebase/app` and `firebase/app-check` for App Check with reCAPTCHA Enterprise, SEC-10; loaded on the first API call only) | Apache-2.0 | https://www.npmjs.com/package/firebase |
+| lucide-react (Skills card icons; named imports only) | ISC | https://www.npmjs.com/package/lucide-react |
 | firebase-tools (runs the Firestore emulator for `services/harness`, P0-09; also an `apps/web` devDependency at the same pinned 15.31.0 for `just deploy-web`, P0-07c) | MIT | https://www.npmjs.com/package/firebase-tools |
 | typescript | Apache-2.0 | https://www.npmjs.com/package/typescript |
 | react, react-dom, pixi.js, vite, @vitejs/plugin-react, vitest, @types/node, @types/react, @types/react-dom | MIT | https://www.npmjs.com/ |

@@ -261,8 +261,9 @@
   border-radius: 18px;
   background: var(--sunk);
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   justify-content: center;
+  color: var(--ink);
   overflow: hidden;
   flex: none;
 }
@@ -1137,6 +1138,11 @@
   border-radius: 15px;
   background: var(--sunk);
   box-shadow: inset 0 0 0 1px var(--line);
+}
+[data-park] .park-skills-ask-avatar,
+[data-park] .park-skills-review-avatar {
+  align-items: center;
+  color: var(--ink);
 }
 
 /* POLISH-2: Skills sits on the shell's page container like Home, Worlds and Team (left edge 80 at 1440, 16 on a phone,
