@@ -1,0 +1,15 @@
+{
+  "manifest_version": 3,
+  "name": "Tilo Skill Recorder",
+  "version": "0.1.0",
+  "description": "Record browser actions for a Tilo skill.",
+  "permissions": ["activeTab", "downloads", "storage", "tabs", "webNavigation"],
+  "host_permissions": ["http://*/*", "https://*/*"],
+  "background": { "service_worker": "background.js", "type": "module" },
+  "action": { "default_popup": "popup.html", "default_title": "Tilo Skill Recorder" },
+  "content_scripts": [{
+    "matches": ["http://*/*", "https://*/*"],
+    "js": ["content.js"],
+    "run_at": "document_idle"
+  }]
+}
