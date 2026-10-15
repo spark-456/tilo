@@ -90,6 +90,7 @@ class SkillRegistry:
         self.problems: dict[str, str] = {}  # "<domain>/<folder>" -> why it was not loaded
         self._folders: dict[str, Path] = {}
         self._descriptions: dict[str, str] = {}
+        self._versions: dict[str, str] = {}
         for yaml_path in sorted(self.root.glob("*/*/skill.yaml")):
             folder = yaml_path.parent
             name = f"{folder.parent.name}/{folder.name}"
@@ -103,10 +104,15 @@ class SkillRegistry:
                 continue
             self._folders[data["id"]] = folder
             self._descriptions[data["id"]] = data["description"]
+            self._versions[data["id"]] = str(data["version"])
 
     def catalog(self) -> list[tuple[str, str]]:
         """What the planner sees (PRD 8.2 Selection): (id, one-line description) per skill."""
         return sorted(self._descriptions.items())
+
+    def version(self, skill_id: str) -> str | None:
+        """The version read when the registry was built (no file read); None if it is not in the registry."""
+        return self._versions.get(skill_id)
 
     def folder(self, skill_id: str) -> Path | None:
         """The skill's folder, `<root>/<domain>/<skill-id>`, or None if it is not in the registry (FR-AGT-15)."""

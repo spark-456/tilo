@@ -1131,13 +1131,35 @@ def get_action_resolver() -> Callable[..., dict]:
     return side_effect_fields.make_resolver()
 
 
+_skill_registries: dict[Path, SkillRegistry] = {}
+_connector_registries: dict[tuple[Path, int, int], ConnectorRegistry] = {}
+
+
 def get_skill_registry() -> SkillRegistry:
-    return SkillRegistry(_REPO_ROOT / "skills")
+    """The built-in skills (`skills/`), read and schema-checked once per root: SKILLS-LIVE, every request used to parse
+    and validate every skill file again (about 300 ms). The files ship with the image and do not change while it runs;
+    a run still pins and re-checks each skill's hash on load (`SkillRegistry.load_pinned`)."""
+    root = _REPO_ROOT / "skills"
+    found = _skill_registries.get(root)
+    if found is None:
+        found = _skill_registries[root] = SkillRegistry(root)
+    return found
 
 
 def get_connector_registry() -> ConnectorRegistry:
+    """`config/connectors.yaml`, parsed once per file version (path, mtime, size): SKILLS-LIVE, it used to be parsed on
+    every request, twice on `GET /v1/connectors`."""
     path = _REPO_ROOT / "config" / "connectors.yaml"
-    return load_registry(path) if path.is_file() else ConnectorRegistry({})
+    try:
+        info = path.stat()
+    except OSError:
+        return ConnectorRegistry({})
+    key = (path, info.st_mtime_ns, info.st_size)
+    found = _connector_registries.get(key)
+    if found is None:
+        _connector_registries.clear()  # only the current file version is worth keeping
+        found = _connector_registries[key] = load_registry(path)
+    return found
 
 
 def get_connector_adapters(request: Request = None) -> dict[str, Any]:  # type: ignore[assignment]
@@ -1528,18 +1550,76 @@ def get_connection_views_rpc() -> Callable[[str], list[MeetingHostRpcConnectionV
     order = [c for c in registry.ids() if registry.get(c)["auth"] == "oauth2"]
 
     def read(user_id: str) -> list[MeetingHostRpcConnectionView] | None:
-        rows = client.connection_views(user_id, order=order)
-        if rows is None and client.views_not_configured:
+        def fetch() -> tuple[list[MeetingHostRpcConnectionView] | None, bool]:
+            rows = client.connection_views(user_id, order=order)
+            return rows, rows is None and client.views_not_configured
+
+        rows, not_configured = _CONNECTION_VIEWS_CACHE.get(user_id, fetch)
+        if not_configured:
             raise ConnectionViewsNotConfigured
         return rows
 
     return read
 
 
+class _ConnectionViewsCache:
+    """SKILLS-LIVE: `GET /v1/connectors` made one network call to tilo-connectors per request (an ID token from the
+    metadata server, then the request; 4.9 s live on a cold instance, 10 s at the worst). The page loads it on every
+    visit, so a person's views are kept in this process for `VIEWS_TTL_S` (a failed or unconfigured answer for the
+    shorter `VIEWS_FAILURE_TTL_S`, so a cold instance is waited for once, not once per click). Connect, disconnect and
+    callback drop that person's entry, so their own change shows at once. Keyed by user id only, holds the display views
+    the route already shows (no token, record or secret), bounded by `VIEWS_MAX_USERS`."""
+
+    VIEWS_TTL_S = 20.0
+    VIEWS_FAILURE_TTL_S = 5.0
+    VIEWS_MAX_USERS = 512
+
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
+        self._rows: dict[str, tuple[float, tuple[list[MeetingHostRpcConnectionView] | None, bool]]] = {}
+        self.clock: Callable[[], float] = time.monotonic  # read at call time, so a test can replace it
+
+    def get(
+        self,
+        user_id: str,
+        fetch: Callable[[], tuple[list[MeetingHostRpcConnectionView] | None, bool]],
+    ) -> tuple[list[MeetingHostRpcConnectionView] | None, bool]:
+        now = self.clock()
+        with self._lock:
+            hit = self._rows.get(user_id)
+            if hit is not None and hit[0] > now:
+                return hit[1]
+        answer = fetch()  # outside the lock: a slow call never blocks another person's read
+        ttl = self.VIEWS_TTL_S if answer[0] is not None else self.VIEWS_FAILURE_TTL_S
+        with self._lock:
+            if len(self._rows) >= self.VIEWS_MAX_USERS:
+                self._rows = {u: v for u, v in self._rows.items() if v[0] > now}
+                if len(self._rows) >= self.VIEWS_MAX_USERS:
+                    self._rows.clear()
+            self._rows[user_id] = (self.clock() + ttl, answer)
+        return answer
+
+    def forget(self, user_id: str | None = None) -> None:
+        with self._lock:
+            if user_id is None:
+                self._rows.clear()
+            else:
+                self._rows.pop(user_id, None)
+
+
+_CONNECTION_VIEWS_CACHE = _ConnectionViewsCache()
+
+
+def forget_connection_views(user_id: str) -> None:
+    """A person's own connect, disconnect or callback changed their state: the next list reads it fresh."""
+    _CONNECTION_VIEWS_CACHE.forget(user_id)
+
+
 def _forget_host_client() -> None:
     global _host_client, _host_client_retry_at
     with _host_client_lock:
         _host_client, _host_client_retry_at = None, None
+    _CONNECTION_VIEWS_CACHE.forget()
 
 
 get_meeting_host_client.cache_clear = _forget_host_client  # type: ignore[attr-defined]  # tests start from a cold process
