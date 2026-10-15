@@ -124,6 +124,7 @@ class ToolUnitRunner:
         archive: ToolArchive | None = None,
         cache: ToolCache | None = None,
         role_tools: Mapping[str, Iterable[str]] | None = None,
+        default_tools: Mapping[str, Iterable[str]] | None = None,
         max_steps: int = MAX_STEPS,
         credit_cap: float = CREDIT_CAP,
         effect_gate: EffectGate | None = None,
@@ -144,6 +145,7 @@ class ToolUnitRunner:
         self._archive = archive
         self._cache: ToolCache = cache if cache is not None else MemoryToolCache()
         self._role_tools = {role: frozenset(names) for role, names in (role_tools or {}).items()}
+        self._default_tools = {role: frozenset(names) for role, names in (default_tools or {}).items()}
         self._max_steps, self._credit_cap = max_steps, credit_cap
         self._gate, self._on_call, self._meter = effect_gate, on_tool_call, meter
         self._options = request_options or {}
@@ -247,9 +249,12 @@ class ToolUnitRunner:
         return UnitRun(outcome, loop.credits, tuple(loop.calls), stop)
 
     def _allowed(self, role: str, context: UnitContext) -> dict[str, Tool]:
-        """Skills' tools_allowed (union) intersect the role's tools intersect the registry, by name. With a role map,
-        a role that is not in it gets nothing (deny by default)."""
+        """Skills' tools_allowed (union) intersect the role's tools intersect the registry, by name; when no skill names
+        a tool, the role's `default_tools` stand in for them. With a role map, a role that is not in it gets nothing
+        (deny by default)."""
         named = {name for skill in context.skills for name in skill.tools_allowed}
+        if not named:  # no skill names a tool: the role's default tools (read-only, by the caller's choice)
+            named = set(self._default_tools.get(role, ()))
         named &= self._role_tools.get(role, frozenset()) if self._role_tools else self._tools.names()
         found = ((name, self._tools.get(name)) for name in sorted(named))
         return {name: tool for name, tool in found if tool is not None}
