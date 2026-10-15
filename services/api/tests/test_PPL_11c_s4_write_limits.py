@@ -81,6 +81,7 @@ BODY_ROUTES = {
     "edit meeting": "/v1/meetings/mt_q4_plan/edit",
     "delete meeting": "/v1/meetings/mt_q4_plan/delete",
     "meeting world": "/v1/meetings/mt_q4_plan/world",
+    "meeting brief": "/v1/meetings/mt_q4_plan/brief",
     "host meeting": "/v1/meetings/mt_q4_plan/host",
     "attend meeting": "/v1/meetings/mt_q4_plan/attend",
     "create pin": "/v1/pinboards",
@@ -191,6 +192,23 @@ def test_PPL_11c_s4_BQ_PPL11C_1_team_put_routes_oversize_body_is_a_413(people_ri
     assert status == 413 and consumed <= 4096
 
 
+# `PATCH /v1/meetings/{id}` (ADR-0047, MB-10) is the owner's meeting edit under its second name: same cap.
+MEETING_PATCH_ROUTES = {"edit meeting": "/v1/meetings/mt_q4_plan"}
+
+
+@pytest.mark.parametrize("path", list(MEETING_PATCH_ROUTES.values()), ids=list(MEETING_PATCH_ROUTES))
+def test_PPL_11c_s4_BQ_PPL11C_1_meeting_patch_oversize_body_is_a_413(people_rig, path):
+    rig = meeting_rig(people_rig)
+    before = rig.snapshot()
+    status, consumed, headers, text = stream_post(rig.app, path, method="PATCH", total_bytes=5_000_000)
+    assert status == 413 and json.loads(text) == {"detail": "body_too_large"}, (status, text[:120])
+    assert consumed <= MAX_BODY_BYTES + 64 * 1024
+    status, consumed, headers, text = stream_post(
+        rig.app, path, method="PATCH", total_bytes=10, declared_length=50_000_000
+    )
+    assert status == 413 and consumed <= 4096 and rig.snapshot() == before
+
+
 # `/v1/me/settings` (ADR-0039) has its own 16 KiB cap and a route-level `write_limit` (user_settings.py)
 SETTINGS_PUT_ROUTES = {"settings": "/v1/me/settings"}
 SETTINGS_MAX_BODY_BYTES = 16384
@@ -261,7 +279,12 @@ def test_PPL_11c_s4_BQ_PPL11C_1_every_put_and_patch_write_route_is_covered(peopl
         if any(m in methods for m in ("put", "patch")) and t.startswith("/v1/")
     ]
     patterns = {t: re.compile("^" + re.sub(r"\{[^/}]+\}", "[^/]+", t) + "$") for t in templates}
-    all_covered = [*TEAM_PUT_ROUTES.values(), *SETTINGS_PUT_ROUTES.values(), *ORG_MODEL_KEY_WRITE_ROUTES.values()]
+    all_covered = [
+        *TEAM_PUT_ROUTES.values(),
+        *SETTINGS_PUT_ROUTES.values(),
+        *ORG_MODEL_KEY_WRITE_ROUTES.values(),
+        *MEETING_PATCH_ROUTES.values(),
+    ]
     uncovered = [t for t, p in patterns.items() if not any(p.match(path) for path in all_covered)]
     assert not uncovered, f"PUT/PATCH write routes with no body-cap case: {uncovered}"
 

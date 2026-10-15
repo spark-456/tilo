@@ -22,8 +22,9 @@ from tilo_api import deps
 from tilo_api.assistant.config import AssistantConfig
 from tilo_api.assistant.metering import SpendLedger
 from tilo_api.meeting_analysis_mode import analyze_owner_minutes
+from tilo_api.meeting_brief import brief_for_owner
 from tilo_api.meeting_minutes import MinutesWriter
-from tilo_api.people_writes import Refusal
+from tilo_api.people_writes import Refusal, Writer
 
 
 def get_owner_minutes_budget(
@@ -63,6 +64,27 @@ class OwnerMinutesCaller:
             writer,
             self.store,
             self.artifacts,
+            meeting_id,
+            principal=self.principal,
+            switches=self.switches,
+            budget=self.budget,
+            events=self.events,
+            allowance=self.allowance,
+            allowance_cap=self.allowance_cap,
+            clock=self.clock,
+        )
+
+    def brief(self, meeting_id: str, worlds: deps.MeetingWorlds) -> dict[str, Any]:
+        """The owner's explicit "make my brief now" (ADR-0047 MB-03): same budget, allowance and modes as minutes."""
+        if re.fullmatch(r"mt_[0-9A-Za-z_]{1,48}", meeting_id) is None:
+            raise Refusal(404, "not_found")
+        writer = Writer(self.stores, deps.ORG_ID, self.principal.user_id, self.clock(), self.redact)
+        return brief_for_owner(
+            self.request,
+            writer,
+            self.store,
+            self.artifacts,
+            worlds,
             meeting_id,
             principal=self.principal,
             switches=self.switches,

@@ -425,7 +425,7 @@ def remove_meeting(
     if m["status"] != "deleted":
         if m.get("world_id") is not None:  # no world, no artifact: nothing is stored outside a world
             scope = Scope(m["org_id"], m["world_id"], m["owner"])
-            for ref in (m["transcript"], m["minutes"]):
+            for ref in (m["transcript"], m["minutes"], m.get("brief")):  # the brief goes with them (MB-09)
                 if ref is not None:
                     _purge(artifacts, scope, ref["artifact_id"])
             _purge_hosted(artifacts, scope, meeting_id)
