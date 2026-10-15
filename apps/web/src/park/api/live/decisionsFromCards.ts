@@ -2,7 +2,7 @@
 // toast and approvedTitle are empty and facts is absent, never a sample (HR-1..HR-7). Defaults: BQ-WIRE3-1..5.
 // Pure: it never mutates its input and never imports fixtures.
 import type { Card } from "@tilo/contracts";
-import type { Decision, DecisionKey } from "../types";
+import type { Decision, DecisionCard, DecisionKey } from "../types";
 
 export interface CardFeedItem {
   world_id: string;
@@ -41,6 +41,38 @@ function bodyOf(card: Card): string {
 export const needsFields = (card: Card): boolean =>
   card.kind === "needs_you" && card.options.some((o) => o.id === "provide");
 
+/** STUDIO-4: the served fields Needs you reads, copied as they are (never a sample, never written here). */
+function detailOf(card: Card): DecisionCard {
+  const gate = card.kind === "gate" ? card.gate : null;
+  const consent = card.kind === "consent" ? card.consent : null;
+  return {
+    id: card.id,
+    kind: card.kind,
+    why: card.why_it_matters,
+    options: card.options.map((o) => ({
+      id: o.id,
+      label: o.label,
+      suggested: o.suggested,
+      irreversible: o.irreversible,
+      ...(o.reason ? { reason: o.reason } : {}),
+    })),
+    safeDefault: card.safe_default,
+    createdAt: card.created_at,
+    timeout: card.timeout,
+    showMe: Array.isArray(card.actions) && card.actions.includes("show_me"),
+    gate: gate
+      ? {
+          exact: gate.action?.exact ?? "",
+          recipients: [...(gate.recipients ?? [])],
+          item: gate.action?.item?.label ?? null,
+          irreversible: gate.irreversible,
+          riskTier: gate.risk_tier,
+        }
+      : null,
+    consent: consent ? { connector: consent.connector, scopes: [...(consent.scopes ?? [])] } : null,
+  };
+}
+
 function decisionOf({ world_id, card_id, card }: CardFeedItem): Decision {
   const id = answerOption(card);
   return {
@@ -57,6 +89,7 @@ function decisionOf({ world_id, card_id, card }: CardFeedItem): Decision {
     toast: "",
     approvedTitle: "",
     ...(needsFields(card) ? { provide: { cardId: card_id } } : {}),
+    card: detailOf(card),
   };
 }
 

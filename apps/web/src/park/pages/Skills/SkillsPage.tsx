@@ -1,25 +1,28 @@
-// The Skills page (WEB-8a): the header with its summary pills and "Teach a skill", and the "Teach Tilo
-// something new" card, as drawn in design_handoff_tilo_web_app/design/Tilo App Skills.dc.html. The sections
-// below the card (help your agents get better, the library, the tools) are later tickets (8b, 8c). Data comes
-// only through the Api (`useParkApi`); a page whose Api is not built says "Skills data is unavailable", never numbers.
-// The card's 900 ms steps go through the provider's `useSchedule`; a draft skill's save goes through `saveSkill`.
-import { type ReactNode, useEffect, useRef, useState } from "react";
+// The Skills page (WEB-8a; STUDIO-4 design/studio-v2 "Tilo S Skills", Canvas section 06): the gallery (Teach Tilo
+// banner, search and filters, every skill as a card, Learning now), one skill's detail in a side sheet, and the 3-step
+// Teach wizard. Below the gallery stay "Help your agents get better" and tool access. Data comes only through the Api
+// (`useParkApi`: GET /v1/skills?include_builtin=true, GET /v1/learn); the wizard posts captures, version and save; a live
+// pause posts /v1/skills/{id}/state. A page whose Api is not built says "Skills data is unavailable", never numbers.
+import { type ReactNode, useEffect, useState } from "react";
+import { displayApiError } from "../../api/errorMessage";
+import { isSkillRow, skillFromRow } from "../../api/live/skillsFromApi";
 import type { Learn, Skill, Source, User } from "../../api/types";
 import type { AppCtx } from "../../app/AppCtx";
-import { useParkApi } from "../../app/context";
+import { useParkApi, useWorldClient } from "../../app/context";
 import type { CurrencyCode } from "../../app/ledgerKpis";
-import { PageSheet } from "../../components";
+import { Button } from "../../components";
 import { FirstRunPanels } from "../../sample/FirstRunPanels";
 import { useFirstRunPreview } from "../../sample/useFirstRunPreview";
 import { ApiReadState } from "../../shared/ApiReadState";
 import { FixSkill } from "./FixSkill";
+import { LearningNow, SkillGrid, TeachBanner } from "./Gallery";
 import { HelpSection } from "./HelpSection";
-import { LibrarySection } from "./LibrarySection";
+import { SkillDrawer } from "./SkillDrawer";
 import "./Skills.css";
-import { TeachCard } from "./TeachCard";
+import "./SkillsStudio.css";
+import { TeachWizard } from "./TeachWizard";
 import { ToolAccess } from "./ToolAccess";
 import { type SkillFixEntry, applySkillFix } from "./skillConfig";
-import { icon } from "./skillsKit";
 import { INTRO, pillTotal } from "./teachData";
 import { useTeach } from "./useTeach";
 
@@ -75,6 +78,8 @@ function PersonalSkillsPage({ app }: { app: AppCtx }) {
   const [data, setData] = useState<Loaded>(null);
   const [error, setError] = useState<unknown>(null);
   const [attempt, setAttempt] = useState(0);
+  const [teaching, setTeaching] = useState(false);
+  const teach = { on: teaching, set: setTeaching };
   useEffect(() => {
     void attempt;
     let live = true;
@@ -112,9 +117,9 @@ function PersonalSkillsPage({ app }: { app: AppCtx }) {
 
   return (
     <div className="park-skills-root" data-testid="park-page-skills">
-      <PageSheet gap={30}>
+      <div className="park-skills-page">
         {data !== null && data !== "failed" ? (
-          <Ready app={app} data={data} retryRead={() => setAttempt((n) => n + 1)} />
+          <Ready app={app} data={data} teach={teach} retryRead={() => setAttempt((n) => n + 1)} />
         ) : data === "failed" &&
           error instanceof Error &&
           error.name === "NotBuilt" &&
@@ -137,7 +142,7 @@ function PersonalSkillsPage({ app }: { app: AppCtx }) {
             />
           </>
         )}
-      </PageSheet>
+      </div>
     </div>
   );
 }
@@ -150,14 +155,30 @@ function withTaught(skills: Skill[], taught: Skill | null): Skill[] {
     : [...skills, taught];
 }
 
-function Ready({ app, data, retryRead }: { app: AppCtx; data: Data; retryRead: () => void }) {
+/** Why pausing cannot be done here: a session with no signed-in client (a demo) has no route to call. */
+const PAUSE_OFF = "Pausing is not available in this session.";
+
+/** The page's view: the gallery, or the Teach wizard (kept across a Retry that reads the data again). */
+type Teaching = { on: boolean; set: (on: boolean) => void };
+
+function Ready({
+  app,
+  data,
+  teach,
+  retryRead,
+}: { app: AppCtx; data: Data; teach: Teaching; retryRead: () => void }) {
   const api = useParkApi();
+  const client = useWorldClient();
   const { user, learn, source, currency } = data;
-  const teachRef = useRef<HTMLElement>(null);
+  const live = source !== "fixture";
   const draft = data.skills.find((s) => s.st === "draft" && !s.builtin);
   const t = useTeach({ app, api, user, draft, source, currency });
 
-  const [sel, setSel] = useState<string | null>(null);
+  const view = teach.on ? "teach" : "gallery";
+  const setView = (v: "gallery" | "teach") => teach.set(v === "teach");
+  const [open, setOpen] = useState<string | null>(
+    typeof app.params?.id === "string" ? app.params.id : null,
+  );
   const [ans, setAns] = useState<Record<string, string>>({});
   const [rate, setRate] = useState<Record<string, "up" | "down">>({});
   const [fixed, setFixed] = useState<Record<string, SkillFixEntry>>({});
@@ -192,38 +213,90 @@ function Ready({ app, data, retryRead }: { app: AppCtx; data: Data; retryRead: (
       : { text: "Nothing waiting", tone: "chip" },
   ];
 
-  const scrollTeach = () => {
-    const el = teachRef.current;
-    if (el && typeof window.scrollTo === "function") {
-      // To the card's top less the nav's height, as the reference does.
-      window.scrollTo({ top: Math.max(0, el.getBoundingClientRect().top + window.scrollY - 96) });
-    }
-  };
+  // Live: one POST, and the page shows the record the server answers with. Sample data: this page only, said so.
+  const pause =
+    live && client === null
+      ? null
+      : (skill: Skill, on: boolean): Promise<void> | undefined => {
+          if (!live) {
+            setPaused((prev) => ({ ...prev, [skill.id]: on }));
+            app.toast(
+              on
+                ? `Sample data: “${skill.name}” is paused on this page only. Nothing changed for your worlds`
+                : `Sample data: “${skill.name}” is shown as running again on this page only`,
+            );
+            return;
+          }
+          // One POST; the page shows only the record the server answers with.
+          return Promise.resolve()
+            .then(() =>
+              client?.postJson(`/v1/skills/${encodeURIComponent(skill.id)}/state`, {
+                change: on ? "paused" : "resumed",
+              }),
+            )
+            .then((row) => {
+              if (!isSkillRow(row) || row.id !== skill.id) throw new Error("unreadable");
+              setPersisted((prev) => ({ ...prev, [skill.id]: skillFromRow(row) }));
+              app.toast(on ? `“${skill.name}” is paused.` : `“${skill.name}” is running again.`);
+            })
+            .catch((e: unknown) => {
+              app.toast(
+                `Couldn’t ${on ? "pause" : "resume"} “${skill.name}”. ${displayApiError(e)}`,
+              );
+            });
+        };
 
-  const openTeach = () => {
-    scrollTeach();
+  const startTeach = (name?: string) => {
     if (t.saved) t.reset();
+    if (name !== undefined) t.setName(name);
+    setOpen(null);
+    setView("teach");
+    if (typeof window.scrollTo === "function") window.scrollTo({ top: 0 });
   };
 
-  const paramId = typeof app.params?.id === "string" ? app.params.id : undefined;
-  const selectedId = sel ?? t.taught?.id ?? paramId ?? skills[0]?.id ?? "";
+  if (view === "teach")
+    return (
+      <TeachWizard
+        t={t}
+        user={user}
+        night={app.night}
+        onClose={() => {
+          if (t.saved) t.reset();
+          setView("gallery");
+        }}
+        retryRead={retryRead}
+        onView={(id) => {
+          t.reset();
+          setView("gallery");
+          setOpen(id);
+        }}
+      />
+    );
 
+  const current = open ? skills.find((s) => s.id === open) : undefined;
   return (
     <>
       <Header total={pillTotal(skills.length)}>
-        <div className="park-skills-actions">
-          {pills.map((p) => (
-            <span key={p.tone} className={`park-skills-pill park-skills-pill--${p.tone}`}>
-              {p.text}
-            </span>
-          ))}
-          <button type="button" className="park-skills-teach" onClick={openTeach}>
-            {icon("plus", 15)}
-            Teach a skill
-          </button>
-        </div>
+        <Button variant="primary" onClick={() => startTeach()}>
+          + Teach Tilo a skill
+        </Button>
       </Header>
-      <TeachCard t={t} night={app.night} user={user} cardRef={teachRef} retryRead={retryRead} />
+      <div className="park-skills-actions">
+        {pills.map((p) => (
+          <span key={p.tone} className={`park-skills-pill park-skills-pill--${p.tone}`}>
+            {p.text}
+          </span>
+        ))}
+      </div>
+      <TeachBanner night={app.night} onStart={() => startTeach()} />
+      <SkillGrid skills={skills} paused={paused} night={app.night} onOpen={setOpen} />
+      <LearningNow
+        skills={skills.filter((s) => !paused[s.id])}
+        night={app.night}
+        onOpen={setOpen}
+        onPause={pause ? (s) => void pause(s, true) : null}
+        pauseOff={PAUSE_OFF}
+      />
       <HelpSection
         app={app}
         skills={skills}
@@ -232,7 +305,7 @@ function Ready({ app, data, retryRead }: { app: AppCtx; data: Data; retryRead: (
         rate={rate}
         fixed={fixed}
         rev={rev}
-        live={source !== "fixture"}
+        live={live}
         onAnswer={(skillId, skillName, label) => {
           setAns((prev) => ({ ...prev, [skillId]: label }));
           app.toast(
@@ -252,41 +325,30 @@ function Ready({ app, data, retryRead }: { app: AppCtx; data: Data; retryRead: (
           if (decision === "trusted") app.toast(`“${skillName}” is trusted`);
         }}
       />
-      <LibrarySection
-        app={app}
-        skills={skills}
-        selectedId={selectedId}
-        paused={paused}
-        currency={currency}
-        live={source !== "fixture"}
-        onSelect={(id) => setSel(id)}
-        onTogglePause={(skill) => {
-          const nextPaused = !paused[skill.id];
-          setPaused((prev) => ({ ...prev, [skill.id]: nextPaused }));
-          // The demo's pause is this page's only: no world, run or stored skill changes (W10).
-          app.toast(
-            nextPaused
-              ? `Sample data: “${skill.name}” is paused on this page only. Nothing changed for your worlds`
-              : `Sample data: “${skill.name}” is shown as running again on this page only`,
-          );
-        }}
-        onTryDraft={() => {
-          t.setMethod("describe");
-          t.capture();
-          t.goStep(2);
-          scrollTeach();
-        }}
-      />
       <ToolAccess skills={skills} tools={learn.tools} />
-      {source === "live" && skills.find((s) => s.id === selectedId)?.fix ? (
-        <FixSkill
-          key={`${selectedId}:${persisted[selectedId]?.fix?.version ?? 0}`}
-          api={api}
-          skill={skills.find((s) => s.id === selectedId) as Skill}
-          saved={(s) => {
-            setPersisted((prev) => ({ ...prev, [s.id]: s }));
-            app.toast("Step fix saved.");
-          }}
+      {current ? (
+        <SkillDrawer
+          app={app}
+          skill={current}
+          paused={Boolean(paused[current.id])}
+          currency={currency}
+          onPause={pause}
+          pauseOff={PAUSE_OFF}
+          onTeach={() => startTeach(current.builtin ? "" : current.name)}
+          onClose={() => setOpen(null)}
+          fix={
+            source === "live" && current.fix ? (
+              <FixSkill
+                key={`${current.id}:${persisted[current.id]?.fix?.version ?? 0}`}
+                api={api}
+                skill={current}
+                saved={(s) => {
+                  setPersisted((prev) => ({ ...prev, [s.id]: s }));
+                  app.toast("Step fix saved.");
+                }}
+              />
+            ) : null
+          }
         />
       ) : null}
     </>

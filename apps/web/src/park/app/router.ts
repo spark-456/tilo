@@ -35,6 +35,7 @@ const ROOT_PAGES = new Set<string>([
   "library",
   "more",
   "chat",
+  "needs",
 ]);
 const ROUTINES_ADDRESS = /^\/(?:park\/)?routines\/?$/;
 const ROOT_WORLD = /^\/world\/[^/]+\/?$/;

@@ -96,6 +96,7 @@ export function skillFromRow(r: SkillRow): Skill {
         }
       : {}),
     ...ask,
+    ...(r.paused ? { paused: true } : {}),
   };
 }
 

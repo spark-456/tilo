@@ -21,6 +21,7 @@ export const PAGE_LABEL: Record<PageId, string> = {
   settings: "Settings",
   library: "Library",
   chat: "Chat",
+  needs: "Needs you",
 };
 
 export type SpyApi = Api & {

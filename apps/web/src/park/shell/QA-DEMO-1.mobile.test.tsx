@@ -34,10 +34,10 @@ describe("QA_DEMO_1_B2 the nav on a phone", () => {
           .replace(/Current page|\d+ decisions?/g, "")
           .trim(),
       ),
-    ).toEqual(["Home", "Chat", "Worlds", "Skills", "Ledger", "Agenda", "Team"]);
+    ).toEqual(["Home", "Chat", "Worlds", "Skills", "Needs you", "Ledger", "Agenda", "Team"]); // STUDIO-2 Chat, STUDIO-4 Needs you
     // the current page is said in words, and decisions waiting are counted (colour carries nothing alone)
-    expect(text(items[6] as Element)).toContain("Current page");
-    expect(text(items[2] as Element)).toContain("2 decisions");
+    expect(text(items[7] as Element)).toContain("Current page");
+    expect(text(items[4] as Element)).toContain("2 decisions");
   });
 
   it("QA_DEMO_1_B2_320_choosing_a_page_goes_there_and_closes_the_menu", async () => {
@@ -56,7 +56,7 @@ describe("QA_DEMO_1_B2 the nav on a phone", () => {
 
   it("QA_DEMO_1_B2_1440_keeps_the_six_tab_strip_and_no_page_menu", async () => {
     const rig = await mountApp({ api: fakeApi(), viewport: { vw: 1440, vh: 900 }, path: "/team" });
-    expect(qa(rig.m.container, "header nav a")).toHaveLength(7);
+    expect(qa(rig.m.container, "header nav a")).toHaveLength(8); // STUDIO-2 Chat, STUDIO-4 Needs you
     expect(document.body.querySelector("button.park-shell__pagebtn")).toBeNull();
   });
 });

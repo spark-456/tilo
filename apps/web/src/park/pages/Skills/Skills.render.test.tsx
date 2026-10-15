@@ -11,41 +11,20 @@
 // open card; "Teach a skill" scrolls to it); the counts in the pills come from the skills' `st`, not `status`.
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, q, qa } from "../../../../test-support/park/componentsHarness";
-import {
-  CAPTURED_HINT,
-  CARD_SUB,
-  CARD_TITLE,
-  DEFAULT_NAME,
-  INTRO,
-  METHODS,
-  NO_STEPS_YET,
-  SCREEN,
-  STEP_LABELS,
-} from "../../../../test-support/park/skillsCopy";
+import { INTRO } from "../../../../test-support/park/skillsCopy";
 import {
   NIGHT,
-  agentArt,
-  artIn,
   control,
-  currentStep,
   elWithText,
   fixtureResult,
   flat,
   goCalls,
-  isDisabled,
-  isOn,
-  methodTile,
   mountSkills,
+  openSkill,
   pageText,
   pendingApi,
-  pickedCount,
-  reachable,
   rejects,
-  skillNameField,
   skillsApi,
-  stepBar,
-  stepButtons,
-  teachCard,
   textOf,
   toasts,
 } from "../../../../test-support/park/skillsHarness";
@@ -63,16 +42,16 @@ it("LIVE-SKILLS renders builtins as shipped descriptions with run and edit contr
     api: skillsApi({ getSkills: () => fixtureResult(list ?? []) }),
   });
   expect(el.textContent).toContain("Web Research");
-  expect(el.textContent).toContain("Shipped with Tilo · version 1.0.0");
   expect(el.textContent).toContain("Research public sources.");
-  expect(el.textContent).toContain("Built-in and learned skills");
-  expect(teachCard(el).textContent).not.toContain("Web Research");
-  for (const text of ["Try run", "Pause", "Edit steps"]) {
-    const button = Array.from(el.querySelectorAll("button")).find(
+  // STUDIO-4: the detail is a side sheet; a built-in offers no run, pause or step edit at all.
+  const drawer = openSkill(el, "Web Research");
+  expect(drawer.textContent).toContain("Shipped with Tilo · version 1.0.0");
+  expect(drawer.textContent).toContain("Built-in skills are picked by agents during a run.");
+  for (const text of ["Try run", "Test run", "Pause", "Edit steps"]) {
+    const button = Array.from(drawer.querySelectorAll("button")).find(
       (b) => b.textContent?.trim() === text,
     );
-    expect(button, text).toBeDefined();
-    expect(button?.disabled, text).toBe(true);
+    expect(button, text).toBeUndefined();
   }
 });
 
@@ -98,7 +77,7 @@ describe("WEB_8a_skills_render: the page frame", () => {
     for (const api of [skillsApi(), pendingApi()]) {
       const { el } = await mountSkills({ api });
       expect(qa(el, "main")).toHaveLength(0); // the landmark belongs to the shell
-      expect(qa(el, ".park-sheet")).toHaveLength(1);
+      expect(qa(el, ".park-skills-page")).toHaveLength(1); // STUDIO-4: the Studio page frame
       const h1s = qa(el, "h1");
       expect(h1s).toHaveLength(1);
       expect(textOf(h1s[0] as HTMLElement)).toBe("Skills");
@@ -126,10 +105,10 @@ describe("WEB_8a_skills_render: the page frame", () => {
     const h1 = q(el, "h1");
     const pill = elWithText(el, "4 trusted") as HTMLElement;
     const button = q(el, "button");
-    expect(follows(h1, pill)).toBe(true);
-    expect(textOf(button)).toBe("Teach a skill"); // the first control on the page
-    expect(follows(pill, button)).toBe(true);
-    expect(follows(button, teachCard(el))).toBe(true);
+    expect(textOf(button)).toBe("+ Teach Tilo a skill"); // STUDIO-4: the first control, the one primary
+    expect(follows(h1, button)).toBe(true);
+    expect(follows(button, pill)).toBe(true);
+    expect(follows(pill, q(el, 'section[aria-label="Teach Tilo a skill"]'))).toBe(true);
   });
 
   it("WEB_8a_skills_render_nothing_is_called_or_announced_on_mount_and_no_chip_is_drawn", async () => {
@@ -188,130 +167,16 @@ describe("WEB_8a_skills_render: the summary pills (README Skills 1)", () => {
     expect(elWithText(el, "4 skills")).toBeDefined();
   });
 
-  it("WEB_8a_skills_render_Teach_a_skill_is_a_button_with_a_plus_icon", async () => {
+  it("STUDIO_4_skills_render_Teach_Tilo_a_skill_is_the_one_primary_button", async () => {
     const { el } = await mountSkills();
     const button = q(el, "button");
-    expect(textOf(button)).toBe("Teach a skill");
-    expect(button.querySelector("svg")).not.toBeNull();
+    expect(textOf(button)).toBe("+ Teach Tilo a skill");
+    expect(qa(el, ".park-btn--primary")).toEqual([button]);
   });
 });
 
-describe("WEB_8a_skills_render: the Teach card, as first drawn (README Skills 2)", () => {
-  it("WEB_8a_skills_render_the_card_is_a_labelled_region_with_its_title_and_line", async () => {
-    const { el } = await mountSkills();
-    const card = teachCard(el);
-    expect(card.tagName === "SECTION" || card.getAttribute("role") === "region").toBe(true);
-    expect(textOf(q(card, "h2"))).toBe(CARD_TITLE);
-    expect(elWithText(card, CARD_SUB)).toBeDefined();
-  });
-
-  it("WEB_8a_skills_render_the_card_is_open_on_the_first_step_with_nothing_to_unfold", async () => {
-    // The reference has no closed state: the card is the open card and "Teach a skill" scrolls to it.
-    const { el } = await mountSkills();
-    for (const m of METHODS) expect(methodTile(el, m.name)).toBeDefined();
-    expect(currentStep(el)).toBe("Show it");
-  });
-
-  it("WEB_8a_skills_render_the_step_bar_is_a_labelled_ordered_list_of_four_numbered_steps", async () => {
-    const { el } = await mountSkills();
-    const items = qa(stepBar(el), "li");
-    expect(stepBar(el).tagName).toBe("OL");
-    expect(items.map((li) => flat(textOf(li)))).toEqual(
-      STEP_LABELS.map((l, i) => flat(`${i + 1}${l}`)),
-    );
-    expect(stepButtons(el)).toHaveLength(4);
-  });
-
-  it("WEB_8a_skills_render_at_first_only_Show_it_can_be_pressed_and_it_is_the_current_step", async () => {
-    const { el } = await mountSkills();
-    expect(reachable(el)).toEqual([true, false, false, false]);
-    expect(currentStep(el)).toBe("Show it");
-    expect(qa(stepBar(el), '[aria-current="step"]')).toHaveLength(1);
-  });
-
-  it.each(METHODS.map((m) => [m.name, m.desc] as const))(
-    "WEB_8a_skills_render_method_tile_%s_with_its_line",
-    async (name, desc) => {
-      const { el } = await mountSkills();
-      expect(flat(textOf(methodTile(el, name)))).toBe(flat(`${name}${desc}`));
-    },
-  );
-
-  it("WEB_8a_skills_render_Record_my_screen_is_the_chosen_method_and_the_others_are_not", async () => {
-    const { el } = await mountSkills();
-    const on = METHODS.map((m) => isOn(methodTile(el, m.name)));
-    expect(on).toEqual([true, false, false, false]);
-  });
-
-  it("WEB_8a_skills_render_the_mock_browser_shows_the_address_the_hint_and_Start_recording", async () => {
-    const { el } = await mountSkills();
-    const card = teachCard(el);
-    expect(elWithText(card, SCREEN.record.url)).toBeDefined();
-    expect(elWithText(card, SCREEN.record.hint)).toBeDefined();
-    expect(isDisabled(control(card, SCREEN.record.start))).toBe(false);
-    expect(pageText(card)).not.toMatch(/REC 00:/);
-  });
-
-  it("WEB_8a_skills_render_what_Tilo_has_picked_up_starts_empty_with_the_name_and_a_disabled_next", async () => {
-    const { el } = await mountSkills();
-    const card = teachCard(el);
-    expect(elWithText(card, "What Tilo has picked up")).toBeDefined();
-    expect(pickedCount(el)).toBe(0);
-    expect(elWithText(card, NO_STEPS_YET)).toBeDefined();
-    expect(pageText(card)).not.toContain(CAPTURED_HINT);
-    expect(skillNameField(el).value).toBe(DEFAULT_NAME);
-    expect(isDisabled(control(card, "Show me Tilo’s version"))).toBe(true);
-  });
-
-  it("WEB_8a_skills_render_the_labelled_regions_of_the_inventory_are_there", async () => {
-    // inventory.md: Teach a skill · Steps · (Describe the task, once Describe it is chosen) · Skill name
-    const { el } = await mountSkills();
-    expect(qa(el, '[aria-label="Teach a skill"]')).toHaveLength(1);
-    expect(qa(el, '[aria-label="Steps"]')).toHaveLength(1);
-    expect(qa(el, 'input[aria-label="Skill name"]')).toHaveLength(1);
-  });
-
-  it("WEB_8a_skills_render_every_control_has_a_name_and_every_button_is_type_button", async () => {
-    const { el } = await mountSkills();
-    for (const b of qa<HTMLButtonElement>(el, "button")) {
-      expect(b.getAttribute("type"), textOf(b)).toBe("button");
-      expect(
-        (b.getAttribute("aria-label") ?? textOf(b)).length,
-        "a button without a name",
-      ).toBeGreaterThan(0);
-    }
-    for (const f of qa<HTMLInputElement>(el, "input, textarea")) {
-      const named = f.getAttribute("aria-label") || f.closest("label")?.textContent?.trim();
-      expect(named, "a field without a name").toBeTruthy();
-    }
-  });
-});
-
-describe("WEB_8a_skills_render: the pictures are the kit's own (design: K.agent)", () => {
-  it("WEB_8a_skills_render_the_teacher_in_the_card_header_is_the_research_lead_talking", async () => {
-    const { el } = await mountSkills();
-    expect(await artIn(teachCard(el))).toContain(
-      await agentArt({ role: "research", rank: "lead", expr: "talking" }, 58),
-    );
-  });
-
-  it("WEB_8a_skills_render_by_night_the_pictures_are_drawn_for_night", async () => {
-    const spec = { role: "research", rank: "lead", expr: "talking" };
-    const night = await agentArt(spec, 58, true);
-    const day = await agentArt(spec, 58, false);
-    expect(night, "the kit draws night differently").not.toBe(day);
-    const rig = await mountSkills({ app: NIGHT });
-    expect(await artIn(teachCard(rig.el))).toContain(night);
-    expect(await artIn(teachCard(rig.el))).not.toContain(day);
-  });
-
-  it("WEB_8a_skills_render_the_empty_list_of_steps_has_the_research_agent_waiting_neutral", async () => {
-    const { el } = await mountSkills();
-    expect(await artIn(teachCard(el))).toContain(
-      await agentArt({ role: "research", expr: "neutral" }, 58),
-    );
-  });
-});
+// STUDIO-4: the 4-step Teach card and its pictures were replaced by the 3-step Teach wizard;
+// its tests are in Skills.STUDIO_4.test.tsx.
 
 describe("WEB_8a_skills_render: data comes through the Api, and shows only what it returned", () => {
   it("WEB_8a_skills_render_reads_the_skills_and_the_learn_data_and_nothing_it_does_not_need", async () => {

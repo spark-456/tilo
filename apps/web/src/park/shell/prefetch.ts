@@ -6,6 +6,7 @@ const LOADERS: Partial<Record<PageId, () => Promise<unknown>>> = {
   chat: () => import("../pages/Chat/ChatPage"),
   worlds: () => import("../pages/Worlds/WorldsPage"),
   skills: () => import("../pages/Skills/SkillsPage"),
+  needs: () => import("../pages/Needs/NeedsPage"),
   ledger: () => import("../pages/Ledger/LedgerPage"),
   agenda: () => import("../pages/Agenda/AgendaPage"),
   team: () => import("../pages/Team/TeamPage"),

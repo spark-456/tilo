@@ -66,8 +66,9 @@ describe("WEB_8a_static: the page folder", () => {
     expect(code(join(DIR, "SkillsPage.tsx"))).toMatch(/export\s+(?:function|const)\s+SkillsPage\b/);
   });
 
-  it("WEB_8a_static_the_page_is_laid_on_the_PageSheet_component", () => {
-    expect(code(join(DIR, "SkillsPage.tsx"))).toMatch(/\bPageSheet\b/);
+  // STUDIO-4: the Studio page frame (design/studio-v2 "Tilo S Skills") replaced the Park PageSheet.
+  it("STUDIO_4_static_the_page_is_laid_on_the_studio_page_frame", () => {
+    expect(code(join(DIR, "SkillsPage.tsx"))).toMatch(/park-skills-page/);
   });
 });
 
@@ -90,10 +91,12 @@ describe("WEB_8a_static: honesty (HR-1..HR-7; the scan and its allowlist are unt
     expect(sources.filter((p) => banned.test(code(p))).map(rel)).toEqual([]);
   });
 
-  it("WEB_8a_static_the_900ms_steps_go_through_useSchedule", () => {
+  // STUDIO-4: the recorded capture and the practice run (the old 900 ms steps) are gone; nothing in the page waits
+  // on a timer, so no step can look like work that is not happening (HR-1..HR-7).
+  it("STUDIO_4_static_nothing_in_the_page_waits_on_a_timer", () => {
     const all = ts.map((p) => code(p)).join("\n");
-    expect(all).toMatch(/\buseSchedule\b/);
-    expect(all).toMatch(/\b900\b/);
+    expect(all).not.toMatch(/\buseSchedule\b/);
+    expect(all).not.toMatch(/\b900\b/);
   });
 });
 

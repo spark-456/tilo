@@ -43,7 +43,7 @@ it("JUDGE_FIRST_RUN_F4_skills_lists_the_built_in_skills_and_teach_above_the_labe
   const skillsPage = root.querySelector('[data-testid="park-page-skills"]');
   expect(skillsPage).not.toBeNull();
   expect(skillsPage?.textContent).toContain("Web research");
-  expect(skillsPage?.textContent).toContain("Teach a skill");
+  expect(skillsPage?.textContent).toContain("Teach Tilo a skill"); // STUDIO-4 copy (design/studio-v2)
   // the examples are present once each, labelled, and come after the real page in the document
   for (const page of ["skills", "team", "agenda"]) {
     const examples = root.querySelectorAll(`[data-first-run-panels="${page}"]`);
