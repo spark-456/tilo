@@ -354,7 +354,7 @@ describe("WEB_12_profile_styles: appearance", () => {
       ["30px", "46px", "7px"],
       ["38px", "22px", "7px"],
     ]);
-    expect(type(byText(day, "Day"))).toEqual(["14.5px", "800"]);
+    expect(type(byText(day, "Light"))).toEqual(["14.5px", "800"]);
     const sub = byText(day, "Bright lawns");
     expect([...type(sub), d(sub, "color")]).toEqual(["12.5px", "700", "var(--ink3)"]);
   });

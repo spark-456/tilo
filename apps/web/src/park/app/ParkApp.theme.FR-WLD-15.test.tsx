@@ -22,9 +22,9 @@ afterEach(() => {
 });
 
 describe("FR-WLD-15 the Park root carries the theme", () => {
-  it("FR-WLD-15 Metropolis is the default, day", async () => {
+  it("FR-WLD-15 Studio is the default, day (UI-STUDIO-1)", async () => {
     const m = await visit();
-    expect(root(m.container)?.dataset).toMatchObject({ theme: "metropolis", time: "day" });
+    expect(root(m.container)?.dataset).toMatchObject({ theme: "studio", time: "day" });
   });
 
   it("FR-WLD-15 a stored second theme applies by day and by night", async () => {
@@ -37,11 +37,11 @@ describe("FR-WLD-15 the Park root carries the theme", () => {
     expect(root(night.container)?.dataset).toMatchObject({ theme: "neutral", time: "night" });
   });
 
-  it("FR-WLD-15 an id that no theme file defines falls back to Metropolis", async () => {
+  it("FR-WLD-15 an id that no theme file defines falls back to the default, Studio", async () => {
     for (const stored of ["nope", 'x"><script>', "NEUTRAL"]) {
       window.localStorage.setItem("tilo.theme", stored);
       const m = await visit();
-      expect(root(m.container)?.dataset.theme).toBe("metropolis");
+      expect(root(m.container)?.dataset.theme).toBe("studio");
       cleanup();
     }
   });

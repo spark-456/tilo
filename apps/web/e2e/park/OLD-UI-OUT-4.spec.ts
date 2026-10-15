@@ -32,7 +32,7 @@ for (const width of [1440, 390]) {
     await expect(
       page.getByText("No routines are recorded in this sample.", { exact: false }),
     ).toBeVisible();
-    await page.locator(".park-admin").getByRole("button", { name: "Night", exact: false }).click();
+    await page.locator(".park-admin").getByRole("button", { name: "Dark", exact: false }).click();
     await expect(page.locator("[data-park]")).toHaveAttribute("data-time", "night");
     await page.screenshot({
       path: `test-results/OLD-UI-OUT-4-settings-${width}.png`,

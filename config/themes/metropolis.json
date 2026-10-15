@@ -1,8 +1,8 @@
 {
   "id": "metropolis",
   "name": "Metropolis",
-  "default": true,
-  "note": "The shipped Park City look. Its values are the base of apps/web/src/park/tokens/park.css (verbatim from the design handoff), so it overrides nothing. Another theme lists only the role tokens it changes, for day and for night.",
+  "default": false,
+  "note": "The Park City look (the default until UI-STUDIO-1 made Studio the default). Its values are the base of apps/web/src/park/tokens/park.css (verbatim from the design handoff), so it overrides nothing. Another theme lists only the role tokens it changes, for day and for night.",
   "day": {},
   "night": {}
 }

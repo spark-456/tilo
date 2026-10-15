@@ -39,16 +39,18 @@ const harbour = {
 };
 
 describe("FR-WLD-15 themes from config/themes", () => {
-  it("FR-WLD-15 loads Metropolis as the default and a second theme from the config folder", () => {
+  // Updated for UI-STUDIO-1: Studio is the default theme; Metropolis stays first as the base park.css.
+  it("FR-WLD-15 loads Studio as the default, Metropolis as the base and a second theme from the config folder", () => {
     const themes = readThemes(THEMES_DIR);
-    expect(themes[0]).toMatchObject({ id: "metropolis", isDefault: true });
-    expect(themes.filter((t) => t.isDefault)).toHaveLength(1);
+    expect(themes[0]).toMatchObject({ id: "metropolis", isDefault: false });
+    expect(themes.filter((t) => t.isDefault).map((t) => t.id)).toEqual(["studio"]);
     expect(themes.map((t) => t.id)).toContain("neutral");
-    expect(DEFAULT_THEME).toBe("metropolis");
+    expect(DEFAULT_THEME).toBe("studio");
     expect(THEMES.map((t) => t.id)).toEqual(themes.map((t) => t.id));
     expect(themeFor("neutral")).toBe("neutral");
+    expect(themeFor("metropolis")).toBe("metropolis");
     for (const bad of ["nope", "", null, undefined, 3, "../neutral", "NEUTRAL"]) {
-      expect(themeFor(bad)).toBe("metropolis");
+      expect(themeFor(bad)).toBe("studio");
     }
   });
 

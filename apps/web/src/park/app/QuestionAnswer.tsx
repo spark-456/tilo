@@ -1,5 +1,6 @@
 import { useId, useState } from "react";
 import type { Decision, DecisionKey } from "../api/types";
+import "../studio/studio.components.css";
 
 export function QuestionAnswer({
   d,
@@ -13,12 +14,13 @@ export function QuestionAnswer({
   const [error, setError] = useState("");
   if (!d.questionOptions) return null;
   return (
-    <div style={{ width: "100%" }}>
-      <div>
+    <div className="park-question">
+      <div className="park-question__options">
         {d.questionOptions.map((o) => (
           <button
             key={o.id}
             type="button"
+            className="park-question__option"
             style={{ minHeight: 44, minWidth: 44 }}
             onClick={() => onDecide(d.k, undefined, o.id)}
           >
@@ -27,6 +29,7 @@ export function QuestionAnswer({
         ))}
       </div>
       <form
+        className="park-question__own"
         onSubmit={(e) => {
           e.preventDefault();
           if (!text.trim() || Array.from(text).length > 300) {
@@ -37,17 +40,28 @@ export function QuestionAnswer({
           onDecide(d.k, text);
         }}
       >
-        <label htmlFor={id}>Type my own answer</label>
+        <label htmlFor={id} className="park-question__label">
+          Type my own answer
+        </label>
         <textarea
           id={id}
           value={text}
           maxLength={600}
+          className="park-question__field"
           style={{ minHeight: 44, width: "100%" }}
           aria-invalid={Boolean(error)}
           onChange={(e) => setText(e.target.value)}
         />
-        {error && <p role="alert">{error}</p>}
-        <button type="submit" style={{ minHeight: 44, minWidth: 44 }}>
+        {error && (
+          <p role="alert" className="park-question__error">
+            {error}
+          </p>
+        )}
+        <button
+          type="submit"
+          className="park-question__send"
+          style={{ minHeight: 44, minWidth: 44 }}
+        >
           Send
         </button>
       </form>

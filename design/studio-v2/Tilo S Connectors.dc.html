@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="./tilo-daylight.css">
+<link rel="stylesheet" href="./tilo-studio.css">
+<script src="./tilo-city.js"></script>
+<script src="./tilo-daylight.js"></script>
+<style>body{margin:0;-webkit-font-smoothing:antialiased}a{color:var(--ink);text-decoration:none}a:hover{color:var(--ink2)}</style>
+</helmet>
+<div data-theme="{{ theme }}" style="position:relative;width:100%;min-height:100%;background:var(--bg);color:var(--ink);font-family:var(--fB);font-size:16px;line-height:1.5">
+  <dc-import name="Tilo S Nav" active="connectors" theme="{{ theme }}" hint-size="100%,72px"></dc-import>
+  <main style="max-width:1296px;margin:0 auto;padding:48px 32px 64px;display:flex;flex-direction:column;gap:24px">
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <h1 style="margin:0;font-family:var(--fH);font-weight:700;font-size:48px;line-height:1.05;letter-spacing:-2px">Connectors</h1>
+      <p style="margin:0;font-size:18px;color:var(--ink2)">The apps Tilo can use for you. You decide what it may do in each one.</p>
+    </div>
+    <div style="display:flex;align-items:center;gap:12px">
+      <div style="height:48px;width:340px;box-sizing:border-box;padding:0 16px;border-radius:14px;background:var(--card);border:1px solid var(--line);display:flex;align-items:center;gap:10px;color:var(--ink3);font-weight:500"><span>{{ iSearch }}</span>Find an app</div>
+      <div style="display:flex;gap:6px">
+        <sc-for list="{{ cats }}" as="c" hint-placeholder-count="6"><span style="height:44px;padding:0 16px;border-radius:99px;display:flex;align-items:center;font-size:14.5px;font-weight:600;background:{{ c.bg }};color:{{ c.fg }};border:1px solid {{ c.bd }}">{{ c.t }}</span></sc-for>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:minmax(0,1fr) 420px;gap:24px;align-items:start">
+      <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px">
+        <sc-for list="{{ apps }}" as="a" hint-placeholder-count="9">
+          <div style="background:var(--card);border:1px solid {{ a.bd }};box-shadow:{{ a.ring }};border-radius:22px;padding:18px;display:flex;flex-direction:column;gap:12px;transition:transform .25s" style-hover="transform:translateY(-2px)">
+            <div style="display:flex;align-items:center;gap:12px">
+              <span style="width:48px;height:48px;border-radius:14px;background:{{ a.mbg }};color:{{ a.mfg }};font-family:var(--fH);font-weight:700;font-size:17px;display:flex;align-items:center;justify-content:center;flex:none">{{ a.m }}</span>
+              <span style="flex:1;display:flex;flex-direction:column;line-height:1.3"><span style="font-weight:700;font-size:16px">{{ a.n }}</span><span style="font-size:13px;color:var(--ink3)">{{ a.c }}</span></span>
+            </div>
+            <span style="font-size:14px;color:var(--ink2);min-height:42px">{{ a.d }}</span>
+            <div style="display:flex;align-items:center;justify-content:space-between">
+              <span style="height:26px;padding:0 10px 0 8px;border-radius:99px;background:{{ a.sbg }};color:{{ a.sfg }};font-size:12.5px;font-weight:700;display:flex;align-items:center;gap:6px"><span style="width:7px;height:7px;border-radius:99px;background:{{ a.dot }}"></span>{{ a.st }}</span>
+              <span style="font-size:13.5px;font-weight:700;text-decoration:underline;text-underline-offset:3px">{{ a.act }}</span>
+            </div>
+          </div>
+        </sc-for>
+      </div>
+      <aside style="background:var(--card);border:1px solid var(--line);border-radius:28px;box-shadow:var(--sh2);overflow:hidden">
+        <div style="padding:22px 22px 18px;display:flex;align-items:center;gap:14px;border-bottom:1px solid var(--line)">
+          <span style="width:56px;height:56px;border-radius:16px;background:var(--redSoft);color:var(--redInk);font-family:var(--fH);font-weight:700;font-size:20px;display:flex;align-items:center;justify-content:center">Gm</span>
+          <span style="flex:1;display:flex;flex-direction:column;line-height:1.3"><span style="font-family:var(--fH);font-weight:700;font-size:22px">Gmail</span><span style="font-size:13.5px;color:var(--ink3)">Connected as maya@raostudio.co</span></span>
+          <span style="width:40px;height:40px;border-radius:12px;background:var(--sunk);display:flex;align-items:center;justify-content:center;color:var(--ink2)">×</span>
+        </div>
+        <div style="padding:20px 22px;display:flex;flex-direction:column;gap:16px">
+          <span style="font-weight:700;font-size:15px">What Tilo may do</span>
+          <sc-for list="{{ perms }}" as="p" hint-placeholder-count="4">
+            <div style="display:flex;flex-direction:column;gap:8px">
+              <div style="display:flex;flex-direction:column;line-height:1.35"><span style="font-weight:600;font-size:15px">{{ p.t }}</span><span style="font-size:13px;color:var(--ink3)">{{ p.s }}</span></div>
+              <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:4px;padding:3px;border-radius:12px;background:var(--sunk)">
+                <sc-for list="{{ p.o }}" as="o" hint-placeholder-count="3"><span style="height:34px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;background:{{ o.bg }};color:{{ o.fg }};box-shadow:{{ o.sh }}">{{ o.t }}</span></sc-for>
+              </div>
+            </div>
+          </sc-for>
+          <div style="border-top:1px solid var(--line);padding-top:16px;display:flex;flex-direction:column;gap:10px">
+            <span style="font-weight:700;font-size:15px">Recently</span>
+            <sc-for list="{{ log }}" as="l" hint-placeholder-count="3"><div style="display:flex;gap:10px;font-size:14px"><span style="font-family:var(--mono);font-size:11.5px;color:var(--ink3);width:44px;flex:none;padding-top:2px">{{ l.w }}</span><span style="flex:1;color:var(--ink2)">{{ l.t }}</span></div></sc-for>
+          </div>
+          <a href="#" style="font-size:14px;font-weight:600;color:var(--redInk)">Disconnect Gmail</a>
+        </div>
+      </aside>
+    </div>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1440,&quot;height&quot;:1100},&quot;theme&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;studio&quot;,&quot;studioDark&quot;],&quot;default&quot;:&quot;studio&quot;,&quot;tsType&quot;:&quot;string&quot;}}">
+class Component extends DCLogic {
+  componentDidMount() { if (!window.TiloR) this.t = setInterval(() => { if (window.TiloR && window.TiloCity) { clearInterval(this.t); this.forceUpdate(); } }, 60); }
+  componentWillUnmount() { clearInterval(this.t); }
+  renderVals() {
+    const R = window.TiloR ? window.TiloR(React.createElement) : null;
+    const theme = this.props.theme ?? 'studio';
+    const ST = { on: ['Connected', 'mint'], off: ['Not connected', 'sunk'], warn: ['Needs attention', 'amber'] };
+    const apps = [['Gm', 'Gmail', 'Email', 'Reads and drafts. Sends only after you say yes.', 'on', 'red', 'Manage', true], ['Ca', 'Google Calendar', 'Calendar', 'Prepares briefs, suggests times, joins calls you invite it to.', 'on', 'sky', 'Manage'], ['Dr', 'Google Drive', 'Files', 'Reads the folders you pick. Never deletes.', 'on', 'amber', 'Manage'], ['Sl', 'Slack', 'Chat', 'Reads #design and #launch. Posts only your Friday update.', 'on', 'lilac', 'Manage'], ['No', 'Notion', 'Files', 'Reads your sprint board and project pages.', 'on', 'sunk', 'Manage'], ['Ws', 'Web search', 'Web', 'Isn’t connected yet. Tilo uses what it already knows instead.', 'warn', 'teal', 'Connect'], ['Pa', 'Payments card', 'Money', 'Card ending 4021. Every payment asks you first.', 'on', 'mint', 'Manage'], ['Mp', 'Maps', 'Web', 'Drive times, places and opening hours.', 'on', 'pink', 'Manage'], ['Zm', 'Zoom', 'Calendar', 'Lets Tilo join and take notes in calls.', 'off', 'sky', 'Connect']].map(([m, n, c, d, s, col, act, sel]) => {
+      const st = ST[s]; const soft = st[1] === 'sunk';
+      return { m, n, c, d, act, st: st[0], sbg: soft ? 'var(--sunk)' : `var(--${st[1]}Soft)`, sfg: soft ? 'var(--ink2)' : `var(--${st[1]}Ink)`, dot: soft ? 'var(--ink3)' : `var(--${st[1]})`, mbg: col === 'sunk' ? 'var(--sunk)' : `var(--${col}Soft)`, mfg: col === 'sunk' ? 'var(--ink)' : `var(--${col}Ink)`, bd: sel ? 'var(--ink)' : 'var(--line)', ring: sel ? '0 0 0 1px var(--ink)' : 'var(--sh1)' };
+    });
+    const on = ['var(--card)', 'var(--ink)', '0 1px 2px rgba(0,0,0,.12)'], off = ['transparent', 'var(--ink3)', 'none'];
+    const opt = (sel) => ['Always', 'Ask me', 'Never'].map((t, i) => ({ t, bg: i === sel ? on[0] : off[0], fg: i === sel ? on[1] : off[1], sh: i === sel ? on[2] : off[2] }));
+    return {
+      theme, apps, iSearch: R ? R.ic('search', 17) : null,
+      cats: ['All', 'Email', 'Calendar', 'Files', 'Chat', 'Money'].map((t, i) => ({ t, bg: i ? 'var(--card)' : 'var(--ink)', fg: i ? 'var(--ink)' : 'var(--card)', bd: i ? 'var(--line)' : 'var(--ink)' })),
+      perms: [['Read emails', 'Only threads linked to your worlds', 0], ['Draft replies', 'Saved as drafts in Gmail', 0], ['Send emails', 'Shows you exactly what will be sent', 1], ['Delete or archive', 'Tilo never tidies your inbox for you', 2]].map(([t, s, sel]) => ({ t, s, o: opt(sel) })),
+      log: [['11:20', 'Sent your reply to Northline, after you said yes'], ['10:02', 'Drafted a quote request to 3 suppliers'], ['9:15', 'Read 4 threads for “Compare 3 suppliers”']].map(([w, t]) => ({ w, t }))
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -21,6 +21,7 @@ old screens until the cutover PR. WEB-1a holds the tokens, fonts, typed fixtures
   `Popover`/`Menu` share `Panel.tsx` (Escape on the document, backdrop, focus back to the opener).
 - `dev/Components.tsx`: `/dev/components` (dev build only; a lazy route in `Root.tsx`), a day and a
   night `data-park` panel with every component; one filled primary button per panel (UX-1).
+- Studio (UI-STUDIO-1, design/studio-v2): the DEFAULT theme. Colours are role tokens in `config/themes/studio.json` (day = light, night = dark; extra roles `priFill`/`onPri`/`priLip` = the primary button, `lime`, `lineStrong`, `focus`, `lilacSoft`/`lilacInk`; `heroFill` stays safe under the pages' white text); shape, Geist type and shadows in `studio/studio.css`, scoped `[data-park][data-theme="studio"]` (Metropolis keeps park.components.css). `time` pref: day | night | system (`store.timeFor`, follows prefers-color-scheme live); `studio/ThemeSwitch` (account menu) and Profile Appearance write it. Shared states `studio/States.tsx` (`EmptyState`, `Skeleton` still, `ErrorState`), styles in `studio/studio.components.css`. No motion in either file.
 ## App (WEB-3a, `app/`)
 - `src/Root.tsx` shows the old app, or the lazy `app/ParkApp.tsx` under `/park` (`isParkPath`).
 - `AppCtx.ts` is the `app` prop. `store.ts` (framework-free, injected `schedule`) holds decisions, started

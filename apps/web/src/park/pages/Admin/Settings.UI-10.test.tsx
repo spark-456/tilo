@@ -36,7 +36,7 @@ it("UI-10 W8 Settings offers the same appearance preferences as Profile and upda
     return b as HTMLButtonElement;
   };
   expect(m.container.querySelectorAll("[data-park]")).toHaveLength(0); // reuse the shell, no nested full-height Park root
-  click(button("Night"));
+  click(button("Dark")); // UI-STUDIO-1: the night card is Dark
   expect(m.container.querySelector('[data-testid="prefs"]')?.textContent).toBe("night/calm");
   click(button("Still"));
   expect(m.container.querySelector('[data-testid="prefs"]')?.textContent).toBe("night/still");

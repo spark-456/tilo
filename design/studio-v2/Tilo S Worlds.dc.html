@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="./tilo-daylight.css">
+<link rel="stylesheet" href="./tilo-studio.css">
+<script src="./tilo-city.js"></script>
+<script src="./tilo-daylight.js"></script>
+<style>body{margin:0;-webkit-font-smoothing:antialiased}a{color:var(--ink);text-decoration:none}a:hover{color:var(--ink2)}</style>
+</helmet>
+<div data-theme="{{ theme }}" style="position:relative;width:100%;min-height:100%;background:var(--bg);color:var(--ink);font-family:var(--fB);font-size:16px;line-height:1.5">
+  <dc-import name="Tilo S Nav" active="worlds" theme="{{ theme }}" hint-size="100%,72px"></dc-import>
+  <main style="max-width:1232px;margin:0 auto;padding:48px 32px 64px;display:flex;flex-direction:column;gap:28px">
+    <div style="display:flex;align-items:flex-end;gap:24px">
+      <div style="flex:1;display:flex;flex-direction:column;gap:8px">
+        <h1 style="margin:0;font-family:var(--fH);font-weight:700;font-size:48px;line-height:1.05;letter-spacing:-2px">Worlds</h1>
+        <p style="margin:0;font-size:18px;color:var(--ink2)">Every bigger job gets its own little city. Here are all of yours.</p>
+      </div>
+      <span style="height:52px;padding:0 22px;border-radius:16px;background:var(--pri);color:var(--onPri);box-shadow:0 3px 0 var(--priH);display:flex;align-items:center;gap:10px;font-family:var(--fH);font-weight:700;font-size:16px"><span style="font-size:20px;line-height:1">+</span>New world</span>
+    </div>
+    <div style="position:relative;height:340px;border-radius:28px;background:var(--cityBg);border:1px solid var(--cityLine);overflow:hidden">
+      <div style="position:absolute;left:26%;right:-2%;top:-10px;bottom:-30px;filter:var(--cityFx)">{{ town }}</div>
+      <div style="position:absolute;left:24px;top:24px;bottom:24px;width:320px;box-sizing:border-box;background:var(--card);border-radius:22px;box-shadow:var(--sh2);padding:22px;display:flex;flex-direction:column;gap:12px">
+        <span style="font-family:var(--mono);font-size:12px;color:var(--ink3);letter-spacing:.5px">YOUR TOWN</span>
+        <span style="font-family:var(--fH);font-weight:700;font-size:26px;letter-spacing:-.8px;line-height:1.15">6 worlds, 14 helpers out and about</span>
+        <div style="flex:1"></div>
+        <div style="display:flex;flex-direction:column;gap:8px;font-size:14.5px">
+          <span style="display:flex;align-items:center;gap:10px"><span style="width:10px;height:10px;border-radius:99px;background:var(--pri)"></span><span style="flex:1">Working</span><span style="font-family:var(--mono)">3</span></span>
+          <span style="display:flex;align-items:center;gap:10px"><span style="width:10px;height:10px;border-radius:99px;background:var(--amber)"></span><span style="flex:1">Needs you</span><span style="font-family:var(--mono)">1</span></span>
+          <span style="display:flex;align-items:center;gap:10px"><span style="width:10px;height:10px;border-radius:99px;background:var(--mint)"></span><span style="flex:1">Done this week</span><span style="font-family:var(--mono)">2</span></span>
+        </div>
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:12px">
+      <div style="display:flex;gap:4px;padding:4px;border-radius:16px;background:var(--sunk)">
+        <sc-for list="{{ tabs }}" as="t" hint-placeholder-count="5"><span style="height:40px;padding:0 16px;border-radius:12px;display:flex;align-items:center;gap:8px;font-size:14.5px;font-weight:600;background:{{ t.bg }};color:{{ t.fg }};box-shadow:{{ t.sh }}">{{ t.l }}<span style="font-family:var(--mono);font-size:12px;color:var(--ink3)">{{ t.n }}</span></span></sc-for>
+      </div>
+      <div style="flex:1"></div>
+      <div style="height:48px;width:300px;box-sizing:border-box;padding:0 16px;border-radius:14px;background:var(--card);border:1px solid var(--line);display:flex;align-items:center;gap:10px;color:var(--ink3);font-weight:500"><span>{{ iSearch }}</span>Find a world</div>
+      <span style="height:48px;padding:0 16px;border-radius:14px;border:1px solid var(--line);background:var(--card);display:flex;align-items:center;font-weight:600;font-size:14.5px">Newest first ▾</span>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px">
+      <sc-for list="{{ worlds }}" as="w" hint-placeholder-count="6">
+        <a href="#" style="display:flex;flex-direction:column;background:var(--card);border:1px solid var(--line);border-radius:22px;box-shadow:var(--sh1);overflow:hidden;color:var(--ink);transition:transform .25s cubic-bezier(.2,.8,.2,1),box-shadow .25s" style-hover="transform:translateY(-3px);box-shadow:var(--sh2);color:var(--ink)">
+          <div style="position:relative;height:170px;margin:8px 8px 0;border-radius:16px;background:var(--cityBg);overflow:hidden">
+            <div style="position:absolute;inset:10px 4px 0;filter:var(--cityFx)">{{ w.city }}</div>
+            <span style="position:absolute;top:10px;left:10px;height:28px;padding:0 10px 0 8px;border-radius:99px;background:{{ w.pbg }};color:{{ w.pfg }};font-size:13px;font-weight:700;display:flex;align-items:center;gap:6px;box-shadow:var(--sh1)"><span style="width:8px;height:8px;border-radius:99px;background:{{ w.dot }}"></span>{{ w.pill }}</span>
+            <span style="position:absolute;top:10px;right:10px;height:28px;padding:0 10px;border-radius:99px;background:var(--card);font-family:var(--mono);font-size:11.5px;display:flex;align-items:center;box-shadow:var(--sh1)">{{ w.pct }}</span>
+          </div>
+          <div style="padding:16px 18px 18px;display:flex;flex-direction:column;gap:10px">
+            <div style="display:flex;flex-direction:column;gap:2px"><span style="font-weight:700;font-size:17px">{{ w.name }}</span><span style="font-size:14px;color:var(--ink3)">{{ w.last }}</span></div>
+            <div style="height:6px;border-radius:99px;background:var(--sunk)"><div style="height:100%;border-radius:99px;width:{{ w.pct }};background:{{ w.bar }}"></div></div>
+            <div style="display:flex;align-items:center;justify-content:space-between;font-size:13.5px;color:var(--ink2)"><span>{{ w.team }}</span><span style="font-family:var(--mono);font-size:12px">{{ w.cost }}</span></div>
+          </div>
+        </a>
+      </sc-for>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:12px;padding-top:8px">
+      <div style="display:flex;align-items:baseline;justify-content:space-between"><h2 style="margin:0;font-family:var(--fH);font-weight:700;font-size:24px;letter-spacing:-.6px">Routines</h2><span style="font-size:14px;color:var(--ink3);font-weight:600">Worlds that run on a schedule</span></div>
+      <div style="background:var(--card);border:1px solid var(--line);border-radius:22px;padding:6px">
+        <sc-for list="{{ routines }}" as="r" hint-placeholder-count="3">
+          <div style="display:flex;align-items:center;gap:14px;padding:12px 14px;border-radius:16px;border-bottom:1px solid {{ r.bd }}">
+            <span style="width:40px;height:40px;border-radius:12px;background:{{ r.bg }};color:{{ r.fg }};display:flex;align-items:center;justify-content:center">{{ r.ic }}</span>
+            <span style="flex:1;display:flex;flex-direction:column"><span style="font-weight:700">{{ r.t }}</span><span style="font-size:14px;color:var(--ink3)">{{ r.s }}</span></span>
+            <span style="font-family:var(--mono);font-size:12px;color:var(--ink2)">{{ r.next }}</span>
+            <span style="width:40px;height:24px;border-radius:99px;background:{{ r.tb }};display:flex;align-items:center;padding:3px;box-sizing:border-box;justify-content:{{ r.tj }}"><span style="width:18px;height:18px;border-radius:99px;background:#FFFFFF"></span></span>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1440,&quot;height&quot;:1500},&quot;theme&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;studio&quot;,&quot;studioDark&quot;],&quot;default&quot;:&quot;studio&quot;,&quot;tsType&quot;:&quot;string&quot;}}">
+class Component extends DCLogic {
+  componentDidMount() { if (!window.TiloR) this.t = setInterval(() => { if (window.TiloR && window.TiloCity) { clearInterval(this.t); this.forceUpdate(); } }, 60); }
+  componentWillUnmount() { clearInterval(this.t); }
+  renderVals() {
+    const R = window.TiloR ? window.TiloR(React.createElement) : null;
+    const theme = this.props.theme ?? 'studio', ic = (n, s) => R ? R.ic(n, s) : null;
+    const S = { working: ['Working', 'var(--priSoft)', 'var(--priInk)', 'var(--lime)', 'var(--pri)'], needs: ['Needs you', 'var(--amberSoft)', 'var(--amberInk)', 'var(--amber)', 'var(--amber)'], done: ['Done', 'var(--mintSoft)', 'var(--mintInk)', 'var(--mint)', 'var(--mint)'] };
+    const worlds = [['Road trip to Gokarna', 'Researcher found 5 hidden beaches · 2m', 'working', 62, 'trip', '5 helpers', '£1.90 / £8'], ['Compare 3 suppliers', 'Waiting on you: email 3 suppliers · 12m', 'needs', 48, 'suppliers', '4 helpers', '£0.80 / £5'], ['Spring launch plan', 'Designer started the launch page · 20m', 'working', 30, 'launch', '6 helpers', '£3.40 / £20'], ['Weekly invoice check', 'Matched 41 of 42 invoices · 1h', 'working', 80, 'invoices', '3 helpers', '£0.60 / £2'], ['Reply to Northline', 'Sent at 11:20', 'done', 100, 'email', '2 helpers', '£0.12'], ['Summarise customer calls', 'Finished yesterday · 12 calls', 'done', 100, 'calls', '3 helpers', '£0.90']].map(([name, last, s, p, plan, team, cost]) => ({ name, last, team, cost, pill: S[s][0], pbg: S[s][1], pfg: S[s][2], dot: S[s][3], bar: S[s][4], pct: p + '%', city: R ? R.city(plan, { labels: false, tags: false }) : null }));
+    const on = ['var(--card)', 'var(--ink)', '0 1px 2px rgba(0,0,0,.12)'], off = ['transparent', 'var(--ink2)', 'none'];
+    return {
+      theme, worlds, iSearch: ic('search', 17), town: R ? R.city('town', { labels: false, tags: true, seed: 5 }) : null,
+      tabs: [['All', '6'], ['Working', '3'], ['Needs you', '1'], ['Done', '2'], ['Archived', '9']].map(([l, n], i) => ({ l, n, bg: i ? off[0] : on[0], fg: i ? off[1] : on[1], sh: i ? off[2] : on[2] })),
+      routines: [['Weekly invoice check', 'Every Monday at 8 am · asks before paying anything', 'MON 20 OCT', 'coin', 'mint', true], ['Friday team update', 'Every Friday at 4 pm · uses your “Weekly team update” skill', 'FRI 17 OCT', 'people', 'sky', true], ['Monthly price check', 'First of the month · paused by you', 'PAUSED', 'tag', 'lilac', false]].map(([t, s, next, i, c, live], k, a) => ({ t, s, next, ic: ic(i, 18), bg: `var(--${c}Soft)`, fg: `var(--${c}Ink)`, tb: live ? 'var(--ink)' : 'var(--line2)', tj: live ? 'flex-end' : 'flex-start', bd: k < a.length - 1 ? 'var(--line)' : 'transparent' }))
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -40,6 +40,11 @@ const DEMOS = [
   "menu-static",
   "menu-live",
   "scrim",
+  // UI-STUDIO-1: the theme switch and the shared states
+  "theme-switch",
+  "state-empty",
+  "state-loading",
+  "state-error",
 ] as const;
 
 const PANELS = [

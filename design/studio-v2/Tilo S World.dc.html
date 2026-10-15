@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="./tilo-studio.css">
+<link rel="stylesheet" href="./tilo-daylight.css">
+<script src="./tilo-city.js"></script>
+<script src="./tilo-daylight.js"></script>
+<style>body{margin:0;-webkit-font-smoothing:antialiased}a{color:var(--ink);text-decoration:none}a:hover{color:var(--ink2)}</style>
+</helmet>
+<div data-theme="{{ theme }}" style="position:relative;width:100%;min-height:100%;background:var(--bg);color:var(--ink);font-family:var(--fB);font-size:16px;line-height:1.5">
+
+<sc-if value="{{ desk }}" hint-placeholder-val="{{ true }}">
+  <dc-import name="Tilo S Nav" active="worlds" theme="{{ theme }}" hint-size="100%,72px"></dc-import>
+  <div style="max-width:1440px;box-sizing:border-box;margin:0 auto;padding:24px 32px 32px;display:flex;flex-direction:column;gap:20px">
+    <div style="display:flex;align-items:center;gap:32px">
+      <div style="flex:1;display:flex;flex-direction:column;gap:4px">
+        <a href="#" style="font-size:14px;font-weight:700;color:var(--ink3)">← All worlds</a>
+        <div style="display:flex;align-items:center;gap:12px">
+          <h1 style="margin:0;font-family:var(--fH);font-weight:700;font-size:34px;line-height:1.15;letter-spacing:-.6px">Road trip to Gokarna</h1>
+          <sc-if value="{{ cityView }}" hint-placeholder-val="{{ true }}"><span style="height:30px;padding:0 12px 0 10px;border-radius:99px;background:var(--priSoft);color:var(--priInk);font-size:14px;font-weight:800;display:flex;align-items:center;gap:6px"><span style="width:8px;height:8px;border-radius:99px;background:var(--pri)"></span>Working</span></sc-if>
+          <sc-if value="{{ result }}" hint-placeholder-val="{{ false }}"><span style="height:30px;padding:0 12px 0 10px;border-radius:99px;background:var(--mintSoft);color:var(--mintInk);font-size:14px;font-weight:800;display:flex;align-items:center;gap:6px"><span style="width:8px;height:8px;border-radius:99px;background:var(--mint)"></span>Done</span></sc-if>
+        </div>
+      </div>
+      <div style="width:400px;display:flex;flex-direction:column;gap:8px">
+        <div style="display:flex;justify-content:space-between;font-size:15px"><span style="font-weight:800">{{ progLabel }}</span><span style="color:var(--ink3);font-weight:600">{{ progSub }}</span></div>
+        <div style="position:relative;height:12px;border-radius:99px;background:var(--sunk)"><div style="height:100%;border-radius:99px;width:{{ prog }};background:{{ progC }}"></div></div>
+        <div style="display:flex;justify-content:space-between;font-size:14px;color:var(--ink2);font-weight:600"><span><strong style="color:var(--ink)">{{ spent }}</strong> spent so far</span><span>Cap £8 · Tilo asks before going over</span></div>
+      </div>
+      <div style="display:flex;gap:8px">
+        <span style="height:44px;padding:0 18px;border-radius:14px;border:1px solid var(--line2);background:var(--card);display:flex;align-items:center;font-weight:800;font-size:15px">{{ secBtn }}</span>
+      </div>
+    </div>
+
+    <div style="display:flex;align-items:center;gap:24px">
+      <div role="tablist" style="display:flex;gap:4px;padding:4px;border-radius:16px;background:var(--sunk);flex:none">
+        <sc-for list="{{ tabs }}" as="t" hint-placeholder-count="3">
+          <span role="tab" style="height:40px;padding:0 18px;border-radius:12px;display:flex;align-items:center;gap:8px;font-size:15px;font-weight:800;background:{{ t.bg }};color:{{ t.fg }};box-shadow:{{ t.sh }}">{{ t.label }}<span style="font-size:13px;font-weight:700;color:var(--ink3)">{{ t.n }}</span></span>
+        </sc-for>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+        <span style="font-size:14px;font-weight:700;color:var(--ink3)">Assumed:</span>
+        <sc-for list="{{ assumed }}" as="a" hint-placeholder-count="4">
+          <span style="height:36px;padding:0 12px;border-radius:12px;background:var(--card);border:1px dashed var(--line2);display:flex;align-items:center;gap:6px;font-size:14px;font-weight:600;white-space:nowrap" style-hover="border-color:var(--pri)">{{ a }}<span style="font-size:12px;color:var(--ink3)">✎</span></span>
+        </sc-for>
+      </div>
+    </div>
+
+    <sc-if value="{{ cityView }}" hint-placeholder-val="{{ true }}">
+      <div style="display:grid;grid-template-columns:minmax(0,3fr) minmax(0,2fr);gap:24px">
+        <div style="position:relative;height:760px;border-radius:28px;background:var(--cityBg);border:1px solid var(--cityLine);overflow:hidden">
+          <div style="position:absolute;inset:48px 12px 40px;filter:var(--cityFx)">{{ city }}</div>
+          <span style="position:absolute;left:20px;top:20px;height:36px;padding:0 14px;border-radius:99px;background:var(--card);box-shadow:var(--sh1);display:flex;align-items:center;gap:8px;font-size:14px;font-weight:800"><span style="width:8px;height:8px;border-radius:99px;background:var(--mint)"></span>Live · 5 helpers working</span>
+          <div style="position:absolute;right:20px;top:20px;width:260px;box-sizing:border-box;background:var(--card);border-radius:18px;box-shadow:var(--sh2);padding:14px 16px;display:flex;align-items:center;gap:12px;overflow:hidden">
+            <span style="position:absolute;top:8px;right:14px;width:7px;height:7px;background:var(--amber);border-radius:2px;transform:rotate(45deg)"></span>
+            <span style="position:absolute;top:24px;right:34px;width:5px;height:5px;background:var(--sun);border-radius:99px"></span>
+            <span style="position:absolute;bottom:10px;right:22px;width:6px;height:6px;background:var(--mint);border-radius:2px;transform:rotate(20deg)"></span>
+            <span style="width:40px;height:40px;border-radius:12px;background:var(--mintSoft);color:var(--mintInk);display:flex;align-items:center;justify-content:center;flex:none">{{ iCheck }}</span>
+            <span style="display:flex;flex-direction:column;line-height:1.3"><span style="font-weight:800;font-size:15px">Fuel &amp; Tolls is done</span><span style="font-size:13px;color:var(--ink3);font-weight:600">Step 4 of 7 · just now</span></span>
+          </div>
+          <div style="position:absolute;left:20px;bottom:20px;height:44px;padding:0 16px;border-radius:14px;background:var(--card);box-shadow:var(--sh1);display:flex;align-items:center;gap:16px;font-size:13px;font-weight:700;color:var(--ink2)">
+            <span style="display:flex;align-items:center;gap:6px"><span style="width:10px;height:10px;border-radius:99px;background:var(--pri)"></span>Working</span>
+            <span style="display:flex;align-items:center;gap:6px"><span style="width:10px;height:10px;border-radius:99px;background:var(--mint)"></span>Done</span>
+            <span style="display:flex;align-items:center;gap:6px"><span style="width:10px;height:10px;border-radius:99px;background:var(--amber)"></span>Needs you</span>
+            <span style="display:flex;align-items:center;gap:6px"><span style="width:10px;height:10px;border-radius:3px;border:1.5px dashed var(--ink3)"></span>Planned</span>
+          </div>
+          <div style="position:absolute;right:20px;bottom:20px;display:flex;flex-direction:column;border-radius:14px;background:var(--card);box-shadow:var(--sh1);overflow:hidden">
+            <span style="width:44px;height:44px;display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:700;border-bottom:1px solid var(--line)">+</span>
+            <span style="width:44px;height:44px;display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:700">−</span>
+          </div>
+        </div>
+
+        <sc-if value="{{ steps }}" hint-placeholder-val="{{ false }}">
+        <div style="height:760px;box-sizing:border-box;background:var(--card);border:1px solid var(--line);border-radius:28px;box-shadow:var(--sh1);display:flex;flex-direction:column;overflow:hidden">
+          <div style="padding:20px 24px 14px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--line)">
+            <h2 style="margin:0;font-family:var(--fH);font-weight:700;font-size:22px">Steps</h2>
+            <span style="font-size:14px;font-weight:600;color:var(--ink3)">The plan, in order</span>
+            <div style="flex:1"></div>
+            <span style="font-family:var(--mono);font-size:12px;color:var(--ink3)">4 of 7 done</span>
+          </div>
+          <div style="flex:1;padding:12px 16px;display:flex;flex-direction:column">
+            <sc-for list="{{ stepList }}" as="s" hint-placeholder-count="7">
+              <div style="position:relative;display:flex;gap:14px;padding:12px 10px;border-radius:16px;background:{{ s.bg }}">
+                <div style="position:relative;display:flex;flex-direction:column;align-items:center;flex:none">
+                  <span style="width:32px;height:32px;border-radius:99px;background:{{ s.dotBg }};color:{{ s.dotFg }};border:{{ s.dotBd }};box-sizing:border-box;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700">{{ s.mark }}</span>
+                </div>
+                <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px">
+                  <div style="display:flex;align-items:center;gap:8px"><span style="font-weight:600;font-size:15.5px">{{ s.t }}</span><sc-if value="{{ s.tag }}"><span style="height:22px;padding:0 8px;border-radius:99px;background:{{ s.tagBg }};color:{{ s.tagFg }};font-size:11.5px;font-weight:700;display:flex;align-items:center">{{ s.tag }}</span></sc-if></div>
+                  <div style="font-size:14px;color:var(--ink3)">{{ s.d }}</div>
+                </div>
+                <div style="display:flex;flex-direction:column;align-items:flex-end;gap:2px;flex:none;font-family:var(--mono);font-size:11.5px;color:var(--ink3)"><span>{{ s.time }}</span><span>{{ s.cost }}</span></div>
+              </div>
+            </sc-for>
+          </div>
+          <div style="padding:14px 24px;border-top:1px solid var(--line);display:flex;align-items:center;gap:10px;font-size:14px;color:var(--ink2)"><span style="flex:1">Steps can change as helpers learn more. You’ll always see why.</span><span style="height:40px;padding:0 14px;border-radius:12px;border:1px solid var(--line2);display:flex;align-items:center;font-weight:600;color:var(--ink)">Add a step</span></div>
+        </div>
+        </sc-if>
+        <sc-if value="{{ story }}" hint-placeholder-val="{{ true }}">
+        <div style="height:760px;box-sizing:border-box;background:var(--card);border:1px solid var(--line);border-radius:28px;box-shadow:var(--sh1);display:flex;flex-direction:column;overflow:hidden">
+          <div style="padding:20px 24px 12px;display:flex;align-items:center;gap:10px">
+            <h2 style="margin:0;font-family:var(--fH);font-weight:700;font-size:22px">Story</h2>
+            <span style="font-size:14px;font-weight:700;color:var(--ink3)">What your team is doing, in order</span>
+          </div>
+          <div style="flex:1;overflow:hidden;padding:4px 24px 24px;display:flex;flex-direction:column;gap:20px">
+            <div style="background:var(--amberSoft);border:1px solid var(--amberLine);border-radius:20px;padding:18px;display:flex;flex-direction:column;gap:12px">
+              <div style="display:flex;align-items:center;gap:10px">
+                <span style="width:36px;height:36px;border-radius:99px;background:var(--card);display:flex;align-items:flex-end;justify-content:center;overflow:hidden;flex:none">{{ qAgent }}</span>
+                <span style="flex:1;font-size:14px;font-weight:800;color:var(--amberInk)">The stays planner has a question</span>
+                <span style="font-size:13px;color:var(--amberInk);font-weight:600">3 min ago</span>
+              </div>
+              <div style="font-family:var(--fH);font-weight:800;font-size:20px;line-height:1.3">Where would you like to stay on night 2?</div>
+              <div style="font-size:15px;color:var(--ink2);margin-top:-4px">All three fit your budget. The rest of the plan keeps going while you decide.</div>
+              <div style="display:flex;flex-direction:column;gap:8px">
+                <sc-for list="{{ opts }}" as="o" hint-placeholder-count="3">
+                  <span style="min-height:56px;box-sizing:border-box;padding:10px 14px;border-radius:14px;background:var(--card);border:1px solid {{ o.bd }};display:flex;align-items:center;gap:12px;transition:transform .2s" style-hover="transform:translateY(-2px)">
+                    <span style="width:20px;height:20px;border-radius:99px;border:2px solid var(--line2);box-sizing:border-box;flex:none"></span>
+                    <span style="flex:1;display:flex;flex-direction:column;line-height:1.35"><span style="font-weight:800;font-size:15px">{{ o.t }}</span><span style="font-size:13px;color:var(--ink3);font-weight:600">{{ o.s }}</span></span>
+                    <sc-if value="{{ o.pick }}"><span style="height:24px;padding:0 8px;border-radius:99px;background:var(--priSoft);color:var(--priInk);font-size:12px;font-weight:800;display:flex;align-items:center;white-space:nowrap">Tilo’s pick</span></sc-if>
+                  </span>
+                </sc-for>
+              </div>
+              <div style="height:48px;box-sizing:border-box;padding:0 6px 0 14px;border-radius:14px;background:var(--card);border:1px dashed var(--amberLine);display:flex;align-items:center;gap:8px">
+                <span style="flex:1;font-size:15px;color:var(--ink3);font-weight:600">Type my own answer…</span>
+                <span style="height:36px;padding:0 14px;border-radius:10px;background:var(--amber);color:#2A211C;font-weight:800;font-size:14px;display:flex;align-items:center">Send</span>
+              </div>
+              <div style="font-size:13px;color:var(--amberInk);font-weight:600">No rush. If you don’t answer by 6 pm, Tilo goes with Kudle Beach and tells you.</div>
+            </div>
+            <sc-for list="{{ feed }}" as="f" hint-placeholder-count="4">
+              <div style="display:flex;gap:12px">
+                <span style="width:44px;height:44px;border-radius:99px;background:{{ f.bg }};display:flex;align-items:flex-end;justify-content:center;overflow:hidden;flex:none">{{ f.av }}</span>
+                <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:4px">
+                  <div style="display:flex;align-items:center;gap:8px;font-size:14px"><span style="font-weight:800">{{ f.who }}</span><sc-if value="{{ f.done }}"><span style="height:22px;padding:0 8px;border-radius:99px;background:var(--mintSoft);color:var(--mintInk);font-size:12px;font-weight:800;display:flex;align-items:center">Step done</span></sc-if><span style="color:var(--ink3);font-weight:600;margin-left:auto">{{ f.time }}</span></div>
+                  <div style="font-size:16px;line-height:1.5;text-wrap:pretty">{{ f.text }}</div>
+                  <div style="display:flex;flex-wrap:wrap;gap:6px">
+                    <sc-for list="{{ f.chips }}" as="c" hint-placeholder-count="0"><span style="height:30px;padding:0 10px;border-radius:10px;background:var(--sunk);font-size:13px;font-weight:700;display:flex;align-items:center">{{ c }}</span></sc-for>
+                  </div>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+        </sc-if>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ result }}" hint-placeholder-val="{{ false }}">
+      <div style="display:grid;grid-template-columns:minmax(0,3fr) minmax(0,2fr);gap:24px;align-items:start">
+        <article style="background:var(--card);border:1px solid var(--line);border-radius:28px;box-shadow:var(--sh1);padding:40px 48px;display:flex;flex-direction:column;gap:24px">
+          <div style="display:flex;align-items:center;gap:12px">
+            <span style="font-size:14px;font-weight:700;color:var(--ink3);flex:1">Finished today at 4:12 pm · 3 pages</span>
+            <span style="height:44px;padding:0 16px;border-radius:14px;border:1px solid var(--line2);display:flex;align-items:center;gap:8px;font-weight:800;font-size:15px">↓ Download PDF</span>
+            <span style="height:44px;padding:0 18px;border-radius:14px;background:var(--pri);color:var(--onPri);box-shadow:0 3px 0 var(--priH);display:flex;align-items:center;gap:8px;font-weight:800;font-size:15px">Share</span>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <h2 style="margin:0;font-family:var(--fH);font-weight:700;font-size:40px;line-height:1.1;letter-spacing:-.8px">Your 5-day Gokarna road trip</h2>
+            <p style="margin:0;font-size:18px;color:var(--ink2);line-height:1.55;text-wrap:pretty">A slow coastal drive with two quiet beach nights, one lively one, and no day longer than 6 hours behind the wheel.</p>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:12px">
+            <h3 style="margin:0;font-family:var(--fH);font-weight:800;font-size:22px">The plan at a glance</h3>
+            <div style="border:1px solid var(--line);border-radius:18px;overflow:hidden">
+              <div style="display:grid;grid-template-columns:80px minmax(0,1.4fr) 110px minmax(0,1.2fr);gap:16px;padding:12px 20px;background:var(--sunk);font-size:13px;font-weight:800;color:var(--ink2)"><span>Day</span><span>Where</span><span>Drive</span><span>Stay</span></div>
+              <sc-for list="{{ days }}" as="d" hint-placeholder-count="5">
+                <div style="display:grid;grid-template-columns:80px minmax(0,1.4fr) 110px minmax(0,1.2fr);gap:16px;padding:14px 20px;border-top:1px solid var(--line);font-size:15px"><span style="font-weight:800">{{ d.d }}</span><span>{{ d.w }}</span><span style="color:var(--ink2)">{{ d.t }}</span><span style="color:var(--ink2)">{{ d.s }}</span></div>
+              </sc-for>
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:12px">
+            <h3 style="margin:0;font-family:var(--fH);font-weight:800;font-size:22px">Route</h3>
+            <div style="height:240px;border-radius:18px;border:1px solid var(--line);background:repeating-linear-gradient(135deg,var(--sunk) 0 12px,var(--bg) 12px 24px);display:flex;align-items:center;justify-content:center;font-family:ui-monospace,Menlo,monospace;font-size:14px;color:var(--ink2)">route map · Bengaluru → Gokarna via the coast</div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:12px">
+            <h3 style="margin:0;font-family:var(--fH);font-weight:800;font-size:22px">Beaches worth the detour</h3>
+            <sc-for list="{{ beaches }}" as="b" hint-placeholder-count="3">
+              <div style="display:flex;align-items:flex-start;gap:14px;padding:14px 0;border-top:1px solid var(--line)">
+                <span style="width:32px;height:32px;border-radius:10px;background:var(--skySoft);color:var(--skyInk);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:15px;flex:none">{{ b.n }}</span>
+                <span style="flex:1;display:flex;flex-direction:column"><span style="font-weight:800">{{ b.t }}</span><span style="font-size:15px;color:var(--ink2)">{{ b.s }}</span></span>
+                <a href="#" style="font-size:14px;font-weight:800;white-space:nowrap">Open in Maps ↗</a>
+              </div>
+            </sc-for>
+          </div>
+        </article>
+        <aside style="display:flex;flex-direction:column;gap:16px">
+          <div style="background:var(--card);border:1px solid var(--line);border-radius:28px;box-shadow:var(--sh1);overflow:hidden">
+            <div style="height:260px;background:var(--cityBg);padding:12px;box-sizing:border-box"><div style="width:100%;height:100%;filter:var(--cityFx)">{{ cityDone }}</div></div>
+            <div style="padding:20px 24px 24px;display:flex;flex-direction:column;gap:14px">
+              <div style="font-family:var(--fH);font-weight:700;font-size:22px">Made by 5 helpers in 18 minutes</div>
+              <div style="display:flex">{{ crew }}</div>
+              <div style="display:flex;flex-direction:column;gap:6px">
+                <div style="display:flex;justify-content:space-between;font-size:14px;font-weight:700"><span>£3.10 spent</span><span style="color:var(--ink3)">of £8 cap</span></div>
+                <div style="height:10px;border-radius:99px;background:var(--sunk)"><div style="width:39%;height:100%;border-radius:99px;background:var(--mint)"></div></div>
+              </div>
+            </div>
+          </div>
+          <div style="background:var(--card);border:1px solid var(--line);border-radius:24px;padding:20px;display:flex;flex-direction:column;gap:12px">
+            <div style="font-weight:800;font-size:16px">Want something changed?</div>
+            <div style="height:52px;box-sizing:border-box;padding:0 6px 0 16px;border-radius:14px;background:var(--sunk);display:flex;align-items:center;gap:8px"><span style="flex:1;color:var(--ink3);font-weight:600">e.g. Add a day in Udupi</span><span style="height:40px;padding:0 16px;border-radius:12px;background:var(--pri);color:var(--onPri);font-weight:800;font-size:14px;display:flex;align-items:center">Ask</span></div>
+            <a href="#" style="font-size:14px;font-weight:800">Save this as a skill for next time →</a>
+          </div>
+        </aside>
+      </div>
+    </sc-if>
+  </div>
+</sc-if>
+
+<sc-if value="{{ phone }}" hint-placeholder-val="{{ false }}">
+  <div style="position:relative;height:844px;overflow:hidden;display:flex;flex-direction:column">
+    <dc-import name="Tilo R Nav" device="status" hint-size="100%,48px"></dc-import>
+    <div style="padding:0 16px;display:flex;align-items:center;gap:8px">
+      <span style="width:44px;height:44px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:700;margin-left:-8px">‹</span>
+      <div style="flex:1;font-family:var(--fH);font-weight:700;font-size:20px;line-height:1.2">Road trip to Gokarna</div>
+      <span style="height:28px;padding:0 10px 0 8px;border-radius:99px;background:{{ pillBg }};color:{{ pillFg }};font-size:13px;font-weight:800;display:flex;align-items:center;gap:6px"><span style="width:7px;height:7px;border-radius:99px;background:{{ progC }}"></span>{{ pillLabel }}</span>
+    </div>
+    <div style="padding:8px 16px 120px;display:flex;flex-direction:column;gap:14px">
+      <div style="display:flex;flex-direction:column;gap:6px">
+        <div style="height:10px;border-radius:99px;background:var(--sunk)"><div style="height:100%;border-radius:99px;width:{{ prog }};background:{{ progC }}"></div></div>
+        <div style="display:flex;justify-content:space-between;font-size:13px;font-weight:700;color:var(--ink2)"><span>{{ progLabel }}</span><span>{{ spent }} of £8 cap</span></div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px;padding:4px;border-radius:16px;background:var(--sunk)">
+        <sc-for list="{{ tabs }}" as="t" hint-placeholder-count="3"><span style="height:40px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;background:{{ t.bg }};color:{{ t.fg }};box-shadow:{{ t.sh }}">{{ t.label }}</span></sc-for>
+      </div>
+      <sc-if value="{{ story }}" hint-placeholder-val="{{ true }}">
+        <div style="position:relative;height:230px;border-radius:24px;background:var(--cityBg);border:1px solid var(--cityLine);overflow:hidden">
+          <div style="position:absolute;inset:12px 0 4px;filter:var(--cityFx)">{{ cityS }}</div>
+          <span style="position:absolute;left:10px;top:10px;height:30px;padding:0 10px;border-radius:99px;background:var(--card);box-shadow:var(--sh1);display:flex;align-items:center;gap:6px;font-size:12px;font-weight:800"><span style="width:7px;height:7px;border-radius:99px;background:var(--mint)"></span>Live · 5 helpers</span>
+        </div>
+        <div style="display:flex;gap:6px;overflow:hidden;margin-right:-16px;align-items:center">
+          <span style="font-size:13px;font-weight:700;color:var(--ink3);flex:none">Assumed:</span>
+          <sc-for list="{{ assumed }}" as="a" hint-placeholder-count="4"><span style="height:36px;padding:0 10px;border-radius:12px;background:var(--card);border:1px dashed var(--line2);display:flex;align-items:center;gap:4px;font-size:13px;font-weight:600;white-space:nowrap;flex:none">{{ a }} <span style="font-size:11px;color:var(--ink3)">✎</span></span></sc-for>
+        </div>
+        <div style="background:var(--amberSoft);border:1px solid var(--amberLine);border-radius:20px;padding:16px;display:flex;flex-direction:column;gap:10px">
+          <div style="font-size:13px;font-weight:800;color:var(--amberInk)">The stays planner has a question</div>
+          <div style="font-family:var(--fH);font-weight:800;font-size:18px;line-height:1.3">Where would you like to stay on night 2?</div>
+          <sc-for list="{{ opts }}" as="o" hint-placeholder-count="3">
+            <span style="min-height:52px;box-sizing:border-box;padding:8px 12px;border-radius:14px;background:var(--card);border:1px solid {{ o.bd }};display:flex;align-items:center;gap:10px"><span style="flex:1;display:flex;flex-direction:column;line-height:1.3"><span style="font-weight:800;font-size:15px">{{ o.t }}</span><span style="font-size:12px;color:var(--ink3);font-weight:600">{{ o.s }}</span></span><sc-if value="{{ o.pick }}"><span style="font-size:11px;font-weight:800;color:var(--priInk);background:var(--priSoft);padding:2px 8px;border-radius:99px">Tilo’s pick</span></sc-if></span>
+          </sc-for>
+          <div style="height:48px;box-sizing:border-box;padding:0 6px 0 12px;border-radius:14px;background:var(--card);border:1px dashed var(--amberLine);display:flex;align-items:center;gap:8px"><span style="flex:1;font-size:14px;color:var(--ink3);font-weight:600">Type my own answer…</span><span style="height:36px;padding:0 12px;border-radius:10px;background:var(--amber);color:#2A211C;font-weight:800;font-size:13px;display:flex;align-items:center">Send</span></div>
+        </div>
+      </sc-if>
+      <sc-if value="{{ result }}" hint-placeholder-val="{{ false }}">
+        <article style="background:var(--card);border:1px solid var(--line);border-radius:24px;padding:20px;display:flex;flex-direction:column;gap:14px">
+          <h2 style="margin:0;font-family:var(--fH);font-weight:700;font-size:26px;line-height:1.15">Your 5-day Gokarna road trip</h2>
+          <p style="margin:0;font-size:15px;color:var(--ink2)">Two quiet beach nights, one lively one, and no day over 6 hours of driving.</p>
+          <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px">
+            <span style="height:48px;border-radius:14px;border:1px solid var(--line2);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:15px">↓ Download</span>
+            <span style="height:48px;border-radius:14px;background:var(--pri);color:var(--onPri);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:15px">Share</span>
+          </div>
+          <h3 style="margin:4px 0 0;font-family:var(--fH);font-weight:800;font-size:18px">The plan at a glance</h3>
+          <div style="border:1px solid var(--line);border-radius:16px;overflow:hidden">
+            <sc-for list="{{ days }}" as="d" hint-placeholder-count="5">
+              <div style="display:grid;grid-template-columns:56px minmax(0,1fr) 64px;gap:10px;padding:12px 14px;border-top:1px solid var(--line);font-size:14px"><span style="font-weight:800">{{ d.d }}</span><span>{{ d.w }}</span><span style="color:var(--ink2);text-align:right">{{ d.t }}</span></div>
+            </sc-for>
+          </div>
+          <div style="height:150px;border-radius:16px;border:1px solid var(--line);background:repeating-linear-gradient(135deg,var(--sunk) 0 12px,var(--bg) 12px 24px);display:flex;align-items:center;justify-content:center;font-family:ui-monospace,Menlo,monospace;font-size:12px;color:var(--ink2)">route map</div>
+        </article>
+      </sc-if>
+    </div>
+    <dc-import name="Tilo R Nav" device="phone" active="worlds" style="position:absolute;left:0;right:0;bottom:0" hint-size="100%,84px"></dc-import>
+  </div>
+</sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1440,&quot;height&quot;:1100},&quot;theme&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;studio&quot;,&quot;studioDark&quot;],&quot;default&quot;:&quot;studio&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;tab&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;story&quot;,&quot;steps&quot;,&quot;result&quot;],&quot;default&quot;:&quot;story&quot;,&quot;tsType&quot;:&quot;string&quot;}}">
+class Component extends DCLogic {
+  componentDidMount() { if (!window.TiloR) this.t = setInterval(() => { if (window.TiloR && window.TiloCity) { clearInterval(this.t); this.forceUpdate(); } }, 60); }
+  componentWillUnmount() { clearInterval(this.t); }
+  renderVals() {
+    const R = window.TiloR ? window.TiloR(React.createElement) : null;
+    const theme = this.props.theme ?? 'studio', device = this.props.device ?? 'desktop', tab = this.props.tab ?? 'story';
+    const ag = (r, e, s, k) => R ? R.agent(r, e, s, k) : null, ic = (n, s) => R ? R.ic(n, s) : null;
+    const res = tab === 'result', stp = tab === 'steps';
+    const tabs = [['Story', ''], ['Steps', res ? '7/7' : '4/7'], ['Result', res ? '' : '']].map(([label, n], i) => {
+      const on = res ? i === 2 : stp ? i === 1 : i === 0;
+      return { label, n, bg: on ? 'var(--card)' : 'transparent', fg: on ? 'var(--ink)' : 'var(--ink2)', sh: on ? 'var(--sh1)' : 'none' };
+    });
+    const feed = [
+      ['Fuel planner', 'finance', 'var(--tealSoft)', '1 min', 'Fuel and tolls come to about ₹4,200 each way. Two toll plazas, both take FASTag.', true, []],
+      ['Researcher', 'research', 'var(--skySoft)', '4 min', 'The researcher found 5 hidden beaches near Gokarna. Three are a short walk from the car park.', true, ['Paradise', 'Half Moon', 'Kudle', 'Om', 'Nirvana']],
+      ['Route planner', 'designer', 'var(--lilacSoft)', '7 min', 'Picked the coastal road. It’s 40 minutes longer, but it skips the steep ghat section you said you’d rather avoid.', false, []],
+      ['Director', null, 'var(--priSoft)', '12 min', 'Split your trip into four parts: beaches, route, places to stay and food stops.', false, []]
+    ].map(([who, role, bg, time, text, done, chips]) => ({ who, bg, time, text, done, chips, av: ag(role, done ? 'delighted' : 'focused', 40, role ? undefined : 'director') }));
+    const opts = [['Kudle Beach', 'Calm, good cafés · ₹4,800 a night', true], ['Om Beach', 'Quietest, 10 min walk to car · ₹5,200', false], ['Gokarna town', 'Lively, lots of food · ₹3,900', false]].map(([t, s, pick]) => ({ t, s, pick, bd: pick ? 'var(--pri)' : 'var(--line)' }));
+    const days = [['Fri', 'Bengaluru → Chitradurga', '3 h 10', 'Heritage homestay'], ['Sat', 'Chitradurga → Gokarna', '5 h 40', 'Kudle Beach huts'], ['Sun', 'Beach day · Om & Half Moon', '20 min', 'Kudle Beach huts'], ['Mon', 'Gokarna → Udupi', '3 h 30', 'Sea-view guesthouse'], ['Tue', 'Udupi → Bengaluru', '5 h 50', 'Home']].map(([d, w, t, s]) => ({ d, w, t, s }));
+    const beaches = [['1', 'Half Moon Beach', 'Reached by a 20-minute cliff path. No shops, so bring water.'], ['2', 'Paradise Beach', 'Boat from Om Beach, about ₹400 return. Best before noon.'], ['3', 'Nirvana Beach', 'Long and empty, good for a sunset walk.']].map(([n, t, s]) => ({ n, t, s }));
+    return {
+      theme, desk: device === 'desktop', phone: device === 'phone', story: !res && !stp, steps: stp, cityView: !res, result: res, tabs, feed, opts, days, beaches,
+      stepList: [['Split the trip into parts', 'Director · beaches, route, stays, food', 'done', '2 min', '£0.10'], ['Find quiet beaches', 'Researcher · found 5, checked all are open', 'done', '6 min', '£0.60'], ['Plan the route', 'Route planner · coastal road, skips the ghat', 'done', '4 min', '£0.40'], ['Work out fuel and tolls', 'Fuel planner · about ₹4,200 each way', 'done', '1 min', '£0.20'], ['Pick places to stay', 'Stays planner · waiting on your answer for night 2', 'needs', '', '£0.30'], ['Find food stops', 'Researcher · starts after stays', 'working', 'now', '£0.10'], ['Write it all up', 'Writer · PDF with map and day plan', 'planned', '', '~£0.40']].map(([t, d, s, time, cost], i) => ({ t, d, time, cost, mark: s === 'done' ? '✓' : String(i + 1), tag: s === 'needs' ? 'Needs you' : s === 'working' ? 'Working' : '', tagBg: s === 'needs' ? 'var(--amberSoft)' : 'var(--priSoft)', tagFg: s === 'needs' ? 'var(--amberInk)' : 'var(--priInk)', bg: s === 'needs' ? 'var(--amberSoft)' : 'transparent', dotBg: s === 'done' ? 'var(--mint)' : s === 'needs' ? 'var(--amber)' : s === 'working' ? 'var(--pri)' : 'transparent', dotFg: s === 'done' ? '#FFFFFF' : s === 'needs' ? '#1A1407' : s === 'working' ? 'var(--onPri)' : 'var(--ink3)', dotBd: s === 'planned' ? '1.5px dashed var(--line2)' : 'none' })),
+      assumed: ['Leaving Fri 24 Oct', '2 adults, 1 child', 'Our own car', 'Max 6 h driving a day'],
+      prog: res ? '100%' : '62%', progC: res ? 'var(--mint)' : 'var(--pri)', progLabel: res ? 'All 7 steps done' : '62% done · step 4 of 7', progSub: res ? 'Took 18 min' : 'About 8 min left',
+      spent: res ? '£3.10' : '£1.90', secBtn: res ? 'Run again' : 'Pause',
+      pillBg: res ? 'var(--mintSoft)' : 'var(--priSoft)', pillFg: res ? 'var(--mintInk)' : 'var(--priInk)', pillLabel: res ? 'Done' : 'Working',
+      city: R ? R.city('trip', { labels: true, tags: true }) : null, cityS: R ? R.city('trip', { labels: false, tags: true }) : null,
+      cityDone: R ? R.city('tripDone', { labels: false, tags: false }) : null,
+      qAgent: ag('connector', 'needs', 34), iCheck: ic('check', 20),
+      crew: R ? ['research', 'designer', 'finance', 'connector', 'browser'].map(r => ag(r, 'delighted', 44)) : null
+    };
+  }
+}
+</script>
+</body>
+</html>

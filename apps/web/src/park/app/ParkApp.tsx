@@ -9,6 +9,8 @@ import "../tokens/fonts";
 import "../tokens/park.css";
 import "../tokens/park.opaque.css";
 import "../tokens/themes.css";
+import "../studio/fonts";
+import "../studio/studio.css";
 import { themeFor } from "../tokens/themes";
 import { PAGE_LABEL } from "./AppCtx";
 import { NotFound } from "./NotFound";
