@@ -18,6 +18,7 @@ from _api_lib import as_principal, base_event, make_district, make_principal, ma
 from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 from tilo_api import app, deps
+from tilo_api.rate_limit import reset_default_rate_limiter
 
 ALICE, BOB, CARA = "u_alice", "u_bob", "u_cara"
 ITEM_KEYS = {"world_id", "title", "status", "created_at", "last_seq"}  # BQ-S14-2
@@ -415,6 +416,10 @@ _TS = st.sampled_from([T1, T2, T3, T4])  # few values on purpose: many ties, so 
 def test_S_14_worlds_list_property_pages_have_no_duplicates_no_gaps_and_no_cross_user_leak(
     client, store, a_stamps, b_stamps, limit
 ):
+    # SEC-10: the autouse reset runs once per test, not per Hypothesis example, so 40 examples of up to ~40 requests
+    # each drained one user bucket (120, 10/s) and a page got 429. Each example starts with empty buckets; the limits
+    # themselves are tested in test_SEC_10.
+    reset_default_rate_limiter()
     store.worlds.clear()
     store.events.clear()
     mine = [(f"w_a{i:02d}", ts) for i, ts in enumerate(a_stamps)]
