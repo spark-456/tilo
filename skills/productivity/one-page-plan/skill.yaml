@@ -1,0 +1,9 @@
+id: one-page-plan
+version: "1.0.0"
+domain: productivity
+author: "Tilo Skills Library"
+reviewer: "Tilo Product Review"
+tools_allowed: []
+inputs: {"type":"object","additionalProperties":false,"required":["objective"],"properties":{"objective":{"type":"string","description":"The outcome the plan should achieve."},"deadline":{"type":"string","description":"Optional deadline."},"constraints":{"type":"array","items":{"type":"string","description":"A user-supplied budget, staffing, or scope constraint."}},"context":{"type":"string","description":"Supporting background and known resources."}}}
+outputs: {"type":"object","additionalProperties":false,"required":["goal","success_measure","actions","risks","decisions_needed","assumptions"],"properties":{"goal":{"type":"string","description":""},"success_measure":{"type":"string","description":""},"actions":{"type":"array","items":{"type":"object","additionalProperties":false,"required":["action","owner","timing","dependency","status"],"properties":{"action":{"type":"string","description":""},"owner":{"type":"string","description":""},"timing":{"type":"string","description":""},"dependency":{"type":"string","description":""},"status":{"type":"string","description":"Current state if supplied."}}}},"risks":{"type":"array","items":{"type":"string","description":""}},"decisions_needed":{"type":"array","items":{"type":"string","description":""}},"assumptions":{"type":"array","items":{"type":"string","description":""}}}}
+description: "Create a one-page plan; est. max 12 credits/run (~$0.060)."
