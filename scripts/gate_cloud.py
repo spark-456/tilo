@@ -27,8 +27,8 @@ MACHINE = "E2_HIGHCPU_8"
 # Published USD0.0156/min; conservative INR100/USD, doubled for region/overhead.
 INR_PER_MINUTE = 3.2
 RESERVATION = 32 * INR_PER_MINUTE
-STOP_INR = 1000
-CAP_INR = 1000
+STOP_INR = 1500  # raised from 1000 by the owner in chat, 15 Oct 2026: "Sure raise the cap"
+CAP_INR = 1500
 ROOTS = set(
     ".claude .github apps config contracts design design_handoff_tilo_web_app docs evals infra "
     "meet-bot packages prompts scripts services skills templates tests".split()
