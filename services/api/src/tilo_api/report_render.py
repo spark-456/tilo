@@ -11,19 +11,24 @@ from tilo_harness.outputs import RenderedOffice, RenderedPdf
 from tilo_render.docx import render_docx
 from tilo_render.pdf import render_pdf
 from tilo_render.pptx import render_pptx
-from tilo_render.spec import RequestDeliverableSpec
+from tilo_render.spec import DeliverableSpec, RequestDeliverableSpec
+from tilo_render.xlsx import render_xlsx
 
 from tilo_api.render_rpc import MIME, RenderRpc
 
 _SLOTS = threading.BoundedSemaphore(2)
 RENDER_TIMEOUT_S = 30.0
+OFFICE_MIME = {**MIME, "xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}
 
 
 async def render_report(reply: str, *, fmt: str = "pdf") -> RenderedPdf | RenderedOffice:
-    if fmt not in ("pdf", "pptx", "docx"):
+    if fmt not in ("pdf", "pptx", "docx", "xlsx"):
         raise DeliverableRefused("render_failed")
     try:
-        spec = RequestDeliverableSpec.model_validate(parse_spec(reply).model_dump())
+        # A workbook is made in process and has its own cell cap, so it takes the full spec, not the door's 1200 cells.
+        spec = (DeliverableSpec if fmt == "xlsx" else RequestDeliverableSpec).model_validate(
+            parse_spec(reply).model_dump()
+        )
     except Exception:
         raise DeliverableRefused("invalid_spec") from None
     if not _SLOTS.acquire(blocking=False):
@@ -40,9 +45,9 @@ async def render_report(reply: str, *, fmt: str = "pdf") -> RenderedPdf | Render
         try:
             url = os.environ.get("TILO_RENDER_URL", "")
             if fmt in ("pptx", "docx") and url:
-                return RenderRpc(url).render(spec, cast(Literal["pptx", "docx"], fmt))
+                return RenderRpc(url).render(cast(RequestDeliverableSpec, spec), cast(Literal["pptx", "docx"], fmt))
             # DOCS-OUT: with no render door configured, the same library the door runs renders in process.
-            return {"pdf": render_pdf, "docx": render_docx, "pptx": render_pptx}[fmt](spec)
+            return {"pdf": render_pdf, "docx": render_docx, "pptx": render_pptx, "xlsx": render_xlsx}[fmt](spec)
         finally:
             _SLOTS.release()
 
@@ -55,9 +60,9 @@ async def render_report(reply: str, *, fmt: str = "pdf") -> RenderedPdf | Render
             abandoned = True
             if not claimed:
                 _SLOTS.release()
-    if fmt in ("pptx", "docx"):
+    if fmt in ("pptx", "docx", "xlsx"):
         return RenderedOffice(
-            media_type=MIME[fmt],
+            media_type=OFFICE_MIME[fmt],
             content=content,
             spec_text=spec.model_dump_json(),
         )

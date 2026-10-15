@@ -12,6 +12,7 @@ Cloud Run service (PRD 6.2): deliverables — PPTX, PDF, charts; Google Slides a
 ## Contracts
 - Reads: `packages/contracts-py` deliverable-spec types; `templates/`; `design/tokens.json`.
 - HTTP (`POST /render`, LW-11): service-to-service Google OIDC Bearer auth before body read (`create_app(oidc_verifier=..., audience=..., allowed_callers=...)`; fails closed with 401/403 when missing or unconfigured). Accepts JSON `{"format": "pdf" | "pptx", "spec": DeliverableSpec}` (`extra="forbid"`; `manifest` is omitted from JSON because `tilo-harness` attaches provenance in `outputs.keep`). Returns deterministic file bytes with `Content-Disposition: attachment`, `X-Content-Type-Options: nosniff`, `Cache-Control: no-store`.
+- `tilo_render.xlsx.render_xlsx` (DOCS-OUT A4) turns a spec's tables into a workbook in process in `tilo-api` (not on the HTTP door), capped at 7000 cells.
 - Writes: PDF/PPTX bytes to the HTTP response; this service does not persist artifacts or write to Cloud Storage. The harness attaches provenance and stores accepted outputs through `outputs.keep`.
 
 ## Config

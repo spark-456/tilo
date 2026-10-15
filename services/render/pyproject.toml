@@ -5,6 +5,7 @@ description = "tilo_render: PDF and PPTX deliverables from templates with data-b
 requires-python = "==3.12.*"
 dependencies = [
     "pydantic>=2.13.5",
+    "openpyxl>=3.1.5",  # DOCS-OUT A4: xlsx deliverables and template fill (MIT)
     "python-pptx>=1.0.2",
     "pyyaml>=6.0.2",
     "reportlab>=4.2.5",

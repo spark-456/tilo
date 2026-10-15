@@ -23,6 +23,7 @@ from tilo_harness.outputs import MAX_PDF, RenderedPdf
 
 MAX_REPLY = 500_000  # characters of the writer's reply (the spec's own limits keep a real report far below this)
 PDF_FORMAT = "pdf"
+RENDERED_FORMATS = ("pdf", "pptx", "docx", "xlsx")  # DOCS-OUT: the formats the final writer's spec becomes
 _REASONS = {
     "too_large": "the reply is too long",
     "not_json": "the reply is not one JSON object",
@@ -58,9 +59,7 @@ def render_format(unit: Mapping[str, Any], brief: Mapping[str, Any] | None) -> s
     first = items[0] if isinstance(items, list) and items else None
     fmt = first.get("format") if isinstance(first, Mapping) else None
     return (
-        fmt
-        if unit.get("role") == "writer" and unit.get("unit_type") == "deliver" and fmt in ("pdf", "pptx", "docx")
-        else None
+        fmt if unit.get("role") == "writer" and unit.get("unit_type") == "deliver" and fmt in RENDERED_FORMATS else None
     )
 
 
