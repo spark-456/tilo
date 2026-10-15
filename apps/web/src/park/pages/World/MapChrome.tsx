@@ -43,7 +43,7 @@ const KIND_ICON = { done: "check", needs: "flag", info: "doc" } as const;
 /** The artboard's top-right card: a tile with a glyph (check, flag or document: never colour alone), the line, who and when. */
 export function MapToast({ line }: { line: LatestLine }) {
   return (
-    <output className="park-world-toast" data-kind={line.kind}>
+    <output className="park-world-toast" data-kind={line.kind} data-park-floating="">
       <span className="park-world-toast__tile" aria-hidden="true">
         {icon(KIND_ICON[line.kind], 20)}
       </span>
@@ -87,7 +87,7 @@ export function ZoomableMap({ children, controls }: { children: ReactNode; contr
         </div>
       </div>
       {controls ? (
-        <fieldset className="park-world-zoom">
+        <fieldset className="park-world-zoom" data-park-floating="">
           <legend className="park-world-sr">Map zoom</legend>
           <button
             type="button"

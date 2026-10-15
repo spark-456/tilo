@@ -49,19 +49,16 @@ describe("QA_DEMO_1_M2 an unknown world id", () => {
 });
 
 describe("QA_DEMO_1_m3 a world with no recorded run", () => {
+  // POLISH-2: the intent stays (the reason is words on the page, never a hidden tooltip) but a sample world no longer
+  // carries greyed-out lens links at all: one chip replaces them.
   it("QA_DEMO_1_m3_lens_links_are_disabled_and_the_reason_is_visible_text", async () => {
     const rig = mountShell(<World />, { api: fakeApi(), path: "/world/k1" });
     await settle();
-    const lenses = qa(rig.m.container, ".park-world-lenses a");
-    expect(lenses.map(text)).toEqual(["Story", "Trace", "Delivery", "Inspect"]);
-    for (const a of lenses) {
-      expect(a.getAttribute("aria-disabled")).toBe("true");
-      expect(a.getAttribute("href")).toBeNull();
-      expect(a.getAttribute("aria-describedby")).toBe("park-world-nostage");
-    }
+    expect(qa(rig.m.container, ".park-world-lenses a")).toHaveLength(0);
+    expect(qa(rig.m.container, 'a[aria-disabled="true"]')).toHaveLength(0);
     const why = q(rig.m.container, "#park-world-nostage");
     expect(why.classList.contains("park-world-sr")).toBe(false); // words on the page, not hidden text
-    expect(text(why)).toContain("no recorded run");
+    expect(text(why)).toBe("Live view is for real runs");
   });
 
   it("QA_DEMO_1_m3_the_disabled_links_are_styled_muted_not_the_pressable_purple", () => {

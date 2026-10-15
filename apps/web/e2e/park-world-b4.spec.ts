@@ -9,41 +9,29 @@ async function open(page: Page) {
   await page.evaluate(() => document.fonts.ready.then(() => undefined));
 }
 
-test("UI_10_B4_sample_lens_tabs_take_focus_and_the_reason_is_visible", async ({ page }) => {
+// POLISH-2: a sample world offers no lens links or live view (they read as broken when greyed out): one chip says why.
+// The lens pill's own layout (inside the map at 320 and 390, 24px targets) is pinned in vitest for live worlds
+// (World.WORLD-DESIGN.test.tsx, World.stage.test.tsx); a fixture build has no live world to open here.
+test("UI_10_B4_sample_has_no_lens_tabs_and_the_reason_is_a_visible_chip", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await open(page);
-  const nav = page.getByRole("navigation", { name: "Run views" });
-  for (const name of ["Story", "Trace", "Delivery", "Inspect"]) {
-    const link = nav.getByRole("link", { name });
-    await link.focus();
-    await expect(link).toBeFocused();
-    await expect(link).toHaveAttribute("aria-disabled", "true");
-  }
+  await expect(page.getByRole("navigation", { name: "Run views" })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "Open live view" })).toHaveCount(0);
   const reason = page.locator(".park-world-nostage");
   await expect(reason).toBeVisible();
-  await expect(reason).toHaveText("Sample world: there is no recorded run to open");
-  const live = page.getByRole("link", { name: "Open live view" });
-  await live.focus();
-  await expect(live).toBeFocused();
+  await expect(reason).toHaveText("Live view is for real runs");
 });
 
 for (const width of [320, 390]) {
-  test(`UI_10_B4_${width}_lens_pill_stays_inside_the_map_and_targets_are_24px`, async ({
+  test(`UI_10_B4_${width}_the_sample_chip_stays_on_the_page_and_nothing_overflows`, async ({
     page,
   }) => {
     await page.setViewportSize({ width, height: 844 });
     await open(page);
-    const map = await page.locator(".park-world-map").first().boundingBox();
-    const nav = await page.getByRole("navigation", { name: "Run views" }).boundingBox();
-    if (!map || !nav) throw new Error("no map or lens nav");
-    expect(nav.x).toBeGreaterThanOrEqual(map.x - 0.5);
-    expect(nav.x + nav.width).toBeLessThanOrEqual(map.x + map.width + 0.5);
-    expect(nav.x + nav.width).toBeLessThanOrEqual(width);
-    const links = page.getByRole("navigation", { name: "Run views" }).getByRole("link");
-    for (let i = 0; i < (await links.count()); i++) {
-      const box = await links.nth(i).boundingBox();
-      expect(box?.height ?? 0).toBeGreaterThanOrEqual(24);
-    }
+    const chip = await page.locator(".park-world-nostage").boundingBox();
+    if (!chip) throw new Error("no chip");
+    expect(chip.x).toBeGreaterThanOrEqual(0);
+    expect(chip.x + chip.width).toBeLessThanOrEqual(width);
     const overflow = await page.evaluate(
       () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
     );

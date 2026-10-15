@@ -166,7 +166,7 @@ test("OLD_UI_OUT_e2e_the_retired_task_and_start_addresses_go_to_the_park_home", 
 
 // ---- the fix pass: real intake stays reachable, unknown paths are Park "Not found", samples have no stage ----
 
-const NO_STAGE = "Sample world: there is no recorded run to open";
+const NO_STAGE = "Live view is for real runs";
 
 for (const path of ["/xyz", "/world/x/unknown", "/start/x", "/team/x"]) {
   test(`WEB_CUTOVER_e2e_${path.slice(1).replace(/\//g, "_")}_is_the_park_not_found_with_a_home_link`, async ({
@@ -231,6 +231,7 @@ for (const [name, viewport] of [
   });
 }
 
+// POLISH-2: no disabled link is offered at all; one chip says why.
 test("WEB_CUTOVER_e2e_a_sample_world_has_a_disabled_live_view_and_nothing_to_open", async ({
   page,
 }) => {
@@ -238,21 +239,9 @@ test("WEB_CUTOVER_e2e_a_sample_world_has_a_disabled_live_view_and_nothing_to_ope
   await page.goto("/world/k1");
   const world = page.getByTestId("park-page-world");
   await expect(world).toBeVisible();
-  const live = world.getByRole("link", { name: "Open live view" });
-  await expect(live).toBeVisible();
-  await expect(live).toHaveAttribute("aria-disabled", "true");
-  await expect(live).not.toHaveAttribute("href", /.*/);
-  await expect(live).toHaveAttribute("title", NO_STAGE);
-  for (const lens of ["Story", "Trace", "Delivery", "Inspect"]) {
-    const a = world
-      .getByRole("navigation", { name: "Run views" })
-      .getByRole("link", { name: lens });
-    await expect(a, lens).toHaveAttribute("aria-disabled", "true");
-    await expect(a, lens).not.toHaveAttribute("href", /.*/);
-  }
-  await expect(world.getByText(NO_STAGE).first()).toBeAttached();
-  await live.click({ force: true }); // Playwright treats aria-disabled as not clickable
+  await expect(world.getByRole("link", { name: "Open live view" })).toHaveCount(0);
+  await expect(world.getByRole("navigation", { name: "Run views" })).toHaveCount(0);
+  await expect(world.getByText(NO_STAGE).first()).toBeVisible();
   await expect(page).toHaveURL(/\/world\/k1$/);
-  await expect(world).toBeVisible();
   expect(problems).toEqual([]);
 });

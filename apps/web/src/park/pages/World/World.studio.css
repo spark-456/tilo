@@ -184,6 +184,13 @@
     padding: 0 14px;
     white-space: nowrap;
   }
+  /* POLISH-2: with no lens row (a sample world) the map does not keep its 64px band empty */
+  [data-park] .park-world-map:not(:has(> .park-world-lenses)) {
+    padding-top: 116px;
+  }
+  [data-park] .park-world-map:not(:has(> .park-world-lenses)) .park-world-zoom {
+    top: 64px;
+  }
   [data-park] .park-world-zoom {
     top: 128px;
     right: auto;

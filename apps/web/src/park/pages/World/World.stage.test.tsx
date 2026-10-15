@@ -1,14 +1,15 @@
 // @vitest-environment happy-dom
-// WEB-CUTOVER acceptance: a world has a stage only when its data came from the live API. "Open live view" and
-// the Story / Trace / Delivery / Inspect links of a sample (fixture) world are the same elements, disabled:
-// no href, aria-disabled, the reason as a title and as visually-hidden text. A live-source world links the
-// stage routes as before (docs/park-designed-not-in-prd/World.md).
+// WEB-CUTOVER acceptance: a world has a stage only when its data came from the live API. A sample (fixture) world
+// offers no "Open live view" and no Story / Trace / Delivery / Inspect links (POLISH-2; they were disabled links
+// before) and says why in one chip. A live-source world links the stage routes as before
+// (docs/park-designed-not-in-prd/World.md).
 import { afterEach, describe, expect, it } from "vitest";
 import { cleanup, qa } from "../../../../test-support/park/componentsHarness";
 import {
   clickEl,
   control,
   goCalls,
+  hasControl,
   liveWorldsApi,
   mountWorld,
   pageText,
@@ -18,54 +19,37 @@ import {
 
 afterEach(cleanup);
 
-const REASON = "Sample world: there is no recorded run to open";
+const REASON = "Live view is for real runs";
 const LENSES = ["Story", "Trace", "Delivery", "Inspect"] as const;
 
 const lensNav = (el: HTMLElement) => el.querySelector('nav[aria-label="Run views"]') as HTMLElement;
 
+// POLISH-2: a sample world does not show a greyed-out live view or lens links (they read as broken). It shows no stage
+// controls and one visible chip with the reason. (Before: the same elements, disabled, with the reason as a title.)
 describe("WEB_CUTOVER_world_stage: a sample world has no stage to open", () => {
   it("WEB_CUTOVER_world_stage_sample_open_live_view_is_disabled_with_the_reason", async () => {
     const { el } = await mountWorld();
-    const live = control(el, "Open live view");
-    expect(live.hasAttribute("href")).toBe(false);
-    expect(live.getAttribute("aria-disabled")).toBe("true");
-    expect(live.getAttribute("role")).toBe("link");
-    expect(live.getAttribute("title")).toBe(REASON);
-    expect(live.className).toContain("park-world-live");
-    expect(live.querySelector("svg"), "the play icon stays").not.toBeNull();
-    const hidden = qa(el, `#${live.getAttribute("aria-describedby")}`);
-    expect(hidden).toHaveLength(1);
-    expect(textOf(hidden[0] as HTMLElement)).toBe(REASON);
+    expect(hasControl(el, "Open live view")).toBe(false);
+    expect(qa(el, "a.park-world-live")).toHaveLength(0);
+    expect(pageText(el)).toContain(REASON);
   });
 
   it("WEB_CUTOVER_world_stage_sample_lens_links_are_disabled_with_the_reason", async () => {
     const { el } = await mountWorld();
-    const nav = lensNav(el);
-    expect(nav).not.toBeNull();
-    for (const name of LENSES) {
-      const a = control(nav, name);
-      expect(a.hasAttribute("href"), name).toBe(false);
-      expect(a.getAttribute("aria-disabled"), name).toBe("true");
-      expect(a.getAttribute("role"), name).toBe("link");
-      expect(a.getAttribute("title"), name).toBe(REASON);
-      expect(qa(el, `#${a.getAttribute("aria-describedby")}`), name).toHaveLength(1);
-    }
+    expect(lensNav(el)).toBeNull();
+    const links = qa(el, "a").map(textOf);
+    for (const name of LENSES) expect(links, name).not.toContain(name);
     expect(pageText(el)).toContain(REASON);
   });
 
   it("UI_10_B4_disabled_lens_links_and_live_view_are_keyboard_focusable_and_the_reason_is_visible", async () => {
     const { el } = await mountWorld();
-    const all = [control(el, "Open live view"), ...LENSES.map((n) => control(lensNav(el), n))];
-    for (const a of all) {
-      // a link without an href is not in the tab order: tabindex 0 puts it there, aria-disabled keeps it inert
-      expect(a.getAttribute("tabindex"), textOf(a)).toBe("0");
-      expect(a.getAttribute("aria-disabled"), textOf(a)).toBe("true");
-    }
-    // the reason is words on the page (not only a tooltip) and not visually hidden
+    // nothing is left disabled to tab to; the reason is words on the page (a chip), not a tooltip or hidden text
+    expect(qa(el, 'a[aria-disabled="true"]')).toHaveLength(0);
     const reason = qa(el, ".park-world-nostage");
     expect(reason).toHaveLength(1);
     expect(textOf(reason[0] as HTMLElement)).toBe(REASON);
-    expect(all[0]?.getAttribute("aria-describedby")).toBe(reason[0]?.id);
+    expect(reason[0]?.classList.contains("park-world-sr")).toBe(false);
   });
 
   it("WEB_CUTOVER_world_stage_sample_no_link_leads_to_a_stage_route", async () => {
@@ -76,7 +60,8 @@ describe("WEB_CUTOVER_world_stage: a sample world has no stage to open", () => {
   it("WEB_CUTOVER_world_stage_clicking_a_disabled_link_goes_nowhere", async () => {
     const rig = await mountWorld();
     const before = window.location.pathname;
-    for (const label of ["Open live view", ...LENSES]) clickEl(control(rig.el, label));
+    expect(hasControl(rig.el, "Open live view")).toBe(false);
+    expect(qa(rig.el, "a").map(textOf)).not.toContain("Story");
     expect(window.location.pathname).toBe(before);
     expect(goCalls(rig.app)).toBe(0);
   });
@@ -87,7 +72,8 @@ describe("WEB_CUTOVER_world_stage: a sample world has no stage to open", () => {
     const started = (await api.getWorlds({}, [])).data.find((w) => w.id === "hires");
     if (!started) throw new Error("no hires world in the list");
     const { el } = await mountWorld({ id: "hires", api, added: [started] });
-    expect(control(el, "Open live view").hasAttribute("href")).toBe(false);
+    expect(hasControl(el, "Open live view")).toBe(false);
+    expect(pageText(el)).toContain(REASON);
   });
 });
 

@@ -12,7 +12,13 @@ import { norm } from "../../../../test-support/park/componentsCss";
 import { cleanup } from "../../../../test-support/park/componentsHarness";
 import { q } from "../../../../test-support/park/componentsHarness";
 import { type Decls, declared, rulesOf } from "../../../../test-support/park/pageCss";
-import { control, controls, mountWorld, textOf } from "../../../../test-support/park/worldHarness";
+import {
+  control,
+  controls,
+  liveWorldsApi,
+  mountWorld,
+  textOf,
+} from "../../../../test-support/park/worldHarness";
 
 afterEach(cleanup);
 
@@ -104,8 +110,9 @@ describe("WEB_6_world_styles_dom: the buttons", () => {
   });
 
   // STUDIO-3: the header holds one quiet outlined control per action ("Tilo S World" secBtn: h44 r14 15/800).
+  // POLISH-2: a sample world no longer offers the live view (one chip says why), so its look is pinned on a live world.
   it("STUDIO_3_world_styles_dom_Open_live_view_is_h44_0_18_outlined_on_card", async () => {
-    const { el } = await mountWorld();
+    const { el } = await mountWorld({ api: liveWorldsApi() });
     check("Open live view", control(el, "Open live view"), {
       height: 44,
       pad: [0, 18, 0, 18],

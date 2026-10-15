@@ -26,7 +26,18 @@ import { useToolLevels } from "./LiveConnectorsWithLevels";
 import { ManagePanel } from "./ManagePanel";
 import { MeetingHostAccess } from "./MeetingHostAccess";
 import { icon } from "./icons";
-import { type Overrides, SAMPLE_STRIP, type UsedRow, isOn, matches, merge, usedBy } from "./view";
+import {
+  CATEGORY_CHIPS,
+  type CategoryChip,
+  type Overrides,
+  SAMPLE_STRIP,
+  type UsedRow,
+  chipOf,
+  isOn,
+  matches,
+  merge,
+  usedBy,
+} from "./view";
 
 type Load =
   | { kind: "loading" }
@@ -112,6 +123,7 @@ export function ConnectorsPage({
   const live = useMemo(() => (flow === undefined ? liveConnectFlow() : flow), [flow]);
   const [load, setLoad] = useState<Load>({ kind: "loading" });
   const [q, setQ] = useState("");
+  const [chip, setChip] = useState<CategoryChip | "All">("All");
   const [open, setOpen] = useState<string | null>(null);
 
   useEffect(() => {
@@ -192,8 +204,10 @@ export function ConnectorsPage({
   }
 
   const all = merge(load.connectors, NO_OVERRIDES, now());
-  const on = all.filter((c) => isOn(c) && matches(c, q));
-  const avail = all.filter((c) => !isOn(c) && matches(c, q));
+  const inChip = (c: Connector) => chip === "All" || chipOf(c.cat) === chip;
+  const chips = CATEGORY_CHIPS.filter((k) => all.some((c) => chipOf(c.cat) === k));
+  const on = all.filter((c) => isOn(c) && matches(c, q) && inChip(c));
+  const avail = all.filter((c) => !isOn(c) && matches(c, q) && inChip(c));
   const attn = all.filter((c) => c.st === "attention");
   const cur = all.find((c) => c.id === open);
   const nOn = `${on.length} connected`;
@@ -222,6 +236,21 @@ export function ConnectorsPage({
           />
         </div>
       </Heading>
+
+      <fieldset className="park-connectors-chips">
+        <legend className="park-connectors-chips__legend">Category</legend>
+        {(["All", ...chips] as const).map((k) => (
+          <button
+            key={k}
+            type="button"
+            className="park-connectors-chip"
+            aria-pressed={chip === k}
+            onClick={() => setChip(k)}
+          >
+            {k}
+          </button>
+        ))}
+      </fieldset>
 
       <p className="park-connectors-strip" role="note">
         <strong>Example connections</strong>

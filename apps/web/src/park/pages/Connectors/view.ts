@@ -86,6 +86,22 @@ export const matches = (c: Connector, q: string): boolean =>
   !q || `${c.name} ${c.cat}`.toLowerCase().includes(q.toLowerCase());
 
 /**
+ * POLISH-2 (design "Tilo S Connectors" category chips): the chip a tool's own `cat` falls under. Only the sample list
+ * carries `cat`; the live registry (GET /v1/connectors) has no category, so the live page shows no chips.
+ */
+export const CATEGORY_CHIPS = ["Email", "Files", "Calendar", "Meetings", "Build", "Other"] as const;
+export type CategoryChip = (typeof CATEGORY_CHIPS)[number];
+export function chipOf(cat: string): CategoryChip {
+  const c = cat.toLowerCase();
+  if (c.includes("email")) return "Email";
+  if (c.includes("calendar")) return "Calendar";
+  if (c.includes("meeting")) return "Meetings";
+  if (/(files?|docs?)/.test(c)) return "Files";
+  if (/(code|projects?|build)/.test(c)) return "Build";
+  return "Other";
+}
+
+/**
  * HR-1: this list is the sample company's, so no sync event stands behind a tool's "synced 2 min ago" or "synced
  * live". A connected tool says so plainly; only the sign-in warning (worked out from `expires`) keeps its text.
  */
