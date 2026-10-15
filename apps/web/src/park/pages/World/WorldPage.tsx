@@ -59,6 +59,7 @@ import {
   stepsCount,
 } from "./Panels";
 import { RecordedWorldArt } from "./RecordedWorldArt";
+import { DeliveryDock, useSharedResult } from "./ResultPanel";
 import { RunProgressCard } from "./RunProgressCard";
 import { AssumedChips, RunResult, RunStatus } from "./RunStatus";
 import { ShareLine } from "./ShareLine";
@@ -244,6 +245,8 @@ export function WorldPage({ app }: { app: AppCtx }) {
       ? listed.id
       : null;
   const runEvents = useRunEvents(worldClient, runId);
+  // WORLD-LIVE: the run's result is read once, when it is recorded delivered, for the Delivery Dock and the Result tab.
+  const result = useSharedResult(api, runId, runEvents);
 
   useEffect(() => {
     let live = true;
@@ -759,6 +762,15 @@ export function WorldPage({ app }: { app: AppCtx }) {
             ) : null}
           </div>
           {toastLine ? <MapToast line={toastLine} /> : null}
+          {trackRun && runEvents.length > 0 ? (
+            <DeliveryDock
+              result={result}
+              worldId={w.id}
+              worldName={w.name}
+              delivered={delivered}
+              failed={view?.phase === "failed"}
+            />
+          ) : null}
           {showRunViews && !hasStage ? (
             // QA-DEMO-1 m3: the reason the lens links and "Open live view" are off is words on the page, not a tooltip
             <p id={NO_STAGE_ID} className="park-world-nostage">
@@ -847,7 +859,7 @@ export function WorldPage({ app }: { app: AppCtx }) {
           </TabPanel>
           <TabPanel tab="result" on={shown} title="Result" sub="What this world delivered">
             {delivered ? (
-              <RunResult api={api} worldId={w.id} events={runEvents} />
+              <RunResult api={api} worldId={w.id} events={runEvents} shared={result} />
             ) : null}
             {trackRun && !delivered ? (
               <EmptyPanel
