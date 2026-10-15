@@ -116,7 +116,8 @@
 # layout.schema.json 1.0.0 sha256:1db88b1e3b744add
 # manifest.schema.json 1.0.0 sha256:9b885d1826522bb7
 # mcp_tools.schema.json 1.0.0 sha256:46a498402c9b1e4e
-# meeting.schema.json 1.2.0 sha256:034e93898bb28957
+# meeting.schema.json 1.3.0 sha256:2042ae5ef2dc73c2
+# meeting_brief.schema.json 1.0.0 sha256:1f6442fa4f0c3e86
 # meeting_host_rpc.schema.json 1.3.0 sha256:76c124635c8ad9c2
 # meeting_join.schema.json 1.0.0 sha256:ea1e8f0945773573
 # meeting_room.schema.json 1.0.0 sha256:13c682235d58ce69
@@ -2137,6 +2138,66 @@ class MeetingAttestation(BaseModel):
     by: UserId
     at: Timestamp
     notice_version: Semver
+
+
+type MeetingBriefLine = Annotated[
+    str,
+    Field(
+        max_length=240,
+        min_length=1,
+        pattern="^[^\\u0000-\\u001F\\u007F-\\u009F\\u00AD\\u0600-\\u0605\\u061C\\u06DD\\u070F\\u0890\\u0891\\u08E2\\u115F\\u1160\\u180E\\u200B-\\u200F\\u2028-\\u202E\\u2060-\\u206F\\u2800\\u3164\\uFEFF\\uFFA0\\uFFF0-\\uFFFB]+$",
+    ),
+]
+"""
+One line of brief text: 1 to 240 characters, the same link-free and hidden-character checks as a meeting title (PE-13, ADR-0016 decision 14). Astral format characters are the validator's (MB-11).
+"""
+
+
+type MeetingBriefItemRef = Annotated[
+    str, Field(pattern="^(?:ai[0-9]{1,3}|d[0-9]{1,2})$")
+]
+"""
+An item of a prior meeting's minutes: `ai<n>` is the action item with that `id`, `d<n>` the decision at that zero-based index of `decisions`, both in the minutes version the prior meeting pins (MB-06).
+"""
+
+
+class MeetingBriefAgendaLine(BaseModel):
+    """
+    A line of this meeting's agenda, by zero-based index (MB-05).
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    kind: Literal["agenda"]
+    index: Annotated[int, Field(ge=0, le=19)]
+
+
+class MeetingBriefPriorItem(BaseModel):
+    """
+    An item of a prior meeting's confirmed minutes (MB-06).
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    kind: Literal["prior"]
+    meeting_id: MeetingId
+    item: MeetingBriefItemRef
+
+
+class MeetingBriefCarryItem(BaseModel):
+    """
+    A decision or a still-open action item carried over from a prior meeting, its text copied by code (MB-06, MB-07). A decision cites a `d<n>` item, an open action an `ai<n>` item.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    text: MeetingBriefLine
+    kind: Literal["decision", "open_action"]
+    from_meeting: MeetingId
+    item: MeetingBriefItemRef
 
 
 class MeetingHostRpcDraft(BaseModel):
@@ -4952,6 +5013,9 @@ class MeetingAgendaItem(BaseModel):
     minutes: MeetingAgendaMinutes | None
 
 
+type MeetingBriefSource = MeetingBriefAgendaLine | MeetingBriefPriorItem
+
+
 class MeetingHostRpcReceipt(BaseModel):
     """
     What the adapter made (HostReceipt): Google's event id, never a link. HB-07: event_ref equals side_effect_marker(entry); world_id, outbox_id and draft equal the entry's; meeting_id and owner equal the draft's. tilo-api stores it through the run's receipt store only when all hold.
@@ -6120,7 +6184,7 @@ class Manifest(BaseModel):
 
 class Meeting(BaseModel):
     """
-    A meeting Tilo attended or took a transcript of (FR-MTG-01, -10). Owner-only (PE-05). There is no field for a join link or URL: the bot receives it in its start request and nothing stores it. The transcript is deleted at `delete_transcript_after` (30 days by default), the minutes at `delete_minutes_after` (90 days). `world_id` (1.1.0, optional: absent, never null) is the world that holds the transcript and minutes, written by tilo-api when it creates that world and never taken from a request; a meeting without it yields no evidence quote (PE-23, ADR-0020, BQ-273). The free text (`title`, agenda `title`, attendee `name`) holds no link (PE-13; 1.2.0, ADR-0016 decision 14): no `://` or its backslash forms; no meeting host meet.google.com, teams.microsoft.com, teams.live.com, zoom.us, webex.com or whereby.com, alone or as a suffix (acme.zoom.us); no bare `host.tld/segment` (a last label of 2 to 63 letters other than `js`, an optional port, a slash and a path character), which also catches g.co/meet and teams.live.com/meet; no Cc, Zl, Zp, Basic Multilingual Plane Cf, Hangul filler (U+115F, U+1160, U+3164, U+FFA0), braille blank (U+2800) or unassigned default-ignorable code point anywhere; an invisible combining mark (U+034F, U+17B4, U+17B5, U+180B to U+180D, U+180F, variation selectors U+FE00 to U+FE0F) only after a non-ASCII character, or U+FE0E and U+FE0F after a keycap base (# or * or a digit), so emoji keep their variation selector. Astral format and default-ignorable characters (U+E0000 to U+E0FFF, which include the tag characters and variation selectors 17 to 256, and others) cannot be written portably in a pattern: tilo-api removes or refuses them before the schema check (validator, PE-13).
+    A meeting Tilo attended or took a transcript of (FR-MTG-01, -10). Owner-only (PE-05). There is no field for a join link or URL: the bot receives it in its start request and nothing stores it. The transcript is deleted at `delete_transcript_after` (30 days by default), the minutes at `delete_minutes_after` (90 days). `world_id` (1.1.0, optional: absent, never null) is the world that holds the transcript and minutes, written by tilo-api when it creates that world and never taken from a request; a meeting without it yields no evidence quote (PE-23, ADR-0020, BQ-273). The free text (`title`, agenda `title`, attendee `name`) holds no link (PE-13; 1.2.0, ADR-0016 decision 14): no `://` or its backslash forms; no meeting host meet.google.com, teams.microsoft.com, teams.live.com, zoom.us, webex.com or whereby.com, alone or as a suffix (acme.zoom.us); no bare `host.tld/segment` (a last label of 2 to 63 letters other than `js`, an optional port, a slash and a path character), which also catches g.co/meet and teams.live.com/meet; no Cc, Zl, Zp, Basic Multilingual Plane Cf, Hangul filler (U+115F, U+1160, U+3164, U+FFA0), braille blank (U+2800) or unassigned default-ignorable code point anywhere; an invisible combining mark (U+034F, U+17B4, U+17B5, U+180B to U+180D, U+180F, variation selectors U+FE00 to U+FE0F) only after a non-ASCII character, or U+FE0E and U+FE0F after a keycap base (# or * or a digit), so emoji keep their variation selector. Astral format and default-ignorable characters (U+E0000 to U+E0FFF, which include the tag characters and variation selectors 17 to 256, and others) cannot be written portably in a pattern: tilo-api removes or refuses them before the schema check (validator, PE-13). 1.3.0 (ADR-0047, additive; each optional: absent, never null): `brief_requested` and `auto_report` are the owner's two switches, set only through the owner's meeting edit; `brief` pins the latest `meeting_brief` artifact version, written by tilo-api when it stores a brief and never taken from a request; a discarded or deleted meeting keeps no `brief` (FR-MTG-10). Rules MB-01 to MB-12 in `meeting_brief.rules.md`.
     """
 
     model_config = ConfigDict(
@@ -6130,6 +6194,9 @@ class Meeting(BaseModel):
     org_id: OrgId
     owner: UserId
     world_id: WorldId | None = None
+    brief_requested: bool | None = None
+    auto_report: bool | None = None
+    brief: ArtifactRef | None = None
     title: Annotated[
         str,
         Field(
@@ -6152,6 +6219,18 @@ class Meeting(BaseModel):
     delete_transcript_after: Timestamp | None
     delete_minutes_after: Timestamp | None
     created_at: Timestamp
+
+
+class MeetingBriefTalkPoint(BaseModel):
+    """
+    A point the owner may raise, written by the model and checked by code (MB-05).
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    text: MeetingBriefLine
+    evidence: Annotated[list[MeetingBriefSource], Field(max_length=10, min_length=1)]
 
 
 class MeetingHostRpcEvidence(BaseModel):
@@ -6684,6 +6763,19 @@ class LayoutLevel(BaseModel):
     districts: Annotated[list[LayoutDistrict], Field(max_length=6, min_length=1)]
 
 
+class MeetingBriefAgendaPoint(BaseModel):
+    """
+    One agenda line of the meeting, copied by code (MB-04), with up to five talk points.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    title: MeetingBriefLine
+    minutes: MeetingAgendaMinutes | None
+    talk_points: Annotated[list[MeetingBriefTalkPoint], Field(max_length=5)]
+
+
 class MeetingHostRpcSendRequest(BaseModel):
     """
     POST /internal/meeting-host/send, called only by the host run's outbox stub in tilo-api (HB-02). entry is the outbox entry (outbox.schema.json) tilo-api's outbox enqueued, evidence the case its enqueue checked, and draft the pinned item the owner approved. It names no user: the grant used is (entry.authz.ref, meeting_host). The then branch narrows entry to the one action this surface runs (MH-10), a meeting invitation the owner approved: state queued, create_meeting_event on meeting_host, T3 with the new_recipients modifier, 1 to 50 recipients (MAX_RECIPIENTS), no attachments, the draft pinned as item, the host account's primary calendar as destination, no undo window, authorised by a person. (The narrowing sits in if/then so the generated type stays Outbox.)
@@ -6813,6 +6905,25 @@ class LayoutSemantic(BaseModel):
     islands: list[LayoutIsland]
     gates: list[LayoutGate]
     agents: Annotated[list[LayoutAgent], Field(min_length=1)]
+
+
+class MeetingBrief(BaseModel):
+    """
+    The brief Tilo prepares before one meeting: the content of a `meeting_brief` artifact version (`application/json`), pinned by `meeting.brief` (ADR-0047). Not the intake brief (`brief.schema.json`). Owner-only (PE-05, MB-01). Code copies each agenda point's `title` and `minutes` from the meeting's agenda, in order (MB-04), and each `carry_over` item from a prior meeting's confirmed minutes (MB-06); a model writes only the talk points' `text`, and every talk point cites at least one agenda line or prior-minutes item (MB-05). No recipients, times, addresses or links: every text field is one link-free line, and nothing in a brief is sent anywhere. Rules MB-01 to MB-12 in `meeting_brief.rules.md`.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    v: Literal["1.0"]
+    meeting_id: MeetingId
+    generated_at: Timestamp
+    flagged: bool
+    """
+    The safety provider flagged the model's input or reply: the panel marks the brief flagged (MB-08).
+    """
+    agenda_points: Annotated[list[MeetingBriefAgendaPoint], Field(max_length=20)]
+    carry_over: Annotated[list[MeetingBriefCarryItem], Field(max_length=30)]
 
 
 type MeetingHostRpc = Annotated[

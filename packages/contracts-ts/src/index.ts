@@ -117,7 +117,8 @@
  * layout.schema.json 1.0.0 sha256:1db88b1e3b744add
  * manifest.schema.json 1.0.0 sha256:9b885d1826522bb7
  * mcp_tools.schema.json 1.0.0 sha256:46a498402c9b1e4e
- * meeting.schema.json 1.2.0 sha256:034e93898bb28957
+ * meeting.schema.json 1.3.0 sha256:2042ae5ef2dc73c2
+ * meeting_brief.schema.json 1.0.0 sha256:1f6442fa4f0c3e86
  * meeting_host_rpc.schema.json 1.3.0 sha256:76c124635c8ad9c2
  * meeting_join.schema.json 1.0.0 sha256:ea1e8f0945773573
  * meeting_room.schema.json 1.0.0 sha256:13c682235d58ce69
@@ -870,6 +871,25 @@ export type McpToolsWithheldReason = "not_text" | "too_large";
  * via the `definition` "MeetingAgendaMinutes".
  */
 export type MeetingAgendaMinutes = number;
+/**
+ * One line of brief text: 1 to 240 characters, the same link-free and hidden-character checks as a meeting title (PE-13, ADR-0016 decision 14). Astral format characters are the validator's (MB-11).
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MeetingBriefLine".
+ */
+export type MeetingBriefLine = string;
+/**
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MeetingBriefSource".
+ */
+export type MeetingBriefSource = MeetingBriefAgendaLine | MeetingBriefPriorItem;
+/**
+ * An item of a prior meeting's minutes: `ai<n>` is the action item with that `id`, `d<n>` the decision at that zero-based index of `decisions`, both in the minutes version the prior meeting pins (MB-06).
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MeetingBriefItemRef".
+ */
+export type MeetingBriefItemRef = string;
 /**
  * The internal surface of tilo-connectors that tilo-api calls (FR-MTG-09, ADR-0032 decision 2 and addendum 1; FR-CON-02, ADR-0035 decision 2): what tilo-api posts to /internal/meeting-host/send, /internal/meeting-host/status, /internal/meeting-host/disconnect, /internal/connections/views, /internal/connections/start, /internal/connections/callback, /internal/connections/disconnect and /internal/side-effects/execute, and what each answers. Each route validates its own request and answer ($defs send_request and send_answer; user_request and status_answer; user_request and disconnect_answer; user_request and views_answer; start_request and start_answer; callback_request and callback_answer; connection_disconnect_request and connection_disconnect_answer; execute_request and execute_answer; error for any refusal) in both services; this root is any one of them. Every object is closed, and no field holds an access or refresh token, the client secret, a PKCE verifier, key material or a Meet link (ADR-0024 decision 4, ADR-0032 decision 3). Two fields carry a credential on purpose and nothing else does: callback_request.state and .code, the one-time values Google handed the browser (ADR-0035 LC-03; useless without the verifier and the client secret, which stay in tilo-connectors), and start_answer.authorize_url, the public part of the sign-in link. Ids travel in the body, never in a path or query. A route refuses a body over 65536 bytes (64 KiB) before it parses it. Rules that compare values (HB-03 the draft against its hash and the entry, HB-05 the owner, HB-07 the receipt against the entry, HB-09 the views against config/connectors.yaml, LC-05 the flow's person against the caller, LC-07 the items against the entry) are checked by the routes and by tilo-api's client, not by this schema. 1.1.0 adds views_answer, connection_view and scope; 1.2.0 adds the four live-connector routes' defs and the error codes start_again, not_granted and wrong_account (additive). 1.3.0 adds the three model-key routes of ADR-0041 decision 2 (Proposed and inert until config/byok.yaml enabled is true): /internal/model-keys/put, /internal/model-keys/remove and /internal/model-keys/status with the defs model_key_put_request and model_key_put_answer, model_key_remove_request and model_key_remove_answer, model_key_status_request and model_key_status_answer, and the error code key_refused (additive). model_key_put_request.key is the one more credential on this surface (BK-02): it is no-store and, like state and code above, nothing logs, stores or echoes it. /internal/model-keys/generate is model_call_rpc.schema.json's.
  *
@@ -4255,7 +4275,7 @@ export interface McpToolsToolRefusal {
     | "unavailable";
 }
 /**
- * A meeting Tilo attended or took a transcript of (FR-MTG-01, -10). Owner-only (PE-05). There is no field for a join link or URL: the bot receives it in its start request and nothing stores it. The transcript is deleted at `delete_transcript_after` (30 days by default), the minutes at `delete_minutes_after` (90 days). `world_id` (1.1.0, optional: absent, never null) is the world that holds the transcript and minutes, written by tilo-api when it creates that world and never taken from a request; a meeting without it yields no evidence quote (PE-23, ADR-0020, BQ-273). The free text (`title`, agenda `title`, attendee `name`) holds no link (PE-13; 1.2.0, ADR-0016 decision 14): no `://` or its backslash forms; no meeting host meet.google.com, teams.microsoft.com, teams.live.com, zoom.us, webex.com or whereby.com, alone or as a suffix (acme.zoom.us); no bare `host.tld/segment` (a last label of 2 to 63 letters other than `js`, an optional port, a slash and a path character), which also catches g.co/meet and teams.live.com/meet; no Cc, Zl, Zp, Basic Multilingual Plane Cf, Hangul filler (U+115F, U+1160, U+3164, U+FFA0), braille blank (U+2800) or unassigned default-ignorable code point anywhere; an invisible combining mark (U+034F, U+17B4, U+17B5, U+180B to U+180D, U+180F, variation selectors U+FE00 to U+FE0F) only after a non-ASCII character, or U+FE0E and U+FE0F after a keycap base (# or * or a digit), so emoji keep their variation selector. Astral format and default-ignorable characters (U+E0000 to U+E0FFF, which include the tag characters and variation selectors 17 to 256, and others) cannot be written portably in a pattern: tilo-api removes or refuses them before the schema check (validator, PE-13).
+ * A meeting Tilo attended or took a transcript of (FR-MTG-01, -10). Owner-only (PE-05). There is no field for a join link or URL: the bot receives it in its start request and nothing stores it. The transcript is deleted at `delete_transcript_after` (30 days by default), the minutes at `delete_minutes_after` (90 days). `world_id` (1.1.0, optional: absent, never null) is the world that holds the transcript and minutes, written by tilo-api when it creates that world and never taken from a request; a meeting without it yields no evidence quote (PE-23, ADR-0020, BQ-273). The free text (`title`, agenda `title`, attendee `name`) holds no link (PE-13; 1.2.0, ADR-0016 decision 14): no `://` or its backslash forms; no meeting host meet.google.com, teams.microsoft.com, teams.live.com, zoom.us, webex.com or whereby.com, alone or as a suffix (acme.zoom.us); no bare `host.tld/segment` (a last label of 2 to 63 letters other than `js`, an optional port, a slash and a path character), which also catches g.co/meet and teams.live.com/meet; no Cc, Zl, Zp, Basic Multilingual Plane Cf, Hangul filler (U+115F, U+1160, U+3164, U+FFA0), braille blank (U+2800) or unassigned default-ignorable code point anywhere; an invisible combining mark (U+034F, U+17B4, U+17B5, U+180B to U+180D, U+180F, variation selectors U+FE00 to U+FE0F) only after a non-ASCII character, or U+FE0E and U+FE0F after a keycap base (# or * or a digit), so emoji keep their variation selector. Astral format and default-ignorable characters (U+E0000 to U+E0FFF, which include the tag characters and variation selectors 17 to 256, and others) cannot be written portably in a pattern: tilo-api removes or refuses them before the schema check (validator, PE-13). 1.3.0 (ADR-0047, additive; each optional: absent, never null): `brief_requested` and `auto_report` are the owner's two switches, set only through the owner's meeting edit; `brief` pins the latest `meeting_brief` artifact version, written by tilo-api when it stores a brief and never taken from a request; a discarded or deleted meeting keeps no `brief` (FR-MTG-10). Rules MB-01 to MB-12 in `meeting_brief.rules.md`.
  *
  * This interface was referenced by `TiloContracts`'s JSON-Schema
  * via the `definition` "Meeting".
@@ -4265,6 +4285,9 @@ export interface Meeting {
   org_id: OrgId;
   owner: UserId;
   world_id?: WorldId;
+  brief_requested?: boolean;
+  auto_report?: boolean;
+  brief?: ArtifactRef2;
   title: string;
   series: string | null;
   scheduled: MeetingScheduledWindow | null;
@@ -4281,11 +4304,19 @@ export interface Meeting {
   status: "scheduled" | "joining" | "live" | "ended" | "minuted" | "discarded" | "deleted";
   ended_reason: ("completed" | "left_on_request" | "removed" | "timeout" | "failed") | null;
   minutes_confirmed_by: TeamLeadAssignment | null;
-  transcript: ArtifactRef2 | null;
-  minutes: ArtifactRef3 | null;
+  transcript: ArtifactRef3 | null;
+  minutes: ArtifactRef4 | null;
   delete_transcript_after: Timestamp | null;
   delete_minutes_after: Timestamp | null;
   created_at: Timestamp;
+}
+/**
+ * A pinned version of a stored artifact.
+ */
+export interface ArtifactRef2 {
+  artifact_id: ArtifactId;
+  version: number;
+  label?: string;
 }
 /**
  * This interface was referenced by `TiloContracts`'s JSON-Schema
@@ -4327,7 +4358,7 @@ export interface MeetingAttestation {
 /**
  * A pinned version of a stored artifact.
  */
-export interface ArtifactRef2 {
+export interface ArtifactRef3 {
   artifact_id: ArtifactId;
   version: number;
   label?: string;
@@ -4335,10 +4366,94 @@ export interface ArtifactRef2 {
 /**
  * A pinned version of a stored artifact.
  */
-export interface ArtifactRef3 {
+export interface ArtifactRef4 {
   artifact_id: ArtifactId;
   version: number;
   label?: string;
+}
+/**
+ * The brief Tilo prepares before one meeting: the content of a `meeting_brief` artifact version (`application/json`), pinned by `meeting.brief` (ADR-0047). Not the intake brief (`brief.schema.json`). Owner-only (PE-05, MB-01). Code copies each agenda point's `title` and `minutes` from the meeting's agenda, in order (MB-04), and each `carry_over` item from a prior meeting's confirmed minutes (MB-06); a model writes only the talk points' `text`, and every talk point cites at least one agenda line or prior-minutes item (MB-05). No recipients, times, addresses or links: every text field is one link-free line, and nothing in a brief is sent anywhere. Rules MB-01 to MB-12 in `meeting_brief.rules.md`.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MeetingBrief".
+ */
+export interface MeetingBrief {
+  v: "1.0";
+  meeting_id: MeetingId;
+  generated_at: Timestamp;
+  /**
+   * The safety provider flagged the model's input or reply: the panel marks the brief flagged (MB-08).
+   */
+  flagged: boolean;
+  /**
+   * @maxItems 20
+   */
+  agenda_points: MeetingBriefAgendaPoint[];
+  /**
+   * @maxItems 30
+   */
+  carry_over: MeetingBriefCarryItem[];
+}
+/**
+ * One agenda line of the meeting, copied by code (MB-04), with up to five talk points.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MeetingBriefAgendaPoint".
+ */
+export interface MeetingBriefAgendaPoint {
+  title: MeetingBriefLine;
+  minutes: MeetingAgendaMinutes | null;
+  /**
+   * @maxItems 5
+   */
+  talk_points: MeetingBriefTalkPoint[];
+}
+/**
+ * A point the owner may raise, written by the model and checked by code (MB-05).
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MeetingBriefTalkPoint".
+ */
+export interface MeetingBriefTalkPoint {
+  text: MeetingBriefLine;
+  /**
+   * @minItems 1
+   * @maxItems 10
+   */
+  evidence: [MeetingBriefSource, ...MeetingBriefSource[]];
+}
+/**
+ * A line of this meeting's agenda, by zero-based index (MB-05).
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MeetingBriefAgendaLine".
+ */
+export interface MeetingBriefAgendaLine {
+  kind: "agenda";
+  index: number;
+}
+/**
+ * An item of a prior meeting's confirmed minutes (MB-06).
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MeetingBriefPriorItem".
+ */
+export interface MeetingBriefPriorItem {
+  kind: "prior";
+  meeting_id: MeetingId;
+  item: MeetingBriefItemRef;
+}
+/**
+ * A decision or a still-open action item carried over from a prior meeting, its text copied by code (MB-06, MB-07). A decision cites a `d<n>` item, an open action an `ai<n>` item.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MeetingBriefCarryItem".
+ */
+export interface MeetingBriefCarryItem {
+  text: MeetingBriefLine;
+  kind: "decision" | "open_action";
+  from_meeting: MeetingId;
+  item: MeetingBriefItemRef;
 }
 /**
  * POST /internal/meeting-host/send, called only by the host run's outbox stub in tilo-api (HB-02). entry is the outbox entry (outbox.schema.json) tilo-api's outbox enqueued, evidence the case its enqueue checked, and draft the pinned item the owner approved. It names no user: the grant used is (entry.authz.ref, meeting_host). The then branch narrows entry to the one action this surface runs (MH-10), a meeting invitation the owner approved: state queued, create_meeting_event on meeting_host, T3 with the new_recipients modifier, 1 to 50 recipients (MAX_RECIPIENTS), no attachments, the draft pinned as item, the host account's primary calendar as destination, no undo window, authorised by a person. (The narrowing sits in if/then so the generated type stays Outbox.)
@@ -6473,7 +6588,7 @@ export interface TranscriptUtterance {
  */
 export interface TranscriptEvidenceQuote {
   meeting_id: MeetingId;
-  transcript: ArtifactRef4 | null;
+  transcript: ArtifactRef5 | null;
   utterance_id: UtteranceId;
   state: "shown" | "missing" | "expired" | "withheld";
   speaker: TranscriptQuoteLine | null;
@@ -6483,7 +6598,7 @@ export interface TranscriptEvidenceQuote {
 /**
  * A pinned version of a stored artifact.
  */
-export interface ArtifactRef4 {
+export interface ArtifactRef5 {
   artifact_id: ArtifactId;
   version: number;
   label?: string;

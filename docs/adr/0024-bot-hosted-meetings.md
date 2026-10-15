@@ -15,7 +15,10 @@
   **Amendment 4 (a transient Meet join link for the meeting's owner, read on click and stored nowhere) is
   ACCEPTED: the user approved it on 8 Oct 2026, about 12:00 IST** (relayed by the supervisor as user-approved;
   the user's own words are not quoted here). See "Amendment 4" below; it narrows decision 4, nothing else.
-- Deciders: user (the scope change; approval of the ADR-0017 change; amendment 4), architect (design)
+  **Amendment 5 (the host card says the notetaker joins at the start time, and approving it authorises that
+  unattended launch) is ACCEPTED: the owner approved it at 01:15 IST on 16 Oct 2026** with the words "approved, we
+  will test it all" (in the supervisor chat, relayed by the supervisor). See "Amendment 5" below.
+- Deciders: user (the scope change; approval of the ADR-0017 change; amendments 4 and 5), architect (design)
 - Requirement: FR-MTG-09 (amended), FR-MTG-01, FR-MTG-10, FR-CAL-01, FR-CAL-02, FR-CAL-04; PE-13, PE-14, PE-18,
   PE-20; PRD 3.4, 10.4, 16.1, 16.2; ADR-0016 decision 7, ADR-0017; amendment 4: PPL-60c, MJ-01 to MJ-10
 
@@ -211,6 +214,49 @@ logs.
 Join), JOIN-d (`joinable` on agenda rows, with the FR-CAL-01 agenda route); acceptance tests first. Contract
 changes: `meeting_join.schema.json` 1.0.0 (new), `calendar_entry.schema.json` 1.1.0 (additive), the PE-13
 sentence, regenerated types. Open points: BQ-JOIN-1 to BQ-JOIN-6.
+
+## Amendment 5 (16 Oct 2026, ACCEPTED by the owner): the notetaker joins at the start time
+**Context.** The attend call is tab-bound: tilo-api holds `POST /v1/meetings/{id}/attend` open and the bot stops
+when that caller goes, so today a meeting starts only when the owner clicks "Send Tilo to the meeting" and keeps
+the tab open. The owner wants Tilo to join on time without that click. The launch is not an outbox action, but the
+bot posts a chat line (the recording notice, FR-MTG-01) to other people, and an unlisted action is T3, so the card
+the owner approves must say so. Design: `agy-bridge/reports/MEETING-LOOP-DESIGN.md` section 1.
+
+**Decision.**
+1. **The card says it.** The host card's `exact` sentence (`tilo_connectors.meeting_host._exact`) gains, just
+   before "An invitation cannot be unsent.", the sentence "Tilo notetaker joins at the start time and posts a
+   recording notice." The outbox entry still equals the card (CR-12, OB-05).
+2. **Approving that card authorises the unattended launch,** for that one meeting and nothing else: a meeting
+   whose host receipt traces to an approved card whose `exact` holds the sentence (a meeting hosted before this
+   change, uploaded or never hosted still starts only by the owner's click); at the start the card showed, while the
+   meeting's `scheduled.start` still equals it; from status `scheduled` only, by the existing `scheduled` to
+   `joining` compare-and-set, so it runs once. The bot behaves as today: the recording notice first (FR-MTG-01),
+   `Tilo leave` (FR-MTG-10), never Admit (amendment 3(c)).
+3. **Withdrawal is checked at launch time,** not at approval: a discarded, deleted or moved meeting, a disconnected
+   `meeting_host` or a tripped kill switch launches nothing.
+4. **The link is read server-side and stored nowhere.** The launcher reads it by amendment 4's one narrow read
+   (`MeetingHostAdapter.join_link`, MJ-03, MJ-04) into the 60-second `MeetingJoin` it hands the bot, and MJ-05
+   applies to the launcher too: no store, task payload, event, log line or error report holds it. A queued launch
+   names the meeting id only.
+5. **No new event type and no outbox entry:** the launch reuses the registered `meeting.started` and
+   `meeting.ended` with `meeting_id`.
+6. **Unchanged:** invitations stay T3 through the outbox and a gate card that only the meeting owner approves in a
+   signed-in session (decision 3); amendment 3's persistent-profile exception still ends at the 17 Oct freeze unless
+   the user renews it, so without it the launched bot is the unsigned Cloud Run "Tilo notetaker" that an invited
+   person inside the call must admit (BQ-MLOOP-1).
+
+**Decision record, 16 Oct 2026.** The supervisor asked the owner to approve "ADR-0024 amendment 5 and the meeting
+brief/report contract" as described in the design's sections 1(c), 2(c), 3(c), 6 and 7. The owner answered, at
+01:15 IST in the supervisor chat: **"approved, we will test it all"**. The supervisor relayed the quote to the
+architect. The meeting brief and report switches are ADR-0047, approved by the same words.
+
+**Consequences.** The sentence adds 69 characters with its space, and MH-06 still refuses a card sentence over 500
+(`card.schema.json` `gate_action.exact`): with the zone `Asia/Kolkata` a title of up to 116 characters fits, or 63
+when 49 attendees are left uninvited (the longest zone names leave 96 and 43). Today's worst case (509) is already
+refused; the connector ticket tests the boundary, and raising the cap is a card contract change outside this
+amendment. For 17 Oct: the sentence change and the client-armed launch from Agenda (the tab stays open). The server
+sweep that starts the attend in the background is after submission and takes a security review. The PRD is
+read-only: the owner adds FR-MTG-18 (scheduled launch). Questions: BQ-MLOOP-1, BQ-MLOOP-2, BQ-MLOOP-6.
 
 ## Revocation and end of life (runbook; owner: the user; date: the hackathon freeze, 17 Oct 2026, or at once on any doubt)
 1. In Tilo, disconnect `meeting_host` (the token broker revokes the grant).
