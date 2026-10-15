@@ -1,4 +1,12 @@
-import { type ChangeEvent, type ReactNode, useEffect, useRef, useState } from "react";
+import {
+  type ChangeEvent,
+  type ReactNode,
+  Suspense,
+  lazy,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 // The Park "World" page (STUDIO-3, design/studio-v2 "Tilo S World.dc.html"; first WEB-6 "Tilo App World.dc.html"):
 // one world. The title block with its progress and buttons, the run's status banner, then the city on the left and
 // the Story / Steps / Result tabs on the right (Story: what the team did, from the recorded events or the list's
@@ -77,6 +85,17 @@ import {
   stateLook,
   withRunState,
 } from "./worldModel";
+
+// WORLD-LIVE: a real run is drawn by the live stage (the same one as /world/:id/stage), a chunk of its own; a browser
+// with no WebGL2 keeps the recorded text map and the Story, which is what "no WebGL2" has always meant here.
+const LiveStageEmbed = lazy(() => import("../../../worldView/LiveStageEmbed"));
+const canDrawStage = (): boolean => {
+  try {
+    return document.createElement("canvas").getContext("webgl2") !== null;
+  } catch {
+    return false;
+  }
+};
 
 interface Loaded {
   worlds: World[];
@@ -194,6 +213,7 @@ export function WorldPage({ app }: { app: AppCtx }) {
   const worldClient = useWorldClient();
   const demo = useDemoSession(); // QA-DEMO-1: the sample company: labelled, and approving records nothing
   const [roomClient] = useState(createRoomClient);
+  const [canDraw] = useState(canDrawStage);
   const [loaded, setLoaded] = useState<Loaded | "failed" | null>(null);
   const [paused, setPaused] = useState<Record<string, boolean>>({});
   // STUDIO-3: the chosen tab; until a person picks one, Story (or Result once a run's result is delivered).
@@ -675,8 +695,20 @@ export function WorldPage({ app }: { app: AppCtx }) {
         }}
       >
         <div className="park-world-mapcard">
-          <div className={isCity ? "park-world-map" : "park-world-map park-world-map--art"}>
-            {trackRun ? (
+          <div
+            className={
+              trackRun && canDraw
+                ? "park-world-map park-world-map--live"
+                : isCity
+                  ? "park-world-map"
+                  : "park-world-map park-world-map--art"
+            }
+          >
+            {trackRun && canDraw ? (
+              <Suspense fallback={null}>
+                <LiveStageEmbed worldId={w.id} />
+              </Suspense>
+            ) : trackRun ? (
               <RecordedWorldArt events={runEvents} />
             ) : isCity ? (
               <ZoomableMap key={w.id} controls={Boolean(w.plan && loaded.plans[w.plan])}>
@@ -814,7 +846,9 @@ export function WorldPage({ app }: { app: AppCtx }) {
             ) : null}
           </TabPanel>
           <TabPanel tab="result" on={shown} title="Result" sub="What this world delivered">
-            {delivered ? <RunResult api={api} worldId={w.id} events={runEvents} /> : null}
+            {delivered ? (
+              <RunResult api={api} worldId={w.id} events={runEvents} />
+            ) : null}
             {trackRun && !delivered ? (
               <EmptyPanel
                 title={view?.phase === "failed" ? "No result" : "No result yet"}

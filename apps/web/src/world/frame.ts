@@ -10,6 +10,17 @@ import { type Bridge, type GateLook, LEVEL_RISE, type Link, MARGIN, type Rect } 
 import { P } from "./art/iso";
 import { styleOf } from "./art/style";
 import type { WorldState } from "./reducer";
+import { agentNames } from "./runSummary";
+
+const NAMES = new WeakMap<Layout, Map<string, string>>();
+function namesOf(layout: Layout): Map<string, string> {
+  let names = NAMES.get(layout);
+  if (!names) {
+    names = agentNames(layout);
+    NAMES.set(layout, names);
+  }
+  return names;
+}
 
 // The solver assigns one of 6 numbered district roles (district.1..6); the design exports have
 // no numbered slots (design/tokens.json note on `color.district`), so this cycles the named tint
@@ -73,6 +84,16 @@ export interface FrameAgent {
   readonly rank: string;
   readonly tint: string;
   readonly level: number; // stacking order of the level it stands on, for draw order
+  /** The tool icon over it: agent.working was its latest event (WORLD-LIVE). */
+  readonly working: boolean;
+  /** Its latest handoff note and who it went to, until its next event (WORLD-LIVE); null otherwise. */
+  readonly say: FrameSay | null;
+}
+/** A speech bubble: the receiver's name (or, when `head` is set, that exact heading) over the words. */
+export interface FrameSay {
+  readonly text: string;
+  readonly to: string;
+  readonly head?: string;
 }
 
 export interface Frame {
@@ -264,6 +285,10 @@ export function frameOf(layout: Layout, state: WorldState): Frame {
         rank: meta.rank,
         tint,
         level: spot.level,
+        working: agent.working,
+        say: agent.say
+          ? { text: agent.say.text, to: namesOf(layout).get(agent.say.to) ?? agent.say.to }
+          : null,
       },
     ];
   });

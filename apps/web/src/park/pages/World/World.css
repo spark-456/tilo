@@ -1598,3 +1598,34 @@
   color: var(--heroInk);
   text-decoration: underline;
 }
+
+/* WORLD-LIVE: a real run's map is the live stage, filling the card; the tag, lenses and toast sit over it. */
+[data-park] .park-world-map--live {
+  padding: 0;
+  align-items: stretch;
+  justify-content: stretch;
+}
+[data-park] .park-world-livestage {
+  position: absolute;
+  inset: 0;
+  display: flex;
+}
+[data-park] .park-world-livestage .stage-frame {
+  flex: 1;
+  min-width: 0;
+}
+[data-park] .park-world-livenote {
+  position: absolute;
+  left: 20px;
+  right: 20px;
+  bottom: 20px;
+  padding: 10px 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--card);
+  color: var(--ink);
+  font-size: 14px;
+}
+[data-park] .park-world-livenote p {
+  margin: 0;
+}

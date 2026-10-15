@@ -32,6 +32,10 @@ const RUN_ENGINE = [
   "display/density",
 ];
 
+// WORLD-LIVE: the World page draws a real run with the live stage. The one file that holds it sits outside park, is
+// loaded lazily, and is the only stage/world drawing code the page reaches (it imports them, park does not).
+const STAGE_EMBED = "worldView/LiveStageEmbed";
+
 const files = walk(PARK);
 const rel = (p: string) => relative(PARK, p).replaceAll("\\", "/");
 const text = (p: string) => readFileSync(p, "utf8");
@@ -168,7 +172,9 @@ describe("WEB_1a_static: park stays beside the old app", () => {
         // The run-admin sections read the live run through four engine modules the stage shares: the one named
         // exception to "nothing from world/" (the old app is gone; nothing else may be added here).
         const engine =
-          RUN_ENGINE.includes(inSrc) || /(?:^|\/)config\/home_suggestions\.json$/.test(inSrc);
+          RUN_ENGINE.includes(inSrc) ||
+          inSrc === STAGE_EMBED ||
+          /(?:^|\/)config\/home_suggestions\.json$/.test(inSrc);
         if (!(inSrc === "api" || inSrc.startsWith("api/") || shared || engine))
           bad.push(`${rel(p)} imports ${m[1]}`);
       }
