@@ -3,7 +3,7 @@
    would move with nothing behind them, HR-2). */
 [data-park] .park-bubble {
   position: fixed;
-  z-index: 30;
+  z-index: 33;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -60,11 +60,10 @@
   inset: auto;
   margin: 0;
   padding: 0;
-  z-index: 31;
+  z-index: 34;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
-  max-height: calc(100vh - 120px);
   overflow: hidden;
   border: 1px solid var(--line);
   border-radius: 22px;
@@ -75,6 +74,7 @@
   line-height: 1.45;
 }
 [data-park] .park-bubble__head {
+  flex: none;
   display: flex;
   align-items: center;
   gap: 10px;
@@ -123,6 +123,7 @@
   background: var(--sunk);
 }
 [data-park] .park-bubble__body {
+  flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
   display: flex;
@@ -194,6 +195,7 @@
   font-size: 13px;
 }
 [data-park] .park-bubble__form {
+  flex: none;
   display: flex;
   align-items: center;
   gap: 6px;

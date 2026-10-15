@@ -22,6 +22,8 @@ const SIZE = 64;
 const EDGE = 8;
 const STEP = 16;
 const DRAG_FROM = 4;
+/** The panel keeps 24px from the side edges: 8px plus room for a page scrollbar. */
+const PANEL_EDGE = 24;
 
 /** The default place: 40px from the corner on a desktop, clear of the run bar on a phone. */
 export const homePos = (vw: number): BubblePos =>
@@ -150,10 +152,19 @@ export function TiloBubble({
     go(p);
   };
 
-  // The panel opens above the bubble, or below it when the bubble sits in the top half.
-  const width = Math.min(384, (vw || 1440) - 2 * EDGE);
-  const right = Math.min(Math.max(pos.right, EDGE), Math.max(EDGE, (vw || 1440) - width - EDGE));
-  const above = pos.bottom < (vh || 900) / 2;
+  // The panel opens on the side of the bubble with more room (above it in the lower half), never past an edge: the
+  // horizontal margin leaves room for a page scrollbar, and the height is what that side has.
+  const W = vw || 1440;
+  const H = vh || 900;
+  const width = Math.min(384, W - 2 * PANEL_EDGE);
+  const right = Math.min(
+    Math.max(pos.right, PANEL_EDGE),
+    Math.max(PANEL_EDGE, W - width - PANEL_EDGE),
+  );
+  const roomAbove = H - pos.bottom - SIZE - 16 - EDGE;
+  const roomBelow = pos.bottom - 16 - EDGE;
+  const above = roomAbove >= roomBelow;
+  const maxHeight = Math.max(120, above ? roomAbove : roomBelow);
   const recent = chat.turns.slice(-2);
 
   return (
@@ -167,9 +178,8 @@ export function TiloBubble({
           style={{
             right,
             width,
-            ...(above
-              ? { bottom: pos.bottom + SIZE + 16 }
-              : { top: (vh || 900) - pos.bottom + 16 }),
+            maxHeight,
+            ...(above ? { bottom: pos.bottom + SIZE + 16 } : { top: H - pos.bottom + 16 }),
           }}
         >
           <div className="park-bubble__head">
