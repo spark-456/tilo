@@ -1034,8 +1034,9 @@ export class HttpClient implements TiloClient, SchedulesApi, FieldsApi, ItemApi 
       } catch (error) {
         const notYet = error instanceof TiloApiError && error.status === 404;
         if (!notYet) throw error;
-        if (tries >= LAYOUT_404_POLLS) throw new TiloApiError(NOT_BUILT, 404, true);
-        await sleep(this.pollMs, signal);
+        const ended = [...TERMINAL].some((type) => this.feed(worldId).types.has(type));
+        if (ended || tries >= LAYOUT_404_POLLS) throw new TiloApiError(NOT_BUILT, 404, true);
+        await sleep(Math.min(this.pollMs * 2 ** (tries - 1), MAX_BACKOFF_MS), signal); // backs off, never a storm
       }
     }
   }

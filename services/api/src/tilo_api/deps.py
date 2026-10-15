@@ -380,10 +380,19 @@ def member_world(principal: Principal, store: Store, world_id: str) -> WorldReco
     raise HTTPException(status_code=404, detail="Tilo could not find that.")
 
 
+def world_layout(store: Store, world_id: str) -> dict | None:
+    """The world's built layout: the in-process run's, else the one stored on the world record (LIVE-LAYOUT: a finished
+    run, a restart or another Cloud Run instance holds no `Run`, but the record keeps the layout, ADR-0026)."""
+    layout = getattr(store.runs.get(world_id), "layout", None)
+    if not isinstance(layout, dict) or not layout:
+        layout = getattr(store.worlds.get(world_id), "layout", None)
+    return layout if isinstance(layout, dict) and layout else None
+
+
 def _layout_districts(store: Store, world_id: str) -> list[str]:
     """The district ids the world's built layout names; none for no layout or one that is not the expected shape."""
     try:
-        layout = getattr(store.runs.get(world_id), "layout", None)
+        layout = world_layout(store, world_id)
         if not isinstance(layout, dict):
             return []
         return [

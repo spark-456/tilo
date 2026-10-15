@@ -1155,7 +1155,12 @@ def get_delivery(
     world = store.worlds.get(world_id)
     owner = world.owner if world is not None else None
     stream = store.events.get(world_id, [])
-    if principal.world_id != world_id or (principal.role, principal.user_id) != ("owner", owner):
+    try:  # the owner by membership: a world-bound session or an unbound sign-in that owns it (LIVE-LAYOUT)
+        deps.member_world(principal, store, world_id)
+        reads_as_owner = (principal.role, principal.user_id) == ("owner", owner)
+    except HTTPException:
+        reads_as_owner = False
+    if not reads_as_owner:
         _, viewer = deps.team_reader(principal, store, people, clock, world_id)  # the one unknown-world 404 otherwise
         stream = [
             e

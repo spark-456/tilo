@@ -24,6 +24,7 @@ from tilo_api.deps import (
     get_people_provider,
     get_store,
     readable_world,
+    world_layout,
 )
 from tilo_api.layout import visible_layout
 
@@ -224,9 +225,8 @@ def get_world_layout(
     """FR-WLD-05, CL-INT-4: the run's layout, never invented: 404 until the run has built one. The owner gets all
     of it; anyone else only what their districts show (`visible_layout`), and 404 when that is nothing."""
     world, principal = readable_world(principal, store, people, clock, world_id)
-    run = store.runs.get(world_id)
-    layout = getattr(run, "layout", None)
-    if not isinstance(layout, dict) or not layout:
+    layout = world_layout(store, world_id)
+    if layout is None:
         raise HTTPException(status_code=404, detail="Tilo could not find that.")
     if not _is_owner(principal, world.owner):
         layout = visible_layout(layout, _safe_districts(principal.districts))
