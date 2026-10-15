@@ -502,24 +502,48 @@ def is_tilo(actor: str) -> bool:
     return actor.startswith("A_")
 
 
-def is_member(persons: dict, user: str, team: str, now: str) -> bool:
-    """A member of team T at `now` (people.rules.md "Terms"): a `memberships` entry for T whose
-    `assigned_by.by` is a person of the same org with `org_role: owner`, `assigned_by.at <= now`."""
+def _founding(persons: dict, p: dict, m: dict) -> bool:
+    """`m` is T's founding entry: strictly earlier than every other entry for T in the org (a tie founds nothing)."""
+    others = (o for q in persons.values() if q["org_id"] == p["org_id"] for o in q["memberships"] if o is not m)
+    return all(m["assigned_by"]["at"] < o["assigned_by"]["at"] for o in others if o["team"] == m["team"])
+
+
+def _lead_entries(persons: dict, user: str, team: str, now: str) -> list[dict]:
     p = persons.get(user)
     if p is None:
+        return []
+    return [m for m in p["memberships"] if m["team"] == team and m.get("lead") is True and counts(persons, p, m, now)]
+
+
+def counts(persons: dict, p: dict, m: dict, now: str) -> bool:
+    """One `memberships` entry counts at `now` (people.rules.md "Terms", ADR-0044): an org owner's assignment; the
+    founding entry its creator assigned themselves with `lead: true`; or, without `lead: true`, an invitation by a lead
+    of T (a lead since no later than the invitation) that the person accepted between the invitation and `now`."""
+    a = persons.get(m["assigned_by"]["by"])
+    if a is None or a["org_id"] != p["org_id"] or m["assigned_by"]["at"] > now:
         return False
-    for m in p["memberships"]:
-        if m["team"] != team:
-            continue
-        assigner = persons.get(m["assigned_by"]["by"])
-        if (
-            assigner is not None
-            and assigner["org_id"] == p["org_id"]
-            and assigner["org_role"] == "owner"
-            and m["assigned_by"]["at"] <= now
-        ):
-            return True
-    return False
+    if a["org_role"] == "owner":
+        return True
+    if m.get("lead") is True:
+        return a["id"] == p["id"] and _founding(persons, p, m)
+    at, accepted = m["assigned_by"]["at"], m.get("accepted_at")
+    return accepted is not None and at <= accepted <= now and invited_by_a_lead(persons, m, now)
+
+
+def invited_by_a_lead(persons: dict, m: dict, now: str) -> bool:
+    """`m`'s assigner leads its team at `now` through a lead entry assigned no later than `m` (no revival)."""
+    leads = _lead_entries(persons, m["assigned_by"]["by"], m["team"], now)
+    return m.get("lead") is not True and any(e["assigned_by"]["at"] <= m["assigned_by"]["at"] for e in leads)
+
+
+def is_lead(persons: dict, user: str, team: str, now: str) -> bool:
+    return bool(_lead_entries(persons, user, team, now))
+
+
+def is_member(persons: dict, user: str, team: str, now: str) -> bool:
+    """A member of team T at `now` (people.rules.md "Terms"): an entry for T that `counts`."""
+    p = persons.get(user)
+    return p is not None and any(m["team"] == team and counts(persons, p, m, now) for m in p["memberships"])
 
 
 def teammates(persons: dict, a: str, b: str, now: str) -> bool:

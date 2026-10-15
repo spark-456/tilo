@@ -226,13 +226,14 @@ class _PersonMemoryStore(MemoryStore):
 
     def create_founder(self, record: Mapping[str, Any]) -> Stored:
         """The founder marker, the person and its address, in one step. Refused `OrgAlreadyFounded` when the org has a
-        marker or any person, then `AlreadyExists` (id), then `EmailTaken`; a refusal writes nothing."""
+        marker (members who joined first do not block it, ADR-0044), then `AlreadyExists` (id), then `EmailTaken`; a
+        refusal writes nothing."""
         key = self._checked(record)
         if record.get("org_role") != "owner":
             raise PeopleInputError("a founder is an owner")
         copied = copy.deepcopy(dict(record))
         with self._lock:
-            if key[0] in self._founders or any(org == key[0] for org, _ in self._rows):
+            if key[0] in self._founders:
                 raise OrgAlreadyFounded("OrgAlreadyFounded")
             if key in self._rows:
                 raise AlreadyExists(f"AlreadyExists: person {key[1]}")

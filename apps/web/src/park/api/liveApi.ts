@@ -40,6 +40,7 @@ import { nameInitials } from "./nameInitials";
 import { installOneStep, oneStepOver } from "./oneStep";
 import { installQuizReader } from "./quizApps";
 import { installResultReader } from "./results";
+import { installTeamsTransport } from "./selfServeTeams";
 import { installSkillFixer } from "./skillFixes";
 import type { Dec, DecisionKey, Effort, QuickReply, TierKey, Today, User } from "./types";
 
@@ -284,6 +285,7 @@ export function createLiveApi(options: LiveApiOptions = {}): Api {
       `/worlds/${encodeURIComponent(world)}/result${artifact ? `?artifact=${encodeURIComponent(artifact)}` : ""}`,
     ),
   );
+  installTeamsTransport(http); // SELF-SERVE-TEAMS: the Team page's own-teams panel
   installQuizReader(api, async (world, artifact) => {
     const raw = await http.getJson(
       `/worlds/${encodeURIComponent(world)}/apps/${encodeURIComponent(artifact)}`,

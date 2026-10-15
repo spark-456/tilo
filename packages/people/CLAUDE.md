@@ -20,7 +20,7 @@ resolution, and in-memory record stores whose interface `tilo-api` implements on
 
 ## Requirement IDs
 FR-MTG-05, FR-PA-01, FR-PA-11, FR-PA-17, FR-PB-01, FR-PB-02, FR-PB-04 to FR-PB-07,
-FR-CAL-03, FR-CAL-06 (oracle half), FR-CAL-07b-1 (`free_slots`); PPL-10a to PPL-10d. ADR-0040 (TSW-1): `world_share.py` (`share_id`, `in_force`, `reader_share`), `PeopleStores.world_shares` (required), `erase_person` deletes the shares a person granted. `decide` knows `read_team` (`TEAM_ACTIONS`, `TEAM_VIEW`) and `create` of an item with a `world_id`.
+FR-CAL-03, FR-CAL-06 (oracle half), FR-CAL-07b-1 (`free_slots`); PPL-10a to PPL-10d. ADR-0040 (TSW-1): `world_share.py` (`share_id`, `in_force`, `reader_share`), `PeopleStores.world_shares` (required), `erase_person` deletes the shares a person granted. `decide` knows `read_team` (`TEAM_ACTIONS`, `TEAM_VIEW`) and `create` of an item with a `world_id`. ADR-0044 (SELF-SERVE-TEAMS): `Directory.is_member`/`is_lead`/`counts` follow the amended Terms (owner's, founding, accepted invitation; the directory must be the whole org); `teams.py` `decide_team` ports `tests/contracts/_teams_lib.team_permits` (crossref `fixtures/person.membership/crossref/`); `read_directory` admits a pending invitee's inviter (PE-20).
 
 ## Local rules
 - Pure: no model, provider, network, randomness, logging, print or clock read under `src/`.

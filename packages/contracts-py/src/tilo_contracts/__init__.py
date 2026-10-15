@@ -128,7 +128,7 @@
 # model_call_rpc.schema.json 1.0.0 sha256:3f585f8e5d092538
 # org_model_key.schema.json 1.1.0 sha256:ba443cf35d658c90
 # outbox.schema.json 1.0.0 sha256:0b9b172f230a6347
-# person.schema.json 1.0.0 sha256:2c928319dd7ab9d1
+# person.schema.json 1.1.0 sha256:2d974d326607d569
 # pilot.schema.json 1.0.0 sha256:5d091f814844b3b1
 # pinboard_item.schema.json 1.1.0 sha256:edf4c50a588211ee
 # plan.schema.json 1.1.0 sha256:f0722cc94a84e2d1
@@ -5252,7 +5252,7 @@ class Outbox(BaseModel):
 
 class PersonMembership(BaseModel):
     """
-    Membership of a team, counted only as people.rules.md defines it (PE-02).
+    Membership of a team, counted only as people.rules.md defines it (PE-02 terms, PE-37, ADR-0044). `lead` (1.1.0) marks the team's lead; tilo-api writes it only as true, and absent means not a lead. It counts only on a membership an org owner assigned or on the founding membership the team's creator assigned to themselves. `accepted_at` (1.1.0) is when the person accepted a membership a team lead assigned them; until then that membership counts for nothing. The team's lead is not the Team Lead role of PRD 10.1 (team_lead.schema.json): it manages that team's memberships and authorises nothing else.
     """
 
     model_config = ConfigDict(
@@ -5260,6 +5260,8 @@ class PersonMembership(BaseModel):
     )
     team: TeamId
     assigned_by: TeamLeadAssignment
+    lead: bool | None = None
+    accepted_at: Timestamp | None = None
 
 
 class Pilot(BaseModel):
@@ -6331,7 +6333,7 @@ An organisation's own model key as tilo-api keeps and serves it (ADR-0041 decisi
 
 class Person(BaseModel):
     """
-    A person of an org (PRD 15.1 User entity, ADR-0015): who they are, how they are called in a meeting, how Tilo reaches them, and which teams an org owner put them in. `aliases` are names others use for them; a spoken name that matches more than one person is never assigned (PE-15). A membership counts only as people.rules.md defines it (PE-02). Contact details are never shown to teammates; `tilo-api` resolves a recipient from this record (PE-09).
+    A person of an org (PRD 15.1 User entity, ADR-0015): who they are, how they are called in a meeting, how Tilo reaches them, and which teams they are in (an org owner's assignment, a team they founded, or a team lead's invitation they accepted, ADR-0044). `aliases` are names others use for them; a spoken name that matches more than one person is never assigned (PE-15). A membership counts only as people.rules.md defines it (PE-02). Contact details are never shown to teammates; `tilo-api` resolves a recipient from this record (PE-09).
     """
 
     model_config = ConfigDict(

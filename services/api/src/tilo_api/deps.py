@@ -95,6 +95,8 @@ class Principal:
     # session, never from anything in a request; needed to answer, or read in full, another owned world's cards
     auth_time: float | None = None  # ADR-0041 BK-06: the verified token's `auth_time` (epoch s), server-set only; a key
     # act older than 10 minutes needs a fresh sign-in. None (a dev, email or test session) is never fresh.
+    verified_email: str | None = field(default=None, repr=False)  # SELF-SERVE-TEAMS: the Google-verified `email`
+    # claim, server-set only (never a body or header); the one address `/v1/people/first` may store. Not in a repr.
 
 
 def full_world_session(principal: Principal) -> bool:

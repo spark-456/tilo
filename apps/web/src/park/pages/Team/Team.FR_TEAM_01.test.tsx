@@ -2,6 +2,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, makeApp, renderTeam } from "../../../../test-support/park/teamHarness";
 import { createLiveApi } from "../../api/liveApi";
+import { ORGANISATION_SETUP } from "../../api/organisationSetup";
 
 afterEach(cleanup);
 const apiFor = (people: unknown[], status = 200) =>
@@ -53,7 +54,7 @@ describe("FR_TEAM_01 live Team", () => {
 
 it("LIVE-PEOPLE FR-TEAM-01 absent person shows organisation setup without member controls", async () => {
   const { root } = await renderTeam(makeApp(), apiFor([], 404));
-  expect(root.textContent).toContain("Set up your organisation");
+  expect(root.textContent).toContain(ORGANISATION_SETUP);
   expect(root.textContent).not.toContain("Team data is unavailable");
   expect(root.textContent).not.toContain("0 people");
   expect(root.querySelector('input[aria-label="Invite by email"]')).toBeNull();
