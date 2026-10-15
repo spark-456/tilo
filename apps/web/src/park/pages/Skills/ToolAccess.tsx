@@ -4,10 +4,16 @@ import { useState } from "react";
 import type { Learn, Skill } from "../../api/types";
 import { LEVELS, allowedLevels, shownLevel, toolRows } from "./skillAccess";
 
+/** POLISH-1: the list is long, so the page shows this many rows and the rest sit behind "Show all". */
+export const ACCESS_PREVIEW = 5;
+
 export function ToolAccess({ skills, tools }: { skills: Skill[]; tools: Learn["tools"] }) {
   const [picked, setPicked] = useState<Record<string, number>>({});
+  const [all, setAll] = useState(false);
   const rows = toolRows(skills, tools);
   if (rows.length === 0) return null;
+  const folded = rows.length > ACCESS_PREVIEW;
+  const shown = folded && !all ? rows.slice(0, ACCESS_PREVIEW) : rows;
   return (
     <section className="park-skills-access" aria-label="Tool access per skill">
       <h2 className="park-skills-access-h">Tool access per skill</h2>
@@ -15,7 +21,7 @@ export function ToolAccess({ skills, tools }: { skills: Skill[]; tools: Learn["t
         A skill can use a tool at a lower level than your team’s. It can never use a higher one.
       </p>
       <ul className="park-skills-access-list">
-        {rows.map((r) => {
+        {shown.map((r) => {
           const key = `${r.skillId}:${r.tool}`;
           const allowed = allowedLevels(r.team);
           return (
@@ -41,6 +47,16 @@ export function ToolAccess({ skills, tools }: { skills: Skill[]; tools: Learn["t
           );
         })}
       </ul>
+      {folded ? (
+        <button
+          type="button"
+          className="park-skills-access-more"
+          aria-expanded={all}
+          onClick={() => setAll((v) => !v)}
+        >
+          {all ? "Show fewer" : `Show all ${rows.length}`}
+        </button>
+      ) : null}
     </section>
   );
 }

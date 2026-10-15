@@ -354,6 +354,7 @@
 [data-park] .park-team-more[aria-expanded="true"] {
   background: var(--chip);
 }
+[data-park] .park-team-matrix:focus-visible,
 [data-park] .park-team-select:focus-visible,
 [data-park] .park-team-more:focus-visible,
 [data-park] .park-team-btn:focus-visible {

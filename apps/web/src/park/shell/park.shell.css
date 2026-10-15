@@ -109,6 +109,34 @@
   max-width: 1320px;
   margin: 0 auto;
 }
+/* POLISH-1: one page container for Home, Worlds and Team (and Connectors, which already uses these numbers): the
+   content is at most 1296 wide with an 8px inner gutter, so its left edge is the same on every page (80px at 1440).
+   A phone's page gutter is 16, the same as Home's own. */
+[data-park] {
+  --park-page-max: 1296px;
+  --park-page-pad: 8px;
+}
+@media (max-width: 560px) {
+  [data-park] .park-shell__page {
+    padding-right: 16px;
+    padding-left: 16px;
+  }
+}
+/* Worlds sits on the page like Team and Connectors (design/studio-v2): no outer white shell, the same container, so its
+   left edge matches Home. Here, not in Worlds.css, whose static test allows park-worlds- classes only. */
+[data-park][data-theme="studio"] [data-testid="park-page-worlds"] > .park-sheet {
+  max-width: var(--park-page-max, 1296px);
+  margin: 0 auto;
+  padding: 8px var(--park-page-pad, 8px) 64px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+@media (max-width: 560px) {
+  [data-park][data-theme="studio"] [data-testid="park-page-worlds"] > .park-sheet {
+    padding: 0 0 48px;
+  }
+}
 
 /* ---- City backdrop: fixed, full-bleed, behind everything, never clickable ---- */
 [data-park] .park-shell__backdrop {
@@ -515,6 +543,22 @@
   [data-park] .park-shell__pagebtn {
     padding: 0 8px 0 10px;
     font-size: 14px;
+  }
+}
+
+/* POLISH-1: from 361px up every nav control is a 44x44 target on a phone (PRD 18.1). min-* so the Studio sheet's
+   40px widths (studio.css) give way; the look stays, only the box grows. At 360 and below QA-DEMO-1 B2's tighter
+   boxes keep the page button's room. */
+@media (min-width: 361px) and (max-width: 560px) {
+  [data-park] .park-shell__logo,
+  [data-park] .park-shell__iconbtn,
+  [data-park] .park-shell__sample,
+  [data-park] .park-shell__avatar {
+    min-width: 44px;
+    min-height: 44px;
+  }
+  [data-park] .park-shell__logo {
+    justify-content: center;
   }
 }
 

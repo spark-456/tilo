@@ -25,7 +25,8 @@ const has = (rules: readonly CssRule[], prop: string, value: string): boolean =>
 const ROWS: readonly [string, string, string][] = [
   // the page column
   ["page width", "max-width", "1296px"],
-  ["page padding", "padding", "120px 32px 64px"],
+  // POLISH-1: the side gutter is the shell's --park-page-pad (8px), so Home, Worlds and Team share a left edge.
+  ["page padding", "padding", "120px 8px 64px"],
   ["page gap", "gap", "36px"],
   // greeting type
   ["date line size", "font-size", "13px"],

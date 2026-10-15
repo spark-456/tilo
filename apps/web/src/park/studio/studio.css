@@ -183,16 +183,21 @@
 }
 /* A phone: the bar is 64px and the tools sit closer. */
 @media (max-width: 560px) {
+  /* POLISH-1: the nav controls are 44px boxes now, so the gaps and sides give back the room (the page name keeps its
+     four letters at 390). */
   [data-park][data-theme="studio"] .park-shell__nav {
     height: 64px;
-    gap: 10px;
-    padding: 0 12px;
+    gap: 4px;
+    padding: 0 6px;
+  }
+  [data-park][data-theme="studio"] .park-shell__pagebtn {
+    padding: 0 6px 0 10px;
   }
   [data-park][data-theme="studio"] .park-shell__bar {
     top: 61px;
   }
   [data-park][data-theme="studio"] .park-shell__tools {
-    gap: 2px;
+    gap: 0;
   }
   /* 40 wide and 44 tall, without the hairline, so the page button keeps room for its name. */
   [data-park][data-theme="studio"] .park-shell__iconbtn {
@@ -202,7 +207,7 @@
   [data-park][data-theme="studio"] .park-shell__avatar {
     width: 40px;
     height: 40px;
-    margin-left: 4px;
+    margin-left: 0;
   }
   [data-park][data-theme="studio"] .park-shell__wordmark {
     font-size: 22px;
