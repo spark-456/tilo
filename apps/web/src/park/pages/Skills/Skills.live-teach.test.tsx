@@ -89,6 +89,7 @@ const SAVED_TOAST = "Saved “Match invoices”. It starts as Learning";
 // M2-CODES-1 (5b57e7ef): a retryable 5xx on a POST may still have happened, so the page says it is unconfirmed.
 const ERR_TRY = "We could not confirm it. Reload before trying again.";
 const ERR_UNDERSTOOD = "Check the information and try again.";
+const ERR_DESCRIPTION = "Try rewriting the description to say what you want Tilo to do.";
 const NOT_CONNECTED = ERR_TRY;
 
 type Handler = (init: RequestInit) => Response | Promise<Response>;
@@ -370,6 +371,20 @@ describe("SKILLS_5_live_teach: Tilo's version (step 2)", () => {
       line,
     );
     expect(text(r)).toContain("Note the total");
+    expect(askSwitches(r.el)).toHaveLength(0);
+    for (const l of PLAN.map((p) => p.text)) expect(text(r)).not.toContain(l);
+  });
+
+  it("SKILLS_5_live_teach_a_not_understood_version_422_guides_a_description_change", async () => {
+    const r = await rig({
+      "POST /v1/skills/captures/tsk_C1/version": () =>
+        json({ code: "not_understood", detail: "not_understood" }, 422),
+    }).mount();
+    await toVersion(r);
+    expect(pageText(r.el.querySelector('[data-testid="skills-teach-error"] p') as Element)).toBe(
+      ERR_DESCRIPTION,
+    );
+    expect(currentStep(r.el)).toBe("Show an example");
     expect(askSwitches(r.el)).toHaveLength(0);
     for (const l of PLAN.map((p) => p.text)) expect(text(r)).not.toContain(l);
   });

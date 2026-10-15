@@ -7,6 +7,7 @@ const mappings = [
   ["body_too_large", 413, "This is too large to send. Reduce its size and try again."],
   ["allowance_capped", 429, "Your allowance is used up. Try again when it resets."],
   ["rate_limited", 429, "Too many requests. Wait a moment and try again."],
+  ["not_understood", 422, "Try rewriting the description to say what you want Tilo to do."],
   ["store_unavailable", 503, "Stored information is unavailable. Try again in a moment."],
   ["spend_cap_reached", 403, "Your spending limit has been reached."],
 ] as const;

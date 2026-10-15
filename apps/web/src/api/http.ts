@@ -235,7 +235,7 @@ export function displayApiError(error: unknown): string {
     not_joinable: "This meeting cannot be joined right now.",
     not_publishable: "This skill is not ready to publish.",
     not_text: "Only text can be used here.",
-    not_understood: "Tilo could not understand this request. Check it and try again.",
+    not_understood: "Try rewriting the description to say what you want Tilo to do.",
     outbox_unavailable: "Pending deliveries are unavailable right now.",
     over_cap: "The usage limit has been reached.",
     own_role: "You cannot change your own role here.",
