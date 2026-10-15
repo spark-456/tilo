@@ -1,38 +1,8 @@
-.park-access {
-  position: fixed;
-  inset: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 76px 16px 24px;
-  box-sizing: border-box;
-  overflow: auto;
-  background: var(--paper);
-  color: var(--ink);
-  font-family: "Nunito Sans", system-ui, sans-serif;
-}
+/* SEC-15 access pages in Studio (STUDIO-6): the card's question, choices and its one filled Continue. The page, header
+   and card come from landing/landing.css; colours are Studio role tokens. No motion. */
 .park-access__card {
-  position: relative;
-  z-index: 1;
-  flex-shrink: 0;
   margin-block: auto;
-  width: min(100%, 520px);
-  box-sizing: border-box;
-  padding: 32px;
-  border: 1px solid var(--gBd);
-  border-radius: 28px;
-  background: var(--gBg);
-  backdrop-filter: var(--gFx);
-  box-shadow: var(--shPop);
   overflow-wrap: anywhere;
-}
-.park-access h1 {
-  margin: 0 0 16px;
-  font: 900 28px / 1.2 "Nunito", system-ui, sans-serif;
-}
-.park-access p {
-  color: var(--ink2);
-  line-height: 1.5;
 }
 .park-access fieldset {
   min-width: 0;
@@ -43,6 +13,7 @@
 .park-access legend {
   margin-bottom: 16px;
   color: var(--ink2);
+  font-weight: 500;
 }
 .park-access__choice {
   display: flex;
@@ -50,25 +21,31 @@
   gap: 12px;
   margin-bottom: 12px;
   padding: 16px;
-  border: 1px solid var(--line);
-  border-radius: 16px;
+  border: 1px solid var(--lineStrong);
+  border-radius: 18px;
   background: var(--field);
   cursor: pointer;
 }
-.park-access__choice:has(input:checked) {
-  border-color: var(--ink2);
+.park-access__choice:hover {
   background: var(--rowHover);
+}
+.park-access__choice:has(input:checked) {
+  border-color: var(--ink);
+  background: var(--rowOn);
 }
 .park-access__choice input {
   flex-shrink: 0;
-  width: 18px;
-  height: 18px;
-  margin: 3px 0 0;
+  width: 20px;
+  height: 20px;
+  margin: 2px 0 0;
   accent-color: var(--ink);
 }
 .park-access__choice strong,
 .park-access__choice span span {
   display: block;
+}
+.park-access__choice strong {
+  font-weight: 700;
 }
 .park-access__choice span span {
   margin-top: 6px;
@@ -76,40 +53,25 @@
   font-size: 14px;
   line-height: 1.5;
 }
-.park-access__continue,
-.park-access__toggle {
-  min-height: 44px;
-  border: 1px solid var(--line);
-  border-radius: 14px;
-  font: 700 16px "Nunito Sans", system-ui, sans-serif;
-  cursor: pointer;
-}
 .park-access__continue {
   width: 100%;
-  background: var(--ink);
-  color: var(--inv);
+  min-height: 52px;
+  margin-top: 4px;
+  border: 0;
+  border-radius: 16px;
+  background: var(--priFill);
+  box-shadow: 0 3px 0 var(--priLip);
+  color: var(--onPri);
+  font: inherit;
+  font-size: 17px;
+  font-weight: 700;
+  cursor: pointer;
 }
 .park-access__continue:disabled {
   cursor: default;
   opacity: 0.6;
 }
-.park-access__toggle {
-  position: fixed;
-  top: 16px;
-  right: 16px;
-  z-index: 2;
-  padding-inline: 16px;
-  background: var(--gBg);
-  color: var(--ink);
-  backdrop-filter: var(--gFx);
-}
-.park-access button:focus-visible,
 .park-access__choice:has(input:focus-visible) {
-  outline: 3px solid var(--ink2);
-  outline-offset: 3px;
-}
-@media (max-width: 480px) {
-  .park-access__card {
-    padding: 24px 20px;
-  }
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
 }

@@ -40,12 +40,13 @@ describe("GLASS_1_tokens: the Park surface tokens are opaque", () => {
   }
 });
 
+// STUDIO-6: the signed-out pages (landing, access, legal, OAuth) share landing/landing.css; their cards are the solid
+// Studio --card token and nothing blurs.
 describe("GLASS_1_signin: the sign-in card is opaque", () => {
-  const css = read("auth/signin.css");
+  const css = read("landing/landing.css");
   it("GLASS_1_signin_card_tokens_are_solid_and_nothing_blurs", () => {
-    for (const m of css.matchAll(/--si-card:\s*([^;]+);/g))
-      expect((m[1] ?? "").trim()).toMatch(SOLID);
     expect(css).not.toMatch(/backdrop-filter\s*:\s*blur/);
+    expect(css).not.toMatch(/--gBg|--gFx/);
   });
 });
 
@@ -53,7 +54,7 @@ describe("GLASS_1_import: the override loads wherever the handoff tokens do", ()
   it("GLASS_1_import_every_park_css_importer_loads_park_opaque_css_after_it", () => {
     const files = [
       "access/AccessScreen.tsx",
-      "auth/SignInBackdrop.tsx",
+      "auth/SignInScreen.tsx",
       "legal/LegalPage.tsx",
       "oauth/CallbackPage.tsx",
       "park/app/ParkApp.tsx",

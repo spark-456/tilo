@@ -1,15 +1,22 @@
-// The sign-in screen (SEC-15 / SIGNIN): the Park city behind a glass card with Google and a demo session. The card is
-// drawn at once; the city is its own chunk and arrives behind it. Tilo never handles passwords: no field, no form
-// (PRD 16.1). The two choices are real buttons; what they do is the gate's (`SignInGate`).
-import { Component, type ReactNode, Suspense, lazy, useState } from "react";
-import "./signin.css";
+// The signed-out page (SEC-15 / SIGNIN), in Studio (STUDIO-6, design/studio-v2 "Tilo S Landing"): a header, the hero
+// with Google and a demo session, then the landing (a recorded replay of a sample run, how it works, safety, skills)
+// in a chunk of its own. The hero is drawn at once; the landing arrives below it into a reserved box, so nothing
+// above it moves (CLS) and the art engines stay off the entry bundle (NFR-01). Tilo never handles passwords: no
+// field, no form (PRD 16.1). The buttons are real; what they do is the gate's (`SignInGate`).
+import { Component, type ReactNode, Suspense, lazy } from "react";
+import "../park/tokens/park.css";
+import "../park/tokens/park.opaque.css";
+import "../park/tokens/themes.css";
+import "../park/studio/fonts";
+import { Logo } from "../landing/Logo";
+import { ThemeToggle } from "../landing/ThemeToggle";
+import { useNightToggle } from "../landing/media";
+import "../landing/landing.css";
 
-const SignInBackdrop = lazy(() => import("./SignInBackdrop"));
+const LandingBody = lazy(() => import("../landing/LandingBody"));
 
-type Time = "day" | "night";
-
-/** The city is decoration: if its chunk does not arrive (a deploy while the page is open, a dropped network) the
- * card stays and the page does not go blank. */
+/** The landing below the hero is extra: if its chunk does not arrive (a deploy while the page is open, a dropped
+ * network) the hero and its buttons stay and the page does not go blank. */
 class QuietBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
   state = { failed: false };
   static getDerivedStateFromError() {
@@ -59,88 +66,77 @@ export function SignInScreen({
   readonly onGoogle: () => void;
   readonly onDemo: () => void;
 }) {
-  const [time, setTime] = useState<Time>("day");
+  const [night, toggle] = useNightToggle();
   return (
-    <main className="signin" data-testid="sign-in" data-time={time}>
-      <div className="signin__city">
-        <QuietBoundary>
-          <Suspense fallback={null}>
-            <SignInBackdrop time={time} />
-          </Suspense>
-        </QuietBoundary>
-      </div>
-      <button
-        type="button"
-        className="signin__toggle"
-        aria-label={time === "day" ? "Switch to the night city" : "Switch to the day city"}
-        onClick={() => setTime(time === "day" ? "night" : "day")}
-      >
-        <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-          {time === "day" ? (
-            <path fill="currentColor" d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.800z" />
-          ) : (
-            <g fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-              <circle cx="12" cy="12" r="4" />
-              <path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.900 4.900l1.400 1.400M17.700 17.700l1.400 1.400M4.900 19.100l1.400-1.400M17.700 6.300l1.400-1.400" />
-            </g>
-          )}
-        </svg>
-      </button>
-      <div className="signin__card">
-        <div className="signin__logo" aria-label="tilo" role="img">
-          <div className="signin__mark">
-            <div className="signin__visor">
-              <div className="signin__dot" />
-              <div className="signin__dot" />
-            </div>
-          </div>
-          <div className="signin__word" aria-hidden="true">
-            tilo
-          </div>
-        </div>
-        <h1 className="signin__title">Sign in to your city</h1>
-        <p className="signin__lead">
-          Your agents keep working while you’re away. Sign in to see what needs you.
+    <div
+      className="landing"
+      data-testid="sign-in"
+      data-park
+      data-theme="studio"
+      data-time={night ? "night" : "day"}
+    >
+      <header className="landing-head">
+        <Logo />
+        <nav className="landing-head__nav" aria-label="On this page">
+          <a href="#how">How it works</a>
+          <a href="#safety">Safety</a>
+          <a href="#skills">Skills</a>
+        </nav>
+        <ThemeToggle night={night} onToggle={toggle} />
+      </header>
+      <main className="landing-hero">
+        <h1 className="landing-hero__title">
+          Describe the work. <span className="landing-mark">Watch your team do it.</span>
+        </h1>
+        <p className="landing-hero__lead">
+          Plain words in. A small city of AI helpers plans it, does it, and checks with you before
+          anything important.
         </p>
-        <button
-          type="button"
-          className="signin__btn"
-          disabled={busy}
-          aria-busy={busy ? "true" : undefined}
-          onClick={onGoogle}
-        >
-          <GoogleMark />
-          Continue with Google
-        </button>
-        <div className="signin__or" aria-hidden="true">
-          OR
+        <div className="landing-hero__actions">
+          <button
+            type="button"
+            className="landing-btn landing-btn--primary"
+            disabled={busy}
+            aria-busy={busy ? "true" : undefined}
+            onClick={onGoogle}
+          >
+            <span className="landing-btn__g">
+              <GoogleMark />
+            </span>
+            Continue with Google
+          </button>
+          <button
+            type="button"
+            className="landing-link-btn landing-link-btn--big"
+            disabled={busy}
+            onClick={onDemo}
+          >
+            Explore a demo session
+          </button>
         </div>
-        <button
-          type="button"
-          className="signin__btn signin__btn--demo"
-          disabled={busy}
-          onClick={onDemo}
-        >
-          <span aria-hidden="true">✦</span> Explore a demo session
-        </button>
-        <p className="signin__note">
+        <p className="landing-hero__note">
           A sample company to explore. Demo sessions replay recorded runs.
         </p>
         {signOutFailedText ? (
-          <p className="signin__error" role="alert" data-testid="sign-out-failed">
+          <p className="landing-error" role="alert" data-testid="sign-out-failed">
             {signOutFailedText}
           </p>
         ) : null}
         {failed && (
-          <p className="signin__error" role="alert">
+          <p className="landing-error" role="alert">
             {failedText}
           </p>
         )}
-        <p className="signin__legal">
+        <p className="landing-hero__legal">
           By continuing you agree to Tilo’s <a href="/terms">Terms</a> and{" "}
           <a href="/privacy">Privacy Policy</a>.
         </p>
-      </div>
-    </main>
+        <QuietBoundary>
+          <Suspense fallback={<div className="landing-hero__stage landing-hero__stage--held" />}>
+            <LandingBody night={night} busy={busy} onGoogle={onGoogle} onDemo={onDemo} />
+          </Suspense>
+        </QuietBoundary>
+      </main>
+    </div>
   );
 }

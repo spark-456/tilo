@@ -21,7 +21,7 @@ it("SEC-15 Park declaration offers descriptive cards and keeps Continue waiting 
 });
 
 it.each(["declaration", "notice"])(
-  "SEC-15 Park %s has a day/night city and a scoped glass card",
+  "SEC-15 Park %s has a light/dark switch and a scoped Studio card (STUDIO-6)",
   (page) => {
     mount(
       page === "declaration" ? <SignUpDeclaration onSubmit={() => {}} /> : <UnderConstruction />,
@@ -30,9 +30,9 @@ it.each(["declaration", "notice"])(
     expect(screen).not.toBeNull();
     expect(screen.dataset.time).toBe("day");
     expect(q(screen, ".park-access__card")).not.toBeNull();
-    click(q(screen, 'button[aria-label="Switch to the night city"]'));
+    click(q(screen, 'button[aria-label="Switch to dark mode"]'));
     expect(screen.dataset.time).toBe("night");
-    click(q(screen, 'button[aria-label="Switch to the day city"]'));
+    click(q(screen, 'button[aria-label="Switch to light mode"]'));
     expect(screen.dataset.time).toBe("day");
   },
 );

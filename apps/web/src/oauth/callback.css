@@ -1,47 +1,22 @@
-/* ADR-0035 LC-02..04: the Google callback page. Park tokens only (park/tokens/park.css); no motion, no inline styles (CSP). */
-[data-park].oauth-root {
-  background: var(--paper);
-  color: var(--ink);
-  font-family: "Nunito Sans", sans-serif;
-  min-height: 100vh;
-  padding: 0 16px 24px;
-  box-sizing: border-box;
-}
-[data-park] .oauth-main {
-  max-width: 560px;
-  margin: 0 auto;
-  padding-top: 64px;
-}
-[data-park] .oauth-main h1 {
-  font-family: "Nunito", sans-serif;
-  font-weight: 900;
-  font-size: 24px;
-  line-height: 1.3;
-  color: var(--ink);
-  margin: 0 0 8px;
-}
-[data-park] .oauth-main p {
-  font-size: 16px;
-  line-height: 1.6;
-  color: var(--ink2);
-  margin: 0 0 16px;
-}
-[data-park] .oauth-main ul {
+/* ADR-0035 LC-02..04: the Google callback page in Studio (STUDIO-6). The page, header and card come from
+   landing/landing.css; Studio role tokens only; no motion, no inline styles (CSP). */
+.oauth-root .oauth-main ul {
   margin: 0 0 16px;
   padding-left: 20px;
   color: var(--ink2);
-  font-size: 16px;
   line-height: 1.6;
 }
-[data-park] .oauth-back {
-  min-height: 44px;
-  padding: 0 20px;
+.oauth-root .oauth-back {
+  min-height: 52px;
+  margin-top: 8px;
+  padding: 0 22px;
   border: 0;
-  border-radius: 12px;
-  background: var(--logo);
-  color: var(--inv);
-  font-family: "Nunito", sans-serif;
-  font-weight: 800;
-  font-size: 16px;
+  border-radius: 16px;
+  background: var(--priFill);
+  box-shadow: 0 3px 0 var(--priLip);
+  color: var(--onPri);
+  font: inherit;
+  font-size: 17px;
+  font-weight: 700;
   cursor: pointer;
 }
