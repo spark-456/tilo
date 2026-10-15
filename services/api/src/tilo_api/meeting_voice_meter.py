@@ -1,4 +1,4 @@
-"""ADR-0042 (BQ-M2-4, BQ-M2-5; MV-01 to MV-16): the two routes the meeting bot meters its Gemini Live voice through.
+"""ADR-0042 (BQ-M2-4, BQ-M2-5; MV-01 to MV-16): the two routes the meeting bot meters its live voice through.
 
 `POST /internal/meeting-voice/reserve` and `.../close` are public routes of the access gate and of App Check and check
 their own caller: a Google ID token for `TILO_VOICE_METER_AUDIENCE` from `TILO_VOICE_METER_CALLER`, variables of their
